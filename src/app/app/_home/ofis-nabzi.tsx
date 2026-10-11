@@ -119,7 +119,7 @@ export async function OfisNabzi({ ctx }: { ctx: HomeCtx }) {
                     <Link
                       key={c.signal}
                       href={c.href}
-                      className={`focus-ring ds-pill ${c.signal === "gorev" ? "pm-t-warn" : "pm-t-danger"} inline-flex min-h-7 items-center rounded-full bg-[var(--t-soft)] px-2.5 text-xs font-semibold text-[var(--t-text)]`}
+                      className={`focus-ring ds-pill ${c.signal === "gorev" ? "pm-t-warn" : "pm-t-danger"} inline-flex min-h-7 items-center rounded-full bg-[var(--t-soft)] px-2.5 text-xs font-semibold text-[var(--t-text)] touch:min-h-11`}
                     >
                       {c.label}
                     </Link>

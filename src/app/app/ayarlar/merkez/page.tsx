@@ -1,5 +1,6 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowLeft, ArrowUpRight, Search, SlidersHorizontal } from "lucide-react";
 import { ReadOnlyGate } from "../read-only-gate";
 import { SettingField } from "@/components/settings/setting-field";
@@ -135,22 +136,13 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
       </form>
 
       <nav aria-label="Tanım grupları" className="flex flex-wrap gap-2">
-        <Link
-          href={href({})}
-          aria-current={!grup && !onlyChanged ? "page" : undefined}
-          className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold ${!grup && !onlyChanged ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-ink-950 hover:bg-canvas"}`}
-        >
+        <FilterChip href={href({})} active={!grup && !onlyChanged}>
           Tümü ({views.length})
-        </Link>
+        </FilterChip>
         {OFFICE_SETTING_GROUPS.map((g) => (
-          <Link
-            key={g.id}
-            href={href({ grup: g.id })}
-            aria-current={grup === g.id ? "page" : undefined}
-            className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold ${grup === g.id ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-ink-950 hover:bg-canvas"}`}
-          >
+          <FilterChip key={g.id} href={href({ grup: g.id })} active={grup === g.id}>
             {g.label} ({views.filter((v) => v.group === g.id).length})
-          </Link>
+          </FilterChip>
         ))}
         {onlyChanged ? (
           <Link href={href({ grup })} className="focus-ring rounded-full border border-amber-400/50 bg-amber-400/15 px-3 py-1 text-xs font-semibold text-amber-800">

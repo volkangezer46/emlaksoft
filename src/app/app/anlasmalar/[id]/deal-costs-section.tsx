@@ -156,7 +156,7 @@ export function DealCostsSection({
                         <button
                           type="button"
                           aria-label="Kalemi sil"
-                          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600"
+                          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 touch:min-h-11 touch:min-w-11"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -212,7 +212,7 @@ export function DealCostsSection({
             <button
               type="submit"
               disabled={pending}
-              className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+              className="btn-shine focus-ring press inline-flex h-[38px] items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 touch:min-h-11"
             >
               <Plus className="h-4 w-4" /> {pending ? "Ekleniyor…" : "Ekle"}
             </button>

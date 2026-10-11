@@ -249,7 +249,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                         type="button"
                         onClick={() => { setEditing(a); setUpdateError(null); }}
                         title="Düzenle"
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -258,7 +258,7 @@ export function AnnouncementsManager({ announcements, teamCount }: { announcemen
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

@@ -499,7 +499,7 @@ function RiskCard({ risk }: { risk: RiskLead }) {
           <>
             <a
               href={toTelHref(risk.phone) ?? "#"}
-              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-brand-600 transition hover:bg-brand-600/5"
+              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-brand-600 transition hover:bg-brand-600/5 touch:min-h-11 touch:min-w-11"
               title="Ara"
               aria-label="Ara"
             >
@@ -509,7 +509,7 @@ function RiskCard({ risk }: { risk: RiskLead }) {
               href={toWhatsAppLink(risk.phone) ?? "#"}
               target="_blank"
               rel="noreferrer"
-              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:bg-mint-50"
+              className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-mint-600 transition hover:bg-mint-50 touch:min-h-11 touch:min-w-11"
               title="WhatsApp"
               aria-label="WhatsApp"
             >

@@ -271,7 +271,7 @@ export default async function AkilliListelerPage({ searchParams }: { searchParam
                             <a
                               href={`tel:${e.c.phone}`}
                               aria-label={`${e.c.full_name} ara`}
-                              className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-mint-600 transition hover:bg-mint-500/10"
+                              className="focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-mint-600 transition hover:bg-mint-500/10 touch:min-h-11 touch:min-w-11"
                             >
                               <Phone className="h-3.5 w-3.5" />
                             </a>

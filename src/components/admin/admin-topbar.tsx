@@ -107,7 +107,7 @@ export function AdminTopbar({
               aria-expanded={quickOpen}
               aria-haspopup="menu"
               aria-controls="admin-quick-menu"
-              className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover"
+              className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover touch:min-h-11"
             >
               <Plus className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Hızlı erişim</span>
             </button>

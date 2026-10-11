@@ -49,7 +49,7 @@ export function ReferralNudgeCard({ moment }: { moment: NudgeMoment }) {
         <p className="mt-0.5 text-xs text-text-muted">{copy.text}</p>
         <Link
           href="/app/buyume"
-          className="focus-ring press mt-2 inline-flex min-h-[36px] items-center rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring press mt-2 inline-flex min-h-[36px] items-center rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 touch:min-h-11"
         >
           {copy.cta}
         </Link>

@@ -103,7 +103,7 @@ export function CardsPanel({
                       type="button"
                       aria-label={`${maskedCardLabel(c)} kartını sil`}
                       onClick={() => setConfirmId(c.id)}
-                      className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-strong"
+                      className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/50 hover:text-danger-strong touch:min-h-11 touch:min-w-11"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

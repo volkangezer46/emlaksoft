@@ -217,7 +217,7 @@ export function IconPicker({
                       onChange({ kind: "lucide", name: i.name });
                       setOpen(false);
                     }}
-                    className={`focus-ring grid h-10 w-full place-items-center rounded-[var(--radius-control)] border text-ink-950 transition hover:border-brand-400 ${active ? "border-brand-500 bg-brand-600/10" : "border-line"}`}
+                    className={`focus-ring grid h-10 w-full place-items-center rounded-[var(--radius-control)] border text-ink-950 transition hover:border-brand-400 ${active ? "border-brand-500 bg-brand-600/10" : "border-line"} touch:min-h-11`}
                   >
                     {renderMenuIcon({ kind: "lucide", name: i.name }, 18)}
                   </button>

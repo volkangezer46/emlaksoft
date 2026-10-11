@@ -200,13 +200,13 @@ export default async function AuditPage({
             {/* Belge Merkezi aynı modül kapısı (settings) arkasında; KVKK incelemesinde denetim iziyle birlikte kullanılır. */}
             <Link
               href="/app/belgeler"
-              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300"
+              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300 touch:min-h-11"
             >
               <FolderArchive className="h-4 w-4 text-brand-600" /> Belge merkezi
             </Link>
             <Link
               href="/app/ofis-kontrol"
-              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300"
+              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300 touch:min-h-11"
             >
               <ShieldAlert className="h-4 w-4 text-brand-600" /> Ofis Kontrol
             </Link>

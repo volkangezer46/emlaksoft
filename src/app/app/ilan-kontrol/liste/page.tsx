@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -58,14 +59,13 @@ export default async function IlanKontrolListePage({ searchParams }: { searchPar
       <ControlSubNav active="liste" closures={effectiveCanAccessModule(perms, "leak")} />
       <nav aria-label="Gösterge filtresi" className="mb-4 flex flex-wrap gap-1.5">
         {KPI_KEYS.map((k) => (
-          <Link
+          <FilterChip
             key={k}
             href={district === undefined ? kpiHref(k, group, groupId) : districtListHref(k, district)}
-            aria-current={k === kpi ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-semibold ${k === kpi ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`}
+            active={k === kpi}
           >
             {KPI_LABELS[k]}
-          </Link>
+          </FilterChip>
         ))}
       </nav>
       <Suspense fallback={<SkeletonCard height={420} label="Liste yükleniyor" />}>
@@ -157,7 +157,7 @@ async function ListBody({
       </TableFrame>
       {next ? (
         <div className="flex justify-end">
-          <Link href={`${CONTROL_BASE}/liste?${q.toString()}&imlec=${encodeURIComponent(next)}`} className="focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold hover:border-brand-400">
+          <Link href={`${CONTROL_BASE}/liste?${q.toString()}&imlec=${encodeURIComponent(next)}`} className="focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold hover:border-brand-400 touch:min-h-11">
             Sonraki 50 portföy
           </Link>
         </div>

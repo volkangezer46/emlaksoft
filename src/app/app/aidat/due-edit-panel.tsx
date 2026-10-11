@@ -59,7 +59,7 @@ export function DueEditPanel({ due }: { due: EditableDue }) {
           onClick={onClick}
           {...aria}
           aria-label={`${due.title} aidatını düzenle`}
-          className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-50 hover:text-brand-600"
+          className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-50 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>

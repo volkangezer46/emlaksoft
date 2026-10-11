@@ -367,7 +367,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {hasTrendData ? (
           <>
             <dl className="mt-3 grid divide-y divide-line/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                 <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   Toplam gelir
                   <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
@@ -378,14 +378,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 </dd>
                 {hasPrevPeriodData ? <p className="text-xs tabular-nums text-text-faint">Önceki 6 ay {money(prevIncomeTotal)}</p> : null}
               </Link>
-              <Link href="/app/giderler" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+              <Link href="/app/giderler" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                 <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   Toplam gider
                   <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
                 </dt>
                 <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${NEG}`}>{money(trendExpenseTotal)}</dd>
               </Link>
-              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover">
+              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
                 <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                   Net
                   <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />

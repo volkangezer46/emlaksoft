@@ -115,7 +115,7 @@ export function ContactActions({
           href={wa}
           target="_blank"
           rel="noopener noreferrer"
-          className="focus-ring press inline-flex h-8 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
+          className="focus-ring press inline-flex h-8 items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 transition hover:bg-canvas touch:min-h-11"
         >
           <MessageCircle className="h-3.5 w-3.5" aria-hidden /> WhatsApp
         </a>

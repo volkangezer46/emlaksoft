@@ -71,7 +71,7 @@ export async function AssignmentSection({ ctx }: { ctx: AssignCtx }) {
             key={v}
             href={assignHref(v)}
             aria-current={durum === v ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-8 items-center rounded-full px-3 text-sm font-medium transition ${durum === v ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-hover hover:text-text"}`}
+            className={`focus-ring inline-flex min-h-8 items-center rounded-full px-3 text-sm font-medium transition ${durum === v ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-hover hover:text-text"} touch:min-h-11`}
           >
             {label}
           </Link>

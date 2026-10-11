@@ -301,7 +301,7 @@ export default async function HedeflerPage() {
                           <button
                             type="button"
                             aria-label="Hedefi sil"
-                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-danger-strong transition hover:border-danger-500/40"
+                            className="focus-ring press relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline bg-surface text-danger-strong transition hover:border-danger-500/40 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

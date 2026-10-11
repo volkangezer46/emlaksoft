@@ -144,7 +144,7 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
       role="tab"
       aria-selected={source === s}
       onClick={() => setSource(s)}
-      className={`focus-ring inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${source === s ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`}
+      className={`focus-ring inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${source === s ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"} touch:min-h-11`}
     >
       <Icon aria-hidden="true" className="h-4 w-4" />
       {label}

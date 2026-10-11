@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   ArrowUpRight,
   CalendarRange,
@@ -511,17 +512,9 @@ export default async function CommissionPage({
             { value: "bekleyen" as const, label: "Bekleyen" },
             { value: "tahsil" as const, label: "Tahsil edilen" },
           ].map((f) => (
-            <Link
-              key={f.label}
-              href={filterHref({ durum: f.value })}
-              className={`rounded-[var(--radius-control)] border px-3.5 py-1.5 text-xs font-semibold transition ${
-                durum === f.value
-                  ? "border-accent bg-accent-subtle text-accent-text"
-                  : "border-line bg-surface text-text hover:border-border-interactive"
-              }`}
-            >
+            <FilterChip key={f.label} href={filterHref({ durum: f.value })} active={durum === f.value}>
               {f.label}
-            </Link>
+            </FilterChip>
           ))}
         </div>
         {/* Tarih aralığı — GET formu (?from=&to=) + hızlı seçim çipleri; ?durum= korunur */}
@@ -530,18 +523,9 @@ export default async function CommissionPage({
           {presets.map((p) => {
             const active = from === p.from && to === p.to;
             return (
-              <Link
-                key={p.label}
-                href={filterHref({ from: p.from, to: p.to })}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                  active
-                    ? "border-accent bg-accent-subtle text-accent-text"
-                    : "border-line bg-surface text-text-muted hover:border-border-interactive hover:text-accent-text"
-                }`}
-              >
+              <FilterChip key={p.label} href={filterHref({ from: p.from, to: p.to })} active={active}>
                 {p.label}
-              </Link>
+              </FilterChip>
             );
           })}
           <form action="/app/komisyon" className="flex flex-wrap items-center gap-2">

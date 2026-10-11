@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   ArrowLeft,
   BarChart3,
@@ -281,13 +282,9 @@ function Catalog({ scope, pathname, reports, params }: { scope: ReportScope; pat
 
 function CategoryChip({ href, active, label }: { href: string; active: boolean; label: string }) {
   return (
-    <Link
-      href={href}
-      aria-current={active ? "true" : undefined}
-      className={`focus-ring press inline-flex min-h-11 items-center rounded-full border px-3.5 text-xs font-semibold transition sm:min-h-9 ${active ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
-    >
+    <FilterChip href={href} active={active}>
       {label}
-    </Link>
+    </FilterChip>
   );
 }
 

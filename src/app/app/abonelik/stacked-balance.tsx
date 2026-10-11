@@ -28,7 +28,7 @@ export function StackedBalance({ items, ariaLabel, note }: { items: StackedBalan
       <ul className="mt-3 grid list-none gap-1 p-0 @md:grid-cols-3">
         {items.map((i) => (
           <li key={i.key}>
-            <Link href={i.href} className="focus-ring flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-2 text-sm hover:bg-surface-hover">
+            <Link href={i.href} className="focus-ring flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-2 text-sm hover:bg-surface-hover touch:min-h-11">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: i.color }} aria-hidden="true" />
               <span className="text-text-muted">{i.label}</span>
               <span className="ml-auto font-semibold tabular-nums text-text">{i.valueText}</span>

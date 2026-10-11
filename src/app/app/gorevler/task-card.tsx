@@ -252,7 +252,7 @@ export function TaskCard({
                 onClick={() => setStatus("open")}
                 disabled={pending}
                 aria-label="Görevi yeniden aç"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50"
+                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
               >
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
               </button>
@@ -275,7 +275,7 @@ export function TaskCard({
             confirmLabel="Sil"
             onConfirm={removeTask}
             trigger={
-              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40">
+              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40 touch:min-h-11 touch:min-w-11">
                 <Trash2 className="h-4 w-4" />
               </button>
             }

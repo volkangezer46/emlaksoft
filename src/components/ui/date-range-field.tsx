@@ -6,7 +6,7 @@ import { isRangeInvalid } from "@/lib/ui/filter-params";
  * Değerler YYYY-MM-DD. Başlangıç > bitiş ise uyarı gösterilir ve alanlar aria-invalid olur.
  */
 const INPUT =
-  "min-h-9 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)] aria-[invalid=true]:border-danger-400";
+  "min-h-9 touch:min-h-11 touch:text-base w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)] aria-[invalid=true]:border-danger-400";
 
 export function DateRangeField({
   legend = "Tarih aralığı",

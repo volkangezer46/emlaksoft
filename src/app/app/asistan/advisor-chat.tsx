@@ -130,7 +130,7 @@ function SessionSidebar({
           type="button"
           onClick={onNew}
           aria-label="Yeni sohbet başlat"
-          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
+          className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
         >
           <MessageSquarePlus className="h-4 w-4" />
         </button>
@@ -170,7 +170,7 @@ function SessionSidebar({
                 trigger={
                   <button
                     type="button"
-                    className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid"
+                    className="focus-ring mt-0.5 hidden h-5 w-5 shrink-0 place-items-center rounded text-text-faint transition hover:text-danger-500 group-hover:grid touch:min-h-11 touch:min-w-11"
                     aria-label="Sohbeti sil"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -500,7 +500,7 @@ export function TenantAdvisorChat({
                   const activeSession = sessions.find((s) => s.id === sessionId);
                   exportChatAsTxt(messages, activeSession?.title);
                 }}
-                className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600"
+                className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-brand-600/10 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                 aria-label="Sohbeti indir"
               >
                 <Download className="h-4 w-4" />
@@ -614,7 +614,7 @@ export function TenantAdvisorChat({
                 type="button"
                 onClick={cancel}
                 title="Yanıtı durdur"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-ink-950 text-white transition hover:opacity-85"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-ink-950 text-white transition hover:opacity-85 touch:min-h-11 touch:min-w-11"
                 aria-label="Yanıtı durdur"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
@@ -624,7 +624,7 @@ export function TenantAdvisorChat({
                 type="button"
                 onClick={() => send(input)}
                 disabled={!input.trim()}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40 touch:min-h-11 touch:min-w-11"
                 aria-label="Gönder"
               >
                 <ArrowUp className="h-4 w-4" />

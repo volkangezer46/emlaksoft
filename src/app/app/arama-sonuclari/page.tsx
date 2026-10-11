@@ -114,7 +114,7 @@ export default async function AramaSonuclariPage({
           {tur ? <input type="hidden" name="tur" value={tur} /> : null}
           <button
             type="submit"
-            className="focus-ring press min-h-[42px] rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+            className="focus-ring press min-h-[42px] rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700 touch:min-h-11"
           >
             Ara
           </button>
@@ -168,7 +168,7 @@ export default async function AramaSonuclariPage({
           </p>
           <Link
             href={buildHref(q, tur === topGroup.kind ? null : topGroup.kind)}
-            className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+            className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 touch:min-h-11"
           >
             {tur === topGroup.kind ? "Filtreyi kaldır" : `Yalnız ${topGroup.title.toLocaleLowerCase("tr-TR")}`}
             <ArrowUpRight className="h-3.5 w-3.5" />

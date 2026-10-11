@@ -338,12 +338,12 @@ export default async function DanismanKpiPage({
           <>
             {/* Dönem gezinme — ?ay=YYYY-MM, sunucuda hesaplanan Link'ler. Gelecek aya gidilmez. */}
             <div className="flex items-center gap-1">
-              <Link href={prevHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text" aria-label="Önceki ay">
+              <Link href={prevHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11" aria-label="Önceki ay">
                 <ChevronLeft className="h-4 w-4" />
               </Link>
               <span className="min-w-[120px] px-2 text-center text-sm font-bold text-text first-letter:uppercase">{donem}</span>
               {nextHref ? (
-                <Link href={nextHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text" aria-label="Sonraki ay">
+                <Link href={nextHref} className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11" aria-label="Sonraki ay">
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               ) : (

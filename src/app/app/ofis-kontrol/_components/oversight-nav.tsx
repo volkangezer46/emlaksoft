@@ -1,4 +1,4 @@
-import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 
 export type OversightTab = "akis" | "uyarilar" | "karne" | "kurallar" | "benim";
 
@@ -26,23 +26,9 @@ export function OversightNav({
       {tabs.map((t) => {
         const isActive = t.id === active;
         return (
-          <Link
-            key={t.id}
-            href={t.href}
-            aria-current={isActive ? "page" : undefined}
-            className={`focus-ring press rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
-              isActive
-                ? "border-brand-600 bg-brand-600 text-white"
-                : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
-            }`}
-          >
+          <FilterChip key={t.id} href={t.href} active={isActive} count={t.id === "uyarilar" && openAlerts ? openAlerts : null}>
             {t.label}
-            {t.id === "uyarilar" && openAlerts ? (
-              <span className={`ml-1.5 rounded-full px-1.5 py-0.5 tabular-nums ${isActive ? "bg-white/20" : "bg-amber-400/20 text-amber-700"}`}>
-                {openAlerts}
-              </span>
-            ) : null}
-          </Link>
+          </FilterChip>
         );
       })}
     </nav>

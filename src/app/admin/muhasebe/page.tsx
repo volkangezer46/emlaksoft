@@ -228,7 +228,7 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
           <ul>
             {comparison.map((c) => (
               <li key={c.label}>
-                <Link href={c.href} className="focus-ring grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-4 rounded-[var(--radius-control)] px-1.5 text-sm tabular-nums transition-colors hover:bg-[var(--surface-sunken)]">
+                <Link href={c.href} className="focus-ring grid min-h-10 grid-cols-[1fr_auto_auto] items-center gap-4 rounded-[var(--radius-control)] px-1.5 text-sm tabular-nums transition-colors hover:bg-[var(--surface-sunken)] touch:min-h-11">
                   <span className="text-text">{c.label}</span>
                   <span className="text-xs text-text-faint">önceki {formatKurusShort(c.prev)}</span>
                   <span className="flex items-center justify-end gap-2">

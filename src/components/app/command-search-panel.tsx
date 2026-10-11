@@ -512,7 +512,7 @@ export function CommandSearchPanel({
                 autoFocus
               />
               {pending ? <Loader2 className="h-4 w-4 animate-spin text-brand-600" /> : null}
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
+              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas touch:min-h-11 touch:min-w-11" aria-label="Kapat">
                 <X className="h-4 w-4" />
               </button>
             </div>

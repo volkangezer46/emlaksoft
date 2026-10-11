@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Copy, Pencil, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -266,15 +267,12 @@ export default async function CampaignDetailPage({
         {recipients.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-1.5">
             {RECIPIENT_FILTERS.map((f) => (
-              <Link
+              <FilterChip active={durum === f.value}
                 key={f.value}
                 href={durumHref(f.value)}
-                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
-                  durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-                }`}
               >
                 {f.label}
-              </Link>
+              </FilterChip>
             ))}
           </div>
         ) : null}

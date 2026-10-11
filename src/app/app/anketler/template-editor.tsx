@@ -196,13 +196,13 @@ export function TemplateEditor({
               </div>
               {!readOnly ? (
                 <div className="flex shrink-0 gap-1">
-                  <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Yukarı taşı" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface disabled:opacity-40">
+                  <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Yukarı taşı" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface disabled:opacity-40 touch:min-h-11 touch:min-w-11">
                     <ArrowUp className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" onClick={() => move(i, 1)} disabled={i === drafts.length - 1} aria-label="Aşağı taşı" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface disabled:opacity-40">
+                  <button type="button" onClick={() => move(i, 1)} disabled={i === drafts.length - 1} aria-label="Aşağı taşı" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line bg-surface disabled:opacity-40 touch:min-h-11 touch:min-w-11">
                     <ArrowDown className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" onClick={() => setDrafts((prev) => prev.filter((x) => x.key !== d.key))} aria-label="Soruyu sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-danger-500/30 bg-surface text-danger-500">
+                  <button type="button" onClick={() => setDrafts((prev) => prev.filter((x) => x.key !== d.key))} aria-label="Soruyu sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-danger-500/30 bg-surface text-danger-500 touch:min-h-11 touch:min-w-11">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>

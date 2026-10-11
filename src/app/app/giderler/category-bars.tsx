@@ -27,7 +27,7 @@ export function CategoryBars({
             <Link
               href={hrefFor(active ? null : r.value)}
               aria-current={active ? "page" : undefined}
-              className={`grid min-h-10 grid-cols-[minmax(5rem,9rem)_1fr_auto] items-center gap-3 rounded-[var(--radius-control)] px-2 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] ${active ? "bg-surface-accent-soft" : ""}`}
+              className={`grid min-h-10 grid-cols-[minmax(5rem,9rem)_1fr_auto] items-center gap-3 rounded-[var(--radius-control)] px-2 hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] ${active ? "bg-surface-accent-soft" : ""} touch:min-h-11`}
             >
               <span className="truncate text-sm text-text-muted" title={r.label}>
                 {r.label}

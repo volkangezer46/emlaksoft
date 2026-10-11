@@ -121,7 +121,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
               className="min-h-9 w-full max-w-xs"
             />
             <Button variant="outline" size="md" type="submit">Ara</Button>
-            {q ? <Link href={`${BASE}#bakiyeler`} className="focus-ring inline-flex min-h-9 items-center px-2 text-sm font-semibold text-brand-600">Temizle</Link> : null}
+            {q ? <Link href={`${BASE}#bakiyeler`} className="focus-ring inline-flex min-h-9 items-center px-2 text-sm font-semibold text-brand-600 touch:min-h-11">Temizle</Link> : null}
           </form>
           {!list ? (
             <p className="rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">

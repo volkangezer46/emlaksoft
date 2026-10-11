@@ -227,13 +227,13 @@ export default async function AsistanPage({
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Link
                     href={c.href}
-                    className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90"
+                    className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 touch:min-h-11"
                   >
                     {c.hrefLabel} <ArrowUpRight className="h-3 w-3" />
                   </Link>
                   <Link
                     href={`/app/asistan?q=${encodeURIComponent(c.ask)}`}
-                    className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-brand-600/5"
+                    className="focus-ring press inline-flex min-h-10 items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-brand-600/5 touch:min-h-11"
                   >
                     <Sparkles className="h-3 w-3" /> Asistana sor
                   </Link>
@@ -275,7 +275,7 @@ export default async function AsistanPage({
                     <Link
                       key={p}
                       href={`/app/asistan?q=${encodeURIComponent(p)}`}
-                      className="focus-ring press group flex min-h-10 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-xs text-ink-950 transition hover:border-brand-300 hover:bg-canvas"
+                      className="focus-ring press group flex min-h-10 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 text-xs text-ink-950 transition hover:border-brand-300 hover:bg-canvas touch:min-h-11"
                     >
                       <span className="truncate">{p}</span>
                       <ArrowUpRight className="h-3 w-3 shrink-0 text-text-faint transition group-hover:text-brand-600" />
@@ -301,7 +301,7 @@ export default async function AsistanPage({
                 <li key={s.id}>
                   <Link
                     href={`/app/asistan?oturum=${s.id}`}
-                    className="focus-ring press group flex min-h-10 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 transition hover:border-brand-300 hover:bg-canvas"
+                    className="focus-ring press group flex min-h-10 items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/50 px-3 py-2 transition hover:border-brand-300 hover:bg-canvas touch:min-h-11"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-xs font-semibold text-ink-950 group-hover:text-brand-600">

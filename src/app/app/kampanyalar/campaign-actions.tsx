@@ -57,7 +57,7 @@ export function CampaignActions({
             <button
               type="button"
               title="Sil"
-              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-red-50 hover:text-red-600"
+              className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-red-50 hover:text-red-600 touch:min-h-11 touch:min-w-11"
               aria-label="Kampanyayı sil"
             >
               <Trash2 className="h-3.5 w-3.5" />

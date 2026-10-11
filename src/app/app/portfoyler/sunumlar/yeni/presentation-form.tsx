@@ -228,7 +228,7 @@ export function PresentationForm({
               href={createdUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas"
+              className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 text-xs font-semibold text-ink-950 hover:bg-canvas touch:min-h-11"
             >
               <ExternalLink className="h-3.5 w-3.5" /> Önizle
             </a>
@@ -295,7 +295,7 @@ export function PresentationForm({
                 }}
                 title="Müşteri bağını kaldır"
                 aria-label="Müşteri bağını kaldır"
-                className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950"
+                className="focus-ring absolute right-2 top-[30px] grid h-7 w-7 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-950 touch:min-h-11 touch:min-w-11"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

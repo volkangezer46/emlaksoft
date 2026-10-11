@@ -24,7 +24,7 @@ export function InvitePanel({ url, canCreate }: { url: string | null; canCreate:
           <button
             type="button"
             disabled={pending}
-            className="focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60 touch:min-h-11"
             onClick={() =>
               start(async () => {
                 setError(null);

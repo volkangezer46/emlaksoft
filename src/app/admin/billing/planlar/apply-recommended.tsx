@@ -33,7 +33,7 @@ export function ApplyRecommended() {
  }>
             {pending ? "Uygulanıyor…" : "Onayla"}
           </Button>
-          <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted">Vazgeç</button>
+          <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-3 text-xs font-semibold text-text-muted touch:min-h-11">Vazgeç</button>
         </>
       )}
       {msg ? <span role={msg.ok ? "status" : "alert"} className={`text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>{msg.text}</span> : null}

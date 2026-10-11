@@ -23,7 +23,7 @@ export function CopyLinkButton({ url }: { url: string }) {
         }
       }}
       title="Public linki kopyala"
-      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
+      className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-2.5 text-xs font-semibold text-ink-950 transition hover:bg-canvas touch:min-h-11"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Link2 className="h-3.5 w-3.5" />}
       {copied ? "Kopyalandı" : "Link"}
@@ -39,7 +39,7 @@ export function DeletePresentationButton({ id, title }: { id: string; title: str
         <button
           type="button"
           title="Sunumu sil"
-          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline-strong bg-surface text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-hairline-strong bg-surface text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

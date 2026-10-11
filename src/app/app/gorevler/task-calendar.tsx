@@ -46,11 +46,11 @@ export function TaskCalendar({
   return (
     <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
       <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-        <Link href={prevHref} aria-label="Önceki ay" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:border-brand-300 hover:text-brand-600">
+        <Link href={prevHref} aria-label="Önceki ay" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11">
           <ChevronLeft className="h-4 w-4" />
         </Link>
         <h2 className="font-display text-base font-bold text-ink-950">{monthLabel(monthKey)}</h2>
-        <Link href={nextHref} aria-label="Sonraki ay" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:border-brand-300 hover:text-brand-600">
+        <Link href={nextHref} aria-label="Sonraki ay" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11">
           <ChevronRight className="h-4 w-4" />
         </Link>
       </div>

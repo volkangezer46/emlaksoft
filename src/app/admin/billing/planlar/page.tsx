@@ -80,7 +80,7 @@ export default async function PlansAdminPage({
             aria-current={section === x.id ? "page" : undefined}
             className={`focus-ring min-h-9 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition ${
               section === x.id ? "bg-ink-950 text-white" : "text-text-muted hover:bg-canvas hover:text-ink-950"
-            }`}
+            } touch:min-h-11`}
           >
             {x.label}
           </Link>

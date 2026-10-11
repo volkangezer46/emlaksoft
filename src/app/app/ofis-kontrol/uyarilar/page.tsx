@@ -1,3 +1,4 @@
+import { filterChipClass } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -51,10 +52,7 @@ export default async function UyarilarPage({ searchParams }: { searchParams?: Pr
   const countBy = (s: AlertSeverity) => data.open.filter((a) => a.severity === s).length;
   const disabledRules = ALERT_RULE_IDS.filter((r) => !settings.thresholds.enabled[r] || !ALERT_RULE_META[r].sourceAvailable);
 
-  const chip = (active: boolean) =>
-    `focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-      active ? "border-brand-600 bg-brand-600 text-white" : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
-    }`;
+  const chip = (active: boolean) => filterChipClass({ active });
 
   return (
     <div className="space-y-5">

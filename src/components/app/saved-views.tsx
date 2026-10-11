@@ -154,7 +154,7 @@ export function SavedViews({
               type="button"
               onClick={() => setConfirmId(confirmId === view.id ? null : view.id)}
               aria-label={`${view.name} görünümünü sil`}
-              className="absolute -right-1.5 -top-1.5 z-10 hidden h-4 w-4 place-items-center rounded-full bg-ink-950 text-white transition hover:bg-danger-500 group-hover/chip:grid"
+              className="absolute -right-1.5 -top-1.5 z-10 hidden h-4 w-4 place-items-center rounded-full bg-ink-950 text-white transition hover:bg-danger-500 group-hover/chip:grid touch:min-h-11 touch:min-w-11"
             >
               <X className="h-2.5 w-2.5" />
             </button>

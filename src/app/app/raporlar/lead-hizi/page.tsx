@@ -1,4 +1,5 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, CheckCircle2, Hourglass, Timer, Users } from "lucide-react";
@@ -123,28 +124,18 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
 
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Süzgeçler">
         {DONEM_FILTERS.map((f) => (
-          <Link
-            key={f.key}
-            href={href({ ...base, donem: f.key, durum: sp.durum })}
-            aria-current={f.key === donem.key ? "true" : undefined}
-            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${f.key === donem.key ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
-          >
+          <FilterChip key={f.key} href={href({ ...base, donem: f.key, durum: sp.durum })} active={f.key === donem.key}>
             {f.label}
-          </Link>
+          </FilterChip>
         ))}
         <span className="mx-1 text-xs text-text-faint" aria-hidden="true">
           |
         </span>
         <span className="text-xs font-semibold text-text-muted">Hedef süre:</span>
         {SLA_OPTIONS_MIN.map((m) => (
-          <Link
-            key={m}
-            href={href({ ...base, esik: m, durum: sp.durum })}
-            aria-current={m === esik ? "true" : undefined}
-            className={`focus-ring press rounded-full border px-3 py-1.5 text-xs font-semibold transition ${m === esik ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
-          >
+          <FilterChip key={m} href={href({ ...base, esik: m, durum: sp.durum })} active={m === esik}>
             {formatMinutes(m)}
-          </Link>
+          </FilterChip>
         ))}
       </div>
 
@@ -271,14 +262,9 @@ export default async function LeadSpeedPage({ searchParams }: { searchParams: Pr
         <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
           <h2 className="mr-2 text-sm font-bold text-text">Kayıtlar</h2>
           {DURUM_FILTERS.map((f) => (
-            <Link
-              key={f.key}
-              href={href({ ...base, durum: f.key })}
-              aria-current={f.key === durum.key ? "true" : undefined}
-              className={`focus-ring press rounded-full border px-3 py-1 text-xs font-semibold transition ${f.key === durum.key ? "border-accent bg-accent-subtle text-accent-text" : "border-line bg-surface text-text-muted hover:border-border-interactive"}`}
-            >
+            <FilterChip key={f.key} href={href({ ...base, durum: f.key })} active={f.key === durum.key}>
               {f.label}
-            </Link>
+            </FilterChip>
           ))}
         </div>
         {list.length === 0 ? (

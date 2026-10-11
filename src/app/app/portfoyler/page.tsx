@@ -1,4 +1,5 @@
 import { formatTry } from "@/lib/format";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
@@ -789,17 +790,16 @@ export default async function PropertiesPage({
               </div>
               <div className="flex gap-1">
                 {healthSegments.map((s) => (
-                  <Link
+                  <FilterChip
                     key={s.label}
                     href={hrefWith({ saglik: saglikFilter === s.param ? "" : s.param, sayfa: "" })}
-                    aria-current={saglikFilter === s.param ? "true" : undefined}
-                    className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition hover:bg-canvas ${
-                      saglikFilter === s.param ? "border-brand-400 bg-brand-600/10 text-brand-700" : "border-line text-text-muted"
-                    } ${s.count === 0 ? "opacity-55" : ""}`}
+                    active={saglikFilter === s.param}
+                    count={s.count}
+                    className={s.count === 0 ? "opacity-55" : undefined}
                   >
                     <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                    {s.label} <span className="numeric text-text">{s.count}</span>
-                  </Link>
+                    {s.label}
+                  </FilterChip>
                 ))}
               </div>
             </div>

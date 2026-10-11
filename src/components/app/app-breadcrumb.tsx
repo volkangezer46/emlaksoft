@@ -51,7 +51,7 @@ export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppMod
       <Link
         href="/app"
         aria-label="Bugün (ana ekran)"
-        className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted transition-colors hover:text-text"
+        className="focus-ring grid h-8 w-8 shrink-0 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted transition-colors hover:text-text touch:min-h-11 touch:min-w-11"
       >
         <House className="h-4 w-4" aria-hidden="true" />
       </Link>

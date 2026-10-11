@@ -237,7 +237,7 @@ export function CommunicationTimeline({
                     trigger={
                       <button
                         type="button"
-                        className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-faint transition hover:bg-red-50 hover:text-red-600"
+                        className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-text-faint transition hover:bg-red-50 hover:text-red-600 touch:min-h-11 touch:min-w-11"
                         aria-label="Kaydı sil"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

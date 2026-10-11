@@ -147,7 +147,7 @@ export function DemandBulkBar({ canDelete = false }: { canDelete?: boolean }) {
           clear();
           setError(null);
         }}
-        className="ml-auto grid min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-line"
+        className="ml-auto grid min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-line touch:min-h-11"
         aria-label="Seçimi temizle"
       >
         <X className="h-4 w-4" />

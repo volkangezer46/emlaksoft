@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { daysAgoIso, msSince, msUntil, DAY_MS } from "@/lib/clock";
@@ -380,17 +381,12 @@ export default async function PortalsPage({
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               {DURUM_FILTERS.map((f) => (
-                <Link
+                <FilterChip active={durum === f.value}
                   key={f.value}
                   href={portalHref(f.value, portal, undefined, propertyF)}
-                  className={`focus-ring rounded-full px-2.5 py-1 text-xs font-bold transition ${
-                    durum === f.value
-                      ? "bg-ink-950 text-white"
-                      : "border border-line text-text-muted hover:text-ink-950"
-                  }`}
                 >
                   {f.label}
-                </Link>
+                </FilterChip>
               ))}
               {portal ? (
                 <Link

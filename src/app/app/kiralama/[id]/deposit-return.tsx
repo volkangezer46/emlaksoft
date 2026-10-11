@@ -43,7 +43,7 @@ export function DepositReturnControl({
           disabled={pending}
           onClick={() => set(false)}
           title="İadeyi geri al"
-          className="focus-ring grid h-6 w-6 place-items-center rounded-[var(--radius-control)] text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50"
+          className="focus-ring grid h-6 w-6 place-items-center rounded-[var(--radius-control)] text-white/50 transition hover:bg-white/10 hover:text-white disabled:opacity-50 touch:min-h-11 touch:min-w-11"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
         </button>

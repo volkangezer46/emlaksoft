@@ -140,13 +140,13 @@ export function CustomerTasks({
               {canEdit ? (
                 isDone ? (
                   <Tip label="Yeniden aç">
-                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300">
+                    <button type="button" disabled={pending} onClick={() => act(reopenTask, t.id)} aria-label="Görevi yeniden aç" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 touch:min-h-11 touch:min-w-11">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
                 ) : (
                   <Tip label="Tamamla">
-                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20">
+                    <button type="button" disabled={pending} onClick={() => act(completeTask, t.id)} aria-label="Görevi tamamla" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-mint-500/10 text-mint-600 transition hover:bg-mint-500/20 touch:min-h-11 touch:min-w-11">
                       <CheckCircle2 className="h-3.5 w-3.5" />
                     </button>
                   </Tip>
@@ -159,7 +159,7 @@ export function CustomerTasks({
                   confirmLabel="Sil"
                   onConfirm={() => removeTask(t.id)}
                   trigger={
-                    <button type="button" disabled={pending} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40">
+                    <button type="button" disabled={pending} aria-label="Görevi sil" className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40 touch:min-h-11 touch:min-w-11">
                     <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   }

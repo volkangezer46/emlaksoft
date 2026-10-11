@@ -309,7 +309,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                             router.refresh();
                           })
                         }
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
                       >
                         {t.is_active ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                       </button>
@@ -317,7 +317,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                         type="button"
                         title="Düzenle"
                         onClick={() => startEdit(t)}
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -326,7 +326,7 @@ export function TemplatesManager({ templates }: { templates: MessageTemplateRow[
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

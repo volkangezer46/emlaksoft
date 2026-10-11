@@ -36,7 +36,7 @@ export function PeriodBar({
               aria-current={active ? "page" : undefined}
               className={`focus-ring min-h-9 rounded-[var(--radius-control)] px-3 py-1.5 text-sm font-semibold transition ${
                 active ? "bg-ink-950 text-white" : "text-text-muted hover:bg-canvas hover:text-ink-950"
-              }`}
+              } touch:min-h-11`}
             >
               {p.label}
             </Link>

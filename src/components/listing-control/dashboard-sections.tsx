@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowRight, Building2, CheckCircle2, Clock3, EyeOff, Gauge, RadioTower, Siren, AlertTriangle, Sparkles } from "lucide-react";
 import { StatCard } from "@/components/app/stat-card";
 import { RadialGauge } from "@/components/ui/viz";
@@ -191,14 +192,9 @@ export function GroupSwitcher({ active, basePath = CONTROL_BASE }: { active: Gro
       {GROUP_OPTIONS.map((g) => {
         const on = g.value === active;
         return (
-          <Link
-            key={g.value}
-            href={g.value === "ofis" ? basePath : `${basePath}?gruplama=${g.value}`}
-            aria-current={on ? "page" : undefined}
-            className={`focus-ring inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-semibold transition ${on ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`}
-          >
+          <FilterChip key={g.value} href={g.value === "ofis" ? basePath : `${basePath}?gruplama=${g.value}`} active={on}>
             {g.label}
-          </Link>
+          </FilterChip>
         );
       })}
     </nav>

@@ -61,7 +61,7 @@ export function StatusStackBar({
           <li key={it.key}>
             <Link
               href={it.href}
-              className="focus-ring flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-1 text-sm transition hover:bg-surface-hover"
+              className="focus-ring flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-1 text-sm transition hover:bg-surface-hover touch:min-h-11"
             >
               <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: it.color }} />
               <span className="text-text-muted">{it.label}</span>

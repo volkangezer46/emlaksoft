@@ -185,7 +185,7 @@ export function SeatPanel(props: SeatPanelProps) {
               onClick={() => setClamped(target - 1)}
               disabled={target <= sliderMin || pending}
               aria-label="Bir kullanıcı azalt"
-              className="focus-ring grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-ink-950 transition hover:border-brand-400 disabled:opacity-40"
+              className="focus-ring grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-ink-950 transition hover:border-brand-400 disabled:opacity-40 touch:min-h-11 touch:min-w-11"
             >
               <Minus className="h-4 w-4" />
             </button>
@@ -198,7 +198,7 @@ export function SeatPanel(props: SeatPanelProps) {
               onClick={() => setClamped(target + 1)}
               disabled={target >= sliderMax || pending}
               aria-label="Bir kullanıcı artır"
-              className="focus-ring grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-ink-950 transition hover:border-brand-400 disabled:opacity-40"
+              className="focus-ring grid h-10 w-10 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-ink-950 transition hover:border-brand-400 disabled:opacity-40 touch:min-h-11 touch:min-w-11"
             >
               <Plus className="h-4 w-4" />
             </button>

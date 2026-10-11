@@ -1,4 +1,5 @@
 import { batchAll } from "@/lib/supabase/query-batch";
+import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowDownLeft,
@@ -410,36 +411,24 @@ export async function InboxView({
           </span>
         </form>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={hrefWith({ kanal: undefined, sayfa: undefined })}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${!kanalF ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:border-brand-400 hover:text-brand-600"}`}
-          >
+          <FilterChip href={hrefWith({ kanal: undefined, sayfa: undefined })} active={!kanalF}>
             Tümü
-          </Link>
+          </FilterChip>
           {COMM_CHANNELS.map((c) => (
-            <Link
-              key={c.value}
-              href={hrefWith({ kanal: c.value, sayfa: undefined })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${kanalF === c.value ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:border-brand-400 hover:text-brand-600"}`}
-            >
+            <FilterChip key={c.value} href={hrefWith({ kanal: c.value, sayfa: undefined })} active={kanalF === c.value}>
               {c.emoji} {c.label}
-            </Link>
+            </FilterChip>
           ))}
           <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
           {YON_FILTERS.map((f) => (
-            <Link
+            <FilterChip
               key={f.value}
               href={hrefWith({ yon: yonF === f.value ? undefined : f.value, sayfa: undefined })}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                yonF === f.value
-                  ? f.value === "cevapsiz"
-                    ? "bg-danger-500 text-white"
-                    : "bg-ink-950 text-white"
-                  : "border border-line text-text-muted hover:border-brand-400 hover:text-brand-600"
-              }`}
+              active={yonF === f.value}
+              className={yonF === f.value && f.value === "cevapsiz" ? "border-danger-500 bg-danger-500" : undefined}
             >
               {f.value === "cevapsiz" ? "☎ " : ""}{f.label}
-            </Link>
+            </FilterChip>
           ))}
           {unmatchedOnly ? (
             <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-600">
@@ -545,7 +534,7 @@ export async function InboxView({
                   {telHref ? (
                     <a
                       href={telHref}
-                      className="relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600"
+                      className="relative z-10 grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-brand-600/10 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                       aria-label="Numarayı ara"
                     >
                       <Phone className="h-4 w-4" />

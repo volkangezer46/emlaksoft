@@ -444,7 +444,7 @@ export function DealBoard({
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
               <DialogTitle className="font-display text-lg font-bold text-ink-950">Anlaşmayı düzenle</DialogTitle>
               <DialogClose asChild>
-                <button type="button" className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas" aria-label="Kapat">
+                <button type="button" className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas touch:min-h-11 touch:min-w-11" aria-label="Kapat">
                   <X className="h-5 w-5" />
                 </button>
               </DialogClose>

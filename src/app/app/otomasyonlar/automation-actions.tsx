@@ -88,7 +88,7 @@ export function AutomationRowActions({ row }: { row: AutomationRow }) {
           isActive
             ? "border-amber-400/30 text-amber-600 hover:bg-amber-50"
             : "border-mint-500/30 text-mint-600 hover:bg-mint-50"
-        }`}
+        } touch:min-h-11`}
       >
         {pending ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -104,7 +104,7 @@ export function AutomationRowActions({ row }: { row: AutomationRow }) {
             type="button"
             disabled={pending}
             aria-label="Otomasyonu sil"
-            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50"
+            className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-faint transition hover:border-danger-500/30 hover:text-danger-500 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

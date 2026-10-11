@@ -99,11 +99,11 @@ function DeleteMacro({ id, title }: { id: string; title: string }) {
             router.refresh();
           })
         }
-        className="focus-ring min-h-9 rounded-[var(--radius-control)] bg-danger-600 px-2.5 py-1 font-bold text-white disabled:opacity-60"
+        className="focus-ring min-h-9 rounded-[var(--radius-control)] bg-danger-600 px-2.5 py-1 font-bold text-white disabled:opacity-60 touch:min-h-11"
       >
         {pending ? "Siliniyor…" : "Evet, sil"}
       </button>
-      <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-2 font-semibold text-text-muted">Vazgeç</button>
+      <button type="button" disabled={pending} onClick={() => setConfirm(false)} className="focus-ring min-h-9 px-2 font-semibold text-text-muted touch:min-h-11">Vazgeç</button>
       {error ? <span role="alert" className="w-full font-semibold text-danger-600">{error}</span> : null}
     </span>
   );

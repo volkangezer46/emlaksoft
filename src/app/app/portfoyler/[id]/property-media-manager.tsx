@@ -794,7 +794,7 @@ export function PropertyMediaManager({
                       title="AI ile oku (tapu/yetki belgesi)"
                       disabled={ocrPending}
                       onClick={() => runOcr(m.id)}
-                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60"
+                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60 touch:min-h-11 touch:min-w-11"
                     >
                       {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
                     </button>
@@ -803,7 +803,7 @@ export function PropertyMediaManager({
                         type="button"
                         title="Kapak yap"
                         onClick={() => makeCover(m.id)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
                       >
                         <Star className="h-3.5 w-3.5" />
                       </button>
@@ -814,7 +814,7 @@ export function PropertyMediaManager({
                         title="Belge olarak işaretle (dışarıda gösterilmez)"
                         aria-label="Belge olarak işaretle (dışarıda gösterilmez)"
                         onClick={() => markDocument([m.id], true)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
                       >
                         <FileLock2 className="h-3.5 w-3.5" />
                       </button>
@@ -824,7 +824,7 @@ export function PropertyMediaManager({
                         <button
                           type="button"
                           title="Sil"
-                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600"
+                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -893,7 +893,7 @@ export function PropertyMediaManager({
                         title="AI ile oku (tapu/yetki belgesi)"
                         disabled={ocrPending}
                         onClick={() => runOcr(m.id)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60"
+                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60 touch:min-h-11 touch:min-w-11"
                       >
                         {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
                       </button>
@@ -903,7 +903,7 @@ export function PropertyMediaManager({
                           title="Fotoğraf yap (paylaşımda gösterilir)"
                           aria-label="Fotoğraf yap (paylaşımda gösterilir)"
                           onClick={() => markDocument([m.id], false)}
-                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white"
+                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
                         >
                           <ImageIcon className="h-3.5 w-3.5" />
                         </button>
@@ -913,7 +913,7 @@ export function PropertyMediaManager({
                           <button
                             type="button"
                             title="Sil"
-                            className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600"
+                            className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -963,7 +963,7 @@ export function PropertyMediaManager({
                       fd.set("property_id", propertyId);
                       startTransition(() => deletePropertyMedia(fd));
                     }}
-                    className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 hover:border-danger-500/40"
+                    className="grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 hover:border-danger-500/40 touch:min-h-11 touch:min-w-11"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1027,7 +1027,7 @@ export function PropertyMediaManager({
                 type="button"
                 aria-label="Kapat"
                 onClick={() => setOcrOpen(false)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:text-ink-950"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted hover:text-ink-950 touch:min-h-11 touch:min-w-11"
               >
                 <X className="h-4 w-4" />
               </button>

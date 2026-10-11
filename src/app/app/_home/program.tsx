@@ -94,7 +94,7 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
               const a = items.find((i) => i.id === s.id)!;
               return (
                 <li key={a.id} className="flex items-center gap-1">
-                  <Link href="/app/randevular" className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1">
+                  <Link href="/app/randevular" className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
                     <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--accent-soft,var(--surface-hover))] text-xs font-bold text-[var(--accent-text)]">
                       {idx + 1}
                     </span>
@@ -112,7 +112,7 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`${a.time} ${a.type} için yol tarifi`}
-                      className="focus-ring grid h-10 w-10 flex-none place-items-center rounded-[var(--radius-control)] text-[var(--accent-text)] hover:bg-surface-hover"
+                      className="focus-ring grid h-10 w-10 flex-none place-items-center rounded-[var(--radius-control)] text-[var(--accent-text)] hover:bg-surface-hover touch:min-h-11 touch:min-w-11"
                     >
                       <Navigation className="h-4 w-4" aria-hidden="true" />
                     </a>
@@ -126,7 +126,7 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
               href={fullRoute}
               target="_blank"
               rel="noopener noreferrer"
-              className="focus-ring mt-2 inline-flex min-h-10 items-center gap-1.5 self-start rounded-full border border-hairline px-3 text-xs font-semibold text-[var(--accent-text)] hover:bg-surface-hover"
+              className="focus-ring mt-2 inline-flex min-h-10 items-center gap-1.5 self-start rounded-full border border-hairline px-3 text-xs font-semibold text-[var(--accent-text)] hover:bg-surface-hover touch:min-h-11"
             >
               <Navigation className="h-3.5 w-3.5" aria-hidden="true" /> Günün rotasını haritada aç ({coordStops} durak)
             </a>

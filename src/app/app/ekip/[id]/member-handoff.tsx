@@ -200,7 +200,7 @@ export function MemberHandoff({
               type="button"
               disabled={!to || selected.length === 0}
               onClick={() => setTab("onay")}
-              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-bold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-40 touch:min-h-11"
             >
               <ArrowLeftRight className="h-4 w-4" /> Devam
             </button>
@@ -245,7 +245,7 @@ export function MemberHandoff({
               type="button"
               disabled={pending}
               onClick={() => setTab("kapsam")}
-              className="focus-ring press inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+              className="focus-ring press inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas touch:min-h-11"
             >
               Geri
             </button>
@@ -253,7 +253,7 @@ export function MemberHandoff({
               type="button"
               disabled={!canRun}
               onClick={run}
-              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-danger-500 px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+              className="focus-ring press inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] bg-danger-500 px-4 text-sm font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11"
             >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
               Devri onayla{targetName ? ` — ${targetName}` : ""}

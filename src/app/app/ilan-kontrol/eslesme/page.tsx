@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Suspense } from "react";
 import { GitMerge } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -72,15 +73,14 @@ function GroupTabs({ active }: { active: MatchGroup | null }) {
   return (
     <nav aria-label="Eşleşme grupları" className="mb-3 flex flex-wrap gap-2">
       {GROUP_TABS.map((t) => (
-        <Link
+        <FilterChip
           key={t.label}
           href={t.id ? `${CONTROL_BASE}/eslesme?grup=${t.id}` : `${CONTROL_BASE}/eslesme`}
           title={t.hint}
-          aria-current={t.id === active ? "page" : undefined}
-          className={`focus-ring inline-flex min-h-9 items-center rounded-full border px-3 text-sm font-semibold transition ${t.id === active ? "border-brand-600 bg-brand-50 text-text" : "border-line text-text-muted hover:text-text"}`}
+          active={t.id === active}
         >
           {t.label}
-        </Link>
+        </FilterChip>
       ))}
     </nav>
   );

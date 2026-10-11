@@ -253,7 +253,7 @@ export function AdminSidebar({
           target="_blank"
           rel="noopener noreferrer"
           title="Ana siteyi yeni sekmede aç"
-          className="focus-ring flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white"
+          className="focus-ring flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white touch:min-h-11"
         >
           <Globe className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
           <span className="sb-label flex-1 truncate">Siteyi görüntüle</span>

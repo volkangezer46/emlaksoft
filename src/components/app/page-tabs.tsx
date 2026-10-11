@@ -35,7 +35,7 @@ export function PageTabs({
               href={i === 0 ? base : `${base}?sekme=${tab.id}`}
               aria-current={tab.id === active ? "page" : undefined}
               className={cn(
-                "focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition",
+                "focus-ring inline-flex items-center gap-2 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition touch:min-h-11",
                 tab.id === active
                   ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]"
                   : "text-text-muted hover:text-ink-950",

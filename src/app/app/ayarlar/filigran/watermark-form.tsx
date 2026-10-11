@@ -187,7 +187,7 @@ export function WatermarkForm({
             onClick={() => patch({ enabled: !settings.enabled })}
             className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition ${
               settings.enabled ? "bg-mint-500" : "bg-ink-950/15"
-            }`}
+            } touch:min-h-11`}
           >
             <span
               className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[var(--shadow-xs)] transition-all ${

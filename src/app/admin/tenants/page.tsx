@@ -187,7 +187,7 @@ export default async function AdminTenantsPage({
               <p className="mt-0.5 text-xs text-danger-600/85">Güvenlik ekibi hata kayıtlarını kontrol etmelidir; yeni destek oturumu başlatmadan önce olay kaydını doğrulayın.</p>
             </div>
           </div>
-          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] hover:bg-danger-500/10">
+          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] hover:bg-danger-500/10 touch:min-h-11 touch:min-w-11">
             <X className="h-4 w-4" />
           </Link>
         </div>

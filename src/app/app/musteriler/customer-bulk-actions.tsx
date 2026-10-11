@@ -272,7 +272,7 @@ export function CustomerBulkBar({
           setError(null);
           setInfo(null);
         }}
-        className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-line"
+        className="ml-auto grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] text-text-muted transition hover:bg-line touch:min-h-11 touch:min-w-11"
         aria-label="Seçimi temizle"
       >
         <X className="h-4 w-4" />

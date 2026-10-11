@@ -102,7 +102,7 @@ export function AppointmentCalendar({
           <button
             type="button"
             onClick={() => shiftMonth(-1)}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label="Önceki ay"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -117,7 +117,7 @@ export function AppointmentCalendar({
           <button
             type="button"
             onClick={() => shiftMonth(1)}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas"
+            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
             aria-label="Sonraki ay"
           >
             <ChevronRight className="h-4 w-4" />
@@ -151,7 +151,7 @@ export function AppointmentCalendar({
                   isToday     ? "border border-brand-400/50 font-bold text-brand-600" :
                   isPast      ? "text-text-faint hover:bg-canvas/60" :
                                 "text-ink-950 hover:bg-canvas"}
-              `}
+               touch:min-h-11`}
             >
               {Number(cell.slice(8))}
               {dayAppts.length > 0 && (

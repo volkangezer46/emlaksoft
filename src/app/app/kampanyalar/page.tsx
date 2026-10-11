@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { redirect } from "next/navigation";
 import { AlertTriangle, BarChart3, CheckCircle2, Loader2, MessageSquare, Plus, Send } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -230,29 +231,17 @@ export default async function KampanyalarPage({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex flex-wrap gap-1.5">
             {DURUM_FILTERS.map((f) => (
-              <Link
-                key={`d-${f.value}`}
-                href={filterHref(f.value, kanal)}
-                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
-                  durum === f.value ? "bg-ink-950 text-white" : "border border-line text-text-muted hover:text-ink-950"
-                }`}
-              >
+              <FilterChip key={`d-${f.value}`} href={filterHref(f.value, kanal)} active={durum === f.value}>
                 {f.label}
-              </Link>
+              </FilterChip>
             ))}
           </div>
           <span aria-hidden className="hidden h-4 w-px bg-line sm:block" />
           <div className="flex flex-wrap gap-1.5">
             {KANAL_FILTERS.map((f) => (
-              <Link
-                key={`k-${f.value}`}
-                href={filterHref(durum, f.value)}
-                className={`focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold transition ${
-                  kanal === f.value ? "bg-brand-600 text-white" : "border border-line text-text-muted hover:text-ink-950"
-                }`}
-              >
+              <FilterChip key={`k-${f.value}`} href={filterHref(durum, f.value)} active={kanal === f.value}>
                 {f.label}
-              </Link>
+              </FilterChip>
             ))}
           </div>
         </div>

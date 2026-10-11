@@ -59,7 +59,7 @@ export function KontorBandiKutu({
           }
           listeners.forEach((l) => l());
         }}
-        className="focus-ring press grid h-7 w-7 place-items-center rounded-full text-text-muted hover:bg-ink-950/6"
+        className="focus-ring press grid h-7 w-7 place-items-center rounded-full text-text-muted hover:bg-ink-950/6 touch:min-h-11 touch:min-w-11"
       >
         <X className="h-4 w-4" aria-hidden />
       </button>

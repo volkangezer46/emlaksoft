@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { redirect } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -105,17 +106,9 @@ export default async function RolePermissionsPage({
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         {ROLES.map((r) => (
-          <Link
-            key={r.value}
-            href={`/app/ayarlar/roller?role=${r.value}`}
-            className={`shrink-0 rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition ${
-              selectedRole === r.value
-                ? "bg-ink-950 text-white"
-                : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-            }`}
-          >
+          <FilterChip key={r.value} href={`/app/ayarlar/roller?role=${r.value}`} active={selectedRole === r.value}>
             {r.label}
-          </Link>
+          </FilterChip>
         ))}
       </div>
 

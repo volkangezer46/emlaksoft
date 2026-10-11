@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { Suspense } from "react";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
@@ -73,15 +74,13 @@ function hrefFor(type: string | null, advisorId: string | null, page = 1, proper
 }
 
 function TypeFilters({ active, advisorId, propertyId }: { active: string | null; advisorId: string | null; propertyId: string | null }) {
-  const chip = (on: boolean) =>
-    `focus-ring inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-semibold transition ${on ? "border-brand-500 bg-brand-600 text-white" : "border-line bg-surface text-text hover:border-brand-400"}`;
   return (
     <nav aria-label="Uyarı türü" className="mb-4 flex flex-wrap gap-1.5">
-      <Link href={hrefFor(null, advisorId, 1, propertyId)} aria-current={active === null ? "page" : undefined} className={chip(active === null)}>Tümü</Link>
+      <FilterChip href={hrefFor(null, advisorId, 1, propertyId)} active={active === null}>Tümü</FilterChip>
       {ANOMALY_FILTERS.map((f) => (
-        <Link key={f.value} href={hrefFor(f.value, advisorId, 1, propertyId)} aria-current={active === f.value ? "page" : undefined} className={chip(active === f.value)}>
+        <FilterChip key={f.value} href={hrefFor(f.value, advisorId, 1, propertyId)} active={active === f.value}>
           {f.label}
-        </Link>
+        </FilterChip>
       ))}
     </nav>
   );

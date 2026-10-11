@@ -197,7 +197,7 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
                     <TD className="px-4 py-2.5 text-right">
                       <Link
                         href={`/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(def.path)}#editor`}
-                        className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline"
+                        className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline touch:min-h-11"
                       >
                         Düzenle
                       </Link>
@@ -353,7 +353,7 @@ async function RedirectsTab({ canBulk, prefill }: { canBulk: boolean; prefill?: 
                     <TD className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</TD>
                     <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</TD>
                     <TD className="px-4 py-2.5 text-right">
-                      <Link href={`/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}`} className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline">
+                      <Link href={`/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}`} className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline touch:min-h-11">
                         Yönlendir
                       </Link>
                     </TD>

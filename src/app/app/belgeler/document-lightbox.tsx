@@ -65,7 +65,7 @@ export function DocumentLightbox({
             <a
               href={current.downloadUrl}
               download={current.name}
-              className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+              className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 touch:min-h-11 touch:min-w-11"
               aria-label="Bu görseli indir"
             >
               <Download className="h-5 w-5" />
@@ -75,7 +75,7 @@ export function DocumentLightbox({
             type="button"
             onClick={onClose}
             aria-label="Önizlemeyi kapat (Esc)"
-            className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            className="focus-ring grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 touch:min-h-11 touch:min-w-11"
           >
             <X className="h-5 w-5" />
           </button>

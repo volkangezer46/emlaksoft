@@ -434,7 +434,7 @@ export function PlaybooksManager({
                           onClick={() => moveStep(i, -1)}
                           disabled={i === 0}
                           title="Yukarı taşı"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30 touch:min-h-11 touch:min-w-11"
                         >
                           <ArrowUp className="h-3.5 w-3.5" />
                         </button>
@@ -443,7 +443,7 @@ export function PlaybooksManager({
                           onClick={() => moveStep(i, 1)}
                           disabled={i === steps.length - 1}
                           title="Aşağı taşı"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-30 touch:min-h-11 touch:min-w-11"
                         >
                           <ArrowDown className="h-3.5 w-3.5" />
                         </button>
@@ -452,7 +452,7 @@ export function PlaybooksManager({
                           onClick={() => setSteps((prev) => (prev.length > 1 ? prev.filter((_, k) => k !== i) : prev))}
                           disabled={steps.length === 1}
                           title="Adımı sil"
-                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-30"
+                          className="focus-ring press grid h-7 w-7 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 disabled:opacity-30 touch:min-h-11 touch:min-w-11"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -571,7 +571,7 @@ export function PlaybooksManager({
                         type="button"
                         onClick={() => openEdit(p)}
                         title="Düzenle"
-                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+                        className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11 touch:min-w-11"
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -580,7 +580,7 @@ export function PlaybooksManager({
                           <button
                             type="button"
                             title="Sil"
-                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500"
+                            className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-danger-500/40 hover:text-danger-500 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>

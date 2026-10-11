@@ -152,7 +152,7 @@ export function ConvertReferralButton({ id, done }: { id: string; done: boolean 
               router.refresh();
             });
           }}
-          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55 touch:min-h-11"
         >
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
           Müşteriye dönüştür
@@ -221,7 +221,7 @@ export function ReferralNoteButton({ id }: { id: string }) {
               router.refresh();
             });
           }}
-          className="focus-ring press inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+          className="focus-ring press inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-2.5 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55 touch:min-h-11"
         >
           {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
           Kaydet
@@ -280,7 +280,7 @@ export function ReferralLinkToggle({ id, active }: { id: string; active: boolean
         }}
         className={`focus-ring relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition disabled:opacity-55 ${
           on ? "bg-mint-500" : "bg-ink-950/15"
-        }`}
+        } touch:min-h-11`}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-[var(--elev-1)] transition ${
@@ -537,7 +537,7 @@ export function SuggestedReferralButton({
             router.refresh();
           });
         }}
-        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55"
+        className="focus-ring press inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700 disabled:pointer-events-none disabled:opacity-55 touch:min-h-11"
       >
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
         Link üret

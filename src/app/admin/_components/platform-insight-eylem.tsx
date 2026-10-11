@@ -50,7 +50,7 @@ export function PlatformInsightEylem({ id }: { id: string }) {
               type="button"
               role="menuitem"
               onClick={(e) => run(it.go, e.currentTarget.closest("details"))}
-              className="focus-ring flex min-h-9 w-full items-center rounded-[var(--radius-control)] px-3 text-left text-sm font-medium text-ink-950 hover:bg-surface-hover"
+              className="focus-ring flex min-h-9 w-full items-center rounded-[var(--radius-control)] px-3 text-left text-sm font-medium text-ink-950 hover:bg-surface-hover touch:min-h-11"
             >
               {it.label}
             </button>

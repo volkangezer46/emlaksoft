@@ -461,7 +461,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
               href={`/app/lig?donem=${period}${keepScope}&tv=1`}
               title="TV modu — ofis ekranı görünümü"
               aria-label="TV modunu aç"
-              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text"
+              className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11"
             >
               <Tv className="h-4 w-4" />
             </Link>
@@ -469,7 +469,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
 <><div className="flex flex-wrap items-center gap-1">
               <Link
                 href={prevHref}
-                className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text"
+                className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11"
                 aria-label="Önceki dönem"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -480,7 +480,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
               {nextHref ? (
                 <Link
                   href={nextHref}
-                  className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text"
+                  className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11"
                   aria-label="Sonraki dönem"
                 >
                   <ChevronRight className="h-4 w-4" />

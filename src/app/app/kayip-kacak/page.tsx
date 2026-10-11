@@ -645,7 +645,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                   <button
                     type="submit"
                     title="İlanı şimdi teyit et — gecikmiş listeden düşer"
-                    className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/10 px-2.5 text-xs font-bold text-mint-700 transition hover:border-mint-500/45 hover:bg-mint-500/15"
+                    className="focus-ring press inline-flex min-h-[36px] items-center gap-1 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/10 px-2.5 text-xs font-bold text-mint-700 transition hover:border-mint-500/45 hover:bg-mint-500/15 touch:min-h-11"
                   >
                     <CheckCircle2 className="h-3.5 w-3.5" /> Teyit et
                   </button>

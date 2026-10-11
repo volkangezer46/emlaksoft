@@ -20,7 +20,7 @@ export function SiradakiGec({ actionKey, dismissed, todayKey }: { actionKey: str
         document.cookie = `${SKIP_COOKIE}=${value}; path=/app; max-age=86400; samesite=lax`;
         start(() => router.refresh());
       }}
-      className="focus-ring press inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950 disabled:opacity-60"
+      className="focus-ring press inline-flex min-h-10 items-center rounded-[var(--radius-control)] px-3 text-sm font-semibold text-text-muted transition hover:bg-canvas hover:text-ink-950 disabled:opacity-60 touch:min-h-11"
     >
       Bugün için geç
     </button>

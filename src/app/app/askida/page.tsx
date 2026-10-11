@@ -122,14 +122,14 @@ export default async function SuspendedPage() {
                 isCancelled
                   ? "bg-brand-600 text-white hover:bg-brand-700"
                   : "border border-line text-text-muted hover:border-brand-300 hover:text-brand-600"
-              }`}
+              } touch:min-h-11`}
             >
               <Mail className="h-4 w-4" /> Destek yaz
             </a>
             {staff ? (
               <Link
                 href="/admin"
-                className="inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400/70"
+                className="inline-flex min-h-[42px] items-center rounded-[var(--radius-control)] border border-amber-400/40 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:border-amber-400/70 touch:min-h-11"
               >
                 Ops paneline git
               </Link>
@@ -137,7 +137,7 @@ export default async function SuspendedPage() {
             <form action={signOut}>
               <button
                 type="submit"
-                className="min-h-[42px] rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-brand-300 hover:text-text"
+                className="min-h-[42px] rounded-[var(--radius-control)] border border-line px-4 py-2.5 text-sm font-semibold text-text-muted transition hover:border-brand-300 hover:text-text touch:min-h-11"
               >
                 Çıkış yap
               </button>
