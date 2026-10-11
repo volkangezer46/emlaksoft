@@ -48,7 +48,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
       text: `${c.direction === "inbound" ? "Gelen" : "Giden"} arama: ${c.phone}`,
       time: c.started_at,
       tone: "text-cyan-600",
-      href: "/app/arama",
+      href: "/app/gelen-kutusu?sekme=cagri",
       actions: c.phone ? [{ key: "tel", kind: "tel" as const, href: `tel:${c.phone}` }] : [],
     })),
     ...feed.appointments.map((a) => ({

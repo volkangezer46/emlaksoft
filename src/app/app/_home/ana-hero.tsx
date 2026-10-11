@@ -23,7 +23,7 @@ function eyebrowOf(nowMs: number, context: string): string {
 
 const QUICK: Partial<Record<HomeLayout["variant"], { href: string; label: string; Icon: typeof Plus }>> = {
   accounting: { href: "/app/komisyon?durum=bekleyen", label: "Komisyonlar", Icon: Receipt },
-  call_center: { href: "/app/arama", label: "Aramalar", Icon: Phone },
+  call_center: { href: "/app/gelen-kutusu?sekme=cagri", label: "Aramalar", Icon: Phone },
 };
 
 /**

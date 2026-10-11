@@ -33,8 +33,8 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
     const all = JSON.stringify(ADMIN_NAV);
     expect(all).not.toContain("/admin/satis");
     expect(all).not.toMatch(/Demo & aday/);
-    expect(read("src/app/admin/satis/page.tsx")).toContain('redirect("/admin/tenants?durum=trial")');
-    expect(read("src/app/admin/satis/[id]/page.tsx")).toContain('redirect("/admin/tenants?durum=trial")');
+    expect(read("next.config.ts")).toContain('source: "/admin/satis", destination: "/admin/tenants?durum=trial"');
+    expect(read("next.config.ts")).toContain('source: "/admin/satis/:path*", destination: "/admin/tenants?durum=trial"');
     for (const f of ["src/components/admin/admin-topbar.tsx", "src/components/admin/command-palette.tsx", "src/components/admin/admin-sidebar.tsx", "src/lib/admin-badges.ts"]) {
       expect(read(f), f).not.toMatch(/admin\/satis|demo_requests/);
     }

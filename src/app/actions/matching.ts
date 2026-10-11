@@ -108,12 +108,12 @@ export async function saveMatchAndNotify(formData: FormData): Promise<MatchActio
     tenantId: gate.tenantId,
     title: "Eşleştirme kaydedildi",
     body: `${custName ?? "Müşteri"} × ${property.property_code} · skor ${scored.score}`,
-    href: `/app/eslestirme?demand=${demandId}&property=${propertyId}`,
+    href: `/app/talepler?sekme=eslesme&demand=${demandId}&property=${propertyId}`,
     kind: "success",
     userId: property.assigned_to ?? undefined,
   });
 
-  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/talepler");
   revalidatePath("/app/talepler");
   if (demand.customer_id) revalidatePath(`/app/musteriler/${demand.customer_id}`);
   return { ok: true, score: scored.score };

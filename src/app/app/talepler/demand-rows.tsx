@@ -43,7 +43,7 @@ function MatchPill({ d }: { d: DemandVM }) {
   if (m.strong > 0 || m.good > 0) {
     return (
       <Link
-        href={`/app/eslestirme?demand=${d.id}`}
+        href={`/app/talepler?sekme=eslesme&demand=${d.id}`}
         prefetch={false}
         title={`En iyi skor ${m.best} · eşleştirmede aç`}
         className={`focus-ring relative z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition hover:opacity-80 ${m.strong > 0 ? "tone-success" : "tone-neutral"}`}
@@ -166,7 +166,7 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                   <RowActions>
                     <RowActionLink href={d.href} label="Talep detayını aç" icon={Eye} />
                     {d.customerId ? <RowActionLink href={`/app/musteriler/${d.customerId}`} label={`${d.customerName ?? "Müşteri"} kartını aç`} icon={User} /> : null}
-                    <RowActionLink href={`/app/eslestirme?demand=${d.id}`} label="Bu talebi eşleştir" icon={Crosshair} />
+                    <RowActionLink href={`/app/talepler?sekme=eslesme&demand=${d.id}`} label="Bu talebi eşleştir" icon={Crosshair} />
                   </RowActions>
                 </TD>
               </TR>

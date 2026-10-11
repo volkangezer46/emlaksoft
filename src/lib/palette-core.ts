@@ -65,7 +65,7 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni otomasyon", href: "/app/otomasyonlar/yeni", icon: ICONS.otomasyon, module: "settings" },
   { label: "Yeni danışman", href: "/app/ekip/yeni", icon: ICONS.ekip, module: "team" },
   { label: "Yeni destek talebi", href: "/app/destek/yeni", icon: ICONS.destek, module: "support" },
-  { label: "Görüşme kaydet", href: "/app/arama", icon: ICONS.telefon, module: "calls" },
+  { label: "Görüşme kaydet", href: "/app/gelen-kutusu?sekme=cagri", icon: ICONS.telefon, module: "calls" },
   // Toplu kayıt eylemi (menü öğesi değil; Müşteriler/Portföyler başlığındaki "İçe aktar" düğmesiyle aynı hedef).
   { label: "Excel'den içe aktar", href: "/app/ice-aktarma", icon: ICONS.iceAktarma, module: "customers" },
 ];

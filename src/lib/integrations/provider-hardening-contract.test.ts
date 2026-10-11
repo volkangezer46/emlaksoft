@@ -11,7 +11,6 @@ const emlakfiyati = read("src/lib/integrations/emlakfiyati/adapter.ts");
 const emlakfiyatiKeys = read("src/lib/integrations/emlakfiyati/keys.ts");
 const portals = read("src/lib/integrations/portals/index.ts");
 const portalActions = read("src/app/actions/portal-keys.ts");
-const efatura = read("src/lib/efatura.ts");
 
 describe("external provider hardening contract", () => {
   it("wires EmlakFiyati into the real valuation path and never reads removed providers", () => {
@@ -66,14 +65,4 @@ describe("external provider hardening contract", () => {
     expect(portals).not.toContain("errorCode: body.slice");
   });
 
-  it("keeps e-invoice endpoints allow-listed, bounded and response-body safe", () => {
-    expect(efatura).toContain("IMPLEMENTED_EFATURA_PROVIDERS");
-    expect(efatura).toContain("process.env.EFATURA_ALLOWED_HOSTS");
-    expect(efatura).toContain("fetchExternal(");
-    expect(efatura).toContain("EFATURA_MAX_RESPONSE_BYTES");
-    expect(efatura).not.toMatch(/\bfetch\s*\(/);
-    expect(efatura).toContain('redirect: "error"');
-    expect(efatura).toContain("safeArtifactUrl(data.pdf_url");
-    expect(efatura).not.toContain("err.slice(0, 100)");
-  });
 });

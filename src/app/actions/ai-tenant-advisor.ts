@@ -429,7 +429,7 @@ function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdviso
   const priority: string[] = [];
   if (c.tasksOverdue > 0) priority.push(`${c.tasksOverdue} gecikmiş görevi kapat (/app/gorevler?filter=overdue)`);
   if (c.hotLeadCount > 0) priority.push(`${c.hotLeadCount} sıcak müşteriyi ara (/app/musteriler?sort=hot)`);
-  if (c.newDemands > 0) priority.push(`${c.newDemands} yeni talebi eşleştir (/app/eslestirme)`);
+  if (c.newDemands > 0) priority.push(`${c.newDemands} yeni talebi eşleştir (/app/talepler?sekme=eslesme)`);
   if (c.overpricedCount > 0) priority.push(`${c.overpricedCount} riskli fiyatlı portföyü gözden geçir (/app/portfoyler?saglik=riskli)`);
 
   return (

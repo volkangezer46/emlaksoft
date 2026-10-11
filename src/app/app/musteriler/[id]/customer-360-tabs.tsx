@@ -265,7 +265,7 @@ export function Customer360Tabs({
                     {d.min_sqm ? <span>≥ {d.min_sqm} m²</span> : null}
                     {d.urgency ? <span className="text-amber-500">{d.urgency}</span> : null}
                   </div>
-                  <Link href={`/app/eslestirme?demand=${d.id}`} className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
+                  <Link href={`/app/talepler?sekme=eslesme&demand=${d.id}`} className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
                     Bu talebe portföy eşleştir →
                   </Link>
                 </div>

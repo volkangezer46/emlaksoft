@@ -159,7 +159,7 @@ function CallTab({ customers }: { customers: ComboboxOption[] }) {
   const [direction, setDirection] = useState("outbound");
   const [disposition, setDisposition] = useState<string>("Ulaşıldı");
   if (q.done) {
-    return <Success title="Görüşme kaydedildi" openHref="/app/arama" openLabel="Kaydı aç (görüşmeler)" onAgain={q.again} />;
+    return <Success title="Görüşme kaydedildi" openHref="/app/gelen-kutusu?sekme=cagri" openLabel="Kaydı aç (görüşmeler)" onAgain={q.again} />;
   }
   return (
     <form key={q.round} onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} className="flex flex-col gap-4">

@@ -138,7 +138,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         previous: k.callsYesterday,
         previousText: `Dün ${k.callsYesterday}`,
         tone: "success",
-        href: "/app/arama",
+        href: "/app/gelen-kutusu?sekme=cagri",
         series: weekBuckets(k.callDates, nowMs),
         seriesLabel: "Son 7 hafta haftalık arama sayısı",
       });

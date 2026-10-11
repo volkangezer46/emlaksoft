@@ -204,7 +204,7 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
       kind: "demand",
       title: `${d.transaction_type}${d.property_type ? ` · ${d.property_type}` : ""}`,
       subtitle: [name, d.rooms].filter(Boolean).join(" · ") || "Talep",
-      href: `/app/eslestirme?demand=${d.id}`,
+      href: `/app/talepler?sekme=eslesme&demand=${d.id}`,
     });
   }
 

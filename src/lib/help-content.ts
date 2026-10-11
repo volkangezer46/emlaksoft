@@ -43,7 +43,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       "Müşterinin istediği ile ilanın ne kadar uyduğunu 100 üzerinden gösterir. Puan yüksekse ilan o müşteriye uygundur.",
     detail:
       "Puan; işlem türü (satılık/kiralık), konum, bütçe, portföy türü, oda sayısı ve m² karşılaştırmasından çıkar. Varsayılan ağırlıklar: işlem türü 25, konum 25, bütçe 20, portföy türü 15, oda 10, m² 5. Ofis olarak Ayarlar bölümünden değiştirebilirsiniz.",
-    href: "/app/eslestirme",
+    href: "/app/talepler?sekme=eslesme",
     hrefLabel: "Eşleştirme sayfası",
   },
   {
@@ -228,7 +228,7 @@ export const GUIDES: readonly Guide[] = [
       "Beğendiğiniz ilanda \"Kaydet & bildir\" düğmesine basın; eşleşme kaydedilir.",
       "Aynı satırdaki \"Randevu ver\" ve \"Teklif al\" kısayollarıyla sonraki işi başlatabilirsiniz.",
     ],
-    href: "/app/eslestirme",
+    href: "/app/talepler?sekme=eslesme",
     cta: "Eşleştirmeyi aç",
   },
   {

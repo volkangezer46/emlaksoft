@@ -174,7 +174,7 @@ async function notifyPriceDropToMatchingDemands(input: {
         userId: m.advisorId ?? input.fallbackUserId,
         title: `${label} fiyatı düştü: ₺${fmt(input.oldPrice)} → ₺${fmt(input.newPrice)}`,
         body: `${m.customerName} talebiyle eşleşiyor.`,
-        href: `/app/eslestirme?property=${input.property.id}`,
+        href: `/app/talepler?sekme=eslesme&property=${input.property.id}`,
         kind: "info",
         prefKey: "priceDrop",
       });

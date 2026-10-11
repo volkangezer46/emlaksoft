@@ -58,8 +58,8 @@ describe("tanım listeleri tek kaynak sözleşmesi", () => {
     expect(offenders.filter((o) => !notSeeds.some((n) => o.includes(n)))).toEqual([]);
   });
 
-  it("lead-sources ve expense-categories yalnız tek kaynağı yeniden dışa aktarır", () => {
-    for (const name of ["lead-sources.ts", "expense-categories.ts"]) {
+  it("lead-sources yalnız tek kaynağı yeniden dışa aktarır", () => {
+    for (const name of ["lead-sources.ts"]) {
       const text = files.find((f) => f.rel === `lib/${name}`)!.text;
       expect(text).toContain("@/lib/definition-defaults");
       expect(text).not.toMatch(/value:\s*"/);

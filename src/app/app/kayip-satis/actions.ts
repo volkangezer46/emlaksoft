@@ -92,7 +92,7 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
           entityId: customerId,
           newValue: { direction: "outbound", phone: parsePhoneStrict(rawPhone).stored, disposition: "Ulaşıldı" },
         });
-        revalidatePath("/app/arama");
+        revalidatePath("/app/gelen-kutusu");
         revalidatePath(`/app/musteriler/${customerId}`);
       }
     }

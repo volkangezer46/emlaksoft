@@ -35,7 +35,7 @@ const CATEGORY_LINKS: Partial<Record<SettingCategoryId, { label: string; href: s
   ],
   saglik: [
     { label: "Sistem sağlığı ve cron nabzı", href: "/admin/sistem" },
-    { label: "Hata kayıtları", href: "/admin/hatalar" },
+    { label: "Hata kayıtları", href: "/admin/sistem?sekme=hatalar" },
   ],
 };
 

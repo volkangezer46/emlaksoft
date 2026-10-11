@@ -106,7 +106,19 @@ const nextConfig: NextConfig = {
 
   // /demo public sayfası kapatıldı: 308 ile kayıt akışına gider (satış demosu formu verisi /admin/satis'te kalır).
   async redirects() {
-    return [{ source: "/demo", destination: "/kayit", permanent: true }];
+    // Eski, yalnız yönlendiren sayfalar (kalıcı). İstek sorgu parametreleri hedefe aynen taşınır (Next redirects);
+    // hedef sayfa kendi modül/paket kapısını uygular.
+    return [
+      { source: "/demo", destination: "/kayit", permanent: true },
+      { source: "/app/brifing", destination: "/app", permanent: true },
+      { source: "/app/ekip/kazanc", destination: "/app/cuzdan?sekme=ofis", permanent: true },
+      { source: "/app/ayarlar/duyurular", destination: "/app/bildirimler?sekme=yonetim", permanent: true },
+      { source: "/app/arama", destination: "/app/gelen-kutusu?sekme=cagri", permanent: true },
+      { source: "/app/eslestirme", destination: "/app/talepler?sekme=eslesme", permanent: true },
+      { source: "/app/yatirim", destination: "/app/hesaplayici?sekme=yatirim", permanent: true },
+      { source: "/admin/satis", destination: "/admin/tenants?durum=trial", permanent: true },
+      { source: "/admin/satis/:path*", destination: "/admin/tenants?durum=trial", permanent: true },
+    ];
   },
 
   async headers() {

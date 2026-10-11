@@ -137,7 +137,7 @@ export async function linkRecordToCustomer(
   });
 
   revalidatePath("/app/gelen-kutusu");
-  revalidatePath("/app/arama");
+  revalidatePath("/app/gelen-kutusu");
   revalidatePath(`/app/musteriler/${custId}`);
   return { ok: true, id: recId };
 }

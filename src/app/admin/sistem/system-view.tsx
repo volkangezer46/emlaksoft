@@ -218,7 +218,7 @@ export async function SystemView() {
             layout="inline"
             label="Açık hata türü"
             value={openErrors ?? 0}
-            href="/admin/hatalar"
+            href="/admin/sistem?sekme=hatalar"
             icon={Bug}
             tone={(openErrors ?? 0) > 0 ? "danger" : "success"}
             attention={(openErrors ?? 0) > 0}

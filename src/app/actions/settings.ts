@@ -70,7 +70,7 @@ export async function updateMatchingWeights(formData: FormData): Promise<Setting
   });
 
   revalidatePath("/app/ayarlar");
-  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/talepler");
   revalidatePath("/app/talepler");
   return { ok: true };
 }

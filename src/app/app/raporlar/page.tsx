@@ -526,7 +526,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           { href: "/app/raporlar/memnuniyet", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
           { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
           { href: "/app/kayip-kacak", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
-          { href: "/app/eslestirme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
+          { href: "/app/talepler?sekme=eslesme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
           { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },
           { href: "/app/musteriler", icon: ICONS.musteri, title: "Müşteri merkezi", sub: "360 görünüm" },
           { href: "/app/franchise", icon: ICONS.sube, title: "Şube analitiği", sub: "Şube bazlı konsolide" },

@@ -71,7 +71,7 @@ export async function notifyMatchingDemandsForProperty(
       userId: notifyUserId,
       title,
       body,
-      href: `/app/eslestirme?property=${property.id}`,
+      href: `/app/talepler?sekme=eslesme&property=${property.id}`,
       kind: "success",
     });
 
@@ -95,7 +95,7 @@ export async function notifyMatchingDemandsForProperty(
           userId: ownerId,
           title: `Müşterinizin talebi yeni portföyle eşleşti`,
           body: `${shown}${more}: ${property.title ?? property.property_code} (${property.property_code}) talebe uyuyor. Eşleştirme ekranından öneriyi inceleyin.`,
-          href: `/app/eslestirme?property=${property.id}`,
+          href: `/app/talepler?sekme=eslesme&property=${property.id}`,
           kind: "success",
         });
       } catch (e) {

@@ -20,7 +20,7 @@ export async function BugunOfiste({ ctx, params }: { ctx: HomeCtx; params: HomeP
   const rows: { key: string; Icon: LucideIcon; label: string; n: number; href: string }[] = [
     { key: "musteri", Icon: UserPlus, label: "yeni müşteri", n: feed.customers.length, href: `/app/musteriler?from=${from}&to=${to}` },
     { key: "portfoy", Icon: Home, label: "yeni portföy", n: feed.properties.length, href: "/app/portfoyler" },
-    { key: "arama", Icon: Phone, label: "arama", n: feed.calls.length, href: "/app/arama" },
+    { key: "arama", Icon: Phone, label: "arama", n: feed.calls.length, href: "/app/gelen-kutusu?sekme=cagri" },
     { key: "randevu", Icon: CalendarPlus, label: "yeni randevu", n: feed.appointments.length, href: "/app/randevular" },
   ];
   const live = rows.filter((r) => r.n > 0);

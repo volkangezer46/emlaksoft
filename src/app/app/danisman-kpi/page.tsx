@@ -35,8 +35,8 @@ function coachLink(a: CoachAction): { href: string; hrefLabel: string } | undefi
   const t = a.title.toLocaleLowerCase("tr");
   if (t.includes("yetki")) return { href: "/app/portfoyler", hrefLabel: "Portföyler" };
   if (t.includes("görev")) return { href: "/app/gorevler?filter=overdue", hrefLabel: "Gecikmiş görevler" };
-  if (t.includes("çağrı") && t.includes("dönüşüm")) return { href: "/app/arama", hrefLabel: "Çağrı kayıtları" };
-  if (t.includes("görüşme") && t.includes("dönüşüm")) return { href: "/app/eslestirme", hrefLabel: "Eşleştirme" };
+  if (t.includes("çağrı") && t.includes("dönüşüm")) return { href: "/app/gelen-kutusu?sekme=cagri", hrefLabel: "Çağrı kayıtları" };
+  if (t.includes("görüşme") && t.includes("dönüşüm")) return { href: "/app/talepler?sekme=eslesme", hrefLabel: "Eşleştirme" };
   if (t.includes("teklif") && t.includes("dönüşüm")) return { href: "/app/teklifler", hrefLabel: "Teklifler" };
   if (t.includes("sıcak")) return { href: "/app/musteriler?sort=hot", hrefLabel: "Sıcak müşteriler" };
   if (t.includes("dokunulmadı")) return { href: "/app/musteriler", hrefLabel: "Müşteriler" };
@@ -44,7 +44,7 @@ function coachLink(a: CoachAction): { href: string; hrefLabel: string } | undefi
   if (t.includes("anlaşma")) return { href: "/app/anlasmalar", hrefLabel: "Anlaşmalar" };
   if (t.includes("teklif")) return { href: "/app/teklifler", hrefLabel: "Teklifler" };
   if (t.includes("randevu")) return { href: "/app/randevular", hrefLabel: "Randevular" };
-  if (t.includes("çağrı") || t.includes("huni")) return { href: "/app/arama", hrefLabel: "Çağrı kayıtları" };
+  if (t.includes("çağrı") || t.includes("huni")) return { href: "/app/gelen-kutusu?sekme=cagri", hrefLabel: "Çağrı kayıtları" };
   if (t.includes("müşteri")) return { href: "/app/musteriler", hrefLabel: "Müşteriler" };
   return undefined;
 }
@@ -440,7 +440,7 @@ export default async function DanismanKpiPage({
           label="Ekip çağrısı"
           value={teamNow.call}
           icon={PhoneCall}
-          href="/app/arama"
+          href="/app/gelen-kutusu?sekme=cagri"
           {...trendOf(teamNow.call, teamPrev.call)}
         />
         <StatCard
@@ -655,7 +655,7 @@ export default async function DanismanKpiPage({
                   </TD>
                   <TD align="right" className="text-text-muted">
                     <Link
-                      href={`/app/arama?danisman=${a.id}`}
+                      href={`/app/gelen-kutusu?sekme=cagri&danisman=${a.id}`}
                       className="focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline"
                       aria-label={`${a.full_name} çağrıları`}
                     >

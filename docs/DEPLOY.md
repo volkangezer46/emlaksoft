@@ -91,6 +91,7 @@ Enum `ADD VALUE` + kullanımı aynı dosyada olamaz. Ayrıntı: `MIGRATION_GUIDE
 - [ ] Cron auth negatif testi (salt-okunur):
       `APP_URL=https://... npm run cron:smoke -- --auth-only`
 - [ ] Public E2E uzak deploy'da geçti.
+- [ ] Salt-okunur duman: `npm run smoke:live` (demo sahip + danışman ile /app dinamik olmayan tüm sayfalar: durum, "şu anda açılamadı" hata sınırı, >2,5 sn uyarı; `BASE=https://...`).
 - [ ] Giriş, şifre sıfırlama, tenant izolasyonu, platform admin erişimi, ticket akışı kontrol edildi.
 - [ ] Ödeme/webhook kullanılıyorsa imza doğrulama + tek test işlemi.
 - [ ] `/admin/sistem` tüm planlı işleri gösteriyor; heartbeat eşikleri uygun.

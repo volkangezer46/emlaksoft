@@ -594,7 +594,7 @@ export type VisibleSection = NavSection & { href: string };
 
 /**
  * Menüden kalkan ama yolu çalışmaya devam eden eski sayfalar (yer imleri):
- * eski yol → birleşik sayfa. Sayfa dosyası kendi yönlendirmesini yapar.
+ * eski yol → birleşik sayfa. Yönlendirme next.config.ts redirects() içindedir (sorgu parametreleri korunur).
  */
 export const NAV_ALIASES: Readonly<Record<string, string>> = {
   "/app/yatirim": "/app/hesaplayici?sekme=yatirim",
@@ -613,7 +613,6 @@ export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/askida": "Askıya alınmış/ödemesi geciken ofis bilgilendirme ekranı; kabuk yönlendirir",
   "/app/bildirimler": "Üst çubuktaki zilden ('Tüm bildirimleri gör') açılır; komut paletinde aranabilir, menü öğesi değil",
   "/app/baslangic": "Kurulum sihirbazı bir EYLEM akışıdır: ana ekran kurulum şeridi, Ayarlar dizini kartı ve komut paleti eylemi",
-  "/app/brifing": "Ana ekrana yönlendirir (içerik Bugün bloğunda)",
   "/app/hesabim": "Kullanıcı menüsünden (sağ üst) açılır; danışmanda 'Ben' merkezinin 'Profilim' sekmesi, komut paletinde aranabilir",
   "/app/hizli": "Sahada hızlı kayıt: üst çubuk 'Yeni' menüsü ve komut paleti eylemi",
   "/app/hos-geldin": "Danışman ilk giriş karşılaması; koşul sağlanmazsa ana ekrana yönlendirir",
