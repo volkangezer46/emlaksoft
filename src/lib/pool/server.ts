@@ -316,9 +316,11 @@ export async function computeSuggestions(
   nowMs: number,
   ruleId: string | null,
   labels?: { neighborhood?: string; district?: string; province?: string },
+  /** Önceden okunmuş aday bağlamı (süpürme: ofis+kural başına BİR kez okunur, ilan başına tekrarlanmaz). */
+  preloaded?: { candidates: PoolCandidate[]; officeAvgOpen: number },
 ): Promise<PoolSuggestion[]> {
   const [{ candidates, officeAvgOpen }, resolved] = await Promise.all([
-    loadPoolCandidates(db, tenantId, nowMs, ruleId),
+    preloaded ? Promise.resolve(preloaded) : loadPoolCandidates(db, tenantId, nowMs, ruleId),
     labels ? Promise.resolve(labels) : loadGeoLabels(property),
   ]);
   return rankCandidates(candidates, property, { nowMs, officeAvgOpen, labels: resolved });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { runPoolSweep } from "@/lib/pool/system-assign";
 import { authorizeCron } from "@/lib/cron-auth";
 import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
@@ -40,8 +41,8 @@ export async function GET(req: NextRequest) {
     }
     await recordHeartbeat(
       "havuz-atama",
-      control.ok ? "ok" : "error",
-      `${summary.examined} kayıt, ${summary.autoAssigned} otomatik, ${summary.fallbackAssigned} yedek, ${summary.escalated} yükseltme, ${summary.slaBreached} gecikme · ${control.text} · ${leadText}`,
+      control.ok ? heartbeatFor({ failed: summary.failed, truncated: summary.truncated }) : "error",
+      `${summary.examined} kayıt, ${summary.autoAssigned} otomatik, ${summary.fallbackAssigned} yedek, ${summary.escalated} yükseltme, ${summary.slaBreached} gecikme${failureNote({ failed: summary.failed, truncated: summary.truncated })} · ${control.text} · ${leadText}`,
     );
     return NextResponse.json({ ok: true, ...summary, control: control.text, lead: leadText });
   } catch (err) {
