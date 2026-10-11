@@ -27,7 +27,7 @@ type ButtonChipProps = { active?: boolean; count?: number | string | null; href?
 function Count({ value, active }: { value: number | string | null | undefined; active: boolean }) {
   if (value === null || value === undefined || value === "") return null;
   return (
-    <span className={cn("num rounded-full px-1.5 text-[11px] leading-5", active ? "bg-white/20" : "bg-surface-sunken text-text-muted")}>
+    <span className={cn("num rounded-full px-1.5 text-xs leading-5", active ? "bg-white/20" : "bg-surface-sunken text-text-muted")}>
       {value}
     </span>
   );
