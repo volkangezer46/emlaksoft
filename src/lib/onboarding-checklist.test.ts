@@ -14,6 +14,7 @@ const empty: OnboardingFacts = {
   youDone: false,
   members: 1,
   poolEnabled: false,
+  poolAdvisorRecords: 0,
   publishedProperties: 0,
   activeIntegrations: 0,
   planPaid: false,
@@ -24,6 +25,7 @@ const full: OnboardingFacts = {
   youDone: true,
   members: 2,
   poolEnabled: true,
+  poolAdvisorRecords: 2,
   publishedProperties: 1,
   activeIntegrations: 0,
   planPaid: true,
@@ -71,7 +73,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
-    const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true });
+    const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1 });
     expect(s.doneCount).toBe(3);
     expect(s.percent).toBe(43);
     expect(s.nextId).toBe("team");
@@ -99,7 +101,11 @@ describe("onboarding-checklist", () => {
   });
 
   it("havuz ve paket adımları gerçek olgudan tamamlanır; portallar yayın ya da entegrasyondan", () => {
-    expect(buildOnboarding({ ...empty, poolEnabled: true }).steps.find((x) => x.id === "pool")?.done).toBe(true);
+    const pool = (f: Partial<OnboardingFacts>) => buildOnboarding({ ...empty, ...f }).steps.find((x) => x.id === "pool")?.done;
+    expect(pool({ poolEnabled: true, poolAdvisorRecords: 1 })).toBe(true);
+    // Havuz açık ama gerçek uzmanlık/bölge kaydı yok (örnek veri sayılmaz): atama çalışamaz, adım bitmez.
+    expect(pool({ poolEnabled: true, poolAdvisorRecords: 0 })).toBe(false);
+    expect(pool({ poolEnabled: false, poolAdvisorRecords: 3 })).toBe(false);
     expect(buildOnboarding({ ...empty, planPaid: true }).steps.find((x) => x.id === "plan")?.done).toBe(true);
     expect(buildOnboarding({ ...empty, activeIntegrations: 1 }).steps.find((x) => x.id === "portals")?.done).toBe(true);
     expect(buildOnboarding({ ...empty, publishedProperties: 2 }).steps.find((x) => x.id === "portals")?.done).toBe(true);

@@ -30,6 +30,7 @@ import {
   resolvePortalTab,
 } from "@/lib/customer-portal/portal-model";
 import { MatchFeedback } from "./match-feedback";
+import { DEMAND_STATUS_TR } from "@/app/app/talepler/demand-list-logic";
 import { DealProcessProgress } from "@/components/public/deal-process-progress";
 import { BuildingDuesSection } from "@/components/public/building-dues-section";
 import { now as clockNow, trDayKey } from "@/lib/clock";
@@ -61,13 +62,6 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Müşteri Paneli",
   robots: { index: false, follow: false },
-};
-
-const DEMAND_TYPE_LABELS: Record<string, string> = {
-  buy:    "Satın alma",
-  rent:   "Kiralama",
-  sell:   "Satış",
-  invest: "Yatırım",
 };
 
 const APPT_TYPE_LABELS = APPOINTMENT_TYPE_LABELS;
@@ -360,6 +354,15 @@ export default async function CustomerPortalPage({
                           </span>
                         )}
                       </div>
+                      {m.reasons.length > 0 && (
+                        <ul className="mt-2 flex flex-wrap gap-1" aria-label="Neden önerildi">
+                          {m.reasons.map((r) => (
+                            <li key={r} className="rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">
+                              {r} uyuyor
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {m.property.price && (
                         <p className="mt-2 text-sm font-bold text-ink-950">{money(m.property.price)}</p>
                       )}
@@ -407,7 +410,7 @@ export default async function CustomerPortalPage({
                 <div key={d.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
-                      {DEMAND_TYPE_LABELS[d.type] ?? d.type}
+                      {d.type || "Arayış"}
                       {d.province ? ` — ${d.province}` : ""}
                     </p>
                     {(d.minPrice || d.maxPrice) && (
@@ -421,7 +424,7 @@ export default async function CustomerPortalPage({
                       ? "bg-mint-500/12 text-mint-700"
                       : "bg-canvas text-text-muted"
                   }`}>
-                    {d.status === "active" ? "Aktif" : d.status}
+                    {DEMAND_STATUS_TR[d.status] ?? "Kayıtlı"}
                   </span>
                 </div>
               ))}
@@ -622,7 +625,7 @@ export default async function CustomerPortalPage({
           </PortalSection>
         ) : null}
 
-        <PortalFooterNote office={tenant.name} />
+        <PortalFooterNote office={tenant.name} asOf={formatDateTimeTr(clockNow())} />
         <PortalStickySpacer active={Boolean(advisorTel || advisorWhatsApp)} />
       </main>
 

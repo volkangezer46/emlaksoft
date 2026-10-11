@@ -14,6 +14,17 @@ export const PORTAL_TAB_LABELS: Record<PortalTab, string> = {
   belgeler: "Belgeler",
 };
 
+/** Eşleşme gerekçeleri: yalnız hesaplanmış (belirsiz olmayan) ve uyan olanlar, ağırlığa göre en çok 3. Boşsa boş dizi. */
+export function topPortalReasons(
+  reasons: readonly { label: string; ok: boolean; weight: number; unknown?: boolean }[],
+): string[] {
+  return [...reasons]
+    .filter((r) => r.ok && !r.unknown && !r.label.includes("(belirsiz)"))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 3)
+    .map((r) => r.label);
+}
+
 export type PortalOwnerProperty = {
   id: string;
   label: string;

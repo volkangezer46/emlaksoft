@@ -157,9 +157,10 @@ export function PortalStickySpacer({ active }: { active: boolean }) {
 }
 
 /** Portal alt notu — kimin hazırladığı + KVKK/gizlilik erişimi. */
-export function PortalFooterNote({ office }: { office: string }) {
+export function PortalFooterNote({ office, asOf }: { office: string; asOf?: string }) {
   return (
     <div className="space-y-2 pb-4 text-center text-xs leading-relaxed text-text-faint">
+      {asOf ? <p>Veriler {asOf} itibarıyla.</p> : null}
       <p>
         Bu sayfa {office} tarafından sizin için oluşturulmuştur.
         <br />

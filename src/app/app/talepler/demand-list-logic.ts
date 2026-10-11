@@ -9,6 +9,9 @@ export const DEMAND_STATUS_LABELS: Record<string, string> = {
   closed: "Kapalı",
 };
 
+/** Müşteri portalı gibi yüzeylerin kullandığı ad (aynı Türkçe tablo). */
+export const DEMAND_STATUS_TR = DEMAND_STATUS_LABELS;
+
 export const URGENCY_LABELS: Record<string, string> = {
   low: "Düşük",
   normal: "Normal",

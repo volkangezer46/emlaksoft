@@ -56,6 +56,9 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       // Giderler ve kasa adımı (Finans Paket B): ofis hesabı ya da düzenli ödeme var mı (RLS: yetkisiz kullanıcıda 0).
       supabase.from("finance_accounts").select("id", { count: "exact", head: true }).eq("owner_scope", "office").is("archived_at", null),
       supabase.from("recurring_rules").select("id", { count: "exact", head: true }).eq("scope", "office"),
+      // Havuz adımı: ofiste gerçek (örnek olmayan) danışman uzmanlık/bölge kaydı var mı (RLS kiracı sınırı).
+      supabase.from("advisor_specialties").select("id", { count: "exact", head: true }).eq("is_sample", false),
+      supabase.from("advisor_regions").select("id", { count: "exact", head: true }).eq("is_sample", false),
     ]),
     supabase
       .from("tenants")
@@ -89,7 +92,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const appointments = results[9].count ?? 0;
   const customDefinitions = results[5].count ?? 0;
 
-  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes] = optional;
+  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes] = optional;
   const title = String((titleRes.error ? null : (titleRes.data as { title?: string | null } | null)?.title) ?? "").trim();
   const specCount = specRes.error ? 0 : (specRes.count ?? 0);
   const regionCount = regionRes.error ? 0 : (regionRes.count ?? 0);
@@ -104,6 +107,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     youDone: title.length > 0 && specCount + regionCount > 0,
     members: results[3].count ?? 0,
     poolEnabled: poolRes.error ? false : (poolRes.data as { listing_pool_enabled?: boolean } | null)?.listing_pool_enabled === true,
+    poolAdvisorRecords: (poolSpecRes.error ? 0 : (poolSpecRes.count ?? 0)) + (poolRegionRes.error ? 0 : (poolRegionRes.count ?? 0)),
     publishedProperties: results[6].count ?? 0,
     activeIntegrations: results[4].count ?? 0,
     planPaid: subRes.error ? false : (subRes.data as { status?: string } | null)?.status === "active",
