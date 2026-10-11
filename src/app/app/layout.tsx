@@ -14,7 +14,7 @@ import { DAY_MS, msUntil } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { loadOwnProfileAvatar } from "@/lib/avatar-read";
-import { getPlatformStaffIdentity } from "@/lib/platform";
+import { getPlatformStaffIdentity, isPlatformAllowlistedEmail } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
@@ -190,9 +190,15 @@ async function buildShellModel() {
     : null;
 
   // boot, platformStaff, impersonatedTenant ve (yedek) kimlik okuması yalnız `user`'a bağlı → tek turda paralel.
+  // Platform personeli: kabuk RPC'si 'platform_staff' alanını döndürüyorsa ve çağıran aktif personel DEĞİLSE
+  // (allowlist e-postası hariç: ilk girişte satır oluşturma yolu korunur) ayrı platform_staff turu atılmaz.
+  // Karar her istekte DB'den (RPC, RLS) gelir; başlık/çerezle verilmez. Personel ise AAL2/parola kapılı tam yol çalışır.
+  const platformStaffPromise = bootPromise.then((b) =>
+    b && b.platformStaff === null && !isPlatformAllowlistedEmail(user?.email) ? null : getPlatformStaffIdentity(),
+  );
   const [boot, platformStaff, { data: impersonatedTenant }, identityRes] = await Promise.all([
     bootPromise,
-    getPlatformStaffIdentity(),
+    platformStaffPromise,
     impersonatedTenantPromise,
     // Kimlik satırı istek-içi TEK okumadır (sayfa kapısı/requireActiveTenant aynı sonucu paylaşır).
     user ? getRequestIdentity(user.id) : Promise.resolve({ data: null, error: null }),

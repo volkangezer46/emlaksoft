@@ -272,6 +272,8 @@ const F = {
   financeIsSample: "20261012000400_finance_is_sample.sql",
   // Analiz dili (2026-10-12): ef.packs seed paket adlari "... kontor" -> "... TL" (yalniz dokunulmamis adlar; veri modeli ayni).
   efPackNamesTl: "20261012000600_ef_pack_names_tl.sql",
+  // Kabuk zinciri (2026-10-11): app_shell_bootstrap yanitina aktif platform personeli satiri (ayri platform_staff turu kalkar).
+  appShellPlatformStaff: "20261012000700_app_shell_platform_staff.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
@@ -444,6 +446,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.expenseSampleScope]: "davranis", // tenant_expense_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek giderler toplamlardan DUSER
     [F.financeIsSample]: "ek", // finance_accounts/cash_entries/recurring_rules/expense_budgets: is_sample boolean default false (sabit varsayilan; mevcut satirlar degismez)
     [F.efPackNamesTl]: "ek", // platform_settings ef.packs: yalniz seed paket adlarinda "kontor" -> "TL" metin degisimi (sema/fonksiyon yok)
+    [F.appShellPlatformStaff]: "ek", // app_shell_bootstrap govdesi birebir + yeni platform_staff alani (CREATE OR REPLACE); tablo/politika/veri degismez
     [F.portalRequestsV2]: "davranis", // portal_customer_request govdesi genisler (3 yeni tur) + kind CHECK genisler; 2 yeni istek tablosu + owner_portal_tokens.weekly_report_enabled
     [F.recurringRunErrors]: "davranis", // recurring_run_due govdesi ayni; donusune errors dizisi (en cok 20: rule_id, step, code, message) eklenir
     [F.customerPortalRequests]: "ek", // yeni portal_customer_requests (iz) + anon/authenticated DEFINER RPC portal_customer_request (token icerde dogrulanir; yalniz taslak teklif/gorev/bakim yazar) + portal_customer_request_ready
@@ -599,6 +602,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "KONSEY-kazanc-ekstre-gizliligi", order: 29.99986749, title: "Kazanc gizliligi: komisyon/rapor toplulastirmasi earnings_all kapisi + ekstre satiri maas/hesap suzgeci (20260816000200, 20261011001000 ve 001200 sonrasi; sira serbest)", files: [F.earningsStatementPrivacy] },
     { id: "KONSEY3-finans-is-sample", order: 29.9999892, title: "Finans tablolarina is_sample (hesap, hareket, duzenli odeme, butce; 20261010000600/000900 ve 20261008000700 sonrasi; sira serbest, ek)", files: [F.financeIsSample] },
     { id: "ANALIZ-paket-adlari-tl", order: 32, title: "ef.packs seed paket adlari: kontor -> TL (analiz bakiyesi dili; 20261008001000 SONRASI, sira serbest, ek)", files: [F.efPackNamesTl] },
+    { id: "HIZ-kabuk-platform-personeli", order: 33, title: "Kabuk RPC: aktif platform personeli satiri tek turda (20261010000100 SONRASI, sira serbest, ek)", files: [F.appShellPlatformStaff] },
     { id: "KONSEY3-portal-istekleri-v2", order: 29.9998695, title: "Portal istekleri v2: gosterim talebi + arayis guncelleme + kiraci Odedim + malik haftalik rapor anahtari (20261007000620 SONRASI; sira serbest)", files: [F.portalRequestsV2] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
@@ -690,6 +694,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planUpgradeFulfillment, F.efPack],
     // Sureli kontor: cuzdan RPC'leri (000100) + devir tavani RPC'si (001200; no-op'a cevrilir) uzerine yazar.
     [F.efPackNamesTl, F.planPricesEfTariff],
+    [F.appShellPlatformStaff, F.appShellHiddenModules],
     [F.financeIsSample, F.financeAccountsCashEntries],
     [F.financeIsSample, F.recurringRules],
     [F.financeIsSample, F.expenseBudgetsRecurring],
