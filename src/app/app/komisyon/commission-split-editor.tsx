@@ -14,6 +14,7 @@ import { updateCommissionSplits } from "@/app/actions/commissions";
 import { useAutoAnimate } from "@/components/ui/auto-animate";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+import { FormField, FormTextarea } from "@/components/ui/form-controls";
 
 type Party = "staff" | "office" | "external";
 export type SplitInitial = { label?: string; rate?: number; profile_id?: string | null; kind?: string | null; unresolved?: boolean };
@@ -61,6 +62,9 @@ export function CommissionSplitEditor({
   // Pay satırı eklenince/silinince yumuşak geçiş.
   const rowsRef = useAutoAnimate<HTMLDivElement>();
   const [error, setError] = useState<string | null>(null);
+  // Tahsil edilmiş komisyonda sunucu gerekçe ister (needsReason); alan o zaman görünür.
+  const [needsReason, setNeedsReason] = useState(false);
+  const [reason, setReason] = useState("");
   const [pending, startTransition] = useTransition();
 
   const totalRate = rows.reduce((s, r) => s + (Number(r.rate) || 0), 0);
@@ -89,7 +93,9 @@ export function CommissionSplitEditor({
       const res = await updateCommissionSplits(
         commissionId,
         rows.map((r) => ({ label: r.label, rate: Number(r.rate) || 0, party: r.party, profileId: r.party === "staff" ? r.profileId : null })),
+        needsReason ? reason.trim() : undefined,
       );
+      if (res.needsReason) setNeedsReason(true);
       if (res.error) setError(res.error);
       else {
         setOpen(false);
@@ -188,6 +194,25 @@ export function CommissionSplitEditor({
                 <span>Toplam: %{totalRate.toFixed(0)}</span>
                 <span>{remaining >= 0 ? `Kalan: %${remaining.toFixed(0)}` : `%${Math.abs(remaining).toFixed(0)} fazla`}</span>
               </div>
+
+              {needsReason ? (
+                <FormField
+                  className="mt-3"
+                  label="Değişiklik gerekçesi"
+                  htmlFor={`split-reason-${commissionId}`}
+                  required
+                  hint="Tahsil edilmiş komisyonun paylaşımı değişiyor; gerekçe denetim kaydına yazılır (en az 5 karakter)."
+                >
+                  <FormTextarea
+                    id={`split-reason-${commissionId}`}
+                    rows={2}
+                    maxLength={300}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder="Örn. danışman payı sözleşmeye göre düzeltildi"
+                  />
+                </FormField>
+              ) : null}
 
               {error ? (
                 <p className="mt-2 text-sm font-medium text-[color:var(--viz-neg)]" role="alert">{error}</p>
