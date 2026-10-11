@@ -219,7 +219,7 @@ export type CustomerDeleteImpact = {
 };
 
 /**
- * Silmeden önce bağlı kayıt özeti: açık anlaşma, aktif talep, açık görev, bekleyen/onaylı randevu, sözleşme.
+ * Silmeden önce bağlı kayıt özeti: açık anlaşma, açık talep (yeni/aktif/eşleşti), açık görev, bekleyen/onaylı randevu, sözleşme.
  * Silme yumuşaktır (çöp kutusundan geri alınır) ama bağlı kayıtlar sahipsiz kalır; kullanıcı bunu görerek onaylar.
  */
 export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDeleteImpact> {
@@ -232,9 +232,9 @@ export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDe
   const head = { count: "exact" as const, head: true };
   const [deals, demands, tasks, appts, contracts] = await Promise.all([
     supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", ["new", "qualified", "negotiation"]),
-    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "active"),
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["new", "active", "matched"]),
     supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "open"),
-    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["pending", "confirmed"]),
+    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["pending", "confirmed", "signature"]),
     supabase.from("contracts").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list),
   ]);
   return {
