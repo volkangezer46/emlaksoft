@@ -28,6 +28,7 @@ import {
 } from "@/lib/ef-credits/plan-credits";
 import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 
 export const maxDuration = 300;
 
@@ -36,6 +37,8 @@ const CHUNK = 200;
 const CONCURRENCY = 8;
 /** Tek koşuda yakılacak en çok parti sayısı (kalan sonraki günkü koşuya). */
 const BURN_LIMIT = 2000;
+/** Şema/fonksiyon henüz yok (migration uygulanmamış) hata kodları; yalnız bunlar "atlandı" sayılır. */
+const EF_MISSING_SCHEMA_CODES = new Set(["PGRST202", "42883", "PGRST205"]);
 
 function chunks<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = [];
@@ -67,6 +70,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const ready = await admin.rpc("ef_credit_ready");
+    // Yalnız "fonksiyon/şema yok" (PGRST202 / 42883 / PGRST205) atlandı sayılır; zaman aşımı vb. gerçek hata kırmızıdır.
+    if (ready.error && !EF_MISSING_SCHEMA_CODES.has(String(ready.error.code ?? ""))) {
+      console.error("cron ef-kontor-hak hazirlik", ready.error.code ?? "unknown");
+      await recordHeartbeat("ef-kontor-hak", "error", `hazırlık sorgusu başarısız (${ready.error.code ?? "bilinmeyen"})`);
+      return NextResponse.json({ error: "wallet_ready_failed" }, { status: 500 });
+    }
     if (ready.error || ready.data !== true) {
       await recordHeartbeat("ef-kontor-hak", "ok", "atlandı: cüzdan hazır değil");
       return NextResponse.json({ ok: true, skipped: true, reason: "wallet_not_ready" });
@@ -224,9 +233,9 @@ export async function GET(req: NextRequest) {
     const skippedModule = decision.skipped.filter((s) => s.reason === "modul_kapali").length;
     const skippedOther = decision.skipped.length - skippedModule;
     const detail = `${grantedTenants.size} ofis, ${units} kontör, ${granted} hibe, ${already + alreadyKeys.size} zaten verilmiş, ${skippedModule + skippedOther} atlandı (${skippedModule} modül kapalı), ${failed} hata, ${burnedUnits} kontör süresi dolduğu için yandı (${burnedLots} parti)${burnFailed > 0 ? `, ${burnFailed} yakma hatası` : ""}`;
-    await recordHeartbeat("ef-kontor-hak", failed > 0 ? "error" : "ok", detail);
+    await recordHeartbeat("ef-kontor-hak", heartbeatFor({ failed: failed + burnFailed }), detail);
     return NextResponse.json({
-      ok: failed === 0,
+      ok: failed + burnFailed === 0,
       month: monthKey,
       offices: grantedTenants.size,
       units,

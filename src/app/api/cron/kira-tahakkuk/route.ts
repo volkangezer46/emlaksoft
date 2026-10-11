@@ -10,7 +10,7 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
 import { trDayKey } from "@/lib/clock";
 import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
-import { findNotifiedKeys, insertNotifications } from "@/lib/notify-batch";
+import { findNotifiedKeys, insertNotifications, insertNotificationsDetailed } from "@/lib/notify-batch";
 import { runBuildingDueReminders } from "@/lib/building-management/reminders";
 
 type PropRel = { property_code?: string; title?: string | null } | { property_code?: string; title?: string | null }[] | null;
@@ -60,7 +60,7 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
  *     kiracı ofise (tenant) bildirim yazar.
  *  3. Yenileme radarı: yıldönümüne (ya da sözleşme bitişine) 60 gün kala
  *     TÜFE tavanlı önerilen yeni kirayla TEK SEFERLİK bildirim yazar —
- *     mükerrer koruması href'teki `?yenileme={yıl}` işaretiyle sağlanır.
+ *     mükerrer koruması dedupe_key `rent-renew:<kira>:<yıl>` ile sağlanır.
  *  4. Kiracı hatırlatması (H3): ofis ayarı AÇIKSA (KAPALI doğar) vade yaklaşan/gelen/geciken kiralar için ofise wa.me
  *     bildirimi ve (ayrıca açıksa + ofisin kendi SMS entegrasyonu hazırsa) kiracıya SMS. Ayrıntı: src/lib/rent-reminders/run.ts.
  *
@@ -186,13 +186,6 @@ export async function GET(req: NextRequest) {
     const due = dueDateOf(String(c.period).slice(0, 10), dueDay);
     if (due > limitDate) continue; // 7 gün dolmamış
 
-    const { error: updErr } = await admin.from("rent_charges").update({ status: "overdue" }).eq("id", c.id);
-    if (updErr) {
-      console.error("kira-tahakkuk cron overdue", updErr);
-      failed += 1;
-      continue;
-    }
-
     const propRel = rentalRel?.property;
     const prop = Array.isArray(propRel) ? propRel[0] : propRel;
     const propName = prop?.title ?? prop?.property_code ?? "Portföy";
@@ -203,13 +196,30 @@ export async function GET(req: NextRequest) {
       Number(c.amount),
     );
 
-    await admin.from("notifications").insert({
-      tenant_id: c.tenant_id,
-      title: "Geciken kira tahakkuku",
-      body: `${propName} · ${donem} · ${tutar} — vade 7+ gün geçti`,
-      href: `/app/kiralama/${c.rental_id}`,
-      kind: "warning",
-    });
+    // Önce bildirim (dedupe_key ile mükerrer güvenli), sonra durum: bildirim yazılamazsa tahakkuk beklemede kalır,
+    // sonraki koşu yeniden dener ve bildirim sessizce kaybolmaz.
+    const notif = await insertNotificationsDetailed(admin, [
+      {
+        tenant_id: c.tenant_id,
+        title: "Geciken kira tahakkuku",
+        body: `${propName} · ${donem} · ${tutar} — vade 7+ gün geçti`,
+        href: `/app/kiralama/${c.rental_id}`,
+        kind: "warning",
+        dedupe_key: `rent-overdue:${c.id}`,
+      },
+    ]);
+    if (notif.failed > 0) {
+      console.error("kira-tahakkuk cron gecikme bildirimi", c.id);
+      failed += 1;
+      continue;
+    }
+
+    const { error: updErr } = await admin.from("rent_charges").update({ status: "overdue" }).eq("id", c.id);
+    if (updErr) {
+      console.error("kira-tahakkuk cron overdue", updErr);
+      failed += 1;
+      continue;
+    }
 
     overdueCount += 1;
   }
@@ -233,16 +243,19 @@ export async function GET(req: NextRequest) {
   // TÜFE: yönetimin tablosu (yoksa gömülü); kiralama sayfası ve yasal artış işlemiyle aynı kaynak.
   const tufeTable = await loadTufeTable();
   if (candidates.length > 0) {
-    const { data: existingNotifs, error: notifErr } = await admin
-      .from("notifications")
-      .select("href")
-      .in("href", candidates.map((c) => c.href))
-      .limit(candidates.length);
-    if (notifErr) console.error("kira-tahakkuk cron yenileme sorgusu", notifErr);
-
-    const already = new Set((existingNotifs ?? []).map((n) => n.href as string));
+    const renewKey = (rentalId: string, renewalDate: string) => `rent-renew:${rentalId}:${renewalDate.slice(0, 4)}`;
+    const already = await findNotifiedKeys(admin, {
+      tenantIds: [...new Set(candidates.map((c) => c.r.tenant_id))],
+      keys: candidates.map((c) => renewKey(c.r.id, c.renewalDate)),
+    });
+    if (already === null) {
+      // Mükerrer denetimi okunamadı: kör yazma yapma, hata say (sonraki koşu yeniden dener).
+      console.error("kira-tahakkuk cron yenileme sorgusu");
+      failed += 1;
+    }
     for (const { r, renewalDate, href } of candidates) {
-      if (notifErr || already.has(href)) continue;
+      const key = renewKey(r.id, renewalDate);
+      if (already === null || already.has(key)) continue;
       const prop = Array.isArray(r.property) ? r.property[0] : r.property;
       const propName = prop?.title ?? prop?.property_code ?? "Portföy";
       const increase = computeLegalIncreaseIn(tufeTable, Number(r.monthly_rent), renewalDate.slice(0, 7));
@@ -253,17 +266,20 @@ export async function GET(req: NextRequest) {
       const oneri = increase.official
         ? `önerilen yeni kira ${para(increase.newRent)} (TÜFE %${increase.appliedRate.toFixed(2)})`
         : `resmi TÜFE açıklanınca yeni kira hesaplanmalı (mevcut ${para(Number(r.monthly_rent))})`;
-      const { error: insNotifErr } = await admin.from("notifications").insert({
-        tenant_id: r.tenant_id,
-        title: "Kira yenileme yaklaşıyor",
-        body: `'${propName}' kirasının yenilenmesine ${kalanGun} gün — ${oneri}`,
-        href,
-        kind: "info",
-      });
-      if (insNotifErr) {
-        console.error("kira-tahakkuk cron yenileme bildirimi", insNotifErr);
+      const res = await insertNotificationsDetailed(admin, [
+        {
+          tenant_id: r.tenant_id,
+          title: "Kira yenileme yaklaşıyor",
+          body: `'${propName}' kirasının yenilenmesine ${kalanGun} gün — ${oneri}`,
+          href,
+          kind: "info",
+          dedupe_key: key,
+        },
+      ]);
+      if (res.failed > 0) {
+        console.error("kira-tahakkuk cron yenileme bildirimi", r.id);
         failed += 1;
-      } else renewalNotified += 1;
+      } else renewalNotified += res.written;
     }
   }
 
@@ -280,6 +296,7 @@ export async function GET(req: NextRequest) {
     if (reminders.enabledTenants > 0) {
       reminderNote = `, hatırlatma: ${reminders.office} ofis / ${reminders.sms} SMS${reminders.smsFailed ? ` (${reminders.smsFailed} SMS hatası)` : ""}`;
     }
+    failed += Number(reminders.smsFailed) || 0;
   } catch (e) {
     console.error("kira-tahakkuk cron hatirlatma", e);
     reminderNote = ", hatırlatma atlandı (hata)";
@@ -294,6 +311,7 @@ export async function GET(req: NextRequest) {
     if (payout.notified > 0) payoutNote = `, ${payout.notified} mülk sahibi ödeme hatırlatması`;
   } catch (e) {
     console.error("kira-tahakkuk cron mulk sahibi hatirlatma", e instanceof Error ? e.message : "hata");
+    failed += 1;
   }
 
   // ---- 4c) Bina aidat vade hatırlatması (M2; yalnız ofis içi bildirim, mükerrer korumalı; hata asıl işi bozmaz) ----
@@ -309,6 +327,7 @@ export async function GET(req: NextRequest) {
     if (bld.notified > 0) buildingNote = `, ${bld.notified} bina aidat hatırlatması`;
   } catch (e) {
     console.error("kira-tahakkuk cron bina aidat hatirlatma", e instanceof Error ? e.message : "hata");
+    failed += 1;
   }
 
   // ---- 5) Mart: kira geliri beyanı hatırlatması (ofise yılda bir; tutar YAZILMAZ). Anahtar kolonu yoksa yazılmaz. ----
@@ -342,6 +361,7 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     console.error("kira-tahakkuk cron beyan hatirlatma", e instanceof Error ? e.message : "hata");
+    failed += 1;
   }
 
   // ---- 6) Düzenli ödemeler (Finans Paket B): vadesi gelen kural için hareket (+ ofis gideri) ya da onay taslağı, vade -3 gün hatırlatma.
@@ -353,15 +373,21 @@ export async function GET(req: NextRequest) {
       p_skip_tenants: tenantsDisabledFor(disabledModules, "expenses"),
     });
     if (recErr) {
-      if (recErr.code !== "PGRST202" && recErr.code !== "42883") console.error("kira-tahakkuk cron duzenli odeme", recErr.code);
+      // PGRST202 / 42883: fonksiyon yok = migration uygulanmamış (atlanır); diğer hatalar cron'u kırmızıya çevirir.
+      if (recErr.code !== "PGRST202" && recErr.code !== "42883") {
+        console.error("kira-tahakkuk cron duzenli odeme", recErr.code);
+        failed += 1;
+      }
     } else {
       const r = (rec ?? {}) as { posted?: number; drafts?: number; reminded?: number; failed?: number };
+      failed += Number(r.failed) || 0;
       if ((r.posted ?? 0) + (r.drafts ?? 0) + (r.reminded ?? 0) + (r.failed ?? 0) > 0) {
         recurringNote = `, düzenli ödeme: ${r.posted ?? 0} kayıt / ${r.drafts ?? 0} taslak / ${r.reminded ?? 0} hatırlatma${r.failed ? ` (${r.failed} hata)` : ""}`;
       }
     }
   } catch (e) {
     console.error("kira-tahakkuk cron duzenli odeme", e instanceof Error ? e.message : "hata");
+    failed += 1;
   }
 
   await recordHeartbeat(
