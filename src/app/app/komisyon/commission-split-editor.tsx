@@ -13,9 +13,23 @@ import {
 import { updateCommissionSplits } from "@/app/actions/commissions";
 import { useAutoAnimate } from "@/components/ui/auto-animate";
 import { AnimatedNumber } from "@/components/ui/animated-number";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
+
+type Party = "staff" | "office" | "external";
+export type SplitInitial = { label?: string; rate?: number; profile_id?: string | null; kind?: string | null; unresolved?: boolean };
+export type SplitStaff = { id: string; name: string };
 
 /** `id`: yalnız istemci tarafı kararlı satır anahtarı (animasyon + odak korunur); sunucuya gitmez. */
-type Row = { id: number; label: string; rate: string };
+type Row = { id: number; party: Party; profileId: string; label: string; rate: string; unresolved: boolean };
+
+const PARTY_LABEL: Record<Party, string> = { staff: "Ofis personeli", office: "Ofis payı", external: "Dış taraf" };
+
+function rowFromInitial(s: SplitInitial, i: number): Row {
+  const rate = String(s.rate ?? "");
+  if (s.profile_id) return { id: i, party: "staff", profileId: s.profile_id, label: s.label ?? "", rate, unresolved: false };
+  if (s.kind === "office" || (s.label ?? "").trim().toLocaleLowerCase("tr") === "ofis") return { id: i, party: "office", profileId: "", label: "Ofis", rate, unresolved: false };
+  return { id: i, party: "external", profileId: "", label: s.label ?? "", rate, unresolved: Boolean(s.unresolved) };
+}
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -25,17 +39,23 @@ export function CommissionSplitEditor({
   commissionId,
   gross,
   initial,
+  staff,
 }: {
   commissionId: string;
   gross: number;
-  initial: { label?: string; rate?: number }[] | null;
+  initial: SplitInitial[] | null;
+  /** Ofis personeli (taraf seçici). */
+  staff: readonly SplitStaff[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>(
     initial && initial.length > 0
-      ? initial.map((s, i) => ({ id: i, label: s.label ?? "", rate: String(s.rate ?? "") }))
-      : [{ id: 0, label: "Danışman", rate: "60" }, { id: 1, label: "Ofis", rate: "40" }],
+      ? initial.map(rowFromInitial)
+      : [
+          { id: 0, party: "staff", profileId: "", label: "", rate: "60", unresolved: false },
+          { id: 1, party: "office", profileId: "", label: "Ofis", rate: "40", unresolved: false },
+        ],
   );
   const nextId = useRef(Math.max(2, initial?.length ?? 0));
   // Pay satırı eklenince/silinince yumuşak geçiş.
@@ -52,7 +72,7 @@ export function CommissionSplitEditor({
   function addRow() {
     const id = nextId.current;
     nextId.current += 1;
-    setRows((rs) => [...rs, { id, label: "", rate: "" }]);
+    setRows((rs) => [...rs, { id, party: "external", profileId: "", label: "", rate: "", unresolved: false }]);
   }
   function removeRow(i: number) {
     setRows((rs) => rs.filter((_, idx) => idx !== i));
@@ -60,10 +80,15 @@ export function CommissionSplitEditor({
 
   function save() {
     setError(null);
+    const missing = rows.find((r) => Number(r.rate) > 0 && (r.party === "staff" ? !r.profileId : r.party === "external" ? !r.label.trim() : false));
+    if (missing) {
+      setError(missing.party === "staff" ? "Ofis personeli satırında bir kişi seçin." : "Dış taraf satırına ad yazın.");
+      return;
+    }
     startTransition(async () => {
       const res = await updateCommissionSplits(
         commissionId,
-        rows.map((r) => ({ label: r.label, rate: Number(r.rate) || 0 })),
+        rows.map((r) => ({ label: r.label, rate: Number(r.rate) || 0, party: r.party, profileId: r.party === "staff" ? r.profileId : null })),
       );
       if (res.error) setError(res.error);
       else {
@@ -98,13 +123,39 @@ export function CommissionSplitEditor({
                 {rows.map((r, i) => {
                   const amt = Math.round(gross * ((Number(r.rate) || 0) / 100));
                   return (
-                    <div key={r.id} className="flex items-center gap-2">
-                      <input
-                        value={r.label}
-                        onChange={(e) => update(i, { label: e.target.value })}
-                        placeholder="Taraf (ör. Danışman, Ofis, Referans)"
-                        className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
-                      />
+                    <div key={r.id} className="flex flex-wrap items-center gap-2">
+                      <div className="w-36 shrink-0">
+                        <Select value={r.party} onValueChange={(v) => update(i, { party: v as Party, unresolved: false })}>
+                          <SelectTrigger aria-label="Taraf türü" placeholder="Taraf" />
+                          <SelectContent>
+                            {(Object.keys(PARTY_LABEL) as Party[]).map((k) => (
+                              <SelectItem key={k} value={k}>{PARTY_LABEL[k]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {r.party === "staff" ? (
+                        <div className="min-w-0 flex-1">
+                          <Select value={r.profileId} onValueChange={(v) => update(i, { profileId: v })}>
+                            <SelectTrigger aria-label="Ofis personeli" placeholder="Kişi seçin" />
+                            <SelectContent>
+                              {staff.map((m) => (
+                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : r.party === "external" ? (
+                        <input
+                          value={r.label}
+                          onChange={(e) => update(i, { label: e.target.value })}
+                          placeholder="Dış taraf adı (ör. referans veren)"
+                          aria-label="Dış taraf adı"
+                          className="min-w-0 flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent"
+                        />
+                      ) : (
+                        <span className="min-w-0 flex-1 px-1 text-sm text-text-muted">Ofisin payı</span>
+                      )}
                       <div className="relative w-20 shrink-0">
                         <input
                           type="number" min="0" max="100" step="1"
@@ -119,6 +170,11 @@ export function CommissionSplitEditor({
                       <button type="button" onClick={() => removeRow(i)} aria-label="Sil" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint hover:bg-[color-mix(in_srgb,var(--viz-neg)_12%,transparent)] hover:text-[color:var(--viz-neg)]">
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
+                      {r.unresolved ? (
+                        <p className="w-full text-xs font-medium text-[color:var(--pm-warn-text)]" role="status">
+                          &quot;{r.label}&quot; bir personelle eşleşmedi; bu pay kimsenin kazancına yazılmıyor. Ofis personeli seçin veya dış taraf olarak bırakın.
+                        </p>
+                      ) : null}
                     </div>
                   );
                 })}

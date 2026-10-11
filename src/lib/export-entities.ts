@@ -79,7 +79,7 @@ const COMMISSION_STATUS_TR: Record<string, string> = {
   cancelled: "İptal",
 };
 
-type SplitRow = { label?: string; amount?: number | string | null };
+type SplitRow = { label?: string; amount?: number | string | null; kind?: string | null };
 
 /** splits: "Ofis" etiketli satırlar ofis payı, kalanlar danışman payı (kuruşa yuvarlı). Boş/bozuksa null. */
 export function commissionShares(splits: unknown): { advisor: number | null; office: number | null } {
@@ -89,7 +89,9 @@ export function commissionShares(splits: unknown): { advisor: number | null; off
   for (const s of splits as SplitRow[]) {
     const amount = Number(s?.amount ?? 0);
     if (!Number.isFinite(amount)) continue;
-    if (String(s?.label ?? "").trim().toLocaleLowerCase("tr-TR").startsWith("ofis")) office += amount;
+    // Taraf türü (kind) varsa o esastır; yoksa eski serbest metin etiketi ("Ofis...").
+    const isOffice = s?.kind ? s.kind === "office" : String(s?.label ?? "").trim().toLocaleLowerCase("tr-TR").startsWith("ofis");
+    if (isOffice) office += amount;
     else advisor += amount;
   }
   return { advisor: Math.round(advisor * 100) / 100, office: Math.round(office * 100) / 100 };
