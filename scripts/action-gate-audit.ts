@@ -78,6 +78,7 @@ const MUAF: Record<string, string> = {
   "booking-public.ts::createPublicBooking": "Online randevu rezervasyonu; token danismanin booking_settings kaydini cozer.",
   "open-house-public.ts::registerOpenHouseVisitorByToken": "Acik ev QR self check-in; token etkinlige sabit.",
   "owner-portal-offers.ts::respondToOfferByToken": "Malik portalinda teklif onay/ret; token ile.",
+  "owner-price-proposal.ts::decideOwnerPriceProposal": "Malik portalinda fiyat onerisi onay/ret/not; token ve oneri-portfoy eslesmesi SQL RPC icinde (20261012000800), service_role yok, IP hiz siniri.",
   "customer-portal-feedback.ts::submitMatchFeedbackByToken": "Musteri portali begen/gec geri bildirimi; token ile.",
   "customer-portal-requests.ts::submitPortalRequest": "Musteri portali teklif/erteleme/bakim istegi; token ve sahiplik SQL RPC icinde (20261007000620), service_role yok.",
   "survey-public.ts::submitSurveyByToken": "NPS memnuniyet anketi; token ankete sabit.",
