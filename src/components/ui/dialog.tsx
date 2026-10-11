@@ -48,7 +48,7 @@ export function DialogDrawerContent({
       <DialogPrimitive.Content
         {...props}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[min(88vw,300px)] overflow-hidden shadow-[var(--shadow-lg)] outline-none",
+          "fixed inset-y-0 left-0 z-50 h-dvh max-h-dvh w-[min(88vw,300px)] overflow-hidden overscroll-contain shadow-[var(--shadow-lg)] outline-none",
           responsiveClassName,
           className,
         )}
@@ -79,7 +79,7 @@ export function DialogSheetContent({
       <DialogPrimitive.Content
         {...props}
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] outline-none",
+          "fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-[var(--radius-panel)] border-t border-line bg-surface pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[var(--shadow-lg)] outline-none",
           responsiveClassName,
           className,
         )}

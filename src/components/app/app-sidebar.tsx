@@ -3,13 +3,13 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Lock, Menu, Plus, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
 import { hubNav, resolveActiveHub, type HubPage, type NavHub } from "@/lib/nav-config";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
-import { getHrefStore } from "@/lib/nav-memory";
+import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
@@ -17,6 +17,7 @@ import { MobileNewSheet, mobileNewActions } from "@/components/app/mobile-new-sh
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
+import { DrawerGroup } from "@/components/ui/console/drawer-kit";
 import { MenuSearchButton } from "@/components/ui/console/quick-access";
 import { Dialog, DialogClose, DialogDrawerContent, DialogTitleHidden, DialogTrigger } from "@/components/ui/dialog";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
@@ -127,6 +128,37 @@ export function AppSidebar({
   const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
   useIdlePrefetch(idleTargets, 14);
 
+  // Mobil çekmece: ardışık aynı grup başlıklı merkezler tek bölümde toplanır (akordeon); etkin merkezin grubu hep açık.
+  const hubSections = useMemo(() => {
+    const out: { key: string; group: string | null; hubs: NavHub[] }[] = [];
+    for (const hub of nav.hubs) {
+      const last = out[out.length - 1];
+      if (last && last.group === (hub.group ?? null)) last.hubs.push(hub);
+      else out.push({ key: `g${out.length}`, group: hub.group ?? null, hubs: [hub] });
+    }
+    return out;
+  }, [nav.hubs]);
+  const [openGroups, setOpenGroups] = useState<string[]>([]);
+
+  // "Son açılanlar": yalnız sayfa yolları, yerel ve kullanıcıya özel (localStorage, try/catch); menüdeki yetkili sayfalarla süzülür.
+  const recentStore = getHrefStore("recent", storageScope);
+  const recents = useSyncExternalStore(recentStore.subscribe, recentStore.read, recentStore.getServerSnapshot);
+  const pageIndex = useMemo(() => {
+    const m = new Map<string, HubPage>();
+    for (const p of [...nav.hubs, ...nav.dock].flatMap((h) => h.pages).concat(nav.tools)) if (!m.has(p.href)) m.set(p.href, p);
+    return m;
+  }, [nav]);
+  const currentPage = active.pageHref;
+  useEffect(() => {
+    if (!currentPage || currentPage === "/app" || !pageIndex.has(currentPage)) return;
+    const cur = recentStore.read();
+    if (cur[0] !== currentPage) recentStore.write(pushRecent(cur, currentPage));
+  }, [currentPage, pageIndex, recentStore]);
+  const recentRows = recents
+    .filter((h) => h !== currentPage && h !== "/app" && pageIndex.has(h))
+    .slice(0, 3)
+    .map((h) => pageIndex.get(h)!);
+
   const creatable = creatableModules ?? accessibleModules;
   const actionsFor = (hub: NavHub) => {
     const owned = hub.pages.map((p) => p.href).filter((h) => h !== "/app");
@@ -220,22 +252,72 @@ export function AppSidebar({
 
       <MenuSearchButton onActivate={() => setOpen(false)} />
 
-      <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
+      <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 overscroll-contain px-3" innerClassName="pb-3">
         <div className="sb-expanded">
-          <div className="space-y-0.5 pt-1">
-            {nav.hubs.map((hub, i) => (
-              <Fragment key={hub.id}>
-                {hub.group && hub.group !== nav.hubs[i - 1]?.group ? (
-                  <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:pt-1">{hub.group}</p>
-                ) : null}
-                {renderHub(hub, {})}
-              </Fragment>
-            ))}
-          </div>
+          {variant === "drawer" ? (
+            <>
+              {recentRows.length > 0 ? (
+                <div className="pt-1">
+                  <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-white/70">Son açılanlar</p>
+                  <div className="space-y-0.5">
+                    {recentRows.map((r) => (
+                      <Link
+                        key={r.href}
+                        href={r.href}
+                        data-nav-link
+                        onClick={() => setOpen(false)}
+                        className="nav-row focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 pr-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white"
+                      >
+                        <r.icon className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
+                        <span className="min-w-0 flex-1 truncate">{r.label}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+              {hubSections.map((sec) => {
+                const hasActive = sec.hubs.some((h) => h.id === activeHubId) && !active.inDock && !active.inTools;
+                const sectionBadge = sec.hubs.reduce((n, h) => n + (hubBadge(h, badges)?.count ?? 0), 0);
+                if (!sec.group) {
+                  return (
+                    <div key={sec.key} className="space-y-0.5 pt-1">
+                      {sec.hubs.map((hub) => renderHub(hub, {}))}
+                    </div>
+                  );
+                }
+                return (
+                  <DrawerGroup
+                    key={sec.key}
+                    id={sec.key}
+                    title={sec.group}
+                    count={sec.hubs.length}
+                    expanded={hasActive || openGroups.includes(sec.key)}
+                    locked={hasActive}
+                    badge={sectionBadge}
+                    onToggle={() => setOpenGroups((cur) => (cur.includes(sec.key) ? cur.filter((k) => k !== sec.key) : [...cur, sec.key]))}
+                  >
+                    {sec.hubs.map((hub) => renderHub(hub, {}))}
+                  </DrawerGroup>
+                );
+              })}
+            </>
+          ) : (
+            <div className="space-y-0.5 pt-1">
+              {nav.hubs.map((hub, i) => (
+                <Fragment key={hub.id}>
+                  {hub.group && hub.group !== nav.hubs[i - 1]?.group ? (
+                    <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:pt-1">{hub.group}</p>
+                  ) : null}
+                  {renderHub(hub, {})}
+                </Fragment>
+              ))}
+            </div>
+          )}
 
-          {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle. */}
+          {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle.
+              Mobil çekmecede Ayarlar/Abonelik/Yardım kaydırma alanının dışında, yapışkan alt şeritte durur. */}
           <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">
-            {nav.dock.map((hub) => renderHub(hub, { dock: true }))}
+            {variant === "desktop" ? nav.dock.map((hub) => renderHub(hub, { dock: true })) : null}
             {nav.tools.length > 0 ? (
               <>
                 <button
@@ -272,6 +354,7 @@ export function AppSidebar({
         </div>
 
         {/* İkon modu (64px): merkez başına tek ikon; hover/odakta sağda sayfa listesi + hızlı eylemler. */}
+        {variant === "desktop" ? (
         <div className="sb-rail space-y-1 pt-3">
           {nav.hubs.map((hub) => {
             const isActive = hub.id === activeHubId && !active.inDock;
@@ -342,7 +425,32 @@ export function AppSidebar({
             </NavFlyout>
           ) : null}
         </div>
+        ) : null}
       </NavScroller>
+
+      {/* Mobil çekmece: Ayarlar/Abonelik/Yardım yapışkan alt şeritte, tek satır kare düğmeler (kaydırmadan hep erişilir). */}
+      {variant === "drawer" && nav.dock.length > 0 ? (
+        <div className="grid shrink-0 gap-1 border-t border-white/10 px-3 py-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(nav.dock.length, 4)}, minmax(0, 1fr))` }}>
+          {nav.dock.map((hub) => {
+            const isActive = hub.id === activeHubId && active.inDock;
+            return (
+              <Link
+                key={hub.id}
+                href={hub.href}
+                data-nav-link
+                aria-current={isActive ? "page" : undefined}
+                onClick={() => setOpen(false)}
+                className={`focus-ring flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[var(--radius-control)] px-1 text-center text-xs font-semibold leading-tight transition-colors ${
+                  isActive ? "nav-pill text-white" : "text-white/75 hover:bg-white/6 hover:text-white"
+                }`}
+              >
+                <hub.icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                <span className="max-w-full truncate">{hub.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Alt şerit TEK satır: kompakt ofis durumu çipi (paket + deneme günü / en dolu kullanım; tıklayınca panel)
           ve vitrin kısayolu. Eski büyük "Ofis durumu" kartı kaldırıldı (kullanıcı geri bildirimi: gereksiz büyük). */}
@@ -402,9 +510,9 @@ export function AppSidebar({
       </aside>
       <DialogDrawerContent id="app-mobile-navigation" aria-describedby={undefined} responsiveClassName="lg:hidden">
         <DialogTitleHidden>Panel menüsü</DialogTitleHidden>
-        <aside className="sb-surface flex h-full flex-col">
+        <aside className="sb-surface flex h-full min-h-0 flex-col pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pt-[env(safe-area-inset-top)]">
           <DialogClose asChild>
-            <button type="button" className="absolute right-3 top-2 z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+            <button type="button" className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
           </DialogClose>
           {renderContent("drawer")}
         </aside>

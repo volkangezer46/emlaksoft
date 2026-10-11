@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import Link from "@/components/ui/smart-link";
+import { MorphNavScrollActive } from "@/components/ui/morph-nav-scroll";
 import { cn } from "@/lib/utils";
 
 export type SegmentTabItem = {
@@ -33,7 +34,7 @@ export function SegmentTabs({
 }) {
   if (items.length < 2) return null;
   return (
-    <nav aria-label={label} className={cn("no-print -mx-1 overflow-x-auto px-1 py-0.5", className)}>
+    <nav aria-label={label} className={cn("no-print strip-fade -mx-1 overflow-x-auto px-1 py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>
       <ul className="inline-flex min-w-max items-center gap-1 rounded-full border border-line bg-canvas p-1">
         {items.map((item) => {
           const on = item.id === active;
@@ -57,6 +58,7 @@ export function SegmentTabs({
             </li>
           );
         })}
+        <MorphNavScrollActive activeId={active} levels={2} />
       </ul>
     </nav>
   );
