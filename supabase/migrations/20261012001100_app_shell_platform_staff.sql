@@ -1,7 +1,7 @@
--- MIGRATION 20261012000700_app_shell_platform_staff.sql
+-- MIGRATION 20261012001100_app_shell_platform_staff.sql
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
--- `npm run db:migrate -- --only 20261012000700_app_shell_platform_staff.sql` ile uygular.
--- Geri alma: supabase/rollbacks/20261012000700_app_shell_platform_staff.rollback.sql
+-- `npm run db:migrate -- --only 20261012001100_app_shell_platform_staff.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20261012001100_app_shell_platform_staff.rollback.sql
 -- BAGIMLILIK: public.app_shell_bootstrap() (20261010000100), public.platform_staff.
 --
 -- AMAC (kabuk zinciri, hiz): /app layout'u kabuk RPC'siyle PARALEL ayri bir platform_staff sorgusu atiyordu.
