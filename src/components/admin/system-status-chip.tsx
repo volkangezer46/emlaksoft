@@ -12,7 +12,7 @@ import { systemStatusOf } from "@/lib/admin/system-status";
  * tıklayınca/klavyeyle (Enter, Space; Escape kapatır) ayrıntı paneli açılır. Değerler gerçek ölçümden
  * (`getAdminHealth`, 30 sn önbellek); uydurma kesintisiz süre yok. Durum metni `aria-live="polite"`.
  */
-export function SystemStatusChip({ health }: { health: AdminHealth }) {
+export function SystemStatusChip({ health, clock = "" }: { health: AdminHealth; clock?: string }) {
   const s = systemStatusOf(health);
   const dot = s.level === "ok" ? "bg-mint-500 status-pulse" : s.level === "warn" ? "bg-amber-500" : "bg-danger-500";
   const tone = s.level === "ok" ? "bg-mint-500/10 text-mint-700" : s.level === "warn" ? "bg-amber-500/12 text-amber-800" : "bg-danger-500/12 text-danger-600";
@@ -21,11 +21,16 @@ export function SystemStatusChip({ health }: { health: AdminHealth }) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`focus-ring inline-flex h-10 items-center gap-2 rounded-full px-3 text-sm font-bold ${tone} touch:min-h-11`}
+          className="focus-ring inline-flex h-11 items-center gap-2 rounded-full border border-hairline bg-surface-raised px-3.5 text-sm font-semibold text-text shadow-[var(--elev-1)] transition-colors hover:border-border-interactive"
           aria-label={`Sistem durumu: ${s.label}. Ayrıntıyı aç`}
         >
           <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden />
           <span aria-live="polite" className="hidden xl:inline">{s.label}</span>
+          {clock ? (
+            <span className="hidden border-l border-hairline pl-2 tabular-nums text-text-muted lg:inline" aria-label={`Saat ${clock}`}>
+              {clock}
+            </span>
+          ) : null}
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-4 text-sm">

@@ -132,12 +132,12 @@ function StatusStrip({
 }) {
   const body = (
     <>
-      <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden />
+      <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{children}</span>
       {href ? <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
     </>
   );
-  const cls = `tone-${tone} flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-2.5 text-sm font-semibold`;
+  const cls = `tone-${tone} flex items-center gap-2.5 rounded-[var(--radius-control)] px-3.5 py-1.5 text-xs font-medium leading-5`;
   return href ? (
     <Link href={href} role={role} className={`${cls} focus-ring transition-[filter] hover:brightness-[0.98]`}>
       {body}

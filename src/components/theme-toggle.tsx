@@ -11,7 +11,7 @@ const AppearancePanel = lazy(() => import("@/components/appearance-panel").then(
 const ICONS: Record<ThemePref, typeof Sun> = { system: Monitor, light: Sun, dark: Moon };
 
 /** Üst çubuktaki "Görünüm" düğmesi: tema modu + vurgu rengi paneli açar. */
-export function ThemeToggle() {
+export function ThemeToggle({ className = "" }: { className?: string } = {}) {
   const pref = useSyncExternalStore(subscribeTheme, readThemePref, () => "system" as ThemePref);
   const Current = ICONS[pref] ?? Palette;
 
@@ -19,7 +19,7 @@ export function ThemeToggle() {
     <Popover>
       <PopoverTrigger
         aria-label="Görünüm ve tema ayarları"
-        className="focus-ring inline-flex h-11 w-11 items-center justify-center sm:h-10 sm:w-10 rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition-colors hover:text-text"
+        className={`focus-ring inline-flex h-11 w-11 items-center justify-center sm:h-10 sm:w-10 rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition-colors hover:text-text ${className}`}
       >
         <Current className="h-4 w-4" aria-hidden />
       </PopoverTrigger>

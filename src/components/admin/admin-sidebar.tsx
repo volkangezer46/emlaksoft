@@ -121,7 +121,7 @@ export function AdminSidebar({
     return (
       <div key={section.id}>
         {section.title ? (
-          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
             <button
               type="button"
               onClick={() => toggle(`o-${section.id}`)}
@@ -137,7 +137,7 @@ export function AdminSidebar({
             </button>
           </div>
         ) : (
-          <div className="pt-3" />
+          <div className="pt-4" />
         )}
         {expanded ? (
           <div id={`adm-${section.id}`} className="space-y-0.5">
@@ -191,7 +191,7 @@ export function AdminSidebar({
           {groups.map(renderGroup)}
           {other.length > 0 ? (
             <div>
-              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
                 <button
                   type="button"
                   onClick={() => toggle("diger-acik")}
@@ -258,7 +258,7 @@ export function AdminSidebar({
           target="_blank"
           rel="noopener noreferrer"
           title="Ana siteyi yeni sekmede aç"
-          className="focus-ring flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white touch:min-h-11"
+          className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white md:min-h-10"
         >
           <Globe className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
           <span className="sb-label flex-1 truncate">Siteyi görüntüle</span>
