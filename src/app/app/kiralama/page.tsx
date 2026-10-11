@@ -366,7 +366,7 @@ export default async function KiralamaPage({
       <ListHero
         art="kiralama"
         title="Mülk yönetimi"
-        eyebrow="Kira takibi"
+        eyebrow="Kiralar"
         description="Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri."
         actions={
           <>

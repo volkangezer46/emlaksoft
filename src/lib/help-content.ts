@@ -449,7 +449,7 @@ export const GUIDES: readonly Guide[] = [
     steps: [
       "Finans bölümünden Giderler sayfasını açın ve gider ekleyin.",
       "Kategori dağılımı grafiği ve tablo giderlerinizi özetler.",
-      "Mülk yönetimi sayfasındaki \"Aidat & site\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
+      "Mülk yönetimi sayfasındaki \"Aidatlar\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
       "İki sayfa da paketinize bağlıdır; kilitliyse Abonelik sayfası hangi pakette açıldığını söyler.",
       "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Roller'den expenses iznini vermelidir.",
     ],
