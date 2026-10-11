@@ -201,3 +201,46 @@ export function sqlRaiseMessage(err: unknown, codes: readonly string[] = ["P0001
   if (/row-level security|permission denied|violates|duplicate key|syntax error|does not exist|function |relation /i.test(msg)) return null;
   return msg;
 }
+
+/**
+ * Supabase Auth / MFA (giriş, 2FA, şifre) hatasını kullanıcı dostu TÜRKÇE cümleye çevirir.
+ * Ham (İngilizce) `error.message` ASLA geçmez; bilinmeyen hata tür ipucuna düşer.
+ * İstemci bileşenlerinde de güvenle kullanılır (saf, log yazmaz).
+ */
+export function authErrorMessage(err: unknown, fallback = "İşlem tamamlanamadı"): string {
+  if (err instanceof ActionUserError) return err.message;
+  const e = asErrorLike(err);
+  const code = e?.code == null ? "" : String(e.code);
+  const msg = typeof e?.message === "string" ? e.message : "";
+  const subject = actionErrorSubject(fallback);
+
+  if (code === "invalid_credentials" || /invalid login credentials/i.test(msg)) {
+    return "E-posta veya şifre hatalı. Bilgilerinizi kontrol edip tekrar deneyin.";
+  }
+  if (code === "email_not_confirmed" || /email not confirmed/i.test(msg)) {
+    return "E-posta adresiniz henüz doğrulanmadı. Gelen kutunuzdaki doğrulama bağlantısına tıklayın.";
+  }
+  if (code === "mfa_verification_failed" || /invalid totp|mfa.*(fail|invalid)|verification failed/i.test(msg)) {
+    return "Doğrulama kodu hatalı ya da süresi dolmuş. Authenticator uygulamasındaki güncel 6 haneli kodu girin.";
+  }
+  if (code === "mfa_challenge_expired" || /challenge.*expired/i.test(msg)) {
+    return "Doğrulama isteğinin süresi doldu. Yeni bir kod ile tekrar deneyin.";
+  }
+  if (code === "mfa_factor_not_found" || /factor.*not found/i.test(msg)) {
+    return "Doğrulama yöntemi bulunamadı. Sayfayı yenileyip kurulumu baştan başlatın.";
+  }
+  if (code === "mfa_factor_name_conflict" || code === "too_many_enrolled_mfa_factors") {
+    return "Bu hesapta zaten bir doğrulama yöntemi kayıtlı. Sayfayı yenileyip tekrar deneyin.";
+  }
+  if (code === "same_password" || /different from the old/i.test(msg)) {
+    return "Yeni şifreniz eski şifrenizle aynı olamaz.";
+  }
+  if (code === "user_banned" || /user.*banned/i.test(msg)) {
+    return "Hesabınıza erişim kısıtlandı. Ofis yöneticinize ya da destek ekibine başvurun.";
+  }
+  if (/session missing|auth session missing/i.test(msg)) {
+    return `${subject}: ${ACTION_ERROR_HINTS.session}`;
+  }
+  const kind = classifyActionError(err);
+  return `${subject}: ${ACTION_ERROR_HINTS[kind]}`;
+}
