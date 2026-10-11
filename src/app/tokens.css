@@ -276,7 +276,7 @@
 
   --font-sans: var(--font-manrope);
   --font-body: var(--font-inter);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-geist-mono, ui-monospace, monospace);
 
   --radius-chip: 8px;
   --radius-control: 10px;
