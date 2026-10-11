@@ -24,17 +24,12 @@ function walk(dir: string, out: string[] = []): string[] {
 const files = walk(SRC);
 const rel = (f: string) => relative(ROOT, f).replace(/\\/g, "/");
 
-/** Paralel ajanın (A: projeler) dosyaları birleşene kadar eski yolu kullanabilir; sonra liste boşalır ve sarmalayıcı silinir. */
-const DEPRECATED_IMPORT_ALLOW = new Set([
-  "src/app/app/projeler/page.tsx",
-  "src/app/app/projeler/[id]/loading.tsx",
-  "src/app/app/projeler/[id]/units-board.tsx",
-]);
-
 describe("kanonik UI bileşenleri", () => {
   it("silinen kopyalar yok", () => {
     for (const f of [
       "src/components/ui/empty-state-v3.tsx",
+      "src/components/app/empty-state.tsx",
+      "src/components/app/skeleton.tsx",
       "src/components/admin/count-up.tsx",
       "src/app/app/odometer-number.tsx",
       "src/app/app/_home/format.ts",
@@ -48,8 +43,7 @@ describe("kanonik UI bileşenleri", () => {
   it("@deprecated sarmalayıcılara yeni içe aktarım yok (boş durum / iskelet)", () => {
     const offenders = files
       .filter((f) => /["']@\/components\/app\/(empty-state|skeleton)["']/.test(readFileSync(f, "utf8")))
-      .map(rel)
-      .filter((f) => !DEPRECATED_IMPORT_ALLOW.has(f));
+      .map(rel);
     expect(offenders).toEqual([]);
   });
 
@@ -63,6 +57,29 @@ describe("kanonik UI bileşenleri", () => {
       .filter((f) => /showing:\s*["']Yer gösterme["']/.test(readFileSync(f, "utf8")))
       .map(rel)
       .filter((f) => f !== "src/lib/appointment-labels.ts");
+    expect(offenders).toEqual([]);
+  });
+
+  /**
+   * Boş durum RATCHET (konsey #34): yeni yerel "Empty*" bileşeni YAZILMAZ, `ui/empty-state` kullanılır.
+   * Aşağıdaki liste mevcut gerekçeli istisnalardır (TV panosu kendi koyu CSS'i, public portal kiti, tablo satırı, grafik
+   * çizimi vb.); liste yalnız KÜÇÜLEBİLİR.
+   */
+  it("yerel boş durum bileşeni yok (kanonik ui/empty-state)", () => {
+    const ALLOWED = new Set([
+      "src/app/app/pano-tv/tv-board.tsx", // TV panosu: kendi yüksek kontrast CSS'i
+      "src/components/admin/admin-table.tsx", // AdminEmpty: tablo gövdesi
+      "src/components/public/portal-kit.tsx", // PortalEmpty: public token'lı portal kiti
+      "src/components/public/vitrin-fav.tsx", // FavEmptyNotice: vitrin favori bilgisi
+      "src/components/tools/tool-ui.tsx", // EmptyMsg: public araç mesajı
+      "src/components/ui/premium/charts.tsx", // EmptyArt: grafik çizimi
+      "src/components/ui/table.tsx", // TableEmptyRow: tablo kanonik satırı
+      "src/components/ui/empty-state.tsx", // kanonik bileşenin kendisi
+    ]);
+    const offenders = files
+      .filter((f) => /\bfunction\s+(?:Empty\w*|[A-Z]\w*Empty\w*)\s*\(/.test(readFileSync(f, "utf8")))
+      .map(rel)
+      .filter((f) => !ALLOWED.has(f));
     expect(offenders).toEqual([]);
   });
 });

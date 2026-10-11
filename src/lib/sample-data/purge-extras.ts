@@ -12,10 +12,13 @@ import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
  *     Mahsup bağlantıları (`owner_charge_links.unit_charge`) kira silinirken kaskatlanır.
  *  3. Örnek meydan okumalar (açıklaması `[Örnek veri]` ile başlar; `league_challenges`'ta is_sample yok).
  *  4. Örnek danışman uzmanlık/bölge satırları (`is_sample`; profiller silinmez). Havuz kayıtları örnek portföyle kaskatlanır.
+ *  5. Örnek finans kayıtları (20261012000400 `is_sample`): kasa hareketleri → düzenli ödeme kuralları → hesaplar → bütçe.
+ *     Hesap silinince kalan hareket/kural/oluşum/ekstre kayıtları ON DELETE CASCADE ile gider; gerçek hesaba yazılmış örnek
+ *     hareket ayrıca silinir. Gerçek (is_sample=false) hiçbir finans satırına dokunulmaz.
  *
  * Kendiliğinden temizlenenler (ekstra adım gerekmez): kira tahsilat/sözleşme/hakediş/yansıtma (rentals kaskatı), tapu süreci adımları
  * (deals kaskatı), ilan analizi (properties kaskatı), örnek giderler (is_sample).
- * Temizlenmeyen (bilinçli): gider bütçesi (örnek modda hiç yazılmaz) ve lig ayarı (boş kural = varsayılan; zararsız).
+ * Temizlenmeyen (bilinçli): lig ayarı (boş kural = varsayılan; zararsız).
  */
 export type PurgeExtrasReport = { deleted: Record<string, number>; failed: string[] };
 
@@ -42,5 +45,9 @@ export async function purgeSampleModuleData(db: SupabaseClient, tenantId: string
   // Örnek danışman uzmanlık/bölge satırları (20261010000800 is_sample). Havuz kayıtları ve olayları örnek portföyle birlikte kaskatlanır.
   await step("advisor_specialties", () => db.from("advisor_specialties").delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
   await step("advisor_regions", () => db.from("advisor_regions").delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
+  // Örnek finans: önce hareket ve kurallar, sonra hesaplar, en son bütçe (20261012000400; kolon yoksa "etkin değil" sayılır).
+  for (const table of ["cash_entries", "recurring_rules", "finance_accounts", "expense_budgets"] as const) {
+    await step(table, () => db.from(table).delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
+  }
   return report;
 }

@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { EmptyState } from "@/components/app/empty-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { searchCustomers } from "@/app/actions/lookup";
 import { UnitPaymentPlan } from "./unit-payment-plan";
 import { AddUnitsTrigger } from "./add-units-panel";

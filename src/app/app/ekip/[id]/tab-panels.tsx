@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now, trDayKey } from "@/lib/clock";
 import { StatRow, type StatRowItem } from "@/components/ui/stat-row";
-import { EmptyStateV3 } from "@/components/ui/empty-state";
+import { EmptyState, EmptyStateV3 } from "@/components/ui/empty-state";
 import { getStageLabels } from "@/lib/definitions";
 import { buildCoachActions } from "@/lib/advisor-coach";
 import { CoachPanel, type CoachActionWithLink } from "@/app/app/danisman-kpi/coach-panel";
@@ -64,10 +64,6 @@ function Section({ title, icon, aside, children }: { title: string; icon?: React
       {children}
     </section>
   );
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-text-muted">{children}</p>;
 }
 
 /** "Önceki ay 4 · +2 (%50)" — önceki ay 0 ise yüzde yazılmaz. */
@@ -142,7 +138,7 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Müşteriler" icon={<Users className="h-4 w-4 text-brand-600" />} aside={customerCount}>
           {customers.length === 0 ? (
-            <Empty>Atanmış müşteri yok.</Empty>
+            <EmptyState variant="compact" title="Atanmış müşteri yok." />
           ) : (
             <>
               <ul className="space-y-1.5">
@@ -164,7 +160,7 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
 
         <Section title="Portföyler" icon={<Building2 className="h-4 w-4 text-mint-600" />} aside={propertyCount}>
           {properties.length === 0 ? (
-            <Empty>Atanmış portföy yok.</Empty>
+            <EmptyState variant="compact" title="Atanmış portföy yok." />
           ) : (
             <>
               <ul className="space-y-1.5">
@@ -287,7 +283,7 @@ export async function LeadTab({ ctx }: { ctx: Ctx }) {
     <section id={anchor} className={`${SECTION} scroll-mt-24`}>
       <h2 className="mb-3 text-sm font-bold text-ink-950">{title}</h2>
       {rows.length === 0 ? (
-        <Empty>Kayıt yok.</Empty>
+        <EmptyState variant="compact" title="Kayıt yok." />
       ) : (
         <ul className="space-y-1.5">
           {rows.map((t) => (

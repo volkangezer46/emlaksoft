@@ -241,6 +241,15 @@ describe("GET /api/cron/kira-tahakkuk", () => {
     expect(hb?.detail).toContain("2 hata");
   });
 
+  it("recurring_run_due errors dizisi heartbeat notuna yansır (kod ve adım)", async () => {
+    state.rpc = { data: { posted: 0, failed: 1, errors: [{ rule_id: "r1", step: "run", code: "P0001", message: "boom" }] }, error: null };
+    await GET(req("Bearer s3cret"));
+    const hb = state.heartbeat.at(-1);
+    expect(hb?.status).toBe("error");
+    expect(hb?.detail).toContain("run/P0001");
+    expect(hb?.detail).not.toContain("boom");
+  });
+
   it("4b (mülk sahibi hatırlatması) catch -> error", async () => {
     state.payoutThrow = true;
     await GET(req("Bearer s3cret"));

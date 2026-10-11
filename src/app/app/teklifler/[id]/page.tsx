@@ -41,11 +41,11 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_STYLE: Record<string, string> = {
   accepted: "bg-mint-50 text-mint-700 ring-mint-600/20",
-  rejected: "bg-red-50 text-red-700 ring-red-600/20",
+  rejected: "bg-danger-50 text-danger-700 ring-danger-600/20",
   submitted: "bg-brand-50 text-brand-700 ring-brand-600/20",
   countered: "bg-amber-50 text-amber-700 ring-amber-600/20",
-  draft: "bg-zinc-100 text-text-muted ring-zinc-500/10",
-  withdrawn: "bg-zinc-50 text-text-muted ring-zinc-400/10",
+  draft: "bg-surface-sunken text-text-muted ring-line",
+  withdrawn: "bg-surface-sunken text-text-muted ring-line",
 };
 
 function money(n: number | null) {

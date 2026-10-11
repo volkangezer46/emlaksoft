@@ -1,1496 +1,1807 @@
 {
  "src/app/app/abonelik/cards-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/abonelik/checkout-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/abonelik/kontor-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/abonelik/kontor-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/abonelik/seat-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/acik-ev/[id]/convert-visitor-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/acik-ev/[id]/edit-open-house-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/acik-ev/[id]/registration-qr-card.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/acik-ev/[id]/visitor-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/aidat/due-edit-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/aidat/dues-client.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/aidat/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/anketler/ic-anket/pulse-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/anketler/kuyruk/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/anketler/queue-task-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/anketler/template-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/deal-board.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 8,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/status-transition.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/checklist-file.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/deal-checklist-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 2,
   "hamButon": 7,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/deal-costs-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 7,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/deal-link-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/deal-notes-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/anlasmalar/[id]/kapanis-sihirbazi.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/arama/call-ai-summary.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/arama/call-console.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/arama/calls-view.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/arama-sonuclari/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/asistan/action-cards.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/asistan/action-proposal-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/asistan/advisor-chat.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 8,
   "kucukHedef": 0
  },
  "src/app/app/askida/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/cografya-bildir/report-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/company-form.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/duyurular/announcements-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/filigran/watermark-form.tsx": {
   "hamRenk": 5,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/guvenlik/two-factor-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/is-akislari/playbooks-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 2,
   "hamButon": 11,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/lead/lead-capture-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/matching-weights-form.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/merkez/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/mesaj-sablonlari/templates-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 8,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/roller/role-permissions-matrix.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/sozlesme-sablonlari/contract-templates-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/tanimlar/definitions-manager.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/tanimlar/stage-labels-panel.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/yetkilendirme/override-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/yetkilendirme/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/yetkilendirme/user-exceptions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/_sekmeler/tum-tab.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/baslangic/steps/giderler-kasa-step.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/belgeler/document-lightbox.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/belgeler/document-list.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/belgeler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/bildirimler/notifications-view.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/buyume/invite-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/dashboard-quick-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/dashboard-widgets.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/parsel/parsel-client.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/parsel/rapor/[raporId]/report-detail-client.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/parsel/report-archive.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/valuation-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/[id]/share-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/degerleme/[id]/valuation-manage.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/denetim/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/page.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/app/destek/ticket-reply-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/[id]/tenant-ticket-controls.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/[id]/ticket-attachment-list.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/[id]/ticket-csat-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/[id]/ticket-thread.tsx": {
   "hamRenk": 4,
+  "hamPalet": 0,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/app/ekip/branch-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/ekip/izinler/leave-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ekip/izinler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/ekip/kartvizitim/kartvizit-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 7,
   "kucukHedef": 0
  },
  "src/app/app/ekip/page.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/app/ekip/team-panels.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ekip/yeni/advisor-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ekip/[id]/member-handoff.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/ekip/[id]/pii-reveal.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/eslestirme/save-match-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/eslestirme/send-match-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/franchise/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/inbox-view.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/link-to-customer.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/reply-draft-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/row-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/sms-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/sms-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/gelen-kutusu/whatsapp-window-reply.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/giderler/expense-create-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/giderler/expense-edit-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/giderler/expense-receipt-file.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/giderler/expenses-table.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/giderler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/giderler/quick-entry.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/giderler/recurring-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/gorevler/task-bulk-list.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/gorevler/task-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/gorevler/task-edit-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/hedefler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/hedefler/target-form-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/hesaplayici/calculator.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/hizli/quick-capture.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/hos-geldin/hosgeldin-akisi.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ice-aktarma/import-wizard.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/ilan-havuzu/pool-entry-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/ilan-havuzu/pool-settings-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kampanyalar/campaign-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 2,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kampanyalar/yeni/new-campaign-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kampanyalar/[id]/duzenle/edit-campaign-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kayip-kacak/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kayip-satis/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/apply-increase-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/late-fee-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/reminder-settings-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/[id]/deposit-return.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/[id]/end-rental-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/[id]/maintenance-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/[id]/reminders-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/kiralama/[id]/rental-edit-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/komisyon/bulk-collect.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/komisyon/commission-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/komisyon/commission-simulator.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/komisyon/commission-split-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/komisyon/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/layout.tsx": {
   "hamRenk": 4,
+  "hamPalet": 0,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/app/lig/challenges-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/mahalle-notlari/delete-note-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/mahalle-notlari/note-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/cift-kayit/groups-client.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/customer-bulk-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/customer-row-delete.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/sms-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/customer-files-tab.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/customer-tag-chips.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/customer-tasks.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/delete-customer-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/demand-status-buttons.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/edit-customer-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/edit-demand-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/musteriler/[id]/reassign-advisor-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ofis-kontrol/kurallar/settings-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ofis-kontrol/_components/feed-filters.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/ofis-kontrol/_components/review-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/onaylar/approval-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/onaylar/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/otomasyonlar/automation-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/otomasyonlar/automation-wizard.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 8,
   "kucukHedef": 0
  },
  "src/app/app/otomasyonlar/[id]/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 1,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/pano-tv/tv-board.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/pano-tv/tv-live.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/portallar/bulk-confirm-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portallar/confirm-listing-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portallar/portal-dialogs.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/portallar/portal-row-more.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/anahtarlar/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/map-view.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/property-bulk-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/property-row-compare.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/sunumlar/presentation-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/sunumlar/shared-portals.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/sunumlar/yeni/presentation-form.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/yeni/owner-info-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/ai-content-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/edit-property-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/portal-listing-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-admin-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-extras.tsx": {
   "hamRenk": 0,
+  "hamPalet": 5,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-keys-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 9,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-media-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 23,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-price-history.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/portfoyler/[id]/property-workflow.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
+  "kucukHedef": 0
+ },
+ "src/app/app/portfoyler/[id]/related-properties-widget.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 2,
+  "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/app/product-tour.tsx": {
   "hamRenk": 3,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/projeler/[id]/units-board.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/randevular/appointment-calendar.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/app/randevular/appointment-edit-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/randevular/appointment-row-more.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/randevular/appointment-rows.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/randevular/booking-link-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/randevular/calendar-subscribe-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/randevular/complete-appointment-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/randevular/optimistic-confirm-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/randevular/rota-map.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/raporlar/talep-arz/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/raporlar/talep-arz/talep-arz-map.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/yeni/new-contract-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/cancel-contract-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/contract-sign-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/copy-sign-link.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/fill-fields-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/remind-signer.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/signer-edit-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/sozlesmeler/[id]/version-history.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/talepler/demand-bulk.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/talepler/[id]/demand-followup.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/talepler/[id]/demand-status-switch.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/tavsiyeler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/tavsiyeler/referral-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 11,
   "kucukHedef": 0
  },
  "src/app/app/teklifler/[id]/convert-to-deal-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/teklifler/[id]/offer-edit-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/teklifler/[id]/offer-round-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/teklifler/[id]/offer-status-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/app/uyum/iys-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/uyum/kvkk-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/app/yabanci-satis/foreign-sale-forms.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/yatirim/investment-analyzer.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/_home/durum-cubugu.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/_home/insight-eylem.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/_home/kontor-bandi-client.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/_home/ne-yapmak.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/_home/sekme-serit.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/_home/siradaki-gec.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/bildirimler/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/billing/inline-op.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/billing/planlar/apply-recommended.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/billing/planlar/ef-credits-section.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/billing/planlar/plan-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/billing/planlar/price-simulator.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/danisman/advisor-chat.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/admin/duyuru/broadcast-row.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/ef-kontor/editors.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 10,
   "kucukHedef": 0
  },
  "src/app/admin/geo/entity-list.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/admin/geo/ice-aktar/import-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/geo/province-row.tsx": {
   "hamRenk": 0,
+  "hamPalet": 5,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/growth/growth-forms.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 10,
   "kucukHedef": 0
  },
  "src/app/admin/hesabim/account-forms.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/marka/brand-manager.tsx": {
   "hamRenk": 4,
+  "hamPalet": 2,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/admin/members/[id]/member-forms.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 11,
   "kucukHedef": 0
  },
  "src/app/admin/personel/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/personel/[id]/page.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/personel/[id]/staff-account-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 12,
   "kucukHedef": 0
  },
  "src/app/admin/seo/seo-ui.tsx": {
   "hamRenk": 0,
+  "hamPalet": 3,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/sistem/emlakfiyati-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 15,
   "kucukHedef": 0
  },
  "src/app/admin/site-icerik/content-preview.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/site-icerik/editor-fields.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 5,
   "kucukHedef": 0
  },
  "src/app/admin/site-icerik/site-content-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/editor-ui.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/footer-announcement-tabs.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 8,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/menu-preview.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/menu-tab.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 12,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/site-menu-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/tenants/yeni/office-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/tenants/[id]/account-credit-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/app/admin/tenants/[id]/module-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/tenants/[id]/office-management.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 35,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/makrolar/macro-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/page.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/staff-reply-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/ticket-queue-view.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/[id]/ticket-detail-controls.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/[id]/ticket-macro-manager.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/_components/platform-insight-eylem.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/admin/admin-sidebar.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/components/admin/admin-topbar.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/admin/command-palette.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/admin/notification-bell.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/components/admin/openai-key-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/admin/portal-keys-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/admin/system-status-chip.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/add-to-calendar-button.tsx": {
   "hamRenk": 5,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/app/announcement-read-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/app-sidebar.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 6,
   "kucukHedef": 0
  },
  "src/components/app/avatar-editor.tsx": {
   "hamRenk": 1,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/command-search-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 11,
   "kucukHedef": 0
  },
  "src/components/app/command-search.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/communication-timeline.tsx": {
   "hamRenk": 0,
+  "hamPalet": 4,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/app/copy-listing-text.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/app/custom-field-filter-bar.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/duplicate-hint.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/app/email-verify-strip.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/app/keyboard-shortcuts-dialog.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/lat-lng-picker.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/more-actions.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/notification-bell-panel.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/components/app/notification-bell.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/notification-prefs.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/office-status-chip.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/ops-impersonation-banner.tsx": {
   "hamRenk": 2,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/property-owner-editor.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/app/push-subscribe.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/quick-create-menu-body.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/quick-create-menu.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/record-ops-buttons.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/referral-nudge-card.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/saved-views.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 7,
+  "kucukHedef": 0
+ },
+ "src/components/app/seller-potential-card.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 1,
+  "hamButon": 0,
   "kucukHedef": 0
  },
  "src/components/app/social-card-picker.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/structured-demand-fields.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/app/sw-register.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/toast-provider.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/app/wa-template-menu.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/components/app/whatsapp-share-button.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/billing/plan-picker.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 4,
   "kucukHedef": 0
  },
  "src/components/listing-control/extension-wizard.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/listing-control/inventory-import-form.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/settings/secrets-migration.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/settings/setting-field.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 7,
   "kucukHedef": 0
  },
  "src/components/tools/tool-ui.tsx": {
   "hamRenk": 0,
+  "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  }

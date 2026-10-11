@@ -374,10 +374,7 @@ export function rankScored<T extends Scored>(scored: readonly T[], byId: Readonl
 
 /** Havuz profili: adaylar -> sıralı öneri listesi (`rankScored`). */
 export function rankCandidates(candidates: PoolCandidate[], property: PoolProperty, ctx: ScoreContext): PoolSuggestion[] {
-  return rankScored(
-    candidates.map((c) => scoreCandidate(c, property, ctx)),
-    new Map(candidates.map((c) => [c.profileId, c])),
-  );
+  return rankForProfile({ kind: "pool" }, candidates, property, ctx);
 }
 
 /** Puan veren bileşenlerin tek satır dökümü, örn. "Bölge +35 · Tür uzmanlığı +20" (iki profil ORTAK). */
@@ -403,4 +400,102 @@ export function toStoredSuggestions(list: PoolSuggestion[], limit = 5) {
       summary: s.summary,
       reasons: s.reasons.map((r) => ({ key: r.key, label: r.label, points: r.points, max: r.max })),
     }));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// TEK PUANLAYICI, İKİ PROFİL (Konsey #11): havuz ve Ofis Merkezi akıllı ataması aynı alt hesapları AYNI dosyadan kullanır.
+//  - "pool": sabit havuz ağırlıkları (POOL_MAX; otomatik atama eşikleri buna göre) -> `scoreCandidate`.
+//  - "office": ofis ayarından gelen 5 ağırlık (toplam 100'e normalize) -> `scoreWeighted`.
+// `scoreForProfile` / `rankForProfile` tek giriş kapısıdır; office-center/smart-assign.ts yalnız bunu çağırır (kopya hesap yok).
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type ScoreWeights = { workload: number; specialty: number; region: number; performance: number; availability: number };
+
+/** Ayar kaydı yoksa Ofis Merkezi profilinin geçerli ağırlıkları (registry tenant.ts ile aynı; test kilitler). */
+export const DEFAULT_OFFICE_WEIGHTS: ScoreWeights = { workload: 25, specialty: 20, region: 25, performance: 15, availability: 15 };
+
+/** Ağırlıkları doğrular ve toplamı 100'e oransal normalize eder; hepsi 0/geçersizse varsayılan. */
+export function normalizeScoreWeights(input?: Partial<ScoreWeights> | null): ScoreWeights {
+  const keys = Object.keys(DEFAULT_OFFICE_WEIGHTS) as (keyof ScoreWeights)[];
+  const raw: ScoreWeights = { ...DEFAULT_OFFICE_WEIGHTS };
+  for (const k of keys) {
+    const v = input?.[k];
+    raw[k] = typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : DEFAULT_OFFICE_WEIGHTS[k];
+  }
+  const sum = keys.reduce((s, k) => s + raw[k], 0);
+  if (sum <= 0) return { ...DEFAULT_OFFICE_WEIGHTS };
+  const out = {} as ScoreWeights;
+  let acc = 0;
+  keys.forEach((k, i) => {
+    if (i === keys.length - 1) out[k] = 100 - acc;
+    else {
+      out[k] = Math.round((raw[k] / sum) * 100);
+      acc += out[k];
+    }
+  });
+  return out;
+}
+
+/**
+ * Uzmanlık = motorun tür + işlem bileşenleri; ilanın fiyatı ve danışmanın fiyat bandı TANIMLIYSA fiyat bandı da girer.
+ * Bant tanımsızsa fiyat nötr değildir, hesaptan çıkar (tam uzman tam puan alır).
+ */
+function weightedSpecialty(c: PoolCandidate, p: PoolProperty, max: number): ScoreReason {
+  const [type, txn, price] = specialtyReasons(c, p);
+  const banded = p.listPrice != null && p.listPrice > 0 && c.specialties.some((sp) => sp.kind === "property_type" && (sp.priceMin != null || sp.priceMax != null));
+  const got = type.points + txn.points + (banded ? price.points : 0);
+  const of = POOL_MAX.type + POOL_MAX.transaction + (banded ? POOL_MAX.price : 0);
+  const parts = [type.points > 0 ? type.detail : null, txn.points > 0 ? txn.detail : null, banded ? price.detail : null].filter(Boolean);
+  return {
+    key: "specialty",
+    label: "Uzmanlık",
+    points: Math.round(max * clamp(got / of, 0, 1)),
+    max,
+    detail: parts.length ? parts.join(" · ") : "Tür/işlem uzmanlığı eşleşmedi",
+  };
+}
+
+function weightedRegion(c: PoolCandidate, p: PoolProperty, ctx: ScoreContext, max: number): ScoreReason {
+  const r = regionPoints(c, p, ctx);
+  return { key: "region", label: "Bölge", points: Math.round(max * clamp(r.points / POOL_MAX.region, 0, 1)), max, detail: r.detail };
+}
+
+/** Ofis profili puanı: ağırlıklar uygulanır; `extraExclusion` (ör. şube kısıtı) havuz eleme kurallarından ÖNCE gelir. */
+export function scoreWeighted(
+  c: EngineCandidate,
+  p: PoolProperty,
+  ctx: ScoreContext,
+  weights?: Partial<ScoreWeights> | null,
+  extraExclusion?: string | null,
+): PoolSuggestion {
+  const why = extraExclusion ?? exclusionReason(c, ctx);
+  if (why) return { profileId: c.profileId, name: c.name, score: 0, reasons: [], summary: `Elendi: ${why}`, excluded: { reason: why } };
+  const w = normalizeScoreWeights(weights);
+  const reasons = [
+    factorReason("workload", "İş yükü", workloadFactor(c, ctx), w.workload),
+    weightedSpecialty(c, p, w.specialty),
+    weightedRegion(c, p, ctx, w.region),
+    factorReason("performance", "Performans (90 gün)", performanceFactor(c), w.performance),
+    factorReason("availability", "Müsaitlik", availabilityFactor(c, ctx.nowMs), w.availability),
+  ].filter((r) => r.max > 0);
+  const score = clamp(reasons.reduce((s, r) => s + r.points, 0), 0, 100);
+  return { profileId: c.profileId, name: c.name, score, reasons, summary: explainReasons(reasons, "Puan veren ölçüt yok") };
+}
+
+export type ScoreProfile =
+  | { kind: "pool" }
+  | { kind: "office"; weights?: Partial<ScoreWeights> | null; extraExclusion?: (c: EngineCandidate) => string | null };
+
+/** TEK giriş: aynı aday/ilan/bağlam, seçilen profile göre puanlanır. */
+export function scoreForProfile(profile: ScoreProfile, c: EngineCandidate, p: PoolProperty, ctx: ScoreContext): PoolSuggestion {
+  if (profile.kind === "pool") return scoreCandidate(c, p, ctx);
+  return scoreWeighted(c, p, ctx, profile.weights, profile.extraExclusion?.(c) ?? null);
+}
+
+/** TEK sıralama girişi (adil dağıtımlı `rankScored`). */
+export function rankForProfile(profile: ScoreProfile, candidates: readonly EngineCandidate[], p: PoolProperty, ctx: ScoreContext): PoolSuggestion[] {
+  return rankScored(
+    candidates.map((c) => scoreForProfile(profile, c, p, ctx)),
+    new Map(candidates.map((c) => [c.profileId, c])),
+  );
 }

@@ -253,7 +253,7 @@ export default async function KayipSatisPage() {
               href="#kritik"
               className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
-              <p className="font-display text-2xl font-extrabold text-red-400">{critical.length}</p>
+              <p className="font-display text-2xl font-extrabold text-danger-400">{critical.length}</p>
               <p className="text-xs text-white/70">Kritik</p>
             </Link>
             <Link
@@ -300,7 +300,7 @@ export default async function KayipSatisPage() {
           {/* Kritik */}
           {critical.length > 0 && (
             <section id="kritik" className="scroll-mt-24">
-              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-red-600">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-danger-600">
                 <AlertTriangle className="h-4 w-4" /> Kritik — Hemen ara
               </h2>
               <div className="space-y-2">
@@ -467,11 +467,11 @@ function RiskCard({ risk }: { risk: RiskLead }) {
 
   return (
     <div className={`flex flex-wrap items-center gap-3 rounded-[var(--radius-card)] border px-4 py-3 transition hover:bg-canvas/60 ${
-      isCritical ? "border-red-200 bg-red-50/50" : "border-amber-200 bg-amber-50/40"
+      isCritical ? "border-danger-300 bg-danger-50/50" : "border-amber-200 bg-amber-50/40"
     }`}>
       {/* Avatar */}
       <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-bold text-white ${
-        isCritical ? "bg-red-500" : "bg-amber-500"
+        isCritical ? "bg-danger-500" : "bg-amber-500"
       }`}>
         {initials}
       </span>
@@ -485,7 +485,7 @@ function RiskCard({ risk }: { risk: RiskLead }) {
           {risk.full_name}
         </Link>
         <p className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
-          <AlertTriangle className={`h-3 w-3 ${isCritical ? "text-red-500" : "text-amber-500"}`} />
+          <AlertTriangle className={`h-3 w-3 ${isCritical ? "text-danger-500" : "text-amber-500"}`} />
           {risk.reasonLabel}
         </p>
         {risk.phone && (
