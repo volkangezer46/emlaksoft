@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Banknote, CalendarClock, Eye, HandCoins, Loader2, SlidersHorizontal, Wrench, X } from "lucide-react";
 import { submitPortalRequest } from "@/app/actions/customer-portal-requests";
+import { finalizeRentReceiptUpload, prepareRentReceiptUpload } from "@/app/actions/rent-receipt-public";
 
 type Variant = "offer" | "appointment" | "maintenance" | "visit" | "demand" | "rent";
 
@@ -32,6 +33,25 @@ const DONE: Partial<Record<Variant, string>> = {
 
 const FIELD =
   "focus-ring mt-1 block min-h-11 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm text-ink-950 placeholder:text-text-faint";
+
+const RECEIPT_MAX_BYTES = 5 * 1024 * 1024;
+const RECEIPT_TYPES = ["image/jpeg", "image/png", "application/pdf"];
+
+/** Dekontu imzalı URL ile özel kovaya yükler (hazırla -> yükle -> sunucuda bayt doğrulama). */
+async function uploadReceipt(token: string, chargeId: string, file: File): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!RECEIPT_TYPES.includes(file.type)) return { ok: false, error: "yalnız JPEG, PNG veya PDF yüklenebilir." };
+  if (file.size > RECEIPT_MAX_BYTES) return { ok: false, error: "dosya en fazla 5 MB olabilir." };
+  const prep = await prepareRentReceiptUpload(token, chargeId, { fileName: file.name, fileSize: file.size, fileType: file.type });
+  if (!prep.ok) return { ok: false, error: prep.error };
+  // supabase-js yalnız yükleme anında indirilir (sayfa açılışını şişirmez).
+  const { createClient } = await import("@/lib/supabase/client");
+  const { error } = await createClient()
+    .storage.from(prep.upload.bucket)
+    .uploadToSignedUrl(prep.upload.path, prep.upload.token, file, { contentType: prep.upload.contentType, cacheControl: "3600" });
+  if (error) return { ok: false, error: "dosya yüklenemedi." };
+  const fin = await finalizeRentReceiptUpload(token, chargeId);
+  return fin.ok ? { ok: true } : { ok: false, error: fin.error ?? "dosya doğrulanamadı." };
+}
 
 /**
  * Müşteri portalı istek formu (kart içinde açılan şerit; popup yok). Gönderim `submitPortalRequest` (token + SQL içi
@@ -73,9 +93,22 @@ export function PortalRequestForm({ token, refId, variant }: { token: string; re
         fd.set("token", token);
         fd.set("ref_id", refId);
         fd.set("kind", variant === "appointment" ? kind : KIND_OF[variant]);
+        // Dekont dosyası sunucu eylemine GİTMEZ (gövde şişmesin); bildirim sonrası imzalı URL ile özel kovaya yüklenir.
+        const picked = variant === "rent" ? fd.get("receipt") : null;
+        const receipt = picked instanceof File && picked.size > 0 ? picked : null;
+        fd.delete("receipt");
         start(async () => {
           const r = await submitPortalRequest(fd);
-          setMsg({ ok: r.ok, text: r.ok ? (DONE[variant] ?? r.message) : r.message });
+          if (!r.ok) {
+            setMsg({ ok: false, text: r.message });
+            return;
+          }
+          let text = DONE[variant] ?? r.message;
+          if (receipt) {
+            const up = await uploadReceipt(token, refId, receipt);
+            text = up.ok ? `${text} Dekontunuz da danışmanınıza iletildi.` : `${text} Ancak dekont yüklenemedi: ${up.error}`;
+          }
+          setMsg({ ok: true, text });
         });
       }}
     >
@@ -152,10 +185,17 @@ export function PortalRequestForm({ token, refId, variant }: { token: string; re
         </>
       ) : null}
       {variant === "rent" ? (
-        <label className="block text-xs font-medium text-ink-950">
-          Dekont / işlem no (isteğe bağlı)
-          <input name="reference" maxLength={120} placeholder="Örn. Havale açıklaması" className={FIELD} />
-        </label>
+        <>
+          <label className="block text-xs font-medium text-ink-950">
+            Dekont / işlem no (isteğe bağlı)
+            <input name="reference" maxLength={120} placeholder="Örn. Havale açıklaması" className={FIELD} />
+          </label>
+          <label className="block text-xs font-medium text-ink-950">
+            Dekont fotoğrafı (isteğe bağlı)
+            <input name="receipt" type="file" accept="image/jpeg,image/png,application/pdf" className={`${FIELD} py-2`} />
+            <span className="mt-1 block text-xs font-normal text-text-faint">JPEG, PNG veya PDF · en fazla 5 MB</span>
+          </label>
+        </>
       ) : null}
       {variant !== "maintenance" ? (
         <label className="block text-xs font-medium text-ink-950">

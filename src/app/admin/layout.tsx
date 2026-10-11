@@ -38,10 +38,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 }
 
 async function AdminShell({ children }: { children: React.ReactNode }) {
-  const staff = await requirePlatformStaffForAccount();
+  // Kimlik yerel JWT'den (ağ turu yok). Personel kapısı, kendi avatar satırı (RLS: yalnız kendi satırı) ve MFA ayarı
+  // birbirinden bağımsız → TEK turda paralel (eskiden staff → avatar → ayar sıralı 3 tur). Yetki kararı staff kapısındadır;
+  // reddedilirse (redirect) diğer iki okuma sonucu atılır.
+  const user = await getRequestUser();
+  const [staff, avatar, mfaDbSetting] = await Promise.all([
+    requirePlatformStaffForAccount(),
+    user ? loadStaffAvatar(user.id) : Promise.resolve(null),
+    getPlatformSetting(PLATFORM_MFA_DB_SETTING_KEY),
+  ]);
 
   // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz.
-  const user = await getRequestUser();
   const jar = await cookies();
   const fontScale = resolveFontScale({
     userId: user?.id,
@@ -68,15 +75,13 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
 
   // Sidebar rozet sayıları — 30 sn önbellekli (bkz. admin-badges.ts); her
   // gezinmede 3 count sorgusu koşmasın.
-  const [badges, health, avatar] = await Promise.all([
+  const [badges, health] = await Promise.all([
     getAdminBadges(modules),
     modules.includes("sistem") ? getAdminHealth().catch(() => null) : Promise.resolve(null),
-    // Üst çubuk avatarı: kendi satırı (RLS platform_staff_self_select); hata/yoksa baş harf.
-    loadStaffAvatar(staff.id),
   ]);
 
   // MFA tek kaynak uyumu: env ile DB ayarı (SQL kapıları yalnız ayara bakar) ayrışırsa uyarı şeridi.
-  const mfaSyncIssue = platformMfaSyncIssue(isPlatformMfaRequired(), await getPlatformSetting(PLATFORM_MFA_DB_SETTING_KEY));
+  const mfaSyncIssue = platformMfaSyncIssue(isPlatformMfaRequired(), mfaDbSetting);
 
   return (
     <div className="flex min-h-screen bg-canvas">
@@ -133,12 +138,12 @@ function StatusStrip({
 }) {
   const body = (
     <>
-      <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden />
+      <ShieldAlert className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{children}</span>
       {href ? <ChevronRight className="h-4 w-4 shrink-0 opacity-70" aria-hidden /> : null}
     </>
   );
-  const cls = `tone-${tone} flex items-center gap-3 rounded-[var(--radius-card)] px-4 py-2.5 text-sm font-semibold`;
+  const cls = `tone-${tone} flex items-center gap-2.5 rounded-[var(--radius-control)] px-3.5 py-1.5 text-xs font-medium leading-5`;
   return href ? (
     <Link href={href} role={role} className={`${cls} focus-ring transition-[filter] hover:brightness-[0.98]`}>
       {body}

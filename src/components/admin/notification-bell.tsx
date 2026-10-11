@@ -166,7 +166,7 @@ export function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="focus-ring relative grid h-10 w-10 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted shadow-[var(--elev-1)] transition hover:border-border-interactive hover:text-text touch:min-h-11 touch:min-w-11"
+        className="focus-ring relative grid h-11 w-11 place-items-center rounded-full border border-hairline bg-surface-raised text-text-muted shadow-[var(--elev-1)] transition hover:border-border-interactive hover:text-text"
         aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
       >
         <Bell className="h-[18px] w-[18px]" aria-hidden />

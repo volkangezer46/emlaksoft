@@ -122,7 +122,7 @@ export function MenuSearchButton({ onActivate }: { onActivate?: () => void }) {
       }}
       aria-label="Menüde ara (komut paletini aç)"
       title="Menüde ara, sayfaya git"
-      className="sb-expanded focus-ring mx-3 mt-1 flex min-h-8 touch:min-h-11 w-[calc(100%-1.5rem)] items-center gap-2 rounded-[var(--radius-control)] bg-white/6 px-2.5 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+      className="sb-expanded focus-ring mx-3 mt-1 flex min-h-8 max-md:min-h-11 touch:min-h-11 w-[calc(100%-1.5rem)] items-center gap-2 rounded-[var(--radius-control)] bg-white/6 px-2.5 text-left text-xs text-white/70 transition-colors hover:bg-white/10 hover:text-white"
     >
       <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">Ara</span>

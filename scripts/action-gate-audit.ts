@@ -87,6 +87,8 @@ const MUAF: Record<string, string> = {
   "document-request-public.ts::prepareDocRequestUpload": "Evrak linki yukleme izni; token SHA-256 ozetiyle cozulur (sure/iptal/limit), IP+token hiz siniri (deny), tek nesnelik izin.",
   "document-request-public.ts::finalizeDocRequestUpload": "Evrak linki dosya dogrulamasi; ayni token akisi, bayt/imza dogrulamasi, tenant token'in cozdugu kayda sabit.",
   "document-request-public.ts::completeDocRequest": "Evrak linkini tek kullanimlik kapatir; ayni token akisi ve hiz siniri.",
+  "rent-receipt-public.ts::prepareRentReceiptUpload": "Kiraci Odedim dekontu yukleme izni; musteri portali token'i portal_rent_receipt_target RPC'siyle cozulur (sure/sahiplik/bekleyen bildirim), IP+token hiz siniri (deny), tek nesnelik imza, jpg/png/pdf <=5 MB.",
+  "rent-receipt-public.ts::finalizeRentReceiptUpload": "Kiraci dekontu bayt/imza dogrulamasi; ayni token akisi, ofis/kiraci/bildirim token'in cozdugu kayda sabit.",
   "vitrin-alerts.ts::createVitrinPriceAlert": "Vitrin fiyat alarmi; yayindaki ilana sabit, ofis ici bildirim uretir.",
   "vitrin.ts::createVitrinSavedSearch": "Vitrin kayitli arama; ziyaretci oturum acmaz.",
   "vitrin.ts::likePublicShare": "Paylasim baglantisinda begeni sayaci.",

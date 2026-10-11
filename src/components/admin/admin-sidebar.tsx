@@ -121,23 +121,26 @@ export function AdminSidebar({
     return (
       <div key={section.id}>
         {section.title ? (
-          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
             <button
               type="button"
               onClick={() => toggle(`o-${section.id}`)}
               disabled={hasActive}
               aria-expanded={expanded}
               aria-controls={`adm-${section.id}`}
-              className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
+              className="focus-ring flex min-h-8 max-md:min-h-11 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
             >
               <span className="shrink-0">{section.title}</span>
               <span className="h-px flex-1 bg-white/10" aria-hidden />
+              {!expanded ? (
+                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{items.length}</span>
+              ) : null}
               <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
               <span className="sr-only">{expanded ? "bölümü daralt" : "bölümü aç"}</span>
             </button>
           </div>
         ) : (
-          <div className="pt-3" />
+          <div className="pt-4" />
         )}
         {expanded ? (
           <div id={`adm-${section.id}`} className="space-y-0.5">
@@ -154,7 +157,7 @@ export function AdminSidebar({
       : [];
 
   const renderContent = (variant: "desktop" | "drawer") => (
-    <aside className="sb-surface flex h-full w-full flex-col">
+    <aside className="sb-surface flex h-full min-h-0 w-full flex-col max-md:pb-[env(safe-area-inset-bottom)] max-md:pl-[env(safe-area-inset-left)] max-md:pt-[env(safe-area-inset-top)]">
       <div className="sb-head relative flex min-h-16 shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
         <Brand variant="mark" tone="dark" height={38} alt="" className="rounded-[var(--radius-card)]" />
         <div className="sb-label min-w-0 flex-1">
@@ -191,17 +194,20 @@ export function AdminSidebar({
           {groups.map(renderGroup)}
           {other.length > 0 ? (
             <div>
-              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1 pt-3 text-white/70">
+              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
                 <button
                   type="button"
                   onClick={() => toggle("diger-acik")}
                   disabled={otherHasActive}
                   aria-expanded={otherOpen}
                   aria-controls="adm-diger"
-                  className="focus-ring flex min-h-8 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
+                  className="focus-ring flex min-h-8 max-md:min-h-11 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
                 >
                   <span className="shrink-0">Diğer</span>
                   <span className="h-px flex-1 bg-white/10" aria-hidden />
+                  {!otherOpen ? (
+                    <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{other.length}</span>
+                  ) : null}
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${otherOpen ? "" : "-rotate-90"}`} aria-hidden />
                   <span className="sr-only">{otherOpen ? "bölümü daralt" : "bölümü aç"}</span>
                 </button>
@@ -258,7 +264,7 @@ export function AdminSidebar({
           target="_blank"
           rel="noopener noreferrer"
           title="Ana siteyi yeni sekmede aç"
-          className="focus-ring flex min-h-10 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white touch:min-h-11"
+          className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/80 transition-colors hover:bg-white/6 hover:text-white md:min-h-10"
         >
           <Globe className="h-[18px] w-[18px] shrink-0 text-white/65" aria-hidden />
           <span className="sb-label flex-1 truncate">Siteyi görüntüle</span>
@@ -288,7 +294,7 @@ export function AdminSidebar({
       <DialogDrawerContent id="admin-mobile-navigation" aria-describedby={undefined}>
         <DialogTitleHidden>Admin menüsü</DialogTitleHidden>
         <DialogClose asChild>
-          <button type="button" className="absolute right-3 top-2 z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
+          <button type="button" className="absolute right-3 top-[max(0.5rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-white/8 text-white/80" aria-label="Kapat"><X className="h-5 w-5" /></button>
         </DialogClose>
         {renderContent("drawer")}
       </DialogDrawerContent>

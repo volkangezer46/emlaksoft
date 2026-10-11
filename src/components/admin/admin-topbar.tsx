@@ -98,7 +98,7 @@ export function AdminTopbar({
         <CommandPalette modules={modules} />
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         {quickItems.length > 0 ? (
           <div ref={quickRef} className="relative">
             <button
@@ -107,12 +107,12 @@ export function AdminTopbar({
               aria-expanded={quickOpen}
               aria-haspopup="menu"
               aria-controls="admin-quick-menu"
-              className="focus-ring press inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-control)] bg-accent px-3.5 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover touch:min-h-11"
+              className="focus-ring press inline-flex h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover"
             >
               <Plus className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Hızlı erişim</span>
             </button>
             {quickOpen ? (
-              <div id="admin-quick-menu" role="menu" className="absolute right-0 top-11 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
+              <div id="admin-quick-menu" role="menu" className="absolute right-0 top-12 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
                 {quickItems.map((q) => (
                   <Link
                     key={q.href}
@@ -132,14 +132,16 @@ export function AdminTopbar({
           </div>
         ) : null}
 
-        {/* Canlı saat: gerçek canlı gösterge (tek sonsuz nabız istisnası); dakika hassasiyeti. */}
-        <span className="hidden h-10 items-center gap-2 rounded-full bg-mint-500/10 px-3 text-sm font-bold tabular-nums text-mint-700 lg:inline-flex" aria-label={clock ? `Saat ${clock}` : undefined}>
-          <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
-        </span>
+        {/* Tek sade durum göstergesi: sistem durumu + saat aynı çipte (sağlık ölçümü yoksa yalnız saat). */}
+        {health ? (
+          <SystemStatusChip health={health} clock={clock} />
+        ) : clock ? (
+          <span className="hidden h-11 items-center gap-2 rounded-full border border-hairline bg-surface-raised px-3.5 text-sm font-semibold tabular-nums text-text-muted shadow-[var(--elev-1)] lg:inline-flex" aria-label={`Saat ${clock}`}>
+            <span className="status-pulse h-2 w-2 rounded-full bg-mint-500" aria-hidden /> {clock}
+          </span>
+        ) : null}
 
-        {health ? <SystemStatusChip health={health} /> : null}
-
-        <ThemeToggle />
+        <ThemeToggle className="rounded-full border-hairline bg-surface-raised shadow-[var(--elev-1)] hover:border-border-interactive sm:h-11 sm:w-11" />
 
         <NotificationBell />
 
