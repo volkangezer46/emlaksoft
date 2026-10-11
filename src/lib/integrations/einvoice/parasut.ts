@@ -351,6 +351,28 @@ export function createParasutAdapter(creds: ParasutCredentials, hooks: ParasutHo
       });
     },
 
+    async findIssued(ref) {
+      if (ref.docType === "e-smm") return fail("not_supported", "Paraşüt bağlantısında e-Serbest Meslek Makbuzu desteklenmiyor.");
+      // 1) İş kimliği biliniyorsa trackable_jobs; 2) bilinmiyorsa faturanın etkin e-belgesi (yanıt kaybolduysa jobId yoktur).
+      if (ref.jobId && !ref.eDocId) {
+        const job = await api("GET", `/trackable_jobs/${encodeURIComponent(ref.jobId)}`);
+        if (!job.ok) return job;
+        const status = str(rec(rec(rec(job.value.json)?.data)?.attributes)?.status);
+        if (status === "error") return ok({ found: false, ref });
+        if (status !== "done") return ok({ found: true, state: "waiting" as RemoteState, ref: { ...ref, issued: true } });
+      }
+      const doc = await activeDocument(ref.externalId);
+      if (!doc.ok) return doc;
+      if (!doc.value.docId) return ok({ found: false, ref });
+      return ok({
+        found: true,
+        state: doc.value.state ?? ("waiting" as RemoteState),
+        number: doc.value.number,
+        reason: doc.value.reason,
+        ref: { ...ref, issued: true, eDocId: doc.value.docId, eDocType: doc.value.docType ?? null },
+      });
+    },
+
     async getPdf(ref) {
       if (!ref.issued) return fail("not_supported", "Paraşüt'te PDF belge resmileştikten sonra alınır.");
       let docId = ref.eDocId;

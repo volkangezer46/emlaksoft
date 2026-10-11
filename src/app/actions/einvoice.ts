@@ -22,7 +22,10 @@ import { parasutAuthorizeWithPassword } from "@/lib/integrations/einvoice/parasu
 import {
   EINVOICE_ROW_COLUMNS,
   isMissingEInvoiceTable,
+  isAmbiguousIssueError,
+  issueLockExpired,
   loadAdapterForUser,
+  resolveIssueOutcome,
   rowToDraft,
   rowToRef,
   type EInvoiceRow,
@@ -56,6 +59,8 @@ function nowIso(): string {
 }
 
 const BUSY = "İşlem sürüyor, birazdan Durumu yenile ile bakın.";
+const UNCERTAIN =
+  "Sağlayıcıdan yanıt alınamadı; fatura gönderilmiş olabilir. Sonuç sağlayıcıda doğrulanıyor, tekrar gönderilmeyecek. Birkaç dakika sonra Durumu yenile ile bakın.";
 const RATE_MSG = "Çok sık deneme yapıldı. Birkaç saniye bekleyip yeniden deneyin.";
 
 type RpcErr = { code?: string; message?: string };
@@ -373,6 +378,7 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
     const existing = await loadRow(id, gate.tenantId);
     if (!existing) return { error: "Fatura bulunamadı." };
     if (existing.status !== "draft") return { error: "Yalnız taslak fatura resmileştirilebilir." };
+    if (existing.issue_stage) return { error: UNCERTAIN };
     return { error: BUSY };
   }
   const row = claimed;
@@ -412,9 +418,19 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
       return { error: "Sağlayıcıda taslak oluştu ancak kayıt güncellenemedi. Birazdan yeniden deneyin." };
     }
   }
-  // 2) Resmileştir
+  // 2) Resmileştir. İSTEKTEN ÖNCE işaret: yanıt kaybolursa satır "sonucu doğrulanıyor" durumunda kalır, ikinci kez GÖNDERİLMEZ.
+  const sent = await supabase.rpc("einvoice_mark_issue_sent", { p_id: row.id });
+  if (sent.error || sent.data !== true) {
+    console.error("issueInvoice mark_issue_sent", sent.error?.code);
+    await release("Resmileştirme başlatılamadı, birazdan yeniden deneyin.");
+    return { error: "Resmileştirme başlatılamadı, birazdan yeniden deneyin." };
+  }
   const issued = await adapter.issue(ref);
   if (!issued.ok) {
+    if (isAmbiguousIssueError(issued.error.code)) {
+      // İstek işlenmiş olabilir: kilit/işaret KORUNUR; otomasyon (ve Durumu yenile) sağlayıcıda UUID ile arar.
+      return { error: UNCERTAIN };
+    }
     await release(adapterMessage(issued.error));
     return { error: adapterMessage(issued.error) };
   }
@@ -435,6 +451,33 @@ export async function issueInvoice(id: string, confirmed: boolean): Promise<EInv
   return { ok: true, id: row.id, message: "Fatura resmileştirme için sağlayıcıya gönderildi. Sonucu Durumu yenile ile sorgulayın." };
 }
 
+/** Belirsiz resmileştirmeyi sağlayıcıdan kanıtla çözer (yalnız sorgu; ASLA yeniden göndermez). */
+async function recoverUncertainIssue(row: EInvoiceRow, tenantId: string): Promise<EInvoiceActionResult> {
+  if (!issueLockExpired(row)) return { error: UNCERTAIN };
+  const supabase = await createClient();
+  const loaded = await loadAdapterForUser(supabase, tenantId);
+  if (!loaded.ok) return { error: adapterMessage(loaded.error) };
+  if (loaded.value.connection.provider !== row.provider) return { error: "Bu fatura başka bir sağlayıcıyla kesilmiş; durum sorgulanamaz." };
+  const res = await resolveIssueOutcome(loaded.value.adapter, row);
+  if (res.outcome === "unknown") return { error: UNCERTAIN };
+  const applied = await supabase.rpc("einvoice_recover_issue_mine", {
+    p_id: row.id,
+    p_outcome: res.outcome,
+    p_ref: res.outcome === "sent" ? res.ref : null,
+    p_number: res.outcome === "sent" ? res.number : null,
+  });
+  if (applied.error || applied.data !== true) return { error: rpcFailure(applied.error ?? {}, "Sonuç kaydedilemedi.") };
+  refresh();
+  return {
+    ok: true,
+    id: row.id,
+    message:
+      res.outcome === "sent"
+        ? "Fatura sağlayıcıda bulundu ve resmileşme listesine alındı."
+        : "Sağlayıcıda bu fatura için gönderim bulunmadı. İsterseniz yeniden resmileştirebilirsiniz.",
+  };
+}
+
 /** Tek faturanın durumunu sağlayıcıdan sorar. */
 export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionResult> {
   const gate = await requirePermission("commissions", "create");
@@ -443,6 +486,7 @@ export async function refreshInvoiceStatus(id: string): Promise<EInvoiceActionRe
   const row = await loadRow(id, gate.tenantId);
   if (!row) return { error: "Fatura bulunamadı." };
   const ref = rowToRef(row);
+  if (row.status === "draft" && row.issue_stage === "issue_sent" && ref) return recoverUncertainIssue(row, gate.tenantId);
   if (row.status === "draft" || !ref) return { error: "Bu fatura henüz resmileştirilmedi." };
   if (row.status !== "issued") return { error: "Bu fatura için durum sorgulanamaz. Hatalıysa Taslağa çevirip yeniden deneyin." };
   const supabase = await createClient();

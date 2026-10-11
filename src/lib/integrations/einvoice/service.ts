@@ -58,13 +58,16 @@ export type EInvoiceRow = {
   number: string | null;
   error: string | null;
   idempotency_key: string;
+  /** 'issue_sent': resmileştirme isteği sağlayıcıya gitti, sonuç henüz doğrulanmadı (yeniden talep edilemez). */
+  issue_stage?: string | null;
+  issue_claimed_at?: string | null;
   issued_at: string | null;
   last_checked_at: string | null;
   created_at: string;
 };
 
 export const EINVOICE_ROW_COLUMNS =
-  "id, tenant_id, connection_id, provider, mode, source_type, source_id, source_label, doc_type, status, provider_state, buyer_name, buyer_tax_id, buyer_tax_office, buyer_address, buyer_city, buyer_district, buyer_alias, lines, net_total, vat_total, gross_total, issue_date, note, external_id, provider_ref, number, error, idempotency_key, issued_at, last_checked_at, created_at";
+  "id, tenant_id, connection_id, provider, mode, source_type, source_id, source_label, doc_type, status, provider_state, buyer_name, buyer_tax_id, buyer_tax_office, buyer_address, buyer_city, buyer_district, buyer_alias, lines, net_total, vat_total, gross_total, issue_date, note, external_id, provider_ref, number, error, idempotency_key, issued_at, last_checked_at, created_at, issue_stage, issue_claimed_at";
 
 export const CONNECTION_COLUMNS =
   "id, provider, mode, status, fingerprint, company_name, last_test_at, last_test_ok, last_error, created_at";
@@ -192,7 +195,93 @@ async function loadAdapterForTenantAdmin(admin: SupabaseClient, tenantId: string
   return ok({ adapter, connection: { id: row.id, provider: opened.provider, mode: opened.mode } });
 }
 
-export type EInvoiceSyncSummary = { checked: number; updated: number; failed: number };
+export type EInvoiceSyncSummary = { checked: number; updated: number; failed: number; recovered?: number };
+
+/** Kilit süresi (SQL ile aynı: 5 dk). Bu süre dolmadan kurtarma denenmez (istek hâlâ sürüyor olabilir). */
+export const ISSUE_LOCK_MS = 5 * 60 * 1000;
+
+/** Sağlayıcı hatası sonucu belirsiz mi bırakır (istek işlenmiş olabilir)? Kesin ret/yetki/girdi hatası belirsiz DEĞİLDİR. */
+export function isAmbiguousIssueError(code: string): boolean {
+  return code === "unavailable" || code === "invalid_response";
+}
+
+export type IssueRecovery =
+  | { outcome: "sent"; ref: EInvoiceRef; number: string | null }
+  | { outcome: "not_sent" }
+  | { outcome: "unknown" };
+
+/**
+ * Belirsiz resmileştirmeyi sağlayıcıdan KANITLA çözer (UUID/trackable job ile arar). ASLA ikinci resmileştirme yapmaz:
+ * yalnız sorgular. Sağlayıcı hata verirse "unknown" (kilit korunur).
+ */
+export async function resolveIssueOutcome(adapter: EInvoiceAdapter, row: EInvoiceRow): Promise<IssueRecovery> {
+  const ref = rowToRef(row);
+  if (!ref) return { outcome: "unknown" };
+  const found = await adapter.findIssued(ref);
+  if (!found.ok) return { outcome: "unknown" };
+  if (!found.value.found) return { outcome: "not_sent" };
+  return { outcome: "sent", ref: { ...found.value.ref, issued: true }, number: found.value.number ?? row.number };
+}
+
+/** Kilit süresi dolmuş mu (kurtarma yapılabilir mi). */
+export function issueLockExpired(row: Pick<EInvoiceRow, "issue_claimed_at">): boolean {
+  if (!row.issue_claimed_at) return true;
+  return now() - new Date(row.issue_claimed_at).getTime() > ISSUE_LOCK_MS;
+}
+
+/**
+ * Cron: 'issue_sent' işaretli, kilidi dolmuş taslakları sağlayıcıda arar ve sonucu kurtarır (service_role RPC).
+ * Sonuç belirsizse satıra DOKUNMAZ (bir sonraki çalıştırmada yeniden sorulur).
+ */
+async function recoverStuckIssues(admin: SupabaseClient, summary: EInvoiceSyncSummary, deadlineMs?: number): Promise<void> {
+  const cutoff = new Date(now() - ISSUE_LOCK_MS).toISOString();
+  const { data, error } = await admin
+    .from("einvoices")
+    .select(EINVOICE_ROW_COLUMNS)
+    .eq("status", "draft")
+    .eq("issue_stage", "issue_sent")
+    .lt("issue_claimed_at", cutoff)
+    .order("issue_claimed_at", { ascending: true })
+    .limit(STATUS_SYNC_BATCH);
+  if (error) {
+    // Sütun yok (migration bekliyor) ya da tablo yok: sessizce atla.
+    if (!isMissingEInvoiceTable(error) && error.code !== "42703") console.error("recoverStuckIssues", error.code);
+    return;
+  }
+  const rows = (data ?? []) as unknown as EInvoiceRow[];
+  const adapters = new Map<string, Result<LoadedAdapter>>();
+  for (const row of rows) {
+    if (deadlineMs !== undefined && now() >= deadlineMs) break;
+    let loaded = adapters.get(row.tenant_id);
+    if (!loaded) {
+      loaded = await loadAdapterForTenantAdmin(admin, row.tenant_id);
+      adapters.set(row.tenant_id, loaded);
+    }
+    if (!loaded.ok || loaded.value.connection.provider !== row.provider) {
+      summary.failed += 1;
+      continue;
+    }
+    summary.checked += 1;
+    const res = await resolveIssueOutcome(loaded.value.adapter, row);
+    if (res.outcome === "unknown") {
+      summary.failed += 1;
+      continue;
+    }
+    const { data: applied, error: rpcErr } = await admin.rpc("einvoice_recover_issue", {
+      p_id: row.id,
+      p_outcome: res.outcome,
+      p_ref: res.outcome === "sent" ? res.ref : null,
+      p_number: res.outcome === "sent" ? res.number : null,
+    });
+    if (rpcErr) {
+      console.error("recoverStuckIssues rpc", rpcErr.code);
+      summary.failed += 1;
+    } else if (applied === true) {
+      summary.recovered = (summary.recovered ?? 0) + 1;
+      summary.updated += 1;
+    }
+  }
+}
 
 /**
  * `otomasyon` cron adımı: resmileştirilmiş ama sağlayıcıca henüz sonuçlanmamış belgelerin durumunu sorar.
@@ -201,6 +290,7 @@ export type EInvoiceSyncSummary = { checked: number; updated: number; failed: nu
  */
 export async function syncPendingEInvoices(admin: SupabaseClient, options: { deadlineMs?: number } = {}): Promise<EInvoiceSyncSummary> {
   const summary: EInvoiceSyncSummary = { checked: 0, updated: 0, failed: 0 };
+  await recoverStuckIssues(admin, summary, options.deadlineMs);
   const cutoff = new Date(now() - STATUS_RECHECK_MS).toISOString();
   const { data, error } = await admin
     .from("einvoices")

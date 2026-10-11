@@ -319,6 +319,21 @@ export function createNilveraAdapter(creds: NilveraCredentials, mode: EInvoiceMo
       return ok({ state, reason: state === "failed" ? reason : undefined, ref });
     },
 
+    async findIssued(ref) {
+      if (ref.docType === "e-smm") return fail("not_supported", "Nilvera bağlantısında e-Serbest Meslek Makbuzu desteklenmiyor.");
+      // Gönderilmemiş taslak UUID'si için Sale/Invoices durum ucu 404 verir; 404 = "gönderim izi yok" (kanıtlı).
+      const probe = await adapter.getStatus({ ...ref, issued: false });
+      if (!probe.ok) return probe;
+      const found = probe.value.state !== "draft";
+      return ok({
+        found,
+        state: found ? probe.value.state : undefined,
+        number: probe.value.number,
+        reason: probe.value.reason,
+        ref: { ...ref, issued: found },
+      });
+    },
+
     async getPdf(ref) {
       if (ref.docType === "e-smm") return fail("not_supported", "Nilvera bağlantısında e-Serbest Meslek Makbuzu desteklenmiyor.");
       const id = encodeURIComponent(ref.externalId);
