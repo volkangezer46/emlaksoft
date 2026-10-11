@@ -249,7 +249,7 @@ async function settlePriceProposal(
     await notifyTenant({
       tenantId: ctx.tenantId,
       userId: ctx.actorId,
-      title: "Fiyat güncellenemedi",
+      title: "Fiyat güncellenemedi; portföy sayfasından yeniden deneyin",
       body: message,
       href: `/app/portfoyler/${propertyId}`,
       kind: "warning",
@@ -277,7 +277,7 @@ async function settlePriceProposal(
   return "Fiyat güncellendi (mülk sahibi + yönetici onaylı).";
 }
 
-export type BulkApprovalResult = { error?: string; decided?: number; skipped?: number; firstError?: string };
+export type BulkApprovalResult = { error?: string; decided?: number; skipped?: number; firstError?: string; infos?: string[] };
 
 /**
  * Toplu onay/ret: her talep TEK TEK `decideApproval` yolundan geçer (kademe, "kendi talebini
@@ -297,19 +297,23 @@ export async function decideApprovalsBulk(ids: string[], decision: string, note:
   let decided = 0;
   let skipped = 0;
   let firstError: string | undefined;
+  const infos: string[] = [];
   for (const id of list) {
     const fd = new FormData();
     fd.set("id", id);
     fd.set("decision", decision);
     fd.set("decision_note", cleanNote);
     const res = await decideApproval({}, fd);
-    if (res.ok) decided += 1;
+    if (res.ok) {
+      decided += 1;
+      if (res.info) infos.push(res.info);
+    }
     else {
       skipped += 1;
       firstError ??= res.error;
     }
   }
-  return { decided, skipped, firstError };
+  return { decided, skipped, firstError, infos: infos.length > 0 ? infos : undefined };
 }
 
 /** Talebi geri çek — YALNIZ sahibi, YALNIZ bekliyorken. Satır silinmez, `iptal` olur. */
