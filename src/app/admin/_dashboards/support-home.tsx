@@ -9,6 +9,7 @@ import { AttentionList, type AttentionLevel } from "@/components/ui/attention-li
 import { Ring } from "@/components/ui/console/ring";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 
 const statusLabel: Record<string, string> = {
@@ -47,7 +48,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
     .limit(200);
 
   const rows = data ?? [];
-  const openRows = rows.filter((t) => ["open", "in_progress", "waiting"].includes(t.status));
+  const openRows = rows.filter((t) => (TICKET_OPEN_STATUSES as readonly string[]).includes(t.status));
   const open = rows.filter((t) => t.status === "open").length;
   const inProgress = rows.filter((t) => t.status === "in_progress").length;
   const waiting = rows.filter((t) => t.status === "waiting").length;

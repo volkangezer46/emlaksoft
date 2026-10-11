@@ -1,5 +1,6 @@
 "use server";
 
+import { OPEN_DEMAND_STATUSES as OPEN_DEMAND_STATUSES_SOURCE } from "@/lib/workflow-state";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -899,7 +900,8 @@ export type MyDemandResponseRow = {
 };
 
 const BUDGET_PRECISION = 100_000;
-const OPEN_DEMAND_STATUSES = ["new", "active", "matched"];
+// Tek kaynak: workflow-state (sorgularda yayılım için kopya dizi).
+const OPEN_DEMAND_STATUSES: string[] = [...OPEN_DEMAND_STATUSES_SOURCE];
 
 /** Bütçe maskesi: 100K hassasiyet — min aşağı, max yukarı yuvarlanır
  *  (gerçek pazarlık payı DTO'dan okunamaz). */

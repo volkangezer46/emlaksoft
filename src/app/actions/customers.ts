@@ -1,5 +1,6 @@
 "use server";
 
+import { OPEN_DEAL_STAGES, OPEN_DEMAND_STATUSES, UNCLOSED_APPOINTMENT_STATUSES } from "@/lib/workflow-state";
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -231,10 +232,10 @@ export async function getCustomerDeleteImpact(ids: string[]): Promise<CustomerDe
   const supabase = await createClient();
   const head = { count: "exact" as const, head: true };
   const [deals, demands, tasks, appts, contracts] = await Promise.all([
-    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", ["new", "qualified", "negotiation"]),
-    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["new", "active", "matched"]),
+    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("stage", [...OPEN_DEAL_STAGES]),
+    supabase.from("customer_demands").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", [...OPEN_DEMAND_STATUSES]),
     supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).eq("status", "open"),
-    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", ["pending", "confirmed", "signature"]),
+    supabase.from("appointments").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list).in("status", [...UNCLOSED_APPOINTMENT_STATUSES]),
     supabase.from("contracts").select("id", head).eq("tenant_id", gate.tenantId).in("customer_id", list),
   ]);
   return {

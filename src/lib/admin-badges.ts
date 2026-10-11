@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 
 const KNOWN_JOBS: ReadonlySet<string> = new Set(CRON_JOBS.map((j) => j.job));
@@ -37,7 +38,7 @@ const cachedBadges = unstable_cache(
     const admin = createAdminClient();
     const t0 = now();
     const [ticketRes, riskRes, cronRes] = await Promise.all([
-      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress", "waiting"]),
+      admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", [...TICKET_OPEN_STATUSES]),
       admin.from("tenants").select("id", { count: "exact", head: true }).in("status", ["past_due", "suspended"]),
       admin.from("cron_heartbeats").select("job, last_status, last_run_at"),
     ]);

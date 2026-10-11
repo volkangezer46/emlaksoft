@@ -190,6 +190,8 @@ export async function findSimilarOpenDemands(
     .select("id, transaction_type, property_type, district_id, status, created_at")
     .eq("tenant_id", args.tenantId)
     .eq("customer_id", args.customerId)
+    // Bilinçli: yinelenen-talep denetimi yalnız "active" talebe bakar (yeni/eşleşmiş talep çift sayılmaz);
+    // OPEN_DEMAND_STATUSES'ten dar olması kasıtlı.
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(20);

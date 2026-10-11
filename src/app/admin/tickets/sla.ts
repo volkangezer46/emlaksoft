@@ -1,4 +1,4 @@
-import { ticketSlaCalendarHours } from "@/lib/support/ticket-contract";
+import { TICKET_OPEN_STATUSES, ticketSlaCalendarHours } from "@/lib/support/ticket-contract";
 
 /**
  * Veritabanındaki hedef tarih kanoniktir. Henüz bu alanı seçmeyen eski ekranlar
@@ -6,7 +6,7 @@ import { ticketSlaCalendarHours } from "@/lib/support/ticket-contract";
  * İş saati veya resmî tatil hesabı yapıldığı ima edilmez.
  */
 
-export const SLA_OPEN_STATUSES = ["open", "in_progress", "waiting"] as const;
+export const SLA_OPEN_STATUSES = TICKET_OPEN_STATUSES;
 
 export type SlaState = {
   /** SLA takibi bu ticket için geçerli mi? */

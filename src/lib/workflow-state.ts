@@ -34,6 +34,31 @@ export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
 export const CONTRACT_STATUSES = ["draft", "sent", "signed", "rejected", "cancelled"] as const;
 export type ContractStatus = (typeof CONTRACT_STATUSES)[number];
 
+/**
+ * "Açık / bitmemiş" kümelerinin TEK kaynağı. Elle `["new","active","matched"]`
+ * ya da `.not("stage","in","(won,lost)")` yazmak yerine bunlar kullanılır
+ * (bkz. status-literal-contract.test.ts). Farklı bir küme gerekiyorsa
+ * gerekçeli, adlandırılmış ayrı sabit tanımlanır.
+ */
+const DEMAND_CLOSED: readonly DemandStatus[] = ["closed"];
+export const OPEN_DEMAND_STATUSES: readonly DemandStatus[] = DEMAND_STATUSES.filter((s) => !DEMAND_CLOSED.includes(s));
+
+export const CLOSED_DEAL_STAGES: readonly DealStage[] = ["won", "lost"];
+export const OPEN_DEAL_STAGES: readonly DealStage[] = DEAL_STAGES.filter((s) => !CLOSED_DEAL_STAGES.includes(s));
+
+/** Yaklaşan randevu: imza aşamasına gelmemiş (bekleyen/onaylı). */
+export const UPCOMING_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = ["pending", "confirmed"];
+export const CLOSED_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = ["completed", "cancelled"];
+/** Kapanmamış randevu: tamamlanmamış/iptal edilmemiş (imza bekleyen dahil). */
+export const UNCLOSED_APPOINTMENT_STATUSES: readonly AppointmentStatus[] = APPOINTMENT_STATUSES.filter(
+  (s) => !CLOSED_APPOINTMENT_STATUSES.includes(s),
+);
+
+/** PostgREST `.not(col, "in", ...)` için `(a,b)` biçimi. */
+export function postgrestInList(values: readonly string[]): string {
+  return `(${values.join(",")})`;
+}
+
 const OFFER_FLOW: Readonly<Record<OfferStatus, readonly OfferStatus[]>> = {
   draft: ["submitted", "withdrawn"],
   submitted: ["countered", "accepted", "rejected", "withdrawn"],

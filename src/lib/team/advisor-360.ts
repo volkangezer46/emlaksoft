@@ -3,9 +3,10 @@
  * Girdiler gerçek tablo satırlarıdır; veri yoksa değer null/boş döner.
  */
 import { trMonthContext } from "@/lib/team/scorecard";
+import { OPEN_DEAL_STAGES, OPEN_DEMAND_STATUSES as WORKFLOW_OPEN_DEMAND_STATUSES } from "@/lib/workflow-state";
 
 /** Talep durumu: talepler listesindeki "açık" kümesiyle aynı. */
-export const OPEN_DEMAND_STATUSES = ["new", "active", "matched"] as const;
+export const OPEN_DEMAND_STATUSES = WORKFLOW_OPEN_DEMAND_STATUSES;
 
 /** Kıyas: bir danışman bu eşiklerden birini aşarsa "dikkat gerektiren" sayılır. */
 export const ATTENTION_OVERDUE_TASKS = 3;
@@ -71,7 +72,7 @@ export function buildTimeline(events: readonly TimelineEvent[], limit: number): 
 
 export type PipelineStage = { stage: string; count: number; value: number };
 
-const OPEN_STAGES = ["new", "qualified", "negotiation"] as const;
+const OPEN_STAGES = OPEN_DEAL_STAGES;
 
 /** Kendi açık anlaşmalarının aşama dağılımı (won/lost hariç); sıra aşama sırasıdır. */
 export function openPipeline(deals: readonly { stage: string; deal_value: number | string | null }[]): PipelineStage[] {

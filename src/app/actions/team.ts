@@ -1,5 +1,6 @@
 "use server";
 
+import { CLOSED_DEAL_STAGES, UNCLOSED_APPOINTMENT_STATUSES, postgrestInList } from "@/lib/workflow-state";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -410,7 +411,7 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
         .update({ assigned_to: to, updated_at: nowIso })
         .eq("tenant_id", gate.tenantId)
         .eq("assigned_to", from)
-        .not("stage", "in", "(won,lost)")
+        .not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES))
         .select("id"),
     tasks: () =>
       supabase
@@ -426,7 +427,7 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
         .update({ assigned_to: to })
         .eq("tenant_id", gate.tenantId)
         .eq("assigned_to", from)
-        .in("status", ["pending", "confirmed", "signature"])
+        .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
         .gte("scheduled_at", nowIso)
         .select("id"),
   };
@@ -555,14 +556,14 @@ export async function getHandoffCounts(fromId: string): Promise<{ counts?: Recor
   const [c, p, d, t, a] = await Promise.all([
     supabase.from("customers").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
     supabase.from("properties").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
-    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).not("stage", "in", "(won,lost)"),
+    supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)),
     supabase.from("tasks").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).eq("status", "open"),
     supabase
       .from("appointments")
       .select("id", head)
       .eq("tenant_id", gate.tenantId)
       .eq("assigned_to", fromId)
-      .in("status", ["pending", "confirmed", "signature"])
+      .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
       .gte("scheduled_at", nowIso),
   ]);
   if (c.error || p.error || d.error || t.error || a.error) return { error: actionErrorMessage(c.error, "Sayımlar okunamadı.") };
