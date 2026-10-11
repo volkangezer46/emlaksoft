@@ -1,6 +1,7 @@
 import { Lock } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
+import { isUuid } from "@/lib/finance/cash/input";
 import { loadAccountsWithBalances } from "@/lib/finance/cash/load";
 import { DuzenliTab } from "../giderler/_tabs/duzenli";
 import { HareketlerTab, type EntriesNav } from "../giderler/_tabs/hareketler";
@@ -9,6 +10,7 @@ import { QuickEntryButtons, type AccountOption } from "../giderler/quick-entry";
 
 const KASAM_NAV: EntriesNav = { base: "/app/hesabim", sekme: "kasam" };
 const kasamHref = (accountId: string) => `/app/hesabim?sekme=kasam&hesap=${accountId}`;
+const kasamEkstreHref = (accountId: string) => `/app/hesabim?sekme=kasam&ekstre=${accountId}`;
 
 /**
  * "Kasam": kullanıcının KENDİ kişisel kasa/banka hesapları, hareketleri ve düzenli ödemeleri (`/app/hesabim?sekme=kasam`).
@@ -49,7 +51,7 @@ export async function KasamTab({
             <QuickEntryButtons accounts={options} defaultDate={today} canSalary={false} />
           </div>
         </header>
-        <KasaBankaTab supabase={supabase} accounts={mine} today={today} canOffice={false} entriesHref={kasamHref} />
+        <KasaBankaTab supabase={supabase} accounts={mine} today={today} canOffice={false} entriesHref={kasamHref} statementHref={kasamEkstreHref} reviewAccountId={isUuid(flat.ekstre) ? flat.ekstre : null} />
       </section>
 
       <section aria-label="Düzenli ödemelerim" id="duzenli" className="grid gap-4">

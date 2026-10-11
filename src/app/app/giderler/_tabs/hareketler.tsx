@@ -63,10 +63,12 @@ export async function HareketlerTab({
   const from = isoDateParam(params.from);
   const to = isoDateParam(params.to);
   const q = val("q").trim().slice(0, 60);
+  // ?mutabik=hayir: hesap kartındaki "mutabık olmayan hareket" sayısından gelir (ekstre kapsam penceresi from/to ile birlikte).
+  const mutabikYok = val("mutabik") === "hayir";
   const page = parsePage(params.sayfa);
 
   const [{ entries, total }, summary] = await Promise.all([
-    loadCashEntries(supabase, { accountId: accountId || null, accountIds: limitToAccounts && !accountId ? accounts.map((a) => a.id) : null, tur: tur || null, category: kategori || null, from: from || null, to: to || null, q: q || null, page }),
+    loadCashEntries(supabase, { accountId: accountId || null, accountIds: limitToAccounts && !accountId ? accounts.map((a) => a.id) : null, tur: tur || null, category: kategori || null, from: from || null, to: to || null, q: q || null, unreconciled: mutabikYok, page }),
     loadCashSummary(supabase, { from: from || null, to: to || null }),
   ]);
 
@@ -93,7 +95,8 @@ export async function HareketlerTab({
     { key: "from", label: "Başlangıç", format: (v) => formatDateTr(v) },
     { key: "to", label: "Bitiş", format: (v) => formatDateTr(v) },
     { key: "q", label: "Arama" },
-  ]).filter((c) => (c.key === "hesap" ? Boolean(accountId) : c.key === "tur" ? Boolean(tur) : c.key === "kategori" ? Boolean(kategori) : true));
+    { key: "mutabik", label: "Mutabakat", format: () => "Mutabık değil" },
+  ]).filter((c) => (c.key === "hesap" ? Boolean(accountId) : c.key === "tur" ? Boolean(tur) : c.key === "kategori" ? Boolean(kategori) : c.key === "mutabik" ? mutabikYok : true));
 
   const w = pageWindow(page, total, ENTRY_PAGE_SIZE, entries.length);
   const categoryOptions = [
@@ -110,13 +113,13 @@ export async function HareketlerTab({
         params={pathParams}
         searchPlaceholder="Açıklama veya karşı taraf ara…"
         searchLabel="Hareketlerde ara"
-        panelParamKeys={["hesap", "tur", "kategori", "from", "to"]}
+        panelParamKeys={["hesap", "tur", "kategori", "mutabik", "from", "to"]}
         panel={
           <FilterGrid>
             <FilterSelect name="hesap" label="Hesap" value={accountId} options={[{ value: "", label: "Tüm hesaplar" }, ...accounts.map((a) => ({ value: a.id, label: `${a.name}${a.owner_scope === "user" ? " (kişisel)" : ""}` }))]} />
             <FilterSelect name="tur" label="Tür" value={tur} options={TUR_OPTIONS} />
             <FilterSelect name="kategori" label="Ne için" value={kategori} options={categoryOptions} />
-            <span />
+            <FilterSelect name="mutabik" label="Mutabakat" value={mutabikYok ? "hayir" : ""} options={[{ value: "", label: "Tümü" }, { value: "hayir", label: "Mutabık değil" }]} />
             <FilterDate name="from" label="Başlangıç" value={from} />
             <FilterDate name="to" label="Bitiş" value={to} />
           </FilterGrid>
