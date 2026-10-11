@@ -52,15 +52,15 @@ export default async function KiraDetayPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, tenantId } = await requireModulePage("rentals", "/app/kiralama");
+  // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
+  const [{ perms, tenantId }, { id }, sp] = await Promise.all([requireModulePage("rentals", "/app/kiralama"), params, searchParams]);
   const canCreateContract = perms.contracts?.includes("create") ?? false;
   const canViewContracts = perms.contracts?.includes("view") ?? false;
   const canCreate = perms.rentals?.includes("create") ?? false;
   const canEdit = perms.rentals?.includes("edit") ?? false;
   const canDelete = perms.rentals?.includes("delete") ?? false;
-  const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin paneli çizilir
-  const tab = resolveTab(await searchParams, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
+  const tab = resolveTab(sp, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
 
   const supabase = await createClient();
   const rentalP = supabase

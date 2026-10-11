@@ -107,6 +107,48 @@ export async function loadDormantDays(tenantId: string | null | undefined): Prom
   return typeof v === "number" && v > 0 ? v : undefined;
 }
 
+type SignalOpts = { dormantDays?: number };
+
+async function fetchStateSignals(
+  supabase: SupabaseClient,
+  tenantId: string | null | undefined,
+  ids: readonly string[],
+  opts: SignalOpts,
+) {
+  const [lead, heat, upcoming, dormantDays] = await Promise.all([
+    fetchLeadSignals(supabase, tenantId, ids),
+    fetchHeatSignals(supabase, tenantId, ids),
+    fetchUpcomingAppointmentIds(supabase, ids, daysAgoIso(0)),
+    opts.dormantDays !== undefined ? Promise.resolve(opts.dormantDays) : loadDormantDays(tenantId),
+  ]);
+  return { lead, heat, upcoming, dormantDays };
+}
+
+type StateSignals = Awaited<ReturnType<typeof fetchStateSignals>>;
+export type StateSignalsPrefetch = {
+  ids: readonly string[];
+  settled: Promise<{ ok: true; value: StateSignals } | { ok: false; error: unknown }>;
+};
+
+const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Müşteri kaydı okunmadan ÖNCE başlatılır (yalnız id gerekir): ısı/aday/randevu sinyalleri künye turuyla aynı turda koşar.
+ * Sonuç `loadCustomerStates(..., { prefetched })` ile tüketilir; malik geçmişi (müşteri türüne bağlı) yine ayrıca okunur.
+ */
+export function prefetchCustomerStateSignals(
+  supabase: SupabaseClient,
+  tenantId: string | null | undefined,
+  ids: readonly string[],
+  opts: SignalOpts = {},
+): StateSignalsPrefetch {
+  const settled = fetchStateSignals(supabase, tenantId, ids, opts).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+  return { ids, settled };
+}
+
 export type StateCustomer = {
   id: string;
   created_at: string;
@@ -125,7 +167,7 @@ export async function loadCustomerStates(
   supabase: SupabaseClient,
   tenantId: string | null | undefined,
   customers: readonly StateCustomer[],
-  opts: { nowMs?: number; dormantDays?: number; context?: string } = {},
+  opts: { nowMs?: number; dormantDays?: number; context?: string; prefetched?: StateSignalsPrefetch } = {},
 ): Promise<Map<string, CustomerState>> {
   const states = new Map<string, CustomerState>();
   if (customers.length === 0) return states;
@@ -133,13 +175,13 @@ export async function loadCustomerStates(
   const ids = customers.map((c) => c.id);
   const ownerIds = customers.filter((c) => isOwnerCustomer(c.customer_types)).map((c) => c.id);
 
-  const [lead, heat, upcoming, owner, dormantDays] = await Promise.all([
-    fetchLeadSignals(supabase, tenantId, ids),
-    fetchHeatSignals(supabase, tenantId, ids),
-    fetchUpcomingAppointmentIds(supabase, ids, daysAgoIso(0)),
+  const pre = opts.prefetched && sameIds(opts.prefetched.ids, ids) ? await opts.prefetched.settled : null;
+  if (pre && !pre.ok) throw pre.error;
+  const [signals, owner] = await Promise.all([
+    pre ? Promise.resolve(pre.value) : fetchStateSignals(supabase, tenantId, ids, opts),
     fetchOwnerHistory(supabase, ownerIds),
-    opts.dormantDays !== undefined ? Promise.resolve(opts.dormantDays) : loadDormantDays(tenantId),
   ]);
+  const { lead, heat, upcoming, dormantDays } = signals;
 
   // Hata sessizce "veri yok"a dönüşmesin: çağıranın error.tsx sınırına düşer.
   assertQueryBatchSucceeded([lead, heat, upcoming, owner], ["lead-signals", "heat-signals", "upcoming-appointments", "owner-history"], opts.context ?? "Müşteri durumu");

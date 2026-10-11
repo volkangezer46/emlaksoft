@@ -110,11 +110,10 @@ export default async function DealDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId, role, tenantId } = await requireModulePage("commissions");
+  // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
+  const [{ perms, userId, role, tenantId }, { id }, sp] = await Promise.all([requireModulePage("commissions"), params, searchParams]);
   const seeAllEarnings = canSeeAllEarnings(perms);
-  const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
-  const sp = await searchParams;
   const tab = resolveTab(sp, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
   const timelineCategory = resolveCategory(sp.kategori, DEAL_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);

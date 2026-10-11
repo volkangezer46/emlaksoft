@@ -34,7 +34,7 @@ import { MoreActions } from "@/components/app/more-actions";
 import { HelpTip } from "@/components/ui/help-tip";
 import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
-import { loadCustomerStates } from "@/lib/customer-state/load";
+import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
 import { heatTitle } from "@/lib/customer-state/heat";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
@@ -110,23 +110,25 @@ export default async function CustomerDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, userId, tenantId } = await requireModulePage("customers");
-  const stageNames = stageLabelMap(await getStageLabels());
+  // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
+  const [{ perms, userId, tenantId }, { id }, sp] = await Promise.all([requireModulePage("customers"), params, searchParams]);
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
   const canTaskCreate = (perms.tasks ?? []).includes("create");
   const canTaskEdit = (perms.tasks ?? []).includes("edit");
   const canTaskDelete = (perms.tasks ?? []).includes("delete");
   const canTaskView = (perms.tasks ?? []).includes("view");
-  const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir (eski ?tab= linkleri de çalışır)
-  const sp = await searchParams;
   const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet", CUSTOMER_TAB_ALIASES);
   const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
   const supabase = await createClient();
   const noRows = Promise.resolve({ data: null });
+  // Müşteri kaydını BEKLEMEDEN başlar (yalnız id gerekir): ısı/aday/randevu sinyalleri künye sorgusuyla aynı turda koşar.
+  const stateSignals = prefetchCustomerStateSignals(supabase, tenantId, [id]);
+  // Aşama adları yalnız zaman çizelgesi sekmesinde kullanılır; o sekmede toplu turla birlikte okunur.
+  const stageNamesP = tab === "gecmis" ? getStageLabels().then(stageLabelMap) : null;
 
   // Tüm sorgular yalnızca `id`'ye bağlı — müşteri sorgusu da batch'e katıldı (notFound sonra)
   const [
@@ -156,6 +158,7 @@ export default async function CustomerDetailPage({
     { data: editAdvisors },
     sourceDefs,
     prefRes,
+    stageNames,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -262,6 +265,7 @@ export default async function CustomerDetailPage({
     tab === "ozet"
       ? supabase.from("customers").select("rent_reminder_opt_out, rent_reminder_opt_out_at").eq("id", id).maybeSingle()
       : Promise.resolve(null),
+    stageNamesP ?? Promise.resolve({} as ReturnType<typeof stageLabelMap>),
   ]);
 
   if (!customer) notFound();
@@ -329,7 +333,7 @@ export default async function CustomerDetailPage({
       source: customer.source,
       customer_types: types,
     }],
-    { context: "Müşteri 360" },
+    { context: "Müşteri 360", prefetched: stateSignals },
   )).get(customer.id)!;
   const lead = state.scores.lead;
   const score = lead.score;

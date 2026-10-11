@@ -476,17 +476,32 @@ export async function loadAdvisorMetrics(
   if (wanted) pq = pq.in("id", wanted);
   else pq = pq.in("role", [...METRIC_ROLES]);
   if (!wanted && !opts.includeInactive) pq = pq.eq("is_active", true);
-  const [sample, profilesRes] = await Promise.all([samplePromise, pq]);
-  const profiles = (profilesRes.data ?? []) as MetricsProfile[];
-  const ids = profiles.map((p) => p.id);
-  const idSet = new Set(ids);
+  // Kişi belli ise (`wanted`) profil sorgusu sayım turunu BEKLEMEZ: kimlikler zaten bilinir, profil okuması aynı turda koşar
+  // (görünmeyen/yanlış kimlik sonunda idSet dışında kalır, sayılar yok sayılır). Takım geneli taramada eski sıra korunur.
+  let profilesRes: { data: unknown; error: unknown; count: number | null };
+  let sample: Awaited<typeof samplePromise>;
+  let profilesLater: PromiseLike<{ data: unknown; error: unknown; count: number | null }> | null = null;
+  let ids: string[];
+  if (wanted) {
+    sample = await samplePromise;
+    profilesLater = Promise.resolve(pq) as unknown as PromiseLike<{ data: unknown; error: unknown; count: number | null }>;
+    ids = [...new Set(wanted)];
+    profilesRes = { data: [], error: null, count: null };
+  } else {
+    const both = await Promise.all([samplePromise, pq]);
+    sample = both[0];
+    profilesRes = both[1];
+    ids = ((profilesRes.data ?? []) as MetricsProfile[]).map((p) => p.id);
+  }
+  let profiles = (profilesRes.data ?? []) as MetricsProfile[];
+  let idSet = new Set(ids);
 
   const single = ids.length === 1 ? ids[0] : null;
   const scan = (q: Q, col: string): Q => (single ? q.eq(col, single) : q);
   const tq = (q: Q): Q => (tenantId ? q.eq("tenant_id", tenantId) : q);
   /** Tenant + örnek veri kapsamı (is_sample taşıyan tablolar için). */
   const tsq = (q: Q): Q => sample.apply(tq(q));
-  let failed = Boolean(profilesRes.error);
+  let failed = false;
   let partial = false;
   const noteScan = (rows: unknown[]) => {
     if (rows.length >= SCAN_LIMIT) partial = true;
@@ -592,6 +607,12 @@ export async function loadAdvisorMetrics(
       : null,
   ]);
 
+  if (profilesLater) {
+    profilesRes = await profilesLater;
+    profiles = (profilesRes.data ?? []) as MetricsProfile[];
+    idSet = new Set(profiles.map((p) => p.id));
+  }
+  if (profilesRes.error) failed = true;
   for (const r of [newCustRes, callRes, apptRes, offerRes, targetRes, demandRes, taskRes]) {
     if (r && (r as { error?: unknown }).error) failed = true;
   }

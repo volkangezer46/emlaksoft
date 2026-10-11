@@ -88,8 +88,6 @@ import { PriceProposalSection } from "./price-proposal-section";
 import { PropertyLifecyclePanel } from "@/components/listing-control/property-lifecycle-panel";
 import { PROPERTY_TIMELINE_CATEGORIES } from "./property-events";
 import { resolveCategory } from "@/lib/activity-timeline";
-import { getStageLabels } from "@/lib/definitions";
-import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { RadialGauge } from "@/components/ui/viz";
 import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { provinceOptionsResult } from "@/lib/geo/reader";
@@ -153,12 +151,11 @@ export default async function PropertyDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { perms, tenantId } = await requireModulePage("properties");
+  // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
+  const [{ perms, tenantId }, { id }, sp] = await Promise.all([requireModulePage("properties"), params, searchParams]);
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
-  const { id } = await params;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
-  const sp = await searchParams;
   const tab = resolveTab(sp, PROPERTY_TAB_IDS, "ozet", PROPERTY_TAB_ALIASES);
   const timelineCategory = resolveCategory(sp.kategori, PROPERTY_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
@@ -170,7 +167,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -190,10 +187,11 @@ export default async function PropertyDetailPage({
       .maybeSingle();
     return { data: (res.data as { avg_days_listed: number | null } | null) ?? null };
   });
-  const assigneeP = propertyP.then(async ({ data: prop }): Promise<{ data: { full_name: string | null } | null }> => {
-    if (!prop?.assigned_to) return { data: null };
-    const res = await supabase.from("profiles").select("full_name").eq("id", prop.assigned_to).maybeSingle();
-    return { data: (res.data as { full_name: string | null } | null) ?? null };
+  // Danışman adı portföy satırıyla AYNI sorguda gömülü gelir (eskiden ayrı bir profil turu).
+  const assigneeP = propertyP.then(({ data: prop }): { data: { full_name: string | null } | null } => {
+    const raw = (prop as { assignee?: unknown } | null)?.assignee;
+    const row = (Array.isArray(raw) ? raw[0] : raw) as { full_name?: string | null } | null | undefined;
+    return { data: row ? { full_name: row.full_name ?? null } : null };
   });
 
   // KÜNYE BATCH'İ — yalnız hero + üst kartların ihtiyacı. Hepsi `id`'ye bağlı,
@@ -1035,7 +1033,6 @@ export default async function PropertyDetailPage({
             <Suspense fallback={<TimelineSkeleton />}>
               <PropertyTimelineSection
                 propertyId={id}
-                stageNames={stageLabelMap(await getStageLabels())}
                 category={timelineCategory}
                 limit={timelineLimit}
               />

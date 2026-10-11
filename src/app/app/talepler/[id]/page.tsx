@@ -97,6 +97,13 @@ const RENT_VARIANTS = ["Kiralık", "kiralık", "Kiralik", "kiralik", "KİRALIK",
 const isSaleTx = (v: string) => ["satılık", "satilik", "sale", "satış", "satis"].some((x) => v.includes(x));
 const isRentTx = (v: string) => ["kiralık", "kiralik", "rent", "kira"].some((x) => v.includes(x));
 
+/** Eşleşen portföyün kapak küçük resmi: ortak söz çözülünce çizilir, yoksa simge. */
+async function MatchCover({ coverMapP, propertyId, alt }: { coverMapP: Promise<Map<string, string>>; propertyId: string; alt: string }) {
+  const coverId = (await coverMapP).get(propertyId);
+  if (!coverId) return <Building2 className="h-6 w-6 text-brand-600/35" />;
+  return <Image src={`/api/property-media/${coverId}/download`} alt={alt} fill sizes="80px" className="object-cover" unoptimized />;
+}
+
 export default async function DemandDetailPage({
   params,
   searchParams,
@@ -104,18 +111,24 @@ export default async function DemandDetailPage({
   params: Promise<{ id: string }>;
   searchParams?: Promise<{ kategori?: string; adet?: string }>;
 }) {
-  const { perms, tenantId } = await requireModulePage("demands");
+  // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
+  const [{ perms, tenantId }, { id }, spRaw] = await Promise.all([requireModulePage("demands"), params, searchParams]);
   const canEdit = (perms.demands ?? []).includes("edit");
   const taskPerms = perms.tasks ?? [];
   const canTaskView = taskPerms.includes("view");
   const canApptView = (perms.appointments ?? []).includes("view");
   const canApptCreate = (perms.appointments ?? []).includes("create");
-  const { id } = await params;
-  const sp = (await searchParams) ?? {};
+  const sp = spRaw ?? {};
   const activeCategory = resolveCategory(sp.kategori, DEMAND_TIMELINE_CATEGORIES.map((c) => c.key));
   const timelineLimit = Math.min(400, Math.max(40, Number.parseInt(sp.adet ?? "", 10) || 40));
   const supabase = await createClient();
 
+  // Talep satırına BAĞLI olmayan okumalar talep sorgusuyla AYNI turda başlar (eskiden talepten sonraki turdaydı).
+  const provincesP = provinceOptionsResult({ includeInactive: true });
+  const weightsP = fetchTenantMatchingWeights(supabase);
+  const networkP = Promise.resolve(
+    supabase.from("network_demands").select("id, status, commission_share_pct").eq("demand_id", id).maybeSingle(),
+  );
   const { data: demandData } = await supabase
     .from("customer_demands")
     .select(
@@ -201,8 +214,8 @@ export default async function DemandDetailPage({
     { data: apptRows },
     allEvents,
   ] = await Promise.all([
-    provinceOptionsResult({ includeInactive: true }),
-    fetchTenantMatchingWeights(supabase),
+    provincesP,
+    weightsP,
     propQuery.order("created_at", { ascending: false }).limit(200),
     customer
       ? supabase
@@ -210,11 +223,7 @@ export default async function DemandDetailPage({
           .select("property_id, verdict")
           .eq("customer_id", customer.id)
       : Promise.resolve({ data: [] as { property_id: string; verdict: string }[] }),
-    supabase
-      .from("network_demands")
-      .select("id, status, commission_share_pct")
-      .eq("demand_id", id)
-      .maybeSingle(),
+    networkP,
     customer?.assigned_to
       ? supabase.from("profiles").select("full_name").eq("id", customer.assigned_to).maybeSingle()
       : Promise.resolve({ data: null as { full_name: string } | null }),
@@ -278,17 +287,25 @@ export default async function DemandDetailPage({
   const topMatches = matches.slice(0, 10);
 
   // Kapak görselleri — portföy listesindeki desen (yalnız listelenen 10 portföy için)
-  const coverByProperty = new Map<string, string>();
-  if (topMatches.length > 0) {
-    const { data: covers } = await supabase
-      .from("property_media")
-      .select("id, property_id")
-      .in("property_id", topMatches.map((m) => m.property.id))
-      .eq("is_cover", true);
-    for (const cover of (covers ?? []) as { id: string; property_id: string }[]) {
-      if (!coverByProperty.has(cover.property_id)) coverByProperty.set(cover.property_id, cover.id);
-    }
-  }
+  // Kapaklar listeyi BEKLETMEZ: sözle başlar, her küçük resim kendi Suspense sınırında çözülür (üçüncü ardışık tur kalktı).
+  const coverMapP: Promise<Map<string, string>> = Promise.resolve(
+    topMatches.length > 0
+      ? supabase
+          .from("property_media")
+          .select("id, property_id")
+          .in("property_id", topMatches.map((m) => m.property.id))
+          .eq("is_cover", true)
+      : { data: [] as { id: string; property_id: string }[] },
+  ).then(
+    ({ data: covers }) => {
+      const map = new Map<string, string>();
+      for (const cover of (covers ?? []) as { id: string; property_id: string }[]) {
+        if (!map.has(cover.property_id)) map.set(cover.property_id, cover.id);
+      }
+      return map;
+    },
+    () => new Map<string, string>(),
+  );
 
   const criteriaChips = [
     demand.rooms,
@@ -433,7 +450,6 @@ export default async function DemandDetailPage({
           ) : (
             <div className="divide-y divide-line">
               {topMatches.map((m) => {
-                const coverId = coverByProperty.get(m.property.id);
                 return (
                   <article key={m.property.id} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02]">
                     <Link
@@ -441,18 +457,9 @@ export default async function DemandDetailPage({
                       className="relative grid h-16 w-20 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-card)] bg-[image:var(--grad-brand-soft)]"
                       aria-label={`${m.property.title ?? m.property.property_code} portföyünü aç`}
                     >
-                      {coverId ? (
-                        <Image
-                          src={`/api/property-media/${coverId}/download`}
-                          alt={m.property.title ?? m.property.property_code}
-                          fill
-                          sizes="80px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <Building2 className="h-6 w-6 text-brand-600/35" />
-                      )}
+                      <Suspense fallback={<Building2 className="h-6 w-6 text-brand-600/35" />}>
+                        <MatchCover coverMapP={coverMapP} propertyId={m.property.id} alt={m.property.title ?? m.property.property_code} />
+                      </Suspense>
                     </Link>
 
                     <div className="min-w-0 flex-1">

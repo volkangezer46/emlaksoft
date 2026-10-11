@@ -1,3 +1,5 @@
+import { getStageLabels } from "@/lib/definitions";
+import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { countByCategory, filterByCategory } from "@/lib/activity-timeline";
 import { createClient } from "@/lib/supabase/server";
@@ -10,16 +12,15 @@ import { buildPropertyEvents, PROPERTY_TIMELINE_CATEGORIES } from "./property-ev
  */
 export async function PropertyTimelineSection({
   propertyId,
-  stageNames,
   category,
   limit,
 }: {
   propertyId: string;
-  stageNames: Record<string, string>;
   category: string;
   limit: number;
 }) {
-  const supabase = await createClient();
+  const [supabase, stageLabels] = await Promise.all([createClient(), getStageLabels()]);
+  const stageNames = stageLabelMap(stageLabels);
   const all = await buildPropertyEvents(supabase, propertyId, stageNames);
   const counts = countByCategory(all);
   const base = `/app/portfoyler/${propertyId}?sekme=zaman`;
