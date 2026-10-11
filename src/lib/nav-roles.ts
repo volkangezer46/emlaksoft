@@ -73,11 +73,8 @@ const MUSTERILER: HubDef = {
     p("/app/talepler", "Talepler"),
     p("/app/gelen-kutusu", "Gelen kutusu"),
     p("/app/akilli-listeler", "Akıllı listeler"),
-    p("/app/kayip-satis", "Riskli müşteriler"),
     p("/app/tavsiyeler", "Tavsiyeler"),
     p("/app/kampanyalar", "Kampanyalar"),
-    p("/app/ayarlar/etiketler", "Etiketler"),
-    p("/app/ayarlar/mesaj-sablonlari", "Şablonlar"),
   ],
 };
 
@@ -103,7 +100,7 @@ const SATIS: HubDef = {
   label: "Anlaşmalar",
   group: "Satış",
   icon: "baslikAnlasma",
-  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/onaylar", "Onaylar"), p("/app/ayarlar/sozlesme-sablonlari", "Şablonlar")],
+  pages: [p("/app/anlasmalar", "Anlaşmalar"), p("/app/teklifler", "Teklifler"), p("/app/sozlesmeler", "Sözleşmeler"), p("/app/onaylar", "Onaylar"), p("/app/ayarlar/sozlesme-sablonlari", "Sözleşme şablonu")],
 };
 
 const KOMISYON: HubDef = {
@@ -144,11 +141,10 @@ const EKIBIM: HubDef = {
     p("/app/ofis-kontrol", "Ofis kontrolü"),
     p("/app/ekip/takimlar", "Takımlar"),
     p("/app/ekip/subeler", "Şubeler"),
-    p("/app/ekip/devir", "Devir"),
+    p("/app/ekip/devir", "Danışman devri"),
     p("/app/lig", "Lig"),
     p("/app/ekip/kiyas", "Karşılaştır"),
     p("/app/denetim", "Denetim"),
-    p("/app/ofis-merkezi", "Ofis merkezi"),
   ],
 };
 
@@ -165,7 +161,7 @@ const RAPORLAR: HubDef = {
     p("/app/raporlar/kar-zarar", "Kâr-zarar"),
     p("/app/anketler", "Anketler"),
     p("/app/raporlar/lead-hizi", "Yanıt hızı"),
-    p("/app/franchise", "Franchise"),
+    p("/app/franchise"),
   ],
 };
 

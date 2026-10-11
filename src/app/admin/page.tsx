@@ -391,7 +391,7 @@ async function ChurnSection({ period }: { period: Period }) {
   return (
     <ChartCard
       as="h2"
-      title="Riskli ofisler ve churn"
+      title="Riskli ofisler ve kayıp riski"
       subtitle="Gecikmiş, askıda veya az kullanan ofisler"
       icon={ShieldAlert}
       tone="danger"

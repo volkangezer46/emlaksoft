@@ -175,7 +175,7 @@ export default async function KampanyalarPage({
         art="kampanya"
         title="SMS & WhatsApp kampanyaları"
         description="Kampanyalar küçük partilerle işlenir; her teslimattan hemen önce sistemde kayıtlı kanal izni yeniden doğrulanır."
-        actions={canCreate ? <ButtonLink href="/app/kampanyalar/yeni" icon={Plus}>Yeni kampanya</ButtonLink> : undefined}
+        actions={canCreate ? (<><ButtonLink href="/app/ayarlar/mesaj-sablonlari" variant="outline" icon={MessageSquare}>Mesaj şablonları</ButtonLink><ButtonLink href="/app/kampanyalar/yeni" icon={Plus}>Yeni kampanya</ButtonLink></>) : undefined}
       />
 
       <KpiStrip items={kpis} />

@@ -357,7 +357,7 @@ export default async function AdminTenantDetailPage({
               </p>
             ) : null}
             {heatRows.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-muted">Son 30 günde hiç kullanım kaydı yok — churn riski yüksek.</p>
+              <p className="py-8 text-center text-sm text-text-muted">Son 30 günde hiç kullanım kaydı yok — kayıp riski yüksek.</p>
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[440px]">

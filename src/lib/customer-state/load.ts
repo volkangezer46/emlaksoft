@@ -64,6 +64,48 @@ export async function fetchUpcomingAppointmentIds(
   return { data: out, error: null };
 }
 
+const DAY_MS = 86_400_000;
+
+/**
+ * "Arandı" (30 gün) ya da "1 hafta ertele" ile risk listesinden düşürülen müşteri id'leri (TEK erteleme hafızası:
+ * `lost_sale_dismissals`). Süresi dolmamış kayıtlar, tenant filtreli; hata değer olarak döner.
+ */
+export async function fetchRiskDismissedIds(
+  supabase: SupabaseClient,
+  tenantId: string | null | undefined,
+  nowMs: number,
+): Promise<{ data: Set<string>; error: QueryError }> {
+  const out = new Set<string>();
+  if (!tenantId) return { data: out, error: null };
+  const nowIso = new Date(nowMs).toISOString();
+  const calledSince = new Date(nowMs - 30 * DAY_MS).toISOString();
+  const { data, error } = await supabase
+    .from("lost_sale_dismissals")
+    .select("customer_id, dismissed_until, reason, created_at")
+    .eq("tenant_id", tenantId)
+    .or(`dismissed_until.gt.${nowIso},and(reason.eq.called,created_at.gt.${calledSince})`);
+  if (error) return { data: out, error };
+  for (const d of (data ?? []) as { customer_id: string; dismissed_until: string | null; reason: string; created_at: string }[]) {
+    const active =
+      (d.dismissed_until != null && new Date(d.dismissed_until).getTime() > nowMs) ||
+      (d.reason === "called" && nowMs - new Date(d.created_at).getTime() < 30 * DAY_MS);
+    if (active) out.add(d.customer_id);
+  }
+  return { data: out, error: null };
+}
+
+/** Ertelenen/aranan müşteri: risk "düşük"e iner, kayıp-riski gerekçesi ve kurtarma önerisi sönümlenir (diğer sinyaller korunur). */
+function withoutRisk(state: CustomerState): CustomerState {
+  if (state.risk !== "yuksek" && state.risk !== "orta") return state;
+  const nba = state.nextBestAction;
+  return {
+    ...state,
+    risk: "dusuk",
+    reasons: state.reasons.filter((r) => !r.label.endsWith("kayıp riski")),
+    nextBestAction: nba && (nba.key === "kurtar" || nba.key === "dokun") ? { ...nba, key: "rutin" } : nba,
+  };
+}
+
 export type OwnerHistory = { wonDeals: Map<string, number>; listingIntent: Set<string> };
 
 /** Satıcı-tahmini girdileri (kazanılmış anlaşma + açık satış talebi) — yalnız malik-tipi id'ler için. */
@@ -177,21 +219,20 @@ export async function loadCustomerStates(
 
   const pre = opts.prefetched && sameIds(opts.prefetched.ids, ids) ? await opts.prefetched.settled : null;
   if (pre && !pre.ok) throw pre.error;
-  const [signals, owner] = await Promise.all([
+  const [signals, owner, dismissed] = await Promise.all([
     pre ? Promise.resolve(pre.value) : fetchStateSignals(supabase, tenantId, ids, opts),
     fetchOwnerHistory(supabase, ownerIds),
+    fetchRiskDismissedIds(supabase, tenantId, nowMs),
   ]);
   const { lead, heat, upcoming, dormantDays } = signals;
 
   // Hata sessizce "veri yok"a dönüşmesin: çağıranın error.tsx sınırına düşer.
-  assertQueryBatchSucceeded([lead, heat, upcoming, owner], ["lead-signals", "heat-signals", "upcoming-appointments", "owner-history"], opts.context ?? "Müşteri durumu");
+  assertQueryBatchSucceeded([lead, heat, upcoming, owner, dismissed], ["lead-signals", "heat-signals", "upcoming-appointments", "owner-history", "risk-dismissals"], opts.context ?? "Müşteri durumu");
 
   const leadMap = new Map<string, LeadRpcSignals>(lead.data.map((s) => [s.customer_id, s]));
   const heatMap = new Map<string, HeatRpcRow>(heat.data.map((s) => [s.customer_id, s]));
   for (const c of customers) {
-    states.set(
-      c.id,
-      buildCustomerState(
+    const built = buildCustomerState(
         {
           customerId: c.id,
           createdAt: c.created_at,
@@ -208,8 +249,8 @@ export async function loadCustomerStates(
         },
         nowMs,
         { dormantDays },
-      ),
-    );
+      );
+    states.set(c.id, dismissed.data.has(c.id) ? withoutRisk(built) : built);
   }
   return states;
 }
