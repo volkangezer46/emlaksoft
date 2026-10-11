@@ -234,6 +234,9 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
     newValue: { length: text.length, jobid: result.jobid ?? null },
   });
 
+  // Başarılı SMS = iletişim: açık "Bugün ara" kartı anında kapanır.
+  if (comm) closeCallPriorityAfterContact(customerId);
+
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/gelen-kutusu");
   return { ok: true, id: comm?.id };
