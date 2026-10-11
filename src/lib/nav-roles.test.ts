@@ -20,13 +20,13 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     }
   });
 
-  it("satır sayıları: ofis yönetimi 7, danışman 5, muhasebe 4, çağrı 4; bütçeyi aşmaz", () => {
-    expect(NAV_BY_ROLE.owner.hubs).toHaveLength(7);
-    expect(NAV_BY_ROLE.gm.hubs).toHaveLength(7);
-    expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(7);
-    expect(NAV_BY_ROLE.advisor.hubs).toHaveLength(5);
-    expect(NAV_BY_ROLE.team_lead.hubs).toHaveLength(5);
-    expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(4);
+  it("satır sayıları: ofis yönetimi 10, danışman 6, muhasebe 6, çağrı 4; bütçeyi aşmaz", () => {
+    expect(NAV_BY_ROLE.owner.hubs).toHaveLength(10);
+    expect(NAV_BY_ROLE.gm.hubs).toHaveLength(10);
+    expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(9);
+    expect(NAV_BY_ROLE.advisor.hubs).toHaveLength(6);
+    expect(NAV_BY_ROLE.team_lead.hubs).toHaveLength(6);
+    expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(6);
     expect(NAV_BY_ROLE.call_center.hubs).toHaveLength(4);
     for (const role of ["advisor", "team_lead"] as const) expect(NAV_BY_ROLE[role].hubs.length).toBeLessThanOrEqual(NAV_BUDGET.advisor);
     for (const role of ROLES) expect(NAV_BY_ROLE[role].hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
@@ -50,7 +50,7 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     }
     expect(NAV_BY_ROLE.owner.mobile).toEqual(["bugun", "musteriler", "new", "ilanlar", "menu"]);
     expect(NAV_BY_ROLE.advisor.mobile).toEqual(["bugun", "musteriler", "new", "ilanlar", "ben"]);
-    expect(NAV_BY_ROLE.accounting.mobile).toEqual(["bugun", "para", "raporlar", "menu"]);
+    expect(NAV_BY_ROLE.accounting.mobile).toEqual(["bugun", "muhasebe", "raporlar", "menu"]);
     expect(NAV_BY_ROLE.call_center.mobile).toEqual(["bugun", "gelen-kutusu", "musteriler", "new", "menu"]);
   });
 

@@ -3,7 +3,7 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { Fragment, useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Lock, Menu, Plus, X } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
@@ -222,7 +222,16 @@ export function AppSidebar({
 
       <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 px-3" innerClassName="pb-3">
         <div className="sb-expanded">
-          <div className="space-y-0.5 pt-1">{nav.hubs.map((hub) => renderHub(hub, {}))}</div>
+          <div className="space-y-0.5 pt-1">
+            {nav.hubs.map((hub, i) => (
+              <Fragment key={hub.id}>
+                {hub.group && hub.group !== nav.hubs[i - 1]?.group ? (
+                  <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-white/45 first:pt-1">{hub.group}</p>
+                ) : null}
+                {renderHub(hub, {})}
+              </Fragment>
+            ))}
+          </div>
 
           {/* Alt sabit: Ayarlar, Abonelik, Yardım (satır bütçesine sayılmaz) + Araçlar (kapalı grup) + Menüyü düzenle. */}
           <div className="mt-3 space-y-0.5 border-t border-white/10 pt-3">

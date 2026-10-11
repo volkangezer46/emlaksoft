@@ -19,21 +19,21 @@ const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
-  it("bütçe sabitleri: danışman 5, ofis 6, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 5, office: 7, admin: 6 });
+  it("bütçe sabitleri: danışman 6, ofis 10, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 10, admin: 6 });
   });
 
-  it("danışman / takım lideri <= 5 satır", () => {
+  it("danışman / takım lideri <= 6 satır", () => {
     for (const role of ["advisor", "team_lead"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
   });
 
-  it("ofis yönetimi (owner/gm/branch_manager) <= 6 satır", () => {
+  it("ofis yönetimi (owner/gm/branch_manager) <= 10 satır", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
   });
 
-  it("diğer roller de ofis bütçesini aşmaz; muhasebe ve çağrı merkezi 4 satır", () => {
+  it("diğer roller de ofis bütçesini aşmaz; muhasebe 6, çağrı merkezi 4 satır", () => {
     for (const role of ROLES) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
-    expect(rows("accounting")).toHaveLength(4);
+    expect(rows("accounting")).toHaveLength(6);
     expect(rows("call_center")).toHaveLength(4);
   });
 

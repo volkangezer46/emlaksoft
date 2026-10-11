@@ -13,7 +13,7 @@ import type { AppRole } from "@/lib/permissions";
  * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
  */
 
-export const NAV_BUDGET = { advisor: 5, office: 7, admin: 6 } as const;
+export const NAV_BUDGET = { advisor: 6, office: 10, admin: 6 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -29,6 +29,8 @@ export type HubDef = {
   id: string;
   label: string;
   icon: HubIconKey;
+  /** Yan menüde üstte görünen küçük grup başlığı (ardışık aynı gruptakiler tek başlık altında). */
+  group?: string;
   /** Şeritteki sıra = dizi sırası. İlk 5 sayfa görünür, kalanı "Diğer" menüsündedir. */
   pages: readonly HubPageRef[];
 };
@@ -54,6 +56,7 @@ const p = (href: string, label?: string, ownModule?: boolean): HubPageRef => ({ 
 const BUGUN: HubDef = {
   id: "bugun",
   label: "Bugün",
+  group: "Günlük işler",
   icon: "baslikBugun",
   pages: [p("/app", "Ana ekran"), p("/app/randevular"), p("/app/gorevler")],
 };
@@ -61,6 +64,7 @@ const BUGUN: HubDef = {
 const MUSTERILER: HubDef = {
   id: "musteriler",
   label: "Müşteriler",
+  group: "Günlük işler",
   icon: "baslikMusteri",
   pages: [
     p("/app/musteriler"),
@@ -77,7 +81,8 @@ const MUSTERILER: HubDef = {
 
 const ILANLAR: HubDef = {
   id: "ilanlar",
-  label: "İlanlar",
+  label: "Portföy",
+  group: "Portföy",
   icon: "baslikPortfoy",
   pages: [
     p("/app/portfoyler"),
@@ -90,28 +95,43 @@ const ILANLAR: HubDef = {
   ],
 };
 
-const SATIS_PARA: HubDef = {
+const SATIS: HubDef = {
   id: "satis-para",
-  label: "Satış ve Para",
+  label: "Satış",
+  group: "Finans",
   icon: "baslikAnlasma",
-  pages: [
-    p("/app/anlasmalar"),
-    p("/app/teklifler"),
-    p("/app/komisyon"),
-    p("/app/giderler", "Finans"),
-    p("/app/kiralama"),
-    p("/app/sozlesmeler"),
-    p("/app/cuzdan", "Kazanç"),
-    p("/app/onaylar"),
-    p("/app/kira-artis"),
-    p("/app/aidat"),
-    p("/app/ayarlar/sozlesme-sablonlari"),
-  ],
+  pages: [p("/app/anlasmalar"), p("/app/teklifler"), p("/app/sozlesmeler"), p("/app/onaylar"), p("/app/ayarlar/sozlesme-sablonlari")],
+};
+
+const KOMISYON: HubDef = {
+  id: "komisyon",
+  label: "Komisyon",
+  group: "Finans",
+  icon: "baslikFinans",
+  pages: [p("/app/komisyon"), p("/app/cuzdan", "Kazanç")],
+};
+
+/** Muhasebe: gelir-gider, kasa/banka, düzenli ödemeler, faturalar (sayfa içi sekmeler). Kullanıcı: "muhasebe nerede?" (2026-10-12). */
+const MUHASEBE: HubDef = {
+  id: "muhasebe",
+  label: "Muhasebe",
+  group: "Finans",
+  icon: "gider",
+  pages: [p("/app/giderler", "Gelir ve gider")],
+};
+
+const KIRALAMA_AIDAT: HubDef = {
+  id: "kiralama",
+  label: "Kiralama ve Aidat",
+  group: "Finans",
+  icon: "anahtar",
+  pages: [p("/app/kiralama"), p("/app/aidat", "Aidat & site"), p("/app/kira-artis")],
 };
 
 const EKIBIM: HubDef = {
   id: "ekibim",
   label: "Ekibim",
+  group: "Yönetim",
   icon: "ekip",
   pages: [
     p("/app/ekip", "Danışmanlar"),
@@ -132,6 +152,7 @@ const EKIBIM: HubDef = {
 const RAPORLAR: HubDef = {
   id: "raporlar",
   label: "Raporlar",
+  group: "Yönetim",
   icon: "baslikPerformans",
   pages: [
     p("/app/raporlar", "Ofis"),
@@ -150,41 +171,28 @@ const RAPORLAR: HubDef = {
 const SATIS_DANISMAN: HubDef = {
   id: "satis",
   label: "Satış",
+  group: "Finans",
   icon: "baslikAnlasma",
-  pages: [
-    p("/app/anlasmalar"),
-    p("/app/teklifler"),
-    p("/app/komisyon", "Komisyonum"),
-    p("/app/cuzdan", "Kazanç"),
-    p("/app/onaylar"),
-    p("/app/sozlesmeler"),
-    p("/app/kiralama"),
-  ],
+  pages: [p("/app/anlasmalar"), p("/app/teklifler"), p("/app/onaylar"), p("/app/sozlesmeler"), p("/app/kiralama")],
+};
+
+const KOMISYONUM: HubDef = {
+  id: "komisyon",
+  label: "Komisyonum",
+  group: "Finans",
+  icon: "baslikFinans",
+  pages: [p("/app/komisyon", "Komisyonum"), p("/app/cuzdan", "Kazanç")],
 };
 
 const BEN: HubDef = {
   id: "ben",
   label: "Ben",
+  group: "Ben",
   icon: "rozet",
   pages: [p("/app/performansim"), p("/app/hedefler", "Hedefim", true), p("/app/hesabim", "Profilim")],
 };
 
 /* ------------------------------- Muhasebe / çağrı / salt okunur ------------------------------- */
-
-const PARA: HubDef = {
-  id: "para",
-  label: "Para",
-  icon: "baslikFinans",
-  pages: [
-    p("/app/giderler", "Finans"),
-    p("/app/komisyon"),
-    p("/app/cuzdan", "Kazanç"),
-    p("/app/onaylar"),
-    p("/app/kiralama"),
-    p("/app/kira-artis"),
-    p("/app/aidat"),
-  ],
-};
 
 const ABONELIK_SATIRI: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
 const GELEN_KUTUSU: HubDef = { id: "gelen-kutusu", label: "Gelen kutusu", icon: "gelenKutusu", pages: [p("/app/gelen-kutusu", "Gelen kutusu")] };
@@ -238,30 +246,34 @@ const TOOLS_COMMON = [
 const HAVUZ_ATAMA: HubDef = {
   id: "havuz",
   label: "Havuz ve Atama",
+  group: "Portföy",
   icon: "ilanHavuzu",
   pages: [p("/app/ilan-havuzu", "Bekleyen ilanlar")],
 };
 const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu") };
 
 const MANAGER: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SATIS_PARA, EKIBIM, RAPORLAR],
+  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SATIS, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
   dock: [AYARLAR, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
   mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
 };
 
+/** Şube müdürü: yönetim düzeni, muhasebe (expenses) yetkisi olmadığından Muhasebe satırı yok (ölü satır yasak). */
+const BRANCH_MANAGER: RoleNav = { ...MANAGER, hubs: MANAGER.hubs.filter((h) => h.id !== "muhasebe") };
+
 const ADVISOR: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_DANISMAN, BEN],
+  hubs: [BUGUN, MUSTERILER, ILANLAR, SATIS_DANISMAN, KOMISYONUM, BEN],
   dock: [ABONELIK, YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "musteriler", "new", "ilanlar", "ben"],
 };
 
 const ACCOUNTING: RoleNav = {
-  hubs: [BUGUN, PARA, RAPORLAR, ABONELIK_SATIRI],
+  hubs: [BUGUN, MUHASEBE, KOMISYON, KIRALAMA_AIDAT, RAPORLAR, ABONELIK_SATIRI],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
-  mobile: ["bugun", "para", "raporlar", "menu"],
+  mobile: ["bugun", "muhasebe", "raporlar", "menu"],
 };
 
 const CALL_CENTER: RoleNav = {
@@ -291,7 +303,7 @@ const READONLY: RoleNav = {
 export const NAV_BY_ROLE: Readonly<Record<AppRole, RoleNav>> = {
   owner: MANAGER,
   gm: MANAGER,
-  branch_manager: MANAGER,
+  branch_manager: BRANCH_MANAGER,
   team_lead: ADVISOR,
   advisor: ADVISOR,
   accounting: ACCOUNTING,

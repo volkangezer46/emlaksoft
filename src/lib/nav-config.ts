@@ -758,6 +758,8 @@ export type NavHub = {
   id: string;
   label: string;
   icon: NavIcon;
+  /** Yan menü grup başlığı (isteğe bağlı). */
+  group?: string;
   /** Merkezin girişi: ilk görünen sayfası. */
   href: string;
   /** Görünen sayfalar (yetki + kapalı modül süzgeci uygulanmış); merkezin TEK sekme şeridi bunlardır. */
@@ -801,7 +803,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
   });
   const first = pages[0];
   if (!first) return null;
-  return { id: def.id, label: def.label, icon: ICONS[def.icon], href: first.href, pages };
+  return { id: def.id, label: def.label, icon: ICONS[def.icon], ...(def.group ? { group: def.group } : {}), href: first.href, pages };
 }
 
 /**
