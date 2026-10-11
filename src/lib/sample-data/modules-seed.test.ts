@@ -118,9 +118,30 @@ describe("modül örnek verisi — kaynak sözleşmesi", () => {
     expect(src).toContain('rpc("bm_recompute_charge"');
   });
 
-  it("örnek modda is_sample işareti taşıyan tablolar işaretlenir; bütçe örnek modda yazılmaz", () => {
+  it("örnek modda is_sample işareti taşıyan tablolar işaretlenir; finans tabloları (hesap, hareket, kural, bütçe) da işaretlenir", () => {
     expect(src).toMatch(/ctx\.sample \? \{ is_sample: true \} : \{\}/);
-    expect(src).toMatch(/if \(!ctx\.sample\) \{[\s\S]*expense_budgets/);
+    // 20261012000400: bütçe artık örnek modda is_sample ile yazılır; hesap/hareket/kural `flag` ile işaretlenir.
+    expect(src).toMatch(/expense_budgets[\s\S]*is_sample: true|is_sample: true[\s\S]*expense_budgets/);
+    for (const table of ["finance_accounts", "cash_entries", "recurring_rules"]) {
+      const at = src.indexOf(`insertRows(db, "${table}"`);
+      expect(at, table).toBeGreaterThan(0);
+      expect(src.slice(at, at + 1800), table).toContain("...flag");
+    }
+  });
+
+  it("finans hikâyesi tek kaynak: kural, gider ve banka hareketi aynı tutar/vade gününden türer; tahsilat hareketleri gerçek kaynağa bağlı", () => {
+    expect([...src.matchAll(/mode: "(?:auto|approve)", expenseCategory:/g)]).toHaveLength(3);
+    // portal gideri (RECURRING) vade gününü ve tutarı kuraldan alır
+    expect(src).toMatch(/dueDay: SAHIBINDEN_RULE_DAY/);
+    expect(src).toMatch(/day: SAHIBINDEN_RULE_DAY/);
+    expect(src).toContain('amount: 9500, day: SAHIBINDEN_RULE_DAY');
+    expect(src).toContain('amount: 9500, recurrence: "monthly", portal: "sahibinden"');
+    // kaynaklı tahsilat hareketleri
+    expect(src).toContain('source_type: "commission"');
+    expect(src).toContain('source_type: "rent"');
+    expect(src).toContain('source_type: "recurring"');
+    // uydurma sabit tahsilat satırı yok
+    expect(src).not.toMatch(/Moda 3\+1 satış komisyonu/);
   });
 
   it("ürün kararı: yalnız İstanbul büyük ilçeleri (küçük il/ilçe adı yok)", () => {

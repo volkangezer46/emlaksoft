@@ -868,13 +868,58 @@ const BUDGETS: { category: string; amount: number }[] = [
   { category: "egitim", amount: 6000 },
 ];
 
-type RecurringDef = { title: string; category: string; amount: number; recurrence: "monthly" | "quarterly" | "yearly"; portal?: "sahibinden" | "hepsiemlak" | "zingat" | "emlakjet"; days: number[] };
+/** Düzenli ödeme kuralları (kasa/banka hesabına bağlı) — gider ve kasa hareketleri aynı tutar/vade gününden türer. */
+const SAHIBINDEN_RULE_DAY = 5;
+const BANK_NAME = "İş Bankası Kadıköy";
+const KASA_NAME = "Ofis kasası";
+type RuleDef = {
+  title: string;
+  category: string;
+  amount: number;
+  day: number;
+  mode: "auto" | "approve";
+  expenseCategory: string;
+  portal: "sahibinden" | null;
+  /** true: son vadesi ödenmiş (gider + banka hareketi + işlenmiş dönem) yazılır. */
+  history: boolean;
+};
+const RULES: RuleDef[] = [
+  { title: "Kadıköy ofis kirası", category: "kira", amount: 45000, day: 1, mode: "auto", expenseCategory: "ofis", portal: null, history: true },
+  { title: "Sahibinden.com mağaza paketi", category: "portal", amount: 9500, day: SAHIBINDEN_RULE_DAY, mode: "auto", expenseCategory: "reklam", portal: "sahibinden", history: true },
+  { title: "Muhasebe ücreti", category: "muhasebe", amount: 3500, day: 28, mode: "approve", expenseCategory: "ofis", portal: null, history: false },
+];
+
+/** `YYYY-MM-DD` anahtarının ayına `n` ay ekler; gün kısa ayda ayın son gününe kırpılır. */
+function shiftMonthKey(key: string, n: number, day = Number(key.slice(8, 10))): string {
+  const y = Number(key.slice(0, 4));
+  const m = Number(key.slice(5, 7));
+  const last = new Date(Date.UTC(y, m - 1 + n + 1, 0)).getUTCDate();
+  const d = new Date(Date.UTC(y, m - 1 + n, Math.min(day, last)));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Ayın `day`. gününe göre bugüne eşit/önceki en son vade (kısa ay kırpılır). */
+function lastDueOnOrBefore(today: string, day: number): string {
+  const thisMonth = shiftMonthKey(today, 0, day);
+  return thisMonth <= today ? thisMonth : shiftMonthKey(today, -1, day);
+}
+
+type RecurringDef = {
+  title: string;
+  category: string;
+  amount: number;
+  recurrence: "monthly" | "quarterly" | "yearly";
+  portal?: "sahibinden" | "hepsiemlak" | "zingat" | "emlakjet";
+  days: number[];
+  /** Verilirse giderler SON üç ayın bu günü yazılır (düzenli ödeme kuralının vade günüyle AYNI kaynak; `days` yok sayılır). */
+  dueDay?: number;
+};
 
 const RECURRING: RecurringDef[] = [
   { title: "Ofis interneti ve telefon hatları", category: "ofis", amount: 1450, recurrence: "monthly", days: [-12] },
   { title: "Mesleki sorumluluk sigortası", category: "ofis", amount: 4200, recurrence: "quarterly", days: [-35] },
   { title: "Alan adı ve e-posta barındırma", category: "ofis", amount: 3600, recurrence: "yearly", days: [-200] },
-  { title: "Sahibinden.com mağaza paketi", category: "reklam", amount: 9500, recurrence: "monthly", portal: "sahibinden", days: [-66, -36, -6] },
+  { title: "Sahibinden.com mağaza paketi", category: "reklam", amount: 9500, recurrence: "monthly", portal: "sahibinden", days: [], dueDay: SAHIBINDEN_RULE_DAY },
   { title: "Hepsiemlak kurumsal paket", category: "reklam", amount: 7800, recurrence: "quarterly", portal: "hepsiemlak", days: [-80] },
   { title: "Zingat ilan paketi", category: "reklam", amount: 2900, recurrence: "monthly", portal: "zingat", days: [-50, -20] },
   { title: "Emlak Jet yıllık abonelik", category: "reklam", amount: 14000, recurrence: "yearly", portal: "emlakjet", days: [-100] },
@@ -883,11 +928,16 @@ const RECURRING: RecurringDef[] = [
 async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
   const { db, tenantId } = ctx;
   let n = 0;
-  // Bütçe tablosunda is_sample YOK: örnek modda yazılmaz (temizlikte kalıcı artık bırakmasın).
-  if (!ctx.sample) {
-    const rows = BUDGETS.map((b) => ({ tenant_id: tenantId, category: b.category, monthly_amount: b.amount, created_by: ctx.ownerId }));
+  // Bütçe: örnek modda is_sample işaretiyle yazılır (20261012000400); "Gerçek kullanıma geç" temizler. Gerçek bütçe satırı varsa
+  // (tenant+kategori çakışması) ona dokunulmaz.
+  {
+    const rows = BUDGETS.map((b) => ({
+      tenant_id: tenantId, category: b.category, monthly_amount: b.amount, created_by: ctx.ownerId,
+      ...(ctx.sample ? { is_sample: true } : {}),
+    }));
     const { data, error } = await db.from("expense_budgets").upsert(rows, { onConflict: "tenant_id,category", ignoreDuplicates: true }).select("id");
-    if (error) throw new DbFail("expense_budgets", error);
+    // Örnek modda is_sample kolonu (20261012000400) henüz uygulanmadıysa yalnız bütçe atlanır; giderler yazılmaya devam eder.
+    if (error && !(ctx.sample && isMissingSampleSchema(error))) throw new DbFail("expense_budgets", error);
     n += (data ?? []).length;
   }
   const today = todayKey();
@@ -895,8 +945,13 @@ async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
   const seen = new Set(existing.map((e) => `${e.title}|${e.expense_date}`));
   const rows: Dict[] = [];
   for (const r of RECURRING) {
-    for (const d of r.days) {
-      const date = addDays(today, d);
+    const dates = r.dueDay
+      ? (() => {
+          const last = lastDueOnOrBefore(today, r.dueDay);
+          return [shiftMonthKey(last, -2, r.dueDay), shiftMonthKey(last, -1, r.dueDay), last];
+        })()
+      : r.days.map((d) => addDays(today, d));
+    for (const date of dates) {
       if (seen.has(`${r.title}|${date}`)) continue;
       rows.push({
         tenant_id: tenantId, created_by: ctx.ownerId, category: r.category, title: r.title, amount: r.amount, expense_date: date,
@@ -910,53 +965,179 @@ async function seedFinance(ctx: ModuleSeedContext): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
-// 7b) Kasa / banka (Finans Paket A): ofis kasası + banka hesabı + birkaç hareket (İstanbul örnekleri)
+// 7b) Kasa / banka (Finans Paket A) + düzenli ödemeler (Paket B) — TEK TUTARLI HİKÂYE (İstanbul örnekleri)
+//  * Bakiye = açılış + girişler − çıkışlar: DB hesaplar; burada yalnız satırlar tutarlı yazılır.
+//  * Tahsilat hareketleri GERÇEK kaynaklara bağlıdır: tahsil edilmiş komisyonlar ('commission'), kira tahsilatları ('rent').
+//    Mülk sahibi hakedişleri bankadan çıkar. Hiçbir tutar uydurma değildir; kaynak yoksa hareket yazılmaz.
+//  * Düzenli ödeme kuralları AYNI banka hesabına bağlıdır; son vadesi işlenmiş dönem + gider + banka hareketi birbirine bağlıdır.
+//  * Gider-bağlı hareketler giderin kendi tutarını/tarihini kullanır (iki ayrı rakam yok).
+//  * Örnek modda her satır is_sample=true taşır ve "Gerçek kullanıma geç" ile (purge-extras) silinir.
 // ---------------------------------------------------------------------------
+const OPENING_DAYS = -120;
 const CASH_ACCOUNTS = [
-  { kind: "cash", name: "Ofis kasası", iban_last4: null, opening: 15000, openingDays: -90 },
-  { kind: "bank", name: "İş Bankası Kadıköy", iban_last4: "4821", opening: 240000, openingDays: -90 },
+  { kind: "cash", name: KASA_NAME, iban_last4: null, opening: 15000 },
+  { kind: "bank", name: BANK_NAME, iban_last4: "4821", opening: 240000 },
 ] as const;
 
-const CASH_ENTRIES: { account: string; direction: "in" | "out"; amount: number; category: string; title: string; counterparty: string; day: number }[] = [
-  { account: "İş Bankası Kadıköy", direction: "in", amount: 85000, category: "komisyon", title: "Moda 3+1 satış komisyonu", counterparty: "Kadıköy / Moda alıcısı", day: -21 },
-  { account: "İş Bankası Kadıköy", direction: "in", amount: 18500, category: "hizmet_bedeli", title: "Beşiktaş değerleme raporu bedeli", counterparty: "Beşiktaş mülk sahibi", day: -14 },
-  { account: "İş Bankası Kadıköy", direction: "out", amount: 32000, category: "kira", title: "Ofis kirası (Kadıköy)", counterparty: "Mülk sahibi", day: -10 },
-  { account: "Ofis kasası", direction: "out", amount: 1850, category: "ofis", title: "Kırtasiye ve ikram", counterparty: "Çarşı Kırtasiye", day: -8 },
-  { account: "Ofis kasası", direction: "out", amount: 640, category: "ulasim", title: "Şişli yer gösterme yol gideri", counterparty: "", day: -5 },
-  { account: "Ofis kasası", direction: "in", amount: 6500, category: "diger_gelir", title: "Üsküdar kapora nakit teslimi", counterparty: "Üsküdar müşterisi", day: -3 },
+/** Elle girilen (kaynağa bağlı olmayan) hareketler. */
+const MANUAL_ENTRIES: { account: string; direction: "in" | "out"; amount: number; category: string; title: string; counterparty: string; day: number }[] = [
+  { account: BANK_NAME, direction: "in", amount: 18500, category: "hizmet_bedeli", title: "Beşiktaş değerleme raporu bedeli", counterparty: "Beşiktaş mülk sahibi", day: -14 },
+  { account: KASA_NAME, direction: "out", amount: 1850, category: "ofis", title: "Kırtasiye ve ikram", counterparty: "Çarşı Kırtasiye", day: -8 },
+  { account: KASA_NAME, direction: "in", amount: 6500, category: "diger_gelir", title: "Üsküdar kapora nakit teslimi", counterparty: "Üsküdar müşterisi", day: -3 },
+];
+
+/** Var olan giderlerden ödenmiş sayılanlar: başlığa göre bulunur, hareket giderin tutar/tarihini taşır. */
+const EXPENSE_PAID_FROM: { title: string; account: string }[] = [
+  { title: "Gösterim yakıt gideri", account: KASA_NAME },
+  { title: "Sahibinden doping paketi", account: BANK_NAME },
+  { title: "Danışman satış eğitimi", account: BANK_NAME },
 ];
 
 async function seedCash(ctx: ModuleSeedContext): Promise<number> {
-  // Hesap/hareket tablolarında is_sample YOK: örnek modda yazılmaz (temizlikte kalıcı artık bırakmasın).
-  if (ctx.sample) return 0;
   const { db, tenantId } = ctx;
+  const flag = ctx.sample ? { is_sample: true } : {};
   const today = todayKey();
+  const openingDate = addDays(today, OPENING_DAYS);
+  const clampDate = (d: string) => (d > today ? today : d < openingDate ? openingDate : d);
   let n = 0;
-  const existing = must("finance_accounts", await db.from("finance_accounts").select("id, name").eq("tenant_id", tenantId).eq("owner_scope", "office")) as { id: string; name: string }[];
+  const existing = must("finance_accounts", await db.from("finance_accounts").select("id, name").eq("tenant_id", tenantId).eq("owner_scope", "office").is("archived_at", null)) as { id: string; name: string }[];
   const byName = new Map(existing.map((a) => [a.name, a.id]));
   for (const a of CASH_ACCOUNTS) {
     if (byName.has(a.name)) continue;
     const [row] = await insertRows(db, "finance_accounts", [{
       tenant_id: tenantId, owner_scope: "office", kind: a.kind, name: a.name, iban_last4: a.iban_last4, currency: "TRY",
-      opening_balance: a.opening, opening_date: addDays(today, a.openingDays), created_by: ctx.ownerId,
+      opening_balance: a.opening, opening_date: openingDate, created_by: ctx.ownerId, ...flag,
     }]);
     byName.set(a.name, row!.id as string);
     n += 1;
   }
-  const have = must("cash_entries", await db.from("cash_entries").select("title, entry_date, account_id").eq("tenant_id", tenantId)) as { title: string; entry_date: string; account_id: string }[];
+  const bankId = byName.get(BANK_NAME);
+  const kasaId = byName.get(KASA_NAME);
+
+  const have = must("cash_entries", await db.from("cash_entries").select("title, entry_date, account_id, source_type, source_id, expense_id").eq("tenant_id", tenantId).is("voided_at", null)) as {
+    title: string; entry_date: string; account_id: string; source_type: string; source_id: string | null; expense_id: string | null;
+  }[];
   const seen = new Set(have.map((e) => `${e.account_id}|${e.title}|${e.entry_date}`));
+  const seenSource = new Set(have.filter((e) => e.source_id).map((e) => `${e.source_type}|${e.source_id}`));
+  const seenExpense = new Set(have.filter((e) => e.expense_id).map((e) => e.expense_id as string));
   const rows: Dict[] = [];
-  for (const e of CASH_ENTRIES) {
-    const accountId = byName.get(e.account);
-    const date = addDays(today, e.day);
-    if (!accountId || seen.has(`${accountId}|${e.title}|${date}`)) continue;
+  const push = (accountId: string | undefined, e: { direction: "in" | "out"; amount: number; category: string; title: string; counterparty?: string | null; date: string; source_type?: string; source_id?: string | null; expense_id?: string | null }) => {
+    if (!accountId) return;
+    const date = clampDate(e.date);
+    if (seen.has(`${accountId}|${e.title}|${date}`)) return;
+    if (e.source_id && seenSource.has(`${e.source_type}|${e.source_id}`)) return;
+    if (e.expense_id && seenExpense.has(e.expense_id)) return;
+    seen.add(`${accountId}|${e.title}|${date}`);
+    if (e.source_id) seenSource.add(`${e.source_type}|${e.source_id}`);
+    if (e.expense_id) seenExpense.add(e.expense_id);
     rows.push({
-      tenant_id: tenantId, account_id: accountId, direction: e.direction, amount: e.amount, currency: "TRY", entry_date: date,
+      tenant_id: tenantId, account_id: accountId, direction: e.direction, amount: money(e.amount), currency: "TRY", entry_date: date,
       kind: e.direction === "in" ? "income" : "expense", category: e.category, title: e.title, counterparty: e.counterparty || null,
-      source_type: "manual", created_by: ctx.ownerId,
+      source_type: e.source_type ?? "manual", source_id: e.source_id ?? null, expense_id: e.expense_id ?? null, created_by: ctx.ownerId, ...flag,
     });
+  };
+
+  // 1) Elle girilen hareketler
+  for (const e of MANUAL_ENTRIES) push(byName.get(e.account), { ...e, date: addDays(today, e.day) });
+
+  // 2) Ödenmiş giderler: hareket giderin tutarını/tarihini taşır (gider yoksa hareket yazılmaz)
+  const titles = EXPENSE_PAID_FROM.map((e) => e.title);
+  const exps = must("expenses", await db.from("expenses").select("id, title, amount, category, expense_date").eq("tenant_id", tenantId).in("title", titles)) as { id: string; title: string; amount: number; category: string; expense_date: string }[];
+  for (const def of EXPENSE_PAID_FROM) {
+    const x = exps.find((e) => e.title === def.title);
+    if (!x) continue;
+    const cat = x.category === "reklam" || x.category === "ofis" || x.category === "ulasim" ? x.category : "diger_gider";
+    push(byName.get(def.account), { direction: "out", amount: Number(x.amount), category: cat, title: x.title, date: x.expense_date, expense_id: x.id });
   }
+
+  // 3) Tahsil edilmiş komisyonlar → bankaya giriş (kaynak: commission)
+  let comQ = db.from("commissions").select("id, gross_amount, vat_amount, created_at").eq("tenant_id", tenantId).eq("status", "paid").order("created_at", { ascending: true }).limit(3);
+  if (ctx.sample) comQ = comQ.eq("is_sample", true);
+  const commissions = must("commissions", await comQ) as { id: string; gross_amount: number; vat_amount: number | null; created_at: string }[];
+  for (const c of commissions) {
+    const amount = Number(c.gross_amount) + Number(c.vat_amount ?? 0);
+    if (!(amount > 0)) continue;
+    push(bankId, { direction: "in", amount, category: "komisyon", title: `Komisyon tahsilatı (${c.id.slice(0, 8)})`, date: c.created_at.slice(0, 10), source_type: "commission", source_id: c.id });
+  }
+
+  // 4) Kira tahsilatları (kaynak: rent) ve mülk sahibi hakedişleri (bankadan çıkış)
+  let rentalQ = db.from("rentals").select("id").eq("tenant_id", tenantId).limit(200);
+  if (ctx.sample) rentalQ = rentalQ.eq("is_sample", true);
+  const rentalIds = (must("rentals", await rentalQ) as { id: string }[]).map((r) => r.id);
+  if (rentalIds.length > 0) {
+    const pays = must("rent_payments", await db.from("rent_payments").select("id, amount, paid_on, method, receipt_no").eq("tenant_id", tenantId).in("rental_id", rentalIds).is("voided_at", null).order("paid_on")) as {
+      id: string; amount: number; paid_on: string; method: string; receipt_no: number;
+    }[];
+    for (const p of pays) {
+      push(p.method === "cash" ? kasaId : bankId, { direction: "in", amount: Number(p.amount), category: "kira_tahsilat", title: `Kira tahsilatı (makbuz ${p.receipt_no})`, date: p.paid_on, source_type: "rent", source_id: p.id });
+    }
+    const payouts = must("owner_payouts", await db.from("owner_payouts").select("amount, paid_on, reference").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("paid_on")) as {
+      amount: number; paid_on: string; reference: string | null;
+    }[];
+    for (const o of payouts) {
+      push(bankId, { direction: "out", amount: Number(o.amount), category: "diger_gider", title: `Mülk sahibi hakedişi${o.reference ? ` (${o.reference})` : ""}`, date: o.paid_on });
+    }
+  }
+
   n += (await insertRows(db, "cash_entries", rows)).length;
+  return n;
+}
+
+/** Düzenli ödeme kuralları: banka hesabına bağlı; son vadesi işlenmiş dönem + gider + banka hareketi birbirine bağlı. */
+async function seedRecurring(ctx: ModuleSeedContext): Promise<number> {
+  const { db, tenantId } = ctx;
+  const flag = ctx.sample ? { is_sample: true } : {};
+  const today = todayKey();
+  const acc = must("finance_accounts", await db.from("finance_accounts").select("id").eq("tenant_id", tenantId).eq("owner_scope", "office").eq("name", BANK_NAME).is("archived_at", null).limit(1)) as { id: string }[];
+  const accountId = acc[0]?.id;
+  if (!accountId) return 0;
+  const have = new Set((must("recurring_rules", await db.from("recurring_rules").select("title").eq("tenant_id", tenantId)) as { title: string }[]).map((r) => r.title));
+  let n = 0;
+  for (const def of RULES) {
+    if (have.has(def.title)) continue;
+    const lastDue = lastDueOnOrBefore(today, def.day);
+    const lastPeriod = `${lastDue.slice(0, 7)}-01`;
+    const nextPeriod = def.history || lastDue < today ? shiftMonthKey(lastPeriod, 1, 1) : lastPeriod;
+    const [rule] = await insertRows(db, "recurring_rules", [{
+      tenant_id: tenantId, scope: "office", direction: "out", category: def.category, title: def.title, amount: def.amount,
+      account_id: accountId, frequency: "monthly", pay_day: def.day,
+      start_date: def.history ? lastPeriod : today, anchor: def.history ? lastPeriod : `${today.slice(0, 7)}-01`,
+      mode: def.mode, portal_key: def.portal, expense_category: def.expenseCategory, create_expense: true,
+      next_period: nextPeriod, next_due: shiftMonthKey(nextPeriod, 0, def.day), last_period: def.history ? lastPeriod : null,
+      created_by: ctx.ownerId, ...flag,
+    }]);
+    n += 1;
+    if (!def.history || !rule) continue;
+
+    // İşlenmiş dönem: gider (var olan portal gideri yeniden kullanılır) + banka hareketi + oluşum — üçü aynı tutar/tarih.
+    let expenseId: string | null = null;
+    let createdExpense = false;
+    const exp = must("expenses", await db.from("expenses").select("id").eq("tenant_id", tenantId).eq("title", def.title).eq("expense_date", lastDue).limit(1)) as { id: string }[];
+    if (exp[0]) expenseId = exp[0].id;
+    else {
+      const [x] = await insertRows(db, "expenses", [{
+        tenant_id: tenantId, created_by: ctx.ownerId, category: def.expenseCategory, title: def.title, amount: def.amount, expense_date: lastDue,
+        portal_key: def.portal, notes: "Düzenli ödeme", ...flag,
+      }]);
+      expenseId = (x?.id as string | undefined) ?? null;
+      createdExpense = true;
+    }
+    const [occ] = await insertRows(db, "recurring_occurrences", [{
+      tenant_id: tenantId, rule_id: rule.id, period: lastPeriod, due_date: lastDue, amount: def.amount, status: "posted", decided_by: ctx.ownerId, decided_at: isoAt(lastDue, 9),
+    }]);
+    const usedExpense = expenseId
+      ? (must("cash_entries", await db.from("cash_entries").select("id").eq("tenant_id", tenantId).eq("expense_id", expenseId).is("voided_at", null).limit(1)) as unknown[]).length > 0
+      : false;
+    const [entry] = await insertRows(db, "cash_entries", [{
+      tenant_id: tenantId, account_id: accountId, direction: "out", amount: def.amount, currency: "TRY", entry_date: lastDue, kind: "expense",
+      category: def.category, title: def.title, expense_id: usedExpense ? null : expenseId, created_expense: createdExpense && !usedExpense,
+      source_type: "recurring", source_id: occ?.id ?? null, created_by: ctx.ownerId, ...flag,
+    }]);
+    if (occ && entry) {
+      const { error } = await db.from("recurring_occurrences").update({ entry_id: entry.id }).eq("id", occ.id as string).eq("tenant_id", tenantId);
+      if (error) throw new DbFail("recurring_occurrences", error);
+    }
+  }
   return n;
 }
 
@@ -1011,10 +1192,9 @@ export async function seedModuleData(ctx: ModuleSeedContext): Promise<ModuleSeed
   await run("listing_analyses", () => seedListingAnalyses(ctx));
   await run("finance", () => seedFinance(ctx));
   await run("cash", () => seedCash(ctx));
+  await run("recurring", () => seedRecurring(ctx));
   await run("listing_pool", () => seedListingPool(ctx));
   if (!ctx.sample) await run("avatars", () => seedAvatars(ctx));
   else report.skipped.push({ group: "avatars", reason: "gerçek kullanıcı profiline hazır avatar yazılmaz: etkin değil" });
-  if (ctx.sample) report.skipped.push({ group: "cash", reason: "hesap/hareket tablolarında is_sample yok: örnek modda yazılmaz" });
-  if (ctx.sample) report.skipped.push({ group: "expense_budgets", reason: "bütçe tablosunda is_sample yok: örnek modda yazılmaz" });
   return report;
 }
