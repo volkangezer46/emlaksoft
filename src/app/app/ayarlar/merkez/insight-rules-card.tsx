@@ -84,15 +84,15 @@ export function InsightRulesCard({
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
           {closed.length > 0 ? (
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant={onlyClosed ? "navy" : "outline"}
               aria-pressed={onlyClosed}
               onClick={() => setOnlyClosed((v) => !v)}
-              className="focus-ring press rounded-full border border-line bg-canvas px-3 py-1 text-xs font-semibold text-ink-950 transition hover:border-border-strong aria-pressed:border-amber-400/60 aria-pressed:bg-amber-400/15"
               title={onlyClosed ? "Tüm kuralları göster" : "Yalnız kapalı kuralları göster"}
             >
               Kapalı kural: {closed.length}
-            </button>
+            </Button>
           ) : (
             <span className="text-xs font-medium text-text-muted">Tüm kurallar açık</span>
           )}
