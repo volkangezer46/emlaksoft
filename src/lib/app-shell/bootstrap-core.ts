@@ -37,6 +37,11 @@ export type ShellBootstrap = {
   modules: ModuleRow[];
   /** Kişisel gizli modüller (user_module_prefs). `null` = RPC bu alanı henüz döndürmüyor (migration yok) → eski okuma. */
   hiddenModules: string[] | null;
+  /**
+   * Çağıranın aktif platform_staff satırı (RLS: yalnız kendi satırı). `undefined` = RPC bu alanı henüz döndürmüyor
+   * (migration yok) → eski ayrı okuma; `null` = aktif personel değil (ayrı tur atılmaz).
+   */
+  platformStaff: { id: string } | null | undefined;
   usage: ShellUsageCounts;
   badges: ShellBadgeCounts;
 };
@@ -104,6 +109,12 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
     ? raw.hidden_modules.filter((k): k is string => typeof k === "string")
     : null;
 
+  const platformStaff: { id: string } | null | undefined = "platform_staff" in raw
+    ? isObj(raw.platform_staff) && str(raw.platform_staff.id) && raw.platform_staff.is_active === true
+      ? { id: str(raw.platform_staff.id)! }
+      : null
+    : undefined;
+
   return {
     profile: { id, fullName: str(raw.profile.full_name) ?? "", role, tenantId },
     office,
@@ -111,6 +122,7 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
     userOverrides,
     modules,
     hiddenModules,
+    platformStaff,
     usage: {
       seats: count(raw.usage.seats),
       activeProperties: count(raw.usage.active_properties),

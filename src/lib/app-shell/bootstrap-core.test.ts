@@ -33,6 +33,13 @@ describe("parseShellBootstrap", () => {
     expect(parseShellBootstrap({ ...sample, hidden_modules: [] })!.hiddenModules).toEqual([]);
   });
 
+  it("platform_staff: alan yoksa undefined (eski ayrı okuma); null = personel değil; aktif satır id taşır; pasif satır null", () => {
+    expect(parseShellBootstrap(sample)!.platformStaff).toBeUndefined();
+    expect(parseShellBootstrap({ ...sample, platform_staff: null })!.platformStaff).toBeNull();
+    expect(parseShellBootstrap({ ...sample, platform_staff: { id: "s1", is_active: true } })!.platformStaff).toEqual({ id: "s1" });
+    expect(parseShellBootstrap({ ...sample, platform_staff: { id: "s1", is_active: false } })!.platformStaff).toBeNull();
+  });
+
   it("profil/tenant kimliği eksikse null (yarım veri kullanılmaz)", () => {
     expect(parseShellBootstrap(null)).toBeNull();
     expect(parseShellBootstrap({ profile: { id: "u1", role: "advisor" }, usage: {}, badges: {} })).toBeNull();
