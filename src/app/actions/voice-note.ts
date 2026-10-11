@@ -148,7 +148,7 @@ export async function saveVoiceNote(input: { kind: VoiceNoteKind; id: string; su
       body,
     });
     if (error) return { error: actionErrorMessage(error, "Not kaydedilemedi.") };
-    closeCallPriorityAfterContact(gate.tenantId, customerId);
+    closeCallPriorityAfterContact(customerId);
     revalidatePath(`/app/musteriler/${customerId}`);
   }
 

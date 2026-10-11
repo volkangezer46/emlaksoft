@@ -275,30 +275,18 @@ export async function expireStaleInsights(
 
 /**
  * Olay anında kapatma: müşteriyle temas (arama/iletişim kaydı) girildi → o müşterinin AÇIK "Bugün ara" kartları hemen
- * biter (motor turunu beklemez). Kural sürümünden bağımsız `call_priority@*`; `state`/`state_reason` değişmez.
+ * biter (motor turunu beklemez). `insights` tablosuna doğrudan yazma yalnız service_role'de olduğundan ve insights kodu
+ * createAdminClient KULLANMADIĞINDAN (insights-contract.test.ts) bu, çağıranın OTURUMUYLA çalışan dar bir RPC'dir
+ * (`insight_close_call_priority`, 20261012001600): ofis oturumdan çözülür, yalnız call_priority + açık satırlar,
+ * yalnız valid_until yazılır (state/state_reason değişmez). RPC henüz yoksa 0 döner (öneri motor turunda kapanır).
  */
-export async function closeCallPriorityForCustomer(
-  admin: SupabaseClient,
-  tenantId: string,
-  customerId: string,
-  nowMs: number,
-): Promise<number> {
-  const nowIso = new Date(nowMs).toISOString();
-  const { data, error } = await admin
-    .from("insights")
-    .update({ valid_until: nowIso })
-    .eq("tenant_id", tenantId)
-    .eq("kind", "call_priority")
-    .eq("entity_type", "customer")
-    .eq("entity_id", customerId)
-    .in("state", ["new", "seen", "snoozed"])
-    .gt("valid_until", nowIso)
-    .select("id");
+export async function closeCallPriorityForCustomer(client: SupabaseClient, customerId: string): Promise<number> {
+  const { data, error } = await client.rpc("insight_close_call_priority", { p_customer_id: customerId });
   if (error) {
     if (isMissingSchemaError(error)) return 0;
-    throw new Error(`insights(call_priority_close): ${error.code ?? "hata"}`);
+    throw new Error(`insight_close_call_priority: ${error.code ?? "hata"}`);
   }
-  return (data ?? []).length;
+  return Number(data ?? 0) || 0;
 }
 
 /** Süresi geçmiş/kapanmış satır temizliği (RPC yoksa 0). */

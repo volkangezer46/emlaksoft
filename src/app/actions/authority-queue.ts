@@ -196,7 +196,7 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
     body: text,
   });
   // Mal sahibine hatırlatma gitti = temas: açık "Bugün ara" kartı kapanır.
-  closeCallPriorityAfterContact(gate.tenantId, ownerId);
+  closeCallPriorityAfterContact(ownerId);
 
   await logActivity({
     tenantId: gate.tenantId,

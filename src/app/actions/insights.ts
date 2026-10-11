@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { isMissingSchemaError } from "@/lib/insights/facts";
 import { normalizeInsightSettings } from "@/lib/insights/settings";
-import { INSIGHT_DISMISS_REASONS, ruleBase, type InsightDismissReason, type InsightSettings } from "@/lib/insights/types";
+import { INSIGHT_DISMISS_REASONS, type InsightDismissReason, type InsightSettings } from "@/lib/insights/types";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type InsightActionResult = { ok?: boolean; error?: string; taskId?: string };
@@ -206,9 +206,10 @@ async function updateInsightSettings(
 }
 
 /**
- * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI). Yalnız ofis sahibi / genel müdür.
- * Yalnız verilen alanlar değişir (kısmi girdi güvenlidir). AI anlatımı açıldığında bile üretim tarafındaki kota kapısı,
- * denetim kaydı ve sayı doğrulaması (insight-narrative) aynen geçerlidir.
+ * İçgörü ofis ayarları: sessize alınan kurallar + LLM anlatımı (varsayılan KAPALI) + `qualityReopened`. Yalnız ofis sahibi /
+ * genel müdür. Yalnız verilen alanlar değişir (kısmi girdi diğer alanları silmez). Aynı eylem "Yeniden aç" (otomatik sessiz
+ * kuralı `qualityReopened`a ekle) ve "Varsayılana dön" (üç alanı sıfırla) için kullanılır; ayrı eylem yoktur (yetki kapısı tek).
+ * AI anlatımı açıldığında bile üretim tarafındaki kota kapısı, denetim kaydı ve sayı doğrulaması (insight-narrative) geçerlidir.
  */
 export async function saveInsightSettings(input: Partial<InsightSettings>): Promise<InsightActionResult> {
   const who = await requireInsightSettingsEditor();
@@ -218,32 +219,4 @@ export async function saveInsightSettings(input: Partial<InsightSettings>): Prom
   if (input.narrativeEnabled !== undefined) patch.narrativeEnabled = input.narrativeEnabled;
   if (input.qualityReopened !== undefined) patch.qualityReopened = input.qualityReopened;
   return updateInsightSettings(who.gate, () => patch, { action: "insight.settings_update" });
-}
-
-/**
- * "Yeniden aç": yanlış alarm oranı yüksek olduğu için OTOMATİK sessize alınan bir kuralı bu ofis için tekrar etkinleştirir
- * (`qualityReopened` listesine taban ad eklenir; elle kapatma listesinden de çıkarılır). Yalnız owner/gm.
- */
-export async function reopenInsightRule(ruleId: string): Promise<InsightActionResult> {
-  const who = await requireInsightSettingsEditor();
-  if (!who.ok) return { error: who.error };
-  const base = ruleBase(String(ruleId ?? "").trim());
-  if (!/^[a-z0-9_]{3,40}$/.test(base)) return { error: "Geçersiz öneri kuralı." };
-  return updateInsightSettings(
-    who.gate,
-    (prev) => ({
-      qualityReopened: [...new Set([...(prev.qualityReopened ?? []), base])],
-      mutedRules: prev.mutedRules.filter((m) => ruleBase(m) !== base),
-    }),
-    { action: "insight.rule_reopen" },
-  );
-}
-
-/** "Varsayılana dön": elle kapatmalar, yeniden açma kayıtları ve AI anlatımı sıfırlanır (anlatım KAPALI). Yalnız owner/gm. */
-export async function resetInsightSettings(): Promise<InsightActionResult> {
-  const who = await requireInsightSettingsEditor();
-  if (!who.ok) return { error: who.error };
-  return updateInsightSettings(who.gate, () => ({ mutedRules: [], narrativeEnabled: false, qualityReopened: [] }), {
-    action: "insight.settings_reset",
-  });
 }

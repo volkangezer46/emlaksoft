@@ -16,9 +16,10 @@ const NOW = Date.UTC(2026, 9, 6, 9, 0, 0);
 const NOW_ISO = new Date(NOW).toISOString();
 const U1 = "11111111-1111-4111-8111-111111111111";
 
+const base = { rule_id: "call_priority@1", recipient_user_id: U1, dedupe_key: "call:x:w", state: "new", state_reason: null, updated_at: NOW_ISO };
 const openRows = [
-  { id: "i-old", entity_id: "c-old" },
-  { id: "i-live", entity_id: "c-live" },
+  { id: "i-old", entity_id: "c-old", ...base },
+  { id: "i-live", entity_id: "c-live", ...base },
 ];
 
 function setup(rows = openRows) {
@@ -71,16 +72,19 @@ describe("expireStaleInsights", () => {
   });
 });
 
-describe("closeCallPriorityForCustomer (olay anında)", () => {
-  it("kiracı + müşteri + call_priority + açık satırlarla sınırlı; yalnız valid_until yazar", async () => {
-    const { mock, admin } = setup();
-    await closeCallPriorityForCustomer(admin, "t1", "c-old", NOW);
-    const [upd] = updates(mock);
-    expect(upd.payload).toEqual({ valid_until: NOW_ISO });
-    expect(hasFilter(upd, "eq", "tenant_id", "t1")).toBe(true);
-    expect(hasFilter(upd, "eq", "kind", "call_priority")).toBe(true);
-    expect(hasFilter(upd, "eq", "entity_id", "c-old")).toBe(true);
-    expect(upd.filters.find((f) => f.method === "in" && f.args[0] === "state")?.args[1]).toEqual(["new", "seen", "snoozed"]);
+describe("closeCallPriorityForCustomer (olay anında, RPC)", () => {
+  it("dar RPC'yi müşteri kimliğiyle çağırır; kapanan sayıyı döndürür", async () => {
+    const mock = createSupabaseMock((q) => (q.table === "rpc:insight_close_call_priority" ? { data: 2 } : undefined));
+    const n = await closeCallPriorityForCustomer(mock.client as unknown as SupabaseClient, "c-old");
+    expect(n).toBe(2);
+    expect(mock.rpcCalls).toEqual([{ name: "insight_close_call_priority", args: { p_customer_id: "c-old" } }]);
+  });
+
+  it("RPC henüz yoksa (migration bekliyor) sessizce 0; diğer hatalarda fırlatır", async () => {
+    const missing = createSupabaseMock(() => ({ error: { code: "PGRST202", message: "Could not find the function" } }));
+    expect(await closeCallPriorityForCustomer(missing.client as unknown as SupabaseClient, "c1")).toBe(0);
+    const broken = createSupabaseMock(() => ({ error: { code: "XX000", message: "boom" } }));
+    await expect(closeCallPriorityForCustomer(broken.client as unknown as SupabaseClient, "c1")).rejects.toThrow(/insight_close_call_priority/);
   });
 });
 

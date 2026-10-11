@@ -59,7 +59,7 @@ export async function createCommunication(
   if (error || !data) return { error: actionErrorMessage(error, "İletişim kaydı oluşturulamadı.") };
 
   // İletişim kaydı girildi: müşterinin açık "Bugün ara" kartı anında kapanır.
-  closeCallPriorityAfterContact(gate.tenantId, customerId);
+  closeCallPriorityAfterContact(customerId);
 
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);

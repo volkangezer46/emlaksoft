@@ -57,7 +57,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
   }
 
   // Arama girildi: müşterinin açık "Bugün ara" kartı motor turunu beklemeden kapanır.
-  closeCallPriorityAfterContact(gate.tenantId, customerId || null);
+  closeCallPriorityAfterContact(customerId || null);
 
   await logActivity({
     tenantId: gate.tenantId,

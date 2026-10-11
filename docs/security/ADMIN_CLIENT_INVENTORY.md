@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **424** (224 dosya) — risk: P0=12, P1=36, P2=376
-- Tenant filtresi: var=254, uygulanamaz=94, yok=53, param=15, devir=8
-- Kapı türü: public-token=36, dosya-duzeyi=98, platform=73, belirsiz=98, elle-dogrulandi=13, oturum-izin=79, cron=24, webhook-imza=3
+- Toplam birim: **423** (223 dosya) — risk: P0=12, P1=36, P2=375
+- Tenant filtresi: var=254, uygulanamaz=93, yok=53, param=15, devir=8
+- Kapı türü: public-token=36, dosya-duzeyi=98, platform=73, belirsiz=97, elle-dogrulandi=13, oturum-izin=79, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **61**; RLS'li client'a taşıma adayı: **64**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -412,7 +412,6 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/growth/store.ts:343` | `getAdminGrowthOverview` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/growth/store.ts:110` | `getReferralOverview` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/growth/store.ts:158` | `recordSignupAttributionSafe` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/lib/insights/close-on-contact.ts:17` | `closeCallPriorityOnContact` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/integrations/einvoice/server-writes.ts:24` | `writeEInvoiceResult` | Gerekçe doğrulanmadı. | dosya-duzeyi | param | P2 |
 | `src/lib/lead-intake.ts:102` | `intakeLead` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/lib/match-notify.ts:23` | `notifyMatchingDemandsForProperty` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |

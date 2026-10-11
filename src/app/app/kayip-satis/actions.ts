@@ -62,7 +62,7 @@ export async function dismissLostSaleRisk(formData: FormData): Promise<void> {
   });
 
   // "Arandı" = temas: müşterinin açık "Bugün ara" kartı çağrı kaydı girilsin girilmesin anında kapanır.
-  if (reason === "called") closeCallPriorityAfterContact(gate.tenantId, customerId);
+  if (reason === "called") closeCallPriorityAfterContact(customerId);
 
   // Opsiyonel çağrı kaydı: "Arandı" + kutu işaretli + geçerli telefon.
   // Ayrı yetki kapısı (calls.create) — yoksa dismiss yine de tamamlanır,

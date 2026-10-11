@@ -61,7 +61,7 @@ const ACTIONS = {
 };
 
 /** Öneriler kartı verisi: ayar + kural kataloğu (Türkçe adlar kayıt listesinden) + otomatik sessiz kurallar. */
-async function loadInsightCard(tenantId: string): Promise<{ rules: InsightRuleRowView[]; narrativeEnabled: boolean }> {
+async function loadInsightCard(tenantId: string): Promise<{ rules: InsightRuleRowView[]; narrativeEnabled: boolean; reopened: string[] }> {
   const supabase = await createClient();
   const [settings, catalog, autoMuted] = await Promise.all([
     loadInsightSettings(supabase, tenantId),
@@ -70,6 +70,7 @@ async function loadInsightCard(tenantId: string): Promise<{ rules: InsightRuleRo
   ]);
   return {
     narrativeEnabled: settings.narrativeEnabled,
+    reopened: settings.qualityReopened ?? [],
     rules: catalog.map((r) => ({ ...r, state: ruleSwitchState(settings, autoMuted, r.id) })),
   };
 }
@@ -172,7 +173,7 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
         ) : null}
       </nav>
 
-      {insightCard && canEdit ? <InsightRulesCard rules={insightCard.rules} narrativeEnabled={insightCard.narrativeEnabled} /> : null}
+      {insightCard && canEdit ? <InsightRulesCard rules={insightCard.rules} narrativeEnabled={insightCard.narrativeEnabled} reopened={insightCard.reopened} /> : null}
 
       <ReadOnlyGate canEdit={canEdit}>
         {groups.length === 0 ? (

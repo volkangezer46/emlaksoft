@@ -395,7 +395,6 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/growth/store.ts", fn: "getReferralOverview", calls: 1, tenantFilter: "var" },
   { file: "src/lib/growth/store.ts", fn: "isActivePartnerCode", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/growth/store.ts", fn: "recordSignupAttributionSafe", calls: 1, tenantFilter: "var" },
-  { file: "src/lib/insights/close-on-contact.ts", fn: "closeCallPriorityOnContact", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/integrations/einvoice/server-writes.ts", fn: "writeEInvoiceResult", calls: 1, tenantFilter: "param" },
   { file: "src/lib/lead-intake.ts", fn: "intakeLead", calls: 1, tenantFilter: "var" },
   { file: "src/lib/match-notify.ts", fn: "notifyMatchingDemandsForProperty", calls: 1, tenantFilter: "var" },

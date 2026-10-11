@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { reopenInsightRule, resetInsightSettings, saveInsightSettings } from "@/app/actions/insights";
+import { saveInsightSettings } from "@/app/actions/insights";
 
 export type InsightRuleRowView = { id: string; base: string; label: string; state: "on" | "off" | "auto" };
 
@@ -17,7 +17,16 @@ export type InsightRuleRowView = { id: string; base: string; label: string; stat
  * Kural adları kayıt listesinden gelir. Otomatik sessize alınan kural için "Yeniden aç" vardır. Kalite sayıları
  * gösterilmez: arkasında filtreli bir hedef ekran yoktur (sıfır çıkmaz metrik ilkesi).
  */
-export function InsightRulesCard({ rules, narrativeEnabled }: { rules: InsightRuleRowView[]; narrativeEnabled: boolean }) {
+export function InsightRulesCard({
+  rules,
+  narrativeEnabled,
+  reopened,
+}: {
+  rules: InsightRuleRowView[];
+  narrativeEnabled: boolean;
+  /** Sahibin "Yeniden aç" dediği (otomatik sessizden muaf) kural taban adları. */
+  reopened: string[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [onlyClosed, setOnlyClosed] = useState(false);
@@ -26,7 +35,7 @@ export function InsightRulesCard({ rules, narrativeEnabled }: { rules: InsightRu
 
   const closed = rules.filter((r) => r.state !== "on");
   const shown = onlyClosed ? closed : rules;
-  const dirty = closed.length > 0 || narrativeEnabled;
+  const dirty = closed.length > 0 || narrativeEnabled || reopened.length > 0;
 
   function run(fn: () => Promise<{ ok?: boolean; error?: string }>) {
     setError(null);
@@ -40,9 +49,14 @@ export function InsightRulesCard({ rules, narrativeEnabled }: { rules: InsightRu
     });
   }
 
+  /** Otomatik sessiz kuralı yeniden açar: taban ad `qualityReopened`a eklenir (sunucuda ayrıca owner/gm doğrulanır). */
+  function reopen(rule: InsightRuleRowView) {
+    run(() => saveInsightSettings({ qualityReopened: [...new Set([...reopened, rule.base])] }));
+  }
+
   function toggle(rule: InsightRuleRowView, nextOn: boolean) {
     if (nextOn && rule.state === "auto") {
-      run(() => reopenInsightRule(rule.id));
+      reopen(rule);
       return;
     }
     const mutedBases = new Set(rules.filter((r) => r.state === "off").map((r) => r.base));
@@ -84,7 +98,7 @@ export function InsightRulesCard({ rules, narrativeEnabled }: { rules: InsightRu
           )}
           {confirmReset ? (
             <span className="flex items-center gap-1.5">
-              <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => resetInsightSettings())}>
+              <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => saveInsightSettings({ mutedRules: [], narrativeEnabled: false, qualityReopened: [] }))}>
                 Evet, varsayılana dön
               </Button>
               <Button size="sm" variant="ghost" disabled={pending} onClick={() => setConfirmReset(false)}>
@@ -116,7 +130,7 @@ export function InsightRulesCard({ rules, narrativeEnabled }: { rules: InsightRu
                     <Badge variant="warning" size="sm" dot>
                       Yanlış alarm oranı yüksek olduğu için otomatik sessizde
                     </Badge>
-                    <Button size="xs" variant="outline" disabled={pending} onClick={() => run(() => reopenInsightRule(r.id))}>
+                    <Button size="xs" variant="outline" disabled={pending} onClick={() => reopen(r)}>
                       Yeniden aç
                     </Button>
                   </div>
