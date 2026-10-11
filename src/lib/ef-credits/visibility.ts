@@ -1,5 +1,5 @@
 /**
- * Kontör merkezi + rapor arşivi SAF kuralları (DB yok; sunucu/istemci güvenli).
+ * Analiz bakiyesi merkezi + rapor arşivi SAF kuralları (DB yok; sunucu/istemci güvenli).
  * Görünürlük (ef_reports RLS niyeti): danışman yalnız KENDİ raporunu görür; owner/gm ofisin tüm raporlarını görür.
  * Tüm zaman hesapları çağıranın verdiği epoch ms ile yapılır (clock.ts now()); burada Date.now() YOK.
  */
@@ -11,7 +11,7 @@ export const EF_REPORT_VALID_DAYS = 30;
 /** Rapor listesi: görünürlük sonrası en çok bu kadar satır çekilir. */
 export const EF_REPORT_FETCH_LIMIT = 200;
 
-/** Kontör satın alma / bakiye / banner yetkisi: yalnız ofis sahibi ve genel müdür. */
+/** Analiz bakiyesi satın alma / bakiye / banner yetkisi: yalnız ofis sahibi ve genel müdür. */
 export function canManageEfCredits(role: string | null | undefined): boolean {
   return role === "owner" || role === "gm";
 }
@@ -97,9 +97,9 @@ export function filterReports<T extends Pick<EfReportRow, "created_at" | "tip" |
 export type MonthlyAllowanceView = {
   /** Planın bu ay verilmesi gereken hakkı (ek kullanıcı dahil). */
   entitlement: number;
-  /** Bu TR ayında deftere işlenen plan kontörü. */
+  /** Bu TR ayında deftere işlenen plan analiz bakiyesi. */
   grantedThisMonth: number;
-  /** Bu TR ayında harcanan kontör (tüm kalemler). */
+  /** Bu TR ayında harcanan analiz bakiyesi (tüm kalemler). */
   spentThisMonth: number;
   /** Bu ayın hakkından henüz kullanılmayan (en çok bakiye kadar). */
   remainingOfMonthly: number;
@@ -109,7 +109,7 @@ export type MonthlyAllowanceView = {
 
 type MovementLike = { at: string | null; label: string; units: number; category?: string };
 
-/** Defter satırlarından aylık hak sayacı. Plan kontörü satırı = etiketi "Plan kontörü" olan yükleme. */
+/** Defter satırlarından aylık hak sayacı. Plan analiz bakiyesi satırı = etiketi "Plan analiz bakiyesi" olan yükleme. */
 export function monthlyAllowanceView(p: {
   entitlement: number;
   rows: MovementLike[];
@@ -123,7 +123,7 @@ export function monthlyAllowanceView(p: {
   for (const r of p.rows) {
     const at = r.at ? Date.parse(r.at) : Number.NaN;
     if (!Number.isFinite(at) || at < start || at >= end) continue;
-    if (r.units > 0 && r.label === "Plan kontörü") granted += r.units;
+    if (r.units > 0 && r.label === "Plan analiz bakiyesi") granted += r.units;
     // Süre dolumu (yanma) harcama sayılmaz.
     if (r.units < 0 && r.category !== "sona-erme") spent += -r.units;
   }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * startPlanCheckout + startCreditPackPurchase (actions/billing.ts) hata yolları — mock Supabase / iyzico / fulfillment.
  * Odak (para akışı): her hata yolunda taslak fatura 'failed' işaretlenir ve iyzico/fulfill çağrısı SIZMAZ; tutar istemciden alınmaz;
- * kupon/hesap kredisi/kayıtlı kart yalnız yetkili rollerle; EF (kontör) satışı hazır değilse PARA ALINMAZ.
+ * kupon/hesap kredisi/kayıtlı kart yalnız yetkili rollerle; EF (analiz bakiyesi) satışı hazır değilse PARA ALINMAZ.
  */
 const h = vi.hoisted(() => ({
   gate: { ok: true, userId: "u1", tenantId: "12345678-aaaa-bbbb-cccc-000000000000", role: "owner", impersonating: false } as
@@ -29,7 +29,7 @@ const h = vi.hoisted(() => ({
   efPurchasable: true,
   efReady: true,
   efLotsReady: true,
-  pack: { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 } as Record<string, unknown> | null,
+  pack: { id: "p100", name: "100 TL", units: 100, priceNetTry: 990 } as Record<string, unknown> | null,
   packInvoice: vi.fn(),
   // Oransal yukseltme / duraklatma kapilari (varsayilan KAPALI: eski akis aynen).
   changeState: null as Record<string, unknown> | null,
@@ -93,7 +93,7 @@ vi.mock("@/lib/base-url", () => ({ getBaseUrl: () => "https://app.test" }));
 vi.mock("@/lib/billing/card-store", () => ({ getTenantCardUserKey: h.cardKey }));
 vi.mock("@/lib/billing/credit-pack-purchase", () => ({ createCreditPackInvoice: h.packInvoice }));
 vi.mock("@/lib/billing/credit-pack-purchase-core", () => ({
-  creditPackBasketName: () => "100 kontör",
+  creditPackBasketName: () => "100 TL",
   findPurchasablePack: () => h.pack,
   quoteCreditPack: () => ({ totalTry: 1188 }),
 }));
@@ -130,7 +130,7 @@ beforeEach(() => {
   h.efPurchasable = true;
   h.efReady = true;
   h.efLotsReady = true;
-  h.pack = { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 };
+  h.pack = { id: "p100", name: "100 TL", units: 100, priceNetTry: 990 };
   h.changeState = null;
   h.changeEnabled = false;
   h.upgradeReady = false;
@@ -361,7 +361,7 @@ describe("startPlanCheckout — demo / kredi / iyzico yolları", () => {
   });
 });
 
-describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
+describe("startCreditPackPurchase (EF analiz bakiyesi) — hata yolları", () => {
   const pform = (over: Record<string, string> = {}) => {
     const f = new FormData();
     const base: Record<string, string> = { pack_id: "p100", ...over };
@@ -376,7 +376,7 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
     expect((await startCreditPackPurchase(pform())).error).toMatch(/Destek oturumunda/);
     h.gate = { ok: true, userId: "u1", tenantId: "12345678-x", role: "owner", impersonating: false };
     expect((await startCreditPackPurchase(pform({ pack_id: "../x" }))).error).toBe("Geçersiz paket.");
-    expect((await startCreditPackPurchase(pform({ coupon: "YAZ10" }))).error).toMatch(/Kupon kontör paketlerinde geçerli değil/);
+    expect((await startCreditPackPurchase(pform({ coupon: "YAZ10" }))).error).toMatch(/Kupon analiz paketlerinde geçerli değil/);
     expect(h.packInvoice).not.toHaveBeenCalled();
   });
 
@@ -390,9 +390,9 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
     h.efReady = false;
     expect((await startCreditPackPurchase(pform())).error).toMatch(/henüz etkin değil/);
     h.efReady = true;
-    // Süreli parti şeması (20261010000300) yokken paket SATILMAZ: kontör süresiz kalırdı.
+    // Süreli parti şeması (20261010000300) yokken paket SATILMAZ: analiz bakiyesi süresiz kalırdı.
     h.efLotsReady = false;
-    expect((await startCreditPackPurchase(pform())).error).toMatch(/Süreli kontör paketleri hazırlanıyor/);
+    expect((await startCreditPackPurchase(pform())).error).toMatch(/Süreli analiz paketleri hazırlanıyor/);
     h.efLotsReady = true;
     h.configured = false;
     expect((await startCreditPackPurchase(pform())).error).toMatch(/yapılandırılmamış/);
@@ -403,7 +403,7 @@ describe("startCreditPackPurchase (EF kontör) — hata yolları", () => {
   it("satıştan kalkmış paket ve değişen tutar (confirm_try) reddedilir; yeni tutar döner", async () => {
     h.pack = null;
     expect((await startCreditPackPurchase(pform())).error).toMatch(/artık satışta değil/);
-    h.pack = { id: "p100", name: "100 kontör", units: 100, priceNetTry: 990 };
+    h.pack = { id: "p100", name: "100 TL", units: 100, priceNetTry: 990 };
     const r = await startCreditPackPurchase(pform({ confirm_try: "999" }));
     expect(r.error).toMatch(/Tutar güncellendi/);
     expect(r.quotedTotalTry).toBe(1188);

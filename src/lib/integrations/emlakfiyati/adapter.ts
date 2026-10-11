@@ -52,7 +52,7 @@ import {
  *   aynı sorgu için bellek önbelleği + eşzamanlı aynı istek birleştirme.
  * - 401 = anahtar geçersiz/iptal: OTOMATİK YENİDEN DENEME YOK (yalnız geçerli `previous` ile BİR kez), alarm üretilir.
  *   403 = kapsam yok. 429 = bekle. 5xx/ağ = sınırlı yeniden deneme.
- * - Kontör mantığı BU MODÜLÜN DIŞINDADIR; `onEmlakFiyatiRequest` ile yalnız "istek yapıldı" olayları dışarı verilir.
+ * - Analiz bakiyesi mantığı BU MODÜLÜN DIŞINDADIR; `onEmlakFiyatiRequest` ile yalnız "istek yapıldı" olayları dışarı verilir.
  * - Parametre şeması YALNIZ /api/endeks için doğrulandı; diğer uçlar için burada yalnız tür-güvenli `get(path, query)` vardır.
  */
 
@@ -74,7 +74,7 @@ export type EmlakFiyatiResult<T = unknown> =
   | { ok: true; status: number; data: T; cached: boolean }
   | { ok: false; kind: EmlakFiyatiErrorKind; status?: number };
 
-/** Kontör/ölçüm kancası için olay: anahtar, sorgu değeri veya yanıt gövdesi İÇERMEZ. */
+/** Analiz bakiyesi/ölçüm kancası için olay: anahtar, sorgu değeri veya yanıt gövdesi İÇERMEZ. */
 export type EmlakFiyatiRequestEvent = {
   path: EmlakFiyatiGetPath;
   status: number | null;
@@ -491,7 +491,7 @@ export async function probeEmlakFiyatiConnection(): Promise<{ state: EmlakFiyati
 
 // ===========================================================================================================================
 // ORTAK API v1 AKTARIMI (docs/integrations/EMLAKFIYATI_ORTAK_API_V1.md) — emlakfiyati.com'a giden ortak/referans çağrıları da
-// YALNIZ bu dosyadan çıkar. Kapı (bayrak + yoklama) ve kontör mantığı BURADA DEĞİL (ortak.ts / ef-credits/service.ts).
+// YALNIZ bu dosyadan çıkar. Kapı (bayrak + yoklama) ve analiz bakiyesi mantığı BURADA DEĞİL (ortak.ts / ef-credits/service.ts).
 // ===========================================================================================================================
 
 type Lane = "value" | "pdf" | "other";

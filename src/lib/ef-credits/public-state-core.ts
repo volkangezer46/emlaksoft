@@ -1,6 +1,6 @@
 /**
  * EmlakFiyati TEK DURUM KAYNAĞI (SAF karar; sunucu/istemci güvenli, DB yok).
- * Public vitrin, /fiyatlar, /kayit, ofis kontör satın alma kapısı ve admin aynı kararı kullanır; para alan yol yalnız
+ * Public vitrin, /fiyatlar, /kayit, ofis analiz bakiyesi satın alma kapısı ve admin aynı kararı kullanır; para alan yol yalnız
  * `purchasable` (= "live") iken açılır. Önbellekli okuyucu `public-state.ts` içindedir.
  *
  * live        : anahtar var + ortak bayrağı AÇIK + son ortak yoklaması TAZE + cüzdan SQL'i hazır.
@@ -12,9 +12,9 @@ export type EfPublicState = "live" | "soon" | "stale" | "maintenance";
 
 export type EfPublicStatus = {
   state: EfPublicState;
-  /** state === "live". Kontör satışı, "kontör ile ek sorgu satın alınabilir" cümlesi ve sayıların "planlanan" etiketsiz gösterimi buna bağlıdır. */
+  /** state === "live". Analiz bakiyesi satışı, "analiz bakiyesi ile ek sorgu satın alınabilir" cümlesi ve sayıların "planlanan" etiketsiz gösterimi buna bağlıdır. */
   live: boolean;
-  /** Kontör paketi için para alınabilir mi (şimdilik live ile aynı; ayrı alan, ileride ayrışabilsin diye). */
+  /** Analiz paketi için para alınabilir mi (şimdilik live ile aynı; ayrı alan, ileride ayrışabilsin diye). */
   purchasable: boolean;
 };
 
@@ -57,7 +57,7 @@ export function efPublicStatusOf(state: EfPublicState): EfPublicStatus {
   return { state, live, purchasable: live };
 }
 
-/** Kapalı kontör satırına eklenen etiket (sayı plan kataloğundan gelir; durum live değilse "planlanan"). */
+/** Kapalı analiz bakiyesi satırına eklenen etiket (sayı plan kataloğundan gelir; durum live değilse "planlanan"). */
 export const EF_PLANNED_SUFFIX = "(planlanan)";
 
 export function efPlannedLine(line: string | null, live: boolean): string | null {
@@ -66,4 +66,4 @@ export function efPlannedLine(line: string | null, live: boolean): string | null
 }
 
 /** Satın alma kapısı hata/bilgi metni (sunucu action'ı ve ofis ekranı AYNI metni kullanır). */
-export const EF_PURCHASE_CLOSED_MESSAGE = "Kontör satın alma, EmlakFiyati değerleme etkinleşince açılır.";
+export const EF_PURCHASE_CLOSED_MESSAGE = "Analiz bakiyesi satın alma, EmlakFiyati değerleme etkinleşince açılır.";

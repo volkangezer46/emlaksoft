@@ -111,7 +111,7 @@ describe("planlı düşürme (dönem sonunda, iade yok)", () => {
 });
 
 describe("kredi tavanı seçimi (son ödenen düz yenileme)", () => {
-  it("koltuk/kontör faturaları atlanır, düz yenilemenin neti alınır", () => {
+  it("koltuk/analiz bakiyesi faturaları atlanır, düz yenilemenin neti alınır", () => {
     expect(
       pickPaidCapNetTry([
         { amount_try: 100, meta: { kind: "extra_seats" } },

@@ -9,16 +9,16 @@ import type { EfPack } from "@/lib/ef-credits/config";
 import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
 
 /**
- * KONTÖR PAKETİ SATIN ALMA: SUNUCU KATMANI.
+ * ANALİZ PAKETİ SATIN ALMA: SUNUCU KATMANI.
  * Para tahsil eden yol yalnız `ef_credit_ready()` true iken açılır (kapı action'dadır): cüzdan SQL'i
- * (ef_credit_grant + fulfill'in `meta.kind='credit_pack'` dalı) yokken tahsilat yapılıp kontör verilememesi mümkün olmaz.
+ * (ef_credit_grant + fulfill'in `meta.kind='credit_pack'` dalı) yokken tahsilat yapılıp analiz bakiyesi verilememesi mümkün olmaz.
  *
  * Fatura meta sözleşmesi (fulfill SQL'inin okuyacağı): { kind: 'credit_pack', packId, units, priceNetTry }
- * + izleme alanı conversationId. Fulfill, units/priceNetTry'yi fatura net tutarıyla doğrular; kontör
+ * + izleme alanı conversationId. Fulfill, units/priceNetTry'yi fatura net tutarıyla doğrular; analiz bakiyesi
  * `ef_credit_grant(kind 'purchase', idem 'invoice:<fatura id>')` ile eklenir.
  */
 
-/** Kontör paketi faturası taslağı; tutar/kontör SUNUCU kataloğundan gelen pakettir (istemciden değil). */
+/** Analiz paketi faturası taslağı; tutar/analiz bakiyesi SUNUCU kataloğundan gelen pakettir (istemciden değil). */
 export async function createCreditPackInvoice(input: {
   tenantId: string;
   pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">;
@@ -51,7 +51,7 @@ export async function createCreditPackInvoice(input: {
     .single();
   if (error || !data) {
     console.error("createCreditPackInvoice", error);
-    throw new Error("Kontör paketi faturası oluşturulamadı.");
+    throw new Error("Analiz paketi faturası oluşturulamadı.");
   }
   const invoiceId = data.id as string;
   if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };

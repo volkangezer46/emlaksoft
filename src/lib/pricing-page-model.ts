@@ -68,7 +68,7 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
     // Canlı değilse satır etiketi ve her hücre "(planlanan)" taşır (sayılar yine plan kataloğundan).
     const planned = opts.efLive ? "" : ` ${EF_PLANNED_SUFFIX}`;
     pricing.rows.push(
-      numericRow(plans, `Aylık EmlakFiyati kontörü${planned}`, (p) => {
+      numericRow(plans, `Aylık EmlakFiyati analiz bakiyesi${planned}`, (p) => {
         const n = p.efCreditsMonthly ?? 0;
         if (n <= 0) return "Yok";
         const m = cost > 0 ? Math.floor(n / cost) : 0;

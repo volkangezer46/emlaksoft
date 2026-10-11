@@ -301,7 +301,7 @@ export function summarizeOrtakUsage(data: unknown): OrtakUsageSummary | null {
 
 export type OrtakValuationOk = {
   durum: "deger";
-  /** true → kontörü KESİNLEŞTİR. */
+  /** true → analiz bakiyesi KESİNLEŞTİR. */
   ucretlendirilir: boolean;
   raporId: string | null;
   expiresAt: string | null;

@@ -3,7 +3,7 @@ import { efAdminGrantSchema, examplePackPreset, packIdFromName } from "@/lib/ef-
 import { efPackWarnings, efPacksSchema } from "@/lib/ef-credits/config";
 import { filterAndPage, normalizeLedgerRow, parseEfBalance, type EfMovement } from "@/lib/ef-credits/credit-view";
 
-describe("kontör defter satırı", () => {
+describe("analiz bakiyesi defter satırı", () => {
   it("satın alma, kullanım, iade; rezerve/serbest gizli", () => {
     expect(normalizeLedgerRow({ id: "1", kind: "grant_purchase", units: 25, created_at: "2026-10-01T10:00:00Z" })).toMatchObject({ category: "satin-alma", units: 25 });
     expect(normalizeLedgerRow({ id: "2", entry_type: "commit", amount: 5, item: "valuation_konut" })).toMatchObject({ category: "degerleme", units: -5 });
@@ -53,7 +53,7 @@ describe("admin manuel yükleme doğrulaması", () => {
     expect(efAdminGrantSchema.safeParse({ ...ok, reason: "" }).success).toBe(false);
     expect(efAdminGrantSchema.safeParse({ ...ok, reason: "kısa" }).success).toBe(false);
   });
-  it("negatif, sıfır, kesirli, aşırı kontör ve bilinmeyen tür reddedilir", () => {
+  it("negatif, sıfır, kesirli, aşırı analiz bakiyesi ve bilinmeyen tür reddedilir", () => {
     for (const units of [-5, 0, 1.5, 100001]) expect(efAdminGrantSchema.safeParse({ ...ok, units }).success).toBe(false);
     expect(efAdminGrantSchema.safeParse({ ...ok, kind: "purchase" }).success).toBe(false);
   });

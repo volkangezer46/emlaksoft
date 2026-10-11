@@ -34,11 +34,11 @@ export type PublicPricing = {
   offers: Record<string, PublicOffer>;
   /** Yalnız kampanya aktif, şema hazır, kota dolu değil ve en az bir planda indirimli fiyat varsa. */
   founders: PublicFounders | null;
-  /** Bir değerlemenin kontör bedeli (tarifeden); "yaklaşık N değerleme" satırı için. */
+  /** Bir değerlemenin analiz bakiyesi bedeli (tarifeden); "yaklaşık N değerleme" satırı için. */
   efValuationCost: number;
   /** EmlakFiyati tek durum kaynağı (ef-credits/public-state). */
   efState: EfPublicState;
-  /** efState === "live": kontör satırları "planlanan" etiketsiz ve "kontör ile ek sorgu satın alınabilir" cümlesi yalnız bu durumda. */
+  /** efState === "live": analiz bakiyesi satırları "planlanan" etiketsiz ve "analiz bakiyesi ile ek sorgu satın alınabilir" cümlesi yalnız bu durumda. */
   efLive: boolean;
 };
 

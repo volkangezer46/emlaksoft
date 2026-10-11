@@ -5,7 +5,7 @@ import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./ed
 
 /**
  * Ana sayfanın koda gömülü olan bölümlerinin editör sekmeleri: bölüm düzeni (sıra + görünürlük), ürün turu,
- * özellik ızgarası, karşılaştırma tablosu ve EmlakFiyati kontör bölümü. Yapı (ekran çizimi, ızgara yerleşimi,
+ * özellik ızgarası, karşılaştırma tablosu ve EmlakFiyati analiz bakiyesi bölümü. Yapı (ekran çizimi, ızgara yerleşimi,
  * illüstrasyon) kimlikten gelir; burada yalnız metin, sıra ve gösterim düzenlenir.
  */
 
@@ -166,10 +166,10 @@ export function EfTab({ cfg, update, issues, readOnly }: TabProps) {
   return (
     <>
       <p className="text-xs text-text-muted">
-        Sayılar (aylık kontör, değerleme bedeli, paket fiyatları) plan tanımı, kontör tarifesi ve paket kataloğundan gelir; buraya sayı yazmayın. “Canlı / Yakında” durumu
-        EmlakFiyati bağlantısından otomatik okunur. Bölüm, hiçbir pakette aylık kontör yoksa kendiliğinden gizlenir.
+        Sayılar (aylık analiz bakiyesi, değerleme bedeli, paket fiyatları) plan tanımı, analiz tarifesi ve paket kataloğundan gelir; buraya sayı yazmayın. “Canlı / Yakında” durumu
+        EmlakFiyati bağlantısından otomatik okunur. Bölüm, hiçbir pakette aylık analiz bakiyesi yoksa kendiliğinden gizlenir.
       </p>
-      <Card title="EmlakFiyati kontör bölümü">
+      <Card title="EmlakFiyati analiz bakiyesi bölümü">
         <Txt label="Üst başlık" value={e.eyebrow} max={LIMITS.eyebrow} onChange={(v) => update((d) => void (d.efSection.eyebrow = v))} path="efSection.eyebrow" {...f} />
         <div className="hidden sm:block" />
         <Full>
@@ -181,9 +181,9 @@ export function EfTab({ cfg, update, issues, readOnly }: TabProps) {
         </Full>
         <Full><Txt label="Canlıyken açıklama" multiline value={e.liveText} max={LIMITS.lead} onChange={(v) => update((d) => void (d.efSection.liveText = v))} path="efSection.liveText" {...f} /></Full>
         <Full><Txt label="Canlı değilken açıklama" multiline value={e.soonText} max={LIMITS.lead} onChange={(v) => update((d) => void (d.efSection.soonText = v))} path="efSection.soonText" {...f} /></Full>
-        <Txt label="Paket kontörü başlığı" value={e.plansTitle} max={LIMITS.title} onChange={(v) => update((d) => void (d.efSection.plansTitle = v))} path="efSection.plansTitle" {...f} />
+        <Txt label="Paket analiz bakiyesi başlığı" value={e.plansTitle} max={LIMITS.title} onChange={(v) => update((d) => void (d.efSection.plansTitle = v))} path="efSection.plansTitle" {...f} />
         <Txt label="Ek paket başlığı" value={e.packsTitle} max={LIMITS.title} onChange={(v) => update((d) => void (d.efSection.packsTitle = v))} path="efSection.packsTitle" {...f} />
-        <Full><Txt label="Paket kontörü dipnotu" multiline value={e.plansNote} max={LIMITS.note} onChange={(v) => update((d) => void (d.efSection.plansNote = v))} path="efSection.plansNote" {...f} /></Full>
+        <Full><Txt label="Paket analiz bakiyesi dipnotu" multiline value={e.plansNote} max={LIMITS.note} onChange={(v) => update((d) => void (d.efSection.plansNote = v))} path="efSection.plansNote" {...f} /></Full>
         <Full><Txt label="Ek paket açıklaması" multiline value={e.packsText} max={LIMITS.text} onChange={(v) => update((d) => void (d.efSection.packsText = v))} path="efSection.packsText" {...f} /></Full>
         <Full><Txt label="Paket yokken metin" value={e.packsEmpty} max={LIMITS.text} onChange={(v) => update((d) => void (d.efSection.packsEmpty = v))} path="efSection.packsEmpty" {...f} /></Full>
         <CtaFields label="Ayrıntı bağlantısı" value={e.detailLink} onChange={(v) => update((d) => void (d.efSection.detailLink = v))} path="efSection.detailLink" {...f} />

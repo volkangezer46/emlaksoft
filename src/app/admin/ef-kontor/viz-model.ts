@@ -1,5 +1,5 @@
 /**
- * Kontör ekonomisi grafik modelleri (saf hesap). Ölçekler gerçek orandır; sahte değer yok.
+ * Analiz bakiyesi ekonomisi grafik modelleri (saf hesap). Ölçekler gerçek orandır; sahte değer yok.
  * Toptan maliyet bilinmiyorsa marj akışı üretilmez (null).
  */
 
@@ -39,7 +39,7 @@ export function marginFlow(econ: { revenueNetKurus: number; costKurus: number; m
 
 export type GrantSegment = { kind: string; label: string; units: number; pct: number };
 
-/** Yığılmış çubuk dilimleri: toplam kontör içindeki pay (yüzdeler toplamı 100'e yakın). */
+/** Yığılmış çubuk dilimleri: toplam analiz bakiyesi içindeki pay (yüzdeler toplamı 100'e yakın). */
 export function grantSegments(grants: readonly { kind: string; label: string; units: number }[]): GrantSegment[] {
   const rows = grants.filter((g) => Number.isFinite(g.units) && g.units > 0);
   const total = rows.reduce((a, g) => a + g.units, 0);

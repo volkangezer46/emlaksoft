@@ -12,7 +12,7 @@ export const maxDuration = 60;
 
 /**
  * EmlakFiyati günlük bağlantı sağlık yoklaması: ortak istemcinin probe'u (GET /kullanim, tek deneme) çalışır; başarıda
- * `emlakfiyati_ortak_probe_ok_at` damgası yenilenir, başarısızlıkta silinir (public durum "live" olmaktan çıkar, kontör
+ * `emlakfiyati_ortak_probe_ok_at` damgası yenilenir, başarısızlıkta silinir (public durum "live" olmaktan çıkar, analiz bakiyesi
  * satışı kapanır). EmlakFiyati anahtarı veya ortak bayrağı yoksa HİÇBİR ŞEY yapılmaz (hata değil). service_role istemcisi
  * yok: damga yazımı mevcut platform-settings yolundan gider (yeni service_role istemcisi kullanımı eklenmez).
  */

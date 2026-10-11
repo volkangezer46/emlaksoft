@@ -133,7 +133,7 @@ export function ReportArchive({
                   </span>
                   <span className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                     <span className="rounded-full bg-ink-950/6 px-2.5 py-0.5 text-text-muted">{guvenEtiketi(r.guven_sinifi)}</span>
-                    <span className="rounded-full bg-ink-950/6 px-2.5 py-0.5 text-text-muted">{r.units_charged} kontör</span>
+                    <span className="rounded-full bg-ink-950/6 px-2.5 py-0.5 text-text-muted">{r.units_charged} TL</span>
                     <span className={`rounded-full px-2.5 py-0.5 ${pdf.taken ? "bg-mint-500/10 text-mint-700" : "bg-ink-950/6 text-text-muted"}`}>{pdf.label}</span>
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 ${

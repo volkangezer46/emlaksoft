@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     const detail = `${describeReconciliation(result)}${result.saved ? "" : "; kayıt yazılamadı (ef_reconciliation_runs migration'ı uygulanmamış olabilir)"}`;
     if (result.status === "drift") {
       await notifyPlatformStaff({
-        title: "EmlakFiyati kontör mutabakatında sapma",
+        title: "EmlakFiyati analiz bakiyesi mutabakatında sapma",
         body: detail,
         href: "/admin/ef-kontor",
         kind: "warning",

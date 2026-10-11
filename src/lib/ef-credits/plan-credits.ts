@@ -1,5 +1,5 @@
 /**
- * Plan kontör hakkı (EmlakFiyati) — SAF yardımcılar (DB yok, sunucu/istemci güvenli).
+ * Plan analiz bakiyesi hakkı (EmlakFiyati) — SAF yardımcılar (DB yok, sunucu/istemci güvenli).
  * Tarife `config.ts`ten gelir (sabit yok); aylık hak plan tanımındaki `efCreditsMonthly` alanıdır.
  * Hak verme mantığı cron'da (`api/cron/ef-kontor-hak`), burada yalnız karar/anahtar/metin üretimi vardır.
  */
@@ -8,14 +8,14 @@ import type { EfTariff } from "@/lib/ef-credits/config";
 
 /**
  * Hibe değerlendirmesine giren abonelik durumları (past_due/paused/cancelled HİÇ hak almaz).
- * trialing yalnız HOŞ GELDİN kontörü alabilir; AYLIK plan hakkı için bkz. EF_MONTHLY_SUBSCRIPTION_STATUSES.
+ * trialing yalnız HOŞ GELDİN analiz bakiyesi alabilir; AYLIK plan hakkı için bkz. EF_MONTHLY_SUBSCRIPTION_STATUSES.
  */
 export const EF_GRANT_SUBSCRIPTION_STATUSES = ["trialing", "active"] as const;
-/** AYLIK plan hakkı (ve ek kullanıcı kontörü) yalnız ilk gerçek ödemeden sonra: deneme (trialing) almaz. */
+/** AYLIK plan hakkı (ve ek kullanıcı analiz bakiyesi) yalnız ilk gerçek ödemeden sonra: deneme (trialing) almaz. */
 export const EF_MONTHLY_SUBSCRIPTION_STATUSES = ["active"] as const;
 
 /**
- * SÜRELİ KONTÖR (20261010000300): aylık plan hakkı TR ay sonunda yanar (devretmez; eski "3 aylık devir tavanı" kaldırıldı).
+ * SÜRELİ ANALİZ BAKİYESİ (20261010000300): aylık plan hakkı TR ay sonunda yanar (devretmez; eski "3 aylık devir tavanı" kaldırıldı).
  * Son kullanma tarihini SQL `ef_credit_grant` verir: plan_monthly = İstanbul ayı sonu, bonus = 30 gün, paket = faturadaki ay.
  */
 
@@ -39,7 +39,7 @@ export function welcomeIdempotencyKey(tenantId: string): string {
   return `welcome:${tenantId}`;
 }
 
-/** Plan alanından verilecek aylık kontör (null/0/geçersiz = 0). */
+/** Plan alanından verilecek aylık analiz bakiyesi (null/0/geçersiz = 0). */
 export function monthlyUnitsOf(efCreditsMonthly: number | null | undefined): number {
   return typeof efCreditsMonthly === "number" && Number.isInteger(efCreditsMonthly) && efCreditsMonthly > 0 ? efCreditsMonthly : 0;
 }
@@ -61,7 +61,7 @@ export function monthlyUnitsWithSeats(
 }
 
 /**
- * Bir değerlemenin giriş kontör bedeli = en ucuz (0 olmayan) rapor bedeli (varsayılanda konut 700); config'i istemciye
+ * Bir değerlemenin giriş analiz bakiyesi bedeli = en ucuz (0 olmayan) rapor bedeli (varsayılanda konut 700); config'i istemciye
  * çekmemek için alanlar doğrudan okunur. Ticari alanı eski çağıranlarda olmayabilir.
  */
 export function valuationUnitCost(tariff: Pick<EfTariff, "valuationArsa"> & Partial<Pick<EfTariff, "valuationKonut" | "valuationTicari">>): number {
@@ -76,7 +76,7 @@ export function approxValuations(units: number, tariff: Parameters<typeof valuat
   return Math.floor(units / cost);
 }
 
-/** Public/admin satırı: "Aylık N kontör (yaklaşık M değerleme)"; hak yoksa null (satır gizlenir). */
+/** Public/admin satırı: "Her ay N TL analiz bakiyesi dahil (yaklaşık M değerleme)"; hak yoksa null (satır gizlenir). */
 export function efCreditsLine(
   efCreditsMonthly: number | null | undefined,
   valuationCost: number,
@@ -84,13 +84,13 @@ export function efCreditsLine(
 ): string | null {
   const n = monthlyUnitsOf(efCreditsMonthly);
   if (n === 0) return null;
-  let base = `Aylık ${n.toLocaleString("tr-TR")} kontör`;
+  let base = `Her ay ${n.toLocaleString("tr-TR")} TL analiz bakiyesi dahil`;
   if (valuationCost > 0) {
     const m = Math.floor(n / valuationCost);
     if (m > 0) base = `${base} (yaklaşık ${m.toLocaleString("tr-TR")} değerleme)`;
   }
   const per = monthlyUnitsOf(efCreditsPerExtraSeat);
-  return per > 0 ? `${base} + her ek kullanıcı için ${per.toLocaleString("tr-TR")} kontör` : base;
+  return per > 0 ? `${base} + her ek kullanıcı için ${per.toLocaleString("tr-TR")} TL` : base;
 }
 
 export type EfGrantCandidate = {
@@ -132,10 +132,10 @@ export function welcomeEligible(createdAt: string | null | undefined, welcomeSin
  * Hangi ofise hangi hibe:
  * - Hoş geldin (`welcomeUnits` > 0, tek sefer `welcome:<tenant>`): trialing/active abonelik + ofis trial/active,
  *   YALNIZ `welcomeSinceMs` sonrası açılan ofisler (geriye dönük yok).
- * - AYLIK plan hakkı (+ ek kullanıcı kontörü): yalnız `active` abonelik (ilk gerçek ödemeden sonra); deneme almaz.
+ * - AYLIK plan hakkı (+ ek kullanıcı analiz bakiyesi): yalnız `active` abonelik (ilk gerçek ödemeden sonra); deneme almaz.
  *   Ay içinde ilk hibe `plan:<tenant>:<ay>`; aynı ay güncel hak o ay verilenden büyükse (yükseltme/ek kullanıcı) pozitif FARK
  *   `plan:<tenant>:<ay>:delta:<yeniHak>` ile verilir. Düşürmede geri alma YOK.
- *   `monthGranted` (tenant -> o ay verilen plan kontörü toplamı) verilmezse yalnız `monthlyGranted` ön elemesi kullanılır (fark yok).
+ *   `monthGranted` (tenant -> o ay verilen plan analiz bakiyesi toplamı) verilmezse yalnız `monthlyGranted` ön elemesi kullanılır (fark yok).
  * valuation modülü kapalı ofis hak almaz.
  */
 export function decideGrants(input: {

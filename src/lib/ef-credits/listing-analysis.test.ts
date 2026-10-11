@@ -23,9 +23,9 @@ vi.mock("@/lib/comparables", () => ({
       ? { estimatedValue: null, lowValue: null, highValue: null, medianSqmPrice: null, compCount: 0, wonCount: 0, activeCount: 0, confidence: "yetersiz", spreadPct: null }
       : { estimatedValue: 5_000_000, lowValue: 4_700_000, highValue: 5_300_000, medianSqmPrice: 50_000, compCount: 9, wonCount: 4, activeCount: 5, confidence: "orta", spreadPct: 8 },
 }));
-// KONTÖRSÜZ (2026-10-10): cüzdan modülü HİÇ yüklenmemeli; yüklenirse test düşer.
+// BAKİYE HARCAMAYAN (2026-10-10): cüzdan modülü HİÇ yüklenmemeli; yüklenirse test düşer.
 vi.mock("./wallet", () => {
-  throw new Error("ilan analizi cüzdana (kontör) dokunmamalı");
+  throw new Error("ilan analizi cüzdana (analiz bakiyesi) dokunmamalı");
 });
 
 import { runListingAnalysis } from "./listing-analysis";
@@ -98,8 +98,8 @@ beforeEach(() => {
   w.rows.length = 0;
 });
 
-describe("ilan analizi: kontörsüz", () => {
-  it("ilk analiz kontör düşmez (units_charged 0) ve sonuç kaydedilir", async () => {
+describe("ilan analizi: bakiye harcamayan", () => {
+  it("ilk analiz bakiye düşmez (units_charged 0) ve sonuç kaydedilir", async () => {
     const out = await run();
     expect(out.status).toBe("ok");
     if (out.status !== "ok") return;
@@ -123,7 +123,7 @@ describe("ilan analizi: kontörsüz", () => {
     expect(w.rows).toHaveLength(1);
   });
 
-  it("24 saat geçince ya da girdi (fiyat) değişince yeniden hesaplanır; yine kontörsüz", async () => {
+  it("24 saat geçince ya da girdi (fiyat) değişince yeniden hesaplanır; yine bakiye harcamayan", async () => {
     await run();
     w.nowMs += 25 * 3_600_000;
     await run();
@@ -142,7 +142,7 @@ describe("ilan analizi: kontörsüz", () => {
     expect(w.rows).toHaveLength(0);
   });
 
-  it("kayıt yazılamazsa hata döner (kontör zaten yok)", async () => {
+  it("kayıt yazılamazsa hata döner (analiz bakiyesi zaten yok)", async () => {
     w.insertFails = true;
     const out = await run();
     expect(out.status).toBe("error");

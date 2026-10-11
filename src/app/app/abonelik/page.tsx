@@ -129,7 +129,7 @@ export default async function BillingPage({
   ]);
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
-  // Kontör paketi ödemesi sonrası dönüş mesajı: son kontör faturası yeniyse plan mesajı yerine kontör mesajı.
+  // Analiz paketi ödemesi sonrası dönüş mesajı: son analiz bakiyesi faturası yeniyse plan mesajı yerine analiz bakiyesi mesajı.
   const packInvoice = tenantId && (sp.paid || active === "kontor") ? await loadLatestPackInvoice(supabase, tenantId) : null;
   const packInvoiceRecent = Boolean(packInvoice && msSince(packInvoice.paidAt ?? packInvoice.createdAt) < 15 * 60_000);
 
@@ -149,7 +149,7 @@ export default async function BillingPage({
   const canCancel = auth.role === "owner" || auth.role === "gm";
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
-    { id: "kontor", label: "Kontör" },
+    { id: "kontor", label: "Analiz bakiyesi" },
     // Hesap kredisi yalnız ofis sahibi ve genel müdüre görünür (sekme gizlenir; doğrudan bağlantıda bölüm mesaj gösterir).
     { id: "cuzdan", label: "Hesap kredisi", hidden: !(auth.role === "owner" || auth.role === "gm") },
     { id: "faturalar", label: "Faturalar" },
@@ -347,7 +347,7 @@ export default async function BillingPage({
         <div className="rounded-[var(--radius-card)] border border-mint-500/30 bg-mint-500/10 px-4 py-3 text-sm font-medium text-success-strong">
           <span className="inline-flex items-center gap-2">
             <Check className="h-4 w-4" />
-            Ödeme alındı{sp.demo ? " (demo)" : ""}. {packInvoiceRecent && packInvoice?.status === "paid" ? "Kontör paketiniz bakiyenize eklenir (Kontör sekmesinden görebilirsiniz)." : sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
+            Ödeme alındı{sp.demo ? " (demo)" : ""}. {packInvoiceRecent && packInvoice?.status === "paid" ? "Analiz paketiniz bakiyenize eklenir (Analiz bakiyesi sekmesinden görebilirsiniz)." : sp.plan ? `${planLabel(sp.plan)} paketi aktif.` : "Paket güncellendi."}
           </span>
         </div>
       ) : null}

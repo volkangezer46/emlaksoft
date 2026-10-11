@@ -47,20 +47,20 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
 }
 
 /**
- * Aylık EmlakFiyati kontör hakkı (günlük çalışır; ay içinde ikinci kez hak vermez).
+ * Aylık EmlakFiyati analiz bakiyesi hakkı (günlük çalışır; ay içinde ikinci kez hak vermez).
  *
  * - Hoş geldin + aylık hak değerlendirmesine yalnız trialing/active abonelik (+ ofis trial/active) ve "valuation" modülü
  *   açık ofisler girer; past_due/askıda/iptal/duraklatılmış ofis ALMAZ.
- * - AYLIK plan hakkı (+ ek kullanıcı kontörü) yalnız `active` abonelikte (ilk gerçek ödemeden sonra); deneme (trialing) almaz.
+ * - AYLIK plan hakkı (+ ek kullanıcı analiz bakiyesi) yalnız `active` abonelikte (ilk gerçek ödemeden sonra); deneme (trialing) almaz.
  *   Plan `efCreditsMonthly` > 0 ise `ef_credit_grant(kind 'plan_monthly', idem 'plan:<tenant>:<YYYY-MM>')` (TR ay anahtarı).
  *   Aynı ay yükseltmede güncel hak ile o ay verilen toplam arasındaki pozitif fark `plan:<t>:<ay>:delta:<yeniHak>` ile verilir.
  * - Hoş geldin (ayar `ef.welcome_units`, 0 = kapalı): `welcome:<tenant>` anahtarıyla TEK SEFER `bonus`; yalnız
  *   `tenants.created_at >= ef.welcome_since` ofislere (geriye dönük dağıtım yok; ayar yoksa kimse almaz).
- * - SÜRELİ KONTÖR (20261010000300): her hibe bir parti (lot) olur. Aylık plan hakkı TR ay sonunda, hoş geldin
- *   kontörü 30 gün sonra (EF_WELCOME_VALID_DAYS), paket seçilen süre sonunda yanar (devretmez). Cron'un son adımı
+ * - SÜRELİ ANALİZ BAKİYESİ (20261010000300): her hibe bir parti (lot) olur. Aylık plan hakkı TR ay sonunda, hoş geldin
+ *   analiz bakiyesi 30 gün sonra (EF_WELCOME_VALID_DAYS), paket seçilen süre sonunda yanar (devretmez). Cron'un son adımı
  *   `ef_credit_burn_expired` suresi dolmuş partileri defterde "expire" satırıyla yakar (idempotent; şema yoksa atlanır,
  *   hata cron'u düşürmez). Eski "3 aylık devir tavanı" kaldırıldı.
- * - Kontör cüzdanı (`ef_credit_ready()`) hazır değilse HİÇ hibe yapılmaz ("atlandı"), hata verilmez.
+ * - Analiz bakiyesi cüzdanı (`ef_credit_ready()`) hazır değilse HİÇ hibe yapılmaz ("atlandı"), hata verilmez.
  */
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Bu ay verilen plan kontörü toplamı (yükseltme farkı için). Okunamazsa null: fark verilmez, yalnız anahtar ön elemesi.
+    // Bu ay verilen plan analiz bakiyesi toplamı (yükseltme farkı için). Okunamazsa null: fark verilmez, yalnız anahtar ön elemesi.
     const monthGranted = await loadMonthGranted(
       admin,
       candidates.filter((c) => (EF_MONTHLY_SUBSCRIPTION_STATUSES as readonly string[]).includes(c.subscriptionStatus)).map((c) => c.tenantId),
@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
 
     const skippedModule = decision.skipped.filter((s) => s.reason === "modul_kapali").length;
     const skippedOther = decision.skipped.length - skippedModule;
-    const detail = `${grantedTenants.size} ofis, ${units} kontör, ${granted} hibe, ${already + alreadyKeys.size} zaten verilmiş, ${skippedModule + skippedOther} atlandı (${skippedModule} modül kapalı), ${failed} hata, ${burnedUnits} kontör süresi dolduğu için yandı (${burnedLots} parti)${burnFailed > 0 ? `, ${burnFailed} yakma hatası` : ""}`;
+    const detail = `${grantedTenants.size} ofis, ${units} TL, ${granted} hibe, ${already + alreadyKeys.size} zaten verilmiş, ${skippedModule + skippedOther} atlandı (${skippedModule} modül kapalı), ${failed} hata, ${burnedUnits} TL süresi dolduğu için yandı (${burnedLots} parti)${burnFailed > 0 ? `, ${burnFailed} yakma hatası` : ""}`;
     await recordHeartbeat("ef-kontor-hak", heartbeatFor({ failed: failed + burnFailed }), detail);
     return NextResponse.json({
       ok: failed + burnFailed === 0,
@@ -256,7 +256,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Bu ay (TR ay anahtarı) verilen PLAN kontörü toplamı (tenant -> kontör): tam hibe `plan:<t>:<ay>` + yükseltme farkları
+ * Bu ay (TR ay anahtarı) verilen PLAN analiz bakiyesi toplamı (tenant -> analiz bakiyesi): tam hibe `plan:<t>:<ay>` + yükseltme farkları
  * `plan:<t>:<ay>:delta:<n>`. Okunamazsa null (çağıran fark vermez; yalnız idempotency ön elemesi kalır).
  */
 async function loadMonthGranted(

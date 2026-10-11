@@ -3,7 +3,7 @@ import type { PlatformModule } from "@/lib/platform-access";
 /**
  * "Site yönetimi" merkezinin kart envanteri (TEK kaynak): admin'in ONLINE yönetebildiği alanlar.
  * Her `href` GERÇEK bir `page.tsx`'e gider (sözleşme testi doğrular); olmayan ekran için kart eklenmez
- * (ör. EmlakFiyati kontör tarifesi ekranı yazılınca buraya eklenir). Ekran kopyası yok: kartlar mevcut ekranlara bağlanır.
+ * (ör. EmlakFiyati analiz tarifesi ekranı yazılınca buraya eklenir). Ekran kopyası yok: kartlar mevcut ekranlara bağlanır.
  * `audit`: son değişikliği bulmak için `platform_audit_logs.action` önekleri (kişisel veri okunmaz).
  */
 export type HubCardId =

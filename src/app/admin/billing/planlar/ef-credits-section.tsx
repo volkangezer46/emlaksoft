@@ -12,7 +12,7 @@ const lbl = "block text-xs font-semibold text-text-muted";
 
 type Row = { id: string; name: string; units: number; perExtraSeat?: number };
 
-/** "Kontör hakları": paket başına aylık hak özeti (canlı yaklaşık değerleme) + hoş geldin kontörü ayarı. */
+/** "Analiz bakiyesi hakları": paket başına aylık hak özeti (canlı yaklaşık değerleme) + hoş geldin analiz bakiyesi ayarı. */
 export function EfCreditsSection({
   rows,
   valuationCost,
@@ -47,17 +47,17 @@ export function EfCreditsSection({
   }
 
   return (
-    <section aria-label="Kontör hakları" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+    <section aria-label="Analiz bakiyesi hakları" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div>
-        <h2 className="font-display font-bold text-ink-950">Kontör hakları</h2>
+        <h2 className="font-display font-bold text-ink-950">Analiz bakiyesi hakları</h2>
         <p className="text-xs text-text-muted">
-          Paket başına aylık EmlakFiyati kontörü plan düzenleyicisinden girilir; günlük çalışma, trialing/active aboneliği olan ofislere ayı için tek sefer verir.
-          Aylık hak o ayın sonunda yanar, devretmez (süreli kontör, 2026-10-10 kararı). Plan yükseltmede ara hak verilmez; yeni paketin hakkı sonraki ay başlar.
-          Ek kullanıcı başı kontör, plan düzenleyicisindeki &quot;ek kullanıcı başı kontör&quot; alanından girilir ve satırlarda hakka eklenir.
+          Paket başına aylık EmlakFiyati analiz bakiyesi plan düzenleyicisinden girilir; günlük çalışma, trialing/active aboneliği olan ofislere ayı için tek sefer verir.
+          Aylık hak o ayın sonunda yanar, devretmez (süreli analiz bakiyesi, 2026-10-10 kararı). Plan yükseltmede ara hak verilmez; yeni paketin hakkı sonraki ay başlar.
+          Ek kullanıcı başı analiz bakiyesi, plan düzenleyicisindeki &quot;ek kullanıcı başı analiz bakiyesi&quot; alanından girilir ve satırlarda hakka eklenir.
         </p>
         <p className="mt-1 text-xs text-text-muted">
           Toptan maliyet (EmlakFiyatı işlem başı tarifesi): {wholesaleKnown ? "tanımlı" : "BİLİNMİYOR, varsayılan 0 kullanılıyor; marj gerçek değildir"}.{" "}
-          <Link href="/admin/ef-kontor#ekonomi" className="font-semibold text-brand-600 hover:underline">Kontör ekonomisi ve maliyet girişi</Link>
+          <Link href="/admin/ef-kontor#ekonomi" className="font-semibold text-brand-600 hover:underline">Analiz bakiyesi ekonomisi ve maliyet girişi</Link>
         </p>
       </div>
       <ul className="space-y-1 text-sm">
@@ -69,9 +69,9 @@ export function EfCreditsSection({
         ))}
       </ul>
       <div className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-sm font-bold text-ink-950">Hoş geldin kontörü (yalnız deneme/yeni ofis, tek sefer)</h3>
+        <h3 className="text-sm font-bold text-ink-950">Hoş geldin analiz bakiyesi (yalnız deneme/yeni ofis, tek sefer)</h3>
         <label className={lbl}>
-          Kontör (0 = kapalı)
+          Analiz bakiyesi (0 = kapalı)
           <input
             inputMode="numeric"
             value={value}
@@ -87,8 +87,8 @@ export function EfCreditsSection({
           <p className="text-xs text-text-muted">
             {Number(value.trim()) === 0
               ? "Kapalı: yeni hoş geldin hibesi verilmez."
-              : (efCreditsLine(Number(value.trim()), valuationCost)?.replace("Aylık ", "") ?? "")}
-            {" "}Hoş geldin kontörü yalnız deneme/yeni ofise bir kez verilir; mevcut ofislere geriye dönük dağıtılmaz.
+              : (efCreditsLine(Number(value.trim()), valuationCost)?.replace("Her ay ", "") ?? "")}
+            {" "}Hoş geldin analiz bakiyesi yalnız deneme/yeni ofise bir kez verilir; mevcut ofislere geriye dönük dağıtılmaz.
           </p>
         ) : (
           <p role="alert" className="text-xs font-semibold text-danger-600">0-1000 arasında tam sayı girin.</p>

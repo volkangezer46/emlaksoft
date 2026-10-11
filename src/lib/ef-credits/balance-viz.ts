@@ -1,5 +1,5 @@
 /**
- * Kontör merkezi görsel hesapları (saf, zaman dışarıdan verilir). Yalnız GERÇEK defter verisinden
+ * Analiz bakiyesi merkezi görsel hesapları (saf, zaman dışarıdan verilir). Yalnız GERÇEK defter verisinden
  * türetilir: yetersiz geçmişte tahmin ÜRETİLMEZ (sahte "bitiş tarihi" yok).
  */
 import { DAY_MS } from "@/lib/clock";

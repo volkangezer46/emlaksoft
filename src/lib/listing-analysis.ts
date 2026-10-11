@@ -6,7 +6,7 @@
  * önerisi ve ilan metni/fotoğraf kontrol listesi.
  *
  * DÜRÜSTLÜK KURALLARI (CLAUDE.md "Zeka katmanı"):
- *  - Emsal yoksa (güven "yetersiz", tahmin yok, liste fiyatı yok) sonuç `null`: kontör düşmez, hiçbir rakam uydurulmaz.
+ *  - Emsal yoksa (güven "yetersiz", tahmin yok, liste fiyatı yok) sonuç `null`: bakiye düşmez, hiçbir rakam uydurulmaz.
  *  - Fiyat revizyon önerisi YALNIZ emsal güveni orta/yüksek ve ilan piyasa üstündeyse verilir; "Tahmin" etiketlidir.
  *  - Eşikler `pricePosition` (comparables.ts) ile AYNI: ±%7 "piyasa seviyesi". Bu dosya server-only içe aktarmaz.
  */
@@ -132,7 +132,7 @@ function buildChecklist(q: AnalysisInput["quality"]): ChecklistItem[] {
 }
 
 /**
- * Analizi hesaplar. Emsal yoksa `null` (kontör düşmez). Kontrol listesi tek başına ücretlendirilmez: fiyat konumu
+ * Analizi hesaplar. Emsal yoksa `null` (bakiye düşmez). Kontrol listesi tek başına ücretlendirilmez: fiyat konumu
  * hesaplanamıyorsa tüm analiz "yeterli emsal yok" sayılır.
  */
 export function computeListingAnalysis(input: AnalysisInput): ListingAnalysisResult | null {
@@ -225,7 +225,7 @@ export function isAnalysisFresh(createdAtMs: number, nowMs: number): boolean {
 }
 
 /**
- * Kontör rezervasyonu idempotency anahtarı (^[A-Za-z0-9_.:-]{8,128}$). Aynı ilan + aynı girdi + aynı 24 saatlik pencere =
+ * Analiz bakiyesi rezervasyonu idempotency anahtarı (^[A-Za-z0-9_.:-]{8,128}$). Aynı ilan + aynı girdi + aynı 24 saatlik pencere =
  * aynı anahtar: çift tıklama/yarış tek düşüm yapar (cüzdan RPC'si 'duplicate' döner).
  */
 export function analysisIdempotencyKey(propertyId: string, inputKey: string, nowMs: number): string {

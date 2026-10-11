@@ -80,7 +80,7 @@ export async function CuzdanSection({
           variant="full"
           icon={Wallet}
           title="Hesap kredisi henüz etkin değil"
-          description="Davet ödülleri, kampanya ve iade kredileri etkinleşince bakiyeniz burada görünür ve paket, ek kullanıcı ve kontör faturalarınızda kullanılır."
+          description="Davet ödülleri, kampanya ve iade kredileri etkinleşince bakiyeniz burada görünür ve paket, ek kullanıcı ve analiz bakiyesi faturalarınızda kullanılır."
           action={{ href: TRY_WALLET_LINKS.invoices, label: "Faturalarıma git" }}
         />
       </section>
@@ -197,7 +197,7 @@ export async function CuzdanSection({
           {full ? " Kredi toplamı karşılıyorsa kart çekimi yapılmaz." : ""}
         </p>
         <p className="mt-1 text-xs text-text-muted">
-          Kredi nakde çevrilmez; paket, ek kullanıcı ve kontör paketi faturalarında kullanılır. Fatura tutarı ve KDV değişmez, iade
+          Kredi nakde çevrilmez; paket, ek kullanıcı ve analiz paketi faturalarında kullanılır. Fatura tutarı ve KDV değişmez, iade
           edilirse kullanılan kredi hesabınıza geri yazılır.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
@@ -208,7 +208,7 @@ export async function CuzdanSection({
             Ek kullanıcı
           </Link>
           <Link href={TRY_WALLET_LINKS.packs} className="focus-ring rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-text">
-            Kontör paketleri
+            Analiz paketleri
           </Link>
         </div>
       </section>

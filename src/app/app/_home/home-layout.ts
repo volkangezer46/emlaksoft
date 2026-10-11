@@ -45,7 +45,7 @@ export type HomeLayout = {
   /** Hero'da "Ofis | Ben" anahtarı (yalnız ofis geneli veri kapsamı olan roller). */
   scopeSwitch: boolean;
   periodToggle: boolean;
-  /** Durum çubuğu (örnek veri, kontör, kurulum, duyuru…). */
+  /** Durum çubuğu (örnek veri, analiz bakiyesi, kurulum, duyuru…). */
   statusBar: boolean;
   /** "Dikkat gerektirenler" listesi (+ içgörüler); yalnız yönetim. */
   attention: boolean;

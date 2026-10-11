@@ -10,7 +10,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Ada/parsel değerleme (EmlakFiyati Ortak API) — kullanıcı eylemleri. Her action requirePermission("valuation", ...) + hız sınırı.
- * Kontör mantığı, tenant sahipliği ve denetim kaydı src/lib/ef-credits/service.ts'tedir. Kullanıcıya EmlakFiyati anahtarı/URL'si ASLA dönmez.
+ * Analiz bakiyesi mantığı, tenant sahipliği ve denetim kaydı src/lib/ef-credits/service.ts'tedir. Kullanıcıya EmlakFiyati anahtarı/URL'si ASLA dönmez.
  */
 
 export type EfGeoOption = { id: number; ad: string };
@@ -69,7 +69,7 @@ export async function efCheckGeoMatch(input: { il: string; ilce: string; mahalle
   };
 }
 
-/** Değerlemeyi çalıştırır (kontör: rezerve → sorgu → kesinleştir/iade). Tarife 0 ise kontör düşmez. */
+/** Değerlemeyi çalıştırır (analiz bakiyesi: rezerve → sorgu → kesinleştir/iade). Tarife 0 ise bakiye düşmez. */
 export async function submitParcelValuation(input: OrtakValuationInput): Promise<EfRunResult> {
   const gate = await requirePermission("valuation", "create");
   if (!gate.ok) return { ok: false, error: gate.error };

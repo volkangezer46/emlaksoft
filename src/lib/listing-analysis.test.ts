@@ -43,7 +43,7 @@ function input(over: Partial<AnalysisInput> = {}): AnalysisInput {
 }
 
 describe("computeListingAnalysis", () => {
-  it("emsal yoksa null (kontör düşmez)", () => {
+  it("emsal yoksa null (bakiye düşmez)", () => {
     expect(computeListingAnalysis(input({ estimate: { ...EST, confidence: "yetersiz" } }))).toBeNull();
     expect(computeListingAnalysis(input({ estimate: { ...EST, estimatedValue: null } }))).toBeNull();
     expect(computeListingAnalysis(input({ estimate: { ...EST, compCount: 0 } }))).toBeNull();

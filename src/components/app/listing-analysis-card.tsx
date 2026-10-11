@@ -3,7 +3,7 @@ import { readLatestListingAnalysis } from "@/lib/ef-credits/listing-analysis";
 import { ListingAnalysisPanel } from "./listing-analysis-panel";
 
 /**
- * İlan analizi kartı (sunucu): son kayıtlı sonucu okur ve istemci paneline verir. KONTÖRSÜZDÜR (kontör yalnız
+ * İlan analizi kartı (sunucu): son kayıtlı sonucu okur ve istemci paneline verir. BAKİYE HARCAMAZ (analiz bakiyesi yalnız
  * değerleme için harcanır). Portföy detayı (Fiyat sekmesi) ve Değerleme sayfasında (?property=) kullanılır.
  */
 export async function ListingAnalysisCard({ propertyId, tenantId, canRun }: { propertyId: string; tenantId: string; canRun: boolean }) {

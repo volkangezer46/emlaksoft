@@ -6,7 +6,7 @@ import { EF_RPC, type EfBalance, type EfReserveResult, type EfSettleResult } fro
 import type { EfReportRow } from "./types";
 
 /**
- * EF kontör CÜZDANI — RPC sarmalayıcıları + `ef_reports` erişimi. `createAdminClient` YALNIZ bu dosyada (ve service.ts'te DEĞİL).
+ * EF analiz bakiyesi CÜZDANI — RPC sarmalayıcıları + `ef_reports` erişimi. `createAdminClient` YALNIZ bu dosyada (ve service.ts'te DEĞİL).
  * FAIL-CLOSED: her işlev FIRLATMAZ; cüzdan/tablo yoksa ya da hata olursa `null`/`false` döner ve çağıran sorguyu YAPMAZ.
  * SQL (RPC'ler + `ef_reports`) canlı DB'ye henüz uygulanmamış olabilir: bu durumda `efCreditReady()` false → özellik "etkin değil".
  * Kişisel veri YAZILMAZ: yalnız kimlikler, kalem, birim, X-Istek-Id, rapor_id.
@@ -184,7 +184,7 @@ export async function listEfReports(tenantId: string, limit = 30, onlyUserId?: s
 }
 
 /**
- * PDF "alındı" işareti (yalnız henüz işaretlenmemişse). PDF artık KONTÖRSÜZDÜR (2026-10-10): `pdf_charged` sütunu "PDF
+ * PDF "alındı" işareti (yalnız henüz işaretlenmemişse). PDF artık BAKİYE HARCAMAZ (2026-10-10): `pdf_charged` sütunu "PDF
  * indirildi" anlamına gelir; `pdfReservationId` yalnız eski (ücretli) kayıtlar için dolu olur.
  */
 export async function markEfPdfCharged(tenantId: string, raporId: string, pdfReservationId: string | null): Promise<boolean> {

@@ -17,7 +17,7 @@ export type TokenContext = {
 const TOKEN_RE = /\{([a-z_]+)\}/g;
 
 /**
- * Paket başına aylık EmlakFiyati sorgu (kontör) hakkı: sayı KODA SABİTLENMEZ; plan tanımındaki `efCreditsMonthly` alanından
+ * Paket başına aylık EmlakFiyati sorgu (analiz bakiyesi) hakkı: sayı KODA SABİTLENMEZ; plan tanımındaki `efCreditsMonthly` alanından
  * gelir. Alan henüz yoksa veya hiçbir pakette >0 değilse null (değişkenli satır gizlenir).
  */
 export function efMonthlyAllowanceText(plans: readonly PlanDef[]): string | null {

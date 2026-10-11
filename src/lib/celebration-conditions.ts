@@ -23,7 +23,7 @@ export function isTargetReachedMoment(actual: number, target: number): boolean {
   return Number.isFinite(actual) && Number.isFinite(target) && target > 0 && actual >= target;
 }
 
-/** Kontör paketi satın alındı: son kontör faturası ödenmiş VE yeni (sunucuda hesaplanan `recent`). */
+/** Analiz paketi satın alındı: son analiz bakiyesi faturası ödenmiş VE yeni (sunucuda hesaplanan `recent`). */
 export function isCreditPurchaseMoment(invoice: { status: string } | null, recent: boolean): boolean {
   return invoice?.status === "paid" && recent;
 }

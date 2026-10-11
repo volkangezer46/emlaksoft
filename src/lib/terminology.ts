@@ -60,13 +60,14 @@ export const TERMS = {
   },
   hesapKredisi: {
     canonical: "Hesap kredisi",
-    definition: "Ofisin TL bakiyesi (davet ödülü, kampanya, iade); paket, ek kullanıcı ve kontör faturalarından düşer. Kontörle karıştırılmaz.",
+    definition: "Ofisin TL bakiyesi (davet ödülü, kampanya, iade); paket, ek kullanıcı ve analiz paketi faturalarından düşer. Analiz bakiyesiyle karıştırılmaz.",
     forbidden: [/kredi cüzdan/i, /hesap cüzdan/i],
   },
-  kontor: {
-    canonical: "Kontör bakiyesi",
-    definition: "EmlakFiyati değerleme ve PDF rapor işlemlerinde harcanan işlem hakkı; aylık hak ve ek paketlerle yüklenir.",
-    forbidden: [/kontör cüzdan/i],
+  analizBakiyesi: {
+    canonical: "Analiz bakiyesi",
+    definition: "EmlakFiyati değerleme analizlerinde harcanan TL bakiyesi (1 birim = 1 TL); aylık plan hakkı ve süreli analiz paketleriyle yüklenir. Eski ad kullanıcıya görünmez (iç ad ef_credit_* kalır).",
+    // "ef-kontor-*" cron/rota tanımlayıcıları ve ?sekme=kontor URL değeri iç addır; görünür metinde "kontör" geçmez.
+    forbidden: [/(?<!ef-|sekme=|#)kont[öo]r(?!-)/i],
   },
   davet: {
     canonical: "Davet et ve kazan",

@@ -15,7 +15,7 @@ export type KontorPackCard = {
   id: string;
   name: string;
   units: number;
-  /** Geçerlilik (ay): süre sonunda kullanılmayan kontör yanar. */
+  /** Geçerlilik (ay): süre sonunda kullanılmayan bakiye sona erer. */
   months: number;
   netTry: number;
   taxTry: number;
@@ -47,7 +47,7 @@ export function KontorPanel({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useCredit, setUseCredit] = useState(false);
-  const reason = !canBuy ? "Kontör paketini yalnızca ofis sahibi veya genel müdür satın alabilir." : blockReason;
+  const reason = !canBuy ? "Analiz paketini yalnızca ofis sahibi veya genel müdür satın alabilir." : blockReason;
 
   async function buy(p: KontorPackCard) {
     if (pending || reason) return;
@@ -102,24 +102,24 @@ export function KontorPanel({
               </div>
               <p className="mt-3 text-xs font-semibold text-text-muted">{p.name}</p>
               <p className="numeric font-display text-2xl font-extrabold text-text">
-                {fmt.format(p.units)} <span className="text-sm font-semibold text-text-faint">kontör</span>
+                {fmt.format(p.units)} TL <span className="text-sm font-semibold text-text-faint">analiz bakiyesi</span>
               </p>
               <p className="mt-1 text-xs font-semibold text-accent-text">
-                {p.months} ay geçerli · aylık ~{fmt.format(Math.round(p.units / p.months))} kontör
+                {p.months} ay geçerli · aylık ~{fmt.format(Math.round(p.units / p.months))} TL
               </p>
               <p className="numeric mt-1 text-sm font-bold text-text">
                 {tl(p.netTry)} <span className="text-xs font-semibold text-text-faint">+ KDV</span>
               </p>
               <p className="numeric text-xs text-text-muted">
-                KDV dahil {tl2(p.totalTry)} · kontör başı {tl2(p.unitNetTry)} (KDV hariç)
+                KDV dahil {tl2(p.totalTry)} · 1 TL bakiye başı {tl2(p.unitNetTry)} (KDV hariç)
               </p>
               {open ? (
                 <div className="mt-3 space-y-2 rounded-[var(--radius-control)] border border-line bg-surface p-3 text-xs">
                   <p className="font-semibold text-text">
-                    {fmt.format(p.units)} kontör için {tl2(p.totalTry)} (KDV dahil) ödeyeceksiniz.
+                    {fmt.format(p.units)} TL için {tl2(p.totalTry)} (KDV dahil) ödeyeceksiniz.
                   </p>
                   <p className="text-text-muted">
-                    Net {tl2(p.netTry)} + KDV {tl2(p.taxTry)}. Ödeme iyzico güvenli sayfasında alınır; ödeme onaylanınca kontör
+                    Net {tl2(p.netTry)} + KDV {tl2(p.taxTry)}. Ödeme iyzico güvenli sayfasında alınır; ödeme onaylanınca analiz bakiyesi
                     bakiyenize eklenir ve {p.months} ay sonra kullanılmayan kısmı yanar (devretmez).
                   </p>
                   <WalletCreditToggle

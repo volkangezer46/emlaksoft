@@ -18,7 +18,7 @@ const NOW = Date.parse("2026-10-15T09:00:00.000Z");
 const iso = (ms: number) => new Date(ms).toISOString();
 
 describe("rol kapısı", () => {
-  it("yalnız owner ve gm kontör yönetir/tüm raporları görür", () => {
+  it("yalnız owner ve gm analiz bakiyesi yönetir/tüm raporları görür", () => {
     expect(canManageEfCredits("owner")).toBe(true);
     expect(canManageEfCredits("gm")).toBe(true);
     for (const r of ["branch_manager", "advisor", "readonly", "", null, undefined]) expect(canManageEfCredits(r)).toBe(false);
@@ -123,10 +123,10 @@ describe("aylık hak sayacı", () => {
       available: 25,
       nowMs: NOW,
       rows: [
-        mv("2026-10-01T00:05:00.000Z", "Plan kontörü", 40),
+        mv("2026-10-01T00:05:00.000Z", "Plan analiz bakiyesi", 40),
         mv("2026-10-03T10:00:00.000Z", "Değerleme", -5),
         mv("2026-10-04T10:00:00.000Z", "PDF rapor", -2),
-        mv("2026-09-30T20:30:00.000Z", "Plan kontörü", 40), // TR 30 Eylül 23:30 -> geçen ay
+        mv("2026-09-30T20:30:00.000Z", "Plan analiz bakiyesi", 40), // TR 30 Eylül 23:30 -> geçen ay
         mv("2026-09-15T10:00:00.000Z", "Değerleme", -9),
         mv("2026-10-05T10:00:00.000Z", "Paket satın alma", 100),
       ],
@@ -139,7 +139,7 @@ describe("aylık hak sayacı", () => {
   it("bakiye bilinmiyorsa hak farkı gösterilir; satır yoksa sıfır", () => {
     expect(monthlyAllowanceView({ entitlement: 10, rows: [], available: null, nowMs: NOW }).remainingOfMonthly).toBe(0);
     expect(
-      monthlyAllowanceView({ entitlement: 10, rows: [mv("2026-10-02T10:00:00.000Z", "Plan kontörü", 10)], available: null, nowMs: NOW }).remainingOfMonthly,
+      monthlyAllowanceView({ entitlement: 10, rows: [mv("2026-10-02T10:00:00.000Z", "Plan analiz bakiyesi", 10)], available: null, nowMs: NOW }).remainingOfMonthly,
     ).toBe(10);
   });
 });

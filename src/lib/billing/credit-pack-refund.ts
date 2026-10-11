@@ -1,12 +1,12 @@
 /**
- * Kontör paketi (meta.kind = 'credit_pack') faturası iadesi: verilen EF kontörü geri alınır (clawback).
+ * Analiz paketi (meta.kind = 'credit_pack') faturası iadesi: verilen EF analiz bakiyesi geri alınır (clawback).
  * Saf yardımcılar; cüzdan çağrısı platform-billing.ts'te (ef_credit_reserve + commit, kalem `pack_refund`).
- * Kontör kullanılmışsa (bakiye yetmiyorsa) rezerv `insufficient` döner ve iade ENGELLENİR.
+ * Analiz bakiyesi kullanılmışsa (bakiye yetmiyorsa) rezerv `insufficient` döner ve iade ENGELLENİR.
  */
 
 export const EF_PACK_REFUND_ITEM = "pack_refund";
 
-/** İade oranına göre geri alınacak kontör (yukarı yuvarlanır; paket birimini aşmaz). */
+/** İade oranına göre geri alınacak analiz bakiyesi (yukarı yuvarlanır; paket birimini aşmaz). */
 export function efPackClawbackUnits(packUnits: number, refundTry: number, totalTry: number): number {
   if (!Number.isFinite(packUnits) || !Number.isFinite(refundTry) || !Number.isFinite(totalTry)) return 0;
   const units = Math.trunc(packUnits);

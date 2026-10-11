@@ -14,7 +14,7 @@ import {
   filterAndPage,
   type EfMovementCategory,
 } from "@/lib/ef-credits/credit-view";
-import { EF_WELCOME_VALID_DAYS, efEntryValuationUnits, efUnitsFor } from "@/lib/ef-credits/config";
+import { EF_WELCOME_VALID_DAYS, efEntryValuationUnits, efPackDisplayName, efUnitsFor } from "@/lib/ef-credits/config";
 import { DAY_MS, now, trNextMonthStartMs } from "@/lib/clock";
 import { monthlyAllowanceView } from "@/lib/ef-credits/visibility";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
@@ -53,7 +53,7 @@ const LOT_KIND_LABEL: Record<string, string> = {
   refund: "İade",
   legacy: "Önceki bakiye",
 };
-const lotKindLabel = (k: string) => LOT_KIND_LABEL[k] ?? "Kontör";
+const lotKindLabel = (k: string) => LOT_KIND_LABEL[k] ?? "Analiz bakiyesi";
 
 function hrefOf(params: Record<string, string | undefined>, hash = "gecmis"): string {
   const sp = new URLSearchParams({ sekme: "kontor" });
@@ -70,11 +70,11 @@ export type KontorSectionProps = {
   sayfa?: string;
   /** "Önerilen paketi tek tıkla al": önerilen paketin onay paneli açık gelir. */
   onerilen?: boolean;
-  /** Ödeme sonrası dönüş durumu (son kontör faturası). */
+  /** Ödeme sonrası dönüş durumu (son analiz bakiyesi faturası). */
   latestInvoice: { status: string; paidAt: string | null; units: number | null } | null;
-  /** Son kontör faturasının ödemesi yeni mi (sunucuda clock ile hesaplanır). */
+  /** Son analiz bakiyesi faturasının ödemesi yeni mi (sunucuda clock ile hesaplanır). */
   invoiceIsRecent: boolean;
-  /** Planın otomatik aylık kontör hakkı (ek kullanıcı hakkı dahil); units 0 = pakette aylık hak yok. */
+  /** Planın otomatik aylık analiz bakiyesi hakkı (ek kullanıcı hakkı dahil); units 0 = pakette aylık hak yok. */
   allowance?: { planName: string; units: number; perExtraSeat: number; extraSeats: number };
   /** TL hesap kredisi cüzdanı (null: etkin değil → "kredimi kullan" kutusu gösterilmez). */
   wallet?: WalletCheckoutInfo | null;
@@ -95,7 +95,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
     const q = quoteCreditPack(p);
     return {
       id: p.id,
-      name: p.name,
+      name: efPackDisplayName(p),
       units: p.units,
       months: p.months,
       netTry: q.netTry,
@@ -110,9 +110,9 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
   const blockReason = !efState.purchasable
     ? `${EF_PURCHASE_CLOSED_MESSAGE} Paketleri şimdiden inceleyebilirsiniz.`
     : !ready
-      ? "Kontör satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor. Paketleri şimdiden inceleyebilirsiniz."
+      ? "Analiz bakiyesi satın alma henüz etkin değil: yönetici hazırlığı tamamlanıyor. Paketleri şimdiden inceleyebilirsiniz."
       : !lotsReady
-      ? "Süreli kontör paketleri hazırlanıyor; satın alma kısa süre içinde açılır. Paketleri şimdiden inceleyebilirsiniz."
+      ? "Süreli analiz paketleri hazırlanıyor; satın alma kısa süre içinde açılır. Paketleri şimdiden inceleyebilirsiniz."
       : !iyzicoConfigured
       ? "Ödeme altyapısı yapılandırılmamış; lütfen yönetici ile iletişime geçin."
       : null;
@@ -127,7 +127,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
   const nowMs = now();
   const liveLots = (balance?.lots ?? []).filter((l) => Date.parse(l.expiresAt) > nowMs);
   const expiredTotal = balance?.expired_total ?? 0;
-  // Yakında yanacak kontör (7 gün): ofis sahibi/GM fark etsin diye uyarı bandı (sıfır çıkmaz: partiler listesine bağlanır).
+  // Yakında yanacak analiz bakiyesi (7 gün): ofis sahibi/GM fark etsin diye uyarı bandı (sıfır çıkmaz: partiler listesine bağlanır).
   const nextExpiryMs = balance?.next_expiry_at ? Date.parse(balance.next_expiry_at) : Number.NaN;
   const expiringSoon =
     Number.isFinite(nextExpiryMs) && nextExpiryMs - nowMs <= 7 * DAY_MS && (balance?.next_expiry_units ?? 0) > 0
@@ -163,26 +163,26 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
     <div className="space-y-6">
       {isCreditPurchaseMoment(latestInvoice, invoiceIsRecent) ? (
         <div className="relative flex justify-center">
-          <Celebration tick label="Kontör paketi satın alındı" />
+          <Celebration tick label="Analiz paketi satın alındı" />
         </div>
       ) : null}
 
       {latestInvoice && invoiceIsRecent ? (
         latestInvoice.status === "paid" ? (
-          <Alert tone="success" title="Kontör paketi ödemeniz alındı">
-            {latestInvoice.units ? `${fmt.format(latestInvoice.units)} kontör ` : "Kontör "}
+          <Alert tone="success" title="Analiz paketi ödemeniz alındı">
+            {latestInvoice.units ? `${fmt.format(latestInvoice.units)} TL ` : "Analiz bakiyesi "}
             bakiyenize eklenir; birkaç saniye içinde görünmezse sayfayı yenileyin.
           </Alert>
         ) : latestInvoice.status === "draft" || latestInvoice.status === "open" ? (
-          <Alert tone="info" title="Kontör paketi ödemesi tamamlanmadı">
-            Ödeme onaylanmadıysa kontör eklenmez; dilerseniz aşağıdan yeniden deneyebilirsiniz.
+          <Alert tone="info" title="Analiz paketi ödemesi tamamlanmadı">
+            Ödeme onaylanmadıysa analiz bakiyesi eklenmez; dilerseniz aşağıdan yeniden deneyebilirsiniz.
           </Alert>
         ) : null
       ) : null}
 
       {!ready ? (
-        <Alert tone="info" title="Kontör bakiyesi henüz etkin değil">
-          Kontör bakiyesi, satın alma ve kullanım geçmişi yönetici hazırlığı tamamlanınca açılır. Tarife ve paketleri şimdiden
+        <Alert tone="info" title="Analiz bakiyesi henüz etkin değil">
+          Analiz bakiyesi, satın alma ve kullanım geçmişi yönetici hazırlığı tamamlanınca açılır. Tarife ve paketleri şimdiden
           inceleyebilirsiniz.
         </Alert>
       ) : null}
@@ -190,43 +190,43 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
       {expiringSoon ? (
         <Alert
           tone="warning"
-          title="Kontörünüzün bir kısmı yakında yanacak"
+          title="Analiz bakiyenizin bir kısmı yakında yanacak"
           action={
             <Link href={`${BASE}?sekme=kontor#bakiye`} className="text-xs font-bold underline">
               Partileri gör
             </Link>
           }
         >
-          {fmt.format(expiringSoon.units)} kontör {dt.format(expiringSoon.atMs)} tarihinde sona erer; kullanılmazsa yanar ve devretmez.
+          {fmt.format(expiringSoon.units)} TL {dt.format(expiringSoon.atMs)} tarihinde sona erer; kullanılmazsa yanar ve devretmez.
         </Alert>
       ) : null}
 
       {low && low.state !== "ok" ? (
         <Alert
           tone={low.state === "empty" ? "danger" : "warning"}
-          title={low.state === "empty" ? "Kontörünüz bitti" : "Kontörünüz azalıyor"}
+          title={low.state === "empty" ? "Analiz bakiyeniz bitti" : "Analiz bakiyeniz azalıyor"}
           action={
             suggested && sellable.length > 0 ? (
               <Link href={canOneClick ? oneClickHref : `${BASE}?sekme=kontor#paketler`} className="text-xs font-bold underline">
-                {canOneClick ? `Önerilen paketi al: ${suggested.name}` : `Önerilen paket: ${suggested.name}`}
+                {canOneClick ? `Önerilen paketi al: ${efPackDisplayName(suggested)}` : `Önerilen paket: ${efPackDisplayName(suggested)}`}
               </Link>
             ) : undefined
           }
         >
           {low.state === "empty"
-            ? "Değerleme için kontör gerekir."
-            : `Kalan ${fmt.format(balance!.available)} kontör, en ucuz işlemin iki katı (${fmt.format(low.threshold)}) ve altında.`}
+            ? "Değerleme için analiz bakiyesi gerekir."
+            : `Kalan ${fmt.format(balance!.available)} TL, en ucuz işlemin iki katı (${fmt.format(low.threshold)}) ve altında.`}
         </Alert>
       ) : null}
 
       <section id="bakiye" className="rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-3)]">
-        <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Coins className="h-4 w-4" /> EmlakFiyati kontörü</p>
-        <h2 className="mt-1 font-display font-bold text-text">Kontör bakiyeniz</h2>
+        <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Coins className="h-4 w-4" /> EmlakFiyati analiz bakiyesi</p>
+        <h2 className="mt-1 font-display font-bold text-text">Analiz bakiyeniz</h2>
         {balance ? (
           <div className="mt-4 space-y-5">
             <div className="grid gap-6 lg:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] lg:items-center">
               <Link href={hrefOf({})} className="focus-ring block rounded-[var(--radius-control)] p-2 hover:bg-surface-hover">
-                <p className="text-xs font-semibold text-text-muted">Kullanılabilir kontör</p>
+                <p className="text-xs font-semibold text-text-muted">Kullanılabilir analiz bakiyesi</p>
                 <p className="numeric font-display text-4xl font-extrabold text-text">{fmt.format(balance.available)}</p>
                 <p className="mt-1 text-xs text-text-muted">
                   Defter bakiyesi (yüklenen − harcanan − süresi dolan): <span className="numeric font-semibold">{fmt.format(balance.granted_total - balance.committed_total - expiredTotal)}</span>
@@ -234,8 +234,8 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
               </Link>
               {stacked ? (
                 <StackedBalance
-                  ariaLabel="Kontör dağılımı"
-                  note="Çubuk: kullanılabilir, işlemde (rezerve) ve bugüne dek harcanan kontörün payları."
+                  ariaLabel="Analiz bakiyesi dağılımı"
+                  note="Çubuk: kullanılabilir, işlemde (rezerve) ve bugüne dek harcanan analiz bakiyesinin payları."
                   items={stacked.segments.map((seg) => ({
                     key: seg.key,
                     pct: seg.pct,
@@ -246,7 +246,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   }))}
                 />
               ) : (
-                <p className="text-sm text-text-muted">Henüz kontör hareketi yok: ilk yükleme veya değerlemeden sonra dağılım burada görünür.</p>
+                <p className="text-sm text-text-muted">Henüz bakiye hareketi yok: ilk yükleme veya değerlemeden sonra dağılım burada görünür.</p>
               )}
             </div>
 
@@ -259,11 +259,11 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <div className="mt-2">
                   <div className="relative">
                     <AreaChart
-                      series={[{ name: "Bakiye (kontör)", values: series.values }]}
+                      series={[{ name: "Analiz bakiyesi (TL)", values: series.values }]}
                       pointLabels={series.atMs.map((t) => shortDay.format(t))}
                       height={176}
                       format="number"
-                      ariaLabel={`Bakiye geçmişi: ${fmt.format(series.values[0]!)} kontörden ${fmt.format(series.values[series.values.length - 1]!)} kontöre`}
+                      ariaLabel={`Bakiye geçmişi: ${fmt.format(series.values[0]!)} TL ile ${fmt.format(series.values[series.values.length - 1]!)} TL arası`}
                     />
                     {thresholdTop !== null ? (
                       <div className="pointer-events-none absolute inset-x-0 top-0" style={{ height: 176 }} aria-hidden="true">
@@ -277,7 +277,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   {forecast ? (
                     <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-text-muted">
                       <span className="rounded-full bg-warning-soft px-2 py-0.5 font-bold text-warning-strong">TAHMİN</span>
-                      Son 60 günlük kullanım hızıyla (günde yaklaşık {fmt.format(Math.max(1, Math.round(forecast.burnPerDay)))} kontör) bakiye yaklaşık{" "}
+                      Son 60 günlük kullanım hızıyla (günde yaklaşık {fmt.format(Math.max(1, Math.round(forecast.burnPerDay)))} TL) bakiye yaklaşık{" "}
                       {renewalFmt.format(forecast.dateMs)} tarihinde biter. Kesin değildir; kullanım değişirse kayar.
                     </p>
                   ) : (
@@ -290,18 +290,18 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             </div>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Kontör bakiyesi etkinleşince bakiyeniz burada görünür."}</p>
+          <p className="mt-3 text-sm text-text-muted">{ready ? "Bakiye şu an okunamadı; sayfayı yenileyin." : "Analiz bakiyesi etkinleşince bakiyeniz burada görünür."}</p>
         )}
         {balance && balance.lots ? (
           <div className="mt-5 rounded-[var(--radius-control)] bg-[var(--surface-sunken)] p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h3 className="text-sm font-semibold text-text">Kontör partileri ve son kullanma</h3>
+              <h3 className="text-sm font-semibold text-text">Analiz bakiyesi partileri ve son kullanma</h3>
               <Link href={hrefOf({ kalem: "sona-erme" })} className="text-xs font-semibold text-accent-text hover:underline">
-                Süresi dolan kontör: {fmt.format(expiredTotal)}
+                Süresi dolan analiz bakiyesi: {fmt.format(expiredTotal)}
               </Link>
             </div>
             {liveLots.length === 0 ? (
-              <p className="mt-2 text-sm text-text-muted">Süresi dolmamış kontör partisi yok. Kontör paketleri süreli satılır; süre sonunda kullanılmayan kontör yanar.</p>
+              <p className="mt-2 text-sm text-text-muted">Süresi dolmamış analiz bakiyesi partisi yok. Analiz paketleri süreli satılır; süre sonunda kullanılmayan bakiye sona erer.</p>
             ) : (
               <ul className="mt-2 divide-y divide-line text-sm">
                 {liveLots.map((l) => (
@@ -309,7 +309,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                     <Link href={hrefOf({ kalem: "satin-alma" })} className="focus-ring flex flex-wrap items-center justify-between gap-2 py-2 hover:text-accent-text">
                       <span className="font-semibold text-text">{lotKindLabel(l.kind)}</span>
                       <span className="numeric text-text-muted">
-                        {fmt.format(l.remaining)} / {fmt.format(l.units)} kontör · {dt.format(Date.parse(l.expiresAt))} tarihine kadar
+                        {fmt.format(l.remaining)} / {fmt.format(l.units)} TL · {dt.format(Date.parse(l.expiresAt))} tarihine kadar
                       </span>
                     </Link>
                   </li>
@@ -317,7 +317,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
               </ul>
             )}
             <p className="mt-2 text-xs text-text-muted">
-              Harcama önce en yakın tarihte sona erecek partiden düşer. Hoş geldin kontörü {EF_WELCOME_VALID_DAYS} gün, aylık plan hakkı ay sonuna kadar,
+              Harcama önce en yakın tarihte sona erecek partiden düşer. Hoş geldin analiz bakiyesi {EF_WELCOME_VALID_DAYS} gün, aylık plan hakkı ay sonuna kadar,
               satın alınan paket seçtiğiniz süre kadar geçerlidir.
             </p>
           </div>
@@ -335,21 +335,21 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   size={88}
                   stroke={9}
                   tone="success"
-                  ariaLabel="Aylık haktan kalan kontör"
+                  ariaLabel="Aylık haktan kalan analiz bakiyesi"
                 >
                   <span className="numeric font-display text-base font-extrabold text-text">{fmt.format(monthly.remainingOfMonthly)}</span>
                 </RadialGauge>
               ) : null}
               <div className="min-w-0 flex-1 basis-60">
-                <p className="text-xs font-semibold text-success-strong">{allowance.planName} paketinin aylık kontör hakkı</p>
+                <p className="text-xs font-semibold text-success-strong">{allowance.planName} paketinin aylık analiz bakiyesi hakkı</p>
                 <p className="numeric font-display text-xl font-extrabold text-text [text-wrap:balance]">
-                  Her ay {fmt.format(allowance.units)} kontör
+                  Her ay {fmt.format(allowance.units)} TL
                   {efEntryValuationUnits(tariff) > 0 ? ` (yaklaşık ${fmt.format(Math.floor(allowance.units / efEntryValuationUnits(tariff)))} değerleme)` : ""}
                 </p>
                 <p className="mt-1 text-xs text-text-muted">
-                  Otomatik yüklenir; o ayın sonunda kullanılmayan kontör yanar, sonraki aya devretmez.
+                  Otomatik yüklenir; o ayın sonunda kullanılmayan bakiye sona erer, sonraki aya devretmez.
                   {allowance.perExtraSeat > 0
-                    ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} kontör artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
+                    ? ` Hak, her ek kullanıcı için ${fmt.format(allowance.perExtraSeat)} TL artar (şu an ${fmt.format(allowance.extraSeats)} ek kullanıcı).`
                     : ""}
                   {" "}Yetmezse aşağıdan ek paket alabilirsiniz.
                 </p>
@@ -358,7 +358,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             {monthly ? (
               <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
                 <div>
-                  <dt className="font-semibold text-text-muted">Bu ay verilen plan kontörü</dt>
+                  <dt className="font-semibold text-text-muted">Bu ay verilen plan analiz bakiyesi</dt>
                   <dd className="numeric font-display text-base font-extrabold text-text">
                     {fmt.format(monthly.grantedThisMonth)} / {fmt.format(monthly.entitlement)}
                   </dd>
@@ -388,7 +388,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 href={oneClickHref}
                 className="focus-ring press inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white touch:min-h-11"
               >
-                <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name} ({fmt.format(suggested.units)} kontör)
+                <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {efPackDisplayName(suggested)} ({fmt.format(suggested.units)} TL)
               </Link>
             ) : (
               <>
@@ -397,7 +397,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                   disabled
                   className="inline-flex min-h-9 cursor-not-allowed items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white opacity-50 touch:min-h-11"
                 >
-                  <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {suggested.name}
+                  <Coins className="h-4 w-4" aria-hidden="true" /> Önerilen paketi tek tıkla al: {efPackDisplayName(suggested)}
                 </button>
                 {blockReason ? <p className="mt-1.5 text-xs text-text-muted">{blockReason}</p> : null}
               </>
@@ -408,7 +408,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
 
       <section className="rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
         <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Info className="h-4 w-4" /> Tarife</p>
-        <h2 className="mt-1 font-display font-bold text-text">Hangi işlem kaç kontör?</h2>
+        <h2 className="mt-1 font-display font-bold text-text">Hangi işlem kaç TL?</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           {tariffItems.map((t) => (
             <Link
@@ -421,26 +421,26 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                 <ArrowUpRight className="h-4 w-4 text-text-faint transition group-hover:text-accent-text" />
               </div>
               <p className="numeric mt-1 font-display text-xl font-extrabold text-text">
-                {t.units > 0 ? `${fmt.format(t.units)} kontör` : "Ücretsiz"}
+                {t.units > 0 ? `${fmt.format(t.units)} TL` : "Ücretsiz"}
               </p>
             </Link>
           ))}
         </div>
         <p className="mt-3 text-xs text-text-muted">
-          Kontör yalnız değerleme için harcanır; PDF indirme, rapor detayı ve ilan analizi kontör düşmez. Sonuç üretilemezse (yetersiz veri
-          veya hata) kontör düşmez. Değerler ilan fiyatlarına dayanır; kesin satış değeri değildir.
+          Analiz bakiyesi yalnız değerleme için harcanır; PDF indirme, rapor detayı ve ilan analizi bakiye düşmez. Sonuç üretilemezse (yetersiz veri
+          veya hata) TL düşmez. Değerler ilan fiyatlarına dayanır; kesin satış değeri değildir.
         </p>
       </section>
 
       <section id="paketler" className="scroll-mt-24 rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
         <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Coins className="h-4 w-4" /> Paketler</p>
-        <h2 className="mt-1 font-display font-bold text-text">Kontör paketi satın alın</h2>
+        <h2 className="mt-1 font-display font-bold text-text">Analiz paketi satın alın</h2>
         <div className="mt-4">
           {cards.length === 0 ? (
             <EmptyState
               variant="full"
               icon={Coins}
-              title="Şu an satışta kontör paketi yok"
+              title="Şu an satışta analiz paketi yok"
               description="Paketler yönetici tarafından tanımlandığında burada listelenir. Gerekirse destek ekibimize yazın."
               action={{ href: "/app/destek", label: "Destek talebi aç" }}
             />
@@ -448,14 +448,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} wallet={props.wallet ?? null} autoOpenId={props.onerilen ? (suggested?.id ?? null) : null} />
           )}
         </div>
-        <p className="mt-3 text-xs text-text-muted">Kupon kodları kontör paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>
+        <p className="mt-3 text-xs text-text-muted">Kupon kodları analiz paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>
       </section>
 
       <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><History className="h-4 w-4" /> Geçmiş</p>
-            <h2 className="mt-1 font-display font-bold text-text">Kontör kullanım geçmişi</h2>
+            <h2 className="mt-1 font-display font-bold text-text">Analiz bakiyesi kullanım geçmişi</h2>
           </div>
           <nav aria-label="Kalem süzgeci" className="flex flex-wrap gap-1.5">
             {([null, "degerleme", "satin-alma", "sona-erme", "iade"] as const).map((k) => (
@@ -472,7 +472,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         </div>
         {!history ? (
           <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
-            Kullanım geçmişi, kontör bakiyesi etkinleşince burada listelenir.
+            Kullanım geçmişi, analiz bakiyesi etkinleşince burada listelenir.
           </p>
         ) : !history.enabled ? (
           <p className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-6 text-center text-sm text-text-muted">
@@ -487,14 +487,14 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                     <TH>Tarih</TH>
                     <TH>Kalem</TH>
                     <TH>Kullanıcı</TH>
-                    <TH align="right">Kontör</TH>
+                    <TH align="right">Analiz bakiyesi</TH>
                     <TH align="right">Bakiye</TH>
                   </TR>
                 </THead>
                 <TBody>
                   {page!.rows.length === 0 ? (
                     <TableEmptyRow colSpan={5}>
-                      {category || props.kullanici ? "Bu süzgece uyan hareket yok." : "Henüz kontör hareketi yok: ilk değerlemenizden veya paket alımından sonra burada listelenir."}
+                      {category || props.kullanici ? "Bu süzgece uyan hareket yok." : "Henüz bakiye hareketi yok: ilk değerlemenizden veya paket alımından sonra burada listelenir."}
                     </TableEmptyRow>
                   ) : (
                     page!.rows.map((r) => (
@@ -514,7 +514,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
                             "Sistem"
                           )}
                         </TD>
-                        <TD align="right" label="Kontör" className={`numeric font-bold ${r.units < 0 ? "text-text" : "text-success-strong"}`}>
+                        <TD align="right" label="Analiz bakiyesi" className={`numeric font-bold ${r.units < 0 ? "text-text" : "text-success-strong"}`}>
                           {r.units > 0 ? "+" : ""}
                           {fmt.format(r.units)}
                         </TD>

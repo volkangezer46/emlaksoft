@@ -90,21 +90,21 @@ export default async function FiyatlarPage() {
       </Section>
       <Section
         id="kontor"
-        title="EmlakFiyati kontörü"
+        title="EmlakFiyati analiz bakiyesi"
         lead={
           efLive
-            ? "Kontör yalnız ada/parsel değerleme için harcanır (PDF, rapor detayı ve ilan analizi kontörsüzdür). Paketinizdeki aylık kontör her ay yüklenir ve ay sonunda yanar; yetmezse süreli ek paket alırsınız."
-            : "Değerleme henüz herkese açık değil; aşağıdaki kontör hakları planlanan değerlerdir ve değerleme açılınca geçerli olur."
+            ? "Analiz bakiyesi yalnız ada/parsel değerleme için harcanır (PDF, rapor detayı ve ilan analizi bakiye harcamaz). Paketinizdeki aylık analiz bakiyesi her ay yüklenir ve ay sonunda yanar; yetmezse süreli ek paket alırsınız."
+            : "Değerleme henüz herkese açık değil; aşağıdaki analiz bakiyesi hakları planlanan değerlerdir ve değerleme açılınca geçerli olur."
         }
       >
         <EfPlanCreditsTable plans={plans} tariff={efCatalog.tariff} live={efLive} />
-        <p className="mt-2 text-xs text-text-muted">Aylık kontör o ayın sonunda yanar, devretmez. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
+        <p className="mt-2 text-xs text-text-muted">Aylık analiz bakiyesi o ayın sonunda yanar, devretmez. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
         <div className="mt-6">
           <EfPackTiersTable packs={efCatalog.packs} tariff={efCatalog.tariff} live={efLive} />
-          <p className="mt-2 text-xs text-text-muted">Ek paketler 1, 3, 6 ve 12 aylık satılır; süre sonunda kullanılmayan kontör yanar. Tutarlar KDV hariçtir.</p>
+          <p className="mt-2 text-xs text-text-muted">Ek paketler 1, 3, 6 ve 12 aylık satılır; süre sonunda kullanılmayan bakiye sona erer. Tutarlar KDV hariçtir.</p>
           {efLive ? (
             <p className="mt-2 text-sm">
-              <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">Ofis panelinde kontör satın al</Link>
+              <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">Ofis panelinde analiz bakiyesi satın al</Link>
               <span className="text-text-muted"> · Hesabınız yoksa önce <Link href="/kayit" className="font-semibold text-brand-700 hover:underline">denemeyi başlatın</Link>.</span>
             </p>
           ) : null}

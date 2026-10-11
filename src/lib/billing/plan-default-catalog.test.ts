@@ -97,7 +97,7 @@ describe("plans.ts ham varsayılanı onaylı katalogla aynı (tek kaynak kaymas�
     }
   });
 
-  it("önerilen aylık kontör hakkı (1 kontör = 1 TL): Danışman 100, Ofis 700, Profesyonel 2.100, Business 3.500, Kurumsal 7.000 (+ ek kullanıcı başına 50)", () => {
+  it("önerilen aylık analiz bakiyesi hakkı (1 birim = 1 TL): Danışman 100, Ofis 700, Profesyonel 2.100, Business 3.500, Kurumsal 7.000 (+ ek kullanıcı başına 50)", () => {
     const got = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsMonthly ?? null]));
     expect(got).toEqual({ advisor: 100, office: 700, professional: 2100, business: 3500, enterprise: 7000 });
     const seat = Object.fromEntries(raw.map((p) => [p.id, p.efCreditsPerExtraSeat ?? null]));

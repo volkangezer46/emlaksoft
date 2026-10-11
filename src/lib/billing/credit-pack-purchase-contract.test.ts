@@ -28,7 +28,7 @@ vi.mock("@/lib/ef-credits/credit-reader", () => ({
   getEfCatalog: async () => ({ tariff: {}, packs: packs.list }),
 }));
 vi.mock("@/lib/ef-credits/public-state", () => ({
-  EF_PURCHASE_CLOSED_MESSAGE: "Kontör satın alma, EmlakFiyati değerleme etkinleşince açılır.",
+  EF_PURCHASE_CLOSED_MESSAGE: "Analiz bakiyesi satın alma, EmlakFiyati değerleme etkinleşince açılır.",
   getEfPublicState: async () => ({ state: efState.purchasable ? "live" : "soon", live: efState.purchasable, purchasable: efState.purchasable }),
 }));
 vi.mock("@/lib/billing/credit-pack-purchase", () => ({ createCreditPackInvoice: createInvoice }));
@@ -102,7 +102,7 @@ describe("startCreditPackPurchase kapıları", () => {
   });
   it("EmlakFiyati live değilken (anahtar/bayrak/taze yoklama) para alınmaz: iyzico ve fatura çağrılmaz", async () => {
     efState.purchasable = false;
-    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toBe("Kontör satın alma, EmlakFiyati değerleme etkinleşince açılır.");
+    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toBe("Analiz bakiyesi satın alma, EmlakFiyati değerleme etkinleşince açılır.");
     expect(createInvoice).not.toHaveBeenCalled();
     expect(initCheckout).not.toHaveBeenCalled();
   });
@@ -114,7 +114,7 @@ describe("startCreditPackPurchase kapıları", () => {
   });
   it("süreli parti şeması hazır değilken (ef_credit_lots_ready) para tahsil yolu AÇILMAZ", async () => {
     ready.lots = false;
-    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/Süreli kontör paketleri hazırlanıyor/);
+    expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/Süreli analiz paketleri hazırlanıyor/);
     expect(createInvoice).not.toHaveBeenCalled();
     expect(initCheckout).not.toHaveBeenCalled();
   });
@@ -123,7 +123,7 @@ describe("startCreditPackPurchase kapıları", () => {
     expect((await startCreditPackPurchase(fd({ pack_id: "mini" }))).error).toMatch(/yapılandırılmamış/);
     expect(createInvoice).not.toHaveBeenCalled();
   });
-  it("kupon kontör paketine uygulanmaz", async () => {
+  it("kupon analiz paketine uygulanmaz", async () => {
     expect((await startCreditPackPurchase(fd({ pack_id: "mini", coupon: "ABC" }))).error).toMatch(/Kupon/);
     expect(createInvoice).not.toHaveBeenCalled();
   });
@@ -133,7 +133,7 @@ describe("startCreditPackPurchase kapıları", () => {
     expect((await startCreditPackPurchase(fd({ pack_id: "../x" }))).error).toMatch(/Geçersiz/);
     expect(createInvoice).not.toHaveBeenCalled();
   });
-  it("istemci tutarı/kontörü YOK SAYILIR: fatura katalogdaki paketle açılır", async () => {
+  it("istemci tutarı/analiz bakiyesi YOK SAYILIR: fatura katalogdaki paketle açılır", async () => {
     const r = await startCreditPackPurchase(fd({ pack_id: "mini", units: "9999", amount: "1", price: "1", priceNetTry: "1" }));
     expect(r.checkoutUrl).toBe("https://pay.example/x");
     const arg = createInvoice.mock.calls[0]![0] as { pack: { id: string; units: number; priceNetTry: number } };
@@ -148,7 +148,7 @@ describe("startCreditPackPurchase kapıları", () => {
   });
 });
 
-describe("kontör satın alma kaynak sözleşmesi", () => {
+describe("analiz bakiyesi satın alma kaynak sözleşmesi", () => {
   const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
   const billing = read("src/app/actions/billing.ts");
   const body = billing.slice(billing.indexOf("export async function startCreditPackPurchase"));

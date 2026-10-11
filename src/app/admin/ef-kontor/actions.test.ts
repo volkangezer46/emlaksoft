@@ -41,7 +41,7 @@ function fd(o: Record<string, string>) {
 const goodPacks = JSON.stringify([{ id: "mini", name: "Mini", units: 10, priceNetTry: 175, active: true, order: 10 }]);
 const grantForm = { tenantId: T, units: "10", kind: "admin", reason: "Müşteri telafisi için manuel yükleme", idemKey: "11111111-2222-3333-4444-555555555555" };
 
-describe("admin kontör action'ları", () => {
+describe("admin analiz bakiyesi action'ları", () => {
   beforeEach(() => {
     store.clear();
     audit.mockClear();
@@ -69,7 +69,7 @@ describe("admin kontör action'ları", () => {
     expect((await saveEfTariff(fd({ valuationArsa: "-1", valuationKonut: "5" }))).error).toBeTruthy();
     expect((await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "x" }))).error).toBeTruthy();
     expect(store.size).toBe(0);
-    // Eski formdan gelen pdfFirst/reportDetail/listingAnalysis alanları YAZILMAZ (kontör yalnız değerleme için).
+    // Eski formdan gelen pdfFirst/reportDetail/listingAnalysis alanları YAZILMAZ (analiz bakiyesi yalnız değerleme için).
     const r = await saveEfTariff(fd({ valuationArsa: "5", valuationKonut: "6", valuationTicari: "9", pdfFirst: "2", reportDetail: "1", listingAnalysis: "1" }));
     expect(r.ok).toBe(true);
     const saved = JSON.parse(store.get(EF_TARIFF_SETTING_KEY)!);

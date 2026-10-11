@@ -39,7 +39,7 @@ export default async function ParselReportPage({ params }: { params: Promise<{ r
           ]}
         />
         <section role="status" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 text-sm text-text-muted shadow-[var(--shadow-xs)]">
-          <p>Aynı parsel için yeni bir değerleme yapabilirsiniz; değerleme tarifesine göre kontör düşer.</p>
+          <p>Aynı parsel için yeni bir değerleme yapabilirsiniz; değerleme tarifesine göre bakiye düşer.</p>
           <Link href="/app/degerleme/parsel#gecmis-raporlar" className="focus-ring mt-4 inline-block font-semibold text-brand-600 hover:underline">
             ← Rapor arşivine dön
           </Link>
@@ -77,7 +77,7 @@ export default async function ParselReportPage({ params }: { params: Promise<{ r
               className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-xs font-semibold text-white"
             >
               <FileDown className="h-3.5 w-3.5" aria-hidden="true" /> PDF indir
-              {" "}(kontör düşmez)
+              {" "}(bakiye düşmez)
             </a>
           ) : null}
         </div>

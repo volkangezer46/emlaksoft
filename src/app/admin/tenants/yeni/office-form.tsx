@@ -451,7 +451,7 @@ function OfficeFormInner({
                         <span className="flex items-start gap-1.5 text-xs text-text-muted">
                           <Check className="mt-0.5 size-3.5 shrink-0 text-brand-600" aria-hidden="true" />
                           <span className="min-w-0">
-                            Aylık <span className="numeric font-semibold text-ink-950">{nf.format(p.efCreditsMonthly)}</span> EmlakFiyatı kontörü
+                            Aylık <span className="numeric font-semibold text-ink-950">{nf.format(p.efCreditsMonthly)}</span> EmlakFiyatı analiz bakiyesi
                           </span>
                         </span>
                       ) : null}

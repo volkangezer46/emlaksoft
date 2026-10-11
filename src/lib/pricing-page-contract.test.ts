@@ -77,15 +77,15 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
     expect(read("src/components/pricing.tsx")).toContain("KDV hariç");
   });
 
-  it("EmlakFiyati kontör satırı: canlı değilse (planlanan), canlıysa etiketsiz; sayı plan kataloğundan", () => {
+  it("EmlakFiyati analiz bakiyesi satırı: canlı değilse (planlanan), canlıysa etiketsiz; sayı plan kataloğundan", () => {
     const plans = PLANS.map((p, i) => ({ ...p, efCreditsMonthly: 10 * (i + 1) }));
     const rowOf = (efLive: boolean) =>
-      buildComparison(plans, { efValuationCost: 5, efLive }).flatMap((g) => g.rows).find((r) => r.label.startsWith("Aylık EmlakFiyati kontörü"))!;
+      buildComparison(plans, { efValuationCost: 5, efLive }).flatMap((g) => g.rows).find((r) => r.label.startsWith("Aylık EmlakFiyati analiz bakiyesi"))!;
     const soon = rowOf(false);
     expect(soon.label).toContain("(planlanan)");
     expect(soon.cells[0]!.text).toContain("10");
     const live = rowOf(true);
-    expect(live.label).toBe("Aylık EmlakFiyati kontörü");
+    expect(live.label).toBe("Aylık EmlakFiyati analiz bakiyesi");
     expect(live.label).not.toContain("planlanan");
     // varsayılan (durum verilmedi) dürüst tarafta kalır: planlanan
     expect(buildComparison(plans).flatMap((g) => g.rows).some((r) => r.label.includes("(planlanan)"))).toBe(true);
