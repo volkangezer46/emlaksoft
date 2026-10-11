@@ -89,7 +89,7 @@ describe("skor/risk modelleri yalnız customer-state içinden çağrılır", () 
 
   it("eski dağınık dosyalar geri gelmez", () => {
     const libs = readdirSync(join(ROOT, "lib"));
-    for (const gone of ["lead-score.ts", "customer-heat.ts", "churn-risk.ts", "seller-prediction.ts", "deal-score.ts"]) {
+    for (const gone of ["lead-score.ts", "customer-heat.ts", "churn-risk.ts", "seller-prediction.ts", "deal-score.ts", "lost-sale-detector.ts"]) {
       expect(libs).not.toContain(gone);
     }
   });

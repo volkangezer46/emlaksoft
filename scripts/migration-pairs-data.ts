@@ -253,6 +253,9 @@ const F = {
   homeSnapshotRpc: "20261011000200_home_snapshot_rpc.sql",
   // Once goster sonra tazele: cekirdek tablolar supabase_realtime yayinina (ekip degisikligi acik sayfayi tazeler).
   realtimeCoreTables: "20261011000800_realtime_publication_core_tables.sql",
+  // Komisyon taraf kimligi (profile_id) + serbest metin esleme + commission_splits esitleme; kasa maas bakiye gizliligi + iptal audit.
+  commissionSplitProfile: "20261011001000_commission_split_profile.sql",
+  financeSalaryPrivacy: "20261011001100_finance_salary_privacy_void_audit.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
@@ -405,6 +408,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.recurringRules]: "ek", // yeni recurring_rules/recurring_occurrences tablolari (RLS: kisisel kural yalniz sahibine, maas kurali yalniz owner/gm) + recurring_* RPC; mevcut tablo/davranis degismez (kurala cevir yalniz expenses.recurrence'i bosaltir, kullanici eylemiyle)
     [F.poolDefaultOn]: "davranis", // tenants.listing_pool_enabled sutun varsayilani true (yalniz YENI ofisler; mevcut satirlar degismez) + havuz kaynak CHECK genisler
     [F.realtimeCoreTables]: "ek", // yalniz yayina tablo ekler; tablo/politika/veri degismez
+    [F.commissionSplitProfile]: "davranis", // commission_splits'e 2 sutun + commissions.splits yazimini normallestiren BEFORE/AFTER tetikleyici; mevcut paylasim kayitlari ad->profil eslenir (jsonb'ye profile_id/kind eklenir), tablo esitlenir
+    [F.financeSalaryPrivacy]: "davranis", // finance_account_balances: yetkisiz rol icin maas hareketleri bakiyeden haric; finance_void_source_entries audit_logs yazar (imza/ACL degismez)
     [F.homeSnapshotRpc]: "ek", // yalniz 1 yeni invoker RPC (home_snapshot); RLS cagiranin yetkisiyle, tablo/politika/veri degismez
     [F.einvoice]: "ek", // yeni einvoice_connections + einvoices tablolari (RLS ofis kapsamli, yazma commissions.create/settings.edit) + 2 DEFINER RPC; mevcut tablo/politika degismez
     [F.einvoiceStateMachine]: "davranis", // einvoices'te authenticated INSERT/UPDATE/DELETE kapanir (yazma yalniz DEFINER RPC); guard durum matrisi eklenir; veri degismez
@@ -562,6 +567,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB62-e-fatura-durum-makinesi", order: 29.9998674, title: "e-Fatura durum makinesi + atomik resmilestirme talebi (000700'den SONRA; yazma yalniz RPC; sira serbest)", files: [F.einvoiceStateMachine] },
     { id: "PB60-havuz-varsayilan-acik", order: 29.9998672, title: "Ilan havuzu yeni ofiste varsayilan acik + kaynak CHECK genislemesi (listing_pool 001500 sonrasi; sira serbest)", files: [F.poolDefaultOn] },
     { id: "PB61-realtime-cekirdek-tablolar", order: 29.99986745, title: "Realtime yayinina cekirdek tablolar (portfoy, talep, randevu, gorev, havuz, kasa; sira serbest, ek)", files: [F.realtimeCoreTables] },
+    { id: "KONSEY-komisyon-taraf-kimligi", order: 29.99986746, title: "Komisyon paylasimi taraf kimligi: profile_id esleme + commission_splits esitleme (20260816000200 ve 000400 sonrasi; sira serbest)", files: [F.commissionSplitProfile] },
+    { id: "KONSEY-kasa-maas-gizliligi", order: 29.99986747, title: "Kasa: maas hareketleri bakiyeden yetkisiz rol icin haric + kaynak bagli iptal audit (20261010000600 sonrasi; sira serbest)", files: [F.financeSalaryPrivacy] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
     { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },

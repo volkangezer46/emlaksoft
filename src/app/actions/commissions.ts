@@ -9,7 +9,17 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
 import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 
-export type CommissionSplitInput = { label: string; rate: number };
+/**
+ * Paylaşım satırı. `party` verilirse taraf kimliği AÇIKTIR (Konsey #0+#8): "staff" = ofis personeli (profileId zorunlu),
+ * "office" = ofis payı, "external" = dış taraf (label = ad). `party` yoksa (eski kapanış sihirbazı) serbest metin
+ * kalır; DB tetikleyicisi ad -> profil eşlemesini dener, eşleşmeyen satırı `unresolved` işaretler.
+ */
+export type CommissionSplitInput = {
+  label: string;
+  rate: number;
+  party?: "staff" | "office" | "external";
+  profileId?: string | null;
+};
 export type CommissionResult = { ok?: boolean; error?: string; info?: string };
 
 /**
@@ -24,8 +34,13 @@ export async function updateCommissionSplits(
   if (!gate.ok) return { error: gate.error };
 
   const clean = rows
-    .map((r) => ({ label: String(r.label ?? "").trim(), rate: Number(r.rate) || 0 }))
-    .filter((r) => r.label && r.rate > 0);
+    .map((r) => ({
+      label: String(r.label ?? "").trim(),
+      rate: Number(r.rate) || 0,
+      party: r.party,
+      profileId: r.profileId ? String(r.profileId) : null,
+    }))
+    .filter((r) => (r.party === "staff" ? Boolean(r.profileId) : Boolean(r.label) || r.party === "office") && r.rate > 0);
 
   if (clean.length === 0) return { error: "En az bir geçerli paylaşım satırı girin." };
   const totalRate = clean.reduce((s, r) => s + r.rate, 0);
@@ -42,11 +57,23 @@ export async function updateCommissionSplits(
   if (!commission) return { error: "Komisyon kaydı bulunamadı." };
 
   const gross = Number(commission.gross_amount) || 0;
-  const splits = clean.map((r) => ({
-    label: r.label,
-    rate: r.rate,
-    amount: Math.round(gross * (r.rate / 100) * 100) / 100,
-  }));
+
+  // Ofis personeli seçimi: profil bu ofise ait olmalı (çapraz-ofis kimlik yazılamaz); etiket güncel ad olur.
+  const staffIds = Array.from(new Set(clean.filter((r) => r.party === "staff").map((r) => r.profileId as string)));
+  const nameById = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const { data: staff } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", gate.tenantId).in("id", staffIds);
+    for (const p of staff ?? []) nameById.set(p.id as string, String(p.full_name ?? "").trim());
+    if (staffIds.some((id) => !nameById.has(id))) return { error: "Seçilen ofis personeli bulunamadı." };
+  }
+
+  const splits = clean.map((r) => {
+    const amount = Math.round(gross * (r.rate / 100) * 100) / 100;
+    if (r.party === "staff") return { label: nameById.get(r.profileId as string) || r.label, rate: r.rate, amount, profile_id: r.profileId, kind: "advisor" };
+    if (r.party === "office") return { label: "Ofis", rate: r.rate, amount, kind: "office" };
+    if (r.party === "external") return { label: r.label, rate: r.rate, amount, kind: "other" };
+    return { label: r.label, rate: r.rate, amount };
+  });
 
   const { error } = await supabase
     .from("commissions")

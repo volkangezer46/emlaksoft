@@ -8,7 +8,9 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getLossReasonOptions } from "@/lib/definitions";
 import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
 import { createClient } from "@/lib/supabase/server";
-import { computeFragileDealType, detectLostSaleRisks, estimateLostRevenue } from "@/lib/lost-sale-detector";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
+import { loadCustomerStates } from "@/lib/customer-state/load";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/ui/empty-state";
 import { dismissLostSaleRisk } from "./actions";
@@ -19,6 +21,16 @@ function money(n: number) {
 }
 
 const DAY = 86_400_000;
+
+/** Risk kartı satırı: müşteri riski TEK okuyucudan (`customer-state`) türer; bu sayfa kendi skoru üretmez. */
+type RiskLead = {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  reasonLabel: string;
+  urgency: "critical" | "warning";
+  riskScore: number;
+};
 
 type DealRow = {
   id: string;
@@ -141,7 +153,8 @@ export default async function KayipSatisPage() {
   // Snooze/arandı filtresi: dismissed_until gelecekte olanlar ve son 30 günde
   // "called" işaretlenenler listeden düşer (bkz. lost_sale_dismissals).
   const supabase = await createClient();
-  const [{ data: dismissals }, { data: closedDeals }, lossOptions] = await Promise.all([
+  const nowMsValue = nowMs();
+  const [{ data: dismissals }, { data: closedDeals }, lossOptions, customersRes] = await Promise.all([
     supabase
       .from("lost_sale_dismissals")
       .select("customer_id, dismissed_until, reason, created_at")
@@ -155,13 +168,40 @@ export default async function KayipSatisPage() {
       .gte("updated_at", daysAgoIso(365))
       .limit(1000),
     getLossReasonOptions(),
+    fetchAllRows((from, to) =>
+      supabase
+        .from("customers")
+        .select("id, full_name, phone, email, customer_types, blacklist, source, created_at")
+        .is("deleted_at", null)
+        .eq("tenant_id", ctx.tenantId)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
   ]);
   const reasonLabels = lossReasonLabels(lossOptions);
 
-  // Ofis geneli "kırılgan işlem türü" deseni — detectLostSaleRisks'e canlı
-  // talep eşleştirmesi için geçirilir (bkz. lost-sale-detector.ts kural 4).
-  const fragileDealType = computeFragileDealType((closedDeals ?? []) as { stage: string; deal_type: string | null }[]);
-  const detected = await detectLostSaleRisks(50, fragileDealType);
+  // Müşteri riski: tek okuyucu (müşteri listesi, 360, Akıllı Listeler ve ana ekranla AYNI sonuç).
+  assertQueryBatchSucceeded([customersRes], ["kayip-satis-customers"], "Risk altındaki müşteriler");
+  const customerRows = (customersRes.data ?? []) as {
+    id: string; full_name: string; phone: string | null; email: string | null;
+    customer_types: string[] | null; blacklist: boolean | null; source: string | null; created_at: string;
+  }[];
+  const stateMap = await loadCustomerStates(supabase, ctx.tenantId, customerRows, { nowMs: nowMsValue, context: "Risk altındaki müşteriler" });
+  const detected: RiskLead[] = customerRows
+    .flatMap((c): RiskLead[] => {
+      const st = stateMap.get(c.id);
+      if (!st || c.blacklist || (st.risk !== "yuksek" && st.risk !== "orta")) return [];
+      const why = st.reasons.find((r) => r.label.endsWith("kayıp riski"));
+      return [{
+        id: c.id,
+        full_name: c.full_name,
+        phone: c.phone ?? null,
+        reasonLabel: why ? `${why.label} · ${why.evidence}` : st.scores.churn.label,
+        urgency: st.risk === "yuksek" ? "critical" : "warning",
+        riskScore: st.scores.churn.risk,
+      }];
+    })
+    .sort((a, b) => b.riskScore - a.riskScore);
 
   const now = nowMs();
   const dismissedIds = new Set(
@@ -175,7 +215,6 @@ export default async function KayipSatisPage() {
 
   const risks = detected.filter((r) => !dismissedIds.has(r.id));
   const hiddenCount = detected.length - risks.length;
-  const estLost = estimateLostRevenue(risks);
 
   const critical = risks.filter((r) => r.urgency === "critical");
   const warning  = risks.filter((r) => r.urgency === "warning");
@@ -225,11 +264,11 @@ export default async function KayipSatisPage() {
               <p className="text-xs text-white/70">Uyarı</p>
             </Link>
             <Link
-              href="#kritik"
+              href="/app/akilli-listeler?segment=churn"
               className="focus-ring press lift block rounded-[var(--radius-card)] border border-white/12 bg-white/8 p-3 text-center hover:border-white/30"
             >
-              <p className="font-display text-lg font-extrabold text-white">{money(estLost)}</p>
-              <p className="text-xs text-white/70">Tahmini kayıp</p>
+              <p className="font-display text-lg font-extrabold text-white">{risks.length}</p>
+              <p className="text-xs text-white/70">Risk altında · Akıllı Listeler</p>
             </Link>
             {/* Kaybedilen ciro: son 12 ayın lost anlaşmalarının gerçek toplamı */}
             <Link
@@ -265,7 +304,7 @@ export default async function KayipSatisPage() {
                 <AlertTriangle className="h-4 w-4" /> Kritik — Hemen ara
               </h2>
               <div className="space-y-2">
-                {critical.map((r) => (
+                {critical.slice(0, 50).map((r) => (
                   <RiskCard key={r.id} risk={r} />
                 ))}
               </div>
@@ -279,7 +318,7 @@ export default async function KayipSatisPage() {
                 <AlertTriangle className="h-4 w-4" /> Uyarı — Bu hafta ara
               </h2>
               <div className="space-y-2">
-                {warning.map((r) => (
+                {warning.slice(0, 50).map((r) => (
                   <RiskCard key={r.id} risk={r} />
                 ))}
               </div>
@@ -416,7 +455,7 @@ export default async function KayipSatisPage() {
   );
 }
 
-function RiskCard({ risk }: { risk: Awaited<ReturnType<typeof detectLostSaleRisks>>[0] }) {
+function RiskCard({ risk }: { risk: RiskLead }) {
   const initials = risk.full_name
     .split(" ")
     .map((p) => p[0] ?? "")

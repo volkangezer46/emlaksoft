@@ -49,7 +49,7 @@ type CommissionRow = {
   gross_amount: number;
   vat_amount: number;
   status: string;
-  splits: { label?: string; amount?: number; rate?: number }[] | null;
+  splits: { label?: string; amount?: number; rate?: number; profile_id?: string | null; kind?: string | null; unresolved?: boolean }[] | null;
   created_at: string;
   deal_id: string | null;
   deal: {
@@ -75,7 +75,7 @@ type CommissionAggregate = {
   month_pending: number;
   month_record_count: number;
   monthly: { month_start: string; accrued: number; paid: number }[];
-  advisors: { label: string; pay: number; record_count: number }[];
+  advisors: { label: string; pay: number; record_count: number; profile_id?: string | null; unresolved?: boolean }[];
 };
 
 function money(value: number) {
@@ -269,6 +269,8 @@ export default async function CommissionPage({
     label: row.label,
     pay: Number(row.pay),
     adet: Number(row.record_count),
+    profileId: row.profile_id ?? null,
+    unresolved: Boolean(row.unresolved),
   }));
   const advisorMax = Math.max(1, ...advisorDist.map((a) => a.pay));
 
@@ -318,13 +320,14 @@ export default async function CommissionPage({
     .map((r) => r.id);
 
   /*
-   * Split satırları serbest metin etiket taşır ({label, rate}); danışman id'si
-   * YOK. Etiket bir ekip üyesinin adıyla birebir eşleşiyorsa profiline link
-   * verilir — eşleşmeyen etiketler (Ofis, Referans…) düz metin kalır.
+   * Paylaşım tarafları profile_id taşır (Konsey #0+#8); eşleşmeyen serbest metin "Eşleşmedi" uyarısı alır.
+   * Editördeki personel seçici aktif ekip üyelerinden beslenir.
    */
-  const memberIdByName = new Map(
-    (memberRows ?? []).map((m) => [m.full_name as string, m.id as string]),
-  );
+  const staffOptions = (memberRows ?? [])
+    .map((m) => ({ id: m.id as string, name: String(m.full_name ?? "").trim() }))
+    .filter((m) => m.name)
+    .sort((x, y) => x.name.localeCompare(y.name, "tr"));
+
 
   return (
     <ListPage>
@@ -440,9 +443,9 @@ export default async function CommissionPage({
               <p className="mt-0.5 text-xs text-text-muted">Tüm defterden hesaplanan en yüksek 8 danışman payı</p>
               <ul className="mt-4 mb-4 space-y-3">
                 {advisorDist.map((a) => {
-                  const memberId = memberIdByName.get(a.label);
+                  const memberId = a.profileId ?? undefined;
                   return (
-                    <li key={a.label}>
+                    <li key={a.profileId ?? a.label}>
                       <div className="flex items-center justify-between gap-2 text-sm">
                         {memberId ? (
                           <Link href={`/app/ekip/${memberId}`} className="focus-ring rounded-[4px] font-semibold text-accent-text hover:underline">
@@ -451,6 +454,7 @@ export default async function CommissionPage({
                         ) : (
                           <span className="font-semibold text-text">{a.label}</span>
                         )}
+                        {a.unresolved ? <span className="ml-2 rounded-full bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] px-2 py-0.5 text-xs font-bold text-[color:var(--pm-warn-text)]">Eşleşmedi</span> : null}
                         <span className="numeric font-display text-sm font-bold text-text">{money(a.pay)}</span>
                       </div>
                       <div className="mt-1 flex items-center gap-2">
@@ -645,7 +649,7 @@ export default async function CommissionPage({
                       {seeAllEarnings && Array.isArray(row.splits) && row.splits.some((s) => s.rate != null && Number.isFinite(Number(s.rate))) ? (
                         <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-text-muted">
                           {row.splits.filter((s) => s.rate != null && Number.isFinite(Number(s.rate))).map((s, i, arr) => {
-                            const memberId = s.label ? memberIdByName.get(s.label) : undefined;
+                            const memberId = s.profile_id ?? undefined;
                             return (
                               <span key={i}>
                                 {memberId ? (
@@ -658,6 +662,7 @@ export default async function CommissionPage({
                                 ) : (
                                   s.label || "Pay"
                                 )}
+                                {s.unresolved ? <span className="ml-1 rounded-full bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] px-1.5 py-0.5 text-xs font-bold text-[color:var(--pm-warn-text)]" title="Bu taraf bir personelle eşleşmedi; kazanca yazılmaz. Paylaşımı düzenleyin.">Eşleşmedi</span> : null}
                                 {" "}%{s.rate}{i < arr.length - 1 ? " ·" : ""}
                               </span>
                             );
@@ -669,7 +674,7 @@ export default async function CommissionPage({
                     {canEdit ? (
                       <div className="relative z-10 flex flex-col items-end gap-1.5">
                         {seeAllEarnings ? (
-                          <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} />
+                          <CommissionSplitEditor commissionId={row.id} gross={Number(row.gross_amount)} initial={row.splits} staff={staffOptions} />
                         ) : null}
                         <CommissionActions commissionId={row.id} amount={Number(row.gross_amount)} status={row.status} />
                       </div>
