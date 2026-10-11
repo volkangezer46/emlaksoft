@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -18,9 +19,16 @@ export async function GET(req: NextRequest) {
 
   try {
     const result = await runBillingReconciliation(0, "ef_sweep");
+    if (result.efSweepError) {
+      await recordHeartbeat("ef-kontor-sweep", "error", `süpürme RPC hatası (${result.efSweepError})`);
+      return NextResponse.json({ ok: false, error: "ef_sweep_failed" }, { status: 500 });
+    }
     const released = result.efSweep ?? null;
-    const detail = released === null ? "cüzdan etkin değil (migration uygulanmadı)" : `${released} rezerv serbest bırakıldı`;
-    await recordHeartbeat("ef-kontor-sweep", "ok", detail);
+    if (released === null) {
+      await recordHeartbeat("ef-kontor-sweep", "ok", "atlandı: cüzdan etkin değil (migration uygulanmadı)");
+      return NextResponse.json({ ok: true, released: null });
+    }
+    await recordHeartbeat("ef-kontor-sweep", heartbeatFor({}), `${released} rezerv serbest bırakıldı`);
     return NextResponse.json({ ok: true, released });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";

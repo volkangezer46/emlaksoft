@@ -193,6 +193,8 @@ export async function runBillingReconciliation(
   BillingReconciliationSummary & {
     growthClaims?: ProcessSummary | null;
     efSweep?: number | null;
+    /** `ef_sweep`: şema-dışı RPC hatası kodu (şema yoksa null; o durum hata değildir). */
+    efSweepError?: string | null;
     efReconcile?: (EfReconcileResult & { saved: boolean }) | null;
     insightEngine?: EngineSummary;
     platformInsights?: PlatformEngineSummary;
@@ -240,6 +242,8 @@ export async function runBillingReconciliation(
   if (job === "ef_sweep") {
     // EF kontör: 15 dakikadan eski açık rezervleri serbest bırakır. Cüzdan yoksa/RPC hata verirse null (etkin değil).
     const { data, error } = await admin.rpc(EF_RPC.sweep, { p_older_than: "15 minutes" });
+    // Yalnız şema/fonksiyon yok (PGRST202 / 42883 / PGRST205) "etkin değil"dir; diğer hatalar efSweepError olarak döner.
+    const missing = !!error && ["PGRST202", "42883", "PGRST205"].includes(String(error.code ?? ""));
     return {
       expiredCheckouts: 0,
       inspected: 0,
@@ -248,6 +252,7 @@ export async function runBillingReconciliation(
       manualReview: 0,
       refundRequired: 0,
       efSweep: error ? null : Number(data ?? 0),
+      efSweepError: error && !missing ? String(error.code || "unknown") : null,
     };
   }
   if (job === "ef_reconcile") {

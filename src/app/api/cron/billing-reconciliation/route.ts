@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -14,7 +15,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const summary = await runBillingReconciliation(50);
-    await recordHeartbeat("billing-reconciliation", "ok", JSON.stringify(summary));
+    // İade gerektiren yakalama (refund_required) operasyon kuyruğudur: yeşil görünmemeli. manualReview yalnız nota girer.
+    const refundRequired = summary.refundRequired > 0;
+    const note = `${JSON.stringify(summary)}${refundRequired ? ` · ${summary.refundRequired} iade gerekli` : ""}${summary.manualReview > 0 ? ` · ${summary.manualReview} elle inceleme` : ""}`;
+    await recordHeartbeat("billing-reconciliation", refundRequired ? "error" : heartbeatFor({}), note);
     return NextResponse.json({ ok: true, summary });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";

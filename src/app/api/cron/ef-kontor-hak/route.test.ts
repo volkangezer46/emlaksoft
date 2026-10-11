@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 type Sub = { tenant_id: string; plan: string; status: string; extra_seats?: number };
 const state = {
-  ready: true as boolean | "error",
+  ready: true as boolean | "error" | "timeout",
   subs: [] as Sub[],
   tenants: {} as Record<string, string>,
   disabled: new Map<string, Set<string>>(),
@@ -38,7 +38,8 @@ vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     rpc: async (name: string, args?: { p_tenant: string; p_units: number; p_kind: string; p_idem: string; p_keep?: number }) => {
       if (name === "ef_credit_ready") {
-        return state.ready === "error" ? { data: null, error: { message: "function does not exist" } } : { data: state.ready, error: null };
+        if (state.ready === "timeout") return { data: null, error: { code: "57014", message: "statement timeout" } };
+        return state.ready === "error" ? { data: null, error: { code: "PGRST202", message: "function does not exist" } } : { data: state.ready, error: null };
       }
       if (name === "ef_credit_grant" && args) {
         const key = `ef:grant:${args.p_tenant}:${args.p_idem}`;
@@ -265,6 +266,29 @@ describe("cron ef-kontor-hak", () => {
     const failed = await GET(req("Bearer s3cret"));
     expect(failed.status).toBe(200);
     expect(await failed.json()).toMatchObject({ burnFailed: 1, burnedUnits: 0 });
+  });
+
+  it("dürüst heartbeat: yakma hatası (burnFailed=1, failed=0) heartbeat'i error yapar", async () => {
+    state.subs = [{ tenant_id: "t1", plan: "office", status: "active" }];
+    state.tenants = { t1: "active" };
+    state.burnResult = "error";
+    const res = await GET(req("Bearer s3cret"));
+    expect(await res.json()).toMatchObject({ failed: 0, burnFailed: 1, ok: false });
+    expect(state.heartbeat.at(-1)?.status).toBe("error");
+  });
+
+  it("dürüst heartbeat: hazırlık sorgusu zaman aşımı -> error; PGRST202 -> ok + atlandı", async () => {
+    state.ready = "timeout";
+    const res = await GET(req("Bearer s3cret"));
+    expect(res.status).toBe(500);
+    expect(state.heartbeat.at(-1)?.status).toBe("error");
+    expect(state.grants).toEqual([]);
+
+    state.ready = "error"; // PGRST202
+    const skipped = await GET(req("Bearer s3cret"));
+    expect(skipped.status).toBe(200);
+    expect(state.heartbeat.at(-1)?.status).toBe("ok");
+    expect(state.heartbeat.at(-1)?.detail).toContain("atlandı");
   });
 
   it("cüzdan hazır değilse yakma da çalışmaz", async () => {
