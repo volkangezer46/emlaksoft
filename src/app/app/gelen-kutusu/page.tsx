@@ -1,4 +1,4 @@
-import { PageTabs, type PageTab } from "@/components/app/page-tabs";
+import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { CallsView } from "../arama/calls-view";
@@ -40,7 +40,7 @@ export default async function InboxPage({
 
   return (
     <div className="space-y-6">
-      <PageTabs base="/app/gelen-kutusu" label="Gelen kutusu sekmeleri" tabs={TABS} active={active} />
+      <PageSegmentTabs base="/app/gelen-kutusu" label="Gelen kutusu sekmeleri" tabs={TABS} active={active} />
       {active === "cagri" ? <CallsView searchParams={rest} /> : <InboxView searchParams={rest} />}
     </div>
   );

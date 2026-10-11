@@ -30,7 +30,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { Badge } from "@/components/ui/badge";
 import { loadInvoiceButtonContext } from "@/lib/integrations/einvoice/service";
 import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
-import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { computeDealScore, scoreGap } from "@/lib/customer-state/deal";
 import { getBaseUrl } from "@/lib/base-url";
@@ -459,7 +459,7 @@ export default async function DealDetailPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
-          <DetailTabs basePath={`/app/anlasmalar/${deal.id}`} tabs={tabDefs} active={tab} label="Anlaşma sekmeleri" />
+          <DetailSegmentTabs basePath={`/app/anlasmalar/${deal.id}`} tabs={tabDefs} active={tab} label="Anlaşma sekmeleri" />
 
           {tab === "kapanis" && deal.deal_type === "sale" && !kayip ? (
             <Suspense fallback={null}>

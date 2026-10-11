@@ -23,7 +23,7 @@ import { advisorShare, dealOf, isPaid, type SplitEntry } from "@/lib/team/adviso
 import { redirect } from "next/navigation";
 import { lockedGate } from "@/lib/billing/page-gates";
 import { getTenantGateContext } from "@/lib/cache/request";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { currentMonthPeriod, earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { OfficeEarnings } from "./office-earnings";
@@ -84,7 +84,7 @@ export default async function CuzdanPage({
   if (activeTab === "ofis") {
     return (
       <div className="space-y-5">
-        <DetailTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
+        <DetailSegmentTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
         <OfficeEarnings viewer={{ userId, role, perms }} tenantId={tenantId} />
       </div>
     );
@@ -190,7 +190,7 @@ export default async function CuzdanPage({
     <div className="space-y-6">
       {officeTabAvailable ? (
         <div className="no-print">
-          <DetailTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
+          <DetailSegmentTabs basePath="/app/cuzdan" tabs={tabs} active={activeTab} label="Kazanç sekmeleri" />
         </div>
       ) : null}
       <PageHeader

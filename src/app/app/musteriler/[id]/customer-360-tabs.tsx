@@ -17,7 +17,7 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
-import { DetailTabs, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
@@ -216,7 +216,7 @@ export function Customer360Tabs({
 
   return (
     <div className="space-y-4">
-      <DetailTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
+      <DetailSegmentTabs basePath={`/app/musteriler/${customerId}`} tabs={tabDefs} active={active} label="Müşteri sekmeleri" />
 
       <Pane id="gecmis" active={active}>
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

@@ -28,7 +28,7 @@ import { createClient } from "@/lib/supabase/server";
 import { LicenseStatusCard } from "@/components/app/license-status-card";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ButtonLink } from "@/components/ui/button";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
 import { setPropertyStatus } from "@/app/actions/properties";
@@ -574,7 +574,7 @@ export default async function PropertyDetailPage({
               Portföy silinemedi: açık anlaşma, canlı portal ilanı, dışarıdaki anahtar veya planlı açık ev var. Önce bunları kapatın.
             </p>
           ) : null}
-          <DetailTabs basePath={`/app/portfoyler/${property.id}`} tabs={tabDefs} active={tab} label="Portföy sekmeleri" />
+          <DetailSegmentTabs basePath={`/app/portfoyler/${property.id}`} tabs={tabDefs} active={tab} label="Portföy sekmeleri" />
 
           {tab === "ozet" ? (
             <div className="space-y-4">

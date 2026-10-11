@@ -29,7 +29,7 @@ import { FillFieldsDialog } from "./fill-fields-dialog";
 import { VersionHistory } from "./version-history";
 import { riskSummary, scanContract } from "@/lib/contract-risk";
 import { now } from "@/lib/clock";
-import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -254,7 +254,7 @@ export default async function ContractDetailPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
-          <DetailTabs basePath={`/app/sozlesmeler/${id}`} tabs={tabDefs} active={tab} label="Sözleşme sekmeleri" />
+          <DetailSegmentTabs basePath={`/app/sozlesmeler/${id}`} tabs={tabDefs} active={tab} label="Sözleşme sekmeleri" />
 
           {tab === "icerik" ? (
             <div className="space-y-4">

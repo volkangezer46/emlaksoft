@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { ArrowUpRight, CalendarDays, MessageCircle, PhoneCall, Sparkles, StickyNote } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { MoreActions } from "@/components/app/more-actions";
@@ -53,6 +54,30 @@ export function DetailTabs({
       variant="underline"
       label={label}
       activeId={active}
+      scroll={false}
+      items={tabs
+        .filter((t) => !t.hidden)
+        .map((t) => ({ id: t.id, href: `${basePath}?sekme=${t.id}`, label: t.label, icon: t.icon, count: t.count }))}
+    />
+  );
+}
+
+/** `DetailTabs` ile aynı sözleşme (`?sekme=`), /app detay sayfaları için tek şerit: SegmentTabs kapsülü. */
+export function DetailSegmentTabs({
+  basePath,
+  tabs,
+  active,
+  label = "Detay sekmeleri",
+}: {
+  basePath: string;
+  tabs: DetailTabDef[];
+  active: string;
+  label?: string;
+}) {
+  return (
+    <SegmentTabs
+      label={label}
+      active={active}
       scroll={false}
       items={tabs
         .filter((t) => !t.hidden)

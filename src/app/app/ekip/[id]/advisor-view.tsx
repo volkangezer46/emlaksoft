@@ -21,7 +21,7 @@ import { SpecialtyTab } from "./uzmanlik-tab";
 import { canSeeAllEarnings, canSeeEarningsOf } from "@/lib/team/earnings-scope";
 import { fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { trMonthContext } from "@/lib/team/scorecard";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { loadMemberMonth } from "./advisor-data";
 import { AdvisorListingOpsCard } from "@/components/listing-control/advisor-ops-card";
 import { AdvisorSurveyCard } from "@/components/surveys/advisor-survey-card";
@@ -239,7 +239,7 @@ export async function AdvisorDetailView({
         </Alert>
       ) : null}
 
-      <DetailTabs basePath={basePath} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
+      <DetailSegmentTabs basePath={basePath} tabs={tabs} active={active} label="Danışman 360 sekmeleri" />
 
       {active === "ozet" ? <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} /> : null}
       {active === "ozet" && effectiveCanAccessModule(perms, "portals") ? <AdvisorListingOpsCard advisorId={id} /> : null}

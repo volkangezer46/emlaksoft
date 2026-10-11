@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { ArrowLeftRight, FileText, Landmark, LayoutDashboard, Repeat } from "lucide-react";
-import { PageTabs, type PageTab } from "@/components/app/page-tabs";
+import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
 import { QuickEntryButtons, type AccountOption } from "../quick-entry";
 
 /**
@@ -48,5 +48,5 @@ export const FINANCE_HERO_TEXT = {
 
 /** Sekme şeridi; şema (kasa/banka) yokken görünmez. */
 export function FinanceTabs({ cashAvailable, active }: { cashAvailable: boolean; active: FinanceTab }) {
-  return cashAvailable ? <PageTabs base={FINANCE_BASE} label="Finans sekmeleri" tabs={FINANCE_TABS} active={active} /> : null;
+  return cashAvailable ? <PageSegmentTabs base={FINANCE_BASE} label="Finans sekmeleri" tabs={FINANCE_TABS} active={active} /> : null;
 }

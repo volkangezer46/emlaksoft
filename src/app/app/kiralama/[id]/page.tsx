@@ -3,7 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { notFound } from "next/navigation";
 import { ArrowLeft, BellRing, Banknote, Building2, CalendarClock, FileSignature, Landmark, StickyNote, TrendingUp, User, Wrench } from "lucide-react";
-import { ContactActions, DetailTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -250,7 +250,7 @@ export default async function KiraDetayPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
-          <DetailTabs basePath={`/app/kiralama/${rental.id}`} tabs={tabDefs} active={tab} label="Kira sekmeleri" />
+          <DetailSegmentTabs basePath={`/app/kiralama/${rental.id}`} tabs={tabDefs} active={tab} label="Kira sekmeleri" />
 
           {tab === "tahakkuk" ? (
             <div className="space-y-4">

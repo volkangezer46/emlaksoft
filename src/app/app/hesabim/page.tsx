@@ -5,7 +5,7 @@ import { KasamTab } from "./kasam-tab";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { NotificationPrefsPanel } from "@/components/app/notification-prefs";
 import { getNotificationPrefs } from "@/app/actions/notification-prefs";
 import { loadNotificationChannels } from "@/lib/notification-channels";
@@ -99,7 +99,7 @@ export default async function AccountPage({
         description="Kendi profiliniz, parolanız, oturumlarınız, bildirim ve görünüm tercihleriniz."
         className="mb-0"
       />
-      <DetailTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
+      <DetailSegmentTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
 
       {active === "profil" && sp.eposta === "onay" ? (
         <Alert tone="success">E-posta değişikliği onaylandı. Bir sonraki girişinizde yeni adresinizi kullanın.</Alert>

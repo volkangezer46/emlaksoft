@@ -52,7 +52,7 @@ import { TRY_DEFAULT_MAX_SHARE } from "@/lib/try-credits/constants";
 import type { WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 import { monthlyUnitsWithSeats } from "@/lib/ef-credits/plan-credits";
 import { loadLatestPackInvoice } from "@/lib/ef-credits/credit-reader";
-import { DetailTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
+import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -416,7 +416,7 @@ export default async function BillingPage({
           </Link>
         ))}
 
-      <DetailTabs basePath="/app/abonelik" tabs={tabs} active={active} label="Abonelik sekmeleri" />
+      <DetailSegmentTabs basePath="/app/abonelik" tabs={tabs} active={active} label="Abonelik sekmeleri" />
 
       {active === "iptal" && cancelSupported ? (
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">

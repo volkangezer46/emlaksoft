@@ -10,21 +10,7 @@ import { join } from "node:path";
  *  2) Geniş tablo (TableFrame minWidth >= 100) mobil kart alternatifi (MobileCard ya da kırılımla gizleme) olmadan
  *     kullanılmaz; mevcutlar istisna listesindedir ve YALNIZ AZALABİLİR.
  */
-const STRIP_EXCEPTIONS = new Set<string>([
-  "src/app/app/abonelik/page.tsx",
-  "src/app/app/anlasmalar/[id]/page.tsx",
-  "src/app/app/bildirimler/page.tsx",
-  "src/app/app/cuzdan/page.tsx",
-  "src/app/app/ekip/[id]/advisor-view.tsx",
-  "src/app/app/gelen-kutusu/page.tsx",
-  "src/app/app/giderler/_tabs/finance-shell.tsx",
-  "src/app/app/hesabim/page.tsx",
-  "src/app/app/kiralama/[id]/page.tsx",
-  "src/app/app/musteriler/[id]/customer-360-tabs.tsx",
-  "src/app/app/portfoyler/[id]/page.tsx",
-  "src/app/app/sozlesmeler/[id]/page.tsx",
-  "src/app/app/talepler/page.tsx",
-]);
+const STRIP_EXCEPTIONS = new Set<string>([]);
 
 const WIDE_TABLE_EXCEPTIONS = new Set<string>([]);
 

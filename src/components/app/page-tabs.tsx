@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import type { LucideIcon } from "lucide-react";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { cn } from "@/lib/utils";
 
 export type PageTab = {
@@ -48,6 +49,32 @@ export function PageTabs({
         ))}
       </ul>
     </nav>
+  );
+}
+
+/** `PageTabs` ile aynı sözleşme; /app sayfa içi sekmeleri tek şerit (SegmentTabs) çizer. İlk sekme parametresiz adrestir. */
+export function PageSegmentTabs({
+  base,
+  label,
+  tabs,
+  active,
+}: {
+  base: string;
+  label: string;
+  tabs: readonly PageTab[];
+  active: string;
+}) {
+  return (
+    <SegmentTabs
+      label={label}
+      active={active}
+      items={tabs.map((tab, i) => ({
+        id: tab.id,
+        href: i === 0 ? base : `${base}?sekme=${tab.id}`,
+        label: tab.label,
+        icon: tab.icon,
+      }))}
+    />
   );
 }
 

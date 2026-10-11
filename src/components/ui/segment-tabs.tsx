@@ -22,11 +22,14 @@ export function SegmentTabs({
   active,
   label,
   className,
+  scroll,
 }: {
   items: readonly SegmentTabItem[];
   active: string;
   label: string;
   className?: string;
+  /** false: sekme geçişinde sayfa başına kaydırılmaz (detay sayfaları). */
+  scroll?: boolean;
 }) {
   if (items.length < 2) return null;
   return (
@@ -38,6 +41,7 @@ export function SegmentTabs({
             <li key={item.id}>
               <Link
                 href={item.href}
+                scroll={scroll}
                 aria-current={on ? "page" : undefined}
                 className={cn(
                   "focus-ring inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition",
