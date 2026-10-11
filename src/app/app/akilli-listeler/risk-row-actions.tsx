@@ -1,5 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import { AlarmClock, ArrowUpRight, ClipboardPlus, MessageCircle, Phone, PhoneCall } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { dismissRiskFromSmartList } from "./actions";
 
@@ -48,24 +49,16 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
             </label>
           </>
         ) : null}
-        <button
-          type="submit"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/10 touch:min-h-11"
-          title="Arandı olarak işaretle (30 gün listeden düşer)"
-        >
-          <PhoneCall className="h-3.5 w-3.5" /> Arandı
-        </button>
+        <Button type="submit" size="xs" variant="outline" icon={PhoneCall} title="Arandı olarak işaretle (30 gün listeden düşer)">
+          Arandı
+        </Button>
       </form>
       <form action={dismissRiskFromSmartList}>
         <input type="hidden" name="customer_id" value={customerId} />
         <input type="hidden" name="reason" value="snoozed" />
-        <button
-          type="submit"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-amber-600 transition hover:bg-amber-50 touch:min-h-11"
-          title="1 hafta sonra tekrar hatırlat"
-        >
-          <AlarmClock className="h-3.5 w-3.5" /> 1 hafta ertele
-        </button>
+        <Button type="submit" size="xs" variant="outline" icon={AlarmClock} title="1 hafta sonra tekrar hatırlat">
+          1 hafta ertele
+        </Button>
       </form>
       <Link
         href="/app/gorevler/yeni"

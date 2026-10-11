@@ -78,7 +78,7 @@ describe("paket kilidi", () => {
   it("her kilit menüde bir sayfaya karşılık gelir ve tekrar etmez", () => {
     const hrefs = PLAN_GATES.map((g) => g.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    const orphans = hrefs.filter((h) => !ALL_NAV_HREFS.includes(h) && h !== "/app/franchise" && h !== "/app/ofis-kontrol/kurallar");
+    const orphans = hrefs.filter((h) => !ALL_NAV_HREFS.includes(h) && h !== "/app/franchise" && h !== "/app/ofis-kontrol/kurallar" && h !== "/app/kayip-satis" /* eski yer imi: sayfa Akıllı listeler'e yönlenir, plan kilidi eski yolda sürer */);
     expect(orphans).toEqual([]);
     expect(requiredPlanName(PLAN_GATES[0]!)).toBe("Ofis");
   });

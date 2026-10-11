@@ -231,9 +231,9 @@ describe("paket bilgisi PLAN_GATES'ten türer", () => {
 });
 
 describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
-  it("menü öğesi sayısı 35 (9 başlık; 2026-10: Aidat Mülk yönetimi sekmesi oldu; 2026-10 paket D: Portal ilanları, Teklifler, Bildirimler menüden çıktı; eskiden 39 = 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı; 2026-10: Kaçan komisyonlar İlan Kontrol alt sekmesi, TV panosu düğme, Kıyas/KPI/Lig tek Ekip performansı öğesi)", () => {
+  it("menü öğesi sayısı 34 (9 başlık; 2026-10-12: Ofis Merkezi öğesi kalktı (Ekip merkezi ve Ayarlar dizini karşılıyor); 2026-10: Aidat Mülk yönetimi sekmesi oldu; 2026-10 paket D: Portal ilanları, Teklifler, Bildirimler menüden çıktı; eskiden 39 = 36 + Davet et ve kazan + İlan Kontrol + Ofis Merkezi + Bildirimler + Mahalle notları; eylem sayfaları İçe aktarma ve Ofis kurulumu menüden çıktı; 2026-10: Kaçan komisyonlar İlan Kontrol alt sekmesi, TV panosu düğme, Kıyas/KPI/Lig tek Ekip performansı öğesi)", () => {
     expect(NAV_SECTIONS.length).toBe(9);
-    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(35);
+    expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(34);
   });
 
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
@@ -243,7 +243,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
       expect(topHrefs).not.toContain(gone);
     }
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/kayip-satis", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
   });
@@ -252,7 +252,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     const closed = ["smart_lists", "keys", "presentations", "lost_sales", "rentals", "projects", "campaigns"];
     const open = allHrefs(visibleSections(ALL_MODULES));
     const shut = allHrefs(visibleSections(ALL_MODULES, { closed }));
-    for (const href of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/kayip-satis", "/app/kiralama", "/app/kira-artis", "/app/projeler", "/app/kampanyalar"]) {
+    for (const href of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/kiralama", "/app/kira-artis", "/app/projeler", "/app/kampanyalar"]) {
       expect(open, `açıkken ${href}`).toContain(href);
       expect(shut, `kapalıyken ${href}`).not.toContain(href);
     }
@@ -283,11 +283,11 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     expect(getAppActions(ALL_MODULES).map((a) => a.href)).toContain("/app/teklifler/yeni");
   });
 
-  it("Teklifler sekmesi kendi izniyle gizlenir; Riskli müşteriler müşteri izniyle Müşteriler'de", () => {
+  it("Teklifler sekmesi kendi izniyle gizlenir; Riskli müşteriler artık Müşteriler sekmesi değil (Akıllı listeler bölümü)", () => {
     const items = (mods: AppModule[], label = "Anlaşmalar") => visibleSections(mods).flatMap((s) => s.items).find((i) => i.label === label);
     expect(items(["commissions"])?.tabs?.map((t) => t.href)).toEqual(["/app/anlasmalar"]);
     expect(items(["commissions", "offers"])?.tabs?.map((t) => t.href)).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(items(["customers"])).toBeUndefined();
-    expect(items(["customers"], "Müşteriler")?.tabs?.map((t) => t.href)).toContain("/app/kayip-satis");
+    expect(items(["customers"], "Müşteriler")?.tabs?.map((t) => t.href)).not.toContain("/app/kayip-satis");
   });
 });
