@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Sağlayıcı SONUCUNU yazan e-Fatura RPC'leri yalnız service_role'e açıktır (20261012000700):
+ * Sağlayıcı SONUCUNU yazan e-Fatura RPC'leri yalnız service_role'e açıktır (20261012001000):
  * kullanıcı PostgREST'ten sahte "issued" yazamaz. Çağıran action, kullanıcı iznini
  * (`requirePermission("commissions","create")`) ve ofisi KENDİSİ doğruladıktan SONRA buraya gelir;
  * ofis her RPC'ye açıkça geçer ve SQL tarafı her UPDATE'i tenant_id ile sınırlar.

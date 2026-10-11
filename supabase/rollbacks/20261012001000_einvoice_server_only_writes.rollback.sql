@@ -1,4 +1,4 @@
--- 20261012000700 geri alma: *_srv RPC'leri duser, eski RPC'ler authenticated'a geri acilir.
+-- 20261012001000 geri alma: *_srv RPC'leri duser, eski RPC'ler authenticated'a geri acilir.
 drop function if exists public.einvoice_srv_record_progress(uuid, uuid, uuid, jsonb, text, text, boolean);
 drop function if exists public.einvoice_srv_mark_issued(uuid, uuid, uuid, jsonb, text);
 drop function if exists public.einvoice_srv_record_status(uuid, uuid, uuid, text, text, text, text, jsonb);

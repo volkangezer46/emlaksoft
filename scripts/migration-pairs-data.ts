@@ -272,7 +272,7 @@ const F = {
   financeIsSample: "20261012000400_finance_is_sample.sql",
   // Analiz dili (2026-10-12): ef.packs seed paket adlari "... kontor" -> "... TL" (yalniz dokunulmamis adlar; veri modeli ayni).
   efPackNamesTl: "20261012000600_ef_pack_names_tl.sql",
-  einvoiceServerOnlyWrites: "20261012000700_einvoice_server_only_writes.sql",
+  einvoiceServerOnlyWrites: "20261012001000_einvoice_server_only_writes.sql",
   rentNoticeReceipt: "20261012000900_rent_notice_receipt.sql",
   // Konsey ertelenen #7 (2026-10-12): fiyat revizyonu onerisi + mulk sahibi (token) onayi; guard_property_list_price_drop govdesi bir erken donus kazanir.
   propertyPriceProposals: "20261012000800_property_price_proposals.sql",
@@ -607,7 +607,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "KONSEY3-finans-is-sample", order: 29.9999892, title: "Finans tablolarina is_sample (hesap, hareket, duzenli odeme, butce; 20261010000600/000900 ve 20261008000700 sonrasi; sira serbest, ek)", files: [F.financeIsSample] },
     { id: "KONSEY-fiyat-onerisi", order: 33, title: "Fiyat revizyonu onerisi + mulk sahibi onayi (20261007000800 fiyat kapisi SONRASI; sira serbest)", files: [F.propertyPriceProposals] },
     { id: "ANALIZ-paket-adlari-tl", order: 32, title: "ef.packs seed paket adlari: kontor -> TL (analiz bakiyesi dili; 20261008001000 SONRASI, sira serbest, ek)", files: [F.efPackNamesTl] },
-    { id: "EINV-sunucu-yazimi", order: 34, title: "e-Fatura saglayici sonucu yalniz sunucu (service_role) RPC'leriyle yazilir (000100'den SONRA; sira serbest)", files: [F.einvoiceServerOnlyWrites] },
+    { id: "EINV-sunucu-yazimi", order: 36, title: "e-Fatura saglayici sonucu yalniz sunucu (service_role) RPC'leriyle yazilir (000100'den SONRA; sira serbest)", files: [F.einvoiceServerOnlyWrites] },
     { id: "PORTAL-kira-dekont", order: 35, title: "Kiraci Odedim dekont fotografi: ozel rent-receipts kovasi + dekont sutunlari + token cozucu RPC (20261012000200 SONRASI, sira serbest, ek)", files: [F.rentNoticeReceipt] },
     { id: "KONSEY3-portal-istekleri-v2", order: 29.9998695, title: "Portal istekleri v2: gosterim talebi + arayis guncelleme + kiraci Odedim + malik haftalik rapor anahtari (20261007000620 SONRASI; sira serbest)", files: [F.portalRequestsV2] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },

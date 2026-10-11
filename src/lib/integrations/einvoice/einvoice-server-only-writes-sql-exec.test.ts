@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
 /**
- * 20261012000700: sağlayıcı SONUCUNU yazan RPC'ler yalnız service_role'e açık.
+ * 20261012001000: sağlayıcı SONUCUNU yazan RPC'ler yalnız service_role'e açık.
  * Açık: commissions.create yetkili kullanıcı einvoice_mark_issued ile sahte "issued" yazabiliyordu.
  */
 const mod = await loadPglite();
@@ -72,7 +72,7 @@ describe.skipIf(!mod)("e-Fatura sağlayıcı sonucu yalnız sunucu (pglite)", ()
     await db.exec(read("supabase/migrations/20261010000700_einvoice.sql"));
     await db.exec(read("supabase/migrations/20261011000600_einvoice_state_machine.sql"));
     await db.exec(read("supabase/migrations/20261012000100_einvoice_recovery.sql"));
-    await db.exec(read("supabase/migrations/20261012000700_einvoice_server_only_writes.sql"));
+    await db.exec(read("supabase/migrations/20261012001000_einvoice_server_only_writes.sql"));
     await db.exec(`grant all on all tables in schema public to service_role`);
   });
 
