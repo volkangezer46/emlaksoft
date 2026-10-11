@@ -7,6 +7,7 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
  * İŞLEVSEL SQL TESTİ (pglite): 20261011001200_bank_statement_import — taslak yazma (mükerrer dosya/satır), onay (hareket üret,
  * mevcutla eşle, atla), mutabakat işareti ve durum sayacı, kişisel hesap gizliliği, maaş kapısı, tahsilat bağı yetkisi,
  * doğrudan yazma yok, taslağı at, rollback.
+ * 20261011001400: düzenli ödeme (auto/approve) + ekstre = TEK gider/hareket; komisyon ekstreden bağlanınca tahsil edildi olur.
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -20,14 +21,18 @@ create function public.current_profile_role() returns text language sql stable a
 create function public.has_effective_permission(p_module text, p_action text) returns boolean language sql stable as $$
   select position(p_module || ':' || p_action in coalesce(current_setting('test.perms', true), '')) > 0 $$;
 create table public.tenants(id uuid primary key default gen_random_uuid());
-create table public.profiles(id uuid primary key default gen_random_uuid(), tenant_id uuid);
+create table public.profiles(id uuid primary key default gen_random_uuid(), tenant_id uuid, role text default 'advisor', is_active boolean default true);
 create table public.expenses(id uuid primary key default gen_random_uuid(), tenant_id uuid, created_by uuid, category text default 'diger', title text,
-  amount numeric default 0, currency text default 'TRY', expense_date date, notes text, receipt_url text);
-create table public.commissions(id uuid primary key default gen_random_uuid(), tenant_id uuid not null);
+  amount numeric default 0, currency text default 'TRY', expense_date date, notes text, receipt_url text, recurrence text, portal_key text,
+  created_at timestamptz default now());
+create table public.commissions(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, status text not null default 'pending');
 create table public.rent_payments(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, voided_at timestamptz);
 create table public.building_payments(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, voided_at timestamptz);
 create table public.audit_logs(id uuid primary key default gen_random_uuid(), tenant_id uuid, actor_id uuid, action text, entity_type text,
   entity_id uuid, old_value jsonb, new_value jsonb);
+create table public.notifications(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, user_id uuid, title text not null, body text,
+  href text, kind text not null default 'info', dedupe_key text, created_at timestamptz default now());
+create unique index notifications_tenant_dedupe_key_uidx on public.notifications (tenant_id, dedupe_key) where dedupe_key is not null;
 grant usage on schema public to authenticated;
 grant select on all tables in schema public to authenticated;
 `;
@@ -65,7 +70,10 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     ADV2 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
     RENT = (await q(`insert into public.rent_payments(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261010000600_finance_accounts_cash_entries.sql"));
+    await db.exec(read("supabase/migrations/20261010000900_recurring_rules.sql"));
     await db.exec(read("supabase/migrations/20261011001200_bank_statement_import.sql"));
+    await db.exec(read("supabase/migrations/20261011001400_statement_apply_recurring_commission.sql"));
+    await db.exec(`grant select on all tables in schema public to authenticated; grant all on all tables in schema public to service_role; grant usage on schema public to service_role`);
     await as(OWNER, FULL, "owner");
     BANK = (await rpc(`public.finance_account_create('office','bank','İş Bankası Örnek',null,'TRY',10000::numeric,'2026-10-01'::date)`, [])).account_id as string;
     await as(ADV, "", "advisor");
@@ -187,6 +195,130 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     // İşlenmiş satırı olan dosya kaydı korunur.
     expect((await rpc(`public.finance_statement_discard($1::uuid)`, [imp1])).outcome).toBe("discarded");
     expect(await q(`select 1 from public.finance_statement_imports where id = $1`, [imp1])).toHaveLength(1);
+  });
+
+  // ---- 20261011001400: düzenli ödeme ve komisyon tek gerçek ----
+  describe("ekstre uygulama: düzenli ödeme + komisyon", () => {
+    let REC: string;
+    const day = async (offset: number) => String((await q(`select ((now() at time zone 'Europe/Istanbul')::date + $1::int)::text as d`, [offset]))[0]!.d);
+    const runDue = async () => {
+      await db.exec(`reset role; set role service_role`);
+      const r = await rpc(`public.recurring_run_due(((now() at time zone 'Europe/Istanbul')::date), '{}'::uuid[])`, []);
+      await as(OWNER, FULL, "owner");
+      return r;
+    };
+    /** Kuralı geçmiş bir vadeye çeker (RPC geçmiş başlangıç kabul etmez; vade yalnız test için doğrudan güncellenir). */
+    const makeRule = async (title: string, amount: number, mode: "auto" | "approve", dueOffset: number) => {
+      await as(OWNER, FULL, "owner");
+      const r = await rpc(`public.recurring_rule_create('office', 'out', 'ofis', $1, $2::numeric, $3::uuid, 'monthly', 15, null, null, $4, null, 'ofis', true)`, [title, amount, REC, mode]);
+      const id = r.rule_id as string;
+      const due = await day(dueOffset);
+      await db.exec(`reset role`);
+      await q(`update public.recurring_rules set next_due = $2::date, next_period = date_trunc('month', $2::date)::date,
+        anchor = date_trunc('month', $2::date)::date, pay_day = extract(day from $2::date)::int where id = $1`, [id, due]);
+      await as(OWNER, FULL, "owner");
+      return { id, due };
+    };
+    const counts = async (title: string) => ({
+      expenses: Number((await q(`select count(*) as n from public.expenses where title = $1`, [title]))[0]!.n),
+      entries: Number((await q(`select count(*) as n from public.cash_entries where title = $1 and voided_at is null`, [title]))[0]!.n),
+    });
+    const stageOne = async (acc: string, n: number, date: string, dir: "in" | "out", amt: number, desc: string) => {
+      const res = await stage(acc, n.toString(16).padStart(64, "0"), [line(n, date, dir, amt, desc)]);
+      expect(res.outcome).toBe("staged");
+      return lineId(H(n));
+    };
+
+    it("auto kural + ekstre = tek gider: cron'la post edilmiş dönem + 4 gün sapmalı ekstre -> expenses=1, cash_entries=1", async () => {
+      await as(OWNER, FULL, "owner");
+      REC = (await rpc(`public.finance_account_create('office','bank','Düzenli test hesabı',null,'TRY',0::numeric,((now() at time zone 'Europe/Istanbul')::date - 60))`, [])).account_id as string;
+      const { id, due } = await makeRule("Portal üyeliği (auto)", 7777, "auto", -10);
+      expect(await runDue()).toMatchObject({ outcome: "ok", failed: 0 });
+      expect(await counts("Portal üyeliği (auto)")).toEqual({ expenses: 1, entries: 1 });
+      const lid = await stageOne(REC, 101, await day(-6), "out", 7777, "PORTAL UYELIK");
+      const res = await apply(REC, [{ line_id: lid, action: "recurring", rule_id: id }]);
+      expect(res).toMatchObject({ outcome: "applied", created: 0, matched: 1, failed: 0 });
+      expect(await counts("Portal üyeliği (auto)")).toEqual({ expenses: 1, entries: 1 });
+      const e = (await q(`select reconciled_at, entry_date::text as d from public.cash_entries where title = 'Portal üyeliği (auto)'`))[0]!;
+      expect(e.reconciled_at).not.toBeNull();
+      expect(e.d).toBe(due);
+      const l = (await q(`select status, entry_id from public.finance_statement_lines where id = $1`, [lid]))[0]!;
+      expect(l.status).toBe("matched");
+      expect(l.entry_id).not.toBeNull();
+      // İkinci uygulama (satır artık bekleyen değil) hiçbir şey yazmaz.
+      expect(await apply(REC, [{ line_id: lid, action: "recurring", rule_id: id }])).toMatchObject({ created: 0, matched: 0, failed: 1 });
+      expect(await counts("Portal üyeliği (auto)")).toEqual({ expenses: 1, entries: 1 });
+    });
+
+    it("approve kural + ekstre: occurrence posted olur (tek gider, tek hareket); sonraki cron koşusu yeni satır yazmaz", async () => {
+      const { id } = await makeRule("Muhasebe (approve)", 2500, "approve", -9);
+      expect(await runDue()).toMatchObject({ outcome: "ok", drafts: 1 });
+      expect(await counts("Muhasebe (approve)")).toEqual({ expenses: 0, entries: 0 });
+      expect((await q(`select status from public.recurring_occurrences where rule_id = $1`, [id])).map((o) => o.status)).toEqual(["pending"]);
+      const lid = await stageOne(REC, 102, await day(-8), "out", 2500, "MUHASEBE UCRETI");
+      const res = await apply(REC, [{ line_id: lid, action: "recurring", rule_id: id }]);
+      expect(res).toMatchObject({ outcome: "applied", created: 1, matched: 0, failed: 0 });
+      expect((await q(`select status from public.recurring_occurrences where rule_id = $1`, [id])).map((o) => o.status)).toEqual(["posted"]);
+      expect(await counts("Muhasebe (approve)")).toEqual({ expenses: 1, entries: 1 });
+      expect((await q(`select reconciled_at from public.cash_entries where title = 'Muhasebe (approve)'`))[0]!.reconciled_at).not.toBeNull();
+      expect((await q(`select status from public.finance_statement_lines where id = $1`, [lid]))[0]!.status).toBe("posted");
+      const before = Number((await q(`select count(*) as n from public.recurring_occurrences where rule_id = $1`, [id]))[0]!.n);
+      expect(await runDue()).toMatchObject({ posted: 0, drafts: 0 });
+      expect(Number((await q(`select count(*) as n from public.recurring_occurrences where rule_id = $1`, [id]))[0]!.n)).toBe(before);
+      expect(await counts("Muhasebe (approve)")).toEqual({ expenses: 1, entries: 1 });
+    });
+
+    it("recurring: cron henüz üretmediyse vadesi gelmiş dönem ekstreden üretilir; yanlış kural/yön/gelecek dönem reddedilir", async () => {
+      const { id } = await makeRule("Su faturası (cron öncesi)", 640, "auto", -7);
+      const lid = await stageOne(REC, 103, await day(-5), "out", 640, "SU");
+      expect(await apply(REC, [{ line_id: lid, action: "recurring", rule_id: "00000000-0000-0000-0000-000000000000" }])).toMatchObject({ created: 0, failed: 1 });
+      expect(await apply(REC, [{ line_id: lid, action: "recurring", rule_id: id }])).toMatchObject({ created: 1, failed: 0 });
+      expect(await counts("Su faturası (cron öncesi)")).toEqual({ expenses: 1, entries: 1 });
+      // Cron sonradan koşsa aynı dönemi yeniden üretmez.
+      expect(await runDue()).toMatchObject({ posted: 0 });
+      expect(await counts("Su faturası (cron öncesi)")).toEqual({ expenses: 1, entries: 1 });
+      // Gelecek dönem (vadesi gelmemiş) ekstre satırıyla üretilmez; yön uyuşmayan kural kabul edilmez.
+      const lid2 = await stageOne(REC, 104, await day(-1), "out", 640, "SU 2");
+      expect(await apply(REC, [{ line_id: lid2, action: "recurring", rule_id: id }])).toMatchObject({ created: 0, matched: 0, failed: 1 });
+      const lid3 = await stageOne(REC, 105, await day(-1), "in", 640, "GELIR");
+      expect(await apply(REC, [{ line_id: lid3, action: "recurring", rule_id: id }])).toMatchObject({ failed: 1 });
+    });
+
+    it("komisyon apply -> commissions.status tahsil edildi (aynı işlemde); ikinci apply yeni cash_entries yazmaz", async () => {
+      await db.exec(`reset role`);
+      const C = (await q(`insert into public.commissions(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
+      const C2 = (await q(`insert into public.commissions(tenant_id, status) values ($1, 'paid') returning id`, [T]))[0]!.id as string;
+      await as(OWNER, FULL, "owner");
+      const l1 = await stageOne(REC, 110, await day(-3), "in", 12345.67, "KOMISYON");
+      const l2 = await stageOne(REC, 111, await day(-2), "in", 12345.67, "KOMISYON 2");
+      const l3 = await stageOne(REC, 112, await day(-2), "in", 900, "ESKI KOMISYON");
+      expect((await q(`select status from public.commissions where id = $1`, [C]))[0]!.status).toBe("pending");
+      expect(await apply(REC, [{ line_id: l1, action: "create", category: "komisyon", source_type: "commission", source_id: C }])).toMatchObject({ created: 1, failed: 0 });
+      expect((await q(`select status from public.commissions where id = $1`, [C]))[0]!.status).toBe("paid");
+      expect(await apply(REC, [{ line_id: l2, action: "create", category: "komisyon", source_type: "commission", source_id: C }])).toMatchObject({ created: 0, failed: 1 });
+      expect(Number((await q(`select count(*) as n from public.cash_entries where source_type = 'commission' and source_id = $1`, [C]))[0]!.n)).toBe(1);
+      expect((await q(`select status from public.finance_statement_lines where id = $1`, [l2]))[0]!.status).toBe("pending");
+      // Zaten tahsil edilmiş ama kasaya bağlanmamış komisyon kasaya bağlanabilir; durum değişmez.
+      expect(await apply(REC, [{ line_id: l3, action: "create", category: "komisyon", source_type: "commission", source_id: C2 }])).toMatchObject({ created: 1, failed: 0 });
+      expect((await q(`select status from public.commissions where id = $1`, [C2]))[0]!.status).toBe("paid");
+      expect(Number((await q(`select count(*) as n from public.audit_logs where action = 'commission.paid'`))[0]!.n)).toBe(1);
+      // Başka hesapta kasaya bağlı tahsilat ikinci hesaba bağlanamaz.
+      const other = (await rpc(`public.finance_account_create('office','cash','İkinci kasa',null,'TRY',0::numeric,((now() at time zone 'Europe/Istanbul')::date - 60))`, [])).account_id as string;
+      const l4 = await stageOne(other, 120, await day(-2), "in", 4500, "KOMISYON 3");
+      expect(await apply(other, [{ line_id: l4, action: "create", category: "komisyon", source_type: "commission", source_id: C }])).toMatchObject({ created: 0, failed: 1 });
+    });
+  });
+
+  it("20261011001400 rollback: recurring eylemi tanınmaz; migration yeniden uygulanınca geri gelir", async () => {
+    await db.exec(`reset role`);
+    await db.exec(read("supabase/rollbacks/20261011001400_statement_apply_recurring_commission.rollback.sql"));
+    await as(OWNER, FULL, "owner");
+    const acc = (await q(`select account_id from public.finance_statement_lines where line_hash = $1`, [H(112)]))[0]!.account_id as string;
+    const s = await stage(acc, "f".repeat(64), [line(130, "2026-10-09", "out", 10, "x")]);
+    expect(s.outcome).toBe("staged");
+    expect(await apply(acc, [{ line_id: await lineId(H(130)), action: "recurring", rule_id: "00000000-0000-0000-0000-000000000000" }])).toMatchObject({ created: 0, failed: 1 });
+    await db.exec(`reset role`);
+    await db.exec(read("supabase/migrations/20261011001400_statement_apply_recurring_commission.sql"));
   });
 
   it("rollback tabloları, fonksiyonları ve sütunu düşürür; hareketler kalır", async () => {

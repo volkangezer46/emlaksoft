@@ -37,6 +37,29 @@ export type MatchContext = {
   canSalary: boolean;
 };
 
+/** Onay ekranından RPC'ye giden karar (saf). Düzenli ödeme önerisi `recurring` eylemidir ve ruleId taşır; `create` olarak GİTMEZ
+ *  (yoksa cron'un yazdığı dönem + ekstre satırı iki gider üretirdi). */
+export type ApplyDecision = {
+  lineId: string;
+  action: "create" | "match" | "skip" | "recurring";
+  category?: string | null;
+  title?: string | null;
+  entryId?: string | null;
+  ruleId?: string | null;
+  sourceType?: "commission" | "rent" | "building" | null;
+  sourceId?: string | null;
+};
+export type ReviewChoice = { action: "create" | "match" | "skip"; category: string };
+
+export function buildDecision(lineId: string, s: Suggestion, choice: ReviewChoice): ApplyDecision {
+  if (choice.action === "skip") return { lineId, action: "skip" };
+  if (choice.action === "match" && s.kind === "existing") return { lineId, action: "match", entryId: s.entryId };
+  // Kullanıcı kategoriyi önerilenden değiştirdiyse düzenli ödeme değil, sıradan hareket oluşturur.
+  if (s.kind === "recurring" && s.category === choice.category) return { lineId, action: "recurring", ruleId: s.ruleId };
+  const collection = s.kind === "collection" && s.category === choice.category ? { sourceType: s.source, sourceId: s.sourceId } : {};
+  return { lineId, action: "create", category: choice.category, title: s.kind === "recurring" ? s.title : null, ...collection };
+}
+
 const DAY_MS = 86_400_000;
 export function dayNumber(iso: string): number {
   const [y, m, d] = iso.split("-").map(Number);

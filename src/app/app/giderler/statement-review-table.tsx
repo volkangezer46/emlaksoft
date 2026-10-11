@@ -13,7 +13,7 @@ import { StatusPill } from "@/components/ui/list-kit";
 import { categoriesFor } from "@/lib/finance/cash/categories";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { formatDateTr } from "@/lib/format";
-import type { Suggestion } from "@/lib/finance/statement/match";
+import { buildDecision, type Suggestion } from "@/lib/finance/statement/match";
 
 export type ReviewLine = {
   id: string;
@@ -55,14 +55,7 @@ export function StatementReviewTable({ accountId, importIds, currency, canSalary
     for (const l of lines) {
       const st = rows[l.id];
       if (!st?.checked) continue;
-      if (st.action === "skip") decisions.push({ lineId: l.id, action: "skip" });
-      else if (st.action === "match" && l.suggestion.kind === "existing") decisions.push({ lineId: l.id, action: "match", entryId: l.suggestion.entryId });
-      else {
-        const s = l.suggestion;
-        const collection = s.kind === "collection" && s.category === st.category ? { sourceType: s.source, sourceId: s.sourceId } : {};
-        const title = s.kind === "recurring" ? s.title : null;
-        decisions.push({ lineId: l.id, action: "create", category: st.category, title, ...collection });
-      }
+      decisions.push(buildDecision(l.id, l.suggestion, st));
     }
     if (decisions.length === 0) return setError("Önce onaylanacak satırları işaretleyin.");
     setBusy(true);

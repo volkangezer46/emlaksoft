@@ -20,7 +20,9 @@ export type StatementResult = { ok?: boolean; error?: string; info?: string };
 
 export type StatementDecision = {
   lineId: string;
-  action: "create" | "match" | "skip";
+  action: "create" | "match" | "skip" | "recurring";
+  /** Düzenli ödeme kuralı (action: "recurring"). */
+  ruleId?: string | null;
   category?: string | null;
   title?: string | null;
   entryId?: string | null;
@@ -74,6 +76,9 @@ export async function applyStatementDecisions(accountId: string, decisions: read
     } else if (d.action === "match") {
       if (!d.entryId || !isUuid(d.entryId)) return { error: "Eşleştirilecek hareket seçilmemiş." };
       payload.push({ line_id: d.lineId, action: "match", entry_id: d.entryId });
+    } else if (d.action === "recurring") {
+      if (!d.ruleId || !isUuid(d.ruleId)) return { error: "Düzenli ödeme kuralı seçilmemiş." };
+      payload.push({ line_id: d.lineId, action: "recurring", rule_id: d.ruleId });
     } else if (d.action === "create") {
       const category = d.category ? String(d.category) : null;
       if (category && !isCashCategory(category, dir)) return { error: "Kategori satırın yönüyle (gelir/gider) uyuşmuyor." };

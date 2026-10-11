@@ -112,7 +112,7 @@ export async function loadMatchContext(
       ? supabase.from("building_payments").select("id, paid_on, amount, receipt_no").is("voided_at", null).gte("paid_on", from).lte("paid_on", to).limit(500)
       : Promise.resolve({ data: [] as unknown[] }),
     withCollections
-      ? supabase.from("commissions").select("id, gross_amount, vat_amount").gte("created_at", `${shiftIso(from, -365)}T00:00:00Z`).limit(1000)
+      ? supabase.from("commissions").select("id, gross_amount, vat_amount, status").gte("created_at", `${shiftIso(from, -365)}T00:00:00Z`).limit(1000)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
@@ -143,15 +143,44 @@ export async function loadMatchContext(
     }
     for (const r of (commRes.data ?? []) as Record<string, unknown>[]) {
       const gross = Number(r.gross_amount);
-      collections.push({ source: "commission", id: String(r.id), date: null, amounts: [gross, gross + Number(r.vat_amount ?? 0)], label: "Komisyon tutarıyla eşleşiyor" });
+      const settled = r.status === "paid" || r.status === "collected";
+      collections.push({
+        source: "commission", id: String(r.id), date: null, amounts: [gross, gross + Number(r.vat_amount ?? 0)],
+        label: settled ? "Tahsil edilmiş komisyon (kasaya bağlı değil)" : "Komisyon tutarıyla eşleşiyor",
+      });
     }
-    // Zaten bir hesaba işlenmiş tahsilatlar tekrar önerilmez.
-    const ids = collections.map((c) => c.id);
-    if (ids.length > 0) {
-      const { data: used } = await supabase.from("cash_entries").select("source_type, source_id").in("source_id", ids).is("voided_at", null).limit(1000);
-      const usedKeys = new Set(((used ?? []) as Record<string, unknown>[]).map((u) => `${u.source_type}:${u.source_id}`));
-      return { entries, rules, collections: collections.filter((c) => !usedKeys.has(`${c.source}:${c.id}`)) };
-    }
+    // Herhangi bir hesaba (başka hesap dahil) zaten işlenmiş tahsilatlar tekrar önerilmez: tahsil edilmiş ve kasaya bağlı komisyon aday değildir;
+    // tahsil edilmiş ama kasaya bağlanmamış olan kalır (kullanıcı hangi hesaba girdiğini ekstreden bağlar).
+    const usedKeys = await linkedSourceKeys(supabase, collections);
+    return { entries, rules, collections: collections.filter((c) => !usedKeys.has(`${c.source}:${c.id}`)) };
   }
   return { entries, rules, collections };
+}
+
+const LINK_CHUNK = 100;
+
+/** `source_type:source_id` anahtarları; geçersiz kılınmamış (voided_at null) kasa hareketine bağlı kaynaklar. Uzun `in(...)` URL'si sessizce
+ *  boş dönüp tekrar önermesin diye 100'lük parçalarla sorgulanır. */
+async function linkedSourceKeys(supabase: SupabaseClient, collections: readonly CollectionCandidate[]): Promise<Set<string>> {
+  const used = new Set<string>();
+  const ids = collections.map((c) => c.id);
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += LINK_CHUNK) chunks.push(ids.slice(i, i + LINK_CHUNK));
+  await Promise.all(
+    chunks.map(async (part) => {
+      const { data, error } = await supabase
+        .from("cash_entries")
+        .select("source_type, source_id")
+        .in("source_type", ["commission", "rent", "building"])
+        .in("source_id", part)
+        .is("voided_at", null)
+        .limit(1000);
+      if (error) {
+        console.error("loadMatchContext linked", { code: error.code });
+        return;
+      }
+      for (const u of (data ?? []) as Record<string, unknown>[]) used.add(`${u.source_type}:${u.source_id}`);
+    }),
+  );
+  return used;
 }

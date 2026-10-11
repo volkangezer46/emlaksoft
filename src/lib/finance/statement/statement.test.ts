@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseStatementFile, sha256Hex, toStagePayload } from "./file";
-import { guessCategory, isoFromDayNumber, shiftIso, suggestAll, dayNumber, type MatchContext } from "./match";
+import { buildDecision, guessCategory, isoFromDayNumber, shiftIso, suggestAll, dayNumber, type MatchContext } from "./match";
 import { parseOfx } from "./ofx";
 import {
   applyColumnMapping,
@@ -210,6 +210,20 @@ describe("eşleştirme önerileri", () => {
     const rules = [{ id: "u1", dir: "out" as const, amount: 1200, payDay: 5, title: "Muhasebe ücreti", category: "muhasebe" }];
     expect(suggestAll([L("a", "2026-10-07", "out", 1200)], ctx({ rules })).get("a")).toMatchObject({ kind: "recurring", ruleId: "u1", category: "muhasebe" });
     expect(suggestAll([L("a", "2026-10-20", "out", 1200)], ctx({ rules })).get("a")!.kind).not.toBe("recurring");
+  });
+
+  it("düzenli ödeme önerisi karara ruleId ile 'recurring' olarak gider, 'create' olarak ÜRETİLMEZ", () => {
+    const rules = [{ id: "u1", dir: "out" as const, amount: 1200, payDay: 5, title: "Muhasebe ücreti", category: "muhasebe" }];
+    const s = suggestAll([L("a", "2026-10-07", "out", 1200)], ctx({ rules })).get("a")!;
+    expect(s).toMatchObject({ kind: "recurring", ruleId: "u1" });
+    const d = buildDecision("a", s, { action: "create", category: "muhasebe" });
+    expect(d).toEqual({ lineId: "a", action: "recurring", ruleId: "u1" });
+    expect(d.action).not.toBe("create");
+    // Kategori önerilenden değiştirilirse sıradan hareket oluşturulur (kural dönemi tüketilmez).
+    expect(buildDecision("a", s, { action: "create", category: "diger_gider" })).toMatchObject({ action: "create", category: "diger_gider" });
+    expect(buildDecision("a", s, { action: "skip", category: "muhasebe" })).toEqual({ lineId: "a", action: "skip" });
+    const coll = { kind: "collection" as const, source: "commission" as const, sourceId: "c1", category: "komisyon", label: "x" };
+    expect(buildDecision("b", coll, { action: "create", category: "komisyon" })).toMatchObject({ action: "create", sourceType: "commission", sourceId: "c1" });
   });
 
   it("kategori tahmini: anahtar sözcükler, maaş yalnız yetkiliye", () => {
