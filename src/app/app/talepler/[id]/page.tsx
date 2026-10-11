@@ -162,6 +162,34 @@ export default async function DemandDetailPage({
   // İli null portföy "İl (belirsiz)" olarak yine skorlanır — dışarıda bırakma.
   if (demand.province_id) propQuery = propQuery.or(`province_id.is.null,province_id.eq.${demand.province_id}`);
 
+  // Görev/randevu sorguları TEK kez başlar; hem aşağıdaki batch hem zaman tüneli (olay) üreticisi aynı sözleri paylaşır.
+  const taskP = Promise.resolve(
+    customer && canTaskView
+      ? supabase
+          .from("tasks")
+          .select("id, title, kind, priority, status, due_at, completed_at, created_at")
+          .eq("customer_id", customer.id)
+          .order("status", { ascending: true })
+          .order("due_at", { ascending: true, nullsFirst: false })
+          .limit(50)
+      : { data: [] as DemandTaskRow[] },
+  );
+  const apptP = Promise.resolve(
+    customer && canApptView
+      ? supabase
+          .from("appointments")
+          .select("id, appointment_type, scheduled_at, location, status")
+          .eq("customer_id", customer.id)
+          .order("scheduled_at", { ascending: false })
+          .limit(30)
+      : { data: [] as DemandApptRow[] },
+  );
+  const allEventsP = buildDemandEvents(
+    supabase,
+    { id: demand.id, created_at: demand.created_at, customerId: customer?.id ?? null },
+    Promise.all([taskP, apptP]).then(([t, ap]) => ({ tasks: (t.data ?? []) as DemandTaskRow[], appts: (ap.data ?? []) as DemandApptRow[] })),
+  );
+
   const [
     { data: provinces },
     fetchedWeights,
@@ -171,6 +199,7 @@ export default async function DemandDetailPage({
     { data: agentProfile },
     { data: taskRows },
     { data: apptRows },
+    allEvents,
   ] = await Promise.all([
     provinceOptionsResult({ includeInactive: true }),
     fetchTenantMatchingWeights(supabase),
@@ -190,31 +219,12 @@ export default async function DemandDetailPage({
       ? supabase.from("profiles").select("full_name").eq("id", customer.assigned_to).maybeSingle()
       : Promise.resolve({ data: null as { full_name: string } | null }),
     // Görev/randevu: talep ile görev arasında sütun yok; bağ talebin müşterisi üzerindendir.
-    customer && canTaskView
-      ? supabase
-          .from("tasks")
-          .select("id, title, kind, priority, status, due_at, completed_at, created_at")
-          .eq("customer_id", customer.id)
-          .order("status", { ascending: true })
-          .order("due_at", { ascending: true, nullsFirst: false })
-          .limit(50)
-      : Promise.resolve({ data: [] as DemandTaskRow[] }),
-    customer && canApptView
-      ? supabase
-          .from("appointments")
-          .select("id, appointment_type, scheduled_at, location, status")
-          .eq("customer_id", customer.id)
-          .order("scheduled_at", { ascending: false })
-          .limit(30)
-      : Promise.resolve({ data: [] as DemandApptRow[] }),
+    taskP,
+    apptP,
+    allEventsP,
   ]);
   const tasks = (taskRows ?? []) as DemandTaskRow[];
   const appts = (apptRows ?? []) as DemandApptRow[];
-  const allEvents = await buildDemandEvents(
-    supabase,
-    { id: demand.id, created_at: demand.created_at, customerId: customer?.id ?? null },
-    { tasks, appts },
-  );
   const eventCounts = countByCategory(allEvents);
   const timelineBase = `/app/talepler/${demand.id}`;
   const timelineCategories = DEMAND_TIMELINE_CATEGORIES.map((c) => ({ key: c.key, label: c.label, count: eventCounts[c.key] ?? 0 }));

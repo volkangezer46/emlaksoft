@@ -63,7 +63,7 @@ export default async function KiraDetayPage({
   const tab = resolveTab(await searchParams, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
 
   const supabase = await createClient();
-  const { data: rental } = await supabase
+  const rentalP = supabase
     .from("rentals")
     .select(
       "id, monthly_rent, due_day, start_date, end_date, deposit, deposit_returned, deposit_returned_at, status, notes, created_at, property:properties!rentals_property_id_fkey(id, property_code, title, address_line, province:geo_provinces(name), district:geo_districts(name)), renter:customers!rentals_renter_customer_id_fkey(id, full_name, phone), charges:rent_charges!rent_charges_rental_id_fkey(id, period, amount, status, paid_at), maintenance:maintenance_requests!maintenance_requests_rental_id_fkey(id, title, description, status, cost, created_at)",
@@ -71,12 +71,19 @@ export default async function KiraDetayPage({
     .eq("id", id)
     .maybeSingle();
 
-  if (!rental) notFound();
-
   // Kiralamadan oluşturulan sözleşmeler (H6, iki yönlü bağ). Hataya dayanıklı: sütun yoksa (migration uygulanmamış) liste boş kalır.
-  const contractsRes = canViewContracts
-    ? await supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20)
-    : null;
+  // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
+  // Hepsi yalnız `id`/tenant'a bağlı → ana kayıtla AYNI turda (önceden 3 sıralı tur).
+  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData] = await Promise.all([
+    rentalP,
+    canViewContracts
+      ? Promise.resolve(supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20))
+      : Promise.resolve(null),
+    supabase.from("rent_charges").select("id, paid_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
+    loadRentalPayments(supabase, tenantId ?? "", id),
+    loadLateFeeSettings(supabase, tenantId ?? ""),
+  ]);
+  if (!rental) notFound();
   const linkedContracts = contractsRes && !contractsRes.error ? (contractsRes.data ?? []) : [];
   const contractsAvailable = !contractsRes || !contractsRes.error;
 
@@ -89,12 +96,6 @@ export default async function KiraDetayPage({
     a.created_at < b.created_at ? 1 : -1,
   );
 
-  // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
-  const [paidRes, paymentData, lateFeeData] = await Promise.all([
-    supabase.from("rent_charges").select("id, paid_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
-    loadRentalPayments(supabase, tenantId ?? "", id),
-    loadLateFeeSettings(supabase, tenantId ?? ""),
-  ]);
   const paidById = new Map<string, number>(
     paidRes.error ? [] : ((paidRes.data ?? []) as { id: string; paid_amount: number | string }[]).map((c) => [c.id, Number(c.paid_amount) || 0]),
   );

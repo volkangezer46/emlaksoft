@@ -78,14 +78,19 @@ function one<T>(v: T | T[] | null): T | null {
 
 export default async function OfferDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { perms } = await requireModulePage("offers", "/app/teklifler");
-  const stageNames = stageLabelMap(await getStageLabels());
   const canEdit = (perms.offers ?? perms.commissions ?? []).includes("edit");
   const { id } = await params;
+  const supabase = await createClient();
 
-  const offer = await getOffer(id);
+  // Hepsi yalnız `id`'ye bağlı → tek turda (önceden 4 sıralı tur). deal_id kolonu henüz yoksa sorgu hata döner → yok sayılır.
+  const [stageLabels, offer, rounds, { data: linkRow }] = await Promise.all([
+    getStageLabels(),
+    getOffer(id),
+    listOfferRounds(id),
+    supabase.from("offers").select("deal_id").eq("id", id).maybeSingle(),
+  ]);
+  const stageNames = stageLabelMap(stageLabels);
   if (!offer) notFound();
-
-  const rounds = await listOfferRounds(id);
 
   const property = one(offer.property) as
     | { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string | null; property_type: string | null }
@@ -97,35 +102,28 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
    * akışında atanır; migration 20260726000069). Bağ yoksa eski yaklaşık
    * eşleştirme: aynı portföy + müşteri ikilisine bağlı en güncel anlaşma.
    */
-  const supabase = await createClient();
   let relatedDeal: { id: string; stage: string } | null = null;
   let exactLink = false;
-  // deal_id kolonu henüz yoksa sorgu hata döner → yok sayıp yaklaşık eşleşmeye düş
-  const { data: linkRow } = await supabase
-    .from("offers")
-    .select("deal_id")
-    .eq("id", offer.id)
-    .maybeSingle();
   const linkedDealId = (linkRow as { deal_id?: string | null } | null)?.deal_id ?? null;
-  if (linkedDealId) {
-    const { data: linkedDeal } = await supabase
-      .from("deals")
-      .select("id, stage")
-      .eq("id", linkedDealId)
-      .maybeSingle();
-    if (linkedDeal) {
-      relatedDeal = linkedDeal as { id: string; stage: string };
-      exactLink = true;
-    }
-  }
-  if (!relatedDeal && offer.property_id && offer.customer_id) {
-    const { data: dealRows } = await supabase
-      .from("deals")
-      .select("id, stage")
-      .eq("property_id", offer.property_id)
-      .eq("customer_id", offer.customer_id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+  // Kesin bağ + yaklaşık eşleşme AYNI turda (yedek sorgu yalnız kesin bağ yoksa/bulunamazsa kullanılır).
+  const [{ data: linkedDeal }, { data: dealRows }] = await Promise.all([
+    linkedDealId
+      ? supabase.from("deals").select("id, stage").eq("id", linkedDealId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    offer.property_id && offer.customer_id
+      ? supabase
+          .from("deals")
+          .select("id, stage")
+          .eq("property_id", offer.property_id)
+          .eq("customer_id", offer.customer_id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+      : Promise.resolve({ data: null }),
+  ]);
+  if (linkedDeal) {
+    relatedDeal = linkedDeal as { id: string; stage: string };
+    exactLink = true;
+  } else {
     relatedDeal = (dealRows?.[0] as { id: string; stage: string } | undefined) ?? null;
   }
 

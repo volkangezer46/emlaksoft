@@ -150,6 +150,12 @@ export default async function CustomerDetailPage({
     transactionTypeDefs,
     propertyTypeDefs,
     demandUrgencyDefs,
+    { data: waTenant },
+    { data: waAdvisor },
+    { data: editBranches },
+    { data: editAdvisors },
+    sourceDefs,
+    prefRes,
   ] = await Promise.all([
     supabase
       .from("customers")
@@ -245,19 +251,20 @@ export default async function CustomerDetailPage({
     getDefinitions("transaction_type"),
     getDefinitions("property_type"),
     getDefinitions("demand_urgency"),
-  ]);
-
-  if (!customer) notFound();
-
-  // WhatsApp şablon değişkenleri — {ofis} ve {danisman} için iki hafif sorgu
-  const [{ data: waTenant }, { data: waAdvisor }, { data: editBranches }, { data: editAdvisors }, sourceDefs] = await Promise.all([
+    // WhatsApp şablon değişkenleri — {ofis} ve {danisman} için iki hafif sorgu (yalnız userId'ye bağlı → aynı tur)
     supabase.from("tenants").select("name, phone").limit(1).maybeSingle(),
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     // Düzenleme paneli seçenekleri (yalnız düzenleme yetkisi varsa gerekir)
     canEdit ? supabase.from("branches").select("id, name").eq("is_active", true).order("name") : noRows,
     canEdit ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name") : noRows,
     canEdit ? getDefinitionsOrDefault("customer_source") : Promise.resolve([]),
+    // Kira hatırlatması tercihi (H3 sütunları): yalnız "özet" sekmesinde; sütun yoksa kart çizilmez (hata yok sayılır).
+    tab === "ozet"
+      ? supabase.from("customers").select("rent_reminder_opt_out, rent_reminder_opt_out_at").eq("id", id).maybeSingle()
+      : Promise.resolve(null),
   ]);
+
+  if (!customer) notFound();
 
   const customerTypeOptions = customerTypeDefs.length ? customerTypeDefs.map((d) => d.value) : undefined;
   const transactionTypeOptions = transactionTypeDefs.length ? transactionTypeDefs.map((d) => d.value) : undefined;
@@ -354,12 +361,7 @@ export default async function CustomerDetailPage({
   // Kira hatırlatması tercihi (H3 sütunları): yalnız "İletişim tercihleri" sekmesinde; sütun yoksa kart çizilmez.
   let rentPref: { optOut: boolean; atLabel: string | null } | null = null;
   if (tab === "ozet") {
-    const prefRes = await supabase
-      .from("customers")
-      .select("rent_reminder_opt_out, rent_reminder_opt_out_at")
-      .eq("id", customer.id)
-      .maybeSingle();
-    if (!prefRes.error && prefRes.data) {
+    if (prefRes && !prefRes.error && prefRes.data) {
       const row = prefRes.data as { rent_reminder_opt_out?: boolean | null; rent_reminder_opt_out_at?: string | null };
       rentPref = {
         optOut: row.rent_reminder_opt_out === true,
