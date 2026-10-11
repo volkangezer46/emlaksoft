@@ -66,7 +66,7 @@ export async function createExpense(
       notes,
       property_id:  propertyId,
       // Yeni sütunlar yalnız doluysa yazılır: şema (20261008000700) yokken eski gider akışı aynen çalışır.
-      ...(fin.value.recurrence ? { recurrence: fin.value.recurrence } : {}),
+      // `recurrence` YENİ YAZILMAZ: düzenli ödemenin tek giriş yolu recurring_rules (Konsey #13+#18); eski seriler yalnız okunur / "Kurala çevir".
       ...(fin.value.portalKey ? { portal_key: fin.value.portalKey } : {}),
     })
     .select("id")
@@ -135,7 +135,6 @@ export async function updateExpense(
       notes,
       ...(fd.has("property_id") ? { property_id: propertyId } : {}),
       ...(fd.has("receipt_url") ? { receipt_url: receiptUrl } : {}),
-      ...(fin.value.hasRecurrence ? { recurrence: fin.value.recurrence } : {}),
       ...(fin.value.hasPortal ? { portal_key: fin.value.portalKey } : {}),
     })
     .eq("id", id)

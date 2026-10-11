@@ -9,7 +9,6 @@ import { useToast } from "@/components/app/toast-provider";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
 import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
-import { RECURRENCES, RECURRENCE_LABEL } from "@/lib/finance/recurring-expenses";
 
 type Category = { value: string; label: string };
 
@@ -103,16 +102,12 @@ export function ExpenseCreateForm({
       <input id="expense-notes" name="notes" maxLength={2000} placeholder="Not (opsiyonel)" className={`sm:col-span-2 ${inputClass}`} />
       {financeFields ? (
         <>
-      <label htmlFor="expense-recurrence" className="sr-only">Tekrar dönemi</label>
-      <select id="expense-recurrence" name="recurrence" defaultValue="" className={inputClass}>
-        <option value="">Tek seferlik</option>
-        {RECURRENCES.map((r) => <option key={r} value={r}>{RECURRENCE_LABEL[r]} tekrarlar</option>)}
-      </select>
       <label htmlFor="expense-portal" className="sr-only">Portal (opsiyonel)</label>
       <select id="expense-portal" name="portal_key" defaultValue="" className={inputClass}>
         <option value="">Portal gideri değil</option>
         {PORTAL_KEYS.map((k) => <option key={k} value={k}>{PORTAL_LABEL[k]} gideri</option>)}
       </select>
+      <p className="text-xs text-slate-500 sm:col-span-2">Her ay/yıl tekrar eden ödeme için bu formu değil, aşağıdaki Düzenli ödemeler bölümünü kullanın.</p>
         </>
       ) : null}
       {accounts.length > 0 ? (
