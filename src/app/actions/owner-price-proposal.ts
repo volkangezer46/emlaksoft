@@ -44,9 +44,13 @@ export async function decideOwnerPriceProposal(fd: FormData): Promise<OwnerPrice
   if (!m.ok) return { ok: false, message: m.text };
 
   revalidatePath(`/malik-portali/${token}`);
+  // Ofis kuralı esik-ustu fiyat dusurmesi icin yonetici onayi isterse fiyat HEMEN degismez (20261012001200).
+  const awaitingManager = (data as { outcome?: string } | null)?.outcome === "awaiting_manager";
   const done =
     decision === "approved"
-      ? "Teşekkürler, yeni fiyat onaylandı ve ilanınıza yansıtıldı."
+      ? awaitingManager
+        ? "Onayınız alındı. Ofis yöneticisinin onayından sonra fiyat güncellenecek."
+        : "Teşekkürler, yeni fiyat onaylandı ve ilanınıza yansıtıldı."
       : decision === "rejected"
         ? "Önerilen fiyat reddedildi. Danışmanınız sizinle iletişime geçecek."
         : "Notunuz danışmanınıza iletildi.";

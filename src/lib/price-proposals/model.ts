@@ -3,13 +3,16 @@
  *
  * Akış: danışman portföy detayında yeni fiyat + gerekçe önerir -> mülk sahibi portalında onaylar/reddeder/not ekler ->
  * onayda portföy fiyatı AYNI işlemde güncellenir (SQL: decide_property_price_proposal_by_token, 20261012000800).
+ * Ofis "eşik üstü fiyat düşürme" kuralı açıksa mülk sahibi onayı yönetici onayının YERİNE GEÇMEZ: öneri `awaiting_manager`
+ * olur, yönetici onayından sonra `apply_price_proposal_after_approval` fiyatı uygular (20261012001200).
  * Kural: emsal yoksa öneri aralığı YOK (uydurma değer yazılmaz); emsal özeti mülk sahibine yalnız anonim satırlarla gider.
  */
 
-export type ProposalStatus = "pending" | "approved" | "rejected" | "expired";
+export type ProposalStatus = "pending" | "awaiting_manager" | "approved" | "rejected" | "expired";
 
 export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
   pending: "Mülk sahibi onayı bekliyor",
+  awaiting_manager: "Mülk sahibi onayladı, yönetici onayı bekleniyor",
   approved: "Mülk sahibi onayladı",
   rejected: "Mülk sahibi reddetti",
   expired: "Süresi doldu",
@@ -166,7 +169,7 @@ export function proposalMessage(code: string): { ok: boolean; text: string } {
     case "no_owner_portal":
       return { ok: false, text: "Mülk sahibine açık bir portal bağlantısı yok. Önce 'Mülk sahibi portalı' bölümünden bağlantı oluşturun." };
     case "already_pending":
-      return { ok: false, text: "Zaten mülk sahibinin onayını bekleyen bir öneri var. Önce onu iptal edin ya da yanıtını bekleyin." };
+      return { ok: false, text: "Zaten mülk sahibinin veya yöneticinin onayını bekleyen bir öneri var. Önce onu iptal edin ya da yanıtını bekleyin." };
     case "not_found":
       return { ok: false, text: "Kayıt bulunamadı ya da artık geçerli değil. Sayfayı yenileyin." };
     case "invalid_link":
@@ -177,6 +180,12 @@ export function proposalMessage(code: string): { ok: boolean; text: string } {
       return { ok: false, text: "Bu önerinin süresi dolmuş. Danışmanınız yeni bir öneri gönderebilir." };
     case "price_changed":
       return { ok: false, text: "Bu arada portföy fiyatı değişmiş; öneri geçersiz sayıldı. Danışmanınız güncel fiyatla yeniden önerecek." };
+    case "not_awaiting":
+      return { ok: false, text: "Bu öneri artık yönetici onayı beklemiyor. Sayfayı yenileyin." };
+    case "no_approval":
+      return { ok: false, text: "Geçerli (48 saat içinde verilmiş, kullanılmamış) bir yönetici onayı bulunamadı." };
+    case "no_denial":
+      return { ok: false, text: "Eşleşen reddedilmiş yönetici kararı bulunamadı." };
     case "note_required":
       return { ok: false, text: "Danışmanınıza iletmek istediğiniz notu yazın." };
     case "rate_limited":

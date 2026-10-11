@@ -40,6 +40,7 @@ export type ProposalView = {
 
 const TONE: Record<ProposalStatus, "neutral" | "attention" | "success"> = {
   pending: "attention",
+  awaiting_manager: "attention",
   approved: "success",
   rejected: "neutral",
   expired: "neutral",
@@ -188,7 +189,7 @@ export function PriceProposalPanel({ propertyId, canEdit, items }: { propertyId:
                     </p>
                     <StatusBadge
                       tone={TONE[p.status]}
-                      icon={p.status === "approved" ? <BadgeCheck /> : p.status === "pending" ? <Clock /> : <XCircle />}
+                      icon={p.status === "approved" ? <BadgeCheck /> : p.status === "pending" || p.status === "awaiting_manager" ? <Clock /> : <XCircle />}
                     >
                       {PROPOSAL_STATUS_LABEL[p.status]}
                     </StatusBadge>
@@ -200,7 +201,7 @@ export function PriceProposalPanel({ propertyId, canEdit, items }: { propertyId:
                     {formatDateTr(p.createdAt, { day: "2-digit", month: "long", year: "numeric" })} tarihinde gönderildi
                     {p.status === "pending" ? ` · ${formatDateTr(p.expiresAt, { day: "2-digit", month: "long" })} tarihine kadar geçerli (${PROPOSAL_TTL_DAYS} gün)` : ""}
                   </p>
-                  {canEdit && p.status === "pending" ? (
+                  {canEdit && (p.status === "pending" || p.status === "awaiting_manager") ? (
                     <div className="mt-2">
                       <Button size="sm" variant="secondary" loading={pending} onClick={() => cancel(p.id)}>
                         Öneriyi iptal et

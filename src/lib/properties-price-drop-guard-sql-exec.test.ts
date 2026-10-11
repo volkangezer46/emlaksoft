@@ -9,6 +9,9 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
  * Supabase taklidi (roller, auth.*, JWT GUC'leri) üzerinde koşar; çağrılar `set role authenticated` ile RLS'li yapılır.
  * Senaryolar: danışman doğrudan düşüremez, onaylı akış geçer (tüketilmemiş ve uygulama yolundaki "önce tüket"),
  * owner/gm geçer, başka ofis görünmez, fiyat izi silinemez/değiştirilemez, service_role etkilenmez, rollback.
+ * Aynı senaryolar İKİ kez koşar: (1) yalnız PB53 kapısı, (2) üstüne 20261012000800 + 20261012001200 (GUVENLIK-1: kapı
+ * price_drop_check'e taşındı, "approved + decided_at = now()" erken dönüşü KALKTI). İkinci koşuda ek olarak
+ * mülk sahibi onayının yönetici onayının yerine geçmediği doğrulanır.
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -43,7 +46,23 @@ grant all on public.approval_requests to authenticated, service_role;
 create table public.oversight_settings(tenant_id uuid primary key references public.tenants(id), approval_rules jsonb not null default '{}'::jsonb);
 `;
 
-describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history salt-okunur (pglite)", () => {
+/** 20261012000800 + 20261012001200 için tablo/şema eklemeleri (kapı gövdesi bunlara bakar). */
+const PROPOSAL_EXTRA = `
+alter table public.tenants add column status text not null default 'active';
+alter table public.profiles add column is_active boolean not null default true;
+alter table public.profiles add column full_name text;
+alter table public.properties add column property_code text;
+alter table public.properties add column assigned_to uuid;
+create table public.owner_portal_tokens(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, property_id uuid not null,
+  owner_name text, token text not null unique, expires_at timestamptz not null);
+create table public.notifications(id uuid primary key default gen_random_uuid(), tenant_id uuid, user_id uuid, title text not null, body text,
+  href text, kind text not null default 'info', meta jsonb not null default '{}', created_at timestamptz default now());
+create table public.tasks(id uuid primary key default gen_random_uuid(), tenant_id uuid, title text not null, notes text, kind text, priority text,
+  status text, due_at timestamptz, assigned_to uuid, customer_id uuid, property_id uuid, created_at timestamptz default now());
+`;
+
+function registerSuite(label: string, withProposals: boolean) {
+describe.skipIf(!mod)(label, () => {
   let db: Db;
   let T1: string, T2: string, OWNER: string, GM: string, ADV: string, ADV2: string, MGR: string, OUT: string;
   let P: string, P2: string, PX: string, PF: string;
@@ -90,6 +109,11 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
     await db.exec(read("supabase/migrations/20260725000049_property_price_history.sql"));
     await db.exec(read("supabase/migrations/20260823000100_sec3_approval_requests_rls.sql"));
     await db.exec(read("supabase/migrations/20261007000800_properties_price_drop_db_guard.sql"));
+    if (withProposals) {
+      await db.exec(PROPOSAL_EXTRA);
+      await db.exec(read("supabase/migrations/20261012000800_property_price_proposals.sql"));
+      await db.exec(read("supabase/migrations/20261012001200_price_proposal_oversight_gate.sql"));
+    }
     await db.exec(`grant select on public.property_price_history to authenticated`);
     await admin();
     T1 = (await q(`insert into public.tenants default values returning id`))[0]!.id as string;
@@ -265,7 +289,32 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
     expect((await q(`select polname from pg_policy where polrelid = 'public.property_price_history'::regclass`)).map((r) => r.polname)).toEqual(["pph_select"]);
   });
 
-  it("rollback: kapı kalkar, eski politikalar geri gelir", async () => {
+  it.skipIf(!withProposals)("mülk sahibi onayı TEK BAŞINA kapıyı açmaz: aynı işlemdeki 'approved' öneri danışman PATCH'ini geçirmez; öneren owner/gm ise geçirir", async () => {
+    await resetPrice(P);
+    await admin();
+    await q(`update public.oversight_settings set approval_rules = $2::jsonb where tenant_id = $1`, [T1, JSON.stringify({ price_drop: { enabled: true, threshold: 10 } })]);
+    // Önceki senaryolardan kalan (yakın zamanda tüketilmiş) onaylar (b) yolunu açmasın: temiz başla.
+    await q(`delete from public.approval_requests`);
+    const asAdvInTx = (proposer: string) => `
+      reset role;
+      select set_config('request.jwt.claim.role','service_role',false), set_config('request.jwt.claim.sub','',false);
+      insert into public.property_price_proposals(tenant_id, property_id, proposed_by, old_price, new_price, reason, status, decided_at)
+        values ('${T1}', '${P}', '${proposer}', 1000000, 800000, 'sahte onay', 'approved', now());
+      select set_config('request.jwt.claim.sub','${ADV}',false), set_config('request.jwt.claim.role','authenticated',false),
+        set_config('test.tenant','${T1}',false), set_config('test.role','advisor',false), set_config('test.perms','properties:edit',false);
+      set role authenticated;
+      update public.properties set list_price = 800000 where id = '${P}';`;
+    await expect(db.exec(asAdvInTx(ADV))).rejects.toThrow(/yonetici onayi/);
+    expect(await price(P)).toBe(1_000_000);
+    // (d) yolu: öneren owner ise ayni islemde onaylanmis oneri gecerli.
+    await db.exec(asAdvInTx(OWNER));
+    expect(await price(P)).toBe(800_000);
+    await admin();
+    await q(`delete from public.property_price_proposals`);
+    await resetPrice(P);
+  });
+
+  it.skipIf(withProposals)("rollback: kapı kalkar, eski politikalar geri gelir", async () => {
     await admin();
     await db.exec(read("supabase/rollbacks/20261007000800_properties_price_drop_db_guard.rollback.sql"));
     await as(ADV, T1, "advisor");
@@ -281,3 +330,7 @@ describe.skipIf(!mod)("properties fiyat düşürme DB kapısı + price_history s
     await resetPrice(P, 1_000_000).catch(() => undefined);
   });
 });
+}
+
+registerSuite("properties fiyat düşürme DB kapısı + price_history salt-okunur (pglite)", false);
+registerSuite("properties fiyat düşürme DB kapısı: GUVENLIK-1 sonrası (price_drop_check + öneri) aynı davranış", true);

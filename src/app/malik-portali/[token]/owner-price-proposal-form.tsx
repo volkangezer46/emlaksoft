@@ -57,7 +57,7 @@ export function OwnerPriceProposalForm({ token, proposalId, newPriceLabel }: { t
             </Button>
           }
           title="Yeni fiyatı onayla"
-          description={`İlanınızın fiyatı ${newPriceLabel} olarak güncellenecek. Bu işlem geri alınamaz.`}
+          description={`Yeni fiyat (${newPriceLabel}) onayınızla işleme alınır. Bu işlem geri alınamaz.`}
           confirmLabel="Onaylıyorum"
           cancelLabel="Vazgeç"
           tone="default"

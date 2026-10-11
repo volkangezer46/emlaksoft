@@ -3,8 +3,9 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2, X } from "lucide-react";
-import { markCommissionsPaidBulk } from "@/app/actions/commissions";
+import { markCommissionsPaidBulk, retryCommissionCash } from "@/app/actions/commissions";
 import { useToast } from "@/components/app/toast-provider";
+import { Button } from "@/components/ui/button";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 
 /**
@@ -62,7 +63,27 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [accountId, setAccountId] = useState("");
-  if (!ctx || allIds.length === 0) return null;
+  // Tahsilat kaydedildi ama kasa hareketi yazılamayanlar: uyarı + "Yeniden dene" (aynı hesapla, idempotent).
+  const [cashFailed, setCashFailed] = useState<{ ids: string[]; accountId: string } | null>(null);
+  const [retrying, setRetrying] = useState(false);
+  if (!ctx || (allIds.length === 0 && !cashFailed)) return null;
+
+  async function retry() {
+    if (!cashFailed) return;
+    setRetrying(true);
+    const res = await retryCommissionCash(cashFailed.ids, cashFailed.accountId);
+    setRetrying(false);
+    if (res.failedIds.length > 0) {
+      setCashFailed({ ids: res.failedIds, accountId: cashFailed.accountId });
+      push(`${res.failedIds.length} tahsilat kasaya yazılamadı`, "err");
+    } else if (res.error) {
+      push(res.error, "err");
+    } else {
+      setCashFailed(null);
+      push(`${res.recorded} tahsilat kasaya yazıldı`, "ok");
+      router.refresh();
+    }
+  }
 
   const count = ctx.selected.size;
   const allSelected = count > 0 && allIds.every((id) => ctx.selected.has(id));
@@ -75,7 +96,10 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
     if (res.error) push(res.error, "err");
     else {
       push(`${res.updated ?? 0} komisyon tahsil edildi olarak işaretlendi`, "ok");
-      if (res.info) push(res.info, "err");
+      if (res.cashFailedCount > 0) {
+        setCashFailed({ ids: res.cashFailedIds, accountId });
+        push(`${res.cashFailedCount} tahsilat kasaya yazılamadı`, "err");
+      } else if (res.info) push(res.info, "err");
       ctx.clear();
       router.refresh();
     }
@@ -83,6 +107,14 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-2.5">
+      {cashFailed ? (
+        <div role="alert" className="flex w-full flex-wrap items-center gap-2 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-neg)_10%,transparent)] px-3 py-2 text-xs font-semibold text-[color:var(--viz-neg)]">
+          <span>{cashFailed.ids.length} tahsilat kasaya yazılamadı</span>
+          <Button type="button" variant="outline" size="sm" onClick={retry} loading={retrying} disabled={retrying} className="touch:h-11">
+            Yeniden dene
+          </Button>
+        </div>
+      ) : null}
       <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-muted">
         <input
           type="checkbox"

@@ -7,7 +7,8 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
-import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import { recordCollectionCashResult, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 
 /**
  * Paylaşım satırı. `party` verilirse taraf kimliği AÇIKTIR (Konsey #0+#8): "staff" = ofis personeli (profileId zorunlu),
@@ -20,15 +21,26 @@ export type CommissionSplitInput = {
   party?: "staff" | "office" | "external";
   profileId?: string | null;
 };
-export type CommissionResult = { ok?: boolean; error?: string; info?: string };
+export type CommissionResult = {
+  ok?: boolean;
+  error?: string;
+  info?: string;
+  /** Tahsil edilmiş komisyonun paylaşımı değişiyor: arayüz "Değişiklik gerekçesi" alanını göstermeli. */
+  needsReason?: boolean;
+};
+
+const SPLIT_REASON_MIN = 5;
 
 /**
  * Komisyon paylaşımını (çok taraflı split) günceller. Oranlar (%) verilir,
  * tutarlar brüt komisyondan otomatik hesaplanır. Toplam oran %100'ü aşamaz.
+ * Tahsil edilmiş (paid/collected) komisyonda yalnız owner/gm değiştirebilir ve gerekçe (en az 5 karakter) zorunludur;
+ * her başarılı değişiklik eski/yeni paylarla denetim kaydına yazılır. `reason` opsiyoneldir (eski çağrılar bozulmaz).
  */
 export async function updateCommissionSplits(
   commissionId: string,
   rows: CommissionSplitInput[],
+  reason?: string,
 ): Promise<CommissionResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -49,12 +61,23 @@ export async function updateCommissionSplits(
   const supabase = await createClient();
   const { data: commission } = await supabase
     .from("commissions")
-    .select("gross_amount")
+    .select("gross_amount, status, splits")
     .eq("id", commissionId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
 
   if (!commission) return { error: "Komisyon kaydı bulunamadı." };
+
+  const settled = commission.status === "paid" || commission.status === "collected";
+  const cleanReason = String(reason ?? "").trim();
+  if (settled) {
+    if (!isApprovalExemptRole(gate.role)) {
+      return { error: "Tahsil edilmiş komisyonun paylaşımını yalnız ofis sahibi veya genel müdür değiştirebilir." };
+    }
+    if (cleanReason.length < SPLIT_REASON_MIN) {
+      return { error: `Tahsil edilmiş komisyonun paylaşımını değiştirmek için en az ${SPLIT_REASON_MIN} karakterlik bir gerekçe yazın.`, needsReason: true };
+    }
+  }
 
   const gross = Number(commission.gross_amount) || 0;
 
@@ -86,6 +109,16 @@ export async function updateCommissionSplits(
     return { error: actionErrorMessage(error, "Paylaşım güncellenemedi.") };
   }
 
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "commission.splits_updated",
+    entityType: "commission",
+    entityId: commissionId,
+    oldValue: { splits: commission.splits ?? [], status: commission.status },
+    newValue: { splits, reason: cleanReason || null },
+  });
+
   revalidatePath("/app/komisyon");
   revalidateTenantData(gate.tenantId);
   return { ok: true };
@@ -99,14 +132,14 @@ export async function updateCommissionSplits(
 export async function markCommissionsPaidBulk(
   ids: string[],
   accountId?: string | null,
-): Promise<CommissionResult & { updated?: number }> {
+): Promise<CommissionResult & { updated?: number; cashFailedIds: string[]; cashFailedCount: number }> {
   const gate = await requirePermission("commissions", "edit");
-  if (!gate.ok) return { error: gate.error };
+  if (!gate.ok) return { error: gate.error, cashFailedIds: [], cashFailedCount: 0 };
 
   const clean = Array.from(
     new Set(ids.map((id) => String(id ?? "").trim()).filter(Boolean)),
   ).slice(0, 200);
-  if (clean.length === 0) return { error: "En az bir kayıt seçin." };
+  if (clean.length === 0) return { error: "En az bir kayıt seçin.", cashFailedIds: [], cashFailedCount: 0 };
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -119,19 +152,23 @@ export async function markCommissionsPaidBulk(
 
   if (error) {
     console.error("markCommissionsPaidBulk", error);
-    return { error: actionErrorMessage(error, "Kayıtlar güncellenemedi.") };
+    return { error: actionErrorMessage(error, "Kayıtlar güncellenemedi."), cashFailedIds: [], cashFailedCount: 0 };
   }
 
   const updatedIds = (data ?? []).map((r) => r.id as string);
   // Istege bagli "Hangi hesaba girdi?": secildiyse her tahsilat icin ofis hesabina bir hareket (ayni komisyon iki kez yazilmaz).
   let info: string | undefined;
+  const cashFailedIds: string[] = [];
   if (accountId) {
     const today = trDayKey(now());
     for (const row of data ?? []) {
-      const warn = await recordCollectionCash(supabase, {
+      const res = await recordCollectionCashResult(supabase, {
         accountId, sourceType: "commission", sourceId: row.id as string, amount: Number(row.gross_amount), date: today, title: "Komisyon tahsilatı",
       });
-      if (warn) info = warn;
+      if (!res.ok) {
+        cashFailedIds.push(row.id as string);
+        info = res.warning; // gösterim metni; asıl bilgi cashFailedIds / cashFailedCount
+      }
     }
   }
   if (updatedIds.length > 0) {
@@ -147,7 +184,62 @@ export async function markCommissionsPaidBulk(
 
   revalidatePath("/app/komisyon");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, updated: updatedIds.length, info };
+  return { ok: true, updated: updatedIds.length, info, cashFailedIds, cashFailedCount: cashFailedIds.length };
+}
+
+/**
+ * Toplu tahsilatta kasaya yazılamayan komisyonlar için hareket yazımını yeniden dener.
+ * Yalnız bu ofisin paid/collected komisyonları; en çok 200 kayıt. Yeniden deneme güvenlidir (idempotent):
+ * hareket zaten varsa (duplicate) başarı sayılır.
+ */
+export async function retryCommissionCash(
+  ids: string[],
+  accountId: string,
+): Promise<CommissionResult & { failedIds: string[]; failedCount: number; recorded: number }> {
+  const none = { failedIds: [] as string[], failedCount: 0, recorded: 0 };
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error, ...none };
+
+  const clean = Array.from(new Set((ids ?? []).map((id) => String(id ?? "").trim()).filter(Boolean)));
+  if (clean.length === 0) return { error: "Yeniden denenecek kayıt yok.", ...none };
+  if (clean.length > 200) return { error: "Tek seferde en çok 200 kayıt yeniden denenebilir.", ...none };
+  if (!String(accountId ?? "").trim()) return { error: "Hareketin yazılacağı hesabı seçin.", ...none };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("commissions")
+    .select("id, gross_amount")
+    .in("id", clean)
+    .eq("tenant_id", gate.tenantId)
+    .in("status", ["paid", "collected"]);
+  if (error) {
+    console.error("retryCommissionCash", error);
+    return { error: actionErrorMessage(error, "Kayıtlar okunamadı."), ...none };
+  }
+
+  const today = trDayKey(now());
+  const failedIds: string[] = [];
+  let recorded = 0;
+  for (const row of data ?? []) {
+    const res = await recordCollectionCashResult(supabase, {
+      accountId, sourceType: "commission", sourceId: row.id as string, amount: Number(row.gross_amount), date: today, title: "Komisyon tahsilatı",
+    });
+    if (res.ok) recorded += 1; // recorded ya da duplicate
+    else failedIds.push(row.id as string);
+  }
+
+  revalidatePath("/app/komisyon");
+  revalidateTenantData(gate.tenantId);
+  if (failedIds.length > 0) {
+    return {
+      ok: false,
+      error: `${failedIds.length} tahsilat kasaya yazılamadı.`,
+      failedIds,
+      failedCount: failedIds.length,
+      recorded,
+    };
+  }
+  return { ok: true, failedIds, failedCount: 0, recorded };
 }
 
 /**

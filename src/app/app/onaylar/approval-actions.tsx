@@ -102,6 +102,9 @@ export function DecisionControls({ requestId, requestTitle }: { requestId: strin
           </div>
         </form>
       ) : null}
+      {!mode && state?.ok && state.info ? (
+        <p className="basis-full text-right text-xs font-medium text-text-muted" role="status">{state.info}</p>
+      ) : null}
     </span>
   );
 }
@@ -132,6 +135,8 @@ export function ApprovalBulkBar() {
         `${res.decided ?? 0} talep ${decision === "onaylandi" ? "onaylandı" : "reddedildi"}${skipped > 0 ? ` · ${skipped} atlandı${res.firstError ? ` (${res.firstError})` : ""}` : ""}`,
         skipped > 0 ? "err" : "ok",
       );
+      const firstInfo = res.infos?.[0];
+      if (firstInfo) push(res.infos!.length > 1 ? `${firstInfo} (+${res.infos!.length - 1} talep daha)` : firstInfo, "ok");
       clear();
       setNote("");
       router.refresh();

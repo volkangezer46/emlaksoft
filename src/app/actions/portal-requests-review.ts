@@ -103,14 +103,18 @@ export async function confirmRentNotice(input: { noticeId: string; paidOn?: stri
   if (!UUID_RE.test(input.noticeId)) return { error: "Bildirim bulunamadı." };
 
   const supabase = await createClient();
-  const { data: notice } = await supabase
+  // Sahiplen (decideDemandUpdate deseni): yalnız bekleyen bildirim teyit edilir; çift tıklama / iki yönetici aynı anda
+  // tek tahsilat üretir. Tahsilat ANCAK sahiplenen çağrıda kaydedilir (önce kayıt, sonra durum yazmak çift makbuz açabilirdi).
+  const { data: notice, error: claimErr } = await supabase
     .from("rent_payment_notices")
-    .select("id, rental_id, charge_id, amount, status, reference")
+    .update({ status: "confirmed", decided_by: gate.userId, decided_at: daysAgoIso(0) })
     .eq("id", input.noticeId)
     .eq("tenant_id", gate.tenantId)
+    .eq("status", "pending")
+    .select("id, rental_id, charge_id, amount, reference")
     .maybeSingle();
-  if (!notice) return { error: "Bildirim bulunamadı." };
-  if (notice.status !== "pending") return { error: "Bu bildirim zaten karara bağlanmış." };
+  if (claimErr) return { error: actionErrorMessage(claimErr, "Bildirim karara bağlanamadı") };
+  if (!notice) return { error: "Bu bildirim zaten karara bağlanmış." };
 
   const paid = await recordRentPayment({
     chargeId: notice.charge_id as string,
@@ -120,15 +124,18 @@ export async function confirmRentNotice(input: { noticeId: string; paidOn?: stri
     method: "bank_transfer",
     bankNote: ["Kiracı bildirimi", notice.reference ? String(notice.reference) : ""].filter(Boolean).join(" · ").slice(0, 300),
   });
-  if (!paid.ok) return { error: paid.error ?? actionErrorMessage(null, "Tahsilat kaydedilemedi") };
+  if (!paid.ok) {
+    // Tahsilat yazılamadı: sahipliği geri bırak ki bildirim "teyit edildi ama tahsilat yok" olarak kalmasın.
+    const { error: rollbackErr } = await supabase
+      .from("rent_payment_notices")
+      .update({ status: "pending", decided_by: null, decided_at: null })
+      .eq("id", input.noticeId)
+      .eq("tenant_id", gate.tenantId)
+      .eq("status", "confirmed");
+    if (rollbackErr) console.error("confirmRentNotice rollback", { code: rollbackErr.code, noticeId: input.noticeId });
+    return { error: paid.error ?? actionErrorMessage(null, "Tahsilat kaydedilemedi") };
+  }
 
-  const { error } = await supabase
-    .from("rent_payment_notices")
-    .update({ status: "confirmed", decided_by: gate.userId, decided_at: daysAgoIso(0) })
-    .eq("id", input.noticeId)
-    .eq("tenant_id", gate.tenantId)
-    .eq("status", "pending");
-  if (error) console.error("confirmRentNotice", { code: error.code });
   revalidatePath(`/app/kiralama/${notice.rental_id as string}`);
   return { ok: true, info: paid.info };
 }

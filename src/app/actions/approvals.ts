@@ -7,8 +7,9 @@ import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
 import { canDecide, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { proposalMessage } from "@/lib/price-proposals/model";
 
-export type ApprovalResult = { ok?: boolean; error?: string; id?: string };
+export type ApprovalResult = { ok?: boolean; error?: string; id?: string; info?: string };
 
 const PATH = "/app/onaylar";
 
@@ -147,7 +148,7 @@ export async function decideApproval(
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("approval_requests")
-    .select("id, title, kind, status, requested_by")
+    .select("id, title, kind, status, requested_by, description")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -199,11 +200,84 @@ export async function decideApproval(
     });
   }
 
+  // Fiyat önerisi bağlantısı: mülk sahibi onayladı, ofis kuralı yönetici onayı istedi (GUVENLIK-1, 20261012001200).
+  // Karar ZATEN yazıldı: fiyat uygulanamazsa onayı geri almayız, nedenini bilgi olarak döndürürüz.
+  const info = await settlePriceProposal(supabase, {
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    description: row.description as string | null,
+    decision,
+  });
+
   revalidatePath(PATH);
-  return { ok: true, id };
+  return info ? { ok: true, id, info } : { ok: true, id };
 }
 
-export type BulkApprovalResult = { error?: string; decided?: number; skipped?: number; firstError?: string };
+const PRICE_DROP_FINGERPRINT = /^\[oversight:price_drop:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/i;
+
+/**
+ * `[oversight:price_drop:<ilan>]` talebine verilen kararı, o ilan için 'yönetici onayı bekleyen' fiyat önerisine yansıtır:
+ * onay -> `apply_price_proposal_after_approval` (onayı tüketir, fiyatı ve fiyat izini tek işlemde yazar);
+ * ret -> `reject_price_proposal_after_denial`. Öneri yoksa (normal fiyat düşürme talebi) hiçbir şey yapmaz.
+ */
+async function settlePriceProposal(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ctx: { tenantId: string; actorId: string; description: string | null; decision: "onaylandi" | "reddedildi" },
+): Promise<string | undefined> {
+  const match = PRICE_DROP_FINGERPRINT.exec(ctx.description ?? "");
+  if (!match) return undefined;
+  const propertyId = match[1]!;
+
+  const { data: proposal } = await supabase
+    .from("property_price_proposals")
+    .select("id")
+    .eq("tenant_id", ctx.tenantId)
+    .eq("property_id", propertyId)
+    .eq("status", "awaiting_manager")
+    .maybeSingle();
+  if (!proposal) return undefined;
+
+  if (ctx.decision === "reddedildi") {
+    const { error } = await supabase.rpc("reject_price_proposal_after_denial", { p_proposal_id: proposal.id });
+    if (error) console.error("reject_price_proposal_after_denial", { code: error.code });
+    revalidatePath(`/app/portfoyler/${propertyId}`);
+    return undefined;
+  }
+
+  // Karar satırı onay sekmesinden düştüğü için hata yalnız dönüş değerine bırakılmaz: karar vericiye bildirim de düşer.
+  const fail = async (message: string): Promise<string> => {
+    await notifyTenant({
+      tenantId: ctx.tenantId,
+      userId: ctx.actorId,
+      title: "Fiyat güncellenemedi; portföy sayfasından yeniden deneyin",
+      body: message,
+      href: `/app/portfoyler/${propertyId}`,
+      kind: "warning",
+    }).catch(() => undefined);
+    return message;
+  };
+
+  const { data, error } = await supabase.rpc("apply_price_proposal_after_approval", { p_proposal_id: proposal.id });
+  if (error) {
+    console.error("apply_price_proposal_after_approval", { code: error.code });
+    return fail(`Onay verildi; ${actionErrorMessage(error, "fiyat güncellenemedi")}`);
+  }
+  const code = (data as { code?: string } | null)?.code ?? "error";
+  if (code !== "ok") return fail(`Onay verildi; fiyat güncellenemedi: ${proposalMessage(code).text}`);
+
+  await logActivity({
+    tenantId: ctx.tenantId,
+    actorId: ctx.actorId,
+    action: "property.price_proposal_applied",
+    entityType: "property",
+    entityId: propertyId,
+    newValue: { proposal_id: proposal.id },
+  });
+  revalidatePath(`/app/portfoyler/${propertyId}`);
+  return "Fiyat güncellendi (mülk sahibi + yönetici onaylı).";
+}
+
+export type BulkApprovalResult = { error?: string; decided?: number; skipped?: number; firstError?: string; infos?: string[] };
 
 /**
  * Toplu onay/ret: her talep TEK TEK `decideApproval` yolundan geçer (kademe, "kendi talebini
@@ -223,19 +297,23 @@ export async function decideApprovalsBulk(ids: string[], decision: string, note:
   let decided = 0;
   let skipped = 0;
   let firstError: string | undefined;
+  const infos: string[] = [];
   for (const id of list) {
     const fd = new FormData();
     fd.set("id", id);
     fd.set("decision", decision);
     fd.set("decision_note", cleanNote);
     const res = await decideApproval({}, fd);
-    if (res.ok) decided += 1;
+    if (res.ok) {
+      decided += 1;
+      if (res.info) infos.push(res.info);
+    }
     else {
       skipped += 1;
       firstError ??= res.error;
     }
   }
-  return { decided, skipped, firstError };
+  return { decided, skipped, firstError, infos: infos.length > 0 ? infos : undefined };
 }
 
 /** Talebi geri çek — YALNIZ sahibi, YALNIZ bekliyorken. Satır silinmez, `iptal` olur. */

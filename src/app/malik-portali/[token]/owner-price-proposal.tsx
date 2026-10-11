@@ -61,6 +61,21 @@ export async function OwnerPriceProposalSection({ db, tenantId, propertyId, toke
       </PortalSection>
     );
   }
+  if (status === "awaiting_manager") {
+    // Mülk sahibi onayladı; ofis kuralı yönetici onayı istiyor. Fiyat henüz değişmedi.
+    return (
+      <PortalSection id="fiyat-onerisi" icon={Handshake} title="Fiyat önerisi">
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm shadow-[var(--shadow-xs)]">
+          <p className="font-semibold text-ink-950">Onayınız alındı. Ofis yöneticisinin onayından sonra fiyat güncellenecek.</p>
+          <p className="mt-1 text-text-muted">
+            {formatTry(oldPrice)} → {formatTry(newPrice)}
+            {pctText}
+          </p>
+          {row.owner_note ? <p className="mt-1 text-xs text-text-muted">Notunuz: {row.owner_note}</p> : null}
+        </div>
+      </PortalSection>
+    );
+  }
   if (status !== "pending") return null;
 
   const snap = parseSnapshot(row.comparables_snapshot);
