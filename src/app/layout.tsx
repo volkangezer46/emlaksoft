@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/app/sw-register";
 import { getBaseUrl } from "@/lib/base-url";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -9,16 +8,8 @@ import { brandIcons } from "@/lib/brand/icons";
 import { buildRootMetadata } from "@/lib/seo/store";
 import "./globals.css";
 
-// Inter ve Manrope kendi sunucumuzdan (src/app/fonts + globals.css @font-face; Türkçe harfler küçük alt küme).
-// Yalnız Geist Mono (kod/sayı; public sayfalarda yüklenmez) next/font ile gelir.
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-  display: "swap",
-  preload: false,
-  fallback: ["monospace"],
-});
-
+// Inter ve Manrope kendi sunucumuzdan (src/app/fonts + globals.css @font-face; Türkçe harfler aynı dosyada).
+// Geist Mono yalnız konsol layout'larında yüklenir (components/ui/console/mono-font.tsx).
 
 // Başlık, açıklama, Open Graph, Twitter ve arama motoru doğrulama kodları /admin/seo "Genel" sekmesinden
 // gelir (src/lib/seo/store.ts buildRootMetadata); ayar yokken değerler eskisiyle birebir aynıdır.
@@ -74,7 +65,7 @@ export default async function RootLayout({
     <html
       lang="tr"
       suppressHydrationWarning
-      className={`${geistMono.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

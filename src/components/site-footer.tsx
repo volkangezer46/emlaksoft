@@ -25,7 +25,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
       <div className="mk-wrap" style={{ paddingBlock: "clamp(3rem, 2rem + 4vw, 5rem)" }}>
         <div className="mk-foot-grid" style={{ "--mk-foot-cols": Math.min(Math.max(columns.length, 1), 5) } as React.CSSProperties}>
           <div className="mk-foot-brand">
-            <Link href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
+            <Link prefetch={false} href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
               <Brand variant="horizontal" tone="dark" height={36} alt="" lazy />
             </Link>
             <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
@@ -36,7 +36,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
               <li><Scale size={15} aria-hidden="true" />KVKK süreç araçları</li>
               <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
             </ul>
-            <Link href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
+            <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
               Ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
@@ -63,8 +63,8 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
       </div>
       {/* Mobil alt çubuk (< 768 px). smartCta: ana sayfada yalnız hero CTA'sı görünüm dışındayken belirir (MotionRoot). */}
       <div className="mk-sticky-cta" data-smart={smartCta ? "" : undefined}>
-        <Link href="/giris" className="mk-sticky-login">Giriş</Link>
-        <Link href="/kayit" className="mk-btn mk-btn-grad">{trialCtaMobileLabel(trialDays)}</Link>
+        <Link prefetch={false} href="/giris" className="mk-sticky-login">Giriş</Link>
+        <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad">{trialCtaMobileLabel(trialDays)}</Link>
       </div>
     </footer>
   );
@@ -83,7 +83,7 @@ function FootLinks({ links }: { links: readonly { id: string; label: string; hre
           ) : l.href.startsWith("mailto:") || l.href.startsWith("tel:") ? (
             <a href={l.href}>{l.label}</a>
           ) : (
-            <Link href={l.href}>{l.label}</Link>
+            <Link prefetch={false} href={l.href}>{l.label}</Link>
           )}
         </li>
       ))}
