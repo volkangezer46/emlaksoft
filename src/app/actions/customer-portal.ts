@@ -141,6 +141,9 @@ export type CustomerPortalData = {
     maxPrice:    number | null;
     status:      string;
     createdAt:   string;
+    rooms:       string | null;
+    /** Müşteri "Arayışımı güncelle" istedi, danışman onayı bekliyor. */
+    updatePending: boolean;
   }[];
   appointments: {
     id:         string;
@@ -250,6 +253,11 @@ export async function getCustomerPortalData(
   if (!customer || !tenant || !isPublicTenantActive(tenant.status)) return null;
 
   const demandRows = demands ?? [];
+  // Bekleyen arayış güncelleme istekleri (tablo henüz yoksa sorgu boş döner).
+  const pendingUpdRes = demandRows.length
+    ? await admin.from("portal_demand_updates").select("demand_id").eq("tenant_id", tenantId).eq("customer_id", customerId).eq("status", "pending")
+    : { data: [] as { demand_id: string }[] };
+  const pendingUpdateIds = new Set(((pendingUpdRes.data ?? []) as { demand_id: string }[]).map((u) => u.demand_id));
 
   // Aktif taleplere göre portföyleri anlık skorla — en iyi 6 eşleşme
   const activeDemands = demandRows.filter((d) => ["new", "active", "matched"].includes(d.status));
@@ -295,6 +303,8 @@ export async function getCustomerPortalData(
       maxPrice:  d.budget_max ?? null,
       status:    d.status ?? "",
       createdAt: d.created_at,
+      rooms:     (d as { rooms?: string | null }).rooms ?? null,
+      updatePending: pendingUpdateIds.has(d.id),
     })),
     appointments: (appointments ?? []).map((a) => ({
       id:          a.id,
@@ -397,13 +407,15 @@ async function loadPortalRoles(admin: AdminDb, tenantId: string, customerId: str
   type RentalRaw = { id: string; monthly_rent: number; due_day: number; start_date: string; end_date: string | null; property: { title: string | null; property_code: string } | { title: string | null; property_code: string }[] | null };
   const rentals = rentalsRes.error ? [] : ((rentalsRes.data ?? []) as RentalRaw[]);
   const rentalIds = rentals.map((r) => r.id);
-  const [chargesRes, maintRes] = rentalIds.length
+  const [chargesRes, maintRes, noticesRes] = rentalIds.length
     ? await Promise.all([
-        admin.from("rent_charges").select("rental_id, period, amount, status").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("period", { ascending: false }).limit(24),
+        admin.from("rent_charges").select("id, rental_id, period, amount, status").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("period", { ascending: false }).limit(24),
         admin.from("maintenance_requests").select("rental_id, title, status, created_at").eq("tenant_id", tenantId).in("rental_id", rentalIds).order("created_at", { ascending: false }).limit(20),
+        admin.from("rent_payment_notices").select("charge_id").eq("tenant_id", tenantId).eq("customer_id", customerId).eq("status", "pending").limit(50),
       ])
-    : [{ data: [] }, { data: [] }];
-  const charges = (chargesRes.data ?? []) as { rental_id: string; period: string; amount: number; status: string }[];
+    : [{ data: [] }, { data: [] }, { data: [] }];
+  const noticePendingIds = new Set(((noticesRes.data ?? []) as { charge_id: string }[]).map((n) => n.charge_id));
+  const charges = (chargesRes.data ?? []) as { id: string; rental_id: string; period: string; amount: number; status: string }[];
   const maint = (maintRes.data ?? []) as { rental_id: string; title: string; status: string; created_at: string }[];
   const renter: PortalRental[] = rentals.map((r) => {
     const p = Array.isArray(r.property) ? r.property[0] : r.property;
@@ -414,7 +426,7 @@ async function loadPortalRoles(admin: AdminDb, tenantId: string, customerId: str
       dueDay: r.due_day,
       startDate: r.start_date,
       endDate: r.end_date,
-      charges: charges.filter((c) => c.rental_id === r.id).slice(0, 6).map((c) => ({ period: c.period, amount: Number(c.amount), status: c.status })),
+      charges: charges.filter((c) => c.rental_id === r.id).slice(0, 6).map((c) => ({ id: c.id, period: c.period, amount: Number(c.amount), status: c.status, noticePending: noticePendingIds.has(c.id) })),
       maintenance: maint.filter((m) => m.rental_id === r.id).slice(0, 5).map((m) => ({ title: m.title, status: m.status, at: m.created_at })),
     };
   });

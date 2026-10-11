@@ -6,9 +6,11 @@ import {
   createOwnerPortalToken,
   extendOwnerPortalToken,
   revokeOwnerPortalToken,
+  setOwnerWeeklyReport,
 } from "@/app/actions/owner-portal";
 import { Button } from "@/components/ui/button";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { Switch } from "@/components/ui/switch";
 import { toWhatsAppLink } from "@/lib/phone";
 
 export type OwnerPortalTokenRow = {
@@ -21,6 +23,8 @@ export type OwnerPortalTokenRow = {
   /** Sunucuda hesaplanır (bileşende zaman okunmaz). */
   active: boolean;
   daysLeft: number | null;
+  /** Haftalık rapor bu malike gidiyor mu (portföy anahtarı; yoksa ofis ayarı). */
+  weeklyReport: boolean;
 };
 
 const WA_OWNER = (name: string, label: string, url: string) =>
@@ -126,6 +130,29 @@ export function OwnerPortalPanel({
               <p className="numeric select-all break-all rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs text-ink-950">
                 {t.url}
               </p>
+              {t.active ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2">
+                  <span className="text-xs font-semibold text-ink-950">
+                    Haftalık rapor gönder: <span className={t.weeklyReport ? "text-mint-700" : "text-text-muted"}>{t.weeklyReport ? "açık" : "kapalı"}</span>
+                  </span>
+                  {canEdit ? (
+                    <Switch
+                      checked={t.weeklyReport}
+                      aria-label="Haftalık rapor gönder"
+                      disabled={pending}
+                      onCheckedChange={(next) => {
+                        setError(null);
+                        setNotice(null);
+                        startTransition(async () => {
+                          const res = await setOwnerWeeklyReport(t.id, next);
+                          if (res.error) setError(res.error);
+                        });
+                      }}
+                    />
+                  ) : null}
+                  <span className="text-xs text-text-muted">Her pazartesi son 7 günün özeti malike iletilir (SMS ya da danışmana hatırlatma).</span>
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" size="sm" type="button" onClick={() => copy(t)}>
                   {copiedId === t.id ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}

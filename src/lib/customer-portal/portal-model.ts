@@ -42,7 +42,8 @@ export type PortalRental = {
   dueDay: number;
   startDate: string;
   endDate: string | null;
-  charges: { period: string; amount: number; status: string }[];
+  /** noticePending: kiracı "Ödedim" dedi, ofis teyidi bekliyor (tahakkuk durumu değişmez). */
+  charges: { id: string; period: string; amount: number; status: string; noticePending: boolean }[];
   maintenance: { title: string; status: string; at: string }[];
 };
 
@@ -113,6 +114,8 @@ export function portalRequestMessage(code: string): { ok: boolean; text: string 
       return { ok: false, text: "Geçerli bir teklif tutarı girin." };
     case "invalid_title":
       return { ok: false, text: "Kısa bir başlık yazın (en az 3 karakter)." };
+    case "nothing_to_update":
+      return { ok: false, text: "Değiştirmek istediğiniz en az bir alanı doldurun." };
     case "not_found":
       return { ok: false, text: "Kayıt bulunamadı ya da artık işlem yapılamıyor." };
     case "invalid_link":

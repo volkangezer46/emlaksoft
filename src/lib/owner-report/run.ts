@@ -11,7 +11,8 @@ import { buildOwnerReportSms, lastFullWeek, ownerReportDedupeKey } from "@/lib/o
 
 /**
  * Malik haftalık raporu teslimi — `haftalik-ozet` cron'unun adımı (YENİ cron yok).
- *  - Yalnız ofis ayarı AÇIK ofisler (`office.owner_report.weekly_enabled`, varsayılan kapalı).
+ *  - Ofis ayarı AÇIK ofisler (`office.owner_report.weekly_enabled`, varsayılan kapalı) VEYA portföy anahtarı açık belirteçler
+ *    (`owner_portal_tokens.weekly_report_enabled`: true açık / false kapalı / null ofis ayarına uyar).
  *  - Aktif (süresi geçmemiş) malik paneli belirteci olan, örnek olmayan, silinmemiş portföyler.
  *  - Kanal: ofisin SMS sağlayıcısı hazır + malik telefonu TR cep → SMS (bağlantı yalnız); aksi halde sorumlu danışmana
  *    "bağlantıyı malike iletin" bildirimi. Her durumda bildirim = tekrar önleme kaydı (`owner-report:<belirteç>:<hafta>`).
@@ -30,12 +31,24 @@ export async function runOwnerWeeklyReports(db: SupabaseClient, input: { todayKe
   if (!def) return out;
   const { data: settings, error } = await db.from("tenant_settings").select("tenant_id, value").eq("key", storageKeyOf(def)).limit(5000);
   if (error) return { ...out, skipped: true };
-  const tenantIds = ((settings ?? []) as { tenant_id: string; value: unknown }[])
-    .filter((s) => {
-      const parsed = coerceInput(def, s.value);
-      return parsed.ok && parsed.value === true;
-    })
-    .map((s) => s.tenant_id);
+  const officeOn = new Set(
+    ((settings ?? []) as { tenant_id: string; value: unknown }[])
+      .filter((s) => {
+        const parsed = coerceInput(def, s.value);
+        return parsed.ok && parsed.value === true;
+      })
+      .map((s) => s.tenant_id),
+  );
+  // Portföy anahtarı (owner_portal_tokens.weekly_report_enabled): true = ofis ayarı kapalı olsa da açık; false = kapalı; null = ofis ayarına uy.
+  // Sütun yoksa (eski şema) sorgu hata verir -> yalnız ofis ayarı geçerli (bugünkü davranış).
+  const { data: explicitOn, error: explicitErr } = await db
+    .from("owner_portal_tokens")
+    .select("tenant_id")
+    .eq("weekly_report_enabled", true)
+    .gt("expires_at", input.nowIso)
+    .limit(TOKEN_LIMIT);
+  const hasSwitch = !explicitErr;
+  const tenantIds = [...new Set([...officeOn, ...((hasSwitch ? (explicitOn ?? []) : []) as { tenant_id: string }[]).map((t) => t.tenant_id)])];
   if (tenantIds.length === 0) return out;
 
   const { data: tenants } = await db.from("tenants").select("id, name").in("id", tenantIds).in("status", ["active", "trial", "past_due"]);
@@ -45,12 +58,13 @@ export async function runOwnerWeeklyReports(db: SupabaseClient, input: { todayKe
 
   const { data: tokens } = await db
     .from("owner_portal_tokens")
-    .select("id, tenant_id, property_id, token, owner_phone")
+    .select(hasSwitch ? "id, tenant_id, property_id, token, owner_phone, weekly_report_enabled" : "id, tenant_id, property_id, token, owner_phone")
     .in("tenant_id", [...tenantName.keys()])
     .gt("expires_at", input.nowIso)
     .order("created_at", { ascending: false })
     .limit(TOKEN_LIMIT);
-  const tokenRows = (tokens ?? []) as { id: string; tenant_id: string; property_id: string; token: string; owner_phone: string | null }[];
+  const tokenRows = ((tokens ?? []) as unknown as { id: string; tenant_id: string; property_id: string; token: string; owner_phone: string | null; weekly_report_enabled?: boolean | null }[])
+    .filter((t) => (t.weekly_report_enabled ?? officeOn.has(t.tenant_id)) === true);
   if (tokenRows.length === 0) return out;
 
   const { data: props } = await db

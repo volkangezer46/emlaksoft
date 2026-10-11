@@ -264,6 +264,8 @@ const F = {
   statementApplyRecurringCommission: "20261011001400_statement_apply_recurring_commission.sql",
   // Konsey Tur 2 #38+#39: komisyon/rapor toplulastirmasi earnings_all kapisi + ekstre satiri hesap/maas suzgeci.
   earningsStatementPrivacy: "20261011001300_earnings_statement_privacy.sql",
+  // Konsey Tur 3 (2026-10-12): portal istekleri v2 - gosterim talebi, arayis guncelleme istegi, kiraci "Odedim" bildirimi + malik haftalik rapor anahtari.
+  portalRequestsV2: "20261012000200_portal_requests_v2.sql",
   // Kapali portfoy sizintisi (2026-10-08): vitrin_chat_context govdesi ayni, yalniz kapali portfoy suzgeci eklenir (000330'a bagli).
   vitrinChatClosedListing: "20261008001810_vitrin_chat_closed_listing.sql",
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
@@ -434,6 +436,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.perfIndexesRpc]: "davranis", // current_session_two_factor_satisfied/is_platform_staff/support_is_ticket_staff dili sql->plpgsql (govde+ACL birebir; sorgu basi ~360us ayristirma biter) + idx_customer_demands_tenant_created
     [F.propertiesPriceDropGuard]: "siki", // properties BEFORE UPDATE OF list_price tetikleyicisi (kural acikken esik ustu dusus onay ister; yalniz authenticated) + property_price_history authenticated icin yalniz SELECT
     [F.expenseSampleScope]: "davranis", // tenant_expense_aggregates imzasina p_sample_threshold (varsayilan 5); esik ustu ofiste ornek giderler toplamlardan DUSER
+    [F.portalRequestsV2]: "davranis", // portal_customer_request govdesi genisler (3 yeni tur) + kind CHECK genisler; 2 yeni istek tablosu + owner_portal_tokens.weekly_report_enabled
     [F.customerPortalRequests]: "ek", // yeni portal_customer_requests (iz) + anon/authenticated DEFINER RPC portal_customer_request (token icerde dogrulanir; yalniz taslak teklif/gorev/bakim yazar) + portal_customer_request_ready
     [F.closureLossAnomalies]: "davranis", // listing_anomalies.type CHECK'ine closure_loss; listing_closures AFTER tetikleyicisi + tek seferlik uzlastirma (yalniz 'explained' satir, SLA yok); lc_closure_loss_ready yoklamasi
     [F.webhookEnqueueGate]: "siki", // webhook_enqueue modul izni + 30 sn tekrar freni; webhook_mark_delivery yalniz kuyruga yazan + ilk deneme; webhook_deliveries.enqueued_by
@@ -585,6 +588,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "KONSEY-kasa-maas-gizliligi", order: 29.99986747, title: "Kasa: maas hareketleri bakiyeden yetkisiz rol icin haric + kaynak bagli iptal audit (20261010000600 sonrasi; sira serbest)", files: [F.financeSalaryPrivacy] },
     { id: "KONSEY-ekstre-duzenli-komisyon", order: 29.99986748, title: "Ekstre uygulama: duzenli odeme tek gercek + komisyon tahsil edildi (001200 ve 000900 sonrasi; sira serbest)", files: [F.statementApplyRecurringCommission] },
     { id: "KONSEY-kazanc-ekstre-gizliligi", order: 29.99986749, title: "Kazanc gizliligi: komisyon/rapor toplulastirmasi earnings_all kapisi + ekstre satiri maas/hesap suzgeci (20260816000200, 20261011001000 ve 001200 sonrasi; sira serbest)", files: [F.earningsStatementPrivacy] },
+    { id: "KONSEY3-portal-istekleri-v2", order: 29.9998695, title: "Portal istekleri v2: gosterim talebi + arayis guncelleme + kiraci Odedim + malik haftalik rapor anahtari (20261007000620 SONRASI; sira serbest)", files: [F.portalRequestsV2] },
     { id: "PB61-ana-ekran-home-snapshot", order: 29.9998673, title: "Ana ekran home_snapshot RPC'si (ben/ofis ilk ekran okumalari tek tur; kod RPC yokken eski sorgulara duser; sira serbest, ek)", files: [F.homeSnapshotRpc] },
     { id: "PB58-ilan-analizi", order: 29.999865, title: "Ilan analizi onbellek tablosu (kod tablo yokken analizi 'etkin degil' der, kontor dusmez; sira serbest, ek)", files: [F.listingAnalyses] },
     { id: "PB58-vitrin-sohbet-kapali", order: 29.999866, title: "vitrin_chat_context: kapali portfoy sizintisi duzeltmesi (000330 govdesi + suzgec; sira serbest)", files: [F.vitrinChatClosedListing] },
@@ -673,6 +677,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.subscriptionPause, F.billingAmount],
     [F.planUpgradeFulfillment, F.efPack],
     // Sureli kontor: cuzdan RPC'leri (000100) + devir tavani RPC'si (001200; no-op'a cevrilir) uzerine yazar.
+    [F.portalRequestsV2, F.customerPortalRequests],
     [F.efCreditLots, F.efWallet],
     [F.efCreditLots, F.efPlanExpiry],
     // Katalog/tarife seed'i (suresiz -> sureli) lot sisteminden ONCE uygulanir (dosya adi sirasi ile de ayni).

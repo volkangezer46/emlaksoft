@@ -51,6 +51,7 @@ import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
 import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
 import { OwnedPropertiesCard } from "./owned-properties-card";
+import { PortalRequestsCard } from "./portal-requests-card";
 // Ortak tekil SMS dialogu — tek kopya gelen-kutusu'nda yaşar (Yanıtla da onu kullanır)
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
@@ -692,6 +693,12 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
             }}
             ozetSlot={
               <>
+                {/* Portaldan gelen arayış güncelleme isteği (bekleyen yoksa çizilmez) */}
+                {tenantId ? (
+                  <Suspense fallback={null}>
+                    <PortalRequestsCard customerId={customer.id} tenantId={tenantId} canEdit={canEdit} />
+                  </Suspense>
+                ) : null}
                 {/* Portföy önerileri — yalnız Özet açıkken sorgulanır */}
                 <Suspense fallback={<MatchedSkeleton />}>
                   <MatchedSection demands={activeDemands} />

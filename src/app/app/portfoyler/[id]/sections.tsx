@@ -35,6 +35,8 @@ import { PropertyTimeline } from "./property-timeline";
 import { PropertyKeysSection } from "./property-keys-section";
 import { OwnerPortalPanel, type OwnerPortalTokenRow } from "./owner-portal-panel";
 import { getBaseUrl } from "@/lib/base-url";
+import { getSetting } from "@/lib/settings/read";
+import { OWNER_WEEKLY_REPORT_KEY } from "@/lib/settings/registry/tenant";
 
 export const OwnerPortalSkeleton = () => <Skeleton className="h-48" />;
 
@@ -52,12 +54,15 @@ export async function OwnerPortalSection({
   canEdit: boolean;
 }) {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("owner_portal_tokens")
-    .select("id, token, owner_name, owner_phone, expires_at, last_seen_at")
-    .eq("property_id", propertyId)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const [{ data }, officeWeekly] = await Promise.all([
+    supabase
+      .from("owner_portal_tokens")
+      .select("id, token, owner_name, owner_phone, expires_at, last_seen_at, weekly_report_enabled")
+      .eq("property_id", propertyId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    getSetting<boolean>(OWNER_WEEKLY_REPORT_KEY),
+  ]);
   const base = getBaseUrl();
   const tokens: OwnerPortalTokenRow[] = (data ?? []).map((t) => {
     const msLeft = new Date(t.expires_at as string).getTime() - now();
@@ -70,6 +75,8 @@ export async function OwnerPortalSection({
       lastSeenAt: (t.last_seen_at as string | null) ?? null,
       active: msLeft > 0,
       daysLeft: msLeft > 0 ? Math.ceil(msLeft / DAY_MS) : null,
+      // null = ofis ayarına uyar; açık/kapalı kararı tek yerde (panel bu değeri gösterir).
+      weeklyReport: ((t.weekly_report_enabled as boolean | null) ?? officeWeekly) === true,
     };
   });
   return <OwnerPortalPanel propertyId={propertyId} propertyLabel={propertyLabel} tokens={tokens} canEdit={canEdit} />;

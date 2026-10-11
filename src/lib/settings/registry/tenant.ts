@@ -330,7 +330,7 @@ const contact: AnySettingDef[] = [
     group: "iletisim",
     default: false,
     label: "Malike haftalık pazarlama raporu",
-    description: "Her pazartesi aktif malik paneli bağlantısı olan portföyler için son 7 günün gösterim, teklif, ziyaretçi geri bildirimi ve vitrin görüntülenme özeti hazırlanır; malik panelinde \"Haftalık rapor\" bölümü görünür.",
+    description: "Ofis varsayılanı; her portföyde (Portallar sekmesi) tek tıkla açılıp kapatılabilir. Her pazartesi aktif malik paneli bağlantısı olan portföyler için son 7 günün gösterim, teklif, ziyaretçi geri bildirimi ve vitrin görüntülenme özeti hazırlanır; malik panelinde \"Haftalık rapor\" bölümü görünür.",
     impact: "Ofisin kendi SMS hesabı bağlı ve malik telefonu kayıtlıysa malike rapor bağlantısı SMS ile gider; değilse sorumlu danışmana \"bağlantıyı malike gönderin\" bildirimi düşer. Kapalıyken hiçbir rapor/bildirim üretilmez.",
   }),
   defineBool({

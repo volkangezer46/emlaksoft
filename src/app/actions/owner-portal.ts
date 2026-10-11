@@ -309,3 +309,28 @@ export async function getOwnerPortalData(token: string): Promise<OwnerPortalData
     })),
   };
 }
+
+/**
+ * Malik haftalık raporu — portföy bazında tek tık anahtarı (açık/kapalı). Değer `owner_portal_tokens.weekly_report_enabled`;
+ * null = ofis ayarına uyar, buradan her zaman AÇIK ya da KAPALI olarak yazılır. Teslimi mevcut `haftalik-ozet` cron adımı yapar.
+ */
+export async function setOwnerWeeklyReport(tokenId: string, enabled: boolean): Promise<OwnerPortalResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tokenId)) return { error: "Portal linki bulunamadı." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("owner_portal_tokens")
+    .update({ weekly_report_enabled: enabled === true })
+    .eq("id", tokenId)
+    .eq("tenant_id", gate.tenantId)
+    .select("property_id")
+    .maybeSingle();
+  if (error) {
+    return { error: actionErrorMessage(error, "Haftalık rapor ayarı kaydedilemedi") };
+  }
+  if (!data) return { error: "Portal linki bulunamadı." };
+  revalidatePath(`/app/portfoyler/${data.property_id}`);
+  return { ok: true };
+}
