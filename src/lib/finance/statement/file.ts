@@ -11,6 +11,51 @@ import { csvTextToTable, lineKeys, tableFromRawRows, type MappedStatement, type 
 
 export const MAX_STATEMENT_BYTES = 2 * 1024 * 1024;
 
+/** .xlsx = ZIP: açılmış boyut / girdi sayısı / sıkıştırma oranı sınırları (zip bombası); kütüphane açmadan ÖNCE merkezi dizinden denetlenir. */
+export const MAX_XLSX_UNPACKED_BYTES = 20 * 1024 * 1024;
+export const MAX_XLSX_ENTRIES = 50;
+export const MAX_XLSX_RATIO = 100;
+
+/**
+ * ZIP merkezi dizinini (EOCD + merkezi girdiler) okur, hiçbir şeyi AÇMADAN sınırları denetler. Yeni bağımlılık yok.
+ * Dönüş: null = güvenli; metin = reddetme nedeni (kullanıcıya gösterilir). ZIP64 / bozuk dizin reddedilir (2 MB'lık ekstre ZIP64 gerektirmez).
+ */
+export function inspectXlsxZip(bytes: Uint8Array): string | null {
+  const bad = "Dosya geçerli bir .xlsx gibi görünmüyor. Bankanızın indirdiği ekstreyi değiştirmeden yükleyin.";
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const len = bytes.byteLength;
+  if (len < 22) return bad;
+  // EOCD: sondan geriye (en çok 22 + 65535 yorum baytı).
+  let eocd = -1;
+  for (let i = len - 22; i >= Math.max(0, len - 22 - 0xffff); i -= 1) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
+  }
+  if (eocd < 0) return bad;
+  const total = view.getUint16(eocd + 10, true);
+  const cdSize = view.getUint32(eocd + 12, true);
+  const cdOffset = view.getUint32(eocd + 16, true);
+  if (total === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) return bad; // ZIP64
+  if (total > MAX_XLSX_ENTRIES) return "Excel dosyası beklenenden çok iç dosya içeriyor; güvenlik nedeniyle okunmadı.";
+  if (total === 0 || cdOffset + cdSize > eocd) return bad;
+  let pos = cdOffset;
+  let unpacked = 0;
+  for (let n = 0; n < total; n += 1) {
+    if (pos + 46 > eocd || view.getUint32(pos, true) !== 0x02014b50) return bad;
+    const comp = view.getUint32(pos + 20, true);
+    const raw = view.getUint32(pos + 24, true);
+    const entryLen = 46 + view.getUint16(pos + 28, true) + view.getUint16(pos + 30, true) + view.getUint16(pos + 32, true);
+    if (comp === 0xffffffff || raw === 0xffffffff) return bad;
+    unpacked += raw;
+    if (unpacked > MAX_XLSX_UNPACKED_BYTES) return "Excel dosyası açıldığında çok büyük (en çok 20 MB); güvenlik nedeniyle okunmadı.";
+    if (raw > 0 && (comp === 0 || raw / comp > MAX_XLSX_RATIO)) return "Excel dosyasının sıkıştırma oranı olağandışı; güvenlik nedeniyle okunmadı.";
+    pos += entryLen;
+  }
+  return null;
+}
+
 export type ParsedStatementFile =
   | { ok: true; format: "ofx"; fileHash: string; statement: MappedStatement }
   | { ok: true; format: "csv" | "xlsx"; fileHash: string; table: StatementTable }
@@ -36,6 +81,8 @@ export async function parseStatementFile(name: string, bytes: Uint8Array): Promi
   const fileHash = sha256Hex(bytes);
   try {
     if (kind === "xlsx") {
+      const zipError = inspectXlsxZip(bytes);
+      if (zipError) return { ok: false, error: zipError };
       const { readSheet } = await import("read-excel-file/node");
       const data = (await readSheet(Buffer.from(bytes))) as unknown as unknown[][];
       const raw = data.slice(0, 5000).map((r) => r.map(cellToText));
