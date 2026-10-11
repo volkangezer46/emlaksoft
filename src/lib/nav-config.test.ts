@@ -143,7 +143,7 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     );
     expect(tabLabels["/app/ayarlar/etiketler"]).toBe("Etiketler");
     expect(tabLabels["/app/ayarlar/filigran"]).toBe("Filigran");
-    expect(tabLabels["/app/ayarlar/sozlesme-sablonlari"]).toBe("Sözleşme şablonları");
+    expect(tabLabels["/app/ayarlar/sozlesme-sablonlari"]).toBe("Sözleşme şablonu");
     expect(tabLabels["/app/ayarlar/mesaj-sablonlari"]).toBe("Mesaj şablonları");
     expect(tabLabels["/app/ayarlar/ai-kullanim"]).toBe("AI kullanımı");
     for (const [href, label] of Object.entries(tabLabels)) if (href !== "/app/ayarlar") expect(label, href).not.toBe("Ayarlar");

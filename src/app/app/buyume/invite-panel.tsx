@@ -7,7 +7,7 @@ import { createMyReferralCode } from "@/app/actions/growth";
 import { buildWhatsAppHref } from "@/lib/growth/program";
 
 const BTN =
-  "focus-ring press inline-flex min-h-[40px] items-center gap-2 rounded-[var(--radius-control)] border border-hairline bg-surface px-3.5 py-2 text-sm font-semibold text-text shadow-[var(--elev-1)] transition hover:bg-surface-hover";
+  "focus-ring press inline-flex min-h-[40px] touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-hairline bg-surface px-3.5 py-2 text-sm font-semibold text-text shadow-[var(--elev-1)] transition hover:bg-surface-hover";
 
 /** Davet bağlantısı paneli: oluştur, kopyala, WhatsApp'ta paylaş. Popup yok; durum satır içinde. */
 export function InvitePanel({ url, canCreate }: { url: string | null; canCreate: boolean }) {
@@ -38,7 +38,7 @@ export function InvitePanel({ url, canCreate }: { url: string | null; canCreate:
             Davet bağlantımı oluştur
           </button>
         ) : (
-          <p className="text-xs text-text-muted">Bağlantıyı ofis yöneticisi oluşturabilir.</p>
+          <p className="text-xs text-text-muted">Davet oluşturma yetkiniz yok; ofis yöneticinize sorun.</p>
         )}
         {error ? (
           <p role="alert" className="text-xs font-semibold text-danger-strong">

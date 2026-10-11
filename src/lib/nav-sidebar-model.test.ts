@@ -114,8 +114,8 @@ describe("etkin merkez çözümü ve tek sekme şeridi", () => {
     expect(resolveActiveHub("/app/abonelik", owner).hub?.id).toBe("abonelik");
     const tool = resolveActiveHub("/app/degerleme", owner);
     expect(tool).toMatchObject({ inTools: true, hub: null });
-    // En uzun yol kazanır: Etiketler Ayarlar'a değil Müşteriler'e bağlıdır.
-    expect(resolveActiveHub("/app/ayarlar/etiketler", owner).hub?.id).toBe("musteriler");
+    // Etiketler artık müşteri şeridinde değil: Araçlar listesinde (menü satırı değil) ve Ayarlar dizininde bulunur.
+    expect(resolveActiveHub("/app/ayarlar/etiketler", owner)).toMatchObject({ inTools: true });
   });
   it("şerit: rolün menüsünde olmayan sayfa ofis yöneticisi düzeninin merkezini kullanır", () => {
     const own = resolveStripHub("/app/kampanyalar", ALL, { role: "readonly" });

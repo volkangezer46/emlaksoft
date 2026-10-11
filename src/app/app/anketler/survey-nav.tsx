@@ -22,7 +22,7 @@ export function SurveyNav({ current }: { current: (typeof TABS)[number]["key"] }
             href={t.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "focus-ring inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition",
+              "focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-3 text-sm font-semibold transition",
               active ? "bg-brand-600 text-white" : "text-text-muted hover:bg-surface-hover hover:text-ink-950",
             )}
           >

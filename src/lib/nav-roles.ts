@@ -238,6 +238,9 @@ const TOOLS_COMMON = [
   "/app/ag",
   "/app/acik-ev",
   "/app/projeler",
+  // Ayarlar dizininde de kart olarak bulunur; müşteri şeridinden çıkarıldı (şerit 6 sekme), kaybolmasın diye araç listesinde.
+  "/app/ayarlar/etiketler",
+  "/app/ayarlar/mesaj-sablonlari",
 ] as const;
 
 /* ------------------------------- Rol düzenleri ------------------------------- */

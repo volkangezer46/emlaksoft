@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readCached, walkSource } from "./test-support/src-tree";
 
 /**
  * Dokunma hedefi sözleşmesi (WCAG 2.5.5 / 2.5.8): kanonik etkileşim bileşenleri dokunmatikte
@@ -48,5 +49,17 @@ describe("dokunma hedefi sözleşmesi", () => {
   it("touch varyantı tanımlı", () => {
     const css = readFileSync(path.join(process.cwd(), "src/app/a11y.css"), "utf8");
     expect(css).toContain("@custom-variant touch");
+  });
+
+  it("ratchet: touch: sınıfı olmayan ham <select>/<input> satırları artmaz (src/app/app)", () => {
+    // Sayı yalnız AZALABİLİR: yeni ham kontrol yazarken className'e touch:h-11 / touch:min-h-11 ekle (ya da kanonik Input/Select kullan).
+    // Azaltınca sabiti de düşür.
+    const RAW_CONTROL_BUDGET = 619;
+    const re = /<(select|input)\b/;
+    let count = 0;
+    for (const file of walkSource(path.join(process.cwd(), "src/app/app")).filter((f) => f.endsWith(".tsx"))) {
+      for (const line of readCached(file).split("\n")) if (re.test(line) && !line.includes("touch:")) count += 1;
+    }
+    expect(count, "touch: olmayan ham kontrol satırı bütçeyi aştı").toBeLessThanOrEqual(RAW_CONTROL_BUDGET);
   });
 });

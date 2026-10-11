@@ -21,6 +21,7 @@ import { RISK_BAND_LABEL } from "@/lib/listing-control/risk-language";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { RadialGauge } from "@/components/ui/viz/radial-gauge";
 import { now, trMonthStartMs } from "@/lib/clock";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton";
 import { loadPotentialLosses } from "@/lib/listing-control/server/potential-loss";
 import { summarizeLosses, type PotentialLossRow } from "@/lib/listing-control/potential-loss-core";
@@ -514,9 +515,13 @@ async function RateReasons({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                 </div>
               </RadialGauge>
             ) : (
-              <div className="grid h-28 w-28 shrink-0 place-items-center rounded-full border-[10px] border-[color:var(--surface-sunken)] text-center">
-                <p className="text-xs text-text-faint">Kayıt yok</p>
-              </div>
+              <Link
+                href="/app/ilan-kontrol"
+                title="Kapanış kaydı oluşunca kaçak oranı burada görünür; ilan kontrolünden ilan kapatın"
+                className="focus-ring grid h-28 w-28 shrink-0 place-items-center rounded-full border-[10px] border-[color:var(--surface-sunken)] px-2 text-center hover:border-brand-300"
+              >
+                <span className="text-xs text-text-faint">Kayıt yok · ilan kontrolüne git</span>
+              </Link>
             )}
             <div className="space-y-2 text-xs text-text-muted">
               <div className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-mint-500" /> {ours} bizim kapanış</div>
@@ -532,7 +537,15 @@ async function RateReasons({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
           </p>
           <h2 className="mt-1 font-display font-bold text-ink-950">Kapanış sebepleri</h2>
           {reasonBars.length === 0 ? (
-            <p className="mt-6 text-sm text-text-muted">Henüz kapanış kaydı yok. Portal Kontrol’den ilan kapatınca burada görünür.</p>
+            <EmptyState
+              className="mt-5"
+              variant="compact"
+              icon={ShieldAlert}
+              tone="amber"
+              title="Henüz kapanış kaydı yok"
+              description="İlan kontrolünden bir ilanı kapattığınızda kapanış sebepleri burada dağılım olarak görünür."
+              action={{ href: "/app/ilan-kontrol", label: "İlan kontrolüne git" }}
+            />
           ) : (
             <div className="mt-5 space-y-3">
               {reasonBars.map((r, i) => {
@@ -592,7 +605,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
               </div>
             </div>
             <Link href="/app/portallar?durum=teyit" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
-              Tümü Portal Kontrol&apos;de <ArrowUpRight className="h-3.5 w-3.5" />
+              Tümü İlan kontrolünde <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
           <div className="mt-4 space-y-2">
@@ -726,7 +739,7 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
                 </Link>
               </span>
             ) : null}
-            <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
+            <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">İlan kontrolü</Link>
           </div>
         </div>
         {/* ?from=&to= — tarih aralığı GET formu; neden/tip gizli alanlarla korunur */}
