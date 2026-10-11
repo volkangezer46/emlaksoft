@@ -91,7 +91,7 @@ function relOne<T extends { full_name?: string; name?: string; id?: string; assi
 }
 
 /** Sayfa başına kayıt — gerçek sayfalama. */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 
 /**
  * Segment çipleri (bütçe bantları + en yoğun iller) havuz sınırı: bantlar TS'te türetildiğinden

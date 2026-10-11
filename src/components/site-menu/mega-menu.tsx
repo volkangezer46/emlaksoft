@@ -61,7 +61,7 @@ function ItemLabel({ it }: { it: Pick<ClientItem, "label" | "badge" | "external"
 function NavAnchor({ href, external, onClick, className, style, children }: { href: string; external: boolean; onClick: () => void; className?: string; style?: CSSProperties; children: ReactNode }) {
   if (!external && isInternal(href)) {
     return (
-      <Link href={href} onClick={onClick} className={className} style={style}>
+      <Link prefetch={false} href={href} onClick={onClick} className={className} style={style}>
         {children}
       </Link>
     );
@@ -282,7 +282,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
       {top}
       <header>
         <div className="mk-wrap mk-wrap-wide mk-nav-row">
-          <Link href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
+          <Link prefetch={false} href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
             {logo}
           </Link>
           <nav aria-label="Ana site navigasyonu" className="mk-nav-links" onPointerEnter={() => setArmed(true)} onFocus={() => setArmed(true)}>
@@ -386,8 +386,8 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                           <li>KVKK süreç araçları</li>
                         </ul>
                         <span className="mk-mega-bar-cta">
-                          <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={16} aria-hidden="true" /></Link>
-                          <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Fiyatlar</Link>
+                          <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={16} aria-hidden="true" /></Link>
+                          <Link prefetch={false} href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Fiyatlar</Link>
                         </span>
                       </div>
                     </div>
@@ -397,9 +397,9 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
             })}
           </nav>
           <div className="mk-nav-cta">
-            <Link href="/giris" className="mk-btn mk-btn-line mk-login">Giriş yap</Link>
-            <Link href="/giris" className="mk-login-m">Giriş</Link>
-            <Link href="/kayit" className="mk-btn mk-btn-primary mk-nav-trial">
+            <Link prefetch={false} href="/giris" className="mk-btn mk-btn-line mk-login">Giriş yap</Link>
+            <Link prefetch={false} href="/giris" className="mk-login-m">Giriş</Link>
+            <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-primary mk-nav-trial">
               <span className="mk-long">Ücretsiz dene</span><span className="mk-short">Ücretsiz dene</span> <ArrowRight size={16} aria-hidden="true" />
             </Link>
             <button
@@ -421,8 +421,8 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
           <nav aria-label="Mobil site navigasyonu" className="mk-sheet-nav">
             <MobileSheetBody groups={groups} close={close} />
             <div className="mk-sheet-cta">
-              <Link href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
-              <Link href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
+              <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
+              <Link prefetch={false} href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
             </div>
           </nav>
         </div>

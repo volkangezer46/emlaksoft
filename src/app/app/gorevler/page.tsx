@@ -44,7 +44,7 @@ export const dynamic = "force-dynamic";
 const PATH = "/app/gorevler";
 
 /** Sayfa başına görev — gerçek sayfalama (blind .limit yerine). */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 
 const FILTERS = [
   { key: "open", label: "Açık" },

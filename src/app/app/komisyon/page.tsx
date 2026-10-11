@@ -97,7 +97,7 @@ function dealOf(value: CommissionRow["deal"]) {
 const DURUM_FILTERS = ["bekleyen", "tahsil"] as const;
 type DurumFilter = (typeof DURUM_FILTERS)[number];
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 /** Kendi payım toplamı için okunan en fazla satır (aşılırsa uyarı gösterilir). */
 const OWN_ROWS_LIMIT = 2000;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

@@ -43,6 +43,8 @@ function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
 
+/** Liste dilim boyutu: ilk açılış 30 kayıt, "Daha fazla göster" 30 artırır. */
+const ADET_ADIM = 30;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 // UTC getter'lar kullanılır — bu yardımcı yalnız istanbulMonthUtc ile Date.UTC(...)
@@ -96,8 +98,10 @@ export default async function GiderlerPage({
   // ?portal= Portal getirisi kartından: liste yalnız o portala eşlenmiş giderler.
   const portalF = isPortalKey(params.portal) ? params.portal : null;
   const now = new Date(nowMs());
-  // Sayfalama: ?adet= 200'den başlar, "Daha fazla göster" 200 artırır (tavan 1000).
-  const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || 200, 200), 1000);
+  // Sayfalama: ?adet= 30 kayıtla başlar, "Daha fazla göster" 30 artırır (tavan 1000); toplamlar RPC.den gelir, listeye bağlı değildir.
+  const adet = Math.min(Math.max(Math.trunc(Number(params.adet)) || ADET_ADIM, ADET_ADIM), 1000);
+  // ?kategori= listeyi SUNUCUDA süzer (30 kayıtlık dilimde bellek içi eleme kayıt kaçırırdı).
+  const kategoriRaw = (params.kategori ?? "").trim().slice(0, 80);
 
   const supabase = await createClient();
   const canCreate = perms.expenses?.includes("create") ?? false;
@@ -165,7 +169,7 @@ export default async function GiderlerPage({
     // NOT: KPI/kırılım/trend artık aşağıdaki RPC'den gelir, bu diziden DEĞİL —
     // liste görünümü için 200 kayıt tavanı yeterli, ama toplam/tutar asla bu
     // tavana bağlı olmamalı (bkz. tenant_expense_aggregates).
-    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined, propertyId: portfoyF ?? undefined, portalKey: portalF ?? undefined }, adet),
+    listExpenses(undefined, { from: fromF ?? undefined, to: toF ?? undefined, propertyId: portfoyF ?? undefined, portalKey: portalF ?? undefined, category: kategoriRaw || undefined }, adet),
     getDefinitionsOrDefault("expense_category"),
     supabase.rpc("tenant_expense_aggregates", { p_from: fromF, p_to: toF, p_as_of: now.toISOString() }),
     loadSampleKpiScope(supabase, tenantId),
@@ -195,7 +199,7 @@ export default async function GiderlerPage({
 
   // ?kategori= sunucu filtresi — yalnızca tanımlı kategori değerleri kabul edilir
   const kategoriF = categories.some((c) => c.value === params.kategori) ? params.kategori! : "";
-  const filteredExpenses = kategoriF ? expenses.filter((e) => e.category === kategoriF) : expenses;
+  const filteredExpenses = expenses; // kategori süzgeci listExpenses içinde sunucuda uygulandı
 
   // Mevcut filtreleri koruyan link üretici
   const href = (next: { kategori?: string | null; from?: string | null; to?: string | null; portfoy?: string | null; portal?: string | null }) =>
@@ -570,7 +574,7 @@ export default async function GiderlerPage({
       {expenses.length >= adet && adet < 1000 ? (
         <div className="text-center">
           <Link
-            href={qs({ kategori: kategoriF || null, from: fromF, to: toF, portfoy: portfoyF, portal: portalF, adet: String(adet + 200) })}
+            href={qs({ kategori: kategoriF || null, from: fromF, to: toF, portfoy: portfoyF, portal: portalF, adet: String(adet + ADET_ADIM) })}
             className="focus-ring inline-flex rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-accent-text hover:border-brand-300"
           >
             Daha fazla göster ({adet} kayıt gösteriliyor)

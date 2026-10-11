@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { ChevronRight, ShieldAlert } from "lucide-react";
+import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
@@ -27,12 +28,12 @@ import { OwnPasswordForm } from "@/app/admin/hesabim/account-forms";
 /** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <ConsoleMonoFont>
       <IconSprite />
       <Suspense fallback={<RouteSplash />}>
         <AdminShell>{children}</AdminShell>
       </Suspense>
-    </>
+    </ConsoleMonoFont>
   );
 }
 
