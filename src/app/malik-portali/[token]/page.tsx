@@ -126,8 +126,13 @@ export default async function MalikPortaliPage({
       />
     );
   }
-  const ownerSettings = await readTenantSettings(admin, tenant.id, [OWNER_WEEKLY_REPORT_KEY]);
-  const weeklyReportOn = ownerSettings[OWNER_WEEKLY_REPORT_KEY] === true;
+  // Haftalık rapor: portföy anahtarı (danışman tek tıkla açar/kapatır) varsa o, yoksa ofis ayarı. Sütun yoksa hata -> ofis ayarı.
+  const [ownerSettings, switchRes] = await Promise.all([
+    readTenantSettings(admin, tenant.id, [OWNER_WEEKLY_REPORT_KEY]),
+    admin.from("owner_portal_tokens").select("weekly_report_enabled").eq("token", token).eq("tenant_id", tenant.id).maybeSingle(),
+  ]);
+  const tokenSwitch = switchRes.error ? null : ((switchRes.data as { weekly_report_enabled?: boolean | null } | null)?.weekly_report_enabled ?? null);
+  const weeklyReportOn = (tokenSwitch ?? ownerSettings[OWNER_WEEKLY_REPORT_KEY] === true) === true;
   const [{ data: propertyRel }, { data: coverRows }, { data: priceRows }] = await Promise.all([
     admin
       .from("properties")
