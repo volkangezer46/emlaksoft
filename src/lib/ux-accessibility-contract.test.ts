@@ -1,8 +1,9 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
+import { readCached, walkAll } from "./test-support/src-tree";
 import { describe, expect, it } from "vitest";
 
 function source(file: string): string {
-  return readFileSync(file, "utf8");
+  return readCached(file);
 }
 
 const mainContentShells = [
@@ -152,11 +153,7 @@ describe("navigation accessibility contract", () => {
   });
 
   it("loads the drag-and-drop library only with the deal board chunk", () => {
-    const walk = (dir: string): string[] =>
-      readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-        e.isDirectory() ? walk(`${dir}/${e.name}`) : /\.tsx?$/.test(e.name) ? [`${dir}/${e.name}`] : [],
-      );
-    const sources = walk("src").filter((file) => !file.endsWith(".test.ts"));
+    const sources = walkAll("src").filter((file) => /\.tsx?$/.test(file) && !file.endsWith(".test.ts"));
 
     expect(sources.filter((file) => /from "@dnd-kit\//.test(source(file))).sort()).toEqual([
       // Admin "Site menüsü" editörü: yalnız /admin/site-menu rotasının kendi parçasında (herkese açık sayfalara girmez).

@@ -47,7 +47,7 @@ describe("ayar kayıt defteri: yapı sözleşmesi", () => {
       expect(d.risk, d.key).toBe("high");
       expect(d.default, d.key).toBe("");
     }
-    for (const k of ["openai_api_key", "netgsm_password", "whatsapp_api_token", "efatura_api_key", "sahibinden_api_key", "emlakjet_api_secret"]) {
+    for (const k of ["openai_api_key", "netgsm_password", "whatsapp_api_token", "sahibinden_api_key", "emlakjet_api_secret"]) {
       const d = getSettingDefByStorage("platform", k);
       expect(d && isSecretDef(d), k).toBe(true);
     }

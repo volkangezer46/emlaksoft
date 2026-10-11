@@ -141,7 +141,7 @@ export default async function AsistanPage({
       tone: "bg-cyan-500/12 text-cyan-700",
       title: `${insights.newDemands} yeni talep`,
       description: "İşlenmemiş talepleri portföylerle eşleştirip fırsata çevirin.",
-      href: "/app/eslestirme",
+      href: "/app/talepler?sekme=eslesme",
       hrefLabel: "Eşleştirmeye git",
       ask: "Yeni talepler için nasıl bir eşleştirme stratejisi izlemeliyim?",
     });

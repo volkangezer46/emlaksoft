@@ -418,7 +418,7 @@ export async function DemandsView({
         meta={<ScopeBadge text={listScope.badge} />}
         actions={
           <>
-            <ButtonLink href="/app/eslestirme" variant="secondary" size="sm" icon={Crosshair}>
+            <ButtonLink href="/app/talepler?sekme=eslesme" variant="secondary" size="sm" icon={Crosshair}>
               Akıllı eşleştirme
             </ButtonLink>
             {canCreate ? <ButtonLink href="/app/talepler/yeni" size="sm" icon={Plus}>Yeni talep</ButtonLink> : null}

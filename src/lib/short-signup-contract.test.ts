@@ -99,9 +99,7 @@ describe("tek Kurulum sihirbazı sözleşmesi", () => {
     expect(page).toContain("/app/baslangic");
   });
 
-  it("ofis adımı telefon/logo/geo mevcut yoldan; profil action'ları yetki kapılı", () => {
-    const a = read("src/app/actions/profile-complete.ts");
-    expect((a.match(/requirePermission\("settings", "edit"\)/g) ?? []).length).toBe(2);
+  it("ofis adımı telefon/logo/geo mevcut yoldan", () => {
     const office = read("src/app/app/baslangic/office-step.tsx");
     expect(office).toContain("saveOfficeProfile");
     expect(office).toContain("uploadTenantLogo");

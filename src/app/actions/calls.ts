@@ -64,7 +64,7 @@ export async function createCall(formData: FormData): Promise<CallResult> {
     newValue: { direction, phone, disposition },
   });
 
-  revalidatePath("/app/arama");
+  revalidatePath("/app/gelen-kutusu");
   revalidatePath("/app/gelen-kutusu");
   if (customerId) revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app");

@@ -62,7 +62,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
           </p>
         </div>
         <Link
-          href="/app/eslestirme"
+          href="/app/talepler?sekme=eslesme"
           className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
         >
           Tümünü gör <ArrowUpRight className="h-3.5 w-3.5" />
@@ -115,7 +115,7 @@ export function MatchedPropertiesWidget({ demands, properties, weights }: Props)
       {pairs.length > 6 ? (
         <div className="border-t border-line px-5 py-3 text-center">
           <Link
-            href="/app/eslestirme"
+            href="/app/talepler?sekme=eslesme"
             className="text-xs font-semibold text-brand-600 hover:underline"
           >
             +{pairs.length - 6} portföy daha →

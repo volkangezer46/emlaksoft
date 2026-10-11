@@ -20,7 +20,7 @@ const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
 ];
 
 /** Çağrı merkezi için ilk eylem görüşme kaydıdır. */
-const CALL_ACTION = { href: "/app/arama", label: "Görüşme kaydet" } as const;
+const CALL_ACTION = { href: "/app/gelen-kutusu?sekme=cagri", label: "Görüşme kaydet" } as const;
 
 /** Rolün "+ Yeni" sayfasındaki eylemleri (yetki, paket kilidi ve kapalı modül süzgeciyle). */
 export function mobileNewActions(

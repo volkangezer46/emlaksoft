@@ -123,7 +123,7 @@ export async function OverviewTab({ ctx, canHandoff, editableScopes }: { ctx: Ct
   items.push(
     { label: "Müşteri (toplam)", value: customerCount, href: `/app/musteriler?assigned=${id}`, icon: <Users /> },
     { label: "Portföy (toplam)", value: propertyCount, href: `/app/portfoyler?danisman=${id}`, icon: <Building2 /> },
-    { label: "Çağrı (bu ay)", value: kpis.callsCur, href: `/app/arama?danisman=${id}`, icon: <PhoneCall /> },
+    { label: "Çağrı (bu ay)", value: kpis.callsCur, href: `/app/gelen-kutusu?sekme=cagri&danisman=${id}`, icon: <PhoneCall /> },
   );
 
   return (
@@ -217,7 +217,7 @@ export async function ActivityTab({ ctx }: { ctx: Ctx }) {
 
   const events: TimelineEvent[] = [];
   for (const c of (calls.data ?? []) as unknown as { id: string; direction: string; started_at: string; customer_id: string | null; customer: Rel }[]) {
-    events.push({ key: `call-${c.id}`, kind: "call", title: CALL_DIR[c.direction] ?? "Çağrı", sub: relOf(c.customer)?.full_name ?? null, at: c.started_at, href: c.customer_id ? `/app/musteriler/${c.customer_id}` : `/app/arama?danisman=${id}` });
+    events.push({ key: `call-${c.id}`, kind: "call", title: CALL_DIR[c.direction] ?? "Çağrı", sub: relOf(c.customer)?.full_name ?? null, at: c.started_at, href: c.customer_id ? `/app/musteriler/${c.customer_id}` : `/app/gelen-kutusu?sekme=cagri&danisman=${id}` });
   }
   for (const a of (appts.data ?? []) as unknown as { id: string; appointment_type: string; status: string; scheduled_at: string; customer_id: string | null; customer: Rel }[]) {
     events.push({ key: `appt-${a.id}`, kind: "appointment", title: APPT_TYPE[a.appointment_type] ?? "Randevu", sub: relOf(a.customer)?.full_name ?? null, at: a.scheduled_at, href: `/app/randevular?danisman=${id}` });
@@ -554,7 +554,7 @@ function coachHref(title: string, id: string, isSelf: boolean): { href?: string;
   if (t.includes("randevu")) return { href: `/app/randevular?danisman=${id}`, hrefLabel: "Randevular" };
   if (t.includes("teklif")) return { href: `/app/teklifler?danisman=${id}`, hrefLabel: "Teklifler" };
   if (t.includes("anlaşma")) return { href: `/app/anlasmalar?danisman=${id}`, hrefLabel: "Anlaşmalar" };
-  if (t.includes("çağrı") || t.includes("huni")) return { href: `/app/arama?danisman=${id}`, hrefLabel: "Çağrı kayıtları" };
+  if (t.includes("çağrı") || t.includes("huni")) return { href: `/app/gelen-kutusu?sekme=cagri&danisman=${id}`, hrefLabel: "Çağrı kayıtları" };
   if (t.includes("piyasa üstü")) return { href: `/app/portfoyler?danisman=${id}`, hrefLabel: "Portföyler" };
   return { href: `/app/musteriler?assigned=${id}`, hrefLabel: "Müşteriler" };
 }

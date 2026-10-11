@@ -70,6 +70,6 @@ export async function previewDemandMatches(input: unknown): Promise<MatchPreview
       score: r.score,
       tier: tierOf(r.score),
     })),
-    href: `/app/eslestirme?kriter=${encodeURIComponent(encodeDemandPreviewParam(values))}`,
+    href: `/app/talepler?sekme=eslesme&kriter=${encodeURIComponent(encodeDemandPreviewParam(values))}`,
   };
 }

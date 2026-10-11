@@ -495,7 +495,7 @@ export default async function PropertyDetailPage({
               <Link href="/app/kayip-kacak" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
               </Link>
-              <Link href={`/app/eslestirme?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Eşleştir
               </Link>
               <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">

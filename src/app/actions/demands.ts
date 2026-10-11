@@ -27,7 +27,7 @@ export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
 function revalidateDemandPaths(tenantId: string, customerId: string) {
   revalidatePath("/app/talepler");
-  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/talepler");
   revalidatePath(`/app/musteriler/${customerId}`);
   revalidatePath("/app/musteriler");
   revalidateTenantData(tenantId);
@@ -323,7 +323,7 @@ export async function bulkSetDemandStatus(ids: string[], status: string): Promis
     newValue: { ids: rows.map((r) => r.id), status, count: rows.length },
   });
   revalidatePath("/app/talepler");
-  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/talepler");
   revalidatePath("/app/musteriler");
   for (const cid of new Set(rows.map((r) => r.customer_id))) revalidatePath(`/app/musteriler/${cid}`);
   revalidateTenantData(gate.tenantId);
@@ -387,7 +387,7 @@ export async function bulkDeleteDemands(ids: string[]): Promise<DemandResult & {
     newValue: { ids: rows.map((r) => r.id), count: rows.length },
   });
   revalidatePath("/app/talepler");
-  revalidatePath("/app/eslestirme");
+  revalidatePath("/app/talepler");
   revalidatePath("/app/musteriler");
   for (const cid of new Set(rows.map((r) => r.customer_id))) revalidatePath(`/app/musteriler/${cid}`);
   revalidateTenantData(gate.tenantId);

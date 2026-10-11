@@ -412,7 +412,7 @@ export default async function CustomerDetailPage({
   const kpis: KpiItem[] = [
     { label: "Açık talep", value: activeDemandCount, href: `${base}?sekme=talepler`, icon: <Target />, tone: "info", hint: `${demands.length} talep kaydı` },
     ...(activeDemands.length > 0
-      ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/eslestirme?customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
+      ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/talepler?sekme=eslesme&customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
       : []),
     ...(appts.length > 0
       ? [{ label: "Yapılan randevu", value: completedAppts, href: `${base}?sekme=ozet`, icon: <CalendarDays />, tone: "success" as const, hint: `${appts.length} randevu kaydı` }]
@@ -560,13 +560,13 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
                 >
                   <BookUser className="h-4 w-4" /> Rehbere ekle (.vcf)
                 </a>
-                <Link href={`/app/arama?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
                 <Link href={`/app/musteriler/${customer.id}?sekme=gecmis`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <MessageSquare className="h-4 w-4" /> Not ekle
                 </Link>
-                <Link href={`/app/eslestirme?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                <Link href={`/app/talepler?sekme=eslesme&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Target className="h-4 w-4" /> Eşleştir
                 </Link>
                 {canEdit ? (

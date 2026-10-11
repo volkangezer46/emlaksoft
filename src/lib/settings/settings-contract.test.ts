@@ -82,7 +82,6 @@ describe("ayar yazım sözleşmesi", () => {
     expect(read("src/lib/messaging/netgsm.ts")).toContain('getPlatformSecret("netgsm_password")');
     expect(read("src/lib/messaging/netgsm.ts")).toContain('getPlatformSecret("whatsapp_api_token")');
     expect(read("src/lib/integrations/portals/index.ts")).toContain("getPlatformSecret(`${portal}_api_key`)");
-    expect(read("src/lib/efatura.ts")).toContain('getPlatformSecret("efatura_api_key")');
   });
 
   it("log/denetim/geçmiş yazan kodlar gizli düz değeri taşımaz", () => {

@@ -12,7 +12,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const BULK_LIMIT = 100;
 
 function refresh() {
-  revalidatePath("/admin/hatalar");
+  revalidatePath("/admin/sistem");
   revalidatePath("/admin/sistem");
 }
 

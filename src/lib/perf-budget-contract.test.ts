@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { readCached, statKind, walkAll } from "./test-support/src-tree";
 import { dirname, join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -18,22 +18,14 @@ import { describe, expect, it } from "vitest";
  */
 const ROOT = process.cwd();
 
-function walk(dir: string, out: string[] = []): string[] {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    if (statSync(full).isDirectory()) walk(full, out);
-    else out.push(full);
-  }
-  return out;
-}
 const rel = (f: string) => f.slice(ROOT.length + 1).split("\\").join("/");
-const SRC_FILES = walk(join(ROOT, "src")).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.(ts|tsx)$/.test(f));
+const SRC_FILES = walkAll(join(ROOT, "src")).filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.(ts|tsx)$/.test(f));
 
 describe("(a) her sayfa segmentinin kendi loading.tsx dosyası var", () => {
   it("/app ve /admin page.tsx segmentleri", () => {
-    const missing = [...walk(join(ROOT, "src/app/app")), ...walk(join(ROOT, "src/app/admin"))]
+    const missing = [...walkAll(join(ROOT, "src/app/app")), ...walkAll(join(ROOT, "src/app/admin"))]
       .filter((f) => f.endsWith("page.tsx"))
-      .filter((f) => !existsSync(join(dirname(f), "loading.tsx")))
+      .filter((f) => statKind(join(dirname(f), "loading.tsx")) !== "file")
       .map((f) => rel(dirname(f)));
     expect(missing, `loading.tsx eksik segmentler (tıklayınca iskelet gelmez):\n${missing.join("\n")}`).toEqual([]);
   });
@@ -108,11 +100,11 @@ describe("(b) sayfalarda bağımsız ardışık await supabase (waterfall) yok",
 
   it("/app ve /admin page.tsx dosyaları", () => {
     const offenders: string[] = [];
-    const pages = [...walk(join(ROOT, "src/app/app")), ...walk(join(ROOT, "src/app/admin"))].filter((f) => f.endsWith("page.tsx"));
+    const pages = [...walkAll(join(ROOT, "src/app/app")), ...walkAll(join(ROOT, "src/app/admin"))].filter((f) => f.endsWith("page.tsx"));
     for (const f of pages) {
       const path = rel(f);
       if (WATERFALL_ALLOW[path]) continue;
-      const hits = findIndependentSequentialAwaits(readFileSync(f, "utf8"));
+      const hits = findIndependentSequentialAwaits(readCached(f));
       if (hits.length > 0) offenders.push(`${path}: satır ${hits.join(", ")}`);
     }
     expect(offenders, `Bağımsız ardışık await supabase (Promise.all kullanın ya da gerekçeyle istisna ekleyin):\n${offenders.join("\n")}`).toEqual([]);
@@ -127,20 +119,34 @@ const HEAVY_ENTRY_ALLOW: Record<string, string> = {
   "src/components/ui/chart.tsx": "recharts sarmalayıcısı; yalnız lazy-charts.tsx (next/dynamic) tarafından yüklenir",
 };
 
+const RS_CACHE = new Map<string, string | null>();
 function resolveSpec(spec: string, from: string): string | null {
+  const key = `${from}function resolveSpec(spec: string, from: string): string | null {${spec}`;
+  if (RS_CACHE.has(key)) return RS_CACHE.get(key)!;
+  const r = resolveSpecRaw(spec, from);
+  RS_CACHE.set(key, r);
+  return r;
+}
+function resolveSpecRaw(spec: string, from: string): string | null {
   let base: string;
   if (spec.startsWith("@/")) base = join(ROOT, "src", spec.slice(2));
   else if (spec.startsWith(".")) base = resolve(dirname(from), spec);
   else return null;
   for (const ext of ["", ".ts", ".tsx", "/index.ts", "/index.tsx"]) {
     const p = base + ext;
-    if (existsSync(p) && statSync(p).isFile()) return p;
+    if (statKind(p) === "file") return p;
   }
   return null;
 }
 
 /** Değer içe aktarmaları (`import type`, yalnız-tip listeleri ve dinamik `import()` hariç). */
+const VI_CACHE = new Map<string, string[]>();
 function valueImports(text: string): string[] {
+  let r = VI_CACHE.get(text);
+  if (!r) VI_CACHE.set(text, (r = valueImportsRaw(text)));
+  return r;
+}
+function valueImportsRaw(text: string): string[] {
   const out: string[] = [];
   const re = /(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;]*?)\s*from\s*["']([^"']+)["']/g;
   let m: RegExpExecArray | null;
@@ -161,13 +167,13 @@ describe("(c) istemci bileşenleri ağır kütüphaneyi statik içe aktarmaz", (
     const heavyHit = (spec: string) => HEAVY_PACKAGES.find((p) => spec === p || spec.startsWith(`${p}/`));
     const offenders: string[] = [];
     for (const f of SRC_FILES) {
-      const text = readFileSync(f, "utf8");
+      const text = readCached(f);
       if (!isClientFile(text)) continue;
       const seen = new Set<string>();
       const walkChain = (file: string, chain: string[]): string | null => {
         if (seen.has(file)) return null;
         seen.add(file);
-        const t = readFileSync(file, "utf8");
+        const t = readCached(file);
         // "use server" sınırı istemci paketine girmez (eylem referansı olur).
         if (chain.length > 0 && /^\s*["']use server["']/.test(t)) return null;
         for (const spec of valueImports(t)) {
@@ -190,7 +196,7 @@ describe("(c) istemci bileşenleri ağır kütüphaneyi statik içe aktarmaz", (
   it("istisna listesindeki dosyalar gerçekten dinamik yükleyiciyle bağlı (statik import yok)", () => {
     for (const allowed of Object.keys(HEAVY_ENTRY_ALLOW)) {
       const importers = SRC_FILES.filter((f) => {
-        const text = readFileSync(f, "utf8");
+        const text = readCached(f);
         return valueImports(text).some((s) => resolveSpec(s, f) === join(ROOT, allowed));
       }).map(rel);
       expect(importers, `${allowed} statik içe aktarılıyor`).toEqual([]);
@@ -206,18 +212,18 @@ describe("(d) sunucu Supabase istemcileri takılma korumasından (guardedFetch) 
   it("kurucu çağrıları yalnız korumalı dosyalarda", () => {
     const offenders = SRC_FILES.map(rel).filter((f) => {
       if (GUARDED.includes(f) || EXEMPT.has(f)) return false;
-      const s = readFileSync(join(ROOT, f), "utf8");
+      const s = readCached(join(ROOT, f));
       return /\b(createServerClient|createBrowserClient)\(/.test(s) || /import\s*\{[^}]*\bcreateClient\b[^}]*\}\s*from\s*"@supabase\/supabase-js"/.test(s);
     });
     expect(offenders).toEqual([]);
   });
   it("korumalı dosyalar guardedFetch kullanır", () => {
-    for (const f of GUARDED) expect(readFileSync(join(ROOT, f), "utf8"), f).toMatch(/global:\s*\{\s*fetch:\s*guardedFetch\s*\}/);
+    for (const f of GUARDED) expect(readCached(join(ROOT, f)), f).toMatch(/global:\s*\{\s*fetch:\s*guardedFetch\s*\}/);
   });
 });
 
 describe("(e) istemci router önbelleği: 300 sn + arka plan tazeleme + tam önceden yükleme + realtime", () => {
-  const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
+  const read = (p: string) => readCached(join(ROOT, p));
   it("next.config staleTimes.dynamic 1..300", () => {
     const m = read("next.config.ts").match(/staleTimes:\s*\{\s*dynamic:\s*(\d+)/);
     expect(m, "staleTimes.dynamic tanımlı olmalı").not.toBeNull();

@@ -7,7 +7,6 @@ const protectedProviderFiles = [
   "src/lib/calendar/index.ts",
   "src/lib/tcmb.ts",
   "src/lib/billing/iyzico.ts",
-  "src/lib/efatura.ts",
   "src/lib/integrations/emlakfiyati/adapter.ts",
   "src/lib/integrations/portals/index.ts",
   "src/lib/messaging/netgsm.ts",

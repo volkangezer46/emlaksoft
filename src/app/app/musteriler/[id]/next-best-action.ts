@@ -74,7 +74,7 @@ export function computeNextBestAction(
       title: "Yeni eşleşme fırsatı olabilir",
       action: "Eşleştir",
       reason: `${input.openDemandCount} açık talep · ${input.candidatePropertyCount} aktif portföy taranabilir`,
-      href: `/app/eslestirme?customer=${input.customerId}`,
+      href: `/app/talepler?sekme=eslesme&customer=${input.customerId}`,
     };
   }
 

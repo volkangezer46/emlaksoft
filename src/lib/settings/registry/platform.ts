@@ -13,7 +13,7 @@ import { parseMaxShare } from "@/lib/try-credits/config";
 import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
 import { EMAIL_TEMPLATES, templateSettingKey } from "@/lib/email/templates";
 import type { AnySettingDef } from "../types";
-import { defineBool, defineEnum, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
+import { defineBool, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
 
 /**
  * PLATFORM ayarlari. ILK DALGA KURALI: varsayilan = bugunku sabit (registry.test.ts kilitler), davranis degismez,
@@ -292,57 +292,6 @@ const integrations: AnySettingDef[] = [
     description: "WhatsApp sağlayıcı erişim anahtarı. Şifreli saklanır.",
     impact: "Yanlış anahtar WhatsApp gönderimini durdurur. API adresi /admin/sistem ekranındadır.",
     envFallback: "WHATSAPP_API_TOKEN",
-  }),
-  defineEnum({
-    key: "efatura.provider",
-    storageKey: "efatura_provider",
-    default: "",
-    options: [
-      { value: "", label: "Tanımsız (ortam değişkeni)" },
-      { value: "parasutu", label: "Paraşüt" },
-      { value: "logo", label: "Logo" },
-      { value: "custom", label: "Özel" },
-    ],
-    category: "entegrasyon",
-    label: "E-fatura sağlayıcı",
-    description: "Fatura kesim entegrasyonu sağlayıcısı.",
-    impact: "Yanlış sağlayıcı fatura oluşturmayı başarısız kılar.",
-    risk: "high",
-    envFallback: "EFATURA_PROVIDER",
-  }),
-  defineString({
-    key: "efatura.api_url",
-    storageKey: "efatura_api_url",
-    default: "",
-    maxLength: 512,
-    category: "entegrasyon",
-    label: "E-fatura API adresi",
-    description: "Sağlayıcı API tabanı (izinli alan adı denetimi okuma anında yapılır).",
-    impact: "İzinli olmayan adres e-fatura entegrasyonunu kapalı sayar.",
-    risk: "high",
-    envFallback: "EFATURA_API_URL",
-  }),
-  defineSecret({
-    key: "efatura.api_key",
-    storageKey: "efatura_api_key",
-    maxLength: 1024,
-    category: "entegrasyon",
-    label: "E-fatura API anahtarı",
-    description: "E-fatura sağlayıcı anahtarı. Şifreli saklanır.",
-    impact: "Yanlış anahtar fatura kesimini durdurur.",
-    envFallback: "EFATURA_API_KEY",
-  }),
-  defineString({
-    key: "efatura.company_vkn",
-    storageKey: "efatura_company_vkn",
-    default: "",
-    maxLength: 11,
-    category: "entegrasyon",
-    label: "E-fatura firma VKN",
-    description: "Faturayı kesen firmanın vergi kimlik numarası.",
-    impact: "Kesilen faturalardaki satıcı kimliğidir.",
-    risk: "high",
-    envFallback: "EFATURA_COMPANY_VKN",
   }),
 ];
 
