@@ -91,7 +91,7 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 }
 
 /** Liste görünümünde sayfa başına kayıt — gerçek sayfalama. */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 /** Tutar toplamları için taranan azami kayıt; tavana dayanırsa rakamlar gösterilmez. */
 const SUM_SCAN_LIMIT = 2000;
 

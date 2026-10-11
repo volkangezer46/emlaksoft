@@ -135,7 +135,7 @@ function formatDate(iso: string) {
 }
 
 /** Sayfa başına kayıt — gerçek sunucu sayfalaması (200'lük dilim yerine). */
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 30;
 /** Harita görünümü tek seferde en çok bu kadar konumlu portföy çizer. */
 const MAP_LIMIT = 1000;
 /** Tek hafif tarama (değer toplamı, tip sayaçları, haftalık seri) azami kayıt sayısı. */
@@ -245,10 +245,13 @@ export default async function PropertiesPage({
   // "Foto eksik" (F3): sayı + kapak kuralıyla eksik portföy id'leri (en çok PHOTO_GAP_ID_CAP). İki ön sorgu
   // birbirinden bağımsız: aynı turda (eskiden ardışıktı).
   // Özel alan filtresi (?ozel=anahtar:değer) de aynı turda çözülür: eşleşen kimlikler ortak filtre kurucusuna iner.
-  const [photoGap, eidsLoad, customFilter] = await Promise.all([
+  // Süzgeç yoksa tanım okuması (yalnız filtre çubuğu) liste turunu BEKLETMEZ; sorgularla paralel koşar.
+  const customRaw = customFilterRaw(params as Record<string, string | undefined>);
+  const customFilterP = resolveCustomFieldFilter(supabase, tenantId, "property", customRaw);
+  const [photoGap, eidsLoad, customPre] = await Promise.all([
     nlFilters.fotoEksik ? fetchPhotoGapIds(supabase) : Promise.resolve(null),
     eidsFilter ? loadEidsStatus(supabase) : Promise.resolve(null),
-    resolveCustomFieldFilter(supabase, tenantId, "property", customFilterRaw(params as Record<string, string | undefined>)),
+    customRaw ? customFilterP : Promise.resolve(null),
   ]);
   const eidsIds = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.ids[eidsFilter] : null;
   const eidsTotal = eidsFilter && eidsLoad?.enabled ? eidsLoad.summary.counts[eidsFilter] : 0;
@@ -265,7 +268,7 @@ export default async function PropertiesPage({
   if (danismanF) urlParams.danisman = danismanF;
   if (eklenenDays) urlParams.eklenen = String(eklenenDays);
   if (eidsFilter) urlParams.yetki = eidsFilter;
-  if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
+  if (customPre?.active) urlParams.ozel = customFilterValue(customPre.active.def.key, customPre.active.value);
   Object.assign(urlParams, propertyNlUrlParams(nlFilters));
   if (siralaF) urlParams.sirala = siralaF;
   if (view !== "liste") urlParams.gorunum = view;
@@ -324,7 +327,7 @@ export default async function PropertiesPage({
     query = applyPropertyNlFilters(query, nlFilters);
     if (photoGap) query = query.in("id", photoGap.ids.length > 0 ? photoGap.ids : ["00000000-0000-0000-0000-000000000000"]);
     if (eidsIds) query = query.in("id", eidsIds.length > 0 ? eidsIds.slice(0, EIDS_ID_CAP) : ["00000000-0000-0000-0000-000000000000"]);
-    query = applyCustomFieldIds(query, customFilter.ids);
+    query = applyCustomFieldIds(query, customPre?.ids ?? null);
     return query;
   };
   const buildFilteredQuery = (select: string, opts?: { count: "exact"; head?: boolean }) => {
@@ -333,7 +336,7 @@ export default async function PropertiesPage({
     return query;
   };
 
-  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customFilter.active;
+  const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customPre?.active;
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
@@ -443,6 +446,7 @@ export default async function PropertiesPage({
     scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("transaction_type", "Kiralık"),
   ]);
 
+  const customFilter = customPre ?? (await customFilterP);
   const rows = (data ?? []) as unknown as PropertyRow[];
   const totalFilteredCount = (filtersEmpty ? totalCount : filteredTotal) ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));

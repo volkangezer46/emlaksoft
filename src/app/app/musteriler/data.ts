@@ -21,7 +21,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { buildCustomerState, computeCustomerHeat, type CustomerState } from "@/lib/customer-state/core";
 import { fetchOwnerHistory, fetchUpcomingAppointmentIds } from "@/lib/customer-state/load";
 import { isOwnerCustomer } from "@/lib/customer-state/seller";
-import { HEAT_SEGMENTS, heatTitle, type CustomerHeat, type HeatSegment } from "@/lib/customer-state/heat";
+import { HEAT_SEGMENTS, heatTitle, type HeatSegment } from "@/lib/customer-state/heat";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { getSetting } from "@/lib/settings/read";
@@ -34,7 +34,7 @@ import { applyCustomFieldIds } from "@/lib/custom-fields/filter";
 import { weekBucketsOf } from "@/lib/ui/list-charts";
 
 /** Sayfa başına kayıt — gerçek sayfalama, 500'lük dilim yerine. */
-export const PAGE_SIZE = 50;
+export const PAGE_SIZE = 30;
 
 /** Tip çipi sayaçları için taranan azami kayıt; aşılırsa sayaçlar gizlenir (yaklaşık sayı gösterilmez). */
 const TYPE_SCAN_LIMIT = 2000;
@@ -87,7 +87,21 @@ type HeatPoolRow = { id: string; created_at: string; blacklist: boolean | null }
 const LIST_COLS =
   "id, full_name, phone, email, customer_types, tags, source, lead_channel, notes, blacklist, assigned_to, created_at, birth_date, anniversary_date, anniversary_note, province:geo_provinces(name)";
 
-export type Occasion = { id: string; name: string; kind: "birthday" | "anniversary"; days: number; note: string | null };
+/** Liste dışı özet (sayfa Suspense ile akıtır): KPI sayıları, grafikler, özel günler, sıcaklık segmentleri. */
+export type CustomersSummary = {
+  buyerCount: number;
+  ownerCount: number;
+  occasions: Occasion[];
+  growthTotal: number;
+  growthFromDate: string;
+  weeklySeries: number[] | undefined;
+  weeklyBars: ReturnType<typeof weekBucketsOf>;
+  typeCounts: ReturnType<typeof countCustomerTypes> | null;
+  segmentCounts: Record<HeatSegment, number>;
+  poolLimited: boolean;
+};
+
+export type Occasion ={ id: string; name: string; kind: "birthday" | "anniversary"; days: number; note: string | null };
 
 function relativeAdded(iso: string) {
   const days = Math.floor(msSince(iso) / 86_400_000);
@@ -162,6 +176,11 @@ export async function loadCustomersData(input: CustomersDataInput) {
     listQuery = listQuery.order("created_at", { ascending: sortDir === "asc" });
   }
 
+  // ---- Liste-önce akış (hız ilkesi) -----------------------------------------------
+  // Liste + görünen satırların ısı/lead/randevu sinyalleri ilk ekranı belirler. KPI/çip sayıları, tip sayaçları,
+  // büyüme grafiği, özel günler ve sıcaklık havuzu (2000 satırlık tarama + ısı RPC'si) AYRI bir "özet" sözüdür:
+  // sayfa Suspense ile akıtır, liste bunları BEKLEMEZ. Yalnız ?segment süzgeci havuza ihtiyaç duyar (sayfa dilimi havuzdan kesilir).
+
   // Sıcaklık havuzu — skor girdisi için hafif kolonlar (id + yaş + kara liste);
   // segment sayıları ve ?segment filtresi bu havuzdan hesaplanır.
   let heatPoolQuery = buildFilteredQuery("id, created_at, blacklist");
@@ -174,21 +193,11 @@ export async function loadCustomersData(input: CustomersDataInput) {
   }
 
   const eightWeeksAgo = daysAgoIso(56);
+  // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS) — ana sorgularla aynı turda.
+  const dormantP = tenantId ? getSetting<number>("office.insight.dormant_days", { tenantId }) : Promise.resolve(undefined);
 
-  // Liste + havuz sorguları hemen başlar; ısı RPC'si bunlara bağlıdır
-  // ama diğer (referans/KPI) sorguları BEKLEMEZ — eskiden hepsi bitince seri başlıyordu.
-  const listP = segmentF
-    ? Promise.resolve({ data: null, count: null })
-    : Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1));
-  const poolP = heatPoolQuery.limit(HEAT_POOL_LIMIT);
-  const heatP = (async (): Promise<{ data: HeatSignalRow[] | null; error?: unknown }> => {
-    const [l, p] = await Promise.all([listP, poolP]);
-    const ids = [
-      ...new Set([
-        ...((p.data ?? []) as unknown as HeatPoolRow[]).map((r) => r.id),
-        ...((l.data ?? []) as unknown as CustomerRow[]).map((r) => r.id),
-      ]),
-    ];
+  /** Isı sinyalleri: kimlikler HEAT_RPC_CHUNK'lık dilimlerle, dilimler paralel (N+1 yok). */
+  const heatRpc = async (ids: string[]): Promise<{ data: HeatSignalRow[] | null; error?: unknown }> => {
     if (!tenantId || ids.length === 0) return { data: [] };
     const chunks: string[][] = [];
     for (let i = 0; i < ids.length; i += HEAT_RPC_CHUNK) chunks.push(ids.slice(i, i + HEAT_RPC_CHUNK));
@@ -199,7 +208,18 @@ export async function loadCustomersData(input: CustomersDataInput) {
       data: results.flatMap((r) => (r.data as HeatSignalRow[] | null) ?? []),
       error: results.find((r) => r.error)?.error,
     };
-  })();
+  };
+
+  // Segment filtresi aktifken sayfa dilimi havuzdan kesilir; normal range sorgusu boşa çalışmasın diye atlanır.
+  const listP = segmentF
+    ? Promise.resolve({ data: null, count: null })
+    : Promise.resolve(listQuery.range(offset, offset + PAGE_SIZE - 1));
+  const poolP = Promise.resolve(heatPoolQuery.limit(HEAT_POOL_LIMIT));
+  const poolHeatP = poolP.then((p) => heatRpc(((p.data ?? []) as unknown as HeatPoolRow[]).map((r) => r.id)));
+  // Görünen sayfanın ısı sinyalleri: küçük (≤PAGE_SIZE) RPC — 2000'lik havuz RPC'sini beklemez.
+  const pageHeatP = segmentF
+    ? poolHeatP
+    : listP.then((l) => heatRpc(((l.data ?? []) as unknown as CustomerRow[]).map((r) => r.id)));
   // Lead sinyalleri YALNIZ görünen sayfanın id'leri için (eski imza tüm tenant'ı döndürür ve 1000'de kesilirdi).
   // Segment filtresinde satırlar havuzdan kesildiği için sinyaller aşağıda satırlar bilinince çekilir.
   const signalsP = segmentF
@@ -207,51 +227,127 @@ export async function loadCustomersData(input: CustomersDataInput) {
     : listP.then((l) =>
         fetchLeadSignals(supabase, tenantId, ((l.data ?? []) as unknown as CustomerRow[]).map((c) => c.id)),
       );
+  // Yaklaşan randevu + mülk sahibi geçmişi de satırlar bilinir bilinmez başlar (eskiden ısı RPC'sinden SONRA ardışıktı).
+  const extrasP = segmentF
+    ? Promise.resolve(null)
+    : listP.then((l) => {
+        const pageRows = (l.data ?? []) as unknown as CustomerRow[];
+        return Promise.all([
+          fetchUpcomingAppointmentIds(supabase, pageRows.map((c) => c.id), daysAgoIso(0)),
+          fetchOwnerHistory(supabase, pageRows.filter((c) => isOwnerCustomer(c.customer_types)).map((c) => c.id)),
+        ]);
+      });
+
+  // ---- Özet (akışla gelir): KPI sayıları, grafikler, özel günler, sıcaklık segmentleri ----------
+  const summary: Promise<CustomersSummary> = (async () => {
+    const [poolRes, poolHeat, dormantDays, buyerRes, ownerRes, occasionRes, growthRes, typeScanRes] = await Promise.all([
+      poolP,
+      poolHeatP,
+      dormantP,
+      scoped(supabase
+        .from("customers")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null))
+        .contains("customer_types", ["Alıcı"]),
+      scoped(supabase
+        .from("customers")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null))
+        .contains("customer_types", ["Mülk sahibi"]),
+      // Özel günler — sayfa dilimi yerine tarihli tüm kayıtlardan (dar seçim)
+      scoped(supabase
+        .from("customers")
+        .select("id, full_name, birth_date, anniversary_date, anniversary_note")
+        .is("deleted_at", null))
+        .or("birth_date.not.is.null,anniversary_date.not.is.null")
+        .limit(1000),
+      // Büyüme grafiği — son 8 haftanın kayıt tarihleri
+      scoped(supabase
+        .from("customers")
+        .select("created_at")
+        .is("deleted_at", null))
+        .gte("created_at", eightWeeksAgo)
+        .limit(2000),
+      // Tip çipi sayaçları — hafif tek kolon taraması (TYPE_SCAN_LIMIT'i aşarsa sayaç gösterilmez).
+      scoped(supabase.from("customers").select("customer_types").is("deleted_at", null)).limit(TYPE_SCAN_LIMIT),
+    ]);
+    // Hata sessizce "kayıt yok"a dönüşmesin: error.tsx sınırına düşer (sahte sıfır yok).
+    assertQueryBatchSucceeded(
+      [poolRes, poolHeat, buyerRes, ownerRes, occasionRes, growthRes, typeScanRes],
+      [
+        "customers-heat-pool",
+        "customers-heat-signals",
+        "customers-buyers",
+        "customers-owners",
+        "customers-occasions",
+        "customers-growth",
+        "customers-type-scan",
+      ],
+      "Müşteri listesi",
+    );
+    const nowMs = now();
+    const signalMap = new Map<string, HeatSignalRow>();
+    for (const s of (poolHeat.data ?? []) as HeatSignalRow[]) signalMap.set(s.customer_id, s);
+    const poolRows = (poolRes.data ?? []) as unknown as HeatPoolRow[];
+    // Havuz sayımı: tam durum okuyucusunun ısı parçasıyla BİREBİR aynı hesap (tek tanım: customer-state/core).
+    const segmentCounts: Record<HeatSegment, number> = { sicak: 0, ilgili: 0, soguk: 0, uykuda: 0 };
+    for (const r of poolRows) {
+      const seg = computeCustomerHeat({ createdAt: r.created_at, blacklist: Boolean(r.blacklist) }, signalMap.get(r.id) ?? null, nowMs, { dormantDays }).segment;
+      segmentCounts[seg] += 1;
+    }
+
+    // Yaklaşan doğum günü / yıldönümü (önümüzdeki 7 gün) — ayrı dar sorgudan
+    const occasions: Occasion[] = [];
+    for (const row of (occasionRes.data ?? []) as OccasionRow[]) {
+      const bd = daysUntilAnnual(row.birth_date);
+      if (bd !== null && bd <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "birthday", days: bd, note: null });
+      const ad = daysUntilAnnual(row.anniversary_date);
+      if (ad !== null && ad <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "anniversary", days: ad, note: row.anniversary_note });
+    }
+    occasions.sort((a, b) => a.days - b.days);
+
+    // Büyüme grafiği — son 8 haftalık kayıtlar (gerçek toplam, sayfa dilimi değil)
+    const growthRows = (growthRes.data ?? []) as { created_at: string }[];
+    const weekMs = 7 * 86_400_000;
+    const buckets = Array.from({ length: 8 }, () => 0);
+    growthRows.forEach((row) => {
+      const idx = 7 - Math.floor((nowMs - new Date(row.created_at).getTime()) / weekMs);
+      if (idx >= 0 && idx < 8) buckets[idx] += 1;
+    });
+    const typeScanRows = (typeScanRes.data ?? []) as { customer_types: string[] | null }[];
+    return {
+      buyerCount: buyerRes.count ?? 0,
+      ownerCount: ownerRes.count ?? 0,
+      occasions,
+      growthTotal: buckets.reduce((a, b) => a + b, 0),
+      growthFromDate: eightWeeksAgo.slice(0, 10),
+      // PostgREST tavanı 1000 satır olabilir (limit 2000 istense de): 1000 ve üstü kesilmiş sayılır, seri çizilmez.
+      weeklySeries: growthRows.length >= 1000 ? undefined : buckets,
+      weeklyBars: weekBucketsOf(growthRows.map((r) => r.created_at), nowMs, 1000),
+      // Tarama kesilmediyse güvenilir
+      typeCounts: typeScanRows.length >= TYPE_SCAN_LIMIT ? null : countCustomerTypes(typeScanRows),
+      segmentCounts,
+      poolLimited: poolRows.length >= HEAT_POOL_LIMIT,
+    };
+  })();
+  // Sayfa hata öncesi çıkarsa (yönlendirme vb.) yakalanmamış red olmasın; bileşenler yine aynı sözü bekleyip hatayı görür.
+  summary.catch(() => undefined);
 
   const batch = await Promise.all([
-    // Segment filtresi aktifken sayfa dilimi havuzdan kesilir; normal range
-    // sorgusu boşa çalışmasın diye atlanır (listP yukarıda).
     listP,
-    poolP,
+    segmentF ? poolP : Promise.resolve(null),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     signalsP,
-    // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
-    // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
+    // "Toplam kayıt" — liste sayfalı olduğundan head-count (satır taşımaz, yalnızca sayım döner).
     scoped(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)),
-    scoped(supabase
-      .from("customers")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null))
-      .contains("customer_types", ["Alıcı"]),
-    scoped(supabase
-      .from("customers")
-      .select("id", { count: "exact", head: true })
-      .is("deleted_at", null))
-      .contains("customer_types", ["Mülk sahibi"]),
-    // Özel günler — sayfa dilimi yerine tarihli tüm kayıtlardan (dar seçim)
-    scoped(supabase
-      .from("customers")
-      .select("id, full_name, birth_date, anniversary_date, anniversary_note")
-      .is("deleted_at", null))
-      .or("birth_date.not.is.null,anniversary_date.not.is.null")
-      .limit(1000),
-    // Büyüme grafiği — son 8 haftanın kayıt tarihleri
-    scoped(supabase
-      .from("customers")
-      .select("created_at")
-      .is("deleted_at", null))
-      .gte("created_at", eightWeeksAgo)
-      .limit(2000),
-    // Tip çipi sayaçları — hafif tek kolon taraması (TYPE_SCAN_LIMIT'i aşarsa sayaç gösterilmez).
-    scoped(supabase.from("customers").select("customer_types").is("deleted_at", null)).limit(TYPE_SCAN_LIMIT),
     // Etiket filtresi + toplu etiketleme önerileri — tenant'taki distinct etiketler
     fetchTenantTags(supabase),
     getDefinitionsOrDefault("customer_type"),
     getDefinitionsOrDefault("customer_source"),
     savedViewsPromise,
-    heatP,
-    // Ofis tanımı: uykuda eşiği (varsayılan 90 gün = DORMANT_DAYS) — ana sorgularla aynı turda (eskiden ardışıktı).
-    tenantId ? getSetting<number>("office.insight.dormant_days", { tenantId }) : Promise.resolve(undefined),
+    pageHeatP,
+    dormantP,
+    extrasP,
   ]);
   const [
     listRes,
@@ -259,91 +355,49 @@ export async function loadCustomersData(input: CustomersDataInput) {
     advisorsRes,
     signalsRes,
     totalAllRes,
-    buyerRes,
-    ownerRes,
-    occasionRes,
-    growthRes,
-    typeScanRes,
     tenantTags,
     typeDefs,
     sourceDefs,
     savedViews,
     heatRes,
     dormantDays,
+    extrasRes,
   ] = batch;
-  // Hata sessizce "kayıt yok"a dönüşmesin: error.tsx sınırına düşer (sahte sıfır yok).
   assertQueryBatchSucceeded(
-    [listRes, poolRes, advisorsRes, totalAllRes, buyerRes, ownerRes, occasionRes, growthRes, typeScanRes, heatRes],
-    [
-      "customers-list",
-      "customers-heat-pool",
-      "advisors",
-      "customers-total",
-      "customers-buyers",
-      "customers-owners",
-      "customers-occasions",
-      "customers-growth",
-      "customers-type-scan",
-      "customers-heat-signals",
-    ],
+    [listRes, ...(poolRes ? [poolRes] : []), advisorsRes, totalAllRes, heatRes],
+    ["customers-list", ...(poolRes ? ["customers-heat-pool"] : []), "advisors", "customers-total", "customers-heat-signals"],
     "Müşteri listesi",
   );
   if (signalsRes) assertQueryBatchSucceeded([signalsRes], ["lead-signals"], "Müşteri listesi");
   const customers = listRes.data;
   const customerTotal = listRes.count;
-  const heatPool = poolRes.data;
   const advisors = advisorsRes.data;
   const totalAll = totalAllRes.count;
-  const buyerCount = buyerRes.count;
-  const ownerCount = ownerRes.count;
-  const occasionRows = occasionRes.data;
-  const growthRows = growthRes.data;
-  const typeScanRows = typeScanRes.data;
 
   // DB-driven tanımlar (boşsa definition-defaults.ts yedeği getDefinitionsOrDefault içinde)
   const customerTypes = typeDefs;
   const sourceEntries = sourceDefs.map((s) => [s.value, s.label] as const);
 
-  // ---- Sıcaklık skorlama (tek toplu RPC — N+1 yok) ------------------------
-  const poolRows = (heatPool ?? []) as unknown as HeatPoolRow[];
+  // ---- Isı sinyalleri (tek toplu RPC — N+1 yok) -----------------------------
   const pageRowsRaw = (customers ?? []) as unknown as CustomerRow[];
-  // Isı sinyalleri (heatP): havuz + görünen sayfa id'leri için, diğer sorgularla paralel.
-  // Niyet sinyalleri (teklif/açık anlaşma) sayfa satırlarına bağlıdır, ısı RPC'sine
-  // değil: segment filtresi yokken satırlar = pageRowsRaw → ısı RPC'siyle paralel başlar.
-  const { data: heatSignals } = heatRes;
-
   const heatSignalMap = new Map<string, HeatSignalRow>();
-  for (const s of (heatSignals ?? []) as HeatSignalRow[]) heatSignalMap.set(s.customer_id, s);
+  for (const s of (heatRes.data ?? []) as HeatSignalRow[]) heatSignalMap.set(s.customer_id, s);
   const nowMs = now();
-  const heatOf = (id: string, createdAt: string, blacklist: boolean | null): CustomerHeat => {
-    const s = heatSignalMap.get(id);
-    // Havuz sayımı: tam durum okuyucusunun ısı parçasıyla BİREBİR aynı hesap (tek tanım: customer-state/core).
-    return computeCustomerHeat({ createdAt, blacklist: Boolean(blacklist) }, s ?? null, nowMs, { dormantDays });
-  };
-  const heatMap = new Map<string, CustomerHeat>();
-  for (const r of poolRows) heatMap.set(r.id, heatOf(r.id, r.created_at, r.blacklist));
-  for (const r of pageRowsRaw) {
-    if (!heatMap.has(r.id)) heatMap.set(r.id, heatOf(r.id, r.created_at, r.blacklist));
-  }
-
-  // Segment sayıları — filtrelenmiş listenin ilk HEAT_POOL_LIMIT kaydından.
-  const segmentCounts: Record<HeatSegment, number> = { sicak: 0, ilgili: 0, soguk: 0, uykuda: 0 };
-  for (const r of poolRows) {
-    const seg = heatMap.get(r.id)?.segment;
-    if (seg) segmentCounts[seg] += 1;
-  }
-  const poolLimited = poolRows.length >= HEAT_POOL_LIMIT;
 
   // ---- Görünen satırlar + sayfalama ---------------------------------------
   let rows: CustomerRow[];
   let totalFiltered: number;
   if (segmentF) {
     // Segment filtresi: havuz skorlanır → filtrelenir → bellek içinde sayfalanır.
-    const matching = poolRows.filter((r) => heatMap.get(r.id)?.segment === segmentF);
+    const poolRows = (poolRes?.data ?? []) as unknown as HeatPoolRow[];
+    const matching = poolRows.filter(
+      (r) =>
+        computeCustomerHeat({ createdAt: r.created_at, blacklist: Boolean(r.blacklist) }, heatSignalMap.get(r.id) ?? null, nowMs, { dormantDays }).segment === segmentF,
+    );
     totalFiltered = matching.length;
     const sliceIds = matching.slice(offset, offset + PAGE_SIZE).map((r) => r.id);
     if (sliceIds.length > 0) {
-      // Dilim küçüktür (≤50) — tam kolonlar yalnız görünen satırlar için çekilir.
+      // Dilim küçüktür (≤PAGE_SIZE) — tam kolonlar yalnız görünen satırlar için çekilir.
       const sliceRes = await buildFilteredQuery(LIST_COLS).in("id", sliceIds);
       assertQueryBatchSucceeded([sliceRes], ["customers-segment-slice"], "Müşteri listesi");
       const byId = new Map(((sliceRes.data ?? []) as unknown as CustomerRow[]).map((r) => [r.id, r]));
@@ -366,10 +420,12 @@ export async function loadCustomersData(input: CustomersDataInput) {
   if (!signalsRes) assertQueryBatchSucceeded([leadSignalRes], ["lead-signals"], "Müşteri listesi");
   const signalMap = new Map<string, LeadSignalRow>();
   for (const s of leadSignalRes.data) signalMap.set(s.customer_id, s);
-  const [upcomingRes, ownerHistRes] = await Promise.all([
-    fetchUpcomingAppointmentIds(supabase, rowIds, daysAgoIso(0)),
-    fetchOwnerHistory(supabase, rows.filter((c) => isOwnerCustomer(c.customer_types)).map((c) => c.id)),
-  ]);
+  const [upcomingRes, ownerHistRes] =
+    extrasRes ??
+    (await Promise.all([
+      fetchUpcomingAppointmentIds(supabase, rowIds, daysAgoIso(0)),
+      fetchOwnerHistory(supabase, rows.filter((c) => isOwnerCustomer(c.customer_types)).map((c) => c.id)),
+    ]));
   assertQueryBatchSucceeded([upcomingRes, ownerHistRes], ["upcoming-appointments", "owner-history"], "Müşteri listesi");
   const stateMap = new Map<string, CustomerState>(
     rows.map((c) => [
@@ -405,43 +461,15 @@ export async function loadCustomersData(input: CustomersDataInput) {
     full_name: String(a.full_name ?? ""),
   }));
 
-  // Yaklaşan doğum günü / yıldönümü (önümüzdeki 7 gün) — ayrı dar sorgudan
-  const occasions: Occasion[] = [];
-  for (const row of (occasionRows ?? []) as OccasionRow[]) {
-    const bd = daysUntilAnnual(row.birth_date);
-    if (bd !== null && bd <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "birthday", days: bd, note: null });
-    const ad = daysUntilAnnual(row.anniversary_date);
-    if (ad !== null && ad <= WINDOW_DAYS) occasions.push({ id: row.id, name: row.full_name, kind: "anniversary", days: ad, note: row.anniversary_note });
-  }
-  occasions.sort((a, b) => a.days - b.days);
-
-  // Büyüme grafiği — son 8 haftalık kayıtlar (gerçek toplam, sayfa dilimi değil)
-  const weekMs = 7 * 86_400_000;
-  const buckets = Array.from({ length: 8 }, () => 0);
-  ((growthRows ?? []) as { created_at: string }[]).forEach((row) => {
-    const idx = 7 - Math.floor((nowMs - new Date(row.created_at).getTime()) / weekMs);
-    if (idx >= 0 && idx < 8) buckets[idx] += 1;
-  });
-
   const pageIds = displayRows.map((c) => c.id);
 
-  const growthTotal = buckets.reduce((a, b) => a + b, 0);
-  const growthFromDate = eightWeeksAgo.slice(0, 10);
-
-  // ---- Tip çipi sayaçları + haftalık yeni kayıt serisi (yalnız tarama kesilmediyse güvenilir) ----
-  const typeCounts = (typeScanRows ?? []).length >= TYPE_SCAN_LIMIT
-    ? null
-    : countCustomerTypes((typeScanRows ?? []) as { customer_types: string[] | null }[]);
-  // PostgREST tavanı 1000 satır olabilir (limit 2000 istense de): 1000 ve üstü kesilmiş sayılır, seri çizilmez.
-  const weeklySeries = ((growthRows ?? []) as unknown[]).length >= 1000 ? undefined : buckets;
-  const weeklyBars = weekBucketsOf(((growthRows ?? []) as { created_at: string }[]).map((r) => r.created_at), nowMs, 1000);
   const advisorName = new Map(advisorList.map((a) => [a.id, a.full_name]));
   const sourceLabel = new Map<string, string>(sourceEntries);
 
   // ---- Satır modelleri (tablo + mobil liste ortak veri) ----------------------
   const viewModels: CustomerVM[] = displayRows.map((c) => {
     const state = stateMap.get(c.id);
-    const heat = state?.scores.heat ?? heatMap.get(c.id);
+    const heat = state?.scores.heat;
     const lastContactIso = heatSignalMap.get(c.id)?.last_contact ?? null;
     const lastDays = lastContactIso && !Number.isNaN(new Date(lastContactIso).getTime())
       ? Math.floor(msSince(lastContactIso) / 86_400_000)
@@ -482,8 +510,6 @@ export async function loadCustomersData(input: CustomersDataInput) {
     pageIds,
     rowCount: rows.length,
     totalAll: totalAll ?? 0,
-    buyerCount: buyerCount ?? 0,
-    ownerCount: ownerCount ?? 0,
     totalFiltered,
     totalPages,
     rangeStart,
@@ -491,18 +517,12 @@ export async function loadCustomersData(input: CustomersDataInput) {
     hotCount,
     advisorList,
     advisorName,
-    occasions,
-    growthTotal,
-    growthFromDate,
-    weeklySeries,
-    weeklyBars,
-    typeCounts,
     tenantTags,
     customerTypes,
     sourceEntries,
     sourceLabel,
     savedViews,
-    segmentCounts,
-    poolLimited,
+    /** Akışla gelen özet (KPI/grafik/özel gün/segment): sayfa Suspense içinde bekler. */
+    summary,
   };
 }
