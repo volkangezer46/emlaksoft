@@ -5,6 +5,8 @@ import { afterSafe } from "@/lib/after-safe";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, parseTrLocalDateTime } from "@/lib/clock";
 import { logActivity } from "@/lib/activity";
+import { dispatchNewFsboLead } from "@/lib/prospecting/automation-dispatch";
+import { closeFsboInsightAfterContact } from "@/lib/insights/close-on-contact";
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
 import { parsePhoneStrict } from "@/lib/phone-rules";
@@ -105,6 +107,7 @@ export async function createFsboLead(_prev: ProspectingResult, formData: FormDat
   const res = await saveFsboLead({ db, tenantId: gate.tenantId, userId: gate.userId, role: gate.role }, parsed.data);
   if (!res.ok) return { error: res.error };
   refresh(res.id);
+  if (res.created) dispatchNewFsboLead({ tenantId: gate.tenantId, leadId: res.id, title: parsed.data.title ?? null, assignedTo: parsed.data.assignedTo ?? gate.userId, fields: { transaction_type: parsed.data.transactionType, price: parsed.data.price ?? null } });
   const notices = res.notices.map((n) => n.message);
   if (res.ownership.kind === "other") return { ok: false, id: res.id, error: res.ownership.message };
   if (!res.created) notices.unshift("Bu ilan zaten kayıtlıydı; yeni fiyat gözlemi eklendi.");
@@ -162,6 +165,7 @@ export async function logFsboCall(input: { id: string; outcome: string; note?: s
     note: note || null,
   });
   if (result.doNotCall) await addDoNotCall(db, gate, lead, "ilan_sahibi_istedi");
+  closeFsboInsightAfterContact(lead.id);
   refresh(lead.id);
   const notices: string[] = [];
   if (result.suggestLost) notices.push("6 denemedir ulaşılamıyor; kaydı \"Kayıp: ulaşılamadı\" olarak kapatmayı düşünün.");
@@ -201,6 +205,7 @@ export async function markFsboDoNotCall(input: { id: string; reason?: string }):
   if (upd.error) return { error: actionErrorMessage(upd.error, "İşlem kaydedilemedi. Lütfen tekrar deneyin.") };
   await addDoNotCall(db, gate, lead, reason);
   await db.from("fsbo_lead_activities").insert({ tenant_id: gate.tenantId, lead_id: lead.id, actor_id: gate.userId, kind: "call", outcome: "aranmasin", note: null });
+  closeFsboInsightAfterContact(lead.id);
   refresh(lead.id);
   return { ok: true, id: lead.id };
 }
@@ -358,6 +363,7 @@ export async function changeFsboStatus(input: { id: string; to: string; lostReas
   await db.from("fsbo_lead_activities").insert({ tenant_id: gate.tenantId, lead_id: lead.id, actor_id: gate.userId, kind: "status", note });
   // "Aslında emlakçı": o numara ofis genelinde işaretlenir.
   if (to === "kayip" && lostReason === "aslinda_emlakci") await addDoNotCall(db, gate, lead, "aslinda_emlakci");
+  if (to === "kayip" || to === "yetki_alindi") closeFsboInsightAfterContact(lead.id);
   refresh(lead.id);
   return { ok: true, id: lead.id, notices };
 }

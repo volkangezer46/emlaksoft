@@ -1,4 +1,5 @@
 import { now } from "@/lib/clock";
+import { closeFsboInsightAfterContact } from "@/lib/insights/close-on-contact";
 import { requirePermission } from "@/lib/require-permission";
 import { MANAGER_ROLES } from "@/lib/team/assignable-roles";
 import type { Db } from "./store";
@@ -56,5 +57,6 @@ export async function linkConvertedFsboLead(
     kind: "status",
     note: "Portföye dönüştü.",
   });
+  closeFsboInsightAfterContact(lead.id);
   return { ok: true };
 }

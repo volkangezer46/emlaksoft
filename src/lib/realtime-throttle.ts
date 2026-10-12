@@ -22,9 +22,9 @@ export const REALTIME_ALL_TABLES = ["deals", "commissions", "portal_listings", "
 export const REALTIME_EXTENDED_TABLES = ["properties", "customer_demands", "appointments", "tasks", "listing_pool_entries", "cash_entries"] as const;
 
 /**
- * Üçüncü kanal: 20261012002300 ile yayına eklenen merkez tabloları (migration uygulanana kadar yalnız bu kanal sessiz kalır).
+ * Üçüncü kanal: 20261012002300 (merkez tabloları) ve 20261012002500 (fsbo_leads) ile yayına eklenen tablolar (migration uygulanana kadar yalnız bu kanal sessiz kalır).
  */
-export const REALTIME_MORE_TABLES = ["offers", "rent_charges", "rent_payments", "property_keys"] as const;
+export const REALTIME_MORE_TABLES = ["offers", "rent_charges", "rent_payments", "property_keys", "fsbo_leads"] as const;
 
 const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["/app/musteriler", ["customers"]],
@@ -44,6 +44,7 @@ const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["/app/kira-artis", ["rent_charges", "properties"]],
   ["/app/teklifler", ["offers", "deals"]],
   ["/app/cuzdan", ["commissions"]],
+  ["/app/portfoy-avi", ["fsbo_leads"]],
 ];
 
 /** Açık rotada tazelenmesi anlamlı tablolar. Ana pano tümünü gösterir; bilinmeyen rota hiçbirini. */
