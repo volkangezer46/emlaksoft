@@ -94,12 +94,6 @@ export function efUnitsFor(item: EfBillableItem, tariff: EfTariff = EF_DEFAULT_T
   }
 }
 
-/** "Yaklaşık N değerleme" paydası: en ucuz (0 olmayan) değerleme raporu bedeli (varsayılanda konut 700). 0 = hesaplanamaz. */
-export function efEntryValuationUnits(tariff: Pick<EfTariff, "valuationArsa" | "valuationKonut" | "valuationTicari">): number {
-  const costs = [tariff.valuationKonut, tariff.valuationArsa, tariff.valuationTicari].filter((n) => n > 0);
-  return costs.length > 0 ? Math.min(...costs) : 0;
-}
-
 export function parseEfTariff(raw: string | null | undefined): EfTariff {
   if (!raw) return EF_DEFAULT_TARIFF;
   try {

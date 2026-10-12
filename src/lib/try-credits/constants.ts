@@ -33,3 +33,6 @@ export const TRY_WALLET_LINKS = {
   packs: "/app/abonelik?sekme=kontor",
   invoices: "/app/abonelik?sekme=faturalar",
 } as const;
+
+/** p_idem biçimi (SQL ile aynı). */
+export const TRY_IDEM_PATTERN = /^[A-Za-z0-9_.:-]{8,128}$/;

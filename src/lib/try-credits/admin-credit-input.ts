@@ -6,7 +6,7 @@
  * defterde (tenant, idem) tekilliği sayesinde YENİ kayıt yazmaz (`already: true`).
  * Tutar üst sınırı yalnız yanlış yazım güvenliğidir (fazladan sıfır); ödül/fiyat kararı DEĞİLDİR.
  */
-import { KURUS, TRY_IDEM_PATTERN, type TryGrantKind } from "./config";
+import { KURUS, TRY_IDEM_PATTERN, type TryGrantKind } from "./constants";
 
 /** Tek işlemde yüklenebilecek/geri alınabilecek en yüksek tutar (TL). Yazım hatası güvenliği; gerekirse sahip değiştirir. */
 export const ADMIN_CREDIT_MAX_TRY = 50_000;

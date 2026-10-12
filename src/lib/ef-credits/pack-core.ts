@@ -174,3 +174,9 @@ export function efIdempotencyKey(reservationId: string): string {
 
 /** Mutabakat için gün anahtarı ve alan adları: EmlakFiyati `GET /kullanim` `toplam.degerleme` ve `toplam.pdf` ile eşleşir. */
 export const EF_RECONCILE_FIELDS = { valuation: "degerleme", pdf: "pdf" } as const;
+
+/** "Yaklaşık N değerleme" paydası: en ucuz (0 olmayan) değerleme raporu bedeli (varsayılanda konut 700). 0 = hesaplanamaz. */
+export function efEntryValuationUnits(tariff: { valuationArsa: number; valuationKonut: number; valuationTicari: number }): number {
+  const costs = [tariff.valuationKonut, tariff.valuationArsa, tariff.valuationTicari].filter((n) => n > 0);
+  return costs.length > 0 ? Math.min(...costs) : 0;
+}
