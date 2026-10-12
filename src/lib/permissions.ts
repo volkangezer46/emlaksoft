@@ -38,7 +38,8 @@ export type AppModule =
   | "network"
   | "surveys"
   | "earnings_all"
-  | "office_center";
+  | "office_center"
+  | "prospecting";
 
 export type AppAction = "view" | "create" | "edit" | "delete";
 
@@ -87,6 +88,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
         "surveys",
         "earnings_all",
         "office_center",
+        "prospecting",
       ] as AppModule[]
     ).map((m) => [m, ALL]),
   ),
@@ -123,6 +125,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     earnings_all: VIEW,
     // Ofis Merkezi (DB seed: 20261006000500).
     office_center: ALL,
+    // Sahibinden ilanlar (portföy avı; DB seed: 20261012002410).
+    prospecting:  ALL,
   },
   branch_manager: {
     dashboard:    VIEW,
@@ -149,6 +153,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     projects:     ALL,
     // DB seed'i (20261006000500) ile senkron: şube müdürü kendi şubesinde atama/düzenleme yapar, danışman ekleyemez.
     office_center: ["view", "edit"],
+    prospecting:  ALL,
   },
   team_lead: {
     dashboard:    VIEW,
@@ -168,6 +173,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     surveys:      VIEW,
     // DB seed'i (20261006000500) ile senkron: takım lideri ofis merkezini yalnız görür.
     office_center: VIEW,
+    prospecting:  ALL,
   },
   advisor: {
     dashboard:    VIEW,
@@ -193,6 +199,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     surveys:      VIEW,
     // DB seed'i (20260726000075) ile senkron
     projects:     CRUD_NO_DEL,
+    prospecting:  CRUD_NO_DEL,
   },
   call_center: {
     dashboard: VIEW,
@@ -203,6 +210,8 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     tasks: CRUD_NO_DEL,
     support: VIEW,
     surveys: VIEW,
+    // Sahibinden ilanlar: arar, not ve sonuç kaydeder; silme/dönüştürme yok (sahip kararı).
+    prospecting: CRUD_NO_DEL,
   },
   accounting: {
     dashboard: VIEW,
@@ -232,6 +241,7 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     reports: VIEW,
     valuation: VIEW,
     surveys: VIEW,
+    prospecting: VIEW,
   },
 };
 

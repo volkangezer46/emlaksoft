@@ -47,8 +47,8 @@ function allHrefs(sections: ReturnType<typeof visibleSections>) {
 }
 
 describe("modül kayıt defteri", () => {
-  it("28 kapatılabilir modül (27 + office_center), anahtarlar benzersiz ve DB biçimine uyar", () => {
-    expect(PERMISSION_MODULES_SOURCE.length).toBe(28);
+  it("29 kapatılabilir modül (27 + office_center + prospecting), anahtarlar benzersiz ve DB biçimine uyar", () => {
+    expect(PERMISSION_MODULES_SOURCE.length).toBe(29);
     expect(new Set(FEATURE_KEYS).size).toBe(FEATURE_KEYS.length);
     for (const key of FEATURE_KEYS) expect(key).toMatch(/^[a-z][a-z0-9_]{1,40}$/);
   });
@@ -245,7 +245,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
     expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
-    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
+    expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoy-avi", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
   });
 
   it("kapalı modül menüden, sekmelerden ve Daha fazla listesinden çıkar; çekirdek kalır", () => {

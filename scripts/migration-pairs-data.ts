@@ -279,6 +279,9 @@ const F = {
   portfolioCountsRpc: "20261012002200_portfolio_counts_rpc.sql",
   searchTrgmTasksDocs: "20261012002210_search_trgm_tasks_docs.sql",
   detailReadRpcs: "20261012002220_detail_read_rpcs.sql",
+  // FSBO (2026-10-12): Sahibinden ilanlar (portfoy avi) tablolari + prospecting izin varsayilanlari.
+  fsboLeads: "20261012002400_fsbo_leads.sql",
+  fsboPermissionDefaults: "20261012002410_fsbo_permission_defaults.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -475,6 +478,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPackNamesTl]: "ek", // platform_settings ef.packs: yalniz seed paket adlarinda "kontor" -> "TL" metin degisimi (sema/fonksiyon yok)
     [F.portfolioCountsRpc]: "ek", // 2 yeni SECURITY INVOKER sayim RPC'si (portfolio_counts, task_counts); tablo/politika/veri degismez
     [F.searchTrgmTasksDocs]: "ek", // tasks/customer_files/property_media/contracts/deal_checklist_items GIN trigram indeksleri (8); veri degismez
+    [F.fsboLeads]: "ek", // 4 yeni tablo (fsbo_leads, fsbo_lead_observations, fsbo_lead_activities, fsbo_do_not_call; RLS + acik grant) + tasks.fsbo_lead_id nullable sutun; mevcut satir/politika degismez, kod tablo yokken bos duruma duser
+    [F.fsboPermissionDefaults]: "ek", // yalniz VERI seed: prospecting izin varsayilani (owner/gm/branch_manager/team_lead ALL, advisor/call_center view+create+edit, readonly view); idempotent
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
     [F.serviceRoleWriteGrants]: "ek", // yalniz eksik GRANT (insert/update); delete yok, tablo/politika/veri degismez
@@ -646,6 +651,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "HIZ-liste-sayim-rpc", order: 49, title: "Portfoy/gorev KPI sayimlari tek RPC (portfolio_counts, task_counts; kod RPC yokken eski head-count sorgularina duser; sira serbest, ek)", files: [F.portfolioCountsRpc] },
     { id: "HIZ-arama-trigram-gorev-belge", order: 49.1, title: "Gorev ve belge ilike aramasi icin pg_trgm GIN indeksleri (20261010000200 ile ayni desen; sira serbest, ek)", files: [F.searchTrgmTasksDocs] },
     { id: "HIZ-detay-okuma-rpc", order: 49.2, title: "Anlasma teklif+randevu sayimi ve portfoy bolge istatistigi okuma RPC'leri (kod RPC yokken eski yola duser; sira serbest, ek)", files: [F.detailReadRpcs] },
+    { id: "FSBO-sahibinden-ilanlar", order: 51, title: "Sahibinden ilanlar (portfoy avi): fsbo_* tablolari + tasks.fsbo_lead_id (RLS has_effective_permission('prospecting') kullanir; kod tablo yokken bos duruma duser; sira serbest, ek)", files: [F.fsboLeads] },
+    { id: "FSBO-izin-varsayilanlari", order: 51.1, title: "prospecting permission_defaults seed'i (20261012002400 SONRASI; seed olmadan RLS izin vermez; sira serbest, ek)", files: [F.fsboPermissionDefaults] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
     { id: "GUVENILIRLIK-dekont-depo-temizligi", order: 45, title: "Kiraci dekontu depo temizligi: rent-receipts outbox izni + silinen/degisen dekont tetikleyicisi (20261012000900 ve 20261007000700 SONRASI, sira serbest, ek)", files: [F.storageCleanupReceipts] },
@@ -816,6 +823,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.webhookEnqueueGate, F.webhooksApiKeys],
     // PB51: closure_loss tetikleyicisi anomali tablolarina dayanir.
     [F.closureLossAnomalies, F.lcAnomalyTables],
+    // FSBO: izin seed'i tablolarin RLS'inden once ya da sonra olabilir, ancak ayni pencerede uygulanir.
+    [F.fsboPermissionDefaults, F.fsboLeads],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

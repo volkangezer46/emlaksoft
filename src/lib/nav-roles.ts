@@ -86,6 +86,7 @@ const ILANLAR: HubDef = {
   icon: "baslikPortfoy",
   pages: [
     p("/app/portfoyler", "Portföyler"),
+    p("/app/portfoy-avi", "Sahibinden ilanlar"),
     p("/app/ilan-havuzu", "Havuz ve atama"),
     p("/app/ilan-kontrol", "İlan kontrolü"),
     p("/app/portallar", "Portallar"),
@@ -281,7 +282,7 @@ const CALL_CENTER: RoleNav = {
   hubs: [
     { id: "bugun", label: "Bugün", icon: "baslikBugun", pages: [p("/app", "Ana ekran")] },
     GELEN_KUTUSU,
-    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler")] },
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
     RANDEVU_GOREV,
   ],
   dock: [ABONELIK, YARDIM],

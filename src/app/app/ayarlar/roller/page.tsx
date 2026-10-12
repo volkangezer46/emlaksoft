@@ -46,6 +46,7 @@ const MODULES: AppModule[] = [
   "network",
   "surveys",
   "earnings_all",
+  "prospecting",
 ];
 
 /**

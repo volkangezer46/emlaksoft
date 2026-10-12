@@ -28,7 +28,7 @@ describe("paket <-> modül eşlemesi", () => {
       for (const k of keys) expect(members, `${id} > ${k}`).toContain(k);
     };
     has("mulk", ["rentals"]);
-    has("pazarlama", ["campaigns", "vitrin", "presentations", "open_house", "smart_lists"]);
+    has("pazarlama", ["campaigns", "vitrin", "presentations", "open_house", "smart_lists", "prospecting"]);
     has("satis_plus", ["offers", "contracts", "approvals", "lost_sales"]);
     has("ekip", ["team_perf", "franchise", "office_center", "automation", "tv_board"]);
     has("analiz", ["valuation", "reports", "leak", "portals"]);

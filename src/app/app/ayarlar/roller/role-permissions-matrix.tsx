@@ -46,6 +46,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   surveys:     "Anketler ve anketör",
   earnings_all: "Başkasının kazancı (yalnız Görüntüle)",
   office_center: "Ofis Merkezi",
+  prospecting: "Sahibinden ilanlar",
 };
 
 function cellKey(mod: AppModule, action: AppAction) {

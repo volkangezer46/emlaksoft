@@ -320,6 +320,8 @@ export const VITRIN_AI_CHAT_KEY = "office.vitrin.ai_chat_enabled";
 export const MARKET_DATA_SHARE_KEY = "office.market_data.share_enabled";
 /** Yetki belgesi yıllık harç kontrolü hatırlatma ayı ("0" = kapalı). Okuyucu: abonelik-kontrol cron'u (`license-reminders.ts`). */
 export const LICENSE_FEE_MONTH_KEY = "office.license.annual_fee_month";
+/** Sahibinden ilanlar: dönüşmeyen kayıtların kişisel verisi (ad, telefon, not) son etkinlikten sonra bu kadar gün saklanır. Okuyucu: operational-retention cron adımı. */
+export const FSBO_RETENTION_DAYS_KEY = "office.prospecting.retention_days";
 
 const TR_MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
@@ -376,6 +378,18 @@ const compliance: AnySettingDef[] = [
     label: "Yetki belgesi yıllık harç hatırlatma ayı",
     description: "Seçilen ayın ilk günü ofis sahibi ve genel müdüre yetki belgesi yıllık harç/ödeme ve belge geçerlilik kontrolü hatırlatması düşer (yılda bir kez).",
     impact: "Tutar veya son gün yazılmaz; belgenizden ve güncel mevzuattan doğrulayın. Kapalıyken hatırlatma üretilmez.",
+  }),
+  defineInt({
+    ...TENANT,
+    key: FSBO_RETENTION_DAYS_KEY,
+    group: "uyum",
+    default: 90,
+    min: 30,
+    max: 180,
+    label: "Sahibinden ilan kişisel veri saklama süresi",
+    description: "Portföye dönüşmeyen sahibinden ilan kayıtlarında ilan sahibinin adı, telefonu ve notları son etkinlikten bu kadar gün sonra silinir.",
+    impact: "İlan bağlantısı, fiyat geçmişi, durum ve kayıp nedeni (istatistik) kalır. Aranmasın listesi yalnız telefon özeti tuttuğu için etkilenmez. Süreyi kısaltmak bir sonraki günlük temizlikte daha çok kaydı siler.",
+    unit: "gün",
   }),
   defineBool({
     ...TENANT,

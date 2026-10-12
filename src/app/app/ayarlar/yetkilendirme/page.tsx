@@ -44,7 +44,7 @@ const AUDIT_PAGE_SIZE = 50;
 const MODULES: AppModule[] = [
   "dashboard", "customers", "demands", "properties", "matching", "portals", "leak", "appointments", "calls", "commissions",
   "tasks", "team", "support", "settings", "billing", "reports", "valuation", "compliance", "campaigns", "contracts",
-  "expenses", "offers", "targets", "open_house", "rentals", "projects", "network", "surveys", "earnings_all", "office_center",
+  "expenses", "offers", "targets", "open_house", "rentals", "projects", "network", "surveys", "earnings_all", "office_center", "prospecting",
 ];
 
 type ProfileRow = { id: string; full_name: string; role: string; is_active: boolean; branch_id: string | null; team_id?: string | null };
