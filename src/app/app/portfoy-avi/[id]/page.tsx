@@ -161,7 +161,7 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
               <dt className="text-xs text-text-muted">Bitiş</dt>
               <dd className="numeric font-medium text-ink-950">
                 {trDate(auth.endsOn)}
-                <span className={`ml-1.5 text-xs ${auth.state === "expired" ? "text-red-600" : auth.state === "expiring" ? "text-amber-600" : "text-text-muted"}`}>
+                <span className={`ml-1.5 text-xs ${auth.state === "expired" ? "text-danger-strong" : auth.state === "expiring" ? "text-warning-strong" : "text-text-muted"}`}>
                   {auth.state === "expired" ? "süresi doldu" : `${auth.daysLeft} gün kaldı`}
                 </span>
               </dd>

@@ -39,6 +39,8 @@ export default defineConfig({
     alias: {
       // tsconfig'deki "@/*" yolu Vitest'e ayrıca tanıtılmalı.
       "@": path.resolve(import.meta.dirname, "./src"),
+      // "server-only" Next'in içinden gelir, node_modules'ta yok; testlerde boş modüle eşlenir.
+      "server-only": path.resolve(import.meta.dirname, "./src/test/server-only-stub.ts"),
     },
   },
 });
