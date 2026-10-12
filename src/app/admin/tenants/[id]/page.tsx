@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { formatTry } from "@/lib/format";
 import Link from "@/components/ui/smart-link";
 import type { ReactNode } from "react";
@@ -357,7 +358,7 @@ export default async function AdminTenantDetailPage({
               </p>
             ) : null}
             {heatRows.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-muted">Son 30 günde hiç kullanım kaydı yok — kayıp riski yüksek.</p>
+              <EmptyState variant="compact" bare icon={Gauge} tone="amber" title="Son 30 günde kullanım kaydı yok" description="Kayıp riski yüksek: ofisle iletişime geçmeyi düşünün." />
             ) : (
               <div className="overflow-x-auto">
                 <div className="min-w-[440px]">

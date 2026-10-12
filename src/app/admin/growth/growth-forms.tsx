@@ -1,6 +1,6 @@
 "use client";
 
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -21,8 +21,6 @@ import type { SettingsKey } from "@/lib/growth/engine";
 const FIELD =
   "w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm text-ink-950 outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
 const LABEL = "block text-xs font-semibold text-text-muted";
-const PRIMARY = buttonClass({ variant: "primary", size: "md" });
-const SMALL = buttonClass({ variant: "outline", size: "xs" });
 
 function useFormAction(action: (fd: FormData) => Promise<GrowthResult>, resetOnOk = false) {
   const router = useRouter();
@@ -75,10 +73,10 @@ export function FlagsForm({ referral, partner, cash }: { referral: boolean; part
         Kapalıyken davet/ortak atfı yazılmaz, talep/komisyon üretilmez, ödeme yapılmaz.
       </p>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={f.pending} className={PRIMARY}>
+        <Button variant="primary" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Kaydet
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>
@@ -133,10 +131,10 @@ export function RuleForm() {
         Hemen aktif
       </label>
       <div className="flex items-end gap-3">
-        <button type="submit" disabled={f.pending} className={PRIMARY}>
+        <Button variant="primary" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Kural ekle
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>
@@ -149,10 +147,9 @@ export function RuleToggle({ id, active }: { id: string; active: boolean }) {
   const [err, setErr] = useState<string | null>(null);
   return (
     <span className="inline-flex items-center gap-2">
-      <button
+      <Button variant="outline" size="xs"
         type="button"
         disabled={pending}
-        className={SMALL}
         onClick={() =>
           start(async () => {
             const r = await setRewardRuleActive(id, !active);
@@ -162,7 +159,7 @@ export function RuleToggle({ id, active }: { id: string; active: boolean }) {
         }
       >
         {active ? "Kapat" : "Aç"}
-      </button>
+      </Button>
       {err ? <span className="text-xs text-danger-500">{err}</span> : null}
     </span>
   );
@@ -192,10 +189,10 @@ export function PartnerForm() {
         <input name="code" required maxLength={40} pattern="[a-z0-9][a-z0-9\-]{2,39}" className={`${FIELD} mt-1`} />
       </label>
       <div className="flex items-end gap-3">
-        <button type="submit" disabled={f.pending} className={PRIMARY}>
+        <Button variant="primary" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Ortak ekle
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>
@@ -271,19 +268,19 @@ export function ClaimActions({ id, status, flags }: { id: string; status: string
       />
       <div className="flex flex-wrap gap-1.5">
         {canApprove ? (
-          <button type="button" disabled={pending} className={SMALL} onClick={() => decide("approve")}>
+          <Button variant="outline" size="xs" type="button" disabled={pending} onClick={() => decide("approve")}>
             Onayla
-          </button>
+          </Button>
         ) : null}
         {canReject ? (
-          <button type="button" disabled={pending} className={SMALL} onClick={() => decide("reject")}>
+          <Button variant="outline" size="xs" type="button" disabled={pending} onClick={() => decide("reject")}>
             Reddet
-          </button>
+          </Button>
         ) : null}
         {canReverse ? (
-          <button type="button" disabled={pending} className={SMALL} onClick={() => decide("reverse")}>
+          <Button variant="outline" size="xs" type="button" disabled={pending} onClick={() => decide("reverse")}>
             Geri al
-          </button>
+          </Button>
         ) : null}
       </div>
       <Msg msg={msg} />
@@ -355,10 +352,10 @@ export function SettingsForm({ values }: { values: Record<string, string | numbe
         </fieldset>
       ))}
       <div className="flex items-center gap-3">
-        <button type="submit" disabled={f.pending} className={PRIMARY}>
+        <Button variant="primary" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
           Ayarları kaydet
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>
@@ -411,10 +408,10 @@ export function PartnerDetailsForm({
         <input type="date" name="contract_signed_at" className={`${FIELD} mt-1`} />
       </label>
       <div className="flex items-end gap-3 sm:col-span-2 lg:col-span-5">
-        <button type="submit" disabled={f.pending} className={SMALL}>
+        <Button variant="outline" size="xs" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : null}
           Ortak bilgilerini kaydet
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>
@@ -447,10 +444,10 @@ export function PayoutForm({ partnerId, cashEnabled }: { partnerId: string; cash
         <input name="note" maxLength={300} className={`${FIELD} mt-1`} />
       </label>
       <div className="flex items-end gap-3">
-        <button type="submit" disabled={f.pending} className={SMALL}>
+        <Button variant="outline" size="xs" type="submit" disabled={f.pending}>
           {f.pending ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : null}
           Ödeme oluştur
-        </button>
+        </Button>
         <Msg msg={f.msg} />
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 ﻿import Link from "@/components/ui/smart-link";
 import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
@@ -296,7 +297,7 @@ export default async function AdminBillingPage({
             <p>Mutabakat kuyruğu okunamadı. Billing reconciliation migration ve servis erişimini doğrulayın.</p>
           </div>
         ) : reconciliationRows.length === 0 ? (
-          <div className="px-5 py-5 text-sm text-text-muted">Bekleyen, inceleme veya iade kuyruğunda tahsilat yok.</div>
+          <EmptyState variant="compact" bare icon={CreditCard} tone="mint" title="Mutabakat kuyruğu temiz" description="Bekleyen, inceleme veya iade kuyruğunda tahsilat yok." action={{ href: "/admin/billing/faturalar", label: "Faturalara git" }} />
         ) : (
           <div className="divide-y divide-line">
             {reconciliationRows.map((capture) => {
@@ -408,7 +409,7 @@ export default async function AdminBillingPage({
                   }))}
               />
             ) : (
-              <p className="text-sm text-text-muted">Abonelik kaydı yok.</p>
+              <EmptyState variant="compact" bare icon={CreditCard} title="Abonelik kaydı yok" description="Ofisler bir paket seçtiğinde abonelikleri burada görünür." action={{ href: "/admin/billing/planlar", label: "Paketleri aç" }} />
             )}
           </div>
         </section>

@@ -1,6 +1,6 @@
 "use client";
 
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowUp, Plus, Sparkles } from "lucide-react";
@@ -33,8 +33,6 @@ import {
 const field =
   "min-h-9 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm text-ink-950 disabled:opacity-60";
 const lbl = "block text-xs font-semibold text-text-muted";
-const primary = buttonClass({ variant: "primary", size: "md" });
-const ghost = buttonClass({ variant: "outline", size: "md" });
 const fmt2 = new Intl.NumberFormat("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /** Satır içi iki adımlı onay (popup yok): Kaydet -> Onayla / Vazgeç. */
@@ -58,10 +56,9 @@ function ConfirmSave({
       {confirming ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-3">
           <p className="text-xs font-semibold text-ink-950">{summary ?? "Değişiklikler kaydedilsin mi?"}</p>
-          <button
+          <Button variant="primary"
             type="button"
             disabled={pending}
-            className={primary}
             onClick={() =>
               start(async () => {
                 const r = await run();
@@ -74,23 +71,22 @@ function ConfirmSave({
             }
           >
             Onayla
-          </button>
-          <button type="button" disabled={pending} className={ghost} onClick={() => setConfirming(false)}>
+          </Button>
+          <Button variant="outline" type="button" disabled={pending} onClick={() => setConfirming(false)}>
             Vazgeç
-          </button>
+          </Button>
         </div>
       ) : (
-        <button
+        <Button variant="primary"
           type="button"
           disabled={disabled}
-          className={primary}
           onClick={() => {
             setMsg(null);
             setConfirming(true);
           }}
         >
           {label}
-        </button>
+        </Button>
       )}
       {msg ? (
         <p role={msg.ok ? "status" : "alert"} className={`text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>
@@ -194,19 +190,18 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
     <div className="space-y-4">
       {canWrite ? (
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button variant="outline"
             type="button"
-            className={ghost}
             onClick={() => {
               setRows(examplePackPreset());
               setPresetNote(true);
             }}
           >
             <Sparkles className="h-4 w-4" /> Önerilen kataloğu uygula (12 paket)
-          </button>
-          <button type="button" className={ghost} onClick={add} disabled={rows.length >= 12}>
+          </Button>
+          <Button variant="outline" type="button" onClick={add} disabled={rows.length >= 12}>
             <Plus className="h-4 w-4" /> Paket ekle
-          </button>
+          </Button>
         </div>
       ) : null}
       {presetNote ? (
@@ -262,12 +257,12 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
                     <input type="number" min={1} step="0.01" disabled={!canWrite} value={r.priceNetTry} onChange={(e) => update(i, { priceNetTry: Number(e.target.value) })} className={field} />
                   </label>
                   <div className="flex items-end gap-1">
-                    <button type="button" aria-label="Yukarı taşı" disabled={!canWrite || i === 0} onClick={() => move(i, -1)} className={ghost}>
+                    <Button variant="outline" type="button" aria-label="Yukarı taşı" disabled={!canWrite || i === 0} onClick={() => move(i, -1)}>
                       <ArrowUp className="h-4 w-4" />
-                    </button>
-                    <button type="button" aria-label="Aşağı taşı" disabled={!canWrite || i === rows.length - 1} onClick={() => move(i, 1)} className={ghost}>
+                    </Button>
+                    <Button variant="outline" type="button" aria-label="Aşağı taşı" disabled={!canWrite || i === rows.length - 1} onClick={() => move(i, 1)}>
                       <ArrowDown className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-muted">
@@ -397,11 +392,11 @@ export function GrantForm({ tenantId, tenantName, disabledReason }: { tenantId: 
         {confirming ? (
           <>
             <p className="text-xs font-semibold text-ink-950">{tenantName} ofisine {units} TL ({ADMIN_GRANT_KIND_LABEL[kind]}, {validity} ay geçerli) yüklensin mi?</p>
-            <button type="submit" disabled={pending} className={primary}>Onayla</button>
-            <button type="button" disabled={pending} className={ghost} onClick={() => setConfirming(false)}>Vazgeç</button>
+            <Button variant="primary" type="submit" disabled={pending}>Onayla</Button>
+            <Button variant="outline" type="button" disabled={pending} onClick={() => setConfirming(false)}>Vazgeç</Button>
           </>
         ) : (
-          <button type="submit" disabled={off || pending || !units || reason.trim().length < 10} className={primary}>Yükle</button>
+          <Button variant="primary" type="submit" disabled={off || pending || !units || reason.trim().length < 10}>Yükle</Button>
         )}
       </div>
       {msg ? (

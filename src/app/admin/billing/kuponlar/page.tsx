@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { EmptyState } from "@/components/ui/empty-state";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TicketPercent } from "lucide-react";
@@ -44,7 +45,7 @@ export default async function CouponsPage() {
           <h2 className="font-display font-bold text-ink-950">Tanımlı kuponlar <span className="ml-1 rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">{rows.length}</span></h2>
         </div>
         {rows.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-text-muted">Henüz kupon yok. Yukarıdan ilk kuponu oluşturun.</p>
+          <EmptyState variant="compact" bare icon={TicketPercent} title="Henüz kupon yok" description="Yukarıdaki formdan ilk kuponu oluşturun; ofisler ödeme sırasında kodu girebilir." />
         ) : (
           <div className="divide-y divide-line">
             {rows.map((c) => (

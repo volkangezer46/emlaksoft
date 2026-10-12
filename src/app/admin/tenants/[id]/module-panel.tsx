@@ -1,6 +1,6 @@
 "use client";
 
-import { buttonClass } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Layers, Loader2 } from "lucide-react";
@@ -48,7 +48,6 @@ export function ModulePanel({
     });
   }
 
-  const btn = buttonClass({ variant: "outline", size: "sm" });
 
   return (
     <section
@@ -103,16 +102,16 @@ export function ModulePanel({
                 {editable ? (
                   <div className="flex flex-wrap items-center gap-1.5">
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-text-muted" aria-hidden /> : null}
-                    <button type="button" className={btn} disabled={pending} onClick={() => run(m.key, "force_on")}>
+                    <Button variant="outline" size="sm" type="button" disabled={pending} onClick={() => run(m.key, "force_on")}>
                       Zorunlu aç
-                    </button>
-                    <button type="button" className={btn} disabled={pending} onClick={() => run(m.key, "force_off")}>
+                    </Button>
+                    <Button variant="outline" size="sm" type="button" disabled={pending} onClick={() => run(m.key, "force_off")}>
                       Zorunlu kapat
-                    </button>
+                    </Button>
                     {isLocked ? (
-                      <button type="button" className={btn} disabled={pending} onClick={() => run(m.key, "release")}>
+                      <Button variant="outline" size="sm" type="button" disabled={pending} onClick={() => run(m.key, "release")}>
                         Kilidi kaldır
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 ) : null}

@@ -54,7 +54,13 @@ export async function searchCustomers(query: string): Promise<ComboboxOption[]> 
   }));
 }
 
-export async function searchProperties(query: string): Promise<ComboboxOption[]> {
+/** Portföy arama sonucu: seçici seçeneği + liste fiyatı / işlem türü (form ön dolgusu için). */
+export type PropertySearchOption = ComboboxOption & {
+  list_price: number | null;
+  transaction_type: string | null;
+};
+
+export async function searchProperties(query: string): Promise<PropertySearchOption[]> {
   const gate = await requirePermission("properties", "view");
   if (!gate.ok) return [];
 
@@ -64,7 +70,7 @@ export async function searchProperties(query: string): Promise<ComboboxOption[]>
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("properties")
-    .select("id, property_code, title")
+    .select("id, property_code, title, list_price, transaction_type")
     .is("deleted_at", null)
     .or(orIlike(["property_code", "title", "address_line"], q))
     .order("created_at", { ascending: false })
@@ -75,6 +81,8 @@ export async function searchProperties(query: string): Promise<ComboboxOption[]>
     value: p.id,
     label: p.title ?? "Başlıksız",
     hint: p.property_code,
+    list_price: p.list_price != null ? Number(p.list_price) : null,
+    transaction_type: (p.transaction_type as string | null) ?? null,
   }));
 }
 

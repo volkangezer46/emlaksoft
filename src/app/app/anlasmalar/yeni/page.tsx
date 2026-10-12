@@ -21,7 +21,7 @@ export default async function NewDealPage() {
       .select("id, property_code, title, list_price, transaction_type")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(20),
     supabase
       .from("customers")
       .select("id, full_name")
