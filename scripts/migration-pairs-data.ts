@@ -476,7 +476,6 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.portfolioCountsRpc]: "ek", // 2 yeni SECURITY INVOKER sayim RPC'si (portfolio_counts, task_counts); tablo/politika/veri degismez
     [F.searchTrgmTasksDocs]: "ek", // tasks/customer_files/property_media/contracts/deal_checklist_items GIN trigram indeksleri (8); veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
-    [F.insightCloseOnContact]: "ek",// yeni dar SECURITY DEFINER RPC (insight_close_call_priority; yalniz valid_until); tablo/politika/veri degismez
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
     [F.serviceRoleWriteGrants]: "ek", // yalniz eksik GRANT (insert/update); delete yok, tablo/politika/veri degismez
     [F.storageCleanupReceipts]: "ek", // rent-receipts outbox kova izni + dekont yolu silinince/degisince tetikleyici + kismi indeks; mevcut veri/govde degismez
