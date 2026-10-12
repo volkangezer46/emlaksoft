@@ -96,7 +96,7 @@ export default async function DanismanKpiPage({
     return (
       <div className="space-y-5">
         <ViewSwitch active="kiyas" />
-        <KiyasView tenantId={tenantId} userId={userId} role={role} perms={perms} sirala={sp.sirala} filtre={sp.filtre} />
+        <KiyasView tenantId={tenantId ?? ""} userId={userId} role={role} perms={perms} sirala={sp.sirala} filtre={sp.filtre} />
       </div>
     );
   }

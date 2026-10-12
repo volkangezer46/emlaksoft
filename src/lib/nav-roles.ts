@@ -136,7 +136,7 @@ const EKIBIM: HubDef = {
   pages: [
     p("/app/ekip", "Danışmanlar"),
     p("/app/hedefler", "Hedefler"),
-    p("/app/danisman-kpi", "Karne ve kıyas"),
+    p("/app/danisman-kpi", "Karne"),
     p("/app/pano-tv", "TV ekranı"),
     p("/app/ofis-kontrol", "Ofis kontrolü"),
     p("/app/ekip/takimlar", "Takımlar"),
