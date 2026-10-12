@@ -20,6 +20,8 @@ import { PrintButton } from "@/components/ui/print-button";
 import { PaceCard } from "./pace-card";
 import { CoachInsightSlot } from "./coach-insight-slot";
 import { monthElapsedPct } from "./month-progress";
+import { KiyasView } from "./kiyas-view";
+import { ViewSwitch } from "./view-switch";
 import { Progress } from "@/components/ui/progress";
 
 export const metadata = { title: "Danışman performansı" };
@@ -81,9 +83,23 @@ type AdvisorKpi = {
 export default async function DanismanKpiPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ ay?: string }>;
+  searchParams?: Promise<{ ay?: string; gorunum?: string; sirala?: string; filtre?: string }>;
 }) {
-  const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/danisman-kpi");
+  const sp = (await searchParams) ?? {};
+  const kiyas = sp.gorunum === "kiyas";
+  // Kıyas görünümü eski /app/ekip/kiyas paket kapısını korur.
+  const { tenantId, userId, perms, role } = await requireModulePage(
+    "reports",
+    kiyas ? "/app/ekip/kiyas" : "/app/danisman-kpi",
+  );
+  if (kiyas) {
+    return (
+      <div className="space-y-5">
+        <ViewSwitch active="kiyas" />
+        <KiyasView tenantId={tenantId ?? ""} userId={userId} role={role} perms={perms} sirala={sp.sirala} filtre={sp.filtre} />
+      </div>
+    );
+  }
   // Kazanç gizliliği: başkasının geliri yalnız `earnings_all` izniyle görünür (kendi geliri her zaman).
   const seeAllEarnings = canSeeAllEarnings(perms);
   const showRevenue = (id: string) => seeAllEarnings || id === userId;
@@ -91,7 +107,6 @@ export default async function DanismanKpiPage({
 
   // ?ay=YYYY-MM — dönem seçici. Geçersiz/gelecek değer bu aya düşer;
   // gezinme linkleri sunucuda hesaplanır (randevular hafta görünümü deseni).
-  const sp = (await searchParams) ?? {};
   // B8: ay sınırları Türkiye takvimine göre (sunucu UTC; ayın ilk 3 saati önceki aya yazılmasın).
   const trMonth = (y: number, m: number) => new Date(Date.UTC(y, m, 1) - TR_OFFSET_MS);
   const trNow = trParts(now());
@@ -328,6 +343,7 @@ export default async function DanismanKpiPage({
 
   return (
     <div className="space-y-6">
+      <div className="no-print"><ViewSwitch active="siralama" /></div>
       {/* Hero — çıktıda yok; kâğıttaki başlık aşağıdaki print-only bant. */}
       <PageHeader
         className="no-print mb-0"

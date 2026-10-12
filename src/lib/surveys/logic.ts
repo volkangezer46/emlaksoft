@@ -432,6 +432,17 @@ export function combinedNpsScores(
   return [...customerScores(tasks), ...legacyScores];
 }
 
+/**
+ * TEK KAYNAK: kiracının birleşik NPS/CSAT özeti (anket modülü görevleri + eski kapanış link anketleri).
+ * Anketler ve müşteri memnuniyeti görünümü aynı fonksiyonu çağırır; iki ekranda farklı sayı çıkmaz.
+ */
+export function combinedNpsStats(
+  tasks: readonly (StatTask & { deal_id?: string | null })[],
+  legacy: readonly { deal_id: string | null; score: number | null; status: string }[],
+): ScoreStats | null {
+  return scoreStats(combinedNpsScores(tasks, legacy));
+}
+
 /* -------------------------------------------------- otomatik gönderim kuralı */
 
 /** Görev başına en çok gönderim denemesi (başarısız deneme de sayılır; tekrar tekrar SMS yok). */

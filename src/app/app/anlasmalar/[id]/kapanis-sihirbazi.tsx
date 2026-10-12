@@ -13,7 +13,7 @@ import { updateCommissionSplits } from "@/app/actions/commissions";
 import { updatePropertyCommissionRate } from "@/app/actions/property-commission-rate";
 import { createTask } from "@/app/actions/tasks";
 import { calculateCommission } from "@/lib/commission";
-import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
+import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
 import {
   COLLECTION_TASK_PREFIX,
   advisorShareOf,

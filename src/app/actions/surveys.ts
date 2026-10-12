@@ -142,7 +142,7 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
         userId: agentId,
         title: "Anket linki hazır — müşteriye iletin",
         body: `${customerName} için memnuniyet anketi oluşturuldu. Linki raporlar sayfasından kopyalayabilirsiniz.`,
-        href: "/app/raporlar/memnuniyet",
+        href: "/app/anketler?sekme=sonuc",
         kind: "info",
       });
     } catch (e) {
@@ -150,7 +150,7 @@ export async function createSurveyForDeal(formData: FormData): Promise<SurveyRes
     }
   }
 
-  revalidatePath("/app/raporlar/memnuniyet");
+  revalidatePath("/app/anketler");
   return { ok: true, id: data.id, url };
 }
 

@@ -143,7 +143,6 @@ const EKIBIM: HubDef = {
     p("/app/ekip/subeler", "Şubeler"),
     p("/app/ekip/devir", "Danışman devri"),
     p("/app/lig", "Lig"),
-    p("/app/ekip/kiyas", "Karşılaştır"),
     p("/app/denetim", "Denetim"),
   ],
 };
@@ -157,7 +156,6 @@ const RAPORLAR: HubDef = {
     p("/app/raporlar", "Genel"),
     p("/app/bolge-analizi", "Bölge"),
     p("/app/raporlar/talep-arz", "Talep ve arz"),
-    p("/app/raporlar/memnuniyet", "Memnuniyet"),
     p("/app/raporlar/kar-zarar", "Kâr-zarar"),
     p("/app/anketler", "Anketler"),
     p("/app/raporlar/lead-hizi", "Yanıt hızı"),

@@ -225,7 +225,7 @@ export default async function ReferralsPage({
         description="Memnun müşteri yeni müşteri getirir. Kişiye özel link üretin, gelen tavsiyeleri takip edin."
         actions={
           <Link
-            href="/app/raporlar/memnuniyet"
+            href="/app/anketler?sekme=sonuc"
             className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline-strong bg-surface px-3 py-2 text-xs font-semibold text-ink-950 transition hover:bg-canvas"
           >
             <Sparkles className="h-3.5 w-3.5 text-brand-600" />
