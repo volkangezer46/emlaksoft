@@ -43,7 +43,7 @@ export type KiyasViewProps = {
 };
 
 const LINK =
-  "focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
+  "focus-ring relative z-10 inline-flex touch:min-h-11 touch:min-w-11 items-center justify-end rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
 
 /** Karne içindeki "Kıyas" görünümü (eski /app/ekip/kiyas sayfası; kapı çağıran sayfada). */
 export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre }: KiyasViewProps) {
@@ -121,7 +121,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
       <PageHeader
         eyebrow="Ekip Merkezi"
         title="Danışman karnesi: karşılaştırma"
-        description={`${monthLabel} dönemi karnesi. Ölçümler mevcut çağrı, randevu, teklif, anlaşma, portföy ve hedef kayıtlarınızdan gelir.`}
+        description={`${monthLabel} dönemi: arama, randevu, teklif, anlaşma, hedef.`}
       />
 
       {loadFailed ? (
@@ -167,10 +167,10 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
                   <li key={r.id}>
                     <Link
                       href={`/app/ekip/${r.id}?sekme=oncul`}
-                      className="focus-ring flex items-center justify-between gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm transition hover:border-brand-400"
+                      className="focus-ring flex flex-col gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm transition hover:border-brand-400 sm:flex-row sm:items-center sm:justify-between sm:gap-3 touch:min-h-11"
                     >
-                      <span className="font-semibold text-ink-950">{r.fullName}</span>
-                      <span className="text-xs text-danger-600">{reasons.join(" · ")}</span>
+                      <span className="min-w-0 truncate font-semibold text-ink-950">{r.fullName}</span>
+                      <span className="break-words text-xs text-danger-600">{reasons.join(" · ")}</span>
                     </Link>
                   </li>
                 ))}
