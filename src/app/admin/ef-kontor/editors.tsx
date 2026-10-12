@@ -15,20 +15,20 @@ import {
   EF_PACK_MONTHS,
   EF_PACK_MONTHS_LABEL,
   efPackMonthlyUnits,
-  efPackSchema,
   efPackUnitPriceTry,
   efPackWarnings,
+  isEfPackValid,
   type EfPack,
   type EfPackMonths,
-  type EfTariff,
-} from "@/lib/ef-credits/config";
+} from "@/lib/ef-credits/pack-core";
+import type { EfTariff } from "@/lib/ef-credits/config";
 import {
   ADMIN_GRANT_KINDS,
   ADMIN_GRANT_KIND_LABEL,
   EF_PACK_PRESET_NOTE,
   examplePackPreset,
   packIdFromName,
-} from "@/lib/ef-credits/admin-grant";
+} from "@/lib/ef-credits/admin-grant-core";
 
 const field =
   "min-h-9 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm text-ink-950 disabled:opacity-60";
@@ -186,7 +186,7 @@ export function PacksEditor({ initial, tariff, canWrite }: { initial: EfPack[]; 
     popular: r.popular ? true : undefined,
     order: r.order,
   }));
-  const invalid = clean.some((p) => !efPackSchema.safeParse(p).success) || new Set(clean.map((p) => p.id)).size !== clean.length;
+  const invalid = clean.some((p) => !isEfPackValid(p)) || new Set(clean.map((p) => p.id)).size !== clean.length;
   const warnings = invalid ? [] : efPackWarnings(clean);
   const retailUnits = tariff.valuationKonut;
 
