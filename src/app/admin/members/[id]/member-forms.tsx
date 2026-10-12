@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -32,9 +33,6 @@ function NoticeLine({ notice }: { notice: Notice }) {
     </p>
   );
 }
-
-const btn =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60";
 
 /** Bilgiler sekmesi: ad ve telefon. E-posta giriş kimliğidir; burada yalnız gösterilir. */
 export function MemberInfoForm({
@@ -85,9 +83,9 @@ export function MemberInfoForm({
         </FormField>
       </div>
       <NoticeLine notice={notice} />
-      <button type="submit" disabled={pending} className={`${btn} bg-ink-950 text-white`}>
+      <Button type="submit" disabled={pending} variant="navy" size="sm">
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Kaydet
-      </button>
+      </Button>
     </form>
   );
 }
@@ -179,14 +177,14 @@ export function MemberAccessPanel({
                 ))}
               </FormSelect>
             </FormField>
-            <button
+            <Button
               type="button"
               disabled={busy || roleValue === role}
               onClick={() => run(setMemberRoleAsStaff, { role: roleValue }, "Rol güncellendi.")}
-              className={`${btn} bg-ink-950 text-white`}
+              variant="navy" size="sm"
             >
               Rolü kaydet
-            </button>
+            </Button>
           </div>
         ) : !canRole ? (
           <p className="mt-3 text-xs text-text-faint">Rol değiştirme yalnız süper admin içindir.</p>
@@ -204,38 +202,38 @@ export function MemberAccessPanel({
               confirming === "deactivate" ? (
                 <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
                   Üye pasifleştirilsin ve oturumları kapatılsın mı?
-                  <button type="button" onClick={() => run(setMemberActiveAsStaff, { is_active: "false" }, "Üye pasifleştirildi.")} className={`${btn} bg-ink-950 text-white`}>
+                  <Button type="button" onClick={() => run(setMemberActiveAsStaff, { is_active: "false" }, "Üye pasifleştirildi.")} variant="navy" size="sm">
                     Evet, pasifleştir
-                  </button>
-                  <button type="button" onClick={() => setConfirming(null)} className={`${btn} border border-line bg-surface text-ink-950`}>
+                  </Button>
+                  <Button type="button" onClick={() => setConfirming(null)} variant="outline" size="sm">
                     Vazgeç
-                  </button>
+                  </Button>
                 </span>
               ) : (
-                <button type="button" disabled={busy} onClick={() => setConfirming("deactivate")} className={`${btn} border border-danger-500/40 text-danger-600`}>
+                <Button type="button" disabled={busy} onClick={() => setConfirming("deactivate")} variant="outline" size="sm" className="border-danger-500/40 text-danger-600">
                   <UserMinus className="h-3.5 w-3.5" /> Pasifleştir
-                </button>
+                </Button>
               )
             ) : (
-              <button type="button" disabled={busy} onClick={() => run(setMemberActiveAsStaff, { is_active: "true" }, "Üye aktifleştirildi.")} className={`${btn} bg-ink-950 text-white`}>
+              <Button type="button" disabled={busy} onClick={() => run(setMemberActiveAsStaff, { is_active: "true" }, "Üye aktifleştirildi.")} variant="navy" size="sm">
                 <UserCheck className="h-3.5 w-3.5" /> Aktifleştir
-              </button>
+              </Button>
             )}
 
             {confirming === "signout" ? (
               <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
                 Tüm açık oturumlar kapatılsın mı?
-                <button type="button" onClick={() => run(signOutMemberSessions, {}, "Açık oturumlar kapatıldı.")} className={`${btn} bg-ink-950 text-white`}>
+                <Button type="button" onClick={() => run(signOutMemberSessions, {}, "Açık oturumlar kapatıldı.")} variant="navy" size="sm">
                   Evet, kapat
-                </button>
-                <button type="button" onClick={() => setConfirming(null)} className={`${btn} border border-line bg-surface text-ink-950`}>
+                </Button>
+                <Button type="button" onClick={() => setConfirming(null)} variant="outline" size="sm">
                   Vazgeç
-                </button>
+                </Button>
               </span>
             ) : (
-              <button type="button" disabled={busy} onClick={() => setConfirming("signout")} className={`${btn} border border-line text-ink-950`}>
+              <Button type="button" disabled={busy} onClick={() => setConfirming("signout")} variant="outline" size="sm">
                 <LogOut className="h-3.5 w-3.5" /> Oturumları kapat
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -251,15 +249,15 @@ export function MemberAccessPanel({
         </p>
         {canReset ? (
           <div className="mt-3 space-y-3">
-            <button type="button" disabled={busy} onClick={() => run(generateMemberResetLink, {}, "Sıfırlama bağlantısı üretildi.")} className={`${btn} border border-line text-ink-950`}>
+            <Button type="button" disabled={busy} onClick={() => run(generateMemberResetLink, {}, "Sıfırlama bağlantısı üretildi.")} variant="outline" size="sm">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <KeyRound className="h-3.5 w-3.5" />} Bağlantı üret
-            </button>
+            </Button>
             {link ? (
               <div className="flex gap-2">
                 <input readOnly value={link} aria-label="Sıfırlama bağlantısı" onFocus={(e) => e.currentTarget.select()} className="numeric focus-ring w-full min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs" />
-                <button type="button" onClick={copyLink} aria-label="Bağlantıyı kopyala" className={`${btn} border border-line text-ink-950`}>
+                <Button type="button" onClick={copyLink} aria-label="Bağlantıyı kopyala" variant="outline" size="sm">
                   {copied ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>

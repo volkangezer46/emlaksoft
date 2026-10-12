@@ -187,7 +187,7 @@ export function TicketDetailControls({
         <form action={completeTicket} className="space-y-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/[0.06] p-3">
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1.5 text-xs font-bold text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> Çözüm kaydı</p>
-            <button type="button" onClick={() => setTerminalTarget(null)} className="focus-ring rounded-md p-1 text-text-faint hover:text-ink-950" aria-label="Çözüm formunu kapat"><X className="h-3.5 w-3.5" /></button>
+            <Button type="button" onClick={() => setTerminalTarget(null)} variant="ghost" size="icon" className="h-6 w-6 text-text-faint" aria-label="Çözüm formunu kapat"><X className="h-3.5 w-3.5" /></Button>
           </div>
           <label className="block text-xs font-semibold text-text-muted">
             Çözüm türü

@@ -33,24 +33,21 @@ export function InlineOp({
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  const btn =
-    tone === "danger"
-      ? "border-danger-500/30 bg-danger-500/10 text-danger-600 hover:bg-danger-500/15"
-      : "border-line bg-canvas text-ink-950 hover:bg-brand-600/5";
+  const btnTone = tone === "danger" ? "border-danger-500/30 text-danger-600" : undefined;
 
   if (!open) {
     return (
       <span className="inline-flex flex-wrap items-center gap-2">
-        <button
+        <Button
           type="button"
           onClick={() => {
             setMsg(null);
             setOpen(true);
           }}
-          className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition ${btn} touch:min-h-11`}
+          variant="outline" size="sm" className={btnTone}
         >
           {label}
-        </button>
+        </Button>
         {msg ? (
           <span role="status" className={`text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>
             {msg.text}
@@ -87,13 +84,13 @@ export function InlineOp({
           {msg.text}
         </p>
       ) : null}
-      <button
+      <Button
         type="submit"
         disabled={pending}
-        className={`focus-ring press min-h-9 rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-bold transition disabled:opacity-60 ${btn} touch:min-h-11`}
+        variant="outline" size="sm" className={btnTone}
       >
         {pending ? "İşleniyor…" : confirmLabel}
-      </button>
+      </Button>
       <Button variant="ghost" size="sm" type="button" disabled={pending} onClick={() => setOpen(false)}>
         Vazgeç
       </Button>

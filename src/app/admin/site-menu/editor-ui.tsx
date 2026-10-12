@@ -75,17 +75,18 @@ export function InlineConfirm({
   return (
     <span role="group" aria-label={`${label} onayı`} className="inline-flex flex-wrap items-center gap-1.5 rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900">
       <span className="font-semibold">Emin misiniz?</span>
-      <button
+      <Button
         type="button"
-        className={`focus-ring rounded px-2 py-1 font-bold text-white ${tone === "danger" ? "bg-danger-500" : "bg-brand-600"}`}
+        variant={tone === "danger" ? "danger" : "primary"}
+        size="xs"
         onClick={() => {
           setAsking(false);
           onConfirm();
         }}
       >
         {confirmLabel}
-      </button>
-      <button type="button" className="focus-ring rounded px-2 py-1 font-semibold" onClick={() => setAsking(false)}>Vazgeç</button>
+      </Button>
+      <Button type="button" variant="ghost" size="xs" onClick={() => setAsking(false)}>Vazgeç</Button>
     </span>
   );
 }

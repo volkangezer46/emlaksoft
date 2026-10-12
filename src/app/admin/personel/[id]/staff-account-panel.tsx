@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
@@ -15,9 +16,6 @@ import { FormField, FormInput } from "@/components/ui/form-controls";
 import { generatePassword } from "../staff-model";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
-
-const btn =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60";
 
 function secureRandomInt(max: number): number {
   const buf = new Uint32Array(1);
@@ -157,9 +155,9 @@ export function StaffAccountPanel({
             <EmailInput id="staff_email" name="email" defaultValue={email} required />
           </FormField>
         </div>
-        <button type="submit" disabled={pending} className={`${btn} bg-ink-950 text-white`}>
+        <Button type="submit" disabled={pending} variant="navy" size="sm">
           {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Bilgileri kaydet
-        </button>
+        </Button>
       </form>
 
       <div className="space-y-3 border-t border-line pt-4">
@@ -167,15 +165,15 @@ export function StaffAccountPanel({
         <p className="text-xs text-text-muted">
           Bağlantı hesabı ele geçirmeye yeter: yalnız güvenli bir kanaldan iletin; bu ekran kapanınca yeniden görünmez.
         </p>
-        <button type="button" disabled={pending} onClick={makeLink} className={`${btn} border border-line text-ink-950`}>
+        <Button type="button" disabled={pending} onClick={makeLink} variant="outline" size="sm">
           <KeyRound className="h-3.5 w-3.5" /> Bağlantı üret
-        </button>
+        </Button>
         {link ? (
           <div className="flex gap-2">
             <input readOnly value={link} aria-label="Sıfırlama bağlantısı" onFocus={(e) => e.currentTarget.select()} className="numeric focus-ring w-full min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs" />
-            <button type="button" onClick={() => copy(link, "link")} aria-label="Bağlantıyı kopyala" className={`${btn} border border-line text-ink-950`}>
+            <Button type="button" onClick={() => copy(link, "link")} aria-label="Bağlantıyı kopyala" variant="outline" size="sm">
               {copiedKey === "link" ? <Check className="h-3.5 w-3.5 text-mint-600" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -185,13 +183,13 @@ export function StaffAccountPanel({
         {confirmSignOut ? (
           <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
             Personelin tüm açık oturumları kapatılsın mı?
-            <button type="button" onClick={signOutAll} className={`${btn} bg-ink-950 text-white`}>Evet, kapat</button>
-            <button type="button" onClick={() => setConfirmSignOut(false)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+            <Button type="button" onClick={signOutAll} variant="navy" size="sm">Evet, kapat</Button>
+            <Button type="button" onClick={() => setConfirmSignOut(false)} variant="outline" size="sm">Vazgeç</Button>
           </span>
         ) : (
-          <button type="button" disabled={pending} onClick={() => setConfirmSignOut(true)} className={`${btn} border border-line text-ink-950`}>
+          <Button type="button" disabled={pending} onClick={() => setConfirmSignOut(true)} variant="outline" size="sm">
             <LogOut className="h-3.5 w-3.5" /> Oturumları kapat
-          </button>
+          </Button>
         )}
       </div>
 
@@ -213,43 +211,43 @@ export function StaffAccountPanel({
  aria-label="Geçici parola"
  placeholder="En az 10 karakter"
  className="numeric min-w-0 flex-1 basis-56 font-mono" />
-          <button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Parolayı gizle" : "Parolayı göster"} aria-pressed={showPw} className={`${btn} border border-line text-text-muted`}>
+          <Button type="button" onClick={() => setShowPw((v) => !v)} aria-label={showPw ? "Parolayı gizle" : "Parolayı göster"} aria-pressed={showPw} variant="outline" size="sm" className="text-text-muted">
             {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-          <button type="button" onClick={() => copy(password, "pw")} disabled={!password} aria-label="Parolayı kopyala" className={`${btn} border border-line text-text-muted`}>
+          </Button>
+          <Button type="button" onClick={() => copy(password, "pw")} disabled={!password} aria-label="Parolayı kopyala" variant="outline" size="sm" className="text-text-muted">
             {copiedKey === "pw" ? <Check className="h-4 w-4 text-mint-600" /> : <Copy className="h-4 w-4" />}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={() => {
               setPassword(generatePassword(secureRandomInt));
               setShowPw(true);
               setConfirmPw(false);
             }}
-            className={`${btn} border border-line text-ink-950`}
+            variant="outline" size="sm"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Üret
-          </button>
+          </Button>
         </div>
         {confirmPw ? (
           <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
             Personelin parolası bu geçici parolayla değiştirilsin mi?
-            <button type="button" onClick={applyPassword} className={`${btn} bg-ink-950 text-white`}>
+            <Button type="button" onClick={applyPassword} variant="navy" size="sm">
               Evet, ata
-            </button>
-            <button type="button" onClick={() => setConfirmPw(false)} className={`${btn} border border-line bg-surface text-ink-950`}>
+            </Button>
+            <Button type="button" onClick={() => setConfirmPw(false)} variant="outline" size="sm">
               Vazgeç
-            </button>
+            </Button>
           </span>
         ) : (
-          <button
+          <Button
             type="button"
             disabled={pending || password.length < 10}
             onClick={() => setConfirmPw(true)}
-            className={`${btn} border border-danger-500/40 text-danger-600`}
+            variant="outline" size="sm" className="border-danger-500/40 text-danger-600"
           >
             Geçici parolayı ata
-          </button>
+          </Button>
         )}
       </div>
     </section>

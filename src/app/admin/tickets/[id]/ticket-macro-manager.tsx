@@ -26,14 +26,16 @@ function DeleteMacroButton({ id, title }: { id: string; title: string }) {
     <div className="shrink-0 text-right">
       <ConfirmDialog
         trigger={
-          <button
+          <Button
             type="button"
             disabled={pending}
             aria-label={`“${title}” makrosunu sil`}
-            className="focus-ring rounded-md p-1.5 text-text-faint transition hover:bg-danger-500/10 hover:text-danger-600 disabled:opacity-50"
+            variant="ghost"
+            size="icon"
+            className="text-text-faint hover:bg-danger-500/10 hover:text-danger-600"
           >
             {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-          </button>
+          </Button>
         }
         title="Hazır yanıt silinsin mi?"
         description={`“${title}” hazır yanıtı kalıcı olarak kaldırılacak.`}

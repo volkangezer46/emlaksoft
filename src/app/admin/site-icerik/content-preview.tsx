@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Faq, buildHomeFaqs } from "@/components/marketing/faq";
 import { FinalCta } from "@/components/marketing/final-cta";
@@ -12,7 +13,7 @@ import { ValueCards } from "@/components/marketing/value-cards";
 import { PLANS } from "@/lib/billing/plans";
 import type { EfValuationStatus } from "@/lib/site-content/ef-status";
 import type { SiteContent } from "@/lib/site-content/schema";
-import { btn } from "../site-menu/editor-ui";
+
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
 
@@ -45,15 +46,15 @@ export function ContentPreview({ cfg }: { cfg: SiteContent }) {
         <h2 className="font-display text-base font-extrabold text-ink-950">Canlı önizleme</h2>
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Önizleme bölümü">
           {PARTS.map((p) => (
-            <button key={p.id} type="button" className={btn} aria-pressed={part === p.id} onClick={() => setPart(p.id)}>{p.label}</button>
+            <Button key={p.id} type="button" variant="outline" size="sm" aria-pressed={part === p.id} onClick={() => setPart(p.id)}>{p.label}</Button>
           ))}
         </div>
       </div>
       {part === "valuation" ? (
         <div className="mt-2 flex items-center gap-2 text-xs text-text-muted">
           Özellik durumu (önizleme):
-          <button type="button" className={btn} aria-pressed={status === "soon"} onClick={() => setStatus("soon")}>Yakında</button>
-          <button type="button" className={btn} aria-pressed={status === "live"} onClick={() => setStatus("live")}>Canlı</button>
+          <Button type="button" variant="outline" size="sm" aria-pressed={status === "soon"} onClick={() => setStatus("soon")}>Yakında</Button>
+          <Button type="button" variant="outline" size="sm" aria-pressed={status === "live"} onClick={() => setStatus("live")}>Canlı</Button>
         </div>
       ) : null}
       <div className="mk mt-3 max-h-[36rem] overflow-auto rounded-[var(--radius-card)] border border-line" onClickCapture={block}>

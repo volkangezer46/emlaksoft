@@ -12,9 +12,6 @@ import { passwordStrength } from "../personel/staff-model";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
 
-const btn =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-4 py-2 text-xs font-semibold transition disabled:opacity-60";
-
 function NoticeLine({ notice }: { notice: Notice }) {
   if (!notice) return null;
   return (
@@ -64,9 +61,9 @@ export function OwnProfileForm({ fullName, email, roleLabel }: { fullName: strin
         </FormField>
       </div>
       <NoticeLine notice={notice} />
-      <button type="submit" disabled={pending} className={`${btn} bg-ink-950 text-white`}>
+      <Button type="submit" disabled={pending} variant="navy" size="sm">
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Kaydet
-      </button>
+      </Button>
     </form>
   );
 }
@@ -144,9 +141,9 @@ export function OwnPasswordForm({ forced = false }: { forced?: boolean }) {
       </div>
       {next ? <p className="text-xs font-semibold text-text-muted" role="status" aria-live="polite">Parola gücü: {strength.label}</p> : null}
       <NoticeLine notice={notice} />
-      <button type="submit" disabled={pending} className={`${btn} bg-ink-950 text-white`}>
+      <Button type="submit" disabled={pending} variant="navy" size="sm">
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldAlert className="h-3.5 w-3.5" />} Parolayı değiştir
-      </button>
+      </Button>
     </form>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useId, type ReactNode } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Input, Textarea } from "@/components/ui/input";
 import type { Issue } from "@/lib/site-menu/schema-core";
 import type { SiteContent } from "@/lib/site-content/schema";
 import { moveInArray } from "@/lib/site-menu/editor-model";
-import { btn, iconBtn } from "../site-menu/editor-ui";
+
 
 /** Taslağı yerinde değiştiren güncelleyici (kopya üzerinde çalışır). */
 export type Update = (fn: (draft: SiteContent) => void) => void;
@@ -129,10 +130,10 @@ export function ListShell<T extends { id: string; hidden: boolean }>({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-display text-base font-extrabold text-ink-950">{title}</h3>
         {onAdd && !readOnly ? (
-          <button type="button" className={btn} disabled={max !== undefined && items.length >= max} onClick={onAdd}>
+          <Button type="button" variant="outline" size="sm" disabled={max !== undefined && items.length >= max} onClick={onAdd}>
             <Plus className="h-3.5 w-3.5" aria-hidden="true" />
             {addLabel ?? "Ekle"}
-          </button>
+          </Button>
         ) : null}
       </div>
       <ol className="space-y-3">
@@ -142,12 +143,12 @@ export function ListShell<T extends { id: string; hidden: boolean }>({
               <p className="truncate text-xs font-bold text-text-muted">{i + 1}. {summary(it) || "(boş)"}{it.hidden ? " · gizli" : ""}</p>
               {!readOnly ? (
                 <div className="flex shrink-0 gap-1">
-                  <button type="button" className={iconBtn} aria-label="Yukarı taşı" disabled={i === 0} onClick={() => setItems(moveInArray(items, i, i - 1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-                  <button type="button" className={iconBtn} aria-label="Aşağı taşı" disabled={i === items.length - 1} onClick={() => setItems(moveInArray(items, i, i + 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-                  <button type="button" className={iconBtn} aria-label={it.hidden ? "Göster" : "Gizle"} aria-pressed={it.hidden} onClick={() => setItems(items.map((x, n) => (n === i ? { ...x, hidden: !x.hidden } : x)))}>
+                  <Button type="button" variant="outline" size="icon" aria-label="Yukarı taşı" disabled={i === 0} onClick={() => setItems(moveInArray(items, i, i - 1))}><ArrowUp className="h-4 w-4" aria-hidden="true" /></Button>
+                  <Button type="button" variant="outline" size="icon" aria-label="Aşağı taşı" disabled={i === items.length - 1} onClick={() => setItems(moveInArray(items, i, i + 1))}><ArrowDown className="h-4 w-4" aria-hidden="true" /></Button>
+                  <Button type="button" variant="outline" size="icon" aria-label={it.hidden ? "Göster" : "Gizle"} aria-pressed={it.hidden} onClick={() => setItems(items.map((x, n) => (n === i ? { ...x, hidden: !x.hidden } : x)))}>
                     {it.hidden ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                  </button>
-                  {onAdd ? <button type="button" className={iconBtn} aria-label="Sil" onClick={() => setItems(items.filter((_, n) => n !== i))}><Trash2 className="h-4 w-4" aria-hidden="true" /></button> : null}
+                  </Button>
+                  {onAdd ? <Button type="button" variant="outline" size="icon" aria-label="Sil" onClick={() => setItems(items.filter((_, n) => n !== i))}><Trash2 className="h-4 w-4" aria-hidden="true" /></Button> : null}
                 </div>
               ) : null}
             </div>

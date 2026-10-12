@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,7 @@ import { PIONEER_CLAIM } from "@/lib/site-content/claims";
 import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
 import type { SiteContent, validateSiteContent } from "@/lib/site-content/schema";
 
-import { InlineConfirm, TargetDatalist, btn } from "../site-menu/editor-ui";
+import { InlineConfirm, TargetDatalist } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
 import { ContentPreview } from "./content-preview";
 import { BentoTab, EfTab, LayoutTab, TourTab, WhyTab, setValuationVisible, valuationVisible } from "./editor-landing-tabs";
@@ -173,9 +174,9 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
         </div>
         {!readOnly ? (
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <button type="button" className={btn} disabled={pending || !dirty || blocked} onClick={saveDraft}>
+            <Button type="button" variant="outline" size="sm" disabled={pending || !dirty || blocked} onClick={saveDraft}>
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Save className="h-3.5 w-3.5" aria-hidden="true" />} Taslağı kaydet
-            </button>
+            </Button>
             <label className="min-w-[10rem] flex-1 sm:max-w-xs">
               <span className="sr-only">Sürüm notu</span>
               <Input placeholder="Sürüm notu (isteğe bağlı)" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} />
@@ -212,7 +213,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
 
       <div role="tablist" aria-label="Site içeriği bölümleri" className="flex flex-wrap gap-1.5 border-b border-line pb-2">
         {TABS.map((t, i) => (
-          <button
+          <Button
             key={t.id}
             ref={(el) => {
               tabRefs.current[i] = el;
@@ -228,7 +229,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
             className={`focus-ring rounded-[var(--radius-control)] px-3.5 py-2 text-sm font-bold transition ${tab === t.id ? "bg-brand-600 text-white" : "text-text-muted hover:text-ink-950"}`}
           >
             {t.label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -494,7 +495,7 @@ function ValuationTab({ cfg, update, issues, readOnly }: TabProps) {
                 <input type="checkbox" disabled={readOnly} checked={!v.claim.hidden} onChange={(e) => update((d) => void (d.valuation.claim.hidden = !e.target.checked))} />
                 Göster
               </label>
-              <button type="button" className={btn} disabled={readOnly} onClick={() => update((d) => void (d.valuation.claim.text = PIONEER_CLAIM.text))}>Varsayılan metin</button>
+              <Button type="button" variant="outline" size="sm" disabled={readOnly} onClick={() => update((d) => void (d.valuation.claim.text = PIONEER_CLAIM.text))}>Varsayılan metin</Button>
             </div>
           </div>
         </Full>

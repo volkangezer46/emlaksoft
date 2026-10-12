@@ -41,9 +41,6 @@ type Panel = null | "edit" | "deactivate" | "alias" | "move" | "merge" | "sugges
 
 const input =
   "rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-brand-400";
-const ghostBtn =
-  "focus-ring inline-flex h-8 items-center gap-1 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-text-muted hover:bg-canvas";
-
 type Props = {
   level: GeoLevel;
   rows: EntityRowData[];
@@ -177,13 +174,13 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
         <div className="flex flex-wrap items-center gap-0.5">
           {canWrite ? (
             <>
-              <button type="button" className={ghostBtn} onClick={() => open("edit")} aria-label={`${row.name} düzenle`}><Pencil className="h-3.5 w-3.5" /> Düzenle</button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => open("edit")} aria-label={`${row.name} düzenle`}><Pencil className="h-3.5 w-3.5" /> Düzenle</Button>
               {/* İkincil eylemler ⋮ (satırda tek birincil eylem; panel yine satırın altında açılır). */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button type="button" className={ghostBtn} aria-label={`Diğer işlemler: ${row.name}`} title="Diğer işlemler">
+                  <Button type="button" variant="ghost" size="sm" aria-label={`Diğer işlemler: ${row.name}`} title="Diğer işlemler">
                     <MoreVertical className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onSelect={() => open("alias")}><Tag aria-hidden="true" /> Takma adlar</DropdownMenuItem>
@@ -201,7 +198,7 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
               </DropdownMenu>
             </>
           ) : (
-            <button type="button" className={ghostBtn} onClick={() => open("suggest")}><Lightbulb className="h-3.5 w-3.5" /> Düzeltme öner</button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => open("suggest")}><Lightbulb className="h-3.5 w-3.5" /> Düzeltme öner</Button>
           )}
         </div>
         {childHref ? (
@@ -246,14 +243,15 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
                   ? "Pasife alınan kayıt yeni seçimlerde görünmez; ilan/talep/müşteri gibi mevcut kayıtlarda korunur. Silme yoktur."
                   : "Etkinleştirilen kayıt yeni seçimlerde yeniden görünür."}
               </p>
-              <button
+              <Button
                 type="button"
                 disabled={pending || !impact}
                 onClick={() => run(() => setGeoActive(fd({ level, ids: row.id, active: row.isActive ? "false" : "true" })), close)}
-                className={`rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60 ${row.isActive ? "bg-danger-500" : "bg-brand-600"}`}
+                variant={row.isActive ? "danger" : "primary"}
+                size="sm"
               >
                 {row.isActive ? "Pasife almayı onayla" : "Etkinleştirmeyi onayla"}
-              </button>
+              </Button>
             </div>
           ) : null}
 
@@ -268,7 +266,7 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
                       <li key={a.id} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs">
                         <span className="font-semibold">{a.alias}</span>
                         <span className="text-text-muted">{a.kind === "old_name" ? "eski ad" : a.kind === "merged" ? "birleşen" : "varyant"}{a.validTo ? ` · ${a.validTo}` : ""}</span>
-                        <button type="button" aria-label={`${a.alias} takma adını sil`} className="text-text-muted hover:text-danger-500" onClick={() => run(() => removeGeoAlias(fd({ alias_id: a.id })), () => setAliases((l) => (l ?? []).filter((x) => x.id !== a.id)))}><X className="h-3 w-3" /></button>
+                        <Button type="button" variant="ghost" size="icon" aria-label={`${a.alias} takma adını sil`} className="h-5 w-5 touch:h-11 touch:w-11 hover:text-danger-500" onClick={() => run(() => removeGeoAlias(fd({ alias_id: a.id })), () => setAliases((l) => (l ?? []).filter((x) => x.id !== a.id)))}><X className="h-3 w-3" /></Button>
                       </li>
                     ))}
                     {(aliases ?? []).length === 0 ? <li className="text-xs text-text-muted">Takma ad yok.</li> : null}

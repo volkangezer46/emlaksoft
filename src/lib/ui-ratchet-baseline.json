@@ -1289,31 +1289,7 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/billing/inline-op.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 2,
-  "kucukHedef": 0
- },
- "src/app/admin/billing/planlar/apply-recommended.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/billing/planlar/ef-credits-section.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/app/admin/billing/planlar/plan-editor.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/billing/planlar/price-simulator.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
@@ -1322,19 +1298,13 @@
  "src/app/admin/danisman/advisor-chat.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/duyuru/broadcast-row.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/app/admin/geo/entity-list.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/geo/ice-aktar/import-panel.tsx": {
@@ -1343,22 +1313,10 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/hesabim/account-forms.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 2,
-  "kucukHedef": 0
- },
  "src/app/admin/marka/brand-manager.tsx": {
   "hamRenk": 4,
   "hamPalet": 2,
   "hamButon": 0,
-  "kucukHedef": 0
- },
- "src/app/admin/members/[id]/member-forms.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 11,
   "kucukHedef": 0
  },
  "src/app/admin/personel/page.tsx": {
@@ -1370,13 +1328,7 @@
  "src/app/admin/personel/[id]/page.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 2,
-  "kucukHedef": 0
- },
- "src/app/admin/personel/[id]/staff-account-panel.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 12,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/seo/seo-ui.tsx": {
@@ -1385,58 +1337,16 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/admin/sistem/emlakfiyati-panel.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 15,
-  "kucukHedef": 0
- },
- "src/app/admin/site-icerik/content-preview.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/app/admin/site-icerik/editor-fields.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 5,
-  "kucukHedef": 0
- },
- "src/app/admin/site-icerik/site-content-editor.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
  "src/app/admin/site-menu/editor-ui.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/app/admin/site-menu/footer-announcement-tabs.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 8,
-  "kucukHedef": 0
- },
- "src/app/admin/site-menu/menu-preview.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 2,
-  "kucukHedef": 0
- },
- "src/app/admin/site-menu/menu-tab.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 12,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/site-menu-editor.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 2,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/tenants/yeni/office-form.tsx": {
@@ -1448,18 +1358,6 @@
  "src/app/admin/tenants/[id]/account-credit-panel.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 4,
-  "kucukHedef": 0
- },
- "src/app/admin/tenants/[id]/office-management.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/tickets/makrolar/macro-editor.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
@@ -1467,24 +1365,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/app/admin/tickets/ticket-queue-view.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/tickets/[id]/ticket-detail-controls.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/tickets/[id]/ticket-macro-manager.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/_components/platform-insight-eylem.tsx": {

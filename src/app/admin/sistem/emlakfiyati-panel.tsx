@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Loader2, PlugZap, RotateCw, Save, Trash2 } from "lucide-react";
 import {
   clearEmlakFiyatiKey,
@@ -17,9 +18,6 @@ import { EMLAKFIYATI_KEY_PREFIX } from "@/lib/integrations/emlakfiyati/policy";
 
 const field =
   "focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 font-mono text-sm text-ink-950 outline-none focus:border-brand-300";
-const btn =
-  "focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-semibold disabled:opacity-60";
-
 const PROBE_LABEL: Record<string, { text: string; good: boolean }> = {
   connected: { text: "Bağlı: anahtar geçerli, uç yanıt veriyor.", good: true },
   auth: { text: "401: anahtar geçersiz veya iptal edilmiş.", good: false },
@@ -201,33 +199,33 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
         </div>
         {canEdit ? (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={runProbe} disabled={pending || !props.configured} className={`${btn} border border-line bg-surface text-ink-950`}>
+            <Button type="button" onClick={runProbe} disabled={pending || !props.configured} variant="outline" size="sm">
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />} Bağlantıyı dene
-            </button>
+            </Button>
             {props.previousPresent ? (
               confirm === "previous" ? (
                 <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
                   Eski anahtar silinsin mi?
-                  <button type="button" onClick={() => run(deletePreviousEmlakFiyatiKey, "Eski anahtar silindi.")} className={`${btn} bg-ink-950 text-white`}>Evet, sil</button>
-                  <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                  <Button type="button" onClick={() => run(deletePreviousEmlakFiyatiKey, "Eski anahtar silindi.")} variant="navy" size="sm">Evet, sil</Button>
+                  <Button type="button" onClick={() => setConfirm(null)} variant="outline" size="sm">Vazgeç</Button>
                 </span>
               ) : (
-                <button type="button" onClick={() => setConfirm("previous")} disabled={pending} className={`${btn} border border-line text-danger-500`}>
+                <Button type="button" onClick={() => setConfirm("previous")} disabled={pending} variant="outline" size="sm" className="text-danger-500">
                   <Trash2 className="h-3.5 w-3.5" /> Eskiyi şimdi sil
-                </button>
+                </Button>
               )
             ) : null}
             {props.source === "admin" ? (
               confirm === "clear" ? (
                 <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
                   Admin&apos;deki anahtar silinsin mi?
-                  <button type="button" onClick={() => run(clearEmlakFiyatiKey, "Admin anahtarı silindi.")} className={`${btn} bg-ink-950 text-white`}>Evet, sil</button>
-                  <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                  <Button type="button" onClick={() => run(clearEmlakFiyatiKey, "Admin anahtarı silindi.")} variant="navy" size="sm">Evet, sil</Button>
+                  <Button type="button" onClick={() => setConfirm(null)} variant="outline" size="sm">Vazgeç</Button>
                 </span>
               ) : (
-                <button type="button" onClick={() => setConfirm("clear")} disabled={pending} className={`${btn} border border-line text-danger-500`}>
+                <Button type="button" onClick={() => setConfirm("clear")} disabled={pending} variant="outline" size="sm" className="text-danger-500">
                   <Trash2 className="h-3.5 w-3.5" /> Kaldır
-                </button>
+                </Button>
               )
             ) : null}
           </div>
@@ -270,10 +268,10 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
               aria-label="EmlakFiyati API anahtarı"
               className={field}
             />
-            <button type="submit" disabled={pending || !secretsEnabled} className={`${btn} bg-ink-950 text-white`}>
+            <Button type="submit" disabled={pending || !secretsEnabled} variant="navy" size="sm">
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : props.configured ? <RotateCw className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
               {props.configured ? "Anahtarı değiştir" : "Kaydet"}
-            </button>
+            </Button>
           </form>
         ) : null}
         {error ? <p role="alert" className="mt-2 text-xs font-medium text-danger-600">{error}</p> : null}
@@ -308,37 +306,37 @@ export function EmlakFiyatiPanel(props: EmlakFiyatiPanelProps) {
           </div>
           {canEdit ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={runOrtakProbe} disabled={pending || !props.configured} className={`${btn} border border-line bg-surface text-ink-950`}>
+              <Button type="button" onClick={runOrtakProbe} disabled={pending || !props.configured} variant="outline" size="sm">
                 {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlugZap className="h-3.5 w-3.5" />} Ortak bağlantıyı dene
-              </button>
+              </Button>
               {props.ortakFlagOn ? (
                 confirm === "ortak-off" ? (
                   <span className="inline-flex items-center gap-2 text-xs font-semibold text-amber-800">
                     Ortak uçlar kapatılsın mı?
-                    <button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(false), "Ortak uçlar kapatıldı.")} className={`${btn} bg-ink-950 text-white`}>Evet, kapat</button>
-                    <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                    <Button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(false), "Ortak uçlar kapatıldı.")} variant="navy" size="sm">Evet, kapat</Button>
+                    <Button type="button" onClick={() => setConfirm(null)} variant="outline" size="sm">Vazgeç</Button>
                   </span>
                 ) : (
-                  <button type="button" onClick={() => setConfirm("ortak-off")} disabled={pending} className={`${btn} border border-line text-danger-500`}>
+                  <Button type="button" onClick={() => setConfirm("ortak-off")} disabled={pending} variant="outline" size="sm" className="text-danger-500">
                     Ortak uçları kapat
-                  </button>
+                  </Button>
                 )
               ) : confirm === "ortak-on" ? (
                 <span className="inline-flex flex-wrap items-center gap-2 text-xs font-semibold text-amber-800">
                   Canlı kullanıcı verisiyle kullanım için EmlakFiyati sözleşmesi imzalı mı? Etkinleştirilsin mi?
-                  <button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(true), "Ortak uçlar etkinleştirildi.")} className={`${btn} bg-ink-950 text-white`}>Evet, etkinleştir</button>
-                  <button type="button" onClick={() => setConfirm(null)} className={`${btn} border border-line bg-surface text-ink-950`}>Vazgeç</button>
+                  <Button type="button" onClick={() => run(() => setEmlakFiyatiOrtakFlag(true), "Ortak uçlar etkinleştirildi.")} variant="navy" size="sm">Evet, etkinleştir</Button>
+                  <Button type="button" onClick={() => setConfirm(null)} variant="outline" size="sm">Vazgeç</Button>
                 </span>
               ) : (
-                <button
+                <Button
                   type="button"
                   onClick={() => setConfirm("ortak-on")}
                   disabled={pending || !props.ortakProbeOkLabel}
                   title={props.ortakProbeOkLabel ? undefined : "Önce başarılı ortak yoklaması gerekir"}
-                  className={`${btn} bg-ink-950 text-white`}
+                  variant="navy" size="sm"
                 >
                   Ortak uçları etkinleştir
-                </button>
+                </Button>
               )}
             </div>
           ) : (

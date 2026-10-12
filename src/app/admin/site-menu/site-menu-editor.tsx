@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, Undo2 } from "lucide-react";
@@ -18,7 +19,7 @@ import type { MediaEntry } from "@/lib/site-menu/store";
 import { AnnouncementTab, FooterTab } from "./footer-announcement-tabs";
 import { MenuPreview } from "./menu-preview";
 import { MenuTab, type Update } from "./menu-tab";
-import { InlineConfirm, TargetDatalist, btn } from "./editor-ui";
+import { InlineConfirm, TargetDatalist } from "./editor-ui";
 
 type Tab = "menu" | "footer" | "announcement" | "versions";
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -184,9 +185,9 @@ export function SiteMenuEditor({ initialDraft, live, defaults, history, media: i
 
         {!readOnly ? (
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <button type="button" className={btn} disabled={pending || !dirty || blocked} onClick={saveDraft}>
+            <Button type="button" variant="outline" size="sm" disabled={pending || !dirty || blocked} onClick={saveDraft}>
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Save className="h-3.5 w-3.5" aria-hidden="true" />} Taslağı kaydet
-            </button>
+            </Button>
             <label className="min-w-[10rem] flex-1 sm:max-w-xs">
               <span className="sr-only">Sürüm notu</span>
               <Input placeholder="Sürüm notu (isteğe bağlı)" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} />

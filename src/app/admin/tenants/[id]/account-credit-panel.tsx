@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Coins, Loader2, Undo2 } from "lucide-react";
 import { grantAccountCredit, reverseAccountCredit, type AdminCreditResult } from "@/app/actions/admin-account-credit";
@@ -171,20 +172,18 @@ export function AccountCreditPanel({
                 : "Geri alma geri döndürülemez; bakiye eksiye düşebilir (eksi bakiye harcanamaz). Onaylıyor musunuz?"}
             </p>
           ) : null}
-          <button
+          <Button
             type="submit"
             disabled={pending}
-            className={`focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition disabled:opacity-60 ${
-              mode === "reverse" ? "bg-danger-600 text-white hover:bg-danger-700" : "bg-accent text-accent-fg hover:bg-accent-hover"
-            } touch:min-h-11`}
+            variant={mode === "reverse" ? "danger" : "primary"}
           >
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : mode === "reverse" ? <Undo2 className="h-4 w-4" aria-hidden /> : <Coins className="h-4 w-4" aria-hidden />}
             {confirming ? (mode === "grant" ? "Evet, yükle" : "Evet, geri al") : mode === "grant" ? "Kredi yükle" : "Krediyi geri al"}
-          </button>
+          </Button>
           {confirming ? (
-            <button type="button" onClick={() => setConfirming(false)} className="focus-ring text-xs font-semibold text-text-muted hover:text-ink-950">
+            <Button type="button" onClick={() => setConfirming(false)} variant="ghost" size="sm">
               Vazgeç
-            </button>
+            </Button>
           ) : null}
         </div>
       </form>

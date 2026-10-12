@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import Link from "@/components/ui/smart-link";
 import {
@@ -254,9 +255,9 @@ export function TicketQueueView({
       {notice ? (
         <div role="status" className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-mint-500/20 bg-mint-500/[0.08] px-4 py-3 text-sm font-semibold text-mint-700">
           <span>{notice}</span>
-          <button type="button" onClick={() => setNotice(undefined)} className="focus-ring rounded-[7px] p-1 text-mint-700/70 transition hover:bg-mint-500/10" aria-label="Bildirimi kapat">
+          <Button type="button" onClick={() => setNotice(undefined)} variant="ghost" size="icon" className="h-6 w-6 text-mint-700/70" aria-label="Bildirimi kapat">
             ×
-          </button>
+          </Button>
         </div>
       ) : null}
 

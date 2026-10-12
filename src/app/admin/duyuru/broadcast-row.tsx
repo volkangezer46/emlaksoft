@@ -128,7 +128,7 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
             confirmDelete ? (
               <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/5 px-2.5 py-1.5 text-xs">
                 <span className="font-semibold text-danger-600">Duyuru ofislerin bildirim kutusundan da silinsin mi?</span>
-                <button
+                <Button
                   type="button"
                   disabled={pending}
                   onClick={() =>
@@ -143,11 +143,12 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
                       router.refresh();
                     })
                   }
-                  className="focus-ring min-h-9 rounded-[var(--radius-control)] bg-danger-600 px-2.5 py-1 font-bold text-white disabled:opacity-60 touch:min-h-11"
+                  variant="danger"
+                  size="sm"
                 >
                   {pending ? "Siliniyor…" : "Evet, geri çek"}
-                </button>
-                <button type="button" disabled={pending} onClick={() => setConfirmDelete(false)} className="focus-ring min-h-9 px-2 font-semibold text-text-muted touch:min-h-11">Vazgeç</button>
+                </Button>
+                <Button type="button" disabled={pending} onClick={() => setConfirmDelete(false)} variant="ghost" size="sm">Vazgeç</Button>
                 {delError ? <span role="alert" className="w-full font-semibold text-danger-600">{delError}</span> : null}
               </span>
             ) : (

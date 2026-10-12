@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useMemo, useState, type MouseEvent } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { Brand } from "@/components/brand/brand";
@@ -8,7 +9,6 @@ import { MobileSheetBody, SiteHeaderClient } from "@/components/site-menu/mega-m
 import { now } from "@/lib/clock";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import type { SiteMenuConfig } from "@/lib/site-menu/schema";
-import { btn } from "./editor-ui";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
 
@@ -35,12 +35,12 @@ export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
           <p className="text-xs text-text-muted">Sitedeki gerçek menü bileşeni, kaydedilmemiş değişikliklerinizle. Bağlantılar burada açılmaz.</p>
         </div>
         <div role="group" aria-label="Önizleme boyutu" className="flex gap-1.5">
-          <button type="button" className={btn} aria-pressed={mode === "desktop"} onClick={() => setMode("desktop")}>
+          <Button type="button" variant="outline" size="sm" aria-pressed={mode === "desktop"} onClick={() => setMode("desktop")}>
             <Monitor className="h-3.5 w-3.5" aria-hidden="true" /> Masaüstü
-          </button>
-          <button type="button" className={btn} aria-pressed={mode === "mobile"} onClick={() => setMode("mobile")}>
+          </Button>
+          <Button type="button" variant="outline" size="sm" aria-pressed={mode === "mobile"} onClick={() => setMode("mobile")}>
             <Smartphone className="h-3.5 w-3.5" aria-hidden="true" /> Mobil
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -554,25 +554,25 @@ export function AdvisorChat({ aiEnabled }: { aiEnabled: boolean }) {
               className="max-h-32 flex-1 resize-none rounded-[var(--radius-card)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300"
             />
             {pending ? (
-              <button
+              <Button
                 type="button"
                 onClick={cancel}
                 title="Yanıtı durdur"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-ink-950 text-white transition hover:opacity-85 touch:min-h-11 touch:min-w-11"
+                variant="navy" size="icon" className="h-10 w-10 shrink-0 touch:h-11 touch:w-11"
                 aria-label="Yanıtı durdur"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
-              </button>
+              </Button>
             ) : (
-              <button
+              <Button
                 type="button"
                 onClick={() => send(input)}
                 disabled={!input.trim()}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-brand-600 text-white transition hover:bg-brand-700 disabled:opacity-40 touch:min-h-11 touch:min-w-11"
+                variant="primary" size="icon" className="h-10 w-10 shrink-0 touch:h-11 touch:w-11"
                 aria-label="Gönder"
               >
                 <ArrowUp className="h-4 w-4" />
-              </button>
+              </Button>
             )}
           </div>
         </div>

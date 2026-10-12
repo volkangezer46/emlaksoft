@@ -1,7 +1,7 @@
 "use client";
 
 import { EmptyState } from "@/components/ui/empty-state";
-import { buttonClass, Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState, useTransition } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
@@ -109,8 +109,6 @@ export type OfficeManagementProps = {
 
 type ActionState = { error?: string; message?: string } | null;
 
-const btnPrimary = buttonClass({ variant: "primary", size: "sm" });
-const btnDanger = buttonClass({ variant: "danger", size: "sm" });
 
 /** Sunucu action'ını çalıştırır; başarıda sayfa verisini yeniler. Hata/başarı metni bölümde gösterilir. */
 function useOfficeAction<R extends OfficeActionResult>(
@@ -1144,10 +1142,10 @@ function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests
                 </FormField>
                 <ConfirmName name={tenant.name} inputId={`mgmt-closure-confirm-${r.id}`} />
                 <div className="flex flex-wrap gap-2">
-                  <button type="submit" className={r.type === "account_closure" ? btnDanger : btnPrimary} disabled={act.pending}>
+                  <Button type="submit" variant={r.type === "account_closure" ? "danger" : "primary"} size="sm" disabled={act.pending}>
                     {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
                     {r.type === "account_closure" ? "Ofisi arşivle ve talebi tamamla" : "Talebi tamamla"}
-                  </button>
+                  </Button>
                   <Button variant="outline" size="sm" type="button" onClick={() => setOpenId(null)}>Vazgeç</Button>
                 </div>
               </form>

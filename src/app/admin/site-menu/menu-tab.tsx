@@ -1,6 +1,7 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element -- yüklenen medya önizlemesi sandbox'lı rotadan <img>/<video> */
+import { Button } from "@/components/ui/button";
 import { useState, type CSSProperties } from "react";
 import {
   DndContext,
@@ -42,9 +43,6 @@ import {
   MOTION_ACCEPT,
   STILL_ACCEPT,
   assetUrl,
-  btn,
-  btnPrimary,
-  iconBtn,
 } from "./editor-ui";
 
 export type Update = (fn: (draft: SiteMenuConfig) => void) => void;
@@ -104,17 +102,17 @@ function ItemRow({
       className={`rounded-[var(--radius-card)] border bg-surface p-3 ${isOver && !isDragging ? "border-brand-500 ring-2 ring-brand-500/30" : "border-line"} ${isDragging ? "opacity-80 shadow-lg" : ""} ${item.hidden ? "opacity-70" : ""}`}
     >
       <div className="flex flex-wrap items-start gap-2">
-        <button
+        <Button
           type="button"
           ref={setActivatorNodeRef}
           {...listeners}
           {...attributes}
           disabled={readOnly}
           aria-label={`${item.label || "Bağlantı"} taşı (Boşluk ile tut, ok tuşlarıyla taşı)`}
-          className={`${iconBtn} cursor-grab touch-none active:cursor-grabbing`}
+          variant="outline" size="icon" className="cursor-grab touch-none active:cursor-grabbing"
         >
           <GripVertical className="h-4 w-4" aria-hidden="true" />
-        </button>
+        </Button>
         <IconPicker value={item.icon} onChange={(v) => set((it) => { it.icon = v; })} onMedia={addMedia} disabled={readOnly} />
         <div className="grid min-w-[10rem] flex-1 gap-2 sm:grid-cols-2">
           <Field label="Başlık">
@@ -127,15 +125,15 @@ function ItemRow({
           </Field>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" className={iconBtn} disabled={readOnly || ii === 0} aria-label="Yukarı taşı" onClick={() => update((d) => { d.groups[gi].items = moveInArray(d.groups[gi].items, ii, ii - 1); })}>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly || ii === 0} aria-label="Yukarı taşı" onClick={() => update((d) => { d.groups[gi].items = moveInArray(d.groups[gi].items, ii, ii - 1); })}>
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button type="button" className={iconBtn} disabled={readOnly || ii === count - 1} aria-label="Aşağı taşı" onClick={() => update((d) => { d.groups[gi].items = moveInArray(d.groups[gi].items, ii, ii + 1); })}>
+          </Button>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly || ii === count - 1} aria-label="Aşağı taşı" onClick={() => update((d) => { d.groups[gi].items = moveInArray(d.groups[gi].items, ii, ii + 1); })}>
             <ArrowDown className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button type="button" className={iconBtn} disabled={readOnly} aria-pressed={item.hidden} aria-label={item.hidden ? "Göster" : "Gizle"} title={item.hidden ? "Gizli: sitede görünmez" : "Görünür"} onClick={() => set((it) => { it.hidden = !it.hidden; })}>
+          </Button>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly} aria-pressed={item.hidden} aria-label={item.hidden ? "Göster" : "Gizle"} title={item.hidden ? "Gizli: sitede görünmez" : "Görünür"} onClick={() => set((it) => { it.hidden = !it.hidden; })}>
             {item.hidden ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-          </button>
+          </Button>
         </div>
       </div>
       <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_12rem_9rem_auto]">
@@ -191,9 +189,9 @@ function FeaturedEditor({
   const base = `groups.${gi}.featured`;
   if (!f) {
     return (
-      <button type="button" className={btn} disabled={readOnly} onClick={() => update((d) => { d.groups[gi].featured = blankFeatured(); })}>
+      <Button type="button" variant="outline" size="sm" disabled={readOnly} onClick={() => update((d) => { d.groups[gi].featured = blankFeatured(); })}>
         <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Öne çıkan kart ekle
-      </button>
+      </Button>
     );
   }
   const set = (fn: (x: NonNullable<MenuGroup["featured"]>) => void) => update((d) => { const x = d.groups[gi].featured; if (x) fn(x); });
@@ -207,10 +205,10 @@ function FeaturedEditor({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h4 className="text-sm font-extrabold text-ink-950">Öne çıkan kart</h4>
         <div className="flex gap-2">
-          <button type="button" className={btn} disabled={readOnly} aria-pressed={f.hidden} onClick={() => set((x) => { x.hidden = !x.hidden; })}>
+          <Button type="button" variant="outline" size="sm" disabled={readOnly} aria-pressed={f.hidden} onClick={() => set((x) => { x.hidden = !x.hidden; })}>
             {f.hidden ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
             {f.hidden ? "Gizli" : "Görünür"}
-          </button>
+          </Button>
           <InlineConfirm label="Kartı kaldır" confirmLabel="Evet, kaldır" tone="danger" disabled={readOnly} onConfirm={() => update((d) => { d.groups[gi].featured = null; })} />
         </div>
       </div>
@@ -291,9 +289,9 @@ function FeaturedEditor({
                 </div>
               ) : null}
               <div>
-                <button type="button" className={btn} disabled={readOnly} onClick={() => set((x) => { x.media = null; })}>
+                <Button type="button" variant="outline" size="sm" disabled={readOnly} onClick={() => set((x) => { x.media = null; })}>
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Medyayı kaldır
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -361,15 +359,15 @@ function GroupCard({
           </div>
         )}
         <div className="flex items-center gap-1">
-          <button type="button" className={iconBtn} disabled={readOnly || gi === 0} aria-label="Grubu sola taşı" onClick={() => update((d) => { d.groups = moveGroup(d, gi, -1).groups; })}>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly || gi === 0} aria-label="Grubu sola taşı" onClick={() => update((d) => { d.groups = moveGroup(d, gi, -1).groups; })}>
             <ArrowUp className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button type="button" className={iconBtn} disabled={readOnly || gi === total - 1} aria-label="Grubu sağa taşı" onClick={() => update((d) => { d.groups = moveGroup(d, gi, 1).groups; })}>
+          </Button>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly || gi === total - 1} aria-label="Grubu sağa taşı" onClick={() => update((d) => { d.groups = moveGroup(d, gi, 1).groups; })}>
             <ArrowDown className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button type="button" className={iconBtn} disabled={readOnly} aria-pressed={g.hidden} aria-label={g.hidden ? "Grubu göster" : "Grubu gizle"} onClick={() => set((x) => { x.hidden = !x.hidden; })}>
+          </Button>
+          <Button type="button" variant="outline" size="icon" disabled={readOnly} aria-pressed={g.hidden} aria-label={g.hidden ? "Grubu göster" : "Grubu gizle"} onClick={() => set((x) => { x.hidden = !x.hidden; })}>
             {g.hidden ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-          </button>
+          </Button>
           <InlineConfirm label="Grubu sil" confirmLabel="Evet, sil" tone="danger" disabled={readOnly} icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={() => update((d) => { d.groups.splice(gi, 1); })} />
         </div>
       </div>
@@ -391,14 +389,14 @@ function GroupCard({
             {g.items.length === 0 ? <li className="rounded-[var(--radius-card)] border border-dashed border-line p-4 text-center text-xs text-text-muted">Bu grupta bağlantı yok. Bağlantı ekleyin ya da başka bir gruptan sürükleyin.</li> : null}
           </ul>
           <div className="flex flex-wrap items-center gap-2">
-            <button
+            <Button
               type="button"
-              className={btnPrimary}
+              variant="primary" size="sm"
               disabled={readOnly || !canAddItem(cfg, gi)}
               onClick={() => update((d) => { d.groups[gi].items.push(blankItem(newId("item", allIds(d)))); })}
             >
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Bağlantı ekle
-            </button>
+            </Button>
             <span className="text-xs text-text-faint">{g.items.length}/{LIMITS.maxItemsPerGroup}</span>
           </div>
           <FeaturedEditor g={g} gi={gi} update={update} issues={issues} media={media} addMedia={addMedia} readOnly={readOnly} />
@@ -458,14 +456,14 @@ export function MenuTab(props: Props) {
           ))}
         </div>
       </DndContext>
-      <button
+      <Button
         type="button"
-        className={btnPrimary}
+        variant="primary" size="sm"
         disabled={readOnly || cfg.groups.length >= LIMITS.maxGroups}
         onClick={() => update((d) => { d.groups.push(blankGroup(newId("grup", allIds(d)))); })}
       >
         <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Grup ekle
-      </button>
+      </Button>
       <span className="ml-2 text-xs text-text-faint">{cfg.groups.length}/{LIMITS.maxGroups}</span>
     </div>
   );

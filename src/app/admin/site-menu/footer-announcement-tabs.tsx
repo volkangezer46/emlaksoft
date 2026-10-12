@@ -1,11 +1,12 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { allIds, blankFooterColumn, blankFooterLink, moveInArray, newId } from "@/lib/site-menu/editor-model";
 import { LIMITS, type Issue } from "@/lib/site-menu/schema-core";
 import type { SiteMenuConfig } from "@/lib/site-menu/schema";
-import { Field, FieldIssue, InlineConfirm, btnPrimary, iconBtn } from "./editor-ui";
+import { Field, FieldIssue, InlineConfirm } from "./editor-ui";
 import type { Update } from "./menu-tab";
 
 type Props = { cfg: SiteMenuConfig; update: Update; issues: readonly Issue[]; readOnly: boolean };
@@ -26,11 +27,11 @@ export function FooterTab({ cfg, update, issues, readOnly }: Props) {
                 </Field>
               </div>
               <div className="flex items-center gap-1">
-                <button type="button" className={iconBtn} disabled={readOnly || ci === 0} aria-label="Sütunu sola taşı" onClick={() => update((d) => { d.footer = moveInArray(d.footer, ci, ci - 1); })}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-                <button type="button" className={iconBtn} disabled={readOnly || ci === cfg.footer.length - 1} aria-label="Sütunu sağa taşı" onClick={() => update((d) => { d.footer = moveInArray(d.footer, ci, ci + 1); })}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-                <button type="button" className={iconBtn} disabled={readOnly} aria-pressed={c.hidden} aria-label={c.hidden ? "Sütunu göster" : "Sütunu gizle"} onClick={() => update((d) => { d.footer[ci].hidden = !d.footer[ci].hidden; })}>
+                <Button type="button" variant="outline" size="icon" disabled={readOnly || ci === 0} aria-label="Sütunu sola taşı" onClick={() => update((d) => { d.footer = moveInArray(d.footer, ci, ci - 1); })}><ArrowUp className="h-4 w-4" aria-hidden="true" /></Button>
+                <Button type="button" variant="outline" size="icon" disabled={readOnly || ci === cfg.footer.length - 1} aria-label="Sütunu sağa taşı" onClick={() => update((d) => { d.footer = moveInArray(d.footer, ci, ci + 1); })}><ArrowDown className="h-4 w-4" aria-hidden="true" /></Button>
+                <Button type="button" variant="outline" size="icon" disabled={readOnly} aria-pressed={c.hidden} aria-label={c.hidden ? "Sütunu göster" : "Sütunu gizle"} onClick={() => update((d) => { d.footer[ci].hidden = !d.footer[ci].hidden; })}>
                   {c.hidden ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                </button>
+                </Button>
                 <InlineConfirm label="Sütunu sil" confirmLabel="Evet, sil" tone="danger" disabled={readOnly} icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={() => update((d) => { d.footer.splice(ci, 1); })} />
               </div>
             </div>
@@ -55,11 +56,11 @@ export function FooterTab({ cfg, update, issues, readOnly }: Props) {
                       </Field>
                     </div>
                     <div className="flex items-center gap-1 pt-5">
-                      <button type="button" className={iconBtn} disabled={readOnly || li === 0} aria-label="Yukarı taşı" onClick={() => update((d) => { d.footer[ci].links = moveInArray(d.footer[ci].links, li, li - 1); })}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-                      <button type="button" className={iconBtn} disabled={readOnly || li === c.links.length - 1} aria-label="Aşağı taşı" onClick={() => update((d) => { d.footer[ci].links = moveInArray(d.footer[ci].links, li, li + 1); })}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-                      <button type="button" className={iconBtn} disabled={readOnly} aria-pressed={l.hidden} aria-label={l.hidden ? "Göster" : "Gizle"} onClick={() => update((d) => { d.footer[ci].links[li].hidden = !d.footer[ci].links[li].hidden; })}>
+                      <Button type="button" variant="outline" size="icon" disabled={readOnly || li === 0} aria-label="Yukarı taşı" onClick={() => update((d) => { d.footer[ci].links = moveInArray(d.footer[ci].links, li, li - 1); })}><ArrowUp className="h-4 w-4" aria-hidden="true" /></Button>
+                      <Button type="button" variant="outline" size="icon" disabled={readOnly || li === c.links.length - 1} aria-label="Aşağı taşı" onClick={() => update((d) => { d.footer[ci].links = moveInArray(d.footer[ci].links, li, li + 1); })}><ArrowDown className="h-4 w-4" aria-hidden="true" /></Button>
+                      <Button type="button" variant="outline" size="icon" disabled={readOnly} aria-pressed={l.hidden} aria-label={l.hidden ? "Göster" : "Gizle"} onClick={() => update((d) => { d.footer[ci].links[li].hidden = !d.footer[ci].links[li].hidden; })}>
                         {l.hidden ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                      </button>
+                      </Button>
                       <InlineConfirm label="Sil" confirmLabel="Evet, sil" tone="danger" disabled={readOnly} icon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={() => update((d) => { d.footer[ci].links.splice(li, 1); })} />
                     </div>
                   </li>
@@ -67,18 +68,18 @@ export function FooterTab({ cfg, update, issues, readOnly }: Props) {
               })}
             </ul>
             <div className="mt-3 flex items-center gap-2">
-              <button type="button" className={btnPrimary} disabled={readOnly || c.links.length >= LIMITS.maxFooterLinksPerColumn} onClick={() => update((d) => { d.footer[ci].links.push(blankFooterLink(newId("fl", allIds(d)))); })}>
+              <Button type="button" variant="primary" size="sm" disabled={readOnly || c.links.length >= LIMITS.maxFooterLinksPerColumn} onClick={() => update((d) => { d.footer[ci].links.push(blankFooterLink(newId("fl", allIds(d)))); })}>
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Bağlantı ekle
-              </button>
+              </Button>
               <span className="text-xs text-text-faint">{c.links.length}/{LIMITS.maxFooterLinksPerColumn}</span>
             </div>
           </section>
         );
       })}
       <div className="flex items-center gap-2">
-        <button type="button" className={btnPrimary} disabled={readOnly || cfg.footer.length >= LIMITS.maxFooterColumns} onClick={() => update((d) => { d.footer.push(blankFooterColumn(newId("fk", allIds(d)))); })}>
+        <Button type="button" variant="primary" size="sm" disabled={readOnly || cfg.footer.length >= LIMITS.maxFooterColumns} onClick={() => update((d) => { d.footer.push(blankFooterColumn(newId("fk", allIds(d)))); })}>
           <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Sütun ekle
-        </button>
+        </Button>
         <span className="text-xs text-text-faint">{cfg.footer.length}/{LIMITS.maxFooterColumns}</span>
       </div>
     </div>
