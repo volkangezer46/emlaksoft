@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Home, Loader2, PhoneCall, RefreshCw } from "lucide-react";
+import { LazyCombobox } from "@/components/public/lazy-combobox";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
   estimatePublicValuation,
@@ -19,6 +20,10 @@ import {
 
 const inputCls =
   "w-full rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-sm text-white placeholder:text-white/35 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.07]";
+
+// Combobox tetikleyicisi koyu kart uzerinde: acik tema renklerini ezer.
+const comboCls =
+  "border-white/12 bg-white/[0.04] py-3 text-white hover:border-white/25 data-[state=open]:border-mint-400/50 data-[state=open]:bg-white/[0.07]";
 
 const ROOM_OPTIONS = ["1+0", "1+1", "2+1", "3+1", "4+1", "5+1 ve üzeri"];
 const AGE_OPTIONS = ["0 (yeni)", "1-5", "6-10", "11-20", "21 ve üzeri"];
@@ -78,6 +83,10 @@ export function ValuationFunnel({
   async function onEstimate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+    if (!provinceId || !districtId) {
+      setError("Lütfen il ve ilçe seçin.");
+      return;
+    }
     setPending(true);
     try {
       const res = await estimatePublicValuation({
@@ -251,41 +260,33 @@ export function ValuationFunnel({
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <select
+        <LazyCombobox
+          aria-label="İl"
+          placeholder="İl seçin *"
+          searchPlaceholder="İl ara…"
+          emptyText="Eşleşen il yok"
+          clearable={false}
           value={provinceId}
-          onChange={(e) => {
-            setProvinceId(e.target.value);
+          onValueChange={(v) => {
+            setProvinceId(v);
             setDistrictId("");
             setDistricts([]);
           }}
-          required
-          className={inputCls}
-          aria-label="İl"
-        >
-          <option value="" className="bg-ink-950">İl seçin *</option>
-          {provinces.map((p) => (
-            <option key={p.id} value={p.id} className="bg-ink-950">
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={districtId}
-          onChange={(e) => setDistrictId(e.target.value)}
-          required
-          disabled={!provinceId}
-          className={`${inputCls} disabled:opacity-50`}
+          options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+          className={comboCls}
+        />
+        <LazyCombobox
           aria-label="İlçe"
-        >
-          <option value="" className="bg-ink-950">
-            {loadingDistricts ? "Yükleniyor…" : provinceId ? "İlçe seçin *" : "Önce il seçin"}
-          </option>
-          {districts.map((d) => (
-            <option key={d.id} value={d.id} className="bg-ink-950">
-              {d.name}
-            </option>
-          ))}
-        </select>
+          placeholder={loadingDistricts ? "Yükleniyor…" : provinceId ? "İlçe seçin *" : "Önce il seçin"}
+          searchPlaceholder="İlçe ara…"
+          emptyText="Eşleşen ilçe yok"
+          clearable={false}
+          disabled={!provinceId}
+          value={districtId}
+          onValueChange={setDistrictId}
+          options={districts.map((d) => ({ value: d.id, label: d.name }))}
+          className={comboCls}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">

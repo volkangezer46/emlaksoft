@@ -27,7 +27,7 @@ export default async function NewDealPage() {
       .select("id, full_name")
       .is("deleted_at", null)
       .order("full_name")
-      .limit(200),
+      .limit(20),
     loadCustomFieldInputDefs(supabase, tenantId, "deal"),
   ]);
   const stageNames = stageLabelMap(stageLabels);

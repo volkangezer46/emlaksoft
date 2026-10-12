@@ -29,8 +29,8 @@ export default async function NewAppointmentPage({
   const canAssign = MANAGEMENT_TIER_ROLES.includes(gate.role as TeamRole);
   const [{ data: customers }, { data: properties }, typeDefs, { data: pickedCustomer }, { data: pickedProperty }, { data: advisorRows }] =
     await Promise.all([
-      supabase.from("customers").select("id, full_name").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
-      supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+      supabase.from("customers").select("id, full_name").is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
+      supabase.from("properties").select("id, title, property_code").is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
       getDefinitions("appointment_type"),
       customerId
         ? supabase.from("customers").select("id, full_name").eq("id", customerId).is("deleted_at", null).maybeSingle()

@@ -29,7 +29,7 @@ export default async function NewTaskPage({
       .eq("tenant_id", ctx.tenantId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(20),
     canSeeDeals
       ? supabase
           .from("deals")

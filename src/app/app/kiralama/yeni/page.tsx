@@ -29,17 +29,17 @@ export default async function NewRentalPage({
       .select("id, property_code, title")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(20),
     supabase
       .from("customers")
       .select("id, full_name, phone")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .limit(20),
   ]);
 
   /*
-   * Seçici havuzları "son eklenen 100" kısayolu. Ön dolgu havuz dışında
+   * Seçici havuzları "son eklenen 20" kısayolu. Ön dolgu havuz dışında
    * kalırsa sessizce düşerdi — eksik kayıtlar tek sorguyla listeye eklenir.
    */
   const properties = [...(propData ?? [])];

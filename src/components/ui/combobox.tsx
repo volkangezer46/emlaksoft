@@ -100,6 +100,20 @@ export function Combobox({
   const value = controlledValue ?? uncontrolled;
 
   /*
+   * Form reset: form.reset() kontrolsuz React durumunu bilmez; tetikleyicinin
+   * formunu dinleyip kontrolsuz degeri varsayilana doneriz. (Kontrollu
+   * kullanimda sifirlama ust bilesenin isidir.)
+   */
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const form = triggerRef.current?.form;
+    if (!form) return;
+    const onReset = () => setUncontrolled(defaultValue);
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, [defaultValue]);
+
+  /*
    * Aday havuzu: sayfadan gelen liste + sunucudan dönenler, değere göre
    * tekilleştirilmiş. Sunucu sonucu önce yazılıyor ki daha güncel etiket
    * (ör. yeniden adlandırılmış portföy) kazansın.
@@ -212,6 +226,7 @@ export function Combobox({
       >
         <PopoverPrimitive.Trigger asChild>
           <button
+            ref={triggerRef}
             type="button"
             id={triggerId}
             role="combobox"

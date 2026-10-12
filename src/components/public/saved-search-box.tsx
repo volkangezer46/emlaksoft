@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { BellRing, CheckCircle2, Loader2 } from "lucide-react";
+import { LazyCombobox } from "@/components/public/lazy-combobox";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { createVitrinSavedSearch } from "@/app/actions/vitrin";
 import { listPublicDistricts, type PublicGeoOption } from "@/app/actions/public-valuation";
@@ -30,6 +31,7 @@ export function SavedSearchBox({
   const [kvkkAccepted, setKvkkAccepted] = useState(false);
   const [districts, setDistricts] = useState<PublicGeoOption[]>([]);
   const [districtLoading, setDistrictLoading] = useState(false);
+  const [districtId, setDistrictId] = useState("");
   const errorRef = useRef<HTMLParagraphElement>(null);
 
   useEffect(() => {
@@ -50,6 +52,13 @@ export function SavedSearchBox({
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+
+    // Gizli girdi tarayici dogrulamasina girmez: il secimini elle zorunlu tut.
+    if (!String(fd.get("province_id") ?? "")) {
+      setError("Lütfen bir il seçin.");
+      setStatus("error");
+      return;
+    }
 
     setStatus("loading");
     setError(null);
@@ -133,30 +142,34 @@ export function SavedSearchBox({
             <option value="satilik">Satılık</option>
             <option value="kiralik">Kiralık</option>
           </select>
-          <select
+          <LazyCombobox
             id="saved-search-province"
             name="province_id"
-            required
-            defaultValue=""
-            onChange={(e) => onProvinceChange(e.target.value)}
-            className={inputCls}
             aria-label="İl"
-          >
-            <option value="" disabled>İl *</option>
-            {provinces.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select id="saved-search-district" name="district_id" defaultValue="" className={inputCls} aria-label="İlçe" aria-busy={districtLoading}>
-            <option value="">{districtLoading ? "İlçeler yükleniyor…" : "İlçe (tümü)"}</option>
-            {districts.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
+            placeholder="İl *"
+            searchPlaceholder="İl ara…"
+            emptyText="Eşleşen il yok"
+            clearable={false}
+            options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+            onValueChange={(v) => {
+              setDistrictId("");
+              void onProvinceChange(v);
+            }}
+            className={inputCls}
+          />
+          <LazyCombobox
+            id="saved-search-district"
+            name="district_id"
+            aria-label="İlçe"
+            placeholder={districtLoading ? "İlçeler yükleniyor…" : "İlçe (tümü)"}
+            searchPlaceholder="İlçe ara…"
+            emptyText="Eşleşen ilçe yok"
+            disabled={districts.length === 0}
+            value={districtId}
+            onValueChange={setDistrictId}
+            options={districts.map((d) => ({ value: d.id, label: d.name }))}
+            className={inputCls}
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

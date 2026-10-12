@@ -183,7 +183,7 @@ export default async function AidatPage({
       .select("id, property_code, title")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(300),
+      .limit(20),
   ]);
 
   const readFailures = [listError, kpiRes.error, overdueStripError, propertiesError].filter(Boolean);
