@@ -92,6 +92,7 @@ export async function SystemView() {
     schemaRows,
     { count: openErrors },
     { data: manualRunRows },
+    { data: evdsRows },
   ] = await Promise.all([
     getPlatformSecret("openai_api_key"),
     getEmlakFiyatiAdminStatus(),
@@ -116,7 +117,15 @@ export async function SystemView() {
       .eq("action", "platform_cron.run")
       .order("created_at", { ascending: false })
       .limit(20),
+    admin.from("market_rates").select("key, fetched_at").in("key", ["housing_loan_rate_annual", "cpi_12m_avg"]),
   ]);
+  const evdsConfigured = Boolean(process.env.EVDS_API_KEY?.trim());
+  const evdsLastFetch =
+    ((evdsRows ?? []) as { fetched_at: string | null }[])
+      .map((r) => r.fetched_at)
+      .filter((v): v is string => Boolean(v))
+      .sort()
+      .at(-1) ?? null;
   const canRun = staff.role === "super_admin";
   type ManualRun = { id: string; actor_id: string | null; meta: { job?: string; label?: string; status?: number; ok?: boolean; duration_ms?: number } | null; created_at: string };
   const manualRuns = (manualRunRows ?? []) as ManualRun[];
@@ -388,6 +397,19 @@ export async function SystemView() {
             <div className="flex min-h-10 items-center justify-between py-1">
               <span className="text-sm font-semibold text-ink-950">iyzico (canlı tahsilat)</span>
               <StatusPill ok={iyzicoConfigured} okLabel="Tanımlı" badLabel="Demo mod" />
+            </div>
+            <div className="flex min-h-10 items-center justify-between gap-3 py-1">
+              <span className="min-w-0 text-sm font-semibold text-ink-950">
+                TCMB EVDS (konut faizi, TÜFE)
+                <span className="mt-0.5 block text-xs font-normal text-text-muted">
+                  {evdsConfigured
+                    ? evdsLastFetch
+                      ? `Son çekim: ${relativeTimeTR(evdsLastFetch)}`
+                      : "Henüz çekim yok (tcmb-kur cron'u bekleniyor)"
+                    : "EVDS_API_KEY tanımlı değil (opsiyonel)"}
+                </span>
+              </span>
+              <StatusPill ok={evdsConfigured} okLabel="Tanımlı" badLabel="Kapalı" />
             </div>
             <div className="flex min-h-10 items-center justify-between py-1">
               <span className="text-sm font-semibold text-ink-950">VAPID push (bildirim)</span>

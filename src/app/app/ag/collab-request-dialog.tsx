@@ -3,19 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Handshake } from "lucide-react";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/inline-dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea, FormField } from "@/components/ui/input";
+import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { sendCollabRequest, type NetworkResult } from "@/app/actions/network";
 
 const init: NetworkResult = {};
 
+/** İş birliği talebi: popup yok, sayfa içi panel (InlineTabbedPanel). */
 export function CollabRequestDialog({
   listingId,
   listingTitle,
@@ -30,7 +25,7 @@ export function CollabRequestDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const action = (formData: FormData) => {
+  const onSubmit = (formData: FormData) => {
     startTransition(async () => {
       const res = await sendCollabRequest(init, formData);
       if (res.error) {
@@ -44,23 +39,27 @@ export function CollabRequestDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="secondary">
+    <InlineTabbedPanel
+      open={open}
+      onOpenChange={setOpen}
+      title="İş birliği talebi"
+      description={`${officeName} ofisine "${listingTitle}" ilanı için talep gönderilecek. İletişim bilgileri yalnız karşılıklı kabul sonrası açılır.`}
+      icon={<Handshake />}
+      onSubmit={onSubmit}
+      pending={pending}
+      error={error}
+      submitLabel="Talebi gönder"
+      fieldLabels={{ message: "Mesaj" }}
+      trigger={({ onClick, ...aria }) => (
+        <Button size="sm" variant="secondary" type="button" onClick={onClick} {...aria}>
           <Handshake className="h-4 w-4" /> İş birliği talep et
         </Button>
-      </DialogTrigger>
-
-      <DialogContent size="sm">
-        <DialogHeader
-          icon={<Handshake />}
-          title="İş birliği talebi"
-          description={`${officeName} ofisine "${listingTitle}" ilanı için talep gönderilecek. İletişim bilgileri yalnız karşılıklı kabul sonrası açılır.`}
-        />
-        <form action={action} className="space-y-4 p-6">
-          <input type="hidden" name="listing_id" value={listingId} />
-
-          <FormField label="Mesajınız" htmlFor={`nw-msg-${listingId}`} required>
+      )}
+      hiddenFields={<input type="hidden" name="listing_id" value={listingId} />}
+      tabs={[{ id: "mesaj", label: "Mesaj", icon: Handshake, fields: ["message"] }]}
+      panels={{
+        mesaj: (
+          <FormField label="Mesajınız" htmlFor={`nw-msg-${listingId}`} required className="sm:col-span-2">
             <Textarea
               id={`nw-msg-${listingId}`}
               name="message"
@@ -70,23 +69,8 @@ export function CollabRequestDialog({
               placeholder="Örn. Bu bölgede hazır alıcımız var, ortak çalışmak isteriz…"
             />
           </FormField>
-
-          {error ? (
-            <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <div className="hairline-t flex justify-end gap-2 pt-4">
-            <DialogClose asChild>
-              <Button type="button" variant="secondary">Vazgeç</Button>
-            </DialogClose>
-            <Button type="submit" loading={pending}>
-              <Handshake className="h-4 w-4" /> Talebi gönder
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        ),
+      }}
+    />
   );
 }

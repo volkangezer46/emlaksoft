@@ -23,6 +23,7 @@ import {
 import { useToast } from "@/components/app/toast-provider";
 import { formatTurkishPhone } from "@/lib/phone";
 import { searchCustomers } from "@/app/actions/lookup";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type CustomerOption = { id: string; full_name: string; phone: string | null };
 export type StaffOption = { id: string; full_name: string };
@@ -413,19 +414,13 @@ export function ReferralLinkCreator({ staff }: { staff: StaffOption[] }) {
           <label htmlFor="ref-staff" className="mb-1.5 block text-xs font-semibold text-text-muted">
             Gelen tavsiyeleri alacak danışman
           </label>
-          <select
+          <PersonSelect
             id="ref-staff"
             value={staffId}
-            onChange={(e) => setStaffId(e.target.value)}
-            className={inputCls}
-          >
-            <option value="">İşlemi yapan üstlensin</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setStaffId}
+            people={staff.map((s) => ({ id: s.id, name: s.full_name }))}
+            emptyLabel="İşlemi yapan üstlensin"
+          />
         </div>
 
         <div>

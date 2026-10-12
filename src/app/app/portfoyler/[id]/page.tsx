@@ -167,7 +167,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, branch_id, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -201,6 +201,7 @@ export default async function PropertyDetailPage({
     { data: portalsData },
     { data: dealsData },
     { data: provinces },
+    { data: branchRows },
     { data: teamMembers },
     propertyTypeDefs,
     transactionTypeDefs,
@@ -227,6 +228,7 @@ export default async function PropertyDetailPage({
       .order("updated_at", { ascending: false })
       .limit(20),
     provinceOptionsResult({ includeInactive: true }),
+    supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     getDefinitions("property_type"),
     getDefinitions("transaction_type"),
@@ -463,6 +465,7 @@ export default async function PropertyDetailPage({
                     parcel_lot: property.parcel_lot,
                     lat: property.lat as number | null,
                     lng: property.lng as number | null,
+                    branch_id: (property as unknown as { branch_id?: string | null }).branch_id ?? null,
                     features: (property.features ?? {}) as {
                       rooms?: string | null;
                       sqm?: number | null;
@@ -475,6 +478,7 @@ export default async function PropertyDetailPage({
                     },
                   }}
                   provinces={provinces ?? []}
+                  branches={branchRows ?? []}
                   propertyTypes={propertyTypeOptions}
                   transactionTypes={transactionTypeOptions}
                 />

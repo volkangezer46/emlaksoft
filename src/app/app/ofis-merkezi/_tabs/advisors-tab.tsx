@@ -14,6 +14,7 @@ import { ROLE_LABELS } from "@/lib/role-labels";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import { buildHref, mergeParams } from "@/lib/ui/filter-params";
 import type { TabContext } from "./context";
+import { Combobox } from "@/components/ui/combobox";
 
 const PATH = TEAM_HUB_PATH;
 const ADVISOR_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
@@ -80,14 +81,15 @@ export async function AdvisorsTab({ ctx, extra }: { ctx: TabContext; extra?: Rea
               {data.branches.length ? (
                 <label className="text-xs font-medium text-ink-950">
                   Şube
-                  <FormSelect name="sube" defaultValue={f.sube} className="mt-1">
-                    <option value="">Tümü</option>
-                    {data.branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </FormSelect>
+                  <Combobox
+                    name="sube"
+                    defaultValue={f.sube}
+                    options={data.branches.map((b) => ({ value: b.id, label: b.name }))}
+                    placeholder="Tümü"
+                    searchPlaceholder="Şube ara…"
+                    emptyText="Eşleşen şube yok"
+                    className="mt-1"
+                  />
                 </label>
               ) : null}
             </>

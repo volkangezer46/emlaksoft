@@ -59,6 +59,7 @@ import {
   type ParsedCsv,
 } from "./import-config";
 import { isLegacyXls, isXlsxFile, readXlsxTable } from "@/lib/xlsx-import";
+import { Combobox } from "@/components/ui/combobox";
 
 /**
  * Dört adımlı içe aktarma sihirbazı (müşteri / portföy / talep ortak altyapı).
@@ -669,18 +670,20 @@ export function ImportWizard({
 
             {!NO_ASSIGNEE_TARGETS.includes(target) ? (
               <FormField label="Danışman ataması" hint="Yeni oluşan kayıtların sorumlusu.">
-                <Select value={assignee} onValueChange={setAssignee}>
-                  <SelectTrigger aria-label="Danışman ataması" placeholder="Danışman seçin" />
-                  <SelectContent>
-                    <SelectItem value={ME}>Ben (içe aktaran kullanıcı)</SelectItem>
-                    <SelectItem value={UNASSIGNED}>Danışmansız bırak</SelectItem>
-                    {team.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Combobox
+                  value={assignee}
+                  onValueChange={setAssignee}
+                  aria-label="Danışman ataması"
+                  clearable={false}
+                  placeholder="Danışman seçin"
+                  searchPlaceholder="Danışman ara…"
+                  emptyText="Eşleşen danışman yok"
+                  options={[
+                    { value: ME, label: "Ben (içe aktaran kullanıcı)" },
+                    { value: UNASSIGNED, label: "Danışmansız bırak" },
+                    ...team.map((m) => ({ value: m.id, label: m.name })),
+                  ]}
+                />
               </FormField>
             ) : null}
           </div>

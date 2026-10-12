@@ -17,8 +17,9 @@ import {
   slugifyAgentName,
 } from "@/lib/agent-profile";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { enqueueStorageDeletion } from "@/lib/storage-deletion-outbox";
 
-export type AgentProfileResult = { ok?: boolean; error?: string; slug?: string; url?: string };
+export type AgentProfileResult = { ok?: boolean; error?: string; slug?: string; url?: string; warning?: string };
 
 const PHOTO_BUCKET = "agent-photos";
 const PHOTO_MAX_SIZE = 3 * 1024 * 1024; // 3MB — portre için fazlasıyla yeterli
@@ -204,11 +205,7 @@ export async function removeAgentPhoto(fd: FormData): Promise<AgentProfileResult
   const gate = await gateForTarget(String(fd.get("target_id") ?? ""));
   if (!gate.ok) return { error: gate.error };
 
-  const admin = createAdminClient();
-  await admin.storage
-    .from(PHOTO_BUCKET)
-    .remove(["jpg", "png", "webp"].map((ext) => `${gate.tenantId}/${gate.targetId}.${ext}`));
-
+  // Önce DB (hata kontrolüyle), sonra nesneler kalıcı silme kuyruğuna: DB başarısızsa nesne silinmez.
   const supabase = await createClient();
   const { error } = await supabase.from("profiles").update({ photo_url: null }).eq("id", gate.targetId);
   if (error) {
@@ -216,6 +213,30 @@ export async function removeAgentPhoto(fd: FormData): Promise<AgentProfileResult
     return { error: actionErrorMessage(error, "Fotoğraf kaldırılamadı.") };
   }
 
+  let queueFailed = false;
+  for (const ext of ["jpg", "png", "webp"]) {
+    try {
+      await enqueueStorageDeletion({
+        tenantId: gate.tenantId,
+        parentId: gate.targetId,
+        bucket: PHOTO_BUCKET,
+        objectPath: `${gate.tenantId}/${gate.targetId}.${ext}`,
+        sourceTable: "profiles",
+        sourceId: gate.targetId,
+        reason: "agent_photo_removed",
+      });
+    } catch (queueError) {
+      queueFailed = true;
+      console.error("removeAgentPhoto outbox", { ext, error: queueError instanceof Error ? queueError.message : "unknown" });
+    }
+  }
+
   revalidatePath("/app/ekip/kartvizitim");
+  if (queueFailed) {
+    return {
+      ok: true,
+      warning: "Fotoğraf profilden kaldırıldı ancak dosyanın depodan silinmesi sıraya alınamadı. Destek ekibimiz temizliği tamamlayacak.",
+    };
+  }
   return { ok: true };
 }

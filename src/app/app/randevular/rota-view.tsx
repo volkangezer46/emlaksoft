@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RotaMap, type RotaMarker } from "./rota-map";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Günün rotası — seçili günün iptal edilmemiş randevuları saat sırasıyla
@@ -132,18 +133,14 @@ export function RotaView({
         {advisors ? (
           <label className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
             <UserRound className="h-3.5 w-3.5 text-brand-600" />
-            <select
+            <PersonSelect
               value={selectedAdvisorId}
-              onChange={(e) => onAdvisorChange(e.target.value)}
-              className="focus-ring rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold text-ink-950"
+              onValueChange={onAdvisorChange}
               aria-label="Danışman seç"
-            >
-              {advisors.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+              people={advisors}
+              clearable={false}
+              className="w-auto min-w-[11rem] text-xs font-semibold"
+            />
           </label>
         ) : null}
         {stops.length > 0 ? (

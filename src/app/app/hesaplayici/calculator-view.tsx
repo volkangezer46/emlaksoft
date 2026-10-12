@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { MARKET_KEY_HOUSING_LOAN, housingLoanDefault } from "@/lib/evds";
 import {
   DEFAULT_DOWN_PAYMENT_PCT,
   DEFAULT_LOAN_MONTHS,
@@ -63,13 +64,23 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
 
   // Portföy listesi: fiyatı girilmiş satılık portföyler (hesap satış bedeli
   // üzerinden kurulduğu için fiyatsız kayıt seçici de anlamsız).
-  const { data: propertyRows } = await supabase
-    .from("properties")
-    .select("id, property_code, title, list_price, transaction_type, features")
-    .is("deleted_at", null)
-    .gt("list_price", 0)
-    .order("created_at", { ascending: false })
-    .limit(150);
+  // TCMB EVDS faizi bağımsız sorgu: paralel (tablo/veri yoksa null → eski varsayılan).
+  const [{ data: propertyRows }, marketRow] = await Promise.all([
+    supabase
+      .from("properties")
+      .select("id, property_code, title, list_price, transaction_type, features")
+      .is("deleted_at", null)
+      .gt("list_price", 0)
+      .order("created_at", { ascending: false })
+      .limit(150),
+    supabase
+      .from("market_rates")
+      .select("value, as_of")
+      .eq("key", MARKET_KEY_HOUSING_LOAN)
+      .maybeSingle()
+      .then((r) => r.data, () => null),
+  ]);
+  const market = housingLoanDefault(marketRow);
 
   const properties: CalculatorProperty[] = (propertyRows ?? []).map((p) => ({
     id: p.id,
@@ -155,7 +166,8 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
           price,
           downPayment,
           months,
-          monthlyRatePct: num(sp.faiz, DEFAULT_MONTHLY_RATE_PCT),
+          monthlyRatePct: num(sp.faiz, market?.monthlyPct ?? DEFAULT_MONTHLY_RATE_PCT),
+          rateSource: market && (sp.faiz == null || sp.faiz === "") ? { asOf: market.asOf, annualPct: market.annualPct } : null,
           commissionPct: num(sp.komisyon, DEFAULT_RATES.commissionPct),
           deedFeeShare,
           sqm,

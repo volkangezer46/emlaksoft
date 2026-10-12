@@ -128,7 +128,7 @@ export default async function GiderlerPage({
         <ListHero
           eyebrow={FINANCE_HERO_TEXT.cash.eyebrow}
           art="gider"
-          title="Finans"
+          title="Muhasebe"
           description={FINANCE_HERO_TEXT.cash.description}
           actions={<FinanceActions cashAvailable quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={null} />}
         />
@@ -292,7 +292,7 @@ export default async function GiderlerPage({
       <ListHero
         eyebrow={cash.available ? FINANCE_HERO_TEXT.cash.eyebrow : FINANCE_HERO_TEXT.legacy.eyebrow}
         art="gider"
-        title="Finans"
+        title="Muhasebe"
         meta={<SampleDataBadge label={sampleLabel} />}
         description={cash.available ? FINANCE_HERO_TEXT.cash.description : FINANCE_HERO_TEXT.legacy.description}
         actions={<FinanceActions cashAvailable={cash.available} quickAccounts={quickAccounts} defaultDate={today} canSalary={canSalary} legacyCreate={legacyCreate} />}

@@ -11,6 +11,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { ACCOUNT_KIND_LABEL } from "@/lib/finance/cash/input";
 import type { AccountOption } from "./quick-entry";
+import { Combobox } from "@/components/ui/combobox";
 
 export type EditableAccount = {
   id: string;
@@ -198,14 +199,28 @@ function TransferDialog({ accounts, today, onClose }: { accounts: readonly Accou
         <form onSubmit={submit}>
           <DialogBody className="grid gap-4">
             <FormField label="Nereden?" htmlFor="tf-from" required>
-              <FormSelect id="tf-from" value={from} onChange={(e) => setFrom(e.target.value)}>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{label(a)}</option>)}
-              </FormSelect>
+              <Combobox
+                id="tf-from"
+                value={from}
+                onValueChange={setFrom}
+                clearable={false}
+                options={accounts.map((a) => ({ value: a.id, label: label(a) }))}
+                placeholder="Hesap seçin"
+                searchPlaceholder="Hesap ara…"
+                emptyText="Eşleşen hesap yok"
+              />
             </FormField>
             <FormField label="Nereye?" htmlFor="tf-to" required>
-              <FormSelect id="tf-to" value={to} onChange={(e) => setTo(e.target.value)}>
-                {accounts.map((a) => <option key={a.id} value={a.id}>{label(a)}</option>)}
-              </FormSelect>
+              <Combobox
+                id="tf-to"
+                value={to}
+                onValueChange={setTo}
+                clearable={false}
+                options={accounts.map((a) => ({ value: a.id, label: label(a) }))}
+                placeholder="Hesap seçin"
+                searchPlaceholder="Hesap ara…"
+                emptyText="Eşleşen hesap yok"
+              />
             </FormField>
             <div className="grid gap-4 sm:grid-cols-2">
               <FormField label="Tutar" htmlFor="tf-amount" required>

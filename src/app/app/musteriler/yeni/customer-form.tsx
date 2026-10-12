@@ -20,6 +20,7 @@ import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
 import { EmailInput } from "@/components/ui/email-input";
 import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS } from "./customer-tabs";
+import { Combobox } from "@/components/ui/combobox";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -111,12 +112,15 @@ export function CustomerForm({
         </FormField>
         {branches.length > 0 ? (
           <FormField label="Şube" htmlFor="branch_id">
-            <FormSelect name="branch_id" defaultValue="">
-              <option value="">Şube atanmadı</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>{b.name}</option>
-              ))}
-            </FormSelect>
+            <Combobox
+            name="branch_id"
+            defaultValue={""}
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+            placeholder="Şube atanmadı"
+            searchPlaceholder="Şube ara…"
+            emptyText="Eşleşen şube yok"
+            id="branch_id"
+          />
           </FormField>
         ) : null}
       </>

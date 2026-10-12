@@ -191,9 +191,9 @@ function ColumnSelect({ id, label, value, headers, onChange, required }: { id: s
 
 function OfxSummary({ preview, currency }: { preview: OfxPreview; currency: string }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
       <p className="text-sm text-text-muted">OFX dosyasında {preview.lineCount} hareket bulundu{preview.invalid ? `, ${preview.invalid} satır okunamadı` : ""}. Sütun eşlemesi gerekmez.</p>
-      <ul className="grid gap-1 rounded-[var(--radius-card)] border border-line p-2 text-xs">
+      <ul className="grid grid-cols-[minmax(0,1fr)] gap-1 rounded-[var(--radius-card)] border border-line p-2 text-xs">
         {preview.preview.map((l, i) => (
           <li key={i} className="flex items-center justify-between gap-2">
             <span className="min-w-0 truncate text-text">{formatDateTr(l.date)} · {l.description || "Açıklama yok"}</span>

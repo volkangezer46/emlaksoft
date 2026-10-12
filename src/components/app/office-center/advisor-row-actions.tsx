@@ -9,6 +9,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { Combobox } from "@/components/ui/combobox";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type RowAdvisor = { id: string; fullName: string; role: string; isActive: boolean; branchId: string | null; teamId: string | null };
 export type Option = { id: string; name: string };
@@ -84,20 +86,17 @@ export function AdvisorRowActions({
             <label className="sr-only" htmlFor={`oc-branch-${advisor.id}`}>
               Şube
             </label>
-            <FormSelect
+            <Combobox
               id={`oc-branch-${advisor.id}`}
-              className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
+              className="w-auto min-w-[9rem] px-2 py-1 text-xs"
               value={advisor.branchId ?? ""}
               disabled={pending}
-              onChange={(e) => run(() => updateAdvisor({ advisorId: advisor.id, branchId: e.target.value }))}
-            >
-              <option value="">Şubesiz</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </FormSelect>
+              onValueChange={(v) => run(() => updateAdvisor({ advisorId: advisor.id, branchId: v }))}
+              options={branches.map((b) => ({ value: b.id, label: b.name }))}
+              placeholder="Şubesiz"
+              searchPlaceholder="Şube ara…"
+              emptyText="Eşleşen şube yok"
+            />
           </>
         ) : null}
         {teamsAvailable && teams.length ? (
@@ -105,20 +104,17 @@ export function AdvisorRowActions({
             <label className="sr-only" htmlFor={`oc-team-${advisor.id}`}>
               Takım
             </label>
-            <FormSelect
+            <Combobox
               id={`oc-team-${advisor.id}`}
-              className="h-8 touch:h-11 w-auto px-2 py-1 text-xs"
+              className="w-auto min-w-[9rem] px-2 py-1 text-xs"
               value={advisor.teamId ?? ""}
               disabled={pending}
-              onChange={(e) => run(() => updateAdvisor({ advisorId: advisor.id, teamId: e.target.value }))}
-            >
-              <option value="">Takımsız</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </FormSelect>
+              onValueChange={(v) => run(() => updateAdvisor({ advisorId: advisor.id, teamId: v }))}
+              options={teams.map((t) => ({ value: t.id, label: t.name }))}
+              placeholder="Takımsız"
+              searchPlaceholder="Takım ara…"
+              emptyText="Eşleşen takım yok"
+            />
           </>
         ) : null}
         {advisor.isActive ? (
@@ -139,14 +135,13 @@ export function AdvisorRowActions({
             (müşteri, portföy, açık anlaşma, açık görev, yaklaşan randevu) başka danışmana devredin.
           </p>
           <FormField label="İş yükünü devral (isteğe bağlı)" htmlFor={`${panelId}-to`}>
-            <FormSelect id={`${panelId}-to`} value={handoffTo} onChange={(e) => setHandoffTo(e.target.value)}>
-              <option value="">Devir yapma</option>
-              {handoffTargets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </FormSelect>
+            <PersonSelect
+              id={`${panelId}-to`}
+              value={handoffTo}
+              onValueChange={setHandoffTo}
+              people={handoffTargets}
+              emptyLabel="Devir yapma"
+            />
           </FormField>
           <FormField label="Gerekçe" htmlFor={`${panelId}-reason`} required={Boolean(handoffTo)} hint="Devir seçildiyse zorunlu (en az 5 karakter); denetim kaydına yazılır.">
             <FormTextarea id={`${panelId}-reason`} rows={2} value={reason} maxLength={300} onChange={(e) => setReason(e.target.value)} />

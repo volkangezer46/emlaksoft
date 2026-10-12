@@ -22,6 +22,7 @@ import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
 import { FREQUENCY_LABEL } from "@/lib/finance/recurring/rules";
 import { cn } from "@/lib/utils";
 import type { AccountOption } from "./quick-entry";
+import { Combobox } from "@/components/ui/combobox";
 
 export type EditableRule = {
   id: string;
@@ -188,14 +189,19 @@ function RuleDialog({
               </div>
 
               <FormField label="Hangi hesap?" htmlFor="rl-account" required hint={chosen?.scope === "user" ? "Kişisel hesap: yalnız siz görürsünüz, ofis kâr-zararına girmez." : undefined}>
-                <FormSelect id="rl-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-                  {office.length > 0 ? (
-                    <optgroup label="Ofis hesapları">{office.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}</optgroup>
-                  ) : null}
-                  {personal.length > 0 ? (
-                    <optgroup label="Kişisel hesaplarım">{personal.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}</optgroup>
-                  ) : null}
-                </FormSelect>
+                <Combobox
+                id="rl-account"
+                value={accountId}
+                onValueChange={setAccountId}
+                required
+                options={[
+                  ...office.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Ofis hesabı" })),
+                  ...personal.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Kişisel hesabım" })),
+                ]}
+                placeholder="Hesap seçin"
+                searchPlaceholder="Hesap ara…"
+                emptyText="Eşleşen hesap yok"
+              />
               </FormField>
 
               <FormField label="Nasıl işlensin?" htmlFor="rl-mode" hint={mode === "approve" ? "Vade gelince taslak oluşur ve bildirim alırsınız; onaylayınca kaydedilir." : "Vade gününde hesaba kendiliğinden işlenir."}>
@@ -388,9 +394,16 @@ export function ConvertSeriesButton({ expenseId, title, officeAccounts }: { expe
             <form onSubmit={submit}>
               <DialogBody className="grid gap-4">
                 <FormField label="Hangi hesaptan?" htmlFor="cs-account" required>
-                  <FormSelect id="cs-account" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                    {officeAccounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-                  </FormSelect>
+                  <Combobox
+                    id="cs-account"
+                    value={accountId}
+                    onValueChange={setAccountId}
+                    clearable={false}
+                    options={officeAccounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})` }))}
+                    placeholder="Hesap seçin"
+                    searchPlaceholder="Hesap ara…"
+                    emptyText="Eşleşen hesap yok"
+                  />
                 </FormField>
                 <FormField label="Nasıl işlensin?" htmlFor="cs-mode">
                   <FormSelect id="cs-mode" value={mode} onChange={(e) => setMode(e.target.value as "auto" | "approve")}>

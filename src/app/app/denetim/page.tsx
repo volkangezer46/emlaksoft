@@ -35,6 +35,7 @@ import { actionCodesMatching } from "@/lib/audit-filters";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PersonSelect } from "@/components/ui/person-select";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 
@@ -279,17 +280,14 @@ export default async function AuditPage({
             aria-label="Bitiş tarihi"
             className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
           />
-          <select
+          <PersonSelect
             name="aktor"
             defaultValue={aktorF}
             aria-label="Aktör filtresi"
-            className="rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400"
-          >
-            <option value="">Tüm aktörler</option>
-            {actorOptions.map((a) => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+            people={actorOptions}
+            emptyLabel="Tüm aktörler"
+            className="w-56"
+          />
           <select
             name="risk"
             defaultValue={riskF}

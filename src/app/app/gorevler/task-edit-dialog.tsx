@@ -5,6 +5,8 @@ import { toTrLocalInput } from "@/lib/clock";
 import { CalendarClock, ListTodo, Pencil } from "lucide-react";
 import { updateTask, type TaskResult } from "@/app/actions/tasks";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import { PersonSelect } from "@/components/ui/person-select";
+import { Combobox } from "@/components/ui/combobox";
 
 type Task = {
   id: string;
@@ -178,23 +180,28 @@ export function TaskEditDialog({
             {members && members.length > 0 ? (
               <label className="text-xs font-semibold text-text-muted sm:col-span-2">
                 Atanan
-                <select name="assigned_to" defaultValue={task.assigned_to ?? ""} className={`mt-1 ${fieldClass}`}>
-                  {!task.assigned_to ? <option value="">Atanmamış</option> : null}
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
+                <PersonSelect
+                  name="assigned_to"
+                  defaultValue={task.assigned_to ?? ""}
+                  people={members}
+                  emptyLabel="Atanmamış"
+                  clearable={!task.assigned_to}
+                  className="mt-1"
+                />
               </label>
             ) : null}
             {dealOptions ? (
               <label className="text-xs font-semibold text-text-muted sm:col-span-2">
                 İlgili anlaşma
-                <select name="deal_id" defaultValue={task.deal_id ?? ""} className={`mt-1 ${fieldClass}`}>
-                  <option value="">Bağlı değil</option>
-                  {dealOptions.map((d) => (
-                    <option key={d.id} value={d.id}>{d.label}</option>
-                  ))}
-                </select>
+                <Combobox
+                  name="deal_id"
+                  defaultValue={task.deal_id ?? ""}
+                  options={dealOptions.map((d) => ({ value: d.id, label: d.label }))}
+                  placeholder="Bağlı değil"
+                  searchPlaceholder="Anlaşma ara…"
+                  emptyText="Eşleşen anlaşma yok"
+                  className="mt-1"
+                />
               </label>
             ) : null}
           </>

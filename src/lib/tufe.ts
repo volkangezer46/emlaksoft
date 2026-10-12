@@ -139,6 +139,30 @@ export function serializeTufeTable(table: TufeTable): string {
   return JSON.stringify({ entries: table.entries, verifiedAt: table.verifiedAt, source: table.source });
 }
 
+/** EVDS'ten otomatik doldurulan satırların kaynak etiketi (resmi açıklanmış oranla karışmaz). */
+export const TUFE_EVDS_SOURCE = "TCMB EVDS (otomatik)";
+
+/**
+ * EVDS'ten hesaplanan 12 aylık ortalama oranları tabloya işler. Resmi (official=true) satırlar ASLA ezilmez;
+ * EVDS satırları official=false olur. Resmi satır varsa tablo düzeyindeki doğrulama tarihi/kaynağı korunur ve
+ * kaynağa EVDS notu eklenir; yoksa kaynak "TCMB EVDS (otomatik)" olur.
+ */
+export function mergeEvdsTufe(table: TufeTable, rates: Record<string, number>): TufeTable {
+  const entries: Record<string, TufeEntry> = { ...table.entries };
+  for (const [month, rate] of Object.entries(rates)) {
+    if (!MONTH_RE.test(month) || !Number.isFinite(rate) || rate <= 0 || rate > 500) continue;
+    if (entries[month]?.official === true) continue;
+    entries[month] = { rate, official: false };
+  }
+  const anyOfficial = Object.values(entries).some((e) => e.official);
+  if (!anyOfficial) {
+    return { entries, verifiedAt: null, source: TUFE_EVDS_SOURCE, fromSettings: true };
+  }
+  const base = table.source ?? "";
+  const source = base.includes(TUFE_EVDS_SOURCE) ? base : `${base} + ${TUFE_EVDS_SOURCE} (resmi olmayan satırlar)`.trim();
+  return { entries, verifiedAt: table.verifiedAt, source: source.slice(0, 300), fromSettings: true };
+}
+
 /** Tablodaki aylar (eskiden yeniye). */
 export function tufeMonths(table: TufeTable): string[] {
   return Object.keys(table.entries).sort();
