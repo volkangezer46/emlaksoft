@@ -1,5 +1,5 @@
 import { ICONS } from "@/lib/icons";
-import { featureForHref } from "@/lib/modules/registry";
+import { featureForHref } from "@/lib/modules/route-table";
 import { navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";

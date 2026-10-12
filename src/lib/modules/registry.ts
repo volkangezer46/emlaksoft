@@ -122,19 +122,8 @@ function matches(path: string, prefix: string): boolean {
   return p === prefix || p.startsWith(`${prefix}/`);
 }
 
-const ROUTE_TABLE: readonly { prefix: string; key: FeatureKey }[] = MODULES.flatMap((m) =>
-  m.routes.map((prefix) => ({ prefix, key: m.key })),
-).sort((a, b) => b.prefix.length - a.prefix.length);
-
-/**
- * Yolun (sorgu/hash atılır) bağlı olduğu kapatılabilir modül; çekirdek yol için null.
- * En uzun ön ek kazanır (`/app/portfoyler/sunumlar` -> presentations, `/app/portfoyler` -> null).
- */
-export function featureForHref(href: string): FeatureKey | null {
-  const path = href.split(/[?#]/)[0] ?? href;
-  for (const row of ROUTE_TABLE) if (matches(path, row.prefix)) return row.key;
-  return null;
-}
+// Rota tablosu kabuğa hafif girsin diye ayrı dosyada (route-table.ts); MODULES[].routes ile birebir (test karşılaştırır).
+export { featureForHref } from "@/lib/modules/route-table";
 
 /** Herkese açık yol için bağlı modül (token sayfaları). */
 export function featureForPublicPath(path: string): FeatureKey | null {
