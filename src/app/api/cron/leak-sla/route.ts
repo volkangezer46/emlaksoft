@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
-import { cronDeadline, heartbeatFor, isPastDeadline } from "@/lib/cron-run";
+import { cronDeadline, heartbeatFor, isPastDeadline, guardCron } from "@/lib/cron-run";
 import { insertNotificationsDetailed } from "@/lib/notify-batch";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
 import { leakSeverity } from "@/lib/listing-control/sla-plan";
@@ -61,7 +61,7 @@ async function propertiesWithOpenLostDealAnomaly(admin: ReturnType<typeof create
  * saatlik kademeler en çok ~1 saat gecikmeyle tetiklensin. Aşama kaydı (anomali, aşama) tekildir; tekrar çalışma
  * aynı aşamayı iki kez bildirmez.
  */
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -192,3 +192,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: hb.status === "ok", sent, failed });
 }
+
+export const GET = guardCron("leak-sla", run);

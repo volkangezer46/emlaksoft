@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
@@ -62,7 +63,7 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
  *   hata cron'u düşürmez). Eski "3 aylık devir tavanı" kaldırıldı.
  * - Analiz bakiyesi cüzdanı (`ef_credit_ready()`) hazır değilse HİÇ hibe yapılmaz ("atlandı"), hata verilmez.
  */
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -282,3 +283,5 @@ async function loadMonthGranted(
   }
   return out;
 }
+
+export const GET = guardCron("ef-kontor-hak", run);

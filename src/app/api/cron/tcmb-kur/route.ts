@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTcmbRate, fetchLatestTcmbRate } from "@/lib/tcmb";
@@ -21,7 +22,7 @@ export const maxDuration = 300;
  *    Zaten kayıtlı günler tekrar çekilmez — kotayı boşa harcamaz.
  */
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -131,3 +132,5 @@ export async function GET(req: NextRequest) {
     eurSelling: result.rate.eurSelling,
   });
 }
+
+export const GET = guardCron("tcmb-kur", run);

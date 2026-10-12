@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
-import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 /** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
 export const maxDuration = 300;
@@ -40,7 +40,7 @@ const TX_VARIANTS: Array<{ filter: string | null; label: "Tümü" | "Satılık" 
   { filter: "Kiralık", label: "Kiralık" },
 ];
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -142,3 +142,5 @@ export async function GET(req: NextRequest) {
     failed,
   });
 }
+
+export const GET = guardCron("bolge-snapshot", run);

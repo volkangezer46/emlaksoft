@@ -6,14 +6,14 @@ import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
 import { getDisabledModulesByTenant, isDisabledFor, tenantsDisabledFor } from "@/lib/modules/state";
 import { runLeagueDailyForTenant } from "@/lib/league/daily";
-import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -149,3 +149,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: hb.status === "ok", sent, skippedPrefs, failed, remaining: remainingOf({ total: tenants.length, processed }) });
 }
+
+export const GET = guardCron("gunluk-ozet", run);
