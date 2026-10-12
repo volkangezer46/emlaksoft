@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { verifyImageFile } from "@/lib/file-validation";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { enqueueStorageDeletion } from "@/lib/storage-deletion-outbox";
 
-export type LogoResult = { ok?: boolean; error?: string; url?: string };
+export type LogoResult = { ok?: boolean; error?: string; url?: string; warning?: string };
 
 const BUCKET = "tenant-logos";
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
@@ -76,18 +77,44 @@ export async function deleteTenantLogo(): Promise<LogoResult> {
 
   const supabase = await createClient();
 
-  // Tüm ext varyantlarını dene
-  const exts = ["png", "jpg", "webp", "svg"];
-  for (const ext of exts) {
-    await supabase.storage.from(BUCKET).remove([`${gate.tenantId}/logo.${ext}`]);
-  }
-
-  await supabase
+  // Önce DB alanı boşaltılır (hata kontrolüyle); nesneler sonra kalıcı silme kuyruğuna (outbox) düşer.
+  // Böylece DB başarısızsa nesne silinmez, nesne silme başarısızsa yeniden denenir.
+  const { error: dbErr } = await supabase
     .from("tenants")
     .update({ logo_url: null, updated_at: new Date().toISOString() })
     .eq("id", gate.tenantId);
+  if (dbErr) {
+    console.error("deleteTenantLogo db", dbErr);
+    return { error: actionErrorMessage(dbErr, "Logo kaldırılamadı. Lütfen tekrar deneyin.") };
+  }
+
+  // Tüm ext varyantları (kuyruk işçisi var olmayan nesneyi başarılı sayar; güncel logo_url'e işaret eden nesne korunur).
+  const exts = ["png", "jpg", "webp", "svg"];
+  let queueFailed = false;
+  for (const ext of exts) {
+    try {
+      await enqueueStorageDeletion({
+        tenantId: gate.tenantId,
+        parentId: null,
+        bucket: BUCKET,
+        objectPath: `${gate.tenantId}/logo.${ext}`,
+        sourceTable: "tenants",
+        sourceId: gate.tenantId,
+        reason: "tenant_logo_removed",
+      });
+    } catch (error) {
+      queueFailed = true;
+      console.error("deleteTenantLogo outbox", { ext, error: error instanceof Error ? error.message : "unknown" });
+    }
+  }
 
   revalidatePath("/app/ayarlar");
   revalidatePath("/app");
+  if (queueFailed) {
+    return {
+      ok: true,
+      warning: "Logo ayarlardan kaldırıldı ancak dosyanın depodan silinmesi sıraya alınamadı. Destek ekibimiz temizliği tamamlayacak.",
+    };
+  }
   return { ok: true };
 }

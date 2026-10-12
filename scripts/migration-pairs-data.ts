@@ -275,6 +275,7 @@ const F = {
   einvoiceServerOnlyWrites: "20261012001000_einvoice_server_only_writes.sql",
   // ARGE-1 (2026-10-12): arama/iletisim kaydi girilince call_priority onerisi aninda kapanir (SECURITY DEFINER RPC; yalniz valid_until).
   insightCloseOnContact: "20261012001600_insight_close_on_contact.sql",
+  storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   rentNoticeReceipt: "20261012000900_rent_notice_receipt.sql",
   // Kabuk zinciri (2026-10-11): app_shell_bootstrap yanitina aktif platform personeli satiri (ayri platform_staff turu kalkar).
   appShellPlatformStaff: "20261012001100_app_shell_platform_staff.sql",
@@ -464,6 +465,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeEntrySourceAmountGuard]: "siki", // guvenlik/para: kasa hareketi kaynak tutar tavani (Paket 2)
     [F.commissionSplitsIntegrity]: "siki", // guvenlik/para: komisyon paylasimi butunlugu (Paket 2)
     [F.efPackNamesTl]: "ek", // platform_settings ef.packs: yalniz seed paket adlarinda "kontor" -> "TL" metin degisimi (sema/fonksiyon yok)
+    [F.storageCleanupReceipts]: "ek", // rent-receipts outbox kova izni + dekont yolu silinince/degisince tetikleyici + kismi indeks; mevcut veri/govde degismez
     [F.insightCloseOnContact]: "ek", // yeni dar SECURITY DEFINER RPC (insight_close_call_priority; yalniz valid_until); tablo/politika/veri degismez
     [F.appShellPlatformStaff]: "ek", // app_shell_bootstrap govdesi birebir + yeni platform_staff alani (CREATE OR REPLACE); tablo/politika/veri degismez
     [F.portalRequestsV2]: "davranis", // portal_customer_request govdesi genisler (3 yeni tur) + kind CHECK genisler; 2 yeni istek tablosu + owner_portal_tokens.weekly_report_enabled
@@ -628,6 +630,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
       files: [F.priceProposalOversightGate, F.rentChargesFinancialGuard, F.financeEntrySourceAmountGuard, F.commissionSplitsIntegrity],
     },
     { id: "ANALIZ-paket-adlari-tl", order: 32, title: "ef.packs seed paket adlari: kontor -> TL (analiz bakiyesi dili; 20261008001000 SONRASI, sira serbest, ek)", files: [F.efPackNamesTl] },
+    { id: "GUVENILIRLIK-dekont-depo-temizligi", order: 45, title: "Kiraci dekontu depo temizligi: rent-receipts outbox izni + silinen/degisen dekont tetikleyicisi (20261012000900 ve 20261007000700 SONRASI, sira serbest, ek)", files: [F.storageCleanupReceipts] },
     { id: "ARGE-oneri-olay-kapatma", order: 43, title: "Oneri olay aninda kapatma: insight_close_call_priority RPC (20260826002500 insights SONRASI, sira serbest, ek; kod RPC yokken hatayi yutar)", files: [F.insightCloseOnContact] },
     { id: "EINV-sunucu-yazimi", order: 36, title: "e-Fatura saglayici sonucu yalniz sunucu (service_role) RPC'leriyle yazilir (000100'den SONRA; sira serbest)", files: [F.einvoiceServerOnlyWrites] },
     { id: "PORTAL-kira-dekont", order: 35, title: "Kiraci Odedim dekont fotografi: ozel rent-receipts kovasi + dekont sutunlari + token cozucu RPC (20261012000200 SONRASI, sira serbest, ek)", files: [F.rentNoticeReceipt] },
