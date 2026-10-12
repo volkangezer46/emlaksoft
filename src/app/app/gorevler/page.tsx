@@ -21,6 +21,7 @@ import { ScopeBadge } from "@/components/app/scope-badge";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { orIlike } from "@/lib/pgrst";
+import { loadTaskCounts, taskCountsKnownMissing } from "@/lib/supabase/count-rpcs";
 import { buildHref } from "@/lib/ui/filter-params";
 import {
   CategoryChips,
@@ -224,44 +225,50 @@ export default async function TasksPage({
         : Promise.resolve([]);
 
   const head = () => scoped(supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId));
+  const todayStartIso = startOfToday().toISOString();
+  const todayEndIso = endOfToday().toISOString();
+  const weekEndIso = daysFromNowIso(7);
 
-  const [
-    { data: tasksData, count: taskTotal },
-    savedViews,
-    openRes,
-    overdueRes,
-    todayRes,
-    upcomingRes,
-    doneRes,
-    allRes,
-    ...kindRes
-  ] = await batchAll("Görevler", [
-    "tasks", "saved-views", "count-open", "count-overdue", "count-today", "count-upcoming", "count-done", "count-all",
-    ...KIND_FILTERS.map((k) => `count-kind-${k.key}`),
-  ], [
-    query,
-    savedViewsPromise,
+  // Sayaçlar: task_counts RPC'si tek taramada döner; RPC yoksa/hata verirse eski head-count sorgularına düşülür.
+  const useRpcCounts = !taskCountsKnownMissing();
+  const legacyCounts = () => Promise.all([
     head().eq("status", "open"),
     head().eq("status", "open").lt("due_at", nowIso),
-    head().eq("status", "open").gte("due_at", startOfToday().toISOString()).lte("due_at", endOfToday().toISOString()),
-    head().eq("status", "open").gte("due_at", nowIso).lte("due_at", daysFromNowIso(7)),
+    head().eq("status", "open").gte("due_at", todayStartIso).lte("due_at", todayEndIso),
+    head().eq("status", "open").gte("due_at", nowIso).lte("due_at", weekEndIso),
     head().eq("status", "done"),
     head(),
     // Tür çipi sayaçları: açık görevler içinde
     ...KIND_FILTERS.map((k) => head().eq("status", "open").eq("kind", k.key)),
   ]);
 
-  const counts = {
-    open: openRes.count ?? 0,
-    overdue: overdueRes.count ?? 0,
-    today: todayRes.count ?? 0,
-    upcoming: upcomingRes.count ?? 0,
-    done: doneRes.count ?? 0,
-    all: allRes.count ?? 0,
-  };
+  const [
+    { data: tasksData, count: taskTotal },
+    savedViews,
+    rpcCounts,
+    legacyNow,
+  ] = await batchAll("Görevler", ["tasks", "saved-views", "task-counts-rpc", "task-counts-legacy"], [
+    query,
+    savedViewsPromise,
+    useRpcCounts
+      ? loadTaskCounts(supabase, { scope: listScope.filter, nowIso, todayStartIso, todayEndIso, weekEndIso, kinds: KIND_FILTERS.map((k) => k.key) })
+      : Promise.resolve(null),
+    useRpcCounts ? Promise.resolve(null) : legacyCounts(),
+  ]);
+  const legacy = rpcCounts ? null : (legacyNow ?? (await legacyCounts()));
+  const counts = rpcCounts
+    ? { open: rpcCounts.open, overdue: rpcCounts.overdue, today: rpcCounts.today, upcoming: rpcCounts.upcoming, done: rpcCounts.done, all: rpcCounts.all }
+    : {
+        open: legacy![0].count ?? 0,
+        overdue: legacy![1].count ?? 0,
+        today: legacy![2].count ?? 0,
+        upcoming: legacy![3].count ?? 0,
+        done: legacy![4].count ?? 0,
+        all: legacy![5].count ?? 0,
+      };
   const kindCounts: Record<string, number> = {};
   KIND_FILTERS.forEach((k, i) => {
-    kindCounts[k.key] = (kindRes[i] as { count: number | null }).count ?? 0;
+    kindCounts[k.key] = rpcCounts ? (rpcCounts.kinds[k.key] ?? 0) : (legacy![6 + i].count ?? 0);
   });
 
   type RawTask = TaskRow & { deal?: DealOptionSource | DealOptionSource[] | null };

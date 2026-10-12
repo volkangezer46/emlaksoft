@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { loadPropertyRegionDays } from "@/lib/supabase/count-rpcs";
 import { PropertyExtraPanel } from "./property-extra-panel";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
@@ -173,7 +174,11 @@ export default async function PropertyDetailPage({
       .is("deleted_at", null)
       .maybeSingle(),
   );
-  const regionP = propertyP.then(async ({ data: prop }): Promise<{ data: { avg_days_listed: number | null } | null }> => {
+  // Bölge satış hızı: property_region_days RPC'si portföy satırıyla AYNI turda (id'den kendisi çözer); RPC yoksa/hata verirse
+  // eski yol (portföy satırına zincirli region_stats_history okuması).
+  const regionRpcP = loadPropertyRegionDays(supabase, id);
+  const regionP = Promise.all([regionRpcP, propertyP]).then(async ([rpcRes, { data: prop }]): Promise<{ data: { avg_days_listed: number | null } | null }> => {
+    if (rpcRes) return { data: rpcRes.avgDays === null ? null : { avg_days_listed: rpcRes.avgDays } };
     if (!prop || !isDiagnosable(prop.status) || !prop.district_id) return { data: null };
     // Bölge (ilçe) satış hızı — region_stats_history'nin en güncel dönemi.
     const txTypeStat = /kira/i.test(prop.transaction_type ?? "") ? "Kiralık" : /sat/i.test(prop.transaction_type ?? "") ? "Satılık" : "Tümü";
