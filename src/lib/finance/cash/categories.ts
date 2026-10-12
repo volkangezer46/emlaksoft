@@ -9,6 +9,8 @@ export type CashCategory = { value: string; label: string; direction: CashDirect
 
 export const SALARY_CATEGORY = "maas";
 export const TRANSFER_CATEGORY = "transfer";
+/** Mülk sahibi hakediş ödemesinin kasa çıkışı kategorisi (elle seçilemez; yalnız owner_payout kaynağı yazar). */
+export const OWNER_PAYOUT_CATEGORY = "mulk_sahibi_odeme";
 
 export const CASH_CATEGORIES: readonly CashCategory[] = [
   // Gider
@@ -39,6 +41,7 @@ export function categoriesFor(direction: CashDirection): readonly CashCategory[]
 export function cashCategoryLabel(value: string | null | undefined): string {
   if (!value) return "—";
   if (value === TRANSFER_CATEGORY) return "Transfer";
+  if (value === OWNER_PAYOUT_CATEGORY) return "Mülk sahibi ödemesi";
   return CASH_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 

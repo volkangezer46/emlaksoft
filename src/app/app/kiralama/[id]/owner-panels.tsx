@@ -14,6 +14,7 @@ import { useToast } from "@/components/app/toast-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
 import { Switch } from "@/components/ui/switch";
 import { feeDescription } from "@/lib/property-management/ledger";
 import { PAYMENT_METHOD_LABELS, PAYOUT_METHODS, type FeeType, type PaymentMethod } from "@/lib/property-management/payments";
@@ -216,10 +217,12 @@ export function PayoutPanel({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [voidFor, setVoidFor] = useState<string | null>(null);
+  const [accountId, setAccountId] = useState("");
 
   function submit(fd: FormData) {
     setError(null);
     fd.set("rental_id", rentalId);
+    fd.set("account_id", accountId);
     start(async () => {
       const res = await recordOwnerPayout({}, fd);
       if (res.error) {
@@ -227,6 +230,7 @@ export function PayoutPanel({
         return;
       }
       push("Mülk sahibi ödemesi kaydedildi", "ok");
+      if (res.info) push(res.info, "err");
       setOpen(false);
       router.refresh();
     });
@@ -276,6 +280,9 @@ export function PayoutPanel({
             </FormField>
             <FormField label="Not" htmlFor="payout_note" className="sm:col-span-2">
               <FormInput id="payout_note" name="note" maxLength={300} />
+            </FormField>
+            <FormField label="Hangi hesaptan çıktı?" htmlFor="payout_account" hint="İsteğe bağlı: seçerseniz kasa/banka çıkış hareketi otomatik yazılır." className="sm:col-span-2">
+              <FinanceAccountPicker direction="out" value={accountId} onChange={setAccountId} />
             </FormField>
           </div>
           <label className="flex items-start gap-2 text-xs text-text-muted">

@@ -13,10 +13,13 @@ export function FinanceAccountPicker({
   value,
   onChange,
   className,
+  direction = "in",
 }: {
   value: string;
   onChange: (accountId: string) => void;
   className?: string;
+  /** "out": mülk sahibi ödemesi gibi çıkış (etiketler "hesabından çıktı"). */
+  direction?: "in" | "out";
 }) {
   const [accounts, setAccounts] = useState<PostableAccount[] | null>(null);
   useEffect(() => {
@@ -31,11 +34,11 @@ export function FinanceAccountPicker({
   if (!accounts || accounts.length === 0) return null;
   return (
     <Combobox
-      aria-label="Hangi hesaba girdi (isteğe bağlı)"
+      aria-label={direction === "out" ? "Hangi hesaptan çıktı (isteğe bağlı)" : "Hangi hesaba girdi (isteğe bağlı)"}
       value={value}
       onValueChange={onChange}
-      options={accounts.map((a) => ({ value: a.id, label: `${a.name} hesabına girdi` }))}
-      placeholder="Hesaba işleme"
+      options={accounts.map((a) => ({ value: a.id, label: direction === "out" ? `${a.name} hesabından çıktı` : `${a.name} hesabına girdi` }))}
+      placeholder={direction === "out" ? "Hesaptan işleme" : "Hesaba işleme"}
       searchPlaceholder="Hesap ara…"
       emptyText="Eşleşen hesap yok"
       className={cn("w-auto min-w-[10rem] text-xs", className)}

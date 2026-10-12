@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingCashSchema } from "./load";
 import { isUuid } from "./input";
+import { OWNER_PAYOUT_CATEGORY } from "./categories";
 
 /**
  * Komisyon / kira / aidat tahsilatını isteğe bağlı olarak ofis hesabına hareket olarak yazar (SUNUCU yardımcısı; "use server" DEĞİL).
@@ -61,10 +62,42 @@ export async function recordCollectionCash(
   return res.ok ? null : res.warning;
 }
 
-/** Tahsilat geri alınınca/iptal edilince bağlı hareketi iptal eder (en iyi çaba; şema yoksa sessiz). */
+export const OWNER_PAYOUT_CASH_WARN = "Ödeme kaydedildi ancak seçilen hesaba çıkış hareketi yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
+
+/**
+ * Mülk sahibi hakediş ödemesini isteğe bağlı olarak ofis hesabına ÇIKIŞ olarak yazar (source_type 'owner_payout', source_id = owner_payouts.id).
+ * Hesap seçilmediyse hiçbir şey yapmaz. Hareket hatası ödemeyi BOZMAZ: uyarı metni döner (null = sorun yok).
+ */
+export async function recordOwnerPayoutCash(
+  supabase: SupabaseClient,
+  args: { accountId?: string | null; payoutId: string; amount: number; date: string; title: string; counterparty?: string | null },
+): Promise<string | null> {
+  const accountId = (args.accountId ?? "").trim();
+  if (!accountId) return null;
+  if (!isUuid(accountId) || !isUuid(args.payoutId)) return OWNER_PAYOUT_CASH_WARN;
+  const { data, error } = await supabase.rpc("finance_record_entry", {
+    p_account_id: accountId,
+    p_direction: "out",
+    p_amount: args.amount,
+    p_entry_date: args.date,
+    p_category: OWNER_PAYOUT_CATEGORY,
+    p_title: args.title.slice(0, 160),
+    p_counterparty: args.counterparty ? args.counterparty.slice(0, 120) : null,
+    p_source_type: "owner_payout",
+    p_source_id: args.payoutId,
+  });
+  if (error) {
+    if (!isMissingCashSchema(error)) console.error("recordOwnerPayoutCash", { code: error.code });
+    return OWNER_PAYOUT_CASH_WARN;
+  }
+  const outcome = (data as { outcome?: string } | null)?.outcome;
+  return outcome === "recorded" || outcome === "duplicate" ? null : OWNER_PAYOUT_CASH_WARN;
+}
+
+/** Tahsilat geri alınınca/iptal edilince bağlı hareketi iptal eder (en iyi çaba; şema yoksa sessiz). Ödeme iptalinde 'owner_payout'. */
 export async function voidCollectionCash(
   supabase: SupabaseClient,
-  sourceType: CollectionSource,
+  sourceType: CollectionSource | "owner_payout",
   sourceId: string,
   reason = "Tahsilat geri alındı",
 ): Promise<void> {

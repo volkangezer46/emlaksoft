@@ -15,6 +15,7 @@ const SOURCE_LABEL: Record<string, string> = {
   commission: "Komisyon tahsilatı",
   rent: "Kira tahsilatı",
   building: "Aidat tahsilatı",
+  owner_payout: "Mülk sahibi ödemesi",
   due: "Aidat",
   recurring: "Düzenli ödeme",
   import: "Ekstreden",

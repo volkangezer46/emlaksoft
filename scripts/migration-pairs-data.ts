@@ -290,6 +290,7 @@ const F = {
   // Portal ice/disa aktarim (2026-10-12): eklentiyle yardimli doldurma oturum kaydi + JWT RPC'leri.
   portalTransferSessions: "20261012002700_portal_transfer_sessions.sql",
   fsboSelectScope: "20261012002800_fsbo_select_scope.sql",
+  financeOwnerPayoutSource: "20261012002900_finance_owner_payout_source.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -492,6 +493,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.automationTriggerFsbo]: "ek", // yalniz enum degeri ekler (new_fsbo_lead, fsbo_no_contact_days; idempotent); tablo/politika/veri degismez
     [F.fsboRlsScope]: "siki", // fsbo_leads UPDATE politikasi kendi+sahipsiz kapsama, sutun UPDATE yetkisi daralir, insert is_sample=false; iki kapatma RPC'si izin kapisi alir; veri degismez
     [F.fsboSelectScope]: "siki", // fsbo_leads/observations/activities SELECT politikasi danisman kapsamina daralir; assigned_to/deleted_at kullanici UPDATE yetkisi kalkar (fsbo_assign_lead/fsbo_archive_lead RPC); fsbo_find_existing dar okuma RPC; veri degismez
+    [F.financeOwnerPayoutSource]: "siki", // finance_record_entry/finance_void_source_entries gövdeleri + cash_entries.source_type CHECK listesine owner_payout; veri degismez, hesap secilmezse davranis ayni
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -672,6 +674,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FSBO-rls-kapsami", order: 54, title: "fsbo_leads RLS kapsami + sutun yetkisi + kapatma RPC izin kapisi (20261012002400 ve 002500 SONRASI; sira serbest, siki)", files: [F.fsboRlsScope] },
     { id: "FSBO-realtime-kapatma", order: 52, title: "fsbo_leads realtime yayini + insight_close_fsbo_lead RPC (20261012002400 SONRASI; kod yayin/RPC yokken sessiz; sira serbest, ek)", files: [F.fsboRealtime] },
     { id: "FSBO-select-kapsami", order: 57, title: "fsbo_leads SELECT kapsami (danisman kendi+sahipsiz+olusturdugu) + fsbo_find_existing/fsbo_assign_lead/fsbo_archive_lead RPC'leri + assigned_to/deleted_at sutun yetkisi kaldirma (20261012002600 SONRASI; kodla birlikte yayinlanir; siki)", files: [F.fsboSelectScope] },
+    { id: "FINANS-hakedis-kasa", order: 58, title: "Mulk sahibi hakedis odemesi kasada cikis (owner_payout kaynagi; 20261008001100, 20261010000600, 20261011001100 ve 20261012001400 SONRASI; kodla birlikte yayinlanir; siki)", files: [F.financeOwnerPayoutSource] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
@@ -850,6 +853,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.fsboRlsScope, F.fsboRealtime],
     // FSBO SELECT kapsami: UPDATE politikasi/sutun listesi 002600'de kurulur, bu dosya onun ustune yazar.
     [F.fsboSelectScope, F.fsboRlsScope],
+    // Hakedis kasa kaynagi: owner_payouts (core), finance_* (000600/001100) ve tavan govdesi (001400) uzerine yazar.
+    [F.financeOwnerPayoutSource, F.financeEntrySourceAmountGuard],
+    [F.financeOwnerPayoutSource, F.propertyManagementCore],
     // Portal aktarim RPC'leri lc_bind_portal_listing (002000), lc_row_visible (002010) ve lc_mark_state_stale (002040) cekirdegine dayanir.
     [F.portalTransferSessions, F.lcInventoryMatching],
   ],

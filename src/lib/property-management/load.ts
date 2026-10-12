@@ -241,6 +241,20 @@ export async function loadManagementFeeIncome(
   return { total: totalK / 100, byRental };
 }
 
+/** Dönem içi mülk sahibi hakediş ödemeleri (iptal edilmemiş; `fromDay` dahil, `toDayExclusive` hariç): toplam ve adet. Okunamazsa null. */
+export async function loadOwnerPayoutTotals(
+  db: SupabaseClient,
+  input: { tenantId: string; fromDay: string; toDayExclusive: string },
+): Promise<{ total: number; count: number } | null> {
+  const res = await fetchAllRows<{ amount: number | string }>((from, to) =>
+    db.from("owner_payouts").select("id, amount").eq("tenant_id", input.tenantId).is("voided_at", null)
+      .gte("paid_on", input.fromDay).lt("paid_on", input.toDayExclusive).order("id", { ascending: true }).range(from, to), 1000, 20);
+  if (res.error) return null;
+  let totalK = 0;
+  for (const r of res.data) totalK += Math.round(num(r.amount) * 100);
+  return { total: totalK / 100, count: res.data.length };
+}
+
 export async function loadLateFeeSettings(db: SupabaseClient, tenantId: string): Promise<{ available: boolean; settings: LateFeeSettings }> {
   const res = await db.from("property_management_settings").select("late_fee_enabled, late_fee_monthly_percent, late_fee_grace_days").eq("tenant_id", tenantId).maybeSingle();
   if (res.error) return { available: false, settings: LATE_FEE_DEFAULTS };

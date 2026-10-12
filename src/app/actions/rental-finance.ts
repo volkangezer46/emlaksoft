@@ -13,7 +13,7 @@ import { formatIban, isValidTrIban, normalizeIban } from "@/lib/property-managem
 import { exceedsBalance } from "@/lib/property-management/ledger";
 import { loadOwnerFinance } from "@/lib/property-management/load";
 import { isPaymentMethod, isPayoutMethod } from "@/lib/property-management/payments";
-import { recordCollectionCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import { recordCollectionCash, recordOwnerPayoutCash, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 
 /**
  * Mülk yönetimi (M1) server action'ları. Tümü `rentals` modülü kapısında; yazma yolları veritabanı RPC'leridir
@@ -262,8 +262,12 @@ export async function recordOwnerPayout(_prev: PmResult, fd: FormData): Promise<
   const outcome = typeof res.outcome === "string" ? res.outcome : "invalid_result";
   if (outcome !== "recorded") return { error: outcomeError(outcome) };
 
+  const payoutId = String(res.payout_id ?? "");
+  const info = payoutId
+    ? await recordOwnerPayoutCash(supabase, { accountId: String(fd.get("account_id") ?? ""), payoutId, amount: amount.value, date: paidOn, title: "Mülk sahibi hakediş ödemesi", counterparty: finance.agreement.accountHolder })
+    : null;
   refresh(gate.tenantId, rentalId);
-  return { ok: true, id: String(res.payout_id ?? "") };
+  return { ok: true, id: payoutId, info: info ?? undefined };
 }
 
 /** Mülk sahibi ödemesi iptali (silinmez; neden zorunlu). */
@@ -284,6 +288,7 @@ export async function voidOwnerPayout(input: { payoutId: string; rentalId: strin
   }
   const outcome = typeof asObject(data).outcome === "string" ? String(asObject(data).outcome) : "invalid_result";
   if (outcome !== "voided") return { error: outcomeError(outcome) };
+  await voidCollectionCash(supabase, "owner_payout", input.payoutId, "Mülk sahibi ödemesi iptal edildi");
 
   refresh(gate.tenantId, input.rentalId);
   return { ok: true };

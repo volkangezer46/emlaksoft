@@ -5,7 +5,7 @@ import { FilterDate, FilterGrid, FilterSelect, KpiStrip, ListPager, ListToolbar,
 import { buildActiveChips, isoDateParam, pageWindow, parsePage, uuidParam } from "@/components/ui/list-kit/list-logic";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { formatDateTr } from "@/lib/format";
-import { CASH_CATEGORIES, cashCategoryLabel, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
+import { CASH_CATEGORIES, cashCategoryLabel, OWNER_PAYOUT_CATEGORY, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { ENTRY_PAGE_SIZE, loadCashEntries, loadCashSummary, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney, sumByCurrency } from "@/lib/finance/cash/money";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -59,7 +59,7 @@ export async function HareketlerTab({
   const turRaw = val("tur");
   const tur = turRaw === "gelir" || turRaw === "gider" || turRaw === "transfer" ? turRaw : "";
   const categoryRaw = val("kategori");
-  const kategori = CASH_CATEGORIES.some((c) => c.value === categoryRaw) && (canSalary || categoryRaw !== SALARY_CATEGORY) ? categoryRaw : "";
+  const kategori = (CASH_CATEGORIES.some((c) => c.value === categoryRaw) || categoryRaw === OWNER_PAYOUT_CATEGORY) && (canSalary || categoryRaw !== SALARY_CATEGORY) ? categoryRaw : "";
   const from = isoDateParam(params.from);
   const to = isoDateParam(params.to);
   const q = val("q").trim().slice(0, 60);
@@ -102,6 +102,7 @@ export async function HareketlerTab({
   const categoryOptions = [
     { value: "", label: "Tümü" },
     ...CASH_CATEGORIES.filter((c) => canSalary || c.value !== SALARY_CATEGORY).map((c) => ({ value: c.value, label: c.label })),
+    { value: OWNER_PAYOUT_CATEGORY, label: cashCategoryLabel(OWNER_PAYOUT_CATEGORY) },
   ];
 
   return (
@@ -314,6 +315,7 @@ const SOURCE_LABEL: Record<string, string> = {
   commission: "Komisyon tahsilatı",
   rent: "Kira tahsilatı",
   building: "Aidat tahsilatı",
+  owner_payout: "Mülk sahibi ödemesi",
   due: "Aidat",
   recurring: "Düzenli ödeme",
   import: "Ekstreden",

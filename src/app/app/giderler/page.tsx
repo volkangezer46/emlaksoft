@@ -33,7 +33,7 @@ import { HareketlerTab } from "./_tabs/hareketler";
 import { KasaBankaTab } from "./_tabs/kasa-banka";
 import { DuzenliTab } from "./_tabs/duzenli";
 import { PendingApprovalsCard } from "./_tabs/pending-card";
-import { ManagementFeeCard } from "./_tabs/management-fee-card";
+import { ManagementFeeCard, OwnerPayoutsCard } from "./_tabs/management-fee-card";
 import { canHandleSalary } from "@/lib/finance/cash/categories";
 import { isUuid } from "@/lib/finance/cash/input";
 import { loadAccountsWithBalances, loadCashSummary } from "@/lib/finance/cash/load";
@@ -307,9 +307,14 @@ export default async function GiderlerPage({
         </Suspense>
       ) : null}
       {tenantId && (perms.rentals?.includes("edit") ?? false) ? (
-        <Suspense fallback={null}>
-          <ManagementFeeCard supabase={supabase} tenantId={tenantId} today={today} />
-        </Suspense>
+        <>
+          <Suspense fallback={null}>
+            <ManagementFeeCard supabase={supabase} tenantId={tenantId} today={today} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <OwnerPayoutsCard supabase={supabase} tenantId={tenantId} today={today} />
+          </Suspense>
+        </>
       ) : null}
 
       <KpiStrip items={kpis} />
