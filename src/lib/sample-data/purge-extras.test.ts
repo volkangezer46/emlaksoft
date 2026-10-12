@@ -40,6 +40,7 @@ describe("purgeSampleModuleData (RPC'nin bilmediği örnek kayıtlar)", () => {
     expect(rep.failed).toEqual([]);
     expect(calls.map((c) => `${c.op}:${c.table}`)).toEqual([
       "update:rentals",
+      "delete:fsbo_leads",
       "delete:buildings",
       "delete:league_challenges",
       "delete:advisor_specialties",
@@ -52,7 +53,7 @@ describe("purgeSampleModuleData (RPC'nin bilmediği örnek kayıtlar)", () => {
     for (const c of calls) {
       expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["tenant_id", "t-1"]))).toBe(true);
     }
-    const [rentals, buildings, league, specialties, regions, ...finance] = calls;
+    const [rentals, , buildings, league, specialties, regions, ...finance] = calls;
     for (const c of [specialties!, regions!, ...finance]) {
       expect(c.filters.some(([k, a]) => k === "eq" && JSON.stringify(a) === JSON.stringify(["is_sample", true]))).toBe(true);
     }
@@ -68,6 +69,36 @@ describe("purgeSampleModuleData (RPC'nin bilmediği örnek kayıtlar)", () => {
     expect((await purgeSampleModuleData(missing.db, "t-1")).failed).toEqual([]);
     const broken = recordingDb({ league_challenges: { code: "XX000", message: "boom" } });
     expect((await purgeSampleModuleData(broken.db, "t-1")).failed).toEqual(["league_challenges"]);
+  });
+});
+
+describe("FSBO örnek adayları", () => {
+  const eq = (c: Call, k: string, v: unknown) => c.filters.some(([f, a]) => f === "eq" && JSON.stringify(a) === JSON.stringify([k, v]));
+
+  it("fsbo_leads yalnız tenant_id ve is_sample=true süzgeciyle silinir; gerçek kayda dokunulmaz", async () => {
+    const { db, calls } = recordingDb();
+    await purgeSampleModuleData(db, "t-1");
+    const fsbo = calls.filter((c) => c.table === "fsbo_leads");
+    expect(fsbo).toHaveLength(1);
+    expect(fsbo[0]!.op).toBe("delete");
+    expect(fsbo[0]!.filters.filter(([k]) => k === "eq").map(([, a]) => a)).toEqual([["tenant_id", "t-1"], ["is_sample", true]]);
+    expect(fsbo.some((c) => eq(c, "is_sample", false))).toBe(false);
+    expect(calls.some((c) => c.table === "fsbo_do_not_call")).toBe(false);
+  });
+
+  it("fsbo hatası failed listesine düşer, diğer adımlar sürer", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db, calls } = recordingDb({ fsbo_leads: { code: "XX000", message: "boom" } });
+    const rep = await purgeSampleModuleData(db, "t-1");
+    expect(rep.failed).toEqual(["fsbo_leads"]);
+    expect(calls.some((c) => c.table === "expense_budgets")).toBe(true);
+  });
+
+  it("tablo yoksa (42P01 / PGRST205) failed'e girmez", async () => {
+    for (const code of ["42P01", "PGRST205"]) {
+      const { db } = recordingDb({ fsbo_leads: { code, message: "missing" } });
+      expect((await purgeSampleModuleData(db, "t-1")).failed).toEqual([]);
+    }
   });
 });
 

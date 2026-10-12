@@ -16,8 +16,11 @@ import { SAMPLE_MARKER } from "@/lib/sample-data/markers";
  *     Hesap silinince kalan hareket/kural/oluşum/ekstre kayıtları ON DELETE CASCADE ile gider; gerçek hesaba yazılmış örnek
  *     hareket ayrıca silinir. Gerçek (is_sample=false) hiçbir finans satırına dokunulmaz.
  *
+ *  6. Örnek Sahibinden ilan adayları (`fsbo_leads.is_sample`): gözlemler ve etkinlikler lead_id ON DELETE CASCADE ile gider,
+ *     `tasks.fsbo_lead_id` ON DELETE SET NULL. `fsbo_do_not_call` ofis geneli listedir (is_sample yok): DOKUNULMAZ.
+ *
  * Kendiliğinden temizlenenler (ekstra adım gerekmez): kira tahsilat/sözleşme/hakediş/yansıtma (rentals kaskatı), tapu süreci adımları
- * (deals kaskatı), ilan analizi (properties kaskatı), örnek giderler (is_sample).
+ * (deals kaskatı), ilan analizi (properties kaskatı), FSBO gözlem ve etkinliği (fsbo_leads kaskatı), örnek giderler (is_sample).
  * Temizlenmeyen (bilinçli): lig ayarı (boş kural = varsayılan; zararsız).
  */
 export type PurgeExtrasReport = { deleted: Record<string, number>; failed: string[] };
@@ -40,6 +43,7 @@ export async function purgeSampleModuleData(db: SupabaseClient, tenantId: string
   await step("rentals.deal_id", () =>
     db.from("rentals").update({ deal_id: null }, { count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true).not("deal_id", "is", null),
   );
+  await step("fsbo_leads", () => db.from("fsbo_leads").delete({ count: "exact" }).eq("tenant_id", tenantId).eq("is_sample", true));
   await step("buildings", () => db.from("buildings").delete({ count: "exact" }).eq("tenant_id", tenantId).like("notes", like));
   await step("league_challenges", () => db.from("league_challenges").delete({ count: "exact" }).eq("tenant_id", tenantId).like("description", like));
   // Örnek danışman uzmanlık/bölge satırları (20261010000800 is_sample). Havuz kayıtları ve olayları örnek portföyle birlikte kaskatlanır.
