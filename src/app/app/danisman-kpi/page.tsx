@@ -87,11 +87,8 @@ export default async function DanismanKpiPage({
 }) {
   const sp = (await searchParams) ?? {};
   const kiyas = sp.gorunum === "kiyas";
-  // Kıyas görünümü eski /app/ekip/kiyas paket kapısını korur.
-  const { tenantId, userId, perms, role } = await requireModulePage(
-    "reports",
-    kiyas ? "/app/ekip/kiyas" : "/app/danisman-kpi",
-  );
+  // Karşılaştır görünümü eski /app/ekip/kiyas ile aynı paket kilidini (professional) taşır.
+  const { tenantId, userId, perms, role } = await requireModulePage("reports", "/app/danisman-kpi");
   if (kiyas) {
     return (
       <div className="space-y-5">
