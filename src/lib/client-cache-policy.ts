@@ -27,7 +27,7 @@ export const PREFETCH_SLOT_MS = 700;
 export const REWARM_DELAY_MS = 1_500;
 export const REWARM_MIN_GAP_MS = 10_000;
 /** Liste satırlarında görünür alanda tam önceden yüklenen ilk detay bağlantısı sayısı. */
-export const VIEWPORT_PREFETCH_BUDGET = 2;
+export const VIEWPORT_PREFETCH_BUDGET = 4;
 
 export type ArrivalDecision = "mark" | "fresh" | "refresh";
 
@@ -75,5 +75,5 @@ export function networkAllowsPrefetch(conn: NetworkInfo | null | undefined): boo
   return !/^(slow-)?(2g|3g)$/.test(conn.effectiveType ?? "");
 }
 
-/** Boşta tam önceden yükleme oturum başına en çok bu kadar adres (Supabase API yükü — 2026-10-11 canlı tıkanma dersi). */
-export const IDLE_PREFETCH_SESSION_CAP = 4;
+/** Boşta tam önceden yükleme oturum başına en çok bu kadar adres (= rolün menü merkezleri, ≤10). 2026-10-11 tıkanmasında 4 idi; Supabase işlem gücü yükseltildi (2026-10-12), eşzamanlılık 2 + 700 ms aralık + toplu yeniden ısıtma YOK korunur. */
+export const IDLE_PREFETCH_SESSION_CAP = 10;

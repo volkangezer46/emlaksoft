@@ -38,13 +38,14 @@ import {
   TICKET_STATUS_LABEL,
   type TicketListFilters,
 } from "./ticket-list-model";
+import { Combobox } from "@/components/ui/combobox";
 
 const STATUS_COLOR: Record<string, string> = {
   open: "var(--brand-500)",
   in_progress: "var(--cyan-400)",
   waiting: "var(--amber-400)",
   resolved: "var(--mint-500)",
-  closed: "rgba(10,34,71,0.25)",
+  closed: "color-mix(in srgb, var(--ink-950) 25%, transparent)",
 };
 
 const SLA_FILTER_LABEL: Record<string, string> = {
@@ -651,11 +652,18 @@ export default async function AdminTicketsPage({
 
           <div>
             <label htmlFor="ticket-assignee" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Atanan</label>
-            <select id="ticket-assignee" name="atanan" defaultValue={filters.atanan ?? ""} className="focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-xs font-semibold text-ink-950 outline-none focus:border-brand-400">
-              <option value="">Tüm personel</option>
-              <option value="atanmadi">Atanmamış</option>
-              {staff.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
-            </select>
+            <Combobox
+              id="ticket-assignee"
+              name="atanan"
+              defaultValue={filters.atanan ?? ""}
+              options={[
+                { value: "atanmadi", label: "Atanmamış" },
+                ...staff.map((person) => ({ value: person.id, label: person.full_name ?? "İsimsiz" })),
+              ]}
+              placeholder="Tüm personel"
+              searchPlaceholder="Personel ara…"
+              emptyText="Eşleşen personel yok"
+            />
           </div>
 
           {filters.sla ? (

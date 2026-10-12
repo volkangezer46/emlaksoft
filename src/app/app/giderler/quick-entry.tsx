@@ -12,6 +12,7 @@ import Link from "@/components/ui/smart-link";
 import { Switch } from "@/components/ui/switch";
 import { categoriesFor, type CashDirection } from "@/lib/finance/cash/categories";
 import { cn } from "@/lib/utils";
+import { Combobox } from "@/components/ui/combobox";
 
 export type AccountOption = { id: string; name: string; kind: string; currency: string; scope: "office" | "user" };
 
@@ -167,18 +168,19 @@ function EntryDialog({
               </div>
 
               <FormField label="Hangi hesap?" htmlFor="qe-account" required hint={chosen?.scope === "user" ? "Kişisel hesap: yalnız siz görürsünüz, ofis kâr-zararına girmez." : undefined}>
-                <FormSelect id="qe-account" value={accountId} onChange={(e) => setAccountId(e.target.value)} required>
-                  {office.length > 0 ? (
-                    <optgroup label="Ofis hesapları">
-                      {office.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-                    </optgroup>
-                  ) : null}
-                  {personal.length > 0 ? (
-                    <optgroup label="Kişisel hesaplarım">
-                      {personal.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-                    </optgroup>
-                  ) : null}
-                </FormSelect>
+                <Combobox
+                id="qe-account"
+                value={accountId}
+                onValueChange={setAccountId}
+                required
+                options={[
+                  ...office.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Ofis hesabı" })),
+                  ...personal.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Kişisel hesabım" })),
+                ]}
+                placeholder="Hesap seçin"
+                searchPlaceholder="Hesap ara…"
+                emptyText="Eşleşen hesap yok"
+              />
               </FormField>
 
               {showDate ? (

@@ -20,6 +20,7 @@ import {
   type CustomerDeleteImpact,
 } from "@/app/actions/customers";
 import { describeDeleteImpact } from "./delete-impact";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Müşteri listesinde toplu seçim + toplu işlem.
@@ -286,19 +287,14 @@ export function CustomerBulkBar({
           <label htmlFor="bulk-assign-advisor" className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
             Danışman
           </label>
-          <select
+          <PersonSelect
             id="bulk-assign-advisor"
+            className="max-w-sm"
             value={advisor}
-            onChange={(e) => setAdvisor(e.target.value)}
-            className="w-full max-w-sm rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-          >
-            <option value="">Atamayı kaldır (danışmansız)</option>
-            {advisors.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.full_name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setAdvisor}
+            people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
+            emptyLabel="Atamayı kaldır (danışmansız)"
+          />
           <div className="mt-3 flex gap-2">
             <Button variant="secondary" size="sm" onClick={() => setPanel(null)}>Vazgeç</Button>
             <Button size="sm" loading={pending} onClick={handleAssign}>Ata</Button>

@@ -36,7 +36,7 @@ export const MODULE_LABELS: Record<AppModule, string> = {
   compliance:  "Uyum",
   campaigns:   "Kampanyalar",
   contracts:   "Sözleşmeler",
-  expenses:    "Giderler",
+  expenses:    "Muhasebe",
   offers:      "Teklifler",
   targets:     "Hedefler",
   open_house:  "Açık Ev",

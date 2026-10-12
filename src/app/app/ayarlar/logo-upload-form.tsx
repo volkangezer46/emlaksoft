@@ -17,7 +17,7 @@ export function LogoUploadForm({
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(currentUrl);
   const [pending, startTransition] = useTransition();
-  const [result, setResult] = useState<{ ok?: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ ok?: boolean; error?: string; warning?: string } | null>(null);
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -99,6 +99,7 @@ export function LogoUploadForm({
             <Check className="h-3.5 w-3.5" /> Kaydedildi
           </p>
         )}
+        {result?.warning && <p className="text-xs text-amber-700">{result.warning}</p>}
         {result?.error && (
           <p className="text-xs text-danger-500">{result.error}</p>
         )}

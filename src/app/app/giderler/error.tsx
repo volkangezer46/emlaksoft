@@ -3,5 +3,5 @@
 import { RouteError, type RouteErrorBoundaryProps } from "@/components/ui/route-error";
 
 export default function GiderlerError(props: RouteErrorBoundaryProps) {
-  return <RouteError {...props} moduleName="Giderler" />;
+  return <RouteError {...props} moduleName="Muhasebe" />;
 }

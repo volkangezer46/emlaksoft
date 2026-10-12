@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, UserRoundCog } from "lucide-react";
 import { deleteProperty, reassignProperty } from "@/app/actions/properties";
 import { useUndoDelete } from "@/components/app/record-ops-buttons";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export function DeletePropertyButton({ propertyId }: { propertyId: string }) {
   const [confirming, setConfirming] = useState(false);
@@ -75,17 +76,15 @@ export function ReassignProperty({
     <form action={reassignProperty} className="flex items-center gap-1.5">
       <input type="hidden" name="id" value={propertyId} />
       <UserRoundCog className="h-3.5 w-3.5 text-white/50" />
-      <select
+      <PersonSelect
         aria-label="Sorumlu danışman"
         name="assigned_to"
         defaultValue={currentAssignee ?? ""}
-        className="rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white outline-none [color-scheme:dark]"
-      >
-        <option value="">Atanmadı</option>
-        {members.map((m) => (
-          <option key={m.id} value={m.id}>{m.full_name}</option>
-        ))}
-      </select>
+        people={members.map((m) => ({ id: m.id, name: m.full_name }))}
+        emptyLabel="Atanmadı"
+        clearable={false}
+        className="w-auto min-w-[10rem] max-w-[14rem] border-white/15 bg-white/5 px-2 py-1 text-xs font-semibold text-white hover:border-white/30"
+      />
       <button type="submit" className="rounded-[var(--radius-control)] bg-white/10 px-2 py-1 text-xs font-bold text-white hover:bg-white/20">
         Ata
       </button>

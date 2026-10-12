@@ -7,7 +7,7 @@ import { assignPoolEntry } from "@/app/actions/listing-pool";
 import { assignFromPool } from "@/app/actions/office-center";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
-import { FormSelect } from "@/components/ui/form-controls";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type QuickSuggestion = { profileId: string; name: string; score: number; reason: string };
 export type QuickTarget = { kind: "pool"; entryId: string } | { kind: "property"; propertyId: string };
@@ -70,19 +70,15 @@ export function QuickAssign({
         <label className="sr-only" htmlFor={`qa-${target.kind === "pool" ? target.entryId : target.propertyId}`}>
           Başka danışman seç
         </label>
-        <FormSelect
+        <PersonSelect
           id={`qa-${target.kind === "pool" ? target.entryId : target.propertyId}`}
-          className="h-10 w-auto min-w-[12rem] px-3 py-1 text-sm"
+          className="min-w-[14rem]"
+          people={advisors.map((a) => ({ id: a.id, name: a.name }))}
+          featuredIds={suggestion ? [suggestion.profileId] : undefined}
+          emptyLabel="Başka danışman seç…"
           value={other}
-          onChange={(e) => setOther(e.target.value)}
-        >
-          <option value="">Başka danışman seç…</option>
-          {advisors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </FormSelect>
+          onValueChange={setOther}
+        />
         <Button
           type="button"
           variant="secondary"

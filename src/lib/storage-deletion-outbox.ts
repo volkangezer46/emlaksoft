@@ -120,6 +120,18 @@ async function currentMetadataReference(
     return { referenced: Boolean(data), error: null };
   }
 
+  if (job.bucket === "rent-receipts") {
+    const { data, error } = await admin
+      .from("rent_payment_notices")
+      .select("id")
+      .eq("tenant_id", job.tenant_id)
+      .eq("receipt_path", job.object_path)
+      .limit(1)
+      .maybeSingle();
+    if (error) return { referenced: false, error: `rent_receipt_reference_check:${error.code}` };
+    return { referenced: Boolean(data), error: null };
+  }
+
   if (job.bucket === "agent-photos") {
     const profileId = job.parent_id;
     if (!profileId) return { referenced: false, error: "missing_profile_parent" };
@@ -234,4 +246,21 @@ export async function processStorageDeletionOutbox(limit = 50): Promise<StorageD
   }
 
   return summary;
+}
+
+export type StorageDeletionQueueStats = { waiting: number; failed: number };
+
+/** Kuyruk derinliği (bekleyen + yeniden denenecek) ve kalıcı başarısız sayısı; heartbeat/izleme için. */
+export async function storageDeletionQueueStats(): Promise<StorageDeletionQueueStats> {
+  const admin = createAdminClient();
+  const [waiting, failed] = await Promise.all([
+    admin
+      .from("storage_deletion_outbox")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "retry", "processing"]),
+    admin.from("storage_deletion_outbox").select("id", { count: "exact", head: true }).eq("status", "failed"),
+  ]);
+  if (waiting.error) throw new Error(`storage deletion stats failed: ${waiting.error.code}`);
+  if (failed.error) throw new Error(`storage deletion stats failed: ${failed.error.code}`);
+  return { waiting: waiting.count ?? 0, failed: failed.count ?? 0 };
 }

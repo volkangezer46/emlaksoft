@@ -12,6 +12,7 @@ import { EmailInput } from "@/components/ui/email-input";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { Combobox } from "@/components/ui/combobox";
 
 /**
  * Hızlı davet (panel, popup değil): hesap açma + e-posta daveti MEVCUT ekip akışıdır (`createAdvisor`).
@@ -86,14 +87,15 @@ export function QuickInvitePanel({ roles, branches }: { roles: readonly string[]
             </FormSelect>
           </FormField>
           <FormField label="Şube" htmlFor="oc-inv-branch">
-            <FormSelect id="oc-inv-branch" name="branch_id" defaultValue="">
-              <option value="">Şubesiz</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </FormSelect>
+            <Combobox
+              id="oc-inv-branch"
+              name="branch_id"
+              defaultValue=""
+              options={branches.map((b) => ({ value: b.id, label: b.name }))}
+              placeholder="Şubesiz"
+              searchPlaceholder="Şube ara…"
+              emptyText="Eşleşen şube yok"
+            />
           </FormField>
           {error ? (
             <div className="sm:col-span-2">

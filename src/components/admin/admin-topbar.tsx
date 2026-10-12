@@ -27,7 +27,7 @@ import { SystemStatusChip } from "@/components/admin/system-status-chip";
 const QUICK: { label: string; href: string; icon: typeof Building2; module: PlatformModule }[] = [
   { label: "Yeni ofis aç", href: "/admin/tenants/yeni", icon: Plus, module: "sales" },
   { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
-  { label: "Abonelik & fatura", href: "/admin/billing", icon: CreditCard, module: "billing" },
+  { label: "Abonelikler", href: "/admin/billing", icon: CreditCard, module: "billing" },
   { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
   { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
 ];

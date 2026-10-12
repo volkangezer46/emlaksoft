@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, Scale } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FilterDate, FilterGrid, FilterSelect, KpiStrip, ListPager, ListToolbar, StatusPill, type KpiItem } from "@/components/ui/list-kit";
+import { FilterDate, FilterGrid, FilterSelect, KpiStrip, ListPager, ListToolbar, MobileCard, MobileCardList, StatusPill, type KpiItem } from "@/components/ui/list-kit";
 import { buildActiveChips, isoDateParam, pageWindow, parsePage, uuidParam } from "@/components/ui/list-kit/list-logic";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { formatDateTr } from "@/lib/format";
@@ -147,7 +147,13 @@ export async function HareketlerTab({
           />
         )
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
+        <>
+        <MobileCardList aria-label="Para hareketleri">
+          {entries.map((e) => (
+            <EntryCard key={e.id} entry={e} account={accountById.get(e.account_id)} nav={nav} today={today} canEdit={canEdit} canDelete={canDelete} canSalary={canSalary} />
+          ))}
+        </MobileCardList>
+        <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
           <table className="w-full min-w-[720px] text-sm">
             <caption className="sr-only">Para hareketleri</caption>
             <thead>
@@ -166,6 +172,7 @@ export async function HareketlerTab({
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <ListPager pathname={nav.base} params={pathParams} window={w} total={total} />
@@ -239,6 +246,67 @@ function EntryRow({
         ) : null}
       </td>
     </tr>
+  );
+}
+
+function EntryCard({
+  entry: e,
+  account,
+  today,
+  canEdit,
+  canDelete,
+  canSalary,
+  nav,
+}: {
+  nav: EntriesNav;
+  entry: CashEntry;
+  account: AccountWithBalance | undefined;
+  today: string;
+  canEdit: boolean;
+  canDelete: boolean;
+  canSalary: boolean;
+}) {
+  const personal = account?.owner_scope === "user";
+  const isTransfer = e.kind === "transfer";
+  const manual = e.source_type === "manual" && (e.kind === "income" || e.kind === "expense");
+  const mayEdit = manual && (personal || canEdit);
+  const mayVoid = personal || canDelete;
+  return (
+    <MobileCard>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words font-semibold text-text">{e.title}</p>
+          <p className="numeric mt-0.5 text-xs text-text-muted">{formatDateTr(e.entry_date)} · {cashCategoryLabel(e.category)}</p>
+        </div>
+        <p className={`numeric shrink-0 text-right font-bold ${isTransfer ? "text-text" : e.direction === "in" ? "text-success-strong" : "text-danger-strong"}`}>
+          {e.direction === "in" ? "+" : "−"}
+          {formatAccountMoney(e.amount, e.currency)}
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+        {account ? (
+          <Link href={`${nav.base}?sekme=${nav.sekme}&hesap=${account.id}`} className="font-medium text-accent-text hover:underline">{account.name}</Link>
+        ) : null}
+        {personal ? <StatusPill tone="neutral" dot={false}>Kişisel</StatusPill> : null}
+        {e.counterparty ? <span>· {e.counterparty}</span> : null}
+        {e.source_type !== "manual" ? <StatusPill tone="info" dot={false}>{SOURCE_LABEL[e.source_type] ?? e.source_type}</StatusPill> : null}
+        {e.document_url ? (
+          <a href={e.document_url} target="_blank" rel="noreferrer noopener" className="font-semibold text-accent-text hover:underline">Belge</a>
+        ) : null}
+      </div>
+      {mayEdit || mayVoid ? (
+        <div className="mt-2 flex justify-end border-t border-line pt-2">
+          <EntryRowActions
+            entry={{ id: e.id, direction: e.direction, amount: e.amount, date: e.entry_date, category: e.category, title: e.title, counterparty: e.counterparty, note: e.note }}
+            today={today}
+            canEdit={mayEdit}
+            canVoid={mayVoid}
+            canSalary={canSalary}
+            isTransfer={isTransfer}
+          />
+        </div>
+      ) : null}
+    </MobileCard>
   );
 }
 

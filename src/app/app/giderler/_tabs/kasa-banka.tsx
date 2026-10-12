@@ -184,12 +184,12 @@ function AccountCard({
 
       {recon !== undefined ? <ReconLine account={a} recon={recon} entriesHref={entriesHref} statementHref={statementHref} /> : null}
 
-      <div>
+      <div className="min-w-0">
         <p className="mb-1 text-xs font-semibold text-text-muted">Son hareketler</p>
         {recent.length === 0 ? (
           <p className="text-xs text-text-faint">Henüz hareket yok. Açılış: {formatDateTr(a.opening_date)}.</p>
         ) : (
-          <ul className="grid gap-1">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
             {recent.map((e) => (
               <li key={e.id}>
                 <Link href={entriesHref(a.id)} className="focus-ring flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-1.5 py-1 text-xs hover:bg-surface-hover">

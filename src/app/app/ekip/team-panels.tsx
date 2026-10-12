@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 import { createBranch, type TeamResult } from "@/app/actions/team";
+import { Combobox } from "@/components/ui/combobox";
 
 type Province = { id: string; name: string };
 
@@ -59,10 +60,16 @@ function AddBranchForm({ provinces, onDone }: { provinces: Province[]; onDone: (
       </div>
       <div>
         <label className="mb-1.5 block text-sm text-text-muted" htmlFor="province_id">İl</label>
-        <select id="province_id" name="province_id" defaultValue="" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-          <option value="">Seçiniz</option>
-          {provinces.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        <Combobox
+        id="province_id"
+        name="province_id"
+        defaultValue={""}
+        options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+        placeholder="Seçiniz"
+        searchPlaceholder="İl ara…"
+        emptyText="Eşleşen il yok"
+        className=""
+      />
       </div>
       {state.error ? <p className="text-sm font-medium text-danger-600 sm:col-span-2" role="alert">{state.error}</p> : null}
       <div className="hairline-t flex justify-end gap-2 pt-4 sm:col-span-2">

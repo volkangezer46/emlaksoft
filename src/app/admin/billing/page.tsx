@@ -183,7 +183,7 @@ export default async function AdminBillingPage({
   return (
     <div className="space-y-6">
       <AdminPageHeader
-        eyebrow="Abonelik & fatura"
+        eyebrow="Abonelikler"
         icon={CreditCard}
         title="Gelir operasyonu"
         art="invoice"

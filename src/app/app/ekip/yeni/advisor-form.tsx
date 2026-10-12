@@ -13,7 +13,7 @@ import { MODULE_LABELS } from "@/app/app/ayarlar/roller/role-permissions-matrix"
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { EmailInput } from "@/components/ui/email-input";
-import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { FormField, FormInput } from "@/components/ui/form-controls";
 import { PageHeader } from "@/components/ui/page-header";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -31,6 +31,7 @@ import {
 } from "./advisor-tabs";
 import { RegionsField, SpecialtiesField } from "./advisor-extra-fields";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { Combobox } from "@/components/ui/combobox";
 
 export type RolePermissionSummary = {
   role: string;
@@ -271,10 +272,15 @@ export function AdvisorForm({
         </fieldset>
         {selected ? <RoleMatrix summary={selected} /> : null}
         <FormField label="Şube" htmlFor="adv-branch" className="sm:col-span-2">
-          <FormSelect name="branch_id" defaultValue="">
-            <option value="">Şube atanmadı</option>
-            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </FormSelect>
+          <Combobox
+          name="branch_id"
+          defaultValue={""}
+          options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          placeholder="Şube atanmadı"
+          searchPlaceholder="Şube ara…"
+          emptyText="Eşleşen şube yok"
+          id="adv-branch"
+        />
         </FormField>
         <div className="space-y-2 sm:col-span-2">
           <InfoRow

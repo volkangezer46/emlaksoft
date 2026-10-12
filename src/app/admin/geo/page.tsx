@@ -6,6 +6,7 @@ import { attachUsage, listAdminRows } from "@/lib/geo/admin-store";
 import { NewEntityForm } from "./new-entity-form";
 import { GeoSyncAutoRefresh } from "./geo-sync-auto-refresh";
 import { ProvinceRow, type ProvinceRowData } from "./province-row";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 
 export default async function AdminGeoPage({
@@ -73,7 +74,7 @@ export default async function AdminGeoPage({
         </div>
         {canWrite ? <NewEntityForm level="province" /> : null}
         {syncResult.error ? (
-          <div className="border-b border-amber-300/40 bg-amber-500/[0.06] px-5 py-3 text-xs font-medium text-amber-800">
+          <div className="border-b border-warning-line bg-warning-soft px-5 py-3 text-xs font-medium text-warning-strong">
             İl bazlı tarama altyapısı bu ortamda henüz etkin değil. Mevcut coğrafya kayıtları görüntülenmeye devam eder.
           </div>
         ) : null}
@@ -82,7 +83,13 @@ export default async function AdminGeoPage({
             <ProvinceRow key={p.id} province={p} />
           ))}
           {rows.length === 0 ? (
-            <p className="px-5 py-12 text-center text-sm text-text-muted">Eşleşen il bulunamadı.</p>
+            <EmptyState
+              variant="compact"
+              icon={MapPin}
+              title={query ? "Eşleşen il bulunamadı" : "Henüz il kaydı yok"}
+              description={query ? `“${query}” için sonuç yok. Yazımı kontrol edin ya da aramayı temizleyin.` : "Coğrafya verisi yüklendiğinde iller burada listelenir."}
+              action={query ? { href: "/admin/geo", label: "Aramayı temizle" } : undefined}
+            />
           ) : null}
         </div>
       </div>
