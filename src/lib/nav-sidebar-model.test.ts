@@ -13,10 +13,10 @@ const labels = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs.map(
 const pagesOf = (role: AppRole, hubId: string) => hubNav(accessibleOf(role), { role }).hubs.find((h) => h.id === hubId)?.pages ?? [];
 
 describe("yan menü görünür yüzeyi (hubNav)", () => {
-  it("ofis sahibi / genel müdür / şube müdürü: 10 açık satır", () => {
+  it("ofis sahibi / genel müdür / şube müdürü: 11 açık satır", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) {
       // Şube müdürünün muhasebe (expenses) yetkisi yok: Muhasebe satırı onun düzeninde yer almaz.
-      const want = ["Bugün", "Müşteriler", "Portföyler", "Havuz ve atama", "Anlaşmalar", "Komisyon", "Muhasebe", "Mülk yönetimi", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
+      const want = ["Bugün", "Müşteriler", "Portföyler", "Havuz ve atama", "Sahibinden ilanlar", "Anlaşmalar", "Komisyon", "Muhasebe", "Mülk yönetimi", "Ekibim", "Raporlar"].filter((l) => role !== "branch_manager" || l !== "Muhasebe");
       expect(labels(role), role).toEqual(want);
       // Alt sabit satırlar rolün varsayılan yetkisine göre süzülür (şube müdüründe ayar/abonelik izni yoktur).
       const dock = hubNav(accessibleOf(role), { role }).dock.map((h) => h.label);

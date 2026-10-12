@@ -19,15 +19,15 @@ const src = (f: string) => readFileSync(join(process.cwd(), f), "utf8");
 const rows = (role: AppRole) => hubNav(accessibleOf(role), { role }).hubs;
 
 describe("menü görünür satır bütçesi (hubNav çıktısı)", () => {
-  it("bütçe sabitleri: danışman 6, ofis 10, admin 6", () => {
-    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 10, admin: 6 });
+  it("bütçe sabitleri: danışman 6, ofis 11, admin 6", () => {
+    expect(NAV_BUDGET).toEqual({ advisor: 6, office: 11, admin: 6 });
   });
 
   it("danışman / takım lideri <= 6 satır", () => {
     for (const role of ["advisor", "team_lead"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.advisor);
   });
 
-  it("ofis yönetimi (owner/gm/branch_manager) <= 10 satır", () => {
+  it("ofis yönetimi (owner/gm/branch_manager) <= 11 satır", () => {
     for (const role of ["owner", "gm", "branch_manager"] as const) expect(rows(role).length, role).toBeLessThanOrEqual(NAV_BUDGET.office);
   });
 

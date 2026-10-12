@@ -20,10 +20,10 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     }
   });
 
-  it("satır sayıları: ofis yönetimi 10, danışman 6, muhasebe 6, çağrı 4; bütçeyi aşmaz", () => {
-    expect(NAV_BY_ROLE.owner.hubs).toHaveLength(10);
-    expect(NAV_BY_ROLE.gm.hubs).toHaveLength(10);
-    expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(9);
+  it("satır sayıları: ofis yönetimi 11, danışman 6, muhasebe 6, çağrı 4; bütçeyi aşmaz", () => {
+    expect(NAV_BY_ROLE.owner.hubs).toHaveLength(11);
+    expect(NAV_BY_ROLE.gm.hubs).toHaveLength(11);
+    expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(10);
     expect(NAV_BY_ROLE.advisor.hubs).toHaveLength(6);
     expect(NAV_BY_ROLE.team_lead.hubs).toHaveLength(6);
     expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(6);

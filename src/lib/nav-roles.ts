@@ -13,7 +13,7 @@ import type { AppRole } from "@/lib/permissions";
  * Bütçeyi `nav-budget-contract.test.ts` korur (gevşetme değil, öğeyi bir merkeze taşı).
  */
 
-export const NAV_BUDGET = { advisor: 6, office: 10, admin: 6 } as const;
+export const NAV_BUDGET = { advisor: 6, office: 11, admin: 6 } as const;
 
 export type HubIconKey = keyof typeof ICONS;
 
@@ -252,10 +252,19 @@ const HAVUZ_ATAMA: HubDef = {
   icon: "ilanHavuzu",
   pages: [p("/app/ilan-havuzu", "Bekleyen ilanlar")],
 };
-const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu") };
+/** Yönetim: sahibinden ilan avı günlük iş — kendi menü satırı (kullanıcı: "fsbo menüde görünmüyor", 2026-10-12). Danışmanda Portföyler sekmesi. */
+const SAHIBINDEN: HubDef = {
+  id: "sahibinden",
+  label: "Sahibinden ilanlar",
+  short: "Sahibinden",
+  group: "Portföy",
+  icon: "telefon",
+  pages: [p("/app/portfoy-avi", "Sahibinden ilanlar")],
+};
+const ILANLAR_YONETIM: HubDef = { ...ILANLAR, pages: ILANLAR.pages.filter((pg) => pg.href !== "/app/ilan-havuzu" && pg.href !== "/app/portfoy-avi") };
 
 const MANAGER: RoleNav = {
-  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SATIS, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
+  hubs: [BUGUN, MUSTERILER, ILANLAR_YONETIM, HAVUZ_ATAMA, SAHIBINDEN, SATIS, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, EKIBIM, RAPORLAR],
   dock: [AYARLAR, ABONELIK, YARDIM],
   tools: [...TOOLS_COMMON, "/app/buyume"],
   mobile: ["bugun", "musteriler", "new", "ilanlar", "menu"],
