@@ -9,6 +9,7 @@ import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { gateIysRecipient } from "@/lib/iys/gate";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
+import { FSBO_ALLOWED_ACTIONS, assignFsboByAutomation, collectFsboNoContactPage, fsboTaskLink } from "@/lib/prospecting/automation-source";
 import type { FeatureKey } from "@/lib/modules/registry";
 import {
   AUTOMATION_LIST_PAGE,
@@ -59,18 +60,21 @@ export type AutomationEventTrigger =
   | "property_matched"
   | "offer_received"
   | "deal_won"
-  | "deal_lost";
+  | "deal_lost"
+  | "new_fsbo_lead";
 
 /** Tetikleyicisi kapatılabilir bir modüle ait olaylar: modül kapalıyken tetiklenmez. */
 const EVENT_TRIGGER_FEATURE: Partial<Record<AutomationEventTrigger, FeatureKey>> = {
   offer_received: "offers",
+  new_fsbo_lead: "prospecting",
 };
 
 export type AutomationScheduledTrigger =
   | "no_contact_days"
   | "auth_expiring"
   | "appointment_missed"
-  | "demand_stale";
+  | "demand_stale"
+  | "fsbo_no_contact_days";
 
 type AutomationRow = {
   id: string;
@@ -84,7 +88,7 @@ type AutomationRow = {
 };
 
 export type AutomationEventPayload = {
-  entityType: "customer" | "demand" | "property" | "offer" | "deal" | "appointment";
+  entityType: "customer" | "demand" | "property" | "offer" | "deal" | "appointment" | "fsbo_lead";
   entityId: string;
   /** Bildirim/görev metinlerinde görünen insan-okur etiket (müşteri adı, portföy kodu vb.) */
   label?: string | null;
@@ -117,6 +121,7 @@ const SCHEDULED_TRIGGERS: AutomationScheduledTrigger[] = [
   "auth_expiring",
   "appointment_missed",
   "demand_stale",
+  "fsbo_no_contact_days",
 ];
 
 /** Aynı kayıt için aynı otomasyonun yeniden tetiklenebilmesi için geçmesi gereken süre */
@@ -189,6 +194,8 @@ function hrefForEntity(payload: AutomationEventPayload): string {
       return "/app/anlasmalar";
     case "appointment":
       return "/app/randevular";
+    case "fsbo_lead":
+      return `/app/portfoy-avi/${payload.entityId}`;
   }
 }
 
@@ -243,6 +250,12 @@ async function executeAction(
   const type = String(action.type ?? "");
   const cfg = action.config ?? {};
 
+  // Sahibinden ilanlar (FSBO): ilan sahibi aday henüz müşteri değildir, iletişim izni yoktur. Yalnız görev / atama / bildirim
+  // çalışır; SMS, WhatsApp, etiket ve durum değişikliği KAPALIDIR (sözleşme testi korur).
+  if (payload.entityType === "fsbo_lead" && !FSBO_ALLOWED_ACTIONS.has(type)) {
+    return { type, result: "skip", detail: "fsbo_action_closed" };
+  }
+
   try {
     switch (type) {
       case "create_task": {
@@ -282,6 +295,7 @@ async function executeAction(
           customer_id: payload.customerId ?? null,
           property_id: payload.propertyId ?? null,
           deal_id: payload.dealId ?? null,
+          ...fsboTaskLink(payload.entityType, payload.entityId),
         });
         if (error) return { type, result: "error", detail: error.message };
         return { type, result: "ok" };
@@ -358,6 +372,11 @@ async function executeAction(
         //  - müşteri bağlamı varsa customers.assigned_to
         //  - portföy olayıysa properties.assigned_to
         //  - ikisi de yoksa yapılacak kalıcı atama yok → skip (+log)
+        if (payload.entityType === "fsbo_lead") {
+          const err = await assignFsboByAutomation(admin, { tenantId: automation.tenant_id, leadId: payload.entityId, assigneeId, nowIso: new Date().toISOString() });
+          if (err) return { type, result: "error", detail: err };
+          return { type, result: "ok", detail: "fsbo_assigned" };
+        }
         if (payload.customerId) {
           const { error } = await admin
             .from("customers")
@@ -695,6 +714,23 @@ async function collectScheduledCandidatePage(
       };
     }
 
+    case "fsbo_no_contact_days": {
+      // Açık ilan adaylarından, N gündür aranmayanlar (sorgu prospecting/automation-source.ts'te; yalnız görev/atama/bildirim).
+      const days = cfgNumber(cfg, ["days"], 7);
+      const cutoff = new Date(now - days * DAY_MS).toISOString();
+      const res = await collectFsboNoContactPage(admin, { tenantId: automation.tenant_id, cutoffIso: cutoff, afterId, pageSize: PAGE });
+      return {
+        page: { rawCount: res.rawCount, lastId: res.lastId },
+        payloads: res.rows.map((l) => ({
+          entityType: "fsbo_lead" as const,
+          entityId: l.id,
+          label: l.title,
+          assignedTo: l.assignedTo,
+          fields: { status: l.status, price: l.price, contact_attempts: l.contactAttempts },
+        })),
+      };
+    }
+
     case "appointment_missed": {
       // 2 saat tolerans; en fazla 7 gün geriye bak
       const graceEnd = new Date(now - 2 * 3_600_000).toISOString();
@@ -788,6 +824,7 @@ export async function runScheduledAutomations(options: { deadlineMs?: number } =
       break;
     }
     if (isDisabledFor(disabledModules, row.tenant_id, "automation")) continue;
+    if (row.trigger_type === "fsbo_no_contact_days" && isDisabledFor(disabledModules, row.tenant_id, "prospecting")) continue;
     summary.automationsEvaluated += 1;
     try {
       let fired = 0;

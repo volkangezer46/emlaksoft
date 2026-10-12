@@ -21,6 +21,8 @@ export const TRIGGER_LABELS: Record<string, string> = {
   auth_expiring:      "Yetki belgesi doluyor",
   appointment_missed: "Randevu kaçırıldı",
   demand_stale:       "Hareketsiz talep",
+  new_fsbo_lead:      "Yeni sahibinden ilan",
+  fsbo_no_contact_days: "Sahibinden ilan: iletişimsizlik",
   authority_expiring: "Yetki belgesi bitiyor",
   portal_stale:       "Portal teyidi gecikti",
   demand_created:     "Yeni talep oluştu",
@@ -91,6 +93,9 @@ export const TRIGGER_OPTIONS: TriggerOption[] = [
   { value: "appointment_missed", label: "Randevu kaçırıldı",      description: "Saati 2 saatten fazla geçen, sonuçlanmamış randevular için çalışır (günlük tarama)." },
   { value: "demand_stale",       label: "Hareketsiz talep",       description: "Belirlenen gün boyunca güncellenmeyen açık talepler için çalışır (günlük tarama).",
     daysConfig: { key: "days", label: "Kaç gün hareketsizlik", defaultValue: 30 } },
+  { value: "new_fsbo_lead",      label: "Yeni sahibinden ilan",   description: "Sahibinden ilanlar listesine yeni bir ilan eklendiğinde tetiklenir (yalnız görev, atama ve bildirim; mesaj gönderilmez)." },
+  { value: "fsbo_no_contact_days", label: "Sahibinden ilan: iletişimsizlik", description: "Belirlenen gün boyunca aranmayan açık ilan sahipleri için çalışır (günlük tarama; yalnız görev, atama ve bildirim).",
+    daysConfig: { key: "days", label: "Kaç gün aranmadı", defaultValue: 7 } },
 ];
 
 /** Koşul operatörleri — engine'deki evaluateConditions ile birebir. */
@@ -139,6 +144,14 @@ export const TRIGGER_CONDITION_FIELDS: Record<string, { value: string; label: st
   no_contact_days:    [{ value: "full_name", label: "Müşteri adı", hint: "'içerir' ile filtrelenebilir" }],
   auth_expiring:      [{ value: "status", label: "Portföy durumu", hint: "ör. active" }],
   appointment_missed: [{ value: "status", label: "Randevu durumu", hint: "pending / confirmed" }],
+  new_fsbo_lead:      [
+    { value: "transaction_type", label: "İşlem türü", hint: "sale / rent" },
+    { value: "price",            label: "Fiyat", hint: "Sayısal karşılaştırma" },
+  ],
+  fsbo_no_contact_days: [
+    { value: "status",           label: "İlan durumu", hint: "yeni / arandi / randevu" },
+    { value: "contact_attempts", label: "Arama denemesi", hint: "Sayısal karşılaştırma" },
+  ],
   demand_stale:       [
     { value: "status",           label: "Talep durumu", hint: "new / active" },
     { value: "transaction_type", label: "İşlem türü" },
@@ -161,8 +174,8 @@ export const DEMAND_STATUS_OPTIONS = [
 /** Varsayılan aşama adları (tek kaynak); ofisin özel adları sihirbaza `stageNames` ile gelir. */
 export const DEAL_STAGE_OPTIONS = DEAL_STAGES.map((value) => ({ value, label: stageLabelMap(defaultStageLabels())[value] }));
 
-/** Müşteri bağlamı olmayan tetikleyiciler — SMS/WhatsApp/etiket burada anlamsız. */
-const NO_CUSTOMER_TRIGGERS = new Set(["new_property", "auth_expiring"]);
+/** Müşteri bağlamı olmayan tetikleyiciler — SMS/WhatsApp/etiket burada anlamsız (FSBO tetikleyicilerinde mesaj KAPALI). */
+const NO_CUSTOMER_TRIGGERS = new Set(["new_property", "auth_expiring", "new_fsbo_lead", "fsbo_no_contact_days"]);
 
 export type ActionOption = { value: string; label: string; description: string };
 

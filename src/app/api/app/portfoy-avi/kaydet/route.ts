@@ -1,3 +1,4 @@
+import { dispatchNewFsboLead } from "@/lib/prospecting/automation-dispatch";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
   const res = await saveFsboLead({ db, tenantId: gate.tenantId, userId: gate.userId, role: gate.role }, parsed.data);
   if (!res.ok) return NextResponse.json({ ok: false, error: "save_failed", message: res.error }, { status: 502, headers: NO_STORE });
   revalidatePath("/app/portfoy-avi");
+  if (res.created) dispatchNewFsboLead({ tenantId: gate.tenantId, leadId: res.id, title: parsed.data.title ?? null, assignedTo: gate.userId, fields: { transaction_type: parsed.data.transactionType, price: parsed.data.price ?? null } });
   return NextResponse.json(
     {
       ok: true,

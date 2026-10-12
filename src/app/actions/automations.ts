@@ -162,6 +162,7 @@ const TRIGGER_TYPES = [
   "new_customer", "new_demand", "new_property", "property_matched",
   "no_contact_days", "offer_received", "deal_won", "deal_lost",
   "auth_expiring", "appointment_missed", "demand_stale",
+  "new_fsbo_lead", "fsbo_no_contact_days",
 ] as const;
 
 /** automation_action enum'unun bugünkü değerleri. */
@@ -176,6 +177,7 @@ const DEMAND_STATUSES = ["new", "active", "matched", "closed"] as const;
 /** Zaman tabanlı tetikleyicilerin trigger_config gün anahtarı. */
 const TRIGGER_DAY_KEYS: Record<string, string> = {
   no_contact_days: "days",
+  fsbo_no_contact_days: "days",
   demand_stale: "days",
   auth_expiring: "days_before",
 };
@@ -272,6 +274,9 @@ async function parseWizardForm(
       return {
         error: "WhatsApp otomasyonu, onaylı Meta şablon adı ve dil sözleşmesi eklenene kadar kullanılamaz.",
       };
+    }
+    if (triggerType.includes("fsbo") && !["create_task", "assign_to_staff", "notify_manager", "send_notification"].includes(type)) {
+      return { error: "Sahibinden ilan kurallarında yalnız görev, atama ve bildirim eylemleri kullanılabilir." };
     }
     const src = (a.config ?? {}) as Record<string, unknown>;
     const config: Record<string, unknown> = {};
