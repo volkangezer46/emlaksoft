@@ -1,7 +1,7 @@
 import "server-only";
 import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
-import { closeCallPriorityForCustomer } from "@/lib/insights/store";
+import { closeCallPriorityForCustomer, closeFsboLeadInsights } from "@/lib/insights/store";
 
 /**
  * Olay anında kapatma: arama (`calls`) ya da iletişim kaydı (`communications`) eklendiğinde müşterinin açık "Bugün ara"
@@ -23,4 +23,16 @@ export async function closeCallPriorityOnContact(customerId: string | null | und
 export function closeCallPriorityAfterContact(customerId: string | null | undefined): void {
   if (!customerId) return;
   afterSafe(() => closeCallPriorityOnContact(customerId), "call_priority kapatma");
+}
+
+/** FSBO ilanı için temas/durum değişince o ilana bağlı açık kartı kapatır. ASLA fırlatmaz. */
+export function closeFsboInsightAfterContact(leadId: string | null | undefined): void {
+  if (!leadId) return;
+  afterSafe(async () => {
+    try {
+      await closeFsboLeadInsights(await createClient(), leadId);
+    } catch (e) {
+      console.error("close-fsbo-insight", e instanceof Error ? e.message : "hata");
+    }
+  }, "fsbo kartı kapatma");
 }

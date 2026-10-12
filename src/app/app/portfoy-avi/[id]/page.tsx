@@ -4,7 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
+import { DAY_MS, now, trDayKey, trDayStartMs } from "@/lib/clock";
 import { formatTry } from "@/lib/format";
 import { MANAGER_ROLES } from "@/lib/team/assignable-roles";
 import { buildCallScript, CALL_NOTICE } from "@/lib/prospecting/script";
@@ -13,6 +13,9 @@ import { OUTCOME_LABELS, PORTAL_LABELS, type FsboOutcome } from "@/lib/prospecti
 import { FSBO_ROW_SELECT, type FsboRow } from "@/lib/prospecting/load";
 import { toCardData } from "@/lib/prospecting/view";
 import type { Db } from "@/lib/prospecting/store";
+import { countOpenBuyerDemandsInDistrict } from "@/lib/prospecting/demand-count";
+import { evaluateAuthorization } from "@/lib/prospecting/authorization";
+import { AreaTrend, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { FsboCard } from "../fsbo-card";
 
 export const metadata = { title: "Sahibinden ilan" };
@@ -21,6 +24,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Raw = Omit<FsboRow, "districtName" | "assigneeName" | "doNotCall" | "price" | "gross_m2" | "last_price_drop_pct"> & {
+  district_id: string | null;
   price: number | string | null;
   gross_m2: number | string | null;
   last_price_drop_pct: number | string | null;
@@ -54,7 +58,8 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
   // Danışman/çağrı merkezi başkasının kaydını (kişisel veri) açamaz; yönetici ve takım lideri tümünü görür.
   if (!isManager && ctx.role !== "team_lead" && raw.assigned_to && raw.assigned_to !== ctx.userId) redirect("/app/portfoy-avi");
 
-  const [activities, observations, tenantRow, profileRow, prevLead, customer, hashCheck] = await Promise.all([
+  const canViewDemands = (ctx.perms.demands ?? []).includes("view");
+  const [activities, observations, tenantRow, profileRow, prevLead, customer, hashCheck, buyerDemands] = await Promise.all([
     supabase
       .from("fsbo_lead_activities")
       .select("id, kind, outcome, note, created_at, actor:profiles!fsbo_lead_activities_actor_id_fkey(full_name)")
@@ -68,6 +73,7 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
     raw.relist_of ? supabase.from("fsbo_leads").select("id, title, price, first_seen_at").eq("tenant_id", ctx.tenantId).eq("id", raw.relist_of).maybeSingle() : Promise.resolve({ data: null }),
     raw.customer_id ? supabase.from("customers").select("id, full_name").eq("tenant_id", ctx.tenantId).eq("id", raw.customer_id).maybeSingle() : Promise.resolve({ data: null }),
     raw.phone_hash ? supabase.from("fsbo_do_not_call").select("id").eq("tenant_id", ctx.tenantId).eq("phone_hash", raw.phone_hash).limit(1) : Promise.resolve({ data: [] }),
+    canViewDemands ? countOpenBuyerDemandsInDistrict(supabase, { tenantId: ctx.tenantId, userId: ctx.userId, role: ctx.role, districtId: raw.district_id }) : Promise.resolve(null),
   ]);
 
   const row: FsboRow = {
@@ -88,12 +94,20 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
     districtName: row.districtName,
     rooms: row.rooms,
     portalLabel: PORTAL_LABELS[row.portal as keyof typeof PORTAL_LABELS] ?? "ilan sitesi",
+    activeBuyerDemands: buyerDemands,
   });
   const tomorrow = new Date(trDayStartMs(nowMs) + DAY_MS + 3 * 3_600_000).toISOString().slice(0, 10);
   const prev = prevLead.data as { id: string; title: string | null; price: number | string | null; first_seen_at: string } | null;
   const cust = customer.data as { id: string; full_name: string } | null;
   const obs = ((observations.data ?? []) as { id: string; observed_at: string; price: number | string | null }[]).map((o) => ({ ...o, price: o.price == null ? null : Number(o.price) }));
   const acts = (activities.data ?? []) as unknown as { id: string; kind: string; outcome: string | null; note: string | null; created_at: string; actor: { full_name: string | null } | { full_name: string | null }[] | null }[];
+
+  // Fiyat geçmişi grafiği: en az iki fiyatlı gözlem (eskiden yeniye).
+  const chartPoints = [...obs].reverse().filter((o) => o.price != null).map((o) => ({ gun: dateText(o.observed_at).slice(0, 5), fiyat: o.price as number }));
+  // Yetki / EİDS: "Yetki alındı" adımının durum notundan okunur (ayrı kolon yok).
+  const authNote = acts.find((a) => a.kind === "status" && a.note?.startsWith("Yetkilendirme sözleşmesi:"))?.note ?? null;
+  const auth = row.status === "yetki_alindi" || row.status === "portfoye_donustu" ? evaluateAuthorization(authNote, trDayKey(nowMs)) : null;
+  const trDate = (iso: string) => iso.split("-").reverse().join(".");
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4">
@@ -123,6 +137,39 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
             {prev.price != null ? `, ${formatTry(Number(prev.price))}` : ""}
             {row.price != null && prev.price != null ? ` → şimdi ${formatTry(row.price)}` : ""}).{" "}
             <Link href={`/app/portfoy-avi/${prev.id}`} className="font-semibold text-brand-600 hover:underline">Önceki kaydı aç</Link>
+          </p>
+        </Card>
+      ) : null}
+
+      {buyerDemands && raw.district_id ? (
+        <Card className="p-4 text-sm">
+          <p className="font-semibold text-ink-950">Bölgede alıcı talebi</p>
+          <p className="mt-1 text-text-muted">
+            <Link href={`/app/talepler?ilce=${raw.district_id}`} className="numeric font-semibold text-brand-600 hover:underline">{buyerDemands} açık alıcı talebi</Link>{" "}
+            {row.districtName ?? "bu ilçe"} için kayıtlı; ilan sahibiyle konuşurken değer cümlesi olarak kullanabilirsiniz.
+          </p>
+        </Card>
+      ) : null}
+
+      {auth ? (
+        <Card className="p-4 text-sm">
+          <p className="font-semibold text-ink-950">Yetki ve EİDS durumu</p>
+          <dl className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-3">
+            <div><dt className="text-xs text-text-muted">Sözleşme tarihi</dt><dd className="numeric font-medium text-ink-950">{trDate(auth.signedOn)}</dd></div>
+            <div><dt className="text-xs text-text-muted">Süre</dt><dd className="font-medium text-ink-950">{auth.months} ay</dd></div>
+            <div>
+              <dt className="text-xs text-text-muted">Bitiş</dt>
+              <dd className="numeric font-medium text-ink-950">
+                {trDate(auth.endsOn)}
+                <span className={`ml-1.5 text-xs ${auth.state === "expired" ? "text-red-600" : auth.state === "expiring" ? "text-amber-600" : "text-text-muted"}`}>
+                  {auth.state === "expired" ? "süresi doldu" : `${auth.daysLeft} gün kaldı`}
+                </span>
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-xs text-text-muted">
+            İlanı yayınlamadan önce malikin EİDS&apos;te ofisi yetkilendirdiğinden emin olun.
+            {auth.overLegalMax ? " Yetkilendirme süresi 3 ayı aşıyor (uyarı; kayıt engellenmedi)." : ""}
           </p>
         </Card>
       ) : null}
@@ -163,6 +210,13 @@ export default async function FsboDetailPage({ params }: { params: Promise<{ id:
         </Card>
         <Card className="p-4">
           <h2 className="text-sm font-semibold text-ink-950">Fiyat geçmişi</h2>
+          {chartPoints.length >= 2 ? (
+            <div className="mt-3">
+              <ChartFrame title="Fiyat değişimi" subtitle={`${chartPoints.length} gözlem`} height={180}>
+                <AreaTrend data={chartPoints} xKey="gun" format="money" rangeable={false} summary="none" series={[{ key: "fiyat", label: "Fiyat (₺)" }]} />
+              </ChartFrame>
+            </div>
+          ) : null}
           {obs.length === 0 ? (
             <p className="mt-2 text-sm text-text-muted">Henüz gözlem yok.</p>
           ) : (

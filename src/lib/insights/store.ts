@@ -289,6 +289,19 @@ export async function closeCallPriorityForCustomer(client: SupabaseClient, custo
   return Number(data ?? 0) || 0;
 }
 
+/**
+ * FSBO (Sahibinden ilanlar) ilan kartı için olay anında kapatma (`insight_close_fsbo_lead`, 20261012002500): aynı dar desen,
+ * yalnız o ilana bağlı açık call_priority satırlarının valid_until alanı yazılır. RPC yoksa 0 döner (motor turunda kapanır).
+ */
+export async function closeFsboLeadInsights(client: SupabaseClient, leadId: string): Promise<number> {
+  const { data, error } = await client.rpc("insight_close_fsbo_lead", { p_lead_id: leadId });
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(`insight_close_fsbo_lead: ${error.code ?? "hata"}`);
+  }
+  return Number(data ?? 0) || 0;
+}
+
 /** Süresi geçmiş/kapanmış satır temizliği (RPC yoksa 0). */
 export async function runHousekeeping(admin: SupabaseClient): Promise<number> {
   const { data, error } = await admin.rpc("insight_housekeeping", { p_closed_retention_days: 90, p_expired_grace_days: 7 });
