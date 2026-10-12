@@ -320,7 +320,7 @@ describe("site yönetimi merkezi", () => {
     for (const h of ["/admin/site-menu", "/admin/site-icerik", "/admin/seo", "/admin/sistem#ayarlar", "/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing"]) {
       expect(hrefs, h).toContain(h);
     }
-    if (!existsSync(join(root, "src/app/admin/ef-kontor/page.tsx"))) expect(hrefs.some((h) => h.includes("ef-kontor"))).toBe(false);
+    if (!existsSync(join(root, "src/app/admin/analiz-tarifesi/page.tsx"))) expect(hrefs.some((h) => h.includes("ef-kontor"))).toBe(false);
   });
 
   it("son değişiklik eşlemesi: eylem öneki -> kart", () => {

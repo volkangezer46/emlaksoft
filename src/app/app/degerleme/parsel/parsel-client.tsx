@@ -438,7 +438,7 @@ function RunOutcome({ run }: { run: RunValuationResult }) {
       return (
         <div role="alert" className="mt-4 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-amber-800">
           <p className="font-semibold">Yetersiz analiz bakiyesi: bu işlem {run.needed} TL, kalan {run.available}.</p>
-          <p className="mt-1">Analiz paketlerini <Link href="/app/abonelik?sekme=kontor#paketler" className="font-semibold underline">Abonelik &gt; Analiz bakiyesi</Link> sayfasından alabilirsiniz (satın alma yalnızca ofis sahibi veya genel müdür içindir; değilseniz yöneticinize başvurun).</p>
+          <p className="mt-1">Analiz paketlerini <Link href="/app/abonelik?sekme=analiz#paketler" className="font-semibold underline">Abonelik &gt; Analiz bakiyesi</Link> sayfasından alabilirsiniz (satın alma yalnızca ofis sahibi veya genel müdür içindir; değilseniz yöneticinize başvurun).</p>
         </div>
       );
     case "disabled":

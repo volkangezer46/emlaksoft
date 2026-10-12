@@ -421,7 +421,7 @@ describe("startCreditPackPurchase (EF analiz bakiyesi) — hata yolları", () =>
     h.initCheckout.mockClear();
     h.packInvoice.mockResolvedValue({ invoiceId: "inv-pack", totalTry: 1188, credit: { fullCredit: true, creditTry: 1188, cashTry: 0 } });
     const full = await startCreditPackPurchase(pform({ use_credit: "1" }));
-    expect(full.checkoutUrl).toBe("https://app.test/app/abonelik?sekme=kontor&paid=1");
+    expect(full.checkoutUrl).toBe("https://app.test/app/abonelik?sekme=analiz&paid=1");
     expect(h.fulfillCredit).toHaveBeenCalledTimes(1);
     expect(h.initCheckout).not.toHaveBeenCalled();
     h.fulfillCredit.mockRejectedValue(new Error("Kredi düşülemedi."));

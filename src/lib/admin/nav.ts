@@ -114,7 +114,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
       },
       { href: "/admin/growth", label: "Büyüme", description: "Davet ve ortak programı, kayıt kaynakları", icon: Sprout, modules: ["sales"] },
-      { href: "/admin/ef-kontor", label: "Analiz tarifesi", description: "Analiz tarifesi, paketler, ofis bakiyeleri", icon: Coins, modules: ["billing"] },
+      { href: "/admin/analiz-tarifesi", label: "Analiz tarifesi", description: "Analiz tarifesi, paketler, ofis bakiyeleri", icon: Coins, modules: ["billing"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi ve maliyet tablosu", icon: Sparkles, modules: ["billing"] },
     ],
   },

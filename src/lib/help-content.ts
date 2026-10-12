@@ -545,7 +545,7 @@ export const GUIDES: readonly Guide[] = [
       "AI kullanımı: yapay zeka asistanı ve AI özellikleri ölçülür ve paketinizin aylık AI kotasına göre izlenir; kotası tanımlı olmayan pakette sınırsız görünür. AI kullanımı analiz bakiyenizden veya hesap kredinizden düşmez.",
       "Bakiyeleri görmek için Abonelik sayfasını açın. Hesap kredisi sekmesini yalnız ofis sahibi ve genel müdür görür.",
     ],
-    href: "/app/abonelik?sekme=kontor",
+    href: "/app/abonelik?sekme=analiz",
     cta: "Abonelik sayfası",
   },
 ] as const;

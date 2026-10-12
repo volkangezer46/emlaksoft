@@ -86,7 +86,7 @@ describe("EF kapalıyken para alan yol yok (kaynak sözleşmesi)", () => {
     expect(users.map((f) => f.replace(root, "").replaceAll("\\", "/"))).toEqual(["/src/app/actions/billing.ts"]);
   });
   it("ofis analiz bakiyesi ekranı aynı kapıyı blockReason olarak kullanır", () => {
-    const s = read("src/app/app/abonelik/kontor-section.tsx");
+    const s = read("src/app/app/abonelik/analiz-section.tsx");
     expect(s).toContain("getEfPublicState()");
     expect(s).toContain("efState.purchasable");
   });

@@ -375,7 +375,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "ai",
     q: "Analiz bakiyesi nedir, ne zaman harcanır?",
     a: "Yalnız Ada/Parsel değerlemede harcanan bakiyedir; PDF indirme, rapor detayı ve ilan analizi bakiye düşmez. Harcanacak miktar işlem öncesi ekranda gösterilir; sonuç üretilemezse veya hata olursa düşmez. Analiz bakiyesi süreli geçerlidir (aylık hak ay sonunda, paket seçtiğiniz 1/3/6/12 ay sonunda yanar). Yetmezse Abonelik > Analiz bakiyesi sekmesinden paket alınır. " + PRICE_NOTE,
-    href: "/app/abonelik?sekme=kontor",
+    href: "/app/abonelik?sekme=analiz",
     hrefLabel: "Analiz bakiyesi",
   },
   {
@@ -383,7 +383,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "ai",
     q: "Hesap kredisi, analiz bakiyesi ve AI kotası aynı şey mi?",
     a: "Hayır, üç ayrı bakiyedir ve birbirine dönüşmez. Hesap kredisi (TL) faturalarınızdan düşer; analiz bakiyesi değerleme ve rapor işlemlerinde harcanır; AI kullanımı paketinizin aylık AI kotasına göre izlenir ve analiz bakiyesinden ya da krediden düşmez.",
-    href: "/app/abonelik?sekme=kontor",
+    href: "/app/abonelik?sekme=analiz",
     hrefLabel: "Abonelik",
   },
   {

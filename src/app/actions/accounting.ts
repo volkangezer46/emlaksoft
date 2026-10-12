@@ -49,6 +49,6 @@ export async function saveEfWholesale(formData: FormData): Promise<AccountingOpR
     meta: { before, after: next },
   });
   revalidatePath("/admin/muhasebe");
-  revalidatePath("/admin/ef-kontor");
+  revalidatePath("/admin/analiz-tarifesi");
   return { ok: true, notice: "Toptan maliyet kaydedildi." };
 }

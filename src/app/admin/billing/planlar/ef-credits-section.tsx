@@ -57,7 +57,7 @@ export function EfCreditsSection({
         </p>
         <p className="mt-1 text-xs text-text-muted">
           Toptan maliyet (EmlakFiyatı işlem başı tarifesi): {wholesaleKnown ? "tanımlı" : "BİLİNMİYOR, varsayılan 0 kullanılıyor; marj gerçek değildir"}.{" "}
-          <Link href="/admin/ef-kontor#ekonomi" className="font-semibold text-brand-600 hover:underline">Analiz bakiyesi ekonomisi ve maliyet girişi</Link>
+          <Link href="/admin/analiz-tarifesi#ekonomi" className="font-semibold text-brand-600 hover:underline">Analiz bakiyesi ekonomisi ve maliyet girişi</Link>
         </p>
       </div>
       <ul className="space-y-1 text-sm">

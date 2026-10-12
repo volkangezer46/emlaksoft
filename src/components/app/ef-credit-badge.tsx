@@ -64,7 +64,7 @@ export async function EfCreditBadge({
     data.state === "empty" ? "Analiz bakiyesi bitti" : data.state === "low" ? `Analiz bakiyesi azalıyor: ${fmt.format(data.available)}` : `${fmt.format(data.available)} TL`;
   return (
     <Link
-      href="/app/abonelik?sekme=kontor"
+      href="/app/abonelik?sekme=analiz"
       title="EmlakFiyati analiz bakiyeniz. Ayrıntı, aylık hak ve paketler için tıklayın."
       aria-label={`${label}. Analiz bakiyesi merkezini aç`}
       className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-semibold transition ${TONE[data.state]}`}

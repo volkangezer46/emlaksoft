@@ -2,7 +2,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Download, ShieldCheck } from "lucide-react";
 
 /**
- * Emlakfiyati anonim piyasa verisi indirme kartı (yalnız süper admin görür). Veri: `/admin/ef-kontor/piyasa-verisi`
+ * Emlakfiyati anonim piyasa verisi indirme kartı (yalnız süper admin görür). Veri: `/admin/analiz-tarifesi/piyasa-verisi`
  * (opt-in ofisler, k≥5, hücre başına en az 2 ofis; kişisel veri yok). Otomatik gönderim YOK: dosya elle paylaşılır.
  */
 export function MarketExportCard() {
@@ -21,10 +21,10 @@ export function MarketExportCard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <a href="/admin/ef-kontor/piyasa-verisi?bicim=csv" className={link} download>
+          <a href="/admin/analiz-tarifesi/piyasa-verisi?bicim=csv" className={link} download>
             <Download className="h-4 w-4" aria-hidden="true" /> CSV indir
           </a>
-          <a href="/admin/ef-kontor/piyasa-verisi?bicim=json" className={link} download>
+          <a href="/admin/analiz-tarifesi/piyasa-verisi?bicim=json" className={link} download>
             <Download className="h-4 w-4" aria-hidden="true" /> JSON indir
           </a>
         </div>

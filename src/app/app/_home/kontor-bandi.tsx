@@ -31,7 +31,7 @@ export async function KontorBandi({ ctx, valuationClosed }: { ctx: HomeCtx; valu
     <KontorBandiKutu
       storageKey={`es:ef-low-banner:${ctx.tenantId}:${ctx.userId}:${data.state}`}
       empty={empty}
-      href="/app/abonelik?sekme=kontor#paketler"
+      href="/app/abonelik?sekme=analiz#paketler"
       actionLabel="Analiz paketlerini gör"
     >
       {empty ? (

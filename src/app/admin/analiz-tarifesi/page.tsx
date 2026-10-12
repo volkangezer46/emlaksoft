@@ -27,7 +27,7 @@ export const metadata = { title: "Analiz tarifesi" };
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const BASE = "/admin/ef-kontor";
+const BASE = "/admin/analiz-tarifesi";
 
 type SP = { q?: string; sayfa?: string; ofis?: string; hsayfa?: string; donem?: string };
 

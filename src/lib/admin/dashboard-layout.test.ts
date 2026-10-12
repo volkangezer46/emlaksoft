@@ -82,7 +82,7 @@ describe("buildAttentionQueue", () => {
   it("EF sapması yalnız drift/error durumunda görünür ve ef-kontor sayfasına bağlanır", () => {
     expect(buildAttentionQueue({ ...EMPTY, efReconciliation: null }, "super_admin")).toEqual([]);
     const q = buildAttentionQueue({ ...EMPTY, efReconciliation: "error" }, "super_admin");
-    expect(q[0]?.href).toBe("/admin/ef-kontor");
+    expect(q[0]?.href).toBe("/admin/analiz-tarifesi");
   });
 
   it("her satırın href'i /admin ile başlar ve sayı pozitiftir", () => {

@@ -37,7 +37,7 @@ function firstIssue(e: { issues: { message: string }[] }): string {
 
 function done() {
   updateTag(EF_CONFIG_CACHE_TAG);
-  revalidatePath("/admin/ef-kontor");
+  revalidatePath("/admin/analiz-tarifesi");
   revalidatePath("/app/abonelik");
 }
 
@@ -119,6 +119,6 @@ export async function grantEfCreditAction(formData: FormData): Promise<EfKontorR
     entityId: parsed.data.tenantId,
     meta: { units: parsed.data.units, kind: parsed.data.kind, validity_months: parsed.data.validityMonths, reason: parsed.data.reason },
   });
-  revalidatePath("/admin/ef-kontor");
+  revalidatePath("/admin/analiz-tarifesi");
   return { ok: true, message: `${parsed.data.units} TL yüklendi. Yeni bakiye: ${r.available ?? "-"}.` };
 }

@@ -36,7 +36,7 @@ describe("Emlakfiyati anonim dışa aktarım", () => {
   });
 
   it("uç: süper admin + hız sınırı + yalnız opt-in okuyucusu; opt-in ayarı varsayılan kapalı", () => {
-    const route = src("src/app/admin/ef-kontor/piyasa-verisi/route.ts");
+    const route = src("src/app/admin/analiz-tarifesi/piyasa-verisi/route.ts");
     expect(route).toContain('staff.role !== "super_admin"');
     expect(route).toContain("checkRateLimit(");
     expect(route).toContain("buildMarketExport(");

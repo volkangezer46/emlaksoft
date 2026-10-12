@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
       await notifyPlatformStaff({
         title: "EmlakFiyati analiz bakiyesi mutabakatında sapma",
         body: detail,
-        href: "/admin/ef-kontor",
+        href: "/admin/analiz-tarifesi",
         kind: "warning",
         meta: { job: JOB, diffDegerleme: result.diffDegerleme, diffPdf: result.diffPdf },
       });

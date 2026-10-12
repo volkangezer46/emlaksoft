@@ -315,7 +315,7 @@ export const HOME_VALUE_SUMMARY_KEY = "office.customer_portal.home_value_enabled
 export const VITRIN_AI_CHAT_KEY = "office.vitrin.ai_chat_enabled";
 /**
  * Anonim piyasa verisi paylaşım izni (ofis bazlı opt-in, varsayılan KAPALI). Okuyucu: platform dışa aktarımı
- * `/admin/ef-kontor/piyasa-verisi` (`src/lib/listing-control/market-export.ts`) yalnız açık ofislerin ilanlarını k≥5 hücrelerde toplar.
+ * `/admin/analiz-tarifesi/piyasa-verisi` (`src/lib/listing-control/market-export.ts`) yalnız açık ofislerin ilanlarını k≥5 hücrelerde toplar.
  */
 export const MARKET_DATA_SHARE_KEY = "office.market_data.share_enabled";
 /** Yetki belgesi yıllık harç kontrolü hatırlatma ayı ("0" = kapalı). Okuyucu: abonelik-kontrol cron'u (`license-reminders.ts`). */

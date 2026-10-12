@@ -22,7 +22,7 @@ import {
 import { loadEfLedgerEntries, loadEfPackSales, loadEfUsage } from "@/lib/accounting/loaders";
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
-const BASE = "/admin/ef-kontor";
+const BASE = "/admin/analiz-tarifesi";
 export const OFFICE_ROWS_SHOWN = 15;
 
 export type EfEconomicsData = {
