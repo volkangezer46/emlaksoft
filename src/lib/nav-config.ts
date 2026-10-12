@@ -312,7 +312,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
       },
       {
         href: "/app/giderler",
-        label: "Giderler",
+        label: "Muhasebe",
         icon: ICONS.gider,
         module: "expenses",
         description: "Ofis giderleri ve kâr-zarar",

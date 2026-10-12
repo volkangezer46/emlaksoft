@@ -22,7 +22,7 @@ import { getPlatformSetting } from "@/lib/platform-settings";
 import { resolvePeriod } from "@/lib/accounting/period";
 import { EF_WHOLESALE_SETTING_KEY, parseEfWholesale } from "@/lib/accounting/ef-economics";
 
-export const metadata = { title: "EmlakFiyati analiz bakiyesi" };
+export const metadata = { title: "Analiz tarifesi" };
 
 const fmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const dt = new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" });
@@ -60,7 +60,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
         art="coins"
         icon={Coins}
         eyebrow="Faturalama · analiz bakiyesi"
-        title="EmlakFiyati analiz bakiyesi"
+        title="Analiz tarifesi"
         description="Tarife, paket kataloğu, ofis bakiyeleri ve manuel yükleme tek merkezde. Analiz bakiyesi YALNIZ Emlaksoft'ta tutulur."
       />
 
