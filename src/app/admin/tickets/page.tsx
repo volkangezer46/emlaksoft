@@ -44,7 +44,7 @@ const STATUS_COLOR: Record<string, string> = {
   in_progress: "var(--cyan-400)",
   waiting: "var(--amber-400)",
   resolved: "var(--mint-500)",
-  closed: "rgba(10,34,71,0.25)",
+  closed: "color-mix(in srgb, var(--ink-950) 25%, transparent)",
 };
 
 const SLA_FILTER_LABEL: Record<string, string> = {

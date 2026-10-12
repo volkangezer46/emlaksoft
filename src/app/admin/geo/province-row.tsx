@@ -33,12 +33,12 @@ const initial: GeoActionResult = {};
 const initialSync: GeoSyncActionResult = {};
 
 const statusPresentation: Record<string, { label: string; className: string }> = {
-  queued: { label: "Sırada", className: "bg-amber-500/10 text-amber-700" },
+  queued: { label: "Sırada", className: "bg-warning-soft text-warning-strong" },
   running: { label: "Taranıyor", className: "bg-brand-600/10 text-brand-700" },
-  retry: { label: "Yeniden denenecek", className: "bg-amber-500/10 text-amber-700" },
-  succeeded: { label: "Tamamlandı", className: "bg-emerald-500/10 text-emerald-700" },
-  partial: { label: "İnceleme gerekli", className: "bg-orange-500/10 text-orange-700" },
-  dead_letter: { label: "İşlem gerekli", className: "bg-danger-500/10 text-danger-600" },
+  retry: { label: "Yeniden denenecek", className: "bg-warning-soft text-warning-strong" },
+  succeeded: { label: "Tamamlandı", className: "bg-success-soft text-success-strong" },
+  partial: { label: "İnceleme gerekli", className: "bg-warning-soft text-warning-strong" },
+  dead_letter: { label: "İşlem gerekli", className: "bg-danger-soft text-danger-strong" },
   paused: { label: "Bekletiliyor", className: "bg-ink-950/5 text-text-muted" },
 };
 
@@ -123,8 +123,8 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
     ?? syncString(province.sync, "created_at");
 
   return (
-    <div className={`grid gap-3 border-b border-line px-5 py-3.5 transition hover:bg-canvas/60 lg:grid-cols-[auto_minmax(0,1fr)_minmax(190px,auto)_auto_auto_auto] lg:items-center ${province.plate_code === 46 ? "bg-amber-500/[0.025]" : ""}`}>
-      <span className="rounded-full bg-brand-600/8 px-2.5 py-1 text-center text-xs font-bold text-brand-600">
+    <div className={`grid gap-3 border-b border-line px-5 py-3.5 transition hover:bg-canvas/60 lg:grid-cols-[3rem_minmax(0,1fr)_minmax(220px,260px)_9.5rem_auto_auto] lg:items-center ${province.plate_code === 46 ? "bg-warning-soft/40" : ""}`}>
+      <span className="numeric rounded-full bg-brand-600/8 px-2.5 py-1 text-center text-xs font-bold text-brand-600">
         {province.plate_code}
       </span>
       <div>
@@ -152,7 +152,7 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
           ) : null}
         </p>
         {province.plate_code === 46 ? (
-          <p className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-amber-700">Öncelikli doğrulama ili</p>
+          <p className="mt-1 text-xs font-bold uppercase tracking-[0.1em] text-warning-strong">Öncelikli doğrulama ili</p>
         ) : null}
       </div>
       <div className="min-w-0">
@@ -176,19 +176,21 @@ export function ProvinceRow({ province }: { province: ProvinceRowData }) {
           <span className="text-xs text-text-faint">Henüz il bazlı taranmadı</span>
         )}
         {syncState.error ? <p className="mt-1 text-xs text-danger-500">{syncState.error}</p> : null}
-        {syncState.message ? <p className="mt-1 text-xs text-emerald-700">{syncState.message}</p> : null}
+        {syncState.message ? <p className="mt-1 text-xs text-success-strong">{syncState.message}</p> : null}
       </div>
       <form action={syncAction}>
         <input type="hidden" name="province_id" value={province.id} />
-        <button
+        <Button
           type="submit"
+          variant="outline"
+          size="sm"
+          className="w-full whitespace-nowrap"
           disabled={!province.syncAvailable || !province.is_active || activeSync || syncPending}
-          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-[var(--radius-control)] border border-brand-400/40 bg-brand-600/[0.04] px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-600/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
           title={!province.syncAvailable ? "Tarama altyapısı henüz etkin değil" : "Seçilen ili öne alır ve diğer il taramalarını bekletir"}
         >
           {syncPending || syncStatus === "running" ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
           {syncPending ? "Kuyruğa alınıyor" : activeSync ? status?.label : "Tara ve tamamla"}
-        </button>
+        </Button>
       </form>
       <ButtonLink variant="outline" size="sm" href={`/admin/geo/${province.id}`}>
         İlçeler <ChevronRight className="h-3.5 w-3.5" />
