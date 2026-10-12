@@ -32,6 +32,23 @@ Bu belge, Windows dizüstündeki Claude oturumundan sunucudaki Claude oturumuna 
 - Yedek: her gece `pg_dump` + storage arşivi → Hetzner Storage Box (sahip açacak), WAL arşivi (pgBackRest/WAL-G) ile zaman noktasına dönüş; haftalık geri yükleme provası. Hetzner sunucu yedeği ek katman.
 - E-posta (auth e-postaları): şu an Supabase bulut SMTP'si; self-hosted GoTrue için SMTP sağlayıcısı (ör. Brevo/Resend/SES) gerekir — sahibe sor/tarif et.
 
+## İLERLEME (2026-10-13 gece, Windows oturumunun son hali)
+- ✅ DNS (TurkTicaret wildcard kabul etmiyor → tek tek A): `emlaksoft.com.tr`, `www`, `panel`, `api` → 178.105.169.160.
+- ✅ Hetzner Cloud Firewall `firewall-3`: yalnız TCP 22/80/443 (Docker portları ufw'yi atladığı için şart). 8000 dışarıdan kapalı doğrulandı.
+- ✅ Coolify paneli **https://panel.emlaksoft.com.tr** (Let's Encrypt). Yönetici: volkangezer@yahoo.com. Panel FQDN tinker ile ayarlandı + `Server::find(0)->setupDynamicProxyConfiguration()`.
+- ✅ Coolify API anahtarı (root yetki) sunucuda `/root/.coolify-token` (600). Örnek: `curl -H "Authorization: Bearer $(cat /root/.coolify-token)" http://localhost:8000/api/v1/servers`. Sunucu uuid `qvww13s3x5aqxomva7iok8px`, proje `EmlakSoft` uuid `gy91710lfyqoeg95mmhnreie`, ortam `production`.
+- ✅ **Supabase servisi** Coolify uuid `moqbebljyeyprktd19zb1ihn`, Kong → **https://api.emlaksoft.com.tr** (auth/rest/storage 200 doğrulandı). Değişiklikler: Postgres imajı `supabase/postgres:17.6.1.178` (bulut 17.6 ile aynı; şablon 15.8 idi), MinIO kaldırıldı (`minio/mc` imajı Docker Hub'dan kalktı) → `STORAGE_BACKEND=file` (`./volumes/storage`), `STORAGE_PUBLIC_URL=https://api.emlaksoft.com.tr`. Düzenlenen compose: `/root/supabase-compose.yml` (orijinal `.orig.yml`), API ile `docker_compose_raw` (base64) PATCH. Env: API_EXTERNAL_URL=https://api.emlaksoft.com.tr, GOTRUE_SITE_URL=https://emlaksoft.com.tr, ADDITIONAL_REDIRECT_URLS, ENABLE_EMAIL_AUTOCONFIRM=true (SMTP yok), DISABLE_SIGNUP=false. Anon anahtar `/root/.sb-anon`; tüm anahtarlar Coolify servis env'lerinde (SERVICE_SUPABASEANON_KEY, SERVICE_SUPABASESERVICE_KEY, SERVICE_PASSWORD_POSTGRES, SERVICE_PASSWORD_JWT…). DB konteyneri `supabase-db-moqbebljyeyprktd19zb1ihn`.
+- ⏳ Bulut tam yedeği: `/root/backups/bulut-tam-*.dump` (pg_dump -Fc, `supabase/postgres:17.6.1.178` imajıyla, pooler URL'i 6543→5432 session modu; doğrudan `db.<ref>.supabase.co` yalnız IPv6 olduğu için konteynerden çözülmedi). Bitip bitmediğini ve boyutunu kontrol et (`pg_restore -l` ile TABLE DATA sayısı).
+- Bulut DB: Postgres 17.6, 57 MB, eklentiler pg_stat_statements, pg_trgm, pgcrypto, supabase_vault, uuid-ossp.
+
+### Sıradaki somut adımlar
+1. Yedek doğrula; ayrıca Supabase yöntemine göre ayrı dosyalar: roller (`pg_dumpall --roles-only` yerine bulutta yalnız özel roller), şema (public + özel şemalar), veri (`auth`, `storage`, `public` data-only). Yeni DB'ye: önce şema, sonra `SET session_replication_role = replica;` ile veri. `auth`/`storage` şemaları self-hosted'ta zaten var → yalnız veri.
+2. Storage nesneleri: bulut Storage API (service key) ile tüm kovaları indir → yeni Storage'a yükle (aynı bucket/yol; `storage.objects` satırları veriyle gelir, dosya baytları ayrıca kopyalanmalı).
+3. `npm run check:migrations -- --database` (yeni DB URL ile) + `npm run db:rls-audit`.
+4. Uygulama: Coolify'da "Public/Private Git Repository" (deploy key) ya da Dockerfile ile Next.js standalone; env'ler Vercel üretim değişkenlerinden (sahip `vercel env pull` / panelden) + yeni Supabase URL/anahtarlar; domain `https://emlaksoft.com.tr`, `www` yönlendirme.
+5. 36 cron → Coolify Scheduled Tasks (Bearer CRON_SECRET), iyzico/e-fatura webhook adresleri, Google OAuth redirect, eklenti EmlakSoft alanı (yeni sürüm).
+6. Kesme: bulutta yazmayı durdur → son fark → açılış → izleme → 1-2 hafta sonra Vercel/Supabase silme (önce son yedek).
+
 ## Taşıma adımları (sırayla)
 1. ✅ Sunucu sertleştirme, Coolify, Node, Claude Code, depo + .env.local + hafıza aktarımı.
 2. Sahip: Coolify yönetici hesabı; DNS `*` A kaydı; Hetzner Backups; GitHub deploy key; SMTP sağlayıcısı.
