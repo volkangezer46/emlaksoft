@@ -3,7 +3,7 @@
  * Çıktıda ilan kodu, adres, malik, danışman, OFİS KİMLİĞİ yoktur. Her hücrede asgari k ilan (varsayılan 5) ve isteğe
  * bağlı asgari ofis sayısı aranır; altındaki hücre ATILIR (k-anonimlik). Yalnız ofis bazlı opt-in
  * (`office.market_data.share_enabled`) açık ofislerin satırları girer. Platform yöneticisi indirilebilir CSV/JSON alır
- * (`/admin/ef-kontor/piyasa-verisi`, okuyucu `market-export.ts`); EmlakFiyati'na OTOMATİK gönderim YOK (karşı taraf şeması yok,
+ * (`/admin/analiz-tarifesi/piyasa-verisi`, okuyucu `market-export.ts`); EmlakFiyati'na OTOMATİK gönderim YOK (karşı taraf şeması yok,
  * HAFIZA §6b) — bu dosya ağ çağrısı YAPMAZ.
  */
 

@@ -118,7 +118,7 @@ describe("iade / iptal", () => {
 
 describe("abonelik sayfası: Cüzdan bölümü", () => {
   it("sekme kayıtlı, süzgeç URL'den, bakiye RLS'li RPC ile; zaman clock.ts'ten", () => {
-    expect(page).toContain('resolveTab(sp, ["plan", "kontor", "cuzdan", "faturalar", "iptal"], "plan")');
+    expect(page).toContain('resolveTab(sp, ["plan", "analiz", "cuzdan", "faturalar", "iptal"], "plan", { kontor: "analiz" })');
     expect(page).toContain('{ id: "cuzdan", label: "Hesap kredisi", hidden: !(auth.role === "owner" || auth.role === "gm") }');
     expect(page).toContain("readTryOverview(supabase)");
     expect(page).toContain("<CuzdanSection");

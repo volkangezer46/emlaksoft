@@ -608,7 +608,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
       return { error: actionErrorMessage(error, "Kredi ile ödeme tamamlanamadı.") };
     }
     revalidatePath("/app/abonelik");
-    return { checkoutUrl: `${appUrl()}/app/abonelik?sekme=kontor&paid=1`, quotedTotalTry: invoice.totalTry };
+    return { checkoutUrl: `${appUrl()}/app/abonelik?sekme=analiz&paid=1`, quotedTotalTry: invoice.totalTry };
   }
 
   try {

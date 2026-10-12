@@ -183,7 +183,7 @@ describe("analiz bakiyesi satın alma kaynak sözleşmesi", () => {
     expect(read("src/lib/billing/credit-pack-purchase.ts")).toContain("buildCreditPackMeta(");
   });
   it("admin sayfası ve ofis bölümü saat/piksel kurallarına uyar", () => {
-    for (const f of ["src/app/admin/ef-kontor/page.tsx", "src/app/admin/ef-kontor/editors.tsx", "src/app/app/abonelik/kontor-section.tsx", "src/app/app/abonelik/kontor-panel.tsx"]) {
+    for (const f of ["src/app/admin/analiz-tarifesi/page.tsx", "src/app/admin/analiz-tarifesi/editors.tsx", "src/app/app/abonelik/analiz-section.tsx", "src/app/app/abonelik/kontor-panel.tsx"]) {
       const s = read(f);
       expect(s).not.toMatch(/Date\.now\(|new Date\(/);
       expect(s).not.toMatch(/text-\[\d+px\]/);

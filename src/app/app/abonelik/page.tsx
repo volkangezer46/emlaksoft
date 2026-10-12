@@ -43,7 +43,7 @@ import {
   parseAutoRenewFlag,
   type PaymentCardRow,
 } from "@/lib/billing/cards";
-import { KontorSection } from "./kontor-section";
+import { KontorSection } from "./analiz-section";
 import { ReferralNudge } from "@/components/app/referral-nudge";
 import { CuzdanSection } from "./cuzdan-section";
 import { readTryOverview } from "@/lib/try-credits/reader";
@@ -75,7 +75,7 @@ export default async function BillingPage({
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
-  const active = resolveTab(sp, ["plan", "kontor", "cuzdan", "faturalar", "iptal"], "plan");
+  const active = resolveTab(sp, ["plan", "analiz", "cuzdan", "faturalar", "iptal"], "plan", { kontor: "analiz" });
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -130,7 +130,7 @@ export default async function BillingPage({
 
   const currentPlan = sub?.plan ?? tenant?.plan ?? "office";
   // Analiz paketi ödemesi sonrası dönüş mesajı: son analiz bakiyesi faturası yeniyse plan mesajı yerine analiz bakiyesi mesajı.
-  const packInvoice = tenantId && (sp.paid || active === "kontor") ? await loadLatestPackInvoice(supabase, tenantId) : null;
+  const packInvoice = tenantId && (sp.paid || active === "analiz") ? await loadLatestPackInvoice(supabase, tenantId) : null;
   const packInvoiceRecent = Boolean(packInvoice && msSince(packInvoice.paidAt ?? packInvoice.createdAt) < 15 * 60_000);
 
   // Dönem sonu iptal (K5): kolonlar henüz yoksa sorgu hata verir ve iptal sekmesi gizlenir.
@@ -149,7 +149,7 @@ export default async function BillingPage({
   const canCancel = auth.role === "owner" || auth.role === "gm";
   const tabs: DetailTabDef[] = [
     { id: "plan", label: "Plan ve kullanım" },
-    { id: "kontor", label: "Analiz bakiyesi" },
+    { id: "analiz", label: "Analiz bakiyesi" },
     // Hesap kredisi yalnız ofis sahibi ve genel müdüre görünür (sekme gizlenir; doğrudan bağlantıda bölüm mesaj gösterir).
     { id: "cuzdan", label: "Hesap kredisi", hidden: !(auth.role === "owner" || auth.role === "gm") },
     { id: "faturalar", label: "Faturalar" },
@@ -427,7 +427,7 @@ export default async function BillingPage({
         </section>
       ) : null}
 
-      {active === "kontor" && tenantId ? (
+      {active === "analiz" && tenantId ? (
         <KontorSection
           tenantId={tenantId}
           canBuy={isSeatOwner}

@@ -66,7 +66,7 @@ export const TERMS = {
   analizBakiyesi: {
     canonical: "Analiz bakiyesi",
     definition: "EmlakFiyati değerleme analizlerinde harcanan TL bakiyesi (1 birim = 1 TL); aylık plan hakkı ve süreli analiz paketleriyle yüklenir. Eski ad kullanıcıya görünmez (iç ad ef_credit_* kalır).",
-    // "ef-kontor-*" cron/rota tanımlayıcıları ve ?sekme=kontor URL değeri iç addır; görünür metinde "kontör" geçmez.
+    // "ef-kontor-*" cron/rota tanımlayıcıları ve eski ?sekme=kontor takma adı iç addır; görünür metinde "kontör" geçmez.
     forbidden: [/(?<!ef-|sekme=|#)kont[öo]r(?!-)/i],
   },
   davet: {

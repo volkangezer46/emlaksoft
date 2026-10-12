@@ -16,7 +16,7 @@ function signed(n: number | null): string {
 
 /**
  * "Son mutabakat" kartı (salt-okunur, sunucu bileşeni). EmlakFiyati `/kullanim` son 31 gün toplamı ile defter
- * (committed rezervler) karşılaştırması. BAĞLAMA YERİ: /admin/ef-kontor sayfası (veya /admin/sistem EmlakFiyati sekmesi)
+ * (committed rezervler) karşılaştırması. BAĞLAMA YERİ: /admin/analiz-tarifesi sayfası (veya /admin/sistem EmlakFiyati sekmesi)
  * içinde `<LastReconciliationCard />` olarak yerleştirilir; sayfa kendi `requirePlatformModule` kapısını zaten geçmiştir.
  */
 export async function LastReconciliationCard() {

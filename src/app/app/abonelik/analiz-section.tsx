@@ -56,7 +56,7 @@ const LOT_KIND_LABEL: Record<string, string> = {
 const lotKindLabel = (k: string) => LOT_KIND_LABEL[k] ?? "Analiz bakiyesi";
 
 function hrefOf(params: Record<string, string | undefined>, hash = "gecmis"): string {
-  const sp = new URLSearchParams({ sekme: "kontor" });
+  const sp = new URLSearchParams({ sekme: "analiz" });
   for (const [k, v] of Object.entries(params)) if (v) sp.set(k, v);
   return `${BASE}?${sp.toString()}#${hash}`;
 }
@@ -141,7 +141,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
     low && low.threshold > 0 && series.values.length >= 2 ? thresholdTopPct(low.threshold, Math.max(...series.values)) : null;
   const forecast = balance && history?.enabled ? forecastDepletion(history.rows, balance.available, now()) : null;
   const canOneClick = canBuy && efState.purchasable && ready && lotsReady && iyzicoConfigured && suggested !== null && sellable.length > 0;
-  const oneClickHref = `${BASE}?sekme=kontor&onerilen=1#paketler`;
+  const oneClickHref = `${BASE}?sekme=analiz&onerilen=1#paketler`;
 
   const category: EfMovementCategory | null = categoryOf(props.kalem);
   const page = history
@@ -151,7 +151,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
         page: Number.parseInt(props.sayfa ?? "", 10) || 1,
       })
     : null;
-  const pagerParams = { sekme: "kontor", kalem: category ?? undefined, kullanici: props.kullanici || undefined };
+  const pagerParams = { sekme: "analiz", kalem: category ?? undefined, kullanici: props.kullanici || undefined };
 
   const tariffItems = [
     { label: "Konut değerlemesi", units: efUnitsFor("valuation_konut", tariff), kalem: "degerleme" },
@@ -192,7 +192,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           tone="warning"
           title="Analiz bakiyenizin bir kısmı yakında yanacak"
           action={
-            <Link href={`${BASE}?sekme=kontor#bakiye`} className="text-xs font-bold underline">
+            <Link href={`${BASE}?sekme=analiz#bakiye`} className="text-xs font-bold underline">
               Partileri gör
             </Link>
           }
@@ -207,7 +207,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
           title={low.state === "empty" ? "Analiz bakiyeniz bitti" : "Analiz bakiyeniz azalıyor"}
           action={
             suggested && sellable.length > 0 ? (
-              <Link href={canOneClick ? oneClickHref : `${BASE}?sekme=kontor#paketler`} className="text-xs font-bold underline">
+              <Link href={canOneClick ? oneClickHref : `${BASE}?sekme=analiz#paketler`} className="text-xs font-bold underline">
                 {canOneClick ? `Önerilen paketi al: ${efPackDisplayName(suggested)}` : `Önerilen paket: ${efPackDisplayName(suggested)}`}
               </Link>
             ) : undefined

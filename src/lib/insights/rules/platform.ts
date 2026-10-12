@@ -87,11 +87,11 @@ export function evaluateEfDrift(run: EfRunFact | null, nowMs: number): PlatformD
       title: "EmlakFiyatı analiz bakiyesi mutabakatında sapma var",
       why: `Son mutabakat çalışması defter ile EmlakFiyatı kullanımı arasında fark buldu (değerleme ${dd >= 0 ? "+" : ""}${dd}, PDF ${dp >= 0 ? "+" : ""}${dp}). Fark gözlemdir; nedeni (gecikmiş kayıt, iade, çift sayım) elle incelenmelidir.`,
       evidence: [
-        { label: "Değerleme farkı", value: String(dd), href: "/admin/ef-kontor" },
+        { label: "Değerleme farkı", value: String(dd), href: "/admin/analiz-tarifesi" },
         { label: "PDF farkı", value: String(dp) },
         { label: "Çalışma", value: run.runAt.slice(0, 10) },
       ],
-      href: "/admin/ef-kontor",
+      href: "/admin/analiz-tarifesi",
       tenantId: null,
       entityType: "ef_reconciliation_run",
       entityId: run.id,

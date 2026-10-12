@@ -30,7 +30,7 @@ export const TRY_WALLET_LINKS = {
   wallet: "/app/abonelik?sekme=cuzdan",
   plans: "/app/abonelik?sekme=plan#paketler",
   seats: "/app/abonelik?sekme=plan#koltuk",
-  packs: "/app/abonelik?sekme=kontor",
+  packs: "/app/abonelik?sekme=analiz",
   invoices: "/app/abonelik?sekme=faturalar",
 } as const;
 

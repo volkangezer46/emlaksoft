@@ -484,7 +484,7 @@ async function HealthSection({ role }: { role: PlatformRole }) {
         label="EF mutabakatı"
         value={sys.ef.status === "ok" ? "Uyumlu" : sys.ef.status === "drift" ? "Sapma var" : "Yapılamadı"}
         hint={relativeTimeTR(sys.ef.runAt)}
-        href="/admin/ef-kontor"
+        href="/admin/analiz-tarifesi"
         tone={sys.ef.status === "ok" ? "success" : "warn"}
       />,
     );

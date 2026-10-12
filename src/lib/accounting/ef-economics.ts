@@ -117,7 +117,7 @@ export function computeEfEconomics(
 }
 
 // ---------------------------------------------------------------------------
-// Analiz bakiyesi ekonomisi (admin /admin/ef-kontor): ofis bazlı kullanım, yükümlülük, hak dağılımı. Hepsi SAF.
+// Analiz bakiyesi ekonomisi (admin /admin/analiz-tarifesi): ofis bazlı kullanım, yükümlülük, hak dağılımı. Hepsi SAF.
 // ---------------------------------------------------------------------------
 
 /** İki toptan tarife de 0 ise maliyet BİLİNMİYOR demektir (varsayılan 0 gerçek maliyet değildir): arayüz açıkça uyarır. */

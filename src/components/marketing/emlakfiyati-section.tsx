@@ -15,7 +15,7 @@ import type { SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
 
 /** Ofis panelindeki Analiz bakiyesi sekmesi; yalnız durum "live" iken bağlantı verilir. Hesabı olmayan /kayit'tan başlar. */
-export const EF_PACKS_APP_HREF = "/app/abonelik?sekme=kontor#paketler";
+export const EF_PACKS_APP_HREF = "/app/abonelik?sekme=analiz#paketler";
 
 const TH = "px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.06em] text-text-muted";
 const TD = "px-3 py-2.5 text-sm tabular-nums text-ink-950";

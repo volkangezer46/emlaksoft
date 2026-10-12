@@ -76,7 +76,7 @@ export function buildDefaultEfPacks(): EfPack[] {
 }
 
 /**
- * Varsayılan analiz paketleri. Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/ef-kontor'dan düzenler
+ * Varsayılan analiz paketleri. Ayar (`ef.packs`) hiç yoksa/boşsa bunlar geçerlidir; admin /admin/analiz-tarifesi'dan düzenler
  * (kayıt varsa yalnız o geçerli).
  */
 export const EF_DEFAULT_PACKS: readonly EfPack[] = buildDefaultEfPacks();

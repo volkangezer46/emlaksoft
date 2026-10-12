@@ -177,7 +177,7 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
         <ul className="grid gap-1 text-xs sm:grid-cols-2">
           {[
             ["Plan fiyatları, koltuk, kampanya", "/admin/billing/planlar"],
-            ["EmlakFiyatı analiz tarifesi ve paketler", "/admin/ef-kontor"],
+            ["EmlakFiyatı analiz tarifesi ve paketler", "/admin/analiz-tarifesi"],
             ["Büyüme bayrakları ve kurallar", "/admin/growth"],
             ["SEO merkezi (taslak/yayın)", "/admin/seo"],
             ["Site içeriği", "/admin/site-icerik"],

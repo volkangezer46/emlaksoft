@@ -69,7 +69,7 @@ export const efTariffSchema = z.object({
 export type EfTariff = z.infer<typeof efTariffSchema>;
 
 /**
- * Varsayılan tarife (2026-10-08 fiyat kararı; 1 birim = 1 TL; admin /admin/ef-kontor'dan değiştirir).
+ * Varsayılan tarife (2026-10-08 fiyat kararı; 1 birim = 1 TL; admin /admin/analiz-tarifesi'dan değiştirir).
  * Konut raporu 700, arsa 850, ticari 1.050 TL. Başka hiçbir özellik bakiye düşmez.
  */
 export const EF_DEFAULT_TARIFF: EfTariff = {

@@ -118,6 +118,8 @@ const nextConfig: NextConfig = {
       { source: "/app/arama", destination: "/app/gelen-kutusu?sekme=cagri", permanent: true },
       { source: "/app/eslestirme", destination: "/app/talepler?sekme=eslesme", permanent: true },
       { source: "/app/yatirim", destination: "/app/hesaplayici?sekme=yatirim", permanent: true },
+      { source: "/admin/ef-kontor", destination: "/admin/analiz-tarifesi", permanent: true },
+      { source: "/admin/ef-kontor/:path*", destination: "/admin/analiz-tarifesi/:path*", permanent: true },
       { source: "/admin/satis", destination: "/admin/tenants?durum=trial", permanent: true },
       { source: "/admin/satis/:path*", destination: "/admin/tenants?durum=trial", permanent: true },
     ];
