@@ -112,7 +112,7 @@ export default function SeatCalculator({
           step={1}
           value={sliderValue}
           onChange={(e) => commit(Number(e.target.value))}
-          className="mt-5 h-11 w-full cursor-pointer accent-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          className="mt-5 h-11 touch:h-11 w-full cursor-pointer accent-brand-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         />
         <div className="flex justify-between text-xs tabular-nums text-text-muted" aria-hidden>
           <span>{bounds.min}</span>

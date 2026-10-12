@@ -77,7 +77,7 @@ export function LoginForm({
               <label className="block text-sm font-semibold text-ink-900" htmlFor="password">
                 Şifre
               </label>
-              <Link href="/sifre-sifirla" className="text-xs font-semibold text-brand-600 hover:underline">
+              <Link href="/sifre-sifirla" className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
                 Şifremi unuttum
               </Link>
             </div>
@@ -95,7 +95,7 @@ export function LoginForm({
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
                 aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -134,7 +134,7 @@ export function LoginForm({
 
         <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
           Hesabınız yok mu?{" "}
-          <Link href="/kayit" className="font-semibold text-brand-600 hover:underline">
+          <Link href="/kayit" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
             Ücretsiz deneyin
           </Link>
         </p>

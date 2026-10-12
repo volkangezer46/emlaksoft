@@ -63,6 +63,7 @@ export default async function FiyatlarPage() {
         </div>
       </div>
 
+      <h2 className="sr-only">Paketler ve ekip hesaplayıcı</h2>
       <section aria-label="Ekibinize göre paket hesaplayıcı" className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
         <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
       </section>
@@ -89,7 +90,7 @@ export default async function FiyatlarPage() {
         <ComparisonTable plans={plans} efValuationCost={efValuationCost} efLive={efLive} />
       </Section>
       <Section
-        id="kontor"
+        id="analiz"
         title="EmlakFiyati analiz bakiyesi"
         lead={
           efLive

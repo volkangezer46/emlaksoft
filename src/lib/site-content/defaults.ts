@@ -204,7 +204,7 @@ export function defaultSiteContent(): SiteContent {
       packsTitle: "Ek analiz paketleri",
       packsText: "Ek analiz paketleri 1, 3, 6 ve 12 aylık satılır; süre sonunda kullanılmayan bakiye sona erer. Uzun süreli pakette 1 TL bakiye başı fiyat düşer.",
       packsEmpty: "Ek paket fiyatları ofis panelinde, giriş yaptıktan sonra görünür.",
-      detailLink: { label: "Analiz bakiyesi ayrıntıları ve fiyatlar", href: "/fiyatlar#kontor" },
+      detailLink: { label: "Analiz bakiyesi ayrıntıları ve fiyatlar", href: "/fiyatlar#analiz" },
       note: "Tutarlar KDV hariçtir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.",
     },
     // Bölüm sırası = bugünkü ana sayfa sırası; hepsi görünür.

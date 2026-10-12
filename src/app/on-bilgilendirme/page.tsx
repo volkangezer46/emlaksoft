@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
@@ -16,7 +17,7 @@ export default function OnBilgilendirmePage() {
       <LegalSection no="1." title="Sağlayıcı Bilgileri">
         <p>
           EmlakSoft — Türkiye emlak ofisleri için bulut tabanlı CRM ve ofis yönetim platformu. İletişim:{" "}
-          <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>.
+          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
           Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme onay ekranında ve düzenlenen faturada da yer alır.
         </p>
         {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. */}
@@ -63,7 +64,7 @@ export default function OnBilgilendirmePage() {
           Sözleşmenin kurulmasından itibaren 14 gün içinde cayma hakkınız vardır. Onayınızla hizmetin ifasına derhâl
           başlanması hâlinde Yönetmelik m.15/1-ğ istisnası uygulanır; ayrıntılı koşullar ve iade süreci{" "}
           <Link className="font-semibold text-brand-600" href="/iptal-iade">İptal &amp; İade Politikası</Link>&apos;nda yer alır.
-          Cayma bildirimi için: <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>
+          Cayma bildirimi için: <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
         </p>
       </LegalSection>
 

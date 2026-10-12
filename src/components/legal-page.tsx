@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
 import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
@@ -25,10 +26,10 @@ export function LegalPage({
         <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-brand-600/30 blur-[90px]" />
         <div className="relative mx-auto max-w-3xl px-6 pb-12 pt-10">
           <div className="flex items-center justify-between">
-            <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white/70 transition hover:text-white">
+            <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-white/70 transition hover:text-white">
               <ArrowLeft className="h-4 w-4" /> Ana sayfa
             </Link>
-            <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex"><Brand variant="horizontal" tone="dark" height={34} alt="" /></Link>
+            <Link href="/" aria-label="EmlakSoft ana sayfa" className="inline-flex min-h-11 items-center"><Brand variant="horizontal" tone="dark" height={34} alt="" /></Link>
           </div>
           <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
             <FileText className="h-3.5 w-3.5" /> Yasal metin
@@ -51,20 +52,20 @@ export function LegalPage({
               <p className="text-xs text-text-muted">Yasal metinlerle ilgili tüm sorularınız için bize yazın.</p>
             </div>
           </div>
-          <a href="mailto:destek@emlaksoft.app" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
-            destek@emlaksoft.app
+          <a href={SUPPORT_MAILTO} className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
+            {SUPPORT_EMAIL}
           </a>
         </div>
 
-        <nav className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-xs text-text-muted">
-          <Link className="hover:text-brand-600" href="/kullanim-sartlari">Kullanım Şartları</Link>
-          <Link className="hover:text-brand-600" href="/gizlilik">Gizlilik Politikası</Link>
-          <Link className="hover:text-brand-600" href="/kvkk-aydinlatma">KVKK Aydınlatma</Link>
-          <Link className="hover:text-brand-600" href="/cerez-politikasi">Çerez Politikası</Link>
-          <Link className="hover:text-brand-600" href="/mesafeli-satis">Mesafeli Satış Sözleşmesi</Link>
-          <Link className="hover:text-brand-600" href="/on-bilgilendirme">Ön Bilgilendirme Formu</Link>
-          <Link className="hover:text-brand-600" href="/iptal-iade">İptal &amp; İade</Link>
-          <Link className="hover:text-brand-600" href="/davet-kosullari">Davet Koşulları</Link>
+        <nav aria-label="Yasal sayfalar" className="mt-8 flex flex-wrap gap-x-5 text-xs text-text-muted">
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/kullanim-sartlari">Kullanım Şartları</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/gizlilik">Gizlilik Politikası</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/kvkk-aydinlatma">KVKK Aydınlatma</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/cerez-politikasi">Çerez Politikası</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/mesafeli-satis">Mesafeli Satış Sözleşmesi</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/on-bilgilendirme">Ön Bilgilendirme Formu</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/iptal-iade">İptal &amp; İade</Link>
+          <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/davet-kosullari">Davet Koşulları</Link>
         </nav>
       </section>
     </main>

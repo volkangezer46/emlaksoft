@@ -279,9 +279,9 @@ export function RegisterForm({
             <p className="mt-2 text-center text-xs font-medium text-text-muted">{trialLine}</p>
             <p className="mt-3 text-center text-xs leading-relaxed text-text-faint">
               Devam ederek{" "}
-              <Link href="/kullanim-sartlari" target="_blank" className="font-semibold text-brand-600 hover:underline">Kullanım koşulları</Link>
+              <Link href="/kullanim-sartlari" target="_blank" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Kullanım koşulları</Link>
               {" "}ve{" "}
-              <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 hover:underline">Gizlilik (KVKK)</Link>
+              <Link href="/kvkk-aydinlatma" target="_blank" className="inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">Gizlilik (KVKK)</Link>
               {" "}metnini okuduğunu kabul etmiş olursun.
             </p>
           </div>

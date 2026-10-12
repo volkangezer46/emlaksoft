@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import {
   ArrowUpRight,
   Building2,
@@ -74,7 +75,7 @@ export default async function SuspendedPage() {
 
   const steps = isCancelled
     ? [
-        { icon: Mail, title: "1 · Bize yazın", desc: "destek@emlaksoft.com.tr adresine ofis adınızla kısa bir e-posta gönderin." },
+        { icon: Mail, title: "1 · Bize yazın", desc: `${SUPPORT_EMAIL} adresine ofis adınızla kısa bir e-posta gönderin.` },
         { icon: FileCheck2, title: "2 · Paketi seçin", desc: "Ekibimiz size uygun paketi ve geçiş adımlarını aynı gün iletir." },
         { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki mevcut kayıtlarınıza hesap yeniden açıldığında erişirsiniz." },
       ]
@@ -117,7 +118,7 @@ export default async function SuspendedPage() {
               </ButtonLink>
             ) : null}
             <a
-              href="mailto:destek@emlaksoft.com.tr"
+              href={SUPPORT_MAILTO}
               className={`inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
                 isCancelled
                   ? "bg-brand-600 text-white hover:bg-brand-700"

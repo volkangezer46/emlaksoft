@@ -1,3 +1,4 @@
+import { SUPPORT_MAILTO } from "@/lib/contact-info";
 import type WebPush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -15,7 +16,7 @@ async function ensureConfigured(): Promise<typeof WebPush | null> {
   const mod = await import("web-push");
   const webpush = (mod.default ?? mod) as typeof WebPush;
   webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT ?? "mailto:destek@emlaksoft.com.tr",
+    process.env.VAPID_SUBJECT ?? SUPPORT_MAILTO,
     pub,
     priv,
   );

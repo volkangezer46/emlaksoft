@@ -10,24 +10,18 @@ import "@/app/marketing-sections.css";
 export function PricingShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-surface text-text">
-      <a
-        href="#icerik"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-[var(--radius-control)] focus:bg-surface focus:px-4 focus:py-2 focus:font-semibold focus:text-ink-950 focus:shadow-[var(--shadow-md)]"
-      >
-        İçeriğe geç
-      </a>
       {/* Ana sayfayla AYNI üst menü (ortak SiteHeader); .mk yalnız başlığın stil kapsamıdır. */}
       <div className="mk">
         <SiteHeader />
       </div>
-      <main id="icerik">{children}</main>
+      <main id="main-content">{children}</main>
       <footer className="border-t border-line bg-surface-2">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6 text-sm text-text-muted sm:px-6">
           <p>© EmlakSoft</p>
           <nav aria-label="Alt bilgi" className="flex flex-wrap gap-x-5 gap-y-1">
             <Link href="/" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Ana sayfa</Link>
             <Link href="/araclar" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Araçlar</Link>
-            <Link href="/gizlilik"className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Gizlilik</Link>
+            <Link href="/gizlilik" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Gizlilik</Link>
             <Link href="/kullanim-sartlari" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Kullanım şartları</Link>
           </nav>
         </div>
@@ -48,7 +42,8 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section aria-labelledby={`${id}-baslik`} className="mx-auto max-w-6xl scroll-mt-6 px-4 py-12 sm:px-6 sm:py-16">
+    <section id={id} aria-labelledby={`${id}-baslik`} className="mx-auto max-w-6xl scroll-mt-6 px-4 py-12 sm:px-6 sm:py-16">
+      {id === "analiz" ? <span id="kontor" aria-hidden="true" /> : null}
       <h2 id={`${id}-baslik`} className="font-display text-2xl font-extrabold text-ink-950 sm:text-3xl">
         {title}
       </h2>

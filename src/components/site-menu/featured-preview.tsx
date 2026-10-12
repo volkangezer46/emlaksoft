@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL } from "@/lib/contact-info";
 import type { CSSProperties, ReactNode } from "react";
 import type { SceneKind } from "@/lib/site-menu/previews";
 
@@ -575,7 +576,7 @@ const Support: Scene = () => (
       <rect x="20" y="8" width="76" height="52" rx="8" fill="var(--mp-soft-2)" stroke="var(--mp-sky)" strokeWidth="1.5" />
       <path className="mk-mp-d" pathLength={1} d="M22 12 L58 38 L94 12" fill="none" stroke="var(--mp-sky)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </g>
-    <text className="mk-mp-f" x="58" y="72" textAnchor="middle" fontSize="5.6" fontWeight="700" fill="var(--mp-ink)" opacity="0.85">destek@emlaksoft.com.tr</text>
+    <text className="mk-mp-f" x="58" y="72" textAnchor="middle" fontSize="5.6" fontWeight="700" fill="var(--mp-ink)" opacity="0.85">{SUPPORT_EMAIL}</text>
     <g className="mk-mp-p" style={at(3)}>
       <path d="M108 24 h34 a8 8 0 0 1 8 8 v14 a8 8 0 0 1 -8 8 h-20 l-8 7 v-7 h-6 a8 8 0 0 1 -8 -8 v-14 a8 8 0 0 1 8 -8 Z" fill="var(--mp-blue)" />
       <circle cx="118" cy="39" r="2.2" fill="var(--mp-card)" />

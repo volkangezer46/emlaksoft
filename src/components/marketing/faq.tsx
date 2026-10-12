@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import { PLANS, type PlanDef } from "@/lib/billing/plans";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { FaqItem, Heading } from "@/lib/site-content/schema";
@@ -49,7 +50,7 @@ export function Faq({ items, heading = defaultSiteContent().sections.sss }: { it
           ))}
         </div>
         <p className="mk-faq-note">
-          Sorunuz hâlâ mı var? <a href="mailto:destek@emlaksoft.com.tr">destek@emlaksoft.com.tr</a>
+          Sorunuz hâlâ mı var? <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
         </p>
       </div>
     </section>
