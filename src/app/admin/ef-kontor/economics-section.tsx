@@ -282,7 +282,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink-950">Ofis bazlı kullanım (en çok harcayan {OFFICE_ROWS_SHOWN})</h3>
         {bars.length === 0 ? (
-          <EmptyState variant="compact" bare icon={Wallet} title="Bakiye hareketi olan ofis yok" description="Ofisler EF kontör harcadıkça en çok harcayanlar burada sıralanır." />
+          <EmptyState variant="compact" bare icon={Wallet} title="Bakiye hareketi olan ofis yok" description="Ofisler analiz bakiyesi harcadıkça en çok harcayanlar burada sıralanır." />
         ) : (
           <ol className="m-0 list-none divide-y divide-line p-0">
             {bars.map((o) => {
