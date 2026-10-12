@@ -3,7 +3,7 @@
   "name": "EmlakSoft İlan Kontrol",
   "short_name": "EmlakSoft İlan",
   "version": "0.4.0",
-  "description": "Ofisinizin sahibinden, Hepsiemlak ve Emlakjet ilanlarını günde en az bir kez, yalnız sizin tarayıcınızda ve düşük hızla portföyünüzle karşılaştırır.",
+  "description": "İlanlarınızı tarayıcınızda portföyünüzle karşılaştırır; sahibinden ilanları tek tıkla EmlakSoft'a kaydeder.",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "alarms", "activeTab", "scripting"],
   "host_permissions": [],
