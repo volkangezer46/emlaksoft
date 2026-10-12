@@ -280,3 +280,20 @@ export async function loadFsboList(
     unavailable: false,
   };
 }
+
+/**
+ * Sahipsiz açık Sahibinden ilan sayısı. Hedef liste (/app/portfoy-avi?danisman=sahipsiz) ile
+ * AYNI süzgeci kullanır (açık durumlar + silinmemiş + atanmamış). Tablo yoksa ya da hata varsa 0 döner.
+ */
+export async function countUnassignedOpenFsbo(db: Db, tenantId: string, nowMs: number): Promise<number> {
+  const filters: FsboFilters = { ...parseFsboFilters({}, { isManager: true }), danisman: "sahipsiz" };
+  const { count, error } = await applyFsboFilters(
+    db.from("fsbo_leads").select("id", { count: "exact", head: true }),
+    filters,
+    { kind: "none" },
+    tenantId,
+    nowMs,
+  );
+  if (error) return isMissingSchemaError(error) ? 0 : 0;
+  return count ?? 0;
+}

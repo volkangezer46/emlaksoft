@@ -1,6 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { AlertTriangle, Clock, Hand, Inbox, Layers, Settings2 } from "lucide-react";
+import { AlertTriangle, Clock, Hand, Inbox, Layers, Settings2, UserMinus } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { ListHero, ListPage } from "@/components/ui/list-page";
@@ -21,6 +21,8 @@ import { getDistrictsByIds, getNeighborhoodsByIds, getProvincesByIds } from "@/l
 import { parseAssignView } from "@/lib/office-center/logic";
 import { loadUnassignedProperties } from "@/lib/office-center/store";
 import { AssignmentSection, assignBranchOf } from "./assignment-section";
+import { countUnassignedOpenFsbo } from "@/lib/prospecting/load";
+import type { Db as ProspectingDb } from "@/lib/prospecting/store";
 
 export const metadata = { title: "Havuz ve atama" };
 
@@ -151,7 +153,7 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
   if (durum === "sahiplen") list = list.gte("claim_open_until", nowIso);
 
   const onList = tab === "bekleyen";
-  const [listRes, pendingRes, lateRes, claimRes, enabled, rule, unassignedRes, advisorsRes] = await Promise.all([
+  const [listRes, pendingRes, lateRes, claimRes, enabled, rule, unassignedRes, advisorsRes, fsboUnassigned] = await Promise.all([
     onList ? list.limit(LIMIT) : Promise.resolve({ data: [] as Row[], count: 0, error: null }),
     count((q) => q.eq("status", "pending")),
     count((q) => q.eq("status", "pending").lt("sla_due_at", nowIso)),
@@ -168,6 +170,10 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
           return q;
         })()
       : Promise.resolve({ data: [] as Row[] }),
+    // Sahipsiz Sahibinden ilan: yalnız ofis geneli roller (portföy avı danışman süzgeciyle aynı) + prospecting görme izni.
+    onList && canManage && (perms.prospecting ?? []).includes("view")
+      ? countUnassignedOpenFsbo(supabase as unknown as ProspectingDb, tenantId, nowMs).catch(() => 0)
+      : Promise.resolve(0),
   ]);
 
   if (listRes.error && isMissingSchemaError(listRes.error)) {
@@ -336,6 +342,9 @@ export default async function ListingPoolPage({ searchParams }: { searchParams?:
                 { label: "Bekleyen ilan", value: pendingTotal, href: tabHref("bekleyen"), icon: <Inbox className="h-4 w-4" aria-hidden="true" /> },
                 { label: "Gecikenler", value: lateRes.count ?? 0, href: tabHref("bekleyen", "gecikmis"), attention: true, icon: <AlertTriangle className="h-4 w-4" aria-hidden="true" /> },
                 { label: "Kendine alınabilir", value: claimRes.count ?? 0, href: tabHref("bekleyen", "sahiplen"), icon: <Hand className="h-4 w-4" aria-hidden="true" /> },
+                ...(fsboUnassigned > 0
+                  ? [{ label: "Sahipsiz Sahibinden ilan", value: fsboUnassigned, href: "/app/portfoy-avi?danisman=sahipsiz", icon: <UserMinus className="h-4 w-4" aria-hidden="true" /> }]
+                  : []),
               ]}
             />
 
