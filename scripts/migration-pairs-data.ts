@@ -285,6 +285,7 @@ const F = {
   fsboLeads: "20261012002400_fsbo_leads.sql",
   fsboPermissionDefaults: "20261012002410_fsbo_permission_defaults.sql",
   fsboRealtime: "20261012002500_fsbo_realtime.sql",
+  fsboRlsScope: "20261012002600_fsbo_rls_scope.sql",
   automationTriggerFsbo: "20261012002510_automation_trigger_fsbo.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
@@ -486,6 +487,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.fsboLeads]: "ek", // 4 yeni tablo (fsbo_leads, fsbo_lead_observations, fsbo_lead_activities, fsbo_do_not_call; RLS + acik grant) + tasks.fsbo_lead_id nullable sutun; mevcut satir/politika degismez, kod tablo yokken bos duruma duser
     [F.fsboPermissionDefaults]: "ek", // yalniz VERI seed: prospecting izin varsayilani (owner/gm/branch_manager/team_lead ALL, advisor/call_center view+create+edit, readonly view); idempotent
     [F.automationTriggerFsbo]: "ek", // yalniz enum degeri ekler (new_fsbo_lead, fsbo_no_contact_days; idempotent); tablo/politika/veri degismez
+    [F.fsboRlsScope]: "siki", // fsbo_leads UPDATE politikasi kendi+sahipsiz kapsama, sutun UPDATE yetkisi daralir, insert is_sample=false; iki kapatma RPC'si izin kapisi alir; veri degismez
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
@@ -662,6 +664,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FSBO-sahibinden-ilanlar", order: 51, title: "Sahibinden ilanlar (portfoy avi): fsbo_* tablolari + tasks.fsbo_lead_id (RLS has_effective_permission('prospecting') kullanir; kod tablo yokken bos duruma duser; sira serbest, ek)", files: [F.fsboLeads] },
     { id: "FSBO-izin-varsayilanlari", order: 51.1, title: "prospecting permission_defaults seed'i (20261012002400 SONRASI; seed olmadan RLS izin vermez; sira serbest, ek)", files: [F.fsboPermissionDefaults] },
     { id: "FSBO-otomasyon-tetikleyici", order: 53, title: "automation_trigger enum: new_fsbo_lead + fsbo_no_contact_days (sira serbest, ek; kod enum yokken FSBO kurali kaydetmez)", files: [F.automationTriggerFsbo] },
+    { id: "FSBO-rls-kapsami", order: 54, title: "fsbo_leads RLS kapsami + sutun yetkisi + kapatma RPC izin kapisi (20261012002400 ve 002500 SONRASI; sira serbest, siki)", files: [F.fsboRlsScope] },
     { id: "FSBO-realtime-kapatma", order: 52, title: "fsbo_leads realtime yayini + insight_close_fsbo_lead RPC (20261012002400 SONRASI; kod yayin/RPC yokken sessiz; sira serbest, ek)", files: [F.fsboRealtime] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
@@ -835,6 +838,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.closureLossAnomalies, F.lcAnomalyTables],
     // FSBO: izin seed'i tablolarin RLS'inden once ya da sonra olabilir, ancak ayni pencerede uygulanir.
     [F.fsboPermissionDefaults, F.fsboLeads],
+    // FSBO RLS kapsami: tablo (002400) ve kapatma RPC'si (002500) once var olmalidir.
+    [F.fsboRlsScope, F.fsboLeads],
+    [F.fsboRlsScope, F.fsboRealtime],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
