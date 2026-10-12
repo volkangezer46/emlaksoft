@@ -24,9 +24,24 @@ type Row = {
   created_at: string;
   claim_expires_at: string | null;
   rooms: string | null;
+  phone_hash: string | null;
   district: { name: string | null } | { name: string | null }[] | null;
   assignee: { full_name: string | null } | { full_name: string | null }[] | null;
 };
+
+/** Aranmasın listesindeki özetler (ofis geneli; tablo yoksa süzgeçsiz devam). 200'lük parçalar. */
+async function doNotCallHashes(admin: SupabaseClient, tenantId: string, hashes: string[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  for (let i = 0; i < hashes.length; i += 200) {
+    const { data, error } = await admin.from("fsbo_do_not_call").select("phone_hash").eq("tenant_id", tenantId).in("phone_hash", hashes.slice(i, i + 200));
+    if (error) {
+      if (isMissingSchemaError(error)) return out;
+      throw new Error(`fsbo_do_not_call: ${error.code ?? "hata"}`);
+    }
+    for (const r of (data ?? []) as { phone_hash: string }[]) out.add(r.phone_hash);
+  }
+  return out;
+}
 
 const ms = (v: string | null): number | null => {
   if (!v) return null;
@@ -39,7 +54,7 @@ export async function loadProspectingFacts(admin: SupabaseClient, tenantId: stri
   const { data, error } = await admin
     .from("fsbo_leads")
     .select(
-      "id, assigned_to, status, contact_attempts, first_seen_at, listed_at, last_contact_at, next_action_at, last_price_drop_at, last_price_drop_pct, relist_of, created_at, claim_expires_at, rooms, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)",
+      "id, assigned_to, status, contact_attempts, first_seen_at, listed_at, last_contact_at, next_action_at, last_price_drop_at, last_price_drop_pct, relist_of, created_at, claim_expires_at, rooms, phone_hash, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)",
     )
     .eq("tenant_id", tenantId)
     .eq("is_sample", false)
@@ -52,7 +67,10 @@ export async function loadProspectingFacts(admin: SupabaseClient, tenantId: stri
     throw new Error(`fsbo_leads: ${error.code ?? "hata"}`);
   }
   const rows = (data ?? []) as unknown as Row[];
-  const facts = rows.map<FsboFact>((r) => ({
+  // Aranmasın listesindeki ilan sahibi için "ara" içgörüsü üretilmez.
+  const hashes = [...new Set(rows.map((r) => r.phone_hash).filter((h): h is string => !!h))];
+  const dnc = hashes.length > 0 ? await doNotCallHashes(admin, tenantId, hashes) : new Set<string>();
+  const facts = rows.filter((r) => !r.phone_hash || !dnc.has(r.phone_hash)).map<FsboFact>((r) => ({
     id: r.id,
     assignedTo: r.assigned_to,
     assigneeName: first(r.assignee)?.full_name ?? null,

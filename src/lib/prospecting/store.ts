@@ -193,7 +193,8 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
       owner_name: input.ownerName,
       phone: input.phone,
       phone_hash: hash,
-      next_action_at: new Date(initialNextActionMs(nowMs)).toISOString(),
+      // Aranmasın listesindeki ilan sahibi için "ilk arama" zamanı konmaz (içgörü/otomasyon görev üretmesin).
+      next_action_at: doNotCall ? null : new Date(initialNextActionMs(nowMs)).toISOString(),
       last_activity_at: nowIso,
       claim_expires_at: new Date(nowMs + CLAIM_IDLE_DAYS * DAY_MS).toISOString(),
       customer_id: cust?.id ?? null,

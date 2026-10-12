@@ -9,7 +9,7 @@ import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { gateIysRecipient } from "@/lib/iys/gate";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
-import { FSBO_ALLOWED_ACTIONS, assignFsboByAutomation, collectFsboNoContactPage, fsboTaskLink } from "@/lib/prospecting/automation-source";
+import { FSBO_ALLOWED_ACTIONS, assignFsboByAutomation, collectFsboNoContactPage, fsboTaskLink, isFsboLeadDoNotCall } from "@/lib/prospecting/automation-source";
 import type { FeatureKey } from "@/lib/modules/registry";
 import {
   AUTOMATION_LIST_PAGE,
@@ -259,6 +259,10 @@ async function executeAction(
   try {
     switch (type) {
       case "create_task": {
+        // Aranmasın listesindeki ilan sahibi için "ara" görevi açılmaz (new_fsbo_lead tetikleyicisi dahil).
+        if (payload.entityType === "fsbo_lead" && (await isFsboLeadDoNotCall(admin, automation.tenant_id, payload.entityId))) {
+          return { type, result: "skip", detail: "atlandı: aranmasın" };
+        }
         // Deterministik iz — aynı otomasyon + aynı kayıt için açık görev varsa atla
         const marker = `[oto:${automation.id.slice(0, 8)}:${payload.entityId.slice(0, 8)}]`;
         const { data: existing } = await admin
