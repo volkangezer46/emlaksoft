@@ -113,10 +113,15 @@ export function ExpenseCreateForm({
       {accounts.length > 0 ? (
         <>
           <label htmlFor="expense-account" className="sr-only">Hangi hesaptan çıktı (opsiyonel)</label>
-          <select id="expense-account" name="account_id" defaultValue="" className={inputClass}>
-            <option value="">Hesaba işleme (yalnız gider kaydı)</option>
-            {accounts.map((a) => <option key={a.id} value={a.id}>{a.name} ({a.currency}) hesabından çıktı</option>)}
-          </select>
+          <Combobox
+            id="expense-account"
+            name="account_id"
+            defaultValue=""
+            options={accounts.map((a) => ({ value: a.id, label: `${a.name} (${a.currency}) hesabından çıktı` }))}
+            placeholder="Hesaba işleme (yalnız gider kaydı)"
+            searchPlaceholder="Hesap ara…"
+            emptyText="Eşleşen hesap yok"
+          />
         </>
       ) : null}
       <Combobox

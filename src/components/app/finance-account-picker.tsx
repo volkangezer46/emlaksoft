@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { listPostableAccounts, type PostableAccount } from "@/app/actions/finance-accounts";
 import { cn } from "@/lib/utils";
+import { Combobox } from "@/components/ui/combobox";
 
 /**
  * "Hangi hesaba girdi?" (isteğe bağlı) — komisyon / kira / aidat tahsilat ekranlarında. Yetki veya şema yoksa ya da
@@ -29,16 +30,15 @@ export function FinanceAccountPicker({
   }, []);
   if (!accounts || accounts.length === 0) return null;
   return (
-    <select
+    <Combobox
       aria-label="Hangi hesaba girdi (isteğe bağlı)"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={cn("min-h-8 rounded-[var(--radius-control)] border border-line bg-canvas px-2 text-xs text-text outline-none focus:border-brand-400", className)}
-    >
-      <option value="">Hesaba işleme</option>
-      {accounts.map((a) => (
-        <option key={a.id} value={a.id}>{a.name} hesabına girdi</option>
-      ))}
-    </select>
+      onValueChange={onChange}
+      options={accounts.map((a) => ({ value: a.id, label: `${a.name} hesabına girdi` }))}
+      placeholder="Hesaba işleme"
+      searchPlaceholder="Hesap ara…"
+      emptyText="Eşleşen hesap yok"
+      className={cn("w-auto min-w-[10rem] text-xs", className)}
+    />
   );
 }

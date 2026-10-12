@@ -3,11 +3,12 @@ import Link from "@/components/ui/smart-link";
 import { Scale } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { FormField, FormSelect } from "@/components/ui/form-controls";
+import { FormField } from "@/components/ui/form-controls";
 import { Button } from "@/components/ui/button";
 import { CARI_NOTE, cariBalanceLabel } from "@/lib/building-management/unit-ledger";
 import { PAYER_LABELS } from "@/lib/building-management/charges";
 import { loadUnitCari, loadUnitOptions } from "@/lib/building-management/load";
+import { Combobox } from "@/components/ui/combobox";
 
 const money = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
 const dayLabel = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium" }).format(new Date(`${iso.slice(0, 10)}T00:00:00`));
@@ -24,10 +25,15 @@ export async function CariTab({ db, tenantId, daireId }: { db: SupabaseClient; t
       <form action="/app/aidat" className="flex flex-wrap items-end gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         <input type="hidden" name="sekme" value="cari" />
         <FormField label="Daire" htmlFor="cari-daire" className="min-w-64 flex-1">
-          <FormSelect id="cari-daire" name="daire" defaultValue={daireId}>
-            <option value="">Daire seçin…</option>
-            {options.map((o) => <option key={o.id} value={o.id}>{o.buildingName} · {o.label}</option>)}
-          </FormSelect>
+          <Combobox
+            id="cari-daire"
+            name="daire"
+            defaultValue={daireId}
+            options={options.map((o) => ({ value: o.id, label: `${o.buildingName} · ${o.label}` }))}
+            placeholder="Daire seçin…"
+            searchPlaceholder="Bina veya daire ara…"
+            emptyText="Eşleşen daire yok"
+          />
         </FormField>
         <Button type="submit" size="sm">Ekstreyi göster</Button>
       </form>

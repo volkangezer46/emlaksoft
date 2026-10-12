@@ -14,6 +14,7 @@ import {
   reportValidity,
   validityLabel,
 } from "@/lib/ef-credits/visibility";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type ArchiveParams = { rapor_bas?: string; rapor_bit?: string; rapor_tip?: string; rapor_kullanici?: string };
 
@@ -84,12 +85,13 @@ export function ReportArchive({
         {canSeeAll ? (
           <label className="text-xs font-semibold text-text-muted">
             Kullanıcı
-            <select name="rapor_kullanici" defaultValue={userId ?? ""} className="focus-ring mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm text-ink-950">
-              <option value="">Tüm kullanıcılar</option>
-              {authors.map((id) => (
-                <option key={id} value={id}>{userNames[id] ?? "Kullanıcı"}</option>
-              ))}
-            </select>
+            <PersonSelect
+              name="rapor_kullanici"
+              defaultValue={userId ?? ""}
+              people={authors.map((id) => ({ id, name: userNames[id] ?? "Kullanıcı" }))}
+              emptyLabel="Tüm kullanıcılar"
+              className="mt-1 min-w-[12rem]"
+            />
           </label>
         ) : null}
         <button type="submit" className="focus-ring press min-h-9 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-1.5 text-sm font-semibold text-white touch:min-h-11">

@@ -32,6 +32,7 @@ import {
   keyStatusTone,
 } from "@/lib/key-overdue";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Anahtar takibi — portföyün fiziksel anahtarları kimde?
@@ -368,21 +369,14 @@ export function PropertyKeysSection({
                     {holderType === "staff" ? (
                       <label className="text-xs font-semibold text-text-muted">
                         Danışman
-                        <select
+                        <PersonSelect
                           name="holder_staff_id"
                           required
                           defaultValue=""
-                          className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-sm outline-none focus:border-brand-300"
-                        >
-                          <option value="" disabled>
-                            Seçin…
-                          </option>
-                          {staff.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.full_name ?? "İsimsiz"}
-                            </option>
-                          ))}
-                        </select>
+                          people={staff.map((s) => ({ id: s.id, name: s.full_name ?? "İsimsiz" }))}
+                          emptyLabel="Seçin…"
+                          className="mt-1"
+                        />
                       </label>
                     ) : (
                       <>

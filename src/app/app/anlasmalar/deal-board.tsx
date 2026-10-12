@@ -71,6 +71,7 @@ import {
   type BoardAction,
   type StageNames,
 } from "./board-logic";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type BoardDeal = {
   id: string;
@@ -472,12 +473,13 @@ export function DealBoard({
               </div>
               <div>
                 <label htmlFor={`deal-${editing.id}-assignee`} className="mb-1 block text-xs font-semibold text-text-muted">Sorumlu danışman</label>
-                <select id={`deal-${editing.id}-assignee`} name="assigned_to" defaultValue={editing.assigned_to ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
-                  <option value="">Değiştirme</option>
-                  {members.map((m) => (
-                    <option key={m.id} value={m.id}>{m.full_name}</option>
-                  ))}
-                </select>
+                <PersonSelect
+                  id={`deal-${editing.id}-assignee`}
+                  name="assigned_to"
+                  defaultValue={editing.assigned_to ?? ""}
+                  people={members.map((m) => ({ id: m.id, name: m.full_name }))}
+                  emptyLabel="Değiştirme"
+                />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <DialogClose asChild>

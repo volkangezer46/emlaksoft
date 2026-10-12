@@ -12,6 +12,7 @@ import { LatLngPicker } from "@/components/app/lat-lng-picker";
 import { GeoSelect } from "@/components/app/geo-select";
 import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/yeni/property-options";
 import { defaultDefinitionValues, LEGACY_TRANSACTION_TYPE_VALUES } from "@/lib/definition-defaults";
+import { Combobox } from "@/components/ui/combobox";
 
 type Province = { id: string; name: string };
 
@@ -167,10 +168,15 @@ export function EditPropertyDialog({
             {branches.length > 0 ? (
               <label className="text-xs font-medium text-text-muted">
                 Şube
-                <select name="branch_id" defaultValue={property.branch_id ?? ""} className={`${field} touch:h-11`}>
-                  <option value="">Şube atanmadı</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                <Combobox
+                  name="branch_id"
+                  defaultValue={property.branch_id ?? ""}
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                  placeholder="Şube atanmadı"
+                  searchPlaceholder="Şube ara…"
+                  emptyText="Eşleşen şube yok"
+                  className="mt-1"
+                />
               </label>
             ) : null}
           </>

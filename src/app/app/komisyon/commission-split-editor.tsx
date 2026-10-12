@@ -15,6 +15,7 @@ import { useAutoAnimate } from "@/components/ui/auto-animate";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { FormField, FormTextarea } from "@/components/ui/form-controls";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type Party = "staff" | "office" | "external";
 export type SplitInitial = { label?: string; rate?: number; profile_id?: string | null; kind?: string | null; unresolved?: boolean };
@@ -142,14 +143,14 @@ export function CommissionSplitEditor({
                       </div>
                       {r.party === "staff" ? (
                         <div className="min-w-0 flex-1">
-                          <Select value={r.profileId} onValueChange={(v) => update(i, { profileId: v })}>
-                            <SelectTrigger aria-label="Ofis personeli" placeholder="Kişi seçin" />
-                            <SelectContent>
-                              {staff.map((m) => (
-                                <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <PersonSelect
+                            value={r.profileId}
+                            onValueChange={(v) => update(i, { profileId: v })}
+                            aria-label="Ofis personeli"
+                            people={staff}
+                            emptyLabel="Kişi seçin"
+                            clearable={false}
+                          />
                         </div>
                       ) : r.party === "external" ? (
                         <input

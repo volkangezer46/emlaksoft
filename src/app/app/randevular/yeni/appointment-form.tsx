@@ -10,6 +10,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS } from "./appointment-tabs";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type Option = { id: string; label: string };
 
@@ -110,11 +111,15 @@ export function AppointmentForm({
       <>
         {advisors && advisors.length > 0 ? (
           <FormField label="Danışman" htmlFor="appointment-advisor" hint="Boş bırakırsanız randevu sizin adınıza açılır." className="sm:col-span-2">
-            <FormSelect name="assigned_to" defaultValue={userId}>
-              {advisors.map((a) => (
-                <option key={a.id} value={a.id}>{a.id === userId ? `${a.label} (ben)` : a.label}</option>
-              ))}
-            </FormSelect>
+            <PersonSelect
+              id="appointment-advisor"
+              name="assigned_to"
+              defaultValue={userId}
+              required
+              people={advisors.map((a) => ({ id: a.id, name: a.id === userId ? `${a.label} (ben)` : a.label }))}
+              featuredIds={[userId]}
+              emptyLabel="Danışman seçin"
+            />
           </FormField>
         ) : null}
         <FormField label="Müşteri" htmlFor="appointment-customer">

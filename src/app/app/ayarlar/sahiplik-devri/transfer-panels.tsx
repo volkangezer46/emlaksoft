@@ -13,6 +13,7 @@ import {
   resolveOwnershipTransfer,
   type OwnershipActionResult,
 } from "@/app/actions/ownership-transfer";
+import { Combobox } from "@/components/ui/combobox";
 
 function useAction() {
   const router = useRouter();
@@ -63,16 +64,15 @@ export function RequestTransferForm({
         </p>
       </div>
       <FormField label="Devralacak kişi" htmlFor={ids.to} required>
-        <FormSelect name="to_user_id" defaultValue="" required>
-          <option value="" disabled>
-            Ekipten birini seçin
-          </option>
-          {candidates.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.label}
-            </option>
-          ))}
-        </FormSelect>
+        <Combobox
+          id={ids.to}
+          name="to_user_id"
+          required
+          options={candidates.map((c) => ({ value: c.id, label: c.label }))}
+          placeholder="Ekipten birini seçin"
+          searchPlaceholder="İsim ara…"
+          emptyText="Eşleşen kişi bulunamadı"
+        />
       </FormField>
       <FormField label="Devirden sonra sizin rolünüz" htmlFor={ids.role} hint="Ofiste kalırsınız; yalnız sahiplik yetkileri yeni sahibe geçer.">
         <FormSelect name="demote_role" defaultValue="gm">
