@@ -279,7 +279,7 @@ export const FAQ: readonly FaqItem[] = [
     q: "Giderleri ve aidatı nerede takip ederim?",
     a: "Finans bölümündeki Giderler sayfasında ofis giderlerini, Aidat sayfasında portföy aidat ve vergi ödemelerini vade ve durumla izlersiniz. İkisi de paketinize bağlıdır.",
     href: "/app/giderler",
-    hrefLabel: "Giderler",
+    hrefLabel: "Muhasebe",
   },
   // Paket
   {

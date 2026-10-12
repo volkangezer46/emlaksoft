@@ -454,7 +454,7 @@ export const GUIDES: readonly Guide[] = [
       "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Roller'den expenses iznini vermelidir.",
     ],
     href: "/app/giderler",
-    cta: "Giderler",
+    cta: "Muhasebe",
   },
   {
     slug: "degerleme",
