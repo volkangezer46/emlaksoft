@@ -16,6 +16,7 @@ export {
   TRY_DEFAULT_MAX_SHARE,
   TRY_FULL_CREDIT_SHARE,
   TRY_GRANT_KINDS,
+  TRY_IDEM_PATTERN,
   TRY_GRANT_KIND_LABELS,
   TRY_MAX_SHARE_SETTING_KEY,
   TRY_UNIT,
@@ -37,8 +38,6 @@ export function parseMaxShare(raw: string | null | undefined): number {
 // Yükleme türleri (defter source eşlemesi SQL'de; liste constants.ts'te)
 // ---------------------------------------------------------------------------
 
-/** p_idem biçimi (SQL ile aynı). */
-export const TRY_IDEM_PATTERN = /^[A-Za-z0-9_.:-]{8,128}$/;
 
 // ---------------------------------------------------------------------------
 // RPC sözleşmesi (hepsi service_role-only; ofis okuması hariç)

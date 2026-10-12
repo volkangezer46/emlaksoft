@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { runWhenIdle } from "@/lib/idle";
 import { now } from "@/lib/clock";
 import { noteClientCacheRefreshed } from "@/lib/client-cache-state";
-import { computeRefreshDelay } from "@/lib/realtime-throttle";
+import { computeRefreshDelay, shouldIgnoreRealtimeEvent } from "@/lib/realtime-throttle";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -21,6 +21,8 @@ export function useRealtimeRefresh(opts: {
   tables: string[];
   /** Ayrı kanalda dinlenen ek tablolar (publication'da olmayan tablo yalnız bu kanalı sessiz bırakır). */
   extraTables?: string[];
+  /** Üçüncü ayrı kanal (sonradan yayına eklenen tablolar). */
+  moreTables?: string[];
   enabled?: boolean;
   debounceMs?: number;
   /** Açık rotaya göre ilgili tablo alt kümesi; verilmezse tüm tablolar ilgilidir. */
@@ -44,6 +46,7 @@ export function useRealtimeRefresh(opts: {
   // yeni bir dizi referansı olabileceği için tek bir anahtar string'e indiriliyor.
   const tablesKey = opts.tables.join("|");
   const extraKey = (opts.extraTables ?? []).join("|");
+  const moreKey = (opts.moreTables ?? []).join("|");
   const tenantId = opts.tenantId;
   const debounceMs = opts.debounceMs;
 
@@ -51,6 +54,7 @@ export function useRealtimeRefresh(opts: {
     if (!enabled || !tenantId) return;
     const tables = tablesKey.split("|").filter(Boolean);
     const extra = extraKey.split("|").filter(Boolean);
+    const more = moreKey.split("|").filter(Boolean);
     let cancelled = false;
     let supabase: SupabaseClient | null = null;
     const channels: RealtimeChannel[] = [];
@@ -58,6 +62,7 @@ export function useRealtimeRefresh(opts: {
     // Her router.refresh() sayfanın TÜM sunucu sorgularını yeniden koşturur.
     // Sekme arka plandayken tetiklenmez: "bekliyor" işaretlenir, görünür olunca yenilenir.
     let pending = false;
+    let selfUserId: string | null = null;
     const schedule = () => {
       // Bekleyen bir yenileme zaten var: olayı birleştir (yeniden kurma).
       if (timer.current) return;
@@ -74,7 +79,9 @@ export function useRealtimeRefresh(opts: {
         router.refresh();
       }, delay);
     };
-    const bump = (table: string) => {
+    const bump = (table: string, payload?: { new?: Record<string, unknown> | null; commit_timestamp?: string | null }) => {
+      // Kendi yazımızın yankısı / son tazelemede zaten görünen değişiklik: mutasyon revalidatePath ile tazeler.
+      if (payload && shouldIgnoreRealtimeEvent(payload, selfUserId, lastRefreshAt.current)) return;
       const relevant = relevantRef.current?.(pathRef.current ?? "");
       if (relevant && !relevant.includes(table)) return;
       if (document.visibilityState === "hidden") {
@@ -94,6 +101,9 @@ export function useRealtimeRefresh(opts: {
     const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(({ createClient }) => {
       if (cancelled) return;
       supabase = createClient();
+      void supabase.auth.getSession().then(({ data }) => {
+        selfUserId = data.session?.user?.id ?? null;
+      });
       const open = (name: string, list: string[]) => {
         if (!supabase || list.length === 0) return;
         let ch = supabase.channel(name);
@@ -101,7 +111,7 @@ export function useRealtimeRefresh(opts: {
           ch = ch.on(
             "postgres_changes",
             { event: "*", schema: "public", table, filter: `tenant_id=eq.${tenantId}` },
-            () => bump(table),
+            (payload) => bump(table, payload as { new?: Record<string, unknown> | null; commit_timestamp?: string | null }),
           );
         }
         ch.subscribe();
@@ -109,6 +119,7 @@ export function useRealtimeRefresh(opts: {
       };
       open(`es-rt:${tenantId}:${tables.join(",")}`, tables);
       open(`es-rt-x:${tenantId}:${extra.join(",")}`, extra);
+      open(`es-rt-m:${tenantId}:${more.join(",")}`, more);
     }));
 
     return () => {
@@ -120,5 +131,5 @@ export function useRealtimeRefresh(opts: {
       const client = supabase;
       if (client) for (const ch of channels) void client.removeChannel(ch);
     };
-  }, [enabled, tenantId, tablesKey, extraKey, debounceMs, router]);
+  }, [enabled, tenantId, tablesKey, extraKey, moreKey, debounceMs, router]);
 }

@@ -3,7 +3,7 @@ import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
 import { layoutHrefs, navLayoutFor, type HubDef, type MobileSlot } from "@/lib/nav-roles";
-import { featureForHref } from "@/lib/modules/registry";
+import { featureForHref } from "@/lib/modules/route-table";
 
 /**
  * /app menüsünün TEK kaynağı. 55 düz link yerine 9 iş başlığı: kullanıcı önce

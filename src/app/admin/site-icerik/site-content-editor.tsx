@@ -7,7 +7,8 @@ import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, U
 import { discardSiteContentDraft, publishSiteContent, resetSiteContentToDefault, rollbackSiteContent, saveSiteContentDraft } from "@/app/actions/site-content";
 import { Input } from "@/components/ui/input";
 import { PIONEER_CLAIM } from "@/lib/site-content/claims";
-import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, sameContent, validateSiteContent, type SectionKey, type SiteContent } from "@/lib/site-content/schema";
+import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
+import type { SiteContent, validateSiteContent } from "@/lib/site-content/schema";
 
 import { InlineConfirm, TargetDatalist, btn } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
@@ -57,10 +58,21 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
   const [pending, start] = useTransition();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const issues = useMemo(() => validateSiteContent(cfg).issues, [cfg]);
+  // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular).
+  const [validate, setValidate] = useState<typeof validateSiteContent | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("@/lib/site-content/schema").then((m) => {
+      if (alive) setValidate(() => m.validateSiteContent);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const issues = useMemo(() => (validate ? validate(cfg).issues : []), [validate, cfg]);
   const errorCount = issues.filter((i) => i.level === "error").length;
   const warnCount = issues.length - errorCount;
-  const blocked = hasErrors(issues);
+  const blocked = !validate || hasErrors(issues);
   const dirty = !sameContent(cfg, saved);
   const liveCfg = live ?? defaults;
   const pendingPublish = !sameContent(saved, liveCfg);

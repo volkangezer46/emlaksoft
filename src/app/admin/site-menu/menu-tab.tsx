@@ -29,7 +29,8 @@ import {
   moveItem,
   newId,
 } from "@/lib/site-menu/editor-model";
-import { FEATURED_PREVIEWS, FEATURED_RATIOS, LIMITS, type Issue, type MenuGroup, type MenuItem, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import { FEATURED_PREVIEWS, FEATURED_RATIOS, LIMITS, type Issue } from "@/lib/site-menu/schema-core";
+import type { MenuGroup, MenuItem, SiteMenuConfig } from "@/lib/site-menu/schema";
 import { PREVIEW_LABELS } from "@/lib/site-menu/previews";
 import type { MediaEntry } from "@/lib/site-menu/store";
 import {
