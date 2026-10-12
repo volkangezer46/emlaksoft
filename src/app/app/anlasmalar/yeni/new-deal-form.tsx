@@ -2,12 +2,12 @@
 
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { Save, TriangleAlert } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createPipelineDeal } from "@/app/actions/deals";
-import { searchCustomers, searchProperties } from "@/app/actions/lookup";
+import { searchCustomers, searchProperties, type PropertySearchOption } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
@@ -42,6 +42,15 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
   const nameOf = (v: string) => stageNames[v] ?? v;
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
+  // Aramadan gelen portföylerin fiyat/tür bilgisi (ilk liste yalnız 20 kayıt).
+  const foundRef = useRef(new Map<string, PropertySearchOption>());
+  const [, bumpFound] = useState(0);
+  const searchWithMeta = useCallback(async (q: string) => {
+    const res = await searchProperties(q);
+    for (const r of res) foundRef.current.set(r.value, r);
+    bumpFound((n) => n + 1);
+    return res;
+  }, []);
   const { onSubmit, pending, error } = useCreateForm((fd) => createPipelineDeal(fd), {
     successMessage: "Anlaşma satış sürecine eklendi",
     redirectTo: (r) => detailOrList("/app/anlasmalar", r.dealId),
@@ -74,7 +83,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             placeholder="Seçilmedi"
             searchPlaceholder="Kod ya da başlık ara…"
             emptyText="Eşleşen portföy yok"
-            onSearch={searchProperties}
+            onSearch={searchWithMeta}
             options={properties.map((p) => ({
               value: p.id,
               label: p.title ?? "Başlıksız",
@@ -139,7 +148,18 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
-    const prop = properties.find((p) => p.id === values.property_id);
+    const found = foundMap[values.property_id ?? ""];
+    const prop: Prop | undefined =
+      properties.find((p) => p.id === values.property_id) ??
+      (found
+        ? {
+            id: found.value,
+            property_code: found.hint ?? "",
+            title: found.label,
+            list_price: found.list_price,
+            transaction_type: found.transaction_type ?? "",
+          }
+        : undefined);
     const hasProp = (values.property_id ?? "") !== "";
     const cust = customers.find((c) => c.id === values.customer_id);
     const hasCust = (values.customer_id ?? "") !== "";
