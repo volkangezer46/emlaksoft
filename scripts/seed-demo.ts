@@ -1728,6 +1728,89 @@ async function main() {
     return (await insertRows("valuations", rows)).length;
   });
 
+  // ---------------- Sahibinden ilanlar (portföy avı; FSBO) ----------------
+  // Örnek veri: is_sample=true → içgörü motoru bu kayıtlardan kart ÜRETMEZ (örnek veri içgörü üretmez kuralı).
+  // Telefon/ad yok (kişisel veri sahte de olsa saklanmaz). Tablo yoksa (migration uygulanmamış) bölüm atlanır.
+  try {
+    await section("Sahibinden ilanlar", "fsbo_leads", tenantId, 7, async () => {
+      const specs = [
+        { key: "01", title: "Kadıköy Moda 3+1 sahibinden", district: geo.kadikoyId, rooms: "3+1", m2: 135, price: 12_900_000, status: "yeni", seenDaysAgo: 1, drop: null as null | { from: number; pct: number } },
+        { key: "02", title: "Beşiktaş Levent 2+1 sahibinden", district: geo.besiktasId, rooms: "2+1", m2: 95, price: 14_250_000, status: "yeni", seenDaysAgo: 3, drop: { from: 15_000_000, pct: 5 } },
+        { key: "03", title: "Ataşehir 4+1 sahibinden", district: geo.atasehirId, rooms: "4+1", m2: 190, price: 19_800_000, status: "arandi", seenDaysAgo: 9, drop: null, attempts: 2, nextInDays: 1 },
+        { key: "04", title: "Maltepe 2+1 sahibinden", district: geo.maltepeId, rooms: "2+1", m2: 88, price: 5_300_000, status: "randevu", seenDaysAgo: 12, drop: null, attempts: 3, nextInDays: 2 },
+        { key: "05", title: "Üsküdar 3+1 sahibinden", district: geo.uskudarId, rooms: "3+1", m2: 120, price: 9_450_000, status: "yetki_alindi", seenDaysAgo: 20, drop: null, attempts: 4, auth: true },
+        { key: "06", title: "Kadıköy Fenerbahçe 3+1 sahibinden", district: geo.kadikoyId, rooms: "3+1", m2: 140, price: 16_900_000, status: "kayip", seenDaysAgo: 30, drop: null, attempts: 5, lost: "baska_ofis" },
+        { key: "07", title: "Şişli 1+1 sahibinden", district: geo.sisliId, rooms: "1+1", m2: 62, price: 4_100_000, status: "arandi", seenDaysAgo: 40, drop: null, attempts: 1, nextInDays: -3 },
+      ] as Array<{
+        key: string; title: string; district: string; rooms: string; m2: number; price: number; status: string; seenDaysAgo: number;
+        drop: null | { from: number; pct: number }; attempts?: number; nextInDays?: number; auth?: boolean; lost?: string;
+      }>;
+      const rows = specs.map((x) => {
+        const seen = daysFromNow(-x.seenDaysAgo, 10);
+        const contacted = (x.attempts ?? 0) > 0;
+        return {
+          tenant_id: tenantId,
+          assigned_to: advisorId,
+          created_by: advisorId,
+          source: "manual",
+          portal: "sahibinden",
+          external_id: `DEMO-FSBO-${x.key}`,
+          title: x.title,
+          transaction_type: "sale",
+          property_type: "Daire",
+          price: x.price,
+          rooms: x.rooms,
+          gross_m2: x.m2,
+          province_id: geo.istanbulId,
+          district_id: x.district,
+          location_text: "İstanbul",
+          first_seen_at: iso(seen),
+          last_seen_at: iso(daysFromNow(-1, 9)),
+          listing_status: "active",
+          status: x.status,
+          status_changed_at: iso(daysFromNow(-Math.max(1, x.seenDaysAgo - 2), 12)),
+          lost_reason: x.lost ?? null,
+          contact_attempts: x.attempts ?? 0,
+          last_contact_at: contacted ? iso(daysFromNow(-Math.max(1, Math.floor(x.seenDaysAgo / 2)), 14)) : null,
+          next_action_at: x.nextInDays != null ? iso(daysFromNow(x.nextInDays, 9)) : x.status === "yeni" ? iso(daysFromNow(0, 9)) : null,
+          last_activity_at: iso(daysFromNow(-1, 11)),
+          price_drop_count: x.drop ? 1 : 0,
+          last_price_drop_pct: x.drop ? x.drop.pct : null,
+          last_price_drop_at: x.drop ? iso(daysFromNow(-2, 10)) : null,
+          is_sample: true,
+        };
+      });
+      const created = await insertRows("fsbo_leads", rows);
+      const idOf = new Map(created.map((r) => [String(r.external_id), String(r.id)]));
+      const obs: Dict[] = [];
+      const acts: Dict[] = [];
+      for (const x of specs) {
+        const id = idOf.get(`DEMO-FSBO-${x.key}`);
+        if (!id) continue;
+        if (x.drop) {
+          obs.push(
+            { tenant_id: tenantId, lead_id: id, observed_at: iso(daysFromNow(-x.seenDaysAgo, 10)), price: x.drop.from, listing_status: "active", source: "manual", observed_by: advisorId },
+            { tenant_id: tenantId, lead_id: id, observed_at: iso(daysFromNow(-2, 10)), price: x.price, listing_status: "active", source: "manual", observed_by: advisorId },
+          );
+        } else {
+          obs.push({ tenant_id: tenantId, lead_id: id, observed_at: iso(daysFromNow(-x.seenDaysAgo, 10)), price: x.price, listing_status: "active", source: "manual", observed_by: advisorId });
+        }
+        acts.push({ tenant_id: tenantId, lead_id: id, actor_id: advisorId, kind: "status", note: "Elle eklendi.", created_at: iso(daysFromNow(-x.seenDaysAgo, 10)) });
+        if (x.auth) {
+          const d = daysFromNow(-6, 12);
+          const dd = String(d.getDate()).padStart(2, "0");
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          acts.push({ tenant_id: tenantId, lead_id: id, actor_id: advisorId, kind: "status", note: `Yetkilendirme sözleşmesi: ${dd}.${mm}.${d.getFullYear()}, 3 ay.`, created_at: iso(d) });
+        }
+      }
+      await insertRows("fsbo_lead_observations", obs);
+      await insertRows("fsbo_lead_activities", acts);
+      return created.length;
+    });
+  } catch (e) {
+    console.log(`- Sahibinden ilanlar: atlandı (${e instanceof Error ? e.message : "tablo yok"})`);
+  }
+
   // ---------------- İstanbul normalizasyonu (eski küçük-il satırları) ----------------
   {
     const moved = await normalizeDemoGeo(tenantId, geo);

@@ -122,6 +122,7 @@ export async function DemandsView({
     from?: string;
     to?: string;
     il?: string;
+    ilce?: string;
     butce?: string;
     danisman?: string;
     sayfa?: string;
@@ -154,6 +155,7 @@ export async function DemandsView({
   const aciliyetF = aciliyetValues.join(",");
   // Liste-kesen kullanıcı filtreleri: ?il= (province_id, doğrulanmış uuid) ?butce= ?yas= ?danisman= — hepsi sunucuda.
   const ilF = uuidParam(sp.il);
+  const ilceF = uuidParam(sp.ilce);
   const butceF: BandKey | "" = BUDGET_BANDS.some((b) => b.key === sp.butce) ? (sp.butce as BandKey) : "";
   const yasF = sp.yas === String(AGING_DAYS);
   // ?eklenen=7|30|90: son N günde açılan talepler (ana ekran "Yeni talep · N gün" KPI'sı buraya iner; sayımla aynı koşul).
@@ -174,6 +176,7 @@ export async function DemandsView({
   if (statusF) urlParams.status = statusF;
   if (aciliyetF) urlParams.aciliyet = aciliyetF;
   if (ilF) urlParams.il = ilF;
+  if (ilceF) urlParams.ilce = ilceF;
   if (butceF) urlParams.butce = butceF;
   if (yasF) urlParams.yas = String(AGING_DAYS);
   if (eklenenF) urlParams.eklenen = String(eklenenF);
@@ -213,6 +216,7 @@ export async function DemandsView({
   const buildList = (select: string, opts?: { count: "exact"; head?: boolean }) => {
     let query = buildBase(select, opts);
     if (ilF) query = query.eq("province_id", ilF);
+    if (ilceF) query = query.eq("district_id", ilceF);
     if (butceF) query = query.or(budgetOrFilter(butceF));
     // Yaşlanan: 30+ gündür açık; kapalılar sayılmaz.
     if (yasF) query = query.lte("created_at", daysAgoIso(AGING_DAYS)).neq("status", "closed");
@@ -344,7 +348,7 @@ export async function DemandsView({
       value: openTotal,
       icon: <Target />,
       tone: "info",
-      href: hrefWith({ status: "", aciliyet: "", yas: "", il: "", butce: "", q: "" }),
+      href: hrefWith({ status: "", aciliyet: "", yas: "", il: "", ilce: "", butce: "", q: "" }),
       series: weekly,
       showTrend: true,
       seriesLabel: "haftalık yeni talep",
@@ -395,6 +399,7 @@ export async function DemandsView({
       format: (v) => v.split(",").map((x) => URGENCY_LABELS[x] ?? x).join(" + "),
     },
     { key: "il", label: "İl", format: () => ilName ?? "Seçili il" },
+    { key: "ilce", label: "İlçe", format: () => "Seçili ilçe" },
     { key: "butce", label: "Bütçe", format: (v) => BUDGET_BANDS.find((b) => b.key === v)?.label ?? v },
     { key: "yas", label: "Açık süre", format: (v) => `${v}+ gün` },
     { key: "eklenen", label: "Eklenme", format: (v) => addedLabel(v) },

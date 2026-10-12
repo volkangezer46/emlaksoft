@@ -23,6 +23,7 @@ export default async function DemandsPage({
   yas?: string;
   eklenen?: string;
   il?: string;
+  ilce?: string;
   butce?: string;
   danisman?: string;
   sayfa?: string;

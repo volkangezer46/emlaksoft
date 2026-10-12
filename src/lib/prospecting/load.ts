@@ -128,7 +128,7 @@ export type FsboRow = {
 };
 
 export const FSBO_ROW_SELECT =
-  "id, title, url, portal, external_id, transaction_type, price, rooms, gross_m2, location_text, first_seen_at, listed_at, status, lost_reason, contact_attempts, last_contact_at, next_action_at, price_drop_count, last_price_drop_pct, relist_of, owner_name, phone, phone_hash, assigned_to, customer_id, property_id, claim_expires_at, is_sample, pii_purged_at, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)";
+  "id, district_id, title, url, portal, external_id, transaction_type, price, rooms, gross_m2, location_text, first_seen_at, listed_at, status, lost_reason, contact_attempts, last_contact_at, next_action_at, price_drop_count, last_price_drop_pct, relist_of, owner_name, phone, phone_hash, assigned_to, customer_id, property_id, claim_expires_at, is_sample, pii_purged_at, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)";
 
 type Chain = {
   eq: (c: string, v: unknown) => Chain;
