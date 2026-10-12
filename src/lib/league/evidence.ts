@@ -26,7 +26,7 @@ export function evidenceHref(rule: ScoreRuleKey, staffId: string): string {
     case "listing_confirmed":
       return "/app/ilan-kontrol";
     case "nps_promoter":
-      return "/app/raporlar/memnuniyet";
+      return "/app/anketler?sekme=sonuc";
     case "leak_sla_response":
       return "/app/kayip-kacak";
   }

@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { ExternalLink, Eye, HeartHandshake, MessageSquareQuote, Presentation } from "lucide-react";
 // Kopyalama davranışı tek yerde yaşasın diye memnuniyet raporundaki client
 // bileşeni AYNEN yeniden kullanılıyor (o dosya değiştirilmedi, yalnız import).
-import { CopySurveyLinkButton } from "../../raporlar/memnuniyet/survey-actions";
+import { CopySurveyLinkButton } from "../../anketler/survey-actions";
 
 export type CustomerSurveyRow = {
   id: string;
@@ -67,7 +67,7 @@ export function CustomerSatisfactionSection({
           <HeartHandshake className="h-4 w-4 text-mint-600" /> Memnuniyet &amp; Paylaşımlar
         </h2>
         {surveys.length > 0 ? (
-          <Link href="/app/raporlar/memnuniyet" className="text-xs font-semibold text-brand-600 hover:underline">
+          <Link href="/app/anketler?sekme=sonuc" className="text-xs font-semibold text-brand-600 hover:underline">
             Memnuniyet raporu →
           </Link>
         ) : null}

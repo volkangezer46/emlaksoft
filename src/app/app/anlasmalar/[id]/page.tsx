@@ -54,7 +54,7 @@ import { parseOutcomeParam } from "./kapanis-model";
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
  * halde aynı davranışın iki kopyası ayrışmaya başlar.
  */
-import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
+import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { DealTimelineSection } from "./deal-timeline-section";
