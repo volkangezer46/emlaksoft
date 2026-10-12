@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -114,7 +115,7 @@ export function MacroList({ macros, canEdit }: { macros: MacroRow[]; canEdit: bo
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-2"><MacroPanel canEdit={canEdit} /></div>
       {macros.length === 0 ? (
-        <p className="rounded-[var(--radius-card)] border border-line bg-surface p-5 text-sm text-text-muted">Henüz hazır yanıt yok.</p>
+        <EmptyState icon={Pencil} title="Henüz hazır yanıt yok" description="Sık verilen cevapları makro olarak kaydedin; destek taleplerinde tek tıkla kullanın." />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           {macros.map((m) => (

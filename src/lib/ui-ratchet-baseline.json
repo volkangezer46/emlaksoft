@@ -1331,12 +1331,6 @@
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/admin/ef-kontor/editors.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 10,
-  "kucukHedef": 0
- },
  "src/app/admin/geo/entity-list.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
@@ -1347,12 +1341,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/admin/growth/growth-forms.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 10,
   "kucukHedef": 0
  },
  "src/app/admin/hesabim/account-forms.tsx": {
@@ -1424,7 +1412,7 @@
  "src/app/admin/site-menu/editor-ui.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 6,
+  "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/admin/site-menu/footer-announcement-tabs.tsx": {
@@ -1463,16 +1451,10 @@
   "hamButon": 4,
   "kucukHedef": 0
  },
- "src/app/admin/tenants/[id]/module-panel.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 3,
-  "kucukHedef": 0
- },
  "src/app/admin/tenants/[id]/office-management.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 35,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/makrolar/macro-editor.tsx": {

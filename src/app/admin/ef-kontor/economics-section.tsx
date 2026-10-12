@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
+import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Wallet } from "lucide-react";
 import type { createAdminClient } from "@/lib/supabase/admin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatRow } from "@/components/ui/stat-row";
@@ -248,7 +249,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink-950">Plan hakkı ve yükleme dağılımı (dönemdeki yüklemeler)</h3>
         {segments.length === 0 ? (
-          <p className="text-sm text-text-muted">Bu dönemde bakiye yüklemesi yok.</p>
+          <EmptyState variant="compact" bare icon={Wallet} title="Bu dönemde bakiye yüklemesi yok" description="Dönem aralığını genişletin ya da ofislerin yüklemesini bekleyin." />
         ) : (
           <>
             <div role="img" aria-label="Yükleme dağılımı (analiz bakiyesi payı)" className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--surface-sunken)]">
@@ -281,7 +282,7 @@ function Body({ data, ledgerHref, muhasebeHref }: { data: EfEconomicsData; ledge
       <div>
         <h3 className="mb-2 text-sm font-bold text-ink-950">Ofis bazlı kullanım (en çok harcayan {OFFICE_ROWS_SHOWN})</h3>
         {bars.length === 0 ? (
-          <p className="text-sm text-text-muted">Bakiye hareketi olan ofis yok.</p>
+          <EmptyState variant="compact" bare icon={Wallet} title="Bakiye hareketi olan ofis yok" description="Ofisler EF kontör harcadıkça en çok harcayanlar burada sıralanır." />
         ) : (
           <ol className="m-0 list-none divide-y divide-line p-0">
             {bars.map((o) => {

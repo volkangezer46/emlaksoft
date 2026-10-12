@@ -1,6 +1,7 @@
 "use client";
 
-import { buttonClass } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { buttonClass, Button } from "@/components/ui/button";
 import { useEffect, useState, useTransition } from "react";
 import type { FormEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
@@ -108,7 +109,6 @@ export type OfficeManagementProps = {
 
 type ActionState = { error?: string; message?: string } | null;
 
-const btn = buttonClass({ variant: "outline", size: "sm" });
 const btnPrimary = buttonClass({ variant: "primary", size: "sm" });
 const btnDanger = buttonClass({ variant: "danger", size: "sm" });
 
@@ -336,9 +336,9 @@ function ProfileSection({ tenant, can, provinces }: OfficeManagementProps) {
         pending={act.pending}
         error={act.state?.error ?? null}
         trigger={({ onClick, "aria-expanded": expanded, "aria-controls": controls }) => (
-          <button type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls} className={btn}>
+          <Button variant="outline" size="sm" type="button" onClick={onClick} aria-expanded={expanded} aria-controls={controls}>
             <Pencil className="h-3.5 w-3.5" aria-hidden /> Bilgileri düzenle
-          </button>
+          </Button>
         )}
         panels={{
           ofis: (
@@ -430,9 +430,8 @@ function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
 
       <div className="flex flex-wrap gap-2">
         {can.plan_status ? (
-          <button
+          <Button variant="outline" size="sm"
             type="button"
-            className={btn}
             aria-expanded={mode === "plan"}
             onClick={() => {
               planAct.clear();
@@ -440,7 +439,7 @@ function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
             }}
           >
             <CreditCard className="h-3.5 w-3.5" aria-hidden /> Paketi / durumu değiştir
-          </button>
+          </Button>
         ) : null}
       </div>
 
@@ -475,10 +474,10 @@ function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button type="submit" className={btnPrimary} disabled={planAct.pending}>
+              <Button variant="primary" size="sm" type="submit" disabled={planAct.pending}>
                 {planAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />} Kaydet
-              </button>
-              <button type="button" className={btn} onClick={() => setMode("none")}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setMode("none")}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -545,9 +544,8 @@ function SlugSection({ tenant }: { tenant: ManagedTenant }) {
         </a>
       </p>
       <div>
-        <button
+        <Button variant="outline" size="sm"
           type="button"
-          className={btn}
           aria-expanded={open}
           onClick={() => {
             act.clear();
@@ -556,7 +554,7 @@ function SlugSection({ tenant }: { tenant: ManagedTenant }) {
           }}
         >
           <Pencil className="h-3.5 w-3.5" aria-hidden /> Adresi değiştir
-        </button>
+        </Button>
       </div>
 
       {open ? (
@@ -607,10 +605,10 @@ function SlugSection({ tenant }: { tenant: ManagedTenant }) {
               Eski vitrin bağlantılarının çalışmayacağını ve yönlendirme olmadığını anladım.
             </label>
             <div className="flex flex-wrap gap-2">
-              <button type="submit" className={btnDanger} disabled={act.pending || !changed || !valid || taken}>
+              <Button variant="danger" size="sm" type="submit" disabled={act.pending || !changed || !valid || taken}>
                 {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null} Adresi değiştir
-              </button>
-              <button type="button" className={btn} onClick={() => setOpen(false)}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setOpen(false)}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -660,19 +658,19 @@ function OwnerSection({ tenant, can, owner, ownerCount, members }: OfficeManagem
       {anyAction ? (
         <div className="flex flex-wrap gap-2">
           {can.resend_access ? (
-            <button type="button" className={btn} aria-expanded={mode === "resend"} disabled={!owner?.isActive} onClick={() => toggle("resend")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "resend"} disabled={!owner?.isActive} onClick={() => toggle("resend")}>
               <Send className="h-3.5 w-3.5" aria-hidden /> Erişim bağlantısını yeniden gönder
-            </button>
+            </Button>
           ) : null}
           {can.change_owner_email ? (
-            <button type="button" className={btn} aria-expanded={mode === "email"} disabled={!owner || ownerCount > 1} onClick={() => toggle("email")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "email"} disabled={!owner || ownerCount > 1} onClick={() => toggle("email")}>
               <Mail className="h-3.5 w-3.5" aria-hidden /> E-postayı değiştir
-            </button>
+            </Button>
           ) : null}
           {can.transfer_ownership ? (
-            <button type="button" className={btn} aria-expanded={mode === "transfer"} disabled={candidates.length === 0 && ownerCount <= 1} onClick={() => toggle("transfer")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "transfer"} disabled={candidates.length === 0 && ownerCount <= 1} onClick={() => toggle("transfer")}>
               <UserCog className="h-3.5 w-3.5" aria-hidden /> Sahipliği devret
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}
@@ -684,10 +682,10 @@ function OwnerSection({ tenant, can, owner, ownerCount, members }: OfficeManagem
             Mevcut şifre bağlantı kullanılana kadar geçerli kalır.
           </p>
           <form onSubmit={(e) => resendAct.run(formDataOf(e, tenant.id))} className="flex flex-wrap gap-2">
-            <button type="submit" className={btnPrimary} disabled={resendAct.pending}>
+            <Button variant="primary" size="sm" type="submit" disabled={resendAct.pending}>
               {resendAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Send className="h-3.5 w-3.5" aria-hidden />} Gönder
-            </button>
-            <button type="button" className={btn} onClick={close}>Vazgeç</button>
+            </Button>
+            <Button variant="outline" size="sm" type="button" onClick={close}>Vazgeç</Button>
           </form>
         </InlineArea>
       ) : null}
@@ -706,10 +704,10 @@ function OwnerSection({ tenant, can, owner, ownerCount, members }: OfficeManagem
               <ConfirmName name={tenant.name} inputId="mgmt-owner-email-confirm" />
             </div>
             <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button type="submit" className={btnDanger} disabled={emailAct.pending}>
+              <Button variant="danger" size="sm" type="submit" disabled={emailAct.pending}>
                 {emailAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null} E-postayı değiştir
-              </button>
-              <button type="button" className={btn} onClick={close}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={close}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -738,10 +736,10 @@ function OwnerSection({ tenant, can, owner, ownerCount, members }: OfficeManagem
               <ConfirmName name={tenant.name} inputId="mgmt-transfer-confirm" />
             </div>
             <div className="flex flex-wrap gap-2 sm:col-span-2">
-              <button type="submit" className={btnDanger} disabled={transferAct.pending}>
+              <Button variant="danger" size="sm" type="submit" disabled={transferAct.pending}>
                 {transferAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null} Sahipliği devret
-              </button>
-              <button type="button" className={btn} onClick={close}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={close}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -821,17 +819,16 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
             pending={addAct.pending}
             error={addAct.state?.error ?? null}
             trigger={({ onClick, "aria-expanded": expanded, "aria-controls": controls }) => (
-              <button
+              <Button variant="primary" size="sm"
                 type="button"
                 onClick={onClick}
                 aria-expanded={expanded}
                 aria-controls={controls}
-                className={btnPrimary}
                 disabled={full}
                 title={full ? "Paket kullanıcı limiti dolu; önce paketi yükseltin" : undefined}
               >
                 <UserPlus className="h-3.5 w-3.5" aria-hidden /> Kullanıcı ekle
-              </button>
+              </Button>
             )}
             panels={{
               kullanici: (
@@ -872,10 +869,10 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
             <code className="numeric flex min-h-11 min-w-0 flex-1 items-center break-all rounded-[var(--radius-control)] border border-line bg-surface px-3 font-mono text-sm text-ink-950">
               {created.password}
             </code>
-            <button type="button" onClick={copyPassword} aria-label="Parolayı kopyala" className={cn(btn, "w-11 justify-center px-0")}>
+            <Button variant="outline" size="sm" type="button" onClick={copyPassword} aria-label="Parolayı kopyala" className="w-11 justify-center px-0">
               {copied ? <Check className="h-4 w-4 text-mint-600" aria-hidden /> : <Copy className="h-4 w-4" aria-hidden />}
-            </button>
-            <button type="button" onClick={() => setCreated(null)} className={btn}>Kapat</button>
+            </Button>
+            <Button variant="outline" size="sm" type="button" onClick={() => setCreated(null)}>Kapat</Button>
           </div>
           <p className="mt-2 text-xs text-amber-800">
             Parola kaydedilmedi ve denetim kaydına yazılmadı. {created.linkSent ? "Şifre belirleme e-postası da gönderildi." : "Erişim e-postası gönderilemedi."}
@@ -884,7 +881,7 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
       ) : null}
 
       {members.length === 0 ? (
-        <p className="py-4 text-center text-sm text-text-muted">Bu ofiste kullanıcı yok.</p>
+        <EmptyState variant="compact" bare icon={Users} title="Bu ofiste kullanıcı yok" description="Yukarıdan ilk kullanıcıyı ekleyerek ofisin erişimini başlatın." />
       ) : (
         <ul className="divide-y divide-line rounded-[var(--radius-card)] border border-line">
           {members.map((m) => {
@@ -903,9 +900,8 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
                   </div>
                   {canToggle ? (
                     m.isActive ? (
-                      <button
+                      <Button variant="outline" size="sm"
                         type="button"
-                        className={btn}
                         aria-expanded={confirmId === m.id}
                         onClick={() => {
                           activeAct.clear();
@@ -913,11 +909,11 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
                         }}
                       >
                         <UserMinus className="h-3.5 w-3.5" aria-hidden /> Pasife al
-                      </button>
+                      </Button>
                     ) : (
-                      <button type="button" className={btn} disabled={activeAct.pending || full} title={full ? "Paket kullanıcı limiti dolu" : undefined} onClick={() => setActive(m.id, true)}>
+                      <Button variant="outline" size="sm" type="button" disabled={activeAct.pending || full} title={full ? "Paket kullanıcı limiti dolu" : undefined} onClick={() => setActive(m.id, true)}>
                         <Power className="h-3.5 w-3.5" aria-hidden /> Yeniden etkinleştir
-                      </button>
+                      </Button>
                     )
                   ) : isOwner ? (
                     <span className="text-xs text-text-faint">Sahip pasife alınamaz</span>
@@ -928,10 +924,10 @@ function UsersSection({ tenant, can, members, activeSeats, seatLimit }: OfficeMa
                     <InlineArea title={`${m.fullName || "Kullanıcı"} pasife alınsın mı?`} tone="danger">
                       <p className="text-xs text-text-muted">Kullanıcının girişi kapatılır ve açık oturumları sonlandırılır. Kayıtları silinmez; yeniden etkinleştirilebilir.</p>
                       <div className="flex flex-wrap gap-2">
-                        <button type="button" className={btnDanger} disabled={activeAct.pending} onClick={() => setActive(m.id, false)}>
+                        <Button variant="danger" size="sm" type="button" disabled={activeAct.pending} onClick={() => setActive(m.id, false)}>
                           {activeAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null} Pasife al
-                        </button>
-                        <button type="button" className={btn} onClick={() => setConfirmId(null)}>Vazgeç</button>
+                        </Button>
+                        <Button variant="outline" size="sm" type="button" onClick={() => setConfirmId(null)}>Vazgeç</Button>
                       </div>
                     </InlineArea>
                   </div>
@@ -964,9 +960,9 @@ function NotesSection({ tenantId, notes }: { tenantId: string; notes: OfficeMana
         <FormField label="Yeni not" htmlFor="mgmt-note" hint="Müşteri kişisel verisi yazmayın. En çok 1000 karakter.">
           <FormTextarea id="mgmt-note" name="note" rows={3} maxLength={1000} required minLength={3} value={text} onChange={(e) => setText(e.target.value)} />
         </FormField>
-        <button type="submit" className={btnPrimary} disabled={act.pending || text.trim().length < 3}>
+        <Button variant="primary" size="sm" type="submit" disabled={act.pending || text.trim().length < 3}>
           {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <StickyNote className="h-3.5 w-3.5" aria-hidden />} Not ekle
-        </button>
+        </Button>
       </form>
       <Feedback state={act.state} />
       {notes.length === 0 ? (
@@ -1020,24 +1016,24 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
       {anyAction ? (
         <div className="flex flex-wrap gap-2">
           {can.suspend && !suspended && !archived ? (
-            <button type="button" className={btn} aria-expanded={mode === "suspend"} onClick={() => toggle("suspend")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "suspend"} onClick={() => toggle("suspend")}>
               <Ban className="h-3.5 w-3.5" aria-hidden /> Askıya al
-            </button>
+            </Button>
           ) : null}
           {can.reactivate && suspended ? (
-            <button type="button" className={btn} aria-expanded={mode === "reactivate"} onClick={() => toggle("reactivate")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "reactivate"} onClick={() => toggle("reactivate")}>
               <Power className="h-3.5 w-3.5" aria-hidden /> Yeniden etkinleştir
-            </button>
+            </Button>
           ) : null}
           {can.archive && !archived ? (
-            <button type="button" className={btn} aria-expanded={mode === "archive"} onClick={() => toggle("archive")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "archive"} onClick={() => toggle("archive")}>
               <Archive className="h-3.5 w-3.5" aria-hidden /> Arşivle
-            </button>
+            </Button>
           ) : null}
           {can.restore && archived ? (
-            <button type="button" className={btn} aria-expanded={mode === "restore"} onClick={() => toggle("restore")}>
+            <Button variant="outline" size="sm" type="button" aria-expanded={mode === "restore"} onClick={() => toggle("restore")}>
               <Undo2 className="h-3.5 w-3.5" aria-hidden /> Arşivden geri yükle
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : (
@@ -1057,11 +1053,11 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
             </FormField>
             <ConfirmName name={tenant.name} inputId="mgmt-lifecycle-confirm" />
             <div className="flex flex-wrap gap-2">
-              <button type="submit" className={btnDanger} disabled={act.pending}>
+              <Button variant="danger" size="sm" type="submit" disabled={act.pending}>
                 {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
                 {mode === "suspend" ? "Askıya al" : "Arşivle"}
-              </button>
-              <button type="button" className={btn} onClick={() => setMode("none")}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setMode("none")}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -1077,11 +1073,11 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
               </FormSelect>
             </FormField>
             <div className="flex flex-wrap items-end gap-2">
-              <button type="submit" className={btnPrimary} disabled={act.pending}>
+              <Button variant="primary" size="sm" type="submit" disabled={act.pending}>
                 {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />}
                 {mode === "reactivate" ? "Etkinleştir" : "Geri yükle"}
-              </button>
-              <button type="button" className={btn} onClick={() => setMode("none")}>Vazgeç</button>
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setMode("none")}>Vazgeç</Button>
             </div>
           </form>
         </InlineArea>
@@ -1127,9 +1123,9 @@ function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests
                 {r.type === "account_closure" ? "Ofis hesabını kapatma" : "Ofis verisini indirme"}
                 <span className="ml-2 text-xs font-normal text-text-muted">son tarih {r.dueLabel}</span>
               </span>
-              <button type="button" className={btn} aria-expanded={openId === r.id} onClick={() => { act.clear(); setOpenId(openId === r.id ? null : r.id); }}>
+              <Button variant="outline" size="sm" type="button" aria-expanded={openId === r.id} onClick={() => { act.clear(); setOpenId(openId === r.id ? null : r.id); }}>
                 Talebi işle
-              </button>
+              </Button>
             </div>
             <p className="text-xs text-text-muted">
               Talebi açan:{" "}
@@ -1152,7 +1148,7 @@ function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests
                     {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
                     {r.type === "account_closure" ? "Ofisi arşivle ve talebi tamamla" : "Talebi tamamla"}
                   </button>
-                  <button type="button" className={btn} onClick={() => setOpenId(null)}>Vazgeç</button>
+                  <Button variant="outline" size="sm" type="button" onClick={() => setOpenId(null)}>Vazgeç</Button>
                 </div>
               </form>
             ) : null}

@@ -66,10 +66,10 @@ export function InlineConfirm({
   const [asking, setAsking] = useState(false);
   if (!asking) {
     return (
-      <button type="button" className={btn} disabled={disabled} onClick={() => setAsking(true)}>
+      <Button variant="outline" size="sm" type="button" disabled={disabled} onClick={() => setAsking(true)}>
         {icon}
         {label}
-      </button>
+      </Button>
     );
   }
   return (
@@ -142,10 +142,10 @@ export function MediaUploadButton({
         onChange={(e) => upload(e.target.files?.[0], e.target)}
         disabled={disabled || pending}
       />
-      <button type="button" className={btn} disabled={disabled || pending} onClick={() => ref.current?.click()}>
+      <Button variant="outline" size="sm" type="button" disabled={disabled || pending} onClick={() => ref.current?.click()}>
         {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImageUp className="h-3.5 w-3.5" aria-hidden="true" />}
         {label}
-      </button>
+      </Button>
       {hint ? <p className="mt-1 text-xs text-text-faint">{hint}</p> : null}
       {error ? <p role="alert" className="mt-1 text-xs font-semibold text-danger-500">{error}</p> : null}
     </div>
@@ -228,7 +228,7 @@ export function IconPicker({
             {list.length === 0 ? <li className="col-span-full py-3 text-center text-xs text-text-muted">Eşleşen ikon yok.</li> : null}
           </ul>
           <div className="mt-3 flex flex-wrap items-start gap-2 border-t border-line pt-3">
-            <button type="button" className={btn} onClick={() => { onChange({ kind: "none" }); setOpen(false); }}>İkon yok</button>
+            <Button variant="outline" size="sm" type="button" onClick={() => { onChange({ kind: "none" }); setOpen(false); }}>İkon yok</Button>
             {readOnlyMediaOk ? (
               <MediaUploadButton
                 role="icon"

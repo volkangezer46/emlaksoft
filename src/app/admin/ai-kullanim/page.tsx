@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import Link from "@/components/ui/smart-link";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,7 +69,7 @@ export default async function AdminAiUsagePage({ searchParams }: { searchParams:
         </CardHeader>
         <CardContent>
           {usage.rows.length === 0 ? (
-            <p className="text-sm text-text-muted">Bu ay ölçülmüş AI kullanımı yok.</p>
+            <EmptyState variant="compact" bare icon={Sparkles} title="Bu ay ölçülmüş AI kullanımı yok" description="Ofisler AI asistanını kullandıkça maliyet ve kota burada görünür." />
           ) : (
             <ul className="divide-y divide-line">
               {usage.rows.map((r) => (

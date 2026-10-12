@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Handshake, Hourglass, Megaphone, ShieldAlert, Sprout, Users, Wallet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -184,7 +185,7 @@ export default async function AdminGrowthPage({
               <div className="rounded-[var(--radius-card)] p-4" style={{ boxShadow: "var(--elev-3)" }}>
                 <h3 className="mb-2 text-sm font-bold text-ink-950">Referans hunisi</h3>
                 {funnel.every((s) => s.value === 0) ? (
-                  <p className="py-6 text-center text-sm text-text-muted">Henüz tıklama ya da kayıt yok</p>
+                  <EmptyState variant="compact" bare icon={Megaphone} title="Henüz tıklama ya da kayıt yok" description="Ortak bağlantıları paylaşıldıkça huni dolar." />
                 ) : (
                   <>
                     <div className="h-44" role="group" aria-label="Referans hunisi: tıklama, kayıt, ödeyen, ödül">
@@ -382,7 +383,7 @@ export default async function AdminGrowthPage({
         bodyClassName="p-5 space-y-4"
       >
         {ov.rules.length === 0 ? (
-          <p className="text-sm text-text-muted">Tanımlı kural yok.</p>
+          <EmptyState variant="compact" bare icon={Sprout} title="Tanımlı ödül kuralı yok" description="Aşağıdaki formdan ilk kuralı ekleyin." />
         ) : (
           <ul className="divide-y divide-line">
             {ov.rules.map((r) => (
@@ -423,7 +424,7 @@ export default async function AdminGrowthPage({
 
       <AdminPanel title="Ortaklar" description="Eğitmen, ajans, mali müşavir, içerik üreticisi, kurum. Bağlantı: /p/<kod>." bodyClassName="p-5 space-y-4">
         {ov.partners.length === 0 ? (
-          <p className="text-sm text-text-muted">Henüz ortak tanımlı değil.</p>
+          <EmptyState variant="compact" bare icon={Handshake} title="Henüz ortak tanımlı değil" description="Aşağıdaki formdan ilk ortağı ekleyin." />
         ) : (
           <div className="space-y-5">
             <AdminScrollArea minWidth={760}>
