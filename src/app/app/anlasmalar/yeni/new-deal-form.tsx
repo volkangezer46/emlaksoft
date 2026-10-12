@@ -43,12 +43,10 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
   const [stage, setStage] = useState<string>("new");
   const [hasAuthority, setHasAuthority] = useState(false);
   // Aramadan gelen portföylerin fiyat/tür bilgisi (ilk liste yalnız 20 kayıt).
-  const foundRef = useRef(new Map<string, PropertySearchOption>());
-  const [, bumpFound] = useState(0);
+  const [foundMap, setFoundMap] = useState<Record<string, PropertySearchOption>>({});
   const searchWithMeta = useCallback(async (q: string) => {
     const res = await searchProperties(q);
-    for (const r of res) foundRef.current.set(r.value, r);
-    bumpFound((n) => n + 1);
+    setFoundMap((prev) => ({ ...prev, ...Object.fromEntries(res.map((r) => [r.value, r])) }));
     return res;
   }, []);
   const { onSubmit, pending, error } = useCreateForm((fd) => createPipelineDeal(fd), {
