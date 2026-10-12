@@ -160,3 +160,23 @@ describe("portföy avı: modül kaydı ve rapor", () => {
     expect(relative(ROOT, join(ROOT, "src/lib/clock.ts"))).toBe(join("src", "lib", "clock.ts"));
   });
 });
+
+describe("portföy avı: aranmasın lead içgörü/otomasyon görevi üretmez", () => {
+  it("içgörü olguları ve otomasyon kaynağı fsbo_do_not_call ile süzülür", () => {
+    expect(read("src/lib/insights/prospecting-facts.ts")).toContain("fsbo_do_not_call");
+    expect(read("src/lib/insights/prospecting-facts.ts")).toContain("phone_hash");
+    const src = read("src/lib/prospecting/automation-source.ts");
+    expect(src).toContain("fsbo_do_not_call");
+    expect(src).toMatch(/\.eq\("is_sample", false\)/);
+  });
+
+  it("otomasyon motoru FSBO create_task öncesi aranmasın kontrolü yapar", () => {
+    const engine = read("src/lib/automation-engine.ts");
+    expect(engine.indexOf("isFsboLeadDoNotCall(admin")).toBeGreaterThan(0);
+    expect(engine.indexOf("isFsboLeadDoNotCall(admin")).toBeLessThan(engine.indexOf("open_task_exists"));
+  });
+
+  it("yeni kayıtta aranmasın ise next_action_at boş yazılır", () => {
+    expect(read("src/lib/prospecting/store.ts")).toMatch(/next_action_at:\s*doNotCall \? null/);
+  });
+});

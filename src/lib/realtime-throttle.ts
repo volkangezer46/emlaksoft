@@ -73,8 +73,15 @@ export function computeRefreshDelay(
   return Math.max(0, debounceMs, untilAllowed);
 }
 
-/** Satırda "son yazan" bilgisini taşıyan olası kolonlar (varsa kendi yazımımız sayılır). */
-const ACTOR_COLUMNS = ["updated_by", "created_by", "actor_id"] as const;
+/**
+ * Satırda "son yazan" bilgisini taşıyan kolonlar, olay türüne göre:
+ * INSERT'te oluşturan/aktör kendi yankımızdır; UPDATE'te YALNIZ `updated_by` (created_by başkasının güncellemesini
+ * gizlemesin). DELETE'te ya da tür bilinmiyorsa aktör kuralı uygulanmaz.
+ */
+const ACTOR_COLUMNS_BY_EVENT: Record<string, readonly string[]> = {
+  INSERT: ["created_by", "updated_by", "actor_id"],
+  UPDATE: ["updated_by"],
+};
 
 /**
  * Olay yok sayılmalı mı?
@@ -82,13 +89,14 @@ const ACTOR_COLUMNS = ["updated_by", "created_by", "actor_id"] as const;
  * (2) Değişiklik, son yenilememizden ÖNCE commit edildiyse o yenileme zaten içerir.
  */
 export function shouldIgnoreRealtimeEvent(
-  payload: { new?: Record<string, unknown> | null; commit_timestamp?: string | null },
+  payload: { new?: Record<string, unknown> | null; commit_timestamp?: string | null; eventType?: string },
   selfUserId: string | null,
   lastRefreshAtMs: number | null,
 ): boolean {
   const row = payload.new ?? null;
+  const actorCols = (payload.eventType && ACTOR_COLUMNS_BY_EVENT[payload.eventType]) || [];
   if (selfUserId && row) {
-    for (const col of ACTOR_COLUMNS) {
+    for (const col of actorCols) {
       if (row[col] === selfUserId) return true;
     }
   }

@@ -79,7 +79,7 @@ export function useRealtimeRefresh(opts: {
         router.refresh();
       }, delay);
     };
-    const bump = (table: string, payload?: { new?: Record<string, unknown> | null; commit_timestamp?: string | null }) => {
+    const bump = (table: string, payload?: { new?: Record<string, unknown> | null; commit_timestamp?: string | null; eventType?: string }) => {
       // Kendi yazımızın yankısı / son tazelemede zaten görünen değişiklik: mutasyon revalidatePath ile tazeler.
       if (payload && shouldIgnoreRealtimeEvent(payload, selfUserId, lastRefreshAt.current)) return;
       const relevant = relevantRef.current?.(pathRef.current ?? "");
@@ -111,7 +111,7 @@ export function useRealtimeRefresh(opts: {
           ch = ch.on(
             "postgres_changes",
             { event: "*", schema: "public", table, filter: `tenant_id=eq.${tenantId}` },
-            (payload) => bump(table, payload as { new?: Record<string, unknown> | null; commit_timestamp?: string | null }),
+            (payload) => bump(table, payload as { new?: Record<string, unknown> | null; commit_timestamp?: string | null; eventType?: string }),
           );
         }
         ch.subscribe();

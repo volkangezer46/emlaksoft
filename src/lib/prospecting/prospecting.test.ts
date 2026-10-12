@@ -6,7 +6,7 @@ import { buildFunnel } from "./funnel";
 import { phoneHash } from "./phone-hash";
 import { evaluatePriceChange } from "./price";
 import { suggestRelist } from "./relist";
-import { clampRetentionDays, isPurgeDue, PII_CLEAR_PATCH } from "./retention";
+import { clampRetentionDays, isPurgeDue, PII_CLEAR_PATCH, purgeExpiredFsboPii } from "./retention";
 import { buildCallScript } from "./script";
 import { actionsLocked, applyCallOutcome, canTransition, checkStatusChange } from "./state-machine";
 import { CADENCE_DAYS, MAX_FAILED_ATTEMPTS } from "./thresholds";
@@ -140,6 +140,129 @@ describe("saklama süresi", () => {
   });
   it("temizlik yalnız kişisel alanları siler; istatistik alanlarına dokunmaz", () => {
     expect(Object.keys(PII_CLEAR_PATCH).sort()).toEqual(["owner_name", "phone", "phone_hash"]);
+  });
+});
+
+type PurgeRow = { id: string; tenant_id: string; status: string; last_activity_at: string; pii_purged_at: string | null; owner_name: string | null; phone: string | null; phone_hash: string | null };
+
+/** Bellekte çalışan asgari FSBO istemcisi (select/update/süzgeç/sıra/limit/head sayım). */
+function fakePurgeDb(rows: PurgeRow[], opts: { selectError?: { code: string } } = {}) {
+  const activityTouched: string[] = [];
+  const from = (table: string) => {
+    const filters: ((r: PurgeRow) => boolean)[] = [];
+    let mode: "select" | "update" = "select";
+    let patch: Partial<PurgeRow> = {};
+    let order: { col: keyof PurgeRow; asc: boolean } | null = null;
+    let lim = Number.POSITIVE_INFINITY;
+    let head = false;
+    let inIds: string[] = [];
+    const b: Record<string, unknown> = {};
+    const add = (fn: (r: PurgeRow) => boolean) => {
+      filters.push(fn);
+      return b;
+    };
+    Object.assign(b, {
+      select: (_c: string, o?: { head?: boolean }) => {
+        head = !!o?.head;
+        return b;
+      },
+      update: (p: Partial<PurgeRow>) => {
+        mode = "update";
+        patch = p;
+        return b;
+      },
+      is: (c: keyof PurgeRow, v: unknown) => add((r) => r[c] === v),
+      neq: (c: keyof PurgeRow, v: unknown) => add((r) => r[c] !== v),
+      eq: (c: keyof PurgeRow, v: unknown) => add((r) => r[c] === v),
+      lt: (c: keyof PurgeRow, v: string) => add((r) => (r[c] as string) < v),
+      gt: (c: keyof PurgeRow, v: string) => add((r) => (r[c] as string) > v),
+      in: (c: string, v: string[]) => {
+        inIds = v;
+        return c === "id" ? add((r) => v.includes(r.id)) : b;
+      },
+      order: (c: keyof PurgeRow, o?: { ascending?: boolean }) => {
+        order = { col: c, asc: o?.ascending !== false };
+        return b;
+      },
+      limit: (n: number) => {
+        lim = n;
+        return b;
+      },
+      then: (resolve: (v: unknown) => void) => {
+        if (table !== "fsbo_leads") {
+          activityTouched.push(...inIds);
+          return resolve({ data: null, error: null });
+        }
+        if (mode === "select" && opts.selectError) return resolve({ data: null, count: null, error: opts.selectError });
+        let m = rows.filter((r) => filters.every((f) => f(r)));
+        if (mode === "update") {
+          for (const r of m) Object.assign(r, patch);
+          return resolve({ data: null, error: null });
+        }
+        if (order) {
+          const { col, asc } = order;
+          m = [...m].sort((x, y) => (String(x[col]) < String(y[col]) ? -1 : String(x[col]) > String(y[col]) ? 1 : 0) * (asc ? 1 : -1));
+        }
+        return resolve({ data: head ? null : m.slice(0, lim), count: m.length, error: null });
+      },
+    });
+    return b;
+  };
+  return { db: { from } as unknown as Parameters<typeof purgeExpiredFsboPii>[0], activityTouched };
+}
+
+const mkRow = (id: string, tenant: string, ageDays: number, status = "arandi"): PurgeRow => ({
+  id,
+  tenant_id: tenant,
+  status,
+  last_activity_at: new Date(NOW - ageDays * DAY_MS).toISOString(),
+  pii_purged_at: null,
+  owner_name: "Ad",
+  phone: "05321234567",
+  phone_hash: "h",
+});
+
+describe("purgeExpiredFsboPii: ofis başına kesim, tavan ve özet", () => {
+  const retentionFor = async (t: string) => (t === "a" ? 180 : 90);
+
+  it("180 günlük ofisin süresi dolmamış satırları 90 günlük ofisin süresi dolmuş satırlarını engellemez", async () => {
+    const rows = [...[1, 2, 3, 4, 5].map((i) => mkRow(`a${i}`, "a", 100)), ...[1, 2, 3].map((i) => mkRow(`b${i}`, "b", 100))];
+    const { db, activityTouched } = fakePurgeDb(rows);
+    const res = await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor, batch: 2 });
+    expect(res).toMatchObject({ purged: 3, skipped: false, expiredRemaining: 0, truncated: false });
+    expect(rows.filter((r) => r.tenant_id === "b").every((r) => r.pii_purged_at && r.phone === null && r.owner_name === null && r.phone_hash === null)).toBe(true);
+    expect(rows.filter((r) => r.tenant_id === "a").every((r) => r.pii_purged_at === null && r.phone !== null)).toBe(true);
+    expect(activityTouched.sort()).toEqual(["b1", "b2", "b3"]);
+  });
+
+  it("dönüşen kayıt ve zaten temizlenmiş kayıt işlenmez; sonuç idempotent", async () => {
+    const rows = [mkRow("b1", "b", 100, "portfoye_donustu"), mkRow("b2", "b", 100), { ...mkRow("b3", "b", 100), pii_purged_at: "2026-01-01T00:00:00.000Z" }];
+    const { db } = fakePurgeDb(rows);
+    expect((await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor })).purged).toBe(1);
+    expect((await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor })).purged).toBe(0);
+    expect(rows[0]!.phone).toBe("05321234567");
+  });
+
+  it("satır tavanı aşılırsa tur kesilir; kalan süresi dolmuş kayıt sayısı bildirilir", async () => {
+    const rows = [1, 2, 3, 4, 5].map((i) => mkRow(`b${i}`, "b", 100));
+    const { db } = fakePurgeDb(rows);
+    const res = await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor, batch: 2, maxRows: 2 });
+    expect(res).toMatchObject({ purged: 2, truncated: true, expiredRemaining: 3 });
+  });
+
+  it("süre bütçesi aşılırsa tur kesilir ve sonraki ofislerin kalanı da sayılır", async () => {
+    const rows = [mkRow("b1", "b", 100), mkRow("b2", "b", 100), mkRow("c1", "c", 100)];
+    const { db } = fakePurgeDb(rows);
+    let t = 0;
+    const res = await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor, batch: 1, budgetMs: 60_000, clock: () => (t += 40_000) });
+    expect(res.truncated).toBe(true);
+    expect(res.purged).toBe(1);
+    expect(res.expiredRemaining).toBe(2);
+  });
+
+  it("tablo yoksa atlanır", async () => {
+    const { db } = fakePurgeDb([], { selectError: { code: "42P01" } });
+    expect(await purgeExpiredFsboPii(db, { nowMs: NOW, retentionFor })).toMatchObject({ purged: 0, skipped: true });
   });
 });
 
