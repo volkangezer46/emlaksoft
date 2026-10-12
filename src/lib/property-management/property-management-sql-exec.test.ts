@@ -59,12 +59,13 @@ describe.skipIf(!mod)("property_management_core (pglite)", () => {
     P = (await q(`insert into public.properties(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
     R = (await q(`insert into public.rentals(tenant_id, property_id, due_day) values ($1,$2,5) returning id`, [T, P]))[0]!.id as string;
     R2 = (await q(`insert into public.rentals(tenant_id, due_day) values ($1,5) returning id`, [T2]))[0]!.id as string;
+    // Dönem tarihleri uzak gelecekte: durum türetimi current_date'e bağlı (vadesi geçen dönem 'overdue' olur); test tarihten bağımsız kalsın.
     // Eski 'ödendi' tahakkuk (geri doldurma testi) migration'dan ÖNCE vardır.
     LEG = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount, status, paid_at) values ($1,$2,'2026-01-01',5000,'paid','2026-01-06T09:00:00Z') returning id`, [T, R]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261008001100_property_management_core.sql"));
-    C1 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2026-10-01',10000) returning id`, [T, R]))[0]!.id as string;
-    C2 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2026-11-01',10000) returning id`, [T, R]))[0]!.id as string;
-    C3 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2026-10-01',3000) returning id`, [T2, R2]))[0]!.id as string;
+    C1 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2099-10-01',10000) returning id`, [T, R]))[0]!.id as string;
+    C2 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2099-11-01',10000) returning id`, [T, R]))[0]!.id as string;
+    C3 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2099-10-01',3000) returning id`, [T2, R2]))[0]!.id as string;
   });
 
   it("eski ödendi tahakkuk için legacy tahsilat + paid_amount + makbuz sırası dolduruldu", async () => {
@@ -104,7 +105,7 @@ describe.skipIf(!mod)("property_management_core (pglite)", () => {
     await as(U, T, EDIT);
     const c4 = (await q(`select 1`)); void c4;
     await db.exec(`reset role`);
-    const C4 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2026-12-01',9000) returning id`, [T, R]))[0]!.id as string;
+    const C4 = (await q(`insert into public.rent_charges(tenant_id, rental_id, period, amount) values ($1,$2,'2099-12-01',9000) returning id`, [T, R]))[0]!.id as string;
     await as(U, T, EDIT);
     expect((await pay(C4, 1000)).management_fee).toBe(1000);
     expect((await pay(C4, 5000)).management_fee).toBe(500);
