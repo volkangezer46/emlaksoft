@@ -32,6 +32,7 @@ type Props = {
     parcel_lot: string | null;
     lat: number | null;
     lng: number | null;
+    branch_id?: string | null;
     features: {
       rooms?: string | null;
       sqm?: number | null;
@@ -44,6 +45,7 @@ type Props = {
     };
   };
   provinces: Province[];
+  branches?: { id: string; name: string }[];
   transactionTypes?: string[];
   propertyTypes?: string[];
 };
@@ -57,6 +59,7 @@ const DEFAULT_PROPERTY_TYPES = defaultDefinitionValues("property_type");
 export function EditPropertyDialog({
   property,
   provinces,
+  branches = [],
   transactionTypes = DEFAULT_TRANSACTION_TYPES,
   propertyTypes = DEFAULT_PROPERTY_TYPES,
 }: Props) {
@@ -112,7 +115,7 @@ export function EditPropertyDialog({
         title: "Başlık", transaction_type: "İşlem", property_type: "Tür", list_price: "Liste fiyatı",
         min_price: "Min. fiyat", commission_rate: "Komisyon %", rooms: "Oda", sqm: "m²", floor: "Kat",
         heating: "Isınma", building_age: "Bina yaşı", facade: "Cephe", parcel_block: "Tapu ada",
-        parcel_lot: "Tapu parsel", address_line: "Adres", description: "İlan açıklaması", virtual_tour_url: "360° tur / video",
+        parcel_lot: "Tapu parsel", address_line: "Adres", branch_id: "Şube", description: "İlan açıklaması", virtual_tour_url: "360° tur / video",
       }}
       trigger={({ onClick, ...aria }) => (
         <button
@@ -125,7 +128,7 @@ export function EditPropertyDialog({
         </button>
       )}
       tabs={[
-        { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate"] },
+        { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate", "branch_id"] },
         { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade"] },
         { id: "konum", label: "Konum ve tapu", icon: MapPin, fields: ["address_line", "parcel_block", "parcel_lot"] },
         { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description", "virtual_tour_url"] },
@@ -161,6 +164,15 @@ export function EditPropertyDialog({
               Komisyon %
               <input name="commission_rate" inputMode="decimal" required min="0.01" max="100" step="0.01" defaultValue={property.commission_rate ?? ""} className={field} />
             </label>
+            {branches.length > 0 ? (
+              <label className="text-xs font-medium text-text-muted">
+                Şube
+                <select name="branch_id" defaultValue={property.branch_id ?? ""} className={field}>
+                  <option value="">Şube atanmadı</option>
+                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </label>
+            ) : null}
           </>
         ),
         ozellik: (
