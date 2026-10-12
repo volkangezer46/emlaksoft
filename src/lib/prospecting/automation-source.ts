@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { leadHashCandidates } from "./phone-hash";
 
 /**
  * Otomasyon motorunun Sahibinden ilanlar (FSBO) yardımcıları. Motor dosyası FSBO tablolarına doğrudan dokunmaz
@@ -38,11 +39,13 @@ export async function fsboDoNotCallHashes(db: Db, tenantId: string, hashes: stri
 
 /** Aday aranmasın listesinde mi (telefon özeti eşleşmesi)? Okuma hatasında ya da tablo yokken false (görev akışı bozulmaz). */
 export async function isFsboLeadDoNotCall(db: Db, tenantId: string, leadId: string): Promise<boolean> {
-  const { data } = await db.from("fsbo_leads").select("phone_hash").eq("tenant_id", tenantId).eq("id", leadId).maybeSingle();
-  const hash = (data as { phone_hash: string | null } | null)?.phone_hash;
-  if (!hash) return false;
+  const { data } = await db.from("fsbo_leads").select("phone, phone_hash").eq("tenant_id", tenantId).eq("id", leadId).maybeSingle();
+  const row = data as { phone: string | null; phone_hash: string | null } | null;
+  const candidates = leadHashCandidates(tenantId, row?.phone, row?.phone_hash);
+  if (candidates.length === 0) return false;
   try {
-    return (await fsboDoNotCallHashes(db, tenantId, [hash])).has(hash);
+    const dnc = await fsboDoNotCallHashes(db, tenantId, candidates);
+    return candidates.some((h) => dnc.has(h));
   } catch {
     return false;
   }
@@ -55,7 +58,7 @@ export async function collectFsboNoContactPage(
 ): Promise<{ rows: FsboAutomationCandidate[]; rawCount: number; lastId: string | null }> {
   let q = db
     .from("fsbo_leads")
-    .select("id, title, status, assigned_to, price, contact_attempts, phone_hash")
+    .select("id, title, status, assigned_to, price, contact_attempts, phone, phone_hash")
     .eq("tenant_id", input.tenantId)
     .eq("is_sample", false)
     .is("deleted_at", null)
@@ -72,15 +75,18 @@ export async function collectFsboNoContactPage(
     assigned_to: string | null;
     price: number | string | null;
     contact_attempts: number | null;
+    phone: string | null;
     phone_hash: string | null;
   }[];
   // Aranmasın listesindeki ilan sahibine görev açılmaz. rawCount/lastId HAM satırlardan (sayfalama bozulmasın).
-  const hashes = [...new Set(raw.map((l) => l.phone_hash).filter((h): h is string => !!h))];
+  // v1/v2 geçiş dönemi: her kayıt için telefon varsa iki özete de bakılır.
+  const candidatesOf = (l: { phone: string | null; phone_hash: string | null }) => leadHashCandidates(input.tenantId, l.phone, l.phone_hash);
+  const hashes = [...new Set(raw.flatMap(candidatesOf))];
   const dnc = await fsboDoNotCallHashes(db, input.tenantId, hashes);
   return {
     rawCount: raw.length,
     lastId: raw.length > 0 ? String(raw[raw.length - 1].id) : null,
-    rows: raw.filter((l) => !l.phone_hash || !dnc.has(l.phone_hash)).map((l) => ({
+    rows: raw.filter((l) => !candidatesOf(l).some((h) => dnc.has(h))).map((l) => ({
       id: String(l.id),
       title: l.title,
       status: l.status,

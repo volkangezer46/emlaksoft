@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { InsightFactsUnavailable, isMissingSchemaError } from "@/lib/insights/facts";
 import type { FsboFact } from "@/lib/insights/rules/prospecting";
+import { leadHashCandidates } from "@/lib/prospecting/phone-hash";
 
 /**
  * Sahibinden ilanlar içgörü olguları. Ofis sınırı AÇIK `tenant_id` filtresiyle (motor service_role ile çalışır, RLS yok);
@@ -24,6 +25,7 @@ type Row = {
   created_at: string;
   claim_expires_at: string | null;
   rooms: string | null;
+  phone: string | null;
   phone_hash: string | null;
   district: { name: string | null } | { name: string | null }[] | null;
   assignee: { full_name: string | null } | { full_name: string | null }[] | null;
@@ -54,7 +56,7 @@ export async function loadProspectingFacts(admin: SupabaseClient, tenantId: stri
   const { data, error } = await admin
     .from("fsbo_leads")
     .select(
-      "id, assigned_to, status, contact_attempts, first_seen_at, listed_at, last_contact_at, next_action_at, last_price_drop_at, last_price_drop_pct, relist_of, created_at, claim_expires_at, rooms, phone_hash, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)",
+      "id, assigned_to, status, contact_attempts, first_seen_at, listed_at, last_contact_at, next_action_at, last_price_drop_at, last_price_drop_pct, relist_of, created_at, claim_expires_at, rooms, phone, phone_hash, district:geo_districts!fsbo_leads_district_id_fkey(name), assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)",
     )
     .eq("tenant_id", tenantId)
     .eq("is_sample", false)
@@ -68,9 +70,11 @@ export async function loadProspectingFacts(admin: SupabaseClient, tenantId: stri
   }
   const rows = (data ?? []) as unknown as Row[];
   // Aranmasın listesindeki ilan sahibi için "ara" içgörüsü üretilmez.
-  const hashes = [...new Set(rows.map((r) => r.phone_hash).filter((h): h is string => !!h))];
+  // v1/v2 geçiş dönemi: telefon varsa iki özete de bakılır.
+  const candidatesOf = (r: Row) => leadHashCandidates(tenantId, r.phone, r.phone_hash);
+  const hashes = [...new Set(rows.flatMap(candidatesOf))];
   const dnc = hashes.length > 0 ? await doNotCallHashes(admin, tenantId, hashes) : new Set<string>();
-  const facts = rows.filter((r) => !r.phone_hash || !dnc.has(r.phone_hash)).map<FsboFact>((r) => ({
+  const facts = rows.filter((r) => !candidatesOf(r).some((h) => dnc.has(h))).map<FsboFact>((r) => ({
     id: r.id,
     assignedTo: r.assigned_to,
     assigneeName: first(r.assignee)?.full_name ?? null,

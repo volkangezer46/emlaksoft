@@ -40,15 +40,20 @@ export type ConflictFacts = {
   customer: { id: string; name: string; type: string | null } | null;
   /** Ofisin portföyünde/portal ilanında aynı ilan no ya da bağlantı. */
   ownListing: { propertyId: string } | null;
+  /** Aynı numara ofiste başka danışmanın kaydında (RLS'i delmeyen `fsbo_find_existing`; yalnız sahip adı). */
+  otherLead?: { name: string | null } | null;
 };
 
-export type ConflictNotice = { key: "do_not_call" | "customer" | "own_listing"; message: string; href: string | null };
+export type ConflictNotice = { key: "do_not_call" | "customer" | "own_listing" | "other_lead"; message: string; href: string | null };
 
 /** Kullanıcıya gösterilecek çakışma uyarıları (sıra: aranmasın > portföy > müşteri). */
 export function conflictNotices(f: ConflictFacts): ConflictNotice[] {
   const out: ConflictNotice[] = [];
   if (f.doNotCall) out.push({ key: "do_not_call", message: "Bu numara ofisinizde \"Aranmasın\" olarak işaretli; arama eylemleri kilitli.", href: null });
   if (f.ownListing) out.push({ key: "own_listing", message: "Bu ilan zaten ofisinizin portföyünde.", href: `/app/portfoyler/${f.ownListing.propertyId}` });
+  if (f.otherLead) {
+    out.push({ key: "other_lead", message: `Bu numara ofiste ${f.otherLead.name ?? "başka bir danışmanın"} sahibinden ilan kaydında; çakışma olabilir.`, href: null });
+  }
   if (f.customer) {
     const type = f.customer.type ? ` (${f.customer.type})` : "";
     out.push({ key: "customer", message: `Bu numara ${f.customer.name}${type} kaydında.`, href: `/app/musteriler/${f.customer.id}` });
