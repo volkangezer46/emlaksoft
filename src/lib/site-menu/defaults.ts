@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { FooterColumn, IconRef, MenuGroup, MenuItem, SiteMenuConfig } from "./schema";
 
 /**
@@ -68,7 +69,7 @@ const DEFAULT_GROUPS: MenuGroup[] = [
       item("kaynak-guvenlik", "Öğrenin", "Güvenlik ve KVKK", "Süreç ve altyapı", "/#guvenlik", "Lock"),
       item("kaynak-uyum", "Yasal ve destek", "Telefon ve KVKK uyumu", "Doğru numara, izinli iletişim", "/#uyum", "ShieldCheck"),
       item("kaynak-kvkk-aydinlatma", "Yasal ve destek", "KVKK aydınlatma metni", "Yasal metin", "/kvkk-aydinlatma", "Scale"),
-      item("kaynak-destek-emlaksoft-com-tr", "Yasal ve destek", "Destek", "destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr", "Mail"),
+      item("kaynak-destek-emlaksoft-com-tr", "Yasal ve destek", "Destek", SUPPORT_EMAIL, SUPPORT_MAILTO, "Mail"),
     ],
     featured: { eyebrow: "Veri güvenliği", icon: { kind: "lucide", name: "Lock" }, title: "Verinizi süreçle koruyun", text: "Satır düzeyinde güvenlik, rol ve izin matrisi, denetim kaydı ve dışa aktarma.", ctaLabel: "Güvenlik bölümüne git", href: "/#guvenlik", hidden: false, media: null },
   },
@@ -147,7 +148,7 @@ function defaultFooter(): FooterColumn[] {
       hidden: false,
       autoPlans: false,
       links: [
-        link("iletisim-destek", "destek@emlaksoft.com.tr", "mailto:destek@emlaksoft.com.tr"),
+        link("iletisim-destek", SUPPORT_EMAIL, SUPPORT_MAILTO),
       ],
     },
   ];

@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
@@ -16,7 +17,7 @@ export default function MesafeliSatisPage() {
       <LegalSection no="1." title="Taraflar">
         <p>
           <b>Sağlayıcı:</b> EmlakSoft (&quot;Platform&quot;) — iletişim:{" "}
-          <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>.
+          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
           Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme sayfasındaki sözleşme onay ekranında ve faturada da yer alır.
         </p>
         {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. */}
@@ -72,7 +73,7 @@ export default function MesafeliSatisPage() {
       <LegalSection no="5." title="Cayma Hakkı">
         <p>
           Müşteri, sözleşmenin kurulduğu tarihten itibaren <b>14 gün</b> içinde gerekçe göstermeksizin cayma hakkına
-          sahiptir. Cayma bildirimi <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>{" "}
+          sahiptir. Cayma bildirimi <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
           adresine iletilebilir. Mesafeli Sözleşmeler Yönetmeliği m.15/1-ğ uyarınca, Müşteri&apos;nin onayı ile
           hizmetin ifasına derhâl başlanan hâllerde cayma hakkı kullanılamaz; bu nedenle ücretsiz deneme süresi
           sonunda ücretli aboneliğe geçişte, ifasına başlanmamış dönem bedeli iade kapsamındadır. Ayrıntılar{" "}

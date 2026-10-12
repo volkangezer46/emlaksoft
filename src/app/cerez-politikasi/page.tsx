@@ -20,7 +20,8 @@ export default function CerezPolitikasiPage() {
       </LegalSection>
 
       <LegalSection no="2." title="Kullandığımız Çerezler">
-        <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
+        <p className="mb-2 text-xs text-text-muted sm:hidden" aria-hidden="true">Tabloyu görmek için yana kaydırın →</p>
+        <div tabIndex={0} role="region" aria-label="Çerez tablosu (yana kaydırılabilir)" className="overflow-x-auto rounded-[var(--radius-card)] border border-line focus-visible:outline-2 focus-visible:outline-brand-600">
           <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-canvas text-xs text-text-muted">
               <tr>

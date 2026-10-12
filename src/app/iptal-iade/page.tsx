@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
@@ -23,7 +24,7 @@ export default function IptalIadePage() {
       <LegalSection no="2." title="Abonelik İptali">
         <p>
           Aboneliğinizi panel içinden (Ayarlar → Abonelik) veya{" "}
-          <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>{" "}
+          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
           üzerinden dilediğiniz an iptal edebilirsiniz. İptal, mevcut fatura döneminin sonunda yürürlüğe girer;
           dönem sonuna kadar hizmete erişiminiz devam eder. Taahhüt yoktur, cayma bedeli alınmaz.
         </p>

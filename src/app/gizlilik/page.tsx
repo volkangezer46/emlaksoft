@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
@@ -90,7 +91,7 @@ export default function GizlilikPage() {
       <LegalSection no="6." title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için:{" "}
-          <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>
+          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
         </p>
       </LegalSection>
     </LegalPage>

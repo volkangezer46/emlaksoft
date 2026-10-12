@@ -110,7 +110,7 @@ export function Pricing({
           aria-label="Yıllık faturalandırma"
           aria-checked={yearly}
           onClick={() => setYearly((v) => !v)}
-          className={`relative mx-1 h-7 w-13 rounded-full p-0.5 transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+          className={`relative mx-1 h-7 w-13 rounded-full p-0.5 before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] transition-colors duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
             yearly ? "bg-brand-600" : "bg-line-strong"
           }`}
           style={{ width: 52 }}
@@ -230,7 +230,7 @@ export function Pricing({
 
               <Link
                 href={`/kayit?plan=${plan.id}&cycle=${yearly ? "yearly" : "monthly"}`}
-                className={`btn-shine mt-7 inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
+                className={`btn-shine mt-7 inline-flex min-h-11 touch:min-h-11 w-full items-center justify-center rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 ${
                   plan.popular ? "bg-white text-ink-950 hover:bg-white/90" : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >

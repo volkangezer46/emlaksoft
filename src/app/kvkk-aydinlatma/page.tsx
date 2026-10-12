@@ -1,3 +1,4 @@
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import { LegalPage, LegalSection } from "@/components/legal-page";
@@ -16,7 +17,7 @@ export default function KvkkAydinlatmaPage() {
       <LegalSection no="1." title="Veri Sorumlusu">
         <p>
           Kişisel verileriniz, veri sorumlusu sıfatıyla EmlakSoft (&quot;Platform&quot;) tarafından aşağıda açıklanan
-          kapsamda işlenmektedir. İletişim: <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>
+          kapsamda işlenmektedir. İletişim: <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
         </p>
       </LegalSection>
 
@@ -74,7 +75,7 @@ export default function KvkkAydinlatmaPage() {
           Kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silinmesini/yok edilmesini
           isteme, aktarıldığı üçüncü kişileri bilme, otomatik sistemlerle analiz sonucuna itiraz etme ve zarara
           uğramanız hâlinde giderim talep etme haklarına sahipsiniz. Taleplerinizi{" "}
-          <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>{" "}
+          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
           adresine iletebilirsiniz; başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır.
         </p>
       </LegalSection>
