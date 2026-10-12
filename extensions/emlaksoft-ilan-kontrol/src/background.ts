@@ -32,6 +32,7 @@ import {
   type ScanStates,
   type ScanUpload,
 } from "@/lib/listing-control/worker/extension-scan";
+import { dueFsbo, enqueueFsbo, markFsboDone, markFsboFailed, sanitizeFsboPayload, type FsboPending } from "@/lib/prospecting/extension-queue";
 import { isAllowedAppOrigin } from "@/lib/listing-control/worker/extension-pairing";
 import { installLandingUrl, shouldOpenInstallLanding } from "@/lib/listing-control/worker/extension-install";
 import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest } from "./messages";
@@ -442,6 +443,32 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
         await setLocal(STORAGE_KEYS.scanUploads, markUploadFailed(await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []), String(msg.id), Date.now()));
         return { ok: true };
       });
+    case "fsboPut":
+      return locked(async () => {
+        // Kullanıcının popup'ta onayladığı TEK ilan (okuma popup'ta, tıklamayla yapıldı); arka planda hiçbir sayfa okunmaz.
+        const payload = sanitizeFsboPayload(msg.payload);
+        if (!payload) return { ok: false, error: "invalid" };
+        const list = await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, []);
+        await setLocal(STORAGE_KEYS.fsboPending, enqueueFsbo(list, payload, Date.now(), crypto.randomUUID()));
+        return { ok: true };
+      });
+    case "fsboPendingDue": {
+      const list = await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, []);
+      return { entries: dueFsbo(list, Date.now()).slice(0, 3) };
+    }
+    case "fsboPendingDone":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.fsboPending, markFsboDone(await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, []), String(msg.id)));
+        await setLocal(STORAGE_KEYS.fsboLast, { at: Date.now(), summary: String(msg.summary ?? "").slice(0, 200), ok: true });
+        return { ok: true };
+      });
+    case "fsboPendingFail":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.fsboPending, markFsboFailed(await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, []), String(msg.id), Date.now()));
+        return { ok: true };
+      });
+    case "fsboLast":
+      return { last: await getLocal<{ at: number; summary: string; ok: boolean } | null>(STORAGE_KEYS.fsboLast, null), pending: (await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, [])).length };
     case "outboxPut":
       return locked(async () => {
         const list = await getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []);

@@ -36,6 +36,12 @@ declare namespace chrome {
   }
   namespace tabs {
     function create(props: { url: string }): Promise<unknown>;
+    /** Yalnız açılır pencerede, kullanıcı eylemiyle (activeTab): etkin sekmenin adresi. */
+    function query(info: { active: boolean; currentWindow: boolean }): Promise<{ id?: number; url?: string }[]>;
+  }
+  namespace scripting {
+    /** Yalnız kullanıcı tıklamasıyla, etkin sekmede (activeTab). Arka plan/izleme için kullanılmaz. */
+    function executeScript<T>(injection: { target: { tabId: number }; func: () => T }): Promise<{ result?: T }[]>;
   }
   namespace alarms {
     function create(name: string, info: { periodInMinutes?: number; delayInMinutes?: number }): Promise<void> | void;

@@ -87,10 +87,10 @@ describe("istemci/sunucu sınırları", () => {
 });
 
 describe("tarayıcı eklentisi", () => {
-  it("Manifest V3; izinler yalnız storage + alarms; portal alanları adaptör kaydından", () => {
+  it("Manifest V3; izinler storage + alarms + activeTab + scripting (0.4.0: yalnız kullanıcı tıklamasıyla tek ilan kaydı); portal alanları adaptör kaydından", () => {
     const m = JSON.parse(src(`${EXT}/manifest.base.json`)) as Record<string, unknown>;
     expect(m.manifest_version).toBe(3);
-    expect(m.permissions).toEqual(["storage", "alarms"]);
+    expect(m.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
     expect(allPortalHosts()).toEqual(["emlakjet.com", "hepsiemlak.com", "sahibinden.com"]);
     const b = src("scripts/build-extension.ts");
     expect(b).toContain("allPortalHosts()");
