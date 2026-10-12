@@ -37,6 +37,11 @@ function Inner({ identity }: { identity: string }) {
   const key = `${pathname}?${search}`;
   const prevIdentity = useRef(identity);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Kapsam değişimi: gezinme (ScopeSwitch / "Ofis görünümüne dön") hedef adrese inene kadar tazeleme BEKLER;
+  // yoksa tazeleme eski adresi yeniden çizer, gezinme sonra yeniden çizer (çift yükleme).
+  const scopePending = useRef(false);
+  const scopeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keyRef = useRef(key);
 
   // Geçiş/kapı: arka plan tazelemesi kapı sayfasına düştüyse tam yükleme.
   useEffect(() => {
@@ -48,6 +53,21 @@ function Inner({ identity }: { identity: string }) {
   // Adrese varış: önbellekten eski veri gösterildiyse sessizce tazele.
   useEffect(() => {
     if (timer.current) clearTimeout(timer.current);
+    keyRef.current = key;
+    if (scopePending.current) {
+      // Kapsam gezinmesi indi: sayfa yeni kapsamla zaten taze çekildi; diğer önbellek girdileri için TEK sessiz tazeleme.
+      scopePending.current = false;
+      if (scopeTimer.current) clearTimeout(scopeTimer.current);
+      markFetched(key);
+      timer.current = setTimeout(() => {
+        markBgRefresh();
+        noteClientCacheRefreshed(key);
+        startTransition(() => router.refresh());
+      }, 250);
+      return () => {
+        if (timer.current) clearTimeout(timer.current);
+      };
+    }
     const decision = decideArrival({
       fetchedAt: getFetchedAt(key),
       nowMs: now(),
@@ -83,10 +103,22 @@ function Inner({ identity }: { identity: string }) {
     const onScope = () => {
       clearClientCacheState();
       resetPrefetchState();
-      setTimeout(() => startTransition(() => router.refresh()), 0);
+      scopePending.current = true;
+      if (scopeTimer.current) clearTimeout(scopeTimer.current);
+      // Gezinme gelmezse (aynı adres) yine de tek tazeleme yapılır.
+      scopeTimer.current = setTimeout(() => {
+        if (!scopePending.current) return;
+        scopePending.current = false;
+        markBgRefresh();
+        noteClientCacheRefreshed(keyRef.current);
+        startTransition(() => router.refresh());
+      }, 1500);
     };
     window.addEventListener(SCOPE_CHANGE_EVENT, onScope);
-    return () => window.removeEventListener(SCOPE_CHANGE_EVENT, onScope);
+    return () => {
+      window.removeEventListener(SCOPE_CHANGE_EVENT, onScope);
+      if (scopeTimer.current) clearTimeout(scopeTimer.current);
+    };
   }, [router]);
 
   // Layout'tan çıkış (çıkış yapma / giriş sayfasına yönlenme): durum sıfırlanır; kapıya düşüldüyse tam yükleme.

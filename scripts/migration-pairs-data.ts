@@ -279,6 +279,8 @@ const F = {
   portfolioCountsRpc: "20261012002200_portfolio_counts_rpc.sql",
   searchTrgmTasksDocs: "20261012002210_search_trgm_tasks_docs.sql",
   detailReadRpcs: "20261012002220_detail_read_rpcs.sql",
+  // Canli veri (2026-10-12): teklif, kira tahakkuku/odemesi ve anahtar tablolari realtime yayinina eklenir.
+  realtimePublicationMore: "20261012002300_realtime_publication_more.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -475,6 +477,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.efPackNamesTl]: "ek", // platform_settings ef.packs: yalniz seed paket adlarinda "kontor" -> "TL" metin degisimi (sema/fonksiyon yok)
     [F.portfolioCountsRpc]: "ek", // 2 yeni SECURITY INVOKER sayim RPC'si (portfolio_counts, task_counts); tablo/politika/veri degismez
     [F.searchTrgmTasksDocs]: "ek", // tasks/customer_files/property_media/contracts/deal_checklist_items GIN trigram indeksleri (8); veri degismez
+    [F.realtimePublicationMore]: "ek", // 4 tabloyu supabase_realtime yayinina ekler (idempotent); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
     [F.serviceRoleWriteGrants]: "ek", // yalniz eksik GRANT (insert/update); delete yok, tablo/politika/veri degismez
@@ -645,6 +648,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "ANALIZ-paket-adlari-tl", order: 32, title: "ef.packs seed paket adlari: kontor -> TL (analiz bakiyesi dili; 20261008001000 SONRASI, sira serbest, ek)", files: [F.efPackNamesTl] },
     { id: "HIZ-liste-sayim-rpc", order: 49, title: "Portfoy/gorev KPI sayimlari tek RPC (portfolio_counts, task_counts; kod RPC yokken eski head-count sorgularina duser; sira serbest, ek)", files: [F.portfolioCountsRpc] },
     { id: "HIZ-arama-trigram-gorev-belge", order: 49.1, title: "Gorev ve belge ilike aramasi icin pg_trgm GIN indeksleri (20261010000200 ile ayni desen; sira serbest, ek)", files: [F.searchTrgmTasksDocs] },
+    { id: "HIZ-realtime-yayin-ek", order: 50, title: "Realtime yayinina teklif/kira tahakkuku/kira odemesi/anahtar tablolari (kod tablo yayinda degilken yalniz o kanal sessiz kalir; sira serbest, ek)", files: [F.realtimePublicationMore] },
     { id: "HIZ-detay-okuma-rpc", order: 49.2, title: "Anlasma teklif+randevu sayimi ve portfoy bolge istatistigi okuma RPC'leri (kod RPC yokken eski yola duser; sira serbest, ek)", files: [F.detailReadRpcs] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },

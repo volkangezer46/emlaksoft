@@ -105,7 +105,9 @@ describe("realtime throttle", () => {
     expect(tablesForPath("/app/musteriler")).toEqual(["customers"]);
     expect(tablesForPath("/app/musteriler/abc")).toEqual(["customers"]);
     expect(tablesForPath("/app/komisyon")).toEqual(["commissions"]);
-    expect(tablesForPath("/app")).toHaveLength(10);
+    expect(tablesForPath("/app")).toHaveLength(14);
+    expect(tablesForPath("/app/teklifler")).toEqual(["offers", "deals"]);
+    expect(tablesForPath("/app/portfoyler/anahtarlar")).toEqual(["property_keys", "properties"]);
     expect(tablesForPath("/app/gorevler")).toEqual(["tasks"]);
     expect(tablesForPath("/app/randevular")).toEqual(["appointments"]);
     expect(tablesForPath("/app/musteriler-x")).toEqual([]);

@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { runWhenIdle } from "@/lib/idle";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
-import { REALTIME_ALL_TABLES, REALTIME_EXTENDED_TABLES, tablesForPath } from "@/lib/realtime-throttle";
+import { REALTIME_ALL_TABLES, REALTIME_EXTENDED_TABLES, REALTIME_MORE_TABLES, tablesForPath } from "@/lib/realtime-throttle";
 import { emitNotificationInsert, type NotificationInsertRow } from "@/lib/realtime";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
@@ -15,6 +15,7 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
     // ikinci bir "*" aboneliği (Realtime list_changes poller maliyeti) gereksizdi.
     tables: [...REALTIME_ALL_TABLES],
     extraTables: [...REALTIME_EXTENDED_TABLES],
+    moreTables: [...REALTIME_MORE_TABLES],
     debounceMs: 1200,
     // Rota duyarlı: yalnız açık sayfayı ilgilendiren tablolar yenileme tetikler;
     // iki yenileme arası en az 10 sn (bkz. src/lib/realtime-throttle.ts).
