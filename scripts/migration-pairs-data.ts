@@ -287,6 +287,8 @@ const F = {
   fsboRealtime: "20261012002500_fsbo_realtime.sql",
   fsboRlsScope: "20261012002600_fsbo_rls_scope.sql",
   automationTriggerFsbo: "20261012002510_automation_trigger_fsbo.sql",
+  // Portal ice/disa aktarim (2026-10-12): eklentiyle yardimli doldurma oturum kaydi + JWT RPC'leri.
+  portalTransferSessions: "20261012002700_portal_transfer_sessions.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -488,6 +490,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.fsboPermissionDefaults]: "ek", // yalniz VERI seed: prospecting izin varsayilani (owner/gm/branch_manager/team_lead ALL, advisor/call_center view+create+edit, readonly view); idempotent
     [F.automationTriggerFsbo]: "ek", // yalniz enum degeri ekler (new_fsbo_lead, fsbo_no_contact_days; idempotent); tablo/politika/veri degismez
     [F.fsboRlsScope]: "siki", // fsbo_leads UPDATE politikasi kendi+sahipsiz kapsama, sutun UPDATE yetkisi daralir, insert is_sample=false; iki kapatma RPC'si izin kapisi alir; veri degismez
+    [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
@@ -666,6 +669,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FSBO-otomasyon-tetikleyici", order: 53, title: "automation_trigger enum: new_fsbo_lead + fsbo_no_contact_days (sira serbest, ek; kod enum yokken FSBO kurali kaydetmez)", files: [F.automationTriggerFsbo] },
     { id: "FSBO-rls-kapsami", order: 54, title: "fsbo_leads RLS kapsami + sutun yetkisi + kapatma RPC izin kapisi (20261012002400 ve 002500 SONRASI; sira serbest, siki)", files: [F.fsboRlsScope] },
     { id: "FSBO-realtime-kapatma", order: 52, title: "fsbo_leads realtime yayini + insight_close_fsbo_lead RPC (20261012002400 SONRASI; kod yayin/RPC yokken sessiz; sira serbest, ek)", files: [F.fsboRealtime] },
+    { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
     { id: "GUVENILIRLIK-dekont-depo-temizligi", order: 45, title: "Kiraci dekontu depo temizligi: rent-receipts outbox izni + silinen/degisen dekont tetikleyicisi (20261012000900 ve 20261007000700 SONRASI, sira serbest, ek)", files: [F.storageCleanupReceipts] },
@@ -841,6 +845,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // FSBO RLS kapsami: tablo (002400) ve kapatma RPC'si (002500) once var olmalidir.
     [F.fsboRlsScope, F.fsboLeads],
     [F.fsboRlsScope, F.fsboRealtime],
+    // Portal aktarim RPC'leri lc_bind_portal_listing (002000), lc_row_visible (002010) ve lc_mark_state_stale (002040) cekirdegine dayanir.
+    [F.portalTransferSessions, F.lcInventoryMatching],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

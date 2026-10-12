@@ -13,6 +13,8 @@ import { GeoSelect } from "@/components/app/geo-select";
 import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/yeni/property-options";
 import { defaultDefinitionValues, LEGACY_TRANSACTION_TYPE_VALUES } from "@/lib/definition-defaults";
 import { Combobox } from "@/components/ui/combobox";
+import { PortalFeatureFields } from "@/components/app/portal-feature-fields";
+import { PORTAL_FEATURES } from "@/lib/portal-transfer/features";
 
 type Province = { id: string; name: string };
 
@@ -116,7 +118,7 @@ export function EditPropertyDialog({
         title: "Başlık", transaction_type: "İşlem", property_type: "Tür", list_price: "Liste fiyatı",
         min_price: "Min. fiyat", commission_rate: "Komisyon %", rooms: "Oda", sqm: "m²", floor: "Kat",
         heating: "Isınma", building_age: "Bina yaşı", facade: "Cephe", parcel_block: "Tapu ada",
-        parcel_lot: "Tapu parsel", address_line: "Adres", branch_id: "Şube", description: "İlan açıklaması", virtual_tour_url: "360° tur / video",
+        parcel_lot: "Tapu parsel", ...Object.fromEntries(PORTAL_FEATURES.map((f) => [f.key, f.label])), address_line: "Adres", branch_id: "Şube", description: "İlan açıklaması", virtual_tour_url: "360° tur / video",
       }}
       trigger={({ onClick, ...aria }) => (
         <button
@@ -130,7 +132,7 @@ export function EditPropertyDialog({
       )}
       tabs={[
         { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate", "branch_id"] },
-        { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade"] },
+        { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade", ...PORTAL_FEATURES.map((f) => f.key)] },
         { id: "konum", label: "Konum ve tapu", icon: MapPin, fields: ["address_line", "parcel_block", "parcel_lot"] },
         { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description", "virtual_tour_url"] },
       ]}
@@ -216,6 +218,7 @@ export function EditPropertyDialog({
                 {FACADE_OPTIONS.map((f) => <option key={f}>{f}</option>)}
               </select>
             </label>
+            <PortalFeatureFields idPrefix="edit-pf" defaults={property.features as Record<string, unknown>} />
           </>
         ),
         aciklama: (

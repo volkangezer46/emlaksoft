@@ -19,6 +19,7 @@ import { commissionSummary, parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
 import { evaluateOwnerInfo, parseOwnerInfoForm } from "@/lib/property-owner/info";
 import { OwnerInfoSection } from "./owner-info-section";
+import { PortalFeatureFields } from "@/components/app/portal-feature-fields";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_FORM_ID, PROPERTY_TABS } from "./property-tabs";
 
@@ -215,6 +216,7 @@ export function PropertyForm({
         <FormField label="Tapu — Parsel" htmlFor="parcel-lot">
           <FormInput name="parcel_lot" placeholder="Örn. 56" />
         </FormField>
+        <PortalFeatureFields />
       </>
     ),
     sahip: (

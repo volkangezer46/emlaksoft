@@ -2,6 +2,7 @@
 
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath, revalidateTag } from "next/cache";
+import { parsePortalFeatureFields } from "@/lib/portal-transfer/features";
 import { parsePropertyDescription, withDescription } from "@/lib/property-description";
 import { parseVirtualTourUrl, withVirtualTour } from "@/lib/virtual-tour";
 import { revalidateTenantData } from "@/lib/revalidate";
@@ -110,6 +111,8 @@ function parseFeatureFields(formData: FormData, base: { rooms: string; sqm: numb
     heating: heating || null,
     building_age: parseIntOrNull(formData.get("building_age")),
     facade: facade || null,
+    // Portal formlarının istediği ek alanlar: yalnız formda alanı VARSA yazılır (düzenleme formu göstermiyorsa mevcut değer silinmez).
+    ...parsePortalFeatureFields(formData),
   };
 }
 
