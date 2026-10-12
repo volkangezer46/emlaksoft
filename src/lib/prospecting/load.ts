@@ -3,6 +3,7 @@ import { orIlike } from "@/lib/pgrst";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import type { ScopeFilter } from "@/lib/access-control/query-scope";
 import type { Db } from "./store";
+import { leadHashCandidates } from "./phone-hash";
 import { CLAIM_WARN_DAYS } from "./thresholds";
 import { FSBO_STATUSES, OPEN_STATUSES, type FsboStatus } from "./types";
 
@@ -251,7 +252,9 @@ export async function loadFsboList(
     throw new Error(`fsbo_leads: ${err.code ?? "hata"}`);
   }
   const raw = (list.data ?? []) as unknown as RawRow[];
-  const hashes = [...new Set(raw.map((r) => r.phone_hash).filter((h): h is string => !!h))];
+  // v1/v2 geçiş dönemi: telefon varsa iki özete de bakılır.
+  const candidatesOf = (r: RawRow) => leadHashCandidates(tenantId, r.phone, r.phone_hash);
+  const hashes = [...new Set(raw.flatMap(candidatesOf))];
   let dnc = new Set<string>();
   if (hashes.length > 0) {
     const { data } = await db.from("fsbo_do_not_call").select("phone_hash").eq("tenant_id", tenantId).in("phone_hash", hashes);
@@ -264,7 +267,7 @@ export async function loadFsboList(
     last_price_drop_pct: numOrNull(r.last_price_drop_pct),
     districtName: first(r.district)?.name ?? null,
     assigneeName: first(r.assignee)?.full_name ?? null,
-    doNotCall: !!r.phone_hash && dnc.has(r.phone_hash),
+    doNotCall: candidatesOf(r).some((h) => dnc.has(h)),
   }));
   return {
     rows,

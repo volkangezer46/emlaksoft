@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DAY_MS, now } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { MANAGER_ROLES } from "@/lib/team/assignable-roles";
 import { conflictNotices, ownershipVerdict, type ConflictNotice, type OwnershipVerdict } from "./conflict";
 import { initialNextActionMs } from "./cadence";
-import { phoneHash } from "./phone-hash";
+import { phoneHash, phoneHashCandidates } from "./phone-hash";
 import { evaluatePriceChange } from "./price";
 import { suggestRelist, type RelistSuggestion } from "./relist";
 import type { FsboSaveInput } from "./schema";
@@ -36,14 +37,26 @@ type ExistingRow = {
   price_drop_count: number | null;
   last_activity_at: string;
   claim_expires_at: string | null;
-  assignee: { full_name: string | null } | { full_name: string | null }[] | null;
 };
 
-const EXISTING_SELECT =
-  "id, assigned_to, price, phone, price_drop_count, last_activity_at, claim_expires_at, assignee:profiles!fsbo_leads_assigned_to_fkey(full_name)";
+const EXISTING_SELECT = "id, assigned_to, price, phone, price_drop_count, last_activity_at, claim_expires_at";
 
-function one<T>(v: T | T[] | null | undefined): T | null {
-  return Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
+/** `fsbo_find_existing` RPC satırı (RLS'i delmeden ofis içi tekilleştirme: yalnız var/yok + sahip adı + sahiplik tarihleri). */
+type FindRow = {
+  lead_id: string;
+  match_kind: "url" | "phone";
+  assigned_to: string | null;
+  assignee_name: string | null;
+  last_activity_at: string;
+  claim_expires_at: string | null;
+  status: string;
+  is_mine: boolean | null;
+};
+
+/** İlan anahtarı özeti (SQL'deki `sha256(convert_to(...))` ile aynı anahtar biçimi). */
+export function listingKeyHash(input: { portal: string; externalId: string | null; url: string | null }): string | null {
+  const key = input.externalId ? `ext|${input.portal}|${input.externalId}` : input.url ? `url|${input.url}` : null;
+  return key ? createHash("sha256").update(key, "utf8").digest("hex") : null;
 }
 
 /**
@@ -60,32 +73,55 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
   const nowIso = new Date(nowMs).toISOString();
   const isManager = (MANAGER_ROLES as readonly string[]).includes(role);
   const hash = input.phone ? phoneHash(tenantId, input.phone) : null;
+  // v1/v2 geçiş dönemi: aranmasın ve tekilleştirme sorguları iki özete de bakar; yeni kayıt `hash` (v2) yazar.
+  const hashCandidates = input.phone ? phoneHashCandidates(tenantId, input.phone) : [];
 
-  // 1) Aynı ilan ofiste kayıtlı mı?
-  let existing: ExistingRow | null = null;
-  if (input.externalId || input.url) {
-    let q = db.from("fsbo_leads").select(EXISTING_SELECT).eq("tenant_id", tenantId).is("deleted_at", null);
-    q = input.externalId ? q.eq("portal", input.portal).eq("external_id", input.externalId) : q.eq("url", input.url as string);
-    const { data, error } = await q.limit(1).maybeSingle();
+  // 1) Aynı ilan / aynı telefon ofiste kayıtlı mı? SELECT RLS'i danışman kapsamındadır; ofis içi tekilleştirme dar RPC ile yapılır.
+  const urlHash = listingKeyHash(input);
+  let existingFind: FindRow | null = null;
+  let phoneMatch: FindRow | null = null;
+  if (urlHash || hashCandidates.length > 0) {
+    const { data, error } = await db.rpc("fsbo_find_existing", {
+      p_url_hash: urlHash ?? "",
+      p_phone_hash: hashCandidates[0] ?? null,
+      p_phone_hash_alt: hashCandidates[1] ?? null,
+    });
     if (error) return { ok: false, error: actionErrorMessage(error, "Kayıt kontrol edilemedi. Lütfen tekrar deneyin.") };
-    existing = (data as ExistingRow | null) ?? null;
+    const found = (data as FindRow[] | null) ?? [];
+    existingFind = found.find((r) => r.match_kind === "url") ?? null;
+    phoneMatch = found.find((r) => r.match_kind === "phone" && r.lead_id !== existingFind?.lead_id) ?? null;
   }
 
-  if (existing) {
+  let existing: ExistingRow | null = null;
+  if (existingFind) {
     const verdict = ownershipVerdict(
       {
-        assignedTo: existing.assigned_to,
-        assignedName: one(existing.assignee)?.full_name ?? null,
-        lastActivityMs: Date.parse(existing.last_activity_at),
-        claimExpiresMs: existing.claim_expires_at ? Date.parse(existing.claim_expires_at) : null,
+        assignedTo: existingFind.assigned_to,
+        assignedName: existingFind.assignee_name,
+        lastActivityMs: Date.parse(existingFind.last_activity_at),
+        claimExpiresMs: existingFind.claim_expires_at ? Date.parse(existingFind.claim_expires_at) : null,
       },
       userId,
       nowMs,
       { canOverride: isManager },
     );
     if (verdict.kind === "other") {
-      return { ok: true, id: existing.id, created: false, ownership: verdict, notices: [], priceDropPct: null, relist: null, doNotCall: false };
+      return { ok: true, id: existingFind.lead_id, created: false, ownership: verdict, notices: [], priceDropPct: null, relist: null, doNotCall: false };
     }
+    // Sahiplenme (sahipsiz / devralma): assigned_to sütununa kullanıcı UPDATE yetkisi yoktur; yetki + kapsam RPC'de.
+    if (existingFind.assigned_to !== userId) {
+      const claim = await db.rpc("fsbo_assign_lead", { p_lead_id: existingFind.lead_id, p_assignee: userId });
+      if (claim.error) return { ok: false, error: actionErrorMessage(claim.error, "Kayıt sahiplenilemedi. Lütfen tekrar deneyin.") };
+      if (claim.data !== "ok") return { ok: false, error: "Bu kayıt başka bir danışmanın." };
+    }
+    // Artık görünür (kendi): ayrıntıyı normal sorguyla oku.
+    const { data, error } = await db.from("fsbo_leads").select(EXISTING_SELECT).eq("tenant_id", tenantId).eq("id", existingFind.lead_id).is("deleted_at", null).maybeSingle();
+    if (error) return { ok: false, error: actionErrorMessage(error, "Kayıt kontrol edilemedi. Lütfen tekrar deneyin.") };
+    existing = (data as ExistingRow | null) ?? null;
+    if (!existing) return { ok: false, error: "Kayıt bulunamadı. Lütfen tekrar deneyin." };
+  }
+
+  if (existing) {
     const prevPrice = existing.price == null ? null : Number(existing.price);
     const change = evaluatePriceChange(prevPrice, input.price);
     const patch: Record<string, unknown> = {
@@ -94,7 +130,6 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
       listing_status: "active",
       claim_expires_at: new Date(nowMs + CLAIM_IDLE_DAYS * DAY_MS).toISOString(),
     };
-    if (verdict.kind === "free") patch.assigned_to = userId;
     if (input.price != null) patch.price = input.price;
     if (input.title) patch.title = input.title;
     if (!existing.phone && input.phone) {
@@ -122,7 +157,7 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
 
   // 2) Yeni kayıt: çakışma olgularını tek turda topla.
   const [dncRes, customerRes, listingRes, relistRes, profileRes] = await Promise.all([
-    hash ? db.from("fsbo_do_not_call").select("id").eq("tenant_id", tenantId).eq("phone_hash", hash).limit(1) : Promise.resolve({ data: [], error: null }),
+    hashCandidates.length > 0 ? db.from("fsbo_do_not_call").select("id").eq("tenant_id", tenantId).in("phone_hash", hashCandidates).limit(1) : Promise.resolve({ data: [], error: null }),
     input.phone
       ? db.from("customers").select("id, full_name, customer_types").eq("tenant_id", tenantId).eq("phone", input.phone).limit(1)
       : Promise.resolve({ data: [], error: null }),
@@ -144,7 +179,8 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
   const own = ((listingRes.data as { property_id: string }[] | null) ?? [])[0] ?? null;
   const candidates = ((relistRes.data as { id: string; phone_hash: string | null; district_id: string | null; rooms: string | null; gross_m2: number | string | null; price: number | string | null; title: string | null }[] | null) ?? []).map((c) => ({
     id: c.id,
-    phoneHash: c.phone_hash,
+    // v1 ile kayıtlı eski özet aynı numaraysa yeni (v2) özete normalleştirilir; aksi halde tekrar ilan eşleşmesi kaçar.
+    phoneHash: c.phone_hash && hashCandidates.includes(c.phone_hash) ? hash : c.phone_hash,
     districtId: c.district_id,
     rooms: c.rooms,
     sqm: c.gross_m2 == null ? null : Number(c.gross_m2),
@@ -228,6 +264,7 @@ export async function saveFsboLead(ctx: SaveCtx, input: FsboSaveInput): Promise<
   ]);
 
   const notices = conflictNotices({
+    otherLead: phoneMatch && phoneMatch.assigned_to !== userId ? { name: phoneMatch.assignee_name } : null,
     doNotCall,
     customer: cust ? { id: cust.id, name: cust.full_name, type: cust.customer_types?.[0] ?? null } : null,
     ownListing: own ? { propertyId: own.property_id } : null,

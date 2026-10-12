@@ -14,7 +14,7 @@ import { MANAGER_ROLES } from "@/lib/team/assignable-roles";
 import { applyCallOutcome, checkStatusChange } from "@/lib/prospecting/state-machine";
 import { fsboSaveSchema } from "@/lib/prospecting/schema";
 import { saveFsboLead, type Db } from "@/lib/prospecting/store";
-import { phoneHash } from "@/lib/prospecting/phone-hash";
+import { leadHashCandidates, phoneHash } from "@/lib/prospecting/phone-hash";
 import {
   FSBO_DNC_REASONS,
   isFsboLostReason,
@@ -62,9 +62,11 @@ async function loadLead(db: Db, tenantId: string, id: string): Promise<LeadRow |
   return (data as LeadRow | null) ?? null;
 }
 
-async function isDoNotCall(db: Db, tenantId: string, hash: string | null): Promise<boolean> {
-  if (!hash) return false;
-  const { data } = await db.from("fsbo_do_not_call").select("id").eq("tenant_id", tenantId).eq("phone_hash", hash).limit(1);
+/** v1/v2 geçiş dönemi: kaydın telefonu varsa iki özete de, kayıtlı özete de bakılır. */
+async function isDoNotCall(db: Db, tenantId: string, lead: Pick<LeadRow, "phone" | "phone_hash">): Promise<boolean> {
+  const candidates = leadHashCandidates(tenantId, lead.phone, lead.phone_hash);
+  if (candidates.length === 0) return false;
+  const { data } = await db.from("fsbo_do_not_call").select("id").eq("tenant_id", tenantId).in("phone_hash", candidates).limit(1);
   return ((data as unknown[] | null) ?? []).length > 0;
 }
 
@@ -73,8 +75,17 @@ function refresh(id?: string) {
   if (id) revalidatePath(`${PATH}/${id}`);
 }
 
-/** Ortak: sahipsiz kayda dokunan danışman kaydı sahiplenir. */
-const claimPatch = (lead: Pick<LeadRow, "assigned_to">, userId: string) => (lead.assigned_to ? {} : { assigned_to: userId });
+/**
+ * Ortak: sahipsiz kayda dokunan danışman kaydı sahiplenir. `assigned_to` sütununa kullanıcı UPDATE yetkisi yoktur
+ * (20261012002800): sahiplenme yetki + kapsam kontrolü içeride olan `fsbo_assign_lead` RPC'siyle yapılır.
+ * Hata metni ya da null döner.
+ */
+async function claimIfFree(db: Db, lead: Pick<LeadRow, "id" | "assigned_to">, userId: string): Promise<string | null> {
+  if (lead.assigned_to) return null;
+  const res = await db.rpc("fsbo_assign_lead", { p_lead_id: lead.id, p_assignee: userId });
+  if (res.error) return actionErrorMessage(res.error, "Kayıt sahiplenilemedi. Lütfen tekrar deneyin.");
+  return res.data === "ok" ? null : "Bu kayıt başka bir danışmanın.";
+}
 
 /** Elle ekleme formu (bağlantı yapıştır + telefon). */
 export async function createFsboLead(_prev: ProspectingResult, formData: FormData): Promise<ProspectingResult> {
@@ -129,7 +140,7 @@ export async function logFsboCall(input: { id: string; outcome: string; note?: s
   if (!canTouch(gate.role, gate.userId, lead)) return { error: "Bu kayıt başka bir danışmanın." };
   if (!isFsboStatus(lead.status)) return { error: "Kayıt durumu tanınmadı." };
 
-  const dnc = await isDoNotCall(db, gate.tenantId, lead.phone_hash);
+  const dnc = await isDoNotCall(db, gate.tenantId, lead);
   const nowMs = now();
   const userNextMs = input.nextDate ? (parseTrLocalDateTime(`${input.nextDate}T09:00`)?.getTime() ?? null) : null;
   if (input.outcome === "sonra_ara" && input.nextDate && userNextMs == null) return { error: "Sonraki arama tarihi geçersiz." };
@@ -141,8 +152,9 @@ export async function logFsboCall(input: { id: string; outcome: string; note?: s
   if (!result.ok) return { error: result.error };
 
   const nowIso = new Date(nowMs).toISOString();
+  const claimError = await claimIfFree(db, lead, gate.userId);
+  if (claimError) return { error: claimError };
   const patch: Record<string, unknown> = {
-    ...claimPatch(lead, gate.userId),
     status: result.status,
     contact_attempts: result.contactAttempts,
     last_contact_at: nowIso,
@@ -173,7 +185,8 @@ export async function logFsboCall(input: { id: string; outcome: string; note?: s
 }
 
 async function addDoNotCall(db: Db, gate: { tenantId: string; userId: string }, lead: LeadRow, reason: FsboDncReason): Promise<void> {
-  const hash = lead.phone_hash ?? (lead.phone ? phoneHash(gate.tenantId, lead.phone) : null);
+  // Yeni aranmasın kayıtları v2 özetle yazılır (telefon varsa); telefon temizlenmişse kayıtlı özet kullanılır.
+  const hash = lead.phone ? phoneHash(gate.tenantId, lead.phone) : lead.phone_hash;
   if (!hash) return;
   await db
     .from("fsbo_do_not_call")
@@ -196,10 +209,12 @@ export async function markFsboDoNotCall(input: { id: string; reason?: string }):
   if (lead.status === "portfoye_donustu") return { error: "Portföye dönüşen kayıt aranmasın olarak işaretlenemez; müşteri kaydından yönetin." };
   if (!lead.phone_hash && !lead.phone) return { error: "Bu kayıtta telefon yok; aranmasın listesine eklenecek numara bulunamadı." };
 
+  const claimError = await claimIfFree(db, lead, gate.userId);
+  if (claimError) return { error: claimError };
   const nowIso = new Date(now()).toISOString();
   const upd = await db
     .from("fsbo_leads")
-    .update({ ...claimPatch(lead, gate.userId), status: "kayip", lost_reason: reason === "aslinda_emlakci" ? "aslinda_emlakci" : "emlakci_istemiyor", status_changed_at: nowIso, last_activity_at: nowIso, next_action_at: null })
+    .update({ status: "kayip", lost_reason: reason === "aslinda_emlakci" ? "aslinda_emlakci" : "emlakci_istemiyor", status_changed_at: nowIso, last_activity_at: nowIso, next_action_at: null })
     .eq("tenant_id", gate.tenantId)
     .eq("id", lead.id);
   if (upd.error) return { error: actionErrorMessage(upd.error, "İşlem kaydedilemedi. Lütfen tekrar deneyin.") };
@@ -217,8 +232,9 @@ export async function removeFsboDoNotCall(input: { id: string }): Promise<Prospe
   if (!isManagerRole(gate.role)) return { error: "Aranmasın kaydını yalnız yönetici kaldırabilir." };
   const db = (await createClient()) as Db;
   const lead = await loadLead(db, gate.tenantId, input.id);
-  if (!lead?.phone_hash) return { error: "Kayıtta telefon özeti yok; kaldırılacak aranmasın kaydı bulunamadı." };
-  const del = await db.from("fsbo_do_not_call").delete().eq("tenant_id", gate.tenantId).eq("phone_hash", lead.phone_hash);
+  const hashes = lead ? leadHashCandidates(gate.tenantId, lead.phone, lead.phone_hash) : [];
+  if (!lead || hashes.length === 0) return { error: "Kayıtta telefon özeti yok; kaldırılacak aranmasın kaydı bulunamadı." };
+  const del = await db.from("fsbo_do_not_call").delete().eq("tenant_id", gate.tenantId).in("phone_hash", hashes);
   if (del.error) return { error: actionErrorMessage(del.error, "Aranmasın kaydı kaldırılamadı.") };
   afterSafe(() => logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "fsbo.do_not_call_remove", entityType: "fsbo_lead", entityId: lead.id }), "aranmasın kaldırma denetimi");
   refresh(lead.id);
@@ -255,7 +271,7 @@ export async function createFsboTask(input: { id: string; title?: string; dueDat
   if (!lead) return { error: "Kayıt bulunamadı." };
   if (!canTouch(gate.role, gate.userId, lead)) return { error: "Bu kayıt başka bir danışmanın." };
   if (lead.status === "portfoye_donustu") return { error: "Portföye dönüşen kayıt için görev açılamaz." };
-  if (await isDoNotCall(db, gate.tenantId, lead.phone_hash)) return { error: "Bu numara aranmasın listesinde; görev açılamaz." };
+  if (await isDoNotCall(db, gate.tenantId, lead)) return { error: "Bu numara aranmasın listesinde; görev açılamaz." };
   const suffix = lead.title ? `: ${lead.title}` : "";
   const title = (input.title ?? "").trim().slice(0, 200) || `Sahibinden ilan sahibini tekrar ara${suffix}`.slice(0, 200);
   const ins = await db.from("tasks").insert({
@@ -288,7 +304,7 @@ export async function startFsboAppointment(input: { id: string }): Promise<Prosp
   if (!lead) return { error: "Kayıt bulunamadı." };
   if (!canTouch(gate.role, gate.userId, lead)) return { error: "Bu kayıt başka bir danışmanın." };
   if (lead.status === "portfoye_donustu") return { error: "Portföye dönüşen kayıt için randevu açılamaz." };
-  if (await isDoNotCall(db, gate.tenantId, lead.phone_hash)) return { error: "Bu numara aranmasın listesinde; randevu açılamaz." };
+  if (await isDoNotCall(db, gate.tenantId, lead)) return { error: "Bu numara aranmasın listesinde; randevu açılamaz." };
 
   let customerId = lead.customer_id;
   if (!customerId) {
@@ -315,7 +331,9 @@ export async function startFsboAppointment(input: { id: string }): Promise<Prosp
       customerId = String((ins.data as { id: string }).id);
       revalidatePath("/app/musteriler");
     }
-    await db.from("fsbo_leads").update({ customer_id: customerId, last_activity_at: new Date(now()).toISOString(), ...claimPatch(lead, gate.userId) }).eq("tenant_id", gate.tenantId).eq("id", lead.id);
+    const claimError = await claimIfFree(db, lead, gate.userId);
+    if (claimError) return { error: claimError };
+    await db.from("fsbo_leads").update({ customer_id: customerId, last_activity_at: new Date(now()).toISOString() }).eq("tenant_id", gate.tenantId).eq("id", lead.id);
   }
   refresh(lead.id);
   return { ok: true, id: lead.id, href: `/app/randevular/yeni?customer=${customerId}` };
@@ -349,8 +367,9 @@ export async function changeFsboStatus(input: { id: string; to: string; lostReas
   if (to === "kayip") note = `Kayıp nedeni: ${lostReason}`;
 
   const nowIso = new Date(now()).toISOString();
+  const claimError = await claimIfFree(db, lead, gate.userId);
+  if (claimError) return { error: claimError };
   const patch: Record<string, unknown> = {
-    ...claimPatch(lead, gate.userId),
     status: to,
     status_changed_at: nowIso,
     last_activity_at: nowIso,
@@ -378,9 +397,10 @@ export async function assignFsboLead(input: { id: string; assignedTo: string }):
   if (!lead) return { error: "Kayıt bulunamadı." };
   const { data: target } = await db.from("profiles").select("id").eq("id", input.assignedTo).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle();
   if (!target) return { error: "Seçilen danışman bu ofiste bulunamadı." };
-  const nowIso = new Date(now()).toISOString();
-  const upd = await db.from("fsbo_leads").update({ assigned_to: input.assignedTo, last_activity_at: nowIso }).eq("tenant_id", gate.tenantId).eq("id", lead.id);
+  // assigned_to sütununa kullanıcı UPDATE yetkisi yoktur; yetki + kapsam RPC içinde (tekrar doğrulanır).
+  const upd = await db.rpc("fsbo_assign_lead", { p_lead_id: lead.id, p_assignee: input.assignedTo });
   if (upd.error) return { error: actionErrorMessage(upd.error, "Atama yapılamadı.") };
+  if (upd.data !== "ok") return { error: upd.data === "bad_target" ? "Seçilen danışman bu ofiste bulunamadı." : "Bu kaydı atama yetkiniz yok." };
   await db.from("fsbo_lead_activities").insert({ tenant_id: gate.tenantId, lead_id: lead.id, actor_id: gate.userId, kind: "status", note: "Danışman değiştirildi." });
   refresh(lead.id);
   return { ok: true, id: lead.id };
@@ -408,8 +428,10 @@ export async function archiveFsboLead(input: { id: string }): Promise<Prospectin
   const lead = await loadLead(db, gate.tenantId, input.id);
   if (!lead) return { error: "Kayıt bulunamadı." };
   if (!canTouch(gate.role, gate.userId, lead)) return { error: "Bu kayıt başka bir danışmanın." };
-  const upd = await db.from("fsbo_leads").update({ deleted_at: new Date(now()).toISOString() }).eq("tenant_id", gate.tenantId).eq("id", lead.id);
+  // deleted_at sütununa kullanıcı UPDATE yetkisi yoktur; yetki + kapsam RPC içinde.
+  const upd = await db.rpc("fsbo_archive_lead", { p_lead_id: lead.id });
   if (upd.error) return { error: actionErrorMessage(upd.error, "Kayıt kaldırılamadı.") };
+  if (upd.data !== "ok") return { error: "Bu kaydı kaldırma yetkiniz yok." };
   refresh();
   return { ok: true };
 }
