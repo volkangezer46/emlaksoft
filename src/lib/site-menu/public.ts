@@ -1,4 +1,5 @@
-import { checkHref, isExternalHref, type FeaturedPreviewKind, type FeaturedRatio, type IconRef, type MediaKind, type SiteMenuConfig } from "./schema";
+import { checkHref, isExternalHref, type FeaturedPreviewKind, type FeaturedRatio, type MediaKind } from "./schema-core";
+import type { IconRef, SiteMenuConfig } from "./schema";
 
 /**
  * Yapılandırmadan herkese açık görünüme: gizlenenler, geçersiz bağlantılar ve süresi dolan duyuru ayıklanır;

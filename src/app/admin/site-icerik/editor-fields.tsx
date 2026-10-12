@@ -3,7 +3,7 @@
 import { useId, type ReactNode } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Input, Textarea } from "@/components/ui/input";
-import type { Issue } from "@/lib/site-menu/schema";
+import type { Issue } from "@/lib/site-menu/schema-core";
 import type { SiteContent } from "@/lib/site-content/schema";
 import { moveInArray } from "@/lib/site-menu/editor-model";
 import { btn, iconBtn } from "../site-menu/editor-ui";

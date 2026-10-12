@@ -1,4 +1,5 @@
-import { LIMITS, type FooterColumn, type FooterLink, type MenuGroup, type MenuItem, type SiteMenuConfig } from "./schema";
+import { LIMITS } from "./schema-core";
+import type { FooterColumn, FooterLink, MenuGroup, MenuItem, SiteMenuConfig } from "./schema";
 
 /**
  * Admin editörünün saf durum yardımcıları (taşıma, ekleme, kimlik üretimi). Test edilebilir; React'a bağlı değil.

@@ -1,6 +1,7 @@
 "use client";
 
-import { LANDING_SECTIONS, LIMITS, normalizeLayout, type SiteContent, type validateSiteContent } from "@/lib/site-content/schema";
+import { LANDING_SECTIONS, LIMITS, normalizeLayout } from "@/lib/site-content/schema-core";
+import type { SiteContent, validateSiteContent } from "@/lib/site-content/schema";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
 
 /**

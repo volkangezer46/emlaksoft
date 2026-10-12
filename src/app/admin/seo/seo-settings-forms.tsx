@@ -23,7 +23,8 @@ import {
 } from "@/app/actions/seo-admin";
 import { buildRobots, robotsToText } from "@/lib/seo/robots-rules";
 import { validateJsonLd } from "@/lib/seo/jsonld";
-import { AI_BOTS, type SeoGlobal, type SeoIndexNowSettings, type SeoRobotsSettings, type SeoSitemapSettings } from "@/lib/seo/schema";
+import { AI_BOTS } from "@/lib/seo/schema-core";
+import type { SeoGlobal, SeoIndexNowSettings, SeoRobotsSettings, SeoSitemapSettings } from "@/lib/seo/schema";
 import { LockedNote, ResultNote, SeoForm, SubmitButton } from "./seo-ui";
 
 /* ------------------------------ Genel ------------------------------ */

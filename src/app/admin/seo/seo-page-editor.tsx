@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { resetSeoPage, saveSeoPage } from "@/app/actions/seo-admin";
 import { canonicalUrl, type ChecklistItem } from "@/lib/seo/rules";
-import { CHANGE_FREQS, JSON_LD_KINDS, type JsonLdKind, type SeoPageOverride } from "@/lib/seo/schema";
+import { CHANGE_FREQS, JSON_LD_KINDS, type JsonLdKind } from "@/lib/seo/schema-core";
+import type { SeoPageOverride } from "@/lib/seo/schema";
 import { Checklist, LockedNote, SeoForm, SerpPreview, SocialPreview, SubmitButton } from "./seo-ui";
 
 export type PageEditorData = {

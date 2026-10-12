@@ -11,7 +11,8 @@ import {
   saveSiteMenuDraft,
 } from "@/app/actions/site-menu";
 import { Input } from "@/components/ui/input";
-import { hasErrors, validateSiteMenu, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import { hasErrors, type Issue } from "@/lib/site-menu/schema-core";
+import type { SiteMenuConfig } from "@/lib/site-menu/schema";
 import { sameConfig } from "@/lib/site-menu/editor-model";
 import type { MediaEntry } from "@/lib/site-menu/store";
 import { AnnouncementTab, FooterTab } from "./footer-announcement-tabs";
@@ -50,10 +51,21 @@ export function SiteMenuEditor({ initialDraft, live, defaults, history, media: i
   const [pending, start] = useTransition();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const issues = useMemo(() => validateSiteMenu(cfg, { media }).issues, [cfg, media]);
+  // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular).
+  const [validate, setValidate] = useState<typeof import("@/lib/site-menu/schema").validateSiteMenu | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("@/lib/site-menu/schema").then((m) => {
+      if (alive) setValidate(() => m.validateSiteMenu);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const issues = useMemo<Issue[]>(() => (validate ? validate(cfg, { media }).issues : []), [validate, cfg, media]);
   const errorCount = issues.filter((i) => i.level === "error").length;
   const warnCount = issues.length - errorCount;
-  const blocked = hasErrors(issues);
+  const blocked = !validate || hasErrors(issues);
   const dirty = !sameConfig(cfg, saved);
   const liveCfg = live ?? defaults;
   const pendingPublish = !sameConfig(saved, liveCfg);

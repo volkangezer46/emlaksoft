@@ -3,7 +3,8 @@
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { allIds, blankFooterColumn, blankFooterLink, moveInArray, newId } from "@/lib/site-menu/editor-model";
-import { LIMITS, type Issue, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import { LIMITS, type Issue } from "@/lib/site-menu/schema-core";
+import type { SiteMenuConfig } from "@/lib/site-menu/schema";
 import { Field, FieldIssue, InlineConfirm, btnPrimary, iconBtn } from "./editor-ui";
 import type { Update } from "./menu-tab";
 

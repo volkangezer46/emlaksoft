@@ -9,7 +9,8 @@ import { renderMenuIcon } from "@/lib/site-menu/icon-node";
 import { MENU_ICON_LIST } from "@/lib/site-menu/icon-registry";
 import { MEDIA_LIMITS, type MediaRole } from "@/lib/site-menu/media";
 import { HOME_ANCHORS, knownPublicPaths } from "@/lib/site-menu/known-routes";
-import type { IconRef, Issue } from "@/lib/site-menu/schema";
+import type { Issue } from "@/lib/site-menu/schema-core";
+import type { IconRef } from "@/lib/site-menu/schema";
 import type { MediaEntry } from "@/lib/site-menu/store";
 
 export const btn = buttonClass({ variant: "outline", size: "sm" });
