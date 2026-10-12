@@ -167,7 +167,7 @@ export function EditPropertyDialog({
             {branches.length > 0 ? (
               <label className="text-xs font-medium text-text-muted">
                 Şube
-                <select name="branch_id" defaultValue={property.branch_id ?? ""} className={field}>
+                <select name="branch_id" defaultValue={property.branch_id ?? ""} className={`${field} touch:h-11`}>
                   <option value="">Şube atanmadı</option>
                   {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
