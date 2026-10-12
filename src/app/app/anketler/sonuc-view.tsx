@@ -270,7 +270,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
               Henüz anket yok. Kapanan anlaşmalardan anket üretince danışman kırılımı burada oluşur.
             </p>
           ) : (
-            <TableFrame className="mt-4" minWidth={420}>
+            <TableFrame className="mt-4" minWidth={420} stack>
               <Table className="w-full text-sm">
                 <THead>
                   <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
@@ -286,24 +286,25 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                     const aAvg = avgOf(a.scores);
                     return (
                       <TR key={a.id} className="border-b border-line/60 last:border-0">
-                        <TD className="py-2.5 pr-3 font-semibold text-text">{a.name}</TD>
-                        <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
+                        <TD label="Danışman" className="py-2.5 pr-3 font-semibold text-text">{a.name}</TD>
+                        <TD label="Yanıt" className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {a.scores.length}/{a.total}
                         </TD>
                         <TD
+                          label="NPS"
                           className={`py-2.5 pr-3 text-right font-bold tabular-nums ${
                             aNps === null
                               ? "text-text-faint"
                               : aNps >= 30
                                 ? "text-[color:var(--viz-pos)]"
                                 : aNps >= 0
-                                  ? "text-amber-600"
+                                  ? "text-warning-strong"
                                   : "text-danger-500"
                           }`}
                         >
                           {aNps === null ? "—" : aNps}
                         </TD>
-                        <TD className="py-2.5 text-right tabular-nums text-text">
+                        <TD label="Ort. puan" className="py-2.5 text-right tabular-nums text-text">
                           {aAvg === null ? "—" : aAvg.toLocaleString("tr-TR")}
                         </TD>
                       </TR>
