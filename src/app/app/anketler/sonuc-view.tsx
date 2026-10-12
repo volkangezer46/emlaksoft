@@ -285,7 +285,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                     const aNps = npsOf(a.scores);
                     const aAvg = avgOf(a.scores);
                     return (
-                      <TR key={a.id}className="border-b border-line/60 last:border-0">
+                      <TR key={a.id} className="border-b border-line/60 last:border-0">
                         <TD className="py-2.5 pr-3 font-semibold text-text">{a.name}</TD>
                         <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {a.scores.length}/{a.total}
