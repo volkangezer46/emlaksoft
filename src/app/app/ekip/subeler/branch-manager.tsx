@@ -8,10 +8,12 @@ import { createBranch, deleteBranch, updateBranch } from "@/app/actions/team";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { FormField, FormInput } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { formatTurkishPhone } from "@/lib/phone";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { Combobox } from "@/components/ui/combobox";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type BranchRow = {
   id: string;
@@ -46,20 +48,24 @@ function Fields({
         <FormInput id={`${idPrefix}-name`} name="name" required maxLength={120} defaultValue={branch?.name ?? ""} placeholder="Örn. Merkez Şube" />
       </FormField>
       <FormField label="İl" htmlFor={`${idPrefix}-il`}>
-        <FormSelect id={`${idPrefix}-il`} name="province_id" defaultValue={branch?.province_id ?? ""}>
-          <option value="">İl seçilmedi</option>
-          {provinces.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </FormSelect>
+        <Combobox
+          id={`${idPrefix}-il`}
+          name="province_id"
+          defaultValue={branch?.province_id ?? ""}
+          options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+          placeholder="İl seçilmedi"
+          searchPlaceholder="İl ara…"
+          emptyText="Eşleşen il yok"
+        />
       </FormField>
       <FormField label={ROLE_LABELS.branch_manager} htmlFor={`${idPrefix}-mgr`} hint="Ofisin aktif üyelerinden seçilir.">
-        <FormSelect id={`${idPrefix}-mgr`} name="manager_user_id" defaultValue={branch?.manager_user_id ?? ""}>
-          <option value="">Atanmadı</option>
-          {managers.map((m) => (
-            <option key={m.id} value={m.id}>{m.name} · {m.roleLabel}</option>
-          ))}
-        </FormSelect>
+        <PersonSelect
+          id={`${idPrefix}-mgr`}
+          name="manager_user_id"
+          defaultValue={branch?.manager_user_id ?? ""}
+          people={managers.map((m) => ({ id: m.id, name: m.name, hint: m.roleLabel }))}
+          emptyLabel="Atanmadı"
+        />
       </FormField>
       {phoneSupported ? (
         <FormField label="Şube telefonu" htmlFor={`${idPrefix}-tel`}>

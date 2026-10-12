@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Building2, Check, Pencil, Trash2, X } from "lucide-react";
 import { updateBranch, deleteBranch } from "@/app/actions/team";
 import { useToast } from "@/components/app/toast-provider";
+import { Combobox } from "@/components/ui/combobox";
 
 type Province = { id: string; name: string };
 
@@ -63,16 +64,15 @@ export function BranchCard({
           className="w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-2 text-sm font-semibold outline-none focus:border-brand-400"
           placeholder="Şube adı"
         />
-        <select
+        <Combobox
           name="province_id"
           defaultValue={branch.province_id ?? ""}
-          className="mt-2 w-full rounded-[var(--radius-control)] border border-line bg-surface px-2.5 py-2 text-xs outline-none focus:border-brand-400"
-        >
-          <option value="">İl seçilmedi</option>
-          {provinces.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+          options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+          placeholder="İl seçilmedi"
+          searchPlaceholder="İl ara…"
+          emptyText="Eşleşen il yok"
+          className="mt-2 text-xs"
+        />
         <div className="mt-3 flex justify-end gap-1.5">
           <button type="button" onClick={() => setEditing(false)} className="rounded-[var(--radius-control)] border border-line px-2.5 py-1.5 text-xs font-semibold text-text-muted hover:bg-canvas">
             Vazgeç

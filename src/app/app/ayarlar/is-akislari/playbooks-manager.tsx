@@ -36,6 +36,7 @@ import {
   updatePlaybook,
   type PlaybookResult,
 } from "@/app/actions/playbooks";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type StaffOption = { id: string; full_name: string };
 
@@ -407,17 +408,13 @@ export function PlaybooksManager({
                           </select>
                         </div>
                         {s.assign_to === "specific" ? (
-                          <select
+                          <PersonSelect
                             value={s.assignee_id ?? ""}
-                            onChange={(e) => patchStep(i, { assignee_id: e.target.value || null })}
-                            className={`${fieldClass} appearance-none`}
+                            onValueChange={(v) => patchStep(i, { assignee_id: v || null })}
                             aria-label={`${i + 1}. adım için kişi`}
-                          >
-                            <option value="">Kişi seçin…</option>
-                            {staff.map((p) => (
-                              <option key={p.id} value={p.id}>{p.full_name}</option>
-                            ))}
-                          </select>
+                            people={staff.map((p) => ({ id: p.id, name: p.full_name }))}
+                            emptyLabel="Kişi seçin…"
+                          />
                         ) : null}
                         <input
                           value={s.note ?? ""}

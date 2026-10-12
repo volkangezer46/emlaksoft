@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { CheckCircle2, ClipboardCheck, Loader2, UserPlus } from "lucide-react";
 import { applyForeignChecklist, markCustomerForeign, type ForeignSaleResult } from "@/app/actions/foreign-sale";
+import { Combobox } from "@/components/ui/combobox";
+import { searchCustomers, searchDeals } from "@/app/actions/lookup";
 
 const EMPTY: ForeignSaleResult = {};
 
@@ -60,16 +62,16 @@ export function ApplyChecklistForm({
       <div className="flex flex-wrap items-end gap-2">
         <label className="min-w-[220px] flex-1 text-xs font-semibold text-text-muted">
           Anlaşma seç
-          <select name="deal_id" required defaultValue="" className={`mt-1 ${inputCls}`}>
-            <option value="" disabled>
-              Anlaşma seçin…
-            </option>
-            {deals.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="deal_id"
+            required
+            options={deals.map((d) => ({ value: d.id, label: d.label }))}
+            onSearch={searchDeals}
+            placeholder="Anlaşma seçin…"
+            searchPlaceholder="Anlaşma ara…"
+            emptyText="Eşleşen anlaşma yok"
+            className="mt-1"
+          />
         </label>
         <button
           type="submit"
@@ -119,16 +121,16 @@ export function MarkForeignForm({
       <div className="grid gap-2 sm:grid-cols-[1.4fr_1fr_1fr_auto] sm:items-end">
         <label className="text-xs font-semibold text-text-muted">
           Müşteri
-          <select name="customer_id" required defaultValue="" className={`mt-1 ${inputCls}`}>
-            <option value="" disabled>
-              Müşteri seçin…
-            </option>
-            {customers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.full_name}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            name="customer_id"
+            required
+            options={customers.map((c) => ({ value: c.id, label: c.full_name }))}
+            onSearch={searchCustomers}
+            placeholder="Müşteri seçin…"
+            searchPlaceholder="Müşteri ara…"
+            emptyText="Eşleşen müşteri yok"
+            className="mt-1"
+          />
         </label>
         <label className="text-xs font-semibold text-text-muted">
           Uyruk <span className="font-normal text-text-faint">(opsiyonel)</span>

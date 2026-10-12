@@ -6,7 +6,7 @@ import { saveDealProcessStep, type DealProcessResult } from "@/app/actions/deal-
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormField, Input, Textarea } from "@/components/ui/input";
-import { FormSelect } from "@/components/ui/form-controls";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /** Tek adımın düzenleme formu (tarih, sorumlu, not, yapıldı). Kaydedince sayfa sunucuda yenilenir. */
 export function DealProcessStepForm({
@@ -36,14 +36,13 @@ export function DealProcessStepForm({
         <Input id={`${id}-tarih`} name="planned_at" type="datetime-local" defaultValue={plannedLocal} />
       </FormField>
       <FormField label="Sorumlu" htmlFor={`${id}-sorumlu`}>
-        <FormSelect id={`${id}-sorumlu`} name="assigned_to" defaultValue={assignedTo}>
-          <option value="">Seçilmedi</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </FormSelect>
+        <PersonSelect
+          id={`${id}-sorumlu`}
+          name="assigned_to"
+          defaultValue={assignedTo}
+          people={members}
+          emptyLabel="Seçilmedi"
+        />
       </FormField>
       <FormField label="Not (yalnız ofis içi)" htmlFor={`${id}-not`} className="sm:col-span-2" error={state.error}>
         <Textarea id={`${id}-not`} name="note" rows={2} maxLength={500} defaultValue={note} placeholder="Örn. banka ekspertiz tarihi, evrak eksiği" />

@@ -1,5 +1,6 @@
 import { UserCog } from "lucide-react";
 import { reassignCustomer } from "@/app/actions/customers";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Müşteri kartı "Danışmanı değiştir": JS'siz çalışan tek satır form (sunucu eylemi + yenileme). Eylem hedef
@@ -21,19 +22,15 @@ export function ReassignAdvisorForm({
       <label htmlFor={`reassign-${customerId}`} className="sr-only">
         Danışman
       </label>
-      <select
+      <PersonSelect
         id={`reassign-${customerId}`}
         name="assigned_to"
         defaultValue={current ?? ""}
-        className="max-w-[11rem] truncate rounded-[var(--radius-control)] border-0 bg-transparent py-1 text-sm font-semibold text-white outline-none [&>option]:text-ink-950"
-      >
-        <option value="">Danışmansız</option>
-        {advisors.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.full_name}
-          </option>
-        ))}
-      </select>
+        people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
+        emptyLabel="Danışmansız"
+        clearable={false}
+        className="w-auto min-w-[11rem] max-w-[14rem] border-0 bg-transparent font-semibold text-white hover:border-0"
+      />
       <button type="submit" className="focus-ring press rounded-[var(--radius-control)] bg-white/10 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-white/20">
         Danışmanı değiştir
       </button>

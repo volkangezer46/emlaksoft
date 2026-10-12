@@ -9,6 +9,7 @@ import { updateAppointment } from "@/app/actions/appointments";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type TypeOption = { value: string; label: string };
 type Appointment = {
@@ -141,12 +142,14 @@ export function AppointmentEditDialog({
             {advisors && advisors.length > 0 ? (
               <label className="text-xs font-semibold text-text-muted sm:col-span-2">
                 Danışman
-                <select name="assigned_to" defaultValue={appointment.assigned_to ?? ""} className={`mt-1 ${fieldClass}`}>
-                  {!appointment.assigned_to ? <option value="">Atanmamış</option> : null}
-                  {advisors.map((a) => (
-                    <option key={a.id} value={a.id}>{a.label}</option>
-                  ))}
-                </select>
+                <PersonSelect
+                  name="assigned_to"
+                  defaultValue={appointment.assigned_to ?? ""}
+                  people={advisors.map((a) => ({ id: a.id, name: a.label }))}
+                  emptyLabel="Atanmamış"
+                  clearable={!appointment.assigned_to}
+                  className="mt-1"
+                />
               </label>
             ) : null}
             <div className="text-xs font-semibold text-text-muted">
