@@ -27,6 +27,7 @@ import {
 import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
+import { loadPortfolioCounts, portfolioCountsKnownMissing } from "@/lib/supabase/count-rpcs";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -383,30 +384,64 @@ export default async function PropertiesPage({
     return (covers ?? []) as { id: string; property_id: string }[];
   });
 
+  // KPI sayımları: portfolio_counts RPC'si tek taramada (FILTER) döner; RPC yoksa/hata verirse eski head-count
+  // sorgularına düşülür (bilinen-yok iken sorgular aynı turda başlar, aksi halde yalnız RPC yoksa ikinci turda).
+  const rpcCountArgs = {
+    scope: listScope.filter,
+    live: STATUS_DB_VALUES.live, pending: STATUS_DB_VALUES.pending, draft: STATUS_DB_VALUES.draft,
+    green: SAGLIK_DB_VALUES.iyi, yellow: SAGLIK_DB_VALUES.izle, red: SAGLIK_DB_VALUES.riskli,
+    recentSince: daysAgoIso(28),
+  };
+  const useRpcCounts = !portfolioCountsKnownMissing();
+  // Sağlık dağılımı yalnız kapsam dışı süzgeç yoksa RPC'den gelir (q/durum/kategori... bağlamı RPC'de yok).
+  const healthFromRpc = useRpcCounts && !statusValues && !qOrClause && !kategoriF && !addedSince && !danismanF
+    && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customPre?.active;
+  type CountOnly = { count: number | null };
+  const none: Promise<CountOnly> = Promise.resolve({ count: null });
+  const headScoped = () => scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null));
+  const legacyKpi = () => ({
+    total: headScoped(),
+    live: headScoped().in("status", STATUS_DB_VALUES.live),
+    recent: headScoped().gte("created_at", daysAgoIso(28)),
+    pending: headScoped().in("status", STATUS_DB_VALUES.pending),
+    draft: headScoped().in("status", STATUS_DB_VALUES.draft),
+    sale: headScoped().eq("transaction_type", "Satılık"),
+    rent: headScoped().eq("transaction_type", "Kiralık"),
+  });
+  const legacyHealth = () => ({
+    green: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
+    yellow: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
+    red: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
+  });
+  const legacyKpiNow = useRpcCounts ? null : legacyKpi();
+  const legacyHealthNow = healthFromRpc ? null : legacyHealth();
+
   const [
     { data },
     { data: mapData, count: mapLocatedTotal },
     { count: filteredTotal },
     fxRates,
-    { count: totalCount },
-    { count: liveCount },
+    { count: totalCountQ },
+    { count: liveCountQ },
     { count: portalCount },
-    { count: greenCount },
-    { count: yellowCount },
-    { count: redCount },
-    { count: recentCount },
+    { count: greenCountQ },
+    { count: yellowCountQ },
+    { count: redCountQ },
+    { count: recentCountQ },
     { data: scanRows },
     typeDefs,
     savedViews,
     coverRows,
-    { count: pendingCount },
-    { count: draftCount },
-    { count: saleCount },
-    { count: rentCount },
+    { count: pendingCountQ },
+    { count: draftCountQ },
+    { count: saleCountQ },
+    { count: rentCountQ },
+    rpcCounts,
   ] = await batchAll("Portföyler", [
     "properties", "properties-map", "properties-filtered-total", "fx-rates", "properties-total", "properties-live",
     "portal-live", "health-green", "health-yellow", "health-red", "properties-recent", "properties-scan",
     "property-types", "saved-views", "covers", "properties-pending", "properties-draft", "properties-sale", "properties-rent",
+    "portfolio-counts-rpc",
   ], [
     listP,
     mapQuery,
@@ -420,15 +455,15 @@ export default async function PropertiesPage({
     fetchLatestRates(supabase),
     // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
     // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)),
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.live),
+    legacyKpiNow ? legacyKpiNow.total : none,
+    legacyKpiNow ? legacyKpiNow.live : none,
     supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live"),
     // Sağlık dağılımı — aktif q+durum bağlamında (sağlık HARİÇ) gerçek sayımlar
-    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
-    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
-    buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
+    legacyHealthNow ? legacyHealthNow.green : none,
+    legacyHealthNow ? legacyHealthNow.yellow : none,
+    legacyHealthNow ? legacyHealthNow.red : none,
     // Son 4 haftada eklenen (KPI) — ?eklenen=28 hedefiyle aynı koşul.
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).gte("created_at", daysAgoIso(28)),
+    legacyKpiNow ? legacyKpiNow.recent : none,
     // Tek hafif tarama: portföy değeri + tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt).
     scoped(supabase
       .from("properties")
@@ -440,11 +475,44 @@ export default async function PropertiesPage({
     savedViewsPromise,
     coversP,
     // Grafik: durum dağılımı (yayında + toplam zaten yukarıda) ve işlem türü — kapsamlı gerçek sayımlar.
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.pending),
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).in("status", STATUS_DB_VALUES.draft),
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("transaction_type", "Satılık"),
-    scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null)).eq("transaction_type", "Kiralık"),
+    legacyKpiNow ? legacyKpiNow.pending : none,
+    legacyKpiNow ? legacyKpiNow.draft : none,
+    legacyKpiNow ? legacyKpiNow.sale : none,
+    legacyKpiNow ? legacyKpiNow.rent : none,
+    useRpcCounts ? loadPortfolioCounts(supabase, rpcCountArgs) : Promise.resolve(null),
   ]);
+
+  // RPC denendi ve başarısızsa (yoksa/hata) eski sayımlar ikinci turda çalışır; aksi halde RPC değerleri kullanılır.
+  let kpi: Record<"total" | "live" | "recent" | "pending" | "draft" | "sale" | "rent", number | null>;
+  let health: Record<"green" | "yellow" | "red", number | null>;
+  if (rpcCounts) {
+    kpi = { total: rpcCounts.total, live: rpcCounts.live, recent: rpcCounts.recent, pending: rpcCounts.pending, draft: rpcCounts.draft, sale: rpcCounts.sale, rent: rpcCounts.rent };
+    health = healthFromRpc
+      ? { green: rpcCounts.green, yellow: rpcCounts.yellow, red: rpcCounts.red }
+      : { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
+  } else if (!legacyKpiNow) {
+    const l = legacyKpi();
+    const h = healthFromRpc ? legacyHealth() : null;
+    const [t, lv, rc, pe, dr, sa, re, hg, hy, hr] = await batchAll("Portföyler", [
+      "properties-total", "properties-live", "properties-recent", "properties-pending", "properties-draft", "properties-sale", "properties-rent",
+      "health-green", "health-yellow", "health-red",
+    ], [l.total, l.live, l.recent, l.pending, l.draft, l.sale, l.rent, h ? h.green : none, h ? h.yellow : none, h ? h.red : none]);
+    kpi = { total: t.count, live: lv.count, recent: rc.count, pending: pe.count, draft: dr.count, sale: sa.count, rent: re.count };
+    health = h ? { green: hg.count, yellow: hy.count, red: hr.count } : { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
+  } else {
+    kpi = { total: totalCountQ, live: liveCountQ, recent: recentCountQ, pending: pendingCountQ, draft: draftCountQ, sale: saleCountQ, rent: rentCountQ };
+    health = { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
+  }
+  const totalCount = kpi.total;
+  const liveCount = kpi.live;
+  const recentCount = kpi.recent;
+  const pendingCount = kpi.pending;
+  const draftCount = kpi.draft;
+  const saleCount = kpi.sale;
+  const rentCount = kpi.rent;
+  const greenCount = health.green;
+  const yellowCount = health.yellow;
+  const redCount = health.red;
 
   const customFilter = customPre ?? (await customFilterP);
   const rows = (data ?? []) as unknown as PropertyRow[];

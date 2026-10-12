@@ -1,8 +1,10 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTcmbRate, fetchLatestTcmbRate } from "@/lib/tcmb";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { syncEvds } from "@/lib/evds";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -20,7 +22,7 @@ export const maxDuration = 300;
  *    Zaten kayıtlı günler tekrar çekilmez — kotayı boşa harcamaz.
  */
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -82,13 +84,22 @@ export async function GET(req: NextRequest) {
   }
 
   // ---- Günlük mod ---------------------------------------------------------
+  // EVDS (konut kredisi faizi + TÜFE) AYRI adım: kendi hatasını yutar, kur adımını etkilemez; anahtar yoksa hiçbir şey yapmaz.
+  let evdsNote = "";
+  try {
+    evdsNote = ` · ${(await syncEvds(admin)).detail}`;
+  } catch (e) {
+    console.error("tcmb-kur evds", e);
+    evdsNote = " · EVDS: hata";
+  }
+
   // Son 7 günü tarar: cron bir gün kaçırsa boşluk kalmaz.
   const result = await fetchLatestTcmbRate(7);
 
   if (!result.ok) {
     // Yayın yokluğu normal durum → 200. Ağ/parse hatası → 502.
     if (result.reason === "no-publication") {
-      await recordHeartbeat("tcmb-kur", "ok", "TCMB yayını yok (hafta sonu/tatil)");
+      await recordHeartbeat("tcmb-kur", "ok", `TCMB yayını yok (hafta sonu/tatil)${evdsNote}`);
       return NextResponse.json({ skipped: true, reason: "TCMB yayını yok (hafta sonu/tatil)" });
     }
     return NextResponse.json(
@@ -112,7 +123,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "db", detail: error.message }, { status: 500 });
   }
 
-  await recordHeartbeat("tcmb-kur", "ok", `kur alındı: ${result.rate.rateDate}`);
+  await recordHeartbeat("tcmb-kur", "ok", `kur alındı: ${result.rate.rateDate}${evdsNote}`);
 
   return NextResponse.json({
     ok: true,
@@ -121,3 +132,5 @@ export async function GET(req: NextRequest) {
     eurSelling: result.rate.eurSelling,
   });
 }
+
+export const GET = guardCron("tcmb-kur", run);

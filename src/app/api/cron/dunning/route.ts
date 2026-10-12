@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
@@ -59,7 +60,7 @@ function stageMessage(stage: number, invoiceNo: string, daysOverdue: number) {
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -216,3 +217,5 @@ export async function GET(req: NextRequest) {
     autoRenew,
   });
 }
+
+export const GET = guardCron("dunning", run);

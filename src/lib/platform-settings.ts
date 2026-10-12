@@ -17,14 +17,20 @@ export async function getPlatformSetting(key: string): Promise<string | null> {
 }
 
 /** Birden çok platform ayarını TEK sorguyla okur (yoksa değer null). */
-export async function getPlatformSettingsMany(keys: readonly string[]): Promise<Record<string, string | null>> {
+export async function getPlatformSettingsMany(
+  keys: readonly string[],
+  opts?: { strict?: boolean },
+): Promise<Record<string, string | null>> {
   const out: Record<string, string | null> = {};
   for (const k of keys) out[k] = null;
   try {
     const admin = createAdminClient();
-    const { data } = await admin.from("platform_settings").select("key, value").in("key", [...keys]);
+    const { data, error } = await admin.from("platform_settings").select("key, value").in("key", [...keys]);
+    if (error && opts?.strict) throw new Error(error.message);
     for (const row of data ?? []) out[row.key as string] = (row.value as string | null) ?? null;
   } catch (e) {
+    // strict: cron gibi "okunamadı = başarılı say" diyemeyen çağıranlar hatayı görür (varsayılan: sessiz varsayılan).
+    if (opts?.strict) throw e;
     console.error("getPlatformSettingsMany", e);
   }
   return out;

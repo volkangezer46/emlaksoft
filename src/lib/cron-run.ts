@@ -77,3 +77,29 @@ export function heartbeatFor(outcome: RunOutcome): { status: "ok" | "error"; det
   const status = outcome.failed > 0 || remaining > 0 || outcome.timedOut || Boolean(outcome.listError) ? "error" : "ok";
   return { status, detail: parts.join(" · ") };
 }
+
+/**
+ * Cron rotası güvenlik ağı: altyapı çökmesi (admin client oluşturma, ilk sorgu vb.) yakalanmamış istisna
+ * yerine 500 + heartbeat 'error' (hata özeti detayda) üretir. Yetkilendirme/başarı yolu aynen kalır;
+ * yalnız işleyiciden FIRLAYAN hata yakalanır (kısmi başarı sonuçları işleyicinin kendi yapısında kalır).
+ */
+export function guardCron<A extends unknown[]>(
+  job: string,
+  handler: (...args: A) => Promise<Response>,
+): (...args: A) => Promise<Response> {
+  return async (...args: A) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("cron altyapı hatası", { job, error: message });
+      try {
+        const { recordHeartbeat } = await import("@/lib/cron-heartbeat");
+        await recordHeartbeat(job, "error", `altyapı hatası: ${message}`.slice(0, 500));
+      } catch {
+        // heartbeat de yazılamıyorsa yalnız 500 döneriz
+      }
+      return Response.json({ ok: false, error: "cron_failed" }, { status: 500 });
+    }
+  };
+}

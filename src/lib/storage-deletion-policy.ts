@@ -4,6 +4,7 @@ export const STORAGE_DELETION_BUCKETS = [
   "agent-photos",
   "tenant-logos",
   "expense-receipts",
+  "rent-receipts",
 ] as const;
 
 export type StorageDeletionBucket = (typeof STORAGE_DELETION_BUCKETS)[number];
@@ -44,6 +45,12 @@ export function isSafeStorageDeletionPath(input: StorageDeletionPathInput): bool
     if (!parentId || !UUID_RE.test(parentId)) return false;
     const prefix = `${tenantId}/${parentId}/`;
     return objectPath.startsWith(prefix) && NESTED_FILE_RE.test(objectPath.slice(prefix.length));
+  }
+
+  if (bucket === "rent-receipts") {
+    // Yol: ofis / kiracı (müşteri) / bildirim / dosya.<jpg|png|pdf>
+    if (!parentId || !UUID_RE.test(parentId)) return false;
+    return new RegExp(`^${tenantId}/${parentId}/[0-9a-f-]{36}/[0-9a-f-]{36}\\.(jpg|png|pdf)$`, "i").test(objectPath);
   }
 
   if (bucket === "agent-photos") {

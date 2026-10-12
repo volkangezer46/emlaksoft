@@ -10,6 +10,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { TASK_DRAFT_FIELDS, TASK_FORM_ID, TASK_TABS } from "./task-tabs";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type Member = { id: string; full_name: string | null };
 type Customer = { id: string; full_name: string };
@@ -120,10 +121,13 @@ export function TaskForm({
           </FormSelect>
         </FormField>
         <FormField label="Atanan" htmlFor="task-assignee">
-          <FormSelect name="assigned_to" defaultValue="">
-            <option value="">Bana ata</option>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
-          </FormSelect>
+          <PersonSelect
+            id="task-assignee"
+            name="assigned_to"
+            defaultValue=""
+            people={members.map((m) => ({ id: m.id, name: m.full_name }))}
+            emptyLabel="Bana ata"
+          />
         </FormField>
         <FormField label="İlgili müşteri" htmlFor="task-customer">
           <Combobox

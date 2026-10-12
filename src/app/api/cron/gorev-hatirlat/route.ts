@@ -5,7 +5,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { authorizeCron } from "@/lib/cron-auth";
 import { formatDateTimeTr } from "@/lib/format";
-import { fetchAllPaged } from "@/lib/cron-run";
+import { fetchAllPaged, guardCron } from "@/lib/cron-run";
 import { runLowScoreEscalation } from "@/lib/surveys/escalate";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
@@ -14,7 +14,7 @@ const MAX_PAGES = 10;
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -100,3 +100,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, notified, skipped, lowScoreEscalated: lowScore.escalated });
 }
+
+export const GET = guardCron("gorev-hatirlat", run);

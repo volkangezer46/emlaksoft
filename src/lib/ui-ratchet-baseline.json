@@ -920,7 +920,7 @@
  "src/app/app/portallar/portal-dialogs.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 3,
   "kucukHedef": 0
  },
  "src/app/app/portallar/portal-row-more.tsx": {
@@ -1349,12 +1349,6 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/geo/province-row.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 5,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/app/admin/growth/growth-forms.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
@@ -1485,12 +1479,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
-  "kucukHedef": 0
- },
- "src/app/admin/tickets/page.tsx": {
-  "hamRenk": 1,
-  "hamPalet": 0,
-  "hamButon": 0,
   "kucukHedef": 0
  },
  "src/app/admin/tickets/staff-reply-form.tsx": {

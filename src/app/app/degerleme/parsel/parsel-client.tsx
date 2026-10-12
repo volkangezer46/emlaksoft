@@ -12,6 +12,7 @@ import {
 import type { OrtakValuationInput } from "@/lib/integrations/emlakfiyati/ortak-contract";
 import type { RunValuationResult } from "@/lib/ef-credits/types";
 import { EfResultView } from "./result-view";
+import { Combobox } from "@/components/ui/combobox";
 
 const field =
   "focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 text-sm text-ink-950 outline-none focus:border-brand-300 disabled:opacity-60";
@@ -209,30 +210,45 @@ export function ParselClient({ iller, illerError, balance, unitsArsa, unitsKonut
         <div className="mt-4 space-y-3">
           <label className="block">
             <span className={label}>İl</span>
-            <select value={ilId} onChange={(e) => onIl(e.target.value)} className={field} disabled={iller.length === 0}>
-              <option value="">İl seçin</option>
-              {iller.map((i) => (
-                <option key={i.id} value={i.id}>{i.ad}</option>
-              ))}
-            </select>
+            <Combobox
+              value={ilId}
+              onValueChange={onIl}
+              options={iller.map((i) => ({ value: String(i.id), label: i.ad }))}
+              placeholder="İl seçin"
+              searchPlaceholder="İl ara…"
+              emptyText="Eşleşen il yok"
+              disabled={iller.length === 0}
+              clearable={false}
+              aria-label="İl seçin"
+            />
           </label>
           <label className="block">
             <span className={label}>İlçe</span>
-            <select value={ilceId} onChange={(e) => onIlce(e.target.value)} className={field} disabled={!ilId || ilceler.length === 0}>
-              <option value="">İlçe seçin</option>
-              {ilceler.map((i) => (
-                <option key={i.id} value={i.id}>{i.ad}</option>
-              ))}
-            </select>
+            <Combobox
+              value={ilceId}
+              onValueChange={onIlce}
+              options={ilceler.map((i) => ({ value: String(i.id), label: i.ad }))}
+              placeholder="İlçe seçin"
+              searchPlaceholder="İlçe ara…"
+              emptyText="Eşleşen ilçe yok"
+              disabled={!ilId || ilceler.length === 0}
+              clearable={false}
+              aria-label="İlçe seçin"
+            />
           </label>
           <label className="block">
             <span className={label}>Mahalle</span>
-            <select value={mahalleId} onChange={(e) => onMahalle(e.target.value)} className={field} disabled={!ilceId || mahalleler.length === 0}>
-              <option value="">Mahalle seçin</option>
-              {mahalleler.map((i) => (
-                <option key={i.id} value={i.id}>{i.ad}</option>
-              ))}
-            </select>
+            <Combobox
+              value={mahalleId}
+              onValueChange={onMahalle}
+              options={mahalleler.map((i) => ({ value: String(i.id), label: i.ad }))}
+              placeholder="Mahalle seçin"
+              searchPlaceholder="Mahalle ara…"
+              emptyText="Eşleşen mahalle yok"
+              disabled={!ilceId || mahalleler.length === 0}
+              clearable={false}
+              aria-label="Mahalle seçin"
+            />
           </label>
           {geoNote ? (
             <p role="status" className="flex gap-2 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-800">

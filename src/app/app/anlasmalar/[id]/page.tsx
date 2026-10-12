@@ -1,5 +1,6 @@
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { Suspense } from "react";
+import { loadDealSideReads } from "@/lib/supabase/count-rpcs";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
@@ -54,7 +55,7 @@ import { parseOutcomeParam } from "./kapanis-model";
  * var; YENİDEN YAZILMADI, aynen import edildi (o dosyaya dokunulmadı). Aksi
  * halde aynı davranışın iki kopyası ayrışmaya başlar.
  */
-import { CopySurveyLinkButton, CreateSurveyButton } from "../../raporlar/memnuniyet/survey-actions";
+import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { DealTimelineSection } from "./deal-timeline-section";
@@ -122,13 +123,21 @@ export default async function DealDetailPage({
   // Etiket/neden okumaları anlaşma sorgusuyla AYNI turda başlar (önceden ondan önce ayrı tur).
   const labelsP = Promise.all([getStageLabels(), getLossReasonOptions()]);
 
-  const { data: deal } = await supabase
-    .from("deals")
-    .select(
-      "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to, project_unit_id",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // Teklifler + randevu sayısı: deal_side_reads RPC'si anlaşma okumasıyla AYNI turda başlar (id'den kendisi çözer);
+  // RPC yoksa/hata verirse (null) aşağıdaki eski sorgular çalışır.
+  const sideReadsP = loadDealSideReads(supabase, id);
+  const [{ data: deal }, sideReads] = await Promise.all([
+    Promise.resolve(
+      supabase
+        .from("deals")
+        .select(
+          "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to, project_unit_id",
+        )
+        .eq("id", id)
+        .maybeSingle(),
+    ),
+    sideReadsP,
+  ]);
 
   // RLS kiracı dışını zaten göstermiyor; burada yalnızca "yok" durumu.
   if (!deal) notFound();
@@ -142,7 +151,7 @@ export default async function DealDetailPage({
   const [
     unitRes,
     [stageLabels, lossOptions],
-    { data: offers },
+    { data: offersQ },
     { data: contracts },
     { count: gorusmeSayisi },
     { data: property },
@@ -160,7 +169,7 @@ export default async function DealDetailPage({
             .maybeSingle()
         : Promise.resolve({ data: null }),
       labelsP,
-      capraz
+      capraz && !sideReads
         ? supabase
             .from("offers")
             .select("id, amount, status, valid_until, created_at")
@@ -179,14 +188,14 @@ export default async function DealDetailPage({
             .limit(10)
         : Promise.resolve({ data: null }),
       // Görüşme sayısı kapanma tahmininde kullanılır; randevuda deal_id yok → portföy+müşteri ikilisinden eşleştirilir.
-      capraz
+      capraz && !sideReads
         ? supabase
             .from("appointments")
             .select("id", { count: "exact", head: true })
             .eq("property_id", deal.property_id!)
             .eq("customer_id", deal.customer_id!)
             .neq("status", "cancelled")
-        : Promise.resolve({ count: 0 }),
+        : Promise.resolve({ count: sideReads?.appointmentCount ?? 0 }),
       deal.property_id
         ? supabase
             .from("properties")
@@ -231,6 +240,7 @@ export default async function DealDetailPage({
             .maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+  const offers = (sideReads ? sideReads.offers : offersQ) as typeof offersQ;
 
   /*
    * Evrak dosyası, işlem dosyası ve not akışı ARTIK BURADA ÇEKİLMİYOR.

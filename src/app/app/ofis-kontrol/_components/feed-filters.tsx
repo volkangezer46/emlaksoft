@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { FEED_CATEGORIES, feedActionOptions } from "@/lib/oversight/feed";
 import { hasFeedFilter, type FeedFilters } from "@/lib/oversight/feed-query";
+import { PersonSelect } from "@/components/ui/person-select";
 
 const CONTROL =
   "rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-sm outline-none focus:border-brand-400";
@@ -21,14 +22,14 @@ export function FeedFiltersForm({
   return (
     <form method="get" action={basePath} className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-line bg-surface p-3">
       {hideActor ? null : (
-        <select name="aktor" defaultValue={filters.aktor} aria-label="Danışman" className={CONTROL}>
-          <option value="">Tüm danışmanlar</option>
-          {advisors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+        <PersonSelect
+          name="aktor"
+          defaultValue={filters.aktor}
+          aria-label="Danışman"
+          people={advisors}
+          emptyLabel="Tüm danışmanlar"
+          className="w-56"
+        />
       )}
       <select name="kategori" defaultValue={filters.kategori} aria-label="İşlem grubu" className={CONTROL}>
         <option value="">Tüm işlem grupları</option>

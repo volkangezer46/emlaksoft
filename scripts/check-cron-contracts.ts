@@ -21,12 +21,10 @@ const issues: string[] = [];
 
 /** Sabit "ok" yazan ESKİ cronlar (taşındıkça buradan silinir; yeni giriş eklemek yasak). */
 const LEGACY_CONSTANT_OK = new Set<string>([
-  "direct-file-upload-cleanup",
   "dogum-gunu",
   "geo-sync",
   "growth-claims",
   "insight-engine",
-  "operational-retention",
   "public-mutation-outbox",
   "seo-robot",
   "tcmb-kur",

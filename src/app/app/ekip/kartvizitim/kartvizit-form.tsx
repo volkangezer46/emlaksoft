@@ -215,7 +215,8 @@ export function KartvizitForm({ view }: { view: KartvizitView }) {
         push(res.error, "err");
         return;
       }
-      push("Fotoğraf kaldırıldı", "ok");
+      if (res.warning) push(res.warning, "err");
+      else push("Fotoğraf kaldırıldı", "ok");
       router.refresh();
     });
   }

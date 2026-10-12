@@ -38,6 +38,7 @@ import {
   type TalepArzPropertyRow,
 } from "@/lib/talep-arz";
 import type { TalepArzMarker } from "./talep-arz-map";
+import { Combobox } from "@/components/ui/combobox";
 
 // Harita ağır bir client komponenti — dynamic import ile ayrı chunk
 // (portfoyler sayfasındaki MapView deseniyle aynı).
@@ -274,19 +275,16 @@ export default async function TalepArzPage({
         <form action="/app/raporlar/talep-arz" className="ml-auto flex items-center gap-2">
           {islem.key ? <input type="hidden" name="islem" value={islem.key} /> : null}
           {donem.key !== DEFAULT_DONEM ? <input type="hidden" name="donem" value={donem.key} /> : null}
-          <select
+          <Combobox
+            aria-label="İl filtresi"
             name="il"
             defaultValue={ilFilter ?? ""}
-            aria-label="İl filtresi"
-            className="rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text outline-none transition focus:border-accent"
-          >
-            <option value="">Tüm iller</option>
-            {provinces.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            options={provinces.map((p) => ({ value: p.id, label: p.name }))}
+            placeholder="Tüm iller"
+            searchPlaceholder="İl ara…"
+            emptyText="Eşleşen il yok"
+            className="w-48 text-xs font-semibold"
+          />
           <button
             type="submit"
             className="rounded-[var(--radius-control)] bg-ink-900 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-ink-800"

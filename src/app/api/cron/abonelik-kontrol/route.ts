@@ -5,7 +5,7 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
 import { authorizeCron } from "@/lib/cron-auth";
-import { cronDeadline, isPastDeadline } from "@/lib/cron-run";
+import { cronDeadline, isPastDeadline, guardCron } from "@/lib/cron-run";
 import { runLicenseReminders } from "@/lib/license-reminders";
 import { runOfferExpiryReminders } from "@/lib/offer-expiry-reminders";
 import { runPropertyAuthorityReminders } from "@/lib/property-authority-reminders";
@@ -24,7 +24,7 @@ const BATCH_LIMIT = 100;
 const DAY_MS = 86_400_000;
 const BILLING_HREF = "/app/abonelik";
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -243,3 +243,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, deferred });
 }
+
+export const GET = guardCron("abonelik-kontrol", run);

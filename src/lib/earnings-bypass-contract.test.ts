@@ -64,7 +64,7 @@ describe("B1/B2 kazanç ve kapsam atlama yolları sözleşmesi", () => {
   it("danışman ekranları tek kaynaktan beslenir: kendi RPC/toplama sorgusu yazmaz", () => {
     for (const p of [
       "src/app/app/danisman-kpi/page.tsx",
-      "src/app/app/ekip/kiyas/page.tsx",
+      "src/app/app/danisman-kpi/kiyas-view.tsx",
       "src/lib/tv/tv-data.ts",
       "src/app/app/lig/page.tsx",
       "src/app/app/ekip/[id]/advisor-view.tsx",

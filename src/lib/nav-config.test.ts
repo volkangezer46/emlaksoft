@@ -113,9 +113,9 @@ describe("mükerrer menü girişi yok (2026-10)", () => {
     expect(menu).not.toContain("/app/brifing");
     expect(resolveActiveNav("/app/pano-tv", visibleSections(ALL_MODULES)).href).toBe("/app/danisman-kpi");
   });
-  it("Ekip performansı TEK öğe: Özet / Lig / Kıyas; Ekip Merkezi bu sekmeleri tekrar etmez", () => {
+  it("Ekip performansı TEK öğe: Özet (Sıralama | Kıyas) / Lig; Ekip Merkezi bu sekmeleri tekrar etmez", () => {
     const perf = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.label === "Ekip karnesi");
-    expect(perf?.tabs?.map((t) => t.label)).toEqual(["Özet", "Lig", "Kıyas"]);
+    expect(perf?.tabs?.map((t) => t.label)).toEqual(["Özet", "Lig"]);
     const ekip = NAV_SECTIONS.flatMap((s) => s.items).find((i) => i.href === "/app/ekip");
     for (const h of ["/app/lig", "/app/danisman-kpi", "/app/ekip/kiyas"]) expect(ekip?.tabs?.map((t) => t.href)).not.toContain(h);
   });
@@ -182,7 +182,7 @@ describe("sekmeli menü öğeleri", () => {
 
   it("Raporlar ve Otomasyon tek öğe, yolları sabit sekmedir; arama/eşleştirme eski yol olarak durur", () => {
     expect(tabsOf(ALL_MODULES, "/app/raporlar")).toEqual([
-      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/memnuniyet", "/app/raporlar/lead-hizi", "/app/franchise", "/app/raporlar/kar-zarar",
+      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise", "/app/raporlar/kar-zarar",
     ]);
     expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/ayarlar/is-akislari"]);
     const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));

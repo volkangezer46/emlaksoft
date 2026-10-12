@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -70,7 +71,7 @@ function matches(s: SavedSearch, p: LiveProperty): boolean {
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -140,3 +141,5 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat("vitrin-eslesme", "ok", `${notified} eşleşme bildirimi${skippedTenantsNote(disabledModules, "vitrin")}`);
   return NextResponse.json({ ok: true, notified, searches: searches.length });
 }
+
+export const GET = guardCron("vitrin-eslesme", run);

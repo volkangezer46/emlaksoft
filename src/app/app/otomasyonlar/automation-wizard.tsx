@@ -16,6 +16,7 @@ import {
   DEAL_STAGE_OPTIONS,
   availableActionsForTrigger,
 } from "./labels";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Otomasyon Stüdyosu sihirbazı — 3 adım: tetikleyici → koşullar → aksiyon + ad.
@@ -416,12 +417,13 @@ export function AutomationWizard({
               {actionType === "assign_to_staff" && (
                 <div className="max-w-sm">
                   <label htmlFor="aw-assignee" className={labelClass}>Atanacak danışman *</label>
-                  <select id="aw-assignee" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={fieldClass}>
-                    <option value="">Seçin…</option>
-                    {staff.map((s) => (
-                      <option key={s.id} value={s.id}>{s.full_name}</option>
-                    ))}
-                  </select>
+                  <PersonSelect
+                    id="aw-assignee"
+                    value={assigneeId}
+                    onValueChange={setAssigneeId}
+                    people={staff.map((s) => ({ id: s.id, name: s.full_name }))}
+                    emptyLabel="Seçin…"
+                  />
                 </div>
               )}
 

@@ -6,7 +6,7 @@ import { authorizeCron } from "@/lib/cron-auth";
 import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
 import { tenantsDisabledFor } from "@/lib/modules/state";
-import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf } from "@/lib/cron-run";
+import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 import { runOwnerWeeklyReports } from "@/lib/owner-report/run";
 import { trDayKey } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
@@ -46,7 +46,7 @@ const compactTry = new Intl.NumberFormat("tr-TR", {
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -259,3 +259,5 @@ export async function GET(req: NextRequest) {
     remaining: remainingOf({ total: tenants.length, processed }),
   });
 }
+
+export const GET = guardCron("haftalik-ozet", run);

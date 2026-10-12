@@ -46,6 +46,8 @@ export type CalculatorInitial = {
   downPayment: number | null;
   months: number;
   monthlyRatePct: number;
+  /** TCMB EVDS'ten gelen varsayılan faiz (varsa); etiket için. Kullanıcı elle değiştirebilir. */
+  rateSource?: { asOf: string; annualPct: number } | null;
   commissionPct: number;
   deedFeeShare: DeedFeeShare;
   sqm: number;
@@ -339,6 +341,12 @@ export function PurchaseCalculator({
                 <p className="mt-1 text-xs text-text-faint">
                   Yıllık nominal ≈ %{loan.annualRatePct} · bankanızın güncel oranını girin
                 </p>
+                {initial.rateSource && monthlyRatePct === initial.monthlyRatePct ? (
+                  <p className="mt-0.5 text-xs text-text-muted">
+                    TCMB haftalık ortalama konut kredisi faizi · {initial.rateSource.asOf.split("-").reverse().join(".")} (yıllık %
+                    {initial.rateSource.annualPct.toLocaleString("tr-TR")})
+                  </p>
+                ) : null}
               </div>
             </div>
 

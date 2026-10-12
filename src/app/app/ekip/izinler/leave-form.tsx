@@ -6,6 +6,7 @@ import { CalendarPlus } from "lucide-react";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 import { createLeave, type LeaveResult } from "@/app/actions/staff-leaves";
 import { LEAVE_KIND_LABELS, type LeaveKind } from "@/lib/leave-utils";
+import { PersonSelect } from "@/components/ui/person-select";
 
 const initial: LeaveResult = {};
 
@@ -96,19 +97,15 @@ function AddLeaveForm({
             Personel
           </label>
           {canManage ? (
-            <select
+            <PersonSelect
               id="leave_staff"
               name="staff_id"
               defaultValue={selfId}
-              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.full_name}
-                  {m.id === selfId ? " (siz)" : ""}
-                </option>
-              ))}
-            </select>
+              required
+              people={members.map((m) => ({ id: m.id, name: `${m.full_name}${m.id === selfId ? " (siz)" : ""}` }))}
+              featuredIds={[selfId]}
+              emptyLabel="Kişi seçin"
+            />
           ) : (
             <>
               <input type="hidden" name="staff_id" value={selfId} />

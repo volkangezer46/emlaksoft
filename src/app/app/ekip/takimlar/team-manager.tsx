@@ -10,6 +10,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { PersonSelect } from "@/components/ui/person-select";
+import { Combobox } from "@/components/ui/combobox";
 
 export type TeamRow = { id: string; name: string; branchId: string | null; leadUserId: string | null; isActive: boolean; memberCount: number };
 export type MemberRow = { id: string; name: string; roleLabel: string; branchId: string | null; teamId: string | null };
@@ -22,20 +24,24 @@ function Fields({ idPrefix, team, members, branches }: { idPrefix: string; team?
         <FormInput id={`${idPrefix}-name`} name="name" required maxLength={80} defaultValue={team?.name ?? ""} placeholder="Örn. Kuzey Ekibi" />
       </FormField>
       <FormField label={ROLE_LABELS.team_lead} htmlFor={`${idPrefix}-lead`} hint="Portal uyarıları 4 saat sonra bu kişiye yükselir.">
-        <FormSelect id={`${idPrefix}-lead`} name="lead_user_id" defaultValue={team?.leadUserId ?? ""}>
-          <option value="">Atanmadı</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>{m.name} · {m.roleLabel}</option>
-          ))}
-        </FormSelect>
+        <PersonSelect
+          id={`${idPrefix}-lead`}
+          name="lead_user_id"
+          defaultValue={team?.leadUserId ?? ""}
+          people={members.map((m) => ({ id: m.id, name: m.name, hint: m.roleLabel }))}
+          emptyLabel="Atanmadı"
+        />
       </FormField>
       <FormField label="Şube" htmlFor={`${idPrefix}-branch`}>
-        <FormSelect id={`${idPrefix}-branch`} name="branch_id" defaultValue={team?.branchId ?? ""}>
-          <option value="">Şubesiz</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </FormSelect>
+        <Combobox
+          id={`${idPrefix}-branch`}
+          name="branch_id"
+          defaultValue={team?.branchId ?? ""}
+          options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          placeholder="Şubesiz"
+          searchPlaceholder="Şube ara…"
+          emptyText="Eşleşen şube yok"
+        />
       </FormField>
     </div>
   );

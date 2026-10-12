@@ -44,6 +44,7 @@ import { ApprovalBulkBar, ApprovalCommentForm, CancelApprovalButton, DecisionCon
 import { BulkRowCheckbox, BulkSelectAll, BulkSelectionProvider } from "@/components/app/bulk-selection";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
+import { PersonSelect } from "@/components/ui/person-select";
 
 const PAGE_SIZE = 20;
 
@@ -391,12 +392,13 @@ export default async function OnaylarPage({
           {manager && requesters.length > 0 ? (
             <label className="text-xs font-semibold text-text-muted">
               Talep eden
-              <select name="talep_eden" defaultValue={talepEden} className="mt-1 block rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs">
-                <option value="">Herkes</option>
-                {requesters.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              <PersonSelect
+                name="talep_eden"
+                defaultValue={talepEden}
+                people={requesters}
+                emptyLabel="Herkes"
+                className="mt-1 w-56"
+              />
             </label>
           ) : null}
           <label className="text-xs font-semibold text-text-muted">

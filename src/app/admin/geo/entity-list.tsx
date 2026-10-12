@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/geo-admin";
 import { listDistricts, type GeoOption } from "@/app/actions/geo";
 import type { GeoLevel } from "@/lib/geo/types";
+import { Combobox } from "@/components/ui/combobox";
 
 export type EntityRowData = {
   id: string;
@@ -303,26 +304,35 @@ function Row({ level, row, siblings, canWrite, provinceOptions, childHref, child
             <div className="space-y-2">
               <ImpactSummary impact={impact} />
               <div className="flex flex-wrap items-center gap-2">
-                <select
+                <Combobox
                   aria-label="Hedef il"
                   value={moveProvince}
-                  className={input}
-                  onChange={(e) => {
-                    const v = e.target.value;
+                  className="w-52"
+                  clearable={false}
+                  options={provinceOptions.map((p) => ({ value: p.id, label: p.name }))}
+                  placeholder="Hedef il…"
+                  searchPlaceholder="İl ara…"
+                  emptyText="Eşleşen il yok"
+                  onValueChange={(v) => {
                     setMoveProvince(v);
                     setTarget(level === "district" ? v : "");
                     setMoveDistricts([]);
                     if (level === "neighborhood" && v) start(async () => setMoveDistricts(await listDistricts(v)));
                   }}
-                >
-                  <option value="">Hedef il…</option>
-                  {provinceOptions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+                />
                 {level === "neighborhood" ? (
-                  <select aria-label="Hedef ilçe" value={target} onChange={(e) => setTarget(e.target.value)} className={input} disabled={moveDistricts.length === 0}>
-                    <option value="">Hedef ilçe…</option>
-                    {moveDistricts.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  <Combobox
+                    aria-label="Hedef ilçe"
+                    value={target}
+                    onValueChange={setTarget}
+                    className="w-52"
+                    clearable={false}
+                    disabled={moveDistricts.length === 0}
+                    options={moveDistricts.map((d) => ({ value: d.id, label: d.name }))}
+                    placeholder="Hedef ilçe…"
+                    searchPlaceholder="İlçe ara…"
+                    emptyText="Eşleşen ilçe yok"
+                  />
                 ) : null}
                 <Button variant="navy" size="sm" type="button" disabled={pending || !target} onClick={() => run(() => moveGeoEntity(fd({ level, id: row.id, new_parent_id: target })), close)}>
                   Taşımayı onayla

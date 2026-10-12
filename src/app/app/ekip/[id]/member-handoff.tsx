@@ -12,6 +12,7 @@ import {
   HANDOFF_SCOPE_LABELS,
   type HandoffScope,
 } from "@/lib/team/handoff";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type Advisor = { id: string; full_name: string };
 type Counts = Record<HandoffScope, number>;
@@ -124,19 +125,14 @@ export function MemberHandoff({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <select
+        <PersonSelect
           value={to}
+          onValueChange={setTo}
           aria-label="Devralan danışman"
-          onChange={(e) => setTo(e.target.value)}
-          className="min-w-[200px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-400"
-        >
-          <option value="">Devralan danışmanı seçin…</option>
-          {advisors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.full_name}
-            </option>
-          ))}
-        </select>
+          className="min-w-[200px]"
+          people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
+          emptyLabel="Devralan danışmanı seçin…"
+        />
       </div>
 
       <MorphTabs

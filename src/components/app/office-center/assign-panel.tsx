@@ -7,8 +7,8 @@ import { assignFromPool, suggestAssignees } from "@/app/actions/office-center";
 import { useToast } from "@/components/app/toast-provider";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { FormSelect } from "@/components/ui/form-controls";
 import type { SmartSuggestion } from "@/lib/office-center/smart-assign";
+import { PersonSelect } from "@/components/ui/person-select";
 
 export type AssignOption = { id: string; name: string };
 
@@ -69,14 +69,15 @@ export function AssignPanel({ propertyId, advisors, canAssign }: { propertyId: s
         <label className="sr-only" htmlFor={`oc-manual-${propertyId}`}>
           Elle danışman seç
         </label>
-        <FormSelect id={`oc-manual-${propertyId}`} className="h-8 w-auto px-2 py-1 text-xs" value={manual} onChange={(e) => setManual(e.target.value)}>
-          <option value="">Elle danışman seç…</option>
-          {advisors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </FormSelect>
+        <PersonSelect
+          id={`oc-manual-${propertyId}`}
+          className="w-auto min-w-[12rem] px-2 py-1 text-xs"
+          value={manual}
+          onValueChange={setManual}
+          people={advisors}
+          featuredIds={suggestions?.map((s) => s.profileId)}
+          emptyLabel="Elle danışman seç…"
+        />
         <Button type="button" variant="secondary" size="sm" icon={UserPlus} disabled={!manual} loading={pending && busyId === manual && manual !== ""} onClick={() => assign(manual, "manual")}>
           Elle ata
         </Button>

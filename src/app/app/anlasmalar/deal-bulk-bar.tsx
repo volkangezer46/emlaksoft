@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { useBulkSelection } from "@/components/app/bulk-selection";
 import { useToast } from "@/components/app/toast-provider";
 import { bulkAssignDeals, bulkUpdateDealStage } from "@/app/actions/deals";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Anlaşma listesi toplu işlem çubuğu: açık aşamalar arası geçiş, danışman ataması (yönetim)
@@ -71,17 +72,14 @@ export function DealBulkBar({
       {canAssign ? (
         <>
           <label className="sr-only" htmlFor="deal-bulk-assignee">Danışman</label>
-          <select
+          <PersonSelect
             id="deal-bulk-assignee"
+            className="min-w-[12rem]"
+            people={members}
+            emptyLabel="Danışman seç…"
             value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            className="h-8 min-w-0 max-w-full rounded-[var(--radius-control)] border border-line bg-surface px-2 text-sm touch:h-11"
-          >
-            <option value="">Danışman seç…</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
+            onValueChange={setAssignee}
+          />
           <Button
             size="sm"
             variant="secondary"

@@ -15,6 +15,7 @@ import { ASSIGNABLE_SCOPES, SCOPE_LABELS, getDefaultScopeForRole, scopeLabel } f
 import { canChangeScope, isCustomScope, minimumScopeForRole, type AssignableScope, type ScopeInput } from "@/lib/access-control/admin-rules";
 import type { AccessScope } from "@/lib/access-control/types";
 import type { AppRole } from "@/lib/permissions";
+import { Combobox } from "@/components/ui/combobox";
 
 export type ScopeMember = {
   id: string;
@@ -180,19 +181,27 @@ function Row({
           {draft.scope_type === "team" ? (
             <label className="grid gap-1 text-xs font-semibold text-text-muted">
               Takım
-              <FormSelect value={draft.team_id ?? ""} onChange={(e) => setDraft((d) => ({ ...d, team_id: e.target.value || null }))}>
-                <option value="">Seçin…</option>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </FormSelect>
+              <Combobox
+                value={draft.team_id ?? ""}
+                onValueChange={(v) => setDraft((d) => ({ ...d, team_id: v || null }))}
+                options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                placeholder="Seçin…"
+                searchPlaceholder="Takım ara…"
+                emptyText="Eşleşen takım yok"
+              />
             </label>
           ) : null}
           {draft.scope_type === "branch" ? (
             <label className="grid gap-1 text-xs font-semibold text-text-muted">
               Şube
-              <FormSelect value={draft.branch_id ?? ""} onChange={(e) => setDraft((d) => ({ ...d, branch_id: e.target.value || null }))}>
-                <option value="">Seçin…</option>
-                {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </FormSelect>
+              <Combobox
+                value={draft.branch_id ?? ""}
+                onValueChange={(v) => setDraft((d) => ({ ...d, branch_id: v || null }))}
+                options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                placeholder="Seçin…"
+                searchPlaceholder="Şube ara…"
+                emptyText="Eşleşen şube yok"
+              />
             </label>
           ) : null}
           <label className="grid gap-1 text-xs font-semibold text-text-muted sm:col-span-1">

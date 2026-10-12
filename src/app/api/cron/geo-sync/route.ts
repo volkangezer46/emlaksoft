@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
@@ -38,7 +39,7 @@ const CHECKS: ReadonlyArray<{ key: string; label: string; severity: "danger" | "
   { key: "demands_orphan_district", label: "geo karşılığı olmayan ilçe referanslı talep", severity: "danger" },
 ];
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -72,3 +73,5 @@ export async function GET(req: NextRequest) {
   await recordHeartbeat("geo-sync", "ok", "geo tutarlılık temiz");
   return NextResponse.json({ ok: true, clean: true, counts });
 }
+
+export const GET = guardCron("geo-sync", run);

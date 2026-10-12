@@ -101,7 +101,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/billing", core: true,
-        label: "Abonelik & fatura",
+        label: "Abonelikler",
         description: "MRR, faturalar, planlar, kuponlar, muhasebe ve deneme ayarları",
         icon: CreditCard,
         modules: ["billing"],
@@ -114,7 +114,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         ],
       },
       { href: "/admin/growth", label: "Büyüme", description: "Davet ve ortak programı, kayıt kaynakları", icon: Sprout, modules: ["sales"] },
-      { href: "/admin/ef-kontor", label: "EmlakFiyati analiz bakiyesi", description: "Analiz tarifesi, paketler, ofis bakiyeleri", icon: Coins, modules: ["billing"] },
+      { href: "/admin/ef-kontor", label: "Analiz tarifesi", description: "Analiz tarifesi, paketler, ofis bakiyeleri", icon: Coins, modules: ["billing"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi ve maliyet tablosu", icon: Sparkles, modules: ["billing"] },
     ],
   },
@@ -124,7 +124,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/site", core: true,
-        label: "Site & marka",
+        label: "Site ve marka",
         description: "Ana sayfa içeriği, site menüsü, SEO, logo ve favicon",
         icon: Globe,
         modules: ["sitecontent", "sitemenu", "seo", "marka"],
@@ -147,7 +147,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/tickets", core: true,
-        label: "Destek talepleri",
+        label: "Talepler",
         description: "Destek kuyruğu ve yanıt süreleri",
         icon: LifeBuoy,
         modules: ["tickets"],
@@ -162,7 +162,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/sistem", core: true,
-        label: "Sistem",
+        label: "Sistem durumu",
         description: "Sağlık, cron nabzı, entegrasyonlar, hata ve aktivite kaydı",
         icon: Radar,
         modules: ["sistem", "activity"],

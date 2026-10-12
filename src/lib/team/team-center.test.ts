@@ -190,7 +190,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
     const ekipPerf = perf.items.find((i) => i.label === "Ekip karnesi")!;
-    expect(ekipPerf.tabs?.map((t) => t.href)).toEqual(["/app/danisman-kpi", "/app/lig", "/app/ekip/kiyas"]);
+    expect(ekipPerf.tabs?.map((t) => t.href)).toEqual(["/app/danisman-kpi", "/app/lig"]);
     expect(ALL_NAV_HREFS).toContain("/app/danisman-kpi");
     expect(ALL_NAV_HREFS).toContain("/app/lig");
     expect(ALL_NAV_HREFS).toContain("/app/hedefler");

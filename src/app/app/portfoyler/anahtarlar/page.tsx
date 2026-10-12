@@ -32,6 +32,7 @@ import {
   keyStatusLabel,
   keyStatusTone,
 } from "@/lib/key-overdue";
+import { PersonSelect } from "@/components/ui/person-select";
 
 /**
  * Anahtar panosu — ofis genelinde "hangi anahtar kimde?".
@@ -223,18 +224,13 @@ export default async function PropertyKeysBoardPage({
         </div>
         <label className="text-xs font-semibold text-text-muted">
           <span className="sr-only">Danışman</span>
-          <select
+          <PersonSelect
             name="danisman"
             defaultValue={danisman}
-            className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm font-semibold outline-none focus:border-brand-400"
-          >
-            <option value="">Tüm danışmanlar</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name ?? "İsimsiz"}
-              </option>
-            ))}
-          </select>
+            people={staff.map((s) => ({ id: s.id, name: s.full_name ?? "İsimsiz" }))}
+            emptyLabel="Tüm danışmanlar"
+            className="w-60 font-semibold"
+          />
         </label>
         <button
           type="submit"

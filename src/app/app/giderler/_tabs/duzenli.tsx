@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { Repeat } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusPill } from "@/components/ui/list-kit";
+import { MobileCard, MobileCardList, StatusPill } from "@/components/ui/list-kit";
 import { formatDateTr } from "@/lib/format";
 import { cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
@@ -97,7 +97,23 @@ export async function DuzenliTab({
           action={allowCreate ? { node: <RuleFormButton accounts={options} canSalary={canSalary && scope === "office"} today={today} /> } : undefined}
         />
       ) : (
-        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
+        <>
+        <MobileCardList aria-label="Düzenli ödemeler">
+          {visible.map((r) => (
+            <RuleCard
+              key={r.id}
+              rule={r}
+              accountName={accountById.get(r.account_id)?.name}
+              accountHref={entriesHref(r.account_id)}
+              accounts={options}
+              today={today}
+              canSalary={canSalary && scope === "office"}
+              canEdit={allowEdit}
+              canDelete={allowDelete}
+            />
+          ))}
+        </MobileCardList>
+        <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
           <table className="w-full min-w-[760px] text-sm">
             <caption className="sr-only">Düzenli ödemeler</caption>
             <thead>
@@ -127,6 +143,7 @@ export async function DuzenliTab({
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
@@ -189,5 +206,60 @@ function RuleRow({
         </span>
       </td>
     </tr>
+  );
+}
+
+function RuleCard({
+  rule: r,
+  accountName,
+  accountHref,
+  accounts,
+  today,
+  canSalary,
+  canEdit,
+  canDelete,
+}: {
+  rule: RecurringRule;
+  accountName: string | undefined;
+  accountHref: string;
+  accounts: readonly AccountOption[];
+  today: string;
+  canSalary: boolean;
+  canEdit: boolean;
+  canDelete: boolean;
+}) {
+  const ended = !r.active && !r.next_due;
+  return (
+    <MobileCard>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words font-semibold text-text">{r.title}</p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+            <span>{r.direction === "in" ? "Gelir" : "Gider"} · {cashCategoryLabel(r.category)}</span>
+            {accountName ? <Link href={accountHref} className="font-semibold text-accent-text hover:underline">{accountName}</Link> : null}
+          </p>
+        </div>
+        <p className={`numeric shrink-0 text-right font-bold ${r.direction === "in" ? "text-success-strong" : "text-danger-strong"}`}>
+          {r.direction === "in" ? "+" : "−"}
+          {formatAccountMoney(r.amount, "TRY")}
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+        <span>{FREQUENCY_LABEL[r.frequency]} · {payDayLabel(r.pay_day)}</span>
+        <span className="numeric">· {r.next_due && r.active ? formatDateTr(r.next_due) : ended ? "Tamamlandı" : "Durduruldu"}</span>
+        <StatusPill tone={r.mode === "auto" ? "success" : "info"} dot={false}>{RULE_MODE_LABEL[r.mode]}</StatusPill>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-1 border-t border-line pt-2">
+        {canEdit && !ended ? (
+          <RuleFormButton
+            accounts={accounts}
+            canSalary={canSalary}
+            today={today}
+            rule={{ id: r.id, title: r.title, amount: r.amount, accountId: r.account_id, payDay: r.pay_day, endDate: r.end_date, mode: r.mode }}
+          />
+        ) : null}
+        <RuleRowActions ruleId={r.id} title={r.title} active={r.active} canEdit={canEdit && !ended} canDelete={canDelete} />
+      </div>
+    </MobileCard>
   );
 }

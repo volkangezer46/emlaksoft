@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    const [settings, keys] = await Promise.all([getPlatformSettingsMany([EF_ORTAK_FLAG_SETTING_KEY]), resolveEmlakFiyatiKeys()]);
+    // strict: ayar okunamazsa (altyapı çöktü) "atlandı/ok" değil hata (500 + heartbeat 'error') olmalı.
+    const settings = await getPlatformSettingsMany([EF_ORTAK_FLAG_SETTING_KEY], { strict: true });
+    const keys = await resolveEmlakFiyatiKeys();
     if (!keys.current || !parseSettingBool(settings[EF_ORTAK_FLAG_SETTING_KEY], false)) {
       await recordHeartbeat("ef-kontor-mutabakat", "ok", "atlandı: EmlakFiyati anahtarı veya ortak bayrağı yok");
       return NextResponse.json({ ok: true, skipped: true });

@@ -18,6 +18,7 @@ import {
   breakdownByAgent,
   breakdownByAudienceGroup,
   breakdownByEventAudience,
+  combinedNpsStats,
   customerScores,
   isOverdue,
   isLowScore,
@@ -40,6 +41,8 @@ import {
   type SurveyTaskStatus,
 } from "@/lib/surveys/types";
 import { SurveyNav, SurveyNotReady } from "./survey-nav";
+import { SonucView } from "./sonuc-view";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { LowScoreCloseForm } from "./low-score-close-form";
 
 const PAGE_SIZE = 20;
@@ -135,6 +138,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const supabase = await createClient();
 
+  const sekme = one(sp.sekme) === "sonuc" ? "sonuc" : "genel";
   const header = (
     <PageHeader
       eyebrow="Anketler"
@@ -149,6 +153,23 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
         {header}
         <SurveyNav current="sonuclar" />
         <SurveyNotReady />
+      </div>
+    );
+  }
+
+  const switcher = (
+    <nav aria-label="Sonuç görünümü" className="flex flex-wrap items-center gap-2 text-xs">
+      <FilterChip href={BASE} active={sekme === "genel"}>Anket sonuçları</FilterChip>
+      <FilterChip href={`${BASE}?sekme=sonuc`} active={sekme === "sonuc"}>Müşteri memnuniyeti (NPS)</FilterChip>
+    </nav>
+  );
+  if (sekme === "sonuc") {
+    return (
+      <div className="space-y-5">
+        {header}
+        <SurveyNav current="sonuclar" />
+        {switcher}
+        <SonucView perms={ctx.perms} />
       </div>
     );
   }
@@ -170,7 +191,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     return q.range(from, to);
   };
 
-  const [taskRes, answerRes, { data: profiles }] = await Promise.all([
+  const [taskRes, answerRes, { data: profiles }, legacyRes] = await Promise.all([
     fetchAllRows(taskPage),
     fetchAllRows((from, to) =>
       supabase
@@ -181,6 +202,16 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
         .range(from, to),
     ),
     supabase.from("profiles").select("id, full_name").limit(500),
+    // Eski kapanış link anketleri: birleşik NPS tek kaynaktan (combinedNpsStats) hesaplansın diye okunur.
+    fetchAllRows((from, to) => {
+      let q = supabase
+        .from("surveys")
+        .select("id, deal_id, score, status")
+        .order("sent_at", { ascending: false })
+        .order("id", { ascending: true });
+      if (!officeWide) q = q.eq("agent_id", ctx.userId);
+      return q.range(from, to);
+    }),
   ]);
   assertQueryBatchSucceeded([taskRes, answerRes], ["survey-tasks", "survey-answers"], "Anketler");
   const taskData = taskRes.data;
@@ -202,7 +233,11 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
   const lowOpen = lowAll.filter((t) => t.low_score_handled !== true);
   const lowClosed = lowAll.filter((t) => t.low_score_handled === true);
   const rate = responseRate(tasks);
-  const overall = scoreStats(customerScores(tasks));
+  // TEK KAYNAK: "Müşteri memnuniyeti" görünümü ile aynı birleşik hesap (görev + eski link anketi, mükerrersiz).
+  const overall = combinedNpsStats(
+    tasks,
+    (legacyRes.data ?? []).map((s) => ({ deal_id: (s.deal_id as string | null) ?? null, score: s.score === null ? null : Number(s.score), status: String(s.status) })),
+  );
   const groups = breakdownByAudienceGroup(tasks);
   const eventAudience = breakdownByEventAudience(tasks);
   const trend = monthlyTrend(tasks, nowMs, 6);
@@ -312,6 +347,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     <div className="space-y-5">
       {header}
       <SurveyNav current="sonuclar" />
+      {switcher}
       <StatRow items={stats} label="Anket özeti" />
 
       {tasks.length === 0 ? (

@@ -8,6 +8,8 @@ import { GeoSelect } from "@/components/app/geo-select";
 import { updateCustomer, type CustomerResult } from "@/app/actions/customers";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { EmailInput } from "@/components/ui/email-input";
+import { Combobox } from "@/components/ui/combobox";
+import { PersonSelect } from "@/components/ui/person-select";
 
 type Province = { id: string; name: string };
 
@@ -138,19 +140,27 @@ export function EditCustomerDialog({
             {branches.length > 0 ? (
               <div>
                 <label className={lbl} htmlFor="edit-branch">Şube</label>
-                <select id="edit-branch" name="branch_id" defaultValue={customer.branch_id ?? ""} className={input}>
-                  <option value="">Şube atanmadı</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                <Combobox
+                  id="edit-branch"
+                  name="branch_id"
+                  defaultValue={customer.branch_id ?? ""}
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                  placeholder="Şube atanmadı"
+                  searchPlaceholder="Şube ara…"
+                  emptyText="Eşleşen şube yok"
+                />
               </div>
             ) : null}
             {advisors.length > 0 ? (
               <div>
                 <label className={lbl} htmlFor="edit-assigned">Danışman</label>
-                <select id="edit-assigned" name="assigned_to" defaultValue={customer.assigned_to ?? ""} className={input}>
-                  <option value="">Danışmansız</option>
-                  {advisors.map((a) => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                </select>
+                <PersonSelect
+                  id="edit-assigned"
+                  name="assigned_to"
+                  defaultValue={customer.assigned_to ?? ""}
+                  people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
+                  emptyLabel="Danışmansız"
+                />
               </div>
             ) : null}
             <div>

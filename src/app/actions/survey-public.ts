@@ -141,7 +141,7 @@ export async function submitSurveyByToken(fd: FormData): Promise<PublicSurveyRes
             userId,
             title: `⚠ Düşük memnuniyet: ${customerName} ${score} verdi`,
             body: "Deneyimi telafi etmek için müşteriyi en kısa sürede arayın.",
-            href: "/app/raporlar/memnuniyet",
+            href: "/app/anketler?sekme=sonuc",
             kind: "warning",
           }),
         ),
