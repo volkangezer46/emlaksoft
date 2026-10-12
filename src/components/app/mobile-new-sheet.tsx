@@ -15,6 +15,7 @@ const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
   { href: "/app/talepler/yeni", label: "Yeni talep" },
   { href: "/app/randevular/yeni", label: "Yeni randevu" },
   { href: "/app/gorevler/yeni", label: "Yeni görev" },
+  { href: "/app/portfoy-avi/yeni", label: "Sahibinden ilan ekle" },
 ];
 
 /** Çağrı merkezi için ilk eylem görüşme kaydıdır. */

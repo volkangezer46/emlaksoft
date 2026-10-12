@@ -23,8 +23,9 @@ const H = "mb-3 text-sm font-semibold text-ink-950";
  * Sahip ya mevcut müşteriden seçilir ya da yeni müşteri olarak açılır; kayıt `createProperty` içinde müşteri kaydına bağlanır.
  * Kimlik/vergi numarası BİLEREK toplanmaz (veri minimizasyonu). Zorunlu alanlar eksikse ilan taslak kalır, yayına alınamaz.
  */
-export function OwnerInfoSection({ poolEnabled }: { poolEnabled: boolean }) {
-  const [mode, setMode] = useState<"existing" | "new">("existing");
+export function OwnerInfoSection({ poolEnabled, prefill }: { poolEnabled: boolean; prefill?: { name: string; phone: string } }) {
+  // Sahibinden ilan adayından geliyorsa ad/telefon hazır: "Yeni müşteri" modu açık başlar.
+  const [mode, setMode] = useState<"existing" | "new">(prefill ? "new" : "existing");
 
   return (
     <>
@@ -68,10 +69,10 @@ export function OwnerInfoSection({ poolEnabled }: { poolEnabled: boolean }) {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             <FormField label="Ad soyad / unvan" htmlFor="owner-name" className="sm:col-span-2">
-              <FormInput id="owner-name" name="owner_name" autoComplete="off" placeholder="Örn. Ayşe Yılmaz" />
+              <FormInput id="owner-name" name="owner_name" autoComplete="off" placeholder="Örn. Ayşe Yılmaz" defaultValue={prefill?.name} />
             </FormField>
             <FormField label="Telefon" htmlFor="owner-phone">
-              <PhoneInput id="owner-phone" name="owner_phone" />
+              <PhoneInput id="owner-phone" name="owner_phone" defaultValue={prefill?.phone} />
             </FormField>
             <FormField label="E-posta" htmlFor="owner-email">
               <EmailInput id="owner-email" name="owner_email" placeholder="ornek@eposta.com" />

@@ -170,6 +170,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "properties",
         tabs: [
           { href: "/app/portfoyler", label: "Portföyler", icon: ICONS.portfoy, module: "properties" },
+          { href: "/app/portfoy-avi", label: "Sahibinden ilanlar", icon: ICONS.portfoy, module: "prospecting", description: "Sahibinden ilan sahiplerini arayıp portföy kazanın", keywords: ["sahibinden", "ilan sahibi", "portföy avı", "aranmasın", "mal sahibi", "fsbo"] },
           { href: "/app/portfoyler/anahtarlar", label: "Anahtar takibi", icon: ICONS.anahtarTakip, module: "properties", description: "Anahtar kimde, ne zaman teslim edildi", keywords: ["anahtar", "teslim"] },
           { href: "/app/portfoyler/sunumlar", label: "Sunumlar", icon: ICONS.sunum, module: "properties", description: "Müşteriye gönderilecek portföy sunumları", keywords: ["sunum", "paylaşım", "pdf"] },
           { href: "/app/ilan-havuzu", label: "Havuz ve atama", icon: ICONS.ilanHavuzu, module: "properties", description: "Atanmamış ilanların uzmanlığa göre dağıtımı", keywords: ["havuz", "atama", "ata", "ilan ata", "dağıt", "uzmanlık"] },

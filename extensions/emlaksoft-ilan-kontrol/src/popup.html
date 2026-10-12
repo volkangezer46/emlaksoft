@@ -77,6 +77,14 @@
       .foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10.5px; color: var(--muted); }
       .link[hidden] { display: none; }
       .link { background: none; border: 0; padding: 0; color: var(--brand); cursor: pointer; font-size: 10.5px; text-decoration: underline; }
+      .fsbo { margin-top: 12px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); }
+      .fsbo[hidden], .fsbo form[hidden] { display: none; }
+      .fsbo h2 { margin-top: 0; }
+      .fsbo form { display: grid; gap: 8px; margin-top: 10px; }
+      .fsbo label.f { display: grid; gap: 3px; font-size: 11.5px; color: var(--muted); }
+      .fsbo input[type="text"] { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font-size: 12.5px; }
+      .fsbo .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .fsbo .chk { display: flex; gap: 6px; align-items: flex-start; font-size: 11.5px; color: var(--muted); }
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
     </style>
   </head>
@@ -99,6 +107,29 @@
         </div>
         <span class="pill" id="pill" role="status">Yükleniyor…</span>
       </div>
+
+      <section class="fsbo" id="fsbo" hidden aria-label="Sahibinden ilan olarak kaydet">
+        <h2>EmlakSoft'a sahibinden ilan olarak kaydet</h2>
+        <p class="muted" id="fsboHint">Açık olan bu ilanı ofis kaydınıza eklersiniz.</p>
+        <button type="button" class="cta" id="fsboRead">Bu ilanı oku</button>
+        <form id="fsboForm" hidden>
+          <label class="f">Başlık<input type="text" id="fsboTitle" maxlength="200" autocomplete="off" /></label>
+          <div class="two">
+            <label class="f">Fiyat (TL)<input type="text" id="fsboPrice" inputmode="decimal" autocomplete="off" /></label>
+            <label class="f">Oda<input type="text" id="fsboRooms" maxlength="20" autocomplete="off" /></label>
+          </div>
+          <div class="two">
+            <label class="f">Brüt m²<input type="text" id="fsboM2" inputmode="decimal" autocomplete="off" /></label>
+            <label class="f">Konum<input type="text" id="fsboLoc" maxlength="200" autocomplete="off" /></label>
+          </div>
+          <label class="f">İlan sahibi adı (ilanda görünen)<input type="text" id="fsboOwner" maxlength="120" autocomplete="off" /></label>
+          <label class="f">Telefon (yalnız ilanda gördüyseniz)<input type="text" id="fsboPhone" inputmode="tel" maxlength="25" autocomplete="off" /></label>
+          <label class="chk"><input type="checkbox" id="fsboPhoneOk" /> Bu numarayı ilanda kendim gördüm ve ofis kaydına eklemek istiyorum.</label>
+          <button type="submit" class="cta" id="fsboSave">EmlakSoft'a kaydet</button>
+        </form>
+        <p class="muted" id="fsboResult" role="status"></p>
+        <p class="muted">Yalnız şu an açık olan ilanı ofis kaydınıza eklersiniz. EmlakSoft portalları kendiliğinden taramaz. Telefonu yalnız ilanda gördüyseniz ekleyin; eklenti "numarayı göster" düğmesine basmaz.</p>
+      </section>
 
       <section class="hero" id="hero" aria-live="polite">
         <div class="txt"><strong id="heroTitle">Yükleniyor…</strong><span id="heroSub"></span></div>

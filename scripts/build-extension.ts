@@ -8,7 +8,8 @@
  *
  * - `host_permissions` YALNIZ portal adaptör kayıt defterinden (`allPortalHosts()`): sahibinden/hepsiemlak/emlakjet.
  * - İçerik betiği YALNIZ EmlakSoft alanında: `emlaksoft.vercel.app` + `NEXT_PUBLIC_APP_URL` host'u (varsa).
- * - İzinler yalnız `storage` + `alarms`. `externally_connectable` YALNIZ EmlakSoft kökenleri için (siteden salt-okunur `ping`;
+ * - İzinler `storage` + `alarms` + (0.4.0) `activeTab` + `scripting`: ikisi yalnız popup'ta kullanıcı tıklamasıyla açık sekmedeki TEK ilanı
+ *   okumak içindir (sahibinden ilan kaydı); arka planda gezinme/izleme yoktur. `externally_connectable` YALNIZ EmlakSoft kökenleri için (siteden salt-okunur `ping`;
  *   bağlama ve veri yolu değişmedi: içerik betiği köprüsü + kullanıcı etkinliği).
  * - Sürüm tek kaynak: `src/lib/listing-control/worker/extension-release.ts` (manifest.base.json ile eşitliği test kilitler).
  * - Köprü sözleşmesi, hız kuralı ve ayrıştırıcılar uygulamanın `src/lib/listing-control/**` dosyalarından DOĞRUDAN derlenir.

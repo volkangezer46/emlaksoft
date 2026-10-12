@@ -8,6 +8,9 @@ export const BRIDGE_ENDPOINT = "/api/app/ilan-kontrol/isci";
 /** Günlük mağaza taraması (ofisin kendi ilan listesi) yükleme ucu; aynı köken + aynı başlık kuralı. */
 export const BRIDGE_INVENTORY_ENDPOINT = "/api/app/ilan-kontrol/envanter";
 
+/** Sahibinden ilan kaydı (0.4.0): kullanıcının popup'ta onayladığı TEK ilan; aynı köken + aynı başlık kuralı. */
+export const BRIDGE_FSBO_ENDPOINT = "/api/app/portfoy-avi/kaydet";
+
 export function isSameOriginBridgeRequest(req: { headers: Headers; url: string }): boolean {
   if (req.headers.get(BRIDGE_HEADER) !== "1") return false;
   let host: string;

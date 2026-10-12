@@ -39,7 +39,13 @@ export type BgRequest =
   /** İçerik betiği: EmlakSoft'a yüklenmeyi bekleyen tarama sonucu (en çok 1) ve sonucu. */
   | { kind: "scanPendingDue" }
   | { kind: "scanPendingDone"; id: string }
-  | { kind: "scanPendingFail"; id: string };
+  | { kind: "scanPendingFail"; id: string }
+  /** (0.4.0) Kullanıcının onayladığı TEK sahibinden ilan kaydı: kuyruğa yazılır, açık EmlakSoft sekmesi gönderir. */
+  | { kind: "fsboPut"; payload: unknown }
+  | { kind: "fsboPendingDue" }
+  | { kind: "fsboPendingDone"; id: string; summary: string }
+  | { kind: "fsboPendingFail"; id: string }
+  | { kind: "fsboLast" };
 
 /** Sayfadan (externally_connectable) gelen TEK ileti türü: salt okunur yoklama. Bağlama ve veri okuma bu kanaldan YAPILMAZ. */
 export type ExternalRequest = { kind: "ping" };
@@ -66,6 +72,9 @@ export const STORAGE_KEYS = {
   scanStates: "es_scan_states",
   /** EmlakSoft'a yüklenmeyi bekleyen tarama sonuçları. */
   scanUploads: "es_scan_uploads",
+  /** EmlakSoft'a gönderilmeyi bekleyen sahibinden ilan kayıtları ve son gönderim özeti. */
+  fsboPending: "es_fsbo_pending",
+  fsboLast: "es_fsbo_last",
 } as const;
 
 export const ALARM_TICK = "es-tick";

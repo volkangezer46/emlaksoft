@@ -11,7 +11,7 @@ export const PROPERTY_TABS = [
     id: "temel",
     label: "Temel",
     description: "İlanın başlığı ve türü.",
-    fields: ["title", "transaction_type", "property_type", "rooms", "sqm", "branch_id"],
+    fields: ["title", "transaction_type", "property_type", "rooms", "sqm", "branch_id", "fsbo_lead_id"],
     required: ["title", "transaction_type", "property_type"],
   },
   {

@@ -1,6 +1,7 @@
 import { BRIDGE_REQUEST_SOURCE, BRIDGE_RESPONSE_SOURCE } from "@/lib/listing-control/worker/bridge";
 import { nextDelayMs, replyToReport, type StepOutcome } from "@/lib/listing-control/worker/core";
-import { BRIDGE_ENDPOINT, BRIDGE_HEADER, BRIDGE_INVENTORY_ENDPOINT } from "@/lib/listing-control/worker/bridge-request";
+import { BRIDGE_ENDPOINT, BRIDGE_FSBO_ENDPOINT, BRIDGE_HEADER, BRIDGE_INVENTORY_ENDPOINT } from "@/lib/listing-control/worker/bridge-request";
+import type { FsboPending } from "@/lib/prospecting/extension-queue";
 import type { ScanUpload } from "@/lib/listing-control/worker/extension-scan";
 import { sendVerdict, type OutboxEntry } from "@/lib/listing-control/worker/extension-outbox";
 import { isTrustedConnectRequest, isTrustedScanRequest } from "@/lib/listing-control/worker/extension-pairing";
@@ -209,6 +210,39 @@ async function flushScans(): Promise<void> {
   }
 }
 
+/**
+ * (0.4.0) Kullanıcının popup'ta onayladığı sahibinden ilan kayıtlarını EmlakSoft'a gönderir (açık oturumla, aynı kökenli uç).
+ * Otomatik kontrol bağlantısından BAĞIMSIZDIR (kuyruk yalnız kullanıcı "Kaydet" dediğinde dolar); portal sayfası okunmaz.
+ * Başarısızsa (ağ/oturum/5xx) kuyrukta kalır, üstel geri çekilmeyle yeniden denenir; sunucu idempotenttir.
+ */
+let fsboFlushing = false;
+async function flushFsbo(): Promise<void> {
+  if (fsboFlushing) return;
+  fsboFlushing = true;
+  try {
+    const due = await send<{ entries?: FsboPending[] }>({ kind: "fsboPendingDue" });
+    for (const e of due?.entries ?? []) {
+      const r = await api(e.payload as unknown as Record<string, unknown>, BRIDGE_FSBO_ENDPOINT);
+      const data = r.data as ApiReply & { created?: boolean; ownedByOther?: string | null };
+      const verdict = sendVerdict(r.status, data);
+      if (verdict === "retry") {
+        await send({ kind: "fsboPendingFail", id: e.id });
+        break;
+      }
+      const summary = data.ok
+        ? data.ownedByOther
+          ? String(data.ownedByOther)
+          : data.created === false
+            ? "İlan zaten kayıtlıydı; yeni fiyat gözlemi eklendi."
+            : "EmlakSoft'a kaydedildi."
+        : "Kayıt reddedildi.";
+      await send({ kind: "fsboPendingDone", id: e.id, summary });
+    }
+  } finally {
+    fsboFlushing = false;
+  }
+}
+
 async function step(): Promise<StepOutcome | "wait"> {
   if (paused || !connected) return "idle";
   if (!navigator.onLine) return "busy";
@@ -307,3 +341,10 @@ if (window.location.pathname === "/app" || window.location.pathname.startsWith("
     schedule(5_000);
   });
 }
+
+// (0.4.0) Sahibinden ilan kayıt kuyruğu: sayfa açılınca, kuyruk değişince ve çevrimiçi olunca (yalnız EmlakSoft kökeninde).
+void flushFsbo();
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && STORAGE_KEYS.fsboPending in changes) void flushFsbo();
+});
+window.addEventListener("online", () => void flushFsbo());

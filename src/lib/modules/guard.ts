@@ -25,6 +25,7 @@ const PERMISSION_MODULE_FEATURE: Readonly<Record<string, FeatureKey>> = {
   valuation: "valuation",
   expenses: "expenses",
   surveys: "surveys",
+  prospecting: "prospecting",
 };
 
 /** İzin modülünün bağlı olduğu kapatılabilir ürün alanı (yoksa çekirdek: null). */

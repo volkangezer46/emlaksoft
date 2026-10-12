@@ -81,7 +81,10 @@ export function PropertyForm({
   poolEnabled = false,
   poolSource,
   customFields = [],
+  fsbo,
 }: {
+  /** Sahibinden ilan adayından dönüşüm (?fsbo=<id>): alanlar önden dolar, kayıt sonunda aday "Portföye döndü" olur. */
+  fsbo?: { id: string; title: string; transaction: string; rooms: string; sqm: string; price: string; ownerName: string; ownerPhone: string; locationText: string };
   /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
   customFields?: CustomFieldInputDef[];
   provinces: Province[];
@@ -147,19 +150,19 @@ export function PropertyForm({
     temel: (
       <>
         <FormField label="Portföy başlığı" htmlFor="property-title" required className="sm:col-span-2">
-          <FormInput name="title" required placeholder="Örn. Kadıköy Moda 3+1" />
+          <FormInput name="title" required placeholder="Örn. Kadıköy Moda 3+1" defaultValue={fsbo?.title} />
         </FormField>
-        <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue="Satılık">
+        <SelectField id="transaction-type" name="transaction_type" label="İşlem türü" required defaultValue={fsbo?.transaction || "Satılık"}>
           {transactionTypes.map((type) => <option key={type}>{type}</option>)}
         </SelectField>
         <SelectField id="property-type" name="property_type" label="Portföy türü" required defaultValue="Daire">
           {propertyTypes.map((type) => <option key={type}>{type}</option>)}
         </SelectField>
         <FormField label="Oda" htmlFor="rooms">
-          <FormInput name="rooms" placeholder="4+1" />
+          <FormInput name="rooms" placeholder="4+1" defaultValue={fsbo?.rooms} />
         </FormField>
         <FormField label="Brüt m²" htmlFor="sqm">
-          <FormInput name="sqm" inputMode="decimal" placeholder="185" />
+          <FormInput name="sqm" inputMode="decimal" placeholder="185" defaultValue={fsbo?.sqm} />
         </FormField>
         {branches.length > 0 ? (
           <SelectField id="property-branch" name="branch_id" label="Şube" defaultValue="" className="sm:col-span-2">
@@ -182,7 +185,7 @@ export function PropertyForm({
     fiyat: (
       <>
         <FormField label="Liste fiyatı" htmlFor="list-price" required>
-          <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" />
+          <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" defaultValue={fsbo?.price} />
         </FormField>
         <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
           <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
@@ -214,7 +217,12 @@ export function PropertyForm({
         </FormField>
       </>
     ),
-    sahip: <OwnerInfoSection poolEnabled={poolEnabled} />,
+    sahip: (
+      <OwnerInfoSection
+        poolEnabled={poolEnabled}
+        prefill={fsbo && (fsbo.ownerName || fsbo.ownerPhone) ? { name: fsbo.ownerName, phone: fsbo.ownerPhone } : undefined}
+      />
+    ),
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
@@ -280,10 +288,19 @@ export function PropertyForm({
       submitIcon={Check}
       pending={pending}
       error={error}
-      notice={<DuplicateHint kind="property" />}
+      notice={
+        <>
+          {fsbo ? (
+            <p className="mb-3 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/8 px-3 py-2 text-sm text-ink-950">
+              Sahibinden ilan kaydından önden dolduruldu{fsbo.locationText ? ` (${fsbo.locationText})` : ""}. İlanı yayınlamadan önce yazılı yetkilendirme sözleşmesi (en çok 3 ay) imzalayın ve mal sahibinin sizi e-Devlet&apos;te (EİDS) yetkilendirmesini isteyin. İl ve ilçeyi Konum sekmesinden seçin.
+            </p>
+          ) : null}
+          <DuplicateHint kind="property" />
+        </>
+      }
       onSubmit={onSubmit}
       tabs={tabs}
-      tabPanels={{ ...tabPanels, temel: <>{tabPanels.temel}<CustomFieldInputs defs={customFields} /></> }}
+      tabPanels={{ ...tabPanels, temel: <>{fsbo ? <input type="hidden" name="fsbo_lead_id" value={fsbo.id} /> : null}{tabPanels.temel}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       saveAndNew
       fieldLabels={FIELD_LABELS}

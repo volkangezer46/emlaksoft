@@ -36,6 +36,7 @@ import { shortAuthorityWarning } from "@/lib/eids/authority-term";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import { notifyAssignment } from "@/lib/assignment-notify";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { linkConvertedFsboLead } from "@/lib/prospecting/convert";
 import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
 
 export type PropertyResult = {
@@ -379,6 +380,7 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
   // İlan sahibi: müşteri kaydına bağla + ayrıntıları yaz (şema yoksa notlara düşer; ilan her durumda oluşur).
   let ownerInfoScore: number | undefined;
   let ownerMissing: string[] | undefined;
+  let ownerCustomerId: string | null = null;
   if (ownerInfo) {
     const saved = await saveOwnerInfo(supabase, {
       tenantId: gate.tenantId,
@@ -394,6 +396,22 @@ export async function createProperty(formData: FormData): Promise<PropertyResult
     ownerMissing = saved.evaluation.missing.map((m) => m.label);
     if (saved.error) console.error("createProperty owner info", saved.error);
     if (saved.customerId) revalidatePath("/app/musteriler");
+    ownerCustomerId = saved.customerId ?? null;
+  }
+
+  // Sahibinden ilan adayından gelen portföy (?fsbo=<id>): aday "Portföye döndü" olur (hata portföyü etkilemez).
+  const fsboLeadId = String(formData.get("fsbo_lead_id") ?? "").trim();
+  if (fsboLeadId) {
+    const linked = await linkConvertedFsboLead(supabase, {
+      tenantId: gate.tenantId,
+      userId: gate.userId,
+      role: gate.role,
+      leadId: fsboLeadId,
+      propertyId: data.id,
+      customerId: ownerCustomerId,
+    });
+    if (linked.ok) revalidatePath("/app/portfoy-avi");
+    else console.error("createProperty fsbo dönüşümü", linked.error);
   }
 
   // Havuz: kayıt aç, öneri üret, moda göre (otomatik atama / sahiplenme / yönetici bekler) karar ver.

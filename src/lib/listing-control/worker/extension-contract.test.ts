@@ -17,13 +17,13 @@ const src = (p: string) => readFileSync(join(ROOT, p), "utf8");
 
 describe("manifest ve paketleme (mağazaya hazırlık)", () => {
   const m = JSON.parse(src(`${EXT}/manifest.base.json`)) as Record<string, unknown>;
-  it("MV3, en az izin: yalnız storage + alarms; gereksiz izin/erişim yok", () => {
+  it("MV3, en az izin: storage + alarms + activeTab + scripting (0.4.0, yalnız tıklamaya bağlı tek ilan kaydı); gereksiz izin/erişim yok", () => {
     expect(m.manifest_version).toBe(3);
-    expect(m.permissions).toEqual(["storage", "alarms"]);
+    expect(m.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
     expect(m.externally_connectable).toBeUndefined(); // taban manifest'te yok; derleme betiği YALNIZ EmlakSoft kökenleri için yazar (aşağıdaki test)
     expect(m.web_accessible_resources).toBeUndefined();
     expect(m.optional_permissions).toBeUndefined();
-    expect(JSON.stringify(m)).not.toMatch(/<all_urls>|"tabs"|"cookies"|"webRequest"|"scripting"|"activeTab"|"declarativeNetRequest"/);
+    expect(JSON.stringify(m)).not.toMatch(/<all_urls>|"tabs"|"cookies"|"webRequest"|"webNavigation"|"declarativeNetRequest"/);
     expect(m.host_permissions).toEqual([]); // derleme betiği yalnız portal adaptör alanlarını yazar
   });
   it("sürüm tek kaynak; ikonlar 16/32/48/128 var ve manifest'e bağlı", () => {
@@ -211,11 +211,25 @@ describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
   const bg = src(`${EXT}/src/background.ts`);
   const content = src(`${EXT}/src/content.ts`);
   const setup = src("src/components/listing-control/sync-setup.tsx");
-  it("sürüm 0.3.1; manifest izinleri genişlemedi (tabs izni gerekmez)", () => {
+  it("sürüm 0.4.0; izinler yalnız activeTab + scripting kadar genişledi (tabs izni gerekmez)", () => {
     const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { version: string; permissions: string[] };
-    expect(EXTENSION_VERSION).toBe("0.3.1");
-    expect(manifest.version).toBe("0.3.1");
-    expect(manifest.permissions).toEqual(["storage", "alarms"]);
+    expect(EXTENSION_VERSION).toBe("0.4.0");
+    expect(manifest.version).toBe("0.4.0");
+    expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
+  });
+
+  it("0.4.0 sahibinden ilan kaydı: yalnız popup tıklamasıyla okunur, arka plan/içerik betiği portal sayfasını okumaz, numara göster'e basılmaz", () => {
+    const popup = src(`${EXT}/src/popup.ts`);
+    expect(popup).toContain("chrome.scripting.executeScript");
+    expect(bg).not.toMatch(/chrome\.scripting/);
+    expect(content).not.toMatch(/chrome\.scripting/);
+    // Okuma tek yerde (popup'ta "Bu ilanı oku" tıklaması) ve numara düğmesine tıklama kodu yok.
+    expect(popup.match(/executeScript/g)?.length).toBe(1);
+    expect(popup).not.toMatch(/\.click\(\)|dispatchEvent/);
+    // Telefon kullanıcı onay kutusu olmadan gönderilmez.
+    expect(popup).toContain("fsboPhoneOk");
+    // Gönderim yalnız EmlakSoft kökenindeki içerik betiğinden, oturumlu aynı kökenli uçla.
+    expect(content).toContain("BRIDGE_FSBO_ENDPOINT");
   });
   it("onInstalled: yalnız ilk kurulumda, yalnız derleme kökeniyle EmlakSoft sekmesi açar; bağlamaz", () => {
     const block = bg.slice(bg.indexOf("chrome.runtime.onInstalled.addListener"), bg.indexOf("chrome.runtime.onStartup"));
