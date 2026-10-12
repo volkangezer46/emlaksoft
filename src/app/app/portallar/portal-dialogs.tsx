@@ -196,7 +196,7 @@ export function ClosePortalDialog({
         deal_happened: "İşlem gerçekleşti",
         closed_by_us: "Biz kapattık",
         competitor_closed: "Rakip kapattı",
-        has_authority: "Yazılı yetki / EİDS",
+        has_authority: "Yazılı yetki belgesi",
       }}
       trigger={openProp !== undefined ? undefined : ({ onClick, ...aria }) => (
         <button
@@ -257,7 +257,7 @@ export function ClosePortalDialog({
             </div>
             <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-medium text-text-muted sm:col-span-2">
               <input type="checkbox" name="has_authority" className="mt-0.5 accent-mint-600" />
-              <span><strong className="text-mint-700">Yazılı yetki / EİDS onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
+              <span><strong className="text-mint-700">Yazılı yetki belgesi onaylı</strong><br />Bizim kapanışımızda müşteri seçimiyle birlikte zorunludur.</span>
             </label>
             <div className="rounded-[var(--radius-control)] border border-danger-500/20 bg-danger-500/5 px-4 py-3 text-xs text-danger-500 sm:col-span-2">Bu kayıt kayıp-kaçak analizine dahil edilir ve sonradan denetlenebilir.</div>
           </>
