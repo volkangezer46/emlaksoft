@@ -50,6 +50,24 @@ import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/fin
 import { pickLeastEfficientPortal, unusedPortalSubscriptions } from "@/lib/finance/portal-roi";
 import { EXPENSE_CATEGORIES } from "@/lib/definition-defaults";
 import { trNextMonthStartMs } from "@/lib/clock";
+import { loadProspectingFacts, FSBO_FACT_LIMIT } from "@/lib/insights/prospecting-facts";
+import {
+  FSBO_AGING_RULE_ID,
+  FSBO_CLAIM_RULE_ID,
+  FSBO_FOLLOWUP_RULE_ID,
+  FSBO_PRICE_DROP_RULE_ID,
+  FSBO_RELISTED_RULE_ID,
+  FSBO_UNCALLED_RULE_ID,
+  evaluateFsboAging,
+  evaluateFsboClaimExpiring,
+  evaluateFsboFollowupDue,
+  evaluateFsboPriceDrop,
+  evaluateFsboRelisted,
+  evaluateFsboUncalled,
+} from "@/lib/insights/rules/prospecting";
+import { isFeatureEnabledIn } from "@/lib/modules/logic";
+import { loadTenantModuleState } from "@/lib/modules/state";
+import type { FsboFact } from "@/lib/insights/rules/prospecting";
 
 const categoryLabel = (value: string): string => EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 
@@ -93,6 +111,39 @@ export async function insightThresholds(admin: SupabaseClient, tenantId: string)
     quietDays: numberSetting(v, "office.insight.customer_quiet_days", CALL_MIN_QUIET_DAYS),
     listingStaleDays: numberSetting(v, "office.insight.listing_stale_days", PRICE_MIN_DAYS),
   };
+}
+
+/**
+ * Sahibinden ilanlar (portföy avı): tek olgu sorgusu, altı saf kural. Modül kapalıysa kart üretilmez ve açık kartlar kapanır.
+ * Olgu kümesi satır tavanına ulaştıysa kapatma yapılmaz (güvenli taraf).
+ */
+// Altı kural aynı ofis turunda AYNI olgu kümesini paylaşır (son anahtar önbelleği: ofis + tur zamanı).
+let prospectingMemo: { key: string; value: Promise<{ enabled: boolean; facts: FsboFact[]; truncated: boolean }> } | null = null;
+function prospectingFactsOnce(admin: SupabaseClient, tenantId: string, nowMs: number) {
+  const key = `${tenantId}:${nowMs}`;
+  if (prospectingMemo?.key === key) return prospectingMemo.value;
+  const value = (async () => {
+    const moduleState = await loadTenantModuleState(admin, tenantId);
+    if (!isFeatureEnabledIn(moduleState, "prospecting")) return { enabled: false, facts: [], truncated: false };
+    return { enabled: true, ...(await loadProspectingFacts(admin, tenantId)) };
+  })();
+  prospectingMemo = { key, value };
+  value.catch(() => {
+    if (prospectingMemo?.key === key) prospectingMemo = null;
+  });
+  return value;
+}
+
+async function runProspecting(
+  admin: SupabaseClient,
+  tenantId: string,
+  nowMs: number,
+  evaluate: (facts: readonly FsboFact[], nowMs: number) => InsightRuleRun,
+): Promise<InsightRuleRun> {
+  const { enabled, facts, truncated } = await prospectingFactsOnce(admin, tenantId, nowMs);
+  if (!enabled) return { drafts: [], liveEntityIds: new Set<string>() };
+  const run = evaluate(facts, nowMs);
+  return truncated || facts.length >= FSBO_FACT_LIMIT ? { drafts: run.drafts, liveEntityIds: null } : run;
 }
 
 export const INSIGHT_RULES: readonly InsightRule[] = [
@@ -189,6 +240,13 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     label: "Memnun müşteriye tavsiye daveti",
     run: async (admin, tenantId, nowMs) => noClose(evaluateReferralInvites(await loadReferralInviteFacts(admin, tenantId, nowMs), nowMs)),
   },
+  // SAHİBİNDEN İLANLAR (portföy avı; saf kurallar: rules/prospecting.ts; olgular: prospecting-facts.ts). Örnek veri kart üretmez.
+  { id: FSBO_UNCALLED_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: kayıttan beri aranmayanlar", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboUncalled) },
+  { id: FSBO_FOLLOWUP_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: tekrar arama günü gelenler", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboFollowupDue) },
+  { id: FSBO_PRICE_DROP_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: fiyatı düşenler", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboPriceDrop) },
+  { id: FSBO_RELISTED_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: yeniden yayına çıkanlar", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboRelisted) },
+  { id: FSBO_AGING_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: uzun süredir satılamayanlar", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboAging) },
+  { id: FSBO_CLAIM_RULE_ID, kind: "call_priority", label: "Sahibinden ilan: sahipliği düşecek kayıtlar (yönetici)", run: (a, t, n) => runProspecting(a, t, n, evaluateFsboClaimExpiring) },
   // GİDER içgörüleri (alıcı: yönetim). Şema (20261008000700) yoksa kural "etkin değil" sayılır.
   {
     id: EXPENSE_BUDGET_RULE_ID,

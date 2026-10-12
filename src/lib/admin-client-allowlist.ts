@@ -239,7 +239,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/api/cron/kira-tahakkuk/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/leak-sla/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/lig-snapshot/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
-  { file: "src/app/api/cron/operational-retention/route.ts", fn: "GET", calls: 2, tenantFilter: "yok" },
+  { file: "src/app/api/cron/operational-retention/route.ts", fn: "GET", calls: 1, tenantFilter: "param" },
   { file: "src/app/api/cron/portal-teyit/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/proje-vade/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/cron/randevu-hatirlat/route.ts", fn: "run", calls: 1, tenantFilter: "var" },
