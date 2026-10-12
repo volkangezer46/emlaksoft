@@ -53,6 +53,7 @@ export const PROPERTY_TABS = [
       "site_name",
       "dues",
       "credit_eligible",
+      "swap_ok",
       "currency",
     ],
     required: [],

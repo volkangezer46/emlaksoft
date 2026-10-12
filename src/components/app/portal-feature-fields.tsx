@@ -88,6 +88,7 @@ export function PortalFeatureFields({ defaults, idPrefix = "pf" }: { defaults?: 
       <TextField name="site_name" idPrefix={idPrefix} defaults={defaults} placeholder="Örn. Bahçeşehir Konakları" />
       <NumberField name="dues" idPrefix={idPrefix} defaults={defaults} placeholder="Örn. 1500" />
       <ChoiceField name="credit_eligible" idPrefix={idPrefix} defaults={defaults} yesNo />
+      <ChoiceField name="swap_ok" idPrefix={idPrefix} defaults={defaults} yesNo />
       <ChoiceField name="currency" idPrefix={idPrefix} defaults={defaults} options={CURRENCY_OPTIONS} />
     </>
   );

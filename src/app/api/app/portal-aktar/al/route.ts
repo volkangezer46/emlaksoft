@@ -6,6 +6,7 @@ import { codeOutcomeMessage, hashTransferCode, normalizeTransferCode } from "@/l
 import { buildPortalPayload, readinessCheck } from "@/lib/portal-transfer/payload";
 import { isTransferPortal } from "@/lib/portal-transfer/rules";
 import { loadPropertyForTransfer } from "@/lib/portal-transfer/server";
+import { transferWatermarkFromTenant } from "@/lib/portal-transfer/photo-watermark";
 import { guardBridgeRequest, NO_STORE } from "@/lib/portal-transfer/bridge-guard";
 
 export const dynamic = "force-dynamic";
@@ -52,5 +53,8 @@ export async function POST(request: Request) {
   const input = await loadPropertyForTransfer(db, gate.tenantId, r.property_id);
   if (!input) return NextResponse.json({ ok: false, error: "property_not_found", message: codeOutcomeMessage("property_not_found") }, { status: 404, headers: NO_STORE });
   const payload = buildPortalPayload(input, r.portal, clockNow());
-  return NextResponse.json({ ok: true, sessionId: r.session_id, payload, readiness: readinessCheck(payload) }, { headers: NO_STORE });
+  // Ofis filigranı: yalnız kendi kiracısının ayarı (RLS + tenant eşitliği); kapalıysa null → fotoğraflar orijinal gider.
+  const { data: tenant } = await db.from("tenants").select("name, logo_url, watermark_settings").eq("id", gate.tenantId).maybeSingle();
+  const watermark = transferWatermarkFromTenant(tenant);
+  return NextResponse.json({ ok: true, sessionId: r.session_id, payload, readiness: readinessCheck(payload), watermark }, { headers: NO_STORE });
 }

@@ -11,6 +11,7 @@ import {
   BRIDGE_TRANSFER_FETCH_ENDPOINT,
 } from "@/lib/listing-control/worker/bridge-request";
 import type { DonePayload, ImportPayload, QueueEntry } from "@/lib/portal-transfer/ext-queue";
+import { buildTransferMark, sanitizeTransferWatermark, stampTransferMark, type TransferWatermark } from "@/lib/portal-transfer/photo-watermark";
 import { PHOTO_JPEG_QUALITY, PHOTO_MAX_SIDE, bytesToBase64, photoBudget, photoSummary, scaledSize } from "@/lib/portal-transfer/photo-prep";
 import type { FsboPending } from "@/lib/prospecting/extension-queue";
 import type { ScanUpload } from "@/lib/listing-control/worker/extension-scan";
@@ -276,7 +277,7 @@ async function flushFsbo(): Promise<void> {
  * service worker'a, fotoğrafları (aynı kökenli yetkili medya ucundan indirilip ≤1600 px JPEG'e küçültülerek) oturum deposuna koyar.
  * Portala HİÇBİR istek atılmaz; formu kullanıcı portal sekmesinde eklenti penceresinden doldurur ve "Yayınla"ya kendisi basar.
  */
-async function downscaleToJpegB64(blob: Blob): Promise<{ b64: string; type: string } | null> {
+async function downscaleToJpegB64(blob: Blob, mark: OffscreenCanvas | null, wm: TransferWatermark | null): Promise<{ b64: string; type: string } | null> {
   try {
     const bmp = await createImageBitmap(blob);
     const size = scaledSize(bmp.width, bmp.height, PHOTO_MAX_SIDE);
@@ -285,6 +286,7 @@ async function downscaleToJpegB64(blob: Blob): Promise<{ b64: string; type: stri
     if (!ctx) return null;
     ctx.drawImage(bmp, 0, 0, size.width, size.height);
     bmp.close();
+    if (mark && wm) stampTransferMark(ctx, size.width, size.height, mark, wm.settings);
     const out = await canvas.convertToBlob({ type: "image/jpeg", quality: PHOTO_JPEG_QUALITY });
     return { b64: bytesToBase64(new Uint8Array(await out.arrayBuffer())), type: "image/jpeg" };
   } catch {
@@ -302,6 +304,22 @@ async function runTransfer(code: string): Promise<{ ok: boolean; photos: number;
   const put = await send<{ ok?: boolean }>({ kind: "transferPut", data });
   if (!put?.ok) return fail("Paket eklentiye alınamadı.");
   const photos = Array.isArray(data.payload?.photos) ? data.payload.photos : [];
+  // Ofis filigranı açıksa her fotoğrafa basılır (EmlakSoft'taki orijinal değişmez); logo yüklenemezse metne düşülür.
+  const wm = sanitizeTransferWatermark((data as { watermark?: unknown }).watermark);
+  let mark: OffscreenCanvas | null = null;
+  if (wm) {
+    let logo: ImageBitmap | null = null;
+    if (wm.logoUrl) {
+      try {
+        const lr = await fetch(wm.logoUrl, { mode: "cors", credentials: "omit" });
+        if (lr.ok) logo = await createImageBitmap(await lr.blob());
+      } catch {
+        logo = null;
+      }
+    }
+    mark = buildTransferMark(wm, logo);
+    logo?.close();
+  }
   let used = 0;
   let stored = 0;
   let skipped = 0;
@@ -317,7 +335,7 @@ async function runTransfer(code: string): Promise<{ ok: boolean; photos: number;
         skipped += 1;
         continue;
       }
-      const prepared = await downscaleToJpegB64(await res.blob());
+      const prepared = await downscaleToJpegB64(await res.blob(), mark, wm);
       const decision = prepared ? photoBudget(used, prepared.b64.length) : { take: false };
       if (!prepared || !decision.take) {
         skipped += 1;

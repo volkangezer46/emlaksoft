@@ -50,8 +50,8 @@ export async function loadPropertyForTransfer(db: Db, tenantId: string, property
     features: (p.features && typeof p.features === "object" ? p.features : {}) as Record<string, unknown>,
     parcelBlock: str(p.parcel_block),
     parcelLot: str(p.parcel_lot),
-    // `swap_ok` yalnız talep tarafında vardır (customer_demands); portföyde takas alanı yok → boş kalır, uydurulmaz.
-    swapOk: typeof p.swap_ok === "boolean" ? p.swap_ok : null,
+    // Portföyde sütun yok; "Takasa uygun" `features.swap_ok` (evet/hayır) olarak tutulur. Girilmemişse boş kalır, uydurulmaz.
+    swapOk: typeof (p.features as Record<string, unknown> | null)?.swap_ok === "boolean" ? ((p.features as Record<string, unknown>).swap_ok as boolean) : null,
     eidsPropertyNo: str(p.eids_property_no),
     authorityDocNo: str(p.authority_doc_no),
     authorityEidsStatus: str(p.authority_eids_status),

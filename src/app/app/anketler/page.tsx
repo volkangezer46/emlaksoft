@@ -43,6 +43,8 @@ import {
 import { SurveyNav, SurveyNotReady } from "./survey-nav";
 import { SonucView } from "./sonuc-view";
 import { FilterChip } from "@/components/ui/filter-chip";
+import { ListPager } from "@/components/ui/list-kit/list-pager";
+import { pageWindow, parsePage } from "@/components/ui/list-kit/list-logic";
 import { LowScoreCloseForm } from "./low-score-close-form";
 
 const PAGE_SIZE = 20;
@@ -255,7 +257,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     danisman: one(sp.danisman),
     ay: one(sp.ay),
     takip: one(sp.takip),
-    page: one(sp.page),
+    sayfa: one(sp.sayfa),
   };
   const olay = isSurveyEventType(params.olay) ? params.olay : "";
   const group = AUDIENCE_GROUPS.find((g) => g.id === params.kitle) ?? null;
@@ -282,9 +284,8 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     if (takip === "kapanan" && !(t.status === "completed" && isLowScore(t.score, settings.low_score_max) && t.low_score_handled === true)) return false;
     return true;
   });
-  const page = Math.max(1, Number.parseInt(String(params.page ?? "1"), 10) || 1);
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const current = Math.min(page, pageCount);
+  const current = Math.min(parsePage(params.sayfa), pageCount);
   const rows = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
   const answerMap = new Map<string, { label: string; value: string }[]>();
@@ -313,7 +314,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     for (const f of (follow ?? []) as FollowRow[]) followMap.set(String(f.id), f);
   }
 
-  const link = (patch: ParamRecord) => buildHref(BASE, mergeParams(params, { page: "", ...patch }));
+  const link = (patch: ParamRecord) => buildHref(BASE, mergeParams(params, { sayfa: "", ...patch }));
   const clearAll = { olay: "", kitle: "", muhatap: "", durum: "", puan: "", neden: "", danisman: "", ay: "", takip: "" };
   const chips: { label: string; clear: string }[] = [];
   if (olay) chips.push({ label: EVENT_LABELS[olay], clear: link({ olay: "" }) });
@@ -519,15 +520,9 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
               <h2 className="font-display font-bold text-ink-950">Anket listesi</h2>
               <span className="text-xs text-text-muted">{filtered.length} kayıt</span>
               <div className="ml-auto flex flex-wrap gap-1.5">
-                {/* Danger tonlu çip için yeni FilterChip varyantı açılmadı: mevcut sınıflar + dokunma hedefi. */}
-                <Link
-                  href={link({ takip: takip === "acik" ? "" : "acik" })}
-                  className={`focus-ring inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition touch:min-h-11 ${
-                    takip === "acik" ? "border-danger-500 bg-danger-500 text-white" : "border-line text-text-muted hover:border-danger-500/60"
-                  }`}
-                >
+                <FilterChip href={link({ takip: takip === "acik" ? "" : "acik" })} active={takip === "acik"} tone="danger">
                   Açık düşük puan ({lowOpen.length})
-                </Link>
+                </FilterChip>
                 <FilterChip href={link({ takip: takip === "kapanan" ? "" : "kapanan" })} active={takip === "kapanan"}>
                   Kapanış raporu ({lowClosed.length})
                 </FilterChip>
@@ -641,27 +636,9 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
               </ul>
             )}
 
-            {pageCount > 1 ? (
-              <nav aria-label="Sayfalama" className="mt-4 flex items-center justify-between text-sm">
-                {current > 1 ? (
-                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current - 1) }))} className="focus-ring inline-flex items-center rounded-[var(--radius-control)] font-semibold text-brand-700 touch:min-h-11 touch:px-2">
-                    ← Önceki
-                  </Link>
-                ) : (
-                  <span />
-                )}
-                <span className="text-text-muted">
-                  Sayfa {current} / {pageCount}
-                </span>
-                {current < pageCount ? (
-                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current + 1) }))} className="focus-ring inline-flex items-center rounded-[var(--radius-control)] font-semibold text-brand-700 touch:min-h-11 touch:px-2">
-                    Sonraki →
-                  </Link>
-                ) : (
-                  <span />
-                )}
-              </nav>
-            ) : null}
+            <div className="mt-4">
+              <ListPager pathname={BASE} params={params} window={pageWindow(current, filtered.length, PAGE_SIZE, rows.length)} total={filtered.length} />
+            </div>
           </section>
         </>
       )}

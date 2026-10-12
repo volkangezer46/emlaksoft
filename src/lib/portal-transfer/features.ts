@@ -38,6 +38,7 @@ export const PORTAL_FEATURES: readonly PortalFeatureDef[] = [
   { key: "site_name", label: "Site adı", kind: "text", max: 80 },
   { key: "dues", label: "Aidat (TL)", kind: "decimal", max: 10_000_000 },
   { key: "credit_eligible", label: "Krediye uygun", kind: "bool" },
+  { key: "swap_ok", label: "Takasa uygun", kind: "bool" },
   { key: "currency", label: "Para birimi", kind: "enum", options: CURRENCY_OPTIONS },
 ];
 

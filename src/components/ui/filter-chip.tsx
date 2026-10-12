@@ -9,20 +9,27 @@ import { cn } from "@/lib/utils";
  * kök yazı boyutundan bağımsız piksele sabitler), odak halkası ve basma geri bildirimi tabandan gelir.
  *  - `href` verilirse bağlantıdır (sunucu filtresi: değer URL'de); seçili çipe `aria-current="page"` otomatik verilir.
  *  - `href` yoksa düğmedir (istemci durumu); seçili çipe `aria-pressed` verilir.
+ *  - `tone="danger"`: dikkat gerektiren filtre (ör. açık düşük puan); token tabanlı (`danger-*`), seçiliyken dolgulu.
  * Çipe tıklanabilir ikinci öğe (sayaç vb.) KOYMA; sayaç için `count` kullan.
  */
-export function filterChipClass({ active = false, className }: { active?: boolean; className?: string } = {}) {
+export type FilterChipTone = "default" | "danger";
+
+export function filterChipClass({ active = false, tone = "default", className }: { active?: boolean; tone?: FilterChipTone; className?: string } = {}) {
   return cn(
     "focus-ring press inline-flex min-h-8 touch:min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition",
-    active
-      ? "border-ink-950 bg-ink-950 text-white"
-      : "border-line bg-surface text-ink-950 hover:bg-surface-hover",
+    tone === "danger"
+      ? active
+        ? "border-danger-500 bg-danger-500 text-white"
+        : "tone-danger border-transparent hover:border-danger-500"
+      : active
+        ? "border-ink-950 bg-ink-950 text-white"
+        : "border-line bg-surface text-ink-950 hover:bg-surface-hover",
     className,
   );
 }
 
-type LinkChipProps = { active?: boolean; count?: number | string | null } & ComponentProps<typeof Link>;
-type ButtonChipProps = { active?: boolean; count?: number | string | null; href?: undefined } & ComponentProps<"button">;
+type LinkChipProps = { active?: boolean; tone?: FilterChipTone; count?: number | string | null } & ComponentProps<typeof Link>;
+type ButtonChipProps = { active?: boolean; tone?: FilterChipTone; count?: number | string | null; href?: undefined } & ComponentProps<"button">;
 
 function Count({ value, active }: { value: number | string | null | undefined; active: boolean }) {
   if (value === null || value === undefined || value === "") return null;
@@ -35,17 +42,17 @@ function Count({ value, active }: { value: number | string | null | undefined; a
 
 export function FilterChip(props: LinkChipProps | ButtonChipProps) {
   if ("href" in props && props.href !== undefined) {
-    const { active = false, count, className, children, ...rest } = props as LinkChipProps;
+    const { active = false, tone, count, className, children, ...rest } = props as LinkChipProps;
     return (
-      <Link aria-current={active ? "page" : undefined} className={filterChipClass({ active, className })} {...rest}>
+      <Link aria-current={active ? "page" : undefined} className={filterChipClass({ active, tone, className })} {...rest}>
         {children}
         <Count value={count} active={active} />
       </Link>
     );
   }
-  const { active = false, count, className, children, type = "button", ...rest } = props as ButtonChipProps;
+  const { active = false, tone, count, className, children, type = "button", ...rest } = props as ButtonChipProps;
   return (
-    <button type={type} aria-pressed={active} className={filterChipClass({ active, className })} {...rest}>
+    <button type={type} aria-pressed={active} className={filterChipClass({ active, tone, className })} {...rest}>
       {children}
       <Count value={count} active={active} />
     </button>
