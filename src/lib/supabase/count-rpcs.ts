@@ -1,6 +1,6 @@
 /**
  * Liste sayfası KPI sayımları için tek-tur RPC'ler (portfolio_counts / task_counts).
- * Migration: supabase/migrations/20261012001700_portfolio_counts_rpc.sql (SECURITY INVOKER → RLS çağıranın yetkisiyle).
+ * Migration: supabase/migrations/20261012002200_portfolio_counts_rpc.sql (SECURITY INVOKER → RLS çağıranın yetkisiyle).
  * RPC yoksa/hata verirse `null` döner; çağıran eski head-count sorgularına düşer (rpc-probe deseni). Sahte sıfır üretilmez.
  */
 import type { ScopeFilter } from "@/lib/access-control/query-scope";
@@ -110,7 +110,7 @@ export function loadTaskCounts(
   }, parseTaskCounts);
 }
 
-// ---- Detay sayfası okuma RPC'leri (20261012001720_detail_read_rpcs.sql) --------------------------------------------
+// ---- Detay sayfası okuma RPC'leri (20261012002220_detail_read_rpcs.sql) --------------------------------------------
 
 export const DEAL_SIDE_READS_RPC = "deal_side_reads";
 export const PROPERTY_REGION_DAYS_RPC = "property_region_days";

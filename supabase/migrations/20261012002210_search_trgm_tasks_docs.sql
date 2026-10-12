@@ -1,7 +1,7 @@
--- MIGRATION 20261012001710_search_trgm_tasks_docs.sql
+-- MIGRATION 20261012002210_search_trgm_tasks_docs.sql
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
--- `npm run db:migrate -- --only 20261012001710_search_trgm_tasks_docs.sql` ile uygular.
--- Geri alma: supabase/rollbacks/20261012001710_search_trgm_tasks_docs.rollback.sql
+-- `npm run db:migrate -- --only 20261012002210_search_trgm_tasks_docs.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20261012002210_search_trgm_tasks_docs.rollback.sql
 -- BAGIMLILIK: pg_trgm eklentisi (`public.gin_trgm_ops`; 20261010000200 ile ayni), public.tasks, public.customer_files,
 --   public.property_media, public.contracts, public.deal_checklist_items.
 --

@@ -1,7 +1,7 @@
--- MIGRATION 20261012001720_detail_read_rpcs.sql
+-- MIGRATION 20261012002220_detail_read_rpcs.sql
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
--- `npm run db:migrate -- --only 20261012001720_detail_read_rpcs.sql` ile uygular.
--- Geri alma: supabase/rollbacks/20261012001720_detail_read_rpcs.rollback.sql
+-- `npm run db:migrate -- --only 20261012002220_detail_read_rpcs.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20261012002220_detail_read_rpcs.rollback.sql
 -- BAGIMLILIK: public.deals, public.offers, public.appointments, public.properties, public.region_stats_history,
 --   public.current_tenant_id().
 --

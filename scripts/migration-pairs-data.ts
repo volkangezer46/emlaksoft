@@ -276,9 +276,9 @@ const F = {
   // ARGE-1 (2026-10-12): arama/iletisim kaydi girilince call_priority onerisi aninda kapanir (SECURITY DEFINER RPC; yalniz valid_until).
   insightCloseOnContact: "20261012001600_insight_close_on_contact.sql",
   // HIZ (2026-10-12): liste sayimlari tek RPC (portfolio_counts/task_counts), gorev+belge trigram indeksleri, detay okuma RPC'leri.
-  portfolioCountsRpc: "20261012001700_portfolio_counts_rpc.sql",
-  searchTrgmTasksDocs: "20261012001710_search_trgm_tasks_docs.sql",
-  detailReadRpcs: "20261012001720_detail_read_rpcs.sql",
+  portfolioCountsRpc: "20261012002200_portfolio_counts_rpc.sql",
+  searchTrgmTasksDocs: "20261012002210_search_trgm_tasks_docs.sql",
+  detailReadRpcs: "20261012002220_detail_read_rpcs.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",

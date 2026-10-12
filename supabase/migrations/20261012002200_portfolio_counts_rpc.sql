@@ -1,7 +1,7 @@
--- MIGRATION 20261012001700_portfolio_counts_rpc.sql
+-- MIGRATION 20261012002200_portfolio_counts_rpc.sql
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
--- `npm run db:migrate -- --only 20261012001700_portfolio_counts_rpc.sql` ile uygular.
--- Geri alma: supabase/rollbacks/20261012001700_portfolio_counts_rpc.rollback.sql
+-- `npm run db:migrate -- --only 20261012002200_portfolio_counts_rpc.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20261012002200_portfolio_counts_rpc.rollback.sql
 -- BAGIMLILIK: public.properties, public.tasks, public.current_tenant_id().
 --
 -- AMAC (HIZ-1): /app/portfoyler her acilista ayni properties tablosuna 10 ayri head-count turu atiyordu
