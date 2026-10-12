@@ -49,7 +49,34 @@ export default function GizlilikPage() {
         </p>
       </LegalSection>
 
-      <LegalSection no="5." title="İletişim">
+      <LegalSection no="5." title="EmlakSoft İlan Kontrol Tarayıcı Eklentisi">
+        <p>
+          Eklenti yalnız EmlakSoft hesabına bağlanan ofis kullanıcıları içindir ve yalnız aşağıdaki iki iş için veri işler:
+        </p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <b>İlan kontrolü:</b> Ofisinizin EmlakSoft&apos;taki portföy ilanlarının bağlantıları, sahibinden, Hepsiemlak ve
+            Emlakjet sayfalarında sizin tarayıcınızda, düşük hızla açılır; ilanın yayında olup olmadığı, fiyatı ve başlığı
+            okunup yalnız ofisinizin EmlakSoft hesabına gönderilir.
+          </li>
+          <li>
+            <b>Sahibinden ilan kaydı:</b> Yalnız siz eklenti düğmesine bastığınızda, yalnız açık sekmedeki ilanın başlığı,
+            fiyatı, metrekaresi, konumu ve ilanda görünen ilan sahibi adı okunur; size gösterilir, siz onaylayınca
+            kaydedilir. Telefon numarası yalnız ilanda zaten görünüyorsa ve onay kutusunu işaretlerseniz eklenir; eklenti
+            &quot;numarayı göster&quot; düğmesine basmaz.
+          </li>
+        </ul>
+        <p>
+          Eklenti tarama geçmişinizi, diğer sitelerdeki gezinmenizi, şifrelerinizi veya ödeme bilgilerinizi okumaz ve
+          toplamaz. Tarayıcıda yalnız ayarlarınız, EmlakSoft bağlantı anahtarı ve bekleyen işler kuyruğu saklanır. Veriler
+          yalnız EmlakSoft sunucularına (TLS ile) gönderilir; satılmaz, reklam için kullanılmaz ve üçüncü taraflarla
+          paylaşılmaz. Portföye dönüşmeyen sahibinden ilan kayıtlarındaki kişisel bilgiler ofisin belirlediği süre
+          (varsayılan 90 gün) sonunda silinir; &quot;aranmasın&quot; listesinde yalnız telefon numarasının takma adlı özeti
+          tutulur. Eklentiyi Chrome&apos;dan kaldırmanız veya EmlakSoft&apos;taki bağlantıyı kesmeniz veri akışını durdurur.
+        </p>
+      </LegalSection>
+
+      <LegalSection no="6." title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için:{" "}
           <a className="font-semibold text-brand-600" href="mailto:destek@emlaksoft.app">destek@emlaksoft.app</a>
