@@ -43,6 +43,7 @@ const ROUTES: ReadonlyArray<readonly [string, FeatureKey]> = [
   ["/app/ayarlar/is-akislari", "automation"],
   ["/app/belgeler", "documents"],
   ["/app/asistan", "ai_assistant"],
+  ["/app/portfoy-avi", "prospecting"],
   ["/app/ofis-merkezi", "office_center"],
 ];
 
