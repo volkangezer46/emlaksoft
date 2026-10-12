@@ -1,10 +1,10 @@
 import { dealTypeLabel } from "@/lib/deal-type-label";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { Table, TableFrame, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { StatRow } from "@/components/ui/stat-row";
 import Link from "@/components/ui/smart-link";
 import {
-  ArrowUpRight,
   Gauge,
   Hourglass,
   MessageSquareQuote,
@@ -132,10 +132,11 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
   const detractors = combined?.detractors ?? 0;
 
   // Danışman bazlı tablo — yalnız cevaplanan anketler puana girer.
-  const byAgent = new Map<string, { name: string; total: number; scores: number[] }>();
+  const byAgent = new Map<string, { id: string; name: string; total: number; scores: number[] }>();
   for (const s of rows) {
     const key = (s.agent_id as string | null) ?? "-";
     const cur = byAgent.get(key) ?? {
+      id: key,
       name: key === "-" ? "Atanmamış" : (agentName.get(key) ?? "Danışman"),
       total: 0,
       scores: [],
@@ -161,67 +162,52 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-text-muted">
-        Kapanış sonrası 0-10 puan anketi · NPS = %destekleyen (9-10) − %kötüleyen (0-6). Anketörün telefonla aldığı kapanış cevapları da bu sayılara dahildir.
-      </p>
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        {[
+      <details className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2 text-xs text-text-muted">
+        <summary className="focus-ring cursor-pointer font-semibold text-ink-950 touch:min-h-11 touch:py-2.5">Nasıl hesaplanır?</summary>
+        <p className="mt-2">
+          Kapanış sonrası 0-10 puan anketi · NPS = %destekleyen (9-10) − %kötüleyen (0-6). Anketörün telefonla aldığı kapanış cevapları da bu sayılara dahildir.
+        </p>
+      </details>
+      <StatRow
+        label="Memnuniyet özeti"
+        items={[
           {
             label: "NPS skoru",
             value: nps === null ? "—" : String(nps),
-            sub: nps === null ? "Henüz yanıt yok" : `${promoters} destekleyen · ${passives} pasif · ${detractors} kötüleyen`,
-            icon: Gauge,
-            tone: npsTone,
-            href: "#danisman",
+            hint: nps === null ? "Henüz yanıt yok" : `${promoters} destekleyen · ${passives} pasif · ${detractors} kötüleyen`,
+            icon: <Gauge className="h-4 w-4" aria-hidden="true" />,
+            href: "/app/anketler?durum=tamamlandi#kitle",
           },
           {
             label: "Memnuniyet (CSAT)",
             value: combined ? `%${combined.csat}` : "—",
-            sub: combined ? `${combined.n} cevap · 7-10 veren oranı` : "Henüz yanıt yok",
-            icon: Smile,
-            tone: "text-[color:var(--viz-pos)]",
-            href: "/app/anketler#kitle",
+            hint: combined ? `${combined.n} cevap · 7-10 veren oranı` : "Henüz yanıt yok",
+            icon: <Smile className="h-4 w-4" aria-hidden="true" />,
+            href: "/app/anketler?durum=tamamlandi#liste",
           },
           {
             label: "Yanıt oranı",
             value: responseRate === null ? "—" : `%${responseRate}`,
-            sub: `${answered.length} yanıt / ${rows.length} kapanış anketi`,
-            icon: Send,
-            tone: "text-accent-text",
-            href: "#bekleyen",
+            hint: `${answered.length} yanıt / ${rows.length} kapanış anketi`,
+            icon: <Send className="h-4 w-4" aria-hidden="true" />,
+            href: "/app/anketler?durum=kapanan",
           },
           {
             label: "Ortalama puan",
             value: avg === null ? "—" : avg.toLocaleString("tr-TR"),
-            sub: "0-10 ölçeği",
-            icon: Star,
-            tone: "text-amber-700",
-            href: "#yorumlar",
+            hint: "0-10 ölçeği",
+            icon: <Star className="h-4 w-4" aria-hidden="true" />,
+            href: "/app/anketler?durum=tamamlandi#liste",
           },
           {
             label: "Bekleyen anket",
             value: String(pending.length),
-            sub: "Linki iletilmeyi bekliyor",
-            icon: Hourglass,
-            tone: "text-[color:var(--viz-pos)]",
-            href: "#bekleyen",
+            hint: "Linki iletilmeyi bekliyor",
+            icon: <Hourglass className="h-4 w-4" aria-hidden="true" />,
+            href: "/app/anketler/kuyruk?durum=bekleyen",
           },
-        ].map((k) => (
-          <a
-            key={k.label}
-            href={k.href}
-            className="focus-ring press lift group block rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] transition hover:border-border-interactive"
-          >
-            <span className="flex items-start justify-between">
-              <k.icon className={`h-4 w-4 ${k.tone}`} />
-              <ArrowUpRight className="hover-action h-4 w-4 text-text-faint opacity-0 transition group-hover:text-accent-text group-hover:opacity-100" />
-            </span>
-            <p className={`numeric mt-2 font-display text-xl font-extrabold ${k.label === "NPS skoru" ? k.tone : "text-text"}`}>{k.value}</p>
-            <p className="text-xs font-medium text-text-muted">{k.label}</p>
-            <p className="mt-0.5 text-xs text-text-faint">{k.sub}</p>
-          </a>
-        ))}
-      </div>
+        ]}
+      />
 
       {/* Anket oluştur — kapanan ve anketi olmayan anlaşmalar */}
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -284,7 +270,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
               Henüz anket yok. Kapanan anlaşmalardan anket üretince danışman kırılımı burada oluşur.
             </p>
           ) : (
-            <div className="mt-4 overflow-x-auto">
+            <TableFrame className="mt-4" minWidth={420}>
               <Table className="w-full text-sm">
                 <THead>
                   <TR className="border-b border-line text-left text-xs font-bold uppercase tracking-[0.08em] text-text-muted">
@@ -299,7 +285,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                     const aNps = npsOf(a.scores);
                     const aAvg = avgOf(a.scores);
                     return (
-                      <TR key={a.name} className="border-b border-line/60 last:border-0">
+                      <TR key={a.id}className="border-b border-line/60 last:border-0">
                         <TD className="py-2.5 pr-3 font-semibold text-text">{a.name}</TD>
                         <TD className="py-2.5 pr-3 text-right tabular-nums text-text-muted">
                           {a.scores.length}/{a.total}
@@ -325,7 +311,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                   })}
                 </TBody>
               </Table>
-            </div>
+            </TableFrame>
           )}
         </section>
 
@@ -383,7 +369,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
             {comments.map((s) => {
               const cust = rel(s.customer as Rel);
               return (
-                <li key={String(s.id)} className="rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
+                <li key={String(s.id)} className="min-w-0 rounded-[var(--radius-card)] border border-line bg-canvas/60 p-4">
                   <div className="flex items-center gap-3">
                     <ScoreBadge score={Number(s.score)} />
                     <div className="min-w-0">
@@ -399,7 +385,7 @@ export async function SonucView({ perms }: { perms: EffectivePermissions }) {
                       </p>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm leading-relaxed text-text-muted">
+                  <p className="mt-3 break-words text-sm leading-relaxed text-text-muted">
                     &ldquo;{String(s.comment)}&rdquo;
                   </p>
                 </li>

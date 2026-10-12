@@ -40,7 +40,7 @@ export function SurveyNotReady() {
   return (
     <Alert tone="warning" title="Anket modülü bu ortamda henüz etkin değil">
       Anketör kuyruğu için gereken veritabanı tabloları bu ortamda oluşturulmamış. Veritabanı güncellemesi uygulanana kadar
-      bu bölüm kullanılamaz; mevcut müşteri memnuniyet anketi (Raporlar &gt; Memnuniyet) ve bağlı anket linkleri aynen çalışmaya devam eder.
+      bu bölüm kullanılamaz; mevcut müşteri memnuniyet anketi (Anketler &gt; Sonuçlar) ve bağlı anket linkleri aynen çalışmaya devam eder.
     </Alert>
   );
 }

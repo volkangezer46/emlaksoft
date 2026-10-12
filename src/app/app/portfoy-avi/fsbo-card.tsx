@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { ArrowDownRight, CalendarPlus, ExternalLink, Home, ListPlus, NotebookPen, Phone, PhoneOff, Repeat, UserCheck, XCircle } from "lucide-react";
+import { ArrowDownRight, CalendarPlus, ExternalLink, Home, ListPlus, MoreHorizontal, NotebookPen, Phone, PhoneOff, Repeat, UserCheck, UserPlus, XCircle } from "lucide-react";
 import { buttonClass, Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { PersonSelect, type PersonOption } from "@/components/ui/person-select";
 import { StatusPill } from "@/components/ui/list-kit";
@@ -65,6 +66,7 @@ export function FsboCard({
   const [panel, setPanel] = useState<Panel>(null);
   const [outcome, setOutcome] = useState<string>("gorusuldu");
   const [assignee, setAssignee] = useState<string>(data.assignedTo ?? "");
+  const [dncOpen, setDncOpen] = useState(false);
   const closed = data.status === "portfoye_donustu";
   const locked = data.doNotCall || closed;
   const lostLike = data.status === "kayip";
@@ -86,6 +88,34 @@ export function FsboCard({
 
   const toggle = (p: Exclude<Panel, null>) => setPanel((cur) => (cur === p ? null : p));
 
+  // "Diğer" menüsü koşulları (önceki görünür düğmelerle aynı yetki koşulları).
+  const showWork = canEdit && !locked && !lostLike;
+  const showAppointment = showWork && data.hasPhone;
+  const showConvert = canConvert && !closed && !lostLike && !data.doNotCall;
+  const showLost = canEdit && !closed && !lostLike;
+  const showDnc = canEdit && !closed && !data.doNotCall && data.hasPhone;
+  const showAssign = isManager && canEdit && !closed;
+  const hasMenu = showWork || showConvert || showLost || showDnc || showAssign || !!data.url;
+
+  // Rozetler: en çok 2 görünür, kalanı "+N"; "Aranmasın" ve durum rozeti her zaman görünür, sayıma girmez.
+  const badges: { key: string; label: string; node: ReactNode }[] = [];
+  if (data.dropText) {
+    badges.push({
+      key: "drop",
+      label: `Fiyat düştü ${data.dropText}`,
+      node: (
+        <StatusPill key="drop" tone="success" dot={false} title="Fiyat düştü">
+          <ArrowDownRight aria-hidden="true" className="mr-0.5 h-3 w-3" />
+          {data.dropText}
+        </StatusPill>
+      ),
+    });
+  }
+  if (data.relist) badges.push({ key: "relist", label: "Tekrar ilan", node: <StatusPill key="relist" tone="warning" dot={false}>Tekrar ilan</StatusPill> });
+  if (data.isSample) badges.push({ key: "sample", label: "Örnek", node: <StatusPill key="sample" tone="neutral" dot={false}>Örnek</StatusPill> });
+  const shownBadges = badges.slice(0, 2);
+  const hiddenBadges = badges.slice(2);
+
   return (
     <article className="surface-card rounded-[var(--radius-panel)] p-4" aria-label={data.title}>
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -101,21 +131,19 @@ export function FsboCard({
         <div className="flex flex-wrap items-center gap-1.5">
           <StatusPill tone={closed ? "success" : lostLike ? "neutral" : data.status === "yeni" ? "info" : "warning"}>
             {STATUS_LABELS[data.status]}
-            {lostLike && data.lostReason ? ` · ${LOST_REASON_LABELS[data.lostReason as keyof typeof LOST_REASON_LABELS] ?? data.lostReason}` : ""}
           </StatusPill>
-          {data.dropText ? (
-            <StatusPill tone="success" dot={false} title="Fiyat düştü">
-              <ArrowDownRight aria-hidden="true" className="mr-0.5 h-3 w-3" />
-              {data.dropText}
+          {shownBadges.map((b) => b.node)}
+          {hiddenBadges.length > 0 ? (
+            <StatusPill tone="neutral" dot={false} title={hiddenBadges.map((b) => b.label).join(", ")}>
+              +{hiddenBadges.length}
+              <span className="sr-only"> rozet daha: {hiddenBadges.map((b) => b.label).join(", ")}</span>
             </StatusPill>
           ) : null}
-          {data.relist ? <StatusPill tone="warning" dot={false}>Tekrar ilan</StatusPill> : null}
           {data.doNotCall ? <StatusPill tone="danger">Aranmasın</StatusPill> : null}
-          {data.isSample ? <StatusPill tone="neutral" dot={false}>Örnek</StatusPill> : null}
         </div>
       </div>
 
-      <dl className="mt-3 grid gap-x-4 gap-y-1 text-xs sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs lg:grid-cols-4">
         <div><dt className="text-text-muted">Fiyat</dt><dd className="numeric font-semibold text-ink-950">{data.priceText}</dd></div>
         <div><dt className="text-text-muted">İlan yaşı</dt><dd className="font-medium text-ink-950">{data.ageText}</dd></div>
         <div><dt className="text-text-muted">Son temas</dt><dd className="font-medium text-ink-950">{data.lastContactText}</dd></div>
@@ -124,11 +152,18 @@ export function FsboCard({
           <dd className={`font-medium ${data.overdue ? "text-danger-500" : "text-ink-950"}`}>{data.nextText}</dd>
         </div>
       </dl>
-      <p className="mt-2 text-xs text-text-muted">
-        {data.assigneeName ? `Danışman: ${data.assigneeName}` : "Sahipsiz (ilk dokunan sahiplenir)"}
-        {data.ownerName ? ` · ${data.ownerName}` : ""}
-        {data.phoneDisplay ? ` · ${data.phoneDisplay}` : data.piiPurged ? " · Kişisel veri saklama süresi doldu" : ""}
-      </p>
+      <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-2">
+        <div className="min-w-0 break-words">
+          <dt className="sr-only">Danışman</dt>
+          <dd className="text-text-muted">{data.assigneeName ? `Danışman: ${data.assigneeName}` : "Sahipsiz (ilk dokunan sahiplenir)"}</dd>
+        </div>
+        <div className="min-w-0 break-words">
+          <dt className="sr-only">İlan sahibi ve telefon</dt>
+          <dd className="text-text-muted">
+            {[data.ownerName, data.phoneDisplay ?? (data.piiPurged ? "Kişisel veri saklama süresi doldu" : null)].filter(Boolean).join(" · ") || "İletişim bilgisi yok"}
+          </dd>
+        </div>
+      </dl>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {canEdit && !locked && !lostLike && data.phoneTel ? (
@@ -141,36 +176,72 @@ export function FsboCard({
             <Button size={SMALL} variant="outline" icon={Phone} onClick={() => toggle("call")} aria-expanded={panel === "call"}>Sonuç kaydet</Button>
             <Button size={SMALL} variant="outline" icon={NotebookPen} onClick={() => toggle("note")} aria-expanded={panel === "note"}>Not</Button>
             <Button size={SMALL} variant="outline" icon={ListPlus} onClick={() => toggle("task")} aria-expanded={panel === "task"}>Görev</Button>
-            {data.hasPhone ? (
-              <Button
-                size={SMALL}
-                variant="outline"
-                icon={CalendarPlus}
-                loading={pending}
-                onClick={() => run(() => startFsboAppointment({ id: data.id }), "Satıcı müşteri kaydı hazır; randevu formu açılıyor.", (r) => r.href && router.push(r.href))}
-              >
-                Randevu
-              </Button>
-            ) : null}
-            <Button size={SMALL} variant="outline" icon={UserCheck} onClick={() => toggle("yetki")} aria-expanded={panel === "yetki"}>Yetki alındı</Button>
           </>
-        ) : null}
-        {canConvert && !closed && !lostLike && !data.doNotCall ? (
-          <Link href={`/app/portfoyler/yeni?fsbo=${data.id}`} className={buttonClass({ variant: "navy", size: SMALL })}>
-            <Home aria-hidden="true" className="h-3.5 w-3.5" /> Portföye dönüştür
-          </Link>
         ) : null}
         {canEdit && lostLike && !data.doNotCall ? (
           <Button size={SMALL} variant="outline" icon={Repeat} loading={pending} onClick={() => run(() => changeFsboStatus({ id: data.id, to: "yeni" }), "Kayıt yeniden açıldı.")}>
             Yeniden dene
           </Button>
         ) : null}
-        {canEdit && !closed && !lostLike ? (
-          <Button size={SMALL} variant="ghost" icon={XCircle} onClick={() => toggle("lost")} aria-expanded={panel === "lost"}>Kayıp</Button>
+        {canDelete && isManager && data.doNotCall ? (
+          <Button size={SMALL} variant="ghost" loading={pending} onClick={() => run(() => removeFsboDoNotCall({ id: data.id }), "Aranmasın kaydı kaldırıldı.")}>
+            Aranmasın kaydını kaldır
+          </Button>
         ) : null}
-        {canEdit && !closed && !data.doNotCall && data.hasPhone ? (
+        {hasMenu ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size={SMALL} variant="outline" icon={MoreHorizontal} aria-label="Diğer eylemler" aria-haspopup="menu">Diğer</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent aria-label="Diğer eylemler">
+              {showAppointment ? (
+                <DropdownMenuItem
+                  onSelect={() => run(() => startFsboAppointment({ id: data.id }), "Satıcı müşteri kaydı hazır; randevu formu açılıyor.", (r) => r.href && router.push(r.href))}
+                >
+                  <CalendarPlus aria-hidden="true" /> Randevu
+                </DropdownMenuItem>
+              ) : null}
+              {showWork ? (
+                <DropdownMenuItem onSelect={() => setPanel("yetki")}>
+                  <UserCheck aria-hidden="true" /> Yetki alındı
+                </DropdownMenuItem>
+              ) : null}
+              {showConvert ? (
+                <DropdownMenuItem asChild>
+                  <Link href={`/app/portfoyler/yeni?fsbo=${data.id}`}>
+                    <Home aria-hidden="true" /> Portföye dönüştür
+                  </Link>
+                </DropdownMenuItem>
+              ) : null}
+              {showLost ? (
+                <DropdownMenuItem onSelect={() => setPanel("lost")}>
+                  <XCircle aria-hidden="true" /> Kayıp
+                </DropdownMenuItem>
+              ) : null}
+              {showDnc ? (
+                <DropdownMenuItem danger onSelect={() => setDncOpen(true)}>
+                  <PhoneOff aria-hidden="true" /> Aranmasın
+                </DropdownMenuItem>
+              ) : null}
+              {showAssign ? (
+                <DropdownMenuItem onSelect={() => setPanel("assign")}>
+                  <UserPlus aria-hidden="true" /> Danışman ata
+                </DropdownMenuItem>
+              ) : null}
+              {data.url ? (
+                <DropdownMenuItem asChild>
+                  <a href={data.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink aria-hidden="true" /> İlanı aç
+                  </a>
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        {showDnc ? (
           <ConfirmDialog
-            trigger={<Button size={SMALL} variant="ghost" icon={PhoneOff} loading={pending}>Aranmasın</Button>}
+            open={dncOpen}
+            onOpenChange={setDncOpen}
             title="Aranmasın olarak işaretle"
             description="Bu numara ofisinizin tüm danışmanları için aranmasın olarak işaretlenecek. Numaranın kendisi saklanmaz; yalnız eşleşme için şifreli özeti tutulur. Geri almak yalnız yöneticinin yetkisindedir."
             confirmLabel="Aranmasın olarak işaretle"
@@ -178,19 +249,6 @@ export function FsboCard({
               run(() => markFsboDoNotCall({ id: data.id }), "Numara aranmasın olarak işaretlendi.");
             }}
           />
-        ) : null}
-        {canDelete && isManager && data.doNotCall ? (
-          <Button size={SMALL} variant="ghost" loading={pending} onClick={() => run(() => removeFsboDoNotCall({ id: data.id }), "Aranmasın kaydı kaldırıldı.")}>
-            Aranmasın kaydını kaldır
-          </Button>
-        ) : null}
-        {isManager && canEdit && !closed ? (
-          <Button size={SMALL} variant="ghost" onClick={() => toggle("assign")} aria-expanded={panel === "assign"}>Danışman ata</Button>
-        ) : null}
-        {data.url ? (
-          <a href={data.url} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: SMALL })}>
-            <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" /> İlanı aç
-          </a>
         ) : null}
       </div>
 

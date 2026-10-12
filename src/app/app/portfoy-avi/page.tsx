@@ -46,6 +46,8 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
   const canCreate = perms.includes("create");
   const canEdit = perms.includes("edit");
   const canDelete = perms.includes("delete");
+  const canPortals = (ctx.perms.portals ?? []).includes("view");
+  const canProperties = (ctx.perms.properties ?? []).includes("view");
   const isManager = (MANAGER_ROLES as readonly string[]).includes(ctx.role);
   // Dönüştürme: portföy oluşturma yetkisi + çağrı merkezi hariç (sahip kararı).
   const canConvert = canEdit && ctx.role !== "call_center" && (ctx.perms.properties ?? []).includes("create");
@@ -135,15 +137,18 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
       <ListHero
         eyebrow="Portföy kazanımı"
         title="Sahibinden ilanlar"
-        description="Sahibinden ilan veren mal sahiplerini arayın: ilanı kaydedin, takip ritmiyle arayın, yetkiyi alıp portföye dönüştürün."
+        description="İlan sahiplerini arayın, yetkiyi alıp portföye dönüştürün."
         meta={<ScopeBadge text={listScope.badge} />}
         actions={canCreate ? <ButtonLink href="/app/portfoy-avi/yeni" icon={Plus}>Sahibinden ilan ekle</ButtonLink> : null}
       />
 
-      <p className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2 text-xs text-text-muted">
-        İlan sahibini arayabilirsiniz; toplu SMS/WhatsApp gönderemezsiniz. Kişi &apos;aramayın&apos; derse &apos;Aranmasın&apos;a ekleyin; numara ofisinizde bir daha aranmaz.
-        Portföye dönüşmeyen kayıtların kişisel bilgileri son etkinlikten {retentionDays} gün sonra silinir.
-      </p>
+      <details className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-2 text-xs text-text-muted">
+        <summary className="focus-ring cursor-pointer font-semibold text-ink-950 touch:min-h-11 touch:py-2.5">Arama kuralları ve kişisel veri saklama süresi</summary>
+        <p className="mt-2">
+          İlan sahibini arayabilirsiniz; toplu SMS/WhatsApp gönderemezsiniz. Kişi &apos;aramayın&apos; derse &apos;Aranmasın&apos;a ekleyin; numara ofisinizde bir daha aranmaz.
+          Portföye dönüşmeyen kayıtların kişisel bilgileri son etkinlikten {retentionDays} gün sonra silinir.
+        </p>
+      </details>
 
       {data.unavailable ? (
         <EmptyState
@@ -152,7 +157,7 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
           title="Sahibinden ilanlar henüz etkin değil"
           description="Bu özellik için gerekli veritabanı güncellemesi henüz uygulanmamış. Yöneticinize ya da destek ekibine bildirin."
           tone="brand"
-          action={{ href: "/app/portfoyler", label: "Portföylere git" }}
+          action={canProperties ? { href: "/app/portfoyler", label: "Portföylere git" } : undefined}
         />
       ) : (
         <>
@@ -204,12 +209,20 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
               title={emptyAll ? "Henüz sahibinden ilan kaydetmediniz" : "Bu filtrede ilan yok"}
               description={
                 emptyAll
-                  ? "Eklentiyi kurup açtığınız ilanı tek tıkla kaydedin ya da ilan bağlantısını yapıştırın. Kayıtlar takip ritmiyle size hatırlatılır."
+                  ? `Eklentiyi kurup açtığınız ilanı tek tıkla kaydedin ya da ilan bağlantısını yapıştırın. Kayıtlar takip ritmiyle size hatırlatılır.${canPortals ? "" : " Eklentiyi yöneticiniz kurar."}`
                   : "Arama ifadenizi ya da filtreleri değiştirip tekrar deneyin."
               }
               tone="brand"
-              action={emptyAll ? (canCreate ? { href: "/app/portfoy-avi/yeni", label: "İlan bağlantısı yapıştır" } : { href: "/app/portfoyler", label: "Portföylere git" }) : { href: PATH, label: "Filtreleri temizle" }}
-              secondary={emptyAll ? { href: "/app/ilan-kontrol/eklenti", label: "Eklentiyi kur" } : { href: `${PATH}?durum=tumu`, label: "Tüm kayıtları göster" }}
+              action={
+                emptyAll
+                  ? canCreate
+                    ? { href: "/app/portfoy-avi/yeni", label: "İlan bağlantısı yapıştır" }
+                    : canProperties
+                      ? { href: "/app/portfoyler", label: "Portföylere git" }
+                      : undefined
+                  : { href: PATH, label: "Filtreleri temizle" }
+              }
+              secondary={emptyAll ? (canPortals ? { href: "/app/ilan-kontrol/eklenti", label: "Eklentiyi kur" } : undefined) : { href: `${PATH}?durum=tumu`, label: "Tüm kayıtları göster" }}
             />
           ) : (
             <div className="space-y-2">

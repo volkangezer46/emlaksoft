@@ -368,18 +368,8 @@ export default async function KiralamaPage({
         title="Mülk yönetimi"
         eyebrow="Kiralar"
         description="Yönettiğiniz kiralık mülklerin kira, aidat ve mülk sahibi ödemeleri."
-        actions={
-          <>
-            <ButtonLink href="/app/kira-artis" variant="secondary" size="sm">
-              Kira artış hesaplayıcı
-            </ButtonLink>
-            {canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
-          </>
-        }
+        actions={canCreate ? <ButtonLink href="/app/kiralama/yeni" icon={Plus}>Yeni kira kaydı</ButtonLink> : null}
       />
-
-      <LateFeeCard initial={lateFeeData.settings} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={pmReady && lateFeeData.available} />
-      <ReminderSettingsCard initial={reminderSettings} smsAvailable={smsAvailable} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={reminderSchemaReady} />
 
       {rentals.length === 0 && rentalTotal === 0 ? (
         <EmptyState illustration="portfoy"
@@ -563,6 +553,19 @@ export default async function KiralamaPage({
           )}
 
           <ListPager pathname={PATH} params={urlParams} window={win} total={filtered.length} />
+
+          {canEdit && rentals.length > 0 ? (
+            <details className="group rounded-[var(--radius-card)] border border-line bg-surface">
+              <summary className="focus-ring flex cursor-pointer items-center justify-between gap-2 rounded-[var(--radius-card)] px-4 py-3 text-sm font-semibold text-ink-950 touch:min-h-11">
+                Gecikme faizi ve hatırlatmalar
+                <span className="text-xs font-medium text-text-muted group-open:hidden">Ayarları aç</span>
+              </summary>
+              <div className="space-y-4 border-t border-line p-4">
+                <LateFeeCard initial={lateFeeData.settings} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={pmReady && lateFeeData.available} />
+                <ReminderSettingsCard initial={reminderSettings} smsAvailable={smsAvailable} canEdit={canEdit && ["owner", "gm", "branch_manager"].includes(role)} schemaReady={reminderSchemaReady} />
+              </div>
+            </details>
+          ) : null}
         </>
       )}
     </ListPage>
