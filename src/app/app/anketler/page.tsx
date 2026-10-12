@@ -143,7 +143,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
     <PageHeader
       eyebrow="Anketler"
       title="Anket sonuçları"
-      description="Kapanış, yetki, gösterim, kira ve kayıp olaylarında sorulan anketler. 0-10 ölçeği; her sayı ilgili listeye gider."
+      description={sekme === "sonuc" ? "Müşteri memnuniyeti: NPS ve CSAT" : "Olay anketleri: 0-10 puan, her sayı listeye gider."}
     />
   );
 
@@ -519,39 +519,29 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
               <h2 className="font-display font-bold text-ink-950">Anket listesi</h2>
               <span className="text-xs text-text-muted">{filtered.length} kayıt</span>
               <div className="ml-auto flex flex-wrap gap-1.5">
+                {/* Danger tonlu çip için yeni FilterChip varyantı açılmadı: mevcut sınıflar + dokunma hedefi. */}
                 <Link
                   href={link({ takip: takip === "acik" ? "" : "acik" })}
-                  className={`focus-ring rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                  className={`focus-ring inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold transition touch:min-h-11 ${
                     takip === "acik" ? "border-danger-500 bg-danger-500 text-white" : "border-line text-text-muted hover:border-danger-500/60"
                   }`}
                 >
                   Açık düşük puan ({lowOpen.length})
                 </Link>
-                <Link
-                  href={link({ takip: takip === "kapanan" ? "" : "kapanan" })}
-                  className={`focus-ring rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-                    takip === "kapanan" ? "border-brand-600 bg-brand-600 text-white" : "border-line text-text-muted hover:border-brand-400"
-                  }`}
-                >
+                <FilterChip href={link({ takip: takip === "kapanan" ? "" : "kapanan" })} active={takip === "kapanan"}>
                   Kapanış raporu ({lowClosed.length})
-                </Link>
+                </FilterChip>
                 {SURVEY_EVENT_TYPES.filter((e) => e !== "advisor_pulse").map((e) => (
-                  <Link
-                    key={e}
-                    href={link({ olay: olay === e ? "" : e })}
-                    className={`focus-ring rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
-                      olay === e ? "border-brand-600 bg-brand-600 text-white" : "border-line text-text-muted hover:border-brand-400"
-                    }`}
-                  >
+                  <FilterChip key={e} href={link({ olay: olay === e ? "" : e })} active={olay === e}>
                     {EVENT_LABELS[e]}
-                  </Link>
+                  </FilterChip>
                 ))}
               </div>
             </div>
             {chips.length > 0 ? (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 {chips.map((c) => (
-                  <Link key={c.label} href={c.clear} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                  <Link key={c.label} href={c.clear} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-700 touch:min-h-11">
                     {c.label} <span aria-hidden="true">×</span>
                     <span className="sr-only">filtreyi kaldır</span>
                   </Link>
@@ -654,7 +644,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
             {pageCount > 1 ? (
               <nav aria-label="Sayfalama" className="mt-4 flex items-center justify-between text-sm">
                 {current > 1 ? (
-                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current - 1) }))} className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700">
+                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current - 1) }))} className="focus-ring inline-flex items-center rounded-[var(--radius-control)] font-semibold text-brand-700 touch:min-h-11 touch:px-2">
                     ← Önceki
                   </Link>
                 ) : (
@@ -664,7 +654,7 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
                   Sayfa {current} / {pageCount}
                 </span>
                 {current < pageCount ? (
-                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current + 1) }))} className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700">
+                  <Link href={buildHref(BASE, mergeParams(params, { page: String(current + 1) }))} className="focus-ring inline-flex items-center rounded-[var(--radius-control)] font-semibold text-brand-700 touch:min-h-11 touch:px-2">
                     Sonraki →
                   </Link>
                 ) : (
