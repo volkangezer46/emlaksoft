@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
     // yukarı yürüyor; bu makinede C:\Users\Laptop altında .pnpm/.pnpm-state
     // işaretçileri var, tespit belirsiz. __dirname burada mutlak yol döndüğü
     // doğrulandı (Next config CJS olarak yükleniyor).
-    root: __dirname,
+    root: "C:/Users/volka/Projects/emlaksoft",
   },
 
   // Uygulama kodu sharp kullanmıyor (filigran istemcide); Vercel görseli kendi altyapısında optimize eder.
