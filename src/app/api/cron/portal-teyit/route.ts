@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findRecentKeysByPrefix, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
-import { fetchAllPaged, heartbeatFor } from "@/lib/cron-run";
+import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { buildDedupeKey, timeBucket } from "@/lib/notify-dedupe";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
@@ -114,7 +114,7 @@ async function recentlyVerifiedListingIds(
   return out;
 }
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -210,3 +210,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: hb.status === "ok", notified, skippedRecent, failed: insertResult.failed, priceHealthUpdated });
 }
+
+export const GET = guardCron("portal-teyit", run);

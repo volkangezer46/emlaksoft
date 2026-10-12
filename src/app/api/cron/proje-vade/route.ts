@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
@@ -26,7 +27,7 @@ export const maxDuration = 300;
  * NOT: vercel.json'a bilerek DOKUNULMADI — cron path: /api/cron/proje-vade
  * (CRON_SECRET Bearer başlığıyla çağrılır).
  */
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -181,3 +182,5 @@ export async function GET(req: NextRequest) {
     releaseNotified: releaseNotifCount,
   });
 }
+
+export const GET = guardCron("proje-vade", run);

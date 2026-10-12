@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
@@ -75,7 +76,7 @@ function nextAnniversaryOf(startDate: string, today: string): string | null {
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -417,3 +418,5 @@ export async function GET(req: NextRequest) {
     reminders: reminders ? { office: reminders.office, sms: reminders.sms, skippedOptOut: reminders.skippedOptOut } : null,
   });
 }
+
+export const GET = guardCron("kira-tahakkuk", run);

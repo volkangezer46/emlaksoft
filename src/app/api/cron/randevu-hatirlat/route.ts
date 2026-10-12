@@ -4,7 +4,7 @@ import { findNotifiedIds, findNotifiedKeys, insertNotificationsDetailed, type No
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getBaseUrl } from "@/lib/base-url";
 import { authorizeCron } from "@/lib/cron-auth";
-import { fetchAllPaged, heartbeatFor } from "@/lib/cron-run";
+import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
 import { formatDateTimeTr } from "@/lib/format";
 import { runWebhookRetries } from "@/lib/integrations-api/webhooks";
@@ -23,7 +23,7 @@ type ApptRow = {
   customer: { full_name?: string } | { full_name?: string }[] | null;
 };
 
-export async function GET(req: NextRequest) {
+async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -116,3 +116,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: hb.status === "ok", notified, skipped: skipped + result.duplicates, failed: result.failed });
 }
+
+export const GET = guardCron("randevu-hatirlat", run);

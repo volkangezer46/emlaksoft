@@ -32,34 +32,6 @@ const vercel = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8
 const jobs = vercel.crons.map((c) => c.path.replace("/api/cron/", ""));
 const loaders = import.meta.glob("./*/route.ts") as Record<string, () => Promise<{ GET: (req: NextRequest) => Promise<Response> }>>;
 
-/**
- * BİLİNEN AÇIK (ratchet): altyapı çökünce ya yakalanmamış istisna fırlatır (createAdminClient try dışında;
- * heartbeat 'error' yazılmaz) ya da hatayı yutup 200 döner. Liste yalnız KÜÇÜLEBİLİR: rota düzeltilince
- * test "artık sağlıklı, listeden çıkar" diye düşer. Yeni cron bu listeye GİREMEZ.
- */
-const KNOWN_GAPS = new Set<string>([
-  "gunluk-ozet",
-  "randevu-hatirlat",
-  "gorev-hatirlat",
-  "portal-teyit",
-  "abonelik-kontrol",
-  "leak-sla",
-  "dogum-gunu",
-  "tcmb-kur",
-  "otomasyon",
-  "bolge-snapshot",
-  "vitrin-eslesme",
-  "dunning",
-  "kira-tahakkuk",
-  "proje-vade",
-  "haftalik-ozet",
-  "geo-sync",
-  "lig-snapshot",
-  "ef-kontor-hak",
-  "ef-kontor-saglik",
-  "ef-kontor-mutabakat",
-]);
-
 function request(authorization?: string) {
   return new NextRequest("http://localhost/api/cron/x", { headers: authorization ? { authorization } : {} });
 }
@@ -116,11 +88,6 @@ describe("cron rotaları: parametrik sözleşme", () => {
         threw = true;
       }
       const mine = h.heartbeats.filter((b) => b.job === job);
-      const healthy = !threw && status >= 500 && mine.length > 0 && mine.at(-1)?.status === "error";
-      if (KNOWN_GAPS.has(job)) {
-        expect(healthy, `${job}: artık sağlıklı; KNOWN_GAPS listesinden çıkarın`).toBe(false);
-        return;
-      }
       expect(threw, `${job}: yakalanmamış istisna (try/catch + recordHeartbeat error gerekir)`).toBe(false);
       expect(status, `${job}: iş çökünce 5xx beklenir`).toBeGreaterThanOrEqual(500);
       expect(mine.length, `${job}: recordHeartbeat(iş adı = klasör adı) çağrılmalı`).toBeGreaterThan(0);

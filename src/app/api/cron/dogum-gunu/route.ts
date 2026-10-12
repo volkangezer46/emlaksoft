@@ -1,3 +1,4 @@
+import { guardCron } from "@/lib/cron-run";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
@@ -13,7 +14,7 @@ export const maxDuration = 300;
  * Zamanlama: Her gün sabah 08:00 (vercel.json'a eklenecek)
  * Yetki: CRON_SECRET header kontrolü
  */
-export async function GET(req: Request) {
+async function run(req: Request) {
   const denied = authorizeCron(req);
   if (denied) return denied;
 
@@ -96,3 +97,5 @@ export async function GET(req: Request) {
     date: `${day}/${month}`,
   });
 }
+
+export const GET = guardCron("dogum-gunu", run);
