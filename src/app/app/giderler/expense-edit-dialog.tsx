@@ -134,6 +134,7 @@ export function ExpenseEditDialog({
                 onSearch={searchProperties}
                 options={expense.property_id ? [{ value: expense.property_id, label: expense.property_label ?? "Bağlı portföy" }] : []}
                 defaultValue={expense.property_id ?? ""}
+                selectedLabel={expense.property_label ?? "Bağlı portföy"}
               />
             </div>
             <div>

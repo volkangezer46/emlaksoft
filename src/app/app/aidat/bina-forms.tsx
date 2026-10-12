@@ -243,11 +243,11 @@ export function UnitsPanel({
           <div className="grid gap-3 sm:grid-cols-2">
             <FormField label="Malik (müşteri)" htmlFor="u-owner" inject={false}>
               <Combobox id="u-owner" name="ownerCustomerId" aria-label="Malik" placeholder="Malik seçin" searchPlaceholder="Ad ya da telefon ara…" emptyText="Eşleşen müşteri yok" onSearch={searchCustomers}
-                defaultValue={current?.ownerCustomerId ?? ""} options={current?.ownerCustomerId ? [{ value: current.ownerCustomerId, label: current.ownerName ?? "Malik" }] : []} />
+                defaultValue={current?.ownerCustomerId ?? ""} selectedLabel={current?.ownerName ?? "Malik"} options={current?.ownerCustomerId ? [{ value: current.ownerCustomerId, label: current.ownerName ?? "Malik" }] : []} />
             </FormField>
             <FormField label="Kiracı (müşteri)" htmlFor="u-renter" inject={false}>
               <Combobox id="u-renter" name="tenantCustomerId" aria-label="Kiracı" placeholder="Kiracı seçin" searchPlaceholder="Ad ya da telefon ara…" emptyText="Eşleşen müşteri yok" onSearch={searchCustomers}
-                defaultValue={current?.tenantCustomerId ?? ""} options={current?.tenantCustomerId ? [{ value: current.tenantCustomerId, label: current.tenantName ?? "Kiracı" }] : []} />
+                defaultValue={current?.tenantCustomerId ?? ""} selectedLabel={current?.tenantName ?? "Kiracı"} options={current?.tenantCustomerId ? [{ value: current.tenantCustomerId, label: current.tenantName ?? "Kiracı" }] : []} />
             </FormField>
             <FormField label="Bağlı kira (isteğe bağlı)" htmlFor="u-rental" hint="Malik aidat borcunu kira hakedişinden mahsup etmek için." inject={false}>
               <Combobox id="u-rental" name="rentalId" aria-label="Bağlı kira" placeholder="Kira seçin" searchPlaceholder="Portföy ya da kiracı ara…" emptyText="Eşleşen kira yok"
@@ -255,7 +255,7 @@ export function UnitsPanel({
             </FormField>
             <FormField label="Portföy bağı (isteğe bağlı)" htmlFor="u-prop" inject={false}>
               <Combobox id="u-prop" name="propertyId" aria-label="Portföy" placeholder="Portföy seçin" searchPlaceholder="Kod ya da başlık ara…" emptyText="Eşleşen portföy yok" onSearch={searchProperties}
-                defaultValue={current?.propertyId ?? ""} options={current?.propertyId ? [{ value: current.propertyId, label: current.propertyLabel ?? "Portföy" }] : []} />
+                defaultValue={current?.propertyId ?? ""} selectedLabel={current?.propertyLabel ?? "Portföy"} options={current?.propertyId ? [{ value: current.propertyId, label: current.propertyLabel ?? "Portföy" }] : []} />
             </FormField>
           </div>
           <FormError error={error} />

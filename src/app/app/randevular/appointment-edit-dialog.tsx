@@ -163,6 +163,7 @@ export function AppointmentEditDialog({
                   emptyText="Eşleşen müşteri yok"
                   onSearch={searchCustomers}
                   defaultValue={appointment.customer_id ?? ""}
+                  selectedLabel={appointment.customer_label ?? "Müşteri"}
                   options={appointment.customer_id ? [{ value: appointment.customer_id, label: appointment.customer_label ?? "Müşteri" }] : []}
                 />
               </div>
@@ -178,6 +179,7 @@ export function AppointmentEditDialog({
                   emptyText="Eşleşen portföy yok"
                   onSearch={searchProperties}
                   defaultValue={appointment.property_id ?? ""}
+                  selectedLabel={appointment.property_label ?? "Portföy"}
                   options={appointment.property_id ? [{ value: appointment.property_id, label: appointment.property_label ?? "Portföy" }] : []}
                 />
               </div>

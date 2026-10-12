@@ -40,6 +40,11 @@ type Props = {
   onSearch?: (query: string) => Promise<ComboboxOption[]>;
   /** `onSearch` için en az karakter sayısı. */
   minSearchLength?: number;
+  /**
+   * Seçili değer havuzda (options + arama sonuçları) yoksa tetikleyicide gösterilecek etiket. Düzenleme formlarında
+   * `defaultValue` ile birlikte, sayfanın zaten çektiği etiketle kullanılır; mount'ta sunucu araması YAPILMAZ.
+   */
+  selectedLabel?: string;
   className?: string;
   id?: string;
   "aria-label"?: string;
@@ -81,6 +86,7 @@ export function Combobox({
   clearable = true,
   onSearch,
   minSearchLength = 2,
+  selectedLabel,
   className,
   id,
   "aria-label": ariaLabel,
@@ -105,10 +111,15 @@ export function Combobox({
    * kullanimda sifirlama ust bilesenin isidir.)
    */
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const validityRef = useRef<HTMLInputElement>(null);
+  const [showInvalid, setShowInvalid] = useState(false);
   useEffect(() => {
     const form = triggerRef.current?.form;
     if (!form) return;
-    const onReset = () => setUncontrolled(defaultValue);
+    const onReset = () => {
+      setUncontrolled(defaultValue);
+      setShowInvalid(false);
+    };
     form.addEventListener("reset", onReset);
     return () => form.removeEventListener("reset", onReset);
   }, [defaultValue]);
@@ -127,6 +138,18 @@ export function Combobox({
   }, [options, remote, onSearch]);
 
   const selected = useMemo(() => pool.find((o) => o.value === value), [pool, value]);
+  // Havuzda olmayan ama sayfanın etiketini bildiği seçim (düzenleme formu): tetikleyicide etiket gösterilir.
+  const shownLabel = selected?.label ?? (value && selectedLabel ? selectedLabel : undefined);
+
+  /*
+   * Zorunlu alan doğrulaması: type="hidden" girişler tarayıcı doğrulamasına girmez, `required` sessizce işlemezdi.
+   * Bu yüzden görsel olarak gizli ama doğrulanabilir bir metin girişi kullanılır (readOnly DEĞİL: readOnly giriş
+   * doğrulamadan muaftır). Boşken Türkçe özel mesaj; geçersizse tetikleyiciye odaklanılır.
+   */
+  const validated = !!required && !disabled && !loading;
+  useEffect(() => {
+    validityRef.current?.setCustomValidity(validated && !value ? "Lütfen bir seçim yapın" : "");
+  }, [validated, value]);
 
   /*
    * Sunucu araması. Geciktirme (debounce) 250 ms: her tuş vuruşunda sorgu
@@ -180,6 +203,7 @@ export function Combobox({
   function commit(next: string) {
     if (controlledValue === undefined) setUncontrolled(next);
     onValueChange?.(next);
+    if (next) setShowInvalid(false);
     setOpen(false);
     setQuery("");
   }
@@ -212,7 +236,28 @@ export function Combobox({
 
   return (
     <>
-      {name ? <input type="hidden" name={name} value={value} required={required} /> : null}
+      {validated ? (
+        // Tek `name` taşıyıcısı bu giriştir (çift gönderim yok). sr-only: akıştaki konumunda (tetikleyicinin hemen yanında)
+        // kalır, bu yüzden tarayıcı doğrulama balonu doğru yerde çıkar.
+        <input
+          ref={validityRef}
+          type="text"
+          name={name}
+          value={value}
+          required
+          tabIndex={-1}
+          aria-hidden="true"
+          autoComplete="off"
+          onChange={() => undefined}
+          onInvalid={() => {
+            setShowInvalid(true);
+            triggerRef.current?.focus();
+          }}
+          className="sr-only"
+        />
+      ) : name ? (
+        <input type="hidden" name={name} value={value} />
+      ) : null}
       {/* `active` sıfırlaması efektte değil olay işleyicilerinde: efekt içinde
           senkron setState zincirleme render doğurur (react-hooks/set-state-in-effect).
           Zaten her iki tetikleyici de bizim kontrolümüzde. */}
@@ -238,16 +283,17 @@ export function Combobox({
               "focus-ring flex w-full items-center justify-between gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-[0.4375rem] text-left text-sm outline-none transition touch:min-h-11",
               "hover:border-brand-300 data-[state=open]:border-brand-400 data-[state=open]:bg-surface",
               "disabled:cursor-not-allowed disabled:opacity-60",
-              selected ? "text-ink-950" : "text-text-faint",
+              shownLabel ? "text-ink-950" : "text-text-faint",
+              showInvalid && !value && "border-danger-500",
               className,
             )}
           >
             <span className="min-w-0 flex-1 truncate">
-              {loading ? "Yükleniyor…" : (selected?.label ?? placeholder)}
+              {loading ? "Yükleniyor…" : (shownLabel ?? placeholder)}
             </span>
             {loading ? (
               <Loader2 className="h-4 w-4 shrink-0 animate-spin text-text-faint" />
-            ) : clearable && selected && !required ? (
+            ) : clearable && shownLabel && !required ? (
               // `<button>` içinde `<button>` geçersiz HTML — bu yüzden span.
               // Rol ve klavye erişimi elle kuruldu.
               <span
@@ -355,6 +401,11 @@ export function Combobox({
           </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
       </PopoverPrimitive.Root>
+      {showInvalid && validated && !value ? (
+        <p role="alert" className="mt-1 text-xs text-danger-600">
+          Lütfen bir seçim yapın
+        </p>
+      ) : null}
     </>
   );
 }
