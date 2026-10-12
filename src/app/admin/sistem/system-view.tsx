@@ -86,7 +86,7 @@ export async function SystemView() {
     dbKey,
     emlakFiyatiStatus,
     dbNetgsmUser, dbNetgsmPass, dbNetgsmHeader, dbWaUrl, dbWaToken,
-    sahibindenConfig, hepsiemlakConfig, zingatConfig, emlakjetConfig,
+    sahibindenConfig, hepsiemlakConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
     { data: heartbeatRows },
     schemaRows,
@@ -103,7 +103,6 @@ export async function SystemView() {
     getPlatformSecret("whatsapp_api_token"),
     getPortalConfig("sahibinden"),
     getPortalConfig("hepsiemlak"),
-    getPortalConfig("zingat"),
     getPortalConfig("emlakjet"),
     geoRowCount("province"),
     geoRowCount("district"),
@@ -161,12 +160,10 @@ export async function SystemView() {
   // Portal API anahtarları
   const sahibindenKey  = sahibindenConfig?.apiKey ?? null;
   const hepsiemlakKey  = hepsiemlakConfig?.apiKey ?? null;
-  const zingatKey      = zingatConfig?.apiKey ?? null;
   const emlakjetKey    = emlakjetConfig?.apiKey ?? null;
 
   const maskedSahibinden  = sahibindenKey  ? mask(sahibindenKey)  : null;
   const maskedHepsiemlak  = hepsiemlakKey  ? mask(hepsiemlakKey)  : null;
-  const maskedZingat      = zingatKey      ? mask(zingatKey)      : null;
   const maskedEmlakjet    = emlakjetKey    ? mask(emlakjetKey)    : null;
 
   // Netgsm / WhatsApp — DB öncelikli, env yedek; ekrana yalnız maskeli özet düşer (parola/anahtar asla)
@@ -532,11 +529,9 @@ export async function SystemView() {
         canEdit={staff.role === "super_admin"}
         sahibindenConfigured={Boolean(sahibindenConfig)}
         hepsiemlakConfigured={Boolean(hepsiemlakConfig)}
-        zingatConfigured={Boolean(zingatConfig)}
         emlakjetConfigured={Boolean(emlakjetConfig)}
         maskedSahibinden={maskedSahibinden}
         maskedHepsiemlak={maskedHepsiemlak}
-        maskedZingat={maskedZingat}
         maskedEmlakjet={maskedEmlakjet}
       />
 

@@ -38,6 +38,8 @@ import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
 import { PortalListingActions } from "./portal-listing-actions";
+import { PortalTransferPanel } from "./portal-transfer-panel";
+import { PORTAL_FORM_RULES, TRANSFER_PORTALS } from "@/lib/portal-transfer/rules";
 import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
@@ -869,6 +871,18 @@ export default async function PropertyDetailPage({
               </div>
             )}
           </section>
+
+          {/* Portala aktar: eklentiyle yardımlı doldurma (kullanıcı oturumu, "Yayınla"ya kullanıcı basar) */}
+          {(perms.portals ?? []).includes("edit") ? (
+            <PortalTransferPanel
+              propertyId={property.id}
+              closed={isClosedStatus}
+              portals={TRANSFER_PORTALS.map((id) => {
+                const live = livePortals.find((p) => p.portal_name.trim().toLowerCase() === id);
+                return { id, label: PORTAL_FORM_RULES[id].label, live: live ? { externalId: live.portal_listing_id, url: live.portal_url } : null };
+              })}
+            />
+          ) : null}
 
           {/* İlan kontrol: yaşam döngüsü, portal geçmişi, sağlık skoru (izole bileşen) */}
           {(perms.portals ?? []).includes("view") ? (

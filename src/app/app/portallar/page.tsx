@@ -219,6 +219,7 @@ export default async function PortalsPage({
         actions={
           <>
             <ButtonLink href="/app/kayip-kacak" variant="secondary" iconRight={ArrowUpRight}>Kayıp-kaçak panosu</ButtonLink>
+            <ButtonLink href="/app/ilan-kontrol/eklenti#aktarim" variant="secondary" iconRight={ArrowUpRight}>Portaldan al</ButtonLink>
             <NewPortalTrigger variant="solid" disabled={propertyOptions.length === 0} />
           </>
         }

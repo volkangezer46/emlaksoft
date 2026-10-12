@@ -61,7 +61,6 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
     Promise.all([
       isPortalConfigured("sahibinden"),
       isPortalConfigured("hepsiemlak"),
-      isPortalConfigured("zingat"),
       isPortalConfigured("emlakjet"),
     ]).then((states) => states.some(Boolean)),
   ]);
@@ -110,7 +109,7 @@ export async function listIntegrations(tenantId: string | null = null): Promise<
       key: "property_portals",
       name: "Kurumsal İlan Portalları",
       category: "operasyon",
-      description: "Sahibinden, Hepsiemlak, Zingat veya Emlakjet kurumsal API'sine ilan gönderir ve kaldırır.",
+      description: "Sahibinden, Hepsiemlak veya Emlakjet kurumsal API'sine ilan gönderir ve kaldırır.",
       unlocks: "Portföy ekranından seçili portala yayın, güncelleme ve yayından kaldırma.",
       status: portalConfigured ? "configured" : "setup_required",
       requires: "En az bir portal için kurumsal sözleşme, API anahtarı ve sağlayıcının verdiği HTTPS API kökü",

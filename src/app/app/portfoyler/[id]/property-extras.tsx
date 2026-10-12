@@ -213,7 +213,6 @@ export function PropertyAuthorizationPanel({
 const PORTALS: { name: PortalName; label: string }[] = [
   { name: "sahibinden", label: "Sahibinden.com" },
   { name: "hepsiemlak", label: "Hepsiemlak" },
-  { name: "zingat",     label: "Zingat" },
 ];
 
 export function PublishToPortalsPanel({

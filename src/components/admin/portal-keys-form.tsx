@@ -135,21 +135,17 @@ export function PortalApiKeysSection({
   canEdit,
   sahibindenConfigured,
   hepsiemlakConfigured,
-  zingatConfigured,
   emlakjetConfigured,
   maskedSahibinden,
   maskedHepsiemlak,
-  maskedZingat,
   maskedEmlakjet,
 }: {
   canEdit: boolean;
   sahibindenConfigured: boolean;
   hepsiemlakConfigured: boolean;
-  zingatConfigured: boolean;
   emlakjetConfigured: boolean;
   maskedSahibinden: string | null;
   maskedHepsiemlak: string | null;
-  maskedZingat: string | null;
   maskedEmlakjet: string | null;
 }) {
   return (
@@ -170,13 +166,6 @@ export function PortalApiKeysSection({
           label="Hepsiemlak"
           configured={hepsiemlakConfigured}
           maskedKey={maskedHepsiemlak}
-          canEdit={canEdit}
-        />
-        <PortalKeyCard
-          portal="zingat"
-          label="Zingat"
-          configured={zingatConfigured}
-          maskedKey={maskedZingat}
           canEdit={canEdit}
         />
         <PortalKeyCard

@@ -116,10 +116,35 @@ export default async function EklentiPage() {
             <p className="mt-2 text-xs text-text-muted">Bu sayfadaki güncel ayrıştırıcı sürümü: {PARSER_VERSION}.</p>
           </Panel>
         ) : null}
+        <div id="aktarim">
+          <Panel
+            title="Portala aktar ve portaldan al"
+            description="Sahibinden, Hepsiemlak ve Emlakjet için; her adım sizin tıklamanızla, sizin portal oturumunuzda yapılır."
+          >
+            <ul className="list-disc space-y-1.5 pl-5 text-sm text-text">
+              <li>
+                <strong>Portala aktar:</strong> portföy sayfasında “Yayın ve portallar” sekmesinden portalı seçin. Eklenti portalın “İlan ver” formunu portföy bilgileri ve fotoğraflarıyla doldurur; kategori, konum ve harita
+                adımlarını siz seçersiniz, bulunamayan alanlar “Elle doldurun” listesinde görünür. <strong>“Yayınla”ya siz basarsınız.</strong> Yayınlanınca ilan numarası portföye bağlanır.
+              </li>
+              <li>
+                <strong>Portaldan al:</strong> portalın “İlanlarım” sayfasındayken eklenti penceresinden “İlanlarımı EmlakSoft’a al”a basın, almak istediklerinizi seçin. Seçilenler taslak portföy olur; aynı ilan numarası
+                zaten bağlıysa atlanır, benzer bir portföy varsa yeni kayıt açılmaz ve{" "}
+                <TextLink href="/app/ilan-kontrol/eslesme">eşleşme kuyruğuna</TextLink> düşer.
+              </li>
+              <li>
+                Eksik portal ve fiyat/durum farkları <TextLink href={CONTROL_BASE}>İlan Kontrol</TextLink> sayfasında görünür. Portal bir değişiklik yaparsa form doldurma geçici olarak çalışmayabilir; bu durumda eklenti
+                dürüstçe “bulunamadı” der, hiçbir alanı tahminle yazmaz.
+              </li>
+            </ul>
+          </Panel>
+        </div>
         <Panel title="İzinler ve gizlilik">
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-text">
             <li>Erişilen portal alanları yalnız: {hosts.join(", ")}. Başka siteye istek atılmaz.</li>
-            <li>Eklenti yalnız iki izin ister: yerel ayar depolama ve dakikalık uyandırma. Oturum anahtarınızı almaz; EmlakSoft ile yalnız açık EmlakSoft sayfasındaki oturumunuz üzerinden konuşur.</li>
+            <li>
+              Eklenti dört izin ister: yerel ayar depolama, dakikalık uyandırma ve — yalnız siz eklenti penceresindeki düğmeye bastığınızda — açık portal sekmesini okuma/doldurma (etkin sekme + betik).
+              Arka planda sekme gezmez. Oturum anahtarınızı almaz; EmlakSoft ile yalnız açık EmlakSoft sayfasındaki oturumunuz üzerinden konuşur.
+            </li>
             <li>Portal şifrenizi istemez, saklamaz. Siz bağlanmadan eklenti hiçbir ilanı kontrol etmez; &quot;Bağlantıyı kes&quot; ile istediğiniz an durdurabilirsiniz.</li>
             <li>Sunucuya yalnız ilan no ile ilişkili gözlem gider (bulundu/bulunamadı, fiyat, başlık, ilan sahibi adı) ve ayrıştırıcı sayaçları; sayfanın tamamı gönderilmez.</li>
           </ul>

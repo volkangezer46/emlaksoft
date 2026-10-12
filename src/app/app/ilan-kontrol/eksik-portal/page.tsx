@@ -1,0 +1,127 @@
+import Link from "@/components/ui/smart-link";
+import { Suspense } from "react";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { PageHeader } from "@/components/ui/page-header";
+import { SkeletonCard } from "@/components/ui/viz";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableFrame, Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
+import { ButtonLink } from "@/components/ui/button";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
+import { requireModulePage } from "@/lib/require-module-page";
+import { formatTry } from "@/lib/format";
+import { isTransferPortal, PORTAL_FORM_RULES, TRANSFER_PORTALS, type TransferPortal } from "@/lib/portal-transfer/rules";
+import { CONTROL_BASE } from "@/components/listing-control/helpers";
+import { ControlSubNav } from "@/components/listing-control/sub-nav";
+import { ControlUnavailable } from "@/components/listing-control/ui-parts";
+import { getDb, loadPropertyBriefs } from "@/components/listing-control/readers";
+import { loadPortalGaps } from "@/components/listing-control/portal-gap-readers";
+
+export const metadata = { title: "Portalda olmayan portföyler" };
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+const PAGE_SIZE = 50;
+
+/**
+ * EKSİK PORTAL listesi: yayındaki portföy, ofisin kullandığı portalda canlı ilan taşımıyor. İlan Kontrol ana ekranındaki
+ * "Portal farkları" kartıyla AYNI kaynaktan (`portal-gap-readers`) beslenir. Her satırda tek eylem: "Portala aktar".
+ */
+export default async function EksikPortalPage({ searchParams }: { searchParams: SearchParams }) {
+  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const sp = await searchParams;
+  const raw = Array.isArray(sp.portal) ? sp.portal[0] : sp.portal;
+  const portal: TransferPortal = isTransferPortal(raw) ? raw : "sahibinden";
+  const sayfa = Math.max(1, Math.min(200, Number.parseInt(String(Array.isArray(sp.sayfa) ? sp.sayfa[0] : sp.sayfa ?? "1"), 10) || 1));
+  return (
+    <>
+      <PageHeader
+        eyebrow="İlan Kontrol"
+        title={`${PORTAL_FORM_RULES[portal].label}'te olmayan portföyler`}
+        description="Yayındaki portföy, ofisinizin kullandığı bu portalda canlı ilan taşımıyor. Satırdan “Portala aktar” ile eklentiyle forma doldurabilirsiniz."
+        breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Eksik portal" }]}
+      />
+      <ControlSubNav active="liste" closures={effectiveCanAccessModule(perms, "leak")} />
+      <nav aria-label="Portal" className="mb-4 flex flex-wrap gap-1.5">
+        {TRANSFER_PORTALS.map((p) => (
+          <FilterChip key={p} href={`${CONTROL_BASE}/eksik-portal?portal=${p}`} active={p === portal}>
+            {PORTAL_FORM_RULES[p].label}
+          </FilterChip>
+        ))}
+      </nav>
+      <Suspense fallback={<SkeletonCard height={420} label="Liste yükleniyor" />}>
+        <Body portal={portal} sayfa={sayfa} />
+      </Suspense>
+    </>
+  );
+}
+
+async function Body({ portal, sayfa }: { portal: TransferPortal; sayfa: number }) {
+  const db = await getDb();
+  const res = await loadPortalGaps(db);
+  if (!res.available) return <ControlUnavailable />;
+  const gap = res.gaps.find((g) => g.portal === portal);
+  if (!gap) {
+    return (
+      <EmptyState
+        variant="panel"
+        title={`${PORTAL_FORM_RULES[portal].label} için eksik portföy yok`}
+        description="Bu portalda henüz hiç ilanınız yok ya da yayındaki bütün portföyler bu portalda görünüyor."
+        secondary={{ href: CONTROL_BASE, label: "Genel görünüme dön" }}
+      />
+    );
+  }
+  const ids = gap.missing.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE);
+  const briefs = await loadPropertyBriefs(db, ids);
+  const hasNext = gap.missing.length > sayfa * PAGE_SIZE;
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-muted">
+        <span className="font-semibold tabular-nums text-text">{gap.missing.length}</span> portföy {PORTAL_FORM_RULES[portal].label}&apos;te yok ({gap.used} portföyünüz bu portalda yayında).
+      </p>
+      <TableFrame stack minWidth={640}>
+        <Table>
+          <caption className="sr-only">{PORTAL_FORM_RULES[portal].label}&apos;te olmayan portföyler</caption>
+          <THead>
+            <TR>
+              <TH>Portföy</TH>
+              <TH align="right">Fiyat</TH>
+              <TH align="right">İşlem</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {ids.map((id) => {
+              const b = briefs.get(id);
+              return (
+                <TR key={id}>
+                  <TD primary>
+                    <Link href={`/app/portfoyler/${id}?sekme=portallar`} className="focus-ring rounded font-medium text-accent-text hover:underline">
+                      <span className="font-mono text-xs text-text-muted">{b?.code ?? "-"}</span> {b?.title ?? "Portföy"}
+                    </Link>
+                  </TD>
+                  <TD label="Fiyat" align="right">{b?.price != null ? formatTry(b.price) : "-"}</TD>
+                  <TD label="İşlem" align="right">
+                    <ButtonLink href={`/app/portfoyler/${id}?sekme=portallar#portallar`} size="sm" variant="outline">Portala aktar</ButtonLink>
+                  </TD>
+                </TR>
+              );
+            })}
+          </TBody>
+        </Table>
+      </TableFrame>
+      <div className="flex justify-between gap-2">
+        {sayfa > 1 ? (
+          <Link href={`${CONTROL_BASE}/eksik-portal?portal=${portal}&sayfa=${sayfa - 1}`} className="focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold hover:border-brand-400 touch:min-h-11">
+            Önceki
+          </Link>
+        ) : (
+          <span />
+        )}
+        {hasNext ? (
+          <Link href={`${CONTROL_BASE}/eksik-portal?portal=${portal}&sayfa=${sayfa + 1}`} className="focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-control)] border border-line bg-surface px-4 text-sm font-semibold hover:border-brand-400 touch:min-h-11">
+            Sonraki {PAGE_SIZE} portföy
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
+}

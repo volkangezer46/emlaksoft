@@ -1,7 +1,13 @@
 /**
  * Portal Yayın Entegrasyon İskeleti
  *
- * Türkiye'deki büyük emlak portalları (Sahibinden, Hepsiemlak, Zingat)
+ * SÖZLEŞME YOKSA KAPALI, UÇLAR TAHMİNDİR: aşağıdaki uç noktalar (api.sahibinden.com/listings, api.hepsiemlak.com/adverts,
+ * api.emlakjet.com/ilan) ve alan adları HİÇBİR portalın belgesine dayanmaz; sağlayıcının verdiği `baseUrl` + anahtar yoksa
+ * adaptör kapalı kalır ve istek atılmaz. Resmî ortaklık / XML-feed sözleşmesi gelince bu iskelet SÖZLEŞME ŞEMASINA göre YENİDEN
+ * YAZILACAKTIR (docs/design/PORTAL_ENTEGRASYON_ARASTIRMA_2026-10.md). Zingat (Hepsiemlak çatı şirketine geçti) kaldırıldı.
+ * Bugün portala yayın yolu eklentiyle yardımlı doldurmadır (src/lib/portal-transfer, kullanıcı "Yayınla"ya basar).
+ *
+ * Türkiye'deki büyük emlak portalları (Sahibinden, Hepsiemlak, Emlakjet)
  * kurumsal API anlaşması gerektiren kapalı API'lere sahiptir.
  * Bu modül entegrasyon noktalarını standartlaştırır; gerçek API anahtarları
  * platform_settings'ten okunur.
@@ -31,7 +37,7 @@ import {
 // Ortak tipler
 // ---------------------------------------------------------------------------
 
-export type PortalName = "sahibinden" | "hepsiemlak" | "zingat" | "emlakjet";
+export type PortalName = "sahibinden" | "hepsiemlak" | "emlakjet";
 
 export type PortalPublishConfig = {
   apiKey: string;
@@ -169,19 +175,6 @@ const PORTAL_SPECS: Record<PortalName, PortalSpec> = {
     map: mapToHepsiemlak,
     parseId: (d) => String(d.advertId ?? ""),
     parseUrl: (d) => (typeof d.advertUrl === "string" ? d.advertUrl : undefined),
-  },
-  zingat: {
-    label: "Zingat",
-    allowedHosts: ["api.zingat.com"],
-    collectionPath: "/listings",
-    headers: (cfg) => ({
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${cfg.apiKey}`,
-      ...(cfg.agencyId ? { "X-Agency-Id": cfg.agencyId } : {}),
-    }),
-    map: mapToZingat,
-    parseId: (d) => String(d.listingId ?? d.id ?? ""),
-    parseUrl: (d) => (typeof d.listingUrl === "string" ? d.listingUrl : undefined),
   },
   emlakjet: {
     label: "Emlakjet",
@@ -359,27 +352,6 @@ function mapToHepsiemlak(p: PropertyPayload): Record<string, unknown> {
     floorCount:       p.floorCount,
     buildingAge:      p.buildingAge,
     photos:           (p.imageUrls ?? []).map((url) => ({ url })),
-  };
-}
-
-function mapToZingat(p: PropertyPayload): Record<string, unknown> {
-  return {
-    referenceNo:      p.propertyCode,
-    title:            p.title,
-    description:      p.description ?? "",
-    price:            p.listPrice,
-    currency:         p.currency ?? "TRY",
-    category:         p.propertyType,
-    listingType:      p.transactionType === "satilik" ? "sale" : "rent",
-    city:             p.province,
-    district:         p.district,
-    neighborhood:     p.neighborhood,
-    grossArea:        p.squareMeters,
-    roomCount:        p.roomCount,
-    floor:            p.floorCount,
-    buildingAge:      p.buildingAge,
-    images:           p.imageUrls ?? [],
-    phone:            p.contactPhone,
   };
 }
 

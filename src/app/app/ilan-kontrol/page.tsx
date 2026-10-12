@@ -34,6 +34,7 @@ import {
   type TodayCheckView,
 } from "@/components/listing-control/dashboard-sections";
 import { DailySyncSection } from "@/components/listing-control/daily-sync-section";
+import { PortalGapSection } from "@/components/listing-control/portal-gap-section";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { countOpenAnomalies, getDb, loadPropertyBriefs, resolveGroupNames, loadPublishLeadTimes } from "@/components/listing-control/readers";
@@ -161,6 +162,9 @@ async function DashboardBody({ group, management }: { group: GroupParam; managem
         <ChangesSince changes={changes.available ? changes.changes : null} sinceLabel="Son 24 saat" />
         <MismatchCard summary={summary} counts={anomalies.counts} />
       </div>
+      <Suspense fallback={<SkeletonCard height={150} label="Portal farkları yükleniyor" />}>
+        <PortalGapSection summary={summary} />
+      </Suspense>
       <section aria-label="Kırılım" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold text-text">Nerede problem var?</h2>
