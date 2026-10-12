@@ -17,7 +17,7 @@ const BATCH = 100;
 /**
  * Herkese açık (token'lı) yüklemelerde prepare edilip finalize edilmemiş yetim nesneler:
  * - kira dekontu (rent-receipts): bildirim satırındaki dekont alanları boşaltılır; nesne kalıcı silme kuyruğuna düşer.
- * - evrak linki dosyası (customer-files / document_request_files): nesne kuyruğa düşer, bekleyen satır silinir.
+ * - evrak linki dosyası (customer-files / document_request_files): nesne kuyruğa düşer, satır "blocked" yapılır (service_role DELETE yetkisi varsayılmaz).
  * Her adım ayrı try/catch; biri hata verirse öbürü çalışır. Silme kuyruğu işçisi nesnenin güncel
  * meta kaydında olup olmadığına bakar; doğrulanmış dosyaya asla dokunulmaz (yalnız pending/blocked taranır).
  */
@@ -95,11 +95,11 @@ export async function cleanupAbandonedPublicUploads(nowMs: number): Promise<Publ
         });
         const { error: deleteError } = await admin
           .from("document_request_files")
-          .delete()
+          .update({ status: "blocked" })
           .eq("id", row.id)
           .eq("tenant_id", row.tenant_id)
           .eq("status", "pending");
-        if (deleteError) throw new Error(`doc request file delete failed: ${deleteError.code}`);
+        if (deleteError) throw new Error(`doc request file block failed: ${deleteError.code}`);
         summary.docRequestFilesQueued += 1;
       } catch (err) {
         console.error("cleanupAbandonedPublicUploads doc", { id: row.id, error: err instanceof Error ? err.message : "unknown" });
