@@ -278,6 +278,8 @@ const F = {
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
+  // Davet kodu duzeltmesi (2026-10-12): admin client ile yazilan tablolarda service_role eksik INSERT/UPDATE yetkileri.
+  serviceRoleWriteGrants: "20261012002100_service_role_write_grants.sql",
   rentNoticeReceipt: "20261012000900_rent_notice_receipt.sql",
   // Kabuk zinciri (2026-10-11): app_shell_bootstrap yanitina aktif platform personeli satiri (ayri platform_staff turu kalkar).
   appShellPlatformStaff: "20261012001100_app_shell_platform_staff.sql",
@@ -468,6 +470,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.commissionSplitsIntegrity]: "siki", // guvenlik/para: komisyon paylasimi butunlugu (Paket 2)
     [F.efPackNamesTl]: "ek", // platform_settings ef.packs: yalniz seed paket adlarinda "kontor" -> "TL" metin degisimi (sema/fonksiyon yok)
     [F.marketRates]: "ek", // yeni market_rates tablosu (authenticated SELECT, service_role yazma); mevcut nesnelere dokunmaz
+    [F.serviceRoleWriteGrants]: "ek", // yalniz eksik GRANT (insert/update); delete yok, tablo/politika/veri degismez
     [F.storageCleanupReceipts]: "ek", // rent-receipts outbox kova izni + dekont yolu silinince/degisince tetikleyici + kismi indeks; mevcut veri/govde degismez
     [F.insightCloseOnContact]: "ek", // yeni dar SECURITY DEFINER RPC (insight_close_call_priority; yalniz valid_until); tablo/politika/veri degismez
     [F.appShellPlatformStaff]: "ek", // app_shell_bootstrap govdesi birebir + yeni platform_staff alani (CREATE OR REPLACE); tablo/politika/veri degismez
@@ -634,6 +637,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     },
     { id: "ANALIZ-paket-adlari-tl", order: 32, title: "ef.packs seed paket adlari: kontor -> TL (analiz bakiyesi dili; 20261008001000 SONRASI, sira serbest, ek)", files: [F.efPackNamesTl] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
+    { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
     { id: "GUVENILIRLIK-dekont-depo-temizligi", order: 45, title: "Kiraci dekontu depo temizligi: rent-receipts outbox izni + silinen/degisen dekont tetikleyicisi (20261012000900 ve 20261007000700 SONRASI, sira serbest, ek)", files: [F.storageCleanupReceipts] },
     { id: "ARGE-oneri-olay-kapatma", order: 43, title: "Oneri olay aninda kapatma: insight_close_call_priority RPC (20260826002500 insights SONRASI, sira serbest, ek; kod RPC yokken hatayi yutar)", files: [F.insightCloseOnContact] },
     { id: "EINV-sunucu-yazimi", order: 36, title: "e-Fatura saglayici sonucu yalniz sunucu (service_role) RPC'leriyle yazilir (000100'den SONRA; sira serbest)", files: [F.einvoiceServerOnlyWrites] },
