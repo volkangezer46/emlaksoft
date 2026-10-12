@@ -2,7 +2,14 @@ import { EXTENSION_INSTALL_PATH, EXTENSION_LEGAL_NOTE } from "@/lib/listing-cont
 import { CLASSIFICATION_LABEL, HEALTH_LABEL, PORTAL_LABEL, RUN_STATE_LABEL, reasonLabel } from "@/lib/listing-control/worker/extension-labels";
 import { sanitizeSettings } from "@/lib/listing-control/worker/extension-settings";
 import type { RunState } from "@/lib/listing-control/worker/extension-status-view";
-import { allPortalHosts } from "@/lib/listing-control/adapters/html";
+import { allPortalHosts, listHtmlAdapters } from "@/lib/listing-control/adapters/html";
+import type { StoreItem } from "@/lib/listing-control/adapters/html";
+import { applyActionsInPage, attachPhotosInPage, collectControlsInPage, readListHtmlInPage, readPageRefInPage } from "@/lib/portal-transfer/page-fns";
+import { mergeApplyResults, planFill, summarizeReport, type FieldReport } from "@/lib/portal-transfer/fill-plan";
+import { extractListingRef, parseListingInput } from "@/lib/portal-transfer/listing-ref";
+import type { PortalPayload } from "@/lib/portal-transfer/payload";
+import type { StoredTransfer } from "@/lib/portal-transfer/ext-queue";
+import { photoSummary } from "@/lib/portal-transfer/photo-prep";
 import { parsePriceText } from "@/lib/listing-control/adapters/inventory-csv";
 import { extractListing, type PageSnapshot } from "@/lib/prospecting/extension-extract";
 import type { StatusReply } from "./messages";
@@ -313,6 +320,11 @@ function captureSnapshot(): PageSnapshot {
   };
 }
 
+/** Portal sekmesine betik enjekte eden TEK geçit: yalnız kullanıcı tıklamasıyla, etkin sekmede (activeTab). Arka planda hiçbir sayfa okunmaz. */
+function runInTab<T, A extends unknown[]>(tabId: number, func: (...args: A) => T, ...args: A) {
+  return chrome.scripting.executeScript({ target: { tabId }, func, args });
+}
+
 const PORTAL_HOSTS = allPortalHosts();
 let activeTabId: number | null = null;
 let activeUrl = "";
@@ -343,7 +355,7 @@ $("fsboRead").addEventListener("click", async () => {
   if (activeTabId === null) return;
   $("fsboResult").textContent = "";
   try {
-    const [out] = await chrome.scripting.executeScript({ target: { tabId: activeTabId }, func: captureSnapshot });
+    const [out] = await runInTab(activeTabId, captureSnapshot);
     const snap = out?.result;
     if (!snap) throw new Error("empty");
     const x = extractListing(snap);
@@ -406,3 +418,296 @@ $("fsboForm").addEventListener("submit", async (event) => {
 });
 
 void initFsbo();
+
+// ---------------------------------------------------------------- (0.5.0) Portala aktar + Portaldaki ilanlarımı al
+// Her ikisi de YALNIZ popup düğmesine basılınca, etkin portal sekmesinde çalışır. Eklenti formu doldurur; "Yayınla"ya, kategori ve
+// konum seçimine kullanıcı basar. Parola/e-posta/telefon/dosya (fotoğraf hariç) denetimlerine dokunulmaz. Portal sayfası değiştirilmez.
+
+type TransferGet = { transfer: StoredTransfer | null; doneLast: { at: number; ok: boolean; summary: string } | null; donePending: number };
+type PortalTab = { tabId: number; portal: "sahibinden" | "hepsiemlak" | "emlakjet"; url: string };
+let portalTab: PortalTab | null = null;
+let loadedTransfer: StoredTransfer | null = null;
+let lastReport: FieldReport[] = [];
+
+const STATUS_LABEL: Record<FieldReport["status"], string> = {
+  planned: "Dolduruldu",
+  already_filled: "Zaten dolu",
+  not_found: "Alan bulunamadı",
+  no_option: "Seçenek eşleşmedi",
+  skipped: "EmlakSoft'ta değer yok",
+};
+const STATUS_TONE: Record<FieldReport["status"], string> = { planned: "ok", already_filled: "", not_found: "warn", no_option: "warn", skipped: "" };
+
+async function transferGet(): Promise<TransferGet> {
+  return ((await call({ kind: "transferGet" }).catch(() => null)) as unknown as TransferGet | null) ?? { transfer: null, doneLast: null, donePending: 0 };
+}
+
+function renderReport(report: FieldReport[]) {
+  const list = $("transferReport");
+  list.replaceChildren();
+  for (const r of report.filter((x) => x.status !== "skipped")) {
+    const li = el("li", "row");
+    const name = el("div", "name");
+    name.append(el("span", "", r.label));
+    if (r.detail) name.append(el("small", "", r.detail));
+    li.append(name, el("span", `tag ${STATUS_TONE[r.status]}`, STATUS_LABEL[r.status]));
+    list.append(li);
+  }
+}
+
+function renderManual(payload: PortalPayload, report: FieldReport[]) {
+  const wrap = $("transferManualWrap");
+  const list = $("transferManual");
+  list.replaceChildren();
+  const rows: { label: string; value: string }[] = [];
+  for (const m of payload.manual) rows.push({ label: m.label, value: m.value ?? "Portalda siz seçin" });
+  for (const r of report) if (r.status === "not_found" || r.status === "no_option") rows.push({ label: r.label, value: r.detail ?? "" });
+  if (!payload.eids.propertyNo) rows.push({ label: "EİDS taşınmaz numarası", value: "Portföyde yok; mal sahibinden alıp portala girin" });
+  if (payload.eids.warning) rows.push({ label: "Yetki durumu", value: payload.eids.warning });
+  wrap.hidden = rows.length === 0;
+  for (const r of rows) {
+    const li = el("li", "row");
+    const name = el("div", "name");
+    name.append(el("span", "", r.label), el("small", "", r.value));
+    li.append(name);
+    list.append(li);
+  }
+}
+
+async function renderTransfer() {
+  if (!portalTab) return;
+  const info = await transferGet();
+  loadedTransfer = info.transfer;
+  const t = info.transfer;
+  const fill = $<HTMLButtonElement>("transferFill");
+  if (!t) {
+    $("transferHint").textContent = "EmlakSoft'ta portföyün “Yayın ve portallar” sekmesinden “Portala aktar”a basın; sonra buraya dönüp doldurun.";
+    fill.disabled = true;
+  } else if (t.portal !== portalTab.portal) {
+    $("transferHint").textContent = `Hazır paket başka portal için (${PORTAL_LABEL[t.portal] ?? t.portal}). EmlakSoft'tan bu portal için yeniden “Portala aktar” deyin.`;
+    fill.disabled = true;
+  } else {
+    const payload = t.payload as PortalPayload;
+    $("transferHint").textContent = `Hazır: ${t.propertyCode} · ${t.propertyTitle} — ${Object.keys(payload.fields).length} alan, ${t.photoIds.length} fotoğraf. Portalın “İlan ver” formunu açıp kategoriyi seçtikten sonra doldurun.`;
+    fill.disabled = false;
+    $("transferPhotos").textContent = t.photoIds.length > 0 ? photoSummary(t.photosStored, t.photoIds.length) : "";
+    $("transferBind").hidden = false;
+  }
+  if (info.doneLast) $("transferResult").textContent = info.doneLast.summary;
+  else if (info.donePending > 0) $("transferResult").textContent = "Bağlama EmlakSoft'a gönderilmeyi bekliyor (bir EmlakSoft sekmesi açın).";
+}
+
+/** Fotoğrafları bellekten alıp (en çok 6'şarlı gruplarla) dosya alanına koyar; başaramazsa dürüst yönlendirme gösterir. */
+async function attachPhotos(t: StoredTransfer): Promise<void> {
+  const total = t.photoIds.length;
+  if (total === 0 || !portalTab) return;
+  const retry = $("transferPhotoRetry");
+  const open = $("transferPhotoOpen");
+  retry.hidden = true;
+  open.hidden = true;
+  const files: { name: string; type: string; b64: string }[] = [];
+  for (let from = 0; from < total; from += 4) {
+    const got = (await call({ kind: "transferPhotos", from, count: 4 }).catch(() => null)) as unknown as { photos?: ({ name: string; type: string; b64: string } | null)[] } | null;
+    for (const ph of got?.photos ?? []) if (ph) files.push(ph);
+  }
+  if (files.length === 0) {
+    $("transferPhotos").textContent = "Fotoğraflar eklenti belleğinde yok (tarayıcı yeniden başlamış olabilir). EmlakSoft'tan yeniden “Portala aktar” deyin ya da fotoğrafları elle ekleyin.";
+    open.hidden = false;
+    return;
+  }
+  let attached = 0;
+  let reason = "";
+  for (let i = 0; i < files.length; i += 6) {
+    const [out] = await runInTab(portalTab.tabId, attachPhotosInPage, files.slice(i, i + 6)).catch(() => []);
+    const r = out?.result;
+    if (!r?.ok) {
+      reason = r?.reason ?? "error";
+      break;
+    }
+    attached += r.attached;
+    if (r.reason === "single_input") {
+      reason = "single_input";
+      break;
+    }
+  }
+  if (attached === files.length) $("transferPhotos").textContent = `${attached} fotoğraf forma eklendi; portalın yüklemesini kontrol edin.`;
+  else {
+    $("transferPhotos").textContent =
+      reason === "no_file_input"
+        ? "Portalda fotoğraf alanı bu adımda yok. Fotoğraf adımına geçince “Fotoğrafları yeniden dene”ye basın."
+        : `Fotoğrafların ${attached}/${files.length} kadarı otomatik eklenebildi (${reason === "single_input" ? "alan tek dosya kabul ediyor" : "portal sürükle-bırak istiyor olabilir"}). Kalanları EmlakSoft'tan indirip elle ekleyin.`;
+    retry.hidden = false;
+    open.hidden = false;
+  }
+}
+
+$("transferFill").addEventListener("click", async () => {
+  if (!portalTab || !loadedTransfer || loadedTransfer.portal !== portalTab.portal) return;
+  const payload = loadedTransfer.payload as PortalPayload;
+  $("transferResult").textContent = "";
+  try {
+    const [scan] = await runInTab(portalTab.tabId, collectControlsInPage);
+    const descriptors = scan?.result ?? [];
+    if (descriptors.length === 0) throw new Error("empty");
+    const plan = planFill(descriptors, payload);
+    const [applied] = plan.actions.length > 0 ? await runInTab(portalTab.tabId, applyActionsInPage, plan.actions) : [];
+    lastReport = mergeApplyResults(plan, applied?.result ?? []);
+    renderReport(lastReport);
+    renderManual(payload, lastReport);
+    const sum = summarizeReport(lastReport);
+    $("transferResult").textContent = `${sum.filled} alan dolduruldu, ${sum.manual} alanı elle doldurmanız gerekiyor. Kontrol edip “Yayınla”ya siz basın.`;
+    $("transferBind").hidden = false;
+    await attachPhotos(loadedTransfer);
+    const report: Record<string, string> = {};
+    for (const r of lastReport) report[r.key] = r.status;
+    void call({ kind: "transferDonePut", payload: { sessionId: loadedTransfer.sessionId, portal: portalTab.portal, state: "filled", externalId: null, url: null, report } });
+    // Yayınlanmış ilan sayfasındaysa numarayı önceden doldur.
+    const [ref] = await runInTab(portalTab.tabId, readPageRefInPage).catch(() => []);
+    const found = ref?.result ? extractListingRef(ref.result) : null;
+    if (found && !$<HTMLInputElement>("transferListing").value) $<HTMLInputElement>("transferListing").value = found.url ?? found.externalId;
+  } catch {
+    $("transferResult").textContent = "Form okunamadı. Portalın “İlan ver” formunun açık olduğundan ve kategori adımını geçtiğinizden emin olun.";
+  }
+});
+
+$("transferPhotoRetry").addEventListener("click", () => {
+  if (loadedTransfer) void attachPhotos(loadedTransfer);
+});
+
+$("transferPhotoOpen").addEventListener("click", () => {
+  if (!loadedTransfer) return;
+  void chrome.tabs.create({ url: `${__EMLAKSOFT_APP_ORIGIN__}/app/portfoyler/${encodeURIComponent(loadedTransfer.propertyId)}?sekme=medya` });
+});
+
+$("transferBind").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!portalTab || !loadedTransfer || loadedTransfer.portal !== portalTab.portal) return;
+  let ref = parseListingInput($<HTMLInputElement>("transferListing").value);
+  if (!ref) {
+    // Alan boşsa açık ilan sayfasından okumayı dener (kullanıcı yayınlanan ilanın sayfasındaysa).
+    const [page] = await runInTab(portalTab.tabId, readPageRefInPage).catch(() => []);
+    ref = page?.result ? extractListingRef(page.result) : null;
+  }
+  if (!ref) {
+    $("transferResult").textContent = "İlan numarası okunamadı. İlan numarasını (6-12 haneli) ya da ilanın bağlantısını yapıştırın.";
+    return;
+  }
+  const res = (await call({
+    kind: "transferDonePut",
+    payload: { sessionId: loadedTransfer.sessionId, portal: portalTab.portal, state: "published", externalId: ref.externalId, url: ref.url, report: {} },
+  })) as unknown as { ok?: boolean } | null;
+  if (!res?.ok) {
+    $("transferResult").textContent = "Kayıt kuyruğa alınamadı.";
+    return;
+  }
+  $("transferResult").textContent = "Kuyruğa alındı. Bir EmlakSoft sekmesi açıksa otomatik bağlanır; değilse EmlakSoft'u açın.";
+  for (let i = 0; i < 8; i += 1) {
+    await new Promise((r) => setTimeout(r, 1_000));
+    const info = await transferGet();
+    if (info.donePending === 0 && info.doneLast && info.doneLast.at > Date.now() - 20_000) {
+      $("transferResult").textContent = info.doneLast.summary;
+      break;
+    }
+  }
+});
+
+// ---- Portaldaki ilanlarımı al
+let importCandidates: StoreItem[] = [];
+
+function renderImportList(items: StoreItem[]) {
+  const box = $("importList");
+  box.replaceChildren();
+  const all = el("label", "pick");
+  const allBox = el("input");
+  allBox.type = "checkbox";
+  allBox.id = "importAll";
+  allBox.addEventListener("change", () => {
+    for (const c of Array.from(box.querySelectorAll<HTMLInputElement>("input[data-ext-id]"))) c.checked = allBox.checked;
+  });
+  all.append(allBox, el("span", "", `Tümünü seç (${items.length})`));
+  box.append(all);
+  for (const it of items) {
+    const row = el("label", "pick");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.dataset.extId = it.externalId;
+    const txt = el("span");
+    txt.append(document.createTextNode(it.title ?? `İlan ${it.externalId}`));
+    const meta = [it.price ? `${new Intl.NumberFormat("tr-TR").format(it.price)} TL` : "", it.rooms ?? "", it.sqm ? `${it.sqm} m²` : "", it.location ?? "", it.status === "passive" ? "pasif" : "", `#${it.externalId}`]
+      .filter(Boolean)
+      .join(" · ");
+    txt.append(el("small", "", meta));
+    row.append(cb, txt);
+    box.append(row);
+  }
+}
+
+$("importRead").addEventListener("click", async () => {
+  if (!portalTab) return;
+  $("importResult").textContent = "";
+  try {
+    const adapter = listHtmlAdapters().find((a) => a.id === portalTab?.portal);
+    const [out] = await runInTab(portalTab.tabId, readListHtmlInPage);
+    const page = out?.result;
+    if (!adapter || !page) throw new Error("empty");
+    const parsed = adapter.parseStore({ status: 200, finalUrl: page.url, html: page.html });
+    importCandidates = parsed.items.slice(0, 100);
+    if (importCandidates.length === 0) {
+      $("importListWrap").hidden = true;
+      $("importResult").textContent = "Bu sayfada ilan listesi okunamadı. Portalın “İlanlarım” sayfasını açıp listenin göründüğünden emin olun.";
+      return;
+    }
+    renderImportList(importCandidates);
+    $("importListWrap").hidden = false;
+    $("importResult").textContent = `${importCandidates.length} ilan okundu${parsed.nextUrl ? " (sonraki sayfalar için sayfayı değiştirip yeniden okuyun)" : ""}. EmlakSoft'a alacaklarınızı seçin.`;
+  } catch {
+    $("importResult").textContent = "Sayfa okunamadı. İlanlarım sayfasında olduğunuzdan emin olun.";
+  }
+});
+
+$("importSend").addEventListener("click", async () => {
+  if (!portalTab) return;
+  const chosen = new Set(Array.from($("importList").querySelectorAll<HTMLInputElement>("input[data-ext-id]")).filter((c) => c.checked).map((c) => c.dataset.extId as string));
+  const items = importCandidates.filter((i) => chosen.has(i.externalId));
+  if (items.length === 0) {
+    $("importResult").textContent = "Önce EmlakSoft'a almak istediğiniz ilanları seçin.";
+    return;
+  }
+  const res = (await call({
+    kind: "importPut",
+    payload: {
+      portal: portalTab.portal,
+      items: items.map((i) => ({ externalId: i.externalId, url: i.url, title: i.title ?? null, price: i.price ?? null, sqm: i.sqm ?? null, rooms: i.rooms ?? null, location: i.location ?? null, status: i.status ?? "active" })),
+    },
+  })) as unknown as { ok?: boolean } | null;
+  if (!res?.ok) {
+    $("importResult").textContent = "Seçim kuyruğa alınamadı.";
+    return;
+  }
+  $("importListWrap").hidden = true;
+  $("importResult").textContent = `${items.length} ilan kuyruğa alındı. Bir EmlakSoft sekmesi açıksa otomatik eklenir; değilse EmlakSoft'u açın.`;
+  for (let i = 0; i < 10; i += 1) {
+    await new Promise((r) => setTimeout(r, 1_500));
+    const info = (await call({ kind: "importLast" }).catch(() => null)) as unknown as { last?: { at: number; summary: string } | null; pending?: number } | null;
+    if (info && !info.pending && info.last && info.last.at > Date.now() - 30_000) {
+      $("importResult").textContent = info.last.summary;
+      break;
+    }
+  }
+});
+
+async function initPortalTools() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true }).catch(() => []);
+  if (!tab?.id || !tab.url) return;
+  const adapter = listHtmlAdapters().find((a) => a.isPortalUrl(tab.url as string));
+  if (!adapter) return;
+  portalTab = { tabId: tab.id, portal: adapter.id as PortalTab["portal"], url: tab.url };
+  $("transfer").hidden = false;
+  $("importer").hidden = false;
+  await renderTransfer();
+  const last = (await call({ kind: "importLast" }).catch(() => null)) as unknown as { last?: { summary: string } | null; pending?: number } | null;
+  if (last?.pending) $("importResult").textContent = `${last.pending} kayıt EmlakSoft'a gönderilmeyi bekliyor (bir EmlakSoft sekmesi açın).`;
+  else if (last?.last?.summary) $("importResult").textContent = `Son işlem: ${last.last.summary}`;
+}
+
+void initPortalTools();

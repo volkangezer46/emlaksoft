@@ -41,7 +41,7 @@ declare namespace chrome {
   }
   namespace scripting {
     /** Yalnız kullanıcı tıklamasıyla, etkin sekmede (activeTab). Arka plan/izleme için kullanılmaz. */
-    function executeScript<T>(injection: { target: { tabId: number }; func: () => T }): Promise<{ result?: T }[]>;
+    function executeScript<T, A extends unknown[] = []>(injection: { target: { tabId: number }; func: (...args: A) => T; args?: A }): Promise<{ result?: T }[]>;
   }
   namespace alarms {
     function create(name: string, info: { periodInMinutes?: number; delayInMinutes?: number }): Promise<void> | void;

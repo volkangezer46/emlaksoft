@@ -19,6 +19,12 @@
  *   sayfa → eklenti : { source, type: "status-request", id }
  *   eklenti → sayfa : { source: BRIDGE, type: "status-response", id, status: ExtensionStatusView }
  *
+ * (0.5.0) Portal aktarımı:
+ *   sayfa → eklenti : { source, type: "transfer-request", nonce, code }   ("Portala aktar": kullanıcı yeni üretilen tek kullanımlık kodu eklentiye verir)
+ *   eklenti → sayfa : { source: BRIDGE, type: "transfer-response", nonce, ok, photos, total, message }
+ *   Eklenti kodu aynı kökenli `/api/app/portal-aktar/al` ucunda tüketir, paketi ve fotoğrafları kendi deposuna alır; portal formunu
+ *   kullanıcı portal sekmesinde eklenti penceresinden doldurur ("Yayınla"ya kullanıcı basar).
+ *
  * Belge kökü işaretleri: `data-emlaksoft-listing-bridge="1"` (kurulu), `data-emlaksoft-listing-autorun="1"` (eklenti
  * otomatik kontrol döngüsünü KENDİSİ yürütüyor: sayfa içi işçi iş talep etmez, çift kontrol olmaz),
  * `data-emlaksoft-listing-paused="1"` (kullanıcı eklentiyi duraklattı: hiçbir kontrol yapılmaz),
@@ -43,7 +49,8 @@ export type BridgeMessage =
   | { type: "inventory-response"; id: string; reply: unknown }
   | { type: "connect-response"; nonce: string; ok: boolean }
   | { type: "scan-response"; nonce: string; ok: boolean }
-  | { type: "status-response"; id: string; status: unknown };
+  | { type: "status-response"; id: string; status: unknown }
+  | { type: "transfer-response"; nonce: string; ok: boolean; photos: number; total: number; message: string };
 
 /** Eklentinin "şimdi yapamadım / duraklatıldı" yanıtları: gözlem değildir, iş bırakılır. */
 export const BRIDGE_DEFER_ERRORS: readonly string[] = ["busy", "paused", "not_connected", "portal_disabled"];
@@ -65,6 +72,10 @@ export function parseBridgeMessage(data: unknown): BridgeMessage | null {
   }
   if (d.type === "status-response" && typeof d.id === "string" && d.id.length > 0 && d.id.length <= 64) {
     return { type: "status-response", id: d.id, status: d.status };
+  }
+  if (d.type === "transfer-response" && typeof d.nonce === "string" && d.nonce.length > 0 && d.nonce.length <= 64) {
+    const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1000 ? v : 0);
+    return { type: "transfer-response", nonce: d.nonce, ok: d.ok === true, photos: n(d.photos), total: n(d.total), message: typeof d.message === "string" ? d.message.slice(0, 300) : "" };
   }
   return null;
 }
@@ -219,4 +230,19 @@ export async function requestStatus(timeoutMs = 2_500): Promise<unknown> {
   const id = `st-${Math.random().toString(36).slice(2, 10)}`;
   const msg = await postAndWait({ type: "status-request", id }, (m) => m.type === "status-response" && m.id === id, timeoutMs);
   return msg?.type === "status-response" ? msg.status : null;
+}
+
+export type TransferResult = { ok: boolean; photos: number; total: number; message: string };
+
+/**
+ * "Portala aktar": üretilen tek kullanımlık kodu eklentiye verir (eklenti kodu EmlakSoft'tan tüketir ve paketi/fotoğrafları alır).
+ * Fotoğraflar indirildiği için süre uzundur (varsayılan 90 sn). Eklenti yoksa/yanıtlamazsa `{ ok: false }`.
+ */
+export async function requestTransfer(code: string, timeoutMs = 90_000): Promise<TransferResult> {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  const nonce = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  const msg = await postAndWait({ type: "transfer-request", nonce, code }, (m) => m.type === "transfer-response" && m.nonce === nonce, timeoutMs);
+  if (msg?.type !== "transfer-response") return { ok: false, photos: 0, total: 0, message: "Eklenti yanıt vermedi. Eklentinin kurulu ve bağlı olduğundan emin olun." };
+  return { ok: msg.ok, photos: msg.photos, total: msg.total, message: msg.message };
 }

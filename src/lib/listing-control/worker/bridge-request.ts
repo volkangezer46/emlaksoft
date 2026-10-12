@@ -31,3 +31,10 @@ export function isSameOriginBridgeRequest(req: { headers: Headers; url: string }
   }
   return req.headers.get("sec-fetch-site") === "same-origin";
 }
+
+/** Portal aktarımı (0.5.0): aynı köken + aynı başlık kuralı. Kod tüketme / ilan no geri bağlama / ilanlarımı portföye alma. */
+export const BRIDGE_TRANSFER_FETCH_ENDPOINT = "/api/app/portal-aktar/al";
+export const BRIDGE_TRANSFER_DONE_ENDPOINT = "/api/app/portal-aktar/tamamla";
+export const BRIDGE_IMPORT_ENDPOINT = "/api/app/portal-aktar/ice-al";
+/** Aktarılacak portföy fotoğrafı (mevcut yetkili medya ucu; oturum + kiracı kapsamı sunucuda). */
+export const BRIDGE_MEDIA_PATH = "/api/property-media";

@@ -48,7 +48,6 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
   let U1: string;
   let U2: string;
   let P1: string;
-  let P2: string;
   const q = async (sql: string, params?: unknown[]) => (await db.query(sql, params)).rows;
   const as = async (tenant: string, uid: string, role = "advisor", deny = "", scopeDeny = "") => {
     await db.exec(`select set_config('t.tenant','${tenant}',false), set_config('t.uid','${uid}',false), set_config('t.role','${role}',false), set_config('t.deny','${deny}',false), set_config('t.scope_deny','${scopeDeny}',false)`);
@@ -68,7 +67,6 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
     U1 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T1]))[0]!.id as string;
     U2 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T2]))[0]!.id as string;
     P1 = (await q(`insert into public.properties(tenant_id, assigned_to) values ($1,$2) returning id`, [T1, U1]))[0]!.id as string;
-    P2 = (await q(`insert into public.properties(tenant_id, assigned_to) values ($1,$2) returning id`, [T2, U2]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261012002700_portal_transfer_sessions.sql"));
   });
 

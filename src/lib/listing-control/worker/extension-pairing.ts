@@ -60,6 +60,27 @@ export function isTrustedScanRequest(i: Omit<ConnectRequestInput, "userActive">)
   return !!d && d.type === SCAN_REQUEST_TYPE && typeof d.nonce === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(d.nonce);
 }
 
+export const TRANSFER_REQUEST_TYPE = "transfer-request";
+
+/**
+ * (0.5.0) Sayfanın "Portala aktar" kodu verme isteği güvenilir mi: aynı pencere + aynı köken + izinli EmlakSoft kökeni + biçim
+ * (nonce ve 10 karakterli aktarım kodu). Kod kısa ömürlü ve TEK KULLANIMLIKTIR; asıl yetki sunucudadır (oturum + portals/edit +
+ * kodun sahibi), bu denetim yalnız yabancı sayfa iletilerini eler.
+ */
+export function isTrustedTransferRequest(i: Omit<ConnectRequestInput, "userActive">): boolean {
+  if (!i.fromSameWindow || i.eventOrigin !== i.locationOrigin) return false;
+  if (!isAllowedAppOrigin(i.locationOrigin, i.allowedOrigins)) return false;
+  const d = i.data as { type?: unknown; nonce?: unknown; code?: unknown } | null;
+  return (
+    !!d &&
+    d.type === TRANSFER_REQUEST_TYPE &&
+    typeof d.nonce === "string" &&
+    /^[A-Za-z0-9_-]{8,64}$/.test(d.nonce) &&
+    typeof d.code === "string" &&
+    /^[A-Za-z0-9]{5}[-\s]?[A-Za-z0-9]{5}$/.test(d.code)
+  );
+}
+
 export const CONNECT_REQUEST_TYPE = "connect-request";
 
 /** Sayfanın "bağlan" isteği güvenilir mi: aynı pencere + aynı köken + izinli EmlakSoft kökeni + kullanıcı etkinliği + biçim. */

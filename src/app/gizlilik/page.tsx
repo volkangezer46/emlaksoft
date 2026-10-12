@@ -51,7 +51,7 @@ export default function GizlilikPage() {
 
       <LegalSection no="5." title="EmlakSoft İlan Kontrol Tarayıcı Eklentisi">
         <p>
-          Eklenti yalnız EmlakSoft hesabına bağlanan ofis kullanıcıları içindir ve yalnız aşağıdaki iki iş için veri işler:
+          Eklenti yalnız EmlakSoft hesabına bağlanan ofis kullanıcıları içindir ve yalnız aşağıdaki dört iş için veri işler:
         </p>
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
@@ -64,6 +64,17 @@ export default function GizlilikPage() {
             fiyatı, metrekaresi, konumu ve ilanda görünen ilan sahibi adı okunur; size gösterilir, siz onaylayınca
             kaydedilir. Telefon numarası yalnız ilanda zaten görünüyorsa ve onay kutusunu işaretlerseniz eklenir; eklenti
             &quot;numarayı göster&quot; düğmesine basmaz.
+          </li>
+          <li>
+            <b>Portala aktarma:</b> Yalnız siz EmlakSoft&apos;ta &quot;Portala aktar&quot; dediğinizde, portföyünüzün
+            bilgileri ve fotoğrafları yalnız sizin açtığınız portal sekmesindeki forma yazılır. Eklenti portala hiçbir şey
+            göndermez; &quot;Yayınla&quot; düğmesine siz basarsınız. Yayınlanan ilanın numarası ve bağlantısı EmlakSoft&apos;a
+            geri yazılır. Fotoğraflar yalnız tarayıcı oturumunuzun belleğinde tutulur ve tarayıcıyı kapatınca silinir.
+          </li>
+          <li>
+            <b>Portaldan ilan alma:</b> Yalnız siz portalın &quot;İlanlarım&quot; sayfasındayken eklenti düğmesine
+            bastığınızda, görünen ilanların başlığı, fiyatı, oda sayısı, metrekaresi, konumu ve ilan numarası okunur; siz
+            seçtiklerinizi EmlakSoft&apos;a taslak portföy olarak alırsınız. Telefon numarası ve kişi adı alınmaz.
           </li>
         </ul>
         <p>

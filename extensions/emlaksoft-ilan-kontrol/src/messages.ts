@@ -45,7 +45,28 @@ export type BgRequest =
   | { kind: "fsboPendingDue" }
   | { kind: "fsboPendingDone"; id: string; summary: string }
   | { kind: "fsboPendingFail"; id: string }
-  | { kind: "fsboLast" };
+  | { kind: "fsboLast" }
+  /**
+   * (0.5.0) Portala aktar: içerik betiği EmlakSoft'tan tükettiği paketi (`data`) ve fotoğrafları service worker'a verir;
+   * açılır pencere portal sekmesinde formu bu paketle doldurur. Fotoğraflar `chrome.storage.session`'da tutulur (tarayıcı kapanınca silinir).
+   */
+  | { kind: "transferPut"; data: unknown }
+  | { kind: "transferPhoto"; sessionId: string; index: number; name: string; type: string; b64: string }
+  | { kind: "transferPhotosDone"; sessionId: string; skipped: number }
+  | { kind: "transferGet" }
+  | { kind: "transferPhotos"; from: number; count: number }
+  | { kind: "transferClear" }
+  /** (0.5.0) Yayın sonrası ilan no/URL (ve ilerleme) → kuyruk → açık EmlakSoft sekmesi `tamamla` ucuna gönderir. */
+  | { kind: "transferDonePut"; payload: unknown }
+  | { kind: "transferDoneDue" }
+  | { kind: "transferDoneAck"; id: string; ok: boolean; summary: string }
+  | { kind: "transferDoneFail"; id: string }
+  /** (0.5.0) Portaldaki ilanlarımı EmlakSoft'a al: kullanıcının seçtikleri kuyruğa yazılır, içerik betiği `ice-al` ucuna gönderir. */
+  | { kind: "importPut"; payload: unknown }
+  | { kind: "importDue" }
+  | { kind: "importAck"; id: string; ok: boolean; summary: string }
+  | { kind: "importFail"; id: string }
+  | { kind: "importLast" };
 
 /** Sayfadan (externally_connectable) gelen TEK ileti türü: salt okunur yoklama. Bağlama ve veri okuma bu kanaldan YAPILMAZ. */
 export type ExternalRequest = { kind: "ping" };
@@ -75,6 +96,13 @@ export const STORAGE_KEYS = {
   /** EmlakSoft'a gönderilmeyi bekleyen sahibinden ilan kayıtları ve son gönderim özeti. */
   fsboPending: "es_fsbo_pending",
   fsboLast: "es_fsbo_last",
+  /** (0.5.0) Portala aktar: kodu tüketilmiş paket (kalıcı, küçük) ve fotoğraflar (oturum deposu; `es_tphoto_<sıra>`). */
+  transfer: "es_transfer",
+  transferPhotoPrefix: "es_tphoto_",
+  transferDone: "es_transfer_done",
+  transferDoneLast: "es_transfer_done_last",
+  importPending: "es_import_pending",
+  importLast: "es_import_last",
 } as const;
 
 export const ALARM_TICK = "es-tick";

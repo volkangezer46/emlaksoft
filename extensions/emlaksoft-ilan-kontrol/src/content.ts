@@ -1,10 +1,21 @@
 import { BRIDGE_REQUEST_SOURCE, BRIDGE_RESPONSE_SOURCE } from "@/lib/listing-control/worker/bridge";
 import { nextDelayMs, replyToReport, type StepOutcome } from "@/lib/listing-control/worker/core";
-import { BRIDGE_ENDPOINT, BRIDGE_FSBO_ENDPOINT, BRIDGE_HEADER, BRIDGE_INVENTORY_ENDPOINT } from "@/lib/listing-control/worker/bridge-request";
+import {
+  BRIDGE_ENDPOINT,
+  BRIDGE_FSBO_ENDPOINT,
+  BRIDGE_HEADER,
+  BRIDGE_IMPORT_ENDPOINT,
+  BRIDGE_INVENTORY_ENDPOINT,
+  BRIDGE_MEDIA_PATH,
+  BRIDGE_TRANSFER_DONE_ENDPOINT,
+  BRIDGE_TRANSFER_FETCH_ENDPOINT,
+} from "@/lib/listing-control/worker/bridge-request";
+import type { DonePayload, ImportPayload, QueueEntry } from "@/lib/portal-transfer/ext-queue";
+import { PHOTO_JPEG_QUALITY, PHOTO_MAX_SIDE, bytesToBase64, photoBudget, photoSummary, scaledSize } from "@/lib/portal-transfer/photo-prep";
 import type { FsboPending } from "@/lib/prospecting/extension-queue";
 import type { ScanUpload } from "@/lib/listing-control/worker/extension-scan";
 import { sendVerdict, type OutboxEntry } from "@/lib/listing-control/worker/extension-outbox";
-import { isTrustedConnectRequest, isTrustedScanRequest } from "@/lib/listing-control/worker/extension-pairing";
+import { isTrustedConnectRequest, isTrustedScanRequest, isTrustedTransferRequest } from "@/lib/listing-control/worker/extension-pairing";
 import { buildTelemetry } from "@/lib/listing-control/worker/extension-telemetry";
 import { STORAGE_KEYS, type BgRequest } from "./messages";
 
@@ -119,6 +130,23 @@ window.addEventListener("message", (event: MessageEvent) => {
       return;
     }
     void send({ kind: "scanNow" }).then((status) => reply({ type: "scan-response", nonce, ok: status !== null }));
+    return;
+  }
+
+  if (d.type === "transfer-request") {
+    const nonce = typeof d.nonce === "string" ? d.nonce.slice(0, 64) : "";
+    const trusted = isTrustedTransferRequest({
+      fromSameWindow: event.source === window,
+      eventOrigin: event.origin,
+      locationOrigin: window.location.origin,
+      allowedOrigins: __EMLAKSOFT_APP_ORIGINS__,
+      data: d,
+    });
+    if (!trusted) {
+      reply({ type: "transfer-response", nonce, ok: false, photos: 0, total: 0, message: "İstek doğrulanamadı." });
+      return;
+    }
+    void runTransfer(String(d.code)).then((r) => reply({ type: "transfer-response", nonce, ...r }));
     return;
   }
 
@@ -243,6 +271,116 @@ async function flushFsbo(): Promise<void> {
   }
 }
 
+/**
+ * (0.5.0) Portala aktar: sayfanın verdiği TEK KULLANIMLIK kodu aynı kökenli uçta tüketir (kullanıcının açık oturumu), paketi
+ * service worker'a, fotoğrafları (aynı kökenli yetkili medya ucundan indirilip ≤1600 px JPEG'e küçültülerek) oturum deposuna koyar.
+ * Portala HİÇBİR istek atılmaz; formu kullanıcı portal sekmesinde eklenti penceresinden doldurur ve "Yayınla"ya kendisi basar.
+ */
+async function downscaleToJpegB64(blob: Blob): Promise<{ b64: string; type: string } | null> {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const size = scaledSize(bmp.width, bmp.height, PHOTO_MAX_SIDE);
+    const canvas = new OffscreenCanvas(size.width, size.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bmp, 0, 0, size.width, size.height);
+    bmp.close();
+    const out = await canvas.convertToBlob({ type: "image/jpeg", quality: PHOTO_JPEG_QUALITY });
+    return { b64: bytesToBase64(new Uint8Array(await out.arrayBuffer())), type: "image/jpeg" };
+  } catch {
+    // Çözülemeyen biçim: küçükse olduğu gibi (arka plan 1,5 MB üstünü zaten reddeder).
+    if (blob.size > 1_000_000) return null;
+    return { b64: bytesToBase64(new Uint8Array(await blob.arrayBuffer())), type: blob.type || "image/jpeg" };
+  }
+}
+
+async function runTransfer(code: string): Promise<{ ok: boolean; photos: number; total: number; message: string }> {
+  const fail = (message: string) => ({ ok: false, photos: 0, total: 0, message });
+  const r = await api({ code }, BRIDGE_TRANSFER_FETCH_ENDPOINT);
+  const data = r.data as ApiReply & { sessionId?: string; payload?: { photos?: { id?: unknown; fileName?: unknown }[] }; message?: string };
+  if (!data.ok || typeof data.sessionId !== "string") return fail(typeof data.message === "string" ? data.message : "Aktarım paketi alınamadı.");
+  const put = await send<{ ok?: boolean }>({ kind: "transferPut", data });
+  if (!put?.ok) return fail("Paket eklentiye alınamadı.");
+  const photos = Array.isArray(data.payload?.photos) ? data.payload.photos : [];
+  let used = 0;
+  let stored = 0;
+  let skipped = 0;
+  for (let i = 0; i < photos.length; i += 1) {
+    const mediaId = typeof photos[i]?.id === "string" ? (photos[i]!.id as string) : "";
+    if (!mediaId) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const res = await fetch(`${BRIDGE_MEDIA_PATH}/${encodeURIComponent(mediaId)}/download`, { credentials: "same-origin" });
+      if (!res.ok) {
+        skipped += 1;
+        continue;
+      }
+      const prepared = await downscaleToJpegB64(await res.blob());
+      const decision = prepared ? photoBudget(used, prepared.b64.length) : { take: false };
+      if (!prepared || !decision.take) {
+        skipped += 1;
+        continue;
+      }
+      const base = typeof photos[i]?.fileName === "string" ? String(photos[i]!.fileName).replace(/\.[A-Za-z0-9]{2,5}$/, "") : `foto-${i + 1}`;
+      const ok = await send<{ ok?: boolean }>({ kind: "transferPhoto", sessionId: data.sessionId, index: i, name: `${base}.jpg`, type: prepared.type, b64: prepared.b64 });
+      if (ok?.ok) {
+        used += prepared.b64.length;
+        stored += 1;
+      } else skipped += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+  await send({ kind: "transferPhotosDone", sessionId: data.sessionId, skipped });
+  return { ok: true, photos: stored, total: photos.length, message: photoSummary(stored, photos.length) };
+}
+
+/** (0.5.0) Yayın sonrası ilan no/URL geri bağlama kuyruğu (kullanıcı popup'ta "EmlakSoft'a bağla" dediğinde dolar). */
+let doneFlushing = false;
+async function flushTransferDone(): Promise<void> {
+  if (doneFlushing) return;
+  doneFlushing = true;
+  try {
+    const due = await send<{ entries?: QueueEntry<DonePayload>[] }>({ kind: "transferDoneDue" });
+    for (const e of due?.entries ?? []) {
+      const r = await api(e.payload as unknown as Record<string, unknown>, BRIDGE_TRANSFER_DONE_ENDPOINT);
+      const data = r.data as ApiReply & { message?: string };
+      const verdict = sendVerdict(r.status, data);
+      if (verdict === "retry") {
+        await send({ kind: "transferDoneFail", id: e.id });
+        break;
+      }
+      await send({ kind: "transferDoneAck", id: e.id, ok: data.ok === true, summary: typeof data.message === "string" ? data.message : data.ok ? "Kaydedildi." : "Reddedildi." });
+    }
+  } finally {
+    doneFlushing = false;
+  }
+}
+
+/** (0.5.0) Kullanıcının İlanlarım sayfasından SEÇTİĞİ ilanlar: EmlakSoft'a taslak portföy olarak gönderilir (sunucu mükerrer kontrolü yapar). */
+let importFlushing = false;
+async function flushImport(): Promise<void> {
+  if (importFlushing) return;
+  importFlushing = true;
+  try {
+    const due = await send<{ entries?: QueueEntry<ImportPayload>[] }>({ kind: "importDue" });
+    for (const e of due?.entries ?? []) {
+      const r = await api(e.payload as unknown as Record<string, unknown>, BRIDGE_IMPORT_ENDPOINT);
+      const data = r.data as ApiReply & { summary?: string; message?: string };
+      const verdict = sendVerdict(r.status, data);
+      if (verdict === "retry") {
+        await send({ kind: "importFail", id: e.id });
+        break;
+      }
+      await send({ kind: "importAck", id: e.id, ok: data.ok === true, summary: data.ok ? String(data.summary ?? "Eklendi.") : String(data.message ?? "Reddedildi.") });
+    }
+  } finally {
+    importFlushing = false;
+  }
+}
+
 async function step(): Promise<StepOutcome | "wait"> {
   if (paused || !connected) return "idle";
   if (!navigator.onLine) return "busy";
@@ -344,7 +482,16 @@ if (window.location.pathname === "/app" || window.location.pathname.startsWith("
 
 // (0.4.0) Sahibinden ilan kayıt kuyruğu: sayfa açılınca, kuyruk değişince ve çevrimiçi olunca (yalnız EmlakSoft kökeninde).
 void flushFsbo();
+void flushTransferDone();
+void flushImport();
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && STORAGE_KEYS.fsboPending in changes) void flushFsbo();
+  if (area !== "local") return;
+  if (STORAGE_KEYS.fsboPending in changes) void flushFsbo();
+  if (STORAGE_KEYS.transferDone in changes) void flushTransferDone();
+  if (STORAGE_KEYS.importPending in changes) void flushImport();
 });
-window.addEventListener("online", () => void flushFsbo());
+window.addEventListener("online", () => {
+  void flushFsbo();
+  void flushTransferDone();
+  void flushImport();
+});

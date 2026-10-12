@@ -211,10 +211,10 @@ describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
   const bg = src(`${EXT}/src/background.ts`);
   const content = src(`${EXT}/src/content.ts`);
   const setup = src("src/components/listing-control/sync-setup.tsx");
-  it("sürüm 0.4.0; izinler yalnız activeTab + scripting kadar genişledi (tabs izni gerekmez)", () => {
+  it("sürüm 0.5.0; izin listesi 0.4.0 ile AYNI (yeni Chrome izni yok; tabs izni gerekmez)", () => {
     const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { version: string; permissions: string[] };
-    expect(EXTENSION_VERSION).toBe("0.4.0");
-    expect(manifest.version).toBe("0.4.0");
+    expect(EXTENSION_VERSION).toBe("0.5.0");
+    expect(manifest.version).toBe("0.5.0");
     expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
   });
 
@@ -258,5 +258,59 @@ describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
       expect(src(`src/lib/listing-control/worker/${f}`), f).not.toMatch(/Date\.now|new Date\(/);
     }
     expect(src("src/components/listing-control/sync-install-step.tsx")).not.toMatch(/Date\.now|new Date\(/);
+  });
+});
+
+describe("0.5.0 portal aktarımı (Portala aktar / İlanlarımı al)", () => {
+  const bg = src(`${EXT}/src/background.ts`);
+  const content = src(`${EXT}/src/content.ts`);
+  const popup = src(`${EXT}/src/popup.ts`);
+  const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { description: string; permissions: string[]; host_permissions: string[]; optional_permissions?: unknown };
+  it("mağaza sınırı: açıklama ≤ 132 karakter; yeni izin / isteğe bağlı izin YOK", () => {
+    expect(manifest.description.length).toBeLessThanOrEqual(132);
+    expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
+    expect(manifest.optional_permissions).toBeUndefined();
+    expect(manifest.host_permissions).toEqual([]);
+  });
+  it("sayfa içi okuma/yazma yalnız popup'ta, TEK geçitten (runInTab) ve kullanıcı tıklamasıyla; arka plan/içerik betiği portal sayfasına dokunmaz", () => {
+    expect(popup).toContain("function runInTab");
+    expect(popup.match(/executeScript/g)?.length).toBe(1);
+    expect(bg).not.toMatch(/chrome\.scripting/);
+    expect(content).not.toMatch(/chrome\.scripting|chrome\.tabs/);
+    // Her enjeksiyon bir düğme olay işleyicisinden başlar (otomatik tetikleyici / zamanlayıcı yok).
+    expect(popup).not.toMatch(/(setInterval|setTimeout)\([^)]*runInTab/);
+    expect(popup).toContain('$("transferFill").addEventListener("click"');
+    expect(popup).toContain('$("importRead").addEventListener("click"');
+  });
+  it("gönderim ve gezinme yok: eklenti formu göndermez, 'Yayınla'ya basmaz, sayfayı değiştirmez", () => {
+    for (const f of ["src/lib/portal-transfer/page-fns.ts", `${EXT}/src/popup.ts`]) {
+      expect(src(f), f).not.toMatch(/\.submit\(|requestSubmit|location\.(assign|replace)|window\.open/);
+    }
+    // Popup metni kullanıcıya "Yayınla'ya siz basarsınız" der.
+    expect(src(`${EXT}/src/popup.html`)).toContain("“Yayınla” düğmesine siz basarsınız");
+  });
+  it("kişisel denetimler atlanır: parola, e-posta, telefon, dosya (fotoğraf işlevi hariç) için plan çıkmaz", () => {
+    const plan = src("src/lib/portal-transfer/fill-plan.ts");
+    for (const t of ["password", "email", "tel", "file", "hidden"]) expect(plan, t).toContain(`"${t}"`);
+  });
+  it("aktarım kodu yalnız EmlakSoft içerik betiğinden tüketilir (aynı pencere + aynı köken + izinli köken); portala hiçbir istek atılmaz", () => {
+    expect(content).toContain("isTrustedTransferRequest(");
+    expect(content).toContain("BRIDGE_TRANSFER_FETCH_ENDPOINT");
+    expect(content).toContain("BRIDGE_MEDIA_PATH");
+    expect(bg.match(/\bfetch\(/g)?.length).toBe(1);
+    for (const f of ["al", "tamamla", "ice-al"]) {
+      const route = src(`src/app/api/app/portal-aktar/${f}/route.ts`);
+      expect(route, f).toContain("guardBridgeRequest(");
+      expect(route, f).not.toMatch(/sahibinden\.com|hepsiemlak\.com|emlakjet\.com/);
+    }
+    const guard = src("src/lib/portal-transfer/bridge-guard.ts");
+    expect(guard).toContain("isSameOriginBridgeRequest(");
+    expect(guard).toContain('failurePolicy: "deny"');
+    expect(guard).toContain("requirePermission(");
+  });
+  it("fotoğraf yükü: yalnız oturum deposu (tarayıcı kapanınca silinir), toplam bütçe sınırlı", () => {
+    expect(bg).toContain("chrome.storage.session.set({ [`${STORAGE_KEYS.transferPhotoPrefix}");
+    expect(bg).toContain("TRANSFER_PHOTO_MAX_B64");
+    expect(content).toContain("photoBudget(");
   });
 });

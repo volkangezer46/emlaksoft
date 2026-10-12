@@ -84,7 +84,42 @@ npm run build:extension      # tip denetimi + derleme + sürüm numaralı ZIP
 | Ana makine: `https://*.sahibinden.com/*`, `https://*.hepsiemlak.com/*`, `https://*.emlakjet.com/*` | Kullanıcının kendi portal oturumuyla, kendi ilanlarının sayfasını düşük hızla okuyup yayında olup olmadığını denetlemek (tek amaç). |
 | İçerik betiği: `https://emlaksoft.vercel.app/*` (+ ofisin alan adı) | EmlakSoft sayfasıyla (aynı kökenli, kullanıcının açık oturumu) konuşmak: kontrol işini almak, sonucu bildirmek, "Eklentiyi bağla" isteğini almak. |
 
-Talep EDİLMEYEN: `tabs`, `cookies`, `webRequest`, `scripting`, `activeTab`, `<all_urls>`. Uzaktan kod yüklenmez (tüm betikler pakette).
+Talep EDİLMEYEN: `tabs`, `cookies`, `webRequest`, `<all_urls>`, isteğe bağlı izin. `activeTab` + `scripting` 0.4.0'dan beri vardır ve 0.5.0'da AYNI kalır (aşağıdaki §4b). Uzaktan kod yüklenmez (tüm betikler pakette).
+
+## 4b. Tek amaç beyanı ve izin gerekçeleri: 0.5.0 (GÜNCEL ÖNERİ; mağaza gönderimi sahibin işi)
+
+0.5.0, 0.4.0 ile **aynı izin listesini** kullanır (`storage`, `alarms`, `activeTab`, `scripting` + üç portal alanı + EmlakSoft içerik betiği): Chrome mevcut kurulumları
+"yeni izin onayı" için devre dışı bırakmaz. Değişen yalnız `activeTab`/`scripting` kullanımının kapsamıdır; bu yüzden mağaza formundaki **tek amaç** ve **izin gerekçesi**
+metinleri güncellenmeli ve paket yeniden incelemeye gönderilmelidir.
+
+**Kısa açıklama (manifest `description`, ≤ 132 karakter; sınır sözleşme testiyle kilitli):**
+"Portföyünüzü portallarla eşitler: ilanları karşılaştırır, portal formunu onayınızla doldurur, ilanlarınızı EmlakSoft'a alır."
+
+**Tek amaç (mağaza "Tek amaç" alanı):**
+> EmlakSoft portföyünüz ile ilan portallarındaki (sahibinden.com, hepsiemlak.com, emlakjet.com) kendi ilanlarınızı eşitler: ilanlarınızın yayında olup olmadığını ve
+> fiyat/durum farkını karşılaştırır, portalın "İlan ver" formunu sizin onayınızla portföy bilgileriyle doldurur ve portalda zaten yayında olan ilanlarınızı EmlakSoft'a alır.
+
+**İzin gerekçeleri (mağaza formu; `scripting` ve `activeTab` metni güncellendi):**
+
+| İzin | Gerekçe |
+| --- | --- |
+| `storage` | Bağlantı durumu, ayarlar, hız sayaçları, gönderilemeyen sonuç kuyruğu; "Portala aktar" için kodu tüketilmiş paket (küçük) yerel; aktarım fotoğrafları yalnız oturum deposunda (tarayıcı kapanınca silinir). |
+| `alarms` | Manifest V3 arka plan işçisi uykuya geçer; dakikalık alarm rozeti/bağlantı durumunu ve günlük taramayı tazeler. |
+| `activeTab` | Yalnız eklenti penceresindeki bir düğmeye bastığınızda, ÖNÜNÜZDE AÇIK olan portal sekmesine geçici erişim: (1) formu doldurmak ("EmlakSoft'tan doldur"), (2) "İlanlarım" sayfasındaki görünen listeyi okumak, (3) tek bir ilanı kaydetmek. Arka planda sekme gezilmez. |
+| `scripting` | `activeTab` ile verilen o tek sekmede, yalnız düğmeye basıldığında küçük bir paket-içi işlev çalıştırmak: form alanlarını yazmak, fotoğrafları dosya alanına eklemek, listeyi okumak. Sayfa gönderilmez, "Yayınla"ya eklenti basmaz, parola/e-posta/telefon alanlarına dokunulmaz. Uzaktan kod yüklenmez. |
+| Ana makine: sahibinden / hepsiemlak / emlakjet | Kullanıcının kendi oturumuyla kendi ilanlarının sayfasını düşük hızla okuyup yayında olup olmadığını denetlemek (günlük kontrol). |
+| İçerik betiği: EmlakSoft alanı | EmlakSoft sayfasıyla (aynı kökenli, açık oturum) konuşmak: kontrol işi, aktarım paketini almak, yayın sonrası ilan no/URL'yi geri bağlamak, seçilen ilanları göndermek. |
+
+**Veri kullanımı notu (Limited Use):** portföy bilgisi ve fotoğrafları yalnız siz "Portala aktar" dediğinizde, açtığınız portal sekmesine yazılır; ilan numarası ve URL EmlakSoft'a
+döner. Portaldan alınan ilan bilgisi (başlık, fiyat, oda, m², konum) yalnız sizin seçtiğiniz ilanlar için ve yalnız EmlakSoft ofisinize gönderilir; telefon ve kişi adı alınmaz.
+Veri satılmaz, reklam/analitik için kullanılmaz.
+
+**Mağazada ayrıca göster:** "Eklenti formu doldurur; **Yayınla düğmesine siz basarsınız.** Kategori, konum ve harita adımlarını siz seçersiniz." (Kullanıcı onayı olmadan mesaj/ilan gönderme
+yasağıyla çelişmediğini gösterir.)
+
+**Canlı doğrulama (yayın öncesi ZORUNLU, henüz yapılmadı):** form kuralları (`src/lib/portal-transfer/rules.ts`) etiket tabanlıdır ve `verified:false`tır. Gerçek sahibinden/hepsiemlak/emlakjet
+ofis hesabında: (1) "İlan ver" formunda alan etiketlerinin eşleşmesi ve seçenek metinleri, (2) fotoğraf alanının `DataTransfer` ile yüklemeyi kabul etmesi (reddederse popup dürüstçe uyarır),
+(3) yayın sonrası ilan no okuması, (4) "İlanlarım" listesinin okunması (sayfalama dahil) denenmeli; sonuçlara göre `rules.ts` etiketleri güncellenmeli ve `verified` ancak sonra `true` yapılmalı.
 
 ## 5. Gizlilik politikası taslağı ve veri kullanımı beyanı (hukuk onayı sahibin işi)
 
@@ -95,6 +130,10 @@ Talep EDİLMEYEN: `tabs`, `cookies`, `webRequest`, `scripting`, `activeTab`, `<a
 > **Topladığımız veri.** Denetlenen ilan için: ilan numarası, ilan başlığı, fiyat, yayın durumu ve (portalın sayfada gösterdiği) ilan sahibi adı. Bu bilgi yalnız sizin
 > EmlakSoft ofisinize gönderilir. Ayrıca kimlik içermeyen kullanım sayaçları (portal adı, ayrıştırıcı sürümü, sonucun türü, hata kodu) gönderilir; amaç ayrıştırıcının
 > bozulup bozulmadığını görmektir.
+>
+> **Portala aktarma ve ilan alma (0.5.0).** Siz "Portala aktar" dediğinizde portföy bilgileriniz ve fotoğraflarınız yalnız açtığınız portal sekmesindeki forma yazılır; portala gönderme
+> (Yayınla) işlemini siz yaparsınız, yayınlanan ilanın numarası ve bağlantısı EmlakSoft'a geri döner. "İlanlarımı EmlakSoft'a al" dediğinizde yalnız seçtiğiniz ilanların başlık,
+> fiyat, oda, m², konum ve ilan numarası ofisinize gönderilir; telefon ve kişi adı alınmaz.
 >
 > **Toplamadığımız veri.** Portal şifreniz, çerezleriniz, kredi kartı, TC kimlik, telefon, e-posta, gezinme geçmişiniz, sayfaların tam içeriği. Eklenti EmlakSoft oturum
 > anahtarınızı okumaz veya saklamaz.

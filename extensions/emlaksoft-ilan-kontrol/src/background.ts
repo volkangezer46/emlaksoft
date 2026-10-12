@@ -34,6 +34,21 @@ import {
 } from "@/lib/listing-control/worker/extension-scan";
 import { dueFsbo, enqueueFsbo, markFsboDone, markFsboFailed, sanitizeFsboPayload, type FsboPending } from "@/lib/prospecting/extension-queue";
 import { isAllowedAppOrigin } from "@/lib/listing-control/worker/extension-pairing";
+import {
+  doneEntry,
+  doneKey,
+  dueEntries as dueQueue,
+  enqueueEntry,
+  failEntry,
+  importKey,
+  sanitizeDonePayload,
+  sanitizeImportPayload,
+  sanitizeTransferResponse,
+  type DonePayload,
+  type ImportPayload,
+  type QueueEntry,
+  type StoredTransfer,
+} from "@/lib/portal-transfer/ext-queue";
 import { installLandingUrl, shouldOpenInstallLanding } from "@/lib/listing-control/worker/extension-install";
 import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest } from "./messages";
 
@@ -55,6 +70,9 @@ const FETCH_TIMEOUT_MS = 20_000;
 /** Sayfa içi işçiden gelen istekte beklenmez (zaman aşımı 25 sn); otomatik döngü ve liste okumada kısa bekleme kabul. */
 const MAX_WAIT_MS = 35_000;
 const PORTAL_IDS = listHtmlAdapters().map((a) => a.id);
+/** Aktarım paketi bu süre sonra düşer (kod 2 saatlik; doldurma/yayın için pay). Fotoğraf başına en çok ~1,1 MB (base64) kabul edilir. */
+const TRANSFER_TTL_MS = 12 * 3_600_000;
+const TRANSFER_PHOTO_MAX_B64 = 1_500_000;
 
 type Stats = { lastAt: number | null; lastKind: StatusInput["lastKind"]; lastError: string | null };
 type AppState = { seenAt: number | null; session: AppSession; okAt: number | null };
@@ -68,6 +86,11 @@ async function getLocal<T>(key: string, fallback: T): Promise<T> {
   return (v as T | undefined) ?? fallback;
 }
 const setLocal = (key: string, value: unknown) => chrome.storage.local.set({ [key]: value });
+
+/** Oturum deposundaki aktarım fotoğraflarını temizler (en çok 40 sıra). */
+async function clearTransferPhotos(): Promise<void> {
+  await chrome.storage.session.remove(Array.from({ length: 40 }, (_, i) => `${STORAGE_KEYS.transferPhotoPrefix}${i}`));
+}
 
 // Depo okuma-değiştirme-yazma işlemleri tek kuyrukta (eşzamanlı iletiler birbirinin üstüne yazmasın).
 let storeChain: Promise<unknown> = Promise.resolve();
@@ -469,6 +492,102 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
       });
     case "fsboLast":
       return { last: await getLocal<{ at: number; summary: string; ok: boolean } | null>(STORAGE_KEYS.fsboLast, null), pending: (await getLocal<FsboPending[]>(STORAGE_KEYS.fsboPending, [])).length };
+    // ---- (0.5.0) Portala aktar: paket + fotoğraflar (bellekte), yayın sonrası geri bağlama kuyruğu, portaldan içe alma kuyruğu ----
+    case "transferPut":
+      return locked(async () => {
+        const t = sanitizeTransferResponse(msg.data, Date.now());
+        if (!t) return { ok: false, error: "invalid" };
+        await clearTransferPhotos();
+        await setLocal(STORAGE_KEYS.transfer, t);
+        return { ok: true };
+      });
+    case "transferPhoto":
+      return locked(async () => {
+        const t = await getLocal<StoredTransfer | null>(STORAGE_KEYS.transfer, null);
+        const b64 = typeof msg.b64 === "string" ? msg.b64 : "";
+        if (!t || t.sessionId !== msg.sessionId || !Number.isInteger(msg.index) || msg.index < 0 || msg.index >= t.photoIds.length || b64.length === 0 || b64.length > TRANSFER_PHOTO_MAX_B64) {
+          return { ok: false };
+        }
+        await chrome.storage.session.set({ [`${STORAGE_KEYS.transferPhotoPrefix}${msg.index}`]: { name: String(msg.name ?? "foto.jpg").slice(0, 120), type: String(msg.type ?? "image/jpeg").slice(0, 40), b64 } });
+        await setLocal(STORAGE_KEYS.transfer, { ...t, photosStored: t.photosStored + 1 } satisfies StoredTransfer);
+        return { ok: true };
+      });
+    case "transferPhotosDone":
+      return locked(async () => {
+        const t = await getLocal<StoredTransfer | null>(STORAGE_KEYS.transfer, null);
+        if (!t || t.sessionId !== msg.sessionId) return { ok: false };
+        await setLocal(STORAGE_KEYS.transfer, { ...t, photosDone: true, photosSkipped: Math.max(0, Math.min(40, Math.trunc(Number(msg.skipped) || 0))) } satisfies StoredTransfer);
+        return { ok: true };
+      });
+    case "transferGet": {
+      const t = await getLocal<StoredTransfer | null>(STORAGE_KEYS.transfer, null);
+      const fresh = t && Date.now() - t.receivedAt < TRANSFER_TTL_MS ? t : null;
+      return {
+        transfer: fresh,
+        doneLast: await getLocal<{ at: number; ok: boolean; summary: string } | null>(STORAGE_KEYS.transferDoneLast, null),
+        donePending: (await getLocal<QueueEntry<DonePayload>[]>(STORAGE_KEYS.transferDone, [])).length,
+      };
+    }
+    case "transferPhotos": {
+      const from = Math.max(0, Math.trunc(Number(msg.from) || 0));
+      const count = Math.max(1, Math.min(4, Math.trunc(Number(msg.count) || 1)));
+      const keys = Array.from({ length: count }, (_, i) => `${STORAGE_KEYS.transferPhotoPrefix}${from + i}`);
+      const got = await chrome.storage.session.get(keys);
+      return { photos: keys.map((k) => got[k] ?? null) };
+    }
+    case "transferClear":
+      return locked(async () => {
+        await clearTransferPhotos();
+        await chrome.storage.local.remove(STORAGE_KEYS.transfer);
+        return { ok: true };
+      });
+    case "transferDonePut":
+      return locked(async () => {
+        const payload = sanitizeDonePayload(msg.payload);
+        if (!payload) return { ok: false, error: "invalid" };
+        const list = await getLocal<QueueEntry<DonePayload>[]>(STORAGE_KEYS.transferDone, []);
+        await setLocal(STORAGE_KEYS.transferDone, enqueueEntry(list, doneKey(payload), payload, Date.now(), crypto.randomUUID()));
+        return { ok: true };
+      });
+    case "transferDoneDue":
+      return { entries: dueQueue(await getLocal<QueueEntry<DonePayload>[]>(STORAGE_KEYS.transferDone, []), Date.now()).slice(0, 3) };
+    case "transferDoneAck":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.transferDone, doneEntry(await getLocal<QueueEntry<DonePayload>[]>(STORAGE_KEYS.transferDone, []), String(msg.id)));
+        await setLocal(STORAGE_KEYS.transferDoneLast, { at: Date.now(), ok: msg.ok === true, summary: String(msg.summary ?? "").slice(0, 240) });
+        return { ok: true };
+      });
+    case "transferDoneFail":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.transferDone, failEntry(await getLocal<QueueEntry<DonePayload>[]>(STORAGE_KEYS.transferDone, []), String(msg.id), Date.now()));
+        return { ok: true };
+      });
+    case "importPut":
+      return locked(async () => {
+        const payload = sanitizeImportPayload(msg.payload);
+        if (!payload) return { ok: false, error: "invalid" };
+        const list = await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, []);
+        await setLocal(STORAGE_KEYS.importPending, enqueueEntry(list, importKey(payload), payload, Date.now(), crypto.randomUUID()));
+        return { ok: true, count: payload.items.length };
+      });
+    case "importDue":
+      return { entries: dueQueue(await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, []), Date.now()).slice(0, 1) };
+    case "importAck":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.importPending, doneEntry(await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, []), String(msg.id)));
+        await setLocal(STORAGE_KEYS.importLast, { at: Date.now(), ok: msg.ok === true, summary: String(msg.summary ?? "").slice(0, 300) });
+        return { ok: true };
+      });
+    case "importFail":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.importPending, failEntry(await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, []), String(msg.id), Date.now()));
+        return { ok: true };
+      });
+    case "importLast":
+      return {
+        last: await getLocal<{ at: number; ok: boolean; summary: string } | null>(STORAGE_KEYS.importLast, null),
+        pending: (await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, [])).length,
+      };
     case "outboxPut":
       return locked(async () => {
         const list = await getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []);
