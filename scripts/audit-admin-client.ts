@@ -156,6 +156,31 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
     tenantFilter: "uygulanamaz",
     evidence: "çağıranlar admin/site/reklam (requirePlatformModule seo) ve measure/collector (platform sağlık); platform_growth_funnel platform geneli toplam (kanal başına sayı) döner, ofis satırı/kimliği döndürmez; migration 20261013003220",
   },
+  "src/app/api/duyuru/tik/route.ts::GET": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "AD8 duyuru tıklama ölçümü: yalnız platform_announcement_track_click(p_delivery uuid) RPC'si (service_role; teslim id rastgele UUID = yetenek anahtarı); yalnız o teslimin clicked_at/read_at'ini ve duyuru sayacını yazar, duyurunun KENDİ href'ini döndürür (yönlendirme hedefi istekten alınmaz); IP hız sınırı; migration 20261013004700",
+  },
+  "src/app/actions/platform-notifications.ts::cancelScheduledBroadcast": {
+    tenantFilter: "uygulanamaz",
+    evidence: "AD8 platform işi: requirePlatformModule('broadcast') + super_admin/ops; yalnız tek duyuru id'si (UUID) ile platform_announcements durumu ve o duyurunun bekleyen teslimleri; kiracılar arası tasarım gereği, ofis verisi okumaz",
+  },
+  "src/app/actions/platform-notifications.ts::retryFailedDeliveries": {
+    tenantFilter: "uygulanamaz",
+    evidence: "AD8 platform işi: requirePlatformModule('broadcast') + super_admin/ops; yalnız tek duyurunun (UUID) 'failed' teslim satırlarını 'pending'e çevirir; ofis verisi okumaz",
+  },
+  "src/app/actions/platform-notifications.ts::setBannerActive": {
+    tenantFilter: "uygulanamaz",
+    evidence: "AD8 platform işi: requirePlatformModule('broadcast') + super_admin/ops; platform_banners (tenant_id sütunu yok; hedef listesi tenant_ids) tek satır is_active güncellemesi",
+  },
+  "src/app/actions/platform-notifications.ts::previewBroadcastSegment": {
+    tenantFilter: "uygulanamaz",
+    evidence: "AD8 platform işi: requirePlatformModule('broadcast') + super_admin/ops; segment çözümleyicisi (lib/platform-announcements/segment.ts) kiracılar arası yalnız SAYI döndürür (ofis/kişi kimliği dönmez)",
+  },
+  "src/lib/platform-announcements/run.ts::runAnnouncementQueue": {
+    tenantFilter: "uygulanamaz",
+    evidence: "AD8 duyuru kuyruğu: çağıranlar api/cron/campaign-delivery (CRON_SECRET) ve platform-notifications sendBroadcast/retryFailedDeliveries (requirePlatformModule broadcast); hedef ofis/kullanıcı personelin tanımladığı segmentten, teslim satırı tenant_id+user_id taşır, bildirim profiles.tenant_id eşleşmesiyle yazılır (notifyUsersBulk)",
+  },
   "src/lib/geo-province-sync.ts::failClaimedJob": {
     tenantFilter: "uygulanamaz",
     evidence: "yalnız runGeoProvinceSyncWorker <- api/cron/geo-province-sync (CRON_SECRET dosya düzeyi çıkarım); global il/ilçe iş kuyruğu (RPC gövdesi doğrulanmadı)",

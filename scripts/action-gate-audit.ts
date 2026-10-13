@@ -62,7 +62,8 @@ const MUAF: Record<string, string> = {
   // (kiracı kapısı değil). Her biri UUID doğrular, gerekçe ister ve platform_audit_logs'a önce/sonra yazar.
   "platform-subscription-fix.ts::markSubscriptionUnpaid": "Platform 'billing' modül kapısı (requirePlatformModule); hedef ofis personel seçimi, denetim izli.",
   "platform-subscription-fix.ts::extendSubscriptionPeriod": "Platform 'billing' modül kapısı; 1-90 gün sınırı, gerekçe ve denetim izi.",
-  "platform-trial.ts::extendTrial": "Platform personeli + canChangeTrial rol kapısı; yalnız deneme ofisinde, ≤90 gün, gerekçe ve denetim izi.",
+  "platform-notifications.ts::searchTenantUsersBroadcast": "Platform 'broadcast' personeli (super_admin/ops) kapısı; doğrudan mesaj için seçilen ofisin aktif kullanıcı adlarını listeler (salt okunur, UUID doğrulanır).",
+  "platform-trial.ts::extendTrial":"Platform personeli + canChangeTrial rol kapısı; yalnız deneme ofisinde, ≤90 gün, gerekçe ve denetim izi.",
   "contracts.ts::signContractByToken": "İmza bağlantısı token ile korunuyor, oturum gerektirmez.",
   "contracts.ts::submitSignatureByToken": "Aynı token akışı.",
 

@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **473** (254 dosya) — risk: P0=12, P1=39, P2=422
-- Tenant filtresi: var=260, uygulanamaz=133, yok=55, param=17, devir=8
-- Kapı türü: public-token=35, dosya-duzeyi=118, platform=84, belirsiz=110, elle-dogrulandi=20, oturum-izin=79, cron=24, webhook-imza=3
+- Toplam birim: **487** (259 dosya) — risk: P0=12, P1=39, P2=436
+- Tenant filtresi: var=265, uygulanamaz=142, yok=55, param=17, devir=8
+- Kapı türü: public-token=35, dosya-duzeyi=119, platform=88, belirsiz=113, elle-dogrulandi=26, oturum-izin=79, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **63**; RLS'li client'a taşıma adayı: **64**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -172,13 +172,21 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform-members.ts:93` | `setMemberRoleAsStaff` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/app/actions/platform-members.ts:230` | `signOutMemberSessions` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/actions/platform-members.ts:49` | `updateMemberProfile` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:274` | `deleteBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:145` | `listRecentBroadcasts` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/actions/platform-notifications.ts:28` | `markAllPlatformNotificationsRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:15` | `markPlatformNotificationRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:167` | `searchTenantsBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
-| `src/app/actions/platform-notifications.ts:90` | `sendBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
-| `src/app/actions/platform-notifications.ts:232` | `updateBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:296` | `cancelScheduledBroadcast` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:657` | `deleteBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:477` | `deleteChangelogEntry` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:492` | `listRecentBroadcasts` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/platform-notifications.ts:33` | `markAllPlatformNotificationsRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:20` | `markPlatformNotificationRead` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:249` | `previewBroadcastSegment` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
+| `src/app/actions/platform-notifications.ts:267` | `retryFailedDeliveries` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:366` | `saveBanner` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:451` | `saveChangelogEntry` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:514` | `searchTenantsBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/platform-notifications.ts:321` | `searchTenantUsersBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/actions/platform-notifications.ts:158` | `sendBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:417` | `setBannerActive` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-notifications.ts:616` | `updateBroadcast` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform-ops.ts:93` | `createAlertChannel` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-ops.ts:125` | `deleteAlertChannel` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-ops.ts:196` | `muteAlertRule` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -272,7 +280,11 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/billing/kuponlar/page.tsx:20` | `CouponsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/billing/page.tsx:92` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/billing/planlar/page.tsx:50` | `PlansAdminPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
-| `src/app/admin/duyuru/page.tsx:41` | `BroadcastPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/duyuru/banner-panel.tsx:45` | `BannerPanel` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/admin/duyuru/changelog-panel.tsx:18` | `ChangelogPanel` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/app/admin/duyuru/delivery-detail.tsx:69` | `DeliveryDetail` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/admin/duyuru/page.tsx:182` | `AnnouncementsTab` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/admin/duyuru/page.tsx:115` | `BroadcastPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/geo/[provinceId]/page.tsx:35` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/geo/bildirimler/page.tsx:29` | `AdminGeoRequestsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/geo/page.tsx:22` | `AdminGeoPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -326,6 +338,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/cron/vitrin-alarm/route.ts:27` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
 | `src/app/api/cron/vitrin-eslesme/route.ts:81` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
 | `src/app/api/customer-files/[id]/download/route.ts:58` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/api/duyuru/tik/route.ts:47` | `GET` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/app/api/expense-receipts/[id]/download/route.ts:54` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/health/route.ts:93` | `GET` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/app/api/iyzico/callback/route.ts:63` | `handle` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
@@ -464,6 +477,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/perf/store.ts:149` | `pruneLabRuns` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/perf/store.ts:109` | `upsertLabRun` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/platform-activity.ts:79` | `logPlatformActivityChecked` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
+| `src/lib/platform-announcements/run.ts:19` | `runAnnouncementQueue` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/platform-notify.ts:19` | `notifyPlatformStaff` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
 | `src/lib/platform-security/security-overview.ts:135` | `countActiveSuperAdmins` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/platform-security/security-overview.ts:101` | `loadImpersonationHistory` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
