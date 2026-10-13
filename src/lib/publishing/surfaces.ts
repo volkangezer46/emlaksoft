@@ -15,16 +15,17 @@ import {
   readAdminState as readMenuState,
   resetToDefault as resetMenuToDefault,
 } from "@/lib/site-menu/store";
+import { seoPublishSurface } from "@/lib/seo/publish-surface";
 import { createVersionedStore, type HistoryEntry, type StoreResult } from "@/lib/versioned-config/store";
 import { hashOf, type ScheduleWriteResult } from "./schedule";
 
 /**
  * YAYIN MASASI yüzey bağdaştırıcıları (kayıt defteri): taslak/yayın/geçmiş akışı olan her yönetilen içerik burada
  * tek biçime indirgenir. Depolar YALNIZ dışa açık işlevleriyle kullanılır (editörlerin kendi dosyalarına dokunulmaz).
- * Yeni yüzey = SURFACES'e bir giriş (ör. marka, SEO sonraki turda).
+ * Yeni yüzey = SURFACES'e bir giriş (site menüsü, site içeriği, SEO sayfa ayarları; ör. marka sonraki turda).
  */
 
-export type SurfaceId = "sitecontent" | "sitemenu";
+export type SurfaceId = "sitecontent" | "sitemenu" | "seo";
 
 export type SurfaceState = {
   live: unknown | null;
@@ -192,7 +193,29 @@ const siteMenu: PublishSurface = {
   },
 };
 
-export const SURFACES: readonly PublishSurface[] = [siteMenu, siteContent];
+/**
+ * SEO sayfa ayarları (S2 dikişi): SP2'nin taslak/yayın/geçmiş yüzeyi (`seo/publish-surface.ts`). `livePaths` yayından
+ * SONRA bilinir (son yayında değişen sayfalar); bu yüzden getter olarak bağlanır, kopyalanmaz.
+ */
+const seoPages: PublishSurface = {
+  id: "seo",
+  label: seoPublishSurface.label,
+  module: seoPublishSurface.module,
+  editorHref: seoPublishSurface.editorHref,
+  cacheTag: seoPublishSurface.cacheTag,
+  get livePaths() {
+    return seoPublishSurface.livePaths;
+  },
+  defaults: () => seoPublishSurface.defaults(),
+  readState: () => seoPublishSurface.readState(),
+  readLiveStrict: () => seoPublishSurface.readLiveStrict(),
+  validate: (cfg) => seoPublishSurface.validate(cfg),
+  publish: (cfg, staffId, label, by, opts) => seoPublishSurface.publish(cfg, staffId, label, by, opts),
+  resetToDefault: (staffId, by, opts) => seoPublishSurface.resetToDefault(staffId, by, opts),
+  restore: (historyId, staffId, by) => seoPublishSurface.restore(historyId, staffId, by),
+};
+
+export const SURFACES: readonly PublishSurface[] = [siteMenu, siteContent, seoPages];
 
 export function surfaceById(id: string): PublishSurface | null {
   return SURFACES.find((s) => s.id === id) ?? null;

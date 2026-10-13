@@ -2,7 +2,8 @@ import { matchStaticIds, staticRouteById, type StaticRouteId } from "@/lib/stati
 
 /**
  * K2 — DÜZELTME YÜRÜTÜCÜSÜ `static_refresh` (risk: güvenli). Sözleşme tipleri SP1 `src/lib/site-issues/types.ts`'ten
- * KOPYALANIR (import edilmez); kayıt S4 dikişinde yapılır. Otopilot izin listesinde varsayılan olarak yer alır.
+ * KOPYALANIR (import edilmez); Kokpit kaydı `src/lib/site-issues/executors.ts` (bağdaştırıcı: adapters.ts). Otopilot izin
+ * listesinde varsayılan olarak yer alır.
  *  - `plan()` kuru çalışmadır: hiçbir şey yazmaz; hangi statik sayfanın önbelleğinin temizlenip yeniden çizileceğini söyler.
  *  - `apply()` önbelleği düşürür, `statik.rev` artırır, sayfayı yeniden çizer; önce/sonra ETag ve gzip boyutunu döner.
  * İçerik DEĞİŞTİRMEZ (yalnız sunum önbelleği); bu yüzden geri alma gerektirmez.

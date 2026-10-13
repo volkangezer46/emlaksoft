@@ -3,11 +3,12 @@ import { canAutoOptimize as scopeCanAutoOptimize, normalizePath } from "@/lib/se
 import { adsRecommendations, CAMPAIGN_ONLY_AD_GROUP_ID, type AdsMetricRow } from "./ads-rules";
 import { pathOfPage } from "./gsc";
 import { GOOGLE_SERVICES, GOOGLE_SERVICE_LABELS, type GoogleService } from "./keys";
-import { areaOf, computeServiceStatus, isBroken } from "./status";
+import { areaOf, computeServiceStatus, isBroken, type ServiceStatus } from "./status";
 import type { GoogleStoreSnapshot } from "./token-store";
 
 /**
- * Google toplayıcısı (K1 sözleşmesi; tipler SP1 `site-issues/types.ts`'ten KOPYALANIR, import edilmez).
+ * Google toplayıcısı (K1; yerel tip biçimi). Kokpit kaydı (S4 dikişi) `src/lib/site-issues/adapters.ts`'tedir: orada
+ * Search Console (alan seo) ve Google Ads (alan reklam) olarak iki Kokpit toplayıcısına ayrılır.
  * Saf çekirdek `buildGoogleIssues` (testli) + sunucu sarmalayıcı `googleCollector` (yalnız tabloları/ayarı okur, Google
  * API'si ÇAĞIRMAZ). Bulgular:
  *  - google-baglanti-kopuk (kritik): hizmet "yeniden bağla" durumunda (invalid_grant).
@@ -34,7 +35,13 @@ export type IssueInput = {
   proposal?: Record<string, unknown> | null;
   manualOnly?: boolean;
 };
-export type CollectorResult = { collector: string; scanned: string[] | "all"; issues: IssueInput[] };
+export type CollectorResult = {
+  collector: string;
+  scanned: string[] | "all";
+  issues: IssueInput[];
+  /** Hizmet durumları: Kokpit kutucuğu bağlı olmayan hizmetin alanında "veri yok" gösterir (sahte skor yok). */
+  services?: Record<GoogleService, ServiceStatus>;
+};
 export type IssueCollector = { id: string; areas: IssueArea[]; collect(): Promise<CollectorResult> };
 
 export const CTR_RULE = {
@@ -195,7 +202,7 @@ export function buildGoogleIssues(input: GoogleIssueInput): CollectorResult {
     }
   }
 
-  return { collector: "google", scanned: [...new Set(scanned)], issues };
+  return { collector: "google", scanned: [...new Set(scanned)], issues, services: status };
 }
 
 /** Sunucu toplayıcısı: yalnız tablolar ve mühürlü ayar okunur (dış çağrı YOK). */

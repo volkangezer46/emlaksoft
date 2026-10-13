@@ -62,12 +62,14 @@ export async function publishDraftsSequential(
         continue;
       }
       out.push({ surface: s.id, label: s.label, ok: true, message: "Yayınlandı." });
+      // Yayın sonrası yollar yayından SONRA okunur: SEO yüzeyi etkilenen sayfaları ancak yayında bilir (diğerlerinde aynı).
+      const publishedPaths = s.livePaths.map((p) => p.path);
       try {
         await opts.onPublished?.({
           surface: s.id,
           kind: "publish",
           publishRef: hashOf(state.draft).slice(0, 16),
-          livePaths,
+          livePaths: publishedPaths,
           actorId: actor.id,
           source: actor.source,
           ...(beforeDigests ? { beforeDigests } : {}),

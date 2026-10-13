@@ -2,7 +2,7 @@ import { matchStaticIds, type StaticRouteId } from "@/lib/static-home/registry";
 
 /**
  * K3 — YAYIN SONRASI KANCA (statik tazeleme, order 10; doğrulama kancası `verify` order 20'den ÖNCE çalışır).
- * Sözleşme tipleri SP1 `src/lib/site-issues/types.ts`'ten KOPYALANIR (import edilmez); kayıt S2/S3 dikişinde yapılır.
+ * Sözleşme tipleri SP1 `src/lib/site-issues/types.ts`'ten KOPYALANIR (import edilmez); kayıt `publishing/after-publish.ts` HOOKS.
  *
  * Davranış: `livePaths` ile eşleşen kimlikler (ya da "*" → tümü) bellek önbelleğinden düşer, `statik.rev` BİR kez artar
  * (diğer süreçler ≤5 sn'de tazelenir) ve AÇIK olanlar yeniden çizilir (ısıtma). Böylece yayından sonra eski statik sayfa

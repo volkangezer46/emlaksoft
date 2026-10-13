@@ -17,7 +17,7 @@ import { SEO_CACHE_TAG, writeSeoSetting } from "./store";
  *  - Mevcut doğrudan kaydetme (`saveSeoPage`) KORUNUR. Canlı doğrudan kayıtla değiştiyse bir sonraki yayın önce o
  *    canlıyı geçmişe "önceki canlı" olarak yazar: geri dönüş her zaman yayın öncesi değere ulaşır.
  *  - Yayından ve taslağı atmadan sonra fark BOŞALTILIR (zamanlı yayında yalnız henüz canlıya geçmemiş alanlar kalır).
- *  - Yüzey kaydı (SURFACES listesi, SurfaceId birleşimi) S2 dikişindedir; burada yalnız nesne dışa verilir.
+ *  - Yüzey kaydı: `publishing/surfaces.ts` SURFACES ("seo"; livePaths getter olarak bağlanır).
  */
 
 export const SEO_OVERRIDES_PREFIX = "seo.overrides";

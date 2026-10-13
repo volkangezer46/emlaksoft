@@ -8,7 +8,7 @@ import { canAutoOptimize, isManualOnly, pathOfUrl } from "./scope";
 import type { AuditRun, SeoSettings } from "./store";
 
 /**
- * SEO TOPLAYICISI (K1, area "seo"). Kokpit (SP1) bunu kayıt listesine S4 dikişinde ekler; burada yalnız nesne dışa verilir.
+ * SEO TOPLAYICISI (K1, area "seo"). Kokpit kaydı `site-issues/collectors.ts` (dönüşüm: site-issues/builtin-seo-latest.ts).
  *  - "read": son robot koşusunu (`seo.audit.latest`) okur; ağ çağrısı YOK.
  *  - "audit": robotu çalıştırır (keşif + kurallar), sonra aynı dönüşümü uygular.
  * `scanned`: o koşuda taranan adresler (eski kayıtlarda h1 anahtarları). Her bulguda Türkçe `explain` ve ilgili

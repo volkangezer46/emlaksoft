@@ -1,17 +1,21 @@
-import type { AuditRun } from "@/lib/seo/store";
+import { auditRunToIssues } from "@/lib/seo/issues-collector";
+import type { AuditRun, SeoSettings } from "@/lib/seo/store";
+import type { IssueProposal as SeoProposal } from "@/lib/seo/contracts";
 import { canAutoOptimize, isInPublicScope, normalizeUrlForFingerprint } from "./fingerprint";
-import type { CollectorResult, IssueInput, IssueSeverity } from "./types";
+import type { CollectorResult, IssueInput, IssueProposal } from "./types";
 
 /**
- * Yerleşik SEO toplayıcısı (K1, area "seo"): SEO robotunun SON denetimini (`seo.audit.latest`, mevcut okuma işlevi
- * `readAuditLatest`) bulgu kuyruğuna çevirir. Robotu çalıştırmaz, SEO deposuna yazmaz. Kapsam "all": robotun son
- * TAM taramasında görünmeyen bulgu doğrulanmış sayılır; tarama kısmiyse (`truncated`) kapsam boştur, hiçbir şey kapanmaz. Kapsam dışı yollar (oturum, portal) hiç alınmaz; üyelik yolları
- * (`/kayit`) `manualOnly` olur ve hiçbir zaman "Taslağa al" önerisi taşımaz.
+ * SEO toplayıcısının Kokpit dönüşümü (K1, area "seo"; S4 dikişi): SEO robotunun bir koşusunu (`seo.audit.latest`)
+ * SP2'nin SEO toplayıcı dönüşümünden (`auditRunToIssues`: teknik olmayan açıklama, düzeltme ekranı, kural önerisi)
+ * geçirip Kokpit sözleşmesine (types.ts) indirger. Toplayıcı kimliği eski yerleşik toplayıcıyla AYNI kalır (mevcut
+ * kuyruk kayıtları sahipsiz kalmasın). Kapsam "all": robotun son TAM taramasında görünmeyen bulgu doğrulanmış sayılır;
+ * tarama kısmiyse (`truncated`) kapsam boştur, hiçbir şey kapanmaz. Kapsam dışı yollar (oturum, portal) hiç alınmaz;
+ * üyelik yolları (`/kayit`) `manualOnly` olur ve hiçbir zaman "Taslağa al" önerisi taşımaz.
+ * Öneri yalnız SEO ayarları verilirse (gerçek açıklama metni ve kısaltılmış hâli) ve eylemi varsa üretilir; tür adı
+ * Otopilot izin listesiyle aynıdır (`seo_meta_draft:<kod>`, `redirect_404_draft`).
  */
 
 export const BUILTIN_SEO_COLLECTOR = "builtin-seo-latest";
-
-const SEVERITY: Record<"critical" | "warning" | "info", IssueSeverity> = { critical: "kritik", warning: "uyari", info: "bilgi" };
 
 /** Teknik olmayan başlık; listede olmayan kod robotun kendi mesajını kullanır. */
 const TITLES: Record<string, string> = {
@@ -34,39 +38,41 @@ const TITLES: Record<string, string> = {
   "jsonld-parse": "Yapılandırılmış veri okunamıyor",
 };
 
-/** Otomatik hazırlanabilen öneri türleri (yürütücüleri SP2 dikişinde bağlanır; Otopilot izin listesiyle aynı adlar). */
-const AUTO_PROPOSALS: Record<string, (path: string, message: string) => { summary: string; before: string | null; after: string | null }> = {
-  "long-description": (path, message) => {
-    const n = /(\d+)\s*karakter/.exec(message)?.[1] ?? null;
-    return { summary: `${path} açıklaması ${n ? `${n}→155` : "155"} karakter`, before: n ? `${n} karakter` : null, after: "≤155 karakter" };
-  },
-  "missing-og-title": (path) => ({ summary: `${path} için paylaşım başlığı eklenir`, before: null, after: "Sayfa başlığından üretilir" }),
-};
+/** SEO önerisi → Kokpit önerisi. Eylemsiz öneri (elle düzeltilecek) Kokpit'te öneri olarak taşınmaz, kanıta yazılır. */
+export function seoProposalToIssue(code: string, p: SeoProposal | null | undefined): IssueProposal | null {
+  if (!p?.action) return null;
+  const kind = p.action.kind === "seo_meta_draft" ? `seo_meta_draft:${code}` : p.action.kind;
+  return {
+    kind,
+    summary: p.summary,
+    before: p.before ?? null,
+    after: p.after ?? null,
+    params: { rule: p.rule, field: p.field ?? null, risk: p.action.risk },
+  };
+}
 
-const seoHref = (path: string) => `/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
-
-export function auditRunToCollectorResult(run: AuditRun | null): CollectorResult {
+export function auditRunToCollectorResult(run: AuditRun | null, settings: SeoSettings | null = null): CollectorResult {
   if (!run) return { collector: BUILTIN_SEO_COLLECTOR, area: "seo", scanned: [], issues: [], sourceAt: null, note: "SEO robotu henüz çalışmadı." };
+  const seo = auditRunToIssues(run, settings);
   const issues: IssueInput[] = [];
-  for (const f of run.findings ?? []) {
+  run.findings.forEach((f, i) => {
     const path = normalizeUrlForFingerprint(f.url);
-    if (!isInPublicScope(path)) continue;
-    const auto = canAutoOptimize(path);
-    const make = AUTO_PROPOSALS[f.code];
-    const p = auto && make ? make(path, f.message) : null;
+    if (!isInPublicScope(path)) return;
+    const s = seo.issues[i]!;
+    const manualOnly = s.manualOnly || !canAutoOptimize(path);
     issues.push({
       area: "seo",
       url: path,
       code: f.code,
-      severity: SEVERITY[f.severity] ?? "bilgi",
-      title: TITLES[f.code] ?? f.message,
-      explain: `${f.message} ${f.fix}`.trim(),
-      evidence: { message: f.message, auditAt: run.at },
-      proposal: p ? { kind: `seo_meta_draft:${f.code}`, ...p } : null,
-      href: path.endsWith(".xml") || path.endsWith(".txt") ? "/admin/seo?sekme=robot" : seoHref(path),
-      manualOnly: !auto,
+      severity: s.severity,
+      title: TITLES[f.code] ?? s.title,
+      explain: s.explain,
+      evidence: { message: f.message, fix: f.fix, auditAt: run.at, ...(s.proposal && !s.proposal.action ? { suggestion: s.proposal.summary } : {}) },
+      proposal: manualOnly ? null : seoProposalToIssue(f.code, s.proposal),
+      href: s.href,
+      manualOnly,
     });
-  }
+  });
   // Kısmi tarama (sayfa sınırı, zaman bütçesi ya da depoda kırpılan bulgular): görünmeyen bulgunun düzeldiği
   // BİLİNEMEZ, bu turda hiçbir şey kapanmaz (taranmayan URL'nin bulgusu kapanmaz).
   if (run.truncated) {

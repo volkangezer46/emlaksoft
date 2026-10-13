@@ -1,31 +1,95 @@
 import "server-only";
 import { after } from "next/server";
 import { now } from "@/lib/clock";
-import { readAuditLatest } from "@/lib/seo/store";
+import { googleCollector } from "@/lib/google/collector";
+import { measureCollector } from "@/lib/measure/collector";
+import { readAuditLatest, readSeoSettingsFresh, type AuditRun } from "@/lib/seo/store";
+import { speedCollector } from "@/lib/static-home/collector";
+import { GOOGLE_ADS_COLLECTOR, GOOGLE_GSC_COLLECTOR, MEASURE_COLLECTOR, SPEED_COLLECTOR, googleResultToCollector, measureResultToCollector, speedResultToCollector } from "./adapters";
 import { BUILTIN_SEO_COLLECTOR, auditRunToCollectorResult } from "./builtin-seo-latest";
 import { recordOptimizerAction, upsertCollectorResult } from "./store";
 import type { CollectorResult, IssueArea, IssueCollector, OptimizerSource, SyncMode } from "./types";
 
 /**
- * TOPLAYICI KAYDI (K1). Bu pakette tek toplayıcı yerleşik SEO'dur; Hız, Ölçüm ve Reklam toplayıcıları kendi
- * paketlerinin dikişinde (S4) bu listeye eklenir. Kokpit kutucuğu toplayıcısı olmayan alanı "Henüz bağlı değil" gösterir.
+ * TOPLAYICI KAYDI (K1; S4 dikişi tamam). Paketlerin toplayıcıları `adapters.ts` ile Kokpit biçimine çevrilip burada
+ * kaydedilir: SEO robotu (seo), Search Console (seo), Hız (hiz), Ölçüm sağlığı (olcum), Google Ads (reklam).
+ * Kokpit kutucuğu toplayıcısı olmayan alanı "Henüz bağlı değil" gösterir.
  */
 
-export const builtinSeoCollector: IssueCollector = {
+const nowIso = () => new Date(now()).toISOString();
+
+/** "Siteyi şimdi denetle": son robot koşusu bundan yeniyse robot yeniden çalıştırılmaz (ağır tarama + IndexNow). */
+export const SEO_AUDIT_FRESH_MS = 15 * 60_000;
+
+/**
+ * SEO robotu: "cron" modunda son koşuyu okur (gece robotu az önce çalıştı); "audit" modunda son koşu 15 dk'dan eskiyse
+ * robotu çalıştırır. SEO ayarları kural önerileri (gerçek açıklama metni) için okunur; okunamazsa öneri üretilmez.
+ */
+export const seoIssueCollector: IssueCollector = {
   id: BUILTIN_SEO_COLLECTOR,
   area: "seo",
-  label: "SEO robotunun son taraması",
-  run: async () => auditRunToCollectorResult(await readAuditLatest()),
+  label: "SEO robotu",
+  async run(ctx) {
+    let run: AuditRun | null = await readAuditLatest();
+    if (ctx.mode === "audit" && (!run || now() - Date.parse(run.at) > SEO_AUDIT_FRESH_MS)) {
+      const { executeSeoRobot } = await import("@/lib/seo/robot");
+      run = (await executeSeoRobot("manual")).run;
+    }
+    const settings = run ? await readSeoSettingsFresh().catch(() => null) : null;
+    return auditRunToCollectorResult(run, settings);
+  },
 };
 
-export const COLLECTORS: readonly IssueCollector[] = [builtinSeoCollector];
+export const speedIssueCollector: IssueCollector = {
+  id: SPEED_COLLECTOR,
+  area: "hiz",
+  label: "Hız",
+  run: async () => speedResultToCollector(await speedCollector.collect(), nowIso()),
+};
+
+export const measureIssueCollector: IssueCollector = {
+  id: MEASURE_COLLECTOR,
+  area: "olcum",
+  label: "Ölçüm sağlığı",
+  run: async () => measureResultToCollector(await measureCollector.collect(), nowIso()),
+};
+
+/** Google tabloları iki toplayıcı (Search Console, Ads) için tek kez okunur (aynı denetim turunda 30 sn paylaşılır). */
+let googleMemo: { at: number; p: ReturnType<typeof googleCollector.collect> } | null = null;
+function loadGoogle(): ReturnType<typeof googleCollector.collect> {
+  const t = now();
+  if (!googleMemo || t - googleMemo.at > 30_000) {
+    const p = googleCollector.collect();
+    googleMemo = { at: t, p };
+    p.catch(() => {
+      if (googleMemo?.p === p) googleMemo = null;
+    });
+  }
+  return googleMemo.p;
+}
+
+export const googleGscIssueCollector: IssueCollector = {
+  id: GOOGLE_GSC_COLLECTOR,
+  area: "seo",
+  label: "Google Search Console",
+  run: async () => googleResultToCollector(await loadGoogle(), "seo", nowIso()),
+};
+
+export const googleAdsIssueCollector: IssueCollector = {
+  id: GOOGLE_ADS_COLLECTOR,
+  area: "reklam",
+  label: "Google Ads",
+  run: async () => googleResultToCollector(await loadGoogle(), "reklam", nowIso()),
+};
+
+export const COLLECTORS: readonly IssueCollector[] = [seoIssueCollector, googleGscIssueCollector, speedIssueCollector, measureIssueCollector, googleAdsIssueCollector];
 
 /** Kutucukların kurulum/ayrıntı ekranları (her bağlantı GERÇEK bir sayfaya gider). */
 export const AREA_META: Record<Exclude<IssueArea, "icerik">, { label: string; setupHref: string; setupLabel: string }> = {
   seo: { label: "SEO", setupHref: "/admin/seo", setupLabel: "SEO merkezi" },
-  hiz: { label: "Hız", setupHref: "/admin/sistem", setupLabel: "Sistem durumu" },
-  olcum: { label: "Ölçüm", setupHref: "/admin/growth", setupLabel: "Büyüme ve kayıt kaynakları" },
-  reklam: { label: "Reklam", setupHref: "/admin/growth", setupLabel: "Büyüme ve kayıt kaynakları" },
+  hiz: { label: "Hız", setupHref: "/admin/site/hiz", setupLabel: "Hız" },
+  olcum: { label: "Ölçüm", setupHref: "/admin/site/reklam", setupLabel: "Huni ve ziyaret sayacı" },
+  reklam: { label: "Reklam", setupHref: "/admin/site/baglantilar", setupLabel: "Google bağlantıları" },
 };
 
 export const collectorsFor = (area: IssueArea) => COLLECTORS.filter((c) => c.area === area);

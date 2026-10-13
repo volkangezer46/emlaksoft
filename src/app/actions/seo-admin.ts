@@ -40,10 +40,11 @@ import { getBaseUrl } from "@/lib/base-url";
 import { fetchOwnOriginInspect, readExternalText } from "@/lib/external-fetch";
 import { visibleText } from "@/lib/seo/audit-rules";
 import { SeoAiOutputSchema, suggestSeoWithAi } from "@/lib/seo/ai-suggest";
-import { seoAfterPublishHook } from "@/lib/seo/after-publish-hook";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
+import { hashOf } from "@/lib/publishing/schedule";
 import { seoMetaDraftExecutor } from "@/lib/seo/executors";
 import { auditRunToIssues } from "@/lib/seo/issues-collector";
-import { discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
+import { changedPagePaths, discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
 import { canAutoOptimize } from "@/lib/seo/scope";
 
 export type SeoActionResult = { ok?: boolean; error?: string; message?: string; data?: string };
@@ -429,18 +430,24 @@ export async function draftSeoAiSuggestion(fd: FormData): Promise<SeoActionResul
   return { ok: true, message: "AI önerisi taslağa yazıldı (yayınlanmadı)." };
 }
 
-/** SEO taslağını yayınlar (yalnız süper admin): seo.pages'e yazılır, geçmişe girer; etkilenen sayfalar IndexNow + yeniden denetim. */
+/**
+ * SEO taslağını yayınlar (yalnız süper admin): seo.pages'e yazılır, geçmişe girer. Yayın sonrası zinciri (Yayın masasıyla
+ * AYNI: statik tazeleme → canlı doğrulama → SEO IndexNow + yeniden denetim) etkilenen sayfalar için çalışır.
+ */
 export async function publishSeoDraft(): Promise<SeoActionResult> {
   const g = await guard(true);
   if ("error" in g) return g;
   const state = await seoPublishSurface.readState();
   if (!state.draft) return { error: "Yayınlanacak taslak yok." };
+  const draft = state.draft as Parameters<typeof changedPagePaths>[1];
+  const beforeDigests = await captureLiveDigests(changedPagePaths((state.live ?? {}) as typeof draft, draft));
   const res = await seoPublishSurface.publish(state.draft, g.staff.id, "SEO taslağı yayını", g.staff.full_name);
   if (!res.ok) return { error: res.error };
   const livePaths = seoPublishSurface.livePaths.map((p) => p.path);
   await audit(g.staff, "seo.draft.publish", "pages", { paths: livePaths });
   refresh();
-  afterSafe(() => seoAfterPublishHook.run({ surfaceId: "seo", livePaths, actorId: g.staff.id, source: "staff", at: new Date(now()).toISOString() }), "seo.after-publish");
+  const publishRef = hashOf(state.draft).slice(0, 16);
+  afterSafe(() => runAfterPublish({ surface: "seo", kind: "publish", publishRef, livePaths, actorId: g.staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, message: livePaths.length > 0 ? `Yayınlandı: ${livePaths.join(", ")}.` : "Yayınlandı (değişiklik yoktu)." };
 }
 

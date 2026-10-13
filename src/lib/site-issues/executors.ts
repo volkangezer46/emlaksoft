@@ -1,12 +1,20 @@
+import { indexNowExecutor, redirect404DraftExecutor, seoMetaDraftExecutor } from "@/lib/seo/executors";
+import { staticRefreshExecutor } from "@/lib/static-home/executors";
+import { fromSeoExecutor, fromStaticExecutor } from "./adapters";
 import { canAutoOptimize } from "./fingerprint";
 import type { IssueExecutor, SiteIssue } from "./types";
 
 /**
- * YÜRÜTÜCÜ KAYDI (K2). Yerleşik iki eylem:
+ * YÜRÜTÜCÜ KAYDI (K2; S2/S4 dikişi tamam). Yerleşik iki eylem:
  *  - `href`: yalnız ilgili ekrana götürür ("Düzelt"); plan/apply yoktur.
  *  - `ignore`: gerekçeli yoksayma; gerekçe zorunludur (eylem katmanı doğrular, durum makinesi "yoksayildi").
- * Taslak hazırlayan yürütücüler (seo_meta_draft:*, redirect_404_draft, static_refresh, indexnow) kendi paketlerinin
- * dikişinde (S2/S4) EXECUTORS listesine eklenir. Kaydı olmayan `kind` için arayüz "Bu düzeltme için ekran: …" gösterir.
+ * Paket yürütücüleri `adapters.ts` ile Kokpit biçimine çevrilip kaydedilir (hepsi "guvenli"; Otopilot izin listesiyle
+ * aynı adlar):
+ *  - seo_meta_draft:long-description / :missing-og-title → SEO yayın yüzeyinin TASLAĞINA yazar (canlı değişmez);
+ *  - redirect_404_draft → 404 adresine KAPALI yönlendirme kuralı ekler (açmak insan işi);
+ *  - indexnow → adresi IndexNow'a bildirir (kapalıysa dış çağrı yok);
+ *  - static_refresh → statik sayfa önbelleğini temizleyip yeniden çizer (içerik değişmez).
+ * Kaydı olmayan `kind` için arayüz "Bu düzeltme için ekran: …" gösterir.
  */
 
 export const hrefExecutor: IssueExecutor = { kind: "href", label: "Düzelt", risk: "guvenli", mode: "link" };
@@ -15,7 +23,18 @@ export const IGNORE_REASON_MIN = 5;
 
 export const ignoreExecutor: IssueExecutor = { kind: "ignore", label: "Yoksay", risk: "guvenli", mode: "direct" };
 
-export const EXECUTORS: readonly IssueExecutor[] = [hrefExecutor, ignoreExecutor];
+/** SEO taslaklarının Yayın masası yüzeyi (publishing/surfaces.ts "seo"). */
+export const SEO_DRAFT_SURFACE = "seo";
+
+export const PACKAGE_EXECUTORS: readonly IssueExecutor[] = [
+  fromSeoExecutor("seo_meta_draft:long-description", seoMetaDraftExecutor, { label: "Açıklamayı kısalt (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
+  fromSeoExecutor("seo_meta_draft:missing-og-title", seoMetaDraftExecutor, { label: "Paylaşım başlığı ekle (taslak)", draftSurface: SEO_DRAFT_SURFACE, status: "taslakta" }),
+  fromSeoExecutor("redirect_404_draft", redirect404DraftExecutor, { draftSurface: null, status: "taslakta" }),
+  fromSeoExecutor("indexnow", indexNowExecutor, { draftSurface: null, status: null }),
+  fromStaticExecutor(staticRefreshExecutor),
+];
+
+export const EXECUTORS: readonly IssueExecutor[] = [hrefExecutor, ignoreExecutor, ...PACKAGE_EXECUTORS];
 
 export function executorFor(kind: string | null | undefined, list: readonly IssueExecutor[] = EXECUTORS): IssueExecutor | null {
   if (!kind) return null;
