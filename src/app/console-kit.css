@@ -270,9 +270,10 @@ html[data-theme="dark"] .adm-ent-ico { box-shadow: inset 0 0 0 1px color-mix(in 
 .lk-row-act {
   @apply grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 active:bg-surface-pressed;
 }
-/* Etkileşimli tablo satırı (table.tsx TR interactive): zemin + sol kenarda ince marka vurgusu. */
+/* Etkileşimli tablo satırı (table.tsx TR interactive): sol kenarda ince marka vurgusu. Hover ZEMİNİ burada değil,
+   bileşende (`hover:bg-surface-hover`, yardımcı katman): zemin veren çağıranların (seçili, target:) üstüne binmeli. */
 .tbl-row-link {
-  @apply relative cursor-pointer hover:bg-surface-hover hover:shadow-[inset_2px_0_0_0_var(--brand-500)];
+  @apply relative cursor-pointer hover:shadow-[inset_2px_0_0_0_var(--brand-500)];
 }
 
 } /* @layer components */
