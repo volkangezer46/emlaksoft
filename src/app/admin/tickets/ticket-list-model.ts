@@ -69,6 +69,8 @@ export type TicketListFilters = {
   kategori?: string;
   atanan?: string;
   tenant?: string;
+  /** Bilet etiketi (AD9); kanonik kuyruk RPC'si etiket bilmez, bu yüzden doğrudan sorguya düşer. */
+  etiket?: string;
   sla?: TicketSlaFilter;
   sirala?: TicketSortKey;
   yon?: TicketSortDirection;
@@ -92,6 +94,7 @@ export function normalizeTicketFilters(raw: {
   kategori?: string;
   atanan?: string;
   tenant?: string;
+  etiket?: string;
   sla?: string;
   sirala?: string;
   yon?: string;
@@ -113,6 +116,8 @@ export function normalizeTicketFilters(raw: {
     : undefined;
   const atanan = raw.atanan === "atanmadi" || isUuid(raw.atanan) ? raw.atanan : undefined;
   const tenant = isUuid(raw.tenant) ? raw.tenant : undefined;
+  const rawTag = (raw.etiket ?? "").trim().toLocaleLowerCase("tr-TR");
+  const etiket = /^[\p{L}\p{N}][\p{L}\p{N} _-]{0,31}$/u.test(rawTag) ? rawTag : undefined;
   const sla = (["normal", "warning", "breached"] as const).includes(raw.sla as TicketSlaFilter)
     ? (raw.sla as TicketSlaFilter)
     : undefined;
@@ -120,7 +125,7 @@ export function normalizeTicketFilters(raw: {
     ? (raw.sirala as TicketSortKey)
     : "queue";
   // SLA görünümleri operasyon kuyruğunun kanonik risk sırasını korur.
-  const sirala = sla ? "queue" : requestedSort;
+  const sirala = sla ? "queue" : etiket && requestedSort === "queue" ? "created_at" : requestedSort;
   const yon = sirala === "queue" ? "desc" : raw.yon === "asc" || raw.yon === "desc" ? raw.yon : "desc";
   const parsedPage = Number(raw.sayfa);
   const sayfa = Number.isInteger(parsedPage) && parsedPage > 1 ? parsedPage : 1;
@@ -132,6 +137,7 @@ export function normalizeTicketFilters(raw: {
     kategori,
     atanan,
     tenant,
+    ...(etiket ? { etiket } : {}),
     sla,
     sirala,
     yon,
@@ -154,6 +160,7 @@ export function buildTicketListHref(
   if (next.kategori) params.set("kategori", next.kategori);
   if (next.atanan) params.set("atanan", next.atanan);
   if (next.tenant) params.set("tenant", next.tenant);
+  if (next.etiket) params.set("etiket", next.etiket);
   if (next.sla) params.set("sla", next.sla);
   if (next.sirala && next.sirala !== "queue") params.set("sirala", next.sirala);
   if (next.yon && next.yon !== "desc") params.set("yon", next.yon);

@@ -27,6 +27,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { cn } from "@/lib/utils";
 import { TicketDetailControls } from "./ticket-detail-controls";
 import { TicketMacroManager } from "./ticket-macro-manager";
+import { TicketTagsEditor } from "./ticket-tags-editor";
+import { loadMacros, loadTicketTags, SUPPORT_STAFF_ROLES } from "@/lib/support/desk-data";
+import { canEditMacros, describeMacroActions, parseMacroActions } from "@/lib/support/macro-template";
 
 const statusLabel: Record<string, string> = {
   open: "Açık",
@@ -72,6 +75,8 @@ const eventLabel: Record<string, string> = {
   sla_first_response_breach: "İlk yanıt SLA aşıldı",
   sla_resolution_warning: "Çözüm SLA uyarısı",
   sla_resolution_breach: "Çözüm SLA aşıldı",
+  tags: "Etiketler güncellendi",
+  auto_reminder: "Müşteriye otomatik hatırlatma",
   "attachment.uploaded": "Güvenli dosya eklendi",
   "attachment.deleted": "Dosya silindi",
 };
@@ -128,8 +133,10 @@ function Prop({ label, children }: { label: string; children: React.ReactNode })
 
 function eventDetail(event: TicketEvent) {
   const next = event.new_value;
+  if (event.event_type === "status" && next?.auto) return "Yanıt gelmediği için otomatik kapatıldı";
   if (event.event_type === "status" && typeof next?.status === "string") return statusLabel[next.status] ?? next.status;
-  if (event.event_type === "assign") return next?.assigned_staff_id ? "Personel atandı" : "Atama kaldırıldı";
+  if (event.event_type === "assign") return next?.assigned_staff_id ? (next?.auto ? "Kurala göre otomatik atandı" : "Personel atandı") : "Atama kaldırıldı";
+  if (event.event_type === "tags" && Array.isArray(next?.tags)) return next.tags.length ? next.tags.map((t) => `#${String(t)}`).join(" ") : "Etiketler kaldırıldı";
   if (event.event_type === "priority" && typeof next?.priority === "string") return priorityLabel[next.priority] ?? next.priority;
   if (event.event_type === "category" && typeof next?.category === "string") return categoryLabel[next.category] ?? next.category;
   return event.visibility === "internal" ? "Yalnız personel" : "Müşteriye görünür";
@@ -140,7 +147,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [ticketResult, messagesResult, eventsResult, attachmentsResult, staffResult, macroResult, categoryDefinitionsResult, csatResult] = await Promise.all([
+  const [ticketResult, messagesResult, eventsResult, attachmentsResult, staffResult, macroResult, categoryDefinitionsResult, csatResult, tags] = await Promise.all([
     admin
       .from("support_tickets")
       .select("id, ticket_no, subject, body, category, priority, status, created_at, updated_at, tenant_id, created_by, created_by_staff_id, assigned_staff_id, source, first_response_due_at, resolution_due_at, first_response_at, first_response_breached_at, resolution_breached_at, last_activity_at, last_customer_reply_at, last_staff_reply_at, resolved_at, closed_at, reopened_at, reopen_count, resolution_code, resolution_summary, version, tenant:tenants(name,status)")
@@ -168,9 +175,9 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       .from("platform_staff")
       .select("id, full_name")
       .eq("is_active", true)
-      .in("role", ["super_admin", "ops", "support"])
+      .in("role", [...SUPPORT_STAFF_ROLES])
       .order("full_name"),
-    admin.from("ticket_macros").select("id, title, body").order("title"),
+    loadMacros(),
     admin
       .from("definitions")
       .select("value, label, tenant_id, sort_order")
@@ -182,6 +189,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       .select("score, comment, created_at")
       .eq("ticket_id", id)
       .maybeSingle(),
+    loadTicketTags(id),
   ]);
 
   if (ticketResult.error) throw new Error(`Destek talebi yüklenemedi: ${ticketResult.error.message}`);
@@ -190,7 +198,6 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
   if (eventsResult.error) throw new Error(`Ticket geçmişi yüklenemedi: ${eventsResult.error.message}`);
   if (attachmentsResult.error) throw new Error(`Ticket ekleri yüklenemedi: ${attachmentsResult.error.message}`);
   if (staffResult.error) throw new Error(`Personel listesi yüklenemedi: ${staffResult.error.message}`);
-  if (macroResult.error) throw new Error(`Hazır yanıtlar yüklenemedi: ${macroResult.error.message}`);
   if (categoryDefinitionsResult.error) throw new Error(`Ticket kategorileri yüklenemedi: ${categoryDefinitionsResult.error.message}`);
   if (csatResult.error) throw new Error(`Müşteri değerlendirmesi yüklenemedi: ${csatResult.error.message}`);
   const csat = csatResult.data;
@@ -225,7 +232,15 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
   for (const member of actorStaffResult.data ?? []) names[member.id] = member.full_name;
 
   const staff = staffResult.data ?? [];
-  const macros = macroResult.data ?? [];
+  // En çok kullanılan makro listenin başında (sayaç yoksa alfabetik).
+  const macroRecords = [...macroResult.macros].sort((a, b) => (b.use_count ?? 0) - (a.use_count ?? 0) || a.title.localeCompare(b.title, "tr-TR"));
+  const staffNameOf = (staffId: string) => staff.find((member) => member.id === staffId)?.full_name;
+  const macros = macroRecords.map((m) => ({
+    id: m.id,
+    title: m.title,
+    body: m.body,
+    actionSummary: describeMacroActions(parseMacroActions(m.actions_json), staffNameOf),
+  }));
   const definitionRows = (categoryDefinitionsResult.data ?? []).filter(
     (definition) => definition.tenant_id === null || definition.tenant_id === ticket.tenant_id,
   );
@@ -261,7 +276,14 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
     resolutionBreachedAt: ticket.resolution_breached_at,
   });
   const internalCount = rows.filter((message) => message.visibility === "internal").length;
-  const isSuperAdmin = viewer.role === "super_admin";
+  const macroEditor = canEditMacros(viewer.role);
+  const macroVars = {
+    "ofis.ad": tenantName === "—" ? null : tenantName,
+    "kullanici.ad": ticket.created_by ? names[ticket.created_by] ?? null : null,
+    "bilet.no": ticket.ticket_no ?? null,
+    "bilet.konu": ticket.subject,
+    "temsilci.ad": viewer.full_name,
+  };
   const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label }));
 
   return (
@@ -325,7 +347,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700"><MessageSquareText className="h-4 w-4" /></span>
               <div><h2 className="font-display text-sm font-bold text-ink-950">Yanıt veya iç not ekle</h2><p className="mt-0.5 text-xs text-text-muted">Müşteri yanıtı bildirime gider; iç not yalnız destek ekibinde kalır.</p></div>
             </div>
-            <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} version={ticket.version} /></div>
+            <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} macroVars={macroVars} version={ticket.version} /></div>
           </section>
         </main>
 
@@ -344,6 +366,8 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
               version={ticket.version}
             />
           </section>
+
+          {tags ? <TicketTagsEditor key={tags.join("|")} ticketId={ticket.id} tags={tags} /> : null}
 
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="font-display text-sm font-bold text-ink-950">Kayıt bilgileri</h2>
@@ -406,7 +430,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
             </ol>
           </details>
 
-          {isSuperAdmin ? <TicketMacroManager macros={macros} /> : null}
+          {macroEditor ? <TicketMacroManager macros={macros} /> : null}
         </aside>
       </div>
     </div>

@@ -4,6 +4,8 @@ const TABS = [
   { id: "talepler", label: "Talepler", href: "/admin/tickets" },
   { id: "makrolar", label: "Hazır yanıtlar", href: "/admin/tickets/makrolar" },
   { id: "kvkk", label: "KVKK talepleri", href: "/admin/tickets/kvkk" },
+  { id: "raporlar", label: "Raporlar", href: "/admin/tickets/raporlar" },
+  { id: "ayarlar", label: "Ayarlar", href: "/admin/tickets/ayarlar" },
 ] as const;
 
 /** Destek bölümü sayfa içi sekmeleri (yeni menü satırı DEĞİL; nav.ts değişmez). */

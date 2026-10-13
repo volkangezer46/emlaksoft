@@ -2,8 +2,10 @@
 
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, LockKeyhole, Send, Sparkles } from "lucide-react";
+import { Eye, LockKeyhole, Send, Sparkles, X } from "lucide-react";
 import { replyTicketAsStaff, type TicketResult } from "@/app/actions/tickets";
+import { applyTicketMacroActions } from "@/app/actions/support-desk";
+import { renderMacroBody, type MacroVariables } from "@/lib/support/macro-template";
 import { TicketAttachmentInput, uploadTicketFiles } from "@/app/app/destek/ticket-attachment-input";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,17 +21,26 @@ import type { TicketAttachmentVisibility } from "@/lib/ticket-attachments";
 type ReplyState = TicketResult & { messageId?: string; warning?: string };
 const initial: ReplyState = {};
 
-export type TicketMacro = { id: string; title: string; body: string };
+export type TicketMacro = {
+  id: string;
+  title: string;
+  body: string;
+  /** Gönderimde uygulanacak eylemlerin okunur özeti (boşsa yalnız metin + kullanım sayacı). */
+  actionSummary?: string[];
+};
 
 export function StaffReplyForm({
   ticketId,
   closed = false,
   macros = [],
+  macroVars = {},
   version,
 }: {
   ticketId: string;
   closed?: boolean;
   macros?: TicketMacro[];
+  /** Makro değişkenleri ({{ofis.ad}} …) — sunucuda hazırlanır, seçimde tarayıcıda anında doldurulur. */
+  macroVars?: MacroVariables;
   /** İyimser eşzamanlılık kontrolü — bkz. support_tickets.version. */
   version: number;
 }) {
@@ -39,6 +50,7 @@ export function StaffReplyForm({
   const [visibility, setVisibility] = useState<TicketAttachmentVisibility>("public");
   const [attachmentKey, setAttachmentKey] = useState(0);
   const [requestId, setRequestId] = useState("");
+  const [activeMacro, setActiveMacro] = useState<TicketMacro | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setRequestId(crypto.randomUUID()), 0);
@@ -62,6 +74,17 @@ export function StaffReplyForm({
     const result = (await replyTicketAsStaff({}, replyData)) as ReplyState;
     if (!result.ok) return result;
 
+    // Makro eylemleri (durum/öncelik/atama/etiket) + kullanım sayacı, yanıt kaydedildikten SONRA.
+    let macroWarning: string | undefined;
+    const macroId = String(formData.get("macro_id") ?? "");
+    if (macroId) {
+      const macroData = new FormData();
+      macroData.set("id", ticketId);
+      macroData.set("macro_id", macroId);
+      const applied = await applyTicketMacroActions(macroData);
+      if (applied.error) macroWarning = applied.error;
+    }
+
     const uploaded = await uploadTicketFiles({
       ticketId,
       messageId: result.messageId,
@@ -72,29 +95,32 @@ export function StaffReplyForm({
       formRef.current?.reset();
       setAttachmentKey((value) => value + 1);
       setRequestId(crypto.randomUUID());
+      setActiveMacro(null);
       router.refresh();
     });
-    if (!uploaded.ok) {
-      return {
-        ...result,
-        warning:
-          uploaded.uploaded > 0
-            ? `Mesaj gönderildi; ${uploaded.uploaded} dosya yüklendi. ${uploaded.error ?? "Bazı dosyalar yüklenemedi."}`
-            : `Mesaj gönderildi ancak dosya eklenemedi. ${uploaded.error ?? ""}`.trim(),
-      };
-    }
-    return { ...result, warning: uploaded.uploaded ? `${uploaded.uploaded} dosya güvenle doğrulandı.` : undefined };
+    // Makro uyarısı yükleme sonucunu gizlemesin: ikisi de tek uyarı satırında gösterilir.
+    const uploadNote = !uploaded.ok
+      ? uploaded.uploaded > 0
+        ? `Mesaj gönderildi; ${uploaded.uploaded} dosya yüklendi. ${uploaded.error ?? "Bazı dosyalar yüklenemedi."}`
+        : `Mesaj gönderildi ancak dosya eklenemedi. ${uploaded.error ?? ""}`.trim()
+      : uploaded.uploaded
+        ? `${uploaded.uploaded} dosya güvenle doğrulandı.`
+        : undefined;
+    const warning = [macroWarning, uploadNote].filter(Boolean).join(" ");
+    return { ...result, warning: warning || undefined };
   }, initial);
 
-  function insertMacro(body: string) {
+  function insertMacro(macro: TicketMacro) {
     if (!textareaRef.current) return;
-    textareaRef.current.value = body;
+    textareaRef.current.value = renderMacroBody(macro.body, macroVars);
     textareaRef.current.focus();
+    setActiveMacro(macro);
   }
 
   return (
     <form ref={formRef} action={action} className="space-y-3">
       <input type="hidden" name="request_id" value={requestId} />
+      <input type="hidden" name="macro_id" value={activeMacro?.id ?? ""} />
       <div
         role="tablist"
         aria-label="Mesaj görünürlüğü"
@@ -171,7 +197,7 @@ export function StaffReplyForm({
             <DropdownMenuContent align="end" className="max-h-72 overflow-y-auto">
               <DropdownMenuLabel>Hazır yanıtlar</DropdownMenuLabel>
               {macros.map((macro) => (
-                <DropdownMenuItem key={macro.id} onSelect={() => insertMacro(macro.body)}>
+                <DropdownMenuItem key={macro.id} onSelect={() => insertMacro(macro)}>
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{macro.title}</p>
                     <p className="mt-0.5 line-clamp-1 text-xs text-text-faint">{macro.body}</p>
@@ -182,6 +208,28 @@ export function StaffReplyForm({
           </DropdownMenu>
         ) : null}
       </div>
+
+      {activeMacro ? (
+        <div className="flex flex-wrap items-center gap-1.5 rounded-[var(--radius-control)] border border-brand-300/40 bg-brand-600/[0.05] px-2.5 py-1.5 text-xs" role="status">
+          <Sparkles className="h-3 w-3 text-brand-600" aria-hidden />
+          <span className="font-semibold text-ink-950">{activeMacro.title}</span>
+          {activeMacro.actionSummary?.length ? (
+            <span className="text-text-muted">· gönderimde: {activeMacro.actionSummary.join(" · ")}</span>
+          ) : (
+            <span className="text-text-muted">· yalnız metin</span>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setActiveMacro(null)}
+            aria-label="Makro eylemlerini kaldır"
+            className="ml-auto rounded-full text-text-faint hover:text-danger-600"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ) : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <TicketAttachmentInput key={attachmentKey} id={`staff-ticket-files-${ticketId}`} disabled={pending} compact />

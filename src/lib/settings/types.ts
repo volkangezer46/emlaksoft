@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { AppModule } from "@/lib/permissions";
-import type { PlatformModule } from "@/lib/platform-access";
+import type { PlatformModule, PlatformRole } from "@/lib/platform-access";
 
 /**
  * Ayar Kayit Defteri tipleri (SAF: sunucu/istemci ortak, yan etkisiz).
@@ -60,6 +60,8 @@ export type SettingPermission = {
   /** Platform personeli icin modul (guardPlatformAction). */
   platformModule?: PlatformModule;
   superAdminOnly?: boolean;
+  /** Yazabilecek platform rolleri (sunucuda zorunlu; modül erişimi tek başına yetmez). superAdminOnly önceliklidir. */
+  platformRoles?: readonly PlatformRole[];
   /** Ofis kapsami icin (requirePermission(mod, "edit")). */
   appModule?: AppModule;
 };

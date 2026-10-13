@@ -47,7 +47,7 @@ export const PLATFORM_ROLE_TAGLINES: Record<PlatformRole, string> = {
 export const PLATFORM_ROLE_MODULES: Record<PlatformRole, PlatformModule[]> = {
   super_admin: ["dashboard", "sales", "tenants", "members", "billing", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "personel", "marka", "seo", "sitemenu", "sitecontent", "reklam"],
   ops: ["dashboard", "sales", "tenants", "members", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "seo", "sitemenu", "sitecontent", "reklam"],
-  billing: ["dashboard", "billing", "tenants", "reports", "advisor"],
+  billing: ["dashboard", "billing", "tenants", "reports", "advisor", "tickets"],
   support: ["dashboard", "sales", "tickets", "members", "tenants"],
 };
 
