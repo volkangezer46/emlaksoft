@@ -4,6 +4,7 @@ import { findNotifiedIds, insertNotificationsDetailed, type NotificationRow } fr
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { formatDateTimeTr } from "@/lib/format";
 import { fetchAllPaged, guardCron } from "@/lib/cron-run";
 import { runLowScoreEscalation } from "@/lib/surveys/escalate";
@@ -17,6 +18,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("gorev-hatirlat", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const to = new Date(Date.now() + 24 * 3600_000);

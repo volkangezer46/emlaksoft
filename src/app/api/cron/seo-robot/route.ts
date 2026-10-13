@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { executeSeoRobot } from "@/lib/seo/robot";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { runNightlyKokpitNow, type NightlyOutcome } from "@/lib/site-issues/nightly";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("seo-robot", req);
+  if (pausedRun) return pausedRun;
 
   try {
     const { run, indexNow, notified } = await executeSeoRobot("cron");

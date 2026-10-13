@@ -6,6 +6,7 @@ import { runOrtakProbe } from "@/lib/integrations/emlakfiyati/ortak-client";
 import { parseSettingBool } from "@/lib/platform-setting-keys";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,6 +20,8 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("ef-kontor-saglik", req);
+  if (pausedRun) return pausedRun;
 
   try {
     // strict: ayar okunamazsa (altyapı çöktü) "atlandı/ok" değil hata (500 + heartbeat 'error') olmalı.

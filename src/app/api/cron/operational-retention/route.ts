@@ -5,6 +5,7 @@ import { processStorageDeletionOutbox, storageDeletionQueueStats } from "@/lib/s
 import { purgeExpiredScopeOverrides } from "@/lib/access-control/expire-overrides";
 import { now } from "@/lib/clock";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
 import { clampRetentionDays, purgeExpiredFsboPii } from "@/lib/prospecting/retention";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
@@ -22,6 +23,8 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("operational-retention", req);
+  if (pausedRun) return pausedRun;
 
   // Retention RPC'si, depo silme kuyruğu ve kapsam istisnası temizliği BAĞIMSIZ adımlardır:
   // biri hata verince öbürleri yine çalışır; hatalar adıyla heartbeat'e yazılır.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 export const dynamic = "force-dynamic";
 /** Tenant döngülü toplu iş: zaman bütçesi (240 sn) bu sınırın altındadır. */
@@ -17,6 +18,8 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("insight-engine", req);
+  if (pausedRun) return pausedRun;
 
   try {
     const result = await runBillingReconciliation(0, "insight_engine");

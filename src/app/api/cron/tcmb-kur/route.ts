@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchTcmbRate, fetchLatestTcmbRate } from "@/lib/tcmb";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { syncEvds } from "@/lib/evds";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
@@ -25,6 +26,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("tcmb-kur", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const backfillParam = req.nextUrl.searchParams.get("backfill");

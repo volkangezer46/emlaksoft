@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
+import { runAlertEvaluationStep } from "@/lib/alerts/engine";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -9,6 +11,11 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const denied = authorizeCron(request);
   if (denied) return denied;
+  // Uyarı motoru (AD10): yeni cron route'u yerine bu 5 dakikalık işte AYRIK adım. Duraklatma kontrolünden önce
+  // çalışır (ticket-sla duraklatılsa da uyarılar sürer), asla fırlatmaz, kendi nabzını 'uyari-motoru' adıyla yazar.
+  await runAlertEvaluationStep();
+  const pausedRun = await beginCronRun("ticket-sla", request);
+  if (pausedRun) return pausedRun;
 
   try {
     const admin = createAdminClient();

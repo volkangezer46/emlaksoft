@@ -8,6 +8,7 @@ import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { runRentReminders, type RentalForReminder } from "@/lib/rent-reminders/run";
 import { daysAgoIso, trDayKey } from "@/lib/clock";
 import { runOwnerPayoutReminders } from "@/lib/property-management/payout-reminders";
@@ -79,6 +80,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("kira-tahakkuk", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);

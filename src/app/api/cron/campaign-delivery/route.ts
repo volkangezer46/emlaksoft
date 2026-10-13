@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { runCampaignDeliveryWorker } from "@/lib/campaign-delivery";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   const denied = authorizeCron(request);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("campaign-delivery", request);
+  if (pausedRun) return pausedRun;
 
   try {
     const summary = await runCampaignDeliveryWorker({

@@ -9,6 +9,7 @@ import { parseSettingBool } from "@/lib/platform-setting-keys";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -24,6 +25,8 @@ const JOB = "ef-kontor-mutabakat";
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("ef-kontor-mutabakat", req);
+  if (pausedRun) return pausedRun;
 
   try {
     // strict: ayar okunamazsa (altyapı çöktü) "atlandı/ok" değil hata (500 + heartbeat 'error') olmalı.

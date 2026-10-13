@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { now, trParts } from "@/lib/clock";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
@@ -55,6 +56,8 @@ type AnniversaryRow = {
 async function run(req: Request) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("dogum-gunu", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const nowMs = now();

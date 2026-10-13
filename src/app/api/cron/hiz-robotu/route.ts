@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { failureNote, heartbeatFor } from "@/lib/cron-heartbeat-status";
 import { now } from "@/lib/clock";
@@ -29,6 +30,8 @@ const ALWAYS = ["/", "/fiyatlar"] as const;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("hiz-robotu", req);
+  if (pausedRun) return pausedRun;
 
   try {
     const key = await readPsiKey();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runScheduledAutomations } from "@/lib/automation-engine";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { cronDeadline, heartbeatFor, guardCron } from "@/lib/cron-run";
 
 /** Zaman tabanlı otomasyonları çalıştırır (auth_expiring, demand_stale, no_contact_days, appointment_missed). */
@@ -11,6 +12,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("otomasyon", req);
+  if (pausedRun) return pausedRun;
 
   const summary = await runScheduledAutomations({ deadlineMs: cronDeadline(Date.now()) });
 

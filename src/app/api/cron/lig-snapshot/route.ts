@@ -6,6 +6,7 @@ import { notifyTenant } from "@/lib/notify";
 import { evaluateBadges, BADGE_BY_CODE } from "@/lib/gamification";
 import { loadLeagueData, periodOf, periodRange, previousPeriod } from "@/lib/gamification-query";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 /** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
@@ -38,6 +39,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("lig-snapshot", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
 

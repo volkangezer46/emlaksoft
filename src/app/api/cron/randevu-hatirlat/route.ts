@@ -4,6 +4,7 @@ import { findNotifiedIds, findNotifiedKeys, insertNotificationsDetailed, type No
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getBaseUrl } from "@/lib/base-url";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
 import { formatDateTimeTr } from "@/lib/format";
@@ -26,6 +27,8 @@ type ApptRow = {
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("randevu-hatirlat", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const startedAt = Date.now();

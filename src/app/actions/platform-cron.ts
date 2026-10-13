@@ -8,6 +8,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { now } from "@/lib/clock";
 import { fetchExternal, readExternalText } from "@/lib/external-fetch";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { CRON_TRIGGER_HEADER } from "@/lib/cron-pause";
 
 export type CronRunResult = {
   ok?: boolean;
@@ -52,7 +53,8 @@ export async function runCronJobNow(fd: FormData): Promise<CronRunResult> {
       `${getBaseUrl()}${job.path}`,
       {
         method: "GET",
-        headers: secret ? { authorization: `Bearer ${secret}` } : {},
+        // Elle tetikleme başlığı: duraklatılmış iş de çalışır, cron_runs satırı "elle" işaretlenir.
+        headers: secret ? { authorization: `Bearer ${secret}`, [CRON_TRIGGER_HEADER]: "manual" } : { [CRON_TRIGGER_HEADER]: "manual" },
         cache: "no-store",
       },
       { timeoutMs: CRON_TIMEOUT_MS },

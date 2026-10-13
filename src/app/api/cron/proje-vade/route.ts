@@ -8,6 +8,7 @@ import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { logActivity } from "@/lib/activity";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -30,6 +31,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("proje-vade", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const today = new Date().toISOString().slice(0, 10);
