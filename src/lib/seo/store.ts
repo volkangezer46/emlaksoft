@@ -9,7 +9,13 @@ import { isHistoryTracked, parseSeoHistory, pushSeoHistory } from "./history";
 import {
   DEFAULT_SEO_GLOBAL,
   GlobalInputSchema,
+  INDEXNOW_LOG_MAX,
+  IndexNowLogSchema,
   IndexNowSettingsSchema,
+  SeoAiSettingsSchema,
+  mergeSeoAi,
+  type IndexNowLogEntry,
+  type SeoAiSettings,
   PagesSchema,
   PatternsSchema,
   RedirectsSchema,
@@ -159,6 +165,27 @@ export async function indexNowKeyMatches(key: string): Promise<boolean> {
   return s.enabled && s.key.length === 32 && s.key === key;
 }
 
+/* ---------- AI önerisi ayarı ve IndexNow son bildirimler ---------- */
+
+export async function readSeoAi(): Promise<SeoAiSettings> {
+  return mergeSeoAi(safeParse(SeoAiSettingsSchema, await getPlatformSetting(SEO_KEYS.ai)));
+}
+
+export async function readIndexNowLog(): Promise<IndexNowLogEntry[]> {
+  return safeParse(IndexNowLogSchema, await getPlatformSetting(SEO_KEYS.indexnowLog)) ?? [];
+}
+
+/** Yeni girdileri başa ekler, en çok 50 tutar. Yazma hatası gönderimi etkilemez (false döner). */
+export async function appendIndexNowLog(entries: readonly IndexNowLogEntry[]): Promise<boolean> {
+  if (entries.length === 0) return true;
+  try {
+    const list = [...entries, ...(await readIndexNowLog())].slice(0, INDEXNOW_LOG_MAX);
+    return await setPlatformSetting(SEO_KEYS.indexnowLog, JSON.stringify(list));
+  } catch {
+    return false;
+  }
+}
+
 export async function readIndexNowSeen(): Promise<Set<string>> {
   const raw = await getPlatformSetting(SEO_KEYS.indexnowSeen);
   return new Set((raw ?? "").split(",").filter(Boolean));
@@ -181,6 +208,10 @@ export type AuditRun = {
   h1: Record<string, number>;
   truncated: boolean;
   notes: string[];
+  /** Bu koşuda taranan sayfa adresleri (sitemap + keşif). Eski kayıtlarda yok: okuyucu `h1` anahtarlarına düşer. */
+  scanned?: string[];
+  /** Sitemap dışından iç bağlantılarla keşfedilen sayfa sayısı. */
+  discovered?: number;
 };
 
 export type AuditHistoryPoint = { at: string; critical: number; warning: number; info: number; pagesChecked: number };
@@ -208,7 +239,8 @@ export async function readAuditHistory(): Promise<AuditHistoryPoint[]> {
 
 const MAX_STORED_FINDINGS = 400;
 
-export async function writeAuditRun(run: AuditRun): Promise<boolean> {
+/** `appendHistory: false`: yayın sonrası kısmi yeniden denetim trend grafiğine nokta eklemez. */
+export async function writeAuditRun(run: AuditRun, opts: { appendHistory?: boolean } = {}): Promise<boolean> {
   const rank = { critical: 0, warning: 1, info: 2 } as const;
   const sorted = [...run.findings].sort((a, b) => rank[a.severity] - rank[b.severity]);
   const trimmed: AuditRun = { ...run, findings: sorted.slice(0, MAX_STORED_FINDINGS), truncated: run.truncated || sorted.length > MAX_STORED_FINDINGS };
@@ -220,6 +252,7 @@ export async function writeAuditRun(run: AuditRun): Promise<boolean> {
     json = JSON.stringify(trimmed);
   }
   const ok = await setPlatformSetting(SEO_KEYS.auditLatest, json);
+  if (opts.appendHistory === false) return ok;
   const history = await readAuditHistory();
   history.push({ at: run.at, ...pickCounts(run.summary) });
   await setPlatformSetting(SEO_KEYS.auditHistory, JSON.stringify(history.slice(-60)));

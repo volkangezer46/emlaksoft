@@ -305,6 +305,8 @@ const F = {
   portalRulesLearn: "20261013002020_portal_rules_learn.sql",
   // SP1 (2026-10-13): Buyume Kokpiti birlesik bulgu kuyrugu + optimize edici islem kaydi (yeni tablolar; yalniz service_role).
   siteIssues: "20261013003000_site_issues.sql",
+  // SP2 (2026-10-13): platform AI kotasi (SEO AI onerisi + platform danismani; yeni tablo + atomik RPC).
+  platformAiQuota: "20261013003100_platform_ai_quota.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -516,6 +518,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.portalRulesRpcs]: "ek", // yeni JWT SECURITY DEFINER RPC'ler (pt_rules_current, pt_report_form_feedback, pt_rules_admin_*; yayin/geri alma yalniz super_admin); mevcut fonksiyonlara dokunmaz, pt_complete_session degismez
     [F.portalRulesLearn]: "ek", // yalniz service_role fonksiyonlari (pt_rules_learn, pt_rules_publish_system, pt_learning_retention); kod fonksiyon yokken cron adimini 'skipped' gecer
     [F.siteIssues]: "ek", // yeni tablolar site_issues + site_optimizer_actions (RLS acik, politika yok, yalniz service_role) + site_issues_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken Kokpit "kurulum bekliyor"
+    [F.platformAiQuota]: "ek", // yeni tablo platform_ai_quota (RLS acik, politika yok, yalniz service_role) + SECURITY DEFINER platform_ai_quota_take; mevcut nesnelere dokunmaz, kod tablo yokken AI onerisi kapali kalir
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -702,6 +705,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
     { id: "SP1-buyume-kokpiti", order: 65, title: "Buyume Kokpiti: site_issues + site_optimizer_actions + site_issues_prune (yalniz service_role; kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteIssues] },
+    { id: "SP2-platform-ai-kotasi", order: 66, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },

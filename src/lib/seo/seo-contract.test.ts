@@ -94,10 +94,14 @@ describe("SEO sözleşmesi: sitemap kaynağı", () => {
   it("robot yalnız kendi alan adını tarar (getBaseUrl); harici kaynak adresi sabitlenmemiş", () => {
     const src = read("src/lib/seo/audit-runner.ts");
     expect(src).toContain("getBaseUrl()");
-    // Tek dış çağrı IndexNow'dur ve ayara bağlıdır.
-    const urls = [...src.matchAll(/https?:\/\/[a-z0-9.-]+/gi)].map((m) => m[0]).filter((u) => !u.includes("example"));
-    expect(new Set(urls)).toEqual(new Set(["https://api.indexnow.org"]));
+    const urlsIn = (s: string) => [...s.matchAll(/https?:\/\/[a-z0-9.-]+/gi)].map((m) => m[0]).filter((u) => !u.includes("example"));
+    // Robotta sabit dış adres yok; tek dış çağrı IndexNow'dur (indexnow-events.ts) ve ayara bağlıdır.
+    expect(urlsIn(src)).toEqual([]);
     expect(src).toMatch(/if \(!s\.enabled\)/);
+    const events = read("src/lib/seo/indexnow-events.ts");
+    expect(new Set(urlsIn(events))).toEqual(new Set(["https://api.indexnow.org"]));
+    expect(events).toMatch(/if \(!s\.enabled\)/);
+    expect(events).toContain("fetchExternal(");
   });
 });
 

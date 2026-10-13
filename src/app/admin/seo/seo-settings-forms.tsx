@@ -25,7 +25,7 @@ import {
 import { buildRobots, robotsToText } from "@/lib/seo/robots-rules";
 import { validateJsonLd } from "@/lib/seo/jsonld";
 import { AI_BOTS } from "@/lib/seo/schema-core";
-import type { SeoGlobal, SeoIndexNowSettings, SeoRobotsSettings, SeoSitemapSettings } from "@/lib/seo/schema";
+import type { IndexNowLogEntry, SeoGlobal, SeoIndexNowSettings, SeoRobotsSettings, SeoSitemapSettings } from "@/lib/seo/schema";
 import { LockedNote, ResultNote, SeoForm, SubmitButton, withScope } from "./seo-ui";
 
 /* ------------------------------ Genel ------------------------------ */
@@ -302,7 +302,7 @@ export function RobotsForm({ value, canEdit, base }: { value: SeoRobotsSettings;
 
 /* ------------------------------ IndexNow ve robot ------------------------------ */
 
-export function IndexNowPanel({ value, canEdit, base }: { value: SeoIndexNowSettings; canEdit: boolean; base: string }) {
+export function IndexNowPanel({ value, canEdit, base, log = [] }: { value: SeoIndexNowSettings; canEdit: boolean; base: string; log?: readonly IndexNowLogEntry[] }) {
   const router = useRouter();
   const [res, setRes] = useState<SeoActionResult | null>(null);
   const [pending, start] = useTransition();
@@ -317,9 +317,9 @@ export function IndexNowPanel({ value, canEdit, base }: { value: SeoIndexNowSett
     <Card>
       <CardHeader>
         <div>
-          <CardTitle>IndexNow (Bing, Yandex, Seznam, Naver)</CardTitle>
+          <CardTitle>IndexNow (yeni sayfayı arama motorlarına anında bildir)</CardTitle>
           <CardDescription>
-            Dış çağrıdır: yalnız açıkken ve yalnız yeni/değişen, indekslenebilir adresler için api.indexnow.org’a gönderim yapılır (günlük en çok 2.000 URL). Varsayılan KAPALI.
+            Google desteklemez; Bing, Yandex ve diğerleri (Seznam, Naver) destekler. Dış çağrıdır: yalnız açıkken ve yalnız yeni/değişen, indekslenebilir adresler için api.indexnow.org’a gönderim yapılır (günlük en çok 2.000 URL). Yayın anında yalnız etkilenen sayfalar bildirilir. Varsayılan KAPALI.
           </CardDescription>
         </div>
       </CardHeader>
@@ -343,7 +343,7 @@ export function IndexNowPanel({ value, canEdit, base }: { value: SeoIndexNowSett
                 run(() => setIndexNowEnabled(fd));
               }}
             >
-              {value.enabled ? "IndexNow'u kapat" : "IndexNow'u etkinleştir"}
+              {value.enabled ? "IndexNow'ı kapat" : "IndexNow'ı aç"}
             </Button>
             {value.key ? (
               <Button variant="secondary" loading={pending} onClick={() => run(() => regenerateIndexNowKey())}>
@@ -355,6 +355,21 @@ export function IndexNowPanel({ value, canEdit, base }: { value: SeoIndexNowSett
           <LockedNote>IndexNow ayarını yalnız süper admin değiştirebilir.</LockedNote>
         )}
         <ResultNote res={res} />
+        {log.length > 0 ? (
+          <div className="space-y-1">
+            <p className="text-xs font-semibold text-ink-950">Son bildirimler</p>
+            <ul className="max-h-56 divide-y divide-line overflow-auto rounded-[var(--radius-control)] border border-line text-xs">
+              {log.slice(0, 50).map((e, i) => (
+                <li key={`${e.at}-${e.url}-${i}`} className="flex flex-wrap items-center gap-x-3 gap-y-0.5 px-3 py-1.5">
+                  <span className="break-all font-mono text-ink-950">{e.url}</span>
+                  <span className="text-text-muted">{e.at.slice(0, 16).replace("T", " ")} UTC</span>
+                  <span className={e.status === 200 || e.status === 202 ? "text-success-strong" : "text-danger-600"}>{e.status === 0 ? "bağlantı hatası" : `HTTP ${e.status}`}</span>
+                  <span className="text-text-muted">{e.source === "yayin" ? "yayın" : e.source === "elle" ? "elle" : "günlük robot"}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <p className="text-xs text-text-muted">
           Google IndexNow desteklemez ve sitemap ping’ini kaldırmıştır: Google Search Console &gt; Sitemaps bölümüne {base}/sitemap.xml adresini bir kez ekleyin.
         </p>

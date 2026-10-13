@@ -2,7 +2,8 @@ import { unstable_cache } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { getBaseUrl } from "@/lib/base-url";
-import { filterSafeEntries, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
+import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { filterSafeEntries, historyHeadAt, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
 import { SEO_CACHE_TAG, getSeoSettings } from "./store";
 import { resolveOptInSlugs } from "@/lib/vitrin-settings-logic";
 import { sitePageSitemapEntries } from "@/lib/site-pages/metadata";
@@ -21,6 +22,9 @@ import { listPublishedSitePages } from "@/lib/site-pages/store";
  */
 
 export const SITEMAP_CACHE_TAG = "seo-sitemap";
+
+/** Yayın yüzeylerinin geçmiş anahtarları (versioned-config `<prefix>.history`; site-content ve pricing-page depoları). */
+export const PUBLISH_HISTORY_KEYS = { home: "sitecontent.history", pricing: "pricingpage.history" } as const;
 const PAGE = 1000;
 const HARD_CAP = 49000;
 
@@ -45,10 +49,22 @@ const iso = (v: unknown): string | undefined => {
 
 async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string; maxPerSitemap: number }> {
   const base = getBaseUrl();
-  const settings = await getSeoSettings();
-  const entries: SitemapEntry[] = staticSitemapEntries(base, settings.pages, settings.sitemap);
+  const [settings, sitePages] = await Promise.all([getSeoSettings(), listPublishedSitePages()]);
+  // Gerçek lastmod: yayın yüzeylerinin son CANLI geçmiş girdisi (sitecontent -> "/", pricingpage -> "/fiyatlar",
+  // sayfa oluşturucu -> kendi slug'ı). Tek sorgu; okunamazsa boş (lastmod yazılmaz, sahte "bugün" yok).
+  const historyKeys = [PUBLISH_HISTORY_KEYS.home, PUBLISH_HISTORY_KEYS.pricing, ...sitePages.map((p) => `sitepage.${p.id}.history`)];
+  const histories = await getPlatformSettingsMany(historyKeys).catch(() => ({}) as Record<string, string | null>);
+  const publishedAt: Record<string, string | undefined> = {
+    "/": historyHeadAt(histories[PUBLISH_HISTORY_KEYS.home]),
+    "/fiyatlar": historyHeadAt(histories[PUBLISH_HISTORY_KEYS.pricing]),
+  };
+  const entries: SitemapEntry[] = staticSitemapEntries(base, settings.pages, settings.sitemap, publishedAt);
   const sm = settings.sitemap;
-  if (sm.staticPages) entries.push(...sitePageSitemapEntries(base, await listPublishedSitePages()));
+  if (sm.staticPages) {
+    // Özel sayfa lastmod'u: kendi yayın geçmişi; yoksa alan boş kalır (sitePageSitemapEntries geçersiz zamanı yazmaz).
+    const withPublishTime = sitePages.map((p) => ({ ...p, updatedAt: historyHeadAt(histories[`sitepage.${p.id}.history`]) ?? "" }));
+    entries.push(...sitePageSitemapEntries(base, withPublishTime));
+  }
 
   if (sm.vitrinOffices || sm.vitrinListings || sm.advisors) {
     try {

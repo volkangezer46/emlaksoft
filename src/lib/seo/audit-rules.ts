@@ -1,6 +1,7 @@
 import { extractJsonLdBlocks, validateJsonLd } from "./jsonld";
 import { NEVER_INDEX_PREFIXES } from "./registry";
 import { DESC_MAX, TITLE_MAX } from "./rules";
+import { SEO_THRESHOLDS } from "./thresholds";
 
 /**
  * Robot denetim kuralları (SAF): HTML metni + HTTP bilgisi → bulgular. Ağ/DB yok; tamamı birim testlidir.
@@ -282,4 +283,181 @@ export function resolveInternalLink(href: string, pageUrl: string, origin: strin
   u.hash = "";
   u.search = "";
   return u.toString();
+}
+
+/* ------------------------------ Genişletilmiş kurallar (SP2) ------------------------------ */
+
+/**
+ * Ham HTML'den çıkarılan ek ölçümler (SAF). `auditPage` bunları kullanmaz: mevcut kurallar ve testleri değişmez;
+ * robot ek kuralları `auditPageDeep` ile ayrıca çalıştırır.
+ */
+export type DeepFacts = {
+  /** Ham HTML bayt sayısı (okunamayan çok büyük gövde: sınır + 1). */
+  rawBytes: number;
+  /** İlk yanıt başlıklarına kadar geçen süre; ölçülmediyse null. */
+  ttfbMs: number | null;
+  /** alt özniteliği HİÇ olmayan <img> sayısı (alt="" dekoratif sayılır, bulgu değildir). */
+  imgsMissingAlt: number;
+  /** İlk başlık atlaması (ör. "h2→h4"); yoksa null. */
+  headingSkip: string | null;
+  /** Görünür metindeki sözcük sayısı (script/style/svg/noscript hariç). */
+  wordCount: number;
+  /** <title> ya da meta description </head>'den SONRA geliyor. */
+  metaAfterHead: boolean;
+  /** rel="nofollow" taşıyan iç bağlantı sayısı. */
+  nofollowInternal: number;
+  /** https sayfada http:// ile yüklenen kaynak sayısı (img/script/iframe/stil). */
+  mixedContent: number;
+};
+
+const stripInvisible = (html: string) =>
+  html.replace(/<!--[\s\S]*?-->/g, " ").replace(/<(script|style|noscript|template|svg)\b[\s\S]*?<\/\1>/gi, " ");
+
+/** Görünür metin (etiketler atılmış, boşluklar sadeleşmiş). */
+export function visibleText(html: string): string {
+  const bodyStart = html.search(/<body\b/i);
+  const part = bodyStart >= 0 ? html.slice(bodyStart) : html;
+  return decode(stripInvisible(part).replace(/<[^>]+>/g, " "));
+}
+
+export function countWords(text: string): number {
+  return text.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+}
+
+function sameOrigin(href: string, pageUrl: string, origin: string): boolean {
+  try {
+    return new URL(href, pageUrl).origin === new URL(origin).origin;
+  } catch {
+    return false;
+  }
+}
+
+export function extractDeepFacts(
+  pageUrl: string,
+  html: string,
+  origin: string,
+  timing: { rawBytes?: number; ttfbMs?: number | null } = {},
+): DeepFacts {
+  const clean = stripInvisible(html);
+
+  let imgsMissingAlt = 0;
+  for (const m of clean.matchAll(/<img\b[^>]*>/gi)) if (attr(m[0], "alt") === null) imgsMissingAlt += 1;
+
+  let headingSkip: string | null = null;
+  let prev = 0;
+  for (const m of clean.matchAll(/<h([1-6])\b/gi)) {
+    const level = Number(m[1]);
+    if (prev > 0 && level > prev + 1) {
+      headingSkip = `h${prev}→h${level}`;
+      break;
+    }
+    prev = level;
+  }
+
+  const headEnd = html.search(/<\/head>/i);
+  const titleAt = html.search(/<title\b/i);
+  let descAt = -1;
+  for (const m of html.matchAll(/<meta\b[^>]*>/gi)) {
+    if ((attr(m[0], "name") ?? "").toLowerCase() === "description") {
+      descAt = m.index ?? -1;
+      break;
+    }
+  }
+  const metaAfterHead = headEnd >= 0 && ((titleAt >= 0 && titleAt > headEnd) || (descAt >= 0 && descAt > headEnd));
+
+  let nofollowInternal = 0;
+  for (const m of clean.matchAll(/<a\b[^>]*>/gi)) {
+    const rel = (attr(m[0], "rel") ?? "").toLowerCase().split(/\s+/);
+    const href = attr(m[0], "href");
+    if (href && rel.includes("nofollow") && !/^(mailto:|tel:|javascript:|#)/i.test(href) && sameOrigin(href, pageUrl, origin)) nofollowInternal += 1;
+  }
+
+  let mixedContent = 0;
+  if (pageUrl.startsWith("https://")) {
+    for (const m of clean.matchAll(/<(img|iframe|source|video|audio|embed)\b[^>]*>/gi)) {
+      if (/^http:\/\//i.test(attr(m[0], "src") ?? "")) mixedContent += 1;
+    }
+    // stripInvisible <script> bloklarını atar; dış betik etiketleri ham HTML'de sayılır.
+    for (const m of html.matchAll(/<script\b[^>]*>/gi)) if (/^http:\/\//i.test(attr(m[0], "src") ?? "")) mixedContent += 1;
+    for (const m of clean.matchAll(/<link\b[^>]*>/gi)) {
+      const rel = (attr(m[0], "rel") ?? "").toLowerCase();
+      if (/stylesheet|icon|preload/.test(rel) && /^http:\/\//i.test(attr(m[0], "href") ?? "")) mixedContent += 1;
+    }
+  }
+
+  return {
+    rawBytes: timing.rawBytes ?? new TextEncoder().encode(html).length,
+    ttfbMs: timing.ttfbMs ?? null,
+    imgsMissingAlt,
+    headingSkip,
+    wordCount: countWords(visibleText(html)),
+    metaAfterHead,
+    nofollowInternal,
+    mixedContent,
+  };
+}
+
+/**
+ * Ek sayfa kuralları (SAF): alt metin, başlık hiyerarşisi, ince içerik, yavaş yanıt, büyük HTML, <head> dışı meta,
+ * iç bağlantıda nofollow, karışık içerik. Yalnız 2xx sayfalarda çalışır. Eşikler: thresholds.ts.
+ */
+export function auditPageDeep(facts: PageFacts, deep: DeepFacts, opts: { inSitemap: boolean }): Finding[] {
+  if (facts.status < 200 || facts.status >= 300) return [];
+  const T = SEO_THRESHOLDS;
+  const out: Finding[] = [];
+  const push = (code: string, severity: Severity, message: string, fix: string) => out.push({ code, severity, url: facts.url, message, fix });
+
+  if (deep.imgsMissingAlt > 0) push("img-missing-alt", "warning", `${deep.imgsMissingAlt} görselde alt metni yok.`, "Her görsele içeriğini anlatan kısa bir alt metni yazın (süs görselinde alt=\"\").");
+  if (deep.headingSkip) push("heading-skip", "info", `Başlık sırası atlıyor (${deep.headingSkip}).`, "Ara başlık düzeyini atlamadan sıralayın.");
+  if (opts.inSitemap && !facts.noindex && deep.wordCount < T.thinContentWords) {
+    push("thin-content", "warning", `Sayfada yalnız ${deep.wordCount} sözcük görünür metin var (en az ${T.thinContentWords} önerilir).`, "Sayfaya ziyaretçinin sorusunu yanıtlayan özgün metin ekleyin.");
+  }
+  if (deep.ttfbMs !== null && deep.ttfbMs > T.slowTtfbMs) push("slow-ttfb", "warning", `Sunucu ilk yanıtı ${Math.round(deep.ttfbMs)} ms'de verdi (en çok ${T.slowTtfbMs} ms önerilir).`, "Sayfayı önbelleğe alın ya da statik sürümünü açın.");
+  if (deep.rawBytes > T.htmlTooLargeBytes) push("html-too-large", "warning", `HTML ${Math.round(deep.rawBytes / 1024)} KB (en çok ${Math.round(T.htmlTooLargeBytes / 1024)} KB önerilir).`, "Sayfaya gömülü veriyi azaltın.");
+  if (deep.metaAfterHead) push("meta-not-in-head", "warning", "Robotun aldığı HTML'de başlık ya da açıklama <head> bölümünün dışında basılıyor.", "Metadata'nın <head> içinde basıldığından emin olun (akışlı metadata). Not: Next bilinen botlara (Bingbot, Yandex) metadata'yı <head> içinde verir; bulgu yalnız tarayıcı/robot görünümünü yansıtabilir.");
+  if (deep.nofollowInternal > 0) push("internal-link-nofollow", "warning", `${deep.nofollowInternal} iç bağlantı nofollow.`, "Kendi sayfalarınıza verdiğiniz bağlantılardan nofollow'u kaldırın.");
+  if (deep.mixedContent > 0) push("mixed-content", "critical", `${deep.mixedContent} kaynak güvensiz (http://) adresten yükleniyor.`, "Kaynak adreslerini https:// yapın.");
+  return out;
+}
+
+/** OG görseli nerede: kendi kökenimiz mi (denetlenebilir), dış adres mi (ASLA çekilmez)? */
+export function classifyOgImage(ogImage: string | null, pageUrl: string, origin: string): { kind: "own"; url: string } | { kind: "external" } | null {
+  if (!ogImage) return null;
+  try {
+    const u = new URL(ogImage, pageUrl);
+    if (u.origin === new URL(origin).origin) return { kind: "own", url: u.toString() };
+    return { kind: "external" };
+  } catch {
+    return null;
+  }
+}
+
+/** OG görseli bulgusu: kendi kökenimizdeki görsel erişilemiyorsa uyarı; dış görsel yalnız bilgi (çekilmedi). */
+export function ogImageFinding(pageUrl: string, kind: "own" | "external", status: number | null): Finding | null {
+  if (kind === "external") {
+    return { code: "og-image-external", severity: "info", url: pageUrl, message: "Dış OG görseli (denetlenmedi).", fix: "Paylaşım görselini kendi alan adınızda barındırırsanız robot erişimini denetleyebilir." };
+  }
+  if (status !== null && status >= 200 && status < 400) return null;
+  return {
+    code: "og-image-unreachable",
+    severity: "warning",
+    url: pageUrl,
+    message: `Paylaşım görseli açılmıyor (${status === null || status === 0 ? "yanıt yok" : `HTTP ${status}`}).`,
+    fix: "OG görselinin adresini düzeltin ya da genel ayardaki marka kartına dönün.",
+  };
+}
+
+/**
+ * Yetim sayfa: sitemap'te olup taranan HİÇBİR başka sayfadan bağlantı almayan sayfa (ana sayfa hariç).
+ * `inbound`: hedef adres (sondaki "/" yok) → bağlantı veren sayfalar. Tarama kısmi ise çağıran bu kuralı çalıştırmaz.
+ */
+export function findOrphans(sitemapUrls: readonly string[], inbound: ReadonlyMap<string, ReadonlySet<string>>, origin: string): Finding[] {
+  const home = stripSlash(origin);
+  return sitemapUrls
+    .filter((u) => stripSlash(u) !== home)
+    .filter((u) => {
+      const from = inbound.get(stripSlash(u));
+      return !from || [...from].every((f) => stripSlash(f) === stripSlash(u));
+    })
+    .map((url) => ({ code: "orphan-page", severity: "info" as const, url, message: "Hiçbir sayfa bu sayfaya bağlantı vermiyor (yetim sayfa).", fix: "İlgili bir sayfadan ya da menüden bu sayfaya bağlantı verin." }));
 }

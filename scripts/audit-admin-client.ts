@@ -125,6 +125,11 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
     tenantFilter: "uygulanamaz",
     evidence: "tek çağıran src/lib/seo/robot.ts executeSeoRobot <- api/cron/seo-robot (CRON_SECRET) ve runSeoRobotNow (requirePlatformModule seo + süper admin); yalnız seo_404_hits temizliği, tenant verisi yok",
   },
+  "src/lib/ai/platform-quota.ts::takePlatformAiQuota": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "platform_ai_quota_take RPC'si yalnız platform_ai_quota (tenant_id yok; anahtar/dönem/sayaç) satırını artırır; çağıranlar SEO AI önerisi (super_admin kapısı) ve platform danışmanı (requirePlatformModule); migration 20261013003100",
+  },
   "src/lib/geo-province-sync.ts::failClaimedJob": {
     tenantFilter: "uygulanamaz",
     evidence: "yalnız runGeoProvinceSyncWorker <- api/cron/geo-province-sync (CRON_SECRET dosya düzeyi çıkarım); global il/ilçe iş kuyruğu (RPC gövdesi doğrulanmadı)",

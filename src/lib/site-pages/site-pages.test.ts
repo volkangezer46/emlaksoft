@@ -189,7 +189,11 @@ describe("metadata ve sitemap", () => {
     );
     expect(entries.map((e) => e.url)).toEqual([`${base}/hakkimizda`]);
     expect(entries[0]!.lastModified).toBe("2026-10-13T08:00:00.000Z");
-    expect(read("src/lib/seo/sitemap-data.ts")).toContain("sitePageSitemapEntries(base, await listPublishedSitePages())");
+    // SP2: yayınlı sayfalar listPublishedSitePages'ten gelir; lastmod sayfanın kendi yayın geçmişinden (sitepage.<id>.history).
+    const data = read("src/lib/seo/sitemap-data.ts");
+    expect(data).toContain("listPublishedSitePages()");
+    expect(data).toContain("sitePageSitemapEntries(base, withPublishTime)");
+    expect(data).toMatch(/historyHeadAt\(histories\[`sitepage\.\$\{p\.id\}\.history`\]\)/);
   });
 
   it("FAQPage verisi sayfadaki görünen SSS bloklarından gelir", () => {

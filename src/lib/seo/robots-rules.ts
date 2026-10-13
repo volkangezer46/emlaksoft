@@ -1,5 +1,7 @@
-import { ALWAYS_DISALLOW } from "./registry";
-import type { SeoGlobal, SeoRobotsSettings } from "./schema";
+import { effectiveIndexable } from "./metadata";
+import { ALWAYS_DISALLOW, seoPages } from "./registry";
+import type { SeoGlobal, SeoPages, SeoRobotsSettings } from "./schema";
+import { autoOptimizeRegistryPaths } from "./scope";
 
 /** robots.txt kuralları (SAF). Crawl-delay BİLEREK yoktur (Google yok sayar, Bing'de gereksiz yavaşlatır). */
 
@@ -28,23 +30,29 @@ export function robotsToText(r: RobotsOut): string {
 }
 
 /**
- * llms.txt: isteğe bağlı site özeti. Varsayılan KAPALI. İçerik admin metnidir (düz metin),
- * yoksa ayarlardaki site adı/açıklamasından üretilen güvenli özet.
+ * llms.txt: isteğe bağlı site özeti. Varsayılan KAPALI. İçerik admin metnidir (düz metin), yoksa OTOMATİK üretilir:
+ * yalnız `canAutoOptimize` izin listesindeki ve (override dahil) indekslenebilir registry sayfaları listelenir.
+ * Üyelik/oturum (/kayit, /giris), ofis vitrinleri ve token'lı yüzeyler ASLA girmez.
  */
-export function buildLlmsTxt(global: SeoGlobal, settings: SeoRobotsSettings, base: string): string | null {
+export function buildLlmsTxt(global: SeoGlobal, settings: SeoRobotsSettings, base: string, pages: SeoPages = {}): string | null {
   if (!settings.llmsTxtEnabled) return null;
   if (settings.llmsTxt.trim()) return `${settings.llmsTxt.trim()}\n`;
   const b = base.replace(/\/+$/, "");
+  const allowed = new Set(autoOptimizeRegistryPaths());
+  const defs = seoPages().filter((d) => allowed.has(d.path) && effectiveIndexable(d, pages[d.path]));
+  const line = (d: (typeof defs)[number]) => {
+    const desc = (pages[d.path]?.description ?? d.description ?? "").trim();
+    const label = d.path === "/" ? "Ana sayfa" : d.label.replace(/^Araç:\s*/, "");
+    return `- [${label}](${d.path === "/" ? `${b}/` : `${b}${d.path}`})${desc ? `: ${desc}` : ""}`;
+  };
+  const section = (title: string, list: typeof defs) => (list.length > 0 ? [`## ${title}`, ...list.map(line), ""] : []);
   return [
     `# ${global.siteName}`,
     "",
     `> ${global.defaultDescription}`,
     "",
-    "## Genel sayfalar",
-    `- [Ana sayfa](${b}/)`,
-    `- [Fiyatlar](${b}/fiyatlar)`,
-    `- [Ücretsiz hesaplama araçları](${b}/araclar)`,
-    `- [Ücretsiz başla](${b}/kayit)`,
-    "",
+    ...section("Genel sayfalar", defs.filter((d) => d.group === "ana" || d.group === "hesap")),
+    ...section("Ücretsiz hesaplama araçları", defs.filter((d) => d.group === "arac")),
+    ...section("Yasal metinler", defs.filter((d) => d.group === "yasal")),
   ].join("\n");
 }

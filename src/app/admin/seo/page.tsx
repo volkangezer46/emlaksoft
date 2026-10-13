@@ -1,7 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import { Archive, Bot, Braces, Globe, History, ListChecks, Map as MapIcon, SearchCheck, Shuffle, WandSparkles } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { PageTabs } from "@/components/app/page-tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { FAQS } from "@/components/marketing/faq";
@@ -15,14 +14,21 @@ import { effectivePageView } from "@/lib/seo/metadata";
 import { analyzeRedirects, normalizeRedirectPath } from "@/lib/seo/redirects";
 import { getSeoPage, seoPages } from "@/lib/seo/registry";
 import { pageChecklist } from "@/lib/seo/rules";
-import { readSeoSettingsFresh, readAuditHistory, readAuditLatest, readIndexNow, listNotFound } from "@/lib/seo/store";
+import { readSeoSettingsFresh, readAuditHistory, readAuditLatest, readIndexNow, readIndexNowLog, readSeoAi, listNotFound } from "@/lib/seo/store";
+import { auditRunToIssues } from "@/lib/seo/issues-collector";
+import { changedPagePaths, seoPublishSurface } from "@/lib/seo/publish-surface";
+import { canAutoOptimize } from "@/lib/seo/scope";
+import { readPlatformAiQuota } from "@/lib/ai/platform-quota";
+import { now, trDayKey } from "@/lib/clock";
 import { loadSitemapFresh } from "@/lib/seo/sitemap-data";
 import { SEO_HISTORY_LABELS, diffSeoValues, listSeoHistory } from "@/lib/seo/history";
 import { notFoundCandidates, suggest404Target } from "@/lib/seo/not-found-suggest";
-import { SEO_KEYS } from "@/lib/seo/schema";
+import { SEO_KEYS, type SeoPages } from "@/lib/seo/schema";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { buildFaq } from "@/lib/pricing-page-model";
 import { loadPatternData } from "./pattern-samples";
+import { SeoTabs } from "./seo-tabs";
+import { AiSuggestPanel, RuleDraftButton, SeoAiSettingsPanel, SeoDraftPanel } from "./seo-growth-panels";
 import { PatternsPanel } from "./seo-patterns-panel";
 import { HistoryRestoreButton } from "./seo-history-panel";
 import { PageEditor, type PageEditorData } from "./seo-page-editor";
@@ -43,16 +49,17 @@ export const metadata = { title: "SEO merkezi" };
 // "Robotu şimdi çalıştır" sunucu action'ı bu segmentin süre sınırını kullanır.
 export const maxDuration = 60;
 
+// Temel: Genel ve kurulum · Sorunlar ve robot. Uzman ▾: diğerleri. `?sekme=` adresleri değişmez.
 const TABS = [
-  { id: "genel", label: "Genel", icon: Globe },
-  { id: "sayfalar", label: "Sayfalar", icon: ListChecks },
-  { id: "kaliplar", label: "Dinamik kalıplar", icon: WandSparkles },
-  { id: "sitemap", label: "Sitemap ve robots", icon: MapIcon },
-  { id: "yonlendirme", label: "Yönlendirmeler ve 404", icon: Shuffle },
-  { id: "veri", label: "Yapılandırılmış veri", icon: Braces },
-  { id: "robot", label: "Robot", icon: Bot },
-  { id: "gecmis", label: "Geçmiş", icon: History },
-  { id: "yedek", label: "Yedek", icon: Archive },
+  { id: "genel", label: "Genel ve kurulum", icon: Globe },
+  { id: "robot", label: "Sorunlar ve robot", icon: Bot },
+  { id: "sayfalar", label: "Sayfalar", icon: ListChecks, expert: true },
+  { id: "kaliplar", label: "Dinamik kalıplar", icon: WandSparkles, expert: true },
+  { id: "sitemap", label: "Sitemap ve robots", icon: MapIcon, expert: true },
+  { id: "yonlendirme", label: "Yönlendirmeler ve 404", icon: Shuffle, expert: true },
+  { id: "veri", label: "Yapılandırılmış veri", icon: Braces, expert: true },
+  { id: "gecmis", label: "Geçmiş", icon: History, expert: true },
+  { id: "yedek", label: "Yedek", icon: Archive, expert: true },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -76,14 +83,15 @@ export default async function AdminSeoPage({ searchParams }: { searchParams?: Pr
         description="Başlık, açıklama, paylaşım kartı, sitemap, robots.txt, yapılandırılmış veri, yönlendirme ve günlük denetim robotu tek yerden. Ayar yokken site bugünkü değerleriyle çalışır."
         glow="brand"
       />
-      <PageTabs base="/admin/seo" label="SEO sekmeleri" tabs={TABS} active={active} />
-      {active === "genel" ? <GeneralTab canEdit={canSensitive} /> : null}
+      <SeoTabs base="/admin/seo" tabs={TABS} active={active} />
+      <SeoDraftSection canPublish={canSensitive} />
+      {active === "genel" ? <GeneralTab canEdit={canSensitive} base={base} /> : null}
       {active === "sayfalar" ? <PagesTab selected={sp.sayfa} canSensitive={canSensitive} base={base} /> : null}
       {active === "kaliplar" ? <PatternsTab canEdit={canSensitive} base={base} /> : null}
       {active === "sitemap" ? <SitemapTab canEdit={canSensitive} base={base} /> : null}
       {active === "veri" ? <StructuredDataTab base={base} /> : null}
       {active === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} prefillTo={sp.hedef} /> : null}
-      {active === "robot" ? <RobotTab canRun={canSensitive} base={base} /> : null}
+      {active === "robot" ? <RobotTab canRun={canSensitive} /> : null}
       {active === "gecmis" ? <HistoryTab canRestore={canSensitive} /> : null}
       {active === "yedek" ? <BackupPanel canImport={canSensitive} /> : null}
     </div>
@@ -92,9 +100,59 @@ export default async function AdminSeoPage({ searchParams }: { searchParams?: Pr
 
 /* ------------------------------ Genel ------------------------------ */
 
-async function GeneralTab({ canEdit }: { canEdit: boolean }) {
-  const s = await readSeoSettingsFresh();
-  return <GlobalForm value={s.global} canEdit={canEdit} />;
+async function GeneralTab({ canEdit, base }: { canEdit: boolean; base: string }) {
+  const [s, indexNow, log, ai, quota] = await Promise.all([readSeoSettingsFresh(), readIndexNow(), readIndexNowLog(), readSeoAi(), readPlatformAiQuota("seo.ai")]);
+  const v = s.global.verification;
+  const checks = [
+    { id: "vGoogle", label: "Google Search Console", ok: Boolean(v.google) },
+    { id: "vBing", label: "Bing Webmaster", ok: Boolean(v.bing) },
+    { id: "vYandex", label: "Yandex Webmaster", ok: Boolean(v.yandex) },
+  ];
+  const month = trDayKey(now()).slice(0, 7);
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Kurulum kontrol listesi</CardTitle>
+            <CardDescription>Arama motoru doğrulama kodları aşağıdaki Genel formundan girilir. Boş olan sarı görünür.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid gap-2 md:grid-cols-3">
+            {checks.map((c) => (
+              <li key={c.id}>
+                <a href={`#${c.id}`} className={`flex items-center justify-between gap-2 rounded-[var(--radius-control)] px-3 py-2 text-sm font-semibold ${c.ok ? "tone-success" : "tone-warning"}`}>
+                  <span>{c.label}</span>
+                  <span className="text-xs">{c.ok ? "Doğrulama kodu var" : "Eksik"}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+      <IndexNowPanel value={indexNow} canEdit={canEdit} base={base} log={log} />
+      <SeoAiSettingsPanel value={ai} canEdit={canEdit} usedThisMonth={quota === null ? null : quota.period === month ? quota.used : 0} />
+      <GlobalForm value={s.global} canEdit={canEdit} />
+    </div>
+  );
+}
+
+/* ------------------------------ SEO taslağı ------------------------------ */
+
+/** Yayınlanmamış SEO taslağı varsa her sekmenin üstünde görünür (taslak canlıyı değiştirmez). */
+async function SeoDraftSection({ canPublish }: { canPublish: boolean }) {
+  const state = await seoPublishSurface.readState();
+  if (!state.draft) return null;
+  const live = (state.live ?? {}) as SeoPages;
+  const draft = state.draft as SeoPages;
+  const changes = changedPagePaths(live, draft).map((path) => ({
+    path,
+    fields: Object.keys({ ...(live[path] ?? {}), ...(draft[path] ?? {}) }).filter(
+      (k) => k !== "updatedAt" && JSON.stringify((live[path] as Record<string, unknown> | undefined)?.[k]) !== JSON.stringify((draft[path] as Record<string, unknown> | undefined)?.[k]),
+    ),
+  }));
+  return <SeoDraftPanel changes={changes} canPublish={canPublish} />;
 }
 
 /* ------------------------------ Sayfalar ------------------------------ */
@@ -551,8 +609,10 @@ async function HistoryTab({ canRestore }: { canRestore: boolean }) {
 
 /* ------------------------------ Robot ------------------------------ */
 
-async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
-  const [run, history, indexNow] = await Promise.all([readAuditLatest(), readAuditHistory(), readIndexNow()]);
+async function RobotTab({ canRun }: { canRun: boolean }) {
+  const [run, history, settings, ai] = await Promise.all([readAuditLatest(), readAuditHistory(), readSeoSettingsFresh(), readSeoAi()]);
+  const issues = run ? auditRunToIssues(run, settings).issues : [];
+  const aiPages = canRun && ai.enabled ? seoPages().filter((p) => p.index && canAutoOptimize(p.path)).map((p) => ({ path: p.path, label: p.label })) : [];
   const cron = CRON_JOBS.find((j) => j.job === "seo-robot");
   const maxBar = Math.max(1, ...history.map((h) => h.critical + h.warning));
   return (
@@ -562,7 +622,7 @@ async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
           <div>
             <CardTitle>SEO robotu</CardTitle>
             <CardDescription>
-              Her gün {cron?.cadenceLabel.replace("her gün ", "") ?? "04:20"} sitemap’inizdeki sayfaları KENDİ sunucunuzdan kontrol eder (harici site taraması yok): durum kodu, başlık, açıklama, canonical, OG, h1, robots, yapılandırılmış veri, yinelenenler, noindex/sitemap çelişkisi, kırık iç bağlantı örneklemesi ve robots-sitemap tutarlılığı. Kritik bulguda platform bildirimi gönderir.
+              Her gün {cron?.cadenceLabel.replace("her gün ", "") ?? "04:20"} ana sayfa ve sitemap’inizdeki sayfaları KENDİ sunucunuzdan kontrol eder ve iç bağlantılarla 2 seviyeye kadar sitemap dışı sayfaları da keşfeder (harici site taraması yok): durum kodu, başlık, açıklama, canonical, OG, h1, başlık sırası, görsel alt metni, içerik uzunluğu, yanıt süresi, robots, yapılandırılmış veri, yinelenenler, noindex/sitemap çelişkisi, sitemap dışı aranabilir sayfa, yetim sayfa, kırık iç bağlantı örneklemesi ve robots-sitemap tutarlılığı. Kritik bulguda platform bildirimi gönderir.
             </CardDescription>
           </div>
         </CardHeader>
@@ -588,6 +648,7 @@ async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
           {run ? (
             <p className="text-xs text-text-muted">
               Son çalışma: {formatDateTimeTr(run.at)} · {run.trigger === "cron" ? "otomatik" : "elle"} · {Math.round(run.durationMs / 1000)} sn · {run.summary.linksChecked} iç bağlantı örneklendi
+              {run.discovered ? ` · ${run.discovered} sayfa keşifle bulundu` : ""}
               {run.truncated ? " · bütçe sınırı nedeniyle kısmi" : ""}
             </p>
           ) : null}
@@ -641,6 +702,7 @@ async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
           ) : (
             <ul className="divide-y divide-line">
               {run.findings.slice(0, 150).map((f, i) => {
+                const issue = issues[i];
                 let path = "";
                 try {
                   path = new URL(f.url).pathname;
@@ -655,6 +717,14 @@ async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
                       <span className="break-all font-mono text-xs text-text-muted">{f.url}</span>
                     </div>
                     <p className="text-sm text-ink-950">{f.message}</p>
+                    {issue ? <p className="text-xs text-text-muted">{issue.explain}</p> : null}
+                    {issue?.proposal ? (
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-ink-950">Öneri: {issue.proposal.summary}</span>
+                        {issue.proposal.after && issue.proposal.field !== "redirect" ? <code className="break-all rounded bg-canvas px-1 py-0.5">{issue.proposal.after}</code> : null}
+                        {issue.proposal.action && !issue.manualOnly ? <RuleDraftButton url={f.url} code={f.code} /> : <span className="text-text-faint">Elle düzenlenir (üyelik/oturum ya da ofis sayfası).</span>}
+                      </div>
+                    ) : null}
                     <p className="text-xs text-text-muted">
                       Öneri: {f.fix}{" "}
                       {editable ? (
@@ -676,7 +746,7 @@ async function RobotTab({ canRun, base }: { canRun: boolean; base: string }) {
         </Card>
       ) : null}
 
-      <IndexNowPanel value={indexNow} canEdit={canRun} base={base} />
+      <AiSuggestPanel pages={aiPages} />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import {
   RobotsSettingsSchema,
   SEO_KEYS,
   SitemapSettingsSchema,
+  SeoAiSettingsSchema,
   AI_BOTS,
   CHANGE_FREQS,
   JSON_LD_KINDS,
@@ -32,8 +33,18 @@ import {
   type SeoPageOverride,
   type SeoRedirectRule,
 } from "@/lib/seo/schema";
-import { SEO_CACHE_TAG, readIndexNow, readSeoSettingsFresh, writeIndexNow, writeSeoSetting } from "@/lib/seo/store";
+import { SEO_CACHE_TAG, readAuditLatest, readIndexNow, readSeoSettingsFresh, writeIndexNow, writeSeoSetting } from "@/lib/seo/store";
 import type { PlatformStaff } from "@/lib/platform";
+import { afterSafe } from "@/lib/after-safe";
+import { getBaseUrl } from "@/lib/base-url";
+import { fetchOwnOriginInspect, readExternalText } from "@/lib/external-fetch";
+import { visibleText } from "@/lib/seo/audit-rules";
+import { SeoAiOutputSchema, suggestSeoWithAi } from "@/lib/seo/ai-suggest";
+import { seoAfterPublishHook } from "@/lib/seo/after-publish-hook";
+import { seoMetaDraftExecutor } from "@/lib/seo/executors";
+import { auditRunToIssues } from "@/lib/seo/issues-collector";
+import { discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
+import { canAutoOptimize } from "@/lib/seo/scope";
 
 export type SeoActionResult = { ok?: boolean; error?: string; message?: string; data?: string };
 
@@ -327,6 +338,121 @@ export async function regenerateIndexNowKey(): Promise<SeoActionResult> {
   await audit(g.staff, "seo.indexnow.regenerate", "indexnow");
   refresh();
   return { ok: true };
+}
+
+/* ------------------------------ AI önerisi ayarı ------------------------------ */
+
+/** AI önerisi aç/kapat ve aylık sınır (yalnız süper admin). Varsayılan KAPALI; kota platform AI kotasından düşer. */
+export async function saveSeoAiSettings(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const limit = Number(text(fd, "monthlyLimit") ?? "300");
+  const input = { enabled: bool(fd, "enabled"), monthlyLimit: Number.isInteger(limit) ? limit : 300 };
+  const res = await writeSeoSetting("ai", SeoAiSettingsSchema, input, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, input.enabled ? "seo.ai.enable" : "seo.ai.disable", "ai", { monthlyLimit: input.monthlyLimit });
+  revalidatePath("/admin/seo");
+  return { ok: true, message: input.enabled ? "AI önerisi açıldı." : "AI önerisi kapalı." };
+}
+
+/* ------------------------------ Öneri → taslak ------------------------------ */
+
+/**
+ * Robot bulgusunun KURAL önerisini SEO taslağına yazar (canlı değişmez). Bulgu son koşudan bulunur; öneri sunucuda
+ * yeniden hesaplanır (istemciden değer alınmaz). Kapsam dışı/üyelik sayfası bulgusu taslak ALMAZ.
+ */
+export async function draftSeoRuleFix(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(false);
+  if ("error" in g) return g;
+  const url = text(fd, "url") ?? "";
+  const code = text(fd, "code") ?? "";
+  const [run, settings] = await Promise.all([readAuditLatest(), readSeoSettingsFresh()]);
+  if (!run) return { error: "Robot henüz çalışmadı." };
+  const finding = run.findings.find((f) => f.url === url && f.code === code);
+  if (!finding) return { error: "Bulgu artık yok (robot yeniden çalışmış olabilir)." };
+  const issue = auditRunToIssues({ ...run, findings: [finding] }, settings).issues[0];
+  if (!issue || !seoMetaDraftExecutor.canHandle(issue)) return { error: "Bu bulgu için otomatik taslak yok; sayfayı elle düzenleyin." };
+  const res = await seoMetaDraftExecutor.apply(issue, { actorId: g.staff.id, source: "staff" });
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.draft.rule", issue.url, { code, before: res.before, after: res.after });
+  revalidatePath("/admin/seo");
+  return { ok: true, message: res.message };
+}
+
+/** Sayfanın görünür metnini KENDİ kökenimizden okur (yalnız AI önerisi girdisi; dış adres YOK). */
+async function ownPageText(path: string): Promise<string | null> {
+  try {
+    const res = await fetchOwnOriginInspect(`${getBaseUrl()}${path === "/" ? "/" : path}`, { method: "GET", cache: "no-store" }, { timeoutMs: 8000 });
+    if (res.status !== 200) {
+      await res.body?.cancel();
+      return null;
+    }
+    return visibleText(await readExternalText(res, 1_500_000));
+  } catch {
+    return null;
+  }
+}
+
+/** AI önerisi ister (yalnız süper admin, ayar açık, sayfa kapsam içi; kota platform AI kotasından). Hiçbir şey yazmaz. */
+export async function requestSeoAiSuggestion(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const path = text(fd, "path") ?? "";
+  if (!getSeoPage(path)) return { error: "Bu yol yönetilebilir sayfalar arasında değil." };
+  const pageText = await ownPageText(path);
+  if (pageText === null) return { error: "Sayfa kendi sunucumuzdan okunamadı; sayfanın açıldığını kontrol edip tekrar deneyin." };
+  const r = await suggestSeoWithAi({ path, visibleText: pageText, actor: { id: g.staff.id, role: g.staff.role } });
+  if (!r.ok) return { error: r.error };
+  return { ok: true, message: "AI önerisi hazır; kontrol edip taslağa yazabilirsiniz.", data: JSON.stringify(r.suggestion) };
+}
+
+/** AI önerisini (super admin gözden geçirdikten sonra) SEO taslağına yazar. Değerler şema sınırlarından geçer. */
+export async function draftSeoAiSuggestion(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const path = text(fd, "path") ?? "";
+  if (!getSeoPage(path) || !canAutoOptimize(path)) return { error: "Bu sayfa otomatik öneri kapsamında değil." };
+  const parsed = SeoAiOutputSchema.safeParse({ title: text(fd, "title"), description: text(fd, "description"), ogTitle: text(fd, "ogTitle") ?? null });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Öneri geçersiz." };
+  const fields: Array<["title" | "description" | "ogTitle", string | null | undefined]> = [
+    ["title", parsed.data.title],
+    ["description", parsed.data.description],
+    ["ogTitle", parsed.data.ogTitle],
+  ];
+  for (const [field, value] of fields) {
+    if (!value) continue;
+    const res = await draftSeoPageField(path, field, value, g.staff.id);
+    if (!res.ok) return { error: res.error };
+  }
+  await audit(g.staff, "seo.draft.ai", path);
+  revalidatePath("/admin/seo");
+  return { ok: true, message: "AI önerisi taslağa yazıldı (yayınlanmadı)." };
+}
+
+/** SEO taslağını yayınlar (yalnız süper admin): seo.pages'e yazılır, geçmişe girer; etkilenen sayfalar IndexNow + yeniden denetim. */
+export async function publishSeoDraft(): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const state = await seoPublishSurface.readState();
+  if (!state.draft) return { error: "Yayınlanacak taslak yok." };
+  const res = await seoPublishSurface.publish(state.draft, g.staff.id, "SEO taslağı yayını", g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  const livePaths = seoPublishSurface.livePaths.map((p) => p.path);
+  await audit(g.staff, "seo.draft.publish", "pages", { paths: livePaths });
+  refresh();
+  afterSafe(() => seoAfterPublishHook.run({ surfaceId: "seo", livePaths, actorId: g.staff.id, source: "staff", at: new Date(now()).toISOString() }), "seo.after-publish");
+  return { ok: true, message: livePaths.length > 0 ? `Yayınlandı: ${livePaths.join(", ")}.` : "Yayınlandı (değişiklik yoktu)." };
+}
+
+/** Bekleyen taslak farkını atar (canlı değişmez). */
+export async function discardSeoDraft(): Promise<SeoActionResult> {
+  const g = await guard(false);
+  if ("error" in g) return g;
+  const res = await discardSeoDraftPatch(g.staff.id);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.draft.discard", "pages");
+  revalidatePath("/admin/seo");
+  return { ok: true, message: "Taslak atıldı." };
 }
 
 /* ------------------------------ Robot ------------------------------ */
