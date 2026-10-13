@@ -41,8 +41,27 @@ Bu belge, Windows dizüstündeki Claude oturumundan sunucudaki Claude oturumuna 
 - ✅ Bulut tam yedeği: `/root/backups/bulut-tam-20261012-2346.dump` (5 MB, pg_dump -Fc, 299 TABLE DATA; `supabase/postgres:17.6.1.178` imajıyla, DATABASE_POOLER_URL session modu 5432). Kopyası sahibin bilgisayarında `C:\Users\volka\emlaksoft-sunucu-yedek\`. DİKKAT: ssh tek tırnak içinde `tr -d "\x27"` kullanma — `\x27` harfiyen geçip URL'den 2 ve 7 rakamlarını siler; heredoc (`ssh host 'bash -s' <<'EOF'`) kullan. Doğrudan `db.<ref>.supabase.co` yalnız IPv6.
 - Bulut DB: Postgres 17.6, 57 MB, eklentiler pg_stat_statements, pg_trgm, pgcrypto, supabase_vault, uuid-ossp.
 
+### İLERLEME (2026-10-13, sunucu oturumu)
+- ⚠️ `bulut-tam-20261012-2346.dump` **GRANT içermiyor** (0 ACL) → geri yükleme için kullanma. Yeni yedek **`/root/backups/bulut-tam-20261012-2356.dump`** (1018 ACL, DATABASE_POOLER_URL 5432 ile).
+- ⚠️ Sürüm farkı: bulut GoTrue son göç `20260831180000` (= **v2.197.0**), Storage göç 72; Coolify şablonu v2.186.0 / v1.44.2 (göç 56). Veri bu eski şemalara yüklenmez. Hazır compose: **`/root/supabase-compose.next.yml`** (gotrue v2.197.0, storage-api v1.80.2 [göç 73], realtime v2.134.10, postgrest v14.17, postgres-meta v0.99.0, edge-runtime v1.76.2; supavisor/studio/kong aynı — env adları farklı). **Canlı servise uygulanması otomatik denetimce engellendi → sahip onayı gerekli** (komut aşağıda).
+- ✅ Prova geri yükleme (izole konteyner, aynı imajlar): `scripts/sunucu/restore-cloud-dump.sh` + `restore-list.py` — public şeması (yetkiler dahil) + pg_trgm + `ensure_rls` + avatar politikaları + auth/storage verisi (göç tabloları hariç), `session_replication_role=replica`. Sonuç: 287 tablo / **41.448 satır birebir**, 254 tablo/535 politika/220 tetikleyici, realtime yayını 19 tablo, `check:migrations --database` temiz (371 · `5d126cdcf3825980`), `db:rls-audit` yalnız beklenen 5 "politika yok" (service_role tabloları), GoTrue v2.197.0 kullanıcıları okuyor (12 kullanıcı). Beklenen 2 pg_restore hatası `ensure_rls` (betik postgres rolüyle yeniden kurar).
+- ✅ Storage: bulutta 7 kova, **0 nesne** (API ile de doğrulandı) → kopyalanacak dosya yok; kovalar DB verisiyle gelir. Kesme anında yeniden kontrol et.
+- `scripts/rls-audit.ts` / `validate-migrations.ts`: URL'de `sslmode=disable` varsa SSL'siz bağlanır (self-hosted Postgres SSL'siz).
+- Not: JWT sırrı farklı → taşımadan sonra herkes yeniden giriş yapar (parola özetleri taşınır).
+
+Sahip onayıyla uygulanacak (canlı Supabase servisi; şu an içinde veri yok):
+```bash
+B64=$(base64 -w0 /root/supabase-compose.next.yml)
+curl -s -X PATCH -H "Authorization: Bearer $(cat /root/.coolify-token)" -H 'Content-Type: application/json' \
+  http://localhost:8000/api/v1/services/moqbebljyeyprktd19zb1ihn -d "{\"docker_compose_raw\":\"$B64\"}"
+curl -s -X POST -H "Authorization: Bearer $(cat /root/.coolify-token)" \
+  "http://localhost:8000/api/v1/services/moqbebljyeyprktd19zb1ihn/restart?latest=true"
+# göçler bitince: max(auth.schema_migrations)=20260831180000, max(storage.migrations.id)>=72
+# sonra: scripts/sunucu/restore-cloud-dump.sh <yedek> <servis docker ağı> supabase-db <SERVICE_PASSWORD_POSTGRES>
+```
+
 ### Sıradaki somut adımlar
-1. Yedek doğrula; ayrıca Supabase yöntemine göre ayrı dosyalar: roller (`pg_dumpall --roles-only` yerine bulutta yalnız özel roller), şema (public + özel şemalar), veri (`auth`, `storage`, `public` data-only). Yeni DB'ye: önce şema, sonra `SET session_replication_role = replica;` ile veri. `auth`/`storage` şemaları self-hosted'ta zaten var → yalnız veri.
+1. ~~Yedek doğrula~~ (prova tamam, yukarı bak) → canlı servise compose yükseltmesi + gerçek geri yükleme (sahip onayı); ayrıca Supabase yöntemine göre ayrı dosyalar: roller (`pg_dumpall --roles-only` yerine bulutta yalnız özel roller), şema (public + özel şemalar), veri (`auth`, `storage`, `public` data-only). Yeni DB'ye: önce şema, sonra `SET session_replication_role = replica;` ile veri. `auth`/`storage` şemaları self-hosted'ta zaten var → yalnız veri.
 2. Storage nesneleri: bulut Storage API (service key) ile tüm kovaları indir → yeni Storage'a yükle (aynı bucket/yol; `storage.objects` satırları veriyle gelir, dosya baytları ayrıca kopyalanmalı).
 3. `npm run check:migrations -- --database` (yeni DB URL ile) + `npm run db:rls-audit`.
 4. Uygulama: Coolify'da "Public/Private Git Repository" (deploy key) ya da Dockerfile ile Next.js standalone; env'ler Vercel üretim değişkenlerinden (sahip `vercel env pull` / panelden) + yeni Supabase URL/anahtarlar; domain `https://emlaksoft.com.tr`, `www` yönlendirme.

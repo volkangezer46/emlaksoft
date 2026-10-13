@@ -104,7 +104,8 @@ async function main() {
 
     const client = new pg.Client({
       connectionString: databaseUrl,
-      ssl: { rejectUnauthorized: false },
+      // Self-hosted Postgres (Hetzner) SSL'siz: URL'de sslmode=disable verilir.
+      ssl: /sslmode=disable/.test(databaseUrl) ? false : { rejectUnauthorized: false },
       connectionTimeoutMillis: 20_000,
     });
     try {

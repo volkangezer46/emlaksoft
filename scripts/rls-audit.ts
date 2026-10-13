@@ -45,7 +45,9 @@ async function main() {
     process.exit(1);
   }
 
-  const c = new Client({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  // Self-hosted Postgres (Hetzner) SSL'siz: URL'de sslmode=disable verilir.
+  const ssl = /sslmode=disable/.test(url) ? false : { rejectUnauthorized: false };
+  const c = new Client({ connectionString: url, ssl });
   await c.connect();
   const bulgular: Bulgu[] = [];
 
