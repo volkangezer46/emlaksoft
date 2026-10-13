@@ -83,7 +83,10 @@ export type PaymentCardRow = {
   created_at: string;
 };
 
-/** Otomatik yenilemede hangi aboneliklerin denenebileceğinin saf kararı (flag/rıza dışı kurallar). */
+/**
+ * Otomatik yenilemede hangi aboneliklerin denenebileceğinin saf kararı (flag/rıza dışı kurallar). Sınırlar adminden
+ * (`dunning.auto_renew_max_attempts` / `dunning.auto_renew_retry_gap_days`, `dunning-policy.ts`); sabitler yalnız varsayılandır.
+ */
 export const AUTO_RENEW_MAX_ATTEMPTS = 3;
 export const AUTO_RENEW_RETRY_GAP_MS = 3 * 24 * 60 * 60 * 1000;
 
@@ -91,8 +94,10 @@ export function autoRenewAttemptAllowed(input: {
   priorAttempts: number;
   lastAttemptAtMs: number | null;
   nowMs: number;
+  maxAttempts?: number;
+  retryGapMs?: number;
 }): boolean {
-  if (input.priorAttempts >= AUTO_RENEW_MAX_ATTEMPTS) return false;
-  if (input.lastAttemptAtMs !== null && input.nowMs - input.lastAttemptAtMs < AUTO_RENEW_RETRY_GAP_MS) return false;
+  if (input.priorAttempts >= (input.maxAttempts ?? AUTO_RENEW_MAX_ATTEMPTS)) return false;
+  if (input.lastAttemptAtMs !== null && input.nowMs - input.lastAttemptAtMs < (input.retryGapMs ?? AUTO_RENEW_RETRY_GAP_MS)) return false;
   return true;
 }
