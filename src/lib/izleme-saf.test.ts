@@ -43,6 +43,16 @@ describe("buildServerErrorEntry", () => {
   it("boş hata null döner", () => {
     expect(buildServerErrorEntry(null, "/")).toBeNull();
   });
+  it("Next sayısal digest'i telefon sanıp maskelemez", () => {
+    const e = buildServerErrorEntry(Object.assign(new Error("x"), { digest: "5321234567" }), "/");
+    expect(e?.digest).toBe("5321234567");
+    expect(buildServerErrorEntry(Object.assign(new Error("x"), { digest: "792982591@E352" }), "/")?.digest).toBe("792982591@E352");
+  });
+  it("istemci iptalleri (akış erken kapandı, AbortError) kaydedilmez", () => {
+    expect(buildServerErrorEntry(new Error("The destination stream closed early."), "/app")).toBeNull();
+    expect(buildServerErrorEntry(Object.assign(new Error("This operation was aborted"), { name: "AbortError" }), "/app")).toBeNull();
+    expect(buildServerErrorEntry(new Error('A "use server" file can only export async functions'), "/app")).not.toBeNull();
+  });
 });
 
 describe("buildLogLine", () => {
