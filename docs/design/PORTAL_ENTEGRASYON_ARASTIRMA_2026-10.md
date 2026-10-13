@@ -344,6 +344,10 @@ token'lı feed yayımlanır: `/api/feed/portal/[portal]/[token].xml`. Kurallar:
   İnceleme yeniden yapılır; mağaza hesabı ve gönderim sahibin işidir.
 - MV3 uzak kod yasağı: form kural dosyası **yalnız veri** (seçici + eşleme JSON) olabilir; çalıştırılabilir kod uzaktan gelmez (mevcut
   ilke).
+  **GÜNCELLEME (2026-10-13, eklenti 0.6.0): kurallar veri, imzalı, motor pakette.** Uzaktan gelen set seçici, regex, URL ya da adım dizisi de
+  İÇERMEZ (yalnız etiket eş anlamlıları, seçenek takma adları, alan durumu/güveni, form parametreleri, parmak izleri); katı şema
+  (`rule-format.ts validateRuleSet`, bilinmeyen anahtar → ret) ve ECDSA P-256 imzasıyla doğrulanır, eşleme motoru ve tohum kurallar pakettedir.
+  Kural güncellemesi mağaza gerektirmez; motor/format değişirse yeni paket. Ayrıntı `docs/runbooks/PORTAL_KURALLARI.md`.
 
 ### 4(e) Veri modeli ve migration planı
 

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { PORTAL_FEATURES, featureFormValue, parsePortalFeatureFields } from "./features";
 import { buildPortalPayload, normalizeRooms, readinessCheck, type PortalPropertyInput } from "./payload";
 import { chooseOption, parseNumericOption, planFill, mergeApplyResults, summarizeReport, type ControlDescriptor } from "./fill-plan";
-import { fold, propertyKind, FIELD_RULES, FILL_FIELD_KEYS, PORTAL_FORM_RULES } from "./rules";
+import { fold, propertyKind, FIELD_RULES, FILL_FIELD_KEYS, PORTAL_FORM_RULES, TRANSFER_PORTALS } from "./rules";
+import { validateRuleSet } from "./rule-format";
+import { seedRuleSet } from "./seed-rules";
 import { codeOutcomeMessage, generateTransferCode, hashTransferCode, normalizeTransferCode } from "./code";
 import { buildDraft, importSummaryText, inferPropertyType, inferTransaction, planImport, sanitizeImportItems, summarizeImport } from "./import-plan";
 import type { PropertyForMatch } from "@/lib/listing-control/inventory-import";
@@ -239,6 +241,38 @@ describe("doldurma planı", () => {
     const s = summarizeReport(merged);
     expect(s.filled).toBe(1);
     expect(s.manual).toBeGreaterThan(1);
+  });
+});
+
+describe("tohum kural seti (0.6.0): format-1 veri, geriye uyum", () => {
+  it("her portalda tohum tüm FILL_FIELD_KEYS'i kapsar ve validateRuleSet'ten geçer (sürüm 0 yalnız tohuma izinli)", () => {
+    for (const p of TRANSFER_PORTALS) {
+      const seed = seedRuleSet(p);
+      expect(seed.portal, p).toBe(p);
+      expect(seed.version, p).toBe(0);
+      expect(seed.fields.map((f) => f.key).sort(), p).toEqual([...FILL_FIELD_KEYS].sort());
+      expect(validateRuleSet(seed, { allowSeed: true }).ok, p).toBe(true);
+      expect(validateRuleSet(seed, { allowSeed: false }).ok, `${p} tohum dışı sürüm 0`).toBe(false);
+    }
+  });
+  it("planFill(desc, payload) ile planFill(desc, payload, seedRuleSet(p)) AYNI planı üretir (varsayılan = tohum)", () => {
+    const descs = [
+      d({ idx: 0, labels: ["İlan Başlığı"] }),
+      d({ idx: 1, labels: ["m² (Brüt)"] }),
+      d({ idx: 2, labels: ["m² (Net)"] }),
+      d({ idx: 3, labels: ["fiyatInput"], type: "number" }),
+      d({ idx: 4, tag: "textarea", type: "", labels: ["Açıklama"] }),
+      d({ idx: 5, tag: "select", type: "", labels: ["Isıtma"], options: ["Seçiniz", "Soba", "Kombi Doğalgaz"], current: "Seçiniz" }),
+      d({ idx: 6, type: "checkbox", labels: ["Balkon"], checked: false }),
+      d({ idx: 7, type: "radio", labels: ["Site İçerisinde"], group: "site", optionText: "Evet" }),
+      d({ idx: 8, type: "radio", labels: ["Site İçerisinde"], group: "site", optionText: "Hayır" }),
+      d({ idx: 9, type: "tel", labels: ["Telefon"] }),
+      d({ idx: 10, labels: ["internet"] }),
+    ];
+    for (const p of TRANSFER_PORTALS) {
+      const payload = buildPortalPayload(base, p, NOW);
+      expect(planFill(descs, payload, seedRuleSet(p)), p).toEqual(planFill(descs, payload));
+    }
   });
 });
 

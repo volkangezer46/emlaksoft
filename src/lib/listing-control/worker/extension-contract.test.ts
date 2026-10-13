@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { EXTENSION_VERSION, EXTENSION_DOWNLOAD_PATH } from "./extension-release";
 import { EXTENSION_LIMITS } from "./extension-pacing";
-import { PARSER_VERSION, PORTAL_RULES_VERSION } from "../adapters/html";
+import { PARSER_VERSION, PORTAL_RULES_VERSION, allPortalHosts } from "../adapters/html";
+import { validateRuleSet } from "@/lib/portal-transfer/rule-format";
+import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
+import { buildFeedback } from "@/lib/portal-transfer/feedback-build";
+import { formShapes, signShapes } from "@/lib/portal-transfer/form-signature";
+import type { ControlDescriptor } from "@/lib/portal-transfer/fill-plan";
 
 /**
  * İLAN KONTROL EKLENTİSİ SÖZLEŞMELERİ (kaynak düzeyi). Değişmez ilkeler: kullanıcının kendi tarayıcısı/oturumu, düşük hız,
@@ -211,10 +216,10 @@ describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
   const bg = src(`${EXT}/src/background.ts`);
   const content = src(`${EXT}/src/content.ts`);
   const setup = src("src/components/listing-control/sync-setup.tsx");
-  it("sürüm 0.5.0; izin listesi 0.4.0 ile AYNI (yeni Chrome izni yok; tabs izni gerekmez)", () => {
+  it("sürüm 0.6.0; izin listesi 0.4.0 ile AYNI (yeni Chrome izni yok; tabs izni gerekmez)", () => {
     const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { version: string; permissions: string[] };
-    expect(EXTENSION_VERSION).toBe("0.5.0");
-    expect(manifest.version).toBe("0.5.0");
+    expect(EXTENSION_VERSION).toBe("0.6.0");
+    expect(manifest.version).toBe("0.6.0");
     expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
   });
 
@@ -312,5 +317,202 @@ describe("0.5.0 portal aktarımı (Portala aktar / İlanlarımı al)", () => {
     expect(bg).toContain("chrome.storage.session.set({ [`${STORAGE_KEYS.transferPhotoPrefix}");
     expect(bg).toContain("TRANSFER_PHOTO_MAX_B64");
     expect(content).toContain("photoBudget(");
+  });
+});
+
+describe("0.6.0 öğrenen form kuralları: kural VERİDİR, motor pakettedir", () => {
+  const bg = src(`${EXT}/src/background.ts`);
+  const content = src(`${EXT}/src/content.ts`);
+  const popup = src(`${EXT}/src/popup.ts`);
+  const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as Record<string, unknown>;
+
+  it("manifest izinleri ve portal host kalıbı 0.5.0 ile AYNI (sabit liste; mağazadaki 0.4.0 kurulumları yeni izin onayına düşmez)", () => {
+    expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
+    expect(manifest.host_permissions).toEqual([]);
+    expect(manifest.content_scripts).toEqual([]);
+    expect(manifest.optional_permissions).toBeUndefined();
+    expect(manifest.optional_host_permissions).toBeUndefined();
+    // Derleme betiği portal host'larını yalnız adaptör kayıt defterinden yazar; liste 0.5.0'daki üç portal.
+    expect(allPortalHosts()).toEqual(["emlakjet.com", "hepsiemlak.com", "sahibinden.com"]);
+    const b = src("scripts/build-extension.ts");
+    expect(b).toContain("manifest.host_permissions = allPortalHosts().map((h) => `https://*.${h}/*`);");
+    expect(b).not.toMatch(/manifest\.permissions\s*=|optional_(host_)?permissions/);
+    // Mağaza paketi kural açık anahtarı olmadan çıkmaz; --soft bu hatayı yutamaz.
+    expect(b).toContain("Object.keys(RULE_PUBLIC_KEYS)");
+    expect(b).toMatch(/if \(RELEASE_BUILD\) throw new Error/);
+    expect(b).toContain('process.argv.includes("--soft") && !RELEASE_BUILD');
+  });
+
+  it("arka plan: fetch hâlâ TEK (portal okuması); EmlakSoft kökenine istek yok, köprü ucu yok", () => {
+    expect(bg.match(/\bfetch\(/g)?.length).toBe(1);
+    expect(bg).not.toMatch(/BRIDGE_[A-Z_]*ENDPOINT|\/api\/app\/|EXT_VERSION_HEADER/);
+    const at = bg.indexOf("async function fetchPage");
+    expect(at).toBeGreaterThan(-1);
+    expect(bg.slice(at, bg.indexOf("\n}\n", at))).not.toMatch(/__EMLAKSOFT_APP_ORIGIN/);
+  });
+
+  it("kurallar YALNIZ içerik betiğinde, aynı kökenli BRIDGE_RULES_ENDPOINT ile alınır; popup ve arka plan ağdan kural çekmez", () => {
+    expect(content).toContain("BRIDGE_RULES_ENDPOINT");
+    expect(content).toContain("EXT_VERSION_HEADER");
+    for (const [name, s] of [["background", bg], ["popup", popup]] as const) {
+      expect(s, name).not.toMatch(/BRIDGE_RULES_ENDPOINT|portal-aktar\/kurallar/);
+    }
+    expect(popup).not.toMatch(/\bfetch\(/);
+  });
+
+  it("uzak kod yolu yok: eval, new Function, değişkenle RegExp ve dinamik import( yasak (eklenti + kural motoru)", () => {
+    const lib = ["rule-format.ts", "rules-engine.ts", "rules-store.ts", "rules-verify.ts", "fill-plan.ts", "feedback-build.ts", "correction.ts"];
+    const files: [string, string][] = [
+      ["background", bg],
+      ["content", content],
+      ["popup", popup],
+      ...lib.filter((f) => existsSync(join(ROOT, "src/lib/portal-transfer", f))).map((f) => [f, src(`src/lib/portal-transfer/${f}`)] as [string, string]),
+    ];
+    for (const [name, s] of files) {
+      expect(s, name).not.toMatch(/\beval\(|new Function\(|\bimport\(/);
+      // Yalnız düz dize sabitiyle RegExp kurulabilir; değişken/şablon (uzak veri) ile kurulamaz.
+      expect(s, name).not.toMatch(/\bRegExp\(\s*(?!["'])/);
+    }
+  });
+
+  it("rule-format.ts: validateRuleSet katıdır, bilinmeyen anahtarı (kök ya da alan düzeyinde) reddeder", () => {
+    expect(src("src/lib/portal-transfer/rule-format.ts")).toContain("export function validateRuleSet");
+    const seed = seedRuleSet("sahibinden");
+    expect(validateRuleSet(seed, { allowSeed: true }).ok).toBe(true);
+    expect(validateRuleSet({ ...seed, script: "alert(1)" }, { allowSeed: true }).ok).toBe(false);
+    const withSelector = { ...seed, fields: seed.fields.map((f, i) => (i === 0 ? { ...f, selector: "#fiyat" } : f)) };
+    expect(validateRuleSet(withSelector, { allowSeed: true }).ok).toBe(false);
+  });
+
+  it("arka plan rulesPut yolu decideAccept'ten geçer (boyut → şema → sürüm → sha → imza); ham kural doğrudan depoya yazılmaz", () => {
+    const at = bg.indexOf('case "rulesPut"');
+    expect(at).toBeGreaterThan(-1);
+    const next = bg.indexOf('case "', at + 10);
+    const block = bg.slice(at, next > at ? next : undefined);
+    // Doğrudan çağrı ya da bloğun çağırdığı yardımcının (arka planda ya da rules-store.ts'te) gövdesinde decideAccept olmalı.
+    const store = src("src/lib/portal-transfer/rules-store.ts");
+    const callees = [...block.matchAll(/\b([A-Za-z_$][\w$]*)\(/g)].map((m) => m[1]);
+    const viaHelper = callees.some((n) =>
+      [bg, store].some((s) => {
+        const def = s.search(new RegExp(`function ${n}\\(|function ${n}\\s*<|function ${n}\\s*\\(`));
+        return def >= 0 && s.slice(def, s.indexOf("\n}\n", def)).includes("decideAccept(");
+      }),
+    );
+    expect(block.includes("decideAccept(") || viaHelper).toBe(true);
+  });
+
+  it("geri bildirim yükü değer taşımaz (kaynak, ikincil): feedback-build çıktısında value / current / checked anahtarı yok; çıkış sanitizeFeedbackPayload'tan geçer", () => {
+    const fb = src("src/lib/portal-transfer/feedback-build.ts");
+    expect(fb).toContain("sanitizeFeedbackPayload(");
+    expect(fb).not.toMatch(/(^|[{,\s])["']?(value|current|checked)["']?\s*:/m);
+  });
+
+  it("geri bildirim yükü değer taşımaz (davranış): buildFeedback çıktısının anahtar kümesi izin listesinin alt kümesi, kullanıcı değeri yok", async () => {
+    // İzin listesi burada bilerek ELLE yazılır (feedback-format sabitlerinden türetilmez): yeni anahtar bu testte tartışılmadan eklenemez.
+    const ROOT_ALLOWED = ["consentTextVersion", "counts", "engine", "fields", "formFp", "phase", "portal", "ruleSha", "ruleVersion", "rulesRegressed", "sessionId", "v"];
+    const COUNTS_ALLOWED = ["controls", "droppedPii"];
+    const FIELD_ALLOWED = ["anchorHit", "control", "correction", "key", "label", "labelSource", "options", "outcome", "required", "sig"];
+    const CORRECTION_ALLOWED = ["category", "kind", "option", "valueKey"];
+    const d = (p: Partial<ControlDescriptor> & { idx: number; labels: string[] }): ControlDescriptor => ({
+      tag: "input", type: "text", options: [], current: "", checked: false, group: "", optionText: "", disabled: false, visible: true, required: false, sources: ["label_for"], ...p,
+    });
+    const descs: ControlDescriptor[] = [
+      d({ idx: 0, labels: ["İlan Başlığı"], current: "Kadıköy Moda 3+1 deniz manzaralı" }),
+      d({ idx: 1, type: "number", labels: ["Fiyat"], current: "6750000" }),
+      d({ idx: 2, tag: "select", type: "", labels: ["Isıtma"], options: ["Seçiniz", "Soba", "Kombi (Doğalgaz)"], current: "Soba" }),
+      d({ idx: 3, type: "tel", labels: ["Cep Telefonu"], current: "0532 123 45 67" }),
+      d({ idx: 4, labels: ["Kat Sayısı"], current: "12" }),
+    ];
+    const signed = await signShapes(formShapes(descs).shapes);
+    const sigOf = (idx: number) => signed.find((x) => x.idxs.includes(idx))!.sig;
+    const fb = buildFeedback({
+      sessionId: "6f9619ff-8b86-4011-b42d-00c04fc964ff",
+      portal: "sahibinden",
+      phase: "checked",
+      plan: {
+        report: [
+          { idx: 0, key: "title", status: "planned" },
+          { idx: 1, key: "price", status: "planned" },
+          { idx: 2, key: "heating", status: "planned" },
+        ] as Parameters<typeof buildFeedback>[0]["plan"]["report"],
+        unclaimed: [4],
+        ruleVersion: 0,
+        ruleSha: null,
+        rulesRegressed: false,
+      },
+      descs,
+      signed,
+      formFp: "a".repeat(64),
+      outcomes: [
+        { sig: sigOf(0), key: "title", outcome: "corrected", correction: { kind: "value_edited", category: "rewritten" } },
+        { sig: sigOf(1), key: "price", outcome: "corrected", correction: { kind: "value_edited", category: "format" } },
+        { sig: sigOf(2), key: "heating", outcome: "corrected", correction: { kind: "other_option", option: "soba" } },
+      ],
+      // Popup'taki gibi EmlakSoft alan değerleri (payload.fields): serbest metin ve sayı ASLA yüke girmemeli.
+      values: { title: "Kadıköy Moda 3+1 deniz manzaralı", price: 6_750_000, heating: "Kombi (Doğalgaz)" },
+    });
+    expect(fb.payload).not.toBeNull();
+    const body = fb.payload!;
+    const extra = (o: object, allowed: string[]) => Object.keys(o).filter((k) => !allowed.includes(k));
+    expect(extra(body, ROOT_ALLOWED)).toEqual([]);
+    expect(extra(body.counts, COUNTS_ALLOWED)).toEqual([]);
+    expect(body.fields.length).toBeGreaterThan(0);
+    for (const f of body.fields) {
+      expect(extra(f, FIELD_ALLOWED), f.sig).toEqual([]);
+      if (f.correction) expect(extra(f.correction, CORRECTION_ALLOWED), f.sig).toEqual([]);
+    }
+    const text = JSON.stringify(body);
+    expect(text).not.toMatch(/kad[ıi]k[öo]y|manzara|6750000|6\.750\.000|0532|5321234567|cep telefonu/i);
+    // values dalı çalıştı: yalnız seçim alanında katlanmış kısa sözlük değeri.
+    expect(body.fields.find((f) => f.key === "heating")!.correction).toEqual({ kind: "other_option", option: "soba", valueKey: "kombi dogalgaz" });
+  });
+
+  it("arka plan: feedbackPut kuyruğa yazmadan önce rıza kapısından (hasConsent) ve ortak süzgeçten geçer", () => {
+    const bg = src(`${EXT}/src/background.ts`);
+    const start = bg.indexOf('case "feedbackPut":');
+    expect(start).toBeGreaterThan(-1);
+    const block = bg.slice(start, bg.indexOf("case ", start + 10));
+    const consent = block.indexOf("if (!(await hasConsent())) return");
+    const sanitize = block.indexOf("sanitizeFeedbackPayload(msg.payload)");
+    const write = block.indexOf("setLocal(STORAGE_KEYS.feedback");
+    expect(consent).toBeGreaterThan(-1);
+    expect(sanitize).toBeGreaterThan(consent);
+    expect(write).toBeGreaterThan(sanitize);
+    expect(block).toMatch(/if \(sender\.tab\) return \{ ok: false/); // içerik betiği/sayfa gönderemez, yalnız popup
+  });
+
+  it("gözlem ucu: kök, sayaç, alan ve düzeltme şemaları zod .strict() (bilinmeyen/değer anahtarı 400)", () => {
+    const route = src("src/app/api/app/portal-aktar/gozlem/route.ts");
+    expect(route.match(/\.strict\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(route).not.toMatch(/\.passthrough\(\)|\.catchall\(/);
+  });
+
+  it("popup: rıza denetimi olmadan feedbackPut yok; form gönderimi yok (ikincil; asıl kapı arka planda)", () => {
+    const sends = [...popup.matchAll(/["']feedbackPut["']/g)].map((m) => m.index ?? 0);
+    expect(sends.length).toBeGreaterThan(0);
+    // Her gönderim noktası rıza denetiminin yanındadır (kapanış önce tanımlanıp rıza varsa çağrılabilir: ±pencere).
+    for (const i of sends) expect(popup.slice(Math.max(0, i - 800), i + 400), `feedbackPut @${i}`).toMatch(/consent(Granted|\.granted|Get)/);
+    expect(popup).not.toMatch(/\.submit\(|requestSubmit/);
+  });
+
+  it("gizlilik eki (privacy C) sayfada ve mağaza runbook'unda BİREBİR aynı; OpenAI alt işleyen olarak adlandırılır", () => {
+    const page = src("src/app/gizlilik/page.tsx");
+    const title = /const EXTENSION_LEARNING_TITLE = "([^"]+)";/.exec(page)?.[1];
+    const text = /const EXTENSION_LEARNING_TEXT =\s*"([^"]+)";/.exec(page)?.[1];
+    expect(title && text).toBeTruthy();
+    expect(text).toContain("alt işleyenimiz OpenAI");
+    expect(page).toContain("{EXTENSION_LEARNING_TEXT}");
+    const doc = src("docs/runbooks/ILAN_KONTROL_EKLENTI_YAYIN.md");
+    expect(doc).toContain(`**${title}** ${text}`);
+    for (const s of ["Kullanıcı etkinliği: EVET", "Web sitesi içeriği: EVET", "Web geçmişi: HAYIR", "0.5.0 mağazaya GÖNDERİLMEZ", "sürekli öğrenme", "mağaza GEREKMEZ"]) {
+      expect(doc, s).toContain(s);
+    }
+    expect(existsSync(join(ROOT, "docs/runbooks/PORTAL_KURALLARI.md"))).toBe(true);
+  });
+
+  it("tamamla bildirimi alan raporunu boş nesneyle EZMEZ ('report: {}' yok; B8)", () => {
+    for (const [name, s] of [["popup", popup], ["content", content], ["background", bg]] as const) {
+      expect(s, name).not.toMatch(/report:\s*\{\s*\}/);
+    }
   });
 });

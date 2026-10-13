@@ -84,42 +84,52 @@ npm run build:extension      # tip denetimi + derleme + sürüm numaralı ZIP
 | Ana makine: `https://*.sahibinden.com/*`, `https://*.hepsiemlak.com/*`, `https://*.emlakjet.com/*` | Kullanıcının kendi portal oturumuyla, kendi ilanlarının sayfasını düşük hızla okuyup yayında olup olmadığını denetlemek (tek amaç). |
 | İçerik betiği: `https://emlaksoft.vercel.app/*` (+ ofisin alan adı) | EmlakSoft sayfasıyla (aynı kökenli, kullanıcının açık oturumu) konuşmak: kontrol işini almak, sonucu bildirmek, "Eklentiyi bağla" isteğini almak. |
 
-Talep EDİLMEYEN: `tabs`, `cookies`, `webRequest`, `<all_urls>`, isteğe bağlı izin. `activeTab` + `scripting` 0.4.0'dan beri vardır ve 0.5.0'da AYNI kalır (aşağıdaki §4b). Uzaktan kod yüklenmez (tüm betikler pakette).
+Talep EDİLMEYEN: `tabs`, `cookies`, `webRequest`, `<all_urls>`, isteğe bağlı izin. `activeTab` + `scripting` 0.4.0'dan beri vardır ve 0.6.0'da AYNI kalır (aşağıdaki §4b). Uzaktan kod yüklenmez (tüm betikler pakette).
 
-## 4b. Tek amaç beyanı ve izin gerekçeleri: 0.5.0 (GÜNCEL ÖNERİ; mağaza gönderimi sahibin işi)
+## 4b. Tek amaç beyanı ve izin gerekçeleri: 0.6.0 (GÜNCEL; mağazaya gönderilecek paket — gönderim sahibin işi)
 
-0.5.0, 0.4.0 ile **aynı izin listesini** kullanır (`storage`, `alarms`, `activeTab`, `scripting` + üç portal alanı + EmlakSoft içerik betiği): Chrome mevcut kurulumları
-"yeni izin onayı" için devre dışı bırakmaz. Değişen yalnız `activeTab`/`scripting` kullanımının kapsamıdır; bu yüzden mağaza formundaki **tek amaç** ve **izin gerekçesi**
-metinleri güncellenmeli ve paket yeniden incelemeye gönderilmelidir.
+**Mağaza sırası (sahip kararı):** 0.5.0 mağazaya GÖNDERİLMEZ. Mağazada yayında olan 0.4.0'dan sonraki ilk paket **0.6.0**'dır ve tek seferde gönderilir;
+inceleme farkı 0.4.0 → 0.6.0'dır: portal aktarımı (form doldurma, fotoğraf, ilanlarımı al) ile öğrenen form kuralları BİRLİKTE incelenir. İnceleme notu iki
+özelliği birlikte anlatır; demo hesap örnek veriyle gerçek bir "EmlakSoft'tan doldur" denemesi yaptırabilmelidir (demo kiracı öğrenme uygunluğundan dışlanır).
 
-**Kısa açıklama (manifest `description`, ≤ 132 karakter; sınır sözleşme testiyle kilitli):**
+0.6.0, 0.4.0 ile **aynı izin listesini** kullanır (`storage`, `alarms`, `activeTab`, `scripting` + üç portal alanı + EmlakSoft içerik betiği; sözleşme testi
+`worker/extension-contract.test.ts` sabit listeyle kilitler): Chrome mevcut kurulumları "yeni izin onayı" için devre dışı bırakmaz. ECDSA doğrulaması
+(`crypto.subtle`) ve `chrome.storage.session` yeni izin istemez. Arka planın ağ isteği hâlâ TEKTİR (portal okuması); kurallar yalnız EmlakSoft sayfasındaki
+içerik betiğinden, aynı kökenli oturumlu uçtan alınır.
+
+**Kısa açıklama (manifest `description`, ≤ 132 karakter; sınır sözleşme testiyle kilitli; 0.5.0 ile aynı):**
 "Portföyünüzü portallarla eşitler: ilanları karşılaştırır, portal formunu onayınızla doldurur, ilanlarınızı EmlakSoft'a alır."
 
-**Tek amaç (mağaza "Tek amaç" alanı):**
+**Tek amaç (mağaza "Tek amaç" alanı; privacy A):**
 > EmlakSoft portföyünüz ile ilan portallarındaki (sahibinden.com, hepsiemlak.com, emlakjet.com) kendi ilanlarınızı eşitler: ilanlarınızın yayında olup olmadığını ve
 > fiyat/durum farkını karşılaştırır, portalın "İlan ver" formunu sizin onayınızla portföy bilgileriyle doldurur ve portalda zaten yayında olan ilanlarınızı EmlakSoft'a alır.
+> Form alanlarının eşleştirmesi, izin veren ofislerin düzeltmelerinden toplu olarak iyileşir; eşleştirme kuralları imzalı veri olarak gelir, kod indirilmez.
 
-**İzin gerekçeleri (mağaza formu; `scripting` ve `activeTab` metni güncellendi):**
+**İzin gerekçeleri (mağaza formu; privacy A):**
 
 | İzin | Gerekçe |
 | --- | --- |
-| `storage` | Bağlantı durumu, ayarlar, hız sayaçları, gönderilemeyen sonuç kuyruğu; "Portala aktar" için kodu tüketilmiş paket (küçük) yerel; aktarım fotoğrafları yalnız oturum deposunda (tarayıcı kapanınca silinir). |
-| `alarms` | Manifest V3 arka plan işçisi uykuya geçer; dakikalık alarm rozeti/bağlantı durumunu ve günlük taramayı tazeler. |
-| `activeTab` | Yalnız eklenti penceresindeki bir düğmeye bastığınızda, ÖNÜNÜZDE AÇIK olan portal sekmesine geçici erişim: (1) formu doldurmak ("EmlakSoft'tan doldur"), (2) "İlanlarım" sayfasındaki görünen listeyi okumak, (3) tek bir ilanı kaydetmek. Arka planda sekme gezilmez. |
-| `scripting` | `activeTab` ile verilen o tek sekmede, yalnız düğmeye basıldığında küçük bir paket-içi işlev çalıştırmak: form alanlarını yazmak, fotoğrafları dosya alanına eklemek, listeyi okumak. Sayfa gönderilmez, "Yayınla"ya eklenti basmaz, parola/e-posta/telefon alanlarına dokunulmaz. Uzaktan kod yüklenmez. |
+| `storage` | Bağlantı durumu, ayarlar, hız sayaçları, gönderilemeyen sonuç kuyruğu; "Portala aktar" için kodu tüketilmiş paket (küçük); imzası doğrulanmış form eşleştirme kuralları (son iyi sürüm) ve izin verilmişse gönderilmeyi bekleyen form geri bildirimi yerel. Aktarım fotoğrafları ve doldurma anlık görüntüsü (değer değil, yalnız özet) yalnız oturum deposunda (tarayıcı kapanınca silinir). |
+| `alarms` | Manifest V3 arka plan işçisi uykuya geçer; dakikalık alarm rozeti/bağlantı durumunu ve günlük taramayı tazeler. Kural tazeleme için yeni alarm yoktur. |
+| `activeTab` | Yalnız eklenti penceresindeki bir düğmeye bastığınızda, ÖNÜNÜZDE AÇIK olan portal sekmesine geçici erişim: (1) formu doldurmak ("EmlakSoft'tan doldur"), (2) "Yayından önce kontrol et" ile doldurulan alanların şimdiki durumunu okumak (değer değil, özet), (3) "İlanlarım" sayfasındaki görünen listeyi okumak, (4) tek bir ilanı kaydetmek. Arka planda sekme gezilmez. |
+| `scripting` | `activeTab` ile verilen o tek sekmede, yalnız düğmeye basıldığında küçük bir paket-içi işlev çalıştırmak: form alanlarını yazmak, fotoğrafları dosya alanına eklemek, doldurulan alanları özet olarak okumak, listeyi okumak. Sayfa gönderilmez, "Yayınla"ya eklenti basmaz, parola/e-posta/telefon alanlarına dokunulmaz. Uzaktan kod yüklenmez: sunucudan gelen form kuralları regex, seçici, URL ya da betik içermeyen, imzalı düz veridir. |
 | Ana makine: sahibinden / hepsiemlak / emlakjet | Kullanıcının kendi oturumuyla kendi ilanlarının sayfasını düşük hızla okuyup yayında olup olmadığını denetlemek (günlük kontrol). |
-| İçerik betiği: EmlakSoft alanı | EmlakSoft sayfasıyla (aynı kökenli, açık oturum) konuşmak: kontrol işi, aktarım paketini almak, yayın sonrası ilan no/URL'yi geri bağlamak, seçilen ilanları göndermek. |
+| İçerik betiği: EmlakSoft alanı | EmlakSoft sayfasıyla (aynı kökenli, açık oturum) konuşmak: kontrol işi, aktarım paketini almak, yayın sonrası ilan no/URL'yi geri bağlamak, seçilen ilanları göndermek, imzalı form kurallarını almak ve izin verilmişse form geri bildirimini göndermek. |
+
+**Uzak kod beyanı (mağaza "Are you using remote code?"):** HAYIR. Tüm JavaScript pakettedir. Sunucudan yalnız imzalı JSON veri gelir (etiket eş anlamlıları, seçenek
+takma adları, alan durumu, form parametreleri); eklenti bu veriyi katı şema (`validateRuleSet`, bilinmeyen anahtar → ret) ve ECDSA P-256 imzasıyla doğrular,
+yalnız metin eşitliği/kelime karşılaştırmasında kullanır. `eval`, `new Function`, değişkenle `RegExp` ve dinamik `import(` sözleşme testiyle yasaktır.
 
 **Veri kullanımı notu (Limited Use):** portföy bilgisi ve fotoğrafları yalnız siz "Portala aktar" dediğinizde, açtığınız portal sekmesine yazılır; ilan numarası ve URL EmlakSoft'a
 döner. Portaldan alınan ilan bilgisi (başlık, fiyat, oda, m², konum) yalnız sizin seçtiğiniz ilanlar için ve yalnız EmlakSoft ofisinize gönderilir; telefon ve kişi adı alınmaz.
-Veri satılmaz, reklam/analitik için kullanılmaz.
+Form geri bildirimi yalnız açık izinle ve yalnız form yapısı/sonuç türü olarak gider (§5 eki). Veri satılmaz, reklam/analitik için kullanılmaz.
 
 **Mağazada ayrıca göster:** "Eklenti formu doldurur; **Yayınla düğmesine siz basarsınız.** Kategori, konum ve harita adımlarını siz seçersiniz." (Kullanıcı onayı olmadan mesaj/ilan gönderme
 yasağıyla çelişmediğini gösterir.)
 
-**Canlı doğrulama (yayın öncesi ZORUNLU, henüz yapılmadı):** form kuralları (`src/lib/portal-transfer/rules.ts`) etiket tabanlıdır ve `verified:false`tır. Gerçek sahibinden/hepsiemlak/emlakjet
-ofis hesabında: (1) "İlan ver" formunda alan etiketlerinin eşleşmesi ve seçenek metinleri, (2) fotoğraf alanının `DataTransfer` ile yüklemeyi kabul etmesi (reddederse popup dürüstçe uyarır),
-(3) yayın sonrası ilan no okuması, (4) "İlanlarım" listesinin okunması (sayfalama dahil) denenmeli; sonuçlara göre `rules.ts` etiketleri güncellenmeli ve `verified` ancak sonra `true` yapılmalı.
+**Canlı doğrulama (0.6.0):** form kuralları artık pakete gömülü TOHUM (`seed-rules.ts`, bugünkü `rules.ts`'ten, durum `unverified`) + sunucudan gelen imzalı sürümlerdir.
+Elle bir kerelik "verified:true" adımı yerine **sürekli öğrenme** vardır: ofislerin "Yayından önce kontrol et" / "EmlakSoft'a bağla" düzeltmeleri toplanır, eşik dolan öneri
+yeni sürüm olur. Başlangıçta uygun gerçek ofis sayısı az olduğundan **ilk yayında onay yolu personeldir** (`portal_rules.auto_publish=false`); ayrıntı `docs/runbooks/PORTAL_KURALLARI.md`.
 
 ## 5. Gizlilik politikası taslağı ve veri kullanımı beyanı (hukuk onayı sahibin işi)
 
@@ -146,9 +156,19 @@ ofis hesabında: (1) "İlan ver" formunda alan etiketlerinin eşleşmesi ve seç
 >
 > İletişim: <destek e-posta adresi> · Veri sorumlusu: <şirket unvanı> · Güncelleme tarihi: <tarih>
 
-Chrome "veri kullanımı" beyanı: Toplanan veri türleri → "Web geçmişi" HAYIR; "Kişisel olarak tanımlanabilir bilgi" HAYIR (ilan sahibi adı portalda herkese açık
-ilan bilgisidir; yine de formda "Web sitesi içeriği" işaretlenir); "Web sitesi içeriği" EVET (yalnız ilan alanları). Üç taahhüt kutusu işaretlenir (satılmaz, amaç dışı
-kullanılmaz, kredi/borç amacıyla kullanılmaz).
+> **EK (0.6.0) — gizlilik politikasına ve mağaza gizlilik alanına BİREBİR girecek paragraf (privacy C; `src/app/gizlilik/page.tsx` bölüm 5 ile aynı, sözleşme testi kilitler):**
+>
+> **Form eşleştirmesini iyileştirme (0.6.0, isteğe bağlı):** Yalnız eklenti penceresinde açıkça izin verirseniz (varsayılan kapalı), eklenti doldurduğu portal formunun yapısını EmlakSoft'a gönderir: alana bağlı etiket, alan türü, portalın kendi seçenek metinleri, zorunlu işareti, alanın doldurulup doldurulmadığı ve yayından önce değiştirip değiştirmediğiniz (değişmedi, biçimi değişti, yeniden yazıldı, boşaltıldı ya da seçtiğiniz portal seçeneği). Alanlara yazılan değerler (başlık, açıklama, fiyat, adres), telefon, e-posta, ad soyad ve iletişim alanları hiçbir zaman gönderilmez; rakam dizisi, e-posta ya da bağlantı içeren etiket ve seçenekler eklentide ve sunucuda ayrıca ayıklanır. Bu bilgi yalnız portal formlarının doğru doldurulması için ve ofisler arasında toplu olarak kullanılır; iyileştirilen eşleştirme kuralları eklentiye EmlakSoft imzalı veri olarak döner, uzaktan kod indirilmez. Platform yöneticisi istediğinde, en az iki ofiste görülen ve henüz eşleşmeyen alan etiketleri ile seçenekleri (kullanıcı değeri olmadan, kişisel veri maskelenerek) eşleştirme önerisi üretmek için alt işleyenimiz OpenAI'ye iletilir. İzni eklenti penceresinden istediğiniz an geri alabilirsiniz; geri aldığınızda gönderilmeyi bekleyen kayıtlar tarayıcınızdan silinir. Sunucudaki alan gözlemleri en çok 180 gün, form raporları en çok 90 gün saklanır.
+
+Bu ekle birlikte: rıza kartı metni (eklenti penceresi, privacy B) OpenAI'ye maskelenmiş aktarımı da söyler; belirgin bildirim yalnız politikada durmaz (User Data FAQ).
+Metindeki "en az iki ofiste" sözü `portal_rules.ai_min_tenants ≥ 2` ayarına dayanır: bu ayar 2'nin altına İNDİRİLMEZ (`docs/runbooks/PORTAL_KURALLARI.md` §4).
+
+Chrome "veri kullanımı" beyanı (0.6.0): Toplanan veri türleri →
+- **Kullanıcı etkinliği: EVET** (izin verilmişse: formdaki alanın doldurulup değiştirilmediği ve seçilen portal seçeneği gibi form etkileşim sonuçları);
+- **Web sitesi içeriği: EVET** (ilan alanları; izin verilmişse portal formunun alan etiketleri ve seçenek metinleri);
+- **Web geçmişi: HAYIR**;
+- "Kişisel olarak tanımlanabilir bilgi" HAYIR (ilan sahibi adı portalda herkese açık ilan bilgisidir; form geri bildiriminde ad/telefon/e-posta alanları hiç gönderilmez).
+Üç taahhüt kutusu işaretlenir (satılmaz, amaç dışı kullanılmaz, kredi/borç amacıyla kullanılmaz).
 
 ## 6. Ekran görüntüsü listesi (1280×800)
 
@@ -163,6 +183,11 @@ Mağaza açıklaması taslağı: "EmlakSoft açıkken portal ilanlarınızın h�
 denetler. Portaldan kalkan ama kaydı işlem görmeyen ilan EmlakSoft'ta uyarı olarak düşer. Siz bağlanmadan çalışmaz; doğrulama (CAPTCHA) veya hız sınırı görürse durur."
 
 ## 7. Gerçek portal sayfasına karşı doğrulama (YAYIN ÖNCESİ ZORUNLU; henüz yapılmadı)
+
+> **0.6.0 notu (form doldurma):** canlı doğrulama artık **sürekli öğrenme**dir; ilk yayında **personel onayı** ile ilerler. Portal "İlan ver" formu için
+> tek seferlik `verified:true` adımı yoktur: tohum kurallar `unverified` başlar, izin veren ofislerin düzeltmeleri toplanır, eşiği dolan öneri
+> `/admin/sistem?sekme=portal-kurallari` ekranında personel onayıyla yeni imzalı sürüm olur (`portal_rules.auto_publish` kapalı). Alan durumu ancak ofis
+> oylarıyla `verified` olur. Aşağıdaki adımlar ilan KONTROLÜ ayrıştırıcıları (`portal-rules.json`) içindir ve aynen geçerlidir. Ayrıntı: `docs/runbooks/PORTAL_KURALLARI.md`.
 
 Ayrıştırıcılar yalnız temsili (sentetik) sayfalarla test edildi; `portal-rules.json` `verified:false`. Gerçek sayfalar JSON-LD/meta/durum JSON'u/DOM düzeni açısından
 farklı olabilir. Güvenli düşüş: tutmayan kalıp "kontrol edilemedi" üretir, yanlış "ilan yok" üretmez.
@@ -182,6 +207,23 @@ farklı olabilir. Güvenli düşüş: tutmayan kalıp "kontrol edilemedi" üreti
 3. Uygulama (Vercel) yeniden dağıtılır: `prebuild` yeni ZIP'i üretir; kurulu eklenti eski sürümdeyse kurulum sayfası "yeni sürüm var" uyarısı ve indirme düğmesi gösterir.
    Mağaza kurulumları tarayıcı tarafından otomatik güncellenir; elle (ZIP) kurulumlar kullanıcıdan yeniden yükleme ister.
 4. Yükseltme sonrası ilk gün "Ayrıştırıcı sağlığı" tablosunda yeni sürümün "kontrol edilemedi" oranına bak; belirgin kötüyse mağazada önceki sürüme dön / kuralı düzelt.
+5. **Form kuralları (0.6.0+) için mağaza GEREKMEZ:** etiket, seçenek takma adı, alan durumu ve form parametresi değişiklikleri veritabanına yeni imzalı sürüm
+   olarak girer ve eklentiye kendiliğinden iner (`docs/runbooks/PORTAL_KURALLARI.md`). Yeni paket YALNIZ şu durumlarda gerekir: eşleme motoru değişti
+   (`fill-plan.ts`, `rules-engine.ts`), kural formatı değişti (`FORM_RULES_FORMAT`/`FORM_RULES_ENGINE` artar; eski eklenti yeni formatı reddeder, son iyi sürümde
+   kalır) ya da pakete gömülü açık anahtar listesi (`rule-keys.ts`) değişti.
+6. **Mağaza paketi:** `npx tsx scripts/build-extension.ts --release` (ya da `npm run build:extension -- --release`). `RULE_PUBLIC_KEYS` boşsa HATA verir; derleme
+   çıktısındaki "kural formatı: f1 (format 1) · imza anahtarları: …" satırı yüklenecek ZIP'teki anahtar kimliklerini gösterir.
+
+### 8b. 0.6.0 sahip kontrol listesi (sırayla; hepsi işaretlenmeden ZIP yüklenmez)
+
+- [ ] Anahtar üretildi: `npx tsx scripts/gen-portal-rules-keypair.ts` (çıktı yalnız ekrana; dosyaya yazılmaz).
+- [ ] Env girildi: `PORTAL_RULES_SIGNING_KEY` (PKCS8 PEM) ve `PORTAL_RULES_SIGNING_KID` → `.env.production` (sahip).
+- [ ] `src/lib/portal-transfer/rule-keys.ts` dolu: açık JWK `{ "<kid>": {...} }` yapıştırıldı, commit edildi (paket derlenmeden ÖNCE).
+- [ ] P1 migration'ları canlıda: `20261013002000_portal_rules_core` → `002010_portal_rules_rpcs` → `002020_portal_rules_learn` (yedek + dry-run sonrası).
+- [ ] Uygulama deploy edildi (kural/gözlem uçları ve yönetim sekmesi).
+- [ ] Tohum v1 yayında: `/admin/sistem?sekme=portal-kurallari` → "Tohumu yayınla (sürüm 1)" (üç portal).
+- [ ] Paketlenmemiş eklentide imza doğrulandı: geliştirici modunda yükle, EmlakSoft sayfasını aç; açılır pencerede kural sürümü 1 görünür; bozuk/yabancı imzalı set reddedilir.
+- [ ] `--release` ile ZIP üretildi ve Chrome Web Store'a (sonra Edge) yüklendi; §4b metinleri ve §5 eki mağaza formuna birebir girildi.
 
 ## 9. Edge Add-ons
 

@@ -4,6 +4,14 @@ import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/**
+ * Eklenti 0.6.0 form öğrenmesi eki (mağaza gizlilik metni "privacy C"). Metin `docs/runbooks/ILAN_KONTROL_EKLENTI_YAYIN.md` §5'te
+ * BİREBİR aynıdır (sözleşme testi kilitler); değiştirirken iki yeri birlikte güncelleyin.
+ */
+const EXTENSION_LEARNING_TITLE = "Form eşleştirmesini iyileştirme (0.6.0, isteğe bağlı):";
+const EXTENSION_LEARNING_TEXT =
+  "Yalnız eklenti penceresinde açıkça izin verirseniz (varsayılan kapalı), eklenti doldurduğu portal formunun yapısını EmlakSoft'a gönderir: alana bağlı etiket, alan türü, portalın kendi seçenek metinleri, zorunlu işareti, alanın doldurulup doldurulmadığı ve yayından önce değiştirip değiştirmediğiniz (değişmedi, biçimi değişti, yeniden yazıldı, boşaltıldı ya da seçtiğiniz portal seçeneği). Alanlara yazılan değerler (başlık, açıklama, fiyat, adres), telefon, e-posta, ad soyad ve iletişim alanları hiçbir zaman gönderilmez; rakam dizisi, e-posta ya da bağlantı içeren etiket ve seçenekler eklentide ve sunucuda ayrıca ayıklanır. Bu bilgi yalnız portal formlarının doğru doldurulması için ve ofisler arasında toplu olarak kullanılır; iyileştirilen eşleştirme kuralları eklentiye EmlakSoft imzalı veri olarak döner, uzaktan kod indirilmez. Platform yöneticisi istediğinde, en az iki ofiste görülen ve henüz eşleşmeyen alan etiketleri ile seçenekleri (kullanıcı değeri olmadan, kişisel veri maskelenerek) eşleştirme önerisi üretmek için alt işleyenimiz OpenAI'ye iletilir. İzni eklenti penceresinden istediğiniz an geri alabilirsiniz; geri aldığınızda gönderilmeyi bekleyen kayıtlar tarayıcınızdan silinir. Sunucudaki alan gözlemleri en çok 180 gün, form raporları en çok 90 gün saklanır.";
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/gizlilik");
 }
@@ -79,10 +87,13 @@ export default function GizlilikPage() {
           </li>
         </ul>
         <p>
+          <b>{EXTENSION_LEARNING_TITLE}</b> {EXTENSION_LEARNING_TEXT}
+        </p>
+        <p>
           Eklenti tarama geçmişinizi, diğer sitelerdeki gezinmenizi, şifrelerinizi veya ödeme bilgilerinizi okumaz ve
-          toplamaz. Tarayıcıda yalnız ayarlarınız, EmlakSoft bağlantı anahtarı ve bekleyen işler kuyruğu saklanır. Veriler
-          yalnız EmlakSoft sunucularına (TLS ile) gönderilir; satılmaz, reklam için kullanılmaz ve üçüncü taraflarla
-          paylaşılmaz. Portföye dönüşmeyen sahibinden ilan kayıtlarındaki kişisel bilgiler ofisin belirlediği süre
+          toplamaz. Tarayıcıda yalnız ayarlarınız, EmlakSoft bağlantı anahtarı, imzalı form kuralları ve bekleyen işler
+          kuyruğu saklanır. Veriler yalnız EmlakSoft sunucularına (TLS ile) gönderilir; satılmaz, reklam için kullanılmaz
+          ve yukarıda belirtilen alt işleyen dışında üçüncü taraflarla paylaşılmaz. Portföye dönüşmeyen sahibinden ilan kayıtlarındaki kişisel bilgiler ofisin belirlediği süre
           (varsayılan 90 gün) sonunda silinir; &quot;aranmasın&quot; listesinde yalnız telefon numarasının takma adlı özeti
           tutulur. Eklentiyi Chrome&apos;dan kaldırmanız veya EmlakSoft&apos;taki bağlantıyı kesmeniz veri akışını durdurur.
         </p>
