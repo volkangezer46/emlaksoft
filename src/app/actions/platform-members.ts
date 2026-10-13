@@ -408,7 +408,7 @@ export async function bulkSignOutMembers(fd: FormData): Promise<BulkMemberResult
     const { error } = await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
     if (error) {
       if (/could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))) missingFn = true;
-      failed.push({ id, name: target.full_name, error: "Oturumlar kapatılamadı." });
+      failed.push({ id, name: target.full_name, error: actionErrorMessage(error, "Oturumlar kapatılamadı.") });
     } else done += 1;
   });
   if (missingFn) return { error: "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200).", done, failed };

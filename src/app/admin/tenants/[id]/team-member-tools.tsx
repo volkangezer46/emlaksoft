@@ -99,10 +99,17 @@ export function MemberLoginLog({ memberId, name }: { memberId: string; name: str
 
   return (
     <div className="relative z-10 w-full">
-      <button type="button" onClick={toggle} aria-expanded={open} className="focus-ring inline-flex items-center gap-1 rounded-sm text-xs font-semibold text-accent-text hover:underline">
-        <History className="h-3.5 w-3.5" aria-hidden /> Giriş günlüğü
+      <Button
+        variant="ghost"
+        size="xs"
+        icon={History}
+        onClick={toggle}
+        aria-expanded={open}
+        className="h-auto gap-1 rounded-sm px-0 text-accent-text hover:bg-transparent hover:text-accent-text hover:underline active:bg-transparent"
+      >
+        Giriş günlüğü
         <ChevronDown className={`h-3.5 w-3.5 transition ${open ? "rotate-180" : ""}`} aria-hidden />
-      </button>
+      </Button>
       {open ? (
         <div className="mt-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2" aria-label={`${name} giriş günlüğü`}>
           {busy && rows === null ? (

@@ -10,6 +10,7 @@ import { TBody, TD, TFoot, TH, THead, TR, Table } from "@/components/ui/table";
 import { InvoiceActions } from "../../invoice-actions";
 import { BillingNav } from "../../billing-nav";
 import { DocumentActions } from "./document-actions";
+import { ledgerFilterParams } from "@/lib/accounting/ledger";
 
 const invStatus: Record<string, string> = {
   draft: "Taslak",
@@ -221,7 +222,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               </li>
             ))}
           </ul>
-          <Link href={`/admin/muhasebe/defter?donem=tumu&durum=dekont&q=${encodeURIComponent(inv.invoice_no)}`} className="focus-ring mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline">
+          <Link href={`/admin/muhasebe/defter?${new URLSearchParams({ donem: "tumu", ...ledgerFilterParams({ durum: "dekont", q: inv.invoice_no }) })}`} className="focus-ring mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline">
             Defterde göster
           </Link>
         </section>

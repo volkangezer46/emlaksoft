@@ -6,6 +6,7 @@ import { Check, ChevronDown, Eye, EyeOff, Loader2, Search, ShieldAlert, ShieldCh
 import { setMemberOverrideAsStaff, setMemberScopeAsStaff, setTenantRolePermissionAsStaff, type AccessActionResult } from "@/app/actions/platform-member-access";
 import { MODULE_LABELS } from "@/app/app/ayarlar/roller/role-permissions-matrix";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { ACTION_LABELS, ACTION_ORDER, describeModuleAccess, type ModuleAccessRow, type ScopeRowInput } from "@/lib/admin/member-access-explain";
 import { SCOPE_LABELS } from "@/lib/access-control/scope-rules";
@@ -111,7 +112,7 @@ export function AccessInspector(props: AccessInspectorProps) {
                     {ACTION_ORDER.map((a) => (
                       <span
                         key={a}
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${r.final.includes(a) ? "bg-brand-600/10 text-brand-700" : "bg-ink-950/5 text-text-faint line-through"}`}
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${r.final.includes(a) ? "bg-brand-600/10 text-brand-700" : "bg-ink-950/5 text-text-faint line-through"}`}
                       >
                         {short[a]}
                       </span>
@@ -317,26 +318,28 @@ function ScopePanel({ memberId, role, scope, branches, teams, canEdit }: AccessI
             </FormField>
             {v.scope_type === "team" ? (
               <FormField label="Takım" htmlFor="scope_team">
-                <FormSelect id="scope_team" value={v.team_id ?? ""} onChange={(e) => setV({ ...v, team_id: e.target.value || null })}>
-                  <option value="">Seçin</option>
-                  {teams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </FormSelect>
+                <Combobox
+                  id="scope_team"
+                  aria-label="Takım"
+                  placeholder="Seçin"
+                  searchPlaceholder="Takım ara…"
+                  value={v.team_id ?? ""}
+                  onValueChange={(id) => setV({ ...v, team_id: id || null })}
+                  options={teams.map((t) => ({ value: t.id, label: t.name }))}
+                />
               </FormField>
             ) : null}
             {v.scope_type === "branch" ? (
               <FormField label="Şube" htmlFor="scope_branch">
-                <FormSelect id="scope_branch" value={v.branch_id ?? ""} onChange={(e) => setV({ ...v, branch_id: e.target.value || null })}>
-                  <option value="">Seçin</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}
-                    </option>
-                  ))}
-                </FormSelect>
+                <Combobox
+                  id="scope_branch"
+                  aria-label="Şube"
+                  placeholder="Seçin"
+                  searchPlaceholder="Şube ara…"
+                  value={v.branch_id ?? ""}
+                  onValueChange={(id) => setV({ ...v, branch_id: id || null })}
+                  options={branches.map((b) => ({ value: b.id, label: b.name }))}
+                />
               </FormField>
             ) : null}
           </div>

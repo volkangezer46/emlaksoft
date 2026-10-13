@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { PrintButton } from "@/components/ui/print-button";
 import { deleteManualDraft, issueManualInvoice, sendInvoiceEmail } from "@/app/actions/platform-invoices";
 import { InlineOp } from "../../inline-op";
+import type { LedgerStatusFilter } from "@/lib/accounting/ledger";
+
+/** Taslak silinince fatura defterinin "Taslak" süzgecine dönülür (durum değeri defterin süzgeç listesiyle tip-denetimli). */
+const DRAFTS_LEDGER_HREF = `/admin/muhasebe/defter?${new URLSearchParams({ donem: "tumu", durum: "draft" satisfies LedgerStatusFilter })}`;
 
 /** Fatura belgesi işlemleri: elle taslağı kes/sil, e-postayla (yeniden) gönder, yazdır / PDF olarak kaydet. */
 export function DocumentActions({
@@ -58,7 +62,7 @@ export function DocumentActions({
                     setError(res.error);
                     return;
                   }
-                  router.replace("/admin/muhasebe/defter?donem=tumu&durum=draft");
+                  router.replace(DRAFTS_LEDGER_HREF);
                 })
               }
             >

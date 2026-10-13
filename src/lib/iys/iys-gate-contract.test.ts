@@ -43,6 +43,7 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/support/reply-email.ts": "müşterinin açtığı destek talebine verilen yanıtın bildirimi (talep sahibine, talebin konusuyla sınırlı; ticari değil)",
   "src/app/actions/platform-invoices.ts": "platform faturasının ofis sahibine e-postası (abonelik borç/fatura bildirimi; ticari değil)",
   "src/lib/email/test-send.ts": "yönetimden e-posta kanalı test gönderimi (yalnız giriş yapmış platform personelinin kendi adresine; ticari değil)",
+  "src/app/api/cron/dunning/route.ts": "gecikmiş abonelik faturası tahsilat hatırlatması ve askı öncesi son uyarı (yalnız borçlu ofisin sahibine, kendi faturası ve ödeme/kart bağlantısıyla sınırlı; ticari değil)",
   "src/lib/alerts/channels.ts": "operasyon uyarısı (AD10): yalnız süper adminin tanımladığı iç kanallara (Telegram/e-posta/webhook) sistem arıza bildirimi; ticari değil",
 };
 

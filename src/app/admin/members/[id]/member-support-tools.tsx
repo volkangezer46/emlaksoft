@@ -17,11 +17,8 @@ import {
 } from "@/app/actions/platform-member-access";
 import { setMemberActiveAsStaff } from "@/app/actions/platform-members";
 import { Button } from "@/components/ui/button";
-import {
-  FormField,
-  FormInput,
-  FormSelect,
-} from "@/components/ui/form-controls";
+import { FormField, FormInput } from "@/components/ui/form-controls";
+import { PersonSelect } from "@/components/ui/person-select";
 import {
   HANDOFF_SCOPES,
   HANDOFF_SCOPE_LABELS,
@@ -301,18 +298,18 @@ export function DeactivateWizard({
       {total > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Devralan danışman" htmlFor="handoff_to">
-            <FormSelect
+            <PersonSelect
               id="handoff_to"
+              aria-label="Devralan danışman"
+              emptyLabel="Seçin"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
-            >
-              <option value="">Seçin</option>
-              {snap.candidates.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} · {ROLE_LABELS[c.role] ?? c.role}
-                </option>
-              ))}
-            </FormSelect>
+              onValueChange={setTo}
+              people={snap.candidates.map((c) => ({
+                id: c.id,
+                name: c.name,
+                hint: ROLE_LABELS[c.role] ?? c.role,
+              }))}
+            />
           </FormField>
           <FormField label="Devir gerekçesi (zorunlu)" htmlFor="handoff_reason">
             <FormInput

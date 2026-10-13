@@ -590,6 +590,6 @@ export async function getMemberLoginLog(memberId: string): Promise<{ rows?: Logi
     .eq("user_id", memberId)
     .order("created_at", { ascending: false })
     .limit(15);
-  if (error) return { error: "Giriş kayıtları okunamadı." };
+  if (error) return { error: actionErrorMessage(error, "Giriş kayıtları okunamadı.") };
   return { rows: (data ?? []) as LoginLogRow[] };
 }
