@@ -20,6 +20,11 @@ export type RegisterSearchParams = {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  /** Ölçüm istemcisinin (atıf taşıma açıkken) /kayit bağlantısına eklediği alanlar; sunucuda yeniden doğrulanır. */
+  utm_term?: string;
+  utm_content?: string;
+  src_host?: string;
+  lp?: string;
 };
 
 type RegisterFormProps = ComponentProps<typeof RegisterForm>;
@@ -59,8 +64,18 @@ export async function loadRegisterFormProps(params: RegisterSearchParams): Promi
       utm_source: params.utm_source,
       utm_medium: params.utm_medium,
       utm_campaign: params.utm_campaign,
+      utm_term: short(params.utm_term, 64),
+      utm_content: short(params.utm_content, 64),
+      src_host: short(params.src_host, 100),
+      lp: short(params.lp, 120),
     },
   };
+}
+
+/** Sorgu parametresini gizli alana taşımadan önce tek değere ve uzunluğa indirger (doğrulama sunucuda). */
+function short(v: string | string[] | undefined, max: number): string | undefined {
+  const s = Array.isArray(v) ? v[0] : v;
+  return typeof s === "string" && s.length > 0 && s.length <= max ? s : undefined;
 }
 
 /** Platform ayarı "kayıt kapalı" iken gösterilen ekran (mevcut kullanıcı girişi açık kalır). */
