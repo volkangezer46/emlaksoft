@@ -12,7 +12,15 @@ import { runPropertyAuthorityReminders } from "@/lib/property-authority-reminder
 import { trDayKey } from "@/lib/clock";
 import { sendTrialEndingEmails } from "@/lib/email/trial-reminder";
 import { getBaseUrl } from "@/lib/base-url";
-import { pausedSubscriptionIds, runSubscriptionLifecycle, type LifecycleSummary } from "@/lib/billing/subscription-lifecycle";
+import {
+  isExpireToPastDueEnabled,
+  pausedSubscriptionIds,
+  runExpireActiveToPastDue,
+  runSubscriptionLifecycle,
+  type ExpireSummary,
+  type LifecycleSummary,
+} from "@/lib/billing/subscription-lifecycle";
+import { runMrrSnapshot, type MrrSnapshotSummary } from "@/lib/billing/mrr-snapshot";
 
 export const maxDuration = 120;
 
@@ -247,6 +255,20 @@ async function run(req: NextRequest) {
     cancelled = cancelSubIds.length;
   }
 
+  // Dönemi bitmiş 'active' abonelik → past_due (kök neden). YALNIZ `billing.expire_to_past_due` açıksa; varsayılan
+  // KAPALI, kapalıyken hiçbir okuma/yazma yapmaz. Dönem sonu iptali adımından SONRA: iptal bekleyenler zaten kapandı.
+  let expire: ExpireSummary = { enabled: false, candidates: 0, expired: 0, tenants: 0, error: null };
+  try {
+    if (overBudget()) deferred.push("dönemi bitmiş abonelik (süre)");
+    else {
+      expire = await runExpireActiveToPastDue(admin, now, { enabled: await isExpireToPastDueEnabled(), limit: BATCH_LIMIT });
+      if (expire.error) failures.push(expire.error.slice(0, 120));
+      else if (expire.candidates >= BATCH_LIMIT) deferred.push("dönemi bitmiş abonelik (limit)");
+    }
+  } catch (e) {
+    failures.push(`dönemi bitmiş abonelik: ${e instanceof Error ? e.message : "hata"}`.slice(0, 120));
+  }
+
   // Yetki belgesi hatırlatmaları (60/30/7 gün + yıllık harç ayı; ofis ayarı kapalı doğar). Hata asıl işi bozmaz.
   let license = { expiry: 0, annualFee: 0, skipped: true };
   try {
@@ -274,13 +296,26 @@ async function run(req: NextRequest) {
     console.error("abonelik-kontrol authority", e instanceof Error ? e.message : "hata");
   }
 
+  // SON ADIM: platform MRR günlük anlık görüntüsü (tüm durum değişikliklerinden SONRA; günde ofis başına tek satır,
+  // upsert → tekrar koşmak satır çoğaltmaz). Tablo yoksa (migration uygulanmadı) sessiz atlanır; yazma hatası failures'a düşer.
+  let snapshot: MrrSnapshotSummary = { written: 0, total: 0, skipped: true, error: null };
+  try {
+    if (overBudget()) deferred.push("MRR anlık görüntüsü (süre)");
+    else {
+      snapshot = await runMrrSnapshot(admin, trDayKey(nowMs));
+      if (snapshot.error) failures.push(`MRR anlık görüntüsü: ${snapshot.error}`.slice(0, 120));
+    }
+  } catch (e) {
+    failures.push(`MRR anlık görüntüsü: ${e instanceof Error ? e.message : "hata"}`.slice(0, 120));
+  }
+
   await recordHeartbeat(
     "abonelik-kontrol",
     deferred.length > 0 || failures.length > 0 ? "error" : "ok",
-    `${failures.length > 0 ? `failed — ${failures.join("; ")} · ` : ""}${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
+    `${failures.length > 0 ? `failed — ${failures.join("; ")} · ` : ""}${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}, dönemi bitmiş ${expire.enabled ? `${expire.expired}/${expire.candidates}` : "kapalı"}, MRR anlık görüntüsü ${snapshot.skipped ? "atlandı" : `${snapshot.written} ofis`}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
   );
 
-  return NextResponse.json({ ok: failures.length === 0, failures, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, deferred });
+  return NextResponse.json({ ok: failures.length === 0, failures, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, expire, snapshot, deferred });
 }
 
 export const GET = guardCron("abonelik-kontrol", run);

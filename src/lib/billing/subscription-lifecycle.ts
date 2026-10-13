@@ -8,6 +8,8 @@ import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
  *  1) Süresi dolan duraklatmalar OTOMATİK devam eder (dönem sonu gerçek duraklatma süresi kadar uzar).
  *  2) Dönemi biten planlı düşürmeler uygulanır (kapasite aşımında planlı kayıt iptal edilir + bildirim).
  *  3) Duraklatılmış abonelik dönem sonu iptali / gecikme akışlarından MUAFTIR (`pausedSubscriptionIds`).
+ *  4) Dönemi bitmiş 'active' abonelik → 'past_due' (`runExpireActiveToPastDue`; YALNIZ `billing.expire_to_past_due`
+ *     açıksa, varsayılan KAPALI — 1-3'ün aksine bayrağa BAĞLIDIR).
  * Her iki adım da bayraktan BAĞIMSIZ çalışır: bayrak kapansa da duraklatılmış ofis takılı kalmaz. RPC'ler yoksa
  * (migration uygulanmadı) adımlar sessizce atlanır. Hata asıl cron işini bozmaz.
  */
@@ -92,6 +94,97 @@ export async function runSubscriptionLifecycle(admin: SupabaseClient): Promise<L
       out.notified = await insertNotifications(admin, rows);
     } catch (e) {
       console.error("abonelik-kontrol lifecycle notify", e instanceof Error ? e.message : "hata");
+    }
+  }
+  return out;
+}
+
+export type ExpireSummary = { enabled: boolean; candidates: number; expired: number; tenants: number; error: string | null };
+
+/** Ayar okuyucusu (Ayar Kayıt Defteri; varsayılan KAPALI). Okunamazsa kapalı sayılır. */
+export async function isExpireToPastDueEnabled(): Promise<boolean> {
+  try {
+    const { getSetting } = await import("@/lib/settings/read");
+    return (await getSetting<boolean>("billing.expire_to_past_due")) === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * KÖK NEDEN ADIMI: dönemi bitmiş ama hâlâ 'active' görünen abonelik → 'past_due' (ofis 'active' ise o da 'past_due').
+ * YALNIZ `billing.expire_to_past_due` AÇIKSA çalışır (varsayılan KAPALI; sahip /admin dikkat kuyruğunu inceleyip açar).
+ * Kapalıyken HİÇBİR okuma/yazma yapmaz. Duraklatılmış (pause_started_at dolu) ve dönem sonu iptali bekleyen
+ * (cancel_at_period_end) abonelik atlanır: onları kendi adımları kapatır.
+ * YARIŞ GÜVENLİĞİ: güncelleme okuma koşulunu TEKRARLAR (status=active + dönem geçmiş); bu arada ödeme alıp dönemi
+ * uzayan abonelik ezilmez. Idempotent: ikinci koşuda aday kalmaz.
+ */
+export async function runExpireActiveToPastDue(
+  admin: SupabaseClient,
+  nowIso: string,
+  opts: { enabled: boolean; limit?: number },
+): Promise<ExpireSummary> {
+  const out: ExpireSummary = { enabled: opts.enabled, candidates: 0, expired: 0, tenants: 0, error: null };
+  if (!opts.enabled) return out;
+  const { data, error } = await admin
+    .from("subscriptions")
+    .select("id, tenant_id")
+    .eq("status", "active")
+    .lt("current_period_end", nowIso)
+    .is("pause_started_at", null)
+    .eq("cancel_at_period_end", false)
+    .order("current_period_end", { ascending: true })
+    .limit(opts.limit ?? 100);
+  if (error) {
+    out.error = `dönemi bitmiş okunamadı: ${error.message}`;
+    return out;
+  }
+  const rows = (data ?? []) as Array<{ id: string; tenant_id: string }>;
+  out.candidates = rows.length;
+  if (rows.length === 0) return out;
+
+  const subRes = await admin
+    .from("subscriptions")
+    .update({ status: "past_due", updated_at: nowIso })
+    .in("id", rows.map((r) => r.id))
+    .eq("status", "active")
+    .lt("current_period_end", nowIso)
+    .select("id, tenant_id");
+  if (subRes.error) {
+    out.error = `dönemi bitmiş yazılamadı: ${subRes.error.message}`;
+    return out;
+  }
+  const changed = (subRes.data ?? []) as Array<{ id: string; tenant_id: string }>;
+  out.expired = changed.length;
+  const tenantIds = [...new Set(changed.map((r) => String(r.tenant_id)))];
+  if (tenantIds.length === 0) return out;
+
+  const tenantRes = await admin
+    .from("tenants")
+    .update({ status: "past_due", updated_at: nowIso })
+    .in("id", tenantIds)
+    .eq("status", "active")
+    .select("id");
+  if (tenantRes.error) {
+    out.error = `dönemi bitmiş ofis yazılamadı: ${tenantRes.error.message}`;
+    return out;
+  }
+  const changedTenants = ((tenantRes.data ?? []) as Array<{ id: string }>).map((t) => String(t.id));
+  out.tenants = changedTenants.length;
+  if (changedTenants.length > 0) {
+    try {
+      await insertNotifications(
+        admin,
+        changedTenants.map((tenantId) => ({
+          tenant_id: tenantId,
+          title: "Abonelik döneminiz sona erdi",
+          body: "Ödenmiş döneminiz bitti ve yenileme ödemesi alınamadı. Kesinti yaşamamak için Paket & ödeme sayfasından ödemenizi tamamlayın.",
+          href: BILLING_HREF,
+          kind: "warning",
+        })),
+      );
+    } catch (e) {
+      console.error("abonelik-kontrol expire notify", e instanceof Error ? e.message : "hata");
     }
   }
   return out;

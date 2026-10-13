@@ -9,6 +9,8 @@ import { Ring } from "@/components/ui/console/ring";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { exactArr } from "@/lib/reporting/platform";
+import { loadPlatformMrr } from "@/lib/accounting/loaders";
+import { isExpiredActive } from "@/lib/admin/platform-metrics";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 import { PLANS } from "@/lib/billing/plans";
 
@@ -47,27 +49,31 @@ function money(n: number) {
 export async function BillingHome({ staffName }: { staffName: string }) {
   const admin = createAdminClient();
 
-  const [{ data: subs }, { data: invoices }] = await Promise.all([
+  const [{ data: subs }, { data: invoices }, platformMrr] = await Promise.all([
     admin
       .from("subscriptions")
-      .select("id, plan, status, amount_try, current_period_end, created_at")
+      .select("id, plan, status, amount_try, current_period_end, pause_started_at, cancel_at_period_end, created_at")
       .order("created_at", { ascending: false }),
     admin
       .from("invoices")
       .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(id, name)")
       .order("created_at", { ascending: false })
       .limit(60),
+    // MRR TEK kaynak (exactMrr; panel, /admin/billing ve raporlarla aynı). Okunamazsa null → "Veri yok".
+    loadPlatformMrr(admin, now()).catch(() => null),
   ]);
 
   const subRows = subs ?? [];
   const invRows = invoices ?? [];
 
-  const mrr = subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
+  const mrr = platformMrr?.mrr ?? null;
   const activeCount = subRows.filter((s) => s.status === "active").length;
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
   const nowMs = now();
+  // Dönemi bitmiş ama aktif (isExpiredActive: duraklatılmış/iptal bekleyen hariç): Ofis listesinde süzülür, eylemler Ofis 360'ta.
+  const expiredActive = subRows.filter((s) => isExpiredActive(s, nowMs)).length;
   const tp = trParts(nowMs);
   const monthStart = Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS;
   const collectedThisMonth = invRows
@@ -112,7 +118,15 @@ export async function BillingHome({ staffName }: { staffName: string }) {
       />
 
       <KpiGrid label="Finans özet göstergeleri">
-        <KpiCard layout="inline" label="Aylık yinelenen gelir" value={money(mrr)} href="/admin/billing" icon={TrendingUp} tone="gold" hint={`Yıllık ${money(exactArr(mrr))}`} />
+        <KpiCard
+          layout="inline"
+          label="Aylık yinelenen gelir"
+          value={mrr === null ? "Veri yok" : money(mrr)}
+          href="/admin/billing"
+          icon={TrendingUp}
+          tone="gold"
+          hint={mrr === null ? "Gelir özeti okunamadı" : `Yıllık ${money(exactArr(mrr))}`}
+        />
         <KpiCard layout="inline" label="Aktif abonelik" value={activeCount} href="/admin/billing?durum=active" icon={CreditCard} tone="brand" hint={`${trialing} deneme aboneliği`} />
         <KpiCard layout="inline" label="Bu ay tahsilat" value={money(collectedThisMonth)} href="/admin/billing?durum=paid" icon={Wallet} tone="success" hint="Ödenen faturalar" />
         <KpiCard
@@ -136,6 +150,19 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           attention={pastDue > 0}
           hint={pastDue > 0 ? "Tahsilat takibi gerekli" : "Gecikmiş abonelik yok"}
         />
+        {expiredActive > 0 ? (
+          <KpiCard
+            layout="inline"
+            tinted
+            label="Dönemi bitmiş ama aktif"
+            value={expiredActive}
+            href="/admin/tenants?durum=donemi-bitmis"
+            icon={Clock}
+            tone="danger"
+            attention
+            hint="Ödenmedi işaretle ya da dönemi uzat"
+          />
+        ) : null}
         <KpiCard layout="inline" label="Açık bakiye" value={money(openTotal)} href="/admin/billing?durum=open" icon={Receipt} tone="warn" hint="Ödenmemiş açık faturalar" />
       </KpiGrid>
 

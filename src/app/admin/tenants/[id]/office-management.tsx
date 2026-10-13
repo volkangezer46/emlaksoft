@@ -7,8 +7,10 @@ import type { FormEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   Archive,
   Ban,
+  CalendarClock,
   Building2,
   Check,
   Copy,
@@ -33,6 +35,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { updateTenantPlanStatus } from "@/app/actions/platform";
 import { processOfficeClosureRequestByAdmin } from "@/app/actions/platform-tenant-closure";
+import { extendTrial } from "@/app/actions/platform-trial";
+import { extendSubscriptionPeriod, markSubscriptionUnpaid } from "@/app/actions/platform-subscription-fix";
 import {
   addTenantPlatformNote,
   addTenantUserByAdmin,
@@ -105,6 +109,11 @@ export type OfficeManagementProps = {
   plans: PlanOption[];
   legalHref: string;
   closureRequests: { id: string; type: "account_closure" | "data_export"; status: string; dueLabel: string; note: string | null; requestedBy: ClosureRequestRow["requestedBy"] }[];
+  /** Denemeyi uzat/kısalt yetkisi (`canChangeTrial`; sales ya da tenants + yazma). */
+  canChangeTrial?: boolean;
+  /** Dönemi bitmiş ama aktif abonelik (yoksa null): dönem sonu etiketi. Eylemler billing modülü ister. */
+  expiredSubscription?: { periodEndLabel: string } | null;
+  canFixSubscription?: boolean;
 };
 
 type ActionState = { error?: string; message?: string } | null;
@@ -260,7 +269,9 @@ export function OfficeManagement(props: OfficeManagementProps) {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       {can.edit_profile || can.edit_billing_profile ? <ProfileSection {...props} /> : null}
+      {props.expiredSubscription && props.canFixSubscription ? <ExpiredSubscriptionSection tenant={tenant} info={props.expiredSubscription} /> : null}
       {can.plan_status ? <PlanSection {...props} /> : null}
+      {tenant.status === "trial" && props.canChangeTrial ? <TrialSection tenant={tenant} /> : null}
       {can.change_slug ? <SlugSection tenant={tenant} /> : null}
       <OwnerSection {...props} />
       {showUsers ? <UsersSection {...props} /> : null}
@@ -482,6 +493,172 @@ function PlanSection({ tenant, can, plans }: OfficeManagementProps) {
       ) : null}
 
       <Feedback state={planAct.state} />
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Denemeyi uzat / kısalt (platform-trial.ts; sales ya da tenants + yazma)
+// ---------------------------------------------------------------------------
+
+type TrialPreset = "7" | "14" | "date";
+
+function TrialSection({ tenant }: { tenant: ManagedTenant }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [state, setState] = useState<ActionState>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [preset, setPreset] = useState<TrialPreset | null>(null);
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const reason = String(fd.get("reason") ?? "");
+    const change = preset === "date" ? { date: String(fd.get("date") ?? "") } : { days: Number(preset) };
+    setState(null);
+    setWarning(null);
+    startTransition(async () => {
+      try {
+        const res = await extendTrial(tenant.id, change, reason);
+        if (res.error) {
+          setState({ error: res.error });
+          return;
+        }
+        setState({ message: res.message ?? "Kaydedildi." });
+        setWarning(res.warning ?? null);
+        setPreset(null);
+        router.refresh();
+      } catch {
+        setState({ error: "İşlem sırasında bağlantı kesildi. Lütfen tekrar deneyin." });
+      }
+    });
+  }
+
+  const choose = (p: TrialPreset) => {
+    setState(null);
+    setWarning(null);
+    setPreset(preset === p ? null : p);
+  };
+
+  return (
+    <Section
+      id="yonetim-deneme"
+      title="Denemeyi uzat / kısalt"
+      description="Yeni bitiş en erken yarın, en geç bugünden 90 gün sonra olabilir. Ofis kaydı ve deneme aboneliği birlikte güncellenir; denetim kaydına yazılır."
+      icon={CalendarClock}
+    >
+      <dl className="grid gap-4 sm:grid-cols-2">
+        <Fact label="Şu anki deneme bitişi" value={tenant.trialEndsLabel ?? "—"} />
+      </dl>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" type="button" aria-pressed={preset === "7"} onClick={() => choose("7")}>+7 gün</Button>
+        <Button variant="outline" size="sm" type="button" aria-pressed={preset === "14"} onClick={() => choose("14")}>+14 gün</Button>
+        <Button variant="outline" size="sm" type="button" aria-pressed={preset === "date"} onClick={() => choose("date")}>
+          Özel tarih / kısalt
+        </Button>
+      </div>
+      {preset ? (
+        <InlineArea title={preset === "date" ? "Yeni deneme bitiş tarihi" : `Deneme ${preset} gün uzatılsın mı?`}>
+          <form onSubmit={submit} className="grid gap-3">
+            {preset === "date" ? (
+              <FormField label="Bitiş günü" htmlFor="mgmt-trial-date" required hint="Daha erken bir gün seçerek denemeyi kısaltabilirsiniz (en erken yarın).">
+                <FormInput id="mgmt-trial-date" name="date" type="date" required />
+              </FormField>
+            ) : null}
+            <FormField label="Gerekçe" htmlFor="mgmt-trial-reason" required hint="En az 10 karakter; denetim kaydına yazılır.">
+              <FormTextarea id="mgmt-trial-reason" name="reason" rows={2} required minLength={10} maxLength={500} />
+            </FormField>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" size="sm" type="submit" disabled={pending}>
+                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />} Kaydet
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setPreset(null)}>Vazgeç</Button>
+            </div>
+          </form>
+        </InlineArea>
+      ) : null}
+      <Feedback state={state} />
+      {warning ? (
+        <p role="status" className="rounded-[var(--radius-control)] bg-amber-400/12 px-3 py-2 text-xs font-semibold text-amber-800">
+          {warning}
+        </p>
+      ) : null}
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dönemi bitmiş ama aktif abonelik (platform-subscription-fix.ts; billing)
+// ---------------------------------------------------------------------------
+
+function ExpiredSubscriptionSection({ tenant, info }: { tenant: ManagedTenant; info: { periodEndLabel: string } }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [state, setState] = useState<ActionState>(null);
+  const [mode, setMode] = useState<"none" | "unpaid" | "extend">("none");
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const reason = String(fd.get("reason") ?? "");
+    const days = Number(fd.get("days") ?? 0);
+    setState(null);
+    startTransition(async () => {
+      try {
+        const res = mode === "unpaid" ? await markSubscriptionUnpaid(tenant.id, reason) : await extendSubscriptionPeriod(tenant.id, days, reason);
+        if (res.error) {
+          setState({ error: res.error });
+          return;
+        }
+        setState({ message: res.message ?? "Kaydedildi." });
+        setMode("none");
+        router.refresh();
+      } catch {
+        setState({ error: "İşlem sırasında bağlantı kesildi. Lütfen tekrar deneyin." });
+      }
+    });
+  }
+
+  return (
+    <Section
+      id="yonetim-donem"
+      title="Dönemi bitmiş ama aktif abonelik"
+      description={`Ödenmiş dönem ${info.periodEndLabel} tarihinde bitti, abonelik hâlâ aktif görünüyor. Ödenmedi olarak işaretleyin ya da dönemi uzatın; her işlem gerekçeyle denetim kaydına yazılır.`}
+      icon={AlertTriangle}
+      tone="danger"
+    >
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" type="button" aria-expanded={mode === "unpaid"} onClick={() => { setState(null); setMode(mode === "unpaid" ? "none" : "unpaid"); }}>
+          Ödenmedi olarak işaretle
+        </Button>
+        <Button variant="outline" size="sm" type="button" aria-expanded={mode === "extend"} onClick={() => { setState(null); setMode(mode === "extend" ? "none" : "extend"); }}>
+          Dönemi uzat
+        </Button>
+      </div>
+      {mode !== "none" ? (
+        <InlineArea title={mode === "unpaid" ? "Abonelik gecikmiş (ödenmedi) yapılsın mı?" : "Dönem kaç gün uzatılsın?"} tone={mode === "unpaid" ? "danger" : "default"}>
+          <form onSubmit={submit} className="grid gap-3">
+            {mode === "unpaid" ? (
+              <p className="text-xs text-text-muted">Abonelik ve aktif ofis «gecikmiş» olur; ofise ödeme hatırlatması gider ve tahsilat akışı başlar.</p>
+            ) : (
+              <FormField label="Gün" htmlFor="mgmt-period-days" required hint="1 ile 90 gün arası. Yeni bitiş bugünden (ya da ileri tarihli bitişten) sayılır.">
+                <FormInput id="mgmt-period-days" name="days" type="number" inputMode="numeric" min={1} max={90} defaultValue={30} required />
+              </FormField>
+            )}
+            <FormField label="Gerekçe" htmlFor="mgmt-period-reason" required hint="En az 10 karakter; denetim kaydına yazılır.">
+              <FormTextarea id="mgmt-period-reason" name="reason" rows={2} required minLength={10} maxLength={500} />
+            </FormField>
+            <div className="flex flex-wrap gap-2">
+              <Button variant={mode === "unpaid" ? "danger" : "primary"} size="sm" type="submit" disabled={pending}>
+                {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Check className="h-3.5 w-3.5" aria-hidden />}
+                {mode === "unpaid" ? "Ödenmedi işaretle" : "Uzat"}
+              </Button>
+              <Button variant="outline" size="sm" type="button" onClick={() => setMode("none")}>Vazgeç</Button>
+            </div>
+          </form>
+        </InlineArea>
+      ) : null}
+      <Feedback state={state} />
     </Section>
   );
 }
@@ -1064,7 +1241,11 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
       {mode === "reactivate" || mode === "restore" ? (
         <InlineArea title={mode === "reactivate" ? "Ofis yeniden etkinleştirilsin mi?" : "Ofis arşivden geri yüklensin mi?"}>
           <form onSubmit={(e) => act.run(formDataOf(e, tenant.id, { mode }))} className="grid gap-3 sm:grid-cols-2">
-            <FormField label="Dönülecek durum" htmlFor="mgmt-target-status" hint="Deneme seçilirse mevcut deneme bitişi geçerli olur; gerekiyorsa süreyi ayrıca uzatın.">
+            <FormField
+              label="Dönülecek durum"
+              htmlFor="mgmt-target-status"
+              hint="Deneme seçilirse mevcut deneme bitişi geçerli olur; gerekiyorsa denemeye döndürdükten sonra süreyi bu sekmedeki Denemeyi uzat / kısalt bölümünden uzatın."
+            >
               <FormSelect id="mgmt-target-status" name="target_status" defaultValue="active">
                 <option value="active">{OFFICE_STATUS_LABELS.active}</option>
                 <option value="trial">{OFFICE_STATUS_LABELS.trial}</option>

@@ -39,6 +39,7 @@ import {
   type TicketListFilters,
 } from "./ticket-list-model";
 import { Combobox } from "@/components/ui/combobox";
+import { TicketsTabs } from "./kvkk/tickets-tabs";
 
 const STATUS_COLOR: Record<string, string> = {
   open: "var(--brand-500)",
@@ -475,6 +476,7 @@ export default async function AdminTicketsPage({
 
   return (
     <div className="space-y-4">
+      <TicketsTabs active="talepler" />
       <AdminPageHeader
         eyebrow="Müşteri operasyon merkezi"
         icon={LifeBuoy}
@@ -493,9 +495,6 @@ export default async function AdminTicketsPage({
           <>
             <ButtonLink href={filters.tenant ? `/admin/tickets/yeni?tenant=${filters.tenant}` : "/admin/tickets/yeni"} size="lg" variant="primary" icon={LifeBuoy}>
               Yeni talep
-            </ButtonLink>
-            <ButtonLink href="/admin/tickets/makrolar" size="lg" variant="outline">
-              Hazır yanıtlar
             </ButtonLink>
           </>
         }

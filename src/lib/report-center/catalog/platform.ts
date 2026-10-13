@@ -10,6 +10,7 @@ import { now, trMonthKey } from "@/lib/clock";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { KVKK_STATUS_LABELS, KVKK_TYPE_LABELS, kvkkDaysLeft, kvkkDeadlineIso } from "@/lib/compliance/kvkk-queue";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { STATUS } from "../labels";
 import { applyTimestampRange, enrichStaff, enrichTenants, chainEnrich, label, nameOf, searchOr } from "../query-helpers";
@@ -533,6 +534,45 @@ export const destekTalepleri = defineReport({
   },
 });
 
+/**
+ * KVKK talep defteri: tüm ofislerin ilgili kişi başvuruları — YALNIZ META (ofis, tür, durum, tarihler, kalan gün).
+ * Kişi adı (requester_name), müşteri bağı, not ve çözüm notu sorgulanmaz; `personalData` bu yüzden işaretsizdir.
+ */
+export const kvkkTalepDefteri = defineReport({
+  id: "kvkk-talep-defteri",
+  title: "KVKK talep defteri",
+  description: "Tüm ofislerin KVKK ilgili kişi başvuruları: ofis, tür, durum, oluşturma, 30 günlük son tarih ve kalan gün (kişi adı ve içerik yok).",
+  category: "destek",
+  scope: "platform",
+  platformModule: "tickets",
+  keywords: ["kvkk", "ilgili kişi", "başvuru", "silme", "dışa aktarma", "son tarih"],
+  filters: [
+    { kind: "select", key: "tur", label: "Tür", options: opts(KVKK_TYPE_LABELS) },
+    { kind: "select", key: "durum", label: "Durum", options: opts(KVKK_STATUS_LABELS) },
+    ...DATE_RANGE_FIELDS("Oluşturma başlangıcı", "Oluşturma bitişi"),
+  ],
+  columns: [
+    { key: "ofis", label: "Ofis", type: "text", width: 30, get: (r, c) => nameOf(c, r.tenant_id) },
+    { key: "tur", label: "Tür", type: "text", width: 20, get: (r) => label(KVKK_TYPE_LABELS, r.request_type) },
+    { key: "durum", label: "Durum", type: "text", width: 14, get: (r) => label(KVKK_STATUS_LABELS, r.status) },
+    { key: "olusturma", label: "Oluşturma", type: "date", get: (r) => r.created_at },
+    { key: "sonTarih", label: "Son tarih (30 gün)", type: "date", get: (r) => kvkkDeadlineIso(String(r.created_at)) },
+    { key: "kalan", label: "Kalan gün", type: "number", get: (r) => kvkkDaysLeft(String(r.created_at), String(r.status), now()) },
+    { key: "kapanis", label: "Kapanış", type: "date", get: (r) => r.resolved_at },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase.from("kvkk_requests").select("id, tenant_id, request_type, status, created_at, resolved_at", { count: "exact" });
+      if (f.tur) q = q.eq("request_type", f.tur);
+      if (f.durum) q = q.eq("status", f.durum);
+      q = applyTimestampRange(q, "created_at", f);
+      return q.order("created_at", { ascending: true }).order("id", { ascending: true });
+    },
+    enrich: enrichTenants((r) => [r.tenant_id]),
+  },
+});
+
 export const platformDenetim = defineReport({
   id: "platform-denetim",
   title: "Platform denetim kaydı (personel işlemleri)",
@@ -665,4 +705,4 @@ export const demoTalepleri = defineReport({
   },
 });
 
-export const PLATFORM_REPORTS = [ofisler, uyeler, abonelikler, faturalar, odemeUyarilari, tahsilatDonemsel, paketDagilimi, kuponlar, kuponKullanimlari, hesapKredisi, efKontor, aiKullanimi, destekTalepleri, platformDenetim, ofisDenetim, kayitKaynaklari, demoTalepleri];
+export const PLATFORM_REPORTS = [ofisler, uyeler, abonelikler, faturalar, odemeUyarilari, tahsilatDonemsel, paketDagilimi, kuponlar, kuponKullanimlari, hesapKredisi, efKontor, aiKullanimi, destekTalepleri, kvkkTalepDefteri, platformDenetim, ofisDenetim, kayitKaynaklari, demoTalepleri];
