@@ -122,7 +122,7 @@ function PlotFrame({
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-y-0 left-0 w-11" aria-hidden="true">
           {ticks.map((t) => (
-            <span key={t} className="absolute right-0 -translate-y-1/2 text-[11px] leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
+            <span key={t} className="absolute right-0 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
               {axis(t)}
             </span>
           ))}
@@ -150,7 +150,8 @@ function PlotFrame({
       </div>
       <div className="relative ml-12 mr-1 h-5 shrink-0" aria-hidden="true">
         {xLabels.map((l, i) => {
-          const edge = l.width === undefined ? (l.x <= 2 ? "left" : l.x >= 98 ? "right" : "center") : "center";
+          // Genişlikli etiket (çubuk bandı) kendi bandında ortalanır; noktalı etiket konumuna göre hizalanır.
+          const edge = l.width !== undefined ? "band" : l.x <= 2 ? "left" : l.x >= 98 ? "right" : "center";
           return (
             <span
               key={i}
