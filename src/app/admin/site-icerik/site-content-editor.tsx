@@ -6,6 +6,8 @@ import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, Undo2 } from "lucide-react";
 import { discardSiteContentDraft, publishSiteContent, resetSiteContentToDefault, rollbackSiteContent, saveSiteContentDraft } from "@/app/actions/site-content";
+import { acknowledgeHeroBudget } from "@/app/actions/site-media";
+import { kb, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
 import { Input } from "@/components/ui/input";
 import { PIONEER_CLAIM } from "@/lib/site-content/claims";
 import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, newCardId, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
@@ -16,10 +18,12 @@ import { InlineConfirm, TargetDatalist } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
 import { ContentPreview } from "./content-preview";
 import { LookFields, PortalStripCard, TestimonialsTab, setOpt } from "./editor-look";
-import { RealPreview } from "./real-preview";
+import { RealPreview, type RealPreviewHandle } from "./real-preview";
+import { cmsFieldSelectors, cmsTabFor, type EditorTab } from "./cms-bridge";
+import { MediaPicker, type MediaLibraryState, type PickerMedia } from "./media-picker";
 import { BentoTab, EfTab, LayoutTab, TourTab, WhyTab, setValuationVisible, valuationVisible } from "./editor-landing-tabs";
 
-type Tab = "layout" | "hero" | "sections" | "lists" | "tour" | "bento" | "why" | "valuation" | "ef" | "faq" | "testimonials" | "final" | "pages" | "versions";
+type Tab = EditorTab;
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "layout", label: "Bölüm düzeni" },
   { id: "hero", label: "Ana başlık" },
@@ -53,9 +57,9 @@ export type HistoryView = { id: string; atLabel: string; by: string; label: stri
 /** Önizleme bağlamı (sunucudan): gerçek deneme günü/paketler ve imzalı önizleme bağlantısı ayarları. */
 export type PreviewContext = { trialDays?: number; plans: readonly PlanDef[]; enabled: boolean; ttlOptions: readonly number[]; defaultTtl: number };
 
-type Props = { initialDraft: SiteContent; live: SiteContent | null; defaults: SiteContent; history: HistoryView[]; canWrite: boolean; preview: PreviewContext };
+type Props = { initialDraft: SiteContent; live: SiteContent | null; defaults: SiteContent; history: HistoryView[]; canWrite: boolean; preview: PreviewContext; media: MediaLibraryState };
 
-export function SiteContentEditor({ initialDraft, live, defaults, history, canWrite, preview }: Props) {
+export function SiteContentEditor({ initialDraft, live, defaults, history, canWrite, preview, media }: Props) {
   const router = useRouter();
   const readOnly = !canWrite;
   const [cfg, setCfg] = useState<SiteContent>(initialDraft);
@@ -65,6 +69,18 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
   const [msg, setMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const previewRef = useRef<RealPreviewHandle>(null);
+  // Yerinde düzenleme: önizlemede tıklanan yol (sekme açılır, alan odaklanır).
+  const [focusPath, setFocusPath] = useState<string | null>(null);
+  // Bu oturumda yüklenen görseller (sunucu listesi yenilenene kadar seçicide görünsün).
+  const [uploaded, setUploaded] = useState<PickerMedia[]>([]);
+  const library: MediaLibraryState = useMemo(
+    () => ({ status: media.status, items: [...uploaded.filter((u) => !media.items.some((m) => m.id === u.id)), ...media.items] }),
+    [media, uploaded],
+  );
+  // Kalite kapısı: ilk ekran bütçesini aşan hero görseli "Yine de kaydet" + gerekçe ister (yalnız bu yüzey).
+  const [gate, setGate] = useState<{ action: () => void; reason: string } | null>(null);
+  const [ackedFor, setAckedFor] = useState<string | null>(null);
 
   // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular).
   const [validate, setValidate] = useState<typeof validateSiteContent | null>(null);
@@ -101,6 +117,44 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
     setMsg(null);
   }, []);
 
+  useEffect(() => {
+    if (!focusPath) return;
+    const raf = requestAnimationFrame(() => {
+      const [exact, under] = cmsFieldSelectors(focusPath);
+      const el = document.querySelector<HTMLElement>(exact) ?? document.querySelector<HTMLElement>(under) ?? document.getElementById(`sc-panel-${tab}`);
+      el?.scrollIntoView({ block: "center", behavior: "smooth" });
+      el?.focus({ preventScroll: true });
+      setFocusPath(null);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focusPath, tab]);
+
+  const onCmsSelect = useCallback((path: string) => {
+    const t = cmsTabFor(path);
+    if (!t) return;
+    setTab(t);
+    setFocusPath(path);
+  }, []);
+
+  const heroMedia = cfg.hero.image ? library.items.find((m) => m.id === cfg.hero.image!.mediaId) : undefined;
+  const needsBudgetAck = Boolean(heroMedia?.heroOver && saved.hero.image?.mediaId !== heroMedia.id && ackedFor !== heroMedia.id);
+  /** Bütçe aşımı varsa önce gerekçe paneli; yoksa doğrudan. */
+  const guarded = (action: () => void) => (needsBudgetAck ? setGate({ action, reason: "" }) : action());
+  const confirmGate = () => {
+    if (!gate || !heroMedia) return;
+    const { action, reason } = gate;
+    start(async () => {
+      const res = await acknowledgeHeroBudget(heroMedia.id, reason);
+      if (res.error) {
+        setMsg({ kind: "error", text: res.error });
+        return;
+      }
+      setAckedFor(heroMedia.id);
+      setGate(null);
+      action();
+    });
+  };
+
   const run = (job: () => Promise<{ ok?: boolean; error?: string; config?: SiteContent }>, okText: string, after?: (c?: SiteContent) => void) => {
     setMsg(null);
     start(async () => {
@@ -112,6 +166,8 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
       after?.(res.config);
       setMsg({ kind: "ok", text: okText });
       router.refresh();
+      // Kayıtlı taslak değişti: açık gerçek önizleme yeni bağlantıyla yenilenir (eski bağlantı geçersiz olur).
+      previewRef.current?.refresh();
     });
   };
   const adopt = (c?: SiteContent) => {
@@ -181,14 +237,14 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
         </div>
         {!readOnly ? (
           <div className="mt-3 flex flex-wrap items-end gap-2">
-            <Button type="button" variant="outline" size="sm" disabled={pending || !dirty || blocked} onClick={saveDraft}>
+            <Button type="button" variant="outline" size="sm" disabled={pending || !dirty || blocked} onClick={() => guarded(saveDraft)}>
               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <Save className="h-3.5 w-3.5" aria-hidden="true" />} Taslağı kaydet
             </Button>
             <label className="min-w-[10rem] flex-1 sm:max-w-xs">
               <span className="sr-only">Sürüm notu</span>
               <Input placeholder="Sürüm notu (isteğe bağlı)" value={note} maxLength={80} onChange={(e) => setNote(e.target.value)} />
             </label>
-            <InlineConfirm label="Yayınla" confirmLabel="Evet, canlıya al" disabled={pending || blocked || (!dirty && !pendingPublish)} icon={<Send className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={publish} />
+            <InlineConfirm label="Yayınla" confirmLabel="Evet, canlıya al" disabled={pending || blocked || (!dirty && !pendingPublish)} icon={<Send className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={() => guarded(publish)} />
             <InlineConfirm
               label="Taslağı bırak"
               confirmLabel="Evet, bırak"
@@ -208,6 +264,22 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
           </div>
         ) : null}
         {blocked ? <p className="mt-2 text-xs font-semibold text-danger-500">Hatalar düzelmeden taslak kaydedilemez ve yayınlanamaz.</p> : null}
+        {gate && heroMedia ? (
+          <div role="alertdialog" aria-label="İlk ekran bütçesi aşıldı" className="mt-3 rounded-[var(--radius-card)] border border-amber-300 bg-amber-50 p-3">
+            <p className="flex items-start gap-1.5 text-xs font-bold text-amber-900">
+              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              Ana başlık görseli ilk ekran bütçesini aşıyor: 960 px AVIF {kb(heroMedia.heroBytes)} (sınır {kb(SITE_MEDIA_LIMITS.heroBudgetBytes)}). Sayfanın ilk açılışı yavaşlar. Daha küçük bir görsel seçin ya da gerekçe yazıp yine de kaydedin.
+            </p>
+            <label className="mt-2 block text-xs font-semibold text-amber-900">
+              Gerekçe (denetim kaydına yazılır)
+              <Input className="mt-1" value={gate.reason} maxLength={300} onChange={(e) => setGate({ ...gate, reason: e.target.value })} placeholder="ör. Kampanya görseli, bir hafta yayında kalacak" />
+            </label>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="primary" disabled={pending || gate.reason.trim().length < 5} onClick={confirmGate}>Yine de kaydet</Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setGate(null)}>Vazgeç</Button>
+            </div>
+          </div>
+        ) : null}
         {msg ? (
           <p role={msg.kind === "error" ? "alert" : "status"} className={`mt-2 flex items-center gap-1.5 text-xs font-semibold ${msg.kind === "error" ? "text-danger-500" : "text-mint-700"}`}>
             {msg.kind === "error" ? <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -216,7 +288,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
         ) : null}
       </section>
 
-      <RealPreview enabled={preview.enabled} dirty={dirty} ttlOptions={preview.ttlOptions} defaultTtl={preview.defaultTtl} />
+      <RealPreview ref={previewRef} enabled={preview.enabled} dirty={dirty} ttlOptions={preview.ttlOptions} defaultTtl={preview.defaultTtl} onSelect={onCmsSelect} />
 
       <ContentPreview cfg={cfg} trialDays={preview.trialDays} plans={preview.plans} />
 
@@ -244,7 +316,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
 
       <div role="tabpanel" id={`sc-panel-${tab}`} aria-labelledby={`sc-tab-${tab}`} tabIndex={0} className="focus-ring space-y-4 rounded-[var(--radius-card)]">
         {tab === "layout" ? <LayoutTab {...props} /> : null}
-        {tab === "hero" ? <HeroTab {...props} /> : null}
+        {tab === "hero" ? <HeroTab {...props} library={library} onUploaded={(m) => setUploaded((list) => [m, ...list])} /> : null}
         {tab === "sections" ? <SectionsTab {...props} /> : null}
         {tab === "lists" ? <ListsTab {...props} /> : null}
         {tab === "tour" ? <TourTab {...props} /> : null}
@@ -304,11 +376,24 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
 
 type TabProps = { cfg: SiteContent; update: Update; issues: ReturnType<typeof validateSiteContent>["issues"]; readOnly: boolean };
 
-function HeroTab({ cfg, update, issues, readOnly }: TabProps) {
+function HeroTab({ cfg, update, issues, readOnly, library, onUploaded }: TabProps & { library: MediaLibraryState; onUploaded: (m: PickerMedia) => void }) {
   const h = cfg.hero;
   const f = { issues, readOnly };
   return (
     <>
+      <MediaPicker
+        value={h.image}
+        library={library}
+        onUploaded={onUploaded}
+        readOnly={readOnly}
+        issues={issues}
+        onChange={(v) =>
+          update((d) => {
+            if (v) d.hero.image = v;
+            else delete d.hero.image;
+          })
+        }
+      />
       <Card title="Ana başlık (hero)">
         <Txt label="Rozet" value={h.badge} max={LIMITS.badge} onChange={(v) => update((d) => void (d.hero.badge = v))} path="hero.badge" {...f} />
         <Full>

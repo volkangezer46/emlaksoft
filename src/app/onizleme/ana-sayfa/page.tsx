@@ -4,6 +4,7 @@ import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { now } from "@/lib/clock";
 import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { verifyPreviewToken, type PreviewVerdict } from "@/lib/preview-token";
+import { PREVIEW_BRIDGE_JS } from "./bridge";
 import { readPreviewDraft } from "./draft";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
@@ -15,6 +16,9 @@ import "@/app/marketing-mobile.css";
  * yalnız site içeriği taslağını salt okunur gösterir. Gerçek ana sayfa işleviyle (renderHome) gerçek paket/deneme verisiyle
  * çizilir; üstte sabit "TASLAK" şeridi. Her istekte taslak yeniden okunur (önbellek yok), dizine eklenmez
  * (metadata noindex + next.config X-Robots-Tag). Statik ana sayfa rotasına ve proxy'ye dokunmaz.
+ * SANDBOX KARARI (SP6): yönetim iframe'i `sandbox="allow-scripts"` (allow-same-origin YOK) ile açar. Belirteç URL'de
+ * kalır: sandbox yalnız belgenin kökenini opak yapar, iframe gezinmesi sorgu parametresini sunucuya aynen taşır ve
+ * doğrulama sunucuda yapılır (çerez/oturum gerekmez). Bu yüzden belirteci httpOnly çereze taşımaya gerek yok.
  */
 export const dynamic = "force-dynamic";
 
@@ -50,5 +54,11 @@ export default async function HomeDraftPreviewPage({ searchParams }: { searchPar
   if (!verdict.ok) return <Invalid reason={verdict.reason} />;
   const [draft, pricing, efCatalog] = await Promise.all([readPreviewDraft(), getPublicPricing(), getEfCatalog()]);
   if (draft.hash !== verdict.draftHash) return <Invalid reason="stale" />;
-  return renderHome({ content: draft.content, pricing, efCatalog, preview: true });
+  return (
+    <>
+      {renderHome({ content: draft.content, pricing, efCatalog, preview: true })}
+      {/* Yerinde düzenleme köprüsü: yalnız yönetim iframe'inde etkin (bridge.ts); yeni sekmede hiçbir şey yapmaz. */}
+      <script dangerouslySetInnerHTML={{ __html: PREVIEW_BRIDGE_JS }} />
+    </>
+  );
 }

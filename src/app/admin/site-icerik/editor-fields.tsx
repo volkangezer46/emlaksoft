@@ -41,7 +41,7 @@ export function Txt({
   const err = issueAt(issues, path, "error");
   const warn = issueAt(issues, path, "warn");
   const shown = err ?? warn;
-  const common = { id, value, maxLength: max, readOnly, "aria-invalid": err ? true : undefined, "aria-describedby": shown ? `${id}-i` : undefined } as const;
+  const common = { id, value, maxLength: max, readOnly, "aria-invalid": err ? true : undefined, "aria-describedby": shown ? `${id}-i` : undefined, "data-cms-field": path } as const;
   return (
     <div className="min-w-0">
       <label htmlFor={id} className="mb-1 flex items-baseline justify-between gap-2 text-xs font-semibold text-ink-950">

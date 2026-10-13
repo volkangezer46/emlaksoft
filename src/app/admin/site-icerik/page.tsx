@@ -7,6 +7,8 @@ import { DEFAULT_PREVIEW_TTL_HOURS, PREVIEW_TTL_HOURS, isPreviewEnabled } from "
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { sameContent } from "@/lib/site-content/schema";
 import { siteContentStore } from "@/lib/site-content/store";
+import { listSiteMedia } from "@/lib/site-media/store";
+import { toPickerMedia, type MediaLibraryState } from "./media-view";
 import { SiteContentEditor, type HistoryView } from "./site-content-editor";
 
 export const metadata = { title: "Site içeriği" };
@@ -15,7 +17,9 @@ export const metadata = { title: "Site içeriği" };
 export default async function AdminSiteContentPage() {
   const staff = await requirePlatformModule("sitecontent");
   // Şematik önizleme de gerçek deneme günü ve paket tanımıyla çizilir (sabit örnek değer yok).
-  const [state, pricing] = await Promise.all([siteContentStore.readState(), getPublicPricing()]);
+  // Ana başlık görseli seçicisi medya kütüphanesinden okur (tablo yokken "kurulum bekliyor").
+  const [state, pricing, mediaList] = await Promise.all([siteContentStore.readState(), getPublicPricing(), listSiteMedia().catch(() => ({ status: "error" as const, error: "" }))]);
+  const media: MediaLibraryState = { status: mediaList.status, items: mediaList.status === "ok" ? mediaList.items.map(toPickerMedia) : [] };
   const defaults = defaultSiteContent();
   const draft = state.draft ?? state.live ?? defaults;
 
@@ -43,6 +47,7 @@ export default async function AdminSiteContentPage() {
         defaults={defaults}
         history={history}
         canWrite={staff.role === "super_admin"}
+        media={media}
         preview={{ trialDays: pricing.trialDays, plans: pricing.plans, enabled: isPreviewEnabled(), ttlOptions: PREVIEW_TTL_HOURS, defaultTtl: DEFAULT_PREVIEW_TTL_HOURS }}
       />
     </div>
