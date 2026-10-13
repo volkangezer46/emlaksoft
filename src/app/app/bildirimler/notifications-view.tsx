@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/notifications";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { daysAgoIso } from "@/lib/clock";
+import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
 
 import { PageHeader } from "@/components/ui/page-header";
 /**
@@ -85,7 +86,8 @@ export async function NotificationsView({
     kindCounts[k] = kindCountRes[i]?.count ?? 0;
   });
 
-  const rows = data ?? [];
+  // Gövde sonundaki makine izi (` · task:<uuid>`) gösterilmez; izden kayda daha yakın bağlantı türetilir.
+  const rows = (data ?? []).map((r) => ({ ...r, body: stripNotificationMarker(r.body), href: notificationHref(r) }));
   const total = count ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageParam, totalPages);

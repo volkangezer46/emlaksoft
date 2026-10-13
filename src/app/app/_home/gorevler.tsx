@@ -6,6 +6,7 @@ import { TaskQuickRow } from "../dashboard-quick-actions";
 import { Widget } from "../dashboard-widgets";
 import { loadTaskSummary, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
+import { taskListHref } from "@/lib/notification-text";
 import { PanelLink } from "./ortak";
 
 export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
@@ -61,9 +62,9 @@ export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
           {dueTasks.map((task) => (
             <li key={task.id}>
               <TaskQuickRow id={task.id} showAction={!ctx.tvMode}>
-                <div className="relative flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition group-hover/task:border-brand-300 group-hover/task:bg-surface">
+                <div className="relative flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 transition touch:pr-28 group-hover/task:border-brand-300 group-hover/task:bg-surface">
                   <Link
-                    href="/app/gorevler"
+                    href={taskListHref(task.title)}
                     className="focus-ring absolute inset-0 rounded-[var(--radius-card)]"
                     aria-label={task.title}
                   />
