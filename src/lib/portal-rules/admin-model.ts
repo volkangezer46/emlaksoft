@@ -279,63 +279,39 @@ export function shortFingerprint(fp: string): string {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// pt_rules_admin_overview → alan başına toplu sayılar (kiracı adı yok)
+// Alan başına toplu sayılar: açık önerilerden (kiracı adı yok)
 
 export type FieldOverview = {
   key: string;
+  /** Alanın açık önerileri içinde en yüksek destekleyen / karşı çıkan ofis sayısı (öneriler arası toplanmaz: aynı ofis birden çok öneride olabilir). */
   supportTenants: number;
   contradictTenants: number;
-  /** Son 14 günde başarı oranı 0..1; deneme yoksa null. */
-  success14d: number | null;
-  attempts14d: number;
+  /** Bekleyen (ready/collecting) öneri sayısı; bağlantı `alan:<key>` görünümünde tam bu listeyi gösterir. */
+  openProposals: number;
   lastSeen: string | null;
 };
 
-export type Overview = {
-  fields: Map<string, FieldOverview>;
-  pendingProposals: number | null;
-  formAlerts: number | null;
-  eligibleTenants: number | null;
-};
-
-function ratio(v: unknown): number | null {
-  const n = num(v);
-  if (n == null) return null;
-  const r = n > 1 ? n / 100 : n;
-  return r >= 0 && r <= 1 ? r : null;
-}
+export type Overview = { fields: Map<string, FieldOverview> };
 
 /**
- * RPC yanıtını savunmacı okur: `{fields:[...]}` ya da düz dizi; sayı alanları için birkaç yaygın ad kabul edilir.
- * Tanınmayan biçim boş özet döner (sayı uydurulmaz → tabloda "—").
+ * `pt_rules_admin_overview` alan bazında sayı DÖNDÜRMEZ (yalnız toplamlar); bu yüzden tablo, sayfada zaten okunan açık
+ * öneri satırlarından beslenir. Böylece her hücre tıklandığında açılan `alan:<key>` görünümündeki önerilerle birebir tutar.
+ * Alan anahtarı olmayan (form_meta) öneriler sayılmaz.
  */
-export function normalizeOverview(raw: unknown): Overview {
-  const root = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
-  const list: unknown[] = Array.isArray(raw) ? raw : Array.isArray(root.fields) ? (root.fields as unknown[]) : [];
+export function fieldOverviewFromProposals(
+  proposals: readonly { fieldKey: string | null; supportTenants: number; contradictTenants: number; lastEvaluated: string | null }[],
+): Overview {
   const fields = new Map<string, FieldOverview>();
-  for (const item of list) {
-    if (!item || typeof item !== "object") continue;
-    const r = item as Record<string, unknown>;
-    const key = typeof r.field_key === "string" ? r.field_key : typeof r.key === "string" ? r.key : null;
-    if (!key) continue;
-    const ok = num(r.ok_14d) ?? num(r.success_n_14d);
-    const attempts = num(r.attempts_14d) ?? num(r.sessions_14d) ?? num(r.total_14d) ?? 0;
-    const success = ratio(r.success_14d) ?? ratio(r.success_rate_14d) ?? (ok != null && attempts > 0 ? ok / attempts : null);
-    fields.set(key, {
-      key,
-      supportTenants: num(r.support_tenants) ?? 0,
-      contradictTenants: num(r.contradict_tenants) ?? 0,
-      success14d: attempts > 0 || success != null ? success : null,
-      attempts14d: attempts,
-      lastSeen: typeof r.last_seen === "string" ? r.last_seen : null,
-    });
+  for (const p of proposals) {
+    if (!p.fieldKey) continue;
+    const cur = fields.get(p.fieldKey) ?? { key: p.fieldKey, supportTenants: 0, contradictTenants: 0, openProposals: 0, lastSeen: null };
+    cur.supportTenants = Math.max(cur.supportTenants, p.supportTenants || 0);
+    cur.contradictTenants = Math.max(cur.contradictTenants, p.contradictTenants || 0);
+    cur.openProposals += 1;
+    if (p.lastEvaluated && (!cur.lastSeen || p.lastEvaluated > cur.lastSeen)) cur.lastSeen = p.lastEvaluated;
+    fields.set(p.fieldKey, cur);
   }
-  return {
-    fields,
-    pendingProposals: num(root.pending_proposals) ?? num(root.ready_proposals),
-    formAlerts: num(root.form_alerts),
-    eligibleTenants: num(root.eligible_tenants),
-  };
+  return { fields };
 }
 
 /** 0,734 → "%73"; null → "—". */
@@ -354,15 +330,4 @@ export function suggestedExclusion(tenant: { name?: string | null; slug?: string
   if (n === "demo emlak ofisi" || s === "demo-ofis" || s === "demo ofis") return "Demo ofisi";
   if (n === "admin" || s === "admin") return "Platform yönetim kiracısı";
   return null;
-}
-
-// ---------------------------------------------------------------------------------------------------------------------
-// Yayın içeriği
-
-/**
- * Yayınlanacak içerik: tabandaki kural seti + yeni sürüm numarası + yayın anı. Taban değiştirilmez (yeni nesne).
- * Sürüm = portaldaki en büyük sürüm + 1 (SQL de aynı kuralı denetler).
- */
-export function withVersion<T extends Record<string, unknown>>(base: T, version: number, issuedAtIso: string): T & { version: number; issuedAt: string } {
-  return { ...base, version, issuedAt: issuedAtIso };
 }

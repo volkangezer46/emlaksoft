@@ -11,16 +11,18 @@ import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { TRANSFER_PORTALS } from "@/lib/portal-transfer/rules";
 import { validateRuleSet } from "@/lib/portal-transfer/rule-format";
 import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
-import { applyProposals } from "@/lib/portal-transfer/rule-apply";
-import { suggestPortalRules } from "@/lib/portal-rules/server/ai-suggest";
-import { needsPiiAck, withVersion } from "@/lib/portal-rules/admin-model";
+import { applyProposals, type RuleProposal } from "@/lib/portal-transfer/rule-apply";
+import { suggestPortalRules, type SuggestResult } from "@/lib/portal-rules/server/ai-suggest";
+import { loadSigningKey, publishRuleSet, readPublished, rollbackRuleSet, type PublishResult, type SigningKey } from "@/lib/portal-rules/server/sign";
+import { needsPiiAck } from "@/lib/portal-rules/admin-model";
 
 /**
  * Yönetim > Sistem > Portal kuralları eylemleri. KAPI: her eylem `requirePlatformModule("sistem")` (super_admin + ops);
  * yayın üreten eylemler (onay, geri alma, tohum) yalnız super_admin (K1). Veri yolu OTURUMLU istemci + SECURITY DEFINER
  * RPC'ler (rol kapısı ve denetim kaydı SQL'de, P1); `createAdminClient` YOK (allowlist değişmez).
- * Bozuk içerik yayına giremez: onay ve tohum TS'te `validateRuleSet`'ten geçmeden RPC çağrılmaz; geri alma da hedef
- * içeriği bugünkü doğrulayıcıyla yeniden doğrular (N3).
+ * Yayın ve geri alma P1'in `publishRuleSet`/`rollbackRuleSet` yardımcılarıyla yapılır: damga (max+1, şimdi, 14 gün) →
+ * `validateRuleSet` → sha → imza → RPC (sürüm çakışmasında bir kez yeniden dener). İmza anahtarı yoksa yayın yapılmaz.
+ * RPC'ler reddi HATA değil `{outcome}` verisi olarak döndürür; her yanıtta `outcome === "ok"` aranır.
  */
 
 export type PortalRulesResult = { ok?: boolean; error?: string; notice?: string; version?: number };
@@ -28,6 +30,8 @@ export type PortalRulesResult = { ok?: boolean; error?: string; notice?: string;
 const PATH = "/admin/sistem";
 const SCHEMA_PENDING = "Sistem güncellemesi bekleniyor: portal kuralları tabloları henüz kurulmadı.";
 const SUPER_ONLY = "Kural yayını ve geri alma yalnız süper admin tarafından yapılabilir.";
+const SIGNING_UNAVAILABLE =
+  "Kural imzalama anahtarı bu ortamda tanımlı değil ya da paketteki açık anahtarla eşleşmiyor (PORTAL_RULES_SIGNING_KEY / PORTAL_RULES_SIGNING_KID). Yayın yapılmadı.";
 
 const portalSchema = z.enum(TRANSFER_PORTALS);
 const reasonSchema = z.string().trim().min(3, "Gerekçe en az 3 karakter olmalı.").max(500, "Gerekçe en çok 500 karakter olabilir.");
@@ -38,53 +42,51 @@ function dbError(error: DbError, subject: string): string {
   if (isMissingSchema(error)) return SCHEMA_PENDING;
   const msg = String(error?.message ?? "");
   if (/forbidden|permission denied|42501/i.test(msg) || error?.code === "42501") return "Bu işlem için yetkiniz yok.";
-  if (/version|23505|duplicate/i.test(msg) || error?.code === "23505") return `${subject}: sürüm çakıştı, sayfayı yenileyip tekrar deneyin.`;
   return `${subject} yapılamadı.`;
 }
 
-function issuedAtIso(): string {
-  return new Date(now()).toISOString();
+/** RPC `outcome` (ve yayın yardımcısının `reason`) değerleri → Türkçe mesaj. Bilinmeyen değer genel mesaja düşer. */
+const OUTCOME_TEXT: Record<string, string> = {
+  forbidden: "Bu işlem için yetkiniz yok.",
+  invalid_input: "İstek geçersiz.",
+  not_found: "Kayıt bulunamadı.",
+  already_decided: "Bu öneri için zaten karar verilmiş.",
+  pii_confirmation_required: "Bu öneri tek ofisten geliyor. Onaylamadan önce metnin kişisel veri içermediğini teyit edin.",
+  version_conflict: "Aynı anda başka bir sürüm yayınlandı; sayfayı yenileyip tekrar deneyin.",
+  invalid_content: "Kural seti veritabanı doğrulamasından geçmedi.",
+  invalid_signature: "Kural seti imzası geçersiz.",
+  invalid_expiry: "Kural setinin geçerlilik süresi geçersiz.",
+  invalid_parent: "Önceki sürüm bilgisi tutmuyor; sayfayı yenileyip tekrar deneyin.",
+  content_mismatch: "Geri alınan içerik hedef sürümle aynı değil.",
+};
+
+function outcomeText(outcome: string | null | undefined, subject: string): string {
+  const o = String(outcome ?? "");
+  if (OUTCOME_TEXT[o]) return `${subject}: ${OUTCOME_TEXT[o]}`;
+  if (/^rpc:(42P01|42883|PGRST20[0-9])/.test(o)) return SCHEMA_PENDING;
+  if (/^rpc:42501/.test(o)) return OUTCOME_TEXT.forbidden;
+  if (o.startsWith("invalid:") || o.startsWith("invalid_target:")) return `${subject}: içerik bugünkü doğrulamadan geçmiyor (${o.split(":").slice(1).join(":")}).`;
+  return `${subject} yapılamadı${o ? ` (${o})` : ""}.`;
 }
 
-/** Yanıttan sürüm numarası (RPC int ya da {version} döndürebilir). */
-function versionOf(data: unknown): number | undefined {
-  if (typeof data === "number" && Number.isFinite(data)) return data;
-  if (data && typeof data === "object") {
-    const v = (data as { version?: unknown }).version;
-    if (typeof v === "number" && Number.isFinite(v)) return v;
-  }
-  return undefined;
+/** jsonb RPC yanıtındaki `outcome` (yoksa null). */
+function outcomeOf(data: unknown): string | null {
+  return data && typeof data === "object" && typeof (data as { outcome?: unknown }).outcome === "string" ? (data as { outcome: string }).outcome : null;
+}
+
+function signingKey(): SigningKey | null {
+  const s = loadSigningKey();
+  return s.ok ? s.key : null;
 }
 
 function refresh() {
   revalidatePath(PATH);
 }
 
-type Db = Awaited<ReturnType<typeof createClient>>;
+type RpcDb = Parameters<typeof publishRuleSet>[0];
 
-async function maxVersion(db: Db, portal: string): Promise<{ version: number } | { error: string }> {
-  const { data, error } = await db.from("portal_rule_sets").select("version").eq("portal", portal).order("version", { ascending: false }).limit(1);
-  if (error) return { error: dbError(error, "Sürüm okuma") };
-  const v = (data?.[0] as { version?: number } | undefined)?.version;
-  return { version: typeof v === "number" ? v : 0 };
-}
-
-/**
- * P1 `applyProposals` sonucunu biçimden bağımsız okur ({ok,content,changeSummary} ya da hata). Fırlatırsa hata sayılır.
- * Sonuç ne olursa olsun yayından önce aşağıda `validateRuleSet` YENİDEN çalışır.
- */
-function runApply(content: unknown, proposal: Record<string, unknown>): { ok: true; content: unknown; summary: unknown } | { ok: false; reason: string } {
-  try {
-    const r = (applyProposals as unknown as (c: unknown, p: unknown[], o: { maxChanges: number }) => unknown)(content, [proposal], { maxChanges: 5 });
-    if (!r || typeof r !== "object") return { ok: false, reason: "boş sonuç" };
-    const o = r as Record<string, unknown>;
-    if (o.ok === false) return { ok: false, reason: String(o.reason ?? o.error ?? "bilinmeyen neden") };
-    const next = o.content ?? o.set;
-    if (!next) return { ok: false, reason: "içerik yok" };
-    return { ok: true, content: next, summary: o.changeSummary ?? o.change_summary ?? o.summary ?? [] };
-  } catch (e) {
-    return { ok: false, reason: e instanceof Error ? e.message : String(e) };
-  }
+function publishFailure(r: Extract<PublishResult, { ok: false }>, subject: string): string {
+  return outcomeText(r.reason, subject);
 }
 
 const decideSchema = z.object({
@@ -95,8 +97,9 @@ const decideSchema = z.object({
 });
 
 /**
- * Öneri kararı. Onay: yayındaki içerik + öneri → applyProposals → validateRuleSet → pt_rules_admin_publish → öneri
- * approved. Ret: pt_rules_admin_decide (gerekçe zorunlu). Onayda bozuk içerik çıkarsa HİÇBİR yazma yapılmaz.
+ * Öneri kararı. Onay (P1 sözleşmesi sırasıyla): yayındaki içerik + öneri → applyProposals (yalnız TS, yazma yok; bozuksa
+ * dur) → pt_rules_admin_decide(approve, p_pii_confirmed) → publishRuleSet({proposalIds}) (yayın öneriye rule_set_id
+ * bağlar). Ret: pt_rules_admin_decide(reject, gerekçe zorunlu).
  */
 export async function decideProposal(input: z.input<typeof decideSchema>): Promise<PortalRulesResult> {
   const staff = await requirePlatformModule("sistem");
@@ -108,8 +111,9 @@ export async function decideProposal(input: z.input<typeof decideSchema>): Promi
   if (decision === "reject") {
     const r = reasonSchema.safeParse(reason);
     if (!r.success) return { error: "Reddetmek için gerekçe yazın (en az 3 karakter)." };
-    const { error } = await db.rpc("pt_rules_admin_decide", { p_proposal_id: proposalId, p_decision: "rejected", p_reason: r.data });
+    const { data, error } = await db.rpc("pt_rules_admin_decide", { p_proposal_id: proposalId, p_decision: "reject", p_reason: r.data });
     if (error) return { error: dbError(error, "Ret") };
+    if (outcomeOf(data) !== "ok") return { error: outcomeText(outcomeOf(data), "Ret") };
     refresh();
     return { ok: true, notice: "Öneri reddedildi." };
   }
@@ -118,50 +122,65 @@ export async function decideProposal(input: z.input<typeof decideSchema>): Promi
 
   const { data: proposal, error: pErr } = await db
     .from("portal_rule_proposals")
-    .select("id, portal, proposal_key, kind, field_key, field_sig, proposal, source, support_tenants, state, ai_unverified")
+    .select("id, portal, proposal_key, kind, field_key, field_sig, proposal, source, support_tenants, state, ai_unverified, confidence")
     .eq("id", proposalId)
     .maybeSingle();
   if (pErr) return { error: dbError(pErr, "Öneri okuma") };
   if (!proposal) return { error: "Öneri bulunamadı." };
   const p = proposal as Record<string, unknown> & { portal: string; kind: string; state: string; support_tenants: number | null };
   if (p.state !== "ready" && p.state !== "collecting") return { error: "Bu öneri artık karar beklemiyor." };
-  if (needsPiiAck(p.kind, p.support_tenants) && !noPersonalData) {
-    return { error: "Bu öneri tek ofisten geliyor. Onaylamadan önce metnin kişisel veri içermediğini teyit edin." };
+  const portal = portalSchema.safeParse(p.portal);
+  if (!portal.success) return { error: "Öneri bulunamadı." };
+  if (needsPiiAck(p.kind, p.support_tenants) && !noPersonalData) return { error: OUTCOME_TEXT.pii_confirmation_required };
+
+  const key = signingKey();
+  if (!key) return { error: SIGNING_UNAVAILABLE };
+
+  let current: Awaited<ReturnType<typeof readPublished>>;
+  try {
+    current = await readPublished(db as unknown as RpcDb, portal.data);
+  } catch (e) {
+    return { error: dbError((e as { pg?: DbError }).pg, "Yayındaki set okuma") };
   }
-
-  const [{ data: current, error: cErr }, max] = await Promise.all([
-    db.from("portal_rule_sets").select("id, version, content").eq("portal", p.portal).eq("status", "published").maybeSingle(),
-    maxVersion(db, p.portal),
-  ]);
-  if (cErr) return { error: dbError(cErr, "Yayındaki set okuma") };
   if (!current) return { error: "Bu portalda yayında kural seti yok. Önce tohumu yayınlayın." };
-  if ("error" in max) return { error: max.error };
 
-  const applied = runApply((current as { content: unknown }).content, p);
+  const base = validateRuleSet(current.content, { portal: portal.data });
+  if (!base.ok) return { error: `Yayındaki set bugünkü doğrulamadan geçmiyor, öneri uygulanamaz (${base.reason}).` };
+  const ruleProposal: RuleProposal = {
+    id: String(p.id),
+    kind: p.kind as RuleProposal["kind"],
+    field_key: (p.field_key ?? null) as RuleProposal["field_key"],
+    source: p.source as RuleProposal["source"],
+    proposal: p.proposal && typeof p.proposal === "object" ? (p.proposal as Record<string, unknown>) : {},
+    confidence: typeof p.confidence === "number" ? p.confidence : null,
+  };
+  const applied = applyProposals(base.set, [ruleProposal], { maxChanges: 5 });
   if (!applied.ok) return { error: `Öneri uygulanamadı, yayın yapılmadı (${applied.reason}).` };
-  const nextVersion = max.version + 1;
-  const candidate = withVersion(applied.content as Record<string, unknown>, nextVersion, issuedAtIso());
-  const valid = validateRuleSet(candidate);
-  if (!valid.ok) return { error: `Öneri bozuk bir kural seti üretiyor, yayın yapılmadı (${valid.reason}).` };
 
-  const { data: pub, error: pubErr } = await db.rpc("pt_rules_admin_publish", {
-    p_portal: p.portal,
-    p_content: valid.set,
-    p_kind: "staff",
-    p_parent: (current as { id: string }).id,
-    p_change_summary: applied.summary,
-  });
-  if (pubErr) return { error: dbError(pubErr, "Yayın") };
-
-  const { error: dErr } = await db.rpc("pt_rules_admin_decide", {
+  const { data: dec, error: dErr } = await db.rpc("pt_rules_admin_decide", {
     p_proposal_id: proposalId,
-    p_decision: "approved",
+    p_decision: "approve",
     p_reason: reason ? reason : "Personel onayı",
+    p_pii_confirmed: noPersonalData,
+  });
+  if (dErr) return { error: dbError(dErr, "Onay") };
+  if (outcomeOf(dec) !== "ok") return { error: outcomeText(outcomeOf(dec), "Onay") };
+
+  const pub = await publishRuleSet(db as unknown as RpcDb, {
+    portal: portal.data,
+    content: applied.content,
+    kind: "staff",
+    parentId: current.id,
+    changeSummary: applied.changeSummary,
+    proposalIds: [proposalId],
+    nowMs: now(),
+    key,
   });
   refresh();
-  const version = versionOf(pub) ?? nextVersion;
-  if (dErr) return { ok: true, version, notice: `Sürüm ${version} yayınlandı; öneri durumu güncellenemedi (${dbError(dErr, "Karar")}).` };
-  return { ok: true, version, notice: `Onaylandı, sürüm ${version} yayınlandı.` };
+  if (!pub.ok) {
+    return { error: `Öneri onaylandı ancak yeni sürüm YAYINLANMADI: ${publishFailure(pub, "Yayın")} Öneri "onaylandı" durumunda kaldı; yayındaki set değişmedi.` };
+  }
+  return { ok: true, version: pub.version, notice: `Onaylandı, sürüm ${pub.version} yayınlandı.` };
 }
 
 const rollbackSchema = z.object({ portal: portalSchema, version: z.number().int().min(1).max(2_147_483_647) });
@@ -184,14 +203,15 @@ export async function rollbackTo(portal: string, version: number): Promise<Porta
   if (!target) return { error: "Sürüm bulunamadı." };
   const t = target as { status: string; content: unknown };
   if (t.status === "published") return { error: "Bu sürüm zaten yayında." };
-  const valid = validateRuleSet(t.content);
+  const valid = validateRuleSet(t.content, { portal: parsed.data.portal });
   if (!valid.ok) return { error: `Bu sürümün içeriği bugünkü doğrulamadan geçmiyor, geri dönülemez (${valid.reason}).` };
 
-  const { data, error } = await db.rpc("pt_rules_admin_rollback", { p_portal: parsed.data.portal, p_to_version: parsed.data.version });
-  if (error) return { error: dbError(error, "Geri alma") };
+  const key = signingKey();
+  if (!key) return { error: SIGNING_UNAVAILABLE };
+  const r = await rollbackRuleSet(db as unknown as RpcDb, { portal: parsed.data.portal, toVersion: parsed.data.version, nowMs: now(), key });
+  if (!r.ok) return { error: publishFailure(r, "Geri alma") };
   refresh();
-  const v = versionOf(data);
-  return { ok: true, version: v, notice: v ? `Sürüm ${parsed.data.version} içeriği sürüm ${v} olarak yayınlandı.` : "Geri alma yayınlandı." };
+  return { ok: true, version: r.version, notice: `Sürüm ${parsed.data.version} içeriği sürüm ${r.version} olarak yayınlandı.` };
 }
 
 /** Tohum (paket içi varsayılan kurallar) → sürüm 1. Yalnız portalda HİÇ set yokken. */
@@ -206,21 +226,21 @@ export async function publishSeed(portal: string): Promise<PortalRulesResult> {
   if (cErr) return { error: dbError(cErr, "Set okuma") };
   if ((count ?? 0) > 0) return { error: "Bu portalda zaten kural seti var; tohum yalnız ilk sürüm için yayınlanır." };
 
-  const candidate = withVersion(seedRuleSet(parsed.data) as unknown as Record<string, unknown>, 1, issuedAtIso());
-  const valid = validateRuleSet(candidate);
-  if (!valid.ok) return { error: `Tohum içeriği doğrulamadan geçmedi (${valid.reason}).` };
-
-  const { data, error } = await db.rpc("pt_rules_admin_publish", {
-    p_portal: parsed.data,
-    p_content: valid.set,
-    p_kind: "seed",
-    p_parent: null,
-    p_change_summary: { seed: true },
+  const key = signingKey();
+  if (!key) return { error: SIGNING_UNAVAILABLE };
+  // Damga (sürüm 1, şimdi, 14 gün) publishRuleSet'te basılır; tohumun 9999 son tarihi yayına taşınmaz.
+  const r = await publishRuleSet(db as unknown as RpcDb, {
+    portal: parsed.data,
+    content: seedRuleSet(parsed.data),
+    kind: "seed",
+    parentId: null,
+    changeSummary: { seed: true, count: 0 },
+    nowMs: now(),
+    key,
   });
-  if (error) return { error: dbError(error, "Tohum yayını") };
+  if (!r.ok) return { error: publishFailure(r, "Tohum yayını") };
   refresh();
-  const v = versionOf(data) ?? 1;
-  return { ok: true, version: v, notice: `Tohum sürüm ${v} olarak yayınlandı.` };
+  return { ok: true, version: r.version, notice: `Tohum sürüm ${r.version} olarak yayınlandı.` };
 }
 
 const trustSchema = z.object({
@@ -235,12 +255,13 @@ export async function setTenantTrust(input: z.input<typeof trustSchema>): Promis
   const parsed = trustSchema.safeParse(input);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Geçersiz istek." };
   const db = await createClient();
-  const { error } = await db.rpc("pt_rules_admin_set_trust", {
+  const { data, error } = await db.rpc("pt_rules_admin_set_trust", {
     p_tenant_id: parsed.data.tenantId,
     p_eligible: parsed.data.eligible,
     p_reason: parsed.data.reason,
   });
   if (error) return { error: dbError(error, "Uygunluk") };
+  if (outcomeOf(data) !== "ok") return { error: outcomeText(outcomeOf(data), "Uygunluk") };
   refresh();
   return { ok: true, notice: parsed.data.eligible ? "Ofis öğrenmeye dahil edildi." : "Ofis öğrenmeden dışlandı." };
 }
@@ -255,24 +276,27 @@ export async function runAiSuggest(portal: string): Promise<PortalRulesResult> {
   if (!rl.allowed) return { error: "Bu portal için AI önerisi 10 dakikada bir üretilebilir. Biraz sonra tekrar deneyin." };
 
   const db = await createClient();
-  let r: unknown;
+  let r: SuggestResult;
   try {
-    r = await (suggestPortalRules as unknown as (i: { db: Db; portal: string; actorId: string }) => Promise<unknown>)({ db, portal: parsed.data, actorId: staff.id });
+    r = await suggestPortalRules({ db: db as unknown as RpcDb, portal: parsed.data, actorId: staff.id });
   } catch (e) {
     console.error("runAiSuggest", e);
     return { error: "AI önerisi üretilemedi." };
   }
-  const o = r && typeof r === "object" ? (r as Record<string, unknown>) : {};
-  const reason = String(o.reason ?? o.error ?? "");
-  if (/insufficient|yetersiz|no_input|empty/i.test(reason) || o.insufficient === true) {
-    const fromResult = typeof o.minTenants === "number" ? o.minTenants : typeof o.min_tenants === "number" ? o.min_tenants : null;
-    const fromSetting = fromResult ?? Number((await getSettings(["portal_rules.ai_min_tenants"]).catch(() => ({})) as Record<string, unknown>)["portal_rules.ai_min_tenants"]);
-    const n = Number.isFinite(fromSetting) && fromSetting > 0 ? fromSetting : 2;
+  if (!r.ok) {
+    if (r.error === "schema_pending") return { error: SCHEMA_PENDING };
+    if (r.error === "ai_unconfigured") return { error: "AI sağlayıcısı yapılandırılmamış (OpenAI anahtarı yok); öneri üretilemedi." };
+    if (r.error === "rate_limited") return { error: "AI önerisi hız sınırına takıldı (portal başına 10 dakikada 1, günde en çok 20). Biraz sonra tekrar deneyin." };
+    if (r.error === "forbidden") return { error: OUTCOME_TEXT.forbidden };
+    if (r.error === "invalid_output") return { error: "AI yanıtı doğrulamadan geçmedi; öneri eklenmedi." };
+    return { error: "AI önerisi üretilemedi." };
+  }
+  if (r.outcome === "no_input") {
+    const raw = Number(((await getSettings(["portal_rules.ai_min_tenants"]).catch(() => ({}))) as Record<string, unknown>)["portal_rules.ai_min_tenants"]);
+    const n = Number.isFinite(raw) && raw > 0 ? Math.max(2, raw) : 2;
     return { ok: false, error: `Yetersiz veri (en az ${n} ofiste görülen eşleşmemiş alan yok).` };
   }
-  if (/schema|missing/i.test(reason)) return { error: SCHEMA_PENDING };
-  if (o.ok === false) return { error: "AI önerisi üretilemedi." };
   refresh();
-  const n = [o.inserted, o.proposals, o.count].find((v): v is number => typeof v === "number");
-  return { ok: true, notice: n != null ? `${n} AI önerisi eklendi (doğrulanmamış).` : "AI önerileri eklendi (doğrulanmamış)." };
+  if (r.created === 0) return { ok: true, notice: "AI yeni öneri üretmedi (girdiler mevcut önerilerle aynı ya da uygun öneri yok)." };
+  return { ok: true, notice: `${r.created} AI önerisi eklendi (doğrulanmamış).` };
 }

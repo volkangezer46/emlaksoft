@@ -9,7 +9,7 @@ import { TRANSFER_PORTALS, type TransferPortal } from "@/lib/portal-transfer/rul
 import {
   PORTAL_LABELS,
   fieldLabel,
-  normalizeOverview,
+  fieldOverviewFromProposals,
   parsePortal,
   parseView,
   portalRulesHref,
@@ -66,7 +66,7 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
   const db = await createClient();
   const canPublish = staff.role === "super_admin";
 
-  const [published, versions, overviewRes, proposals, alerts, trust, tenants, settings, evidence, catalog] = await Promise.all([
+  const [published, versions, proposals, alerts, trust, trustList, settings, evidence, catalog] = await Promise.all([
     db.from("portal_rule_sets").select("id, version, content").eq("portal", portal).eq("status", "published").maybeSingle(),
     db
       .from("portal_rule_sets")
@@ -74,7 +74,6 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
       .eq("portal", portal)
       .order("version", { ascending: false })
       .limit(30),
-    db.rpc("pt_rules_admin_overview", { p_portal: portal }),
     db
       .from("portal_rule_proposals")
       .select("id, kind, field_key, proposal, source, support_tenants, contradict_tenants, support_sessions, weeks_n, confidence, state, ai_unverified, first_seen, last_evaluated")
@@ -91,7 +90,8 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
       .order("last_seen", { ascending: false })
       .limit(12),
     db.from("portal_rule_tenant_trust").select("tenant_id, eligible, reason, set_at"),
-    view.kind === "uygunluk" ? db.from("tenants").select("id, name, slug, status, sample_pack, created_at").order("created_at").limit(200) : Promise.resolve({ data: null, error: null }),
+    // Uygunluk paneli P1'in RPC'sinden: varsayılan kural sonucu + son 60 gün doğrulanmış oturum (yalnız bu görünümde).
+    view.kind === "uygunluk" ? db.rpc("pt_rules_admin_trust_list") : Promise.resolve({ data: null, error: null }),
     getSettings([...THRESHOLD_KEYS]).catch(() => ({}) as Record<string, unknown>),
     view.kind === "kanit" ? db.rpc("pt_rules_admin_evidence", { p_proposal_id: view.id }) : Promise.resolve({ data: null, error: null }),
     view.kind === "form"
@@ -120,7 +120,6 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
     );
   }
 
-  const overview = normalizeOverview(overviewRes.error ? null : overviewRes.data);
   const content = (published.data as { content?: { fields?: unknown } } | null)?.content;
   const setFields: SetField[] = rows(content?.fields).map((f) => ({
     key: String(f.key ?? ""),
@@ -147,6 +146,7 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
   }));
   const visibleProposals = view.kind === "alan" ? proposalRows.filter((p) => p.fieldKey === view.key) : proposalRows;
   const readyCount = proposalRows.filter((p) => p.state === "ready").length;
+  const overview = fieldOverviewFromProposals(proposalRows);
 
   const formAlerts = rows(alerts.data)
     .map(toFormAlert)
@@ -166,16 +166,20 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
   const trustRows = rows(trust.data);
   const trustByTenant = new Map(trustRows.map((t) => [String(t.tenant_id), t] as const));
   const excludedCount = trustRows.filter((t) => t.eligible === false).length;
-  const trustTenants: TrustTenant[] = rows(tenants.data).map((t) => {
-    const tr = trustByTenant.get(String(t.id));
+  const trustListData = trustList.error ? null : (trustList.data as { outcome?: string; tenants?: unknown } | null);
+  const trustListOk = trustListData?.outcome === "ok";
+  const trustTenants: TrustTenant[] = rows(trustListOk ? trustListData?.tenants : null).map((t) => {
+    const tr = trustByTenant.get(String(t.tenant_id));
     return {
-      id: String(t.id),
+      id: String(t.tenant_id),
       name: String(t.name ?? "Adsız ofis"),
-      slug: str(t.slug),
+      slug: null,
       status: str(t.status),
-      samplePack: t.sample_pack != null,
+      samplePack: t.sample === true,
       eligible: tr ? tr.eligible === true : null,
       reason: tr ? str(tr.reason) : null,
+      defaultEligible: t.default_eligible === true,
+      sessions60d: n(t.verified_sessions_60d),
     };
   });
 
@@ -272,7 +276,7 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
       {show("surumler") ? <VersionsPanel portal={portal} versions={versionRows} canPublish={canPublish} /> : null}
 
       {view.kind === "uygunluk" ? (
-        <TrustPanel tenants={trustTenants} />
+        <TrustPanel tenants={trustTenants} unavailable={!trustListOk} />
       ) : view.kind === "genel" ? (
         <section className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div>

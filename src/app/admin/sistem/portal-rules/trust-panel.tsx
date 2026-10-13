@@ -17,6 +17,10 @@ export type TrustTenant = {
   /** null = personel kararı yok (öğrenme varsayılan kuralla hesaplar). */
   eligible: boolean | null;
   reason: string | null;
+  /** Personel kararı yokken öğrenmenin uygulayacağı varsayılan kural sonucu (P1 `pt_rules_admin_trust_list`). */
+  defaultEligible: boolean;
+  /** Son 60 günde doğrulanmış (yayına çıkmış ve işçi tarafından görülmüş) aktarım oturumu. */
+  sessions60d: number;
 };
 
 function TrustRow({ t }: { t: TrustTenant }) {
@@ -45,11 +49,18 @@ function TrustRow({ t }: { t: TrustTenant }) {
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-ink-950">
           {t.name}
-          {effective === true ? <Badge variant="success" size="sm">Uygun</Badge> : effective === false ? <Badge variant="danger" size="sm">Dışlandı</Badge> : <Badge variant="outline" size="sm">Varsayılan kural</Badge>}
+          {effective === true ? (
+            <Badge variant="success" size="sm">Uygun</Badge>
+          ) : effective === false ? (
+            <Badge variant="danger" size="sm">Dışlandı</Badge>
+          ) : (
+            <Badge variant="outline" size="sm">{t.defaultEligible ? "Varsayılan: uygun" : "Varsayılan: oy sayılmaz"}</Badge>
+          )}
           {t.samplePack ? <Badge variant="neutral" size="sm">Örnek veri</Badge> : null}
           {t.status && t.status !== "active" ? <Badge variant="warning" size="sm">{t.status}</Badge> : null}
           {effective === null && suggestion ? <Badge variant="warning" size="sm">Önerilen: dışla</Badge> : null}
         </p>
+        <p className="mt-0.5 text-xs text-text-muted tabular-nums">Son 60 günde {t.sessions60d} doğrulanmış aktarım</p>
       </div>
       <FormInput
         aria-label={`${t.name} gerekçe`}
@@ -80,14 +91,16 @@ function TrustRow({ t }: { t: TrustTenant }) {
  * Ofis uygunluğu (kiracı adı YALNIZ burada). Personel kararı yoksa öğrenme varsayılan kuralı uygular (aktif, örnek veri
  * yok, ≥14 gün, son 60 günde ≥3 yayınlanmış oturum). E2E Test Ofis, Demo Emlak Ofisi ve admin dışlanması önerilir.
  */
-export function TrustPanel({ tenants }: { tenants: TrustTenant[] }) {
+export function TrustPanel({ tenants, unavailable = false }: { tenants: TrustTenant[]; unavailable?: boolean }) {
   return (
     <section aria-label="Ofis uygunluğu" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <h2 className="font-display font-bold text-ink-950">Ofis uygunluğu</h2>
       <p className="mt-1 text-sm text-text-muted">
         Uygun olmayan ofisin oyu sayılmaz. Karar ve gerekçe denetim kaydına yazılır. Ofis adları yalnız bu panelde görünür.
       </p>
-      {tenants.length === 0 ? (
+      {unavailable ? (
+        <p className="mt-4 text-sm text-text-muted">Ofis listesi okunamadı (yetki ya da sistem güncellemesi bekleniyor).</p>
+      ) : tenants.length === 0 ? (
         <p className="mt-4 text-sm text-text-muted">Ofis bulunamadı.</p>
       ) : (
         <ul className="mt-2 divide-y divide-line">

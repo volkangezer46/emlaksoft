@@ -78,13 +78,16 @@ function mask(value: string | null, prefixLen = 6, suffixLen = 4): string | null
 }
 
 type PortalRows = { data: unknown; error: unknown };
-type PortalRulesSummary = { proposals: number; proposalPortal: string; alerts: number; alertPortal: string };
+type PortalCount = { portal: string; n: number };
+type PortalRulesSummary = { proposals: PortalCount[]; alerts: PortalCount[] };
 
-/** En çok kaydı olan portal (bağlantı o portalın filtreli görünümüne gider). */
-function topPortal(rows: { portal?: string }[]): string {
+const PORTAL_SHORT: Record<string, string> = { sahibinden: "sahibinden", hepsiemlak: "Hepsiemlak", emlakjet: "Emlakjet" };
+
+/** Portal başına sayım (çoktan aza); her sayı kendi portalının filtreli görünümüne bağlanır (sayı = hedef). */
+function perPortal(rows: { portal?: string }[]): PortalCount[] {
   const counts = new Map<string, number>();
   for (const r of rows) if (r.portal) counts.set(r.portal, (counts.get(r.portal) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "sahibinden";
+  return [...counts.entries()].map(([portal, n]) => ({ portal, n })).sort((a, b) => b.n - a.n);
 }
 
 /** Tablolar yoksa (P1 migration'ı uygulanmamış) null → satır hiç çizilmez. */
@@ -92,13 +95,13 @@ function portalRulesSummary(proposals: PortalRows, alerts: PortalRows): PortalRu
   if (proposals.error || alerts.error) return null;
   const p = (Array.isArray(proposals.data) ? proposals.data : []) as { portal?: string }[];
   const a = (Array.isArray(alerts.data) ? alerts.data : []) as { portal?: string }[];
-  return { proposals: p.length, proposalPortal: topPortal(p), alerts: a.length, alertPortal: topPortal(a) };
+  return { proposals: perPortal(p), alerts: perPortal(a) };
 }
 
-/** Tek satır özet: "Portal kuralları: N bekleyen öneri · M form uyarısı"; ikisi de 0 ise "sorun yok". */
+/** Tek satır özet: "Portal kuralları: bekleyen öneri sahibinden 3 · Emlakjet 2 — form uyarısı …"; ikisi de yoksa "sorun yok". */
 function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
   const base = "/admin/sistem?sekme=portal-kurallari";
-  if (summary.proposals === 0 && summary.alerts === 0) {
+  if (summary.proposals.length === 0 && summary.alerts.length === 0) {
     return (
       <p className="text-sm text-text-muted">
         <Link href={base} className="font-semibold text-ink-950 hover:underline">
@@ -108,22 +111,28 @@ function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
       </p>
     );
   }
+  const group = (label: string, items: PortalCount[], view: string, tone: string) =>
+    items.length ? (
+      <span>
+        {label}{" "}
+        {items.map((c, i) => (
+          <span key={c.portal}>
+            {i > 0 ? " · " : null}
+            <Link href={`${base}&portal=${c.portal}&gorunum=${view}`} className={`font-semibold tabular-nums hover:underline ${tone}`}>
+              {PORTAL_SHORT[c.portal] ?? c.portal} {c.n}
+            </Link>
+          </span>
+        ))}
+      </span>
+    ) : null;
   return (
     <p className="text-sm text-text-muted">
       <Link href={base} className="font-semibold text-ink-950 hover:underline">
         Portal kuralları
       </Link>
-      :{" "}
-      <Link href={`${base}&portal=${summary.proposalPortal}&gorunum=oneriler`} className="font-semibold tabular-nums text-ink-950 hover:underline">
-        {summary.proposals} bekleyen öneri
-      </Link>
-      {" · "}
-      <Link
-        href={`${base}&portal=${summary.alertPortal}&gorunum=uyarilar`}
-        className={`font-semibold tabular-nums hover:underline ${summary.alerts > 0 ? "text-amber-700" : "text-ink-950"}`}
-      >
-        {summary.alerts} form uyarısı
-      </Link>
+      : {group("bekleyen öneri", summary.proposals, "oneriler", "text-ink-950")}
+      {summary.proposals.length && summary.alerts.length ? " — " : null}
+      {group("form uyarısı", summary.alerts, "uyarilar", "text-amber-700")}
     </p>
   );
 }

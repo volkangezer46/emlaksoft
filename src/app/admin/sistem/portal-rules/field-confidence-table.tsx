@@ -11,7 +11,6 @@ import {
   fieldLabel,
   fieldStateOf,
   formatConfidence,
-  formatPercent,
   portalRulesHref,
   type Overview,
 } from "@/lib/portal-rules/admin-model";
@@ -19,7 +18,7 @@ import {
 export type SetField = { key: string; state: unknown; confidence: number; labels: string[] };
 
 /**
- * Yayındaki setin alanları + pt_rules_admin_overview toplu sayıları. Her sayı alanın kanıt görünümüne
+ * Yayındaki setin alanları + açık önerilerden alan başına toplu sayılar (`fieldOverviewFromProposals`). Her sayı alanın kanıt görünümüne
  * (`?gorunum=alan:<key>`: o alanın önerileri ve kanıtları) bağlanır — sıfır çıkmaz metrik.
  */
 export function FieldConfidenceTable({
@@ -41,7 +40,7 @@ export function FieldConfidenceTable({
     <section aria-label="Alan güveni" className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <h2 className="font-display font-bold text-ink-950">{focusKey ? `Alan: ${focusLabel}` : "Alan güveni"}</h2>
       <p className="mt-1 text-sm text-text-muted">
-        Güven, ofis oylarının Wilson alt sınırıdır (≥0,50 yüksek). Destek ve karşı sayıları ofis bazlıdır; ofis adı gösterilmez.
+        Güven, ofis oylarının Wilson alt sınırıdır (≥0,50 yüksek). Destek / karşı, alanın açık önerileri içindeki en yüksek ofis sayısıdır; ofis adı gösterilmez. Açık önerisi olmayan alanda tire görünür.
       </p>
       {!hasSet ? (
         <p className="mt-4 text-sm text-text-muted">
@@ -58,8 +57,8 @@ export function FieldConfidenceTable({
                 <th className="py-2 pr-3 font-semibold">Durum</th>
                 <th className="py-2 pr-3 font-semibold">Güven</th>
                 <th className="py-2 pr-3 font-semibold">Destek / karşı ofis</th>
-                <th className="py-2 pr-3 font-semibold">14 günlük başarı</th>
-                <th className="py-2 font-semibold">Son görülme</th>
+                <th className="py-2 pr-3 font-semibold">Açık öneri</th>
+                <th className="py-2 font-semibold">Son değerlendirme</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
@@ -98,8 +97,7 @@ export function FieldConfidenceTable({
                     </td>
                     <td className="py-2 pr-3 tabular-nums">
                       <Link href={href} className="hover:underline">
-                        {o ? formatPercent(o.success14d) : "—"}
-                        {o && o.attempts14d > 0 ? <span className="text-xs text-text-faint"> · {o.attempts14d} deneme</span> : null}
+                        {o ? o.openProposals : "—"}
                       </Link>
                     </td>
                     <td className="py-2 text-text-muted">{o?.lastSeen ? relativeTimeTR(o.lastSeen) : "—"}</td>

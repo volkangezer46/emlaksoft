@@ -6,14 +6,13 @@ import {
   formChangedText,
   formatConfidence,
   needsPiiAck,
-  normalizeOverview,
+  fieldOverviewFromProposals,
   parsePortal,
   parseView,
   portalRulesHref,
   sourceBadge,
   suggestedExclusion,
   toFormAlert,
-  withVersion,
 } from "./admin-model";
 
 describe("confidenceBucket", () => {
@@ -94,13 +93,16 @@ describe("form değişti", () => {
   });
 });
 
-describe("normalizeOverview", () => {
-  it("alan sayıları okunur; bilinmeyen biçim boş", () => {
-    const o = normalizeOverview({ fields: [{ field_key: "heating", support_tenants: 3, contradict_tenants: 1, success_14d: 0.8, attempts_14d: 10, last_seen: "2026-10-12T00:00:00Z" }], pending_proposals: 2 });
-    expect(o.fields.get("heating")).toMatchObject({ supportTenants: 3, contradictTenants: 1, success14d: 0.8, attempts14d: 10 });
-    expect(o.pendingProposals).toBe(2);
-    expect(normalizeOverview("x").fields.size).toBe(0);
-    expect(normalizeOverview([{ key: "price", ok_14d: 3, attempts_14d: 4 }]).fields.get("price")?.success14d).toBe(0.75);
+describe("fieldOverviewFromProposals", () => {
+  it("alan başına açık öneri sayısı, en yüksek destek/karşı ve son değerlendirme; alansız öneri sayılmaz", () => {
+    const o = fieldOverviewFromProposals([
+      { fieldKey: "heating", supportTenants: 3, contradictTenants: 1, lastEvaluated: "2026-10-11T00:00:00Z" },
+      { fieldKey: "heating", supportTenants: 2, contradictTenants: 2, lastEvaluated: "2026-10-12T00:00:00Z" },
+      { fieldKey: null, supportTenants: 9, contradictTenants: 0, lastEvaluated: null },
+    ]);
+    expect(o.fields.get("heating")).toEqual({ key: "heating", supportTenants: 3, contradictTenants: 2, openProposals: 2, lastSeen: "2026-10-12T00:00:00Z" });
+    expect(o.fields.size).toBe(1);
+    expect(fieldOverviewFromProposals([]).fields.size).toBe(0);
   });
 });
 
@@ -110,13 +112,5 @@ describe("uygunluk önerisi", () => {
     expect(suggestedExclusion({ name: "Demo Emlak Ofisi" })).toMatch(/Demo/);
     expect(suggestedExclusion({ name: "admin" })).toMatch(/yönetim/);
     expect(suggestedExclusion({ name: "Gezertaşar Emlak" })).toBeNull();
-  });
-});
-
-describe("withVersion", () => {
-  it("tabanı değiştirmeden sürüm ve yayın anı yazar", () => {
-    const base = { version: 0, issuedAt: "x", fields: [] };
-    expect(withVersion(base, 4, "2026-10-13T00:00:00.000Z")).toEqual({ version: 4, issuedAt: "2026-10-13T00:00:00.000Z", fields: [] });
-    expect(base.version).toBe(0);
   });
 });
