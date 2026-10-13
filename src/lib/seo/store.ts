@@ -5,17 +5,20 @@ import { getPlatformSetting, getPlatformSettingsMany, setPlatformSetting } from 
 import { resolvePageMetadata, resolveRootMetadata, type ExtraMetadata } from "./metadata";
 import { buildRedirectMap, normalizeRedirectPath, withLegacyRedirects, type RedirectMap } from "./redirects";
 import type { AuditSummary, Finding } from "./audit-rules";
+import { isHistoryTracked, parseSeoHistory, pushSeoHistory } from "./history";
 import {
   DEFAULT_SEO_GLOBAL,
   GlobalInputSchema,
   IndexNowSettingsSchema,
   PagesSchema,
+  PatternsSchema,
   RedirectsSchema,
   RobotsSettingsSchema,
   SEO_KEYS,
   SitemapSettingsSchema,
   mergeGlobal,
   mergeIndexNow,
+  mergePatterns,
   mergeRobots,
   mergeSitemap,
   safeParse,
@@ -23,6 +26,7 @@ import {
   type SeoGlobal,
   type SeoIndexNowSettings,
   type SeoPages,
+  type SeoPatterns,
   type SeoRedirectRule,
   type SeoRobotsSettings,
   type SeoSitemapSettings,
@@ -43,6 +47,8 @@ export type SeoSettings = {
   sitemap: SeoSitemapSettings;
   robots: SeoRobotsSettings;
   redirects: SeoRedirectRule[];
+  /** Vitrin/ilan/danışman dinamik kalıpları (boş alan = bugünkü sabit çıktı). */
+  patterns: SeoPatterns;
 };
 
 export const DEFAULT_SEO_SETTINGS: SeoSettings = {
@@ -51,6 +57,7 @@ export const DEFAULT_SEO_SETTINGS: SeoSettings = {
   sitemap: mergeSitemap(null),
   robots: mergeRobots(null),
   redirects: [],
+  patterns: mergePatterns(null),
 };
 
 function parseAll(raw: Record<string, string | null>): SeoSettings {
@@ -60,10 +67,11 @@ function parseAll(raw: Record<string, string | null>): SeoSettings {
     sitemap: mergeSitemap(safeParse(SitemapSettingsSchema, raw[SEO_KEYS.sitemap] ?? null)),
     robots: mergeRobots(safeParse(RobotsSettingsSchema, raw[SEO_KEYS.robots] ?? null)),
     redirects: safeParse(RedirectsSchema, raw[SEO_KEYS.redirects] ?? null) ?? [],
+    patterns: mergePatterns(safeParse(PatternsSchema, raw[SEO_KEYS.patterns] ?? null)),
   };
 }
 
-const KEYS = [SEO_KEYS.global, SEO_KEYS.pages, SEO_KEYS.sitemap, SEO_KEYS.robots, SEO_KEYS.redirects];
+const KEYS = [SEO_KEYS.global, SEO_KEYS.pages, SEO_KEYS.sitemap, SEO_KEYS.robots, SEO_KEYS.redirects, SEO_KEYS.patterns];
 
 /** Önbelleksiz güncel ayarlar (yönetim ekranı). */
 export async function readSeoSettingsFresh(): Promise<SeoSettings> {
@@ -100,20 +108,41 @@ export async function getRedirectMap(nowMs: number): Promise<RedirectMap> {
 
 export type WriteResult = { ok: true } | { ok: false; error: string };
 
-/** Şema + boyut doğrulayıp yazar ve geri okuyarak doğrular. */
+/**
+ * Şema + boyut doğrulayıp yazar ve geri okuyarak doğrular. Yönetici ayarlarında (history.ts SEO_HISTORY_KEYS)
+ * yazmadan ÖNCE mevcut değer `seo.history` halkasına eklenir (değer değişmiyorsa eklenmez). Halka yazılamazsa
+ * ayar yine kaydedilir (geçmiş, kaydı engellemez).
+ */
 export async function writeSeoSetting(
   keyName: keyof typeof SEO_KEYS,
   schema: Parameters<typeof serializeSetting>[1],
   value: unknown,
   staffId?: string,
+  byName?: string | null,
 ): Promise<WriteResult> {
   const s = serializeSetting(keyName, schema, value);
   if (!s.ok) return s;
+  if (isHistoryTracked(keyName)) await appendSeoHistory(keyName, s.json, staffId ?? null, byName ?? null);
   const ok = await setPlatformSetting(SEO_KEYS[keyName], s.json, staffId);
   if (!ok) return { ok: false, error: "Ayar kaydedilemedi: platform ayarları tablosuna yazılamadı." };
   const back = await getPlatformSetting(SEO_KEYS[keyName]);
   if (back !== s.json) return { ok: false, error: "Ayar yazıldı ama doğrulanamadı; tekrar deneyin." };
   return { ok: true };
+}
+
+async function appendSeoHistory(keyName: keyof typeof SEO_KEYS, nextJson: string, by: string | null, byName: string | null): Promise<void> {
+  try {
+    const cur = await getPlatformSettingsMany([SEO_KEYS[keyName], SEO_KEYS.history]);
+    const prev = cur[SEO_KEYS[keyName]] ?? null;
+    if (prev === nextJson) return;
+    const at = new Date().toISOString();
+    const id = `${at.replace(/\D/g, "").slice(0, 17)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+    const list = pushSeoHistory(parseSeoHistory(cur[SEO_KEYS.history] ?? null), { id, key: keyName, at, by, byName, prev });
+    const ok = await setPlatformSetting(SEO_KEYS.history, JSON.stringify(list), by ?? undefined);
+    if (!ok) console.error("seo.history yazılamadı", keyName);
+  } catch (e) {
+    console.error("seo.history", e);
+  }
 }
 
 export async function readIndexNow(): Promise<SeoIndexNowSettings> {
@@ -214,8 +243,17 @@ const MAX_PENDING_404 = 200;
 export function isLoggable404Path(path: string): boolean {
   if (!path.startsWith("/") || path.length > 300 || /[?#]/.test(path)) return false;
   // Otomatik güvenlik tarayıcı gürültüsü (wp-admin, .php, .env...) listeyi boğmasın.
-  if (/\.(php\d?|asp|aspx|jsp|env|git|sql|bak|zip|tar|gz|ini|yml|yaml)(\/|$)|wp-|xmlrpc|\.well-known|phpmyadmin|cgi-bin/i.test(path)) return false;
+  if (/\.(php\d*|asp|aspx|jsp|env|git|sql|bak|zip|tar|gz|ini|yml|yaml)(\/|$)|wp-|xmlrpc|\.well-known|phpmyadmin|cgi-bin/i.test(path)) return false;
   return !path.split("/").some((seg) => /^[A-Za-z0-9_-]{24,}$/.test(seg));
+}
+
+/** Yerel/iç ağ yönlendireni (sağlık kontrolü, sunucu içi istek): 404 listesine yazılmaz. */
+export function isLocalReferrerHost(host: string | null | undefined): boolean {
+  if (!host) return false;
+  let h = host.trim().toLowerCase();
+  if (h.startsWith("[")) h = h.slice(1, h.indexOf("]") > 0 ? h.indexOf("]") : undefined);
+  else if (h.split(":").length === 2) h = h.split(":")[0]!; // ana makine:port
+  return h === "127.0.0.1" || h === "localhost" || h === "::1" || h === "0.0.0.0";
 }
 
 /**
@@ -224,7 +262,7 @@ export function isLoggable404Path(path: string): boolean {
  */
 export async function logNotFound(path: string, referrerHost: string | null, nowMs: number): Promise<void> {
   try {
-    if (table404Missing || !isLoggable404Path(path)) return;
+    if (table404Missing || !isLoggable404Path(path) || isLocalReferrerHost(referrerHost)) return;
     const key = normalizeRedirectPath(path);
     const cur = pending404.get(key);
     if (cur) cur.n += 1;

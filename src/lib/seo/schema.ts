@@ -12,6 +12,8 @@ export * from "./schema-core";
  *   seo.robots    -> SeoRobotsSettings
  *   seo.redirects -> SeoRedirectRule[]
  *   seo.indexnow  -> SeoIndexNowSettings
+ *   seo.patterns  -> SeoPatterns (vitrin/ilan/danışman dinamik başlık-açıklama kalıpları; patterns.ts)
+ *   seo.history   -> SEO ayar geçmişi halkası (history.ts; audit/indexnow anahtarları girmez)
  *   seo.audit.latest / seo.audit.history -> robot denetim sonucu
  *
  * Güvenlik: HİÇBİR alan HTML kabul etmez; metinler düz metin olarak render edilir,
@@ -28,6 +30,8 @@ export const SEO_KEYS = {
   indexnowSeen: "seo.indexnow.seen",
   auditLatest: "seo.audit.latest",
   auditHistory: "seo.audit.history",
+  patterns: "seo.patterns",
+  history: "seo.history",
 } as const;
 
 /** Anahtar başına en çok bayt (JSON metni). */
@@ -41,6 +45,8 @@ export const SEO_MAX_BYTES: Record<keyof typeof SEO_KEYS, number> = {
   indexnowSeen: 512 * 1024,
   auditLatest: 256 * 1024,
   auditHistory: 64 * 1024,
+  patterns: 8 * 1024,
+  history: 300 * 1024,
 };
 
 const plain = (max: number) =>
@@ -296,6 +302,31 @@ export const RedirectRuleSchema = z.object({
 });
 export type SeoRedirectRule = z.infer<typeof RedirectRuleSchema>;
 export const RedirectsSchema = z.array(RedirectRuleSchema).max(500);
+
+/* ---------- Dinamik kalıplar (seo.patterns) ---------- */
+
+/** Kalıp alanı: düz metin, en çok 200 karakter; boş = varsayılan kalıp (bugünkü sabit çıktı). */
+const patternText = optionalPlain(200);
+const PatternPairSchema = z.object({ title: patternText, description: patternText });
+
+export const PatternsSchema = z.object({
+  office: PatternPairSchema.optional(),
+  listing: PatternPairSchema.optional(),
+  agent: PatternPairSchema.optional(),
+});
+export type SeoPatternPair = { title: string; description: string };
+export type SeoPatterns = { office: SeoPatternPair; listing: SeoPatternPair; agent: SeoPatternPair };
+export const PATTERN_ENTITIES = ["office", "listing", "agent"] as const;
+export type SeoPatternEntity = (typeof PATTERN_ENTITIES)[number];
+
+/** Ayar yokken her alan boştur: boş alan = varsayılan kalıp (patterns.ts DEFAULT_SEO_PATTERNS). */
+export function mergePatterns(i: z.infer<typeof PatternsSchema> | null | undefined): SeoPatterns {
+  const pair = (p: { title?: string; description?: string } | undefined): SeoPatternPair => ({
+    title: p?.title?.trim() ?? "",
+    description: p?.description?.trim() ?? "",
+  });
+  return { office: pair(i?.office), listing: pair(i?.listing), agent: pair(i?.agent) };
+}
 
 export const IndexNowSettingsSchema = z.object({
   enabled: z.boolean().optional(),

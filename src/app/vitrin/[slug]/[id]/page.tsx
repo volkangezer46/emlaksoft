@@ -19,7 +19,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { isVitrinEnabled } from "@/lib/vitrin-settings";
+import { isVitrinEnabled, loadVitrinSettings } from "@/lib/vitrin-settings";
+import { getSeoSettings } from "@/lib/seo/store";
+import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
 import { formatPhoneDisplay, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import dynamicImport from "next/dynamic";
 import { LeadForm } from "@/app/lead/[token]/lead-form";
@@ -145,36 +147,52 @@ export async function generateMetadata({
   const coverId = firstPublicImageByProperty(coverRows).get(id);
   const cover = coverId ? { id: coverId } : null;
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
-  if (!(await isVitrinEnabled(admin, tenant.id))) return { title: "İlan bulunamadı" };
 
-  const { data: property } = await admin
-    .from("properties")
-    .select(
-      "id, title, property_code, transaction_type, property_type, list_price, address_line, features, province:geo_provinces(name), district:geo_districts(name)",
-    )
-    .eq("id", id)
-    .eq("tenant_id", tenant.id)
-    .eq("status", "live")
-    .is("deleted_at", null)
-    .eq("is_sample", false)
-    .or(OPEN_LISTING_OR_FILTER)
-    .maybeSingle();
+  // Vitrin ayarı (açık mı + arama onayı), ilan ve SEO kalıpları bağımsız: paralel.
+  const [{ settings: vitrinCfg }, { data: property }, seo] = await Promise.all([
+    loadVitrinSettings(admin, tenant.id),
+    admin
+      .from("properties")
+      .select(
+        "id, title, property_code, transaction_type, property_type, list_price, address_line, features, province:geo_provinces(name), district:geo_districts(name)",
+      )
+      .eq("id", id)
+      .eq("tenant_id", tenant.id)
+      .eq("status", "live")
+      .is("deleted_at", null)
+      .eq("is_sample", false)
+      .or(OPEN_LISTING_OR_FILTER)
+      .maybeSingle(),
+    getSeoSettings(),
+  ]);
+  if (!vitrinCfg.enabled) return { title: "İlan bulunamadı" };
   if (!property) return { title: "İlan bulunamadı" };
 
   const priceText = money(property.list_price != null ? Number(property.list_price) : null, property.transaction_type);
-  const title = `${property.title || property.property_code} - ${priceText}`;
   const loc = buildLoc(property);
+  // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
+  const vars = {
+    ofis: tenant.name,
+    ilan_basligi: property.title || property.property_code,
+    fiyat: priceText,
+    il: relName(property.province as Rel),
+    ilce: relName(property.district as Rel),
+    konum: loc || "Türkiye",
+    islem: property.transaction_type,
+    tip: property.property_type,
+    oda: ((property.features ?? {}) as Feat).rooms ?? null,
+  };
+  const title = resolveSeoPattern(seo.patterns, "listing", "title", vars);
   const rawDesc = await fetchDescription(admin, id, property.features);
-  const description = (
-    rawDesc ??
-    `${loc || "Türkiye"} · ${property.property_type} · ${property.transaction_type} · ${priceText} — ${tenant.name} güvencesiyle.`
-  )
+  const description = (rawDesc ?? resolveSeoPattern(seo.patterns, "listing", "description", vars))
     .replace(/\s+/g, " ")
     .slice(0, 160);
 
   return {
     title: { absolute: title },
     description,
+    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
+    robots: vitrinRobots(vitrinCfg.seoOptin),
     alternates: { canonical: `/vitrin/${slug}/${id}` },
     openGraph: {
       type: "website",

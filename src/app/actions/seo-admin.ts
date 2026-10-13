@@ -8,12 +8,17 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { now } from "@/lib/clock";
 import { optionalEmailSchema, optionalPhoneSchema } from "@/lib/validation/contact";
 import { getSeoPage } from "@/lib/seo/registry";
+import { effectivePageView } from "@/lib/seo/metadata";
+import { loadSitemapFresh } from "@/lib/seo/sitemap-data";
+import { SEO_HISTORY_KEYS, listSeoHistory, type SeoHistoryKey } from "@/lib/seo/history";
+import { pageImpact, robotsImpact, sitemapImpact, type SeoImpact } from "@/app/admin/seo/noindex-impact";
 import { executeSeoRobot } from "@/lib/seo/robot";
 import { validateNewRule, analyzeRedirects } from "@/lib/seo/redirects";
 import {
   GlobalInputSchema,
   PageOverrideSchema,
   PagesSchema,
+  PatternsSchema,
   RedirectRuleSchema,
   RedirectsSchema,
   RobotsSettingsSchema,
@@ -23,6 +28,7 @@ import {
   CHANGE_FREQS,
   JSON_LD_KINDS,
   compactOverride,
+  mergeSitemap,
   type SeoPageOverride,
   type SeoRedirectRule,
 } from "@/lib/seo/schema";
@@ -97,7 +103,7 @@ export async function saveSeoGlobal(fd: FormData): Promise<SeoActionResult> {
       yandex: text(fd, "vYandex") ?? "",
     },
   };
-  const res = await writeSeoSetting("global", GlobalInputSchema, input, g.staff.id);
+  const res = await writeSeoSetting("global", GlobalInputSchema, input, g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.global.save", "global");
   refresh();
@@ -115,14 +121,33 @@ export async function saveSeoPage(fd: FormData): Promise<SeoActionResult> {
 
   const settings = await readSeoSettingsFresh();
   const prev = settings.pages[path] ?? {};
-  const superAdmin = g.staff.role === "super_admin";
+  const next = pageOverrideFromForm(fd, prev, g.staff.role === "super_admin");
+  if (!def.canIndex && next.robotsIndex === true) return { error: "Bu sayfa (örn. giriş) indekslenebilir yapılamaz." };
+  if (next.sitemapPriority !== undefined && !(next.sitemapPriority >= 0 && next.sitemapPriority <= 1)) return { error: "Öncelik 0 ile 1 arasında olmalı." };
+  // Hiçbir değişiklik yoksa güncellenme zamanı yazılmaz.
+  const checked = PageOverrideSchema.safeParse(next);
+  if (!checked.success) return { error: checked.error.issues[0]?.message ?? "Sayfa ayarı geçersiz." };
+  const compact = compactOverride(checked.data);
 
+  const pages = { ...settings.pages };
+  if (!compact) delete pages[path];
+  else pages[path] = { ...compact, updatedAt: new Date(now()).toISOString() };
+
+  const res = await writeSeoSetting("pages", PagesSchema, pages, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.page.save", path);
+  refresh();
+  return { ok: true };
+}
+
+/** Sayfa formundan override (saveSeoPage ve etki önizlemesi ortak). İndeks/sitemap kararları yalnız süper admin. */
+function pageOverrideFromForm(fd: FormData, prev: SeoPageOverride, superAdmin: boolean): SeoPageOverride {
   const priorityRaw = text(fd, "sitemapPriority");
   const priority = priorityRaw === undefined ? undefined : Number(priorityRaw.replace(",", "."));
   const freq = text(fd, "changeFreq");
   const kinds = fd.getAll("jsonLd").filter((v): v is string => typeof v === "string");
 
-  const next: SeoPageOverride = {
+  return {
     title: text(fd, "title"),
     description: text(fd, "description"),
     canonical: text(fd, "canonical"),
@@ -137,22 +162,6 @@ export async function saveSeoPage(fd: FormData): Promise<SeoActionResult> {
     changeFreq: superAdmin ? ((CHANGE_FREQS as readonly string[]).includes(freq ?? "") ? (freq as SeoPageOverride["changeFreq"]) : undefined) : prev.changeFreq,
     jsonLd: superAdmin ? (kinds.length > 0 ? (kinds.filter((k) => (JSON_LD_KINDS as readonly string[]).includes(k)) as SeoPageOverride["jsonLd"]) : undefined) : prev.jsonLd,
   };
-  if (!def.canIndex && next.robotsIndex === true) return { error: "Bu sayfa (örn. giriş) indekslenebilir yapılamaz." };
-  if (next.sitemapPriority !== undefined && !(next.sitemapPriority >= 0 && next.sitemapPriority <= 1)) return { error: "Öncelik 0 ile 1 arasında olmalı." };
-  // Hiçbir değişiklik yoksa güncellenme zamanı yazılmaz.
-  const checked = PageOverrideSchema.safeParse(next);
-  if (!checked.success) return { error: checked.error.issues[0]?.message ?? "Sayfa ayarı geçersiz." };
-  const compact = compactOverride(checked.data);
-
-  const pages = { ...settings.pages };
-  if (!compact) delete pages[path];
-  else pages[path] = { ...compact, updatedAt: new Date(now()).toISOString() };
-
-  const res = await writeSeoSetting("pages", PagesSchema, pages, g.staff.id);
-  if (!res.ok) return { error: res.error };
-  await audit(g.staff, "seo.page.save", path);
-  refresh();
-  return { ok: true };
 }
 
 export async function resetSeoPage(fd: FormData): Promise<SeoActionResult> {
@@ -163,7 +172,7 @@ export async function resetSeoPage(fd: FormData): Promise<SeoActionResult> {
   const settings = await readSeoSettingsFresh();
   const pages = { ...settings.pages };
   delete pages[path];
-  const res = await writeSeoSetting("pages", PagesSchema, pages, g.staff.id);
+  const res = await writeSeoSetting("pages", PagesSchema, pages, g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.page.reset", path);
   refresh();
@@ -175,9 +184,18 @@ export async function resetSeoPage(fd: FormData): Promise<SeoActionResult> {
 export async function saveSeoSitemap(fd: FormData): Promise<SeoActionResult> {
   const g = await guard(true);
   if ("error" in g) return g;
+  const input = sitemapInputFromForm(fd);
+  const res = await writeSeoSetting("sitemap", SitemapSettingsSchema, input, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.sitemap.save", "sitemap", { onlyOptIn: input.onlyOptIn, optIn: input.optInTenantSlugs.length });
+  refresh();
+  return { ok: true };
+}
+
+function sitemapInputFromForm(fd: FormData) {
   const slugs = lines(fd, "optInTenantSlugs").map((s) => s.toLowerCase());
   const max = Number(text(fd, "maxUrlsPerSitemap") ?? "45000");
-  const input = {
+  return {
     staticPages: bool(fd, "staticPages"),
     tools: bool(fd, "tools"),
     vitrinOffices: bool(fd, "vitrinOffices"),
@@ -187,31 +205,30 @@ export async function saveSeoSitemap(fd: FormData): Promise<SeoActionResult> {
     optInTenantSlugs: slugs,
     maxUrlsPerSitemap: Number.isFinite(max) ? Math.round(max) : 45000,
   };
-  const res = await writeSeoSetting("sitemap", SitemapSettingsSchema, input, g.staff.id);
-  if (!res.ok) return { error: res.error };
-  await audit(g.staff, "seo.sitemap.save", "sitemap", { onlyOptIn: input.onlyOptIn, optIn: slugs.length });
-  refresh();
-  return { ok: true };
 }
 
 export async function saveSeoRobots(fd: FormData): Promise<SeoActionResult> {
   const g = await guard(true);
   if ("error" in g) return g;
+  const input = robotsInputFromForm(fd);
+  const res = await writeSeoSetting("robots", RobotsSettingsSchema, input, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.robots.save", "robots", { blockedAi: input.blockedAiBots.length, extra: input.extraDisallow.length });
+  refresh();
+  return { ok: true };
+}
+
+function robotsInputFromForm(fd: FormData) {
   const botIds = AI_BOTS.map((b) => b.id as string);
   // Form "izin ver" anahtarlarını gönderir: işaretli OLMAYAN bot engellenir.
   const allowed = new Set(fd.getAll("allowAi").filter((v): v is string => typeof v === "string"));
   const blocked = botIds.filter((id) => !allowed.has(id));
-  const input = {
+  return {
     extraDisallow: lines(fd, "extraDisallow"),
     blockedAiBots: blocked,
     llmsTxtEnabled: bool(fd, "llmsTxtEnabled"),
     llmsTxt: text(fd, "llmsTxt") ?? "",
   };
-  const res = await writeSeoSetting("robots", RobotsSettingsSchema, input, g.staff.id);
-  if (!res.ok) return { error: res.error };
-  await audit(g.staff, "seo.robots.save", "robots", { blockedAi: blocked.length, extra: input.extraDisallow.length });
-  refresh();
-  return { ok: true };
 }
 
 /* ------------------------------ Yönlendirmeler ------------------------------ */
@@ -236,7 +253,7 @@ export async function addSeoRedirect(fd: FormData): Promise<SeoActionResult> {
   const settings = await readSeoSettingsFresh();
   const err = validateNewRule(settings.redirects, parsed.data);
   if (err) return { error: err };
-  const res = await writeSeoSetting("redirects", RedirectsSchema, [...settings.redirects, parsed.data], g.staff.id);
+  const res = await writeSeoSetting("redirects", RedirectsSchema, [...settings.redirects, parsed.data], g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.redirect.add", parsed.data.id, { from: parsed.data.from, to: parsed.data.to });
   refresh();
@@ -251,7 +268,7 @@ export async function toggleSeoRedirect(fd: FormData): Promise<SeoActionResult> 
   const next: SeoRedirectRule[] = settings.redirects.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r));
   const loop = analyzeRedirects(next).find((i) => i.ruleId === id && i.kind === "loop");
   if (loop) return { error: loop.message };
-  const res = await writeSeoSetting("redirects", RedirectsSchema, next, g.staff.id);
+  const res = await writeSeoSetting("redirects", RedirectsSchema, next, g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.redirect.toggle", id);
   refresh();
@@ -263,7 +280,7 @@ export async function deleteSeoRedirect(fd: FormData): Promise<SeoActionResult> 
   if ("error" in g) return g;
   const id = text(fd, "id") ?? "";
   const settings = await readSeoSettingsFresh();
-  const res = await writeSeoSetting("redirects", RedirectsSchema, settings.redirects.filter((r) => r.id !== id), g.staff.id);
+  const res = await writeSeoSetting("redirects", RedirectsSchema, settings.redirects.filter((r) => r.id !== id), g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.redirect.delete", id);
   refresh();
@@ -276,7 +293,7 @@ export async function deleteAllSeoRedirects(fd: FormData): Promise<SeoActionResu
   if ("error" in g) return g;
   if (text(fd, "confirm") !== "evet") return { error: "Onay gerekli." };
   const settings = await readSeoSettingsFresh();
-  const res = await writeSeoSetting("redirects", RedirectsSchema, [], g.staff.id);
+  const res = await writeSeoSetting("redirects", RedirectsSchema, [], g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.redirect.delete_all", "redirects", { count: settings.redirects.length });
   refresh();
@@ -340,7 +357,7 @@ export async function exportSeoSettings(): Promise<SeoActionResult> {
   const g = await guard(false);
   if ("error" in g) return g;
   const s = await readSeoSettingsFresh();
-  const payload = { version: 1, exportedAt: new Date(now()).toISOString(), global: s.global, pages: s.pages, sitemap: s.sitemap, robots: s.robots, redirects: s.redirects };
+  const payload = { version: 1, exportedAt: new Date(now()).toISOString(), global: s.global, pages: s.pages, sitemap: s.sitemap, robots: s.robots, redirects: s.redirects, patterns: s.patterns };
   await audit(g.staff, "seo.export", "backup");
   return { ok: true, data: JSON.stringify(payload, null, 2) };
 }
@@ -364,6 +381,7 @@ export async function importSeoSettings(fd: FormData): Promise<SeoActionResult> 
     { name: "sitemap", schema: SitemapSettingsSchema, value: obj.sitemap },
     { name: "robots", schema: RobotsSettingsSchema, value: obj.robots },
     { name: "redirects", schema: RedirectsSchema, value: obj.redirects },
+    { name: "patterns", schema: PatternsSchema, value: obj.patterns },
   ];
   // Önce HEPSİNİ doğrula; biri bozuksa hiçbir şey yazılmaz.
   for (const st of steps) {
@@ -373,11 +391,115 @@ export async function importSeoSettings(fd: FormData): Promise<SeoActionResult> 
   }
   for (const st of steps) {
     if (st.value === undefined) continue;
-    const res = await writeSeoSetting(st.name, st.schema, st.value, g.staff.id);
+    const res = await writeSeoSetting(st.name, st.schema, st.value, g.staff.id, g.staff.full_name);
     if (!res.ok) return { error: `${st.name}: ${res.error}` };
     wrote.push(st.name);
   }
   await audit(g.staff, "seo.import", "backup", { keys: wrote });
   refresh();
   return { ok: true, message: wrote.length > 0 ? `İçe aktarıldı: ${wrote.join(", ")}.` : "Yedekte içe aktarılacak bölüm yok." };
+}
+
+/* ------------------------------ Dinamik kalıplar ------------------------------ */
+
+/** Vitrin/ilan/danışman başlık-açıklama kalıpları. Boş alan = bugünkü sabit çıktı. Vitrin ISR 60 sn'de yansır. */
+export async function saveSeoPatterns(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const pair = (prefix: string) => ({ title: text(fd, `${prefix}Title`) ?? "", description: text(fd, `${prefix}Description`) ?? "" });
+  const input = { office: pair("office"), listing: pair("listing"), agent: pair("agent") };
+  const res = await writeSeoSetting("patterns", PatternsSchema, input, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  const custom = Object.entries(input).flatMap(([k, v]) => [v.title ? `${k}.title` : null, v.description ? `${k}.description` : null]).filter(Boolean);
+  await audit(g.staff, "seo.patterns.save", "patterns", { custom });
+  refresh();
+  return { ok: true, message: "Kalıplar kaydedildi; vitrin sayfalarına en geç 60 saniyede yansır." };
+}
+
+/* ------------------------------ Geçmiş ------------------------------ */
+
+const HISTORY_SCHEMAS: Partial<Record<SeoHistoryKey, { schema: Parameters<typeof writeSeoSetting>[1]; empty: unknown }>> = {
+  global: { schema: GlobalInputSchema, empty: {} },
+  pages: { schema: PagesSchema, empty: {} },
+  sitemap: { schema: SitemapSettingsSchema, empty: {} },
+  robots: { schema: RobotsSettingsSchema, empty: {} },
+  redirects: { schema: RedirectsSchema, empty: [] },
+  patterns: { schema: PatternsSchema, empty: {} },
+};
+
+/** Geçmişteki bir değere döner (o kayıttaki ÖNCEKİ değer). Dönüş de geçmişe yazılır ve etkinlik günlüğüne düşer. */
+export async function restoreSeoHistory(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const id = text(fd, "id") ?? "";
+  const entry = (await listSeoHistory()).find((e) => e.id === id);
+  if (!entry) return { error: "Geçmiş kaydı bulunamadı (halka dolup silinmiş olabilir)." };
+  const def = SEO_HISTORY_KEYS.includes(entry.key) ? HISTORY_SCHEMAS[entry.key] : undefined;
+  if (!def) return { error: "Bu ayar geri yüklenemez." };
+  let value: unknown = def.empty;
+  if (entry.prev !== null) {
+    try {
+      value = JSON.parse(entry.prev) as unknown;
+    } catch {
+      return { error: "Geçmiş kaydı bozuk; geri yüklenemedi." };
+    }
+  }
+  const res = await writeSeoSetting(entry.key, def.schema, value, g.staff.id, g.staff.full_name);
+  if (!res.ok) return { error: res.error };
+  await audit(g.staff, "seo.history.restore", entry.key, { historyId: entry.id, at: entry.at });
+  refresh();
+  return { ok: true, message: "Önceki değer geri yüklendi." };
+}
+
+/* ------------------------------ Kazara noindex koruması ------------------------------ */
+
+export type SeoImpactResult = { error?: string; impact?: SeoImpact };
+
+/**
+ * Kaydetmeden önce etki önizlemesi (salt okunur): değişiklik kaç URL'yi arama dışına çıkarır?
+ * `scope`: page | sitemap | robots. Form alanları ilgili kaydetme action'ıyla aynıdır.
+ */
+export async function estimateSeoImpact(fd: FormData): Promise<SeoImpactResult> {
+  const staff = await requirePlatformModule("seo");
+  const scope = text(fd, "scope");
+  const settings = await readSeoSettingsFresh();
+  if (scope === "page") {
+    const path = text(fd, "path") ?? "";
+    const def = getSeoPage(path);
+    if (!def) return { impact: { count: 0, details: [] } };
+    const prev = settings.pages[path] ?? {};
+    const cur = effectivePageView(def, settings.pages[path], settings.global);
+    const nextOv = pageOverrideFromForm(fd, prev, staff.role === "super_admin");
+    const nxt = effectivePageView(def, compactOverride(nextOv) ?? undefined, settings.global);
+    // Sitemap grubu kapalıysa sayfa zaten sitemap'te değildir.
+    const grouped = def.group === "arac" ? settings.sitemap.tools : settings.sitemap.staticPages;
+    return {
+      impact: pageImpact({
+        path,
+        currentlyIndexable: cur.indexable,
+        currentlyInSitemap: cur.inSitemap && grouped,
+        nextIndexable: nxt.indexable,
+        nextInSitemap: nxt.inSitemap && grouped,
+      }),
+    };
+  }
+  if (scope === "sitemap" || scope === "robots") {
+    const fresh = await loadSitemapFresh();
+    const urls = fresh.chunks.flat().map((e) => e.url);
+    if (scope === "robots") {
+      const r = robotsInputFromForm(fd);
+      return { impact: robotsImpact(urls, settings.robots, { extraDisallow: r.extraDisallow, blockedAiBots: r.blockedAiBots }) };
+    }
+    const next = mergeSitemap(sitemapInputFromForm(fd));
+    // Opt-in kümesi: şu an sitemap'te olan vitrin ofisleri (ofis onayı ya da yedek liste) + formdaki yedek liste.
+    const optIn = new Set<string>(next.optInTenantSlugs);
+    if (settings.sitemap.onlyOptIn) {
+      for (const u of urls) {
+        const m = /\/vitrin\/([^/]+)/.exec(u);
+        if (m) optIn.add(m[1]!);
+      }
+    }
+    return { impact: sitemapImpact(urls, settings.sitemap, next, [...optIn]) };
+  }
+  return { error: "Geçersiz kapsam." };
 }

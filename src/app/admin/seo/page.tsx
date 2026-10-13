@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { Archive, Bot, Braces, Globe, ListChecks, Map as MapIcon, SearchCheck, Shuffle } from "lucide-react";
+import { Archive, Bot, Braces, Globe, History, ListChecks, Map as MapIcon, SearchCheck, Shuffle, WandSparkles } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { PageTabs } from "@/components/app/page-tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,12 +12,19 @@ import { formatDateTimeTr } from "@/lib/format";
 import { requirePlatformModule } from "@/lib/platform";
 import { buildPageJsonLd, validateJsonLd } from "@/lib/seo/jsonld";
 import { effectivePageView } from "@/lib/seo/metadata";
-import { analyzeRedirects } from "@/lib/seo/redirects";
+import { analyzeRedirects, normalizeRedirectPath } from "@/lib/seo/redirects";
 import { getSeoPage, seoPages } from "@/lib/seo/registry";
 import { pageChecklist } from "@/lib/seo/rules";
 import { readSeoSettingsFresh, readAuditHistory, readAuditLatest, readIndexNow, listNotFound } from "@/lib/seo/store";
 import { loadSitemapFresh } from "@/lib/seo/sitemap-data";
+import { SEO_HISTORY_LABELS, diffSeoValues, listSeoHistory } from "@/lib/seo/history";
+import { notFoundCandidates, suggest404Target } from "@/lib/seo/not-found-suggest";
+import { SEO_KEYS } from "@/lib/seo/schema";
+import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { buildFaq } from "@/lib/pricing-page-model";
+import { loadPatternData } from "./pattern-samples";
+import { PatternsPanel } from "./seo-patterns-panel";
+import { HistoryRestoreButton } from "./seo-history-panel";
 import { PageEditor, type PageEditorData } from "./seo-page-editor";
 import { RedirectsPanel, type RuleIssues } from "./seo-redirects-panel";
 import {
@@ -39,15 +46,17 @@ export const maxDuration = 60;
 const TABS = [
   { id: "genel", label: "Genel", icon: Globe },
   { id: "sayfalar", label: "Sayfalar", icon: ListChecks },
+  { id: "kaliplar", label: "Dinamik kalıplar", icon: WandSparkles },
   { id: "sitemap", label: "Sitemap ve robots", icon: MapIcon },
-  { id: "veri", label: "Yapılandırılmış veri", icon: Braces },
   { id: "yonlendirme", label: "Yönlendirmeler ve 404", icon: Shuffle },
+  { id: "veri", label: "Yapılandırılmış veri", icon: Braces },
   { id: "robot", label: "Robot", icon: Bot },
+  { id: "gecmis", label: "Geçmiş", icon: History },
   { id: "yedek", label: "Yedek", icon: Archive },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
-type SP = { sekme?: string; sayfa?: string; kaynak?: string };
+type SP = { sekme?: string; sayfa?: string; kaynak?: string; hedef?: string };
 
 const SEVERITY_LABEL = { critical: "Kritik", warning: "Uyarı", info: "Bilgi" } as const;
 
@@ -70,10 +79,12 @@ export default async function AdminSeoPage({ searchParams }: { searchParams?: Pr
       <PageTabs base="/admin/seo" label="SEO sekmeleri" tabs={TABS} active={active} />
       {active === "genel" ? <GeneralTab canEdit={canSensitive} /> : null}
       {active === "sayfalar" ? <PagesTab selected={sp.sayfa} canSensitive={canSensitive} base={base} /> : null}
+      {active === "kaliplar" ? <PatternsTab canEdit={canSensitive} base={base} /> : null}
       {active === "sitemap" ? <SitemapTab canEdit={canSensitive} base={base} /> : null}
       {active === "veri" ? <StructuredDataTab base={base} /> : null}
-      {active === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} /> : null}
+      {active === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} prefillTo={sp.hedef} /> : null}
       {active === "robot" ? <RobotTab canRun={canSensitive} base={base} /> : null}
+      {active === "gecmis" ? <HistoryTab canRestore={canSensitive} /> : null}
       {active === "yedek" ? <BackupPanel canImport={canSensitive} /> : null}
     </div>
   );
@@ -310,14 +321,19 @@ async function StructuredDataTab({ base }: { base: string }) {
 
 /* ------------------------------ Yönlendirmeler ve 404 ------------------------------ */
 
-async function RedirectsTab({ canBulk, prefill }: { canBulk: boolean; prefill?: string }) {
+async function RedirectsTab({ canBulk, prefill, prefillTo }: { canBulk: boolean; prefill?: string; prefillTo?: string }) {
   const [s, nf] = await Promise.all([readSeoSettingsFresh(), listNotFound(100)]);
   const issues: RuleIssues = {};
   for (const i of analyzeRedirects(s.redirects)) (issues[i.ruleId] ??= []).push(i.message);
-  const prefillFrom = prefill && prefill.startsWith("/") && !prefill.startsWith("//") ? prefill.slice(0, 300) : undefined;
+  const sitePath = (v?: string) => (v && v.startsWith("/") && !v.startsWith("//") ? v.slice(0, 300) : undefined);
+  const prefillFrom = sitePath(prefill);
+  const prefillTarget = sitePath(prefillTo);
+  // Öneri adayları: yönetilebilir sayfalar + mevcut yönlendirme hedefleri (yalnız var olan hedefler önerilir).
+  const candidates = notFoundCandidates(s.redirects);
+  const redirected = new Set(s.redirects.filter((r) => r.enabled).map((r) => normalizeRedirectPath(r.from)));
   return (
     <div className="space-y-6">
-      <RedirectsPanel rules={s.redirects} issues={issues} canBulk={canBulk} prefillFrom={prefillFrom} />
+      <RedirectsPanel key={`${prefillFrom ?? ""}|${prefillTarget ?? ""}`} rules={s.redirects} issues={issues} canBulk={canBulk} prefillFrom={prefillFrom} prefillTo={prefillTarget} />
       <Card>
         <CardHeader>
           <div>
@@ -335,36 +351,201 @@ async function RedirectsTab({ canBulk, prefill }: { canBulk: boolean; prefill?: 
           </CardContent>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="w-full min-w-[34rem] text-left text-sm">
+            <Table className="w-full min-w-[42rem] text-left text-sm">
               <THead>
                 <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
                   <TH scope="col" className="px-4 py-2 font-semibold">Yol</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">İstek</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Son görülme</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Gönderen</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Öneri</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold"><span className="sr-only">İşlem</span></TH>
                 </TR>
               </THead>
               <TBody className="divide-y divide-line">
-                {nf.rows.map((r) => (
-                  <TR key={r.path}>
-                    <TD className="max-w-xs truncate px-4 py-2.5 font-mono text-xs text-ink-950">{r.path}</TD>
-                    <TD className="px-4 py-2.5 tabular-nums">{r.hits}</TD>
-                    <TD className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</TD>
-                    <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</TD>
-                    <TD className="px-4 py-2.5 text-right">
-                      <Link href={`/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}`} className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline touch:min-h-11">
-                        Yönlendir
-                      </Link>
-                    </TD>
-                  </TR>
-                ))}
+                {nf.rows.map((r) => {
+                  const suggestion = suggest404Target(r.path, candidates);
+                  const done = redirected.has(normalizeRedirectPath(r.path));
+                  const href = `/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}${suggestion ? `&hedef=${encodeURIComponent(suggestion)}` : ""}#rd-from`;
+                  return (
+                    <TR key={r.path}>
+                      <TD className="max-w-xs truncate px-4 py-2.5 font-mono text-xs text-ink-950">{r.path}</TD>
+                      <TD className="px-4 py-2.5 tabular-nums">{r.hits}</TD>
+                      <TD className="px-4 py-2.5 text-text-muted">{formatDateTimeTr(r.last_seen_at)}</TD>
+                      <TD className="px-4 py-2.5 text-text-muted">{r.referrer_host ?? "-"}</TD>
+                      <TD className="px-4 py-2.5 text-xs">
+                        {done ? (
+                          <StatusBadge tone="success">Yönlendirildi</StatusBadge>
+                        ) : suggestion ? (
+                          <span className="text-ink-950">
+                            Öneri: <code className="rounded bg-canvas px-1 py-0.5">{suggestion}</code>
+                          </span>
+                        ) : (
+                          <span className="text-text-faint">-</span>
+                        )}
+                      </TD>
+                      <TD className="px-4 py-2.5 text-right">
+                        {done ? null : (
+                          <Link href={href} className="focus-ring inline-flex min-h-9 items-center rounded px-2 text-sm font-semibold text-brand-700 hover:underline touch:min-h-11">
+                            Yönlendir
+                          </Link>
+                        )}
+                      </TD>
+                    </TR>
+                  );
+                })}
               </TBody>
             </Table>
           </div>
         )}
       </Card>
     </div>
+  );
+}
+
+/* ------------------------------ Dinamik kalıplar ------------------------------ */
+
+async function PatternsTab({ canEdit, base }: { canEdit: boolean; base: string }) {
+  const [s, data] = await Promise.all([readSeoSettingsFresh(), loadPatternData()]);
+  const indexed = data.optIn.filter((r) => r.optin && r.vitrinEnabled).length;
+  return (
+    <div className="space-y-6">
+      <PatternsPanel value={s.patterns} samples={{ office: data.office, listing: data.listing, agent: data.agent }} base={base} canEdit={canEdit} />
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Ofis vitrinleri: arama motoru durumu</CardTitle>
+            <CardDescription>
+              Salt okunur. Vitrin, ilan ve danışman sayfalarının indekslenmesi YALNIZ ofisin kendi onayına bağlıdır (Ayarlar, Vitrin: “vitrinim aramalarda görünsün”); onay kararı ofisindir ve burada değiştirilmez. Onaysız ofislerin sayfaları “noindex, follow” döner.
+            </CardDescription>
+          </div>
+          <StatusBadge tone={indexed > 0 ? "success" : "neutral"}>{indexed} indekslenir</StatusBadge>
+        </CardHeader>
+        {data.optIn.length === 0 ? (
+          <CardContent>
+            <p className="text-sm text-text-muted">Aktif ofis bulunamadı.</p>
+          </CardContent>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className="w-full min-w-[36rem] text-left text-sm">
+              <THead>
+                <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
+                  <TH scope="col" className="px-4 py-2 font-semibold">Ofis</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Durum</TH>
+                  <TH scope="col" className="px-4 py-2 font-semibold">Neden</TH>
+                </TR>
+              </THead>
+              <TBody className="divide-y divide-line">
+                {data.optIn.map((r) => {
+                  const ok = r.optin && r.vitrinEnabled;
+                  const reason = !r.vitrinEnabled
+                    ? "Ofis vitrinini kapatmış (sayfalar 404)."
+                    : r.optin
+                      ? s.sitemap.vitrinOffices
+                        ? "Ofis arama onayı verdi; sitemap’e girer."
+                        : "Ofis arama onayı verdi; ancak sitemap’te vitrin ofisleri kapalı."
+                      : "Ofis arama onayı vermedi.";
+                  return (
+                    <TR key={r.id}>
+                      <TD className="px-4 py-2.5">
+                        <Link href={`/admin/tenants/${r.id}`} className="font-semibold text-ink-950 hover:underline">
+                          {r.name}
+                        </Link>
+                        <p className="font-mono text-xs text-text-muted">/vitrin/{r.slug}</p>
+                      </TD>
+                      <TD className="px-4 py-2.5">
+                        <StatusBadge tone={ok ? "success" : "neutral"}>{ok ? "index, follow" : "noindex, follow"}</StatusBadge>
+                      </TD>
+                      <TD className="px-4 py-2.5 text-text-muted">{reason}</TD>
+                    </TR>
+                  );
+                })}
+              </TBody>
+            </Table>
+            {data.optInTotal > data.optIn.length ? (
+              <p className="px-4 py-2 text-xs text-text-muted">İlk {data.optIn.length} ofis gösteriliyor (toplam {data.optInTotal}); onay verenler önce listelenir.</p>
+            ) : null}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------ Geçmiş ------------------------------ */
+
+const clip = (v: string | null) => (v == null ? "(yok)" : v.length > 120 ? `${v.slice(0, 119)}…` : v);
+
+async function HistoryTab({ canRestore }: { canRestore: boolean }) {
+  const [entries, current] = await Promise.all([
+    listSeoHistory(),
+    getPlatformSettingsMany([SEO_KEYS.global, SEO_KEYS.pages, SEO_KEYS.sitemap, SEO_KEYS.robots, SEO_KEYS.redirects, SEO_KEYS.patterns]),
+  ]);
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>SEO ayar geçmişi ({entries.length})</CardTitle>
+          <CardDescription>
+            Her kayıttan önce o ayarın önceki değeri saklanır (en çok 30 kayıt). Fark, o zamanki değer ile ŞU ANKİ değer arasındadır. Robot denetimi ve IndexNow durumları geçmişe girmez.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      {entries.length === 0 ? (
+        <CardContent>
+          <p className="text-sm text-text-muted">Henüz kayıt yok. Bir SEO ayarını kaydettiğinizde önceki değer burada görünür ve tek tıkla geri yüklenebilir.</p>
+        </CardContent>
+      ) : (
+        <ul className="divide-y divide-line">
+          {entries.map((e) => {
+            const label = SEO_HISTORY_LABELS[e.key] ?? e.key;
+            const { diffs, total } = diffSeoValues(e.prev, current[SEO_KEYS[e.key]] ?? null, 12);
+            const when = formatDateTimeTr(e.at);
+            return (
+              <li key={e.id} className="space-y-2 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <StatusBadge tone="neutral">{label}</StatusBadge>
+                  <span className="text-sm font-semibold text-ink-950">{when}</span>
+                  <span className="text-xs text-text-muted">{e.byName || (e.by ? "Platform personeli" : "Sistem")}</span>
+                  {e.prev === null ? <span className="text-xs text-text-muted">· öncesinde ayar yoktu (varsayılan)</span> : null}
+                </div>
+                {total === 0 ? (
+                  <p className="text-xs text-text-muted">Bu kayıttaki değer şu anki değerle aynı.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[32rem] text-left text-xs">
+                      <thead>
+                        <tr className="text-text-muted">
+                          <th scope="col" className="py-1 pr-3 font-semibold">Alan</th>
+                          <th scope="col" className="py-1 pr-3 font-semibold">O zamanki değer</th>
+                          <th scope="col" className="py-1 font-semibold">Şu anki değer</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diffs.map((d) => (
+                          <tr key={d.path} className="align-top">
+                            <td className="py-1 pr-3 font-mono text-ink-950">{d.path}</td>
+                            <td className="break-all py-1 pr-3 text-danger-600">{clip(d.before)}</td>
+                            <td className="break-all py-1 text-success-strong">{clip(d.after)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {total > diffs.length ? <p className="mt-1 text-xs text-text-muted">+{total - diffs.length} alan daha</p> : null}
+                  </div>
+                )}
+                {canRestore && total > 0 ? <HistoryRestoreButton id={e.id} label={label} at={when} /> : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {!canRestore ? (
+        <CardContent className="border-t border-line">
+          <p className="text-xs text-text-muted">Geri yükleme yalnız süper admin içindir.</p>
+        </CardContent>
+      ) : null}
+    </Card>
   );
 }
 

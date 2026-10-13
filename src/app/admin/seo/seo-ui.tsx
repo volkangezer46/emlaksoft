@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { CheckCircle2, Smartphone, Monitor, XCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { DESC_MAX, TITLE_MAX, descriptionVerdict, titleVerdict, type ChecklistItem } from "@/lib/seo/rules";
-import type { SeoActionResult } from "@/app/actions/seo-admin";
+import type { SeoActionResult, SeoImpactResult } from "@/app/actions/seo-admin";
 
 export function SubmitButton({ children, variant = "primary", disabled }: { children: ReactNode; variant?: "primary" | "secondary" | "danger"; disabled?: boolean }) {
   const { pending } = useFormStatus();
@@ -35,34 +36,79 @@ export function ResultNote({ res }: { res: SeoActionResult | null }) {
   );
 }
 
-/** Sunucu action'ına bağlı form: sonucu gösterir, başarıda sayfa verisini tazeler. */
+/**
+ * Sunucu action'ına bağlı form: sonucu gösterir, başarıda sayfa verisini tazeler.
+ * `impact` verilirse (kazara noindex koruması) kaydetmeden önce etki hesaplanır; değişiklik URL'leri arama dışına
+ * çıkaracaksa onay penceresi açılır ve kayıt ancak onayla yapılır.
+ */
 export function SeoForm({
   action,
   children,
   className,
   onDone,
+  impact,
 }: {
   action: (fd: FormData) => Promise<SeoActionResult>;
   children: ReactNode;
   className?: string;
   onDone?: (res: SeoActionResult) => void;
+  impact?: (fd: FormData) => Promise<SeoImpactResult>;
 }) {
   const router = useRouter();
   const [res, setRes] = useState<SeoActionResult | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ fd: FormData; count: number; details: string[] } | null>(null);
+  const save = async (fd: FormData) => {
+    const r = await action(fd);
+    setRes(r);
+    onDone?.(r);
+    if (r.ok) router.refresh();
+  };
   return (
     <form
       className={cn("space-y-4", className)}
       action={async (fd) => {
-        const r = await action(fd);
-        setRes(r);
-        onDone?.(r);
-        if (r.ok) router.refresh();
+        if (impact) {
+          const est = await impact(fd);
+          if (est.error) {
+            setRes({ error: est.error });
+            return;
+          }
+          if (est.impact && (est.impact.count > 0 || est.impact.details.length > 0)) {
+            setPendingSave({ fd, count: est.impact.count, details: est.impact.details });
+            return;
+          }
+        }
+        await save(fd);
       }}
     >
       {children}
       <ResultNote res={res} />
+      {pendingSave ? (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setPendingSave(null);
+          }}
+          title={pendingSave.count > 0 ? `Bu değişiklik ${pendingSave.count} URL'yi arama dışına çıkarır` : "Bu değişiklik tarayıcı erişimini daraltır"}
+          description={`${pendingSave.details.join(" ")} Emin misiniz? Gerekirse Geçmiş sekmesinden önceki değere dönebilirsiniz.`}
+          confirmLabel="Yine de kaydet"
+          onConfirm={async () => {
+            const fd = pendingSave.fd;
+            setPendingSave(null);
+            await save(fd);
+          }}
+        />
+      ) : null}
     </form>
   );
+}
+
+/** Etki önizlemesi için form kopyası (kapsam alanı eklenir; asıl kayıt formu değişmez). */
+export function withScope(fd: FormData, scope: "page" | "sitemap" | "robots"): FormData {
+  const copy = new FormData();
+  for (const [k, v] of fd.entries()) copy.append(k, v);
+  copy.set("scope", scope);
+  return copy;
 }
 
 /** Kilitli (yetkisiz) bölümler için not. */
