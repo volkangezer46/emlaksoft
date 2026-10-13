@@ -4,15 +4,11 @@ import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
 import { Fragment, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ChevronDown, Lock, Menu, Plus } from "lucide-react";
-// İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
-import { ICONS } from "@/lib/icons";
-import { hubNav, resolveActiveHub, type HubPage, type NavHub } from "@/lib/nav-config";
+import { ChevronDown, Lock, Menu, Plus, type LucideIcon } from "lucide-react";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import { getHrefStore, pushRecent } from "@/lib/nav-memory";
-import { getAppActions } from "@/lib/palette-core";
-import type { AppModule } from "@/lib/permissions";
-import { useClosedModules } from "@/components/app/closed-modules-context";
+import { resolveActiveHubIn, type ShellAction, type ShellHub, type ShellIcon, type ShellNavSet, type ShellPage } from "@/lib/nav-shell";
+import { glyph, useShellNav } from "@/components/app/nav-glyph";
 import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
 import { mobileNewActions } from "@/components/app/mobile-new-sheet";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
@@ -24,7 +20,7 @@ import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
 import { runWhenIdle } from "@/lib/idle";
 import { useDeferredPanel } from "@/hooks/use-deferred-panel";
 import { lazyPanel } from "@/lib/lazy-panel";
-import { announceScope, useNavRole } from "@/lib/ui/use-nav-role";
+import { announceScope } from "@/lib/ui/use-nav-role";
 import { SCOPE_COOKIE, SCOPE_COOKIE_MAX_AGE } from "@/lib/ui/scope";
 
 // Radix Dialog gövdeleri (menü çekmecesi, "+ Yeni" sayfası) yalnız mobil/tablette gerekir: masaüstü kabuk paketine
@@ -34,8 +30,11 @@ const newSheetPanel = lazyPanel(() => import("@/components/app/mobile-new-sheet-
 /** Tailwind `lg` altı (çekmece kırılımı): yalnız burada boşta önceden yükleme yapılır. */
 const SMALL_SCREEN_QUERY = "(max-width: 1023.98px)";
 
-const VitrinIcon = ICONS.portal;
-const ToolsIcon = ICONS.baslikArac;
+type NavHub = ShellHub<LucideIcon>;
+type HubPage = ShellPage<LucideIcon>;
+
+/** Yan menünün sabit ikonları (ikon sözlüğü `src/lib/icons.ts`; sunucuda çözülür, bkz. nav-shell-server). */
+export type SidebarIcons = { portal: ShellIcon; tools: ShellIcon; modules: ShellIcon };
 
 function isLocked(href: string, lockedHrefs: readonly string[]) {
   return lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
@@ -69,8 +68,9 @@ export function AppSidebar({
   plan,
   trial,
   trialDaysLeft = null,
-  accessibleModules,
-  creatableModules,
+  navs,
+  actions,
+  icons,
   lockedHrefs = [],
   badges = [],
   usage = [],
@@ -86,10 +86,14 @@ export function AppSidebar({
   trial: boolean;
   /** Deneme ofisinde kalan gün (tenants.trial_ends_at); bilinmiyorsa null. */
   trialDaysLeft?: number | null;
-  /** Etkin izinlere göre erişilebilir modüller (bkz. `getEffectivePermissions`, tenant override'larını içerir) */
-  accessibleModules: AppModule[];
-  /** "create" yetkisi olan modüller (hızlı eylemler yalnız bunlara çıkar). */
-  creatableModules?: AppModule[];
+  /**
+   * Rolün menü düzenleri (sunucuda etkin izin + ofisin kapattığı/kişisel gizlenen modüller süzülmüş;
+   * bkz. app/layout.tsx `buildShellNavSet`). Katalog, rol düzeni ve ikon sözlüğü istemci paketine girmez.
+   */
+  navs: ShellNavSet;
+  /** "create" yetkili, paket kilidi ve kapalı modül süzgecinden geçmiş hızlı eylemler (`buildShellActions`). */
+  actions: ShellAction[];
+  icons: SidebarIcons;
   /** Pakete dahil olmayan sayfalar: menüde kilit simgesi, tıklayınca yükseltme sayfası. */
   lockedHrefs?: string[];
   /** Gerçek veriden sayı rozetleri (geciken görev, bekleyen onay). */
@@ -109,7 +113,10 @@ export function AppSidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { navRole, personal } = useNavRole(role, scopeCookie);
+  const { nav, extra, navRole, personal } = useShellNav(navs, role, scopeCookie);
+  const VitrinIcon = glyph(icons.portal);
+  const ToolsIcon = glyph(icons.tools);
+  const ModulesIcon = glyph(icons.modules);
   const backToOffice = () => {
     document.cookie = `${SCOPE_COOKIE}=ofis; path=/app; max-age=${SCOPE_COOKIE_MAX_AGE}; samesite=lax`;
     announceScope("ofis");
@@ -134,10 +141,8 @@ export function AppSidebar({
     setNewOpen(true);
   };
 
-  // Ofisin kapattığı modüller menüden çıkar (veri silinmez).
-  const closedModules = useClosedModules();
-  const nav = useMemo(() => hubNav(accessibleModules, { role: navRole, closed: closedModules }), [accessibleModules, navRole, closedModules]);
-  const active = resolveActiveHub(pathname, nav);
+  // Ofisin kapattığı modüller menüden çıkar (veri silinmez): süzgeç sunucuda (`navs`) uygulanmıştır.
+  const active = resolveActiveHubIn(pathname, nav, extra);
   const activeHubId = active.hub?.id ?? null;
 
   const closedStore = getHrefStore("closed", storageScope);
@@ -186,10 +191,10 @@ export function AppSidebar({
     .slice(0, 3)
     .map((h) => pageIndex.get(h)!);
 
-  const creatable = creatableModules ?? accessibleModules;
+  const allActions = useMemo(() => actions.map((a) => ({ ...a, icon: glyph(a.icon) })), [actions]);
   const actionsFor = (hub: NavHub) => {
     const owned = hub.pages.map((p) => p.href).filter((h) => h !== "/app");
-    return getAppActions(creatable, "", lockedHrefs, closedModules).filter((a) => owned.some((h) => a.href === h || a.href.startsWith(`${h}/`)));
+    return allActions.filter((a) => owned.some((h) => a.href === h || a.href.startsWith(`${h}/`)));
   };
 
   const rowClass = (isActive: boolean, pad: string) =>
@@ -374,7 +379,7 @@ export function AppSidebar({
               title="Kullanmadığınız modülleri tek tıkla gizleyin veya açın"
               className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] px-3 text-sm text-white/65 transition-colors hover:bg-white/8 hover:text-white lg:min-h-9"
             >
-              <ICONS.moduller className="h-[18px] w-[18px] shrink-0" aria-hidden />
+              <ModulesIcon className="h-[18px] w-[18px] shrink-0" aria-hidden />
               <span>Menüyü düzenle</span>
             </Link>
           </div>
@@ -511,10 +516,7 @@ export function AppSidebar({
 
   // Mobil alt çubuk: rol bazlı en çok 5 yuva (nav-roles `mobile`): merkez bağlantıları, "+ Yeni" eylem sayfası, "Menü"
   // çekmecesi. Çekmece masaüstüyle AYNI yapıdır (6 satırlık merkez listesi). Yetkisiz/kapalı merkez yuvası çıkmaz.
-  const newActions = useMemo(
-    () => mobileNewActions(navRole, creatable, lockedHrefs, closedModules),
-    [navRole, creatable, lockedHrefs, closedModules],
-  );
+  const newActions = useMemo(() => mobileNewActions(navRole, allActions), [navRole, allActions]);
   const totalBadges = badges.reduce((n, b) => n + b.count, 0);
   type Slot = { kind: "hub"; hub: NavHub } | { kind: "new" } | { kind: "menu" };
   const slots = nav.mobile.flatMap<Slot>((slot) => {

@@ -3,19 +3,18 @@
 import { usePathname } from "next/navigation";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
-import { useClosedModules } from "@/components/app/closed-modules-context";
+import { useShellNav } from "@/components/app/nav-glyph";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
 import { useIdlePrefetch } from "@/hooks/use-idle-prefetch";
-import { resolveStripHub } from "@/lib/nav-config";
-import type { AppModule } from "@/lib/permissions";
-import { useNavRole } from "@/lib/ui/use-nav-role";
+import { resolveActiveHubIn, resolveStripHubIn, type ResolvableNav, type ShellNavSet } from "@/lib/nav-shell";
 
 /**
  * Sayfanın üstündeki TEK sekme şeridi: etkin menü merkezinin (Müşteriler, İlanlar, Satış ve Para, Ekibim…) kardeş
  * sayfaları. 2-3 katlı şerit YOKTUR: merkezin sayfaları ve eski alt sekmeler tek düz listede toplanmıştır.
  * En çok 5 sekme görünür, fazlası "Diğer" menüsündedir; etiketler mobilde de görünür, şerit yatay kaydırılır ve
  * etkin sekme görünür alana getirilir (MorphNav). Merkezde tek sayfa varsa şerit çizilmez.
- * Kaynak: src/lib/nav-roles.ts (merkez tanımı) + src/lib/nav-config.ts (`resolveStripHub`).
+ * Kaynak: src/lib/nav-roles.ts (merkez tanımı) + src/lib/nav-config.ts; sunucuda düz veriye çevrilir (nav-shell-server),
+ * istemcide `resolveStripHub` kuralıyla (nav-shell `resolveStripHubIn`) etkin merkez seçilir.
  */
 
 /**
@@ -24,9 +23,9 @@ import { useNavRole } from "@/lib/ui/use-nav-role";
  * (yetkisiz sekme bir an bile görünmez).
  */
 
-export function SectionTabsPlaceholder({ allModules }: { allModules: AppModule[] }) {
+export function SectionTabsPlaceholder({ nav, extra }: { nav: ResolvableNav; extra: readonly (readonly [string, string])[] }) {
   const pathname = usePathname();
-  const { hub } = useMemo(() => resolveStripHub(pathname, allModules, { role: "owner" }), [pathname, allModules]);
+  const { hub } = useMemo(() => resolveActiveHubIn(pathname, nav, extra), [pathname, nav, extra]);
   if (!hub || hub.pages.length < 2) return null;
   return (
     <div className="mb-4" aria-hidden="true">
@@ -36,7 +35,7 @@ export function SectionTabsPlaceholder({ allModules }: { allModules: AppModule[]
 }
 
 export function SectionTabs({
-  accessibleModules,
+  navs,
   role = null,
   scopeCookie = null,
   lockedHrefs = [],
@@ -45,7 +44,8 @@ export function SectionTabs({
 }: {
   /** Kapsam çerezi (es_scope): yönetim rolünde "Benim işlerim" kişisel menü düzenine geçirir. */
   scopeCookie?: string | null;
-  accessibleModules: AppModule[];
+  /** Rolün menü düzenleri (sunucuda yetki + kapalı modül süzülmüş; yan menüyle AYNI nesne). */
+  navs: ShellNavSet;
   /** Etkin rol: merkez yapısını belirler (yetkiyi değiştirmez). */
   role?: string | null;
   /** Pakete dahil olmayan sayfalar (kilit simgesi). */
@@ -56,12 +56,8 @@ export function SectionTabs({
   actions?: ReactNode;
 }) {
   const pathname = usePathname();
-  const closedModules = useClosedModules();
-  const { navRole } = useNavRole(role, scopeCookie);
-  const { hub, pageHref } = useMemo(
-    () => resolveStripHub(pathname, accessibleModules, { role: navRole, closed: closedModules }),
-    [pathname, accessibleModules, navRole, closedModules],
-  );
+  const { nav, owner, extra } = useShellNav(navs, role, scopeCookie);
+  const { hub, pageHref } = useMemo(() => resolveStripHubIn(pathname, nav, owner, extra), [pathname, nav, owner, extra]);
   const isLocked = (href: string) => lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
   // Mevcut merkezin kardeş sayfaları boşta TAM veriyle önceden yüklenir (sekme tıklaması ağ turu beklemez).
   const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];

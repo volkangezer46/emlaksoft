@@ -1,10 +1,8 @@
-import { getAppActions, type PaletteEntry } from "@/lib/palette-core";
-import type { AppModule } from "@/lib/permissions";
 
 /**
  * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, ilan, talep, randevu, görev).
- * Liste rol izinlerine, paket kilidine ve kapalı modüle göre `getAppActions` ile süzülür (komut paleti ve üst çubuk
- * "Yeni" menüsüyle aynı kaynak); yetkisiz eylem görünmez. Hedefler ≥56 px yüksekliktedir.
+ * Liste rol izinlerine, paket kilidine ve kapalı modüle göre `getAppActions` ile SUNUCUDA süzülmüş eylemlerden seçilir
+ * (komut paleti ve üst çubuk "Yeni" menüsüyle aynı kaynak; app/layout.tsx → nav-shell-server); yetkisiz eylem görünmez. Hedefler ≥56 px yüksekliktedir.
  *
  * Bu dosya HAFİFTİR (eylem listesi + sınıf sabiti): Radix Dialog gövdesi `mobile-new-sheet-dialog.tsx` içindedir ve
  * kenar çubuğu tarafından ilk "+ Yeni" dokunuşunda yüklenir (kabuk paketine girmez).
@@ -25,14 +23,8 @@ const CALL_ACTION = { href: "/app/gelen-kutusu?sekme=cagri", label: "Görüşme 
 export const SHEET_ROW_CLASS =
   "focus-ring press flex min-h-14 items-center gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-3 text-sm font-semibold text-ink-950 transition hover:border-brand-300 hover:bg-surface";
 
-/** Rolün "+ Yeni" sayfasındaki eylemleri (yetki, paket kilidi ve kapalı modül süzgeciyle). */
-export function mobileNewActions(
-  role: string | null | undefined,
-  creatable: readonly AppModule[],
-  locked: readonly string[],
-  closed: readonly string[],
-): PaletteEntry[] {
-  const all = getAppActions(creatable, "", locked, closed);
+/** Rolün "+ Yeni" sayfasındaki eylemleri (`all`: yetki, paket kilidi ve kapalı modül süzgecinden geçmiş eylemler). */
+export function mobileNewActions<A extends { href: string; label: string }>(role: string | null | undefined, all: readonly A[]): A[] {
   const wanted = role === "call_center" ? [CALL_ACTION, ...SHEET_ACTIONS] : SHEET_ACTIONS;
   return wanted.flatMap((w) => {
     const hit = all.find((a) => a.href === w.href);

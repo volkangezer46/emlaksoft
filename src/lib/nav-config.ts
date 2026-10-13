@@ -4,6 +4,7 @@ import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
 import { layoutHrefs, navLayoutFor, type HubDef, type MobileSlot } from "@/lib/nav-roles";
 import { featureForHref } from "@/lib/modules/route-table";
+import { resolveActiveHubIn } from "@/lib/nav-shell";
 
 /**
  * /app menüsünün TEK kaynağı. 55 düz link yerine 9 iş başlığı: kullanıcı önce
@@ -827,19 +828,14 @@ export type ActiveHub = { hub: NavHub | null; pageHref: string | null; inDock: b
  * `matchPaths` ek yolları (Kapanış kayıpları) sahibi sayfanın merkezini etkin yapar.
  */
 export function resolveActiveHub(pathname: string, nav: HubNavModel): ActiveHub {
-  const owner = new Map<string, { hub: NavHub; dock: boolean }>();
-  for (const hub of nav.hubs) for (const pg of hub.pages) if (!owner.has(pg.href)) owner.set(pg.href, { hub, dock: false });
-  for (const hub of nav.dock) for (const pg of hub.pages) if (!owner.has(pg.href)) owner.set(pg.href, { hub, dock: true });
-  const keys = new Map<string, string>([...owner.keys()].map((h) => [h, h]));
-  for (const [extra, target] of EXTRA_PATH_OWNER) if (owner.has(target) && !keys.has(extra)) keys.set(extra, target);
-  const toolHrefs = nav.tools.map((t) => t.href);
-  const hit = findActiveNavigationHref(pathname, [...keys.keys(), ...toolHrefs], "/app");
-  if (!hit) return { hub: null, pageHref: null, inDock: false, inTools: false };
-  const pageHref = keys.get(hit);
-  const found = pageHref ? owner.get(pageHref) : undefined;
-  if (pageHref && found) return { hub: found.hub, pageHref, inDock: found.dock, inTools: false };
-  return { hub: null, pageHref: hit, inDock: false, inTools: true };
+  return resolveActiveHubIn(pathname, nav, EXTRA_PATH_OWNER);
 }
+
+/** `matchPaths` ek yolları → sahibi sayfa (kabuk modeli istemciye düz veri olarak taşır: nav-shell `extra`). */
+export function navExtraPathOwners(): readonly (readonly [string, string])[] {
+  return EXTRA_PATH_LIST;
+}
+const EXTRA_PATH_LIST: readonly (readonly [string, string])[] = [...EXTRA_PATH_OWNER];
 
 /**
  * Sekme şeridi için etkin merkez: önce rolün kendi menüsü; sayfa rolün menüsünde yoksa (ör. danışman Ctrl+K ile

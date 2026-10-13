@@ -1,5 +1,6 @@
 import type { ICONS } from "@/lib/icons";
 import type { AppRole } from "@/lib/permissions";
+import { MANAGEMENT_ROLES } from "@/lib/ui/scope";
 
 /**
  * Yan menünün rol -> ÇEKİRDEK yapısı (TEK yer). Yalnız GÖRÜNÜRLÜK ve GRUPLAMADIR: yetki matrisi
@@ -323,7 +324,7 @@ export const NAV_BY_ROLE: Readonly<Record<AppRole, RoleNav>> = {
 };
 
 /** Yönetim rolleri. */
-export const MANAGEMENT_ROLES: readonly string[] = ["owner", "gm", "branch_manager"];
+export { MANAGEMENT_ROLES };
 
 function isAppRole(role: string | null | undefined): role is AppRole {
   return typeof role === "string" && Object.hasOwn(NAV_BY_ROLE, role);

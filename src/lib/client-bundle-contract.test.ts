@@ -99,6 +99,23 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
     expect(chainTo(entry, "zod")).toBeNull();
   });
 
+  // /app kabuğu: menü kataloğu (nav-config), rol düzenleri (nav-roles), ikon sözlüğü (icons: ağaç sallanamayan ~105 lucide
+  // ikonu) ve palet eylemleri (palette-core) SUNUCUDA çözülür (nav-shell-server); istemci kabuğu yalnız düz veri alır.
+  it.each([
+    "src/components/app/app-sidebar.tsx",
+    "src/components/app/section-tabs.tsx",
+    "src/components/app/app-breadcrumb.tsx",
+    "src/components/app/keyboard-shortcuts.tsx",
+    "src/components/app/command-search.tsx",
+    "src/components/app/quick-create-menu.tsx",
+    "src/components/admin/command-palette.tsx",
+    "src/components/ui/console/quick-access.tsx",
+  ])("%s → menü kataloğu / ikon sözlüğü / palet çekirdeği zinciri yok", (entry) => {
+    for (const mod of ["@/lib/icons", "@/lib/nav-config", "@/lib/nav-roles", "@/lib/palette-core", "@/lib/nav-shell-server"]) {
+      expect(chainTo(entry, mod), mod).toBeNull();
+    }
+  });
+
   it("hafif sabit modülleri bağımlılıksızdır", () => {
     for (const f of ["src/lib/demand-criteria-labels.ts", "src/lib/matching-weights.ts"]) {
       expect(valueImports(read(f)), f).toEqual([]);
