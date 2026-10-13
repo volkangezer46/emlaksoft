@@ -42,6 +42,8 @@ Bu belge, Windows dizüstündeki Claude oturumundan sunucudaki Claude oturumuna 
 - Bulut DB: Postgres 17.6, 57 MB, eklentiler pg_stat_statements, pg_trgm, pgcrypto, supabase_vault, uuid-ossp.
 
 ### KONSEY TURU (2026-10-13 sabah) — durum
+- 2026-10-13 öğle: yetki onarımı (sahip uyguladı; anon'a açık fonksiyon 529→85, canlı yetkiler gölgeye göre hiçbir yerde daha geniş değil, 207 noktada daha sıkı = bulut hâli) + 3 migration (374/374) + RELEASE_MIGRATION 20261013000400. PostgREST havuzu 20. Gezertaşar aboneliği 2027-10-13'e uzatıldı. EmlakFiyati anahtarı yönetim formuyla yeni PLATFORM_SECRETS_KEY ile yeniden kaydedildi. `age` kurulu (BACKUP_AGE_RECIPIENT bekliyor). Eklenti 0.5.0 yalnız emlaksoft.com.tr (release/…-0.5.0.zip; mağazaya sahip yükler). Hata akışına dakikalık dış sağlık kontrolü (KESİNTİ/DÜZELDİ). Yayınlar arası statik parçalar /srv/emlaksoft/next-static'te korunur.
+- Yönetim paneli turu: tasarım konseyi wf_479ae75c-104 (21 onay/17 erteleme/1 ret), 8 paket (AP1-AP8) uygulanıyor (wf_3b6ba63f-ff5); paket tanımları /root/emlaksoft-paketler.json. AP1'de SAHİP KARARI: demo kartları açık kalır.
 - 13 uzmanlı konsey: 74 öneri (54 onay / 15 erteleme / 5 ret); karar dökümü workflow wf_60ebcf62-6a0 (journal.jsonl).
 - 7 iş paketi uygulandı + bağımsız gözden geçirildi + birleştirildi + CANLIDA (emlaksoft-app:202610130450-fce6c10b). Canlı duman: ofis sahibi masaüstü 38 sayfa, danışman mobil 22 sayfa — 0 sorun.
 - Postgres ayarı CANLIDA (shared_buffers 3GB, effective_cache_size 8GB, work_mem 16MB, jit off, random_page_cost 1.1…; yedek /root/backups/postgresql.auto.conf.before-tuning).
