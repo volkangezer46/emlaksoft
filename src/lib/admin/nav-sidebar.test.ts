@@ -77,7 +77,7 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
 describe("Site, SEO ve Reklam: sekmeler (SP1; AP6 Sayfalar İçerik'in alt sayfası, yeni menü satırı değil)", () => {
   const site = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
   it("sekmeler: Genel bakış · İçerik (Ana sayfa, Sayfalar) · SEO · Site menüsü · Marka; menü satırı eklenmez", () => {
-    expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka"]);
+    expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka", "Hız", "Reklam", "Medya", "Rehber", "Bağlantılar"]);
     const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
     expect(icerik.children!.map((c) => [c.label, c.href])).toEqual([
       ["Ana sayfa", "/admin/site-icerik"],
@@ -94,6 +94,45 @@ describe("Site, SEO ve Reklam: sekmeler (SP1; AP6 Sayfalar İçerik'in alt sayfa
     expect(activeChildHref("/admin/site-icerik", icerik)).toBe("/admin/site-icerik");
     expect(activeTabHref("/admin/site", site.tabs!)).toBe("/admin/site");
   });
+  it("S1 dikişi: Hız, Reklam, Medya, Rehber ve Bağlantılar 'Diğer ▾' altında; ilk 5 sekme değişmez, menü satırı eklenmez", () => {
+    const { visible, more } = splitTabs(site.tabs!);
+    expect(visible.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka"]);
+    expect(more.map((t) => [t.label, t.href])).toEqual([
+      ["Hız", "/admin/site/hiz"],
+      ["Reklam", "/admin/site/reklam"],
+      ["Medya", "/admin/site/medya"],
+      ["Rehber", "/admin/site/rehber"],
+      ["Bağlantılar", "/admin/site/baglantilar"],
+    ]);
+    const hiz = site.tabs!.find((t) => t.label === "Hız")!;
+    expect(hiz.children!.map((c) => c.href)).toEqual(["/admin/site/hiz", "/admin/site/hiz/saha", "/admin/site/hiz/lab"]);
+    expect(activeTabHref("/admin/site/hiz/saha", site.tabs!)).toBe("/admin/site/hiz");
+    expect(activeChildHref("/admin/site/hiz/saha", hiz)).toBe("/admin/site/hiz/saha");
+    expect(activeTabHref("/admin/site/reklam/google", site.tabs!)).toBe("/admin/site/reklam");
+    expect(activeTabHref("/admin/site/rehber/abcdef123456", site.tabs!)).toBe("/admin/site/rehber");
+    for (const href of ["/admin/site/hiz", "/admin/site/reklam", "/admin/site/medya", "/admin/site/rehber", "/admin/site/baglantilar"]) {
+      expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === href), href).toBe(false);
+      expect(adminPaletteFor(PLATFORM_ROLE_MODULES.super_admin).some((c) => c.href === href), href).toBe(true);
+    }
+  });
+
+  it("her sekme ve alt sekmenin modülü açtığı sayfanın kapısını içerir (görünen sekme 'yetkisiz' açılmaz)", () => {
+    const links = site.tabs!.flatMap((t) => [t, ...(t.children ?? [])]);
+    for (const l of links) {
+      const file = join(process.cwd(), `src/app${l.href}/page.tsx`);
+      const code = readFileSync(file, "utf8");
+      const gate = /requirePlatformModule\("([a-z]+)"\)/.exec(code)?.[1];
+      // Genel bakış /admin/site "dashboard" ile kapılıdır (herkes); diğerleri kendi modülüyle.
+      if (gate && gate !== "dashboard") expect(l.modules, `${l.href} -> ${gate}`).toContain(gate);
+    }
+  });
+
+  it("rolü olmayan yeni sekme görünmez: destek ve muhasebe rolleri Site bölümünü hiç görmez", () => {
+    for (const role of ["support", "billing"] as const) {
+      expect(adminNavFor(PLATFORM_ROLE_MODULES[role]).flatMap((s) => s.items).some((i) => i.href === "/admin/site"), role).toBe(false);
+    }
+  });
+
   it("İçerik alt sayfaları rol süzgecinden geçer ve komut paletinde aranır", () => {
     const ops = adminNavFor(PLATFORM_ROLE_MODULES.ops).flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
     expect(ops.tabs!.map((t) => t.label)).not.toContain("Marka");
