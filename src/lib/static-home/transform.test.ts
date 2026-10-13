@@ -26,6 +26,7 @@ describe("statik ana sayfa — istek kararı", () => {
     expect(wantsStaticHome({ ...base, searchParams: params(["_rsc"]) })).toBe(false);
     expect(wantsStaticHome({ ...base, headers: headers({ [STATIC_HOME_SOURCE_HEADER]: "1" }) })).toBe(false);
     expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", STATIC_HOME: "off" } })).toBe(false);
+    expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", VERCEL: "1" } })).toBe(false);
   });
 });
 

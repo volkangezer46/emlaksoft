@@ -18,6 +18,8 @@ export function wantsStaticHome(req: {
 }): boolean {
   const env = req.env ?? process.env;
   if (env.NODE_ENV !== "production" || env.STATIC_HOME?.trim().toLowerCase() === "off") return false;
+  // Vercel (yedek ortam): rota işleyicisinin iç kaynak çağrısı (127.0.0.1) orada yok → normal Next sayfası.
+  if (env.VERCEL) return false;
   if (req.pathname !== "/" || (req.method !== "GET" && req.method !== "HEAD")) return false;
   if (req.searchParams.has("_rsc")) return false;
   const h = req.headers;
