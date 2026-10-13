@@ -32,7 +32,16 @@ describe("bakım/kayıt bayrakları önbelleği", () => {
       demoLoginRaw: null,
       mfaEnforcedRaw: null,
       mfaGraceUntil: null,
+      staticRoutesRaw: null,
     });
+  });
+
+  it("statik sayfa anahtarları (SP4) aynı okumada gelir", async () => {
+    expect(parseFlagRows([{ key: "statik.routes", value: '{"gizlilik":true}' }]).staticRoutesRaw).toBe('{"gizlilik":true}');
+    const f = ok([]);
+    await readPlatformFlagsCached({ ...base, fetchImpl: f, nowMs: 1 });
+    const url = String((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]);
+    expect(url).toContain('"statik.routes"');
   });
 
   it("güvenlik anahtarları ve bakım kapsamı aynı istekte çözülür", () => {

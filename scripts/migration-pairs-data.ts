@@ -311,6 +311,8 @@ const F = {
   publicMeasurement: "20261013003200_public_measurement.sql",
   signupAttributionExt: "20261013003210_signup_attribution_ext.sql",
   growthFunnel: "20261013003220_growth_funnel.sql",
+  // SP4 (2026-10-13): hiz merkezi laboratuvar olcumleri (yeni tablo; FK yok, yalniz service_role).
+  perfLabRuns: "20261013003300_perf_lab_runs.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -517,6 +519,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.rlsInitplanFsboStaff]: "davranis", // 24 politikada satir-bagimsiz yardimci cagrilari (select fn()) ile sarilir (InitPlan); anlam/rol/komut ayni, plan degisir
     [F.tenantIndexesDedupe]: "ek", // 11 kopya indeks dusurulur (benzersiz kisit ikizleri) + 12 tabloya tenant_id indeksi; veri/politika degismez
     [F.readyProbesPgCatalog]: "davranis", // plan_upgrade_ready/subscription_pause_ready sutun sayimi information_schema yerine pg_attribute; imza/ACL/sonuc ayni
+    [F.perfLabRuns]: "ek", // yeni tablo perf_lab_runs (RLS acik, politika yok, yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "migration bekliyor" / cron "atlandi"
     [F.platformMrrDaily]: "ek", // yeni tablo platform_mrr_daily (RLS: platform personeli billing/reports rolleri SELECT; yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "veri yok"
     [F.portalRulesCore]: "ek", // 8 yeni tablo (RLS: platform tablolari pt_rules_is_operator, kiraci tablolari lc_parser_telemetry deseni; dogrudan yazma yok) + yayin degismezlik tetikleyicisi + SQL icerik dogrulayici; mevcut tablo/politika/veri degismez
     [F.portalRulesRpcs]: "ek", // yeni JWT SECURITY DEFINER RPC'ler (pt_rules_current, pt_report_form_feedback, pt_rules_admin_*; yayin/geri alma yalniz super_admin); mevcut fonksiyonlara dokunmaz, pt_complete_session degismez
@@ -710,10 +713,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // order 59 bilerek bos: ACL onarimi migration degil (tek seferlik betik + npm run check:acl).
     { id: "DB1-rls-initplan-fsbo-staff", order: 60, title: "RLS InitPlan sarmasi: fsbo_*, platform personeli ve destek v2 politikalari (20261012002800 SONRASI; anlam ayni, davranis)", files: [F.rlsInitplanFsboStaff] },
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
-    { id: "SP3-birinci-taraf-olcum", order: 65, title: "Birinci taraf olcum: sayac/hiz tablolari + ingest/prune RPC, kayit atfi sutunlari, huni RPC'si (003220, 003200 ve 003210 SONRASI; KOD YAYININDAN ONCE uygulanir; kod tablo/sutun yokken eski yola duser; ek)", files: [F.publicMeasurement, F.signupAttributionExt, F.growthFunnel] },
+    { id: "SP3-birinci-taraf-olcum", order: 67, title: "Birinci taraf olcum: sayac/hiz tablolari + ingest/prune RPC, kayit atfi sutunlari, huni RPC'si (003220, 003200 ve 003210 SONRASI; KOD YAYININDAN ONCE uygulanir; kod tablo/sutun yokken eski yola duser; ek)", files: [F.publicMeasurement, F.signupAttributionExt, F.growthFunnel] },
+    { id: "SP4-hiz-laboratuvari", order: 68, title: "Hiz merkezi laboratuvar olcumleri perf_lab_runs (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'migration bekliyor'; sira serbest, ek)", files: [F.perfLabRuns] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
-    { id: "SP1-buyume-kokpiti", order: 66, title: "Buyume Kokpiti: site_issues + site_optimizer_actions + site_issues_prune (yalniz service_role; kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteIssues] },
-    { id: "SP2-platform-ai-kotasi", order: 67, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
+    { id: "SP1-buyume-kokpiti", order: 65, title: "Buyume Kokpiti: site_issues + site_optimizer_actions + site_issues_prune (yalniz service_role; kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteIssues] },
+    { id: "SP2-platform-ai-kotasi", order: 66, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },

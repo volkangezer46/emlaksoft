@@ -9,13 +9,17 @@ import {
   MAX_REQUESTS,
   budgetReport,
   checkBudget,
+  checkStaticHtml,
   coverageGaps,
   duplicateRatio,
   initialFiles,
   measureRoute,
   parseClientReferenceManifest,
+  staticHomeFromBuild,
+  staticHtmlReport,
   type RouteLoad,
 } from "./check-bundle-budget";
+import { measureHtml } from "../src/lib/perf/measure-html";
 
 const load = (over: Partial<RouteLoad> = {}): RouteLoad => ({
   route: "/app",
@@ -142,6 +146,52 @@ describe("check-bundle-budget", () => {
         `globalThis.__RSC_MANIFEST["/admin/page"] = ${JSON.stringify({ entryJSFiles: { p: ["static/chunks/p.js"] } })};`,
       );
       expect(quiet(() => budgetReport(d, true))).toBe(0);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  it("statik HTML eşiği (F1): gzip 80 KB / ham 360 KB; Next betiği kalırsa ihlal", () => {
+    const m = (raw: number, gz: number, next = 0) => ({ rawBytes: raw * 1024, gzipBytes: gz * 1024, nextScripts: next, externalScripts: next, inlineScripts: 0 });
+    expect(checkStaticHtml(m(360, 80))).toEqual([]);
+    expect(checkStaticHtml(m(361, 80)).map((v) => v.metric)).toEqual(["raw"]);
+    expect(checkStaticHtml(m(300, 81)).map((v) => v.metric)).toEqual(["gzip"]);
+    expect(checkStaticHtml(m(100, 20, 2))[0]?.message).toMatch(/Next betiği/);
+  });
+
+  it("derleme çıktısındaki ana sayfayı dönüştürüp ölçer; ölçülemezse --gate 1", () => {
+    const quiet = (fn: () => number) => {
+      const orig = [console.log, console.warn, console.error];
+      console.log = console.warn = console.error = () => {};
+      try {
+        return fn();
+      } finally {
+        [console.log, console.warn, console.error] = orig;
+      }
+    };
+    const d = mkdtempSync(path.join(tmpdir(), "static-html-"));
+    try {
+      const next = path.join(d, ".next");
+      const pub = path.join(d, "public");
+      expect(staticHomeFromBuild(next, pub)).toBeNull();
+      expect(quiet(() => staticHtmlReport(null, true, "yok"))).toBe(1);
+      expect(quiet(() => staticHtmlReport(null, false, "yok"))).toBe(0);
+      mkdirSync(path.join(next, "server/app"), { recursive: true });
+      mkdirSync(path.join(next, "static/chunks"), { recursive: true });
+      mkdirSync(path.join(pub, "statik"), { recursive: true });
+      writeFileSync(
+        path.join(next, "server/app/index.html"),
+        '<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css"/></head><body><p class="a">x</p><script src="/_next/static/chunks/m.js" async=""></script></body></html>',
+      );
+      writeFileSync(path.join(next, "static/chunks/a.css"), ".a{color:red}.b{color:blue}");
+      writeFileSync(path.join(pub, "statik/manifest.json"), JSON.stringify({ runtime: "/statik/runtime.js", islands: { pricing: "/statik/p.js" }, classTokens: [] }));
+      writeFileSync(path.join(pub, "statik/runtime.js"), "void 0;");
+      const html = staticHomeFromBuild(next, pub);
+      expect(html).toContain("<style>.a{color:red}</style>");
+      expect(html).toContain('{"islands":{"pricing":"/statik/p.js"}}');
+      expect(measureHtml(html!).nextScripts).toBe(0);
+      expect(quiet(() => staticHtmlReport(html, true, "fixture"))).toBe(0);
+      expect(quiet(() => staticHtmlReport(`<html>${"x".repeat(400 * 1024)}</html>`, true, "büyük"))).toBe(1);
     } finally {
       rmSync(d, { recursive: true, force: true });
     }

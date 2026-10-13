@@ -7,6 +7,7 @@ import {
   parseMaintenanceScope,
   type MaintenanceScopeSetting,
 } from "@/lib/platform-security/maintenance-scope";
+import { STATIC_ROUTES_SETTING_KEY } from "@/lib/static-home/settings";
 
 export { isMaintenanceExemptPath } from "@/lib/platform-security/maintenance-scope";
 
@@ -18,9 +19,10 @@ export const SECURITY_SETTING_KEYS = {
 } as const;
 
 /**
- * Bakım modu / kayıt kapısı / güvenlik anahtarları (demo girişi, personel MFA) için HAFİF, kısa TTL bellek önbellekli
+ * Bakım modu / kayıt kapısı / güvenlik anahtarları (demo girişi, personel MFA) / statik sayfa anahtarları için HAFİF, kısa TTL bellek önbellekli
  * okuyucu (proxy/middleware ve sunucu bileşenleri).
- * - Tek PostgREST isteği (7 anahtar); createAdminClient kullanmaz.
+ * - Tek PostgREST isteği (8 anahtar); createAdminClient kullanmaz. Statik sayfa anahtarları (`statik.routes`, SP4) aynı
+ *   okumaya katılır: proxy istek başına ek DB turu yapmaz.
  * - Güvenli varsayılan: okuma hatasında SİTE AÇIK kalır (bakım kapalı, kayıt açık).
  *   Güvenlik anahtarlarında okuma hatası = "satır yok" (env davranışı); SQL kapıları MFA'yı ayrıca DB'den uygular.
  * - Önbellek örnek (instance) başınadır; ayar değişikliği en geç TTL kadar sonra görünür (yazan eylem
@@ -38,6 +40,8 @@ export type EdgeFlags = {
   mfaEnforcedRaw: string | null;
   /** 'platform.mfa_grace_until' ISO (yoksa null). */
   mfaGraceUntil: string | null;
+  /** 'statik.routes' ham JSON (yoksa null → kayıt varsayılanları; çözümleme src/lib/static-home/settings.ts). */
+  staticRoutesRaw: string | null;
 };
 
 export const SAFE_FLAGS: EdgeFlags = {
@@ -48,6 +52,7 @@ export const SAFE_FLAGS: EdgeFlags = {
   demoLoginRaw: null,
   mfaEnforcedRaw: null,
   mfaGraceUntil: null,
+  staticRoutesRaw: null,
 };
 
 export const FLAGS_OK_TTL_MS = 30_000;
@@ -89,6 +94,7 @@ export function parseFlagRows(rows: unknown): EdgeFlags {
     demoLoginRaw: rawOrNull(SECURITY_SETTING_KEYS.demoLogin),
     mfaEnforcedRaw: rawOrNull(SECURITY_SETTING_KEYS.mfaEnforced),
     mfaGraceUntil: rawOrNull(SECURITY_SETTING_KEYS.mfaGraceUntil),
+    staticRoutesRaw: rawOrNull(STATIC_ROUTES_SETTING_KEY),
   };
 }
 
@@ -112,6 +118,7 @@ export async function readPlatformFlagsCached(deps: Deps = {}): Promise<EdgeFlag
     SECURITY_SETTING_KEYS.demoLogin,
     SECURITY_SETTING_KEYS.mfaEnforced,
     SECURITY_SETTING_KEYS.mfaGraceUntil,
+    STATIC_ROUTES_SETTING_KEY,
   ]
     .map((k) => `"${k}"`)
     .join(",");

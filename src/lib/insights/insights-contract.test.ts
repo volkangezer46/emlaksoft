@@ -158,7 +158,7 @@ describe("rollback + migration ayrıntıları", () => {
 });
 
 describe("cron kablolaması", () => {
-  it("insight-engine: CRON_JOBS + vercel.json + route birbirini tutuyor, sayı 37", () => {
+  it("insight-engine: CRON_JOBS + vercel.json + route birbirini tutuyor, sayı 38", () => {
     const job = CRON_JOBS.find((c) => c.job === "insight-engine");
     expect(job?.path).toBe("/api/cron/insight-engine");
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string; schedule: string }[] };
