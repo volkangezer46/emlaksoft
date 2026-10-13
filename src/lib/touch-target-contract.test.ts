@@ -24,7 +24,9 @@ const REQUIRED: [file: string, needles: string[]][] = [
   ["src/components/ui/checkbox.tsx", ["touch:h-6 touch:w-6"]],
   ["src/components/ui/filter-bar.tsx", ["touch:min-h-11"]],
   ["src/components/ui/data-table.tsx", ["touch:min-h-11", "touch:h-11"]],
-  ["src/components/ui/list-kit/row-actions.tsx", ["touch:h-11 touch:w-11"]],
+  // Satır eylemi RSC sınıf diyeti: kurallar `.lk-row-act` (console-kit.css, @apply) içinde.
+  ["src/components/ui/list-kit/row-actions.tsx", ["lk-row-act"]],
+  ["src/app/console-kit.css", ["lk-row-act {\n  @apply grid h-8 w-8 touch:h-11 touch:w-11"]],
   ["src/components/ui/list-kit/list-pager.tsx", ["touch:min-h-11"]],
   ["src/components/ui/list-kit/view-switcher.tsx", ["touch:h-11"]],
   ["src/components/ui/route-error.tsx", ["touch:min-h-11"]],

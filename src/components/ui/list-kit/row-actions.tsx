@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils";
  * Her eylemin erişilebilir adı (`label`) zorunludur; ikon tek başına anlam taşımaz.
  * Ek (ör. diyalog tetikleyen istemci) düğmeler `children` ile eklenir.
  */
-const ACTION =
-  "focus-ring press grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 active:bg-surface-pressed";
+// Görsel kurallar `.lk-row-act` (console-kit.css) içinde: satır başına RSC yükünde uzun dizgi taşınmaz.
+const ACTION = "focus-ring press lk-row-act";
 
 export function RowActions({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cn("relative z-10 flex items-center justify-end gap-0.5", className)}>{children}</div>;
@@ -31,7 +31,12 @@ export function RowActionLink({
   external?: boolean;
   tone?: "default" | "success";
 }) {
-  const cls = cn(ACTION, tone === "success" && "text-[var(--success-strong)] hover:bg-[var(--success-soft)]");
+  // `hover:text-brand-700` tekrarı: .lk-row-act bileşen katmanında; yardımcı katmandaki yeşil metin hover'da onu
+  // ezerdi. Eski dizgide hover rengi marka tonuydu — görünüm birebir korunur.
+  const cls = cn(
+    ACTION,
+    tone === "success" && "text-[var(--success-strong)] hover:bg-[var(--success-soft)] hover:text-brand-700",
+  );
   const icon = <SmartIcon icon={Icon} className="h-4 w-4" />;
   if (external) {
     return (
