@@ -28,7 +28,8 @@ const OLD = "2020-01-01T00:00:00.000Z";
 
 function menu(text: string, withMedia = false): SiteMenuConfig {
   const m = defaultSiteMenu();
-  m.announcement = { ...m.announcement, text };
+  // İşaret: ilk menü grubunun etiketi (duyuru şeridi AP4 ile çoklu listeye dönüştü; bu test yalnız taslak/canlı ayrımını sınar).
+  m.groups[0] = { ...m.groups[0]!, label: text };
   if (withMedia) {
     const g = m.groups.find((x) => x.items.length > 0)!;
     g.items[0] = { ...g.items[0]!, icon: { kind: "media", mediaId: MEDIA } };
@@ -57,8 +58,8 @@ describe("yayın masası yüzeyleri (bellek içi depo)", () => {
     const s = surfaceById("sitemenu")!;
     const res = await s.publish(menu("Zamanlı"), "staff-1", "Zamanlı yayın: X", "Ayşe", { keepDraft: true });
     expect(res.ok).toBe(true);
-    expect((JSON.parse(db.get("sitemenu.live")!) as SiteMenuConfig).announcement.text).toBe("Zamanlı");
-    expect(draft()?.announcement.text).toBe("Editördeki taslak");
+    expect((JSON.parse(db.get("sitemenu.live")!) as SiteMenuConfig).groups[0]!.label).toBe("Zamanlı");
+    expect(draft()?.groups[0]?.label).toBe("Editördeki taslak");
     expect(db.has(`sitemenu.media.${MEDIA}`)).toBe(true);
     expect(db.get("sitemenu.media.index")).toContain(MEDIA);
   });
@@ -69,7 +70,7 @@ describe("yayın masası yüzeyleri (bellek içi depo)", () => {
     const res = await s.resetToDefault("staff-1", "Ayşe", { keepDraft: true });
     expect(res.ok).toBe(true);
     expect(db.has("sitemenu.live")).toBe(false);
-    expect(draft()?.announcement.text).toBe("Editördeki taslak");
+    expect(draft()?.groups[0]?.label).toBe("Editördeki taslak");
     expect(db.has(`sitemenu.media.${MEDIA}`)).toBe(true);
   });
 
@@ -77,7 +78,7 @@ describe("yayın masası yüzeyleri (bellek içi depo)", () => {
     seedMenu(menu("Canlı"));
     const s = surfaceById("sitemenu")!;
     await s.publish(menu("Elle"), "staff-1", "Elle", "Ayşe");
-    expect(draft()?.announcement.text).toBe("Elle");
+    expect(draft()?.groups[0]?.label).toBe("Elle");
     expect(db.has(`sitemenu.media.${MEDIA}`)).toBe(false);
   });
 
@@ -86,7 +87,7 @@ describe("yayın masası yüzeyleri (bellek içi depo)", () => {
     const s = surfaceById("sitemenu")!;
     expect(await s.readLiveStrict()).toBeNull();
     db.set("sitemenu.live", JSON.stringify(menu("Canlı")));
-    expect((await s.readLiveStrict()) as SiteMenuConfig).toMatchObject({ announcement: { text: "Canlı" } });
+    expect(((await s.readLiveStrict()) as SiteMenuConfig).groups[0]?.label).toBe("Canlı");
     failReads = true;
     await expect(s.readLiveStrict()).rejects.toThrow("PostgREST 503");
     await expect(surfaceById("sitecontent")!.readLiveStrict()).rejects.toThrow("PostgREST 503");
