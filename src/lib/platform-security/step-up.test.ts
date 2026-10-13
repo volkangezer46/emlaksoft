@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * AD11 kritik işlem yeniden doğrulaması: (1) `requireStepUp` kod/faktör olmadan geçmez, yanlış kod denetime düşer;
  * (2) sözleşme: iade, kredi, sahiplik devri, ofis kapatma ve rol değişikliği eylemleri İLK yazımdan ÖNCE kodu ister.
+ * Davranış düzeyi (kapatma talebi kodu bir kez doğrular ve tamamlanır): src/app/actions/platform-office-close-step-up.test.ts.
  */
 const state = vi.hoisted(() => ({
   required: true as boolean,
@@ -81,7 +82,9 @@ describe("kritik eylemler kodu ilk yazımdan önce ister (sözleşme)", () => {
     { file: "src/app/actions/platform-tenants.ts", fn: "transferTenantOwnershipByAdmin", action: '"ownership_transfer"' },
     { file: "src/app/actions/platform-tenants.ts", fn: "setTenantLifecycleByAdmin", action: '"office_close"' },
     { file: "src/app/actions/platform-tenant-closure.ts", fn: "processOfficeClosureRequestByAdmin", action: '"office_close"' },
+    { file: "src/app/actions/platform.ts", fn: "updateTenantPlanStatus", action: '"office_close"' },
     { file: "src/app/actions/platform-staff.ts", fn: "updateStaffRole", action: '"staff_role"' },
+    { file: "src/app/actions/platform-staff.ts", fn: "addPlatformStaff", action: '"staff_role"' },
     { file: "src/app/actions/platform-members.ts", fn: "setMemberRoleAsStaff", action: '"member_role"' },
   ];
   for (const c of CASES) {
@@ -90,15 +93,29 @@ describe("kritik eylemler kodu ilk yazımdan önce ister (sözleşme)", () => {
       const start = src.indexOf(`export async function ${c.fn}(`);
       expect(start, c.fn).toBeGreaterThan(-1);
       const next = src.indexOf("\nexport async function ", start + 10);
-      const body = src.slice(start, next === -1 ? undefined : next);
+      // İmza satırı atlanır (ör. `updateTenantPlanStatus(` kendi adını yazım sanmasın).
+      const full = src.slice(start, next === -1 ? undefined : next);
+      const body = full.slice(full.indexOf("\n"));
       const gate = body.indexOf("requireStepUp(");
       expect(gate, `${c.fn}: requireStepUp yok`).toBeGreaterThan(-1);
       expect(body.slice(gate, gate + 80)).toContain(c.action);
       // İlk yazım (update/insert/upsert/delete/yazan rpc) kod kapısından sonra gelir.
-      const writes = [".update(", ".insert(", ".upsert(", ".delete(", "updateTenantPlanStatus(", "admin.rpc("]
+      const writes = [".update(", ".insert(", ".upsert(", ".delete(", "updateTenantPlanStatus(", "applyTenantPlanStatus(", "admin.rpc("]
         .map((w) => body.indexOf(w))
         .filter((i) => i > -1);
       if (writes.length) expect(Math.min(...writes), `${c.fn}: yazım kapıdan önce`).toBeGreaterThan(gate);
     });
   }
+});
+
+describe("erişim politikası anahtarları merkezden yazılamaz", () => {
+  it("IP listesi, boşta/ömür ve step-up bridge; yazım yalnız saveAdminAccessPolicy (fromBridge)", async () => {
+    const { prepareWrite } = await import("@/lib/settings/prepare");
+    for (const key of ["platform.step_up_required", "platform.admin_ip_allowlist", "platform.session_idle_minutes", "platform.session_max_hours"]) {
+      const r = prepareWrite({ key, value: key === "platform.step_up_required" ? false : key === "platform.admin_ip_allowlist" ? "" : 30, reason: "test gerekçesi uzun" });
+      expect(r.ok, key).toBe(false);
+    }
+    const src = readFileSync(join(process.cwd(), "src/app/actions/platform-access-policy.ts"), "utf8");
+    expect(src).toContain("fromBridge: true");
+  });
 });

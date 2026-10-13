@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { updateTenantPlanStatus } from "@/app/actions/platform";
 import { ImpersonateDialog } from "./impersonate-dialog";
+import { useStepUpPrompt } from "@/components/admin/step-up";
+import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { resendTenantOwnerAccessLink } from "@/app/actions/platform-tenants";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { DraftTable } from "@/components/ui/draft-table";
@@ -159,6 +161,7 @@ function TenantRow({
   const router = useRouter();
   const [notice, setNotice] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [resending, startResend] = useTransition();
+  const stepUp = useStepUpPrompt();
   const draft = useRowDraft({
     id: row.id,
     label: row.name,
@@ -172,6 +175,12 @@ function TenantRow({
       fd.set("plan", d.plan);
       fd.set("status", d.status);
       if (ctx.version) fd.set("expected_updated_at", ctx.version);
+      // AD11: askıya alma / iptal ofis kapatmadır; sunucu kodu ister (aynı kural: statusChangeNeedsStepUp).
+      if (statusChangeNeedsStepUp(d.status, row.status)) {
+        const code = await stepUp.ask("Ofis kapatma / askıya alma");
+        if (!code) return { error: "Askıya alma / iptal için doğrulayıcı kodu gerekli." };
+        fd.set("step_up_code", code);
+      }
       const res = await updateTenantPlanStatus(fd);
       if (res.ok) {
         router.refresh();
@@ -204,6 +213,7 @@ function TenantRow({
   return (
     <tr {...rowDraftProps(draft)}>
       <td>
+        {stepUp.dialog}
         <div className="adm-ent">
           <span className="adm-ent-ico" aria-hidden="true">
             <Building2 />

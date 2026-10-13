@@ -24,3 +24,14 @@ export function normalizeStepUpCode(raw: unknown): string | null {
   const s = String(raw ?? "").replace(/[\s-]/g, "");
   return /^\d{6}$/.test(s) ? s : null;
 }
+
+/** Ofis kapatma sayılan abonelik durumları (askıya alma / iptal-arşiv). */
+export const OFFICE_CLOSE_STATUSES: readonly string[] = ["suspended", "cancelled"];
+
+/**
+ * Durum geçişi kod ister mi? Yalnız ofisi askıya alan/kapatan YENİ geçiş (aynı durumda kalan paket değişikliği istemez).
+ * Sunucu (`updateTenantPlanStatus`) ve satır içi tablo aynı kuralı kullanır.
+ */
+export function statusChangeNeedsStepUp(next: string | null | undefined, current: string | null | undefined): boolean {
+  return !!next && OFFICE_CLOSE_STATUSES.includes(next) && next !== current;
+}

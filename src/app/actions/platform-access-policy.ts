@@ -73,7 +73,8 @@ export async function saveAdminAccessPolicy(input: {
       { key: SESSION_MAX_HOURS_KEY, value: Number(input.maxHours) },
       { key: STEP_UP_REQUIRED_KEY, value: input.stepUp !== false },
     ],
-    { reason },
+    // Bu anahtarlar bridge: merkezden yazılamaz, yalnız bu korumalı yoldan (kilitlenme onayı + kapatırken kod).
+    { reason, fromBridge: true },
   );
   if (!res.ok) return { error: res.error };
   resetAdminAccessCache();

@@ -27,11 +27,18 @@ import {
  */
 const SECURITY_HOME = { href: "/admin/personel/guvenlik#erisim", label: "Personel > Güvenlik politikası" } as const;
 const SUPER_SECURITY = { platformModule: "personel", superAdminOnly: true } as const;
+/**
+ * Erişim politikası anahtarları YALNIZ `saveAdminAccessPolicy` ile yazılır (`fromBridge`): o yol kendini kilitleme
+ * onayını ve kritik işlem doğrulamasını kapatırken TOTP kodunu ister. Merkezden (genel ayar yazma yolu) yazım
+ * `prepareWrite` tarafından reddedilir; aksi halde çalınmış oturum step-up'ı kodsuz kapatabilirdi.
+ */
+const ACCESS_POLICY_BRIDGE = { editMode: "bridge", editHref: SECURITY_HOME.href } as const;
 
 export const SECURITY_SETTING_DEFS: AnySettingDef[] = [
   defineString({
     key: ADMIN_IP_ALLOWLIST_KEY,
     home: SECURITY_HOME,
+    ...ACCESS_POLICY_BRIDGE,
     permission: SUPER_SECURITY,
     default: "",
     maxLength: 4000,
@@ -47,6 +54,7 @@ export const SECURITY_SETTING_DEFS: AnySettingDef[] = [
   defineInt({
     key: SESSION_IDLE_MINUTES_KEY,
     home: SECURITY_HOME,
+    ...ACCESS_POLICY_BRIDGE,
     permission: SUPER_SECURITY,
     default: DEFAULT_IDLE_MINUTES,
     min: 0,
@@ -61,6 +69,7 @@ export const SECURITY_SETTING_DEFS: AnySettingDef[] = [
   defineInt({
     key: SESSION_MAX_HOURS_KEY,
     home: SECURITY_HOME,
+    ...ACCESS_POLICY_BRIDGE,
     permission: SUPER_SECURITY,
     default: DEFAULT_MAX_HOURS,
     min: 0,
@@ -75,6 +84,7 @@ export const SECURITY_SETTING_DEFS: AnySettingDef[] = [
   defineBool({
     key: STEP_UP_REQUIRED_KEY,
     home: SECURITY_HOME,
+    ...ACCESS_POLICY_BRIDGE,
     permission: SUPER_SECURITY,
     default: true,
     category: "guvenlik",

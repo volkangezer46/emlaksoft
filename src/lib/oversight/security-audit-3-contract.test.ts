@@ -101,7 +101,7 @@ describe("#8 talebi acan dogrulamasi", () => {
   it("islem arsivlemeden ONCE dogrulanir; admin karti talebi acani gosterir", () => {
     const s = src("src/app/actions/platform-tenant-closure.ts");
     expect(s.indexOf("requesterMayCloseOffice(requester, tenantId)")).toBeGreaterThan(-1);
-    expect(s.indexOf("requesterMayCloseOffice(requester, tenantId)")).toBeLessThan(s.indexOf("setTenantLifecycleByAdmin(archiveForm)"));
+    expect(s.indexOf("requesterMayCloseOffice(requester, tenantId)")).toBeLessThan(s.indexOf("applyTenantPlanStatus(admin, staff.id, { id: tenantId, status: \"cancelled\" })"));
     expect(src("src/app/admin/tenants/[id]/office-management.tsx")).toContain("Talebi açan:");
     expect(src("src/lib/admin/office-management.ts")).toContain("created_by");
   });

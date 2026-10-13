@@ -2,6 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import { startTransition, useActionState, useRef, useState } from "react";
+import { StepUpCodeField } from "@/components/admin/step-up";
+import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { useRouter } from "next/navigation";
 import { CreditCard } from "lucide-react";
 import { updateTenantPlanStatus, type PlatformResult } from "@/app/actions/platform";
@@ -44,6 +46,7 @@ export function SubscriptionPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [plan, setPlan] = useState(currentPlan);
+  const [status, setStatus] = useState(currentStatus);
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -61,7 +64,13 @@ export function SubscriptionPanel({
   const selectedPlan = plans.find((option) => option.id === plan);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setStatus(currentStatus);
+        setOpen(next);
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant="outline" size="md" type="button">
           <CreditCard className="h-4 w-4" /> Abonelik değiştir
@@ -109,7 +118,8 @@ export function SubscriptionPanel({
               <select
                 id="sub-status"
                 name="status"
-                defaultValue={currentStatus}
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
                 className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400"
               >
                 {STATUS_OPTIONS.map((status) => (
@@ -119,6 +129,9 @@ export function SubscriptionPanel({
                 ))}
               </select>
             </div>
+
+            {/* AD11: askıya alma / iptal ofis kapatmadır; sunucu doğrulayıcı kodu ister. */}
+            {statusChangeNeedsStepUp(status, currentStatus) ? <StepUpCodeField id="sub-step-up" /> : null}
 
             {state.error ? (
               <p className="text-sm text-danger-500" role="alert">

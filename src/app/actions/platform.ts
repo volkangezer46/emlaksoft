@@ -15,13 +15,19 @@ import {
   restoreImpersonationMetadata,
 } from "@/lib/impersonation";
 import { logActivity } from "@/lib/activity";
-import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
-import { actionErrorMessage } from "@/lib/action-errors";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logError } from "@/lib/error-log";
 import { parseImpersonationReason } from "@/lib/platform-security/impersonation-reason";
+import { requireStepUp } from "@/lib/platform-security/step-up";
+import { OFFICE_CLOSE_STATUSES, statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
+import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 
-export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string; code?: "stale" };
+export type PlatformResult = {
+  error?: string;
+  ok?: boolean;
+  redirectTo?: string;
+  code?: "stale" | "step_up_required" | "step_up_invalid" | "step_up_no_factor";
+};
 
 const PLANS = ["advisor", "office", "professional", "business", "enterprise"] as const;
 const STATUSES = ["trial", "active", "past_due", "suspended", "cancelled"] as const;
@@ -41,48 +47,24 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
   const admin = createAdminClient();
   // İsteğe bağlı iyimser eşzamanlılık (satır içi kaydetme standardı): satır, okunduğu sürümden (`updated_at`)
   // sonra başkası tarafından değiştiyse yazmadan "bayat" döner. Alan gönderilmezse eski davranış aynen sürer.
+  // AD11: askıya alma / iptal (ofis kapatma) YENİ geçişi doğrulayıcı kodu ister; mevcut durum bunun için okunur.
   const expectedUpdatedAt = String(formData.get("expected_updated_at") ?? "").trim();
-  if (expectedUpdatedAt) {
-    const { data: current, error: readError } = await admin.from("tenants").select("updated_at").eq("id", id).maybeSingle();
+  const closing = OFFICE_CLOSE_STATUSES.includes(status);
+  if (expectedUpdatedAt || closing) {
+    const { data: current, error: readError } = await admin.from("tenants").select("status, updated_at").eq("id", id).maybeSingle();
     if (readError || !current) return { error: "Tenant bulunamadı." };
-    const currentMs = Date.parse(String(current.updated_at ?? ""));
-    if (Number.isFinite(currentMs) && currentMs !== Date.parse(expectedUpdatedAt)) {
-      return { error: "Bu satır başkası tarafından güncellendi. Yenileyip tekrar deneyin.", code: "stale" };
+    if (expectedUpdatedAt) {
+      const currentMs = Date.parse(String(current.updated_at ?? ""));
+      if (Number.isFinite(currentMs) && currentMs !== Date.parse(expectedUpdatedAt)) {
+        return { error: "Bu satır başkası tarafından güncellendi. Yenileyip tekrar deneyin.", code: "stale" };
+      }
+    }
+    if (statusChangeNeedsStepUp(status, String(current.status ?? ""))) {
+      const stepUp = await requireStepUp(formData, "office_close", staff.id);
+      if (!stepUp.ok) return { error: stepUp.error, code: stepUp.code };
     }
   }
-  const { data, error } = await admin.rpc("update_tenant_plan_subscription", {
-    p_tenant_id: id,
-    p_actor_id: staff.id,
-    p_plan: plan || null,
-    p_status: status || null,
-  });
-  if (error) {
-    console.error("updateTenantPlanStatus", error);
-    return {
-      error:
-        planLimitErrorMessage(error) ??
-        (error.code === "PGRST202"
-          ? "Abonelik güncelleme servisi henüz hazır değil. Veritabanı migration'ını uygulayın."
-          : actionErrorMessage(null, "Tenant ve abonelik güncellenemedi.")),
-    };
-  }
-
-  revalidatePath("/admin");
-  revalidatePath("/admin/tenants");
-  revalidatePath("/admin/billing");
-  revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
-  revalidatePath("/vitrin/[slug]/degerleme", "page");
-  revalidatePath("/vitrin/[slug]/favoriler", "page");
-  revalidatePath("/danisman/[slug]", "page");
-  revalidatePath("/sitemap.xml");
-  const tenantSlug = data && typeof data === "object" && !Array.isArray(data)
-    ? (data as Record<string, unknown>).tenantSlug
-    : null;
-  if (typeof tenantSlug === "string" && tenantSlug) {
-    revalidatePath(`/vitrin/${tenantSlug}`);
-  }
-  return { ok: true };
+  return applyTenantPlanStatus(admin, staff.id, { id, plan, status });
 }
 
 /**
