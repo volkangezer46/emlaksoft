@@ -1,5 +1,4 @@
 import { isDemoLoginEnabled } from "@/lib/demo-environment";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
 import { serverTimingEnabled } from "@/lib/server-timing-core";
 
 /**
@@ -10,7 +9,8 @@ import { serverTimingEnabled } from "@/lib/server-timing-core";
  *  - "setting": ayar defterindeki açık/kapalı ayar (`settingKey`); düzenleme ayarın kendi bölümünde (`editHref`),
  *    değişiklik geçmişi `settings_history`. Her ayar tek yerde düzenlenir; bayrak ekranı durumu ve etkiyi gösterir.
  *  - "platform": ayar defterinde olmayan ham platform ayarı (`storageKey`, açık değeri `onValue`); kendi ekranında.
- *  - "env": Vercel ortam değişkeni; buradan DEĞİŞTİRİLEMEZ (değişiklik + yeniden dağıtım sahibin işi).
+ *  - "env": sunucu ortamı değişkeni (`.env.production` + yeniden yayın); buradan DEĞİŞTİRİLEMEZ, ekranda TAVAN olarak
+ *    gösterilir ve açma komutu kopyalanabilir (`envOn`).
  * `requires`: bu bayrak yalnız bağlı bayrak da açıkken etkindir (ör. nakit ödeme yalnız ortak programı açıkken).
  */
 
@@ -26,6 +26,10 @@ export type FeatureFlagDef = {
   storageKey?: string;
   onValue?: string;
   envVar?: string;
+  /** Birden çok ortam değişkeni (ör. demo girişinin iki kademeli tavanı); verilirse `envVar` yerine gösterilir. */
+  envVars?: readonly string[];
+  /** Açmak için `.env.production` satır(lar)ı (kopyalanabilir komut). */
+  envOn?: string;
   /** Ortam bayrağının mevcut kod yolundaki değerlendirmesi (anlam değişmez). */
   env?: (env: NodeJS.ProcessEnv) => boolean;
   editHref?: string;
@@ -65,7 +69,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     key: "maintenance_mode",
     label: "Bakım modu",
     description: "Ofis panelleri bakım ekranı gösterir.",
-    impact: "Tüm ofis kullanıcıları bakım ekranını görür; platform personeli etkilenmez.",
+    impact: "Kapsamdaki sayfalar bakım ekranı gösterir (varsayılan yalnız ofis paneli; ana sayfa açık kalır); platform personeli etkilenmez.",
     source: "setting",
     settingKey: "platform.maintenance_mode",
     editHref: "/admin/sistem#ayarlar",
@@ -120,20 +124,25 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
   {
     key: "platform_mfa",
     label: "Platform personeli için zorunlu iki adımlı doğrulama",
-    description: "Ortam değişkeni PLATFORM_MFA_ENFORCEMENT=on (yayın öncesi açılacak).",
-    impact: "Açıkken /admin girişinde TOTP zorunlu; veritabanı ayarı platform.mfa_enforced ile tutarlı olmalı.",
-    source: "env",
+    description: "Ayar platform.mfa_enforced (Personel > Güvenlik politikası; 7 günlük geçiş süresiyle açılır).",
+    impact: "Açıkken /admin girişinde TOTP zorunlu; veritabanı kapıları da aynı ayara bakar. Sunucu ortamında PLATFORM_MFA_ENFORCEMENT=on her zaman zorunlu tutar, force-off acil kapatmadır.",
+    source: "platform",
+    storageKey: "platform.mfa_enforced",
+    onValue: "on",
     envVar: "PLATFORM_MFA_ENFORCEMENT",
-    env: () => isPlatformMfaRequired(),
+    editHref: "/admin/personel/guvenlik",
   },
   {
     key: "demo_login",
     label: "Hızlı demo girişleri",
-    description: "Giriş sayfasındaki demo kişi kartları (ENABLE_DEMO_LOGIN; canlıda ayrıca açık izin gerekir).",
-    impact: "Canlıda açık olmamalıdır.",
+    description: "Giriş sayfasındaki demo kişi kartları. Sunucu tavanı: ofis kartları + ayrıca süper admin kartları; yönetim anahtarı Personel > Güvenlik politikası.",
+    impact: "Açıkken adresi bilen herkes demo hesaplarına tek tıkla girer; platform kartı açıksa süper admin dahil.",
     source: "env",
-    envVar: "ENABLE_DEMO_LOGIN",
+    envVar: "PRODUCTION_DEMO_LOGIN_OPT_IN",
+    envVars: ["PRODUCTION_DEMO_LOGIN_OPT_IN", "PRODUCTION_PLATFORM_DEMO_OPT_IN"],
+    envOn: "PRODUCTION_DEMO_LOGIN_OPT_IN=true PRODUCTION_PLATFORM_DEMO_OPT_IN=true",
     env: (env) => isDemoLoginEnabled(env),
+    editHref: "/admin/personel/guvenlik",
   },
   {
     key: "billing_demo",
@@ -142,6 +151,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Canlıda açıksa para alınmadan paket aktifleşebilir.",
     source: "env",
     envVar: "ALLOW_BILLING_DEMO",
+    envOn: "ALLOW_BILLING_DEMO=true",
     env: billingDemoAllowed,
   },
   {
@@ -151,6 +161,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Canlıda açıksa ödeme bağlantısı gerçek tahsilat yapmadan kapanabilir.",
     source: "env",
     envVar: "ALLOW_PAYMENT_LINK_DEMO",
+    envOn: "ALLOW_PAYMENT_LINK_DEMO=1",
     env: paymentLinkDemoAllowed,
   },
   {
@@ -160,6 +171,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Açıksa ofis mesajları platformun hesabından ve maliyetiyle gider.",
     source: "env",
     envVar: "ALLOW_PLATFORM_MESSAGING_FALLBACK",
+    envOn: "ALLOW_PLATFORM_MESSAGING_FALLBACK=true",
     env: platformMessagingFallbackEnv,
   },
   {
@@ -169,6 +181,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Yalnız teşhis içindir; log hacmini artırır.",
     source: "env",
     envVar: "EMLAKSOFT_SERVER_TIMING",
+    envOn: "EMLAKSOFT_SERVER_TIMING=1",
     env: (env) => serverTimingEnabled(env),
   },
 ];

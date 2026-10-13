@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Clock, Loader2, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { ArrowLeft, Clock, KeyRound, Loader2, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
@@ -13,6 +13,8 @@ import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { PLATFORM_ROLES, roleSummary } from "../staff-model";
 import { StaffAccountPanel } from "./staff-account-panel";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { listStaffMfaStatus, resetStaffMfa } from "@/app/actions/platform-security";
+import { ReasonDialog } from "../guvenlik/reason-dialog";
 
 type Member = {
   id: string;
@@ -55,8 +57,13 @@ export default function PersonelDetayPage() {
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const [pending, startTransition] = useTransition();
   const [err, setErr] = useState<string | null>(null);
+  // Doğrulanmış TOTP sayısı (undefined: yükleniyor, null: okunamadı).
+  const [mfaCount, setMfaCount] = useState<number | null | undefined>(undefined);
 
   const load = useCallback(() => {
+    void listStaffMfaStatus()
+      .then((m) => setMfaCount(m[id] === undefined || m[id] === null ? null : m[id]!.verified))
+      .catch(() => setMfaCount(null));
     return fetch(`/api/admin/personel?id=${encodeURIComponent(id)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { member: Member; activity: Activity[] } | null) => {
@@ -142,6 +149,40 @@ export default function PersonelDetayPage() {
       />
 
       {err ? <p className="rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-sm font-medium text-danger-600" role="alert">{err}</p> : null}
+
+      <section className="flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+        <KeyRound className="h-4 w-4 text-brand-600" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display font-bold text-ink-950">İki adımlı doğrulama</h2>
+          <p className="text-xs text-text-muted">
+            {mfaCount === undefined
+              ? "Doğrulayıcı bilgisi yükleniyor…"
+              : mfaCount === null
+                ? "Doğrulayıcı bilgisi okunamadı."
+                : mfaCount > 0
+                  ? `Kurulu (${mfaCount} doğrulayıcı). Telefonunu kaybettiyse sıfırlayın; bir sonraki girişte yeniden kurar.`
+                  : "Doğrulayıcı kurulu değil."}
+          </p>
+        </div>
+        {mfaCount ? (
+          <ReasonDialog
+            tone="danger"
+            title={`${member.full_name} için doğrulayıcı sıfırlansın mı?`}
+            description="Kayıtlı tüm authenticator'ları silinir ve oturumları kapanır. İşlem denetim izine yazılır."
+            confirmLabel="Doğrulayıcıyı sıfırla"
+            trigger={
+              <Button variant="outline" size="sm" type="button" className="text-danger-600">
+                Doğrulayıcıyı sıfırla
+              </Button>
+            }
+            onConfirm={async (reason) => {
+              const res = await resetStaffMfa({ staffId: id, reason });
+              if (res.error) return { error: res.error };
+              await load();
+            }}
+          />
+        ) : null}
+      </section>
 
       <StaffAccountPanel
         id={id}
