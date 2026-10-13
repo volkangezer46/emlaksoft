@@ -22,7 +22,7 @@
  */
 
 import { formatTryAmount } from "@/lib/format";
-import { legalValue } from "@/lib/legal-constants";
+import { legalValue, type LegalKey, type LegalValues } from "@/lib/legal-constants";
 
 // ---------------------------------------------------------------------------
 // ORANLAR VE SABİTLER — kaynak + tarih notlarıyla
@@ -98,31 +98,40 @@ export type PurchaseCostRates = {
   rentWithholdingPct: number;
 };
 
-export const DEFAULT_RATES: PurchaseCostRates = {
-  deedFeeTotalPct: legalValue("deedFeeTotalPct"),
-  landRegistryServiceFeeTry: legalValue("landRegistryServiceFeeTry"),
-  // Alıcı tarafı varsayılanı: satış tavanının yarısı (kullanıcı değiştirebilir).
-  commissionPct: legalValue("saleCommissionCapPct") / 2,
-  vatPct: legalValue("vatGeneralPct"),
-  rentCommissionMonths: legalValue("rentCommissionCapMonths"),
+/**
+ * Oran seti, verilen günün mevzuat değerlerinden (AD12 tarihli geçmiş; boş → kod değerleri). Hesaplayıcı sayfası
+ * sunucuda `getEffectiveLegalValues()` okur ve sonucu `rates` olarak istemciye geçer.
+ */
+export function purchaseRatesFromLegal(v?: LegalValues | null): PurchaseCostRates {
+  const lv = (k: LegalKey) => legalValue(k, v);
+  return {
+    deedFeeTotalPct: lv("deedFeeTotalPct"),
+    landRegistryServiceFeeTry: lv("landRegistryServiceFeeTry"),
+    // Alıcı tarafı varsayılanı: satış tavanının yarısı (kullanıcı değiştirebilir).
+    commissionPct: lv("saleCommissionCapPct") / 2,
+    vatPct: lv("vatGeneralPct"),
+    rentCommissionMonths: lv("rentCommissionCapMonths"),
 
-  daskPerSqmTry: legalValue("daskPerSqmTry"),
-  daskMinTry: legalValue("daskMinTry"),
-  daskMaxTry: legalValue("daskMaxTry"),
-  daskFallbackTry: legalValue("daskFallbackTry"),
+    daskPerSqmTry: lv("daskPerSqmTry"),
+    daskMinTry: lv("daskMinTry"),
+    daskMaxTry: lv("daskMaxTry"),
+    daskFallbackTry: lv("daskFallbackTry"),
 
-  homeInsurancePerSqmTry: legalValue("homeInsurancePerSqmTry"),
-  homeInsuranceMinTry: legalValue("homeInsuranceMinTry"),
-  homeInsuranceFallbackTry: legalValue("homeInsuranceFallbackTry"),
+    homeInsurancePerSqmTry: lv("homeInsurancePerSqmTry"),
+    homeInsuranceMinTry: lv("homeInsuranceMinTry"),
+    homeInsuranceFallbackTry: lv("homeInsuranceFallbackTry"),
 
-  appraisalFeeTry: legalValue("appraisalFeeTry"),
-  loanAllocationFeePct: legalValue("loanAllocationFeePct"),
-  mortgageRegistrationFeeTry: legalValue("mortgageRegistrationFeeTry"),
+    appraisalFeeTry: lv("appraisalFeeTry"),
+    loanAllocationFeePct: lv("loanAllocationFeePct"),
+    mortgageRegistrationFeeTry: lv("mortgageRegistrationFeeTry"),
 
-  newBuildVatResidentialSmallPct: legalValue("newBuildVatResidentialSmallPct"),
-  newBuildVatLargePct: legalValue("newBuildVatLargePct"),
-  rentWithholdingPct: legalValue("rentWithholdingPct"),
-};
+    newBuildVatResidentialSmallPct: lv("newBuildVatResidentialSmallPct"),
+    newBuildVatLargePct: lv("newBuildVatLargePct"),
+    rentWithholdingPct: lv("rentWithholdingPct"),
+  };
+}
+
+export const DEFAULT_RATES: PurchaseCostRates = purchaseRatesFromLegal();
 
 /** Konut kredisinde yasal azami vade (BDDK) — 120 ay. */
 export const MAX_LOAN_MONTHS = legalValue("maxLoanMonths");

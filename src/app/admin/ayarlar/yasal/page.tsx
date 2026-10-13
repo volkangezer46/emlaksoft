@@ -5,7 +5,7 @@ import { RegistrySettings } from "@/components/settings/registry-settings";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { trDayKey, toTrLocalInput } from "@/lib/clock";
-import { allLegalConstants, formatLegalValue, LEGAL_CONSTANTS, type LegalConstant, type LegalKey } from "@/lib/legal-constants";
+import { allLegalConstants, DATED_LEGAL_KEYS, formatLegalValue, LEGAL_CONSTANTS, type LegalConstant, type LegalKey } from "@/lib/legal-constants";
 import { activeRecord, nextScheduled } from "@/lib/legal-constants/history";
 import { readLegalConstantHistory } from "@/lib/legal-constants/store";
 import { LEGAL_DOCS } from "@/lib/legal-docs/core";
@@ -13,6 +13,7 @@ import { readLegalOverview } from "@/lib/legal-docs/store";
 import { requirePlatformModule } from "@/lib/platform";
 import { LEGAL_ENTITY_KEYS, SUPPORT_CONTACT_KEYS } from "@/lib/settings/registry/legal";
 import { ConstantEditor, FutureConstantList } from "./constant-editor";
+import { CodeSnapshotButton } from "./snapshot-button";
 
 export const metadata = { title: "Yasal metinler, şirket kimliği ve mevzuat sabitleri" };
 
@@ -54,7 +55,7 @@ export default async function LegalSettingsPage({ searchParams }: { searchParams
         ))}
       </nav>
 
-      {tab === "belgeler" ? <DocumentsTab /> : null}
+      {tab === "belgeler" ? <DocumentsTab canEdit={canEdit} /> : null}
       {tab === "sirket" ? (
         <div className="space-y-8">
           <RegistrySettings
@@ -87,7 +88,7 @@ export default async function LegalSettingsPage({ searchParams }: { searchParams
   );
 }
 
-async function DocumentsTab() {
+async function DocumentsTab({ canEdit }: { canEdit: boolean }) {
   const overview = await readLegalOverview().catch(() => ({ status: "error" as const, error: "okunamadı" }));
   if (overview.status === "missing") {
     return (
@@ -97,16 +98,22 @@ async function DocumentsTab() {
     );
   }
   const rows = overview.status === "ok" ? overview.rows : [];
+  // Taşıma: yayında DB sürümü ve v1 kaydı olmayan belge varsa koddaki metin tek tıkla arşiv v1 olarak kaydedilir.
+  const needsSnapshot = overview.status === "ok" && LEGAL_DOCS.some((d) => !rows.some((r) => r.slug === d.slug && (r.status === "published" || r.version === 1)));
   return (
     <section aria-labelledby="belgeler-baslik" className="space-y-3">
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
         <h2 id="belgeler-baslik" className="text-base font-semibold text-ink-950">
           Yasal belgeler
         </h2>
         <p className="text-xs text-text-muted">
           Yayında DB sürümü yoksa sayfa koddaki metni (v1) gösterir. Taslak yayına alınana kadar sitede görünmez.
           {overview.status === "error" ? " Sürüm bilgisi şu an okunamadı." : ""}
+          {needsSnapshot ? " Koddaki metni v1 olarak kaydederseniz farklar v1'e göre görünür ve v1, belge sayfasından DB sürümü olarak yayınlanabilir." : ""}
         </p>
+        </div>
+        {canEdit && needsSnapshot ? <CodeSnapshotButton /> : null}
       </div>
       <TableFrame minWidth={720}>
         <Table>
@@ -140,7 +147,10 @@ async function DocumentsTab() {
                         {live.requiresReconsent ? <span className="mt-1 inline-block rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-700">Yeniden onay istendi</span> : null}
                       </>
                     ) : (
-                      <span className="text-text-muted">Koddaki metin (v1)</span>
+                      <span className="text-text-muted">
+                        Koddaki metin (v1)
+                        {mine.some((r) => r.version === 1) ? <span className="block text-xs">v1 DB&apos;de kayıtlı</span> : null}
+                      </span>
                     )}
                   </TD>
                   <TD className="text-sm">
@@ -184,8 +194,9 @@ async function ConstantsTab({ canEdit }: { canEdit: boolean }) {
         </h2>
         <p className="text-xs text-text-muted">
           Her değişiklik geçerlilik tarihiyle eklenir; geçmiş silinmez. Geleceğe tarihli değer o güne kadar uygulanmaz. Yürürlükteki değer
-          koddaki değerden farklıysa satırda belirtilir: hesaplayıcılar şu an koddaki değerle çalışır, fark geliştiriciye iletilmelidir
-          (docs/MEVZUAT_SABITLERI.md).
+          o gün hesaplayıcılara (alım maliyeti, satıcı net hesabı) en geç 5 dakikada yansır. &quot;Yalnız kayıt&quot; işaretli sabitler
+          (kredi sınırları, yabancıya satış eşikleri vb.) koddaki değerle çalışır; yürürlükteki değer farklıysa geliştiriciye
+          iletilmelidir (docs/MEVZUAT_SABITLERI.md).
         </p>
       </div>
       {history.status === "missing" ? (
@@ -237,7 +248,12 @@ async function ConstantsTab({ canEdit }: { canEdit: boolean }) {
                   <TD align="right" className="whitespace-nowrap font-semibold text-ink-950">
                     {active ? formatLegalValue(active.value, c.unit) : formatLegalValue(c.value, c.unit)}
                     {active ? <span className="block text-xs font-normal text-text-muted">{active.validFrom} itibarıyla</span> : null}
-                    {differs ? <span className="block text-xs font-bold text-amber-800">Koda işlenmeli</span> : null}
+                    {DATED_LEGAL_KEYS.includes(k) ? (
+                      <span className="block text-xs font-normal text-mint-700">Hesaplayıcıya uygulanır</span>
+                    ) : (
+                      <span className="block text-xs font-normal text-text-muted">Yalnız kayıt</span>
+                    )}
+                    {differs && !DATED_LEGAL_KEYS.includes(k) ? <span className="block text-xs font-bold text-amber-800">Koda işlenmeli</span> : null}
                   </TD>
                   <TD className="whitespace-nowrap text-sm">
                     {next ? (

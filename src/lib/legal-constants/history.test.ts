@@ -39,3 +39,48 @@ describe("mevzuat sabiti geçerlilik geçmişi", () => {
     expect(isDayKey("26-02-01")).toBe(false);
   });
 });
+
+describe("tarihli değer hesaplayıcıya gerçekten yansır", () => {
+  it("satıcı net hesabı o günün kaydını kullanır (öncesinde kod değeri)", async () => {
+    const { computeSellerProceeds } = await import("@/lib/seller-proceeds");
+    const records = [rec("deedFeeTotalPct", 6, "2027-01-01")];
+    const input = { salePrice: 1_000_000, acquisitionPrice: 900_000, holdingMonths: 72 };
+    const before = computeSellerProceeds({ ...input, legal: resolveAllLegalValues(records, "2026-12-31") });
+    const after = computeSellerProceeds({ ...input, legal: resolveAllLegalValues(records, "2027-01-01") });
+    expect(before.deedFee).toBe((1_000_000 * LEGAL_CONSTANTS.deedFeeTotalPct.value) / 100 / 2);
+    expect(after.deedFee).toBe(30_000);
+  });
+
+  it("alım maliyeti oranları o günün kaydını kullanır", async () => {
+    const { computePurchaseCosts, purchaseRatesFromLegal } = await import("@/lib/purchase-costs");
+    const records = [rec("landRegistryServiceFeeTry", 7_500, "2026-01-01")];
+    const rates = purchaseRatesFromLegal(resolveAllLegalValues(records, "2026-10-13"));
+    expect(rates.landRegistryServiceFeeTry).toBe(7_500);
+    const withDb = computePurchaseCosts({ price: 2_000_000, downPayment: 2_000_000, rates });
+    const withCode = computePurchaseCosts({ price: 2_000_000, downPayment: 2_000_000 });
+    expect(withDb.totalCosts - withCode.totalCosts).toBe(7_500 - LEGAL_CONSTANTS.landRegistryServiceFeeTry.value);
+  });
+
+  it("DATED_LEGAL_KEYS listesindeki her sabit bir hesaplayıcı çıktısını değiştirir (liste yalan söylemez)", async () => {
+    const { DATED_LEGAL_KEYS } = await import("./index");
+    const { purchaseRatesFromLegal } = await import("@/lib/purchase-costs");
+    const { computeSellerProceeds } = await import("@/lib/seller-proceeds");
+    const base = purchaseRatesFromLegal();
+    // Satıcı tarafı: 5 yıl içinde, yüksek kazanç, ÜFE eşiği üstü, DKV eşiğine yakın satış.
+    const sellerInput = { salePrice: 20_000_000, acquisitionPrice: 2_000_000, holdingMonths: 30, ufeIncreasePct: 12 };
+    const sellerBase = JSON.stringify(computeSellerProceeds(sellerInput));
+    for (const k of DATED_LEGAL_KEYS) {
+      const v = { [k]: LEGAL_CONSTANTS[k].value * 3 + 7 };
+      const purchaseChanged = JSON.stringify(purchaseRatesFromLegal(v)) !== JSON.stringify(base);
+      const sellerChanged = JSON.stringify(computeSellerProceeds({ ...sellerInput, legal: v })) !== sellerBase;
+      expect(purchaseChanged || sellerChanged, k).toBe(true);
+    }
+  });
+
+  it("hesaplayıcı sayfaları değerleri sunucuda okuyup istemciye geçirir", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const f of ["src/app/app/hesaplayici/seller-view.tsx", "src/app/app/hesaplayici/calculator-view.tsx"]) {
+      expect(readFileSync(f, "utf8"), f).toMatch(/getEffectiveLegalValues\(\)/);
+    }
+  });
+});
