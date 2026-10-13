@@ -15,7 +15,8 @@ function sources(dir: string): string[] {
 
 describe("mega menü sözleşmesi", () => {
   const home = [readFileSync(join(root, "src/app/page.tsx"), "utf8"), ...sources(join(root, "src/components/marketing"))].join("\n");
-  const fiyatlar = readFileSync(join(root, "src/app/fiyatlar/page.tsx"), "utf8");
+  // /fiyatlar görünümü src/lib/pricing-page/view.tsx'te (personel önizlemesiyle ortak); rota dosyası onu çizer.
+  const fiyatlar = ["src/app/fiyatlar/page.tsx", "src/lib/pricing-page/view.tsx"].map((f) => readFileSync(join(root, f), "utf8")).join("\n");
 
   it("dört grup var ve her grupta öne çıkan kart ile en az bir bağlantı bulunur", () => {
     expect(MARKETING_NAV.map((g) => g.id)).toEqual(["urun", "cozum", "kaynak", "fiyat"]);
