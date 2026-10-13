@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
+import { SoftLink as Link } from "@/components/ui/soft-link";
 import { AlertTriangle, LayoutDashboard, RotateCcw, ShieldCheck } from "lucide-react";
 import { reportClientError } from "@/app/actions/report-error";
 
