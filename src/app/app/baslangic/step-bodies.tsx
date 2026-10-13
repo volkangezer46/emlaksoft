@@ -19,6 +19,10 @@ import { TeamStep } from "./team-step";
 import { TitleForm } from "./you-step";
 import { GiderlerKasaStep } from "./steps/giderler-kasa-step";
 import { MulkYonetimiStep } from "./steps/mulk-yonetimi-step";
+import { YetkiBelgesiStep } from "./steps/yetki-belgesi-step";
+import { EidsForwardingGuide } from "@/components/eids/forwarding-guide";
+import { EidsLegalNote } from "@/components/eids/legal-note";
+import { EIDS_HELP_HREF, EIDS_MAILBOX_SETTINGS_HREF } from "@/lib/eids/links";
 import { getTenantModuleState } from "@/lib/modules/state";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
@@ -89,6 +93,40 @@ async function YouBody(p: StepBodyProps) {
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function YetkiBelgesiBody(p: StepBodyProps) {
+  return <YetkiBelgesiStep canEdit={p.canEditSettings} nextHref={p.nextHref} licenseNo={p.profile.facts.licenseNo} />;
+}
+
+/**
+ * "Bakanlık e-postalarını EmlakSoft'a ilet": sağlayıcı sekmeli kılavuz. Alma adresi Ayarlar > Entegrasyonlar kartında
+ * üretilir (EP3); burada adres yerine yer tutucu yazılır ve karta bağlantı verilir. Atlanabilir; tamamlanana kadar
+ * ana ekran Başlangıç kartı adımı hatırlatır.
+ */
+function EidsEpostaBody(p: StepBodyProps) {
+  if (!p.canEditSettings) {
+    return <Alert tone="info">İletme kuralını Bakanlık e-postalarının geldiği kutunun sahibi kurar (genelde ofis sahibi). Bu adımı atlayabilirsin.</Alert>;
+  }
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-text-muted">
+        Malik e-Devlet&apos;te yetki verince ya da iptal edince Bakanlık bir e-posta gönderebilir. Posta kutunda yalnız bu göndericiyi
+        EmlakSoft&apos;a ileten bir kural kurarsan portföy eşleşir ve gerekli görev kendiliğinden açılır. Şimdi kuramıyorsan atla;
+        tamamlanana kadar Başlangıç kartında hatırlatılır.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <ButtonLink href={EIDS_MAILBOX_SETTINGS_HREF} variant="secondary" iconRight={ExternalLink}>
+          Alma adresimi göster
+        </ButtonLink>
+        <ButtonLink href={EIDS_HELP_HREF} variant="ghost">
+          Kılavuzun tamamı
+        </ButtonLink>
+      </div>
+      <EidsForwardingGuide address={null} />
+      <EidsLegalNote variant="compact" />
     </div>
   );
 }
@@ -180,10 +218,12 @@ async function PlanBody(p: StepBodyProps) {
  */
 export const STEP_BODIES: Partial<Record<OnboardingStepId, StepBody>> = {
   office: OfficeBody,
+  "yetki-belgesi": YetkiBelgesiBody,
   you: YouBody,
   team: TeamBody,
   pool: PoolBody,
   portals: PortalsBody,
+  "eids-eposta": EidsEpostaBody,
   "giderler-kasa": GiderlerKasaBody,
   "mulk-yonetimi": MulkYonetimiBody,
   plan: PlanBody,

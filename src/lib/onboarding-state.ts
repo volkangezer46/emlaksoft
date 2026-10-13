@@ -61,6 +61,13 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       supabase.from("advisor_regions").select("id", { count: "exact", head: true }).eq("is_sample", false),
       // Mülk yönetimi sorusu: rentals modül satırı varsa cevaplanmıştır (RLS kiracı sınırı).
       supabase.from("tenant_modules").select("module_key", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("module_key", "rentals"),
+      // Bakanlık (EİDS) e-postaları adımı: etkin alma adresine en az bir e-posta ulaştı mı (EP3 tablosu; yoksa hata = adım bitmedi).
+      supabase
+        .from("eids_inbound_addresses")
+        .select("tenant_id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .is("revoked_at", null)
+        .not("last_received_at", "is", null),
     ]),
     supabase
       .from("tenants")
@@ -94,7 +101,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const appointments = results[9].count ?? 0;
   const customDefinitions = results[5].count ?? 0;
 
-  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes, rentalsModRes] = optional;
+  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes, rentalsModRes, eidsMailRes] = optional;
   const title = String((titleRes.error ? null : (titleRes.data as { title?: string | null } | null)?.title) ?? "").trim();
   const specCount = specRes.error ? 0 : (specRes.count ?? 0);
   const regionCount = regionRes.error ? 0 : (regionRes.count ?? 0);
@@ -103,6 +110,8 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const extra: Record<string, boolean> = {
     "giderler-kasa": (!cashAccRes.error && (cashAccRes.count ?? 0) > 0) || (!ruleRes.error && (ruleRes.count ?? 0) > 0),
     "mulk-yonetimi": !rentalsModRes.error && (rentalsModRes.count ?? 0) > 0,
+    "yetki-belgesi": Boolean(profile.facts.licenseNo?.trim()),
+    "eids-eposta": !eidsMailRes.error && (eidsMailRes.count ?? 0) > 0,
   };
 
   const facts: OnboardingFacts = {

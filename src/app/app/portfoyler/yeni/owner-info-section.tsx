@@ -7,6 +7,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { EmailInput } from "@/components/ui/email-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { OwnerAuthorityHelp } from "@/components/eids/owner-authority-help";
 import {
   AUTHORIZATION_TYPES,
   COMMISSION_KINDS,
@@ -23,7 +24,16 @@ const H = "mb-3 text-sm font-semibold text-ink-950";
  * Sahip ya mevcut müşteriden seçilir ya da yeni müşteri olarak açılır; kayıt `createProperty` içinde müşteri kaydına bağlanır.
  * Kimlik/vergi numarası BİLEREK toplanmaz (veri minimizasyonu). Zorunlu alanlar eksikse ilan taslak kalır, yayına alınamaz.
  */
-export function OwnerInfoSection({ poolEnabled, prefill }: { poolEnabled: boolean; prefill?: { name: string; phone: string } }) {
+export function OwnerInfoSection({
+  poolEnabled,
+  prefill,
+  office,
+}: {
+  poolEnabled: boolean;
+  prefill?: { name: string; phone: string };
+  /** Maliğe hazır EİDS mesajı için ofis adı ve yetki belge numarası (boşsa mesajda yer tutucu + Ayarlar bağlantısı). */
+  office?: { name: string; licenseNo: string | null };
+}) {
   // Sahibinden ilan adayından geliyorsa ad/telefon hazır: "Yeni müşteri" modu açık başlar.
   const [mode, setMode] = useState<"existing" | "new">(prefill ? "new" : "existing");
 
@@ -127,6 +137,7 @@ export function OwnerInfoSection({ poolEnabled, prefill }: { poolEnabled: boolea
           <FormField label="Yetki belgesi no (EİDS taşınmaz numarası)" htmlFor="eids-property-no" hint="Mal sahibi e-Devlet EİDS’te yetkiyi onaylayınca üretilir; portal ilanı bu numarayla yayınlanır. Yetki en az 3 ay olmalıdır. Resmî doğrulama değildir." className="sm:col-span-2">
             <FormInput id="eids-property-no" name="eids_property_no" maxLength={40} autoComplete="off" placeholder="Numara (isteğe bağlı)" />
           </FormField>
+          {office ? <OwnerAuthorityHelp officeName={office.name} licenseNo={office.licenseNo} ownerName={prefill?.name} /> : null}
           <FormField label="Minimum fiyat" htmlFor="min-price" hint="Sahibin kabul edeceği en düşük fiyat; liste fiyatını aşamaz.">
             <FormInput id="min-price" name="min_price" inputMode="decimal" placeholder="6.000.000" />
           </FormField>

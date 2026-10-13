@@ -15,6 +15,7 @@ import { CONTROL_BASE } from "@/components/listing-control/helpers";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { AuthorityRowActions } from "@/components/listing-control/authority-row-actions";
+import { EidsAuthorityGuideSection } from "@/components/eids/authority-guide-section";
 import { loadAuthorityQueue, type AuthorityQueueItem } from "@/lib/eids/authority-queue";
 import {
   AUTHORITY_QUEUE_FILTERS,
@@ -54,6 +55,11 @@ export default async function YetkiKuyrukPage({ searchParams }: { searchParams: 
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Yetki kuyruğu" }]}
       />
       <ControlSubNav active="yetki" closures={effectiveCanAccessModule(perms, "leak")} />
+      <Suspense fallback={null}>
+        <div className="mb-4">
+          <EidsAuthorityGuideSection tenantId={tenantId} />
+        </div>
+      </Suspense>
       <Suspense fallback={<SkeletonCard height={480} label="Yetki kuyruğu yükleniyor" />}>
         <QueueBody kova={kova} page={page} canEdit={canEdit} tenantId={tenantId} />
       </Suspense>

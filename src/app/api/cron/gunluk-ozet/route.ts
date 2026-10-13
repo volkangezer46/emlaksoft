@@ -7,6 +7,7 @@ import { officeDigestDefault, wantsDigest } from "@/lib/digest-prefs";
 import { runControlReportDelivery } from "@/lib/listing-control/server/report-delivery";
 import { getDisabledModulesByTenant, isDisabledFor, tenantsDisabledFor } from "@/lib/modules/state";
 import { runLeagueDailyForTenant } from "@/lib/league/daily";
+import { runLicenseSetupTasks } from "@/lib/eids/license-setup";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 
@@ -140,13 +141,24 @@ async function run(req: NextRequest) {
     console.error("gunluk-ozet lig", e);
   }
 
+  // EİDS (EP5): yetki belgesi no boş ofislerde sahibine tek seferlik kurulum görevi (ayrık adım; özet işini bozmaz).
+  let licenseTasks = 0;
+  try {
+    const r = await runLicenseSetupTasks(admin, tenants.map((t) => t.id), Date.now());
+    licenseTasks = r.opened;
+    failed += r.failed;
+  } catch (e) {
+    console.error("gunluk-ozet yetki belgesi görevi", e);
+    failed += 1;
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 
