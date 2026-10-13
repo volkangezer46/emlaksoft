@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { validateJsonLd } from "@/lib/seo/jsonld";
+import { STATIC_PUBLIC_PATHS } from "@/lib/site-menu/known-routes";
 import { guidePageJsonLd } from "./jsonld";
 import { escapeXml, renderGuideRss } from "./rss";
 import { GUIDE_CATEGORIES, THIN_CONTENT_WORDS, emptyGuide, validateGuide, type GuideContent, type GuideIndexEntry } from "./schema";
-import { guideSitemapEntries } from "./sitemap";
+import { guideHubSitemapEntries, guideSitemapEntries } from "./sitemap";
 import { checkGuideSlug, toGuideSlug } from "./slug";
 import type { PublishedGuide } from "./store";
 import { guideExtraMetadata, guideHubMetadata, relatedGuides } from "./view";
@@ -120,6 +123,22 @@ describe("sitemap", () => {
     expect(guideSitemapEntries(BASE, guides)).toEqual([
       { url: `${BASE}/rehber/emlak-komisyonu-nasil-hesaplanir`, lastModified: "2026-10-10T09:00:00.000Z", changeFrequency: "monthly", priority: 0.6 },
     ]);
+  });
+
+  it("liste ve kategori sayfaları yalnız indekslenebilir yazı varken girer; lastmod içindeki en yeni yazı", () => {
+    expect(guideHubSitemapEntries(BASE, guides)).toEqual([
+      { url: `${BASE}/rehber`, lastModified: "2026-10-10T09:00:00.000Z", changeFrequency: "weekly", priority: 0.6 },
+      { url: `${BASE}/rehber/kategori/${sampleEntry().category}`, lastModified: "2026-10-10T09:00:00.000Z", changeFrequency: "weekly", priority: 0.5 },
+    ]);
+    expect(guideHubSitemapEntries(BASE, guides.slice(1))).toEqual([]);
+  });
+
+  it("S5: sitemap yükleyicisi rehber girdilerini ve vitrin dışlamalarını kullanır; /rehber bilinen herkese açık yol", () => {
+    const src = readFileSync(join(process.cwd(), "src/lib/seo/sitemap-data.ts"), "utf8");
+    expect(src).toContain("listGuideSitemapEntries(base)");
+    expect(src).toContain("loadVitrinSitemapExclusions(admin)");
+    expect(src).toContain("GUIDES_CACHE_TAG");
+    expect(STATIC_PUBLIC_PATHS as readonly string[]).toContain("/rehber");
   });
 
   it("ince içerik noindex; yayında indekslenebilir yazı yokken /rehber noindex", () => {

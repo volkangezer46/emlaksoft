@@ -10,7 +10,7 @@ import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { isOpen, runSchedule, type ScheduleAdapters } from "@/lib/publishing/schedule";
 import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { commitEntry, freshEntry, readScheduleStrict } from "@/lib/publishing/store";
-import { surfaceById } from "@/lib/publishing/surfaces";
+import { resolveSurface, surfaceById, type PublishSurface } from "@/lib/publishing/surfaces";
 
 /**
  * YAYIN ZAMANLAYICI (5 dakikada bir): yayın masasında zamanlanan taslakları publishAt'te canlıya alır,
@@ -32,30 +32,37 @@ async function run(req: NextRequest) {
     return NextResponse.json({ ok: true, published: 0, reverted: 0 });
   }
 
+  // Yüzeyler koşu başında çözülür: sabit yüzeyler + rehber yazıları (`guide:<id>`, S5 dikişi). Rehber listesi o an
+  // okunamazsa yazı yüzeyi geçici olarak bilinmez: kayıt iptal edilmez, sonraki koşu yeniden dener.
+  const resolved = new Map<string, PublishSurface | null>();
+  for (const id of new Set(open.map((e) => e.surface))) resolved.set(id, await resolveSurface(id).catch(() => null));
+  const surfaceOf = (id: string) => resolved.get(id) ?? surfaceById(id);
+  const unknownIsPermanent = (id: string) => !id.startsWith("guide:");
+
   const touched = new Set<string>();
   const adapters: ScheduleAdapters = {
     fresh: (id) => freshEntry(id),
     commit: (entry) => commitEntry(entry, entry.by),
     async readLive(surface) {
-      const s = surfaceById(surface);
+      const s = surfaceOf(surface);
       if (!s) throw new Error(`bilinmeyen yüzey: ${surface}`);
       // Sıkı okuma: hata fırlar -> runSchedule 'failed' sayar, sonraki koşu yeniden dener. Gevşek okuma (hata = null)
       // yayında prevLive'ı kalıcı olarak "kod varsayılanı" yakalar, bitişte kaydı yanlışlıkla "araya elle yayın girdi" iptal ederdi.
       return s.readLiveStrict();
     },
     async publish(surface, cfg, entry, kind) {
-      const s = surfaceById(surface);
-      if (!s) return { ok: false, error: "Bilinmeyen yüzey.", permanent: true };
+      const s = surfaceOf(surface);
+      if (!s) return { ok: false, error: "Bilinmeyen yüzey.", permanent: unknownIsPermanent(surface) };
       const label = kind === "yayin" ? `Zamanlı yayın: ${entry.label}` : `Zamanlı yayın bitti: ${entry.label}`;
       return s.publish(cfg, entry.by, label, entry.byName || "Yayın zamanlayıcı", { keepDraft: true });
     },
     async resetToDefault(surface, entry) {
-      const s = surfaceById(surface);
-      if (!s) return { ok: false, error: "Bilinmeyen yüzey.", permanent: true };
+      const s = surfaceOf(surface);
+      if (!s) return { ok: false, error: "Bilinmeyen yüzey.", permanent: unknownIsPermanent(surface) };
       return s.resetToDefault(entry.by, entry.byName || "Yayın zamanlayıcı", { keepDraft: true });
     },
     revalidate(surface) {
-      const s = surfaceById(surface);
+      const s = surfaceOf(surface);
       if (!s) return;
       touched.add(s.id);
       // Bayat içerik sunulmasın: bir sonraki istek taze okur (statik ana sayfa 60 sn içinde kaynaktan yeniler).
@@ -64,7 +71,7 @@ async function run(req: NextRequest) {
       revalidatePath("/admin/site");
     },
     async notify(entry, kind) {
-      const s = surfaceById(entry.surface);
+      const s = surfaceOf(entry.surface);
       await notifyPlatformStaff({
         title: kind === "yayin" ? "Zamanlı yayın yapılamadı" : "Zamanlı yayın bitişinde geri dönülmedi",
         body: `${s?.label ?? entry.surface} · "${entry.label}": ${entry.note}. Canlı sürüm olduğu gibi bırakıldı.`,
@@ -92,7 +99,7 @@ async function run(req: NextRequest) {
     await Promise.race([
       Promise.all(
         [...touched].map((id) => {
-          const s = surfaceById(id);
+          const s = surfaceOf(id);
           return s ? runAfterPublish({ surface: s.id, kind: "publish", livePaths: s.livePaths.map((p) => p.path), actorId: null, source: "cron" }) : null;
         }),
       ),

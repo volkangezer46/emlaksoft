@@ -15,6 +15,7 @@ import {
   readAdminState as readMenuState,
   resetToDefault as resetMenuToDefault,
 } from "@/lib/site-menu/store";
+import type { GuidePublishSurface } from "@/lib/guides/publish-surface";
 import { seoPublishSurface } from "@/lib/seo/publish-surface";
 import { createVersionedStore, type HistoryEntry, type StoreResult } from "@/lib/versioned-config/store";
 import { hashOf, type ScheduleWriteResult } from "./schedule";
@@ -25,7 +26,7 @@ import { hashOf, type ScheduleWriteResult } from "./schedule";
  * Yeni yüzey = SURFACES'e bir giriş (site menüsü, site içeriği, SEO sayfa ayarları; ör. marka sonraki turda).
  */
 
-export type SurfaceId = "sitecontent" | "sitemenu" | "seo";
+export type SurfaceId = "sitecontent" | "sitemenu" | "seo" | `guide:${string}`;
 
 export type SurfaceState = {
   live: unknown | null;
@@ -215,8 +216,50 @@ const seoPages: PublishSurface = {
   restore: (historyId, staffId, by) => seoPublishSurface.restore(historyId, staffId, by),
 };
 
+/**
+ * Sabit yüzeyler (toplu yayın ve Otopilot YALNIZ bunları yayınlar). Rehber yazıları yazı başına DİNAMİK yüzeydir
+ * (`guide:<id>`): Yayın masasında zamanlanır, önizlenir, hemen yayınlanır ve sürüme dönülür; ama "tümünü yayınla"
+ * ve Otopilot onlara dokunmaz (yayına hazır olmayan yazı toplu yayınla canlıya çıkmasın).
+ */
 export const SURFACES: readonly PublishSurface[] = [siteMenu, siteContent, seoPages];
 
 export function surfaceById(id: string): PublishSurface | null {
   return SURFACES.find((s) => s.id === id) ?? null;
+}
+
+const GUIDE_SURFACE_RE = /^guide:([a-f0-9]{12})$/;
+
+export const guideSurfaceId = (guideId: string): SurfaceId => `guide:${guideId}`;
+
+function asGuideSurface(g: GuidePublishSurface): PublishSurface {
+  const { surfaceId: _s, guideId, ...rest } = g;
+  return { ...rest, id: guideSurfaceId(guideId) };
+}
+
+/** Kimlikten yüzey: sabit yüzeyler ya da rehber yazısı (`guide:<id>`; liste okunamazsa ya da yazı yoksa null). */
+export async function resolveSurface(id: string): Promise<PublishSurface | null> {
+  const fixed = surfaceById(id);
+  if (fixed) return fixed;
+  const m = GUIDE_SURFACE_RE.exec(id);
+  if (!m) return null;
+  const { guidePublishSurfaceById } = await import("@/lib/guides/publish-surface");
+  const g = await guidePublishSurfaceById(m[1]!);
+  return g ? asGuideSurface(g) : null;
+}
+
+/**
+ * Yayın masasında listelenecek rehber yazıları: bekleyen taslağı olabilecekler (son kayıt yayından yeni ya da hiç
+ * yayınlanmamış, arşiv değil) ve açık zamanlaması olanlar; en yeni 20. Asıl "taslak var mı" kararı masada state ile verilir.
+ */
+export async function deskGuideSurfaces(scheduledIds: readonly string[] = []): Promise<PublishSurface[]> {
+  const [{ readGuideIndexState }, { guidePublishSurface }] = await Promise.all([import("@/lib/guides/store"), import("@/lib/guides/publish-surface")]);
+  const read = await readGuideIndexState();
+  if (!read.ok) return [];
+  const wanted = new Set(scheduledIds.map((s) => GUIDE_SURFACE_RE.exec(s)?.[1]).filter((x): x is string => Boolean(x)));
+  const pending = (e: (typeof read.list)[number]) => e.status !== "arsiv" && (!e.publishedAt || Date.parse(e.updatedAt) > Date.parse(e.publishedAt));
+  return read.list
+    .filter((e) => wanted.has(e.id) || pending(e))
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .slice(0, 20)
+    .map((e) => asGuideSurface(guidePublishSurface(e)));
 }

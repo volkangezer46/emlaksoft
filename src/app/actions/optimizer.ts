@@ -11,7 +11,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { HOOKS, captureLiveDigests, lastBaseline, runAfterPublish } from "@/lib/publishing/after-publish";
 import { diffJson, moreLabel, previewValue, type DiffKind } from "@/lib/publishing/diff";
 import { hashOf } from "@/lib/publishing/schedule";
-import { SURFACES, surfaceById } from "@/lib/publishing/surfaces";
+import { SURFACES, resolveSurface, surfaceById } from "@/lib/publishing/surfaces";
 import { AUTOPILOT_KINDS, type AutopilotSettings } from "@/lib/site-issues/autopilot";
 import { readAutopilot, writeAutopilot } from "@/lib/site-issues/autopilot-server";
 import { syncSiteIssues, type SyncStep } from "@/lib/site-issues/collectors";
@@ -293,7 +293,7 @@ export async function recheckLive(surfaceId: string): Promise<OptimizerResult & 
   const g = await gate(false);
   if ("error" in g) return { error: g.error };
   const parsed = surfaceSchema.safeParse(surfaceId);
-  const s = parsed.success ? surfaceById(parsed.data) : null;
+  const s = parsed.success ? await resolveSurface(parsed.data) : null;
   if (!s) return { error: "Bilinmeyen yüzey." };
   const rl = await checkRateLimit(`optimizer-verify:${g.staff.id}`, { limit: 30, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: TOO_FAST };

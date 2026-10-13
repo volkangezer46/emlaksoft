@@ -8,6 +8,9 @@ import { SEO_CACHE_TAG, getSeoSettings } from "./store";
 import { resolveOptInSlugs } from "@/lib/vitrin-settings-logic";
 import { sitePageSitemapEntries } from "@/lib/site-pages/metadata";
 import { listPublishedSitePages } from "@/lib/site-pages/store";
+import { listGuideSitemapEntries } from "@/lib/guides/sitemap";
+import { GUIDES_CACHE_TAG } from "@/lib/guides/store";
+import { loadVitrinSitemapExclusions } from "@/lib/vitrin-seo/store";
 
 /**
  * Sitemap veri yükleyici (sunucu). Kurallar:
@@ -16,6 +19,8 @@ import { listPublishedSitePages } from "@/lib/site-pages/store";
  *    anahtarına bağlı). Robot denetimi sitemap'i taradığı için onları kendiliğinden kapsar.
  *  - Vitrin ofisi/ilanı/danışman: yalnız aktif ofis + (varsayılan) opt-in verenler. Opt-in TEK kaynağı ofisin
  *    kendi ayarıdır (tenants.vitrin_seo_optin, /app/ayarlar/vitrin); sütun yoksa eski elle slug listesi geçerli kalır.
+ *    Kalıcı noindex listesindeki ve örnek veri taşıyan ofisler girmez (vitrin-seo/store.ts).
+ *  - Rehber: yayındaki indekslenebilir yazılar ve liste/kategori sayfaları (guides/sitemap.ts).
  *  - İlanlar: yalnız status=live, silinmemiş, is_sample=false. Token'lı portallar HİÇ girmez.
  *  - lastModified: yalnız gerçek updated_at; yoksa alan yazılmaz (sahte "bugün" yok).
  * Veritabanı yoksa/başarısızsa statik kısım yine döner (sitemap kırılmaz).
@@ -49,7 +54,7 @@ const iso = (v: unknown): string | undefined => {
 
 async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string; maxPerSitemap: number }> {
   const base = getBaseUrl();
-  const [settings, sitePages] = await Promise.all([getSeoSettings(), listPublishedSitePages()]);
+  const [settings, sitePages, guideEntries] = await Promise.all([getSeoSettings(), listPublishedSitePages(), listGuideSitemapEntries(base)]);
   // Gerçek lastmod: yayın yüzeylerinin son CANLI geçmiş girdisi (sitecontent -> "/", pricingpage -> "/fiyatlar",
   // sayfa oluşturucu -> kendi slug'ı). Tek sorgu; okunamazsa boş (lastmod yazılmaz, sahte "bugün" yok).
   const historyKeys = [PUBLISH_HISTORY_KEYS.home, PUBLISH_HISTORY_KEYS.pricing, ...sitePages.map((p) => `sitepage.${p.id}.history`)];
@@ -65,6 +70,8 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
     const withPublishTime = sitePages.map((p) => ({ ...p, updatedAt: historyHeadAt(histories[`sitepage.${p.id}.history`]) ?? "" }));
     entries.push(...sitePageSitemapEntries(base, withPublishTime));
   }
+  // Rehber (S5): yayındaki indekslenebilir yazılar + liste/kategori sayfaları; lastmod = gerçek yayın zamanı.
+  entries.push(...guideEntries);
 
   if (sm.vitrinOffices || sm.vitrinListings || sm.advisors) {
     try {
@@ -105,10 +112,12 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
       const vitrinClosedIds = new Set<string>(
         closedRes.error ? [] : ((closedRes.data ?? []) as unknown as { id: string }[]).map((r) => String(r.id)),
       );
+      // Kalıcı noindex listesi ve örnek veri kiracıları (vitrin SEO, SP7): sayfaları noindex'tir, sitemap'e girmez.
+      const vitrinExcluded = await loadVitrinSitemapExclusions(admin).catch(() => (_slug: string) => false);
       const included = new Map<string, string>(); // tenant_id -> slug
       for (const t of tenants ?? []) {
         const slug = typeof t.slug === "string" ? t.slug : "";
-        if (!slug || !tenantInSitemap(smEff, slug)) continue;
+        if (!slug || !tenantInSitemap(smEff, slug) || vitrinExcluded(slug)) continue;
         if (vitrinClosedIds.has(String(t.id))) continue;
         included.set(String(t.id), slug);
         if (sm.vitrinOffices) {
@@ -173,7 +182,8 @@ export const getSitemapChunks = unstable_cache(
     return { chunks: chunkEntries(entries, maxPerSitemap), generatedAt, total: entries.length };
   },
   ["seo-sitemap-v1"],
-  { tags: [SEO_CACHE_TAG, SITEMAP_CACHE_TAG], revalidate: 1800 },
+  // Rehber yayını `guides` etiketini düşürür: yeni yazı sitemap'e 30 dk beklemeden girer.
+  { tags: [SEO_CACHE_TAG, SITEMAP_CACHE_TAG, GUIDES_CACHE_TAG], revalidate: 1800 },
 );
 
 /** Önbelleksiz (robot ve admin önizleme). */
