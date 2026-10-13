@@ -24,7 +24,8 @@ import {
   ArrowLeftRight,
   PieChart,
 } from "lucide-react";
-import dynamic from "next/dynamic";
+// Harita (ağır client komponenti, yalnız ?gorunum=harita): dynamic() istemci sarmalayıcıda → ayrı parça.
+import { MapView } from "./map-view-lazy";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { loadPortfolioCounts, portfolioCountsKnownMissing } from "@/lib/supabase/count-rpcs";
@@ -80,11 +81,6 @@ import { isClosedListing } from "@/lib/closed-listing";
 
 export const metadata = { title: "Portföyler" };
 
-// Harita ağır bir client komponenti ve yalnız ?gorunum=harita'da görünür —
-// dynamic import ile liste görünümünün ilk yükünden çıkarılır (ayrı chunk).
-const MapView = dynamic(() => import("./map-view").then((m) => m.MapView), {
-  loading: () => <div className="h-[520px] animate-pulse rounded-[var(--radius-panel)] border border-line bg-ink-950/8" />,
-});
 
 type PropertyRow = {
   id: string;

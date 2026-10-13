@@ -78,13 +78,14 @@ type MenuMount = { Menu: ComponentType<CustomerRowMenuProps>; open: boolean; foc
 export function CustomerRowMore({
   customerId,
   name,
-  phone,
+  waMsisdn,
   canEdit,
   canDelete,
 }: {
   customerId: string;
   name: string;
-  phone: string | null;
+  /** WhatsApp numarası (sunucuda `toWhatsAppMsisdn`; telefon kuralları istemci paketine girmez); yoksa null. */
+  waMsisdn: string | null;
   canEdit: boolean;
   canDelete: boolean;
 }) {
@@ -122,7 +123,7 @@ export function CustomerRowMore({
         defaultOpen={mounted.open}
         focusTrigger={mounted.focus}
         onPortal={(el) => {
-          setPortalTarget({ id: customerId, name, phone });
+          setPortalTarget({ id: customerId, name, waMsisdn });
           openPanel(el);
         }}
         onDelete={() => {

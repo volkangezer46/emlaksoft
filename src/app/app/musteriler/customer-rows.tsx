@@ -1,4 +1,5 @@
 import { Eye, MessageCircle, Phone } from "lucide-react";
+import { toWhatsAppMsisdn } from "@/lib/phone";
 import { SpriteIcon } from "@/components/ui/icon-sprite";
 import { IntentLink } from "@/components/app/intent-link";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -202,7 +203,7 @@ export function CustomerTable({
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} />
                     {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
                     {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
-                    <CustomerRowMore customerId={c.id} name={c.name} phone={c.phone} canEdit={canEdit} canDelete={canDelete} />
+                    <CustomerRowMore customerId={c.id} name={c.name} waMsisdn={toWhatsAppMsisdn(c.phone) || null} canEdit={canEdit} canDelete={canDelete} />
                   </RowActions>
                 </TD>
               </TR>

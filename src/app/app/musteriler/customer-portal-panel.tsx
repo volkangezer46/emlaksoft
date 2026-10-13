@@ -6,7 +6,6 @@ import { createCustomerPortalToken } from "@/app/actions/customer-portal";
 import { ResultPanel, WA_CUSTOMER } from "@/components/app/portal-link-dialog";
 import { Button } from "@/components/ui/button";
 import { InlinePanel, useInlinePanel } from "@/components/ui/inline-panel";
-import { toWhatsAppLink } from "@/lib/phone";
 
 /**
  * Müşteri portalı linki — sayfa içi panel (popup değil).
@@ -15,7 +14,13 @@ import { toWhatsAppLink } from "@/lib/phone";
  */
 export const CUSTOMER_PORTAL_PANEL_ID = "musteri-portali-linki";
 
-type Target = { id: string; name: string; phone: string | null };
+/** `waMsisdn`: sunucuda hesaplanan WhatsApp numarası (`toWhatsAppMsisdn`, customer-rows.tsx); yoksa null. */
+type Target = { id: string; name: string; waMsisdn: string | null };
+
+/** `toWhatsAppLink(phone, mesaj)` ile birebir aynı bağlantı; numara sunucudan geldiği için telefon kuralları istemciye inmez. */
+function waLink(msisdn: string | null, message: string): string | null {
+  return msisdn ? `https://wa.me/${msisdn}?text=${encodeURIComponent(message)}` : null;
+}
 
 let target: Target | null = null;
 const listeners = new Set<() => void>();
@@ -49,7 +54,7 @@ function PanelBody({ customer }: { customer: Target }) {
   return (
     <div className="space-y-4 p-4 md:p-6">
       {url ? (
-        <ResultPanel url={url} waHref={toWhatsAppLink(customer.phone, WA_CUSTOMER(customer.name, url))} onReset={close} />
+        <ResultPanel url={url} waHref={waLink(customer.waMsisdn, WA_CUSTOMER(customer.name, url))} onReset={close} />
       ) : (
         <div className="space-y-3">
           <p className="max-w-2xl text-sm leading-relaxed text-text-muted">
