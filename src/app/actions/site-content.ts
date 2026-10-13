@@ -12,6 +12,7 @@ import { hasErrors, validateSiteContent, type SiteContent } from "@/lib/site-con
 import { SITE_CONTENT_CACHE_TAG, siteContentStore } from "@/lib/site-content/store";
 import { listSiteMediaIds } from "@/lib/site-media/store";
 import { mediaRefs } from "@/lib/site-media/usage";
+import { syncSiteMediaUsage } from "@/lib/site-media/usage-server";
 
 export type SiteContentActionResult = { ok?: boolean; error?: string; issues?: Issue[]; config?: SiteContent };
 
@@ -63,6 +64,7 @@ export async function saveSiteContentDraft(input: unknown): Promise<SiteContentA
     entityId: "draft",
     meta: { faq: config.faq.length, warnings: issues.length },
   });
+  await syncSiteMediaUsage();
   refreshAdmin();
   return { ok: true, issues, config };
 }
@@ -85,6 +87,7 @@ export async function publishSiteContent(label: string): Promise<SiteContentActi
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.publish", entityType: "site_content", entityId: entry.id, meta: { label: note } });
+  await syncSiteMediaUsage();
   refreshLive();
   return { ok: true, issues };
 }
@@ -98,6 +101,7 @@ export async function discardSiteContentDraft(): Promise<SiteContentActionResult
   const saved = await siteContentStore.saveDraft(base, staff.id);
   if (!saved.ok) return { error: saved.error };
   await logPlatformActivity({ actorId: staff.id, action: "site_content.draft_discard", entityType: "site_content", entityId: "draft" });
+  await syncSiteMediaUsage();
   refreshAdmin();
   return { ok: true, config: base };
 }
@@ -120,6 +124,7 @@ export async function rollbackSiteContent(versionId: string): Promise<SiteConten
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.rollback", entityType: "site_content", entityId: version.id, meta: { label: version.label } });
+  await syncSiteMediaUsage();
   refreshLive();
   return { ok: true, config };
 }
@@ -135,6 +140,7 @@ export async function resetSiteContentToDefault(): Promise<SiteContentActionResu
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.reset", entityType: "site_content", entityId: "default" });
+  await syncSiteMediaUsage();
   refreshLive();
   return { ok: true, config: defaultSiteContent() };
 }

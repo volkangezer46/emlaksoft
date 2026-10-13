@@ -23,6 +23,9 @@ const h = vi.hoisted(() => {
     staff,
     store,
     contentState: { current: { live: null as unknown, draft: null as unknown } },
+    settingsFail: { current: false },
+    updateTag: vi.fn(),
+    revalidateTag: vi.fn(),
     logPlatformActivity: vi.fn(async (_x: unknown) => undefined),
     requirePlatformModule: vi.fn(async (mod: string) => {
       if (mod !== "sitecontent" || !staff.current.hasModule) throw new Error("NEXT_REDIRECT:/admin");
@@ -30,18 +33,33 @@ const h = vi.hoisted(() => {
     }),
   };
 });
-const { ID, staff, store, contentState, logPlatformActivity } = h;
+const { ID, staff, store, contentState, settingsFail, logPlatformActivity } = h;
 
 vi.mock("@/lib/platform", () => ({ requirePlatformModule: (m: string) => h.requirePlatformModule(m) }));
 vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: async () => ({ allowed: true }) }));
 vi.mock("@/lib/platform-activity", () => ({ logPlatformActivity: (x: unknown) => h.logPlatformActivity(x) }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+  updateTag: (t: string) => h.updateTag(t),
+  revalidateTag: (t: string, p: unknown) => h.revalidateTag(t, p),
+  unstable_cache: (fn: unknown) => fn,
+}));
 vi.mock("@/lib/site-content/store", () => ({
   SITE_CONTENT_CACHE_TAG: "site-content",
-  siteContentStore: { readState: async () => ({ ...h.contentState.current, history: [] }) },
+  siteContentStore: { keys: { live: "sitecontent.live", draft: "sitecontent.draft", history: "sitecontent.history" } },
+}));
+// Kullanım SIKI okunur (getPlatformSettingsMany strict): hata FIRLATIR, sessiz null dönmez.
+vi.mock("@/lib/platform-settings", () => ({
+  getPlatformSettingsMany: async (keys: string[], opts?: { strict?: boolean }) => {
+    if (!opts?.strict) throw new Error("kullanım okuması sıkı olmalı");
+    if (h.settingsFail.current) throw new Error("db down");
+    const v = h.contentState.current as Record<string, unknown>;
+    return Object.fromEntries(keys.map((k) => [k, v[k.split(".")[1]!] ? JSON.stringify(v[k.split(".")[1]!]) : null]));
+  },
 }));
 vi.mock("@/lib/site-media/store", () => ({ SITE_MEDIA_CACHE_TAG: "site-media", ...h.store }));
 
+import { POST as uploadRoute } from "../admin/site/medya/yukle/route";
 import { deleteSiteMedia, uploadSiteMedia } from "./site-media";
 
 async function form(alt = "Ofiste danışman") {
@@ -56,6 +74,9 @@ async function form(alt = "Ofiste danışman") {
 beforeEach(() => {
   staff.current = { id: "s1", role: "super_admin", hasModule: true };
   contentState.current = { live: null, draft: null };
+  settingsFail.current = false;
+  h.updateTag.mockClear();
+  h.revalidateTag.mockClear();
   for (const fn of Object.values(store)) fn.mockClear();
   logPlatformActivity.mockClear();
   store.usedBytes.mockResolvedValue(0);
@@ -101,6 +122,45 @@ describe("uploadSiteMedia", () => {
   });
 });
 
+describe("/admin/site/medya/yukle rotası (ekranların tek yükleme yolu)", () => {
+  // Next 16: updateTag rota bağlamında FIRLATIR (revalidate.js). Rota revalidateTag(..., { expire: 0 }) kullanmalı.
+  const post = (body: FormData) =>
+    uploadRoute(new Request("https://emlaksoft.com.tr/admin/site/medya/yukle", { method: "POST", body, headers: { origin: "https://emlaksoft.com.tr", host: "emlaksoft.com.tr" } }));
+
+  it("yükleme: updateTag ÇAĞRILMAZ, önbellek revalidateTag(expire 0) ile anında düşer, JSON döner", async () => {
+    h.updateTag.mockImplementation(() => {
+      throw new Error("updateTag can only be called from within a Server Action");
+    });
+    try {
+      const res = await post(await form());
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { ok?: boolean; media?: { id: string } };
+      expect(body.ok).toBe(true);
+      expect(body.media?.id).toBeTruthy();
+      expect(h.updateTag).not.toHaveBeenCalled();
+      expect(h.revalidateTag).toHaveBeenCalledWith("site-media", { expire: 0 });
+    } finally {
+      h.updateTag.mockReset();
+    }
+  }, 60_000);
+
+  it("Değiştir (rota): yayındaki içerik etiketi de revalidateTag ile düşer", async () => {
+    const f = await form();
+    f.set("replaceId", ID);
+    const res = await post(f);
+    expect(res.status).toBe(200);
+    expect(h.updateTag).not.toHaveBeenCalled();
+    expect(h.revalidateTag).toHaveBeenCalledWith("site-content", { expire: 0 });
+    expect(store.replaceSiteMediaFiles).toHaveBeenCalledOnce();
+  }, 60_000);
+
+  it("sunucu eylemi bağlamında updateTag kullanılır", async () => {
+    expect((await uploadSiteMedia(await form())).ok).toBe(true);
+    expect(h.updateTag).toHaveBeenCalledWith("site-media");
+    expect(h.revalidateTag).not.toHaveBeenCalled();
+  }, 60_000);
+});
+
 describe("deleteSiteMedia", () => {
   it("kullanımdaki (yayın ya da taslak) medya silinemez", async () => {
     contentState.current = { live: null, draft: { hero: { image: { mediaId: ID } } } };
@@ -109,6 +169,14 @@ describe("deleteSiteMedia", () => {
     expect(store.deleteSiteMediaRow).not.toHaveBeenCalled();
     contentState.current = { live: { hero: { image: { mediaId: ID } } }, draft: null };
     expect((await deleteSiteMedia(ID)).error).toMatch(/yayında/);
+  });
+
+  it("kullanım okunamazsa silme REDDEDİLİR (okunamadı = kullanılmıyor sayılmaz)", async () => {
+    settingsFail.current = true;
+    const res = await deleteSiteMedia(ID);
+    expect(res.error).toMatch(/okunamadı/);
+    expect(store.deleteSiteMediaRow).not.toHaveBeenCalled();
+    expect(store.removeVariantFiles).not.toHaveBeenCalled();
   });
 
   it("kullanılmayan medya silinir; dosyaları kaldırılır ve denetime düşer", async () => {

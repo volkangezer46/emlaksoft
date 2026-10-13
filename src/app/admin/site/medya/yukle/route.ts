@@ -1,9 +1,10 @@
-import { uploadSiteMedia } from "@/app/actions/site-media";
 import { SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
+import { runSiteMediaUpload } from "@/lib/site-media/upload";
 
 /**
  * Medya yükleme ucu (POST multipart): sunucu eylemi gövde sınırı (4 MB) 8 MB giriş için yetmediğinden dosya bu rotayla
- * gelir; tüm kapı ve iş `uploadSiteMedia` eylemindedir (sitecontent modülü + süper admin, sniff, sharp, kota, denetim).
+ * gelir; tüm kapı ve iş `runSiteMediaUpload` çekirdeğindedir (sitecontent modülü + süper admin, sniff, sharp, kota, denetim).
+ * Rota bağlamı: önbellek `revalidateTag(..., { expire: 0 })` ile yenilenir (`updateTag` rotada fırlatır).
  * Sunucu eylemlerinin köken korumasının karşılığı: Origin başlığı istek sunucusuyla aynı olmalı (CSRF).
  */
 export const dynamic = "force-dynamic";
@@ -32,6 +33,6 @@ export async function POST(request: Request) {
   } catch {
     return json({ error: "Yükleme okunamadı." }, 400);
   }
-  const res = await uploadSiteMedia(form);
+  const res = await runSiteMediaUpload(form, "route");
   return json(res, res.error ? 400 : 200);
 }

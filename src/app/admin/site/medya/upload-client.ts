@@ -1,8 +1,8 @@
-import type { SiteMediaActionResult } from "@/app/actions/site-media";
+import type { SiteMediaActionResult } from "@/lib/site-media/upload";
 
 /**
  * İstemci yükleme yardımcısı: dosya 4 MB'ı aşabildiği için sunucu eylemi yerine /admin/site/medya/yukle rotasına
- * multipart POST (kapı ve iş aynı `uploadSiteMedia` eyleminde). Medya ekranı ve site içeriği görsel seçicisi ortak kullanır.
+ * multipart POST (kapı ve iş `runSiteMediaUpload` çekirdeğinde). Medya ekranı ve site içeriği görsel seçicisi ortak kullanır.
  */
 export async function postSiteMedia(form: FormData): Promise<SiteMediaActionResult> {
   try {
