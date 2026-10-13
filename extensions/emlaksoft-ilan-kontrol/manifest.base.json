@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "EmlakSoft İlan Kontrol",
   "short_name": "EmlakSoft İlan",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Portföyünüzü portallarla eşitler: ilanları karşılaştırır, portal formunu onayınızla doldurur, ilanlarınızı EmlakSoft'a alır.",
   "minimum_chrome_version": "116",
   "permissions": ["storage", "alarms", "activeTab", "scripting"],

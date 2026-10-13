@@ -5,6 +5,7 @@
  *
  *   npm run build:extension          # tsc tip denetimi + derleme + ZIP
  *   tsx scripts/build-extension.ts --soft   # `prebuild`: hata olursa uyarır, uygulama derlemesini ENGELLEMEZ
+ *   tsx scripts/build-extension.ts --release   # MAĞAZA paketi: kural açık anahtarı (`rule-keys.ts`) boşsa HATA verir
  *
  * - `host_permissions` YALNIZ portal adaptör kayıt defterinden (`allPortalHosts()`): sahibinden/hepsiemlak/emlakjet.
  * - İçerik betiği YALNIZ EmlakSoft alanında: `emlaksoft.com.tr` + `NEXT_PUBLIC_APP_URL` host'u (varsa).
@@ -13,6 +14,8 @@
  *   bağlama ve veri yolu değişmedi: içerik betiği köprüsü + kullanıcı etkinliği).
  * - Sürüm tek kaynak: `src/lib/listing-control/worker/extension-release.ts` (manifest.base.json ile eşitliği test kilitler).
  * - Köprü sözleşmesi, hız kuralı ve ayrıştırıcılar uygulamanın `src/lib/listing-control/**` dosyalarından DOĞRUDAN derlenir.
+ * - (0.6.0) Form kuralları sunucudan İMZALI VERİ olarak gelir; motor, tohum ve açık anahtar(lar) pakettedir. `RULE_PUBLIC_KEYS` boşsa
+ *   eklenti her uzak seti reddeder ve tohumda kalır: yerel derleme uyarır, `--release` (mağaza) HATA verir. Anahtar ekleme: `docs/runbooks/PORTAL_KURALLARI.md`.
  */
 import { build } from "esbuild";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -21,6 +24,8 @@ import { join, relative, resolve } from "node:path";
 import { allPortalHosts } from "../src/lib/listing-control/adapters/html";
 import { createZip, listZipEntries, type ZipFile } from "../src/lib/listing-control/server/extension-zip";
 import { EXTENSION_PACKAGE_DIR, EXTENSION_VERSION, EXTENSION_ZIP_PREFIX, extensionZipFileName } from "../src/lib/listing-control/worker/extension-release";
+import { FORM_RULES_ENGINE, FORM_RULES_FORMAT } from "../src/lib/portal-transfer/rule-format";
+import { RULE_PUBLIC_KEYS } from "../src/lib/portal-transfer/rule-keys";
 
 const ROOT = resolve(__dirname, "..");
 const EXT = join(ROOT, "extensions", "emlaksoft-ilan-kontrol");
@@ -29,6 +34,20 @@ const DIST = join(EXT, "dist");
 const RELEASE = join(EXT, "release");
 const PUBLIC_DOWNLOADS = join(ROOT, EXTENSION_PACKAGE_DIR);
 const DEFAULT_APP_ORIGIN = "https://emlaksoft.com.tr";
+const RELEASE_BUILD = process.argv.includes("--release");
+
+/**
+ * Kural imza anahtarı kapısı: açık anahtar yoksa uzak kural seti hiç kabul edilmez (eklenti tohumda kalır). Yerel/önizleme
+ * derlemesi bunu UYARI olarak geçer; mağaza paketi (`--release`) anahtarsız ÇIKMAZ (sonradan anahtar eklemek yeni inceleme ister).
+ */
+function ruleKeyIds(): string[] {
+  const kids = Object.keys(RULE_PUBLIC_KEYS);
+  if (kids.length > 0) return kids;
+  const msg = "RULE_PUBLIC_KEYS boş (src/lib/portal-transfer/rule-keys.ts): eklenti uzak form kurallarını reddeder, yalnız tohumla doldurur.";
+  if (RELEASE_BUILD) throw new Error(`${msg} Mağaza paketi anahtarsız üretilmez: docs/runbooks/PORTAL_KURALLARI.md §1.`);
+  console.warn(`UYARI: ${msg}`);
+  return kids;
+}
 
 function appOrigins(): string[] {
   const out = new Set<string>([DEFAULT_APP_ORIGIN]);
@@ -52,6 +71,7 @@ function walk(dir: string): string[] {
 }
 
 async function main() {
+  const ruleKids = ruleKeyIds();
   const origins = appOrigins();
   rmSync(DIST, { recursive: true, force: true });
   mkdirSync(DIST, { recursive: true });
@@ -108,12 +128,13 @@ async function main() {
 
   console.log(`Eklenti derlendi: ${DIST}`);
   console.log(`  sürüm: ${EXTENSION_VERSION} · ZIP: ${join(RELEASE, zipName)} (${zip.length} bayt, sha256 ${sha256.slice(0, 12)}…)`);
+  console.log(`  kural formatı: ${FORM_RULES_ENGINE} (format ${FORM_RULES_FORMAT}) · imza anahtarları: ${ruleKids.length ? ruleKids.join(", ") : "YOK (yalnız tohum)"}${RELEASE_BUILD ? " · mağaza paketi" : ""}`);
   console.log(`  portal izinleri: ${(manifest.host_permissions as string[]).join(", ")}`);
   console.log(`  EmlakSoft alanları: ${origins.join(", ")}`);
 }
 
 main().catch((err) => {
-  if (process.argv.includes("--soft")) {
+  if (process.argv.includes("--soft") && !RELEASE_BUILD) {
     console.warn("Eklenti paketi üretilemedi (uygulama derlemesi sürüyor):", err instanceof Error ? err.message : err);
     return;
   }
