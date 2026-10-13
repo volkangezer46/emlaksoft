@@ -45,6 +45,18 @@ export function heroBudget(variants: readonly VariantLike[]): { bytes: number; o
   return { bytes, over: bytes > SITE_MEDIA_LIMITS.heroBudgetBytes };
 }
 
+/** Hero bütçe aşımı gerekçesinin en kısa uzunluğu (istemci paneli ve sunucu kaydı aynı kural). */
+export const HERO_BUDGET_REASON_MIN = 5;
+
+/**
+ * Kalite kapısı (SAF; sunucu kaydı ve editör aynı karar): bütçeyi aşan hero görseli YENİ seçiliyorsa (kayıtlı taslakta ve
+ * canlıda başka görsel varken) gerekçe zorunludur. Taslakta ya da canlıda zaten olan görsel yeniden gerekçe istemez.
+ */
+export function heroBudgetNeedsReason(input: { nextId: string | null | undefined; draftId: string | null | undefined; liveId: string | null | undefined; over: boolean }): boolean {
+  if (!input.nextId || !input.over) return false;
+  return input.nextId !== input.draftId && input.nextId !== input.liveId;
+}
+
 export function largestOutput(variants: readonly VariantLike[]): number {
   return variants.reduce((m, v) => Math.max(m, v.bytes), 0);
 }

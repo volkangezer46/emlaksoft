@@ -1,7 +1,7 @@
 "use server";
 
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { heroBudget, checkAlt, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
+import { checkAlt, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
 import { deleteSiteMediaRow, readSiteMedia, removeVariantFiles, updateSiteMediaText } from "@/lib/site-media/store";
 import { SITE_MEDIA_ID_RE } from "@/lib/site-media/types";
 import {
@@ -72,19 +72,5 @@ export async function deleteSiteMedia(id: string): Promise<SiteMediaActionResult
   return { ok: true };
 }
 
-/**
- * Kalite kapısı: hero görseli ilk ekran bütçesini aşarken taslak kaydı "Yine de kaydet" ile yapılırsa gerekçe zorunludur
- * ve denetim kaydına yazılır (kayıt engellenmez; karar izlenebilir kalır).
- */
-export async function acknowledgeHeroBudget(mediaId: string, reasonInput: string): Promise<SiteMediaActionResult> {
-  const staff = await requireSiteMediaWriter();
-  if (!staff) return { error: READONLY };
-  const reason = clipText(reasonInput, 300);
-  if (reason.length < 5) return { error: "Gerekçe yazın (en az 5 karakter)." };
-  if (!SITE_MEDIA_ID_RE.test(String(mediaId))) return { error: "Görsel bulunamadı." };
-  const media = await readSiteMedia(mediaId);
-  if (!media) return { error: "Görsel bulunamadı." };
-  const hb = heroBudget(media.variants);
-  await logPlatformActivity({ actorId: staff.id, action: "site_media.hero_budget_override", entityType: "site_media", entityId: mediaId, meta: { bytes: hb.bytes, limit: SITE_MEDIA_LIMITS.heroBudgetBytes, reason } });
-  return { ok: true };
-}
+// Hero bütçe aşımı gerekçesi (kalite kapısı) artık SUNUCUDA, site içeriği taslak kaydında zorunlu tutulur ve denetim
+// kaydına yazılır: src/app/actions/site-content.ts heroBudgetGate (istemci yalnız gerekçeyi toplar).
