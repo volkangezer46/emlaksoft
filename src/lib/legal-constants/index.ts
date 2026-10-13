@@ -13,6 +13,9 @@
  *    `unverified` başlar. Sahip/mali müşavir kaynağı kontrol edip yalnız ilgili satırın
  *    `status` ve `verifiedAt` alanını günceller. Hukuki/mali danışmanlık DEĞİLDİR.
  *  - Sabit değişince yalnız bu dosya değişir; envanter: `docs/MEVZUAT_SABITLERI.md`.
+ *  - Tarihli değer GEÇMİŞİ (AD12): yönetimde /admin/ayarlar/yasal?sekme=sabitler, `legal_constants` tablosu; çözüm saf
+ *    `history.ts` (`resolveLegalValue`: o gün yürürlükteki kayıt > bu dosyadaki değer; geleceğe tarihli kayıt o güne kadar
+ *    uygulanmaz), sunucu okuyucu `store.ts` (`getEffectiveLegalValues`). Hesaplayıcılar şimdilik bu dosyadaki değeri kullanır.
  *
  * Saf modül: I/O ve tarih yok (zaman kuralı: `src/lib/clock.ts`).
  */
@@ -223,6 +226,11 @@ function valueText(v: number, unit: LegalUnit): string {
     default:
       return n;
   }
+}
+
+/** Birimli gösterim (yönetimdeki tarihli değer geçmişi için; `history.ts`). */
+export function formatLegalValue(v: number, unit: LegalUnit): string {
+  return valueText(v, unit);
 }
 
 export function describeLegal(key: LegalKey): LegalDisplay {

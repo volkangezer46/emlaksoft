@@ -1,7 +1,7 @@
 import { FAQ, FAQ_PRICE_PATTERN, type FaqItem } from "@/lib/help-faq";
 
 /**
- * AI asistanına ürün kullanım bilgisi (SSS) besleme — SAF seçici. Ağ/AI çağrısı YOKTUR: seçilen kayıtlar yalnız
+ * AI asistanına ürün kullanım bilgisi (SSS) besleme — SAF seçici. SSS listesi çağırandan gelir (yardım merkezi CMS: kod + DB). Ağ/AI çağrısı YOKTUR: seçilen kayıtlar yalnız
  * mevcut asistan çağrısına (src/lib/ai/openai-client.ts üzerinden; kişisel veri redact.ts ile maskelenir) sistem bağlamı
  * olarak eklenir. Ağ çağrısı burada yazılmaz.
  *
@@ -57,8 +57,11 @@ export function faqContextText(matches: readonly FaqMatch[]): string {
   ].join("\n");
 }
 
-/** Mesaj listesinin son kullanıcı sorusu için bağlam bloğu (kısayol). */
-export function faqContextForMessages(messages: readonly { role: string; content: string }[]): string {
+/**
+ * Mesaj listesinin son kullanıcı sorusu için bağlam bloğu (kısayol). `faq`: yardım merkezinin birleşik SSS'si
+ * (kod + yayındaki DB makaleleri; `getHelpContent()` — src/lib/help-center/store.ts); verilmezse koddaki SSS.
+ */
+export function faqContextForMessages(messages: readonly { role: string; content: string }[], faq: readonly FaqItem[] = FAQ): string {
   const last = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
-  return faqContextText(selectFaqForQuestion(last));
+  return faqContextText(selectFaqForQuestion(last, faq));
 }

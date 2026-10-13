@@ -51,6 +51,9 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/site-pages/store.ts": { calls: 3, scope: "platform", why: "sayfa oluşturucu: yayın haritası, sayfa içeriği (kimlik anahtarda), dizin; platform_settings" },
   "src/lib/try-credits/settings.ts": { calls: 1, scope: "platform", why: "TL kredi tavanı" },
   "src/lib/vitrin-seo/store.ts": { calls: 1, scope: "platform", why: "vitrin kalıcı noindex slug listesi (platform_settings)" },
+  "src/lib/legal-docs/store.ts": { calls: 2, scope: "platform", why: "AD12: yayındaki yasal belge (slug anahtarda) + yeniden onay listesi; kullanıcı onayları önbellek DIŞINDA" },
+  "src/lib/legal-constants/store.ts": { calls: 1, scope: "platform", why: "AD12: mevzuat sabiti tarihli değer geçmişi (platform geneli)" },
+  "src/lib/help-center/store.ts": { calls: 1, scope: "platform", why: "AD12: yardım merkezi yayındaki makaleleri (platform geneli; oylar önbellek DIŞINDA)" },
 };
 
 /** Paylaşılan önbellek içinde yasak: oturum/istek okuması. */

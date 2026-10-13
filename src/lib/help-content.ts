@@ -1,6 +1,7 @@
 /**
- * Yardım merkezi içeriği — TEK kaynak. /app/yardim sayfası ve `HelpTip` ("?")
- * ipuçları buradan okur.
+ * Yardım merkezi içeriği — koddaki TABAN. `HelpTip` ("?") ipuçları buradan okur; /app/yardim ve AI SSS bağlamı
+ * bu tabanı yardım merkezi CMS'iyle birleştirir (src/lib/help-center: yayındaki DB makalesi aynı slug'ı geçersiz kılar,
+ * gizleyebilir ya da yeni makale ekler; yönetim /admin/site/yardim). Koddaki maddeyi değiştirmek için deploy gerekmez.
  *
  * KURAL: Burada yalnız sistemde gerçekten olan davranış anlatılır. Sayılar ve
  * eşikler kodla birebir aynıdır (kaynak dosya her maddenin yanında yazılı);
