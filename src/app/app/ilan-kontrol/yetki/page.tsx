@@ -15,6 +15,8 @@ import { CONTROL_BASE } from "@/components/listing-control/helpers";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { AuthorityRowActions } from "@/components/listing-control/authority-row-actions";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { EidsInboxSection } from "./eids-inbox";
 import { loadAuthorityQueue, type AuthorityQueueItem } from "@/lib/eids/authority-queue";
 import {
   AUTHORITY_QUEUE_FILTERS,
@@ -39,9 +41,11 @@ const STATUS_VARIANT: Record<EidsDisplayStatus, BadgeVariant> = {
 };
 
 export default async function YetkiKuyrukPage({ searchParams }: { searchParams: SearchParams }) {
-  const { perms, tenantId } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms, tenantId, role } = await requireModulePage("portals", "/app/ilan-kontrol");
   const canEdit = (perms.portals ?? []).includes("edit");
   const sp = await searchParams;
+  // ?sekme=eposta: Bakanlık (EİDS) e-postaları (EP3: e-posta ekle + kontrol bekliyor). Varsayılan: yetki kuyruğu.
+  const sekme = (Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "eposta" ? "eposta" : "kuyruk";
   const kovaRaw = Array.isArray(sp.kova) ? sp.kova[0] : sp.kova;
   const kova = isAuthorityQueueFilter(kovaRaw) ? kovaRaw : null;
   const page = Math.max(1, Math.floor(Number(Array.isArray(sp.sayfa) ? sp.sayfa[0] : sp.sayfa) || 1));
@@ -54,8 +58,21 @@ export default async function YetkiKuyrukPage({ searchParams }: { searchParams: 
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Yetki kuyruğu" }]}
       />
       <ControlSubNav active="yetki" closures={effectiveCanAccessModule(perms, "leak")} />
+      <SegmentTabs
+        label="Yetki görünümü"
+        active={sekme}
+        className="mb-4"
+        items={[
+          { id: "kuyruk", href: `${CONTROL_BASE}/yetki`, label: "Yetki kuyruğu" },
+          { id: "eposta", href: `${CONTROL_BASE}/yetki?sekme=eposta`, label: "Bakanlık e-postaları" },
+        ]}
+      />
       <Suspense fallback={<SkeletonCard height={480} label="Yetki kuyruğu yükleniyor" />}>
-        <QueueBody kova={kova} page={page} canEdit={canEdit} tenantId={tenantId} />
+        {sekme === "eposta" ? (
+          <EidsInboxSection tenantId={tenantId} role={role} canEdit={canEdit} />
+        ) : (
+          <QueueBody kova={kova} page={page} canEdit={canEdit} tenantId={tenantId} />
+        )}
       </Suspense>
     </>
   );

@@ -4,8 +4,12 @@ import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
 import { IntegrationsForm } from "../integrations-form";
 import { ReadOnlyGate } from "../read-only-gate";
+import { EidsMailboxCard } from "./eids-mailbox-card";
 
-/** Sekme: ofise özel Netgsm SMS + WhatsApp Cloud API. Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok). */
+/**
+ * Sekme: ofise özel Netgsm SMS + WhatsApp Cloud API. Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok).
+ * Altında "Bakanlık (EİDS) e-postaları" kartı (EP3; kendi verisini okur).
+ */
 export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
   const supabase = await createClient();
   const [{ data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
@@ -39,19 +43,22 @@ export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
       }
     : null;
   return (
-    <section id="entegrasyonlar" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
-      <div className="flex items-center gap-3 border-b border-line pb-4">
-        <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
-        <div>
-          <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
-          <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
+    <div className="space-y-6">
+      <section id="entegrasyonlar" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+        <div className="flex items-center gap-3 border-b border-line pb-4">
+          <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
+          <div>
+            <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
+            <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
+          </div>
         </div>
-      </div>
-      <div className="mt-5">
-        <ReadOnlyGate canEdit={canEdit}>
-          <IntegrationsForm netgsm={netgsm} platformConfigured={netgsmPlatformConfigured && platformMessagingFallbackAllowed()} whatsapp={whatsapp} />
-        </ReadOnlyGate>
-      </div>
-    </section>
+        <div className="mt-5">
+          <ReadOnlyGate canEdit={canEdit}>
+            <IntegrationsForm netgsm={netgsm} platformConfigured={netgsmPlatformConfigured && platformMessagingFallbackAllowed()} whatsapp={whatsapp} />
+          </ReadOnlyGate>
+        </div>
+      </section>
+      <EidsMailboxCard canEdit={canEdit} />
+    </div>
   );
 }

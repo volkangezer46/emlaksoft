@@ -28,6 +28,7 @@ export default function KvkkAydinlatmaPage() {
           <li><b>Davet programı:</b> davet bağlantısı üzerinden gelen kayıtlarda davet eden ofis ile davet edilen ofis arasındaki ilişki (davet kodu, kayıt ve ödül durumu). Davet eden ofisin adı, kayıt ekranında davet edilene gösterilir.</li>
           <li><b>Kullanım:</b> oturum kayıtları, IP adresi, işlem günlükleri (audit log), cihaz/tarayıcı bilgisi.</li>
           <li><b>Müşteri verileri:</b> Ofisinizin Platform&apos;a girdiği müşteri/portföy kayıtları bakımından ofisiniz veri sorumlusu, EmlakSoft veri işleyendir.</li>
+          <li><b>Bakanlık bildirim e-postalarının işlenmesi:</b> Ofisinizin EmlakSoft&apos;a ilettiği ya da yüklediği Ticaret Bakanlığı (EİDS) yetki e-postalarından taşınmaz numarası, yetki türü ve bitiş tarihi çıkarılır; malik adı yalnız maskeli ve eşleştirme özeti olarak saklanır. E-postanın şifreli ham hâli, gönderenin doğrulanabilmesi için en çok 30 gün tutulur ve sonra silinir. Bakanlık dışındaki göndericilerden gelen e-postaların içeriği hiç saklanmaz. Bu kayıtlar bakımından ofisiniz veri sorumlusu, EmlakSoft veri işleyendir.</li>
         </ul>
       </LegalSection>
 
