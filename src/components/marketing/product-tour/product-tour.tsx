@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check } from "lucide-react";
+
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { withGateBadge } from "@/lib/marketing-plan-badge";
 import { DeviceFrame } from "../device-frame";
@@ -10,6 +10,7 @@ import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
 import { LazyTourScreen } from "./lazy-screen";
 import { AutomationScreen, CommissionScreen, CustomersScreen, DealsScreen, PortfolioScreen, ReportsScreen, TodayScreen } from "./screens";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Radyo girdili ürün turu (sekme seçimi JS'siz): radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm sekmelerin metni DOM'dadır (SEO); ilk ekranın çizimi sunucuda, kalanlar boşta yüklenir. Oklar radyo grubunda yerel olarak gezinir. Metinler site içeriğinden (yönetim: /admin/site-icerik);
@@ -62,7 +63,7 @@ export async function ProductTour({ heading = defaultSiteContent().sections.tur,
                   <p>{t.text}</p>
                   <ul>
                     {t.points.map((p) => (
-                      <li key={p}><Check size={16} aria-hidden="true" />{p}</li>
+                      <li key={p}><SpriteIcon name="check" size={16} />{p}</li>
                     ))}
                   </ul>
                 </div>

@@ -1,9 +1,10 @@
-import { ArrowRight, Check, Lock, TrendingUp, type LucideIcon } from "lucide-react";
+import { Check, Lock, TrendingUp, type LucideIcon } from "lucide-react";
 import type { PlanDef } from "@/lib/billing/plans";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { SiteContent } from "@/lib/site-content/schema";
 import { resolveTokens, tx } from "@/lib/site-content/tokens";
 import { ContentLink, Lines, RichTitle } from "./content-link";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 const CHECK_ICONS: Record<string, LucideIcon> = { kvkk: Lock, yillik: TrendingUp };
 
@@ -27,7 +28,7 @@ export function FinalCta({
         <h2 id="son-cta" className="mk-h2"><RichTitle title={content.title} em={content.em} tail={content.tail} /></h2>
         <p className="mk-lead"><Lines text={tx(content.text, ctx)} /></p>
         <div className="mk-cta-row">
-          <ContentLink href={content.primary.href} className="mk-btn mk-btn-light btn-shine">{tx(content.primary.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
+          <ContentLink href={content.primary.href} className="mk-btn mk-btn-light btn-shine">{tx(content.primary.label, ctx)} <SpriteIcon name="arrow-right" size={18} /></ContentLink>
           <ContentLink href={content.secondary.href} className="mk-btn mk-btn-outline-light">{tx(content.secondary.label, ctx)}</ContentLink>
         </div>
         <ul className="mk-final-checks">

@@ -1,4 +1,4 @@
-import { ArrowRight, Calculator, Check, FileText, Gauge, Layers, MapPinned, Package, X, type LucideIcon } from "lucide-react";
+import { Calculator, FileText, Gauge, Layers, MapPinned, Package, X, type LucideIcon } from "lucide-react";
 import type { PlanDef } from "@/lib/billing/plans";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { EfValuationStatus } from "@/lib/site-content/ef-status";
@@ -8,6 +8,7 @@ import { ContentLink, Lines, RichTitle } from "./content-link";
 import { SectionHeading } from "./section-heading";
 import { ExampleReport } from "./example-report";
 import type { EfPublicState } from "@/lib/ef-credits/public-state-core";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 const ICONS: Record<string, LucideIcon> = { adaparsel: MapPinned, guven: Gauge, pdf: FileText, kontor: Layers, hak: Calculator, paket: Package };
 
@@ -75,12 +76,12 @@ export function ValuationSection({
             </div>
             <div className="mk-hl">
               <h3 className="mk-h3">{content.compare.afterTitle}</h3>
-              <ul className="mk-list">{after.map((c) => <li key={c.id}><Check size={16} aria-hidden="true" />{tx(c.text, ctx)}</li>)}</ul>
+              <ul className="mk-list">{after.map((c) => <li key={c.id}><SpriteIcon name="check" size={16} />{tx(c.text, ctx)}</li>)}</ul>
             </div>
           </div>
         ) : null}
         <div className="mk-cta-row mk-cta-center">
-          <ContentLink href={cta.href} className="mk-btn mk-btn-grad btn-shine">{tx(cta.label, ctx)} <ArrowRight size={18} aria-hidden="true" /></ContentLink>
+          <ContentLink href={cta.href} className="mk-btn mk-btn-grad btn-shine">{tx(cta.label, ctx)} <SpriteIcon name="arrow-right" size={18} /></ContentLink>
         </div>
         {content.note ? <p className="mk-fine">{tx(content.note, ctx)}</p> : null}
       </div>

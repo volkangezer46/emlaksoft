@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { X } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { withGateBadge } from "@/lib/marketing-plan-badge";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
@@ -6,6 +6,7 @@ import type { Heading, SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "./content-link";
 import { SectionHeading } from "./section-heading";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Dürüst karşılaştırma: rakip adı veya rakip iddiası YOK; yalnızca "Excel + WhatsApp + defter" gibi genel eski yöntemle kıyas.
@@ -27,7 +28,7 @@ export async function Why({ heading = defaultSiteContent().sections.neden, conte
               <tr>
                 <th scope="col">Konu</th>
                 <th scope="col"><span className="mk-cmp-old"><X size={16} aria-hidden="true" />{content.oldLabel}</span></th>
-                <th scope="col"><span className="mk-cmp-new"><Check size={16} aria-hidden="true" />{content.newLabel}</span></th>
+                <th scope="col"><span className="mk-cmp-new"><SpriteIcon name="check" size={16} />{content.newLabel}</span></th>
               </tr>
             </thead>
             <tbody>

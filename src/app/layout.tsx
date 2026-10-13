@@ -7,6 +7,7 @@ import { getBrandMeta } from "@/lib/brand/store";
 import { brandIcons } from "@/lib/brand/icons";
 import { buildRootMetadata } from "@/lib/seo/store";
 import "./globals.css";
+import { IconSpriteDefs } from "@/components/icons/sprite-defs";
 
 // Inter ve Manrope kendi sunucumuzdan (src/app/fonts + globals.css @font-face; Türkçe harfler aynı dosyada).
 // Geist Mono yalnız konsol layout'larında yüklenir (components/ui/console/mono-font.tsx).
@@ -72,6 +73,7 @@ export default async function RootLayout({
       </head>
       <body className="min-h-full flex flex-col font-[family-name:var(--font-inter)]">
         <a href="#main-content" className="skip-link">İçeriğe atla</a>
+        <IconSpriteDefs />
         <ServiceWorkerRegister />
         <BrandProvider meta={brandMeta}>{children}</BrandProvider>
       </body>

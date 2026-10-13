@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check } from "lucide-react";
+
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
@@ -8,6 +8,7 @@ import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "../content-link";
 import { SectionHeading } from "../section-heading";
 import { AssistantArt, AutomationArt, LeakArt, PortalArt, ShowcaseArt, SignatureArt, TeamArt, ValuationArt } from "./bento-art";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Yapı koddadır (kimlik -> ızgara sınıfı, illüstrasyon, koyu zemin, paket rozeti yolu); metinler site içeriğinden
@@ -53,7 +54,7 @@ export async function BentoGrid({ heading = defaultSiteContent().sections.ozelli
               <p className="mk-bcard-text">{t.text}</p>
               {t.points ? (
                 <ul className="mk-list">
-                  {t.points.map((p) => <li key={p}><Check size={16} aria-hidden="true" />{p}</li>)}
+                  {t.points.map((p) => <li key={p}><SpriteIcon name="check" size={16} />{p}</li>)}
                 </ul>
               ) : null}
               <div className="mk-b-art">{t.art}</div>

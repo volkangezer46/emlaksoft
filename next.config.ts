@@ -107,6 +107,14 @@ const nextConfig: NextConfig = {
     // önbelleği — sunucudaki no-store Cache-Control başlıklarını etkilemez).
     // 300 sn (HIZ ANA İLKESİ): önbellekten ANINDA göster, arkadan tazele; güvenlik/tazelik: ClientCacheSync (arka plan router.refresh, kapı reddinde tam yükleme, kimlik/kapsam değişiminde temizlik) + realtime + mutasyon revalidate.
     staleTimes: { dynamic: 300, static: 300 },
+    // Ana sayfa çoğu ziyaretçinin İLK sayfası: istemci JS'i birkaç dosyada birleştirilir (istek sayısı ↓,
+    // Pingdom/YSlow "fewer HTTP requests"). Diğer rotalar varsayılan parçalamayla kalır (gezinmede önbellek paylaşımı).
+    turbopackChunking: {
+      priorityRoutes: [/^\/$/],
+      priorityBoost: 20,
+      requestCost: 2_000_000,
+      minChunkSize: 400_000,
+    },
     // Barrel-import maliyetini düşür: yalnızca kullanılan alt modüller derlenir.
     // Buradaki her paket gerçekten kurulu olmalı — aksi halde satır ölü kalır.
     optimizePackageImports: [
@@ -189,6 +197,12 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // public/ statik dosyaları (adları içerik özeti taşımaz): 7 gün önbellek + arka planda tazeleme.
+      // sw.js, manifest ve offline.html bu desenlere girmez (kendi kurallarında kalır).
+      ...["/brand/:file*", "/:file([a-z0-9-]+\\.(?:svg|png|webp|ico))"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
+      })),
       // API route'ları — cache yok
       {
         source: "/api/:path*",

@@ -4,21 +4,13 @@ import Link from "next/link";
 import { useState, type ComponentType } from "react";
 import { PLANS, planAmountOf, yearlyOfferLabel, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { trialCtaShort } from "@/lib/marketing-copy";
-import {
-  ArrowRight,
-  BriefcaseBusiness,
-  Building2,
-  Check,
-  Crown,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-} from "lucide-react";
+import { BriefcaseBusiness, Building2, Crown, Sparkles, UserRound } from "lucide-react";
 import { formatNumberTr } from "@/lib/format";
 import type { ExtraSeatSummary } from "@/lib/billing/seat-calculator-model";
 import { AnimatedNumber } from "@/components/ui/animated-number";
 import { efCreditsLine, monthlyUnitsOf } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 const PLAN_ICONS: Record<PlanId, ComponentType<{ className?: string }>> = {
   advisor: UserRound,
@@ -221,7 +213,7 @@ export function Pricing({
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-start gap-2.5">
                     <span className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full ${plan.popular ? "bg-mint-500/25" : "bg-mint-500/15"}`}>
-                      <Check aria-hidden className={`h-3 w-3 ${plan.popular ? "text-mint-400" : "text-mint-700"}`} />
+                      <SpriteIcon name="check" className={`h-3 w-3 ${plan.popular ? "text-mint-400" : "text-mint-700"}`} />
                     </span>
                     <span className={plan.popular ? "text-white/90" : "text-text"}>{f}</span>
                   </li>
@@ -234,10 +226,10 @@ export function Pricing({
                   plan.popular ? "bg-white text-ink-950 hover:bg-white/90" : "bg-brand-600 text-white hover:bg-brand-700"
                 }`}
               >
-                {trialCta} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
+                {trialCta} <SpriteIcon name="arrow-right" className="ml-2 h-4 w-4" />
               </Link>
               <p className={`mt-3 flex items-center justify-center gap-1.5 text-xs ${plan.popular ? "text-white/65" : "text-text-muted"}`}>
-                <ShieldCheck aria-hidden className="h-3.5 w-3.5" /> {trialDays ? `${trialDays} gün ücretsiz, ` : ""}kredi kartı gerekmez, deneme boyunca tüm özellikler açık
+                <SpriteIcon name="shield-check" className="h-3.5 w-3.5" /> {trialDays ? `${trialDays} gün ücretsiz, ` : ""}kredi kartı gerekmez, deneme boyunca tüm özellikler açık
               </p>
             </div>
           );

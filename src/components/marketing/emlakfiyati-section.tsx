@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Coins, FileText } from "lucide-react";
+import { Coins, FileText } from "lucide-react";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
 import { activePacks, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
 import { efEntryValuationUnits, efPackDisplayName, type EfPack } from "@/lib/ef-credits/pack-core";
@@ -13,6 +13,7 @@ import { ContentLink, RichTitle } from "./content-link";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /** Ofis panelindeki Analiz bakiyesi sekmesi; yalnız durum "live" iken bağlantı verilir. Hesabı olmayan /kayit'tan başlar. */
 export const EF_PACKS_APP_HREF = "/app/abonelik?sekme=analiz#paketler";
@@ -178,7 +179,7 @@ export function EmlakFiyatiSection({
         {live ? (
           <p className="mt-3 text-sm">
             <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">
-              Ofis panelinde analiz bakiyesi satın al <ArrowRight aria-hidden className="inline h-4 w-4" />
+              Ofis panelinde analiz bakiyesi satın al <SpriteIcon name="arrow-right" className="inline h-4 w-4" />
             </Link>
             <span className="text-text-muted"> · Hesabınız yoksa önce deneme başlatın.</span>
           </p>

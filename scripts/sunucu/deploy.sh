@@ -16,8 +16,9 @@ DOCKER_BUILDKIT=1 docker build --secret id=appenv,src=.env.production \
 APP_TAG="$TAG" docker compose -f deploy/compose.prod.yml up -d --remove-orphans
 echo "Yayında: emlaksoft-app:$TAG — sağlık bekleniyor"
 for i in $(seq 1 60); do
-  if docker exec emlaksoft-app curl -fsS -o /dev/null http://127.0.0.1:3000/robots.txt 2>/dev/null; then
-    curl -s https://emlaksoft.com.tr/api/health || true; echo; exit 0
+  # Traefik yeni konteyneri görene kadar dış adres 502/503 verebilir → dışarıdan sağlık 200 beklenir.
+  if curl -fsS -o /dev/null https://emlaksoft.com.tr/api/health 2>/dev/null; then
+    curl -s https://emlaksoft.com.tr/api/health; echo; exit 0
   fi
   sleep 2
 done

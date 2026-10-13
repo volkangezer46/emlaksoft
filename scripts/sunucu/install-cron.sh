@@ -15,7 +15,7 @@ for c in json.load(open('vercel.json'))['crons']:
 } > /etc/cron.d/emlaksoft
 chmod 644 /etc/cron.d/emlaksoft
 cat > /etc/logrotate.d/emlaksoft-cron <<'R'
-/var/log/emlaksoft-cron.log {
+/var/log/emlaksoft-cron.log /var/log/emlaksoft-backup.log {
   weekly
   rotate 8
   compress
@@ -23,4 +23,11 @@ cat > /etc/logrotate.d/emlaksoft-cron <<'R'
   notifempty
 }
 R
-echo "$(grep -c '/api/cron/' /etc/cron.d/emlaksoft) cron kuruldu"
+cat > /etc/cron.d/emlaksoft-backup <<B
+# Gece yedeği (03:30 TSİ = 00:30 UTC)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 0 * * * root $(pwd)/scripts/sunucu/backup-db.sh >> /var/log/emlaksoft-backup.log 2>&1
+B
+chmod 644 /etc/cron.d/emlaksoft-backup
+echo "$(grep -c '/api/cron/' /etc/cron.d/emlaksoft) cron + gece yedeği kuruldu"

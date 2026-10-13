@@ -1,4 +1,5 @@
-import { Link2, ShieldCheck } from "lucide-react";
+import { Link2 } from "lucide-react";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Portal kontrolü şeridi. Markalar LOGO değil nötr metin çipidir; yalnız ilan numarası/URL takibi için adlandırılır.
@@ -18,7 +19,7 @@ export function PortalStrip() {
           {PORTALS.map((p) => <li key={p}>{p}</li>)}
           <li className="mk-chip-more">+ diğer portallar</li>
         </ul>
-        <p className="mk-portals-note"><ShieldCheck size={14} aria-hidden="true" />Marka adları yalnız takip için anılır. Resmi entegrasyon veya ortaklık iddiası yoktur; otomatik yayınlama yapılmaz.</p>
+        <p className="mk-portals-note"><SpriteIcon name="shield-check" size={14} />Marka adları yalnız takip için anılır. Resmi entegrasyon veya ortaklık iddiası yoktur; otomatik yayınlama yapılmaz.</p>
       </div>
     </div>
   );

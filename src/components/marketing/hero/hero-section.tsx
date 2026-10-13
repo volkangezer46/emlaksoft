@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarCheck, Check, Zap } from "lucide-react";
+import { CalendarCheck, Zap } from "lucide-react";
 import { HeroScene } from "./hero-scene";
 import { HeroPhoneScene } from "./hero-phone";
 import { PortalStrip } from "../portal-strip";
@@ -8,6 +8,7 @@ import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { heroMobileCopy } from "@/lib/site-content/hero-mobile";
 import type { SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /** Masaüstü/mobil metin çifti: aynıysa tek metin; farklıysa CSS kırılımı (768 px) hangisinin görüneceğini seçer. */
 function Pair({ desk, mobile }: { desk: string; mobile: string }) {
@@ -58,11 +59,11 @@ export function HeroSection({
             </p>
           ) : null}
           <div className="mk-cta-row">
-            <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine mk-hero-primary"><Pair desk={tx(content.primary.label, ctx)} mobile={m.primary} /> <ArrowRight size={18} aria-hidden="true" /></ContentLink>
-            <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost mk-hero-secondary"><CalendarCheck size={18} aria-hidden="true" /><Pair desk={tx(content.secondary.label, ctx)} mobile={m.secondary} /><ArrowRight className="mk-ml" size={16} aria-hidden="true" /></ContentLink>
+            <ContentLink href={content.primary.href} className="mk-btn mk-btn-grad btn-shine mk-hero-primary"><Pair desk={tx(content.primary.label, ctx)} mobile={m.primary} /> <SpriteIcon name="arrow-right" size={18} /></ContentLink>
+            <ContentLink href={content.secondary.href} className="mk-btn mk-btn-ghost mk-hero-secondary"><CalendarCheck size={18} aria-hidden="true" /><Pair desk={tx(content.secondary.label, ctx)} mobile={m.secondary} /><SpriteIcon name="arrow-right" size={16} className="mk-ml" /></ContentLink>
           </div>
           <ul className="mk-checks">
-            {m.checks.map((c) => <li key={c.id}><Check size={16} aria-hidden="true" /><Pair desk={c.text} mobile={c.short} /></li>)}
+            {m.checks.map((c) => <li key={c.id}><SpriteIcon name="check" size={16} /><Pair desk={c.text} mobile={c.short} /></li>)}
           </ul>
         </div>
         <HeroPhoneScene />

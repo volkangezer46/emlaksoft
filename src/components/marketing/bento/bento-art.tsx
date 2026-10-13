@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
-import { Check, Clock, FileSignature, Sparkles, Trophy } from "lucide-react";
+import { FileSignature, Sparkles, Trophy } from "lucide-react";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /* Bento kartlarının illüstrasyonları. Sunucu bileşenleri; tüm içerik ÖRNEKTİR (sayı/isim uydurma yok). */
 
@@ -54,7 +55,7 @@ export function AutomationArt() {
   return (
     <ul className="mk-jobs" aria-label="Örnek zamanlanmış görevler">
       {JOBS.map((j, i) => (
-        <li key={j} style={{ "--i": i } as CSSProperties}><Clock size={14} aria-hidden="true" />{j}<Check size={14} aria-hidden="true" className="mk-a-tickico" /></li>
+        <li key={j} style={{ "--i": i } as CSSProperties}><SpriteIcon name="clock" size={14} />{j}<SpriteIcon name="check" size={14} className="mk-a-tickico" /></li>
       ))}
     </ul>
   );

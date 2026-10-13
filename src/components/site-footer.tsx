@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
-import { ArrowRight, FileSignature, Scale, ShieldCheck } from "lucide-react";
+import { FileSignature } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { now, trParts } from "@/lib/clock";
 import { trialCtaMobileLabel } from "@/lib/marketing-copy";
 import { toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
+import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Alt bilgi sütunları admin'den (Site menüsü > Alt bilgi) yönetilir; yayın yoksa varsayılan içerik kullanılır
@@ -32,12 +33,12 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
               Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.
             </p>
             <ul className="mk-foot-badges" aria-label="Güven başlıkları">
-              <li><ShieldCheck size={15} aria-hidden="true" />Frankfurt veri bölgesi</li>
-              <li><Scale size={15} aria-hidden="true" />KVKK süreç araçları</li>
+              <li><SpriteIcon name="shield-check" size={15} />Frankfurt veri bölgesi</li>
+              <li><SpriteIcon name="scale" size={15} />KVKK süreç araçları</li>
               <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
             </ul>
             <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
-              Ücretsiz dene <ArrowRight size={16} aria-hidden="true" />
+              Ücretsiz dene <SpriteIcon name="arrow-right" size={16} />
             </Link>
           </div>
           {columns.map((col) => (
