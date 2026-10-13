@@ -1,52 +1,138 @@
-import type { ReactNode } from "react";
-import { ArrowLeftRight, FileText, Landmark, LayoutDashboard, Repeat } from "lucide-react";
-import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
-import { QuickEntryButtons, type AccountOption } from "../quick-entry";
+import {
+  ArrowLeftRight,
+  BarChart3,
+  FileText,
+  Landmark,
+  LayoutDashboard,
+  PiggyBank,
+  Receipt,
+  Repeat,
+  Settings2,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { MorphNavMore } from "@/components/ui/morph-nav-more";
+import { splitNavTabs } from "@/lib/morph-tabs";
+import type { FinanceTabId } from "@/lib/finance/ledger/types";
+import { QuickEntryButtons, type AccountOption, type EntryCategoryOption, type RuleSuggestFn } from "../quick-entry";
 
 /**
- * Finans sayfasının ortak üst kısmı: başlık + "Gelir ekle / Gider ekle" (HER sekmede) + sekme şeridi (?sekme=).
- * Şema (kasa/banka) yokken sekme şeridi ve hızlı düğmeler görünmez; sayfa eski Giderler akışıyla çalışır.
+ * Muhasebe merkezinin ortak üst kısmı (TEK kaynak): sekme kimlikleri ve KULLANICIYA GÖRÜNEN etiketler, takma adlar,
+ * eski derin bağlantıların sekmeye eşlenmesi, "Yeni kayıt" eylemi ve sekme şeridi (5 görünür + "Diğer").
+ * Sekme etiketleri başka dosyada kopyalanmaz; komut çubuğu da listeyi buradan (prop olarak) alır.
  */
 export const FINANCE_BASE = "/app/giderler";
 
-export const FINANCE_TABS: readonly PageTab[] = [
-  { id: "ozet", label: "Özet", icon: LayoutDashboard },
-  { id: "hareketler", label: "Hareketler", icon: ArrowLeftRight },
-  { id: "kasa-banka", label: "Kasa ve banka", icon: Landmark },
-  { id: "duzenli", label: "Düzenli ödemeler", icon: Repeat },
-  { id: "faturalar", label: "Faturalar", icon: FileText },
+export type FinanceTabMeta = { id: FinanceTabId; label: string; icon: LucideIcon; hint: string };
+
+/** Sıra = şerit sırası. İlk 5'i görünür, kalanı "Diğer" menüsündedir. */
+export const FINANCE_TAB_META: readonly FinanceTabMeta[] = [
+  { id: "genel", label: "Genel bakış", icon: LayoutDashboard, hint: "Nakit, alacak, borç ve yaklaşan ödemeler" },
+  { id: "hareketler", label: "Hareketler", icon: ArrowLeftRight, hint: "Tüm gelir, gider ve transferler" },
+  { id: "kasa-banka", label: "Kasa ve banka", icon: Landmark, hint: "Hesaplar, bakiyeler ve ekstre eşleştirme" },
+  { id: "cari", label: "Cari", icon: Users, hint: "Kişi ve firma bakiyeleri, vadeler" },
+  { id: "belgeler", label: "Belgeler", icon: FileText, hint: "Faturalar, fişler ve ekler" },
+  { id: "duzenli", label: "Tekrarlayanlar", icon: Repeat, hint: "Her ay tekrarlayan ödemeler" },
+  { id: "butce", label: "Bütçe", icon: PiggyBank, hint: "Bütçe ve gerçekleşen" },
+  { id: "vergi", label: "Vergi", icon: Receipt, hint: "KDV ve stopaj özeti" },
+  { id: "raporlar", label: "Raporlar", icon: BarChart3, hint: "Muhasebe raporları" },
+  { id: "ayarlar", label: "Ayarlar", icon: Settings2, hint: "Kategoriler, kurallar ve dönem kapanışı" },
 ];
 
-export type FinanceTab = "ozet" | "hareketler" | "kasa-banka" | "duzenli" | "faturalar";
+export const FINANCE_VISIBLE_TABS = 5;
 
-export function financeTabOf(value: string | string[] | undefined): FinanceTab {
-  const v = Array.isArray(value) ? value[0] : value;
-  return v === "hareketler" || v === "kasa-banka" || v === "duzenli" ? v : "ozet";
+const TAB_IDS = new Set<string>(FINANCE_TAB_META.map((t) => t.id));
+
+export function financeTabLabel(id: FinanceTabId): string {
+  return FINANCE_TAB_META.find((t) => t.id === id)?.label ?? id;
 }
 
-/** Hero eylemleri: şema varsa "Gelir ekle / Gider ekle", yoksa eski "Yeni gider" bağlantısı. */
-export function FinanceActions({
-  cashAvailable,
-  quickAccounts,
-  defaultDate,
-  canSalary,
-  legacyCreate,
-}: {
-  cashAvailable: boolean;
-  quickAccounts: readonly AccountOption[];
-  defaultDate: string;
-  canSalary: boolean;
-  legacyCreate: ReactNode;
-}) {
-  return cashAvailable ? <QuickEntryButtons accounts={quickAccounts} defaultDate={defaultDate} canSalary={canSalary} /> : <>{legacyCreate}</>;
+/** Sekme adresi: ilk sekme parametresizdir; ek sorgu parametreleri sırayla eklenir (boş değerler atlanır). */
+export function financeHref(tab: FinanceTabId, query: Record<string, string | number | null | undefined> = {}): string {
+  const sp = new URLSearchParams();
+  if (tab !== "genel") sp.set("sekme", tab);
+  for (const [k, v] of Object.entries(query)) if (v !== null && v !== undefined && v !== "") sp.set(k, String(v));
+  const s = sp.toString();
+  return s ? `${FINANCE_BASE}?${s}` : FINANCE_BASE;
+}
+
+/**
+ * `?sekme=` çözümü. Takma adlar: 'ozet' → genel; 'faturalar' → belgeler + tur=fatura. Bilinmeyen değer genel'e düşer.
+ * Eski derin bağlantılar (sekmesiz): `?portal=` → Bütçe (portal getirisi kartı), `?kategori=/from=/to=/portfoy=` → Hareketler
+ * (portföy detayı ve kâr-zarar raporu bağlantıları liste filtresiyle gelir; filtreler korunur).
+ */
+export function resolveFinanceTab(raw: Record<string, string | undefined>): { tab: FinanceTabId; params: Record<string, string | undefined> } {
+  const sekme = (raw.sekme ?? "").trim();
+  if (sekme === "ozet") return { tab: "genel", params: { ...raw, sekme: "genel" } };
+  if (sekme === "faturalar") return { tab: "belgeler", params: { ...raw, sekme: "belgeler", tur: raw.tur || "fatura" } };
+  if (TAB_IDS.has(sekme)) return { tab: sekme as FinanceTabId, params: raw };
+  if (!sekme) {
+    if (raw.portal) return { tab: "butce", params: { ...raw, sekme: "butce" } };
+    if (raw.kategori || raw.from || raw.to || raw.portfoy) return { tab: "hareketler", params: { ...raw, sekme: "hareketler" } };
+  }
+  return { tab: "genel", params: { ...raw, sekme: "genel" } };
+}
+
+/** Eski API (FN öncesi çağıranlar için): yalnız sekme kimliği. */
+export function financeTabOf(value: string | string[] | undefined): FinanceTabId {
+  const v = Array.isArray(value) ? value[0] : value;
+  return resolveFinanceTab({ sekme: v }).tab;
 }
 
 export const FINANCE_HERO_TEXT = {
-  cash: { eyebrow: "Kasa, banka ve giderler", description: "Paranın hangi kasadan ve bankadan girip çıktığını, ofis giderlerini ve bakiyelerinizi tek yerden takip edin." },
-  legacy: { eyebrow: "Gider takibi", description: "Ofis giderlerini kategorilere ve portföylere göre takip edin; fişleri bağlayın, ayları karşılaştırın." },
+  eyebrow: "Mini muhasebe",
+  description: "Kasa ve banka, cari hesaplar, vadeler, belgeler ve KDV tek yerde. Yeni kayıt için Ctrl K ya da G (gelir), E (gider), T (transfer).",
 } as const;
 
-/** Sekme şeridi; şema (kasa/banka) yokken görünmez. */
-export function FinanceTabs({ cashAvailable, active }: { cashAvailable: boolean; active: FinanceTab }) {
-  return cashAvailable ? <PageSegmentTabs base={FINANCE_BASE} label="Finans sekmeleri" tabs={FINANCE_TABS} active={active} /> : null;
+/** Komut çubuğuna giden sekme listesi (etiket kopyası yok: buradan türetilir). */
+export function financeCommandTabs(): { id: string; label: string; hint: string; href: string }[] {
+  return FINANCE_TAB_META.map((t) => ({ id: t.id, label: t.label, hint: t.hint, href: financeHref(t.id) }));
+}
+
+/** Hero eylemi: tek "Yeni kayıt" (gelir / gider / transfer) + klavye kısayolları ve komut çubuğu. */
+export function FinanceActions({
+  accounts,
+  defaultDate,
+  canSalary,
+  canCreate,
+  categories,
+  suggestRule,
+}: {
+  accounts: readonly AccountOption[];
+  defaultDate: string;
+  canSalary: boolean;
+  canCreate: boolean;
+  categories: readonly EntryCategoryOption[];
+  suggestRule?: RuleSuggestFn;
+}) {
+  return (
+    <QuickEntryButtons
+      accounts={accounts}
+      defaultDate={defaultDate}
+      canSalary={canSalary}
+      office={canCreate}
+      categories={categories}
+      suggestRule={suggestRule}
+      hotkeys
+      commandTabs={financeCommandTabs()}
+    />
+  );
+}
+
+/** Sekme şeridi: 5 görünür sekme + "Diğer" (etkin sekme taşmadaysa görünür kümeye alınır; mobilde etiketler hep görünür). */
+export function FinanceTabs({ active }: { active: FinanceTabId }) {
+  const items = FINANCE_TAB_META.map((t) => ({ id: t.id, href: financeHref(t.id), label: t.label, icon: t.icon }));
+  const { shown, more } = splitNavTabs(items, active, FINANCE_VISIBLE_TABS);
+  return (
+    <div className="flex min-w-0 items-center gap-1.5">
+      <SegmentTabs label="Muhasebe sekmeleri" active={active} items={shown} className="min-w-0 flex-1" />
+      {more.length > 0 ? (
+        <MorphNavMore
+          label="Muhasebe sekmeleri"
+          items={more.map(({ icon: Icon, ...rest }) => ({ ...rest, iconNode: <Icon className="h-4 w-4" aria-hidden /> }))}
+        />
+      ) : null}
+    </div>
+  );
 }

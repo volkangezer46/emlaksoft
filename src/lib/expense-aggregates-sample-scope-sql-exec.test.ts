@@ -152,11 +152,12 @@ describe.skipIf(!mod)("tenant_expense_aggregates örnek veri kapsamı (pglite)",
   });
 });
 
-describe("Giderler sayfası sözleşmesi", () => {
-  const page = readFileSync(resolve(process.cwd(), "src/app/app/giderler/page.tsx"), "utf8");
-  it("sample_included kararını etikete bağlar ve RPC'ye eşik göndermez (migration öncesi/sonrası uyumlu)", () => {
-    expect(page).toContain("aggregateSampleLabel(sample.seeded, aggregate.sample_included)");
-    expect(page).toContain("<SampleDataBadge label={sampleLabel} />");
-    expect(page).not.toContain("p_sample_threshold");
+describe("Muhasebe > Genel bakış sözleşmesi", () => {
+  // FN2: page.tsx ince yönlendiricidir; örnek veri etiketi Genel bakış sekmesinde, KPI kapsamının TEK karar noktasından gelir.
+  const tab = readFileSync(resolve(process.cwd(), "src/app/app/giderler/_tabs/genel-bakis.tsx"), "utf8");
+  it("örnek veri etiketini loadSampleKpiScope kararına bağlar ve RPC'ye eşik göndermez", () => {
+    expect(tab).toContain("loadSampleKpiScope(supabase, tenantId)");
+    expect(tab).toContain("<SampleDataBadge label={sample.label} />");
+    expect(tab).not.toContain("p_sample_threshold");
   });
 });
