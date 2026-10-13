@@ -106,6 +106,24 @@ alter table public.support_tickets
   add constraint support_tickets_tags_limit check (cardinality(tags) <= 10) not valid;
 create index if not exists idx_support_tickets_tags on public.support_tickets using gin (tags);
 
+-- Etiketler İÇ KULLANIMDIR (olayı 'internal' görünürlükle yazılır): tarayıcı rolü (authenticated) tabloyu yalnız
+-- tags DIŞINDAKİ kolonlarla okuyabilir. Tablo düzeyi SELECT kaldırılır, mevcut kolonlara (tags hariç) kolon bazlı
+-- SELECT verilir; RLS aynen geçerlidir. Kiracı/personel kodu açık kolon listesiyle seçer (select=* kullanılmaz).
+-- DİKKAT: bundan sonra support_tickets'a eklenip kiracının okuması gereken kolon kendi migration'ında
+-- `grant select (kolon) ... to authenticated` almalıdır; tablo düzeyi `grant select` etiketleri yeniden açar.
+do $$
+declare
+  v_cols text;
+begin
+  select string_agg(quote_ident(c.column_name), ', ' order by c.ordinal_position)
+    into v_cols
+    from information_schema.columns c
+   where c.table_schema = 'public' and c.table_name = 'support_tickets' and c.column_name <> 'tags';
+  revoke select on table public.support_tickets from authenticated;
+  execute format('grant select (%s) on table public.support_tickets to authenticated', v_cols);
+  revoke select (tags) on table public.support_tickets from authenticated;
+end $$;
+
 alter table public.ticket_macros
   add column if not exists actions_json jsonb not null default '{}'::jsonb,
   add column if not exists use_count integer not null default 0,
@@ -192,24 +210,31 @@ as $$
       from public.support_sla_policies s
       where s.plan = '*' and s.priority = p_priority
     ),
+    -- Son çare: seed satırları ve TS DEFAULT_SLA_POLICY ile AYNI (plan='*' satırı silinse de ekran = DB).
     case
       when p_kind = 'first_response' then
-        case p_priority when 'urgent' then 60 when 'high' then 240 when 'low' then 1440 else 480 end
+        case p_priority when 'urgent' then 60 when 'high' then 240 when 'low' then 960 else 480 end
       else
-        case p_priority when 'urgent' then 480 when 'high' then 1440 when 'low' then 7200 else 4320 end
+        case p_priority when 'urgent' then 480 when 'high' then 1080 when 'low' then 2700 else 1620 end
     end
   );
 $$;
 
--- Takvim aralığı uyumluluğu: eski çağıranlar (reopen yolu vb.) için tablo değerini takvim dakikası döndürür.
--- Kalıcı hedefler tetikleyicide iş saatine göre yeniden hesaplanır.
+-- Takvim aralığı uyumluluğu: eski çağıranlar (reopen yolu, kuyruk/cron uyarı penceresi) için plan='*' değerini
+-- takvim dakikası döndürür. Kalıcı hedefler tetikleyicide plan + iş saatine göre yeniden hesaplanır.
+-- BİLİNÇLİ FARK: support_ticket_queue_v2 ve SLA cron'unun "yaklaşıyor" penceresi (support_sla_warning_interval)
+-- plan='*' hedefinden türetilir; plana özel satır (ör. Pro + yüksek = 120 dk) pencereyi değiştirmez. Satır başına
+-- birkaç kez çağrıldığı için tek arama yapar (plan='*' satırı + kod varsayılanı), plan aramasına girmez.
 create or replace function public.support_first_response_interval(p_priority text)
 returns interval
 language sql
 stable
 set search_path = ''
 as $$
-  select make_interval(mins => public.support_sla_minutes('first_response', '*', p_priority));
+  select make_interval(mins => coalesce(
+    (select s.first_response_minutes from public.support_sla_policies s where s.plan = '*' and s.priority = p_priority),
+    public.support_sla_minutes('first_response', '*', p_priority)
+  ));
 $$;
 
 create or replace function public.support_first_response_interval(p_priority text, p_plan text)
@@ -227,7 +252,10 @@ language sql
 stable
 set search_path = ''
 as $$
-  select make_interval(mins => public.support_sla_minutes('resolution', '*', p_priority));
+  select make_interval(mins => coalesce(
+    (select s.resolution_minutes from public.support_sla_policies s where s.plan = '*' and s.priority = p_priority),
+    public.support_sla_minutes('resolution', '*', p_priority)
+  ));
 $$;
 
 comment on function public.support_first_response_interval(text) is

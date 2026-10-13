@@ -98,17 +98,16 @@ export function StaffReplyForm({
       setActiveMacro(null);
       router.refresh();
     });
-    if (macroWarning) return { ...result, warning: macroWarning };
-    if (!uploaded.ok) {
-      return {
-        ...result,
-        warning:
-          uploaded.uploaded > 0
-            ? `Mesaj gönderildi; ${uploaded.uploaded} dosya yüklendi. ${uploaded.error ?? "Bazı dosyalar yüklenemedi."}`
-            : `Mesaj gönderildi ancak dosya eklenemedi. ${uploaded.error ?? ""}`.trim(),
-      };
-    }
-    return { ...result, warning: uploaded.uploaded ? `${uploaded.uploaded} dosya güvenle doğrulandı.` : undefined };
+    // Makro uyarısı yükleme sonucunu gizlemesin: ikisi de tek uyarı satırında gösterilir.
+    const uploadNote = !uploaded.ok
+      ? uploaded.uploaded > 0
+        ? `Mesaj gönderildi; ${uploaded.uploaded} dosya yüklendi. ${uploaded.error ?? "Bazı dosyalar yüklenemedi."}`
+        : `Mesaj gönderildi ancak dosya eklenemedi. ${uploaded.error ?? ""}`.trim()
+      : uploaded.uploaded
+        ? `${uploaded.uploaded} dosya güvenle doğrulandı.`
+        : undefined;
+    const warning = [macroWarning, uploadNote].filter(Boolean).join(" ");
+    return { ...result, warning: warning || undefined };
   }, initial);
 
   function insertMacro(macro: TicketMacro) {

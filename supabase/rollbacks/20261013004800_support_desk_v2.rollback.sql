@@ -138,6 +138,8 @@ $$;
 drop index if exists public.idx_support_tickets_tags;
 alter table public.support_tickets drop constraint if exists support_tickets_tags_limit;
 alter table public.support_tickets drop column if exists tags;
+-- Kolon bazlı okuma yerine 20260731000142'deki tablo düzeyi SELECT'e dön (RLS aynen geçerli).
+grant select on table public.support_tickets to authenticated;
 
 alter table public.ticket_macros drop constraint if exists ticket_macros_actions_object;
 alter table public.ticket_macros

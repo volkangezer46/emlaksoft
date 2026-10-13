@@ -64,6 +64,12 @@ describe("makro şablonu ve eylemleri", () => {
     });
     expect(out).toBe("Merhaba Ayşe, Mavi Emlak için talebiniz incelendi. {{bilinmeyen.alan}}");
   });
+  it("kullanıcı adı yoksa 'Merhaba Merhaba' olmaz: nötr hitap, cümle başında büyük harf", () => {
+    expect(renderMacroBody("Merhaba {{kullanici.ad}},", {})).toBe("Merhaba değerli kullanıcımız,");
+    expect(renderMacroBody("Merhaba {{kullanici.ad}},", { "kullanici.ad": "  " })).toBe("Merhaba değerli kullanıcımız,");
+    expect(renderMacroBody("{{kullanici.ad}}, talebiniz alındı.", {})).toBe("Değerli kullanıcımız, talebiniz alındı.");
+    expect(renderMacroBody("Teşekkürler. {{kullanici.ad}} için not", {})).toBe("Teşekkürler. Değerli kullanıcımız için not");
+  });
   it("etiket normalizasyonu ve eylem ayrıştırma", () => {
     expect(normalizeTag("  İADE ")).toBe("iade");
     expect(normalizeTag("-x")).toBeNull();

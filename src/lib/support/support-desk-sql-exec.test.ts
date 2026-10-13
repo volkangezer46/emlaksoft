@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_SLA_POLICY } from "@/lib/support/sla-policy";
 import { loadPglite, type Db } from "@/lib/test-support/pglite";
 
 /**
@@ -30,11 +31,21 @@ create table public.support_tickets(
   first_response_due_at timestamptz, resolution_due_at timestamptz, first_response_at timestamptz,
   first_response_breached_at timestamptz, resolution_breached_at timestamptz, last_activity_at timestamptz,
   last_customer_reply_at timestamptz, last_staff_reply_at timestamptz, resolved_at timestamptz, closed_at timestamptz,
-  reopened_at timestamptz, resolution_code text, resolution_summary text, version bigint not null default 1
+  reopened_at timestamptz, resolution_code text, resolution_summary text, version bigint not null default 1,
+  constraint support_tickets_priority_check check (priority in ('low','normal','high','urgent')),
+  constraint support_tickets_status_check check (status in ('open','in_progress','waiting','resolved','closed')),
+  constraint support_tickets_terminal_integrity_v3 check (
+    (status in ('open','in_progress','waiting') and resolved_at is null and closed_at is null and resolution_code is null and resolution_summary is null)
+    or (status = 'resolved' and resolved_at is not null and closed_at is null and resolution_code is not null and resolution_summary is not null
+        and char_length(btrim(resolution_code)) between 1 and 80 and char_length(btrim(resolution_summary)) between 3 and 2000)
+    or (status = 'closed' and resolved_at is not null and closed_at is not null and resolution_code is not null and resolution_summary is not null
+        and char_length(btrim(resolution_code)) between 1 and 80 and char_length(btrim(resolution_summary)) between 3 and 2000)
+  )
 );
 create table public.ticket_macros(id uuid primary key default gen_random_uuid(), title text not null, body text not null, created_by uuid, created_at timestamptz default now());
-create table public.support_ticket_messages(id uuid primary key default gen_random_uuid(), ticket_id uuid not null, author_user_id uuid, author_kind text not null, body text not null, visibility text not null default 'public', request_id uuid, created_at timestamptz not null default now());
-create table public.support_ticket_events(id uuid primary key default gen_random_uuid(), ticket_id uuid not null, tenant_id uuid not null, message_id uuid, actor_user_id uuid, actor_kind text not null, event_type text not null, visibility text not null, old_value jsonb, new_value jsonb, created_at timestamptz not null default now());
+create table public.support_ticket_messages(id uuid primary key default gen_random_uuid(), ticket_id uuid not null, author_user_id uuid, author_kind text not null check (author_kind in ('tenant','staff','system')), body text not null, visibility text not null default 'public' check (visibility in ('public','internal')), request_id uuid, created_at timestamptz not null default now(),
+  check (visibility <> 'internal' or author_kind in ('staff','system')));
+create table public.support_ticket_events(id uuid primary key default gen_random_uuid(), ticket_id uuid not null, tenant_id uuid not null, message_id uuid, actor_user_id uuid, actor_kind text not null check (actor_kind in ('tenant','staff','system','cron')), event_type text not null, visibility text not null check (visibility in ('public','internal')), old_value jsonb, new_value jsonb, created_at timestamptz not null default now());
 create function public.support_require_service_role() returns void language plpgsql as $$
 begin if auth.role() is distinct from 'service_role' then raise exception 'Service role required.' using errcode = '42501'; end if; end $$;
 create function public.support_record_event(p_ticket_id uuid, p_tenant_id uuid, p_actor_id uuid, p_actor_kind text, p_event_type text, p_visibility text, p_old_value jsonb default null, p_new_value jsonb default null, p_message_id uuid default null)
@@ -50,6 +61,11 @@ begin
   elsif new.assigned_staff_id is distinct from old.assigned_staff_id then new.assigned_to := new.assigned_staff_id; end if;
   return new;
 end $$;
+-- Canlıdaki yetkiler (20260731000142): tarayıcı rolü bileti yalnız okur, yazımlar service_role/definer RPC'den.
+grant usage on schema auth to service_role, authenticated;
+grant select on table public.support_tickets to authenticated;
+grant all on public.tenants, public.platform_staff, public.platform_settings, public.support_tickets,
+  public.support_ticket_messages, public.support_ticket_events, public.ticket_macros to service_role;
 create trigger trg_support_set_derived_ticket_fields before insert or update on public.support_tickets for each row execute function public.support_set_derived_ticket_fields();
 create trigger trg_support_sync_canonical_assignee before insert or update of assigned_staff_id, assigned_to on public.support_tickets for each row execute function public.support_sync_canonical_assignee();
 `;
@@ -177,6 +193,46 @@ describe.skipIf(!mod)("Destek masası 2.0 SQL — gerçek PL/pgSQL (pglite)", ()
     expect(again.reminded).toHaveLength(0);
     expect(again.closed).toHaveLength(0);
     await q(`reset request.jwt.claim.role`);
+  });
+
+  it("service_role altında bilet ekleme/öncelik güncelleme: invoker tetikleyici + iptal edilmiş yardımcılar çalışır", async () => {
+    const tenant = await one(`insert into public.tenants(plan) values ('office') returning id`);
+    await q(`set role service_role`);
+    try {
+      const row = (await q(
+        `insert into public.support_tickets(tenant_id, priority, category, created_at) values ($1, 'high', 'billing', '2026-10-16T14:30:00Z') returning id, first_response_due_at`,
+        [tenant],
+      ))[0];
+      expect(iso(row.first_response_due_at)).toBe("2026-10-19T09:30:00.000Z");
+      const due = await one(`update public.support_tickets set priority = 'urgent' where id = $1 returning first_response_due_at`, [row.id]);
+      expect(iso(due)).toBe("2026-10-19T06:30:00.000Z");
+    } finally {
+      await q(`reset role`);
+    }
+  });
+
+  it("tarayıcı rolü (authenticated) iç etiketleri okuyamaz; diğer kolonlar okunur; SLA yardımcıları çağrılamaz", async () => {
+    await q(`set role authenticated`);
+    try {
+      await expect(q(`select tags from public.support_tickets limit 1`)).rejects.toThrow(/permission denied/);
+      await expect(q(`select * from public.support_tickets limit 1`)).rejects.toThrow(/permission denied/);
+      await expect(q(`select id, subject, status, priority, first_response_due_at from public.support_tickets limit 1`)).resolves.toBeDefined();
+      await expect(q(`select public.support_sla_minutes('first_response', '*', 'high')`)).rejects.toThrow(/permission denied/);
+      await expect(q(`select public.support_pick_assignee('billing')`)).rejects.toThrow(/permission denied/);
+    } finally {
+      await q(`reset role`);
+    }
+  });
+
+  it("SLA son çare varsayılanları seed ve DEFAULT_SLA_POLICY ile aynı (plan='*' satırı silinse de)", async () => {
+    await q(`create temp table sla_backup as select * from public.support_sla_policies`);
+    await q(`delete from public.support_sla_policies`);
+    for (const [priority, target] of Object.entries(DEFAULT_SLA_POLICY)) {
+      expect(Number(await one(`select public.support_sla_minutes('first_response', '*', $1)`, [priority]))).toBe(target.firstResponseMinutes);
+      expect(Number(await one(`select public.support_sla_minutes('resolution', '*', $1)`, [priority]))).toBe(target.resolutionMinutes);
+    }
+    await q(`insert into public.support_sla_policies select * from sla_backup`);
+    await q(`drop table sla_backup`);
   });
 
   it("rollback temiz uygulanır ve sabit takvim saatlerine döner", async () => {

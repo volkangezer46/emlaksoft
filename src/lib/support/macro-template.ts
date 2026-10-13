@@ -16,20 +16,26 @@ export const MACRO_VARIABLES = [
 export type MacroVariableKey = (typeof MACRO_VARIABLES)[number]["key"];
 export type MacroVariables = Partial<Record<MacroVariableKey, string | null | undefined>>;
 
-/** `{{ ofis.ad }}` boşluklu yazımı da kabul eder. Değer yoksa makul bir yedek kullanılır. */
+/**
+ * `{{ ofis.ad }}` boşluklu yazımı da kabul eder. Değer yoksa nötr bir yedek kullanılır ("Merhaba {{kullanici.ad}},"
+ * → "Merhaba değerli kullanıcımız,"); yedek cümle başına düşerse büyük harfle başlar.
+ */
 export function renderMacroBody(body: string, vars: MacroVariables): string {
   const fallback: Record<MacroVariableKey, string> = {
     "ofis.ad": "ofisiniz",
-    "kullanici.ad": "Merhaba",
+    "kullanici.ad": "değerli kullanıcımız",
     "bilet.no": "talebiniz",
     "bilet.konu": "talebiniz",
     "temsilci.ad": "EmlakSoft Destek",
   };
-  return body.replace(/\{\{\s*([a-z]+\.[a-z]+)\s*\}\}/gi, (match, rawKey: string) => {
+  return body.replace(/\{\{\s*([a-z]+\.[a-z]+)\s*\}\}/gi, (match, rawKey: string, offset: number) => {
     const key = rawKey.toLowerCase() as MacroVariableKey;
     if (!(key in fallback)) return match;
     const value = vars[key]?.trim();
-    return value ? value : fallback[key];
+    if (value) return value;
+    const sentenceStart = /(^|[.!?\n])\s*$/.test(body.slice(0, offset));
+    const text = fallback[key];
+    return sentenceStart ? text.charAt(0).toLocaleUpperCase("tr-TR") + text.slice(1) : text;
   });
 }
 
