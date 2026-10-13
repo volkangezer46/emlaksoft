@@ -47,6 +47,7 @@ import {
   type InventoryRow,
 } from "./tenants-model";
 import { TenantTable, type TenantRowData } from "./tenant-table";
+import { IMPERSONATION_REASON_MAX, IMPERSONATION_REASON_MIN } from "@/lib/platform-security/impersonation-reason";
 
 /** Durum renkleri (halka + lejant): token, iki temada çözülür. */
 const STATUS_COLOR: Record<string, string> = {
@@ -70,7 +71,7 @@ export default async function AdminTenantsPage({
   searchParams,
 }: {
   // Açık tip: link kontratı denetimi (check:links) okunan parametreleri buradan görür.
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; sayfa?: string; audit?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; sayfa?: string; audit?: string; destek?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff.role, "create");
@@ -85,6 +86,13 @@ export default async function AdminTenantsPage({
   const page = f.sayfa ?? 1;
   const filtered = isFiltered(f);
   const auditFailed = raw.audit === "failed";
+  // AD11: destek erişimi gerekçe/bilet eksikse sunucu buraya yollar (pencere aynı kuralı istemcide de uygular).
+  const supportError =
+    raw.destek === "gerekce"
+      ? `Destek erişimi başlatılmadı: gerekçe ${IMPERSONATION_REASON_MIN}-${IMPERSONATION_REASON_MAX} karakter olmalı.`
+      : raw.destek === "bilet"
+        ? "Destek erişimi başlatılmadı: destek bileti numarasını yazın (boşluksuz; harf, rakam, # . _ / -)."
+        : null;
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;
@@ -189,6 +197,17 @@ export default async function AdminTenantsPage({
 
   return (
     <div className="space-y-5">
+      {supportError ? (
+        <div role="alert" className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
+          <div className="flex items-start gap-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p className="font-bold">{supportError}</p>
+          </div>
+          <Link href="/admin/tenants" aria-label="Uyarıyı kapat" className="focus-ring grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] hover:bg-danger-500/10 touch:min-h-11 touch:min-w-11">
+            <X className="h-4 w-4" />
+          </Link>
+        </div>
+      ) : null}
       {auditFailed ? (
         <div role="alert" className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-danger-500/25 bg-danger-500/8 px-4 py-3 text-sm text-danger-600">
           <div className="flex items-start gap-2.5">
