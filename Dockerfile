@@ -12,6 +12,8 @@ RUN --mount=type=cache,target=/root/.npm npm install -g npm@11.6.2 && npm ci --n
 FROM node:24-bookworm-slim AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
+# Derleme yığını: uygulama büyüdükçe varsayılan V8 sınırı yetmiyor (yalnız build aşaması; çalışma imajı etkilenmez).
+ENV NODE_OPTIONS=--max-old-space-size=7168
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ARG RELEASE_SHA=unknown
