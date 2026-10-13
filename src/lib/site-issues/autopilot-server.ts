@@ -10,8 +10,8 @@ import { patchIssue, readQueueIssues, recordOptimizerAction } from "./store";
 
 /**
  * Otopilot'un gerçek bağlantıları: ayar `growth.autopilot` (platform_settings, migration'sız), kuyruk ve işlem kaydı
- * (store.ts), yayın Yayın masası yüzeyleri üzerinden. Gece tetikleyicisi (cron) bu paketin dosya kapsamında DEĞİLDİR;
- * `runAutopilotNow` cron dikişinden çağrılmak üzere hazırdır.
+ * (store.ts), yayın Yayın masası yüzeyleri üzerinden. Gece tetikleyicisi: `seo-robot` cron'unun yalıtılmış Kokpit adımı
+ * (src/lib/site-issues/nightly.ts).
  */
 
 export async function readAutopilot(): Promise<AutopilotSettings> {
