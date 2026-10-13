@@ -14,10 +14,43 @@
  * Her şey tek bir transaction içinde yapılır ve SONUNDA ROLLBACK edilir —
  * denetim kullanıcının verisine hiçbir şey yazmaz.
  *
- * Çalıştırma:  npx tsx scripts/rls-audit.ts
+ * Çalıştırma:  npx tsx scripts/rls-audit.ts [--strict] [--no-acl]
+ *   --strict  sarılmamış (InitPlan'sız) yardımcı çağrıları ve ACL kapısı (check:acl) hataları da çıkış kodunu etkiler.
+ *             Varsayılan: ikisi de yalnız raporlanır.
+ *   --no-acl  ACL kapısını (scripts/check-function-acl.ts) atla.
  */
 import dotenv from "dotenv";
 import { Client } from "pg";
+import { printFindings, runAclCheck } from "./check-function-acl.ts";
+
+const ARGS = process.argv.slice(2);
+const STRICT = ARGS.includes("--strict");
+const WITH_ACL = !ARGS.includes("--no-acl");
+for (const a of ARGS) {
+  if (a !== "--strict" && a !== "--no-acl") {
+    console.error(`Bilinmeyen argüman: ${a} (yalnız --strict, --no-acl)`);
+    process.exit(2);
+  }
+}
+
+/**
+ * Satır-bağımsız yardımcılar: argümansız ya da yalnız sabit argümanlı çağrıldıklarında `(select fn())` ile
+ * sarılmazlarsa planlayıcı onları satır başına çalıştırır (InitPlan yerine Filter). Satır sütunu alan çağrılar
+ * (ör. support_tenant_can_read_ticket(t.tenant_id, ...)) sarılamaz ve sayılmaz.
+ */
+const ROW_INDEPENDENT_HELPERS =
+  /(?:\b(?:public\.)?(?:current_tenant_id|current_active_tenant_id|current_profile_role|is_platform_staff|is_platform_admin|fsbo_office_wide_role|fsbo_manage_role|support_is_ticket_staff|has_effective_permission)|\bauth\.(?:uid|jwt|role))\((\s*(?:'[^']*'(?:::[a-z ]+)?\s*,?\s*)*)\)/g;
+
+/** Politika ifadesindeki sarılmamış satır-bağımsız çağrılar (pg_get_expr: sarılı hâl `( SELECT f() AS f)`). */
+function unwrappedHelperCalls(expr: string): string[] {
+  const out: string[] = [];
+  ROW_INDEPENDENT_HELPERS.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = ROW_INDEPENDENT_HELPERS.exec(expr))) {
+    if (!/SELECT\s+$/i.test(expr.slice(Math.max(0, m.index - 8), m.index))) out.push(m[0]);
+  }
+  return out;
+}
 
 // apply-migrations.ts ile ayni yol: .env.local acikca yukleniyor.
 // `dotenv/config` yalnizca .env okur, bu projede degerler .env.local'da.
@@ -100,6 +133,32 @@ async function main() {
       }
     }
 
+    // --- 2b) InitPlan: sarılmamış satır-bağımsız yardımcı çağrıları (tüm public politikalar) ---
+    /*
+     * `tenant_id = current_tenant_id()` satır başına çağrı; `tenant_id = (select current_tenant_id())` sorgu başına
+     * tek InitPlan. Anlam aynı, maliyet satır sayısıyla büyür (ölçüm: has_effective_permission ~0,2 ms/çağrı).
+     * search_path='' ile deparse edilir ki adlar bağlantının yolundan bağımsız (public./auth. önekli) gelsin.
+     */
+    await c.query("set local search_path = ''");
+    const { rows: tumPol } = await c.query<{ tablename: string; policyname: string; ifade: string }>(`
+      select c.relname as tablename, pol.polname as policyname,
+             coalesce(pg_catalog.pg_get_expr(pol.polqual, pol.polrelid), '') || ' ¦ ' ||
+             coalesce(pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid), '') as ifade
+      from pg_catalog.pg_policy pol join pg_catalog.pg_class c on c.oid = pol.polrelid
+      where c.relnamespace = 'public'::regnamespace
+      order by 1, 2`);
+    await c.query("set local search_path to default");
+    for (const p of tumPol) {
+      const ciplak = unwrappedHelperCalls(p.ifade);
+      if (ciplak.length > 0) {
+        bulgular.push({
+          tablo: p.tablename,
+          tur: "SARILMAMIS-CAGRI",
+          detay: `${p.policyname}: ${ciplak.length} çağrı (select ...) ile sarılmamış: ${[...new Set(ciplak)].join(", ")}`,
+        });
+      }
+    }
+
     // --- 3) Gerçek sızıntı denemesi ---
     /*
      * Tabloya A kiracısının satırını yazıp B kiracısı olarak okumaya
@@ -163,9 +222,19 @@ async function main() {
     // Denetim asla veri bırakmaz.
     await c.query("rollback");
 
-    // Sızıntı bulguları CI'ı kırsın; yerleşim uyarısı kırmasın.
-    const kritik = bulgular.filter((b) => b.tur !== "JWT-YERLESIM");
-    process.exit(kritik.length > 0 ? 1 : 0);
+    // ACL kapısı (npm run check:acl ile aynı denetim; aynı veritabanı, salt-okunur oturum).
+    let aclHata = 0;
+    if (WITH_ACL) {
+      console.log("\nACL kapısı (scripts/check-function-acl.ts):");
+      const aclBulgu = await runAclCheck({ source: { kind: "url", url }, strict: STRICT });
+      aclHata = printFindings(aclBulgu, !STRICT).errors;
+    }
+
+    // Sızıntı bulguları CI'ı kırsın; yerleşim uyarısı kırmasın. Sarılmamış çağrı ve ACL yalnız --strict'te kırar.
+    const kritik = bulgular.filter(
+      (b) => b.tur !== "JWT-YERLESIM" && (STRICT || b.tur !== "SARILMAMIS-CAGRI"),
+    );
+    process.exit(kritik.length > 0 || (STRICT && aclHata > 0) ? 1 : 0);
   } catch (e) {
     await c.query("rollback").catch(() => {});
     throw e;
