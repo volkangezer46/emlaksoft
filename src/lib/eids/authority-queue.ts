@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
+import { isMissingSchema } from "@/lib/listing-control/server/db";
 import {
   classifyAuthority,
   summarizeAuthorityQueue,
@@ -28,24 +29,33 @@ export type AuthorityQueueItem = AuthorityQueueRow & {
 
 export type AuthorityQueueLoad =
   | { available: false }
-  | { available: true; items: AuthorityQueueItem[]; summary: AuthorityQueueSummary; truncated: boolean };
+  | { available: true; items: AuthorityQueueItem[]; summary: AuthorityQueueSummary; truncated: boolean; /** Yetki defteri sütunları okunabildi mi. */ ledger: boolean };
 
 const COLUMNS =
   "id, property_code, title, status, assigned_to, authorization_start, authorization_end, authority_doc_no, authority_eids_status, authority_owner_approved_at, authority_reminder_sent_at, authority_reminder_count";
+/** Yetki defteri sütunları (20261013007100). Yoksa eski seçime düşülür; "teyitsiz" kovası o zaman ölçülmez. */
+const LEDGER_COLUMNS = "authority_eids_source, authority_eids_verified_at, authority_last_email_at, eids_exempt_reason";
 
 type PropRow = AuthorityQueueRow & { property_code: string | null; title: string | null; assigned_to: string | null };
 
 export async function loadAuthorityQueue(supabase: SupabaseClient, tenantId: string): Promise<AuthorityQueueLoad> {
-  const { data, error } = await supabase
-    .from("properties")
-    .select(COLUMNS)
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .eq("is_sample", false)
-    .order("authorization_end", { ascending: true, nullsFirst: false })
-    .limit(SCAN);
-  if (error) return { available: false };
-  const rows = (data ?? []) as PropRow[];
+  const query = (cols: string) =>
+    supabase
+      .from("properties")
+      .select(cols)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .eq("is_sample", false)
+      .order("authorization_end", { ascending: true, nullsFirst: false })
+      .limit(SCAN);
+  let ledger = true;
+  let res = await query(`${COLUMNS}, ${LEDGER_COLUMNS}`);
+  if (res.error && isMissingSchema(res.error)) {
+    ledger = false;
+    res = await query(COLUMNS);
+  }
+  if (res.error) return { available: false };
+  const rows = (res.data ?? []) as unknown as PropRow[];
   const nowMs = now();
   const summary = summarizeAuthorityQueue(rows, nowMs);
 
@@ -89,5 +99,5 @@ export async function loadAuthorityQueue(supabase: SupabaseClient, tenantId: str
     buckets: c.buckets,
     owner: owners.get(r.id) ?? null,
   }));
-  return { available: true, items, summary, truncated: rows.length >= SCAN };
+  return { available: true, items, summary, truncated: rows.length >= SCAN, ledger };
 }

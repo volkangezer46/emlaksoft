@@ -78,7 +78,8 @@ describe("summarizeAuthorityQueue", () => {
       ],
       NOW,
     );
-    expect(s.counts).toEqual({ bekleyen: 2, bitiyor: 0, dolmus: 1, belgesiz: 1 });
+    // EP2: yeni kovalar (iptal/bilinmiyor/teyitsiz) bu satırlarda boş; eski dört kovanın sayısı değişmedi.
+    expect(s.counts).toEqual({ bekleyen: 2, bitiyor: 0, dolmus: 1, belgesiz: 1, iptal: 0, bilinmiyor: 0, teyitsiz: 0 });
     expect(s.total).toBe(3);
     expect(s.ids.dolmus).toEqual(["c"]);
   });
@@ -129,7 +130,12 @@ describe("yetki kuyruğu sözleşmesi", () => {
 
   it("her action requirePermission('portals', 'edit') ile kapılı ve İYS kapısından geçer", () => {
     const src = read("src/app/actions/authority-queue.ts");
-    expect((src.match(/requirePermission\("portals", "edit"\)/g) ?? []).length).toBe(2);
+    // EP2: her dışa açık eylem kapılıdır (yazanlar portals:edit, yalnız okuyan eşleştirme araması portals:view).
+    const exported = (src.match(/^export async function /gm) ?? []).length;
+    const edit = (src.match(/requirePermission\("portals", "edit"\)/g) ?? []).length;
+    const view = (src.match(/requirePermission\("portals", "view"\)/g) ?? []).length;
+    expect(edit + view).toBe(exported);
+    expect(view).toBe(1);
     expect(src).toContain('kind: "authority_reminder"');
     expect(src.indexOf("gateIysRecipient(")).toBeLessThan(src.indexOf("sendSignerSms(gate.tenantId"));
     expect(src).not.toMatch(/createAdminClient/);
@@ -151,10 +157,11 @@ describe("yetki kuyruğu sözleşmesi", () => {
     expect(existsSync(join(process.cwd(), "supabase/rollbacks/20261008001300_property_authority_status.rollback.sql"))).toBe(true);
   });
 
-  it("portal yayını yetki uyarısını döner (engellemez)", () => {
+  it("portal yayını yetki kapısından geçer: iptal/dolmuşta engeller, diğerlerinde uyarı döner (EP2)", () => {
     const src = read("src/app/actions/portal-publish.ts");
-    expect(src).toContain("authorityPublishWarning(");
+    expect(src).toContain("authorityPublishGate(");
     expect(src).toContain("warning");
+    expect(read("src/lib/eids/ledger.ts")).toContain("authorityPublishWarning(");
   });
 
   it("insights kuralı yalnız bitişi geçmişi yakalar (deadline@1 / authority_renewal@1 ile çakışmaz)", () => {

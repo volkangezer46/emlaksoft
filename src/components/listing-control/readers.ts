@@ -217,8 +217,11 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
 
   const config = tenantId ? await loadListingControlConfig(db, tenantId) : normalizeListingControlConfig(null);
   // EİDS taşınmaz no ayrı, hataya dayanıklı okunur (sütun yoksa ölçülemedi).
-  const eidsRes = await db.from("properties").select("eids_property_no").eq("id", propertyId).maybeSingle();
-  const eidsPresent = eidsRes.error ? null : hasValidEidsNo((eidsRes.data as { eids_property_no?: string | null } | null)?.eids_property_no);
+  // Yetki defteri sütunları (20261013007100) yoksa yalnız numaraya düşülür.
+  let eidsRes = await db.from("properties").select("eids_property_no, authority_eids_status, eids_exempt_reason").eq("id", propertyId).maybeSingle();
+  if (eidsRes.error && isMissingSchema(eidsRes.error)) eidsRes = await db.from("properties").select("eids_property_no").eq("id", propertyId).maybeSingle();
+  const eidsRow = (eidsRes.data ?? null) as { eids_property_no?: string | null; authority_eids_status?: string | null; eids_exempt_reason?: string | null } | null;
+  const eidsPresent = eidsRes.error ? null : hasValidEidsNo(eidsRow?.eids_property_no);
   const inputs = buildHealthInputs(
     {
       hasAdvisor: !!p?.assigned_to,
@@ -226,6 +229,8 @@ export async function loadLifecycle(db: Db, tenantId: string | null, propertyId:
       updatedAt: p?.updated_at ?? null,
       authorizationEnd: p?.authorization_end ?? null,
       eidsNoPresent: eidsPresent,
+      eidsStatus: eidsRow?.authority_eids_status ?? null,
+      eidsExempt: Boolean(eidsRow?.eids_exempt_reason),
       authorityShort: p ? evaluateAuthorityTerm({ start: p.authorization_start, end: p.authorization_end }, nowMs).short : false,
       listings: ls.map((l) => {
         const h = healthMap.get(l.id);
