@@ -146,3 +146,5 @@ değişince yeniden yayın).
 ## Bekleyen ürün işleri (taşıma sonrası)
 - Durdurulan "ana beyin" iş akışı (hata avcıları + internet araştırması + karar + uygulama) taşımadan sonra yeniden çalıştırılacak.
 - Sahipten beklenenler: destek e-postasının gerçek adresi (`.app` mı `.com.tr` mi), Chrome eklenti kimliği (0.4.0 incelemede, 0.5.0 hazır), EVDS anahtarı, Nilvera test faturası, portal ortaklık başvuruları.
+
+- **2026-10-13 12:05** — Eklenti 0.6.0 canlı altyapı tamam: P1–P4 deploy (7d57844d), imzalı tohum v1 yayınlandı (sahibinden/hepsiemlak/emlakjet, kid k1), E2E/admin/Demo kiracıları öğrenmeden dışlandı, `auto_publish` kapalı. Mağaza paketi `/root/eklenti-0.6.0/emlaksoft-ilan-kontrol-0.6.0.zip` (sha256 bf50f75e…, canlı indirme ile birebir). Gizlilik/çerez/KVKK metinleri: çerezsiz anonim ziyaret ölçümü, kayıt kaynağı (meşru menfaat), barındırma Almanya (Nürnberg); ana sayfa "Frankfurt" ifadeleri düzeltildi. Sıradaki: SEO/Reklam/Hız SP1–SP4 birleştir → gate → deploy; SP migration'ları sahip `npm run db:migrate`.
