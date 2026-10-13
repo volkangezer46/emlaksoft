@@ -6,6 +6,8 @@
  * hiçbiri yoksa "Müşteri ekle". Yalnız GERÇEK sayı > 0 olan adım aday olur (sahte vaat yok).
  */
 
+import type { OnboardingState } from "@/lib/onboarding-checklist";
+
 export type NextActionTone = "brand" | "danger" | "warn" | "success";
 
 export type NextAction = {
@@ -33,6 +35,16 @@ export type NextActionInput = {
 };
 
 export const FALLBACK_ACTION_KEY = "musteri-ekle";
+
+/**
+ * Kurulum adayı: yetkiye göre DARALTILMIŞ durumdan (loadOnboardingState → scopeOnboardingToPermissions) sıradaki adım.
+ * Kurulum bitmiş/oturmuşsa ya da kullanıcının yapabileceği eksik adım yoksa null (aday olmaz).
+ */
+export function onboardingNextOf(state: OnboardingState | null): NextActionInput["onboardingNext"] {
+  if (!state || state.complete || state.settled) return null;
+  const step = state.steps.find((s) => s.id === state.nextId) ?? state.steps.find((s) => !s.done);
+  return step ? { title: step.title, href: `/app/baslangic?adim=${step.id}` } : null;
+}
 
 export const FALLBACK_ACTION: NextAction = {
   key: FALLBACK_ACTION_KEY,

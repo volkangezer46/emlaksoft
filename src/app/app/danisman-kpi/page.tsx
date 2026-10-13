@@ -427,7 +427,8 @@ export default async function DanismanKpiPage({
                       Skor <span className="numeric font-bold text-text">{a.score}</span>
                       {a.revenue > 0 && showRevenue(a.id) ? ` · ${money(a.revenue)}` : ""} · {a.dealCount} satış
                     </p>
-                    <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${stil.bar}`} aria-hidden="true" />
+                    {/* Tek kişilik podyumda basamak çubuğu boş bir blok olarak kalır: yalnız sıralama varken çizilir. */}
+                    {podium.length > 1 ? <div className={`mt-3 w-full rounded-t-[var(--radius-control)] ${stil.bar}`} aria-hidden="true" /> : null}
                   </Link>
                 );
               })}
@@ -546,7 +547,7 @@ export default async function DanismanKpiPage({
           {office?.name ?? "Emlak ofisi"}
         </p>
         <div className="mt-1 flex flex-wrap items-end justify-between gap-4">
-          <h1 className="font-display text-2xl font-extrabold tracking-[-0.02em] text-text">Danışman karnesi</h1>
+          <h2 className="font-display text-2xl font-extrabold tracking-[-0.02em] text-text">Danışman karnesi</h2>
           <dl className="text-right text-xs text-text-muted">
             <div className="flex justify-end gap-2">
               <dt>Dönem</dt>

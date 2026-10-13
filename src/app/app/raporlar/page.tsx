@@ -80,6 +80,10 @@ function istanbulYearMonth(iso: string) {
   return { year: get("year"), month: get("month") - 1 };
 }
 
+/** Gelir/gider trend kutusundaki etiket bağlantısı: ::after ile tüm kutuyu tıklanır yapar (dl yapısı bozulmadan). */
+const TREND_LINK =
+  "focus-ring flex items-center gap-1.5 rounded-[var(--radius-control)] after:absolute after:inset-0 after:rounded-[var(--radius-control)] after:content-['']";
+
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { tenantId } = await requireModulePage("reports", "/app/raporlar");
   const sp = await searchParams;
@@ -366,32 +370,39 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         {hasTrendData ? (
           <>
+            {/* dl > div > dt + dd (geçerli tanım listesi). Kartın tamamı tıklanır: bağlantı dt içinde, ::after ile kutuyu kaplar. */}
             <dl className="mt-3 grid divide-y divide-line/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
-                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  Toplam gelir
-                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+              <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
+                <dt className="text-xs font-semibold text-text-muted">
+                  <Link href="/app/komisyon" className={TREND_LINK}>
+                    Toplam gelir
+                    <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                  </Link>
                 </dt>
                 <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${POS}`}>
                   {money(trendIncomeTotal)}
                   {incomeVsPrevPeriod ? <TrendPill trend={incomeVsPrevPeriod} className="ml-2 align-middle" /> : null}
                 </dd>
-                {hasPrevPeriodData ? <p className="text-xs tabular-nums text-text-faint">Önceki 6 ay {money(prevIncomeTotal)}</p> : null}
-              </Link>
-              <Link href="/app/giderler" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
-                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  Toplam gider
-                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                {hasPrevPeriodData ? <dd className="text-xs tabular-nums text-text-faint">Önceki 6 ay {money(prevIncomeTotal)}</dd> : null}
+              </div>
+              <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
+                <dt className="text-xs font-semibold text-text-muted">
+                  <Link href="/app/giderler" className={TREND_LINK}>
+                    Toplam gider
+                    <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                  </Link>
                 </dt>
                 <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${NEG}`}>{money(trendExpenseTotal)}</dd>
-              </Link>
-              <Link href="/app/komisyon" className="focus-ring group block min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
-                <dt className="flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  Net
-                  <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+              </div>
+              <div className="group relative min-h-10 rounded-[var(--radius-control)] px-3 py-2 transition hover:bg-surface-hover touch:min-h-11">
+                <dt className="text-xs font-semibold text-text-muted">
+                  <Link href="/app/komisyon" className={TREND_LINK}>
+                    Net
+                    <ArrowUpRight className="ml-auto h-4 w-4 text-text-faint opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                  </Link>
                 </dt>
                 <dd className={`mt-1 font-display text-lg font-extrabold tabular-nums ${trendNet >= 0 ? POS : NEG}`}>{money(trendNet)}</dd>
-              </Link>
+              </div>
             </dl>
 
             {/* Etkileşimli çizgi trend — crosshair + tooltip'te gelir/gider/net (a11y tablo + klavye bileşende) */}

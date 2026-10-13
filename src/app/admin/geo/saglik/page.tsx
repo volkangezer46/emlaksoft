@@ -8,6 +8,8 @@ export default async function AdminGeoHealthPage() {
   const h = await getGeoHealth();
   return (
     <div className="space-y-6">
+      {/* Sekme şeridi görsel başlık işlevi görür; sayfanın tek h1'i ekran okuyucu için. */}
+      <h1 className="sr-only">Coğrafya veri sağlığı</h1>
       <GeoHealthCard />
 
       <section id="ilcesiz-il" className="space-y-2">

@@ -29,6 +29,22 @@ export function paceGauge(current: number, previous: number): PaceGauge | null {
   return { value: current, max: Math.max(current, previous), target: previous, ratioPct: Math.round((current / previous) * 100) };
 }
 
+/** Geçen ay bu eşiğin altındaysa oran yanıltıcıdır (1 → 32 = "%3200"): halka yüzde yerine fark gösterir. */
+export const PACE_MIN_PREV_FOR_RATIO = 5;
+
+/**
+ * Halkanın ortasındaki metin. Geçen ay küçükse (< 5) yüzde yerine fark ("+31"), aksi halde yüzde %100'de
+ * sınırlanır (taşma "geçen ayı geçti" ile anlatılır; %100'ü aşan halka yok).
+ */
+export function paceRingLabel(g: PaceGauge): { main: string; caption: string } {
+  if (g.target < PACE_MIN_PREV_FOR_RATIO) {
+    const diff = g.value - g.target;
+    return { main: diff === 0 ? "±0" : diff > 0 ? `+${diff}` : `−${Math.abs(diff)}`, caption: "geçen aydan fark" };
+  }
+  if (g.ratioPct > 100) return { main: "%100", caption: "geçen ayı geçti" };
+  return { main: `%${g.ratioPct}`, caption: "geçen ayın" };
+}
+
 /**
  * Tempo yorumu: ay ilerlemesine göre beklenen değer = geçen ay × geçen süre oranı.
  * "ahead" beklenenin üstünde, "behind" %10'dan fazla altında, aksi "on-track".

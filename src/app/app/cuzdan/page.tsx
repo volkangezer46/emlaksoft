@@ -209,9 +209,9 @@ export default async function CuzdanPage({
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-accent-text">
               {office?.name ?? "Emlak ofisi"}
             </p>
-            <h1 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-text">
+            <h2 className="mt-1 font-display text-2xl font-extrabold tracking-[-0.02em] text-text">
               Dönem bordrosu
-            </h1>
+            </h2>
             <p className="mt-1 text-sm text-text-muted">{fullName ?? "Danışman"}</p>
           </div>
           <dl className="text-right text-xs text-text-muted">

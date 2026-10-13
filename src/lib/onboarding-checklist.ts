@@ -16,8 +16,10 @@ import {
   isWizardStepKey,
   type OnboardingFacts,
   type OnboardingStepId,
+  type Permission,
   type WizardStepKey,
 } from "@/lib/onboarding-steps";
+import type { EffectivePermissions } from "@/lib/permissions-effective";
 
 export { FINISH_STEP, ONBOARDING_STEP_IDS, isOnboardingStepId, isWizardStepKey };
 export type { OnboardingFacts, OnboardingStepId, WizardStepKey };
@@ -30,6 +32,8 @@ export type OnboardingStep = {
   short: string;
   /** Özel gövdesi olmayan adımın götürdüğü sayfa. */
   href?: string;
+  /** Adımı yapabilmek için gereken yetki; yoksa kişisel adım (bkz. `OnboardingStepDef.requires`). */
+  requires?: Permission;
   done: boolean;
 };
 
@@ -52,9 +56,13 @@ export function buildOnboarding(facts: OnboardingFacts, skipped: readonly Onboar
     title: d.title,
     description: d.description,
     ...("href" in d && typeof d.href === "string" ? { href: d.href } : {}),
+    ...("requires" in d && d.requires ? { requires: d.requires } : {}),
     done: d.isDone(facts),
   }));
+  return summarize(steps, skipped);
+}
 
+function summarize(steps: OnboardingStep[], skipped: readonly OnboardingStepId[]): OnboardingState {
   const total = steps.length;
   const doneCount = steps.filter((s) => s.done).length;
   const next = steps.find((s) => !s.done && !skipped.includes(s.id)) ?? null;
@@ -67,6 +75,26 @@ export function buildOnboarding(facts: OnboardingFacts, skipped: readonly Onboar
     settled: next === null,
     complete: doneCount === total,
   };
+}
+
+function permitted(perms: EffectivePermissions, req: Permission | undefined): boolean {
+  return !req || (perms[req.module] ?? []).includes(req.action);
+}
+
+/**
+ * Ana ekran Başlangıç kartı için durumu kullanıcının YAPABİLDİĞİ adımlara daraltır: yetkisi olmayan adım (ofis bilgileri,
+ * giderler, havuz, paket…) listeden çıkar, yüzde/sıradaki/`settled` yalnız kalanlardan hesaplanır. Danışmanda yalnız
+ * kişisel adımlar ("Sen ve uzmanlığın") kalır; hepsi tamamsa `settled` olur ve kart gizlenir.
+ */
+export function scopeOnboardingToPermissions(
+  state: OnboardingState,
+  perms: EffectivePermissions,
+  skipped: readonly OnboardingStepId[] = [],
+): OnboardingState {
+  return summarize(
+    state.steps.filter((s) => permitted(perms, s.requires)),
+    skipped,
+  );
 }
 
 /** Sihirbazda gösterilecek adım: geçerli istek yoksa sıradaki; hepsi bitmişse özet. */
@@ -97,7 +125,15 @@ export type FirstTaskCounts = {
   customDefinitions: number;
 };
 
-export type FirstTask = { id: "data" | "property" | "demand" | "appointment" | "defs"; title: string; description: string; href: string; done: boolean };
+export type FirstTask = {
+  id: "data" | "property" | "demand" | "appointment" | "defs";
+  title: string;
+  description: string;
+  href: string;
+  done: boolean;
+  /** Görevi yapabilmek için gereken yetki (bkz. `visibleFirstTasks`). */
+  requires?: Permission;
+};
 
 /** Ana ekrandaki Başlangıç kartının "ilk işler" kontrol listesi (sihirbaz adımı değil). */
 export function buildFirstTasks(c: FirstTaskCounts): FirstTask[] {
@@ -106,6 +142,11 @@ export function buildFirstTasks(c: FirstTaskCounts): FirstTask[] {
     { id: "property", title: "İlk portföyünü gir", description: "Başlık, fiyat ve konum yeterli.", href: "/app/portfoyler/yeni", done: c.properties > 0 },
     { id: "demand", title: "İlk talebi kaydet", description: "Bütçe ve bölgeyi gir; uygun portföyler eşleşir.", href: "/app/talepler/yeni", done: c.demands > 0 },
     { id: "appointment", title: "İlk randevuyu planla", description: "Yer gösterme ya da görüşmeyi takvime yaz.", href: "/app/randevular/yeni", done: c.appointments > 0 },
-    { id: "defs", title: "Tanımlarını gözden geçir", description: "Kayıp nedenleri ve aşama adları ofisinin diline uysun.", href: "/app/ayarlar/tanimlar", done: c.customDefinitions > 0 },
+    { id: "defs", title: "Tanımlarını gözden geçir", description: "Kayıp nedenleri ve aşama adları ofisinin diline uysun.", href: "/app/ayarlar/tanimlar", done: c.customDefinitions > 0, requires: { module: "settings", action: "edit" } },
   ];
+}
+
+/** Kullanıcının yapabildiği ilk işler ("Tanımlarını gözden geçir" düzenleme yetkisi olmayana gösterilmez). */
+export function visibleFirstTasks(tasks: readonly FirstTask[], perms: EffectivePermissions): FirstTask[] {
+  return tasks.filter((t) => permitted(perms, t.requires));
 }

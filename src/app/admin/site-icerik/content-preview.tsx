@@ -58,6 +58,10 @@ export function ContentPreview({ cfg }: { cfg: SiteContent }) {
         </div>
       ) : null}
       <div className="mk mt-3 max-h-[36rem] overflow-auto rounded-[var(--radius-card)] border border-line" onClickCapture={block}>
+        {/* Önizleme yalnız görseldir: `inert` alt ağacı erişilebilirlik ağacından ve odak sırasından çıkarır. Böylece
+            gerçek ana sayfa kahramanının h1'i yönetim sayfasında ikinci h1 olmaz (sayfa başına tek h1), önizleme
+            bağlantıları da sekmeyle odaklanmaz. Kaydırma dış kapta kalır. Pazarlama bileşenlerine dokunulmaz. */}
+        <div inert>
         {part === "hero" ? <HeroSection trialDays={trialDays} plans={PLANS} content={cfg.hero} /> : null}
         {part === "cards" ? (
           <>
@@ -70,6 +74,7 @@ export function ContentPreview({ cfg }: { cfg: SiteContent }) {
         {part === "security" ? <SecurityBand trialDays={trialDays} plans={PLANS} content={cfg.security} heading={cfg.sections.guvenlik} /> : null}
         {part === "faq" ? <Faq items={faqs} heading={cfg.sections.sss} /> : null}
         {part === "final" ? <FinalCta trialDays={trialDays} plans={PLANS} content={cfg.finalCta} /> : null}
+        </div>
       </div>
       <p className="mt-2 text-xs text-text-faint">Ürün turu, özellik ızgarası, ayrıntılar ve karşılaştırma bölümlerinin başlıkları sunucuda paket verisiyle çizilir; değişiklik yayınlandığında ana sayfada görünür.</p>
     </section>

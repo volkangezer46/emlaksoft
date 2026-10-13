@@ -12,6 +12,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { afterFirstScreen, EXPIRING_CAP, loadClosures, loadExpiringAuthority, loadLiveListings, type HomeCtx } from "./data";
 import { overdueListingsOf, portalHealth } from "./helpers";
+import { scopeLabel } from "@/lib/metric-labels";
 
 /**
  * İLAN SAĞLIĞI — ana ekranda ilan olgularının TEK bloğu. Eskiden aynı olgu dört yerde yaşıyordu (Portföy sağlığı kartı,
@@ -120,9 +121,9 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
           <h2 id="ilan-sagligi-baslik" className="ds-title">
             İlan sağlığı
           </h2>
-          <p className="ds-sub mt-0.5">
+          <p className="ds-sub mt-0.5" title={hasSummary ? scopeLabel("tracked", { detail: true }) : undefined}>
             {ownRow || !ctx.isManagement ? "Kendi portföyleriniz" : "Ofis geneli"}
-            {hasSummary ? ` · ${s.total_active} aktif portföy` : ""}
+            {hasSummary ? ` · ${s.total_active} ${scopeLabel("tracked", { lower: true })} portföy` : ""}
           </p>
         </div>
         <Link href="/app/ilan-kontrol" className="ds-link focus-ring">

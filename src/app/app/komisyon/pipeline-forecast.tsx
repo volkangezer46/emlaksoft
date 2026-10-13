@@ -7,6 +7,7 @@ import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 import { buildPipelineForecast, LOOKBACK_DAYS, MIN_CLOSED } from "@/lib/forecast/pipeline";
 import { formatTry } from "@/lib/format";
 import { now } from "@/lib/clock";
+import { periodLabel } from "@/lib/metric-labels";
 
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 const monthLabel = (key: string) => `${MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`;
@@ -79,7 +80,7 @@ export async function PipelineForecastCard({ tenantId }: { tenantId: string }) {
             </div>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-text-faint">
-            Yöntem: son 12 ayın kazanma oranı{" "}
+            Yöntem: kazanma oranı ({periodLabel("last12m")}){" "}
             {r.winRates.map((w) => `${w.dealType === "rent" ? "kiralık" : "satış"} %${Math.round(w.rate * 100)} (${w.closed} kapanış)`).join(", ")}
             {r.medianCycleDays != null ? `; medyan kapanış süresi ${r.medianCycleDays} gün` : ""}. Aşama bazlı olasılık kullanılmaz (aşama geçmişi tutulmuyor).
             {r.excludedNoValue > 0 ? ` Tutarı girilmemiş ${r.excludedNoValue} anlaşma dahil değil.` : ""}

@@ -57,6 +57,11 @@ html[data-theme="dark"] {
   .pm-card { transition: box-shadow var(--motion-fast) var(--ease-out), border-color var(--motion-fast) var(--ease-out), translate var(--motion-fast) var(--ease-out); }
 }
 .pm-card:hover { box-shadow: var(--inner-top), var(--pm-shadow-hover); border-color: color-mix(in srgb, var(--t, var(--accent)) 38%, var(--hairline)); }
+/* Sönük (sıfır değerli) kart: opaklık YOK (metin kontrastı düşerdi); kesikli kenar + gömük zemin + gölgesiz.
+   Hover'da normal karta döner (tıklanabilir olduğu belli olsun). */
+.pm-card-dim { background: var(--surface-sunken); border-style: dashed; border-color: var(--line); box-shadow: none; }
+.pm-card-dim .pm-ico { filter: saturate(0.4); }
+.pm-card-dim:hover { background: var(--surface-raised); border-style: solid; }
 .pm-card-head { display: flex; align-items: center; gap: 0.7rem; }
 @media (max-width: 639px) { .pm-card-head { gap: 0.5rem; } }
 .pm-ico {
@@ -91,6 +96,8 @@ html[data-theme="dark"] {
   min-width: 0;
 }
 .pm-value-long { font-size: clamp(1.125rem, 0.9rem + 1vw, var(--fs-kpi)); }
+/* Alt satır --text-muted: açık temada beyaz/sunken zeminde ≥ 5.3:1, koyu temada ≥ 7:1 (AA 4.5:1). Üstüne opaklık
+   uygulanmaz; sönük kart (.pm-card-dim) yalnız kenar/zemin tonunu değiştirir. */
 .pm-sub { font-size: 0.8125rem; color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .pm-chart { margin-top: auto; padding-top: 0.6rem; }
 

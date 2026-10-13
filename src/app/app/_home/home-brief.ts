@@ -8,6 +8,7 @@
  * - `scheduleWarnings`: bugünün programında sıkışık ardışık randevu uyarısı (yalnız gerçek saatlerden).
  */
 import type { Insight, InsightSeverity } from "@/lib/insights/types";
+import { formatDateTr } from "@/lib/format";
 
 export type BriefingMode = "insight" | "fallback";
 
@@ -49,9 +50,32 @@ export const SEVERITY_TONE: Record<InsightSeverity, "danger" | "warn" | "brand">
   bilgi: "brand",
 };
 
+/** Değerin başındaki ISO tarih/zaman ("2026-09-29", "2026-09-29T10:00:00Z"). */
+const ISO_PREFIX = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?/;
+const CHIP_DATE: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+
+/** ISO ile başlayan kanıt değerini Türkçe tarihe çevirir ("2026-09-29" → "29 Eyl 2026"); çözülemezse aynen kalır. */
+export function humanizeEvidenceValue(value: string): string {
+  const m = ISO_PREFIX.exec(value);
+  if (!m) return value;
+  const d = new Date(m[0].length === 10 ? `${m[0]}T12:00:00Z` : m[0]);
+  if (Number.isNaN(d.getTime())) return value;
+  return formatDateTr(d, CHIP_DATE) + value.slice(m[0].length);
+}
+
+/**
+ * Kullanıcıya gösterilecek kanıtlar: boş etiket/değer ve iç sıralama notu ("Sıra", motorun öncelik açıklaması)
+ * elenir, ISO tarih değerleri "29 Eyl 2026" biçimine çevrilir.
+ */
+function visibleEvidence(evidence: Insight["evidence"]): Insight["evidence"] {
+  return evidence
+    .filter((e) => e.label.trim() && e.value.trim() && e.label.trim() !== "Sıra")
+    .map((e) => ({ ...e, value: humanizeEvidenceValue(e.value) }));
+}
+
 /** Odak kartının "neden" etiketleri: kanıt satırları "etiket: değer" (en çok `max`). */
 export function evidenceChips(insight: Pick<Insight, "evidence">, max = 4): { label: string; value: string; href?: string }[] {
-  return insight.evidence.filter((e) => e.label.trim() && e.value.trim()).slice(0, max);
+  return visibleEvidence(insight.evidence).slice(0, max);
 }
 
 /* --------------------------------- Bugün ara -------------------------------- */
@@ -76,7 +100,7 @@ export function buildCallRows(leads: readonly CallLeadInput[], insights: readonl
     const cid = ins.entityType === "customer" ? ins.entityId : null;
     const lead = cid ? byCustomer.get(cid) : undefined;
     if (cid) used.add(cid);
-    const reasons = ins.evidence.map((e) => `${e.label}: ${e.value}`).slice(0, 3);
+    const reasons = visibleEvidence(ins.evidence).map((e) => `${e.label}: ${e.value}`).slice(0, 3);
     rows.push({
       key: `i-${ins.id}`,
       customerId: cid,

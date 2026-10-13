@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { markAllPlatformNotificationsRead, markPlatformNotificationRead } from "@/app/actions/platform-notifications";
+import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
 
 type Notif = {
   id: string;
@@ -124,7 +125,8 @@ export function NotificationBell() {
       setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
       await markPlatformNotificationRead(n.id);
     }
-    if (n.href) router.push(n.href);
+    const href = notificationHref(n);
+    if (href) router.push(href);
   };
 
   const markAll = async () => {
@@ -155,7 +157,7 @@ export function NotificationBell() {
             </span>
             <span className="shrink-0 text-xs text-text-faint">{relTime(n.created_at)}</span>
           </span>
-          {n.body ? <span className="mt-0.5 block truncate text-xs text-text-muted">{n.body}</span> : null}
+          {n.body ? <span className="mt-0.5 block truncate text-xs text-text-muted">{stripNotificationMarker(n.body)}</span> : null}
         </span>
       </button>
     );

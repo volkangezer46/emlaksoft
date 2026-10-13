@@ -81,7 +81,8 @@ export function KpiTile({
     layout === "inline" && "pm-card-inline",
     tinted && "pm-card-tint",
     href && "focus-ring group",
-    dim && "opacity-70 hover:opacity-100",
+    // Sıfır/ikincil kart: soluk görünüm opaklıkla DEĞİL kenar + zemin tonuyla (metin kontrastı ≥ 4.5:1 kalır).
+    dim && "pm-card-dim",
     className,
   );
   // Uzun biçimli tutar ("44.300.000 ₺") kartı taşırmasın: boyut küçülür, ₺ ayrılmaz boşlukla yapışır.

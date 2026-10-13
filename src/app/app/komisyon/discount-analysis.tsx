@@ -19,6 +19,18 @@ const MONTHS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl",
 const monthLabel = (key: string) => `${MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(2, 4)}`;
 const rateText = (n: number) => `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(n)}`;
 
+/** "YYYY-AA" ayının son günü ("YYYY-AA-GG"); saf takvim aritmetiği. */
+const monthEndKey = (key: string) => {
+  const [y, m] = key.split("-").map(Number);
+  return `${key}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+};
+/**
+ * Analizin popülasyonu (kazanılan, örnek olmayan SATIŞ anlaşmaları, güncelleme tarihi aralıkta) anlaşma listesinde
+ * sunucu süzgeçleriyle birebir açılır (`/app/anlasmalar` ?asama=won&tur=satis&ornek=haric&from=&to=).
+ */
+const salesHref = (from: string, to?: string, advisorId?: string) =>
+  `/app/anlasmalar?gorunum=liste&asama=won&tur=satis&ornek=haric&from=${from}${to ? `&to=${to}` : ""}${advisorId ? `&danisman=${advisorId}` : ""}`;
+
 type Rel<T> = T | T[] | null;
 const one = <T,>(v: Rel<T>): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
 
@@ -113,10 +125,13 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Link href="/app/anlasmalar?gorunum=liste&asama=won" className="focus-ring rounded-[var(--radius-card)] border border-line p-3">
+          <Link href={salesHref(`${months[0]}-01`)} className="focus-ring rounded-[var(--radius-card)] border border-line p-3">
             <p className="text-xs text-text-muted">Analiz edilen satış</p>
             <p className="numeric font-display text-xl font-extrabold text-text">{result.salesAnalyzed}</p>
           </Link>
+          {/* İndirimli satış ve kaçan gelir, portföyün GÜNCEL oranı ile ofis standardı karşılaştırılarak burada hesaplanır;
+              anlaşma listesinde bu kümeyi veren bir sunucu süzgeci yok. Sahte bağlantı verilmez: kalemler aşağıdaki
+              "En büyük indirimler" tablosunda tek tek anlaşmaya iner. */}
           <div className="rounded-[var(--radius-card)] border border-line p-3">
             <p className="text-xs text-text-muted">İndirimli satış</p>
             <p className="numeric font-display text-xl font-extrabold text-text">{result.discountedCount}</p>
@@ -150,7 +165,11 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
                     <span className="h-2 overflow-hidden rounded-full bg-line" aria-hidden>
                       <span className="block h-full rounded-full bg-danger-500" style={{ width: `${Math.round((m.leak / maxLeak) * 100)}%` }} />
                     </span>
-                    <Link href={`/app/komisyon?from=${m.key}-01`} className="focus-ring numeric rounded hover:underline">
+                    <Link
+                      href={salesHref(`${m.key}-01`, monthEndKey(m.key))}
+                      title={`${monthLabel(m.key)}: kazanılan satışlar`}
+                      className="focus-ring numeric rounded hover:underline"
+                    >
                       {m.leak > 0 ? formatTry(m.leak) : "—"}
                     </Link>
                   </li>
@@ -217,7 +236,7 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
                       {result.advisors.slice(0, 10).map((a) => (
                         <TR key={a.advisorId}>
                           <TD primary className="font-semibold text-text">
-                            <Link href={`/app/anlasmalar?gorunum=liste&asama=won&danisman=${a.advisorId}`} className="focus-ring rounded hover:underline">{a.name}</Link>
+                            <Link href={salesHref(`${months[0]}-01`, undefined, a.advisorId)} className="focus-ring rounded hover:underline">{a.name}</Link>
                           </TD>
                           <TD label="İndirimli satış" align="right" className="numeric">{a.deals}</TD>
                           <TD label="Ort. indirim" align="right" className="numeric">{new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 2 }).format(a.avgCutPoints)} puan</TD>

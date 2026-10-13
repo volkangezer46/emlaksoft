@@ -26,6 +26,7 @@ import { markAllRead, markReadById, runOptimistic } from "@/lib/optimistic";
 import { daysFromNowIso, msSince, now as clockNow, trDayStartMs } from "@/lib/clock";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AutoAnimate } from "@/components/ui/auto-animate";
+import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
@@ -181,15 +182,16 @@ export function NotificationBellPanel({
             {!n.read_at ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" /> : null}
             <span className="truncate">{n.title}</span>
           </p>
-          {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{n.body}</p> : null}
+          {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-text-muted">{stripNotificationMarker(n.body)}</p> : null}
           <p className="mt-1 text-xs text-text-faint">{relTime(n.created_at)}</p>
         </div>
       </div>
     );
-    return n.href ? (
+    const href = notificationHref(n);
+    return href ? (
       <Link
         key={n.id}
-        href={n.href}
+        href={href}
         onClick={() => {
           void onRead(n.id);
           setOpen(false);

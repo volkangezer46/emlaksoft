@@ -75,7 +75,7 @@ type DueLite = {
 export default async function AidatPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string; bsayfa?: string; sekme?: string; bina?: string; bolum?: string; daire?: string }>;
+  searchParams?: Promise<{ durum?: string; donem?: string; sayfa?: string; bsayfa?: string; sekme?: string; bina?: string; bolum?: string; daire?: string; odeme?: string }>;
 }) {
   const { perms, tenantId } = await requireModulePage("expenses", "/app/aidat");
   const params = (await searchParams) ?? {};
@@ -122,21 +122,24 @@ export default async function AidatPage({
 
   const durumF = DURUM_FILTERS.includes(params.durum as DurumFilter) ? (params.durum as DurumFilter) : "";
   const donemF = DONEM_RE.test(params.donem ?? "") ? params.donem! : "";
+  // ?odeme=YYYY-AA: o ay TAHSİL EDİLEN (paid_at) aidatlar — "Bu ay tahsil" kartının listesi (dönem = tahakkuk ayıdır, farklı küme).
+  const odemeF = DONEM_RE.test(params.odeme ?? "") ? params.odeme! : "";
   const canCreate = perms.expenses?.includes("create") ?? false;
   const canEdit = perms.expenses?.includes("edit") ?? false;
   const page = Math.max(1, Number.parseInt(params.sayfa ?? "", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
   // Mevcut filtreleri koruyan link üretici (sayfa taşınmaz — filtre değişince 1. sayfaya döner)
-  const href = (next: { durum?: string | null; donem?: string | null }) =>
+  const href = (next: { durum?: string | null; donem?: string | null; odeme?: string | null }) =>
     `/app/aidat${qs({
       durum: next.durum === undefined ? durumF || null : next.durum,
       donem: next.donem === undefined ? donemF || null : next.donem,
+      odeme: next.odeme === undefined ? odemeF || null : next.odeme,
     })}`;
 
   // Sayfalama linki — mevcut filtreleri korur, yalnız ?sayfa değişir.
   const pageHref = (n: number) =>
-    `/app/aidat${qs({ durum: durumF || null, donem: donemF || null, sayfa: n > 1 ? String(n) : null })}`;
+    `/app/aidat${qs({ durum: durumF || null, donem: donemF || null, odeme: odemeF || null, sayfa: n > 1 ? String(n) : null })}`;
 
   const supabase = await createClient();
   // Overdue = ödenmemiş + vadesi bugün ya da öncesi (isPast(due_date) semantiği).
@@ -152,6 +155,11 @@ export default async function AidatPage({
   if (durumF === "paid") listQuery = listQuery.eq("status", "paid");
   else if (durumF === "unpaid") listQuery = listQuery.neq("status", "paid");
   else if (durumF === "overdue") listQuery = listQuery.neq("status", "paid").lte("due_date", todayStr);
+  if (odemeF)
+    listQuery = listQuery
+      .eq("status", "paid")
+      .gte("paid_at", `${odemeF}-01T00:00:00+03:00`)
+      .lt("paid_at", `${nextMonthFirst(odemeF)}T00:00:00+03:00`);
   listQuery = listQuery
     .order("period", { ascending: false })
     .order("due_date", { ascending: true, nullsFirst: false })
@@ -257,7 +265,7 @@ export default async function AidatPage({
       value: money(chargedMonth),
       icon: <TrendingUp />,
       tone: "info",
-      href: href({ durum: null, donem: monthKey }),
+      href: href({ durum: null, donem: monthKey, odeme: null }),
       hint: bldKpi ? `tekil mülk + bina · ${monthName}` : `tekil mülk aidatı · ${monthName}`,
     },
     {
@@ -265,8 +273,12 @@ export default async function AidatPage({
       value: money(collectedMonth),
       icon: <Gauge />,
       tone: "success",
-      href: href({ durum: "paid", donem: monthKey }),
-      hint: chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok",
+      // Tahsilat ödeme tarihine (paid_at) göre sayılır: liste ?odeme= ile aynı kümeyi açar (?donem= tahakkuk ayıdır).
+      href: href({ durum: "paid", donem: null, odeme: monthKey }),
+      // Bina aidatı tahsilatı karta dahil ama ?odeme= listesi yalnız tekil mülk aidatını süzer: fark ipucunda söylenir.
+      hint: `${chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok"}${
+        (bldKpi?.collectedMonth ?? 0) > 0 ? " · liste yalnız tekil mülk aidatı" : ""
+      }`,
     },
     {
       label: "Geciken",
@@ -274,10 +286,10 @@ export default async function AidatPage({
       icon: <AlertTriangle />,
       tone: "danger",
       attention: true,
-      href: href({ durum: "overdue" }),
+      href: href({ durum: "overdue", donem: null, odeme: null }),
       hint: overdueAll > 0 ? money(overdueAllTotal) : "vadesi geçen yok",
     },
-    { label: "Toplam borç", value: money(debtAll), icon: <Coins />, tone: "warning", href: href({ durum: "unpaid" }), hint: "ödenmemiş toplam tutar" },
+    { label: "Toplam borç", value: money(debtAll), icon: <Coins />, tone: "warning", href: href({ durum: "unpaid", donem: null, odeme: null }), hint: "ödenmemiş toplam tutar" },
   ];
 
   return (
@@ -301,10 +313,10 @@ export default async function AidatPage({
           tone="success"
           format="money"
           centerLabel="toplam"
-          href={href({ durum: null })}
+          href={href({ durum: null, donem: null, odeme: null })}
           slices={[
-            { label: "Tahsil edildi", value: paidAmount, tone: "success", href: href({ durum: "paid" }) },
-            { label: "Bekleyen", value: unpaid, tone: "warn", href: href({ durum: "unpaid" }) },
+            { label: "Tahsil edildi", value: paidAmount, tone: "success", href: href({ durum: "paid", donem: null, odeme: null }) },
+            { label: "Bekleyen", value: unpaid, tone: "warn", href: href({ durum: "unpaid", donem: null, odeme: null }) },
           ]}
         />
       </ListCharts>
@@ -321,7 +333,7 @@ export default async function AidatPage({
               </span>
             </p>
             <Link
-              href={href({ durum: "overdue" })}
+              href={href({ durum: "overdue", donem: null, odeme: null })}
               className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs font-semibold text-danger-600 transition hover:text-danger-700 hover:underline"
             >
               Tümünü listede gör <ArrowUpRight className="h-3.5 w-3.5" />
@@ -331,7 +343,7 @@ export default async function AidatPage({
             {overdueDues.slice(0, 8).map((d) => {
               const prop = Array.isArray(d.property) ? d.property[0] : d.property;
               const gecikmeGun = d.due_date ? Math.max(1, Math.floor(msSince(`${d.due_date}T00:00:00`) / DAY_MS)) : 0;
-              const target = prop?.id ? `/app/portfoyler/${prop.id}` : href({ durum: "overdue" });
+              const target = prop?.id ? `/app/portfoyler/${prop.id}` : href({ durum: "overdue", donem: null, odeme: null });
               return (
                 <Link
                   key={d.id}
@@ -361,6 +373,7 @@ export default async function AidatPage({
       {/* Dönem (ay) filtresi — GET formu (?donem=YYYY-MM); ?durum= korunur */}
       <form action="/app/aidat" className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         {durumF ? <input type="hidden" name="durum" value={durumF} /> : null}
+        {odemeF ? <input type="hidden" name="odeme" value={odemeF} /> : null}
         <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Dönem:</span>
         <input
           name="donem"
@@ -380,7 +393,7 @@ export default async function AidatPage({
       </form>
 
       {/* Aktif filtre çipleri */}
-      {durumF || donemF ? (
+      {durumF || donemF || odemeF ? (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-text-muted">Filtre:</span>
           {durumF ? (
@@ -395,6 +408,14 @@ export default async function AidatPage({
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
               {donemLabel}
               <Link href={href({ donem: null })} aria-label="Dönem filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            </span>
+          ) : null}
+          {odemeF ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-600/10 px-3 py-1 text-xs font-semibold text-brand-700">
+              Ödeme ayı: {odemeF.split("-").reverse().join(".")}
+              <Link href={href({ odeme: null })} aria-label="Ödeme ayı filtresini temizle" className="focus-ring rounded-full hover:text-brand-900">
                 <X className="h-3.5 w-3.5" />
               </Link>
             </span>
