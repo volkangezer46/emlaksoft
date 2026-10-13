@@ -52,13 +52,16 @@ export async function POST(request: Request) {
     url = n.url;
   }
 
+  // B8: boş/eksik rapor null gider → SQL `coalesce(p_field_report, field_report)` önceki "filled" raporunu korur
+  // ({} null olmadığı için eskisinin üstüne yazıyordu).
+  const fieldReport = body.report && Object.keys(body.report).length > 0 ? body.report : null;
   const db = await createClient();
   const { data, error } = await db.rpc("pt_complete_session", {
     p_session_id: body.sessionId,
     p_state: body.state,
     p_external_id: externalId,
     p_url: url,
-    p_field_report: body.report ?? {},
+    p_field_report: fieldReport,
   });
   if (error) {
     console.error("pt_complete_session", { code: error.code });

@@ -299,6 +299,10 @@ const F = {
   readyProbesPgCatalog: "20261013000400_ready_probes_pg_catalog.sql",
   // AP7 (2026-10-13): platform MRR gunluk anlik goruntusu (yeni tablo; yalniz public.tenants'a FK).
   platformMrrDaily: "20261013001000_platform_mrr_daily.sql",
+  // Ogrenen eklenti 0.6.0 (2026-10-13): surumlu imzali kural setleri, oneriler/oylar, gozlem tablolari + JWT/servis RPC'leri.
+  portalRulesCore: "20261013002000_portal_rules_core.sql",
+  portalRulesRpcs: "20261013002010_portal_rules_rpcs.sql",
+  portalRulesLearn: "20261013002020_portal_rules_learn.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -506,6 +510,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.tenantIndexesDedupe]: "ek", // 11 kopya indeks dusurulur (benzersiz kisit ikizleri) + 12 tabloya tenant_id indeksi; veri/politika degismez
     [F.readyProbesPgCatalog]: "davranis", // plan_upgrade_ready/subscription_pause_ready sutun sayimi information_schema yerine pg_attribute; imza/ACL/sonuc ayni
     [F.platformMrrDaily]: "ek", // yeni tablo platform_mrr_daily (RLS: platform personeli billing/reports rolleri SELECT; yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "veri yok"
+    [F.portalRulesCore]: "ek", // 8 yeni tablo (RLS: platform tablolari pt_rules_is_operator, kiraci tablolari lc_parser_telemetry deseni; dogrudan yazma yok) + yayin degismezlik tetikleyicisi + SQL icerik dogrulayici; mevcut tablo/politika/veri degismez
+    [F.portalRulesRpcs]: "ek", // yeni JWT SECURITY DEFINER RPC'ler (pt_rules_current, pt_report_form_feedback, pt_rules_admin_*; yayin/geri alma yalniz super_admin); mevcut fonksiyonlara dokunmaz, pt_complete_session degismez
+    [F.portalRulesLearn]: "ek", // yalniz service_role fonksiyonlari (pt_rules_learn, pt_rules_publish_system, pt_learning_retention); kod fonksiyon yokken cron adimini 'skipped' gecer
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -692,6 +699,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
+    { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
@@ -877,6 +885,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.rlsInitplanFsboStaff, F.fsboSelectScope],
     // Portal aktarim RPC'leri lc_bind_portal_listing (002000), lc_row_visible (002010) ve lc_mark_state_stale (002040) cekirdegine dayanir.
     [F.portalTransferSessions, F.lcInventoryMatching],
+    // Ogrenen kurallar: RPC'ler ve ogrenme cekirdek tablolara, cekirdek portal_transfer_sessions'a (FK) dayanir.
+    [F.portalRulesRpcs, F.portalRulesCore],
+    [F.portalRulesLearn, F.portalRulesCore],
+    [F.portalRulesCore, F.portalTransferSessions],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

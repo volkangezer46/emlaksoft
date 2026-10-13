@@ -38,3 +38,9 @@ export const BRIDGE_TRANSFER_DONE_ENDPOINT = "/api/app/portal-aktar/tamamla";
 export const BRIDGE_IMPORT_ENDPOINT = "/api/app/portal-aktar/ice-al";
 /** Aktarılacak portföy fotoğrafı (mevcut yetkili medya ucu; oturum + kiracı kapsamı sunucuda). */
 export const BRIDGE_MEDIA_PATH = "/api/property-media";
+
+/** Öğrenen kurallar (0.6.0): imzalı kural setleri (GET, ETag) ve rızalı geri bildirim (POST); aynı köken + aynı başlık kuralı. */
+export const BRIDGE_RULES_ENDPOINT = "/api/app/portal-aktar/kurallar";
+export const BRIDGE_FEEDBACK_ENDPOINT = "/api/app/portal-aktar/gozlem";
+/** İçerik betiğinin gönderdiği eklenti sürümü (chrome.runtime.getManifest().version). Kimlik değildir; yalnız uyumluluk. */
+export const EXT_VERSION_HEADER = "x-emlaksoft-ext";

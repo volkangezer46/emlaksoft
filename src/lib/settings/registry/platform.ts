@@ -159,6 +159,68 @@ const general: AnySettingDef[] = [
   }),
 ];
 
+/** Öğrenen eklenti kuralları (/admin/sistem?sekme=portal-kurallari). SQL `pt_rules_learn` aynı anahtarları okur. */
+export const PORTAL_RULES_HOME = { href: "/admin/sistem?sekme=portal-kurallari", label: "Sistem > Portal kuralları" } as const;
+const portalRules: AnySettingDef[] = [
+  defineInt({
+    key: "portal_rules.min_tenants",
+    home: PORTAL_RULES_HOME,
+    default: 3,
+    min: 1,
+    max: 10,
+    unit: "ofis",
+    category: "bayrak",
+    label: "Portal kuralı: en az destekleyen ofis",
+    description: "Bir eşleme önerisinin 'hazır' sayılması için onu doğrulayan en az uygun ofis sayısı (ofis başına tek oy).",
+    impact: "Düşürmek, daha az ofisin gözlemiyle önerinin hazır olmasını sağlar; zehirleme riskini artırır. Otomatik yayın ayrıca kapalıdır.",
+    risk: "high",
+  }),
+  defineInt({
+    key: "portal_rules.min_sessions",
+    home: PORTAL_RULES_HOME,
+    default: 6,
+    min: 1,
+    max: 1000,
+    unit: "oturum",
+    category: "bayrak",
+    label: "Portal kuralı: en az yayınlanmış oturum",
+    description: "Bir önerinin hazır sayılması için destekleyen ofislerdeki doğrulanmış yayın oturumu toplamı.",
+    impact: "Düşürmek önerilerin daha az kanıtla hazır olmasını sağlar.",
+  }),
+  defineBool({
+    key: "portal_rules.auto_publish",
+    home: PORTAL_RULES_HOME,
+    default: false,
+    category: "bayrak",
+    label: "Portal kuralı: otomatik yayın",
+    description: "Açıkken hazır ofis önerileri (AI önerileri hariç) gece öğrenme adımında imzalı yeni sürüm olarak yayınlanır.",
+    impact: "Açılırsa yeni etiket/seçenek eşlemeleri personel onayı beklemeden tüm ofislerin eklentisine gider (sürüm başına en çok 5 değişiklik, personele bildirim).",
+    risk: "high",
+  }),
+  defineBool({
+    key: "portal_rules.auto_degrade",
+    home: PORTAL_RULES_HOME,
+    default: false,
+    category: "bayrak",
+    label: "Portal kuralı: otomatik geriletme",
+    description: "Açıkken son 14 günde uygun ofislerde hata oranı %50'yi geçen alan 'kontrol edin' durumuna otomatik alınır (haftada en çok 3).",
+    impact: "Açılırsa sorunlu alanlar eklentide uyarıyla doldurulur; uygun ofis sayısı az iken kapalı tutulmalıdır.",
+    risk: "high",
+  }),
+  defineInt({
+    key: "portal_rules.ai_min_tenants",
+    home: PORTAL_RULES_HOME,
+    default: 2,
+    min: 1,
+    max: 5,
+    unit: "ofis",
+    category: "ai",
+    label: "Portal kuralı: AI girdisi için en az ofis",
+    description: "AI önerisine yalnız bu kadar farklı ofiste görülmüş eşleşmemiş alanlar girer (alan metni k≥2 kuralıyla ayrıca sınırlı).",
+    impact: "Yükseltmek AI'ya giden alan sayısını azaltır; 2'nin altı tek ofis metnini açmaz (katalog k≥2 kapısı).",
+  }),
+];
+
 const security: AnySettingDef[] = [
   defineBool({
     key: "platform.mfa_enforced",
@@ -506,6 +568,7 @@ const ops: AnySettingDef[] = [
 export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...general,
   ...security,
+  ...portalRules,
   ...legal,
   ...growth,
   ...bridges,
