@@ -25,17 +25,21 @@ function Pair({ desk, mobile }: { desk: string; mobile: string }) {
  * Hero: sol metin bloğu + sağ ürün sahnesi. Sunucu bileşeni, istemci JS yok. Metinler site içeriğinden (varsayılan = bugünkü metin).
  * Mobil (< 768 px): tek cümle açıklama (`hero.mobileLead`), kısa düğme etiketi, metin bağlantısı, sıkı güven çipleri ve
  * telefon sahnesi (HeroPhoneScene); EmlakFiyati satırı mobilde gizlidir (kendi bölümünde durur). Masaüstü çıktı değişmez.
+ * DÜRÜST DURUM: `efLive` fiyat bölümüyle aynı kaynaktan (getPublicPricing); false iken EmlakFiyati rozeti "Yakında" der.
  */
 export function HeroSection({
   trialDays,
   plans = [],
   content = defaultSiteContent().hero,
+  efLive,
 }: {
   trialDays?: number;
   plans?: readonly PlanDef[];
   content?: SiteContent["hero"];
+  /** EmlakFiyati canlı mı (public-state). Verilmezse rozet metni aynen kalır (önizleme/test). */
+  efLive?: boolean;
 }) {
-  const ctx = { trialDays, plans };
+  const ctx = { trialDays, plans, efLive };
   const m = heroMobileCopy(content, ctx);
   return (
     <>
@@ -53,7 +57,7 @@ export function HeroSection({
           {m.lead ? <p className="mk-hero-lead-m">{m.lead}</p> : null}
           {content.integrationBadge || content.integrationLine ? (
             <p className="mk-hero-int" data-hero-integration="">
-              {content.integrationBadge ? <a href="#degerleme" className="mk-tag mk-tag-plan">{tx(content.integrationBadge, ctx)}</a> : null}
+              {content.integrationBadge ? <a href="#degerleme" className="mk-tag mk-tag-plan">{efLive === false ? `${tx(content.integrationBadge, ctx)} · Yakında` : tx(content.integrationBadge, ctx)}</a> : null}
               {content.integrationBadge && content.integrationLine ? " " : null}
               {content.integrationLine ? tx(content.integrationLine, ctx) : null}
             </p>

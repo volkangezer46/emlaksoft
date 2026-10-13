@@ -1,4 +1,5 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO, SUPPORT_PHONE, SUPPORT_TEL, SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_URL } from "@/lib/contact-info";
+import { LEGAL_ENTITY_PENDING, legalEntityFields } from "@/lib/legal-entity";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
@@ -20,13 +21,17 @@ export default function OnBilgilendirmePage() {
           <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
           Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme onay ekranında ve düzenlenen faturada da yer alır.
         </p>
-        {/* ŞABLON: aşağıdaki alanlar işletme sahibince doldurulmadan yayınlanmamalıdır. */}
+        {/* Sağlayıcı kimliği sunucu ortamından (src/lib/legal-entity.ts); boş alan yer tutucu yerine açık notla gösterilir. */}
         <ul className="list-disc space-y-1 pl-5">
-          <li><b>Ticari ünvan:</b> [ŞİRKET ÜNVANI — DOLDURULACAK]</li>
-          <li><b>Adres:</b> [TEBLİGAT ADRESİ — DOLDURULACAK]</li>
-          <li><b>MERSİS no:</b> [MERSİS NUMARASI — DOLDURULACAK]</li>
-          <li><b>Vergi dairesi / vergi no:</b> [VERGİ DAİRESİ VE NUMARASI — DOLDURULACAK]</li>
-          <li><b>KEP adresi:</b> [KEP ADRESİ — DOLDURULACAK]</li>
+          {legalEntityFields().map((f) => (
+            <li key={f.key}><b>{f.label}:</b> {f.value ?? <span className="text-text-muted">{LEGAL_ENTITY_PENDING}</span>}</li>
+          ))}
+          {SUPPORT_PHONE && SUPPORT_TEL ? (
+            <li><b>Telefon:</b> <a className="font-semibold text-brand-600" href={SUPPORT_TEL}>{SUPPORT_PHONE}</a></li>
+          ) : null}
+          {SUPPORT_WHATSAPP && SUPPORT_WHATSAPP_URL ? (
+            <li><b>WhatsApp:</b> <a className="font-semibold text-brand-600" href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">{SUPPORT_WHATSAPP}</a></li>
+          ) : null}
         </ul>
       </LegalSection>
 

@@ -123,7 +123,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
       <HashTabRedirect active={tab} />
       <SegmentTabs label="Ayarlar sekmeleri" active={tab} items={SETTINGS_TABS.map((t) => ({ id: t.id, label: t.label, href: settingsTabHref(t.id) }))} />
 
-      {tab === "kimlik" ? <KimlikTab tenant={tenant} canEdit={canEditSettings} /> : null}
+      {tab === "kimlik" ? <KimlikTab tenant={tenant} tenantId={tenantId} canEdit={canEditSettings} /> : null}
       {tab === "eslestirme" ? <EslestirmeTab canEdit={canEditSettings} /> : null}
       {tab === "entegrasyon" ? <EntegrasyonTab canEdit={canEditSettings} /> : null}
       {tab === "bildirim" ? <BildirimTab tenantId={tenantId} /> : null}

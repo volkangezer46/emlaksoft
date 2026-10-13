@@ -46,3 +46,12 @@ end loop; end \$\$;"
 
 echo "pg_restore hataları (yalnız ensure_rls ile ilgili 2 hata beklenir):"
 grep 'error:' "$DIR/$BASE.restore.log" || true
+
+# Son denetimler (salt-okunur): yukarıdaki düzeltmeden sonra sayaç kayması kalmamalı ...
+echo "Sayaç denetimi (check-sequences.sql, yalnız rapor):"
+docker run --rm --network "$NET" -v "$HERE":/s:ro -e PGPASSWORD="$PW" $IMG \
+  psql -h "$HOST" -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -f /s/check-sequences.sql \
+  || echo "[uyari] sayaç denetimi çalışmadı"
+# ... ve yetki (ACL) farkı: dökümdeki anon REVOKE'ları hedefte kaybolabilir (bkz. restore-list.py).
+# check:acl yoksa (--if-present) sessiz geçer; başarısızlık geri yüklemeyi geri almaz, elle incelenir.
+(cd "$HERE/../.." && npm run --if-present check:acl) || echo "[uyari] ACL denetimi başarısız — farkı inceleyin"

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { CheckCircle2, HeartHandshake, Loader2, PartyPopper, Phone, Send } from "lucide-react";
+import { CheckCircle2, ExternalLink, HeartHandshake, Loader2, PartyPopper, Phone, Send } from "lucide-react";
 import { submitSurveyByToken } from "@/app/actions/survey-public";
 
 /**
@@ -16,10 +16,13 @@ export function SurveyForm({
   token,
   office,
   officePhone,
+  googleReviewUrl = null,
 }: {
   token: string;
   office: string;
   officePhone: string | null;
+  /** Ofis ayarı (Ofis profili > Google yorum bağlantısı); yalnız resmi Google adresi gelir. Yoksa düğme yok. */
+  googleReviewUrl?: string | null;
 }) {
   const [score, setScore] = useState<number | null>(null);
   const [comment, setComment] = useState("");
@@ -90,14 +93,31 @@ export function SurveyForm({
             Memnuniyetiniz bizim için en büyük ödül. Bizi tavsiye eder misiniz? Çevrenizde
             emlak arayışında olan biri varsa {office} her zaman yanında.
           </p>
-          {officePhone ? (
-            <a
-              href={`tel:${officePhone.replace(/\s/g, "")}`}
-              className="focus-ring press mt-4 inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
-            >
-              <Phone className="h-4 w-4" /> {officePhone}
-            </a>
-          ) : null}
+          {/* Google yorum bağlantısı varsa birincil eylem odur, telefon ikincil kalır. Teşvik/ödül metni YOK. */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {googleReviewUrl ? (
+              <a
+                href={googleReviewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
+              >
+                <ExternalLink className="h-4 w-4" /> Google&apos;da yorum bırakın
+              </a>
+            ) : null}
+            {officePhone ? (
+              <a
+                href={`tel:${officePhone.replace(/\s/g, "")}`}
+                className={
+                  googleReviewUrl
+                    ? "focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/40 bg-surface px-4 py-2.5 text-sm font-bold text-mint-700 transition hover:border-mint-500/70"
+                    : "focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
+                }
+              >
+                <Phone className="h-4 w-4" /> {officePhone}
+              </a>
+            ) : null}
+          </div>
         </div>
       );
     }
