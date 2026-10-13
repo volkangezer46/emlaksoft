@@ -1,6 +1,6 @@
-import Image from "next/image";
 import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
+import { FillImg } from "@/components/ui/fill-img";
 import { SmartIcon } from "@/components/ui/icon-sprite";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * EntityThumb — satır başı görsel önizleme.
  *  - `src` varsa sabit kutuda görsel (lazy, CLS yok).
  *  - Görsel yoksa: `name` verilmişse baş harf avatarı (müşteri), değilse `icon` yer tutucusu (portföy).
- * `src` kimlik doğrulamalı download ucundan gelir; bu yüzden next/image `unoptimized`.
+ * `src` kimlik doğrulamalı download ucundan gelir; optimize edilmez (`FillImg`: next/image `unoptimized` ile aynı çıktı).
  */
 const BOX = {
   sm: "h-10 w-14",
@@ -43,7 +43,7 @@ export function EntityThumb({
       )}
     >
       {src ? (
-        <Image src={src} alt={alt} fill sizes="72px" className="object-cover" unoptimized />
+        <FillImg src={src} alt={alt} className="object-cover" />
       ) : Icon ? (
         <SmartIcon icon={Icon} className="h-5 w-5 text-brand-600/45" />
       ) : null}

@@ -3,7 +3,7 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { IntentLink } from "@/components/app/intent-link";
 import { redirect } from "next/navigation";
-import Image from "next/image";
+import { FillImg } from "@/components/ui/fill-img";
 import { inFilter, orIlike, safeLike } from "@/lib/pgrst";
 import {
   ArrowUpRight,
@@ -942,14 +942,7 @@ export default async function PropertiesPage({
                     >
                       <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
                         {vm.coverSrc ? (
-                          <Image
-                            src={vm.coverSrc}
-                            alt={vm.title}
-                            fill
-                            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                            className="object-cover transition duration-500 group-hover:scale-105"
-                            unoptimized
-                          />
+                          <FillImg src={vm.coverSrc} alt={vm.title} className="object-cover transition duration-500 group-hover:scale-105" />
                         ) : (
                           <>
                             <div className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />

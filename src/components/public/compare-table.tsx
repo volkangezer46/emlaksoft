@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { FillImg } from "@/components/ui/fill-img";
 import { Building2, Check, X } from "lucide-react";
 import {
   Dialog,
@@ -184,14 +184,7 @@ export function CompareTable({
                   >
                     <div className="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-control)] bg-ink-950/5">
                       {it.coverId || it.coverSrc ? (
-                        <Image
-                          src={it.coverSrc ?? `/api/property-media/${it.coverId}`}
-                          alt={it.title}
-                          fill
-                          sizes="200px"
-                          unoptimized
-                          className="object-cover"
-                        />
+                        <FillImg src={it.coverSrc ?? `/api/property-media/${it.coverId}`} alt={it.title} className="object-cover" />
                       ) : (
                         <div className="grid h-full w-full place-items-center text-text-faint">
                           <Building2 className="h-6 w-6" />
