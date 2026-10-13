@@ -443,7 +443,7 @@ async function ChurnSection({ period }: { period: Period }) {
     <ChartCard
       as="h2"
       title="Riskli ofisler ve kayıp riski"
-      subtitle="Gecikmiş, askıda, az kullanan veya sağlık skoru düşük ofisler"
+      subtitle="Gecikmiş, askıda, az kullanan ya da sağlığı düşük ofisler"
       icon={ShieldAlert}
       tone="danger"
       href="/admin/tenants?durum=risk"

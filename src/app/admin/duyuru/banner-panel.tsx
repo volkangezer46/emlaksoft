@@ -114,7 +114,7 @@ export async function BannerPanel({
                   </div>
                   {canEdit ? (
                     <span className="flex items-center gap-2">
-                      <Link href={`/admin/duyuru?sekme=banner&duzenle=${b.id}#banner-formu`} className="inline-flex min-h-9 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-ink-950 hover:border-brand-600">
+                      <Link href={`/admin/duyuru?sekme=banner&duzenle=${b.id}#banner-formu`} className="inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-line px-2.5 text-xs font-semibold text-ink-950 hover:border-brand-600">
                         <Pencil className="h-3.5 w-3.5 text-brand-600" /> Düzenle
                       </Link>
                       <BannerToggle id={b.id} active={b.is_active} />

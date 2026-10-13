@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Sparkles, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
+import { Button } from "@/components/ui/button";
 import { openWhatsNew, type WhatsNewEntry } from "@/app/actions/office-broadcast";
 import { Dialog, DialogClose, DialogDescription, DialogDrawerContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -39,11 +40,12 @@ export function WhatsNew({ unread: initialUnread }: { unread: number }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           aria-label={unread > 0 ? `Yenilikler, ${unread} okunmamış` : "Yenilikler"}
           title="Yenilikler"
-          className="focus-ring relative grid h-9 w-9 place-items-center rounded-full text-text-muted transition hover:bg-ink-950/5 hover:text-ink-950 touch:min-h-11 touch:min-w-11"
+          className="relative h-9 w-9 rounded-full hover:bg-ink-950/5"
         >
           <Sparkles className="h-4 w-4" aria-hidden />
           {unread > 0 ? (
@@ -51,7 +53,7 @@ export function WhatsNew({ unread: initialUnread }: { unread: number }) {
               {unread > 9 ? "9+" : unread}
             </span>
           ) : null}
-        </button>
+        </Button>
       </DialogTrigger>
       <DialogDrawerContent responsiveClassName="" className="left-auto right-0 flex w-[min(92vw,420px)] flex-col border-l border-line bg-surface">
           <div className="flex items-center justify-between border-b border-line px-5 py-4">
@@ -86,7 +88,7 @@ export function WhatsNew({ unread: initialUnread }: { unread: number }) {
                     <p className="mt-1.5 text-sm font-semibold text-ink-950">{e.title}</p>
                     {e.body ? <p className="mt-1 whitespace-pre-line text-sm text-text-muted">{e.body}</p> : null}
                     {e.href ? (
-                      <Link href={e.href} onClick={() => setOpen(false)} className="mt-2 inline-flex min-h-9 items-center text-sm font-semibold text-brand-600 hover:underline">
+                      <Link href={e.href} onClick={() => setOpen(false)} className="mt-2 inline-flex min-h-9 touch:min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">
                         Göz at →
                       </Link>
                     ) : null}

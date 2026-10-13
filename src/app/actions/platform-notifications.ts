@@ -252,7 +252,7 @@ export async function previewBroadcastSegment(fd: FormData): Promise<SegmentPrev
     const recipients = tenantIds.length ? await resolveSegmentRecipients(admin, seg.value, tenantIds) : [];
     return { ok: true, tenants: tenantIds.length, recipients: recipients.length, optedIn: recipients.filter((r) => r.marketingOptIn).length };
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Sayım yapılamadı." };
+    return { error: actionErrorMessage(e, "Segment sayımı yapılamadı") };
   }
 }
 
@@ -369,7 +369,7 @@ export async function saveBanner(fd: FormData): Promise<BroadcastEditResult> {
     try {
       tenantIds = await resolveSegmentTenantIds(admin, seg.value, now());
     } catch (e) {
-      return { error: e instanceof Error ? e.message : "Hedef ofisler okunamadı." };
+      return { error: actionErrorMessage(e, "Hedef ofisler okunamadı") };
     }
     if (tenantIds.length === 0) return { error: "Segmentte ofis yok; banner kimseye görünmez." };
     if (tenantIds.length > 5000) return { error: "Hedef 5000 ofisi aşıyor; segmenti daraltın ya da tüm ofislere gösterin." };

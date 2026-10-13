@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { now } from "@/lib/clock";
+import { actionErrorMessage } from "@/lib/action-errors";
 
 /**
  * Ofis paneli: platform banner'ı kapatma ve "Yenilikler" çekmecesi (AD8). Kullanıcının KENDİ oturumuyla (RLS):
@@ -18,7 +19,7 @@ export async function dismissPlatformBanner(id: string): Promise<{ ok?: boolean;
   if (!UUID_RE.test(id)) return { error: "Geçersiz banner." };
   const supabase = await createClient();
   const { error } = await supabase.from("platform_banner_dismissals").upsert({ banner_id: id, user_id: user.id }, { onConflict: "banner_id,user_id", ignoreDuplicates: true });
-  if (error) return { error: "Banner kapatılamadı." };
+  if (error) return { error: actionErrorMessage(error, "Banner kapatılamadı") };
   return { ok: true };
 }
 
@@ -38,7 +39,7 @@ export async function openWhatsNew(): Promise<{ entries: WhatsNewEntry[]; error?
       .limit(30),
     supabase.from("changelog_reads").select("last_seen_at").eq("user_id", user.id).maybeSingle(),
   ]);
-  if (error) return { entries: [], error: "Yenilikler yüklenemedi." };
+  if (error) return { entries: [], error: actionErrorMessage(error, "Yenilikler yüklenemedi") };
   const nowMs = now();
   const lastSeen = seen?.last_seen_at ? new Date(seen.last_seen_at as string).getTime() : nowMs - 30 * 86_400_000;
   const entries = ((data ?? []) as Omit<WhatsNewEntry, "unread">[]).map((e) => ({ ...e, unread: new Date(e.published_at).getTime() > lastSeen }));

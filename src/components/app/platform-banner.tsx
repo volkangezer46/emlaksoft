@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Info, Megaphone, OctagonAlert, X } from "lucide-react";
 import Link from "@/components/ui/smart-link";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { dismissPlatformBanner } from "@/app/actions/office-broadcast";
 
@@ -58,14 +59,15 @@ export function PlatformBanner({ items }: { items: PlatformBannerItem[] }) {
               </Link>
             ) : null}
             {b.dismissible ? (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={() => hide(b)}
                 aria-label="Duyuruyu kapat"
-                className="focus-ring grid h-5 w-5 place-items-center rounded-full hover:bg-black/5 touch:min-h-11 touch:min-w-11"
+                className="h-5 w-5 rounded-full text-current hover:bg-black/5 hover:text-current"
               >
                 <X className="h-3 w-3" aria-hidden />
-              </button>
+              </Button>
             ) : null}
           </aside>
         );
@@ -85,13 +87,9 @@ export function PlatformBanner({ items }: { items: PlatformBannerItem[] }) {
                   Ayrıntı
                 </Link>
               ) : null}
-              <button
-                type="button"
-                onClick={() => hide(modal)}
-                className="focus-ring press inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-ink-950 px-4 text-sm font-bold text-white"
-              >
+              <Button variant="navy" size="lg" onClick={() => hide(modal)} className="min-h-11 px-4 font-bold">
                 {modal.dismissible ? "Kapat" : "Anladım"}
-              </button>
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

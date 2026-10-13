@@ -5,6 +5,7 @@ import { Pagination, pageRange } from "@/app/admin/_components/pagination";
 import { isSchemaMissing } from "@/lib/platform-announcements/queue";
 import { describeSegment, parseSegment } from "@/lib/platform-announcements/segment";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { DeliveryActions } from "./delivery-actions";
 import { Megaphone } from "lucide-react";
 
@@ -100,7 +101,7 @@ export async function DeliveryDetail({ id, status, channel, page, canEdit }: { i
   if (!a) {
     return (
       <div className="space-y-4">
-        <Link href="/admin/duyuru" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
+        <Link href="/admin/duyuru" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
           <ArrowLeft className="h-4 w-4" /> Duyurulara dön
         </Link>
         <p className="rounded-[var(--radius-panel)] border border-line bg-surface px-5 py-10 text-center text-sm text-text-muted">Duyuru bulunamadı.</p>
@@ -129,25 +130,15 @@ export async function DeliveryDetail({ id, status, channel, page, canEdit }: { i
 
       <nav aria-label="Teslim filtresi" className="flex flex-wrap gap-2">
         {STATUS_FILTERS.map((f) => (
-          <Link
-            key={f.id || "tum"}
-            href={href({ durum: f.id, sayfa: 1 })}
-            aria-current={f.id === st ? "page" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition ${f.id === st ? "border-brand-600 bg-brand-600/10 text-brand-600" : "border-line text-text-muted hover:text-ink-950"}`}
-          >
+          <FilterChip key={f.id || "tum"} href={href({ durum: f.id, sayfa: 1 })} active={f.id === st}>
             {f.label}
-          </Link>
+          </FilterChip>
         ))}
         <span className="mx-1 w-px bg-line" aria-hidden />
         {CHANNEL_FILTERS.map((f) => (
-          <Link
-            key={f.id || "tum-kanal"}
-            href={href({ kanal: f.id, sayfa: 1 })}
-            aria-current={f.id === ch ? "page" : undefined}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-semibold transition ${f.id === ch ? "border-brand-600 bg-brand-600/10 text-brand-600" : "border-line text-text-muted hover:text-ink-950"}`}
-          >
+          <FilterChip key={f.id || "tum-kanal"} href={href({ kanal: f.id, sayfa: 1 })} active={f.id === ch}>
             {f.label}
-          </Link>
+          </FilterChip>
         ))}
       </nav>
 

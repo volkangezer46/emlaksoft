@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DAY_MS } from "@/lib/clock";
 import { planLabel } from "@/lib/billing/plans";
 import { FEATURE_KEYS, getModuleDef, isFeatureKey } from "@/lib/modules/registry";
+import { ActionUserError } from "@/lib/action-errors";
 
 /**
  * Duyuru SEGMENTİ (AD8): hangi ofislerin hangi kullanıcılarına gidileceği. Tek kaynak: kuyruk (gönderim anında çözer),
@@ -174,7 +175,7 @@ async function pagedIds(fetchPage: (from: number, to: number) => PromiseLike<{ d
     if (!data || data.length < PAGE) return out;
   }
   // Sessizce kesmek yanlış hedef kitle demektir (ör. "giriş yapmayan" ölçütüne aktif ofisler girer): hata ver.
-  throw new Error("Hedef kitle çok büyük; ölçütü daraltın.");
+  throw new ActionUserError("Hedef kitle çok büyük; ölçütü daraltın.");
 }
 
 /** Segmentteki ofis kimlikleri (iptal hariç). */
