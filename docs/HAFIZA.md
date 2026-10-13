@@ -98,6 +98,16 @@ Kod yorumlarındaki `HAFIZA §N` eski numaradır: `§7` = aşağıdaki "Kalıcı
 - **WORKTREE TABANI:** ajan worktree'leri yerel `main`'den DEĞİL `origin/main`'den çıkar → ajan prompt'una "ÖNCE `git merge --ff-only main` yap" yazılır; yapmayan ajan eski tabanda çalışıp sonradan yazılmış işi ezer (çatışmada birleşimi iptal, işi yazan ajandan uzlaştırma iste).
 - Ajan ortamı build edemeyebilir (node_modules eksik) → birleşimden sonra izole klonda tam doğrulama ŞART. Aynı rapor tekrar gelirse `TaskStop`; `git log main..dal` boşsa yeni iş yoktur.
 - Yeni modül = 4 kayıt yeri (CLAUDE.md); yeni cron `vercel.json` + `src/lib/cron-jobs.ts` + `npm run check:cron`; service_role yeni kullanım yok (allowlist). Cron sayısı **36** (sözleşme: bu belgede `(36 rota` ifadesi bulunmalı — `growth-engine-contract.test.ts`).
+- **Panel JS bütçesi (WP4, 2026-10-13):** `npm run check:bundle -- --warn|--gate` (bayraksız: eski rapor). Ölçüm `page_client-reference-manifest.js` `entryJSFiles` ∪ `rootMainFiles` (kök + layout zinciri + sayfa + error/loading/not-found sınırları), gzip -6; kopya oranı = aynı turbopack modül kimliğinin ilk yük dosyalarında tekrar baytı / toplam (konsey `dup.mjs` mantığı); istek = JS + CSS dosyası. Eşikler `scripts/check-bundle-budget.ts` içinde (sonra + %10; kopya < %10; istek ≤ 60). `turbopackChunking` (requestCost 2M, minChunkSize 400k) KORUNDU: kopya oranı zaten %2,6–2,8 (< %10), varsayılana dönüş/`generateComponentChunks` denemesi gerekmedi. Liste RSC diyeti: `RowActions` → `.lk-row-act`, etkileşimli `TR` → `group tbl-row-link` (console-kit.css, eski dizgilerin birebir `@apply`'ı; hesaplanmış stil 48/48 durumda aynı, 1440/390 açık/koyu ekran görüntüleri bayt-bayt aynı). Delegation (FE-5 adım 3+) YAPILMADI.
+
+  | Rota | İlk yük JS gzip (önce → sonra) | Ham | Kopya oranı (önce → sonra) | İstek JS+CSS (önce → sonra) |
+  |---|---|---|---|---|
+  | /app | 228,1 → 225,2 KB | 737 → 735 KB | %2,7 → %2,7 | 22 → 15 |
+  | /app/musteriler | 274,5 → 267,8 KB | 864 → 862 KB | %2,6 → %2,6 | 28 → 16 |
+  | /app/portfoyler | 250,1 → 246,1 KB | 800 → 798 KB | %2,8 → %2,8 | 24 → 16 |
+  | /admin | 242,3 → 236,9 KB | 769 → 767 KB | %2,5 → %2,6 | 24 → 15 |
+
+  "Önce" = canlı derleme (`/root/emlaksoft/.next`, 2026-10-13 00:36, aynı chunking ayarı, daha eski kod: istek farkı aradaki commit'lerden, bu paketten değil); "sonra" = WP4 worktree derlemesi. /app/musteriler RSC ham boyutu (30 satır, canlı yakalama `konsey/rsc_app_musteriler.txt` üzerinde sınıf ikamesiyle hesap): 268,1 → 247,2 KB (−20,9 KB; gzip 27,6 → 27,4 KB). ≤ 205 KB hedefine sınıf diyeti tek başına YETMEZ (delegation/satır yükü azaltımı gerekir). Canlı soğuk yük (835 KB) tarayıcı ölçümüdür (tüm istekler, sıkıştırılmış aktarım + RSC + CSS); bu tablo yalnız manifestteki ilk yük JS'idir.
 
 ## 5. Tek-kaynak haritası (yeni kod bunlardan beslenir, kopya yazılmaz) — tam tablo arşiv "ESKİ §6"
 
