@@ -2,7 +2,11 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getBrandAsset, getBrandMeta } from "@/lib/brand/store";
+import { OG_THEME } from "@/lib/brand/og-theme";
 import { readPngSize } from "@/lib/brand/upload-validation";
+import { defaultSiteMenu } from "@/lib/site-menu/defaults";
+import type { OgCard } from "@/lib/site-menu/schema";
+import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
 export const OG_ALT = "EmlakSoft — Türkiye'nin emlak işletim sistemi";
 export const OG_SIZE = { width: 1200, height: 630 };
@@ -44,11 +48,23 @@ async function loadOgLogo(): Promise<{ src: string; width: number; height: numbe
   };
 }
 
-/** 1200x630 marka kartı: opengraph-image ve twitter-image ortak çıktısı. */
+/** Kart metni: yönetimden (Site menüsü > Paylaşım kartı; yayın yoksa bugünkü metin). Okunamazsa varsayılan. */
+async function loadOgText(): Promise<OgCard> {
+  try {
+    return (await getLiveSiteMenu()).ogCard;
+  } catch {
+    return defaultSiteMenu().ogCard;
+  }
+}
+
+/** 1200x630 marka kartı: opengraph-image ve twitter-image ortak çıktısı. Metin düz metindir (satori, HTML işlenmez). */
 export async function renderBrandCard() {
   // Manrope 800 — satori woff2 desteklemediğinden woff olarak src/assets'te tutulur.
-  const manrope = await readFile(join(process.cwd(), "src/assets/manrope-800.woff"));
-  const logo = await loadOgLogo();
+  const [manrope, logo, card] = await Promise.all([
+    readFile(join(process.cwd(), "src/assets/manrope-800.woff")),
+    loadOgLogo(),
+    loadOgText(),
+  ]);
 
   return new ImageResponse(
     (
@@ -60,8 +76,8 @@ export async function renderBrandCard() {
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "72px",
-          background: "linear-gradient(150deg, #0a2247 0%, #071a38 55%, #05122a 100%)",
-          color: "#ffffff",
+          background: OG_THEME.background,
+          color: OG_THEME.text,
           fontFamily: "Manrope",
         }}
       >
@@ -73,7 +89,7 @@ export async function renderBrandCard() {
             width: 520,
             height: 520,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(20,99,255,0.55), rgba(20,99,255,0) 70%)",
+            background: OG_THEME.glowBlue,
             display: "flex",
           }}
         />
@@ -85,7 +101,7 @@ export async function renderBrandCard() {
             width: 480,
             height: 480,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(246,210,122,0.22), rgba(246,210,122,0) 70%)",
+            background: OG_THEME.glowGold,
             display: "flex",
           }}
         />
@@ -96,26 +112,28 @@ export async function renderBrandCard() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.05, letterSpacing: -1.5, maxWidth: 900 }}>
-            Türkiye’nin emlak işletim sistemi
+            {card.title}
           </div>
-          <div style={{ fontSize: 30, color: "rgba(255,255,255,0.66)", maxWidth: 880, lineHeight: 1.35 }}>
-            Müşteriden tapuya, ilandan komisyona — ofisinizi tek premium platformda yönetin.
-          </div>
+          {card.subtitle ? (
+            <div style={{ fontSize: 30, color: OG_THEME.subtitle, maxWidth: 880, lineHeight: 1.35 }}>
+              {card.subtitle}
+            </div>
+          ) : null}
         </div>
 
         <div style={{ display: "flex", gap: 14 }}>
-          {["İYS/EİDS hazırlık akışları", "Yapay zeka destekli", "Portal operasyonları"].map((t) => (
+          {card.chips.map((t, i) => (
             <div
-              key={t}
+              key={i}
               style={{
                 display: "flex",
                 fontSize: 24,
                 fontWeight: 600,
                 padding: "12px 22px",
                 borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.16)",
-                background: "rgba(255,255,255,0.06)",
-                color: "#f6d27a",
+                border: OG_THEME.chipBorder,
+                background: OG_THEME.chipBackground,
+                color: OG_THEME.chipText,
               }}
             >
               {t}

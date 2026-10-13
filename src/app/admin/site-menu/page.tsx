@@ -9,7 +9,7 @@ import { SiteMenuEditor, type HistoryView } from "./site-menu-editor";
 
 export const metadata = { title: "Site menüsü" };
 
-/** Süper admin: herkese açık sitenin üst menüsü, alt bilgisi ve duyuru şeridi (taslak/yayın, sürüm geçmişi). Operasyon salt okur. */
+/** Süper admin: herkese açık sitenin çerçevesi — üst menü, alt bilgi, dönüşüm düğmeleri, duyurular, paylaşım kartı, 404 (taslak/yayın, sürüm geçmişi). Operasyon salt okur. */
 export default async function AdminSiteMenuPage() {
   const staff = await requirePlatformModule("sitemenu");
   const state = await readAdminState();
@@ -32,7 +32,7 @@ export default async function AdminSiteMenuPage() {
         eyebrow="Herkese açık site"
         icon={PanelTop}
         title="Site menüsü"
-        description="Üst mega menü (ikon, logo, öne çıkan kart ve animasyonlu medya), alt bilgi bağlantıları ve duyuru şeridi buradan yönetilir. Değişiklikler önce taslaktır; Yayınla ile canlıya alınır, her yayın geri dönülebilir."
+        description="Üst mega menü (ikon, logo, öne çıkan kart ve animasyonlu medya), alt bilgi (sütunlar ve marka bloğu), dönüşüm düğmeleri, duyurular, paylaşım kartı ve 404 sayfası buradan yönetilir. Değişiklikler önce taslaktır; Yayınla ile canlıya alınır, her yayın geri dönülebilir."
         glow="brand"
       />
       <SiteMenuEditor

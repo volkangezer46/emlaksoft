@@ -1,4 +1,16 @@
-import { checkHref, isExternalHref, type FeaturedPreviewKind, type FeaturedRatio, type MediaKind } from "./schema-core";
+import { announcementKey, endOfDayTrMs, startOfDayTrMs, type AnnouncementTarget } from "./announcements";
+import {
+  DEFAULT_CTAS,
+  checkHref,
+  checkPageHref,
+  isExternalHref,
+  type CtaKey,
+  type CtaLink,
+  type FeaturedPreviewKind,
+  type FeaturedRatio,
+  type MediaKind,
+  type SiteCtas,
+} from "./schema-core";
 import type { IconRef, SiteMenuConfig } from "./schema";
 
 /**
@@ -45,27 +57,76 @@ export type PublicGroup = {
 
 export type PublicFooterColumn = { id: string; title: string; autoPlans: boolean; links: Array<{ id: string; label: string; href: string; external: boolean }> };
 
-export type PublicAnnouncement = {
-  key: string;
+/**
+ * Yayındaki duyuru adayı. `id` kapatma anahtarıdır (kimlik + içerik özeti); seçim `pickAnnouncement` ile yol ve
+ * Türkiye gününe göre yapılır (sunucu çizimi ve istemci aynı saf işlevi kullanır).
+ */
+export type PublicAnnouncement = AnnouncementTarget & {
   text: string;
   href: string;
   linkLabel: string;
   external: boolean;
   dismissible: boolean;
-  /** Bitiş anı (epoch ms) veya null; istemci de kontrol eder. */
-  endsAtMs: number | null;
 };
 
-export type PublicSiteMenu = { groups: PublicGroup[]; footer: PublicFooterColumn[]; announcement: PublicAnnouncement | null };
+export type PublicSiteMenu = { groups: PublicGroup[]; footer: PublicFooterColumn[]; announcements: PublicAnnouncement[] };
 
-/** `YYYY-MM-DD` gününün Türkiye saatiyle sonu (23:59:59). Geçersizse null. */
-export function endOfDayTrMs(endsOn: string): number | null {
-  if (!endsOn) return null;
-  const t = Date.parse(`${endsOn}T23:59:59+03:00`);
-  return Number.isNaN(t) ? null : t;
-}
+export { endOfDayTrMs };
 
 const ok = (href: string) => checkHref(href).ok;
+const pageOk = (href: string) => checkPageHref(href).ok;
+
+/** Duyuru adayları: metinsiz, süresi dolmuş ya da bağlantısı geçersiz olanlar ayıklanır; başlamamış olanlar kalır (istemci saatiyle açılır). */
+export function toPublicAnnouncements(list: SiteMenuConfig["announcements"], nowMs: number): PublicAnnouncement[] {
+  const out: PublicAnnouncement[] = [];
+  for (const a of list) {
+    if (!a.text) continue;
+    const endsAtMs = endOfDayTrMs(a.endsOn);
+    if (endsAtMs !== null && endsAtMs < nowMs) continue;
+    const href = a.href && a.linkLabel && pageOk(a.href) ? a.href : "";
+    out.push({
+      id: announcementKey(a.id, [a.text, href, a.linkLabel, a.startsOn, a.endsOn]),
+      text: a.text,
+      href,
+      linkLabel: href ? a.linkLabel : "",
+      external: href ? isExternalHref(href) : false,
+      dismissible: a.dismissible,
+      startsAtMs: startOfDayTrMs(a.startsOn),
+      endsAtMs,
+      pathMode: a.pathMode,
+      pathPrefix: a.pathPrefix,
+      priority: a.priority,
+    });
+  }
+  return out;
+}
+
+/** Dönüşüm düğmeleri: geçersiz/boş alan bugünkü varsayılana düşer (kırık düğme yayına çıkmaz). */
+export function toPublicCtas(ctas: SiteMenuConfig["ctas"]): SiteCtas {
+  const pick = (k: CtaKey): CtaLink => {
+    const c = ctas[k];
+    const d = DEFAULT_CTAS[k];
+    return { label: c.label || d.label, href: pageOk(c.href) ? c.href : d.href };
+  };
+  return { login: pick("login"), trial: pick("trial"), mobileLogin: pick("mobileLogin"), mobileTrial: pick("mobileTrial") };
+}
+
+/** Varsayılandan farklıysa düğmeler, aynıysa null (istemci bileşenine gereksiz veri geçmez; çıktı bugünküyle aynı kalır). */
+export function customCtas(ctas: SiteMenuConfig["ctas"]): SiteCtas | null {
+  const pub = toPublicCtas(ctas);
+  return JSON.stringify(pub) === JSON.stringify(DEFAULT_CTAS) ? null : pub;
+}
+
+/** `{yil}` değişkenli düz metni parçalara böler (çizimde yıl ayrı metin düğümü olur; bugünkü çıktıyla aynı). */
+export function splitYear(template: string, year: number): Array<string | number> {
+  const parts = template.split("{yil}");
+  const out: Array<string | number> = [];
+  parts.forEach((p, i) => {
+    if (i > 0) out.push(year);
+    if (p) out.push(p);
+  });
+  return out;
+}
 
 export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu {
   const groups: PublicGroup[] = [];
@@ -134,20 +195,5 @@ export function toPublicMenu(cfg: SiteMenuConfig, nowMs: number): PublicSiteMenu
     if (links.length || c.autoPlans) footer.push({ id: c.id, title: c.title, autoPlans: c.autoPlans, links });
   }
 
-  const a = cfg.announcement;
-  const endsAtMs = endOfDayTrMs(a.endsOn);
-  const announcement: PublicAnnouncement | null =
-    a.enabled && a.text && (endsAtMs === null || endsAtMs > nowMs)
-      ? {
-          key: a.key,
-          text: a.text,
-          href: a.href && ok(a.href) && a.linkLabel ? a.href : "",
-          linkLabel: a.linkLabel,
-          external: isExternalHref(a.href),
-          dismissible: a.dismissible,
-          endsAtMs,
-        }
-      : null;
-
-  return { groups, footer, announcement };
+  return { groups, footer, announcements: toPublicAnnouncements(cfg.announcements, nowMs) };
 }

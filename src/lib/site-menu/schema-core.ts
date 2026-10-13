@@ -22,6 +22,30 @@ export const LIMITS = {
   footerLabel: 48,
   announcementText: 140,
   announcementLinkLabel: 24,
+  /** Çoklu duyuru listesi (tarih, yol hedefi, öncelik). */
+  maxAnnouncements: 5,
+  announcementItemText: 160,
+  pathPrefix: 120,
+  /** Alt bilgi marka bloğu. */
+  footerDescription: 240,
+  maxFooterBadges: 4,
+  footerBadge: 40,
+  footerCta: 30,
+  copyright: 120,
+  disclaimer: 240,
+  /** Dönüşüm düğmeleri (üst bar, mega panel, mobil alt çubuk). */
+  ctaLabel: 30,
+  /** Paylaşım kartı (1200x630). Rozet sınırı bugünkü en uzun rozeti ("İYS/EİDS hazırlık akışları", 26) taşır. */
+  ogTitle: 70,
+  ogSubtitle: 120,
+  maxOgChips: 3,
+  ogChip: 28,
+  /** 404 sayfası. */
+  notFoundTitle: 80,
+  notFoundText: 240,
+  maxNotFoundLinks: 6,
+  notFoundLabel: 36,
+  notFoundDesc: 80,
   href: 300,
   /** Serileştirilmiş yapılandırma üst sınırı (bayt). */
   jsonBytes: 120 * 1024,
@@ -32,6 +56,24 @@ export type FeaturedRatio = (typeof FEATURED_RATIOS)[number];
 export const MEDIA_KINDS = ["image", "animated", "video"] as const;
 export type MediaKind = (typeof MEDIA_KINDS)[number];
 
+
+export const ANNOUNCEMENT_PATH_MODES = ["all", "home", "prefix"] as const;
+export type AnnouncementPathMode = (typeof ANNOUNCEMENT_PATH_MODES)[number];
+/** Alt bilgi güven rozeti ikonları (sprite + imza ikonu; istemciye ikon paketi girmez). */
+export const FOOTER_BADGE_ICONS = ["shield-check", "scale", "file-signature", "check", "clock", "none"] as const;
+export type FooterBadgeIcon = (typeof FOOTER_BADGE_ICONS)[number];
+
+/** Dönüşüm düğmeleri bugünkü sabit metinleri (yayın yokken çıktı aynı kalsın; istemci bileşeni de yedek olarak kullanır). */
+export const DEFAULT_CTAS = {
+  login: { label: "Giriş yap", href: "/giris" },
+  trial: { label: "Ücretsiz dene", href: "/kayit" },
+  mobileLogin: { label: "Giriş", href: "/giris" },
+  /** Boş metin: deneme günüyle otomatik ("Ücretsiz dene — 14 gün", marketing-copy). */
+  mobileTrial: { label: "", href: "/kayit" },
+} as const;
+export type CtaKey = keyof typeof DEFAULT_CTAS;
+export type CtaLink = { label: string; href: string };
+export type SiteCtas = Record<CtaKey, CtaLink>;
 
 export const FEATURED_PREVIEWS = ["leak", "valuation", "signature", "plans", "assistant", "listing", "security", "automation", "dashboard"] as const;
 export type FeaturedPreviewKind = (typeof FEATURED_PREVIEWS)[number];
@@ -91,6 +133,18 @@ export function checkHref(raw: string): HrefCheck {
   return { ok: false, message: "Yalnız / ile başlayan site yolu, http(s), mailto ve tel kabul edilir." };
 }
 
+/**
+ * Çerçeve alanları (alt bilgi düğmesi, dönüşüm düğmeleri, duyuru, 404) için daha sıkı kural: yalnız var olan site yolu
+ * ya da https adresi. mailto/tel/http reddedilir (checkHref'in tüm reddleri de geçerli: javascript:, data: vb.).
+ */
+export function checkPageHref(raw: string): HrefCheck {
+  const r = checkHref(raw);
+  if (!r.ok) return r;
+  if (r.kind === "internal") return r;
+  if (r.kind === "external" && /^https:\/\//i.test(raw.trim())) return { ok: true, kind: "external" };
+  return { ok: false, message: "Bu alanda yalnız / ile başlayan site yolu veya https adresi kullanılabilir." };
+}
+
 /** Dış web adresi mi (yeni sekme + rel=noopener gerektirir). */
 export function isExternalHref(href: string): boolean {
   return /^https?:\/\//i.test(href.trim());
@@ -98,7 +152,11 @@ export function isExternalHref(href: string): boolean {
 
 
 export type MediaInfo = { id: string; type: string; kind: MediaKind; bytes: number };
-export type ValidationContext = { media: ReadonlyArray<MediaInfo> };
+export type ValidationContext = {
+  media: ReadonlyArray<MediaInfo>;
+  /** Riskli iddia algılayıcı (site-content `riskyWordsIn`); verilirse metinlere UYARI eklenir, kaydı engellemez. */
+  risky?: (value: string) => string[];
+};
 export type Issue = { level: "error" | "warn"; path: string; message: string };
 
 

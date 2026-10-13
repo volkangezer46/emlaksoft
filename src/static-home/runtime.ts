@@ -3,11 +3,15 @@
  *  - Üst menü: src/components/site-menu/mega-menu.tsx (APG disclosure: aria-expanded, inert, klavye, gecikmeli fare açma,
  *    canlı önizleme katmanı + kart metni), mobil modal sheet (masaüstü panellerden kurulur; inert arka plan, odak tuzağı, Esc).
  *  - Hareket: src/components/marketing/motion-root.tsx (data-motion, js-reveal, .mk-demo duraklatma, akıllı alt çubuk).
- *  - Duyuru: src/components/site-menu/announcement-bar.tsx (kapatma + bitiş).
+ *  - Duyuru: src/components/site-menu/announcement-bar.tsx (kimlik bazlı kapatma + bitiş; ortak saf yardımcılar
+ *    src/lib/site-menu/announcements.ts). Sunucu çizimi "/" için seçilen tek duyuruyu taşır.
+ *  - Dönüşüm düğmeleri (yönetimden): mobil sheet'teki "Giriş" ve deneme düğmesi üst bardaki düğmelerden okunur.
  *  - Adacıklar (Preact; /statik/*.js): fiyat kartları, koltuk hesaplayıcı, tur ekranları, menü önizlemeleri — görünür alana
  *    yaklaşınca / boşta / menüye ilk yaklaşmada yüklenir.
  * Veriler: <script type="application/json" id="mk-static"> (rota işleyicisi ekler).
  */
+
+import { ANNOUNCEMENT_DISMISS_KEY, addDismissed, parseDismissed } from "@/lib/site-menu/announcements";
 
 type StaticData = {
   islands: Record<"pricing" | "seat" | "tour" | "preview", string>;
@@ -306,14 +310,31 @@ function initNav() {
       }
       scroll.appendChild(details);
     }
+    // Giriş ve deneme düğmeleri yönetimden gelir: üst bardaki (sunucu çizimi) düğmelerin metni/hedefi kullanılır.
+    const barLogin = nav.querySelector<HTMLAnchorElement>("a.mk-login");
+    const barTrial = nav.querySelector<HTMLAnchorElement>("a.mk-nav-trial");
+    const external = (a: HTMLAnchorElement, src: HTMLAnchorElement | null) => {
+      if (src?.target === "_blank") {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      }
+    };
     const login = document.createElement("a");
-    login.href = "/giris";
+    login.href = barLogin?.getAttribute("href") || "/giris";
     login.className = "mk-sheet-link";
-    login.textContent = "Giriş yap";
+    login.textContent = barLogin?.textContent?.trim() || "Giriş yap";
+    external(login, barLogin);
     scroll.appendChild(login);
     const cta = document.createElement("div");
     cta.className = "mk-sheet-cta";
-    cta.innerHTML = `<a href="/kayit" class="mk-btn mk-btn-grad">Ücretsiz dene ${ARROW_18}</a><a href="/fiyatlar" class="mk-btn mk-btn-line">Paketleri ve fiyatları gör</a>`;
+    const trial = document.createElement("a");
+    trial.href = barTrial?.getAttribute("href") || "/kayit";
+    trial.className = "mk-btn mk-btn-grad";
+    trial.textContent = `${barTrial?.querySelector(".mk-long")?.textContent?.trim() || "Ücretsiz dene"} `;
+    trial.insertAdjacentHTML("beforeend", ARROW_18);
+    external(trial, barTrial);
+    cta.appendChild(trial);
+    cta.insertAdjacentHTML("beforeend", `<a href="/fiyatlar" class="mk-btn mk-btn-line">Paketleri ve fiyatları gör</a>`);
     sNav.append(scroll, cta);
     root.appendChild(sNav);
     root.addEventListener("click", (e) => {
@@ -405,13 +426,13 @@ function initAnnouncement() {
   };
   if (ends && Date.now() > ends) return hide();
   try {
-    if (key && localStorage.getItem("mk-ann-off") === key) return hide();
+    if (key && parseDismissed(localStorage.getItem(ANNOUNCEMENT_DISMISS_KEY)).includes(key)) return hide();
   } catch {
     /* özel pencere */
   }
   bar.querySelector(".mk-ann-x")?.addEventListener("click", () => {
     try {
-      localStorage.setItem("mk-ann-off", key);
+      localStorage.setItem(ANNOUNCEMENT_DISMISS_KEY, addDismissed(localStorage.getItem(ANNOUNCEMENT_DISMISS_KEY), key));
     } catch {
       /* özel pencere: yalnız bu görünümde kapanır */
     }

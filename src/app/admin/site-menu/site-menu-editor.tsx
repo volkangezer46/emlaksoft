@@ -17,15 +17,20 @@ import type { SiteMenuConfig } from "@/lib/site-menu/schema";
 import { sameConfig } from "@/lib/site-menu/editor-model";
 import type { MediaEntry } from "@/lib/site-menu/store";
 import { AnnouncementTab, FooterTab } from "./footer-announcement-tabs";
+import { BrandTab, CtaTab, NotFoundTab, OgCardTab } from "./frame-tabs";
 import { MenuPreview } from "./menu-preview";
 import { MenuTab, type Update } from "./menu-tab";
 import { InlineConfirm, TargetDatalist } from "./editor-ui";
 
-type Tab = "menu" | "footer" | "announcement" | "versions";
+type Tab = "menu" | "footer" | "brand" | "ctas" | "announcement" | "og" | "notfound" | "versions";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "menu", label: "Üst menü" },
   { id: "footer", label: "Alt bilgi" },
-  { id: "announcement", label: "Duyuru şeridi" },
+  { id: "brand", label: "Alt bilgi marka bloğu" },
+  { id: "ctas", label: "Dönüşüm düğmeleri" },
+  { id: "announcement", label: "Duyurular" },
+  { id: "og", label: "Paylaşım kartı" },
+  { id: "notfound", label: "404 sayfası" },
   { id: "versions", label: "Sürümler" },
 ];
 
@@ -52,18 +57,22 @@ export function SiteMenuEditor({ initialDraft, live, defaults, history, media: i
   const [pending, start] = useTransition();
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular).
+  // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular). Riskli iddia
+  // uyarıları site içeriği editörüyle aynı listeden (riskyWordsIn) gelir; yalnız editörde uyarır, kaydı engellemez.
   const [validate, setValidate] = useState<typeof import("@/lib/site-menu/schema").validateSiteMenu | null>(null);
+  const [risky, setRisky] = useState<((value: string) => string[]) | null>(null);
   useEffect(() => {
     let alive = true;
-    void import("@/lib/site-menu/schema").then((m) => {
-      if (alive) setValidate(() => m.validateSiteMenu);
+    void Promise.all([import("@/lib/site-menu/schema"), import("@/lib/site-content/schema")]).then(([m, c]) => {
+      if (!alive) return;
+      setValidate(() => m.validateSiteMenu);
+      setRisky(() => c.riskyWordsIn);
     });
     return () => {
       alive = false;
     };
   }, []);
-  const issues = useMemo<Issue[]>(() => (validate ? validate(cfg, { media }).issues : []), [validate, cfg, media]);
+  const issues = useMemo<Issue[]>(() => (validate ? validate(cfg, { media, risky: risky ?? undefined }).issues : []), [validate, risky, cfg, media]);
   const errorCount = issues.filter((i) => i.level === "error").length;
   const warnCount = issues.length - errorCount;
   const blocked = !validate || hasErrors(issues);
@@ -239,7 +248,11 @@ export function SiteMenuEditor({ initialDraft, live, defaults, history, media: i
       <div role="tabpanel" id={`sm-panel-${tab}`} aria-labelledby={`sm-tab-${tab}`} tabIndex={0} className="focus-ring rounded-[var(--radius-card)]">
         {tab === "menu" ? <MenuTab cfg={cfg} update={update} issues={issues} media={media} addMedia={addMedia} readOnly={readOnly} /> : null}
         {tab === "footer" ? <FooterTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
+        {tab === "brand" ? <BrandTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
+        {tab === "ctas" ? <CtaTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
         {tab === "announcement" ? <AnnouncementTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
+        {tab === "og" ? <OgCardTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
+        {tab === "notfound" ? <NotFoundTab cfg={cfg} update={update} issues={issues} readOnly={readOnly} /> : null}
         {tab === "versions" ? (
           <section className="space-y-3" aria-label="Sürüm geçmişi">
             <p className="text-xs text-text-muted">Her yayın bir sürüm olarak saklanır (son 10). Bir sürüme dönmek onu yeni bir sürüm olarak canlıya alır; hiçbir kayıt silinmez.</p>

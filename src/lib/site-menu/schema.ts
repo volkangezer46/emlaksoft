@@ -1,10 +1,26 @@
 import { z } from "zod";
-import { FEATURED_PREVIEWS, FEATURED_RATIOS, LIMITS, MEDIA_KINDS, checkHref, type Issue, type MediaInfo, type MediaKind, type ValidationContext } from "./schema-core";
+import {
+  ANNOUNCEMENT_PATH_MODES,
+  FEATURED_PREVIEWS,
+  FEATURED_RATIOS,
+  FOOTER_BADGE_ICONS,
+  LIMITS,
+  MEDIA_KINDS,
+  checkHref,
+  checkPageHref,
+  type Issue,
+  type MediaInfo,
+  type MediaKind,
+  type ValidationContext,
+} from "./schema-core";
 export * from "./schema-core";
+import { startOfDayTrMs } from "./announcements";
+import { defaultSiteMenu } from "./defaults";
 import { isMenuIconName } from "./icon-registry";
 
 /**
- * Site menüsü yapılandırması (üst menü + alt bilgi + duyuru şeridi): tür, sınırlar ve doğrulama.
+ * Site çerçevesi yapılandırması (üst menü, alt bilgi + marka bloğu, dönüşüm düğmeleri, duyurular, paylaşım kartı, 404):
+ * tür, sınırlar ve doğrulama. Eski kayıtlar `upgradeSiteMenu` ile okunurken yükseltilir.
  * Saf modül (sunucu ve istemci ortak): admin editörü canlı hata gösterir, sunucu aynı kuralla yeniden doğrular.
  */
 
@@ -81,33 +97,124 @@ const footerColumnSchema = z.strictObject({
   links: z.array(footerLinkSchema).max(LIMITS.maxFooterLinksPerColumn, `Bir sütunda en fazla ${LIMITS.maxFooterLinksPerColumn} bağlantı olabilir.`),
 });
 
-const announcementSchema = z.strictObject({
-  enabled: z.boolean(),
-  /** Metin değişince kapatma hatırası sıfırlansın diye her kayıtta yenilenen anahtar. */
-  key: z.string().regex(/^[a-z0-9]{1,16}$/),
-  text: text(LIMITS.announcementText, "Duyuru metni"),
-  href: z.string().trim().max(LIMITS.href, "Bağlantı çok uzun."),
+/** ESKİ tekil duyuru şeridi (yalnız yükseltme için okunur; yeni kayıtlar `announcements` listesini kullanır). */
+type LegacyAnnouncement = { enabled?: unknown; text?: unknown; href?: unknown; linkLabel?: unknown; endsOn?: unknown; dismissible?: unknown };
+
+const day = z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/, "Tarih YYYY-AA-GG olmalı.");
+const hrefField = z.string().trim().max(LIMITS.href, "Bağlantı çok uzun.");
+
+const announcementItemSchema = z.strictObject({
+  id,
+  text: text(LIMITS.announcementItemText, "Duyuru metni"),
+  /** İsteğe bağlı bağlantı (boş: bağlantısız). Bağlantı varsa bağlantı metni zorunlu. */
+  href: hrefField,
   linkLabel: text(LIMITS.announcementLinkLabel, "Bağlantı metni"),
-  /** `YYYY-MM-DD` (Türkiye saatiyle o günün sonuna kadar gösterilir) veya boş. */
-  endsOn: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/, "Bitiş tarihi YYYY-AA-GG olmalı."),
+  /** `YYYY-MM-DD` veya boş: Türkiye günüyle başlangıç (00:00) ve bitiş (23:59:59). */
+  startsOn: day,
+  endsOn: day,
+  /** Yol hedefi: bütün site, yalnız ana sayfa ya da bir yol öneki (`/fiyatlar` → /fiyatlar ve altı). */
+  pathMode: z.enum(ANNOUNCEMENT_PATH_MODES),
+  pathPrefix: z.string().trim().max(LIMITS.pathPrefix, "Yol öneki çok uzun."),
+  /** 1-9; aynı anda birden çok duyuru uyarsa en yüksek öncelikli TEK duyuru gösterilir. */
+  priority: z.number().int().min(1, "Öncelik 1-9 olmalı.").max(9, "Öncelik 1-9 olmalı."),
   dismissible: z.boolean(),
 });
 
-export const siteMenuSchema = z.strictObject({
+const ctaLinkSchema = z.strictObject({ label: text(LIMITS.ctaLabel, "Düğme metni"), href: hrefField });
+
+const footerBrandSchema = z.strictObject({
+  description: text(LIMITS.footerDescription, "Marka açıklaması"),
+  badges: z
+    .array(z.strictObject({ label: text(LIMITS.footerBadge, "Rozet"), icon: z.enum(FOOTER_BADGE_ICONS) }))
+    .max(LIMITS.maxFooterBadges, `En fazla ${LIMITS.maxFooterBadges} güven rozeti olabilir.`),
+  cta: z.strictObject({ label: text(LIMITS.footerCta, "Düğme metni"), href: hrefField }),
+  /** `{yil}` değişkeni Türkiye saatiyle bu yılla değişir. */
+  copyright: text(LIMITS.copyright, "Telif satırı"),
+  disclaimer: text(LIMITS.disclaimer, "Yasal not"),
+  /** Açıksa sosyal ve iletişim satırı SEO kurum bilgisinden (sameAs, e-posta, telefon) gelir. */
+  showContact: z.boolean(),
+});
+
+const ogCardSchema = z.strictObject({
+  title: text(LIMITS.ogTitle, "Kart başlığı"),
+  subtitle: text(LIMITS.ogSubtitle, "Kart alt başlığı"),
+  chips: z.array(text(LIMITS.ogChip, "Rozet")).max(LIMITS.maxOgChips, `En fazla ${LIMITS.maxOgChips} rozet olabilir.`),
+});
+
+const notFoundSchema = z.strictObject({
+  title: text(LIMITS.notFoundTitle, "Başlık"),
+  text: text(LIMITS.notFoundText, "Açıklama"),
+  links: z
+    .array(z.strictObject({ label: text(LIMITS.notFoundLabel, "Bağlantı adı"), desc: text(LIMITS.notFoundDesc, "Kısa açıklama"), href: hrefField }))
+    .max(LIMITS.maxNotFoundLinks, `En fazla ${LIMITS.maxNotFoundLinks} bağlantı olabilir.`),
+});
+
+const siteMenuObject = z.strictObject({
   v: z.literal(1),
   groups: z.array(groupSchema).max(LIMITS.maxGroups, `En fazla ${LIMITS.maxGroups} üst grup olabilir.`),
   footer: z.array(footerColumnSchema).max(LIMITS.maxFooterColumns, `En fazla ${LIMITS.maxFooterColumns} alt bilgi sütunu olabilir.`),
-  announcement: announcementSchema,
+  footerBrand: footerBrandSchema,
+  ctas: z.strictObject({ login: ctaLinkSchema, trial: ctaLinkSchema, mobileLogin: ctaLinkSchema, mobileTrial: ctaLinkSchema }),
+  announcements: z.array(announcementItemSchema).max(LIMITS.maxAnnouncements, `En fazla ${LIMITS.maxAnnouncements} duyuru olabilir.`),
+  ogCard: ogCardSchema,
+  notFound: notFoundSchema,
 });
 
-export type SiteMenuConfig = z.infer<typeof siteMenuSchema>;
+/** Sonradan eklenen üst düzey alanlar: eski kayıtta yoksa varsayılandan (bugünkü sabit metin) gelir. */
+const LATER_KEYS = ["footerBrand", "ctas", "ogCard", "notFound"] as const;
+
+/** Eski tekil duyuruyu listeye çevirir (`id: "legacy"`); kapalı ya da metinsiz eski duyuru listeye girmez. */
+export function legacyAnnouncementToList(a: LegacyAnnouncement | null | undefined): AnnouncementItem[] {
+  if (!a || typeof a !== "object" || a.enabled !== true || typeof a.text !== "string" || !a.text.trim()) return [];
+  const str = (v: unknown) => (typeof v === "string" ? v : "");
+  return [
+    {
+      id: "legacy",
+      text: a.text,
+      href: str(a.href),
+      linkLabel: str(a.linkLabel),
+      startsOn: "",
+      endsOn: str(a.endsOn),
+      pathMode: "all",
+      pathPrefix: "",
+      priority: 5,
+      dismissible: a.dismissible !== false,
+    },
+  ];
+}
+
+/**
+ * Eski kayıtları (yayın, taslak, geçmiş) yükseltir: tekil `announcement` → `announcements`, eksik yeni alanlar
+ * varsayılandan. Saf; girdiyi değiştirmez. Yükseltilmiş eski kayıt bugünkü çıktıyı birebir verir.
+ */
+export function upgradeSiteMenu(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const out: Record<string, unknown> = { ...(value as Record<string, unknown>) };
+  if (out.announcements === undefined) out.announcements = legacyAnnouncementToList(out.announcement as LegacyAnnouncement | undefined);
+  delete out.announcement;
+  let defaults: SiteMenuConfig | null = null;
+  for (const k of LATER_KEYS) {
+    if (out[k] === undefined) {
+      defaults ??= defaultSiteMenu();
+      out[k] = defaults[k];
+    }
+  }
+  return out;
+}
+
+export const siteMenuSchema = z.preprocess(upgradeSiteMenu, siteMenuObject);
+
+export type SiteMenuConfig = z.infer<typeof siteMenuObject>;
 export type MenuGroup = z.infer<typeof groupSchema>;
 export type MenuItem = z.infer<typeof itemSchema>;
 export type MenuFeatured = z.infer<typeof featuredSchema>;
 export type IconRef = z.infer<typeof iconRef>;
 export type FooterColumn = z.infer<typeof footerColumnSchema>;
 export type FooterLink = z.infer<typeof footerLinkSchema>;
-export type Announcement = z.infer<typeof announcementSchema>;
+export type AnnouncementItem = z.infer<typeof announcementItemSchema>;
+export type FooterBrand = z.infer<typeof footerBrandSchema>;
+export type OgCard = z.infer<typeof ogCardSchema>;
+export type NotFoundContent = z.infer<typeof notFoundSchema>;
 
 // ---------------------------------------------------------------------------
 // Bağlantı doğrulaması
@@ -123,6 +230,11 @@ function hrefIssues(raw: string, path: string, out: Issue[]) {
   const r = checkHref(raw);
   if (!r.ok) out.push({ level: "error", path, message: r.message });
   else if (r.warn) out.push({ level: "warn", path, message: r.warn });
+}
+
+function pageHrefIssues(raw: string, path: string, out: Issue[]) {
+  const r = checkPageHref(raw);
+  if (!r.ok) out.push({ level: "error", path, message: r.message });
 }
 
 function normalizedTarget(href: string): string {
@@ -245,17 +357,71 @@ export function validateSiteMenu(input: unknown, ctx: ValidationContext = { medi
     issues.push({ level: "error", path: "footer", message: `Alt bilgide en fazla ${LIMITS.maxFooterLinks} bağlantı olabilir (şu an ${footerLinks}).` });
   }
 
-  const a = cfg.announcement;
-  if (a.enabled) {
-    if (!a.text) issues.push({ level: "error", path: "announcement.text", message: "Duyuru açıkken metin zorunlu." });
-    if (a.href) {
-      hrefIssues(a.href, "announcement.href", issues);
-      if (!a.linkLabel) issues.push({ level: "error", path: "announcement.linkLabel", message: "Bağlantı varsa bağlantı metni de yazın." });
-    }
-    if (a.endsOn && Number.isNaN(Date.parse(`${a.endsOn}T00:00:00Z`))) {
-      issues.push({ level: "error", path: "announcement.endsOn", message: "Bitiş tarihi geçerli değil." });
-    }
-  }
+  frameIssues(cfg, issues, ctx.risky);
 
   return { config: cfg, issues };
+}
+
+/** Çerçeve alanları: alt bilgi marka bloğu, dönüşüm düğmeleri, duyurular, paylaşım kartı, 404. Metinler düz metindir. */
+function frameIssues(cfg: SiteMenuConfig, issues: Issue[], risky: ValidationContext["risky"]) {
+  const warnRisky = (value: string, path: string) => {
+    if (!risky || !value) return;
+    const words = risky(value);
+    if (words.length) issues.push({ level: "warn", path, message: `Riskli/abartılı ifade: ${words.join(", ")}. Kanıtlanabilir bir ifade tercih edin.` });
+  };
+
+  const b = cfg.footerBrand;
+  warnRisky(b.description, "footerBrand.description");
+  b.badges.forEach((x, i) => {
+    if (!x.label) issues.push({ level: "error", path: `footerBrand.badges.${i}.label`, message: "Rozet metni boş olamaz." });
+    warnRisky(x.label, `footerBrand.badges.${i}.label`);
+  });
+  if (!b.cta.label) issues.push({ level: "error", path: "footerBrand.cta.label", message: "Düğme metni boş olamaz." });
+  pageHrefIssues(b.cta.href, "footerBrand.cta.href", issues);
+  warnRisky(b.disclaimer, "footerBrand.disclaimer");
+  if (b.copyright && !b.copyright.includes("{yil}")) issues.push({ level: "warn", path: "footerBrand.copyright", message: "Telif satırında {yil} yok; yıl her yıl elle güncellenmeli." });
+
+  for (const k of ["login", "trial", "mobileLogin", "mobileTrial"] as const) {
+    const c = cfg.ctas[k];
+    if (!c.label && k !== "mobileTrial") issues.push({ level: "error", path: `ctas.${k}.label`, message: "Düğme metni boş olamaz." });
+    pageHrefIssues(c.href, `ctas.${k}.href`, issues);
+    warnRisky(c.label, `ctas.${k}.label`);
+  }
+
+  const seenAnn = new Set<string>();
+  cfg.announcements.forEach((a, i) => {
+    const p = `announcements.${i}`;
+    if (seenAnn.has(a.id)) issues.push({ level: "error", path: `${p}.id`, message: "Duyuru kimliği yinelendi; sayfayı yenileyip tekrar deneyin." });
+    seenAnn.add(a.id);
+    if (!a.text) issues.push({ level: "error", path: `${p}.text`, message: "Duyuru metni boş olamaz." });
+    warnRisky(a.text, `${p}.text`);
+    if (a.href) {
+      pageHrefIssues(a.href, `${p}.href`, issues);
+      if (!a.linkLabel) issues.push({ level: "error", path: `${p}.linkLabel`, message: "Bağlantı varsa bağlantı metni de yazın." });
+    }
+    const start = a.startsOn ? startOfDayTrMs(a.startsOn) : null;
+    const end = a.endsOn ? startOfDayTrMs(a.endsOn) : null;
+    if (a.startsOn && start === null) issues.push({ level: "error", path: `${p}.startsOn`, message: "Başlangıç tarihi geçerli değil." });
+    if (a.endsOn && end === null) issues.push({ level: "error", path: `${p}.endsOn`, message: "Bitiş tarihi geçerli değil." });
+    if (start !== null && end !== null && end < start) issues.push({ level: "error", path: `${p}.endsOn`, message: "Bitiş tarihi başlangıçtan önce olamaz." });
+    if (a.pathMode === "prefix" && !/^\/[A-Za-z0-9/_-]*$/.test(a.pathPrefix)) {
+      issues.push({ level: "error", path: `${p}.pathPrefix`, message: "Yol öneki / ile başlamalı (ör. /fiyatlar); sorgu ve bölüm içeremez." });
+    }
+  });
+
+  const og = cfg.ogCard;
+  if (!og.title) issues.push({ level: "error", path: "ogCard.title", message: "Kart başlığı boş olamaz." });
+  warnRisky(og.title, "ogCard.title");
+  warnRisky(og.subtitle, "ogCard.subtitle");
+  og.chips.forEach((c, i) => {
+    if (!c) issues.push({ level: "error", path: `ogCard.chips.${i}`, message: "Rozet boş olamaz; kullanmayacaksanız silin." });
+    warnRisky(c, `ogCard.chips.${i}`);
+  });
+
+  const nf = cfg.notFound;
+  if (!nf.title) issues.push({ level: "error", path: "notFound.title", message: "404 başlığı boş olamaz." });
+  nf.links.forEach((l, i) => {
+    if (!l.label) issues.push({ level: "error", path: `notFound.links.${i}.label`, message: "Bağlantı adı boş olamaz." });
+    pageHrefIssues(l.href, `notFound.links.${i}.href`, issues);
+  });
 }

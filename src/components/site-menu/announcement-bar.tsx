@@ -1,25 +1,29 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
-import { isPast } from "@/lib/clock";
+import { now } from "@/lib/clock";
+import { ANNOUNCEMENT_DISMISS_KEY, addDismissed, parseDismissed, pickAnnouncement } from "@/lib/site-menu/announcements";
 import type { PublicAnnouncement } from "@/lib/site-menu/public";
 
 /**
- * Üst duyuru şeridi. Bitiş tarihi geçince (sayfa önbellekte kalmış olsa bile) istemcide de gizlenir;
- * kapatma tercihi tarayıcıda saklanır (duyuru metni/bağlantısı değişince anahtar değişir ve şerit yeniden görünür).
- * Daha önce kapatılmışsa ilk boyamada yer kaplamaması için sunucu çıktısındaki küçük betik <html>'e işaret koyar
- * (`data-mk-ann-off`); CSS şeridi gizler (CLS yok). Betik: ANNOUNCEMENT_BOOT_SCRIPT (site-header.tsx).
+ * Üst duyuru şeridi. Yönetimden en çok 5 duyuru gelir; sayfada TEK duyuru görünür: Türkiye gününe göre aktif, yola uyan,
+ * kapatılmamış ve en yüksek öncelikli olan (`pickAnnouncement`, saf). Sunucu çizimi sayfanın çizildiği anla seçer; tarayıcı
+ * gerçek saat ve kapatılanlarla yeniden seçer (önbellekte kalmış sayfada bitiş/başlangıç da doğru işler).
+ * Kapatma tarayıcıda kimlik bazlı saklanır (`mk-ann-off`, boşlukla ayrılmış anahtarlar; anahtar = kimlik + içerik özeti,
+ * metin/bağlantı/tarih değişince duyuru yeniden görünür). Daha önce kapatılmışsa ilk boyamada yer kaplamaması için sunucu
+ * çıktısındaki küçük betik <html>'e işaret koyar (`data-mk-ann-off`); CSS şeridi gizler (CLS yok). Betik: site-header.tsx.
+ * Statik ana sayfa aynı anahtarı src/static-home/runtime.ts'te okur.
  */
 
-const STORE_KEY = "mk-ann-off";
 const EVENT = "mk-ann-change";
 
-function readOff(key: string): boolean {
+function readRaw(): string {
   try {
-    return window.localStorage.getItem(STORE_KEY) === key;
+    return window.localStorage.getItem(ANNOUNCEMENT_DISMISS_KEY) ?? "";
   } catch {
-    return false;
+    return "";
   }
 }
 
@@ -32,14 +36,26 @@ function subscribe(cb: () => void) {
   };
 }
 
+/** Gösterilecek duyuru. Sunucu/ilk hidrasyon: `renderedAt` anı, kapatma bilgisi yok; tarayıcı: gerçek saat + kapatılanlar. */
+export function usePickedAnnouncement(list: readonly PublicAnnouncement[] | undefined, renderedAt: number): PublicAnnouncement | null {
+  const path = usePathname() ?? "/";
+  const id = useSyncExternalStore(
+    subscribe,
+    () => (list?.length ? (pickAnnouncement(list, path, now(), parseDismissed(readRaw()))?.id ?? "") : ""),
+    () => (list?.length ? (pickAnnouncement(list, path, renderedAt)?.id ?? "") : ""),
+  );
+  return id ? (list?.find((a) => a.id === id) ?? null) : null;
+}
+
 export function AnnouncementBar({ a }: { a: PublicAnnouncement }) {
-  const dismissed = useSyncExternalStore(subscribe, () => readOff(a.key), () => false);
-  const expired = useSyncExternalStore(subscribe, () => isPast(a.endsAtMs), () => false);
-  if (dismissed || expired) return null;
+  // Önceki duyuru kapatılmışken sıradaki duyuru gösteriliyorsa ilk boyamadaki gizleme işareti kaldırılır.
+  useEffect(() => {
+    if (!parseDismissed(readRaw()).includes(a.id)) document.documentElement.removeAttribute("data-mk-ann-off");
+  }, [a.id]);
 
   const dismiss = () => {
     try {
-      window.localStorage.setItem(STORE_KEY, a.key);
+      window.localStorage.setItem(ANNOUNCEMENT_DISMISS_KEY, addDismissed(readRaw(), a.id));
     } catch {
       /* özel pencere: yalnız bu sayfa görünümünde kapanır */
     }
@@ -48,7 +64,7 @@ export function AnnouncementBar({ a }: { a: PublicAnnouncement }) {
   };
 
   return (
-    <div className="mk-ann" role="region" aria-label="Duyuru" data-key={a.key} data-ends={a.endsAtMs ?? undefined}>
+    <div className="mk-ann" role="region" aria-label="Duyuru" data-key={a.id} data-ends={a.endsAtMs ?? undefined}>
       <p>
         {a.text}
         {a.href ? (
