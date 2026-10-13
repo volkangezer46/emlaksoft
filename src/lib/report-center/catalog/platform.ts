@@ -16,8 +16,47 @@ import { STATUS } from "../labels";
 import { applyTimestampRange, enrichStaff, enrichTenants, chainEnrich, label, nameOf, searchOr } from "../query-helpers";
 import type { ReportColumn, ReportContext, Row } from "../types";
 import { defineReport, opts } from "./define";
+import { HEALTH_BAND_LABELS, healthBandRange } from "@/lib/admin/health-score";
+import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from "@/lib/admin/platform-crm";
+
+/** ilike deseninde joker karakterleri (%, _) ve virgül/parantez düz metin olarak aranır. */
+const likeSafe = (v: string) => v.replace(/[%_,()\\]/g, " ").trim();
 
 const PLAN_OPTIONS = ["advisor", "office", "professional", "business", "enterprise"].map((id) => ({ value: id, label: planLabel(id) }));
+
+/**
+ * Ofis CRM (AD5) alanları: aşama, sorumlu, etiketler, son sağlık skoru. Tablolar yoksa (migration bekliyor) sütunlar boş
+ * kalır; CRM süzgeci seçilmedikçe ana sorgu CRM tablolarına dokunmaz (rapor eskisi gibi çalışır).
+ */
+type TenantCrm = { stage: string | null; owner: string | null; score: number | null; tags: string[] };
+const STAGE_LABELS = Object.fromEntries(LIFECYCLE_STAGES.map((s) => [s, LIFECYCLE_LABELS[s]]));
+const SCORE_OPTIONS = (["riskli", "izlenmeli", "saglikli"] as const).map((b) => {
+  const r = healthBandRange(b);
+  return { value: b, label: `${HEALTH_BAND_LABELS[b]} (${r.gte}-${Math.min(100, r.lt - 1)})` };
+});
+
+async function loadTenantCrm(ctx: ReportContext, ids: string[]): Promise<void> {
+  const out = (ctx.memo.get("tenantCrm") as Map<string, TenantCrm> | undefined) ?? new Map<string, TenantCrm>();
+  ctx.memo.set("tenantCrm", out);
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const [crm, links] = await Promise.all([
+      ctx.supabase
+        .from("platform_tenant_crm")
+        .select("tenant_id, lifecycle_stage, health_score, owner:platform_staff!platform_tenant_crm_account_owner_staff_id_fkey(full_name)")
+        .in("tenant_id", chunk),
+      ctx.supabase.from("tenant_tag_links").select("tenant_id, tag:tenant_tags!tenant_tag_links_tag_id_fkey(name)").in("tenant_id", chunk),
+    ]);
+    if (crm.error || links.error) return; // tablo yok / okunamadı: CRM sütunları boş (uydurulmaz)
+    for (const c of (crm.data ?? []) as Row[]) out.set(c.tenant_id, { stage: c.lifecycle_stage, owner: c.owner?.full_name ?? null, score: c.health_score, tags: [] });
+    for (const l of (links.data ?? []) as Row[]) {
+      const cur = out.get(l.tenant_id) ?? { stage: null, owner: null, score: null, tags: [] };
+      if (l.tag?.name) cur.tags.push(l.tag.name);
+      out.set(l.tenant_id, cur);
+    }
+  }
+}
+const crmOf = (c: ReportContext, id: string) => (c.memo.get("tenantCrm") as Map<string, TenantCrm> | undefined)?.get(id);
 
 type TenantStats = { owner: string; active: number; total: number };
 
@@ -46,16 +85,20 @@ async function loadTenantStats(ctx: ReportContext, ids: string[]): Promise<void>
 export const ofisler = defineReport({
   id: "ofisler",
   title: "Ofisler",
-  description: "Tüm ofisler: paket, durum, deneme bitişi, sahibi, kullanıcı sayısı, abonelik tutarı ve iletişim.",
+  description: "Tüm ofisler: paket, durum, deneme bitişi, sahibi, kullanıcı sayısı, abonelik tutarı, iletişim ve CRM (etiket, sorumlu, aşama, sağlık skoru).",
   category: "platform",
   scope: "platform",
   platformModule: "tenants",
   personalData: true,
-  keywords: ["tenant", "müşteri", "deneme", "kayıt"],
+  keywords: ["tenant", "müşteri", "deneme", "kayıt", "etiket", "sorumlu", "sağlık skoru", "crm"],
   filters: [
     { kind: "select", key: "plan", label: "Paket", options: PLAN_OPTIONS },
     { kind: "select", key: "durum", label: "Durum", options: opts(STATUS.tenantStatus) },
     { kind: "text", key: "q", label: "Ofis adı", placeholder: "Ofis adında ara" },
+    { kind: "text", key: "etiket", label: "Etiket", placeholder: "Etiket adı (ör. Kurumsal)" },
+    { kind: "text", key: "sorumlu", label: "Sorumlu personel", placeholder: "Personel adı" },
+    { kind: "select", key: "asama", label: "Yaşam döngüsü aşaması", options: opts(STAGE_LABELS) },
+    { kind: "select", key: "skor", label: "Sağlık skoru", options: SCORE_OPTIONS },
     ...DATE_RANGE_FIELDS("Kayıt başlangıcı", "Kayıt bitişi"),
   ],
   columns: [
@@ -72,18 +115,38 @@ export const ofisler = defineReport({
     { key: "toplam", label: "Toplam kullanıcı", type: "number", total: true, get: (r, c) => (c.memo.get("tenantUsers") as Map<string, TenantStats> | undefined)?.get(r.id)?.total ?? 0 },
     { key: "deneme", label: "Deneme bitişi", type: "date", get: (r) => r.trial_ends_at },
     { key: "kayit", label: "Kayıt tarihi", type: "date", get: (r) => r.created_at },
+    { key: "saglik", label: "Sağlık skoru", type: "number", get: (r, c) => crmOf(c, r.id)?.score ?? null },
+    { key: "asama", label: "Aşama", type: "text", width: 14, get: (r, c) => label(STAGE_LABELS, crmOf(c, r.id)?.stage) },
+    { key: "sorumlu", label: "Sorumlu personel", type: "text", width: 22, get: (r, c) => crmOf(c, r.id)?.owner },
+    { key: "etiketler", label: "Etiketler", type: "text", width: 26, get: (r, c) => crmOf(c, r.id)?.tags.join(", ") },
   ],
   source: {
     kind: "query",
     build: (ctx, f) => {
-      let q = ctx.supabase.from("tenants").select("id, name, plan, status, phone, city, trial_ends_at, created_at", { count: "exact" });
+      const embeds = [
+        f.etiket ? "tl:tenant_tag_links!tenant_tag_links_tenant_id_fkey!inner(tag:tenant_tags!tenant_tag_links_tag_id_fkey!inner(name))" : "",
+        f.sorumlu || f.asama || f.skor
+          ? `crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(lifecycle_stage, health_score${f.sorumlu ? ", own:platform_staff!platform_tenant_crm_account_owner_staff_id_fkey!inner(full_name)" : ""})`
+          : "",
+      ].filter(Boolean);
+      let q = ctx.supabase.from("tenants").select(`id, name, plan, status, phone, city, trial_ends_at, created_at${embeds.length ? `, ${embeds.join(", ")}` : ""}`, { count: "exact" });
       if (f.plan) q = q.eq("plan", f.plan);
       if (f.durum) q = q.eq("status", f.durum);
       q = searchOr(q, ["name"], f.q);
       q = applyTimestampRange(q, "created_at", f);
+      if (f.etiket) q = q.ilike("tl.tag.name", `%${likeSafe(f.etiket)}%`);
+      if (f.sorumlu) q = q.ilike("crm.own.full_name", `%${likeSafe(f.sorumlu)}%`);
+      if (f.asama) q = q.eq("crm.lifecycle_stage", f.asama);
+      if (f.skor === "riskli" || f.skor === "izlenmeli" || f.skor === "saglikli") {
+        const r = healthBandRange(f.skor);
+        q = q.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
+      }
       return q.order("created_at", { ascending: false }).order("id", { ascending: true });
     },
-    enrich: async (rows, ctx) => loadTenantStats(ctx, rows.map((r) => r.id)),
+    enrich: async (rows, ctx) => {
+      const ids = rows.map((r) => r.id);
+      await Promise.all([loadTenantStats(ctx, ids), loadTenantCrm(ctx, ids)]);
+    },
   },
 });
 

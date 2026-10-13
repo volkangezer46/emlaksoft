@@ -8,6 +8,7 @@ import {
   Activity,
   ArrowLeft,
   Building2,
+  ClipboardList,
   CreditCard,
   Gauge,
   History,
@@ -67,6 +68,12 @@ import {
 } from "./office-360-panels";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { CrmHeaderStrip, CrmRelationTab } from "./crm-panel";
+import { effectiveStage, loadCrmCatalog, loadOfficeCrm, noteView, taskView } from "@/lib/admin/platform-crm";
+import { HEALTH_DEFAULT_RISK_THRESHOLD } from "@/lib/admin/health-score";
+import { officeAdminCan } from "@/lib/admin/office-admin-access";
+import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
+import { getSetting } from "@/lib/settings/read";
 
 const tenantStatusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -78,6 +85,7 @@ const tenantStatusLabel: Record<string, string> = {
 
 const TAB_META: Record<OfficeTab, { label: string; icon: typeof History }> = {
   zaman: { label: "Zaman çizelgesi", icon: History },
+  iliski: { label: "İlişki", icon: ClipboardList },
   yonetim: { label: "Yönetim", icon: Settings2 },
   abonelik: { label: "Abonelik ve ödemeler", icon: CreditCard },
   destek: { label: "Destek", icon: LifeBuoy },
@@ -107,13 +115,17 @@ export default async function AdminTenantDetailPage({
   const admin = createAdminClient();
 
   // Ofis satırı ve KPI okumaları yalnız `id`'ye bağlı → tek tur (önceden ardışık iki tur; ofis yoksa notFound yine kesinti).
-  const [{ data: tenant }, kpiData] = await Promise.all([
+  // CRM (AD5) başlığı da aynı turda: skor/aşama/sorumlu/etiket + "Görevlerim"; not/görev/trend yalnız İlişki sekmesinde.
+  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold] = await Promise.all([
     admin
       .from("tenants")
       .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
       .eq("id", id)
       .maybeSingle(),
     loadOfficeKpis(admin, id, access),
+    loadOfficeCrm(admin, id, staff.id, active === "iliski"),
+    loadCrmCatalog(admin),
+    getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD),
   ]);
   if (!tenant) notFound();
 
@@ -166,8 +178,29 @@ export default async function AdminTenantDetailPage({
 
   // ---- Aktif sekmenin içeriği (yalnız gereken veri çekilir) ----
   let content: ReactNode = null;
+  const nowMs = now();
+  const staffName = (sid: string) => crmCatalog.staff.find((s) => s.id === sid)?.name ?? null;
+  const crmCanEdit = officeAdminCan(staff.role, "note");
+  const crmStage = effectiveStage(crm.stage, tenant.status ?? "trial");
 
-  if (active === "yonetim") {
+  if (active === "iliski") {
+    content = (
+      <CrmRelationTab
+        tenantId={id}
+        ready={crm.ready}
+        notes={crm.notes.map((n) => noteView(n, staffName))}
+        tasks={crm.tasks.map((t) => taskView(t, nowMs, staffName))}
+        trend={crm.trend}
+        staff={crmCatalog.staff}
+        meId={staff.id}
+        canEdit={crmCanEdit}
+        isSuper={staff.role === "super_admin"}
+        threshold={riskThreshold}
+      />
+    );
+  }
+
+  else if (active === "yonetim") {
     const can = officeAdminCanMap(staff.role);
     const [mgmt, moduleState] = await Promise.all([
       loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note }),
@@ -330,7 +363,6 @@ export default async function AdminTenantDetailPage({
     const usageTruncated = usageRows.length >= USAGE_LIMIT;
     const totalOps = usageRows.length;
     const activeActors = new Set(usageRows.map((r) => r.actor_id).filter(Boolean)).size;
-    const nowMs = now();
     const heat = new Map<string, { buckets: [number, number, number, number]; total: number }>();
     for (const r of usageRows) {
       const mod = moduleForAction(r.action);
@@ -451,6 +483,23 @@ export default async function AdminTenantDetailPage({
             <KpiCard key={k.label} layout="inline" label={k.label} value={k.value} href={k.href} icon={k.icon} tone="brand" hint={k.hint} />
           ))}
         </KpiGrid>
+        {crm.ready ? (
+          <CrmHeaderStrip
+            tenantId={id}
+            score={crm.score}
+            threshold={riskThreshold}
+            stage={crmStage.stage}
+            stageAuto={crmStage.auto}
+            ownerId={crm.ownerId}
+            tagIds={crm.tagIds}
+            tags={crmCatalog.tags}
+            staff={crmCatalog.staff}
+            myTasks={crm.myTasks.map((t) => taskView(t, nowMs, staffName))}
+            meId={staff.id}
+            canEdit={crmCanEdit}
+            relationHref={tabHref("iliski")}
+          />
+        ) : null}
       </AdminPageHeader>
 
       <MorphNav

@@ -13,7 +13,7 @@ import type { TimelineEvent } from "@/lib/activity-timeline";
  * (ad, telefon, e-posta, not) bu katmanda HİÇ okunmaz. IP yalnız süper adminde gösterilir.
  */
 
-export const OFFICE_TABS = ["zaman", "yonetim", "abonelik", "destek", "kullanim", "ekip", "yasal", "fatura"] as const;
+export const OFFICE_TABS = ["zaman", "iliski", "yonetim", "abonelik", "destek", "kullanim", "ekip", "yasal", "fatura"] as const;
 export type OfficeTab = (typeof OFFICE_TABS)[number];
 
 export const TIMELINE_CATEGORIES: { key: string; label: string }[] = [
@@ -111,6 +111,11 @@ const ACCOUNT_ACTION_TITLES: Record<string, string> = {
   "tenant.user_deactivate": "Ofis kullanıcısı pasife alındı",
   "tenant.user_reactivate": "Ofis kullanıcısı yeniden etkinleştirildi",
   "tenant.note": "Dahili not eklendi",
+  "tenant.crm_tags": "Ofis etiketleri güncellendi",
+  "tenant.crm_owner": "Sorumlu personel değişti",
+  "tenant.crm_stage": "Yaşam döngüsü aşaması değişti",
+  "tenant.crm_note": "CRM notu kaydedildi",
+  "tenant.crm_task": "Takip görevi güncellendi",
   "billing.tenant_plan_status": "Paket veya durum değiştirildi",
   "team.member_created": "Kullanıcı hesabı oluşturuldu (platform)",
   "team.member_deactivated": "Kullanıcı pasife alındı (platform)",
