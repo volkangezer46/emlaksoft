@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
 import { now } from "@/lib/clock";
 import { orIlike } from "@/lib/pgrst";
+import { classifyError, ERROR_CLASS_LABELS, VERSION_SKEW_PATTERNS } from "@/lib/errors/classify";
 import { ResolveErrorButton } from "./resolve-button";
 import { ErrorsBulkBar, ReopenErrorButton } from "./error-bulk";
 import { ERRORS_BULK_FORM_ID } from "./bulk-form-id";
@@ -77,7 +78,7 @@ function ozetle(rows: Row[]) {
 export async function ErrorsView({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string }>;
+  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; tur?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const params = (await searchParams) ?? {};
@@ -86,7 +87,9 @@ export async function ErrorsView({
   const q = (params.q ?? "").trim().slice(0, 80);
   const kaynak = params.kaynak === "server" || params.kaynak === "client" ? params.kaynak : undefined;
   const ofis = /^[0-9a-f-]{36}$/i.test(params.ofis ?? "") ? params.ofis : undefined;
+  const surumGecisi = params.tur === "surum";
   const base: Filters = {
+    tur: surumGecisi ? "surum" : undefined,
     durum: params.durum,
     son: sonBirSaat ? "1saat" : undefined,
     q: q || undefined,
@@ -110,6 +113,8 @@ export async function ErrorsView({
   if (kaynak) listQ = listQ.eq("source", kaynak);
   if (ofis) listQ = listQ.eq("tenant_id", ofis);
   if (q) listQ = listQ.or(orIlike(["message", "path"], q));
+  // Sürüm geçişi süzgeci: classify.ts ile aynı imzalar (ILIKE OR).
+  if (surumGecisi) listQ = listQ.or(VERSION_SKEW_PATTERNS.map((p) => orIlike(["message"], p)).join(","));
 
   // "Son 1 saatte" kartı sayfa dilimine değil, aynı durum filtresindeki TÜM
   // kayıtlara bakar — sayfa 2'de yanlış sayı göstermesin.
@@ -178,6 +183,9 @@ export async function ErrorsView({
             {o.l}
           </FilterChip>
         ))}
+        <FilterChip href={hrefWith({ ...base, tur: surumGecisi ? undefined : "surum" })} active={surumGecisi}>
+          Sürüm geçişi
+        </FilterChip>
         <FilterChip href={hrefWith({ ...base, son: sonBirSaat ? undefined : "1saat" })} active={sonBirSaat} className="ml-auto">
           <Clock3 className="h-3.5 w-3.5" aria-hidden /> Son 1 saat
         </FilterChip>
@@ -192,6 +200,7 @@ export async function ErrorsView({
         {params.durum ? <input type="hidden" name="durum" value={params.durum} /> : null}
         {sonBirSaat ? <input type="hidden" name="son" value="1saat" /> : null}
         {ofis ? <input type="hidden" name="ofis" value={ofis} /> : null}
+        {surumGecisi ? <input type="hidden" name="tur" value="surum" /> : null}
         <label className="relative min-w-0 flex-1 basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" aria-hidden />
           <Input
@@ -277,6 +286,11 @@ export async function ErrorsView({
                       <Badge variant={r.source === "server" ? "danger" : "warning"}>
                         {r.source === "server" ? "Sunucu" : "İstemci"}
                       </Badge>
+                      {classifyError(r.message) === "surum_gecisi" ? (
+                        <span title="Yeni sürüm yayınlandıktan sonra eski sekmenin artık olmayan dosyayı istemesi; sayfa yenilenince geçer.">
+                          <Badge variant="info">{ERROR_CLASS_LABELS.surum_gecisi}</Badge>
+                        </span>
+                      ) : null}
                       {r.occurrences > 1 ? (
                         <span className="numeric rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
                           {r.occurrences}× tekrar

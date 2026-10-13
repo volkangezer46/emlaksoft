@@ -9,6 +9,9 @@ import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
 import { clampRetentionDays, purgeExpiredFsboPii } from "@/lib/prospecting/retention";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { FSBO_RETENTION_DAYS_KEY } from "@/lib/settings/registry/tenant";
+import { ERRORS_AUTO_RESOLVE_DAYS_KEY } from "@/lib/settings/registry/platform";
+import { getSettings } from "@/lib/settings/read";
+import { autoResolveCutoffIso } from "@/lib/errors/classify";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -43,6 +46,20 @@ export async function GET(req: NextRequest) {
           return clampRetentionDays(values[FSBO_RETENTION_DAYS_KEY]);
         },
       });
+    },
+    // Hata gürültüsü: N gündür (ayar errors.auto_resolve_days, varsayılan 14) görülmeyen açık hata türleri kapanır.
+    // Hata yeniden görülürse record_error_occurrence yeni AÇIK satır açar (çakışma dizini yalnız açık satırlarda).
+    // Kapanan sayı heartbeat notuna (`errorsAutoResolve.closed`) düşer. İdempotent.
+    errorsAutoResolve: async () => {
+      const days = Number((await getSettings([ERRORS_AUTO_RESOLVE_DAYS_KEY]))[ERRORS_AUTO_RESOLVE_DAYS_KEY] ?? 14);
+      const { data, error } = await getAdmin()
+        .from("error_logs")
+        .update({ resolved_at: new Date(now()).toISOString() })
+        .is("resolved_at", null)
+        .lt("last_seen", autoResolveCutoffIso(now(), days))
+        .select("id");
+      if (error) throw new Error(`error auto-resolve failed: ${error.code}`);
+      return { days, closed: (data ?? []).length };
     },
   });
   const queue = await storageDeletionQueueStats().catch(() => null);

@@ -1,29 +1,113 @@
 import { fetchExternal, externalErrorMetadata } from "@/lib/external-fetch";
+import { getPlatformSettingsMany } from "@/lib/platform-settings";
+import { revealSecret } from "@/lib/settings/secrets";
+import { EMAIL_FROM_RE } from "@/lib/settings/registry/platform";
 
 /**
  * E-posta sağlayıcı soyutlaması — tek adaptör: Resend (https://api.resend.com/emails).
- * `RESEND_API_KEY` + `EMAIL_FROM` (ör. "EmlakSoft <bildirim@alanadi.com>", alan adı Resend'de doğrulanmış olmalı) yoksa
- * kanal KAPALI: `sendEmail` hiçbir istek atmadan `{ ok:false, code:"disabled" }` döner; admin ekranı "kanal kapalı" der.
- * Gönderimler yalnız sunucuda; düz metin gövde (HTML yok). Yanıt gövdesi okunmaz (yalnız durum).
+ * Anahtar ve gönderen çözüm SIRASI (her biri için ayrı): ortam değişkeni (RESEND_API_KEY / EMAIL_FROM / EMAIL_REPLY_TO,
+ * öncelikli) > panelden girilen ayar (`email.resend_api_key` şifreli, `email.from`, `email.reply_to`) > yok.
+ * Anahtar ya da geçerli gönderen çözülemezse kanal KAPALI: `sendEmail` hiçbir istek atmadan `{ ok:false, code:"disabled" }`
+ * döner; admin ekranı "kanal kapalı" ve nedenini der (sessiz hata yok). Şifreli anahtar çözülemezse de kanal kapalıdır.
+ * Gönderimler yalnız sunucuda; düz metin gövde (HTML yok). Anahtar değeri bu modülden yalnız istek başlığına çıkar.
  */
 
-export type EmailChannelStatus = { enabled: boolean; from: string | null; reason: string | null };
+/** Panel ayarlarının depo anahtarları (ayar defteri `registry/platform.ts` ile aynı; storageKey = key). */
+export const EMAIL_SETTING_KEYS = {
+  apiKey: "email.resend_api_key",
+  from: "email.from",
+  replyTo: "email.reply_to",
+} as const;
 
-export function emailChannelStatus(): EmailChannelStatus {
-  const key = process.env.RESEND_API_KEY?.trim();
-  const from = process.env.EMAIL_FROM?.trim() || null;
-  if (!key) return { enabled: false, from, reason: "RESEND_API_KEY tanımlı değil" };
-  if (!from || !/<?[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>?$/.test(from)) return { enabled: false, from, reason: "EMAIL_FROM tanımlı değil veya geçersiz" };
-  return { enabled: true, from, reason: null };
+export type EmailValueSource = "env" | "panel" | "none";
+
+export type EmailChannelStatus = {
+  enabled: boolean;
+  from: string | null;
+  replyTo: string | null;
+  reason: string | null;
+  keySource: EmailValueSource;
+  fromSource: EmailValueSource;
+};
+
+type ResolvedEmailChannel = EmailChannelStatus & { apiKey: string | null };
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Gönderen adresinin alan adı (Resend alan adı eşleşmesi için); geçersizse null. */
+export function emailFromDomain(from: string | null | undefined): string | null {
+  const m = /@([^\s@<>]+\.[^\s@<>]+)>?$/.exec((from ?? "").trim());
+  return m ? m[1].toLowerCase() : null;
+}
+
+/**
+ * SAF çözüm: env > panel > kapalı. `storedKey` = panelden çözülmüş düz anahtar (çözülemediyse null),
+ * `storedKeyUndecryptable` = panelde şifreli kayıt var ama açılamadı.
+ */
+export function resolveEmailChannel(
+  env: { RESEND_API_KEY?: string; EMAIL_FROM?: string; EMAIL_REPLY_TO?: string },
+  stored: { apiKey: string | null; apiKeyUndecryptable?: boolean; from: string | null; replyTo: string | null },
+): ResolvedEmailChannel {
+  const envKey = env.RESEND_API_KEY?.trim() || null;
+  const panelKey = stored.apiKey?.trim() || null;
+  const apiKey = envKey ?? panelKey;
+  const keySource: EmailValueSource = envKey ? "env" : panelKey ? "panel" : "none";
+
+  const envFrom = env.EMAIL_FROM?.trim() || null;
+  const panelFrom = stored.from?.trim() || null;
+  const from = envFrom ?? panelFrom;
+  const fromSource: EmailValueSource = envFrom ? "env" : panelFrom ? "panel" : "none";
+
+  const replyRaw = env.EMAIL_REPLY_TO?.trim() || stored.replyTo?.trim() || null;
+  const replyTo = replyRaw && EMAIL_RE.test(replyRaw) ? replyRaw : null;
+
+  const base = { from, replyTo, keySource, fromSource, apiKey };
+  if (!apiKey) {
+    const reason = stored.apiKeyUndecryptable
+      ? "Panelde kayıtlı Resend anahtarı çözülemiyor (PLATFORM_SECRETS_KEY değişmiş olabilir); anahtarı yeniden girin"
+      : "Resend API anahtarı tanımlı değil (ne sunucu ortamında ne panelde)";
+    return { ...base, enabled: false, reason };
+  }
+  if (!from || !EMAIL_FROM_RE.test(from)) {
+    return { ...base, enabled: false, reason: "Gönderen adresi (EMAIL_FROM) tanımlı değil veya geçersiz" };
+  }
+  return { ...base, enabled: true, reason: null };
+}
+
+async function readStored(): Promise<{ apiKey: string | null; apiKeyUndecryptable: boolean; from: string | null; replyTo: string | null }> {
+  try {
+    const raw = await getPlatformSettingsMany([EMAIL_SETTING_KEYS.apiKey, EMAIL_SETTING_KEYS.from, EMAIL_SETTING_KEYS.replyTo]);
+    const sealed = raw[EMAIL_SETTING_KEYS.apiKey] ?? null;
+    const apiKey = revealSecret(EMAIL_SETTING_KEYS.apiKey, sealed);
+    return {
+      apiKey,
+      apiKeyUndecryptable: Boolean(sealed) && !apiKey,
+      from: raw[EMAIL_SETTING_KEYS.from] ?? null,
+      replyTo: raw[EMAIL_SETTING_KEYS.replyTo] ?? null,
+    };
+  } catch {
+    return { apiKey: null, apiKeyUndecryptable: false, from: null, replyTo: null };
+  }
+}
+
+/** SUNUCU İÇİ: anahtar dahil çözülmüş yapılandırma (bağlantı testi ve gönderim için). İstemciye verilmez. */
+export async function resolveEmailChannelConfig(): Promise<ResolvedEmailChannel> {
+  const env = { RESEND_API_KEY: process.env.RESEND_API_KEY, EMAIL_FROM: process.env.EMAIL_FROM, EMAIL_REPLY_TO: process.env.EMAIL_REPLY_TO };
+  return resolveEmailChannel(env, await readStored());
+}
+
+/** Ekran için durum (anahtar değeri YOK). */
+export async function emailChannelStatus(): Promise<EmailChannelStatus> {
+  const { apiKey: _omit, ...status } = await resolveEmailChannelConfig();
+  void _omit;
+  return status;
 }
 
 export type EmailSendResult = { ok: true; id: string | null } | { ok: false; code: "disabled" | "invalid" | "provider_error"; error: string };
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export async function sendEmail(input: { to: string; subject: string; text: string }): Promise<EmailSendResult> {
-  const status = emailChannelStatus();
-  if (!status.enabled) return { ok: false, code: "disabled", error: status.reason ?? "E-posta kanalı kapalı" };
+  const cfg = await resolveEmailChannelConfig();
+  if (!cfg.enabled || !cfg.apiKey) return { ok: false, code: "disabled", error: cfg.reason ?? "E-posta kanalı kapalı" };
   const to = input.to.trim();
   if (!EMAIL_RE.test(to) || to.length > 254) return { ok: false, code: "invalid", error: "Geçersiz alıcı" };
   const subject = input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200);
@@ -33,8 +117,14 @@ export async function sendEmail(input: { to: string; subject: string; text: stri
       "https://api.resend.com/emails",
       {
         method: "POST",
-        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: status.from, to: [to], subject, text: input.text.slice(0, 20_000) }),
+        headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: cfg.from,
+          to: [to],
+          subject,
+          text: input.text.slice(0, 20_000),
+          ...(cfg.replyTo ? { reply_to: cfg.replyTo } : {}),
+        }),
       },
       { timeoutMs: 8_000 },
     );

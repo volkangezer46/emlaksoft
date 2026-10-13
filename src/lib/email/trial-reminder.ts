@@ -9,7 +9,7 @@ import { renderTemplate, templateDef, templateSettingKey } from "@/lib/email/tem
  * service_role istemcisiyle okunur; bu dosya istemci OLUŞTURMAZ). Çalıştırma başına en çok 50 e-posta.
  */
 export async function sendTrialEndingEmails(admin: SupabaseClient, items: { tenantId: string; days: number }[], billingUrl: string): Promise<number> {
-  if (!emailChannelStatus().enabled || items.length === 0) return 0;
+  if (items.length === 0 || !(await emailChannelStatus()).enabled) return 0;
   const def = templateDef("trial_ending");
   const settings = await getSettings([templateSettingKey("trial_ending", "subject"), templateSettingKey("trial_ending", "body")]);
   const subjectTpl = String(settings[templateSettingKey("trial_ending", "subject")] ?? def.defaultSubject);

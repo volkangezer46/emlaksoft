@@ -12,6 +12,7 @@ import { TRY_DEFAULT_MAX_SHARE, TRY_MAX_SHARE_SETTING_KEY } from "@/lib/try-cred
 import { parseMaxShare } from "@/lib/try-credits/config";
 import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
 import { EMAIL_TEMPLATES, templateSettingKey } from "@/lib/email/templates";
+import { z } from "zod";
 import type { AnySettingDef } from "../types";
 import { defineBool, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
 
@@ -423,6 +424,85 @@ const emailTemplates: AnySettingDef[] = EMAIL_TEMPLATES.flatMap((t) => [
   }),
 ]);
 
+/** E-posta gönderen biçimi: "Ad <adres@alan.tld>" ya da çıplak "adres@alan.tld" (provider.ts aynı kuralı kullanır). */
+export const EMAIL_FROM_RE = /^(?:[^<>\r\n]{1,100}\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/;
+const PLAIN_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * E-posta kanalı (Resend). Çözüm sırası provider.ts'te: ortam değişkeni (öncelikli) > bu ayarlar > kapalı.
+ * Anahtar şifreli saklanır (PLATFORM_SECRETS_KEY); değişiklik geçmişe ve denetim izine yalnız parmak iziyle yazılır.
+ * iyzico anahtarları panele TAŞINMAZ (bilinçli karar; ortamda kalır).
+ */
+const emailFromDef = defineString({
+  key: "email.from",
+  home: EMAIL_HOME,
+  default: "",
+  maxLength: 200,
+  category: "bildirim",
+  label: "E-posta gönderen adresi",
+  description: "Biçim: Ad <adres@alanadi.com>. Alan adı Resend'de doğrulanmış olmalı. Ortam değişkeni EMAIL_FROM tanımlıysa o önceliklidir.",
+  impact: "Tüm işlemsel e-postaların gönderen satırı değişir; doğrulanmamış alan adıyla gönderim reddedilir.",
+  envFallback: "EMAIL_FROM",
+});
+const emailReplyToDef = defineString({
+  key: "email.reply_to",
+  home: EMAIL_HOME,
+  default: "",
+  maxLength: 254,
+  category: "bildirim",
+  label: "E-posta yanıt adresi",
+  description: "İsteğe bağlı. Alıcı \"Yanıtla\" dediğinde gidecek adres (adres@alanadi.com). Ortam değişkeni EMAIL_REPLY_TO önceliklidir.",
+  impact: "Boşsa yanıtlar gönderen adresine gider.",
+  envFallback: "EMAIL_REPLY_TO",
+});
+const emailChannel: AnySettingDef[] = [
+  defineSecret({
+    key: "email.resend_api_key",
+    home: EMAIL_HOME,
+    maxLength: 256,
+    minLength: 20,
+    pattern: /^re_[A-Za-z0-9_]+$/,
+    patternMessage: "Geçersiz anahtar biçimi (re_ ile başlamalı).",
+    category: "bildirim",
+    label: "Resend API anahtarı",
+    description: "İşlemsel e-posta sağlayıcısı anahtarı. Şifreli saklanır ve bir daha gösterilmez. Ortam değişkeni RESEND_API_KEY tanımlıysa o önceliklidir.",
+    impact: "Anahtar yoksa ya da çözülemezse e-posta kanalı kapalıdır (uygulama içi bildirimler sürer).",
+    envFallback: "RESEND_API_KEY",
+  }),
+  {
+    ...emailFromDef,
+    schema: z
+      .string()
+      .trim()
+      .max(200)
+      .refine((v) => v === "" || EMAIL_FROM_RE.test(v), "Biçim: Ad <adres@alanadi.com> ya da adres@alanadi.com."),
+  } as AnySettingDef,
+  {
+    ...emailReplyToDef,
+    schema: z
+      .string()
+      .trim()
+      .max(254)
+      .refine((v) => v === "" || PLAIN_EMAIL_RE.test(v), "Geçerli bir e-posta adresi girin."),
+  } as AnySettingDef,
+];
+
+/** Hata gürültüsü: bu kadar gündür görülmeyen açık hata türü operational-retention cron'unda kendiliğinden kapanır. */
+export const ERRORS_AUTO_RESOLVE_DAYS_KEY = "errors.auto_resolve_days";
+const ops: AnySettingDef[] = [
+  defineInt({
+    key: ERRORS_AUTO_RESOLVE_DAYS_KEY,
+    default: 14,
+    min: 1,
+    max: 365,
+    category: "saglik",
+    label: "Hata kaydı otomatik kapanma (gün)",
+    description: "Bu kadar gündür yeniden görülmeyen açık hata türleri gece temizliğinde \"çözüldü\" sayılır.",
+    impact: "Hata yeniden görülürse yeni açık kayıt olarak döner; kapanan sayı cron nabız notuna yazılır.",
+    unit: "gün",
+  }),
+];
+
 export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...general,
   ...security,
@@ -432,4 +512,6 @@ export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...integrations,
   ...portals,
   ...emailTemplates,
+  ...emailChannel,
+  ...ops,
 ];
