@@ -13,8 +13,12 @@ const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 
 describe("muhasebe rolü expenses VIEW (migration 20260826001700)", () => {
   const up = read("supabase/migrations/20260826001700_accounting_expenses_view.sql");
-  it("matris ve SQL aynı: yalnız view", () => {
-    expect(DEFAULT_MATRIX.accounting.expenses).toEqual(["view"]);
+  it("SQL yalnız view ekler; create/edit finans v2 taşımasında (20261014001200), delete hiçbir yerde yok", () => {
+    // Finans v2 (2026-10-14): matris view+create+edit; delete (silme/iptal) muhasebe rolünde YOK.
+    expect(DEFAULT_MATRIX.accounting.expenses).toEqual(["view", "create", "edit"]);
+    const v2 = read("supabase/migrations/20261014001200_finance_ledger_v2_backfill.sql");
+    expect(v2).toContain("('accounting', 'expenses', 'create'), ('accounting', 'expenses', 'edit')");
+    expect(v2).not.toMatch(/'accounting', 'expenses', 'delete'/);
     expect(up).toContain("('accounting', 'expenses', 'view')");
     expect(up).not.toMatch(/'accounting', 'expenses', '(create|edit|delete)'/);
     expect(up).toContain("on conflict do nothing");
