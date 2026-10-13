@@ -59,7 +59,7 @@ type AnnouncementRow = {
   failed_count?: number;
   read_count?: number;
   click_count?: number;
-  stats?: { in_app_sent?: number; open?: number } | null;
+  stats?: { in_app_sent?: number; email_sent?: number; open?: number } | null;
   commercial?: boolean;
   href?: string | null;
 };
@@ -219,6 +219,7 @@ async function AnnouncementsTab({ page, canEdit, isSuperAdmin, fmt }: { page: nu
       reads: a.read_count ?? 0,
       clicks: a.click_count ?? 0,
       inAppSent: a.stats?.in_app_sent ?? 0,
+      emailSent: a.stats?.email_sent ?? 0,
       open: a.stats?.open ?? 0,
       hasHref: Boolean(a.href),
       commercial: Boolean(a.commercial),

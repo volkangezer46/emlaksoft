@@ -33,6 +33,7 @@ export type BroadcastRowData = {
   reads: number;
   clicks: number;
   inAppSent: number;
+  emailSent: number;
   open: number;
   hasHref: boolean;
   commercial: boolean;
@@ -47,7 +48,8 @@ const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   expired: { label: "Süresi doldu", cls: "bg-canvas text-text-muted" },
 };
 const CHANNEL_LABEL: Record<string, string> = { in_app: "Uygulama içi", email: "E-posta", push: "Push" };
-const pct = (n: number, d: number) => (d > 0 ? `%${Math.round((n / d) * 100)}` : "—");
+// Okunma payı (read_count) zil okunması + e-posta tıklamasıdır; payda aynı iki kanalın teslimi (oran %100'ü geçmez).
+const pct = (n: number, d: number) => (d > 0 ? `%${Math.min(100, Math.round((n / d) * 100))}` : "—");
 
 /** Duyuru geçmişi satırı: gövdeyi aç/kapat, düzenle (satır içi panel), geri çek (satır içi onay). */
 export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRowData; canEdit: boolean; isSuperAdmin: boolean }) {
@@ -122,8 +124,8 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
               {row.open} kuyrukta
             </Link>
           ) : null}
-          <Link href={`/admin/duyuru?duyuru=${row.id}&durum=okundu`} className="numeric rounded-full bg-cyan-400/10 px-2 py-0.5 font-semibold text-cyan-600 hover:underline" title="Okunma: zilde okunan / uygulama içi teslim">
-            Okunma {pct(row.reads, row.inAppSent)} ({row.reads})
+          <Link href={`/admin/duyuru?duyuru=${row.id}&durum=okundu`} className="numeric rounded-full bg-cyan-400/10 px-2 py-0.5 font-semibold text-cyan-600 hover:underline" title="Okunma: zilde okunan + e-postadan tıklanan / uygulama içi + e-posta teslimi">
+            Okunma {pct(row.reads, row.inAppSent + row.emailSent)} ({row.reads})
           </Link>
           {row.hasHref ? (
             <Link href={`/admin/duyuru?duyuru=${row.id}&durum=tiklandi`} className="numeric rounded-full bg-cyan-400/10 px-2 py-0.5 font-semibold text-cyan-600 hover:underline" title="Tıklama: bağlantıya tıklayan / toplam teslim">
