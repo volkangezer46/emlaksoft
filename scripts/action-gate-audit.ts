@@ -40,6 +40,7 @@ const GATES = [
   // Platform (super admin) tarafi
   "requirePlatformStaff",
   "requirePlatformModule",
+  "requireSiteMediaWriter", // src/lib/site-media/upload.ts: requirePlatformModule("sitecontent") + yalniz super_admin
   "guardPlatformAction",
   "getPlatformStaff",
   "getPlatformStaffIdentity",

@@ -25,6 +25,8 @@ import { readSiteMediaUsageStrict } from "@/lib/site-media/usage-server";
 
 /** Sunucu eylemi olarak yükleme (4 MB gövde sınırı; ekranlar 8 MB için rotayı kullanır). */
 export async function uploadSiteMedia(form: FormData): Promise<SiteMediaActionResult> {
+  // Kapı eylemde de açık (çekirdek ayrıca denetler; rota yolu yalnız çekirdekten geçer).
+  if (!(await requireSiteMediaWriter())) return { error: READONLY };
   return runSiteMediaUpload(form, "action");
 }
 
