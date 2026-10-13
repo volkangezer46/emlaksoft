@@ -153,6 +153,24 @@ describe("buildChurnRows", () => {
     expect(buildChurnRows(many, new Map(), NOW, 5)).toHaveLength(5);
   });
 
+  it("sağlık skoru eşiğin altındaysa riskli listeye düşer (deneme dahil); eşik ayardan gelir", () => {
+    const tenants = [
+      { id: "h", name: "Hareketli ama düşük skor", status: "active", trial_ends_at: null },
+      { id: "t", name: "Deneme düşük skor", status: "trial", trial_ends_at: null },
+      { id: "g", name: "İyi", status: "active", trial_ends_at: null },
+    ];
+    const act = new Map([["h", 40], ["t", 3], ["g", 40]]);
+    const scores = new Map([["h", 35], ["t", 20], ["g", 80]]);
+    const rows = buildChurnRows(tenants, act, NOW, 8, new Map(), { scores, threshold: 40 });
+    expect(rows.map((r) => r.id).sort()).toEqual(["h", "t"]);
+    expect(rows.find((r) => r.id === "h")!.signals.map((s) => s.label)).toEqual(["Sağlık skoru 35"]);
+    expect(rows.find((r) => r.id === "h")!.healthScore).toBe(35);
+    // Eşik düşerse 35 artık riskli değil.
+    expect(buildChurnRows(tenants, act, NOW, 8, new Map(), { scores, threshold: 30 }).map((r) => r.id)).toEqual(["t"]);
+    // Skor verisi yoksa davranış eskisiyle aynı.
+    expect(buildChurnRows(tenants, act, NOW)).toEqual([]);
+  });
+
   it("son hareket zamanı ve risk düzeyi satıra işlenir", () => {
     const rows = buildChurnRows(
       [{ id: "p", name: "Gecikmiş", status: "past_due", trial_ends_at: null }],

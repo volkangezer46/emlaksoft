@@ -118,7 +118,7 @@ export type ChurnTenant = {
   trial_ends_at: string | null;
 };
 
-export type ChurnSignal = { key: "past_due" | "suspended" | "inactive" | "quiet"; label: string; weight: number };
+export type ChurnSignal = { key: "past_due" | "suspended" | "inactive" | "quiet" | "low_health"; label: string; weight: number };
 
 export type ChurnRow = {
   id: string;
@@ -131,6 +131,8 @@ export type ChurnRow = {
   /** Son 14 gündeki son denetim kaydının zamanı; yoksa null ("14+ gün"). */
   lastActivityAt: string | null;
   level: ChurnLevel;
+  /** Son günlük sağlık skoru (0-100; `tenant_health_daily`/`platform_tenant_crm`); hesaplanmadıysa null. */
+  healthScore: number | null;
 };
 
 export type ChurnLevel = "yuksek" | "orta" | "dusuk";
@@ -157,6 +159,8 @@ export function attentionLevel(severity: number): "acil" | "yuksek" | "orta" | "
  * 14 gün aktivite) ve eşikler tenant listesiyle tutarlıdır (>=10 aktif, 1-9 sessiz, 0 hareketsiz).
  * Deneme bitişi churn DEĞİL dönüşüm fırsatıdır: yalnız dikkat kuyruğunda ("Deneme 7 gün içinde
  * bitiyor") görünür, burada tekrarlanmaz. Sinyali olmayan ofis listelenmez; veri yoksa boş döner.
+ * SAĞLIK SKORU (AD5): `health` verilirse skoru eşiğin (`crm.health_risk_threshold`, varsayılan 40) altındaki ofis
+ * "Sağlık skoru N" sinyaliyle (ağırlık 3) riskli listeye düşer — deneme ofisi dahil (skor kurulum ilerlemesini de ölçer).
  */
 export function buildChurnRows(
   tenants: readonly ChurnTenant[],
@@ -164,6 +168,7 @@ export function buildChurnRows(
   nowMs: number,
   limit = 8,
   lastActivityByTenant: ReadonlyMap<string, string> = new Map(),
+  health: { scores: ReadonlyMap<string, number>; threshold: number } | null = null,
 ): ChurnRow[] {
   void nowMs;
   const rows: ChurnRow[] = [];
@@ -175,6 +180,8 @@ export function buildChurnRows(
     if (t.status === "suspended") signals.push({ key: "suspended", label: "Askıda", weight: 3 });
     if (act === 0) signals.push({ key: "inactive", label: "14 gündür hareket yok", weight: 3 });
     else if (act < 10) signals.push({ key: "quiet", label: "Düşük kullanım", weight: 1 });
+    const healthScore = health?.scores.get(t.id) ?? null;
+    if (healthScore !== null && health && healthScore < health.threshold) signals.push({ key: "low_health", label: `Sağlık skoru ${healthScore}`, weight: 3 });
     if (signals.length === 0) continue;
     // Deneme ofisinin hareketsizliği/sessizliği tek başına churn sayılmaz (henüz kurulumda).
     if (t.status === "trial" && signals.every((s) => s.key === "inactive" || s.key === "quiet")) continue;
@@ -188,6 +195,7 @@ export function buildChurnRows(
       activity14d: act,
       lastActivityAt: lastActivityByTenant.get(t.id) ?? null,
       level: churnLevel(score),
+      healthScore,
     });
   }
   return rows.sort((a, b) => b.score - a.score || a.activity14d - b.activity14d || a.name.localeCompare(b.name, "tr")).slice(0, limit);
