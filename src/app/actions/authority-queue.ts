@@ -24,6 +24,7 @@ import { applyAuthorityEvent, undoAuthorityEvent, type LedgerResult } from "@/li
 import { findAuthorityMatch, type AuthorityMatchLoad } from "@/lib/eids/load";
 import { AUTHORITY_OVERRIDE_MIN_REASON, AUTHORITY_OVERRIDE_TTL_HOURS } from "@/lib/authority-shield";
 import { EIDS_MATCH_WARNING_LABELS, type EidsDealKind } from "@/lib/eids/match";
+import { isMissingSchema } from "@/lib/listing-control/server/db";
 
 export type AuthorityActionResult = { ok?: boolean; error?: string; waUrl?: string; info?: string };
 
@@ -33,7 +34,10 @@ export type ManualAuthorityInput = {
   source: string;
   /** YYYY-MM-DD; durum "onaylandı" iken zorunlu (en az 3 ay kuralı). */
   validUntil?: string | null;
-  /** YYYY-MM-DD; boşsa bugün sayılır (3 ay kuralının başlangıcı). */
+  /**
+   * YYYY-MM-DD; yetki veriliş tarihi (3 ay kuralının başlangıcı). Doluysa portföyün `authorization_start` değerine
+   * defterden yazılır (geri alınabilir). Boşsa portföydeki mevcut başlangıç, o da yoksa bugün esas alınır.
+   */
   grantedOn?: string | null;
   /** "Portalda doğrulandı" işareti: teyit zamanı yazılır. */
   portalVerified?: boolean;
@@ -50,6 +54,8 @@ export type AuthorityMatchInput = {
   validUntil?: string | null;
   /** grant = yetki verildi, revoke = yetki iptal edildi. */
   kind?: "grant" | "revoke";
+  /** Bekleyen bildirimden gelindiyse EP3 `eids_inbound_messages.id` (defter olayına iz olarak yazılır). */
+  inboundMessageId?: string | null;
 };
 
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -301,10 +307,17 @@ export async function setPropertyAuthority(propertyId: string, input: ManualAuth
   if (status === "approved" && !validUntil) {
     return { error: "Ne oldu: onaylı yetki için bitiş tarihi girilmedi. Ne yapmalı: e-Devlet EİDS ekranındaki yetki bitiş tarihini girin." };
   }
-  const term = validateManualAuthorityTerm({ grantedOn, validUntil: status === "approved" ? validUntil : null }, now());
+  const supabase = await createClient();
+  // Veriliş tarihi boşsa portföyde kayıtlı başlangıç esas alınır (2 ay önce verilmiş geçerli yetki "bugün" sayılıp reddedilmesin).
+  let termStart = grantedOn;
+  if (!termStart && status === "approved") {
+    const { data: cur } = await supabase.from("properties").select("authorization_start").eq("id", propertyId).eq("tenant_id", gate.tenantId).maybeSingle();
+    const start = (cur as { authorization_start?: string | null } | null)?.authorization_start;
+    termStart = start ? String(start).slice(0, 10) : null;
+  }
+  const term = validateManualAuthorityTerm({ grantedOn: termStart, validUntil: status === "approved" ? validUntil : null }, now());
   if (!term.ok) return { error: term.error };
 
-  const supabase = await createClient();
   const evidenceMediaId = String(input.evidenceMediaId ?? "").trim() || null;
   if (evidenceMediaId) {
     if (!UUID_RE.test(evidenceMediaId)) return { error: "Ne oldu: seçilen belge bulunamadı. Ne yapmalı: listeden yeniden seçin." };
@@ -329,6 +342,8 @@ export async function setPropertyAuthority(propertyId: string, input: ManualAuth
     newStatus: status,
     validUntil: status === "approved" ? validUntil : null,
     setValidUntil: status === "approved" && Boolean(validUntil),
+    validFrom: status === "approved" ? grantedOn : null,
+    setValidFrom: status === "approved" && Boolean(grantedOn),
     verified,
     evidenceMediaId,
     note: input.note ?? null,
@@ -340,7 +355,7 @@ export async function setPropertyAuthority(propertyId: string, input: ManualAuth
     action: "property.authority_status",
     entityType: "property",
     entityId: propertyId,
-    newValue: { eids_status: status, source, verified, event_id: res.eventId },
+    newValue: { eids_status: status, source, verified, granted_on: status === "approved" ? grantedOn : null, event_id: res.eventId },
   });
   revalidate(propertyId);
   return { ok: true, info: "Yetki durumu kaydedildi." };
@@ -472,6 +487,17 @@ export async function applyAuthorityMatch(propertyId: string, input: AuthorityMa
   const kind = input?.kind === "revoke" ? "revoke" : "grant";
   if (kind === "grant" && !validUntil) return { error: "Ne oldu: yetki verildi bildiriminde bitiş tarihi yok. Ne yapmalı: e-postadaki 'tarihine kadar' tarihini girin." };
   const supabase = await createClient();
+  // Bildirim izi: kimlik bu ofisin bekleyen bildirimi olmalı. Tablo yoksa (EP3 kurulmamış) iz düşülmez.
+  // EP3 SÖZLEŞMESİ: mesajın match_status'unu ("matched") güncellemek EP3 alıcısının işidir; burada yalnız olaya kimlik yazılır.
+  let inboundMessageId: string | null = null;
+  const rawMsg = String(input?.inboundMessageId ?? "").trim();
+  if (rawMsg) {
+    if (!UUID_RE.test(rawMsg)) return { error: "Ne oldu: bildirim bulunamadı. Ne yapmalı: bekleyen bildirimler listesinden yeniden seçin." };
+    const msg = await supabase.from("eids_inbound_messages").select("id").eq("id", rawMsg).eq("tenant_id", gate.tenantId).maybeSingle();
+    if (msg.error && !isMissingSchema(msg.error)) return { error: "Ne oldu: bildirim okunamadı. Ne yapmalı: birkaç saniye sonra tekrar deneyin." };
+    if (!msg.error && !msg.data) return { error: "Ne oldu: bildirim bu ofiste bulunamadı. Ne yapmalı: bekleyen bildirimler listesinden yeniden seçin." };
+    if (!msg.error) inboundMessageId = rawMsg;
+  }
   const res = await applyAuthorityEvent(supabase, {
     tenantId: gate.tenantId,
     propertyId,
@@ -484,6 +510,7 @@ export async function applyAuthorityMatch(propertyId: string, input: AuthorityMa
     bindPropertyNo: bind,
     dealKind: parseDealKind(input?.dealKind),
     grantorName: String(input?.grantorName ?? "").trim().slice(0, 120) || null,
+    inboundMessageId,
     note: bind ? "Aday listesinden elle bağlandı." : null,
   });
   if (!res.ok) return ledgerError(res);
@@ -493,7 +520,7 @@ export async function applyAuthorityMatch(propertyId: string, input: AuthorityMa
     action: "property.authority_match",
     entityType: "property",
     entityId: propertyId,
-    newValue: { kind, bind, event_id: res.eventId },
+    newValue: { kind, bind, event_id: res.eventId, inbound_message_id: inboundMessageId },
   });
   revalidate(propertyId);
   return { ok: true, info: kind === "grant" ? "Yetki portföye işlendi." : "Yetki iptali portföye işlendi; yayın ve aktarım durduruldu." };

@@ -13,9 +13,10 @@ import { activeOverride, findAuthorityMatch, loadAuthorityEvents, type Authority
  * EİDS YETKİ DEFTERİ — TEK YAZMA NOKTASI (EP2). Portföyün yetki durumu yalnız buradan değişir; EP3 (Bakanlık e-postası
  * alıcısı) ve EP4 (aksiyon motoru / cron) YALNIZ `applyAuthorityEvent` ve `undoAuthorityEvent` çağırır.
  *
- * Yazma `eids_apply_authority_event` / `eids_undo_authority_event` RPC'leriyle (20261013007100) yapılır: SECURITY INVOKER,
- * portföy satırı kilitlenir, durum + olay aynı işlemde yazılır, olay tablosu yalnız eklenir. Oturumlu istemcide RLS ve
- * danışman kapsamı geçerlidir (kiracı = JWT, aktör = auth.uid()); service_role çağrısında (EP3/EP4) kiracı parametredir.
+ * Yazma `eids_apply_authority_event` / `eids_undo_authority_event` RPC'leriyle (20261013007100) yapılır: SECURITY DEFINER
+ * + açık denetim (kiracı = JWT, aktör = auth.uid(), portals:edit; portföyü değiştiren olayda properties:edit; override
+ * yalnız owner). Olay tablosuna doğrudan INSERT yetkisi YOKTUR. Portföy satırı kilitlenir, durum + olay aynı işlemde
+ * yazılır, olay tablosu yalnız eklenir. service_role çağrısında (EP3/EP4) kiracı parametredir.
  * Malik adı AÇIK SAKLANMAZ: maskeli biçim + Türkçe katlamalı adın sha256 özeti yazılır.
  */
 
@@ -33,6 +34,9 @@ export type ApplyAuthorityEventInput = {
   /** YYYY-MM-DD; `setValidUntil` true ise portföyün `authorization_end` değeri de buna yazılır. */
   validUntil?: string | null;
   setValidUntil?: boolean;
+  /** YYYY-MM-DD; `setValidFrom` true ise portföyün `authorization_start` (yetki veriliş tarihi) değeri buna yazılır. */
+  validFrom?: string | null;
+  setValidFrom?: boolean;
   eidsPropertyNo?: string | null;
   /** true: portföyde no yoksa bu no yazılır (aday bağlama). Farklı no varsa `no_conflict` döner, hiçbir şey yazılmaz. */
   bindPropertyNo?: boolean;
@@ -63,6 +67,7 @@ export type LedgerErrorCode =
   | "not_undoable"
   | "already_undone"
   | "superseded"
+  | "changed_outside"
   | "failed";
 
 export type LedgerResult =
@@ -81,6 +86,8 @@ export const LEDGER_ERRORS: Record<LedgerErrorCode, string> = {
   not_undoable: "Ne oldu: bu kayıt geri alınamaz (geri alma ve yayın izni kayıtları geri alınmaz). Ne yapmalı: durumu karttan yeniden işaretleyin.",
   already_undone: "Ne oldu: bu işlem zaten geri alınmış. Ne yapmalı: sayfayı yenileyin.",
   superseded: "Ne oldu: bu işlemden sonra başka bir yetki değişikliği yapılmış. Ne yapmalı: önce en son işlemi geri alın ya da durumu karttan yeniden işaretleyin.",
+  changed_outside:
+    "Ne oldu: bu işlemden sonra portföyün yetki bilgileri (ör. bitiş tarihi ya da taşınmaz no) portföy formundan değiştirilmiş; geri alma o düzenlemeyi ezerdi. Ne yapmalı: geri almak yerine durumu karttan yeniden işaretleyin.",
   failed: "Ne oldu: yetki durumu kaydedilemedi. Ne yapmalı: birkaç saniye sonra tekrar deneyin; sürerse destek ekibine bildirin.",
 };
 
@@ -115,6 +122,7 @@ export async function applyAuthorityEvent(db: SupabaseClient, input: ApplyAuthor
   if (input.source !== "system" && !isEidsSource(input.source)) return fail("invalid_input");
   if (input.exemptReason != null && !isEidsExemptReason(input.exemptReason)) return fail("invalid_input");
   if (input.validUntil && !DATE_RE.test(input.validUntil)) return fail("invalid_input");
+  if (input.validFrom && !DATE_RE.test(input.validFrom)) return fail("invalid_input");
   let no: string | null = null;
   if (input.eidsPropertyNo) {
     const parsed = parseEidsPropertyNo(input.eidsPropertyNo);
@@ -128,6 +136,8 @@ export async function applyAuthorityEvent(db: SupabaseClient, input: ApplyAuthor
     new_status: input.newStatus ?? null,
     valid_until: input.validUntil ?? null,
     set_valid_until: Boolean(input.setValidUntil && input.validUntil),
+    valid_from: input.validFrom ?? null,
+    set_valid_from: Boolean(input.setValidFrom && input.validFrom),
     eids_property_no: no,
     bind_property_no: Boolean(input.bindPropertyNo),
     deal_kind: input.dealKind ?? null,
@@ -196,12 +206,16 @@ export async function applyMatchedAuthorityEvent(
   return { applied: true, propertyId: match.result.propertyId, ledger, match };
 }
 
-export type PublishGate = { blocked: false; warning?: string } | { blocked: true; error: string; code: "revoked" | "expired" };
+export type PublishGate = { blocked: false; warning?: string } | { blocked: true; error: string; code: "revoked" | "expired" | "unavailable" };
+
+const GATE_UNAVAILABLE =
+  "Ne oldu: portföyün EİDS yetki durumu şu an okunamadı; yayın/aktarım güvenlik için durduruldu. Ne yapmalı: birkaç saniye sonra tekrar deneyin; sürerse destek ekibine bildirin.";
 
 /**
  * Yayın / portal aktarımı kapısı. Yetkisi iptal edilmiş ya da süresi dolmuş portföy ENGELLENİR; yalnız ofis sahibinin
  * son durum değişikliğinden sonra verdiği ve 24 saati geçmemiş gerekçeli izni (override olayı) engeli kaldırır.
  * Defter sütunları yoksa (migration uygulanmamış) engel UYGULANMAZ, yalnız eski uyarı döner (izin verilemeyen engel olmasın).
+ * Başka bir okuma hatasında (geçici DB/RLS) kapı KAPALI kalır (fail-closed): uyum engeli sessizce açılmaz.
  */
 export async function authorityPublishGate(db: SupabaseClient, tenantId: string, propertyId: string): Promise<PublishGate> {
   const nowMs = now();
@@ -212,7 +226,10 @@ export async function authorityPublishGate(db: SupabaseClient, tenantId: string,
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (full.error) {
-    if (!isMissingSchema(full.error)) return { blocked: false };
+    if (!isMissingSchema(full.error)) {
+      console.error("authorityPublishGate", { code: full.error.code });
+      return { blocked: true, error: GATE_UNAVAILABLE, code: "unavailable" };
+    }
     const legacy = await db
       .from("properties")
       .select("authorization_start, authorization_end, authority_eids_status")

@@ -181,9 +181,13 @@ describe("yetki defteri sözleşmesi", () => {
     expect(sql).toContain("before update or delete on public.eids_authority_events");
     expect(sql).toContain("before truncate on public.eids_authority_events");
     expect(sql).toContain("enable row level security");
-    expect(sql).toContain("security invoker");
-    expect(sql).not.toMatch(/security definer/i);
-    expect(sql).not.toMatch(/grant [^;]*(update|delete)[^;]*on table public\.eids_authority_events/i);
+    // Yazma yalnız açık denetimli SECURITY DEFINER RPC'lerden: tabloya hiçbir role INSERT/UPDATE/DELETE verilmez,
+    // ekleme politikası da yoktur (sahte override/undo satırı eklenemez).
+    expect(sql).toMatch(/function public\.eids_apply_authority_event[\s\S]*?security definer/);
+    expect(sql).toMatch(/function public\.eids_undo_authority_event[\s\S]*?security definer/);
+    expect(sql).toContain("public.current_profile_role() <> 'owner'");
+    expect(sql).not.toMatch(/grant [^;]*(insert|update|delete)[^;]*on table public\.eids_authority_events/i);
+    expect(sql).not.toMatch(/create policy [^;]*for insert[^;]*eids_authority_events|create policy eids_authority_events_insert/i);
     const rb = read("supabase/rollbacks/20261013007100_eids_authority_ledger.rollback.sql");
     expect(rb).toContain("drop table if exists public.eids_authority_events");
     expect(rb).toContain("check (authority_eids_status in ('pending', 'approved', 'rejected'))");

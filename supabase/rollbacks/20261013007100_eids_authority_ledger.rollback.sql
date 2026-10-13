@@ -4,9 +4,12 @@
 -- customers.full_name trigram indeksi BIRAKILIR (canlıda bu migration'dan önce de vardı).
 set local lock_timeout = '5s';
 
+drop function if exists public.eids_properties_by_no_key(uuid, text);
+drop index if exists public.properties_eids_no_key_idx;
 drop function if exists public.eids_authority_candidates(uuid, text, integer);
 drop function if exists public.eids_undo_authority_event(uuid, uuid, text);
 drop function if exists public.eids_apply_authority_event(uuid, uuid, jsonb);
+drop function if exists public.eids_authority_snapshot(uuid);
 
 drop table if exists public.eids_authority_events;
 drop function if exists public.eids_authority_events_append_only();

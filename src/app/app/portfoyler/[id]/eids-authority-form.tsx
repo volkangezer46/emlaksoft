@@ -125,7 +125,7 @@ export function EidsAuthorityForm({
           </FormField>
           {status === "approved" ? (
             <>
-              <FormField label="Yetki veriliş tarihi" htmlFor="ea-granted" hint="Boşsa bugün sayılır.">
+              <FormField label="Yetki veriliş tarihi" htmlFor="ea-granted" hint="Portföyün yetki başlangıcına yazılır. Boşsa kayıtlı başlangıç, o da yoksa bugün sayılır.">
                 <FormInput id="ea-granted" name="granted_on" type="date" defaultValue={initial.grantedOn} />
               </FormField>
               <FormField label="Yetki bitiş tarihi" htmlFor="ea-until" required hint={`EİDS yetkisi en az ${MIN_AUTHORITY_MONTHS} ay olmalıdır.`}>
