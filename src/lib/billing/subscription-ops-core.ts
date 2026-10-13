@@ -209,6 +209,8 @@ export type AdminPlanState = {
   lockedMonthlyTry: number | null;
   pendingPlan: string | null;
   paused: boolean;
+  /** Fiyat kilidi kampanyası (Founders vb.); kampanyasız kilit paket değişince kaldırılır. */
+  priceLockCampaign?: string | null;
 };
 
 export type AdminPlanChangeInput = {
@@ -221,6 +223,11 @@ export type AdminPlanChangeInput = {
   paidCapNetTry?: number | null;
   usedSeats?: number;
   extraSeats?: number;
+  /**
+   * Yeni paketin ÇÖZÜLMÜŞ koltuk limiti (ofise özel istisna + ek koltuk; `resolveSeatLimit`). Verilirse kapasite
+   * kontrolü bununla yapılır (DB tetikleyicisiyle aynı); null = sınırsız. Verilmezse plan + ek (eski davranış).
+   */
+  targetSeatLimit?: number | null;
 };
 
 export type AdminPlanChangePreview =
@@ -236,6 +243,8 @@ export type AdminPlanChangePreview =
       downgradeCreditInfoTry: number;
       evaluation: PlanChangeEval | null;
       message: string;
+      /** Özel anlaşma fiyat kilidi paket değişince kaldırılır/yeniden yazılır: onaydan önce gösterilen uyarı. */
+      priceLockNote: string | null;
     };
 
 const tl = (n: number) => `${Math.round(n).toLocaleString("tr-TR")} ₺`;
@@ -249,12 +258,26 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  *  - `now` + `prorate`: `evaluatePlanChange` (kullanıcı akışıyla AYNI formül; gizli paketler yönetici için seçilebilir).
  *    Yükseltmede kalan süre farkı için fatura satırı oluşur; düşürmede iade/kredi otomatik verilmez (bilgi gösterilir).
  */
+/**
+ * Paket değişince fiyat kilidi ne olur (update_tenant_plan_subscription + subscription_apply_scheduled_plan_changes ile
+ * aynı kural): kampanyasız kilit KALDIRILIR (tutar yeni paketin katalog fiyatı olur); kampanyalı kilit yeni paketin
+ * kampanya fiyatıyla yeniden yazılır (yeni pakette kampanya fiyatı yoksa kaldırılır). Kilit yoksa null.
+ */
+export function priceLockChangeNote(lockedMonthlyTry: number | null, campaign: string | null | undefined, toName: string): string | null {
+  if (lockedMonthlyTry == null || !(lockedMonthlyTry > 0)) return null;
+  if (campaign) {
+    return `Fiyat kilidi (${tl(lockedMonthlyTry)}/ay, ${campaign}) ${toName} paketinin kampanya fiyatıyla yeniden yazılır; o pakette kampanya fiyatı yoksa kilit kaldırılır.`;
+  }
+  return `Özel anlaşma fiyat kilidi (${tl(lockedMonthlyTry)}/ay) paket değişince KALDIRILIR; sonraki yenileme ${toName} paketinin katalog fiyatıyla yapılır. Gerekirse değişiklikten sonra "Özel anlaşma" kartından yeniden tanımlayın.`;
+}
+
 export function previewAdminPlanChange(input: AdminPlanChangeInput): AdminPlanChangePreview {
   const { state } = input;
   const to = input.plans.find((p) => p.id === input.toPlanId);
   if (!to) return { ok: false, error: "Paket bulunamadı." };
   if (to.id === state.planId) return { ok: false, error: "Ofis zaten bu paketi kullanıyor." };
   if (state.paused) return { ok: false, error: "Abonelik duraklatılmış; paket değiştirmek için önce devam ettirin." };
+  const priceLockNote = priceLockChangeNote(state.lockedMonthlyTry, state.priceLockCampaign, to.name);
 
   if (input.timing === "period_end") {
     if (state.status !== "active" && state.status !== "past_due") {
@@ -272,6 +295,7 @@ export function previewAdminPlanChange(input: AdminPlanChangeInput): AdminPlanCh
       downgradeCreditInfoTry: 0,
       evaluation: null,
       message: `${to.name} paketi mevcut dönemin sonunda uygulanır; o zamana kadar mevcut paket sürer. Fatura kesilmez.`,
+      priceLockNote,
     };
   }
 
@@ -284,11 +308,20 @@ export function previewAdminPlanChange(input: AdminPlanChangeInput): AdminPlanCh
       downgradeCreditInfoTry: 0,
       evaluation: null,
       message: `${to.name} paketine hemen geçilir; kıst fark hesaplanmaz ve fatura kesilmez. Sonraki yenileme yeni paketin tutarıyla yapılır.`,
+      priceLockNote,
     };
   }
 
   // Yönetici gizli (çevrimiçi satılmayan) paketi de seçebilir: kıst formülü aynı kalır.
   const plans = input.plans.map((p) => (p.hidden ? { ...p, hidden: false } : p));
+  // Çözülmüş limit verildiyse kapasite burada (istisna dahil) kontrol edilir; formüle plan + ek kontrolü bırakılmaz.
+  const resolvedCheck = input.targetSeatLimit !== undefined;
+  if (resolvedCheck && input.targetSeatLimit != null && input.usedSeats != null && input.usedSeats > input.targetSeatLimit) {
+    return {
+      ok: false,
+      error: `${to.name} paketinde en fazla ${input.targetSeatLimit} kullanıcı olur; şu an ${input.usedSeats} aktif kullanıcı var. Önce kullanıcı sayısını azaltın.`,
+    };
+  }
   const ev = evaluatePlanChange({
     plans,
     fromPlanId: state.planId,
@@ -299,10 +332,10 @@ export function previewAdminPlanChange(input: AdminPlanChangeInput): AdminPlanCh
     periodStartMs: state.periodStartMs,
     periodEndMs: state.periodEndMs,
     nowMs: input.nowMs,
-    usedSeats: input.usedSeats,
+    usedSeats: resolvedCheck ? undefined : input.usedSeats,
     extraSeats: input.extraSeats,
   });
-  const base = { ok: true as const, kind: "immediate" as const, effectiveAtMs: null, evaluation: ev };
+  const base = { ok: true as const, kind: "immediate" as const, effectiveAtMs: null, evaluation: ev, priceLockNote };
   switch (ev.status) {
     case "upgrade":
       return {
@@ -334,6 +367,24 @@ export function previewAdminPlanChange(input: AdminPlanChangeInput): AdminPlanCh
         message: `Kıst fark çıkmadı (${ev.message.replace(/\.$/, "")}). Paket hemen değişir, fatura kesilmez.`,
       };
   }
+}
+
+/** Önizleme → onay arasında izin verilen en uzun süre (gerekçe yazma payı). */
+export const QUOTE_MAX_AGE_MS = 10 * 60_000;
+
+/**
+ * Kıst tutar milisaniye hassasiyetli orandan çıkar (zamanla kayar). Onay, önizlemenin hesaplandığı ANI (`quoted_at_ms`)
+ * yeniden kullanır; böylece aynı girdiyle aynı tutar çıkar ve gerekçe yazmak tutarı "değiştirmez". Anı kabul kuralı:
+ * geçerli tam sayı, gelecekte değil, en çok `QUOTE_MAX_AGE_MS` önce ve (biliniyorsa) mevcut dönemin başından sonra
+ * (arada yenileme olduysa eski an yeni dönemi fiyatlayamaz). Geçersizse null: "yeniden önizleyin".
+ */
+export function resolveQuoteTime(raw: unknown, nowMs: number, periodStartMs: number | null = null): number | null {
+  const s = typeof raw === "string" ? raw.trim() : typeof raw === "number" ? String(raw) : "";
+  if (!/^[0-9]{10,16}$/.test(s)) return null;
+  const t = Number(s);
+  if (!Number.isSafeInteger(t) || t > nowMs || nowMs - t > QUOTE_MAX_AGE_MS) return null;
+  if (periodStartMs != null && t < periodStartMs) return null;
+  return t;
 }
 
 /** Kalan dönem oranı (ekran bilgisi; dönem yoksa 0). */

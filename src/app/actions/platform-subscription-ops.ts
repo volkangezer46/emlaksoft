@@ -19,7 +19,8 @@ import { loadPaidCapNetTry } from "@/lib/billing/plan-change";
 import { evaluatePause, PAUSE_ABSOLUTE_MAX_DAYS, resumedPeriodEndMs } from "@/lib/billing/pause-core";
 import { evaluateSeatChange, type SeatChangeEval } from "@/lib/billing/seat-purchase-core";
 import { parseSeatTiers } from "@/lib/billing/seat-purchase";
-import { parseOverrideInput, describeOverride } from "@/lib/billing/entitlements/overrides";
+import { parseOverrideInput, describeOverride, resolveSeatLimit } from "@/lib/billing/entitlements/overrides";
+import { revalidateTenantPublicPaths } from "@/lib/billing/revalidate-tenant-public";
 import {
   cancelReasonText,
   isCancelReasonCode,
@@ -27,11 +28,12 @@ import {
   parseDealInput,
   parseExpiryDate,
   previewAdminPlanChange,
+  resolveQuoteTime,
   type AdminPlanChangePreview,
   type AdminPlanTiming,
   type AdminProration,
 } from "@/lib/billing/subscription-ops-core";
-import { readOpsSubscription, type OpsSubRow } from "@/lib/billing/subscription-ops";
+import { readEntitlementOverrides, readOpsSubscription, type OpsSubRow } from "@/lib/billing/subscription-ops";
 
 /**
  * ABONELİK OPERASYON KONSOLU (Ofis 360 > Abonelik): platform personelinin abonelik işlemleri.
@@ -44,10 +46,21 @@ import { readOpsSubscription, type OpsSubRow } from "@/lib/billing/subscription-
  */
 
 export type SubOpsResult = { ok?: boolean; error?: string; message?: string };
-export type PlanPreviewResult = { error?: string; preview?: Extract<AdminPlanChangePreview, { ok: true }> & { totalTry: number; taxTry: number } };
+/** `quotedAtMs`: önizlemenin hesaplandığı an; onay formu geri gönderir, onay aynı anla yeniden hesaplar. */
+export type PlanPreviewResult = { error?: string; preview?: Extract<AdminPlanChangePreview, { ok: true }> & { totalTry: number; taxTry: number; quotedAtMs: number } };
 export type SeatPreviewResult = {
   error?: string;
-  preview?: { status: SeatChangeEval["status"]; message: string; chargeNetTry: number; totalTry: number; fromTotal: number; toTotal: number; minTotal: number; maxTotal: number | null };
+  preview?: {
+    status: SeatChangeEval["status"];
+    message: string;
+    chargeNetTry: number;
+    totalTry: number;
+    fromTotal: number;
+    toTotal: number;
+    minTotal: number;
+    maxTotal: number | null;
+    quotedAtMs: number;
+  };
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,6 +68,7 @@ const MISSING_SCHEMA = /commitment_end_at|cancel_reason_code|cancel_note|tenant_
 const SCHEMA_PENDING = "Bu işlem için veritabanı hazırlığı (20261013004000) henüz uygulanmadı; değişiklik yapılmadı.";
 const STALE = "Abonelik bu arada değişti; sayfayı yenileyip tekrar deneyin.";
 const REASON_REQUIRED = "Gerekçe yazın (en az 10 karakter); denetim kaydına yazılır.";
+const QUOTE_EXPIRED = "Önizleme 10 dakikadan eski ya da dönem bu arada yenilendi; yeniden önizleyip onaylayın.";
 
 type Admin = ReturnType<typeof createAdminClient>;
 type Ctx = { staff: Awaited<ReturnType<typeof requirePlatformModule>>; tenantId: string; reason: string; admin: Admin };
@@ -177,7 +191,7 @@ export async function adminSetPlanStatus(_prev: SubOpsResult, formData: FormData
     { plan: res.plan ?? plan, status: res.status ?? status, monthly_amount_try: res.monthlyAmountTry ?? null },
   );
   revalidate(ctx.tenantId);
-  if (tenant.slug) revalidatePath(`/vitrin/${tenant.slug}`);
+  revalidateTenantPublicPaths(typeof res.tenantSlug === "string" && res.tenantSlug ? res.tenantSlug : tenant.slug);
   return { ok: true, message: "Paket ve durum güncellendi." };
 }
 
@@ -230,7 +244,7 @@ export async function adminCancelSubscription(_prev: SubOpsResult, formData: For
   }
 
   // Hemen: tek kaynak RPC (ofis + abonelik durumu, tutar korunur, ofis denetim kaydı) + neden alanları.
-  const { error: rpcError } = await ctx.admin.rpc("update_tenant_plan_subscription", {
+  const { data: rpcData, error: rpcError } = await ctx.admin.rpc("update_tenant_plan_subscription", {
     p_tenant_id: ctx.tenantId,
     p_actor_id: ctx.staff.id,
     p_plan: null,
@@ -248,6 +262,9 @@ export async function adminCancelSubscription(_prev: SubOpsResult, formData: For
   if (extra.error) console.error("adminCancelSubscription reason", extra.error.message);
   await audit(ctx, "cancel_now", before, { status: "cancelled", cancelled_at: nowIso, ...reasonCols }, { reason_code: code, reason_saved: !extra.error });
   revalidate(ctx.tenantId);
+  // Ofis durumu iptal oldu: vitrin/ilan/danışman sayfaları ve sitemap önbellekte yayında kalmasın.
+  const slug = (rpcData as Record<string, unknown> | null)?.tenantSlug;
+  revalidateTenantPublicPaths(typeof slug === "string" ? slug : null);
   return {
     ok: true,
     message: extra.error ? "Abonelik iptal edildi; iptal nedeni kaydedilemedi (denetim kaydında var)." : "Abonelik ve ofis hemen iptal edildi.",
@@ -311,7 +328,8 @@ export async function adminPauseSubscription(_prev: SubOpsResult, formData: Form
   const endsIso = new Date(decision.endsAtMs).toISOString();
   const { data, error } = await ctx.admin
     .from("subscriptions")
-    .update({ pause_started_at: nowIso, pause_ends_at: endsIso, pause_last_started_at: nowIso, updated_at: nowIso })
+    // pause_last_started_at YAZILMAZ: yönetici duraklatması ofis sahibinin yıllık kendi duraklatma hakkını tüketmez.
+    .update({ pause_started_at: nowIso, pause_ends_at: endsIso, updated_at: nowIso })
     .eq("id", row.id)
     .eq("tenant_id", ctx.tenantId)
     .eq("status", "active")
@@ -361,7 +379,7 @@ export async function adminResumeSubscription(_prev: SubOpsResult, formData: For
 // Paket değişikliği (hemen / dönem sonunda; kıst hesapla / hesaplama) + bekleyen plan + dönem tipi
 // ---------------------------------------------------------------------------
 
-async function planPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubRow; preview: AdminPlanChangePreview } | { error: string }> {
+async function planPreview(ctx: Ctx, formData: FormData, nowMs: number): Promise<{ row: OpsSubRow; preview: AdminPlanChangePreview } | { error: string }> {
   const toPlan = String(formData.get("plan") ?? "").trim();
   if (!isPlanId(toPlan)) return { error: "Geçersiz paket." };
   const timing: AdminPlanTiming = formData.get("timing") === "period_end" ? "period_end" : "now";
@@ -369,12 +387,15 @@ async function planPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubR
   const loaded = await loadSub(ctx);
   if ("error" in loaded) return loaded;
   const { row } = loaded;
-  const [plans, paidCap, seats] = await Promise.all([
+  const [plans, paidCap, seats, overrides] = await Promise.all([
     getPlanDefinitions(),
     loadPaidCapNetTry(ctx.admin, ctx.tenantId, row.id),
     ctx.admin.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).eq("is_active", true),
+    readEntitlementOverrides(ctx.admin, ctx.tenantId, nowMs),
   ]);
   const lock = Number(row.price_lock_try);
+  const extraSeats = Number(row.extra_seats ?? 0) || 0;
+  const target = plans.find((p) => p.id === toPlan);
   const preview = previewAdminPlanChange({
     plans,
     state: {
@@ -386,14 +407,17 @@ async function planPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubR
       lockedMonthlyTry: Number.isFinite(lock) && lock > 0 ? lock : null,
       pendingPlan: row.pending_plan,
       paused: Boolean(row.pause_started_at),
+      priceLockCampaign: row.price_lock_campaign,
     },
     toPlanId: toPlan,
     timing,
     proration,
-    nowMs: now(),
+    nowMs,
     paidCapNetTry: paidCap,
     usedSeats: seats.count ?? undefined,
-    extraSeats: Number(row.extra_seats ?? 0) || 0,
+    extraSeats,
+    // Kapasite kontrolü DB tetikleyicisiyle aynı: yeni planın limiti ofise özel istisnayla çözülür (+ ek koltuk).
+    targetSeatLimit: target ? resolveSeatLimit(target.limits.seats, extraSeats, overrides.rows, nowMs) : null,
   });
   return { row, preview };
 }
@@ -402,26 +426,38 @@ async function planPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubR
 export async function previewAdminPlanChangeAction(formData: FormData): Promise<PlanPreviewResult> {
   const ctx = await gate("plan-preview", formData, { skipReason: true });
   if ("error" in ctx) return { error: ctx.error };
-  const r = await planPreview(ctx, formData);
+  const quotedAtMs = now();
+  const r = await planPreview(ctx, formData, quotedAtMs);
   if ("error" in r) return { error: r.error };
   if (!r.preview.ok) return { error: r.preview.error };
   const amounts = r.preview.invoiceNetTry > 0 ? invoiceAmountsTry(r.preview.invoiceNetTry) : { taxTry: 0, totalTry: 0 };
-  return { preview: { ...r.preview, totalTry: amounts.totalTry, taxTry: amounts.taxTry } };
+  return { preview: { ...r.preview, totalTry: amounts.totalTry, taxTry: amounts.taxTry, quotedAtMs } };
 }
 
 export async function applyAdminPlanChange(_prev: SubOpsResult, formData: FormData): Promise<SubOpsResult> {
   const ctx = await gate("plan-change", formData);
   if ("error" in ctx) return { error: ctx.error };
-  const r = await planPreview(ctx, formData);
+  // Onay, önizlemenin hesaplandığı anla yeniden hesaplanır (kıst oran ms hassasiyetli; gerekçe yazarken kaymasın).
+  const quoted = resolveQuoteTime(formData.get("quoted_at_ms"), now());
+  if (quoted == null) return { error: QUOTE_EXPIRED };
+  const r = await planPreview(ctx, formData, quoted);
   if ("error" in r) return { error: r.error };
   const { row, preview } = r;
+  if (resolveQuoteTime(quoted, now(), ms(row.current_period_start)) == null) return { error: QUOTE_EXPIRED };
   if (!preview.ok) return { error: preview.error };
   const toPlan = String(formData.get("plan"));
   const confirmRaw = String(formData.get("confirm_net_try") ?? "").trim();
   if (confirmRaw === "" || Math.abs(Number(confirmRaw) - preview.invoiceNetTry) > 0.01) {
     return { error: "Önizlenen tutar değişti (dönem ilerledi ya da abonelik güncellendi). Yeniden önizleyip onaylayın." };
   }
-  const before = { plan: row.plan, pending_plan: row.pending_plan, amount_try: row.amount_try, current_period_end: row.current_period_end };
+  const before = {
+    plan: row.plan,
+    pending_plan: row.pending_plan,
+    amount_try: row.amount_try,
+    price_lock_try: row.price_lock_try,
+    price_lock_campaign: row.price_lock_campaign,
+    current_period_end: row.current_period_end,
+  };
   const nowIso = new Date(now()).toISOString();
 
   if (preview.kind === "schedule") {
@@ -435,7 +471,13 @@ export async function applyAdminPlanChange(_prev: SubOpsResult, formData: FormDa
       .select("id");
     if (error) return { error: actionErrorMessage(null, "Planlı paket değişikliği kaydedilemedi.") };
     if ((data ?? []).length === 0) return { error: STALE };
-    await audit(ctx, "plan_scheduled", before, { pending_plan: toPlan, pending_plan_effective_at: row.current_period_end }, { timing: "period_end" });
+    await audit(
+      ctx,
+      "plan_scheduled",
+      before,
+      { pending_plan: toPlan, pending_plan_effective_at: row.current_period_end },
+      { timing: "period_end", ...(preview.priceLockNote ? { price_lock_note: preview.priceLockNote } : {}) },
+    );
     revalidate(ctx.tenantId);
     return { ok: true, message: preview.message };
   }
@@ -482,11 +524,23 @@ export async function applyAdminPlanChange(_prev: SubOpsResult, formData: FormDa
     else invoice = created;
   }
   const res = (rpc ?? {}) as Record<string, unknown>;
+  // Fiyat kilidi RPC'de yeniden yazılır/kaldırılır: denetim kaydına sonraki değeri okunarak yazılır.
+  const lockAfter = row.price_lock_try != null
+    ? await ctx.admin.from("subscriptions").select("price_lock_try, price_lock_campaign").eq("id", row.id).maybeSingle()
+    : null;
   await audit(
     ctx,
     "plan_change",
     before,
-    { plan: toPlan, monthly_amount_try: res.monthlyAmountTry ?? null, invoice_id: invoice?.id ?? null, invoice_total_try: invoice?.totalTry ?? 0 },
+    {
+      plan: toPlan,
+      monthly_amount_try: res.monthlyAmountTry ?? null,
+      ...(lockAfter && !lockAfter.error
+        ? { price_lock_try: lockAfter.data?.price_lock_try ?? null, price_lock_campaign: lockAfter.data?.price_lock_campaign ?? null }
+        : {}),
+      invoice_id: invoice?.id ?? null,
+      invoice_total_try: invoice?.totalTry ?? 0,
+    },
     {
       timing: "now",
       proration: formData.get("proration") === "none" ? "none" : "prorate",
@@ -495,6 +549,7 @@ export async function applyAdminPlanChange(_prev: SubOpsResult, formData: FormDa
     },
   );
   revalidate(ctx.tenantId);
+  revalidateTenantPublicPaths(typeof res.tenantSlug === "string" ? res.tenantSlug : null);
   if (invoiceError) return { ok: true, message: "Paket değişti ama fark faturası oluşturulamadı; Faturalama ekranından elle kesin (denetim kaydında tutar var)." };
   return {
     ok: true,
@@ -552,7 +607,7 @@ export async function adminChangeBillingCycle(_prev: SubOpsResult, formData: For
 // Ek koltuk (extra_seats): seat-purchase-core ile aynı kıst hesabı
 // ---------------------------------------------------------------------------
 
-async function seatPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubRow; ev: SeatChangeEval; target: number; included: number } | { error: string }> {
+async function seatPreview(ctx: Ctx, formData: FormData, nowMs: number): Promise<{ row: OpsSubRow; ev: SeatChangeEval; target: number; included: number } | { error: string }> {
   const raw = String(formData.get("extra_seats") ?? "").trim();
   if (!/^[0-9]{1,3}$/.test(raw)) return { error: "Ek koltuk için 0-500 arası bir tam sayı girin." };
   const targetExtra = Number(raw);
@@ -581,7 +636,7 @@ async function seatPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubR
     },
     periodStartMs: ms(row.current_period_start),
     periodEndMs: ms(row.current_period_end),
-    nowMs: now(),
+    nowMs,
   });
   return { row, ev, target: targetExtra, included };
 }
@@ -589,7 +644,8 @@ async function seatPreview(ctx: Ctx, formData: FormData): Promise<{ row: OpsSubR
 export async function previewAdminSeatChange(formData: FormData): Promise<SeatPreviewResult> {
   const ctx = await gate("seat-preview", formData, { skipReason: true });
   if ("error" in ctx) return { error: ctx.error };
-  const r = await seatPreview(ctx, formData);
+  const quotedAtMs = now();
+  const r = await seatPreview(ctx, formData, quotedAtMs);
   if ("error" in r) return { error: r.error };
   const net = r.ev.status === "increase" ? r.ev.immediateChargeTry : 0;
   return {
@@ -602,6 +658,7 @@ export async function previewAdminSeatChange(formData: FormData): Promise<SeatPr
       toTotal: r.ev.toQuote.totalSeats,
       minTotal: r.ev.minTotalSeats,
       maxTotal: Number.isFinite(r.ev.maxTotalSeats) ? r.ev.maxTotalSeats : null,
+      quotedAtMs,
     },
   };
 }
@@ -609,9 +666,12 @@ export async function previewAdminSeatChange(formData: FormData): Promise<SeatPr
 export async function applyAdminSeatChange(_prev: SubOpsResult, formData: FormData): Promise<SubOpsResult> {
   const ctx = await gate("seat-change", formData);
   if ("error" in ctx) return { error: ctx.error };
-  const r = await seatPreview(ctx, formData);
+  const quoted = resolveQuoteTime(formData.get("quoted_at_ms"), now());
+  if (quoted == null) return { error: QUOTE_EXPIRED };
+  const r = await seatPreview(ctx, formData, quoted);
   if ("error" in r) return { error: r.error };
   const { row, ev, target } = r;
+  if (resolveQuoteTime(quoted, now(), ms(row.current_period_start)) == null) return { error: QUOTE_EXPIRED };
   if (ev.status === "no_change") return { ok: true, message: "Koltuk sayısı değişmiyor." };
   if (ev.status === "not_sold" || ev.status === "over_max") {
     return { error: `${ev.message} Ofise özel ek kullanıcı için "Limit istisnası" kullanın.` };

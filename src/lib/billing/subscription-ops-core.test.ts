@@ -10,7 +10,10 @@ import {
   parseDealInput,
   parseExpiryDate,
   previewAdminPlanChange,
+  priceLockChangeNote,
   providerErrorText,
+  QUOTE_MAX_AGE_MS,
+  resolveQuoteTime,
   type AdminPlanState,
 } from "./subscription-ops-core";
 
@@ -75,6 +78,56 @@ describe("yönetici paket değişikliği önizlemesi", () => {
   it("dönemsiz (deneme) abonelikte kıst seçilse de fatura çıkmaz", () => {
     const p = previewAdminPlanChange({ ...base, state: { ...state, periodStartMs: null, periodEndMs: null }, toPlanId: "professional", timing: "now", proration: "prorate" });
     expect(p).toMatchObject({ ok: true, invoiceNetTry: 0 });
+  });
+});
+
+describe("önizleme anı (kıst tutar kayması)", () => {
+  it("önizleme ile onay arasında 60 sn: aynı anla hesap aynı tutarı verir, onay geçer", () => {
+    // office → professional, dönemin ~%59'u kalmış (gerçek kayma: 30 sn'de ~0,03 TL).
+    const st = { ...state, periodStartMs: NOW - 12.3 * DAY_MS, periodEndMs: NOW + 17.7 * DAY_MS };
+    const preview = previewAdminPlanChange({ plans, state: st, nowMs: NOW, toPlanId: "professional", timing: "now", proration: "prorate" });
+    const confirmAt = NOW + 60_000;
+    // Eski davranış: onay anıyla yeniden hesap tutarı kaydırırdı.
+    const drifted = previewAdminPlanChange({ plans, state: st, nowMs: confirmAt, toPlanId: "professional", timing: "now", proration: "prorate" });
+    expect(preview.ok && drifted.ok && Math.abs(preview.invoiceNetTry - drifted.invoiceNetTry) > 0.01).toBe(true);
+    // Yeni davranış: onay, önizleme anını (quoted_at_ms) kabul edip aynı anla hesaplar.
+    const quoted = resolveQuoteTime(String(NOW), confirmAt, st.periodStartMs);
+    expect(quoted).toBe(NOW);
+    const again = previewAdminPlanChange({ plans, state: st, nowMs: quoted!, toPlanId: "professional", timing: "now", proration: "prorate" });
+    expect(again.ok && preview.ok && again.invoiceNetTry === preview.invoiceNetTry).toBe(true);
+  });
+
+  it("geçersiz, gelecekteki, 10 dakikadan eski ya da dönem başından önceki an reddedilir", () => {
+    expect(resolveQuoteTime("", NOW)).toBeNull();
+    expect(resolveQuoteTime("abc", NOW)).toBeNull();
+    expect(resolveQuoteTime(String(NOW + 1), NOW)).toBeNull();
+    expect(resolveQuoteTime(String(NOW - QUOTE_MAX_AGE_MS - 1), NOW)).toBeNull();
+    expect(resolveQuoteTime(String(NOW - QUOTE_MAX_AGE_MS), NOW)).toBe(NOW - QUOTE_MAX_AGE_MS);
+    expect(resolveQuoteTime(NOW - 5_000, NOW, NOW - 1_000)).toBeNull();
+  });
+});
+
+describe("istisna ve fiyat kilidi (paket değişikliği)", () => {
+  it("çözülmüş koltuk limiti verilirse kapasite istisnayla değerlendirilir", () => {
+    // advisor: 1 koltuk; ofise +3 istisna → 4. 3 aktif kullanıcıyla düşürme geçer, 5 ile reddedilir.
+    const ok = previewAdminPlanChange({ ...base, toPlanId: "advisor", timing: "now", proration: "prorate", usedSeats: 3, targetSeatLimit: 4 });
+    expect(ok.ok).toBe(true);
+    const over = previewAdminPlanChange({ ...base, toPlanId: "advisor", timing: "now", proration: "prorate", usedSeats: 5, targetSeatLimit: 4 });
+    expect(over.ok).toBe(false);
+    if (!over.ok) expect(over.error).toMatch(/en fazla 4 kullanıcı/);
+    // Sınırsız (null) yeni limit kapasite reddi üretmez.
+    expect(previewAdminPlanChange({ ...base, toPlanId: "advisor", timing: "now", proration: "prorate", usedSeats: 50, targetSeatLimit: null }).ok).toBe(true);
+  });
+
+  it("kampanyasız fiyat kilidi kaldırılacağı, kampanyalı kilit yeniden yazılacağı önizlemede söylenir", () => {
+    const locked = { ...state, lockedMonthlyTry: 1990 };
+    const p = previewAdminPlanChange({ ...base, state: locked, toPlanId: "professional", timing: "period_end", proration: "none" });
+    expect(p.ok && p.priceLockNote).toMatch(/KALDIRILIR/);
+    const c = previewAdminPlanChange({ ...base, state: { ...locked, priceLockCampaign: "founders" }, toPlanId: "professional", timing: "now", proration: "none" });
+    expect(c.ok && c.priceLockNote).toMatch(/kampanya fiyatıyla yeniden yazılır/);
+    const none = previewAdminPlanChange({ ...base, toPlanId: "professional", timing: "now", proration: "prorate" });
+    expect(none.ok && none.priceLockNote).toBeNull();
+    expect(priceLockChangeNote(0, null, "Pro")).toBeNull();
   });
 });
 

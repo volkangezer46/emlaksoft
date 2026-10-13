@@ -363,7 +363,7 @@ function LifecycleCard({ tenantId, data, paused, cancelled, onDone }: CardProps 
                 submitLabel="Duraklat"
                 onDone={onDone}
               >
-                <FormField label="Süre (gün)" htmlFor="ops-pause-days" required hint="1-90 gün. Yönetici işlemi yıllık 1 kez sınırından muaftır.">
+                <FormField label="Süre (gün)" htmlFor="ops-pause-days" required hint="1-90 gün. Yönetici işlemi yıllık 1 kez sınırından muaftır ve ofisin kendi yıllık duraklatma hakkını tüketmez.">
                   <FormInput id="ops-pause-days" name="days" type="number" min={1} max={90} defaultValue={30} required />
                 </FormField>
               </OpDialog>
@@ -564,7 +564,7 @@ function PlanChangeDialog({ tenantId, plans, currentPlan, onDone }: { tenantId: 
       description="Önce önizleyin: kıst tutar ve fatura satırı onaydan önce görünür."
       icon={<Repeat />}
       submitLabel={p?.kind === "schedule" ? "Dönem sonuna planla" : p && p.invoiceNetTry > 0 ? "Onayla ve faturalandır" : "Onayla"}
-      hidden={{ plan, timing, proration, confirm_net_try: p ? String(p.invoiceNetTry) : "" }}
+      hidden={{ plan, timing, proration, confirm_net_try: p ? String(p.invoiceNetTry) : "", quoted_at_ms: p ? String(p.quotedAtMs) : "" }}
       submitDisabled={!p}
       onDone={onDone}
       size="md"
@@ -652,6 +652,7 @@ function PlanChangeDialog({ tenantId, plans, currentPlan, onDone }: { tenantId: 
           ) : (
             <p className="text-text-muted">Fatura kesilmez.</p>
           )}
+          {p.priceLockNote ? <p className="font-semibold text-amber-700">{p.priceLockNote}</p> : null}
         </PreviewBox>
       ) : null}
     </OpDialog>
@@ -865,7 +866,7 @@ export function SeatChangeDialog({ tenantId, currentExtra }: { tenantId: string;
       description="Satın alınmış ek kullanıcı sayısını değiştirir; artışta kıst fark faturalandırılabilir."
       icon={<Users2 />}
       submitLabel={net > 0 ? "Onayla ve faturalandır" : "Onayla"}
-      hidden={{ extra_seats: target, billing, confirm_net_try: String(net) }}
+      hidden={{ extra_seats: target, billing, confirm_net_try: String(net), quoted_at_ms: p ? String(p.quotedAtMs) : "" }}
       submitDisabled={!p}
       onDone={() => router.refresh()}
     >
