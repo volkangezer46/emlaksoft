@@ -13,6 +13,7 @@ import { Suspense } from "react";
 import { SkeletonCard } from "@/components/ui/viz";
 import { AdvisorProfitCard } from "./advisor-profit";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
+import { cashPnlAdjustments } from "@/lib/finance/expense-budget";
 
 export const metadata = { title: "Kâr / zarar" };
 
@@ -53,14 +54,27 @@ export default async function ProfitLossPage() {
   const commissions: PlCommission[] = data.commissions.map((c) => ({ id: c.id, createdAt: c.createdAt, gross: c.gross, vat: c.vat, status: c.status }));
   const splits: PlSplit[] = data.splits.map((s) => ({ commissionId: s.commissionId, kind: s.kind, amount: s.amount }));
   const expenses: PlExpense[] = data.expenses.map((e) => ({ date: e.date, amount: e.amount, passThrough: e.passThrough }));
-  const pl = buildProfitLoss(keys, commissions, splits, expenses, data.fees ?? []);
+  const base = buildProfitLoss(keys, commissions, splits, expenses, data.fees ?? []);
+  // Muhasebe v2 (finance_pnl): elle girilen gelir (hizmet bedeli, diğer gelir...) ve gidere dönüşmemiş çıkışlar (maaş vb.)
+  // eklenir. Komisyon commissions tablosundan, kira tahsilatı hiç sayılmaz: ikisi de İKİ KEZ sayılmaz. RPC yoksa ek sıfır.
+  const adj = cashPnlAdjustments(keys, data.cashPnl, data.expenses.map((e) => ({ date: e.date, amount: e.amount, passThrough: e.passThrough })));
+  const months = base.months.map((m) => {
+    const a = adj.get(m.key) ?? { manualIncome: 0, extraExpense: 0 };
+    return { ...m, other: a.manualIncome, expenses: m.expenses + a.extraExpense, net: m.net + a.manualIncome - a.extraExpense };
+  });
+  const totals = months.reduce(
+    (t, m) => ({ ...t, other: t.other + m.other, expenses: t.expenses + m.expenses, net: t.net + m.net }),
+    { ...base.totals, other: 0, expenses: 0, net: 0 },
+  );
+  const pl = { ...base, months, totals, hasData: base.hasData || totals.other > 0 || totals.expenses > 0 };
+  const cashLinked = Array.isArray(data.cashPnl);
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Raporlar"
         title="Kâr / zarar"
-        description="Son 12 ay: komisyon gelirinden KDV, danışman ve diğer dış paylar ile ofis giderleri düşülünce kalan net."
+        description="Son 12 ay: komisyon ve elle girilen gelirden KDV, danışman ve diğer dış paylar ile ofis giderleri düşülünce kalan net."
         breadcrumbs={crumbs}
       />
       {!pl.hasData ? (
@@ -68,30 +82,37 @@ export default async function ProfitLossPage() {
           variant="panel"
           title="Son 12 ayda komisyon veya gider kaydı yok."
           description="Komisyon kayıtları anlaşma kapanışında, giderler Giderler ekranından girilir."
-          action={{ label: "Gider ekle", href: "/app/giderler" }}
+          action={{ label: "Muhasebeye git", href: "/app/giderler" }}
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className={`grid grid-cols-2 gap-3 ${pl.totals.other > 0 ? "md:grid-cols-5" : "md:grid-cols-4"}`}>
             <Link href={`/app/komisyon?from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <p className="text-xs text-text-muted">Komisyon (brüt)</p>
               <p className="font-display text-xl font-extrabold text-ink-950">{formatTry(pl.totals.revenue)}</p>
               <p className="text-xs text-text-faint">{pl.totals.commissions} kayıt</p>
             </Link>
+            {pl.totals.other > 0 ? (
+              <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+                <p className="text-xs text-text-muted">Diğer gelir (elle)</p>
+                <p className="font-display text-xl font-extrabold text-ink-950">{formatTry(pl.totals.other)}</p>
+                <p className="text-xs text-text-faint">hizmet bedeli, diğer gelir</p>
+              </Link>
+            ) : null}
             <Link href={`/app/komisyon?from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <p className="text-xs text-text-muted">Dağıtılan paylar</p>
               <p className="font-display text-xl font-extrabold text-ink-950">{formatTry(pl.totals.shares)}</p>
               <p className="text-xs text-text-faint">KDV {formatTry(pl.totals.vat)}</p>
             </Link>
-            <Link href={`/app/giderler?from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <Link href={`/app/giderler?sekme=hareketler&tur=gider&from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <p className="text-xs text-text-muted">Gider</p>
               <p className="font-display text-xl font-extrabold text-ink-950">{formatTry(pl.totals.expenses)}</p>
             </Link>
-            <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+            <Link href="/app/giderler?sekme=raporlar" className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
               <p className="text-xs text-text-muted">Net</p>
               <p className={`font-display text-xl font-extrabold ${pl.totals.net < 0 ? "text-danger-600" : "text-ink-950"}`}>{formatTry(pl.totals.net)}</p>
               <p className="text-xs text-text-faint">12 ay toplamı</p>
-            </div>
+            </Link>
           </div>
           {pl.unsplitCount > 0 ? (
             <Alert tone="warning">
@@ -106,6 +127,7 @@ export default async function ProfitLossPage() {
                   <TH>Ay</TH>
                   <TH className="text-right">Komisyon</TH>
                   {pl.totals.fees > 0 ? <TH className="text-right">Yönetim ücreti</TH> : null}
+                  {pl.totals.other > 0 ? <TH className="text-right">Diğer gelir</TH> : null}
                   <TH className="text-right">KDV</TH>
                   <TH className="text-right">Paylar</TH>
                   <TH className="text-right">Gider</TH>
@@ -126,10 +148,15 @@ export default async function ProfitLossPage() {
                           <Link href={`/app/kiralama?yonetim=ucret`} className="hover:underline">{formatTry(m.fees)}</Link>
                         </TD>
                       ) : null}
+                      {pl.totals.other > 0 ? (
+                        <TD className="text-right tabular-nums">
+                          <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.other)}</Link>
+                        </TD>
+                      ) : null}
                       <TD className="text-right tabular-nums">{formatTry(m.vat)}</TD>
                       <TD className="text-right tabular-nums">{formatTry(m.shares)}</TD>
                       <TD className="text-right tabular-nums">
-                        <Link href={`/app/giderler?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.expenses)}</Link>
+                        <Link href={`/app/giderler?sekme=hareketler&tur=gider&from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.expenses)}</Link>
                       </TD>
                       <TD className={`text-right font-semibold tabular-nums ${m.net < 0 ? "text-danger-600" : ""}`}>{formatTry(m.net)}</TD>
                     </TR>
@@ -140,7 +167,7 @@ export default async function ProfitLossPage() {
           </TableFrame>
           <p className="text-xs leading-relaxed text-text-faint">
             Komisyon tahakkuk esasına göre (kayıt ayı) sayılır; tahsilat değildir. İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
-            danışman/referans/franchise paylarıdır (ofis payı düşülmez). Yönetim ücreti, mülk yönetimindeki kira tahsilatlarından ofise kalan ücrettir (tahsilat tarihi); mülk sahibine yansıtılan gider ofis gideri sayılmaz. Gelir/kurumlar vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
+            danışman/referans/franchise paylarıdır (ofis payı düşülmez). Yönetim ücreti, mülk yönetimindeki kira tahsilatlarından ofise kalan ücrettir (tahsilat tarihi); mülk sahibine yansıtılan gider ofis gideri sayılmaz.{cashLinked ? " Diğer gelir: Muhasebe'de elle girilen gelir hareketleridir (hizmet bedeli, diğer gelir; komisyon ve kira tahsilatı iki kez sayılmaz). Gider, gidere dönüşmemiş kasa çıkışlarını (maaş vb.) da içerir; transfer ve mülk sahibine ödeme gider değildir." : ""} Gelir/kurumlar vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
           </p>
           {/* Danışman bazlı kırılım yalnız ofis sahibi / genel müdür (kazanç gizliliği P12). */}
           {role === "owner" || role === "gm" ? (

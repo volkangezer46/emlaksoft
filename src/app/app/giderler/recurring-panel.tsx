@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Pencil, Play, Plus, Repeat, SkipForward, Trash2 } from "lucide-react";
+import { Check, Landmark, Pause, Pencil, Play, Plus, Repeat, SkipForward, Trash2 } from "lucide-react";
+import { parseBudgetAmount, rentWithholdingBreakdown, vatBreakdown } from "@/lib/finance/expense-budget";
 import {
   approveRecurringOccurrence,
   convertExpenseSeriesToRule,
@@ -32,9 +33,33 @@ export type EditableRule = {
   payDay: number;
   endDate: string | null;
   mode: "auto" | "approve";
+  /** Muhasebe v2: ofis kuralının carisi ve oranları (yoksa null). */
+  partyId?: string | null;
+  vatRate?: number | null;
+  withholdingRate?: number | null;
 };
 
+/** Ofis carisi (finance_parties) — kural formunda seçilir. */
+export type RulePartyOption = { id: string; name: string; kindLabel: string };
+
+/** Hazır kural şablonları. "stopajli_kira": kira gideri, %20 stopaj; brüt, stopaj ve net ayrı gösterilir. */
+export type RuleTemplate = "stopajli_kira";
+
 const FREQUENCIES = ["monthly", "quarterly", "yearly"] as const;
+const VAT_OPTIONS = [
+  { value: "", label: "KDV yok / bilinmiyor" },
+  { value: "1", label: "%1" },
+  { value: "10", label: "%10" },
+  { value: "20", label: "%20" },
+] as const;
+const WITHHOLDING_OPTIONS = [
+  { value: "", label: "Stopaj yok" },
+  { value: "20", label: "%20 (kira, serbest meslek)" },
+  { value: "15", label: "%15" },
+  { value: "10", label: "%10" },
+] as const;
+
+const tl = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 }).format(n);
 
 /** "Düzenli ödeme ekle" (yeni) veya kural düzenle. Tek form: ne için · tutar · hangi hesap · her ay hangi gün · otomatik/bana sor. */
 export function RuleFormButton({
@@ -43,6 +68,9 @@ export function RuleFormButton({
   today,
   rule,
   label = "Düzenli ödeme ekle",
+  parties,
+  template,
+  variant,
 }: {
   accounts: readonly AccountOption[];
   canSalary: boolean;
@@ -50,6 +78,10 @@ export function RuleFormButton({
   today: string;
   rule?: EditableRule;
   label?: string;
+  /** Verilirse (ofis sekmesi) cari, KDV ve stopaj alanları görünür. Kasam'da verilmez. */
+  parties?: readonly RulePartyOption[];
+  template?: RuleTemplate;
+  variant?: "primary" | "outline";
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -59,11 +91,11 @@ export function RuleFormButton({
           Düzenle
         </Button>
       ) : (
-        <Button variant="primary" icon={Plus} onClick={() => setOpen(true)}>
+        <Button variant={variant ?? (template ? "outline" : "primary")} icon={template ? Landmark : Plus} onClick={() => setOpen(true)}>
           {label}
         </Button>
       )}
-      {open ? <RuleDialog accounts={accounts} canSalary={canSalary} today={today} rule={rule} onClose={() => setOpen(false)} /> : null}
+      {open ? <RuleDialog accounts={accounts} canSalary={canSalary} today={today} rule={rule} parties={parties} template={template} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -73,35 +105,50 @@ function RuleDialog({
   canSalary,
   today,
   rule,
+  parties,
+  template,
   onClose,
 }: {
   accounts: readonly AccountOption[];
   canSalary: boolean;
   today: string;
   rule?: EditableRule;
+  parties?: readonly RulePartyOption[];
+  template?: RuleTemplate;
   onClose: () => void;
 }) {
   const router = useRouter();
   const { push } = useToast();
   const editing = Boolean(rule);
+  const rentTemplate = template === "stopajli_kira";
   const [direction, setDirection] = useState<CashDirection>("out");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(rentTemplate ? "kira" : "");
   const [accountId, setAccountId] = useState(rule?.accountId ?? (accounts.find((a) => a.scope === "office")?.id ?? accounts[0]?.id ?? ""));
   const [frequency, setFrequency] = useState<(typeof FREQUENCIES)[number]>("monthly");
   const [mode, setMode] = useState<"auto" | "approve">(rule?.mode ?? "auto");
+  const [amountText, setAmountText] = useState(rule ? String(rule.amount).replace(".", ",") : "");
+  const [partyId, setPartyId] = useState(rule?.partyId ?? "");
+  const [vatRate, setVatRate] = useState(rule?.vatRate != null && rule.vatRate > 0 ? String(rule.vatRate) : "");
+  const [withholdingRate, setWithholdingRate] = useState(rentTemplate ? "20" : rule?.withholdingRate != null && rule.withholdingRate > 0 ? String(rule.withholdingRate) : "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const chosen = accounts.find((a) => a.id === accountId);
   const categories = categoriesFor(direction).filter((c) => (canSalary && chosen?.scope === "office") || c.value !== "maas");
   const office = accounts.filter((a) => a.scope === "office");
   const personal = accounts.filter((a) => a.scope === "user");
+  // Cari/KDV/stopaj yalnız ofis hesabına yazılan kuralda (kişisel kural ofis carisine bağlanmaz).
+  const showTerms = parties !== undefined && chosen?.scope !== "user";
+  const amountValue = parseBudgetAmount(amountText) ?? 0;
+  const wh = rentWithholdingBreakdown(amountValue, Number(withholdingRate) || 0);
+  const vat = vatBreakdown(amountValue, Number(vatRate) || 0, true);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
-    const common = { amount: String(fd.get("amount") ?? ""), accountId, payDay: String(fd.get("payDay") ?? ""), mode, title: String(fd.get("title") ?? "") };
+    const terms = showTerms ? { partyId, vatRate, withholdingRate } : {};
+    const common = { amount: amountText, accountId, payDay: String(fd.get("payDay") ?? ""), mode, title: String(fd.get("title") ?? ""), ...terms };
     const res = rule
       ? await updateRecurringRule(rule.id, { ...common, endDate: String(fd.get("endDate") ?? "") })
       : await createRecurringRule({
@@ -116,6 +163,7 @@ function RuleDialog({
     setBusy(false);
     if (res.error) return setError(res.error);
     push(editing ? "Düzenli ödeme güncellendi" : "Düzenli ödeme kaydedildi", "ok");
+    if (res.warning) push(res.warning, "info");
     onClose();
     router.refresh();
   }
@@ -124,9 +172,13 @@ function RuleDialog({
     <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
       <DialogContent size="md">
         <DialogHeader
-          title={editing ? "Düzenli ödemeyi düzenle" : "Düzenli ödeme ekle"}
-          description="Bir kez tanımlayın; her ay kendiliğinden işlensin ya da size sorulsun. Geçmişe dönük kayıt açılmaz."
-          icon={<Repeat />}
+          title={editing ? "Düzenli ödemeyi düzenle" : rentTemplate ? "Stopajlı ofis kirası" : "Düzenli ödeme ekle"}
+          description={
+            rentTemplate
+              ? "Brüt kirayı yazın: %20 stopaj kesilip vergi dairesine, kalan net tutar mal sahibine ödenir. Üçü ayrı gösterilir."
+              : "Bir kez tanımlayın; her ay kendiliğinden işlensin ya da size sorulsun. Geçmişe dönük kayıt açılmaz."
+          }
+          icon={rentTemplate ? <Landmark /> : <Repeat />}
         />
         {accounts.length === 0 ? (
           <DialogBody>
@@ -180,8 +232,18 @@ function RuleDialog({
               ) : null}
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField label="Tutar" htmlFor="rl-amount" required>
-                  <FormInput id="rl-amount" name="amount" inputMode="decimal" autoComplete="off" placeholder="0,00" defaultValue={rule ? String(rule.amount).replace(".", ",") : ""} required autoFocus />
+                <FormField label={withholdingRate ? "Brüt tutar" : "Tutar"} htmlFor="rl-amount" required hint={withholdingRate ? "Stopaj kesilmeden önceki tutar" : undefined}>
+                  <FormInput
+                    id="rl-amount"
+                    name="amount"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="0,00"
+                    value={amountText}
+                    onChange={(e) => setAmountText(e.target.value)}
+                    required
+                    autoFocus
+                  />
                 </FormField>
                 <FormField label="Her ay hangi gün?" htmlFor="rl-day" required hint="31 yazarsanız ayın son günü">
                   <FormInput id="rl-day" name="payDay" type="number" min={1} max={31} defaultValue={rule?.payDay ?? 1} required />
@@ -204,6 +266,51 @@ function RuleDialog({
               />
               </FormField>
 
+              {showTerms ? (
+                <div className="grid gap-4 rounded-[var(--radius-card)] border border-line bg-canvas p-3">
+                  <FormField label="Cari (kime / kimden)" htmlFor="rl-party" hint={parties.length === 0 ? "Henüz cari yok; Cari sekmesinden ekleyebilirsiniz." : "İsteğe bağlı; cari ekstresinde görünür."}>
+                    <Combobox
+                      id="rl-party"
+                      value={partyId}
+                      onValueChange={setPartyId}
+                      options={parties.map((p) => ({ value: p.id, label: p.name, hint: p.kindLabel }))}
+                      placeholder="Cari seçin"
+                      searchPlaceholder="Cari ara…"
+                      emptyText="Eşleşen cari yok"
+                    />
+                  </FormField>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField label="KDV (tutara dahil)" htmlFor="rl-vat">
+                      <FormSelect id="rl-vat" value={vatRate} onChange={(e) => setVatRate(e.target.value)}>
+                        {VAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </FormSelect>
+                    </FormField>
+                    <FormField label="Stopaj" htmlFor="rl-wh" hint={category === "kira" && !withholdingRate ? "Şahıstan kiralanan ofiste %20 stopaj kesilir." : undefined}>
+                      <FormSelect id="rl-wh" value={withholdingRate} onChange={(e) => setWithholdingRate(e.target.value)}>
+                        {WITHHOLDING_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </FormSelect>
+                    </FormField>
+                  </div>
+                  {amountValue > 0 && (wh.withheld > 0 || vat.vat > 0) ? (
+                    <dl className="grid grid-cols-3 gap-2 text-center" aria-live="polite">
+                      {wh.withheld > 0 ? (
+                        <>
+                          <BreakdownCell label="Brüt" value={tl(wh.gross)} />
+                          <BreakdownCell label={`Stopaj %${withholdingRate}`} value={`− ${tl(wh.withheld)}`} hint="vergi dairesine" tone="warn" />
+                          <BreakdownCell label="Net ödenecek" value={tl(wh.net)} hint={direction === "out" ? "mal sahibine" : "hesabınıza"} tone="strong" />
+                        </>
+                      ) : (
+                        <>
+                          <BreakdownCell label="KDV hariç" value={tl(vat.net)} />
+                          <BreakdownCell label={`KDV %${vatRate}`} value={tl(vat.vat)} tone="warn" />
+                          <BreakdownCell label="Toplam" value={tl(vat.gross)} tone="strong" />
+                        </>
+                      )}
+                    </dl>
+                  ) : null}
+                </div>
+              ) : null}
+
               <FormField label="Nasıl işlensin?" htmlFor="rl-mode" hint={mode === "approve" ? "Vade gelince taslak oluşur ve bildirim alırsınız; onaylayınca kaydedilir." : "Vade gününde hesaba kendiliğinden işlenir."}>
                 <FormSelect id="rl-mode" value={mode} onChange={(e) => setMode(e.target.value as "auto" | "approve")}>
                   <option value="auto">Otomatik kaydet</option>
@@ -212,7 +319,7 @@ function RuleDialog({
               </FormField>
 
               <FormField label="Açıklama" htmlFor="rl-title" hint="Boş bırakırsanız ne için seçtiğiniz yazılır.">
-                <FormInput id="rl-title" name="title" maxLength={160} defaultValue={rule?.title ?? ""} placeholder="ör. Kadıköy ofis kirası" />
+                <FormInput id="rl-title" name="title" maxLength={160} defaultValue={rule?.title ?? (rentTemplate ? "Ofis kirası (stopajlı)" : "")} placeholder="ör. Kadıköy ofis kirası" />
               </FormField>
 
               {!editing ? (
@@ -254,6 +361,16 @@ function RuleDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BreakdownCell({ label, value, hint, tone }: { label: string; value: string; hint?: string; tone?: "warn" | "strong" }) {
+  return (
+    <div className="rounded-[var(--radius-control)] bg-surface px-2 py-1.5">
+      <dt className="text-xs text-text-muted">{label}</dt>
+      <dd className={cn("numeric text-sm font-bold", tone === "warn" ? "text-warning-strong" : tone === "strong" ? "text-text" : "text-text-muted")}>{value}</dd>
+      {hint ? <dd className="text-xs text-text-faint">{hint}</dd> : null}
+    </div>
   );
 }
 

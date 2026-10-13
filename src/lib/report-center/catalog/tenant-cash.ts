@@ -4,9 +4,22 @@
  * sahibine verir; maaş kategorisi ofis hesaplarında yalnız owner/gm'ye gelir. Modül `reports`: danışman kendi kişisel
  * hesabının ekstresini alabilir; ofis hesapları RLS ile `expenses` yetkisine bağlı kalır.
  */
+import { now, trDayKey, trMonthKey } from "@/lib/clock";
 import { cashCategoryLabel } from "@/lib/finance/cash/categories";
+import { isUuid } from "@/lib/finance/cash/input";
+import {
+  addMonths,
+  budgetVsActualRows,
+  countByMonth,
+  vatSummaryRows,
+  type BudgetVsActualRaw,
+  type VatSummaryRaw,
+} from "@/lib/finance/expense-budget";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { DATE_RANGE_FIELDS } from "../filters";
-import { applyActorScope, applyDateRange, one } from "../query-helpers";
+import { memoLabels } from "../labels";
+import { applyActorScope, applyDateRange, nameOf, one } from "../query-helpers";
+import type { ReportContext, Row } from "../types";
 import { defineReport, opts, tid } from "./define";
 
 const KIND_LABEL: Record<string, string> = { income: "Gelir", expense: "Gider", transfer: "Transfer", adjust: "Düzeltme" };
@@ -101,4 +114,457 @@ export const gelirGiderDokumu = defineReport({
   },
 });
 
-export const CASH_REPORTS = [hesapEkstresi, gelirGiderDokumu];
+/* ================================================================================================
+ * Muhasebe v2 (FN6) raporları: cari ekstresi, açık kalemler, KDV özeti, nakit akışı tahmini, bütçe ↔ gerçekleşen,
+ * muhasebeci paketi. Modül `expenses` (Muhasebe). Ofis geneli finans verisi oldukları için hesaplanan raporlar
+ * `officeWideOnly`; RPC'ler (security definer) kiracıyı `current_tenant_id()` ile ayrıca sınırlar. Dokunulan her
+ * tabloda `tenant_id` süzgeci vardır (kapsam sözleşmesi). Şema (FN1) yoksa rapor boş döner, hata vermez.
+ * ============================================================================================== */
+
+type DbErr = { message?: string; code?: string } | null;
+type RpcOut = { data: unknown; error: DbErr };
+
+/** RPC çağrısı: hata ya da şema yoksa boş satır (rapor kırılmaz). */
+async function rpcRows(ctx: ReportContext, fn: string, args: Record<string, unknown>): Promise<Row[]> {
+  const res = (await Promise.resolve(ctx.supabase.rpc(fn, args)).catch(() => ({ data: null, error: { message: "rpc" } }))) as RpcOut;
+  if (res.error || !Array.isArray(res.data)) return [];
+  return res.data as Row[];
+}
+
+const todayKey = () => trDayKey(now());
+const yearStart = () => `${todayKey().slice(0, 4)}-01-01`;
+const n2 = (v: unknown): number | null => (v == null || v === "" ? null : Number.isFinite(Number(v)) ? Math.round(Number(v) * 100) / 100 : null);
+
+const PARTY_KIND: Record<string, string> = { musteri: "Müşteri", malik: "Mülk sahibi", kiraci: "Kiracı", tedarikci: "Tedarikçi", danisman: "Danışman", diger: "Diğer" };
+const DOC_TYPE: Record<string, string> = {
+  entry: "Hareket",
+  cash_entry: "Hareket",
+  open_item: "Vade kaydı",
+  receivable: "Alacak kaydı",
+  payable: "Borç kaydı",
+  settlement: "Tahsilat / ödeme",
+  rent: "Kira tahakkuku",
+  commission: "Komisyon",
+};
+const OPEN_DIR: Record<string, string> = { receivable: "Alacak", payable: "Borç" };
+const OPEN_STATUS: Record<string, string> = { open: "Açık", partial: "Kısmi ödendi", paid: "Ödendi", cancelled: "İptal" };
+const OPEN_SOURCE: Record<string, string> = { manual: "Elle", rent: "Kira", commission: "Komisyon", recurring: "Düzenli ödeme", owner_payout: "Mülk sahibi ödemesi", invoice: "Fatura" };
+
+/** Ofis carilerinin adlarını tek sorguda `ctx.names`'e yazar (kiracı süzgeçli). */
+async function fillPartyNames(ctx: ReportContext, ids: Iterable<string | null | undefined>): Promise<void> {
+  const need = [...new Set([...ids].filter((v): v is string => !!v && !ctx.names.has(v)))];
+  for (let i = 0; i < need.length; i += 150) {
+    const { data } = await ctx.supabase.from("finance_parties").select("id, name").eq("tenant_id", tid(ctx)).in("id", need.slice(i, i + 150));
+    for (const r of (data ?? []) as Row[]) ctx.names.set(String(r.id), String(r.name ?? ""));
+  }
+}
+
+/** Kategori etiketleri: sistem hareket kategorileri + gider tanımları + ofis kategorileri (kiracı süzgeçli). */
+async function categoryLabels(ctx: ReportContext): Promise<(v: unknown) => string> {
+  const hit = ctx.memo.get("finance:catLabels") as Map<string, string> | undefined;
+  const map = hit ?? new Map<string, string>(Object.entries(memoLabels(ctx, "expense_category")));
+  if (!hit) {
+    const { data } = await ctx.supabase.from("finance_categories").select("key, label").eq("tenant_id", tid(ctx));
+    for (const r of (data ?? []) as Row[]) map.set(String(r.key), String(r.label ?? r.key));
+    ctx.memo.set("finance:catLabels", map);
+  }
+  return (v: unknown) => {
+    const key = String(v ?? "");
+    if (!key) return "";
+    const cash = cashCategoryLabel(key);
+    return cash !== key ? cash : (map.get(key) ?? key);
+  };
+}
+
+export const cariEkstresi = defineReport({
+  id: "cari-ekstresi",
+  title: "Cari ekstresi",
+  description: "Kişi ve firma (cari) bazında borç, alacak ve yürüyen bakiye: hareketler, vade kayıtları ve tahsilat/ödemeler. Cari adı ya da cari sayfasından gelen kimlikle süzülür.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  officeWideOnly: true,
+  personalData: true,
+  keywords: ["cari", "ekstre", "bakiye", "borç", "alacak", "müşteri", "tedarikçi"],
+  filters: [{ kind: "text", key: "cari", label: "Cari adı", placeholder: "ör. Yılmaz Emlak" }, ...DATE_RANGE_FIELDS("Ekstre başlangıcı", "Ekstre bitişi")],
+  columns: [
+    { key: "cari", label: "Cari", type: "text", width: 26, get: (r) => r.party_name },
+    { key: "tur", label: "Cari türü", type: "text", width: 14, get: (r) => PARTY_KIND[String(r.party_kind)] ?? r.party_kind },
+    { key: "tarih", label: "Tarih", type: "date", get: (r) => r.d },
+    { key: "belge", label: "Belge", type: "text", width: 16, get: (r) => DOC_TYPE[String(r.doc_type)] ?? r.doc_type },
+    { key: "aciklama", label: "Açıklama", type: "text", width: 32, get: (r) => r.title },
+    { key: "borc", label: "Borç", type: "money", total: true, get: (r) => n2(r.debit) },
+    { key: "alacak", label: "Alacak", type: "money", total: true, get: (r) => n2(r.credit) },
+    { key: "bakiye", label: "Bakiye", type: "money", get: (r) => n2(r.running_balance) },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      let q = ctx.supabase.from("finance_parties").select("id, name, kind").eq("tenant_id", tid(ctx)).is("archived_at", null);
+      const term = (f.cari ?? "").trim();
+      const byId: boolean = isUuid(term);
+      if (byId) q = q.eq("id", term);
+      else if (term) q = q.ilike("name", `%${term.replace(/[%,()*\\]/g, " ").trim()}%`);
+      const { data, error } = await q.order("name", { ascending: true }).limit(50);
+      if (error) return [];
+      const from = f.from ?? yearStart();
+      const to = f.to ?? todayKey();
+      const out: Row[] = [];
+      for (const p of (data ?? []) as Row[]) {
+        const lines = await rpcRows(ctx, "finance_party_statement", { p_party_id: p.id, p_from: from, p_to: to });
+        for (const l of lines) out.push({ ...l, party_name: p.name, party_kind: p.kind });
+      }
+      return out;
+    },
+  },
+});
+
+export const acikKalemler = defineReport({
+  id: "acik-kalemler",
+  title: "Açık kalemler (alacak / borç)",
+  description: "Vadeli alacak ve borç kayıtları: vade, tutar, ödenen, kalan ve gecikme günü. Varsayılan açık ve kısmi ödenmiş kalemlerdir; kira tahakkukları kendi raporundadır.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  personalData: true,
+  keywords: ["vade", "alacak", "borç", "tahsilat", "yaşlandırma", "açık kalem"],
+  filters: [
+    { kind: "select", key: "yon", label: "Yön", options: opts({ receivable: "Alacak", payable: "Borç" }) },
+    { kind: "select", key: "durum", label: "Durum", options: opts({ acik: "Açık + kısmi", paid: "Ödendi", cancelled: "İptal", tumu: "Tümü" }) },
+    ...DATE_RANGE_FIELDS("Vade başlangıcı", "Vade bitişi"),
+  ],
+  columns: [
+    { key: "vade", label: "Vade", type: "date", get: (r) => r.due_date },
+    { key: "yon", label: "Yön", type: "text", width: 10, get: (r) => OPEN_DIR[String(r.direction)] ?? r.direction },
+    { key: "baslik", label: "Açıklama", type: "text", width: 32, get: (r) => r.title },
+    { key: "cari", label: "Cari", type: "text", width: 24, get: (r, c) => nameOf(c, r.party_id) },
+    { key: "tutar", label: "Tutar", type: "money", total: true, get: (r) => n2(r.amount) },
+    { key: "odenen", label: "Ödenen", type: "money", total: true, get: (r) => n2(r.paid_amount) },
+    { key: "kalan", label: "Kalan", type: "money", total: true, get: (r) => (n2(r.amount) ?? 0) - (n2(r.paid_amount) ?? 0) },
+    { key: "gecikme", label: "Gecikme (gün)", type: "number", get: (r) => overdueDays(r) },
+    { key: "durum", label: "Durum", type: "text", width: 14, get: (r) => OPEN_STATUS[String(r.status)] ?? r.status },
+    { key: "kaynak", label: "Kaynak", type: "text", width: 16, get: (r) => OPEN_SOURCE[String(r.source_type ?? "manual")] ?? r.source_type },
+    { key: "para", label: "Para birimi", type: "text", width: 10, get: (r) => r.currency },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("finance_open_items")
+        .select("id, direction, party_id, title, amount, currency, due_date, paid_amount, status, source_type, created_by", { count: "exact" })
+        .eq("tenant_id", tid(ctx));
+      q = applyActorScope(ctx, q, { actorColumn: "created_by", sample: true });
+      if (f.yon) q = q.eq("direction", f.yon);
+      if (!f.durum || f.durum === "acik") q = q.in("status", ["open", "partial"]);
+      else if (f.durum !== "tumu") q = q.eq("status", f.durum);
+      q = applyDateRange(q, "due_date", f);
+      return q.order("due_date", { ascending: true }).order("id", { ascending: true });
+    },
+    enrich: async (rows, ctx) => {
+      await fillPartyNames(ctx, rows.map((r) => r.party_id as string | null));
+    },
+  },
+});
+
+function overdueDays(r: Row): number | null {
+  if (r.status !== "open" && r.status !== "partial") return null;
+  const due = String(r.due_date ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return null;
+  const diff = Math.floor((Date.parse(`${todayKey()}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000);
+  return diff > 0 ? diff : 0;
+}
+
+export const kdvOzeti = defineReport({
+  id: "kdv-ozeti",
+  title: "KDV özeti (aylık)",
+  description: "Ay bazında hesaplanan KDV, indirilecek KDV, ödenecek KDV (hesaplanan − indirilecek), kesilen ve ödenen stopaj ile KDV bilgisi olmayan hareket sayısı. Bilgi amaçlıdır.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  officeWideOnly: true,
+  keywords: ["kdv", "vergi", "stopaj", "beyanname", "muhtasar"],
+  filters: [...DATE_RANGE_FIELDS("Başlangıç", "Bitiş")],
+  columns: [
+    { key: "ay", label: "Ay", type: "text", width: 10, get: (r) => r.label },
+    { key: "hesaplanan", label: "Hesaplanan KDV", type: "money", total: true, get: (r) => r.outputVat },
+    { key: "indirilecek", label: "İndirilecek KDV", type: "money", total: true, get: (r) => r.inputVat },
+    { key: "odenecek", label: "Ödenecek KDV", type: "money", total: true, get: (r) => r.payable },
+    { key: "kesilen", label: "Kesilen stopaj", type: "money", total: true, get: (r) => r.withholdingCollected },
+    { key: "odenen", label: "Ödenen stopaj", type: "money", total: true, get: (r) => r.withholdingPaid },
+    { key: "kdvsiz", label: "KDV bilgisi yok (hareket)", type: "number", total: true, get: (r) => r.noVat },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const from = f.from ?? yearStart();
+      const to = f.to ?? todayKey();
+      const [vat, noVat] = await Promise.all([
+        rpcRows(ctx, "finance_vat_summary", { p_from: from, p_to: to }),
+        fetchAllRows<Row>((a, b) =>
+          ctx.supabase
+            .from("cash_entries")
+            .select("id, entry_date, account:finance_accounts!cash_entries_account_fk!inner(owner_scope)")
+            .eq("tenant_id", tid(ctx))
+            .eq("account.owner_scope", "office")
+            .is("vat_rate", null)
+            .is("voided_at", null)
+            .in("kind", ["income", "expense"])
+            .gte("entry_date", from)
+            .lte("entry_date", to)
+            .order("id", { ascending: true })
+            .range(a, b),
+        ),
+      ]);
+      const rows = vatSummaryRows(vat as VatSummaryRaw[]);
+      const counts = noVat.error ? new Map<string, number>() : countByMonth(noVat.data.map((r) => r.entry_date as string));
+      const months = [...new Set([...rows.map((r) => r.month), ...counts.keys()])].sort();
+      const byMonth = new Map(rows.map((r) => [r.month, r]));
+      return months.map((m) => {
+        const r = byMonth.get(m);
+        return {
+          label: `${m.slice(5, 7)}.${m.slice(0, 4)}`,
+          outputVat: r?.outputVat ?? 0,
+          inputVat: r?.inputVat ?? 0,
+          payable: r?.payable ?? 0,
+          withholdingCollected: r?.withholdingCollected ?? 0,
+          withholdingPaid: r?.withholdingPaid ?? 0,
+          noVat: counts.get(m) ?? 0,
+        };
+      });
+    },
+  },
+});
+
+export const nakitAkisTahmini = defineReport({
+  id: "nakit-akis-tahmini",
+  title: "Nakit akışı tahmini",
+  description: "Önümüzdeki 30 ya da 90 gün için günlük beklenen giriş, çıkış ve bakiye: hesap bakiyeleri, açık alacak/borçlar, kira tahakkukları, komisyonlar ve düzenli ödemeler. Yalnız TL hesaplar; tahmindir.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  officeWideOnly: true,
+  keywords: ["nakit", "tahmin", "bakiye", "likidite", "forecast"],
+  filters: [{ kind: "select", key: "gun", label: "Süre", options: opts({ "30": "30 gün", "90": "90 gün" }) }],
+  columns: [
+    { key: "tarih", label: "Tarih", type: "date", get: (r) => r.d },
+    { key: "giris", label: "Beklenen giriş", type: "money", total: true, get: (r) => n2(r.inflow) },
+    { key: "cikis", label: "Beklenen çıkış", type: "money", total: true, get: (r) => n2(r.outflow) },
+    { key: "bakiye", label: "Bakiye", type: "money", get: (r) => n2(r.balance) },
+    { key: "tur", label: "Tür", type: "text", width: 12, get: (r) => (r.is_actual ? "Gerçekleşen" : "Tahmin") },
+    { key: "esik", label: "Uyarı eşiğinin altında", type: "bool", get: (r) => r.below },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const days = f.gun === "90" ? 90 : 30;
+      const [settings, points] = await Promise.all([
+        ctx.supabase.from("finance_settings").select("forecast_min_balance").eq("tenant_id", tid(ctx)).maybeSingle(),
+        rpcRows(ctx, "finance_cashflow_forecast", { p_days: days, p_rates: null }),
+      ]);
+      const min = n2((settings?.data as Row | null)?.forecast_min_balance);
+      return points.map((p) => ({ ...p, below: min != null && Number(p.balance) < min }));
+    },
+  },
+});
+
+export const butceGerceklesen = defineReport({
+  id: "butce-gerceklesen",
+  title: "Bütçe ↔ gerçekleşen",
+  description: "Aylık gelir hedefi ve gider bütçesi ile gerçekleşen tutarlar: fark ve gerçekleşme oranı. Bütçesi olmayan ama harcama yapılan kategoriler de listelenir.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  officeWideOnly: true,
+  keywords: ["bütçe", "hedef", "gerçekleşen", "sapma"],
+  filters: [{ kind: "select", key: "donem", label: "Dönem", options: opts({ "1": "Bu ay", "3": "Son 3 ay", "6": "Son 6 ay", "12": "Son 12 ay" }) }],
+  columns: [
+    { key: "ay", label: "Ay", type: "text", width: 10, get: (r) => r.label },
+    { key: "yon", label: "Tür", type: "text", width: 14, get: (r) => (r.direction === "in" ? "Gelir hedefi" : "Gider bütçesi") },
+    { key: "kategori", label: "Kategori", type: "text", width: 22, get: (r) => r.categoryLabel },
+    { key: "butce", label: "Bütçe / hedef", type: "money", total: true, get: (r) => r.budget },
+    { key: "gercek", label: "Gerçekleşen", type: "money", total: true, get: (r) => r.actual },
+    { key: "fark", label: "Fark", type: "money", total: true, get: (r) => r.remaining },
+    { key: "oran", label: "Gerçekleşme", type: "percent", decimals: 0, get: (r) => (r.budget > 0 ? Math.round(r.ratio * 1000) / 10 : null) },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const span = [1, 3, 6, 12].includes(Number(f.donem)) ? Number(f.donem) : 1;
+      const current = trMonthKey(now());
+      const first = addMonths(current, -(span - 1));
+      const [labelOf, budgets] = await Promise.all([
+        categoryLabels(ctx),
+        ctx.supabase.from("finance_budgets").select("period_month").eq("tenant_id", tid(ctx)).gte("period_month", `${first}-01`),
+      ]);
+      const months = new Set<string>([current]);
+      for (const b of ((budgets?.data ?? []) as Row[])) months.add(String(b.period_month).slice(0, 7));
+      const out: Row[] = [];
+      for (const m of [...months].filter((k) => k >= first && k <= current).sort().reverse()) {
+        const rows = budgetVsActualRows((await rpcRows(ctx, "finance_budget_vs_actual", { p_month: `${m}-01` })) as BudgetVsActualRaw[]);
+        for (const r of rows) out.push({ ...r, label: `${m.slice(5, 7)}.${m.slice(0, 4)}`, categoryLabel: labelOf(r.category) });
+      }
+      return out;
+    },
+  },
+});
+
+export const muhasebeciPaketi = defineReport({
+  id: "muhasebeci-paketi",
+  title: "Muhasebeci paketi",
+  description: "Mali müşavire teslim dosyası: dönemin defteri (ofis hesapları), cari bakiyeler, aylık KDV özeti ve açık alacak/borç kalemleri. Excel dosyasında her bölüm ayrı sayfadır (Defter, Cari, KDV, Açık kalemler); bilgi amaçlıdır.",
+  category: "finans",
+  scope: "tenant",
+  module: "expenses",
+  officeWideOnly: true,
+  personalData: true,
+  keywords: ["muhasebeci", "mali müşavir", "defter", "teslim", "kdv", "cari", "excel"],
+  xlsxSheetBy: "bolum",
+  filters: [{ kind: "select", key: "bolum", label: "Bölüm", options: opts({ defter: "Defter", cari: "Cari bakiyeler", kdv: "KDV özeti", acik: "Açık kalemler" }) }, ...DATE_RANGE_FIELDS("Dönem başlangıcı", "Dönem bitişi")],
+  columns: [
+    { key: "bolum", label: "Bölüm", type: "text", width: 14, get: (r) => r.section },
+    { key: "tarih", label: "Tarih / vade", type: "date", get: (r) => r.date },
+    { key: "tur", label: "Tür", type: "text", width: 14, get: (r) => r.kind },
+    { key: "aciklama", label: "Açıklama", type: "text", width: 32, get: (r) => r.title },
+    { key: "cari", label: "Cari / karşı taraf", type: "text", width: 24, get: (r) => r.party },
+    { key: "kategori", label: "Kategori", type: "text", width: 18, get: (r) => r.category },
+    { key: "hesap", label: "Hesap", type: "text", width: 18, get: (r) => r.account },
+    { key: "giris", label: "Giriş / alacak", type: "money", get: (r) => r.debit },
+    { key: "cikis", label: "Çıkış / borç", type: "money", get: (r) => r.credit },
+    { key: "kdvoran", label: "KDV oranı", type: "percent", decimals: 0, get: (r) => r.vatRate },
+    { key: "kdv", label: "KDV", type: "money", get: (r) => r.vat },
+    { key: "stopaj", label: "Stopaj", type: "money", get: (r) => r.withholding },
+    { key: "bakiye", label: "Bakiye / kalan", type: "money", get: (r) => r.balance },
+    { key: "para", label: "Para birimi", type: "text", width: 10, get: (r) => r.currency },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const from = f.from ?? `${todayKey().slice(0, 7)}-01`;
+      const to = f.to ?? todayKey();
+      const want = (s: string) => !f.bolum || f.bolum === s;
+      const labelOf = await categoryLabels(ctx);
+      const out: Row[] = [];
+
+      if (want("defter")) {
+        const readLedger = (cols: string) =>
+          fetchAllRows<Row>((a, b) =>
+            ctx.supabase
+              .from("cash_entries")
+              .select(`id, entry_date, kind, category, title, counterparty, direction, amount, currency${cols}, account:finance_accounts!cash_entries_account_fk!inner(name, owner_scope)`)
+              .eq("tenant_id", tid(ctx))
+              .eq("account.owner_scope", "office")
+              .is("voided_at", null)
+              .gte("entry_date", from)
+              .lte("entry_date", to)
+              .order("entry_date", { ascending: true })
+              .order("id", { ascending: true })
+              .range(a, b),
+          );
+        // KDV/cari sütunları (FN1) yoksa defter yine çıkar; yalnız o sütunlar boş kalır.
+        let ledger = await readLedger(", party_id, vat_rate, vat_amount, withholding_amount");
+        if (ledger.error) ledger = await readLedger("");
+        if (!ledger.error) {
+          await fillPartyNames(ctx, ledger.data.map((r) => r.party_id as string | null));
+          for (const r of ledger.data) {
+            out.push({
+              section: "Defter",
+              date: r.entry_date,
+              kind: KIND_LABEL[String(r.kind)] ?? r.kind,
+              title: r.title,
+              party: nameOf(ctx, r.party_id) || r.counterparty,
+              category: labelOf(r.category),
+              account: one(r.account)?.name,
+              debit: r.direction === "in" ? n2(r.amount) : null,
+              credit: r.direction === "out" ? n2(r.amount) : null,
+              vatRate: n2(r.vat_rate),
+              vat: n2(r.vat_amount),
+              withholding: n2(r.withholding_amount),
+              balance: null,
+              currency: r.currency,
+            });
+          }
+        }
+      }
+
+      if (want("cari")) {
+        for (const p of await rpcRows(ctx, "finance_party_balances", { p_kind: null, p_q: null })) {
+          out.push({
+            section: "Cari",
+            date: p.last_activity,
+            kind: PARTY_KIND[String(p.kind)] ?? p.kind,
+            title: "Cari bakiye",
+            party: p.name,
+            category: null,
+            account: null,
+            debit: n2(p.receivable_open),
+            credit: n2(p.payable_open),
+            vatRate: null,
+            vat: null,
+            withholding: null,
+            balance: n2(p.balance),
+            currency: "TRY",
+          });
+        }
+      }
+
+      if (want("kdv")) {
+        for (const v of vatSummaryRows((await rpcRows(ctx, "finance_vat_summary", { p_from: from, p_to: to })) as VatSummaryRaw[])) {
+          out.push({
+            section: "KDV",
+            date: `${v.month}-01`,
+            kind: v.payable >= 0 ? "Ödenecek KDV" : "Devreden KDV",
+            title: `Hesaplanan ${v.outputVat.toFixed(2)} − indirilecek ${v.inputVat.toFixed(2)}`,
+            party: null,
+            category: null,
+            account: null,
+            debit: v.outputVat,
+            credit: v.inputVat,
+            vatRate: null,
+            vat: v.payable,
+            withholding: Math.round((v.withholdingPaid + v.withholdingCollected) * 100) / 100,
+            balance: v.payable,
+            currency: "TRY",
+          });
+        }
+      }
+
+      if (want("acik")) {
+        const items = await fetchAllRows<Row>((a, b) =>
+          ctx.supabase
+            .from("finance_open_items")
+            .select("id, direction, party_id, title, category, amount, paid_amount, currency, due_date, status, vat_rate, vat_amount, withholding_amount")
+            .eq("tenant_id", tid(ctx))
+            .in("status", ["open", "partial"])
+            .order("due_date", { ascending: true })
+            .order("id", { ascending: true })
+            .range(a, b),
+        );
+        if (!items.error) {
+          await fillPartyNames(ctx, items.data.map((r) => r.party_id as string | null));
+          for (const r of items.data) {
+            const open = (n2(r.amount) ?? 0) - (n2(r.paid_amount) ?? 0);
+            out.push({
+              section: "Açık kalem",
+              date: r.due_date,
+              kind: OPEN_DIR[String(r.direction)] ?? r.direction,
+              title: r.title,
+              party: nameOf(ctx, r.party_id),
+              category: labelOf(r.category),
+              account: null,
+              debit: r.direction === "receivable" ? n2(r.amount) : null,
+              credit: r.direction === "payable" ? n2(r.amount) : null,
+              vatRate: n2(r.vat_rate),
+              vat: n2(r.vat_amount),
+              withholding: n2(r.withholding_amount),
+              balance: Math.round(open * 100) / 100,
+              currency: r.currency,
+            });
+          }
+        }
+      }
+      return out;
+    },
+  },
+});
+
+export const CASH_REPORTS = [hesapEkstresi, gelirGiderDokumu, cariEkstresi, acikKalemler, kdvOzeti, nakitAkisTahmini, butceGerceklesen, muhasebeciPaketi];

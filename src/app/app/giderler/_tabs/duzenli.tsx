@@ -1,34 +1,24 @@
 import Link from "@/components/ui/smart-link";
-import { Repeat } from "lucide-react";
+import { CalendarClock, Hourglass, Repeat, TrendingDown } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
-import { MobileCard, MobileCardList, StatusPill } from "@/components/ui/list-kit";
+import { KpiStrip, MobileCard, MobileCardList, StatusPill, type KpiItem } from "@/components/ui/list-kit";
 import { formatDateTr } from "@/lib/format";
+import { now, trDayKey } from "@/lib/clock";
+import { createClient } from "@/lib/supabase/server";
 import { cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
-import type { AccountWithBalance } from "@/lib/finance/cash/load";
+import { loadAccountsWithBalances, type AccountWithBalance } from "@/lib/finance/cash/load";
 import { loadPendingOccurrences, loadRecurringRules, type RecurringRule } from "@/lib/finance/recurring/load";
 import { FREQUENCY_LABEL, RULE_MODE_LABEL, payDayLabel } from "@/lib/finance/recurring/rules";
-import { PendingActions, RuleFormButton, RuleRowActions } from "../recurring-panel";
+import { monthlyEquivalent } from "@/lib/finance/recurring-expenses";
+import { rentWithholdingBreakdown } from "@/lib/finance/expense-budget";
+import { PendingActions, RuleFormButton, RuleRowActions, type EditableRule, type RulePartyOption } from "../recurring-panel";
 import type { AccountOption } from "../quick-entry";
+import { FINANCE_PATH, PARTY_KIND_LABEL, type FinanceTabProps } from "./butce";
 
-/**
- * Düzenli ödemeler: ad, tutar, sıklık, sonraki tarih, kip. Onay bekleyen taslaklar listenin üstünde (Özet kartı buraya gelir).
- * `scope` ofis sayfasında "office", Kasam'da "user" verilir; Kasam'da ofis kuralı hiç sorgulanmaz.
- */
-export async function DuzenliTab({
-  supabase,
-  accounts,
-  scope,
-  ownerUserId,
-  today,
-  canCreate,
-  canEdit,
-  canDelete,
-  canSalary,
-  entriesHref,
-  onlyPending = false,
-}: {
+/** Eski çağrı biçimi (Kasam ve FN2 öncesi sayfa): veri çağırandan gelir. */
+type LegacyDuzenliProps = {
   supabase: SupabaseClient;
   accounts: readonly AccountWithBalance[];
   scope: "office" | "user";
@@ -41,25 +31,133 @@ export async function DuzenliTab({
   entriesHref: (accountId: string) => string;
   /** ?durum=bekleyen: yalnız onay bekleyenler. */
   onlyPending?: boolean;
-}) {
+};
+
+const officeEntriesHref = (id: string) => `${FINANCE_PATH}?sekme=hareketler&hesap=${id}`;
+
+/**
+ * Tekrarlayanlar sekmesi (?sekme=duzenli): düzenli ödeme/gelir kuralları, onay bekleyenler ve aylık yük özeti.
+ * Muhasebe v2 sözleşmesi `DuzenliTab(props: FinanceTabProps)`: sekme kendi verisini çeker. Kasam (`scope="user"`) eski
+ * çağrı biçimiyle aynen çalışır; Kasam'da ofis kuralı ve ofis carisi hiç sorgulanmaz.
+ */
+export async function DuzenliTab(props: FinanceTabProps | LegacyDuzenliProps) {
+  if ("supabase" in props) return <DuzenliView {...props} />;
+  const supabase = await createClient();
+  const cash = await loadAccountsWithBalances(supabase);
+  return (
+    <DuzenliView
+      supabase={supabase}
+      accounts={cash.accounts}
+      scope="office"
+      today={trDayKey(now())}
+      canCreate={props.canCreate}
+      canEdit={props.canEdit}
+      canDelete={props.canDelete}
+      canSalary={props.canSalary}
+      entriesHref={officeEntriesHref}
+      onlyPending={props.params.durum === "bekleyen"}
+    />
+  );
+}
+
+type RuleTerms = { partyId: string | null; vatRate: number | null; withholdingRate: number | null };
+
+/** Ofis kurallarının cari/KDV/stopaj koşulları (FN1 sütunları yoksa boş: sekme eski haliyle çalışır). */
+async function loadRuleTerms(supabase: SupabaseClient, ids: readonly string[]): Promise<Map<string, RuleTerms>> {
+  const out = new Map<string, RuleTerms>();
+  if (ids.length === 0) return out;
+  const { data, error } = await supabase.from("recurring_rules").select("id, party_id, vat_rate, withholding_rate").in("id", ids.slice(0, 500));
+  if (error) return out;
+  for (const r of (data ?? []) as { id: string; party_id: string | null; vat_rate: number | string | null; withholding_rate: number | string | null }[]) {
+    out.set(r.id, {
+      partyId: r.party_id,
+      vatRate: r.vat_rate == null ? null : Number(r.vat_rate),
+      withholdingRate: r.withholding_rate == null ? null : Number(r.withholding_rate),
+    });
+  }
+  return out;
+}
+
+async function loadPartyOptions(supabase: SupabaseClient): Promise<RulePartyOption[] | null> {
+  const { data, error } = await supabase.from("finance_parties").select("id, name, kind").is("archived_at", null).order("name", { ascending: true }).limit(500);
+  if (error) return null;
+  return ((data ?? []) as { id: string; name: string; kind: string }[]).map((p) => ({ id: p.id, name: p.name, kindLabel: PARTY_KIND_LABEL[p.kind] ?? "Cari" }));
+}
+
+async function DuzenliView({
+  supabase,
+  accounts,
+  scope,
+  ownerUserId,
+  today,
+  canCreate,
+  canEdit,
+  canDelete,
+  canSalary,
+  entriesHref,
+  onlyPending = false,
+}: LegacyDuzenliProps) {
   const { available, rules } = await loadRecurringRules(supabase, { scope, ownerUserId });
   if (!available) {
     return <EmptyState icon={Repeat} title="Düzenli ödemeler henüz etkin değil" description="Veritabanı güncellemesi uygulandığında bu bölüm açılır." tone="amber" />;
   }
-  const pending = await loadPendingOccurrences(supabase, rules);
+  const office = scope === "office";
+  // Bekleyenler, koşullar ve cariler birbirinden bağımsız: tek turda.
+  const [pending, terms, parties] = await Promise.all([
+    loadPendingOccurrences(supabase, rules),
+    office ? loadRuleTerms(supabase, rules.map((r) => r.id)) : Promise.resolve(new Map<string, RuleTerms>()),
+    office ? loadPartyOptions(supabase) : Promise.resolve(null),
+  ]);
   const options: AccountOption[] = accounts
     .filter((a) => !a.archived_at && a.owner_scope === scope)
     .map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
   const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const partyName = new Map((parties ?? []).map((p) => [p.id, p.name]));
   const visible = onlyPending ? rules.filter((r) => pending.some((p) => p.rule_id === r.id)) : rules;
   const allowCreate = canCreate || scope === "user";
   const allowEdit = canEdit || scope === "user";
   const allowDelete = canDelete || scope === "user";
+  // Ofis sekmesinde cari/KDV/stopaj alanları yalnız şema (finance_parties) varken açılır.
+  const partyOptions = office && parties ? parties : undefined;
+  const salary = canSalary && office;
+
+  const active = rules.filter((r) => r.active && r.next_due);
+  const monthlyOut = active.filter((r) => r.direction === "out").reduce((s, r) => s + monthlyEquivalent(r.amount, r.frequency), 0);
+  const monthlyIn = active.filter((r) => r.direction === "in").reduce((s, r) => s + monthlyEquivalent(r.amount, r.frequency), 0);
+  const base = `${FINANCE_PATH}?sekme=duzenli`;
+  const kpis: KpiItem[] = [
+    { label: "Aktif düzenli kayıt", value: active.length, icon: <Repeat />, tone: "info", href: base, hint: `${rules.length} tanım` },
+    { label: "Aylık düzenli gider", value: formatAccountMoney(Math.round(monthlyOut), "TRY"), icon: <TrendingDown />, tone: "warning", href: base, hint: monthlyIn > 0 ? `gelir ${formatAccountMoney(Math.round(monthlyIn), "TRY")}` : "aylık eşdeğer" },
+    { label: "Onay bekleyen", value: pending.length, icon: <Hourglass />, tone: pending.length > 0 ? "danger" : "neutral", href: `${base}&durum=bekleyen`, hint: "Bana sor ödemeleri", attention: pending.length > 0 },
+  ];
+
+  const editable = (r: RecurringRule): EditableRule => {
+    const t = terms.get(r.id);
+    return { id: r.id, title: r.title, amount: r.amount, accountId: r.account_id, payDay: r.pay_day, endDate: r.end_date, mode: r.mode, partyId: t?.partyId ?? null, vatRate: t?.vatRate ?? null, withholdingRate: t?.withholdingRate ?? null };
+  };
+  const rowProps = (r: RecurringRule) => ({
+    rule: r,
+    editable: editable(r),
+    terms: terms.get(r.id) ?? null,
+    partyLabel: terms.get(r.id)?.partyId ? (partyName.get(terms.get(r.id)!.partyId!) ?? null) : null,
+    accountName: accountById.get(r.account_id)?.name,
+    accountHref: entriesHref(r.account_id),
+    accounts: options,
+    parties: partyOptions,
+    today,
+    canSalary: salary,
+    canEdit: allowEdit,
+    canDelete: allowDelete,
+  });
 
   return (
     <div className="grid gap-6">
+      {office && rules.length > 0 ? <KpiStrip items={kpis} label="Düzenli ödeme özeti" /> : null}
       <div className="flex flex-wrap items-center gap-2">
-        {allowCreate ? <RuleFormButton accounts={options} canSalary={canSalary && scope === "office"} today={today} /> : null}
+        {allowCreate ? <RuleFormButton accounts={options} canSalary={salary} today={today} parties={partyOptions} /> : null}
+        {allowCreate && office ? (
+          <RuleFormButton accounts={options} canSalary={salary} today={today} parties={partyOptions ?? []} template="stopajli_kira" label="Stopajlı ofis kirası" />
+        ) : null}
         <p className="text-xs text-text-muted">
           Kira, portal üyeliği, muhasebe, maaş gibi her ay tekrarlayan ödemeleri bir kez tanımlayın. Geçmiş aylar için kayıt açılmaz.
         </p>
@@ -94,80 +192,83 @@ export async function DuzenliTab({
           title="Henüz düzenli ödeme yok"
           description="Ofis kirası, portal üyeliği veya muhasebe ücreti gibi her ay aynı gün ödediklerinizi tanımlayın; hesaba kendiliğinden işlensin ya da size sorulsun."
           tone="amber"
-          action={allowCreate ? { node: <RuleFormButton accounts={options} canSalary={canSalary && scope === "office"} today={today} /> } : undefined}
+          action={allowCreate ? { node: <RuleFormButton accounts={options} canSalary={salary} today={today} parties={partyOptions} /> } : undefined}
         />
       ) : (
         <>
-        <MobileCardList aria-label="Düzenli ödemeler">
-          {visible.map((r) => (
-            <RuleCard
-              key={r.id}
-              rule={r}
-              accountName={accountById.get(r.account_id)?.name}
-              accountHref={entriesHref(r.account_id)}
-              accounts={options}
-              today={today}
-              canSalary={canSalary && scope === "office"}
-              canEdit={allowEdit}
-              canDelete={allowDelete}
-            />
-          ))}
-        </MobileCardList>
-        <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
-          <table className="w-full min-w-[760px] text-sm">
-            <caption className="sr-only">Düzenli ödemeler</caption>
-            <thead>
-              <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
-                <th scope="col" className="px-4 py-2.5">Ad</th>
-                <th scope="col" className="px-4 py-2.5 text-right">Tutar</th>
-                <th scope="col" className="px-4 py-2.5">Sıklık</th>
-                <th scope="col" className="px-4 py-2.5">Sonraki tarih</th>
-                <th scope="col" className="px-4 py-2.5">Kip</th>
-                <th scope="col" className="px-4 py-2.5 text-right"><span className="sr-only">İşlemler</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((r) => (
-                <RuleRow
-                  key={r.id}
-                  rule={r}
-                  accountName={accountById.get(r.account_id)?.name}
-                  accountHref={entriesHref(r.account_id)}
-                  accounts={options}
-                  today={today}
-                  canSalary={canSalary && scope === "office"}
-                  canEdit={allowEdit}
-                  canDelete={allowDelete}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+          <MobileCardList aria-label="Düzenli ödemeler">
+            {visible.map((r) => (
+              <RuleCard key={r.id} {...rowProps(r)} />
+            ))}
+          </MobileCardList>
+          <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
+            <table className="w-full min-w-[760px] text-sm">
+              <caption className="sr-only">Düzenli ödemeler</caption>
+              <thead>
+                <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
+                  <th scope="col" className="px-4 py-2.5">Ad</th>
+                  <th scope="col" className="px-4 py-2.5 text-right">Tutar</th>
+                  <th scope="col" className="px-4 py-2.5">Sıklık</th>
+                  <th scope="col" className="px-4 py-2.5">Sonraki tarih</th>
+                  <th scope="col" className="px-4 py-2.5">Kip</th>
+                  <th scope="col" className="px-4 py-2.5 text-right"><span className="sr-only">İşlemler</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((r) => (
+                  <RuleRow key={r.id} {...rowProps(r)} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
+      {office && rules.length > 0 ? (
+        <p className="flex items-center gap-1.5 text-xs text-text-faint">
+          <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Aylık eşdeğer: 3 aylık ve yıllık ödemeler aylara bölünür. Stopajlı kirada brüt tutar kaydedilir; net ve stopaj ayrıca gösterilir.
+        </p>
+      ) : null}
     </div>
   );
 }
 
-function RuleRow({
-  rule: r,
-  accountName,
-  accountHref,
-  accounts,
-  today,
-  canSalary,
-  canEdit,
-  canDelete,
-}: {
+type RowProps = {
   rule: RecurringRule;
+  editable: EditableRule;
+  terms: RuleTerms | null;
+  partyLabel: string | null;
   accountName: string | undefined;
   accountHref: string;
   accounts: readonly AccountOption[];
+  parties: readonly RulePartyOption[] | undefined;
   today: string;
   canSalary: boolean;
   canEdit: boolean;
   canDelete: boolean;
-}) {
+};
+
+/** Cari + KDV + stopaj alt satırı (yalnız koşul varsa). */
+function TermsLine({ rule: r, terms, partyLabel }: Pick<RowProps, "rule" | "terms" | "partyLabel">) {
+  if (!terms || (!terms.partyId && !terms.vatRate && !terms.withholdingRate)) return null;
+  const wh = terms.withholdingRate ? rentWithholdingBreakdown(r.amount, terms.withholdingRate) : null;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+      {terms.partyId && partyLabel ? (
+        <Link href={`${FINANCE_PATH}?sekme=cari&cari=${terms.partyId}`} className="font-semibold text-accent-text hover:underline">
+          {partyLabel}
+        </Link>
+      ) : null}
+      {terms.vatRate ? <StatusPill tone="neutral" dot={false}>KDV %{terms.vatRate}</StatusPill> : null}
+      {wh && wh.withheld > 0 ? (
+        <span className="numeric">
+          brüt {formatAccountMoney(wh.gross, "TRY")} · stopaj %{terms.withholdingRate} {formatAccountMoney(wh.withheld, "TRY")} · net {formatAccountMoney(wh.net, "TRY")}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+function RuleRow({ rule: r, editable, terms, partyLabel, accountName, accountHref, accounts, parties, today, canSalary, canEdit, canDelete }: RowProps) {
   const ended = !r.active && !r.next_due;
   return (
     <tr className="border-b border-line last:border-b-0 hover:bg-surface-hover/40">
@@ -177,6 +278,7 @@ function RuleRow({
           <span>{r.direction === "in" ? "Gelir" : "Gider"} · {cashCategoryLabel(r.category)}</span>
           {accountName ? <Link href={accountHref} className="font-semibold text-accent-text hover:underline">{accountName}</Link> : null}
         </p>
+        <TermsLine rule={r} terms={terms} partyLabel={partyLabel} />
       </td>
       <td className={`numeric whitespace-nowrap px-4 py-3 text-right font-bold ${r.direction === "in" ? "text-success-strong" : "text-danger-strong"}`}>
         {r.direction === "in" ? "+" : "−"}
@@ -194,14 +296,7 @@ function RuleRow({
       </td>
       <td className="px-4 py-3 text-right">
         <span className="inline-flex flex-wrap items-center justify-end gap-1">
-          {canEdit && !ended ? (
-            <RuleFormButton
-              accounts={accounts}
-              canSalary={canSalary}
-              today={today}
-              rule={{ id: r.id, title: r.title, amount: r.amount, accountId: r.account_id, payDay: r.pay_day, endDate: r.end_date, mode: r.mode }}
-            />
-          ) : null}
+          {canEdit && !ended ? <RuleFormButton accounts={accounts} canSalary={canSalary} today={today} rule={editable} parties={parties} /> : null}
           <RuleRowActions ruleId={r.id} title={r.title} active={r.active} canEdit={canEdit && !ended} canDelete={canDelete} />
         </span>
       </td>
@@ -209,25 +304,7 @@ function RuleRow({
   );
 }
 
-function RuleCard({
-  rule: r,
-  accountName,
-  accountHref,
-  accounts,
-  today,
-  canSalary,
-  canEdit,
-  canDelete,
-}: {
-  rule: RecurringRule;
-  accountName: string | undefined;
-  accountHref: string;
-  accounts: readonly AccountOption[];
-  today: string;
-  canSalary: boolean;
-  canEdit: boolean;
-  canDelete: boolean;
-}) {
+function RuleCard({ rule: r, editable, terms, partyLabel, accountName, accountHref, accounts, parties, today, canSalary, canEdit, canDelete }: RowProps) {
   const ended = !r.active && !r.next_due;
   return (
     <MobileCard>
@@ -238,6 +315,7 @@ function RuleCard({
             <span>{r.direction === "in" ? "Gelir" : "Gider"} · {cashCategoryLabel(r.category)}</span>
             {accountName ? <Link href={accountHref} className="font-semibold text-accent-text hover:underline">{accountName}</Link> : null}
           </p>
+          <TermsLine rule={r} terms={terms} partyLabel={partyLabel} />
         </div>
         <p className={`numeric shrink-0 text-right font-bold ${r.direction === "in" ? "text-success-strong" : "text-danger-strong"}`}>
           {r.direction === "in" ? "+" : "−"}
@@ -250,14 +328,7 @@ function RuleCard({
         <StatusPill tone={r.mode === "auto" ? "success" : "info"} dot={false}>{RULE_MODE_LABEL[r.mode]}</StatusPill>
       </div>
       <div className="mt-2 flex flex-wrap items-center justify-end gap-1 border-t border-line pt-2">
-        {canEdit && !ended ? (
-          <RuleFormButton
-            accounts={accounts}
-            canSalary={canSalary}
-            today={today}
-            rule={{ id: r.id, title: r.title, amount: r.amount, accountId: r.account_id, payDay: r.pay_day, endDate: r.end_date, mode: r.mode }}
-          />
-        ) : null}
+        {canEdit && !ended ? <RuleFormButton accounts={accounts} canSalary={canSalary} today={today} rule={editable} parties={parties} /> : null}
         <RuleRowActions ruleId={r.id} title={r.title} active={r.active} canEdit={canEdit && !ended} canDelete={canDelete} />
       </div>
     </MobileCard>

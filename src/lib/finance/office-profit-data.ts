@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { loadManagementPnlInputs } from "@/lib/property-management/load";
+import { now, trMonthKey } from "@/lib/clock";
+import { monthBounds, pnlCashMonths, type PnlCashMonth, type PnlRaw } from "@/lib/finance/expense-budget";
 
 /**
  * Kâr/zarar sayfasının ORTAK ham verisi: son 12 ay komisyon (+ anlaşma sahibi danışman), komisyon payları ve giderler
@@ -30,6 +32,11 @@ export type OfficeProfitData = {
   /** Yönetim ücreti geliri (iptal edilmemiş tahsilatlardan); mülk yönetimi migration'ı yoksa boş. */
   fees: { date: string; amount: number }[];
   advisorNames: Record<string, string>;
+  /**
+   * Muhasebe v2 defter eki (finance_pnl): ay başına elle girilen gelir (hizmet bedeli, diğer gelir...) ve `expenses` dışı
+   * çıkışlar (maaş vb.). RPC henüz yoksa null: sayfa eski hesapla çalışır. Komisyon ve kira tahsilatı burada sayılmaz.
+   */
+  cashPnl?: PnlCashMonth[] | null;
 };
 
 type Rel<T> = T | T[] | null;
@@ -44,7 +51,7 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
     "office-profit",
     { tenantId, userId, scope: firstMonthKey },
     async () => {
-      const [commRes, expRes] = await Promise.all([
+      const [commRes, expRes, pnlRes] = await Promise.all([
         fetchAllRows<{
           id: string;
           created_at: string;
@@ -72,8 +79,11 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
             .order("id", { ascending: true })
             .range(from, to),
         ),
+        // Defter eki (elle girilen gelir + expenses dışı çıkışlar). RPC yoksa/hata verirse null: eski hesap aynen sürer.
+        Promise.resolve(supabase.rpc("finance_pnl", { p_from: `${firstMonthKey}-01`, p_to: monthBounds(trMonthKey(now())).to })).catch(() => ({ data: null, error: { message: "rpc" } })),
       ]);
       if (commRes.error || expRes.error) throw new Error("office-profit: okuma hatası");
+      const cashPnl = pnlRes.error ? null : pnlCashMonths((pnlRes.data ?? []) as PnlRaw[]);
 
       const commissions: OfficeProfitCommission[] = commRes.data.map((c) => ({
         id: c.id,
@@ -128,7 +138,7 @@ export const loadOfficeProfitData = cache(async (tenantId: string, userId: strin
         for (const p of (profiles ?? []) as { id: string; full_name: string | null }[]) advisorNames[p.id] = p.full_name ?? "Danışman";
       }
 
-      return { commissions, splits, expenses, fees: pm.fees, advisorNames };
+      return { commissions, splits, expenses, fees: pm.fees, advisorNames, cashPnl };
     },
     90,
   );
