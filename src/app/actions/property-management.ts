@@ -7,7 +7,7 @@ import { queueAuthorityExtensionSurvey } from "@/lib/surveys/events";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { parseEidsPropertyNo } from "@/lib/eids/property-no";
 import { shortAuthorityWarning } from "@/lib/eids/authority-term";
-import { now } from "@/lib/clock";
+import { now, trDayKey, DAY_MS } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type PropertyActionResult = { ok?: boolean; error?: string; warning?: string };
@@ -104,8 +104,8 @@ export async function getExpiringAuthorizations(daysAhead = 15) {
   if (!gate.ok) return [];
 
   const supabase = await createClient();
-  const future = new Date(Date.now() + daysAhead * 86_400_000).toISOString().slice(0, 10);
-  const today  = new Date().toISOString().slice(0, 10);
+  const future = trDayKey(now() + daysAhead * DAY_MS);
+  const today  = trDayKey();
 
   const { data } = await supabase
     .from("properties")

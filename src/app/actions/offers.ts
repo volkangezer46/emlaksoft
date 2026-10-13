@@ -12,6 +12,7 @@ import { validateTenantReferences } from "@/lib/tenant-references";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { trDayKey } from "@/lib/clock";
 
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
@@ -31,7 +32,7 @@ export async function createOffer(
   if (!propertyId) return { error: "Portföy seçimi zorunludur." };
   if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
   if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
-  if (validUntil && validUntil < new Date().toISOString().slice(0, 10)) {
+  if (validUntil && validUntil < trDayKey()) {
     return { error: "Teklif son tarihi geçmişte olamaz." };
   }
   if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
@@ -209,7 +210,7 @@ export async function updateOffer(
 
   if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
   if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
-  if (validUntil && validUntil < new Date().toISOString().slice(0, 10)) {
+  if (validUntil && validUntil < trDayKey()) {
     return { error: "Teklif son tarihi geçmişte olamaz." };
   }
   if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };

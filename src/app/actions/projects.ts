@@ -15,6 +15,7 @@ import {
   unitEditSchema,
 } from "@/lib/projects/edit-schemas";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { trDayKey } from "@/lib/clock";
 
 export type ProjectResult = { ok?: boolean; error?: string; id?: string };
 
@@ -853,7 +854,7 @@ export async function getProjectPaymentSummary(projectId: string): Promise<{
     return empty;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = trDayKey();
   const monthPrefix = today.slice(0, 7);
   let monthExpected = 0;
   let overdueCount = 0;

@@ -1,3 +1,4 @@
+import { trDayKey } from "@/lib/clock";
 export const EXPENSE_INPUT_LIMITS = {
   title: 160,
   notes: 2_000,
@@ -65,7 +66,7 @@ function isCalendarDate(value: string): boolean {
 
 export function parseExpenseForm(
   formData: FormData,
-  defaultDate = new Date().toISOString().slice(0, 10),
+  defaultDate = trDayKey(),
 ): ExpenseInputResult {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { ok: false, error: "Başlık zorunludur." };
