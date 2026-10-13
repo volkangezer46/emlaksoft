@@ -14,6 +14,11 @@
  *  Başka dosya değişmez: bilet kimliği (`OnboardingStepId`), atla çerezi, ilerleme halkası, komşu adımlar türetilir.
  */
 
+import type { AppAction, AppModule } from "@/lib/permissions";
+
+/** Adımı yapabilmek için gereken yetki (modül + eylem; `EffectivePermissions` ile denetlenir). */
+export type Permission = { module: AppModule; action: AppAction };
+
 /** Sihirbazın adım kararlarını besleyen gerçek veri özeti (sunucu `onboarding-state.ts` doldurur). */
 export type OnboardingFacts = {
   /** Ofisin ili/ilçesi ve açık adresi girildi mi (profil tamamlama `konum` maddeleri). */
@@ -50,7 +55,15 @@ export type OnboardingStepDef = {
    * gövde öncelikli; `href` yedek bağlantı olarak da durur.
    */
   href?: string;
+  /**
+   * Adımı yapabilmek için gereken yetki. Yoksa adım kişiseldir (herkes yapabilir). Ana ekran Başlangıç kartı, adım listesini ve
+   * yüzdeyi yalnız kullanıcının yapabildiği adımlardan hesaplar (`scopeOnboardingToPermissions`); danışmana
+   * "Ofis bilgilerin" ya da "Giderler ve kasa" gösterilmez.
+   */
+  requires?: Permission;
 };
+
+const SETTINGS_EDIT: Permission = { module: "settings", action: "edit" };
 
 /** Mülk Yönetimi (rentals) modülü sorusu; sihirbaz adımı ve Modüller ekranı aynı metni kullanır. */
 export const PROPERTY_MANAGEMENT_QUESTION = "Kiracı ve mülk sahibi adına kira/aidat takibi yapıyor musunuz?";
@@ -58,6 +71,7 @@ export const PROPERTY_MANAGEMENT_QUESTION = "Kiracı ve mülk sahibi adına kira
 export const ONBOARDING_STEP_DEFS = [
   {
     id: "office",
+    requires: SETTINGS_EDIT,
     short: "Ofis",
     title: "Ofis bilgilerin",
     description: "Ofis adı, şehir ve ilçe, adres; logo isteğe bağlı. Sözleşme, portal ve vitrinde görünür.",
@@ -72,6 +86,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "team",
+    requires: { module: "team", action: "create" },
     short: "Ekip",
     title: "Ekibini davet et",
     description: "Danışmanlarını e-posta ya da telefonla davet et; görev ve müşteri paylaşımı başlasın.",
@@ -79,6 +94,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "pool",
+    requires: SETTINGS_EDIT,
     short: "Havuz",
     title: "İlan havuzu ve atama",
     description: "Havuz açıkken gelen ilanlar uzmanlığa göre danışmanlara önerilir ve atanır.",
@@ -86,6 +102,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "portals",
+    requires: SETTINGS_EDIT,
     short: "Portallar",
     title: "Vitrin ve portallar",
     description: "İlanların vitrininde ve portallarda yayınlansın, talepler sana düşsün.",
@@ -93,6 +110,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "giderler-kasa",
+    requires: { module: "expenses", action: "edit" },
     short: "Giderler",
     title: "Giderler ve kasa",
     description: "Kira, muhasebe, portal üyeliği gibi aylık ödemelerini ve ofis kasanı bir kez tanımla; her ay kendiliğinden işlensin.",
@@ -101,6 +119,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "mulk-yonetimi",
+    requires: SETTINGS_EDIT,
     short: "Mülk yönetimi",
     title: "Mülk yönetimi (isteğe bağlı)",
     description: PROPERTY_MANAGEMENT_QUESTION,
@@ -109,6 +128,7 @@ export const ONBOARDING_STEP_DEFS = [
   },
   {
     id: "plan",
+    requires: { module: "billing", action: "edit" },
     short: "Paket",
     title: "Paketini seç (isteğe bağlı)",
     description: "Deneme süresince her şey açık; paketi şimdi seçebilir ya da denemeye devam edebilirsin.",

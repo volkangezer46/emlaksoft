@@ -47,9 +47,10 @@ export const TOURS: readonly TourDef[] = [
     steps: [
       {
         path: "/app",
-        selectors: ['[data-tour="kpi"]', '[data-tour="brifing"]'],
-        title: "Ofisinizin rakamları",
-        desc: "Müşteri, talep ve komisyon sayıları burada. Bir rakama dokunursanız o kayıtların listesi açılır.",
+        // Yalnız brifing paneli: anlatım ona göre yazıldı; panel yoksa çalıştırıcı adımı atlar (başka öğeye düşmez).
+        selectors: ['[data-tour="brifing"]'],
+        title: "Günün brifingi",
+        desc: "Karar bekleyenler, bugünün randevuları, geciken görevler ve aranacak müşteriler burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
       },
       {
         path: "/app/baslangic",

@@ -3,10 +3,14 @@ import {
   buildFirstTasks,
   buildOnboarding,
   resolveWizardStep,
+  scopeOnboardingToPermissions,
+  visibleFirstTasks,
   wizardNeighbors,
   type OnboardingFacts,
 } from "./onboarding-checklist";
 import { ONBOARDING_STEP_DEFS, ONBOARDING_STEP_IDS, resolveLegacyStep } from "./onboarding-steps";
+import { DEFAULT_MATRIX } from "./permissions";
+import type { EffectivePermissions } from "./permissions-effective";
 import { computeProfileCompletion, isOfficeLocationDone, type ProfileFacts } from "./profile-completion";
 
 const empty: OnboardingFacts = {
@@ -141,5 +145,39 @@ describe("ilk işler kontrol listesi (sihirbaz adımı değil)", () => {
     expect(none.every((t) => !t.done && t.href.startsWith("/app/"))).toBe(true);
     const some = buildFirstTasks({ customers: 3, properties: 0, demands: 1, appointments: 0, customDefinitions: 2 });
     expect(some.filter((t) => t.done).map((t) => t.id)).toEqual(["data", "demand", "defs"]);
+  });
+});
+
+describe("yetkiye göre Başlangıç kartı kapsamı", () => {
+  const advisor: EffectivePermissions = { ...DEFAULT_MATRIX.advisor };
+  const owner: EffectivePermissions = { ...DEFAULT_MATRIX.owner };
+
+  it("danışmanda yalnız kişisel adım kalır; yüzde ondan hesaplanır", () => {
+    const s = scopeOnboardingToPermissions(buildOnboarding(empty), advisor);
+    expect(s.steps.map((x) => x.id)).toEqual(["you"]);
+    expect(s.total).toBe(1);
+    expect(s.percent).toBe(0);
+    expect(s.nextId).toBe("you");
+    const titles = s.steps.map((x) => x.title);
+    expect(titles).not.toContain("Ofis bilgilerin");
+    expect(titles).not.toContain("Giderler ve kasa");
+  });
+
+  it("danışmanın kişisel adımı tamamsa kart için settled (gizlenir)", () => {
+    const s = scopeOnboardingToPermissions(buildOnboarding({ ...empty, youDone: true }), advisor);
+    expect(s.settled).toBe(true);
+    expect(s.percent).toBe(100);
+  });
+
+  it("ofis sahibi tüm adımları görür", () => {
+    const s = scopeOnboardingToPermissions(buildOnboarding(empty), owner);
+    expect(s.steps.map((x) => x.id)).toEqual([...ONBOARDING_STEP_IDS]);
+    expect(s.nextId).toBe("office");
+  });
+
+  it("'Tanımlarını gözden geçir' düzenleme yetkisi olmayana gösterilmez", () => {
+    const tasks = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
+    expect(visibleFirstTasks(tasks, advisor).map((t) => t.id)).not.toContain("defs");
+    expect(visibleFirstTasks(tasks, owner).map((t) => t.id)).toContain("defs");
   });
 });

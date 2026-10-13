@@ -5,6 +5,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { ICONS } from "@/lib/icons";
 import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
+import { scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboarding-checklist";
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
 import { SampleSeedButton } from "./sample-seed-button";
 import { afterFirstScreen, loadEmptyProbe, type HomeCtx } from "./data";
@@ -16,7 +17,8 @@ const MAX_TASKS = 3;
 
 /**
  * TEK "Başlangıç" kartı, TEK ilerleme halkası (tek Kurulum sihirbazı, `lib/onboarding-steps` kaydı). Eksik varken kısa:
- *  1) Kurulum halkası + sıradaki adım + eksik adım bağlantıları (şirket/profil ayrıntısı göstermez),
+ *  1) Kurulum halkası + sıradaki adım + eksik adım bağlantıları (şirket/profil ayrıntısı göstermez). Adımlar ve yüzde
+ *     yalnız kullanıcının YAPABİLDİĞİ adımlardan hesaplanır (`requires`); danışmanda yalnız kişisel adımlar kalır,
  *  2) "İlk işler" kontrol listesi (veri getir, ilk portföy, talep, randevu, tanımlar; sihirbaz adımı değil),
  *  3) Örnek veri durumu (kayıtta yüklenemediyse "yeniden dene", yüklüyse "gerçek kullanıma geç"),
  *  4) Boş ofiste müşteri/portföy ekle.
@@ -35,11 +37,12 @@ export async function BaslangicKarti({ ctx }: { ctx: HomeCtx }) {
   const showRetry = ctx.isManagement && jar.get(DEMO_SEED_FAILED_COOKIE)?.value === "1" && !seeded;
   const showSampleLive = !showRetry && canSettings && snap.counts.sampleCustomers > 0;
   const isEmpty = Boolean(probe && probe.customers === 0 && probe.properties === 0);
-  const { state } = snap;
+  // Yetkisi olmayan adım (ofis bilgileri, giderler, havuz, paket…) ne listelenir ne yüzdeye sayılır.
+  const state = scopeOnboardingToPermissions(snap.state, ctx.perms, snap.skipped);
   const nextStep = state.steps.find((s) => s.id === state.nextId) ?? null;
   const pendingSteps = state.steps.filter((s) => !s.done && !snap.skipped.includes(s.id)).slice(0, MAX_STEP_CHIPS);
-  const tasks = snap.firstTasks.filter((t) => !t.done).slice(0, MAX_TASKS);
-  const showWizard = !state.settled;
+  const tasks = visibleFirstTasks(snap.firstTasks, ctx.perms).filter((t) => !t.done).slice(0, MAX_TASKS);
+  const showWizard = state.total > 0 && !state.settled;
 
   if (!showWizard && !showRetry && !showSampleLive && tasks.length === 0 && !isEmpty) return null;
 
