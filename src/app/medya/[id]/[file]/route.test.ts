@@ -14,8 +14,8 @@ const media = {
 };
 
 const getSiteMediaView = vi.fn(async (id: string) => (id === ID ? media : null));
-const downloadVariant = vi.fn(async () => Buffer.from([1, 2, 3]));
-vi.mock("@/lib/site-media/store", () => ({ getSiteMediaView: (id: string) => getSiteMediaView(id), downloadVariant: () => downloadVariant() }));
+const downloadVariant = vi.fn(async (_id: string, _file: string) => Buffer.from([1, 2, 3]));
+vi.mock("@/lib/site-media/store", () => ({ getSiteMediaView: (id: string) => getSiteMediaView(id), downloadVariant: (id: string, file: string) => downloadVariant(id, file) }));
 
 import { GET } from "./route";
 
@@ -36,10 +36,23 @@ describe("/medya/[id]/[file] sunumu", () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(new Uint8Array([1, 2, 3]));
   });
 
-  it("bilinmeyen varyant, `..` içeren ad, bozuk kimlik ve bilinmeyen medya 404 (depoya gidilmez)", async () => {
+  it("Değiştir sonrası eski ad: aynı kimliğin aynı biçimdeki en yakın güncel varyantı KISA önbellekle sunulur", async () => {
+    for (const [file, expected, type] of [
+      ["960w-ffffffff.webp", "960w-0a1b2c3d.webp", "image/webp"],
+      ["1600w-0a1b2c3d.avif", "960w-0a1b2c3d.avif", "image/avif"],
+    ] as const) {
+      downloadVariant.mockClear();
+      const res = await call(ID, file);
+      expect(res.status, file).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=300");
+      expect(res.headers.get("content-type")).toBe(type);
+      expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(downloadVariant).toHaveBeenCalledWith(ID, expected);
+    }
+  });
+
+  it("`..` içeren ad, bozuk kimlik ve bilinmeyen medya 404 (depoya gidilmez)", async () => {
     for (const [id, file] of [
-      [ID, "1600w-0a1b2c3d.avif"], // desene uyar ama kayıtlı değil
-      [ID, "960w-ffffffff.webp"],
       [ID, "../secret.avif"],
       [ID, "..%2F960w-0a1b2c3d.avif"],
       [ID, "960w-0a1b2c3d.avif/.."],
