@@ -299,6 +299,8 @@ const F = {
   readyProbesPgCatalog: "20261013000400_ready_probes_pg_catalog.sql",
   // AP7 (2026-10-13): platform MRR gunluk anlik goruntusu (yeni tablo; yalniz public.tenants'a FK).
   platformMrrDaily: "20261013001000_platform_mrr_daily.sql",
+  // SP4 (2026-10-13): hiz merkezi laboratuvar olcumleri (yeni tablo; FK yok, yalniz service_role).
+  perfLabRuns: "20261013003300_perf_lab_runs.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -505,6 +507,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.rlsInitplanFsboStaff]: "davranis", // 24 politikada satir-bagimsiz yardimci cagrilari (select fn()) ile sarilir (InitPlan); anlam/rol/komut ayni, plan degisir
     [F.tenantIndexesDedupe]: "ek", // 11 kopya indeks dusurulur (benzersiz kisit ikizleri) + 12 tabloya tenant_id indeksi; veri/politika degismez
     [F.readyProbesPgCatalog]: "davranis", // plan_upgrade_ready/subscription_pause_ready sutun sayimi information_schema yerine pg_attribute; imza/ACL/sonuc ayni
+    [F.perfLabRuns]: "ek", // yeni tablo perf_lab_runs (RLS acik, politika yok, yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "migration bekliyor" / cron "atlandi"
     [F.platformMrrDaily]: "ek", // yeni tablo platform_mrr_daily (RLS: platform personeli billing/reports rolleri SELECT; yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "veri yok"
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
@@ -690,6 +693,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // order 59 bilerek bos: ACL onarimi migration degil (tek seferlik betik + npm run check:acl).
     { id: "DB1-rls-initplan-fsbo-staff", order: 60, title: "RLS InitPlan sarmasi: fsbo_*, platform personeli ve destek v2 politikalari (20261012002800 SONRASI; anlam ayni, davranis)", files: [F.rlsInitplanFsboStaff] },
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
+    { id: "SP4-hiz-laboratuvari", order: 64, title: "Hiz merkezi laboratuvar olcumleri perf_lab_runs (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'migration bekliyor'; sira serbest, ek)", files: [F.perfLabRuns] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },

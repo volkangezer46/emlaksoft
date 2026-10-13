@@ -52,11 +52,11 @@ Etkin izin `permissions-effective.ts`'te birleşir; sunucu kapıları `requirePe
 `requireModulePage` (sayfa). Platform staff kendi ops oturumunda geçer, impersonation'da readonly.
 SQL tarafı `current_tenant_id()` JWT claim'i ile RLS (migration 002, role-aware 016).
 
-## Cron envanteri (37 — `vercel.json` + `src/app/api/cron/*`, sayı `npm run check:cron` ile doğrulanır)
+## Cron envanteri (38 — `vercel.json` + `src/app/api/cron/*`, sayı `npm run check:cron` ile doğrulanır)
 
 Bildirim/özet: `gunluk-ozet` (07:00) · `haftalik-ozet` (pzt 07:30) · `randevu-hatirlat` (30 dk) · `gorev-hatirlat` (2 s) · `dogum-gunu` (08:00) · `vitrin-eslesme` (10:00 kayıtlı arama) · `vitrin-alarm` (10:30) · `anahtar-gecikme` (09:00) · `campaign-delivery` (2 dk).
 İlan/kayıp-kaçak: `portal-teyit` (6 s ilan teyidi) · `leak-sla` (saatlik: kaçan komisyon SLA'sı + İlan Kontrol anomali SLA yükseltmesi, tek zincir).
-Motorlar/veri: `otomasyon` (06/14) · `bolge-snapshot` (aylık) · `lig-snapshot` (aylık, önceki ay TR takvimi) · `tcmb-kur` (13:30 hafta içi) · `kira-tahakkuk` (05:00) · `proje-vade` (05:30) · `geo-sync` (3 aylık) · `geo-province-sync` (5 dk).
+Motorlar/veri: `otomasyon` (06/14) · `bolge-snapshot` (aylık) · `lig-snapshot` (aylık, önceki ay TR takvimi) · `tcmb-kur` (13:30 hafta içi) · `kira-tahakkuk` (05:00) · `proje-vade` (05:30) · `geo-sync` (3 aylık) · `geo-province-sync` (5 dk) · `hiz-robotu` (02:55, PageSpeed laboratuvar ölçümü → `perf_lab_runs`).
 Platform/faturalama: `abonelik-kontrol` (gece yarısı) · `dunning` (09:00) · `billing-reconciliation` (10 dk) · `ticket-sla` (5 dk) · `ticket-attachment-cleanup` · `operational-retention` · `direct-file-upload-cleanup` · `public-mutation-outbox` (2 dk).
 SEO: `seo-robot` (04:20, yalnız kendi alan adını tarar).
 Kontör: `ef-kontor-hak` (günlük 04:10 TR; plan `efCreditsMonthly` aylık hibe + hoş geldin kontörü; `ef_credit_ready()` değilse atlar, past_due/askıda/modül kapalı ofis hak almaz).

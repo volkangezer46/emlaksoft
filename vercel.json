@@ -150,6 +150,10 @@
       "schedule": "12,42 * * * *"
     },
     {
+      "path": "/api/cron/hiz-robotu",
+      "schedule": "55 2 * * *"
+    },
+    {
       "path": "/api/cron/yayin-zamanlayici",
       "schedule": "*/5 * * * *"
     }
