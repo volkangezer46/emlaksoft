@@ -84,14 +84,14 @@ export function evaluateBackup(raw: string | null | undefined, nowMs: number): B
     issues.push({
       tone: "danger",
       title: "Yedek şifresiz",
-      action: "Sunucuda age kurun ve BACKUP_AGE_RECIPIENT (age1… açık anahtar) tanımlayın; gizli anahtar sunucuda tutulmaz.",
+      action: "Sistem Ayarları Merkezi > Sağlık ve izleme'de \"Yedek şifreleme açık anahtarı\" (age1…) girin; gizli anahtar sunucuda tutulmaz.",
     });
   }
   if (!record.remote) {
     issues.push({
       tone: "danger",
       title: "Uzak kopya yok",
-      action: "Yedekler yalnız bu sunucuda. BACKUP_REMOTE (Storage Box) tanımlayıp ssh anahtarını kurun.",
+      action: "Yedekler yalnız bu sunucuda. Sistem Ayarları Merkezi'nde uzak kopya türü ve hedefini (Storage Box ya da S3/rclone) girin; ssh anahtarı/rclone yapılandırması sunucuda kurulur.",
     });
   }
   if (record.storageObjects !== null && record.archiveFiles !== null && record.storageObjects !== record.archiveFiles) {
