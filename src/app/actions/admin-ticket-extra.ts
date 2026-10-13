@@ -8,6 +8,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { TICKET_LIMITS, isUuid } from "@/lib/support/ticket-contract";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { canEditMacros, macroActionsFromForm } from "@/lib/support/macro-template";
+import { isMissingRelationError } from "@/lib/support/desk-data";
 
 export type MacroEditResult = { ok?: boolean; error?: string };
 
@@ -27,10 +29,10 @@ export async function searchTicketTenants(query: string): Promise<ComboboxOption
   return data.map((t) => ({ value: t.id, label: t.name, hint: `/${t.slug} · ${t.status}` }));
 }
 
-/** Hazır yanıtı düzenler (başlık + metin) — yalnızca süper admin. */
+/** Hazır yanıtı düzenler (başlık + metin + eylemler) — süper admin, operasyon ve müşteri temsilcisi (AD9). */
 export async function updateTicketMacro(formData: FormData): Promise<MacroEditResult> {
   const staff = await requirePlatformModule("tickets");
-  if (staff.role !== "super_admin") return { error: "Yalnızca süper admin makro düzenleyebilir." };
+  if (!canEditMacros(staff.role)) return { error: "Hazır yanıtları yalnız destek ekibi düzenleyebilir." };
   const rl = await checkRateLimit(`ticket-macro-edit:${staff.id}`, { limit: 40, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yapıldı. Lütfen kısa bir süre sonra yeniden deneyin." };
   const id = String(formData.get("id") ?? "").trim();
@@ -41,8 +43,20 @@ export async function updateTicketMacro(formData: FormData): Promise<MacroEditRe
   if (title.length > TICKET_LIMITS.macroTitleMax || body.length > TICKET_LIMITS.macroBodyMax) {
     return { error: "Hazır yanıt izin verilen uzunluğu aşıyor." };
   }
+  const parsedActions = macroActionsFromForm((name) => String(formData.get(name) ?? ""));
+  if (parsedActions.error) return { error: parsedActions.error };
   const admin = createAdminClient();
-  const { data, error } = await admin.from("ticket_macros").update({ title, body }).eq("id", id).select("id").maybeSingle();
+  let result = await admin
+    .from("ticket_macros")
+    .update({ title, body, actions_json: parsedActions.actions, updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  // Migration öncesi (actions_json yok): yalnız başlık + metin.
+  if (result.error && isMissingRelationError(result.error)) {
+    result = await admin.from("ticket_macros").update({ title, body }).eq("id", id).select("id").maybeSingle();
+  }
+  const { data, error } = result;
   if (error) {
     console.error("updateTicketMacro", error.message);
     return { error: actionErrorMessage(error, "Makro güncellenemedi.") };

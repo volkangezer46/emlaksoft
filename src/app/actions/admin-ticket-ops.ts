@@ -16,6 +16,8 @@ import {
   validateTicketCategory,
 } from "@/lib/support/ticket-contract";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { canEditMacros, macroActionsFromForm } from "@/lib/support/macro-template";
+import { isMissingRelationError } from "@/lib/support/desk-data";
 
 export type AdminTicketOpsResult = {
   error?: string;
@@ -140,7 +142,7 @@ export async function assignTicketStaff(formData: FormData): Promise<AdminTicket
       body: "Destek kuyruğunuzda yeni bir sorumluluk var.",
       href: `/admin/tickets/${id}`,
       kind: "info",
-      roles: ["super_admin", "ops", "support"],
+      roles: ["super_admin", "ops", "support", "billing"],
       meta: { ticket_id: id },
     });
   }
@@ -209,29 +211,41 @@ export async function bulkUpdateTickets(
   return { ok: true, updated };
 }
 
-/** Hazır yanıt makrosu ekler — yalnızca süper admin. */
+/** Hazır yanıt makrosu ekler — süper admin, operasyon ve müşteri temsilcisi (AD9). */
 export async function createTicketMacro(formData: FormData): Promise<AdminTicketOpsResult> {
   const staff = await requirePlatformModule("tickets");
-  if (staff.role !== "super_admin") return { error: "Yalnızca süper admin makro ekleyebilir." };
+  if (!canEditMacros(staff.role)) return { error: "Hazır yanıtları yalnız destek ekibi düzenleyebilir." };
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   if (!title || !body) return { error: "Başlık ve içerik zorunlu." };
   if (title.length > TICKET_LIMITS.macroTitleMax || body.length > TICKET_LIMITS.macroBodyMax) {
     return { error: "Hazır yanıt izin verilen uzunluğu aşıyor." };
   }
+  const parsedActions = macroActionsFromForm((name) => String(formData.get(name) ?? ""));
+  if (parsedActions.error) return { error: parsedActions.error };
 
   const admin = createAdminClient();
-  const { data, error } = await admin.from("ticket_macros").insert({ title, body, created_by: staff.id }).select("id").single();
+  let result = await admin
+    .from("ticket_macros")
+    .insert({ title, body, created_by: staff.id, actions_json: parsedActions.actions })
+    .select("id")
+    .single();
+  // Migration öncesi (actions_json yok): eylemsiz kaydet, metin kaybolmasın.
+  if (result.error && isMissingRelationError(result.error)) {
+    result = await admin.from("ticket_macros").insert({ title, body, created_by: staff.id }).select("id").single();
+  }
+  const { data, error } = result;
   if (error || !data) return { error: actionErrorMessage(error, "Makro eklenemedi.") };
   await logPlatformActivity({ actorId: staff.id, action: "ticket.macro.create", entityType: "ticket_macro", entityId: data.id });
   revalidateTicketPages();
+  revalidatePath("/admin/tickets/makrolar");
   return { ok: true };
 }
 
-/** Hazır yanıt makrosu siler — yalnızca süper admin. */
+/** Hazır yanıt makrosu siler — süper admin, operasyon ve müşteri temsilcisi (AD9). */
 export async function deleteTicketMacro(formData: FormData): Promise<AdminTicketOpsResult> {
   const staff = await requirePlatformModule("tickets");
-  if (staff.role !== "super_admin") return { error: "Yalnızca süper admin makro silebilir." };
+  if (!canEditMacros(staff.role)) return { error: "Hazır yanıtları yalnız destek ekibi silebilir." };
   const id = String(formData.get("id") ?? "").trim();
   if (!isUuid(id)) return { error: "Makro bulunamadı." };
 

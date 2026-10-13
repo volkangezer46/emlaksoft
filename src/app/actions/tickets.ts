@@ -21,6 +21,7 @@ import {
   validateTicketSubject,
 } from "@/lib/support/ticket-contract";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { sendTicketReplyEmail } from "@/lib/support/reply-email";
 
 export type TicketResult = {
   error?: string;
@@ -117,7 +118,8 @@ async function notifySupportQueue(payload: TicketMutationPayload, title: string,
     href: `/admin/tickets/${payload.ticketId}`,
     kind,
     staffId: payload.assignedStaffId ?? undefined,
-    roles: [...QUEUE_ROLES],
+    // Atanan kişi muhasebe olabilir (AD9: Faturalama kuralı); atanmamışsa yalnız destek kuyruğu rolleri.
+    roles: payload.assignedStaffId ? [...QUEUE_ROLES, "billing"] : [...QUEUE_ROLES],
     meta: { ticket_id: payload.ticketId, ticket_no: payload.ticketNo },
   });
 }
@@ -309,7 +311,17 @@ export async function replyTicketAsStaff(
   if (error || !payload) return { error: rpcFailure("replyTicketAsStaff", error, "Yanıt eklenemedi.") };
 
   if (!payload.already && visibilityRaw === "public") {
-    await notifyTicketRequester(payload, "Destek ekibinden yeni yanıt");
+    // Uygulama içi bildirim + (ayar ve e-posta kanalı açıksa) e-posta; e-posta hatası yanıtı bozmaz.
+    await Promise.all([
+      notifyTicketRequester(payload, "Destek ekibinden yeni yanıt"),
+      sendTicketReplyEmail({
+        ticketId: payload.ticketId,
+        ticketNo: payload.ticketNo,
+        subject: payload.subject,
+        createdBy: payload.createdBy,
+        body,
+      }),
+    ]);
   }
   revalidateTicket(id);
   return publicResult(payload);

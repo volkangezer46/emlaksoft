@@ -224,6 +224,7 @@ export default async function AdminTicketsPage({
     kategori?: string;
     atanan?: string;
     tenant?: string;
+    etiket?: string;
     sla?: string;
     sirala?: string;
     yon?: string;
@@ -260,6 +261,7 @@ export default async function AdminTicketsPage({
   if (filters.oncelik) listQuery = listQuery.eq("priority", filters.oncelik);
   if (filters.kategori) listQuery = listQuery.eq("category", filters.kategori);
   if (filters.tenant) listQuery = listQuery.eq("tenant_id", filters.tenant);
+  if (filters.etiket) listQuery = listQuery.contains("tags", [filters.etiket]);
   if (filters.atanan === "atanmadi") listQuery = listQuery.is("assigned_staff_id", null);
   else if (filters.atanan) listQuery = listQuery.eq("assigned_staff_id", filters.atanan);
 
@@ -323,7 +325,7 @@ export default async function AdminTicketsPage({
       .from("platform_staff")
       .select("id, full_name")
       .eq("is_active", true)
-      .in("role", ["super_admin", "ops", "support"])
+      .in("role", ["super_admin", "ops", "support", "billing"])
       .order("full_name"),
     admin
       .from("tenants")
@@ -459,7 +461,7 @@ export default async function AdminTicketsPage({
     .map(({ value, label }) => ({ value, label }));
   const categoryLabels = Object.fromEntries(categoryOptions.map((category) => [category.value, category.label]));
   const statusOptions = TICKET_STATUS_KEYS.map((status) => ({ value: status, label: TICKET_STATUS_LABEL[status] }));
-  const filtered = Boolean(filters.q || filters.durum || filters.oncelik || filters.kategori || filters.atanan || filters.tenant || filters.sla);
+  const filtered = Boolean(filters.q || filters.durum || filters.oncelik || filters.kategori || filters.atanan || filters.tenant || filters.etiket || filters.sla);
   const hrefFor = (patch: Partial<Record<keyof TicketListFilters, string | number | null | undefined>>) =>
     buildTicketListHref(filters, patch);
   const metricHrefFor = (patch: Partial<Record<keyof TicketListFilters, string | number | null | undefined>> = {}) =>
@@ -617,6 +619,7 @@ export default async function AdminTicketsPage({
         >
           {filters.durum ? <input type="hidden" name="durum" value={filters.durum} /> : null}
           {filters.tenant ? <input type="hidden" name="tenant" value={filters.tenant} /> : null}
+          {filters.etiket ? <input type="hidden" name="etiket" value={filters.etiket} /> : null}
           {filters.sla ? <input type="hidden" name="sla" value={filters.sla} /> : null}
           <div className="relative min-w-0 sm:col-span-2 xl:col-span-2 2xl:col-span-1">
             <label htmlFor="ticket-search" className="mb-1 block text-xs font-bold uppercase tracking-[0.05em] text-text-faint">Ara</label>
@@ -708,6 +711,11 @@ export default async function AdminTicketsPage({
             {selectedTenant ? (
               <Link href={hrefFor({ tenant: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/[0.08] px-2.5 py-1 text-xs font-bold text-brand-700">
                 {selectedTenant.name} <X className="h-3 w-3" aria-hidden />
+              </Link>
+            ) : null}
+            {filters.etiket ? (
+              <Link href={hrefFor({ etiket: null })} className="focus-ring inline-flex items-center gap-1 rounded-full bg-brand-600/[0.08] px-2.5 py-1 text-xs font-bold text-brand-700">
+                #{filters.etiket} <X className="h-3 w-3" aria-hidden />
               </Link>
             ) : null}
             {filters.sla ? (

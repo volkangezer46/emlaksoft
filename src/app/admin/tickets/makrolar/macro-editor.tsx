@@ -9,10 +9,34 @@ import { createTicketMacro, deleteTicketMacro } from "@/app/actions/admin-ticket
 import { updateTicketMacro } from "@/app/actions/admin-ticket-extra";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
+import { Combobox } from "@/components/ui/combobox";
+import { MACRO_VARIABLES, type MacroActions } from "@/lib/support/macro-template";
 
-export type MacroRow = { id: string; title: string; body: string };
+export type MacroRow = {
+  id: string;
+  title: string;
+  body: string;
+  actions: MacroActions;
+  /** Eylem özetinin okunur satırları (sunucuda hazırlanır). */
+  actionSummary: string[];
+  useCount: number;
+};
+export type StaffOption = { value: string; label: string };
 
-function MacroPanel({ macro, canEdit }: { macro?: MacroRow; canEdit: boolean }) {
+const selectClass =
+  "focus-ring h-10 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm text-ink-950 outline-none focus:border-brand-400";
+
+function MacroPanel({
+  macro,
+  canEdit,
+  extended,
+  staff,
+}: {
+  macro?: MacroRow;
+  canEdit: boolean;
+  extended: boolean;
+  staff: StaffOption[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -53,7 +77,10 @@ function MacroPanel({ macro, canEdit }: { macro?: MacroRow; canEdit: boolean }) 
           <Pencil className="h-3.5 w-3.5 text-brand-600" /> {macro ? "Düzenle" : "Yeni hazır yanıt"}
         </Button>
       )}
-      tabs={[{ id: "makro", label: "Makro", fields: ["title", "body"] }]}
+      tabs={[
+        { id: "makro", label: "Makro", fields: ["title", "body"] },
+        ...(extended ? [{ id: "eylem", label: "Eylemler", fields: ["action_status", "action_priority", "action_assign", "action_tags"] }] : []),
+      ]}
       panels={{
         makro: (
           <>
@@ -63,6 +90,55 @@ function MacroPanel({ macro, canEdit }: { macro?: MacroRow; canEdit: boolean }) 
             <FormField label="Yanıt metni" htmlFor={`macro-body-${k}`} required className="sm:col-span-2">
               <FormTextarea id={`macro-body-${k}`} name="body" required minLength={3} maxLength={5000} rows={6} defaultValue={macro?.body ?? ""} />
             </FormField>
+            <p className="text-xs text-text-muted sm:col-span-2">
+              Değişkenler:{" "}
+              {MACRO_VARIABLES.map((v, i) => (
+                <span key={v.key}>
+                  {i ? " · " : ""}
+                  <code className="rounded bg-canvas px-1 font-mono">{`{{${v.key}}}`}</code> {v.label.toLocaleLowerCase("tr-TR")}
+                </span>
+              ))}
+            </p>
+          </>
+        ),
+        eylem: (
+          <>
+            <FormField label="Durum" htmlFor={`macro-status-${k}`}>
+              <select id={`macro-status-${k}`} name="action_status" defaultValue={macro?.actions.status ?? ""} className={selectClass}>
+                <option value="">Değiştirme</option>
+                <option value="open">Açık</option>
+                <option value="in_progress">İşleniyor</option>
+                <option value="waiting">Yanıt bekliyor</option>
+              </select>
+            </FormField>
+            <FormField label="Öncelik" htmlFor={`macro-priority-${k}`}>
+              <select id={`macro-priority-${k}`} name="action_priority" defaultValue={macro?.actions.priority ?? ""} className={selectClass}>
+                <option value="">Değiştirme</option>
+                <option value="low">Düşük</option>
+                <option value="normal">Normal</option>
+                <option value="high">Yüksek</option>
+                <option value="urgent">Acil</option>
+              </select>
+            </FormField>
+            <FormField label="Atama" htmlFor={`macro-assign-${k}`}>
+              <Combobox
+                id={`macro-assign-${k}`}
+                name="action_assign"
+                aria-label="Atama eylemi"
+                defaultValue={macro?.actions.assign ?? ""}
+                placeholder="Değiştirme"
+                searchPlaceholder="Personel ara…"
+                options={[
+                  { value: "me", label: "Uygulayan kişiye ata" },
+                  { value: "none", label: "Atamayı kaldır" },
+                  ...staff,
+                ]}
+              />
+            </FormField>
+            <FormField label="Etiket ekle (virgülle)" htmlFor={`macro-tags-${k}`}>
+              <FormInput id={`macro-tags-${k}`} name="action_tags" maxLength={300} placeholder="fatura, iade" defaultValue={macro?.actions.addTags?.join(", ") ?? ""} />
+            </FormField>
+            <p className="text-xs text-text-muted sm:col-span-2">Eylemler, makroyla hazırlanan yanıt gönderildiğinde talebe uygulanır. Çözüm ve kapatma çözüm özeti istediği için makroyla yapılmaz.</p>
           </>
         ),
       }}
@@ -110,21 +186,41 @@ function DeleteMacro({ id, title }: { id: string; title: string }) {
   );
 }
 
-export function MacroList({ macros, canEdit }: { macros: MacroRow[]; canEdit: boolean }) {
+export function MacroList({
+  macros,
+  canEdit,
+  extended,
+  staff,
+}: {
+  macros: MacroRow[];
+  canEdit: boolean;
+  extended: boolean;
+  staff: StaffOption[];
+}) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-2"><MacroPanel canEdit={canEdit} /></div>
+      <div className="flex flex-wrap items-start gap-2"><MacroPanel canEdit={canEdit} extended={extended} staff={staff} /></div>
       {macros.length === 0 ? (
         <EmptyState icon={Pencil} title="Henüz hazır yanıt yok" description="Sık verilen cevapları makro olarak kaydedin; destek taleplerinde tek tıkla kullanın." />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
           {macros.map((m) => (
             <li key={m.id} className="space-y-2 px-5 py-3">
-              <p className="text-sm font-semibold text-ink-950">{m.title}</p>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-semibold text-ink-950">{m.title}</p>
+                {extended ? <span className="text-xs tabular-nums text-text-faint">{m.useCount.toLocaleString("tr-TR")} kullanım</span> : null}
+              </div>
               <p className="whitespace-pre-line text-xs text-text-muted">{m.body}</p>
+              {m.actionSummary.length ? (
+                <p className="flex flex-wrap gap-1.5">
+                  {m.actionSummary.map((a) => (
+                    <span key={a} className="rounded-full border border-line bg-canvas px-2 py-0.5 text-xs text-text-muted">{a}</span>
+                  ))}
+                </p>
+              ) : null}
               {canEdit ? (
                 <div className="flex flex-wrap items-start gap-2">
-                  <MacroPanel macro={m} canEdit />
+                  <MacroPanel macro={m} canEdit extended={extended} staff={staff} />
                   <DeleteMacro id={m.id} title={m.title} />
                 </div>
               ) : null}
