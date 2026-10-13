@@ -133,3 +133,80 @@ export async function notifyTenant(input: {
     });
   }
 }
+
+export type BulkNotifyItem = {
+  /** Çağıranın satır anahtarı (ör. duyuru teslim id'si); sonuç bu anahtarla döner. */
+  key: string;
+  tenantId: string;
+  userId: string;
+  title: string;
+  body?: string;
+  href?: string;
+  kind?: "info" | "success" | "warning" | "danger" | "system";
+  /** notifyTenant ile aynı anlam: kullanıcı bu türü AÇIKÇA kapattıysa satır yazılmaz (skipped). */
+  prefKey?: NotifPrefKey;
+  meta?: Record<string, unknown>;
+};
+
+export type BulkNotifyResult = { ok: true; notificationId: string } | { ok: false; skipped?: boolean; error: string };
+
+/**
+ * Toplu, KULLANICIYA ÖZEL bildirim (platform duyuru kuyruğu): notifyTenant'ın userId + prefKey kurallarını
+ * satır başına uygular ama TEK profil okuması ve parça başına TEK insert ile (200 ofis x N kullanıcı birkaç turda).
+ * Push göndermez (duyurunun ayrı push kanalı vardır). Ofisin "kapalı" varsayılanı burada uygulanmaz: ticari ileti
+ * (marketing) çağıranda AÇIK kullanıcı izniyle süzülür, diğer duyurular ofis varsayılanına bağlı değildir.
+ * İstemci OLUŞTURMAZ: çağıranın service_role istemcisini alır.
+ */
+export async function notifyUsersBulk(
+  admin: ReturnType<typeof createAdminClient>,
+  items: readonly BulkNotifyItem[],
+): Promise<Map<string, BulkNotifyResult>> {
+  const out = new Map<string, BulkNotifyResult>();
+  if (items.length === 0) return out;
+  const userIds = [...new Set(items.map((i) => i.userId))];
+  const { data: profiles, error } = await admin
+    .from("profiles")
+    .select("id, tenant_id, notification_prefs")
+    .in("id", userIds)
+    .eq("is_active", true);
+  if (error) {
+    for (const i of items) out.set(i.key, { ok: false, error: "Bildirim hedefi doğrulanamadı." });
+    return out;
+  }
+  type P = { id: string; tenant_id: string; notification_prefs: Record<string, unknown> | null };
+  const byId = new Map(((profiles ?? []) as P[]).map((p) => [p.id, p]));
+  const rows: { id: string; key: string; row: Record<string, unknown> }[] = [];
+  for (const i of items) {
+    const p = byId.get(i.userId);
+    if (!p || p.tenant_id !== i.tenantId) {
+      out.set(i.key, { ok: false, skipped: true, error: "Kullanıcı bu ofiste aktif değil" });
+      continue;
+    }
+    const prefs = p.notification_prefs;
+    if (i.prefKey && prefs && typeof prefs === "object" && prefs[i.prefKey] === false) {
+      out.set(i.key, { ok: false, skipped: true, error: "Kullanıcı bu bildirim türünü kapattı" });
+      continue;
+    }
+    const id = crypto.randomUUID();
+    rows.push({
+      id,
+      key: i.key,
+      row: {
+        id,
+        tenant_id: i.tenantId,
+        user_id: i.userId,
+        title: i.title,
+        body: i.body ?? null,
+        href: i.href ?? null,
+        kind: i.kind ?? "info",
+        ...(i.meta ? { meta: i.meta } : {}),
+      },
+    });
+  }
+  for (let s = 0; s < rows.length; s += 500) {
+    const chunk = rows.slice(s, s + 500);
+    const { error: insErr } = await admin.from("notifications").insert(chunk.map((c) => c.row));
+    for (const c of chunk) out.set(c.key, insErr ? { ok: false, error: "Bildirim kalıcılaştırılamadı." } : { ok: true, notificationId: c.id });
+  }
+  return out;
+}

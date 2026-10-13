@@ -1,10 +1,11 @@
 import { SETTING_CATEGORIES, type AnySettingDef, type SettingCategoryId } from "../types";
 import { BILLING_SETTING_DEFS } from "./billing";
+import { BROADCAST_SETTING_DEFS } from "./broadcast";
 import { PLATFORM_SETTING_DEFS } from "./platform";
 import { TENANT_SETTING_DEFS } from "./tenant";
 
 /** Tum ayar tanimlari (TEK kaynak). Ofis tanimlari tenant.ts; faturalama ek bayraklari billing.ts; sube/kullanici sonraki pakette. */
-export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...TENANT_SETTING_DEFS];
+export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...BROADCAST_SETTING_DEFS, ...TENANT_SETTING_DEFS];
 
 const BY_KEY = new Map<string, AnySettingDef>();
 const BY_STORAGE = new Map<string, AnySettingDef>();
