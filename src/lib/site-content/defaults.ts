@@ -2,6 +2,8 @@ import { PIONEER_CLAIM } from "./claims";
 import type { SiteContent } from "./schema";
 // Otomatik görev sayısı cron envanterinden türetilir (sabit sayı yazılmaz; check:cron ile doğrulanır).
 import { CRON_JOBS } from "@/lib/cron-jobs";
+import { findGate } from "@/lib/billing/page-gates";
+import { getPlan } from "@/lib/billing/plans";
 
 /**
  * Hiç yayın yokken siteyi BUGÜNKÜ metinle gösteren varsayılan içerik. Ana sayfa bileşenleri bu metinleri artık
@@ -9,6 +11,15 @@ import { CRON_JOBS } from "@/lib/cron-jobs";
  * Değişkenler ({deneme}, {yillik} ...) tokens.ts'te çözülür. Bölüm kimlikleri (id) ikon/yapı eşlemesi içindir; değiştirilmez.
  */
 const p = (id: string, text: string, gate = "") => ({ id, text, gate, hidden: false });
+
+/**
+ * Kayıp-kaçak cümlesinin paket etiketi fiyat kuralından türer (page-gates `minPlan` + plans.ts adı; elle yazılmaz):
+ * " (Profesyonel pakette)". Özellik en düşük pakette açılırsa etiket kendiliğinden kalkar.
+ */
+function leakPlanNote(): string {
+  const gate = findGate("/app/kayip-kacak");
+  return gate && gate.minPlan !== "advisor" ? ` (${getPlan(gate.minPlan).name} pakette)` : "";
+}
 const c = (id: string, text: string) => ({ id, text, hidden: false });
 
 export function defaultSiteContent(): SiteContent {
@@ -19,7 +30,7 @@ export function defaultSiteContent(): SiteContent {
       title: "Emlak işlerinizi",
       em: "tek platformda",
       tail: "yönetin",
-      lead: `Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru, emsal bazlı değerleme ve ${CRON_JOBS.length} otomatik görev ofisinizle birlikte çalışır.`,
+      lead: `Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde. Kaçan komisyonu görünür kılan kayıp-kaçak motoru${leakPlanNote()}, emsal bazlı değerleme ve ${CRON_JOBS.length} otomatik görev ofisinizle birlikte çalışır.`,
       // Boş = uzun açıklamanın ilk cümlesi ("Müşteri, talep, portföy, anlaşma ve komisyon akışı tek panelde.").
       mobileLead: "",
       primary: { label: "{deneme_dene}", href: "/kayit" },

@@ -1,6 +1,7 @@
 import { DEFAULT_SLA_MIN, SLA_OPTIONS_MIN } from "@/lib/response-time/core";
 import type { AnySettingDef } from "../types";
-import { defineBool, defineEnum, defineInt, defineNumber } from "./define";
+import { z } from "zod";
+import { defineBool, defineEnum, defineInt, defineNumber, defineString } from "./define";
 
 /**
  * OFIS (tenant) ayarlari — Ofis Tanimlari Merkezi (/app/ayarlar/merkez).
@@ -314,6 +315,24 @@ export const OWNER_WEEKLY_REPORT_KEY = "office.owner_report.weekly_enabled";
 export const HOME_VALUE_SUMMARY_KEY = "office.customer_portal.home_value_enabled";
 export const VITRIN_AI_CHAT_KEY = "office.vitrin.ai_chat_enabled";
 /**
+ * Google yorum bağlantısı (Ofis profili kartı, /app/ayarlar). Okuyucu: memnuniyet anketi public sayfası
+ * (`src/app/anket/[token]`) 9-10 puan veren müşteriye "Google'da yorum bırakın" düğmesini gösterir. Boş = düğme yok.
+ * Yalnız Google'ın resmi yorum adresleri kabul edilir (isGoogleReviewUrl); başka alan adına yönlendirme yazılamaz.
+ */
+export const OFFICE_GOOGLE_REVIEW_URL = "office.reviews.google_review_url";
+export const GOOGLE_REVIEW_URL_MAX = 300;
+
+/** https://g.page/r/<kimlik>[/review] veya https://search.google.com/local/writereview?placeid=<kimlik>. */
+export function isGoogleReviewUrl(raw: string): boolean {
+  const v = raw.trim();
+  if (!v || v.length > GOOGLE_REVIEW_URL_MAX) return false;
+  return (
+    /^https:\/\/g\.page\/r\/[A-Za-z0-9_-]+(?:\/review)?\/?$/.test(v) ||
+    /^https:\/\/search\.google\.com\/local\/writereview\?placeid=[A-Za-z0-9_-]+$/.test(v)
+  );
+}
+
+/**
  * Anonim piyasa verisi paylaşım izni (ofis bazlı opt-in, varsayılan KAPALI). Okuyucu: platform dışa aktarımı
  * `/admin/analiz-tarifesi/piyasa-verisi` (`src/lib/listing-control/market-export.ts`) yalnız açık ofislerin ilanlarını k≥5 hücrelerde toplar.
  */
@@ -353,6 +372,30 @@ const contact: AnySettingDef[] = [
     description: "Vitrin ilan sayfasında ziyaretçi ilan hakkında soru sorabilir; asistan yalnız ilanın kayıtlı bilgileriyle yanıtlar, fiyat pazarlığı/kesin söz vermez ve her yanıtta danışmana bağlanma (talep formu) önerir.",
     impact: "AI kotanızdan harcar. Ziyaretçinin yazdığı telefon/e-posta/TC gibi kişisel veriler yapay zekâya gitmeden maskelenir. Kapalıyken asistan hiç görünmez.",
   }),
+];
+
+const googleReviewBase = defineString({
+  ...TENANT,
+  key: OFFICE_GOOGLE_REVIEW_URL,
+  group: "iletisim",
+  default: "",
+  maxLength: GOOGLE_REVIEW_URL_MAX,
+  label: "Google yorum bağlantısı",
+  description: "Google İşletme Profilinizdeki \"Yorum isteyin\" bağlantısı (https://g.page/r/... veya https://search.google.com/local/writereview?placeid=...).",
+  impact: "Doluysa memnuniyet anketinde 9-10 puan veren müşteriye \"Google'da yorum bırakın\" düğmesi gösterilir. Boşken düğme hiç görünmez.",
+});
+
+const reviews: AnySettingDef[] = [
+  {
+    ...googleReviewBase,
+    // Yalnız resmi Google yorum adresi ya da boş (boş = kaldır). Depodaki bozuk değer de boş sayılır.
+    schema: z
+      .string()
+      .trim()
+      .max(GOOGLE_REVIEW_URL_MAX)
+      .refine((v) => v === "" || isGoogleReviewUrl(v), "Yalnız https://g.page/r/... veya https://search.google.com/local/writereview?placeid=... bağlantısı kabul edilir."),
+    codec: { parse: (raw) => (raw != null && isGoogleReviewUrl(raw) ? raw.trim() : ""), format: (v) => v },
+  } as AnySettingDef,
 ];
 
 const compliance: AnySettingDef[] = [
@@ -490,4 +533,4 @@ const aiFeatures: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...compliance, ...leadRouting, ...aiFeatures];
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...aiFeatures];

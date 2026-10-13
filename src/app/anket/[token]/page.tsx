@@ -9,6 +9,8 @@ import { loadTenantModuleState } from "@/lib/modules/state";
 import { loadTemplateQuestions } from "@/lib/surveys/server";
 import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
 import { now } from "@/lib/clock";
+import { OFFICE_GOOGLE_REVIEW_URL } from "@/lib/settings/registry/tenant";
+import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { SurveyForm } from "./survey-form";
 import { TaskSurveyForm } from "./task-survey-form";
 
@@ -60,15 +62,21 @@ export default async function SurveyPage({
   };
   const tenant = rel(survey.tenant as TenantShape | TenantShape[] | null);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
-  const { data: customer } = await admin
-    .from("customers")
-    .select("id")
-    .eq("id", survey.customer_id)
-    .eq("tenant_id", survey.tenant_id)
-    .eq("is_sample", false)
-    .is("deleted_at", null)
-    .maybeSingle();
+  // Müşteri doğrulaması ile ofisin Google yorum bağlantısı birbirinden bağımsız → paralel.
+  const [{ data: customer }, reviewSettings] = await Promise.all([
+    admin
+      .from("customers")
+      .select("id")
+      .eq("id", survey.customer_id)
+      .eq("tenant_id", survey.tenant_id)
+      .eq("is_sample", false)
+      .is("deleted_at", null)
+      .maybeSingle(),
+    readTenantSettings(admin, String(survey.tenant_id), [OFFICE_GOOGLE_REVIEW_URL]),
+  ]);
   if (!customer) notFound();
+  // Kayıt defteri yalnız resmi Google yorum adresini geçerli sayar; boş = düğme yok.
+  const googleReviewUrl = (reviewSettings[OFFICE_GOOGLE_REVIEW_URL] as string | undefined) || null;
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = tenant?.phone ?? null;
   const answered = survey.status === "answered";
@@ -91,7 +99,7 @@ export default async function SurveyPage({
           description="Bu anket daha önce cevaplandı — değerlendirmeniz için teşekkür ederiz."
         />
       ) : (
-        <SurveyForm token={token} office={office} officePhone={officePhone} />
+        <SurveyForm token={token} office={office} officePhone={officePhone} googleReviewUrl={googleReviewUrl} />
       )}
     </PublicTokenPage>
   );

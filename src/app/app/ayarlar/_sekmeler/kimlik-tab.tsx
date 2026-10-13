@@ -1,14 +1,21 @@
 import { LicenseStatusCard } from "@/components/app/license-status-card";
 import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
 import { getProvinceOptions } from "@/lib/geo/reader";
+import { getSetting } from "@/lib/settings/read";
+import { OFFICE_GOOGLE_REVIEW_URL } from "@/lib/settings/registry/tenant";
 import { CompanyForm } from "../company-form";
 import { LogoUploadForm } from "../logo-upload-form";
 import { ReadOnlyGate } from "../read-only-gate";
+import { GoogleReviewField } from "./google-review-field";
 import type { SettingsTenant } from "./types";
 
 /** Sekme: Marka ve kimlik (logo + ofis bilgileri + yetki belgesi). Varsayılan sekme; `#marka-kimlik` çapası burada. */
-export async function KimlikTab({ tenant, canEdit }: { tenant: SettingsTenant; canEdit: boolean }) {
-  const [provinces, tenantLicense] = await Promise.all([getProvinceOptions(), loadTenantLicense()]);
+export async function KimlikTab({ tenant, tenantId, canEdit }: { tenant: SettingsTenant; tenantId?: string | null; canEdit: boolean }) {
+  const [provinces, tenantLicense, googleReviewUrl] = await Promise.all([
+    getProvinceOptions(),
+    loadTenantLicense(),
+    tenantId ? getSetting<string>(OFFICE_GOOGLE_REVIEW_URL, { tenantId }).catch(() => "") : Promise.resolve(""),
+  ]);
   const licenseStatus = tenantLicenseStatus(tenantLicense);
   return (
     <>
@@ -30,6 +37,7 @@ export async function KimlikTab({ tenant, canEdit }: { tenant: SettingsTenant; c
             licenseBadge={{ label: licenseStatus.label, tone: licenseStatus.tone }}
             licenseColumnsReady={tenantLicense.extendedColumns}
           />
+          {tenantId ? <GoogleReviewField settingKey={OFFICE_GOOGLE_REVIEW_URL} value={googleReviewUrl || ""} canEdit={canEdit} /> : null}
         </ReadOnlyGate>
       </section>
     </>

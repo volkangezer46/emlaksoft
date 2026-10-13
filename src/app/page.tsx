@@ -67,7 +67,7 @@ export default async function HomePage() {
       <MotionRoot />
       <SiteHeader />
       <main id="main-content">
-        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} />
+        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} efLive={pricing.efLive} />
         {shown.map((id) => <Fragment key={id}>{sections[id]}</Fragment>)}
       </main>
       <SiteFooter smartCta trialDays={trialDays} />

@@ -9,7 +9,7 @@ import { PRICE_MIN_DAYS } from "@/lib/insights/rules/price-action";
 import { DEAL_MIN_IDLE_DAYS } from "@/lib/insights/rules/deal-risk";
 import { prepareWrite } from "../prepare";
 import { getSettingDef } from "./index";
-import { NOTIFY_DEFAULTS, notifyKey, TENANT_SETTING_DEFS } from "./tenant";
+import { isGoogleReviewUrl, NOTIFY_DEFAULTS, notifyKey, OFFICE_GOOGLE_REVIEW_URL, TENANT_SETTING_DEFS } from "./tenant";
 import { coerceInput } from "../view";
 
 describe("ofis ayarları: varsayılan = bugünkü sabit (davranış değişmez)", () => {
@@ -67,5 +67,28 @@ describe("ofis ayarları: kapsam, yetki, doğrulama", () => {
     const d = getSettingDef("office.alert.deal_stale_days")!;
     expect(coerceInput(d, "21")).toEqual({ ok: true, value: 21 });
     expect(coerceInput(getSettingDef(notifyKey("digest"))!, "off")).toEqual({ ok: true, value: false });
+  });
+});
+
+describe("ofis ayarları: Google yorum bağlantısı", () => {
+  it("yalnız resmi Google yorum adresleri ya da boş kabul edilir; varsayılan boş", () => {
+    const d = getSettingDef(OFFICE_GOOGLE_REVIEW_URL)!;
+    expect(d.default).toBe("");
+    expect(isGoogleReviewUrl("https://g.page/r/CbX9abc_-123/review")).toBe(true);
+    expect(isGoogleReviewUrl("https://g.page/r/CbX9abc")).toBe(true);
+    expect(isGoogleReviewUrl("https://search.google.com/local/writereview?placeid=ChIJN1t_tDeuEmsRUsoyG83frY4")).toBe(true);
+    for (const bad of [
+      "http://g.page/r/abc",
+      "https://g.page.evil.com/r/abc",
+      "https://g.page/r/abc?next=https://evil.com",
+      "https://search.google.com/local/writereview?placeid=abc&x=1",
+      "https://evil.com/?u=https://g.page/r/abc",
+      "javascript:alert(1)",
+    ]) {
+      expect(isGoogleReviewUrl(bad), bad).toBe(false);
+      expect(coerceInput(d, bad).ok, bad).toBe(false);
+    }
+    expect(coerceInput(d, "")).toEqual({ ok: true, value: "" });
+    expect(d.codec.parse("https://evil.com")).toBe("");
   });
 });
