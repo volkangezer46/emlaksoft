@@ -1,4 +1,4 @@
-import { isDemoLoginEnabled } from "@/lib/demo-environment";
+import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
 
 import type { Metadata } from "next";
@@ -20,6 +20,7 @@ export default async function LoginPage({
     <LoginForm
       next={params.next ?? "/app"}
       demoEnabled={isDemoLoginEnabled()}
+      platformDemoEnabled={isPlatformDemoPersonaAllowed()}
       googleEnabled={isGoogleAuthEnabled()}
       // Google dönüşünde callback'in verdiği bilinen kod → Türkçe mesaj (bilinmeyen kod gösterilmez).
       googleError={googleErrorMessage(params.hata)}

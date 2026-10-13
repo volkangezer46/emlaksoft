@@ -14,11 +14,14 @@ const initial: AuthResult = {};
 export function LoginForm({
   next,
   demoEnabled,
+  platformDemoEnabled = false,
   googleEnabled = false,
   googleError = null,
 }: {
   next: string;
   demoEnabled: boolean;
+  /** Platform (süper admin vb.) demo kartları; üretimde ayrı açık izin (PRODUCTION_PLATFORM_DEMO_OPT_IN). */
+  platformDemoEnabled?: boolean;
   /** NEXT_PUBLIC_GOOGLE_AUTH_ENABLED (sunucuda okunur); kapalıyken düğme hiç görünmez. */
   googleEnabled?: boolean;
   /** Google dönüşü hata mesajı (?hata=..., bilinen kodlar). */
@@ -130,7 +133,7 @@ export function LoginForm({
           </p>
         </form>
 
-        {demoEnabled ? <DemoQuickLogin /> : null}
+        {demoEnabled ? <DemoQuickLogin showPlatform={platformDemoEnabled} /> : null}
 
         <p className="mt-8 border-t border-line pt-6 text-center text-sm text-text-muted">
           Hesabınız yok mu?{" "}

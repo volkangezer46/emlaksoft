@@ -70,12 +70,13 @@ function PersonaButton({
   );
 }
 
-export function DemoQuickLogin() {
+/** showPlatform: sunucu izni (isPlatformDemoPersonaAllowed); kapalıyken personel kartları hiç gösterilmez (eylem de reddeder). */
+export function DemoQuickLogin({ showPlatform = false }: { showPlatform?: boolean }) {
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const platform = DEMO_PERSONAS.filter((p) => p.kind === "platform");
+  const platform = showPlatform ? DEMO_PERSONAS.filter((p) => p.kind === "platform") : [];
   const office = DEMO_PERSONAS.filter((p) => p.kind === "office");
 
   const pick = (id: string) => {
@@ -114,6 +115,7 @@ export function DemoQuickLogin() {
       ) : null}
 
       <div className="mt-4 space-y-4">
+        {platform.length > 0 ? (
         <div>
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-text-faint">
             <Shield className="h-3.5 w-3.5 text-amber-600" /> EmlakSoft personeli
@@ -124,6 +126,7 @@ export function DemoQuickLogin() {
             ))}
           </div>
         </div>
+        ) : null}
 
         <div>
           <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-text-faint">
