@@ -251,7 +251,10 @@ describe("(e) istemci router önbelleği: 300 sn + arka plan tazeleme + tam önc
       expect(t, `${table} realtime listesinde olmalı`).toContain(`"${table}"`);
     }
     expect(read("src/hooks/use-realtime-refresh.ts")).toMatch(/filter:\s*`tenant_id=eq\.\$\{tenantId\}`/);
-    expect(read("src/components/app/realtime-refresh.tsx")).toMatch(/REALTIME_EXTENDED_TABLES/);
+    // Abonelik rotaya iner: bileşen tabloları `tablesForPath`'ten alır; genişletilmiş liste ROUTE_TABLES'ta kapsanır
+    // (kapsam ayrıntısı realtime-throttle.test.ts'te).
+    expect(read("src/components/app/realtime-refresh.tsx")).toMatch(/^\s*tablesForPath,$/m);
+    expect(t).toMatch(/ROUTE_TABLES/);
   });
   it("tam önceden yükleme: kind full, kuyruk, ağ kapısı; menü + sekme şeridi + satır bağlantıları bağlı", () => {
     const p = read("src/lib/client-prefetch.ts");
