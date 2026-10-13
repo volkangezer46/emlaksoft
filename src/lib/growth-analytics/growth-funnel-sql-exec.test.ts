@@ -136,6 +136,15 @@ describe.skipIf(!mod)("SP3 ölçüm ve huni SQL — gerçek PL/pgSQL (pglite)", 
     expect(f.landings.find((l) => l.path === "/fiyatlar")).toMatchObject({ visits: 4, signups: 0 });
   });
 
+  it("ilk ödeme: total_try=0 ama amount_try>0 olan fatura da örneğe girer", async () => {
+    await as("service_role");
+    const d = await today();
+    const id = await tenant({ channel: "direct" });
+    await q(`insert into public.invoices(tenant_id, status, amount_try, total_try, paid_at) values ($1,'paid',990,0,(select created_at from public.tenants where id=$1) + interval '6 days')`, [id]);
+    const f = parseGrowthFunnel(await one(`select public.platform_growth_funnel(($1::date) - 27, $1::date)`, [d]))!;
+    expect(f.channels.find((c) => c.channel === "direct")).toMatchObject({ signups: 2, paidSamples: 1, medianDaysToPaid: 6 });
+  });
+
   it("geçersiz aralık reddedilir", async () => {
     await as("service_role");
     await expect(q(`select public.platform_growth_funnel(current_date, current_date - 1)`)).rejects.toThrow(/invalid_range/);

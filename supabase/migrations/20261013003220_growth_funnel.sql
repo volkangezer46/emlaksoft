@@ -48,7 +48,7 @@ begin
            (
              select min(i.paid_at) from public.invoices i
              where i.tenant_id = t.id and i.status = 'paid' and i.paid_at is not null
-               and coalesce(i.total_try, i.amount_try, 0) > 0
+               and (coalesce(i.total_try, 0) > 0 or coalesce(i.amount_try, 0) > 0)
            ) as first_paid_at
     from public.tenants t
     left join public.signup_attributions sa on sa.tenant_id = t.id

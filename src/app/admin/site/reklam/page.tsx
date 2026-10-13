@@ -100,7 +100,7 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
               <div>
                 <CardTitle>Huni</CardTitle>
                 <CardDescription>
-                  Dönem: {funnel.from} – {funnel.to}. Ziyaret tam sayfa yüklemesidir (site içi geçişler sayılmaz); aşamalar birbirinin alt kümesi olmadığı için aşama arası yüzde çizilmez.
+                  Dönem: {funnel.from} – {funnel.to}. Ziyaret tam sayfa yüklemesidir (site içi geçişler sayılmaz) ve şimdilik yalnız ana sayfa ile araçlar sayılır (fiyatlar, yasal sayfalar ve kayıt henüz sayaçlı değil); aşamalar birbirinin alt kümesi olmadığı için aşama arası yüzde çizilmez.
                 </CardDescription>
               </div>
             </CardHeader>

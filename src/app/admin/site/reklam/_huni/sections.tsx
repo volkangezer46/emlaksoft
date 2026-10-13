@@ -18,9 +18,9 @@ const num = (n: number | null) => (n === null ? "—" : n.toLocaleString("tr-TR"
 function Delta({ cur, prev }: { cur: number | null; prev: number | null | undefined }) {
   if (cur === null || prev === null || prev === undefined) return null;
   const d = cur - prev;
-  if (d === 0) return <span className="block text-[11px] text-text-faint">önceki dönemle aynı</span>;
+  if (d === 0) return <span className="block text-xs text-text-faint">önceki dönemle aynı</span>;
   return (
-    <span className={`block text-[11px] ${d > 0 ? "text-success-strong" : "text-danger-600"}`}>
+    <span className={`block text-xs ${d > 0 ? "text-success-strong" : "text-danger-600"}`}>
       {d > 0 ? "+" : "−"}
       {Math.abs(d).toLocaleString("tr-TR")} önceki döneme göre
     </span>
@@ -81,11 +81,11 @@ export function ChannelTable({
                 <TD align="right" className="px-4 py-2.5 tabular-nums">{pctText(rate(c.signups, c.visits))}</TD>
                 <TD align="right" className="px-4 py-2.5">
                   <CellLink href={tenants} label={`${c.label}: ${c.activated} ofis ilk ilanını girdi`}>{num(c.activated)}</CellLink>
-                  <span className="block text-[11px] text-text-faint">{pctText(rate(c.activated, c.signups))}</span>
+                  <span className="block text-xs text-text-faint">{pctText(rate(c.activated, c.signups))}</span>
                 </TD>
                 <TD align="right" className="px-4 py-2.5">
                   <CellLink href={`${tenants}&durum=active`} label={`${c.label}: ${c.paid} ödeyen ofis`}>{num(c.paid)}</CellLink>
-                  <span className="block text-[11px] text-text-faint">{pctText(rate(c.paid, c.signups))}</span>
+                  <span className="block text-xs text-text-faint">{pctText(rate(c.paid, c.signups))}</span>
                 </TD>
                 <TD align="right" className="px-4 py-2.5 tabular-nums">
                   {c.medianDaysToPaid === null ? (
@@ -93,7 +93,7 @@ export function ChannelTable({
                   ) : (
                     <>
                       {c.medianDaysToPaid.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} gün
-                      <span className="block text-[11px] text-text-faint">{c.paidSamples} örnek</span>
+                      <span className="block text-xs text-text-faint">{c.paidSamples} örnek</span>
                     </>
                   )}
                 </TD>
