@@ -317,6 +317,8 @@ const F = {
   siteMedia: "20261013003500_site_media.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
+  // AD2 (2026-10-13): fatura satirlari + numarali alacak dekontu (iade tetikleyicisi) + elle fatura taslak RPC'si.
+  invoiceLinesCreditNotes: "20261013004100_invoice_lines_credit_notes.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -535,6 +537,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.growthFunnel]: "ek", // yeni salt-okunur SECURITY DEFINER RPC platform_growth_funnel (yalniz service_role; platform_dashboard_rollups deseni); tablo/politika/veri degismez
     [F.siteMedia]: "ek", // yeni ozel kova site-media (raster mime, 8 MB) + site_media tablosu (RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "kurulum bekliyor" + gorselsiz ana sayfa
     [F.googleData]: "ek", // 3 yeni platform tablosu (RLS acik, politika yok, yalniz service_role) + google_data_prune/seo_gsc_summary (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "veri yok"
+    [F.invoiceLinesCreditNotes]: "davranis", // 2 yeni tablo (invoice_lines geriye donuk tek satirla dolar; credit_notes) + invoices uzerinde YALNIZ meta.refund ilk yazildiginda dekont yazan AFTER UPDATE tetikleyicisi + service_role RPC platform_create_manual_invoice; odeme akislari degismez, kod tablolar yokken satiri faturadan turetir
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -727,6 +730,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
+    { id: "AD2-fatura-satirlari-dekont", order: 72, title: "Fatura satirlari (geriye donuk tek satir) + numarali alacak dekontu (iade kaydi tetikleyicisi; mevcut iadeler dekontlanir) + elle fatura taslak RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken satiri faturadan turetir, elle fatura formu 'kurulum bekliyor' der; sira serbest)", files: [F.invoiceLinesCreditNotes] },
     { id: "SP5-google-veri", order: 69, title: "Google baglanti merkezi: seo_gsc_daily, seo_url_inspections, ads_daily_metrics + google_data_prune/seo_gsc_summary (bagimsiz; kod tablolar yokken bos durum, cron baglanti yokken atlar; sira serbest, ek)", files: [F.googleData] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
