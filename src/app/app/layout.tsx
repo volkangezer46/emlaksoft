@@ -8,6 +8,7 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
+import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
@@ -132,10 +133,22 @@ async function NotificationBellStream() {
   return <NotificationBell initial={notifications} />;
 }
 
+type UserMenuShellProps = Omit<React.ComponentProps<typeof UserMenu>, "face"> & { initials: string };
+
+/** Kullanıcı menüsü; düğme yüzü (avatar/hazır avatar/baş harf) SUNUCUDA çizilir (avatar çizimleri istemci paketine girmez). */
+function UserMenuShell({ initials, avatarUrl = null, avatarPreset = null, ...props }: UserMenuShellProps & { avatarUrl?: string | null; avatarPreset?: string | null }) {
+  return (
+    <UserMenu
+      {...props}
+      face={<UserMenuFace initials={initials} name={props.name} subtitle={props.subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />}
+    />
+  );
+}
+
 /** Kullanıcı menüsü + profil avatarı (tek PK sorgusu, Suspense içinde akar). */
-async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & React.ComponentProps<typeof UserMenu>) {
+async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & UserMenuShellProps) {
   const avatar = userId ? await loadOwnProfileAvatar(userId) : null;
-  return <UserMenu {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
+  return <UserMenuShell {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
 }
 
 /** Ofis skoru rozeti: kabuğu BEKLETMEZ (ilk hesap 5 sorgu; 3 dk önbellekli), kendi sınırında akar. */
@@ -560,7 +573,7 @@ async function ShellHeader() {
             <NotificationBell initial={[]} />
           )}
           {/* Avatar kabuğu bekletmez: önce baş harfli menü, avatar gelince değişir. */}
-          <Suspense fallback={<UserMenu {...userMenuProps} />}>
+          <Suspense fallback={<UserMenuShell {...userMenuProps} />}>
             <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
           </Suspense>
         </div>

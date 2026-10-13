@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
-import { CommandPalette } from "@/components/admin/command-palette";
+import { CommandPaletteLazy } from "@/components/admin/command-palette-lazy";
 import { NotificationBell } from "@/components/admin/notification-bell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
@@ -37,16 +37,15 @@ const QUICK: { label: string; href: string; icon: typeof Building2; module: Plat
 export function AdminTopbar({
   roleLabel,
   staffName,
-  avatarUrl = null,
-  avatarPreset = null,
+  userFace,
   modules,
   fontScale,
   health = null,
 }: {
   roleLabel: string;
   staffName: string;
-  avatarUrl?: string | null;
-  avatarPreset?: string | null;
+  /** Kullanıcı menüsü düğme yüzü: sunucuda çizilmiş `UserMenuFace` (avatar çizimleri istemci paketine girmez). */
+  userFace: ReactNode;
   modules: PlatformModule[];
   fontScale?: FontScale;
   /** Gerçek sağlık ölçümü (yalnız "sistem" modülü görenlere); yoksa çip çizilmez. */
@@ -95,7 +94,7 @@ export function AdminTopbar({
 
       {/* Orta: arama — flex-1 ile boş alanı kapla, çok geniş ekranda okunur genişlikte kal */}
       <div className="mx-auto min-w-0 max-w-2xl flex-1">
-        <CommandPalette modules={modules} />
+        <CommandPaletteLazy modules={modules} />
       </div>
 
       <div className="flex items-center gap-2.5">
@@ -146,10 +145,8 @@ export function AdminTopbar({
         <NotificationBell />
 
         <UserMenu
-          initials={staffName.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
           name={staffName}
-          avatarUrl={avatarUrl}
-          avatarPreset={avatarPreset}
+          face={userFace}
           subtitle={roleLabel}
           fontScale={fontScale}
           links={[

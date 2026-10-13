@@ -1,0 +1,185 @@
+"use client";
+
+import { now as clockNow, msSince, trDayStartMs } from "@/lib/clock";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
+import Link from "@/components/ui/smart-link";
+import { useRouter } from "next/navigation";
+import {
+  AlertOctagon,
+  AlertTriangle,
+  BellOff,
+  CheckCheck,
+  CheckCircle2,
+  Info,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
+import { markAllPlatformNotificationsRead, markPlatformNotificationRead } from "@/app/actions/platform-notifications";
+import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
+import type { Notif } from "./notification-bell";
+
+const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
+  success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
+  warning: { icon: AlertTriangle, cls: "bg-amber-400/15 text-amber-600" },
+  danger: { icon: AlertOctagon, cls: "bg-danger-500/10 text-danger-500" },
+  system: { icon: Settings, cls: "bg-cyan-400/15 text-cyan-600" },
+  info: { icon: Info, cls: "bg-brand-600/10 text-brand-600" },
+};
+function kindMeta(kind: string) {
+  return KIND_META[kind] ?? KIND_META.info;
+}
+
+function relTime(iso: string) {
+  const min = Math.floor(msSince(iso) / 60000);
+  if (min < 1) return "az önce";
+  if (min < 60) return `${min} dk`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} sa`;
+  const day = Math.floor(hr / 24);
+  return `${day} gün`;
+}
+
+function groupByTime(items: Notif[]) {
+  const now = clockNow();
+  const dayStart = trDayStartMs(now);
+  const weekMs = 7 * 86_400_000;
+  const groups: { label: string; items: Notif[] }[] = [
+    { label: "Bugün", items: [] },
+    { label: "Bu hafta", items: [] },
+    { label: "Daha eski", items: [] },
+  ];
+  for (const n of items) {
+    const t = new Date(n.created_at).getTime();
+    if (t >= dayStart) groups[0].items.push(n);
+    else if (now - t < weekMs) groups[1].items.push(n);
+    else groups[2].items.push(n);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+
+/**
+ * Yönetim bildirim açılır paneli (liste, sekmeler, okundu işaretleme). Zil (`notification-bell.tsx`) veriyi yükler,
+ * okunmamış sayısını gösterir ve paneli ilk açılışta tembel bağlar; durum (liste, sayı, sekme) zilde kalır.
+ */
+export function NotificationPanel({
+  items,
+  unread,
+  tab,
+  setTab,
+  setItems,
+  setUnread,
+  setOpen,
+}: {
+  items: Notif[];
+  unread: number;
+  tab: "all" | "unread";
+  setTab: Dispatch<SetStateAction<"all" | "unread">>;
+  setItems: Dispatch<SetStateAction<Notif[]>>;
+  setUnread: Dispatch<SetStateAction<number>>;
+  setOpen: Dispatch<SetStateAction<boolean>>;
+}) {
+  const router = useRouter();
+  const shown = tab === "unread" ? items.filter((n) => !n.read_at) : items;
+  const groups = useMemo(() => groupByTime(shown), [shown]);
+
+  const openItem = async (n: Notif) => {
+    setOpen(false);
+    if (!n.read_at) {
+      setUnread((u) => Math.max(0, u - 1));
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
+      await markPlatformNotificationRead(n.id);
+    }
+    const href = notificationHref(n);
+    if (href) router.push(href);
+  };
+
+  const markAll = async () => {
+    setUnread(0);
+    setItems((prev) => prev.map((x) => ({ ...x, read_at: x.read_at ?? new Date().toISOString() })));
+    await markAllPlatformNotificationsRead();
+    router.refresh();
+  };
+
+  function renderItem(n: Notif) {
+    const meta = kindMeta(n.kind);
+    const Icon = meta.icon;
+    return (
+      <button
+        key={n.id}
+        type="button"
+        onClick={() => openItem(n)}
+        className={`flex w-full items-start gap-3 border-b border-line/70 px-4 py-3 text-left transition hover:bg-canvas ${n.read_at ? "opacity-70" : "bg-brand-600/[0.04]"}`}
+      >
+        <span className={`mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-control)] ${meta.cls}`}>
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center justify-between gap-2">
+            <span className="flex min-w-0 items-center gap-1.5">
+              {!n.read_at ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-600" /> : null}
+              <span className="truncate text-sm font-semibold text-ink-950">{n.title}</span>
+            </span>
+            <span className="shrink-0 text-xs text-text-faint">{relTime(n.created_at)}</span>
+          </span>
+          {n.body ? <span className="mt-0.5 block truncate text-xs text-text-muted">{stripNotificationMarker(n.body)}</span> : null}
+        </span>
+      </button>
+    );
+  }
+
+  return (
+        <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-ink-950">Bildirimler</p>
+              {unread > 0 ? <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-xs font-bold text-danger-600">{unread} yeni</span> : null}
+            </div>
+            {unread > 0 ? (
+              <button type="button" onClick={markAll} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+                <CheckCheck className="h-3.5 w-3.5" /> Tümünü oku
+              </button>
+            ) : null}
+          </div>
+
+          <div className="flex gap-1 border-b border-line px-2 py-1.5">
+            {([
+              { key: "all", label: "Tümü" },
+              { key: "unread", label: `Okunmamış${unread > 0 ? ` (${unread})` : ""}` },
+            ] as const).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${tab === t.key ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:bg-canvas"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="max-h-[60vh] overflow-y-auto">
+            {shown.length === 0 ? (
+              <div className="grid place-items-center px-4 py-12 text-center">
+                <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-canvas text-text-faint"><BellOff className="h-6 w-6" /></span>
+                <p className="mt-3 text-sm font-medium text-ink-950">{tab === "unread" ? "Okunmamış bildirim yok" : "Henüz bildirim yok"}</p>
+              </div>
+            ) : (
+              groups.map((g) => (
+                <div key={g.label}>
+                  <p className="sticky top-0 z-10 bg-canvas px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</p>
+                  {g.items.map(renderItem)}
+                </div>
+              ))
+            )}
+          </div>
+
+          <Link
+            href="/admin/bildirimler"
+            onClick={() => setOpen(false)}
+            className="block border-t border-line px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
+          >
+            Tüm bildirimleri gör
+          </Link>
+        </div>
+  );
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { Kbd, KbdCombo } from "@/components/ui/kbd";
+import { Kbd } from "@/components/ui/kbd";
+import { PaletteTrigger } from "./command-palette-trigger";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -30,9 +31,13 @@ const recentsStore = createRecentsStore("admin_palette_recents");
 const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy, setting: Settings };
 const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi", setting: "Ayar" };
 
-export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
+/**
+ * Yönetim komut paleti gövdesi (arama, sonuçlar, son görülenler). Üst çubuk bunu `command-palette-lazy.tsx` hafif
+ * kabuğuyla tembel yükler: kabuk aynı düğmeyi çizer, ⌘K / açma olayını dinler ve gövdeyi `initialOpen` ile bağlar.
+ */
+export function CommandPalette({ modules, initialOpen = false }: { modules: PlatformModule[]; initialOpen?: boolean }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
   const [loading, setLoading] = useState(false);
@@ -151,21 +156,7 @@ export function CommandPalette({ modules }: { modules: PlatformModule[] }) {
      * bağlı ve aynı genişlikte açılmasıdır.
      */
     <div className="relative w-full">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        aria-controls="admin-command-results"
-        aria-label="Platform genelinde ara"
-        className="focus-ring group flex h-11 w-full items-center gap-3 rounded-full border border-hairline bg-surface-raised px-4 text-sm text-text-muted shadow-[var(--elev-1)] transition hover:border-border-interactive hover:text-text hover:shadow-[var(--elev-2)]"
-      >
-        <Search className="h-4 w-4 shrink-0 transition group-hover:text-accent-text" aria-hidden />
-        <span className="hidden flex-1 truncate text-left text-sm sm:block">Ara… ofis, üye, destek talebi, sayfa</span>
-        <span className="ml-auto hidden shrink-0 lg:inline-flex">
-          <KbdCombo keys={["mod", "K"]} />
-        </span>
-      </button>
+      <PaletteTrigger open={open} onOpen={() => setOpen(true)} />
 
       {open ? (
         <>

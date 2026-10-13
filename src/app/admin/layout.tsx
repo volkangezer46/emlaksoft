@@ -27,7 +27,8 @@ import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { cookies } from "next/headers";
 import { FontScaleBoot } from "@/components/font-scale-boot";
 import { FONT_SCALE_COOKIE, FONT_SCALE_META_KEY, resolveFontScale } from "@/lib/font-scale";
-import { OwnPasswordForm } from "@/app/admin/hesabim/account-forms";
+import { UserMenuFace } from "@/components/ui/console/user-menu-face";
+import { redirect } from "next/navigation";
 
 /** Kok loading.tsx kaldirildi: kabuk sorgulari Suspense icinde, splash hemen ustunde. */
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -53,27 +54,16 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
     getDemoPolicyNow(),
   ]);
 
-  // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz.
+  // Geçici parolayla açılan hesap: kendi parolasını belirleyene dek yönetim kabuğu açılmaz. Zorunlu değişim ekranı
+  // kabuğun DIŞINDA ayrı rotadadır (src/app/(admin-parola)/admin/parola-yenile): parola formu her yönetim sayfasının
+  // paketine girmez.
+  if (mustChangePassword(user)) redirect("/admin/parola-yenile");
   const jar = await cookies();
   const fontScale = resolveFontScale({
     userId: user?.id,
     cookieValue: jar.get(FONT_SCALE_COOKIE)?.value,
     metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
   });
-  if (mustChangePassword(user)) {
-    return (
-      <div className="grid min-h-screen place-items-center bg-canvas p-4">
-        <ThemeController />
-        <FontScaleBoot scale={fontScale} />
-        <div className="w-full max-w-xl space-y-4">
-          <p role="status" className="rounded-[var(--radius-card)] border border-amber-300/50 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-            {staff.full_name}, güvenliğiniz için yönetim paneline girmeden önce parolanızı değiştirmeniz gerekiyor.
-          </p>
-          <OwnPasswordForm forced />
-        </div>
-      </div>
-    );
-  }
 
   const roleLabel = PLATFORM_ROLE_LABELS[staff.role] ?? staff.role;
   const modules = platformModulesFor(staff.role);
@@ -137,7 +127,22 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
         <div className="sticky top-0 z-50 h-0 md:hidden">
           <MobileMenuTrigger controlsId="admin-mobile-navigation" label="Admin menüsünü aç" variant="admin" />
         </div>
-        <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} modules={modules} fontScale={fontScale} health={health} />
+        <AdminTopbar
+          roleLabel={roleLabel}
+          staffName={staff.full_name}
+          userFace={
+            <UserMenuFace
+              initials={staff.full_name.split(/\s+/).map((p) => p[0] ?? "").join("").slice(0, 2).toLocaleUpperCase("tr-TR") || "P"}
+              name={staff.full_name}
+              subtitle={roleLabel}
+              avatarUrl={avatar?.avatar_url ?? null}
+              avatarPreset={avatar?.avatar_preset ?? null}
+            />
+          }
+          modules={modules}
+          fontScale={fontScale}
+          health={health}
+        />
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
         <main
