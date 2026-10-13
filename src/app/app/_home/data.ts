@@ -15,6 +15,7 @@ import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { TR_OFFSET_MS, daysAgoIso, daysFromNowIso, now, trDayKey, trParts } from "@/lib/clock";
 import { PERIODS, parsePeriod as parsePeriodBase, type Period } from "@/components/ui/premium";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
+import { scopeOnboardingToPermissions } from "@/lib/onboarding-checklist";
 import type { SampleKpiScope } from "@/lib/sample-scope";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import {
@@ -698,11 +699,15 @@ export const loadEmptyProbe = cache(async (ctx: HomeCtx) => {
   return { customers: results[0].count ?? 0, properties: results[1].count ?? 0 };
 });
 
-/** Kurulum şeridi verisi (/app/baslangic ile AYNI kaynak: lib/onboarding-state). Hata varsa null — şerit gizlenir. */
-export const loadOnboardingState = cache(async (ctx: HomeCtx) => {
+/**
+ * Kurulum durumu (/app/baslangic ile AYNI kaynak: lib/onboarding-state), kullanıcının YAPABİLDİĞİ adımlara daraltılmış
+ * (Başlangıç kartıyla aynı süzgeç): danışmana "Ofis bilgilerin" gibi yetkisiz adım ne sıradaki eylem ne yüzde olarak
+ * gelir. Hata varsa null — şerit gizlenir.
+ */
+export const loadOnboardingState = cache(async (ctx: Pick<HomeCtx, "tenantId" | "perms">) => {
   if (!ctx.tenantId) return null;
   const snap = await loadOnboardingSnapshot(ctx.tenantId);
-  return snap?.state ?? null;
+  return snap ? scopeOnboardingToPermissions(snap.state, ctx.perms, snap.skipped) : null;
 });
 
 /* ------------------------- Yönetim: bugün karar bekleyenler ------------------------- */

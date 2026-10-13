@@ -275,7 +275,10 @@ export default async function AidatPage({
       tone: "success",
       // Tahsilat ödeme tarihine (paid_at) göre sayılır: liste ?odeme= ile aynı kümeyi açar (?donem= tahakkuk ayıdır).
       href: href({ durum: "paid", donem: null, odeme: monthKey }),
-      hint: chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok",
+      // Bina aidatı tahsilatı karta dahil ama ?odeme= listesi yalnız tekil mülk aidatını süzer: fark ipucunda söylenir.
+      hint: `${chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok"}${
+        (bldKpi?.collectedMonth ?? 0) > 0 ? " · liste yalnız tekil mülk aidatı" : ""
+      }`,
     },
     {
       label: "Geciken",
@@ -370,6 +373,7 @@ export default async function AidatPage({
       {/* Dönem (ay) filtresi — GET formu (?donem=YYYY-MM); ?durum= korunur */}
       <form action="/app/aidat" className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
         {durumF ? <input type="hidden" name="durum" value={durumF} /> : null}
+        {odemeF ? <input type="hidden" name="odeme" value={odemeF} /> : null}
         <span className="flex items-center gap-1.5 text-xs font-semibold text-text-muted"><CalendarRange className="h-3.5 w-3.5" /> Dönem:</span>
         <input
           name="donem"

@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   FALLBACK_ACTION_KEY,
   buildNextActions,
+  onboardingNextOf,
   parseSkipCookie,
   pickNextAction,
   serializeSkipCookie,
   type NextActionInput,
 } from "./siradaki";
+import { buildOnboarding, scopeOnboardingToPermissions, type OnboardingFacts } from "@/lib/onboarding-checklist";
+import { DEFAULT_MATRIX } from "@/lib/permissions";
 
 const EMPTY: NextActionInput = {
   appointmentsToday: 0,
@@ -53,5 +56,38 @@ describe("sıradaki en iyi eylem", () => {
     expect(parseSkipCookie("2026-10-02|gorev", "2026-10-03")).toEqual([]);
     expect(parseSkipCookie("2026-10-03|GOREV,x y,sicak", "2026-10-03")).toEqual(["sicak"]);
     expect(parseSkipCookie(undefined, "2026-10-03")).toEqual([]);
+  });
+});
+
+describe("sıradaki eylemde kurulum adımı yetkiye göre", () => {
+  const facts: OnboardingFacts = {
+    officeLocationDone: false,
+    youDone: false,
+    members: 1,
+    poolEnabled: false,
+    poolAdvisorRecords: 0,
+    publishedProperties: 0,
+    activeIntegrations: 0,
+    planPaid: false,
+    extra: {},
+  };
+
+  it("danışmana 'Ofis bilgilerin' önerilmez; yalnız kişisel adım gelir", () => {
+    const scoped = scopeOnboardingToPermissions(buildOnboarding(facts), { ...DEFAULT_MATRIX.advisor });
+    const next = onboardingNextOf(scoped);
+    expect(next?.href).toBe("/app/baslangic?adim=you");
+    const a = buildNextActions({ ...EMPTY, onboardingNext: next });
+    expect(a.map((x) => x.title).join(" ")).not.toContain("Ofis bilgilerin");
+    expect(a.some((x) => x.href.includes("adim=office"))).toBe(false);
+  });
+
+  it("danışmanın kişisel adımı tamamsa kurulum adayı olmaz", () => {
+    const scoped = scopeOnboardingToPermissions(buildOnboarding({ ...facts, youDone: true }), { ...DEFAULT_MATRIX.advisor });
+    expect(onboardingNextOf(scoped)).toBeNull();
+  });
+
+  it("ofis sahibine ofis bilgileri adımı önerilir", () => {
+    const scoped = scopeOnboardingToPermissions(buildOnboarding(facts), { ...DEFAULT_MATRIX.owner });
+    expect(onboardingNextOf(scoped)?.href).toBe("/app/baslangic?adim=office");
   });
 });

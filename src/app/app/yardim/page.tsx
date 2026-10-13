@@ -6,7 +6,8 @@ import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { requireModulePage } from "@/lib/require-module-page";
 import { FIRST_30_INTRO, GLOSSARY, HELP_TABS, resolveHelpTab, type HelpTab } from "@/lib/help-content";
-import { loadOnboardingState, type HomeCtx } from "../_home/data";
+import { loadOnboardingState } from "../_home/data";
+import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
 import { FaqSearch, GuidesSearch } from "./help-search";
 
@@ -25,7 +26,7 @@ function tabHref(tab: HelpTab) {
  * sayfasıdır, formu değişmemiştir.
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string }> }) {
-  const { tenantId } = await requireModulePage("support");
+  const { tenantId, perms } = await requireModulePage("support");
   const sp = await searchParams;
   const tab = resolveHelpTab(sp?.sekme);
   const q = (sp?.q ?? "").slice(0, 100);
@@ -48,7 +49,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       </nav>
 
       {tab === "baslangic" ? <TourPicker /> : null}
-      {tab === "baslangic" ? <StartTab tenantId={tenantId} /> : null}
+      {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
       {tab === "rehberler" ? <GuidesSearch initialQ={q} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} /> : null}
       {tab === "sozluk" ? <GlossaryTab /> : null}
@@ -57,9 +58,9 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
   );
 }
 
-async function StartTab({ tenantId }: { tenantId: string | null }) {
-  // Kurulum şeridiyle aynı sayımlar (loadOnboardingState yalnız tenantId okur).
-  const state = tenantId ? await loadOnboardingState({ tenantId } as HomeCtx) : null;
+async function StartTab({ tenantId, perms }: { tenantId: string | null; perms: EffectivePermissions }) {
+  // Ana ekran Başlangıç kartıyla aynı sayımlar ve aynı yetki süzgeci (yetkisiz adım listelenmez, yüzdeye sayılmaz).
+  const state = tenantId ? await loadOnboardingState({ tenantId, perms }) : null;
 
   return (
     <section aria-labelledby="ilk-30" className="space-y-4">

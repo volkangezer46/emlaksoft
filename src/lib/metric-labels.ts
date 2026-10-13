@@ -9,8 +9,11 @@
 export const METRIC_SCOPE = {
   /** `status = live`: vitrinde/portallarda yayında olan portföy. */
   live: { label: "Yayında", detail: "Yayında" },
-  /** İlan Kontrol yaşam döngüsünde izlenen portföy: yayında + kirada + opsiyonlu (satılan/çıkan hariç). */
-  tracked: { label: "Takipteki", detail: "Takipteki (yayında+kirada+opsiyonlu)" },
+  /**
+   * İlan Kontrol yaşam döngüsünde izlenen portföy (`k_active`, listing-control/lifecycle): hazırlıktaki, havuzdaki,
+   * yayındaki ve pazarlıktaki portföyler; satılan, kiralanan ve çıkan (iptal/mükerrer/silinen) SAYILMAZ.
+   */
+  tracked: { label: "Takipteki", detail: "Takipteki (satılan, kiralanan ve çıkan hariç)" },
   /** Eşleştirme motorunun aday kümesi (yayında, taslak ve opsiyonlu portföyler). */
   matchable: { label: "Eşleştirmeye açık", detail: "Eşleştirmeye açık" },
 } as const;
@@ -24,7 +27,7 @@ export const METRIC_PERIOD = {
 
 export type MetricPeriod = keyof typeof METRIC_PERIOD;
 
-/** Kapsam etiketi; `detail` true ise parantezli tanımla ("Takipteki (yayında+kirada+opsiyonlu)"). */
+/** Kapsam etiketi; `detail` true ise parantezli tanımla ("Takipteki (satılan, kiralanan ve çıkan hariç)"). */
 export function scopeLabel(scope: MetricScope, opts: { detail?: boolean; lower?: boolean } = {}): string {
   const s = opts.detail ? METRIC_SCOPE[scope].detail : METRIC_SCOPE[scope].label;
   return opts.lower ? s.toLocaleLowerCase("tr-TR") : s;
