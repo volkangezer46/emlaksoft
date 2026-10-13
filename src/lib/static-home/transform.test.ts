@@ -2,18 +2,21 @@ import { describe, expect, it } from "vitest";
 import {
   absolutizeCssUrls,
   buildStaticHome,
+  isKeptExternalScript,
   purgeCss,
   requiredTokens,
   resolveSuspenseBoundaries,
   stripNextRuntime,
 } from "./transform";
-import { STATIC_HOME_SOURCE_HEADER, wantsStaticHome } from "./request";
+import { STATIC_HOME_SOURCE_HEADER, staticRewriteTarget } from "./request";
 
 const headers = (h: Record<string, string> = {}) => ({ get: (n: string) => h[n.toLowerCase()] ?? null });
 const params = (q: string[] = []) => ({ has: (n: string) => q.includes(n) });
 
 describe("statik ana sayfa — istek kararı", () => {
   const base = { method: "GET", pathname: "/", searchParams: params(), headers: headers(), env: { NODE_ENV: "production" } };
+  const home = new Set(["home"]);
+  const wantsStaticHome = (req: typeof base) => staticRewriteTarget(req, home) === "home";
   it("yalnız üretimde, kök belge isteğinde", () => {
     expect(wantsStaticHome(base)).toBe(true);
     expect(wantsStaticHome({ ...base, env: { NODE_ENV: "development" } })).toBe(false);
@@ -25,8 +28,14 @@ describe("statik ana sayfa — istek kararı", () => {
     expect(wantsStaticHome({ ...base, headers: headers({ "next-router-prefetch": "1" }) })).toBe(false);
     expect(wantsStaticHome({ ...base, searchParams: params(["_rsc"]) })).toBe(false);
     expect(wantsStaticHome({ ...base, headers: headers({ [STATIC_HOME_SOURCE_HEADER]: "1" }) })).toBe(false);
-    expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", STATIC_HOME: "off" } })).toBe(false);
-    expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", VERCEL: "1" } })).toBe(false);
+    expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", STATIC_HOME: "off" } as typeof base.env })).toBe(false);
+    expect(wantsStaticHome({ ...base, env: { NODE_ENV: "production", VERCEL: "1" } as typeof base.env })).toBe(false);
+  });
+  it("kayıtta açık olmayan kimlik yeniden yazılmaz", () => {
+    expect(staticRewriteTarget(base, new Set())).toBeNull();
+    expect(staticRewriteTarget({ ...base, pathname: "/gizlilik" }, home)).toBeNull();
+    expect(staticRewriteTarget({ ...base, pathname: "/gizlilik" }, new Set(["gizlilik"]))).toBe("gizlilik");
+    expect(staticRewriteTarget({ ...base, pathname: "/gizlilik/" }, new Set(["gizlilik"]))).toBeNull();
   });
 });
 
@@ -106,5 +115,41 @@ describe("statik ana sayfa — HTML dönüşümü", () => {
     expect(out).toBe('<html><head><style>.a{color:red}</style></head><body><p class="a">x</p><script>1</script></body></html>');
     expect(buildStaticHome({ html, readStylesheet: () => null, purge: {}, bodyEnd: "" })).toBeNull();
     expect(buildStaticHome({ html: "<html><body>stil yok</body></html>", readStylesheet: () => "", purge: {}, bodyEnd: "" })).toBeNull();
+  });
+});
+
+describe("statik sayfa — K4 korunan betik", () => {
+  it("data-static-keep + aynı köken /statik/ adresi korunur; diğerleri atılır", () => {
+    const keep = '<script src="/statik/m-ab12cd.js" defer data-static-keep data-a="1"></script>';
+    const keepReact = '<script src="/statik/m-ab12cd.js" defer="" data-static-keep="" data-a="0"></script>';
+    const html = [
+      "<body>",
+      keep,
+      keepReact,
+      '<script src="/statik/m-ab12cd.js" defer></script>',
+      '<script src="https://evil.example/statik/x.js" data-static-keep></script>',
+      '<script src="//evil.example/statik/x.js" data-static-keep></script>',
+      '<script src="/statik/../_next/x.js" data-static-keep></script>',
+      '<script src="/_next/static/chunks/a.js" data-static-keep></script>',
+      '<script src="/statik/m.js?x=1" data-static-keep></script>',
+      "</body>",
+    ].join("");
+    const out = stripNextRuntime(html).html;
+    expect(out).toBe(`<body>${keep}${keepReact}</body>`);
+  });
+
+  it("öznitelik denetimi", () => {
+    expect(isKeptExternalScript(' src="/statik/m-1.js" data-static-keep')).toBe(true);
+    expect(isKeptExternalScript(' src="/statik/m-1.js" data-static-keeper')).toBe(false);
+    expect(isKeptExternalScript(' data-static-keep src="javascript:alert(1)"')).toBe(false);
+    expect(isKeptExternalScript(' src="/statik/runtime.js"')).toBe(false);
+  });
+
+  it("yasal sayfa: adacıksız tam dönüşüm (gövde sonu verilmezse yalnız stil gömülür)", () => {
+    const html =
+      '<html><head><link rel="stylesheet" href="/_next/static/chunks/a.css"/></head><body><h1 class="a">Gizlilik</h1>' +
+      '<script src="/_next/static/chunks/x.js" async=""></script><script src="/statik/m-1.js" defer data-static-keep></script></body></html>';
+    const out = buildStaticHome({ html, readStylesheet: () => ".a{color:red}.b{color:blue}", purge: {}, bodyEnd: "" });
+    expect(out).toBe('<html><head><style>.a{color:red}</style></head><body><h1 class="a">Gizlilik</h1><script src="/statik/m-1.js" defer data-static-keep></script></body></html>');
   });
 });

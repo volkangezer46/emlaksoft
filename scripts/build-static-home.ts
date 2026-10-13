@@ -10,6 +10,7 @@
 import { build } from "esbuild";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { STATIC_ISLAND_ENTRIES } from "../src/lib/static-home/registry";
 
 const ROOT = resolve(__dirname, "..");
 const SRC = join(ROOT, "src", "static-home");
@@ -54,7 +55,8 @@ async function main() {
   const runtime = await build({ ...common, entryPoints: [join(SRC, "runtime.ts")], format: "iife", write: false });
   writeFileSync(join(OUT, "runtime.js"), runtime.outputFiles[0].text);
 
-  const entries = { pricing: "pricing", seat: "seat-calculator", tour: "tour", preview: "menu-preview" } as const;
+  // Adacık girişleri tek kaynaktan (statik sayfa kayıt defteri): anahtar → src/static-home/islands/<dosya>.tsx.
+  const entries = STATIC_ISLAND_ENTRIES;
   const res = await build({
     ...common,
     entryPoints: Object.fromEntries(Object.entries(entries).map(([k, f]) => [k, join(SRC, "islands", `${f}.tsx`)])),

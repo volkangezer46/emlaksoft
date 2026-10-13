@@ -24,7 +24,10 @@ import { now } from "@/lib/clock";
 import { readProxyGateData } from "@/lib/supabase/proxy-gates";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
-import { STATIC_HOME_ROUTE, wantsStaticHome } from "@/lib/static-home/request";
+import { staticRewriteTarget } from "@/lib/static-home/request";
+import { staticHandlerPath } from "@/lib/static-home/registry";
+import { enabledStaticIds } from "@/lib/static-home/settings";
+import { STATIC_REWRITE_HEADER, staticRewriteToken } from "@/lib/static-home/internal-token";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
 function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAULT_RETRY_AFTER_SEC) {
@@ -49,8 +52,11 @@ export async function updateSession(request: NextRequest) {
   const requestPath = request.nextUrl.pathname;
   let maintenanceOn = false;
   let retryAfterSec = DEFAULT_RETRY_AFTER_SEC;
+  // Statik sayfa anahtarları aynı bayrak okumasından gelir (muaf yollar zaten statik sunulmaz).
+  let staticRoutesRaw: string | null = null;
   if (!isMaintenanceExemptPath(requestPath)) {
     const flags = await readPlatformFlagsCached();
+    staticRoutesRaw = flags.staticRoutesRaw;
     if (flags.maintenanceMode) {
       const scope = flags.maintenanceScope ?? DEFAULT_MAINTENANCE_SCOPE;
       const nowMs = now();
@@ -72,18 +78,26 @@ export async function updateSession(request: NextRequest) {
     requestPath.startsWith("/giris/") ||
     requestPath === "/kayit";
   if (!needsAuthResolution) {
-    // Ana sayfa belge isteği → saf HTML sürümü (Next/React JS'i yok); istemci gezinmesi normal sayfaya gider.
-    if (
-      wantsStaticHome({
+    // Kayıt defterindeki AÇIK sayfanın belge isteği → saf HTML sürümü (Next/React JS'i yok); istemci gezinmesi normal
+    // sayfaya gider. Rota işleyicisi yalnız iç jetonla yanıt verir (doğrudan erişim 404); sorgu dizesi taşınmaz.
+    // needsAuthResolution yolları (/app, /admin, /giris, /kayit) bu bloğa hiç girmez; kayıt defteri de onları reddeder.
+    const staticId = staticRewriteTarget(
+      {
         method: request.method,
         pathname: requestPath,
         searchParams: request.nextUrl.searchParams,
         headers: request.headers,
-      })
-    ) {
+      },
+      enabledStaticIds(staticRoutesRaw),
+    );
+    const staticToken = staticId ? await staticRewriteToken() : null;
+    if (staticId && staticToken) {
       const rewrite = request.nextUrl.clone();
-      rewrite.pathname = STATIC_HOME_ROUTE;
-      return NextResponse.rewrite(rewrite);
+      rewrite.pathname = staticHandlerPath(staticId);
+      rewrite.search = "";
+      const headers = new Headers(request.headers);
+      headers.set(STATIC_REWRITE_HEADER, staticToken);
+      return NextResponse.rewrite(rewrite, { request: { headers } });
     }
     return supabaseResponse;
   }

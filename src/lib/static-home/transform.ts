@@ -46,10 +46,22 @@ export function resolveSuspenseBoundaries(html: string): string {
 
 export type StripResult = { html: string; stylesheets: string[] };
 
+/**
+ * K4: sitenin kendi küçük dış betiği (ör. ölçüm işaretçisi `<script src="/statik/m-….js" defer data-static-keep>`) korunur.
+ * Koşul: `data-static-keep` özniteliği VE aynı kökenli `/statik/` altında `.js` adresi (protokolsüz `//`, şema, `..`
+ * ve sorgu dizesi reddedilir). Diğer tüm dış betikler (Next parçaları dahil) atılır.
+ */
+export function isKeptExternalScript(attrs: string): boolean {
+  if (!/(?:^|\s)data-static-keep(?:\s|=|$)/i.test(attrs)) return false;
+  const src = /\ssrc=(?:"([^"]*)"|'([^']*)')/i.exec(attrs);
+  const url = src?.[1] ?? src?.[2];
+  return typeof url === "string" && /^\/statik\/[\w-]+(?:\.[\w-]+)*\.js$/.test(url);
+}
+
 export function stripNextRuntime(html: string): StripResult {
   const stylesheets: string[] = [];
   let out = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (all, attrs: string, body: string) => {
-    if (/\ssrc=/i.test(attrs)) return "";
+    if (/\ssrc=/i.test(attrs)) return isKeptExternalScript(attrs) && body.trim() === "" ? all : "";
     if (/type="(application\/ld\+json|speculationrules)"/i.test(attrs)) return all;
     if (NEXT_INLINE_MARKERS.some((k) => body.includes(k))) return "";
     return all;
