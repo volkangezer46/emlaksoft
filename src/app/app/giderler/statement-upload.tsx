@@ -40,13 +40,32 @@ async function postStatement<T>(fd: FormData): Promise<T | { error: string }> {
 }
 
 /** Hesap kartındaki "Ekstre yükle": dosya seç -> (CSV/Excel için) sütun eşleme sihirbazı -> taslak -> onay ekranı. */
-export function StatementUploadButton({ accountId, accountName, reviewHref, currency }: { accountId: string; accountName: string; reviewHref: string; currency: string }) {
+export function StatementUploadButton({
+  accountId,
+  accountName,
+  reviewHref,
+  currency,
+  prominent = false,
+}: {
+  accountId: string;
+  accountName: string;
+  reviewHref: string;
+  currency: string;
+  /** Kasa ve banka üst şeridi: hesap adıyla belirgin düğme (kart içinde küçük "Ekstre yükle"). */
+  prominent?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="ghost" size="xs" icon={Upload} onClick={() => setOpen(true)} aria-label={`${accountName} için banka ekstresi yükle`}>
-        Ekstre yükle
-      </Button>
+      {prominent ? (
+        <Button variant="outline" size="sm" icon={Upload} onClick={() => setOpen(true)} aria-label={`${accountName} için banka ekstresi yükle`}>
+          {accountName}
+        </Button>
+      ) : (
+        <Button variant="ghost" size="xs" icon={Upload} onClick={() => setOpen(true)} aria-label={`${accountName} için banka ekstresi yükle`}>
+          Ekstre yükle
+        </Button>
+      )}
       {open ? <UploadDialog accountId={accountId} accountName={accountName} reviewHref={reviewHref} currency={currency} onClose={() => setOpen(false)} /> : null}
     </>
   );

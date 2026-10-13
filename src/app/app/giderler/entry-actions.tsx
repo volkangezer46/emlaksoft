@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Undo2 } from "lucide-react";
-import { updateCashEntry, voidCashEntry } from "@/app/actions/finance-accounts";
+import { recordCashEntry, updateCashEntry, voidCashEntry } from "@/app/actions/finance-accounts";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
-import { categoriesFor, type CashDirection } from "@/lib/finance/cash/categories";
+import { categoriesFor, isCashCategory, type CashDirection } from "@/lib/finance/cash/categories";
 
 export type EditableEntry = {
   id: string;
@@ -21,6 +21,12 @@ export type EditableEntry = {
   note: string | null;
 };
 
+/**
+ * İptal sonrası "Geri al" için gereken bilgi (yalnız elle girilen gelir/gider). İptal kaydı silmez; geri alma aynı bilgilerle
+ * yeni bir hareket yazar. `hadExpense`: hareket ofis gideri üretmişti (iptal o gideri sildi), geri alınca yeniden üretilir.
+ */
+export type UndoInfo = { accountId: string; hadExpense: boolean };
+
 /** Hareket satırı eylemleri: düzenle (yalnız elle girilen gelir/gider) ve iptal (neden zorunlu; silinmez). */
 export function EntryRowActions({
   entry,
@@ -29,6 +35,8 @@ export function EntryRowActions({
   canVoid,
   canSalary,
   isTransfer,
+  undo,
+  disabledReason,
 }: {
   entry: EditableEntry;
   today: string;
@@ -36,22 +44,43 @@ export function EntryRowActions({
   canVoid: boolean;
   canSalary: boolean;
   isTransfer: boolean;
+  /** Verilirse iptal bildiriminde "Geri al" çıkar. */
+  undo?: UndoInfo | null;
+  /** Kilitli dönem vb.: düğmeler pasif, neden ipucu olarak gösterilir. */
+  disabledReason?: string | null;
 }) {
   const [mode, setMode] = useState<"edit" | "void" | null>(null);
   return (
     <div className="flex items-center justify-end gap-1">
       {canEdit ? (
-        <Button variant="ghost" size="xs" icon={Pencil} onClick={() => setMode("edit")} aria-label={`${entry.title} hareketini düzenle`}>
+        <Button
+          variant="ghost"
+          size="xs"
+          icon={Pencil}
+          onClick={() => setMode("edit")}
+          disabled={Boolean(disabledReason)}
+          title={disabledReason ?? undefined}
+          data-row-primary=""
+          aria-label={`${entry.title} hareketini düzenle`}
+        >
           Düzenle
         </Button>
       ) : null}
       {canVoid ? (
-        <Button variant="ghost" size="xs" icon={Undo2} onClick={() => setMode("void")} aria-label={`${entry.title} hareketini iptal et`}>
+        <Button
+          variant="ghost"
+          size="xs"
+          icon={Undo2}
+          onClick={() => setMode("void")}
+          disabled={Boolean(disabledReason)}
+          title={disabledReason ?? undefined}
+          aria-label={`${entry.title} hareketini iptal et`}
+        >
           İptal
         </Button>
       ) : null}
       {mode === "edit" ? <EditDialog entry={entry} today={today} canSalary={canSalary} onClose={() => setMode(null)} /> : null}
-      {mode === "void" ? <VoidDialog entry={entry} isTransfer={isTransfer} onClose={() => setMode(null)} /> : null}
+      {mode === "void" ? <VoidDialog entry={entry} isTransfer={isTransfer} undo={undo ?? null} onClose={() => setMode(null)} /> : null}
     </div>
   );
 }
@@ -124,7 +153,7 @@ function EditDialog({ entry, today, canSalary, onClose }: { entry: EditableEntry
   );
 }
 
-function VoidDialog({ entry, isTransfer, onClose }: { entry: EditableEntry; isTransfer: boolean; onClose: () => void }) {
+function VoidDialog({ entry, isTransfer, undo, onClose }: { entry: EditableEntry; isTransfer: boolean; undo: UndoInfo | null; onClose: () => void }) {
   const router = useRouter();
   const { push } = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -138,8 +167,26 @@ function VoidDialog({ entry, isTransfer, onClose }: { entry: EditableEntry; isTr
     const res = await voidCashEntry(entry.id, String(fd.get("reason") ?? ""));
     setBusy(false);
     if (res.error) return setError(res.error);
-    push("Hareket iptal edildi", "ok");
+    // Geri al: iptal edilen elle girilmiş hareket aynı bilgilerle yeniden yazılır (sistem kategorisi + transfer değil).
+    const restorable = undo && !isTransfer && entry.category && isCashCategory(entry.category, entry.direction) ? undo : null;
+    push("Hareket iptal edildi", "ok", restorable ? { action: { label: "Geri al", onClick: () => void restore(restorable) } } : undefined);
     onClose();
+    router.refresh();
+  }
+
+  async function restore(info: UndoInfo) {
+    const res = await recordCashEntry(entry.direction, {
+      accountId: info.accountId,
+      amount: String(entry.amount),
+      date: entry.date,
+      category: entry.category ?? "",
+      title: entry.title,
+      counterparty: entry.counterparty ?? "",
+      note: entry.note ?? "",
+      alsoExpense: info.hadExpense,
+    });
+    if (res.error) return push(res.error, "err");
+    push("Hareket geri alındı", "ok");
     router.refresh();
   }
 
