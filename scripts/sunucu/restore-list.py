@@ -18,5 +18,7 @@ for line in open(sys.argv[1]):
     elif typ=='POLICY' and schema=='storage' and 'avatars_owner' in name: keep=True
     elif typ=='TABLE DATA' and schema=='auth' and not name.startswith('schema_migrations'): keep=True
     elif typ=='TABLE DATA' and schema=='storage' and not name.startswith('migrations'): keep=True
+    # auth/storage sayaç değerleri (ör. auth.refresh_tokens_id_seq); yoksa yeni oturumlar eski kimliklerle çakışır.
+    elif typ=='SEQUENCE SET' and schema in ('auth','storage'): keep=True
     if keep: out.append(line)
 sys.stdout.writelines(out)

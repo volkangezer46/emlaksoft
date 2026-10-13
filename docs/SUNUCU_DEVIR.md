@@ -42,6 +42,8 @@ Bu belge, Windows dizüstündeki Claude oturumundan sunucudaki Claude oturumuna 
 - Bulut DB: Postgres 17.6, 57 MB, eklentiler pg_stat_statements, pg_trgm, pgcrypto, supabase_vault, uuid-ossp.
 
 ### İLERLEME (2026-10-13 sabah) — CANLI: https://emlaksoft.com.tr
+- ⚠️ OLAY (2026-10-13 01:30-01:39 UTC): girişler 500 "refresh_tokens_pkey duplicate" — geri yüklemede auth sayaçları taşınmamıştı (`auth.refresh_tokens_id_seq` 44, tablo azamisi 1372). `setval` ile düzeltildi; `restore-list.py` artık auth/storage SEQUENCE SET'i alır, `restore-cloud-dump.sh` sonunda tüm sahipli sayaçları sütun azamisine taşır. Kesme anında yeniden yüklemede otomatik.
+- Demo girişi her tıklamada parolayı yeniden yazıyordu → GoTrue o hesabın DİĞER oturumlarını siliyordu (aynı kartla giren ikinci kişi/sekme ilkini atıyordu). Düzeltme: parola yalnız giriş "invalid_credentials" ile başarısız olursa bir kez yazılır; meta veri yalnız bozuksa parolasız onarılır (src/app/actions/demo-login.ts).
 - ✅ Supabase imajları yükseltildi (`/root/supabase-compose.yml` = önceki `.next.yml`; eski hali `/root/backups/supabase-compose.pre-upgrade.yml`).
 - ✅ Bulut verisi canlı DB'ye yüklendi (`bulut-tam-20261013-0004.dump`): 287 tablo / 41.453 satır birebir, `check:migrations --database` + `db:rls-audit` temiz. Geri yüklemeden sonra **`NOTIFY pgrst, 'reload schema'` şart** (yoksa PGRST205 / health 503).
 - ✅ Uygulama: `scripts/sunucu/deploy.sh` (Dockerfile + BuildKit secret, `deploy/compose.prod.yml`, konteyner `emlaksoft-app`, Coolify Traefik etiketleri, Let's Encrypt `emlaksoft.com.tr` + `www` → kök 301, HSTS, h3). Coolify uygulaması DEĞİL; Coolify panelinde görünmez.

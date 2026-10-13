@@ -29,5 +29,20 @@ docker run --rm --network "$NET" -e PGPASSWORD="$PW" $IMG \
      WHEN TAG IN ('CREATE TABLE','CREATE TABLE AS','SELECT INTO')
      EXECUTE FUNCTION public.rls_auto_enable();"
 
+# Güvenlik ağı: sahipli her sayacı sütun azamisinin ötesine taşı (2026-10-13 olayı: refresh_tokens_pkey çakışması → giriş 500).
+docker run --rm --network "$NET" -e PGPASSWORD="$PW" $IMG \
+  psql -h "$HOST" -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -c "
+do \$\$ declare r record; mx bigint; begin
+for r in select n.nspname sch, s.relname seq, tn.nspname tsch, t.relname tbl, a.attname col
+  from pg_class s join pg_namespace n on n.oid=s.relnamespace
+  join pg_depend d on d.objid=s.oid and d.deptype in ('a','i')
+  join pg_class t on t.oid=d.refobjid join pg_namespace tn on tn.oid=t.relnamespace
+  join pg_attribute a on a.attrelid=t.oid and a.attnum=d.refobjsubid
+  where s.relkind='S' and n.nspname in ('auth','storage','public')
+loop
+  execute format('select max(%I)::bigint from %I.%I', r.col, r.tsch, r.tbl) into mx;
+  if mx is not null then execute format('select setval(%L, greatest(%s, (select last_value from %I.%I)))', r.sch||'.'||r.seq, mx, r.sch, r.seq); end if;
+end loop; end \$\$;"
+
 echo "pg_restore hataları (yalnız ensure_rls ile ilgili 2 hata beklenir):"
 grep 'error:' "$DIR/$BASE.restore.log" || true

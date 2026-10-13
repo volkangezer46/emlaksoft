@@ -73,18 +73,40 @@ async function ensureAuthUser(
   const existingId = await findAuthUserIdByEmail(admin, persona.email);
   if (!existingId) throw new Error("Demo kullanıcı bulundu ama kimlik alınamadı.");
 
+  // PAROLAYA DOKUNULMAZ: GoTrue parola değişince hesabın DİĞER TÜM oturumlarını siler; her demo girişinde
+  // parola yazmak, aynı kartla giren başka bir kişinin (veya ikinci sekmenin) oturumunu düşürüyordu.
+  // Parola yalnız giriş "geçersiz kimlik bilgisi" ile başarısız olursa ayarlanır (resetDemoPassword).
+  //
   // GoTrue app_metadata'yı BİRLEŞTİRİR: önceki bir "ofis adına gör" oturumundan kalan
   // impersonating/tenant_id gibi anahtarlar yalnız { role } yazınca silinmez ve hesabı kullanılamaz
-  // yapar (platform kimliği "taklit oturumu" sayılıp /app'e atılır). Bu yüzden açıkça temizlenir.
-  const { error: updErr } = await admin.auth.admin.updateUserById(existingId, {
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: persona.label },
-    app_metadata: restoreImpersonationMetadata({}, meta),
-  });
-  if (updErr) throw new Error(updErr.message);
+  // yapar (platform kimliği "taklit oturumu" sayılıp /app'e atılır). Yalnız GEREKİRSE (parolasız) onarılır.
+  const { data: existing, error: getErr } = await admin.auth.admin.getUserById(existingId);
+  if (getErr) throw new Error(getErr.message);
+  const current = (existing.user?.app_metadata ?? {}) as Record<string, unknown>;
+  const desired = restoreImpersonationMetadata({}, meta);
+  const metadataOk =
+    Object.entries(desired).every(([k, v]) => (current[k] ?? null) === (v ?? null)) &&
+    Boolean(existing.user?.email_confirmed_at) &&
+    existing.user?.user_metadata?.full_name === persona.label;
+  if (!metadataOk) {
+    const { error: updErr } = await admin.auth.admin.updateUserById(existingId, {
+      email_confirm: true,
+      user_metadata: { full_name: persona.label },
+      app_metadata: desired,
+    });
+    if (updErr) throw new Error(updErr.message);
+  }
 
   return existingId;
+}
+
+/** Türetilmiş demo parolası tutmuyorsa (ör. sır değişti) BİR KEZ yeniden yazar; bu, o hesabın diğer oturumlarını kapatır. */
+async function resetDemoPassword(persona: DemoPersona): Promise<void> {
+  const admin = createAdminClient();
+  const id = await findAuthUserIdByEmail(admin, persona.email);
+  if (!id) throw new Error("Demo kullanıcı bulunamadı.");
+  const { error } = await admin.auth.admin.updateUserById(id, { password: passwordForDemoIdentity(persona.email) });
+  if (error) throw new Error(error.message);
 }
 
 async function ensureDemoTenant(): Promise<string> {
@@ -203,10 +225,17 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: persona.email,
-    password: passwordForDemoIdentity(persona.email),
-  });
+  const credentials = { email: persona.email, password: passwordForDemoIdentity(persona.email) };
+  let { error } = await supabase.auth.signInWithPassword(credentials);
+  if (error && (error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message))) {
+    // Parola türetme sırrı değişmiş (ör. sunucu taşıması): yalnız bu durumda bir kez yeniden yazılır.
+    try {
+      await resetDemoPassword(persona);
+      ({ error } = await supabase.auth.signInWithPassword(credentials));
+    } catch (e) {
+      console.error("quickDemoLogin:resetPassword", e);
+    }
+  }
 
   if (error) {
     console.error("quickDemoLogin:signIn", error);
