@@ -154,7 +154,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           <KpiCard
             layout="inline"
             tinted
-            label="Dönemi bitmiş ama aktif"
+            label="Dönemi bitmiş abonelik"
             value={expiredActive}
             href="/admin/tenants?durum=donemi-bitmis"
             icon={Clock}
