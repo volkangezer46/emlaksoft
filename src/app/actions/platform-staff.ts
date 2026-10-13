@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -133,6 +134,9 @@ export async function updateStaffRole(fd: FormData): Promise<StaffActionResult> 
 
   if (!id) return { error: "Personel ID gerekli." };
   if (!role || !VALID_ROLES.includes(role)) return { error: "Geçersiz rol." };
+  // AD11: rol değişikliği doğrulayıcı kodu ister.
+  const stepUp = await requireStepUp(fd, "staff_role", staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
 

@@ -3,10 +3,8 @@
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useFormStatus } from "react-dom";
 import {
   Archive,
-  ArrowRight,
   Briefcase,
   Building2,
   CalendarDays,
@@ -29,7 +27,8 @@ import {
   UserX,
   Users,
 } from "lucide-react";
-import { startImpersonation, updateTenantPlanStatus } from "@/app/actions/platform";
+import { updateTenantPlanStatus } from "@/app/actions/platform";
+import { ImpersonateDialog } from "./impersonate-dialog";
 import { resendTenantOwnerAccessLink } from "@/app/actions/platform-tenants";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { DraftTable } from "@/components/ui/draft-table";
@@ -282,10 +281,7 @@ function TenantRow({
               <span className="btn-text">Yönet</span>
             </ButtonLink>
             {perms.canImpersonate ? (
-              <form action={startImpersonation}>
-                <input type="hidden" name="tenant_id" value={row.id} />
-                <ImpersonateButton name={row.name} />
-              </form>
+              <ImpersonateDialog tenantId={row.id} name={row.name} />
             ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -341,14 +337,5 @@ function TenantRow({
         </div>
       </td>
     </tr>
-  );
-}
-
-function ImpersonateButton({ name }: { name: string }) {
-  const { pending } = useFormStatus();
-  return (
-    <Button type="submit" size="sm" variant="gold" icon={ArrowRight} loading={pending} aria-label={`Ofise gir: ${name}`} title="Destek oturumuyla ofis paneline gir">
-      <span className="btn-text">Ofise gir</span>
-    </Button>
   );
 }

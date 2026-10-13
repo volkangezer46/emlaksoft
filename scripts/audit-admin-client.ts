@@ -142,6 +142,16 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
     tenantFilter: "uygulanamaz",
     evidence: "tek çağıran src/app/admin/site/hiz/saha/page.tsx (requirePlatformModule seo); analytics_vitals_summary yalnız web_vitals_daily histogramını (tenant_id YOK) okur",
   },
+  "src/app/actions/platform-access-policy.ts::revokeStaffSession": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "requirePlatformModule(personel) + guardPlatformAction(super_admin); platform_revoke_staff_session RPC'si yalnız platform_staff kullanıcısının auth.sessions satırını siler (tenant verisi yok); migration 20261013005000",
+  },
+  "src/lib/platform-security/security-overview.ts::loadStaffSessions": {
+    tenantFilter: "uygulanamaz",
+    evidence:
+      "tek çağıran src/app/admin/personel/guvenlik/page.tsx (requirePlatformModule personel); platform_list_staff_sessions yalnız aktif platform personelinin oturumlarını okur, platform_staff global tablo; migration 20261013005000",
+  },
   "src/lib/growth-analytics/funnel.ts::readGrowthFunnel": {
     tenantFilter: "uygulanamaz",
     evidence: "çağıranlar admin/site/reklam (requirePlatformModule seo) ve measure/collector (platform sağlık); platform_growth_funnel platform geneli toplam (kanal başına sayı) döner, ofis satırı/kimliği döndürmez; migration 20261013003220",

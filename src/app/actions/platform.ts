@@ -17,6 +17,9 @@ import {
 import { logActivity } from "@/lib/activity";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { logPlatformActivity } from "@/lib/platform-activity";
+import { logError } from "@/lib/error-log";
+import { parseImpersonationReason } from "@/lib/platform-security/impersonation-reason";
 
 export type PlatformResult = { error?: string; ok?: boolean; redirectTo?: string; code?: "stale" };
 
@@ -82,11 +85,19 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
   return { ok: true };
 }
 
+/**
+ * Destek erişimi (ofise salt-okunur bürünme). AD11: gerekçe (≥10 karakter) ve bilet no ZORUNLU; eksikse oturum
+ * açılmaz. Başlangıç ofisin kendi denetim günlüğüne "EmlakSoft destek erişimi" olarak (gerekçe + bilet no ile),
+ * platform denetim izine (IP/UA) ve kalıcı geçmişe (platform_impersonation_history) yazılır.
+ */
 export async function startImpersonation(formData: FormData): Promise<void> {
   const staff = await requirePlatformModule("tenants");
   if (!IMPERSONATION_ROLES.has(staff.role)) return;
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   if (!tenantId) return;
+  const justification = parseImpersonationReason(formData.get("reason"), formData.get("ticket_id"));
+  if (!justification.ok) redirect(`/admin/tenants?destek=${justification.code}`);
+  const { reason, ticketId } = justification;
 
   const admin = createAdminClient();
   const { data: tenant } = await admin
@@ -126,15 +137,20 @@ export async function startImpersonation(formData: FormData): Promise<void> {
       Number.isFinite(claimExpiry) ? claimExpiry * 1000 : Number.MAX_SAFE_INTEGER,
     ),
   ).toISOString();
-  const { error: snapshotError } = await admin
+  const snapshotRow = {
+    staff_id: staff.id,
+    auth_session_id: sessionId,
+    target_tenant_id: tenantId,
+    original_app_metadata: meta,
+    expires_at: expiresAt,
+  };
+  let { error: snapshotError } = await admin
     .from("platform_impersonation_sessions")
-    .insert({
-      staff_id: staff.id,
-      auth_session_id: sessionId,
-      target_tenant_id: tenantId,
-      original_app_metadata: meta,
-      expires_at: expiresAt,
-    });
+    .insert({ ...snapshotRow, reason, ticket_id: ticketId });
+  if (snapshotError?.code === "PGRST204") {
+    // AD11 migration'ı henüz yoksa (reason/ticket_id kolonu yok) eski biçimle yazılır; gerekçe denetim kayıtlarında kalır.
+    ({ error: snapshotError } = await admin.from("platform_impersonation_sessions").insert(snapshotRow));
+  }
   if (snapshotError) {
     console.error("start impersonation snapshot", snapshotError);
     return;
@@ -176,7 +192,14 @@ export async function startImpersonation(formData: FormData): Promise<void> {
     action: "ops.impersonate.start",
     entityType: "tenant",
     entityId: tenantId,
-    newValue: { tenant: tenant.name, auth_session_id: sessionId },
+    newValue: {
+      erisim: "EmlakSoft destek erişimi (salt okunur)",
+      tenant: tenant.name,
+      reason,
+      ticket_id: ticketId,
+      expires_at: expiresAt,
+      auth_session_id: sessionId,
+    },
   });
   if (!auditResult.ok) {
     const { error: restoreError } = await admin.auth.admin.updateUserById(staff.id, {
@@ -205,6 +228,28 @@ export async function startImpersonation(formData: FormData): Promise<void> {
       });
     }
     return;
+  }
+
+  const [{ error: historyError }] = await Promise.all([
+    admin.from("platform_impersonation_history").insert({
+      staff_id: staff.id,
+      target_tenant_id: tenantId,
+      auth_session_id: sessionId,
+      reason,
+      ticket_id: ticketId,
+      expires_at: expiresAt,
+    }),
+    logPlatformActivity({
+      actorId: staff.id,
+      action: "ops.impersonate.start",
+      entityType: "tenant",
+      entityId: tenantId,
+      meta: { tenant: tenant.name, reason, ticket_id: ticketId, expires_at: expiresAt },
+    }),
+  ]);
+  if (historyError && historyError.code !== "PGRST205") {
+    // Geçmiş satırı yazılamadı: erişim ofis denetim günlüğünde zaten kayıtlı; hata görünür kalır.
+    await logError({ source: "server", message: `Destek erişimi geçmişi yazılamadı: ${historyError.message}`, path: "platform_impersonation_history", userId: staff.id });
   }
 
   const jar = await cookies();
@@ -300,6 +345,20 @@ export async function stopImpersonation(): Promise<void> {
       entityId: tenantId,
     });
     auditFailed = !auditResult.ok;
+  }
+
+  if (tenantId) {
+    // AD11 geçmiş: bitiş zamanı (tek kez) + platform denetim izi. Hata durdurmayı engellemez.
+    const [{ error: endError }] = await Promise.all([
+      admin
+        .from("platform_impersonation_history")
+        .update({ ended_at: new Date().toISOString(), end_kind: "stopped" })
+        .eq("staff_id", staff.id)
+        .eq("auth_session_id", sessionId)
+        .is("ended_at", null),
+      logPlatformActivity({ actorId: staff.id, action: "ops.impersonate.stop", entityType: "tenant", entityId: tenantId }),
+    ]);
+    if (endError && endError.code !== "PGRST205") console.error("stop impersonation history", endError.message);
   }
 
   if (snapshot) {

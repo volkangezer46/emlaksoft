@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { setTenantLifecycleByAdmin } from "@/app/actions/platform-tenants";
 import { logActivity } from "@/lib/activity";
@@ -62,6 +63,11 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   }
   if (!confirmationMatches(String(formData.get("confirm_name") ?? ""), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
+  }
+  // AD11: hesap kapatma (ofis arşivlenir) doğrulayıcı kodu ister.
+  if (request.request_type === "account_closure") {
+    const stepUp = await requireStepUp(formData, "office_close", staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
   }
 
   // Talebi acan kullanici HALA bu ofisin aktif sahibi/genel muduru olmali (eski/yetkisiz talep ofisi arsivleyemez).

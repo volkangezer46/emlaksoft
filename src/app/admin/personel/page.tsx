@@ -26,6 +26,7 @@ import { RowSaveActions, rowDraftProps } from "@/components/ui/row-save-actions"
 import { DraftTable } from "@/components/ui/draft-table";
 import { ButtonLink } from "@/components/ui/button";
 import { useRowDraft } from "@/lib/ui/use-row-draft";
+import { useStepUpPrompt } from "@/components/admin/step-up";
 import {
   updateStaffRole,
   deactivateStaff,
@@ -106,6 +107,7 @@ function MfaCell({ status }: { status: { verified: number } | null | undefined }
 }
 
 function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStatus[string] | undefined; onDone: () => Promise<void> | void }) {
+  const stepUp = useStepUpPrompt();
   const draft = useRowDraft<StaffDraft>({
     id: member.id,
     label: member.full_name,
@@ -122,6 +124,9 @@ function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStat
       }
       if (d.role !== saved.role) {
         fd.set("role", d.role);
+        const code = await stepUp.ask("Rol değişikliği");
+        if (!code) return { error: "Rol değişikliği için doğrulayıcı kodu gerekli." };
+        fd.set("step_up_code", code);
         const r = await updateStaffRole(fd);
         if (r.error) {
           await onDone();
@@ -143,6 +148,7 @@ function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStat
   return (
     <TR {...rowDraftProps(draft)}>
       <TD>
+        {stepUp.dialog}
         <div className="flex items-center gap-2.5">
           <Avatar name={member.full_name} src={member.avatar_url} preset={member.avatar_preset} size="md" />
           <div className="min-w-0">

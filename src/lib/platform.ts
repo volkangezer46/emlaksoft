@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
+import { sessionExpired, sessionStartSec } from "@/lib/platform-security/admin-access";
+import { readAdminAccessPolicyCached } from "@/lib/platform-security/admin-access-cache";
+import { now } from "@/lib/clock";
 
 export type { PlatformRole };
 
@@ -150,13 +153,33 @@ export const getPlatformStaffUnrestricted = cache(async (): Promise<PlatformStaf
 });
 
 /**
+ * AD11 oturum ömrü: personel oturumu `platform.session_max_hours` saatten eskiyse (JWT `amr` giriş zamanı) yönetim
+ * yetkisi düşer ve sayfa kapısı /giris/oturum-sonu'na yollar. Bürünme (destek erişimi) kendi 4 saat sınırıyla yönetilir.
+ * Okuma hatası = süre dolmamış sayılır (kimlik kapıları ayrıca geçerli).
+ */
+export const isPlatformSessionExpired = cache(async (): Promise<boolean> => {
+  try {
+    const policy = await readAdminAccessPolicyCached();
+    if (policy.maxHours <= 0) return false;
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.getClaims();
+    if (error || !data?.claims) return false;
+    return sessionExpired(sessionStartSec(data.claims as Record<string, unknown>), Math.floor(now() / 1000), policy.maxHours);
+  } catch {
+    return false;
+  }
+});
+
+/**
  * Platform capability identity. Readonly impersonation never carries admin powers.
  * Parolası değişmemiş personel için null döner: tüm admin action'ları ve /api/admin rotaları reddedilir.
  */
 export const getPlatformStaff = cache(async (): Promise<PlatformStaff | null> => {
   const user = await getRequestUser();
   if (!user || user.app_metadata?.impersonating === true) return null;
-  return getPlatformStaffIdentity();
+  const staff = await getPlatformStaffIdentity();
+  if (staff && (await isPlatformSessionExpired())) return null;
+  return staff;
 });
 
 export async function requirePlatformStaff(): Promise<PlatformStaff> {
@@ -164,6 +187,10 @@ export async function requirePlatformStaff(): Promise<PlatformStaff> {
   if (!staff) {
     const user = await getRequestUser();
     if (!user) redirect("/giris?next=/admin");
+    // Süresi dolmuş personel oturumu (kimlik geçerli, yalnız ömür aşıldı): oturumu kapatıp girişe yolla.
+    if (user.app_metadata?.impersonating !== true && (await getPlatformStaffIdentity()) && (await isPlatformSessionExpired())) {
+      redirect("/giris/oturum-sonu?neden=sure");
+    }
     if (mustChangePassword(user) && (await getPlatformStaffUnrestricted())) redirect("/admin/hesabim");
     const candidate = await getPlatformMfaCandidate();
     if (candidate && user.app_metadata?.impersonating !== true) {

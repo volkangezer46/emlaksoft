@@ -69,6 +69,7 @@ import { OFFICE_SLUG_MAX, sanitizeSlugTyping, validateOfficeSlug } from "@/lib/a
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { cn } from "@/lib/utils";
+import { StepUpCodeField } from "@/components/admin/step-up";
 
 /**
  * Ofis 360 > Yönetim sekmesi. Tüm işlemler SAYFA İÇİNDE açılır (popup yok): düzenleme için
@@ -910,6 +911,7 @@ function OwnerSection({ tenant, can, owner, ownerCount, members }: OfficeManagem
             <div className="sm:col-span-2">
               <ConfirmName name={tenant.name} inputId="mgmt-transfer-confirm" />
             </div>
+            <StepUpCodeField id="mgmt-transfer-step-up" className="sm:col-span-2" />
             <div className="flex flex-wrap gap-2 sm:col-span-2">
               <Button variant="danger" size="sm" type="submit" disabled={transferAct.pending}>
                 {transferAct.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null} Sahipliği devret
@@ -1227,6 +1229,7 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
               <FormTextarea id="mgmt-lifecycle-reason" name="reason" rows={2} required minLength={5} maxLength={500} />
             </FormField>
             <ConfirmName name={tenant.name} inputId="mgmt-lifecycle-confirm" />
+            <StepUpCodeField id="mgmt-lifecycle-step-up" />
             <div className="flex flex-wrap gap-2">
               <Button variant="danger" size="sm" type="submit" disabled={act.pending}>
                 {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}
@@ -1322,6 +1325,7 @@ function ClosureRequests({ tenant, requests }: { tenant: ManagedTenant; requests
                   <FormTextarea id={`mgmt-closure-reason-${r.id}`} name="reason" rows={2} required minLength={5} maxLength={500} />
                 </FormField>
                 <ConfirmName name={tenant.name} inputId={`mgmt-closure-confirm-${r.id}`} />
+                {r.type === "account_closure" ? <StepUpCodeField id={`mgmt-closure-step-up-${r.id}`} /> : null}
                 <div className="flex flex-wrap gap-2">
                   <Button type="submit" variant={r.type === "account_closure" ? "danger" : "primary"} size="sm" disabled={act.pending}>
                     {act.pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : null}

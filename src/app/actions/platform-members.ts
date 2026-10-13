@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guardPlatformAction } from "@/lib/platform-guards";
@@ -94,6 +95,9 @@ export async function setMemberRoleAsStaff(fd: FormData): Promise<MemberActionRe
   if (!target) return { error: "Üye bulunamadı." };
   if (target.role === "owner") return { error: "Ofis sahibinin rolü bu ekrandan değiştirilemez." };
   if (target.role === role) return { ok: true };
+  // AD11: rol değişikliği doğrulayıcı kodu ister.
+  const stepUp = await requireStepUp(fd, "member_role", gate.staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
   if (authReadError || !authRecord.user) return { error: actionErrorMessage(authReadError, "Üyenin kimlik kaydı doğrulanamadı.") };

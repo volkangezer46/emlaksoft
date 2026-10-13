@@ -4,6 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { Building2, Crown, Eye, Phone, ShieldCheck, User, UserCheck, UserX, Users } from "lucide-react";
 import { setMemberActiveAsStaff, setMemberRoleAsStaff } from "@/app/actions/platform-members";
+import { useStepUpPrompt } from "@/components/admin/step-up";
 import { Avatar } from "@/components/ui/avatar";
 import { ButtonLink } from "@/components/ui/button";
 import { DraftTable } from "@/components/ui/draft-table";
@@ -75,6 +76,7 @@ export function MembersTable({ rows, canRole, canActive }: { rows: MemberRowData
 function MemberRow({ row, canRole, canActive }: { row: MemberRowData; canRole: boolean; canActive: boolean }) {
   const router = useRouter();
   const isOwner = row.role === "owner";
+  const stepUp = useStepUpPrompt();
   const draft = useRowDraft<MemberDraft>({
     id: row.id,
     label: row.name,
@@ -91,6 +93,9 @@ function MemberRow({ row, canRole, canActive }: { row: MemberRowData; canRole: b
       }
       if (d.role !== saved.role) {
         fd.set("role", d.role);
+        const code = await stepUp.ask("Rol değişikliği");
+        if (!code) return { error: "Rol değişikliği için doğrulayıcı kodu gerekli." };
+        fd.set("step_up_code", code);
         const r = await setMemberRoleAsStaff(fd);
         if (r.error) {
           router.refresh();
@@ -113,6 +118,7 @@ function MemberRow({ row, canRole, canActive }: { row: MemberRowData; canRole: b
   return (
     <tr {...rowDraftProps(draft)}>
       <td>
+        {stepUp.dialog}
         <div className="adm-ent">
           {row.avatarUrl || row.avatarPreset ? (
             <Avatar name={row.name} src={row.avatarUrl} preset={row.avatarPreset} size="md" />
