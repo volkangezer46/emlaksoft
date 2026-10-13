@@ -15,8 +15,17 @@ import { TubeGradient } from "./tube-gradient";
  * - `href` verilen dilim fareyle tıklanınca filtreli listeye gider (sıfır çıkmaz metrik). SVG aria-hidden olduğundan
  *   dilim bağlantısı odak sırasına girmez (tabIndex -1); klavye/ekran okuyucu yolu çağıranın lejant bağlantılarıdır.
  * - Erişilebilirlik: role="img" + her dilimin adı, değeri ve yüzdesi sr-only metinde; merkez içerik (`children`) görseldir.
+ *   Her dilim `<title>` taşır (üzerine gelince değer).
  */
-export type DonutSegment = { label: string; value: number; color?: string; tone?: VizTone; href?: string };
+export type DonutSegment = {
+  label: string;
+  value: number;
+  color?: string;
+  tone?: VizTone;
+  href?: string;
+  /** Üzerine gelince yerel ipucu (`<title>`); verilmezse "ad: değer (%pay)". */
+  title?: string;
+};
 
 export function DonutRing({
   segments,
@@ -81,7 +90,9 @@ export function DonutRing({
               strokeDasharray={`${a.len.toFixed(4)} 1`}
               strokeDashoffset={(-a.start).toFixed(4)}
               className="viz-ring-seg"
-            />
+            >
+              <title>{a.s.title ?? `${a.s.label}: ${formatViz(a.s.value, format)} (%${Math.round((a.s.value / total) * 100)})`}</title>
+            </circle>
           );
           return a.s.href ? (
             <Link key={i} href={a.s.href} tabIndex={-1} className="viz-ring-link">

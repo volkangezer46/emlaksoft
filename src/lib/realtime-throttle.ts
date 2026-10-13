@@ -5,28 +5,28 @@
  * değişiminde router.refresh() yapıyordu; toplu işlem (içe aktarma, toplu
  * atama) N oturum x M olay = sorgu fırtınası üretiyordu.
  *
- * Çözüm: (1) olay yalnız açık sayfayı ilgilendiren tablolardan geliyorsa dikkate
- * alınır, (2) iki yenileme arası en az REALTIME_MIN_INTERVAL_MS, (3) bekleyen
+ * Çözüm: (1) abonelik ROTAYA iner: açık sayfanın tabloları (`tablesForPath`, kaynak `ROUTE_TABLES`) TEK
+ * postgres_changes kanalında dinlenir, ilgisiz rotada kanal hiç açılmaz (Realtime sunucusu boşa satır
+ * süzmez, istemci boşa olay işlemez); (2) iki yenileme arası en az REALTIME_MIN_INTERVAL_MS, (3) bekleyen
  * yenileme varken gelen olaylar BİRLEŞTİRİLİR (zamanlayıcı yeniden kurulmaz).
  */
 
 export const REALTIME_MIN_INTERVAL_MS = 10_000;
 
-/** Yayındaki (supabase_realtime publication) çekirdek tablolar: kanal aboneliği bu kümeye yapılır. */
+/** Yayındaki (supabase_realtime publication) çekirdek tablolar. Hepsi `ROUTE_TABLES`'ta en az bir rotaya bağlıdır (test). */
 export const REALTIME_ALL_TABLES = ["deals", "commissions", "portal_listings", "customers"] as const;
 
 /**
- * Genişletilmiş tablolar AYRI kanalda dinlenir (publication'a eklenmemişse yalnız o kanal sessiz kalır, çekirdek
- * kanal etkilenmez). Etkinleştirmek için publication'a ekleyen migration gerekir (bkz. docs/HAFIZA.md §3 hız).
+ * Genişletilmiş tablolar (20261011000800 ile yayında). Rota kanalı tek olduğundan yeni bir tablo `ROUTE_TABLES`'a
+ * ancak publication'a eklendikten SONRA yazılır (yayında olmayan tablo o rotanın kanalını sessiz bırakır).
  */
 export const REALTIME_EXTENDED_TABLES = ["properties", "customer_demands", "appointments", "tasks", "listing_pool_entries", "cash_entries"] as const;
 
-/**
- * Üçüncü kanal: 20261012002300 (merkez tabloları) ve 20261012002500 (fsbo_leads) ile yayına eklenen tablolar (migration uygulanana kadar yalnız bu kanal sessiz kalır).
- */
+/** 20261012002300 (merkez tabloları) ve 20261012002500 (fsbo_leads) ile yayına eklenen tablolar. */
 export const REALTIME_MORE_TABLES = ["offers", "rent_charges", "rent_payments", "property_keys", "fsbo_leads"] as const;
 
-const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
+/** Rota öneki → o sayfada tazelenmesi anlamlı tablolar (realtime aboneliğinin TEK kaynağı). */
+export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["/app/musteriler", ["customers"]],
   ["/app/komisyon", ["commissions"]],
   ["/app/anlasmalar", ["deals", "commissions"]],
@@ -47,10 +47,13 @@ const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
   ["/app/portfoy-avi", ["fsbo_leads"]],
 ];
 
-/** Açık rotada tazelenmesi anlamlı tablolar. Ana pano tümünü gösterir; bilinmeyen rota hiçbirini. */
+/** Ana pano (/app) tüm merkezlerin özetini gösterir: rota tablolarının birleşimi (sıra korunur, tekrarsız). */
+const HOME_TABLES: readonly string[] = [...new Set(ROUTE_TABLES.flatMap(([, tables]) => tables))];
+
+/** Açık rotada tazelenmesi anlamlı tablolar. Ana pano tümünü gösterir; bilinmeyen rota hiçbirini (kanal açılmaz). */
 export function tablesForPath(pathname: string | null | undefined): readonly string[] {
   const p = (pathname ?? "").split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
-  if (p === "/app") return [...REALTIME_ALL_TABLES, ...REALTIME_EXTENDED_TABLES, ...REALTIME_MORE_TABLES];
+  if (p === "/app") return HOME_TABLES;
   for (const [prefix, tables] of ROUTE_TABLES) {
     if (p === prefix || p.startsWith(`${prefix}/`)) return tables;
   }

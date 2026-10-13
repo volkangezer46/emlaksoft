@@ -14,7 +14,7 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
 import { formatTry } from "@/lib/format";
 import { now as clockNow } from "@/lib/clock";
-import { AreaTrendChart } from "@/components/ui/lazy-charts";
+import { AreaTrendChart } from "@/components/ui/viz/server-charts";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";

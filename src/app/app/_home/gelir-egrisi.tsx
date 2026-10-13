@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { Wallet } from "lucide-react";
 import { ChartCard } from "@/components/ui/chart-frame";
-import { AreaTrendChart } from "@/components/ui/lazy-charts";
+import { AreaTrendChart } from "@/components/ui/viz/server-charts";
 import { EmptyState } from "@/components/ui/empty-state";
 import { computeTrend } from "@/components/ui/premium";
 import { now } from "@/lib/clock";

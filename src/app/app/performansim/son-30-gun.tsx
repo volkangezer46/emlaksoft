@@ -1,6 +1,6 @@
 import { Activity } from "lucide-react";
 import { ChartCard } from "@/components/ui/chart-frame";
-import { AreaTrendChart } from "@/components/ui/lazy-charts";
+import { AreaTrendChart } from "@/components/ui/viz/server-charts";
 import { EmptyState } from "@/components/ui/empty-state";
 import { daysAgoIso, now } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
