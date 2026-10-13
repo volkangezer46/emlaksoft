@@ -160,6 +160,8 @@ describe("navigation accessibility contract", () => {
     expect(sources.filter((file) => /from "@dnd-kit\//.test(source(file))).sort()).toEqual([
       // Admin "Site menüsü" editörü: yalnız /admin/site-menu rotasının kendi parçasında (herkese açık sayfalara girmez).
       "src/app/admin/site-menu/menu-tab.tsx",
+      // Admin "Rehber" blok editörü: yalnız /admin/site/rehber/[id] rotasının kendi parçasında.
+      "src/app/admin/site/rehber/[id]/block-list.tsx",
       "src/app/app/anlasmalar/board-dnd.ts",
       "src/app/app/anlasmalar/deal-board.tsx",
     ]);
