@@ -69,7 +69,7 @@ describe("istemci/sunucu sınırları", () => {
     expect(a.match(/requirePermission\("portals", "edit"\)/g)?.length).toBe(2);
   });
   it("yeni cron yok: kopya taraması portal-teyit'in gece turunda, SLA görevi leak-sla'da", () => {
-    expect(CRON_JOBS.length).toBe(38);
+    expect(CRON_JOBS.length).toBe(39);
     expect(src("src/lib/listing-control/server/cron-steps.ts")).toContain("runDuplicateScan(");
     expect(src("src/lib/listing-control/server/escalate.ts")).toContain("createSlaTasks(");
     expect(src("src/lib/listing-control/server/escalate.ts")).toContain("notifyTenant(");
