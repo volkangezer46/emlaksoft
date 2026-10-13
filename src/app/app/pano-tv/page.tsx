@@ -33,5 +33,11 @@ export default async function PanoTvPage() {
   const tenant = profile?.tenants as { name?: string } | { name?: string }[] | null | undefined;
   const officeName = (Array.isArray(tenant) ? tenant[0]?.name : tenant?.name) || "Ofis";
 
-  return <TvBoard tenantId={tenantId} officeName={officeName} />;
+  // Pano tam ekran ve görsel başlıksızdır; sayfa başlığı (tek h1) ekran okuyucu için sr-only.
+  return (
+    <>
+      <h1 className="sr-only">Ofis Panosu · {officeName}</h1>
+      <TvBoard tenantId={tenantId} officeName={officeName} />
+    </>
+  );
 }
