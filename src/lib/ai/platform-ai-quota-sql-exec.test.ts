@@ -24,6 +24,8 @@ describe.skipIf(!mod)("platform_ai_quota_take — gerçek PL/pgSQL (pglite)", ()
     await db.exec(read("supabase/migrations/20261013003100_platform_ai_quota.sql").replace(/notify pgrst[^;]*;/g, ""));
   });
 
+  // SINIR: pglite tek bağlantılıdır; Promise.all çağrıları fiilen SIRALI yürütür. Bu test SQL mantığını (koşullu
+  // artırma) kanıtlar, gerçek satır kilidi yarışını DEĞİL; o yalnız gölge DB'de elle 20 eşzamanlı psql ile denendi.
   it("eşzamanlı 20 çağrıda limit (5) aşılmaz", async () => {
     const results = await Promise.all(Array.from({ length: 20 }, () => take("seo.ai", 5)));
     expect(results.filter(Boolean)).toHaveLength(5);

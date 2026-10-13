@@ -19,7 +19,7 @@ import {
   type PageFacts,
 } from "./audit-rules";
 import { discoveryFindings, inboundLinks, nextFrontier, urlKey } from "./discovery";
-import { postIndexNow } from "./indexnow-events";
+import { indexNowPrint, postIndexNow } from "./indexnow-events";
 import { ALWAYS_DISALLOW } from "./registry";
 import { INDEXNOW_DAILY_LIMIT, type SeoIndexNowSettings } from "./schema";
 import { isPublicScope, pathOfUrl } from "./scope";
@@ -436,7 +436,7 @@ const PAGE_LEVEL_CODES = new Set([
 
 /* ------------------------------ IndexNow ------------------------------ */
 
-const fp = (url: string, lastmod?: string) => createHash("sha1").update(`${url}|${lastmod ?? ""}`).digest("hex").slice(0, 10);
+const fp = indexNowPrint;
 
 export type IndexNowOutcome = { sent: number; status: string; skipped?: string };
 

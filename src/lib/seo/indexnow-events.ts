@@ -1,9 +1,10 @@
+import { createHash } from "node:crypto";
 import { getBaseUrl } from "@/lib/base-url";
 import { now, trDayKey } from "@/lib/clock";
 import { discardExternalResponse, fetchExternal } from "@/lib/external-fetch";
 import { INDEXNOW_DAILY_LIMIT, type IndexNowLogEntry } from "./schema";
 import { canAutoOptimize, pathOfUrl } from "./scope";
-import { appendIndexNowLog, readIndexNow, writeIndexNow } from "./store";
+import { appendIndexNowLog, readIndexNow, readIndexNowSeen, writeIndexNow, writeIndexNowSeen } from "./store";
 
 /**
  * IndexNow OLAY bildirimi (yayın anı, Kokpit eylemi). Günlük robot sitemap farkını ayrıca gönderir (audit-runner.ts
@@ -17,6 +18,9 @@ import { appendIndexNowLog, readIndexNow, writeIndexNow } from "./store";
  */
 
 const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
+
+/** `url|lastmod` parmak izi (seo.indexnow.seen). Günlük sitemap farkı (runIndexNow) ile olay bildirimi AYNI işlevi kullanır. */
+export const indexNowPrint = (url: string, lastmod?: string) => createHash("sha1").update(`${url}|${lastmod ?? ""}`).digest("hex").slice(0, 10);
 
 export type IndexNowEventOutcome = { sent: number; status: string; skipped?: string };
 
@@ -97,10 +101,18 @@ export async function notifyIndexNow(
   if (!/^[a-f0-9]{32}$/.test(s.key)) return { sent: 0, status: "anahtar yok", skipped: "IndexNow anahtarı üretilmemiş" };
 
   let sitemapPaths = opts.sitemapPaths;
+  // Yol -> sitemap girdisi: başarılı gönderimden sonra `url|lastmod` parmak izi "görüldü" kümesine yazılır; böylece
+  // ertesi günkü sitemap farkı (runIndexNow) yayının değiştirdiği lastmod yüzünden aynı adresi YENİDEN göndermez.
+  let byPath: Map<string, { url: string; lastModified?: string }> | null = null;
   if (!sitemapPaths) {
     const { loadSitemapFresh } = await import("./sitemap-data");
     const fresh = await loadSitemapFresh();
-    sitemapPaths = new Set(fresh.chunks.flat().map((e) => pathOfUrl(e.url)).filter((p): p is string => p !== null));
+    byPath = new Map();
+    for (const e of fresh.chunks.flat()) {
+      const p = pathOfUrl(e.url);
+      if (p !== null && !byPath.has(p)) byPath.set(p, e);
+    }
+    sitemapPaths = new Set(byPath.keys());
   }
   const eligible = indexNowEligible(urls, getBaseUrl(), sitemapPaths);
   if (eligible.length === 0) return { sent: 0, status: "gönderilecek adres yok", skipped: "Adresler kapsam dışı ya da indekslenmiyor" };
@@ -113,6 +125,16 @@ export async function notifyIndexNow(
 
   const batch = eligible.slice(0, remaining);
   const res = await postIndexNow(s.key, batch, opts.source, nowMs);
+  if (res.ok && byPath) {
+    const seen = await readIndexNowSeen();
+    const before = seen.size;
+    for (const u of batch) {
+      const p = pathOfUrl(u);
+      const e = p === null ? undefined : byPath.get(p);
+      if (e) seen.add(indexNowPrint(e.url, e.lastModified));
+    }
+    if (seen.size !== before) await writeIndexNowSeen(seen);
+  }
   await writeIndexNow({
     ...s,
     lastSentAt: new Date(nowMs).toISOString(),

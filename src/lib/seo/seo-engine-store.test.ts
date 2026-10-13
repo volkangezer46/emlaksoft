@@ -20,12 +20,19 @@ vi.mock("@/lib/platform-settings", () => ({
 vi.mock("@/lib/ai-advisor", () => ({ getOpenAiKey: async () => "sk-test" }));
 vi.mock("@/lib/ai/platform-quota", () => ({ takePlatformAiQuota: async () => ({ ok: true }) }));
 vi.mock("@/lib/platform-activity", () => ({ logPlatformActivity: async () => undefined }));
+const sitemapEntries: { url: string; lastModified?: string }[] = [];
+vi.mock("./sitemap-data", async (orig) => ({
+  ...(await orig<typeof import("./sitemap-data")>()),
+  loadSitemapFresh: async () => ({ chunks: [sitemapEntries], total: sitemapEntries.length }),
+}));
 
-const { seoPublishSurface, draftSeoPageField, seoOverridesStore } = await import("./publish-surface");
+const { seoPublishSurface, draftSeoPageField, seoOverridesStore, discardSeoDraftPatch, changedPagePaths } = await import("./publish-surface");
+type SeoPagesT = Parameters<typeof changedPagePaths>[0];
 const { suggestSeoWithAi } = await import("./ai-suggest");
-const { notifyIndexNow } = await import("./indexnow-events");
+const { notifyIndexNow, indexNowPrint } = await import("./indexnow-events");
+const { runIndexNow } = await import("./audit-runner");
 const { auditRunToIssues } = await import("./issues-collector");
-const { seoMetaDraftExecutor, indexNowExecutor } = await import("./executors");
+const { seoMetaDraftExecutor, indexNowExecutor, redirect404DraftExecutor } = await import("./executors");
 const { readSeoSettingsFresh } = await import("./store");
 const { SEO_KEYS } = await import("./schema");
 const { ogImageFindings } = await import("./audit-runner");
@@ -66,6 +73,36 @@ describe("SEO yayın yüzeyi (K5)", () => {
     expect(back.ok).toBe(true);
     expect(pages()["/fiyatlar"]?.description).toBe("Eski açıklama");
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it("taslak bir farktır: yayın -> doğrudan kayıt -> yeni taslak -> yayın doğrudan kaydı EZMEZ, hayalet taslak yok", async () => {
+    mem.set(SEO_KEYS.pages, JSON.stringify({ "/fiyatlar": { description: "Eski" } }));
+    await draftSeoPageField("/fiyatlar", "description", "Yeni", "staff-1");
+    const first = await seoPublishSurface.readState();
+    expect((await seoPublishSurface.publish(first.draft, "staff-1", "İlk yayın")).ok).toBe(true);
+    // Yayından sonra bekleyen taslak yok.
+    expect((await seoPublishSurface.readState()).draft).toBeNull();
+
+    // Doğrudan kayıt (saveSeoPage -> writeSeoSetting("pages")) taslağa dokunmaz.
+    mem.set(SEO_KEYS.pages, JSON.stringify({ ...pages(), "/araclar": { title: "Doğrudan kayıt" } }));
+    expect((await seoPublishSurface.readState()).draft).toBeNull();
+
+    await draftSeoPageField("/fiyatlar", "ogTitle", "OG yeni", "staff-1");
+    const second = await seoPublishSurface.readState();
+    expect(changedPagePaths(second.live as SeoPagesT, second.draft as SeoPagesT)).toEqual(["/fiyatlar"]);
+    expect((await seoPublishSurface.publish(second.draft, "staff-1", "İkinci yayın")).ok).toBe(true);
+    const live = pages() as Record<string, { title?: string; description?: string; ogTitle?: string }>;
+    expect(live["/araclar"]?.title).toBe("Doğrudan kayıt");
+    expect(live["/fiyatlar"]).toMatchObject({ description: "Yeni", ogTitle: "OG yeni" });
+  });
+  it("taslağı atmak bekleyen farkı boşaltır; canlıyla aynı değer taslak sayılmaz", async () => {
+    mem.set(SEO_KEYS.pages, JSON.stringify({ "/fiyatlar": { description: "Aynı" } }));
+    await draftSeoPageField("/fiyatlar", "description", "Aynı", "staff-1");
+    expect((await seoPublishSurface.readState()).draft).toBeNull();
+    await draftSeoPageField("/fiyatlar", "description", "Farklı", "staff-1");
+    expect((await seoPublishSurface.readState()).draft).not.toBeNull();
+    expect((await discardSeoDraftPatch("staff-1")).ok).toBe(true);
+    mem.set(SEO_KEYS.pages, JSON.stringify({ "/fiyatlar": { description: "Aynı" }, "/araclar": { title: "Sonra" } }));
+    expect((await seoPublishSurface.readState()).draft).toBeNull();
   });
   it("geçersiz yapılandırma kalıcı hata ile reddedilir", async () => {
     const r = await seoPublishSurface.publish({ "/x": { title: "<b>html</b>" } }, "s", "x");
@@ -138,6 +175,19 @@ describe("IndexNow olay bildirimi", () => {
     expect(log[0]).toMatchObject({ url: "https://emlaksoft.com.tr/fiyatlar", status: 200, source: "yayin" });
     vi.unstubAllEnvs();
   });
+  it("olay gönderimi url|lastmod parmak izini görüldü kümesine yazar: ertesi günkü sitemap farkı yeniden göndermez", async () => {
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://emlaksoft.com.tr");
+    mem.set(SEO_KEYS.indexnow, JSON.stringify({ enabled: true, key: "a".repeat(32) }));
+    sitemapEntries.splice(0, sitemapEntries.length, { url: "https://emlaksoft.com.tr/fiyatlar", lastModified: "2026-10-12T10:00:00.000Z" });
+    const r = await notifyIndexNow(["https://emlaksoft.com.tr/fiyatlar"], { source: "yayin" });
+    expect(r.sent).toBe(1);
+    expect((mem.get(SEO_KEYS.indexnowSeen) ?? "").split(",")).toContain(indexNowPrint("https://emlaksoft.com.tr/fiyatlar", "2026-10-12T10:00:00.000Z"));
+    const daily = await runIndexNow(sitemapEntries, new Set(), Date.parse("2026-10-13T03:00:00.000Z"));
+    expect(daily).toMatchObject({ sent: 0, status: "değişiklik yok" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    sitemapEntries.length = 0;
+    vi.unstubAllEnvs();
+  });
 });
 
 describe("seoCollector read dönüşümü ve eylem kapsamı", () => {
@@ -198,5 +248,24 @@ describe("seoCollector read dönüşümü ve eylem kapsamı", () => {
     expect(mem.get(SEO_KEYS.pages) ?? null).toBe(before);
     const draft = (await seoOverridesStore.readState()).draft!;
     expect(draft["/fiyatlar"]?.description?.length).toBeLessThanOrEqual(155);
+  });
+});
+
+describe("redirect_404_draft kapsam kapısı", () => {
+  const ORIGIN = "https://emlaksoft.com.tr";
+  const notFound = (p: string, extra: Record<string, unknown> = {}) => ({ url: `${ORIGIN}${p}`, code: "http-error", manualOnly: false, evidence: { status: 404 }, ...extra });
+  it("manualOnly ya da kapsam dışı yol hiçbir zaman yönlendirme taslağı almaz", async () => {
+    for (const p of ["/kayit", "/kayit/tamamla", "/giris", "/app", "/admin", "/sifre-yenile", "/vitrin/ofis", "/"]) {
+      expect(redirect404DraftExecutor.canHandle(notFound(p)), p).toBe(false);
+      expect(await redirect404DraftExecutor.plan(notFound(p)), p).toBeNull();
+    }
+    expect(redirect404DraftExecutor.canHandle(notFound("/fiyat", { manualOnly: true }))).toBe(false);
+  });
+  it("yalnız bulunamadı bulgusu: başka kodlar ve broken-link (kaynak sayfa adresi) reddedilir", () => {
+    expect(redirect404DraftExecutor.canHandle({ url: `${ORIGIN}/fiyat`, code: "long-description", manualOnly: false })).toBe(false);
+    expect(redirect404DraftExecutor.canHandle({ url: `${ORIGIN}/fiyat`, code: "broken-link", manualOnly: false })).toBe(false);
+    expect(redirect404DraftExecutor.canHandle(notFound("/fiyat", { evidence: { status: 500 } }))).toBe(false);
+    expect(redirect404DraftExecutor.canHandle(notFound("/fiyat"))).toBe(true);
+    expect(redirect404DraftExecutor.canHandle({ url: `${ORIGIN}/fiyat`, code: "x", manualOnly: false, proposal: { rule: "redirect_404", summary: "x" } })).toBe(true);
   });
 });
