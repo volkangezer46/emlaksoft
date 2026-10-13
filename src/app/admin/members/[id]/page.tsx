@@ -13,6 +13,7 @@ import {
   Mail,
   Phone,
   ShieldCheck,
+  SlidersHorizontal,
   UserRound,
 } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -22,6 +23,11 @@ import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { formatDateTimeTr } from "@/lib/format";
 import { PageTabs } from "@/components/app/page-tabs";
 import { MemberAccessPanel, MemberInfoForm } from "./member-forms";
+import { TwoFactorResetPanel } from "./member-support-tools";
+import { AccessInspector } from "./access-inspector";
+import { explainModuleAccess, explainScope, type ScopeRowInput } from "@/lib/admin/member-access-explain";
+import type { RoleOverrideRow, UserOverrideRow } from "@/lib/permissions-effective";
+import { now } from "@/lib/clock";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
@@ -52,7 +58,49 @@ const MEMBER_TABS = [
   { id: "genel", label: "Genel", icon: LayoutList },
   { id: "bilgiler", label: "Bilgiler", icon: Pencil },
   { id: "erisim", label: "Erişim", icon: ShieldCheck },
+  { id: "yetki", label: "Yetki", icon: SlidersHorizontal },
 ] as const;
+
+type Admin = ReturnType<typeof createAdminClient>;
+
+/**
+ * Yetki sekmesi verisi (yalnız o sekmede okunur): ofis rol ayarı, kişi istisnaları, kapsam satırı, şube/takım
+ * seçenekleri ve ofis durumu — altısı tek turda (Promise.all).
+ */
+async function loadAccessData(admin: Admin, profile: { id: string; tenant_id: string; role: string; team_id?: string | null; branch_id?: string | null }) {
+  const [roleRes, userRes, scopeRes, branchesRes, teamsRes, tenantRes] = await Promise.all([
+    admin.from("tenant_role_permissions").select("module, action, allowed").eq("tenant_id", profile.tenant_id).eq("role", profile.role),
+    admin.from("user_permission_overrides").select("module, actions, expires_at").eq("tenant_id", profile.tenant_id).eq("user_id", profile.id),
+    admin
+      .from("user_scopes")
+      .select("scope_type, team_id, branch_id, can_view_all_data, can_edit_team_members, can_override_permissions, can_see_earnings")
+      .eq("tenant_id", profile.tenant_id)
+      .eq("user_id", profile.id)
+      .maybeSingle(),
+    admin.from("branches").select("id, name").eq("tenant_id", profile.tenant_id).eq("is_active", true).order("name", { ascending: true }).limit(100),
+    admin.from("teams").select("id, name").eq("tenant_id", profile.tenant_id).eq("is_active", true).order("name", { ascending: true }).limit(100),
+    admin.from("tenants").select("status").eq("id", profile.tenant_id).maybeSingle(),
+  ]);
+  const branches = (branchesRes.data ?? []) as { id: string; name: string }[];
+  const teams = (teamsRes.data ?? []) as { id: string; name: string }[];
+  const scopeRow = (scopeRes.data as ScopeRowInput | null) ?? null;
+  const ctxTeam = teams.find((t) => t.id === (scopeRow?.team_id ?? profile.team_id))?.name ?? null;
+  const ctxBranch = branches.find((b) => b.id === (scopeRow?.branch_id ?? profile.branch_id))?.name ?? null;
+  const scope = explainScope(profile.role, scopeRow, { teamName: ctxTeam, branchName: ctxBranch });
+  return {
+    error: Boolean(roleRes.error || userRes.error),
+    rows: explainModuleAccess({
+      role: profile.role,
+      roleOverrides: (roleRes.data ?? []) as RoleOverrideRow[],
+      userOverrides: (userRes.data ?? []) as UserOverrideRow[],
+      nowMs: now(),
+    }),
+    scope: { text: scope.text, custom: scope.custom, value: scope.scope },
+    branches,
+    teams,
+    tenantStatus: (tenantRes.data as { status?: string } | null)?.status ?? null,
+  };
+}
 
 export default async function AdminMemberDetailPage({
   params,
@@ -64,7 +112,7 @@ export default async function AdminMemberDetailPage({
   const staff = await requirePlatformModule("members");
   const { id } = await params;
   const sekme = (await searchParams)?.sekme;
-  const active = sekme === "bilgiler" || sekme === "erisim" ? sekme : "genel";
+  const active = sekme === "bilgiler" || sekme === "erisim" || sekme === "yetki" ? sekme : "genel";
   const admin = createAdminClient();
 
   /*
@@ -74,7 +122,7 @@ export default async function AdminMemberDetailPage({
   const [{ data: profile }, authRes, loginRes, auditRes] = await Promise.all([
     admin
       .from("profiles")
-      .select("id, full_name, phone, role, is_active, created_at, tenant_id, branch_id, tenant:tenants!profiles_tenant_id_fkey(name), branch:branches!profiles_branch_id_fkey(name)")
+      .select("id, full_name, phone, role, is_active, created_at, tenant_id, branch_id, team_id, two_factor_sms, tenant:tenants!profiles_tenant_id_fkey(name), branch:branches!profiles_branch_id_fkey(name)")
       .eq("id", id)
       .maybeSingle(),
     admin.auth.admin.getUserById(id).catch(() => ({ data: { user: null } })),
@@ -94,6 +142,7 @@ export default async function AdminMemberDetailPage({
   ]);
 
   if (!profile) notFound();
+  const accessData = active === "yetki" && profile.tenant_id ? await loadAccessData(admin, profile) : null;
 
   const authUser = authRes.data?.user ?? null;
   const logins = (loginRes.data ?? []) as LoginRow[];
@@ -170,15 +219,41 @@ export default async function AdminMemberDetailPage({
       ) : null}
 
       {active === "erisim" ? (
-        <MemberAccessPanel
-          id={id}
-          role={profile.role}
-          roleLabel={roleLabel[profile.role] ?? profile.role}
-          isActive={profile.is_active}
-          canRole={staff.role === "super_admin"}
-          canActive={staff.role === "super_admin" || staff.role === "ops"}
-          canReset={staff.role === "super_admin"}
-        />
+        <div className="space-y-5">
+          <MemberAccessPanel
+            id={id}
+            name={profile.full_name}
+            role={profile.role}
+            roleLabel={roleLabel[profile.role] ?? profile.role}
+            isActive={profile.is_active}
+            canRole={staff.role === "super_admin"}
+            canActive={staff.role === "super_admin" || staff.role === "ops"}
+            canReset={staff.role === "super_admin"}
+          />
+          <TwoFactorResetPanel id={id} enabled={Boolean(profile.two_factor_sms)} canReset={staff.role === "super_admin" || staff.role === "ops"} />
+        </div>
+      ) : null}
+
+      {active === "yetki" && accessData && profile.tenant_id ? (
+        accessData.error ? (
+          <p role="alert" className="rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/8 px-4 py-6 text-center text-sm text-danger-600">
+            İzin kayıtları okunamadı. Sayfayı yenileyin.
+          </p>
+        ) : (
+          <AccessInspector
+            memberId={id}
+            tenantId={profile.tenant_id}
+            role={profile.role}
+            roleLabel={roleLabel[profile.role] ?? profile.role}
+            isActive={profile.is_active}
+            tenantStatus={accessData.tenantStatus}
+            rows={accessData.rows}
+            scope={accessData.scope}
+            branches={accessData.branches}
+            teams={accessData.teams}
+            canEdit={staff.role === "super_admin" || staff.role === "ops"}
+          />
+        )
       ) : null}
 
       {active === "genel" ? (

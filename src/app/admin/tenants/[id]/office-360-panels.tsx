@@ -22,6 +22,7 @@ import {
   type TicketRow,
 } from "@/lib/admin/office-360";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { MemberLoginLog, RenewInviteButton } from "./team-member-tools";
 
 const fmt = (iso: string | null | undefined) =>
   iso ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(iso)) : "—";
@@ -254,10 +255,13 @@ export function ExportVault({ tenantId }: { tenantId: string }) {
 export function TeamTab({ members, failed30d, tenantId }: { members: TeamMember[]; failed30d: number; tenantId: string }) {
   const active = members.filter((m) => m.is_active).length;
   const with2fa = members.filter((m) => m.two_factor_sms).length;
+  // Bekleyen davet: aktif ama hiç başarılı girişi olmayan üye (daveti kabul edip parola belirlememiş).
+  const pending = members.filter((m) => m.is_active && !m.lastLogin);
+  const membersHref = `/admin/members?tenant=${tenantId}`;
   const stats: { label: string; value: number; href?: string }[] = [
-    { label: "Aktif kullanıcı", value: active },
-    { label: "Pasif kullanıcı", value: members.length - active },
-    { label: "SMS 2FA açık", value: with2fa },
+    { label: "Aktif kullanıcı", value: active, href: `${membersHref}&durum=aktif` },
+    { label: "Pasif kullanıcı", value: members.length - active, href: `${membersHref}&durum=pasif` },
+    { label: "SMS 2FA açık", value: with2fa, href: `${membersHref}&tfa=acik` },
     { label: "Başarısız giriş · 30 gün", value: failed30d, href: `/admin/tenants/${tenantId}?sekme=zaman&kategori=oturum` },
   ];
   return (
@@ -281,6 +285,28 @@ export function TeamTab({ members, failed30d, tenantId }: { members: TeamMember[
           );
         })}
       </div>
+      {pending.length > 0 ? (
+        <Panel title={`Bekleyen davetler (${pending.length})`}>
+          <p className="px-5 pt-3 text-xs text-text-muted">
+            Hiç giriş yapmamış aktif üyeler. “Daveti yenile” tek kullanımlık parola belirleme bağlantısı üretir (yalnız süper admin); bağlantıyı üyeye güvenli kanaldan iletin.
+          </p>
+          <div className="divide-y divide-line">
+            {pending.map((m) => (
+              <div key={m.id} className="flex flex-wrap items-center gap-3 px-5 py-3">
+                <div className="min-w-0 flex-1">
+                  <Link href={`/admin/members/${m.id}`} className="truncate text-sm font-semibold text-ink-950 hover:text-brand-600">
+                    {m.full_name ?? "İsimsiz kullanıcı"}
+                  </Link>
+                  <p className="text-xs text-text-faint">
+                    {ROLE_LABEL[m.role] ?? m.role} · davet {relativeTimeTR(m.created_at)}
+                  </p>
+                </div>
+                <RenewInviteButton memberId={m.id} name={m.full_name ?? "Kullanıcı"} />
+              </div>
+            ))}
+          </div>
+        </Panel>
+      ) : null}
       <Panel title={`Ofis kullanıcıları (${members.length})`}>
         {members.length === 0 ? (
           <EmptyStateV3 variant="compact" title="Kullanıcı yok" />
@@ -296,6 +322,7 @@ export function TeamTab({ members, failed30d, tenantId }: { members: TeamMember[
                   </p>
                 </div>
                 <span className="text-xs text-text-muted">{m.lastLogin ? `Son giriş ${relativeTimeTR(m.lastLogin)}` : "Giriş kaydı yok"}</span>
+                <MemberLoginLog memberId={m.id} name={m.full_name ?? "Kullanıcı"} />
               </div>
             ))}
           </div>

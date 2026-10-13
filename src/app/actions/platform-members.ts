@@ -10,6 +10,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { now } from "@/lib/clock";
 
 export type MemberActionResult = { ok?: boolean; error?: string; link?: string };
 
@@ -127,17 +128,17 @@ export async function setMemberRoleAsStaff(fd: FormData): Promise<MemberActionRe
   return { ok: true };
 }
 
-/** Pasifleştir / aktifleştir: süper admin ve operasyon. Pasifleştirmede açık oturumlar kapatılır. */
-export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberActionResult> {
-  const gate = await guardPlatformAction({ module: "members", roles: ["super_admin", "ops"], rate: RATE });
-  if ("error" in gate) return { error: gate.error };
-
-  const id = String(fd.get("id") ?? "").trim();
-  const active = String(fd.get("is_active") ?? "") === "true";
-
-  const admin = createAdminClient();
-  const target = await loadTarget(admin, id);
-  if (!target) return { error: "Üye bulunamadı." };
+/**
+ * Tek üyenin aktif/pasif geçişi (kapı çağıranda). Tek aktif sahip, koltuk sınırı ve askıdaki ofis kuralları burada;
+ * pasifleştirmede açık oturumlar kapatılır. Tekil düğme, devir sihirbazı ve toplu pasifleştirme AYNI yolu kullanır.
+ */
+async function applyMemberActive(
+  admin: ReturnType<typeof createAdminClient>,
+  target: Target,
+  active: boolean,
+  staffId: string,
+  via: "single" | "bulk" | "handoff" = "single",
+): Promise<MemberActionResult> {
   if (target.is_active === active) return { ok: true };
 
   if (!active && target.role === "owner") {
@@ -170,47 +171,63 @@ export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberAction
     }
   }
 
-  const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(id);
+  const { data: authRecord, error: authReadError } = await admin.auth.admin.getUserById(target.id);
   if (authReadError || !authRecord.user) return { error: actionErrorMessage(authReadError, "Üyenin kimlik kaydı doğrulanamadı.") };
 
   const { error } = await admin
     .from("profiles")
     .update({ is_active: active })
-    .eq("id", id)
+    .eq("id", target.id)
     .eq("tenant_id", target.tenant_id);
   if (error) return { error: actionErrorMessage(error, "Üye durumu güncellenemedi.") };
 
   const currentMeta = (authRecord.user.app_metadata ?? {}) as Record<string, unknown>;
-  const { error: claimError } = await admin.auth.admin.updateUserById(id, {
+  const { error: claimError } = await admin.auth.admin.updateUserById(target.id, {
     app_metadata: {
       ...currentMeta,
       tenant_id: target.tenant_id,
       role: target.role,
       account_active: active,
-      deactivated_at: active ? null : new Date().toISOString(),
+      deactivated_at: active ? null : new Date(now()).toISOString(),
     },
     ban_duration: active ? ("none" as const) : "876000h",
   });
   if (claimError) {
-    await admin.from("profiles").update({ is_active: target.is_active }).eq("id", id).eq("tenant_id", target.tenant_id);
+    await admin.from("profiles").update({ is_active: target.is_active }).eq("id", target.id).eq("tenant_id", target.tenant_id);
     return { error: "Kimlik durumu güncellenemedi; değişiklik geri alındı." };
   }
 
   if (!active) {
     const { error: revokeError } = await admin.rpc("revoke_team_member_sessions", {
-      p_user_id: id,
+      p_user_id: target.id,
       p_tenant_id: target.tenant_id,
     });
-    if (revokeError) console.error("platform member session revoke", { id, error: revokeError.message });
+    if (revokeError) console.error("platform member session revoke", { id: target.id, error: revokeError.message });
   }
 
   await logPlatformActivity({
-    actorId: gate.staff.id,
+    actorId: staffId,
     action: active ? "platform_member.activate" : "platform_member.deactivate",
     entityType: "profile",
-    entityId: id,
-    meta: { tenant_id: target.tenant_id, role: target.role },
+    entityId: target.id,
+    meta: { tenant_id: target.tenant_id, role: target.role, ...(via !== "single" ? { via } : {}) },
   });
+  return { ok: true };
+}
+
+/** Pasifleştir / aktifleştir: süper admin ve operasyon. Pasifleştirmede açık oturumlar kapatılır. */
+export async function setMemberActiveAsStaff(fd: FormData): Promise<MemberActionResult> {
+  const gate = await guardPlatformAction({ module: "members", roles: ["super_admin", "ops"], rate: RATE });
+  if ("error" in gate) return { error: gate.error };
+
+  const id = String(fd.get("id") ?? "").trim();
+  const active = String(fd.get("is_active") ?? "") === "true";
+
+  const admin = createAdminClient();
+  const target = await loadTarget(admin, id);
+  if (!target) return { error: "Üye bulunamadı." };
+  const res = await applyMemberActive(admin, target, active, gate.staff.id, String(fd.get("via") ?? "") === "handoff" ? "handoff" : "single");
+  if (res.error) return res;
 
   revalidatePath(`/admin/members/${id}`);
   revalidatePath("/admin/members");
@@ -277,12 +294,132 @@ export async function generateMemberResetLink(fd: FormData): Promise<MemberActio
   const link = data?.properties?.action_link;
   if (error || !link) return { error: "Sıfırlama bağlantısı üretilemedi." };
 
+  // Ofis 360 > Ekip "daveti yenile" aynı bağlantıyı üretir (hiç giriş yapmamış üye parolasını bununla belirler).
+  const invite = String(fd.get("purpose") ?? "") === "invite";
   await logPlatformActivity({
     actorId: gate.staff.id,
-    action: "platform_member.reset_link",
+    action: invite ? "platform_member.invite_renew" : "platform_member.reset_link",
     entityType: "profile",
     entityId: id,
     meta: { tenant_id: target.tenant_id },
   });
   return { ok: true, link };
+}
+
+// ---------------------------------------------------------------------------
+// Toplu işlemler (liste sayfası seçimi): pasifleştirme ve oturum kapatma
+// ---------------------------------------------------------------------------
+
+export type BulkMemberResult = {
+  ok?: boolean;
+  error?: string;
+  done?: number;
+  failed?: { id: string; name: string; error: string }[];
+};
+
+/** Tek istekte en çok bu kadar üye (sayfa boyu 50; iki sayfa birlikte seçilebilir). */
+const BULK_MAX = 100;
+const BULK_RATE = { key: "platform-members-bulk", limit: 10, windowSec: 600 } as const;
+
+function parseBulkIds(fd: FormData): string[] | { error: string } {
+  const ids = Array.from(new Set(fd.getAll("ids").map((v) => String(v).trim()).filter(Boolean)));
+  if (ids.length === 0) return { error: "En az bir üye seçin." };
+  if (ids.length > BULK_MAX) return { error: `Tek işlemde en fazla ${BULK_MAX} üye seçilebilir.` };
+  if (ids.some((id) => !UUID_RE.test(id))) return { error: "Seçimde geçersiz kimlik var." };
+  return ids;
+}
+
+/** Sınırlı eşzamanlılık: auth yönetim uçlarını boğmadan 50 üyeyi birkaç saniyede bitirir. */
+async function runPool<T>(items: T[], size: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let i = 0;
+  const workers = Array.from({ length: Math.min(size, items.length) }, async () => {
+    while (i < items.length) {
+      const item = items[i++];
+      await fn(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
+async function loadTargets(admin: ReturnType<typeof createAdminClient>, ids: string[]): Promise<Map<string, Target>> {
+  const { data } = await admin.from("profiles").select("id, tenant_id, role, full_name, is_active").in("id", ids);
+  return new Map(((data ?? []) as Target[]).map((t) => [t.id, t]));
+}
+
+/** Toplu pasifleştirme: süper admin ve operasyon. Her üye tekil kuralla (tek aktif sahip vb.) işlenir; kalanlar raporlanır. */
+export async function bulkDeactivateMembers(fd: FormData): Promise<BulkMemberResult> {
+  const gate = await guardPlatformAction({ module: "members", roles: ["super_admin", "ops"], rate: BULK_RATE });
+  if ("error" in gate) return { error: gate.error };
+  const ids = parseBulkIds(fd);
+  if (!Array.isArray(ids)) return { error: ids.error };
+
+  const admin = createAdminClient();
+  const targets = await loadTargets(admin, ids);
+  const failed: NonNullable<BulkMemberResult["failed"]> = [];
+  let done = 0;
+  // Aynı ofisin sahiplerini paralel işlemek "tek aktif sahip" sayımını yarıştırır: sahipler sırayla, kalanlar havuzda.
+  const owners = ids.filter((id) => targets.get(id)?.role === "owner");
+  const others = ids.filter((id) => targets.get(id)?.role !== "owner");
+  const one = async (id: string) => {
+    const target = targets.get(id);
+    if (!target) {
+      failed.push({ id, name: "—", error: "Üye bulunamadı." });
+      return;
+    }
+    const res = await applyMemberActive(admin, target, false, gate.staff.id, "bulk");
+    if (res.error) failed.push({ id, name: target.full_name, error: res.error });
+    else done += 1;
+  };
+  await runPool(others, 5, one);
+  for (const id of owners) await one(id);
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_member.bulk_deactivate",
+    entityType: "profile",
+    meta: { requested: ids.length, done, failed: failed.map((f) => f.id) },
+  });
+  revalidatePath("/admin/members");
+  return { ok: failed.length === 0, done, failed, ...(failed.length ? { error: `${failed.length} üye pasifleştirilemedi.` } : {}) };
+}
+
+/** Toplu oturum kapatma (ör. sızıntı şüphesi): süper admin ve operasyon. Aktif ve pasif hesaplarda çalışır. */
+export async function bulkSignOutMembers(fd: FormData): Promise<BulkMemberResult> {
+  const gate = await guardPlatformAction({ module: "members", roles: ["super_admin", "ops"], rate: BULK_RATE });
+  if ("error" in gate) return { error: gate.error };
+  const ids = parseBulkIds(fd);
+  if (!Array.isArray(ids)) return { error: ids.error };
+
+  const admin = createAdminClient();
+  const targets = await loadTargets(admin, ids);
+  const failed: NonNullable<BulkMemberResult["failed"]> = [];
+  let done = 0;
+  let missingFn = false;
+  await runPool(ids, 10, async (id) => {
+    const target = targets.get(id);
+    if (!target) {
+      failed.push({ id, name: "—", error: "Üye bulunamadı." });
+      return;
+    }
+    const { error } = await admin.rpc("platform_revoke_user_sessions", { p_user_id: id });
+    if (error) {
+      if (/could not find|schema cache|PGRST202/i.test(error.message + (error.code ?? ""))) missingFn = true;
+      failed.push({ id, name: target.full_name, error: "Oturumlar kapatılamadı." });
+    } else done += 1;
+  });
+  if (missingFn) return { error: "Oturum kapatma veritabanı fonksiyonu henüz uygulanmamış (migration 20260816010200).", done, failed };
+
+  await logPlatformActivity({
+    actorId: gate.staff.id,
+    action: "platform_member.bulk_sessions_revoke",
+    entityType: "profile",
+    meta: {
+      requested: ids.length,
+      done,
+      failed: failed.map((f) => f.id),
+      tenants: Array.from(new Set(Array.from(targets.values()).map((t) => t.tenant_id))),
+    },
+  });
+  revalidatePath("/admin/members");
+  return { ok: failed.length === 0, done, failed, ...(failed.length ? { error: `${failed.length} üyenin oturumları kapatılamadı.` } : {}) };
 }
