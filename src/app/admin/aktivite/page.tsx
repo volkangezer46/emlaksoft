@@ -17,6 +17,8 @@ import {
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { Input } from "@/components/ui/input";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { filterSystemRows, humanOnlyFrom, SHOW_SYSTEM_PARAM } from "@/lib/settings/system-keys";
 
 
 function pretty(v: unknown): string {
@@ -258,7 +260,19 @@ export default async function AdminActivityPage({
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Kaynak/gün filtresi sorgu seviyesinde uygulandı; burada yalnızca sayfa dilimi kesilir.
-  const unified = allUnified.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE);
+  const pageSlice = allUnified.slice((sayfa - 1) * PAGE_SIZE, sayfa * PAGE_SIZE);
+  // "Yalnız insan değişiklikleri" (varsayılan AÇIK): sistemin kendi yazdığı ayar kayıtları (imleç, SEO denetimi, ops.*)
+  // bu sayfa diliminden gizlenir ve sayılır. Sorgu (activity-query) değişmez; sayaç bu sayfadaki gizlenenlerdir.
+  const humanOnly = humanOnlyFrom(sp[SHOW_SYSTEM_PARAM]);
+  const settingKeyOf = (r: UnifiedRow): string | null => {
+    if (!r.isPlatform || !r.action.startsWith("settings.")) return null;
+    const m = asRecord(r.meta);
+    const storage = typeof m?.storage === "string" ? m.storage : null;
+    const key = typeof m?.key === "string" ? m.key : null;
+    return storage ?? key;
+  };
+  const { rows: unified, hidden: hiddenSystem } = filterSystemRows(pageSlice, settingKeyOf, humanOnly);
+  const withSystemParam = (h: string, show: boolean) => (show ? `${h}${h.includes("?") ? "&" : "?"}${SHOW_SYSTEM_PARAM}=goster` : h);
 
   const counters = [
     {
@@ -308,6 +322,15 @@ export default async function AdminActivityPage({
       </AdminPageHeader>
 
       <ActivityFilterBar filters={filters} total={totalFiltered} />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <FilterChip href={withSystemParam(activityHref(filters, { sayfa }), humanOnly)} active={humanOnly}>
+          Yalnız insan değişiklikleri
+        </FilterChip>
+        {humanOnly && hiddenSystem > 0 ? (
+          <span className="text-xs text-text-muted">{hiddenSystem} sistem kaydı gizlendi (bu sayfada)</span>
+        ) : null}
+      </div>
 
       <section className="dashboard-panel overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
@@ -382,7 +405,7 @@ export default async function AdminActivityPage({
       <Pagination
         page={sayfa}
         total={totalFiltered}
-        hrefFor={(p) => activityHref(filters, { sayfa: p })}
+        hrefFor={(p) => withSystemParam(activityHref(filters, { sayfa: p }), !humanOnly)}
       />
     </div>
   );

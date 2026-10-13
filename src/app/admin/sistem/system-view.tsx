@@ -22,6 +22,8 @@ import { MessagingKeysSection } from "./messaging-keys-form";
 import { RadialGauge } from "@/components/ui/viz";
 import { CronStatusStrip } from "./cron-status-strip";
 import { classifyCron, geoCoverage, schemaGauge } from "./cron-strip-model";
+import { BackupCard } from "./backup-card";
+import { BACKUP_HEARTBEAT_JOB, BACKUP_STATUS_KEY } from "@/lib/ops/backup-status";
 
 const TOTAL_PROVINCES = 81;
 
@@ -93,6 +95,7 @@ export async function SystemView() {
     { count: openErrors },
     { data: manualRunRows },
     { data: evdsRows },
+    backupRaw,
   ] = await Promise.all([
     getPlatformSecret("openai_api_key"),
     getEmlakFiyatiAdminStatus(),
@@ -117,6 +120,7 @@ export async function SystemView() {
       .order("created_at", { ascending: false })
       .limit(20),
     admin.from("market_rates").select("key, fetched_at").in("key", ["housing_loan_rate_annual", "cpi_12m_avg"]),
+    getPlatformSetting(BACKUP_STATUS_KEY),
   ]);
   const evdsConfigured = Boolean(process.env.EVDS_API_KEY?.trim());
   const evdsLastFetch =
@@ -380,6 +384,8 @@ export async function SystemView() {
             sunucu kaydı oluşur; zamanlanmış işin ana sonucu bloklanmaz.
           </p>
         </section>
+
+        <BackupCard raw={backupRaw} heartbeat={heartbeats.get(BACKUP_HEARTBEAT_JOB) ?? null} nowMs={nowMs} />
 
         <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <p className="flex items-center gap-2 text-xs font-semibold text-amber-600">

@@ -12,6 +12,9 @@ import { getPlatformSetting } from "@/lib/platform-settings";
 import { platformSecretsKeySource } from "@/lib/platform-secrets";
 import { getPlatformSettingViews } from "@/lib/settings/read";
 import { getSettingDef } from "@/lib/settings/registry";
+import { getSecretHealth } from "@/lib/settings/secret-health";
+import { humanOnlyFrom, SHOW_SYSTEM_PARAM } from "@/lib/settings/system-keys";
+import { SettingsChangeFeed } from "./settings-feed";
 import { SETTING_CATEGORIES, type SettingCategoryId, type SettingView } from "@/lib/settings/types";
 
 export const metadata = { title: "Sistem ayarları merkezi" };
@@ -48,7 +51,14 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
   const category = SETTING_CATEGORIES.find((c) => c.id === catParam)?.id as SettingCategoryId | undefined;
   const canEdit = staff.role === "super_admin";
 
-  const [views, mfaDb] = await Promise.all([getPlatformSettingViews(), getPlatformSetting("platform.mfa_enforced")]);
+  const humanOnly = humanOnlyFrom(sp[SHOW_SYSTEM_PARAM]);
+
+  const [views, mfaDb, secretHealth] = await Promise.all([
+    getPlatformSettingViews(),
+    getPlatformSetting("platform.mfa_enforced"),
+    getSecretHealth().catch(() => []),
+  ]);
+  const brokenSecrets = secretHealth.filter((h) => h.durum === "cozulemedi");
 
   const counts = new Map<string, number>();
   for (const v of views) counts.set(v.category, (counts.get(v.category) ?? 0) + 1);
@@ -66,10 +76,11 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
   const plaintextKeys = views.filter((v) => v.sensitivity === "secret" && v.plaintext).map((v) => v.key);
   const mfaIssue = platformMfaSyncIssue(isPlatformMfaRequired(), mfaDb);
 
-  const href = (kategori?: string) => {
+  const href = (kategori?: string, showSystem = !humanOnly) => {
     const p = new URLSearchParams();
     if (kategori) p.set("kategori", kategori);
     if (q) p.set("ara", q);
+    if (showSystem) p.set(SHOW_SYSTEM_PARAM, "goster");
     const s = p.toString();
     return `/admin/ayarlar/merkez${s ? `?${s}` : ""}`;
   };
@@ -82,6 +93,31 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
         title="Sistem ayarları merkezi"
         description="Web'den yönetilebilir ayarlar: her değişiklik doğrulanır, geçmişe yazılır ve geri alınabilir. Gizli anahtarlar şifreli saklanır ve asla gösterilmez."
       />
+
+      {brokenSecrets.length > 0 ? (
+        <section role="alert" aria-labelledby="anahtar-sagligi" className="space-y-2 rounded-[var(--radius-panel)] border border-danger-500/40 bg-danger-500/8 p-4">
+          <h2 id="anahtar-sagligi" className="text-sm font-bold text-danger-600">
+            {brokenSecrets.length} anahtar çözülemiyor (PLATFORM_SECRETS_KEY değişmiş olabilir)
+          </h2>
+          <p className="text-xs text-text-muted">
+            Bu anahtarlar şifreli kayıtlı ama mevcut sunucu anahtarıyla açılamıyor; ilgili özellik ortam değişkeni yedeğine düşer ya da kapalı kalır.
+            Değerler gösterilmez. Anahtarı yeniden girmek yeni sunucu anahtarıyla şifreler.
+          </p>
+          <ul className="divide-y divide-danger-500/20 text-sm">
+            {brokenSecrets.map((h) => (
+              <li key={h.key} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
+                <span className="min-w-0">
+                  <span className="font-semibold text-ink-950">{h.label}</span>
+                  {h.changedAt ? <span className="text-xs text-text-muted"> · son değişiklik {new Date(h.changedAt).toLocaleDateString("tr-TR")}</span> : null}
+                </span>
+                <Link href={h.href} className="text-xs font-semibold text-danger-600 hover:underline">
+                  Yeniden gir →
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <form action="/admin/ayarlar/merkez" className="flex max-w-xl items-center gap-2">
         <label className="relative flex-1">
@@ -169,6 +205,8 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
           </section>
         ))
       )}
+
+      <SettingsChangeFeed humanOnly={humanOnly} toggleHref={href(category, humanOnly)} />
 
       <section aria-labelledby="bridge-title" className="space-y-2 rounded-[var(--radius-panel)] border border-line bg-surface p-4">
         <h2 id="bridge-title" className="text-sm font-semibold text-ink-950">

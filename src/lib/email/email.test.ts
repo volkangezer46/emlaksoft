@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/platform-settings", () => ({ getPlatformSettingsMany: vi.fn(async () => ({})) }));
 import { readFileSync } from "node:fs";
 import { EMAIL_TEMPLATES, renderTemplate, templateSettingKey } from "./templates";
 import { emailChannelStatus, sendEmail } from "./provider";
@@ -10,7 +12,7 @@ describe("e-posta kanalı", () => {
   it("anahtar yoksa kapalı ve gönderim istek atmadan no-op", async () => {
     vi.stubEnv("RESEND_API_KEY", "");
     vi.stubEnv("EMAIL_FROM", "");
-    expect(emailChannelStatus().enabled).toBe(false);
+    expect((await emailChannelStatus()).enabled).toBe(false);
     const res = await sendEmail({ to: "a@b.com", subject: "x", text: "y" });
     expect(res).toMatchObject({ ok: false, code: "disabled" });
   });
