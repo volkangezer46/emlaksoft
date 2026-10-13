@@ -7,8 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { publishBlockReason } from "@/lib/property-owner/server";
-import { authorityPublishWarning } from "@/lib/eids/authority-status";
-import { now as clockNow } from "@/lib/clock";
+import { authorityPublishGate } from "@/lib/eids/ledger";
 import { closedListingBlock } from "@/lib/closed-listing-guard";
 import {
   publishToPortal,
@@ -197,23 +196,11 @@ export async function publishPropertyToPortal(
     return { error: `${portalName} API anahtarı tanımlanmamış. /admin/sistem'den ekleyin.` };
   }
 
-  // Yetki (EİDS) uyarısı: engellemez; yeni sütunlar yoksa (migration uygulanmamış) sessizce atlanır.
-  const { data: authRow } = await supabase
-    .from("properties")
-    .select("authorization_start, authorization_end, authority_eids_status")
-    .eq("id", propertyId)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
-  const warning = authRow
-    ? (authorityPublishWarning(
-        {
-          authorization_start: (authRow as { authorization_start?: string | null }).authorization_start ?? null,
-          authorization_end: (authRow as { authorization_end?: string | null }).authorization_end ?? null,
-          authority_eids_status: (authRow as { authority_eids_status?: string | null }).authority_eids_status ?? null,
-        },
-        clockNow(),
-      ) ?? undefined)
-    : undefined;
+  // Yetki (EİDS) kapısı: iptal edilmiş / süresi dolmuş yetkide yeni yayın ENGELLENİR (yalnız ofis sahibinin gerekçeli
+  // 24 saatlik izni aşar); onaysız/tarihsiz durumda yalnız uyarı döner. Defter yoksa (migration uygulanmamış) eski uyarı.
+  const authGate = await authorityPublishGate(supabase, gate.tenantId, propertyId);
+  if (authGate.blocked) return { error: authGate.error };
+  const warning = authGate.warning;
 
   // Portale gönder
   const result = await publishToPortal(portalName, toPayload(property as PropertyRow));

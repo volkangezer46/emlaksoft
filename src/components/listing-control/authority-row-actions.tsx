@@ -2,22 +2,27 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, MessageCircle, MessageSquareText, XCircle } from "lucide-react";
+import { BadgeCheck, Ban, MessageCircle, MessageSquareText, Undo2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/app/toast-provider";
-import { sendAuthorityReminder, updateAuthorityStatus, type AuthorityActionResult } from "@/app/actions/authority-queue";
+import { sendAuthorityReminder, undoAuthorityChange, updateAuthorityStatus, type AuthorityActionResult } from "@/app/actions/authority-queue";
+import type { EidsDisplayStatus } from "@/lib/eids/authority-status";
 
 /**
  * Yetki kuyruğu satır eylemleri (istemci). Sunucu eylemleri kendi yetki ve İYS kapısını uygular; burada yalnız akış var:
- * hatırlatma (SMS / WhatsApp bağlantısı), onay işaretleme, reddedildi işaretleme ve yetki belgesi no kaydı.
+ * hatırlatma (SMS / WhatsApp bağlantısı), onay / iptal / ret işaretleme (yetki defterinden geçer), son işlemi geri alma
+ * ve yetki belgesi no kaydı. Ayrıntılı giriş (bitiş tarihi, kaynak, belge) portföydeki "Yetki durumu" kartındadır.
  */
 export type AuthorityRowModel = {
   propertyId: string;
   docNo: string;
-  status: "pending" | "approved" | "rejected" | "expired";
+  status: EidsDisplayStatus;
   hasOwnerPhone: boolean;
   canRemind: boolean;
   remindBlockedReason: string | null;
+  /** Geri alınabilir son yetki olayı (yoksa null). */
+  undoEventId?: string | null;
+  undoLabel?: string | null;
 };
 
 export function AuthorityRowActions({ row, canEdit }: { row: AuthorityRowModel; canEdit: boolean }) {
@@ -43,7 +48,8 @@ export function AuthorityRowActions({ row, canEdit }: { row: AuthorityRowModel; 
     });
   };
 
-  const remindDisabled = !row.hasOwnerPhone || !row.canRemind || row.status === "approved";
+  const approved = row.status === "approved" || row.status === "expiring";
+  const remindDisabled = !row.hasOwnerPhone || !row.canRemind || approved || row.status === "exempt";
   const remindTitle = !row.hasOwnerPhone
     ? "Mal sahibinin cep telefonu kayıtlı değil"
     : (row.remindBlockedReason ?? "Mal sahibine e-Devlet EİDS onay hatırlatması gönder (İYS izni aranır)");
@@ -79,18 +85,31 @@ export function AuthorityRowActions({ row, canEdit }: { row: AuthorityRowModel; 
         >
           WhatsApp
         </Button>
-        {row.status !== "approved" ? (
+        {!approved && row.status !== "exempt" ? (
           <Button
             size="sm"
             variant="ghost"
             icon={BadgeCheck}
             disabled={pending}
+            title="Bitiş tarihi ve kaynakla birlikte portföydeki Yetki durumu kartından da girilebilir"
             onClick={() => run(() => updateAuthorityStatus(row.propertyId, { eidsStatus: "approved" }))}
           >
             Onay alındı
           </Button>
         ) : null}
-        {row.status !== "rejected" && row.status !== "approved" ? (
+        {row.status !== "revoked" && row.status !== "exempt" ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={Ban}
+            disabled={pending}
+            title="Malik yetkiyi iptal etti: yeni yayın ve portal aktarımı durur"
+            onClick={() => run(() => updateAuthorityStatus(row.propertyId, { eidsStatus: "revoked" }))}
+          >
+            İptal edildi
+          </Button>
+        ) : null}
+        {!approved && row.status !== "rejected" && row.status !== "revoked" && row.status !== "exempt" ? (
           <Button
             size="sm"
             variant="ghost"
@@ -99,6 +118,18 @@ export function AuthorityRowActions({ row, canEdit }: { row: AuthorityRowModel; 
             onClick={() => run(() => updateAuthorityStatus(row.propertyId, { eidsStatus: "rejected" }))}
           >
             Reddedildi
+          </Button>
+        ) : null}
+        {row.undoEventId ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={Undo2}
+            disabled={pending}
+            title={row.undoLabel ? `Geri al: ${row.undoLabel}` : "Son yetki işlemini geri al"}
+            onClick={() => run(() => undoAuthorityChange(row.propertyId, row.undoEventId as string))}
+          >
+            Son işlemi geri al
           </Button>
         ) : null}
       </div>

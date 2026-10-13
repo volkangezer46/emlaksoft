@@ -8,6 +8,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { now as clockNow } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
+import { authorityPublishGate } from "@/lib/eids/ledger";
 import { generateTransferCode, hashPayloadSource, hashTransferCode, TRANSFER_CODE_TTL_MIN } from "@/lib/portal-transfer/code";
 import { buildPortalPayload, payloadFingerprintSource, readinessCheck, type Readiness } from "@/lib/portal-transfer/payload";
 import { loadPropertyForTransfer } from "@/lib/portal-transfer/server";
@@ -52,6 +53,9 @@ export async function preparePortalTransfer(propertyId: string, portal: string):
   if (!limit.allowed) return { ok: false, error: "Çok sık denediniz; bir dakika sonra tekrar deneyin." };
 
   const db = await createClient();
+  // EİDS kapısı: iptal edilmiş / süresi dolmuş yetkide portala aktarım ENGELLENİR (yalnız ofis sahibinin gerekçeli izni aşar).
+  const authGate = await authorityPublishGate(db, gate.tenantId, propertyId);
+  if (authGate.blocked) return { ok: false, error: authGate.error };
   const input = await loadPropertyForTransfer(db, gate.tenantId, propertyId);
   if (!input) return { ok: false, error: PREPARE_ERRORS.property_not_found! };
   const payload = buildPortalPayload(input, portal, clockNow());

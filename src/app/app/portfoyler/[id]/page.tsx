@@ -53,6 +53,7 @@ import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
 import { PropertyAuthorizationPanel } from "./property-extras";
+import { EidsAuthorityCard } from "./eids-authority-card";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { PropertyMap } from "@/components/app/property-map";
@@ -155,7 +156,7 @@ export default async function PropertyDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
-  const [{ perms, tenantId }, { id }, sp] = await Promise.all([requireModulePage("properties"), params, searchParams]);
+  const [{ perms, tenantId, role }, { id }, sp] = await Promise.all([requireModulePage("properties"), params, searchParams]);
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
@@ -1031,6 +1032,11 @@ export default async function PropertyDetailPage({
               eidsNo,
             }}
           />
+
+          {/* EİDS yetki durumu + defter (elle giriş, istisna, geri alma, owner yayın izni) */}
+          <Suspense fallback={<div className="h-40 animate-pulse rounded-[var(--radius-panel)] bg-line" role="status" aria-label="Yetki durumu yükleniyor" />}>
+            <EidsAuthorityCard tenantId={tenantId} propertyId={property.id} canEdit={(perms.portals ?? []).includes("edit")} isOwner={role === "owner"} />
+          </Suspense>
 
             </div>
           ) : null}
