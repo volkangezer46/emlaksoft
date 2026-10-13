@@ -16,7 +16,7 @@ function statusTr(status: string): string {
 function Pill({ status }: { status: string }) {
   const ok = status.toLowerCase() === "verified";
   return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${ok ? "bg-mint-500/12 text-mint-700" : "bg-amber-400/15 text-amber-700"}`}>
+    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ok ? "bg-mint-500/12 text-mint-700" : "bg-amber-400/15 text-amber-700"}`}>
       {statusTr(status)}
     </span>
   );
