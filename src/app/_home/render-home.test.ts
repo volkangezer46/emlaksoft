@@ -110,13 +110,28 @@ describe("renderHome: canlı ana sayfa ile birebir aynı ağaç", () => {
     expect(norm(renderHome({ content, pricing: p, efCatalog }))).toEqual(norm(legacyHome(content, p)));
   });
 
-  it("önizleme yalnız üstte TASLAK şeridi ekler; gerisi aynı", () => {
+  it("önizleme: üstte TASLAK şeridi + yalnız yerinde düzenleme işaretleri; bölümler ve çerçeve aynı", () => {
+    type Node = { type: string; key: string | null; props: Record<string, unknown> & { children: unknown } };
     const content = defaultSiteContent();
     const live = norm(renderHome({ content, pricing, efCatalog })) as { props: { children: unknown[] } };
     const draft = norm(renderHome({ content, pricing, efCatalog, preview: true })) as { props: { children: unknown[] } };
     expect(live.props.children[0]).toBeNull();
     expect(JSON.stringify(draft.props.children[0])).toContain("TASLAK ÖNİZLEME, yayında değil");
-    expect(draft.props.children.slice(1)).toEqual(live.props.children.slice(1));
+    // JSON-LD, MotionRoot, başlık ve altbilgi birebir aynı.
+    for (const i of [1, 2, 3, 5]) expect(draft.props.children[i]).toEqual(live.props.children[i]);
+    const [liveHero, liveSections] = (live.props.children[4] as Node).props.children as [Node, Node[]];
+    const [draftHero, draftSections] = (draft.props.children[4] as Node).props.children as [Node, Node[]];
+    // Hero: tek fark `cms: true` (metin düğümlerine data-cms-path).
+    expect(draftHero.props).toEqual({ ...liveHero.props, cms: true });
+    // Bölümler: aynı sırada, aynı içerik; önizlemede kutusuz (display: contents) data-cms-path sarmalayıcısında.
+    expect(draftSections.map((s) => s.key)).toEqual(liveSections.map((s) => s.key));
+    draftSections.forEach((s, i) => {
+      expect(s.type).toBe("div");
+      expect(s.props.style).toEqual({ display: "contents" });
+      expect(typeof s.props["data-cms-path"]).toBe("string");
+      expect(s.props.children).toEqual(liveSections[i]!.props.children);
+    });
+    expect(JSON.stringify(live)).not.toContain("data-cms-path");
   });
 
   it("page.tsx yalnız yayındaki içerikle renderHome çağırır (önizleme bayrağı yok, dinamik API yok)", () => {

@@ -441,6 +441,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/seo/store.ts", fn: "logNotFound", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/seo/store.ts", fn: "prune404", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/site-issues/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/lib/site-media/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/storage-deletion-outbox.ts", fn: "enqueueStorageDeletion", calls: 1, tenantFilter: "var" },
   { file: "src/lib/storage-deletion-outbox.ts", fn: "processStorageDeletionOutbox", calls: 1, tenantFilter: "devir" },
   { file: "src/lib/storage-deletion-outbox.ts", fn: "storageDeletionQueueStats", calls: 1, tenantFilter: "yok" },

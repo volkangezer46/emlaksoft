@@ -12,6 +12,9 @@ import type { Issue } from "@/lib/site-menu/schema";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { hasErrors, validateSiteContent, type SiteContent } from "@/lib/site-content/schema";
 import { SITE_CONTENT_CACHE_TAG, siteContentStore } from "@/lib/site-content/store";
+import { listSiteMediaIds } from "@/lib/site-media/store";
+import { mediaRefs } from "@/lib/site-media/usage";
+import { syncSiteMediaUsage } from "@/lib/site-media/usage-server";
 
 export type SiteContentActionResult = { ok?: boolean; error?: string; issues?: Issue[]; config?: SiteContent };
 
@@ -38,6 +41,11 @@ function refreshLive() {
 
 const entryNow = () => new Date(now()).toISOString();
 
+/** Görsel kimliği medya kütüphanesinde var olmalı (SP6): yalnız yapılandırma görsel taşıyorsa kütüphane okunur. */
+async function mediaOpts(input: unknown): Promise<{ mediaIds?: ReadonlySet<string> }> {
+  return mediaRefs(input as Parameters<typeof mediaRefs>[0]).length ? { mediaIds: await listSiteMediaIds() } : {};
+}
+
 /** Taslağı doğrular ve kaydeder. Hatalar kaydı engeller; uyarılar (riskli kelime vb.) engellemez. */
 export async function saveSiteContentDraft(input: unknown): Promise<SiteContentActionResult> {
   const staff = await requireWriter();
@@ -45,7 +53,7 @@ export async function saveSiteContentDraft(input: unknown): Promise<SiteContentA
   const rl = await checkRateLimit(`site-content-draft:${staff.id}`, { limit: 90, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık kaydettiniz; birkaç dakika sonra tekrar deneyin." };
 
-  const { config, issues } = validateSiteContent(input);
+  const { config, issues } = validateSiteContent(input, await mediaOpts(input));
   if (!config || hasErrors(issues)) return { error: "İçerikte düzeltilmesi gereken hatalar var.", issues };
 
   const saved = await siteContentStore.saveDraft(config, staff.id);
@@ -58,6 +66,7 @@ export async function saveSiteContentDraft(input: unknown): Promise<SiteContentA
     entityId: "draft",
     meta: { faq: config.faq.length, warnings: issues.length },
   });
+  await syncSiteMediaUsage();
   refreshAdmin();
   return { ok: true, issues, config };
 }
@@ -71,7 +80,7 @@ export async function publishSiteContent(label: string): Promise<SiteContentActi
 
   const state = await siteContentStore.readState();
   if (!state.draft) return { error: "Yayınlanacak taslak yok; önce değişiklik yapıp taslağı kaydedin." };
-  const { config, issues } = validateSiteContent(state.draft);
+  const { config, issues } = validateSiteContent(state.draft, await mediaOpts(state.draft));
   if (!config || hasErrors(issues)) return { error: "Taslakta hatalar var; düzeltmeden yayınlanamaz.", issues };
 
   const note = String(label ?? "").trim().slice(0, 80) || "Yayın";
@@ -81,6 +90,7 @@ export async function publishSiteContent(label: string): Promise<SiteContentActi
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.publish", entityType: "site_content", entityId: entry.id, meta: { label: note } });
+  await syncSiteMediaUsage();
   refreshLive();
   afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "publish", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, issues };
@@ -95,6 +105,7 @@ export async function discardSiteContentDraft(): Promise<SiteContentActionResult
   const saved = await siteContentStore.saveDraft(base, staff.id);
   if (!saved.ok) return { error: saved.error };
   await logPlatformActivity({ actorId: staff.id, action: "site_content.draft_discard", entityType: "site_content", entityId: "draft" });
+  await syncSiteMediaUsage();
   refreshAdmin();
   return { ok: true, config: base };
 }
@@ -109,7 +120,7 @@ export async function rollbackSiteContent(versionId: string): Promise<SiteConten
   const state = await siteContentStore.readState();
   const version = state.history.find((h) => h.id === String(versionId));
   if (!version) return { error: "Sürüm bulunamadı." };
-  const { config, issues } = validateSiteContent(version.cfg);
+  const { config, issues } = validateSiteContent(version.cfg, await mediaOpts(version.cfg));
   if (!config || hasErrors(issues)) return { error: "Bu sürüm artık kurallara uymuyor; geri dönülemiyor.", issues };
 
   const entry = { id: randomBytes(6).toString("hex"), at: entryNow(), by: staff.full_name || staff.email, label: `Geri dönüş: ${version.label}`.slice(0, 80) };
@@ -118,6 +129,7 @@ export async function rollbackSiteContent(versionId: string): Promise<SiteConten
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.rollback", entityType: "site_content", entityId: version.id, meta: { label: version.label } });
+  await syncSiteMediaUsage();
   refreshLive();
   afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "restore", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config };
@@ -135,6 +147,7 @@ export async function resetSiteContentToDefault(): Promise<SiteContentActionResu
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.reset", entityType: "site_content", entityId: "default" });
+  await syncSiteMediaUsage();
   refreshLive();
   afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "reset", publishRef: "default", livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config: defaultSiteContent() };

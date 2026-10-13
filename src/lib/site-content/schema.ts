@@ -7,6 +7,7 @@ import { HOME_ANCHORS } from "@/lib/site-menu/known-routes";
 import { isMenuIconName } from "@/lib/site-menu/icon-registry";
 import { defaultSiteContent } from "./defaults";
 import { CARD_TONES } from "./tones";
+import { SITE_MEDIA_ID_RE } from "@/lib/site-media/types";
 
 /**
  * Site içeriği (ana sayfa ve genel pazarlama metinleri): tür, sınırlar ve doğrulama.
@@ -105,6 +106,17 @@ export const siteContentSchema = z.strictObject({
         .array(z.strictObject({ name: text(LIMITS.portalName, "Portal adı").min(1, "Portal adı boş olamaz.") }))
         .max(LIMITS.maxPortals, `En fazla ${LIMITS.maxPortals} portal olabilir.`),
     }),
+    /**
+     * Hero görseli (isteğe bağlı): YALNIZ medya kütüphanesi kimliği (serbest URL yok). Boşsa bugünkü ürün sahnesi çizilir.
+     * `alt` bu sayfaya özel alt metin; yoksa kütüphanedeki zorunlu alt metin kullanılır. Kimliğin var olduğu sunucuda
+     * `validateSiteContent(..., { mediaIds })` ile doğrulanır.
+     */
+    image: z
+      .strictObject({
+        mediaId: z.string().regex(SITE_MEDIA_ID_RE, "Görsel yalnız medya kütüphanesinden seçilir (bağlantı girilemez)."),
+        alt: text(LIMITS.imageAlt, "Görsel alt metni").optional(),
+      })
+      .optional(),
   }),
   sections: z.strictObject(sectionsShape),
   valueCards: z.array(cardSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} kart olabilir.`),
@@ -321,7 +333,7 @@ export function collectStrings(cfg: SiteContent): Array<{ path: string; value: s
     if (typeof node === "string") {
       const key = path.split(".").pop() ?? "";
       // Yapısal alanlar şemada doğrulanır (metin değil): paket rozeti, düzen kimliği, ikon, ton, onay tarihi.
-      if (key === "gate" || key === "icon" || key === "tone" || key === "consentDate" || (key === "id" && /^\.?layout\./.test(path))) return;
+      if (key === "gate" || key === "icon" || key === "tone" || key === "consentDate" || key === "mediaId" || (key === "id" && /^\.?layout\./.test(path))) return;
       out.push({ path, value: node, link: key === "href", multiline: ["lead", "text", "a", "panelText", "note", "quote"].includes(key) });
     } else if (Array.isArray(node)) node.forEach((v, i) => walk(v, `${path}.${i}`));
     else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) if (k !== "v") walk(v, path ? `${path}.${k}` : k);
@@ -332,7 +344,13 @@ export function collectStrings(cfg: SiteContent): Array<{ path: string; value: s
 
 const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 
-export function validateSiteContent(input: unknown): { config: SiteContent | null; issues: Issue[] } {
+/**
+ * `mediaIds`: sunucuda medya kütüphanesindeki kimlikler. Verilirse görsel kimliği bu kümede OLMALI (yoksa hata);
+ * istemcideki canlı doğrulama vermez (sunucu kaydederken yine doğrular).
+ */
+export type ValidateSiteContentOptions = { mediaIds?: ReadonlySet<string> };
+
+export function validateSiteContent(input: unknown, opts: ValidateSiteContentOptions = {}): { config: SiteContent | null; issues: Issue[] } {
   const issues: Issue[] = [];
   const parsed = siteContentSchema.safeParse(upgradeSiteContent(input));
   if (!parsed.success) {
@@ -400,6 +418,14 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
     if (risky.length) issues.push({ level: "warn", path: s.path, message: `Riskli ifade: “${risky.join("”, “")}”. Mevcut paket ve koşullarla birebir doğru mu, kontrol edin (yayını engellemez).` });
   }
 
+  if (cfg.hero.image) {
+    if (cfg.hero.image.alt !== undefined && !cfg.hero.image.alt.trim()) {
+      issues.push({ level: "error", path: "hero.image.alt", message: "Hero görselinde alt metin boş olamaz (kütüphanedeki alt metni kullanmak için alanı kaldırın)." });
+    }
+    if (opts.mediaIds && !opts.mediaIds.has(cfg.hero.image.mediaId)) {
+      issues.push({ level: "error", path: "hero.image", message: "Seçilen görsel medya kütüphanesinde yok (silinmiş olabilir); yeniden seçin ya da görseli kaldırın." });
+    }
+  }
   if (!cfg.hero.title && !cfg.hero.em) issues.push({ level: "error", path: "hero.title", message: "Ana başlık boş olamaz." });
   if (!cfg.valuation.hidden && !cfg.valuation.title && !cfg.valuation.em) issues.push({ level: "error", path: "valuation.title", message: "Bölüm başlığı boş olamaz." });
   if (!cfg.valuation.liveCta.label) issues.push({ level: "error", path: "valuation.liveCta.label", message: "Düğme metni boş olamaz." });

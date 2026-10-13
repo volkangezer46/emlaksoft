@@ -1,9 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useId, useState, useTransition } from "react";
-import { AlertTriangle, Copy, ExternalLink, Eye, Loader2, Monitor, Smartphone, Tablet } from "lucide-react";
+import { useEffect, useId, useImperativeHandle, useRef, useState, useTransition, type Ref } from "react";
+import { AlertTriangle, Copy, ExternalLink, Eye, Loader2, Monitor, MousePointerClick, Smartphone, Tablet } from "lucide-react";
+import { acceptCmsMessage } from "./cms-bridge";
 import { createSiteContentPreviewLink } from "./preview-actions";
+import { PreviewFrame } from "./preview-frame";
 
 const WIDTHS = [
   { id: "desktop", label: "Masaüstü", px: 1280, icon: Monitor },
@@ -17,10 +19,30 @@ const ttlLabel = (h: number) => (h % 24 === 0 ? (h === 24 ? "24 saat" : `${h / 2
 /**
  * Gerçek önizleme: kayıtlı taslak, canlı ana sayfayla AYNI işlevle (renderHome), gerçek paket/deneme verisiyle ve
  * "TASLAK" şeridiyle /onizleme/ana-sayfa adresinde çizilir. Bağlantı imzalı ve sürelidir; taslak değişince geçersiz olur.
- * Kaydedilmemiş değişiklikler önizlemeye girmez (önce "Taslağı kaydet").
+ * Kaydedilmemiş değişiklikler önizlemeye girmez (önce "Taslağı kaydet"); taslak kaydedilince açık önizleme yeni
+ * bağlantıyla kendiliğinden yenilenir (`refresh`, editörden).
+ * YERİNDE DÜZENLEME: iframe `sandbox="allow-scripts"` (allow-same-origin YOK). Önizlemedeki öğeye tıklanınca köprü
+ * `cms-select` mesajı yollar; YALNIZ bu iframe'in penceresinden gelen ve izin listesindeki yol `onSelect`e iletilir.
  */
-export function RealPreview({ enabled, dirty, ttlOptions, defaultTtl }: { enabled: boolean; dirty: boolean; ttlOptions: readonly number[]; defaultTtl: number }) {
+export type RealPreviewHandle = { refresh: () => void };
+
+export function RealPreview({
+  enabled,
+  dirty,
+  ttlOptions,
+  defaultTtl,
+  onSelect,
+  ref,
+}: {
+  enabled: boolean;
+  dirty: boolean;
+  ttlOptions: readonly number[];
+  defaultTtl: number;
+  onSelect?: (path: string) => void;
+  ref?: Ref<RealPreviewHandle>;
+}) {
   const [frame, setFrame] = useState<string | null>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
   const [width, setWidth] = useState<WidthId>("desktop");
   const [ttl, setTtl] = useState<number>(defaultTtl);
   const [shared, setShared] = useState<{ url: string; until: string; copied: boolean } | null>(null);
@@ -35,6 +57,18 @@ export function RealPreview({ enabled, dirty, ttlOptions, defaultTtl }: { enable
       if (!res.ok) return setErr(res.error);
       setFrame(res.path);
     });
+
+  useImperativeHandle(ref, () => ({ refresh: () => (frame ? open() : undefined) }));
+
+  useEffect(() => {
+    if (!onSelect) return;
+    const onMessage = (e: MessageEvent) => {
+      const path = acceptCmsMessage(e, frameRef.current?.contentWindow ?? null);
+      if (path) onSelect(path);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [onSelect]);
 
   const share = () =>
     start(async () => {
@@ -117,12 +151,15 @@ export function RealPreview({ enabled, dirty, ttlOptions, defaultTtl }: { enable
                 <w.icon className="h-3.5 w-3.5" aria-hidden="true" /> {w.label} ({w.px})
               </Button>
             ))}
+            <span className="inline-flex items-center gap-1 text-xs text-text-muted">
+              <MousePointerClick className="h-3.5 w-3.5" aria-hidden="true" /> Önizlemede bir metne tıklayın: ilgili alan aşağıda açılır.
+            </span>
             <a href={frame} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-700 underline">
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Yeni sekmede aç
             </a>
           </div>
           <div className="overflow-auto rounded-[var(--radius-card)] border border-line bg-ink-950/5">
-            <iframe title="Ana sayfa taslak önizlemesi" src={frame} style={{ width: px, height: 760 }} className="mx-auto block max-w-none border-0 bg-white" />
+            <PreviewFrame frameRef={frameRef} src={frame} width={px} />
           </div>
         </div>
       ) : null}

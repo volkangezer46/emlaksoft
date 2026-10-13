@@ -35,6 +35,8 @@ export const LIMITS = {
   city: 40,
   source: 120,
   maxTestimonials: 12,
+  /** Hero görseline özel alt metin (medya kütüphanesiyle aynı sınır). */
+  imageAlt: 140,
   /** Serileştirilmiş yapılandırma üst sınırı (bayt). */
   jsonBytes: 120 * 1024,
 } as const;
@@ -136,4 +138,24 @@ export function hasErrors(issues: readonly Issue[]): boolean {
 /** Taslak/canlı karşılaştırması (alan sırası değişmez: iki taraf da aynı şemadan gelir). */
 export function sameContent(a: SiteContent | null, b: SiteContent | null): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+
+/**
+ * Yerinde düzenleme izin listesi: önizlemede `data-cms-path` taşıyabilen ve editörde alan açtıran şema yolları.
+ * Önizleme köprüsünden gelen yol YALNIZ bu desenlerden birine uyarsa işlenir (başka her şey yok sayılır).
+ */
+export const CMS_PATH_PATTERNS: readonly RegExp[] = [
+  /^hero\.(badge|title|em|tail|lead|mobileLead|integrationBadge|integrationLine|image)$/,
+  /^hero\.(primary|secondary)\.label$/,
+  /^hero\.checks\.\d{1,2}\.text$/,
+  /^hero\.portalStrip\.(title|text|note)$/,
+  /^sections\.(tur|ozellikler|diger|neden|nasil|fiyat|sss|guvenlik)\.title$/,
+  /^(valueCards|trust|highlights|steps|faq|tour)$/,
+  /^(valuation|efSection|finalCta)\.title$/,
+  /^testimonials\.heading\.title$/,
+];
+
+export function isCmsPath(path: unknown): path is string {
+  return typeof path === "string" && path.length <= 80 && CMS_PATH_PATTERNS.some((re) => re.test(path));
 }
