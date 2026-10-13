@@ -15,7 +15,8 @@ import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from
  * etkilenmez (`runAfterPublish` hiçbir durumda fırlatmaz). Sonuç `site_optimizer_actions` (kind "after_publish") ve
  * denetim izine (`publishing.after_publish`) yazılır.
  * Çağrı: server action'da yazımdan önce `captureLiveDigests` (taban), başarılı yayından sonra
- * `afterSafe(() => runAfterPublish(...), "yayın sonrası zinciri")`; cron'da `await` + süre sınırı (tabansız).
+ * `afterSafe(() => runAfterPublish(...), "yayın sonrası zinciri")`; cron'da yazımdan önce `createBaselineRecorder`
+ * tabanı + `await` + süre sınırı.
  * Yerleşik kanca `verify` (order 20); paket kancaları (statik tazeleme 10, SEO 30) HOOKS listesindedir.
  */
 
@@ -94,6 +95,62 @@ export async function captureLiveDigests(paths: readonly string[], fetchPage: Fe
     }),
   );
   return Object.fromEntries(pairs.filter((x): x is readonly [string, string] => x !== null));
+}
+
+/** Cron koşusu boyunca taban yakalamaya harcanabilecek en çok süre (maxDuration 120 sn; zincir bütçesi ayrı 30 sn). */
+export const SCHEDULED_BASELINE_BUDGET_MS = 20_000;
+/** Tek yüzeyin taban yakalaması için kesin üst sınır (yol başına 2,5 sn zaman aşımının üstünde güvenlik payı). */
+const SCHEDULED_BASELINE_HARD_CAP_MS = BASELINE_FETCH_TIMEOUT_MS + 1_000;
+
+export type BaselineRecorder = {
+  /** Yüzeyin canlı yollarının tabanını yazımdan HEMEN önce alır (yüzey başına koşuda bir kez). ASLA fırlatmaz. */
+  before(surface: string, paths: readonly string[]): Promise<void>;
+  /** Yakalanan taban; hiç denenmediyse (bütçe bitti) undefined → doğrulama tabansız olduğunu söyler. */
+  get(surface: string): Record<string, string> | undefined;
+};
+
+/**
+ * ZAMANLI YAYIN TABANI (cron): her zamanlı kaydın yüzeyi için canlı yolların gövde özeti, yayın/geri dönüş yazımından
+ * HEMEN önce alınır (elle yayındaki `captureLiveDigests` ile aynı özet). Yüzey başına koşuda yalnız İLK yazımdan önce
+ * alınır (koşunun net değişikliği ölçülür). Süre güvenliği: yol başına 2,5 sn, yüzey başına kesin üst sınır ve koşu
+ * toplam bütçesi; bütçe bitince taban alınmaz (yayın asla bekletilmez/engellenmez, doğrulama "tabansız" der).
+ */
+export function createBaselineRecorder(
+  opts: {
+    capture?: (paths: readonly string[]) => Promise<Record<string, string>>;
+    budgetMs?: number;
+    hardCapMs?: number;
+    nowMs?: () => number;
+  } = {},
+): BaselineRecorder {
+  const capture = opts.capture ?? ((paths) => captureLiveDigests(paths));
+  const budget = opts.budgetMs ?? SCHEDULED_BASELINE_BUDGET_MS;
+  const hardCap = opts.hardCapMs ?? SCHEDULED_BASELINE_HARD_CAP_MS;
+  const clock = opts.nowMs ?? now;
+  const baselines = new Map<string, Record<string, string>>();
+  let spent = 0;
+  return {
+    async before(surface, paths) {
+      if (baselines.has(surface) || !paths.length || spent >= budget) return;
+      const started = clock();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const digests = await Promise.race([
+          Promise.resolve().then(() => capture(paths)),
+          new Promise<Record<string, string>>((resolve) => {
+            timer = setTimeout(() => resolve({}), Math.min(hardCap, budget - spent));
+          }),
+        ]);
+        baselines.set(surface, digests);
+      } catch {
+        baselines.set(surface, {});
+      } finally {
+        clearTimeout(timer);
+        spent += Math.max(0, clock() - started);
+      }
+    },
+    get: (surface) => baselines.get(surface),
+  };
 }
 
 type VerifyDetail = { paths?: VerifyPath[]; baseline?: Record<string, string> };
