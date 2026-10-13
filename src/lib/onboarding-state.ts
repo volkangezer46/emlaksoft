@@ -12,6 +12,7 @@ import {
 import { parseSkipped, setupSkipCookieName } from "@/lib/setup-skip";
 import { loadProfileSnapshot, type ProfileSnapshot } from "@/lib/profile-completion-data";
 import { isOfficeLocationDone } from "@/lib/profile-completion";
+import { PORTAL_MEMBERSHIP_EDITOR_ROLES } from "@/lib/portals/membership";
 
 export type OnboardingSnapshot = {
   state: OnboardingState;
@@ -44,7 +45,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const [profile, optional, ...results] = await Promise.all([
     loadProfileSnapshot(tenantId),
     Promise.all([
-      userId ? supabase.from("profiles").select("title").eq("id", userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      userId ? supabase.from("profiles").select("title, role").eq("id", userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
       userId
         ? supabase.from("advisor_specialties").select("id", { count: "exact", head: true }).eq("profile_id", userId)
         : Promise.resolve({ count: 0, error: null }),
@@ -61,8 +62,9 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       supabase.from("advisor_regions").select("id", { count: "exact", head: true }).eq("is_sample", false),
       // Mülk yönetimi sorusu: rentals modül satırı varsa cevaplanmıştır (RLS kiracı sınırı).
       supabase.from("tenant_modules").select("module_key", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("module_key", "rentals"),
-      // Portal üyelikleri (EP1): sahip en az bir portal için "var/yok" dedi mi (tablo yoksa hata → olgu yazılmaz, eski kural).
-      supabase.from("tenant_portal_accounts").select("portal", { count: "exact", head: true }).eq("tenant_id", tenantId).neq("status", "unknown"),
+      // Portal üyelikleri (EP1): sahip/genel müdür kartı en az bir kez kaydetti mi (her portal "Bilmiyorum" olsa da beyan
+      // sayılır; eklentinin açtığı 'unknown' satırı sayılmaz). Tablo yoksa hata → olgu yazılmaz, eski kural.
+      supabase.from("tenant_portal_accounts").select("portal", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("source", "owner_declared"),
     ]),
     supabase
       .from("tenants")
@@ -106,7 +108,9 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     "giderler-kasa": (!cashAccRes.error && (cashAccRes.count ?? 0) > 0) || (!ruleRes.error && (ruleRes.count ?? 0) > 0),
     "mulk-yonetimi": !rentalsModRes.error && (rentalsModRes.count ?? 0) > 0,
   };
-  if (!portalAccRes.error) extra["portal-uyelik"] = (portalAccRes.count ?? 0) > 0;
+  // Üyelik kartını yalnız owner/gm kaydedebilir: diğer roller (settings:edit olsa da) bu beyanı yapamaz, adım onlara açık kalmaz.
+  const viewerRole = titleRes.error ? null : ((titleRes.data as { role?: string | null } | null)?.role ?? null);
+  if (!portalAccRes.error) extra["portal-uyelik"] = (portalAccRes.count ?? 0) > 0 || (viewerRole !== null && !PORTAL_MEMBERSHIP_EDITOR_ROLES.has(viewerRole));
 
   const facts: OnboardingFacts = {
     officeLocationDone: isOfficeLocationDone(profile.completion),

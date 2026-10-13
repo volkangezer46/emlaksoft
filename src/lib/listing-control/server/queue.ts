@@ -3,6 +3,7 @@ import type { ListingControlConfig } from "../config";
 import type { CheckState } from "../types";
 import { chunk, isMissingSchema, type Db } from "./db";
 import { loadPortalAccountsForTenants, type PortalAccountRow } from "@/lib/portals/membership";
+import { portalIdFromName } from "@/lib/portals/catalog";
 
 /**
  * Kontrol KUYRUĞU (sunucu): planlama, hasat, talep. Kuyruk yalnız çevrimiçi kontrol istemcisi (cihaz) olan ofisler
@@ -90,12 +91,17 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
       }
     }
 
-    // Üyelik süzgeci: "none" / kontrolü kapalı portaldaki canlı ilanların kimlikleri (normalleştirilmiş portal adıyla).
-    const excluded = excludedCheckPortals(accounts.get(tenantId) ?? []);
+    // Üyelik süzgeci: "none" / kontrolü kapalı portaldaki canlı ilanların kimlikleri. Eşleme bellekte portalIdFromName ile
+    // yapılır (portal_name birebir süzülmez): eski/aktarım yoluyla "Sahibinden" ya da "sahibinden.com" yazılmış
+    // satırlar da süzgece takılır.
+    const excluded = new Set(excludedCheckPortals(accounts.get(tenantId) ?? []));
     const skip = new Set<string>();
-    if (excluded.length > 0) {
-      const { data: ex } = await db.from("portal_listings").select("id").eq("tenant_id", tenantId).eq("status", "live").in("portal_name", excluded).limit(5000);
-      for (const r of (ex ?? []) as { id: string }[]) skip.add(r.id);
+    if (excluded.size > 0) {
+      const { data: ex } = await db.from("portal_listings").select("id, portal_name").eq("tenant_id", tenantId).eq("status", "live").limit(5000);
+      for (const r of (ex ?? []) as { id: string; portal_name: string | null }[]) {
+        const id = portalIdFromName(r.portal_name);
+        if (id && excluded.has(id)) skip.add(r.id);
+      }
     }
 
     const jobs: Record<string, unknown>[] = [];

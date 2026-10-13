@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now } from "@/lib/clock";
 import { CURRENT_PORTALS, MEMBERSHIP_STATUSES } from "@/lib/portals/catalog";
+import { PORTAL_MEMBERSHIP_EDITOR_ROLES } from "@/lib/portals/membership";
 
 /**
  * Portal üyelikleri kaydı (Ayarlar > Entegrasyonlar > "Portal üyelikleri" ve Kurulum > "Vitrin ve portallar"). Yetki:
@@ -14,8 +15,6 @@ import { CURRENT_PORTALS, MEMBERSHIP_STATUSES } from "@/lib/portals/catalog";
  * işaretli getirir, sahip/genel müdür "Onayla ve kaydet" deyince bu eylem `source = owner_declared` ile yazar.
  * Eklentinin giriş alanları (last_login_*, seri) bu eylemde değişmez.
  */
-
-const MANAGER_ROLES = new Set(["owner", "gm"]);
 
 const itemSchema = z.object({
   portal: z.enum(CURRENT_PORTALS),
@@ -45,7 +44,7 @@ export type SavePortalMembershipsResult = { ok: true; saved: number } | { ok: fa
 export async function savePortalMemberships(items: PortalMembershipInput[]): Promise<SavePortalMembershipsResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { ok: false, error: gate.error };
-  if (!MANAGER_ROLES.has(gate.role)) {
+  if (!PORTAL_MEMBERSHIP_EDITOR_ROLES.has(gate.role)) {
     return { ok: false, error: "Portal üyeliklerini yalnız ofis sahibi ya da genel müdür değiştirebilir. Değişiklik için onlara iletin." };
   }
   const parsed = inputSchema.safeParse(items);

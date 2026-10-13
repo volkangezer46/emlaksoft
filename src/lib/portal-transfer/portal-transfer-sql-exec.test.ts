@@ -68,6 +68,8 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
     U2 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T2]))[0]!.id as string;
     P1 = (await q(`insert into public.properties(tenant_id, assigned_to) values ($1,$2) returning id`, [T1, U1]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261012002700_portal_transfer_sessions.sql"));
+    // EP1: portal_name tetikleyicisi (initcap geçen RPC'ler de tek biçim yazar).
+    await db.exec(read("supabase/migrations/20261013007100_portal_listings_name_normalize.sql"));
   });
 
   it("kod TEK KULLANIMLIK: ilk tüketim ok, ikinci 'used'", async () => {
@@ -142,7 +144,7 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
     const done = await call("pt_complete_session", [sid, "published", "1234567890", "https://www.sahibinden.com/ilan/1234567890/detay", { title: "planned" }]);
     expect(done).toMatchObject({ outcome: "ok", bind: "applied" });
     const row = (await q(`select source_kind, created_via, portal_name from public.portal_listings where portal_listing_id = '1234567890'`))[0]!;
-    expect(row).toMatchObject({ source_kind: "assisted", created_via: "bind", portal_name: "Sahibinden" });
+    expect(row).toMatchObject({ source_kind: "assisted", created_via: "bind", portal_name: "sahibinden" });
     expect(await call("pt_complete_session", [sid, "published", "1234567890", null, {}])).toMatchObject({ outcome: "replay" });
     // başka portföy için aynı ilan no
     await prepare(P1b, hex("8"), "sahibinden");
@@ -161,6 +163,18 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
     expect(rec).toMatchObject({ outcome: "ok" });
     const bad = await q(`select count(*)::int n from public.portal_transfer_sessions where code_hash is not null and code_hash !~ '^[0-9a-f]{64}$'`);
     expect(bad[0]!.n).toBe(0);
+  });
+
+  it("portal_name her yazımda küçük harf + kırpılmış (tetikleyici); CHECK farklı biçimi kabul etmez", async () => {
+    const id = (await q(`insert into public.portal_listings(tenant_id, property_id, portal_name) values ($1,$2,' HepsiEmlak ') returning id, portal_name`, [T1, P1]))[0]!;
+    expect(id.portal_name).toBe("hepsiemlak");
+    await q(`update public.portal_listings set portal_name = 'EMLAKJET' where id = $1`, [id.id]);
+    expect((await q(`select portal_name from public.portal_listings where id = $1`, [id.id]))[0]!.portal_name).toBe("emlakjet");
+    expect((await q(`select count(*)::int as n from public.portal_listings where portal_name <> lower(btrim(portal_name))`))[0]!.n).toBe(0);
+    await db.exec(`alter table public.portal_listings disable trigger portal_listings_normalize_name`);
+    await expect(q(`update public.portal_listings set portal_name = 'Emlakjet' where id = $1`, [id.id])).rejects.toThrow(/portal_listings_portal_name_normalized/);
+    await db.exec(`alter table public.portal_listings enable trigger portal_listings_normalize_name`);
+    await q(`delete from public.portal_listings where id = $1`, [id.id]);
   });
 
   it("tablo: doğrudan yazma politikası yok (yalnız select); service_role açık yetkili", async () => {
