@@ -13,7 +13,7 @@ const clip = (v: string | undefined) => (typeof v === "string" && v.length > 0 ?
  * Google bağlantı merkezi: Search Console + Google Ads. Modül `reklam` (super_admin yazar, ops salt okur,
  * billing/support göremez). Yalnız platform_settings okunur; Google API çiziminde çağrılmaz.
  */
-export default async function GoogleConnectionsPage({ searchParams }: { searchParams?: Promise<SP> }) {
+export default async function GoogleConnectionsPage({ searchParams }: { searchParams?: Promise<{ ileti?: string; hata?: string }> }) {
   const staff = await requirePlatformModule("reklam");
   const canWrite = platformModuleMode(staff.role, "reklam") === "write" && staff.role === "super_admin";
   const [view, sp] = await Promise.all([readConnectionView(), searchParams ?? Promise.resolve({} as SP)]);
