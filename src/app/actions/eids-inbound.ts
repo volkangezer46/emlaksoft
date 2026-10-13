@@ -165,6 +165,7 @@ type QueueRow = {
   deal_kind: "sale" | "rent" | null;
   valid_until: string | null;
   match_status: string | null;
+  property_id: string | null;
   raw_eml_encrypted: string | null;
 };
 
@@ -198,7 +199,7 @@ export async function approveEidsMessage(messageId: string, propertyRef: string)
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("eids_inbound_messages")
-    .select("id, received_via, auth_result, parse_kind, eids_property_no, deal_kind, valid_until, match_status, raw_eml_encrypted")
+    .select("id, received_via, auth_result, parse_kind, eids_property_no, deal_kind, valid_until, match_status, property_id, raw_eml_encrypted")
     .eq("tenant_id", gate.tenantId)
     .eq("id", messageId)
     .maybeSingle();
@@ -221,6 +222,20 @@ export async function approveEidsMessage(messageId: string, propertyRef: string)
   if (!prop) return { error: "Ne oldu: seçilen portföy bulunamadı. Ne yapmalı: portföy kodunu kontrol edin ya da listeden başka bir portföy seçin." };
   const propertyId = (prop as { id: string }).id;
 
+  // Satırı ATOMİK sahiplen: yalnız hâlâ bekliyorsa 'applied' yap (koşullu update). İki yönetici aynı anda onaylarsa
+  // ya da çift tıklanırsa yalnız biri sahiplenir; defter çağrısı tek kez yapılır. Defter hata verirse eski duruma döner.
+  const nowIso = new Date(now()).toISOString();
+  const prevStatus = String(row.match_status);
+  const { data: claimed, error: claimErr } = await admin
+    .from("eids_inbound_messages")
+    .update({ match_status: "applied", property_id: propertyId, reviewed_by: gate.userId, reviewed_at: nowIso })
+    .eq("tenant_id", gate.tenantId)
+    .eq("id", row.id)
+    .eq("match_status", prevStatus)
+    .select("id");
+  if (claimErr) return { error: "Ne oldu: kayıt güncellenemedi. Ne yapmalı: birkaç saniye sonra tekrar deneyin." };
+  if (!claimed || claimed.length === 0) return { error: "Ne oldu: bu e-posta artık onay beklemiyor (başka biri işlemiş olabilir). Ne yapmalı: sayfayı yenileyin." };
+
   const applied = await ledgerApplier(admin)({
     tenantId: gate.tenantId,
     propertyId,
@@ -234,15 +249,25 @@ export async function approveEidsMessage(messageId: string, propertyRef: string)
     bindPropertyNo: true,
     actorId: gate.userId,
   });
-  if (!applied.ok) return { error: applied.error };
+  if (!applied.ok) {
+    const { error: revertErr } = await admin
+      .from("eids_inbound_messages")
+      .update({ match_status: prevStatus, property_id: row.property_id, reviewed_by: null, reviewed_at: null })
+      .eq("tenant_id", gate.tenantId)
+      .eq("id", row.id)
+      .eq("match_status", "applied")
+      .is("authority_event_id", null);
+    if (revertErr) console.error("approveEidsMessage: sahiplenme geri alınamadı", { code: revertErr.code });
+    return { error: applied.error };
+  }
 
-  const nowIso = new Date(now()).toISOString();
   const { error: upErr } = await admin
     .from("eids_inbound_messages")
-    .update({ match_status: "applied", property_id: propertyId, authority_event_id: applied.eventId, reviewed_by: gate.userId, reviewed_at: nowIso })
+    .update({ authority_event_id: applied.eventId })
     .eq("tenant_id", gate.tenantId)
     .eq("id", row.id);
-  if (upErr) console.error("approveEidsMessage: durum yazılamadı", { code: upErr.code });
+  // Olay defterde açıldı; bağlantı yazılamazsa kayıt yine 'applied' kalır (tekrar onaylanamaz → çift olay yok).
+  if (upErr) console.error("approveEidsMessage: olay bağlantısı yazılamadı", { code: upErr.code });
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
