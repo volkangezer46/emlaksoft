@@ -2,8 +2,8 @@
 
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { getSettings } from "@/lib/settings/read";
-import { EMAIL_TEMPLATES, templateSettingKey, type EmailTemplateKey } from "@/lib/email/templates";
+import { loadTemplateText } from "@/lib/email/send";
+import { isEmailTemplateKey, type EmailTemplateKey } from "@/lib/email/templates";
 import { sendSelfEmail, testResendConnection, type ConnectionTestResult } from "@/lib/email/test-send";
 
 /**
@@ -46,18 +46,10 @@ export async function sendSelfTestEmailAction(): Promise<EmailActionResult> {
 export async function sendTemplateSampleAction(templateKey: string): Promise<EmailActionResult> {
   const g = await gate();
   if ("error" in g) return { error: g.error };
-  const def = EMAIL_TEMPLATES.find((t) => t.key === templateKey);
-  if (!def) return { error: "Bilinmeyen şablon." };
-  const key = def.key as EmailTemplateKey;
-  const sk = templateSettingKey(key, "subject");
-  const bk = templateSettingKey(key, "body");
-  const s = await getSettings([sk, bk]);
-  const res = await sendSelfEmail(g.staff, {
-    type: "template",
-    key,
-    subject: String(s[sk] ?? def.defaultSubject),
-    body: String(s[bk] ?? def.defaultBody),
-  });
+  if (!isEmailTemplateKey(templateKey)) return { error: "Bilinmeyen şablon." };
+  const key: EmailTemplateKey = templateKey;
+  const text = await loadTemplateText(key);
+  const res = await sendSelfEmail(g.staff, { type: "template", key, subject: text.subject, body: text.body, footer: text.footer });
   await logPlatformActivity({ actorId: g.staff.id, action: "integration.email.template_sample", entityType: "integration", meta: { template: key, ok: res.ok } });
   return res.ok ? { ok: true, sentTo: g.staff.email } : { error: res.error };
 }
