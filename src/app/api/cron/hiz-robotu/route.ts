@@ -10,10 +10,13 @@ import { STATIC_ROUTES } from "@/lib/static-home/registry";
 import { staticRouteMode } from "@/lib/static-home/settings";
 
 export const dynamic = "force-dynamic";
-/** PSI koşusu 10-40 sn sürer; bütçe (240 sn) bu sınırın altındadır. */
+/**
+ * PSI koşusu 10-40 sn sürer, en kötü 90 sn'de kesilir. Bütçe yalnız YENİ koşu başlatmayı durdurur; bütçe anında başlamış
+ * koşu 90 sn daha sürebilir: 190 + 90 = 280 sn < 300 sn (maxDuration ve cron-call.sh --max-time 300).
+ */
 export const maxDuration = 300;
 
-const BUDGET_MS = 240_000;
+const BUDGET_MS = 190_000;
 const ALWAYS = ["/", "/fiyatlar"] as const;
 
 /**

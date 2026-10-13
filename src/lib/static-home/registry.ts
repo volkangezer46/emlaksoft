@@ -52,14 +52,14 @@ export type StaticRouteDef = {
 const KEEP_PREFIXES = ["mk-sheet", "mk-pause", "mk-feat-sw", "js-"] as const;
 
 /**
- * Yasal sayfalar: sayfa adacığı yok. Üst menü ana sayfayla aynı olduğu için yalnız menü önizleme adacığı (menüye ilk
- * yaklaşmada, boşta yüklenir) adres olarak verilir; ilk yükte Next/React JS'i yoktur.
+ * Yasal sayfalar: adacıksız. LegalPage düzeninde ana sayfa üst menüsü (.mk-nav) yoktur, menü önizleme adacığı orada hiç
+ * yüklenmez; ilk yükte Next/React JS'i yoktur.
  */
 const legal = (id: StaticRouteId, label: string): StaticRouteDef => ({
   id,
   path: `/${id}`,
   label,
-  islands: ["preview"],
+  islands: [],
   keepPrefixes: KEEP_PREFIXES,
   defaultEnabled: false,
 });

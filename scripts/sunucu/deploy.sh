@@ -35,13 +35,21 @@ mkdir -p "$STATIC_DIR"
 docker cp emlaksoft-app:/app/.next/static/. "$STATIC_DIR/" 2>/dev/null || true
 CID=$(docker create "emlaksoft-app:$TAG")
 docker cp "$CID:/app/.next/static/." "$STATIC_DIR/"
+# Paket bütçesi YENİ İMAJIN derlemesinde ölçülür (ana makinedeki .next eski/eksik olabilir). Aşımda yayın durur;
+# bilinçli geçiş için BUNDLE_GATE=warn.
+BUDGET_DIR=$(mktemp -d)
+docker cp "$CID:/app/.next" "$BUDGET_DIR/"
 docker rm "$CID" >/dev/null
 find "$STATIC_DIR" -type f -mtime +14 -delete
 find "$STATIC_DIR" -mindepth 1 -type d -empty -delete
 chown -R 1001:1001 "$STATIC_DIR"
 
-# Paket bütçesi yalnız rapor (yayını engellemez; betik --gate bayrağını tanımasa da hata vermez).
-npx tsx scripts/check-bundle-budget.ts --gate || echo "[uyari] paket butcesi"
+if ! npx tsx scripts/check-bundle-budget.ts --gate --next-dir="$BUDGET_DIR/.next"; then
+  rm -rf "$BUDGET_DIR"
+  if [ "${BUNDLE_GATE:-}" = "warn" ]; then echo "[uyari] paket bütçesi aşıldı (BUNDLE_GATE=warn, yayına devam)"
+  else echo "Paket bütçesi aşıldı — yayın durduruldu (bilinçli geçiş: BUNDLE_GATE=warn)"; exit 1; fi
+fi
+rm -rf "$BUDGET_DIR"
 
 # Migration'lar yayından önce elle uygulanır (RELEASE_MIGRATION yukarıda). Ardından ACL farkı denetlenir;
 # yalnız ACL_GATE=strict iken başarısızlık yayını durdurur.

@@ -122,6 +122,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Bundle and static HTML budget
+        run: npx tsx scripts/check-bundle-budget.ts --gate
+
   operational-smoke:
     name: Read-only deployed environment gates
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.app_url != '' }}
