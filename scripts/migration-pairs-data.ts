@@ -291,6 +291,12 @@ const F = {
   portalTransferSessions: "20261012002700_portal_transfer_sessions.sql",
   fsboSelectScope: "20261012002800_fsbo_select_scope.sql",
   financeOwnerPayoutSource: "20261012002900_finance_owner_payout_source.sql",
+  // DB konseyi (2026-10-13, WP1): RLS InitPlan sarmasi (fsbo/staff/destek), kopya indeks + tenant_id indeksleri,
+  // hazirlik yoklamalari pg_catalog. ACL onarimi migration DEGIL (tek seferlik /root/backups/acl-onarim.sql;
+  // denetim `npm run check:acl`), bu yuzden 20261013000100 bilerek bos.
+  rlsInitplanFsboStaff: "20261013000200_rls_initplan_fsbo_staff.sql",
+  tenantIndexesDedupe: "20261013000300_tenant_indexes_dedupe.sql",
+  readyProbesPgCatalog: "20261013000400_ready_probes_pg_catalog.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -494,6 +500,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.fsboRlsScope]: "siki", // fsbo_leads UPDATE politikasi kendi+sahipsiz kapsama, sutun UPDATE yetkisi daralir, insert is_sample=false; iki kapatma RPC'si izin kapisi alir; veri degismez
     [F.fsboSelectScope]: "siki", // fsbo_leads/observations/activities SELECT politikasi danisman kapsamina daralir; assigned_to/deleted_at kullanici UPDATE yetkisi kalkar (fsbo_assign_lead/fsbo_archive_lead RPC); fsbo_find_existing dar okuma RPC; veri degismez
     [F.financeOwnerPayoutSource]: "siki", // finance_record_entry/finance_void_source_entries gövdeleri + cash_entries.source_type CHECK listesine owner_payout; veri degismez, hesap secilmezse davranis ayni
+    [F.rlsInitplanFsboStaff]: "davranis", // 24 politikada satir-bagimsiz yardimci cagrilari (select fn()) ile sarilir (InitPlan); anlam/rol/komut ayni, plan degisir
+    [F.tenantIndexesDedupe]: "ek", // 11 kopya indeks dusurulur (benzersiz kisit ikizleri) + 12 tabloya tenant_id indeksi; veri/politika degismez
+    [F.readyProbesPgCatalog]: "davranis", // plan_upgrade_ready/subscription_pause_ready sutun sayimi information_schema yerine pg_attribute; imza/ACL/sonuc ayni
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -675,6 +684,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FSBO-realtime-kapatma", order: 52, title: "fsbo_leads realtime yayini + insight_close_fsbo_lead RPC (20261012002400 SONRASI; kod yayin/RPC yokken sessiz; sira serbest, ek)", files: [F.fsboRealtime] },
     { id: "FSBO-select-kapsami", order: 57, title: "fsbo_leads SELECT kapsami (danisman kendi+sahipsiz+olusturdugu) + fsbo_find_existing/fsbo_assign_lead/fsbo_archive_lead RPC'leri + assigned_to/deleted_at sutun yetkisi kaldirma (20261012002600 SONRASI; kodla birlikte yayinlanir; siki)", files: [F.fsboSelectScope] },
     { id: "FINANS-hakedis-kasa", order: 58, title: "Mulk sahibi hakedis odemesi kasada cikis (owner_payout kaynagi; 20261008001100, 20261010000600, 20261011001100 ve 20261012001400 SONRASI; kodla birlikte yayinlanir; siki)", files: [F.financeOwnerPayoutSource] },
+    // order 59 bilerek bos: ACL onarimi migration degil (tek seferlik betik + npm run check:acl).
+    { id: "DB1-rls-initplan-fsbo-staff", order: 60, title: "RLS InitPlan sarmasi: fsbo_*, platform personeli ve destek v2 politikalari (20261012002800 SONRASI; anlam ayni, davranis)", files: [F.rlsInitplanFsboStaff] },
+    { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
+    { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
@@ -856,6 +869,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // Hakedis kasa kaynagi: owner_payouts (core), finance_* (000600/001100) ve tavan govdesi (001400) uzerine yazar.
     [F.financeOwnerPayoutSource, F.financeEntrySourceAmountGuard],
     [F.financeOwnerPayoutSource, F.propertyManagementCore],
+    // RLS InitPlan sarmasi fsbo_leads_select'in 002800 ifadesini (danisman kapsami) esas alir; once 002800 uygulanmali.
+    [F.rlsInitplanFsboStaff, F.fsboSelectScope],
     // Portal aktarim RPC'leri lc_bind_portal_listing (002000), lc_row_visible (002010) ve lc_mark_state_stale (002040) cekirdegine dayanir.
     [F.portalTransferSessions, F.lcInventoryMatching],
   ],
