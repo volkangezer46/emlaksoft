@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
-import { Handshake, RadioTower, ShieldCheck, ToggleRight, Tv } from "lucide-react";
+import { Handshake, RadioTower, ShieldCheck, Sparkles, ToggleRight, Tv, type LucideIcon } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { gateBadge } from "@/lib/marketing-plan-badge";
+import { menuIconComponent } from "@/lib/site-menu/icon-registry";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
-import type { Heading, TextItem } from "@/lib/site-content/schema";
+import type { Heading, LookTextItem } from "@/lib/site-content/schema";
+import { toneClass } from "@/lib/site-content/tones";
 import { tx } from "@/lib/site-content/tokens";
 import { RichTitle } from "./content-link";
 import { SectionHeading } from "./section-heading";
@@ -12,7 +14,7 @@ import { SectionHeading } from "./section-heading";
  * "Daha fazlası": yalnız sistemde GERÇEKTEN olan beş özellik. Rozetler sayfa kilitlerinden (page-gates) gelir.
  * Küçük önizlemeler CSS ile çizilmiş ÖRNEKTİR (gerçek veri veya canlı sayı iddiası yok); yalnız transform/opacity oynar.
  */
-type Item = { id: string; icon: typeof Tv; title: string; text: string; gate?: string; visual?: ReactNode; wide?: boolean };
+type Item = { id: string; icon: LucideIcon; title: string; text: string; gate?: string; visual?: ReactNode; wide?: boolean };
 
 const ITEMS: Item[] = [
   {
@@ -53,12 +55,14 @@ const ITEMS: Item[] = [
 export async function Highlights({
   heading = defaultSiteContent().sections.diger,
   content = defaultSiteContent().highlights,
-}: { heading?: Heading; content?: readonly TextItem[] } = {}) {
+}: { heading?: Heading; content?: readonly LookTextItem[] } = {}) {
   const plans = await getPublicPlanDefinitions();
-  // Başlık/açıklama, sıra ve gizleme içerikten; ikon, rozet (paket kilidi) ve önizleme kimliğe bağlı koddadır.
-  const shown = content.filter((c) => !c.hidden).flatMap((c) => {
-    const base = ITEMS.find((i) => i.id === c.id);
-    return base ? [{ ...base, title: tx(c.title, { plans }), text: tx(c.text, { plans }) }] : [];
+  // Başlık/açıklama, sıra ve gizleme içerikten; bilinen kimlikte ikon, rozet (paket kilidi) ve önizleme koddadır.
+  // Yönetimden eklenen kart (`c_...`) DÜŞMEZ: seçilen ikon/tonla (yoksa varsayılan) rozetsiz ve önizlemesiz çizilir.
+  const shown = content.filter((c) => !c.hidden).map((c) => {
+    const base: Item = ITEMS.find((i) => i.id === c.id) ?? { id: c.id, icon: Sparkles, title: "", text: "" };
+    const icon = (c.icon ? menuIconComponent(c.icon) : null) ?? base.icon;
+    return { ...base, icon, tint: toneClass(c.tone), title: tx(c.title, { plans }), text: tx(c.text, { plans }) };
   });
   return (
     <section id="diger" className="mk-section" aria-labelledby="diger-baslik">
@@ -70,7 +74,7 @@ export async function Highlights({
             return (
               <li key={it.id} id={it.id} className={`mk-hl${it.wide ? " mk-hl-wide" : ""}`} style={{ "--i": i } as React.CSSProperties}>
                 <div className="mk-hl-head">
-                  <span className="mk-value-ico mk-tint-blue"><it.icon size={24} aria-hidden="true" /></span>
+                  <span className={`mk-value-ico ${it.tint}`}><it.icon size={24} aria-hidden="true" /></span>
                   {badge ? <span className="mk-tag mk-tag-plan">{badge}</span> : null}
                 </div>
                 <h3 className="mk-h3">{it.title}</h3>

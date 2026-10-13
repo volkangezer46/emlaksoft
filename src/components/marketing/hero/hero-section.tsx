@@ -41,6 +41,7 @@ export function HeroSection({
 }) {
   const ctx = { trialDays, plans, efLive };
   const m = heroMobileCopy(content, ctx);
+  const strip = content.portalStrip ?? defaultSiteContent().hero.portalStrip;
   return (
     <>
     <section className="mk-hero" aria-labelledby="hero-baslik">
@@ -74,8 +75,8 @@ export function HeroSection({
         <HeroScene />
       </div>
     </section>
-    {/* Portal şeridi hero kutusunun DIŞINDA: hero yüksekliği (1440'ta <=780px hedefi) şeritten bağımsız. */}
-    <PortalStrip />
+    {/* Portal şeridi hero kutusunun DIŞINDA: hero yüksekliği (1440'ta <=780px hedefi) şeritten bağımsız. Yalnız gizli değilse, içerikten. */}
+    {strip.hidden ? null : <PortalStrip content={{ ...strip, title: tx(strip.title, ctx), text: tx(strip.text, ctx), note: tx(strip.note, ctx) }} />}
     </>
   );
 }

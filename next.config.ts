@@ -228,6 +228,14 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Taslak önizlemesi (imzalı belirteçli): önbelleğe alınmaz, dizine eklenmez (robots.txt'e değil başlığa dayanır).
+      {
+        source: "/onizleme/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-cache, no-store, must-revalidate" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
       // Public statik sayfalar — SWR
       {
         source: "/(gizlilik|kullanim-sartlari)",

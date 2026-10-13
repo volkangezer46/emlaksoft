@@ -58,7 +58,7 @@ describe("ana sayfa bölümleri admin'den yönetilir", () => {
   });
 
   it("ana sayfa bölümleri düzene göre çizer ve FAQPage verisi SSS gizliyken basılmaz", () => {
-    const page = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
+    const page = readFileSync(join(process.cwd(), "src/app/_home/render-home.tsx"), "utf8");
     expect(page).toContain("visibleSections(content)");
     expect(page).toMatch(/shown\.includes\("sss"\) \? faqForJsonLd\(faqs\) : \[\]/);
   });

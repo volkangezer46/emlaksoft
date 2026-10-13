@@ -128,9 +128,13 @@ describe("doğrulama", () => {
     expect(hasErrors(issues)).toBe(false);
   });
 
-  it("sahte yorum/sayaç alanı yok: şemada müşteri yorumu veya sayaç anahtarı bulunmaz", () => {
-    const keys = JSON.stringify(Object.keys(defaultSiteContent()));
-    expect(keys).not.toMatch(/testimonial|review|yorum|counter|sayac/i);
+  it("sahte yorum/sayaç alanı yok: yalnız KANITLI yorum (boş, gizli), puan/sayaç anahtarı bulunmaz", () => {
+    const d = defaultSiteContent();
+    const keys = JSON.stringify(Object.keys(d));
+    expect(keys).not.toMatch(/review|rating|counter|sayac|puan/i);
+    // Müşteri yorumları yalnız yazılı onaylı (consentDate + source zorunlu) ve varsayılan olarak boş + gizli.
+    expect(d.testimonials.items).toEqual([]);
+    expect(d.layout.find((s) => s.id === "testimonials")?.hidden).toBe(true);
     const trust = read("src/components/marketing/trust-strip.tsx");
     expect(trust).toContain("DEĞERLER koddan gelir");
   });
@@ -150,7 +154,7 @@ describe("SSS <-> JSON-LD tutarlılığı", () => {
   });
 
   it("ana sayfa aynı listeyi hem Faq hem JSON-LD'ye verir", () => {
-    const page = read("src/app/page.tsx");
+    const page = read("src/app/_home/render-home.tsx");
     expect(page).toContain("buildHomeFaqs({ trialDays, plans, content: content.faq })");
     expect(page).toContain("faqForJsonLd(faqs)");
     expect(page).toContain("<Faq items={faqs}");
@@ -278,6 +282,7 @@ describe("public sayfa statik kalır", () => {
   it("ana sayfa ve içerik okuyucuları dinamik API çağırmaz", () => {
     const files = [
       "src/app/page.tsx",
+      "src/app/_home/render-home.tsx",
       "src/lib/site-content/store.ts",
       "src/lib/site-content/ef-status.ts",
       "src/components/marketing/valuation-section.tsx",

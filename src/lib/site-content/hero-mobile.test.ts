@@ -52,7 +52,7 @@ describe("mobil hero metinleri", () => {
 
 describe("akıllı alt çubuk sözleşmesi", () => {
   it("ana sayfa çubuğu akıllı modda; IntersectionObserver ile, kaydırma dinleyicisi olmadan", () => {
-    expect(readFileSync("src/app/page.tsx", "utf8")).toContain("<SiteFooter smartCta");
+    expect(readFileSync("src/app/_home/render-home.tsx", "utf8")).toContain("<SiteFooter smartCta");
     const root = readFileSync("src/components/marketing/motion-root.tsx", "utf8");
     expect(root).toContain(".mk-sticky-cta[data-smart]");
     expect(root).not.toMatch(/addEventListener\(\s*["']scroll/);

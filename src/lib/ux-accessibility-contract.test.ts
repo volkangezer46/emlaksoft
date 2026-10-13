@@ -16,7 +16,8 @@ const mainContentShells = [
 ] as const;
 
 const directPublicMainPages = [
-  "src/app/page.tsx",
+  // Ana sayfa gövdesi (src/app/page.tsx ve taslak önizlemesi bunu çağırır).
+  "src/app/_home/render-home.tsx",
   "src/app/danisman/[slug]/page.tsx",
   "src/app/vitrin/[slug]/page.tsx",
   "src/app/vitrin/[slug]/[id]/page.tsx",
@@ -72,6 +73,7 @@ describe("navigation accessibility contract", () => {
       );
     const home = [
       "src/app/page.tsx",
+      "src/app/_home/render-home.tsx",
       ...marketingFiles("src/components/marketing"),
       "src/components/site-footer.tsx",
       "src/lib/site-menu/defaults.ts",

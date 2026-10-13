@@ -24,8 +24,19 @@ export const LIMITS = {
   maxChecks: 6,
   maxTour: 7,
   maxBento: 8,
+  /** Öğe eklenebilen kart listeleri (değer kartları, güven şeridi, ayrıntılar, adımlar, güvenlik maddeleri). */
+  maxCards: 12,
+  portalName: 40,
+  maxPortals: 10,
+  quote: 400,
+  personName: 60,
+  personRole: 60,
+  office: 80,
+  city: 40,
+  source: 120,
+  maxTestimonials: 12,
   /** Serileştirilmiş yapılandırma üst sınırı (bayt). */
-  jsonBytes: 60 * 1024,
+  jsonBytes: 120 * 1024,
 } as const;
 
 
@@ -53,6 +64,7 @@ export const LANDING_SECTIONS = [
   { id: "fiyat", label: "Fiyatlar" },
   { id: "sss", label: "Sık sorulan sorular" },
   { id: "son", label: "Son çağrı" },
+  { id: "testimonials", label: "Müşteri yorumları (yazılı onaylı)" },
 ] as const;
 export type LandingSectionId = (typeof LANDING_SECTIONS)[number]["id"];
 export const LANDING_IDS = LANDING_SECTIONS.map((s) => s.id) as [LandingSectionId, ...LandingSectionId[]];
@@ -61,7 +73,13 @@ export const SECTION_KEYS = ["tur", "ozellikler", "diger", "neden", "nasil", "fi
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 
-/** Düzen listesi: bilinmeyen/yinelenen kimlik atılır, eksik bölüm sona (görünür) eklenir. Saf. */
+/**
+ * Varsayılan olarak GİZLİ başlayan bölümler: eski yayında eksikse sona gizli eklenir (yayındaki sayfa kendiliğinden değişmez).
+ * Müşteri yorumları kanıt (yazılı onay) ister; yönetici açıkça açmadan görünmez.
+ */
+export const HIDDEN_BY_DEFAULT: readonly LandingSectionId[] = ["testimonials"];
+
+/** Düzen listesi: bilinmeyen/yinelenen kimlik atılır, eksik bölüm sona eklenir (görünür; `HIDDEN_BY_DEFAULT` gizli). Saf. */
 export function normalizeLayout(list: ReadonlyArray<{ id?: unknown; hidden?: unknown }>): LayoutItem[] {
   const seen = new Set<string>();
   const out: LayoutItem[] = [];
@@ -71,8 +89,19 @@ export function normalizeLayout(list: ReadonlyArray<{ id?: unknown; hidden?: unk
     seen.add(k);
     out.push({ id: k as LandingSectionId, hidden: it.hidden === true });
   }
-  for (const k of LANDING_IDS) if (!seen.has(k)) out.push({ id: k, hidden: false });
+  for (const k of LANDING_IDS) if (!seen.has(k)) out.push({ id: k, hidden: HIDDEN_BY_DEFAULT.includes(k) });
   return out;
+}
+
+
+/** Yönetimden eklenen kart kimliği: `c_` + 6 rastgele karakter (bilinen kimliklerle çakışmaz; zamana bağlı değil). */
+export function newCardId(taken: readonly string[]): string {
+  const abc = "abcdefghijklmnopqrstuvwxyz0123456789";
+  for (;;) {
+    const bytes = crypto.getRandomValues(new Uint8Array(6));
+    const id = `c_${Array.from(bytes, (b) => abc[b % abc.length]).join("")}`;
+    if (!taken.includes(id)) return id;
+  }
 }
 
 
