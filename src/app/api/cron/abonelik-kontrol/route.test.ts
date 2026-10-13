@@ -73,7 +73,10 @@ vi.mock("@/lib/notify-batch", () => ({ findNotifiedIds: async () => new Set(), i
 vi.mock("@/lib/billing/subscription-lifecycle", () => ({
   pausedSubscriptionIds: async () => new Set(),
   runSubscriptionLifecycle: async () => ({ resumed: 0, downgraded: 0, downgradeFailed: 0, notified: 0, skipped: true }),
+  isExpireToPastDueEnabled: async () => false,
+  runExpireActiveToPastDue: async () => ({ enabled: false, candidates: 0, expired: 0, tenants: 0, error: null }),
 }));
+vi.mock("@/lib/billing/mrr-snapshot", () => ({ runMrrSnapshot: async () => ({ written: 0, total: 0, skipped: true, error: null }) }));
 
 import { GET } from "./route";
 

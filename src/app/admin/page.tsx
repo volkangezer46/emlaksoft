@@ -52,6 +52,8 @@ import {
   homeVariantFor,
   platformHomeSections,
   type AttentionInput,
+  type AttentionRow,
+  ATTENTION_LIMIT,
   type ChurnLevel,
   type ChurnSignal,
   type HomeSection,
@@ -194,7 +196,11 @@ function derive(data: Data) {
 const loadAttention = cache(async (period: Period, role: PlatformRole) => {
   const data = await loadDashboard(period);
   const d = derive(data);
-  const sys = await loadSystemSignals(platformCanAccess(role, "billing"));
+  const canBilling = platformCanAccess(role, "billing");
+  const [sys, expiredActive] = await Promise.all([
+    loadSystemSignals(canBilling),
+    canBilling ? countExpiredActive() : Promise.resolve(null),
+  ]);
   const input: AttentionInput = {
     refundRequired: data.refundRequired,
     manualReview: data.manualReview,
@@ -206,8 +212,32 @@ const loadAttention = cache(async (period: Period, role: PlatformRole) => {
     trialsEnding: d.soon,
     newTrials: data.newTenants,
   };
-  return buildAttentionQueue(input, role);
+  const queue = buildAttentionQueue(input, role);
+  if (!expiredActive) return queue;
+  // Dönemi bitmiş ama 'active' abonelik (status='active' AND current_period_end < şimdi): ödenmemiş dönem gelir
+  // sayılıyor. Satır eylemleri Ofis 360 > Yönetim'de (Ödenmedi / Dönemi uzat; gerekçe + denetim izi).
+  const row: AttentionRow = {
+    id: "expired-active",
+    label: `Dönemi bitmiş ama aktif: ${expiredActive}`,
+    hint: "Ödenmiş dönemi geçmiş, durumu hâlâ aktif",
+    count: expiredActive,
+    href: "/admin/tenants?durum=donemi-bitmis",
+    tone: "danger",
+    severity: 75,
+    module: "billing",
+  };
+  return [...queue, row].sort((a, b) => b.severity - a.severity || b.count - a.count).slice(0, ATTENTION_LIMIT);
 });
+
+/** Dönemi bitmiş aktif abonelik sayısı (tek HEAD sayımı, önbelleksiz); okunamazsa null (satır gizlenir). */
+async function countExpiredActive(): Promise<number | null> {
+  const { count, error } = await createAdminClient()
+    .from("subscriptions")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "active")
+    .lt("current_period_end", new Date(now()).toISOString());
+  return error ? null : (count ?? 0);
+}
 
 const MONTHS_SHORT = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const monthLabel = (iso: string) => MONTHS_SHORT[trParts(iso).month] ?? "";

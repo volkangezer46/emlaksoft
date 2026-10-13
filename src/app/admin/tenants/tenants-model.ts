@@ -12,11 +12,15 @@ export const TRIAL_LABELS: Record<"bitiyor" | "bitti", string> = { bitiyor: "Den
 /** Paket dağılımı grafiği tabanı (URL `dagilim=`): tüm ofisler ya da yalnız aktif aboneler. */
 export const DISTRIBUTION_LABELS: Record<"tum" | "aktif", string> = { tum: "Tüm ofisler", aktif: "Aktif aboneler" };
 const DAY_WINDOWS = new Set(["7", "30", "90"]);
+/** Sanal durum süzgeci: abonelik `status='active' AND current_period_end < şimdi` olan ofisler (dikkat kuyruğu kartı). */
+export const EXPIRED_ACTIVE_FILTER = "donemi-bitmis" as const;
+export const EXPIRED_ACTIVE_LABEL = "Dönemi bitmiş ama aktif";
+const VIRTUAL_STATUS = new Set<string>(["risk", EXPIRED_ACTIVE_FILTER]);
 
 export type TenantFilters = {
   q?: string;
-  /** tenants.status ya da sanal `risk` (gecikmiş + askıda). */
-  durum?: TenantStatusKey | "risk";
+  /** tenants.status ya da sanal `risk` (gecikmiş + askıda) / `donemi-bitmis` (aboneliği aktif ama dönemi geçmiş). */
+  durum?: TenantStatusKey | "risk" | typeof EXPIRED_ACTIVE_FILTER;
   plan?: string;
   veri?: "demo" | "gercek";
   /** Kayıt penceresi (gün). */
@@ -31,7 +35,7 @@ export type TenantFilters = {
 export type RawTenantSearch = Partial<Record<"q" | "durum" | "plan" | "veri" | "yeni" | "deneme" | "gun" | "dagilim" | "sayfa", string>>;
 
 export function parseTenantFilters(sp: RawTenantSearch, isPlan: (id: string) => boolean): TenantFilters {
-  const durum = sp.durum && ((TENANT_STATUS_KEYS as readonly string[]).includes(sp.durum) || sp.durum === "risk") ? (sp.durum as TenantFilters["durum"]) : undefined;
+  const durum = sp.durum && ((TENANT_STATUS_KEYS as readonly string[]).includes(sp.durum) || VIRTUAL_STATUS.has(sp.durum)) ? (sp.durum as TenantFilters["durum"]) : undefined;
   const deneme = sp.deneme === "bitiyor" || sp.deneme === "bitti" ? sp.deneme : undefined;
   const n = Number(sp.sayfa);
   return {
@@ -82,7 +86,10 @@ export function activeChips(f: TenantFilters, planName: (id: string) => string, 
   const drop = (patch: Partial<TenantFilters>) => tenantsHref({ ...f, ...patch, sayfa: undefined });
   const chips: ActiveChip[] = [];
   if (f.q) chips.push({ key: "q", label: `Arama: ${f.q}`, removeHref: drop({ q: undefined }) });
-  if (f.durum) chips.push({ key: "durum", label: `Durum: ${f.durum === "risk" ? "Riskli (gecikmiş + askıda)" : statusName(f.durum)}`, removeHref: drop({ durum: undefined }) });
+  if (f.durum) {
+    const name = f.durum === "risk" ? "Riskli (gecikmiş + askıda)" : f.durum === EXPIRED_ACTIVE_FILTER ? EXPIRED_ACTIVE_LABEL : statusName(f.durum);
+    chips.push({ key: "durum", label: `Durum: ${name}`, removeHref: drop({ durum: undefined }) });
+  }
   if (f.plan) chips.push({ key: "plan", label: `Paket: ${planName(f.plan)}`, removeHref: drop({ plan: undefined }) });
   if (f.veri) chips.push({ key: "veri", label: `Veri: ${DATA_STATE_LABELS[f.veri]}`, removeHref: drop({ veri: undefined }) });
   if (f.yeni) chips.push({ key: "yeni", label: `Kayıt: son ${f.yeni} gün`, removeHref: drop({ yeni: undefined }) });

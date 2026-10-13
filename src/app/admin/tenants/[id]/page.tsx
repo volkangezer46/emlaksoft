@@ -47,6 +47,9 @@ import {
 } from "@/lib/admin/office-360";
 import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-management";
 import { OfficeManagement } from "./office-management";
+import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
+import { isExpiredActive } from "@/lib/admin/platform-metrics";
+import { platformCanAccess } from "@/lib/platform-access";
 import { ModulePanel } from "./module-panel";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionPanel } from "./subscription-panel";
@@ -200,6 +203,11 @@ export default async function AdminTenantDetailPage({
         plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
         legalHref={tabHref("yasal")}
         closureRequests={mgmt.closureRequests.map((r) => ({ ...r, dueLabel: r.dueAt.slice(0, 10) }))}
+        canChangeTrial={canChangeTrial(staff.role)}
+        canFixSubscription={platformCanAccess(staff.role, "billing")}
+        expiredSubscription={
+          kpiData.sub && isExpiredActive(kpiData.sub, now()) ? { periodEndLabel: fmtDay(kpiData.sub.current_period_end ?? null) ?? "—" } : null
+        }
       />
       <ModulePanel
         tenantId={tenant.id}
