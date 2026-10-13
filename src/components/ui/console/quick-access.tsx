@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { RotateCcw, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { OPEN_PALETTE_EVENT } from "@/lib/palette-events";
 import { bumpUsage, getHrefStore, getUsageStore, pushRecent, togglePin, topUsed } from "@/lib/nav-memory";
 import { ShortcutHint } from "@/components/app/shortcut-hint";
 

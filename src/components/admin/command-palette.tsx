@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 import { adminPaletteFor } from "@/lib/admin/nav";
-import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/palette-events";
 
 type Hit = {
   id: string;

@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { Search } from "lucide-react";
-import { OPEN_PALETTE_EVENT } from "@/lib/palette-core";
+import { OPEN_PALETTE_EVENT } from "@/lib/palette-events";
 
 /** Komut paletini (üst çubuktakiyle AYNI palet) başlangıç metniyle açar; palet `detail.q` desteklemiyorsa yalnız açılır. */
 function openPalette(q: string) {

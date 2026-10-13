@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { ShortcutHint } from "./shortcut-hint";
 import type { AppModule } from "@/lib/permissions";
-import { OPEN_PALETTE_EVENT, paletteQueryFromEvent } from "@/lib/palette-core";
+import { OPEN_PALETTE_EVENT, paletteQueryFromEvent } from "@/lib/palette-events";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
 
