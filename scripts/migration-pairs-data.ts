@@ -327,6 +327,11 @@ const F = {
   ad11SecurityHardening: "20261013005000_ad11_security_hardening.sql",
   // AD12 (2026-10-13): surumlu yasal belgeler + yeniden onay kayitlari + tarihli mevzuat sabitleri + yardim merkezi makale/oy tablolari.
   legalHelpContent: "20261013005100_legal_help_content.sql",
+  // FN1 (2026-10-14): Finans v2 mini muhasebe: cari, acik kalem/vade, ekler, ofis kategorisi, kural, ay kilidi, butce, ayar, kayitli
+  // gorunum + cash_entries KDV/stopaj/cari kolonlari + birlesik defter/acik kalem gorunumleri (001000), v2 RPC'ler (001100), veri tasima (001200).
+  financeLedgerV2: "20261014001000_finance_ledger_v2.sql",
+  financeLedgerV2Rpc: "20261014001100_finance_ledger_v2_rpc.sql",
+  financeLedgerV2Backfill: "20261014001200_finance_ledger_v2_backfill.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
   // AD1 (2026-10-13): abonelik operasyon konsolu: ofise ozel limit istisnasi + cozucu, taahhut/iptal kodu, tahsil hata metni.
@@ -566,6 +571,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.pushSubscriptionsRepairFirst]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.supportDeskV2]: "davranis", // 5 yeni tablo (yalniz service_role) + support_tickets.tags + ticket_macros eylem/sayac kolonlari; SLA hedefi IS SAATINE gore (support_set_derived_ticket_fields degisir), BEFORE INSERT otomatik atama tetikleyicisi, billing rolu destek personeli sayilir; kod tablolar yokken eski davranis
+    [F.financeLedgerV2]: "ek", // 9 yeni tablo (RLS: tenant + expenses:view; yazma yalniz RPC, kayitli gorunum kendi satiri) + cash_entries 8 / recurring_rules 3 nullable kolon + 2 security_invoker gorunum + ay kilidi ve acik kalem tetikleri (kilit tablosu bos dogar) + realtime yayini; mevcut satir/davranis degismez
+    [F.financeLedgerV2Rpc]: "ek", // ~30 yeni SECURITY DEFINER finance_* RPC (v2 kayit/guncelleme eski RPC'leri sarar; eski imza ve govdeler degismez)
+    [F.financeLedgerV2Backfill]: "davranis", // karsi taraf metinlerinden cari + cash_entries.party_id (tutar/tarih/hesap degismez, bakiye ayni), expense_budgets -> finance_budgets kopyasi, permission_defaults muhasebe expenses create+edit; idempotent
     [F.legalHelpContent]: "ek", // 5 yeni tablo (legal_documents/consents/constants, help_articles/votes; RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken koddaki icerikle calisir
     [F.googleData]: "ek", // 3 yeni platform tablosu (RLS acik, politika yok, yalniz service_role) + google_data_prune/seo_gsc_summary (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "veri yok"
     [F.subscriptionOps]: "davranis", // kapasite tetikleyicileri + effective_seat_limit ofise ozel istisnayi sayar (istisna yokken sonuc ayni); yeni tablo tenant_entitlement_overrides (RLS+FORCE, personel okur, service_role yazar) + 4 nullable sutun
@@ -772,6 +780,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions ilk onarimi (canlida 004910 oncesi uygulandi): eksik tablo asil tanimla idempotent kurulur; 004910 politikayi sikilastirir (sira serbest, ek)", files: [F.pushSubscriptionsRepairFirst] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "AD2-fatura-satirlari-dekont", order: 72, title: "Fatura satirlari (geriye donuk tek satir) + numarali alacak dekontu (iade kaydi tetikleyicisi; mevcut iadeler dekontlanir) + elle fatura taslak RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken satiri faturadan turetir, elle fatura formu 'kurulum bekliyor' der; sira serbest)", files: [F.invoiceLinesCreditNotes] },
+    { id: "FN1-finans-v2-defter", order: 101, title: "Finans v2 (Muhasebe mini muhasebe programi): sema + RPC + veri tasima AYNI PENCEREDE ve bu sirayla (001000 -> 001100 -> 001200; 20261010000600/000900, 20261011001200, 20261012000400, 20261012002900 ve 20261008001100 SONRASI). KOD YAYININDAN ONCE uygulanir; kod sema yokken 'veritabani guncellemesi bekliyor' der. Dogrulama: cash_entries sayisi ve finance_account_balances once/sonra ayni (davranis)", files: [F.financeLedgerV2, F.financeLedgerV2Rpc, F.financeLedgerV2Backfill] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },
     { id: "SP5-google-veri", order: 69, title: "Google baglanti merkezi: seo_gsc_daily, seo_url_inspections, ads_daily_metrics + google_data_prune/seo_gsc_summary (bagimsiz; kod tablolar yokken bos durum, cron baglanti yokken atlar; sira serbest, ek)", files: [F.googleData] },
     { id: "AD1-abonelik-operasyon", order: 71, title: "Abonelik operasyon konsolu: tenant_entitlement_overrides + tenant_entitlement_resolve, kapasite tetikleyicileri ve effective_seat_limit istisnayi sayar (20260825000600 govdesi md5 on-kosullu), subscriptions.commitment_end_at/cancel_reason_code/cancel_note, invoices.checkout_error (KOD YAYININDAN ONCE ya da SONRA; kod sutun/tablo yokken 'kurulum bekliyor'; davranis)", files: [F.subscriptionOps] },
@@ -881,6 +890,16 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // Sureli kontor: cuzdan RPC'leri (000100) + devir tavani RPC'si (001200; no-op'a cevrilir) uzerine yazar.
     [F.efPackNamesTl, F.planPricesEfTariff],
     [F.appShellPlatformStaff, F.appShellHiddenModules],
+    // FN1: v2 semasi finans/mulk yonetimi tablolarina (is_sample, reconciled_at, rent_charges.paid_amount) dayanir; RPC'ler semaya,
+    // eski finance_record_entry'nin son govdesine (002900) sarilir; tasima RPC/sema sonrasi.
+    [F.financeLedgerV2, F.financeAccountsCashEntries],
+    [F.financeLedgerV2, F.recurringRules],
+    [F.financeLedgerV2, F.bankStatementImport],
+    [F.financeLedgerV2, F.financeIsSample],
+    [F.financeLedgerV2, F.propertyManagementCore],
+    [F.financeLedgerV2Rpc, F.financeLedgerV2],
+    [F.financeLedgerV2Rpc, F.financeOwnerPayoutSource],
+    [F.financeLedgerV2Backfill, F.financeLedgerV2Rpc],
     [F.financeIsSample, F.financeAccountsCashEntries],
     [F.financeIsSample, F.recurringRules],
     [F.financeIsSample, F.expenseBudgetsRecurring],
