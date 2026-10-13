@@ -212,23 +212,16 @@ export async function upsertLegalDraft(slug: LegalDocSlug, input: DraftInput, ac
   return { ok: true, version };
 }
 
-/** Taslağı yayınlar: önceki yayındaki sürüm arşive iner. Dönen sürüm yayına girendir. */
+/**
+ * Taslağı yayınlar: önceki yayındaki sürüm arşive iner. Dönen sürüm yayına girendir. İki adım TEK transaction'da
+ * (`legal_publish_draft` RPC, yalnız service_role): ara adımda hata yayını boşaltmaz, eş zamanlı yayın sıralanır.
+ */
 export async function publishLegalDraft(slug: LegalDocSlug, actorId: string): Promise<{ ok: true; version: number; requiresReconsent: boolean } | { ok: false; error: string }> {
-  const admin = db();
-  const { data, error } = await admin.from("legal_documents").select("id, version, requires_reconsent").eq("slug", slug).eq("status", "draft").maybeSingle();
-  if (error) return { ok: false, error: "Okunamadı; tekrar deneyin." };
-  if (!data) return { ok: false, error: "Yayınlanacak taslak yok." };
-  const d = data as { id: string; version: number; requires_reconsent: boolean };
-  const at = daysAgoIso(0);
-  const { error: e1 } = await admin.from("legal_documents").update({ status: "archived", updated_at: at }).eq("slug", slug).eq("status", "published");
-  if (e1) return { ok: false, error: "Yayındaki sürüm arşive alınamadı; yayın yapılmadı." };
-  const { error: e2 } = await admin
-    .from("legal_documents")
-    .update({ status: "published", published_at: at, published_by: actorId, updated_at: at })
-    .eq("id", d.id)
-    .eq("status", "draft");
-  if (e2) return { ok: false, error: "Yayınlanamadı; tekrar deneyin." };
-  return { ok: true, version: Number(d.version), requiresReconsent: Boolean(d.requires_reconsent) };
+  const { data, error } = await db().rpc("legal_publish_draft", { p_slug: slug, p_actor: actorId });
+  if (error) return { ok: false, error: "Yayınlanamadı; tekrar deneyin." };
+  const row = (Array.isArray(data) ? data[0] : data) as { out_version: number; out_requires_reconsent: boolean } | null | undefined;
+  if (!row) return { ok: false, error: "Yayınlanacak taslak yok." };
+  return { ok: true, version: Number(row.out_version), requiresReconsent: Boolean(row.out_requires_reconsent) };
 }
 
 export async function deleteLegalDraft(slug: LegalDocSlug): Promise<boolean> {
@@ -263,6 +256,30 @@ export async function restoreLegalVersion(slug: LegalDocSlug, version: number, a
   if (ins.error) return { ok: false, error: "Geri dönüş taslağı açılamadı." };
   const pub = await publishLegalDraft(slug, actorId);
   return pub.ok ? { ok: true, version: pub.version } : pub;
+}
+
+/**
+ * Koddaki sayfanın (v1) işaretleme karşılığını DB'ye ARŞİV v1 olarak yazar: sayfa yine koddan çizilir (yayın değişmez),
+ * ama fark görünümü v1 ile karşılaştırır ve "Bu sürüme dön" ile v1 metni DB sürümü olarak yayınlanabilir (taşıma).
+ * Zaten v1 satırı varsa dokunmaz ("exists").
+ */
+export async function insertCodeSnapshot(slug: LegalDocSlug, input: { title: string; body: string }, actorId: string): Promise<"ok" | "exists" | "error"> {
+  const at = daysAgoIso(0);
+  const { error } = await db().from("legal_documents").insert({
+    slug,
+    version: 1,
+    status: "archived",
+    title: input.title,
+    intro: "",
+    body: input.body,
+    requires_reconsent: false,
+    change_note: "Koddaki sürüm (v1) kaydı: yayındaki sayfadan çevrildi",
+    published_at: at,
+    published_by: actorId,
+    created_by: actorId,
+  });
+  if (!error) return "ok";
+  return error.code === "23505" ? "exists" : "error";
 }
 
 /**

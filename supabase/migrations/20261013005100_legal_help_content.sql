@@ -47,8 +47,9 @@ create table if not exists public.legal_documents (
   constraint legal_documents_slug_version unique (slug, version)
 );
 
--- Slug başına tek taslak.
+-- Slug başına tek taslak ve tek yayındaki sürüm.
 create unique index if not exists legal_documents_one_draft on public.legal_documents (slug) where status = 'draft';
+create unique index if not exists legal_documents_one_published on public.legal_documents (slug) where status = 'published';
 create index if not exists legal_documents_slug_published on public.legal_documents (slug, version desc) where status <> 'draft';
 
 create table if not exists public.legal_consents (
@@ -156,5 +157,40 @@ begin
     execute format('grant select, insert, update, delete on table public.%I to service_role', t);
   end loop;
 end $$;
+
+-- Yayın tek transaction'da: önceki yayındaki sürüm arşive iner + taslak yayına girer. İki ayrı UPDATE'te ikinci adım
+-- düşerse yayında hiç DB sürümü kalmazdı (sayfa sessizce koddaki v1'e dönerdi). Taslak satırı FOR UPDATE ile kilitlenir:
+-- eş zamanlı ikinci yayın birincinin bitmesini bekler, sonra taslak bulamaz (boş döner). Yalnız service_role.
+create or replace function public.legal_publish_draft(p_slug text, p_actor uuid)
+returns table (out_version integer, out_requires_reconsent boolean)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  d_id uuid;
+  d_version integer;
+  d_reconsent boolean;
+  at timestamptz := now();
+begin
+  select ld.id, ld.version, ld.requires_reconsent into d_id, d_version, d_reconsent
+    from public.legal_documents ld
+   where ld.slug = p_slug and ld.status = 'draft'
+   for update;
+  if d_id is null then
+    return;
+  end if;
+  update public.legal_documents set status = 'archived', updated_at = at where slug = p_slug and status = 'published';
+  update public.legal_documents
+     set status = 'published', published_at = at, published_by = p_actor, updated_at = at
+   where id = d_id;
+  out_version := d_version;
+  out_requires_reconsent := d_reconsent;
+  return next;
+end;
+$$;
+
+revoke all on function public.legal_publish_draft(text, uuid) from public, anon, authenticated;
+grant execute on function public.legal_publish_draft(text, uuid) to service_role;
 
 notify pgrst, 'reload schema';

@@ -33,7 +33,10 @@ export default async function LegalDocPage({ params }: { params: Promise<{ slug:
   const rows = versions.status === "ok" ? versions.rows : [];
   const draft = rows.find((r) => r.status === "draft") ?? null;
   const live = rows.find((r) => r.status === "published") ?? null;
-  const diff = draft ? diffLines(live?.body ?? "", draft.body) : null;
+  // Fark tabanı: yayındaki DB sürümü; yoksa DB'ye kaydedilmiş koddaki metin (arşiv v1); o da yoksa boş.
+  const codeV1 = live ? null : (rows.find((r) => r.version === 1 && r.status === "archived") ?? null);
+  const base = live ?? codeV1;
+  const diff = draft ? diffLines(base?.body ?? "", draft.body) : null;
   const stats = diff ? diffStats(diff) : null;
   const issues = draft ? lintLegalMarkup(draft.body) : [];
 
@@ -75,10 +78,11 @@ export default async function LegalDocPage({ params }: { params: Promise<{ slug:
       {diff && stats ? (
         <section aria-labelledby="fark-baslik" className="space-y-2">
           <h2 id="fark-baslik" className="text-base font-semibold text-ink-950">
-            Kaydedilmiş taslak ile {live ? `yayındaki v${live.version}` : "boş metin"} arasındaki fark
+            Kaydedilmiş taslak ile {live ? `yayındaki v${live.version}` : codeV1 ? "koddaki metin (v1)" : "boş metin"} arasındaki fark
           </h2>
           <p className="text-xs text-text-muted">
-            {stats.added} satır eklendi, {stats.removed} satır çıkarıldı. Koddaki v1 metni burada karşılaştırılamaz; &quot;Yayındaki metinden taslak başlat&quot; ile başlarsanız fark yalnız sizin değişikliklerinizi gösterir.
+            {stats.added} satır eklendi, {stats.removed} satır çıkarıldı.
+            {base ? "" : " Koddaki v1 metni DB'de kayıtlı değil; Yasal belgeler listesindeki \"Koddaki metinleri v1 olarak kaydet\" ile kaydederseniz fark v1'e göre görünür."}
           </p>
           <pre className="max-h-[480px] overflow-auto whitespace-pre-wrap rounded-[var(--radius-card)] border border-line bg-surface p-3 text-xs leading-relaxed">
             {diff.map((l, i) => (

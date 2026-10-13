@@ -7,10 +7,12 @@ import { trDayKey } from "@/lib/clock";
 import { fetchOwnOriginInspect, readExternalText } from "@/lib/external-fetch";
 import { isLegalKey, isDayKey } from "@/lib/legal-constants/history";
 import { deleteFutureLegalConstant, insertLegalConstant, LEGAL_CONSTANTS_TAG } from "@/lib/legal-constants/store";
-import { isLegalDocSlug, legalDocTitle, legalHtmlToMarkup, lintLegalMarkup, LEGAL_LIMITS, type LegalDocSlug } from "@/lib/legal-docs/core";
+import { isLegalDocSlug, legalDocTitle, convertLegalHtml, lintLegalMarkup, LEGAL_DOCS, LEGAL_LIMITS, type LegalDocSlug } from "@/lib/legal-docs/core";
 import {
   archivePublishedLegal,
   deleteLegalDraft,
+  insertCodeSnapshot,
+  readLegalOverview,
   LEGAL_DOCS_TAG,
   publishLegalDraft,
   readLegalDocVersions,
@@ -103,17 +105,13 @@ export async function deleteLegalDraftAction(slug: string): Promise<Result> {
   return { ok: true, message: "Taslak silindi." };
 }
 
+type LivePage = { ok: true; title: string; body: string } | { ok: false; error: string };
+
 /**
- * Yayındaki sayfadan taslak başlatır: sayfanın HTML'i okunur, metin işaretlemeye çevrilir (koddaki sürüm v1 dahil).
- * Elle kopyalama yok; çıktı yazara taslak olarak gösterilir, yayından önce gözden geçirilir.
+ * Yayındaki sayfanın HTML'i okunur ve işaretlemeye çevrilir. Çevrilemeyen görünür metin varsa (sessiz içerik kaybı
+ * olmasın diye) hata döner.
  */
-export async function startLegalDraftFromLiveAction(slug: string): Promise<Result> {
-  const g = await guardPlatformAction(GATE);
-  if ("error" in g) return { ok: false, error: g.error };
-  if (!isLegalDocSlug(slug)) return { ok: false, error: "Belge bulunamadı." };
-  const versions = await readLegalDocVersions(slug);
-  if (versions.status === "missing") return { ok: false, error: "Yasal belge tabloları henüz kurulmadı (migration bekliyor)." };
-  if (versions.status === "ok" && versions.rows.some((r) => r.status === "draft")) return { ok: false, error: "Bu belgenin zaten bir taslağı var." };
+async function readLivePageMarkup(slug: LegalDocSlug): Promise<LivePage> {
   let html = "";
   try {
     const res = await fetchOwnOriginInspect(
@@ -126,21 +124,76 @@ export async function startLegalDraftFromLiveAction(slug: string): Promise<Resul
   } catch {
     return { ok: false, error: "Sayfa okunamadı; boş taslakla başlayın." };
   }
-  const body = legalHtmlToMarkup(html);
+  const { markup: body, dropped } = convertLegalHtml(html);
   if (!body) return { ok: false, error: "Sayfa metni ayrıştırılamadı; boş taslakla başlayın." };
+  // Sessiz içerik kaybı yok: işaretlemeye çevrilemeyen görünür metin varsa taslak açılmaz.
+  if (dropped.length) {
+    return { ok: false, error: `Sayfada işaretlemeye çevrilemeyen içerik var (ör. "${dropped[0]}"); metni elle aktarın.` };
+  }
   const title = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1]?.replace(/<[^>]+>/g, "").trim() || legalDocTitle(slug);
-  const r = await upsertLegalDraft(slug, { title: title.slice(0, LEGAL_LIMITS.titleMax), intro: "", body: body.slice(0, LEGAL_LIMITS.bodyMax), requiresReconsent: false, changeNote: null }, g.staff.id);
+  return { ok: true, title: title.slice(0, LEGAL_LIMITS.titleMax), body: body.slice(0, LEGAL_LIMITS.bodyMax) };
+}
+
+/**
+ * Yayındaki sayfadan taslak başlatır: sayfanın HTML'i okunur, metin işaretlemeye çevrilir (koddaki sürüm v1 dahil).
+ * Elle kopyalama yok; çıktı yazara taslak olarak gösterilir, yayından önce gözden geçirilir.
+ */
+export async function startLegalDraftFromLiveAction(slug: string): Promise<Result> {
+  const g = await guardPlatformAction(GATE);
+  if ("error" in g) return { ok: false, error: g.error };
+  if (!isLegalDocSlug(slug)) return { ok: false, error: "Belge bulunamadı." };
+  const versions = await readLegalDocVersions(slug);
+  if (versions.status === "missing") return { ok: false, error: "Yasal belge tabloları henüz kurulmadı (migration bekliyor)." };
+  if (versions.status === "ok" && versions.rows.some((r) => r.status === "draft")) return { ok: false, error: "Bu belgenin zaten bir taslağı var." };
+  const page = await readLivePageMarkup(slug);
+  if (!page.ok) return page;
+  const r = await upsertLegalDraft(slug, { title: page.title, intro: "", body: page.body, requiresReconsent: false, changeNote: null }, g.staff.id);
   if (!r.ok) return r;
-  await logPlatformActivity({ actorId: g.staff.id, action: "legal_doc.draft_from_live", entityType: "legal_document", entityId: slug, meta: { version: r.version, length: body.length } });
+  await logPlatformActivity({ actorId: g.staff.id, action: "legal_doc.draft_from_live", entityType: "legal_document", entityId: slug, meta: { version: r.version, length: page.body.length } });
   revalidatePath(`/admin/ayarlar/yasal/${slug}`);
   return { ok: true, version: r.version, message: `Yayındaki metinden taslak v${r.version} açıldı. Giriş metni boş bırakılırsa koddaki giriş kullanılır.` };
+}
+
+/**
+ * Koddaki 8 sayfayı DB'ye ARŞİV v1 olarak kaydeder (taşıma ilk adımı; yayın değişmez). Yalnız yayında DB sürümü
+ * OLMAYAN ve v1 kaydı olmayan belgeler: sayfa koddan çizildiği için okunan HTML gerçekten v1'dir. Çevirisi kayıplı
+ * belge atlanır ve nedeniyle bildirilir. Sonra her belgede fark v1'e göre görünür; "Bu sürüme dön" v1'i DB'den yayınlar.
+ */
+export async function snapshotCodeLegalDocsAction(): Promise<Result> {
+  const g = await guardPlatformAction(GATE);
+  if ("error" in g) return { ok: false, error: g.error };
+  const overview = await readLegalOverview();
+  if (overview.status === "missing") return { ok: false, error: "Yasal belge tabloları henüz kurulmadı (migration bekliyor)." };
+  if (overview.status === "error") return { ok: false, error: "Sürüm bilgisi okunamadı; tekrar deneyin." };
+  const todo = LEGAL_DOCS.filter(
+    (d) => !overview.rows.some((r) => r.slug === d.slug && (r.status === "published" || Number(r.version) === 1)),
+  ).map((d) => d.slug);
+  if (!todo.length) return { ok: true, message: "Kaydedilecek belge yok: hepsinde v1 kaydı ya da yayında DB sürümü var." };
+  const results = await Promise.all(
+    todo.map(async (slug) => {
+      const page = await readLivePageMarkup(slug);
+      if (!page.ok) return { slug, ok: false as const, why: page.error };
+      const r = await insertCodeSnapshot(slug, { title: page.title, body: page.body }, g.staff.id);
+      return r === "error" ? { slug, ok: false as const, why: "Kaydedilemedi; tekrar deneyin." } : { slug, ok: true as const };
+    }),
+  );
+  const saved = results.filter((r) => r.ok).map((r) => r.slug);
+  const failed = results.filter((r): r is { slug: LegalDocSlug; ok: false; why: string } => !r.ok);
+  if (saved.length) {
+    await logPlatformActivity({ actorId: g.staff.id, action: "legal_doc.code_snapshot", entityType: "legal_document", entityId: "v1", meta: { saved, failed: failed.map((f) => f.slug) } });
+    revalidatePath("/admin/ayarlar/yasal");
+    for (const slug of saved) revalidatePath(`/admin/ayarlar/yasal/${slug}`);
+  }
+  const failText = failed.map((f) => `${legalDocTitle(f.slug)}: ${f.why}`).join(" · ");
+  if (!saved.length) return { ok: false, error: `Hiçbir belge kaydedilmedi. ${failText}` };
+  return { ok: true, message: `${saved.length} belge v1 olarak kaydedildi.${failed.length ? ` Atlanan: ${failText}` : ""}` };
 }
 
 /** Eski bir sürümü yeni sürüm numarasıyla yeniden yayınlar (geri dönüş; yeniden onay istenmez). */
 export async function restoreLegalVersionAction(slug: string, version: number): Promise<Result> {
   const g = await guardPlatformAction(GATE);
   if ("error" in g) return { ok: false, error: g.error };
-  if (!isLegalDocSlug(slug) || !Number.isInteger(version) || version < 2) return { ok: false, error: "Sürüm bulunamadı." };
+  if (!isLegalDocSlug(slug) || !Number.isInteger(version) || version < 1) return { ok: false, error: "Sürüm bulunamadı." };
   const beforeDigests = await captureLiveDigests([`/${slug}`]);
   const res = await restoreLegalVersion(slug, version, g.staff.id);
   if (!res.ok) return res;

@@ -46,8 +46,8 @@ export type HelpContent = { guides: Guide[]; faq: FaqItem[]; glossary: GlossaryE
 
 export const HELP_LIMITS = { titleMax: 200, summaryMax: 1000, bodyMax: 20_000, hrefLabelMax: 80 } as const;
 export const HELP_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,79}$/;
-/** İç bağlantı: yalnız site içi yol (açık yönlendirme yok). */
-export const HELP_HREF_RE = /^\/(?!\/)[^\s]*$/;
+/** İç bağlantı: yalnız site içi yol (açık yönlendirme yok; "//" ve tarayıcının "/" saydığı ters eğik çizgi yasak). */
+export const HELP_HREF_RE = /^\/(?![\/\\])[^\s\\]*$/;
 
 const FAQ_CATS = new Set<string>(FAQ_CATEGORIES.map((c) => c.id));
 
@@ -62,6 +62,13 @@ export function stepsFromBody(body: string): string[] {
     .split("\n")
     .map((l) => l.replace(/^\s*(?:\d+[.)]|[-*])\s+/, "").trim())
     .filter(Boolean);
+}
+
+/** Yayındaki birleşik içerikte (kod + yayındaki DB, gizlenenler hariç) makale var mı? Oy yazımı öncesi denetim. */
+export function helpArticleExists(content: HelpContent, kind: HelpKind, slug: string): boolean {
+  if (kind === "guide") return content.guides.some((g) => g.slug === slug);
+  if (kind === "faq") return content.faq.some((f) => f.id === slug);
+  return content.glossary.some((g) => g.slug === slug);
 }
 
 export function rowToGuide(r: HelpDraft & { slug: string }): Guide {

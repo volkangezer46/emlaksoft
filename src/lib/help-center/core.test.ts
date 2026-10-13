@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { GUIDES, matchesQuery } from "@/lib/help-content";
 import { FAQ } from "@/lib/help-faq";
 import { selectFaqForQuestion } from "@/lib/ai/faq-context";
-import { codeDraft, mergeHelpContent, slugify, stepsFromBody, validateHelpDraft, type HelpArticleRow } from "./core";
+import { codeDraft, helpArticleExists, mergeHelpContent, slugify, stepsFromBody, validateHelpDraft, type HelpArticleRow } from "./core";
 
 const row = (over: Partial<HelpArticleRow>): HelpArticleRow => ({
   id: "x",
@@ -63,7 +63,20 @@ describe("yardım merkezi birleşimi", () => {
   it("doğrulama ve slug önerisi", () => {
     expect(validateHelpDraft("faq", { title: "", summary: "", body: "x", category: null, href: null, hrefLabel: null })).toMatch(/Başlık/);
     expect(validateHelpDraft("faq", { title: "a", summary: "", body: "x", category: null, href: "//evil", hrefLabel: null })).toMatch(/site içi/);
+    expect(validateHelpDraft("faq", { title: "a", summary: "", body: "x", category: null, href: "/\\evil.com", hrefLabel: null })).toMatch(/site içi/);
+    expect(validateHelpDraft("faq", { title: "a", summary: "", body: "x", category: null, href: "/app/x\\y", hrefLabel: null })).toMatch(/site içi/);
     expect(validateHelpDraft("guide", { title: "a", summary: "", body: "  ", category: null, href: null, hrefLabel: null })).toMatch(/adım/);
     expect(slugify("Şube & Çalışan İzinleri?")).toBe("sube-calisan-izinleri");
+  });
+});
+
+describe("oy öncesi makale varlık denetimi", () => {
+  it("kod ve yayındaki DB makalesi var; rastgele slug ve gizlenen kod makalesi yok", () => {
+    const merged = mergeHelpContent([row({})]);
+    expect(helpArticleExists(merged, "faq", "yeni-soru")).toBe(true);
+    expect(helpArticleExists(merged, "guide", GUIDES[0]!.slug)).toBe(true);
+    expect(helpArticleExists(merged, "faq", "rastgele-uydurma-slug")).toBe(false);
+    const hidden = mergeHelpContent([row({ kind: "guide", slug: GUIDES[0]!.slug, status: "hidden" })]);
+    expect(helpArticleExists(hidden, "guide", GUIDES[0]!.slug)).toBe(false);
   });
 });

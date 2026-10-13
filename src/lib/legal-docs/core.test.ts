@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffLines, diffStats, groupSections, isSafeHref, legalHtmlToMarkup, lintLegalMarkup, parseInline, parseLegalMarkup, pendingReconsents, type ReconsentDocRow } from "./core";
+import { convertLegalHtml, diffLines, diffStats, groupSections, isSafeHref, legalHtmlToMarkup, lintLegalMarkup, parseInline, parseLegalMarkup, pendingReconsents, type ReconsentDocRow } from "./core";
 
 describe("yasal işaretleme", () => {
   it("başlık, paragraf, madde ve şirket kimliği simgesi", () => {
@@ -19,6 +19,8 @@ describe("yasal işaretleme", () => {
       { t: "token", name: "destek_eposta" },
     ]);
     expect(isSafeHref("//kotu.site")).toBe(false);
+    expect(isSafeHref("/\\evil.com")).toBe(false);
+    expect(isSafeHref("/a\\b")).toBe(false);
     expect(isSafeHref("https://www.resmigazete.gov.tr")).toBe(true);
   });
 
@@ -47,6 +49,28 @@ describe("yasal işaretleme", () => {
       "## 1. Taraflar\n\n**Sağlayıcı:** EmlakSoft — iletişim: {{destek_eposta}}.\n\n{{sirket_kimligi}}\n\nBkz. [fiyatlandırma](/fiyatlar) & koşullar.\n\n## 2. Konu\n\n- bir\n- **iki**",
     );
     expect(legalHtmlToMarkup("<p>yok</p>")).toBeNull();
+  });
+
+  it("çerez tablosu tabloya çevrilir; yalnız mobil ipucu (aria-hidden) atlanır; sessiz kayıp yok", () => {
+    const html = `<article class="legal-body"><section><h2><span>2.</span>Kullandığımız çerezler</h2><div><p class="mb-2 text-xs sm:hidden" aria-hidden="true">Tabloyu görmek için yana kaydırın →</p><div tabindex="0" role="region"><table class="w-full"><thead><tr><th>Tür</th><th>Amaç</th><th>Süre</th></tr></thead><tbody><tr><td>Zorunlu (oturum)</td><td>Giriş oturumu</td><td>Oturum / yenilemeli</td></tr><tr><td>Tercih</td><td>Tema</td><td>12 aya kadar</td></tr></tbody></table></div></div></section></article>`;
+    const r = convertLegalHtml(html);
+    expect(r.dropped).toEqual([]);
+    expect(r.markup).toBe(
+      "## 2. Kullandığımız çerezler\n\n| Tür | Amaç | Süre |\n| --- | --- | --- |\n| Zorunlu (oturum) | Giriş oturumu | Oturum / yenilemeli |\n| Tercih | Tema | 12 aya kadar |",
+    );
+    const blocks = parseLegalMarkup(r.markup!);
+    const table = blocks.find((b) => b.t === "table");
+    expect(table && table.t === "table" ? [table.head.length, table.rows.length] : null).toEqual([3, 2]);
+    expect(lintLegalMarkup(r.markup!)).toEqual([]);
+  });
+
+  it("işaretlemeye çevrilemeyen görünür metin 'dropped' olarak raporlanır", () => {
+    const r = convertLegalHtml(`<article class="legal-body"><section><h2>A</h2><div><p>x</p><div>Kayıp kutu metni</div></div></section></article>`);
+    expect(r.dropped).toEqual(["Kayıp kutu metni"]);
+  });
+
+  it("tablo sütun sayısı tutarsızsa biçim denetimi uyarır", () => {
+    expect(lintLegalMarkup("## 1. A\n\n| a | b |\n| --- | --- |\n| 1 |").some((i) => i.includes("sütun"))).toBe(true);
   });
 });
 

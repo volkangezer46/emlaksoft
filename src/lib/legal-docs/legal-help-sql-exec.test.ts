@@ -48,6 +48,23 @@ describe.skipIf(!mod)("legal_help_content (pglite)", () => {
     expect((await q(`select count(*)::int as n from public.legal_documents`))[0]!.n).toBe(2);
   });
 
+  it("yayın RPC'si: tek transaction'da eskiyi arşivler, taslağı yayınlar; slug başına tek yayın; taslak yoksa boş", async () => {
+    await db.exec(`insert into public.legal_documents(slug, version, title, body, requires_reconsent) values ('gizlilik', 2, 'G', '## 1. A', true)`);
+    const r1 = await q(`select * from public.legal_publish_draft('gizlilik', '${U}')`);
+    expect(r1).toEqual([{ out_version: 2, out_requires_reconsent: true }]);
+    await db.exec(`insert into public.legal_documents(slug, version, title, body) values ('gizlilik', 3, 'G', '## 1. B')`);
+    expect(await q(`select * from public.legal_publish_draft('gizlilik', '${U}')`)).toEqual([{ out_version: 3, out_requires_reconsent: false }]);
+    const st = await q(`select version, status, published_by is not null as by from public.legal_documents where slug = 'gizlilik' order by version`);
+    expect(st).toEqual([
+      { version: 2, status: "archived", by: true },
+      { version: 3, status: "published", by: true },
+    ]);
+    expect(await q(`select * from public.legal_publish_draft('gizlilik', '${U}')`)).toEqual([]);
+    expect(await fails(`update public.legal_documents set status = 'published' where slug = 'gizlilik' and version = 2`)).toBe(true);
+    const g = await q(`select has_function_privilege('authenticated', 'public.legal_publish_draft(text, uuid)', 'execute') as a, has_function_privilege('service_role', 'public.legal_publish_draft(text, uuid)', 'execute') as s`);
+    expect(g[0]).toEqual({ a: false, s: true });
+  });
+
   it("onay: kullanıcı + belge + sürüm tekil", async () => {
     await db.exec(`insert into public.legal_consents(user_id, document, version, ip) values ('${U}', 'kullanim-sartlari', 2, '203.0.113.5')`);
     expect(await fails(`insert into public.legal_consents(user_id, document, version) values ('${U}', 'kullanim-sartlari', 2)`)).toBe(true);
@@ -80,6 +97,7 @@ describe.skipIf(!mod)("legal_help_content (pglite)", () => {
   it("geri alma temiz siler; migration yeniden uygulanabilir", async () => {
     await db.exec(read("supabase/rollbacks/20261013005100_legal_help_content.rollback.sql"));
     expect((await q(`select to_regclass('public.legal_documents') is null as gone`))[0]!.gone).toBe(true);
+    expect((await q(`select to_regprocedure('public.legal_publish_draft(text, uuid)') is null as gone`))[0]!.gone).toBe(true);
     await db.exec(read("supabase/migrations/20261013005100_legal_help_content.sql"));
     await db.exec(read("supabase/migrations/20261013005100_legal_help_content.sql"));
     expect((await q(`select to_regclass('public.help_articles') is not null as ok`))[0]!.ok).toBe(true);

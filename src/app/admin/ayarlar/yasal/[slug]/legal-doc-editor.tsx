@@ -22,7 +22,7 @@ type Draft = { version: number; title: string; intro: string; body: string; requ
 type Msg = { ok: boolean; text: string } | null;
 
 const HELP =
-  "Biçim: ## 1. Başlık (bölüm), boş satır (yeni paragraf), - madde, **kalın**, [metin](/yol). Şirket kimliği listesi için tek satıra {{sirket_kimligi}}, destek e-postası için {{destek_eposta}} yazın.";
+  "Biçim: ## 1. Başlık (bölüm), boş satır (yeni paragraf), - madde, **kalın**, [metin](/yol), tablo için | a | b | satırları (ilk satır başlık). Şirket kimliği listesi için tek satıra {{sirket_kimligi}}, destek e-postası için {{destek_eposta}} yazın.";
 
 /**
  * Yasal belge taslak düzenleyicisi: yazarken canlı önizleme (ertelenmiş değer: yazma akıcı kalır), kaydet / yayınla /

@@ -6,6 +6,7 @@
  *   ## 1. Başlık          → numaralı bölüm (LegalSection)
  *   boş satırla ayrılan   → paragraf
  *   - madde               → madde işaretli liste
+ *   | a | b |             → tablo (ilk satır başlık; `| --- | --- |` ayırıcı satırı isteğe bağlı, yok sayılır)
  *   **kalın**, [metin](/yol | https://… | mailto:… | tel:…)
  *   {{sirket_kimligi}}    → şirket kimliği satırları (ayar defterinden; tek başına satırda)
  *   {{destek_eposta}}     → destek e-postası bağlantısı (satır içi)
@@ -49,9 +50,11 @@ export type Block =
   | { t: "heading"; no: string | null; title: string }
   | { t: "para"; v: Inline[] }
   | { t: "list"; items: Inline[][] }
+  | { t: "table"; head: Inline[][]; rows: Inline[][][] }
   | { t: "entity" };
 
-const SAFE_HREF = /^(\/(?!\/)[^\s]*|#[\w-]*|https:\/\/[^\s]+|mailto:[^\s]+|tel:\+?[0-9]+)$/;
+/** Yol: tek "/" ile başlar; ters eğik çizgi YOK (tarayıcı "/\\evil.com"u "//evil.com" sayar → açık yönlendirme). */
+const SAFE_HREF = /^(\/(?![\/\\])[^\s\\]*|#[\w-]*|https:\/\/[^\s]+|mailto:[^\s]+|tel:\+?[0-9]+)$/;
 
 export function isSafeHref(href: string): boolean {
   return SAFE_HREF.test(href.trim());
@@ -104,6 +107,12 @@ export function parseInline(src: string): Inline[] {
 
 const HEADING_RE = /^##\s+(?:(\d+(?:\.\d+)*\.?)\s+)?(.+)$/;
 const LIST_RE = /^\s*[-*]\s+(.*)$/;
+const TABLE_RE = /^\s*\|(.*)\|\s*$/;
+const TABLE_SEP_RE = /^\s*\|(\s*:?-{3,}:?\s*\|)+\s*$/;
+
+function tableCells(line: string): string[] {
+  return TABLE_RE.exec(line)![1]!.split("|").map((c) => c.trim());
+}
 
 /** Blok ayrıştırıcı. Satır sonları normalize edilir; tek satır sonu paragraf içinde boşluk sayılır. */
 export function parseLegalMarkup(body: string): Block[] {
@@ -111,6 +120,7 @@ export function parseLegalMarkup(body: string): Block[] {
   const blocks: Block[] = [];
   let para: string[] = [];
   let list: string[] | null = null;
+  let table: string[][] | null = null;
   const flushPara = () => {
     if (para.length) blocks.push({ t: "para", v: parseInline(para.join(" ").trim()) });
     para = [];
@@ -119,13 +129,28 @@ export function parseLegalMarkup(body: string): Block[] {
     if (list && list.length) blocks.push({ t: "list", items: list.map((l) => parseInline(l.trim())) });
     list = null;
   };
+  const flushTable = () => {
+    if (table && table.length) {
+      const [head, ...rows] = table;
+      blocks.push({ t: "table", head: head!.map(parseInline), rows: rows.map((r) => r.map(parseInline)) });
+    }
+    table = null;
+  };
   for (const raw of lines) {
     const line = raw.trimEnd();
     if (!line.trim()) {
       flushPara();
       flushList();
+      flushTable();
       continue;
     }
+    if (TABLE_RE.test(line)) {
+      flushPara();
+      flushList();
+      if (!TABLE_SEP_RE.test(line)) (table ??= []).push(tableCells(line));
+      continue;
+    }
+    flushTable();
     if (line.trim() === "{{sirket_kimligi}}") {
       flushPara();
       flushList();
@@ -155,6 +180,7 @@ export function parseLegalMarkup(body: string): Block[] {
   }
   flushPara();
   flushList();
+  flushTable();
   return blocks;
 }
 
@@ -186,6 +212,12 @@ export function lintLegalMarkup(body: string): string[] {
   if (!blocks.some((b) => b.t === "heading")) issues.push("Metinde hiç bölüm başlığı yok (## 1. Başlık biçiminde yazın).");
   for (const m of body.matchAll(/\[([^\]]*)\]\(([^)]*)\)/g)) {
     if (!isSafeHref(m[2]!)) issues.push(`Bağlantı adresi kabul edilmedi: ${m[2]} (yalnız /yol, https://, mailto:, tel:).`);
+  }
+  for (const b of blocks) {
+    if (b.t !== "table") continue;
+    if (b.rows.some((r) => r.length !== b.head.length)) {
+      issues.push(`Tablo satırlarının sütun sayısı başlıkla (${b.head.length}) aynı olmalı.`);
+    }
   }
   if (/<[a-z][\s\S]*?>/i.test(body)) issues.push("HTML etiketi yazılamaz; biçim için ## başlık, - madde, **kalın** kullanın.");
   return issues;
@@ -274,25 +306,57 @@ function inlineHtmlToMarkup(html: string): string {
 /** Şirket kimliği listesi (sayfada `legalEntityFields` ile çizilen <ul>) tek simgeye indirilir. */
 const ENTITY_LIST_HINT = /(Ticari ünvan|MERSİS|KEP adresi)/;
 
+/** Ekran okuyucudan gizli ya da yalnız mobilde görünen yardımcı metin ("yana kaydırın →") belge içeriği değildir. */
+const DECORATIVE_ATTR = /aria-hidden="true"|\bsm:hidden\b/;
+
+function htmlTableToMarkup(body: string): string {
+  const rows = [...body.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) =>
+    [...r[1]!.matchAll(/<(th|td)\b[^>]*>([\s\S]*?)<\/\1>/gi)].map((c) => inlineHtmlToMarkup(c[2]!).replace(/\|/g, "/").replace(/\*\*/g, "")),
+  );
+  const filled = rows.filter((r) => r.length);
+  if (!filled.length) return "";
+  const line = (cells: string[]) => `| ${cells.join(" | ")} |`;
+  const [head, ...rest] = filled;
+  return [line(head!), line(head!.map(() => "---")), ...rest.map(line)].join("\n");
+}
+
+export type LegalHtmlConversion = {
+  markup: string | null;
+  /** Çevrilmeyen (işaretlemede karşılığı olmayan) içerikten örnekler; boş değilse taslak açılmamalı. */
+  dropped: string[];
+};
+
 /**
  * Yayındaki yasal sayfanın HTML'inden (`<article class="legal-body">`) işaretleme taslağı üretir. Kodu elle kopyalamadan
  * "koddaki sürümden taslak başlat" içindir; çıktı yazara gösterilir, yayınlamadan önce gözden geçirilir.
+ * Çevrilen öğeler: h2, p, ul/ol, table. Bunların DIŞINDA kalan görünür metin `dropped` listesine girer (sessiz kayıp yok).
  */
-export function legalHtmlToMarkup(html: string): string | null {
+export function convertLegalHtml(html: string): LegalHtmlConversion {
   const start = html.search(/<article\b[^>]*class="[^"]*legal-body[^"]*"[^>]*>/i);
-  if (start < 0) return null;
+  if (start < 0) return { markup: null, dropped: [] };
   const openEnd = html.indexOf(">", start) + 1;
   const end = html.indexOf("</article>", openEnd);
-  if (end < 0) return null;
+  if (end < 0) return { markup: null, dropped: [] };
   const inner = html.slice(openEnd, end);
   const out: string[] = [];
-  const re = /<(h2|p|ul|ol)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  const re = /<(h2|p|ul|ol|table)\b([^>]*)>([\s\S]*?)<\/\1>/gi;
+  // Çevrilen öğeler çıkarıldıktan sonra kalan görünür metin = kayıp.
+  const rest = inner.replace(/<!--[\s\S]*?-->/g, "").replace(re, " ");
+  const dropped = rest
+    .split(/<[^>]+>/)
+    .map((t) => decodeEntities(t).replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .map((t) => t.slice(0, 80));
   let m: RegExpExecArray | null;
   while ((m = re.exec(inner))) {
     const tag = m[1]!.toLowerCase();
     const attrs = m[2]!;
     const body = m[3]!;
-    if (tag === "h2") {
+    if (DECORATIVE_ATTR.test(attrs)) continue;
+    if (tag === "table") {
+      const t = htmlTableToMarkup(body);
+      if (t) out.push(t);
+    } else if (tag === "h2") {
       const no = /<span\b[^>]*>([\s\S]*?)<\/span>/i.exec(body);
       const noText = no ? decodeEntities(no[1]!.replace(/<[^>]+>/g, "")).trim() : "";
       const title = inlineHtmlToMarkup(no ? body.replace(no[0], "") : body).replace(/\*\*/g, "");
@@ -310,7 +374,12 @@ export function legalHtmlToMarkup(html: string): string | null {
       if (items.length) out.push(items.map((i) => `- ${i}`).join("\n"));
     }
   }
-  return out.length ? out.join("\n\n") : null;
+  return { markup: out.length ? out.join("\n\n") : null, dropped };
+}
+
+/** `convertLegalHtml` kısa yolu: yalnız işaretleme (kayıp denetimi çağıranda değilse). */
+export function legalHtmlToMarkup(html: string): string | null {
+  return convertLegalHtml(html).markup;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
