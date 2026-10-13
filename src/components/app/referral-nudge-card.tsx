@@ -57,7 +57,7 @@ export function ReferralNudgeCard({ moment }: { moment: NudgeMoment }) {
       <button
         type="button"
         aria-label="Bu öneriyi kapat"
-        className="focus-ring rounded-full p-1.5 text-text-muted transition hover:bg-canvas"
+        className="focus-ring rounded-full p-1.5 text-text-muted transition hover:bg-canvas touch:grid touch:size-11 touch:place-items-center"
         onClick={() => {
           try {
             window.localStorage.setItem(key, "1");

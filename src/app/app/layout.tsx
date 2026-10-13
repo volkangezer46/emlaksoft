@@ -17,6 +17,7 @@ import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { loadOwnProfileAvatar } from "@/lib/avatar-read";
 import { getPlatformStaffIdentity, isPlatformAllowlistedEmail } from "@/lib/platform";
 import { AppSidebar } from "@/components/app/app-sidebar";
+import { MobileMenuProvider, MobileMenuTrigger } from "@/components/app/mobile-menu-trigger";
 import { CommandSearch } from "@/components/app/command-search";
 import { NotificationBell } from "@/components/app/notification-bell";
 import { EfCreditBadge } from "@/components/app/ef-credit-badge";
@@ -29,6 +30,7 @@ import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
 import { isEmailVerified } from "@/lib/auth/email-verification";
+import { isDemoEmail } from "@/lib/demo-credentials";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
 import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
@@ -362,6 +364,7 @@ async function buildShellModel() {
     fontScale,
     impName,
     emailUnverified: Boolean(user) && !impersonating && !isEmailVerified(user),
+    demoEmail: isDemoEmail(user?.email),
     trialDaysLeft,
     storageScope: user && tenantId ? `${tenantId}:${user.id}` : undefined,
   };
@@ -382,6 +385,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarBoot />
       <NavPending />
       <ErrorBoundary>
+        <MobileMenuProvider>
         <div className="app-frame flex min-h-screen bg-canvas">
           <Suspense fallback={null}>
             <ShellBoot />
@@ -412,6 +416,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </main>
           </div>
         </div>
+        </MobileMenuProvider>
       </ErrorBoundary>
     </ToastProvider>
     </ConsoleMonoFont>
@@ -496,15 +501,24 @@ async function ShellHeader() {
       {!m.platformStaffFullAccess && m.tenantId ? (
         <DemoTrialStrip sampleActive={Boolean(m.office?.sample_seeded_at)} trialDaysLeft={m.trialDaysLeft} canSwitch={!m.impersonating && canSwitchToRealUse(m.effectiveRole)} />
       ) : null}
-      {m.emailUnverified && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}
+      {/* Demo kişilikleri (demo-credentials alan adı) doğrulama e-postası alamaz: şerit onlara gösterilmez. */}
+      {m.emailUnverified && !m.demoEmail && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}
+      {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla pl-16 boşluğuna oturur,
+          üstteki şeritlerle (demo/deneme, e-posta doğrulama) artık çakışmaz. */}
       <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
-        <AppBreadcrumb accessibleModules={m.accessibleModules} />
+        <MobileMenuTrigger controlsId="app-mobile-navigation" label="Panel menüsünü aç" />
+        <AppBreadcrumb accessibleModules={m.accessibleModules} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} scopeCookie={m.scopeCookie} />
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
         <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
           <ThemeToggle />
           {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><EfCreditBadge tenantId={m.tenantId} role={m.effectiveRole} canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")} valuationClosed={m.closedModules.includes("valuation")} impersonating={m.impersonating} /></Suspense> : null}
-          {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla */}
-          {m.hasQuickCreate ? <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} /> : null}
+          {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan
+              üst çubuktaki kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
+          {m.hasQuickCreate ? (
+            <div className="hidden lg:flex">
+              <QuickCreateMenu creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} />
+            </div>
+          ) : null}
           <Suspense fallback={<OfficeScoreLink text="Ofis skoru —" />}>
             <OfficeScoreBadge tenantId={m.userId ? m.tenantId : null} />
           </Suspense>

@@ -131,4 +131,23 @@ describe("liste sayfaları sözleşmesi", () => {
     expect(readFileSync("src/components/ui/list-page.tsx", "utf8")).not.toMatch(/^["']use client["']/m);
     expect(readFileSync("src/components/ui/illustrations/hero-scenes.tsx", "utf8")).not.toMatch(/^["']use client["']/m);
   });
+
+  it("mobil sıra: kök flex sütunu (gap), grafikler <768 px'te listenin altına iner (katlama yok)", () => {
+    const out = html(createElement(ListPage, { kpis: createElement("div", { className: "k" }), charts: createElement("div", null, "g") }));
+    expect(out).toMatch(/class="lp flex flex-col gap-4"/);
+    expect(out).not.toContain("space-y-4");
+    const css = readFileSync("src/app/list-page.css", "utf8");
+    expect(css).toMatch(/@media \(max-width: 767\.98px\) \{\s*\.lp > \.lp-charts \{ order: 10; \}/);
+  });
+
+  it("toplu seçim satır kutuları ortak RowCheckbox'tır: 44 px label dokunma alanı, görsel kutu 16 px", () => {
+    const code = readFileSync("src/components/app/bulk-selection.tsx", "utf8");
+    expect(code).toMatch(/<label[\s\S]*?stopPropagation[\s\S]*?relative z-10[^"]*touch:-m-\[14px\] touch:size-11/);
+    expect(code).toContain('className="h-4 w-4 cursor-pointer accent-brand-600"');
+    for (const f of ["src/app/app/musteriler/customer-bulk-actions.tsx", "src/app/app/portfoyler/property-bulk-actions.tsx", "src/app/app/talepler/demand-bulk.tsx"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).toContain("<RowCheckbox ");
+      expect(src.match(/type="checkbox"/g)?.length ?? 0, f).toBe(1);
+    }
+  });
 });

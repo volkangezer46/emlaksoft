@@ -3,7 +3,7 @@
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { ChevronDown, Lock, Menu, Plus } from "lucide-react";
 // İkonografi tek kaynaktan: kavramsal ikonlar `src/lib/icons.ts` sözlüğünden gelir.
 import { ICONS } from "@/lib/icons";
@@ -13,6 +13,7 @@ import { getHrefStore, pushRecent } from "@/lib/nav-memory";
 import { getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import { useClosedModules } from "@/components/app/closed-modules-context";
+import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
 import { mobileNewActions } from "@/components/app/mobile-new-sheet";
 import { OfficeStatusChip } from "@/components/app/office-status-chip";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
@@ -115,11 +116,12 @@ export function AppSidebar({
     router.push("/app?kapsam=ofis");
   };
   // Prefetch: next/link varsayılanı (görünür alanda + hover) yeterli; elle router.prefetch yağmuru kaldırıldı.
-  const [open, setOpen] = useState(false);
+  // Çekmece durumu üst çubuktaki hamburger (MobileMenuTrigger) ile ortak bağlamda; alt çubuktaki "Menü" de aynı yolu kullanır.
+  const { open, setOpen, requestOpen: openDrawer, openerRef: drawerOpenerRef, register: registerMenu } = useMobileMenu();
   const [newOpen, setNewOpen] = useState(false);
   const { Panel: Drawer, open: mountDrawer, warm: warmDrawer } = useDeferredPanel(drawerPanel, { idle: false });
   const { Panel: NewSheet, open: mountNewSheet, warm: warmNewSheet } = useDeferredPanel(newSheetPanel, { idle: false });
-  const drawerOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => registerMenu({ mount: mountDrawer, warm: warmDrawer }), [registerMenu, mountDrawer, warmDrawer]);
   useEffect(() => {
     if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
     return runWhenIdle(() => {
@@ -127,11 +129,6 @@ export function AppSidebar({
       newSheetPanel.preload();
     });
   }, []);
-  const openDrawer = () => {
-    drawerOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    mountDrawer();
-    setOpen(true);
-  };
   const openNewSheet = () => {
     mountNewSheet();
     setNewOpen(true);
@@ -144,7 +141,8 @@ export function AppSidebar({
   const activeHubId = active.hub?.id ?? null;
 
   const closedStore = getHrefStore("closed", storageScope);
-  // "closed" deposu menü DURUM kimliklerini tutar: araclar-degisti (Araçlar grubunun varsayılandan ters durumu).
+  // "closed" deposu menü DURUM kimliklerini tutar: araclar-degisti (Araçlar grubunun varsayılandan ters durumu) ve
+  // ck-<ilk merkez> (mobil çekmecede kullanıcının kapattığı grup; try/catch korumalı localStorage).
   const stateIds = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
   const toggleState = (id: string) => {
     const cur = closedStore.read();
@@ -156,7 +154,8 @@ export function AppSidebar({
   const idleTargets = [...nav.hubs, ...nav.dock].map((h) => h.href).filter((h) => h !== active.pageHref && !isLocked(h, lockedHrefs));
   useIdlePrefetch(idleTargets, 14);
 
-  // Mobil çekmece: ardışık aynı grup başlıklı merkezler tek bölümde toplanır (akordeon); etkin merkezin grubu hep açık.
+  // Mobil çekmece: ardışık aynı grup başlıklı merkezler tek bölümde toplanır (akordeon). Gruplar varsayılan AÇIK gelir
+  // (sık işler tek dokunuşta: ör. Komisyon); kullanıcının kapattıkları hatırlanır, etkin merkezin grubu hep açık.
   const hubSections = useMemo(() => {
     const out: { key: string; group: string | null; hubs: NavHub[] }[] = [];
     for (const hub of nav.hubs) {
@@ -166,7 +165,7 @@ export function AppSidebar({
     }
     return out;
   }, [nav.hubs]);
-  const [openGroups, setOpenGroups] = useState<string[]>([]);
+  const drawerGroupId = (hubs: readonly NavHub[]) => `ck-${hubs[0]?.id ?? "grup"}`.slice(0, 32);
 
   // "Son açılanlar": yalnız sayfa yolları, yerel ve kullanıcıya özel (localStorage, try/catch); menüdeki yetkili sayfalarla süzülür.
   const recentStore = getHrefStore("recent", storageScope);
@@ -319,10 +318,10 @@ export function AppSidebar({
                     id={sec.key}
                     title={sec.group}
                     count={sec.hubs.length}
-                    expanded={hasActive || openGroups.includes(sec.key)}
+                    expanded={hasActive || !stateIds.includes(drawerGroupId(sec.hubs))}
                     locked={hasActive}
                     badge={sectionBadge}
-                    onToggle={() => setOpenGroups((cur) => (cur.includes(sec.key) ? cur.filter((k) => k !== sec.key) : [...cur, sec.key]))}
+                    onToggle={() => toggleState(drawerGroupId(sec.hubs))}
                   >
                     {sec.hubs.map((hub) => renderHub(hub, {}))}
                   </DrawerGroup>
@@ -528,20 +527,6 @@ export function AppSidebar({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openDrawer}
-        onPointerEnter={warmDrawer}
-        onFocus={warmDrawer}
-        onTouchStart={warmDrawer}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls="app-mobile-navigation"
-        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-ink-950 text-white shadow-[var(--shadow-card)] lg:hidden"
-        aria-label="Panel menüsünü aç"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
       <aside className="shell-aside sb-surface sticky top-0 hidden h-screen shrink-0 flex-col self-start overflow-hidden lg:flex">
         {renderContent("desktop")}
       </aside>

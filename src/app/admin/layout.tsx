@@ -4,6 +4,7 @@ import { ChevronRight, ShieldAlert } from "lucide-react";
 import { ConsoleMonoFont } from "@/components/ui/console/mono-font";
 import { RouteSplash } from "@/components/route-splash";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { MobileMenuProvider, MobileMenuTrigger } from "@/components/app/mobile-menu-trigger";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
@@ -84,6 +85,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
   const mfaSyncIssue = platformMfaSyncIssue(isPlatformMfaRequired(), mfaDbSetting);
 
   return (
+    <MobileMenuProvider>
     <div className="flex min-h-screen bg-canvas">
       <ThemeController />
       <FontScaleBoot scale={fontScale} />
@@ -92,6 +94,11 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <ClientCacheSync identity={`admin:${staff.id}`} />
       <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobil hamburger: üst çubukla birlikte yapışkan, sıfır yükseklikli kapta (akışa yer kaplamaz); üst çubuğun
+            pl-16 boşluğunda dikey ortalı durur (eskiden `fixed` idi, üstteki şeritlerle çakışabiliyordu). */}
+        <div className="sticky top-0 z-50 h-0 md:hidden">
+          <MobileMenuTrigger controlsId="admin-mobile-navigation" label="Admin menüsünü aç" variant="admin" />
+        </div>
         <AdminTopbar roleLabel={roleLabel} staffName={staff.full_name} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} modules={modules} fontScale={fontScale} health={health} />
         {/* grid + minmax(0,1fr): geniş tablolar kendi kaplarında kaydırılır,
             belgeyi şişirmez (iOS `overflow:clip` viewport'a propagate etmiyor). */}
@@ -118,6 +125,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
     </div>
+    </MobileMenuProvider>
   );
 }
 

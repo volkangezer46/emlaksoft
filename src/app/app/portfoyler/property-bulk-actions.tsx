@@ -1,5 +1,6 @@
 "use client";
 
+import { RowCheckbox } from "@/components/app/bulk-selection";
 import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
 import { ChevronDown, Loader2 } from "lucide-react";
 import { bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
@@ -77,18 +78,10 @@ export function PropertySelectAllCheckbox({ ids }: { ids: string[] }) {
   );
 }
 
-/** Satır checkbox'ı — relative z-10: satırı kaplayan overlay linkin üstünde kalır. */
+/** Satır checkbox'ı — ortak `RowCheckbox` (44 px dokunma alanı; overlay linkin üstünde kalır). */
 export function PropertyRowCheckbox({ id, name }: { id: string; name: string }) {
   const { selected, toggle } = useSelection();
-  return (
-    <input
-      type="checkbox"
-      checked={selected.has(id)}
-      onChange={() => toggle(id)}
-      aria-label={`${name} portföyünü seç`}
-      className="relative z-10 h-4 w-4 cursor-pointer accent-brand-600"
-    />
-  );
+  return <RowCheckbox checked={selected.has(id)} onToggle={() => toggle(id)} label={`${name} portföyünü seç`} />;
 }
 
 /** Seçim varken beliren toplu durum çubuğu. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { RowCheckbox } from "@/components/app/bulk-selection";
 import {
   createContext,
   useCallback,
@@ -98,18 +99,10 @@ export function CustomerSelectAllCheckbox({ ids }: { ids: string[] }) {
   );
 }
 
-/** Satır checkbox'ı — relative z-10: satırı kaplayan overlay linkin üstünde kalır. */
+/** Satır checkbox'ı — ortak `RowCheckbox` (44 px dokunma alanı; overlay linkin üstünde kalır). */
 export function CustomerRowCheckbox({ id, name }: { id: string; name: string }) {
   const { selected, toggle } = useSelection();
-  return (
-    <input
-      type="checkbox"
-      checked={selected.has(id)}
-      onChange={() => toggle(id)}
-      aria-label={`${name} müşterisini seç`}
-      className="relative z-10 h-4 w-4 cursor-pointer accent-brand-600"
-    />
-  );
+  return <RowCheckbox checked={selected.has(id)} onToggle={() => toggle(id)} label={`${name} müşterisini seç`} />;
 }
 
 type Advisor = { id: string; full_name: string };

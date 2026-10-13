@@ -62,16 +62,23 @@ export function BulkSelectAll({ ids, noun }: { ids: readonly string[]; noun: str
   );
 }
 
+/**
+ * Satır onay kutusu (tüm toplu seçimli listelerin ORTAK görünümü). Görsel kutu 16 px kalır; dokunmatik/dar ekranda
+ * 44 px'lik `label` dokunma alanı negatif kenar boşluğuyla satır yüksekliğini büyütmeden kutuyu sarar.
+ * `relative z-10`: satırı kaplayan bindirme bağlantısının (absolute inset-0) üstünde kalır; tık satıra yayılmaz.
+ */
+export function RowCheckbox({ checked, onToggle, label }: { checked: boolean; onToggle: () => void; label: string }) {
+  return (
+    <label
+      onClick={(e) => e.stopPropagation()}
+      className="relative z-10 inline-grid cursor-pointer place-items-center touch:-m-[14px] touch:size-11"
+    >
+      <input type="checkbox" checked={checked} onChange={onToggle} aria-label={label} className="h-4 w-4 cursor-pointer accent-brand-600" />
+    </label>
+  );
+}
+
 export function BulkRowCheckbox({ id, label }: { id: string; label: string }) {
   const { selected, toggle } = useBulkSelection();
-  return (
-    <input
-      type="checkbox"
-      checked={selected.has(id)}
-      onChange={() => toggle(id)}
-      onClick={(e) => e.stopPropagation()}
-      aria-label={`${label} seç`}
-      className="relative z-10 h-4 w-4 cursor-pointer accent-brand-600"
-    />
-  );
+  return <RowCheckbox checked={selected.has(id)} onToggle={() => toggle(id)} label={`${label} seç`} />;
 }

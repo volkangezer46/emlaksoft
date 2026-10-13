@@ -1,5 +1,6 @@
 "use client";
 
+import { RowCheckbox } from "@/components/app/bulk-selection";
 import { createContext, useCallback, useContext, useMemo, useState, useTransition } from "react";
 import { CheckCircle2, RotateCcw, Trash2, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -69,15 +70,7 @@ export function DemandSelectAllCheckbox({ ids }: { ids: string[] }) {
 
 export function DemandRowCheckbox({ id, name }: { id: string; name: string }) {
   const { selected, toggle } = useSelection();
-  return (
-    <input
-      type="checkbox"
-      checked={selected.has(id)}
-      onChange={() => toggle(id)}
-      aria-label={`${name} talebini seç`}
-      className="relative z-10 h-4 w-4 cursor-pointer accent-brand-600"
-    />
-  );
+  return <RowCheckbox checked={selected.has(id)} onToggle={() => toggle(id)} label={`${name} talebini seç`} />;
 }
 
 export function DemandBulkBar({ canDelete = false }: { canDelete?: boolean }) {

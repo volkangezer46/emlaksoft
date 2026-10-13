@@ -6,38 +6,43 @@ import { House } from "lucide-react";
 import { useMemo } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
 import { useClosedModules } from "@/components/app/closed-modules-context";
-import { resolveActiveNav, visibleSections } from "@/lib/nav-config";
+import { hubNav, resolveStripHub } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
+import { useNavRole } from "@/lib/ui/use-nav-role";
 
 /**
- * Üst çubuk konum yolu: Bugün > İş başlığı > Sayfa (en çok 3 seviye). Kaynak nav-config
- * (yetkiye süzülü başlıklar); menüde olmayan yolda gösterilmez. lg altında gizli.
+ * Üst çubuk konum yolu: Bugün > Merkez > Sayfa (en çok 3 seviye). Ara düğüm yan menüyle AYNI kaynaktan gelir:
+ * rolün merkezi (nav-roles HubDef: etiket, tek sayfalı merkezde grup başlığı), katalog iş başlığı DEĞİL. Böylece
+ * kırıntıdaki ad menüde tıklanan satırla aynıdır. Menüde olmayan yolda gösterilmez. lg altında gizli.
  */
-export function AppBreadcrumb({ accessibleModules }: { accessibleModules: AppModule[] }) {
+export function AppBreadcrumb({
+  accessibleModules,
+  role = null,
+  scopeCookie = null,
+}: {
+  accessibleModules: AppModule[];
+  /** Etkin rol (yan menüyle aynı merkez düzeni için). */
+  role?: string | null;
+  scopeCookie?: string | null;
+}) {
   const pathname = usePathname();
   const closedModules = useClosedModules();
-  const sections = useMemo(() => visibleSections(accessibleModules, { closed: closedModules }), [accessibleModules, closedModules]);
-  const { section, href } = resolveActiveNav(pathname, sections);
-  if (!section || !href) return null;
-  const item = section.items.find((i) => i.href === href);
-  if (!item) return null;
+  const { navRole } = useNavRole(role, scopeCookie);
+  const opts = useMemo(() => ({ role: navRole, closed: closedModules }), [navRole, closedModules]);
+  const tools = useMemo(() => hubNav(accessibleModules, opts).tools, [accessibleModules, opts]);
+  const { hub, pageHref, inTools } = resolveStripHub(pathname, accessibleModules, opts);
+  if (!pageHref) return null;
+  const page = hub ? hub.pages.find((p) => p.href === pageHref) : tools.find((t) => t.href === pageHref);
+  if (!page || (!hub && !inTools)) return null;
+
   const items: BreadcrumbItem[] = [];
-  if (section.id !== "bugun") items.push({ label: "Bugün", href: "/app" });
-  const sectionHref = sections.find((s) => s.id === section.id)?.href;
-  // Sekmeli öğede sekme sayfasının kendisi (ör. /app/hedefler) "Ayrıntı" değil sekme adıyla görünür.
-  const activeTab = (item.tabs ?? [])
-    .filter((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0];
-  const isTabRoot = Boolean(activeTab && pathname === activeTab.href);
-  const isDetail =
-    !isTabRoot && pathname !== href && !pathname.startsWith(`${href}?`) && pathname.length > href.length;
-  items.push({ label: section.title, href: sectionHref });
-  if (activeTab && activeTab.href !== href) {
-    items.push({ label: item.label, href });
-    items.push({ label: activeTab.label, href: isDetail ? activeTab.href : undefined });
-  } else {
-    items.push({ label: item.label, href: isDetail ? href : undefined });
-  }
+  if (hub?.id !== "bugun") items.push({ label: "Bugün", href: "/app" });
+  // Ara düğüm: merkez adı (sayfa adından farklıysa) ya da tek sayfalı merkezde menü grup başlığı (bağlantısız).
+  if (inTools) items.push({ label: "Araçlar" });
+  else if (hub && hub.label !== page.label) items.push({ label: hub.label, href: hub.href });
+  else if (hub?.group) items.push({ label: hub.group });
+  const isDetail = pathname !== pageHref && pathname.startsWith(`${pageHref}/`);
+  items.push({ label: page.label, href: isDetail ? pageHref : undefined });
   if (isDetail) {
     // Son segment: /yeni → "Yeni kayıt", diğer her şey (kimlik) → "Ayrıntı".
     const last = pathname.replace(/\/+$/, "").split("/").pop();

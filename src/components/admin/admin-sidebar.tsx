@@ -2,11 +2,11 @@
 
 import Link from "@/components/ui/smart-link";
 import { Brand } from "@/components/brand/brand";
-import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
 import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
-import { activeTabHref, adminSidebarModel, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { activeTabHref, adminSidebarModel, adminTabPathname, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -14,6 +14,7 @@ import { MenuSearchButton, QuickAccessSection, useQuickAccess, type QuickItem } 
 import { useDeferredPanel } from "@/hooks/use-deferred-panel";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
+import { useMobileMenu } from "@/components/app/mobile-menu-trigger";
 
 // Radix Dialog gövdesi (mobil çekmece) yalnız küçük ekranda gerekir: masaüstü kabuk paketine girmez.
 const drawerPanel = lazyPanel(() => import("@/components/admin/admin-sidebar-drawer").then((m) => m.AdminSidebarDrawer));
@@ -36,19 +37,16 @@ export function AdminSidebar({
   badges?: { tickets?: number; risk?: number };
 }) {
   const pathname = usePathname();
+  const sekme = useSearchParams()?.get("sekme");
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  // Çekmece durumu üst kısımdaki hamburger (MobileMenuTrigger, admin layout) ile ortak bağlamda.
+  const { open, setOpen, requestOpen: openDrawer, openerRef: drawerOpenerRef, register: registerMenu } = useMobileMenu();
   const { Panel: Drawer, open: mountDrawer, warm: warmDrawer } = useDeferredPanel(drawerPanel, { idle: false });
-  const drawerOpenerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => registerMenu({ mount: mountDrawer, warm: warmDrawer }), [registerMenu, mountDrawer, warmDrawer]);
   useEffect(() => {
     if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
     return runWhenIdle(drawerPanel.preload);
   }, []);
-  const openDrawer = () => {
-    drawerOpenerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    mountDrawer();
-    setOpen(true);
-  };
   const allowed = platformModulesFor(role);
 
   // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, her grupta çekirdek öğeler görünür, kalanı "+N daha".
@@ -57,19 +55,13 @@ export function AdminSidebar({
   const activeItem = allItems.find((i) => isActive(pathname, i)) ?? null;
   const activeHref = activeItem?.href ?? null;
 
-  // Menü durumu (localStorage, try/catch store): "<grup>" kapalı grup, "fold-<grup>" açık "+N daha", "alt-<sayfa>" açık alt liste.
-  // Aktif sayfanın grubu/katı/alt listesi hep açık.
+  // Menü durumu (localStorage, try/catch store): "o-<grup>" = grubun ek öğeleri açık. Aktif sayfanın grubu hep açık.
   const closedStore = getHrefStore("closed", ADMIN_SCOPE);
   const closed = useSyncExternalStore(closedStore.subscribe, closedStore.read, closedStore.getServerSnapshot);
   const toggle = (id: string) => {
     const cur = closedStore.read();
     closedStore.write(cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
-
-  // Çekirdek olmayan tüm öğeler tek, varsayılan kapalı "Diğer" grubunda (tam liste ayrıca ⌘K'da).
-  const other = useMemo(() => groups.flatMap((g) => g.folded), [groups]);
-  const otherHasActive = other.some((i) => isActive(pathname, i));
-  const otherOpen = otherHasActive || closed.includes("diger-acik");
 
   const quickItems = useMemo<QuickItem[]>(() => allItems.map((i) => ({ href: i.href, label: i.label, icon: i.icon, description: i.description })), [allItems]);
   const itemByHref = useMemo(() => new Map(allItems.map((i) => [i.href, i])), [allItems]);
@@ -132,18 +124,26 @@ export function AdminSidebar({
     );
   };
 
-  const renderGroup = ({ section, items }: AdminSidebarGroup) => {
-    const hasActive = items.some((i) => isActive(pathname, i));
-    // Akordeon: varsayılan yalnız etkin sayfanın grubu açık; kullanıcı tercihi ("o-<grup>" = açık) hatırlanır.
-    const expanded = !section.title || hasActive || closed.includes(`o-${section.id}`);
+  // Tek öğeli grup: başlıksız düz satır. Çok öğeli grup: başlık + çekirdek satır(lar) hep görünür (menü bütçesi <= 6);
+  // grubun ek öğeleri başlıktaki düğmeyle açılır (varsayılan kapalı, tercih hatırlanır; etkin öğe içerideyse hep açık).
+  const renderGroup = ({ section, items, folded }: AdminSidebarGroup) => {
+    if (folded.length === 0 && items.length === 1) {
+      return (
+        <div key={section.id} className="pt-1">
+          {renderItem(items[0]!, { group: section.id })}
+        </div>
+      );
+    }
+    const foldedActive = folded.some((i) => isActive(pathname, i));
+    const expanded = foldedActive || closed.includes(`o-${section.id}`);
     return (
       <div key={section.id}>
-        {section.title ? (
-          <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
+        <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
+          {folded.length > 0 ? (
             <button
               type="button"
               onClick={() => toggle(`o-${section.id}`)}
-              disabled={hasActive}
+              disabled={foldedActive}
               aria-expanded={expanded}
               aria-controls={`adm-${section.id}`}
               className="focus-ring flex min-h-8 max-md:min-h-11 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
@@ -151,27 +151,33 @@ export function AdminSidebar({
               <span className="shrink-0">{section.title}</span>
               <span className="h-px flex-1 bg-white/10" aria-hidden />
               {!expanded ? (
-                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{items.length}</span>
+                <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{folded.length}</span>
               ) : null}
               <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${expanded ? "" : "-rotate-90"}`} aria-hidden />
-              <span className="sr-only">{expanded ? "bölümü daralt" : "bölümü aç"}</span>
+              <span className="sr-only">{expanded ? "ek sayfaları gizle" : "ek sayfaları göster"}</span>
             </button>
-          </div>
-        ) : (
-          <div className="pt-4" />
-        )}
-        {expanded ? (
-          <div id={`adm-${section.id}`} className="space-y-0.5">
-            {items.map((i) => renderItem(i, { group: section.id }))}
-          </div>
-        ) : null}
+          ) : (
+            <>
+              <span className="shrink-0 uppercase">{section.title}</span>
+              <span className="h-px flex-1 bg-white/10" aria-hidden />
+            </>
+          )}
+        </div>
+        <div className="space-y-0.5">
+          {items.map((i) => renderItem(i, { group: section.id }))}
+          {expanded && folded.length > 0 ? (
+            <div id={`adm-${section.id}`} className="space-y-0.5">
+              {folded.map((i) => renderItem(i, { group: section.id }))}
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   };
 
   const railFlyoutItems = (item: Item) =>
     item.tabs && item.tabs.length > 1
-      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(pathname, item.tabs ?? []) === t.href.split(/[?#]/)[0] }))
+      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(adminTabPathname(pathname, sekme), item.tabs ?? []) === t.href.split(/[?#]/)[0] }))
       : [];
 
   const renderContent = (variant: "desktop" | "drawer") => (
@@ -210,33 +216,6 @@ export function AdminSidebar({
             }}
           />
           {groups.map(renderGroup)}
-          {other.length > 0 ? (
-            <div>
-              <div className="sb-eyebrow flex items-center gap-2 px-3 pb-1.5 pt-4 text-white/65">
-                <button
-                  type="button"
-                  onClick={() => toggle("diger-acik")}
-                  disabled={otherHasActive}
-                  aria-expanded={otherOpen}
-                  aria-controls="adm-diger"
-                  className="focus-ring flex min-h-8 max-md:min-h-11 touch:min-h-11 w-full items-center gap-2 rounded-[var(--radius-control)] text-left uppercase transition-colors hover:text-white disabled:cursor-default"
-                >
-                  <span className="shrink-0">Diğer</span>
-                  <span className="h-px flex-1 bg-white/10" aria-hidden />
-                  {!otherOpen ? (
-                    <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-white/10 px-1.5 text-xs font-bold tabular-nums normal-case text-white/80">{other.length}</span>
-                  ) : null}
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${otherOpen ? "" : "-rotate-90"}`} aria-hidden />
-                  <span className="sr-only">{otherOpen ? "bölümü daralt" : "bölümü aç"}</span>
-                </button>
-              </div>
-              {otherOpen ? (
-                <div id="adm-diger" className="space-y-0.5">
-                  {other.map((i) => renderItem(i, { group: "diger" }))}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
         {/* İkon modu: her öğe ikon + hover/odakta alt sayfalar ve ipucu (erişilebilir flyout) */}
@@ -294,22 +273,6 @@ export function AdminSidebar({
 
   return (
     <>
-      {/* Mobil: hamburger (amber, admin teması) — masaüstünde gizli */}
-      <button
-        type="button"
-        onClick={openDrawer}
-        onPointerEnter={warmDrawer}
-        onFocus={warmDrawer}
-        onTouchStart={warmDrawer}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls="admin-mobile-navigation"
-        aria-label="Admin menüsünü aç"
-        className="fixed left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-50 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] bg-[var(--navy-800)] text-white shadow-[var(--elev-3)] md:hidden"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
-
       {/* Masaüstü sabit sidebar */}
       <div className="shell-aside sticky top-0 hidden h-screen shrink-0 self-start overflow-hidden md:block">{renderContent("desktop")}</div>
 
@@ -334,13 +297,16 @@ export function AdminSidebar({
                 key={tab.href}
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
+                aria-label={tab.short ? tab.label : undefined}
+                title={tab.label}
                 onClick={() => setOpen(false)}
                 className={`flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-xs font-semibold transition ${active ? "text-white" : "text-white/70 hover:text-white"}`}
               >
                 <span className={`grid h-7 w-11 place-items-center rounded-full transition ${active ? "bg-[var(--accent)]" : ""}`}>
                   <tab.icon className="h-[18px] w-[18px]" />
                 </span>
-                <span className="max-w-full truncate px-0.5">{tab.label}</span>
+                {/* Dar yuvada kısa ad (ör. "Panel", "Site"); tam ad aria-label/title'da. */}
+                <span className="max-w-full truncate px-0.5">{tab.short ?? tab.label}</span>
               </Link>
             );
           })}

@@ -1,6 +1,7 @@
+import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { ArrowRight, CheckCircle2, Circle, LifeBuoy, ListChecks } from "lucide-react";
+import { ArrowRight, CheckCircle2, Circle, ListChecks } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -14,19 +15,25 @@ export const metadata = { title: "Yardım ve Destek" };
 
 const PANEL = "rounded-[var(--radius-panel)] border border-line bg-surface p-5";
 
+/**
+ * Sayfa içi sekmeler. "Destek talebi" sekmesi kaldırıldı: üstteki şeritte zaten "Destek" (/app/destek) var, aynı yere
+ * giden iki sekme kafa karıştırıyordu. Eski derin bağlantı (?sekme=destek) Destek sayfasına yönlenir.
+ */
+const PAGE_TABS = HELP_TABS.filter((t) => t.id !== "destek");
+
 function tabHref(tab: HelpTab) {
   return tab === "baslangic" ? "/app/yardim" : `/app/yardim?sekme=${tab}`;
 }
 
 /**
  * Yardım merkezi: Başlangıç (kurulum kontrol listesi), Rehberler (görev bazlı
- * adımlar), Sözlük (jargon → ofis dili) ve Destek talebi. İçerik tek kaynaktan
- * gelir (src/lib/help-content.ts); "Destek talepleri" sekmesi mevcut /app/destek
- * sayfasıdır, formu değişmemiştir.
+ * adımlar), SSS ve Sözlük (jargon → ofis dili). İçerik tek kaynaktan gelir
+ * (src/lib/help-content.ts); destek talepleri merkezin "Destek" sekmesidir (/app/destek).
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string }> }) {
   const { tenantId } = await requireModulePage("support");
   const sp = await searchParams;
+  if (sp?.sekme === "destek") redirect("/app/destek");
   const tab = resolveHelpTab(sp?.sekme);
   const q = (sp?.q ?? "").slice(0, 100);
 
@@ -40,7 +47,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       />
 
       <nav aria-label="Yardım bölümleri" className="flex flex-wrap gap-2">
-        {HELP_TABS.map((t) => (
+        {PAGE_TABS.map((t) => (
           <FilterChip key={t.id} href={tabHref(t.id)} active={t.id === tab}>
             {t.label}
           </FilterChip>
@@ -52,7 +59,6 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       {tab === "rehberler" ? <GuidesSearch initialQ={q} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} /> : null}
       {tab === "sozluk" ? <GlossaryTab /> : null}
-      {tab === "destek" ? <SupportTab /> : null}
     </div>
   );
 }
@@ -147,29 +153,6 @@ function GlossaryTab() {
           </div>
         ))}
       </dl>
-    </section>
-  );
-}
-
-function SupportTab() {
-  return (
-    <section aria-label="Destek talebi" className="space-y-4">
-      <div className={PANEL}>
-        <h2 className="flex items-center gap-2 font-display text-lg font-bold text-ink-950">
-          <LifeBuoy className="h-5 w-5 text-brand-600" aria-hidden /> EmlakSoft ekibine yazın
-        </h2>
-        <p className="mt-1 text-sm text-text-muted">
-          Rehberlerde cevabı bulamadıysanız fatura, kurulum veya teknik konuda destek talebi açın. Ekibimiz en geç 1 iş günü içinde döner.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ButtonLink href="/app/destek/yeni" icon={LifeBuoy}>
-            Yeni destek talebi
-          </ButtonLink>
-          <ButtonLink href="/app/destek" variant="secondary" iconRight={ArrowRight}>
-            Taleplerim
-          </ButtonLink>
-        </div>
-      </div>
     </section>
   );
 }
