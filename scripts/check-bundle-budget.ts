@@ -34,15 +34,15 @@ import { buildStaticHome } from "../src/lib/static-home/transform";
 export const BUDGET_ROUTES = ["/app", "/app/musteriler", "/app/portfoyler", "/admin"] as const;
 
 /**
- * Eşikler: 2026-10-13 derlemesi (WP4, turbopackChunking requestCost 2M / minChunkSize 400k) ölçümü + %10, yukarı yuvarlı
- * (ölçüm: /app 225.2 · /app/musteriler 267.8 · /app/portfoyler 246.1 · /admin 236.9 KB gzip).
+ * Eşikler: 2026-10-13 ilk yük inceltmesi sonrası derleme ölçümü + ~%5, yukarı yuvarlı
+ * (ölçüm: /app 190.9 · /app/musteriler 193.6 · /app/portfoyler 198.4 · /admin 181.2 KB gzip; önceki: 221.6 · 269.7 · 248.0 · 233.7).
  * Ölçüm tablosu: docs/HAFIZA.md "Panel JS bütçesi". Bilinçli büyüme olursa yeniden ölç, tabloyu ve burayı birlikte güncelle.
  */
 export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number }> = {
-  "/app": { gzipKb: 248 },
-  "/app/musteriler": { gzipKb: 295 },
-  "/app/portfoyler": { gzipKb: 271 },
-  "/admin": { gzipKb: 261 },
+  "/app": { gzipKb: 201 },
+  "/app/musteriler": { gzipKb: 204 },
+  "/app/portfoyler": { gzipKb: 209 },
+  "/admin": { gzipKb: 191 },
 };
 /** Kopya modül oranı üst sınırı (kabul ölçütü < %10). */
 export const MAX_DUP_RATIO = 0.1;
