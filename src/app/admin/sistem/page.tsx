@@ -1,4 +1,4 @@
-import { AlertTriangle, Landmark, Radar } from "lucide-react";
+import { Landmark, Radar } from "lucide-react";
 import { PageTabs } from "@/components/app/page-tabs";
 import { requirePlatformModule } from "@/lib/platform";
 import { ErrorsView } from "../hatalar/errors-view";
@@ -7,10 +7,13 @@ import { SystemView } from "./system-view";
 
 export const metadata = { title: "Sistem sağlığı" };
 
+/**
+ * Sayfa içi pill'ler. "Üretim hataları" pill'i kaldırıldı: bölüm şeridinde aynı yere giden "Hata kayıtları" sekmesi
+ * var (iki şeritte kopya sekme). `?sekme=hatalar` derin bağlantısı aynen çalışır (hata listesi açılır).
+ */
 const TABS = [
   { id: "saglik", label: "Sistem sağlığı", icon: Radar },
   { id: "emlakfiyati", label: "EmlakFiyati", icon: Landmark },
-  { id: "hatalar", label: "Üretim hataları", icon: AlertTriangle },
 ] as const;
 
 /**

@@ -85,7 +85,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
           disabled={!httpsUrl}
           onClick={() => httpsUrl && copy(httpsUrl, "https")}
           title="ICS linkini kopyala"
-          className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+          className="focus-ring press inline-flex shrink-0 items-center gap-1 rounded-[var(--radius-control)] border border-line bg-surface px-2 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50 touch:min-h-11"
         >
           {copied === "https" ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
           Kopyala
@@ -98,7 +98,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
           type="button"
           disabled={!webcalUrl}
           onClick={() => webcalUrl && copy(webcalUrl, "webcal")}
-          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 disabled:opacity-50 touch:min-h-11"
         >
           {copied === "webcal" ? <Check className="h-3 w-3 text-mint-600" /> : <Copy className="h-3 w-3" />}
           webcal:// kopyala
@@ -108,7 +108,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
             href={googleUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
           >
             <ExternalLink className="h-3 w-3" /> Google Takvim&apos;e ekle
           </a>
@@ -118,7 +118,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
           onClick={regenerate}
           disabled={pending}
           title="Yeni link üretir; eski link artık çalışmaz"
-          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-warn-500 transition hover:border-warn-500/40 disabled:opacity-50"
+          className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-warn-500 transition hover:border-warn-500/40 disabled:opacity-50 touch:min-h-11"
         >
           <RefreshCw className={`h-3 w-3 ${pending ? "animate-spin" : ""}`} />
           {/* Aynı sayfada rezervasyon kartının da yenileme butonu var — isim ayırt edici olmalı */}

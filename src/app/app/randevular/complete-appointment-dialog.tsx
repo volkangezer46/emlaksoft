@@ -70,7 +70,7 @@ export function CompleteAppointmentDialog({
           type="button"
           onClick={onClick}
           {...aria}
-          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+          className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300 touch:min-h-11"
         >
           <CheckCircle2 className="h-3 w-3" /> Tamamlandı
         </button>
@@ -91,7 +91,7 @@ export function CompleteAppointmentDialog({
                       type="button"
                       aria-pressed={active}
                       onClick={() => setOutcome(active ? "" : key)}
-                      className={`focus-ring press flex flex-col items-center gap-1 rounded-[var(--radius-card)] border px-3 py-3 text-xs font-semibold transition ${
+                      className={`focus-ring press flex flex-col items-center gap-1 rounded-[var(--radius-card)] border px-3 py-3 text-xs font-semibold transition touch:min-h-11 ${
                         active
                           ? "border-brand-400/60 bg-brand-600/8 text-brand-700"
                           : "border-line bg-canvas text-text-muted hover:border-brand-300 hover:text-ink-950"

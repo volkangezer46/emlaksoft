@@ -90,6 +90,12 @@
 
 .lp-funnel { gap: 0; }
 
+/* Mobil (<768 px): grafik satırı listenin ALTINA iner (KPI şeridi üstte, grafikler açık; katlama yok) — ilk satır
+   kartı ilk ekranda görünsün. Kök `.lp` flex sütunudur (gap); `order` yalnız burada değişir, masaüstü sırası aynı. */
+@media (max-width: 767.98px) {
+  .lp > .lp-charts { order: 10; }
+}
+
 /* ---- Tablo → kart (<768 px): `TableFrame stack` + `TD label`; ayrı mobil kart listesi yok (tek işaretleme) ---- */
 @media (max-width: 767.98px) {
   .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; overflow: visible; }

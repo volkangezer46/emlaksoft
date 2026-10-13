@@ -27,9 +27,13 @@
   .touch\:min-w-11 { min-width: 44px; }
   .touch\:size-11 { width: 44px; height: 44px; }
 }
-/* Kart başlığı "Tümü →" bağlantıları (premium.css .ds-link, 2rem): dokunmatikte 44 px. */
+/* Kart başlığı "Tümü →" bağlantıları (premium.css .ds-link, 2rem): dokunmatikte 44 px.
+   Liste grafiği lejant satırları (list-page.css .lp-legend-row, her biri filtreli listeye bağlantı) ve tarih filtre
+   girişleri (DateRangeField / FilterDate; ortak sınıf TS sabiti olduğundan kural burada) de 44 px. */
 @media (max-width: 767.98px), (pointer: coarse) {
   html .ds-link { min-height: 44px; padding-inline: 0.6rem; }
+  .lp-legend-row { min-height: 44px; }
+  input[type="date"] { min-height: 44px; }
 }
 @media (max-width: 639.98px) {
   .h-11 { height: 44px; }

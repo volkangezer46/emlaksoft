@@ -332,7 +332,7 @@ export function ChartRangePanel({
               aria-pressed={activeKey === p.key}
               onClick={() => (p.count === null ? onReset() : onRangeChange(rangeForPreset(n, p.count, anchor)))}
               className={cn(
-                "focus-ring min-h-7 rounded-full px-2.5 text-xs font-semibold transition-colors",
+                "focus-ring min-h-7 rounded-full px-2.5 text-xs font-semibold transition-colors touch:min-h-11 touch:min-w-11",
                 activeKey === p.key ? "bg-surface-selected text-accent-text" : "text-text-muted hover:bg-surface-hover hover:text-text",
               )}
             >

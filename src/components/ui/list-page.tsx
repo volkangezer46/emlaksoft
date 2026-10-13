@@ -93,7 +93,7 @@ export function ListPage({
   className?: string;
 }) {
   return (
-    <div className={cn("lp space-y-4", className)}>
+    <div className={cn("lp flex flex-col gap-4", className)}>
       {hero ? <ListHero {...hero} /> : null}
       {kpis}
       {charts ? <ListCharts>{charts}</ListCharts> : null}
