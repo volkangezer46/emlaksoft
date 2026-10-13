@@ -56,7 +56,9 @@ describe("ana sayfa hareket sözleşmesi", () => {
     expect(MARKETING_CSS).toContain(MOTION);
     const page = read("src/app/page.tsx");
     expect(page).toContain('import "./marketing-motion.css"');
-    expect(page).toContain("<MotionRoot />");
+    // Gövde ortak işlevde (canlı ana sayfa + taslak önizleme aynı ağacı çizer).
+    expect(page).toContain("renderHome(");
+    expect(read("src/app/_home/render-home.tsx")).toContain("<MotionRoot />");
   });
 
   it("sonsuz döngü yalnız .mk-demo kapsamında; .mk-demo hareketi data-paused ile durdurulur", () => {

@@ -8,15 +8,18 @@ import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, U
 import { discardSiteContentDraft, publishSiteContent, resetSiteContentToDefault, rollbackSiteContent, saveSiteContentDraft } from "@/app/actions/site-content";
 import { Input } from "@/components/ui/input";
 import { PIONEER_CLAIM } from "@/lib/site-content/claims";
-import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
-import type { SiteContent, validateSiteContent } from "@/lib/site-content/schema";
+import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, newCardId, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
+import type { LookTextItem, SiteContent, validateSiteContent } from "@/lib/site-content/schema";
+import type { PlanDef } from "@/lib/billing/plans";
 
 import { InlineConfirm, TargetDatalist } from "../site-menu/editor-ui";
 import { Card, CtaFields, Full, ListShell, Txt, nextId, type Update } from "./editor-fields";
 import { ContentPreview } from "./content-preview";
+import { LookFields, PortalStripCard, TestimonialsTab, setOpt } from "./editor-look";
+import { RealPreview } from "./real-preview";
 import { BentoTab, EfTab, LayoutTab, TourTab, WhyTab, setValuationVisible, valuationVisible } from "./editor-landing-tabs";
 
-type Tab = "layout" | "hero" | "sections" | "lists" | "tour" | "bento" | "why" | "valuation" | "ef" | "faq" | "final" | "pages" | "versions";
+type Tab = "layout" | "hero" | "sections" | "lists" | "tour" | "bento" | "why" | "valuation" | "ef" | "faq" | "testimonials" | "final" | "pages" | "versions";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "layout", label: "Bölüm düzeni" },
   { id: "hero", label: "Ana başlık" },
@@ -28,6 +31,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "valuation", label: "Değerleme" },
   { id: "ef", label: "EmlakFiyati analiz bakiyesi" },
   { id: "faq", label: "SSS" },
+  { id: "testimonials", label: "Müşteri yorumları" },
   { id: "final", label: "Son çağrı" },
   { id: "pages", label: "Demo ve kayıt" },
   { id: "versions", label: "Sürümler" },
@@ -46,9 +50,12 @@ const SECTION_META: Record<SectionKey, { label: string; hasText: boolean }> = {
 
 export type HistoryView = { id: string; atLabel: string; by: string; label: string; faq: number; isLive: boolean };
 
-type Props = { initialDraft: SiteContent; live: SiteContent | null; defaults: SiteContent; history: HistoryView[]; canWrite: boolean };
+/** Önizleme bağlamı (sunucudan): gerçek deneme günü/paketler ve imzalı önizleme bağlantısı ayarları. */
+export type PreviewContext = { trialDays?: number; plans: readonly PlanDef[]; enabled: boolean; ttlOptions: readonly number[]; defaultTtl: number };
 
-export function SiteContentEditor({ initialDraft, live, defaults, history, canWrite }: Props) {
+type Props = { initialDraft: SiteContent; live: SiteContent | null; defaults: SiteContent; history: HistoryView[]; canWrite: boolean; preview: PreviewContext };
+
+export function SiteContentEditor({ initialDraft, live, defaults, history, canWrite, preview }: Props) {
   const router = useRouter();
   const readOnly = !canWrite;
   const [cfg, setCfg] = useState<SiteContent>(initialDraft);
@@ -209,7 +216,9 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
         ) : null}
       </section>
 
-      <ContentPreview cfg={cfg} />
+      <RealPreview enabled={preview.enabled} dirty={dirty} ttlOptions={preview.ttlOptions} defaultTtl={preview.defaultTtl} />
+
+      <ContentPreview cfg={cfg} trialDays={preview.trialDays} plans={preview.plans} />
 
       <div role="tablist" aria-label="Site içeriği bölümleri" className="flex flex-wrap gap-1.5 border-b border-line pb-2">
         {TABS.map((t, i) => (
@@ -244,6 +253,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
         {tab === "valuation" ? <ValuationTab {...props} /> : null}
         {tab === "ef" ? <EfTab {...props} /> : null}
         {tab === "faq" ? <FaqTab {...props} /> : null}
+        {tab === "testimonials" ? <TestimonialsTab {...props} /> : null}
         {tab === "final" ? <FinalTab {...props} /> : null}
         {tab === "pages" ? <PagesTab {...props} /> : null}
         {tab === "versions" ? (
@@ -335,6 +345,7 @@ function HeroTab({ cfg, update, issues, readOnly }: TabProps) {
         onAdd={() => update((d) => void d.hero.checks.push({ id: nextId("c", d.hero.checks.map((x) => x.id)), text: "", hidden: false }))}
         max={LIMITS.maxChecks}
       />
+      <PortalStripCard {...{ cfg, update, issues, readOnly }} />
     </>
   );
 }
@@ -378,11 +389,15 @@ function ListsTab({ cfg, update, issues, readOnly }: TabProps) {
             <Txt label="Başlık" value={c.title} max={LIMITS.cardTitle} onChange={(v) => update((d) => void (d.valueCards[i]!.title = v))} path={`valueCards.${i}.title`} {...f} />
             <Txt label="Bağlantı" value={c.href} max={300} onChange={(v) => update((d) => void (d.valueCards[i]!.href = v))} path={`valueCards.${i}.href`} list="site-menu-targets" {...f} />
             <Full><Txt label="Açıklama" value={c.text} max={LIMITS.cardText} onChange={(v) => update((d) => void (d.valueCards[i]!.text = v))} path={`valueCards.${i}.text`} {...f} /></Full>
+            <LookFields withTone icon={c.icon} tone={c.tone} readOnly={readOnly} onIcon={(v) => update((d) => setOpt(d.valueCards[i]!, "icon", v))} onTone={(v) => update((d) => setOpt(d.valueCards[i]!, "tone", v))} />
           </>
         )}
+        onAdd={() => update((d) => void d.valueCards.push({ id: newCardId(d.valueCards.map((x) => x.id)), title: "", text: "", href: "/kayit", hidden: false }))}
+        addLabel="Kart ekle"
+        max={LIMITS.maxCards}
       />
       <ListShell
-        title="Güven şeridi (değerler koddan gelir: sahte sayaç yok; yalnız etiket, bağlantı, sıra ve gösterim)"
+        title="Güven şeridi (değerler koddan gelir: sahte sayaç yok; eklenen öğe yalnız ikon ve etiketle, sayısız görünür)"
         items={cfg.trust}
         setItems={(n) => update((d) => void (d.trust = n))}
         readOnly={readOnly}
@@ -391,10 +406,14 @@ function ListsTab({ cfg, update, issues, readOnly }: TabProps) {
           <>
             <Txt label="Etiket" value={c.label} max={LIMITS.cardTitle} onChange={(v) => update((d) => void (d.trust[i]!.label = v))} path={`trust.${i}.label`} {...f} />
             <Txt label="Bağlantı" value={c.href} max={300} onChange={(v) => update((d) => void (d.trust[i]!.href = v))} path={`trust.${i}.href`} list="site-menu-targets" {...f} />
+            <LookFields withTone={false} icon={c.icon} readOnly={readOnly} onIcon={(v) => update((d) => setOpt(d.trust[i]!, "icon", v))} onTone={() => undefined} />
           </>
         )}
+        onAdd={() => update((d) => void d.trust.push({ id: newCardId(d.trust.map((x) => x.id)), label: "", href: "/#fiyat", hidden: false }))}
+        addLabel="Öğe ekle"
+        max={LIMITS.maxCards}
       />
-      <TextItems title="Ayrıntılar (küçük büyük şeyler)" path="highlights" items={cfg.highlights} set={(n) => update((d) => void (d.highlights = n))} update={update} get={(d) => d.highlights} {...f} />
+      <TextItems title="Ayrıntılar (küçük büyük şeyler)" path="highlights" withTone items={cfg.highlights} set={(n) => update((d) => void (d.highlights = n))} update={update} get={(d) => d.highlights} {...f} />
       <TextItems title="Nasıl çalışır: adımlar" path="steps" items={cfg.steps} set={(n) => update((d) => void (d.steps = n))} update={update} get={(d) => d.steps} {...f} />
       <TextItems title="Güvenlik maddeleri" path="security.items" items={cfg.security.items} set={(n) => update((d) => void (d.security.items = n))} update={update} get={(d) => d.security.items} {...f} />
       <ListShell
@@ -414,6 +433,7 @@ function ListsTab({ cfg, update, issues, readOnly }: TabProps) {
   );
 }
 
+/** Başlık + açıklama kartları; öğe eklenebilir (`c_...` kimlik), ikon (ve `withTone` ise renk tonu) seçilir. */
 function TextItems({
   title,
   path,
@@ -423,15 +443,17 @@ function TextItems({
   get,
   issues,
   readOnly,
+  withTone = false,
 }: {
   title: string;
   path: string;
-  items: Array<{ id: string; title: string; text: string; hidden: boolean }>;
-  set: (n: Array<{ id: string; title: string; text: string; hidden: boolean }>) => void;
+  items: LookTextItem[];
+  set: (n: LookTextItem[]) => void;
   update: Update;
-  get: (d: SiteContent) => Array<{ id: string; title: string; text: string; hidden: boolean }>;
+  get: (d: SiteContent) => LookTextItem[];
   issues: TabProps["issues"];
   readOnly: boolean;
+  withTone?: boolean;
 }) {
   return (
     <ListShell
@@ -444,8 +466,12 @@ function TextItems({
         <>
           <Full><Txt label="Başlık" value={c.title} max={LIMITS.title} onChange={(v) => update((d) => void (get(d)[i]!.title = v))} path={`${path}.${i}.title`} issues={issues} readOnly={readOnly} /></Full>
           <Full><Txt label="Açıklama" multiline value={c.text} max={LIMITS.text} onChange={(v) => update((d) => void (get(d)[i]!.text = v))} path={`${path}.${i}.text`} issues={issues} readOnly={readOnly} /></Full>
+          <LookFields withTone={withTone} icon={c.icon} tone={c.tone} readOnly={readOnly} onIcon={(v) => update((d) => setOpt(get(d)[i]!, "icon", v))} onTone={(v) => update((d) => setOpt(get(d)[i]!, "tone", v))} />
         </>
       )}
+      onAdd={() => update((d) => void get(d).push({ id: newCardId(get(d).map((x) => x.id)), title: "", text: "", hidden: false }))}
+      addLabel="Kart ekle"
+      max={LIMITS.maxCards}
     />
   );
 }

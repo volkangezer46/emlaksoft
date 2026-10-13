@@ -1,7 +1,9 @@
 import { FileText } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { toTrLocalInput } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
+import { DEFAULT_PREVIEW_TTL_HOURS, PREVIEW_TTL_HOURS, isPreviewEnabled } from "@/lib/preview-token";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { sameContent } from "@/lib/site-content/schema";
 import { siteContentStore } from "@/lib/site-content/store";
@@ -12,7 +14,8 @@ export const metadata = { title: "Site içeriği" };
 /** Süper admin: ana sayfa ve genel pazarlama metinleri (taslak/yayın, sürüm geçmişi, varsayılana dön). Operasyon salt okur. */
 export default async function AdminSiteContentPage() {
   const staff = await requirePlatformModule("sitecontent");
-  const state = await siteContentStore.readState();
+  // Şematik önizleme de gerçek deneme günü ve paket tanımıyla çizilir (sabit örnek değer yok).
+  const [state, pricing] = await Promise.all([siteContentStore.readState(), getPublicPricing()]);
   const defaults = defaultSiteContent();
   const draft = state.draft ?? state.live ?? defaults;
 
@@ -34,7 +37,14 @@ export default async function AdminSiteContentPage() {
         description="Ana sayfanın ve genel pazarlama sayfalarının metinleri buradan yönetilir. Değişiklikler önce taslaktır; Yayınla ile canlıya alınır, her yayın geri dönülebilir. Hiç yayın yokken site bugünkü metinle çalışır."
         glow="brand"
       />
-      <SiteContentEditor initialDraft={draft} live={state.live} defaults={defaults} history={history} canWrite={staff.role === "super_admin"} />
+      <SiteContentEditor
+        initialDraft={draft}
+        live={state.live}
+        defaults={defaults}
+        history={history}
+        canWrite={staff.role === "super_admin"}
+        preview={{ trialDays: pricing.trialDays, plans: pricing.plans, enabled: isPreviewEnabled(), ttlOptions: PREVIEW_TTL_HOURS, defaultTtl: DEFAULT_PREVIEW_TTL_HOURS }}
+      />
     </div>
   );
 }

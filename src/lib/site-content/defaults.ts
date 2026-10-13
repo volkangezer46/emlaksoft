@@ -42,6 +42,14 @@ export function defaultSiteContent(): SiteContent {
       ],
       integrationBadge: "EmlakFiyati entegrasyonu",
       integrationLine: "Ada/parsel bazlı değerleme ve PDF rapor, müşteri kaydınızın yanından.",
+      // Eskiden portal-strip.tsx'e gömülü metin (birebir). Marka adları LOGO değil nötr metin çipidir.
+      portalStrip: {
+        hidden: false,
+        title: "Tüm portal ilanları tek ekranda",
+        text: "İlan numarasını veya bağlantısını ekleyin; sistem periyodik teyit ister, ilan düşünce kapanış formuyla kaçağı ölçer.",
+        note: "Marka adları yalnız takip için anılır. Resmi entegrasyon veya ortaklık iddiası yoktur; otomatik yayınlama yapılmaz.",
+        portals: ["Sahibinden", "Hepsiemlak", "Zingat", "Emlakjet", "Hürriyet Emlak", "RE/MAX"].map((name) => ({ name })),
+      },
     },
     sections: {
       tur: { eyebrow: "Ürün turu", title: "Panelin içine", em: "bir bakın.", tail: "", text: "Yedi ana ekranın örnek görünümü. Menüdeki dokuz iş başlığının hepsi aynı müşteri ve portföy kaydını kullanır." },
@@ -219,7 +227,15 @@ export function defaultSiteContent(): SiteContent {
       note: "Tutarlar KDV hariçtir. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.",
     },
     // Bölüm sırası = bugünkü ana sayfa sırası; hepsi görünür.
-    layout: ["deger", "guven", "tur", "ozellikler", "degerleme", "emlakfiyati", "diger", "neden", "nasil", "guvenlik", "fiyat", "sss", "son"].map((id) => ({ id: id as SiteContent["layout"][number]["id"], hidden: false })),
+    // Kanıtlı müşteri yorumları: varsayılan boş ve gizli (ana sayfa çıktısı değişmez). Yorum yalnız yazılı onayla eklenir.
+    testimonials: {
+      heading: { eyebrow: "Müşteri yorumları", title: "Ofislerin", em: "kendi sözleriyle.", tail: "", text: "" },
+      items: [],
+    },
+    layout: [
+      ...["deger", "guven", "tur", "ozellikler", "degerleme", "emlakfiyati", "diger", "neden", "nasil", "guvenlik", "fiyat", "sss", "son"].map((id) => ({ id: id as SiteContent["layout"][number]["id"], hidden: false })),
+      { id: "testimonials", hidden: true },
+    ],
     // Geriye dönük anahtar: /demo sayfası kaldırıldı (kalıcı /kayit yönlendirmesi); şema uyumu için korunur, hiçbir sayfa okumaz.
     demo: { title: "Ofisini ücretsiz kur", text: "Kredi kartı gerekmez — kurulum sihirbazı ofisini dakikalar içinde hazırlar." },
     register: {

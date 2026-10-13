@@ -1,12 +1,17 @@
-import { KeyRound, Lock, Scale, Users } from "lucide-react";
+import { KeyRound, Lock, Scale, ShieldCheck, Users, type LucideIcon } from "lucide-react";
 import type { PlanDef } from "@/lib/billing/plans";
+import { menuIconComponent } from "@/lib/site-menu/icon-registry";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
-import type { Heading, SiteContent } from "@/lib/site-content/schema";
+import type { Heading, LookTextItem, SiteContent } from "@/lib/site-content/schema";
 import { tx } from "@/lib/site-content/tokens";
 import { Lines, RichTitle } from "./content-link";
 
-/* Garanti dili YOK: "süreç desteği". Metinler site içeriğinden (varsayılan = bugünkü metin); ikon kimliğe bağlıdır. */
-const ICONS: Record<string, typeof Lock> = { veri: Lock, yetki: KeyRound, rol: Users, kvkk: Scale };
+/*
+ * Garanti dili YOK: "süreç desteği". Metinler site içeriğinden (varsayılan = bugünkü metin); ikon bilinen kimlikte koddan,
+ * yönetimden eklenen maddede seçilen ikondan (yoksa kalkan). Bilinmeyen kimlik düşürülmez.
+ */
+const ICONS: Record<string, LucideIcon> = { veri: Lock, yetki: KeyRound, rol: Users, kvkk: Scale };
+const iconFor = (i: LookTextItem): LucideIcon => (i.icon ? menuIconComponent(i.icon) : null) ?? (Object.hasOwn(ICONS, i.id) ? ICONS[i.id] : undefined) ?? ShieldCheck;
 
 function Shield() {
   return (
@@ -34,7 +39,7 @@ export function SecurityBand({
   heading?: Heading;
 }) {
   const ctx = { trialDays, plans };
-  const items = content.items.filter((i) => !i.hidden && ICONS[i.id]).map((i) => ({ ...i, icon: ICONS[i.id]! }));
+  const items = content.items.filter((i) => !i.hidden).map((i) => ({ ...i, icon: iconFor(i) }));
   const chips = content.chips.filter((c) => !c.hidden);
   return (
     <section id="guvenlik" className="mk-dark mk-section" aria-labelledby="guvenlik-baslik">

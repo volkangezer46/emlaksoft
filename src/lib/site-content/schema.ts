@@ -4,7 +4,9 @@ export * from "./schema-core";
 import { checkHref } from "@/lib/site-menu/schema";
 import type { Issue } from "@/lib/site-menu/schema";
 import { HOME_ANCHORS } from "@/lib/site-menu/known-routes";
+import { isMenuIconName } from "@/lib/site-menu/icon-registry";
 import { defaultSiteContent } from "./defaults";
+import { CARD_TONES } from "./tones";
 
 /**
  * Site içeriği (ana sayfa ve genel pazarlama metinleri): tür, sınırlar ve doğrulama.
@@ -13,7 +15,8 @@ import { defaultSiteContent } from "./defaults";
  * Bağlantılar site menüsünün doğrulayıcısını (`checkHref`) kullanır: yalnız var olan yol, /#bölüm, http(s), mailto, tel.
  */
 
-const id = z.string().regex(/^[a-z0-9][a-z0-9-]{0,29}$/, "Geçersiz kimlik.");
+// Alt çizgi: yönetimden eklenen kartların `c_<kısa id>` kimliği (newCardId).
+const id = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,29}$/, "Geçersiz kimlik.");
 const text = (max: number, msg: string) => z.string().trim().max(max, `${msg} en fazla ${max} karakter olabilir.`);
 const href = z.string().trim().max(LIMITS.href, "Bağlantı çok uzun.");
 
@@ -29,9 +32,45 @@ const headingSchema = z.strictObject({
 
 const ctaSchema = z.strictObject({ label: text(LIMITS.cta, "Düğme metni"), href });
 const checkSchema = z.strictObject({ id, text: text(LIMITS.cardText, "Madde"), hidden: z.boolean() });
-const cardSchema = z.strictObject({ id, title: text(LIMITS.cardTitle, "Başlık"), text: text(LIMITS.cardText, "Açıklama"), href, hidden: z.boolean() });
-const trustSchema = z.strictObject({ id, label: text(LIMITS.cardTitle, "Etiket"), href, hidden: z.boolean() });
+/**
+ * Kart görünümü (isteğe bağlı): ikon site menüsünün KONTROLLÜ ikon listesinden, ton kapalı enumdan (tones.ts).
+ * Boşsa bilinen kimlik bugünkü ikon/rengini, yeni kart bileşenin varsayılan görünümünü kullanır. Serbest sınıf/renk yok.
+ */
+const look = {
+  icon: z.string().max(40).refine(isMenuIconName, "Bilinmeyen ikon; listeden seçin.").optional(),
+  tone: z.enum(CARD_TONES, "Bilinmeyen renk tonu; listeden seçin.").optional(),
+};
+const cardSchema = z.strictObject({ id, title: text(LIMITS.cardTitle, "Başlık"), text: text(LIMITS.cardText, "Açıklama"), href, hidden: z.boolean(), ...look });
+const trustSchema = z.strictObject({ id, label: text(LIMITS.cardTitle, "Etiket"), href, hidden: z.boolean(), ...look });
 const itemSchema = z.strictObject({ id, title: text(LIMITS.title, "Başlık"), text: text(LIMITS.text, "Açıklama"), hidden: z.boolean() });
+/** Öğe eklenebilen metin kartları (ayrıntılar, adımlar, güvenlik maddeleri). */
+const lookItemSchema = itemSchema.extend(look);
+
+/** Takvim tarihi (YYYY-AA-GG) ve gerçekten var olan gün. */
+const isoDate = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Onay tarihi zorunludur (YYYY-AA-GG).")
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+  }, "Geçersiz onay tarihi.");
+
+/**
+ * Müşteri yorumu: YALNIZ yazılı onayı olan gerçek kişi. Onay tarihi ve kaynağı (ör. "e-posta onayı 2026-10-01") zorunludur.
+ * PUAN ALANI YOKTUR; AggregateRating/Review yapılandırılmış verisi üretilmez.
+ */
+const testimonialSchema = z.strictObject({
+  id,
+  quote: text(LIMITS.quote, "Yorum").min(1, "Yorum metni boş olamaz."),
+  name: text(LIMITS.personName, "Ad soyad").min(1, "Ad soyad boş olamaz."),
+  role: text(LIMITS.personRole, "Unvan"),
+  office: text(LIMITS.office, "Ofis"),
+  city: text(LIMITS.city, "Şehir"),
+  consentDate: isoDate,
+  source: text(LIMITS.source, "Onay kaynağı").min(1, "Onay kaynağı zorunludur (ör. e-posta onayı 2026-10-01)."),
+  hidden: z.boolean(),
+});
 const faqSchema = z.strictObject({ id, q: text(LIMITS.question, "Soru"), a: text(LIMITS.answer, "Cevap"), hidden: z.boolean() });
 
 /** Paket rozeti yolu: boş (rozet yok) veya /app altındaki sayfa yolu (rozet sayfa kilidinden `gateBadge` ile üretilir). */
@@ -56,15 +95,25 @@ export const siteContentSchema = z.strictObject({
     /** EmlakFiyati entegrasyonu rozeti ve vurgu satırı (boş bırakılırsa gösterilmez). */
     integrationBadge: text(LIMITS.badge, "Entegrasyon rozeti"),
     integrationLine: text(240, "Vurgu satırı"),
+    /** Hero altındaki portal şeridi (marka adları yalnız takip için; resmi ortaklık iddiası yok). Gizle = hukuki itirazda tek tık. */
+    portalStrip: z.strictObject({
+      hidden: z.boolean(),
+      title: text(LIMITS.title, "Şerit başlığı"),
+      text: text(LIMITS.text, "Şerit açıklaması"),
+      note: text(LIMITS.note, "Şerit dipnotu"),
+      portals: z
+        .array(z.strictObject({ name: text(LIMITS.portalName, "Portal adı").min(1, "Portal adı boş olamaz.") }))
+        .max(LIMITS.maxPortals, `En fazla ${LIMITS.maxPortals} portal olabilir.`),
+    }),
   }),
   sections: z.strictObject(sectionsShape),
-  valueCards: z.array(cardSchema).max(LIMITS.maxList),
-  trust: z.array(trustSchema).max(LIMITS.maxList),
-  highlights: z.array(itemSchema).max(LIMITS.maxList),
-  steps: z.array(itemSchema).max(LIMITS.maxList),
+  valueCards: z.array(cardSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} kart olabilir.`),
+  trust: z.array(trustSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} öğe olabilir.`),
+  highlights: z.array(lookItemSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} kart olabilir.`),
+  steps: z.array(lookItemSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} adım olabilir.`),
   security: z.strictObject({
     chips: z.array(z.strictObject({ id, text: text(LIMITS.chip, "Etiket"), hidden: z.boolean() })).max(LIMITS.maxList),
-    items: z.array(itemSchema).max(LIMITS.maxList),
+    items: z.array(lookItemSchema).max(LIMITS.maxCards, `En fazla ${LIMITS.maxCards} madde olabilir.`),
     note: text(LIMITS.note, "Dipnot"),
   }),
   faq: z.array(faqSchema).max(LIMITS.maxFaq, `En fazla ${LIMITS.maxFaq} soru olabilir.`),
@@ -164,6 +213,11 @@ export const siteContentSchema = z.strictObject({
     detailLink: ctaSchema,
     note: text(LIMITS.note, "Dipnot"),
   }),
+  /** Kanıtlı müşteri yorumları (varsayılan: bölüm gizli, liste boş; öğe yoksa bölüm açık olsa da çizilmez). */
+  testimonials: z.strictObject({
+    heading: headingSchema,
+    items: z.array(testimonialSchema).max(LIMITS.maxTestimonials, `En fazla ${LIMITS.maxTestimonials} yorum olabilir.`),
+  }),
   /** Bölüm sırası ve görünürlüğü (hero sabit, ilk). */
   layout: z.array(z.strictObject({ id: z.enum(LANDING_IDS), hidden: z.boolean() })).max(LANDING_SECTIONS.length),
   demo: z.strictObject({ title: text(LIMITS.title, "Başlık"), text: text(LIMITS.text, "Açıklama") }),
@@ -177,6 +231,9 @@ export type CheckItem = z.infer<typeof checkSchema>;
 export type CardItem = z.infer<typeof cardSchema>;
 export type TrustItem = z.infer<typeof trustSchema>;
 export type TextItem = z.infer<typeof itemSchema>;
+export type LookTextItem = z.infer<typeof lookItemSchema>;
+export type Testimonial = z.infer<typeof testimonialSchema>;
+export type PortalStripContent = SiteContent["hero"]["portalStrip"];
 export type FaqItem = z.infer<typeof faqSchema>;
 
 export type TourItem = SiteContent["tour"][number];
@@ -185,7 +242,7 @@ export type WhyRow = SiteContent["why"]["rows"][number];
 export type LayoutItem = SiteContent["layout"][number];
 
 /** Sonradan eklenen üst düzey anahtarlar: eski yayında yoksa varsayılandan doldurulur (yayın kaybolmaz). */
-const LATER_KEYS = ["tour", "bento", "why", "efSection", "layout"] as const;
+const LATER_KEYS = ["tour", "bento", "why", "efSection", "testimonials", "layout"] as const;
 
 /**
  * Eski yayınları yükseltir: eksik yeni anahtarlar varsayılandan gelir, düzen listesi normalize edilir.
@@ -203,8 +260,14 @@ export function upgradeSiteContent(value: unknown): unknown {
   }
   if (Array.isArray(out.layout)) out.layout = normalizeLayout(out.layout as Array<{ id?: unknown; hidden?: unknown }>);
   // Sonradan eklenen hero alanı: eski yayında yoksa boş (boş = uzun açıklamanın ilk cümlesi).
-  if (out.hero && typeof out.hero === "object" && !Array.isArray(out.hero) && (out.hero as Record<string, unknown>).mobileLead === undefined) {
-    out.hero = { ...(out.hero as Record<string, unknown>), mobileLead: "" };
+  if (out.hero && typeof out.hero === "object" && !Array.isArray(out.hero)) {
+    const hero = out.hero as Record<string, unknown>;
+    if (hero.mobileLead === undefined) out.hero = { ...(out.hero as Record<string, unknown>), mobileLead: "" };
+    // Portal şeridi eskiden koda gömülüydü: eski yayında yoksa bugünkü metin (varsayılan) gelir, görünüm değişmez.
+    if (hero.portalStrip === undefined) {
+      defaults ??= defaultSiteContent();
+      out.hero = { ...(out.hero as Record<string, unknown>), portalStrip: defaults.hero.portalStrip };
+    }
   }
   return out;
 }
@@ -257,8 +320,9 @@ export function collectStrings(cfg: SiteContent): Array<{ path: string; value: s
   const walk = (node: unknown, path: string) => {
     if (typeof node === "string") {
       const key = path.split(".").pop() ?? "";
-      if (key === "gate" || (key === "id" && /^\.?layout\./.test(path))) return; // yapısal alan: şemada doğrulanır, metin değil
-      out.push({ path, value: node, link: key === "href", multiline: ["lead", "text", "a", "panelText", "note"].includes(key) });
+      // Yapısal alanlar şemada doğrulanır (metin değil): paket rozeti, düzen kimliği, ikon, ton, onay tarihi.
+      if (key === "gate" || key === "icon" || key === "tone" || key === "consentDate" || (key === "id" && /^\.?layout\./.test(path))) return;
+      out.push({ path, value: node, link: key === "href", multiline: ["lead", "text", "a", "panelText", "note", "quote"].includes(key) });
     } else if (Array.isArray(node)) node.forEach((v, i) => walk(v, `${path}.${i}`));
     else if (node && typeof node === "object") for (const [k, v] of Object.entries(node)) if (k !== "v") walk(v, path ? `${path}.${k}` : k);
   };
@@ -305,6 +369,7 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
   cfg.bento.tiles.forEach((t, i) => dupCheck(t.points, `bento.tiles.${i}.points`));
   dupCheck(cfg.why.rows, "why.rows");
   dupCheck(cfg.efSection.steps, "efSection.steps");
+  dupCheck(cfg.testimonials.items, "testimonials.items");
   dupCheck(cfg.layout, "layout");
 
   for (const s of collectStrings(cfg)) {
@@ -347,6 +412,17 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
     if (!f.q) issues.push({ level: "error", path: `faq.${i}.q`, message: "Soru boş olamaz." });
     if (!f.a) issues.push({ level: "error", path: `faq.${i}.a`, message: "Cevap boş olamaz." });
   });
+  // Öğe eklenebilen kart listeleri: görünen kartın başlığı/etiketi boş olamaz (boş kart çizilmesin).
+  const needTitle = (list: ReadonlyArray<{ hidden: boolean; title?: string; label?: string }>, name: string, key: "title" | "label") =>
+    list.forEach((it, i) => {
+      if (!it.hidden && !it[key]) issues.push({ level: "error", path: `${name}.${i}.${key}`, message: key === "label" ? "Etiket boş olamaz." : "Başlık boş olamaz." });
+    });
+  needTitle(cfg.valueCards, "valueCards", "title");
+  needTitle(cfg.trust, "trust", "label");
+  needTitle(cfg.highlights, "highlights", "title");
+  needTitle(cfg.steps, "steps", "title");
+  needTitle(cfg.security.items, "security.items", "title");
+  if (!cfg.hero.portalStrip.hidden && !cfg.hero.portalStrip.title) issues.push({ level: "error", path: "hero.portalStrip.title", message: "Şerit başlığı boş olamaz (şeridi kaldırmak için Gizle'yi kullanın)." });
   cfg.tour.forEach((t, i) => {
     if (!t.hidden && !t.label) issues.push({ level: "error", path: `tour.${i}.label`, message: "Sekme adı boş olamaz." });
   });
@@ -357,6 +433,9 @@ export function validateSiteContent(input: unknown): { config: SiteContent | nul
   });
   if (cfg.tour.length > 0 && !cfg.tour.some((t) => !t.hidden)) issues.push({ level: "warn", path: "tour", message: "Hiç görünen ekran yok; ürün turu bölümü çizilmez." });
   if (!visibleSections(cfg).length) issues.push({ level: "warn", path: "layout", message: "Tüm bölümler gizli; ana sayfada yalnız ana başlık kalır." });
+  if (visibleSections(cfg).includes("testimonials") && !cfg.testimonials.items.some((t) => !t.hidden)) {
+    issues.push({ level: "warn", path: "testimonials", message: "Müşteri yorumları bölümü açık ama görünen yorum yok; bölüm çizilmez." });
+  }
   if (cfg.faq.length > 0 && !cfg.faq.some((f) => !f.hidden)) issues.push({ level: "warn", path: "faq", message: "Hiç görünen soru yok; SSS bölümü boş kalır." });
   return { config: cfg, issues };
 }
