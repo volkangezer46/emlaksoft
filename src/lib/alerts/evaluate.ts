@@ -194,3 +194,9 @@ export function formatAlertText(
   const text = [subject, "", c.body, link ? `\n${link}` : ""].join("\n").trim().slice(0, 3500);
   return { subject, text };
 }
+
+/** `cron_late:<iş>` / `cron_error:<iş>` olayı duraklatılmış bir işe mi ait? */
+export function isPausedJobEvent(fingerprint: string, pausedJobs: ReadonlySet<string>): boolean {
+  const m = /^cron_(?:late|error):(.+)$/.exec(fingerprint);
+  return Boolean(m && pausedJobs.has(m[1]!));
+}

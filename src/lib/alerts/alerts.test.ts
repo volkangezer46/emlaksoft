@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { ALERT_RULE_KEYS, isMuted, mergeRuleConfigs, notifyDecision } from "./rules";
-import { evaluateAlerts, formatAlertText, type AlertSnapshot } from "./evaluate";
+import { evaluateAlerts, formatAlertText, isPausedJobEvent, type AlertSnapshot } from "./evaluate";
 import { channelTargetHint, decodeChannelConfig, encodeChannelConfig, isBlockedWebhookHost, parseChannelInput, parseWebhookUrl } from "./channel-config";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -111,6 +111,14 @@ describe("uyarı kuralları", () => {
     const t = formatAlertText({ title: "Disk", body: "dolu", href: "/admin/sistem" }, "resolved", "https://emlaksoft.com.tr/");
     expect(t.subject).toBe("[DÜZELDİ] Disk");
     expect(t.text).toContain("https://emlaksoft.com.tr/admin/sistem");
+  });
+
+  it("duraklatılan işin cron olayı 'düzeldi' sayılmaz", () => {
+    const paused = new Set(["ticket-sla"]);
+    expect(isPausedJobEvent("cron_late:ticket-sla", paused)).toBe(true);
+    expect(isPausedJobEvent("cron_error:ticket-sla", paused)).toBe(true);
+    expect(isPausedJobEvent("cron_late:digest", paused)).toBe(false);
+    expect(isPausedJobEvent("error_burst", paused)).toBe(false);
   });
 });
 

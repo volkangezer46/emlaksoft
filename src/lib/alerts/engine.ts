@@ -8,7 +8,7 @@ import { BACKUP_HEARTBEAT_JOB, BACKUP_STATUS_KEY } from "@/lib/ops/backup-status
 import { getSettings } from "@/lib/settings/read";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { openChannelConfig, sendToChannel } from "./channels";
-import { evaluateAlerts, formatAlertText, type AlertCondition, type AlertSnapshot } from "./evaluate";
+import { evaluateAlerts, formatAlertText, isPausedJobEvent, type AlertCondition, type AlertSnapshot } from "./evaluate";
 import { isMuted, mergeRuleConfigs, notifyDecision, type AlertRuleConfig, type AlertRuleKey, isAlertRuleKey } from "./rules";
 import { OPS_ALERT_SETTING_KEYS } from "@/lib/settings/registry/ops-alerts";
 
@@ -197,7 +197,12 @@ export async function runAlertEvaluation(): Promise<AlertRunResult> {
     const cfg = rules[ev.rule_key];
     if (!evaluated.has(ev.rule_key) && cfg.enabled) continue;
     const patch: Record<string, unknown> = { resolved_at: nowIso, last_at: nowIso };
-    if (cfg.enabled && ev.last_notified_at && !isMuted(cfg, nowMs)) {
+    // İş duraklatıldı diye koşul kalktıysa sorun DÜZELMEDİ: olay bildirimsiz kapanır (yanıltıcı "düzeldi" yok).
+    if (isPausedJobEvent(ev.fingerprint, snapshot.pausedJobs)) {
+      patch.deliveries = appendLog(ev.deliveries, [
+        { at: nowIso, state: "resolved", channel: null, kind: null, ok: false, detail: "iş duraklatıldı; olay bildirimsiz kapandı" },
+      ]);
+    } else if (cfg.enabled && ev.last_notified_at && !isMuted(cfg, nowMs)) {
       const deliveries = await dispatch(
         channels,
         { title: ev.title, body: "Koşul artık sağlanmıyor; sorun düzeldi.", href: ev.href ?? "", ruleKey: ev.rule_key, fingerprint: ev.fingerprint },
