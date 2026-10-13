@@ -21,6 +21,7 @@ import type { StoredTransfer } from "@/lib/portal-transfer/ext-queue";
 import { photoSummary } from "@/lib/portal-transfer/photo-prep";
 import { parsePriceText } from "@/lib/listing-control/adapters/inventory-csv";
 import { extractListing, type PageSnapshot } from "@/lib/prospecting/extension-extract";
+import type { CurrentPortal } from "@/lib/portals/catalog";
 import type { FeedbackConsent, StatusReply } from "./messages";
 
 /**
@@ -435,7 +436,7 @@ void initFsbo();
 // konum seçimine kullanıcı basar. Parola/e-posta/telefon/dosya (fotoğraf hariç) denetimlerine dokunulmaz. Portal sayfası değiştirilmez.
 
 type TransferGet = { transfer: StoredTransfer | null; doneLast: { at: number; ok: boolean; summary: string } | null; donePending: number };
-type PortalTab = { tabId: number; portal: "sahibinden" | "hepsiemlak" | "emlakjet"; url: string };
+type PortalTab = { tabId: number; portal: CurrentPortal; url: string };
 let portalTab: PortalTab | null = null;
 let loadedTransfer: StoredTransfer | null = null;
 let lastReport: FieldReport[] = [];

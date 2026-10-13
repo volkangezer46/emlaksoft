@@ -30,6 +30,7 @@ import { AGE_BUCKETS, filtersToParams, FSBO_PAGE_SIZE, loadFsboList, parseFsboFi
 import { buildCallScript, CALL_NOTICE } from "@/lib/prospecting/script";
 import { clampRetentionDays } from "@/lib/prospecting/retention";
 import { STATUS_LABELS, FSBO_STATUSES } from "@/lib/prospecting/types";
+import { PORTAL_LABELS, isCurrentPortal } from "@/lib/portals/catalog";
 import { toCardData } from "@/lib/prospecting/view";
 import type { Db } from "@/lib/prospecting/store";
 import { FsboCard } from "./fsbo-card";
@@ -99,7 +100,7 @@ export default async function PortfoyAviPage({ searchParams }: { searchParams?: 
         licenseNo: office?.license_no ?? null,
         districtName: r.districtName,
         rooms: r.rooms,
-        portalLabel: r.portal === "sahibinden" ? "Sahibinden" : r.portal === "hepsiemlak" ? "Hepsiemlak" : r.portal === "emlakjet" ? "Emlakjet" : "ilan sitesi",
+        portalLabel: isCurrentPortal(r.portal) ? PORTAL_LABELS[r.portal] : "ilan sitesi",
       }),
     };
   });

@@ -109,10 +109,15 @@ export function portalIdFromName(name: string | null | undefined): PortalId | nu
   return null;
 }
 
-/** Görünen ad: katalogdaki portal için kısa ad, diğerleri (ör. "emlaksoft vitrin") olduğu gibi. */
+/**
+ * Görünen ad: katalogdaki portal için kısa ad, ek kanal (ör. "emlaksoft vitrin") için kendi etiketi, diğerleri baş harfi
+ * büyük. `portal_listings.portal_name` küçük harf saklandığından ekranlar ham değeri değil bunu basar.
+ */
 export function portalDisplayName(name: string | null | undefined): string {
   const id = portalIdFromName(name);
   if (id) return PORTAL_CATALOG[id].label;
+  const extra = EXTRA_LISTING_CHANNELS.find((c) => c.value === normalizePortalName(name));
+  if (extra) return extra.label;
   const raw = (name ?? "").trim();
   return raw ? raw.charAt(0).toLocaleUpperCase("tr-TR") + raw.slice(1) : "Portal";
 }

@@ -14,6 +14,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
+import { portalDisplayName } from "@/lib/portals/catalog";
 import { moneyTry } from "@/lib/leak-shield";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { ControlSubNav } from "@/components/listing-control/sub-nav";
@@ -626,7 +627,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="flex items-center gap-1 truncate text-sm font-semibold text-ink-950">
-                      {r.portal_name} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}
+                      {portalDisplayName(r.portal_name)} {r.portal_listing_id ? `#${r.portal_listing_id}` : ""}
                       {prop?.id ? (
                         <ArrowUpRight className="hover-action h-3.5 w-3.5 shrink-0 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
                       ) : null}
@@ -822,7 +823,7 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
                   ) : null}
                   <div>
                     <p className="text-sm font-semibold text-ink-950">
-                      {listing?.portal_name ?? "Portal"}{" "}
+                      {portalDisplayName(listing?.portal_name)}{" "}
                       {listing?.portal_listing_id ? `#${listing.portal_listing_id}` : ""}
                     </p>
                     <p className="mt-0.5 text-xs text-text-muted">

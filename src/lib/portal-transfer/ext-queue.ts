@@ -3,7 +3,7 @@
  * kuyruğa yazılan kayıtlar, açık EmlakSoft sekmesindeki içerik betiğince oturumlu uca gönderilir. Başarısızsa üstel geri
  * çekilmeyle yeniden denenir; 24 saat ya da 8 denemeden sonra düşer. Aynı `key` tekrar yazılırsa kayıt GÜNCELLENİR (çift yok).
  */
-import { CURRENT_PORTALS } from "@/lib/portals/catalog";
+import { CURRENT_PORTALS, type CurrentPortal } from "@/lib/portals/catalog";
 
 export type QueueEntry<T> = { id: string; key: string; payload: T; attempts: number; nextAttemptAt: number; queuedAt: number };
 
@@ -40,7 +40,7 @@ export function failEntry<T>(list: readonly QueueEntry<T>[], id: string, nowMs: 
 
 export type DonePayload = {
   sessionId: string;
-  portal: "sahibinden" | "hepsiemlak" | "emlakjet";
+  portal: CurrentPortal;
   state: "filled" | "published" | "failed";
   externalId: string | null;
   url: string | null;
@@ -48,7 +48,7 @@ export type DonePayload = {
 };
 
 export type ImportPayload = {
-  portal: "sahibinden" | "hepsiemlak" | "emlakjet";
+  portal: CurrentPortal;
   items: {
     externalId: string;
     url: string | null;
@@ -117,7 +117,7 @@ export const importKey = (p: ImportPayload) => `${p.portal}:${p.items.map((i) =>
 
 export type StoredTransfer = {
   sessionId: string;
-  portal: "sahibinden" | "hepsiemlak" | "emlakjet";
+  portal: CurrentPortal;
   propertyId: string;
   propertyCode: string;
   propertyTitle: string;

@@ -149,9 +149,15 @@ export function checkPortalIds(list: readonly PortalMembership[]): CurrentPortal
   return list.filter((m) => m.checkEnabled).map((m) => m.portal);
 }
 
-/** Sahibin ilk kez onay vermesi gereken durum: hiçbir portal için beyan yok. */
+/** Üyelik kartını kaydedebilen roller (eylem ve RLS ile aynı: yalnız sahip ve genel müdür). */
+export const PORTAL_MEMBERSHIP_EDITOR_ROLES: ReadonlySet<string> = new Set(["owner", "gm"]);
+
+/**
+ * Sahibin ilk kez onay vermesi gereken durum: kart hiç kaydedilmedi. Sahibin kaydettiği satır (`owner_declared`) "Bilmiyorum"
+ * olsa da onaydır; eklentinin açtığı 'unknown' satırı (`extension_login`) sayılmaz.
+ */
 export function awaitingOwnerConfirmation(list: readonly PortalMembership[]): boolean {
-  return list.every((m) => !m.isDeclared);
+  return list.every((m) => !m.isDeclared && m.row?.source !== "owner_declared");
 }
 
 // ---------------------------------------------------------------- okuma (istemci enjekte edilir; service_role ÇAĞRILMAZ)
@@ -215,8 +221,18 @@ export async function loadPortalAccountsForTenants(db: Db, tenantIds: readonly s
   return out;
 }
 
-/** Öneri için kanıt: canlı portal ilanları, son 365 gün portal giderleri ve portal kaynaklı talepler (yalnız okuma). */
+/**
+ * Öneri için kanıt: canlı portal ilanları, son 365 gün portal giderleri ve portal kaynaklı talepler (yalnız sayı).
+ * Önce `portal_membership_evidence` RPC'si (SECURITY DEFINER, yalnız kendi ofisi): sonuç çağıranın `expenses`/`customers`
+ * görme yetkisinden BAĞIMSIZDIR, böylece aynı ofiste sahip de danışman da (eklenti çoğunlukla danışman oturumunda) aynı
+ * etkin listeyi görür. RPC yoksa (migration bekliyor) doğrudan okumaya düşer (RLS'e tabi; eski davranış).
+ */
 export async function loadPortalEvidence(db: Db, tenantId: string): Promise<Record<CurrentPortal, PortalEvidence>> {
+  const rpc = await db.rpc("portal_membership_evidence", { p_tenant_id: tenantId });
+  if (!rpc.error && Array.isArray(rpc.data)) return evidenceFromRpc(rpc.data as Record<string, unknown>[]);
+  if (rpc.error && !isMissing(rpc.error) && !/could not find the function/i.test(String(rpc.error.message ?? ""))) {
+    console.error("portal_membership_evidence", { code: rpc.error.code });
+  }
   const since = daysAgoIso(365);
   const [listings, expenses, leads] = await Promise.all([
     db.from("portal_listings").select("portal_name").eq("tenant_id", tenantId).eq("status", "live").limit(5000),
@@ -228,6 +244,21 @@ export async function loadPortalEvidence(db: Db, tenantId: string): Promise<Reco
     expensePortalKeys: expenses.error ? [] : ((expenses.data ?? []) as { portal_key: string | null }[]).map((r) => r.portal_key),
     leadSources: leads.error ? [] : ((leads.data ?? []) as { lead_source: string | null }[]).map((r) => r.lead_source),
   });
+}
+
+/** RPC satırları (portal, live_listings, expenses, leads) → portal başına kanıt (katalog dışı satır yok sayılır). */
+export function evidenceFromRpc(rows: readonly Record<string, unknown>[]): Record<CurrentPortal, PortalEvidence> {
+  const out = Object.fromEntries(CURRENT_PORTALS.map((p) => [p, { ...EMPTY_EVIDENCE }])) as Record<CurrentPortal, PortalEvidence>;
+  for (const r of rows) {
+    const id = String(r.portal ?? "");
+    if (!isCurrentPortal(id)) continue;
+    out[id] = {
+      liveListings: Number(r.live_listings ?? 0) || 0,
+      expenses: Number(r.expenses ?? 0) || 0,
+      leads: Number(r.leads ?? 0) || 0,
+    };
+  }
+  return out;
 }
 
 /**

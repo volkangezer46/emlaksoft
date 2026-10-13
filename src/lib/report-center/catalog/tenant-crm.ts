@@ -14,6 +14,7 @@ import { loadDefLabels, memoLabels, STATUS, TRANSACTION_FALLBACK } from "../labe
 import { applyActorScope, applyTimestampRange, enrichProfiles, joinList, label, nameOf, one, searchOr } from "../query-helpers";
 import type { Row } from "../types";
 import { ADVISOR_FILTER, defineReport, opts, SEARCH_FILTER, tid } from "./define";
+import { portalDisplayName } from "@/lib/portals/catalog";
 
 const CUSTOMER_TYPE_OPTIONS = DEFAULT_DEFINITIONS.customer_type.map((d) => ({ value: d.value, label: d.label }));
 const SOURCE_OPTIONS = Object.entries(defaultLabelMap("customer_source")).map(([value, label]) => ({ value, label }));
@@ -310,7 +311,7 @@ export const portalIlanlari = defineReport({
     ...DATE_RANGE_FIELDS("Oluşturma başlangıcı", "Oluşturma bitişi"),
   ],
   columns: [
-    { key: "portal", label: "Portal", type: "text", width: 16, get: (r) => r.portal_name },
+    { key: "portal", label: "Portal", type: "text", width: 16, get: (r) => portalDisplayName(r.portal_name as string | null) },
     { key: "ilanno", label: "İlan no", type: "text", width: 16, get: (r) => r.portal_listing_id },
     { key: "kod", label: "Portföy kodu", type: "text", width: 14, get: (r) => one(r.property)?.property_code },
     { key: "baslik", label: "Portföy başlığı", type: "text", width: 32, get: (r) => one(r.property)?.title },
@@ -410,7 +411,7 @@ export const ilanKapanislari = defineReport({
   ],
   columns: [
     { key: "tarih", label: "Kapanış tarihi", type: "date", get: (r) => r.created_at },
-    { key: "portal", label: "Portal", type: "text", width: 16, get: (r) => one(r.portal_listing)?.portal_name },
+    { key: "portal", label: "Portal", type: "text", width: 16, get: (r) => portalDisplayName(one(r.portal_listing)?.portal_name as string | null | undefined) },
     { key: "ilanno", label: "İlan no", type: "text", width: 16, get: (r) => one(r.portal_listing)?.portal_listing_id },
     { key: "kod", label: "Portföy kodu", type: "text", width: 14, get: (r) => one(one(r.portal_listing)?.property)?.property_code },
     { key: "baslik", label: "Portföy", type: "text", width: 30, get: (r) => one(one(r.portal_listing)?.property)?.title },

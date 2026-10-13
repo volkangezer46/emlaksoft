@@ -12,6 +12,7 @@ import { generateTransferCode, hashPayloadSource, hashTransferCode, TRANSFER_COD
 import { buildPortalPayload, payloadFingerprintSource, readinessCheck, type Readiness } from "@/lib/portal-transfer/payload";
 import { loadPropertyForTransfer } from "@/lib/portal-transfer/server";
 import { PORTAL_FORM_RULES, isTransferPortal } from "@/lib/portal-transfer/rules";
+import { isPortalActive } from "@/lib/portals/membership";
 
 /**
  * "Portala aktar" (dışa aktarım) — oturum hazırlama. Sunucu portala istek ATMAZ ve ilan YAYINLAMAZ: yalnız tek kullanımlık,
@@ -50,6 +51,10 @@ export async function preparePortalTransfer(propertyId: string, portal: string):
   if (!idSchema.safeParse(propertyId).success || !isTransferPortal(portal)) return { ok: false, error: "Portföy ve portal seçin." };
   const limit = await checkRateLimit(`pt-prepare:${gate.userId}`, { limit: 30, windowSec: 60, failurePolicy: "deny" });
   if (!limit.allowed) return { ok: false, error: "Çok sık denediniz; bir dakika sonra tekrar deneyin." };
+  // Üyelik sunucuda da denetlenir (arayüz üye olunmayan portalda düğme göstermez; eski sekme/doğrudan çağrı kod üretmesin).
+  if (!(await isPortalActive(gate.tenantId, portal))) {
+    return { ok: false, error: "Ofis bu portala üye görünmüyor; Ayarlar > Entegrasyonlar > Portal üyelikleri kartından ekleyin." };
+  }
 
   const db = await createClient();
   const input = await loadPropertyForTransfer(db, gate.tenantId, propertyId);

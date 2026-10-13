@@ -16,7 +16,11 @@
 --      last_login_fail_at + seri+1. Seri 3'e ulaşınca ofis sahiplerine TEK SEFERLİK "üyelik bitti mi?" bildirimi
 --      (dedupe_key: portal-login-fail:<portal>:<son başarı>); satır yoksa 'unknown' + source 'extension_login' açılır
 --      (beyan sayılmaz). Üyeliği 'none' olan portal için hiçbir şey yazılmaz.
---   3. Veri düzeltmesi: portal_listings.portal_name = lower(btrim(portal_name)) (yalnız farklı olan satırlar).
+--   3. portal_membership_evidence(p_tenant_id) (authenticated, SECURITY DEFINER, search_path=''): üyelik önerisinin kanıtı
+--      (portal başına canlı ilan, son 365 gün gider ve portal kaynaklı talep SAYISI; satır içeriği dönmez). Çağıranın
+--      expenses/customers görme yetkisinden BAĞIMSIZ: aynı ofiste sahip de danışman da aynı etkin listeyi görür.
+--      Yalnız çağıranın kendi ofisi (service_role her ofis).
+--   4. Veri düzeltmesi: portal_listings.portal_name = lower(btrim(portal_name)) (yalnız farklı olan satırlar).
 --      Tekil indeksler zaten lower(btrim(portal_name)) üzerindedir, çakışma üretmez.
 -- ETKİ: ek + tek seferlik veri biçimi düzeltmesi (yalnız büyük/küçük harf ve boşluk). Kod tablo yokken öneriye düşer.
 -- RİSK: düşük. portal_listings güncellemesi postgres rolüyle çalışır (guard tetikleyicisi yalnız authenticated'ı engeller).
@@ -164,7 +168,50 @@ revoke all on function public.portal_account_report_login(text, boolean) from pu
 grant execute on function public.portal_account_report_login(text, boolean) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
--- 3) Veri düzeltmesi: portal adı tek biçim (küçük harf, kırpılmış)
+-- 3) Üyelik önerisi kanıtı (yalnız sayı; çağıranın modül yetkisinden bağımsız)
+-- ---------------------------------------------------------------------------
+-- Takma adlar src/lib/portals/catalog.ts `aliases` ile aynıdır (portalIdFromName içerme eşlemesi).
+create or replace function public.portal_membership_evidence(p_tenant_id uuid)
+returns table (portal text, live_listings integer, expenses integer, leads integer)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with t as (
+    select case
+             when auth.role() = 'service_role' then p_tenant_id
+             when auth.uid() is not null and p_tenant_id = public.current_tenant_id() then p_tenant_id
+           end as id
+  ),
+  p (portal, aliases, ord) as (
+    values ('sahibinden', array['sahibinden'], 1),
+           ('hepsiemlak', array['hepsiemlak', 'hepsi emlak'], 2),
+           ('emlakjet', array['emlakjet', 'emlak jet'], 3)
+  ),
+  l as (
+    select lower(translate(btrim(pl.portal_name), 'İIı', 'iii')) as n
+      from public.portal_listings pl, t
+     where t.id is not null and pl.tenant_id = t.id and pl.status = 'live'
+  )
+  select p.portal,
+         (select count(*) from l where exists (select 1 from unnest(p.aliases) a where position(a in l.n) > 0))::integer,
+         (select count(*) from public.expenses e, t
+           where t.id is not null and e.tenant_id = t.id and lower(btrim(e.portal_key)) = p.portal
+             and e.created_at >= now() - interval '365 days')::integer,
+         (select count(*) from public.customers c, t
+           where t.id is not null and c.tenant_id = t.id and c.deleted_at is null
+             and lower(btrim(c.lead_source)) = 'portal_' || p.portal
+             and c.created_at >= now() - interval '365 days')::integer
+    from p
+   order by p.ord;
+$$;
+
+revoke all on function public.portal_membership_evidence(uuid) from public, anon;
+grant execute on function public.portal_membership_evidence(uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- 4) Veri düzeltmesi: portal adı tek biçim (küçük harf, kırpılmış)
 -- ---------------------------------------------------------------------------
 update public.portal_listings
    set portal_name = lower(btrim(portal_name))

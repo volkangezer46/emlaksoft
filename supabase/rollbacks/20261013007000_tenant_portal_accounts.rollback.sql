@@ -5,5 +5,6 @@
 -- tekil indeksler ve kod zaten lower(btrim(portal_name)) ile çalışır; eski yazım bilgisi anlam taşımaz.
 set local lock_timeout = '5s';
 
+drop function if exists public.portal_membership_evidence(uuid);
 drop function if exists public.portal_account_report_login(text, boolean);
 drop table if exists public.tenant_portal_accounts;

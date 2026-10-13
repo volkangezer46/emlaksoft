@@ -41,7 +41,7 @@ import { PortalListingActions } from "./portal-listing-actions";
 import { PortalTransferPanel } from "./portal-transfer-panel";
 import { PORTAL_FORM_RULES, TRANSFER_PORTALS } from "@/lib/portal-transfer/rules";
 import { getPortalMemberships } from "@/lib/portals/membership";
-import { normalizePortalName } from "@/lib/portals/catalog";
+import { normalizePortalName, portalDisplayName } from "@/lib/portals/catalog";
 import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
@@ -828,7 +828,7 @@ export default async function PropertyDetailPage({
                     <article key={p.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1.3fr_1fr_auto] lg:items-center">
                       <div>
                         <p className="text-sm font-semibold text-ink-950">
-                          {p.portal_name} {p.portal_listing_id ? `#${p.portal_listing_id}` : ""}
+                          {portalDisplayName(p.portal_name)} {p.portal_listing_id ? `#${p.portal_listing_id}` : ""}
                         </p>
                         <p className="mt-0.5 text-xs text-text-muted">
                           {isLive
@@ -857,14 +857,14 @@ export default async function PropertyDetailPage({
                                 Teyit et
                               </button>
                             </form>
-                            <ClosePortalDialog listingId={p.id} label={`${p.portal_name} · ${property.property_code}`} />
+                            <ClosePortalDialog listingId={p.id} label={`${portalDisplayName(p.portal_name)} · ${property.property_code}`} />
                             {canApi ? (
                               <PortalListingActions
                                 propertyId={property.id}
                                 listingId={p.id}
                                 portalKey={portalKey!}
                                 externalId={p.portal_listing_id!}
-                                portalLabel={p.portal_name}
+                                portalLabel={portalDisplayName(p.portal_name)}
                               />
                             ) : null}
                           </>

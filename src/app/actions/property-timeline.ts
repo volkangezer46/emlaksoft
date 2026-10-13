@@ -3,6 +3,7 @@
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { portalDisplayName } from "@/lib/portals/catalog";
 
 /**
  * Portföyün zaman tüneli (X9).
@@ -162,7 +163,7 @@ export async function getPropertyTimeline(propertyId: string): Promise<TimelineE
         id: `pl-${r.id}-in`,
         kind: "portal",
         at: yayin,
-        title: `${r.portal_name} yayına alındı`,
+        title: `${portalDisplayName(r.portal_name)} yayına alındı`,
         tone: "ok",
       });
     }
@@ -171,7 +172,7 @@ export async function getPropertyTimeline(propertyId: string): Promise<TimelineE
         id: `pl-${r.id}-out`,
         kind: "portal",
         at: r.removed_at,
-        title: `${r.portal_name} yayından kaldırıldı`,
+        title: `${portalDisplayName(r.portal_name)} yayından kaldırıldı`,
         detail: r.removal_reason,
         tone: "danger",
       });

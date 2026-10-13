@@ -9,8 +9,10 @@ import { ALL_PORTALS, CURRENT_PORTALS, LEGACY_PORTALS, PORTAL_CATALOG, normalize
 import {
   activePortalIds,
   awaitingOwnerConfirmation,
+  PORTAL_MEMBERSHIP_EDITOR_ROLES,
   checkPortalIds,
   loadPortalAccountRows,
+  loadPortalEvidence,
   needsInference,
   resolveMemberships,
   suggestFromEvidence,
@@ -24,6 +26,8 @@ import { TRANSFER_PORTALS } from "@/lib/portal-transfer/rules";
 import { FSBO_PORTALS } from "@/lib/prospecting/types";
 import { PORTAL_KEYS, PORTAL_LABEL } from "@/lib/finance/portal-roi";
 import { buildDedupeKey, timeBucket } from "@/lib/notify-dedupe";
+
+import { ONBOARDING_STEP_DEFS } from "@/lib/onboarding-steps";
 
 const ROOT = process.cwd();
 
@@ -68,7 +72,9 @@ describe("portal kataloğu (tek kaynak)", () => {
     expect(portalIdFromName("HEPSİEMLAK")).toBe("hepsiemlak");
     expect(portalIdFromName("emlaksoft vitrin")).toBeNull();
     expect(portalDisplayName("sahibinden")).toBe("Sahibinden");
-    expect(portalDisplayName("emlaksoft vitrin")).toBe("Emlaksoft vitrin");
+    expect(portalDisplayName("emlaksoft vitrin")).toBe("EmlakSoft vitrin");
+    expect(portalDisplayName("diğer")).toBe("Diğer");
+    expect(portalDisplayName("Sahibinden.com")).toBe("Sahibinden");
   });
 
   it("migration CHECK'i kataloğun güncel portallarıyla birebir", () => {
@@ -83,17 +89,38 @@ describe("portal kataloğu (tek kaynak)", () => {
     expect(readFileSync(join(ROOT, "supabase/rollbacks/20261013007000_tenant_portal_accounts.rollback.sql"), "utf8")).toContain("drop table if exists public.tenant_portal_accounts");
   });
 
+  // Kataloğun dışında sabit portal listesi kalıpları: dizi literali, birleşim tipi, art arda iki portal anahtarlı nesne haritası,
+  // portal adına göre zincirleme üçlü koşul.
+  const P = "(?:sahibinden|hepsiemlak|emlakjet|zingat)";
+  const PORTAL_LIST_PATTERNS: Record<string, RegExp> = {
+    dizi: new RegExp(`\\[\\s*["']${P}["']\\s*,\\s*["']${P}["']`, "i"),
+    birlesimTipi: new RegExp(`["']${P}["']\\s*\\|\\s*["']${P}["']`),
+    nesneHaritasi: new RegExp(`\\b${P}\\s*:[^\\n{]*,?\\s*\\n?\\s*${P}\\s*:`),
+    ucluKosul: new RegExp(`===\\s*["']${P}["']\\s*\\?[^:\\n]*:\\s*[\\w.?]+\\s*===\\s*["']${P}["']`),
+  };
+
+  it("sabit portal listesi kalıpları gerçek örnekleri yakalar", () => {
+    const samples: Record<string, string> = {
+      dizi: `const X = ["sahibinden", "hepsiemlak"];`,
+      birlesimTipi: `portal: "sahibinden" | "hepsiemlak" | "emlakjet";`,
+      nesneHaritasi: `const L = {\n  sahibinden: "Sahibinden",\n  hepsiemlak: "Hepsiemlak",\n};`,
+      ucluKosul: `r.portal === "sahibinden" ? "Sahibinden" : r.portal === "hepsiemlak" ? "Hepsiemlak" : "x"`,
+    };
+    for (const [k, re] of Object.entries(PORTAL_LIST_PATTERNS)) expect(re.test(samples[k]!), k).toBe(true);
+    expect(PORTAL_LIST_PATTERNS.birlesimTipi!.test(`portal: CurrentPortal;`)).toBe(false);
+  });
+
   it("projede kataloğun dışında sabit portal listesi kalmaz (grep)", () => {
     // Bilinçli istisnalar: arama anahtar sözcükleri (menü/rapor araması; liste değil), statik ana sayfa pazarlama metni
-    // (görünümü birebir korunur) ve ayrıştırıcı test fikstürü.
+    // (görünümü birebir korunur), ayrıştırıcı test fikstürü ve örnek veri tohumu (geçmiş portal Zingat dahil sabit demo kişileri).
     const allow = new Set([
       "src/lib/portals/catalog.ts",
       "src/lib/nav-config.ts",
       "src/lib/report-center/catalog/tenant-crm.ts",
       "src/lib/site-content/defaults.ts",
       "src/lib/listing-control/adapters/html/test-fixtures.ts",
+      "src/lib/sample-data/modules-seed.ts",
     ]);
-    const re = /\[\s*["'](sahibinden|hepsiemlak|emlakjet|zingat)["']\s*,\s*["'](sahibinden|hepsiemlak|emlakjet|zingat)["']/i;
     const hits: string[] = [];
     const walk = (dir: string) => {
       for (const name of readdirSync(dir)) {
@@ -102,14 +129,16 @@ describe("portal kataloğu (tek kaynak)", () => {
         if (statSync(full).isDirectory()) walk(full);
         else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) {
           const rel = relative(ROOT, full);
-          if (!allow.has(rel) && re.test(readFileSync(full, "utf8"))) hits.push(rel);
+          if (allow.has(rel)) continue;
+          const text = readFileSync(full, "utf8");
+          for (const [k, re] of Object.entries(PORTAL_LIST_PATTERNS)) if (re.test(text)) hits.push(`${rel} (${k})`);
         }
       }
     };
     walk(join(ROOT, "src"));
     walk(join(ROOT, "extensions/emlaksoft-ilan-kontrol/src"));
     expect(hits).toEqual([]);
-  });
+  }, 30_000);
 });
 
 describe("üyelik kararı (resolveMemberships)", () => {
@@ -155,6 +184,33 @@ describe("üyelik kararı (resolveMemberships)", () => {
     expect(needsInference([row("sahibinden", { status: "unknown" })])).toBe(true);
   });
 
+  it("sahip kartı 'Bilmiyorum' ile kaydetse de onay tamam; eklentinin açtığı 'unknown' satırı onay sayılmaz", () => {
+    const allUnknown = CURRENT_PORTALS.map((p) => row(p, { status: "unknown" }));
+    expect(awaitingOwnerConfirmation(resolveMemberships(allUnknown, null))).toBe(false);
+    const extOnly = [row("sahibinden", { status: "unknown", source: "extension_login" })];
+    expect(awaitingOwnerConfirmation(resolveMemberships(extOnly, null))).toBe(true);
+  });
+
+  it("kurulum adımı: üyelik olgusu true ise tamam; olgu yoksa eski kural", () => {
+    const step = ONBOARDING_STEP_DEFS.find((s) => s.id === "portals")!;
+    const facts = { publishedProperties: 0, activeIntegrations: 0, extra: {} } as unknown as Parameters<typeof step.isDone>[0];
+    expect(step.isDone({ ...facts, extra: { "portal-uyelik": true } })).toBe(true);
+    expect(step.isDone({ ...facts, extra: { "portal-uyelik": false }, publishedProperties: 3 })).toBe(false);
+    expect(step.isDone({ ...facts, publishedProperties: 3 })).toBe(true);
+    const state = readFileSync(join(ROOT, "src/lib/onboarding-state.ts"), "utf8");
+    expect(state).toContain('.eq("source", "owner_declared")');
+    expect(state).toContain("PORTAL_MEMBERSHIP_EDITOR_ROLES.has(viewerRole)");
+    expect([...PORTAL_MEMBERSHIP_EDITOR_ROLES].sort()).toEqual(["gm", "owner"]);
+  });
+
+  it("üyelik süzgeçleri portal_name'i birebir eşlemez (büyük harfli/takma adlı eski satırlar da süzülür)", () => {
+    for (const f of ["src/lib/listing-control/server/queue.ts", "src/app/api/cron/portal-teyit/route.ts"]) {
+      const text = readFileSync(join(ROOT, f), "utf8");
+      expect(text, f).not.toMatch(/\.in\(\s*"portal_name"/);
+      expect(text, f).toMatch(/portalIdFromName|isNonMemberListing/);
+    }
+  });
+
   it("kontrol kuyruğu: 'none' ve kontrolü kapalı portallar için iş açılmaz", () => {
     expect(excludedCheckPortals([row("sahibinden", { status: "none", check_enabled: false }), row("hepsiemlak"), row("emlakjet", { check_enabled: false })])).toEqual([
       "sahibinden",
@@ -167,6 +223,64 @@ describe("üyelik kararı (resolveMemberships)", () => {
       from: () => ({ select: () => ({ eq: async () => ({ data: null, error: { code: "PGRST205", message: "Could not find the table" } }) }) }),
     } as unknown as Parameters<typeof loadPortalAccountRows>[0];
     await expect(loadPortalAccountRows(db, "t1")).resolves.toEqual({ available: false, rows: [] });
+  });
+});
+
+describe("öneri kanıtı kullanıcının yetkisinden bağımsız (portal_membership_evidence RPC)", () => {
+  type Rows = Record<string, Record<string, unknown>[]>;
+  // RLS'i taklit eden sahte istemci: `visible` tabloları döner, diğerleri boş (yetki yok → RLS satırı gizler).
+  const fakeDb = (opts: { rpc: { data: unknown; error: { code?: string; message?: string } | null }; visible: Rows }) => {
+    const chain = (table: string) => {
+      const result = { data: opts.visible[table] ?? [], error: null };
+      const q: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "not", "gte", "like"]) q[m] = () => q;
+      q.limit = async () => result;
+      return q;
+    };
+    return { rpc: async () => opts.rpc, from: chain } as unknown as Parameters<typeof loadPortalEvidence>[0];
+  };
+  const tenantRows = {
+    portal_listings: [],
+    expenses: [{ portal_key: "hepsiemlak" }],
+    customers: [],
+  };
+  const rpcRows = [
+    { portal: "sahibinden", live_listings: 0, expenses: 0, leads: 0 },
+    { portal: "hepsiemlak", live_listings: 0, expenses: 1, leads: 0 },
+    { portal: "emlakjet", live_listings: 0, expenses: 0, leads: 0 },
+  ];
+
+  it("beyan yokken kanıtı yalnız giderde olan portal: sahip ve expenses:view yetkisi olmayan danışman AYNI listeyi görür", async () => {
+    const owner = fakeDb({ rpc: { data: rpcRows, error: null }, visible: tenantRows });
+    const consultant = fakeDb({ rpc: { data: rpcRows, error: null }, visible: { portal_listings: [] } });
+    const ownerActive = activePortalIds(resolveMemberships([], suggestFromEvidence(await loadPortalEvidence(owner, "t1"))));
+    const consultantActive = activePortalIds(resolveMemberships([], suggestFromEvidence(await loadPortalEvidence(consultant, "t1"))));
+    expect(ownerActive).toEqual(["hepsiemlak"]);
+    expect(consultantActive).toEqual(ownerActive);
+  });
+
+  it("RPC yoksa (migration bekliyor) doğrudan okumaya düşer (RLS'e tabi eski davranış)", async () => {
+    const missing = { data: null, error: { code: "PGRST202", message: "Could not find the function public.portal_membership_evidence" } };
+    const owner = fakeDb({ rpc: missing, visible: tenantRows });
+    expect((await loadPortalEvidence(owner, "t1")).hepsiemlak.expenses).toBe(1);
+    const consultant = fakeDb({ rpc: missing, visible: {} });
+    expect((await loadPortalEvidence(consultant, "t1")).hepsiemlak.expenses).toBe(0);
+  });
+
+  it("migration RPC'yi SECURITY DEFINER ve yalnız kendi ofisiyle tanımlar; geri alma düşürür", () => {
+    const sql = readFileSync(join(ROOT, "supabase/migrations/20261013007000_tenant_portal_accounts.sql"), "utf8");
+    const fn = sql.slice(sql.indexOf("create or replace function public.portal_membership_evidence"));
+    expect(fn).toMatch(/security definer\s+set search_path = ''/);
+    expect(fn).toContain("p_tenant_id = public.current_tenant_id()");
+    expect(sql).toContain("revoke all on function public.portal_membership_evidence(uuid) from public, anon;");
+    // Takma adlar katalogla aynı
+    for (const id of CURRENT_PORTALS) {
+      const aliases = PORTAL_CATALOG[id].aliases.map((a) => `'${a}'`).join(", ");
+      expect(fn).toContain(`('${id}', array[${aliases}]`);
+    }
+    expect(readFileSync(join(ROOT, "supabase/rollbacks/20261013007000_tenant_portal_accounts.rollback.sql"), "utf8")).toContain(
+      "drop function if exists public.portal_membership_evidence(uuid);",
+    );
   });
 });
 

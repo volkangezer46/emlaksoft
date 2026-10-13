@@ -216,10 +216,10 @@ describe("kurulum sonrası otomatik bağlama ve anında kanıt (0.3.1)", () => {
   const bg = src(`${EXT}/src/background.ts`);
   const content = src(`${EXT}/src/content.ts`);
   const setup = src("src/components/listing-control/sync-setup.tsx");
-  it("sürüm 0.6.0; izin listesi 0.4.0 ile AYNI (yeni Chrome izni yok; tabs izni gerekmez)", () => {
+  it("sürüm 0.6.1 (EP1 portal üyeliği); izin listesi 0.4.0 ile AYNI (yeni Chrome izni yok; tabs izni gerekmez)", () => {
     const manifest = JSON.parse(src(`${EXT}/manifest.base.json`)) as { version: string; permissions: string[] };
-    expect(EXTENSION_VERSION).toBe("0.6.0");
-    expect(manifest.version).toBe("0.6.0");
+    expect(EXTENSION_VERSION).toBe("0.6.1");
+    expect(manifest.version).toBe("0.6.1");
     expect(manifest.permissions).toEqual(["storage", "alarms", "activeTab", "scripting"]);
   });
 
@@ -514,5 +514,46 @@ describe("0.6.0 öğrenen form kuralları: kural VERİDİR, motor pakettedir", (
     for (const [name, s] of [["popup", popup], ["content", content], ["background", bg]] as const) {
       expect(s, name).not.toMatch(/report:\s*\{\s*\}/);
     }
+  });
+});
+
+describe("0.6.1 portal üyeliği (EP1): portal isteği YALNIZ sunucu listesi ∩ yerel ayar ile", () => {
+  const bg = src(`${EXT}/src/background.ts`);
+  const content = src(`${EXT}/src/content.ts`);
+  const fnBody = (name: string) => {
+    const start = bg.indexOf(`async function ${name}(`);
+    expect(start, name).toBeGreaterThan(-1);
+    const next = bg.slice(start + 1).search(/\n(async )?function |\n\/\/ -{10,}/);
+    return bg.slice(start, next === -1 ? undefined : start + 1 + next);
+  };
+
+  it("ağ isteği tek yerde (fetchPage); fetchPage yalnız probe ve inventory'den, ikisi de önce isPortalAllowed denetler", () => {
+    expect(bg.match(/\bfetch\(/g)?.length).toBe(1);
+    expect(fnBody("fetchPage")).toMatch(/\bfetch\(/);
+    expect(bg.match(/\bfetchPage\(/g)?.length).toBe(3); // tanım + probe + inventory
+    for (const name of ["probe", "inventory"]) {
+      const body = fnBody(name);
+      const gate = body.indexOf("await isPortalAllowed(job.portal)");
+      expect(gate, name).toBeGreaterThan(-1);
+      expect(gate, name).toBeLessThan(body.indexOf("fetchPage("));
+      expect(body).toContain('error: "portal_disabled"');
+    }
+  });
+
+  it("isPortalAllowed ve tarama döngüsü portalAllowed (sunucu listesi) kullanır; eski portalEnabled (varsayılan AÇIK) background'da yok", () => {
+    expect(fnBody("isPortalAllowed")).toContain("portalAllowed(settings, portal, server)");
+    const cycle = fnBody("runScanCycle");
+    expect(cycle).toContain("getServerPortals()");
+    expect(cycle).toContain("portalAllowed(settings, id, server)");
+    expect(cycle).toContain("duePortals(states, PORTAL_IDS, enabled,");
+    expect(cycle).not.toContain("fetchPage(");
+    expect(cycle).toContain("await inventory(");
+    expect(bg).not.toMatch(/\bportalEnabled\(/);
+  });
+
+  it("sunucu listesi yalnız içerik betiğinin 'serverPortals' iletisiyle ve temizlenerek yazılır; login_required taraması yüklenir", () => {
+    expect(bg).toMatch(/case "serverPortals": \{[\s\S]*?sanitizeServerPortals\(msg\.portals/);
+    expect(content).toContain("serverPortals");
+    expect(fnBody("finishScan")).toMatch(/outcome\.reason === "login_required"/);
   });
 });
