@@ -154,7 +154,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  if new.check_state = 'confirmed_missing' and old.check_state is distinct from 'confirmed_missing' then
+  -- INSERT'te OLD yok: sağlık kaydı doğrudan 'confirmed_missing' ile açılırsa da kalem işaretlenir.
+  if new.check_state = 'confirmed_missing'
+     and (tg_op = 'INSERT' or old.check_state is distinct from 'confirmed_missing') then
     update public.eids_takedown_items i
        set status = 'removed', verified_by = 'extension', done_at = now()
      where i.portal_listing_id = new.portal_listing_id
@@ -167,7 +169,7 @@ $$;
 
 drop trigger if exists trg_eids_takedown_mark_from_health on public.portal_listing_health;
 create trigger trg_eids_takedown_mark_from_health
-  after update of check_state on public.portal_listing_health
+  after insert or update of check_state on public.portal_listing_health
   for each row execute function public.eids_takedown_mark_from_health();
 
 revoke all on function public.eids_takedown_guard_complete() from public, anon, authenticated;
