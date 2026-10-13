@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   const fail = (code: GoogleErrorCode, f: OAuthFlow = flow) => {
     const target = f === "link" ? `/app/hesabim?sekme=parola&google=${code}` : `/giris?hata=${code}`;
-    return redirectTo(request, target);
+    return redirectTo(target);
   };
 
   if (!isGoogleAuthEnabled()) return fail("google-kapali");
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
       profile: null,
       registrationOpen: true,
     });
-    return landing.kind === "redirect" ? redirectTo(request, landing.path) : fail(landing.code);
+    return landing.kind === "redirect" ? redirectTo(landing.path) : fail(landing.code);
   }
 
   const claimTenantId = typeof user.app_metadata?.tenant_id === "string" ? user.app_metadata.tenant_id : null;
@@ -120,11 +121,11 @@ export async function GET(request: NextRequest) {
       result: landing.event,
     });
   }
-  return redirectTo(request, landing.path);
+  return redirectTo(landing.path);
 }
 
-function redirectTo(request: NextRequest, path: string) {
-  const res = NextResponse.redirect(new URL(path, request.nextUrl.origin));
+function redirectTo(path: string) {
+  const res = publicRedirect(path);
   res.headers.set("Cache-Control", "no-store");
   return res;
 }

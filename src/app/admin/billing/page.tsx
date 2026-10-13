@@ -297,7 +297,7 @@ export default async function AdminBillingPage({
             <p>Mutabakat kuyruğu okunamadı. Billing reconciliation migration ve servis erişimini doğrulayın.</p>
           </div>
         ) : reconciliationRows.length === 0 ? (
-          <EmptyState variant="compact" bare icon={CreditCard} tone="mint" title="Mutabakat kuyruğu temiz" description="Bekleyen, inceleme veya iade kuyruğunda tahsilat yok." action={{ href: "/admin/billing/faturalar", label: "Faturalara git" }} />
+          <EmptyState variant="compact" bare icon={CreditCard} tone="mint" title="Mutabakat kuyruğu temiz" description="Bekleyen, inceleme veya iade kuyruğunda tahsilat yok." action={{ href: "/admin/muhasebe/defter", label: "Defteri aç" }} />
         ) : (
           <div className="divide-y divide-line">
             {reconciliationRows.map((capture) => {

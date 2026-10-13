@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 
@@ -33,7 +34,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ kod: st
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("contract_signer_resolve_short", { p_code: kod });
   if (error || typeof data !== "string" || !/^[0-9a-f]{32,128}$/i.test(data)) return invalid();
-  const res = NextResponse.redirect(new URL(`/imza/${data}`, _req.url), 303);
+  const res = publicRedirect(`/imza/${data}`, 303);
   res.headers.set("Cache-Control", "no-store");
   res.headers.set("Referrer-Policy", "no-referrer");
   return res;

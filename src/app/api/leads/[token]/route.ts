@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { intakeLead, type LeadInput } from "@/lib/lead-intake";
 import { buildLeadConsentVersion } from "@/lib/legal-copy";
 import { getLeadFormCopy } from "@/lib/legal-copy-server";
+import { publicOrigin } from "@/lib/public-redirect";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
@@ -25,7 +26,7 @@ export const PUBLIC_LEAD_CONSENT_VERSION = buildLeadConsentVersion(false);
 function allowedOrigins(req: NextRequest): string[] {
   return [
     ...parseOriginAllowlist(process.env.LEAD_CORS_ORIGINS),
-    req.nextUrl.origin,
+    publicOrigin(),
     ...parseOriginAllowlist(process.env.NEXT_PUBLIC_APP_URL),
   ];
 }

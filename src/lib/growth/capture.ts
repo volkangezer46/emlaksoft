@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextResponse, NextRequest } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import {
   REF_COOKIE,
   REF_COOKIE_DAYS,
@@ -14,7 +15,7 @@ import { countClickSafe, recordSignupAttributionSafe } from "@/lib/growth/store"
  * Tanınmayan kod sessizce /kayit'a düşer. Kişisel veri (IP, cihaz izi) okunmaz/saklanmaz.
  */
 export async function captureAndRedirect(req: NextRequest, touch: RefTouch | null): Promise<NextResponse> {
-  const res = NextResponse.redirect(new URL("/kayit", req.url));
+  const res = publicRedirect("/kayit");
   res.headers.set("Cache-Control", "no-store");
   if (!touch) return res;
   await countClickSafe(touch.kind, touch.code);
