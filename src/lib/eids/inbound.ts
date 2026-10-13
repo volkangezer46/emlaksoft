@@ -76,6 +76,7 @@ export type InboundMessageRow = {
   valid_until: string | null;
   match_status: MatchStatus | null;
   property_id: string | null;
+  received_at: string;
 };
 
 export type InboundInsert = Omit<InboundMessageRow, "id"> & {
@@ -100,12 +101,39 @@ export type InboundStore = {
   insertMessage(row: InboundInsert): Promise<{ ok: true; id: string } | { ok: false; conflict: boolean; error?: string }>;
   findExisting(tenantId: string, keys: { messageId: string | null; bodySha: string | null }): Promise<InboundMessageRow | null>;
   updateMessage(tenantId: string, id: string, patch: Partial<InboundInsert> & { authority_event_id?: string | null }): Promise<boolean>;
-  findSemanticDuplicate(tenantId: string, key: { propertyNo: string; kind: "grant" | "revoke"; validUntil: string | null; sinceIso: string }): Promise<string | null>;
+  /**
+   * Anlamsal tekrar adayları: aynı taşınmaz no için pencere içindeki verme/iptal kayıtları (tekrar, ret ve yok sayılanlar
+   * hariç), EN YENİDEN eskiye. Karar `pickSemanticDuplicate` ile kodda verilir (sıra + doğrulama durumu gözetilir).
+   */
+  findSemanticCandidates(tenantId: string, key: { propertyNo: string; sinceIso: string }): Promise<InboundMessageRow[]>;
   findPropertiesByEidsNo(tenantId: string, propertyNo: string): Promise<PropertyMatchRow[]>;
   readAutoApply(tenantId: string): Promise<boolean>;
   touchAddress(tenantId: string, addressId: string | null, atIso: string): Promise<void>;
   alertUnknownFormat(tenantId: string, messageRowId: string): Promise<void>;
 };
+
+/**
+ * Anlamsal tekrar kararı (SAF). Yalnız bu no için pencere içindeki EN SON verme/iptal olayına bakılır:
+ *  - En son olay karşıt türdeyse (verme → iptal → aynı bitişle yeniden verme) tekrar DEĞİLDİR.
+ *  - En son olay aynı tür + aynı bitişse ve uygulanmış ya da doğrulanmışsa → 'tekrar'.
+ *  - En son olay doğrulanmamış ve hâlâ bekliyorsa: gelen kopya doğrulanmışsa eski kayıt geride bırakılır
+ *    ('supersede'; sahte/yapıştırılmış kaydın gerçek e-postayı "tekrar" diye gömmesi engellenir), gelen de
+ *    doğrulanmamışsa 'tekrar' (kuyruk şişmez).
+ */
+export function pickSemanticDuplicate(
+  rows: InboundMessageRow[],
+  key: { kind: "grant" | "revoke"; validUntil: string | null; auth: MailAuthResult },
+): { action: "none" } | { action: "duplicate"; id: string } | { action: "supersede"; id: string } {
+  const latest = rows.find((r) => r.parse_kind === "grant" || r.parse_kind === "revoke");
+  if (!latest || latest.parse_kind !== key.kind || (latest.valid_until ?? null) !== key.validUntil) return { action: "none" };
+  const pending = latest.match_status === "queued" || latest.match_status === "candidate" || latest.match_status === "no_match";
+  if (latest.auth_result === "unverified" && pending && isVerifiedResult(key.auth)) return { action: "supersede", id: latest.id };
+  return { action: "duplicate", id: latest.id };
+}
+
+function isVerifiedResult(a: MailAuthResult) {
+  return a === "verified" || a === "verified_via_arc";
+}
 
 export type InboundInput = {
   tenantId: string;
@@ -277,7 +305,24 @@ export async function processInboundMail(store: InboundStore, applyEvent: Inboun
   // 4a) (a)/(b) Aynı Message-ID ya da gövde özeti zaten var: tekrar. İSTİSNA: doğrulanmamış eski kopya hâlâ
   // bekliyorsa ve bu kopya doğrulanmışsa eski kayıt YÜKSELTİLİR (sahte kopyanın gerçek e-postayı "tekrar" diye
   // gömmesi engellenir). Eşzamanlı yarışta tekil dizin (23505) yine "tekrar" döndürür.
-  const existing = await store.findExisting(input.tenantId, { messageId, bodySha });
+  const sinceIso = new Date(nowMs - SEMANTIC_DUP_DAYS * 86_400_000).toISOString();
+  let candidates: InboundMessageRow[] | null = null;
+  let existing = await store.findExisting(input.tenantId, { messageId, bodySha });
+  // Yalnız gövde özeti tuttu (farklı Message-ID) ama bu no için en son olay karşıt türdeyse (verme → iptal → aynı
+  // metinle yeniden verme) bu yeni bir olaydır: eski kayıt tekrar sayılmaz; gövde özeti tekil dizine takılmasın diye
+  // yeni kayda yazılmaz (anlamsal denetim yine çalışır).
+  // Ara olay, eski kayıt ne kadar eskide kalırsa kalsın aranır (7 günlük pencereyle sınırlı değil).
+  let staleBody = false;
+  if (existing && (!messageId || existing.message_id !== messageId)) {
+    const since = existing.received_at && existing.received_at < sinceIso ? existing.received_at : sinceIso;
+    const all = await store.findSemanticCandidates(input.tenantId, { propertyNo: parsed.propertyNo, sinceIso: since });
+    const latest = all.find((r) => r.parse_kind === "grant" || r.parse_kind === "revoke");
+    if (latest && latest.parse_kind !== parsed.kind && latest.id !== existing.id) {
+      staleBody = true;
+      existing = null;
+    }
+    candidates = all.filter((r) => r.received_at >= sinceIso);
+  }
   const upgradable =
     existing !== null &&
     existing.auth_result === "unverified" &&
@@ -285,15 +330,15 @@ export async function processInboundMail(store: InboundStore, applyEvent: Inboun
     (existing.match_status === "queued" || existing.match_status === "candidate" || existing.match_status === "no_match");
   if (existing && !upgradable) return { ok: true, outcome: "duplicate", id: existing.id, auth };
 
-  // 4b) (c) Anlamsal tekrar: aynı no + tür + bitiş 7 gün içinde → yeni olay yok, yalnız 'tekrar' kaydı.
-  const dupOf = existing
-    ? null
-    : await store.findSemanticDuplicate(input.tenantId, {
-        propertyNo: parsed.propertyNo,
-        kind: parsed.kind,
-        validUntil: parsed.validUntil,
-        sinceIso: new Date(nowMs - SEMANTIC_DUP_DAYS * 86_400_000).toISOString(),
-      });
+  // 4b) (c) Anlamsal tekrar: aynı no + tür + bitiş 7 gün içinde → yeni olay yok, yalnız 'tekrar' kaydı
+  // (sıra ve doğrulama durumu gözetilir; bkz. pickSemanticDuplicate).
+  const sem = existing
+    ? ({ action: "none" } as const)
+    : pickSemanticDuplicate(
+        candidates ?? (await store.findSemanticCandidates(input.tenantId, { propertyNo: parsed.propertyNo, sinceIso })),
+        { kind: parsed.kind, validUntil: parsed.validUntil, auth },
+      );
+  const dupOf = sem.action === "duplicate" ? sem.id : null;
 
   // 5) Eşleştirme + politika.
   const props = dupOf ? [] : await store.findPropertiesByEidsNo(input.tenantId, parsed.propertyNo);
@@ -306,7 +351,7 @@ export async function processInboundMail(store: InboundStore, applyEvent: Inboun
     ...rawCols,
     ...fields,
     from_addr: fromAddr,
-    body_sha256: bodySha,
+    body_sha256: staleBody ? null : bodySha,
     auth_result: auth,
     auth_detail: authDetail,
     match_status: dupOf ? "duplicate" : decision.action === "apply" ? "queued" : decision.status,
@@ -318,20 +363,32 @@ export async function processInboundMail(store: InboundStore, applyEvent: Inboun
   let id: string;
   if (existing) {
     id = existing.id;
-    const ok = await store.updateMessage(input.tenantId, id, {
+    // Yükseltmede ayrıştırılmış alanlar ve gövde özeti de doğrulanmış kopyadan yazılır: eski kayıt aynı Message-ID ile
+    // değiştirilmiş bir .eml'den geldiyse satırda sahte no/bitiş/yetki veren kalmasın (defter bu değerlerle uygulanır).
+    const patch = {
+      ...fields,
+      from_addr: fromAddr,
+      body_sha256: bodySha,
       auth_result: auth,
-      auth_detail: { ...authDetail, upgraded_from: existing.received_via },
+      auth_detail: { ...authDetail, upgraded_from: existing.received_via, ...(existing.body_sha256 !== bodySha ? { body_replaced: true } : {}) },
       received_via: via,
       ...rawCols,
       match_status: row.match_status,
       property_id: row.property_id,
       candidate_property_ids: row.candidate_property_ids,
-    });
+    };
+    let ok = await store.updateMessage(input.tenantId, id, patch);
+    // Gövde özeti başka bir kayıtta zaten varsa (tekil dizin) özet boş bırakılır; Message-ID tekrarı yine yakalar.
+    if (!ok && existing.body_sha256 !== bodySha) ok = await store.updateMessage(input.tenantId, id, { ...patch, body_sha256: null });
     if (!ok) return { ok: false, error: "E-posta kaydı güncellenemedi: bağlantı sorunu olabilir; birkaç saniye sonra tekrar deneyin." };
   } else {
     const ins = await store.insertMessage(row);
     if (!ins.ok) return ins.conflict ? { ok: true, outcome: "duplicate", id: null, auth } : { ok: false, error: ins.error ?? "E-posta kaydı yazılamadı: bağlantı sorunu olabilir; birkaç saniye sonra tekrar deneyin." };
     id = ins.id;
+    // Doğrulanmış kopya geldi: bekleyen doğrulanmamış eski kayıt 'tekrar' olarak bu kayda bağlanır (kuyruktan düşer).
+    if (sem.action === "supersede") {
+      await store.updateMessage(input.tenantId, sem.id, { match_status: "duplicate", duplicate_of: id, auth_detail: { reason: "doğrulanmış kopya geldi", superseded_by: id } });
+    }
   }
   await store.touchAddress(input.tenantId, input.addressId ?? null, nowIso);
 
@@ -363,7 +420,7 @@ export async function processInboundMail(store: InboundStore, applyEvent: Inboun
 // Supabase deposu (service_role; HER sorgu tenant_id ile süzülür — RLS atlandığından izolasyon bu filtreye dayanır).
 
 const ROW_COLUMNS =
-  "id, tenant_id, received_via, message_id, body_sha256, auth_result, parse_kind, eids_property_no, deal_kind, grantor_masked, grantor_name_hash, valid_until, match_status, property_id";
+  "id, tenant_id, received_via, message_id, body_sha256, auth_result, parse_kind, eids_property_no, deal_kind, grantor_masked, grantor_name_hash, valid_until, match_status, property_id, received_at";
 
 export function createSupabaseInboundStore(
   db: SupabaseClient,
@@ -390,20 +447,18 @@ export function createSupabaseInboundStore(
       const { error } = await db.from("eids_inbound_messages").update(patch).eq("tenant_id", tenantId).eq("id", id);
       return !error;
     },
-    async findSemanticDuplicate(tenantId, key) {
-      let q = db
+    async findSemanticCandidates(tenantId, key) {
+      const { data } = await db
         .from("eids_inbound_messages")
-        .select("id")
+        .select(ROW_COLUMNS)
         .eq("tenant_id", tenantId)
         .eq("eids_property_no", key.propertyNo)
-        .eq("parse_kind", key.kind)
+        .in("parse_kind", ["grant", "revoke"])
         .gte("received_at", key.sinceIso)
         .not("match_status", "in", "(duplicate,rejected,dismissed)")
-        .order("received_at", { ascending: true })
-        .limit(1);
-      q = key.validUntil ? q.eq("valid_until", key.validUntil) : q.is("valid_until", null);
-      const { data } = await q.maybeSingle();
-      return (data as { id: string } | null)?.id ?? null;
+        .order("received_at", { ascending: false })
+        .limit(20);
+      return (data ?? []) as InboundMessageRow[];
     },
     async findPropertiesByEidsNo(tenantId, propertyNo) {
       const { data } = await db

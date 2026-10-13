@@ -48,18 +48,18 @@ function memoryStore(props: Record<string, PropertyMatchRow[]>, autoApply = true
       if (r) Object.assign(r, patch);
       return Boolean(r);
     },
-    async findSemanticDuplicate(tenantId, key) {
-      return (
-        rows.find(
+    async findSemanticCandidates(tenantId, key) {
+      // Saat sabit olabileceğinden "en yeni" ekleme sırasıyla belirlenir (DB'de received_at desc).
+      return rows
+        .filter(
           (r) =>
             r.tenant_id === tenantId &&
             r.eids_property_no === key.propertyNo &&
-            r.parse_kind === key.kind &&
-            r.valid_until === key.validUntil &&
+            (r.parse_kind === "grant" || r.parse_kind === "revoke") &&
             r.received_at >= key.sinceIso &&
             !["duplicate", "rejected", "dismissed"].includes(String(r.match_status)),
-        )?.id ?? null
-      );
+        )
+        .reverse() as InboundMessageRow[];
     },
     async findPropertiesByEidsNo(_t, no) {
       return props[no] ?? [];
@@ -228,6 +228,103 @@ describe("EİDS yönlendirici", () => {
     expect(real).toMatchObject({ outcome: "applied", auth: "verified" });
     expect(rows).toHaveLength(1);
     expect(applyCalls).toHaveLength(1);
+  });
+
+  it("önce yapıştırılan (doğrulanmamış) kayıt, farklı gövdeli gerçek e-postayı anlamsal 'tekrar' diye gömemez", async () => {
+    const { store, rows } = memoryStore(PROPS);
+    const paste = await processInboundMail(store, apply, {
+      tenantId: T,
+      via: "paste",
+      pasted: "1234567890 taşınmaz numaralı taşınmazın satışına ilişkin ilan verilmesi konusunda MEHMET KAYA tarafından 31.03.2027 tarihine kadar yetkilendirildiniz.",
+    });
+    expect(paste).toMatchObject({ outcome: "queued", auth: "unverified" });
+    const real = await processInboundMail(store, apply, { tenantId: T, via: "eml_upload", raw: fx.grantSigned, resolver });
+    expect(real).toMatchObject({ outcome: "applied", auth: "verified" });
+    expect(applyCalls).toHaveLength(1);
+    expect(applyCalls[0]).toMatchObject({ propertyId: P_SALE, grantorName: "AHMET YILMAZ" });
+    // Eski doğrulanmamış kayıt kuyruktan düşer ve gerçek kayda bağlanır.
+    expect(rows[0]).toMatchObject({ match_status: "duplicate", duplicate_of: rows[1]!.id });
+  });
+
+  it("verme → iptal → aynı bitişle yeniden verme (7 gün içinde) tekrar sayılmaz", async () => {
+    const { store } = memoryStore(PROPS);
+    const dkim = { dkim: [{ domain: "ticaret.gov.tr", result: "pass" }], arc: null, spf: null, dmarc: null };
+    await processInboundMail(store, apply, { tenantId: T, via: "eml_upload", raw: fx.grantSigned, resolver });
+    const revoke = [
+      "From: EIDS <eids.yetki@ticaret.gov.tr>",
+      "To: ofis@example.com",
+      "Subject: EİDS yetki iptali",
+      "Message-ID: <eids-revoke-9001@ticaret.gov.tr>",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "1234567890 taşınmaz numaralı taşınmazın satışına ilişkin ilan konusunda AHMET YILMAZ tarafından verilen yetki iptal edilmiştir.",
+      "",
+    ].join("\r\n");
+    const revokeRaw = Buffer.from(revoke, "utf8").toString("latin1");
+    expect(await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: revokeRaw, evidence: dkim })).toMatchObject({ outcome: "applied" });
+    // Aynı metin, yalnız yeni Message-ID: gövde özeti eski vermeyle tutar ama aradaki iptal yüzünden yeni olaydır.
+    const regrant = fx.grantSigned.replace("eids-grant-0001", "eids-grant-0003");
+    const r = await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: regrant, evidence: dkim });
+    expect(r).toMatchObject({ outcome: "applied" });
+    expect(applyCalls.map((c) => c.kind)).toEqual(["grant", "revoke", "grant"]);
+    // Yeniden vermenin kendisi tekrar gelirse (yeni Message-ID) yine 'tekrar' sayılır, olay açılmaz.
+    const again = fx.grantSigned.replace("eids-grant-0001", "eids-grant-0004");
+    expect(await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: again, evidence: dkim })).toMatchObject({ outcome: "duplicate" });
+    expect(applyCalls).toHaveLength(3);
+  });
+
+  it("ara iptal 7 günlük pencereden eskide kalsa da aynı metinle yeniden verme tekrar sayılmaz", async () => {
+    const { store, rows } = memoryStore(PROPS);
+    const dkim = { dkim: [{ domain: "ticaret.gov.tr", result: "pass" }], arc: null, spf: null, dmarc: null };
+    await processInboundMail(store, apply, { tenantId: T, via: "eml_upload", raw: fx.grantSigned, resolver });
+    const revoke = [
+      "From: EIDS <eids.yetki@ticaret.gov.tr>",
+      "To: ofis@example.com",
+      "Subject: EİDS yetki iptali",
+      "Message-ID: <eids-revoke-9002@ticaret.gov.tr>",
+      "Content-Type: text/plain; charset=utf-8",
+      "",
+      "1234567890 taşınmaz numaralı taşınmazın satışına ilişkin ilan konusunda AHMET YILMAZ tarafından verilen yetki iptal edilmiştir.",
+      "",
+    ].join("\r\n");
+    await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: Buffer.from(revoke, "utf8").toString("latin1"), evidence: dkim });
+    const old = new Date(Date.parse(rows[0]!.received_at) - 20 * 86_400_000).toISOString();
+    for (const row of rows) row.received_at = old;
+    const regrant = fx.grantSigned.replace("eids-grant-0001", "eids-grant-0005");
+    expect(await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: regrant, evidence: dkim })).toMatchObject({ outcome: "applied" });
+    expect(applyCalls.map((c) => c.kind)).toEqual(["grant", "revoke", "grant"]);
+  });
+
+  it("önce Bakanlık metni yapıştırılır, sonra DKIM'li gerçek e-posta gelirse uygulanır; yapıştırılan kayıt kuyruktan düşer", async () => {
+    const { store, rows } = memoryStore(PROPS);
+    const paste = await processInboundMail(store, apply, {
+      tenantId: T,
+      via: "paste",
+      pasted: "1234567890 taşınmaz numaralı taşınmazın satışına ilişkin Elektronik İlan Doğrulama Sistemi (EİDS) üzerinden ilan verilmesi konusunda AHMET YILMAZ tarafından 31.03.2027 tarihine kadar yetkilendirildiniz.",
+    });
+    expect(paste).toMatchObject({ outcome: "queued", auth: "unverified" });
+    const real = await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: fx.grantSigned, resolver });
+    expect(real).toMatchObject({ outcome: "applied", auth: "verified" });
+    // Gövde özeti tutarsa aynı kayıt yükseltilir, tutmazsa (yasal uyarı vb. fark) yapıştırılan kayıt geride bırakılır;
+    // her iki yolda da tek olay açılır ve kuyrukta bekleyen kayıt kalmaz.
+    expect(applyCalls).toHaveLength(1);
+    expect(applyCalls[0]).toMatchObject({ propertyId: P_SALE, grantorName: "AHMET YILMAZ" });
+    expect(rows.filter((x) => x.match_status === "queued" || x.match_status === "candidate")).toHaveLength(0);
+    expect(rows.filter((x) => x.match_status === "applied")).toHaveLength(1);
+  });
+
+  it("aynı Message-ID'li değiştirilmiş .eml önce gelirse yükseltme kaydın alanlarını gerçek e-postadan yeniler", async () => {
+    const { store, rows } = memoryStore(PROPS);
+    const tampered = fx.grantSigned.replace("AHMET YILMAZ", "SAHTE MALIK").replace("31.03.2027", "31.12.2030");
+    const first = await processInboundMail(store, apply, { tenantId: T, via: "eml_upload", raw: tampered, evidence: { dkim: [], arc: null, spf: null, dmarc: null } });
+    expect(first).toMatchObject({ outcome: "queued", auth: "unverified" });
+    expect(rows[0]).toMatchObject({ valid_until: "2030-12-31" });
+    const real = await processInboundMail(store, apply, { tenantId: T, via: "smtp", raw: fx.grantSigned, resolver });
+    expect(real).toMatchObject({ outcome: "applied", auth: "verified" });
+    expect(rows).toHaveLength(1);
+    expect(applyCalls[0]).toMatchObject({ grantorName: "AHMET YILMAZ", validUntil: "2027-03-31" });
+    expect(rows[0]).toMatchObject({ valid_until: "2027-03-31", grantor_masked: "AH*** YI****", match_status: "applied" });
+    expect(rows[0]!.auth_detail).toMatchObject({ body_replaced: true });
   });
 
   it("ayar kapalıysa doğrulanmış e-posta da onay bekler; defter hatasında kayıt kuyrukta kalır", async () => {
