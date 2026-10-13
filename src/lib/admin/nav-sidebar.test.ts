@@ -55,12 +55,27 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     expect(code).not.toContain('"adm-diger"');
   });
 
-  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site ve marka -> Site", () => {
+  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site ve SEO -> Site", () => {
     const byHref = new Map(ADMIN_NAV.flatMap((s) => s.items).map((i) => [i.href, i]));
     expect(byHref.get("/admin")?.short).toBe("Panel");
+    expect(byHref.get("/admin/site")?.label).toBe("Site ve SEO");
     expect(byHref.get("/admin/site")?.short).toBe("Site");
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).toContain("{tab.short ?? tab.label}");
+  });
+});
+
+describe("Site ve SEO: Sayfalar sekmesi (AP6; yeni menü satırı değil)", () => {
+  const site = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
+  it("Sayfalar 'Genel bakış'tan hemen sonra gelir, sitecontent modülüne bağlıdır; menü satırı eklenmez", () => {
+    expect(site.tabs!.map((t) => t.href).slice(0, 2)).toEqual(["/admin/site", "/admin/site/sayfalar"]);
+    expect(site.tabs!.find((t) => t.href === "/admin/site/sayfalar")?.modules).toEqual(["sitecontent"]);
+    expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === "/admin/site/sayfalar")).toBe(false);
+  });
+  it("sayfa editörü ve fiyatlar alt sayfalarında Sayfalar sekmesi etkindir (Genel bakış değil)", () => {
+    expect(activeTabHref("/admin/site/sayfalar/abcdef123456", site.tabs!)).toBe("/admin/site/sayfalar");
+    expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe("/admin/site/sayfalar");
+    expect(activeTabHref("/admin/site", site.tabs!)).toBe("/admin/site");
   });
 });
 
