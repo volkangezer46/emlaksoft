@@ -24,6 +24,9 @@ import { SyncInstallStep, useBrowserInfo } from "./sync-install-step";
 import { SyncScanPanel, type ScanSummary } from "./sync-scan-panel";
 import { modKey } from "@/lib/listing-control/worker/browser-detect";
 
+/** Sunucudan öğrenilen (sürümlü) form kurallarını alan ilk eklenti sürümü; altındaki kurulumlar uyarı metninde ayrıca belirtilir. */
+const LEARNING_MIN_VERSION = "0.6.0";
+
 /**
  * DURUM ŞERİDİ + 3 ADIM (istemci): Kur → Bağla → Otomatik. Eklenti belge işaretinden ya da (kimlik biliniyorsa) siteden
  * `ping` ile algılanır. Bağlama YALNIZ "Bağla" tıklamasıyla gider (eklenti kurulumdan sonra `?bagla=1` ile bu sayfayı açar;
@@ -164,7 +167,9 @@ export function SyncSetup({ latestVersion, chromeStoreUrl, edgeStoreUrl, downloa
   const stateText = !present
     ? "Eklenti kurulu değil"
     : outdated
-      ? "Eklenti güncellenmeli"
+      ? isOutdated(live.version, LEARNING_MIN_VERSION)
+        ? "Eklenti güncellenmeli. Bu sürümde portal formu eşleştirmesi otomatik iyileşmez; güncelleyin"
+        : "Eklenti güncellenmeli"
       : !live.connected
         ? "Eklenti kurulu, hesap bağlı değil"
         : live.paused

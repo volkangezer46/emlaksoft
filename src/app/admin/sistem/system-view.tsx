@@ -77,6 +77,57 @@ function mask(value: string | null, prefixLen = 6, suffixLen = 4): string | null
   return `${value.slice(0, prefixLen)}••••••••${value.slice(-suffixLen)}`;
 }
 
+type PortalRows = { data: unknown; error: unknown };
+type PortalRulesSummary = { proposals: number; proposalPortal: string; alerts: number; alertPortal: string };
+
+/** En çok kaydı olan portal (bağlantı o portalın filtreli görünümüne gider). */
+function topPortal(rows: { portal?: string }[]): string {
+  const counts = new Map<string, number>();
+  for (const r of rows) if (r.portal) counts.set(r.portal, (counts.get(r.portal) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "sahibinden";
+}
+
+/** Tablolar yoksa (P1 migration'ı uygulanmamış) null → satır hiç çizilmez. */
+function portalRulesSummary(proposals: PortalRows, alerts: PortalRows): PortalRulesSummary | null {
+  if (proposals.error || alerts.error) return null;
+  const p = (Array.isArray(proposals.data) ? proposals.data : []) as { portal?: string }[];
+  const a = (Array.isArray(alerts.data) ? alerts.data : []) as { portal?: string }[];
+  return { proposals: p.length, proposalPortal: topPortal(p), alerts: a.length, alertPortal: topPortal(a) };
+}
+
+/** Tek satır özet: "Portal kuralları: N bekleyen öneri · M form uyarısı"; ikisi de 0 ise "sorun yok". */
+function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
+  const base = "/admin/sistem?sekme=portal-kurallari";
+  if (summary.proposals === 0 && summary.alerts === 0) {
+    return (
+      <p className="text-sm text-text-muted">
+        <Link href={base} className="font-semibold text-ink-950 hover:underline">
+          Portal kuralları
+        </Link>
+        : sorun yok
+      </p>
+    );
+  }
+  return (
+    <p className="text-sm text-text-muted">
+      <Link href={base} className="font-semibold text-ink-950 hover:underline">
+        Portal kuralları
+      </Link>
+      :{" "}
+      <Link href={`${base}&portal=${summary.proposalPortal}&gorunum=oneriler`} className="font-semibold tabular-nums text-ink-950 hover:underline">
+        {summary.proposals} bekleyen öneri
+      </Link>
+      {" · "}
+      <Link
+        href={`${base}&portal=${summary.alertPortal}&gorunum=uyarilar`}
+        className={`font-semibold tabular-nums hover:underline ${summary.alerts > 0 ? "text-amber-700" : "text-ink-950"}`}
+      >
+        {summary.alerts} form uyarısı
+      </Link>
+    </p>
+  );
+}
+
 export async function SystemView() {
   const staff = await requirePlatformModule("sistem");
   const admin = createAdminClient();
@@ -93,6 +144,8 @@ export async function SystemView() {
     { count: openErrors },
     { data: manualRunRows },
     { data: evdsRows },
+    portalProposalRes,
+    portalAlertRes,
   ] = await Promise.all([
     getPlatformSecret("openai_api_key"),
     getEmlakFiyatiAdminStatus(),
@@ -117,6 +170,9 @@ export async function SystemView() {
       .order("created_at", { ascending: false })
       .limit(20),
     admin.from("market_rates").select("key, fetched_at").in("key", ["housing_loan_rate_annual", "cpi_12m_avg"]),
+    // Portal kuralları özeti (tablo yoksa hata → satır gizlenir; yeni service_role çağrısı yok, aynı istemci)
+    admin.from("portal_rule_proposals").select("portal").eq("state", "ready").limit(500),
+    admin.from("portal_form_versions").select("portal").in("alert_state", ["warning", "info"]).limit(500),
   ]);
   const evdsConfigured = Boolean(process.env.EVDS_API_KEY?.trim());
   const evdsLastFetch =
@@ -186,6 +242,7 @@ export async function SystemView() {
     return { job, label, status: classifyCron(hb, staleAfterMinutes, nowMs), when: hb ? relativeTimeTR(hb.last_run_at) : "hiç çalışmadı" };
   });
   const schemaG = schemaGauge(schemaRows);
+  const portalRules = portalRulesSummary(portalProposalRes, portalAlertRes);
   const cronConfigured = Boolean(process.env.CRON_SECRET?.trim());
   const pushConfigured = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
   const iyzicoConfigured = Boolean(process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY);
@@ -237,6 +294,8 @@ export async function SystemView() {
       <div id="cron" className="scroll-mt-24">
         <CronStatusStrip items={stripItems} />
       </div>
+
+      {portalRules ? <PortalRulesLine summary={portalRules} /> : null}
 
       {/* Geo + ortam değişkenleri */}
       <div className="grid gap-4 lg:grid-cols-2">
