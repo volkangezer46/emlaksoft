@@ -18,6 +18,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { useStepUpPrompt } from "@/components/admin/step-up";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { DeactivateWizard, loadHandoffSnapshot, type HandoffSnapshot } from "./member-support-tools";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
 
@@ -101,11 +102,12 @@ const ROLE_OPTIONS: { value: string; label: string }[] = [
   { value: "readonly", label: ROLE_LABELS.readonly },
 ];
 
-type Pending = "deactivate" | "signout" | null;
+type Pending = "signout" | null;
 
 /** Erişim sekmesi: rol, aktif/pasif, oturumları kapat, sıfırlama bağlantısı. Onaylar satır içidir. */
 export function MemberAccessPanel({
   id,
+  name,
   role,
   roleLabel,
   isActive,
@@ -114,6 +116,7 @@ export function MemberAccessPanel({
   canReset,
 }: {
   id: string;
+  name: string;
   role: string;
   roleLabel: string;
   isActive: boolean;
@@ -128,6 +131,7 @@ export function MemberAccessPanel({
   const [roleValue, setRoleValue] = useState(role);
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [wizard, setWizard] = useState<HandoffSnapshot | null>(null);
 
   const isOwner = role === "owner";
   const stepUp = useStepUpPrompt();
@@ -146,6 +150,16 @@ export function MemberAccessPanel({
         setNotice({ tone: "ok", text: okText });
         router.refresh();
       }
+    });
+  }
+
+  /** Pasifleştir: önce iş yükü sayımı (tıklamada), sonra devir sihirbazı. */
+  function openWizard() {
+    setNotice(null);
+    start(async () => {
+      const res = await loadHandoffSnapshot(id);
+      if (res.error || !res.snapshot) setNotice({ tone: "error", text: res.error ?? "İş yükü okunamadı." });
+      else setWizard(res.snapshot);
     });
   }
 
@@ -205,19 +219,9 @@ export function MemberAccessPanel({
         {canActive ? (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {isActive ? (
-              confirming === "deactivate" ? (
-                <span className="inline-flex flex-wrap items-center gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-800">
-                  Üye pasifleştirilsin ve oturumları kapatılsın mı?
-                  <Button type="button" onClick={() => run(setMemberActiveAsStaff, { is_active: "false" }, "Üye pasifleştirildi.")} variant="navy" size="sm">
-                    Evet, pasifleştir
-                  </Button>
-                  <Button type="button" onClick={() => setConfirming(null)} variant="outline" size="sm">
-                    Vazgeç
-                  </Button>
-                </span>
-              ) : (
-                <Button type="button" disabled={busy} onClick={() => setConfirming("deactivate")} variant="outline" size="sm" className="border-danger-500/40 text-danger-600">
-                  <UserMinus className="h-3.5 w-3.5" /> Pasifleştir
+              wizard ? null : (
+                <Button type="button" disabled={busy} onClick={openWizard} variant="outline" size="sm" className="border-danger-500/40 text-danger-600">
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />} Pasifleştir
                 </Button>
               )
             ) : (
@@ -245,6 +249,7 @@ export function MemberAccessPanel({
         ) : (
           <p className="mt-3 text-xs text-text-faint">Durum değiştirme süper admin ve operasyon içindir.</p>
         )}
+        {canActive && isActive && wizard ? <DeactivateWizard id={id} name={name} initial={wizard} onCancel={() => setWizard(null)} /> : null}
       </section>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">

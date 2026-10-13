@@ -174,10 +174,26 @@ export const ofisler = defineReport({
   },
 });
 
+type MemberAuth = { email: string | null; last_sign_in_at: string | null };
+const memberAuth = (c: ReportContext) => (c.memo.get("memberAuth") as Map<string, MemberAuth> | undefined) ?? new Map<string, MemberAuth>();
+
+/** E-posta ve son giriş auth.users'tadır: platform_member_search (20261013004500) kimlik süzgeciyle okunur; RPC yoksa sütunlar boş kalır. */
+async function loadMemberAuth(rows: Row[], ctx: ReportContext): Promise<void> {
+  const map = memberAuth(ctx);
+  ctx.memo.set("memberAuth", map);
+  const ids = rows.map((r) => r.id as string).filter(Boolean);
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const { data, error } = await ctx.supabase.rpc("platform_member_search", { p_ids: chunk, p_limit: 200, p_offset: 0 });
+    if (error) return;
+    for (const m of (data ?? []) as (MemberAuth & { id: string })[]) map.set(m.id, { email: m.email, last_sign_in_at: m.last_sign_in_at });
+  }
+}
+
 export const uyeler = defineReport({
   id: "uyeler",
   title: "Üyeler (tüm kullanıcılar)",
-  description: "Platformdaki tüm ofis kullanıcıları: ofis, rol, telefon, aktiflik ve kayıt tarihi.",
+  description: "Platformdaki tüm ofis kullanıcıları: ofis, rol, e-posta, telefon, aktiflik, SMS 2FA, son giriş ve kayıt tarihi.",
   category: "platform",
   scope: "platform",
   platformModule: "members",
@@ -193,21 +209,24 @@ export const uyeler = defineReport({
     { key: "ad", label: "Ad soyad", type: "text", width: 26, get: (r) => r.full_name },
     { key: "ofis", label: "Ofis", type: "text", width: 28, get: (r, c) => nameOf(c, r.tenant_id) },
     { key: "rol", label: "Rol", type: "text", width: 16, get: (r) => label(ROLE_LABELS, r.role) },
+    { key: "eposta", label: "E-posta", type: "text", width: 28, get: (r, c) => memberAuth(c).get(r.id)?.email ?? "" },
     { key: "telefon", label: "Telefon", type: "text", width: 16, get: (r) => formatPhoneDisplay(r.phone) },
     { key: "aktif", label: "Aktif", type: "bool", get: (r) => r.is_active },
+    { key: "iki_adim", label: "SMS 2FA", type: "bool", get: (r) => Boolean(r.two_factor_sms) },
+    { key: "son_giris", label: "Son giriş", type: "datetime", get: (r, c) => memberAuth(c).get(r.id)?.last_sign_in_at ?? null },
     { key: "kayit", label: "Kayıt tarihi", type: "date", get: (r) => r.created_at },
   ],
   source: {
     kind: "query",
     build: (ctx, f) => {
-      let q = ctx.supabase.from("profiles").select("id, tenant_id, full_name, phone, role, is_active, created_at", { count: "exact" });
+      let q = ctx.supabase.from("profiles").select("id, tenant_id, full_name, phone, role, is_active, two_factor_sms, created_at", { count: "exact" });
       if (f.rol) q = q.eq("role", f.rol);
       if (f.durum) q = q.eq("is_active", f.durum === "aktif");
       q = searchOr(q, ["full_name"], f.q);
       q = applyTimestampRange(q, "created_at", f);
       return q.order("created_at", { ascending: false }).order("id", { ascending: true });
     },
-    enrich: enrichTenants((r) => [r.tenant_id]),
+    enrich: chainEnrich(enrichTenants((r) => [r.tenant_id]), loadMemberAuth),
   },
 });
 
