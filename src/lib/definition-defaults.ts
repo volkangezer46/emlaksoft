@@ -8,6 +8,7 @@
  * (definition-single-source-contract.test.ts) bunu yakalar.
  * Dosya client/server ikisinde de güvenle import edilebilir (sunucu bağımlılığı yok).
  */
+import { ALL_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
 
 export const DEFINITION_CATEGORIES = [
   { key: "customer_type", label: "Müşteri tipi" },
@@ -36,10 +37,8 @@ export type DefaultDefinition = { value: string; label: string };
 
 /** Müşteri formunun son dönemde yazdığı kaynak değerleri (customers.source'ta bulunabilir). */
 export const LEAD_SOURCES = [
-  { value: "portal_sahibinden", label: "Sahibinden.com" },
-  { value: "portal_hepsiemlak", label: "Hepsiemlak" },
-  { value: "portal_zingat", label: "Zingat" },
-  { value: "portal_emlakjet", label: "Emlak Jet" },
+  // Portal kaynakları katalogdan türer (tek kaynak `src/lib/portals/catalog.ts`; Zingat yalnız geçmiş kayıtlar için).
+  ...ALL_PORTALS.map((id) => ({ value: `portal_${id}`, label: PORTAL_CATALOG[id].brandLabel })),
   { value: "tavsiye", label: "Tavsiye / Referans" },
   { value: "sosyal_medya", label: "Sosyal Medya" },
   { value: "web_sitesi", label: "Web Sitesi" },

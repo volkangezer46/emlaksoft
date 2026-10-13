@@ -8,6 +8,7 @@ import {
   BRIDGE_IMPORT_ENDPOINT,
   BRIDGE_INVENTORY_ENDPOINT,
   BRIDGE_MEDIA_PATH,
+  BRIDGE_PORTALS_HEADER,
   BRIDGE_RULES_ENDPOINT,
   BRIDGE_TRANSFER_DONE_ENDPOINT,
   BRIDGE_TRANSFER_FETCH_ENDPOINT,
@@ -187,7 +188,7 @@ window.addEventListener("load", postReady);
 void send({ kind: "appSeen", session: "unknown" });
 
 // ---------------------------------------------------------------- otomatik kontrol döngüsü (lider sekme)
-type ApiReply = { ok?: boolean; error?: string; outcome?: string; clientId?: string; status?: string; jobs?: Job[] };
+type ApiReply = { ok?: boolean; error?: string; outcome?: string; clientId?: string; status?: string; jobs?: Job[]; portals?: unknown };
 type Job = { jobId: string; listingId: string; portal: string; externalId: string | null; url: string | null };
 
 let clientId: string | null = null;
@@ -430,6 +431,11 @@ async function refreshRules(maxAgeMs: number): Promise<void> {
     const headers: Record<string, string> = { [BRIDGE_HEADER]: "1", [EXT_VERSION_HEADER]: VERSION };
     if (status.meta.etag) headers["If-None-Match"] = status.meta.etag;
     const res = await fetch(`${BRIDGE_RULES_ENDPOINT}?engine=${FORM_RULES_ENGINE}`, { method: "GET", credentials: "same-origin", cache: "no-store", signal: ctrl.signal, headers });
+    // (EP1) Kural yenilemede de izinli portal listesi başlıkta gelir (boş değer = hiçbir portal; başlık yoksa liste korunur).
+    const portalHeader = res.headers.get(BRIDGE_PORTALS_HEADER);
+    if (portalHeader !== null && (res.status === 200 || res.status === 304)) {
+      await send({ kind: "serverPortals", portals: portalHeader.split(",").map((p) => p.trim()).filter(Boolean) });
+    }
     if (res.status === 304) await send({ kind: "rulesMeta", notModified: true });
     else if (res.status === 200) await send({ kind: "rulesPut", raw: (await res.text()).slice(0, 300_000), etag: res.headers.get("etag") });
     else await send({ kind: "rulesMeta", error: `http_${res.status}` });
@@ -491,6 +497,8 @@ async function step(): Promise<StepOutcome | "wait"> {
       return "client_invalid";
     }
     clientId = reg.data.clientId;
+    // (EP1) Eşleşmede sunucu ofisin üye + kontrolü açık portal listesini döndürür; eklenti yalnız bunlara istek atar.
+    if (Array.isArray(reg.data.portals)) await send({ kind: "serverPortals", portals: reg.data.portals });
   }
 
   const claim = await api({ op: "claim", clientId });

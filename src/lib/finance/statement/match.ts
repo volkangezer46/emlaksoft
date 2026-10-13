@@ -6,6 +6,7 @@
  *  4) Kategori tahmini: açıklamadaki anahtar sözcükler (kira, SGK, sahibinden, elektrik ...).
  * Hiçbir öneri kendiliğinden kaydedilmez; kullanıcı tek ekranda onaylar/düzeltir.
  */
+import { ALL_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
 import { isCashCategory, SALARY_CATEGORY, type CashDirection } from "@/lib/finance/cash/categories";
 import { foldHeader } from "./parse";
 
@@ -107,7 +108,7 @@ type KeywordRule = { category: string; words: readonly string[] };
 const OUT_KEYWORDS: readonly KeywordRule[] = [
   { category: "maas", words: ["maas", "ucret odemesi", "personel"] },
   { category: "sgk", words: ["sgk", "sosyal guvenlik", "bagkur", "vergi", "kdv", "muhtasar", "gelir idaresi", "damga"] },
-  { category: "portal", words: ["sahibinden", "hepsiemlak", "zingat", "emlakjet", "emlak jet"] },
+  { category: "portal", words: [...new Set(ALL_PORTALS.flatMap((id) => PORTAL_CATALOG[id].aliases))] },
   { category: "reklam", words: ["google ads", "meta ads", "facebook", "instagram", "reklam", "tanitim"] },
   { category: "muhasebe", words: ["muhasebe", "mali musavir", "smmm"] },
   { category: "aidat", words: ["aidat", "site yonetim", "apartman yonetim"] },

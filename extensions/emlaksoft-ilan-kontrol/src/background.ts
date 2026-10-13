@@ -15,7 +15,15 @@ import type { ProbeReply } from "@/lib/listing-control/worker/core";
 import { badgeFor, bumpHistory, entryFromReply, classifyReply, pushRecent, recordHealth, type HealthMap, type History, type RecentItem } from "@/lib/listing-control/worker/extension-health";
 import { dueEntries, enqueue, markDone, markFailed, prune, type OutboxEntry } from "@/lib/listing-control/worker/extension-outbox";
 import { isPairingActive, isTrustedSender, type Pairing } from "@/lib/listing-control/worker/extension-pairing";
-import { DEFAULT_SETTINGS, portalEnabled, sanitizeSettings, withinWorkingHours, type ExtensionSettings } from "@/lib/listing-control/worker/extension-settings";
+import {
+  DEFAULT_SETTINGS,
+  portalAllowed,
+  sanitizeServerPortals,
+  sanitizeSettings,
+  withinWorkingHours,
+  type ExtensionSettings,
+  type ServerPortals,
+} from "@/lib/listing-control/worker/extension-settings";
 import { buildStatusView, type AppSession, type ExtensionStatusView, type StatusInput } from "@/lib/listing-control/worker/extension-status-view";
 import {
   applyPage,
@@ -64,7 +72,8 @@ import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequ
  * isteme. Engel görülünce 30 dk durulur ve sonuç "kontrol edilemedi" olarak bildirilir.
  *
  * TEK TUŞ: kullanıcı "Bağlan" demeden (popup ya da uygulama içi sayfa) HİÇBİR portal isteği yapılmaz. Ayarlar (portal aç/kapa,
- * çalışma saatleri, günlük sınır) yalnız KISAR. MV3: service worker her an uyuyabilir; durum `chrome.storage`'da, uyandırma
+ * çalışma saatleri, günlük sınır) yalnız KISAR. ÜYELİK (EP1): yalnız sunucunun bildirdiği portallara (ofis üye + otomatik kontrol
+ * açık; eşleşme ve kural yenilemede gelir) istek atılır; liste gelmediyse ya da boşsa hiçbir portala istek atılmaz. MV3: service worker her an uyuyabilir; durum `chrome.storage`'da, uyandırma
  * `chrome.alarms` (dakikada bir rozet/bayrak tazeleme) ve gelen iletilerledir.
  */
 
@@ -116,6 +125,12 @@ const isPaused = async () => (await getLocal<boolean>(STORAGE_KEYS.paused, false
 const getPairing = () => getLocal<Pairing>(STORAGE_KEYS.pairing, null);
 const getApp = () => getLocal<AppState>(STORAGE_KEYS.app, { seenAt: null, session: "unknown", okAt: null });
 const getSettings = async (): Promise<ExtensionSettings> => sanitizeSettings(await getLocal<unknown>(STORAGE_KEYS.settings, DEFAULT_SETTINGS));
+const getServerPortals = async (): Promise<ServerPortals> => sanitizeServerPortals(await getLocal<unknown>(STORAGE_KEYS.serverPortals, null), Date.now());
+/** İstek izni: sunucu listesi (üye + kontrol açık) ∩ yerel ayar. */
+async function isPortalAllowed(portal: string): Promise<boolean> {
+  const [settings, server] = await Promise.all([getSettings(), getServerPortals()]);
+  return portalAllowed(settings, portal, server);
+}
 
 async function getPacing(): Promise<PacingState> {
   return { ...INITIAL_PACING, ...(await getLocal<Partial<PacingState>>(STORAGE_KEYS.pacing, {})) };
@@ -135,7 +150,7 @@ async function isConnected(): Promise<boolean> {
 // ---------------------------------------------------------------- durum görünümü, rozet, bayraklar
 
 async function loadInput(): Promise<StatusInput> {
-  const [paused, pacing, pairing, app, settings, health, history, recent, stats, outbox, lease, scanStates, scanProgress, scanUploads] = await Promise.all([
+  const [paused, pacing, pairing, app, settings, health, history, recent, stats, outbox, lease, scanStates, scanProgress, scanUploads, serverPortals] = await Promise.all([
     isPaused(),
     getPacing(),
     getPairing(),
@@ -150,6 +165,7 @@ async function loadInput(): Promise<StatusInput> {
     getLocal<ScanStates>(STORAGE_KEYS.scanStates, {}),
     getLocal<ScanProgress | null>(STORAGE_KEYS.scan, null),
     getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []),
+    getServerPortals(),
   ]);
   const nowMs = Date.now();
   return {
@@ -171,6 +187,7 @@ async function loadInput(): Promise<StatusInput> {
     outboxCount: outbox.length,
     leaderActive: !!lease && lease.expiresAtMs > nowMs,
     portalIds: PORTAL_IDS,
+    serverPortals,
     nowMs,
     dayKey: dayKey(),
     tzOffsetMinutes: tz(),
@@ -270,7 +287,7 @@ async function recordOutcome(portal: string, externalId: string | null, reply: P
 async function probe(job: { portal: string; url: string; externalId: string | null }, wait: boolean): Promise<ProbeReply> {
   const adapter = getHtmlAdapter(job.portal);
   if (!adapter || !adapter.isPortalUrl(job.url)) return { error: "url_not_allowed" };
-  if (!portalEnabled(await getSettings(), job.portal)) return { error: "portal_disabled" };
+  if (!(await isPortalAllowed(job.portal))) return { error: "portal_disabled" };
   const reply = await paced(wait, async (): Promise<ProbeReply> => {
     const page = await fetchPage(job.url);
     // Ağ/zaman aşımı ayrıştırıcıdan değil taşıma katmanından gelir: sürüm yok → ayrıştırıcı telemetrisine girmez.
@@ -284,7 +301,7 @@ async function probe(job: { portal: string; url: string; externalId: string | nu
 async function inventory(job: { portal: string; url: string }) {
   const adapter = getHtmlAdapter(job.portal);
   if (!adapter || !adapter.isPortalUrl(job.url)) return { items: [], nextUrl: null, error: "url_not_allowed" };
-  if (!portalEnabled(await getSettings(), job.portal)) return { items: [], nextUrl: null, error: "portal_disabled" };
+  if (!(await isPortalAllowed(job.portal))) return { items: [], nextUrl: null, error: "portal_disabled" };
   const r = await paced(true, async () => {
     const page = await fetchPage(job.url);
     if ("error" in page) return { items: [], nextUrl: null, error: page.error };
@@ -312,7 +329,12 @@ async function finishScan(outcome: ScanOutcome): Promise<void> {
     states[outcome.portal] = nextPortalState(states[outcome.portal], outcome, now);
     await setLocal(STORAGE_KEYS.scanStates, states);
     // Engelde ya da hiç ilan okunmadan ağ hatasında yükleme yok; okunamayan yapı ("ayrıştırılamadı") telemetri için yüklenir.
-    if (outcome.kind !== "blocked" && !(outcome.read === 0 && outcome.reason !== null && TRANSPORT_ERRORS.has(outcome.reason))) {
+    // İstisna (EP1): "giriş istedi" engeli ilansız yüklenir; sunucu bunu portal üyeliğine last_login_fail_at olarak yazar.
+    const loginRequired = outcome.kind === "blocked" && outcome.reason === "login_required";
+    if (loginRequired) {
+      const list = await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []);
+      await setLocal(STORAGE_KEYS.scanUploads, enqueueUpload(list, buildUpload({ ...outcome, items: [], read: 0 }, PARSER_VERSION, now), now));
+    } else if (outcome.kind !== "blocked" && !(outcome.read === 0 && outcome.reason !== null && TRANSPORT_ERRORS.has(outcome.reason))) {
       const list = await getLocal<ScanUpload[]>(STORAGE_KEYS.scanUploads, []);
       await setLocal(STORAGE_KEYS.scanUploads, enqueueUpload(list, buildUpload(outcome, PARSER_VERSION, now), now));
     }
@@ -332,16 +354,17 @@ async function runScanCycle(force = false): Promise<void> {
   try {
     for (let guard = 0; guard < PORTAL_IDS.length + 1; guard += 1) {
       if (!(await isConnected()) || (await isPaused())) return;
-      const settings = await getSettings();
+      const [settings, server] = await Promise.all([getSettings(), getServerPortals()]);
+      // Sunucu listesi (üye + kontrol açık) yoksa ya da boşsa döngü HİÇ istek atmadan biter (EP1).
+      const enabled = (id: string) => portalAllowed(settings, id, server);
       let progress = await getLocal<ScanProgress | null>(STORAGE_KEYS.scan, null);
-      // Kapatılan portalın ya da 6 saatten eski yarım taramanın ilerlemesi atılır (takılı kalmasın).
-      if (progress && (!portalEnabled(settings, progress.portal) || Date.now() - progress.startedAt > 6 * 3_600_000)) {
+      // Kapatılan / üyeliği düşen portalın ya da 6 saatten eski yarım taramanın ilerlemesi atılır (takılı kalmasın).
+      if (progress && (!enabled(progress.portal) || Date.now() - progress.startedAt > 6 * 3_600_000)) {
         await chrome.storage.local.remove(STORAGE_KEYS.scan);
         progress = null;
       }
       if (!progress) {
         const states = await getLocal<ScanStates>(STORAGE_KEYS.scanStates, {});
-        const enabled = (id: string) => portalEnabled(settings, id);
         const due = force ? PORTAL_IDS.filter(enabled) : duePortals(states, PORTAL_IDS, enabled, Date.now());
         const id = due.find((p) => (getHtmlAdapter(p)?.storeStartUrls.length ?? 0) > 0);
         if (!id) return;
@@ -455,6 +478,16 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
     case "saveSettings":
       await setLocal(STORAGE_KEYS.settings, sanitizeSettings(msg.settings));
       return refresh();
+    case "serverPortals": {
+      // Yalnız EmlakSoft sekmesindeki içerik betiğinden (oturumlu, aynı kökenli uç yanıtı) gelir.
+      const next = sanitizeServerPortals(msg.portals, Date.now());
+      if (!next) return refresh();
+      const prev = await getServerPortals();
+      await setLocal(STORAGE_KEYS.serverPortals, next);
+      // Yeni izin verilen portal varsa tarama döngüsü tetiklenir (zamanı gelmişse); kaldırılan portala istek gitmez.
+      if (next.ids.some((id) => !(prev?.ids ?? []).includes(id))) void runScanCycle();
+      return refresh();
+    }
     case "lease": {
       const d = leaseDecision(await getLease(), String(msg.token ?? ""), Date.now());
       if (d.granted) await chrome.storage.session.set({ [STORAGE_KEYS.lease]: d.lease });

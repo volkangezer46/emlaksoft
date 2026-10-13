@@ -1,3 +1,4 @@
+import { CURRENT_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
 import type { ProbeClassification } from "./core";
 import type { HealthLevel } from "./extension-health";
 
@@ -18,7 +19,7 @@ export const HEALTH_LABEL: Record<HealthLevel, string> = {
   idle: "Henüz veri yok",
 };
 
-export const PORTAL_LABEL: Record<string, string> = { sahibinden: "Sahibinden", hepsiemlak: "Hepsiemlak", emlakjet: "Emlakjet" };
+export const PORTAL_LABEL: Record<string, string> = Object.fromEntries(CURRENT_PORTALS.map((id) => [id, PORTAL_CATALOG[id].label]));
 
 const REASONS: Record<string, string> = {
   captcha: "Portal doğrulama (CAPTCHA) istedi",

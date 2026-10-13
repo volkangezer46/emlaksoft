@@ -19,6 +19,7 @@
  */
 
 import { getPlatformSetting } from "@/lib/platform-settings";
+import type { CurrentPortal } from "@/lib/portals/catalog";
 import { getPlatformSecret, getPlatformSecretsMany } from "@/lib/settings/secret-read";
 import {
   normalizeProviderBaseUrl,
@@ -37,7 +38,7 @@ import {
 // Ortak tipler
 // ---------------------------------------------------------------------------
 
-export type PortalName = "sahibinden" | "hepsiemlak" | "emlakjet";
+export type PortalName = CurrentPortal;
 
 export type PortalPublishConfig = {
   apiKey: string;

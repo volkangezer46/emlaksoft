@@ -2,6 +2,7 @@ import { decideCadence } from "../cadence";
 import type { ListingControlConfig } from "../config";
 import type { CheckState } from "../types";
 import { chunk, isMissingSchema, type Db } from "./db";
+import { loadPortalAccountsForTenants, type PortalAccountRow } from "@/lib/portals/membership";
 
 /**
  * Kontrol KUYRUĞU (sunucu): planlama, hasat, talep. Kuyruk yalnız çevrimiçi kontrol istemcisi (cihaz) olan ofisler
@@ -9,7 +10,14 @@ import { chunk, isMissingSchema, type Db } from "./db";
  * (iş üretilmez). Aynı ilan için tek açık iş DB'de garanti (kısmi unique); talep `FOR UPDATE SKIP LOCKED` ile
  * (iki cihaz aynı ilanı alamaz), lease dolarsa `reapJobs` işi kuyruğa döndürür (3. denemede failed). Saatlik hız sınırı
  * RPC'dedir. service_role istemcisi ÇAĞIRAN tarafından verilir.
+ * ÜYELİK (EP1): ofisin "üye değil" dediği ya da otomatik kontrolü kapattığı portaldaki ilan için İŞ AÇILMAZ (eklenti zaten o
+ * portala istek atmaz); "üyelik dışı canlı ilan" uyarısı `portal-teyit` cron'unda tek seferlik çıkar.
  */
+
+/** İş açılmayacak portallar: üyelik "none" ya da otomatik kontrol kapalı (SAF). */
+export function excludedCheckPortals(rows: readonly PortalAccountRow[]): string[] {
+  return rows.filter((r) => r.status === "none" || !r.check_enabled).map((r) => r.portal);
+}
 
 export type PlanSummary = { tenantsWithClients: number; considered: number; enqueued: number; schemaMissing: boolean };
 
@@ -42,6 +50,7 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
   const clientsByTenant = new Map<string, number>();
   for (const c of (clients ?? []) as { id: string; tenant_id: string }[]) clientsByTenant.set(c.tenant_id, (clientsByTenant.get(c.tenant_id) ?? 0) + 1);
   summary.tenantsWithClients = clientsByTenant.size;
+  const accounts = await loadPortalAccountsForTenants(db, [...clientsByTenant.keys()]);
   let budget = TOTAL_LIMIT;
   const nowIso = new Date(nowMs).toISOString();
 
@@ -81,8 +90,17 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
       }
     }
 
+    // Üyelik süzgeci: "none" / kontrolü kapalı portaldaki canlı ilanların kimlikleri (normalleştirilmiş portal adıyla).
+    const excluded = excludedCheckPortals(accounts.get(tenantId) ?? []);
+    const skip = new Set<string>();
+    if (excluded.length > 0) {
+      const { data: ex } = await db.from("portal_listings").select("id").eq("tenant_id", tenantId).eq("status", "live").in("portal_name", excluded).limit(5000);
+      for (const r of (ex ?? []) as { id: string }[]) skip.add(r.id);
+    }
+
     const jobs: Record<string, unknown>[] = [];
     for (const h of dueRows) {
+      if (skip.has(h.portal_listing_id)) continue;
       summary.considered += 1;
       const d = decideCadence(
         {
@@ -110,6 +128,7 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
       });
     }
     for (const f of fresh) {
+      if (skip.has(f.id)) continue;
       summary.considered += 1;
       jobs.push({ portal_listing_id: f.id, priority: 60, reason: "scheduled", scheduled_at: nowIso, exclude_client_ids: [] });
     }

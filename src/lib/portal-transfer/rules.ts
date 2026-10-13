@@ -8,7 +8,10 @@
  * düşer, uydurulmaz. Kural dosyası yalnız VERİDİR (MV3: uzaktan çalıştırılabilir kod yok).
  */
 
-export const TRANSFER_PORTALS = ["sahibinden", "hepsiemlak", "emlakjet"] as const;
+import { CURRENT_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
+
+/** Aktarım yapılabilen portallar: katalogdaki güncel (eklentinin desteklediği) portallar (tek kaynak `portals/catalog.ts`). */
+export const TRANSFER_PORTALS = CURRENT_PORTALS;
 export type TransferPortal = (typeof TRANSFER_PORTALS)[number];
 
 export function isTransferPortal(v: unknown): v is TransferPortal {
@@ -28,9 +31,9 @@ export type PortalFormRules = {
 };
 
 export const PORTAL_FORM_RULES: Record<TransferPortal, PortalFormRules> = {
-  sahibinden: { id: "sahibinden", label: "Sahibinden", newListingUrl: "https://www.sahibinden.com/ilan-ver", maxPhotos: 30, titleMax: 100, verified: false },
-  hepsiemlak: { id: "hepsiemlak", label: "Hepsiemlak", newListingUrl: "https://www.hepsiemlak.com/ilan-ver", maxPhotos: 30, titleMax: 100, verified: false },
-  emlakjet: { id: "emlakjet", label: "Emlakjet", newListingUrl: "https://www.emlakjet.com/ilan-ver/", maxPhotos: 30, titleMax: 100, verified: false },
+  sahibinden: { id: "sahibinden", label: PORTAL_CATALOG.sahibinden.label, newListingUrl: "https://www.sahibinden.com/ilan-ver", maxPhotos: 30, titleMax: 100, verified: false },
+  hepsiemlak: { id: "hepsiemlak", label: PORTAL_CATALOG.hepsiemlak.label, newListingUrl: "https://www.hepsiemlak.com/ilan-ver", maxPhotos: 30, titleMax: 100, verified: false },
+  emlakjet: { id: "emlakjet", label: PORTAL_CATALOG.emlakjet.label, newListingUrl: "https://www.emlakjet.com/ilan-ver/", maxPhotos: 30, titleMax: 100, verified: false },
 };
 
 /** Doldurulabilen alan anahtarları (payload.fields). */

@@ -1,4 +1,5 @@
 import { FIELD_RULES, TRANSFER_PORTALS, fold, type TransferPortal } from "@/lib/portal-transfer/rules";
+import { PORTAL_CATALOG } from "@/lib/portals/catalog";
 
 /**
  * Yönetim > Sistem > Portal kuralları sekmesinin SAF modeli (sunucu ve istemci ortak; DB/IO yok, testli).
@@ -9,11 +10,7 @@ import { FIELD_RULES, TRANSFER_PORTALS, fold, type TransferPortal } from "@/lib/
 export const PORTAL_RULES_TAB = "portal-kurallari";
 export const PORTAL_RULES_BASE = "/admin/sistem";
 
-export const PORTAL_LABELS: Record<TransferPortal, string> = {
-  sahibinden: "sahibinden.com",
-  hepsiemlak: "Hepsiemlak",
-  emlakjet: "Emlakjet",
-};
+export const PORTAL_LABELS: Record<TransferPortal, string> = Object.fromEntries(TRANSFER_PORTALS.map((id) => [id, PORTAL_CATALOG[id].label])) as Record<TransferPortal, string>;
 
 /** URL'deki `?portal=` değeri; bilinmeyen/boş → sahibinden. */
 export function parsePortal(raw: string | null | undefined): TransferPortal {

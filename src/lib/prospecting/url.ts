@@ -1,7 +1,8 @@
 import { getAdapter } from "@/lib/listing-control/adapters";
+import { CURRENT_PORTALS } from "@/lib/portals/catalog";
 import type { FsboPortal } from "./types";
 
-const KNOWN: readonly Exclude<FsboPortal, "other">[] = ["sahibinden", "hepsiemlak", "emlakjet"];
+const KNOWN: readonly Exclude<FsboPortal, "other">[] = CURRENT_PORTALS;
 
 export type ParsedListingUrl = { portal: FsboPortal; externalId: string | null; url: string };
 

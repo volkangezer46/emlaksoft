@@ -20,6 +20,7 @@ import { TitleForm } from "./you-step";
 import { GiderlerKasaStep } from "./steps/giderler-kasa-step";
 import { MulkYonetimiStep } from "./steps/mulk-yonetimi-step";
 import { getTenantModuleState } from "@/lib/modules/state";
+import { PortalMembershipsSection } from "@/app/app/ayarlar/_sekmeler/portal-memberships-section";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
 export type StepBodyProps = {
@@ -120,6 +121,8 @@ function ChoiceLink({ href, icon, title, text }: { href: string; icon: ReactNode
 function PortalsBody(p: StepBodyProps) {
   return (
     <div className="space-y-3">
+      {/* EP1: "Hangi portallarda ilan veriyorsunuz?" — öneriler işaretli gelir, kayıt sahibin onayıyla. */}
+      {p.canEditSettings ? <PortalMembershipsSection question /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <ChoiceLink
           href="/app/portallar"

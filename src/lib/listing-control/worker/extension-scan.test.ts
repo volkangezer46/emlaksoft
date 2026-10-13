@@ -12,8 +12,10 @@ import {
   SCAN_LIMITS,
   startScan,
   type ScanOutcome,
+  type ScanStates,
   type ScanStep,
 } from "./extension-scan";
+import { portalAllowed, sanitizeServerPortals, sanitizeSettings, type ServerPortals } from "./extension-settings";
 import type { StoreItem } from "../adapters/html/parse-core";
 
 const NOW = Date.parse("2026-10-10T08:00:00Z");
@@ -137,5 +139,50 @@ describe("sunucu doğrulaması", () => {
     expect(sanitizeUpload({ ...base, kind: "x" })).toBeNull();
     expect(sanitizeUpload("x")).toBeNull();
     expect(sanitizeUpload({ ...base, items: new Array(SCAN_LIMITS.maxItems + 1).fill({}) })).toBeNull();
+  });
+});
+
+describe("üyelik süzgeci (EP1): üye olunmayan portala 24 saatte SIFIR istek", () => {
+  const settings = sanitizeSettings(undefined);
+  const ids = ["sahibinden", "hepsiemlak", "emlakjet"];
+
+  /** Arka plan döngüsünün sadeleştirilmiş benzeri: dakikada bir uyanır, hazır portalı "tarar" (istek sayılır). */
+  function simulateDay(server: ServerPortals): Record<string, number> {
+    const requests: Record<string, number> = {};
+    let states: ScanStates = {};
+    const allowed = (id: string) => portalAllowed(settings, id, server);
+    for (let t = NOW; t < NOW + 24 * H; t += 60_000) {
+      for (const id of duePortals(states, ids, allowed, t)) {
+        requests[id] = (requests[id] ?? 0) + 1;
+        states = { ...states, [id]: { lastFullAt: t, lastTryAt: t, lastResult: "complete", lastRead: 1, lastExpected: 1 } };
+      }
+    }
+    return requests;
+  }
+
+  it("üyeliği 'none' olan portal sunucu listesinde yoktur ve hiç taranmaz; üye portal günde en az bir kez taranır", () => {
+    const server = sanitizeServerPortals(["sahibinden", "emlakjet"], NOW);
+    const r = simulateDay(server);
+    expect(r.hepsiemlak ?? 0).toBe(0);
+    expect(r.sahibinden).toBeGreaterThanOrEqual(1);
+    expect(r.emlakjet).toBeGreaterThanOrEqual(1);
+  });
+
+  it("sunucu listesi hiç gelmediyse ya da boşsa hiçbir portala istek atılmaz (varsayılan AÇIK kalktı)", () => {
+    expect(simulateDay(null)).toEqual({});
+    expect(simulateDay(sanitizeServerPortals([], NOW))).toEqual({});
+  });
+
+  it("yerel ayar listeyi yalnız daraltır: sunucu izin vermediği portalı yerel 'açık' açamaz", () => {
+    const local = sanitizeSettings({ portals: { hepsiemlak: true, sahibinden: false } });
+    const server = sanitizeServerPortals({ ids: ["sahibinden", "emlakjet"], at: NOW }, NOW);
+    expect(portalAllowed(local, "hepsiemlak", server)).toBe(false);
+    expect(portalAllowed(local, "sahibinden", server)).toBe(false);
+    expect(portalAllowed(local, "emlakjet", server)).toBe(true);
+  });
+
+  it("sunucu listesi temizlenir: geçersiz kimlik atılır, tekrar tekilleşir", () => {
+    expect(sanitizeServerPortals(["sahibinden", "Kötü!", "sahibinden", 5], NOW)).toEqual({ ids: ["sahibinden"], at: NOW });
+    expect(sanitizeServerPortals("sahibinden", NOW)).toBeNull();
   });
 });

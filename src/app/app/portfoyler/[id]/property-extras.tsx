@@ -11,6 +11,7 @@ import {
 import Link from "@/components/ui/smart-link";
 import { publishPropertyToPortal } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
+import { CURRENT_PORTALS, PORTAL_CATALOG, PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { evaluateAuthorityTerm } from "@/lib/eids/authority-term";
 import { hasValidEidsNo } from "@/lib/eids/property-no";
@@ -210,18 +211,21 @@ export function PropertyAuthorizationPanel({
 // P1-4: Çoklu portal yayın butonu
 // ---------------------------------------------------------------------------
 
-const PORTALS: { name: PortalName; label: string }[] = [
-  { name: "sahibinden", label: "Sahibinden.com" },
-  { name: "hepsiemlak", label: "Hepsiemlak" },
-];
+const PORTALS: { name: PortalName; label: string }[] = CURRENT_PORTALS.map((id) => ({ name: id, label: PORTAL_CATALOG[id].label }));
 
 export function PublishToPortalsPanel({
   propertyId,
-  configuredPortals,
+  configuredPortals: allConfigured,
+  activePortals,
 }: {
   propertyId: string;
   configuredPortals: PortalName[];
+  /** Ofisin üye olduğu portallar (`portals/membership.ts`); verilmezse süzgeç yok. */
+  activePortals?: readonly string[];
 }) {
+  // Yalnız üye olunan portala yayın önerilir; API'si tanımlı ama üyeliği olmayan portal soluk durur.
+  const configuredPortals = activePortals ? allConfigured.filter((p) => activePortals.includes(p)) : allConfigured;
+  const nonMember = activePortals ? PORTALS.filter((p) => allConfigured.includes(p.name) && !activePortals.includes(p.name)) : [];
   const [results, setResults] = useState<Record<string, { ok?: boolean; error?: string; warning?: string }>>({});
   const [publishingAll, startAll] = useTransition();
   const [, startOne] = useTransition();
@@ -248,7 +252,7 @@ export function PublishToPortalsPanel({
     });
   }
 
-  if (configuredPortals.length === 0) return null;
+  if (configuredPortals.length === 0 && nonMember.length === 0) return null;
 
   const successCount = Object.values(results).filter((r) => r.ok).length;
   const authorityWarning = Object.values(results).find((r) => r.warning)?.warning;
@@ -312,6 +316,12 @@ export function PublishToPortalsPanel({
             </div>
           );
         })}
+        {nonMember.map((p) => (
+          <div key={p.name} className="flex items-center gap-2 rounded-[var(--radius-control)] border border-dashed border-line px-3 py-2 text-xs text-text-faint opacity-70">
+            <span>{p.label}</span>
+            <Link href={PORTAL_MEMBERSHIP_HREF} className="font-semibold text-accent-text hover:underline">Üye değilsiniz, ekle</Link>
+          </div>
+        ))}
       </div>
     </section>
   );

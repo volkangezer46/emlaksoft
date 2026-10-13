@@ -3,7 +3,10 @@
  * Arayüzde "FSBO" kelimesi geçmez; kod/rota adı "portföy avı" (modül `prospecting`, /app/portfoy-avi).
  */
 
-export const FSBO_PORTALS = ["sahibinden", "hepsiemlak", "emlakjet", "other"] as const;
+import { CURRENT_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
+
+/** Portföy avı portalları: katalogdaki güncel portallar + "other". Üyelikle SINIRLANMAZ (üyelik yalnız sıralamayı belirler). */
+export const FSBO_PORTALS = [...CURRENT_PORTALS, "other"] as const;
 export type FsboPortal = (typeof FSBO_PORTALS)[number];
 
 export const FSBO_SOURCES = ["extension", "manual", "import"] as const;
@@ -37,9 +40,7 @@ export const FSBO_TRANSACTIONS = ["sale", "rent"] as const;
 export type FsboTransaction = (typeof FSBO_TRANSACTIONS)[number];
 
 export const PORTAL_LABELS: Record<FsboPortal, string> = {
-  sahibinden: "Sahibinden",
-  hepsiemlak: "Hepsiemlak",
-  emlakjet: "Emlakjet",
+  ...(Object.fromEntries(CURRENT_PORTALS.map((id) => [id, PORTAL_CATALOG[id].label])) as Record<Exclude<FsboPortal, "other">, string>),
   other: "Diğer",
 };
 

@@ -18,6 +18,7 @@ import {
 } from "@/app/actions/portal-listings";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
+import { LISTING_CHANNEL_OPTIONS } from "@/lib/portals/catalog";
 
 type PropertyOption = { id: string; property_code: string; title: string | null };
 
@@ -113,8 +114,8 @@ function NewPortalForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-medium text-ink-950">
           Portal *
-          <select name="portal_name" required defaultValue="Sahibinden" className={`${inputClass} mt-1.5`}>
-            {["Sahibinden", "Hepsiemlak", "Emlakjet", "EmlakSoft vitrin", "Diğer"].map((portal) => <option key={portal}>{portal}</option>)}
+          <select name="portal_name" required defaultValue={LISTING_CHANNEL_OPTIONS[0].value} className={`${inputClass} mt-1.5`}>
+            {LISTING_CHANNEL_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </label>
         <label className="text-sm font-medium text-ink-950">

@@ -1,14 +1,17 @@
 import { computeMissingPortals, type PortalGap } from "@/lib/portal-transfer/gaps";
 import { isMissingSchema, type Db } from "@/lib/listing-control/server/db";
+import { getActivePortals } from "@/lib/portals/membership";
 
 /**
  * Eksik portal okuyucusu (kullanıcı oturumu / RLS; service_role yok). Canlı (yayında) portföy kimlikleri ve canlı portal ilanları
  * sayfalanarak okunur (en çok 5000 portföy); okunamazsa `available: false` (kart gösterilmez, yanlış sayı üretilmez).
+ * Portallar ofisin ÜYELİKLERİYLE süzülür (`tenantId` verilirse): üye olunan portal ilanı olmasa da görünür, diğerleri görünmez.
  */
 const PAGE = 1000;
 const MAX = 5000;
 
-export async function loadPortalGaps(db: Db): Promise<{ available: boolean; gaps: PortalGap[] }> {
+export async function loadPortalGaps(db: Db, tenantId?: string | null): Promise<{ available: boolean; gaps: PortalGap[] }> {
+  const activePromise = tenantId ? getActivePortals(tenantId).catch(() => undefined) : Promise.resolve(undefined);
   const props: string[] = [];
   for (let from = 0; from < MAX; from += PAGE) {
     const { data, error } = await db
@@ -41,5 +44,5 @@ export async function loadPortalGaps(db: Db): Promise<{ available: boolean; gaps
     for (const r of (data ?? []) as { property_id: string; portal_name: string }[]) listings.push({ propertyId: r.property_id, portal: r.portal_name });
     if ((data ?? []).length < PAGE) break;
   }
-  return { available: true, gaps: computeMissingPortals(props, listings) };
+  return { available: true, gaps: computeMissingPortals(props, listings, await activePromise) };
 }

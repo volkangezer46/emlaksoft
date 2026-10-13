@@ -4,6 +4,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { workerClaim, workerComplete, workerRegister, workerReportParser, workerRelease } from "@/app/actions/listing-control-worker";
 import { isSameOriginBridgeRequest } from "@/lib/listing-control/worker/bridge-request";
 import { CHECK_RESULTS, type CheckResultKind } from "@/lib/listing-control/types";
+import { getExtensionPortalsForRequest } from "@/lib/portals/membership";
 
 export const dynamic = "force-dynamic";
 
@@ -35,8 +36,12 @@ export async function POST(request: Request) {
   const str = (k: string) => (typeof body[k] === "string" ? (body[k] as string) : "");
 
   switch (body.op) {
-    case "register":
-      return NextResponse.json(await workerRegister(str("deviceKey"), "Tarayıcı eklentisi", str("version")), { headers: NO_STORE });
+    case "register": {
+      // Eşleşmede sunucu, ofisin üye olduğu VE otomatik kontrolü açık portal listesini döndürür (EP1); eklenti yalnız bunlara
+      // istek atar (yerel ayar yalnız daraltır). Liste okunamazsa alan yok: eklenti mevcut listesini korur.
+      const [reg, portals] = await Promise.all([workerRegister(str("deviceKey"), "Tarayıcı eklentisi", str("version")), getExtensionPortalsForRequest()]);
+      return NextResponse.json(reg.ok && portals ? { ...reg, portals } : reg, { headers: NO_STORE });
+    }
     case "claim":
       return NextResponse.json(await workerClaim(str("clientId")), { headers: NO_STORE });
     case "complete": {

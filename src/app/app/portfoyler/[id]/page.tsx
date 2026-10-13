@@ -40,6 +40,8 @@ import type { PortalName } from "@/lib/integrations/portals";
 import { PortalListingActions } from "./portal-listing-actions";
 import { PortalTransferPanel } from "./portal-transfer-panel";
 import { PORTAL_FORM_RULES, TRANSFER_PORTALS } from "@/lib/portal-transfer/rules";
+import { getPortalMemberships } from "@/lib/portals/membership";
+import { normalizePortalName } from "@/lib/portals/catalog";
 import { PropertyWorkflow } from "./property-workflow";
 import { EditPropertyDialog } from "./edit-property-dialog";
 import { DeletePropertyButton, ReassignProperty } from "./property-admin-actions";
@@ -220,6 +222,7 @@ export default async function PropertyDetailPage({
     { data: regionStat },
     { data: assigneeProfile },
     eidsRes,
+    portalMemberships,
   ] = await Promise.all([
     propertyP,
     supabase
@@ -253,6 +256,8 @@ export default async function PropertyDetailPage({
     assigneeP,
     // EİDS taşınmaz no ayrı, hataya dayanıklı okunur: sütun henüz yoksa (migration uygulanmamış) sayfa düşmez.
     supabase.from("properties").select("eids_property_no").eq("id", id).maybeSingle(),
+    // Portal üyelikleri (tek kaynak): Portala aktar paneli yalnız üye olunan portalı önerir, diğerleri soluk durur.
+    tenantId ? getPortalMemberships(tenantId) : Promise.resolve([] as Awaited<ReturnType<typeof getPortalMemberships>>),
   ]);
 
   if (!property) notFound();
@@ -878,8 +883,14 @@ export default async function PropertyDetailPage({
               propertyId={property.id}
               closed={isClosedStatus}
               portals={TRANSFER_PORTALS.map((id) => {
-                const live = livePortals.find((p) => p.portal_name.trim().toLowerCase() === id);
-                return { id, label: PORTAL_FORM_RULES[id].label, live: live ? { externalId: live.portal_listing_id, url: live.portal_url } : null };
+                const live = livePortals.find((p) => normalizePortalName(p.portal_name) === id);
+                const membership = portalMemberships.find((m) => m.portal === id);
+                return {
+                  id,
+                  label: PORTAL_FORM_RULES[id].label,
+                  live: live ? { externalId: live.portal_listing_id, url: live.portal_url } : null,
+                  membership: membership?.effective ?? "unknown",
+                };
               })}
             />
           ) : null}

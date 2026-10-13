@@ -3,6 +3,8 @@
  * kuyruğa yazılan kayıtlar, açık EmlakSoft sekmesindeki içerik betiğince oturumlu uca gönderilir. Başarısızsa üstel geri
  * çekilmeyle yeniden denenir; 24 saat ya da 8 denemeden sonra düşer. Aynı `key` tekrar yazılırsa kayıt GÜNCELLENİR (çift yok).
  */
+import { CURRENT_PORTALS } from "@/lib/portals/catalog";
+
 export type QueueEntry<T> = { id: string; key: string; payload: T; attempts: number; nextAttemptAt: number; queuedAt: number };
 
 export const QUEUE_MAX = 20;
@@ -59,7 +61,7 @@ export type ImportPayload = {
   }[];
 };
 
-const PORTALS = ["sahibinden", "hepsiemlak", "emlakjet"] as const;
+const PORTALS = CURRENT_PORTALS;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const str = (v: unknown, max: number): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
 const num = (v: unknown, min: number, max: number): number | null => (typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : null);

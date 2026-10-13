@@ -105,10 +105,12 @@ function renderSettings(s: StatusReply) {
     const label = el("label", "field");
     const box = el("input");
     box.type = "checkbox";
-    box.checked = p.enabled;
+    // Yerel ayar yalnız daraltır: ofisin üye olmadığı (ya da kontrolü kapattığı) portal seçilemez.
+    box.checked = p.localOn ?? p.enabled;
+    box.disabled = p.member === false;
     box.dataset.portal = p.id;
     box.addEventListener("change", () => (settingsDirty = true));
-    label.append(box, el("span", "", PORTAL_LABEL[p.id] ?? p.id));
+    label.append(box, el("span", "", `${PORTAL_LABEL[p.id] ?? p.id}${p.member === false ? " (ofis üye değil / kontrol kapalı)" : ""}`));
     toggles.append(label);
   }
   const from = $<HTMLSelectElement>("hoursFrom");
