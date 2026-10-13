@@ -1,0 +1,160 @@
+import "server-only";
+import { randomBytes } from "node:crypto";
+import { now } from "@/lib/clock";
+import type { PlatformModule } from "@/lib/platform-access";
+import { defaultSiteContent } from "@/lib/site-content/defaults";
+import { hasErrors as contentHasErrors, validateSiteContent } from "@/lib/site-content/schema";
+import { SITE_CONTENT_CACHE_TAG, siteContentStore } from "@/lib/site-content/store";
+import { defaultSiteMenu } from "@/lib/site-menu/defaults";
+import { hasErrors as menuHasErrors, validateSiteMenu, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import {
+  SITE_MENU_CACHE_TAG,
+  pruneMedia,
+  publishConfig,
+  saveDraft as saveMenuDraft,
+  readAdminState as readMenuState,
+  resetToDefault as resetMenuToDefault,
+} from "@/lib/site-menu/store";
+import type { HistoryEntry, StoreResult } from "@/lib/versioned-config/store";
+import { hashOf, type ScheduleWriteResult } from "./schedule";
+
+/**
+ * YAYIN MASASI yüzey bağdaştırıcıları (kayıt defteri): taslak/yayın/geçmiş akışı olan her yönetilen içerik burada
+ * tek biçime indirgenir. Depolar YALNIZ dışa açık işlevleriyle kullanılır (editörlerin kendi dosyalarına dokunulmaz).
+ * Yeni yüzey = SURFACES'e bir giriş (ör. marka, SEO sonraki turda).
+ */
+
+export type SurfaceId = "sitecontent" | "sitemenu";
+
+export type SurfaceState = {
+  live: unknown | null;
+  draft: unknown | null;
+  history: HistoryEntry<unknown>[];
+  /** Son yayın/geri dönüş (geçmişin ilk girdisi). */
+  updatedBy: string | null;
+  updatedAt: string | null;
+};
+
+export type RestoreResult = { ok: true; label: string; cfg: unknown } | { ok: false; error: string };
+
+export type PublishSurface = {
+  id: SurfaceId;
+  label: string;
+  module: PlatformModule;
+  editorHref: string;
+  cacheTag: string;
+  /** Canlı değişince yeniden üretilecek public yollar. */
+  livePaths: ReadonlyArray<{ path: string; type?: "layout" | "page" }>;
+  defaults(): unknown;
+  readState(): Promise<SurfaceState>;
+  /** Yapılandırmayı bugünkü kurallarla doğrular; geçersizse hata. */
+  validate(cfg: unknown): Promise<{ cfg: unknown } | { error: string }>;
+  /**
+   * Doğrular ve canlıya alır (geçmişe yazılır). Doğrulama hatası kalıcıdır (`permanent`).
+   * `keepDraft`: depo yayında taslağı canlıya eşitler; zamanlı yayında editördeki daha yeni taslak kaybolmasın diye geri yazılır.
+   */
+  publish(cfg: unknown, staffId: string, label: string, by?: string, opts?: { keepDraft?: boolean }): Promise<ScheduleWriteResult>;
+  /** Canlıyı siler: kod varsayılanına döner. */
+  resetToDefault(staffId: string, by?: string): Promise<StoreResult>;
+  /** Geçmişteki bir sürümü yeni yayın olarak canlıya alır. */
+  restore(historyId: string, staffId: string, by?: string): Promise<RestoreResult>;
+};
+
+const newEntry = (label: string, by: string) => ({ id: randomBytes(6).toString("hex"), at: new Date(now()).toISOString(), by, label: label.slice(0, 80) });
+
+/** Yayından önceki taslak canlıdan ve yayınlanandan farklıysa (editörde süren iş) yayından sonra geri yazılacak taslak. */
+function pendingDraft(before: { live: unknown | null; draft: unknown | null }, cfg: unknown, defaults: unknown): unknown | null {
+  if (!before.draft) return null;
+  const h = hashOf(before.draft);
+  return h !== hashOf(cfg) && h !== hashOf(before.live ?? defaults) ? before.draft : null;
+}
+
+function withMeta(live: unknown | null, draft: unknown | null, history: HistoryEntry<unknown>[]): SurfaceState {
+  return { live, draft, history, updatedBy: history[0]?.by || null, updatedAt: history[0]?.at ?? null };
+}
+
+const siteContent: PublishSurface = {
+  id: "sitecontent",
+  label: "Site içeriği",
+  module: "sitecontent",
+  editorHref: "/admin/site-icerik",
+  cacheTag: SITE_CONTENT_CACHE_TAG,
+  livePaths: [{ path: "/" }, { path: "/kayit" }],
+  defaults: defaultSiteContent,
+  async readState() {
+    const s = await siteContentStore.readState();
+    return withMeta(s.live, s.draft, s.history);
+  },
+  async validate(cfg) {
+    const { config, issues } = validateSiteContent(cfg);
+    return config && !contentHasErrors(issues) ? { cfg: config } : { error: "İçerik bugünkü kurallara uymuyor." };
+  },
+  async publish(cfg, staffId, label, by, opts) {
+    const v = await this.validate(cfg);
+    if ("error" in v) return { ok: false, error: v.error, permanent: true };
+    const keep = opts?.keepDraft ? pendingDraft(await siteContentStore.readState(), v.cfg, defaultSiteContent()) : null;
+    const res = await siteContentStore.publish(v.cfg as Parameters<typeof siteContentStore.publish>[0], newEntry(label, by ?? staffId), staffId);
+    if (res.ok && keep) await siteContentStore.saveDraft(keep as Parameters<typeof siteContentStore.saveDraft>[0], staffId);
+    return res;
+  },
+  async resetToDefault(staffId, by) {
+    const e = newEntry("", by ?? staffId);
+    return siteContentStore.resetToDefault({ id: e.id, at: e.at, by: e.by }, staffId);
+  },
+  async restore(historyId, staffId, by) {
+    const s = await siteContentStore.readState();
+    const version = s.history.find((h) => h.id === historyId);
+    if (!version) return { ok: false, error: "Sürüm bulunamadı." };
+    const label = `Geri dönüş: ${version.label}`;
+    const res = await this.publish(version.cfg, staffId, label, by);
+    return res.ok ? { ok: true, label: version.label, cfg: version.cfg } : { ok: false, error: res.error };
+  },
+};
+
+const siteMenu: PublishSurface = {
+  id: "sitemenu",
+  label: "Site menüsü",
+  module: "sitemenu",
+  editorHref: "/admin/site-menu",
+  cacheTag: SITE_MENU_CACHE_TAG,
+  livePaths: [{ path: "/", type: "layout" }],
+  defaults: defaultSiteMenu,
+  async readState() {
+    const s = await readMenuState();
+    return withMeta(s.live, s.draft, s.history);
+  },
+  async validate(cfg) {
+    const { media } = await readMenuState();
+    const { config, issues } = validateSiteMenu(cfg, { media });
+    return config && !menuHasErrors(issues)
+      ? { cfg: config }
+      : { error: "Menüdeki bazı medya dosyaları artık yok ya da kurallar değişti." };
+  },
+  async publish(cfg, staffId, label, by, opts) {
+    const v = await this.validate(cfg);
+    if ("error" in v) return { ok: false, error: v.error, permanent: true };
+    const keep = opts?.keepDraft ? pendingDraft(await readMenuState(), v.cfg, defaultSiteMenu()) : null;
+    const res = await publishConfig(v.cfg as SiteMenuConfig, newEntry(label, by ?? staffId), staffId);
+    if (res.ok && keep) await saveMenuDraft(keep as SiteMenuConfig, staffId);
+    return res;
+  },
+  async resetToDefault(staffId, by) {
+    const e = newEntry("", by ?? staffId);
+    const res = await resetMenuToDefault({ id: e.id, at: e.at, by: e.by }, staffId);
+    if (res.ok) await pruneMedia(staffId);
+    return res;
+  },
+  async restore(historyId, staffId, by) {
+    const s = await readMenuState();
+    const version = s.history.find((h) => h.id === historyId);
+    if (!version) return { ok: false, error: "Sürüm bulunamadı." };
+    const res = await this.publish(version.cfg, staffId, `Geri dönüş: ${version.label}`, by);
+    return res.ok ? { ok: true, label: version.label, cfg: version.cfg } : { ok: false, error: res.error };
+  },
+};
+
+export const SURFACES: readonly PublishSurface[] = [siteMenu, siteContent];
+
+export function surfaceById(id: string): PublishSurface | null {
+  return SURFACES.find((s) => s.id === id) ?? null;
+}
