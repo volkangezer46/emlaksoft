@@ -23,7 +23,8 @@ export type PlatformModule =
   | "marka"
   | "seo"
   | "sitemenu"
-  | "sitecontent";
+  | "sitecontent"
+  | "reklam";
 
 export const PLATFORM_ROLE_LABELS: Record<PlatformRole, string> = {
   super_admin: "Süper admin",
@@ -44,8 +45,8 @@ export const PLATFORM_ROLE_TAGLINES: Record<PlatformRole, string> = {
  * Rol → erişilebilir modüller. `dashboard` herkeste var; içeriği role göre uyarlanır.
  */
 export const PLATFORM_ROLE_MODULES: Record<PlatformRole, PlatformModule[]> = {
-  super_admin: ["dashboard", "sales", "tenants", "members", "billing", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "personel", "marka", "seo", "sitemenu", "sitecontent"],
-  ops: ["dashboard", "sales", "tenants", "members", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "seo", "sitemenu", "sitecontent"],
+  super_admin: ["dashboard", "sales", "tenants", "members", "billing", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "personel", "marka", "seo", "sitemenu", "sitecontent", "reklam"],
+  ops: ["dashboard", "sales", "tenants", "members", "tickets", "reports", "advisor", "activity", "geo", "sistem", "broadcast", "seo", "sitemenu", "sitecontent", "reklam"],
   billing: ["dashboard", "billing", "tenants", "reports", "advisor"],
   support: ["dashboard", "sales", "tickets", "members", "tenants"],
 };
@@ -56,6 +57,21 @@ export function platformModulesFor(role: PlatformRole): PlatformModule[] {
 
 export function platformCanAccess(role: PlatformRole, module: PlatformModule): boolean {
   return platformModulesFor(role).includes(module);
+}
+
+/**
+ * Görüntüleyebildiği ama DEĞİŞTİREMEDİĞİ modüller (sayfalar `readonly` kipinde açılır). `reklam`: Google bağlantıları,
+ * reklam panosu — bağlama/kesme/gizli değer girişi yalnız super_admin; ops yalnız izler.
+ */
+export const PLATFORM_READONLY_MODULES: Partial<Record<PlatformRole, PlatformModule[]>> = {
+  ops: ["reklam"],
+};
+
+export type PlatformModuleMode = "write" | "readonly" | "none";
+
+export function platformModuleMode(role: PlatformRole, module: PlatformModule): PlatformModuleMode {
+  if (!platformCanAccess(role, module)) return "none";
+  return PLATFORM_READONLY_MODULES[role]?.includes(module) ? "readonly" : "write";
 }
 
 /** Giriş sonrası departmanın varsayılan açılış ekranı. */

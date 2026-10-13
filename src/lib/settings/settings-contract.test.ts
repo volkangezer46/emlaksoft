@@ -48,6 +48,8 @@ const LEGACY_WRITERS: Record<string, string> = {
     "Büyüme Kokpiti Otopilot anahtarı (growth.autopilot; SP1 kararı: registry/platform.ts AP8-P1 dosyası olduğu için doğrudan yazılır). Yalnız süper admin setAutopilot eylemiyle, denetim izli; okunarak doğrulanır",
   "src/lib/perf/store.ts":
     "Hız merkezi (SP4): statik.routes (rota anahtarları, düz JSON), statik.rev (önbellek tazeleme sayacı; ayar değil, süreçler arası işaret) ve perf.psi.key (YALNIZ sealSecret ile mühürlü, write_setting meta isSecret+parmak izi); kendi ekranı /admin/site/hiz, süper admin kapılı (speed-admin.ts)",
+  "src/lib/google/db.ts":
+    "Google bağlantı merkezi (google.*): OAuth istemcisi, hizmet başına yenileme belirteci, Ads hesabı, GSC mülkü, kota sayacı. Hepsi sealSecret ile MÜHÜRLÜ JSON (write_setting RPC, is_secret: geçmişte değer yok); okumada düz metin reddedilir (requireSealed). Registry'ye (settings/registry/platform.ts, AP8/P1 kapsamı) bu turda eklenemedi; ekranı /admin/site/baglantilar",
   "src/app/actions/platform-security.ts":
     "güvenlik anahtarları (demo girişi, personel MFA + geçiş süresi, bakım kapsamı; kendi ekranı Personel > Güvenlik politikası). write_setting RPC ile settings_history'ye düşer; env tavanı ve kendini kilitleme koruması registry codec'iyle ifade edilemez",
 };

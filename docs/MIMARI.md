@@ -52,7 +52,7 @@ Etkin izin `permissions-effective.ts`'te birleşir; sunucu kapıları `requirePe
 `requireModulePage` (sayfa). Platform staff kendi ops oturumunda geçer, impersonation'da readonly.
 SQL tarafı `current_tenant_id()` JWT claim'i ile RLS (migration 002, role-aware 016).
 
-## Cron envanteri (39 — `vercel.json` + `src/app/api/cron/*`, sayı `npm run check:cron` ile doğrulanır)
+## Cron envanteri (40 — `vercel.json` + `src/app/api/cron/*`, sayı `npm run check:cron` ile doğrulanır)
 
 Bildirim/özet: `gunluk-ozet` (07:00) · `haftalik-ozet` (pzt 07:30) · `randevu-hatirlat` (30 dk) · `gorev-hatirlat` (2 s) · `dogum-gunu` (08:00) · `vitrin-eslesme` (10:00 kayıtlı arama) · `vitrin-alarm` (10:30) · `anahtar-gecikme` (09:00) · `campaign-delivery` (2 dk).
 İlan/kayıp-kaçak: `portal-teyit` (6 s ilan teyidi) · `leak-sla` (saatlik: kaçan komisyon SLA'sı + İlan Kontrol anomali SLA yükseltmesi, tek zincir).
@@ -66,6 +66,7 @@ Kontör sağlık: `ef-kontor-saglik` (günlük 01:50 UTC = 04:50 TR; ortak istem
 Kontör mutabakat: `ef-kontor-mutabakat` (günlük 02:10 UTC = 05:10 TR; EF `GET /kullanim` son 31 gün `toplam.degerleme/pdf` ile defter `ef_credit_reservations` state=committed sayımı karşılaştırılır, tolerans 2; sonuç `ef_reconciliation_runs`; sapmada platform bildirimi; anahtar/bayrak yoksa atlar; saf mantık `src/lib/ef-credits/reconcile.ts`).
 Zeka katmanı: `insight-engine` (30 dakikada bir, :12/:42; ofisleri imleç + zaman bütçesiyle tarar, kural tabanlı içgörüleri `insights` tablosuna yazar; yüksek şiddet zile günde kullanıcı başına ≤3 düşer; örnek veri ofisi atlanır; service_role istemcisi `runBillingReconciliation(0, "insight_engine")` (kapalı iş seçici) üzerinden gelir, yeni createAdminClient kullanımı yok; saf kurallar `src/lib/insights/rules/*`, okuyucu `src/lib/insights/read.ts`).
 Yayın masası: `yayin-zamanlayici` (5 dakikada bir; `/admin/site` yayın masasında zamanlanan taslağı `publishAt`te yayınlar, `unpublishAt`te önceki canlıya döner — araya elle yayın girdiyse dönmez ve süper admine zil; kayıtlar `platform_settings` `publishing.scheduled`, saf çekirdek `src/lib/publishing/schedule.ts`).
+Google: `google-senkron` (günlük 03:10 UTC = 06:10 TR; bağlantı yoksa "atlandı: bağlı değil" yazar ve dış çağrı yapmaz; bağlıysa Search Console analitiği, URL denetimi (günde ≤50) ve Google Ads (yalnız okuma) çekilir, ardından budama; hizmetler birbirinden yalıtılır, mühürlü OAuth deposu `src/lib/google/token-store.ts`).
 Hepsi `CRON_SECRET` Bearer + `recordHeartbeat` (admin cron sağlık panosu). Modül sistemi açıkken kapalı modülün işini yapan cron'lar o ofisi atlar (6 cron).
 
 ## Yetki, paket, modül: üç ayrı kapı

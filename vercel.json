@@ -160,6 +160,10 @@
     {
       "path": "/api/cron/yayin-zamanlayici",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/google-senkron",
+      "schedule": "10 3 * * *"
     }
   ]
 }

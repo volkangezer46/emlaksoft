@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generatePassword, passwordStrength, PLATFORM_ROLES, roleSummary, staffKpi } from "./staff-model";
+import { generatePassword, passwordStrength, PLATFORM_MODULE_LABELS, PLATFORM_ROLES, roleSummary, staffKpi } from "./staff-model";
 
 describe("generatePassword", () => {
   it("her sınıftan karakter içerir ve uzunluğu korur", () => {
@@ -33,7 +33,7 @@ describe("roleSummary", () => {
   it("izinli + yasaklı = tüm modüller; super_admin hiçbirini yasaklamaz", () => {
     for (const r of PLATFORM_ROLES) {
       const s = roleSummary(r);
-      expect(s.allowed.length + s.denied.length).toBe(17);
+      expect(s.allowed.length + s.denied.length).toBe(Object.keys(PLATFORM_MODULE_LABELS).length);
     }
     expect(roleSummary("super_admin").denied).toEqual([]);
     expect(roleSummary("support").denied).toContain("Personel yönetimi");

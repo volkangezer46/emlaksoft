@@ -399,6 +399,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/geo/reader.ts", fn: "loadProvinces", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/geo/resolve.ts", fn: "loadAliases", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/growth-analytics/funnel.ts", fn: "readGrowthFunnel", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/lib/google/db.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/growth/store.ts", fn: "activeRule", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/growth/store.ts", fn: "countClickSafe", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/growth/store.ts", fn: "ensureReferralCode", calls: 1, tenantFilter: "var" },

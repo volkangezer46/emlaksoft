@@ -153,7 +153,7 @@ describe("salt-okunur kapı ve cron", () => {
     expect(route).toContain("!pausedDue.has(String(s.id))");
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string }[] };
     expect(vercel.crons.filter((c) => c.path.includes("abonelik-kontrol"))).toHaveLength(1);
-    expect(vercel.crons).toHaveLength(39);
+    expect(vercel.crons).toHaveLength(40);
   });
 
   it("plan-support: pauseReady/upgradeReady probe'ları (şema yokken özellik gizli)", () => {
