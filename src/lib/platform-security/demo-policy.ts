@@ -82,8 +82,8 @@ export type DemoPolicyNow = DemoPolicy & { ceiling: DemoCeiling; row: DemoPolicy
 /** Şu anki etkin politika (DB bayrak önbelleğinden; okuma hatasında satır yok = env davranışı). */
 export async function getDemoPolicyNow(): Promise<DemoPolicyNow> {
   const ceiling = demoEnvCeiling();
-  // Tavan tamamen kapalıysa DB okunmaz (karar değişmez).
-  if (!ceiling.tenant) return { tenant: false, platform: false, ceiling, row: null };
   const row = parseDemoPolicyRow((await readPlatformFlagsCached()).demoLoginRaw);
+  // Tavan tamamen kapalıysa karar kesin kapalı; satır yalnız gösterim için (yönetim ekranı) döner.
+  if (!ceiling.tenant) return { tenant: false, platform: false, ceiling, row };
   return { ...effectiveDemoPolicy(ceiling, row, now()), ceiling, row };
 }

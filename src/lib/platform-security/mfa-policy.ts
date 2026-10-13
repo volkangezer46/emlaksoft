@@ -10,6 +10,8 @@ import { readPlatformFlagsCached, SECURITY_SETTING_KEYS } from "@/lib/platform-f
  *    (`growth_staff_super_admin()` vb.) AAL2'yi YALNIZ bu ayara bakarak ister; bu yüzden anahtar hep DB'ye yazılır.
  *  - DB 'platform.mfa_grace_until' (ISO): geçiş süresi. Bitmeden, doğrulayıcısı OLMAYAN personel parolayla girer
  *    (üstte sarı geri sayım şeridi); doğrulayıcısı olan personelden AAL2 hemen istenir.
+ *    YALNIZ uygulama katmanında uygulanır: SQL kapıları geçiş süresine bakmaz, DB kapılı personel RPC'leri
+ *    süre içinde de AAL2 ister (kalıcı çözüm: SQL kapısına grace desteği, ayrı migration paketi).
  *
  * KİLİTLENME KURTARMASI (belgeli): tüm süper adminler doğrulayıcısını kaybederse
  *   1) `.env.production` içinde PLATFORM_MFA_ENFORCEMENT=force-off + yeniden yayın → uygulama katmanı MFA istemez;

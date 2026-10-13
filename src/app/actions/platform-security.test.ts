@@ -85,6 +85,17 @@ describe("setMfaEnforcement", () => {
     expect((await setMfaEnforcement({ on: false, graceDays: 0, reason: "kısa" })).error).toContain("Gerekçe");
     expect(await setMfaEnforcement({ on: false, graceDays: 0, reason: REASON })).toEqual({ ok: true });
   });
+
+  it("env PLATFORM_MFA_ENFORCEMENT=on iken DB'ye 'off' yazılamaz (env/DB ayrışması önlenir)", async () => {
+    vi.stubEnv("PLATFORM_MFA_ENFORCEMENT", "on");
+    try {
+      const res = await setMfaEnforcement({ on: false, graceDays: 0, reason: REASON });
+      expect(res.error).toContain("Sunucu ortamı zorunlu tutuyor");
+      expect(h.setSetting).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("setDemoLoginMode", () => {

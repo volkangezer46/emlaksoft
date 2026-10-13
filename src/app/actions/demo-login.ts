@@ -7,6 +7,7 @@ import { createAdminClient, resolveSupabaseAdminKey } from "@/lib/supabase/admin
 import { restoreImpersonationMetadata } from "@/lib/impersonation";
 import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
 import { getDemoPolicyNow } from "@/lib/platform-security/demo-policy";
+import { isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
 import { planAmountTry } from "@/lib/billing/plans";
@@ -158,7 +159,10 @@ async function ensureDemoTenant(): Promise<string> {
 
 /** Yalnızca tıklanan kişiliği hazırlar (hızlı ilk giriş). Kimlik id'sini döner. */
 async function ensurePersona(persona: DemoPersona): Promise<string> {
-  // Savunma derinliği: politika (env tavanı + yönetim anahtarı) sunucuda bir kez daha denetlenir.
+  // Savunma derinliği: env tavanı doğrudan, ardından politika (env tavanı + yönetim anahtarı) sunucuda bir kez daha denetlenir.
+  if (persona.kind === "platform" && !isPlatformDemoPersonaAllowed()) {
+    throw new Error("Platform demo kişilikleri bu ortamda kesin olarak kapalı.");
+  }
   if (persona.kind === "platform" && !(await getDemoPolicyNow()).platform) {
     throw new Error("Platform demo kişilikleri bu ortamda kesin olarak kapalı.");
   }

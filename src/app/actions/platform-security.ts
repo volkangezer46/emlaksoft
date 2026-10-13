@@ -15,7 +15,7 @@ import {
   demoEnvCeiling,
   type DemoMode,
 } from "@/lib/platform-security/demo-policy";
-import { MFA_ENFORCED_SETTING_KEY, MFA_GRACE_SETTING_KEY } from "@/lib/platform-security/mfa-policy";
+import { MFA_ENFORCED_SETTING_KEY, MFA_GRACE_SETTING_KEY, mfaEnvMode } from "@/lib/platform-security/mfa-policy";
 import {
   MAINTENANCE_SCOPE_SETTING_KEY,
   MAINTENANCE_SCOPES,
@@ -154,6 +154,10 @@ export async function setMfaEnforcement(input: { on: boolean; graceDays: number;
   if (bad) return { error: bad };
   const graceDays = Number(input.graceDays);
   if (graceDays !== 0 && graceDays !== 7) return { error: "Geçiş süresi 0 veya 7 gün olmalı." };
+  // env "on" iken DB'ye 'off' yazılmaz: aksi halde SQL personel kapıları AAL2 istemez (env/DB ayrışması).
+  if (!input.on && mfaEnvMode(process.env.PLATFORM_MFA_ENFORCEMENT) === "on") {
+    return { error: "Sunucu ortamı zorunlu tutuyor (PLATFORM_MFA_ENFORCEMENT=on); buradan kapatılamaz." };
+  }
 
   if (input.on) {
     const own = await verifiedTotpFactors(createAdminClient(), gate.staff.id);

@@ -168,7 +168,7 @@ export default function PersonelDetayPage() {
           <ReasonDialog
             tone="danger"
             title={`${member.full_name} için doğrulayıcı sıfırlansın mı?`}
-            description="Kayıtlı tüm authenticator'ları silinir ve oturumları kapanır. İşlem denetim izine yazılır."
+            description="Kayıtlı tüm doğrulayıcıları silinir; açık oturumlar kendiliğinden kapanmaz. İşlem denetim izine yazılır."
             confirmLabel="Doğrulayıcıyı sıfırla"
             trigger={
               <Button variant="outline" size="sm" type="button" className="text-danger-600">

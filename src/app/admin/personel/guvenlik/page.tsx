@@ -121,6 +121,12 @@ export default async function SecurityPolicyPage() {
                 ? ` · geçiş süresi ${DATE.format(new Date(mfa.graceUntil))} tarihinde bitiyor (${graceDaysLeft} gün)`
                 : ""}
             </p>
+            {mfa.enforced ? (
+              <p className="mt-1 text-xs text-text-muted">
+                Geçiş süresi yalnız panel girişini kapsar; veritabanı kapılı işlemler (ör. büyüme ekranları) süre içinde de
+                doğrulayıcı ister.
+              </p>
+            ) : null}
           </div>
         </div>
         {isSuper ? (

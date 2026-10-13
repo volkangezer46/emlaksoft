@@ -167,5 +167,7 @@ describe("deployment environment safety", () => {
     const action = readFileSync("src/app/actions/demo-login.ts", "utf8");
     expect(config).toContain("assertProductionEnvironment(process.env)");
     expect(action).toContain('persona.kind === "platform" && !isPlatformDemoPersonaAllowed()');
+    expect(action).toContain('persona.kind === "platform" && !(await getDemoPolicyNow()).platform');
+    expect(action).toContain('persona.kind === "platform" && !policy.platform');
   });
 });

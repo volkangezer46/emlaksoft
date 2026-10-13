@@ -162,7 +162,7 @@ export function MfaEnforcementForm({ enforced, canEnable }: { enforced: boolean;
         title="Personel için iki adımlı doğrulama zorunlu olsun mu?"
         description={
           grace === 7
-            ? "7 gün boyunca doğrulayıcısı olmayan personel parolayla girer ve geri sayım şeridi görür; sonra kod zorunludur."
+            ? "7 gün boyunca doğrulayıcısı olmayan personel parolayla panele girer ve geri sayım şeridi görür; sonra kod zorunludur. Dikkat: geçiş süresinde de veritabanı kapılı işlemler (ör. büyüme ekranları) doğrulayıcı ister."
             : "Doğrulayıcısı olmayan personel bir sonraki girişte kurulum ekranına yönlenir."
         }
         confirmLabel="Zorunlu yap"
