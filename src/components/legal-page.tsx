@@ -1,6 +1,7 @@
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import Link from "next/link";
 import { Brand } from "@/components/brand/brand";
+import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
 
 /**
@@ -68,6 +69,9 @@ export function LegalPage({
           <Link className="inline-flex min-h-11 items-center hover:text-brand-600" href="/davet-kosullari">Davet Koşulları</Link>
         </nav>
       </section>
+      {/* Birinci taraf ölçüm etiketi (S6). Bu düzen yalnız herkese açık yasal sayfalarda kullanılır; statik sürümde de
+          korunur (data-static-keep). */}
+      <PublicMeasure />
     </main>
   );
 }

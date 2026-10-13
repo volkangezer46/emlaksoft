@@ -1,13 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { SiteHeader } from "@/components/site-header";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
 
 /**
  * /fiyatlar için ortak üst menü (SiteHeader, ana sayfayla aynı) ve alt bilgi.
+ * `measurePath`: herkese açık sayfa yolu verilirse birinci taraf ölçüm etiketi (<PublicMeasure />, S6) alt bilginin sonuna
+ * basılır. Personel önizlemeleri (/admin/...) aynı kabuğu `measurePath` VERMEDEN kullanır: etiket hiç basılmaz.
  */
-export function PricingShell({ children }: { children: ReactNode }) {
+export function PricingShell({ children, measurePath }: { children: ReactNode; measurePath?: string }) {
   return (
     <div className="min-h-screen bg-surface text-text">
       {/* Ana sayfayla AYNI üst menü (ortak SiteHeader); .mk yalnız başlığın stil kapsamıdır. */}
@@ -25,6 +28,7 @@ export function PricingShell({ children }: { children: ReactNode }) {
             <Link href="/kullanim-sartlari" className="inline-flex min-h-11 items-center hover:text-ink-950 hover:underline">Kullanım şartları</Link>
           </nav>
         </div>
+        {measurePath ? <PublicMeasure path={measurePath} /> : null}
       </footer>
     </div>
   );

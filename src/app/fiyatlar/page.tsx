@@ -18,6 +18,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FiyatlarPage() {
   const [data, live] = await Promise.all([loadPricingViewData(), getLivePricingPage()]);
   const copy = pricingCopy(live ?? defaultPricingPage(), copyContextOf(data), { faqFromCode: !live });
-  return <PricingPageView data={data} copy={copy} />;
+  return <PricingPageView data={data} copy={copy} measurePath="/fiyatlar" />;
 }
 
