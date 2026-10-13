@@ -24,9 +24,15 @@ export function collectControlsInPage(doc?: Doc): ControlDescriptor[] {
     const type = (el.getAttribute("type") ?? "").toLowerCase();
     if (tag === "input" && skip.includes(type)) continue;
     const labels: string[] = [];
-    const push = (s: string | null | undefined) => {
+    // Denetime BAĞLI kaynaklardan gelen etiketlerin kaynağı (labels dizisinin ilk `sources.length` öğesine paralel).
+    const sources: string[] = [];
+    let bounded = true;
+    const push = (s: string | null | undefined, src = "") => {
       const c = clean(s);
-      if (c && c.length <= 80 && !labels.includes(c)) labels.push(c);
+      if (c && c.length <= 80 && !labels.includes(c)) {
+        labels.push(c);
+        if (bounded) sources.push(src);
+      }
     };
     const isChoice = type === "radio" || type === "checkbox";
     let optionText = "";
@@ -34,18 +40,22 @@ export function collectControlsInPage(doc?: Doc): ControlDescriptor[] {
     if (isChoice) {
       optionText = clean(own[0]?.textContent) || clean(el.getAttribute("value"));
     } else {
-      for (const l of own) push(l.textContent);
+      for (const l of own) push(l.textContent, "label_for");
     }
-    push(el.getAttribute("aria-label"));
+    push(el.getAttribute("aria-label"), "aria_label");
     const by = el.getAttribute("aria-labelledby");
-    if (by) for (const id of by.split(/\s+/)) push(d.getElementById(id)?.textContent);
-    if (!isChoice) push(el.getAttribute("placeholder"));
-    push(el.getAttribute("name"));
-    push(el.id);
+    if (by) for (const id of by.split(/\s+/)) push(d.getElementById(id)?.textContent, "aria_labelledby");
+    if (!isChoice) push(el.getAttribute("placeholder"), "placeholder");
+    push(el.getAttribute("name"), "name");
+    push(el.id, "id");
+    // Soru etiketi: grup kabı (fieldset/legend, form-group) ya da kabın önceki kardeşi.
+    const box = isChoice ? (el.closest("fieldset, [role=radiogroup], [role=group], .form-group, .form-row") ?? el.parentElement?.parentElement ?? null) : null;
+    if (isChoice) push(box?.querySelector("legend")?.textContent, "legend");
+    // Buraya kadarki etiketler denetime BAĞLI kaynaklardır (label[for], aria, placeholder, ad, kimlik, legend); geri bildirim
+    // şemasına yalnız bunlar girer. Aşağıdaki komşu metin yalnız eşleştirmede kullanılır, eklentiden dışarı ÇIKMAZ.
+    bounded = false;
+    const starred = own.some((l) => /\*/.test(l.textContent ?? "")) || /\*/.test(box?.querySelector("legend")?.textContent ?? "");
     if (isChoice) {
-      // Soru etiketi: grup kabı (fieldset/legend, form-group) ya da kabın önceki kardeşi.
-      const box = el.closest("fieldset, [role=radiogroup], [role=group], .form-group, .form-row") ?? el.parentElement?.parentElement ?? null;
-      push(box?.querySelector("legend")?.textContent);
       push(box?.querySelector("label")?.textContent);
       push(box?.previousElementSibling?.textContent);
     } else {
@@ -78,6 +88,8 @@ export function collectControlsInPage(doc?: Doc): ControlDescriptor[] {
       optionText,
       disabled: Boolean(el.disabled) || el.getAttribute("readonly") !== null,
       visible,
+      required: Boolean(el.required) || el.getAttribute("required") !== null || el.getAttribute("aria-required") === "true" || starred,
+      sources,
     });
     idx += 1;
   }
@@ -172,4 +184,59 @@ export function readPageRefInPage(doc?: Doc): { url: string; title: string; text
 export function readListHtmlInPage(doc?: Doc): { url: string; html: string } {
   const d: Doc = doc ?? document;
   return { url: d.location?.href ?? "", html: (d.documentElement?.outerHTML ?? "").slice(0, 1_500_000) };
+}
+
+export type ReadValue = {
+  idx: number;
+  kind: "text" | "select" | "bool" | "missing";
+  /** Metin değerinin FNV-1a 32 bit özeti (boşsa YOK). Ham değer sayfadan ÇIKMAZ. */
+  valueHash?: string;
+  /** Yalnız rakamlarının özeti ("1500000" ile "1.500.000" aynı): biçim mi içerik mi değişti ayrımı için. */
+  digitsHash?: string;
+  /** Seçili seçenek metni (portalın kendi sözlüğü; kullanıcının yazdığı metin değil). */
+  option?: string;
+  checked?: boolean;
+};
+
+/**
+ * Doldurulan denetimlerin ŞU ANKİ durumunu okur ("Yayından önce kontrol et" / "EmlakSoft'a bağla"). Metin alanlarının
+ * değeri sayfa içinde özetlenir; dönen yapıda ham değer YOKTUR. Okuma yalnızdır: olay, ağ çağrısı ve gönderim yok.
+ */
+export function readValuesInPage(idxs: number[], doc?: Doc): ReadValue[] {
+  const d: Doc = doc ?? document;
+  // FNV-1a 32 bit (eşzamanlı; enjekte edilen işlev dış içe aktarma kullanamaz). `correction.ts: fnv1a32` ile birebir aynı.
+  const fnv = (s: string): string => {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i += 1) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(16).padStart(8, "0");
+  };
+  const norm = (s: string | null | undefined): string => (s ?? "").replace(/\s+/g, " ").trim();
+  const out: ReadValue[] = [];
+  for (const idx of idxs.slice(0, 200)) {
+    if (!Number.isInteger(idx) || idx < 0) continue;
+    const el = d.querySelector(`[data-emlaksoft-fill="${idx}"]`) as (HTMLInputElement & HTMLSelectElement & HTMLTextAreaElement) | null;
+    if (!el) {
+      out.push({ idx, kind: "missing" });
+      continue;
+    }
+    const tag = el.tagName.toLowerCase();
+    const type = (el.getAttribute("type") ?? "").toLowerCase();
+    if (tag === "select") {
+      const sel = el.options?.[el.selectedIndex];
+      out.push({ idx, kind: "select", option: sel ? norm(sel.textContent).slice(0, 120) : "" });
+    } else if (type === "checkbox" || type === "radio") {
+      out.push({ idx, kind: "bool", checked: Boolean(el.checked) });
+    } else {
+      const v = norm(el.value);
+      const digits = v.replace(/[^0-9]/g, "");
+      const r: ReadValue = { idx, kind: "text" };
+      if (v) r.valueHash = fnv(v);
+      if (digits) r.digitsHash = fnv(digits);
+      out.push(r);
+    }
+  }
+  return out;
 }

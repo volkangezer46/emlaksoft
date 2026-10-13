@@ -1,5 +1,7 @@
-import { FIELD_RULES, fold, type FieldRule, type FillFieldKey } from "./rules";
+import { FIELD_RULES, fold, type FillFieldKey } from "./rules";
 import type { FieldValue, PortalPayload } from "./payload";
+import { RISKY_FIELD_KEYS, type RuleField, type RuleSet } from "./rule-format";
+import { seedRuleSet } from "./seed-rules";
 
 /**
  * FORM DOLDURMA PLANI (SAF, testli). Eklenti, portal sekmesinden form denetimlerinin BETİMLEYİCİLERİNİ okur
@@ -27,6 +29,14 @@ export type ControlDescriptor = {
   optionText: string;
   disabled: boolean;
   visible: boolean;
+  /** (0.6.0) Zorunlu işareti: `required`, `aria-required` ya da etikette '*'. */
+  required?: boolean;
+  /**
+   * (0.6.0) `labels` dizisinin ilk `sources.length` öğesinin kaynağı; bunlar denetime BAĞLIDIR (label_for, aria_label,
+   * aria_labelledby, placeholder, name, id, legend). Geri bildirim şemasına yalnız bunlar girer; komşu metin (ad soyad,
+   * mağaza adı olabilir) eklentiden çıkmaz. Yoksa (eski betimleyici) hiçbir etiket bağlı sayılmaz.
+   */
+  sources?: string[];
 };
 
 export type FillAction =
@@ -34,11 +44,35 @@ export type FillAction =
   | { idx: number; op: "select"; field: FillFieldKey; optionIndex: number }
   | { idx: number; op: "click"; field: FillFieldKey };
 
-export type FieldStatus = "planned" | "not_found" | "no_option" | "already_filled" | "skipped";
-export type FieldReport = { key: FillFieldKey; label: string; status: FieldStatus; detail?: string };
-export type FillPlan = { actions: FillAction[]; report: FieldReport[]; manual: string[] };
+/** `manual`: kural seti alanı kapattı ya da riskli alan doğrulanmamış uzak veriyle eşleşti → doldurulmaz, "elle doldurun". */
+export type FieldStatus = "planned" | "not_found" | "no_option" | "already_filled" | "skipped" | "manual";
+export type RuleState = RuleField["state"];
+export type FieldReport = {
+  key: FillFieldKey;
+  label: string;
+  status: FieldStatus;
+  detail?: string;
+  /** (0.6.0) Eşleşen denetimin sırası (radyoda grubun ilk üyesi); eşleşme yoksa YOK. */
+  idx?: number;
+  /** (0.6.0) Kural setindeki alan durumu (rozet: doğrulanmış / öneri / kontrol edin). */
+  state?: RuleState;
+  score?: number;
+  anchorHit?: boolean;
+};
+export type FillPlan = {
+  actions: FillAction[];
+  report: FieldReport[];
+  manual: string[];
+  /** (0.6.0) Kullanılan kural setinin sürümü (tohum 0) ve sha256'sının ilk 16 hex'i (tohumda null). */
+  ruleVersion: number;
+  ruleSha: string | null;
+  /** (0.6.0) Hiçbir kurala eşleşmeyen denetimler (soru başına ilk sıra): yalnız şeması (değersiz) geri bildirime girer. */
+  unclaimed: number[];
+  /** (0.6.0) Uzak set tohumdan belirgin az eşleştiği için bu turda tohum kullanıldı. */
+  rulesRegressed?: boolean;
+};
 
-const NEVER_TYPES = new Set(["hidden", "submit", "button", "image", "reset", "file", "password", "email", "tel", "search", "range", "color", "date", "datetime-local", "time", "month", "week"]);
+export const NEVER_TYPES = new Set(["hidden", "submit", "button", "image", "reset", "file", "password", "email", "tel", "search", "range", "color", "date", "datetime-local", "time", "month", "week"]);
 const PLACEHOLDER_OPTION = /^(seciniz|sec|seciniz\.\.\.|secim yapiniz|seciniz lutfen|lutfen seciniz|tumu|hepsi|-+|\.\.\.)?$/;
 
 const wordIn = (haystack: string, phrase: string) => ` ${haystack} `.includes(` ${phrase} `);
@@ -48,7 +82,7 @@ export function splitIdentifier(s: string): string {
   return s.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_\-.[\]]+/g, " ");
 }
 
-function labelScore(rule: FieldRule, rawLabels: readonly string[]): number {
+function labelScore(rule: { labels: readonly string[]; exact?: readonly string[] }, rawLabels: readonly string[]): number {
   let best = 0;
   for (const raw of rawLabels) {
     if (!raw || raw.length > 80) continue;
@@ -65,7 +99,7 @@ function labelScore(rule: FieldRule, rawLabels: readonly string[]): number {
   return best;
 }
 
-function isPlaceholderOption(text: string): boolean {
+export function isPlaceholderOption(text: string): boolean {
   return PLACEHOLDER_OPTION.test(fold(text));
 }
 
@@ -101,8 +135,8 @@ function floorWords(n: number): string[] {
  * Bir alan değerine karşılık gelen seçenek sırasını bulur (yoksa null). Kurallar, sırasıyla: bayrak (evet/hayır), sayısal aralık
  * (bina yaşı, kat), tam katlanmış eşitlik, kapsama, sözcük örtüşmesi. Yer tutucu seçenekler hiç seçilmez.
  */
-export function chooseOption(key: FillFieldKey, value: FieldValue, options: readonly string[]): number | null {
-  const cands = options.map((text, i) => ({ text, i, f: fold(text) })).filter((o) => !isPlaceholderOption(o.text));
+export function chooseOption(key: FillFieldKey, value: FieldValue, options: readonly string[], extraPlaceholders: readonly string[] = []): number | null {
+  const cands = options.map((text, i) => ({ text, i, f: fold(text) })).filter((o) => !isPlaceholderOption(o.text) && !extraPlaceholders.includes(o.f));
   if (cands.length === 0) return null;
 
   if (typeof value === "boolean") {
@@ -164,112 +198,173 @@ function textFor(value: FieldValue): string {
   return value;
 }
 
+const ANCHOR_SCORE = 1000;
+const LABEL_OF = new Map(FIELD_RULES.map((r) => [r.key, r.label]));
+
+/** Kural setindeki seçenek takma adıyla seçim (chooseOption'dan ÖNCE). Evet/Hayır yönünü ters çeviren takma ad yok sayılır. */
+function aliasOption(rule: RuleField, value: FieldValue, options: readonly string[], placeholders: readonly string[]): number | null {
+  const valueKey = typeof value === "boolean" ? (value ? "evet" : "hayir") : fold(String(value));
+  const aliases = (rule.options as Record<string, readonly string[]> | undefined)?.[valueKey];
+  if (!aliases || aliases.length === 0) return null;
+  const opposite = typeof value === "boolean" ? (value ? NO : YES) : [];
+  const ok = aliases.filter((a) => !opposite.some((w) => a === w || wordIn(a, w)));
+  for (const alias of ok) {
+    const i = options.findIndex((o) => !isPlaceholderOption(o) && !placeholders.includes(fold(o)) && fold(o) === alias);
+    if (i >= 0) return i;
+  }
+  return null;
+}
+
 /**
  * Form betimleyicilerinden doldurma planı üretir. Bir denetim en çok bir alana atanır; her alan için en yüksek puanlı
  * (en kısa ve belirgin etiketli) denetim seçilir. Dolu alanlara DOKUNULMAZ. Telefon/e-posta/parola/dosya denetimleri hiç
  * değerlendirilmez.
+ *
+ * (0.6.0) Eşleme verisi kural setinden gelir (`rules`; varsayılan pakete gömülü TOHUM = bugünkü `rules.ts`). Puan sırası:
+ * çapa (alan imzası; sayfada TEKİL eşleşirse) > etiket tam eşleşmesi > exact > sözcük içi eşleşme. Kapalı alan doldurulmaz.
+ * Güvenlik tabanı (NEVER_TYPES, yer tutucu seçenekler, dolu alana dokunmama) veriyle gevşetilemez; setin `placeholders`
+ * listesi kodda gömülü kümeye yalnız EKLENİR.
  */
-export function planFill(descriptors: readonly ControlDescriptor[], payload: PortalPayload): FillPlan {
+export function planFill(
+  descriptors: readonly ControlDescriptor[],
+  payload: PortalPayload,
+  rules: RuleSet = seedRuleSet(payload.portal),
+  opts: { ruleSha?: string | null; anchors?: ReadonlyMap<number, string> } = {},
+): FillPlan {
   const usable = descriptors.filter((d) => d.visible && !d.disabled && !NEVER_TYPES.has(d.type));
   const used = new Set<number>();
   const usedGroups = new Set<string>();
   const actions: FillAction[] = [];
   const report: FieldReport[] = [];
+  const placeholders: readonly string[] = rules.placeholders ?? [];
+  const remote = rules.version > 0;
+  const seed = remote ? seedRuleSet(payload.portal) : rules;
+  const seedByKey = new Map(seed.fields.map((f) => [f.key, f]));
 
   // Radyo grupları tek soru: grup etiketlerini birleştir, seçenekler = üyelerin kendi metni.
-  type Q = { key: string; idxs: number[]; labels: string[]; options: string[]; isRadio: boolean };
+  type Q = { key: string; idxs: number[]; labels: string[]; options: string[]; isRadio: boolean; anchor: string | null };
   const questions: Q[] = [];
   const groups = new Map<string, ControlDescriptor[]>();
+  const anchorOf = (idx: number) => opts.anchors?.get(idx) ?? null;
   for (const d of usable) {
     if (d.type === "radio" && d.group) {
       const arr = groups.get(d.group) ?? [];
       arr.push(d);
       groups.set(d.group, arr);
     } else {
-      questions.push({ key: `c${d.idx}`, idxs: [d.idx], labels: d.labels, options: d.tag === "select" ? d.options : [], isRadio: false });
+      questions.push({ key: `c${d.idx}`, idxs: [d.idx], labels: d.labels, options: d.tag === "select" ? d.options : [], isRadio: false, anchor: anchorOf(d.idx) });
     }
   }
   for (const [g, members] of groups) {
-    questions.push({ key: `g${g}`, idxs: members.map((m) => m.idx), labels: members.flatMap((m) => m.labels), options: members.map((m) => m.optionText), isRadio: true });
+    questions.push({ key: `g${g}`, idxs: members.map((m) => m.idx), labels: members.flatMap((m) => m.labels), options: members.map((m) => m.optionText), isRadio: true, anchor: anchorOf(members[0]!.idx) });
   }
+  // Çapa yalnız sayfada TEKİL ise kullanılır (iki eş denetim aynı imzayı verebilir).
+  const anchorCount = new Map<string, number>();
+  for (const q of questions) if (q.anchor) anchorCount.set(q.anchor, (anchorCount.get(q.anchor) ?? 0) + 1);
   const byIdx = new Map(usable.map((d) => [d.idx, d]));
 
-  for (const rule of FIELD_RULES) {
-    const value = payload.fields[rule.key];
+  // Setin sırası korunur; sette olmayan anahtar (eşleme verisi olmadan) raporda yine görünür.
+  const ruleFields: RuleField[] = [...rules.fields];
+  for (const f of seed.fields) if (!ruleFields.some((r) => r.key === f.key)) ruleFields.push({ ...f, labels: [], exact: [], anchors: [], options: {} });
+
+  for (const rule of ruleFields) {
+    const key = rule.key as FillFieldKey;
+    const label = LABEL_OF.get(key) ?? key;
+    const value = payload.fields[key];
+    const state = rule.state;
     if (value === undefined) {
-      report.push({ key: rule.key, label: rule.label, status: "skipped", detail: "EmlakSoft'ta değer yok" });
+      report.push({ key, label, status: "skipped", detail: "EmlakSoft'ta değer yok", state });
       continue;
     }
-    let best: { q: Q; score: number } | null = null;
+    if (state === "disabled") {
+      report.push({ key, label, status: "manual", detail: `${textFor(value)}`, state });
+      continue;
+    }
+    let best: { q: Q; score: number; anchorHit: boolean } | null = null;
     for (const q of questions) {
       if (used.has(q.idxs[0]!) || (q.isRadio && usedGroups.has(q.key))) continue;
-      const score = labelScore(rule, q.labels);
-      if (score > 0 && (!best || score > best.score)) best = { q, score };
+      const anchorHit = Boolean(q.anchor && anchorCount.get(q.anchor) === 1 && rule.anchors.includes(q.anchor));
+      const score = anchorHit ? ANCHOR_SCORE : labelScore(rule, q.labels);
+      if (score > 0 && (!best || score > best.score)) best = { q, score, anchorHit };
     }
     if (!best) {
-      report.push({ key: rule.key, label: rule.label, status: "not_found", detail: `${textFor(value)}` });
+      report.push({ key, label, status: "not_found", detail: `${textFor(value)}`, state });
       continue;
     }
     const q = best.q;
     const first = byIdx.get(q.idxs[0]!)!;
+    const meta = { idx: first.idx, state, score: Math.round(best.score), anchorHit: best.anchorHit };
+
+    // Riskli alan (fiyat, para birimi, tapu, kredi, takas, EİDS, yetki belgesi; `RISKY_FIELD_KEYS`): uzak set bunu
+    // geriletmişse ya da doğrulanmamış uzak veriyle (tohumun bulamayacağı denetim) eşleştiyse doldurma yok, elle.
+    if (remote && state !== "verified" && RISKY_FIELD_KEYS.includes(key)) {
+      const s = seedByKey.get(key);
+      if (state === "degraded" || best.anchorHit || !s || labelScore(s, q.labels) === 0) {
+        used.add(q.idxs[0]!);
+        if (q.isRadio) usedGroups.add(q.key);
+        report.push({ key, label, status: "manual", detail: `${textFor(value)}`, ...meta });
+        continue;
+      }
+    }
 
     if (q.isRadio) {
-      const pick = chooseOption(rule.key, value, q.options);
+      const pick = aliasOption(rule, value, q.options, placeholders) ?? chooseOption(key, value, q.options, placeholders);
       if (pick === null) {
-        report.push({ key: rule.key, label: rule.label, status: "no_option", detail: `${textFor(value)}` });
+        report.push({ key, label, status: "no_option", detail: `${textFor(value)}`, ...meta });
         continue;
       }
       used.add(q.idxs[0]!);
       usedGroups.add(q.key);
       const target = byIdx.get(q.idxs[pick]!)!;
-      if (target.checked) report.push({ key: rule.key, label: rule.label, status: "already_filled" });
+      if (target.checked) report.push({ key, label, status: "already_filled", ...meta });
       else {
-        actions.push({ idx: target.idx, op: "click", field: rule.key });
-        report.push({ key: rule.key, label: rule.label, status: "planned", detail: textFor(value) });
+        actions.push({ idx: target.idx, op: "click", field: key });
+        report.push({ key, label, status: "planned", detail: textFor(value), ...meta });
       }
       continue;
     }
 
     used.add(first.idx);
     if (first.tag === "select") {
-      const pick = chooseOption(rule.key, value, first.options);
+      const pick = aliasOption(rule, value, first.options, placeholders) ?? chooseOption(key, value, first.options, placeholders);
       if (pick === null) {
-        report.push({ key: rule.key, label: rule.label, status: "no_option", detail: `${textFor(value)}` });
+        report.push({ key, label, status: "no_option", detail: `${textFor(value)}`, ...meta });
         continue;
       }
       const cur = first.current.trim();
-      if (cur && !isPlaceholderOption(cur)) {
-        report.push({ key: rule.key, label: rule.label, status: "already_filled", detail: cur });
+      if (cur && !isPlaceholderOption(cur) && !placeholders.includes(fold(cur))) {
+        report.push({ key, label, status: "already_filled", detail: cur, ...meta });
         continue;
       }
-      actions.push({ idx: first.idx, op: "select", field: rule.key, optionIndex: pick });
-      report.push({ key: rule.key, label: rule.label, status: "planned", detail: textFor(value) });
+      actions.push({ idx: first.idx, op: "select", field: key, optionIndex: pick });
+      report.push({ key, label, status: "planned", detail: textFor(value), ...meta });
       continue;
     }
     if (first.tag === "input" && first.type === "checkbox") {
       if (typeof value !== "boolean") {
-        report.push({ key: rule.key, label: rule.label, status: "no_option", detail: textFor(value) });
+        report.push({ key, label, status: "no_option", detail: textFor(value), ...meta });
         continue;
       }
-      if (first.checked === value) report.push({ key: rule.key, label: rule.label, status: "already_filled" });
+      if (first.checked === value) report.push({ key, label, status: "already_filled", ...meta });
       else {
-        actions.push({ idx: first.idx, op: "click", field: rule.key });
-        report.push({ key: rule.key, label: rule.label, status: "planned", detail: textFor(value) });
+        actions.push({ idx: first.idx, op: "click", field: key });
+        report.push({ key, label, status: "planned", detail: textFor(value), ...meta });
       }
       continue;
     }
     // Metin / sayı / çok satırlı.
     if (first.current.trim() !== "") {
-      report.push({ key: rule.key, label: rule.label, status: "already_filled", detail: first.current.slice(0, 40) });
+      report.push({ key, label, status: "already_filled", detail: first.current.slice(0, 40), ...meta });
       continue;
     }
     const raw = typeof value === "number" ? String(value) : textFor(value);
-    actions.push({ idx: first.idx, op: "text", field: rule.key, value: raw });
-    report.push({ key: rule.key, label: rule.label, status: "planned", detail: raw.length > 40 ? `${raw.slice(0, 40)}…` : raw });
+    actions.push({ idx: first.idx, op: "text", field: key, value: raw });
+    report.push({ key, label, status: "planned", detail: raw.length > 40 ? `${raw.slice(0, 40)}…` : raw, ...meta });
   }
 
-  const manual = report.filter((r) => r.status === "not_found" || r.status === "no_option").map((r) => `${r.label}: ${r.detail ?? ""}`.trim());
-  return { actions, report, manual };
+  const manual = report.filter((r) => r.status === "not_found" || r.status === "no_option" || r.status === "manual").map((r) => `${r.label}: ${r.detail ?? ""}`.trim());
+  const unclaimed = questions.filter((q) => !used.has(q.idxs[0]!) && !(q.isRadio && usedGroups.has(q.key))).map((q) => q.idxs[0]!);
+  return { actions, report, manual, ruleVersion: rules.version, ruleSha: opts.ruleSha ? opts.ruleSha.slice(0, 16) : null, unclaimed: unclaimed.sort((a, b) => a - b) };
 }
 
 /** Uygulama sonuçlarını rapora yansıtır (başarısız uygulama "bulunamadı" sayılır). */
@@ -282,7 +377,7 @@ export function mergeApplyResults(plan: FillPlan, results: readonly { idx: numbe
 export function summarizeReport(report: readonly FieldReport[]): { filled: number; manual: number; skipped: number; already: number } {
   return {
     filled: report.filter((r) => r.status === "planned").length,
-    manual: report.filter((r) => r.status === "not_found" || r.status === "no_option").length,
+    manual: report.filter((r) => r.status === "not_found" || r.status === "no_option" || r.status === "manual").length,
     skipped: report.filter((r) => r.status === "skipped").length,
     already: report.filter((r) => r.status === "already_filled").length,
   };

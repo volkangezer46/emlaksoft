@@ -4,15 +4,24 @@ import { sanitizeSettings } from "@/lib/listing-control/worker/extension-setting
 import type { RunState } from "@/lib/listing-control/worker/extension-status-view";
 import { allPortalHosts, listHtmlAdapters } from "@/lib/listing-control/adapters/html";
 import type { StoreItem } from "@/lib/listing-control/adapters/html";
-import { applyActionsInPage, attachPhotosInPage, collectControlsInPage, readListHtmlInPage, readPageRefInPage } from "@/lib/portal-transfer/page-fns";
-import { mergeApplyResults, planFill, summarizeReport, type FieldReport } from "@/lib/portal-transfer/fill-plan";
+import { applyActionsInPage, attachPhotosInPage, collectControlsInPage, readListHtmlInPage, readPageRefInPage, readValuesInPage } from "@/lib/portal-transfer/page-fns";
+import { mergeApplyResults, planFill, summarizeReport, type ControlDescriptor, type FieldReport, type FillPlan } from "@/lib/portal-transfer/fill-plan";
+import { anchorIndex, formFingerprint, formShapes, sigIndex, signShapes, type SignedShape } from "@/lib/portal-transfer/form-signature";
+import { pickPlan, resolveRules } from "@/lib/portal-transfer/rules-engine";
+import { verifyEnvelope } from "@/lib/portal-transfer/rules-verify";
+import type { StoredRules } from "@/lib/portal-transfer/rules-store";
+import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
+import type { RuleSet } from "@/lib/portal-transfer/rule-format";
+import { buildSnapshot, correctionSummary, diffSnapshot, idxsToRead, mergeSnapshots, releaseOwned, resolveSnapshotIdx, untouchedOwnIdxs, type FieldOutcome, type FillSnapshot } from "@/lib/portal-transfer/correction";
+import { buildFeedback } from "@/lib/portal-transfer/feedback-build";
+import { FEEDBACK_CONSENT_TEXT_VERSION, type FeedbackPhase } from "@/lib/portal-transfer/feedback-format";
 import { extractListingRef, parseListingInput } from "@/lib/portal-transfer/listing-ref";
 import type { PortalPayload } from "@/lib/portal-transfer/payload";
 import type { StoredTransfer } from "@/lib/portal-transfer/ext-queue";
 import { photoSummary } from "@/lib/portal-transfer/photo-prep";
 import { parsePriceText } from "@/lib/listing-control/adapters/inventory-csv";
 import { extractListing, type PageSnapshot } from "@/lib/prospecting/extension-extract";
-import type { StatusReply } from "./messages";
+import type { FeedbackConsent, StatusReply } from "./messages";
 
 /**
  * AÇILIR PENCERE (premium, Türkçe). Tek anahtar: Bağlan → Başlat/Duraklat. Gösterir: bağlantı durumu, sıradaki kontrol,
@@ -435,14 +444,21 @@ const STATUS_LABEL: Record<FieldReport["status"], string> = {
   not_found: "Alan bulunamadı",
   no_option: "Seçenek eşleşmedi",
   skipped: "EmlakSoft'ta değer yok",
+  manual: "Elle doldurun",
 };
-const STATUS_TONE: Record<FieldReport["status"], string> = { planned: "ok", already_filled: "", not_found: "warn", no_option: "warn", skipped: "" };
+const STATUS_TONE: Record<FieldReport["status"], string> = { planned: "ok", already_filled: "", not_found: "warn", no_option: "warn", skipped: "", manual: "warn" };
+/** (0.6.0) Uzak (imzalı) kural setiyle doldurulan alanın güven rozeti. Paket içi varsayılanla doldurmada rozet gösterilmez. */
+const STATE_BADGE: Record<string, { text: string; tone: string }> = {
+  verified: { text: "doğrulanmış", tone: "ok" },
+  unverified: { text: "öneri (doğrulanmamış)", tone: "" },
+  degraded: { text: "kontrol edin", tone: "warn" },
+};
 
 async function transferGet(): Promise<TransferGet> {
   return ((await call({ kind: "transferGet" }).catch(() => null)) as unknown as TransferGet | null) ?? { transfer: null, doneLast: null, donePending: 0 };
 }
 
-function renderReport(report: FieldReport[]) {
+function renderReport(report: FieldReport[], remoteRules: boolean) {
   const list = $("transferReport");
   list.replaceChildren();
   for (const r of report.filter((x) => x.status !== "skipped")) {
@@ -450,7 +466,11 @@ function renderReport(report: FieldReport[]) {
     const name = el("div", "name");
     name.append(el("span", "", r.label));
     if (r.detail) name.append(el("small", "", r.detail));
-    li.append(name, el("span", `tag ${STATUS_TONE[r.status]}`, STATUS_LABEL[r.status]));
+    const badges = el("div", "badges");
+    badges.append(el("span", `tag ${STATUS_TONE[r.status]}`, STATUS_LABEL[r.status]));
+    const badge = remoteRules && (r.status === "planned" || r.status === "already_filled") && r.state ? STATE_BADGE[r.state] : undefined;
+    if (badge) badges.append(el("span", `tag ${badge.tone}`, badge.text));
+    li.append(name, badges);
     list.append(li);
   }
 }
@@ -461,7 +481,7 @@ function renderManual(payload: PortalPayload, report: FieldReport[]) {
   list.replaceChildren();
   const rows: { label: string; value: string }[] = [];
   for (const m of payload.manual) rows.push({ label: m.label, value: m.value ?? "Portalda siz seçin" });
-  for (const r of report) if (r.status === "not_found" || r.status === "no_option") rows.push({ label: r.label, value: r.detail ?? "" });
+  for (const r of report) if (r.status === "not_found" || r.status === "no_option" || r.status === "manual") rows.push({ label: r.label, value: r.detail ?? "" });
   if (!payload.eids.propertyNo) rows.push({ label: "EİDS taşınmaz numarası", value: "Portföyde yok; mal sahibinden alıp portala girin" });
   if (payload.eids.warning) rows.push({ label: "Yetki durumu", value: payload.eids.warning });
   wrap.hidden = rows.length === 0;
@@ -541,32 +561,216 @@ async function attachPhotos(t: StoredTransfer): Promise<void> {
   }
 }
 
-$("transferFill").addEventListener("click", async () => {
+// ---- (0.6.0) Öğrenen kurallar + form şeması + düzeltme sinyali (yalnız açık rızayla gönderilir)
+
+type LoadedRules = { set: RuleSet; sha: string | null; remote: boolean; note: string };
+let lastPlan: FillPlan | null = null;
+let consent: FeedbackConsent | null = null;
+/** Rıza kartı doldurmadan SONRA onaylanırsa o doldurmanın şeması bir kez gönderilir. */
+let pendingFilledFeedback: (() => void) | null = null;
+
+const CONSENT_TEXT =
+  "EmlakSoft'un portal formlarını daha iyi tanıması için doldurduğunuz formun alan şemasını (alan adı, türü, portalın kendi seçenekleri) ve hangi alanı düzelttiğinizi (değeri değil, yalnız düzeltmenin türünü) anonim olarak gönderebiliriz. Yazdığınız değerler, iletişim alanları ve kişisel bilgiler gönderilmez. Bu şema bilgisi, eşleştirme önerisi üretmek için yapay zekâ hizmet sağlayıcımızla maskelenmiş olarak paylaşılabilir. İstediğiniz zaman Ayarlar'dan kapatabilirsiniz; kapatınca bekleyen kayıtlar da silinir.";
+
+const consentGranted = () => consent?.granted === true && consent.textVersion === FEEDBACK_CONSENT_TEXT_VERSION;
+const consentUndecided = () => !consent || consent.textVersion !== FEEDBACK_CONSENT_TEXT_VERSION;
+
+async function loadConsent(): Promise<void> {
+  const r = (await call({ kind: "consentGet" }).catch(() => null)) as unknown as { consent?: FeedbackConsent | null } | null;
+  consent = r?.consent ?? null;
+  $<HTMLInputElement>("feedbackConsent").checked = consentGranted();
+}
+
+async function setConsent(granted: boolean): Promise<void> {
+  const r = (await call({ kind: "consentSet", granted }).catch(() => null)) as unknown as { consent?: FeedbackConsent } | null;
+  if (r?.consent) consent = r.consent;
+  $("consentCard").hidden = true;
+  $<HTMLInputElement>("feedbackConsent").checked = consentGranted();
+  const pending = pendingFilledFeedback;
+  pendingFilledFeedback = null;
+  if (consentGranted() && pending) pending();
+}
+
+$("consentText").textContent = CONSENT_TEXT;
+$("consentSettingText").textContent = CONSENT_TEXT;
+$("consentYes").addEventListener("click", () => void setConsent(true));
+$("consentNo").addEventListener("click", () => void setConsent(false));
+$("feedbackConsent").addEventListener("change", () => void setConsent($<HTMLInputElement>("feedbackConsent").checked));
+void loadConsent();
+
+/**
+ * Depodaki imzalı seti alır ve KULLANMADAN ÖNCE yeniden doğrular (imza + katı şema + süre + kurulu sürüm). Herhangi bir
+ * sorun ya da kullanıcı "varsayılan" dediyse pakete gömülü tohum kullanılır.
+ */
+async function loadRules(portal: PortalTab["portal"], forceSeed: boolean): Promise<LoadedRules> {
+  const seed = seedRuleSet(portal);
+  if (forceSeed) return { set: seed, sha: null, remote: false, note: "Paket içi varsayılan eşleştirme kullanıldı." };
+  const got = (await call({ kind: "rulesGet", portal }).catch(() => null)) as unknown as { entry?: StoredRules | null } | null;
+  const entry = got?.entry ?? null;
+  if (!entry?.envelope) return { set: seed, sha: null, remote: false, note: "Eşleştirme kuralları: paket içi varsayılan." };
+  const verified = await verifyEnvelope(entry.envelope).catch(() => ({ ok: false as const }));
+  const r = verified.ok ? resolveRules(entry.envelope.rules, seed, { nowMs: Date.now(), installedVersion: chrome.runtime.getManifest().version }) : null;
+  if (!r || r.source === "seed") return { set: seed, sha: null, remote: false, note: "Güncel kurallar doğrulanamadı ya da süresi doldu; paket içi varsayılan kullanıldı." };
+  return { set: r.set, sha: entry.sha256, remote: true, note: `Eşleştirme kuralları: sürüm ${r.set.version} (imzalı).` };
+}
+
+async function pageShapes(descs: readonly ControlDescriptor[]): Promise<{ signed: SignedShape[]; fp: string }> {
+  const signed = await signShapes(formShapes(descs).shapes);
+  return { signed, fp: await formFingerprint(signed) };
+}
+
+async function getSnapshot(): Promise<FillSnapshot | null> {
+  const r = (await call({ kind: "snapshotGet" }).catch(() => null)) as unknown as { snapshot?: FillSnapshot | null } | null;
+  return r?.snapshot ?? null;
+}
+
+async function fillFromEmlakSoft(forceSeed: boolean): Promise<void> {
   if (!portalTab || !loadedTransfer || loadedTransfer.portal !== portalTab.portal) return;
-  const payload = loadedTransfer.payload as PortalPayload;
+  const tab = portalTab;
+  const transfer = loadedTransfer;
+  const payload = transfer.payload as PortalPayload;
   $("transferResult").textContent = "";
+  $("transferFormWarn").hidden = true;
   try {
-    const [scan] = await runInTab(portalTab.tabId, collectControlsInPage);
+    const rules = await loadRules(tab.portal, forceSeed);
+    const [scan] = await runInTab(tab.tabId, collectControlsInPage);
     const descriptors = scan?.result ?? [];
     if (descriptors.length === 0) throw new Error("empty");
-    const plan = planFill(descriptors, payload);
-    const [applied] = plan.actions.length > 0 ? await runInTab(portalTab.tabId, applyActionsInPage, plan.actions) : [];
-    lastReport = mergeApplyResults(plan, applied?.result ?? []);
-    renderReport(lastReport);
+    const { signed, fp } = await pageShapes(descriptors);
+    const anchors = anchorIndex(signed);
+    // Yeniden doldurma (ör. K3 "varsayılanla yeniden doldur"): önceki turun yazdığı ve kullanıcının dokunmadığı alanlar
+    // plan için boş sayılır, böylece yanlış doldurulmuş alan düzeltilebilir. Kullanıcının yazdığı/değiştirdiği alana dokunulmaz.
+    const prevSnap = await getSnapshot();
+    let owned: number[] = [];
+    if (prevSnap && prevSnap.sessionId === transfer.sessionId && prevSnap.portal === tab.portal && prevSnap.items.length > 0) {
+      const shapesNow = sigIndex(signed);
+      const toRead = idxsToRead(resolveSnapshotIdx(prevSnap, shapesNow));
+      const [prevRead] = toRead.length > 0 ? await runInTab(tab.tabId, readValuesInPage, toRead).catch(() => []) : [];
+      owned = untouchedOwnIdxs(prevSnap, prevRead?.result ?? [], { shapes: shapesNow, descs: descriptors });
+    }
+    const planDescs = owned.length > 0 ? releaseOwned(descriptors, owned) : descriptors;
+    const seedPlan = planFill(planDescs, payload, seedRuleSet(tab.portal), { anchors });
+    let plan = seedPlan;
+    if (rules.remote) {
+      try {
+        plan = pickPlan(planFill(planDescs, payload, rules.set, { ruleSha: rules.sha, anchors }), seedPlan);
+      } catch {
+        plan = { ...seedPlan, rulesRegressed: true };
+      }
+    }
+    const remoteUsed = plan.ruleVersion > 0;
+    const [applied] = plan.actions.length > 0 ? await runInTab(tab.tabId, applyActionsInPage, plan.actions) : [];
+    const appliedRes = applied?.result ?? [];
+    lastReport = mergeApplyResults(plan, appliedRes);
+    lastPlan = { ...plan, report: lastReport };
+    renderReport(lastReport, remoteUsed);
     renderManual(payload, lastReport);
+    $("transferRules").textContent = plan.rulesRegressed ? "Güncel kurallar bu formda daha az alan buldu; bu doldurmada paket içi varsayılan kullanıldı." : rules.note;
+    $("transferFormWarn").hidden = !(rules.remote && rules.set.fingerprints.length > 0 && !rules.set.fingerprints.includes(fp));
+    $("transferSeedFill").hidden = !remoteUsed;
     const sum = summarizeReport(lastReport);
-    $("transferResult").textContent = `${sum.filled} alan dolduruldu, ${sum.manual} alanı elle doldurmanız gerekiyor. Kontrol edip “Yayınla”ya siz basın.`;
+    // Önceki turun yazıp bu turun hedeflemediği alanlar olduğu gibi kalır (silinmez): kullanıcıya söylenir.
+    const targeted = new Set(plan.report.flatMap((r) => (r.idx === undefined ? [] : [r.idx])));
+    const leftover = owned.filter((i) => !targeted.has(i)).length;
+    $("transferResult").textContent =
+      `${sum.filled} alan dolduruldu, ${sum.manual} alanı elle doldurmanız gerekiyor. Kontrol edip “Yayınla”ya siz basın.` +
+      (leftover > 0 ? ` Önceki doldurmadan kalan ${leftover} alan değiştirilmedi; bu alanları kontrol edin.` : "");
     $("transferBind").hidden = false;
-    await attachPhotos(loadedTransfer);
+
+    // Anlık görüntü (oturum deposu): doldurulan alanların ŞİMDİKİ durumunun özeti; ham değer sayfadan çıkmaz.
+    const filled = Array.from(new Set(plan.actions.map((a) => a.idx)));
+    const [read] = filled.length > 0 ? await runInTab(tab.tabId, readValuesInPage, filled).catch(() => []) : [];
+    const fresh = buildSnapshot(
+      { sessionId: transfer.sessionId, portal: tab.portal, ruleVersion: plan.ruleVersion, ruleSha: plan.ruleSha, at: Date.now() },
+      plan.actions,
+      appliedRes,
+      read?.result ?? [],
+      sigIndex(signed),
+      descriptors,
+    );
+    // Birleştirilir (üzerine yazılmaz): ilk turda doldurulan alanların düzeltme takibi kaybolmasın.
+    const snapshot = mergeSnapshots(prevSnap, fresh, sigIndex(signed));
+    await call({ kind: "snapshotPut", snapshot });
+    $("transferCheck").hidden = snapshot.items.length === 0;
+
+    // Form şeması (rıza varsa; ilk doldurmada rıza kartı gösterilir, onaylanırsa bu doldurmanın şeması o an gider).
+    const filledPlan = lastPlan;
+    const sendFilled = () => {
+      const fb = buildFeedback({ sessionId: transfer.sessionId, portal: tab.portal, phase: "filled", plan: filledPlan, descs: descriptors, signed, formFp: fp, values: payload.fields });
+      if (fb.payload) void call({ kind: "feedbackPut", payload: fb.payload });
+    };
+    if (consentGranted()) sendFilled();
+    else if (consentUndecided()) {
+      pendingFilledFeedback = sendFilled;
+      $("consentCard").hidden = false;
+    }
+
+    await attachPhotos(transfer);
     const report: Record<string, string> = {};
     for (const r of lastReport) report[r.key] = r.status;
-    void call({ kind: "transferDonePut", payload: { sessionId: loadedTransfer.sessionId, portal: portalTab.portal, state: "filled", externalId: null, url: null, report } });
+    void call({ kind: "transferDonePut", payload: { sessionId: transfer.sessionId, portal: tab.portal, state: "filled", externalId: null, url: null, report } });
     // Yayınlanmış ilan sayfasındaysa numarayı önceden doldur.
-    const [ref] = await runInTab(portalTab.tabId, readPageRefInPage).catch(() => []);
+    const [ref] = await runInTab(tab.tabId, readPageRefInPage).catch(() => []);
     const found = ref?.result ? extractListingRef(ref.result) : null;
     if (found && !$<HTMLInputElement>("transferListing").value) $<HTMLInputElement>("transferListing").value = found.url ?? found.externalId;
   } catch {
     $("transferResult").textContent = "Form okunamadı. Portalın “İlan ver” formunun açık olduğundan ve kategori adımını geçtiğinizden emin olun.";
+  }
+}
+
+/**
+ * Doldurmadan sonraki durumu okur ve anlık görüntüyle karşılaştırır (alan yeniden çizildiyse imzasıyla bulunur). Rıza varsa
+ * sonuç türleri (değer DEĞİL) geri bildirim kuyruğuna girer. Anlık görüntü yoksa null.
+ */
+async function checkCorrections(phase: Exclude<FeedbackPhase, "filled">): Promise<FieldOutcome[] | null> {
+  if (!portalTab || !loadedTransfer) return null;
+  const tab = portalTab;
+  const snap = await getSnapshot();
+  if (!snap || snap.sessionId !== loadedTransfer.sessionId || snap.items.length === 0) return null;
+  const [scan] = await runInTab(tab.tabId, collectControlsInPage);
+  const descs = scan?.result ?? [];
+  const { signed, fp } = await pageShapes(descs);
+  const shapes = sigIndex(signed);
+  const idxs = idxsToRead(resolveSnapshotIdx(snap, shapes));
+  const [read] = idxs.length > 0 ? await runInTab(tab.tabId, readValuesInPage, idxs) : [];
+  const outcomes = diffSnapshot(snap, read?.result ?? [], { shapes, descs });
+  if (consentGranted()) {
+    const fb = buildFeedback({
+      sessionId: snap.sessionId,
+      portal: tab.portal,
+      phase,
+      plan: { report: [], unclaimed: [], ruleVersion: snap.ruleVersion, ruleSha: snap.ruleSha ?? null, rulesRegressed: lastPlan?.rulesRegressed },
+      descs,
+      signed,
+      formFp: fp,
+      outcomes,
+      values: (loadedTransfer.payload as PortalPayload).fields,
+    });
+    if (fb.payload) await call({ kind: "feedbackPut", payload: fb.payload });
+  }
+  return outcomes;
+}
+
+$("transferFill").addEventListener("click", () => void fillFromEmlakSoft(false));
+// Acil durum (K3): kullanıcı uzak kurallar yerine pakete gömülü varsayılanla yeniden doldurabilir. Önceki turun yazdığı ve
+// el değmemiş alanlar varsayılanla yeniden yazılır; kullanıcının değiştirdiği alanlara dokunulmaz.
+$("transferSeedFill").addEventListener("click", () => void fillFromEmlakSoft(true));
+
+$("transferCheck").addEventListener("click", async () => {
+  try {
+    const outcomes = await checkCorrections("checked");
+    if (!outcomes) {
+      $("transferResult").textContent = "Kontrol için önce bu formda “EmlakSoft'tan doldur”u kullanın.";
+      return;
+    }
+    const s = correctionSummary(outcomes);
+    const changed = s.changed + s.cleared;
+    $("transferResult").textContent =
+      (changed === 0 ? `Doldurulan ${s.accepted} alanın hiçbirini değiştirmediniz.` : `${changed} alanı değiştirdiniz (${s.changed} düzeltme, ${s.cleared} boşaltma).`) +
+      (s.missing > 0 ? ` ${s.missing} alan sayfada bulunamadı.` : "") +
+      " Kontrol edip “Yayınla”ya siz basın.";
+  } catch {
+    $("transferResult").textContent = "Form okunamadı. Portal sekmesinin açık olduğundan emin olun.";
   }
 });
 
@@ -592,14 +796,19 @@ $("transferBind").addEventListener("submit", async (event) => {
     $("transferResult").textContent = "İlan numarası okunamadı. İlan numarasını (6-12 haneli) ya da ilanın bağlantısını yapıştırın.";
     return;
   }
+  // Yayın anındaki son durum: düzeltme sinyali (rıza varsa) "published" fazıyla; anlık görüntü ardından silinir.
+  await checkCorrections("published").catch(() => null);
+  // Alan raporu GÖNDERİLMEZ: "filled" anındaki rapor sunucuda korunur (boş rapor onu ezerdi).
   const res = (await call({
     kind: "transferDonePut",
-    payload: { sessionId: loadedTransfer.sessionId, portal: portalTab.portal, state: "published", externalId: ref.externalId, url: ref.url, report: {} },
+    payload: { sessionId: loadedTransfer.sessionId, portal: portalTab.portal, state: "published", externalId: ref.externalId, url: ref.url },
   })) as unknown as { ok?: boolean } | null;
   if (!res?.ok) {
     $("transferResult").textContent = "Kayıt kuyruğa alınamadı.";
     return;
   }
+  void call({ kind: "snapshotPut", snapshot: null });
+  $("transferCheck").hidden = true;
   $("transferResult").textContent = "Kuyruğa alındı. Bir EmlakSoft sekmesi açıksa otomatik bağlanır; değilse EmlakSoft'u açın.";
   for (let i = 0; i < 8; i += 1) {
     await new Promise((r) => setTimeout(r, 1_000));
@@ -705,6 +914,8 @@ async function initPortalTools() {
   $("transfer").hidden = false;
   $("importer").hidden = false;
   await renderTransfer();
+  const snap = await getSnapshot();
+  $("transferCheck").hidden = !(snap && loadedTransfer && snap.sessionId === loadedTransfer.sessionId && snap.items.length > 0);
   const last = (await call({ kind: "importLast" }).catch(() => null)) as unknown as { last?: { summary: string } | null; pending?: number } | null;
   if (last?.pending) $("importResult").textContent = `${last.pending} kayıt EmlakSoft'a gönderilmeyi bekliyor (bir EmlakSoft sekmesi açın).`;
   else if (last?.last?.summary) $("importResult").textContent = `Son işlem: ${last.last.summary}`;

@@ -66,7 +66,25 @@ export type BgRequest =
   | { kind: "importDue" }
   | { kind: "importAck"; id: string; ok: boolean; summary: string }
   | { kind: "importFail"; id: string }
-  | { kind: "importLast" };
+  | { kind: "importLast" }
+  /**
+   * (0.6.0) Öğrenen kurallar. İçerik betiği kural ucunun HAM yanıtını verir (`rulesPut`); arka plan zarf başına boyut, şema,
+   * sürüm, sha256 ve ECDSA imzasını denetleyip yalnız kabul edileni yazar (son iyi sürüm; asla silmez). 304/hata: `rulesMeta`.
+   */
+  | { kind: "rulesPut"; raw: string; etag?: string | null }
+  | { kind: "rulesMeta"; notModified?: boolean; error?: string | null }
+  | { kind: "rulesGet"; portal: string }
+  | { kind: "rulesStatus" }
+  /** (0.6.0) Form şeması ve düzeltme sinyali: YALNIZ açık rızayla kuyruğa girer; içerik betiği gönderir. */
+  | { kind: "feedbackPut"; payload: unknown }
+  | { kind: "feedbackDue" }
+  | { kind: "feedbackAck"; id: string }
+  | { kind: "feedbackFail"; id: string }
+  /** (0.6.0) Doldurma anlık görüntüsü (oturum deposu; ham değer YOK: özet ya da seçenek metni). */
+  | { kind: "snapshotPut"; snapshot: unknown }
+  | { kind: "snapshotGet" }
+  | { kind: "consentGet" }
+  | { kind: "consentSet"; granted: boolean };
 
 /** Sayfadan (externally_connectable) gelen TEK ileti türü: salt okunur yoklama. Bağlama ve veri okuma bu kanaldan YAPILMAZ. */
 export type ExternalRequest = { kind: "ping" };
@@ -103,7 +121,17 @@ export const STORAGE_KEYS = {
   transferDoneLast: "es_transfer_done_last",
   importPending: "es_import_pending",
   importLast: "es_import_last",
+  /** (0.6.0) Kabul edilmiş (imzalı) kural setleri {portal: zarf}, tazeleme bilgisi, geri bildirim kuyruğu ve rızası (kalıcı). */
+  formRules: "es_form_rules",
+  formRulesMeta: "es_form_rules_meta",
+  feedback: "es_feedback",
+  feedbackConsent: "es_feedback_consent",
+  /** (0.6.0) Doldurma anlık görüntüsü (oturum deposu; tarayıcı kapanınca silinir). */
+  fillSnapshot: "es_fill_snapshot",
 } as const;
+
+/** Rıza kaydı: metin sürümü (`feedback-format.ts: FEEDBACK_CONSENT_TEXT_VERSION`) değişirse yeniden sorulur. */
+export type FeedbackConsent = { granted: boolean; at: number; textVersion: number };
 
 export const ALARM_TICK = "es-tick";
 /** Saatte bir uyanır; son tam taramadan 20 saat geçtiyse günlük taramayı başlatır (kaçırılan gün ilk açılışta telafi edilir). */

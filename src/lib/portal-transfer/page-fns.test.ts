@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyActionsInPage, attachPhotosInPage, collectControlsInPage, readListHtmlInPage, readPageRefInPage } from "./page-fns";
+import { applyActionsInPage, attachPhotosInPage, collectControlsInPage, readListHtmlInPage, readPageRefInPage, readValuesInPage } from "./page-fns";
 import { planFill } from "./fill-plan";
 import { buildPortalPayload, type PortalPropertyInput } from "./payload";
 
@@ -153,6 +153,43 @@ describe("sayfa içi işlevler: toplama, uygulama, fotoğraf", () => {
     const r = isolate(readPageRefInPage)(fakeDoc([]));
     expect(r).toEqual({ url: "https://www.sahibinden.com/ilan-ver", title: "İlan Ver", text: "İlanınız yayında. İlan No: 1234567890" });
     expect(isolate(readListHtmlInPage)(fakeDoc([])).html).toBe("<html></html>");
+  });
+
+  it("(0.6.0) betimleyici: zorunlu işareti (required / aria-required / '*') ve BAĞLI etiket kaynakları; komşu metin bağlı sayılmaz", () => {
+    const a = new FakeEl("input", { type: "text", name: "fiyat", required: "" });
+    const b = new FakeEl("input", { type: "text", "aria-required": "true", placeholder: "Aidat" });
+    const c = new FakeEl("input", { type: "text", id: "m2" });
+    c.labels = [{ textContent: "m² (Brüt) *" }];
+    const e = new FakeEl("input", { type: "text" });
+    e.previousElementSibling = Object.assign(new FakeEl("span"), { textContent: "Danışman: Ahmet Yılmaz" });
+    const descs = isolate(collectControlsInPage)(fakeDoc([a, b, c, e]));
+    expect(descs.map((x) => x.required)).toEqual([true, true, true, false]);
+    expect(descs[0]).toMatchObject({ labels: ["fiyat"], sources: ["name"] });
+    expect(descs[1]).toMatchObject({ labels: ["Aidat"], sources: ["placeholder"] });
+    expect(descs[2]).toMatchObject({ labels: ["m² (Brüt) *", "m2"], sources: ["label_for", "id"] });
+    expect(descs[3]!.labels).toContain("Danışman: Ahmet Yılmaz"); // eşleştirmede kullanılır…
+    expect(descs[3]!.sources).toEqual([]); // …ama bağlı değil: geri bildirime girmez
+  });
+
+  it("(0.6.0) readValuesInPage ham değer döndürmez; kaynağında ağ, gönderim ve olay tetikleme yok", () => {
+    const t = new FakeEl("input", { type: "text", "data-emlaksoft-fill": "0" });
+    t.value = "Kadıköy Moda 3+1";
+    const s = new FakeEl("select", { "data-emlaksoft-fill": "1" });
+    s.options = [
+      { textContent: "Seçiniz", value: "" },
+      { textContent: "Merkezi", value: "7" },
+    ];
+    s.selectedIndex = 1;
+    const out = isolate(readValuesInPage)([0, 1, 5], fakeDoc([t, s]));
+    expect(out[0]).toMatchObject({ idx: 0, kind: "text" });
+    expect(out[0]!.valueHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(out[0]!.digitsHash).toMatch(/^[0-9a-f]{8}$/);
+    expect(out[1]).toEqual({ idx: 1, kind: "select", option: "Merkezi" });
+    expect(out[2]).toEqual({ idx: 5, kind: "missing" });
+    expect(JSON.stringify(out)).not.toMatch(/Kadıköy|Moda/);
+    expect(t.events).toEqual([]);
+    const fnSrc = readValuesInPage.toString();
+    expect(fnSrc).not.toMatch(/fetch\(|XMLHttpRequest|\.submit\(|requestSubmit|dispatchEvent|sendBeacon|\.click\(|\.value\s*=[^=]/);
   });
 
   it("kaynak sözleşmesi: sayfa içi işlevler gönderim/gezinme/ağ çağrısı içermez", async () => {

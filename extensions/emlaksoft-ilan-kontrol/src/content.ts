@@ -2,14 +2,20 @@ import { BRIDGE_REQUEST_SOURCE, BRIDGE_RESPONSE_SOURCE } from "@/lib/listing-con
 import { nextDelayMs, replyToReport, type StepOutcome } from "@/lib/listing-control/worker/core";
 import {
   BRIDGE_ENDPOINT,
+  BRIDGE_FEEDBACK_ENDPOINT,
   BRIDGE_FSBO_ENDPOINT,
   BRIDGE_HEADER,
   BRIDGE_IMPORT_ENDPOINT,
   BRIDGE_INVENTORY_ENDPOINT,
   BRIDGE_MEDIA_PATH,
+  BRIDGE_RULES_ENDPOINT,
   BRIDGE_TRANSFER_DONE_ENDPOINT,
   BRIDGE_TRANSFER_FETCH_ENDPOINT,
+  EXT_VERSION_HEADER,
 } from "@/lib/listing-control/worker/bridge-request";
+import { FORM_RULES_ENGINE } from "@/lib/portal-transfer/rule-format";
+import { rulesRefreshDue, type RulesMeta } from "@/lib/portal-transfer/rules-store";
+import type { FeedbackPayload } from "@/lib/portal-transfer/feedback-format";
 import type { DonePayload, ImportPayload, QueueEntry } from "@/lib/portal-transfer/ext-queue";
 import { buildTransferMark, sanitizeTransferWatermark, stampTransferMark, type TransferWatermark } from "@/lib/portal-transfer/photo-watermark";
 import { PHOTO_JPEG_QUALITY, PHOTO_MAX_SIDE, bytesToBase64, photoBudget, photoSummary, scaledSize } from "@/lib/portal-transfer/photo-prep";
@@ -190,12 +196,12 @@ let running = false;
 let errors = 0;
 let stopped = false;
 
-async function api(body: Record<string, unknown>, endpoint: string = BRIDGE_ENDPOINT): Promise<{ status: number; data: ApiReply }> {
+async function api(body: Record<string, unknown>, endpoint: string = BRIDGE_ENDPOINT, extraHeaders: Record<string, string> = {}): Promise<{ status: number; data: ApiReply }> {
   try {
     const res = await fetch(endpoint, {
       method: "POST",
       credentials: "same-origin",
-      headers: { "content-type": "application/json", [BRIDGE_HEADER]: "1" },
+      headers: { "content-type": "application/json", [BRIDGE_HEADER]: "1", ...extraHeaders },
       body: JSON.stringify(body),
     });
     const data = (await res.json().catch(() => ({}))) as ApiReply;
@@ -298,6 +304,8 @@ async function downscaleToJpegB64(blob: Blob, mark: OffscreenCanvas | null, wm: 
 
 async function runTransfer(code: string): Promise<{ ok: boolean; photos: number; total: number; message: string }> {
   const fail = (message: string) => ({ ok: false, photos: 0, total: 0, message });
+  // Doldurmadan önce kurallar 1 saatten eskiyse tazelenir (başarısızlık aktarımı durdurmaz: son iyi sürüm / tohum).
+  await refreshRules(RULES_MAX_AGE_TRANSFER_MS).catch(() => undefined);
   const r = await api({ code }, BRIDGE_TRANSFER_FETCH_ENDPOINT);
   const data = r.data as ApiReply & { sessionId?: string; payload?: { photos?: { id?: unknown; fileName?: unknown }[] }; message?: string };
   if (!data.ok || typeof data.sessionId !== "string") return fail(typeof data.message === "string" ? data.message : "Aktarım paketi alınamadı.");
@@ -363,7 +371,10 @@ async function flushTransferDone(): Promise<void> {
   try {
     const due = await send<{ entries?: QueueEntry<DonePayload>[] }>({ kind: "transferDoneDue" });
     for (const e of due?.entries ?? []) {
-      const r = await api(e.payload as unknown as Record<string, unknown>, BRIDGE_TRANSFER_DONE_ENDPOINT);
+      // Boş alan raporu GÖNDERİLMEZ (gönderilirse "filled" anındaki rapor sunucuda {} ile ezilirdi).
+      const body = { ...(e.payload as unknown as Record<string, unknown>) };
+      if (typeof body.report !== "object" || body.report === null || Object.keys(body.report).length === 0) delete body.report;
+      const r = await api(body, BRIDGE_TRANSFER_DONE_ENDPOINT);
       const data = r.data as ApiReply & { message?: string };
       const verdict = sendVerdict(r.status, data);
       if (verdict === "retry") {
@@ -396,6 +407,61 @@ async function flushImport(): Promise<void> {
     }
   } finally {
     importFlushing = false;
+  }
+}
+
+/**
+ * (0.6.0) KURAL TAZELEME: aynı kökenli kural ucundan (oturum + köken + köprü başlığı + eklenti sürümü; ETag) ham yanıtı
+ * alır ve service worker'a verir. Doğrulama (boyut, şema, sürüm, sha256, ECDSA imzası) ve depo yazımı YALNIZ arka plandadır;
+ * burada hiçbir karar verilmez. Portala istek yok. Hata olursa üstel bekleme (5 dk → 6 sa) arka plandaki meta'dan hesaplanır.
+ */
+const RULES_MAX_AGE_PAGE_MS = 6 * 3_600_000;
+const RULES_MAX_AGE_TRANSFER_MS = 3_600_000;
+const RULES_TIMEOUT_MS = 20_000;
+let rulesRefreshing = false;
+async function refreshRules(maxAgeMs: number): Promise<void> {
+  if (rulesRefreshing || !navigator.onLine) return;
+  const status = await send<{ meta?: RulesMeta }>({ kind: "rulesStatus" });
+  if (!status?.meta || !rulesRefreshDue(status.meta, Date.now(), maxAgeMs)) return;
+  rulesRefreshing = true;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), RULES_TIMEOUT_MS);
+  try {
+    const headers: Record<string, string> = { [BRIDGE_HEADER]: "1", [EXT_VERSION_HEADER]: VERSION };
+    if (status.meta.etag) headers["If-None-Match"] = status.meta.etag;
+    const res = await fetch(`${BRIDGE_RULES_ENDPOINT}?engine=${FORM_RULES_ENGINE}`, { method: "GET", credentials: "same-origin", cache: "no-store", signal: ctrl.signal, headers });
+    if (res.status === 304) await send({ kind: "rulesMeta", notModified: true });
+    else if (res.status === 200) await send({ kind: "rulesPut", raw: (await res.text()).slice(0, 300_000), etag: res.headers.get("etag") });
+    else await send({ kind: "rulesMeta", error: `http_${res.status}` });
+  } catch {
+    await send({ kind: "rulesMeta", error: ctrl.signal.aborted ? "timeout" : "network" });
+  } finally {
+    clearTimeout(timer);
+    rulesRefreshing = false;
+  }
+}
+
+/**
+ * (0.6.0) Form şeması + düzeltme sinyali kuyruğu (YALNIZ açık rızayla dolar; arka plan her turda rızayı yeniden okur ve rıza
+ * yoksa kuyruğu siler). 2xx ve kalıcı reddi (400/413/426) düşer; ağ/5xx/oturum/hız yeniden denenir.
+ */
+let feedbackFlushing = false;
+async function flushFeedback(): Promise<void> {
+  if (feedbackFlushing) return;
+  feedbackFlushing = true;
+  try {
+    const due = await send<{ entries?: QueueEntry<FeedbackPayload>[] }>({ kind: "feedbackDue" });
+    for (const e of due?.entries ?? []) {
+      const r = await api(e.payload as unknown as Record<string, unknown>, BRIDGE_FEEDBACK_ENDPOINT, { [EXT_VERSION_HEADER]: VERSION });
+      const drop = (r.status >= 200 && r.status < 300) || r.status === 400 || r.status === 413 || r.status === 426;
+      if (!drop) {
+        await send({ kind: "feedbackFail", id: e.id });
+        break;
+      }
+      await send({ kind: "feedbackAck", id: e.id });
+    }
+  } finally {
+    feedbackFlushing = false;
   }
 }
 
@@ -502,14 +568,18 @@ if (window.location.pathname === "/app" || window.location.pathname.startsWith("
 void flushFsbo();
 void flushTransferDone();
 void flushImport();
+void flushFeedback();
+void refreshRules(RULES_MAX_AGE_PAGE_MS);
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (STORAGE_KEYS.fsboPending in changes) void flushFsbo();
   if (STORAGE_KEYS.transferDone in changes) void flushTransferDone();
   if (STORAGE_KEYS.importPending in changes) void flushImport();
+  if (STORAGE_KEYS.feedback in changes) void flushFeedback();
 });
 window.addEventListener("online", () => {
   void flushFsbo();
   void flushTransferDone();
   void flushImport();
+  void flushFeedback();
 });
