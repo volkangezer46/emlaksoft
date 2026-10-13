@@ -168,6 +168,30 @@ describe("öğrenme adımı (learn-step.ts)", () => {
     expect(verifyRuleSignature(signedMessage("sahibinden", 3, String(pub.args.p_sha)), String(pub.args.p_signature), kp.jwk)).toBe(true);
   });
 
+  it("öneriler tek tek uygulanır: riskli öneri atlanıp işaretlenir, kalanı yayınlanır; hepsi düşerse süre tazelemesi yine çalışır", async () => {
+    const kp = keypair();
+    const st = loadSigningKey(kp.env, { k1: kp.jwk });
+    const heating = { id: "p1", portal: "sahibinden", kind: "label_map", field_key: "heating", source: "corrections", proposal: { anchor: "0123456789abcdef" }, confidence: 0.6 };
+    const price = { id: "p2", portal: "sahibinden", kind: "label_map", field_key: "price", source: "corrections", proposal: { label: "satis bedeli" }, confidence: 0.7 };
+    const cur = setV(2);
+    const f = fakeAdmin({ outcome: "ok", settings: { auto_publish: true, auto_degrade: false }, ready: [heating, price], demote_candidates: [], demote_budget: 3 }, { id: "cur", version: 2, content: cur, expires_at: cur.expiresAt });
+    const r = await runPortalRulesLearn(f.db, { nowMs: NOW, signing: st });
+    expect(r).toMatchObject({ status: "ok", published: [{ portal: "sahibinden", version: 3, changes: 1, refresh: false }] });
+    expect(r.status === "ok" && r.notPublished).toEqual([{ portal: "sahibinden", reason: "proposal_invalid:risky_key" }]);
+    expect(f.calls.find((c) => c.fn === "pt_rules_mark_invalid")!.args).toEqual({ p_ids: ["p2"], p_reason: "risky_key" });
+    const pub = f.calls.find((c) => c.fn === "pt_rules_publish_system")!;
+    expect(pub.args).toMatchObject({ p_proposal_ids: ["p1"], p_change_summary: { count: 1 } });
+    expect((pub.args.p_content as RuleSet).fields.find((x) => x.key === "price")!.labels).not.toContain("satis bedeli");
+
+    // Yalnız riskli öneri + süresi yaklaşan set: içerik yayını yok, işaretleme + K3 tazeleme var.
+    const near = NOW + 10 * 86_400_000;
+    const g = fakeAdmin({ outcome: "ok", settings: { auto_publish: true, auto_degrade: false }, ready: [price], demote_candidates: [], demote_budget: 3 }, { id: "cur", version: 2, content: cur, expires_at: cur.expiresAt });
+    const r2 = await runPortalRulesLearn(g.db, { nowMs: near, signing: st });
+    expect(r2.status === "ok" && r2.published).toEqual([{ portal: "sahibinden", version: 3, changes: 0, refresh: true }]);
+    expect(g.calls.filter((c) => c.fn === "pt_rules_mark_invalid")).toHaveLength(1);
+    expect(g.calls.find((c) => c.fn === "pt_rules_publish_system")!.args).toMatchObject({ p_change_summary: { refresh: true, count: 0 } });
+  });
+
   it("süresi yaklaşan yayın aynı içerikle yeniden imzalanır (K3); anahtar yoksa bildirilir", async () => {
     const kp = keypair();
     const st = loadSigningKey(kp.env, { k1: kp.jwk });

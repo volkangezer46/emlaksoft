@@ -4,6 +4,7 @@ set local lock_timeout = '5s';
 
 drop function if exists public.pt_rules_admin_record_ai(text, text, jsonb);
 drop function if exists public.pt_rules_admin_trust_list();
+drop function if exists public.pt_rules_worker_seen(uuid, timestamptz);
 drop function if exists public.pt_rules_admin_set_trust(uuid, boolean, text);
 drop function if exists public.pt_rules_admin_rollback(text, integer, jsonb, text, text, text);
 drop function if exists public.pt_rules_admin_publish(text, jsonb, text, uuid, jsonb, text, text, text, uuid[]);

@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { RULE_LIMITS, validateRuleSet, type RuleSet } from "@/lib/portal-transfer/rule-format";
-import { applyProposals, type RuleProposal } from "@/lib/portal-transfer/rule-apply";
+import { applyProposals, type RuleChange, type RuleProposal } from "@/lib/portal-transfer/rule-apply";
 import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
 import { TRANSFER_PORTALS, type TransferPortal } from "@/lib/portal-transfer/rules";
 import { loadSigningKey, publishRuleSet, readPublished, type SigningKey, type SigningStatus } from "./sign";
@@ -14,8 +14,11 @@ import { loadSigningKey, publishRuleSet, readPublished, type SigningKey, type Si
  *  2. `auto_degrade` açıksa geriletme adayları (haftalık bütçe ≤3), `auto_publish` açıksa hazır ofis önerileri
  *     (AI önerisi ASLA) portal başına en çok 5 değişiklikle `applyProposals` + `validateRuleSet` + imza →
  *     `pt_rules_publish_system`. Varsayılan ikisi de KAPALI: öneriler personel onayını bekler.
- *  3. Süre tazeleme (K3): yayındaki setin süresi 7 günden az kaldıysa aynı içerik yeni sürümle yeniden imzalanır;
- *     imza anahtarı yoksa set süresi dolunca eklenti tohuma döner (güvenli).
+ *     Öneriler TEK TEK uygulanır: uygulanamayan (risky_key, label_shared, ...) öneri atlanır ve
+ *     `pt_rules_mark_invalid` ile 'rejected' olur (her gece yeniden seçilip tüm partiyi düşürmez).
+ *  3. Süre tazeleme (K3): içerik değişikliği yayınlanmadıysa (öneri yok ya da hepsi düştü) ve yayındaki setin süresi
+ *     7 günden az kaldıysa aynı içerik yeni sürümle yeniden imzalanır; imza anahtarı yoksa set süresi dolunca eklenti
+ *     tohuma döner (güvenli).
  * Tablolar/fonksiyon yoksa 'skipped' döner, hata vermez.
  */
 
@@ -108,25 +111,43 @@ export async function runPortalRulesLearn(
         notPublished.push({ portal, reason: `current_invalid:${base.reason}` });
         continue;
       }
-      const baseSet: RuleSet = base?.ok ? base.set : seedRuleSet(portal as TransferPortal);
-      const applied = applyProposals(baseSet, picks, { maxChanges: 5 });
-      if (!applied.ok) {
-        notPublished.push({ portal, reason: applied.reason });
-        continue;
+      let acc: RuleSet = base?.ok ? base.set : seedRuleSet(portal as TransferPortal);
+      const changes: RuleChange[] = [];
+      const appliedIds: string[] = [];
+      const invalid = new Map<string, string[]>();
+      for (const p of picks) {
+        const one = applyProposals(acc, [p], { maxChanges: 1 });
+        if (one.ok) {
+          acc = one.content;
+          changes.push(...one.changeSummary.changes);
+          if (p.id) appliedIds.push(p.id);
+        } else if (p.id) {
+          invalid.set(one.reason, [...(invalid.get(one.reason) ?? []), p.id]);
+        }
       }
-      const res = await publishRuleSet(admin, {
-        portal,
-        content: applied.content,
-        kind: "auto",
-        parentId: current?.id ?? null,
-        changeSummary: applied.changeSummary,
-        proposalIds: picks.map((p) => p.id!).filter(Boolean),
-        nowMs: opts.nowMs,
-        key,
-      });
-      if (res.ok) published.push({ portal, version: res.version, changes: applied.changeSummary.count, refresh: false });
-      else notPublished.push({ portal, reason: res.reason });
-      continue;
+      for (const [reason, ids] of invalid) {
+        notPublished.push({ portal, reason: `proposal_invalid:${reason}` });
+        const { error: markErr } = await admin.rpc("pt_rules_mark_invalid", { p_ids: ids, p_reason: reason });
+        if (markErr && !isMissingSchema(markErr)) console.error("pt_rules_mark_invalid", { code: markErr.code });
+      }
+      if (changes.length > 0) {
+        const res = await publishRuleSet(admin, {
+          portal,
+          content: acc,
+          kind: "auto",
+          parentId: current?.id ?? null,
+          changeSummary: { changes, count: changes.length },
+          proposalIds: appliedIds,
+          nowMs: opts.nowMs,
+          key,
+        });
+        if (res.ok) {
+          published.push({ portal, version: res.version, changes: changes.length, refresh: false });
+          continue;
+        }
+        notPublished.push({ portal, reason: res.reason });
+      }
+      // Hiçbir değişiklik yayınlanamadı: süre tazelemesi yine çalışır.
     }
 
     // Süre tazeleme: içerik aynı, yeni sürüm + yeni süre.

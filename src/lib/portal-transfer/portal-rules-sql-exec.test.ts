@@ -37,6 +37,8 @@ create table public.portal_listings(id uuid primary key default gen_random_uuid(
   portal_url text, status text default 'live', source_kind text, created_via text, last_confirmed_at timestamptz);
 create function public.lc_bind_portal_listing(t uuid, a uuid, p uuid, portal text, ext text, url text, sk text, cv text) returns jsonb language sql as $$
   select jsonb_build_object('outcome', 'applied', 'listing_id', gen_random_uuid()) $$;
+create table public.listing_verifications(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, portal_listing_id uuid not null,
+  checked_at timestamptz not null default now(), result text not null, source_kind text not null, client_id uuid, job_id uuid);
 create table public.platform_staff(id uuid primary key, role text not null, is_active boolean not null default true);
 create table public.platform_audit_logs(id uuid primary key default gen_random_uuid(), actor_id uuid, action text not null, entity_type text, entity_id uuid, meta jsonb, created_at timestamptz not null default now());
 create table public.platform_settings(key text primary key, value text);
@@ -63,14 +65,22 @@ describe.skipIf(!mod)("öğrenen portal kuralları (pglite)", () => {
   const user = async (t: string) => (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [t]))[0]!.id as string;
   const property = async (t: string, u: string) => (await q(`insert into public.properties(tenant_id, assigned_to) values ($1,$2) returning id`, [t, u]))[0]!.id as string;
 
-  /** Doğrulanmış (eklentiyle bağlanmış, işçinin sonradan gördüğü) yayın oturumu. */
-  const publishedSession = async (t: string, u: string, completedAgo: string, portal = "sahibinden") => {
+  /**
+   * Yayın oturumu. 'worker': eklentiyle bağlanmış, ilan kontrol İŞÇİSİ (kuyruk işi) bağdan 2 saat sonra görmüş (doğrulanmış).
+   * 'manual': ofis yalnız "Teyit et"e basmış (last_confirmed_at + elle 'present'); doğrulanmış SAYILMAZ.
+   */
+  const publishedSession = async (t: string, u: string, completedAgo: string, portal = "sahibinden", verify: "worker" | "manual" = "worker") => {
     const p = await property(t, u);
     const pl = (await q(
       `insert into public.portal_listings(tenant_id, property_id, portal_name, status, source_kind, last_confirmed_at)
        values ($1,$2,'Sahibinden','live','assisted', now() - $3::interval + interval '2 hours') returning id`,
       [t, p, completedAgo],
     ))[0]!.id as string;
+    await q(
+      `insert into public.listing_verifications(tenant_id, portal_listing_id, checked_at, result, source_kind, client_id, job_id)
+       values ($1,$2, now() - $3::interval + interval '2 hours', 'present', $4, $5, $5)`,
+      [t, pl, completedAgo, verify === "worker" ? "assisted" : "manual", verify === "worker" ? crypto.randomUUID() : null],
+    );
     return (await q(
       `insert into public.portal_transfer_sessions(tenant_id, property_id, portal, state, actor_id, expires_at, created_at, completed_at, portal_listing_id)
        values ($1,$2,$3,'published',$4, now(), now() - $5::interval, now() - $5::interval, $6) returning id`,
@@ -219,6 +229,97 @@ describe.skipIf(!mod)("öğrenen portal kuralları (pglite)", () => {
     await q(`delete from public.platform_settings where key = 'portal_rules.min_tenants'`);
   });
 
+  /** n uygun ofis; her biri verilen zamanlarda birer oturum ve 'accepted' olay üretir. */
+  const eligibleOffices = async (n: number, sig: string, agos: string[], opts: { key?: string; verify?: "worker" | "manual" } = {}) => {
+    const out: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const t = await tenant(`E${sig.slice(0, 4)}${i}`);
+      const u = await user(t);
+      out.push(t);
+      await q(`insert into public.portal_rule_tenant_trust(tenant_id, eligible, reason) values ($1, true, 'test')`, [t]);
+      for (const ago of agos) {
+        const sid = await publishedSession(t, u, ago, "sahibinden", opts.verify ?? "worker");
+        await event(t, sid, sig, "accepted", ago, opts.key ?? "heating");
+      }
+    }
+    return out;
+  };
+  const proposalOf = async (sig: string) =>
+    (await q(`select proposal_key, state, support_tenants, support_sessions, weeks_n, confidence from public.portal_rule_proposals where kind = 'label_map' and field_sig = $1`, [sig]))[0];
+
+  it("öğrenme eşiği: tam 3 uygun ofis × 2 oturum × 2 hafta → ready (0,526); 2 ofis ya da tek hafta → collecting", async () => {
+    const exact = hex("1a");
+    await eligibleOffices(3, exact, ["10 days", "2 days"]);
+    const twoOffices = hex("2b");
+    await eligibleOffices(2, twoOffices, ["10 days", "2 days"]);
+    const oneWeek = hex("3c");
+    await eligibleOffices(3, oneWeek, ["1 hour", "90 minutes"]);
+    await call("pt_rules_learn", [new Date().toISOString()]);
+    const a = (await proposalOf(exact))!;
+    expect(a).toMatchObject({ state: "ready", support_tenants: 3, weeks_n: 2 });
+    expect(Number(a.support_sessions)).toBe(6);
+    expect(Number(a.confidence)).toBeCloseTo(0.526, 3);
+    expect(await proposalOf(twoOffices)).toMatchObject({ state: "collecting", support_tenants: 2 });
+    expect(await proposalOf(oneWeek)).toMatchObject({ state: "collecting", support_tenants: 3, weeks_n: 1 });
+  });
+
+  it("Y3: yalnız elle 'Teyit et' (last_confirmed_at / manual) ile doğrulanan oturum oy ve uygunluk üretmez", async () => {
+    const sig = hex("4d");
+    const t = await tenant("ElleTeyit");
+    const u = await user(t);
+    for (const ago of ["10 days", "5 days", "2 days"]) {
+      const sid = await publishedSession(t, u, ago, "sahibinden", "manual");
+      await event(t, sid, sig, "accepted", ago);
+    }
+    // Uygunluk: 3 "teyitli" yayın olsa da varsayılan uygunluk yok (14 gün eski aktif ofis).
+    const eligible = (await q(`select public.pt_rules_eligible_tenants(now()) as r`))[0]!.r as string[];
+    expect(eligible).not.toContain(t);
+    await call("pt_rules_learn", [new Date().toISOString()]);
+    expect(await proposalOf(sig)).toBeUndefined();
+    expect((await q(`select count(*)::int n from public.portal_rule_votes where tenant_id = $1`, [t]))[0]!.n).toBe(0);
+    // Aynı ofis işçi doğrulamalı 3 yayın yapınca varsayılan uygun olur.
+    for (const ago of ["9 days", "4 days", "1 day"]) await publishedSession(t, u, ago);
+    expect((await q(`select public.pt_rules_eligible_tenants(now()) as r`))[0]!.r as string[]).toContain(t);
+    // Personel paneli aynı kuralı sayar: 6 yayından yalnız işçinin gördüğü 3'ü.
+    await as("", STAFF);
+    const list = await call("pt_rules_admin_trust_list", []);
+    expect((list.tenants as { tenant_id: string; verified_sessions_60d: number; default_eligible: boolean }[]).find((x) => x.tenant_id === t))
+      .toMatchObject({ verified_sessions_60d: 3, default_eligible: true });
+  });
+
+  it("riskli anahtar (price) için etiket önerisi üretilmez; eski haftanın geriletme adayı yenisiyle değiştirilir", async () => {
+    const sig = hex("5e");
+    await eligibleOffices(3, sig, ["10 days", "2 days"], { key: "price" });
+    const old = (await q(
+      `insert into public.portal_rule_proposals(portal, proposal_key, kind, field_key, proposal, source, state, first_seen, last_evaluated)
+       values ('emlakjet', $1, 'field_demote', 'rooms', '{}', 'corrections', 'ready', now() - interval '8 days', now() - interval '1 day') returning id`,
+      [hex("6f")],
+    ))[0]!.id as string;
+    const cur = (await q(
+      `insert into public.portal_rule_proposals(portal, proposal_key, kind, field_key, proposal, source, state, first_seen, last_evaluated)
+       values ('emlakjet', $1, 'field_demote', 'rooms', '{}', 'corrections', 'ready', now() - interval '1 day', now() - interval '1 day') returning id`,
+      [hex("7a")],
+    ))[0]!.id as string;
+    const stale = (await q(
+      `insert into public.portal_rule_proposals(portal, proposal_key, kind, field_key, proposal, source, state, first_seen, last_evaluated)
+       values ('emlakjet', $1, 'field_demote', 'floor', '{}', 'corrections', 'ready', now() - interval '20 days', now() - interval '20 days') returning id`,
+      [hex("8b")],
+    ))[0]!.id as string;
+    const summary = await call("pt_rules_learn", [new Date().toISOString()]);
+    expect(await proposalOf(sig)).toBeUndefined();
+    expect((summary.ready as { field_key: string }[]).some((r) => r.field_key === "price")).toBe(false);
+    const states = Object.fromEntries((await q(`select id, state from public.portal_rule_proposals where id = any ($1::uuid[])`, [[old, cur, stale]])).map((r) => [r.id, r.state]));
+    expect(states).toEqual({ [old]: "superseded", [cur]: "ready", [stale]: "expired" });
+    // otomatik yayında uygulanamayan öneri işaretlenir (yalnız service_role)
+    expect(await call("pt_rules_mark_invalid", [[cur], "label_shared:x"])).toBe(1);
+    expect((await q(`select state, decision_reason from public.portal_rule_proposals where id = $1`, [cur]))[0]).toEqual({
+      state: "rejected",
+      decision_reason: "Otomatik yayında uygulanamadı: label_shared:x",
+    });
+    const grants = await q(`select grantee from information_schema.routine_privileges where routine_name = 'pt_rules_mark_invalid' and grantee in ('authenticated','anon','service_role')`);
+    expect(grants.map((g) => g.grantee)).toEqual(["service_role"]);
+  });
+
   it("yayın: personel olmayan ve destek rolü yönetim RPC'lerini çağıramaz; super_admin yayınlar; ops yayınlayamaz", async () => {
     const c1 = content(1);
     const args = ["sahibinden", c1, "seed", null, { count: 0 }, hex("d"), SIG, "k1"];
@@ -279,15 +380,31 @@ describe.skipIf(!mod)("öğrenen portal kuralları (pglite)", () => {
     ]);
   });
 
-  it("karar: Y2 tek ofisli metin önerisi açık onaysız onaylanamaz; red gerekçe ister", async () => {
+  it("AI kaydı: etiket ve destek katalogdan (k>=2, eşlenmemiş); çağıranın etiketi/sahte desteği etkisiz", async () => {
+    const cat = (sig: string, label: string | null, k: number, mapped: string | null = null) =>
+      q(`insert into public.portal_form_fields(portal, field_sig, control, label_folded, distinct_tenants, mapped_key) values ('hepsiemlak', $1, 'choice', $2, $3, $4)`, [sig, label, k, mapped]);
+    await cat(hex("9"), "yakit tipi", 2);
+    await cat(hex("8"), "satis bedeli", 3);
+    await cat(hex("6"), null, 1); // tek ofis: açık metin yok
+    await cat(hex("5"), "cephe", 4, "facade"); // zaten eşlenmiş
     await as("", STAFF);
     const r = await call("pt_rules_admin_record_ai", ["hepsiemlak", "gpt-test", [
-      { field_key: "heating", field_sig: hex("9"), label: "yakit tipi", support_tenants: 1, confidence: 0.4 },
+      { field_key: "heating", field_sig: hex("9"), label: "tek ofis metni", support_tenants: 9, confidence: 0.4 },
       { field_key: "price", field_sig: hex("8"), label: "satis bedeli" },
-      { field_key: "heating", field_sig: hex("7"), label: "iletisim no" },
+      { field_key: "heating", field_sig: hex("6"), label: "yakit", support_tenants: 9 },
+      { field_key: "facade", field_sig: hex("5"), label: "cephe" },
+      { field_key: "heating", field_sig: hex("7"), label: "katalogda yok", support_tenants: 9 },
     ]]);
-    expect(r).toMatchObject({ outcome: "ok", created: 1, skipped: 2 });
-    const id = (await q(`select id from public.portal_rule_proposals where portal = 'hepsiemlak' and source = 'ai'`))[0]!.id as string;
+    expect(r).toMatchObject({ outcome: "ok", created: 1, skipped: 4 });
+    const rows = await q(`select support_tenants, proposal->>'label' label from public.portal_rule_proposals where portal = 'hepsiemlak' and source = 'ai'`);
+    expect(rows).toEqual([{ support_tenants: 2, label: "yakit tipi" }]);
+  });
+
+  it("karar: Y2 tek ofisli metin önerisi açık onaysız onaylanamaz; red gerekçe ister", async () => {
+    await as("", STAFF);
+    const made = await call("pt_rules_admin_propose", ["hepsiemlak", "label_map", "heating", { label: "yakit cinsi" }, "personel önerisi"]);
+    expect(made).toMatchObject({ outcome: "ok" });
+    const id = made.id as string;
     expect(await call("pt_rules_admin_decide", [id, "approve", null])).toMatchObject({ outcome: "pii_confirmation_required" });
     expect(await call("pt_rules_admin_decide", [id, "reject", ""])).toMatchObject({ outcome: "invalid_input" });
     expect(await call("pt_rules_admin_decide", [id, "approve", "kontrol edildi", true])).toMatchObject({ outcome: "ok", state: "approved" });

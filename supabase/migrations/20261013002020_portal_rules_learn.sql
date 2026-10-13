@@ -2,18 +2,22 @@
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI
 -- `npm run db:migrate -- --only 20261013002020_portal_rules_learn.sql` ile uygular (20261013002000 ve 002010 SONRASI).
 -- Geri alma: supabase/rollbacks/20261013002020_portal_rules_learn.rollback.sql
--- BAGIMLILIK: 20261013002000 (tablolar), 20261013002010 (pt_rules_insert_set, pt_rules_audit), portal_listings,
---   portal_transfer_sessions, tenants, platform_settings, platform_staff, platform_notifications.
+-- BAGIMLILIK: 20261013002000 (tablolar), 20261013002010 (pt_rules_insert_set, pt_rules_audit, pt_rules_worker_seen),
+--   portal_listings, listing_verifications, portal_transfer_sessions, tenants, platform_settings, platform_staff, platform_notifications.
 --
 -- NE: operational-retention cron'unun iki adimi icin YALNIZ service_role fonksiyonlari:
 --   * pt_rules_learn(p_now): ofis uygunlugu, oylar (ofis basina tek oy), Wilson alt siniri (z=1,645), oneri durumlari,
 --     geriletme adaylari, alan katalogu (k>=2 acik metin), form surumleri ve "form degisti" uyarisi. Ozet jsonb doner;
 --     yeni surum URETMEZ (TS: applyProposals + validateRuleSet + imza + pt_rules_publish_system).
 --   * pt_rules_publish_system(...): otomatik yayin (kind 'auto'), actor null + meta.system='learner', personele bildirim.
---   * pt_learning_retention(p_now): saklama sureleri (olay 180, rapor 90, oy 180 gun; reddedilen/suresi dolan oneri,
---     katalog ve form surumleri 1 yil).
+--   * pt_rules_mark_invalid(ids, reason): otomatik yayinda uygulanamayan (risky_key, label_shared, ...) oneriyi 'rejected'
+--     yapar; boylece her gece yeniden secilip portalin tum partisini dusurmez.
+--   * pt_learning_retention(p_now): saklama sureleri (olay 180, rapor 90, oy 180 gun; reddedilen/suresi dolan/yerine
+--     yenisi gelen oneri, katalog ve form surumleri 1 yil).
 -- ZEHIRLEMEYE KARSI (elestirmen Y3/Y4/O3): yalniz DOGRULANMIS yayin oturumlari oy uretir (eklentinin bagladigi
---   'assisted' ilan, canli, ilan kontrol iscisi bagdan en az 1 saat sonra yeniden gormus); uygun olmayan ofisin oyu 0;
+--   'assisted' ilan, canli, ilan kontrol ISCISI (kuyruk isi; listing_verifications job_id dolu, kaynak manual degil) bagdan
+--   en az 1 saat sonra 'present' gormus; ofisin elle "Teyit et"i / last_confirmed_at SAYILMAZ); uygun olmayan ofisin oyu 0;
+--   riskli anahtarlar (price, currency, deed_status, ...) icin etiket/secenek onerisi uretilmez (rule-apply risky_key);
 --   ofis basina gunde <=20 oneri; geriletmede yalniz uygun ofisler sayilir ve haftada en cok 3 otomatik geriletme;
 --   esikler platform_settings'ten (portal_rules.*), yoksa varsayilan (auto_publish=false, auto_degrade=false).
 -- RISK: dusuk (yalniz yeni fonksiyonlar; service_role disinda kimseye acik degil).
@@ -23,8 +27,10 @@ set local lock_timeout = '5s';
 do $$
 begin
   if not exists (select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-                  where n.nspname = 'public' and p.proname = 'pt_rules_insert_set') then
-    raise exception 'pt_rules_insert_set yok; once 20261013002010 uygulanmali.';
+                  where n.nspname = 'public' and p.proname = 'pt_rules_insert_set')
+     or not exists (select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+                     where n.nspname = 'public' and p.proname = 'pt_rules_worker_seen') then
+    raise exception 'pt_rules_insert_set / pt_rules_worker_seen yok; once 20261013002010 uygulanmali.';
   end if;
   if pg_catalog.to_regclass('public.platform_settings') is null or pg_catalog.to_regclass('public.platform_notifications') is null
      or pg_catalog.to_regclass('public.portal_listings') is null then
@@ -89,9 +95,20 @@ as $$
       select count(*) n from public.portal_transfer_sessions s
         join public.portal_listings pl on pl.id = s.portal_listing_id
        where s.tenant_id = t.id and s.state = 'published' and s.completed_at >= p_now - interval '60 days'
-         and pl.source_kind = 'assisted' and pl.status = 'live' and pl.last_confirmed_at > s.completed_at + interval '1 hour'
+         and pl.source_kind = 'assisted' and pl.status = 'live'
+         and public.pt_rules_worker_seen(pl.id, s.completed_at + interval '1 hour')
     ) ps on true
    where coalesce(tr.eligible, t.status = 'active' and t.sample_pack is null and t.created_at <= p_now - interval '14 days' and ps.n >= 3);
+$$;
+
+-- Riskli anahtarlar (TS RISKY_FIELD_KEYS kopyasi): uzak veri bunlara etiket/capa/secenek ekleyemez; oneri uretilmez.
+create or replace function public.pt_rules_risky_keys()
+returns text[]
+language sql
+immutable
+set search_path = pg_catalog, public
+as $$
+  select array['price', 'currency', 'deed_status', 'credit_eligible', 'swap', 'eids_property_no', 'authority_doc_no']::text[];
 $$;
 
 -- Kanit satirlari: dogrulanmis yayin oturumlarinin doldurma olaylarindan (son 60 gun) oneri anahtari basina ofis kaniti.
@@ -110,7 +127,8 @@ as $$
       from public.portal_transfer_sessions s
       join public.portal_listings pl on pl.id = s.portal_listing_id
      where s.state = 'published' and s.completed_at >= p_now - interval '60 days' and s.completed_at <= p_now
-       and pl.source_kind = 'assisted' and pl.status = 'live' and pl.last_confirmed_at > s.completed_at + interval '1 hour'
+       and pl.source_kind = 'assisted' and pl.status = 'live'
+         and public.pt_rules_worker_seen(pl.id, s.completed_at + interval '1 hour')
   ),
   ev as (
     -- (a) alan imzasi -> anahtar (capa): kabul / bicim duzeltmesi / secenek duzeltmesi alanin dogru oldugunu gosterir;
@@ -124,6 +142,7 @@ as $$
            coalesce(e.updated_at, e.created_at) as at
       from public.portal_fill_events e join sess on sess.id = e.session_id
      where e.field_key is not null and e.outcome in ('accepted', 'corrected', 'cleared')
+       and not (e.field_key = any (public.pt_rules_risky_keys()))
     union all
     -- (b) secenek takma adi: ayni EmlakSoft degeri icin kullanicinin sectigi portal secenegi; baska secenek = karsi kanit.
     select e.portal, 'option_map', e.field_key, null::text,
@@ -140,6 +159,7 @@ as $$
                and x.field_key is not null) a
         on a.portal = e.portal and a.field_key = e.field_key and a.value_key = e.value_key
      where e.correction_kind = 'other_option' and e.value_key is not null and e.corrected_option_folded is not null
+       and not (e.field_key = any (public.pt_rules_risky_keys()))
   ),
   capped as (
     -- Ofis basina gunde en cok 20 farkli oneri etkilenir.
@@ -259,7 +279,8 @@ begin
       join public.portal_listings pl on pl.id = s.portal_listing_id
      where e.field_key is not null and e.tenant_id = any (v_eligible)
        and s.state = 'published' and s.completed_at >= p_now - interval '14 days' and s.completed_at <= p_now
-       and pl.source_kind = 'assisted' and pl.status = 'live' and pl.last_confirmed_at > s.completed_at + interval '1 hour'
+       and pl.source_kind = 'assisted' and pl.status = 'live'
+         and public.pt_rules_worker_seen(pl.id, s.completed_at + interval '1 hour')
      group by e.portal, e.field_key
   )
   insert into public.portal_rule_proposals
@@ -277,6 +298,16 @@ begin
   on conflict (portal, proposal_key) do update
     set support_tenants = excluded.support_tenants, support_sessions = excluded.support_sessions,
         confidence = excluded.confidence, last_evaluated = excluded.last_evaluated;
+
+  -- Ayni alan icin onceki haftalarin bekleyen geriletme adayi yenisiyle degistirilir; 14 gun yeniden gorulmeyen
+  -- (sorun gecmis) aday suresi doldu sayilir. Boylece personel kuyrugunda haftalik kopya birikmez.
+  update public.portal_rule_proposals p set state = 'superseded', decided_at = p_now
+   where p.kind = 'field_demote' and p.source = 'corrections' and p.state = 'ready'
+     and exists (select 1 from public.portal_rule_proposals n
+                  where n.portal = p.portal and n.field_key = p.field_key and n.kind = 'field_demote' and n.source = 'corrections'
+                    and n.state = 'ready' and n.id <> p.id and (n.first_seen, n.id) > (p.first_seen, p.id));
+  update public.portal_rule_proposals set state = 'expired'
+   where kind = 'field_demote' and source = 'corrections' and state = 'ready' and last_evaluated < p_now - interval '14 days';
 
   select count(*) into v_demotes_week from public.portal_rule_proposals
    where kind = 'field_demote' and state = 'auto_approved' and decided_at >= p_now - interval '7 days';
@@ -362,7 +393,8 @@ begin
                                         order by p.portal, p.confidence desc, p.id)
                          from public.portal_rule_proposals p
                         where p.state = 'ready' and p.source = 'corrections' and not p.ai_unverified
-                          and p.kind in ('label_map', 'option_map')), '[]'::jsonb),
+                          and p.kind in ('label_map', 'option_map')
+                          and not (coalesce(p.field_key, '') = any (public.pt_rules_risky_keys()))), '[]'::jsonb),
     'demote_candidates', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'portal', p.portal, 'kind', p.kind, 'field_key', p.field_key,
                                                                        'source', p.source, 'proposal', p.proposal, 'confidence', p.confidence)
                                                     order by p.portal, p.confidence desc, p.id)
@@ -416,6 +448,22 @@ begin
 end;
 $$;
 
+-- Otomatik yayinda uygulanamayan oneri (cron; service_role): 'rejected' + gerekce. AI ve personel onerisine dokunmaz.
+create or replace function public.pt_rules_mark_invalid(p_ids uuid[], p_reason text)
+returns integer
+language sql
+security definer
+set search_path = pg_catalog, public
+as $$
+  with x as (
+    update public.portal_rule_proposals
+       set state = 'rejected', decided_at = now(),
+           decision_reason = left('Otomatik yayında uygulanamadı: ' || coalesce(nullif(btrim(p_reason), ''), 'bilinmiyor'), 500)
+     where id = any (coalesce(p_ids, '{}'::uuid[])) and state = 'ready' and source = 'corrections'
+    returning 1
+  ) select count(*)::integer from x;
+$$;
+
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Saklama
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -438,7 +486,7 @@ begin
   with d as (delete from public.portal_rule_votes where last_at < p_now - interval '180 days' returning 1) select count(*) into v_votes from d;
   with d as (
     delete from public.portal_rule_proposals
-     where state in ('rejected', 'expired') and coalesce(decided_at, last_evaluated) < p_now - interval '1 year'
+     where state in ('rejected', 'expired', 'superseded') and coalesce(decided_at, last_evaluated) < p_now - interval '1 year'
     returning 1
   ) select count(*) into v_proposals from d;
   with d as (delete from public.portal_form_fields where last_seen < p_now - interval '1 year' returning 1) select count(*) into v_fields from d;
@@ -459,8 +507,11 @@ revoke all on function public.pt_rules_learn_evidence(timestamptz, uuid[]) from 
 revoke all on function public.pt_rules_learn(timestamptz) from public, anon, authenticated;
 revoke all on function public.pt_rules_publish_system(text, jsonb, text, uuid, jsonb, text, text, text, uuid[]) from public, anon, authenticated;
 revoke all on function public.pt_learning_retention(timestamptz) from public, anon, authenticated;
+revoke all on function public.pt_rules_risky_keys() from public, anon, authenticated;
+revoke all on function public.pt_rules_mark_invalid(uuid[], text) from public, anon, authenticated;
 grant execute on function public.pt_rules_learn(timestamptz) to service_role;
 grant execute on function public.pt_rules_publish_system(text, jsonb, text, uuid, jsonb, text, text, text, uuid[]) to service_role;
 grant execute on function public.pt_learning_retention(timestamptz) to service_role;
+grant execute on function public.pt_rules_mark_invalid(uuid[], text) to service_role;
 
 notify pgrst, 'reload schema';

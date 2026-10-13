@@ -3,7 +3,7 @@
 -- `npm run db:migrate -- --only 20261013002010_portal_rules_rpcs.sql` ile uygular (20261013002000 SONRASI).
 -- Geri alma: supabase/rollbacks/20261013002010_portal_rules_rpcs.rollback.sql
 -- BAGIMLILIK: 20261013002000_portal_rules_core.sql (tablolar, pt_rules_is_operator/_super_admin, pt_rules_validate_content),
---   portal_transfer_sessions (20261012002700), platform_audit_logs, tenants.
+--   portal_transfer_sessions (20261012002700), listing_verifications (20260826002020), platform_audit_logs, tenants.
 --
 -- NE: kullanici oturumuyla (JWT) calisan SECURITY DEFINER RPC'ler. service_role KULLANILMAZ.
 --   * pt_rules_current(p_engine): portals/view; portal basina yayindaki (suresi dolmamis) imzali set.
@@ -21,6 +21,9 @@ do $$
 begin
   if pg_catalog.to_regclass('public.portal_rule_sets') is null then
     raise exception 'portal_rule_sets yok; once 20261013002000 uygulanmali.';
+  end if;
+  if pg_catalog.to_regclass('public.listing_verifications') is null then
+    raise exception 'listing_verifications yok; ilan kontrol tablolari (20260826002020) once uygulanmali.';
   end if;
 end $$;
 
@@ -590,6 +593,23 @@ begin
 end;
 $$;
 
+-- Y3 "dogrulanmis yayin": ilan kontrol ISCISI (kuyruk isi + istemci; lc_worker_complete) baglanan ilani bagdan en az
+-- 1 saat sonra 'present' gormus olmali. portal_listings.last_confirmed_at YETMEZ: ofis 'Teyit et' dugmesiyle
+-- (confirmPortalListing / lc_submit_manual_check, source_kind 'manual', job_id null) ya da yayin akisi bu alani yazar.
+create or replace function public.pt_rules_worker_seen(p_listing_id uuid, p_after timestamptz)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public
+as $$
+  select exists (
+    select 1 from public.listing_verifications lv
+     where lv.portal_listing_id = p_listing_id and lv.checked_at > p_after
+       and lv.result = 'present' and lv.job_id is not null and lv.source_kind <> 'manual'
+  );
+$$;
+
 /** Ofis uygunluk paneli: kiraci adi YALNIZ burada (operator). Varsayilan uygunluk ogrenme adimiyla ayni kurallar. */
 create or replace function public.pt_rules_admin_trust_list()
 returns jsonb
@@ -616,13 +636,16 @@ begin
         select count(*) n from public.portal_transfer_sessions s
           join public.portal_listings pl on pl.id = s.portal_listing_id
          where s.tenant_id = t.id and s.state = 'published' and s.completed_at >= now() - interval '60 days'
-           and pl.source_kind = 'assisted' and pl.status = 'live' and pl.last_confirmed_at > s.completed_at + interval '1 hour'
+           and pl.source_kind = 'assisted' and pl.status = 'live'
+           and public.pt_rules_worker_seen(pl.id, s.completed_at + interval '1 hour')
       ) ps on true
   ), '[]'::jsonb));
 end;
 $$;
 
-/** AI onerilerini kaydeder (TS'te dogrulanmis; burada bicim tekrar denetlenir). Kaynak 'ai', ai_unverified=true, durum 'ready'. */
+/** AI onerilerini kaydeder (TS'te dogrulanmis; burada bicim tekrar denetlenir). Kaynak 'ai', ai_unverified=true, durum 'ready'.
+ *  Cagirandan YALNIZ (field_sig, field_key, confidence) alinir: etiket ve destek (support_tenants) portal_form_fields
+ *  katalogundan okunur (acik metin k>=2, eslenmemis alan). Katalogda olmayan imza atlanir (Y2 / O6 SQL'de de). */
 create or replace function public.pt_rules_admin_record_ai(p_portal text, p_model text, p_items jsonb)
 returns jsonb
 language plpgsql
@@ -636,6 +659,8 @@ declare
   v_n integer := 0;
   v_skipped integer := 0;
   v_id uuid;
+  v_label text;
+  v_support integer;
   v_keys text[] := array['title','description','price','currency','gross_sqm','net_sqm','rooms','building_age','floor',
     'total_floors','heating','bathrooms','balcony','elevator','parking','furnished','usage_status','in_site','site_name',
     'dues','credit_eligible','deed_status','facade','swap','eids_property_no','authority_doc_no','parcel_block',
@@ -649,21 +674,28 @@ begin
     return jsonb_build_object('outcome', 'invalid_input');
   end if;
   for v_i in select * from jsonb_array_elements(p_items) loop
-    if jsonb_typeof(v_i) <> 'object' or not (coalesce(v_i ->> 'field_key', '') = any (v_keys))
-       or coalesce(v_i ->> 'field_sig', '') !~ '^[0-9a-f]{64}$'
-       or not public.pt_feedback_text_ok(v_i ->> 'label') or public.pt_feedback_label_personal(v_i ->> 'label')
-       or length(v_i ->> 'label') < 3
+    v_label := null;
+    v_support := null;
+    if jsonb_typeof(v_i) = 'object' and coalesce(v_i ->> 'field_sig', '') ~ '^[0-9a-f]{64}$' then
+      select f.label_folded, f.distinct_tenants into v_label, v_support
+        from public.portal_form_fields f
+       where f.portal = p_portal and f.field_sig = v_i ->> 'field_sig'
+         and f.label_folded is not null and f.distinct_tenants >= 2 and f.mapped_key is null;
+    end if;
+    if v_label is null or not (coalesce(v_i ->> 'field_key', '') = any (v_keys))
+       or not public.pt_feedback_text_ok(v_label) or public.pt_feedback_label_personal(v_label)
+       or length(v_label) < 3
        or (v_i ->> 'field_key') in ('price', 'currency', 'deed_status', 'credit_eligible', 'swap', 'eids_property_no', 'authority_doc_no') then
       v_skipped := v_skipped + 1;
       continue;
     end if;
-    v_key := encode(sha256(convert_to('label_map|' || p_portal || '|' || (v_i ->> 'field_key') || '|' || (v_i ->> 'label') || '|' || left(v_i ->> 'field_sig', 16), 'UTF8')), 'hex');
+    v_key := encode(sha256(convert_to('label_map|' || p_portal || '|' || (v_i ->> 'field_key') || '|' || v_label || '|' || left(v_i ->> 'field_sig', 16), 'UTF8')), 'hex');
     insert into public.portal_rule_proposals
       (portal, proposal_key, kind, field_key, field_sig, proposal, source, support_tenants, confidence, state, ai_model, ai_unverified)
     values
       (p_portal, v_key, 'label_map', v_i ->> 'field_key', v_i ->> 'field_sig',
-       jsonb_build_object('label', v_i ->> 'label', 'anchor', left(v_i ->> 'field_sig', 16)), 'ai',
-       (case when coalesce(v_i ->> 'support_tenants', '') ~ '^[0-9]{1,6}$' then (v_i ->> 'support_tenants')::integer else 0 end),
+       jsonb_build_object('label', v_label, 'anchor', left(v_i ->> 'field_sig', 16)), 'ai',
+       v_support,
        (case when jsonb_typeof(v_i -> 'confidence') = 'number' then least(greatest((v_i ->> 'confidence')::numeric, 0), 1) else 0 end), 'ready', nullif(p_model, ''), true)
     on conflict (portal, proposal_key) do nothing
     returning id into v_id;
@@ -681,6 +713,7 @@ $$;
 revoke all on function public.pt_feedback_text_ok(text) from public, anon, authenticated;
 revoke all on function public.pt_feedback_label_personal(text) from public, anon, authenticated;
 revoke all on function public.pt_rules_audit(uuid, text, text, uuid, jsonb) from public, anon, authenticated;
+revoke all on function public.pt_rules_worker_seen(uuid, timestamptz) from public, anon, authenticated;
 revoke all on function public.pt_rules_insert_set(text, jsonb, text, uuid, jsonb, text, text, text, uuid, uuid, uuid[]) from public, anon, authenticated;
 
 revoke all on function public.pt_rules_current(text) from public, anon;
