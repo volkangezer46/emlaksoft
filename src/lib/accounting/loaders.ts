@@ -10,7 +10,7 @@ import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { EF_RPC, EF_UNIT } from "@/lib/ef-credits/config";
 import { exactArr, exactMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { type Period } from "@/lib/accounting/period";
-import { classifyInvoiceKind, toLedgerInvoice, type LedgerInvoice, type RawInvoiceRow } from "@/lib/accounting/ledger";
+import { classifyInvoiceKind, creditNoteToLedger, toLedgerInvoice, type LedgerInvoice, type RawCreditNoteRow, type RawInvoiceRow } from "@/lib/accounting/ledger";
 import { packSaleOfInvoice, type EfLedgerEntry, type EfPackSale, type EfUsageRow } from "@/lib/accounting/ef-economics";
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -90,6 +90,30 @@ export async function enrichPage(admin: Admin, rows: readonly RawInvoiceRow[]): 
   return rows.map((r) => toLedgerInvoice(r, map.get(r.id)));
 }
 
+const CREDIT_NOTE_SELECT =
+  "id, invoice_id, tenant_id, credit_no, amount_try, net_try, tax_try, issued_at, invoice:invoices!credit_notes_invoice_id_fkey(invoice_no, currency, subscription_id, iyzico_payment_id, meta), tenant:tenants!credit_notes_tenant_id_fkey(name, tax_office, tax_number)";
+
+/**
+ * Dönemde (dekont tarihi) kesilen alacak dekontları — defterde EKSİ satır. Tablo yoksa (migration bekliyor) ya da
+ * okunamazsa boş liste + `available:false`: defter dekontsuz çalışır, iade tutarları meta.refund'dan sayılmaya devam eder.
+ */
+export async function loadCreditNoteRows(admin: Admin, period: Pick<Period, "fromIso" | "toIso">): Promise<{ rows: LedgerInvoice[]; available: boolean }> {
+  const out: LedgerInvoice[] = [];
+  let offset = 0;
+  while (offset < LEDGER_MAX_ROWS) {
+    let q = admin.from("credit_notes").select(CREDIT_NOTE_SELECT).order("issued_at", { ascending: false }).order("id", { ascending: true });
+    if (period.fromIso) q = q.gte("issued_at", period.fromIso);
+    if (period.toIso) q = q.lt("issued_at", period.toIso);
+    const { data, error } = await q.range(offset, offset + LEDGER_PAGE_SIZE - 1);
+    if (error) return { rows: out, available: false };
+    const rows = (data ?? []) as unknown as RawCreditNoteRow[];
+    out.push(...rows.map(creditNoteToLedger));
+    if (rows.length < LEDGER_PAGE_SIZE) break;
+    offset += LEDGER_PAGE_SIZE;
+  }
+  return { rows: out, available: true };
+}
+
 export type LedgerLoad = { rows: LedgerInvoice[]; truncated: boolean };
 
 /** Dönemin muhasebe-tarihli faturaları + (istenirse) dönemde iade edilenler; tekilleştirilmiş. */
@@ -110,6 +134,8 @@ export async function loadLedger(admin: Admin, period: Pick<Period, "fromIso" | 
     }
     if (truncated) break;
   }
+  // Alacak dekontları (eksi satır): özetler bunları saymaz (durum credit_note); defter ve rapor gösterir.
+  if (!truncated) rows.push(...(await loadCreditNoteRows(admin, period)).rows);
   return { rows, truncated };
 }
 

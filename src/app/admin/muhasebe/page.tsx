@@ -16,6 +16,7 @@ import {
   summarizeLedger,
 } from "@/lib/accounting/ledger";
 import { formatKurus, formatKurusShort } from "@/lib/accounting/format";
+import { AGING_BUCKETS, AGING_BUCKET_LABELS, summarizeAging } from "@/lib/accounting/aging";
 import {
   EF_ITEM_LABELS,
   EF_WHOLESALE_SETTING_KEY,
@@ -189,6 +190,16 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
 
   const creditSoldNet = summary.byKind.credit_pack.net;
 
+  // Tahsilat yaşlandırması: açık faturalar (dönemden bağımsız, güncel); kova toplamı = Bekleyen + Gecikmiş.
+  const aging = summarizeAging(openRes ?? [], nowMs);
+  const agingItems: StatRowItem[] = AGING_BUCKETS.map((b) => ({
+    label: AGING_BUCKET_LABELS[b],
+    value: formatKurusShort(aging.buckets[b].gross),
+    href: defterHref(period, { durum: "open", yas: b }, true),
+    hint: b === "0-30" ? `${aging.buckets[b].count} fatura · ${aging.notDue.count} tanesi vadesi gelmemiş` : `${aging.buckets[b].count} fatura`,
+    attention: b !== "0-30" && aging.buckets[b].count > 0,
+  }));
+
   return (
     <div className="space-y-6">
       <BillingNav active="muhasebe" />
@@ -219,6 +230,20 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
         <p className="text-xs text-text-faint">
           Tahsilat = durumu &quot;Ödendi&quot; ve ödeme tarihi dönemde olan faturalar; iade = iade kaydının tarihi dönemde olanlar.
           Bekleyen ve gecikmiş kartlar dönemden bağımsız, güncel durumdur (taslaklar borç sayılmaz).
+        </p>
+      </section>
+
+      <section aria-labelledby="yaslandirma-baslik" className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 id="yaslandirma-baslik" className="font-display font-bold text-ink-950">Tahsilat yaşlandırması</h2>
+          <Link href={defterHref(period, { durum: "open" }, true)} className="focus-ring text-xs font-semibold text-brand-600 hover:underline">
+            Toplam açık alacak {formatKurusShort(aging.total.gross)} · {aging.total.count} fatura
+          </Link>
+        </div>
+        <StatRow items={agingItems} label="Tahsilat yaşlandırması" />
+        <p className="text-xs text-text-faint">
+          Açık faturalar vadeden bu yana geçen güne göre (vadesi gelmemiş ya da vadesiz fatura 0-30 kovasında). Güncel durumdur, dönemden bağımsızdır;
+          toplam, yukarıdaki Bekleyen + Gecikmiş kartlarına eşittir.
         </p>
       </section>
 
@@ -440,6 +465,8 @@ export default async function MuhasebePage({ searchParams }: { searchParams?: Pr
 
       <p className="text-xs text-text-faint">
         <Link href="/admin/muhasebe/defter" className="focus-ring font-semibold text-brand-600 hover:underline">Fatura defteri</Link>
+        {" · "}
+        <Link href="/admin/billing/faturalar/yeni" className="focus-ring font-semibold text-brand-600 hover:underline">Elle fatura / tek seferlik ücret kes</Link>
         {" · "}e-Fatura entegrasyonu bu ekranda yoktur (ayrı iş).
       </p>
     </div>

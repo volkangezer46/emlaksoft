@@ -25,6 +25,7 @@ import {
   type LedgerParams,
 } from "@/lib/accounting/ledger";
 import { formatKurus } from "@/lib/accounting/format";
+import { AGING_BUCKET_LABELS } from "@/lib/accounting/aging";
 import { loadLedger, LEDGER_MAX_ROWS } from "@/lib/accounting/loaders";
 import { BillingNav } from "@/app/admin/billing/billing-nav";
 import { PeriodBar } from "../period-bar";
@@ -64,6 +65,7 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
   if (filter.kupon) chips.push({ label: "Yalnız kuponlu", href: href({}, ["kupon"]) });
   if (filter.ofis) chips.push({ label: "Tek ofis", href: href({}, ["ofis"]) });
   if (filter.q) chips.push({ label: `Arama: ${filter.q}`, href: href({}, ["q"]) });
+  if (filter.yas) chips.push({ label: `Yaş: ${AGING_BUCKET_LABELS[filter.yas]}`, href: href({}, ["yas"]) });
   if (filter.minKurus !== undefined || filter.maxKurus !== undefined) {
     chips.push({
       label: `Tutar: ${filter.minKurus !== undefined ? formatKurus(filter.minKurus) : "…"} – ${filter.maxKurus !== undefined ? formatKurus(filter.maxKurus) : "…"}`,
@@ -77,7 +79,7 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
       <PageHeader
         eyebrow="Muhasebe"
         title="Fatura defteri"
-        description="Dönem ve süzgeçlere göre fatura listesi. Satıra tıklayınca fatura detayı ve işlemler açılır."
+        description="Dönem ve süzgeçlere göre fatura listesi; alacak dekontları dekont tarihinde eksi satırdır. Satıra tıklayınca fatura detayı ve işlemler açılır."
         breadcrumbs={[{ label: "Muhasebe", href: "/admin/muhasebe" }, { label: "Fatura defteri" }]}
       />
 
@@ -89,6 +91,7 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
         ))}
         {filter.ofis ? <input type="hidden" name="ofis" value={filter.ofis} /> : null}
         {filter.kupon ? <input type="hidden" name="kupon" value="1" /> : null}
+        {filter.yas ? <input type="hidden" name="yas" value={filter.yas} /> : null}
         <label className="text-xs font-semibold text-text-muted">
           Durum
           <select name="durum" defaultValue={filter.durum ?? ""} className={selectClass}>
@@ -182,19 +185,20 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
           <div className="divide-y divide-line">
             {visible.map((inv) => (
               <div key={inv.id} className="group relative grid gap-2 px-5 py-3 transition hover:bg-brand-600/[0.02] sm:grid-cols-[1.2fr_.8fr_.8fr_.8fr] sm:items-center">
-                <Link href={`/admin/billing/faturalar/${inv.id}`} className="absolute inset-0" aria-label={`${inv.invoiceNo} fatura detayını aç`} />
+                <Link href={`/admin/billing/faturalar/${inv.creditNoteOf ?? inv.id}`} className="absolute inset-0" aria-label={`${inv.invoiceNo} fatura detayını aç`} />
                 <div>
                   <p className="text-sm font-semibold text-ink-950">{inv.invoiceNo}</p>
+                  {inv.refInvoiceNo ? <p className="text-xs text-text-faint">Fatura {inv.refInvoiceNo}</p> : null}
                   <Link href={`/admin/tenants/${inv.tenantId}`} className="focus-ring relative z-10 text-xs text-text-muted hover:text-brand-600">
                     {inv.tenantName || "Ofis"}
                   </Link>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-ink-950">{formatKurus(inv.grossKurus)}</p>
+                  <p className={`text-xs font-semibold ${inv.grossKurus < 0 ? "text-danger-600" : "text-ink-950"}`}>{formatKurus(inv.grossKurus)}</p>
                   <p className="text-xs text-text-faint">Net {formatKurus(inv.netKurus)} · KDV {formatKurus(inv.taxKurus)}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="w-fit rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+                  <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${inv.status === "credit_note" ? "bg-danger-500/10 text-danger-600" : "bg-brand-600/10 text-brand-600"}`}>
                     {INVOICE_STATUS_LABELS[inv.status] ?? inv.status}
                   </span>
                   {isOverdue(inv, nowMs) ? (
@@ -209,7 +213,7 @@ export default async function FaturaDefteriPage({ searchParams }: { searchParams
                 <div className="text-xs text-text-muted">
                   <p>{INVOICE_KIND_LABELS[inv.kind]} · {PAYMENT_METHOD_LABELS[inv.method]}</p>
                   <p className="text-text-faint">
-                    {inv.paidAt ? `Ödeme ${csvDate(inv.paidAt)}` : `Oluşturma ${csvDate(inv.createdAt)}`}
+                    {inv.status === "credit_note" ? `Dekont ${csvDate(inv.createdAt)}` : inv.paidAt ? `Ödeme ${csvDate(inv.paidAt)}` : `Oluşturma ${csvDate(inv.createdAt)}`}
                     {inv.couponCode ? ` · Kupon ${inv.couponCode}` : ""}
                   </p>
                 </div>

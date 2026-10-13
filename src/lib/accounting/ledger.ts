@@ -7,16 +7,22 @@
  * Ödeme yöntemi: meta.manual_payment.method (elle), meta.paidWith='account_credit' (tamamı hesap kredisi) ya da iyzico_payment_id (kart).
  * Hesap kredisi payı: meta.walletCreditTry (000500 SQL'i yazar; karma ödemede kalan nakit meta.walletCashTry).
  * İade: meta.refund = { amount_try (BRÜT), reason, at } (recordInvoiceRefund; faturada durum "paid" kalır).
+ * Alacak dekontu (AD2): iade kaydı yazıldığında DB tetikleyicisi `credit_notes` satırı (ADK-YYYY-NNNNNN) üretir; defterde
+ * dekont tarihinde EKSİ tutarlı ayrı satırdır (durum "credit_note"). Özet kartları dekont satırını saymaz (iade zaten
+ * meta.refund üzerinden sayılır; çift sayım yok).
+ * Tek seferlik / elle fatura: meta.kind = 'one_time' (abonelik bağı yok, MRR'a girmez).
  */
 import { inPeriod, type Period } from "@/lib/accounting/period";
 import { LEGACY_MANUAL_PAYMENT_METHODS, MANUAL_PAYMENT_METHODS } from "@/lib/billing/invoice-ops";
+import { agingBucketOf, daysPastDue, isAgingBucket, type AgingBucket } from "@/lib/accounting/aging";
 
-export type InvoiceKind = "plan" | "extra_seats" | "credit_pack" | "other";
+export type InvoiceKind = "plan" | "extra_seats" | "credit_pack" | "one_time" | "other";
 
 export const INVOICE_KIND_LABELS: Record<InvoiceKind, string> = {
   plan: "Abonelik planı",
   extra_seats: "Ek koltuk",
   credit_pack: "Analiz paketi",
+  one_time: "Tek seferlik ücret",
   other: "Diğer",
 };
 export const INVOICE_KINDS = Object.keys(INVOICE_KIND_LABELS) as InvoiceKind[];
@@ -27,6 +33,7 @@ export const INVOICE_STATUS_LABELS: Record<string, string> = {
   paid: "Ödendi",
   void: "İptal",
   uncollectible: "Tahsil edilemez",
+  credit_note: "Alacak dekontu",
 };
 
 export type PaymentMethodCode = "iyzico" | "hesap_kredisi" | "havale" | "nakit" | "kart_pos" | "diger" | "belirsiz";
@@ -88,6 +95,10 @@ export type LedgerInvoice = {
   walletCreditKurus: number;
   couponCode: string | null;
   couponDiscountKurus: number;
+  /** Alacak dekontu satırında bağlı faturanın kimliği (fatura satırında yok). */
+  creditNoteOf?: string | null;
+  /** Alacak dekontu satırında bağlı faturanın numarası. */
+  refInvoiceNo?: string | null;
 };
 
 export function toKurus(value: unknown): number {
@@ -109,6 +120,7 @@ export function classifyInvoiceKind(meta: unknown, subscriptionId?: string | nul
   const kind = typeof m.kind === "string" ? m.kind : null;
   if (kind === "extra_seats") return "extra_seats";
   if (kind === "credit_pack") return "credit_pack";
+  if (kind === "one_time") return "one_time";
   if (kind === null || kind === "plan" || kind === "plan_renewal" || kind === "subscription") {
     if (typeof m.plan === "string" || subscriptionId || kind !== null) return "plan";
     return "other";
@@ -170,9 +182,55 @@ export function toLedgerInvoice(
   };
 }
 
+/** Ham alacak dekontu satırı (credit_notes + bağlı fatura/ofis gömmesi). */
+export type RawCreditNoteRow = {
+  id: string;
+  invoice_id: string;
+  tenant_id: string;
+  credit_no: string;
+  amount_try: number | string;
+  net_try: number | string;
+  tax_try: number | string;
+  issued_at: string;
+  invoice?: unknown;
+  tenant?: unknown;
+};
+
+/** Dekont → defter satırı: tutarlar EKSİ, tür/yöntem bağlı faturadan, tarih dekont tarihi. */
+export function creditNoteToLedger(row: RawCreditNoteRow): LedgerInvoice {
+  const inv = asRecord(first(row.invoice as unknown));
+  const tenant = asRecord(first(row.tenant as unknown));
+  const neg = (v: unknown) => -Math.abs(toKurus(v));
+  return {
+    id: row.id,
+    invoiceNo: row.credit_no,
+    tenantId: row.tenant_id,
+    tenantName: typeof tenant.name === "string" ? tenant.name : "",
+    taxOffice: typeof tenant.tax_office === "string" ? tenant.tax_office : "",
+    taxNumber: typeof tenant.tax_number === "string" ? tenant.tax_number : "",
+    status: "credit_note",
+    netKurus: neg(row.net_try),
+    taxKurus: neg(row.tax_try),
+    grossKurus: neg(row.amount_try),
+    currency: typeof inv.currency === "string" ? inv.currency : "TRY",
+    createdAt: row.issued_at,
+    paidAt: null,
+    dueAt: null,
+    kind: classifyInvoiceKind(inv.meta, typeof inv.subscription_id === "string" ? inv.subscription_id : null),
+    method: paymentMethodOf(inv.meta, typeof inv.iyzico_payment_id === "string" ? inv.iyzico_payment_id : null),
+    refundKurus: 0,
+    refundAt: null,
+    walletCreditKurus: 0,
+    couponCode: null,
+    couponDiscountKurus: 0,
+    creditNoteOf: row.invoice_id,
+    refInvoiceNo: typeof inv.invoice_no === "string" ? inv.invoice_no : null,
+  };
+}
+
 /** KDV oranı (yüzde, 2 ondalığa yuvarlı). Net sıfırsa 0. */
 export function vatRatePercent(inv: Pick<LedgerInvoice, "netKurus" | "taxKurus">): number {
-  if (inv.netKurus <= 0) return 0;
+  if (inv.netKurus === 0) return 0;
   return Math.round((inv.taxKurus / inv.netKurus) * 10000) / 100;
 }
 
@@ -282,7 +340,7 @@ function inPeriodOrUnbounded(iso: string | null, period: Pick<Period, "fromIso" 
 // ---------------------------------------------------------------------------
 // Defter filtresi
 // ---------------------------------------------------------------------------
-export const LEDGER_STATUS_FILTERS = ["paid", "open", "gecikmis", "draft", "void", "uncollectible", "iade"] as const;
+export const LEDGER_STATUS_FILTERS = ["paid", "open", "gecikmis", "draft", "void", "uncollectible", "iade", "dekont"] as const;
 export type LedgerStatusFilter = (typeof LEDGER_STATUS_FILTERS)[number];
 
 export const LEDGER_STATUS_FILTER_LABELS: Record<LedgerStatusFilter, string> = {
@@ -293,6 +351,7 @@ export const LEDGER_STATUS_FILTER_LABELS: Record<LedgerStatusFilter, string> = {
   void: "İptal",
   uncollectible: "Tahsil edilemez",
   iade: "İade edilen",
+  dekont: "Alacak dekontu",
 };
 
 export type LedgerFilter = {
@@ -308,6 +367,8 @@ export type LedgerFilter = {
   /** Brüt tutar aralığı (kuruş, uçlar dahil). */
   minKurus?: number;
   maxKurus?: number;
+  /** Tahsilat yaşlandırma kovası (yalnız açık faturalar; vadeden bu yana gün). */
+  yas?: AgingBucket;
 };
 
 const TR_LOWER = (s: string) => s.toLocaleLowerCase("tr-TR");
@@ -321,9 +382,12 @@ export function matchesLedger(inv: LedgerInvoice, f: LedgerFilter, period: Pick<
   }
   if (f.durum === "gecikmis") {
     if (!isOverdue(inv, nowMs)) return false;
+  } else if (f.durum === "dekont") {
+    if (inv.status !== "credit_note") return false;
   } else if (f.durum && f.durum !== "iade" && inv.status !== f.durum) {
     return false;
   }
+  if (f.yas && (inv.status !== "open" || agingBucketOf(daysPastDue(inv, nowMs)) !== f.yas)) return false;
   if (f.tur && inv.kind !== f.tur) return false;
   if (f.yontem && inv.method !== f.yontem) return false;
   if (f.ofis && inv.tenantId !== f.ofis) return false;
@@ -332,7 +396,7 @@ export function matchesLedger(inv: LedgerInvoice, f: LedgerFilter, period: Pick<
   if (f.maxKurus !== undefined && inv.grossKurus > f.maxKurus) return false;
   if (f.q) {
     const q = TR_LOWER(f.q.trim());
-    if (q && !TR_LOWER(inv.invoiceNo).includes(q) && !TR_LOWER(inv.tenantName).includes(q)) return false;
+    if (q && !TR_LOWER(inv.invoiceNo).includes(q) && !TR_LOWER(inv.tenantName).includes(q) && !TR_LOWER(inv.refInvoiceNo ?? "").includes(q)) return false;
   }
   return true;
 }
@@ -358,6 +422,7 @@ export type LedgerParams = {
   q?: string;
   min?: string;
   max?: string;
+  yas?: string;
   sayfa?: string;
 };
 
@@ -386,6 +451,7 @@ export function parseLedgerFilter(p: LedgerParams): LedgerFilter {
   const max = parseTlToKurus(p.max);
   if (min !== undefined) f.minKurus = min;
   if (max !== undefined) f.maxKurus = max;
+  if (isAgingBucket(p.yas)) f.yas = p.yas;
   return f;
 }
 
@@ -400,6 +466,7 @@ export function ledgerFilterParams(f: LedgerFilter): Record<string, string> {
   if (f.q) out.q = f.q;
   if (f.minKurus !== undefined) out.min = (f.minKurus / 100).toFixed(2).replace(".", ",");
   if (f.maxKurus !== undefined) out.max = (f.maxKurus / 100).toFixed(2).replace(".", ",");
+  if (f.yas) out.yas = f.yas;
   return out;
 }
 

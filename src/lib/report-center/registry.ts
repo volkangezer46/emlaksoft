@@ -6,7 +6,7 @@
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
 import { PLATFORM_REPORTS } from "./catalog/platform";
-import { muhasebeFaturaDefteri } from "./catalog/platform-accounting";
+import { PLATFORM_ACCOUNTING_REPORTS } from "./catalog/platform-accounting";
 import { ANALYSIS_REPORTS } from "./catalog/tenant-analysis";
 import { CRM_REPORTS } from "./catalog/tenant-crm";
 import { FINANCE_REPORTS } from "./catalog/tenant-finance";
@@ -34,7 +34,7 @@ export const PLATFORM_CATEGORIES: readonly ReportCategory[] = [
 ];
 
 export const TENANT_REPORT_LIST: readonly ReportDef[] = [...CRM_REPORTS, ...SALES_REPORTS, ...FINANCE_REPORTS, ...CASH_REPORTS, ...TEAM_REPORTS, ...ANALYSIS_REPORTS, ...PROSPECTING_REPORTS];
-export const PLATFORM_REPORT_LIST: readonly ReportDef[] = [...PLATFORM_REPORTS, muhasebeFaturaDefteri];
+export const PLATFORM_REPORT_LIST: readonly ReportDef[] = [...PLATFORM_REPORTS, ...PLATFORM_ACCOUNTING_REPORTS];
 
 export const ALL_REPORTS: readonly ReportDef[] = [...TENANT_REPORT_LIST, ...PLATFORM_REPORT_LIST];
 

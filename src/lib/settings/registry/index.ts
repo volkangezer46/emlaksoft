@@ -1,4 +1,5 @@
 import { SETTING_CATEGORIES, type AnySettingDef, type SettingCategoryId } from "../types";
+import { AD2_INVOICE_SETTING_DEFS } from "./ad2-invoices";
 import { BILLING_SETTING_DEFS } from "./billing";
 import { EMAIL_SETTING_DEFS } from "./email";
 import { OPS_ALERT_SETTING_DEFS } from "./ops-alerts";
@@ -10,7 +11,7 @@ import { TENANT_SETTING_DEFS } from "./tenant";
 import { SECURITY_SETTING_DEFS } from "./security";
 import { SUPPORT_SETTING_DEFS } from "./support";
 /** Tum ayar tanimlari (TEK kaynak). Ofis tanimlari tenant.ts; faturalama ek bayraklari billing.ts; sube/kullanici sonraki pakette. */
-export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...EMAIL_SETTING_DEFS, ...TENANT_SETTING_DEFS, ...SUBSCRIPTION_OPS_SETTING_DEFS, ...OPS_ALERT_SETTING_DEFS, ...SECURITY_SETTING_DEFS, ...CRM_SETTING_DEFS, ...BROADCAST_SETTING_DEFS, ...SUPPORT_SETTING_DEFS];
+export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...EMAIL_SETTING_DEFS, ...TENANT_SETTING_DEFS, ...SUBSCRIPTION_OPS_SETTING_DEFS, ...OPS_ALERT_SETTING_DEFS, ...SECURITY_SETTING_DEFS, ...CRM_SETTING_DEFS, ...BROADCAST_SETTING_DEFS, ...SUPPORT_SETTING_DEFS, ...AD];
 
 const BY_KEY = new Map<string, AnySettingDef>();
 const BY_STORAGE = new Map<string, AnySettingDef>();

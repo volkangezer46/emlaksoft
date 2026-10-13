@@ -1,7 +1,66 @@
 export type PlanId = "advisor" | "office" | "professional" | "business" | "enterprise";
 
-/** Fatura KDV oranı (%20). Ön izlemeler bunu kullanır; asıl fatura tutarını `invoiceAmountsTry` (fulfillment.ts) hesaplar. */
-export const BILLING_VAT_RATE = 0.2;
+/** Kod varsayılanı KDV oranı (%20): ayar defterinde `billing.vat_rate` yokken/bozukken kullanılır. */
+export const DEFAULT_BILLING_VAT_RATE = 0.2;
+
+/**
+ * İstemci ön izleme sabiti (varsayılan oran). Kesilen faturanın oranı ayar defterindeki geçerlilik tarihli
+ * `billing.vat_rate` kaydından okunur: sunucuda `getBillingVatRate()` (src/lib/billing/vat-rate.ts) → `vatRateAt`.
+ */
+export const BILLING_VAT_RATE = DEFAULT_BILLING_VAT_RATE;
+
+/** Geçerlilik tarihli KDV kaydı: `from` TR takvim günü (YYYY-AA-GG, o gün 00:00 TR'den itibaren), `rate` 0..<1. */
+export type VatRateEntry = { from: string; rate: number };
+
+/** Ayar defteri varsayılanı (tek kayıt: tarih öncesi her şey %20). */
+export const DEFAULT_VAT_SCHEDULE = "2000-01-01=20";
+
+const VAT_ENTRY_RE = /^(\d{4})-(\d{2})-(\d{2})\s*=\s*(\d{1,2}(?:[.,]\d{1,2})?)$/;
+
+/**
+ * "2000-01-01=20; 2027-01-01=18" biçimini çözer (satır sonu ya da ; ile ayrılır; oran YÜZDE). Geçersiz kayıt,
+ * yinelenen tarih ya da boş liste = null (okuyucu varsayılana düşer, yazım reddedilir). Sonuç tarihe göre artan sıradadır.
+ */
+export function parseVatSchedule(raw: string | null | undefined): VatRateEntry[] | null {
+  const parts = String(raw ?? "")
+    .split(/[;\n]+/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0 || parts.length > 24) return null;
+  const out: VatRateEntry[] = [];
+  for (const p of parts) {
+    const m = VAT_ENTRY_RE.exec(p);
+    if (!m) return null;
+    const [, y, mo, d, pct] = m;
+    const day = `${y}-${mo}-${d}`;
+    const probe = new Date(`${day}T00:00:00Z`);
+    if (Number.isNaN(probe.getTime()) || probe.toISOString().slice(0, 10) !== day) return null;
+    const rate = Math.round(Number(pct.replace(",", ".")) * 100) / 10000;
+    if (!Number.isFinite(rate) || rate < 0 || rate >= 1) return null;
+    if (out.some((e) => e.from === day)) return null;
+    out.push({ from: day, rate });
+  }
+  return out.sort((a, b) => a.from.localeCompare(b.from));
+}
+
+/** Kayıtları ayar metnine çevirir (yüzde; artan tarih). */
+export function formatVatSchedule(entries: readonly VatRateEntry[]): string {
+  return [...entries]
+    .sort((a, b) => a.from.localeCompare(b.from))
+    .map((e) => `${e.from}=${String(Math.round(e.rate * 10000) / 100).replace(".", ",")}`)
+    .join("; ");
+}
+
+/**
+ * Verilen TR gün anahtarında (YYYY-AA-GG) geçerli oran: başlangıcı bu güne eşit/önce olan EN SON kayıt.
+ * Hiç kayıt geçerli değilse (tüm kayıtlar gelecekte) `fallback`. Eski fatura kendi satırındaki oranı taşır;
+ * oran değişince yalnız YENİ kesilen faturalar etkilenir.
+ */
+export function vatRateAt(schedule: readonly VatRateEntry[] | null, trDay: string, fallback = DEFAULT_BILLING_VAT_RATE): number {
+  let rate: number | null = null;
+  for (const e of schedule ?? []) if (e.from <= trDay) rate = e.rate;
+  return rate ?? fallback;
+}
 
 /** Yıllık ödemede ödenen ay sayısı varsayılanı ("10 öde 12 kullan"); plan başına panelden değişir. */
 export const DEFAULT_YEARLY_PAID_MONTHS = 10;
