@@ -1,3 +1,4 @@
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -108,6 +109,11 @@ describe("iletme onay e-postaları", () => {
   it("Gmail onay kodu ve bağlantısı çıkarılır", () => {
     expect(forwardProviderOf("forwarding-noreply@google.com")?.provider).toBe("gmail");
     expect(forwardProviderOf("eids.yetki@ticaret.gov.tr")).toBeNull();
+    // Herkesin açabileceği sağlayıcı adresleri iletme onayı sayılmaz (gönderen kapısı delinmesin).
+    expect(forwardProviderOf("saldirgan@outlook.com")).toBeNull();
+    expect(forwardProviderOf("ali.noreply@yandex.ru")).toBeNull();
+    expect(forwardProviderOf("account-security-noreply@accountprotection.microsoft.com")?.provider).toBe("outlook");
+    expect(forwardProviderOf("noreply@yandex.ru")?.provider).toBe("yandex");
     const c = extractForwardConfirmation(
       "gmail",
       "(#123456789) Gmail Yönlendirme Onayı - ofis@gmail.com adresinden posta al",
@@ -157,6 +163,61 @@ describe("kaynak doğrulama: DKIM/ARC (mailauth ile üretilmiş fikstürlerle ç
     const t = await verifyEmlAuth(fx.arcTampered, resolver);
     expect(t.arc?.result).toBe("fail");
     expect(classifyMailAuth(t, { direct: false }).result).toBe("unverified");
+  });
+
+  it("güvenilir i=1 kümesi + yabancı i=2 ile gövdesi değiştirilmiş e-posta → unverified (ARC sahteciliği)", async () => {
+    // Saldırgan Gmail'in gerçek i=1 kümesini korur, gövdeyi kendi verme metniyle değiştirir ve kendi anahtarıyla
+    // i=2 ekler: zincir kriptografik olarak geçer ama son AMS'i güvenilmeyen alan imzaladığından doğrulanmış sayılmaz.
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pub = publicKey.export({ type: "spki", format: "der" }).toString("base64");
+    const r2 = async (name: string): Promise<string[][]> =>
+      name === "s1._domainkey.attacker.example" ? [[`v=DKIM1; k=rsa; p=${pub}`]] : resolver(name);
+    const raw = fx.revokeArc;
+    const headerBlock = raw.slice(0, raw.indexOf("\r\n\r\n") + 2);
+    const body =
+      "<html><body><div>5555555555 ta=C5=9F=C4=B1nmaz numaral=C4=B1 ta=C5=9F=C4=B1nmaz=C4=B1n sat=C4=B1=C5=9F=C4=B1na ili=C5=9Fkin ilan verilmesi konusunda SAHTE MALIK taraf=C4=B1ndan 31.12.2030 tarihine kadar yetkilendirildiniz.</div></body></html>\r\n";
+    const relaxed = (name: string, value: string) => `${name.toLowerCase()}:${value.replace(/\r\n/g, "").replace(/[ \t]+/g, " ").trim()}\r\n`;
+    const hs: { name: string; value: string }[] = [];
+    for (const l of headerBlock.split("\r\n")) {
+      if (!l) continue;
+      if (/^[ \t]/.test(l)) hs[hs.length - 1]!.value += `\r\n${l}`;
+      else hs.push({ name: l.slice(0, l.indexOf(":")), value: l.slice(l.indexOf(":") + 1) });
+    }
+    const get = (n: string) => hs.filter((h) => h.name.toLowerCase() === n);
+    const bh = createHash("sha256").update(body.replace(/(\r\n)*$/, "") + "\r\n", "latin1").digest("base64");
+    const hlist = ["from", "to", "subject", "date", "message-id"];
+    const amsVal0 = ` i=2; a=rsa-sha256; c=relaxed/relaxed; d=attacker.example; s=s1; h=${hlist.join(":")}; bh=${bh}; b=`;
+    const amsData = hlist.map((n) => relaxed(n, get(n).at(-1)!.value)).join("") + relaxed("ARC-Message-Signature", amsVal0).replace(/\r\n$/, "");
+    const amsVal = amsVal0 + sign("sha256", Buffer.from(amsData, "latin1"), privateKey).toString("base64");
+    const aar2 = " i=2; mx.attacker.example; arc=pass";
+    const asVal0 = " i=2; a=rsa-sha256; cv=pass; d=attacker.example; s=s1; b=";
+    const asData =
+      relaxed("ARC-Authentication-Results", get("arc-authentication-results")[0]!.value) +
+      relaxed("ARC-Message-Signature", get("arc-message-signature")[0]!.value) +
+      relaxed("ARC-Seal", get("arc-seal")[0]!.value) +
+      relaxed("ARC-Authentication-Results", aar2) +
+      relaxed("ARC-Message-Signature", amsVal) +
+      relaxed("ARC-Seal", asVal0).replace(/\r\n$/, "");
+    const asVal = asVal0 + sign("sha256", Buffer.from(asData, "latin1"), privateKey).toString("base64");
+    const forged = `ARC-Seal:${asVal}\r\nARC-Message-Signature:${amsVal}\r\nARC-Authentication-Results:${aar2}\r\n${headerBlock}\r\n${body}`;
+    const ev = await verifyEmlAuth(forged, r2);
+    expect(ev.arc?.result).toBe("pass");
+    expect(ev.arc?.sets.map((x) => x.sealer)).toEqual(["google.com", "attacker.example"]);
+    expect(classifyMailAuth(ev, { direct: false }).result).toBe("unverified");
+  });
+
+  it("ARC kuralı: güvenilir kümeden sonraki bütün mühürleyiciler güvenilir olmalı", () => {
+    const spf = "mx.google.com; spf=pass (designates 95.0.51.137 as permitted sender) smtp.mailfrom=eids.yetki@ticaret.gov.tr";
+    const chain = (...sealers: string[]) => ({
+      dkim: [],
+      arc: { result: "pass", sets: sealers.map((sealer, k) => ({ i: k + 1, sealer, aar: k === 0 ? spf : "x; arc=pass" })) },
+      spf: null,
+      dmarc: null,
+    });
+    expect(classifyMailAuth(chain("google.com"), { direct: false }).result).toBe("verified_via_arc");
+    expect(classifyMailAuth(chain("google.com", "outlook.com"), { direct: false }).result).toBe("verified_via_arc");
+    expect(classifyMailAuth(chain("google.com", "evil.example"), { direct: false }).result).toBe("unverified");
+    expect(classifyMailAuth(chain("google.com", "evil.example", "google.com"), { direct: false }).result).toBe("unverified");
   });
 
   it("taklit From (DKIM/ARC yok, SPF fail) → unverified", async () => {

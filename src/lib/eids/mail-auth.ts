@@ -4,7 +4,8 @@
  *
  *  1) DKIM d=ticaret.gov.tr (veya alt alanı) GEÇERLİ → 'verified'.
  *  2) Değilse ARC zinciri geçerli VE güvenilir bir mühürleyicinin (google.com, outlook/microsoft, yandex)
- *     ARC-Authentication-Results'ında spf=pass smtp.mailfrom=…ticaret.gov.tr varsa → 'verified_via_arc'.
+ *     ARC-Authentication-Results'ında spf=pass smtp.mailfrom=…ticaret.gov.tr varsa → 'verified_via_arc'. O kümeden
+ *     sonraki (son küme dahil) bütün kümelerin mühürleyicisi de güvenilir olmalı (yalnız son AMS gövdeyi kapsar).
  *     Kayıtta gönderen IP'si yazıyorsa Bakanlık SPF adreslerinden biri olmalı (95.0.51.137 / 95.0.51.141).
  *  3) Doğrudan gelen e-postada (iletilmemiş) SPF pass (mailfrom ticaret.gov.tr) VE DMARC pass → 'verified'.
  *  4) Diğer her durum → 'unverified' (hiçbir durumu kendiliğinden değiştirmez; kontrol kuyruğuna düşer).
@@ -59,7 +60,13 @@ export function classifyMailAuth(e: MailAuthEvidence, opts: { direct: boolean })
   if (dkimOk) return { result: "verified", reason: `dkim=pass d=${dkimOk.domain}` };
 
   if (e.arc && e.arc.result === "pass") {
-    const set = [...e.arc.sets].sort((a, b) => a.i - b.i).find((s) => isTrustedSealer(s.sealer) && aarShowsEidsSpfPass(s.aar));
+    // Yalnız SON küme gövdeyi kapsar (önceki AMS'ler doğrulanmaz; AS'ler yalnız ARC başlıklarını imzalar). Bu yüzden
+    // güvenilir kümeden SONRAKİ her küme de güvenilir mühürleyiciye ait olmalı: aksi hâlde gerçek bir Google i=1
+    // kümesini koruyup gövdeyi değiştiren biri kendi alan adıyla i=2 ekleyerek "doğrulanmış" yetki üretebilirdi.
+    const sorted = [...e.arc.sets].sort((a, b) => a.i - b.i);
+    let start = sorted.length;
+    while (start > 0 && isTrustedSealer(sorted[start - 1]!.sealer)) start -= 1;
+    const set = sorted.slice(start).find((s) => aarShowsEidsSpfPass(s.aar));
     if (set) return { result: "verified_via_arc", reason: `arc=pass i=${set.i} sealer=${set.sealer} spf=pass` };
   }
 

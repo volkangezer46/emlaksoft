@@ -241,8 +241,9 @@ export type ForwardConfirmation = { provider: ForwardProvider; code: string | nu
 
 const FORWARD_SENDERS: { provider: ForwardProvider; test: (addr: string) => boolean; domains: string[] }[] = [
   { provider: "gmail", test: (a) => a === "forwarding-noreply@google.com", domains: ["google.com"] },
-  { provider: "yandex", test: (a) => /@yandex\.(ru|com|com\.tr|net)$/.test(a) && /noreply|no-reply|forward|robot/.test(a), domains: ["yandex.ru", "yandex.com", "yandex.com.tr", "yandex.net"] },
-  { provider: "outlook", test: (a) => /@(microsoft\.com|outlook\.com|accountprotection\.microsoft\.com)$/.test(a), domains: ["microsoft.com", "outlook.com", "accountprotection.microsoft.com"] },
+  // Yalnız sistem göndericileri: yerel kısım TAM eşleşir (herkesin açabileceği kisi@yandex/outlook adresleri kapıyı delmesin).
+  { provider: "yandex", test: (a) => /^(noreply|no-reply|robot|forward-noreply)@yandex\.(ru|com|com\.tr|net)$/.test(a), domains: ["yandex.ru", "yandex.com", "yandex.com.tr", "yandex.net"] },
+  { provider: "outlook", test: (a) => a === "account-security-noreply@accountprotection.microsoft.com", domains: ["accountprotection.microsoft.com", "microsoft.com"] },
 ];
 
 /** Göndericiye göre iletme onayı sağlayıcısı (değilse null). */
