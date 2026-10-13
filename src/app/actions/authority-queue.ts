@@ -11,7 +11,10 @@ import { isValidTurkishMobile, normalizeTurkishPhone, toWhatsAppLink } from "@/l
 import { isSignerSmsAvailable, sendSignerSms } from "@/app/imza/_lib/sms";
 import { gateIysRecipient, IYS_SKIP_LABELS } from "@/lib/iys/gate";
 import { DEMO_BLOCKED } from "@/lib/sample-scope";
-import { buildAuthorityReminderText, canSendReminder, isEidsVerifyStatus } from "@/lib/eids/authority-status";
+import { buildAuthorityReminderText, canSendReminder, isEidsVerifyStatus, reminderCooldownLeftMs } from "@/lib/eids/authority-status";
+import { ownerConfirmRequestText } from "@/lib/eids/actions-core";
+import { isValidEmail } from "@/lib/email";
+import { sendLoggedEmail } from "@/lib/email/send";
 
 export type AuthorityActionResult = { ok?: boolean; error?: string; waUrl?: string; info?: string };
 
@@ -87,21 +90,29 @@ export async function updateAuthorityStatus(
 }
 
 /**
- * Mal sahibine e-Devlet EİDS onay hatırlatması gönderir. İYS KAPISINDAN GEÇER (merkezi `gateIysRecipient`):
- * izin yoksa/geri alınmışsa gönderilmez, neden söylenir. SMS ofisin kendi sağlayıcısıyla gider; WhatsApp için gönderim
- * yapılmaz, danışmanın kendi hattından açacağı hazır bağlantı üretilir (serbest metin WhatsApp şablon sözleşmesine aykırıdır).
- * Gönderim izi (zaman, adet, kanal) portföyde tutulur; 24 saatte bir kez.
+ * Mal sahibine EİDS mesajı gönderir. İYS KAPISINDAN GEÇER (merkezi `gateIysRecipient`): izin yoksa/geri alınmışsa
+ * gönderilmez, neden söylenir. SMS ofisin kendi sağlayıcısıyla, e-posta platform e-posta kanalıyla (günlük + bastırma
+ * listesi) gider; WhatsApp için gönderim yapılmaz, danışmanın kendi hattından açacağı hazır bağlantı üretilir (serbest metin
+ * WhatsApp şablon sözleşmesine aykırıdır). Gönderim izi (zaman, adet, kanal) portföyde tutulur; 24 saatte bir kez.
+ *
+ * Şablon: `approval` = e-Devlet onay hatırlatması (onay alınmışsa gerekmez); `confirm` = "Malikten teyit iste" (haftalık
+ * "Yetki doğrula" listesi): malikten e-Devlet "EİDS Yetki İşlemleri" ekran görüntüsünü ister, onaylı portföyde de gider.
  */
-export async function sendAuthorityReminder(propertyId: string, channel: "sms" | "whatsapp"): Promise<AuthorityActionResult> {
+export async function sendAuthorityReminder(
+  propertyId: string,
+  channel: "sms" | "whatsapp" | "email",
+  template: "approval" | "confirm" = "approval",
+): Promise<AuthorityActionResult> {
   const gate = await requirePermission("portals", "edit");
   if (!gate.ok) return { error: gate.error };
   if (!UUID_RE.test(String(propertyId ?? ""))) return { error: "Portföy bulunamadı." };
-  if (channel !== "sms" && channel !== "whatsapp") return { error: "Geçersiz kanal." };
+  if (channel !== "sms" && channel !== "whatsapp" && channel !== "email") return { error: "Geçersiz kanal." };
+  if (template !== "approval" && template !== "confirm") return { error: "Geçersiz mesaj şablonu." };
 
   const supabase = await createClient();
   const { data: p } = await supabase
     .from("properties")
-    .select("id, property_code, title, authorization_start, authorization_end, authority_eids_status, authority_reminder_sent_at, authority_reminder_count")
+    .select("id, property_code, title, eids_property_no, authorization_start, authorization_end, authority_eids_status, authority_reminder_sent_at, authority_reminder_count")
     .eq("id", propertyId)
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
@@ -109,16 +120,21 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
   if (!p) return { error: "Portföy bulunamadı." };
 
   const nowMs = now();
-  const can = canSendReminder(
-    {
-      authority_eids_status: p.authority_eids_status ?? null,
-      authority_reminder_sent_at: p.authority_reminder_sent_at ?? null,
-      authorization_end: p.authorization_end ?? null,
-      authorization_start: p.authorization_start ?? null,
-    },
-    nowMs,
-  );
-  if (!can.ok) return { error: can.reason ?? "Hatırlatma şu an gönderilemez." };
+  if (template === "approval") {
+    const can = canSendReminder(
+      {
+        authority_eids_status: p.authority_eids_status ?? null,
+        authority_reminder_sent_at: p.authority_reminder_sent_at ?? null,
+        authorization_end: p.authorization_end ?? null,
+        authorization_start: p.authorization_start ?? null,
+      },
+      nowMs,
+    );
+    if (!can.ok) return { error: can.reason ?? "Hatırlatma şu an gönderilemez." };
+  } else {
+    const left = reminderCooldownLeftMs(p.authority_reminder_sent_at ?? null, nowMs);
+    if (left > 0) return { error: `Son mesaj 24 saatten yeni; ${Math.ceil(left / 3_600_000)} saat sonra tekrar gönderilebilir.` };
+  }
 
   const { data: ownerInfo } = await supabase
     .from("property_owner_info")
@@ -131,7 +147,7 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
 
   const { data: owner } = await supabase
     .from("customers")
-    .select("id, full_name, phone, is_sample, blacklist")
+    .select("id, full_name, phone, email, is_sample, blacklist")
     .eq("id", ownerId)
     .eq("tenant_id", gate.tenantId)
     .is("deleted_at", null)
@@ -139,23 +155,29 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
   if (!owner) return { error: "Mal sahibi bulunamadı veya görüntüleme yetkiniz yok." };
   if (owner.is_sample) return { error: `Demo kayıt: gerçek gönderim engellendi (${DEMO_BLOCKED}).` };
   if (owner.blacklist) return { error: "Mal sahibi kara listede; mesaj gönderilmez." };
-  const phone = normalizeTurkishPhone(owner.phone ?? "");
-  if (!owner.phone || !isValidTurkishMobile(phone)) return { error: "Mal sahibinin geçerli bir cep telefonu yok." };
+  const email = String(owner.email ?? "").trim();
+  if (channel === "email") {
+    if (!email || !isValidEmail(email)) return { error: "Mal sahibinin geçerli bir e-posta adresi yok; müşteri kartına e-posta ekleyin ya da SMS/WhatsApp seçin." };
+  } else {
+    const phone = normalizeTurkishPhone(owner.phone ?? "");
+    if (!owner.phone || !isValidTurkishMobile(phone)) return { error: "Mal sahibinin geçerli bir cep telefonu yok." };
+  }
 
   // Merkezi İYS kapısı: izinsiz alıcıya hatırlatma gitmez.
   const iys = await gateIysRecipient(supabase, { tenantId: gate.tenantId, kind: "authority_reminder", channel, customerId: ownerId });
   if (!iys.allowed) {
-    return { error: `İYS izni yok (${IYS_SKIP_LABELS[iys.reason ?? "no_record"]}); mesaj gönderilmedi. Uyum sayfasından ${channel === "sms" ? "SMS" : "WhatsApp"} iznini kaydedin.` };
+    const label = channel === "sms" ? "SMS" : channel === "email" ? "e-posta" : "WhatsApp";
+    return { error: `İYS izni yok (${IYS_SKIP_LABELS[iys.reason ?? "no_record"]}); mesaj gönderilmedi. Uyum sayfasından ${label} iznini kaydedin.` };
   }
 
   const { data: tenant } = await supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle();
+  const officeName = (tenant as { name?: string } | null)?.name ?? null;
   const label = [p.property_code, p.title].filter(Boolean).join(" ") || "portföyünüz";
-  const text = buildAuthorityReminderText({
-    ownerName: owner.full_name,
-    office: (tenant as { name?: string } | null)?.name ?? null,
-    propertyLabel: label,
-    endDate: p.authorization_end,
-  });
+  const text =
+    template === "confirm"
+      ? ownerConfirmRequestText({ ownerName: owner.full_name, office: officeName, propertyLabel: label, eidsNo: (p as { eids_property_no?: string | null }).eids_property_no ?? null })
+      : buildAuthorityReminderText({ ownerName: owner.full_name, office: officeName, propertyLabel: label, endDate: p.authorization_end });
+  const subject = template === "confirm" ? "İlan yetkisi teyidi (e-Devlet EİDS)" : "Yetki onayı hatırlatması";
 
   let waUrl: string | undefined;
   if (channel === "sms") {
@@ -166,6 +188,20 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
     if (!res.ok) {
       if (res.code === "50" || res.code === "51") return { error: "SMS kredisi yetersiz — Netgsm bakiyenizi kontrol edin." };
       return { error: res.error ?? "SMS gönderilemedi; birkaç dakika sonra tekrar deneyin." };
+    }
+  } else if (channel === "email") {
+    const res = await sendLoggedEmail({
+      to: email,
+      subject: officeName ? `${officeName}: ${subject}` : subject,
+      text,
+      template: template === "confirm" ? "eids_owner_confirm" : "eids_owner_reminder",
+      source: "authority_queue",
+      tenantId: gate.tenantId,
+    });
+    if (!res.ok) {
+      if (res.code === "disabled") return { error: "E-posta kanalı şu an kapalı; SMS ya da WhatsApp ile gönderin." };
+      if (res.code === "suppressed") return { error: "Bu e-posta adresine gönderim engelli (geri dönen/şikâyet); SMS ya da WhatsApp ile gönderin." };
+      return { error: "E-posta gönderilemedi; adresi kontrol edip birkaç dakika sonra tekrar deneyin." };
     }
   } else {
     waUrl = toWhatsAppLink(owner.phone, text) ?? undefined;
@@ -192,7 +228,7 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
     created_by: gate.userId,
     channel,
     direction: "outbound",
-    subject: "Yetki onayı hatırlatması",
+    subject,
     body: text,
   });
   // Mal sahibine hatırlatma gitti = temas: açık "Bugün ara" kartı kapanır.
@@ -204,13 +240,19 @@ export async function sendAuthorityReminder(propertyId: string, channel: "sms" |
     action: "property.authority_reminder",
     entityType: "property",
     entityId: propertyId,
-    newValue: { channel, via: channel === "sms" ? "sms" : "wa_link" },
+    newValue: { channel, via: channel === "whatsapp" ? "wa_link" : channel, template },
   });
   revalidate(propertyId);
   revalidatePath(`/app/musteriler/${ownerId}`);
+  revalidatePath("/app/ofis-kontrol/benim");
   return {
     ok: true,
     waUrl,
-    info: channel === "sms" ? "Hatırlatma SMS'i gönderildi." : "WhatsApp mesajı hazır; bağlantıyı açıp gönderin.",
+    info:
+      channel === "sms"
+        ? "Mesaj SMS ile gönderildi."
+        : channel === "email"
+          ? "Mesaj e-postayla gönderildi."
+          : "WhatsApp mesajı hazır; bağlantıyı açıp gönderin.",
   };
 }
