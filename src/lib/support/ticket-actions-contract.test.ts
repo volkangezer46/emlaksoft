@@ -36,7 +36,8 @@ describe("support ticket action contract", () => {
     expect(tickets).toContain('prefKey: "support"');
     expect(tickets).toContain('const QUEUE_ROLES = ["super_admin", "ops", "support"]');
     expect(tickets).toContain("staffId: payload.assignedStaffId ?? undefined");
-    expect(tickets).toContain("roles: [...QUEUE_ROLES]");
+    // AD9: atanan kişi muhasebe olabilir; atanmamış talepte fan-out yalnız destek kuyruğu rolleri.
+    expect(tickets).toContain('roles: payload.assignedStaffId ? [...QUEUE_ROLES, "billing"] : [...QUEUE_ROLES]');
   });
 
   it("supports internal notes and max-50 bulk operations", () => {
