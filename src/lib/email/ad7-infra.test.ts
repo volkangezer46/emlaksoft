@@ -196,6 +196,53 @@ describe("günlüklü gönderim (bastırma + kanal kapalı)", () => {
   });
 });
 
+describe("webhook yarışı: günlük satırı henüz yok", () => {
+  const writes: { table: string; op: string }[] = [];
+  let sendRow: Record<string, unknown> | null = null;
+
+  beforeEach(() => {
+    writes.length = 0;
+    sendRow = null;
+    vi.resetModules();
+    vi.doMock("@/lib/clock", async (orig) => ({ ...(await orig<typeof import("@/lib/clock")>()), now: () => Date.parse("2026-10-13T10:01:00Z") }));
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: () => ({
+        from: (table: string) => ({
+          select: () => ({ eq: () => ({ limit: async () => ({ data: sendRow ? [sendRow] : [], error: null }) }) }),
+          update: () => ({ eq: async () => (writes.push({ table, op: "update" }), { error: null }) }),
+          upsert: async () => (writes.push({ table, op: "upsert" }), { error: null }),
+          insert: async () => (writes.push({ table, op: "insert" }), { error: null }),
+        }),
+      }),
+    }));
+  });
+
+  const ev = (type: string, createdAt: string) =>
+    parseResendEvent({ type, created_at: createdAt, data: { email_id: "re_9", to: ["x@y.com"], bounce: { type: "Permanent" } } })!;
+
+  it("taze durum olayı satır yoksa 'pending' (olay yazılmaz, Resend yeniden dener); bastırma yine uygulanır", async () => {
+    const { applyResendEvent } = await import("./webhook");
+    expect(await applyResendEvent("msg_a", ev("email.delivered", "2026-10-13T10:00:55Z"))).toBe("pending");
+    expect(writes).toEqual([]);
+    expect(await applyResendEvent("msg_b", ev("email.bounced", "2026-10-13T10:00:55Z"))).toBe("pending");
+    expect(writes).toEqual([{ table: "email_suppressions", op: "upsert" }]);
+  });
+
+  it("email.sent, pencere dışı olay ya da satır varsa olay yazılır ('applied')", async () => {
+    const { applyResendEvent } = await import("./webhook");
+    expect(await applyResendEvent("msg_c", ev("email.sent", "2026-10-13T10:00:55Z"))).toBe("applied");
+    expect(await applyResendEvent("msg_d", ev("email.delivered", "2026-10-13T09:00:00Z"))).toBe("applied");
+    sendRow = { id: "s1", status: "sent", tenant_id: null, delivered_at: null, opened_at: null };
+    expect(await applyResendEvent("msg_e", ev("email.delivered", "2026-10-13T10:00:55Z"))).toBe("applied");
+    expect(writes).toContainEqual({ table: "email_sends", op: "update" });
+  });
+
+  it("uç: 'pending' 503 döner", () => {
+    const src = readFileSync("src/app/api/webhooks/resend/route.ts", "utf8");
+    expect(src).toContain('if (result === "pending") return json({ ok: false, result }, 503);');
+  });
+});
+
 describe("Ofis 360 İletişim kategorisi", () => {
   it("ofise giden e-postalar 'iletisim' olayı olur; günlük bağlantısı yalnız sistem erişiminde", () => {
     const base: TimelineInput = {

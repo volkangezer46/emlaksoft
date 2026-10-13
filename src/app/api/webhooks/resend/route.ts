@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await applyResendEvent(id, ev);
+    // Günlük satırı henüz yazılmamış (yarış): 503 ile Resend'in yeniden denemesi istenir.
+    if (result === "pending") return json({ ok: false, result }, 503);
     return json({ ok: true, result });
   } catch (e) {
     console.error("resend webhook", e instanceof Error ? e.message : "unknown");

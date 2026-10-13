@@ -128,7 +128,14 @@ export async function resolveWebhookSecret(): Promise<string | null> {
 
 const MISSING_TABLE = new Set(["42P01", "PGRST205"]);
 
-export type ApplyResult = "applied" | "duplicate" | "ignored" | "not_installed";
+export type ApplyResult = "applied" | "duplicate" | "ignored" | "not_installed" | "pending";
+
+/**
+ * Yarış penceresi: `sendLoggedEmail` günlük satırını sağlayıcı yanıtından SONRA yazar; webhook satırdan önce
+ * gelebilir. Bu pencere içindeki durum olayı (email.sent hariç) satır bulunamazsa "pending" döner → uç 503 →
+ * Resend yeniden dener (5 sn, 5 dk ...). Pencere dışı (ör. günlüklenmeyen GoTrue SMTP e-postası) send_id=null yazılır.
+ */
+export const PENDING_WINDOW_MS = 15 * 60 * 1000;
 
 /**
  * Olayı işler: (1) gönderim satırının durumunu öncelik kuralıyla ilerlet; (2) bounce/şikâyette alıcıyı bastırma
@@ -160,6 +167,10 @@ export async function applyResendEvent(eventId: string, ev: ResendEvent): Promis
     if (error) throw new Error(`email_sends update failed: ${error.code}`);
   }
 
+  const fresh = ev.occurredAt !== null && now() - Date.parse(ev.occurredAt) < PENDING_WINDOW_MS;
+  const awaitRow = !send && ev.providerId !== null && ev.status !== "sent" && fresh;
+
+  // Bastırma satırı bulunmasa da uygulanır (data.to kullanılır, idempotent).
   if (ev.suppress && ev.to.length > 0) {
     const rows = ev.to.map((addr) => ({
       email_hash: emailHash(addr),
@@ -171,6 +182,8 @@ export async function applyResendEvent(eventId: string, ev: ResendEvent): Promis
     const { error } = await admin.from("email_suppressions").upsert(rows, { onConflict: "email_hash", ignoreDuplicates: true });
     if (error) throw new Error(`email_suppressions upsert failed: ${error.code}`);
   }
+  // Olay satırı yazılmaz: yeniden denemede svix-id "duplicate" sayılmasın, durum satıra işlensin.
+  if (awaitRow) return "pending";
   const { error: evErr } = await admin.from("email_events").insert({
     event_id: eventId.slice(0, 120),
     send_id: send?.id ?? null,
