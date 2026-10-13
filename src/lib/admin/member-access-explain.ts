@@ -5,7 +5,7 @@
  * Kapsam (user_scopes) satırı yoksa rol varsayılanı geçerlidir (`scope-cache.ts` ile aynı düşüş).
  */
 import { DEFAULT_MATRIX, type AppAction, type AppModule, type AppRole } from "@/lib/permissions";
-import { isOverrideActive, mergeEffectivePermissions, type RoleOverrideRow, type UserOverrideRow } from "@/lib/permissions-effective";
+import { isOverrideActive, mergeEffectivePermissions, type RoleOverrideRow, type UserOverrideRow } from "@/lib/permissions-merge";
 import { defaultUserScopeForRole, SCOPE_LABELS } from "@/lib/access-control/scope-rules";
 import type { AccessScope } from "@/lib/access-control/types";
 
