@@ -4,7 +4,8 @@
 -- Kisisel veri saklanmaz (alici adresi/telefonu YOK; yalniz kanal ve sonuc).
 -- (invoice_id, stage, channel) benzersizdir: ayni fatura+kademe+kanal icin ikinci gonderim yapilmaz (cron "talep" satirini
 --   once yazar, sonra gonderir; cakisirsa gondermez).
--- RLS acik, politika yok -> anon/authenticated hicbir sey goremez; erisim yalniz service_role (perf_lab_runs deseni).
+-- RLS acik + acik deny_clients politikasi (anon/authenticated using false) -> istemci hicbir sey goremez; erisim yalniz
+--   service_role (20260731000141_service_role_tables_explicit_deny deseni; tenant_id tasidigi icin db:rls-audit politika ister).
 -- platform_settings anahtarlari (tablo degisikligi YOK, kod yazar): dunning.* (src/lib/settings/registry/dunning.ts).
 -- KOD DAVRANISI: tablo yokken cron yalniz uygulama ici bildirimi gonderir (bugunku davranis), e-posta/SMS kademeleri atlanir;
 --   rapor ve zaman cizelgesi "gunluk yok" gosterir.
@@ -27,7 +28,10 @@ create index if not exists dunning_events_tenant_sent_idx on public.dunning_even
 create index if not exists dunning_events_sent_idx on public.dunning_events (sent_at desc);
 
 alter table public.dunning_events enable row level security;
--- Politika bilerek yok: anon/authenticated hicbir sey goremez; service_role RLS'i atlar.
+-- Acik red politikasi: anon/authenticated hicbir satira erisemez; service_role RLS'i atlar.
+drop policy if exists dunning_events_deny_clients on public.dunning_events;
+create policy dunning_events_deny_clients on public.dunning_events
+  for all to anon, authenticated using (false) with check (false);
 revoke all on table public.dunning_events from public, anon, authenticated;
 grant select, insert, update, delete on table public.dunning_events to service_role;
 revoke all on sequence public.dunning_events_id_seq from public, anon, authenticated;

@@ -20,6 +20,10 @@ const state = {
   staff: [] as { title: string }[],
   emailOn: false,
   emails: [] as { to: string; subject: string }[],
+  /** notifications tablosundaki önceki son uyarılar (dedupe_key → created_at). */
+  finalNotes: [] as { dedupe_key: string; created_at: string }[],
+  renewCharged: 0,
+  paidInvoices: [] as string[],
 };
 
 vi.mock("server-only", () => ({}));
@@ -35,7 +39,7 @@ vi.mock("@/lib/platform-notify", () => ({
   },
 }));
 vi.mock("@/lib/billing/auto-renew", () => ({
-  runAutoRenewPass: async () => ({ enabled: false, attempted: 0, charged: 0, failed: 0, skipped: 0 }),
+  runAutoRenewPass: async () => ({ enabled: state.renewCharged > 0, attempted: state.renewCharged, charged: state.renewCharged, failed: 0, skipped: 0 }),
 }));
 vi.mock("@/lib/billing/dunning-policy", async (orig) => {
   const actual = await orig<typeof import("@/lib/billing/dunning-policy")>();
@@ -105,6 +109,12 @@ vi.mock("@/lib/supabase/admin", () => ({
           },
         };
       }
+      if (table === "notifications") {
+        const q: Record<string, unknown> = {};
+        const chain = () => q;
+        Object.assign(q, { select: chain, in: chain, limit: async () => ({ data: state.finalNotes, error: null }) });
+        return q;
+      }
       if (table === "platform_audit_logs") {
         return {
           insert: async (row: { action: string; entity_id: string; meta: Record<string, unknown> }) => {
@@ -136,6 +146,10 @@ vi.mock("@/lib/supabase/admin", () => ({
           table === "invoices"
             ? { data: state.invoicesError ? null : state.invoices, error: state.invoicesError ? { message: state.invoicesError } : null }
             : { data: state.subs, error: null },
+        in: (_c: string, ids: string[]) => ({
+          // Askı öncesi yeniden doğrulama: ödenen faturalar artık open değildir.
+          eq: async () => ({ data: ids.filter((id) => !state.paidInvoices.includes(id)).map((id) => ({ id })), error: null }),
+        }),
         update: (v: { reminder_count: number }) => ({
           in: async () => {
             state.updates.push({ stage: v.reminder_count });
@@ -180,6 +194,9 @@ beforeEach(() => {
     staff: [],
     emailOn: false,
     emails: [],
+    finalNotes: [],
+    renewCharged: 0,
+    paidInvoices: [],
   });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -262,6 +279,55 @@ describe("dunning politikası adminden (AD3)", () => {
     await GET(req());
     expect(state.tenantUpdates).toEqual([]);
     expect(state.inserted.map((r) => r.dedupe_key)).toEqual(["dunning:x:final"]);
+  });
+
+  it("askı günü çoktan geçmiş, son uyarı hiç gitmemiş: askı yok, son uyarı şimdi gider", async () => {
+    state.settings = { "dunning.auto_suspend_days": 12, "dunning.final_warning_days": 2 };
+    state.invoices = [overdue("x", 30, 3)];
+    await GET(req());
+    expect(state.tenantUpdates).toEqual([]);
+    expect(state.audits).toEqual([]);
+    expect(state.inserted.map((r) => r.dedupe_key)).toEqual(["dunning:x:final"]);
+    expect(state.inserted[0]?.body).toContain("2 gün içinde");
+    expect(state.events.some((e) => e.stage === "final_warning" && e.channel === "in_app")).toBe(true);
+  });
+
+  it("son uyarı final_warning_days önce gittiyse askı gününde askı olur", async () => {
+    state.settings = { "dunning.auto_suspend_days": 12, "dunning.final_warning_days": 2 };
+    state.invoices = [overdue("x", 12, 3)];
+    state.finalNotes = [{ dedupe_key: "dunning:x:final", created_at: new Date(Date.now() - 2 * 86_400_000 + 60_000).toISOString() }];
+    await GET(req());
+    expect(state.tenantUpdates).toEqual([{ id: "t1", status: "suspended" }]);
+    expect(state.inserted.some((r) => r.dedupe_key === "dunning:x:final")).toBe(false);
+  });
+
+  it("son uyarı yeni gittiyse (süre dolmadı) askı bekler, uyarı tekrarlanmaz", async () => {
+    state.settings = { "dunning.auto_suspend_days": 12, "dunning.final_warning_days": 2 };
+    state.invoices = [overdue("x", 30, 3)];
+    state.finalNotes = [{ dedupe_key: "dunning:x:final", created_at: new Date(Date.now() - 86_400_000).toISOString() }];
+    await GET(req());
+    expect(state.tenantUpdates).toEqual([]);
+    expect(state.inserted).toEqual([]);
+  });
+
+  it("askı gününde otomatik yenileme faturayı tahsil ettiyse ofis askıya alınmaz", async () => {
+    state.settings = { "dunning.auto_suspend_days": 12, "dunning.final_warning_days": 0 };
+    state.invoices = [overdue("x", 12, 3)];
+    state.renewCharged = 1;
+    state.paidInvoices = ["x"];
+    await GET(req());
+    expect(state.tenantUpdates).toEqual([]);
+    expect(state.audits).toEqual([]);
+    expect(state.inserted.some((r) => r.dedupe_key === "dunning:x:suspend")).toBe(false);
+  });
+
+  it("kanal kapalı sayacı aynı fatura için her gün şişmez", async () => {
+    state.settings = { "dunning.stage1_channels": "in_app_email" };
+    state.invoices = [overdue("m", 1)];
+    await GET(req());
+    expect(state.heartbeat.at(-1)?.detail).toContain("1 kanal kapalı");
+    await GET(req());
+    expect(state.heartbeat.at(-1)?.detail).not.toContain("kanal kapalı");
   });
 
   it("e-posta kanalı kapalıyken e-posta kademesi atlanır, günlüğe 'kanal kapalı' yazılır", async () => {

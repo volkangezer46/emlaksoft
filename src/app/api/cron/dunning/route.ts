@@ -116,7 +116,10 @@ async function run(req: NextRequest) {
   const idsByStage = new Map<number, string[]>();
   const inAppEvents: EventRow[] = [];
   const external: ExternalJob[] = [];
-  const suspendTargets = new Map<string, { invoiceId: string; invoiceNo: string; daysOverdue: number; tenantName: string }>();
+  type SuspendTarget = { invoiceId: string; invoiceNo: string; daysOverdue: number; tenantName: string };
+  const suspendTargets = new Map<string, SuspendTarget>();
+  /** Askı günü gelmiş faturalar: son uyarı kapısından geçince askı hedefi olur. */
+  const suspendDue: (SuspendTarget & { tenantId: string; vars: DunningMessageVars })[] = [];
   let suspensionCandidates = 0;
 
   for (const inv of invoices) {
@@ -181,8 +184,55 @@ async function run(req: NextRequest) {
       }
     }
 
-    if (suspendDay && daysOverdue >= suspendDay && SUSPENDABLE.includes(String(t?.status ?? "")) && !suspendTargets.has(tenantId)) {
-      suspendTargets.set(tenantId, { invoiceId: inv.id, invoiceNo: String(inv.invoice_no), daysOverdue, tenantName });
+    if (suspendDay && daysOverdue >= suspendDay && SUSPENDABLE.includes(String(t?.status ?? ""))) {
+      suspendDue.push({ tenantId, vars, invoiceId: inv.id, invoiceNo: String(inv.invoice_no), daysOverdue, tenantName });
+    }
+  }
+
+  // ---- 1a) Son uyarı kapısı: askıdan önce ofis son uyarıyı en az final_warning_days önce almış olmalı ----
+  // Askı yeni açıldığında (ya da gün kısaltıldığında) askı gününü çoktan geçmiş ofisler son uyarı görmeden askıya
+  // alınmaz: uyarı yoksa ŞİMDİ gönderilir, askı final_warning_days sonraya kalır. final_warning_days=0 → kapı yok.
+  if (suspendDay && suspendDue.length > 0) {
+    let warnedAt: Map<string, number> | null = new Map();
+    if (warnDay !== null) {
+      const { data, error } = await admin
+        .from("notifications")
+        .select("dedupe_key, created_at")
+        .in("tenant_id", [...new Set(suspendDue.map((d) => d.tenantId))])
+        .in("dedupe_key", suspendDue.map((d) => `dunning:${d.invoiceId}:final`))
+        .limit(suspendDue.length);
+      if (error) {
+        // Okunamadı: güvenli taraf — bu koşuda askı yok, yeniden uyarı da yok (dedupe_key zaten korur).
+        console.error("dunning final warning lookup", error.message);
+        failed += 1;
+        warnedAt = null;
+      } else {
+        for (const r of (data ?? []) as { dedupe_key: string; created_at: string }[]) {
+          warnedAt.set(r.dedupe_key, new Date(r.created_at).getTime());
+        }
+      }
+    }
+    // Günlük koşu saati kayabilir: yarım gün tolerans (2 gün önceki koşudaki uyarı "2 gün" sayılır).
+    const minGap = policy.finalWarningDays * DAY_MS - DAY_MS / 2;
+    for (const d of warnedAt ? suspendDue : []) {
+      if (suspendTargets.has(d.tenantId)) continue;
+      if (warnDay === null) {
+        suspendTargets.set(d.tenantId, d);
+        continue;
+      }
+      const key = `dunning:${d.invoiceId}:final`;
+      const at = warnedAt!.get(key);
+      if (at !== undefined) {
+        if (now - at >= minGap) suspendTargets.set(d.tenantId, d);
+        continue;
+      }
+      // Son uyarı hiç gitmemiş: şimdi gönder, askı final_warning_days sonra.
+      const msg = finalWarningMessage(d.vars, d.daysOverdue + policy.finalWarningDays);
+      toNotify.push({ tenant_id: d.tenantId, title: msg.title, body: msg.body, href: BILLING_HREF, kind: msg.kind, dedupe_key: key });
+      inAppEvents.push({ tenant_id: d.tenantId, invoice_id: d.invoiceId, stage: "final_warning", channel: "in_app", result: "sent" });
+      if (lastStageDef && (lastStageDef.email || lastStageDef.sms)) {
+        external.push({ tenantId: d.tenantId, invoiceId: d.invoiceId, stage: "final_warning", email: lastStageDef.email, sms: lastStageDef.sms, title: msg.title, body: msg.body });
+      }
     }
   }
 
@@ -226,7 +276,35 @@ async function run(req: NextRequest) {
   const ext = eventsReady ? await deliverExternal(admin, external) : { sent: 0, disabled: 0, failed: 0, skipped: external.length };
   failed += ext.failed;
 
-  // ---- 1d) Otomatik askı (yalnız ayar açıkken) ----
+  // ---- 1d) Otomatik yenileme (KAPALI bayrak: billing.auto_renew_enabled; kapalıyken ödeme kod yolu çalışmaz) ----
+  // Bildirimler yukarıda her zamanki gibi gider; tahsilat başarısızsa bu akış değişmez (ek bildirim eklenir).
+  // Deneme sayısı ve aralığı politikadan (adminden) gelir.
+  let autoRenew: Awaited<ReturnType<typeof runAutoRenewPass>> = { enabled: false, attempted: 0, charged: 0, failed: 0, skipped: 0 };
+  let renewThrew = 0;
+  try {
+    autoRenew = await runAutoRenewPass(admin, now, policy);
+  } catch (e) {
+    console.error("dunning auto-renew", e instanceof Error ? e.message : "error");
+    renewThrew = 1;
+  }
+  failed += autoRenew.failed + renewThrew;
+
+  // Tahsilat bu koşuda başarılıysa askı hedefleri yeniden doğrulanır: kartla ödenen ofis askıya alınmaz
+  // (yanıltıcı "askıya alındı" bildirimi ve gereksiz denetim kaydı oluşmaz).
+  if (suspendTargets.size > 0 && autoRenew.charged > 0) {
+    const ids = [...suspendTargets.values()].map((x) => x.invoiceId);
+    const { data, error } = await admin.from("invoices").select("id").in("id", ids).eq("status", "open");
+    if (error) {
+      console.error("dunning suspend recheck", error.message);
+      failed += 1;
+      suspendTargets.clear();
+    } else {
+      const open = new Set(((data ?? []) as { id: string }[]).map((r) => r.id));
+      for (const [tid, x] of suspendTargets) if (!open.has(x.invoiceId)) suspendTargets.delete(tid);
+    }
+  }
+
+  // ---- 1e) Otomatik askı (yalnız ayar açıkken; son uyarı kapısından geçenler) ----
   let suspended = 0;
   for (const [tenantId, s] of suspendTargets) {
     const r = await suspendTenant(admin, tenantId, s, suspendDay ?? 0);
@@ -264,19 +342,6 @@ async function run(req: NextRequest) {
     subNotified = subResult.written;
     failed += subResult.failed;
   }
-
-  // ---- 3) Otomatik yenileme (KAPALI bayrak: billing.auto_renew_enabled; kapalıyken ödeme kod yolu çalışmaz) ----
-  // Bildirimler yukarıda her zamanki gibi gider; tahsilat başarısızsa bu akış değişmez (ek bildirim eklenir).
-  // Deneme sayısı ve aralığı politikadan (adminden) gelir.
-  let autoRenew: Awaited<ReturnType<typeof runAutoRenewPass>> = { enabled: false, attempted: 0, charged: 0, failed: 0, skipped: 0 };
-  let renewThrew = 0;
-  try {
-    autoRenew = await runAutoRenewPass(admin, now, policy);
-  } catch (e) {
-    console.error("dunning auto-renew", e instanceof Error ? e.message : "error");
-    renewThrew = 1;
-  }
-  failed += autoRenew.failed + renewThrew;
 
   await recordHeartbeat(
     "dunning",
@@ -339,12 +404,18 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
     }
   }
 
-  const logRow = async (row: EventRow) => {
-    const { error } = await admin.from("dunning_events").upsert([row], { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true });
+  /** Yeni satır yazıldıysa true (yinelenen satır yok sayılır → sayaç her gün şişmez). */
+  const logRow = async (row: EventRow): Promise<boolean> => {
+    const { data, error } = await admin
+      .from("dunning_events")
+      .upsert([row], { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true })
+      .select("id");
     if (error) {
       console.error("dunning event", error.message);
       out.failed += 1;
+      return false;
     }
+    return ((data as unknown[] | null) ?? []).length > 0;
   };
 
   for (const j of jobs) {
@@ -355,8 +426,8 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
       if (!on) {
         // Kanal kapalı: sahte gönderim yok; günlüğe "kanal kapalı" yazılır.
         console.info(`dunning ${j.stage} ${channel}: kanal kapalı`);
-        await logRow({ ...base, result: "channel_disabled", detail: `kanal kapalı${channel === "email" && emailCfg?.reason ? `: ${emailCfg.reason}` : channel === "sms" ? ": platform Netgsm hesabı tanımlı değil" : ""}`.slice(0, 300) });
-        out.disabled += 1;
+        const fresh = await logRow({ ...base, result: "channel_disabled", detail: `kanal kapalı${channel === "email" && emailCfg?.reason ? `: ${emailCfg.reason}` : channel === "sms" ? ": platform Netgsm hesabı tanımlı değil" : ""}`.slice(0, 300) });
+        if (fresh) out.disabled += 1;
         continue;
       }
       // Talep satırı: zaten varsa (önceki koşu) gönderilmez.
