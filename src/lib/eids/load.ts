@@ -180,6 +180,25 @@ async function attachOwnerNames(db: SupabaseClient, tenantId: string, rows: Prop
   }
 }
 
+type ExactLoad = { data: PropRow[] | null; error: { code?: string; message?: string } | null };
+
+/** Taşınmaz no rakam anahtarıyla birebir portföyler (en çok 50). */
+async function loadExactByKey(db: SupabaseClient, tenantId: string, key: string): Promise<ExactLoad> {
+  const rpc = await db.rpc("eids_properties_by_no_key", { p_tenant_id: tenantId, p_key: key }).select(MATCH_COLUMNS).limit(50);
+  if (!rpc.error) return { data: (rpc.data ?? []) as unknown as PropRow[], error: null };
+  if (!isMissingSchema(rpc.error)) return { data: null, error: rpc.error };
+  // Eski yol: tam eşit ya da son 6 rakamı bitişik içeren kayıtlar (ayraç son 6 rakamın arasına düşerse kaçabilir).
+  const legacy = await db
+    .from("properties")
+    .select(MATCH_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .not("eids_property_no", "is", null)
+    .or(`eids_property_no.eq.${key},eids_property_no.like.*${key.slice(-6)}*`)
+    .limit(50);
+  return { data: (legacy.data ?? null) as PropRow[] | null, error: legacy.error };
+}
+
 /**
  * Ofis içinde bildirim → portföy eşleştirmesi. Kiracı sınırı her sorguda açık `.eq("tenant_id")` + RLS.
  * 1) Taşınmaz no birebir (rakam anahtarı) → `matchExact` (tür ile ayırt etme, malik/bitiş uyarıları).
@@ -191,15 +210,9 @@ export async function findAuthorityMatch(db: SupabaseClient, tenantId: string, f
   const key = eidsNoMatchKey(facts.propertyNo ?? null);
   if (!key) return { ok: false, error: "Ne oldu: taşınmaz numarası okunamadı. Ne yapmalı: bildirimdeki numarayı (en az 6 rakam) girin." };
 
-  // (1) Birebir: numara tam eşitse ya da rakamları içeriyorsa (ayraçlı kayıt) getir, son karar rakam anahtarıyla.
-  const exactRes = await db
-    .from("properties")
-    .select(MATCH_COLUMNS)
-    .eq("tenant_id", tenantId)
-    .is("deleted_at", null)
-    .not("eids_property_no", "is", null)
-    .or(`eids_property_no.eq.${key},eids_property_no.like.*${key.slice(-6)}*`)
-    .limit(50);
+  // (1) Birebir: rakam anahtarıyla DB'de arama (`eids_properties_by_no_key`, ifade indeksi; ayraçlı kayıt da bulunur).
+  //     RPC yoksa (migration uygulanmamış) eski ön süzgece düşülür; son karar her iki yolda da rakam anahtarıyla.
+  const exactRes = await loadExactByKey(db, tenantId, key);
   if (exactRes.error) {
     return { ok: false, error: isMissingSchema(exactRes.error) ? "EİDS eşleştirmesi için sistem güncellemesi bekleniyor." : "Portföyler okunamadı; birkaç saniye sonra tekrar deneyin." };
   }

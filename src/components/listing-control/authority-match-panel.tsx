@@ -31,6 +31,7 @@ export function AuthorityMatchPanel({ canEdit, prefill }: { canEdit: boolean; pr
     grantorName: prefill?.grantorName ?? "",
     validUntil: prefill?.validUntil ?? "",
     kind: prefill?.kind ?? "grant",
+    inboundMessageId: prefill?.inboundMessageId || null,
   });
   const [result, setResult] = useState<AuthorityMatchActionResult | null>(null);
   const [error, setError] = useState<string | null>(null);

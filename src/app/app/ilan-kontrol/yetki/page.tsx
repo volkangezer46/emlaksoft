@@ -61,12 +61,13 @@ export default async function YetkiKuyrukPage({ searchParams }: { searchParams: 
   const kovaRaw = one(sp.kova);
   const kova = isAuthorityQueueFilter(kovaRaw) ? kovaRaw : null;
   const page = Math.max(1, Math.floor(Number(one(sp.sayfa)) || 1));
-  // Eşleştir sekmesine bildirimden (EP3 kuyruğu) ön doldurma: ?no=&tur=&bitis=&olay=
+  // Eşleştir sekmesine bildirimden (EP3 kuyruğu) ön doldurma: ?no=&tur=&bitis=&olay=&mesaj= (mesaj = bildirim kimliği)
   const prefill = {
     propertyNo: (one(sp.no) ?? "").replace(/[^0-9A-Za-z-]/g, "").slice(0, 40),
     dealKind: one(sp.tur) === "rent" ? "rent" : one(sp.tur) === "sale" ? "sale" : "",
     validUntil: /^\d{4}-\d{2}-\d{2}$/.test(one(sp.bitis) ?? "") ? (one(sp.bitis) as string) : "",
     kind: one(sp.olay) === "revoke" ? ("revoke" as const) : ("grant" as const),
+    inboundMessageId: /^[0-9a-fA-F-]{36}$/.test(one(sp.mesaj) ?? "") ? (one(sp.mesaj) as string) : "",
   };
   return (
     <>
@@ -247,7 +248,7 @@ async function MatchBody({
 }: {
   canEdit: boolean;
   tenantId: string | null | undefined;
-  prefill: { propertyNo: string; dealKind: string; validUntil: string; kind: "grant" | "revoke" };
+  prefill: { propertyNo: string; dealKind: string; validUntil: string; kind: "grant" | "revoke"; inboundMessageId: string };
 }) {
   if (!tenantId) return <ControlUnavailable />;
   const supabase = await createClient();
@@ -279,7 +280,7 @@ async function MatchBody({
         ) : (
           <ul className="space-y-2">
             {inbound.map((m) => {
-              const q = new URLSearchParams({ sekme: "eslestir" });
+              const q = new URLSearchParams({ sekme: "eslestir", mesaj: m.id });
               if (m.eids_property_no) q.set("no", m.eids_property_no);
               if (m.deal_kind === "sale" || m.deal_kind === "rent") q.set("tur", m.deal_kind);
               if (m.valid_until) q.set("bitis", String(m.valid_until).slice(0, 10));
@@ -308,7 +309,7 @@ async function MatchBody({
         <p className="text-sm text-text-muted">
           Taşınmaz no birebir tutarsa tek portföy önerilir. Tutmazsa malik adı benzerliğine göre en çok 5 aday listelenir; hiçbir portföy kendiliğinden bağlanmaz.
         </p>
-        <AuthorityMatchPanel key={`${prefill.propertyNo}-${prefill.kind}-${prefill.validUntil}`} canEdit={canEdit} prefill={prefill} />
+        <AuthorityMatchPanel key={`${prefill.propertyNo}-${prefill.kind}-${prefill.validUntil}-${prefill.inboundMessageId}`} canEdit={canEdit} prefill={prefill} />
       </section>
     </div>
   );
