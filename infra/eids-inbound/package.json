@@ -1,0 +1,13 @@
+{
+  "name": "emlaksoft-eids-inbound",
+  "private": true,
+  "version": "1.0.0",
+  "description": "EmlakSoft EIDS posta alicisi (yalniz eids.emlaksoft.com.tr gelen posta; role yok)",
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": { "start": "node server.ts" },
+  "dependencies": {
+    "mailauth": "5.0.3",
+    "smtp-server": "3.19.13"
+  }
+}

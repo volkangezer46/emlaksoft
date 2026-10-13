@@ -75,6 +75,32 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+  # EİDS posta alıcısı (EP3): yalnız eids.emlaksoft.com.tr için GELEN posta (röle yok, giden posta yok).
+  # PROFİLLİ: deploy.sh'nin `up -d` çağrısı bunu BAŞLATMAZ; kurulum ve güncelleme scripts/sunucu/install-eids-inbound.sh
+  # ile yapılır (DNS MX + Hetzner güvenlik duvarında TCP 25 açıldıktan sonra). Uygulamaya iç ağdan HMAC imzalı POST eder.
+  eids-inbound:
+    profiles: ["eids"]
+    image: emlaksoft-eids-inbound:${EIDS_TAG:-latest}
+    container_name: emlaksoft-eids-inbound
+    restart: unless-stopped
+    # Yalnız köprü anahtarı (EIDS_INBOUND_SECRET) — uygulamanın diğer sırları bu konteynere VERİLMEZ.
+    env_file: /srv/emlaksoft/eids-inbound.env
+    environment:
+      EIDS_APP_URL: http://emlaksoft-app:3000/api/inbound/eids
+      EIDS_SMTP_PORT: "2525"
+      EIDS_MTA_NAME: mx.emlaksoft.com.tr
+    ports:
+      - "25:2525"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 192m
+    memswap_limit: 192m
+    networks: [coolify]
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 networks:
   coolify:
     external: true
