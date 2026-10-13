@@ -45,6 +45,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/settings/read.ts": { calls: 1, scope: "platform", why: "platform ayar anlık görüntüsü (ofis satırları önbellek DIŞINDA)" },
   "src/lib/site-content/ef-status.ts": { calls: 1, scope: "platform", why: "ana sayfa EF durumu" },
   "src/lib/site-content/store.ts": { calls: 1, scope: "platform", why: "site içeriği" },
+  "src/lib/site-media/store.ts": { calls: 1, scope: "platform", why: "site medya kütüphanesi (pazarlama görselleri; kiracı verisi yok)" },
   "src/lib/site-menu/store.ts": { calls: 1, scope: "platform", why: "site menüsü" },
   "src/lib/guides/store.ts": { calls: 2, scope: "platform", why: "rehber: yayındaki yazı listesi ve yazı içeriği (kimlik anahtarda); platform_settings, ofis verisi yok" },
   "src/lib/site-pages/store.ts": { calls: 3, scope: "platform", why: "sayfa oluşturucu: yayın haritası, sayfa içeriği (kimlik anahtarda), dizin; platform_settings" },

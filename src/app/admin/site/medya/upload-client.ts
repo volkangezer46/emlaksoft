@@ -1,3 +1,5 @@
+"use client";
+
 import type { SiteMediaActionResult } from "@/lib/site-media/upload";
 
 /**

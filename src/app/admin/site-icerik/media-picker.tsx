@@ -128,23 +128,27 @@ export function MediaPicker({
             </p>
           ) : null}
           {library.items.length && !readOnly ? (
-            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6" aria-label="Kütüphaneden seç">
+            <ul className="grid grid-cols-3 gap-2 sm:grid-cols-6" role="radiogroup" aria-label="Kütüphaneden seç">
               {library.items.map((m) => (
                 <li key={m.id}>
-                  <button
-                    type="button"
-                    aria-pressed={value?.mediaId === m.id}
-                    onClick={() => onChange(value?.alt ? { mediaId: m.id, alt: value.alt } : { mediaId: m.id })}
-                    className={`focus-ring block aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-control)] border-2 ${value?.mediaId === m.id ? "border-brand-600" : "border-transparent hover:border-brand-300"}`}
+                  <label
+                    className={`block aspect-[16/10] w-full cursor-pointer overflow-hidden rounded-[var(--radius-control)] border-2 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 ${value?.mediaId === m.id ? "border-brand-600" : "border-transparent hover:border-brand-300"}`}
                     title={m.alt}
                   >
+                    <input
+                      type="radio"
+                      name={`${altId}-kutuphane`}
+                      className="sr-only"
+                      checked={value?.mediaId === m.id}
+                      onChange={() => onChange(value?.alt ? { mediaId: m.id, alt: value.alt } : { mediaId: m.id })}
+                    />
                     {m.thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.thumb} alt={m.alt} width={m.w} height={m.h} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-xs">{m.alt}</span>
                     )}
-                  </button>
+                  </label>
                 </li>
               ))}
             </ul>

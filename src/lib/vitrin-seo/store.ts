@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { SEO_CACHE_TAG } from "@/lib/seo/store";
 import { vitrinRobots } from "@/lib/seo/patterns";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import {
   DEFAULT_NEVER_INDEX_SLUGS,
   VITRIN_NEVER_INDEX_KEY,
@@ -47,12 +48,17 @@ export async function resolveVitrinRobots(optin: boolean, tenant: NeverIndexTena
 export async function loadVitrinSitemapExclusions(client: SupabaseClient): Promise<(slug: string) => boolean> {
   const list = await loadNeverIndexList();
   const sample = new Set<string>();
-  const { data, error } = await client
-    .from("tenants")
-    .select("slug, sample_seeded_at, sample_cleared_at")
-    .not("sample_seeded_at", "is", null)
-    .is("sample_cleared_at", null)
-    .limit(5000);
-  if (!error) for (const r of (data ?? []) as { slug: string | null }[]) if (r.slug) sample.add(r.slug);
+  const { rows, error } = await readAllPaged<{ slug: string | null }>(
+    (from, to) =>
+      client
+        .from("tenants")
+        .select("id, slug")
+        .not("sample_seeded_at", "is", null)
+        .is("sample_cleared_at", null)
+        .order("id")
+        .range(from, to),
+    { maxRows: 5000 },
+  );
+  if (!error) for (const r of rows) if (r.slug) sample.add(r.slug);
   return (slug: string) => sample.has(slug) || isNeverIndexTenant({ slug }, list);
 }

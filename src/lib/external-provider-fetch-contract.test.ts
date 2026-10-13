@@ -52,6 +52,7 @@ describe("external provider request contract", () => {
       "src/app/admin/danisman/advisor-chat.tsx",
       "src/app/admin/personel/[id]/page.tsx",
       "src/app/admin/personel/page.tsx",
+      "src/app/admin/site/medya/upload-client.ts", // aynı kökene, medya dosyası yükleme (/admin/site/medya/yukle)
       "src/app/app/asistan/advisor-chat.tsx",
       "src/app/app/destek/ticket-attachment-input.tsx",
       "src/app/app/giderler/statement-upload.tsx", // aynı kökene, ekstre dosyası yükleme (/api/app/finans/ekstre)

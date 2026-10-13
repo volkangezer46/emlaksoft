@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ImageIcon } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Button } from "@/components/ui/button";
 import { requirePlatformModule } from "@/lib/platform";
 import { siteContentStore } from "@/lib/site-content/store";
 import { heroBudget, isLargeOutput, kb, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
@@ -111,7 +112,7 @@ export default async function AdminSiteMediaPage({ searchParams }: { searchParam
             placeholder="Alt metin veya başlıkta ara"
             className="focus-ring surface-sunken h-9 w-56 rounded-[var(--radius-control)] border border-hairline px-3 text-sm text-ink-950"
           />
-          <button type="submit" className="focus-ring h-9 rounded-[var(--radius-control)] bg-brand-600 px-3 text-sm font-bold text-white">Ara</button>
+          <Button type="submit" size="sm">Ara</Button>
         </form>
         <p className="w-full text-xs text-text-muted">
           Kota: <Link href={hrefFor("", "buyuk")} className="font-semibold text-brand-700 underline">{kb(total)} / {kb(SITE_MEDIA_LIMITS.totalBytes)}</Link> kullanılıyor · dosya başına en çok {kb(SITE_MEDIA_LIMITS.inputBytes)} · ilk ekran bütçesi {kb(SITE_MEDIA_LIMITS.heroBudgetBytes)} (960 px AVIF).
