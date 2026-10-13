@@ -7,7 +7,7 @@
  *   tsx scripts/build-extension.ts --soft   # `prebuild`: hata olursa uyarır, uygulama derlemesini ENGELLEMEZ
  *
  * - `host_permissions` YALNIZ portal adaptör kayıt defterinden (`allPortalHosts()`): sahibinden/hepsiemlak/emlakjet.
- * - İçerik betiği YALNIZ EmlakSoft alanında: `emlaksoft.vercel.app` + `NEXT_PUBLIC_APP_URL` host'u (varsa).
+ * - İçerik betiği YALNIZ EmlakSoft alanında: `emlaksoft.com.tr` + `NEXT_PUBLIC_APP_URL` host'u (varsa).
  * - İzinler `storage` + `alarms` + (0.4.0) `activeTab` + `scripting`: ikisi yalnız popup'ta kullanıcı tıklamasıyla açık sekmedeki TEK ilanı
  *   okumak içindir (sahibinden ilan kaydı); arka planda gezinme/izleme yoktur. `externally_connectable` YALNIZ EmlakSoft kökenleri için (siteden salt-okunur `ping`;
  *   bağlama ve veri yolu değişmedi: içerik betiği köprüsü + kullanıcı etkinliği).
@@ -28,7 +28,7 @@ const SRC = join(EXT, "src");
 const DIST = join(EXT, "dist");
 const RELEASE = join(EXT, "release");
 const PUBLIC_DOWNLOADS = join(ROOT, EXTENSION_PACKAGE_DIR);
-const DEFAULT_APP_ORIGIN = "https://emlaksoft.vercel.app";
+const DEFAULT_APP_ORIGIN = "https://emlaksoft.com.tr";
 
 function appOrigins(): string[] {
   const out = new Set<string>([DEFAULT_APP_ORIGIN]);

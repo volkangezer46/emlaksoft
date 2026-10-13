@@ -94,7 +94,7 @@ describe("tarayıcı eklentisi", () => {
     expect(allPortalHosts()).toEqual(["emlakjet.com", "hepsiemlak.com", "sahibinden.com"]);
     const b = src("scripts/build-extension.ts");
     expect(b).toContain("allPortalHosts()");
-    expect(b).toContain("https://emlaksoft.vercel.app");
+    expect(b).toContain("https://emlaksoft.com.tr");
     expect(b).toContain("NEXT_PUBLIC_APP_URL");
   });
   it("köprü sözleşmesi uygulamadan derlenir (kopya yok); yasak teknik yok", () => {
