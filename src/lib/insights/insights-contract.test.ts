@@ -158,13 +158,13 @@ describe("rollback + migration ayrıntıları", () => {
 });
 
 describe("cron kablolaması", () => {
-  it("insight-engine: CRON_JOBS + vercel.json + route birbirini tutuyor, sayı 36", () => {
+  it("insight-engine: CRON_JOBS + vercel.json + route birbirini tutuyor, sayı 37", () => {
     const job = CRON_JOBS.find((c) => c.job === "insight-engine");
     expect(job?.path).toBe("/api/cron/insight-engine");
     const vercel = JSON.parse(read("vercel.json")) as { crons: { path: string; schedule: string }[] };
     expect(vercel.crons.find((c) => c.path === job?.path)?.schedule).toBe(job?.schedule);
     expect(vercel.crons.length).toBe(CRON_JOBS.length);
-    expect(CRON_JOBS.length).toBe(36);
+    expect(CRON_JOBS.length).toBe(37);
   });
 
   it("route: authorizeCron + recordHeartbeat literal + maxDuration 300; service_role yalnız kapalı iş seçiciden", () => {
