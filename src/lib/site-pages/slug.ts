@@ -52,6 +52,7 @@ export const RESERVED_ROUTE_DIRS = [
   "r",
   "randevu-al",
   "randevu-teyit",
+  "rehber",
   "sifre-sifirla",
   "sifre-yenile",
   "site-menu-asset",
