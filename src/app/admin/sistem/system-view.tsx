@@ -1,6 +1,6 @@
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, KeyRound, Landmark, Layers, MapPin, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, History, KeyRound, Landmark, Layers, MapPin, PauseCircle, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { RegistrySettings } from "@/components/settings/registry-settings";
 import { geoRowCount } from "@/lib/geo/reader";
@@ -24,6 +24,9 @@ import { CronStatusStrip } from "./cron-status-strip";
 import { classifyCron, geoCoverage, schemaGauge } from "./cron-strip-model";
 import { BackupCard } from "./backup-card";
 import { BACKUP_HEARTBEAT_JOB, BACKUP_STATUS_KEY } from "@/lib/ops/backup-status";
+import { CronPauseButton } from "./ops-controls";
+import { CronHistoryPanel, type CronRun } from "./cron-history";
+import { countOpenErrors } from "../hatalar/triage";
 
 const TOTAL_PROVINCES = 81;
 
@@ -139,9 +142,11 @@ function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
   );
 }
 
-export async function SystemView() {
+export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
   const staff = await requirePlatformModule("sistem");
   const admin = createAdminClient();
+  // `?is=<iş>`: o işin son 30 çalışması (süre grafiği). Yalnız envanterdeki işler.
+  const historyJob = CRON_JOBS.find((j) => j.job === cronJob) ?? null;
 
   // Tüm platform ayarları + geo sayımları tek turda (bağımsız → tam paralel)
   const [
@@ -158,6 +163,8 @@ export async function SystemView() {
     backupRaw,
     portalProposalRes,
     portalAlertRes,
+    cronStateRes,
+    cronRunsRes,
   ] = await Promise.all([
     getPlatformSecret("openai_api_key"),
     getEmlakFiyatiAdminStatus(),
@@ -174,7 +181,7 @@ export async function SystemView() {
     geoRowCount("neighborhood"),
     admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
     probeSchema(),
-    admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
+    countOpenErrors(admin),
     admin
       .from("platform_audit_logs")
       .select("id, actor_id, meta, created_at")
@@ -186,7 +193,21 @@ export async function SystemView() {
     // Portal kuralları özeti (tablo yoksa hata → satır gizlenir; yeni service_role çağrısı yok, aynı istemci)
     admin.from("portal_rule_proposals").select("portal").eq("state", "ready").limit(500),
     admin.from("portal_form_versions").select("portal").in("alert_state", ["warning", "info"]).limit(500),
+    // İş bazında duraklatma + seçili işin çalışma geçmişi (tablolar yoksa hata → boş / "kurulum bekliyor").
+    admin.from("cron_job_state").select("job, paused, paused_at, reason").eq("paused", true),
+    historyJob
+      ? admin
+          .from("cron_runs")
+          .select("id, started_at, finished_at, duration_ms, status, trigger, detail")
+          .eq("job", historyJob.job)
+          .order("started_at", { ascending: false })
+          .limit(30)
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  type PausedRow = { job: string; paused: boolean; paused_at: string | null; reason: string | null };
+  const pausedJobs = new Map(((cronStateRes.error ? [] : (cronStateRes.data ?? [])) as PausedRow[]).map((r) => [r.job, r] as const));
+  const cronRuns = (cronRunsRes.data ?? []) as CronRun[];
+  const cronRunsPending = Boolean(cronRunsRes.error);
   const evdsConfigured = Boolean(process.env.EVDS_API_KEY?.trim());
   const evdsLastFetch =
     ((evdsRows ?? []) as { fetched_at: string | null }[])
@@ -208,8 +229,9 @@ export async function SystemView() {
   const heartbeats = new Map<string, Heartbeat>();
   for (const h of (heartbeatRows ?? []) as Heartbeat[]) heartbeats.set(h.job, h);
 
-  // Cron sağlığı özeti — hero kartlarında gösterilir
-  const cronHealthy = CRON_JOBS.filter(({ job, staleAfterMinutes }) => {
+  // Cron sağlığı özeti — hero kartlarında gösterilir (duraklatılan işler paydadan çıkar)
+  const activeJobs = CRON_JOBS.filter(({ job }) => !pausedJobs.has(job));
+  const cronHealthy = activeJobs.filter(({ job, staleAfterMinutes }) => {
     const hb = heartbeats.get(job);
     return hb && hb.last_status !== "error" && msSince(hb.last_run_at) <= staleAfterMinutes * 60_000;
   }).length;
@@ -252,7 +274,7 @@ export async function SystemView() {
   const nowMs = clockNow();
   const stripItems = CRON_JOBS.map(({ job, label, staleAfterMinutes }) => {
     const hb = heartbeats.get(job);
-    return { job, label, status: classifyCron(hb, staleAfterMinutes, nowMs), when: hb ? relativeTimeTR(hb.last_run_at) : "hiç çalışmadı" };
+    return { job, label, status: classifyCron(hb, staleAfterMinutes, nowMs, pausedJobs.has(job)), when: hb ? relativeTimeTR(hb.last_run_at) : "hiç çalışmadı" };
   });
   const schemaG = schemaGauge(schemaRows);
   const portalRules = portalRulesSummary(portalProposalRes, portalAlertRes);
@@ -273,12 +295,12 @@ export async function SystemView() {
           <KpiCard
             layout="inline"
             label="Sağlıklı cron"
-            value={`${cronHealthy}/${CRON_JOBS.length}`}
+            value={`${cronHealthy}/${activeJobs.length}`}
             href="/admin/sistem#cron"
             icon={HeartPulse}
-            tone={cronHealthy === CRON_JOBS.length ? "success" : "warn"}
-            attention={cronHealthy !== CRON_JOBS.length}
-            hint="iş zamanlamasına göre sağlıklı"
+            tone={cronHealthy === activeJobs.length ? "success" : "warn"}
+            attention={cronHealthy !== activeJobs.length}
+            hint={pausedJobs.size > 0 ? `${pausedJobs.size} iş duraklatıldı` : "iş zamanlamasına göre sağlıklı"}
           />
           <KpiCard
             layout="inline"
@@ -307,6 +329,10 @@ export async function SystemView() {
       <div id="cron" className="scroll-mt-24">
         <CronStatusStrip items={stripItems} />
       </div>
+
+      {historyJob ? (
+        <CronHistoryPanel job={historyJob.job} label={historyJob.label} runs={cronRuns} setupPending={cronRunsPending} />
+      ) : null}
 
       {portalRules ? <PortalRulesLine summary={portalRules} /> : null}
 
@@ -384,6 +410,7 @@ export async function SystemView() {
               const hb = heartbeats.get(job);
               const stale = !hb || msSince(hb.last_run_at) > staleAfterMinutes * 60_000;
               const failed = hb?.last_status === "error";
+              const pausedRow = pausedJobs.get(job);
               return (
                 <div
                   key={job}
@@ -399,10 +426,21 @@ export async function SystemView() {
                       {lastManualByJob.get(job)
                         ? ` · elle: ${relativeTimeTR(lastManualByJob.get(job)!.created_at)}`
                         : ""}
+                      {" · "}
+                      <Link href={`/admin/sistem?is=${job}#cron-gecmis`} className="inline-flex items-center gap-0.5 font-semibold text-brand-600 hover:underline">
+                        <History className="h-3 w-3" aria-hidden /> Geçmiş
+                      </Link>
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {failed ? (
+                  {pausedRow ? (
+                    <span
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ink-950/8 px-2.5 py-1 text-xs font-bold text-text-muted"
+                      title={`${pausedRow.paused_at ? `${relativeTimeTR(pausedRow.paused_at)} duraklatıldı` : "Duraklatıldı"}${pausedRow.reason ? ` · ${pausedRow.reason}` : ""}. Zamanlanmış çağrı erken döner; “Şimdi çalıştır” çalışır.`}
+                    >
+                      <PauseCircle className="h-3.5 w-3.5" /> Duraklatıldı
+                    </span>
+                  ) : failed ? (
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-danger-500/10 px-2.5 py-1 text-xs font-bold text-danger-500">
                       <XCircle className="h-3.5 w-3.5" /> Hata
                     </span>
@@ -416,6 +454,7 @@ export async function SystemView() {
                     </span>
                   )}
                   {canRun ? <CronRunButton job={job} label={label} /> : null}
+                  {canRun ? <CronPauseButton job={job} label={label} paused={Boolean(pausedRow)} /> : null}
                   </div>
                 </div>
               );
@@ -449,7 +488,8 @@ export async function SystemView() {
           ) : null}
           <p className="mt-3 text-xs text-text-faint">
             Her görev kendi çalışma sıklığına göre değerlendirilir. Kalp atışı yazılamazsa
-            sunucu kaydı oluşur; zamanlanmış işin ana sonucu bloklanmaz.
+            sunucu kaydı oluşur; zamanlanmış işin ana sonucu bloklanmaz. Duraklatılan iş zamanlanmış
+            çağrıda erken döner (uyarı üretmez); “Şimdi çalıştır” yine çalıştırır.
           </p>
         </section>
 

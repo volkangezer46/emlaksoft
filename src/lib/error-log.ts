@@ -66,6 +66,14 @@ export type ErrorLogInput = {
   userId?: string | null;
 };
 
+/** Yayın SHA'sı (health ile aynı kaynak sırası); yoksa null. */
+function releaseSha(): string | null {
+  for (const v of [process.env.VERCEL_GIT_COMMIT_SHA, process.env.GITHUB_SHA, process.env.RELEASE_SHA]) {
+    if (typeof v === "string" && v.trim() && v.trim() !== "unknown") return v.trim().slice(0, 12);
+  }
+  return null;
+}
+
 /**
  * Hatayı kaydeder. ASLA hata fırlatmaz — kayıt yolunda bir sorun çıkarsa
  * asıl hatanın üstünü örtmemeli.
@@ -85,7 +93,7 @@ export async function logError(input: ErrorLogInput): Promise<void> {
     // The database performs the insert/increment atomically. A client-side
     // read-modify-write loses increments when several browsers report the same
     // incident concurrently.
-    const { error: yazmaHatasi } = await admin.rpc("record_error_occurrence", {
+    const args = {
       p_tenant_id: input.tenantId ?? null,
       p_user_id: input.userId ?? null,
       p_source: source,
@@ -95,7 +103,14 @@ export async function logError(input: ErrorLogInput): Promise<void> {
       p_path: path,
       p_user_agent: input.userAgent?.trim().slice(0, MAX_USER_AGENT) || null,
       p_fingerprint: fp,
-    });
+    };
+    // Sürüm (AD10 hata triyajı): p_release 20261013004900 ile gelir. Fonksiyon henüz eski imzadaysa
+    // (PGRST202 = eşleşen fonksiyon yok) sürümsüz eski çağrıya düşülür; kayıt kaybolmaz.
+    const release = releaseSha();
+    let { error: yazmaHatasi } = await admin.rpc("record_error_occurrence", release ? { ...args, p_release: release } : args);
+    if (release && yazmaHatasi?.code === "PGRST202") {
+      ({ error: yazmaHatasi } = await admin.rpc("record_error_occurrence", args));
+    }
     if (yazmaHatasi && !uyarildi) {
       uyarildi = true;
       console.warn("[error-log] hata kaydı yazılamıyor:", yazmaHatasi.message);

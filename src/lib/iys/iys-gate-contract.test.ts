@@ -41,6 +41,7 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/rent-reminders/run.ts": "kira/aidat vade hatırlatması (işlem amaçlı)",
   "src/lib/email/trial-reminder.ts": "ofis sahibine abonelik bildirimi",
   "src/lib/email/test-send.ts": "yönetimden e-posta kanalı test gönderimi (yalnız giriş yapmış platform personelinin kendi adresine; ticari değil)",
+  "src/lib/alerts/channels.ts": "operasyon uyarısı (AD10): yalnız süper adminin tanımladığı iç kanallara (Telegram/e-posta/webhook) sistem arıza bildirimi; ticari değil",
 };
 
 /** Altyapı: sağlayıcı sarmalayıcıları (kendileri ileti kararı vermez). */

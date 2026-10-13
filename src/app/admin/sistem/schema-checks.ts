@@ -45,6 +45,13 @@ export const SCHEMA_CHECKS: SchemaCheck[] = [
   { label: "Anket sistemi (ekip nabzı, düşük puan zinciri)", table: "survey_pulse_responses", migration: "20261007000400_survey_matrix_channels.sql" },
   { label: "Anlaşma kontrol listesi", table: "deal_checklist_items", migration: "20260727000103_deal_checklist.sql" },
   { label: "Sunumlar", table: "presentations", migration: "20260726000100_presentations.sql" },
+  // Canlı hata (2026-10-13): 20260722000013 ledger'da uygulanmış görünüyor ama tablo YOKTU; web push aboneliği
+  // kaydedilemiyordu. Onarım: 20261013004910. Bu satır eksikliği panelde yakalar.
+  { label: "Web push abonelikleri", table: "push_subscriptions", migration: "20261013004910_push_subscriptions_repair.sql (ilk: 20260722000013)" },
+  { label: "Uyarı merkezi (kanal, kural, olay)", table: "alert_events", migration: "20261013004900_ops_alerts.sql" },
+  { label: "Cron çalışma geçmişi ve duraklatma", table: "cron_job_state", migration: "20261013004900_ops_alerts.sql" },
+  { label: "Sunucu kaynak ölçümleri", table: "host_metrics", migration: "20261013004900_ops_alerts.sql" },
+  { label: "Hata triyajı (durum, atanan, not, sürüm)", table: "error_logs", column: "status", migration: "20261013004900_ops_alerts.sql" },
   { label: "Hata kayıtları", table: "error_logs", migration: "error_logs (üretim izleme)" },
   { label: "Cron kalp atışı", table: "cron_heartbeats", migration: "cron_heartbeats (zamanlanmış görevler)" },
 ];
@@ -59,8 +66,11 @@ export async function probeSchema(checks: SchemaCheck[] = SCHEMA_CHECKS): Promis
       try {
         const { error } = await admin.from(c.table).select(c.column ?? "*", { count: "exact", head: true }).limit(1);
         if (!error) return { ...c, ok: true };
-        // 42P01 = undefined_table, 42703 = undefined_column → migration eksik
-        const missing = error.code === "42P01" || error.code === "42703" || /does not exist/i.test(error.message ?? "");
+        // 42P01 = undefined_table, 42703 = undefined_column; PostgREST şema önbelleği: PGRST205 = tablo yok,
+        // PGRST204 = kolon yok → migration eksik
+        const missing =
+          ["42P01", "42703", "PGRST205", "PGRST204"].includes(error.code ?? "") ||
+          /does not exist|could not find the (table|.*column)/i.test(error.message ?? "");
         return { ...c, ok: false, detail: missing ? "Uygulanmamış" : (error.message ?? "Erişilemedi") };
       } catch {
         return { ...c, ok: false, detail: "Erişilemedi" };
