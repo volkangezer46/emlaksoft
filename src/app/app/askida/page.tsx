@@ -1,4 +1,4 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
+import { getSupportContact } from "@/lib/contact-info-server";
 import {
   ArrowUpRight,
   Building2,
@@ -32,8 +32,7 @@ const nf = new Intl.NumberFormat("tr-TR");
  * Veri sayıları gerçektir (RLS tenant'ı süzer); sorgu boş dönerse kart gizlenir.
  */
 export default async function SuspendedPage() {
-  const supabase = await createClient();
-  const user = await getRequestUser();
+  const [supabase, user, contact] = await Promise.all([createClient(), getRequestUser(), getSupportContact()]);
 
   const { data: profile } = user
     ? await supabase
@@ -75,7 +74,7 @@ export default async function SuspendedPage() {
 
   const steps = isCancelled
     ? [
-        { icon: Mail, title: "1 · Bize yazın", desc: `${SUPPORT_EMAIL} adresine ofis adınızla kısa bir e-posta gönderin.` },
+        { icon: Mail, title: "1 · Bize yazın", desc: `${contact.email} adresine ofis adınızla kısa bir e-posta gönderin.` },
         { icon: FileCheck2, title: "2 · Paketi seçin", desc: "Ekibimiz size uygun paketi ve geçiş adımlarını aynı gün iletir." },
         { icon: ShieldCheck, title: "3 · Kaldığınız yerden", desc: "Saklama politikası içindeki mevcut kayıtlarınıza hesap yeniden açıldığında erişirsiniz." },
       ]
@@ -118,7 +117,7 @@ export default async function SuspendedPage() {
               </ButtonLink>
             ) : null}
             <a
-              href={SUPPORT_MAILTO}
+              href={contact.mailto}
               className={`inline-flex min-h-[42px] items-center gap-2 rounded-[var(--radius-control)] px-4 py-2.5 text-sm font-semibold transition ${
                 isCancelled
                   ? "bg-brand-600 text-white hover:bg-brand-700"

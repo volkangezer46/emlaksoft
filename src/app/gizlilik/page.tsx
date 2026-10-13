@@ -1,8 +1,11 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
+import { getSupportContact } from "@/lib/contact-info-server";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
+
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
 
 /**
  * Eklenti 0.6.0 form öğrenmesi eki (mağaza gizlilik metni "privacy C"). Metin `docs/runbooks/ILAN_KONTROL_EKLENTI_YAYIN.md` §5'te
@@ -16,9 +19,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/gizlilik");
 }
 
-export default function GizlilikPage() {
+export default async function GizlilikPage() {
+  const contact = await getSupportContact();
   return (
     <LegalPage
+      slug="gizlilik"
       title="Gizlilik Politikası"
       intro="Gizliliğiniz işimizin temelidir. Bu politika, EmlakSoft'un verilerinizi nasıl topladığını, kullandığını ve koruduğunu açıklar."
     >
@@ -122,7 +127,7 @@ export default function GizlilikPage() {
       <LegalSection no="7." title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için:{" "}
-          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+          <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>
         </p>
       </LegalSection>
     </LegalPage>

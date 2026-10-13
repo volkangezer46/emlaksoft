@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/cerez-politikasi");
 }
@@ -9,6 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function CerezPolitikasiPage() {
   return (
     <LegalPage
+      slug="cerez-politikasi"
       title="Çerez Politikası"
       intro="Bu politika, EmlakSoft web sitesi ve uygulamasında hangi çerezlerin (cookie) hangi amaçlarla kullanıldığını ve bunları nasıl yönetebileceğinizi açıklar."
     >

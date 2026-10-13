@@ -1,19 +1,45 @@
 /**
- * Destek iletişimi TEK KAYNAK. Yasal sayfalar, SSS, menü, push ve bildirimler buradan okur;
- * kaynakta başka yerde sabit adres yazılmaz (contact-info-contract.test.ts).
- * Üretimde NEXT_PUBLIC_SUPPORT_EMAIL ile değiştirilir (docs/DEPLOY.md).
+ * Destek iletişimi TEK KAYNAK. Kaynakta başka yerde sabit adres yazılmaz (contact-info-contract.test.ts).
+ *
+ * Gerçek değerler SUNUCUDA ayar defterinden okunur (`support.email`, `support.phone`, `support.whatsapp`;
+ * /admin/ayarlar/yasal?sekme=sirket): `getSupportContact()` (src/lib/contact-info-server.ts). Yasal sayfalar ve askı
+ * ekranı onu kullanır; deploy gerekmez. Bu dosya SAF kalır (istemci ve statik varsayılanlar da import eder) ve yalnız
+ * koddaki varsayılanı + biçim yardımcılarını taşır. NEXT_PUBLIC_SUPPORT_* artık GEREKMEZ; tanımlıysa yalnız eski kurulumla
+ * uyum için son yedek olarak okunur (derlemeye gömülür; değiştirmek için ayarı kullanın).
  */
-export const SUPPORT_EMAIL: string = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() || "destek@emlaksoft.com.tr";
+export const DEFAULT_SUPPORT_EMAIL = "destek@emlaksoft.com.tr";
+
+/** Statik bağlamlar (menü varsayılanları, push konusu, SSS bileşeni) için e-posta: eski env yedeği > koddaki varsayılan. */
+export const SUPPORT_EMAIL: string = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() || DEFAULT_SUPPORT_EMAIL;
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 
+/** Sunucuda çözülmüş destek iletişimi (istemciye düz veri olarak geçebilir). */
+export type SupportContact = {
+  email: string;
+  mailto: string;
+  phone: string | null;
+  tel: string | null;
+  whatsapp: string | null;
+  whatsappUrl: string | null;
+};
+
 /**
- * İsteğe bağlı destek telefonu / WhatsApp hattı. Varsayılan YOK: env tanımlı değilse null ve hiçbir yerde görünmez
- * (uydurma numara yazılmaz). Değer gösterim biçiminde girilir (ör. "0850 000 00 00"); bağlantı için rakamlar kullanılır.
+ * SAF: ham değerlerden iletişim nesnesi. Boş telefon/WhatsApp = null (hiçbir yerde görünmez; uydurma numara yazılmaz).
+ * Değer gösterim biçiminde girilir (ör. "0850 000 00 00"); bağlantı için rakamlar kullanılır.
  */
-export const SUPPORT_PHONE: string | null = process.env.NEXT_PUBLIC_SUPPORT_PHONE?.trim() || null;
-export const SUPPORT_TEL: string | null = SUPPORT_PHONE ? `tel:${telDigits(SUPPORT_PHONE)}` : null;
-export const SUPPORT_WHATSAPP: string | null = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP?.trim() || null;
-export const SUPPORT_WHATSAPP_URL: string | null = SUPPORT_WHATSAPP ? `https://wa.me/${waDigits(SUPPORT_WHATSAPP)}` : null;
+export function buildSupportContact(input: { email?: string | null; phone?: string | null; whatsapp?: string | null }): SupportContact {
+  const email = input.email?.trim() || DEFAULT_SUPPORT_EMAIL;
+  const phone = input.phone?.trim() || null;
+  const whatsapp = input.whatsapp?.trim() || null;
+  return {
+    email,
+    mailto: `mailto:${email}`,
+    phone,
+    tel: phone ? `tel:${telDigits(phone)}` : null,
+    whatsapp,
+    whatsappUrl: whatsapp ? `https://wa.me/${waDigits(whatsapp)}` : null,
+  };
+}
 
 /** tel: bağlantısı için yalnız rakam ve baştaki +. */
 function telDigits(v: string): string {

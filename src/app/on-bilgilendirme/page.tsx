@@ -1,36 +1,41 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO, SUPPORT_PHONE, SUPPORT_TEL, SUPPORT_WHATSAPP, SUPPORT_WHATSAPP_URL } from "@/lib/contact-info";
-import { LEGAL_ENTITY_PENDING, legalEntityFields } from "@/lib/legal-entity";
+import { getSupportContact } from "@/lib/contact-info-server";
+import { legalEntityFields } from "@/lib/legal-entity";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/on-bilgilendirme");
 }
 
-export default function OnBilgilendirmePage() {
+export default async function OnBilgilendirmePage() {
+  const [contact, entity] = await Promise.all([getSupportContact(), legalEntityFields()]);
   return (
     <LegalPage
+      slug="on-bilgilendirme"
       title="Ön Bilgilendirme Formu"
       intro="Mesafeli Sözleşmeler Yönetmeliği'nin 5. maddesi uyarınca, ödeme yükümlülüğü doğmadan önce aşağıdaki hususlarda bilgilendirilirsiniz."
     >
       <LegalSection no="1." title="Sağlayıcı Bilgileri">
         <p>
           EmlakSoft — Türkiye emlak ofisleri için bulut tabanlı CRM ve ofis yönetim platformu. İletişim:{" "}
-          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
+          <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>.
           Ticari ünvan, adres, MERSİS ve vergi bilgileri ödeme onay ekranında ve düzenlenen faturada da yer alır.
         </p>
-        {/* Sağlayıcı kimliği sunucu ortamından (src/lib/legal-entity.ts); boş alan yer tutucu yerine açık notla gösterilir. */}
-        <ul className="list-disc space-y-1 pl-5">
-          {legalEntityFields().map((f) => (
-            <li key={f.key}><b>{f.label}:</b> {f.value ?? <span className="text-text-muted">{LEGAL_ENTITY_PENDING}</span>}</li>
+        {/* Sağlayıcı kimliği ayar defterinden (src/lib/legal-entity.ts; /admin/ayarlar/yasal?sekme=sirket); boş alan gösterilmez. */}
+        <ul className="list-disc space-y-1 pl-5" data-legal-entity="">
+          {entity.map((f) => (
+            <li key={f.key}><b>{f.label}:</b> {f.value}</li>
           ))}
-          {SUPPORT_PHONE && SUPPORT_TEL ? (
-            <li><b>Telefon:</b> <a className="font-semibold text-brand-600" href={SUPPORT_TEL}>{SUPPORT_PHONE}</a></li>
+          {contact.phone && contact.tel ? (
+            <li><b>Destek telefonu:</b> <a className="font-semibold text-brand-600" href={contact.tel}>{contact.phone}</a></li>
           ) : null}
-          {SUPPORT_WHATSAPP && SUPPORT_WHATSAPP_URL ? (
-            <li><b>WhatsApp:</b> <a className="font-semibold text-brand-600" href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noopener noreferrer">{SUPPORT_WHATSAPP}</a></li>
+          {contact.whatsapp && contact.whatsappUrl ? (
+            <li><b>WhatsApp:</b> <a className="font-semibold text-brand-600" href={contact.whatsappUrl} target="_blank" rel="noopener noreferrer">{contact.whatsapp}</a></li>
           ) : null}
         </ul>
       </LegalSection>
@@ -69,7 +74,7 @@ export default function OnBilgilendirmePage() {
           Sözleşmenin kurulmasından itibaren 14 gün içinde cayma hakkınız vardır. Onayınızla hizmetin ifasına derhâl
           başlanması hâlinde Yönetmelik m.15/1-ğ istisnası uygulanır; ayrıntılı koşullar ve iade süreci{" "}
           <Link className="font-semibold text-brand-600" href="/iptal-iade">İptal &amp; İade Politikası</Link>&apos;nda yer alır.
-          Cayma bildirimi için: <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+          Cayma bildirimi için: <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>
         </p>
       </LegalSection>
 

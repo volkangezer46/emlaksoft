@@ -6,11 +6,12 @@ import {
   DEFAULT_DOWN_PAYMENT_PCT,
   DEFAULT_LOAN_MONTHS,
   DEFAULT_MONTHLY_RATE_PCT,
-  DEFAULT_RATES,
   MAX_LOAN_MONTHS,
   MIN_LOAN_MONTHS,
+  purchaseRatesFromLegal,
   type DeedFeeShare,
 } from "@/lib/purchase-costs";
+import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { LegalConstantsPanel } from "@/components/app/legal-constants-panel";
 import { describeLegalMany } from "@/lib/legal-constants";
 import { PurchaseCalculator, type CalculatorProperty } from "./calculator";
@@ -65,7 +66,8 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
   // Portföy listesi: fiyatı girilmiş satılık portföyler (hesap satış bedeli
   // üzerinden kurulduğu için fiyatsız kayıt seçici de anlamsız).
   // TCMB EVDS faizi bağımsız sorgu: paralel (tablo/veri yoksa null → eski varsayılan).
-  const [{ data: propertyRows }, marketRow] = await Promise.all([
+  // Mevzuat sabitleri: o gün yürürlükteki değer (AD12 tarihli geçmiş; önbellekli, okunamazsa kod değeri).
+  const [{ data: propertyRows }, marketRow, legal] = await Promise.all([
     supabase
       .from("properties")
       .select("id, property_code, title, list_price, transaction_type, features")
@@ -79,7 +81,9 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
       .eq("key", MARKET_KEY_HOUSING_LOAN)
       .maybeSingle()
       .then((r) => r.data, () => null),
+    getEffectiveLegalValues(),
   ]);
+  const rates = purchaseRatesFromLegal(legal);
   const market = housingLoanDefault(marketRow);
 
   const properties: CalculatorProperty[] = (propertyRows ?? []).map((p) => ({
@@ -134,8 +138,8 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
       <PageHeader title="Alım maliyeti & kredi hesaplayıcı" eyebrow={"Müşteri sorusu: \"cebimden ne çıkar?\""} description="Tapu harcı, döner sermaye, komisyon, sigorta ve kredi masraflarını kalem kalem çıkarır; peşinat + masraf toplamını ve aylık taksidi tek ekranda gösterir. Sonucu tek tıkla müşteriye link olarak gönderin." />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-4 inline-flex items-start gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-xs text-white/70">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-cyan-400" />
-            Oranlar tek kaynak dosyadadır (%{DEFAULT_RATES.deedFeeTotalPct} tapu harcı, %
-            {DEFAULT_RATES.loanAllocationFeePct} kredi tahsis tavanı); doğrulama durumu aşağıda rozetle görünür —
+            Oranlar tek kaynak dosyadadır (%{rates.deedFeeTotalPct} tapu harcı, %
+            {rates.loanAllocationFeePct} kredi tahsis tavanı); doğrulama durumu aşağıda rozetle görünür —
             çıktı her hâlükârda <strong className="text-white">yaklaşıktır</strong>.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
@@ -161,6 +165,7 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
 
       <PurchaseCalculator
         properties={properties}
+        rates={rates}
         initial={{
           propertyId: selected?.id ?? "",
           price,
@@ -168,7 +173,7 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
           months,
           monthlyRatePct: num(sp.faiz, market?.monthlyPct ?? DEFAULT_MONTHLY_RATE_PCT),
           rateSource: market && (sp.faiz == null || sp.faiz === "") ? { asOf: market.asOf, annualPct: market.annualPct } : null,
-          commissionPct: num(sp.komisyon, DEFAULT_RATES.commissionPct),
+          commissionPct: num(sp.komisyon, rates.commissionPct),
           deedFeeShare,
           sqm,
           tab: sp.sekme === "kredi" ? "kredi" : "maliyet",
@@ -186,7 +191,7 @@ export async function CalculatorView({ sp }: { sp: CalculatorSearchParams }) {
           "mortgageRegistrationFeeTry",
           "maxLoanMonths",
           "maxLtvPct",
-        ])}
+        ], legal)}
       />
     </div>
   );

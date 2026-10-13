@@ -15,9 +15,10 @@
 import { round2 } from "@/lib/purchase-costs";
 import {
   INCOME_TAX_BRACKETS,
-  legalValue,
+  legalValue as codeOrDatedValue,
   progressiveTax,
   type LegalKey,
+  type LegalValues,
 } from "@/lib/legal-constants";
 
 export type SellerDeedFeeShare = "half" | "seller" | "none";
@@ -45,6 +46,8 @@ export type SellerProceedsInput = {
   otherTaxableIncome?: number | null;
   /** Taşınmazın emlak vergisi değeri (₺) — yalnız DKV uyarısı için; yoksa satış bedeli ipucu olarak kullanılır. */
   propertyTaxValue?: number | null;
+  /** O gün yürürlükteki mevzuat değerleri (AD12 tarihli geçmiş; sayfa sunucuda okur). Yoksa koddaki değerler. */
+  legal?: LegalValues | null;
 };
 
 export type SellerProceedsLine = { key: string; label: string; amount: number; note: string };
@@ -91,6 +94,7 @@ export function computeSellerProceeds(input: SellerProceedsInput): SellerProceed
   const outstandingLoan = pos(input.outstandingLoan);
   const exemptionUsed = pos(input.exemptionAlreadyUsed);
   const otherIncome = pos(input.otherTaxableIncome);
+  const legalValue = (k: LegalKey) => codeOrDatedValue(k, input.legal);
 
   const vatPct = legalValue("vatGeneralPct");
   const commissionPct =

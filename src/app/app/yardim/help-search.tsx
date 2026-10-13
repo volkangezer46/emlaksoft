@@ -4,8 +4,9 @@ import Link from "@/components/ui/smart-link";
 import { useState } from "react";
 import { ArrowRight, Bot, Search } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
-import { GUIDES, matchesQuery } from "@/lib/help-content";
-import { FAQ, FAQ_CATEGORIES } from "@/lib/help-faq";
+import { matchesQuery, type Guide } from "@/lib/help-content";
+import { FAQ_CATEGORIES, type FaqItem } from "@/lib/help-faq";
+import { HelpVote } from "./help-vote";
 
 const PANEL = "rounded-[var(--radius-panel)] border border-line bg-surface p-5";
 
@@ -49,9 +50,10 @@ function SearchBox({ q, onChange, label }: { q: string; onChange: (v: string) =>
   );
 }
 
-export function GuidesSearch({ initialQ }: { initialQ: string }) {
+/** Rehberler: liste sunucudan gelir (kod + yayındaki DB makaleleri; src/lib/help-center). */
+export function GuidesSearch({ initialQ, guides }: { initialQ: string; guides: readonly Guide[] }) {
   const [q, setQ] = useState(initialQ);
-  const list = GUIDES.filter((g) => matchesQuery([g.title, g.intro, ...g.steps], q));
+  const list = guides.filter((g) => matchesQuery([g.title, g.intro, ...g.steps], q));
   function change(v: string) {
     setQ(v);
     syncUrl(v);
@@ -89,10 +91,11 @@ export function GuidesSearch({ initialQ }: { initialQ: string }) {
               <li key={step}>{step}</li>
             ))}
           </ol>
-          <div className="mt-5">
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <ButtonLink href={g.href} iconRight={ArrowRight}>
               Şimdi dene: {g.cta}
             </ButtonLink>
+            <HelpVote kind="guide" slug={g.slug} />
           </div>
         </article>
       ))}
@@ -101,9 +104,9 @@ export function GuidesSearch({ initialQ }: { initialQ: string }) {
   );
 }
 
-export function FaqSearch({ initialQ }: { initialQ: string }) {
+export function FaqSearch({ initialQ, faq }: { initialQ: string; faq: readonly FaqItem[] }) {
   const [q, setQ] = useState(initialQ);
-  const list = FAQ.filter((f) => matchesQuery([f.q, f.a], q));
+  const list = faq.filter((f) => matchesQuery([f.q, f.a], q));
   function change(v: string) {
     setQ(v);
     syncUrl(v);
@@ -137,6 +140,7 @@ export function FaqSearch({ initialQ }: { initialQ: string }) {
                     {f.hrefLabel ?? "Sayfaya git"} <ArrowRight className="h-4 w-4" aria-hidden />
                   </Link>
                 ) : null}
+                <HelpVote kind="faq" slug={f.id} />
               </details>
             ))}
           </div>

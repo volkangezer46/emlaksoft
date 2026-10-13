@@ -1,16 +1,21 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
+import { getSupportContact } from "@/lib/contact-info-server";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/iptal-iade");
 }
 
-export default function IptalIadePage() {
+export default async function IptalIadePage() {
+  const contact = await getSupportContact();
   return (
     <LegalPage
+      slug="iptal-iade"
       title="İptal & İade Politikası"
       intro="Aboneliğinizi dilediğiniz zaman iptal edebilirsiniz. Bu sayfa cayma hakkı, iptal ve iade süreçlerini şeffaf biçimde açıklar."
     >
@@ -24,7 +29,7 @@ export default function IptalIadePage() {
       <LegalSection no="2." title="Abonelik İptali">
         <p>
           Aboneliğinizi panel içinden (Ayarlar → Abonelik) veya{" "}
-          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>{" "}
           üzerinden dilediğiniz an iptal edebilirsiniz. İptal, mevcut fatura döneminin sonunda yürürlüğe girer;
           dönem sonuna kadar hizmete erişiminiz devam eder. Taahhüt yoktur, cayma bedeli alınmaz.
         </p>

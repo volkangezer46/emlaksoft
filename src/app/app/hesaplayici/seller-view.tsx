@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import type { CalculatorSearchParams } from "./calculator-view";
+import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { SellerCalculator } from "./seller-calculator";
 
 /** URL paramı → tam sayı (≥0). Geçersizse 0. */
@@ -10,10 +11,12 @@ function whole(raw: string | undefined): number {
 }
 
 /**
- * Satıcı net/vergi hesaplayıcı sekmesi. Kapı (`valuation`) çağıran sayfadadır; veri okumaz,
- * başlangıç değerleri `?satis=&alis=&ay=` ile link'lenebilir.
+ * Satıcı net/vergi hesaplayıcı sekmesi. Kapı (`valuation`) çağıran sayfadadır; başlangıç değerleri
+ * `?satis=&alis=&ay=` ile link'lenebilir. Mevzuat sabitleri o gün yürürlükteki değerdir (AD12 tarihli geçmiş,
+ * önbellekli okuma; okunamazsa koddaki değer) ve istemci hesaplayıcıya prop olarak geçer.
  */
-export function SellerView({ sp }: { sp: CalculatorSearchParams }) {
+export async function SellerView({ sp }: { sp: CalculatorSearchParams }) {
+  const legal = await getEffectiveLegalValues();
   return (
     <div className="space-y-6">
       <PageHeader
@@ -23,6 +26,7 @@ export function SellerView({ sp }: { sp: CalculatorSearchParams }) {
       />
       <SellerCalculator
         initial={{ salePrice: whole(sp.satis), acquisitionPrice: whole(sp.alis), holdingMonths: whole(sp.ay) }}
+        legal={legal}
       />
     </div>
   );

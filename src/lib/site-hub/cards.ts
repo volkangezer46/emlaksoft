@@ -14,6 +14,7 @@ export type HubCardId =
   | "reklam"
   | "medya"
   | "rehber"
+  | "yardim"
   | "baglantilar"
   | "bakim-kayit"
   | "duyuru"
@@ -44,6 +45,7 @@ export const HUB_CARDS: readonly HubCard[] = [
   { id: "reklam", title: "Reklam ve huni", description: "Ziyaretten kayda huni, kayıt kaynakları ve ziyaret sayacı ayarları.", href: "/admin/site/reklam", module: "seo", audit: ["measure."] },
   { id: "medya", title: "Medya", description: "Site görselleri: yükleme, alternatif metin, kullanım yerleri ve görsel bütçesi.", href: "/admin/site/medya", module: "sitecontent", audit: ["site_media."] },
   { id: "rehber", title: "Rehber", description: "Rehber (blog) yazıları: taslak, yayın, sürümler; /rehber ve site haritası.", href: "/admin/site/rehber", module: "sitecontent", audit: ["site_guide."] },
+  { id: "yardim", title: "Yardım merkezi", description: "Ofislerin Yardım ekranındaki rehber, SSS ve sözlük: taslak, yayın, 'işe yaradı mı' oyları.", href: "/admin/site/yardim", module: "sitecontent", audit: ["help_article."] },
   { id: "baglantilar", title: "Google bağlantıları", description: "Search Console ve Google Ads bağlantıları; kopan bağlantı Kokpit kuyruğuna düşer.", href: "/admin/site/baglantilar", module: "reklam", audit: ["google."] },
   { id: "bakim-kayit", title: "Bakım modu ve kayıt", description: "Siteyi bakıma al, yeni ofis kaydını aç/kapat.", href: "/admin/sistem#ayarlar", module: "sistem", audit: ["platform_settings."] },
   { id: "duyuru", title: "Duyurular", description: "Ofislere gönderilen platform duyuruları.", href: "/admin/duyuru", module: "broadcast", audit: [] },

@@ -137,11 +137,12 @@ docker exec -i supabase-db-moqbebljyeyprktd19zb1ihn psql -U postgres -d postgres
 ACL notu: dökümdeki "anon'dan geri alınmış" yetkiler hedefte pg_default_acl yüzünden geri gelebilir (`restore-list.py` başındaki
 açıklama) → geri yüklemeden sonra ACL farkı `check:acl` ile kontrol edilir.
 
-**Destek ve yasal kimlik env'leri (`.env.production`):** `NEXT_PUBLIC_SUPPORT_EMAIL` (varsayılan `destek@emlaksoft.com.tr`),
-isteğe bağlı `NEXT_PUBLIC_SUPPORT_PHONE` / `NEXT_PUBLIC_SUPPORT_WHATSAPP` (tanımsızsa hiçbir yerde görünmez; `NEXT_PUBLIC_*`
-derlemeye gömülür → değişince yeniden yayın), yasal sayfalar için `LEGAL_UNVAN`, `LEGAL_ADRES`, `LEGAL_MERSIS`, `LEGAL_VERGI`,
-`LEGAL_KEP` (boşsa sayfada "Şirket bilgileri tamamlanıyor" notu çıkar; bilgi uydurulmaz; sayfalar derlemede üretilebildiğinden
-değişince yeniden yayın).
+**Destek ve yasal kimlik (AD12):** ADMİNDEN girilir — /admin/ayarlar/yasal?sekme=sirket (ayar defteri `legal.entity_*`
+ünvan/adres/MERSİS/vergi dairesi/vergi no/KEP/telefon ve `support.email|phone|whatsapp`); mesafeli satış, ön bilgilendirme,
+fatura başlığı ve yasal sayfalar ≤30 sn'de yansır, deploy gerekmez. Env yalnız YEDEK: `LEGAL_UNVAN`, `LEGAL_ADRES`,
+`LEGAL_MERSIS`, `LEGAL_VERGI_DAIRESI`, `LEGAL_VERGI_NO` (eski birleşik `LEGAL_VERGI`), `LEGAL_KEP`, `LEGAL_TELEFON`,
+`SUPPORT_EMAIL`/`SUPPORT_PHONE`/`SUPPORT_WHATSAPP` (eski `NEXT_PUBLIC_SUPPORT_*` son yedek). Boş alan gösterilmez; bilgi uydurulmaz.
+Yasal sayfa metinleri sürümlü (/admin/ayarlar/yasal, `legal_documents`); yardım merkezi /admin/site/yardim (`help_articles`).
 
 ## Bekleyen ürün işleri (taşıma sonrası)
 - Durdurulan "ana beyin" iş akışı (hata avcıları + internet araştırması + karar + uygulama) taşımadan sonra yeniden çalıştırılacak.

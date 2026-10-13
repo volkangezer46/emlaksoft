@@ -6,13 +6,14 @@ import { OPS_ALERT_SETTING_DEFS } from "./ops-alerts";
 import { CRM_SETTING_DEFS } from "./crm";
 import { BROADCAST_SETTING_DEFS } from "./broadcast";
 import { DUNNING_SETTING_DEFS } from "./dunning";
+import { LEGAL_SETTING_DEFS } from "./legal";
 import { PLATFORM_SETTING_DEFS } from "./platform";
 import { SUBSCRIPTION_OPS_SETTING_DEFS } from "./subscription-ops";
 import { TENANT_SETTING_DEFS } from "./tenant";
 import { SECURITY_SETTING_DEFS } from "./security";
 import { SUPPORT_SETTING_DEFS } from "./support";
 /** Tum ayar tanimlari (TEK kaynak). Ofis tanimlari tenant.ts; faturalama ek bayraklari billing.ts; sube/kullanici sonraki pakette. */
-export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...EMAIL_SETTING_DEFS, ...TENANT_SETTING_DEFS, ...SUBSCRIPTION_OPS_SETTING_DEFS, ...OPS_ALERT_SETTING_DEFS, ...SECURITY_SETTING_DEFS, ...CRM_SETTING_DEFS, ...BROADCAST_SETTING_DEFS, ...SUPPORT_SETTING_DEFS, ...AD, ...DUNNING_SETTING_DEFS];
+export const ALL_SETTING_DEFS: readonly AnySettingDef[] = [...PLATFORM_SETTING_DEFS, ...BILLING_SETTING_DEFS, ...EMAIL_SETTING_DEFS, ...TENANT_SETTING_DEFS, ...SUBSCRIPTION_OPS_SETTING_DEFS, ...OPS_ALERT_SETTING_DEFS, ...SECURITY_SETTING_DEFS, ...CRM_SETTING_DEFS, ...BROADCAST_SETTING_DEFS, ...SUPPORT_SETTING_DEFS, ...AD, ...DUNNING_SETTING_DEFS, ...LEGAL_SETTING_DEFS];
 
 const BY_KEY = new Map<string, AnySettingDef>();
 const BY_STORAGE = new Map<string, AnySettingDef>();

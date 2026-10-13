@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { PrintButton } from "@/components/ui/print-button";
+import { legalEntityFields } from "@/lib/legal-entity";
 
 export const metadata = { title: "Fatura" };
 
@@ -30,7 +31,8 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   if (!tenantId || !/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const supabase = await createClient();
 
-  const [{ data: inv }, { data: tenant }] = await Promise.all([
+  // Fatura başlığındaki sağlayıcı kimliği ayar defterinden (src/lib/legal-entity.ts; boş alan gösterilmez, deploy gerekmez).
+  const [{ data: inv }, { data: tenant }, seller] = await Promise.all([
     supabase
       .from("invoices")
       .select("id, invoice_no, status, amount_try, tax_try, total_try, currency, period_start, period_end, due_at, paid_at, iyzico_payment_id, created_at, meta")
@@ -38,6 +40,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       .eq("tenant_id", tenantId)
       .maybeSingle(),
     supabase.from("tenants").select("name, tax_number, address_line, city").eq("id", tenantId).maybeSingle(),
+    legalEntityFields(),
   ]);
   if (!inv) notFound();
   // Hesap kredisi ile odeme: SQL (000500) fatura meta'sina walletCreditTry/walletCashTry yazar; yoksa satir gosterilmez.
@@ -63,6 +66,19 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
           </div>
           <span className="rounded-full bg-brand-600/10 px-3 py-1 text-xs font-bold text-brand-700">{STATUS[inv.status] ?? inv.status}</span>
         </header>
+
+        {seller.length ? (
+          <dl className="mt-4 text-sm" aria-label="Düzenleyen">
+            <dt className="text-xs text-text-muted">Düzenleyen</dt>
+            {seller.map((f) =>
+              f.key === "unvan" ? (
+                <dd key={f.key} className="font-semibold text-ink-950">{f.value}</dd>
+              ) : (
+                <dd key={f.key} className="text-text-muted">{f.label}: {f.value}</dd>
+              ),
+            )}
+          </dl>
+        ) : null}
 
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
           <div>

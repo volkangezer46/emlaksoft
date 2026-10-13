@@ -29,6 +29,7 @@ import {
   computePurchaseCosts,
   formatTry,
   type DeedFeeShare,
+  type PurchaseCostRates,
 } from "@/lib/purchase-costs";
 
 export type CalculatorProperty = {
@@ -149,9 +150,12 @@ function Slider({
 export function PurchaseCalculator({
   properties,
   initial,
+  rates,
 }: {
   properties: CalculatorProperty[];
   initial: CalculatorInitial;
+  /** O gün yürürlükteki oranlar (sunucuda `purchaseRatesFromLegal(getEffectiveLegalValues())`); yoksa kod değerleri. */
+  rates?: PurchaseCostRates;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -181,8 +185,9 @@ export function PurchaseCalculator({
         deedFeeShare,
         newBuild,
         propertyKind,
+        rates,
       }),
-    [price, downPayment, sqm, commissionPct, deedFeeShare, newBuild, propertyKind],
+    [price, downPayment, sqm, commissionPct, deedFeeShare, newBuild, propertyKind, rates],
   );
 
   const loan = useMemo(

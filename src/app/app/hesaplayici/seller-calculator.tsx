@@ -6,7 +6,7 @@ import { AlertTriangle, Banknote, Info } from "lucide-react";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
 import { LegalConstantsPanel } from "@/components/app/legal-constants-panel";
 import { computeSellerProceeds, type SellerDeedFeeShare } from "@/lib/seller-proceeds";
-import { describeBracketTable, describeLegalMany } from "@/lib/legal-constants";
+import { describeBracketTable, describeLegalMany, type LegalValues } from "@/lib/legal-constants";
 import { formatTry } from "@/lib/purchase-costs";
 
 export type SellerInitial = {
@@ -36,7 +36,7 @@ const TAHMINI = (
  * satıcı harcı ve komisyon → satıcının eline geçen. Sabitler `legal-constants` tek kaynağından; her sonuç
  * "Tahmini" etiketli ve kullanılan sabitler doğrulama rozetiyle listelenir.
  */
-export function SellerCalculator({ initial }: { initial: SellerInitial }) {
+export function SellerCalculator({ initial, legal }: { initial: SellerInitial; legal?: LegalValues | null }) {
   const [salePrice, setSalePrice] = useState(money(initial.salePrice));
   const [acquisition, setAcquisition] = useState(money(initial.acquisitionPrice));
   const [months, setMonths] = useState(initial.holdingMonths > 0 ? String(initial.holdingMonths) : "");
@@ -61,17 +61,18 @@ export function SellerCalculator({ initial }: { initial: SellerInitial }) {
         outstandingLoan: parseNumber(loan),
         exemptionAlreadyUsed: parseNumber(usedExemption),
         otherTaxableIncome: parseNumber(otherIncome),
+        legal,
       }),
-    [salePrice, acquisition, months, expenses, ufe, commission, deedShare, loan, usedExemption, otherIncome],
+    [salePrice, acquisition, months, expenses, ufe, commission, deedShare, loan, usedExemption, otherIncome, legal],
   );
 
   const legalItems = useMemo(
     () => [
-      ...describeLegalMany(result.usedConstants),
+      ...describeLegalMany(result.usedConstants, legal),
       ...(result.usedTables.includes("income_tax") ? [describeBracketTable("income_tax")] : []),
       ...(result.usedTables.includes("dkv") ? [describeBracketTable("dkv")] : []),
     ],
-    [result.usedConstants, result.usedTables],
+    [result.usedConstants, result.usedTables, legal],
   );
 
   const moneyInput = (value: string, set: (v: string) => void, id: string, placeholder?: string) => (

@@ -32,6 +32,7 @@ import { ToastProvider } from "@/components/app/toast-provider";
 import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
 import { PlatformBannerSlot, WhatsNewSlot } from "@/components/app/office-broadcast-slots";
 import { WhatsNew } from "@/components/app/whats-new";
+import { LegalReconsentGate } from "@/components/app/legal-reconsent-gate";
 import { isEmailVerified } from "@/lib/auth/email-verification";
 import { isDemoEmail } from "@/lib/demo-credentials";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
@@ -483,6 +484,12 @@ async function ShellBoot() {
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
       <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
+      {/* Yeniden onay kapısı (AD12): önbellekli liste boşsa ek DB turu yok; ayrı sınırda akar, kabuğu bekletmez. */}
+      {m.userId && !m.impersonating && !m.platformStaffFullAccess ? (
+        <Suspense fallback={null}>
+          <LegalReconsentGate userId={m.userId} />
+        </Suspense>
+      ) : null}
     </ClosedModulesProvider>
   );
 }

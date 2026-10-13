@@ -13,6 +13,10 @@
  *    `unverified` başlar. Sahip/mali müşavir kaynağı kontrol edip yalnız ilgili satırın
  *    `status` ve `verifiedAt` alanını günceller. Hukuki/mali danışmanlık DEĞİLDİR.
  *  - Sabit değişince yalnız bu dosya değişir; envanter: `docs/MEVZUAT_SABITLERI.md`.
+ *  - Tarihli değer GEÇMİŞİ (AD12): yönetimde /admin/ayarlar/yasal?sekme=sabitler, `legal_constants` tablosu; çözüm saf
+ *    `history.ts` (`resolveLegalValue`: o gün yürürlükteki kayıt > bu dosyadaki değer; geleceğe tarihli kayıt o güne kadar
+ *    uygulanmaz), sunucu okuyucu `store.ts` (`getEffectiveLegalValues`). Hesaplayıcı sayfaları (/app/hesaplayici) o günün değerini
+ *    okuyup istemciye prop geçer (`legalValue(key, values)`, `purchaseRatesFromLegal`); geri kalan tüketiciler kod değerini kullanır.
  *
  * Saf modül: I/O ve tarih yok (zaman kuralı: `src/lib/clock.ts`).
  */
@@ -185,8 +189,46 @@ export const DKV_BRACKETS: LegalBracketTable = {
   ],
 };
 
-export function legalValue(key: LegalKey): number {
-  return LEGAL_CONSTANTS[key].value;
+/**
+ * O gün yürürlükteki değerler (AD12 tarihli geçmiş; sunucuda `store.ts` `getEffectiveLegalValues` üretir, sayfalar
+ * hesaplayıcılara prop olarak geçirir). Eksik/geçersiz anahtar koddaki değere düşer.
+ */
+export type LegalValues = Partial<Record<LegalKey, number>>;
+
+/**
+ * Tarihli değeri ÜRÜNE YANSIYAN sabitler: /app/hesaplayici (alım maliyeti oranları `purchaseRatesFromLegal` + satıcı net
+ * hesabı `computeSellerProceeds`) o günün değerini sunucuda okur. Listede olmayanlar (kredi vade/LTV sınırı, yabancıya
+ * satış eşikleri, komisyon tavanı denetimi, betikler) koddaki değerle çalışır; yönetim ekranı bunu satırda belirtir.
+ * Kapsam testi: `history.test.ts`.
+ */
+export const DATED_LEGAL_KEYS: readonly LegalKey[] = [
+  "deedFeeTotalPct",
+  "landRegistryServiceFeeTry",
+  "saleCommissionCapPct",
+  "vatGeneralPct",
+  "rentCommissionCapMonths",
+  "daskPerSqmTry",
+  "daskMinTry",
+  "daskMaxTry",
+  "daskFallbackTry",
+  "homeInsurancePerSqmTry",
+  "homeInsuranceMinTry",
+  "homeInsuranceFallbackTry",
+  "appraisalFeeTry",
+  "loanAllocationFeePct",
+  "mortgageRegistrationFeeTry",
+  "newBuildVatResidentialSmallPct",
+  "newBuildVatLargePct",
+  "rentWithholdingPct",
+  "valueGainHoldingMonths",
+  "valueGainIndexThresholdPct",
+  "valueGainExemptionTry",
+  "dkvThresholdTry",
+];
+
+export function legalValue(key: LegalKey, values?: LegalValues | null): number {
+  const v = values?.[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : LEGAL_CONSTANTS[key].value;
 }
 
 /** Doğrulanmış sayılması için hem durum hem tarih gerekir. */
@@ -225,12 +267,17 @@ function valueText(v: number, unit: LegalUnit): string {
   }
 }
 
-export function describeLegal(key: LegalKey): LegalDisplay {
+/** Birimli gösterim (yönetimdeki tarihli değer geçmişi için; `history.ts`). */
+export function formatLegalValue(v: number, unit: LegalUnit): string {
+  return valueText(v, unit);
+}
+
+export function describeLegal(key: LegalKey, values?: LegalValues | null): LegalDisplay {
   const k = LEGAL_CONSTANTS[key] as LegalConstant;
   return {
     key,
     label: k.label,
-    valueText: valueText(k.value, k.unit),
+    valueText: valueText(legalValue(key, values), k.unit),
     source: k.source,
     sourceUrl: k.sourceUrl,
     verified: isLegalVerified(k),
@@ -239,8 +286,8 @@ export function describeLegal(key: LegalKey): LegalDisplay {
   };
 }
 
-export function describeLegalMany(keys: readonly LegalKey[]): LegalDisplay[] {
-  return keys.map(describeLegal);
+export function describeLegalMany(keys: readonly LegalKey[], values?: LegalValues | null): LegalDisplay[] {
+  return keys.map((k) => describeLegal(k, values));
 }
 
 export function describeBracketTable(key: "income_tax" | "dkv"): LegalDisplay {
