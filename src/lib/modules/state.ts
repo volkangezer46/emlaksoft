@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
 import { isFeatureEnabledIn, resolveModuleState, stateFromQuery, type ModuleRow, type TenantModuleState } from "@/lib/modules/logic";
 import { isFeatureKey, normalizeClosed, type FeatureKey } from "@/lib/modules/registry";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 
 /**
  * Modül durumunun TEK sunucu kapısı. İstek-içi (React `cache()`) tek sorgu: layout, sayfa kapısı ve
@@ -52,12 +53,28 @@ export async function getClosedFeatures(tenantId: string | null | undefined): Pr
  */
 export async function getDisabledModulesByTenant(client: SupabaseClient): Promise<Map<string, Set<FeatureKey>>> {
   const out = new Map<string, Set<FeatureKey>>();
-  const { data, error } = await client.from("tenant_modules").select("tenant_id, module_key, enabled");
+  // Yalnız kapalı satırlar, SAYFALI ve deterministik sıralı: PostgREST max_rows (1000) sessizce kesmesin
+  // (ofis sayısı büyüdükçe kapatılmış modüller "açık" sanılıp cron'lar onları da işliyordu).
+  const { rows, error, truncated } = await readAllPaged<{ tenant_id: string; module_key: string; enabled: boolean }>(
+    (from, to) =>
+      client
+        .from("tenant_modules")
+        .select("tenant_id, module_key, enabled")
+        .eq("enabled", false)
+        .order("tenant_id")
+        .order("module_key")
+        .range(from, to),
+  );
   if (error) {
-    if (stateFromQuery(null, error).status === "error") console.error("tenant_modules (cron) okunamadı", error);
+    if (stateFromQuery(null, { message: error }).status === "error") console.error("tenant_modules (cron) okunamadı", error);
     return out;
   }
-  for (const row of (data ?? []) as { tenant_id: string; module_key: string; enabled: boolean }[]) {
+  if (truncated) {
+    // Kısmi liste ile "bazılarını atla" tutarsız olurdu: güvenli varsayılan (atlama yok) korunur.
+    console.error("tenant_modules (cron) okunamadı: satır sınırına ulaşıldı", rows.length);
+    return out;
+  }
+  for (const row of rows) {
     if (row.enabled !== false || !isFeatureKey(row.module_key)) continue;
     const set = out.get(row.tenant_id) ?? new Set<FeatureKey>();
     set.add(row.module_key);
