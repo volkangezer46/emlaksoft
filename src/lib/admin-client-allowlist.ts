@@ -206,6 +206,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/admin/billing/kuponlar/page.tsx", fn: "CouponsPage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/admin/billing/page.tsx", fn: "AdminBillingPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/billing/planlar/page.tsx", fn: "PlansAdminPage", calls: 1, tenantFilter: "devir" },
+  { file: "src/app/admin/billing/tahsilat/page.tsx", fn: "DunningPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/duyuru/page.tsx", fn: "BroadcastPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/geo/[provinceId]/page.tsx", fn: "AdminGeoProvincePage", calls: 1, tenantFilter: "yok" },
   { file: "src/app/admin/geo/bildirimler/page.tsx", fn: "AdminGeoRequestsPage", calls: 1, tenantFilter: "uygulanamaz" },
