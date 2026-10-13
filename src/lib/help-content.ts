@@ -8,6 +8,8 @@
  * kod değişirse buradaki metin de güncellenmelidir. Uydurma metrik yok.
  */
 
+import { EIDS_GUIDE } from "@/lib/help-center/eids";
+
 export type GlossaryEntry = {
   /** Bağlantı çapası (#kayip-kacak) ve HelpTip anahtarı. */
   slug: string;
@@ -549,6 +551,8 @@ export const GUIDES: readonly Guide[] = [
     href: "/app/abonelik?sekme=analiz",
     cta: "Abonelik sayfası",
   },
+  // Bakanlık (EİDS) yetki e-postaları rehberi: içerik src/lib/help-center/eids.ts (ceza tutarı legal-constants'tan).
+  EIDS_GUIDE,
 ] as const;
 
 /** Portföyün yayına alınması için zorunlu 8 ilan sahibi bilgisi (src/lib/property-owner/info.ts ile aynı). */
@@ -563,16 +567,28 @@ export const OWNER_REQUIRED_SUMMARY: readonly string[] = [
   "KVKK / iletişim onayı",
 ];
 
-/** Rehber/SSS arama süzgeci (istemci tarafı; ?q=). Büyük/küçük harf duyarsız, Türkçe uyumlu. */
+/**
+ * Arama katlaması: Türkçe küçük harf, noktasız ı ve şapka/çengel işaretleri atılır ("EIDS", "eids", "EİDS" aynı;
+ * "mersis" "MERSİS"i bulur). Yalnız eşleşmeyi genişletir; gösterilen metin değişmez.
+ */
+function foldForSearch(s: string): string {
+  return s
+    .toLocaleLowerCase("tr-TR")
+    .replace(/ı/g, "i")
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
+/** Rehber/SSS arama süzgeci (istemci tarafı; ?q=). Büyük/küçük harf ve Türkçe karakter duyarsız. */
 export function matchesQuery(parts: readonly string[], q: string): boolean {
-  const needle = q.trim().toLocaleLowerCase("tr-TR");
+  const needle = foldForSearch(q.trim());
   if (!needle) return true;
-  return parts.join(" ").toLocaleLowerCase("tr-TR").includes(needle);
+  return foldForSearch(parts.join(" ")).includes(needle);
 }
 
 /** Başlangıç sekmesi: onboarding adımlarının yanındaki kısa notlar (adımlar canlı veriden gelir). */
 export const FIRST_30_INTRO =
-  "Ofisinizi çalışır hale getirmek için aşağıdaki sekiz adım yeterlidir. Hepsi birlikte yaklaşık yarım saat sürer. İstediğiniz adımı sonraya bırakabilirsiniz.";
+  "Ofisinizi çalışır hale getirmek için aşağıdaki adımlar yeterlidir. Hepsi birlikte yaklaşık yarım saat sürer. İstediğiniz adımı sonraya bırakabilirsiniz.";
 
 export type HelpTab = "baslangic" | "rehberler" | "sss" | "sozluk" | "destek";
 

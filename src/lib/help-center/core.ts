@@ -175,5 +175,18 @@ export function slugify(title: string): string {
     .replace(/-+$/, "");
 }
 
+/** Rehbere derin bağlantı (Rehberler sekmesi + çapa). Uygulama içi "kılavuzu aç" bağlantıları bunu kullanır. */
+export function helpGuideHref(slug: string): string {
+  return `/app/yardim?sekme=rehberler#${slug}`;
+}
+
+/** SSS maddesine derin bağlantı (SSS sekmesi + çapa). */
+export function helpFaqHref(id: string): string {
+  return `/app/yardim?sekme=sss#${id}`;
+}
+
+/** Kod içi EİDS içeriği (rehber + SSS); slug'lar CMS'te aynı anahtarla düzenlenir. */
+export { EIDS_FAQ, EIDS_GUIDE, EIDS_HELP_SLUG } from "./eids";
+
 export type VoteTally = { helpful: number; notHelpful: number };
 export const voteKey = (kind: HelpKind, slug: string) => `${kind}:${slug}`;

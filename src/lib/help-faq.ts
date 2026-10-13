@@ -9,6 +9,8 @@
  * ve kişisel veri src/lib/ai/redact.ts ile maskelenir. Bu dosyada hiçbir ağ/AI çağrısı yoktur.
  */
 
+import { EIDS_FAQ } from "@/lib/help-center/eids";
+
 export type FaqCategory = "baslangic" | "kayitlar" | "ekip" | "komisyon" | "paket" | "iletisim" | "ai";
 
 export type FaqItem = {
@@ -402,7 +404,12 @@ export const FAQ: readonly FaqItem[] = [
     href: "/app/destek/yeni",
     hrefLabel: "Yeni destek talebi",
   },
+  // Bakanlık (EİDS) yetki e-postaları: içerik src/lib/help-center/eids.ts.
+  ...EIDS_FAQ,
 ];
 
-/** Metinde sabit fiyat/TL rakamı olmamasını sözleşme testi bu desenle denetler. */
+/**
+ * Metinde sabit fiyat/TL rakamı olmamasını sözleşme testi bu desenle denetler. İstisna: mevzuat tutarı (EİDS ceza aralığı)
+ * metne `legal-constants` üzerinden girer, ürün fiyatı değildir; test onu `eidsPenaltyRangeText()` ile ayıklar.
+ */
 export const FAQ_PRICE_PATTERN = /\d[\d.,]*\s?(TL|₺|lira)/i;

@@ -29,6 +29,32 @@ export function normalizeLicenseNo(raw: unknown): Norm {
   return { ok: true, value: s };
 }
 
+/** TTBS'de yetki belgesini numarayla sorgulama ekranı (herkese açık). */
+export const TTBS_BELGE_SORGULA_URL = "https://ttbs.gtb.gov.tr/Home/BelgeSorgula";
+
+export type LicenseNoHint = { tone: "ok" | "warning" | "danger"; message: string };
+
+/**
+ * Yetki belgesi no için CANLI biçim ipucu (form; kaydı ENGELLEMEZ, katı kural `normalizeLicenseNo`'dadır).
+ * Boşsa "zorunlu hale gelecek" yönlendirmesi; yalnız rakamsa uygun; harf/işaret varsa belgeyle karşılaştırma uyarısı.
+ * TTBS numaralarının yalnız rakamdan oluştuğu gözleme dayanır, resmî biçim DOĞRULANMADI (uyarı bu yüzden yumuşaktır).
+ */
+export function licenseNoFormatHint(raw: unknown): LicenseNoHint {
+  const n = normalizeLicenseNo(raw);
+  if (!n.ok) return { tone: "danger", message: `${n.error} Belgenizdeki numarayı aynen yazın.` };
+  if (!n.value) {
+    return {
+      tone: "warning",
+      message: "Yetki belgesi no girilmedi. Malikler e-Devlet'te ofisinize bu numarayla yetki verir; ilan ve vitrinde de görünmesi gerekir. Numarayı TTBS BelgeSorgula ekranından bulup girin.",
+    };
+  }
+  if (/^\d{5,12}$/.test(n.value)) return { tone: "ok", message: "Biçim uygun görünüyor. Numaranın doğruluğunu TTBS BelgeSorgula ekranından kontrol edebilirsiniz." };
+  return {
+    tone: "warning",
+    message: "TTBS yetki belge numaraları genellikle yalnız rakamdan oluşur (ör. 3401234). Harf ya da işaret içeren bir numara girdiniz; belgenizle karşılaştırıp TTBS BelgeSorgula ekranından kontrol edin. (Resmî biçim doğrulanmadı.)",
+  };
+}
+
 export function normalizeLicenseTitle(raw: unknown): Norm {
   const s = String(raw ?? "").replace(/\s+/g, " ").trim();
   if (!s) return { ok: true, value: null };

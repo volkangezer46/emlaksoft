@@ -136,6 +136,13 @@ export const LEGAL_CONSTANTS = {
   foreignPersonMaxHectares: c(30, "Yabancı gerçek kişi başına ülke genelinde azami taşınmaz alanı", "ha", "Tapu Kanunu m.35 (ikincil kaynak)"),
   foreignDistrictQuotaPct: c(10, "Yabancıya satılabilecek ilçe yüzölçümü sınırı (yaygın uygulama)", "pct", "Tapu Kanunu m.35 (ikincil kaynak)"),
 
+  // --- EİDS: yetkisiz ilan / süresi biten ilanı kaldırmama cezası (EidsLegalNote; görev, pano ve kılavuz aynı metni okur) ---
+  // Yılbaşında yeniden değerlenir: yalnız bu iki satır değişir (src/lib/eids/legal-text.ts metni buradan üretir).
+  eidsPenaltyMinTry: c(28_620, "EİDS yetkisiz ilan idari para cezası alt sınırı (2026)", "try", "Taşınmaz Ticareti Hakkında Yönetmelik md. 14/2-h ve 14/2-j; 2026 yeniden değerlenmiş tutar (ikincil kaynak)", {
+    note: "İhlal başına uygulanır; aykırılık tekrarlanırsa yetki belgesi iptal edilebilir. Tutarı Ticaret Bakanlığından teyit edin.",
+  }),
+  eidsPenaltyMaxTry: c(858_620, "EİDS yetkisiz ilan idari para cezası üst sınırı (2026)", "try", "Taşınmaz Ticareti Hakkında Yönetmelik md. 14/2-h ve 14/2-j; 2026 yeniden değerlenmiş tutar (ikincil kaynak)"),
+
   // --- Değerli konut vergisi (yalnız bilgi uyarısı) ---
   dkvThresholdTry: c(17_711_000, "Değerli konut vergisi başlangıç eşiği (2026)", "try", SEC_2026, {
     sourceUrl: "https://www.alomaliye.com/2025/12/31/emlak-vergisi-kanunu-genel-tebligi-seri-no-88-2026-degerli-konut-vergisi/",

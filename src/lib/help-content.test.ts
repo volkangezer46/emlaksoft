@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ALL_NAV_HREFS } from "@/lib/nav-config";
 import { FAQ, FAQ_CATEGORIES, FAQ_PRICE_PATTERN } from "./help-faq";
 import { GUIDES, HELP_TABS, OWNER_REQUIRED_SUMMARY, matchesQuery, resolveHelpTab } from "./help-content";
+import { eidsPenaltyRangeText } from "./eids/legal-text";
+
+/** Mevzuat tutarı (EİDS ceza aralığı, legal-constants'tan) ürün fiyatı değildir; fiyat denetiminden önce ayıklanır. */
+const withoutLegalAmounts = (t: string) => t.split(eidsPenaltyRangeText()).join("");
 
 const guideText = (slug: string) => {
   const g = GUIDES.find((x) => x.slug === slug);
@@ -71,7 +75,7 @@ describe("yardım rehberleri", () => {
   });
 
   it("fiyat ve tarife sabit yazılmaz; /fiyatlar ve Abonelik'e yönlendirilir", () => {
-    for (const g of GUIDES) expect(FAQ_PRICE_PATTERN.test([g.intro, ...g.steps].join(" ")), g.slug).toBe(false);
+    for (const g of GUIDES) expect(FAQ_PRICE_PATTERN.test(withoutLegalAmounts([g.intro, ...g.steps].join(" "))), g.slug).toBe(false);
     expect(guideText("paketler")).toContain("/fiyatlar");
     expect(guideText("degerleme")).toContain("işlem öncesi ekranda gösterilir");
   });
@@ -117,7 +121,7 @@ describe("sekmeler ve SSS", () => {
   });
 
   it("SSS'de sabit fiyat/TL rakamı yok; fiyat sorusu /fiyatlar ve Abonelik'e yönlendirir", () => {
-    for (const f of FAQ) expect(FAQ_PRICE_PATTERN.test(f.a), f.id).toBe(false);
+    for (const f of FAQ) expect(FAQ_PRICE_PATTERN.test(withoutLegalAmounts(f.a)), f.id).toBe(false);
     const fiyat = FAQ.find((f) => f.id === "fiyat");
     expect(fiyat?.a).toContain("/fiyatlar");
     expect(fiyat?.a).toContain("Abonelik");
