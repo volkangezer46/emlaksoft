@@ -21,7 +21,9 @@ export function VitrinFilterPanel({ activeCount, children }: { activeCount: numb
       >
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" /> Filtrele
         {activeCount > 0 ? (
-          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-mint-500 px-1.5 text-xs font-extrabold text-ink-950">
+          // Koyu hero (.theme-dark) içinde --ink-950 beyaza döner: mint üstünde beyaz rakam ~2.4:1 kalıyordu.
+          // Değişmez lacivert (--navy-900) ile ~7:1.
+          <span className="grid h-5 min-w-5 place-items-center rounded-full bg-mint-500 px-1.5 text-xs font-extrabold text-[color:var(--navy-900)]">
             {activeCount}
           </span>
         ) : null}
