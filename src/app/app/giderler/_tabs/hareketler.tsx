@@ -18,7 +18,7 @@ import type { FinanceTabProps } from "@/lib/finance/ledger/types";
 import { CASH_CATEGORIES, cashCategoryLabel, isCashCategory, OWNER_PAYOUT_CATEGORY, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { ENTRY_PAGE_SIZE, isMissingCashSchema, loadAccountsWithBalances, loadCashEntries, loadCashSummary, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney, sumByCurrency } from "@/lib/finance/cash/money";
-import { EntryRowActions } from "../entry-actions";
+import { EntryRowActions, type UndoInfo } from "../entry-actions";
 import { ExpensesTable } from "../expenses-table";
 import { LedgerBulkBar, type BulkRowMeta } from "../hareketler/bulk-bar";
 import { InlineCategory, InlineNote, InlineParty, LockedReason, type CategoryOption } from "../hareketler/inline-edit";
@@ -160,8 +160,12 @@ const SOURCE_LABEL: Record<string, string> = {
   open_item: "Vadeli kalem",
 };
 
-/** Satır içi kategori değiştirilebilen kaynaklar (tahsilat/komisyon kaynaklı kayıtların kategorisi kaynağa aittir). */
-const CATEGORY_EDITABLE_SOURCES = new Set(["manual", "import", "recurring", "open_item"]);
+/**
+ * Satır içi kategori / not değiştirilebilen kaynaklar. finance_update_entry_v2 kategori, not, başlık, tutar ve tarihi
+ * "çekirdek" alan sayar ve elle girilmemiş (komisyon, kira, ekstre, düzenli, vadeli kalem) harekette 'locked' döner.
+ * Cari bağı çekirdek değildir: her harekette (transfer hariç) değişebilir.
+ */
+const CATEGORY_EDITABLE_SOURCES = new Set(["manual"]);
 
 function hrefOf(params: Record<string, string>, patch: Record<string, string>): string {
   return buildHref(FINANCE_BASE, mergeParams({ ...params, sekme: "hareketler" }, patch));
@@ -227,10 +231,15 @@ async function LedgerTab(props: FinanceTabProps) {
   const entryIds = rows.filter((r) => r.origin === "entry").map((r) => r.id);
   const partyIds = [...new Set(rows.map((r) => r.party_id).filter((v): v is string => Boolean(v)))];
   const [notesRes, partyNamesRes] = await Promise.all([
-    entryIds.length > 0 ? supabase.from("cash_entries").select("id, document_url").in("id", entryIds) : Promise.resolve({ data: [] as unknown[] }),
+    entryIds.length > 0 ? supabase.from("cash_entries").select("id, document_url, created_expense").in("id", entryIds) : Promise.resolve({ data: [] as unknown[] }),
     partyIds.length > 0 ? supabase.from("finance_parties").select("id, name").in("id", partyIds) : Promise.resolve({ data: [] as unknown[] }),
   ]);
-  const docById = new Map(((notesRes.data ?? []) as { id: string; document_url: string | null }[]).map((n) => [n.id, n.document_url]));
+  const entryMeta = new Map<string, EntryMeta>(
+    ((notesRes.data ?? []) as { id: string; document_url: string | null; created_expense: boolean | null }[]).map((n) => [
+      n.id,
+      { documentUrl: n.document_url, createdExpense: n.created_expense === true },
+    ]),
+  );
   const partyName = new Map(((partyNamesRes.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
 
   const accounts = cash.accounts;
@@ -262,14 +271,18 @@ async function LedgerTab(props: FinanceTabProps) {
   const expenses = sumOf("out");
   const money = (list: { currency: string; amount: number }[]) => (list.length === 0 ? formatAccountMoney(0, "TRY") : list.map((r) => formatAccountMoney(r.amount, r.currency)).join(" · "));
   const net = sumByCurrency([...incomes, ...expenses.map((e) => ({ currency: e.currency, amount: -e.amount }))]);
-  const rangeHint = f.from || f.to ? "seçili aralık" : "tüm zamanlar";
+  // Kartlar hesap özet RPC'sinden gelir: yalnız hesap, kategori ve tarih kapsamını uygular. Cari / arama / kaynak / mutabakat /
+  // belge süzgeci açıkken liste ile kart farklı kümeyi sayar; ipucu bunu açıkça söyler.
+  const cardsIgnoreFilters = Boolean(f.cari || f.q || f.kaynak || f.mutabikYok || f.belgeYok);
+  const scopeHint = f.from || f.to ? "seçili aralık" : "tüm zamanlar";
+  const rangeHint = cardsIgnoreFilters ? `${scopeHint}; cari, arama, kaynak, mutabakat ve belge süzgecinden bağımsız` : scopeHint;
   const legacyN = legacyCount.count ?? 0;
   const entryN = entryCount.count ?? 0;
 
   const kpis: KpiItem[] = [
     { label: "Gelir", value: money(incomes), icon: <ArrowDownCircle />, tone: "success", href: hrefOf(filterParams, { tur: "gelir", kaynak: "" }), hint: rangeHint },
     { label: "Gider", value: money(expenses), icon: <ArrowUpCircle />, tone: "warning", href: hrefOf(filterParams, { tur: "gider", kaynak: "hareket" }), hint: rangeHint },
-    { label: "Net", value: money(net), icon: <Scale />, tone: "info", href: hrefOf(filterParams, { tur: "", kaynak: "hareket" }), hint: "hesaplara işlenen, transfer hariç" },
+    { label: "Net", value: money(net), icon: <Scale />, tone: "info", href: hrefOf(filterParams, { tur: "", kaynak: "hareket" }), hint: cardsIgnoreFilters ? "hesaplara işlenen, transfer hariç; liste süzgecinden bağımsız" : "hesaplara işlenen, transfer hariç" },
     { label: "Hesapsız eski gider", value: legacyN, icon: <Inbox />, tone: legacyN > 0 ? "warning" : "neutral", href: hrefOf(filterParams, { kaynak: "eski", tur: "", mutabik: "" }), hint: "hesaba taşınmayı bekliyor" },
   ];
 
@@ -308,7 +321,7 @@ async function LedgerTab(props: FinanceTabProps) {
   const ctx: RowCtx = {
     accountById,
     partyName,
-    docById,
+    entryMeta,
     lockedMonths,
     categoriesIn,
     categoriesOut,
@@ -322,7 +335,17 @@ async function LedgerTab(props: FinanceTabProps) {
   };
   const meta: BulkRowMeta[] = rows.map((r) => {
     const p = rowPerms(r, ctx);
-    return { id: r.id, origin: r.origin, direction: r.direction, amount: r.amount, editable: p.party && !p.lock };
+    return {
+      id: r.id,
+      origin: r.origin,
+      direction: r.direction,
+      amount: r.amount,
+      currency: r.currency,
+      categoryEditable: p.category && !p.lock,
+      partyEditable: p.party && !p.lock,
+      reconcilable: p.reconcile,
+      reconciled: Boolean(r.reconciled_at),
+    };
   });
   const selectable = canEdit || canCreate;
   const w = pageWindow(f.page, total, LEDGER_PAGE_SIZE, rows.length);
@@ -464,10 +487,13 @@ async function LedgerTab(props: FinanceTabProps) {
   );
 }
 
+type EntryMeta = { documentUrl: string | null; createdExpense: boolean };
+
 type RowCtx = {
   accountById: Map<string, AccountWithBalance>;
   partyName: Map<string, string>;
-  docById: Map<string, string | null>;
+  /** Görünümde olmayan hareket alanları (belge bağlantısı, created_expense); sayfa satırları için tek sorgu. */
+  entryMeta: Map<string, EntryMeta>;
   lockedMonths: ReadonlySet<string>;
   categoriesIn: readonly CategoryOption[];
   categoriesOut: readonly CategoryOption[];
@@ -495,8 +521,12 @@ function rowPerms(r: LedgerRow, ctx: RowCtx) {
     isTransfer,
     lock,
     mayEdit,
-    category: mayEdit && !isTransfer && CATEGORY_EDITABLE_SOURCES.has(r.source_type ?? ""),
+    /** Kategori ve not (çekirdek alan): yalnız elle girilmiş gelir/gider; kilitli ayda pasif. */
+    category: mayEdit && manual && CATEGORY_EDITABLE_SOURCES.has(r.source_type ?? ""),
+    /** Cari bağı: çekirdek alan değil, kaynaklı harekette de değişebilir (kilitli ayda pasif). */
     party: mayEdit && !isTransfer,
+    /** Elle mutabakat: transfer dahil gelir/gider/transfer (düzeltme hariç), ofis hesaplarında expenses:edit. */
+    reconcile: isEntry && ctx.canEdit && (r.kind === "income" || r.kind === "expense" || r.kind === "transfer"),
     dialogEdit: mayEdit && manual,
     mayVoid: isEntry && (personal || ctx.canDelete),
     manual,
@@ -543,7 +573,7 @@ function RowActions({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<ty
   if (r.origin === "legacy_expense") {
     return ctx.canCreate ? (
       <div className="flex justify-end">
-        <AdoptLegacyButton ids={[r.id]} total={r.amount} accounts={ctx.adoptAccounts} />
+        <AdoptLegacyButton items={[{ id: r.id, amount: r.amount, currency: r.currency }]} accounts={ctx.adoptAccounts} />
       </div>
     ) : null;
   }
@@ -556,10 +586,23 @@ function RowActions({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<ty
       canVoid={p.mayVoid}
       canSalary={ctx.canSalary}
       isTransfer={p.isTransfer}
-      undo={p.manual && r.account_id ? { accountId: r.account_id, hadExpense: Boolean(r.expense_id) } : null}
+      undo={p.manual && r.account_id ? undoInfoFor(r, ctx.entryMeta.get(r.id)) : null}
       disabledReason={p.lock}
     />
   );
+}
+
+/**
+ * İptal sonrası "Geri al" bilgisi. finance_void_entry gideri yalnız `created_expense=true` ise siler:
+ * - created_expense=true: geri al gideri yeniden üretir (alsoExpense);
+ * - expense_id dolu, created_expense=false ("Hesaba taşı" ile benimsenmiş eski gider): gider yerinde kalır, iptalle yeniden
+ *   "Hesapsız" olur; geri al YENİ gider yazmaz, aynı gideri aynı hesaba yeniden taşır (adoptExpenseId);
+ * - created_expense bilinmiyorsa (sorgu düştü) güvenli taraf: geri al gösterilmez.
+ */
+function undoInfoFor(r: LedgerRow, meta: EntryMeta | undefined): UndoInfo | null {
+  if (!r.account_id || !meta) return null;
+  if (r.expense_id && !meta.createdExpense) return { accountId: r.account_id, hadExpense: false, adoptExpenseId: r.expense_id };
+  return { accountId: r.account_id, hadExpense: meta.createdExpense && Boolean(r.expense_id) };
 }
 
 function CategoryCell({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<typeof rowPerms> }) {
@@ -584,7 +627,7 @@ function CategoryCell({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<
 
 function PartyAndNote({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<typeof rowPerms> }) {
   const name = (r.party_id ? ctx.partyName.get(r.party_id) : null) ?? null;
-  const doc = ctx.docById.get(r.id) ?? null;
+  const doc = ctx.entryMeta.get(r.id)?.documentUrl ?? null;
   return (
     <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
       {p.party ? (
@@ -594,7 +637,7 @@ function PartyAndNote({ r, ctx, p }: { r: LedgerRow; ctx: RowCtx; p: ReturnType<
       ) : r.counterparty ? (
         <span>{r.counterparty}</span>
       ) : null}
-      {p.party ? <InlineNote entryId={r.id} value={r.note} disabledReason={p.lock} label={r.title} /> : r.note ? <span className="truncate">{r.note}</span> : null}
+      {p.category ? <InlineNote entryId={r.id} value={r.note} disabledReason={p.lock} label={r.title} /> : r.note ? <span className="truncate">{r.note}</span> : null}
       {doc ? (
         <a href={doc} target="_blank" rel="noreferrer noopener" className="font-semibold text-accent-text hover:underline">Belge</a>
       ) : null}
@@ -956,7 +999,12 @@ function entryPerms(e: CashEntry, account: AccountWithBalance | undefined, canEd
     isTransfer: e.kind === "transfer",
     mayEdit: manual && (personal || canEdit),
     mayVoid: personal || canDelete,
-    undo: manual && e.category && isCashCategory(e.category, e.direction) ? { accountId: e.account_id, hadExpense: Boolean(e.expense_id) } : null,
+    // Benimsenmiş eski giderin hareketi (expense_id dolu, created_expense=false): iptal gideri silmez; geri al yeni gider yazıp
+    // çift saydırmasın diye bu listede gösterilmez (yeniden taşıma Muhasebe > Hareketler'de).
+    undo:
+      manual && e.category && isCashCategory(e.category, e.direction) && (!e.expense_id || e.created_expense === true)
+        ? { accountId: e.account_id, hadExpense: e.created_expense === true }
+        : null,
   };
 }
 

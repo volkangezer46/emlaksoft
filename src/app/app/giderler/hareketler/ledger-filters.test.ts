@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ledgerFilterParams, ledgerQueryOps, lockReasonFor, parseLedgerFilters } from "./ledger-filters";
+import { adoptOutcomeText, adoptSelectionSummary, bulkOutcomeText, ledgerFilterParams, ledgerQueryOps, lockReasonFor, parseLedgerFilters } from "./ledger-filters";
 import { nextRowIndex } from "./keyboard-nav";
 import { dailyBalanceSeries, sparkPoints } from "../kasa-banka/account-sparkline";
 
@@ -17,8 +17,8 @@ describe("Hareketler filtre kontratı (URL -> sunucu sorgusu)", () => {
       expect.arrayContaining([
         { op: "is", col: "voided_at", val: null },
         { op: "eq", col: "account_id", val: ID },
-        { op: "eq", col: "direction", val: "out" },
-        { op: "neq", col: "kind", val: "transfer" },
+        { op: "eq", col: "kind", val: "expense" },
+        { op: "neq", col: "kind", val: "adjust" },
         { op: "eq", col: "category", val: "portal" },
         { op: "eq", col: "party_id", val: ID },
         { op: "eq", col: "origin", val: "legacy_expense" },
@@ -43,7 +43,32 @@ describe("Hareketler filtre kontratı (URL -> sunucu sorgusu)", () => {
     const f = parseLedgerFilters({ kaynak: "hareket", tur: "gelir" }, { canSalary: false });
     const ops = ledgerQueryOps(f, { omitKaynak: true });
     expect(ops.some((o) => o.op === "eq" && o.col === "origin")).toBe(false);
-    expect(ops).toContainEqual({ op: "eq", col: "direction", val: "in" });
+    expect(ops).toContainEqual({ op: "eq", col: "kind", val: "income" });
+  });
+
+  it("gelir/gider kind ile süzülür: transfer ve düzeltme (adjust) girmez; 'mutabık değil' düzeltmeyi dışlar", () => {
+    const gelir = ledgerQueryOps(parseLedgerFilters({ tur: "gelir" }, { canSalary: false }));
+    expect(gelir).toContainEqual({ op: "eq", col: "kind", val: "income" });
+    expect(gelir.some((o) => o.op === "eq" && o.col === "direction")).toBe(false);
+    const mutabik = ledgerQueryOps(parseLedgerFilters({ mutabik: "hayir" }, { canSalary: false }));
+    expect(mutabik).toEqual(expect.arrayContaining([{ op: "is", col: "reconciled_at", val: null }, { op: "eq", col: "origin", val: "entry" }, { op: "neq", col: "kind", val: "adjust" }]));
+  });
+});
+
+describe("toplu işlem ve taşıma bildirimleri", () => {
+  it("uygun olmayan ve reddedilen satırlar ayrı sayılır", () => {
+    expect(bulkOutcomeText(3, "yeniden kategorilendi", 0, 0)).toBe("3 hareket yeniden kategorilendi");
+    expect(bulkOutcomeText(2, "mutabık işaretlendi", 4, 1)).toBe("2 hareket mutabık işaretlendi; 4 satır bu işleme uygun değil, atlandı; 1 satır kaydedilemedi");
+  });
+
+  it("taşıma toplamı yalnız hesap para biriminden; TL olmayan ayrıca sayılır", () => {
+    expect(adoptSelectionSummary([{ amount: 100.1, currency: "TRY" }, { amount: 50, currency: "USD" }, { amount: 0.2, currency: "TRY" }], "TRY")).toEqual({ eligible: 2, foreign: 1, total: 100.3 });
+  });
+
+  it("taşıma sonucu RPC sayısını yazar; hiç taşınmadıysa uyarı", () => {
+    expect(adoptOutcomeText(3, 3, "Kasa")).toEqual({ tone: "ok", text: "3/3 gider Kasa hesabına taşındı" });
+    expect(adoptOutcomeText(2, 5, "Kasa").text).toMatch(/^2\/5 gider Kasa hesabına taşındı; 3 tanesi kilitli dönemde/);
+    expect(adoptOutcomeText(0, 4, "Kasa").tone).toBe("err");
   });
 });
 
@@ -76,6 +101,17 @@ describe("hesap kartı 30 gün çizgisi", () => {
     expect(s).toEqual([
       { date: "2026-10-11", balance: 850 },
       { date: "2026-10-12", balance: 800 },
+      { date: "2026-10-13", balance: 1000 },
+    ]);
+  });
+
+  it("ileri tarihli hareket bakiyeye dahil olsa da bugünkü noktadan düşülür", () => {
+    const s = dailyBalanceSeries(1500, [
+      { date: "2026-10-20", direction: "in", amount: 500 },
+      { date: "2026-10-13", direction: "out", amount: 100 },
+    ], "2026-10-13", 2);
+    expect(s).toEqual([
+      { date: "2026-10-12", balance: 1100 },
       { date: "2026-10-13", balance: 1000 },
     ]);
   });

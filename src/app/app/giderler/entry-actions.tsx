@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Undo2 } from "lucide-react";
 import { recordCashEntry, updateCashEntry, voidCashEntry } from "@/app/actions/finance-accounts";
+import { adoptLegacyExpenses } from "@/app/actions/finance-ledger";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
@@ -23,9 +24,11 @@ export type EditableEntry = {
 
 /**
  * İptal sonrası "Geri al" için gereken bilgi (yalnız elle girilen gelir/gider). İptal kaydı silmez; geri alma aynı bilgilerle
- * yeni bir hareket yazar. `hadExpense`: hareket ofis gideri üretmişti (iptal o gideri sildi), geri alınca yeniden üretilir.
+ * yeni bir hareket yazar. `hadExpense`: hareket ofis giderini KENDİSİ üretmişti (created_expense; iptal o gideri sildi), geri
+ * alınca yeniden üretilir. `adoptExpenseId`: hareket "Hesaba taşı" ile benimsenmiş eski gidere bağlıydı (gider iptalde
+ * silinmez, yeniden "Hesapsız" olur); geri al yeni gider YAZMAZ, aynı gideri aynı hesaba yeniden taşır (çift sayım olmaz).
  */
-export type UndoInfo = { accountId: string; hadExpense: boolean };
+export type UndoInfo = { accountId: string; hadExpense: boolean; adoptExpenseId?: string | null };
 
 /** Hareket satırı eylemleri: düzenle (yalnız elle girilen gelir/gider) ve iptal (neden zorunlu; silinmez). */
 export function EntryRowActions({
@@ -175,6 +178,14 @@ function VoidDialog({ entry, isTransfer, undo, onClose }: { entry: EditableEntry
   }
 
   async function restore(info: UndoInfo) {
+    if (info.adoptExpenseId) {
+      const adopted = await adoptLegacyExpenses(info.accountId, [info.adoptExpenseId]);
+      if (!adopted.ok) return push(adopted.error, "err");
+      if ((adopted.count ?? 0) === 0) return push("Gider yeniden hesaba taşınamadı; Hesapsız listesinden elle taşıyın.", "err");
+      push("Hareket geri alındı (gider yeniden hesaba taşındı)", "ok");
+      router.refresh();
+      return;
+    }
     const res = await recordCashEntry(entry.direction, {
       accountId: info.accountId,
       amount: String(entry.amount),

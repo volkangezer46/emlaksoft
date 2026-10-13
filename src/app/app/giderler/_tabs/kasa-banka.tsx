@@ -88,12 +88,17 @@ async function AccountsBoard({
   const [recent, recon, moves, rates] = await Promise.all([
     loadRecentEntriesByAccount(supabase, active.map((a) => a.id), 3),
     loadReconStatus(supabase),
-    finance ? loadMoves(supabase, active.map((a) => a.id), shiftIso(today, -30)) : Promise.resolve(new Map<string, DayMove[]>()),
+    finance ? loadMoves(supabase, active.map((a) => a.id), shiftIso(today, -30)) : Promise.resolve(new Map<string, DayMove[] | null>()),
     finance && active.some((a) => a.currency !== "TRY") ? fetchLatestRates(supabase) : Promise.resolve(null),
   ]);
   const reviewAccount = reviewAccountId && recon.available ? active.find((a) => a.id === reviewAccountId && (a.owner_scope === "user" || canOffice)) ?? null : null;
   const transferable = active.filter((a) => a.owner_scope === "user" || canOffice).map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
-  const series = (a: AccountWithBalance) => (finance ? dailyBalanceSeries(a.balance, moves.get(a.id) ?? [], today, 30) : null);
+  // Hareketi tavanı aşan hesapta (null) çizgi yanlış çıkmasın diye hiç çizilmez.
+  const series = (a: AccountWithBalance) => {
+    if (!finance) return null;
+    const m = moves.get(a.id);
+    return m === null ? null : dailyBalanceSeries(a.balance, m ?? [], today, 30);
+  };
   const statementAccounts = active.filter((a) => a.kind !== "cash" && (a.owner_scope === "user" || canOffice));
   const pendingTotal = recon.available ? [...recon.byAccount.values()].filter((r) => active.some((a) => a.id === r.account_id)).reduce((s, r) => s + r.pending_lines, 0) : 0;
   const officeTry = tryTotal(office, rates);
@@ -189,26 +194,39 @@ async function AccountsBoard({
   );
 }
 
-/** Son 30 günün hareketleri (çizgi için; tek sorgu). */
-async function loadMoves(supabase: SupabaseClient, accountIds: readonly string[], since: string): Promise<Map<string, DayMove[]>> {
-  const out = new Map<string, DayMove[]>();
+/**
+ * Son 30 günün (ve ileri tarihli) hareketleri, çizgi için. Hesap başına paralel sorgu ve hesap başına tavan: tek ortak
+ * sınır yoğun bir hesabın diğerlerini kesmesine yol açardı. Tavanı aşan hesap `null` döner (çizgi çizilmez, yanlış çizilmez).
+ * İleri tarihli hareketler de gelir: bakiye onları içerir, seri onları başlangıçtan düşer (dailyBalanceSeries).
+ */
+const MOVES_CAP = 2000;
+async function loadMoves(supabase: SupabaseClient, accountIds: readonly string[], since: string): Promise<Map<string, DayMove[] | null>> {
+  const out = new Map<string, DayMove[] | null>();
   if (accountIds.length === 0) return out;
-  const { data, error } = await supabase
-    .from("cash_entries")
-    .select("account_id, direction, amount, entry_date")
-    .in("account_id", accountIds as string[])
-    .is("voided_at", null)
-    .gte("entry_date", since)
-    .limit(1000);
-  if (error) {
-    if (!isMissingCashSchema(error)) console.error("loadMoves", { code: error.code });
-    return out;
-  }
-  for (const r of (data ?? []) as Record<string, unknown>[]) {
-    const id = String(r.account_id);
-    const list = out.get(id) ?? [];
-    list.push({ date: String(r.entry_date), direction: r.direction === "in" ? "in" : "out", amount: Number(r.amount ?? 0) });
-    out.set(id, list);
+  const results = await Promise.all(
+    accountIds.map(async (id) => {
+      const { data, error } = await supabase
+        .from("cash_entries")
+        .select("direction, amount, entry_date")
+        .eq("account_id", id)
+        .is("voided_at", null)
+        .gte("entry_date", since)
+        .limit(MOVES_CAP + 1);
+      return { id, data, error };
+    }),
+  );
+  for (const { id, data, error } of results) {
+    if (error) {
+      if (!isMissingCashSchema(error)) console.error("loadMoves", { code: error.code });
+      out.set(id, null);
+      continue;
+    }
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length > MOVES_CAP) {
+      out.set(id, null);
+      continue;
+    }
+    out.set(id, rows.map((r) => ({ date: String(r.entry_date), direction: r.direction === "in" ? "in" : "out", amount: Number(r.amount ?? 0) })));
   }
   return out;
 }
@@ -301,6 +319,7 @@ async function ReconcileQueueSection({
         suggestion: suggestions.get(l.id) ?? { kind: "none" },
         fallbackCategory: guessCategory(l.description, l.dir, canSalary).category,
         reviewHref: statementHref(account.id),
+        scope: account.owner_scope === "user" ? "personal" : "office",
       }));
     }),
   );
@@ -347,8 +366,10 @@ function AccountCard({
   const Icon = KIND_ICON[a.kind];
   const negative = a.balance < 0;
   const tl = a.currency !== "TRY" ? tryOf(a, rates) : null;
+  // 30 günlük değişim serinin kendi uçlarından: bakiye ileri tarihli hareketleri içerebilir, bugünkü nokta içermez.
   const first = series?.[0]?.balance ?? null;
-  const delta = series && first !== null ? Math.round((a.balance - first) * 100) / 100 : null;
+  const last = series?.[series.length - 1]?.balance ?? null;
+  const delta = first !== null && last !== null ? Math.round((last - first) * 100) / 100 : null;
   return (
     <article className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
       <header className="flex items-start justify-between gap-2">

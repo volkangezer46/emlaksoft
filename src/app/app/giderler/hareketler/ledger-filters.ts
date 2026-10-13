@@ -89,8 +89,10 @@ export type QueryOp =
 export function ledgerQueryOps(f: LedgerFilters, opts: { omitKaynak?: boolean } = {}): QueryOp[] {
   const ops: QueryOp[] = [{ op: "is", col: "voided_at", val: null }];
   if (f.accountId) ops.push({ op: "eq", col: "account_id", val: f.accountId });
-  if (f.tur === "gelir") ops.push({ op: "eq", col: "direction", val: "in" }, { op: "neq", col: "kind", val: "transfer" });
-  else if (f.tur === "gider") ops.push({ op: "eq", col: "direction", val: "out" }, { op: "neq", col: "kind", val: "transfer" });
+  // Gelir/gider = kind (eski davranış): transfer ve düzeltme (adjust) kayıtları gelir/gider listesine girmez.
+  // Hesapsız eski giderler görünümde kind='expense' taşır, "Gider" süzgecinde kalır.
+  if (f.tur === "gelir") ops.push({ op: "eq", col: "kind", val: "income" });
+  else if (f.tur === "gider") ops.push({ op: "eq", col: "kind", val: "expense" });
   else if (f.tur === "transfer") ops.push({ op: "eq", col: "kind", val: "transfer" });
   if (f.kategori) ops.push({ op: "eq", col: "category", val: f.kategori });
   if (f.cari) ops.push({ op: "eq", col: "party_id", val: f.cari });
@@ -98,7 +100,8 @@ export function ledgerQueryOps(f: LedgerFilters, opts: { omitKaynak?: boolean } 
     if (f.kaynak === "hareket") ops.push({ op: "eq", col: "origin", val: "entry" });
     else if (f.kaynak === "eski") ops.push({ op: "eq", col: "origin", val: "legacy_expense" });
   }
-  if (f.mutabikYok) ops.push({ op: "is", col: "reconciled_at", val: null }, { op: "eq", col: "origin", val: "entry" });
+  // Düzeltme (adjust) mutabakata girmez (ekstre eşleştirmesi ve elle mutabakat yalnız gelir/gider/transfer).
+  if (f.mutabikYok) ops.push({ op: "is", col: "reconciled_at", val: null }, { op: "eq", col: "origin", val: "entry" }, { op: "neq", col: "kind", val: "adjust" });
   if (f.belgeYok) ops.push({ op: "eq", col: "attachment_count", val: 0 });
   if (f.from) ops.push({ op: "gte", col: "entry_date", val: f.from });
   if (f.to) ops.push({ op: "lte", col: "entry_date", val: f.to });
@@ -121,4 +124,44 @@ export function lockReasonFor(entryDate: string, lockedMonths: ReadonlySet<strin
   if (!lockedMonths.has(key)) return null;
   const month = MONTHS[Number(key.slice(5, 7)) - 1] ?? key;
   return `${month} ${key.slice(0, 4)} dönemi kapatıldı; bu aydaki kayıtlar düzenlenemez. Kilidi Diğer > Ayarlar > Dönem kapanışı'ndan açabilirsiniz.`;
+}
+
+// ---------------------------------------------------------------------------
+// Toplu işlem ve taşıma bildirimleri
+// ---------------------------------------------------------------------------
+
+/** Toplu işlem bildirimi: uygun olmayan (işleme hiç gönderilmeyen) ve sunucunun reddettiği satırlar ayrı sayılır. */
+export function bulkOutcomeText(done: number, verb: string, notEligible: number, failed: number): string {
+  const parts = [`${done} hareket ${verb}`];
+  if (notEligible > 0) parts.push(`${notEligible} satır bu işleme uygun değil, atlandı`);
+  if (failed > 0) parts.push(`${failed} satır kaydedilemedi`);
+  return parts.join("; ");
+}
+
+/** "Hesaba taşı" seçimi: yalnız hesap para birimindeki giderler taşınır (eski giderlerin çoğu TL). */
+export function adoptSelectionSummary(items: readonly { amount: number; currency: string }[], accountCurrency = "TRY"): { eligible: number; foreign: number; total: number } {
+  let eligible = 0;
+  let total = 0;
+  for (const it of items) {
+    if ((it.currency || "TRY") !== accountCurrency) continue;
+    eligible += 1;
+    total += it.amount;
+  }
+  return { eligible, foreign: items.length - eligible, total: Math.round(total * 100) / 100 };
+}
+
+/** Taşıma sonucu: RPC kilitli aydaki, açılıştan önceki ve para birimi uymayan giderleri sessizce atlar; sayı yazılır. */
+export function adoptOutcomeText(moved: number, requested: number, accountName: string): { tone: "ok" | "err"; text: string } {
+  if (moved <= 0) {
+    return {
+      tone: "err",
+      text: "Hiçbir gider taşınamadı: seçilenler kapatılmış (kilitli) bir aya, hesabın açılış tarihinden önceye ya da ileri bir tarihe düşüyor veya hesabın para biriminde değil.",
+    };
+  }
+  const skipped = requested - moved;
+  const head = `${moved}/${requested} gider ${accountName} hesabına taşındı`;
+  return {
+    tone: "ok",
+    text: skipped > 0 ? `${head}; ${skipped} tanesi kilitli dönemde, hesap açılışından önce, ileri tarihli ya da farklı para biriminde olduğu için atlandı.` : head,
+  };
 }

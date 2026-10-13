@@ -54,6 +54,8 @@ export type CashEntry = {
   note: string | null;
   transfer_group_id: string | null;
   expense_id: string | null;
+  /** Hareket gideri kendisi üretti (iptal o gideri siler). false + expense_id: "Hesaba taşı" ile benimsenmiş eski gider. */
+  created_expense?: boolean;
   source_type: string;
   source_id: string | null;
   created_at: string;
@@ -62,7 +64,7 @@ export type CashEntry = {
 
 const ACCOUNT_COLUMNS = "id, owner_scope, owner_user_id, kind, name, iban_last4, currency, opening_balance, opening_date, archived_at";
 const ENTRY_COLUMNS =
-  "id, account_id, direction, amount, currency, entry_date, kind, category, title, counterparty, document_url, note, transfer_group_id, expense_id, source_type, source_id, created_at, voided_at";
+  "id, account_id, direction, amount, currency, entry_date, kind, category, title, counterparty, document_url, note, transfer_group_id, expense_id, created_expense, source_type, source_id, created_at, voided_at";
 
 export const ENTRY_PAGE_SIZE = 50;
 

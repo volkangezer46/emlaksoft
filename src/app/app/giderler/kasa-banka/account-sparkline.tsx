@@ -7,18 +7,28 @@ import { dayNumber, isoFromDayNumber } from "@/lib/finance/statement/match";
 
 export type DayMove = { date: string; direction: "in" | "out"; amount: number };
 
-/** Gün sonu bakiyeleri (eskiden yeniye, `days` nokta; son nokta bugünün bakiyesi). Saf; tarih nesnesi yok. */
+/**
+ * Gün sonu bakiyeleri (eskiden yeniye, `days` nokta; son nokta bugünün gün sonu bakiyesi). Saf; tarih nesnesi yok.
+ * `currentBalance` ileri tarihli hareketleri de içerir (hesap bakiyesi tüm hareketlerden hesaplanır): bunlar bugünkü
+ * noktadan önce düşülür, pencere öncesi hareketler yok sayılır.
+ */
 export function dailyBalanceSeries(currentBalance: number, moves: readonly DayMove[], today: string, days = 30): { date: string; balance: number }[] {
   const end = dayNumber(today);
   const start = end - days + 1;
   const netByDay = new Map<number, number>();
+  let future = 0;
   for (const m of moves) {
     const d = dayNumber(m.date);
-    if (d < start || d > end) continue;
-    netByDay.set(d, (netByDay.get(d) ?? 0) + (m.direction === "in" ? m.amount : -m.amount));
+    const signed = m.direction === "in" ? m.amount : -m.amount;
+    if (d > end) {
+      future += signed;
+      continue;
+    }
+    if (d < start) continue;
+    netByDay.set(d, (netByDay.get(d) ?? 0) + signed);
   }
   const out: { date: string; balance: number }[] = [];
-  let balance = currentBalance;
+  let balance = currentBalance - future;
   for (let d = end; d >= start; d -= 1) {
     out.push({ date: isoFromDayNumber(d), balance: Math.round(balance * 100) / 100 });
     balance -= netByDay.get(d) ?? 0;

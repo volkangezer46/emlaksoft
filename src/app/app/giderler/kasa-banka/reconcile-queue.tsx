@@ -34,6 +34,8 @@ export type QueueItem = {
   suggestion: Suggestion;
   fallbackCategory: string;
   reviewHref: string;
+  /** Kişisel hesabın satırından ofis geneli kural (finance_rules) türetilmez: kişisel ekstre yalnız sahibine görünür. */
+  scope: "office" | "personal";
 };
 
 const PILL: Record<Suggestion["kind"], "success" | "info" | "warning" | "neutral"> = { existing: "success", collection: "info", recurring: "info", rule: "info", category: "warning", none: "neutral" };
@@ -146,7 +148,7 @@ export function ReconcileQueue({ items, total, canSalary, canRule }: { items: re
                 >
                   {isMatch ? "Eşleştir" : "Onayla"}
                 </Button>
-                {canRule && !isMatch && ruleText ? (
+                {canRule && item.scope === "office" && !isMatch && ruleText ? (
                   <Button
                     variant="ghost"
                     size="sm"
