@@ -24,6 +24,23 @@ const autoPath = (t: FixTarget): string | null => {
   return p && canAutoOptimize(p) ? p : null;
 };
 
+/**
+ * "Bulunamadı" bulgusu mu? Yalnız adresin KENDİSİ 404/410 olan bulgular: kural önerisi redirect_404, ya da
+ * http-error + kanıtta 404/410 durumu. `broken-link` BİLEREK yok: onun adresi kırık bağlantıyı İÇEREN sayfadır,
+ * o adrese yönlendirme yazmak çalışan sayfayı yönlendirir.
+ */
+const isNotFoundTarget = (t: FixTarget): boolean => {
+  if (t.proposal?.rule === "redirect_404") return true;
+  const status = t.evidence?.status;
+  return (t.code === "http-error" || t.code === "not-found") && (status === 404 || status === 410);
+};
+
+/** Yönlendirme taslağı alabilecek yol: manualOnly değil, otomatik iyileştirme kapsamında, kök değil, 404 bulgusu. */
+const redirectPath = (t: FixTarget): string | null => {
+  const p = autoPath(t);
+  return p && p !== "/" && isNotFoundTarget(t) ? p : null;
+};
+
 const proposalAfter = (t: FixTarget): string | null => (typeof t.proposal?.after === "string" && t.proposal.after.trim() ? t.proposal.after.trim() : null);
 
 export const seoMetaDraftExecutor: FixExecutor = {
@@ -64,12 +81,11 @@ export const redirect404DraftExecutor: FixExecutor = {
   label: "Yönlendirme taslağı",
   risk: () => "guvenli",
   canHandle(t) {
-    const p = pathOfUrl(t.url);
-    return Boolean(p && p !== "/");
+    return Boolean(redirectPath(t));
   },
   async plan(t): Promise<FixPlan | null> {
-    const from = pathOfUrl(t.url);
-    if (!from || from === "/") return null;
+    const from = redirectPath(t);
+    if (!from) return null;
     const { readSeoSettingsFresh } = await import("./store");
     const s = await readSeoSettingsFresh();
     if (s.redirects.some((r) => normalizeRedirectPath(r.from) === normalizeRedirectPath(from))) return null;
