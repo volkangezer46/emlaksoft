@@ -16,6 +16,25 @@ export async function getPlatformSetting(key: string): Promise<string | null> {
   }
 }
 
+/**
+ * Sıkı tek ayar okuması: satır yoksa null döner, okuma hatasında FIRLATIR (getPlatformSetting'in aksine "okunamadı"
+ * "kayıt yok" sayılmaz; önbelleğe boş girmez, yazmalar boş listeyi ezmez). `version` iyimser kilit içindir
+ * (write_setting RPC'sinin p_expected_version'ı); version sütunu yoksa (migration 002300 öncesi) null.
+ */
+export async function readPlatformSettingStrict(key: string): Promise<{ value: string | null; version: number | null } | null> {
+  const admin = createAdminClient();
+  const res = await admin.from("platform_settings").select("value, version").eq("key", key).maybeSingle();
+  if (!res.error) {
+    if (!res.data) return null;
+    const row = res.data as { value: string | null; version: number | null };
+    return { value: row.value ?? null, version: typeof row.version === "number" ? row.version : null };
+  }
+  if (res.error.code !== "42703") throw new Error(res.error.message);
+  const legacy = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  if (legacy.error) throw new Error(legacy.error.message);
+  return legacy.data ? { value: (legacy.data.value as string | null) ?? null, version: null } : null;
+}
+
 /** Birden çok platform ayarını TEK sorguyla okur (yoksa değer null). */
 export async function getPlatformSettingsMany(
   keys: readonly string[],

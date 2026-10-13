@@ -13,7 +13,7 @@ import { buildRedirectMap, normalizeRedirectPath, withLegacyRedirects } from "@/
 import { hasErrors } from "@/lib/site-content/schema-core";
 import { PAGE_LIMITS, validateSitePage, type SitePageContent, type SitePageIndexEntry } from "@/lib/site-pages/schema";
 import { checkSlug, normalizeSlugInput } from "@/lib/site-pages/slug";
-import { SITE_PAGES_CACHE_TAG, readSitePageIndex, sitePageStore, writeSitePageIndex } from "@/lib/site-pages/store";
+import { SITE_PAGES_CACHE_TAG, readSitePageIndexState, sitePageStore, writeSitePageIndex, type SitePageIndexWrite } from "@/lib/site-pages/store";
 import { getTemplate } from "@/lib/site-pages/templates";
 
 /**
@@ -32,6 +32,8 @@ export type SitePageActionResult = {
   notice?: string;
 };
 
+const INDEX_UNREADABLE = "Sayfa listesi şu an okunamadı; mevcut sayfaları korumak için kayıt yapılmadı. Biraz sonra tekrar deneyin.";
+const INDEX_CONFLICT = "Sayfa listesi bu arada başka bir oturumda değişti; sayfayı yenileyip tekrar deneyin.";
 const READONLY = "Sayfaları yalnız süper admin değiştirebilir; bu hesap salt okunur.";
 const REDIRECT_NOTICE = "Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için /admin/seo'daki kuralı kapatın.";
 
@@ -58,6 +60,12 @@ function refreshLive(id: string, slug: string) {
   revalidatePath(`/${slug}`);
 }
 
+/** Liste yazma sonucunu kullanıcı mesajına çevirir (ok ise null). */
+function indexWriteError(r: SitePageIndexWrite, failMessage: string): string | null {
+  if (r === "ok") return null;
+  return r === "conflict" ? INDEX_CONFLICT : failMessage;
+}
+
 /** Diğer özel sayfaların yolları (iç bağlantı sayılır). */
 const otherPaths = (index: readonly SitePageIndexEntry[], id?: string) => index.filter((e) => e.id !== id).map((e) => `/${e.slug}`);
 
@@ -80,7 +88,9 @@ export async function createSitePage(templateId: string, slugInput: string): Pro
 
   const tpl = getTemplate(String(templateId));
   if (!tpl) return { error: "Şablon bulunamadı." };
-  const index = await readSitePageIndex();
+  const read = await readSitePageIndexState();
+  if (!read.ok) return { error: INDEX_UNREADABLE };
+  const index = read.list;
   if (index.length >= PAGE_LIMITS.maxPages) return { error: `En çok ${PAGE_LIMITS.maxPages} sayfa açılabilir.` };
   const slugCheck = checkSlug(normalizeSlugInput(slugInput || tpl.slug), index.map((e) => e.slug));
   if (!slugCheck.ok) return { error: slugCheck.message };
@@ -92,7 +102,8 @@ export async function createSitePage(templateId: string, slugInput: string): Pro
   const saved = await sitePageStore(id).saveDraft(page, staff.id);
   if (!saved.ok) return { error: saved.error };
   const entry: SitePageIndexEntry = { id, slug: slugCheck.slug, title: page.title, kind: tpl.kind, status: "taslak", updatedAt: nowIso(), updatedBy: who(staff) };
-  if (!(await writeSitePageIndex([...index, entry], staff.id))) return { error: "Sayfa listesi kaydedilemedi; tekrar deneyin." };
+  const indexErr = indexWriteError(await writeSitePageIndex([...index, entry], staff.id, read.version), "Sayfa listesi kaydedilemedi; tekrar deneyin.");
+  if (indexErr) return { error: indexErr };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.create", entityType: "site_page", entityId: id, meta: { slug: entry.slug, template: tpl.id } });
   refreshAdmin();
@@ -108,7 +119,9 @@ export async function saveSitePageDraft(id: string, input: unknown, slugInput?: 
   const rl = await checkRateLimit(`site-pages-draft:${staff.id}`, { limit: 90, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık kaydettiniz; birkaç dakika sonra tekrar deneyin." };
 
-  const index = await readSitePageIndex();
+  const read = await readSitePageIndexState();
+  if (!read.ok) return { error: INDEX_UNREADABLE };
+  const index = read.list;
   const entry = index.find((e) => e.id === id);
   if (!entry) return { error: "Sayfa bulunamadı." };
 
@@ -126,7 +139,8 @@ export async function saveSitePageDraft(id: string, input: unknown, slugInput?: 
   const saved = await sitePageStore(id).saveDraft(page, staff.id);
   if (!saved.ok) return { error: saved.error, issues };
   const next = index.map((e) => (e.id === id ? { ...e, slug, title: page.title, updatedAt: nowIso(), updatedBy: who(staff) } : e));
-  if (!(await writeSitePageIndex(next, staff.id))) return { error: "Sayfa listesi kaydedilemedi; tekrar deneyin.", issues };
+  const indexErr = indexWriteError(await writeSitePageIndex(next, staff.id, read.version), "Sayfa listesi kaydedilemedi; tekrar deneyin.");
+  if (indexErr) return { error: indexErr, issues };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.draft_save", entityType: "site_page", entityId: id, meta: { slug, blocks: page.blocks.length, warnings: issues.length } });
   refreshAdmin(id);
@@ -142,7 +156,9 @@ export async function publishSitePage(id: string, label: string): Promise<SitePa
   const rl = await checkRateLimit(`site-pages-publish:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık yayınladınız; birkaç dakika sonra tekrar deneyin." };
 
-  const index = await readSitePageIndex();
+  const read = await readSitePageIndexState();
+  if (!read.ok) return { error: INDEX_UNREADABLE };
+  const index = read.list;
   const entry = index.find((e) => e.id === id);
   if (!entry) return { error: "Sayfa bulunamadı." };
   // Yayın anında yol yeniden denetlenir (bu arada yeni bir rota/korumalı önek eklenmiş olabilir).
@@ -160,7 +176,8 @@ export async function publishSitePage(id: string, label: string): Promise<SitePa
   const res = await store.publish(page, meta, staff.id);
   if (!res.ok) return { error: res.error };
   const next = index.map((e) => (e.id === id ? { ...e, status: "yayinda" as const, title: page.title, updatedAt: meta.at, updatedBy: meta.by } : e));
-  if (!(await writeSitePageIndex(next, staff.id))) return { error: "İçerik yayına yazıldı ama sayfa listesi güncellenemedi; tekrar Yayınla'ya basın." };
+  const indexErr = indexWriteError(await writeSitePageIndex(next, staff.id, read.version), "İçerik yayına yazıldı ama sayfa listesi güncellenemedi; tekrar Yayınla'ya basın.");
+  if (indexErr) return { error: indexErr };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.publish", entityType: "site_page", entityId: id, meta: { slug: entry.slug, label: note } });
   refreshLive(id, entry.slug);
@@ -173,12 +190,15 @@ export async function unpublishSitePage(id: string): Promise<SitePageActionResul
   const staff = await requireWriter();
   if (!staff) return { error: READONLY };
   if (!isId(id)) return { error: "Sayfa bulunamadı." };
-  const index = await readSitePageIndex();
+  const read = await readSitePageIndexState();
+  if (!read.ok) return { error: INDEX_UNREADABLE };
+  const index = read.list;
   const entry = index.find((e) => e.id === id);
   if (!entry) return { error: "Sayfa bulunamadı." };
   if (entry.status === "arsiv") return { ok: true };
   const next = index.map((e) => (e.id === id ? { ...e, status: "arsiv" as const, updatedAt: nowIso(), updatedBy: who(staff) } : e));
-  if (!(await writeSitePageIndex(next, staff.id))) return { error: "Sayfa listesi kaydedilemedi; tekrar deneyin." };
+  const indexErr = indexWriteError(await writeSitePageIndex(next, staff.id, read.version), "Sayfa listesi kaydedilemedi; tekrar deneyin.");
+  if (indexErr) return { error: indexErr };
   await logPlatformActivity({ actorId: staff.id, action: "site_page.unpublish", entityType: "site_page", entityId: id, meta: { slug: entry.slug } });
   refreshLive(id, entry.slug);
   return { ok: true };
@@ -192,7 +212,9 @@ export async function rollbackSitePage(id: string, versionId: string): Promise<S
   const rl = await checkRateLimit(`site-pages-publish:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
 
-  const index = await readSitePageIndex();
+  const read = await readSitePageIndexState();
+  if (!read.ok) return { error: INDEX_UNREADABLE };
+  const index = read.list;
   const entry = index.find((e) => e.id === id);
   if (!entry) return { error: "Sayfa bulunamadı." };
   const c = checkSlug(entry.slug, index.filter((e) => e.id !== id).map((e) => e.slug));
@@ -208,7 +230,8 @@ export async function rollbackSitePage(id: string, versionId: string): Promise<S
   const res = await store.publish(page, meta, staff.id);
   if (!res.ok) return { error: res.error };
   const next = index.map((e) => (e.id === id ? { ...e, status: "yayinda" as const, title: page.title, updatedAt: meta.at, updatedBy: meta.by } : e));
-  if (!(await writeSitePageIndex(next, staff.id))) return { error: "Sürüm yayına yazıldı ama sayfa listesi güncellenemedi; tekrar deneyin." };
+  const indexErr = indexWriteError(await writeSitePageIndex(next, staff.id, read.version), "Sürüm yayına yazıldı ama sayfa listesi güncellenemedi; tekrar deneyin.");
+  if (indexErr) return { error: indexErr };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.rollback", entityType: "site_page", entityId: id, meta: { slug: entry.slug, version: version.id } });
   refreshLive(id, entry.slug);

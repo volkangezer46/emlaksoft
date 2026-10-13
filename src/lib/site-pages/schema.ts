@@ -118,8 +118,13 @@ export function parseSitePageContent(value: unknown): SitePageContent | null {
 }
 
 export function parseSitePageIndex(value: unknown): SitePageIndexEntry[] {
+  return parseSitePageIndexStrict(value) ?? [];
+}
+
+/** Sıkı sürüm: geçersiz liste null (yazmalar bozuk listeyi "boş" sanıp ezmesin). */
+export function parseSitePageIndexStrict(value: unknown): SitePageIndexEntry[] | null {
   const r = sitePageIndexSchema.safeParse(value);
-  return r.success ? (r.data as SitePageIndexEntry[]) : [];
+  return r.success ? (r.data as SitePageIndexEntry[]) : null;
 }
 
 /** İç bağlantı denetimi: menü doğrulayıcısı + diğer özel sayfaların yolları ("/hakkimizda"). */
