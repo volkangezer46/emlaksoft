@@ -2,7 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { now } from "@/lib/clock";
+import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -69,6 +71,7 @@ export async function publishPricingPage(label: string): Promise<PricingPageActi
   if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: staff.id, action: "pricing_page.publish", entityType: "pricing_page", entityId: entry.id, meta: { label: note } });
   refreshLive();
+  after(() => runAfterPublish({ surface: "pricingpage", kind: "publish", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff" }));
   return { ok: true, issues };
 }
 
@@ -87,6 +90,7 @@ export async function rollbackPricingPage(versionId: string): Promise<PricingPag
   if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: staff.id, action: "pricing_page.rollback", entityType: "pricing_page", entityId: version.id, meta: { label: version.label } });
   refreshLive();
+  after(() => runAfterPublish({ surface: "pricingpage", kind: "restore", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff" }));
   return { ok: true, config };
 }
 

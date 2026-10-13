@@ -42,6 +42,8 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/lib/insights/engine.ts": "içgörü motoru tur imleci (ayar değil, cron durum işaretçisi; tek anahtar, ofis kimliği)",
   "src/lib/publishing/store.ts":
     "yayın masası zamanlama kuyruğu (publishing.scheduled; ayar değil, iş kuyruğu kaydı — insights/engine imleci gibi; yazım publishing cron'u ve yetkili Yayın masası eylemleriyle, her işlem denetim izli)",
+  "src/lib/site-issues/autopilot-server.ts":
+    "Büyüme Kokpiti Otopilot anahtarı (growth.autopilot; SP1 kararı: registry/platform.ts AP8-P1 dosyası olduğu için doğrudan yazılır). Yalnız süper admin setAutopilot eylemiyle, denetim izli; okunarak doğrulanır",
   "src/app/actions/platform-security.ts":
     "güvenlik anahtarları (demo girişi, personel MFA + geçiş süresi, bakım kapsamı; kendi ekranı Personel > Güvenlik politikası). write_setting RPC ile settings_history'ye düşer; env tavanı ve kendini kilitleme koruması registry codec'iyle ifade edilemez",
 };

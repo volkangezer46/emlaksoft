@@ -2,7 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { now } from "@/lib/clock";
+import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -93,6 +95,7 @@ export async function publishSiteMenu(label: string): Promise<SiteMenuActionResu
     meta: { label: note, groups: config.groups.length },
   });
   refreshLive();
+  after(() => runAfterPublish({ surface: "sitemenu", kind: "publish", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff" }));
   return { ok: true, issues };
 }
 
@@ -139,6 +142,7 @@ export async function rollbackSiteMenu(versionId: string): Promise<SiteMenuActio
     meta: { label: version.label },
   });
   refreshLive();
+  after(() => runAfterPublish({ surface: "sitemenu", kind: "restore", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff" }));
   return { ok: true, config };
 }
 

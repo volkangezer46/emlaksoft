@@ -2,7 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { now } from "@/lib/clock";
+import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -79,6 +81,7 @@ export async function publishSiteContent(label: string): Promise<SiteContentActi
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.publish", entityType: "site_content", entityId: entry.id, meta: { label: note } });
   refreshLive();
+  after(() => runAfterPublish({ surface: "sitecontent", kind: "publish", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff" }));
   return { ok: true, issues };
 }
 
@@ -114,6 +117,7 @@ export async function rollbackSiteContent(versionId: string): Promise<SiteConten
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.rollback", entityType: "site_content", entityId: version.id, meta: { label: version.label } });
   refreshLive();
+  after(() => runAfterPublish({ surface: "sitecontent", kind: "restore", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff" }));
   return { ok: true, config };
 }
 

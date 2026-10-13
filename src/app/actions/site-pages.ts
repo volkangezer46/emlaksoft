@@ -2,7 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { now } from "@/lib/clock";
+import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -181,6 +183,7 @@ export async function publishSitePage(id: string, label: string): Promise<SitePa
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.publish", entityType: "site_page", entityId: id, meta: { slug: entry.slug, label: note } });
   refreshLive(id, entry.slug);
+  after(() => runAfterPublish({ surface: "sitepage", kind: "publish", publishRef: meta.id, livePaths: [`/${entry.slug}`], actorId: staff.id, source: "staff" }));
   const notice = (await redirectExistsFor(entry.slug)) ? REDIRECT_NOTICE : undefined;
   return { ok: true, issues, notice };
 }
@@ -235,5 +238,6 @@ export async function rollbackSitePage(id: string, versionId: string): Promise<S
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.rollback", entityType: "site_page", entityId: id, meta: { slug: entry.slug, version: version.id } });
   refreshLive(id, entry.slug);
+  after(() => runAfterPublish({ surface: "sitepage", kind: "restore", publishRef: meta.id, livePaths: [`/${entry.slug}`], actorId: staff.id, source: "staff" }));
   return { ok: true, page };
 }
