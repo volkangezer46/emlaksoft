@@ -21,6 +21,7 @@ export const TIMELINE_CATEGORIES: { key: string; label: string }[] = [
   { key: "degerleme", label: "Değerleme" },
   { key: "odeme", label: "Ödeme" },
   { key: "iade", label: "İade" },
+  { key: "tahsilat", label: "Tahsilat" },
   { key: "destek", label: "Destek" },
   { key: "abonelik", label: "Abonelik" },
   { key: "onay", label: "Onay" },
@@ -250,6 +251,49 @@ export type SubRow = {
   cancel_at_period_end: boolean | null;
 };
 export type ProfileRow = { id: string; created_at: string };
+/** Tahsilat (dunning) günlüğü satırı (`dunning_events`; alıcı bilgisi tutulmaz). */
+export type DunningEventRow = {
+  id: number | string;
+  invoice_id: string | null;
+  stage: string;
+  channel: string;
+  result: string;
+  detail: string | null;
+  sent_at: string;
+};
+
+const DUNNING_STAGE_LABEL: Record<string, string> = {
+  stage1: "1. tahsilat hatırlatması",
+  stage2: "2. tahsilat hatırlatması",
+  stage3: "3. tahsilat hatırlatması",
+  final_warning: "Askı öncesi son uyarı",
+  suspend: "Ödenmeyen fatura nedeniyle otomatik askı",
+  candidate: "Askıya alma adayı (personele bildirildi)",
+};
+const DUNNING_CHANNEL_LABEL: Record<string, string> = { in_app: "uygulama içi", email: "e-posta", sms: "SMS", staff: "personel", system: "sistem" };
+const DUNNING_RESULT_LABEL: Record<string, string> = {
+  pending: "gönderiliyor",
+  sent: "gönderildi",
+  channel_disabled: "kanal kapalı",
+  no_recipient: "alıcı yok",
+  failed: "başarısız",
+  suspended: "uygulandı",
+};
+
+/** Dunning satırı → zaman çizelgesi olayı (saf). */
+export function dunningTimelineEvent(e: DunningEventRow, base: string): TimelineEvent {
+  const bad = e.result === "failed" || e.result === "channel_disabled" || e.result === "no_recipient";
+  return {
+    id: `dun-${e.id}`,
+    at: e.sent_at,
+    category: "tahsilat",
+    title: DUNNING_STAGE_LABEL[e.stage] ?? `Tahsilat olayı (${e.stage})`,
+    detail: `${DUNNING_CHANNEL_LABEL[e.channel] ?? e.channel} · ${DUNNING_RESULT_LABEL[e.result] ?? e.result}${e.detail ? ` · ${e.detail}` : ""}`,
+    tone: e.stage === "suspend" || e.stage === "final_warning" ? "danger" : bad ? "warn" : undefined,
+    icon: "money",
+    href: e.invoice_id ? `/admin/billing/faturalar/${e.invoice_id}` : `${base}?sekme=abonelik`,
+  };
+}
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
   draft: "Taslak",
@@ -307,6 +351,8 @@ export type TimelineInput = {
   profiles: ProfileRow[];
   /** Ofise giden e-postalar (son 30 gün; maskeli alıcı). Tablo yoksa boş. */
   emails?: EmailSendRow[];
+  /** Tahsilat günlüğü (tablo yoksa boş). */
+  dunning?: DunningEventRow[];
 };
 
 /** Tüm kaynakları tek TimelineEvent akışına birleştirir (saf; testlenir). */
@@ -377,6 +423,7 @@ export function buildOfficeTimeline(i: TimelineInput): TimelineEvent[] {
         });
       }
     }
+    for (const d of i.dunning ?? []) ev.push(dunningTimelineEvent(d, base));
     for (const c of i.captures) {
       if (c.status === "refunded" || c.refunded_at) {
         ev.push({
@@ -565,7 +612,7 @@ export async function loadOfficeTimeline(
 ): Promise<TimelineInput> {
   const id = tenant.id;
   const empty = Promise.resolve({ data: [] as never[] });
-  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows, emails] = await Promise.all([
+  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows, emails, dunning] = await Promise.all([
     access.activity
       ? admin.from("audit_logs").select("id, action, actor_id, ip, created_at").eq("tenant_id", id).or(ACCOUNT_AUDIT_OR).order("created_at", { ascending: false }).limit(150)
       : empty,
@@ -590,6 +637,10 @@ export async function loadOfficeTimeline(
     admin.from("profiles").select("id, full_name, created_at").eq("tenant_id", id).order("created_at", { ascending: false }).limit(60),
     admin.from("platform_staff").select("id, full_name").limit(200),
     loadTenantEmailSends(admin, id, 30),
+    // Tahsilat günlüğü: tablo yoksa (migration bekliyor) hata → boş liste.
+    access.billing
+      ? admin.from("dunning_events").select("id, invoice_id, stage, channel, result, detail, sent_at").eq("tenant_id", id).order("sent_at", { ascending: false }).limit(60)
+      : empty,
   ]);
 
   const actorNames = new Map<string, string>();
@@ -614,6 +665,7 @@ export async function loadOfficeTimeline(
     erasures: (erasures.data ?? []) as ErasureRow[],
     profiles: ((profiles.data ?? []) as { id: string; created_at: string }[]).map((p) => ({ id: p.id, created_at: p.created_at })),
     emails,
+    dunning: (dunning.data ?? []) as DunningEventRow[],
   };
 }
 

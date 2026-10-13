@@ -69,3 +69,19 @@ describe("office-360", () => {
     expect(limitPercent(rows[1])).toBeNull();
   });
 });
+
+describe("Ofis 360 tahsilat (dunning) olayları", () => {
+  it("dunning günlüğü 'tahsilat' kategorisinde, faturaya bağlı; fatura yetkisi yoksa görünmez", () => {
+    const dunning = [
+      { id: 1, invoice_id: "inv1", stage: "stage1", channel: "email", result: "channel_disabled", detail: "kanal kapalı", sent_at: "2026-10-01T09:00:00Z" },
+      { id: 2, invoice_id: "inv1", stage: "suspend", channel: "system", result: "suspended", detail: null, sent_at: "2026-10-09T09:00:00Z" },
+    ];
+    const dun = buildOfficeTimeline(empty({ dunning })).filter((e) => e.category === "tahsilat");
+    expect(dun).toHaveLength(2);
+    expect(dun[0]).toMatchObject({ title: "1. tahsilat hatırlatması", href: "/admin/billing/faturalar/inv1", tone: "warn" });
+    expect(dun[0].detail).toContain("kanal kapalı");
+    expect(dun[1]).toMatchObject({ tone: "danger" });
+    const noBilling = buildOfficeTimeline(empty({ dunning, access: officeAccess("ops") }));
+    expect(noBilling.some((e) => e.category === "tahsilat")).toBe(false);
+  });
+});

@@ -23,6 +23,7 @@ import {
 } from "@/lib/billing/cards";
 import type { BillingCycle, PlanId } from "@/lib/billing/plans";
 import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
+import { CARD_UPDATE_HREF, loadDunningPolicy, type DunningPolicy } from "@/lib/billing/dunning-policy";
 import { randomBytes } from "node:crypto";
 
 /**
@@ -32,11 +33,12 @@ import { randomBytes } from "node:crypto";
  *  1) platform_settings `billing.auto_renew_enabled` = "true" (yönetici bayrağı; satır yoksa KAPALI)
  *  2) iyzico yapılandırılmış
  *  3) ofis açık rıza verdi (tenant_payment_profiles.auto_renew_enabled + rıza kimliği/zamanı/IP)
- *  4) abonelik `past_due` (dunning ile aynı kapsam) ve deneme sınırı (en çok 3, aralık 3 gün)
+ *  4) abonelik `past_due` (dunning ile aynı kapsam) ve deneme sınırı: sayı ve aralık ADMINDEN
+ *     (`dunning.auto_renew_max_attempts` / `dunning.auto_renew_retry_gap_days`; varsayılan 3 deneme / 3 gün)
  *
  * Dunning entegrasyonu: dunning cron'u bildirimleri her zamanki gibi gönderir; ardından bu geçiş çağrılır.
  * Başarısızlıkta mevcut bildirim akışı (dunning kademeleri) aynen sürer, ayrıca ofise "otomatik yenileme başarısız"
- * bildirimi düşer. Başarıda fulfill zinciri (imza + tutar + paymentId mutabakatı) Checkout Form ile AYNIDIR.
+ * bildirimi (kart güncelleme bağlantısıyla) düşer. Başarıda fulfill zinciri (imza + tutar + paymentId mutabakatı) Checkout Form ile AYNIDIR.
  *
  * iyzico NOTU: kullanıcısız (off-session) tahsilat için satıcı hesabında kart saklama + bu akışın etkinleştirilmesi/onayı
  * gerekebilir; onaysız hesapta sağlayıcı hata döner, fatura "başlatılamadı" kalır ve dunning devam eder.
@@ -52,16 +54,21 @@ export type AutoRenewSummary = {
 };
 
 const OFF: AutoRenewSummary = { enabled: false, attempted: 0, charged: 0, failed: 0, skipped: 0 };
-const BILLING_HREF = "/app/abonelik";
 const HISTORY_DAYS = 30;
+const DAY_MS = 86_400_000;
+
+type AttemptLimits = { maxAttempts: number; retryGapMs: number };
 
 export async function runAutoRenewPass(
   admin: SupabaseClient,
   nowMs: number,
+  policy?: Pick<DunningPolicy, "autoRenewMaxAttempts" | "autoRenewRetryGapDays">,
 ): Promise<AutoRenewSummary> {
   // KAPI 1+2: bayrak kapalıysa / iyzico yoksa hiçbir sorgu/ödeme yapılmaz.
   if (!parseAutoRenewFlag(await getPlatformSetting(AUTO_RENEW_FLAG_KEY))) return OFF;
   if (!isIyzicoConfigured()) return OFF;
+  const p = policy ?? (await loadDunningPolicy());
+  const limits: AttemptLimits = { maxAttempts: p.autoRenewMaxAttempts, retryGapMs: p.autoRenewRetryGapDays * DAY_MS };
 
   const summary: AutoRenewSummary = { enabled: true, attempted: 0, charged: 0, failed: 0, skipped: 0 };
   const { data: profiles, error } = await admin
@@ -78,10 +85,10 @@ export async function runAutoRenewPass(
   }
 
   const notices: NotificationRow[] = [];
-  for (const p of profiles ?? []) {
-    const tenantId = String(p.tenant_id);
+  for (const row of profiles ?? []) {
+    const tenantId = String(row.tenant_id);
     try {
-      const outcome = await renewOne(admin, tenantId, p, nowMs);
+      const outcome = await renewOne(admin, tenantId, row, nowMs, limits);
       if (outcome === "skipped") summary.skipped += 1;
       else {
         summary.attempted += 1;
@@ -91,8 +98,8 @@ export async function runAutoRenewPass(
           notices.push({
             tenant_id: tenantId,
             title: "Otomatik yenileme tahsilatı başarısız",
-            body: "Kayıtlı kartınızdan otomatik tahsilat yapılamadı. Lütfen kartınızı kontrol edin veya ödemeyi elle tamamlayın.",
-            href: BILLING_HREF,
+            body: "Kayıtlı kartınızdan otomatik tahsilat yapılamadı. Kartınızı güncellemek için Abonelik > Kayıtlı kartlar bölümünü açın veya ödemeyi elle tamamlayın.",
+            href: CARD_UPDATE_HREF,
             kind: "warning",
           });
         }
@@ -118,6 +125,7 @@ async function renewOne(
   tenantId: string,
   p: ProfileRow,
   nowMs: number,
+  limits: AttemptLimits,
 ): Promise<"skipped" | "charged" | "failed"> {
   if (!p.provider_card_user_key || !p.auto_renew_card_id || !p.auto_renew_consent_by || !p.auto_renew_consent_ip) {
     return "skipped";
@@ -138,12 +146,12 @@ async function renewOne(
     .filter("meta->>source", "eq", "auto_renew")
     .gte("created_at", sinceIso)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(Math.max(10, limits.maxAttempts));
   // Çözülmemiş önceki deneme (fatura hâlâ "initialized": tahsilat alınmış olabilir ama fulfill tamamlanmamış, ya da
   // koşu yarıda kesilmiş): YENİ tahsilat YAPILMAZ; mutabakat/yönetici çözer. Çift tahsilatın son kapısı.
   if ((prior ?? []).some((i) => i.status === "draft" && i.checkout_status === "initialized")) return "skipped";
   const last = prior?.[0]?.created_at ? new Date(prior[0].created_at as string).getTime() : null;
-  if (!autoRenewAttemptAllowed({ priorAttempts: prior?.length ?? 0, lastAttemptAtMs: last, nowMs })) {
+  if (!autoRenewAttemptAllowed({ priorAttempts: prior?.length ?? 0, lastAttemptAtMs: last, nowMs, ...limits })) {
     return "skipped";
   }
 

@@ -241,6 +241,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/admin/billing/kuponlar/page.tsx", fn: "CouponsPage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/admin/billing/page.tsx", fn: "AdminBillingPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/billing/planlar/page.tsx", fn: "PlansAdminPage", calls: 1, tenantFilter: "devir" },
+  { file: "src/app/admin/billing/tahsilat/page.tsx", fn: "DunningPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/duyuru/banner-panel.tsx", fn: "BannerPanel", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/duyuru/changelog-panel.tsx", fn: "ChangelogPanel", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/admin/duyuru/delivery-detail.tsx", fn: "DeliveryDetail", calls: 1, tenantFilter: "var" },

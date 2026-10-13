@@ -337,6 +337,8 @@ const F = {
   supportDeskV2: "20261013004800_support_desk_v2.sql",
   // AD2 (2026-10-13): fatura satirlari + numarali alacak dekontu (iade tetikleyicisi) + elle fatura taslak RPC'si.
   invoiceLinesCreditNotes: "20261013004100_invoice_lines_credit_notes.sql",
+  // AD3 (2026-10-13): tahsilat (dunning) olay gunlugu (yeni tablo; tenants/invoices FK, yalniz service_role).
+  dunningEvents: "20261013004200_dunning_events.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -565,6 +567,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.platformCrm]: "ek", // 7 yeni platform tablosu (RLS+FORCE, politika yok, yalniz service_role; FK tenants/platform_staff) + salt-okunur platform_tenant_health_inputs (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "CRM kurulumu bekliyor"
     [F.announcementCenter]: "ek", // platform_announcements'a varsayilanli sutunlar + audience listesi genisler; 5 yeni tablo (RLS; ofis yalniz kendi hedefli banner/yayinlanmis yenilik okur) + notifications uzerinde WHEN (meta ? 'pad') kosullu okundu tetikleyicisi + service_role RPC'ler; mevcut veri degismez, kod tablolar yokken eski anlik duyuruya duser
     [F.invoiceLinesCreditNotes]: "davranis", // 2 yeni tablo (invoice_lines geriye donuk tek satirla dolar; credit_notes) + invoices uzerinde YALNIZ meta.refund ilk yazildiginda dekont yazan AFTER UPDATE tetikleyicisi + service_role RPC platform_create_manual_invoice; odeme akislari degismez, kod tablolar yokken satiri faturadan turetir
+    [F.dunningEvents]: "ek", // yeni tablo dunning_events (RLS acik, politika yok, yalniz service_role; tenants/invoices FK cascade); mevcut nesnelere dokunmaz, kod tablo yokken yalniz uygulama ici kademe (bugunku davranis)
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -767,6 +770,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AD1-abonelik-operasyon", order: 71, title: "Abonelik operasyon konsolu: tenant_entitlement_overrides + tenant_entitlement_resolve, kapasite tetikleyicileri ve effective_seat_limit istisnayi sayar (20260825000600 govdesi md5 on-kosullu), subscriptions.commitment_end_at/cancel_reason_code/cancel_note, invoices.checkout_error (KOD YAYININDAN ONCE ya da SONRA; kod sutun/tablo yokken 'kurulum bekliyor'; davranis)", files: [F.subscriptionOps] },
     { id: "AD5-ofis-crm", order: 75, title: "Ofis CRM katmani: tenant_tags, tenant_tag_links, platform_tenant_crm, platform_tenant_notes, platform_tasks, tenant_health_daily, admin_saved_views + platform_tenant_health_inputs (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'CRM kurulumu bekliyor'; sira serbest, ek)", files: [F.platformCrm] },
     { id: "AD8-duyuru-merkezi", order: 78, title: "Duyuru, mesaj ve Yenilikler merkezi: kanal/segment/zamanlama sutunlari, teslim kuyrugu, banner, changelog + office_broadcast_state (bagimsiz; KOD YAYININDAN ONCE uygulanir, kod tablolar yokken eski anlik duyuru ve banner/yenilik yok; sira serbest, ek)", files: [F.announcementCenter] },
+    { id: "AD3-tahsilat-gunlugu", order: 73, title: "Tahsilat (dunning) olay gunlugu dunning_events (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken e-posta/SMS kademesi atlanir, rapor 'gunluk yok'; sira serbest, ek)", files: [F.dunningEvents] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
