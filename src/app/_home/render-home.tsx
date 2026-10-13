@@ -21,14 +21,42 @@ import { MotionRoot } from "@/components/marketing/motion-root";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
 import type { EfCatalog } from "@/lib/ef-credits/credit-reader";
 import { visibleSections, type LandingSectionId, type SiteContent } from "@/lib/site-content/schema";
+import { StoredHeroImage } from "@/lib/site-media/stored-image";
 
 export type RenderHomeInput = {
   content: SiteContent;
   pricing: PublicPricing;
   efCatalog: EfCatalog;
-  /** Taslak önizlemesi (/onizleme/ana-sayfa): üstte sabit "TASLAK" şeridi. Canlı ana sayfada hiç verilmez. */
+  /**
+   * Taslak önizlemesi (/onizleme/ana-sayfa): üstte sabit "TASLAK" şeridi ve YERİNDE DÜZENLEME işaretleri (`data-cms-path`).
+   * Canlı ana sayfada hiç verilmez: canlı ve statik HTML'de `data-cms-path` yoktur.
+   */
   preview?: boolean;
 };
+
+/**
+ * Önizlemede bölüm sarmalayıcısının yolu (editörde ilgili sekmeyi açar). Bölüm bileşenlerinin kendi metinleri bu turda
+ * ayrıca işaretlenmez; tıklama bölümün başlık alanına götürür. Tümü `isCmsPath` izin listesinde.
+ */
+const SECTION_CMS_PATH: Record<LandingSectionId, string> = {
+  deger: "valueCards",
+  guven: "trust",
+  tur: "sections.tur.title",
+  ozellikler: "sections.ozellikler.title",
+  degerleme: "valuation.title",
+  emlakfiyati: "efSection.title",
+  diger: "sections.diger.title",
+  neden: "sections.neden.title",
+  nasil: "sections.nasil.title",
+  guvenlik: "sections.guvenlik.title",
+  fiyat: "sections.fiyat.title",
+  sss: "faq",
+  son: "finalCta.title",
+  testimonials: "testimonials.heading.title",
+};
+
+/** Kutu üretmeyen sarmalayıcı (yerleşim değişmez); yalnız önizlemede. */
+const CONTENTS: React.CSSProperties = { display: "contents" };
 
 /** Önizleme şeridi: pazarlama CSS'ine yeni sınıf eklemeden (statik ana sayfa CSS'i değişmesin diye) satır içi stil. */
 const PREVIEW_BAR: React.CSSProperties = {
@@ -71,6 +99,12 @@ export function renderHome({ content, pricing, efCatalog, preview = false }: Ren
     testimonials: <Testimonials content={content.testimonials} />,
   };
   const shown = visibleSections(content);
+  const img = content.hero.image;
+  // Görsel yoksa HeroSection'a hiçbir ek prop gitmez: canlı çıktı birebir bugünkü gibi (render-home.test).
+  const heroExtra = {
+    ...(img ? { image: (scene: ReactNode) => <StoredHeroImage mediaId={img.mediaId} alt={img.alt} fallback={scene} cms={preview} /> } : {}),
+    ...(preview ? { cms: true } : {}),
+  };
   return (
     <div className="mk">
       {preview ? (
@@ -83,8 +117,16 @@ export function renderHome({ content, pricing, efCatalog, preview = false }: Ren
       <MotionRoot />
       <SiteHeader />
       <main id="main-content">
-        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} efLive={pricing.efLive} />
-        {shown.map((id) => <Fragment key={id}>{sections[id]}</Fragment>)}
+        <HeroSection trialDays={trialDays} plans={plans} content={content.hero} efLive={pricing.efLive} {...heroExtra} />
+        {shown.map((id) =>
+          preview ? (
+            <div key={id} data-cms-path={SECTION_CMS_PATH[id]} style={CONTENTS}>
+              {sections[id]}
+            </div>
+          ) : (
+            <Fragment key={id}>{sections[id]}</Fragment>
+          ),
+        )}
       </main>
       <SiteFooter smartCta trialDays={trialDays} />
     </div>
