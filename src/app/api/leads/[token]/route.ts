@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  *  yönetimden değiştirilen metinde kanıt sürümü metin izini taşır (POST içinde getLeadFormCopy). */
 export const PUBLIC_LEAD_CONSENT_VERSION = buildLeadConsentVersion(false);
 
-function allowedOrigins(req: NextRequest): string[] {
+function allowedOrigins(): string[] {
   return [
     ...parseOriginAllowlist(process.env.LEAD_CORS_ORIGINS),
     publicOrigin(),
@@ -40,7 +40,7 @@ function response(
   return NextResponse.json(body, {
     status,
     headers: {
-      ...leadCorsHeaders(req.headers.get("origin"), allowedOrigins(req)),
+      ...leadCorsHeaders(req.headers.get("origin"), allowedOrigins()),
       ...extraHeaders,
     },
   });
@@ -48,12 +48,12 @@ function response(
 
 export async function OPTIONS(req: NextRequest) {
   const origin = req.headers.get("origin");
-  if (!isAllowedCorsOrigin(origin, allowedOrigins(req))) {
+  if (!isAllowedCorsOrigin(origin, allowedOrigins())) {
     return response(req, { error: "origin_not_allowed" }, 403);
   }
   return new NextResponse(null, {
     status: 204,
-    headers: leadCorsHeaders(origin, allowedOrigins(req)),
+    headers: leadCorsHeaders(origin, allowedOrigins()),
   });
 }
 
@@ -102,7 +102,7 @@ export async function POST(
   }
 
   const origin = req.headers.get("origin");
-  if (!isAllowedCorsOrigin(origin, allowedOrigins(req))) {
+  if (!isAllowedCorsOrigin(origin, allowedOrigins())) {
     return response(req, { error: "origin_not_allowed" }, 403);
   }
   if (requestBodyTooLarge(req.headers, PUBLIC_REQUEST_MAX_BYTES)) {
