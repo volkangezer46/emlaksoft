@@ -1,4 +1,4 @@
-import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
+import { getDemoPolicyNow } from "@/lib/platform-security/demo-policy";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
 
 import type { Metadata } from "next";
@@ -15,12 +15,13 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string; hata?: string }>;
 }) {
-  const params = await searchParams;
+  // Demo kartları: env tavanı + yönetim anahtarı (Personel > Güvenlik politikası); eylem kararı sunucuda yineler.
+  const [params, demo] = await Promise.all([searchParams, getDemoPolicyNow()]);
   return (
     <LoginForm
       next={params.next ?? "/app"}
-      demoEnabled={isDemoLoginEnabled()}
-      platformDemoEnabled={isPlatformDemoPersonaAllowed()}
+      demoEnabled={demo.tenant}
+      platformDemoEnabled={demo.platform}
       googleEnabled={isGoogleAuthEnabled()}
       // Google dönüşünde callback'in verdiği bilinen kod → Türkçe mesaj (bilinmeyen kod gösterilmez).
       googleError={googleErrorMessage(params.hata)}

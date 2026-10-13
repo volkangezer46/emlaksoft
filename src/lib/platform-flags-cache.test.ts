@@ -24,7 +24,37 @@ describe("bakım/kayıt bayrakları önbelleği", () => {
         { key: "maintenance_message", value: " Yarım saat " },
         { key: "registration_open", value: "off" },
       ]),
-    ).toEqual({ maintenanceMode: true, maintenanceMessage: "Yarım saat", registrationOpen: false });
+    ).toEqual({
+      maintenanceMode: true,
+      maintenanceMessage: "Yarım saat",
+      registrationOpen: false,
+      maintenanceScope: { scope: "app", startsAt: null, endsAt: null },
+      demoLoginRaw: null,
+      mfaEnforcedRaw: null,
+      mfaGraceUntil: null,
+    });
+  });
+
+  it("güvenlik anahtarları ve bakım kapsamı aynı istekte çözülür", () => {
+    const f = parseFlagRows([
+      { key: "platform.maintenance_scope", value: '{"scope":"site","startsAt":null,"endsAt":null}' },
+      { key: "platform.demo_login", value: '{"mode":"tenant"}' },
+      { key: "platform.mfa_enforced", value: "on" },
+      { key: "platform.mfa_grace_until", value: "2026-10-20T00:00:00.000Z" },
+    ]);
+    expect(f.maintenanceScope.scope).toBe("site");
+    expect(f.demoLoginRaw).toBe('{"mode":"tenant"}');
+    expect(f.mfaEnforcedRaw).toBe("on");
+    expect(f.mfaGraceUntil).toBe("2026-10-20T00:00:00.000Z");
+  });
+
+  it("tek PostgREST isteği tüm anahtarları (noktalı olanlar tırnaklı) ister", async () => {
+    const f = ok([]);
+    await readPlatformFlagsCached({ ...base, fetchImpl: f, nowMs: 1 });
+    const url = String((f as unknown as { mock: { calls: unknown[][] } }).mock.calls[0][0]);
+    for (const k of ["maintenance_mode", '"platform.demo_login"', '"platform.mfa_enforced"', '"platform.mfa_grace_until"', '"platform.maintenance_scope"']) {
+      expect(url).toContain(k);
+    }
   });
 
   it("TTL içinde tek istek yapar", async () => {

@@ -20,7 +20,8 @@ const modulePageGate = read("src/lib/require-module-page.ts");
 const appLayout = read("src/app/app/layout.tsx");
 const authMiddleware = read("src/lib/supabase/middleware.ts");
 const platformMfaPage = read("src/app/giris/mfa/page.tsx");
-const platformMfaForm = read("src/app/giris/mfa/platform-mfa-form.tsx");
+// Kurulum/doğrulama mantığı ortak çekirdekte (platform-mfa-form + Hesabım > Güvenlik kullanır).
+const platformMfaForm = read("src/app/giris/mfa/totp-core.tsx");
 
 describe("identity and session hardening contract", () => {
   it("uses a dedicated, time/session/version-bound 2FA proof", () => {

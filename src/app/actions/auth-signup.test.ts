@@ -43,7 +43,7 @@ vi.mock("next/navigation", () => ({
     throw new RedirectSignal(to);
   },
 }));
-vi.mock("@/lib/platform-mfa", () => ({ isPlatformMfaRequired: () => false }));
+vi.mock("@/lib/platform-mfa", () => ({ isPlatformMfaRequired: () => false, isPlatformMfaRequiredNow: async () => false }));
 vi.mock("@/app/giris/_lib/login-events", () => ({ logLoginEvent: h.loginEvent }));
 vi.mock("@/app/imza/_lib/sms", () => ({ sendSignerSms: vi.fn() }));
 vi.mock("@/lib/impersonation", () => ({ restoreImpersonationMetadata: vi.fn() }));

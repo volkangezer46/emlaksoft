@@ -1,22 +1,53 @@
 import { PLATFORM_SETTING_KEYS, parseSettingBool } from "@/lib/platform-setting-keys";
 import { resolveSupabaseAdminKey } from "@/lib/supabase/admin";
+import { now } from "@/lib/clock";
+import {
+  DEFAULT_MAINTENANCE_SCOPE,
+  MAINTENANCE_SCOPE_SETTING_KEY,
+  parseMaintenanceScope,
+  type MaintenanceScopeSetting,
+} from "@/lib/platform-security/maintenance-scope";
+
+export { isMaintenanceExemptPath } from "@/lib/platform-security/maintenance-scope";
+
+/** Güvenlik anahtarları (AP1): demo girişi, personel MFA, MFA geçiş süresi. Ham metin; çözümleme platform-security/*. */
+export const SECURITY_SETTING_KEYS = {
+  demoLogin: "platform.demo_login",
+  mfaEnforced: "platform.mfa_enforced",
+  mfaGraceUntil: "platform.mfa_grace_until",
+} as const;
 
 /**
- * Bakım modu / kayıt kapısı için HAFİF, kısa TTL bellek önbellekli okuyucu (proxy/middleware).
- * - Tek PostgREST isteği (3 anahtar); createAdminClient kullanmaz.
+ * Bakım modu / kayıt kapısı / güvenlik anahtarları (demo girişi, personel MFA) için HAFİF, kısa TTL bellek önbellekli
+ * okuyucu (proxy/middleware ve sunucu bileşenleri).
+ * - Tek PostgREST isteği (7 anahtar); createAdminClient kullanmaz.
  * - Güvenli varsayılan: okuma hatasında SİTE AÇIK kalır (bakım kapalı, kayıt açık).
- * - Önbellek örnek (instance) başınadır; ayar değişikliği en geç TTL kadar sonra görünür.
+ *   Güvenlik anahtarlarında okuma hatası = "satır yok" (env davranışı); SQL kapıları MFA'yı ayrıca DB'den uygular.
+ * - Önbellek örnek (instance) başınadır; ayar değişikliği en geç TTL kadar sonra görünür (yazan eylem
+ *   `resetPlatformFlagsCache` ile kendi örneğini hemen tazeler).
  */
 export type EdgeFlags = {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   registrationOpen: boolean;
+  /** Bakım kapsamı + zaman penceresi (yoksa "app"). */
+  maintenanceScope: MaintenanceScopeSetting;
+  /** 'platform.demo_login' ham JSON (yoksa null → env davranışı). */
+  demoLoginRaw: string | null;
+  /** 'platform.mfa_enforced' ham değer (yoksa null). */
+  mfaEnforcedRaw: string | null;
+  /** 'platform.mfa_grace_until' ISO (yoksa null). */
+  mfaGraceUntil: string | null;
 };
 
 export const SAFE_FLAGS: EdgeFlags = {
   maintenanceMode: false,
   maintenanceMessage: "",
   registrationOpen: true,
+  maintenanceScope: DEFAULT_MAINTENANCE_SCOPE,
+  demoLoginRaw: null,
+  mfaEnforcedRaw: null,
+  mfaGraceUntil: null,
 };
 
 export const FLAGS_OK_TTL_MS = 30_000;
@@ -46,15 +77,23 @@ export function parseFlagRows(rows: unknown): EdgeFlags {
       }
     }
   }
+  const rawOrNull = (k: string) => {
+    const v = (map.get(k) ?? "").trim();
+    return v ? v : null;
+  };
   return {
     maintenanceMode: parseSettingBool(map.get(PLATFORM_SETTING_KEYS.maintenanceMode), false),
     maintenanceMessage: (map.get(PLATFORM_SETTING_KEYS.maintenanceMessage) ?? "").trim(),
     registrationOpen: parseSettingBool(map.get(PLATFORM_SETTING_KEYS.registrationOpen), true),
+    maintenanceScope: parseMaintenanceScope(map.get(MAINTENANCE_SCOPE_SETTING_KEY)),
+    demoLoginRaw: rawOrNull(SECURITY_SETTING_KEYS.demoLogin),
+    mfaEnforcedRaw: rawOrNull(SECURITY_SETTING_KEYS.mfaEnforced),
+    mfaGraceUntil: rawOrNull(SECURITY_SETTING_KEYS.mfaGraceUntil),
   };
 }
 
 export async function readPlatformFlagsCached(deps: Deps = {}): Promise<EdgeFlags> {
-  const nowMs = deps.nowMs ?? Date.now();
+  const nowMs = deps.nowMs ?? now();
   if (memo && nowMs - memo.at < memo.ttl) return memo.value;
 
   const url = deps.url ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -64,11 +103,18 @@ export async function readPlatformFlagsCached(deps: Deps = {}): Promise<EdgeFlag
     return SAFE_FLAGS;
   }
 
+  // Noktalı anahtarlar PostgREST `in` listesinde çift tırnakla verilir.
   const keys = [
     PLATFORM_SETTING_KEYS.maintenanceMode,
     PLATFORM_SETTING_KEYS.maintenanceMessage,
     PLATFORM_SETTING_KEYS.registrationOpen,
-  ].join(",");
+    MAINTENANCE_SCOPE_SETTING_KEY,
+    SECURITY_SETTING_KEYS.demoLogin,
+    SECURITY_SETTING_KEYS.mfaEnforced,
+    SECURITY_SETTING_KEYS.mfaGraceUntil,
+  ]
+    .map((k) => `"${k}"`)
+    .join(",");
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -91,14 +137,4 @@ export async function readPlatformFlagsCached(deps: Deps = {}): Promise<EdgeFlag
   } finally {
     clearTimeout(timer);
   }
-}
-
-/** Bakım sayfası gösterilmeyen yollar: süper admin, giriş (MFA dahil), sağlık, cron, API, statik. */
-export function isMaintenanceExemptPath(path: string): boolean {
-  if (path === "/bakim") return true;
-  const prefixes = ["/admin", "/giris", "/api", "/_next"];
-  if (prefixes.some((p) => path === p || path.startsWith(`${p}/`))) return true;
-  if (path === "/favicon.ico" || path === "/robots.txt" || path === "/sitemap.xml") return true;
-  // Dosya uzantılı yollar (statik varlıklar)
-  return /\.[a-zA-Z0-9]{1,8}$/.test(path);
 }

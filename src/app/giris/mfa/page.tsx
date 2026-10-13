@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformMfaCandidate } from "@/lib/platform";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
 import { PlatformMfaForm } from "./platform-mfa-form";
 
 export const metadata = {
@@ -26,8 +26,8 @@ export default async function PlatformMfaPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(`/giris?next=${encodeURIComponent(next)}`);
 
-  // Geliştirme sürecinde platform MFA kapalı: doğrulama sayfası gereksiz (bkz. src/lib/platform-mfa.ts).
-  if (!isPlatformMfaRequired()) redirect(next);
+  // MFA zorunlu değilse (yönetim anahtarı/env kapalı) doğrulama sayfası gereksiz (bkz. src/lib/platform-mfa.ts).
+  if (!(await isPlatformMfaRequiredNow(true))) redirect(next);
 
   const candidate = await getPlatformMfaCandidate();
   if (!candidate || user.app_metadata?.impersonating === true) redirect("/app");
@@ -36,6 +36,8 @@ export default async function PlatformMfaPage({
     await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
   if (assuranceError) throw new Error("Platform MFA oturumu doğrulanamadı.");
   if (assurance.currentLevel === "aal2") redirect(next);
+  // Geçiş süresinde doğrulayıcısı olmayan personel parolayla devam eder (kurulum Hesabım > Güvenlik'te).
+  if (!(await isPlatformMfaRequiredNow(assurance.nextLevel === "aal2"))) redirect(next);
 
   const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
   if (factorsError) throw new Error("Platform MFA faktörleri okunamadı.");

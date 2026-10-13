@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const flags = vi.hoisted(() => ({ maintenanceMode: false }));
+const flags = vi.hoisted(() => ({
+  maintenanceMode: false,
+  scope: "site" as "app" | "app_vitrin" | "site",
+  endsAt: null as string | null,
+}));
 const readFlags = vi.hoisted(() => vi.fn());
 const getUser = vi.hoisted(() => vi.fn());
 const db = vi.hoisted(() => ({
@@ -72,11 +76,18 @@ describe("bakım modu proxy davranışı", () => {
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "dummy");
     flags.maintenanceMode = false;
+    // Eski davranış testleri "Tüm site" kapsamında; varsayılan kapsam ("app") ayrı testlerde.
+    flags.scope = "site";
+    flags.endsAt = null;
     readFlags.mockReset();
     readFlags.mockImplementation(async () => ({
       maintenanceMode: flags.maintenanceMode,
       maintenanceMessage: "",
       registrationOpen: true,
+      maintenanceScope: { scope: flags.scope, startsAt: null, endsAt: flags.endsAt },
+      demoLoginRaw: null,
+      mfaEnforcedRaw: null,
+      mfaGraceUntil: null,
     }));
     getUser.mockReset();
     getUser.mockResolvedValue({ data: { user: null } });
@@ -148,5 +159,37 @@ describe("bakım modu proxy davranışı", () => {
     });
     const staff = await updateSession(req("/app/musteriler"));
     expect(staff.status).not.toBe(503);
+  });
+
+  it("kapsam 'yalnız /app' iken ana sayfa ve vitrin AÇIK kalır, ofis kullanıcısı /app'te bakım görür", async () => {
+    flags.maintenanceMode = true;
+    flags.scope = "app";
+    for (const p of ["/", "/vitrin/ofis", "/kayit", "/fiyatlar"]) {
+      const res = await updateSession(req(p));
+      expect(res.status, p).not.toBe(503);
+    }
+    getUser.mockResolvedValue({
+      data: { user: { id: "u1", app_metadata: { tenant_id: "t1", role: "owner" } } },
+    });
+    db.profile = { tenant_id: "t1", role: "owner", is_active: true, two_factor_sms: false };
+    expect((await updateSession(req("/app/musteriler"))).status).toBe(503);
+  });
+
+  it("kapsam 'panel + vitrin': vitrin bakımda, ana sayfa açık; Retry-After bitişten hesaplanır", async () => {
+    flags.maintenanceMode = true;
+    flags.scope = "app_vitrin";
+    flags.endsAt = new Date(Date.now() + 3_600_000).toISOString();
+    const vitrin = await updateSession(req("/vitrin/ofis"));
+    expect(vitrin.status).toBe(503);
+    const retry = Number(vitrin.headers.get("Retry-After"));
+    expect(retry).toBeGreaterThan(3500);
+    expect(retry).toBeLessThanOrEqual(3600);
+    expect((await updateSession(req("/"))).status).not.toBe(503);
+  });
+
+  it("kapsam satırı yoksa (eski önbellek biçimi) varsayılan 'app': ana sayfa açık", async () => {
+    flags.maintenanceMode = true;
+    readFlags.mockImplementation(async () => ({ maintenanceMode: true, maintenanceMessage: "", registrationOpen: true }));
+    expect((await updateSession(req("/"))).status).not.toBe(503);
   });
 });

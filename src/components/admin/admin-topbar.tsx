@@ -59,7 +59,7 @@ export function AdminTopbar({
 
   useEffect(() => {
     const tick = () =>
-      setClock(new Date(now()).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
+      setClock(new Date(now()).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }));
     tick();
     const id = setInterval(tick, 30_000);
     return () => clearInterval(id);

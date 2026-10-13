@@ -1,7 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type PlatformAuditInput = {
-  actorId: string;
+  /** Personel kimliği; personel olmayan olaylarda (ör. ofis demo girişi) null. */
+  actorId: string | null;
   action: string;
   entityType?: string;
   entityId?: string | null;

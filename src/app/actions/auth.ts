@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
 import { redirect } from "next/navigation";
 import { logLoginEvent } from "@/app/giris/_lib/login-events";
 import { sendSignerSms } from "@/app/imza/_lib/sms";
@@ -280,10 +280,13 @@ export async function signIn(
       redirect(`/giris/dogrulama?next=${encodeURIComponent(target)}`);
     }
 
-    if (isPlatformStaff && isPlatformMfaRequired()) {
+    // MFA kararı env + yönetim anahtarı + geçiş süresinden (isPlatformMfaRequiredNow(true) = zorunluluk ilan edilmiş);
+    // faktörü olmayan personel geçiş süresinde parolayla girer.
+    if (isPlatformStaff && (await isPlatformMfaRequiredNow(true))) {
       const { data: assurance, error: assuranceError } =
         await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (assuranceError || assurance.currentLevel !== "aal2") {
+      const required = await isPlatformMfaRequiredNow(assurance?.nextLevel === "aal2");
+      if (required && (assuranceError || assurance.currentLevel !== "aal2")) {
         const platformTarget = target === "/app" ? "/admin" : target;
         redirect(`/giris/mfa?next=${encodeURIComponent(platformTarget)}`);
       }

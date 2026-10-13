@@ -11,20 +11,28 @@ import {
 } from "@/lib/two-factor";
 import { resolveSupabasePublicKey } from "@/lib/supabase/keys";
 import { AUTH_VERIFIED_HEADER, userFromClaims } from "@/lib/supabase/verified-request";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
-import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform-flags-cache";
+import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
+import { readPlatformFlagsCached } from "@/lib/platform-flags-cache";
+import {
+  DEFAULT_MAINTENANCE_SCOPE,
+  DEFAULT_RETRY_AFTER_SEC,
+  isMaintenanceExemptPath,
+  isPathUnderMaintenance,
+  maintenanceRetryAfterSec,
+} from "@/lib/platform-security/maintenance-scope";
+import { now } from "@/lib/clock";
 import { readProxyGateData } from "@/lib/supabase/proxy-gates";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
 import { STATIC_HOME_ROUTE, wantsStaticHome } from "@/lib/static-home/request";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
-function maintenanceResponse(request: NextRequest) {
+function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAULT_RETRY_AFTER_SEC) {
   const rewrite = request.nextUrl.clone();
   rewrite.pathname = "/bakim";
   rewrite.search = "";
   const res = NextResponse.rewrite(rewrite, { status: 503 });
-  res.headers.set("Retry-After", "600");
+  res.headers.set("Retry-After", String(retryAfterSec));
   res.headers.set("Cache-Control", "no-store");
   res.headers.set("X-Robots-Tag", "noindex");
   return res;
@@ -36,13 +44,21 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // Bakım modu (K5): kısa TTL önbellekli hafif okuma; okuma hatasında site AÇIK kalır.
+  // Kapsam (AP1): varsayılan yalnız /app; ana sayfa yalnız "Tüm site" kapsamında bakıma düşer.
   // /app yolları kimlik çözüldükten sonra denetlenir (platform personeli geçer).
   const requestPath = request.nextUrl.pathname;
   let maintenanceOn = false;
+  let retryAfterSec = DEFAULT_RETRY_AFTER_SEC;
   if (!isMaintenanceExemptPath(requestPath)) {
-    maintenanceOn = (await readPlatformFlagsCached()).maintenanceMode;
+    const flags = await readPlatformFlagsCached();
+    if (flags.maintenanceMode) {
+      const scope = flags.maintenanceScope ?? DEFAULT_MAINTENANCE_SCOPE;
+      const nowMs = now();
+      maintenanceOn = isPathUnderMaintenance(requestPath, scope.scope, scope, nowMs);
+      retryAfterSec = maintenanceRetryAfterSec(scope, nowMs);
+    }
     if (maintenanceOn && !requestPath.startsWith("/app")) {
-      return maintenanceResponse(request);
+      return maintenanceResponse(request, retryAfterSec);
     }
   }
 
@@ -164,7 +180,7 @@ export async function updateSession(request: NextRequest) {
     const canonicalPlatformStaff = Boolean(staff && !impersonating);
 
     if (maintenanceOn && isApp && !staff) {
-      return maintenanceResponse(request);
+      return maintenanceResponse(request, retryAfterSec);
     }
     const canonicalIdentity = isAdmin
       ? canonicalPlatformStaff
@@ -187,11 +203,13 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(redirect);
     }
 
+    // MFA kararı env + yönetim anahtarından (bayrak önbelleği); geçiş süresinde proxy yönlendirmez
+    // (faktörü olan personeli sunucu kimlik kapısı AAL2'ye yollar).
     if (
-      isPlatformMfaRequired() &&
       isAdmin &&
       canonicalPlatformStaff &&
-      claimsData?.claims?.aal !== "aal2"
+      claimsData?.claims?.aal !== "aal2" &&
+      (await isPlatformMfaRequiredNow())
     ) {
       const redirect = request.nextUrl.clone();
       redirect.pathname = "/giris/mfa";

@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
+import { getPlatformMfaPolicyNow, mfaRequiredFor } from "@/lib/platform-security/mfa-policy";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -112,12 +112,16 @@ export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | n
 const getPlatformStaffIdentityBase = cache(async (): Promise<PlatformStaff | null> => {
   const staff = await getPlatformMfaCandidate();
   if (!staff) return null;
-  // Geliştirme sürecinde AAL2 şartı kapalı (bkz. src/lib/platform-mfa.ts).
-  if (!isPlatformMfaRequired()) return staff;
+  // AAL2 şartı env + yönetim anahtarından (bkz. src/lib/platform-mfa.ts); zorunlu değilse parola yeter.
+  const policy = await getPlatformMfaPolicyNow();
+  if (!policy.enforced) return staff;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error || data.currentLevel !== "aal2") return null;
+  if (error) return null;
+  // Geçiş süresinde doğrulayıcısı olmayan personel parolayla girer (nextLevel aal2 = doğrulanmış faktör var).
+  if (!mfaRequiredFor(policy, data.nextLevel === "aal2")) return staff;
+  if (data.currentLevel !== "aal2") return null;
   return staff;
 });
 

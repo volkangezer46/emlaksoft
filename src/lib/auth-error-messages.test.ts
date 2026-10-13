@@ -36,7 +36,7 @@ describe("authErrorMessage (giriş / 2FA hata metinleri)", () => {
   });
 
   it("2FA formu ham error.message göstermez", () => {
-    const src = readFileSync(path.join(process.cwd(), "src/app/giris/mfa/platform-mfa-form.tsx"), "utf8");
+    const src = readFileSync(path.join(process.cwd(), "src/app/giris/mfa/totp-core.tsx"), "utf8");
     expect(src).not.toMatch(/cause instanceof Error \? cause\.message/);
     expect(src).toContain("authErrorMessage(");
   });
