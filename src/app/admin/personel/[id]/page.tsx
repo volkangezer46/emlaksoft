@@ -15,6 +15,7 @@ import { StaffAccountPanel } from "./staff-account-panel";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { listStaffMfaStatus, resetStaffMfa } from "@/app/actions/platform-security";
 import { ReasonDialog } from "../guvenlik/reason-dialog";
+import { useStepUpPrompt } from "@/components/admin/step-up";
 
 type Member = {
   id: string;
@@ -56,6 +57,7 @@ export default function PersonelDetayPage() {
   const [activity, setActivity] = useState<Activity[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "missing">("loading");
   const [pending, startTransition] = useTransition();
+  const stepUp = useStepUpPrompt();
   const [err, setErr] = useState<string | null>(null);
   // Doğrulanmış TOTP sayısı (undefined: yükleniyor, null: okunamadı).
   const [mfaCount, setMfaCount] = useState<number | null | undefined>(undefined);
@@ -109,6 +111,7 @@ export default function PersonelDetayPage() {
 
   return (
     <div className="space-y-6">
+      {stepUp.dialog}
       <Link href="/admin/personel" className="focus-ring inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950">
         <ArrowLeft className="h-3.5 w-3.5" /> Personel
       </Link>
@@ -203,7 +206,10 @@ export default function PersonelDetayPage() {
                   key={r}
                   type="button"
                   disabled={pending || !member.is_active || on}
-                  onClick={() => run(updateStaffRole, { role: r })}
+                  onClick={async () => {
+                    const code = await stepUp.ask("Rol değişikliği");
+                    if (code) run(updateStaffRole, { role: r, step_up_code: code });
+                  }}
                   aria-pressed={on}
                   className={`focus-ring press rounded-[var(--radius-card)] border p-3 text-left transition disabled:cursor-default ${
                     on ? "border-brand-500 bg-brand-600/[0.06] ring-2 ring-brand-500/25" : "border-line bg-canvas hover:border-brand-300 disabled:opacity-60"

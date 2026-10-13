@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { requirePlatformModule, type PlatformStaff } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -43,6 +44,8 @@ export async function grantAccountCredit(formData: FormData): Promise<AdminCredi
   const parsed = parseAdminGrantInput(formData, now());
   if (!parsed.ok) return { error: parsed.error };
   const input = parsed.value;
+  const stepUp = await requireStepUp(formData, "credit_grant", g.staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
   const { data: tenant } = await admin.from("tenants").select("id").eq("id", input.tenantId).maybeSingle();
@@ -90,6 +93,8 @@ export async function reverseAccountCredit(formData: FormData): Promise<AdminCre
   const parsed = parseAdminReverseInput(formData);
   if (!parsed.ok) return { error: parsed.error };
   const input = parsed.value;
+  const stepUp = await requireStepUp(formData, "credit_reverse", g.staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
   const { data: tenant } = await admin.from("tenants").select("id").eq("id", input.tenantId).maybeSingle();

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -12,7 +13,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 
 const VALID_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
 
-export type StaffActionResult = { ok?: boolean; error?: string };
+export type StaffActionResult = { ok?: boolean; error?: string; code?: "step_up_required" | "step_up_invalid" | "step_up_no_factor" };
 
 /**
  * Yeni platform personeli ekle.
@@ -53,7 +54,10 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
 
     if (already) {
       if (already.is_active) return { error: "Bu e-posta zaten aktif personel olarak kayıtlı." };
-      // Pasif → tekrar aktif et
+      // Pasif → tekrar aktif et. AD11: formdaki rol (süper admin dahil) yeniden atanır = rol değişikliği; kod ister
+      // (aksi halde updateStaffRole'daki kapı "pasifleştir + yeniden davet et" ile atlanırdı).
+      const stepUp = await requireStepUp(fd, "staff_role", staff.id);
+      if (!stepUp.ok) return { error: stepUp.error, code: stepUp.code };
       await admin
         .from("platform_staff")
         .update({ is_active: true, role, full_name: fullName, updated_at: new Date().toISOString() })
@@ -133,6 +137,9 @@ export async function updateStaffRole(fd: FormData): Promise<StaffActionResult> 
 
   if (!id) return { error: "Personel ID gerekli." };
   if (!role || !VALID_ROLES.includes(role)) return { error: "Geçersiz rol." };
+  // AD11: rol değişikliği doğrulayıcı kodu ister.
+  const stepUp = await requireStepUp(fd, "staff_role", staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
 

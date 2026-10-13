@@ -143,18 +143,22 @@ describe("identity and session hardening contract", () => {
   });
 
   it("updates platform billing, subscription, audit and public caches as one contract", () => {
+    // AD11: RPC + önbellek tazeleme kapısız çekirdekte (tenant-plan-status.ts); eylem kapıyı tutar ve çekirdeği çağırır.
+    const planCore = read("src/lib/admin/tenant-plan-status.ts");
     expect(platform).toContain('requirePlatformModule("billing")');
-    expect(platform).toContain('admin.rpc("update_tenant_plan_subscription"');
-    expect(platform).toContain("p_actor_id: staff.id");
+    expect(platform).toContain("applyTenantPlanStatus(admin, staff.id,");
+    expect(planCore.startsWith('import "server-only";')).toBe(true); // istemciden çağrılabilir eylem değil
+    expect(planCore).toContain('admin.rpc("update_tenant_plan_subscription"');
+    expect(planCore).toContain("p_actor_id: actorId");
     expect(platform).not.toContain('.from("tenants").update(patch)');
     expect(migration).toContain("public.update_tenant_plan_subscription(");
     expect(migration).toContain("ps.role in ('super_admin', 'billing')");
     expect(migration).toContain("insert into public.audit_logs");
     expect(migration).toContain("'monthly_amount_try', v_amount_try");
     expect(migration).toContain("to service_role;");
-    expect(platform).toContain('revalidatePath("/vitrin/[slug]", "page")');
-    expect(platform).toContain('revalidatePath("/danisman/[slug]", "page")');
-    expect(platform).toContain('revalidatePath("/sitemap.xml")');
+    expect(planCore).toContain('revalidatePath("/vitrin/[slug]", "page")');
+    expect(planCore).toContain('revalidatePath("/danisman/[slug]", "page")');
+    expect(planCore).toContain('revalidatePath("/sitemap.xml")');
   });
 
   it("preserves allowlisted pricing choices during registration", () => {

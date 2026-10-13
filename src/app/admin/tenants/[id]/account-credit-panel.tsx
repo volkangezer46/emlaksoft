@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { AlertTriangle, CheckCircle2, Coins, Loader2, Undo2 } from "lucide-react";
 import { grantAccountCredit, reverseAccountCredit, type AdminCreditResult } from "@/app/actions/admin-account-credit";
+import { StepUpCodeField } from "@/components/admin/step-up";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import Link from "@/components/ui/smart-link";
 import { formatTry } from "@/lib/format";
@@ -162,6 +163,7 @@ export function AccountCreditPanel({
             <FormTextarea id="kredi-neden" name="reason" required minLength={ADMIN_CREDIT_REASON_MIN} maxLength={ADMIN_CREDIT_REASON_MAX} rows={2} onChange={() => setConfirming(false)} />
           </FormField>
         </div>
+        <StepUpCodeField id="kredi-dogrulama" className="sm:col-span-2" />
 
         <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
           {confirming ? (

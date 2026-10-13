@@ -1,5 +1,6 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -174,6 +175,9 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
   if (!UUID.test(invoiceId)) return { error: "Geçersiz fatura." };
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
   if (reason.length < 3) return { error: isChargeback ? "Ters ibraz nedenini yazın." : "İade nedeni yazın." };
+  // AD11: iade/ters ibraz doğrulayıcı kodu olmadan tamamlanmaz.
+  const stepUp = await requireStepUp(formData, isChargeback ? "chargeback" : "refund", g.staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
 
@@ -345,6 +349,10 @@ export async function resolveCapture(formData: FormData): Promise<BillingOpResul
   if (!UUID.test(captureId)) return { error: "Geçersiz kayıt." };
   const note = String(formData.get("note") ?? "").trim().slice(0, 300);
   if (op === "refunded" && note.length < 3) return { error: "İade referansını/notunu yazın." };
+  if (op === "refunded") {
+    const stepUp = await requireStepUp(formData, "refund", g.staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
+  }
 
   const admin = createAdminClient();
   const { data: row } = await admin

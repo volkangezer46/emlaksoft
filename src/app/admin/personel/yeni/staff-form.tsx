@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, Eye, EyeOff, RefreshCw } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { addPlatformStaff } from "@/app/actions/platform-staff";
+import { useStepUpPrompt } from "@/components/admin/step-up";
 import { EmailInput } from "@/components/ui/email-input";
 import { FormField, FormInput } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
@@ -50,6 +51,7 @@ export function StaffForm() {
   const [showPw, setShowPw] = useState(false);
   const [copied, setCopied] = useState(false);
   const strength = passwordStrength(password);
+  const stepUp = useStepUpPrompt();
 
   const tabs: FormTab[] = useMemo(
     () =>
@@ -74,7 +76,18 @@ export function StaffForm() {
     setError(null);
     setPending(true);
     startTransition(async () => {
-      const res = await addPlatformStaff(fd);
+      let res = await addPlatformStaff(fd);
+      // Pasif personeli yeniden etkinleştirmek rol atamasıdır: sunucu kod isterse sorup aynı formu yeniden gönder.
+      if (res.code === "step_up_required") {
+        const code = await stepUp.ask("Personel rol değişikliği");
+        if (!code) {
+          setPending(false);
+          setError("Pasif personeli yeniden etkinleştirmek için doğrulayıcı kodu gerekli.");
+          return;
+        }
+        fd.set("step_up_code", code);
+        res = await addPlatformStaff(fd);
+      }
       setPending(false);
       if (res.error) {
         setError(res.error);
@@ -269,21 +282,24 @@ export function StaffForm() {
   }
 
   return (
-    <TabbedFormShell
-      title="Yeni personel hesabı"
-      description="EmlakSoft çalışanı için platform hesabı: kimlik, giriş yöntemi ve departman rolü."
-      eyebrow="Platform personeli"
-      breadcrumbs={[{ label: "Personel", href: "/admin/personel" }, { label: "Yeni personel" }]}
-      cancelHref="/admin/personel"
-      submitLabel="Hesabı oluştur"
-      pendingLabel="Oluşturuluyor…"
-      pending={pending}
-      error={error}
-      onSubmit={onSubmit}
-      tabs={tabs}
-      tabPanels={tabPanels}
-      summary={renderSummary}
-      fieldLabels={FIELD_LABELS}
-    />
+    <>
+      {stepUp.dialog}
+      <TabbedFormShell
+        title="Yeni personel hesabı"
+        description="EmlakSoft çalışanı için platform hesabı: kimlik, giriş yöntemi ve departman rolü."
+        eyebrow="Platform personeli"
+        breadcrumbs={[{ label: "Personel", href: "/admin/personel" }, { label: "Yeni personel" }]}
+        cancelHref="/admin/personel"
+        submitLabel="Hesabı oluştur"
+        pendingLabel="Oluşturuluyor…"
+        pending={pending}
+        error={error}
+        onSubmit={onSubmit}
+        tabs={tabs}
+        tabPanels={tabPanels}
+        summary={renderSummary}
+        fieldLabels={FIELD_LABELS}
+      />
+    </>
   );
 }

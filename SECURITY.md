@@ -52,5 +52,6 @@ exceptions fail CI.
 - Incident response: [`docs/runbooks/INCIDENT_RESPONSE.md`](docs/runbooks/INCIDENT_RESPONSE.md)
 - Application/database rollback: [`docs/runbooks/ROLLBACK.md`](docs/runbooks/ROLLBACK.md)
 - Backup restore: [`docs/runbooks/RESTORE.md`](docs/runbooks/RESTORE.md)
+- Admin access recovery (IP allowlist, step-up TOTP, restore drill): [`docs/runbooks/ADMIN_ACCESS_RECOVERY.md`](docs/runbooks/ADMIN_ACCESS_RECOVERY.md)
 - Release gates: [`DEPLOY_CHECKLIST.md`](DEPLOY_CHECKLIST.md)
 

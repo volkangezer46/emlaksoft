@@ -16,6 +16,7 @@ import {
 import { EmailInput } from "@/components/ui/email-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
+import { useStepUpPrompt } from "@/components/admin/step-up";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 type Notice = { tone: "ok" | "error"; text: string } | null;
@@ -129,6 +130,7 @@ export function MemberAccessPanel({
   const [copied, setCopied] = useState(false);
 
   const isOwner = role === "owner";
+  const stepUp = useStepUpPrompt();
 
   function run(action: (fd: FormData) => Promise<MemberActionResult>, extra: Record<string, string>, okText: string) {
     const fd = new FormData();
@@ -160,6 +162,7 @@ export function MemberAccessPanel({
 
   return (
     <div className="space-y-5">
+      {stepUp.dialog}
       <NoticeLine notice={notice} />
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -180,7 +183,10 @@ export function MemberAccessPanel({
             <Button
               type="button"
               disabled={busy || roleValue === role}
-              onClick={() => run(setMemberRoleAsStaff, { role: roleValue }, "Rol güncellendi.")}
+              onClick={async () => {
+                const code = await stepUp.ask("Rol değişikliği");
+                if (code) run(setMemberRoleAsStaff, { role: roleValue, step_up_code: code }, "Rol güncellendi.");
+              }}
               variant="navy" size="sm"
             >
               Rolü kaydet

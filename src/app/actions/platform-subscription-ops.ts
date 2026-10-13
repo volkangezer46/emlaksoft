@@ -1,5 +1,7 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
+import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -172,6 +174,11 @@ export async function adminSetPlanStatus(_prev: SubOpsResult, formData: FormData
   const { data: tenant } = await ctx.admin.from("tenants").select("plan, status, slug").eq("id", ctx.tenantId).maybeSingle();
   if (!tenant) return { error: "Ofis bulunamadı." };
   if ((!plan || plan === tenant.plan) && (!status || status === tenant.status)) return { ok: true, message: "Değişiklik yok." };
+  // AD11: askıya alma / iptal (ofis kapatma) kritik işlemdir; doğrulayıcı kodu sunucuda istenir.
+  if (statusChangeNeedsStepUp(status, String(tenant.status ?? ""))) {
+    const stepUp = await requireStepUp(formData, "office_close", ctx.staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
+  }
 
   const { data, error } = await ctx.admin.rpc("update_tenant_plan_subscription", {
     p_tenant_id: ctx.tenantId,
@@ -206,6 +213,11 @@ export async function adminCancelSubscription(_prev: SubOpsResult, formData: For
   if (mode !== "period_end" && mode !== "now") return { error: "İptal zamanını seçin (dönem sonunda ya da hemen)." };
   const code = String(formData.get("reason_code") ?? "");
   if (!isCancelReasonCode(code)) return { error: "İptal nedenini seçin." };
+  // AD11: hemen iptal ofisi kapatır (kritik işlem); dönem sonu iptali gece kontrolüne kalır.
+  if (mode === "now") {
+    const stepUp = await requireStepUp(formData, "office_close", ctx.staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
+  }
 
   const loaded = await loadSub(ctx);
   if ("error" in loaded) return loaded;

@@ -27,6 +27,8 @@ import {
 import { hashOtpForStorage } from "@/lib/otp-hmac";
 import type { SignupField } from "@/lib/signup-errors";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
+import { now } from "@/lib/clock";
 
 export type AuthResult = {
   error?: string;
@@ -79,6 +81,8 @@ export async function signIn(
   const target = /^\/(?![/\\])/.test(next) ? next : "/app";
   const cookieStore = await cookies();
   cookieStore.delete(TWO_FACTOR_COOKIE);
+  // AD11: önceki oturumdan kalan boşta kalma çerezi yeni oturumu hemen kapatmasın.
+  cookieStore.delete(IDLE_COOKIE);
   let isPlatformStaff = false;
 
   if (userId) {
@@ -165,6 +169,20 @@ export async function signIn(
             console.error("signIn impersonation recovery cleanup", cleanupError);
             await supabase.auth.signOut();
             return { error: "Eski destek oturumu temizlenemedi." };
+          }
+          // AD11 geçmiş: kurtarılan/süresi dolan destek oturumu açık kalmasın (en iyi çaba; giriş durmaz).
+          const endedAt = now();
+          const { error: historyError } = await admin
+            .from("platform_impersonation_history")
+            .update({
+              ended_at: new Date(endedAt).toISOString(),
+              end_kind: new Date(snapshot.expires_at).getTime() <= endedAt ? "expired" : "recovered",
+            })
+            .eq("staff_id", userId)
+            .eq("auth_session_id", snapshot.auth_session_id)
+            .is("ended_at", null);
+          if (historyError && historyError.code !== "PGRST205") {
+            console.error("signIn impersonation recovery history", historyError.message);
           }
         }
 
@@ -524,6 +542,8 @@ export async function signOut() {
     }
   }
   await supabase.auth.signOut();
-  (await cookies()).delete(TWO_FACTOR_COOKIE);
+  const jar = await cookies();
+  jar.delete(TWO_FACTOR_COOKIE);
+  jar.delete(IDLE_COOKIE);
   redirect("/");
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { resolveCapture } from "@/app/actions/platform-billing";
+import { StepUpInlineField } from "@/components/admin/step-up";
 import { InlineOp, opFieldClass } from "./inline-op";
 
 /** Mutabakat kuyruğu satır eylemleri. Para hareketi bu ekrandan yapılmaz; durum + denetim kaydı yazılır. */
@@ -47,6 +48,7 @@ export function CaptureActions({
               İade referansı
               <input name="note" required minLength={3} maxLength={300} placeholder="Örn. iyzico iade no" className={`mt-1 block w-56 ${opFieldClass}`} />
             </label>
+            <StepUpInlineField labelClassName="text-xs font-semibold text-text-muted" inputClassName={`mt-1 block w-28 tabular-nums ${opFieldClass}`} />
           </InlineOp>
         ) : (
           <span className="text-xs text-text-faint">İade kapatma yalnız süper admin.</span>

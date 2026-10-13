@@ -1,8 +1,10 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { updateTenantPlanStatus } from "@/app/actions/platform";
+import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 import { convertDemoToTenant } from "@/app/actions/platform-sales";
 import { generatePassword } from "@/app/admin/personel/staff-model";
 import { logActivity } from "@/lib/activity";
@@ -593,7 +595,7 @@ type LifecycleMode = keyof typeof LIFECYCLE;
 
 /**
  * Askıya al / yeniden etkinleştir / arşivle (iptal durumu; veri silinmez) / arşivden geri yükle.
- * Kalıcı silme YOKTUR. Durum geçişi mevcut atomik `updateTenantPlanStatus` yolundan yapılır.
+ * Kalıcı silme YOKTUR. Durum geçişi `updateTenantPlanStatus` ile aynı atomik çekirdekten (`applyTenantPlanStatus`) yapılır.
  */
 export async function setTenantLifecycleByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
@@ -623,14 +625,17 @@ export async function setTenantLifecycleByAdmin(formData: FormData): Promise<Off
     return { error: "Onay için ofis adını aynen yazın." };
   }
   if (mode === "suspend" && tenant.status === "suspended") return { error: "Ofis zaten askıda." };
+  // AD11: ofis kapatma (askıya alma / arşiv) doğrulayıcı kodu ister.
+  if (rule.status === "suspended" || rule.status === "cancelled") {
+    const stepUp = await requireStepUp(formData, "office_close", staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
+  }
   if (mode === "archive" && tenant.status === "cancelled") return { error: "Ofis zaten arşivde." };
   if (mode === "reactivate" && tenant.status !== "suspended") return { error: "Yalnız askıdaki ofis yeniden etkinleştirilir." };
   if (mode === "restore" && tenant.status !== "cancelled") return { error: "Yalnız arşivdeki ofis geri yüklenir." };
 
-  const statusForm = new FormData();
-  statusForm.set("id", tenantId);
-  statusForm.set("status", nextStatus);
-  const result = await updateTenantPlanStatus(statusForm);
+  // Kod yukarıda doğrulandı: kapısız çekirdek (updateTenantPlanStatus aynı kodu ikinci kez isterdi).
+  const result = await applyTenantPlanStatus(admin, staff.id, { id: tenantId, status: nextStatus });
   if (!result.ok) return { error: result.error ?? actionErrorMessage(null, "Ofis durumu değiştirilemedi.") };
 
   await logPlatformActivity({
@@ -795,6 +800,8 @@ export async function transferTenantOwnershipByAdmin(formData: FormData): Promis
   if (!confirmationMatches(field(formData, "confirm_name"), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
   }
+  const stepUp = await requireStepUp(formData, "ownership_transfer", staff.id);
+  if (!stepUp.ok) return { error: stepUp.error };
 
   const members = (rows ?? []) as { id: string; role: string; is_active: boolean; full_name: string | null }[];
   const target = members.find((m) => m.id === newOwnerId);

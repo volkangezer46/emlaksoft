@@ -2,6 +2,7 @@
 
 import { markInvoicePaid, recordInvoiceChargeback, recordInvoiceRefund, voidInvoice } from "@/app/actions/platform-billing";
 import { MANUAL_PAYMENT_METHODS } from "@/lib/billing/invoice-ops";
+import { StepUpInlineField } from "@/components/admin/step-up";
 import { InlineOp, opFieldClass } from "./inline-op";
 
 export function InvoiceActions({
@@ -82,6 +83,7 @@ export function InvoiceActions({
             İade nedeni
             <input name="reason" required minLength={3} maxLength={300} className={`mt-1 block w-64 ${opFieldClass}`} />
           </label>
+          <StepUpInlineField labelClassName={lbl} inputClassName={`mt-1 block w-28 tabular-nums ${opFieldClass}`} />
         </InlineOp>
       ) : null}
       {isSuperAdmin && status === "paid" && !chargedBack ? (
@@ -97,6 +99,7 @@ export function InvoiceActions({
             Ters ibraz nedeni
             <input name="reason" required minLength={3} maxLength={300} className={`mt-1 block w-64 ${opFieldClass}`} />
           </label>
+          <StepUpInlineField labelClassName={lbl} inputClassName={`mt-1 block w-28 tabular-nums ${opFieldClass}`} />
         </InlineOp>
       ) : null}
       {!isSuperAdmin && status !== "void" ? (

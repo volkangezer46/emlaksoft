@@ -1,7 +1,8 @@
 "use server";
 
+import { requireStepUp } from "@/lib/platform-security/step-up";
 import { revalidatePath } from "next/cache";
-import { setTenantLifecycleByAdmin } from "@/app/actions/platform-tenants";
+import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 import { logActivity } from "@/lib/activity";
 import { OFFICE_ADMIN_DENIED, officeAdminCan } from "@/lib/admin/office-admin-access";
 import { confirmationMatches } from "@/lib/admin/office-create-rules";
@@ -20,7 +21,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 /**
  * Ofis sahibinin açtığı "hesabı kapat" / "veriyi indir" talebini işler (yalnız süper admin).
  * Hesap kapatma = ofisi ARŞİVLEMEK (tenants.status = cancelled): hiçbir veri silinmez, geri yüklenebilir.
- * Sıra: (1) ofis arşivlenir (mevcut setTenantLifecycleByAdmin: ofis adı onayı + gerekçe + denetim kaydı),
+ * Sıra: (1) ofis arşivlenir (ofis adı onayı + gerekçe + kod burada; yazım applyTenantPlanStatus + denetim kaydı),
  * (2) talep "tamamlandı"ya çekilir, (3) platform + ofis denetim kaydı. Arşiv başarılı olup talep güncellemesi
  * başarısız olursa aynı işlem tekrarlanabilir (arşivdeki ofis yeniden arşivlenmez).
  * Veri paketi: ofis sahibi arşiv sonrası /app/askida sayfasından kendi verisini indirir; platform müşteri
@@ -63,6 +64,11 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   if (!confirmationMatches(String(formData.get("confirm_name") ?? ""), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
   }
+  // AD11: hesap kapatma (ofis arşivlenir) doğrulayıcı kodu ister.
+  if (request.request_type === "account_closure") {
+    const stepUp = await requireStepUp(formData, "office_close", staff.id);
+    if (!stepUp.ok) return { error: stepUp.error };
+  }
 
   // Talebi acan kullanici HALA bu ofisin aktif sahibi/genel muduru olmali (eski/yetkisiz talep ofisi arsivleyemez).
   const requesterId = (request as { created_by?: string | null }).created_by;
@@ -79,13 +85,17 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   const plan = planClosure(request.request_type, String(tenant.status), reason);
 
   if (plan.archive) {
-    const archiveForm = new FormData();
-    archiveForm.set("mode", "archive");
-    archiveForm.set("id", tenantId);
-    archiveForm.set("reason", reason);
-    archiveForm.set("confirm_name", String(tenant.name));
-    const archived = await setTenantLifecycleByAdmin(archiveForm);
+    // Yetki (archive), ofis adı onayı, gerekçe ve kod yukarıda doğrulandı: arşiv kapısız çekirdekten yazılır.
+    // (setTenantLifecycleByAdmin çağrılsaydı aynı kodu ikinci kez isterdi ve talep hiç tamamlanmazdı.)
+    const archived = await applyTenantPlanStatus(admin, staff.id, { id: tenantId, status: "cancelled" });
     if (!archived.ok) return { error: archived.error ?? "Ofis arşivlenemedi." };
+    await logPlatformActivity({
+      actorId: staff.id,
+      action: "tenant.archive",
+      entityType: "tenant",
+      entityId: tenantId,
+      meta: { previous_status: tenant.status, status: "cancelled", reason, request_id: requestId },
+    });
   }
 
   const stamp = new Date(now()).toISOString();

@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { startTransition, useActionState, useState, useTransition } from "react";
 import type { ReactNode } from "react";
+import { StepUpCodeField } from "@/components/admin/step-up";
+import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { useRouter } from "next/navigation";
 import {
   Ban,
@@ -200,6 +202,7 @@ export function SubscriptionPanel({
   plans: PlanOption[];
 }) {
   const [plan, setPlan] = useState(currentPlan);
+  const [status, setStatus] = useState(currentStatus);
   const selectedPlan = plans.find((option) => option.id === plan);
   return (
     <OpDialog
@@ -230,14 +233,16 @@ export function SubscriptionPanel({
         </p>
       ) : null}
       <FormField label="Durum" htmlFor="sub-status">
-        <FormSelect id="sub-status" name="status" defaultValue={currentStatus}>
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status.value} value={status.value}>
-              {status.label}
+        <FormSelect id="sub-status" name="status" value={status} onChange={(event) => setStatus(event.target.value)}>
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </FormSelect>
       </FormField>
+      {/* AD11: askıya alma / iptal ofis kapatmadır; sunucu doğrulayıcı kodu ister. */}
+      {statusChangeNeedsStepUp(status, currentStatus) ? <StepUpCodeField id="sub-step-up" /> : null}
     </OpDialog>
   );
 }
@@ -419,6 +424,8 @@ function LifecycleCard({ tenantId, data, paused, cancelled, onDone }: CardProps 
                   ))}
                 </FormSelect>
               </FormField>
+              {/* AD11: hemen iptal ofisi kapatır; sunucu doğrulayıcı kodu ister. */}
+              {mode === "now" ? <StepUpCodeField id="ops-cancel-step-up" /> : null}
             </OpDialog>
           </>
         )
