@@ -1,4 +1,5 @@
 import Link from "@/components/ui/smart-link";
+import { Button } from "@/components/ui/button";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pagination, parsePage } from "@/app/admin/_components/pagination";
@@ -75,9 +76,9 @@ export async function LogView({ sp }: { sp: EmailPageSearch }) {
             ))}
           </select>
         </label>
-        <button type="submit" className="focus-ring press rounded-[var(--radius-control)] border border-line px-3 py-1.5 text-sm font-semibold text-ink-950 hover:border-brand-400">
+        <Button type="submit" variant="outline" size="sm">
           Uygula
-        </button>
+        </Button>
         {tenantId ? (
           <Link href={href({ ofis: undefined, sayfa: undefined })} className="text-xs font-semibold text-brand-600 hover:underline">
             Ofis süzgecini kaldır ({data.tenantNames.get(tenantId) ?? "seçili ofis"}) ×
