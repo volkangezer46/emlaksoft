@@ -1,5 +1,6 @@
 import "server-only";
 import { logActivity } from "@/lib/activity";
+import { logPlatformActivity } from "@/lib/platform-activity";
 import {
   externalErrorMetadata,
   ExternalHttpError,
@@ -101,8 +102,20 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
-/** Denetim izi bağlamı. Tenant yoksa (platform-yönetici çağrıları) kayıt yazılmaz. */
+/**
+ * Denetim izi bağlamı.
+ *  - Kiracı çağrısı: `{ tenantId, actorId }` -> activity_logs + kiracı AI kredisi.
+ *  - Platform çağrısı: `{ platform: true, purpose, actorId }` -> platform_audit_logs (`purpose`, ör. "seo.ai.suggest");
+ *    kiracı kredisi KULLANILMAZ (sınır: platform AI kotası, src/lib/ai/platform-quota.ts).
+ * Hiçbiri yoksa (eski platform-yönetici çağrıları) kayıt yazılmaz.
+ * `OpenAiAudit` adı kiracı biçimini korur (kiracı modülleri `audit.tenantId` okur); istek seçeneği iki varyantı da alır.
+ */
 export type OpenAiAudit = { tenantId: string; actorId?: string | null };
+export type OpenAiPlatformAudit = { platform: true; purpose: string; actorId: string | null };
+export type OpenAiCallAudit = OpenAiAudit | OpenAiPlatformAudit;
+
+const tenantAudit = (a: OpenAiCallAudit | null | undefined): OpenAiAudit | null => (a && "tenantId" in a && a.tenantId ? a : null);
+const platformAudit = (a: OpenAiCallAudit | null | undefined): OpenAiPlatformAudit | null => (a && "platform" in a && a.platform ? a : null);
 
 export type OpenAiRequestOptions = {
   apiKey: string;
@@ -116,7 +129,7 @@ export type OpenAiRequestOptions = {
   signal?: AbortSignal;
   retries?: number;
   retryBaseDelayMs?: number;
-  audit?: OpenAiAudit | null;
+  audit?: OpenAiCallAudit | null;
   /** Çağıran, aynı konuşma turunda ortak Redactor paylaşmak isterse. */
   redactor?: Redactor;
   /** Bilinen ad-soyadlar — verilirse ayrıca maskelenir (varsayılan: kapalı). */
@@ -132,11 +145,15 @@ async function writeAudit(
   counts: RedactCounts,
   attempts: number,
 ): Promise<void> {
-  if (!opts.audit?.tenantId) return;
+  const tenant = tenantAudit(opts.audit);
+  if (!tenant) {
+    await writePlatformAudit(opts, model, outcome, counts, attempts);
+    return;
+  }
   // Yalnız sayaçlar/etiketler: kişisel veri, istem veya yanıt metni YOK.
   await logActivity({
-    tenantId: opts.audit.tenantId,
-    actorId: opts.audit.actorId ?? null,
+    tenantId: tenant.tenantId,
+    actorId: tenant.actorId ?? null,
     action: "ai.openai_call",
     entityType: "ai",
     newValue: {
@@ -146,6 +163,24 @@ async function writeAudit(
       attempts,
       redacted: counts,
     },
+  });
+}
+
+/** Platform çağrısı denetimi (platform_audit_logs). Yalnız sayaç/etiket: istem ve yanıt metni YAZILMAZ. */
+async function writePlatformAudit(
+  opts: OpenAiRequestOptions,
+  model: unknown,
+  outcome: "ok" | OpenAiErrorKind,
+  counts: RedactCounts,
+  attempts: number,
+): Promise<void> {
+  const platform = platformAudit(opts.audit);
+  if (!platform) return;
+  await logPlatformActivity({
+    actorId: platform.actorId,
+    action: platform.purpose,
+    entityType: "ai",
+    meta: { model: typeof model === "string" ? model : null, outcome, attempts, redacted: counts },
   });
 }
 
@@ -166,11 +201,13 @@ export async function openAiChatRequest(opts: OpenAiRequestOptions): Promise<Ope
  * ölçüm hatası asla çağrıyı bozmaz. Deftere yalnız özellik adı, model ve jeton sayısı gider.
  */
 async function meterUsage(opts: OpenAiRequestOptions, model: unknown, tokensIn: number, tokensOut: number): Promise<void> {
-  if (!opts.audit?.tenantId) return;
+  // Platform çağrısı kiracı kredisinden DÜŞÜLMEZ (tenantAudit null döner).
+  const tenant = tenantAudit(opts.audit);
+  if (!tenant) return;
   try {
     await chargeAiUsage({
-      tenantId: opts.audit.tenantId,
-      actorId: opts.audit.actorId ?? null,
+      tenantId: tenant.tenantId,
+      actorId: tenant.actorId ?? null,
       feature: opts.purpose,
       model: typeof model === "string" ? model : null,
       tokensIn,
@@ -263,10 +300,11 @@ export async function openAiTranscribe(opts: {
     outcome = classifyOpenAiError(error);
     throw error;
   } finally {
-    if (opts.audit?.tenantId) {
+    const tenant = tenantAudit(opts.audit);
+    if (tenant) {
       await logActivity({
-        tenantId: opts.audit.tenantId,
-        actorId: opts.audit.actorId ?? null,
+        tenantId: tenant.tenantId,
+        actorId: tenant.actorId ?? null,
         action: "ai.openai_call",
         entityType: "ai",
         newValue: { purpose: opts.purpose, model: TRANSCRIBE_MODEL, outcome, attempts: 1, audio_bytes: opts.audio.size },
@@ -275,8 +313,8 @@ export async function openAiTranscribe(opts: {
         try {
           // Süre bilinmez: bayt/16000 ≈ saniye (düşük bit hızı) -> jeton eşdeğeri tahmini.
           await chargeAiUsage({
-            tenantId: opts.audit.tenantId,
-            actorId: opts.audit.actorId ?? null,
+            tenantId: tenant.tenantId,
+            actorId: tenant.actorId ?? null,
             feature: opts.purpose,
             model: TRANSCRIBE_MODEL,
             tokensIn: Math.max(100, Math.ceil(opts.audio.size / 16)),

@@ -316,6 +316,8 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/ai/credits/meter.ts", fn: "getTenantQuotas", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/ai/credits/usage.ts", fn: "getPlatformUsage", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ai/credits/usage.ts", fn: "getTenantUsage", calls: 1, tenantFilter: "var" },
+  { file: "src/lib/ai/platform-quota.ts", fn: "readPlatformAiQuota", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/lib/ai/platform-quota.ts", fn: "takePlatformAiQuota", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/automation-engine.ts", fn: "dispatchAutomationEvent", calls: 1, tenantFilter: "var" },
   { file: "src/lib/automation-engine.ts", fn: "runScheduledAutomations", calls: 1, tenantFilter: "var" },
   { file: "src/lib/billing/coupon-server.ts", fn: "quoteCoupon", calls: 1, tenantFilter: "uygulanamaz" },

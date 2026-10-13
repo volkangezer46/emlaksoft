@@ -6,6 +6,7 @@ import { getPlan } from "@/lib/billing/plans";
 import { daysAgoIso, daysFromNowIso } from "@/lib/clock";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiChatModel, openAiChat } from "@/lib/ai/openai-client";
+import { platformQuotaGateOpen } from "@/lib/ai/platform-quota";
 
 export type AdvisorMessage = { role: "user" | "assistant"; content: string };
 
@@ -209,6 +210,9 @@ export type AdvisorResult = { reply: string; usedAI: boolean };
 export async function runAdvisor(messages: AdvisorMessage[]): Promise<AdvisorResult> {
   const context = await buildAdvisorContext();
   const apiKey = await getOpenAiKey();
+
+  // Platform AI kotası (advisor.ai): limit ayarı YOKSA kapı yok (mevcut davranış); varsa kota dolunca kural-tabanlı yanıt.
+  if (apiKey && !(await platformQuotaGateOpen("advisor.ai"))) return { reply: fallbackAdvisor(messages, context), usedAI: false };
 
   if (apiKey) {
     try {
