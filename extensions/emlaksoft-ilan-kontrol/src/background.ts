@@ -49,8 +49,12 @@ import {
   type QueueEntry,
   type StoredTransfer,
 } from "@/lib/portal-transfer/ext-queue";
+import { QUEUE_MAX_ATTEMPTS, QUEUE_TTL_MS } from "@/lib/portal-transfer/ext-queue";
+import { EMPTY_RULES_META, applyRulesResponse, type RulesMeta, type StoredRulesMap } from "@/lib/portal-transfer/rules-store";
+import { FEEDBACK_CONSENT_TEXT_VERSION, feedbackKey, sanitizeFeedbackPayload, type FeedbackPayload } from "@/lib/portal-transfer/feedback-format";
+import { sanitizeSnapshot } from "@/lib/portal-transfer/correction";
 import { installLandingUrl, shouldOpenInstallLanding } from "@/lib/listing-control/worker/extension-install";
-import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest } from "./messages";
+import { ALARM_SCAN, ALARM_TICK, STORAGE_KEYS, type BgRequest, type ExternalRequest, type FeedbackConsent } from "./messages";
 
 /**
  * SERVICE WORKER: bütün portal isteklerinin TEK geçidi. Yalnız manifest'teki portal alanlarına, kullanıcının kendi
@@ -380,6 +384,32 @@ async function runScanCycle(force = false): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------- (0.6.0) kurallar, geri bildirim kuyruğu, rıza
+
+/** Geri bildirim kuyruğu (genel ext-queue kayıt biçimi; sınır 40 kayıt, 8 deneme, 24 saat). */
+const FEEDBACK_QUEUE_MAX = 40;
+type FeedbackEntry = QueueEntry<FeedbackPayload>;
+
+function pruneFeedback(list: readonly FeedbackEntry[], nowMs: number): FeedbackEntry[] {
+  return list.filter((e) => nowMs - e.queuedAt < QUEUE_TTL_MS && e.attempts < QUEUE_MAX_ATTEMPTS).slice(-FEEDBACK_QUEUE_MAX);
+}
+
+async function getRulesMeta(): Promise<RulesMeta> {
+  return { ...EMPTY_RULES_META, ...(await getLocal<Partial<RulesMeta>>(STORAGE_KEYS.formRulesMeta, {})) };
+}
+
+/** Geçerli rıza: açıkça verilmiş VE bugünkü metin sürümüne. Yoksa geri bildirim hiç üretilmez/gönderilmez. */
+async function hasConsent(): Promise<boolean> {
+  const c = await getLocal<FeedbackConsent | null>(STORAGE_KEYS.feedbackConsent, null);
+  return c?.granted === true && c.textVersion === FEEDBACK_CONSENT_TEXT_VERSION;
+}
+
+/** Rıza geri alındı ya da yok: bekleyen geri bildirim ve anlık görüntü SİLİNİR (24 saat beklemeden). */
+async function dropFeedbackData(): Promise<void> {
+  await chrome.storage.local.remove(STORAGE_KEYS.feedback);
+  await chrome.storage.session.remove(STORAGE_KEYS.fillSnapshot);
+}
+
 // ---------------------------------------------------------------- ileti işleyici
 
 async function canFetch() {
@@ -588,6 +618,111 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
         last: await getLocal<{ at: number; ok: boolean; summary: string } | null>(STORAGE_KEYS.importLast, null),
         pending: (await getLocal<QueueEntry<ImportPayload>[]>(STORAGE_KEYS.importPending, [])).length,
       };
+    // ---- (0.6.0) Öğrenen kurallar: yalnız imzası doğrulanan, daha yeni sürüm İLERİ yazılır; ret/hata eski seti korur ----
+    case "rulesPut":
+      return locked(async () => {
+        const now = Date.now();
+        const meta = await getRulesMeta();
+        const r = await applyRulesResponse(await getLocal<StoredRulesMap>(STORAGE_KEYS.formRules, {}), typeof msg.raw === "string" ? msg.raw : "", {
+          installedVersion: chrome.runtime.getManifest().version,
+          nowMs: now,
+        });
+        if ("error" in r) {
+          await setLocal(STORAGE_KEYS.formRulesMeta, { ...meta, fetchedAt: now, lastError: r.error, failures: meta.failures + 1, rejects: meta.rejects + 1, lastRejectReason: r.error } satisfies RulesMeta);
+          return { ok: false, error: r.error };
+        }
+        if (r.accepted.length > 0) await setLocal(STORAGE_KEYS.formRules, r.stored);
+        const last = r.rejected[r.rejected.length - 1];
+        await setLocal(STORAGE_KEYS.formRulesMeta, {
+          ...meta,
+          etag: typeof msg.etag === "string" && msg.etag.length <= 200 ? msg.etag : meta.etag,
+          fetchedAt: now,
+          lastError: null,
+          failures: 0,
+          rejects: meta.rejects + r.rejected.length,
+          lastRejectReason: last ? `${last.portal ?? "?"}:${last.reason}` : meta.lastRejectReason,
+          lastRejectVersion: last ? last.version : meta.lastRejectVersion,
+        } satisfies RulesMeta);
+        return { ok: true, accepted: r.accepted, rejected: r.rejected.length };
+      });
+    case "rulesMeta":
+      return locked(async () => {
+        const meta = await getRulesMeta();
+        const now = Date.now();
+        const next: RulesMeta = msg.notModified
+          ? { ...meta, fetchedAt: now, lastError: null, failures: 0 }
+          : { ...meta, fetchedAt: now, lastError: String(msg.error ?? "error").slice(0, 60), failures: meta.failures + 1 };
+        await setLocal(STORAGE_KEYS.formRulesMeta, next);
+        return { ok: true };
+      });
+    case "rulesGet": {
+      const stored = await getLocal<StoredRulesMap>(STORAGE_KEYS.formRules, {});
+      const portal = String(msg.portal ?? "");
+      return { entry: Object.prototype.hasOwnProperty.call(stored, portal) ? (stored[portal] ?? null) : null };
+    }
+    case "rulesStatus": {
+      const stored = await getLocal<StoredRulesMap>(STORAGE_KEYS.formRules, {});
+      const versions: Record<string, number> = {};
+      for (const [p, e] of Object.entries(stored)) if (e) versions[p] = e.version;
+      return { meta: await getRulesMeta(), versions };
+    }
+    case "feedbackPut":
+      return locked(async () => {
+        // Yalnız açılır pencere (kullanıcı tıklaması) ve yalnız rıza varken; yük ortak süzgeçten yeniden geçer.
+        if (sender.tab) return { ok: false, error: "forbidden" };
+        if (!(await hasConsent())) return { ok: false, error: "no_consent" };
+        const clean = sanitizeFeedbackPayload(msg.payload);
+        if (!clean.payload) return { ok: false, error: "invalid" };
+        const now = Date.now();
+        const list = (await getLocal<FeedbackEntry[]>(STORAGE_KEYS.feedback, [])).filter((e) => e.key !== feedbackKey(clean.payload!));
+        const entry: FeedbackEntry = { id: crypto.randomUUID(), key: feedbackKey(clean.payload), payload: clean.payload, attempts: 0, nextAttemptAt: now, queuedAt: now };
+        await setLocal(STORAGE_KEYS.feedback, pruneFeedback([...list, entry], now));
+        return { ok: true };
+      });
+    case "feedbackDue": {
+      if (!(await hasConsent())) {
+        await locked(dropFeedbackData);
+        return { entries: [] };
+      }
+      const now = Date.now();
+      return { entries: pruneFeedback(await getLocal<FeedbackEntry[]>(STORAGE_KEYS.feedback, []), now).filter((e) => e.nextAttemptAt <= now).slice(0, 3) };
+    }
+    case "feedbackAck":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.feedback, doneEntry(await getLocal<FeedbackEntry[]>(STORAGE_KEYS.feedback, []), String(msg.id)));
+        return { ok: true };
+      });
+    case "feedbackFail":
+      return locked(async () => {
+        await setLocal(STORAGE_KEYS.feedback, failEntry(await getLocal<FeedbackEntry[]>(STORAGE_KEYS.feedback, []), String(msg.id), Date.now()));
+        return { ok: true };
+      });
+    case "snapshotPut": {
+      if (sender.tab) return { ok: false, error: "forbidden" };
+      if (msg.snapshot === null) {
+        await chrome.storage.session.remove(STORAGE_KEYS.fillSnapshot); // bağlama sonrası silinir
+        return { ok: true };
+      }
+      const snap = sanitizeSnapshot(msg.snapshot);
+      if (!snap) return { ok: false, error: "invalid" };
+      await chrome.storage.session.set({ [STORAGE_KEYS.fillSnapshot]: snap });
+      return { ok: true };
+    }
+    case "snapshotGet": {
+      if (sender.tab) return { snapshot: null };
+      const v = (await chrome.storage.session.get(STORAGE_KEYS.fillSnapshot))[STORAGE_KEYS.fillSnapshot];
+      return { snapshot: sanitizeSnapshot(v) };
+    }
+    case "consentGet":
+      return { consent: await getLocal<FeedbackConsent | null>(STORAGE_KEYS.feedbackConsent, null), textVersion: FEEDBACK_CONSENT_TEXT_VERSION };
+    case "consentSet":
+      return locked(async () => {
+        if (sender.tab) return { ok: false, error: "forbidden" };
+        const consent: FeedbackConsent = { granted: msg.granted === true, at: Date.now(), textVersion: FEEDBACK_CONSENT_TEXT_VERSION };
+        await setLocal(STORAGE_KEYS.feedbackConsent, consent);
+        if (!consent.granted) await dropFeedbackData();
+        return { ok: true, consent };
+      });
     case "outboxPut":
       return locked(async () => {
         const list = await getLocal<OutboxEntry[]>(STORAGE_KEYS.outbox, []);
