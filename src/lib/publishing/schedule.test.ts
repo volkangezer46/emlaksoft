@@ -61,8 +61,8 @@ function harness(initial: ScheduledEntry[], live: unknown | null = { announcemen
     revalidate: () => {
       calls.revalidate += 1;
     },
-    notify: async (e) => {
-      calls.notify.push(e.id);
+    notify: async (e, kind) => {
+      calls.notify.push(kind === "bitis" ? e.id : `${e.id}:${kind}`);
     },
     log: async (e, kind) => {
       calls.log.push(`${e.id}:${kind}`);
@@ -160,13 +160,49 @@ describe("runSchedule (saf zamanlayıcı çekirdeği)", () => {
     const p = harness([entry()]);
     p.a.publish = async () => ({ ok: false, error: "medya yok", permanent: true });
     await p.run(T0 + 10 * MIN);
-    expect(p.db.list[0]).toMatchObject({ status: "iptal" });
+    expect(p.db.list[0]).toMatchObject({ status: "iptal", note: "Yayınlanamadı: medya yok" });
+    // Yayın aşamasındaki kalıcı hata da zil çalar (bitişle tutarlı).
+    expect(p.calls.notify).toEqual(["e1:yayin"]);
 
     const t = harness([entry()]);
     t.a.publish = async () => ({ ok: false, error: "db" });
     const tr = await t.run(T0 + 10 * MIN);
     expect(tr.failed).toBe(1);
     expect(t.db.list[0]!.status).toBe("bekliyor");
+  });
+
+  it("canlı okunamazsa (yayın anı) önceki canlı yakalanmaz, kayıt beklemede kalır; sonraki koşu doğru yakalar", async () => {
+    const h = harness([entry()]);
+    const realRead = h.a.readLive;
+    h.a.readLive = async () => {
+      throw new Error("PostgREST 503");
+    };
+    const r = await h.run(T0 + 10 * MIN);
+    expect(r).toMatchObject({ published: 0, failed: 1, cancelled: 0 });
+    expect(h.db.list[0]).toMatchObject({ status: "bekliyor", prevLive: null, prevLiveHash: null });
+    expect(h.calls.publish).toHaveLength(0);
+
+    h.a.readLive = realRead;
+    await h.run(T0 + 15 * MIN);
+    expect(h.db.list[0]).toMatchObject({ status: "yayinda", prevLive: { announcement: { text: "Eski" } } });
+  });
+
+  it("canlı okunamazsa (bitiş anı) kayıt iptal edilmez, zil çalmaz; sonraki koşu geri döner", async () => {
+    const h = harness([entry()]);
+    await h.run(T0 + 10 * MIN);
+    const realRead = h.a.readLive;
+    h.a.readLive = async () => {
+      throw new Error("PostgREST 503");
+    };
+    const r = await h.run(T0 + 60 * MIN);
+    expect(r).toMatchObject({ reverted: 0, cancelled: 0, failed: 1 });
+    expect(h.db.list[0]!.status).toBe("yayinda");
+    expect(h.calls.notify).toHaveLength(0);
+
+    h.a.readLive = realRead;
+    const again = await h.run(T0 + 65 * MIN);
+    expect(again.reverted).toBe(1);
+    expect(h.db.live.get("sitemenu")).toEqual({ announcement: { text: "Eski" } });
   });
 });
 

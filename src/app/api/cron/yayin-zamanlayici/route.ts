@@ -36,7 +36,9 @@ async function run(req: NextRequest) {
     async readLive(surface) {
       const s = surfaceById(surface);
       if (!s) throw new Error(`bilinmeyen yüzey: ${surface}`);
-      return (await s.readState()).live;
+      // Sıkı okuma: hata fırlar -> runSchedule 'failed' sayar, sonraki koşu yeniden dener. Gevşek okuma (hata = null)
+      // yayında prevLive'ı kalıcı olarak "kod varsayılanı" yakalar, bitişte kaydı yanlışlıkla "araya elle yayın girdi" iptal ederdi.
+      return s.readLiveStrict();
     },
     async publish(surface, cfg, entry, kind) {
       const s = surfaceById(surface);
@@ -47,7 +49,7 @@ async function run(req: NextRequest) {
     async resetToDefault(surface, entry) {
       const s = surfaceById(surface);
       if (!s) return { ok: false, error: "Bilinmeyen yüzey.", permanent: true };
-      return s.resetToDefault(entry.by, entry.byName || "Yayın zamanlayıcı");
+      return s.resetToDefault(entry.by, entry.byName || "Yayın zamanlayıcı", { keepDraft: true });
     },
     revalidate(surface) {
       const s = surfaceById(surface);
@@ -57,10 +59,10 @@ async function run(req: NextRequest) {
       for (const p of s.livePaths) revalidatePath(p.path, p.type);
       revalidatePath("/admin/site");
     },
-    async notify(entry) {
+    async notify(entry, kind) {
       const s = surfaceById(entry.surface);
       await notifyPlatformStaff({
-        title: "Zamanlı yayın bitişinde geri dönülmedi",
+        title: kind === "yayin" ? "Zamanlı yayın yapılamadı" : "Zamanlı yayın bitişinde geri dönülmedi",
         body: `${s?.label ?? entry.surface} · "${entry.label}": ${entry.note}. Canlı sürüm olduğu gibi bırakıldı.`,
         href: "/admin/site",
         kind: "warning",

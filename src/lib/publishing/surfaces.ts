@@ -2,20 +2,20 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { now } from "@/lib/clock";
 import type { PlatformModule } from "@/lib/platform-access";
+import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { hasErrors as contentHasErrors, validateSiteContent } from "@/lib/site-content/schema";
 import { SITE_CONTENT_CACHE_TAG, siteContentStore } from "@/lib/site-content/store";
 import { defaultSiteMenu } from "@/lib/site-menu/defaults";
-import { hasErrors as menuHasErrors, validateSiteMenu, type SiteMenuConfig } from "@/lib/site-menu/schema";
+import { hasErrors as menuHasErrors, siteMenuSchema, validateSiteMenu, type SiteMenuConfig } from "@/lib/site-menu/schema";
 import {
   SITE_MENU_CACHE_TAG,
+  SITE_MENU_STORAGE_UNAVAILABLE,
   pruneMedia,
-  publishConfig,
-  saveDraft as saveMenuDraft,
   readAdminState as readMenuState,
   resetToDefault as resetMenuToDefault,
 } from "@/lib/site-menu/store";
-import type { HistoryEntry, StoreResult } from "@/lib/versioned-config/store";
+import { createVersionedStore, type HistoryEntry, type StoreResult } from "@/lib/versioned-config/store";
 import { hashOf, type ScheduleWriteResult } from "./schedule";
 
 /**
@@ -47,6 +47,8 @@ export type PublishSurface = {
   livePaths: ReadonlyArray<{ path: string; type?: "layout" | "page" }>;
   defaults(): unknown;
   readState(): Promise<SurfaceState>;
+  /** Canlı yapılandırma (yoksa null = kod varsayılanı). Okunamazsa HATA fırlatır: cron "okunamadı"yı "canlı yok" saymasın. */
+  readLiveStrict(): Promise<unknown | null>;
   /** Yapılandırmayı bugünkü kurallarla doğrular; geçersizse hata. */
   validate(cfg: unknown): Promise<{ cfg: unknown } | { error: string }>;
   /**
@@ -54,8 +56,8 @@ export type PublishSurface = {
    * `keepDraft`: depo yayında taslağı canlıya eşitler; zamanlı yayında editördeki daha yeni taslak kaybolmasın diye geri yazılır.
    */
   publish(cfg: unknown, staffId: string, label: string, by?: string, opts?: { keepDraft?: boolean }): Promise<ScheduleWriteResult>;
-  /** Canlıyı siler: kod varsayılanına döner. */
-  resetToDefault(staffId: string, by?: string): Promise<StoreResult>;
+  /** Canlıyı siler: kod varsayılanına döner. `keepDraft`: publish'teki gibi editördeki bekleyen taslak korunur. */
+  resetToDefault(staffId: string, by?: string, opts?: { keepDraft?: boolean }): Promise<StoreResult>;
   /** Geçmişteki bir sürümü yeni yayın olarak canlıya alır. */
   restore(historyId: string, staffId: string, by?: string): Promise<RestoreResult>;
 };
@@ -68,6 +70,27 @@ function pendingDraft(before: { live: unknown | null; draft: unknown | null }, c
   const h = hashOf(before.draft);
   return h !== hashOf(cfg) && h !== hashOf(before.live ?? defaults) ? before.draft : null;
 }
+
+/** Tek anahtarı sıkı okur (PostgREST hatası/istisna fırlar) ve yüzeyin ayrıştırıcısından geçirir. */
+async function readLiveKey(key: string, parse: (raw: string | null) => unknown | null): Promise<unknown | null> {
+  const row = await getPlatformSettingsMany([key], { strict: true });
+  return parse(row[key] ?? null);
+}
+
+/**
+ * Site menüsü yayını için ortak taslak/yayın/geçmiş kalıbı: src/lib/site-menu/store.ts ile AYNI anahtarlar
+ * (sitemenu.live|draft|history), aynı yazma sırası ve geçmiş sınırları. Menü deposunun publishConfig'i taslağı cfg'ye
+ * eşitledikten hemen sonra medyayı budar; zamanlı yayında editördeki bekleyen taslak geri yazılmadan ÖNCE onun medyası
+ * silinirdi. Burada budama (pruneMedia) taslak geri yazıldıktan SONRA yapılır.
+ */
+const menuStore = createVersionedStore<SiteMenuConfig>({
+  prefix: "sitemenu",
+  parseValue: (v) => {
+    const r = siteMenuSchema.safeParse(v);
+    return r.success ? r.data : null;
+  },
+  unavailableMessage: SITE_MENU_STORAGE_UNAVAILABLE,
+});
 
 function withMeta(live: unknown | null, draft: unknown | null, history: HistoryEntry<unknown>[]): SurfaceState {
   return { live, draft, history, updatedBy: history[0]?.by || null, updatedAt: history[0]?.at ?? null };
@@ -85,6 +108,7 @@ const siteContent: PublishSurface = {
     const s = await siteContentStore.readState();
     return withMeta(s.live, s.draft, s.history);
   },
+  readLiveStrict: () => readLiveKey(siteContentStore.keys.live, siteContentStore.parseConfig),
   async validate(cfg) {
     const { config, issues } = validateSiteContent(cfg);
     return config && !contentHasErrors(issues) ? { cfg: config } : { error: "İçerik bugünkü kurallara uymuyor." };
@@ -97,9 +121,13 @@ const siteContent: PublishSurface = {
     if (res.ok && keep) await siteContentStore.saveDraft(keep as Parameters<typeof siteContentStore.saveDraft>[0], staffId);
     return res;
   },
-  async resetToDefault(staffId, by) {
+  async resetToDefault(staffId, by, opts) {
+    const defaults = defaultSiteContent();
+    const keep = opts?.keepDraft ? pendingDraft(await siteContentStore.readState(), defaults, defaults) : null;
     const e = newEntry("", by ?? staffId);
-    return siteContentStore.resetToDefault({ id: e.id, at: e.at, by: e.by }, staffId);
+    const res = await siteContentStore.resetToDefault({ id: e.id, at: e.at, by: e.by }, staffId);
+    if (res.ok && keep) await siteContentStore.saveDraft(keep as Parameters<typeof siteContentStore.saveDraft>[0], staffId);
+    return res;
   },
   async restore(historyId, staffId, by) {
     const s = await siteContentStore.readState();
@@ -110,6 +138,16 @@ const siteContent: PublishSurface = {
     return res.ok ? { ok: true, label: version.label, cfg: version.cfg } : { ok: false, error: res.error };
   },
 };
+
+/**
+ * Menü yayını/varsayılana dönüşten sonra: bekleyen taslak varsa önce geri yazılır, SONRA kullanılmayan medya budanır
+ * (taslağın medyası "kullanılan" sayılır). Taslak yazılamazsa budama atlanır: medyası silinmesin, bir sonraki yayın budar.
+ */
+async function restoreDraftThenPrune(res: StoreResult, keep: unknown | null, staffId: string): Promise<StoreResult> {
+  if (keep && !(await menuStore.saveDraft(keep as SiteMenuConfig, staffId)).ok) return res;
+  await pruneMedia(staffId);
+  return res;
+}
 
 const siteMenu: PublishSurface = {
   id: "sitemenu",
@@ -123,6 +161,7 @@ const siteMenu: PublishSurface = {
     const s = await readMenuState();
     return withMeta(s.live, s.draft, s.history);
   },
+  readLiveStrict: () => readLiveKey(menuStore.keys.live, menuStore.parseConfig),
   async validate(cfg) {
     const { media } = await readMenuState();
     const { config, issues } = validateSiteMenu(cfg, { media });
@@ -133,16 +172,16 @@ const siteMenu: PublishSurface = {
   async publish(cfg, staffId, label, by, opts) {
     const v = await this.validate(cfg);
     if ("error" in v) return { ok: false, error: v.error, permanent: true };
-    const keep = opts?.keepDraft ? pendingDraft(await readMenuState(), v.cfg, defaultSiteMenu()) : null;
-    const res = await publishConfig(v.cfg as SiteMenuConfig, newEntry(label, by ?? staffId), staffId);
-    if (res.ok && keep) await saveMenuDraft(keep as SiteMenuConfig, staffId);
-    return res;
+    const keep = opts?.keepDraft ? pendingDraft(await menuStore.readState(), v.cfg, defaultSiteMenu()) : null;
+    const res = await menuStore.publish(v.cfg as SiteMenuConfig, newEntry(label, by ?? staffId), staffId);
+    return res.ok ? restoreDraftThenPrune(res, keep, staffId) : res;
   },
-  async resetToDefault(staffId, by) {
+  async resetToDefault(staffId, by, opts) {
+    const defaults = defaultSiteMenu();
+    const keep = opts?.keepDraft ? pendingDraft(await menuStore.readState(), defaults, defaults) : null;
     const e = newEntry("", by ?? staffId);
     const res = await resetMenuToDefault({ id: e.id, at: e.at, by: e.by }, staffId);
-    if (res.ok) await pruneMedia(staffId);
-    return res;
+    return res.ok ? restoreDraftThenPrune(res, keep, staffId) : res;
   },
   async restore(historyId, staffId, by) {
     const s = await readMenuState();

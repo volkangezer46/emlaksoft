@@ -138,7 +138,7 @@ export type ScheduleAdapters = {
   fresh(id: string): Promise<ScheduledEntry | null>;
   /** Kaydı depoya yazar (diğer kayıtlarla birleştirerek). false = yazılamadı. */
   commit(entry: ScheduledEntry): Promise<boolean>;
-  /** Yüzeyin canlı yapılandırması (yoksa null = kod varsayılanı). */
+  /** Yüzeyin canlı yapılandırması (yoksa null = kod varsayılanı). Okunamazsa FIRLATMALI ("okunamadı" ≠ "canlı yok"). */
   readLive(surface: string): Promise<unknown | null>;
   /** Yapılandırmayı yayınlar (doğrulama dahil). `permanent`: tekrar denemek anlamsız (ör. sürüm artık geçersiz). */
   publish(surface: string, cfg: unknown, entry: ScheduledEntry, kind: "yayin" | "bitis"): Promise<ScheduleWriteResult>;
@@ -146,8 +146,8 @@ export type ScheduleAdapters = {
   resetToDefault(surface: string, entry: ScheduledEntry): Promise<ScheduleWriteResult>;
   /** Canlıyı değiştiren her başarılı adımdan sonra (önbellek etiketi). */
   revalidate(surface: string): void;
-  /** Bitişte geri dönülemedi (araya elle yayın girdi ya da önceki sürüm artık geçersiz): süper admine zil. */
-  notify(entry: ScheduledEntry): Promise<void>;
+  /** Zamanlı yayın yapılamadı (kind 'yayin') ya da bitişte geri dönülemedi (kind 'bitis'): süper admine zil. */
+  notify(entry: ScheduledEntry, kind: "yayin" | "bitis"): Promise<void>;
   /** Denetim izi ('publishing.scheduled_publish'). */
   log(entry: ScheduledEntry, kind: "yayin" | "bitis" | "iptal", detail?: string): Promise<void>;
 };
@@ -194,8 +194,11 @@ export async function runSchedule(entries: ScheduledEntry[], nowMs: number, a: S
         const res = await a.publish(e.surface, e.cfg, e, "yayin");
         if (!res.ok) {
           if (res.permanent) {
-            await a.commit({ ...e, status: "iptal", note: `Yayınlanamadı: ${res.error}`.slice(0, 200) });
-            await a.log(e, "iptal", res.error);
+            // Zamanlayan kişi masaya bakmadan da öğrensin (bitişteki kalıcı hatayla aynı: zil + denetim izi).
+            const bad: ScheduledEntry = { ...e, status: "iptal", note: `Yayınlanamadı: ${res.error}`.slice(0, 200) };
+            await a.commit(bad);
+            await a.notify(bad, "yayin");
+            await a.log(bad, "iptal", res.error);
             r.cancelled += 1;
           } else r.failed += 1;
           continue;
@@ -234,7 +237,7 @@ export async function runSchedule(entries: ScheduledEntry[], nowMs: number, a: S
           r.failed += 1;
           continue;
         }
-        await a.notify(cancelled);
+        await a.notify(cancelled, "bitis");
         await a.log(cancelled, "iptal", CONFLICT_NOTE);
         r.cancelled += 1;
         continue;
@@ -244,7 +247,7 @@ export async function runSchedule(entries: ScheduledEntry[], nowMs: number, a: S
         if (res.permanent) {
           const bad: ScheduledEntry = { ...e, status: "iptal", note: `Önceki sürüme dönülemedi: ${res.error}`.slice(0, 200) };
           await a.commit(bad);
-          await a.notify(bad);
+          await a.notify(bad, "bitis");
           await a.log(bad, "iptal", res.error);
           r.cancelled += 1;
         } else r.failed += 1;
