@@ -28,5 +28,5 @@ export function LazyTourScreen({ id }: { id: TourItem["id"] }) {
   }, [id]);
 
   if (Screen) return <Screen />;
-  return <div className="mk-svg mk-svg-ph" aria-hidden="true" />;
+  return <div className="mk-svg mk-svg-ph" data-tour={id} aria-hidden="true" />;
 }

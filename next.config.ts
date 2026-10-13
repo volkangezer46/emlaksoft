@@ -203,6 +203,11 @@ const nextConfig: NextConfig = {
         source,
         headers: [{ key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" }],
       })),
+      // Statik ana sayfa adacıkları: içerik özetli adlar → kalıcı önbellek (runtime.js satır içi gömülür).
+      {
+        source: "/statik/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // API route'ları — cache yok
       {
         source: "/api/:path*",

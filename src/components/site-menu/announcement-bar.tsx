@@ -48,7 +48,7 @@ export function AnnouncementBar({ a }: { a: PublicAnnouncement }) {
   };
 
   return (
-    <div className="mk-ann" role="region" aria-label="Duyuru">
+    <div className="mk-ann" role="region" aria-label="Duyuru" data-key={a.key} data-ends={a.endsAtMs ?? undefined}>
       <p>
         {a.text}
         {a.href ? (

@@ -92,7 +92,7 @@ function Featured({ f, onClick, active, index, withMedia, previews, hover, copy,
         ) : withMedia && previews?.length ? (
           <span className="mk-prev-stack" aria-hidden="true">
             {previews.map((p) => (
-              <span key={p.kind} className="mk-prev-layer" data-on={p.kind === on}>
+              <span key={p.kind} className="mk-prev-layer" data-on={p.kind === on} data-kind={p.kind} data-label={p.label}>
                 {armed ? (
                   <Suspense fallback={null}>
                     <FeaturedPreview kind={p.kind} label={p.label} />

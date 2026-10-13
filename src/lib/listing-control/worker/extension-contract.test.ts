@@ -42,7 +42,7 @@ describe("manifest ve paketleme (mağazaya hazırlık)", () => {
     expect(b).toContain("__EMLAKSOFT_APP_ORIGINS__");
     expect(b).toMatch(/--soft/);
     const pkg = src("package.json");
-    expect(pkg).toContain('"prebuild": "tsx scripts/build-extension.ts --soft"');
+    expect(pkg).toMatch(/"prebuild": "tsx scripts\/build-extension\.ts --soft( && [^"]+)?"/);
     expect(pkg).toContain('"build:extension"');
     expect(src(".gitignore")).toContain("/public/downloads/");
     expect(src(`${EXT}/.gitignore`)).toMatch(/^release\/$/m);

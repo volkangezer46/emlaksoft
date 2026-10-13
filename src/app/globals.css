@@ -10,7 +10,7 @@
    Inter ve Manrope: Google değişken dosyası (wght 300-800'e kırpılmış, Inter opsz=14 sabit); latin + Türkçe harfler
    (Ğ ğ İ Ş ş ₺) TEK dosyada (pyftsubset; istek sayısı 4 -> 2). Dosyalar derlemede içerik özetli adla ve
    değişmez önbellekle servis edilir. Geist Mono yalnız konsolda (components/ui/console/mono-font.tsx). */
-@font-face { font-family: "Inter"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/inter.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 400 800; font-display: swap; src: url("./fonts/inter.woff2") format("woff2"); }
 @font-face { font-family: "Manrope"; font-style: normal; font-weight: 300 800; font-display: swap; src: url("./fonts/manrope.woff2") format("woff2"); }
 :root { --font-manrope: "Manrope", system-ui, sans-serif; --font-inter: "Inter", system-ui, sans-serif; }
 /* Konsol (/app, /admin) stilleri console-base.css içinde: public sayfalara yüklenmez. */

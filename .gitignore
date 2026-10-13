@@ -22,6 +22,8 @@
 
 # tarayıcı eklentisi paketi (npm run build:extension / prebuild üretir; indirme ucu okur)
 /public/downloads/
+# statik ana sayfa paketleri (prebuild: scripts/build-static-home.ts)
+/public/statik/
 
 # misc
 .DS_Store

@@ -16,6 +16,7 @@ import { isMaintenanceExemptPath, readPlatformFlagsCached } from "@/lib/platform
 import { readProxyGateData } from "@/lib/supabase/proxy-gates";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
+import { STATIC_HOME_ROUTE, wantsStaticHome } from "@/lib/static-home/request";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
 function maintenanceResponse(request: NextRequest) {
@@ -54,7 +55,22 @@ export async function updateSession(request: NextRequest) {
     requestPath === "/giris" ||
     requestPath.startsWith("/giris/") ||
     requestPath === "/kayit";
-  if (!needsAuthResolution) return supabaseResponse;
+  if (!needsAuthResolution) {
+    // Ana sayfa belge isteği → saf HTML sürümü (Next/React JS'i yok); istemci gezinmesi normal sayfaya gider.
+    if (
+      wantsStaticHome({
+        method: request.method,
+        pathname: requestPath,
+        searchParams: request.nextUrl.searchParams,
+        headers: request.headers,
+      })
+    ) {
+      const rewrite = request.nextUrl.clone();
+      rewrite.pathname = STATIC_HOME_ROUTE;
+      return NextResponse.rewrite(rewrite);
+    }
+    return supabaseResponse;
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = resolveSupabasePublicKey();

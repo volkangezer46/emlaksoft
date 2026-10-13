@@ -54,5 +54,5 @@ export function SeatCalculatorLazy(props: {
     return () => io.disconnect();
   }, []);
 
-  return <div ref={ref}>{show ? <SeatCalculator {...props} /> : <Skeleton />}</div>;
+  return <div ref={ref} data-island="seat-calculator">{show ? <SeatCalculator {...props} /> : <Skeleton />}</div>;
 }

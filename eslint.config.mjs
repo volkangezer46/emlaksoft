@@ -55,6 +55,8 @@ const eslintConfig = defineConfig([
     "test-results/**",
     // Tarayıcı eklentisi derleme çıktısı (npm run build:extension).
     "extensions/*/dist/**",
+    // Statik ana sayfa derleme çıktısı (scripts/build-static-home.ts, prebuild).
+    "public/statik/**",
   ]),
 ]);
 
