@@ -141,3 +141,76 @@ export async function sendEmail(input: { to: string; subject: string; text: stri
     return { ok: false, code: "provider_error", error: "Bağlantı hatası" };
   }
 }
+
+export type ResolvedEmailConfig = ResolvedEmailChannel;
+
+export type EmailBatchItem = { to: string; subject: string; text: string };
+
+/**
+ * Toplu gönderim sonucu (öğe sırasıyla). `retryable`: sağlayıcı hız sınırı (429) ya da 5xx (istek işlenmedi);
+ * çağıran satırı daha sonra yeniden denemelidir ('failed' yazmamalıdır).
+ */
+export type EmailBatchResult =
+  | { ok: true; id: string | null }
+  | { ok: false; code: "disabled" | "invalid" | "provider_error"; error: string; retryable: boolean };
+
+/** Resend toplu uç noktasının tek istekteki en çok ileti sayısı. */
+export const EMAIL_BATCH_MAX = 100;
+
+/**
+ * Resend TOPLU gönderim (`/emails/batch`, istek başına en çok 100 ileti). Yapılandırma çağıran tarafından BİR KEZ
+ * çözülür (`resolveEmailChannelConfig`) ve verilir: öğe başına ayar okuması yok. Geçersiz öğeler istek atılmadan
+ * 'invalid' döner; geçerli olanlar tek istekte gider. Hız sınırı çağıranın işidir (istek sayısı = ceil(n/100)).
+ */
+export async function sendEmailBatch(cfg: ResolvedEmailConfig, items: readonly EmailBatchItem[]): Promise<EmailBatchResult[]> {
+  const out: EmailBatchResult[] = new Array(items.length);
+  if (!cfg.enabled || !cfg.apiKey) {
+    for (let i = 0; i < items.length; i++) out[i] = { ok: false, code: "disabled", error: cfg.reason ?? "E-posta kanalı kapalı", retryable: false };
+    return out;
+  }
+  const valid: { index: number; payload: Record<string, unknown> }[] = [];
+  items.forEach((input, index) => {
+    const to = input.to.trim();
+    const subject = input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200);
+    if (!EMAIL_RE.test(to) || to.length > 254) out[index] = { ok: false, code: "invalid", error: "Geçersiz alıcı", retryable: false };
+    else if (!subject || !input.text.trim()) out[index] = { ok: false, code: "invalid", error: "Konu/gövde boş", retryable: false };
+    else
+      valid.push({
+        index,
+        payload: { from: cfg.from, to: [to], subject, text: input.text.slice(0, 20_000), ...(cfg.replyTo ? { reply_to: cfg.replyTo } : {}) },
+      });
+  });
+  for (let i = 0; i < valid.length; i += EMAIL_BATCH_MAX) {
+    const chunk = valid.slice(i, i + EMAIL_BATCH_MAX);
+    const fail = (error: string, retryable: boolean) => {
+      for (const v of chunk) out[v.index] = { ok: false, code: "provider_error", error, retryable };
+    };
+    try {
+      const res = await fetchExternal(
+        "https://api.resend.com/emails/batch",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(chunk.map((v) => v.payload)),
+        },
+        { timeoutMs: 15_000 },
+      );
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        fail(`HTTP ${res.status}`, res.status === 429 || res.status >= 500);
+        continue;
+      }
+      const json = (await res.json().catch(() => null)) as { data?: { id?: string }[] } | null;
+      chunk.forEach((v, k) => {
+        const id = json?.data?.[k]?.id;
+        out[v.index] = { ok: true, id: typeof id === "string" ? id : null };
+      });
+    } catch (e) {
+      // Zaman aşımında ileti sağlayıcıda gitmiş olabilir: kendiliğinden yeniden deneme çift gönderim yaratır.
+      // 'failed' kalır; arşivdeki "yeniden dene" bilinçli karardır.
+      console.error("sendEmailBatch", externalErrorMetadata(e));
+      fail("Bağlantı hatası", false);
+    }
+  }
+  return out;
+}

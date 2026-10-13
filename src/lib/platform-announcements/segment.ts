@@ -162,17 +162,19 @@ const PAGE = 1000;
 
 type Admin = {
   from: (table: string) => any; // eslint-disable-line @typescript-eslint/no-explicit-any -- PostgREST istemcisi (tablo şeması tiplenmemiş)
+  rpc: (fn: string, args: Record<string, unknown>) => any; // eslint-disable-line @typescript-eslint/no-explicit-any -- PostgREST RPC oluşturucusu (order/range)
 };
 
 async function pagedIds(fetchPage: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>, pick: (r: Record<string, unknown>) => string) {
   const out = new Set<string>();
-  for (let from = 0; from < TENANT_SCAN_CAP * 5; from += PAGE) {
+  for (let from = 0; from < TENANT_SCAN_CAP; from += PAGE) {
     const { data, error } = await fetchPage(from, from + PAGE - 1);
     if (error) throw new Error("Hedef kitle okunamadı.");
     for (const r of (data ?? []) as Record<string, unknown>[]) out.add(pick(r));
-    if (!data || data.length < PAGE) break;
+    if (!data || data.length < PAGE) return out;
   }
-  return out;
+  // Sessizce kesmek yanlış hedef kitle demektir (ör. "giriş yapmayan" ölçütüne aktif ofisler girer): hata ver.
+  throw new Error("Hedef kitle çok büyük; ölçütü daraltın.");
 }
 
 /** Segmentteki ofis kimlikleri (iptal hariç). */
@@ -192,8 +194,9 @@ export async function resolveSegmentTenantIds(admin: Admin, seg: Segment, nowMs:
   const ctx: SegmentContext = { nowMs };
   if (seg.lastLogin && ids.length) {
     const since = new Date(nowMs - seg.lastLogin.days * DAY_MS).toISOString();
+    // Ofis başına tek satır (RPC: ofis başına EXISTS, giriş satırı sayısından bağımsız); ham giriş satırı taranmaz.
     ctx.loggedInTenantIds = await pagedIds(
-      (a, b) => admin.from("login_events").select("tenant_id").eq("result", "success").gte("created_at", since).not("tenant_id", "is", null).order("id").range(a, b),
+      (a, b) => admin.rpc("platform_announcement_login_tenants", { p_since: since }).order("tenant_id").range(a, b),
       (r) => r.tenant_id as string,
     );
   }

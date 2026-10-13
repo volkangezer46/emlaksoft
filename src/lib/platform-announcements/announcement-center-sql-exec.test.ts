@@ -14,7 +14,8 @@ const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 const STUB = `
 create role service_role; create role authenticated; create role anon;
 create schema auth;
-create table auth.users(id uuid primary key);
+create table auth.users(id uuid primary key, email text);
+create table public.login_events(id uuid primary key default gen_random_uuid(), tenant_id uuid, result text, created_at timestamptz not null default now());
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('t.uid', true), '')::uuid $$;
 create function public.current_tenant_id() returns uuid language sql stable as $$ select nullif(current_setting('t.tenant', true), '')::uuid $$;
 create function public.is_platform_staff() returns boolean language sql stable as $$ select coalesce(current_setting('t.staff', true), '') = '1' $$;
@@ -50,7 +51,7 @@ describe.skipIf(!mod)("duyuru merkezi migration (pglite)", () => {
     T2 = (await q(`insert into public.tenants default values returning id`))[0]!.id as string;
     U1 = "11111111-1111-4111-8111-111111111111";
     U2 = "22222222-2222-4222-8222-222222222222";
-    await q(`insert into auth.users values ($1), ($2)`, [U1, U2]);
+    await q(`insert into auth.users values ($1, 'u1@ornek.com'), ($2, null)`, [U1, U2]);
     await q(`insert into public.profiles values ($1, $2), ($3, $4)`, [U1, T1, U2, T2]);
     await db.exec(read("supabase/migrations/20261013004700_platform_announcement_center.sql"));
     A = (await q(`insert into public.platform_announcements(title, audience, status, channels, href) values ('Duyuru', 'segment', 'sending', array['in_app','email'], '/app/ayarlar') returning id`))[0]!.id as string;
@@ -83,6 +84,36 @@ describe.skipIf(!mod)("duyuru merkezi migration (pglite)", () => {
     expect(first.map((r) => r.id)).not.toContain(second[0]!.id);
     const third = await q(`select id from public.platform_announcement_claim(10, null)`);
     expect(third).toHaveLength(0);
+  });
+
+  it("geri çekilme: not_before gelecekteyse satır alınmaz, geçince alınır", async () => {
+    const d = (await q(
+      `insert into public.platform_announcement_deliveries(announcement_id, tenant_id, user_id, channel, not_before)
+       values ($1, $2, $3, 'push', now() + interval '1 minute') returning id`,
+      [A, T1, U1],
+    ))[0]!.id as string;
+    expect(await q(`select id from public.platform_announcement_claim(10, $1)`, [A])).toHaveLength(0);
+    await q(`update public.platform_announcement_deliveries set not_before = now() - interval '1 second' where id = $1`, [d]);
+    expect((await q(`select id from public.platform_announcement_claim(10, $1)`, [A])).map((r) => r.id)).toEqual([d]);
+  });
+
+  it("alıcı e-postaları tek çağrıda; son giriş RPC'si ofis başına tek satır ve iptal edilmiş ofis hariç", async () => {
+    const emails = await q(`select user_id, email from public.platform_announcement_recipient_emails(array[$1, $2]::uuid[])`, [U1, U2]);
+    expect(emails).toEqual([{ user_id: U1, email: "u1@ornek.com" }]);
+    await q(
+      `insert into public.login_events(tenant_id, result, created_at) values
+         ($1, 'success', now() - interval '1 day'), ($1, 'success', now() - interval '2 day'),
+         ($2, 'failed', now() - interval '1 day'), ($2, 'success', now() - interval '40 day')`,
+      [T1, T2],
+    );
+    const since = `now() - interval '30 day'`;
+    expect((await q(`select tenant_id from public.platform_announcement_login_tenants(${since})`)).map((r) => r.tenant_id)).toEqual([T1]);
+    await q(`update public.tenants set status = 'cancelled' where id = $1`, [T1]);
+    expect(await q(`select tenant_id from public.platform_announcement_login_tenants(${since})`)).toHaveLength(0);
+    await q(`update public.tenants set status = 'active' where id = $1`, [T1]);
+    await asUser(U1, T1);
+    await expect(q(`select * from public.platform_announcement_recipient_emails(array[$1]::uuid[])`, [U1])).rejects.toThrow();
+    await asAdmin();
   });
 
   it("okundu tetikleyicisi yalnız meta.pad taşıyan bildirimde çalışır ve sayacı bir kez artırır", async () => {

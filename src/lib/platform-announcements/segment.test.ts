@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DAY_MS } from "@/lib/clock";
 import { buildDeliveryRows, trackingPath } from "./queue";
-import { describeSegment, parseSegment, segmentFromForm, tenantMatchesSegment, type SegmentTenant } from "./segment";
+import { describeSegment, parseSegment, resolveSegmentTenantIds, segmentFromForm, tenantMatchesSegment, type SegmentTenant } from "./segment";
 
 const NOW = Date.UTC(2026, 9, 13, 7, 0, 0); // 10:00 TSİ
 const T = (over: Partial<SegmentTenant>): SegmentTenant => ({ id: "t", plan: "office", status: "active", trial_ends_at: null, city: null, ...over });
@@ -76,5 +76,35 @@ describe("teslim satırları (saf)", () => {
   });
   it("tıklama bağlantısı yalnız teslim kimliği taşır (hedef adres istekte yok)", () => {
     expect(trackingPath("abc")).toBe("/api/duyuru/tik?d=abc");
+  });
+});
+
+describe("son giriş çözümleyicisi", () => {
+  /** Sahte istemci: tenants sorgusu + ofis başına tek satır döndüren giriş RPC'si (sayfalı). */
+  function fakeAdmin(tenantIds: string[], loggedIn: string[]) {
+    const page = (rows: unknown[]) => ({ order: () => ({ range: async (a: number, b: number) => ({ data: rows.slice(a, b + 1), error: null }) }) });
+    const tenantRows = tenantIds.map((id) => ({ id, plan: "office", status: "active", trial_ends_at: null, city: null }));
+    const chain = { neq: () => chain, in: () => chain, ...page(tenantRows) };
+    const calls: string[] = [];
+    return {
+      calls,
+      from: () => ({ select: () => chain }),
+      rpc: (fn: string) => {
+        calls.push(fn);
+        return page(loggedIn.map((tenant_id) => ({ tenant_id })));
+      },
+    };
+  }
+
+  it("'giriş yapmayan' ölçütü ofis başına RPC ile çözülür; aktif ofis hedefe girmez", async () => {
+    const admin = fakeAdmin(["t1", "t2", "t3"], ["t2"]);
+    const ids = await resolveSegmentTenantIds(admin, { lastLogin: { mode: "inactive", days: 365 } }, NOW);
+    expect(ids).toEqual(["t1", "t3"]);
+    expect(admin.calls).toEqual(["platform_announcement_login_tenants"]);
+  });
+
+  it("üst sınır aşılırsa sessizce kesmez, hata verir", async () => {
+    const many = Array.from({ length: 10_000 }, (_, i) => `t${i}`);
+    await expect(resolveSegmentTenantIds(fakeAdmin(["t1"], many), { lastLogin: { mode: "active", days: 30 } }, NOW)).rejects.toThrow(/çok büyük/);
   });
 });

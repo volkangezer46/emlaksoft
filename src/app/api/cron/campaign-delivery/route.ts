@@ -12,8 +12,9 @@ export async function GET(request: NextRequest) {
 
   try {
     // AYRIK ADIM (AD8): platform duyuru kuyruğu. Kampanya işinden ÖNCE ve bağımsız çalışır (asla fırlatmaz,
-    // kendi süre bütçesi var); kampanya işi çökse de zamanlanmış duyurular 2 dk içinde gider.
-    const announcements = await runAnnouncementQueue();
+    // kendi süre bütçesi var); kampanya işi çökse de zamanlanmış duyurular 2 dk içinde gider. Üst sınır 15 sn:
+    // maxDuration=60 içinde kampanya işine süre kalır (kalan duyuru teslimi 2 dk sonraki turda sürer).
+    const announcements = await runAnnouncementQueue({ maxBudgetMs: 15_000 });
     const summary = await runCampaignDeliveryWorker({
       campaignLimit: 3,
       recipientBatchSize: 10,

@@ -10,6 +10,8 @@ drop trigger if exists trg_notifications_announcement_read on public.notificatio
 drop function if exists public.platform_announcement_mark_read();
 drop function if exists public.platform_announcement_track_click(uuid);
 drop function if exists public.platform_announcement_claim(integer, uuid);
+drop function if exists public.platform_announcement_recipient_emails(uuid[]);
+drop function if exists public.platform_announcement_login_tenants(timestamptz);
 
 drop table if exists public.changelog_reads;
 drop table if exists public.changelog_entries;

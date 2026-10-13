@@ -85,6 +85,8 @@ create table if not exists public.platform_announcement_deliveries (
   notification_id uuid,
   provider_id     text check (provider_id is null or char_length(provider_id) <= 200),
   locked_at       timestamptz,
+  -- Geçici hata (sağlayıcı hız sınırı 429 / 5xx / bağlantı) sonrası bu ana kadar yeniden alınmaz (geri çekilme).
+  not_before      timestamptz,
   sent_at         timestamptz,
   read_at         timestamptz,
   clicked_at      timestamptz,
@@ -131,6 +133,7 @@ begin
     select d.id
     from public.platform_announcement_deliveries d
     where (d.status = 'pending' or (d.status = 'sending' and d.locked_at < now() - interval '10 minutes'))
+      and (d.not_before is null or d.not_before <= now())
       and (p_announcement is null or d.announcement_id = p_announcement)
     order by d.created_at
     limit greatest(1, least(coalesce(p_limit, 100), 1000))
@@ -146,6 +149,45 @@ $$;
 
 revoke all on function public.platform_announcement_claim(integer, uuid) from public, anon, authenticated;
 grant execute on function public.platform_announcement_claim(integer, uuid) to service_role;
+
+-- E-posta adresleri parti başına TEK sorguda (kullanıcı başına auth.admin.getUserById yerine). Yalnız service_role.
+create or replace function public.platform_announcement_recipient_emails(p_users uuid[])
+returns table (user_id uuid, email text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select u.id, u.email::text
+    from auth.users u
+   where u.id = any(p_users)
+     and u.email is not null;
+$$;
+
+revoke all on function public.platform_announcement_recipient_emails(uuid[]) from public, anon, authenticated;
+grant execute on function public.platform_announcement_recipient_emails(uuid[]) to service_role;
+
+-- Segment "son giriş" ölçütü: verilen tarihten beri başarılı girişi olan ofisler (ofis başına tek satır).
+-- Ofis başına idx_login_events_tenant_created üzerinde tek EXISTS araması; giriş satırı sayısından bağımsız.
+-- PostgREST satır sınırı (1000) nedeniyle çağıran sayfalı okur (order tenant_id + range).
+create or replace function public.platform_announcement_login_tenants(p_since timestamptz)
+returns table (tenant_id uuid)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select t.id
+    from public.tenants t
+   where t.status <> 'cancelled'
+     and exists (
+       select 1 from public.login_events e
+        where e.tenant_id = t.id and e.created_at >= p_since and e.result = 'success'
+     );
+$$;
+
+revoke all on function public.platform_announcement_login_tenants(timestamptz) from public, anon, authenticated;
+grant execute on function public.platform_announcement_login_tenants(timestamptz) to service_role;
 
 -- Tıklama: ilk tıklamada teslim satırını işaretler, duyuru sayacını artırır; yönlendirme adresini döndürür.
 -- E-postadan gelen tıklama aynı zamanda "okundu" sayılır (düz metin e-postada açılma ölçümü yok).

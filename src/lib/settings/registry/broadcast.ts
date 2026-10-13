@@ -10,6 +10,7 @@ export const BROADCAST_HOME = { href: "/admin/duyuru", label: "Toplu duyuru" } a
 export const BROADCAST_SETTING_KEYS = {
   batchSize: "broadcast.queue_batch_size",
   budgetSeconds: "broadcast.queue_budget_seconds",
+  emailRatePerSec: "broadcast.email_rate_per_sec",
 } as const;
 
 export const BROADCAST_SETTING_DEFS: AnySettingDef[] = [
@@ -35,6 +36,18 @@ export const BROADCAST_SETTING_DEFS: AnySettingDef[] = [
     label: "Duyuru kuyruğu süre bütçesi (sn)",
     description: "Kuyruğun bir çalıştırmada en çok kaç saniye gönderim yapacağı; kalan iş 2 dakika sonraki çalıştırmaya kalır.",
     impact: "Cron ucu 60 sn ile sınırlıdır; 45 sn üstü desteklenmez. Düşük değer gönderimi uzatır ama sunucuyu rahatlatır.",
+    permission: { platformModule: "broadcast", superAdminOnly: true },
+  }),
+  defineInt({
+    key: BROADCAST_SETTING_KEYS.emailRatePerSec,
+    home: BROADCAST_HOME,
+    default: 2,
+    min: 1,
+    max: 20,
+    category: "bildirim",
+    label: "Duyuru e-postası istek hızı (istek/sn)",
+    description: "Duyuru kuyruğunun e-posta sağlayıcısına (Resend) saniyede en çok kaç istek atacağı. Her istek 100 iletiye kadar toplu gönderir.",
+    impact: "Resend hesabının hız sınırını aşmayın (varsayılan hesapta 2/sn); aşılırsa satırlar 'başarısız' olmaz, geri çekilip yeniden denenir ama gönderim gecikir.",
     permission: { platformModule: "broadcast", superAdminOnly: true },
   }),
 ];
