@@ -108,6 +108,22 @@ describe("kritik eylemler kodu ilk yazımdan önce ister (sözleşme)", () => {
   }
 });
 
+describe("toplu ofis kapatma kodu atlamaz (sözleşme)", () => {
+  it("bulkTenantAction: askıya alma/iptal dalı yazımdan önce office_close kodunu doğrular", () => {
+    const src = readFileSync(join(process.cwd(), "src/app/actions/platform-crm.ts"), "utf8");
+    const start = src.indexOf("export async function bulkTenantAction(");
+    expect(start).toBeGreaterThan(-1);
+    const next = src.indexOf("\nexport async function ", start + 10);
+    const body = src.slice(start, next === -1 ? undefined : next);
+    const branch = body.slice(body.indexOf('action.op === "status"'));
+    const gate = branch.indexOf("requireStepUp(");
+    expect(gate, "requireStepUp yok").toBeGreaterThan(-1);
+    expect(branch.slice(gate, gate + 80)).toContain('"office_close"');
+    expect(branch.indexOf("applyTenantPlanStatus(")).toBeGreaterThan(gate);
+    expect(branch.indexOf("statusChangeNeedsStepUp(")).toBeGreaterThan(-1);
+  });
+});
+
 describe("erişim politikası anahtarları merkezden yazılamaz", () => {
   it("IP listesi, boşta/ömür ve step-up bridge; yazım yalnız saveAdminAccessPolicy (fromBridge)", async () => {
     const { prepareWrite } = await import("@/lib/settings/prepare");
