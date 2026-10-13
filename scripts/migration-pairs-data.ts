@@ -299,6 +299,10 @@ const F = {
   readyProbesPgCatalog: "20261013000400_ready_probes_pg_catalog.sql",
   // AP7 (2026-10-13): platform MRR gunluk anlik goruntusu (yeni tablo; yalniz public.tenants'a FK).
   platformMrrDaily: "20261013001000_platform_mrr_daily.sql",
+  // SP3 (2026-10-13): birinci taraf olcum (cerezsiz sayac + hiz histogrami), kayit atfi genisletmesi, huni RPC'si.
+  publicMeasurement: "20261013003200_public_measurement.sql",
+  signupAttributionExt: "20261013003210_signup_attribution_ext.sql",
+  growthFunnel: "20261013003220_growth_funnel.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -506,6 +510,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.tenantIndexesDedupe]: "ek", // 11 kopya indeks dusurulur (benzersiz kisit ikizleri) + 12 tabloya tenant_id indeksi; veri/politika degismez
     [F.readyProbesPgCatalog]: "davranis", // plan_upgrade_ready/subscription_pause_ready sutun sayimi information_schema yerine pg_attribute; imza/ACL/sonuc ayni
     [F.platformMrrDaily]: "ek", // yeni tablo platform_mrr_daily (RLS: platform personeli billing/reports rolleri SELECT; yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "veri yok"
+    [F.publicMeasurement]: "ek", // 2 yeni tablo (public_pageviews_daily, web_vitals_daily; RLS acik, politika yok, yalniz service_role) + analytics_ingest/analytics_prune/analytics_vitals_summary RPC'leri; mevcut nesnelere dokunmaz, kod tablo yokken 10 dk arayla yeniden dener
+    [F.signupAttributionExt]: "ek", // signup_attributions'a 6 nullable sutun (channel, src_host, utm_term, utm_content, first_touch, last_touch) + uzunluk/desen CHECK'leri (landing_path dahil); gclid YOK; tablo 0 satir, geriye donuk doldurma yok
+    [F.growthFunnel]: "ek", // yeni salt-okunur SECURITY DEFINER RPC platform_growth_funnel (yalniz service_role; platform_dashboard_rollups deseni); tablo/politika/veri degismez
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -690,6 +697,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // order 59 bilerek bos: ACL onarimi migration degil (tek seferlik betik + npm run check:acl).
     { id: "DB1-rls-initplan-fsbo-staff", order: 60, title: "RLS InitPlan sarmasi: fsbo_*, platform personeli ve destek v2 politikalari (20261012002800 SONRASI; anlam ayni, davranis)", files: [F.rlsInitplanFsboStaff] },
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
+    { id: "SP3-birinci-taraf-olcum", order: 64, title: "Birinci taraf olcum: sayac/hiz tablolari + ingest/prune RPC, kayit atfi sutunlari, huni RPC'si (003220, 003200 ve 003210 SONRASI; KOD YAYININDAN ONCE uygulanir; kod tablo/sutun yokken eski yola duser; ek)", files: [F.publicMeasurement, F.signupAttributionExt, F.growthFunnel] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
@@ -877,6 +885,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.rlsInitplanFsboStaff, F.fsboSelectScope],
     // Portal aktarim RPC'leri lc_bind_portal_listing (002000), lc_row_visible (002010) ve lc_mark_state_stale (002040) cekirdegine dayanir.
     [F.portalTransferSessions, F.lcInventoryMatching],
+    // SP3: huni RPC'si sayac tablosunu (003200) ve signup_attributions.channel sutununu (003210) okur.
+    [F.growthFunnel, F.publicMeasurement],
+    [F.growthFunnel, F.signupAttributionExt],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
