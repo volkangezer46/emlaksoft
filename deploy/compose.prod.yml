@@ -47,6 +47,34 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
+  # /_next/static: önceden sıkıştırılmış (brotli q11 / gzip -9) dosyaları doğrudan sunar
+  # (scripts/sunucu/precompress-static.mjs üretir). Uygulama konteyneri bu yolu yine sunabilir; Traefik yalnız
+  # bu yolu daha yüksek öncelikle buraya verir.
+  static:
+    # 2.10.2 önceden sıkıştırılmış yanıtı Range isteği olmadan 206 döndürüyor; 2.10.0 doğru (200).
+    image: caddy:2.10.0-alpine
+    container_name: emlaksoft-static
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 128m
+    volumes:
+      - /srv/emlaksoft/next-static:/srv/static:ro
+      - ./Caddyfile.static:/etc/caddy/Caddyfile:ro
+    tmpfs: [/data, /config]
+    networks: [coolify]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.services.emlaksoft-static.loadbalancer.server.port: "8080"
+      traefik.http.routers.emlaksoft-static.entrypoints: https
+      traefik.http.routers.emlaksoft-static.rule: (Host(`emlaksoft.com.tr`) || Host(`www.emlaksoft.com.tr`)) && PathPrefix(`/_next/static/`)
+      traefik.http.routers.emlaksoft-static.priority: "1000"
+      traefik.http.routers.emlaksoft-static.service: emlaksoft-static
+      traefik.http.routers.emlaksoft-static.tls: "true"
+      traefik.http.routers.emlaksoft-static.tls.certresolver: letsencrypt
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 networks:
   coolify:
     external: true

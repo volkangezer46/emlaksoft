@@ -42,6 +42,9 @@ docker cp "$CID:/app/.next" "$BUDGET_DIR/"
 docker rm "$CID" >/dev/null
 find "$STATIC_DIR" -type f -mtime +14 -delete
 find "$STATIC_DIR" -mindepth 1 -type d -empty -delete
+# Yetim .br/.gz kopyaları (asıl dosyası budanmış) silinir, yeni dosyalar önceden sıkıştırılır (static servisi sunar).
+find "$STATIC_DIR" -type f \( -name '*.br' -o -name '*.gz' \) | while read -r z; do [ -e "${z%.*}" ] || rm -f "$z"; done
+node scripts/sunucu/precompress-static.mjs "$STATIC_DIR"
 chown -R 1001:1001 "$STATIC_DIR"
 
 if ! npx tsx scripts/check-bundle-budget.ts --gate --next-dir="$BUDGET_DIR/.next"; then
