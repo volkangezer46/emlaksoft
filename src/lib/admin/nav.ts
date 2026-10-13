@@ -179,7 +179,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/aktivite", "Aktivite kaydı", "Denetim izi", ["activity"]),
         ],
       },
-{ href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
+      { href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
       { href: "/admin/personel", label: "Personel", description: "EmlakSoft çalışanları ve rolleri", icon: ShieldCheck, modules: ["personel"] },
       {
         href: "/admin/ayarlar",
@@ -233,6 +233,15 @@ export function isAdminNavActive(pathname: string, item: Pick<AdminNavItem, "hre
 export function activeAdminItem(pathname: string, sections: readonly AdminNavSection[] = ADMIN_NAV): AdminNavItem | null {
   for (const s of sections) for (const i of s.items) if (isAdminNavActive(pathname, i)) return i;
   return null;
+}
+
+/**
+ * Sekme etkinliği için yol: hata listesi `/admin/sistem?sekme=hatalar` adresinde açılır (eski /admin/hatalar oraya
+ * yönlenir) ama bölüm şeridinde "Hata kayıtları" sekmesi `/admin/hatalar` yoludur. Sorgu dizgesi yol eşleşmesine
+ * girmediğinden bu görünüm sekme açısından `/admin/hatalar` sayılır; yoksa "Sağlık ve entegrasyonlar" etkin görünürdü.
+ */
+export function adminTabPathname(pathname: string, sekme: string | null | undefined): string {
+  return pathname === "/admin/sistem" && sekme === "hatalar" ? "/admin/hatalar" : pathname;
 }
 
 /** Sekme aktif mi: en uzun eşleşen sekme kazanır (/admin/ayarlar/merkez, /admin/ayarlar'ı ezmez). */

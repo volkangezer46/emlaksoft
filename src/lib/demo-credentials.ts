@@ -20,7 +20,7 @@ export function deriveDemoPassword(secret: string, email: string): string {
 }
 
 /** Demo kimliklerinin alan adı (tek kaynak; `demo-personas.ts` e-postaları bu alandadır). */
-const DEMO_EMAIL_DOMAIN = "demo.emlaksoft.test";
+export const DEMO_EMAIL_DOMAIN = "demo.emlaksoft.test";
 
 /** Demo kişiliği e-postası mı? (ör. e-posta doğrulama şeridi demo hesaplarda gösterilmez). */
 export function isDemoEmail(email: string | null | undefined): boolean {

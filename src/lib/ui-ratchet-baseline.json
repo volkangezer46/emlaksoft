@@ -1376,7 +1376,7 @@
  "src/components/admin/admin-sidebar.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/admin/admin-topbar.tsx": {
@@ -1430,7 +1430,7 @@
  "src/components/app/app-sidebar.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 5,
+  "hamButon": 4,
   "kucukHedef": 0
  },
  "src/components/app/avatar-editor.tsx": {

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "@/components/ui/smart-link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { PlatformModule } from "@/lib/platform-access";
-import { activeAdminItem, activeTabHref, adminNavFor } from "@/lib/admin/nav";
+import { activeAdminItem, activeTabHref, adminNavFor, adminTabPathname } from "@/lib/admin/nav";
 
 /**
  * Bölüm sekmeleri: bulunulan sayfanın menü öğesinin `tabs` listesi varsa (Site & marka, Sistem, Ayarlar) kabuk
@@ -12,10 +12,12 @@ import { activeAdminItem, activeTabHref, adminNavFor } from "@/lib/admin/nav";
  */
 export function AdminSectionTabs({ modules }: { modules: readonly PlatformModule[] }) {
   const pathname = usePathname() ?? "";
+  const sekme = useSearchParams()?.get("sekme");
   const item = activeAdminItem(pathname, adminNavFor(modules));
   const tabs = item?.tabs ?? [];
   if (tabs.length < 2) return null;
-  const current = activeTabHref(pathname, tabs);
+  // `?sekme=hatalar` (hata listesi) "Hata kayıtları" sekmesini etkin yapar; bkz. adminTabPathname.
+  const current = activeTabHref(adminTabPathname(pathname, sekme), tabs);
   return (
     <nav aria-label={`${item!.label} bölümleri`} className="-mb-1 flex gap-1 overflow-x-auto border-b border-line pb-px">
       {tabs.map((t) => {

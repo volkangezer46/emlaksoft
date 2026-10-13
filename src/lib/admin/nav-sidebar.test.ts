@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PLATFORM_ROLE_MODULES } from "@/lib/platform-access";
-import { ADMIN_NAV, adminNavFor, adminSidebarModel } from "./nav";
+import { ADMIN_NAV, activeTabHref, adminNavFor, adminSidebarModel, adminTabPathname } from "./nav";
 
 describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
   it("her rolde görünen + katlanan = rolün menüsü; hiçbir sayfa kaybolmaz, tekrar yok", () => {
@@ -61,5 +61,16 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     expect(byHref.get("/admin/site")?.short).toBe("Site");
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).toContain("{tab.short ?? tab.label}");
+  });
+});
+
+describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekmesini etkin yapar", () => {
+  const sistem = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/sistem")!;
+  it("hata görünümü Hata kayıtları, diğer görünümler Sağlık sekmesidir", () => {
+    expect(activeTabHref(adminTabPathname("/admin/sistem", "hatalar"), sistem.tabs!)).toBe("/admin/hatalar");
+    expect(activeTabHref(adminTabPathname("/admin/sistem", null), sistem.tabs!)).toBe("/admin/sistem");
+    expect(activeTabHref(adminTabPathname("/admin/sistem", "emlakfiyati"), sistem.tabs!)).toBe("/admin/sistem");
+    // Başka sayfadaki `sekme=hatalar` eşlemeye girmez.
+    expect(adminTabPathname("/admin/aktivite", "hatalar")).toBe("/admin/aktivite");
   });
 });

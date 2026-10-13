@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * Mobil menü çekmecesinin AÇIK durumu (lg altı). Eskiden hamburger düğmesi kenar çubuğu bileşeninde `fixed`
@@ -88,15 +89,16 @@ export function useMobileMenu(): MobileMenuState {
  * (h-16) ayrı bileşendir; düğme layout'taki sıfır yükseklikli yapışkan kapta aynı `pl-16` boşluğuna oturur.
  */
 const VARIANT_CLASS = {
-  app: "top-1/2 -translate-y-1/2 bg-ink-950 shadow-[var(--shadow-card)] lg:hidden",
-  admin: "top-2.5 bg-[var(--navy-800)] shadow-[var(--elev-3)] md:hidden",
+  app: "top-1/2 -translate-y-1/2 bg-ink-950 hover:bg-ink-950 active:bg-ink-950 shadow-[var(--shadow-card)] lg:hidden",
+  admin: "top-2.5 bg-[var(--navy-800)] hover:bg-[var(--navy-800)] active:bg-[var(--navy-800)] shadow-[var(--elev-3)] md:hidden",
 } as const;
 
 export function MobileMenuTrigger({ controlsId, label, variant = "app" }: { controlsId: string; label: string; variant?: keyof typeof VARIANT_CLASS }) {
   const { open, requestOpen, warm } = useMobileMenu();
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon"
       onClick={requestOpen}
       onPointerEnter={warm}
       onFocus={warm}
@@ -105,9 +107,10 @@ export function MobileMenuTrigger({ controlsId, label, variant = "app" }: { cont
       aria-expanded={open}
       aria-controls={controlsId}
       aria-label={label}
-      className={`focus-ring absolute left-3 z-10 grid h-11 w-11 place-items-center rounded-[var(--radius-control)] text-white ${VARIANT_CLASS[variant]}`}
+      // Kanonik düğme (odak/basma tek yerde); koyu zemin ve 44px kare burada sabitlenir (twMerge ghost zemin/renklerini varyant sınıflarıyla ezer).
+      className={`absolute left-3 z-10 grid h-11 w-11 place-items-center text-white hover:text-white ${VARIANT_CLASS[variant]}`}
     >
       <Menu className="h-5 w-5" aria-hidden />
-    </button>
+    </Button>
   );
 }
