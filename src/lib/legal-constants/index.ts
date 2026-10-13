@@ -137,7 +137,7 @@ export const LEGAL_CONSTANTS = {
   foreignDistrictQuotaPct: c(10, "Yabancıya satılabilecek ilçe yüzölçümü sınırı (yaygın uygulama)", "pct", "Tapu Kanunu m.35 (ikincil kaynak)"),
 
   // --- EİDS: yetkisiz ilan / süresi biten ilanı kaldırmama cezası (EidsLegalNote; görev, pano ve kılavuz aynı metni okur) ---
-  // Yılbaşında yeniden değerlenir: yalnız bu iki satır değişir (src/lib/eids/legal-text.ts metni buradan üretir).
+  // Yılbaşında yeniden değerlenir: tarihli sabit (DATED_LEGAL_KEYS); yeni tutar mevzuat panelinden girilir, bu satır tabandır.
   eidsPenaltyMinTry: c(28_620, "EİDS yetkisiz ilan idari para cezası alt sınırı (2026)", "try", "Taşınmaz Ticareti Hakkında Yönetmelik md. 14/2-h ve 14/2-j; 2026 yeniden değerlenmiş tutar (ikincil kaynak)", {
     note: "İhlal başına uygulanır; aykırılık tekrarlanırsa yetki belgesi iptal edilebilir. Tutarı Ticaret Bakanlığından teyit edin.",
   }),
@@ -204,7 +204,8 @@ export type LegalValues = Partial<Record<LegalKey, number>>;
 
 /**
  * Tarihli değeri ÜRÜNE YANSIYAN sabitler: /app/hesaplayici (alım maliyeti oranları `purchaseRatesFromLegal` + satıcı net
- * hesabı `computeSellerProceeds`) o günün değerini sunucuda okur. Listede olmayanlar (kredi vade/LTV sınırı, yabancıya
+ * hesabı `computeSellerProceeds`) ve EİDS ceza metni (`src/lib/eids/legal-text.ts`; İlan Kontrol > Yetki, kurulum adımı,
+ * Yardım rehberi + SSS) o günün değerini sunucuda okur. Listede olmayanlar (kredi vade/LTV sınırı, yabancıya
  * satış eşikleri, komisyon tavanı denetimi, betikler) koddaki değerle çalışır; yönetim ekranı bunu satırda belirtir.
  * Kapsam testi: `history.test.ts`.
  */
@@ -231,6 +232,8 @@ export const DATED_LEGAL_KEYS: readonly LegalKey[] = [
   "valueGainIndexThresholdPct",
   "valueGainExemptionTry",
   "dkvThresholdTry",
+  "eidsPenaltyMinTry",
+  "eidsPenaltyMaxTry",
 ];
 
 export function legalValue(key: LegalKey, values?: LegalValues | null): number {

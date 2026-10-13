@@ -6,13 +6,23 @@ import { EidsForwardingGuide } from "@/components/eids/forwarding-guide";
 import { EidsLegalNote } from "@/components/eids/legal-note";
 import { EIDS_CALL_CENTER, EIDS_SENDER_ADDRESS } from "@/lib/eids/legal-text";
 import { EIDS_HELP_HREF, LICENSE_SETTINGS_HREF } from "@/lib/eids/links";
+import type { LegalValues } from "@/lib/legal-constants";
 
 /**
  * İlan Kontrol > Yetki: kılavuzun kısa hali (kapalı başlar; kuyruk önde kalır). Bakanlık e-postasının ne olduğu, nereye
  * geldiği (DOĞRULANMADI etiketiyle), EmlakSoft'a iletme adımları (sağlayıcı sekmeleri) ve iptal/ceza notu. Tam metin
  * Yardım > Rehberler'de (`eids-bakanlik-epostalari`). `address` verilirse adımlar ofisin gerçek alma adresiyle dolar.
  */
-export function EidsAuthorityGuidePanel({ address = null, licenseMissing = false }: { address?: string | null; licenseMissing?: boolean }) {
+export function EidsAuthorityGuidePanel({
+  address = null,
+  licenseMissing = false,
+  legalValues = null,
+}: {
+  address?: string | null;
+  licenseMissing?: boolean;
+  /** O gün yürürlükteki mevzuat değerleri (sarmalayıcı `getEffectiveLegalValues()` okur). */
+  legalValues?: LegalValues | null;
+}) {
   return (
     <details className="group rounded-[var(--radius-card)] border border-line bg-surface px-4 shadow-[var(--shadow-xs)]">
       <summary className="focus-ring flex min-h-11 cursor-pointer items-center gap-2 py-2 text-sm font-semibold text-ink-950">
@@ -44,7 +54,7 @@ export function EidsAuthorityGuidePanel({ address = null, licenseMissing = false
           </p>
         ) : null}
         <EidsForwardingGuide address={address} />
-        <EidsLegalNote />
+        <EidsLegalNote values={legalValues} />
         <ButtonLink href={EIDS_HELP_HREF} variant="secondary" iconRight={ArrowRight}>
           Kılavuzun tamamı
         </ButtonLink>

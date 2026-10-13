@@ -23,6 +23,7 @@ import { YetkiBelgesiStep } from "./steps/yetki-belgesi-step";
 import { EidsForwardingGuide } from "@/components/eids/forwarding-guide";
 import { EidsLegalNote } from "@/components/eids/legal-note";
 import { EIDS_HELP_HREF, EIDS_MAILBOX_SETTINGS_HREF } from "@/lib/eids/links";
+import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { getTenantModuleState } from "@/lib/modules/state";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
@@ -104,12 +105,13 @@ function YetkiBelgesiBody(p: StepBodyProps) {
 /**
  * "Bakanlık e-postalarını EmlakSoft'a ilet": sağlayıcı sekmeli kılavuz. Alma adresi Ayarlar > Entegrasyonlar kartında
  * üretilir (EP3); burada adres yerine yer tutucu yazılır ve karta bağlantı verilir. Atlanabilir; tamamlanana kadar
- * ana ekran Başlangıç kartı adımı hatırlatır.
+ * ana ekran Başlangıç kartı adımı hatırlatır. Ceza tutarı o gün yürürlükteki mevzuat değeridir.
  */
-function EidsEpostaBody(p: StepBodyProps) {
+async function EidsEpostaBody(p: StepBodyProps) {
   if (!p.canEditSettings) {
     return <Alert tone="info">İletme kuralını Bakanlık e-postalarının geldiği kutunun sahibi kurar (genelde ofis sahibi). Bu adımı atlayabilirsin.</Alert>;
   }
+  const legalValues = await getEffectiveLegalValues();
   return (
     <div className="space-y-4">
       <p className="text-sm text-text-muted">
@@ -126,7 +128,7 @@ function EidsEpostaBody(p: StepBodyProps) {
         </ButtonLink>
       </div>
       <EidsForwardingGuide address={null} />
-      <EidsLegalNote variant="compact" />
+      <EidsLegalNote variant="compact" values={legalValues} />
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { unstable_cache } from "next/cache";
 import { daysAgoIso } from "@/lib/clock";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readAllPaged } from "@/lib/supabase/read-all-paged";
+import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
+import { applyEffectiveEidsPenalty } from "./eids";
 import { isHelpKind, mergeHelpContent, voteKey, type HelpArticleRow, type HelpContent, type HelpDraft, type HelpKind, type HelpStatus, type VoteTally } from "./core";
 
 /**
@@ -88,8 +90,10 @@ const cachedLiveRows = unstable_cache(
 );
 
 /** Okuyucu birleşimi (kod + yayındaki DB). Okunamazsa koddaki içerik. */
+/** Birleşik içerik; EİDS ceza tutarı o gün yürürlükteki mevzuat değeriyle (legal_constants geçmişi). */
 export async function getHelpContent(): Promise<HelpContent> {
-  return mergeHelpContent(await cachedLiveRows());
+  const [rows, legal] = await Promise.all([cachedLiveRows(), getEffectiveLegalValues()]);
+  return applyEffectiveEidsPenalty(mergeHelpContent(rows), legal);
 }
 
 export type HelpList = { status: "ok"; rows: HelpArticleRow[] } | { status: "missing" } | { status: "error"; error: string };

@@ -8,7 +8,8 @@ import { LICENSE_SETTINGS_HREF } from "./links";
  *
  * Çalıştıran: mevcut `gunluk-ozet` cron'unda ayrık adım (yeni cron yok). Tek seferlik: aynı başlıklı görev ofiste HERHANGİ
  * bir durumda (açık/bitti/iptal) varsa yeniden açılmaz; sahibi görevi kapatırsa bir daha rahatsız edilmez. Numara girilince
- * ofis listeden kendiliğinden çıkar. Hata diğer cron adımlarını bozmaz (çağıran sayar).
+ * (Ayarlar ya da kurulum sihirbazı) ofis listeden çıkar ve AÇIK kalan görev aynı turda `done` olarak kapatılır (gecikmiş
+ * görünmesin). Hata diğer cron adımlarını bozmaz (çağıran sayar).
  */
 
 export const LICENSE_SETUP_TASK_TITLE = "Yetki belgesi numaranızı girin (EİDS)";
@@ -42,11 +43,18 @@ export function pickLicenseSetupTargets(
   return out;
 }
 
-export type LicenseSetupSummary = { opened: number; failed: number };
+export type LicenseSetupSummary = { opened: number; closed: number; failed: number };
+
+/** SAF: numarası girilmiş ofisler (açık kurulum görevi kapatılacaklar). */
+export function licenseFilledTenantIds(tenants: readonly LicenseSetupTenant[]): string[] {
+  return tenants.filter((t) => String(t.license_no ?? "").trim()).map((t) => t.id);
+}
 
 export async function runLicenseSetupTasks(admin: SupabaseClient, tenantIds: readonly string[], nowMs: number): Promise<LicenseSetupSummary> {
   let opened = 0;
+  let closed = 0;
   let failed = 0;
+  const nowIso = new Date(nowMs).toISOString();
   const dueAt = new Date(nowMs + LICENSE_SETUP_DUE_DAYS * 86_400_000).toISOString();
   for (let i = 0; i < tenantIds.length; i += CHUNK) {
     const ids = tenantIds.slice(i, i + CHUNK);
@@ -55,7 +63,20 @@ export async function runLicenseSetupTasks(admin: SupabaseClient, tenantIds: rea
       failed += 1;
       continue;
     }
-    const missing = ((tenants ?? []) as LicenseSetupTenant[]).filter((t) => !String(t.license_no ?? "").trim());
+    const rows = (tenants ?? []) as LicenseSetupTenant[];
+    const filledIds = licenseFilledTenantIds(rows);
+    if (filledIds.length > 0) {
+      const { data: done, error: cErr } = await admin
+        .from("tasks")
+        .update({ status: "done", completed_at: nowIso })
+        .in("tenant_id", filledIds)
+        .eq("title", LICENSE_SETUP_TASK_TITLE)
+        .eq("status", "open")
+        .select("id");
+      if (cErr) failed += 1;
+      else closed += (done ?? []).length;
+    }
+    const missing = rows.filter((t) => !String(t.license_no ?? "").trim());
     if (missing.length === 0) continue;
     const missingIds = missing.map((t) => t.id);
     const [taskRes, ownerRes] = await Promise.all([
@@ -90,5 +111,5 @@ export async function runLicenseSetupTasks(admin: SupabaseClient, tenantIds: rea
     if (error) failed += 1;
     else opened += targets.length;
   }
-  return { opened, failed };
+  return { opened, closed, failed };
 }

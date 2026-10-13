@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { ALL_NAV_HREFS } from "@/lib/nav-config";
 import { FAQ, FAQ_CATEGORIES, FAQ_PRICE_PATTERN } from "./help-faq";
 import { GUIDES, HELP_TABS, OWNER_REQUIRED_SUMMARY, matchesQuery, resolveHelpTab } from "./help-content";
-import { eidsPenaltyRangeText } from "./eids/legal-text";
+import { stripEidsPenaltyAmounts } from "./eids/legal-text";
 
 /** Mevzuat tutarı (EİDS ceza aralığı, legal-constants'tan) ürün fiyatı değildir; fiyat denetiminden önce ayıklanır. */
-const withoutLegalAmounts = (t: string) => t.split(eidsPenaltyRangeText()).join("");
+const withoutLegalAmounts = stripEidsPenaltyAmounts;
 
 const guideText = (slug: string) => {
   const g = GUIDES.find((x) => x.slug === slug);

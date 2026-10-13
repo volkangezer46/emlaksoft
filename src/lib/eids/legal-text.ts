@@ -5,7 +5,9 @@ import { legalValue, type LegalValues } from "@/lib/legal-constants";
  *
  * Görev metni (EP4 eids_takedown), pano kartı, Yardım rehberi, İlan Kontrol > Yetki kılavuzu ve kurulum adımları bu
  * metni okur; React tarafı `src/components/eids/legal-note.tsx` (EidsLegalNote). Ceza tutarları `legal-constants`
- * (`eidsPenaltyMinTry` / `eidsPenaltyMaxTry`) içinden gelir: yılbaşında yalnız o iki satır güncellenir.
+ * (`eidsPenaltyMinTry` / `eidsPenaltyMaxTry`) içinden gelir ve TARİHLİ sabittir (DATED_LEGAL_KEYS): yılbaşında yönetici yeni
+ * tutarı mevzuat panelinden (`legal_constants` geçmişi) girer; sunucu yüzeyleri `getEffectiveLegalValues()` okuyup `values`
+ * geçirir (İlan Kontrol > Yetki, kurulum adımı, Yardım rehberi + SSS: `applyEffectiveEidsPenalty`). Koddaki satır tabandır.
  * Hukuki danışmanlık DEĞİLDİR; tutar ikincil kaynaktan, resmî metinden teyit edilmedi.
  */
 
@@ -24,6 +26,16 @@ export function eidsPenaltyRangeText(values?: LegalValues | null): string {
   const min = legalValue("eidsPenaltyMinTry", values);
   const max = legalValue("eidsPenaltyMaxTry", values);
   return `${num(min)} – ${num(max)} TL`;
+}
+
+/**
+ * Metinlerdeki ceza tutarı ifadesi ("idari para cezası 28.620 – 858.620 TL"), hangi yılın değeri olursa olsun. Mevzuat
+ * tutarı ürün fiyatı değildir: fiyat denetimleri (FAQ_PRICE_PATTERN; AI SSS bağlamı ve yardım testleri) önce bunu ayıklar.
+ */
+const PENALTY_PHRASE_RE = /idari para cezası \d[\d.]* – \d[\d.]* TL/g;
+
+export function stripEidsPenaltyAmounts(text: string): string {
+  return text.replace(PENALTY_PHRASE_RE, "idari para cezası");
 }
 
 export type EidsLegalNoteContent = {

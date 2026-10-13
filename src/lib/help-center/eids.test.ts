@@ -8,7 +8,10 @@ import {
   fillForwardingText,
   guessForwardingProvider,
 } from "@/lib/eids/forwarding";
-import { EIDS_FAQ, EIDS_GUIDE, EIDS_HELP_SLUG, EIDS_UNVERIFIED_TAG } from "./eids";
+import { eidsPenaltyRangeText as rangeText, stripEidsPenaltyAmounts } from "@/lib/eids/legal-text";
+import { FAQ_PRICE_PATTERN } from "@/lib/help-faq";
+import { selectFaqForQuestion } from "@/lib/ai/faq-context";
+import { EIDS_FAQ, EIDS_GUIDE, EIDS_HELP_SLUG, EIDS_UNVERIFIED_TAG, applyEffectiveEidsPenalty } from "./eids";
 import { helpGuideHref, mergeHelpContent } from "./core";
 
 const content = mergeHelpContent([]);
@@ -97,5 +100,32 @@ describe("iletme kılavuzu (sağlayıcı sekmeleri)", () => {
     expect(guessForwardingProvider("ofis@hotmail.com")).toBe("outlook");
     expect(guessForwardingProvider("ofis@yandex.com.tr")).toBe("yandex");
     expect(guessForwardingProvider(null)).toBe("gmail");
+  });
+});
+
+describe("EİDS ceza tutarı yürürlükteki mevzuat değerini izler", () => {
+  const next = { eidsPenaltyMinTry: 31_000, eidsPenaltyMaxTry: 930_000 };
+
+  it("yardım içeriği (rehber + SSS) yılbaşında girilen tarihli değerle üretilir", () => {
+    const merged = applyEffectiveEidsPenalty(mergeHelpContent([]), next);
+    const guide = merged.guides.find((g) => g.slug === EIDS_HELP_SLUG)!;
+    const faq = merged.faq.find((f) => f.id === "eids-iptal-ilan-duser-mi")!;
+    for (const t of [guide.steps.join(" "), faq.a]) {
+      expect(t).toContain(rangeText(next));
+      expect(t).not.toContain(rangeText());
+    }
+    expect(rangeText(next)).toBe("31.000 – 930.000 TL");
+    const same = mergeHelpContent([]);
+    expect(applyEffectiveEidsPenalty(same, {})).toBe(same);
+  });
+
+  it("ceza tutarı fiyat denetiminden ayıklanır; iptal SSS'i AI bağlamına girer (hangi yılın tutarı olursa olsun)", () => {
+    const merged = applyEffectiveEidsPenalty(mergeHelpContent([]), next);
+    const faq = merged.faq.find((f) => f.id === "eids-iptal-ilan-duser-mi")!;
+    expect(FAQ_PRICE_PATTERN.test(faq.a)).toBe(true);
+    expect(FAQ_PRICE_PATTERN.test(stripEidsPenaltyAmounts(faq.a))).toBe(false);
+    const hit = selectFaqForQuestion("EİDS yetkisi iptal edilince ilan yayından düşer mi?", merged.faq);
+    expect(hit.map((m) => m.item.id)).toContain("eids-iptal-ilan-duser-mi");
+    expect(hit.find((m) => m.item.id === "eids-iptal-ilan-duser-mi")!.item.a).toContain(rangeText(next));
   });
 });

@@ -1,5 +1,6 @@
 import type { Guide } from "@/lib/help-content";
 import type { FaqItem } from "@/lib/help-faq";
+import type { LegalValues } from "@/lib/legal-constants";
 import { EIDS_CALL_CENTER, EIDS_SENDER_ADDRESS, EIDS_TAKEDOWN_DAYS, eidsPenaltyRangeText } from "@/lib/eids/legal-text";
 import { EIDS_AUTHORITY_HREF, EIDS_HELP_HREF, EIDS_HELP_SLUG } from "@/lib/eids/links";
 
@@ -7,7 +8,8 @@ import { EIDS_AUTHORITY_HREF, EIDS_HELP_HREF, EIDS_HELP_SLUG } from "@/lib/eids/
  * EİDS (Bakanlık yetki e-postaları) YARDIM İÇERİĞİ — koddaki taban (SAF).
  *
  * `help-content.ts` GUIDES ve `help-faq.ts` FAQ bu maddeleri ekler; yardım merkezi CMS'i (`help_articles`) aynı slug ile
- * geçersiz kılabilir ("koddan düzenle"). Ceza tutarı metne `legal-text.ts` üzerinden girer (tek yer). Doğrulanmamış
+ * geçersiz kılabilir ("koddan düzenle"). Ceza tutarı metne `legal-text.ts` üzerinden girer (tek yer); koddaki taban
+ * tutarı okuyucuya gitmeden `applyEffectiveEidsPenalty` ile o gün yürürlükteki değerle değiştirilir (store.ts). Doğrulanmamış
  * bilgiler metinde "[Doğrulanmadı]" etiketiyle durur; teyit edilince yalnız etiket kalkar.
  * Uzun kılavuz: docs/eids/KILAVUZ.md. Sağlayıcı adımları: src/lib/eids/forwarding.ts.
  */
@@ -60,3 +62,19 @@ export const EIDS_FAQ: readonly FaqItem[] = [
     hrefLabel: "Yeni portföy",
   },
 ];
+
+/**
+ * Birleşik yardım içeriğinde (kod + DB) koddaki taban ceza aralığını o gün yürürlükteki değerle değiştirir (SAF). Mevzuat
+ * panelinden yılbaşında girilen yeni tutar böylece rehber, SSS ve AI SSS bağlamına da yansır; değer aynıysa nesne aynen döner.
+ */
+export function applyEffectiveEidsPenalty<C extends { guides: Guide[]; faq: FaqItem[] }>(content: C, values?: LegalValues | null): C {
+  const base = eidsPenaltyRangeText();
+  const effective = eidsPenaltyRangeText(values);
+  if (base === effective) return content;
+  const swap = (t: string) => (t.includes(base) ? t.split(base).join(effective) : t);
+  return {
+    ...content,
+    guides: content.guides.map((g) => ({ ...g, intro: swap(g.intro), steps: g.steps.map(swap) })),
+    faq: content.faq.map((f) => ({ ...f, a: swap(f.a) })),
+  };
+}

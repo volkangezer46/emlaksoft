@@ -141,11 +141,13 @@ async function run(req: NextRequest) {
     console.error("gunluk-ozet lig", e);
   }
 
-  // EİDS (EP5): yetki belgesi no boş ofislerde sahibine tek seferlik kurulum görevi (ayrık adım; özet işini bozmaz).
+  // EİDS (EP5): yetki belgesi no boş ofislerde sahibine tek seferlik kurulum görevi; numara girilmişse açık görev kapanır (ayrık adım).
   let licenseTasks = 0;
+  let licenseTasksClosed = 0;
   try {
     const r = await runLicenseSetupTasks(admin, tenants.map((t) => t.id), Date.now());
     licenseTasks = r.opened;
+    licenseTasksClosed = r.closed;
     failed += r.failed;
   } catch (e) {
     console.error("gunluk-ozet yetki belgesi görevi", e);
@@ -158,7 +160,7 @@ async function run(req: NextRequest) {
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi (${licenseTasksClosed} kapandı)`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 
