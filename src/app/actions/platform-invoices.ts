@@ -66,7 +66,7 @@ export async function createManualInvoice(formData: FormData): Promise<InvoiceOp
       return { description: String(r.description ?? ""), quantity: String(r.quantity ?? ""), unitNet: String(r.unitNet ?? "") };
     });
   } catch {
-    return { error: "Kalemler okunamadı." };
+    return { error: "Kalemler okunamadı; sayfayı yenileyip kalemleri yeniden girin." };
   }
 
   const nowMs = clockNow();
@@ -88,7 +88,7 @@ export async function createManualInvoice(formData: FormData): Promise<InvoiceOp
   if (error) {
     if (schemaMissing(error)) return { error: "Elle fatura kurulum bekliyor (veritabanı güncellemesi 20261013004100 uygulanmadı)." };
     console.error("createManualInvoice", error.code, error.message);
-    return { error: error.message?.includes("manual_invoice_tenant") ? "Ofis bulunamadı." : "Taslak fatura oluşturulamadı." };
+    return { error: error.message?.includes("manual_invoice_tenant") ? "Ofis bulunamadı." : "Taslak fatura oluşturulamadı; birkaç dakika sonra tekrar deneyin." };
   }
   const id = String(data ?? "");
   await logPlatformActivity({
@@ -147,7 +147,7 @@ export async function issueManualInvoice(formData: FormData): Promise<InvoiceOpR
     .maybeSingle();
   if (error) {
     console.error("issueManualInvoice", error.code, error.message);
-    return { error: "Fatura kesilemedi." };
+    return { error: "Fatura kesilemedi; sayfayı yenileyip tekrar deneyin." };
   }
   if (!updated) return { ok: true, notice: "Fatura başka bir işlemle zaten güncellenmiş." };
   await logPlatformActivity({
@@ -180,7 +180,7 @@ export async function deleteManualDraft(formData: FormData): Promise<InvoiceOpRe
     .maybeSingle();
   if (error) {
     console.error("deleteManualDraft", error.code, error.message);
-    return { error: "Taslak silinemedi." };
+    return { error: "Taslak silinemedi; sayfayı yenileyip tekrar deneyin." };
   }
   if (!deleted) return { error: "Yalnız kesilmemiş elle taslak silinebilir." };
   await logPlatformActivity({

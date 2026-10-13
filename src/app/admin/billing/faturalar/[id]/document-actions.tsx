@@ -2,8 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PrintButton } from "@/components/ui/print-button";
 import { deleteManualDraft, issueManualInvoice, sendInvoiceEmail } from "@/app/actions/platform-invoices";
 import { InlineOp } from "../../inline-op";
 
@@ -83,9 +83,7 @@ export function DocumentActions({
           hint="Fatura dökümü ofis sahibinin e-posta adresine düz metin olarak gider. E-posta kanalı kapalıysa gönderilmez ve denetim kaydına 'kanal kapalı' düşer."
         />
       ) : null}
-      <Button type="button" variant="outline" size="sm" onClick={() => window.print()}>
-        <Printer className="h-4 w-4" /> Yazdır / PDF olarak kaydet
-      </Button>
+      <PrintButton tone="outline" size="sm" label="Yazdır / PDF olarak kaydet" />
       {error ? (
         <p role="alert" className="w-full text-xs font-semibold text-danger-600">
           {error}

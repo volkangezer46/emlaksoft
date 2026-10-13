@@ -30,7 +30,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PRINT_CSS = `@media print {
   body * { visibility: hidden !important; }
   #fatura-belgesi, #fatura-belgesi * { visibility: visible !important; }
-  #fatura-belgesi { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0 !important; background: #fff !important; color: #000 !important; }
+  #fatura-belgesi { position: absolute; inset: 0 auto auto 0; width: 100%; }
 }`;
 
 type CreditNote = { id: string; credit_no: string; amount_try: number; net_try: number; tax_try: number; reason: string; issued_at: string };
@@ -123,7 +123,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         ) : null}
       </section>
 
-      <section id="fatura-belgesi" aria-labelledby="belge-baslik" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+      <section id="fatura-belgesi" aria-labelledby="belge-baslik" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5 print:border-0 print:bg-white">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-text-faint">EmlakSoft · Fatura</p>
@@ -259,17 +259,24 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <h2 className="font-display font-bold text-ink-950">İşlemler</h2>
         <p className="mt-1 text-xs text-text-faint">İade kaydı (kısmi ya da tam) numaralı alacak dekontu üretir ve fatura defterinde eksi satır olarak görünür.</p>
-        <div className="mt-3">
-          <InvoiceActions
-            invoiceId={inv.id}
-            status={inv.status}
-            totalTry={Number(inv.total_try)}
-            refunded={Boolean(refund)}
-            chargedBack={Boolean(meta.chargeback)}
-            isSuperAdmin={staff.role === "super_admin"}
-            today={trDayKey(clockNow())}
-          />
-        </div>
+        {isDraftManual ? (
+          // Taslak > kesildi akışı atlanmasın: kesilmemiş elle taslak ödendi/iptal işaretlenemez; önce "Faturayı kes".
+          <p role="status" className="mt-3 text-sm text-text-muted">
+            Bu fatura henüz kesilmedi. Ödeme kaydı ve diğer işlemler için önce yukarıdaki &quot;Faturayı kes&quot; düğmesini kullanın.
+          </p>
+        ) : (
+          <div className="mt-3">
+            <InvoiceActions
+              invoiceId={inv.id}
+              status={inv.status}
+              totalTry={Number(inv.total_try)}
+              refunded={Boolean(refund)}
+              chargedBack={Boolean(meta.chargeback)}
+              isSuperAdmin={staff.role === "super_admin"}
+              today={trDayKey(clockNow())}
+            />
+          </div>
+        )}
       </section>
     </div>
   );
