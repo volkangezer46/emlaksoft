@@ -22,6 +22,12 @@ export type StoredRulesMap = Partial<Record<string, StoredRules>>;
 
 export type RulesMeta = {
   etag: string | null;
+  /**
+   * ETag'in alındığı eklenti sürümü + gömülü anahtar kimlikleri (`rulesEtagScope`). Sunucunun ETag'i yalnız içerikten
+   * hesaplanır; eklenti güncellenince (yeni anahtar, daha yüksek kurulu sürüm) aynı içerik artık kabul edilebilir, o yüzden
+   * kapsam değişince ETag yok sayılır ve set yeniden indirilir.
+   */
+  etagScope?: string | null;
   fetchedAt: number | null;
   lastError: string | null;
   /** Ardışık başarısız tazeleme (üstel bekleme için). */
@@ -31,7 +37,7 @@ export type RulesMeta = {
   lastRejectVersion: number | null;
 };
 
-export const EMPTY_RULES_META: RulesMeta = { etag: null, fetchedAt: null, lastError: null, failures: 0, rejects: 0, lastRejectReason: null, lastRejectVersion: null };
+export const EMPTY_RULES_META: RulesMeta = { etag: null, etagScope: null, fetchedAt: null, lastError: null, failures: 0, rejects: 0, lastRejectReason: null, lastRejectVersion: null };
 
 export type RejectReason =
   | "too_large"
@@ -134,4 +140,23 @@ export function rulesRefreshDue(meta: RulesMeta, nowMs: number, maxAgeMs: number
   if (meta.fetchedAt === null) return true;
   const wait = meta.failures > 0 ? Math.min(6 * 3_600_000, 5 * 60_000 * 2 ** Math.min(10, meta.failures - 1)) : maxAgeMs;
   return nowMs - meta.fetchedAt >= wait;
+}
+
+/** ETag kapsamı: kurulu sürüm + gömülü anahtar kimlikleri (sıralı). */
+export function rulesEtagScope(installedVersion: string, keys: Readonly<Record<string, JsonWebKey>> = RULE_PUBLIC_KEYS): string {
+  return `${installedVersion}|${Object.keys(keys).sort().join(",")}`;
+}
+
+/** İstekte gönderilecek ETag: kapsam değiştiyse (eklenti güncellendi / anahtar eklendi) yok sayılır. */
+export function effectiveRulesEtag(meta: Pick<RulesMeta, "etag" | "etagScope">, scope: string): string | null {
+  return meta.etag && meta.etagScope === scope ? meta.etag : null;
+}
+
+/**
+ * 200 yanıtından sonra saklanacak ETag. Yanıttaki zarflardan biri bile reddedildiyse SAKLANMAZ: ETag yalnız içerikten
+ * hesaplandığından, saklansaydı eklenti güncellense de 304 alır ve reddedilen set bir daha hiç indirilmezdi.
+ */
+export function nextRulesEtag(result: Pick<ApplyResult, "rejected">, responseEtag: unknown): string | null {
+  if (result.rejected.length > 0) return null;
+  return typeof responseEtag === "string" && responseEtag.length > 0 && responseEtag.length <= 200 ? responseEtag : null;
 }

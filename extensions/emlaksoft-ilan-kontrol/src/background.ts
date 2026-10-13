@@ -50,7 +50,7 @@ import {
   type StoredTransfer,
 } from "@/lib/portal-transfer/ext-queue";
 import { QUEUE_MAX_ATTEMPTS, QUEUE_TTL_MS } from "@/lib/portal-transfer/ext-queue";
-import { EMPTY_RULES_META, applyRulesResponse, type RulesMeta, type StoredRulesMap } from "@/lib/portal-transfer/rules-store";
+import { EMPTY_RULES_META, applyRulesResponse, effectiveRulesEtag, nextRulesEtag, rulesEtagScope, type RulesMeta, type StoredRulesMap } from "@/lib/portal-transfer/rules-store";
 import { FEEDBACK_CONSENT_TEXT_VERSION, feedbackKey, sanitizeFeedbackPayload, type FeedbackPayload } from "@/lib/portal-transfer/feedback-format";
 import { sanitizeSnapshot } from "@/lib/portal-transfer/correction";
 import { installLandingUrl, shouldOpenInstallLanding } from "@/lib/listing-control/worker/extension-install";
@@ -635,7 +635,9 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
         const last = r.rejected[r.rejected.length - 1];
         await setLocal(STORAGE_KEYS.formRulesMeta, {
           ...meta,
-          etag: typeof msg.etag === "string" && msg.etag.length <= 200 ? msg.etag : meta.etag,
+          // Ret varsa ETag saklanmaz (eklenti güncellenince aynı içerik yeniden indirilip denenebilsin).
+          etag: nextRulesEtag(r, msg.etag),
+          etagScope: rulesEtagScope(chrome.runtime.getManifest().version),
           fetchedAt: now,
           lastError: null,
           failures: 0,
@@ -664,7 +666,8 @@ async function handle(msg: BgRequest, sender: chrome.runtime.MessageSender): Pro
       const stored = await getLocal<StoredRulesMap>(STORAGE_KEYS.formRules, {});
       const versions: Record<string, number> = {};
       for (const [p, e] of Object.entries(stored)) if (e) versions[p] = e.version;
-      return { meta: await getRulesMeta(), versions };
+      const meta = await getRulesMeta();
+      return { meta: { ...meta, etag: effectiveRulesEtag(meta, rulesEtagScope(chrome.runtime.getManifest().version)) }, versions };
     }
     case "feedbackPut":
       return locked(async () => {

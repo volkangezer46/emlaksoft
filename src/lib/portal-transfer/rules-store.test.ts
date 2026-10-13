@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { canonicalJson, signedMessage, type RuleSet } from "./rule-format";
 import { seedRuleSet } from "./seed-rules";
-import { applyRulesResponse, decideAccept, rulesRefreshDue, EMPTY_RULES_META, type StoredRules } from "./rules-store";
+import { applyRulesResponse, decideAccept, effectiveRulesEtag, nextRulesEtag, rulesEtagScope, rulesRefreshDue, EMPTY_RULES_META, type StoredRules } from "./rules-store";
 import { sha256Hex } from "./rules-verify";
 
 /**
@@ -102,6 +102,33 @@ describe("rules-store: decideAccept", () => {
     if ("error" in same) throw new Error(same.error);
     expect(same.rejected).toEqual([]);
     expect(await applyRulesResponse(stored, JSON.stringify({ engine: "f1", sets: [] }), opts)).toMatchObject({ accepted: [], rejected: [] });
+  });
+
+  it("ETag: zarflardan biri bile reddedildiyse saklanmaz; anahtarsız sürümden anahtarlı sürüme geçişte set yeniden indirilip kabul edilir", async () => {
+    const body = JSON.stringify({ engine: "f1", sets: [await envelope(ruleSet(1), priv)] });
+    // Anahtarsız paket (bugün): her zarf no_keys ile reddedilir → ETag saklanmaz (304 kilidi yok).
+    const keyless = await applyRulesResponse({}, body, { ...opts, keys: {} });
+    if ("error" in keyless) throw new Error(keyless.error);
+    expect(keyless.rejected).toEqual([{ portal: "sahibinden", version: 1, reason: "no_keys" }]);
+    expect(nextRulesEtag(keyless, '"abc"')).toBeNull();
+    // Anahtarlı yeni sürüm: If-None-Match gönderilmez (etag yok), 200 gelir, aynı içerik kabul edilir ve ETag saklanır.
+    const keyed = await applyRulesResponse({}, body, opts);
+    if ("error" in keyed) throw new Error(keyed.error);
+    expect(keyed.accepted).toEqual(["sahibinden"]);
+    expect(nextRulesEtag(keyed, '"abc"')).toBe('"abc"');
+    expect(nextRulesEtag(keyed, "x".repeat(201))).toBeNull();
+    expect(nextRulesEtag(keyed, null)).toBeNull();
+  });
+
+  it("ETag kapsamı: eklenti sürümü ya da anahtar listesi değişince saklı ETag yok sayılır", () => {
+    const scope = rulesEtagScope("0.6.0", {});
+    expect(scope).toBe("0.6.0|");
+    expect(rulesEtagScope("0.6.0", { k2: {}, k1: {} })).toBe("0.6.0|k1,k2");
+    const meta = { ...EMPTY_RULES_META, etag: '"abc"', etagScope: scope };
+    expect(effectiveRulesEtag(meta, scope)).toBe('"abc"');
+    expect(effectiveRulesEtag(meta, rulesEtagScope("0.6.1", {}))).toBeNull(); // min_extension reddinden sonra güncelleme
+    expect(effectiveRulesEtag(meta, rulesEtagScope("0.6.0", { k1: {} }))).toBeNull(); // anahtar gömüldü
+    expect(effectiveRulesEtag({ ...meta, etagScope: undefined }, scope)).toBeNull(); // eski meta (kapsamsız)
   });
 
   it("tazeleme zamanı: 6 saat / 1 saat; hatada üstel bekleme 5 dk → 6 sa", () => {
