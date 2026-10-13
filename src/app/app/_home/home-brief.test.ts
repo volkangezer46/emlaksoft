@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Insight } from "@/lib/insights/types";
-import { buildCallRows, evidenceChips, pickBriefing, scheduleWarnings, scheduleWarningText, sortInsights } from "./home-brief";
+import { buildCallRows, evidenceChips, humanizeEvidenceValue, pickBriefing, scheduleWarnings, scheduleWarningText, sortInsights } from "./home-brief";
 
 function ins(over: Partial<Insight> & { id: string }): Insight {
   return {
@@ -56,6 +56,28 @@ describe("evidenceChips", () => {
   it("boş etiket/değeri eler ve sınırlar", () => {
     const chips = evidenceChips({ evidence: [{ label: "A", value: "1" }, { label: " ", value: "2" }, { label: "B", value: "" }, { label: "C", value: "3" }] }, 2);
     expect(chips.map((c) => c.label)).toEqual(["A", "C"]);
+  });
+
+  it("iç sıralama notu ('Sıra') gösterilmez; ISO tarih Türkçe biçime çevrilir", () => {
+    const chips = evidenceChips({
+      evidence: [
+        { label: "Sıra", value: "öncelik 72 · ciddiyet yüksek" },
+        { label: "Son görüşme", value: "2026-09-29" },
+        { label: "Vade", value: "2026-10-01T21:30:00Z (gecikti)" },
+        { label: "Not", value: "2026-13-99 bozuk" },
+      ],
+    });
+    expect(chips.map((c) => c.label)).toEqual(["Son görüşme", "Vade", "Not"]);
+    expect(chips[0].value).toBe("29 Eyl 2026");
+    // Türkiye saatiyle (UTC+3) ertesi gün; ekteki metin korunur.
+    expect(chips[1].value).toBe("2 Eki 2026 (gecikti)");
+    expect(chips[2].value).toBe("2026-13-99 bozuk");
+    expect(chips.some((c) => /^\d{4}-\d{2}-\d{2}/.test(c.value) && c.label !== "Not")).toBe(false);
+  });
+
+  it("humanizeEvidenceValue tarih olmayan değere dokunmaz", () => {
+    expect(humanizeEvidenceValue("3 açık talep")).toBe("3 açık talep");
+    expect(humanizeEvidenceValue("2026-01-05")).toBe("5 Oca 2026");
   });
 });
 
