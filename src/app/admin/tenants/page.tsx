@@ -48,7 +48,7 @@ import {
 } from "./tenants-model";
 import { TenantTable, type TenantRowData } from "./tenant-table";
 import { CrmFilterForm, SavedViewsMenu, TagManager } from "./crm-toolbar";
-import { effectiveStage, loadAdminSavedViews, loadCrmCatalog, loadCrmRows } from "@/lib/admin/platform-crm";
+import { effectiveStage, loadAdminSavedViews, loadCrmCatalog, loadCrmRows, stageFilterOr } from "@/lib/admin/platform-crm";
 import { HEALTH_DEFAULT_RISK_THRESHOLD, healthBand, healthBandRange } from "@/lib/admin/health-score";
 import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
 import { getSetting } from "@/lib/settings/read";
@@ -105,14 +105,15 @@ export default async function AdminTenantsPage({
   // Eşik ayar defterinden (crm.health_risk_threshold); okunamazsa varsayılan. Süzgeç ve rozet aynı eşiği kullanır.
   const riskThreshold = await getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD);
   const ownerFilter = f.sorumlu === "ben" ? staff.id : f.sorumlu;
-  const needCrm = Boolean((ownerFilter && ownerFilter !== "yok") || f.asama || f.skor);
+  // Aşama süzgeci iç birleşim İSTEMEZ: elle seçilmemiş (boş) aşama ve CRM satırı olmayan ofis durumdan türetilir.
+  const needCrm = Boolean((ownerFilter && ownerFilter !== "yok") || f.skor);
   // "Dönemi bitmiş ama aktif": aboneliğe iç birleşim (FK adıyla) — isExpiredActive ile aynı aday: status='active' AND
   // current_period_end < şimdi AND duraklatılmamış AND dönem sonu iptali beklemiyor.
   // Tür: gömme yalnız süzgeç içindir (satırda kullanılmaz), seçim tipi temel sütunlarla aynı kalır.
   // CRM süzgeçleri (AD5) de gömme ile sunucuda uygulanır: etiket ve sorumlu/aşama/skor iç birleşim; "atanmamış" ters birleşim.
   const crmEmbeds = [
     f.etiket ? "tl:tenant_tag_links!tenant_tag_links_tenant_id_fkey!inner(tag_id)" : "",
-    needCrm ? "crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(account_owner_staff_id, lifecycle_stage, health_score)" : "",
+    needCrm ? "crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(account_owner_staff_id, health_score)" : "",
     ownerFilter === "yok" ? "own:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey(account_owner_staff_id)" : "",
   ].filter(Boolean);
   const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}${crmEmbeds.length ? `, ${crmEmbeds.join(", ")}` : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
@@ -138,7 +139,10 @@ export default async function AdminTenantsPage({
   if (f.etiket) listQuery = listQuery.eq("tl.tag_id", f.etiket);
   if (ownerFilter && ownerFilter !== "yok") listQuery = listQuery.eq("crm.account_owner_staff_id", ownerFilter);
   if (ownerFilter === "yok") listQuery = listQuery.not("own.account_owner_staff_id", "is", null).is("own", null);
-  if (f.asama) listQuery = listQuery.eq("crm.lifecycle_stage", f.asama);
+  if (f.asama) {
+    const stageOr = await stageFilterOr(admin, f.asama);
+    listQuery = stageOr ? listQuery.or(stageOr) : listQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
   if (f.skor) {
     const r = healthBandRange(f.skor, riskThreshold);
     listQuery = listQuery.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
@@ -468,6 +472,8 @@ export default async function AdminTenantsPage({
           </div>
         ) : (
           <TenantTable
+            // Süzgeç/sayfa değişince toplu seçim sıfırlanır (layout-router arama parametresinde durumu korur).
+            key={tenantsHref(f)}
             rows={tableRows}
             plans={planDefs.map((p, i) => ({ id: p.id, name: p.name, order: p.order ?? i, hidden: Boolean(p.hidden) }))}
             perms={perms}

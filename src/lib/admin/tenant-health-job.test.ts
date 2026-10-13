@@ -7,7 +7,7 @@ import { runPlatformTaskReminders, runTenantHealthDaily } from "./tenant-health-
 type Call = { table: string; op: string; payload?: unknown; filters: string[] };
 
 /** Zincirlenebilir sahte PostgREST istemcisi: tablo başına yanıt + yapılan yazmaların kaydı. */
-function fakeAdmin(opts: { probeRows?: unknown[]; inputs?: unknown[]; tasks?: unknown[]; missing?: boolean }) {
+function fakeAdmin(opts: { dailyCount?: number; tenantCount?: number; inputs?: unknown[]; tasks?: unknown[]; missing?: boolean }) {
   const calls: Call[] = [];
   const from = (table: string) => {
     const call: Call = { table, op: "select", filters: [] };
@@ -16,11 +16,12 @@ function fakeAdmin(opts: { probeRows?: unknown[]; inputs?: unknown[]; tasks?: un
     const result = () => {
       if (opts.missing) return { data: null, error: { code: "PGRST205", message: "Could not find the table" } };
       if (call.op !== "select") return { data: [], error: null };
-      if (table === "tenant_health_daily") return { data: opts.probeRows ?? [], error: null };
+      if (table === "tenant_health_daily") return { data: null, count: opts.dailyCount ?? 0, error: null };
+      if (table === "tenants") return { data: null, count: opts.tenantCount ?? 0, error: null };
       if (table === "platform_tasks") return { data: opts.tasks ?? [], error: null };
       return { data: [], error: null };
     };
-    for (const m of ["select", "eq", "is", "not", "lte", "in", "order", "limit"]) {
+    for (const m of ["select", "eq", "neq", "is", "not", "lte", "in", "order", "limit"]) {
       chain[m] = (...args: unknown[]) => {
         if (m !== "select") call.filters.push(`${m}:${String(args[0])}`);
         return chain;
@@ -59,11 +60,24 @@ const row = (id: string, extra: Record<string, unknown> = {}) => ({
 });
 
 describe("günlük sağlık skoru işi", () => {
-  it("o gün zaten hesaplandıysa atlar (günde bir kez)", async () => {
-    const f = fakeAdmin({ probeRows: [{ tenant_id: "x" }] });
+  it("o gün tüm ofisler hesaplandıysa atlar (günde bir kez)", async () => {
+    const f = fakeAdmin({ dailyCount: 3, tenantCount: 3 });
     const r = await runTenantHealthDaily(f.client, NOW);
     expect(r).toEqual({ skipped: true, written: 0, error: null });
     expect(f.rpc).not.toHaveBeenCalled();
+  });
+
+  it("o günün turu yarım kaldıysa (satır sayısı eksik) yeniden hesaplar", async () => {
+    const f = fakeAdmin({ dailyCount: 1, tenantCount: 3, inputs: [row("a"), row("b"), row("c")] });
+    const r = await runTenantHealthDaily(f.client, NOW);
+    expect(f.rpc).toHaveBeenCalled();
+    expect(r).toEqual({ skipped: false, written: 3, error: null });
+  });
+
+  it("aşamayı kalıcı yazmaz (boş aşama okuma anında durumdan türetilir)", async () => {
+    const f = fakeAdmin({ inputs: [row("a", { status: "trial" })] });
+    await runTenantHealthDaily(f.client, NOW);
+    expect(f.calls.some((c) => c.table === "platform_tenant_crm" && c.op === "update")).toBe(false);
   });
 
   it("her ofis için günlük satır + son skor yazar; ağırlık bir sonraki hesaplamada etkili", async () => {

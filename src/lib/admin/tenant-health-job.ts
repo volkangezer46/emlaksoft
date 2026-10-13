@@ -5,13 +5,15 @@ import { formatDateTimeTr } from "@/lib/format";
 import { getSettings } from "@/lib/settings/read";
 import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
 import { HEALTH_WINDOW_DAYS, computeHealth, normalizeWeights, type HealthWeights } from "./health-score";
-import { derivedStage, isCrmMissing } from "./platform-crm";
+import { isCrmMissing } from "./platform-crm";
 
 /**
  * OFİS CRM zamanlanmış adımları — `gorev-hatirlat` cron'unun (2 saatte bir) AYRIK adımları (yeni cron yok).
- *  1) `runTenantHealthDaily`: TR gününde BİR kez — o gün için `tenant_health_daily` satırı varsa atlanır. Ağırlıklar
- *     ayar defterinden her koşuda yeniden okunur → ağırlık değişikliği ERTESİ hesaplamaya yansır. Son skor
- *     `platform_tenant_crm.health_score`'a da yazılır (liste/süzgeç/pano tek sütundan okur).
+ *  1) `runTenantHealthDaily`: TR gününde BİR kez — o günün `tenant_health_daily` satır sayısı skorlanacak ofis sayısına
+ *     (iptal olmayan ofisler = RPC kapsamı) ulaştıysa atlanır; yarım kalan tur (parça/son skor hatası) sonraki 2 saatlik
+ *     turda baştan yazılır (upsert idempotent). Ağırlıklar ayar defterinden her koşuda yeniden okunur → ağırlık değişikliği
+ *     ERTESİ hesaplamaya yansır. Son skor `platform_tenant_crm.health_score`'a da yazılır (liste/süzgeç/pano tek sütundan
+ *     okur). Aşama (`lifecycle_stage`) bu işte YAZILMAZ: yalnız elle seçim saklanır, boşsa okuma anında durumdan türetilir.
  *  2) `runPlatformTaskReminders`: vadesi gelmiş, bildirilmemiş açık platform görevleri sorumlunun bildirim kutusuna
  *     (`platform_notifications`) düşer; görev `notified_at` ile işaretlenir (tekrar bildirim yok; vade değişince sıfırlanır).
  * `admin` çağıranın (route) service_role istemcisidir; burada yeni istemci oluşturulmaz. Tablolar yoksa adımlar `skipped`.
@@ -49,9 +51,15 @@ async function readWeights(): Promise<HealthWeights> {
 
 export async function runTenantHealthDaily(admin: SupabaseClient, nowMs: number, opts: { weights?: HealthWeights; force?: boolean } = {}): Promise<HealthJobSummary> {
   const day = trDayKey(nowMs);
-  const probe = await admin.from("tenant_health_daily").select("tenant_id").eq("day", day).limit(1);
-  if (probe.error) return isCrmMissing(probe.error) ? { skipped: true, written: 0, error: null } : { skipped: false, written: 0, error: probe.error.message };
-  if (!opts.force && (probe.data ?? []).length > 0) return { skipped: true, written: 0, error: null };
+  if (!opts.force) {
+    // Tek satır yetmez: o günün satır sayısı skorlanacak ofis sayısına ulaşmadıysa tur yarım kalmıştır → yeniden hesapla.
+    const [done, expected] = await Promise.all([
+      admin.from("tenant_health_daily").select("tenant_id", { count: "exact", head: true }).eq("day", day),
+      admin.from("tenants").select("id", { count: "exact", head: true }).neq("status", "cancelled"),
+    ]);
+    if (done.error) return isCrmMissing(done.error) ? { skipped: true, written: 0, error: null } : { skipped: false, written: 0, error: done.error.message };
+    if (!expected.error && (done.count ?? 0) > 0 && (done.count ?? 0) >= (expected.count ?? 0)) return { skipped: true, written: 0, error: null };
+  }
 
   const { data, error } = await admin.rpc("platform_tenant_health_inputs", {
     p_since: new Date(nowMs - HEALTH_WINDOW_DAYS * DAY_MS).toISOString(),
@@ -95,29 +103,17 @@ export async function runTenantHealthDaily(admin: SupabaseClient, nowMs: number,
     latest.push({ tenant_id: r.tenant_id, health_score: h.score, health_scored_at: computedAt });
   }
 
+  // Önce son skor (yalnız sağlık sütunları, merge: elle seçilen sorumlu/aşama EZİLMEZ), sonra günlük satırlar: günlük
+  // yazım yarıda kalırsa sayım tutmaz ve sonraki tur hepsini yeniden yazar; son skor bayat kalmaz.
+  for (let i = 0; i < latest.length; i += CHUNK) {
+    const res = await admin.from("platform_tenant_crm").upsert(latest.slice(i, i + CHUNK), { onConflict: "tenant_id" });
+    if (res.error) return { skipped: false, written: 0, error: `son skor: ${res.error.message}` };
+  }
   let written = 0;
   for (let i = 0; i < daily.length; i += CHUNK) {
     const res = await admin.from("tenant_health_daily").upsert(daily.slice(i, i + CHUNK), { onConflict: "day,tenant_id" });
     if (res.error) return { skipped: false, written, error: res.error.message };
     written += Math.min(CHUNK, daily.length - i);
-  }
-  // Son skor: yalnız sağlık sütunları (merge): elle seçilen sorumlu/aşama EZİLMEZ; ilk kez açılan satıra aşama durumdan türetilir.
-  for (let i = 0; i < latest.length; i += CHUNK) {
-    const res = await admin.from("platform_tenant_crm").upsert(latest.slice(i, i + CHUNK), { onConflict: "tenant_id" });
-    if (res.error) return { skipped: false, written, error: `son skor: ${res.error.message}` };
-  }
-  const stageless = await admin.from("platform_tenant_crm").select("tenant_id, tenant:tenants!platform_tenant_crm_tenant_id_fkey(status)").is("lifecycle_stage", null).limit(1000);
-  if (!stageless.error) {
-    // Aşama başına tek toplu yazma (en çok 5 tur); yarış güvenliği: yalnız hâlâ boş olan aşama doldurulur.
-    const byStage = new Map<string, string[]>();
-    for (const row of (stageless.data ?? []) as unknown as { tenant_id: string; tenant: { status: string } | null }[]) {
-      if (!row.tenant) continue;
-      const stage = derivedStage(row.tenant.status);
-      byStage.set(stage, [...(byStage.get(stage) ?? []), row.tenant_id]);
-    }
-    for (const [stage, ids] of byStage) {
-      await admin.from("platform_tenant_crm").update({ lifecycle_stage: stage }).in("tenant_id", ids).is("lifecycle_stage", null);
-    }
   }
   return { skipped: false, written, error: null };
 }

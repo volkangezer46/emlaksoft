@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeHealth, healthBand, healthBandRange, normalizeWeights, paymentComponent, supportComponent, usageComponent, type HealthInputs } from "./health-score";
-import { derivedStage, effectiveStage, sanitizeViewParams, viewHref } from "./platform-crm";
+import { derivedStage, derivedStatusCondition, effectiveStage, sanitizeViewParams, stageFilterOr, viewHref } from "./platform-crm";
 
 const healthy: HealthInputs = {
   status: "active",
@@ -77,5 +77,27 @@ describe("ofis CRM yardımcıları", () => {
     expect(sanitizeViewParams("/admin/tenants", { etiket: "x", sorumlu: "ben", sayfa: "3", hack: "1", q: "  " })).toEqual({ etiket: "x", sorumlu: "ben" });
     expect(sanitizeViewParams("/admin/bilinmeyen", { q: "a" })).toBeNull();
     expect(viewHref("/admin/tenants", { etiket: "a", sorumlu: "ben" })).toBe("/admin/tenants?etiket=a&sorumlu=ben");
+  });
+});
+
+describe("aşama süzgeci (elle seçim VEYA durumdan türeyen)", () => {
+  const fake = (rows: { tenant_id: string; lifecycle_stage: string }[]) => {
+    const chain: Record<string, unknown> = {};
+    for (const m of ["select", "not", "order"]) chain[m] = () => chain;
+    chain.range = async () => ({ data: rows, error: null });
+    return { from: () => chain } as never;
+  };
+
+  it("türetme koşulu derivedStage'in tersidir; genişleme hiç türetilmez", () => {
+    expect(derivedStatusCondition("onboarding")).toBe("status.eq.trial");
+    expect(derivedStatusCondition("risk")).toBe("status.in.(past_due,suspended)");
+    expect(derivedStatusCondition("genisleme")).toBeNull();
+  });
+
+  it("elle seçilenler dahil, başka aşamaya elle alınanlar türetmeden hariç", async () => {
+    const or = await stageFilterOr(fake([{ tenant_id: "a", lifecycle_stage: "onboarding" }, { tenant_id: "b", lifecycle_stage: "aktif" }]), "onboarding");
+    expect(or).toBe("id.in.(a),and(status.eq.trial,id.not.in.(b))");
+    const none = await stageFilterOr(fake([]), "genisleme");
+    expect(none).toBe("id.in.(00000000-0000-0000-0000-000000000000)");
   });
 });

@@ -42,6 +42,42 @@ export function effectiveStage(stored: string | null | undefined, status: string
   return isLifecycleStage(stored) ? { stage: stored, auto: false } : { stage: derivedStage(status), auto: true };
 }
 
+/** `derivedStage`'in tersi: bu aşamaya türeyen ofis durumu koşulu (PostgREST sözdizimi). Genişleme hiç türetilmez → null. */
+export function derivedStatusCondition(stage: LifecycleStage): string | null {
+  if (stage === "onboarding") return "status.eq.trial";
+  if (stage === "risk") return "status.in.(past_due,suspended)";
+  if (stage === "kayip") return "status.eq.cancelled";
+  if (stage === "aktif") return "status.not.in.(trial,past_due,suspended,cancelled)";
+  return null;
+}
+
+/** Eşleşmeyen `in` listesi için asla var olmayan kimlik (boş `in.()` sözdizimine güvenilmez). */
+const NO_ID = "00000000-0000-0000-0000-000000000000";
+
+/**
+ * Aşama süzgeci için `tenants` sorgusuna `.or(...)` ifadesi: (elle seçilen aşama = X) VEYA (elle seçim yok VE durum X'e
+ * türüyor). Elle seçimler `platform_tenant_crm.lifecycle_stage`'de saklanır (az sayıda); CRM satırı olmayan ofisler de
+ * durumdan türetilerek süzgece girer. Elle seçimler okunamazsa `null` (çağıran süzgeci boş sonuçla uygular).
+ */
+export async function stageFilterOr(admin: Admin, stage: LifecycleStage): Promise<string | null> {
+  // Sayfalı okuma burada elle (istemci bileşenleri de bu dosyayı içe aktarır; sunucu yardımcısı çekilmez).
+  const data: { tenant_id: string; lifecycle_stage: string }[] = [];
+  for (let from = 0; from < 50_000; from += 1000) {
+    const res = await admin.from("platform_tenant_crm").select("tenant_id, lifecycle_stage").not("lifecycle_stage", "is", null).order("tenant_id").range(from, from + 999);
+    if (res.error) return null;
+    const got = (res.data ?? []) as { tenant_id: string; lifecycle_stage: string }[];
+    data.push(...got);
+    if (got.length < 1000) break;
+  }
+  const stored = { data };
+  const match = stored.data.filter((r) => r.lifecycle_stage === stage).map((r) => r.tenant_id);
+  const other = stored.data.filter((r) => r.lifecycle_stage !== stage).map((r) => r.tenant_id);
+  const parts = [`id.in.(${(match.length ? match : [NO_ID]).join(",")})`];
+  const derived = derivedStatusCondition(stage);
+  if (derived) parts.push(other.length ? `and(${derived},id.not.in.(${other.join(",")}))` : derived);
+  return parts.join(",");
+}
+
 export const NOTE_CATEGORIES = ["genel", "gorusme", "teknik", "ticari", "risk"] as const;
 export type NoteCategory = (typeof NOTE_CATEGORIES)[number];
 export const NOTE_CATEGORY_LABELS: Record<NoteCategory, string> = {

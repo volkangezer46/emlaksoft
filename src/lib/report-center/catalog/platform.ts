@@ -16,8 +16,10 @@ import { STATUS } from "../labels";
 import { applyTimestampRange, enrichStaff, enrichTenants, chainEnrich, label, nameOf, searchOr } from "../query-helpers";
 import type { ReportColumn, ReportContext, Row } from "../types";
 import { defineReport, opts } from "./define";
-import { HEALTH_BAND_LABELS, healthBandRange } from "@/lib/admin/health-score";
-import { LIFECYCLE_LABELS, LIFECYCLE_STAGES } from "@/lib/admin/platform-crm";
+import { HEALTH_BAND_LABELS, HEALTH_DEFAULT_RISK_THRESHOLD, healthBandRange } from "@/lib/admin/health-score";
+import { LIFECYCLE_LABELS, LIFECYCLE_STAGES, effectiveStage, isLifecycleStage, stageFilterOr } from "@/lib/admin/platform-crm";
+import { getSetting } from "@/lib/settings/read";
+import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
 
 /** ilike deseninde joker karakterleri (%, _) ve virgül/parantez düz metin olarak aranır. */
 const likeSafe = (v: string) => v.replace(/[%_,()\\]/g, " ").trim();
@@ -30,10 +32,27 @@ const PLAN_OPTIONS = ["advisor", "office", "professional", "business", "enterpri
  */
 type TenantCrm = { stage: string | null; owner: string | null; score: number | null; tags: string[] };
 const STAGE_LABELS = Object.fromEntries(LIFECYCLE_STAGES.map((s) => [s, LIFECYCLE_LABELS[s]]));
-const SCORE_OPTIONS = (["riskli", "izlenmeli", "saglikli"] as const).map((b) => {
-  const r = healthBandRange(b);
-  return { value: b, label: `${HEALTH_BAND_LABELS[b]} (${r.gte}-${Math.min(100, r.lt - 1)})` };
-});
+// Bant sınırı ayardan (crm.health_risk_threshold) gelir; etikette sabit aralık YAZILMAZ (liste ile aynı küme).
+const SCORE_OPTIONS = (["riskli", "izlenmeli", "saglikli"] as const).map((b) => ({ value: b, label: HEALTH_BAND_LABELS[b] }));
+
+/**
+ * Süzgeç öncesi okumalar (rapor turu başına bir kez, memo): risk eşiği ayar defterinden, aşama süzgecinin `.or` ifadesi
+ * (elle seçim VEYA durumdan türeyen aşama — /admin/tenants?asama=… ile aynı küme).
+ */
+type OfisPrep = { threshold: number; stageOr: string | null };
+function ofisPrep(ctx: ReportContext, f: Record<string, string | undefined>): Promise<OfisPrep> {
+  const hit = ctx.memo.get("ofisPrep") as Promise<OfisPrep> | undefined;
+  if (hit) return hit;
+  const p = (async () => {
+    const [threshold, stageOr] = await Promise.all([
+      f.skor ? getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD) : HEALTH_DEFAULT_RISK_THRESHOLD,
+      isLifecycleStage(f.asama) ? stageFilterOr(ctx.supabase as never, f.asama) : null,
+    ]);
+    return { threshold, stageOr };
+  })();
+  ctx.memo.set("ofisPrep", p);
+  return p;
+}
 
 async function loadTenantCrm(ctx: ReportContext, ids: string[]): Promise<void> {
   const out = (ctx.memo.get("tenantCrm") as Map<string, TenantCrm> | undefined) ?? new Map<string, TenantCrm>();
@@ -116,33 +135,38 @@ export const ofisler = defineReport({
     { key: "deneme", label: "Deneme bitişi", type: "date", get: (r) => r.trial_ends_at },
     { key: "kayit", label: "Kayıt tarihi", type: "date", get: (r) => r.created_at },
     { key: "saglik", label: "Sağlık skoru", type: "number", get: (r, c) => crmOf(c, r.id)?.score ?? null },
-    { key: "asama", label: "Aşama", type: "text", width: 14, get: (r, c) => label(STAGE_LABELS, crmOf(c, r.id)?.stage) },
+    // Elle seçilmemiş aşama durumdan türetilir (listedeki "oto" ile aynı kural).
+    { key: "asama", label: "Aşama", type: "text", width: 14, get: (r, c) => label(STAGE_LABELS, effectiveStage(crmOf(c, r.id)?.stage, r.status).stage) },
     { key: "sorumlu", label: "Sorumlu personel", type: "text", width: 22, get: (r, c) => crmOf(c, r.id)?.owner },
     { key: "etiketler", label: "Etiketler", type: "text", width: 26, get: (r, c) => crmOf(c, r.id)?.tags.join(", ") },
   ],
   source: {
     kind: "query",
-    build: (ctx, f) => {
-      const embeds = [
-        f.etiket ? "tl:tenant_tag_links!tenant_tag_links_tenant_id_fkey!inner(tag:tenant_tags!tenant_tag_links_tag_id_fkey!inner(name))" : "",
-        f.sorumlu || f.asama || f.skor
-          ? `crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(lifecycle_stage, health_score${f.sorumlu ? ", own:platform_staff!platform_tenant_crm_account_owner_staff_id_fkey!inner(full_name)" : ""})`
-          : "",
-      ].filter(Boolean);
-      let q = ctx.supabase.from("tenants").select(`id, name, plan, status, phone, city, trial_ends_at, created_at${embeds.length ? `, ${embeds.join(", ")}` : ""}`, { count: "exact" });
-      if (f.plan) q = q.eq("plan", f.plan);
-      if (f.durum) q = q.eq("status", f.durum);
-      q = searchOr(q, ["name"], f.q);
-      q = applyTimestampRange(q, "created_at", f);
-      if (f.etiket) q = q.ilike("tl.tag.name", `%${likeSafe(f.etiket)}%`);
-      if (f.sorumlu) q = q.ilike("crm.own.full_name", `%${likeSafe(f.sorumlu)}%`);
-      if (f.asama) q = q.eq("crm.lifecycle_stage", f.asama);
-      if (f.skor === "riskli" || f.skor === "izlenmeli" || f.skor === "saglikli") {
-        const r = healthBandRange(f.skor);
-        q = q.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
-      }
-      return q.order("created_at", { ascending: false }).order("id", { ascending: true });
-    },
+    // Süzgeç öncesi async okumalar (eşik, aşama kümesi) `range` içinde beklenir; sorgu her sayfada taze kurulur.
+    build: (ctx, f) => ({
+      range: async (from: number, to: number) => {
+        const pre = await ofisPrep(ctx, f);
+        const embeds = [
+          f.etiket ? "tl:tenant_tag_links!tenant_tag_links_tenant_id_fkey!inner(tag:tenant_tags!tenant_tag_links_tag_id_fkey!inner(name))" : "",
+          f.sorumlu || f.skor
+            ? `crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(health_score${f.sorumlu ? ", own:platform_staff!platform_tenant_crm_account_owner_staff_id_fkey!inner(full_name)" : ""})`
+            : "",
+        ].filter(Boolean);
+        let q = ctx.supabase.from("tenants").select(`id, name, plan, status, phone, city, trial_ends_at, created_at${embeds.length ? `, ${embeds.join(", ")}` : ""}`, { count: "exact" });
+        if (f.plan) q = q.eq("plan", f.plan);
+        if (f.durum) q = q.eq("status", f.durum);
+        q = searchOr(q, ["name"], f.q);
+        q = applyTimestampRange(q, "created_at", f);
+        if (f.etiket) q = q.ilike("tl.tag.name", `%${likeSafe(f.etiket)}%`);
+        if (f.sorumlu) q = q.ilike("crm.own.full_name", `%${likeSafe(f.sorumlu)}%`);
+        if (f.asama) q = pre.stageOr ? q.or(pre.stageOr) : q.eq("id", "00000000-0000-0000-0000-000000000000");
+        if (f.skor === "riskli" || f.skor === "izlenmeli" || f.skor === "saglikli") {
+          const r = healthBandRange(f.skor, pre.threshold);
+          q = q.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
+        }
+        return q.order("created_at", { ascending: false }).order("id", { ascending: true }).range(from, to);
+      },
+    }),
     enrich: async (rows, ctx) => {
       const ids = rows.map((r) => r.id);
       await Promise.all([loadTenantStats(ctx, ids), loadTenantCrm(ctx, ids)]);

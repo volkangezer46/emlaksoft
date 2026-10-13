@@ -207,18 +207,15 @@ export async function saveTenantCrmNote(formData: FormData): Promise<CrmActionRe
   if (body.length < 3 || body.length > 2000) return { error: "Not 3-2000 karakter olmalı." };
   const admin = db();
   const nowIso = nowIsoOf();
+  // Düzenleme silmeyle aynı kural: yalnız yazarı ya da süper admin (başkasının notu sessizce değiştirilemez).
+  let editQ = admin.from("platform_tenant_notes").update({ category, body, pinned, edited_by: staff.id, edited_at: nowIso }).eq("id", noteId ?? "").eq("tenant_id", tenantId);
+  if (staff.role !== "super_admin") editQ = editQ.eq("author_staff_id", staff.id);
   const res = noteId
-    ? await admin
-        .from("platform_tenant_notes")
-        .update({ category, body, pinned, edited_by: staff.id, edited_at: nowIso })
-        .eq("id", noteId)
-        .eq("tenant_id", tenantId)
-        .select("id")
-        .maybeSingle()
+    ? await editQ.select("id").maybeSingle()
     : (await tenantExists(admin, tenantId))
       ? await admin.from("platform_tenant_notes").insert({ tenant_id: tenantId, category, body, pinned, author_staff_id: staff.id }).select("id").single()
       : { data: null, error: null };
-  if (res.error || !res.data) return { error: res.error ? failMessage(res.error, "Not kaydedilemedi. Sayfayı yenileyip tekrar deneyin.") : "Ofis ya da not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
+  if (res.error || !res.data) return { error: res.error ? failMessage(res.error, "Not kaydedilemedi. Sayfayı yenileyip tekrar deneyin.") : noteId ? "Not bulunamadı ya da yalnız yazarı düzenleyebilir." : "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_note", entityType: "tenant", entityId: tenantId, meta: { note_id: res.data.id, category, pinned, edit: Boolean(noteId) } });
   revalidateCrm(tenantId);
   return { ok: true, id: res.data.id, message: noteId ? "Not güncellendi." : "Not eklendi." };
@@ -232,7 +229,10 @@ export async function setTenantCrmNotePinned(noteId: string, pinned: boolean): P
   const admin = db();
   const { data, error } = await admin.from("platform_tenant_notes").update({ pinned: Boolean(pinned) }).eq("id", id).select("tenant_id").maybeSingle();
   if (error || !data) return { error: error ? failMessage(error, "Not güncellenemedi. Sayfayı yenileyip tekrar deneyin.") : "Not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
-  revalidateCrm((data as { tenant_id: string }).tenant_id);
+  const tenantId = (data as { tenant_id: string }).tenant_id;
+  // Sabitleme ekip görünümüdür (not içeriği değişmez): not yetkisi olan herkes yapar, ama denetim kaydına düşer.
+  await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_note", entityType: "tenant", entityId: tenantId, meta: { note_id: id, pinned: Boolean(pinned) } });
+  revalidateCrm(tenantId);
   return { ok: true, message: pinned ? "Not sabitlendi." : "Sabitleme kaldırıldı." };
 }
 

@@ -138,7 +138,9 @@ export function TenantTable({
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const canBulk = Boolean(bulk && (bulk.perms.crm || bulk.perms.trial || bulk.perms.status));
   const showCrm = rows.some((r) => r.crm !== null);
-  const allOn = rows.length > 0 && rows.every((r) => selected.has(r.id));
+  // Toplu işlem YALNIZ ekrandaki satırlara uygulanır: yenileme sonrası listeden düşen kimlikler seçimde kalsa da gönderilmez.
+  const visibleSelected = rows.filter((r) => selected.has(r.id)).map((r) => r.id);
+  const allOn = rows.length > 0 && visibleSelected.length === rows.length;
   const toggle = (id: string) =>
     setSelected((cur) => {
       const next = new Set(cur);
@@ -148,9 +150,9 @@ export function TenantTable({
     });
   return (
     <DraftTable>
-      {canBulk && bulk && selected.size > 0 ? (
+      {canBulk && bulk && visibleSelected.length > 0 ? (
         <TenantBulkBar
-          ids={[...selected]}
+          ids={visibleSelected}
           names={new Map(rows.map((r) => [r.id, r.name]))}
           config={bulk}
           onClear={() => setSelected(new Set())}

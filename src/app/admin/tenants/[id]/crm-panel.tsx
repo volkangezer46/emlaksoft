@@ -381,18 +381,21 @@ function NotesPanel({ tenantId, notes, canEdit, meId, isSuper }: { tenantId: str
                   {canEdit ? (
                     <span className="ml-auto inline-flex gap-0.5">
                       <Button size="icon" variant="ghost" icon={n.pinned ? PinOff : Pin} disabled={pending} aria-label={n.pinned ? "Sabitlemeyi kaldır" : "Sabitle"} onClick={() => run(() => setTenantCrmNotePinned(n.id, !n.pinned))} />
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        icon={Pencil}
-                        aria-label="Düzenle"
-                        onClick={() => {
-                          setEditing(n.id);
-                          setBody(n.body);
-                          setCategory(n.category);
-                          setPinned(n.pinned);
-                        }}
-                      />
+                      {/* Düzenleme ve silme yalnız yazara ya da süper admine (eylem aynı kuralı uygular). */}
+                      {isSuper || n.authorId === meId ? (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          icon={Pencil}
+                          aria-label="Düzenle"
+                          onClick={() => {
+                            setEditing(n.id);
+                            setBody(n.body);
+                            setCategory(n.category);
+                            setPinned(n.pinned);
+                          }}
+                        />
+                      ) : null}
                       {isSuper || n.authorId === meId ? (
                         <ConfirmDialog
                           trigger={<Button size="icon" variant="ghost" icon={Trash2} aria-label="Notu sil" />}
