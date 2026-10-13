@@ -13,6 +13,9 @@ import {
 import { listingFactLine, listingSeoVars, sqmText } from "./describe";
 import { listingImageAlt } from "./alt-text";
 import { vitrinListingBreadcrumbLd } from "./breadcrumb";
+import { HTML_LIMITED_BOT_UA_RE } from "next/dist/shared/lib/router/utils/html-bots";
+import { shouldServeStreamingMetadata } from "next/dist/server/lib/streaming-metadata";
+import { HTML_LIMITED_BOTS } from "@/lib/seo/html-limited-bots";
 import { buildVitrinListingLd } from "./listing-ld";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
@@ -83,8 +86,38 @@ describe("vitrin /[slug] metadata <head> sözleşmesi (HIZ-05)", () => {
     expect(() => read("src/app/vitrin/loading.tsx")).toThrow();
     expect(() => read("src/app/vitrin/[slug]/loading.tsx")).toThrow();
   });
-  it("next.config htmlLimitedBots EKLENMEZ (seçenek A reddedildi)", () => {
-    expect(read("next.config.ts")).not.toContain("htmlLimitedBots");
+  it("next.config htmlLimitedBots akışlı metadata'yı herkese KAPATMAZ (seçenek A reddedildi); yalnız ortak bot listesi", () => {
+    const cfg = read("next.config.ts");
+    expect(cfg).toMatch(/htmlLimitedBots: HTML_LIMITED_BOTS,/);
+    expect(cfg).not.toMatch(/htmlLimitedBots:\s*\/\.\*\//);
+  });
+});
+
+describe("vitrin /[slug]/[id] metadata: robota <head>, insana açılış ekranı", () => {
+  const GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+  const GOOGLEBOT_SMARTPHONE =
+    "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+  const HUMANS = [
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:131.0) Gecko/20100101 Firefox/131.0",
+  ];
+
+  it("Googlebot (masaüstü + akıllı telefon) ve Next varsayılan botları bloklayan metadata alır (<head>)", () => {
+    for (const ua of [GOOGLEBOT, GOOGLEBOT_SMARTPHONE, "Mozilla/5.0 (compatible; bingbot/2.0)", "Mozilla/5.0 (compatible; YandexBot/3.0)", "facebookexternalhit/1.1", "AdsBot-Google"]) {
+      expect(shouldServeStreamingMetadata(ua, HTML_LIMITED_BOTS.source), ua).toBe(false);
+    }
+  });
+  it("insan tarayıcıları akışlı metadata almaya devam eder (açılış ekranı + hızlı TTFB korunur)", () => {
+    for (const ua of HUMANS) expect(shouldServeStreamingMetadata(ua, HTML_LIMITED_BOTS.source), ua).toBe(true);
+  });
+  it("Next varsayılan listesi aynen içeride (yükseltmede kendiliğinden güncellenir)", () => {
+    expect(HTML_LIMITED_BOTS.source.startsWith(HTML_LIMITED_BOT_UA_RE.source)).toBe(true);
+  });
+  it("ilan detayı açılış ekranını (loading.tsx) korur; metadata robots/canonical üretir", () => {
+    expect(read("src/app/vitrin/[slug]/[id]/loading.tsx")).toContain("route-splash");
+    const page = read("src/app/vitrin/[slug]/[id]/page.tsx");
+    expect(page).toContain("alternates: { canonical: `/vitrin/${slug}/${id}` }");
   });
 });
 
