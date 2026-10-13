@@ -141,16 +141,13 @@ function Group({ title, items, selected, onSelect }: { title: string; items: Lin
           const incoming = isIn(t.direction);
           return (
             <li key={key}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => onSelect(key)}
+              <label
                 className={cn(
-                  "focus-ring press flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] border px-3 py-2 text-left text-xs transition",
+                  "press flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[var(--radius-control)] border px-3 py-2 text-left text-xs transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500",
                   active ? "border-brand-500 bg-brand-500/8" : "border-line bg-surface hover:bg-surface-hover",
                 )}
               >
+                <input type="radio" name="finance-link-target" value={key} checked={active} onChange={() => onSelect(key)} className="sr-only" />
                 <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-full", incoming ? "tone-success" : "tone-danger")}>
                   {t.kind === "open_item" ? <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> : incoming ? <ArrowDownLeft className="h-3.5 w-3.5" aria-hidden="true" /> : <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />}
                 </span>
@@ -161,7 +158,7 @@ function Group({ title, items, selected, onSelect }: { title: string; items: Lin
                   </span>
                 </span>
                 <span className={cn("numeric shrink-0 font-semibold", incoming ? "text-success-600" : "text-ink-950")}>{money(t.amount)}</span>
-              </button>
+              </label>
             </li>
           );
         })}
