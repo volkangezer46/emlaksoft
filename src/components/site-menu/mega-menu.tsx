@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { Suspense, lazy, useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { ArrowRight, ChevronDown, ExternalLink, Menu, X } from "lucide-react";
+import { AnnouncementBar, usePickedAnnouncement } from "./announcement-bar";
 import { FeaturedMedia } from "./featured-media";
-import type { PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
+import { DEFAULT_CTAS, type CtaLink, type SiteCtas } from "@/lib/site-menu/schema-core";
+import type { PublicAnnouncement, PublicFeatured, PublicGroup, PublicItem } from "@/lib/site-menu/public";
 import type { SceneKind } from "@/lib/site-menu/previews";
 import type { SceneCopy } from "./scene-copy";
 
@@ -116,7 +118,47 @@ function Featured({ f, onClick, active, index, withMedia, previews, hover, copy,
   );
 }
 
-export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[]; logo: ReactNode; top?: ReactNode }) {
+/** Dönüşüm düğmesi: site yolu Next bağlantısı, https adresi yeni sekmede (yönetimden yalnız bu ikisi kaydedilebilir). */
+function CtaAnchor({ cta, className, onClick, children }: { cta: CtaLink; className?: string; onClick?: () => void; children: ReactNode }) {
+  return isInternal(cta.href) ? (
+    <Link prefetch={false} href={cta.href} className={className} onClick={onClick}>{children}</Link>
+  ) : (
+    <a href={cta.href} className={className} onClick={onClick} {...extProps(true)}>{children}</a>
+  );
+}
+
+/**
+ * `announcements`: yayındaki duyuru adayları (seçim yol + Türkiye günü + kapatılanlar, announcement-bar.tsx); `annAt` sunucu
+ * çizim anı, `annBoot` kapatılmış duyuruyu ilk boyamada gizleyen küçük betik. `top`: admin önizlemesinin hazır şeridi.
+ * `ctas`: yönetimden değiştirilmiş dönüşüm düğmeleri (yoksa bugünkü sabitler).
+ */
+export function SiteHeaderClient({
+  groups,
+  logo,
+  top,
+  announcements,
+  annAt = 0,
+  annBoot,
+  ctas,
+}: {
+  groups: ClientGroup[];
+  logo: ReactNode;
+  top?: ReactNode;
+  announcements?: PublicAnnouncement[];
+  annAt?: number;
+  annBoot?: ReactNode;
+  ctas?: SiteCtas | null;
+}) {
+  const cta = ctas ?? DEFAULT_CTAS;
+  const ann = usePickedAnnouncement(announcements, annAt);
+  const bar = ann ? (
+    <>
+      <AnnouncementBar a={ann} />
+      {annBoot}
+    </>
+  ) : (
+    top
+  );
   const [open, setOpen] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -278,8 +320,8 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
   };
 
   return (
-    <div className="mk-nav" data-scrolled={scrolled} data-open={open} data-menu={menu ?? undefined} data-ann={Boolean(top)} ref={rootRef}>
-      {top}
+    <div className="mk-nav" data-scrolled={scrolled} data-open={open} data-menu={menu ?? undefined} data-ann={Boolean(bar)} ref={rootRef}>
+      {bar}
       <header>
         <div className="mk-wrap mk-wrap-wide mk-nav-row">
           <Link prefetch={false} href="/" className="mk-logo" aria-label="EmlakSoft ana sayfa" onClick={close}>
@@ -386,7 +428,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
                           <li>KVKK süreç araçları</li>
                         </ul>
                         <span className="mk-mega-bar-cta">
-                          <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={16} aria-hidden="true" /></Link>
+                          <CtaAnchor cta={cta.trial} className="mk-btn mk-btn-grad" onClick={close}>{`${cta.trial.label} `}<ArrowRight size={16} aria-hidden="true" /></CtaAnchor>
                           <Link prefetch={false} href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Fiyatlar</Link>
                         </span>
                       </div>
@@ -397,11 +439,11 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
             })}
           </nav>
           <div className="mk-nav-cta">
-            <Link prefetch={false} href="/giris" className="mk-btn mk-btn-line mk-login">Giriş yap</Link>
-            <Link prefetch={false} href="/giris" className="mk-login-m">Giriş</Link>
-            <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-primary mk-nav-trial">
-              <span className="mk-long">Ücretsiz dene</span><span className="mk-short">Ücretsiz dene</span> <ArrowRight size={16} aria-hidden="true" />
-            </Link>
+            <CtaAnchor cta={cta.login} className="mk-btn mk-btn-line mk-login">{cta.login.label}</CtaAnchor>
+            <CtaAnchor cta={cta.mobileLogin} className="mk-login-m">{cta.mobileLogin.label}</CtaAnchor>
+            <CtaAnchor cta={cta.trial} className="mk-btn mk-btn-primary mk-nav-trial">
+              <span className="mk-long">{cta.trial.label}</span><span className="mk-short">{cta.trial.label}</span> <ArrowRight size={16} aria-hidden="true" />
+            </CtaAnchor>
             <button
               type="button"
               ref={burgerRef}
@@ -419,9 +461,9 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
       {open ? (
         <div id="mobile-site-navigation" role="dialog" aria-modal="true" aria-label="Site menüsü" className="mk-sheet" ref={sheetRef}>
           <nav aria-label="Mobil site navigasyonu" className="mk-sheet-nav">
-            <MobileSheetBody groups={groups} close={close} />
+            <MobileSheetBody groups={groups} close={close} login={cta.login} />
             <div className="mk-sheet-cta">
-              <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad" onClick={close}>Ücretsiz dene <ArrowRight size={18} aria-hidden="true" /></Link>
+              <CtaAnchor cta={cta.trial} className="mk-btn mk-btn-grad" onClick={close}>{`${cta.trial.label} `}<ArrowRight size={18} aria-hidden="true" /></CtaAnchor>
               <Link prefetch={false} href="/fiyatlar" className="mk-btn mk-btn-line" onClick={close}>Paketleri ve fiyatları gör</Link>
             </div>
           </nav>
@@ -432,7 +474,7 @@ export function SiteHeaderClient({ groups, logo, top }: { groups: ClientGroup[];
 }
 
 /** Mobil gövde: grup başına akordeon (<details>); doğrudan bağlantı grupları aynı sırada. Admin önizlemesi bunu yeniden kullanır. */
-export function MobileSheetBody({ groups, close }: { groups: ClientGroup[]; close: () => void }) {
+export function MobileSheetBody({ groups, close, login = DEFAULT_CTAS.login }: { groups: ClientGroup[]; close: () => void; login?: CtaLink }) {
   return (
     <div className="mk-sheet-scroll">
       {groups.map((g) =>
@@ -459,9 +501,8 @@ export function MobileSheetBody({ groups, close }: { groups: ClientGroup[]; clos
           </details>
         ),
       )}
-      {/* Sert gezinme bilerek: kök [...slug] rotası eklenince kural uyarır; davranış değişmez. */}
-      {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
-      <a href="/giris" className="mk-sheet-link" onClick={close}>Giriş yap</a>
+      {/* Sert gezinme bilerek (giriş sayfası ayrı kabuk); hedef ve metin yönetimden (Dönüşüm düğmeleri > Giriş). */}
+      <a href={login.href} className="mk-sheet-link" onClick={close} {...extProps(!isInternal(login.href))}>{login.label}</a>
     </div>
   );
 }

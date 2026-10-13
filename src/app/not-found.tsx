@@ -1,25 +1,45 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, Building2, Compass, Home, LogIn, Sparkles } from "lucide-react";
+import { ArrowRight, BarChart3, Building2, Compass, Home, LogIn, Sparkles, type LucideIcon } from "lucide-react";
+import { defaultSiteMenu } from "@/lib/site-menu/defaults";
+import type { NotFoundContent } from "@/lib/site-menu/schema";
+import { checkPageHref } from "@/lib/site-menu/schema-core";
+import { getLiveSiteMenu } from "@/lib/site-menu/store";
 
 // Robots: Next 404 yanıtına kendi `noindex` meta'sını ekler; burada ikinci bir robots etiketi YAZILMAZ (çift meta olmasın).
 export const metadata = {
   title: "Sayfa bulunamadı",
 };
 
+/** Bağlantı ikonu hedefe göre seçilir (yönetimden yalnız metin ve hedef gelir); bilinmeyen hedefte pusula. */
+function iconFor(href: string): LucideIcon {
+  const path = href.split(/[?#]/)[0];
+  if (path === "/fiyatlar") return BarChart3;
+  if (path === "/kayit") return Sparkles;
+  if (path === "/araclar" || path.startsWith("/araclar/")) return Building2;
+  return Compass;
+}
+
 /**
- * 404'ten sonra en çok gidilen yerler. Oturum denetimi (önbelleksiz kimlik turu) 404'e eklenmez:
- * herkese açık, hafif bağlantılar gösterilir; oturumu olan kullanıcı "Giriş yap" ile panele geçer.
+ * 404 metni ve popüler bağlantılar yönetimden (Site menüsü > 404 sayfası; yayın yoksa bugünkü metin). Okunamazsa
+ * varsayılan kullanılır. Oturum denetimi (önbelleksiz kimlik turu) 404'e eklenmez: herkese açık, hafif bağlantılar
+ * gösterilir; oturumu olan kullanıcı "Giriş yap" ile panele geçer.
  */
-const popularLinks = [
-  { href: "/fiyatlar", label: "Fiyatlar", desc: "Paketler ve kapsam", icon: BarChart3 },
-  { href: "/kayit", label: "Ücretsiz deneyin", desc: "Ofisinizi birkaç dakikada açın", icon: Sparkles },
-  { href: "/araclar", label: "Araçlar", desc: "Ücretsiz hesaplayıcılar", icon: Building2 },
-];
+async function loadContent(): Promise<NotFoundContent> {
+  try {
+    return (await getLiveSiteMenu()).notFound;
+  } catch {
+    return defaultSiteMenu().notFound;
+  }
+}
 
 const btn =
   "inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] border border-white/15 bg-white/8 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:border-cyan-400/40 hover:bg-white/12";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const content = await loadContent();
+  const popularLinks = content.links
+    .filter((l) => l.label && checkPageHref(l.href).ok)
+    .map((l) => ({ href: l.href, label: l.label, desc: l.desc, icon: iconFor(l.href) }));
   return (
     <div className="theme-dark relative flex min-h-screen items-center justify-center overflow-hidden bg-[image:var(--grad-ink)] px-4 py-16 text-white">
       <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -35,12 +55,13 @@ export default function NotFound() {
         </p>
 
         <h1 className="mt-3 font-display text-2xl font-extrabold text-white sm:text-3xl">
-          Aradığınız sayfa taşınmış olabilir
+          {content.title}
         </h1>
-        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/70">
-          Bağlantı eski olabilir ya da adres yanlış yazılmış olabilir. Sorun değil, aşağıdan
-          kaldığınız yerden devam edebilirsiniz.
-        </p>
+        {content.text ? (
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-white/70">
+            {content.text}
+          </p>
+        ) : null}
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
@@ -54,11 +75,12 @@ export default function NotFound() {
           </Link>
         </div>
 
+        {popularLinks.length ? (
         <nav aria-label="Popüler bağlantılar" className="mt-12 text-left">
           <p className="text-center text-xs font-bold uppercase tracking-[0.14em] text-white/60">Popüler bağlantılar</p>
           <ul className="mt-4 grid gap-2.5 sm:grid-cols-3">
-            {popularLinks.map((l) => (
-              <li key={l.href}>
+            {popularLinks.map((l, i) => (
+              <li key={i}>
                 <Link
                   href={l.href}
                   className="group flex h-full min-h-11 items-start gap-3 rounded-[var(--radius-card)] border border-white/10 bg-white/[0.05] p-4 backdrop-blur transition hover:border-cyan-400/35 hover:bg-white/10"
@@ -71,13 +93,14 @@ export default function NotFound() {
                       {l.label}
                       <ArrowRight aria-hidden className="hover-action h-3.5 w-3.5 text-cyan-300 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
                     </span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-white/60">{l.desc}</span>
+                    {l.desc ? <span className="mt-0.5 block text-xs leading-relaxed text-white/60">{l.desc}</span> : null}
                   </span>
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
+        ) : null}
       </main>
     </div>
   );

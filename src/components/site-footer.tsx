@@ -4,17 +4,27 @@ import { FileSignature } from "lucide-react";
 import { getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { now, trParts } from "@/lib/clock";
 import { trialCtaMobileLabel } from "@/lib/marketing-copy";
-import { toPublicMenu } from "@/lib/site-menu/public";
+import { formatPhoneDisplay } from "@/lib/phone";
+import { getSeoSettings } from "@/lib/seo/store";
+import { splitYear, toPublicCtas, toPublicMenu } from "@/lib/site-menu/public";
+import { checkPageHref, isExternalHref, type CtaLink, type FooterBadgeIcon } from "@/lib/site-menu/schema-core";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
 import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
- * Alt bilgi sütunları admin'den (Site menüsü > Alt bilgi) yönetilir; yayın yoksa varsayılan içerik kullanılır
- * (src/lib/site-menu/defaults.ts). Sunucu bileşeni: istemciye JS göndermez. `autoPlans` sütununa (varsayılan: "Paketler")
- * paket bağlantıları etkin plan tanımlarından (fiyat okuyucu) eklenir.
+ * Alt bilgi sütunları, marka bloğu (açıklama, güven rozetleri, düğme, telif ve yasal not) ve mobil alt çubuk düğmeleri
+ * admin'den (Site menüsü) yönetilir; yayın yoksa varsayılan içerik kullanılır (src/lib/site-menu/defaults.ts, bugünkü metin).
+ * Sunucu bileşeni: istemciye JS göndermez. `autoPlans` sütununa (varsayılan: "Paketler") paket bağlantıları etkin plan
+ * tanımlarından (fiyat okuyucu) eklenir. "İletişim satırı" açıksa sosyal/iletişim bilgisi SEO kurum ayarından okunur.
+ * Metinler düz metindir (HTML/markdown işlenmez).
  */
 export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: boolean; trialDays?: number } = {}) {
-  const menuColumns = toPublicMenu(await getLiveSiteMenu(), now()).footer;
+  const cfg = await getLiveSiteMenu();
+  const menuColumns = toPublicMenu(cfg, now()).footer;
+  const brand = cfg.footerBrand;
+  const ctas = toPublicCtas(cfg.ctas);
+  const brandCta: CtaLink = checkPageHref(brand.cta.href).ok && brand.cta.label ? brand.cta : { label: "Ücretsiz dene", href: "/kayit" };
+  const contact = brand.showContact ? await footerContact() : null;
   const plans = menuColumns.some((c) => c.autoPlans) ? await getPublicPlanDefinitions() : [];
   const columns = menuColumns.map((c) =>
     c.autoPlans
@@ -29,17 +39,33 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
             <Link prefetch={false} href="/" className="mk-logo" style={{ color: "#fff" }} aria-label="EmlakSoft ana sayfa">
               <Brand variant="horizontal" tone="dark" height={36} alt="" lazy />
             </Link>
-            <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
-              Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.
-            </p>
-            <ul className="mk-foot-badges" aria-label="Güven başlıkları">
-              <li><SpriteIcon name="shield-check" size={15} />Frankfurt veri bölgesi</li>
-              <li><SpriteIcon name="scale" size={15} />KVKK süreç araçları</li>
-              <li><FileSignature size={15} aria-hidden="true" />SMS onaylı imza</li>
-            </ul>
-            <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
-              Ücretsiz dene <SpriteIcon name="arrow-right" size={16} />
-            </Link>
+            {brand.description ? (
+              <p style={{ margin: "1rem 0 0", maxWidth: "18rem", fontSize: "0.9375rem", lineHeight: 1.6 }}>
+                {brand.description}
+              </p>
+            ) : null}
+            {brand.badges.length ? (
+              <ul className="mk-foot-badges" aria-label="Güven başlıkları">
+                {brand.badges.map((b, i) => (
+                  <li key={i}><BadgeIcon icon={b.icon} />{b.label}</li>
+                ))}
+              </ul>
+            ) : null}
+            {contact && contact.length ? (
+              <ul className="mk-foot-badges" aria-label="İletişim ve sosyal medya">
+                {contact.map((c) => (
+                  <li key={c.href}>
+                    <a href={c.href} {...(c.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+                      {c.label}
+                      {c.external ? <span className="sr-only"> (yeni sekmede açılır)</span> : null}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <FootCta cta={brandCta} className="mk-btn mk-btn-light" style={{ marginTop: "1.25rem", minHeight: "2.75rem", padding: "0.5rem 1rem", fontSize: "0.9375rem" }}>
+              {`${brandCta.label} `}<SpriteIcon name="arrow-right" size={16} />
+            </FootCta>
           </div>
           {columns.map((col) => (
             <nav key={col.id} aria-label={col.title} className="mk-foot-col">
@@ -58,17 +84,66 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
           </div>
         </div>
         <div className="mk-foot-bottom">
-          <p style={{ margin: 0 }}>© {trParts().year} EmlakSoft. Tüm hakları saklıdır.</p>
-          <p style={{ margin: 0 }}>Ekran görüntüleri ve sayılar örnek veridir. Anılan portal adları yalnız takip içindir; resmi ortaklık iddiası yoktur.</p>
+          {brand.copyright ? <p style={{ margin: 0 }}>{splitYear(brand.copyright, trParts().year)}</p> : null}
+          {brand.disclaimer ? <p style={{ margin: 0 }}>{brand.disclaimer}</p> : null}
         </div>
       </div>
       {/* Mobil alt çubuk (< 768 px). smartCta: ana sayfada yalnız hero CTA'sı görünüm dışındayken belirir (MotionRoot). */}
       <div className="mk-sticky-cta" data-smart={smartCta ? "" : undefined}>
-        <Link prefetch={false} href="/giris" className="mk-sticky-login">Giriş</Link>
-        <Link prefetch={false} href="/kayit" className="mk-btn mk-btn-grad">{trialCtaMobileLabel(trialDays)}</Link>
+        <FootCta cta={ctas.mobileLogin} className="mk-sticky-login">{ctas.mobileLogin.label}</FootCta>
+        <FootCta cta={ctas.mobileTrial} className="mk-btn mk-btn-grad">{ctas.mobileTrial.label || trialCtaMobileLabel(trialDays)}</FootCta>
       </div>
     </footer>
   );
+}
+
+const SPRITE_BADGES = new Set<FooterBadgeIcon>(["shield-check", "scale", "check", "clock"]);
+
+function BadgeIcon({ icon }: { icon: FooterBadgeIcon }) {
+  if (icon === "file-signature") return <FileSignature size={15} aria-hidden="true" />;
+  if (SPRITE_BADGES.has(icon)) return <SpriteIcon name={icon as "shield-check" | "scale" | "check" | "clock"} size={15} />;
+  return null;
+}
+
+/** Site yolu Next bağlantısı; https adresi yeni sekmede (yönetimden yalnız bu ikisi kaydedilebilir). */
+function FootCta({ cta, className, style, children }: { cta: CtaLink; className?: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  if (cta.href.startsWith("/")) {
+    return <Link prefetch={false} href={cta.href} className={className} style={style}>{children}</Link>;
+  }
+  return <a href={cta.href} className={className} style={style} target="_blank" rel="noopener noreferrer">{children}</a>;
+}
+
+const SOCIAL_NAMES: Record<string, string> = {
+  "instagram.com": "Instagram",
+  "linkedin.com": "LinkedIn",
+  "x.com": "X",
+  "twitter.com": "X",
+  "facebook.com": "Facebook",
+  "youtube.com": "YouTube",
+  "tiktok.com": "TikTok",
+};
+
+/** SEO kurum bilgisinden iletişim satırı (salt okuma; okunamazsa satır çizilmez). */
+async function footerContact(): Promise<Array<{ href: string; label: string; external: boolean }>> {
+  try {
+    const org = (await getSeoSettings()).global.organization;
+    const out: Array<{ href: string; label: string; external: boolean }> = [];
+    if (org.email) out.push({ href: `mailto:${org.email}`, label: org.email, external: false });
+    if (org.phone) out.push({ href: `tel:${org.phone.replace(/[^\d+]/g, "")}`, label: formatPhoneDisplay(org.phone) || org.phone, external: false });
+    for (const url of org.sameAs.slice(0, 6)) {
+      if (!isExternalHref(url) || !url.toLowerCase().startsWith("https://")) continue;
+      let host = "";
+      try {
+        host = new URL(url).hostname.replace(/^www\./, "");
+      } catch {
+        continue;
+      }
+      out.push({ href: url, label: SOCIAL_NAMES[host] ?? host, external: true });
+    }
+    return out;
+  } catch {
+    return [];
+  }
 }
 
 function FootLinks({ links }: { links: readonly { id: string; label: string; href: string; external?: boolean }[] }) {

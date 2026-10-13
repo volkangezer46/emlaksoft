@@ -1,5 +1,6 @@
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
-import type { FooterColumn, IconRef, MenuGroup, MenuItem, SiteMenuConfig } from "./schema";
+import type { FooterBrand, FooterColumn, IconRef, MenuGroup, MenuItem, NotFoundContent, OgCard, SiteMenuConfig } from "./schema";
+import { DEFAULT_CTAS } from "./schema-core";
 
 /**
  * VARSAYILAN site menüsü: yönetici hiçbir şey yayınlamadıysa site bugünkü içerikle birebir aynı çalışır.
@@ -154,11 +155,53 @@ function defaultFooter(): FooterColumn[] {
   ];
 }
 
+/** Alt bilgi marka bloğu: src/components/site-footer.tsx'teki bugünkü sabit metnin birebir aynısı. */
+function defaultFooterBrand(): FooterBrand {
+  return {
+    description: "Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.",
+    badges: [
+      { label: "Frankfurt veri bölgesi", icon: "shield-check" },
+      { label: "KVKK süreç araçları", icon: "scale" },
+      { label: "SMS onaylı imza", icon: "file-signature" },
+    ],
+    cta: { label: "Ücretsiz dene", href: "/kayit" },
+    copyright: "© {yil} EmlakSoft. Tüm hakları saklıdır.",
+    disclaimer: "Ekran görüntüleri ve sayılar örnek veridir. Anılan portal adları yalnız takip içindir; resmi ortaklık iddiası yoktur.",
+    showContact: false,
+  };
+}
+
+/** Paylaşım kartı (1200x630): src/lib/brand/og-card.tsx'teki bugünkü metin. */
+function defaultOgCard(): OgCard {
+  return {
+    title: "Türkiye’nin emlak işletim sistemi",
+    subtitle: "Müşteriden tapuya, ilandan komisyona — ofisinizi tek premium platformda yönetin.",
+    chips: ["İYS/EİDS hazırlık akışları", "Yapay zeka destekli", "Portal operasyonları"],
+  };
+}
+
+/** 404 sayfası: src/app/not-found.tsx'teki bugünkü metin ve popüler bağlantılar. */
+function defaultNotFound(): NotFoundContent {
+  return {
+    title: "Aradığınız sayfa taşınmış olabilir",
+    text: "Bağlantı eski olabilir ya da adres yanlış yazılmış olabilir. Sorun değil, aşağıdan kaldığınız yerden devam edebilirsiniz.",
+    links: [
+      { label: "Fiyatlar", desc: "Paketler ve kapsam", href: "/fiyatlar" },
+      { label: "Ücretsiz deneyin", desc: "Ofisinizi birkaç dakikada açın", href: "/kayit" },
+      { label: "Araçlar", desc: "Ücretsiz hesaplayıcılar", href: "/araclar" },
+    ],
+  };
+}
+
 export function defaultSiteMenu(): SiteMenuConfig {
   return {
     v: 1,
     groups: structuredClone(DEFAULT_GROUPS),
     footer: defaultFooter(),
-    announcement: { enabled: false, key: "0", text: "", href: "", linkLabel: "", endsOn: "", dismissible: true },
+    footerBrand: defaultFooterBrand(),
+    ctas: structuredClone(DEFAULT_CTAS) as SiteMenuConfig["ctas"],
+    announcements: [],
+    ogCard: defaultOgCard(),
+    notFound: defaultNotFound(),
   };
 }

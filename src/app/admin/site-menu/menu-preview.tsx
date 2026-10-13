@@ -7,7 +7,8 @@ import { Brand } from "@/components/brand/brand";
 import { toClientGroups } from "@/components/site-menu/client-groups";
 import { MobileSheetBody, SiteHeaderClient } from "@/components/site-menu/mega-menu";
 import { now } from "@/lib/clock";
-import { toPublicMenu } from "@/lib/site-menu/public";
+import { pickAnnouncement } from "@/lib/site-menu/announcements";
+import { customCtas, toPublicMenu } from "@/lib/site-menu/public";
 import type { SiteMenuConfig } from "@/lib/site-menu/schema";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
@@ -18,9 +19,12 @@ import "@/app/marketing-sections.css";
  */
 export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
   const [mode, setMode] = useState<"desktop" | "mobile">("desktop");
-  const menu = useMemo(() => toPublicMenu(cfg, now()), [cfg]);
+  const nowMs = useMemo(() => now(), []);
+  const menu = useMemo(() => toPublicMenu(cfg, nowMs), [cfg, nowMs]);
   const groups = useMemo(() => toClientGroups(menu), [menu]);
-  const ann = menu.announcement;
+  const ctas = useMemo(() => customCtas(cfg.ctas), [cfg.ctas]);
+  // Önizleme ana sayfa görünümüdür: "/" yolunda bugün görünecek duyuru.
+  const ann = pickAnnouncement(menu.announcements, "/", nowMs);
 
   const block = (e: MouseEvent) => {
     const a = (e.target as HTMLElement).closest("a");
@@ -50,6 +54,7 @@ export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
           <SiteHeaderClient
             groups={groups}
             logo={<Brand variant="horizontal" tone="light" height={34} alt="" />}
+            ctas={ctas}
             top={
               ann ? (
                 <div className="mk-ann" role="region" aria-label="Duyuru (önizleme)">
@@ -64,7 +69,7 @@ export function MenuPreview({ cfg }: { cfg: SiteMenuConfig }) {
         ) : (
           <div className="mk-preview-sheet mx-auto w-[22.5rem] max-w-full p-3">
             <nav aria-label="Mobil menü önizlemesi" className="mk-sheet">
-              <MobileSheetBody groups={groups} close={() => {}} />
+              <MobileSheetBody groups={groups} close={() => {}} login={ctas?.login} />
             </nav>
           </div>
         )}

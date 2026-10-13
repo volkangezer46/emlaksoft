@@ -1,6 +1,6 @@
 "use server";
 
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
 import { now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
@@ -41,13 +41,6 @@ function refreshLive() {
   revalidatePath("/", "layout");
 }
 
-/** Duyuru anahtarı: metin/bağlantı/bitiş değişince değişir; kapatılmış duyuru yeni metinle yeniden görünür. */
-function withAnnouncementKey(cfg: SiteMenuConfig): SiteMenuConfig {
-  const a = cfg.announcement;
-  const key = createHash("sha1").update(`${a.text}|${a.href}|${a.endsOn}`).digest("hex").slice(0, 10);
-  return { ...cfg, announcement: { ...a, key } };
-}
-
 /** Taslağı doğrular ve kaydeder. Hatalar kaydı engeller; uyarılar engellemez. */
 export async function saveSiteMenuDraft(input: unknown): Promise<SiteMenuActionResult> {
   const staff = await requireWriter();
@@ -59,7 +52,8 @@ export async function saveSiteMenuDraft(input: unknown): Promise<SiteMenuActionR
   const { config, issues } = validateSiteMenu(input, { media: state.media });
   if (!config || hasErrors(issues)) return { error: "Menüde düzeltilmesi gereken hatalar var.", issues };
 
-  const next = withAnnouncementKey(config);
+  // Duyuru kapatma anahtarı yayın görünümünde kimlik + içerik özetinden üretilir (src/lib/site-menu/public.ts).
+  const next = config;
   const saved = await saveDraft(next, staff.id);
   if (!saved.ok) return { error: saved.error, issues };
 
@@ -68,7 +62,7 @@ export async function saveSiteMenuDraft(input: unknown): Promise<SiteMenuActionR
     action: "site_menu.draft_save",
     entityType: "site_menu",
     entityId: "draft",
-    meta: { groups: next.groups.length, footerColumns: next.footer.length, announcement: next.announcement.enabled },
+    meta: { groups: next.groups.length, footerColumns: next.footer.length, announcements: next.announcements.length },
   });
   refreshAdmin();
   return { ok: true, issues, config: next };

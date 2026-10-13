@@ -39,7 +39,7 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
     // Paket bağlantıları sabit değil: sütun `autoPlans` ile etkin plan tanımlarından beslenir.
     expect(cfg.footer[1]).toMatchObject({ autoPlans: true });
     expect(cfg.footer[1].links).toHaveLength(1);
-    expect(cfg.announcement.enabled).toBe(false);
+    expect(cfg.announcements).toEqual([]);
   });
 
   it("varsayılan uyarı üretmez (yinelenen hedef yok)", () => {
@@ -50,7 +50,7 @@ describe("varsayılan menü (hiç override yokken site bugünkü gibi)", () => {
     const pub = toPublicMenu(cfg, 0);
     expect(pub.groups).toHaveLength(4);
     expect(pub.groups.flatMap((g) => g.columns.flatMap((c) => c.items)).some((i) => i.external)).toBe(false);
-    expect(pub.announcement).toBeNull();
+    expect(pub.announcements).toEqual([]);
     expect(pub.footer).toHaveLength(5);
   });
 
@@ -182,14 +182,14 @@ describe("anlamsal doğrulama", () => {
     expect(hasErrors(validateSiteMenu(c, { media }).issues)).toBe(true);
   });
 
-  it("duyuru: açıkken metin, bağlantı varsa bağlantı metni zorunlu", () => {
+  it("duyuru: metin zorunlu, bağlantı varsa bağlantı metni zorunlu", () => {
     const c = base();
-    c.announcement = { enabled: true, key: "k", text: "", href: "", linkLabel: "", endsOn: "", dismissible: true };
+    c.announcements = [{ id: "a1", text: "", href: "", linkLabel: "", startsOn: "", endsOn: "", pathMode: "all", pathPrefix: "", priority: 5, dismissible: true }];
     expect(hasErrors(validateSiteMenu(c).issues)).toBe(true);
-    c.announcement.text = "Yeni özellik";
-    c.announcement.href = "/fiyatlar";
+    c.announcements[0].text = "Yeni özellik";
+    c.announcements[0].href = "/fiyatlar";
     expect(hasErrors(validateSiteMenu(c).issues)).toBe(true);
-    c.announcement.linkLabel = "İncele";
+    c.announcements[0].linkLabel = "İncele";
     expect(hasErrors(validateSiteMenu(c).issues)).toBe(false);
   });
 
@@ -226,12 +226,10 @@ describe("herkese açık görünüm", () => {
 
   it("duyuru bitiş tarihi Türkiye gününün sonuna kadar geçerlidir", () => {
     const c = defaultSiteMenu();
-    c.announcement = { enabled: true, key: "k", text: "Duyuru", href: "", linkLabel: "", endsOn: "2026-10-05", dismissible: true };
+    c.announcements = [{ id: "a1", text: "Duyuru", href: "", linkLabel: "", startsOn: "", endsOn: "2026-10-05", pathMode: "all", pathPrefix: "", priority: 5, dismissible: true }];
     const end = endOfDayTrMs("2026-10-05")!;
-    expect(toPublicMenu(c, end - 1000).announcement?.text).toBe("Duyuru");
-    expect(toPublicMenu(c, end + 1000).announcement).toBeNull();
-    c.announcement.enabled = false;
-    expect(toPublicMenu(c, 0).announcement).toBeNull();
+    expect(toPublicMenu(c, end - 1000).announcements.map((a) => a.text)).toEqual(["Duyuru"]);
+    expect(toPublicMenu(c, end + 1000).announcements).toEqual([]);
   });
 });
 
