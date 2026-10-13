@@ -317,6 +317,8 @@ const F = {
   siteMedia: "20261013003500_site_media.sql",
   // AD7 (2026-10-13): e-posta gonderim gunlugu + saglayici olaylari + bastirma listesi (yalniz service_role) + budama RPC.
   emailLog: "20261013004600_email_log.sql",
+  // Onarim (2026-10-13): push_subscriptions defterde var, canlida yoktu; idempotent yeniden kurulum.
+  pushSubscriptionsRepair: "20261013006000_push_subscriptions_repair.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
@@ -536,6 +538,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.signupAttributionExt]: "ek", // signup_attributions'a 6 nullable sutun (channel, src_host, utm_term, utm_content, first_touch, last_touch) + uzunluk/desen CHECK'leri (landing_path dahil); gclid YOK; tablo 0 satir, geriye donuk doldurma yok
     [F.growthFunnel]: "ek", // yeni salt-okunur SECURITY DEFINER RPC platform_growth_funnel (yalniz service_role; platform_dashboard_rollups deseni); tablo/politika/veri degismez
     [F.siteMedia]: "ek", // yeni ozel kova site-media (raster mime, 8 MB) + site_media tablosu (RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "kurulum bekliyor" + gorselsiz ana sayfa
+    [F.pushSubscriptionsRepair]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.googleData]: "ek", // 3 yeni platform tablosu (RLS acik, politika yok, yalniz service_role) + google_data_prune/seo_gsc_summary (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "veri yok"
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
@@ -730,6 +733,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
+    { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions onarimi: canlida eksik tablo asil tanimla idempotent kurulur (sira serbest, ek)", files: [F.pushSubscriptionsRepair] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "SP5-google-veri", order: 69, title: "Google baglanti merkezi: seo_gsc_daily, seo_url_inspections, ads_daily_metrics + google_data_prune/seo_gsc_summary (bagimsiz; kod tablolar yokken bos durum, cron baglanti yokken atlar; sira serbest, ek)", files: [F.googleData] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
