@@ -19,7 +19,8 @@ import path from "node:path";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    // scripts/*.test.ts: derleme araçlarının saf mantığı (ör. check-bundle-budget).
+    include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     // src/ metin dosyaları koşu başına bir kez okunur (sözleşme testleri paylaşır): test-support/src-tree.ts.
     globalSetup: ["./vitest.global-setup.ts"],
     // pglite'lı SQL testlerinin beforeAll kurulumu tam koşu yükünde 10 sn varsayılanı aşıyor.

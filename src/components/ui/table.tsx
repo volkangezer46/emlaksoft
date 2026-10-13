@@ -138,9 +138,11 @@ export function TR({
         "hairline-b transition-colors last:border-0",
         // Hover'da yalnızca zemin değil, sol kenarda ince marka vurgusu:
         // gözün "hangi satırdayım" sorusunu anında cevaplar. Zemin rol token'ından
-        // (--surface-hover): açık/koyu ve her yüzeyde aynı formül.
-        interactive &&
-          "group relative cursor-pointer hover:bg-surface-hover hover:shadow-[inset_2px_0_0_0_var(--brand-500)]",
+        // (--surface-hover): açık/koyu ve her yüzeyde aynı formül. Gölge/cursor `.tbl-row-link` (console-kit.css);
+        // `group` group-hover işaretçisi olduğu için sınıf olarak kalır. `hover:bg-surface-hover` BİLEREK yardımcı
+        // katmanda: zemin sınıfı veren çağıranlarda (seçili satır, `target:` vurgusu, kendi satırım) eski davranışla
+        // aynı şekilde hover zemini kazanır; bileşen katmanına taşınırsa ezilir.
+        interactive && "group tbl-row-link hover:bg-surface-hover",
         className,
       )}
     />

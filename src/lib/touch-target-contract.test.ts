@@ -10,7 +10,8 @@ import { readCached, walkSource } from "./test-support/src-tree";
  * `touch:` yazmak zorunda kalmaz. Masaüstü yoğunluğu değişmez.
  */
 
-const REQUIRED: [file: string, needles: string[]][] = [
+// Dizgi: birebir alt dizgi. RegExp: biçimden (satır sonu/boşluk) bağımsız denetim — CSS @apply kuralları için.
+const REQUIRED: [file: string, needles: (string | RegExp)[]][] = [
   // button.tsx A ajanınca genişletiliyor: yalnız varyantın varlığı denetlenir.
   ["src/components/ui/button.tsx", ["touch:h-11"]],
   ["src/components/ui/input.tsx", ["touch:min-h-11"]],
@@ -24,7 +25,9 @@ const REQUIRED: [file: string, needles: string[]][] = [
   ["src/components/ui/checkbox.tsx", ["touch:h-6 touch:w-6"]],
   ["src/components/ui/filter-bar.tsx", ["touch:min-h-11"]],
   ["src/components/ui/data-table.tsx", ["touch:min-h-11", "touch:h-11"]],
-  ["src/components/ui/list-kit/row-actions.tsx", ["touch:h-11 touch:w-11"]],
+  // Satır eylemi RSC sınıf diyeti: kurallar `.lk-row-act` (console-kit.css, @apply) içinde.
+  ["src/components/ui/list-kit/row-actions.tsx", ["lk-row-act"]],
+  ["src/app/console-kit.css", [/\.lk-row-act\s*\{[^}]*\btouch:h-11\s+touch:w-11\b/]],
   ["src/components/ui/list-kit/list-pager.tsx", ["touch:min-h-11"]],
   ["src/components/ui/list-kit/view-switcher.tsx", ["touch:h-11"]],
   ["src/components/ui/route-error.tsx", ["touch:min-h-11"]],
@@ -36,7 +39,10 @@ describe("dokunma hedefi sözleşmesi", () => {
   for (const [file, needles] of REQUIRED) {
     it(file, () => {
       const src = readFileSync(path.join(process.cwd(), file), "utf8");
-      for (const n of needles) expect(src, `${file} → ${n}`).toContain(n);
+      for (const n of needles) {
+        if (typeof n === "string") expect(src, `${file} → ${n}`).toContain(n);
+        else expect(src, `${file} → ${n}`).toMatch(n);
+      }
     });
   }
 
