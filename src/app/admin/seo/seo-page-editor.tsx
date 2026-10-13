@@ -6,11 +6,11 @@ import { X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
-import { resetSeoPage, saveSeoPage } from "@/app/actions/seo-admin";
+import { estimateSeoImpact, resetSeoPage, saveSeoPage } from "@/app/actions/seo-admin";
 import { canonicalUrl, type ChecklistItem } from "@/lib/seo/rules";
 import { CHANGE_FREQS, JSON_LD_KINDS, type JsonLdKind } from "@/lib/seo/schema-core";
 import type { SeoPageOverride } from "@/lib/seo/schema";
-import { Checklist, LockedNote, SeoForm, SerpPreview, SocialPreview, SubmitButton } from "./seo-ui";
+import { Checklist, LockedNote, SeoForm, SerpPreview, SocialPreview, SubmitButton, withScope } from "./seo-ui";
 
 export type PageEditorData = {
   path: string;
@@ -75,7 +75,7 @@ export function PageEditor({
         </Link>
       </CardHeader>
       <CardContent className="grid gap-6 lg:grid-cols-2">
-        <SeoForm action={saveSeoPage}>
+        <SeoForm action={saveSeoPage} impact={canSensitive ? (fd) => estimateSeoImpact(withScope(fd, "page")) : undefined}>
           <input type="hidden" name="path" value={data.path} />
           <FormField label="Başlık" htmlFor="pe-title" hint={`Şablon uygulanır: ${titleTemplate}`}>
             <FormInput id="pe-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder={d.title ?? defaultTitle} maxLength={120} />

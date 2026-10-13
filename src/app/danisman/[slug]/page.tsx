@@ -25,6 +25,8 @@ import { agentInitials, shortenCustomerName } from "@/lib/agent-profile";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AgentShareCard } from "./agent-share-card";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { getSeoSettings } from "@/lib/seo/store";
+import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import {
@@ -114,20 +116,29 @@ export async function generateMetadata({
   if (!agent) return { title: "Danışman bulunamadı", robots: { index: false, follow: false } };
 
   const admin = createAdminClient();
-  const { data: tenant } = await admin.from("tenants").select("name").eq("id", agent.tenant_id).maybeSingle();
+  const [{ data: tenant }, seo] = await Promise.all([
+    admin.from("tenants").select("name, vitrin_seo_optin").eq("id", agent.tenant_id).maybeSingle(),
+    getSeoSettings(),
+  ]);
   const office = (tenant?.name as string | null) ?? "Emlak ofisi";
   const role = agent.title?.trim() || "Emlak danışmanı";
 
-  const title = `${agent.full_name} — ${role} | ${office}`;
-  const description =
-    agent.bio?.trim() ||
-    `${agent.full_name}, ${office} bünyesinde ${role.toLocaleLowerCase("tr")}. ${
-      agent.specialties?.length ? `Uzmanlık: ${agent.specialties.join(", ")}. ` : ""
-    }Portföyleri görün, tek tıkla arayın veya randevu alın.`;
+  // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
+  const vars = {
+    danisman: agent.full_name,
+    ofis: office,
+    unvan: role,
+    unvan_kucuk: role.toLocaleLowerCase("tr"),
+    uzmanlik: agent.specialties?.length ? `Uzmanlık: ${agent.specialties.join(", ")}. ` : "",
+  };
+  const title = resolveSeoPattern(seo.patterns, "agent", "title", vars);
+  const description = agent.bio?.trim() || resolveSeoPattern(seo.patterns, "agent", "description", vars);
 
   return {
     title: { absolute: title },
     description,
+    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
+    robots: vitrinRobots(tenant?.vitrin_seo_optin === true),
     alternates: { canonical: `/danisman/${slug}` },
     openGraph: {
       type: "profile",

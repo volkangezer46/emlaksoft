@@ -214,6 +214,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/admin/muhasebe/page.tsx", fn: "MuhasebePage", calls: 1, tenantFilter: "devir" },
   { file: "src/app/admin/page.tsx", fn: "getAdminDashboardData", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/raporlar/page.tsx", fn: "AdminReportsPage", calls: 1, tenantFilter: "yok" },
+  { file: "src/app/admin/seo/pattern-samples.ts", fn: "loadPatternData", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/sistem/schema-checks.ts", fn: "probeSchema", calls: 1, tenantFilter: "yok" },
   { file: "src/app/admin/sistem/system-view.tsx", fn: "SystemView", calls: 1, tenantFilter: "yok" },
   { file: "src/app/admin/tenants/[id]/page.tsx", fn: "AdminTenantDetailPage", calls: 1, tenantFilter: "var" },

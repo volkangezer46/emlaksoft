@@ -70,11 +70,14 @@ export function RedirectsPanel({
   issues,
   canBulk,
   prefillFrom,
+  prefillTo,
 }: {
   rules: SeoRedirectRule[];
   issues: RuleIssues;
   canBulk: boolean;
   prefillFrom?: string;
+  /** 404 listesindeki öneri (not-found-suggest.ts); kayıt yine yöneticinin "Yönlendirme ekle" onayıyla. */
+  prefillTo?: string;
 }) {
   const router = useRouter();
   const [confirmAll, setConfirmAll] = useState(false);
@@ -98,7 +101,7 @@ export function RedirectsPanel({
                 <FormInput id="rd-from" name="from" placeholder="/eski-sayfa" defaultValue={prefillFrom} required />
               </FormField>
               <FormField label="Yeni yol ya da adres" htmlFor="rd-to" hint="Örn. /fiyatlar">
-                <FormInput id="rd-to" name="to" placeholder="/fiyatlar" required />
+                <FormInput id="rd-to" name="to" placeholder="/fiyatlar" defaultValue={prefillTo} required />
               </FormField>
               <FormField label="Tür" htmlFor="rd-status">
                 <FormSelect id="rd-status" name="status" defaultValue="308">

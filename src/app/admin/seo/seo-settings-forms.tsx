@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { EmailInput } from "@/components/ui/email-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import {
+  estimateSeoImpact,
   exportSeoSettings,
   importSeoSettings,
   regenerateIndexNowKey,
@@ -25,7 +26,7 @@ import { buildRobots, robotsToText } from "@/lib/seo/robots-rules";
 import { validateJsonLd } from "@/lib/seo/jsonld";
 import { AI_BOTS } from "@/lib/seo/schema-core";
 import type { SeoGlobal, SeoIndexNowSettings, SeoRobotsSettings, SeoSitemapSettings } from "@/lib/seo/schema";
-import { LockedNote, ResultNote, SeoForm, SubmitButton } from "./seo-ui";
+import { LockedNote, ResultNote, SeoForm, SubmitButton, withScope } from "./seo-ui";
 
 /* ------------------------------ Genel ------------------------------ */
 
@@ -108,7 +109,7 @@ export type SitemapPreview = { total: number; chunks: number; sample: string[]; 
 export function SitemapForm({ value, canEdit, preview }: { value: SeoSitemapSettings; canEdit: boolean; preview: SitemapPreview }) {
   return (
     <div className="space-y-6">
-      <SeoForm action={saveSeoSitemap}>
+      <SeoForm action={saveSeoSitemap} impact={canEdit ? (fd) => estimateSeoImpact(withScope(fd, "sitemap")) : undefined}>
         {!canEdit ? <LockedNote>Sitemap kapsamını yalnız süper admin değiştirebilir.</LockedNote> : null}
         <fieldset disabled={!canEdit} className="space-y-6">
           <Card>
@@ -214,7 +215,7 @@ export function RobotsForm({ value, canEdit, base }: { value: SeoRobotsSettings;
   );
   return (
     <div className="space-y-6">
-      <SeoForm action={saveSeoRobots}>
+      <SeoForm action={saveSeoRobots} impact={canEdit ? (fd) => estimateSeoImpact(withScope(fd, "robots")) : undefined}>
         {!canEdit ? <LockedNote>robots.txt kurallarını yalnız süper admin değiştirebilir (yanlış kural siteyi aramalardan düşürebilir).</LockedNote> : null}
         <fieldset disabled={!canEdit} className="space-y-6">
           <Card>

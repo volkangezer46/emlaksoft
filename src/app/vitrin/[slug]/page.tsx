@@ -24,6 +24,8 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 import { toTelHref } from "@/lib/phone";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
+import { getSeoSettings } from "@/lib/seo/store";
+import { introDescription, resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -82,27 +84,32 @@ export async function generateMetadata({
     .eq("slug", slug)
     .maybeSingle();
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
-  // Ofis ayarı (sütun yoksa varsayılan: açık, tanıtım yok).
-  const { settings: vitrinCfg } = await loadVitrinSettings(admin, tenant.id);
+  // Ofis ayarı (sütun yoksa varsayılan: açık, tanıtım yok, arama onayı yok -> noindex).
+  // Ayar, ilan sayısı ve SEO kalıpları birbirinden bağımsız: paralel.
+  const [{ settings: vitrinCfg }, { count }, seo] = await Promise.all([
+    loadVitrinSettings(admin, tenant.id),
+    admin
+      .from("properties")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("status", "live")
+      .is("deleted_at", null)
+      .eq("is_sample", false)
+      .or(OPEN_LISTING_OR_FILTER),
+    getSeoSettings(),
+  ]);
   if (!vitrinCfg.enabled) return { title: "Vitrin bulunamadı" };
 
-  const { count } = await admin
-    .from("properties")
-    .select("id", { count: "exact", head: true })
-    .eq("tenant_id", tenant.id)
-    .eq("status", "live")
-    .is("deleted_at", null)
-    .eq("is_sample", false)
-    .or(OPEN_LISTING_OR_FILTER);
-
-  const title = `${tenant.name} | Portföy Vitrini`;
-  const description =
-    vitrinCfg.intro?.replace(/s+/g, " ").slice(0, 200) ??
-    `${tenant.name} güncel portföy vitrini — ${count ?? 0} aktif ilan. Satılık ve kiralık portföyleri inceleyin, yerinde inceleme için talep bırakın.`;
+  // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
+  const vars = { ofis: tenant.name, ilan_sayisi: count ?? 0 };
+  const title = resolveSeoPattern(seo.patterns, "office", "title", vars);
+  const description = introDescription(vitrinCfg.intro) ?? resolveSeoPattern(seo.patterns, "office", "description", vars);
 
   return {
     title: { absolute: title },
     description,
+    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
+    robots: vitrinRobots(vitrinCfg.seoOptin),
     alternates: { canonical: `/vitrin/${slug}` },
     openGraph: {
       type: "website",
