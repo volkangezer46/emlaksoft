@@ -169,7 +169,9 @@ describe("JSON-LD: BreadcrumbList ve image[]", () => {
     expect(items).toHaveLength(3);
     expect(items.map((i) => i.position)).toEqual([1, 2, 3]);
     expect(items[0]).toMatchObject({ name: "Gezertaş Emlak vitrini", item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak" });
-    expect(items[1]).toMatchObject({ name: "Kadıköy", item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak?q=Kad%C4%B1k%C3%B6y" });
+    // Ara öğe kanonik vitrin URL'si (?q= araması boş dönebilir ve kanonik değildir).
+    expect(items[1]).toMatchObject({ name: "Kadıköy", item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak" });
+    expect(items.some((i) => i.item.includes("?"))).toBe(false);
     expect(items[2]).toMatchObject({ name: input.name, item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak/abc" });
     // İlçe yoksa il; ikisi de yoksa iki öğe.
     expect((vitrinListingBreadcrumbLd({ ...input, district: null, listingId: "abc", listingName: "x" }).itemListElement as unknown[])).toHaveLength(3);
@@ -215,7 +217,10 @@ describe("alt metin", () => {
 describe("istemci yükü", () => {
   it("LeadForm, SavedSearchBox, CompareBar ve FilterPanel görünür alana yaklaşınca yüklenir", () => {
     const islands = read("src/app/vitrin/[slug]/lazy-islands.tsx");
-    expect(islands).toContain("IntersectionObserver");
+    expect(read("src/app/vitrin/[slug]/viewport-gate.ts")).toContain("IntersectionObserver");
+    // Gözlem örnek başına (istemci gezinmesinde ada askıda kalmaz): lazy fabrikası DOM'u aramaz, kapıyı bekler.
+    expect(islands).toContain("gate.watch(ref.current)");
+    expect(islands).not.toContain("getElementById");
     for (const name of ["LazyLeadForm", "LazySavedSearchBox", "LazyCompareBar", "LazyFilterPanel"]) expect(islands).toContain(`export const ${name}`);
     const page = read("src/app/vitrin/[slug]/page.tsx");
     for (const imp of ['from "@/app/lead/[token]/lead-form"', 'from "@/components/public/saved-search-box"', 'from "./filter-panel"']) {
