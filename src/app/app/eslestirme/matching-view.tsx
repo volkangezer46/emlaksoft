@@ -35,6 +35,7 @@ import { RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
+import { scopeLabel } from "@/lib/metric-labels";
 /** ?kriter= önizleme bağlantısının sanal talep kimliği (kayıtlı talep değildir). */
 const PREVIEW_DEMAND_ID = "onizleme";
 
@@ -294,7 +295,7 @@ export async function MatchingView({
                   aktifken tekrar tıklamak filtreyi kaldırır. */}
               {[
                 { label: "Açık talep", value: demands.length, cls: "", href: "/app/talepler" },
-                { label: "Portföy", value: properties.length, cls: "", href: "/app/portfoyler" },
+                { label: `${scopeLabel("matchable")} portföy`, value: properties.length, cls: "", href: "/app/portfoyler" },
                 { label: "Güçlü eşleşme", value: strong, cls: "text-mint-400", href: matchHref({ kademe: kademeF === "strong" ? null : "guclu", minSkor: null }) },
                 { label: "İyi eşleşme", value: good, cls: "text-cyan-300", href: matchHref({ kademe: kademeF === "good" ? null : "iyi", minSkor: null }) },
               ].map((item) => (
@@ -391,7 +392,7 @@ export async function MatchingView({
             <Crosshair className="h-8 w-8 text-text-faint" />
             <p className="mt-3 font-display font-bold text-ink-950">Henüz eşleşme yok</p>
             <p className="mt-1 max-w-md text-sm text-text-muted">
-              Açık talep ve yayında portföy ekleyin. Bütçe / il / oda örtüşünce burada skorlanır.
+              Açık talep ve eşleştirmeye açık (yayında, taslak ya da opsiyonlu) portföy ekleyin. Bütçe / il / oda örtüşünce burada skorlanır.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               <Link href="/app/musteriler" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Müşteriler</Link>

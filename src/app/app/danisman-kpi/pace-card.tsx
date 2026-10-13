@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { RadialGauge } from "@/components/ui/viz";
 import { Progress } from "@/components/ui/progress";
-import { paceGauge, paceVerdict } from "./month-progress";
+import { paceGauge, paceRingLabel, paceVerdict } from "./month-progress";
 
 const VERDICT: Record<"ahead" | "on-track" | "behind", { text: string; color: string }> = {
   ahead: { text: "Geçen ayın önünde", color: "var(--viz-pos)" },
@@ -32,6 +32,7 @@ export function PaceCard({
 }) {
   const g = paceGauge(scoreNow, scorePrev);
   if (!g) return null;
+  const ring = paceRingLabel(g);
   const verdict = paceVerdict(scoreNow, scorePrev, elapsedPct);
   const v = verdict ? VERDICT[verdict] : null;
   return (
@@ -40,8 +41,8 @@ export function PaceCard({
       <p className="mt-0.5 text-xs text-text-faint">Ekip skoru toplamı, {prevLabel} ile karşılaştırma</p>
       <div className="mt-4 flex flex-wrap items-center gap-6">
         <RadialGauge value={g.value} max={g.max} target={g.target} size={112} stroke={10} tone="accent" ariaLabel={`${monthLabel} ekip skoru ${g.value}, ${prevLabel} ${g.target}`}>
-          <span className="font-display text-xl font-extrabold tabular-nums text-text">%{g.ratioPct}</span>
-          <span className="block text-xs text-text-faint">geçen ayın</span>
+          <span className="font-display text-xl font-extrabold tabular-nums text-text">{ring.main}</span>
+          <span className="block text-xs text-text-faint">{ring.caption}</span>
         </RadialGauge>
         <dl className="min-w-48 flex-1 space-y-2 text-sm">
           <div className="flex items-baseline justify-between gap-3">

@@ -23,6 +23,7 @@ import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { getStageLabels } from "@/lib/definitions";
 import { daysAgoIso, msSince } from "@/lib/clock";
+import { periodLabel } from "@/lib/metric-labels";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { BoardDeal } from "./deal-board";
 import { DealBoard } from "./deal-board-lazy";
@@ -92,6 +93,13 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 
 /** Liste görünümünde sayfa başına kayıt — gerçek sayfalama. */
 const PAGE_SIZE = 30;
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "YYYY-AA-GG" → ertesi gün (saf takvim aritmetiği; geçerli zaman okunmaz). */
+function nextDateKey(key: string): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
 /** Tutar toplamları için taranan azami kayıt; tavana dayanırsa rakamlar gösterilmez. */
 const SUM_SCAN_LIMIT = 2000;
 
@@ -118,6 +126,10 @@ export default async function DealsPage({
     bayat?: string;
     sayfa?: string;
     yogunluk?: string;
+    tur?: string;
+    from?: string;
+    to?: string;
+    ornek?: string;
   }>;
 }) {
   const sp = (await searchParams) ?? {};
@@ -142,6 +154,12 @@ export default async function DealsPage({
   // Kapsam, özel alan süzgeci ve arama ön sorgusu birbirinden bağımsız: aşağıda TEK turda beklenir (eskiden 3 ardışık tur).
   const listScopeP = getListScope({ userId, tenantId, role, mineOnly: !officeWide });
   const bayatF = sp.bayat === "1";
+  // Metrik bağlantıları için sunucu süzgeçleri (komisyon indirim analizi): işlem türü, son güncelleme aralığı
+  // (kazanılan anlaşmada kapanış tarihi vekili; TR günü) ve örnek veriyi dışlama. Yalnız listeyi daraltır; sayaçlar değişmez.
+  const turF: "" | "satis" | "kira" = sp.tur === "satis" || sp.tur === "kira" ? sp.tur : "";
+  const fromF = DATE_KEY.test(sp.from ?? "") ? sp.from! : "";
+  const toF = DATE_KEY.test(sp.to ?? "") ? sp.to! : "";
+  const ornekHaricF = sp.ornek === "haric";
   const density = densityOf(sp.yogunluk);
   const page = parsePage(sp.sayfa);
   const offset = (page - 1) * PAGE_SIZE;
@@ -152,6 +170,10 @@ export default async function DealsPage({
   if (asamaF && gorunum === "liste") urlParams.asama = asamaF;
   if (officeWide && danismanF) urlParams.danisman = danismanF;
   if (bayatF) urlParams.bayat = "1";
+  if (turF) urlParams.tur = turF;
+  if (fromF) urlParams.from = fromF;
+  if (toF) urlParams.to = toF;
+  if (ornekHaricF) urlParams.ornek = "haric";
   if (density === "kompakt" && gorunum === "liste") urlParams.yogunluk = "kompakt";
   // Özel alan filtresi (?ozel=anahtar:değer): liste ve pano aynı kimlik kümesiyle daralır.
   const customFilterP = resolveCustomFieldFilter(supabase, tenantId, "deal", customFilterRaw(sp as Record<string, string | undefined>));
@@ -173,6 +195,10 @@ export default async function DealsPage({
   if (search.clause) listQuery = listQuery.or(search.clause);
   listQuery = applyCustomFieldIds(listQuery, customFilter.ids);
   if (bayatF) listQuery = listQuery.not("stage", "in", "(won,lost)").lt("updated_at", staleIso);
+  if (turF) listQuery = listQuery.eq("deal_type", turF === "satis" ? "sale" : "rent");
+  if (fromF) listQuery = listQuery.gte("updated_at", `${fromF}T00:00:00+03:00`);
+  if (toF) listQuery = listQuery.lt("updated_at", `${nextDateKey(toF)}T00:00:00+03:00`);
+  if (ornekHaricF) listQuery = listQuery.eq("is_sample", false);
   if (gorunum === "liste") {
     if (asamaF === "acik") listQuery = listQuery.not("stage", "in", "(won,lost)");
     else if (asamaF) listQuery = listQuery.eq("stage", asamaF);
@@ -324,10 +350,10 @@ export default async function DealsPage({
       href: `${hrefWith({ gorunum: "", asama: "", sayfa: "" })}#huni`,
       hint: "olasılıkla ağırlıklı açık hat",
     });
-    kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma` });
+    kpis.push({ label: "Kazanılan", value: moneyKpi(sums.wonValue), title: money(sums.wonValue), icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `${stageCounts.won} anlaşma · ${periodLabel("allTime")}` });
   } else {
     kpis.push({ label: "Açık anlaşma", value: openCount, icon: <TrendingUp />, tone: "info", href: hrefWith({ gorunum: "liste", asama: "acik", sayfa: "" }), hint: "kazanılmamış, kaybedilmemiş" });
-    kpis.push({ label: "Kazanılan", value: stageCounts.won!, icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: "anlaşma" });
+    kpis.push({ label: "Kazanılan", value: stageCounts.won!, icon: <Trophy />, tone: "success", href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }), hint: `anlaşma · ${periodLabel("allTime")}` });
   }
   if (rate !== null) {
     kpis.push({
@@ -336,7 +362,7 @@ export default async function DealsPage({
       icon: <Percent />,
       tone: rate >= 50 ? "success" : "warning",
       href: hrefWith({ gorunum: "liste", asama: "won", sayfa: "" }),
-      hint: "kazanılan / sonuçlanan",
+      hint: `kazanılan / sonuçlanan · ${periodLabel("allTime")}`,
     });
   }
   kpis.push({
@@ -363,6 +389,10 @@ export default async function DealsPage({
     },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
     { key: "bayat", label: "Hareket", format: () => `${STALE_DAYS}+ gündür güncellenmedi` },
+    { key: "tur", label: "İşlem", format: (v) => (v === "kira" ? "Kiralık" : "Satış") },
+    { key: "from", label: "Güncelleme ≥", format: (v) => v.split("-").reverse().join(".") },
+    { key: "to", label: "Güncelleme ≤", format: (v) => v.split("-").reverse().join(".") },
+    { key: "ornek", label: "Örnek veri", format: () => "Hariç" },
   ]);
 
   // ---- Liste görünümü satırları ------------------------------------------------
@@ -653,7 +683,10 @@ export default async function DealsPage({
                             <li key={f.key} className="flex items-center gap-2 text-xs">
                               <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${f.bar}`} aria-hidden />
                               <span className="text-text-muted">{f.label}</span>
-                              <Link href={`#sutun-${f.key}`} className="numeric focus-ring ml-auto rounded-[var(--radius-control)] font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                              <Link
+                                href={hrefWith({ gorunum: "liste", asama: f.key, sayfa: "" })}
+                                className="numeric focus-ring ml-auto rounded-[var(--radius-control)] font-bold text-ink-950 hover:text-brand-600 hover:underline"
+                              >
                                 {money(f.value)}
                               </Link>
                             </li>
