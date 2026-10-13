@@ -52,7 +52,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const [{ data: subs }, { data: invoices }, platformMrr] = await Promise.all([
     admin
       .from("subscriptions")
-      .select("id, plan, status, amount_try, current_period_end, created_at")
+      .select("id, plan, status, amount_try, current_period_end, pause_started_at, cancel_at_period_end, created_at")
       .order("created_at", { ascending: false }),
     admin
       .from("invoices")
@@ -72,7 +72,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
   const nowMs = now();
-  // Dönemi bitmiş ama aktif (status='active' AND current_period_end < şimdi): Ofis listesinde süzülür, eylemler Ofis 360'ta.
+  // Dönemi bitmiş ama aktif (isExpiredActive: duraklatılmış/iptal bekleyen hariç): Ofis listesinde süzülür, eylemler Ofis 360'ta.
   const expiredActive = subRows.filter((s) => isExpiredActive(s, nowMs)).length;
   const tp = trParts(nowMs);
   const monthStart = Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS;

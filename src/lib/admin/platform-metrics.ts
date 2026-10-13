@@ -327,9 +327,23 @@ export function periodChurn(rows: readonly ChurnSubRow[], nowMs: number, days = 
 
 // ---- Dönemi bitmiş aktif abonelik -------------------------------------------------
 
-/** Abonelik "aktif" ama ödenmiş dönemi geçmiş mi (status='active' AND current_period_end < now). */
-export function isExpiredActive(sub: { status: string; current_period_end: string | null } | null, nowMs: number): boolean {
+/**
+ * Abonelik "aktif" ama ödenmiş dönemi geçmiş mi. TEK aday tanımı (otomatik adım runExpireActiveToPastDue ile aynı):
+ * status='active' AND current_period_end < now AND pause_started_at IS NULL AND cancel_at_period_end = false.
+ * Duraklatılmış abonelikte dönem sonu devamda uzatılır; dönem sonu iptali bekleyeni kendi adımı kapatır — ikisi de
+ * kuyruğa/eylemlere girmez. Sorgular aynı dört koşulu tekrarlar.
+ */
+export type ExpiredActiveSub = {
+  status: string;
+  current_period_end: string | null;
+  pause_started_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
+
+export function isExpiredActive(sub: ExpiredActiveSub | null, nowMs: number): boolean {
   if (!sub || sub.status !== "active" || !sub.current_period_end) return false;
+  if (sub.pause_started_at || sub.cancel_at_period_end) return false;
   const end = Date.parse(sub.current_period_end);
   return Number.isFinite(end) && end < nowMs;
 }
+

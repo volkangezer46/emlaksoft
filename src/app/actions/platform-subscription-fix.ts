@@ -10,8 +10,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
  * DÖNEMİ BİTMİŞ AMA AKTİF ABONELİK düzeltmeleri (dikkat kuyruğu → Ofis 360 > Yönetim). Kapı: "billing" modülü;
- * gerekçe zorunlu (≥10). Yalnız `status='active' AND current_period_end < şimdi` aboneliğe uygulanır; güncelleme bu
- * koşulu TEKRARLAR (bu arada ödeme alıp dönemi uzayan abonelik ezilmez). Denetim izine önce/sonra yazılır.
+ * gerekçe zorunlu (≥10). Yalnız `status='active' AND current_period_end < şimdi AND pause_started_at IS NULL AND
+ * cancel_at_period_end = false` aboneliğe uygulanır (isExpiredActive; otomatik adımla aynı aday). Güncelleme bu koşulu
+ * TEKRARLAR (bu arada ödeme alıp dönemi uzayan, duraklatılan ya da iptal edilen abonelik ezilmez). Denetim izine önce/sonra yazılır.
  *  - Ödenmedi olarak işaretle → abonelik 'past_due' (ofis 'active' ise o da 'past_due'; tahsilat akışına girer).
  *  - Dönemi uzat → dönem sonu max(eski bitiş, şimdi) + N gün (1..90); durum 'active' kalır.
  */
@@ -20,12 +21,19 @@ export type SubscriptionFixResult = { ok?: boolean; error?: string; message?: st
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type SubRow = { id: string; tenant_id: string; status: string; current_period_end: string | null };
+type SubRow = {
+  id: string;
+  tenant_id: string;
+  status: string;
+  current_period_end: string | null;
+  pause_started_at: string | null;
+  cancel_at_period_end: boolean | null;
+};
 
 async function loadExpired(admin: ReturnType<typeof createAdminClient>, tenantId: string, nowMs: number): Promise<SubRow | string> {
   const { data, error } = await admin
     .from("subscriptions")
-    .select("id, tenant_id, status, current_period_end")
+    .select("id, tenant_id, status, current_period_end, pause_started_at, cancel_at_period_end")
     .eq("tenant_id", tenantId)
     .eq("status", "active")
     .order("current_period_end", { ascending: true })
@@ -62,6 +70,8 @@ export async function markSubscriptionUnpaid(tenantId: string, reason: string): 
     .eq("id", sub.id)
     .eq("status", "active")
     .lt("current_period_end", nowIso)
+    .is("pause_started_at", null)
+    .eq("cancel_at_period_end", false)
     .select("id");
   if (subUpd.error) return { error: "Abonelik güncellenemedi; değişiklik yapılmadı, tekrar deneyin." };
   if ((subUpd.data ?? []).length === 0) return { error: "Abonelik bu arada değişti; sayfayı yenileyin." };
@@ -110,6 +120,8 @@ export async function extendSubscriptionPeriod(tenantId: string, days: number, r
     .eq("id", sub.id)
     .eq("status", "active")
     .lt("current_period_end", nowIso)
+    .is("pause_started_at", null)
+    .eq("cancel_at_period_end", false)
     .select("id");
   if (upd.error) return { error: "Dönem uzatılamadı; değişiklik yapılmadı, tekrar deneyin." };
   if ((upd.data ?? []).length === 0) return { error: "Abonelik bu arada değişti; sayfayı yenileyin." };

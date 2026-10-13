@@ -236,6 +236,8 @@ export type SubRow = {
   current_period_start: string | null;
   current_period_end: string | null;
   cancelled_at: string | null;
+  pause_started_at: string | null;
+  cancel_at_period_end: boolean | null;
 };
 export type ProfileRow = { id: string; created_at: string };
 
@@ -510,7 +512,7 @@ export async function loadOfficeKpis(admin: Admin, tenantId: string, access: Off
       : Promise.resolve({ data: [] as { created_at: string }[] }),
     admin
       .from("subscriptions")
-      .select("status, plan, created_at, trial_ends_at, current_period_start, current_period_end, cancelled_at")
+      .select("status, plan, created_at, trial_ends_at, current_period_start, current_period_end, cancelled_at, pause_started_at, cancel_at_period_end")
       .eq("tenant_id", tenantId)
       .maybeSingle(),
   ]);

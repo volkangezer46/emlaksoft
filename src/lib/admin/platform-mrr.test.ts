@@ -90,11 +90,21 @@ describe("MRR eğrisi (platform_mrr_daily ay sonu)", () => {
 });
 
 describe("isExpiredActive", () => {
+  const sub = (status: string, end: string | null, extra: { pause_started_at?: string | null; cancel_at_period_end?: boolean } = {}) => ({
+    status,
+    current_period_end: end,
+    pause_started_at: extra.pause_started_at ?? null,
+    cancel_at_period_end: extra.cancel_at_period_end ?? false,
+  });
   it("yalnız status=active ve dönem sonu geçmiş", () => {
-    expect(isExpiredActive({ status: "active", current_period_end: iso(NOW - DAY) }, NOW)).toBe(true);
-    expect(isExpiredActive({ status: "active", current_period_end: iso(NOW + DAY) }, NOW)).toBe(false);
-    expect(isExpiredActive({ status: "past_due", current_period_end: iso(NOW - DAY) }, NOW)).toBe(false);
-    expect(isExpiredActive({ status: "active", current_period_end: null }, NOW)).toBe(false);
+    expect(isExpiredActive(sub("active", iso(NOW - DAY)), NOW)).toBe(true);
+    expect(isExpiredActive(sub("active", iso(NOW + DAY)), NOW)).toBe(false);
+    expect(isExpiredActive(sub("past_due", iso(NOW - DAY)), NOW)).toBe(false);
+    expect(isExpiredActive(sub("active", null), NOW)).toBe(false);
     expect(isExpiredActive(null, NOW)).toBe(false);
+  });
+  it("duraklatılmış ve dönem sonu iptali bekleyen aday değildir (otomatik adımla aynı tanım)", () => {
+    expect(isExpiredActive(sub("active", iso(NOW - DAY), { pause_started_at: iso(NOW - 10 * DAY) }), NOW)).toBe(false);
+    expect(isExpiredActive(sub("active", iso(NOW - DAY), { cancel_at_period_end: true }), NOW)).toBe(false);
   });
 });

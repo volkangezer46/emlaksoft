@@ -88,7 +88,8 @@ export default async function AdminTenantsPage({
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;
-  // "Dönemi bitmiş ama aktif": aboneliğe iç birleşim (FK adıyla) — status='active' AND current_period_end < şimdi.
+  // "Dönemi bitmiş ama aktif": aboneliğe iç birleşim (FK adıyla) — isExpiredActive ile aynı aday: status='active' AND
+  // current_period_end < şimdi AND duraklatılmamış AND dönem sonu iptali beklemiyor.
   // Tür: gömme yalnız süzgeç içindir (satırda kullanılmaz), seçim tipi temel sütunlarla aynı kalır.
   const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
   let listQuery = admin
@@ -98,7 +99,11 @@ export default async function AdminTenantsPage({
     .range(...pageRange(page));
   if (f.q) listQuery = listQuery.ilike("name", `%${f.q}%`);
   if (f.durum === "risk") listQuery = listQuery.in("status", ["past_due", "suspended"]);
-  else if (expiredOnly) listQuery = listQuery.eq("sub.status", "active").lt("sub.current_period_end", daysAgoIso(0));
+  else if (expiredOnly) listQuery = listQuery
+      .eq("sub.status", "active")
+      .lt("sub.current_period_end", daysAgoIso(0))
+      .is("sub.pause_started_at", null)
+      .eq("sub.cancel_at_period_end", false);
   else if (f.durum) listQuery = listQuery.eq("status", f.durum);
   if (f.yeni) listQuery = listQuery.gte("created_at", daysAgoIso(Number(f.yeni)));
   if (f.deneme === "bitiyor") listQuery = listQuery.eq("status", "trial").gte("trial_ends_at", daysAgoIso(0)).lte("trial_ends_at", daysFromNowIso(7));

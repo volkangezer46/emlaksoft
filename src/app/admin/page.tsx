@@ -229,13 +229,18 @@ const loadAttention = cache(async (period: Period, role: PlatformRole) => {
   return [...queue, row].sort((a, b) => b.severity - a.severity || b.count - a.count).slice(0, ATTENTION_LIMIT);
 });
 
-/** Dönemi bitmiş aktif abonelik sayısı (tek HEAD sayımı, önbelleksiz); okunamazsa null (satır gizlenir). */
+/**
+ * Dönemi bitmiş aktif abonelik sayısı (tek HEAD sayımı, önbelleksiz); okunamazsa null (satır gizlenir).
+ * Aday tanımı isExpiredActive ile aynı: duraklatılmış ve dönem sonu iptali bekleyen sayılmaz.
+ */
 async function countExpiredActive(): Promise<number | null> {
   const { count, error } = await createAdminClient()
     .from("subscriptions")
     .select("id", { count: "exact", head: true })
     .eq("status", "active")
-    .lt("current_period_end", new Date(now()).toISOString());
+    .lt("current_period_end", new Date(now()).toISOString())
+    .is("pause_started_at", null)
+    .eq("cancel_at_period_end", false);
   return error ? null : (count ?? 0);
 }
 

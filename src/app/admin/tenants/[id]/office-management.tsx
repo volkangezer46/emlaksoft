@@ -1244,12 +1244,7 @@ function LifecycleSection({ tenant, can, legalHref, closureRequests }: OfficeMan
             <FormField
               label="Dönülecek durum"
               htmlFor="mgmt-target-status"
-              hint={
-                <>
-                  Deneme seçilirse mevcut deneme bitişi geçerli olur; gerekiyorsa süreyi{" "}
-                  <a href="#yonetim-deneme" className="font-semibold text-brand-600 hover:underline">Denemeyi uzat / kısalt</a> bölümünden ayrıca uzatın.
-                </>
-              }
+              hint="Deneme seçilirse mevcut deneme bitişi geçerli olur; gerekiyorsa denemeye döndürdükten sonra süreyi bu sekmedeki Denemeyi uzat / kısalt bölümünden uzatın."
             >
               <FormSelect id="mgmt-target-status" name="target_status" defaultValue="active">
                 <option value="active">{OFFICE_STATUS_LABELS.active}</option>
