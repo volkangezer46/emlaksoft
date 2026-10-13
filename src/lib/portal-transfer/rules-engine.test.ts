@@ -160,3 +160,39 @@ describe("rules-engine: planFill + pickPlan", () => {
     expect(chosen.report.find((r) => r.key === "title")).toMatchObject({ idx: 6, state: "degraded" });
   });
 });
+
+describe("rules-engine: pickPlan uzak setin elle kararlarını korur", () => {
+  const p = payload({ heating: "Doğalgaz" });
+  const seedPlan = planFill(FORM, p);
+
+  it("3 alan 'disabled' → karşılaştırmaya girmez: tohuma dönülmez, kapatılan alanlar doldurulmaz", () => {
+    const off = ["title", "gross_sqm", "rooms"];
+    const plan = planFill(FORM, p, remote((f) => (off.includes(f.key) ? { ...f, state: "disabled" } : f)), { ruleSha: "c".repeat(64) });
+    const chosen = pickPlan(plan, seedPlan);
+    expect(chosen.rulesRegressed).toBe(false);
+    expect(chosen.ruleVersion).toBe(7);
+    for (const k of off) {
+      expect(chosen.actions.find((a) => a.field === k), k).toBeUndefined();
+      expect(chosen.report.find((r) => r.key === k), k).toMatchObject({ status: "manual", state: "disabled" });
+    }
+  });
+
+  it("riskli alan geriletilmiş + diğer alanlarda gerçek gerileme → tohuma dönülür AMA riskli/kapalı alanlar yine elle kalır", () => {
+    const poor = remote((f) => {
+      if (f.key === "price") return { ...f, state: "degraded" };
+      if (f.key === "rooms") return { ...f, state: "disabled" };
+      if (["title", "gross_sqm", "description"].includes(f.key)) return { ...f, labels: ["zzz yok"], exact: [] };
+      return f;
+    });
+    const chosen = pickPlan(planFill(FORM, p, poor, { ruleSha: "d".repeat(64) }), seedPlan);
+    expect(chosen.rulesRegressed).toBe(true);
+    expect(chosen.ruleVersion).toBe(0);
+    expect(chosen.actions.find((a) => a.field === "price")).toBeUndefined();
+    expect(chosen.actions.find((a) => a.field === "rooms")).toBeUndefined();
+    expect(chosen.report.find((r) => r.key === "price")).toMatchObject({ status: "manual" });
+    expect(chosen.report.find((r) => r.key === "rooms")).toMatchObject({ status: "manual", state: "disabled" });
+    expect(chosen.manual.join("|")).toMatch(/Oda/);
+    // Tohumun bulduğu diğer alanlar doldurulur.
+    expect(chosen.actions.find((a) => a.field === "title")).toMatchObject({ idx: 0, op: "text" });
+  });
+});
