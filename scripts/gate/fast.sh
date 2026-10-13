@@ -5,11 +5,13 @@
 # Sonuç: $LOG (varsayılan /tmp/emlaksoft-gate/fast.log); son satır GATE_OK ya da *_FAIL.
 cd "$(dirname "$0")/../.." || exit 1
 D=${GATE_DIR:-/tmp/emlaksoft-gate}; mkdir -p "$D"; L=${LOG:-$D/fast.log}; : > "$L"
-( npx tsc --noEmit > "$D/tsc.log" 2>&1; echo $? > "$D/tsc.rc" ) &
+( NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit > "$D/tsc.log" 2>&1; echo $? > "$D/tsc.rc" ) &
 ( npm run -s lint > "$D/lint.log" 2>&1; echo $? > "$D/lint.rc" ) &
 npx vitest run --testTimeout=300000 > "$D/vitest.log" 2>&1; V=$?
 wait
-n=$(grep "error TS" "$D/tsc.log" | grep -v "^tmp-" | wc -l); echo "TSC=$n" >> "$L"; [ "$n" = 0 ] || { grep "error TS" "$D/tsc.log" | head -10 >> "$L"; echo TSC_FAIL >> "$L"; exit 1; }
+# tsc'nin ÇIKIŞ KODU da şart: bellek yetmezliğinde çöken tsc "0 hata" sayılmamalı.
+n=$(grep "error TS" "$D/tsc.log" | grep -v "^tmp-" | wc -l); echo "TSC=$n rc=$(cat "$D/tsc.rc")" >> "$L"
+if [ "$n" != 0 ] || [ "$(cat "$D/tsc.rc")" != 0 ]; then grep -E "error TS|heap|Aborted" "$D/tsc.log" | head -10 >> "$L"; echo TSC_FAIL >> "$L"; exit 1; fi
 [ "$(cat "$D/lint.rc")" = 0 ] || { echo LINT_FAIL >> "$L"; tail -20 "$D/lint.log" >> "$L"; exit 1; }
 if [ $V -ne 0 ]; then
   FAILS=$(grep "FAIL" "$D/vitest.log" | grep -oE "src/[^ ]+\.test\.tsx?" | sort -u | xargs)

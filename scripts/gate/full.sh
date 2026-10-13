@@ -4,7 +4,8 @@
 # Sonuç: $LOG (varsayılan /tmp/emlaksoft-gate/full.log). Aynı anda başka ağır iş çalıştırma (bkz. memory: yerel kaynak bütçesi).
 cd "$(dirname "$0")/../.." || exit 1
 D=${GATE_DIR:-/tmp/emlaksoft-gate}; mkdir -p "$D"; L=${LOG:-$D/full.log}; : > "$L"
-n=$(npx tsc --noEmit 2>&1 | grep "error TS" | grep -v "^tmp-" | wc -l); echo "TSC=$n" >> "$L"; [ "$n" = 0 ] || exit 1
+NODE_OPTIONS=--max-old-space-size=6144 npx tsc --noEmit > "$D/tsc.log" 2>&1; TRC=$?
+n=$(grep "error TS" "$D/tsc.log" | grep -v "^tmp-" | wc -l); echo "TSC=$n rc=$TRC" >> "$L"; [ "$n" = 0 ] && [ "$TRC" = 0 ] || { echo TSC_FAIL >> "$L"; exit 1; }
 npm run -s lint > "$D/lint.log" 2>&1 || { echo LINT_FAIL >> "$L"; tail -20 "$D/lint.log" >> "$L"; exit 1; }
 npx vitest run --testTimeout=300000 > "$D/vitest.log" 2>&1; V=$?
 if [ $V -ne 0 ]; then
