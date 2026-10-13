@@ -4,7 +4,8 @@ import { defineBool, defineInt } from "./define";
 /** Ayarların düzenlendiği bölüm: Destek talepleri > Ayarlar > Otomasyon (merkez buraya bağlantı verir). */
 export const SUPPORT_HOME = { href: "/admin/tickets/ayarlar?sekme=otomasyon", label: "Destek talepleri > Ayarlar" } as const;
 
-const SUPPORT_PERMISSION = { platformModule: "tickets", superAdminOnly: false } as const;
+/** Ayarlar ekranındaki SLA/atama yazımıyla aynı kapı (support-desk.ts DESK_MANAGER_ROLES): okuma tickets, yazma süper admin + operasyon. */
+const SUPPORT_PERMISSION = { platformModule: "tickets", superAdminOnly: false, platformRoles: ["super_admin", "ops"] } as const;
 
 /**
  * DESTEK MASASI ayarları (AD9; platform kapsamı, `platform_settings` deposu). SLA matrisi, iş saatleri ve atama

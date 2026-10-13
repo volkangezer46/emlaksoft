@@ -125,6 +125,10 @@ export async function writeSetting(input: WriteSettingInput & { fromBridge?: boo
       rate: SETTINGS_RATE,
     });
     if ("error" in gate) return { ok: false, error: gate.error };
+    const roles = def.permission.platformRoles;
+    if (!def.permission.superAdminOnly && roles && !roles.includes(gate.staff.role)) {
+      return { ok: false, error: "Bu ayarı değiştirme yetkiniz yok (salt okunur)." };
+    }
     actor = { id: gate.staff.id, scope: "platform", role: gate.staff.role };
   } else if (scope === "tenant") {
     if (!def.permission.appModule) return { ok: false, error: "Bu ayar için ofis yetkisi tanımlı değil." };
