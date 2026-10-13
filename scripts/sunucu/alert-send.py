@@ -13,20 +13,27 @@ diske düz sır yazılmaz. Olay kaydı DB erişilebilirse alert_events'e (source
 
 Kullanım:
   alert-send.py refresh                         # kanal/kural önbelleğini tazeler (error-watch 5 dk'da bir)
-  alert-send.py rule                            # health_down kuralını "enabled threshold muted" olarak yazdırır
+  alert-send.py rule                            # health_down kuralını "enabled threshold muted repeat_dk" yazdırır
   alert-send.py fire  --title T --body B        # kesinti uyarısı (kural sessizse yalnız kayıt)
+  alert-send.py fire  --reminder 1 ...          # kesinti sürüyor hatırlatması (tekrar aralığı dolunca)
   alert-send.py resolve --title T --body B      # düzeldi mesajı (yalnız uyarı gönderildiyse)
 Sahte gönderim yok: kanal yoksa teslim günlüğüne "kanal kapalı" düşer.
+
+ÇIKIŞ KODU (fire/resolve): en az bir kanala iletildiyse 0, iletilmediyse 3. error-watch.sh "bildirildi mi"
+kararını YALNIZ bu koddan verir; stdout'taki özet yalnız günlük içindir (stderr uyarıları onu bozamaz).
 """
 import base64
 import datetime as dt
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
+import socket
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 DB = "supabase-db-moqbebljyeyprktd19zb1ihn"
@@ -37,6 +44,8 @@ FINGERPRINT = "health_down"
 HKDF_SALT = b"emlaksoft:platform-secrets:salt:v1"
 HKDF_INFO = b"emlaksoft/platform-secrets/v1"
 DERIVE_SOURCES = ("OTP_HMAC_SECRET", "TWO_FACTOR_COOKIE_SECRET", "PROPERTY_MEDIA_SIGNING_SECRET")
+EXIT_NOT_SENT = 3
+DEFAULT_REPEAT_MIN = 30
 
 
 def now_iso():
@@ -130,7 +139,8 @@ def refresh():
         select json_build_object(
           'channels', coalesce((select json_agg(json_build_object('id', id, 'kind', kind, 'name', name, 'sealed', config_sealed))
                                 from public.alert_channels where enabled), '[]'::json),
-          'rule', (select json_build_object('enabled', enabled, 'threshold', threshold, 'muted_until', muted_until)
+          'rule', (select json_build_object('enabled', enabled, 'threshold', threshold, 'repeat_minutes', repeat_minutes,
+                                            'muted_until', muted_until)
                    from public.alert_rules where key = 'health_down'),
           'email', (select json_object_agg(key, value) from public.platform_settings
                     where key in ('email.resend_api_key', 'email.from', 'email.reply_to')),
@@ -166,6 +176,12 @@ def rule_info(state):
         threshold = float(r.get("threshold")) if r.get("threshold") is not None else 2.0
     except (TypeError, ValueError):
         threshold = 2.0
+    try:
+        repeat = int(r.get("repeat_minutes")) if r.get("repeat_minutes") is not None else DEFAULT_REPEAT_MIN
+    except (TypeError, ValueError):
+        repeat = DEFAULT_REPEAT_MIN
+    if repeat < 5 or repeat > 10_080:  # rules.ts mergeRuleConfigs ile aynı sınır
+        repeat = DEFAULT_REPEAT_MIN
     muted = False
     mu = r.get("muted_until")
     if mu:
@@ -173,16 +189,65 @@ def rule_info(state):
             muted = dt.datetime.fromisoformat(str(mu).replace("Z", "+00:00")) > dt.datetime.now(dt.timezone.utc)
         except ValueError:
             muted = False
-    return enabled, threshold, muted
+    return enabled, threshold, muted, repeat
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Yönlendirme izlenmez (Node fetchExternal redirect: manual ile aynı): doğrulanmış adres 3xx ile iç ağa kaçamaz."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def is_blocked_host(hostname):
+    """channel-config.ts isBlockedWebhookHost ile aynı ad/IP kuralları + DNS çözümü: herhangi bir adres
+    özel/yerel/ayrılmış aralıktaysa reddedilir (kayıttan sonra DNS'i iç ağa çevrilen ad da geçemez)."""
+    h = (hostname or "").lower().strip("[]")
+    if not h or h == "localhost" or h.endswith((".localhost", ".local", ".internal")):
+        return True
+    try:
+        ips = [ipaddress.ip_address(h)]
+    except ValueError:
+        if "." not in h:
+            return True  # tek etiketli ad: docker/iç DNS adı olabilir
+        try:
+            ips = [ipaddress.ip_address(ai[4][0].split("%")[0]) for ai in socket.getaddrinfo(h, 443, proto=socket.IPPROTO_TCP)]
+        except (OSError, ValueError):
+            return True
+    if not ips:
+        return True
+    for ip in ips:
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            return True
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
+                or ip.is_unspecified or ip in ipaddress.ip_network("100.64.0.0/10")):
+            return True
+    return False
+
+
+def webhook_url_ok(url):
+    try:
+        u = urllib.parse.urlsplit(url)
+        port = u.port
+    except ValueError:
+        return False
+    if u.scheme != "https" or u.username or u.password or (port and port not in (443, 8443)):
+        return False
+    return not is_blocked_host(u.hostname or "")
 
 
 def post_json(url, payload, headers=None, timeout=8):
     body = json.dumps(payload).encode()
     req = urllib.request.Request(url, data=body, method="POST", headers={"Content-Type": "application/json", **(headers or {})})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as res:
+        with _OPENER.open(req, timeout=timeout) as res:
             return True, f"HTTP {res.status}"
     except urllib.error.HTTPError as e:
+        if 300 <= e.code < 400:
+            return False, f"HTTP {e.code} (yönlendirme izlenmez)"
         return False, f"HTTP {e.code}"
     except Exception as e:  # ağ/zaman aşımı
         return False, f"Bağlantı hatası ({type(e).__name__})"
@@ -212,6 +277,9 @@ def send(state, env, keys, subject, text, payload):
             )
             deliveries.append({**d, "ok": ok, "detail": "Telegram iletildi" if ok else f"Telegram {info}"})
         elif kind == "webhook":
+            if not webhook_url_ok(str(cfg.get("url") or "")):
+                deliveries.append({**d, "ok": False, "detail": "Webhook reddedildi: iç ağ / geçersiz adres"})
+                continue
             body = json.dumps(payload)
             headers = {"User-Agent": "emlaksoft-alerts/1.0"}
             if cfg.get("secret"):
@@ -283,9 +351,9 @@ def main(argv):
             print(f"önbellek tazelenemedi: {e}", file=sys.stderr)
             return 1
     state = load_state()
-    enabled, threshold, muted = rule_info(state)
+    enabled, threshold, muted, repeat = rule_info(state)
     if cmd == "rule":
-        print(f"{1 if enabled else 0} {threshold:g} {1 if muted else 0}")
+        print(f"{1 if enabled else 0} {threshold:g} {1 if muted else 0} {repeat}")
         return 0
     if cmd not in ("fire", "resolve"):
         print(__doc__)
@@ -294,12 +362,13 @@ def main(argv):
     title = args.get("--title", "Site yanıt vermiyor")
     body = args.get("--body", "")
     event = "firing" if cmd == "fire" else "resolved"
+    reminder = event == "firing" and args.get("--reminder") == "1"
     env = read_env()
     app_url = (env.get("NEXT_PUBLIC_APP_URL") or "https://emlaksoft.com.tr").rstrip("/")
-    prefix = "[UYARI]" if event == "firing" else "[DÜZELDİ]"
+    prefix = "[SÜRÜYOR]" if reminder else ("[UYARI]" if event == "firing" else "[DÜZELDİ]")
     subject = f"{prefix} {title}"
     text = f"{subject}\n\n{body}\n\n{app_url}/admin/sistem?sekme=uyarilar".strip()
-    payload = {"event": event, "rule": "health_down", "fingerprint": FINGERPRINT, "title": title, "body": body,
+    payload = {"event": "reminder" if reminder else event, "rule": "health_down", "fingerprint": FINGERPRINT, "title": title, "body": body,
                "href": "/admin/sistem?sekme=uyarilar", "at": now_iso()}
     send_now = enabled and not muted
     if event == "resolved":
@@ -311,7 +380,7 @@ def main(argv):
     record(event, title, body, deliveries, send_now)
     ok = any(d.get("ok") for d in deliveries)
     print(("gönderildi" if ok else "gönderilmedi") + ": " + "; ".join(str(d.get("detail")) for d in deliveries))
-    return 0
+    return 0 if ok else EXIT_NOT_SENT
 
 
 if __name__ == "__main__":
