@@ -77,6 +77,34 @@ describe("rehber eylemleri yetkisi", () => {
     expect(h.audit).toEqual(["site_guide.create", "site_guide.publish", "site_guide.unpublish", "site_guide.rollback"]);
   });
 
+  it("ham yol normalize kaydedilir; yayından sonra aynı ham yolla kayıt kilitlenmez", async () => {
+    const { id } = await createGuide("Yol denemesi", "ofis-yonetimi");
+    const draft = (await guideStore(id!).readState()).draft!;
+    const saved = await saveGuideDraft(id!, draft, "Kira Artışı");
+    expect(saved).toMatchObject({ ok: true, slug: "kira-artisi" });
+    expect((await publishGuide(id!, "yayın")).ok).toBe(true);
+    // Editör ham metni yeniden gönderse bile normalize hali aynı olduğundan "yol değiştirilemez" hatası gelmez.
+    expect((await saveGuideDraft(id!, draft, "Kira Artışı")).ok).toBe(true);
+    expect((await saveGuideDraft(id!, draft, "baska-yol")).error).toMatch(/değiştirilemez/);
+  });
+
+  it("taslak/yayından kaldırılmış yazıya bağlantı kırık iç bağlantı uyarısı alır; yayındakine almaz", async () => {
+    const live = await createGuide("Yayındaki yazı", "ofis-yonetimi");
+    expect((await publishGuide(live.id!, "yayın")).ok).toBe(true);
+    await createGuide("Taslak yazı", "ofis-yonetimi");
+    const { id } = await createGuide("Bağlantılı yazı", "ofis-yonetimi");
+    const draft = (await guideStore(id!).readState()).draft!;
+    const warnsFor = async (text: string) => {
+      const r = await saveGuideDraft(id!, { ...draft, body: [{ type: "p", text }] });
+      expect(r.ok).toBe(true);
+      return (r.issues ?? []).filter((i) => i.level === "warn" && /Kırık/.test(i.message)).length;
+    };
+    expect(await warnsFor("[a](/rehber/yayindaki-yazi)")).toBe(0);
+    expect(await warnsFor("[b](/rehber/taslak-yazi)")).toBe(1);
+    expect((await unpublishGuide(live.id!)).ok).toBe(true);
+    expect(await warnsFor("[a](/rehber/yayindaki-yazi)")).toBe(1);
+  });
+
   it("rezerve ve güvensiz girdiler reddedilir", async () => {
     expect((await createGuide("Admin", "ofis-yonetimi")).error).toMatch(/ayrılmış/);
     expect((await createGuide("Başlık", "blog")).error).toMatch(/Kategori/);

@@ -66,6 +66,14 @@ describe("parseInline (XSS)", () => {
     expect(html([{ type: "p", text: "[x](//evil.com)" }])).not.toContain("evil.com\"");
   });
 
+  it("adresteki dengeli parantez bağlantının parçasıdır; kaçışlı \\) da desteklenir", () => {
+    const r = parseInline("[Tapu](https://tr.wikipedia.org/wiki/Tapu_(hukuk)) sonra");
+    expect(links(r.nodes)).toMatchObject([{ href: "https://tr.wikipedia.org/wiki/Tapu_(hukuk)" }]);
+    expect(r.nodes[r.nodes.length - 1]).toEqual({ t: "text", v: " sonra" });
+    const e = parseInline("[x](https://ornek.com/a\\)b)");
+    expect(links(e.nodes)).toMatchObject([{ href: "https://ornek.com/a)b" }]);
+  });
+
   it("<script> içeren metin kaçışlanır; ham etiket çıkmaz", () => {
     const out = html([{ type: "p", text: "<script>alert(1)</script> ve **kalın**" }]);
     expect(out).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");

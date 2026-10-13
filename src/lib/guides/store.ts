@@ -73,9 +73,13 @@ export async function writeGuideIndex(list: readonly GuideIndexEntry[], staffId:
   return (await getPlatformSetting(GUIDES_INDEX_KEY)) === json ? "ok" : "fail";
 }
 
-/** Rehberin iç bağlantı sayılan yolları: /rehber, kategori sayfaları ve (verilen listedeki) yazılar. */
-export function guideLinkPaths(index: readonly Pick<GuideIndexEntry, "id" | "slug">[], exceptId?: string): string[] {
-  return ["/rehber", ...GUIDE_CATEGORIES.map(guideCategoryPath), ...index.filter((e) => e.id !== exceptId && e.slug).map((e) => guidePath(e.slug))];
+/**
+ * Rehberin iç bağlantı sayılan yolları: /rehber, kategori sayfaları ve listedeki YAYINDAKİ yazılar.
+ * Taslak/arşiv yazının yolu canlıda 404'tür; kırık bağlantı uyarısı alsın diye dışarıda kalır
+ * (editör, eylemler ve Yayın masası aynı kuralı bu tek yerden uygular).
+ */
+export function guideLinkPaths(index: readonly Pick<GuideIndexEntry, "id" | "slug" | "status">[], exceptId?: string): string[] {
+  return ["/rehber", ...GUIDE_CATEGORIES.map(guideCategoryPath), ...index.filter((e) => e.id !== exceptId && e.slug && e.status === "yayinda").map((e) => guidePath(e.slug))];
 }
 
 export type GuidePublishResult = { ok: true; entry: GuideIndexEntry } | { ok: false; error: string; conflict?: boolean };

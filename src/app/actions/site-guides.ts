@@ -7,7 +7,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { GUIDE_LIMITS, emptyGuide, guideHasErrors, isGuideCategory, validateGuide, type GuideContent, type GuideIndexEntry, type GuideIssue } from "@/lib/guides/schema";
-import { checkGuideSlug } from "@/lib/guides/slug";
+import { checkGuideSlug, toGuideSlug } from "@/lib/guides/slug";
 import { guideLivePaths } from "@/lib/guides/publish-surface";
 import {
   GUIDES_CACHE_TAG,
@@ -34,6 +34,8 @@ export type GuideActionResult = {
   issues?: GuideIssue[];
   id?: string;
   guide?: GuideContent;
+  /** Kayıttan sonraki (normalize edilmiş) yol; editör kendi alanını buna eşitler. */
+  slug?: string;
 };
 
 const INDEX_UNREADABLE = "Rehber listesi şu an okunamadı; mevcut yazıları korumak için kayıt yapılmadı. Biraz sonra tekrar deneyin.";
@@ -118,7 +120,8 @@ export async function saveGuideDraft(id: string, input: unknown, slugInput?: str
   if (!entry) return { error: "Yazı bulunamadı." };
 
   let slug = entry.slug;
-  if (slugInput !== undefined && slugInput.trim() !== entry.slug) {
+  // Normalize hali mevcut yolla aynıysa (ör. "Kira Artışı" → "kira-artisi") değişiklik sayılmaz.
+  if (slugInput !== undefined && toGuideSlug(slugInput.trim()) !== entry.slug) {
     if (entry.status === "yayinda") return { error: "Yayındaki yazının yolu değiştirilemez; önce yayından kaldırın." };
     const c = checkGuideSlug(slugInput, index.filter((e) => e.id !== id).map((e) => e.slug));
     if (!c.ok) return { error: c.message };
@@ -140,7 +143,7 @@ export async function saveGuideDraft(id: string, input: unknown, slugInput?: str
 
   await logPlatformActivity({ actorId: staff.id, action: "site_guide.draft_save", entityType: "site_guide", entityId: id, meta: { slug, blocks: guide.body.length, warnings: issues.length } });
   refreshAdmin(id);
-  return { ok: true, issues, guide };
+  return { ok: true, issues, guide, slug };
 }
 
 /** Kayıtlı taslağı canlıya alır (geçmişe yazılır) ve yazıyı yayına açar. Yalnız süper admin. */

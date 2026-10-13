@@ -48,6 +48,27 @@ function findClose(s: string, token: "**" | "*" | "]", from: number): number {
   return -1;
 }
 
+/**
+ * Bağlantı adresinin kapanış ')' konumu (yoksa -1). Parantezler dengelenir: [x](https://tr.wikipedia.org/wiki/Tapu_(hukuk))
+ * adresin tamamını alır. Kaçışlı \( \) sayılmaz (dengesiz parantez gereken adreste kaçış kullanılabilir).
+ */
+function findHrefClose(s: string, from: number): number {
+  let depth = 0;
+  for (let i = from; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\" && (s[i + 1] === "(" || s[i + 1] === ")")) {
+      i++;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      if (depth === 0) return i;
+      depth--;
+    }
+  }
+  return -1;
+}
+
 function pushText(out: InlineNode[], v: string) {
   if (!v) return;
   const last = out[out.length - 1];
@@ -104,10 +125,10 @@ function parse(s: string, ctx: Ctx): InlineNode[] {
     if (ch === "[" && !ctx.link) {
       const closeText = findClose(s, "]", i + 1);
       if (closeText !== -1 && s[closeText + 1] === "(") {
-        const closeHref = s.indexOf(")", closeText + 2);
+        const closeHref = findHrefClose(s, closeText + 2);
         const text = s.slice(i + 1, closeText);
         if (closeHref !== -1 && text.trim()) {
-          const rawHref = s.slice(closeText + 2, closeHref);
+          const rawHref = s.slice(closeText + 2, closeHref).replace(/\\([()])/g, "$1");
           flush();
           const children = inner(text, { link: true });
           const r = checkRichHref(rawHref, ctx.extraPaths);

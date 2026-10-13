@@ -80,7 +80,11 @@ export function GuideEditor({ id, entry, initialDraft, live, history, canPublish
   const errorCount = issues.filter((i) => i.level === "error").length;
   const warnCount = issues.length - errorCount;
   const blocked = !validate || hasErrors(issues);
-  const dirty = !sameGuide(cfg, saved) || slug.trim() !== entry.slug;
+  // Yol normalize haliyle karşılaştırılır (sunucu "Kira Artışı"nı "kira-artisi" olarak kaydeder); yayındaki yazının yolu kilitlidir.
+  const slugDirty = !published && toGuideSlug(slug.trim()) !== entry.slug;
+  const dirty = !sameGuide(cfg, saved) || slugDirty;
+  // Yayındaki yazıda yol gönderilmez: kilitli alan sunucuda "yol değiştirilemez" hatasına yol açmasın.
+  const slugToSend = published ? undefined : slug;
   const pendingPublish = !published || !sameGuide(saved, live);
   const brokenLinks = issues.filter((i) => i.message.startsWith("Kırık iç bağlantı"));
   const words = wordCount(plainTextOf(cfg.body));
@@ -101,7 +105,8 @@ export function GuideEditor({ id, entry, initialDraft, live, history, canPublish
     setMsg(null);
   };
 
-  const run = (job: () => Promise<{ ok?: boolean; error?: string; issues?: Issue[] }>, okText: string, after?: () => void) => {
+  type RunResult = { ok?: boolean; error?: string; issues?: Issue[]; slug?: string };
+  const run = (job: () => Promise<RunResult>, okText: string, after?: (res: RunResult) => void) => {
     setMsg(null);
     start(async () => {
       const res = await job();
@@ -110,26 +115,34 @@ export function GuideEditor({ id, entry, initialDraft, live, history, canPublish
         setMsg({ kind: "error", text: res.error });
         return;
       }
-      after?.();
+      after?.(res);
       setMsg({ kind: "ok", text: okText });
       router.refresh();
     });
   };
 
-  const saveDraft = () => run(() => saveGuideDraft(id, cfg, slug), "Taslak kaydedildi. Canlı yazı değişmedi.", () => setSaved(cfg));
+  const saveDraft = () =>
+    run(() => saveGuideDraft(id, cfg, slugToSend), "Taslak kaydedildi. Canlı yazı değişmedi.", (res) => {
+      setSaved(cfg);
+      if (res.slug) setSlug(res.slug);
+    });
   const publish = () =>
     run(
       async () => {
+        let savedSlug: string | undefined;
         if (dirty) {
-          const s = await saveGuideDraft(id, cfg, slug);
+          const s = await saveGuideDraft(id, cfg, slugToSend);
           if (s.error) return s;
+          savedSlug = s.slug;
         }
-        return publishGuide(id, note);
+        const p = await publishGuide(id, note);
+        return { ...p, slug: savedSlug };
       },
       "Yayınlandı. Yazı birkaç saniye içinde canlıda.",
-      () => {
+      (res) => {
         setNote("");
         setSaved(cfg);
+        if (res.slug) setSlug(res.slug);
       },
     );
   const unpublish = () => run(() => unpublishGuide(id), "Yayından kaldırıldı; bu yol artık 404 döner.");
@@ -153,9 +166,8 @@ export function GuideEditor({ id, entry, initialDraft, live, history, canPublish
           <Link href={`/admin/site/rehber/${id}/onizleme`} target="_blank" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-brand-700 hover:underline">
             <Eye className="h-4 w-4" aria-hidden="true" /> Önizle (kayıtlı taslak)
           </Link>
-          <Link href="/admin/site" className="inline-flex min-h-11 items-center text-sm font-semibold text-text-muted hover:underline">
-            Zamanla: Yayın masası
-          </Link>
+          {/* Rehber yüzeyi Yayın masasına (surfaces.ts) kaydedilince buraya "Zamanla: Yayın masası" bağlantısı döner. */}
+          <span className="inline-flex min-h-11 items-center text-sm text-text-faint">Zamanlı yayın yakında</span>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" onClick={saveDraft} loading={pending} disabled={blocked || !dirty}>

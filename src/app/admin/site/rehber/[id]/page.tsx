@@ -48,7 +48,7 @@ export default async function AdminGuideEditPage({ params }: { params: Promise<{
         canPublish={staff.role === "super_admin"}
         baseUrl={getBaseUrl()}
         titleTemplate={seo.global.titleTemplate}
-        linkPaths={guideLinkPaths(index.filter((e) => e.status === "yayinda"), id)}
+        linkPaths={guideLinkPaths(index, id)}
       />
     </div>
   );
