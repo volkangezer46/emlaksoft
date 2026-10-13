@@ -54,7 +54,7 @@ ile hızlandırılmış paket gönder. Env'den kaldırmak yalnız YENİ yayını
 | `portal_rules.min_sessions` | 6 | Yayınlanmış oturum sayısı (ayrıca ≥2 takvim haftası, son 14 günde 0 karşı oy). |
 | `portal_rules.auto_publish` | kapalı | Açılmadan önce en az 3 uygun gerçek ofis ve birkaç haftalık temiz geçmiş beklenir. |
 | `portal_rules.auto_degrade` | ilk aşamada KAPALI tutulur | Açıksa yalnız uygun ofislerin hata oranıyla alan "kontrol edin" durumuna iner; her otomatik yayın personele görünür. |
-| `portal_rules.ai_min_tenants` | 2 | **2'nin altına İNDİRİLMEZ**: gizlilik metni "en az iki ofiste görülen" der (`/gizlilik` bölüm 5). |
+| `portal_rules.ai_min_tenants` | 2 | **2'nin altına İNDİRİLMEZ**: gizlilik metni "en az iki ofiste görülen" der (`/gizlilik` bölüm 6). |
 
 ## 5. Test/demo kiracı dışlama
 
