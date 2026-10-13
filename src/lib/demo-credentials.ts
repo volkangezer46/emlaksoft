@@ -18,3 +18,12 @@ export function deriveDemoPassword(secret: string, email: string): string {
     .digest("base64url");
   return `Em!1${digest.slice(0, 40)}`;
 }
+
+/** Demo kimliklerinin alan adı (tek kaynak; `demo-personas.ts` e-postaları bu alandadır). */
+const DEMO_EMAIL_DOMAIN = "demo.emlaksoft.test";
+
+/** Demo kişiliği e-postası mı? (ör. e-posta doğrulama şeridi demo hesaplarda gösterilmez). */
+export function isDemoEmail(email: string | null | undefined): boolean {
+  const e = (email ?? "").trim().toLowerCase();
+  return e.endsWith(`@${DEMO_EMAIL_DOMAIN}`);
+}

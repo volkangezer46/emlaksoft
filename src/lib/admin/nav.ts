@@ -30,6 +30,9 @@ import type { PlatformModule } from "@/lib/platform-access";
  *    bileşenini kullandığı için burada `tabs` vermez, yalnız `match`).
  *  - `palette`: menüde olmayan ama komut paletinde aranabilen hedefler (eylemler, alt sayfalar).
  *  - Görünürlük: `modules` listesinden en az biri rolde açıksa (sayfa kapısı ayrıca `requirePlatformModule`).
+ * Yan menü (UXD-3): tek öğeli grup başlıksız düz satırdır; çok öğeli grupta çekirdek satır hep görünür, kalan öğeler
+ * grubun kendi açılır alanındadır (eski ortak "Diğer" grubu yok: Büyüme/Analiz tarifesi Gelir'de, Toplu duyuru
+ * Destek'te, Coğrafya/Personel/Ayarlar Sistem'de).
  * Kaldırılan "Demo & aday" (self-servis kayıt; demo talebi/aday takibi yok): eski /admin/satis -> /admin/tenants?durum=trial.
  */
 
@@ -39,6 +42,8 @@ export type AdminNavLink = { href: string; label: string; description: string; m
 
 export type AdminNavItem = AdminNavLink & {
   icon: LucideIcon;
+  /** Mobil alt çubukta dar yuvaya sığan kısa ad (tam ad `aria-label`/`title` olarak kalır). */
+  short?: string;
   badgeKey?: AdminBadgeKey;
   /** Yan menüde her zaman görünen ÇEKİRDEK öğe; çekirdek olmayanlar grup içinde "+N daha" ile katlanır (tam liste ⌘K'da). */
   core?: boolean;
@@ -62,6 +67,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         // Raporlar ve AI danışmanı ayrı menü satırı değil, Kontrol panelinin sekmesidir (menü bütçesi: admin <= 6).
         href: "/admin", core: true,
         label: "Kontrol paneli",
+        short: "Panel",
         description: "Canlı metrikler, dikkat kuyruğu, raporlar ve AI danışmanı",
         icon: LayoutDashboard,
         modules: ["dashboard", "reports", "advisor"],
@@ -125,6 +131,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/site", core: true,
         label: "Site ve marka",
+        short: "Site",
         description: "Ana sayfa içeriği, site menüsü, SEO, logo ve favicon",
         icon: Globe,
         modules: ["sitecontent", "sitemenu", "seo", "marka"],
@@ -137,8 +144,6 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/marka", "Marka", "Logo ve favicon", ["marka"]),
         ],
       },
-      { href: "/admin/duyuru", label: "Toplu duyuru", description: "Ofislere duyuru ve bildirim gönder", icon: Megaphone, modules: ["broadcast"] },
-      { href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
     ],
   },
   {
@@ -154,6 +159,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         badgeKey: "tickets",
         palette: [L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"])],
       },
+      { href: "/admin/duyuru", label: "Toplu duyuru", description: "Ofislere duyuru ve bildirim gönder", icon: Megaphone, modules: ["broadcast"] },
     ],
   },
   {
@@ -173,6 +179,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/aktivite", "Aktivite kaydı", "Denetim izi", ["activity"]),
         ],
       },
+{ href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
       { href: "/admin/personel", label: "Personel", description: "EmlakSoft çalışanları ve rolleri", icon: ShieldCheck, modules: ["personel"] },
       {
         href: "/admin/ayarlar",

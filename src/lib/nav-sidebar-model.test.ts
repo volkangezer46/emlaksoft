@@ -144,9 +144,10 @@ describe("yan menü bileşen sözleşmesi (erişilebilirlik ve tek kaynak)", () 
     expect(code).not.toContain("itemSubTabs");
   });
 
-  it("admin yan menüsü Hızlı erişim, Menüde ara, aria-expanded ve 'Diğer' içerir", () => {
+  it("admin yan menüsü Hızlı erişim, Menüde ara ve aria-expanded içerir; ek öğeler kendi grubunda (ortak 'Diğer' yok)", () => {
     const code = src("src/components/admin/admin-sidebar.tsx");
-    for (const needle of ["QuickAccessSection", "MenuSearchButton", "aria-expanded", "Diğer"]) expect(code, needle).toContain(needle);
+    for (const needle of ["QuickAccessSection", "MenuSearchButton", "aria-expanded", "folded.map"]) expect(code, needle).toContain(needle);
+    expect(code).not.toContain("diger-acik");
     const kit = src("src/components/ui/console/nav-kit.tsx");
     expect(kit).toContain('"Escape"');
     expect(kit).toContain("aria-haspopup");
