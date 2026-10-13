@@ -414,7 +414,7 @@ export function auditPageDeep(facts: PageFacts, deep: DeepFacts, opts: { inSitem
   }
   if (deep.ttfbMs !== null && deep.ttfbMs > T.slowTtfbMs) push("slow-ttfb", "warning", `Sunucu ilk yanıtı ${Math.round(deep.ttfbMs)} ms'de verdi (en çok ${T.slowTtfbMs} ms önerilir).`, "Sayfayı önbelleğe alın ya da statik sürümünü açın.");
   if (deep.rawBytes > T.htmlTooLargeBytes) push("html-too-large", "warning", `HTML ${Math.round(deep.rawBytes / 1024)} KB (en çok ${Math.round(T.htmlTooLargeBytes / 1024)} KB önerilir).`, "Sayfaya gömülü veriyi azaltın.");
-  if (deep.metaAfterHead) push("meta-not-in-head", "warning", "Robotun aldığı HTML'de başlık ya da açıklama <head> bölümünün dışında basılıyor.", "Metadata'nın <head> içinde basıldığından emin olun (akışlı metadata). Not: Next bilinen botlara (Bingbot, Yandex) metadata'yı <head> içinde verir; bulgu yalnız tarayıcı/robot görünümünü yansıtabilir.");
+  if (deep.metaAfterHead) push("meta-not-in-head", "warning", "Robotun aldığı HTML'de başlık ya da açıklama <head> bölümünün dışında basılıyor.", "Metadata'nın <head> içinde basıldığından emin olun (akışlı metadata). Not: Next bilinen botlara (Googlebot, Bingbot, Yandex; next.config htmlLimitedBots) metadata'yı <head> içinde verir; bulgu yalnız tarayıcı/robot görünümünü yansıtabilir.");
   if (deep.nofollowInternal > 0) push("internal-link-nofollow", "warning", `${deep.nofollowInternal} iç bağlantı nofollow.`, "Kendi sayfalarınıza verdiğiniz bağlantılardan nofollow'u kaldırın.");
   if (deep.mixedContent > 0) push("mixed-content", "critical", `${deep.mixedContent} kaynak güvensiz (http://) adresten yükleniyor.`, "Kaynak adreslerini https:// yapın.");
   return out;

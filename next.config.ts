@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { assertProductionEnvironment } from "./src/lib/deployment-env";
 import { VIRTUAL_TOUR_FRAME_HOSTS } from "./src/lib/virtual-tour";
+import { HTML_LIMITED_BOTS } from "./src/lib/seo/html-limited-bots";
 
 // Config is loaded by both `next build` and `next start`; fail before the app
 // can be built or served with any production demo escape hatch enabled.
@@ -44,6 +45,9 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  // Akışlı metadata: insanlar için açık kalır (loading.tsx açılış ekranı + hızlı TTFB); Next'in varsayılan bot listesi +
+  // Googlebot ise <title>/description/canonical/robots'u bloklayarak <head> içinde alır (src/lib/seo/html-limited-bots.ts).
+  htmlLimitedBots: HTML_LIMITED_BOTS,
   // Turbopack dev cache — yerel geliştirmede yeniden derlemeyi hızlandırır
   cacheMaxMemorySize: 0, // disk cache'e devret, RAM'i serbest bırak
 

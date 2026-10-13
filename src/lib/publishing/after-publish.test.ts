@@ -9,7 +9,7 @@ vi.mock("@/lib/platform-activity", () => ({ logPlatformActivity: async () => und
 import type { AfterPublishEvent, AfterPublishHook } from "@/lib/site-issues/types";
 import { hashOf } from "@/lib/publishing/schedule";
 import { DRAFT_CHANGED, NOT_PREVIEWED, publishDraftsSequential } from "@/lib/site-issues/publish-all";
-import { bodyDigest, captureLiveDigests, createVerifyHook, runAfterPublish } from "./after-publish";
+import { bodyDigest, captureLiveDigests, createBaselineRecorder, createVerifyHook, runAfterPublish } from "./after-publish";
 
 const ev: AfterPublishEvent = { surface: "sitecontent", kind: "publish", publishRef: "r1", livePaths: ["/", "/kayit"], actorId: "u1", source: "staff" };
 const hook = (id: string, order: number, run: AfterPublishHook["run"]): AfterPublishHook => ({ id, order, run });
@@ -266,5 +266,71 @@ describe("sözleşme: afterPublish her yayın yolunda çağrılır", () => {
     const src = read("src/app/api/cron/yayin-zamanlayici/route.ts");
     expect(src).toMatch(/await Promise\.race\(\[[\s\S]*runAfterPublish\(/);
     expect(src).toContain("AFTER_PUBLISH_BUDGET_MS");
+  });
+
+  it("yayın zamanlayıcı yazımdan ÖNCE taban alır ve zincire beforeDigests olarak geçer", () => {
+    const src = read("src/app/api/cron/yayin-zamanlayici/route.ts");
+    expect(src).toMatch(/await captureBaseline\(s\);\s*return s\.publish\(/);
+    expect(src).toMatch(/await captureBaseline\(s\);\s*return s\.resetToDefault\(/);
+    expect(src).toContain("beforeDigests: baselines.get(s.id)");
+  });
+});
+
+describe("zamanlı yayın tabanı (createBaselineRecorder)", () => {
+  it("cron yolu: taban yazımdan önce alınır → verify gerçek önce/sonra karşılaştırması yapar", async () => {
+    let live = "<h1>eski</h1>";
+    const fetchPage = async () => ({ status: 200, body: live });
+    const rec = createBaselineRecorder({ capture: (paths) => captureLiveDigests(paths, fetchPage) });
+    await rec.before("sitecontent", ["/"]);
+    live = "<h1>yeni</h1>"; // zamanlı yayın yazıldı
+    const at = Date.UTC(2026, 9, 13, 11, 4, 5);
+    const verify = createVerifyHook({ fetchPage, nowMs: () => at });
+    const okRun = await verify.run({ ...ev, livePaths: ["/"], source: "cron", beforeDigests: rec.get("sitecontent") });
+    expect(okRun.ok).toBe(true);
+    expect(okRun.message).toMatch(/^Canlıda doğrulandı /);
+    // Yansımadıysa (canlı aynı) dürüstçe söylenir; artık "karşılaştırma tabanı yok" denmez.
+    const rec2 = createBaselineRecorder({ capture: (paths) => captureLiveDigests(paths, fetchPage) });
+    await rec2.before("sitecontent", ["/"]);
+    const stale = await verify.run({ ...ev, livePaths: ["/"], source: "cron", beforeDigests: rec2.get("sitecontent") });
+    expect(stale).toMatchObject({ ok: false, message: "Henüz yansımadı — tekrar dene" });
+  });
+
+  it("yüzey başına koşuda bir kez (ilk yazımdan önceki hâl) alınır", async () => {
+    const capture = vi.fn(async () => ({ "/": "a" }));
+    const rec = createBaselineRecorder({ capture });
+    await rec.before("s1", ["/"]);
+    await rec.before("s1", ["/"]);
+    await rec.before("s2", ["/x"]);
+    expect(capture).toHaveBeenCalledTimes(2);
+    expect(rec.get("s1")).toEqual({ "/": "a" });
+  });
+
+  it("taban alınamazsa (fırlatma / asılı kalma) yayın engellenmez: kesin üst sınırda boş tabanla döner", async () => {
+    const rec = createBaselineRecorder({
+      capture: async () => {
+        throw new Error("ağ");
+      },
+    });
+    await expect(rec.before("s1", ["/"])).resolves.toBeUndefined();
+    expect(rec.get("s1")).toEqual({});
+    const hang = createBaselineRecorder({ capture: () => new Promise(() => {}), hardCapMs: 20 });
+    await hang.before("s2", ["/"]);
+    expect(hang.get("s2")).toEqual({});
+  });
+
+  it("koşu bütçesi bitince taban denenmez (undefined → doğrulama tabansız der)", async () => {
+    let t = 0;
+    const capture = vi.fn(async () => {
+      t += 50;
+      return { "/": "a" };
+    });
+    const rec = createBaselineRecorder({ capture, budgetMs: 60, nowMs: () => t });
+    await rec.before("s1", ["/"]);
+    await rec.before("s2", ["/"]);
+    await rec.before("s3", ["/"]);
+    expect(capture).toHaveBeenCalledTimes(2);
+    expect(rec.get("s3")).toBeUndefined();
+    await rec.before("bos", []);
+    expect(rec.get("bos")).toBeUndefined();
   });
 });
