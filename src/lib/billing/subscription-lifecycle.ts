@@ -73,7 +73,9 @@ export async function runSubscriptionLifecycle(admin: SupabaseClient): Promise<L
       rows.push({
         tenant_id: tenantId,
         title: "Paket değişikliğiniz uygulandı",
-        body: "Planladığınız daha ucuz pakete geçiş dönem sonunda uygulandı. Sonraki yenilemede yeni paketin tutarı alınır.",
+        // Planlı değişikliği ofis (düşürme) ya da Ofis 360 yöneticisi (yükseltme/düşürme) yapmış olabilir: metin yön
+        // ve kişi varsaymaz.
+        body: "Dönem sonu için planlanan paket değişikliği uygulandı. Sonraki yenilemede yeni paketin tutarı alınır; ayrıntılar Abonelik sayfasında.",
         href: BILLING_HREF,
         kind: "info",
       });

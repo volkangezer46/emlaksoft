@@ -5,11 +5,14 @@ import { getPlanDefinition, getSeatSettings } from "@/lib/billing/plan-definitio
 import { parseSeatTiers } from "@/lib/billing/seat-purchase";
 import { seatUtilization } from "@/lib/billing/seat-pricing";
 import { warnRatioOf } from "@/lib/billing/seat-settings";
+import { SeatChangeDialog } from "./subscription-panel";
 
 /**
  * Ofis detayında SALT OKUNUR koltuk bilgisi (kullanılan / dahil / ek, kilitli fiyat).
  * Sütunlar (extra_seats, seat_price_lock_*) yoksa "etkin değil" gösterilir; sayfa asla bozulmaz.
  * Admin client çağıran sayfadan gelir (yeni service_role kullanımı yok); tenant süzgeci eq ile.
+ * Etkin sınır DB `effective_seat_limit()` (plan + ofise özel limit istisnası + ek koltuk) ile okunur; istisna payı
+ * ayrıca gösterilir. Ek koltuk değişikliği (gerekçeli, kıst faturalı/ücretsiz) bu karttan açılır (`canEdit`).
  */
 export type AdminSeatInfo = {
   enabled: boolean;
@@ -17,6 +20,8 @@ export type AdminSeatInfo = {
   used: number;
   included: number;
   extra: number;
+  /** Ofise özel limit istisnasının koltuğa kattığı (etkin − dahil − ek; yoksa 0). */
+  overrideSeats: number;
   lockedBaseMonthlyTry: number | null;
   lockedTierCount: number;
   level: "ok" | "warn80" | "full";
@@ -30,7 +35,14 @@ export async function loadAdminSeatInfo(
   plan: string,
   used: number,
 ): Promise<AdminSeatInfo> {
-  const [def, settings] = await Promise.all([getPlanDefinition(plan), getSeatSettings()]);
+  const [def, settings, effectiveRes] = await Promise.all([
+    getPlanDefinition(plan),
+    getSeatSettings(),
+    admin.rpc("effective_seat_limit", { p_tenant_id: tenantId }).then(
+      (r) => r,
+      () => ({ data: null, error: true }),
+    ),
+  ]);
   let enabled = false;
   let extra = 0;
   let lockedBase: number | null = null;
@@ -55,13 +67,17 @@ export async function loadAdminSeatInfo(
   } catch (e) {
     console.error("loadAdminSeatInfo", e);
   }
-  const u = seatUtilization(used, def.limits.seats, extra, warnRatioOf(settings));
+  const effective = !effectiveRes.error && effectiveRes.data != null ? Number(effectiveRes.data) : NaN;
+  // İstisna payı: sabit değer plan limitinin altındaysa NEGATİF olur (toplam = DB etkin limiti, tetikleyiciyle aynı).
+  const overrideSeats = Number.isFinite(effective) ? Math.floor(effective) - def.limits.seats - extra : 0;
+  const u = seatUtilization(used, def.limits.seats + overrideSeats, extra, warnRatioOf(settings));
   return {
     enabled,
     planName: def.name,
     used,
     included: def.limits.seats,
     extra,
+    overrideSeats,
     lockedBaseMonthlyTry: lockedBase,
     lockedTierCount,
     level: u.level,
@@ -70,14 +86,29 @@ export async function loadAdminSeatInfo(
   };
 }
 
-export function SeatInfoCard({ info, teamHref }: { info: AdminSeatInfo; teamHref?: string }) {
+export function SeatInfoCard({
+  info,
+  teamHref,
+  tenantId,
+  canEdit = false,
+}: {
+  info: AdminSeatInfo;
+  teamHref?: string;
+  tenantId?: string;
+  /** "billing" modülü: ek koltuk diyaloğu görünür. */
+  canEdit?: boolean;
+}) {
+  const total = info.included + info.overrideSeats + info.extra;
   const tone =
     info.level === "full" ? "text-danger-600" : info.level === "warn80" ? "text-amber-600" : "text-text-muted";
   return (
     <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-      <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
-        <Users2 className="h-4 w-4" /> Koltuk bilgisi (salt okunur)
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+          <Users2 className="h-4 w-4" /> Koltuk bilgisi
+        </p>
+        {canEdit && tenantId && info.enabled ? <SeatChangeDialog tenantId={tenantId} currentExtra={info.extra} /> : null}
+      </div>
       {!info.enabled ? (
         <p className="mt-2 text-sm text-text-muted">
           Ek kullanıcı (koltuk) özelliği henüz etkin değil: veritabanı hazırlığı tamamlanınca burada satın alınmış ek ve kilitli fiyat görünür.
@@ -89,9 +120,9 @@ export function SeatInfoCard({ info, teamHref }: { info: AdminSeatInfo; teamHref
             <dt className="text-xs font-semibold text-text-muted">Kullanılan</dt>
             <dd className="numeric font-display text-lg font-extrabold text-ink-950">
               {teamHref ? (
-                <Link href={teamHref} className="hover:text-brand-600 hover:underline">{info.used} / {info.included + info.extra}</Link>
+                <Link href={teamHref} className="hover:text-brand-600 hover:underline">{info.used} / {total}</Link>
               ) : (
-                <>{info.used} / {info.included + info.extra}</>
+                <>{info.used} / {total}</>
               )}
             </dd>
             <dd className={`text-xs font-semibold ${tone}`}>
@@ -102,7 +133,10 @@ export function SeatInfoCard({ info, teamHref }: { info: AdminSeatInfo; teamHref
           <div>
             <dt className="text-xs font-semibold text-text-muted">Pakete dahil</dt>
             <dd className="numeric font-display text-lg font-extrabold text-ink-950">{info.included}</dd>
-            <dd className="text-xs text-text-faint">{info.planName}</dd>
+            <dd className="text-xs text-text-faint">
+              {info.planName}
+              {info.overrideSeats !== 0 ? ` · ${info.overrideSeats > 0 ? "+" : "−"}${Math.abs(info.overrideSeats)} istisna` : ""}
+            </dd>
           </div>
           <div>
             <dt className="text-xs font-semibold text-text-muted">Satın alınmış ek</dt>

@@ -25,7 +25,7 @@ import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
 import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
-import { DAY_MS, daysAgoIso, now } from "@/lib/clock";
+import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { MorphNav } from "@/components/ui/morph-tab-parts";
@@ -52,7 +52,11 @@ import { isExpiredActive } from "@/lib/admin/platform-metrics";
 import { platformCanAccess } from "@/lib/platform-access";
 import { ModulePanel } from "./module-panel";
 import { loadTenantModuleState } from "@/lib/modules/state";
-import { SubscriptionPanel } from "./subscription-panel";
+import { SubscriptionOpsConsole, SubscriptionPanel, type LimitView } from "./subscription-panel";
+import { PaymentProfilePanel } from "./payment-profile-panel";
+import { loadPaymentProfile, loadSubscriptionOps } from "@/lib/billing/subscription-ops";
+import { resolveEntitlementLimit, resolveSeatLimit } from "@/lib/billing/entitlements/overrides";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
 import { OfficeFinanceCard } from "@/app/admin/muhasebe/office-finance-card";
 import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
@@ -257,7 +261,8 @@ export default async function AdminTenantDetailPage({
       );
     }
   } else if (active === "abonelik") {
-    const [{ data: invoices }, { data: captures }, seatInfo, creditData] = await Promise.all([
+    const nowMs = now();
+    const [{ data: invoices }, { data: captures }, seatInfo, creditData, ops, payment, planDef] = await Promise.all([
       admin
         .from("invoices")
         .select("id, invoice_no, status, total_try, due_at, paid_at, created_at")
@@ -274,13 +279,31 @@ export default async function AdminTenantDetailPage({
       loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats),
       // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
       staff.role === "super_admin" ? loadCreditData(admin, id) : Promise.resolve(null),
+      // Abonelik operasyon konsolu (AD1) + ödeme profili: aynı turda, aynı admin istemcisi.
+      loadSubscriptionOps(admin, id, nowMs),
+      loadPaymentProfile(admin, id),
+      getPlanDefinition(tenant.plan ?? "office"),
     ]);
+    const opsLimits: LimitView[] = [
+      { key: "seats", plan: planDef.limits.seats, effective: resolveSeatLimit(planDef.limits.seats, ops.sub.extraSeats, ops.overrides, nowMs), used: kpiData.seats },
+      { key: "active_properties", plan: planDef.limits.activeProperties, effective: resolveEntitlementLimit(planDef.limits.activeProperties, "active_properties", ops.overrides, nowMs), used: kpiData.properties },
+      { key: "customers", plan: planDef.limits.customers, effective: resolveEntitlementLimit(planDef.limits.customers, "customers", ops.overrides, nowMs), used: kpiData.customers },
+      { key: "branches", plan: planDef.limits.branches, effective: resolveEntitlementLimit(planDef.limits.branches, "branches", ops.overrides, nowMs), used: kpiData.branches },
+    ];
     content = (
       <div className="space-y-6">
         {access.billing ? (
           <OfficeFinanceCard admin={admin} tenantId={id} sub={kpiData.sub} subscriptionHref={billingHref} />
         ) : null}
-        <SeatInfoCard info={seatInfo} teamHref={access.members ? tabHref("ekip") : undefined} />
+        <SubscriptionOpsConsole
+          tenantId={id}
+          data={ops}
+          plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
+          limits={opsLimits}
+          todayKey={trDayKey(nowMs)}
+        />
+        <SeatInfoCard info={seatInfo} teamHref={access.members ? tabHref("ekip") : undefined} tenantId={id} canEdit={access.billing} />
+        <PaymentProfilePanel tenantId={id} data={payment} />
         <SubscriptionTab
           sub={kpiData.sub}
           tenantStatus={tenantStatusLabel[tenant.status] ?? tenant.status}
