@@ -13,6 +13,7 @@ import { ERRORS_AUTO_RESOLVE_DAYS_KEY } from "@/lib/settings/registry/platform";
 import { getSettings } from "@/lib/settings/read";
 import { autoResolveCutoffIso } from "@/lib/errors/classify";
 import { runPortalLearningRetention, runPortalRulesLearn } from "@/lib/portal-rules/server/learn-step";
+import { pruneEmailLog } from "@/lib/email/log-read";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -67,6 +68,8 @@ export async function GET(req: NextRequest) {
     portalRulesLearn: () => runPortalRulesLearn(getAdmin(), { nowMs: now() }),
     // Gözlem saklama süreleri (olay 180, rapor 90, oy 180 gün; katalog 1 yıl). İdempotent.
     portalLearningRetention: () => runPortalLearningRetention(getAdmin(), { nowMs: now() }),
+    // E-posta günlüğü (AD7): olaylar 180, gönderimler 400 gün; bastırma listesi silinmez. RPC yoksa 'skipped'. İdempotent.
+    emailLog: () => pruneEmailLog(getAdmin()),
   });
   const queue = await storageDeletionQueueStats().catch(() => null);
   const failed = cronStepsFailed(outcome);

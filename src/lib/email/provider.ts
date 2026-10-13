@@ -9,7 +9,9 @@ import { EMAIL_FROM_RE } from "@/lib/settings/registry/platform";
  * öncelikli) > panelden girilen ayar (`email.resend_api_key` şifreli, `email.from`, `email.reply_to`) > yok.
  * Anahtar ya da geçerli gönderen çözülemezse kanal KAPALI: `sendEmail` hiçbir istek atmadan `{ ok:false, code:"disabled" }`
  * döner; admin ekranı "kanal kapalı" ve nedenini der (sessiz hata yok). Şifreli anahtar çözülemezse de kanal kapalıdır.
- * Gönderimler yalnız sunucuda; düz metin gövde (HTML yok). Anahtar değeri bu modülden yalnız istek başlığına çıkar.
+ * Gönderimler yalnız sunucuda; düz metin gövde + isteğe bağlı HTML (ortak marka yerleşimi, `templates.ts` üretir; değerler
+ * kaçışlanmış). Anahtar değeri bu modülden yalnız istek başlığına çıkar. Günlük/bastırma sarmalayıcısı: `send.ts`
+ * (`sendLoggedEmail`); uygulama kodu doğrudan bu işlevi DEĞİL, onu çağırır.
  */
 
 /** Panel ayarlarının depo anahtarları (ayar defteri `registry/platform.ts` ile aynı; storageKey = key). */
@@ -105,7 +107,7 @@ export async function emailChannelStatus(): Promise<EmailChannelStatus> {
 
 export type EmailSendResult = { ok: true; id: string | null } | { ok: false; code: "disabled" | "invalid" | "provider_error"; error: string };
 
-export async function sendEmail(input: { to: string; subject: string; text: string }): Promise<EmailSendResult> {
+export async function sendEmail(input: { to: string; subject: string; text: string; html?: string }): Promise<EmailSendResult> {
   const cfg = await resolveEmailChannelConfig();
   if (!cfg.enabled || !cfg.apiKey) return { ok: false, code: "disabled", error: cfg.reason ?? "E-posta kanalı kapalı" };
   const to = input.to.trim();
@@ -123,6 +125,7 @@ export async function sendEmail(input: { to: string; subject: string; text: stri
           to: [to],
           subject,
           text: input.text.slice(0, 20_000),
+          ...(input.html ? { html: input.html.slice(0, 100_000) } : {}),
           ...(cfg.replyTo ? { reply_to: cfg.replyTo } : {}),
         }),
       },

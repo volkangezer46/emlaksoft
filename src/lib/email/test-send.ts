@@ -1,11 +1,12 @@
 import { fetchExternal, externalErrorMetadata, readExternalJson } from "@/lib/external-fetch";
-import { emailFromDomain, resolveEmailChannelConfig, sendEmail, type EmailSendResult } from "./provider";
-import { EMAIL_TEMPLATES, renderTemplate, type EmailTemplateKey } from "./templates";
+import { emailFromDomain, resolveEmailChannelConfig } from "./provider";
+import { composeTemplateEmail, sendLoggedEmail, type LoggedSendResult } from "./send";
+import { DEFAULT_EMAIL_FOOTER, isEmailTemplateKey, sampleVars, type EmailTemplateKey } from "./templates";
 
 /**
  * E-posta kanalı denetimi: Resend bağlantı testi (GET /domains, 5 sn) ve personelin KENDİ adresine test/örnek gönderim.
  * Alıcı parametresi YOKTUR: gönderim yalnız oturumdaki personelin e-postasına gider (kötüye kullanımla dışarıya posta
- * atılamaz). Anahtar değeri sonuçlara/loglara girmez.
+ * atılamaz). Anahtar değeri sonuçlara/loglara girmez. Test gönderimleri de günlüğe yazılır (kaynak "admin_test").
  */
 
 export type DomainCheck = {
@@ -69,39 +70,65 @@ export async function testResendConnection(): Promise<ConnectionTestResult> {
   }
 }
 
-/** Şablon örnek verisi (gerçek kişi/ofis verisi YOK). */
-export const SAMPLE_TEMPLATE_VARS: Record<EmailTemplateKey, Record<string, string | number>> = {
-  trial_ending: { ofis: "Örnek Emlak Ofisi", gun: 3, baglanti: "https://emlaksoft.com.tr/app/abonelik" },
-  owner_weekly_report: { ofis: "Örnek Emlak Ofisi", portfoy: "Örnek Mah. 3+1 Daire", baglanti: "https://emlaksoft.com.tr/" },
-  daily_digest: { ofis: "Örnek Emlak Ofisi", ozet: "Bugün 3 yeni talep, 2 randevu ve 1 imza bekleyen anlaşma var.", baglanti: "https://emlaksoft.com.tr/app" },
-};
+export type SenderDnsState = "ok" | "pending" | "failed" | "missing" | "unknown";
+export type SenderDnsSummary = { state: SenderDnsState; domain: string | null; spf: string | null; dkim: string | null; text: string };
 
-export type SelfSendKind = { type: "test" } | { type: "template"; key: EmailTemplateKey; subject: string; body: string };
+/** Gönderen alan adının SPF/DKIM rozeti (SAF): bağlantı testi sonucundan tek satırlık durum. */
+export function summarizeSenderDns(r: ConnectionTestResult): SenderDnsSummary {
+  if (!r.ok) return { state: "unknown", domain: null, spf: null, dkim: null, text: r.error };
+  if (!r.fromDomain) return { state: "unknown", domain: null, spf: null, dkim: null, text: "Gönderen adresi tanımlı değil." };
+  const d = r.domains.find((x) => x.name.toLowerCase() === r.fromDomain);
+  if (!d) return { state: "missing", domain: r.fromDomain, spf: null, dkim: null, text: `${r.fromDomain} Resend hesabında yok; alan adını ekleyip DNS kayıtlarını girin.` };
+  const rec = (name: string) => {
+    const list = d.records.filter((x) => x.record === name).map((x) => x.status.toLowerCase());
+    if (list.length === 0) return null;
+    if (list.every((s) => s === "verified")) return "verified";
+    return list.some((s) => s === "failed" || s === "temporary_failure") ? "failed" : "pending";
+  };
+  const spf = rec("SPF");
+  const dkim = rec("DKIM");
+  const all = [d.status.toLowerCase(), spf, dkim].filter((x): x is string => Boolean(x));
+  const state: SenderDnsState = all.every((s) => s === "verified")
+    ? "ok"
+    : all.some((s) => s === "failed" || s === "temporary_failure")
+      ? "failed"
+      : "pending";
+  const word = (s: string | null) => (s === "verified" ? "doğrulandı" : s === "failed" ? "başarısız" : s ? "bekliyor" : "okunamadı");
+  return { state, domain: d.name, spf, dkim, text: `${d.name}: SPF ${word(spf)} · DKIM ${word(dkim)}` };
+}
 
-/** Gönderilecek konu/metin (SAF). Şablon örneği "[Örnek]" önekiyle işaretlenir. */
-export function buildSelfEmail(kind: SelfSendKind, staffName: string): { subject: string; text: string } {
+export type SelfSendKind = { type: "test" } | { type: "template"; key: EmailTemplateKey; subject: string; body: string; footer?: string };
+
+/** Gönderilecek konu/metin/HTML (SAF). Şablon örneği "[Örnek]" önekiyle ve katalogdaki örnek değerlerle hazırlanır. */
+export function buildSelfEmail(kind: SelfSendKind, staffName: string): { subject: string; text: string; html?: string; template: string } {
   if (kind.type === "test") {
     return {
       subject: "EmlakSoft e-posta kanalı testi",
       text: `Merhaba${staffName ? ` ${staffName}` : ""},\n\nBu ileti EmlakSoft yönetim panelinden gönderilen bir test e-postasıdır. Kanal çalışıyor.\n\nEmlakSoft`,
+      template: "test",
     };
   }
-  const vars = SAMPLE_TEMPLATE_VARS[kind.key];
-  return {
-    subject: `[Örnek] ${renderTemplate(kind.subject, vars, { singleLine: true })}`,
-    text: renderTemplate(kind.body, vars),
-  };
+  const mail = composeTemplateEmail(
+    kind.key,
+    { subject: kind.subject, body: kind.body, footer: kind.footer ?? DEFAULT_EMAIL_FOOTER },
+    sampleVars(kind.key),
+  );
+  return { subject: `[Örnek] ${mail.subject}`, text: mail.text, html: mail.html, template: kind.key };
 }
 
 /**
- * Personelin KENDİ adresine gönderir. İmza bilinçli olarak alıcı almaz: `staff.email` dışında hedef yoktur.
+ * Personelin KENDİ adresine gönderir (günlüklü: `sendLoggedEmail`, kaynak "admin_test"). İmza bilinçli olarak alıcı
+ * almaz: `staff.email` dışında hedef yoktur.
  */
-export async function sendSelfEmail(staff: { email: string; full_name?: string | null }, kind: SelfSendKind): Promise<EmailSendResult> {
+export async function sendSelfEmail(
+  staff: { id?: string; email: string; full_name?: string | null },
+  kind: SelfSendKind,
+): Promise<LoggedSendResult> {
   const to = (staff.email ?? "").trim();
   if (!to) return { ok: false, code: "invalid", error: "Oturumdaki personelin e-posta adresi yok." };
-  if (kind.type === "template" && !EMAIL_TEMPLATES.some((t) => t.key === kind.key)) {
+  if (kind.type === "template" && !isEmailTemplateKey(kind.key)) {
     return { ok: false, code: "invalid", error: "Bilinmeyen şablon." };
   }
-  const { subject, text } = buildSelfEmail(kind, staff.full_name ?? "");
-  return sendEmail({ to, subject, text });
+  const { subject, text, html, template } = buildSelfEmail(kind, staff.full_name ?? "");
+  return sendLoggedEmail({ to, subject, text, html, template, source: "admin_test", actorId: staff.id ?? null });
 }

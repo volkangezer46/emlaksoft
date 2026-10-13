@@ -24,7 +24,9 @@ describe("e-posta kanalı", () => {
 
   it("her şablonun konu/gövdesi ayar defterinde ve varsayılan kodla aynı", () => {
     for (const t of EMAIL_TEMPLATES) {
-      expect(getSettingDef(templateSettingKey(t.key, "subject"))?.default).toBe(t.defaultSubject);
+      // Auth şablonlarının konusu GoTrue ortamından gelir: konu ayarı YOKTUR.
+      if (t.authType) expect(getSettingDef(templateSettingKey(t.key, "subject"))).toBeUndefined();
+      else expect(getSettingDef(templateSettingKey(t.key, "subject"))?.default).toBe(t.defaultSubject);
       expect(getSettingDef(templateSettingKey(t.key, "body"))?.default).toBe(t.defaultBody);
     }
   });
