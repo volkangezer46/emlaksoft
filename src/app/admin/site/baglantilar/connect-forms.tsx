@@ -208,7 +208,7 @@ export function DisconnectButton({ service, label }: { service: GoogleService; l
           </Button>
         }
         title={`${label} bağlantısı kesilsin mi?`}
-        description="Google'daki izin iptal edilir ve kayıtlı belirteç silinir. Toplanmış geçmiş veriler silinmez; yeniden bağlayınca akış kaldığı yerden sürer."
+        description="Kayıtlı belirteç silinir. Diğer Google hizmeti bağlı değilse Google'daki izin de iptal edilir; bağlıysa o hizmet etkilenmesin diye izin korunur ve son hizmeti kestiğinizde tümüyle iptal edilir. Toplanmış geçmiş veriler silinmez; yeniden bağlayınca akış kaldığı yerden sürer."
         confirmLabel="Bağlantıyı kes"
         onConfirm={() => run(() => disconnectGoogle(service))}
       />

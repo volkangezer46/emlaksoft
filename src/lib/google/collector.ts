@@ -1,5 +1,5 @@
 import { NEVER_INDEX_PREFIXES, seoPages } from "@/lib/seo/registry";
-import { adsRecommendations, type AdsMetricRow } from "./ads-rules";
+import { adsRecommendations, CAMPAIGN_ONLY_AD_GROUP_ID, type AdsMetricRow } from "./ads-rules";
 import { pathOfPage } from "./gsc";
 import { GOOGLE_SERVICES, GOOGLE_SERVICE_LABELS, type GoogleService } from "./keys";
 import { areaOf, computeServiceStatus, isBroken } from "./status";
@@ -189,7 +189,8 @@ export function buildGoogleIssues(input: GoogleIssueInput): CollectorResult {
     }
     // Tüm Ads satırları değerlendirildi: kampanya/grup anahtarları taranmış sayılır.
     for (const row of input.adsRows) {
-      scanned.push(`ads:campaign:${row.campaign_id}`, `ads:adgroup:${row.ad_group_id}`);
+      scanned.push(`ads:campaign:${row.campaign_id}`);
+      if (row.ad_group_id !== CAMPAIGN_ONLY_AD_GROUP_ID) scanned.push(`ads:adgroup:${row.ad_group_id}`);
     }
   }
 

@@ -1,5 +1,6 @@
 import { GOOGLE_REDIRECT_URI, GOOGLE_SCOPES, type GoogleService } from "./keys";
 import { GoogleApiError, googleExpectOk, googleJson, type GoogleDeps } from "./http";
+import { PlaintextSecretError } from "@/lib/settings/secrets";
 import { readToken, removeToken, type OAuthClientConfig, type SettingsPort } from "./token-store";
 
 /**
@@ -85,20 +86,60 @@ export async function revokeToken(token: string, deps: GoogleDeps = {}): Promise
   await googleExpectOk(GOOGLE_REVOKE_ENDPOINT, form({ token }), deps);
 }
 
+export type DisconnectResult =
+  | {
+      ok: true;
+      revoked: boolean;
+      /**
+       * `shared-grant`: diğer hizmet hâlâ bağlı olduğu için Google'da iptal YAPILMADI (artımlı yetkilendirmede iki
+       * hizmetin belirteci aynı birleşik izni temsil eder; revoke diğerini de düşürürdü). `plaintext`: kayıt düz
+       * metindi (güvenilmez) → iptal denenmeden silindi.
+       */
+      note?: "shared-grant" | "plaintext";
+    }
+  | { ok: false; error: string };
+
+/** Diğer hizmetin kullanılabilir (açılabilen, yeniden bağlama beklemeyen) kaydı var mı? Okunamayan kayıt "yok" sayılır. */
+async function otherServiceLive(port: SettingsPort, service: GoogleService): Promise<boolean> {
+  const other: GoogleService = service === "ads" ? "gsc" : "ads";
+  try {
+    const rec = await readToken(port, other);
+    return Boolean(rec && !rec.needsReconnect);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * "Bağlantıyı kes": önce Google'da iptal, sonra kayıt silinir. Google zaten geçersiz saydıysa (400 invalid_token)
  * kayıt yine silinir; ağ/sunucu hatasında kayıt SİLİNMEZ (iptal edilmemiş belirteç unutulmasın) ve hata döner.
+ * Diğer hizmet hâlâ bağlıysa iptal YAPILMAZ, yalnız kayıt silinir (`include_granted_scopes` ile alınan belirteçler aynı
+ * birleşik izni taşır; revoke diğer hizmeti de koparırdı). Son hizmet kesilirken yapılan iptal birleşik izni kapatır.
+ * Düz metin (bozuk) kayıt iptal denenmeden silinir: aksi halde "yeniden bağla" gösteren kayıt hiç temizlenemezdi.
  */
 export async function disconnectService(
   port: SettingsPort,
   service: GoogleService,
   actorId: string | null,
   deps: GoogleDeps = {},
-): Promise<{ ok: true; revoked: boolean } | { ok: false; error: string }> {
-  const record = await readToken(port, service);
+): Promise<DisconnectResult> {
+  let record: Awaited<ReturnType<typeof readToken>>;
+  try {
+    record = await readToken(port, service);
+  } catch (e) {
+    if (!(e instanceof PlaintextSecretError)) throw e;
+    const removed = await removeToken(port, service, actorId);
+    if (!removed) return { ok: false, error: "Bozuk kayıt silinemedi; lütfen tekrar deneyin." };
+    return { ok: true, revoked: false, note: "plaintext" };
+  }
   if (!record) {
     await removeToken(port, service, actorId);
     return { ok: true, revoked: false };
+  }
+  if (await otherServiceLive(port, service)) {
+    const removed = await removeToken(port, service, actorId);
+    if (!removed) return { ok: false, error: "Kayıt silinemedi; lütfen tekrar deneyin." };
+    return { ok: true, revoked: false, note: "shared-grant" };
   }
   let revoked = true;
   try {

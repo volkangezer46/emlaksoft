@@ -1,3 +1,4 @@
+import { CAMPAIGN_ONLY_AD_GROUP_ID, CAMPAIGN_ONLY_AD_GROUP_LABEL } from "./ads-rules";
 import { googleJson, type GoogleDeps } from "./http";
 import { QuotaExceededError } from "./quotas";
 
@@ -6,7 +7,9 @@ import { QuotaExceededError } from "./quotas";
  * adres yalnız `adsEndpoint()` ile kurulur ve yöntem izin listesi dışındaysa fırlatır (sözleşme testi). Reklam hesabında
  * değişiklik yapan hiçbir uç nokta kodda yoktur: bütçe/teklif değişikliğini sahip Google Ads arayüzünde yapar.
  *
- * Günde TEK GAQL sorgusu: reklam grubu satırları kampanya alanlarıyla birlikte (kampanya toplamı satırlardan türetilir).
+ * Günlük çekim İKİ GAQL sorgusudur: reklam grubu satırları (`FROM ad_group`) + kampanya toplamları (`FROM campaign`).
+ * Reklam grubu olmayan kampanyalar (Performance Max vb.) yalnız ikinci sorguda görünür; o kampanya-gün için hiç reklam
+ * grubu satırı yoksa kampanya toplamı `CAMPAIGN_ONLY_AD_GROUP_ID` satırı olarak eklenir (çift sayım yok).
  */
 
 export const ADS_HOST = "https://googleads.googleapis.com";
@@ -60,6 +63,17 @@ export function buildDailyQuery(startDate: string, endDate: string): string {
   ].join(" ");
 }
 
+/** GAQL: kampanya düzeyi günlük toplamlar (reklam grubu olmayan kampanyalar dahil; yalnız SELECT). */
+export function buildCampaignDailyQuery(startDate: string, endDate: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("Geçersiz tarih.");
+  return [
+    "SELECT segments.date, campaign.id, campaign.name, campaign.primary_status_reasons,",
+    "metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, metrics.conversions_value",
+    "FROM campaign",
+    `WHERE segments.date BETWEEN '${startDate}' AND '${endDate}'`,
+  ].join(" ");
+}
+
 type ApiResultRow = {
   segments?: { date?: string };
   campaign?: { id?: string | number; name?: string; primaryStatusReasons?: string[] };
@@ -78,17 +92,17 @@ const num = (v: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-export function mapAdsRow(r: ApiResultRow): AdsDailyRow | null {
+export function mapAdsRow(r: ApiResultRow, campaignLevel = false): AdsDailyRow | null {
   const day = r.segments?.date;
   const cid = r.campaign?.id;
-  const gid = r.adGroup?.id;
+  const gid = campaignLevel ? CAMPAIGN_ONLY_AD_GROUP_ID : r.adGroup?.id;
   if (!day || cid == null || gid == null) return null;
   return {
     day,
     campaign_id: String(cid),
     campaign: (r.campaign?.name ?? "").slice(0, 300),
     ad_group_id: String(gid),
-    ad_group: (r.adGroup?.name ?? "").slice(0, 300),
+    ad_group: (campaignLevel ? CAMPAIGN_ONLY_AD_GROUP_LABEL : (r.adGroup?.name ?? "")).slice(0, 300),
     cost_micros: Math.max(0, Math.round(num(r.metrics?.costMicros))),
     clicks: Math.max(0, Math.round(num(r.metrics?.clicks))),
     impressions: Math.max(0, Math.round(num(r.metrics?.impressions))),
@@ -118,28 +132,43 @@ function headers(a: AdsAccess): Record<string, string> {
 }
 
 /**
- * Günlük metrikler (searchStream; yanıt parça dizisidir). Kota kapısı her istekte 1 işlem sayar.
+ * Reklam grubu satırlarına, hiç reklam grubu satırı olmayan kampanya-günlerin kampanya toplamını ekler (SAF).
+ * Reklam grubu satırı olan kampanya-gün kampanya toplamından EKLENMEZ: aynı harcama iki kez sayılmaz.
+ */
+export function mergeCampaignOnlyRows<T extends { day: string; campaign_id: string }>(adGroupRows: readonly T[], campaignRows: readonly T[]): T[] {
+  const covered = new Set(adGroupRows.map((r) => `${r.day}|${r.campaign_id}`));
+  const extra = campaignRows.filter((r) => !covered.has(`${r.day}|${r.campaign_id}`));
+  return [...adGroupRows, ...extra];
+}
+
+/**
+ * Günlük metrikler (iki searchStream isteği; yanıt parça dizisidir). Kota kapısı her istekte 1 işlem sayar.
  */
 export async function fetchAdsDaily(
   input: AdsAccess & { startDate: string; endDate: string; quota?: { tryConsume(n?: number): boolean } },
   deps: GoogleDeps = {},
 ): Promise<AdsDailyRow[]> {
-  if (input.quota && !input.quota.tryConsume(1)) throw new QuotaExceededError("ads");
   const url = adsEndpoint(input.customerId, "searchStream", input.apiVersion ?? undefined);
-  const batches = await googleJson<Array<{ results?: ApiResultRow[] }>>(
-    url,
-    { method: "POST", headers: headers(input), body: JSON.stringify({ query: buildDailyQuery(input.startDate, input.endDate) }), cache: "no-store" },
-    deps,
-    32 * 1024 * 1024,
-  );
-  const rows: AdsDailyRow[] = [];
-  for (const b of Array.isArray(batches) ? batches : []) {
-    for (const r of b.results ?? []) {
-      const row = mapAdsRow(r);
-      if (row) rows.push(row);
+  const stream = async (query: string, campaignLevel: boolean): Promise<AdsDailyRow[]> => {
+    if (input.quota && !input.quota.tryConsume(1)) throw new QuotaExceededError("ads");
+    const batches = await googleJson<Array<{ results?: ApiResultRow[] }>>(
+      url,
+      { method: "POST", headers: headers(input), body: JSON.stringify({ query }), cache: "no-store" },
+      deps,
+      32 * 1024 * 1024,
+    );
+    const rows: AdsDailyRow[] = [];
+    for (const b of Array.isArray(batches) ? batches : []) {
+      for (const r of b.results ?? []) {
+        const row = mapAdsRow(r, campaignLevel);
+        if (row) rows.push(row);
+      }
     }
-  }
-  return rows;
+    return rows;
+  };
+  const adGroupRows = await stream(buildDailyQuery(input.startDate, input.endDate), false);
+  const campaignRows = await stream(buildCampaignDailyQuery(input.startDate, input.endDate), true);
+  return mergeCampaignOnlyRows(adGroupRows, campaignRows);
 }
 
 /** Erişilebilir hesap doğrulaması (search, tek satır): kurulum sihirbazındaki "bağlantıyı dene" için. */

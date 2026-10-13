@@ -13,7 +13,13 @@ import { buildConnectionView, type ConnectionView } from "./view-model";
 
 const EMPTY: GoogleStoreSnapshot = { client: null, tokens: { gsc: null, ads: null }, adsAccount: null, gscProperty: null, problems: [] };
 
-export async function readConnectionView(): Promise<ConnectionView & { readError: boolean }> {
+/**
+ * `adsCustomerId: true` yalnız Google Ads panosu içindir (derin bağlantıların `__e` hesap parametresi). Varsayılan
+ * görünüm maskeli kalır: bağlantı merkezi gibi görünümü bütünüyle istemciye geçen ekranlara açık kimlik gitmez.
+ */
+export async function readConnectionView(
+  opts: { adsCustomerId?: boolean } = {},
+): Promise<ConnectionView & { readError: boolean; adsCustomerId: string | null }> {
   const today = new Date(now()).toISOString().slice(0, 10);
   let snapshot = EMPTY;
   let quotas: { inspection: QuotaRecord | null; ads: QuotaRecord | null } = { inspection: null, ads: null };
@@ -35,5 +41,9 @@ export async function readConnectionView(): Promise<ConnectionView & { readError
   } catch {
     readError = true;
   }
-  return { ...buildConnectionView({ snapshot, quotas, today, secretsEnabled: secretsWritable() }), readError };
+  return {
+    ...buildConnectionView({ snapshot, quotas, today, secretsEnabled: secretsWritable() }),
+    readError,
+    adsCustomerId: opts.adsCustomerId ? (snapshot.adsAccount?.customerId ?? null) : null,
+  };
 }

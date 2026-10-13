@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { adsRecommendations, type AdsMetricRow } from "./ads-rules";
+import { mergeCampaignOnlyRows } from "./ads";
+import { adsRecommendations, CAMPAIGN_ONLY_AD_GROUP_ID, type AdsMetricRow } from "./ads-rules";
 import { buildAdsDashboard } from "./ads-dashboard";
 import { buildGoogleIssues, canAutoOptimize, type GoogleIssueInput } from "./collector";
 import { GOOGLE_KEYS } from "./keys";
@@ -45,6 +46,35 @@ describe("ads-rules (saf)", () => {
     const recs = adsRecommendations(rows).filter((r) => r.code === "ads-adgroup-high-cpa");
     expect(recs.map((r) => r.adGroupId)).toEqual(["g3"]);
     expect(recs[0].adsUrl).toContain("adGroupId=g3");
+  });
+
+  it("reklam grubu olmayan kampanya (PMax) toplamlara girer ama reklam grubu önerisi üretmez", () => {
+    const rows = [
+      row({ ad_group_id: "g1", ad_group: "Ucuz", cost_micros: 100 * M, clicks: 50, conversions: 10 }),
+      row({ ad_group_id: "g2", ad_group: "Ucuz2", cost_micros: 100 * M, clicks: 50, conversions: 10 }),
+      row({ campaign_id: "pm", campaign: "PMax", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, ad_group: "(reklam grubu yok)", cost_micros: 300 * M, clicks: 50, conversions: 1 }),
+    ];
+    const recs = adsRecommendations(rows);
+    expect(recs.filter((r) => r.code === "ads-adgroup-high-cpa")).toEqual([]);
+    expect(buildAdsDashboard(rows, []).total.spend).toBe(500);
+    // Dönüşümsüz harcama kuralı PMax kampanyasını da değerlendirir.
+    const noConv = adsRecommendations([row({ campaign_id: "pm", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, cost_micros: 600 * M, clicks: 40 })]);
+    expect(noConv.map((r) => [r.code, r.campaignId])).toEqual([["ads-spend-no-conversion", "pm"]]);
+  });
+
+  it("mergeCampaignOnlyRows: reklam grubu satırı olan kampanya-gün kampanya toplamıyla çift sayılmaz", () => {
+    const ag = [row({ campaign_id: "c1", ad_group_id: "g1", cost_micros: 5 * M })];
+    const camp = [
+      row({ campaign_id: "c1", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, cost_micros: 5 * M }),
+      row({ campaign_id: "pm", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, cost_micros: 7 * M }),
+      row({ campaign_id: "c1", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, day: "2026-10-11", cost_micros: 2 * M }),
+    ];
+    const merged = mergeCampaignOnlyRows(ag, camp);
+    expect(merged.map((r) => `${r.day}|${r.campaign_id}|${r.ad_group_id}`)).toEqual([
+      "2026-10-12|c1|g1",
+      "2026-10-12|pm|-",
+      "2026-10-11|c1|-",
+    ]);
   });
 
   it("dönüşüm hiç yoksa CPA kuralları çalışmaz (sahte ortalama yok)", () => {

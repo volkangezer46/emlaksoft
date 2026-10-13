@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ADS_ALLOWED_METHODS, adsEndpoint, fetchAdsDaily, type AdsMethod } from "./ads";
+import { CAMPAIGN_ONLY_AD_GROUP_ID } from "./ads-rules";
 import { GSC_API, GSC_ROW_LIMIT, fetchSearchAnalytics, gscFetchRange, suggestProperty } from "./gsc";
 import { GOOGLE_ALLOWED_HOSTS, GoogleHostError, assertGoogleUrl, googleFetch } from "./http";
 import { GOOGLE_AUTH_ENDPOINT, GOOGLE_REVOKE_ENDPOINT, GOOGLE_TOKEN_ENDPOINT } from "./oauth";
@@ -93,7 +94,7 @@ describe("Google Ads: yalnız search / searchStream", () => {
     expect(() => adsEndpoint("12", "search")).toThrow();
   });
 
-  it("günlük çekim tek searchStream isteğidir; başlıklar developer-token ve MCC taşır", async () => {
+  it("günlük çekim iki searchStream isteğidir (reklam grubu + kampanya); başlıklar developer-token ve MCC taşır", async () => {
     const f = fakeFetch([
       () =>
         json([
@@ -108,19 +109,42 @@ describe("Google Ads: yalnız search / searchStream", () => {
             ],
           },
         ]),
+      () =>
+        json([
+          {
+            results: [
+              // Reklam grubu satırı olan kampanya-gün: kampanya toplamı EKLENMEZ (çift sayım yok).
+              {
+                segments: { date: "2026-10-12" },
+                campaign: { id: "11", name: "Marka", primaryStatusReasons: ["BUDGET_CONSTRAINED"] },
+                metrics: { costMicros: "1500000", clicks: "3", impressions: "40", conversions: 1, conversionsValue: 0 },
+              },
+              // Performance Max: reklam grubu yok → kampanya düzeyi satır olarak eklenir.
+              {
+                segments: { date: "2026-10-12" },
+                campaign: { id: "33", name: "PMax", primaryStatusReasons: [] },
+                metrics: { costMicros: "4000000", clicks: "9", impressions: "300", conversions: 2, conversionsValue: 0 },
+              },
+            ],
+          },
+        ]),
     ]);
     const rows = await fetchAdsDaily(
       { customerId: "1234567890", loginCustomerId: "111-222-3333", developerToken: "dt", accessToken: "at", startDate: "2026-10-01", endDate: "2026-10-12" },
       { fetcher: f.fetcher },
     );
-    expect(f.calls).toHaveLength(1);
+    expect(f.calls).toHaveLength(2);
     expect(f.calls[0].url.endsWith("googleAds:searchStream")).toBe(true);
+    expect(f.calls[1].url.endsWith("googleAds:searchStream")).toBe(true);
+    expect(String(f.calls[0].init.body)).toContain("FROM ad_group");
+    expect(String(f.calls[1].init.body)).toContain("FROM campaign");
     const h = f.calls[0].init.headers as Record<string, string>;
     expect(h["developer-token"]).toBe("dt");
     expect(h["login-customer-id"]).toBe("1112223333");
     expect(String(f.calls[0].init.body)).toMatch(/^\{"query":"SELECT /);
     expect(rows).toEqual([
       expect.objectContaining({ day: "2026-10-12", campaign_id: "11", ad_group_id: "22", cost_micros: 1_500_000, clicks: 3, budget_limited: true }),
+      expect.objectContaining({ day: "2026-10-12", campaign_id: "33", ad_group_id: CAMPAIGN_ONLY_AD_GROUP_ID, cost_micros: 4_000_000, conversions: 2 }),
     ]);
   });
 

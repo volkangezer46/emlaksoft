@@ -161,6 +161,43 @@ describe("token uç noktası ve bağlantıyı kesme (sahte fetch)", () => {
     expect(await readToken(port, "ads")).toBeNull();
   });
 
+  it("diğer hizmet bağlıyken revoke YAPILMAZ (birleşik izin korunur), yalnız kayıt silinir", async () => {
+    restore = withSecrets(true);
+    const { port, removed } = memoryPort();
+    await saveToken(port, "ads", { refreshToken: "RT-ADS", scope: "s", connectedAt: "t", connectedBy: "x" }, "x");
+    await saveToken(port, "gsc", { refreshToken: "RT-GSC", scope: "s", connectedAt: "t", connectedBy: "x" }, "x");
+    const f = fakeFetch([() => new Response(null, { status: 200 })]);
+    const r = await disconnectService(port, "ads", "x", { fetcher: f.fetcher });
+    expect(r).toEqual({ ok: true, revoked: false, note: "shared-grant" });
+    expect(f.calls).toHaveLength(0);
+    expect(removed).toEqual([GOOGLE_KEYS.ads]);
+    expect(await readToken(port, "gsc")).toMatchObject({ refreshToken: "RT-GSC" });
+    // Son hizmet kesilirken iptal yapılır.
+    const r2 = await disconnectService(port, "gsc", "x", { fetcher: f.fetcher });
+    expect(r2).toEqual({ ok: true, revoked: true });
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it("diğer hizmet yeniden bağlama bekliyorsa revoke yapılır", async () => {
+    restore = withSecrets(true);
+    const { port } = memoryPort();
+    await saveToken(port, "ads", { refreshToken: "RT-ADS", scope: "s", connectedAt: "t", connectedBy: "x" }, "x");
+    await saveToken(port, "gsc", { refreshToken: "RT-GSC", scope: "s", connectedAt: "t", connectedBy: "x", needsReconnect: true }, "x");
+    const f = fakeFetch([() => new Response(null, { status: 200 })]);
+    expect(await disconnectService(port, "ads", "x", { fetcher: f.fetcher })).toEqual({ ok: true, revoked: true });
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it("düz metin (bozuk) kayıt iptal denenmeden silinir", async () => {
+    restore = withSecrets(true);
+    const { port, removed } = memoryPort({ [GOOGLE_KEYS.ads]: '{"refreshToken":"duz"}' });
+    const f = fakeFetch([() => new Response(null, { status: 200 })]);
+    const r = await disconnectService(port, "ads", "x", { fetcher: f.fetcher });
+    expect(r).toEqual({ ok: true, revoked: false, note: "plaintext" });
+    expect(f.calls).toHaveLength(0);
+    expect(removed).toEqual([GOOGLE_KEYS.ads]);
+  });
+
   it("Google sunucu hatasında kayıt SİLİNMEZ (iptal edilmemiş belirteç unutulmaz)", async () => {
     restore = withSecrets(true);
     const { port, removed } = memoryPort();

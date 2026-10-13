@@ -23,6 +23,10 @@ export type AdsMetricRow = {
   budget_limited?: boolean;
 };
 
+/** Reklam grubu olmayan kampanyanın (PMax vb.) kampanya düzeyi satırı için yer tutucu reklam grubu kimliği. */
+export const CAMPAIGN_ONLY_AD_GROUP_ID = "-";
+export const CAMPAIGN_ONLY_AD_GROUP_LABEL = "(reklam grubu yok)";
+
 export type AdsRecommendationCode = "ads-spend-no-conversion" | "ads-adgroup-high-cpa" | "ads-budget-limited-efficient";
 
 export type AdsRecommendation = {
@@ -128,6 +132,8 @@ export function adsRecommendations(rows: readonly AdsMetricRow[], customerId?: s
 
   if (avgCpa !== null && avgCpa > 0) {
     for (const g of groups.values()) {
+      // Reklam grubu olmayan kampanyanın (PMax vb.) toplam satırı reklam grubu önerisi üretmez (derin bağlantısı yok).
+      if (g.adGroupId === CAMPAIGN_ONLY_AD_GROUP_ID) continue;
       if (g.conversions <= 0 || g.cost < ADS_RULES.minSpendHighCpa) continue;
       const cpa = g.cost / g.conversions;
       if (cpa > avgCpa * ADS_RULES.highCpaMultiplier) {

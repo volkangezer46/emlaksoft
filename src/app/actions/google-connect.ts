@@ -214,9 +214,22 @@ export async function disconnectGoogle(service: GoogleService): Promise<GoogleAc
   try {
     const r = await disconnectService(platformSettingsPort, svc.data, g.staff.id);
     if (!r.ok) return { error: r.error };
-    await logPlatformActivity({ actorId: g.staff.id, action: "google.disconnect", entityType: "google", meta: { service: svc.data, revoked: r.revoked } });
+    await logPlatformActivity({
+      actorId: g.staff.id,
+      action: "google.disconnect",
+      entityType: "google",
+      meta: { service: svc.data, revoked: r.revoked, note: r.note ?? null },
+    });
     refresh();
-    return { ok: true, message: `${GOOGLE_SERVICE_LABELS[svc.data]} bağlantısı kesildi.` };
+    const label = GOOGLE_SERVICE_LABELS[svc.data];
+    if (r.note === "shared-grant") {
+      return {
+        ok: true,
+        message: `${label} bağlantısı kesildi ve belirteç silindi. Diğer Google hizmeti aynı izni kullandığı için Google'daki izin iptal edilmedi; o hizmeti de kestiğinizde izin tümüyle iptal edilir.`,
+      };
+    }
+    if (r.note === "plaintext") return { ok: true, message: `${label} için bozuk (şifresiz) kayıt silindi. Yeniden bağlayabilirsiniz.` };
+    return { ok: true, message: `${label} bağlantısı kesildi.` };
   } catch (e) {
     return failure(e, "Bağlantı kesilemedi; lütfen tekrar deneyin.");
   }

@@ -22,7 +22,7 @@ export default async function GoogleAdsPage({ searchParams }: { searchParams?: P
   const sp = (await searchParams) ?? {};
   const period: AdsPeriod = sp.donem === "90" ? 90 : 30;
 
-  const view = await readConnectionView();
+  const view = await readConnectionView({ adsCustomerId: true });
   const card = serviceCard(view, "ads");
   const linked = card.status !== "bagli_degil";
 
@@ -38,7 +38,8 @@ export default async function GoogleAdsPage({ searchParams }: { searchParams?: P
 
   const dashboard = rows ? buildAdsDashboard(rows, signups ?? []) : null;
   const recRows = period === 30 ? rows : recentRows;
-  const recommendations = recRows ? adsRecommendations(recRows) : [];
+  const customerId = view.adsCustomerId;
+  const recommendations = recRows ? adsRecommendations(recRows, customerId) : [];
 
-  return <AdsView data={{ card, period, customerId: null, dashboard, recommendations, readonly }} />;
+  return <AdsView data={{ card, period, customerId, dashboard, recommendations, readonly }} />;
 }
