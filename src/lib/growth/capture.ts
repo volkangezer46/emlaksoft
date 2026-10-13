@@ -32,7 +32,7 @@ export async function captureAndRedirect(req: NextRequest, touch: RefTouch | nul
 }
 
 /**
- * signUp sonrası TEK çağrı: form gizli alanları + çerez → ilk dokunuş atfı. ASLA fırlatmaz.
+ * signUp sonrası TEK çağrı: form gizli alanları + çerez → ilk/son dokunuş atfı (atıfsız kayıtta da satır yazılır). ASLA fırlatmaz.
  * Çerez kullanıldıktan sonra silinir.
  */
 export async function recordSignupAttributionFromRequest(tenantId: string, formData: FormData): Promise<void> {
@@ -44,6 +44,11 @@ export async function recordSignupAttributionFromRequest(tenantId: string, formD
       utm_source: String(formData.get("utm_source") ?? ""),
       utm_medium: String(formData.get("utm_medium") ?? ""),
       utm_campaign: String(formData.get("utm_campaign") ?? ""),
+      // Ölçüm istemcisinin /kayit bağlantısına eklediği atıf (yalnız atıf taşıma açıkken gelir; sunucuda yeniden doğrulanır).
+      utm_term: String(formData.get("utm_term") ?? ""),
+      utm_content: String(formData.get("utm_content") ?? ""),
+      src_host: String(formData.get("src_host") ?? ""),
+      lp: String(formData.get("lp") ?? ""),
     });
     await recordSignupAttributionSafe(tenantId, input);
     jar.delete(REF_COOKIE);

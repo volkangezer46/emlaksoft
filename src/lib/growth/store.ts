@@ -34,7 +34,7 @@ import {
 } from "@/lib/growth/settings";
 import {
   generateReferralCode,
-  hasAttribution,
+  signupAttributionColumns,
   type SignupAttributionInput,
 } from "@/lib/growth/attribution";
 
@@ -149,12 +149,13 @@ export async function ensureReferralCode(tenantId: string): Promise<{ code: stri
 }
 
 /**
- * Yeni kayıt olan ofis için ilk-dokunuş atıfını yazar. ASLA fırlatmaz: kayıt akışını bozmamalıdır.
- * Program kapalıysa ofis daveti/ortak atfı yazılmaz (yalnız UTM etiketi saklanır).
+ * Yeni kayıt olan ofis için atıf satırını yazar. ASLA fırlatmaz: kayıt akışını bozmamalıdır.
+ * Atıf olmasa da satır yazılır (kanal `direct` ya da `unknown`): kayıt hunisinde "kaynağı bilinmeyen kayıt" sayılabilsin.
+ * Program kapalıysa ofis daveti/ortak atfı (ref_kind) yazılmaz; kanal etiketi yine yazılır (ödül yalnız ref_kind'e bağlı).
+ * Ek sütunlar (20261013003210) henüz yoksa satır eski sütunlarla yazılır.
  */
 export async function recordSignupAttributionSafe(tenantId: string, input: SignupAttributionInput): Promise<void> {
   try {
-    if (!hasAttribution(input)) return;
     const admin = createAdminClient();
     const flags = await getGrowthFlags();
     let refKind: string = "none";
@@ -181,9 +182,7 @@ export async function recordSignupAttributionSafe(tenantId: string, input: Signu
         referrerTenantId = t.data.id as string;
       }
     }
-    if (refKind === "none" && !input.utm_source && !input.utm_medium && !input.utm_campaign) return;
-
-    const { error } = await admin.from("signup_attributions").insert({
+    const base = {
       tenant_id: tenantId,
       ref_kind: refKind,
       referrer_tenant_id: referrerTenantId,
@@ -192,7 +191,12 @@ export async function recordSignupAttributionSafe(tenantId: string, input: Signu
       utm_medium: input.utm_medium,
       utm_campaign: input.utm_campaign,
       first_seen_at: new Date().toISOString(),
-    });
+    };
+    let { error } = await admin.from("signup_attributions").insert({ ...base, ...signupAttributionColumns(input) });
+    // 42703: ek sütunlar yok (migration 20261013003210 uygulanmamış) → eski sütunlarla yaz.
+    if (error?.code === "42703" || error?.code === "PGRST204") {
+      ({ error } = await admin.from("signup_attributions").insert(base));
+    }
     if (error && !isMissingTableError(error)) console.error("recordSignupAttribution", error.message);
     // Hoş geldin kredisi: kayıtta VERİLMEZ (SQL 'awaiting_first_payment' döner); davet edilenin İLK GERÇEK ÖDEMESİNDE
     // growth_register_referral verir (yalnız ödeme yapan aktif davetçi + yeni müşteri). Güvenli kanca: kaydı bozmaz.

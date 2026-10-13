@@ -130,6 +130,22 @@ const MANUAL_REVIEW: Record<string, { tenantFilter?: TenantFilter; evidence: str
     evidence:
       "platform_ai_quota_take RPC'si yalnız platform_ai_quota (tenant_id yok; anahtar/dönem/sayaç) satırını artırır; çağıranlar SEO AI önerisi (super_admin kapısı) ve platform danışmanı (requirePlatformModule); migration 20261013003100",
   },
+  "src/lib/measure/buffer.ts::doFlush": {
+    tenantFilter: "uygulanamaz",
+    evidence: "SP3 ölçüm tamponu: analytics_ingest RPC'si yalnız public_pageviews_daily/web_vitals_daily günlük sayaçlarını (tenant_id YOK, IP/çerez yok) toplu artırır; migration 20261013003200",
+  },
+  "src/lib/measure/maintenance.ts::runMeasureMaintenance": {
+    tenantFilter: "uygulanamaz",
+    evidence: "tek çağıran api/cron/olcum-bakim (CRON_SECRET); analytics_prune yalnız ölçüm sayaç tablolarını (tenant_id YOK) budar",
+  },
+  "src/lib/measure/field-data.ts::readVitalsSummary": {
+    tenantFilter: "uygulanamaz",
+    evidence: "tek çağıran src/app/admin/site/hiz/saha/page.tsx (requirePlatformModule seo); analytics_vitals_summary yalnız web_vitals_daily histogramını (tenant_id YOK) okur",
+  },
+  "src/lib/growth-analytics/funnel.ts::readGrowthFunnel": {
+    tenantFilter: "uygulanamaz",
+    evidence: "çağıranlar admin/site/reklam (requirePlatformModule seo) ve measure/collector (platform sağlık); platform_growth_funnel platform geneli toplam (kanal başına sayı) döner, ofis satırı/kimliği döndürmez; migration 20261013003220",
+  },
   "src/lib/geo-province-sync.ts::failClaimedJob": {
     tenantFilter: "uygulanamaz",
     evidence: "yalnız runGeoProvinceSyncWorker <- api/cron/geo-province-sync (CRON_SECRET dosya düzeyi çıkarım); global il/ilçe iş kuyruğu (RPC gövdesi doğrulanmadı)",

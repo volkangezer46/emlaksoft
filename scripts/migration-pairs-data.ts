@@ -307,6 +307,10 @@ const F = {
   siteIssues: "20261013003000_site_issues.sql",
   // SP2 (2026-10-13): platform AI kotasi (SEO AI onerisi + platform danismani; yeni tablo + atomik RPC).
   platformAiQuota: "20261013003100_platform_ai_quota.sql",
+  // SP3 (2026-10-13): birinci taraf olcum (cerezsiz sayac + hiz histogrami), kayit atfi genisletmesi, huni RPC'si.
+  publicMeasurement: "20261013003200_public_measurement.sql",
+  signupAttributionExt: "20261013003210_signup_attribution_ext.sql",
+  growthFunnel: "20261013003220_growth_funnel.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -519,6 +523,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.portalRulesLearn]: "ek", // yalniz service_role fonksiyonlari (pt_rules_learn, pt_rules_publish_system, pt_learning_retention); kod fonksiyon yokken cron adimini 'skipped' gecer
     [F.siteIssues]: "ek", // yeni tablolar site_issues + site_optimizer_actions (RLS acik, politika yok, yalniz service_role) + site_issues_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken Kokpit "kurulum bekliyor"
     [F.platformAiQuota]: "ek", // yeni tablo platform_ai_quota (RLS acik, politika yok, yalniz service_role) + SECURITY DEFINER platform_ai_quota_take; mevcut nesnelere dokunmaz, kod tablo yokken AI onerisi kapali kalir
+    [F.publicMeasurement]: "ek", // 2 yeni tablo (public_pageviews_daily, web_vitals_daily; RLS acik, politika yok, yalniz service_role) + analytics_ingest/analytics_prune/analytics_vitals_summary RPC'leri; mevcut nesnelere dokunmaz, kod tablo yokken 10 dk arayla yeniden dener
+    [F.signupAttributionExt]: "ek", // signup_attributions'a 6 nullable sutun (channel, src_host, utm_term, utm_content, first_touch, last_touch) + uzunluk/desen CHECK'leri (landing_path dahil); gclid YOK; tablo 0 satir, geriye donuk doldurma yok
+    [F.growthFunnel]: "ek", // yeni salt-okunur SECURITY DEFINER RPC platform_growth_funnel (yalniz service_role; platform_dashboard_rollups deseni); tablo/politika/veri degismez
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -703,9 +710,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // order 59 bilerek bos: ACL onarimi migration degil (tek seferlik betik + npm run check:acl).
     { id: "DB1-rls-initplan-fsbo-staff", order: 60, title: "RLS InitPlan sarmasi: fsbo_*, platform personeli ve destek v2 politikalari (20261012002800 SONRASI; anlam ayni, davranis)", files: [F.rlsInitplanFsboStaff] },
     { id: "DB3-indeks-hijyeni", order: 61, title: "11 kopya indeks dususu + 12 tabloya tenant_id indeksi (CONCURRENTLY yok, kucuk veri; sira serbest, ek)", files: [F.tenantIndexesDedupe] },
+    { id: "SP3-birinci-taraf-olcum", order: 65, title: "Birinci taraf olcum: sayac/hiz tablolari + ingest/prune RPC, kayit atfi sutunlari, huni RPC'si (003220, 003200 ve 003210 SONRASI; KOD YAYININDAN ONCE uygulanir; kod tablo/sutun yokken eski yola duser; ek)", files: [F.publicMeasurement, F.signupAttributionExt, F.growthFunnel] },
     { id: "AP7-platform-mrr-gunluk", order: 63, title: "Platform MRR gunluk anlik goruntusu platform_mrr_daily (yalniz public.tenants'a bagli, o da temel tablo; KOD YAYININDAN ONCE uygulanir, kod tablo yokken 'veri yok'; sira serbest, ek)", files: [F.platformMrrDaily] },
-    { id: "SP1-buyume-kokpiti", order: 65, title: "Buyume Kokpiti: site_issues + site_optimizer_actions + site_issues_prune (yalniz service_role; kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteIssues] },
-    { id: "SP2-platform-ai-kotasi", order: 66, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
+    { id: "SP1-buyume-kokpiti", order: 66, title: "Buyume Kokpiti: site_issues + site_optimizer_actions + site_issues_prune (yalniz service_role; kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteIssues] },
+    { id: "SP2-platform-ai-kotasi", order: 67, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
@@ -897,6 +905,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.portalRulesRpcs, F.portalRulesCore],
     [F.portalRulesLearn, F.portalRulesCore],
     [F.portalRulesCore, F.portalTransferSessions],
+    // SP3: huni RPC'si sayac tablosunu (003200) ve signup_attributions.channel sutununu (003210) okur.
+    [F.growthFunnel, F.publicMeasurement],
+    [F.growthFunnel, F.signupAttributionExt],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

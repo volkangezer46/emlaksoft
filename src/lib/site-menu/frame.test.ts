@@ -21,6 +21,8 @@ vi.mock("@/lib/seo/store", () => ({
     global: { organization: { name: "EmlakSoft", legalName: "", logo: "", sameAs: ["https://www.instagram.com/emlaksoft"], email: "destek@emlaksoft.com.tr", phone: "05321234567" } },
   }),
 }));
+// Ölçüm etiketi (SP3 <PublicMeasure />) ayrı sözleşmeyle testlenir (public-measure.test.ts); çerçeve golden'ı onsuz kalır.
+vi.mock("@/components/public-measure/public-measure", () => ({ PublicMeasure: () => null }));
 vi.mock("@/lib/clock", async (orig) => {
   const mod = await orig<typeof import("@/lib/clock")>();
   // Sabit an: 2026-10-13 12:00 (TR). Golden yıl ve tarihe bağlı olmasın.

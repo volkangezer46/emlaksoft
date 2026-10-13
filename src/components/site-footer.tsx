@@ -10,6 +10,7 @@ import { splitYear, toPublicCtas, toPublicMenu } from "@/lib/site-menu/public";
 import { checkPageHref, isExternalHref, type CtaLink, type FooterBadgeIcon } from "@/lib/site-menu/schema-core";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
 import { SpriteIcon } from "@/components/icons/sprite-icon";
+import { PublicMeasure } from "@/components/public-measure/public-measure";
 
 /**
  * Alt bilgi sütunları, marka bloğu (açıklama, güven rozetleri, düğme, telif ve yasal not) ve mobil alt çubuk düğmeleri
@@ -93,6 +94,7 @@ export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: b
         <FootCta cta={ctas.mobileLogin} className="mk-sticky-login">{ctas.mobileLogin.label}</FootCta>
         <FootCta cta={ctas.mobileTrial} className="mk-btn mk-btn-grad">{ctas.mobileTrial.label || trialCtaMobileLabel(trialDays)}</FootCta>
       </div>
+      <PublicMeasure />
     </footer>
   );
 }

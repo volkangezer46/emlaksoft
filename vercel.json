@@ -150,6 +150,10 @@
       "schedule": "12,42 * * * *"
     },
     {
+      "path": "/api/cron/olcum-bakim",
+      "schedule": "40 2 * * *"
+    },
+    {
       "path": "/api/cron/yayin-zamanlayici",
       "schedule": "*/5 * * * *"
     }
