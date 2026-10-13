@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { useRouter } from "next/navigation";
 import {
   Building2,
+  FileText,
   LifeBuoy,
   Search,
   Settings,
@@ -19,7 +20,7 @@ import { createRecentsStore, matchesQuery, OPEN_PALETTE_EVENT } from "@/lib/pale
 
 type Hit = {
   id: string;
-  type: "tenant" | "member" | "ticket" | "setting";
+  type: "tenant" | "member" | "ticket" | "setting" | "invoice";
   title: string;
   subtitle: string;
   href: string;
@@ -28,8 +29,8 @@ type Hit = {
 // Yalnız yetkili sayfalar kaydedilir ve gösterilir (kayıt içeriği KVKK gereği saklanmaz).
 const recentsStore = createRecentsStore("admin_palette_recents");
 
-const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy, setting: Settings };
-const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi", setting: "Ayar" };
+const typeIcon = { tenant: Building2, member: User, ticket: LifeBuoy, setting: Settings, invoice: FileText };
+const typeLabel = { tenant: "Ofis", member: "Kullanıcı", ticket: "Destek talebi", setting: "Ayar", invoice: "Fatura" };
 
 /**
  * Yönetim komut paleti gövdesi (arama, sonuçlar, son görülenler). Üst çubuk bunu `command-palette-lazy.tsx` hafif
