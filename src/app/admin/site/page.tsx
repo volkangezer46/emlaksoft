@@ -180,7 +180,7 @@ export default async function AdminSiteHubPage() {
                       <div className="min-w-0 text-sm">
                         <p className="font-bold text-ink-950">
                           {surface.label} · {h.label}
-                          {isLive ? <span className="ml-2 rounded-full bg-mint-500/15 px-2 py-0.5 text-[11px] font-bold text-mint-700">Canlı</span> : null}
+                          {isLive ? <span className="ml-2 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-700">Canlı</span> : null}
                         </p>
                         <p className="text-xs text-text-faint">
                           {fmt(h.at)}

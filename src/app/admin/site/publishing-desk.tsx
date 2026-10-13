@@ -45,16 +45,16 @@ function DiffRows({ diff }: { diff: DiffPreview | null }) {
         {diff.rows.map((r) => (
           <li key={`${r.kind}:${r.path}`} className="space-y-1.5 p-3">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${KIND[r.kind]?.cls ?? ""}`}>{KIND[r.kind]?.text ?? r.kind}</span>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${KIND[r.kind]?.cls ?? ""}`}>{KIND[r.kind]?.text ?? r.kind}</span>
               <code className="break-all text-xs font-semibold text-ink-950">{r.path}</code>
             </div>
             <div className="grid gap-1.5 text-xs sm:grid-cols-2">
               <p className="break-words rounded-[var(--radius-control)] bg-danger-500/5 p-2 text-text-muted">
-                <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-text-faint">Eski</span>
+                <span className="mb-0.5 block text-xs font-bold uppercase tracking-wide text-text-faint">Eski</span>
                 {r.before}
               </p>
               <p className="break-words rounded-[var(--radius-control)] bg-mint-500/10 p-2 text-ink-950">
-                <span className="mb-0.5 block text-[10px] font-bold uppercase tracking-wide text-text-faint">Yeni</span>
+                <span className="mb-0.5 block text-xs font-bold uppercase tracking-wide text-text-faint">Yeni</span>
                 {r.after}
               </p>
             </div>

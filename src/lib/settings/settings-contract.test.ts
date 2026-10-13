@@ -39,6 +39,8 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/app/admin/ai-kullanim/actions.ts": "AI kredi maliyet tablosu (kendi ekranı)",
   "src/lib/evds.ts": "TÜFE tablosunun EVDS otomatik doldurması (platform-tufe ile aynı anahtar; resmî satırları ezmez, cron)",
   "src/lib/insights/engine.ts": "içgörü motoru tur imleci (ayar değil, cron durum işaretçisi; tek anahtar, ofis kimliği)",
+  "src/lib/publishing/store.ts":
+    "yayın masası zamanlama kuyruğu (publishing.scheduled; ayar değil, iş kuyruğu kaydı — insights/engine imleci gibi; yazım publishing cron'u ve yetkili Yayın masası eylemleriyle, her işlem denetim izli)",
   "src/app/actions/platform-security.ts":
     "güvenlik anahtarları (demo girişi, personel MFA + geçiş süresi, bakım kapsamı; kendi ekranı Personel > Güvenlik politikası). write_setting RPC ile settings_history'ye düşer; env tavanı ve kendini kilitleme koruması registry codec'iyle ifade edilemez",
 };
