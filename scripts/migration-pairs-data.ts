@@ -349,6 +349,8 @@ const F = {
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
   // eski suresiz bakiyeler 12 aylik partiye doner. fulfill govdelerine DOKUNMAZ (sure fatura meta'sindan okunur). Kod sema yokken eski akisa duser; paket satisi kapali kalir.
   efCreditLots: "20261010000300_ef_credit_lots_expiry.sql",
+  // EP3 (2026-10-13): Bakanlik (EIDS) e-postalari: ofise ozel alma adresi + islenmis e-posta kayitlari (yalniz service_role yazar).
+  eidsInbound: "20261013007200_eids_inbound.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -550,6 +552,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.ad11SecurityHardening]: "siki", // platform_audit_logs append-only tetik (UPDATE/DELETE/TRUNCATE yasak; FK set-null istisnasi) + 4 nullable kolon; platform_impersonation_sessions'a 3 nullable kolon; yeni tablolar (platform_impersonation_history, backup_runs, restore_drills; yalniz service_role) + 2 service_role RPC; kod tablolar yokken eski yola duser
     [F.siteMedia]: "ek", // yeni ozel kova site-media (raster mime, 8 MB) + site_media tablosu (RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "kurulum bekliyor" + gorselsiz ana sayfa
     [F.pushSubscriptionsRepairFirst]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
+    [F.eidsInbound]: "ek", // 2 yeni tablo eids_inbound_addresses/eids_inbound_messages (RLS: ofis ici okuma, yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.googleData]: "ek", // 3 yeni platform tablosu (RLS acik, politika yok, yalniz service_role) + google_data_prune/seo_gsc_summary (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "veri yok"
     [F.subscriptionOps]: "davranis", // kapasite tetikleyicileri + effective_seat_limit ofise ozel istisnayi sayar (istisna yokken sonuc ayni); yeni tablo tenant_entitlement_overrides (RLS+FORCE, personel okur, service_role yazar) + 4 nullable sutun
@@ -748,6 +751,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AD11-guvenlik-yedek", order: 81, title: "AD11 guvenlik sertlestirmesi: denetim izi append-only + ip/ua/once/sonra, destek erisimi gecmisi (gerekce+bilet), backup_runs/restore_drills, personel oturum RPC'leri (bagimsiz; kod tablolar yokken eski yola duser; sira serbest, siki)", files: [F.ad11SecurityHardening] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
     { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions ilk onarimi (canlida 004910 oncesi uygulandi): eksik tablo asil tanimla idempotent kurulur; 004910 politikayi sikilastirir (sira serbest, ek)", files: [F.pushSubscriptionsRepairFirst] },
+    { id: "EP3-eids-eposta-alimi", order: 93, title: "Bakanlik (EIDS) e-posta alimi: eids_inbound_addresses + eids_inbound_messages (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'kurulum bekliyor'; EP2 olay defteriyle FK yok, sira serbest, ek)", files: [F.eidsInbound] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "SP5-google-veri", order: 69, title: "Google baglanti merkezi: seo_gsc_daily, seo_url_inspections, ads_daily_metrics + google_data_prune/seo_gsc_summary (bagimsiz; kod tablolar yokken bos durum, cron baglanti yokken atlar; sira serbest, ek)", files: [F.googleData] },
     { id: "AD1-abonelik-operasyon", order: 71, title: "Abonelik operasyon konsolu: tenant_entitlement_overrides + tenant_entitlement_resolve, kapasite tetikleyicileri ve effective_seat_limit istisnayi sayar (20260825000600 govdesi md5 on-kosullu), subscriptions.commitment_end_at/cancel_reason_code/cancel_note, invoices.checkout_error (KOD YAYININDAN ONCE ya da SONRA; kod sutun/tablo yokken 'kurulum bekliyor'; davranis)", files: [F.subscriptionOps] },
