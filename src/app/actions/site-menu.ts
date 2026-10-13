@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
-import { runAfterPublish } from "@/lib/publishing/after-publish";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -84,6 +84,7 @@ export async function publishSiteMenu(label: string): Promise<SiteMenuActionResu
 
   const note = String(label ?? "").trim().slice(0, 80) || "Yayın";
   const entry = { id: randomBytes(6).toString("hex"), at: new Date(now()).toISOString(), by: staff.full_name || staff.email, label: note };
+  const beforeDigests = await captureLiveDigests(["/"]);
   const res = await publishConfig(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
 
@@ -95,7 +96,7 @@ export async function publishSiteMenu(label: string): Promise<SiteMenuActionResu
     meta: { label: note, groups: config.groups.length },
   });
   refreshLive();
-  after(() => runAfterPublish({ surface: "sitemenu", kind: "publish", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "sitemenu", kind: "publish", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, issues };
 }
 
@@ -131,6 +132,7 @@ export async function rollbackSiteMenu(versionId: string): Promise<SiteMenuActio
     by: staff.full_name || staff.email,
     label: `Geri dönüş: ${version.label}`.slice(0, 80),
   };
+  const beforeDigests = await captureLiveDigests(["/"]);
   const res = await publishConfig(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
 
@@ -142,7 +144,7 @@ export async function rollbackSiteMenu(versionId: string): Promise<SiteMenuActio
     meta: { label: version.label },
   });
   refreshLive();
-  after(() => runAfterPublish({ surface: "sitemenu", kind: "restore", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "sitemenu", kind: "restore", publishRef: entry.id, livePaths: ["/"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config };
 }
 
@@ -153,12 +155,14 @@ export async function resetSiteMenuToDefault(): Promise<SiteMenuActionResult> {
   const rl = await checkRateLimit(`site-menu-publish:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
 
+  const beforeDigests = await captureLiveDigests(["/"]);
   const res = await resetToDefault({ id: randomBytes(6).toString("hex"), at: new Date(now()).toISOString(), by: staff.full_name || staff.email }, staff.id);
   if (!res.ok) return { error: res.error };
   await pruneMedia(staff.id);
 
   await logPlatformActivity({ actorId: staff.id, action: "site_menu.reset", entityType: "site_menu", entityId: "default" });
   refreshLive();
+  afterSafe(() => runAfterPublish({ surface: "sitemenu", kind: "reset", publishRef: "default", livePaths: ["/"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config: defaultSiteMenu() };
 }
 

@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
-import { runAfterPublish } from "@/lib/publishing/after-publish";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -67,11 +67,12 @@ export async function publishPricingPage(label: string): Promise<PricingPageActi
   if (!config || hasErrors(issues)) return { error: "Taslakta hatalar var; düzeltmeden yayınlanamaz.", issues };
   const note = String(label ?? "").trim().slice(0, 80) || "Yayın";
   const entry = { id: randomBytes(6).toString("hex"), at: entryNow(), by: who(staff), label: note };
+  const beforeDigests = await captureLiveDigests(["/fiyatlar"]);
   const res = await pricingPageStore.publish(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: staff.id, action: "pricing_page.publish", entityType: "pricing_page", entityId: entry.id, meta: { label: note } });
   refreshLive();
-  after(() => runAfterPublish({ surface: "pricingpage", kind: "publish", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "pricingpage", kind: "publish", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, issues };
 }
 
@@ -86,11 +87,12 @@ export async function rollbackPricingPage(versionId: string): Promise<PricingPag
   const { config, issues } = validatePricingPage(version.cfg);
   if (!config || hasErrors(issues)) return { error: "Bu sürüm artık kurallara uymuyor; geri dönülemiyor.", issues };
   const entry = { id: randomBytes(6).toString("hex"), at: entryNow(), by: who(staff), label: `Geri dönüş: ${version.label}`.slice(0, 80) };
+  const beforeDigests = await captureLiveDigests(["/fiyatlar"]);
   const res = await pricingPageStore.publish(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: staff.id, action: "pricing_page.rollback", entityType: "pricing_page", entityId: version.id, meta: { label: version.label } });
   refreshLive();
-  after(() => runAfterPublish({ surface: "pricingpage", kind: "restore", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "pricingpage", kind: "restore", publishRef: entry.id, livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config };
 }
 
@@ -100,9 +102,11 @@ export async function resetPricingPageToDefault(): Promise<PricingPageActionResu
   if (!staff) return { error: READONLY };
   const rl = await checkRateLimit(`pricing-page-publish:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
+  const beforeDigests = await captureLiveDigests(["/fiyatlar"]);
   const res = await pricingPageStore.resetToDefault({ id: randomBytes(6).toString("hex"), at: entryNow(), by: who(staff) }, staff.id);
   if (!res.ok) return { error: res.error };
   await logPlatformActivity({ actorId: staff.id, action: "pricing_page.reset", entityType: "pricing_page", entityId: "default" });
   refreshLive();
+  afterSafe(() => runAfterPublish({ surface: "pricingpage", kind: "reset", publishRef: "default", livePaths: ["/fiyatlar"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config: defaultPricingPage() };
 }

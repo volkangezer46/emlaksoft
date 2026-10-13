@@ -338,7 +338,8 @@ export function PublishAllButton() {
 
   const publish = () =>
     startTransition(async () => {
-      const res = await publishAllDrafts();
+      // Yalnız önizlenen taslaklar: sunucu taslak özeti değişmişse o yüzeyi yayınlamaz.
+      const res = await publishAllDrafts((preview?.groups ?? []).map((g) => ({ surface: g.surface, hash: g.hash })));
       if (res.error) {
         setError(res.error);
         return;

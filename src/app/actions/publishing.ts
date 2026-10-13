@@ -2,12 +2,12 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { runAfterPublish } from "@/lib/publishing/after-publish";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { diffJson, moreLabel, previewValue, type DiffKind } from "@/lib/publishing/diff";
 import {
   MAX_PENDING,
@@ -26,7 +26,8 @@ import { publishDraftsSequential } from "@/lib/site-issues/publish-all";
  * YAYIN MASASI eylemleri (/admin/site): taslağı zamanla, zamanlamayı iptal et, fark önizle, önceki sürüme dön.
  * Yetki: yüzeyin modülü (requirePlatformModule) + o editörün bugünkü yazma kuralı (yalnız süper admin yazar).
  * Fark önizlemesi salt okumadır (modül yeterli). Her yazma denetim izine düşer. Canlıyı değiştiren her başarılı yol
- * (yayınla, geri dön; toplu yayın optimizer.ts'te) sonunda yayın sonrası zincirini (`runAfterPublish`) `after()` ile başlatır.
+ * (yayınla, geri dön; toplu yayın optimizer.ts'te) yazımdan önce canlı tabanı alır (`captureLiveDigests`) ve sonunda yayın
+ * sonrası zincirini (`runAfterPublish`) `afterSafe()` ile başlatır.
  */
 
 export type PublishingResult = { ok?: boolean; error?: string; warning?: string; needsConfirm?: boolean };
@@ -220,6 +221,8 @@ export async function restoreVersion(surfaceId: string, historyId: string): Prom
   const rl = await checkRateLimit(`publishing-restore:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
 
+  const livePaths = surface.livePaths.map((p) => p.path);
+  const beforeDigests = await captureLiveDigests(livePaths);
   const res = await surface.restore(String(historyId ?? ""), staff.id, staff.full_name || staff.email);
   if (!res.ok) return { error: res.error };
 
@@ -231,7 +234,8 @@ export async function restoreVersion(surfaceId: string, historyId: string): Prom
     meta: { label: res.label, cfgHash: hashOf(res.cfg) },
   });
   refreshLive(surface);
-  after(() => runAfterPublish({ surface: surface.id, kind: "restore", publishRef: hashOf(res.cfg).slice(0, 16), livePaths: surface.livePaths.map((p) => p.path), actorId: staff.id, source: "staff" }));
+  const publishRef = hashOf(res.cfg).slice(0, 16);
+  afterSafe(() => runAfterPublish({ surface: surface.id, kind: "restore", publishRef, livePaths, actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true };
 }
 
@@ -246,7 +250,11 @@ export async function publishDraftNow(surfaceId: string): Promise<PublishingResu
   const [item] = await publishDraftsSequential(
     [surface],
     { id: staff.id, name: staff.full_name || staff.email, source: "staff" },
-    { label: "Yayın masasından yayın", onPublished: (ev) => after(() => runAfterPublish(ev)) },
+    {
+      label: "Yayın masasından yayın",
+      captureBefore: (paths) => captureLiveDigests(paths),
+      onPublished: (ev) => afterSafe(() => runAfterPublish(ev), "yayın sonrası zinciri"),
+    },
   );
   if (!item?.ok) return { error: item?.message ?? "Yayınlanamadı." };
   if (item.skipped) return { error: "Yayınlanacak taslak yok; taslak canlı sürümle aynı." };

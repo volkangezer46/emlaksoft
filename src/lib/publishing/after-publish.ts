@@ -7,11 +7,12 @@ import { readActions, recordOptimizerAction } from "@/lib/site-issues/store";
 import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from "@/lib/site-issues/types";
 
 /**
- * YAYIN SONRASI ZİNCİRİ (K3): her başarılı yayın, geri dönüş ve toplu yayından sonra HOOKS `order` sırasıyla çalışır.
+ * YAYIN SONRASI ZİNCİRİ (K3): her başarılı yayın, geri dönüş, varsayılana dönüş, yayından kaldırma ve toplu yayından sonra HOOKS `order` sırasıyla çalışır.
  * Her kanca try/catch + 10 sn zaman aşımıyla yalıtılır; biri hata verse de sonrakiler sürer ve YAYIN SONUCU ASLA
  * etkilenmez (`runAfterPublish` hiçbir durumda fırlatmaz). Sonuç `site_optimizer_actions` (kind "after_publish") ve
  * denetim izine (`publishing.after_publish`) yazılır.
- * Çağrı: server action'da başarılı yayından sonra tek satır `after(() => runAfterPublish(...))`; cron'da `await` + süre sınırı.
+ * Çağrı: server action'da yazımdan önce `captureLiveDigests` (taban), başarılı yayından sonra
+ * `afterSafe(() => runAfterPublish(...), "yayın sonrası zinciri")`; cron'da `await` + süre sınırı (tabansız).
  * Yerleşik kanca `verify` (order 20). Diğer paketler kendi kancalarını (statik tazeleme order 10, IndexNow ...) S2/S4
  * dikişinde HOOKS'a ekler.
  */
@@ -19,6 +20,8 @@ import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from
 export const HOOK_TIMEOUT_MS = 10_000;
 const VERIFY_MAX_PATHS = 5;
 const VERIFY_FETCH_TIMEOUT_MS = 6_000;
+/** Yayın öncesi taban yayını bekletir: kısa tutulur. */
+const BASELINE_FETCH_TIMEOUT_MS = 2_500;
 const VERIFY_MAX_BYTES = 1_500_000;
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -30,7 +33,8 @@ export function trClock(ms: number): string {
 
 /**
  * Gövde özeti: istekten isteğe değişen parçalar (CSP nonce, betik içerikleri, derleme kimliği) atılır; yalnız görünen
- * işaretleme özetlenir. Yayın gerçekten yansıdıysa özet yayın öncesinden farklı olur.
+ * işaretleme özetlenir. Yayın gerçekten yansıdıysa özet yayın öncesinden farklı olur. Sınır: sayfada zamana bağlı
+ * görünür içerik varsa özet yayından bağımsız da değişebilir.
  */
 export function bodyDigest(html: string): string {
   const stable = html
@@ -44,18 +48,19 @@ export function bodyDigest(html: string): string {
 
 export type VerifyPath = { path: string; status: number; digest: string | null; changed: boolean | null };
 
+type FetchPage = (path: string) => Promise<{ status: number; body: string } | null>;
+
 type VerifyDeps = {
-  fetchPage(path: string): Promise<{ status: number; body: string } | null>;
-  previousDigests(surface: string): Promise<Record<string, string>>;
+  fetchPage: FetchPage;
   nowMs(): number;
 };
 
-async function fetchOwnPage(path: string): Promise<{ status: number; body: string } | null> {
+async function fetchOwnPage(path: string, timeoutMs = VERIFY_FETCH_TIMEOUT_MS): Promise<{ status: number; body: string } | null> {
   try {
     const res = await fetchOwnOriginInspect(
       new URL(path, getBaseUrl()).toString(),
       { method: "GET", cache: "no-store", headers: { "User-Agent": "EmlakSoftYayinDogrulama/1.0", Accept: "text/html" } },
-      { timeoutMs: VERIFY_FETCH_TIMEOUT_MS },
+      { timeoutMs },
     );
     let body = "";
     try {
@@ -69,24 +74,51 @@ async function fetchOwnPage(path: string): Promise<{ status: number; body: strin
   }
 }
 
+/**
+ * YAYIN ÖNCESİ TABAN: canlı yolların gövde özeti, yayın yazımından HEMEN ÖNCE alınır ve olaya `beforeDigests` olarak
+ * eklenir. Kısa süre sınırlı (yayını bekletmesin); alınamayan yol tabansız kalır ve doğrulama bunu dürüstçe söyler.
+ * ASLA fırlatmaz.
+ */
+export async function captureLiveDigests(paths: readonly string[], fetchPage: FetchPage = (p) => fetchOwnPage(p, BASELINE_FETCH_TIMEOUT_MS)): Promise<Record<string, string>> {
+  const uniq = [...new Set(paths)].slice(0, VERIFY_MAX_PATHS);
+  const pairs = await Promise.all(
+    uniq.map(async (path) => {
+      try {
+        const page = await fetchPage(path);
+        return page && page.status === 200 ? ([path, bodyDigest(page.body)] as const) : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return Object.fromEntries(pairs.filter((x): x is readonly [string, string] => x !== null));
+}
+
 type VerifyDetail = { paths?: VerifyPath[]; baseline?: Record<string, string> };
 
 /**
- * Yayın öncesi canlının özeti yerine geçen taban: aynı yüzeyin son doğrulaması başarılıysa onun özetleri (o anki canlı);
- * "henüz yansımadı" ise onun kullandığı taban (tekrar denemede karşılaştırma yine yayın öncesine göre yapılır).
+ * "Tekrar dene" için taban: aynı yüzeyin SON doğrulamasının kaydettiği yayın öncesi taban (o yayının gerçek öncesi).
+ * Başka yüzeyin doğrulama özeti ya da sonraki bir canlı özet taban olarak KULLANILMAZ.
  */
-async function lastDigests(surface: string): Promise<Record<string, string>> {
-  const r = await readActions({ kinds: ["after_publish"], limit: 20 });
-  const hit = r.data.find((a) => a.target === surface);
-  const verify = ((hit?.after as { hooks?: { id: string; ok: boolean; detail?: VerifyDetail }[] } | null)?.hooks ?? []).find((h) => h.id === "verify");
-  if (!verify) return {};
-  if (!verify.ok && verify.detail?.baseline) return verify.detail.baseline;
-  return Object.fromEntries((verify.detail?.paths ?? []).filter((p) => p.digest).map((p) => [p.path, p.digest!]));
+export async function lastBaseline(surface: string): Promise<Record<string, string>> {
+  try {
+    const r = await readActions({ kinds: ["after_publish"], target: surface, limit: 5 });
+    for (const a of r.data) {
+      const verify = ((a.after as { hooks?: { id: string; detail?: VerifyDetail }[] } | null)?.hooks ?? []).find((h) => h.id === "verify");
+      if (verify) return verify.detail?.baseline ?? {};
+    }
+  } catch {
+    /* taban okunamazsa tabansız doğrulama */
+  }
+  return {};
 }
 
-const defaultVerifyDeps: VerifyDeps = { fetchPage: fetchOwnPage, previousDigests: lastDigests, nowMs: now };
+const defaultVerifyDeps: VerifyDeps = { fetchPage: (p) => fetchOwnPage(p), nowMs: now };
 
-/** Canlı doğrulama: her yol HTTP 200 dönmeli ve gövde özeti yayın öncesinden farklı olmalı. */
+/**
+ * Canlı doğrulama: her yol HTTP 200 dönmeli ve en az bir yolun gövde özeti yayın öncesi tabandan (`beforeDigests`)
+ * farklı olmalı. Taban yoksa "doğrulandı" DENMEZ; yalnız HTTP 200 olduğu, karşılaştırma yapılamadığı söylenir.
+ */
 export function createVerifyHook(deps: VerifyDeps = defaultVerifyDeps): AfterPublishHook {
   return {
     id: "verify",
@@ -94,7 +126,7 @@ export function createVerifyHook(deps: VerifyDeps = defaultVerifyDeps): AfterPub
     async run(ev) {
       const paths = [...new Set(ev.livePaths)].slice(0, VERIFY_MAX_PATHS);
       if (!paths.length) return { ok: true, message: "Doğrulanacak herkese açık yol yok." };
-      const before = ev.beforeDigests ?? (await deps.previousDigests(ev.surface).catch(() => ({}) as Record<string, string>));
+      const before = ev.beforeDigests ?? {};
       const results: VerifyPath[] = await Promise.all(
         paths.map(async (path) => {
           const page = await deps.fetchPage(path);
@@ -104,16 +136,17 @@ export function createVerifyHook(deps: VerifyDeps = defaultVerifyDeps): AfterPub
           return { path, status: page.status, digest, changed: digest && prev ? digest !== prev : null };
         }),
       );
-      // Önceki özet yoksa yalnız HTTP 200 aranır (ilk doğrulama); varsa en az bir yol değişmiş olmalı.
-      const all200 = results.every((r) => r.status === 200);
+      const detail = { paths: results, baseline: before };
+      // Yayından kaldırma: yol artık 404/410 dönmeli.
+      if (ev.kind === "unpublish") {
+        const gone = results.every((r) => r.status === 404 || r.status === 410);
+        return { ok: gone, message: gone ? `Canlıdan kaldırıldı ${trClock(deps.nowMs())}` : "Henüz yansımadı — tekrar dene", detail };
+      }
+      if (!results.every((r) => r.status === 200)) return { ok: false, message: "Henüz yansımadı — tekrar dene", detail };
       const known = results.filter((r) => r.changed !== null);
-      const reflected = known.length === 0 || known.some((r) => r.changed);
-      const ok = all200 && reflected;
-      return {
-        ok,
-        message: ok ? `Canlıda doğrulandı ${trClock(deps.nowMs())}` : "Henüz yansımadı — tekrar dene",
-        detail: { paths: results, baseline: before },
-      };
+      if (known.length === 0) return { ok: true, message: `HTTP 200 (karşılaştırma tabanı yok) ${trClock(deps.nowMs())}`, detail };
+      const ok = known.some((r) => r.changed);
+      return { ok, message: ok ? `Canlıda doğrulandı ${trClock(deps.nowMs())}` : "Henüz yansımadı — tekrar dene", detail };
     },
   };
 }

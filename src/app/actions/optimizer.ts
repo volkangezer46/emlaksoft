@@ -1,15 +1,16 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
-import { after } from "next/server";
 import { z } from "zod";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
 import { platformCanAccess } from "@/lib/platform-access";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { HOOKS, runAfterPublish } from "@/lib/publishing/after-publish";
+import { HOOKS, captureLiveDigests, lastBaseline, runAfterPublish } from "@/lib/publishing/after-publish";
 import { diffJson, moreLabel, previewValue, type DiffKind } from "@/lib/publishing/diff";
+import { hashOf } from "@/lib/publishing/schedule";
 import { SURFACES, surfaceById } from "@/lib/publishing/surfaces";
 import { AUTOPILOT_KINDS, type AutopilotSettings } from "@/lib/site-issues/autopilot";
 import { readAutopilot, writeAutopilot } from "@/lib/site-issues/autopilot-server";
@@ -32,7 +33,7 @@ export type PlanRow = { issueId: string; kind: string; target: string; summary: 
 export type PrepareResult = OptimizerResult & { plans?: PlanRow[]; applied?: ApplyRow[] };
 export type ApplyRow = { issueId: string; ok: boolean; message: string; before: string | null; after: string | null; target: string };
 export type PublishAllResult = OptimizerResult & { items?: PublishAllItem[] };
-export type DraftDiffGroup = { surface: string; label: string; rows: { path: string; kind: DiffKind; before: string; after: string }[]; total: number; more: string };
+export type DraftDiffGroup = { surface: string; label: string; hash: string; rows: { path: string; kind: DiffKind; before: string; after: string }[]; total: number; more: string };
 export type AllDraftsPreview = OptimizerResult & { groups?: DraftDiffGroup[] };
 
 const SUPER_ONLY = "Bu işlemi yalnız süper admin yapabilir; bu hesap salt okunur.";
@@ -210,6 +211,8 @@ export async function setAutopilot(input: { enabled: boolean; publish?: boolean;
 
 /* ---------- Toplu yayın ---------- */
 
+const surfaceSchema = z.string().trim().min(1).max(40);
+
 const visibleSurfaces = (role: Parameters<typeof platformCanAccess>[0]) => SURFACES.filter((s) => platformCanAccess(role, s.module));
 
 /** Tüm yüzeylerin bekleyen taslak farkları tek listede (mevcut fark motoru). Salt okuma. */
@@ -226,6 +229,7 @@ export async function previewAllDrafts(): Promise<AllDraftsPreview> {
     groups.push({
       surface: s.id,
       label: s.label,
+      hash: hashOf(st.draft),
       rows: d.rows.map((r) => ({ path: r.path, kind: r.kind, before: previewValue(r.before), after: previewValue(r.after) })),
       total: d.total,
       more: moreLabel(d.more),
@@ -234,17 +238,33 @@ export async function previewAllDrafts(): Promise<AllDraftsPreview> {
   return { ok: true, groups };
 }
 
-/** Bekleyen taslakları tek onayla SIRAYLA yayınlar; biri hata verirse diğerleri sürer (yalnız süper admin). */
-export async function publishAllDrafts(): Promise<PublishAllResult> {
+const publishAllSchema = z
+  .array(z.object({ surface: surfaceSchema, hash: z.string().trim().min(1).max(128) }))
+  .min(1)
+  .max(40);
+
+/**
+ * Önizlenen taslakları tek onayla SIRAYLA yayınlar; biri hata verirse diğerleri sürer (yalnız süper admin).
+ * Girdi önizlemedeki {yüzey, taslak özeti} listesidir: önizlemeden sonra değişen ya da önizlemede olmayan taslak YAYINLANMAZ.
+ */
+export async function publishAllDrafts(input: { surface: string; hash: string }[]): Promise<PublishAllResult> {
   const g = await gate(true);
   if ("error" in g) return { error: g.error };
+  const parsed = publishAllSchema.safeParse(input);
+  if (!parsed.success) return { error: "Önizleme bilgisi geçersiz; farkları yeniden önizleyin." };
+  const expected = Object.fromEntries(parsed.data.map((x) => [x.surface, x.hash]));
   const rl = await checkRateLimit(`publishing-all:${g.staff.id}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: TOO_FAST };
   const surfaces = visibleSurfaces(g.staff.role);
   const items = await publishDraftsSequential(
     surfaces,
     { id: g.staff.id, name: g.staff.full_name || g.staff.email, source: "staff" },
-    { label: "Toplu yayın (Kokpit)", onPublished: (ev) => after(() => runAfterPublish(ev)) },
+    {
+      label: "Toplu yayın (Kokpit)",
+      expected,
+      captureBefore: (paths) => captureLiveDigests(paths),
+      onPublished: (ev) => afterSafe(() => runAfterPublish(ev), "yayın sonrası zinciri"),
+    },
   );
   for (const it of items.filter((i) => !i.skipped)) {
     await recordOptimizerAction({ kind: "publish", source: "staff", target: it.surface, status: it.ok ? "yayinlandi" : "hata", after: { message: it.message }, actor: g.staff.id });
@@ -268,8 +288,6 @@ export async function publishAllDrafts(): Promise<PublishAllResult> {
   return { ok: true, items };
 }
 
-const surfaceSchema = z.string().trim().min(1).max(40);
-
 /** Yayın masası rozeti "Henüz yansımadı — tekrar dene": yalnız doğrulama kancasını yeniden çalıştırır. */
 export async function recheckLive(surfaceId: string): Promise<OptimizerResult & { message?: string }> {
   const g = await gate(false);
@@ -279,8 +297,10 @@ export async function recheckLive(surfaceId: string): Promise<OptimizerResult & 
   if (!s) return { error: "Bilinmeyen yüzey." };
   const rl = await checkRateLimit(`optimizer-verify:${g.staff.id}`, { limit: 30, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: TOO_FAST };
+  // Taban: bu yüzeyin son yayınında kaydedilen yayın öncesi özet (başka yüzeyin ya da sonraki canlının özeti değil).
+  const beforeDigests = await lastBaseline(s.id);
   const r = await runAfterPublish(
-    { surface: s.id, kind: "publish", livePaths: s.livePaths.map((p) => p.path), actorId: g.staff.id, source: "staff" },
+    { surface: s.id, kind: "publish", livePaths: s.livePaths.map((p) => p.path), actorId: g.staff.id, source: "staff", beforeDigests },
     { hooks: HOOKS.filter((h) => h.id === "verify") },
   );
   refresh();

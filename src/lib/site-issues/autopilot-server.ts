@@ -1,7 +1,7 @@
 import "server-only";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/platform-settings";
-import { runAfterPublish } from "@/lib/publishing/after-publish";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { SURFACES } from "@/lib/publishing/surfaces";
 import { AUTOPILOT_KEY, parseAutopilot, runAutopilot, type AutopilotRun, type AutopilotSettings } from "./autopilot";
 import { EXECUTORS } from "./executors";
@@ -35,7 +35,11 @@ export async function runAutopilotNow(): Promise<AutopilotRun> {
       publishDraftsSequential(
         SURFACES.filter((s) => ids.includes(s.id)),
         { ...actor, source: "otopilot" },
-        { label: "Otopilot yayını", onPublished: (ev) => after(() => runAfterPublish(ev)) },
+        {
+          label: "Otopilot yayını",
+          captureBefore: (paths) => captureLiveDigests(paths),
+          onPublished: (ev) => afterSafe(() => runAfterPublish(ev), "yayın sonrası zinciri"),
+        },
       ),
   });
 }

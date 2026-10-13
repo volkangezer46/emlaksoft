@@ -33,7 +33,12 @@ vi.mock("@/lib/site-issues/store", () => ({
   recordOptimizerAction: async () => (sideEffects.push("record"), true),
 }));
 vi.mock("@/lib/site-issues/collectors", () => ({ syncSiteIssues: async () => [] }));
-vi.mock("@/lib/publishing/after-publish", () => ({ HOOKS: [], runAfterPublish: async () => ({ ok: true, hooks: [] }) }));
+vi.mock("@/lib/publishing/after-publish", () => ({
+  HOOKS: [],
+  runAfterPublish: async () => ({ ok: true, hooks: [] }),
+  captureLiveDigests: async () => ({}),
+  lastBaseline: async () => ({}),
+}));
 vi.mock("@/lib/publishing/surfaces", () => ({ SURFACES: [], surfaceById: () => null }));
 
 import { ignoreIssue, publishAllDrafts, setAutopilot } from "@/app/actions/optimizer";
@@ -45,9 +50,19 @@ describe("optimizer.ts yetki", () => {
   });
 
   it("operasyon publishAllDrafts çağıramaz: yayın yapılmaz, kayıt düşmez", async () => {
-    const r = await publishAllDrafts();
+    const r = await publishAllDrafts([{ surface: "sitecontent", hash: "abc" }]);
     expect(r.error).toMatch(/yalnız süper admin/);
     expect(sideEffects).toEqual(["gate:seo"]);
+  });
+
+  it("süper admin: önizleme özeti olmadan toplu yayın yapılmaz (zod)", async () => {
+    role.current = "super_admin";
+    for (const bad of [[], [{ surface: "", hash: "x" }], [{ surface: "sitecontent" }]] as unknown as { surface: string; hash: string }[][]) {
+      expect((await publishAllDrafts(bad)).error).toMatch(/yeniden önizleyin/);
+    }
+    expect(sideEffects).not.toContain("publish");
+    expect(await publishAllDrafts([{ surface: "sitecontent", hash: "abc" }])).toEqual({ ok: true, items: [] });
+    expect(sideEffects).toContain("publish");
   });
 
   it("operasyon setAutopilot çağıramaz: ayar yazılmaz", async () => {

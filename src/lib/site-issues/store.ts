@@ -188,11 +188,12 @@ export async function recordOptimizerAction(input: OptimizerActionInput): Promis
 const ACTION_COLS = "id, kind, source, target, dry_run, status, before, after, publish_ref, actor, created_at";
 
 /** Son işlemler (tür/kaynak/zaman süzgeçli). Tablo yoksa boş. */
-export async function readActions(opts: { kinds?: readonly string[]; source?: OptimizerSource; sinceIso?: string; limit?: number }): Promise<Readable<OptimizerAction[]>> {
+export async function readActions(opts: { kinds?: readonly string[]; source?: OptimizerSource; target?: string; sinceIso?: string; limit?: number }): Promise<Readable<OptimizerAction[]>> {
   if (skipBecauseMissing()) return { available: false, data: [] };
   let q = db().from("site_optimizer_actions").select(ACTION_COLS).order("created_at", { ascending: false }).limit(opts.limit ?? 50);
   if (opts.kinds?.length) q = q.in("kind", [...opts.kinds]);
   if (opts.source) q = q.eq("source", opts.source);
+  if (opts.target) q = q.eq("target", opts.target);
   if (opts.sinceIso) q = q.gte("created_at", opts.sinceIso);
   const { data, error } = await q;
   if (error) return markMissing(error) ? { available: false, data: [] } : { available: false, data: [], error: error.message };

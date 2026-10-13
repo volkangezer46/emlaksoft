@@ -7,7 +7,13 @@ import type { AfterPublishEvent, OptimizerSource } from "./types";
  * yüzeyleri SIRAYLA Yayın masası bağdaştırıcısıyla (`surface.publish`) yayınlar. Biri hata verirse diğerleri sürer;
  * her yüzeyin sonucu ayrı döner. Başarılı her yayından sonra `onPublished` (yayın sonrası zinciri) çağrılır ve onun
  * hatası yayın sonucunu ETKİLEMEZ. Yetki ve denetim izi çağıranın işidir.
+ * `expected` verilirse (Kokpit "Farkı gördüm, tümünü yayınla") YALNIZ önizlenen yüzeyler ve yalnız taslak özeti önizlemedeki
+ * özetle hâlâ aynıysa yayınlanır: önizlemeden sonra değişen ya da önizlemede olmayan taslak görülmeden canlıya çıkmaz.
+ * `captureBefore` verilirse yüzeyin canlı yollarının yayın öncesi özeti yazımdan hemen önce alınır (doğrulama tabanı).
  */
+
+export const DRAFT_CHANGED = "Taslak önizlemeden sonra değişti; yeniden önizleyin.";
+export const NOT_PREVIEWED = "Önizlemede yoktu; yayınlanmadı.";
 
 export type PublishAllItem = { surface: string; label: string; ok: boolean; skipped?: boolean; message: string };
 
@@ -20,7 +26,13 @@ export function hasPendingDraft(state: { live: unknown | null; draft: unknown | 
 export async function publishDraftsSequential(
   surfaces: readonly Pick<PublishSurface, "id" | "label" | "livePaths" | "defaults" | "readState" | "publish">[],
   actor: { id: string; name: string; source: OptimizerSource },
-  opts: { label?: string; onPublished?: (ev: AfterPublishEvent) => void | Promise<void> } = {},
+  opts: {
+    label?: string;
+    onPublished?: (ev: AfterPublishEvent) => void | Promise<void>;
+    /** Yüzey kimliği → önizlenen taslağın `hashOf` özeti. */
+    expected?: Readonly<Record<string, string>>;
+    captureBefore?: (paths: readonly string[]) => Promise<Record<string, string>>;
+  } = {},
 ): Promise<PublishAllItem[]> {
   const out: PublishAllItem[] = [];
   const label = (opts.label ?? "Toplu yayın").slice(0, 80);
@@ -31,6 +43,19 @@ export async function publishDraftsSequential(
         out.push({ surface: s.id, label: s.label, ok: true, skipped: true, message: "Bekleyen taslak yok." });
         continue;
       }
+      if (opts.expected) {
+        const want = opts.expected[s.id];
+        if (want === undefined) {
+          out.push({ surface: s.id, label: s.label, ok: false, skipped: true, message: NOT_PREVIEWED });
+          continue;
+        }
+        if (want !== hashOf(state.draft)) {
+          out.push({ surface: s.id, label: s.label, ok: false, skipped: true, message: DRAFT_CHANGED });
+          continue;
+        }
+      }
+      const livePaths = s.livePaths.map((p) => p.path);
+      const beforeDigests = opts.captureBefore ? await opts.captureBefore(livePaths).catch(() => undefined) : undefined;
       const res = await s.publish(state.draft, actor.id, label, actor.name);
       if (!res.ok) {
         out.push({ surface: s.id, label: s.label, ok: false, message: res.error || "Yayınlanamadı." });
@@ -42,9 +67,10 @@ export async function publishDraftsSequential(
           surface: s.id,
           kind: "publish",
           publishRef: hashOf(state.draft).slice(0, 16),
-          livePaths: s.livePaths.map((p) => p.path),
+          livePaths,
           actorId: actor.id,
           source: actor.source,
+          ...(beforeDigests ? { beforeDigests } : {}),
         });
       } catch {
         // Yayın sonrası zinciri yayının sonucunu değiştirmez.

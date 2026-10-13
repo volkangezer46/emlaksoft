@@ -2,9 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
-import { after } from "next/server";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
-import { runAfterPublish } from "@/lib/publishing/after-publish";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -76,12 +76,13 @@ export async function publishSiteContent(label: string): Promise<SiteContentActi
 
   const note = String(label ?? "").trim().slice(0, 80) || "Yayın";
   const entry = { id: randomBytes(6).toString("hex"), at: entryNow(), by: staff.full_name || staff.email, label: note };
+  const beforeDigests = await captureLiveDigests(["/", "/kayit"]);
   const res = await siteContentStore.publish(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.publish", entityType: "site_content", entityId: entry.id, meta: { label: note } });
   refreshLive();
-  after(() => runAfterPublish({ surface: "sitecontent", kind: "publish", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "publish", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, issues };
 }
 
@@ -112,12 +113,13 @@ export async function rollbackSiteContent(versionId: string): Promise<SiteConten
   if (!config || hasErrors(issues)) return { error: "Bu sürüm artık kurallara uymuyor; geri dönülemiyor.", issues };
 
   const entry = { id: randomBytes(6).toString("hex"), at: entryNow(), by: staff.full_name || staff.email, label: `Geri dönüş: ${version.label}`.slice(0, 80) };
+  const beforeDigests = await captureLiveDigests(["/", "/kayit"]);
   const res = await siteContentStore.publish(config, entry, staff.id);
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.rollback", entityType: "site_content", entityId: version.id, meta: { label: version.label } });
   refreshLive();
-  after(() => runAfterPublish({ surface: "sitecontent", kind: "restore", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff" }));
+  afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "restore", publishRef: entry.id, livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config };
 }
 
@@ -128,10 +130,12 @@ export async function resetSiteContentToDefault(): Promise<SiteContentActionResu
   const rl = await checkRateLimit(`site-content-publish:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
 
+  const beforeDigests = await captureLiveDigests(["/", "/kayit"]);
   const res = await siteContentStore.resetToDefault({ id: randomBytes(6).toString("hex"), at: entryNow(), by: staff.full_name || staff.email }, staff.id);
   if (!res.ok) return { error: res.error };
 
   await logPlatformActivity({ actorId: staff.id, action: "site_content.reset", entityType: "site_content", entityId: "default" });
   refreshLive();
+  afterSafe(() => runAfterPublish({ surface: "sitecontent", kind: "reset", publishRef: "default", livePaths: ["/", "/kayit"], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, config: defaultSiteContent() };
 }

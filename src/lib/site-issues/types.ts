@@ -141,13 +141,13 @@ export type IssueExecutor = {
 export type AfterPublishEvent = {
   /** Yayın yüzeyi: "sitecontent" | "sitemenu" | "sitepage" | "pricingpage" | ... */
   surface: string;
-  kind: "publish" | "restore" | "reset";
+  kind: "publish" | "restore" | "reset" | "unpublish";
   publishRef?: string | null;
   /** Canlıda değişen herkese açık yollar ("/", "/kayit", "/fiyatlar" ...). */
   livePaths: readonly string[];
   actorId: string | null;
   source: OptimizerSource;
-  /** Yayın öncesi gövde özetleri (yol → özet); yoksa son doğrulamanın özeti kullanılır. */
+  /** Yayın öncesi gövde özetleri (yol → özet; `captureLiveDigests`). Yoksa doğrulama karşılaştırmasız yapılır. */
   beforeDigests?: Record<string, string>;
 };
 
