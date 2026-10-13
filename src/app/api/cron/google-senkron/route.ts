@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { now } from "@/lib/clock";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 import { guardCron } from "@/lib/cron-run";
@@ -28,6 +29,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("google-senkron", req);
+  if (pausedRun) return pausedRun;
 
   const outcome = await runGoogleSync({
     port: platformSettingsPort,

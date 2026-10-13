@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { cleanupDirectFileUploads } from "@/lib/direct-file-upload-cleanup";
 import { cleanupAbandonedPublicUploads } from "@/lib/public-upload-cleanup";
 import { processStorageDeletionOutbox, storageDeletionQueueStats } from "@/lib/storage-deletion-outbox";
@@ -20,6 +21,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const denied = authorizeCron(request);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("direct-file-upload-cleanup", request);
+  if (pausedRun) return pausedRun;
 
   const outcome = await runCronSteps({
     directUploads: () => cleanupDirectFileUploads(),

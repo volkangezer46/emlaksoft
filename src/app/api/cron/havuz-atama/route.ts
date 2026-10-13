@@ -4,6 +4,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { runPoolSweep } from "@/lib/pool/system-assign";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { getDisabledModulesByTenant, tenantsDisabledFor } from "@/lib/modules/state";
 import { runControlStepFrequent } from "@/lib/listing-control/server/cron-steps";
 import { runLeadRoutingSweep } from "@/lib/lead-routing/server";
@@ -26,6 +27,8 @@ export const maxDuration = 300;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("havuz-atama", req);
+  if (pausedRun) return pausedRun;
   try {
     const admin = createAdminClient();
     const summary = await runPoolSweep(admin);

@@ -19,7 +19,13 @@ describe("cron strip model", () => {
     expect(classifyCron({ last_run_at: ago(90), last_status: "ok" }, 90, NOW)).toBe("ok");
   });
   it("sayım", () => {
-    expect(countByStatus(["ok", "ok", "error", "never"])).toEqual({ ok: 2, error: 1, stale: 0, never: 1 });
+    expect(countByStatus(["ok", "ok", "error", "never"])).toEqual({ ok: 2, error: 1, stale: 0, never: 1, paused: 0 });
+    expect(countByStatus(["paused", "ok"])).toEqual({ ok: 1, error: 0, stale: 0, never: 0, paused: 1 });
+  });
+  it("duraklatılan iş bayat/hata olsa da duraklatıldı sayılır", () => {
+    expect(classifyCron({ last_run_at: ago(500), last_status: "error" }, 90, NOW, true)).toBe("paused");
+    expect(classifyCron(undefined, 90, NOW, true)).toBe("paused");
+    expect(classifyCron({ last_run_at: ago(10), last_status: "ok" }, 90, NOW, false)).toBe("ok");
   });
   it("şema gauge: kontrol yoksa null", () => {
     expect(schemaGauge([])).toBeNull();

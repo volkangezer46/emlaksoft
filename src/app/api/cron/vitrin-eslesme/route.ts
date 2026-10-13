@@ -7,6 +7,7 @@ import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote } from "@
 import { notifyTenant } from "@/lib/notify";
 import { formatTurkishPhone } from "@/lib/phone";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 type SavedSearch = {
   id: string;
@@ -74,6 +75,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("vitrin-eslesme", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();

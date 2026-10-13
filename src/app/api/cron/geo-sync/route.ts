@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -42,6 +43,8 @@ const CHECKS: ReadonlyArray<{ key: string; label: string; severity: "danger" | "
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("geo-sync", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("geo_consistency_check");

@@ -319,6 +319,10 @@ const F = {
   emailLog: "20261013004600_email_log.sql",
   // Onarim (2026-10-13): push_subscriptions defterde var, canlida yoktu; idempotent yeniden kurulum.
   pushSubscriptionsRepair: "20261013006000_push_subscriptions_repair.sql",
+  // AD10 (2026-10-13): operasyon ve uyari merkezi (uyari kanal/kural/olay, cron_runs + duraklatma, host_metrics,
+  // hata triyaji sutunlari, record_error_occurrence p_release, salt-okunur DB konsolu RPC'leri) + push_subscriptions onarimi.
+  opsAlerts: "20261013004900_ops_alerts.sql",
+  pushSubscriptionsRepair: "20261013004910_push_subscriptions_repair.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
   // AD1 (2026-10-13): abonelik operasyon konsolu: ofise ozel limit istisnasi + cozucu, taahhut/iptal kodu, tahsil hata metni.
@@ -539,6 +543,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.publicMeasurement]: "ek", // 2 yeni tablo (public_pageviews_daily, web_vitals_daily; RLS acik, politika yok, yalniz service_role) + analytics_ingest/analytics_prune/analytics_vitals_summary RPC'leri; mevcut nesnelere dokunmaz, kod tablo yokken 10 dk arayla yeniden dener
     [F.signupAttributionExt]: "ek", // signup_attributions'a 6 nullable sutun (channel, src_host, utm_term, utm_content, first_touch, last_touch) + uzunluk/desen CHECK'leri (landing_path dahil); gclid YOK; tablo 0 satir, geriye donuk doldurma yok
     [F.growthFunnel]: "ek", // yeni salt-okunur SECURITY DEFINER RPC platform_growth_funnel (yalniz service_role; platform_dashboard_rollups deseni); tablo/politika/veri degismez
+    [F.opsAlerts]: "davranis", // 7 yeni tablo (RLS+FORCE, REVOKE; yalniz service_role) + error_logs'a 5 sutun (status varsayilan 'open', geri doldurma: cozulmusler 'resolved') + status/resolved_at esitleme tetikleyicisi + record_error_occurrence p_release (DEFAULT null; eski 9 argumanli cagri ayni) ve dakikalik sayac + 2 salt-okunur service_role RPC (ops_db_overview, ops_slow_queries); kod tablolar yokken "kurulum bekliyor", hata kaydi eski imzaya duser
+    [F.pushSubscriptionsRepair]: "ek", // canlida eksik push_subscriptions tablosu (ledger'da 20260722000013 uygulanmis gorunuyor) idempotent yeniden kurulur; politika current_tenant_id() + WITH CHECK; baska nesneye dokunmaz
     [F.siteMedia]: "ek", // yeni ozel kova site-media (raster mime, 8 MB) + site_media tablosu (RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "kurulum bekliyor" + gorselsiz ana sayfa
     [F.pushSubscriptionsRepair]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
@@ -735,6 +741,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "SP2-platform-ai-kotasi", order: 66, title: "Platform AI kotasi platform_ai_quota + platform_ai_quota_take RPC (bagimsiz; kod tablo yokken SEO AI onerisi 'kota kurulmadi' der; sira serbest, ek)", files: [F.platformAiQuota] },
     { id: "DB8-hazirlik-yoklamalari", order: 62, title: "plan_upgrade_ready / subscription_pause_ready: information_schema yerine pg_catalog sayimi (sonuc ayni; sira serbest)", files: [F.readyProbesPgCatalog] },
     { id: "PORTAL-ogrenen-kurallar", order: 64, title: "Ogrenen eklenti 0.6.0: kural setleri + oneri/oy + gozlem tablolari, JWT/personel RPC'leri, ogrenme/saklama (20261012002700 SONRASI; 002000 -> 002010 -> 002020 sirayla; kod tablolar yokken sets:[] / schema_pending; ek)", files: [F.portalRulesCore, F.portalRulesRpcs, F.portalRulesLearn] },
+    { id: "AD10-operasyon-uyari-merkezi", order: 80, title: "Operasyon ve uyari merkezi (uyari tablolari, cron_runs/duraklatma, host_metrics, hata triyaji, DB konsolu RPC) + push_subscriptions onarimi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'kurulum bekliyor'; 004900 -> 004910 sirayla, davranis)", files: [F.opsAlerts, F.pushSubscriptionsRepair] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
     { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions onarimi: canlida eksik tablo asil tanimla idempotent kurulur (sira serbest, ek)", files: [F.pushSubscriptionsRepair] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },

@@ -16,6 +16,8 @@ import { ERRORS_BULK_FORM_ID } from "./bulk-form-id";
 import { hrefWith, type Filters } from "./errors-href";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
+import { ErrorTriageForm } from "./error-triage";
+import { countOpenErrors, DURUM_TO_STATUS, isMissingColumn, TRIAGE_LABEL, type TriageStatus } from "./triage";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -32,7 +34,16 @@ type Row = {
   last_seen: string;
   resolved_at: string | null;
   tenant: { name: string } | { name: string }[] | null;
+  // Triyaj (AD10; migration yokken gelmez)
+  status?: TriageStatus;
+  assignee_id?: string | null;
+  note?: string | null;
+  release?: string | null;
+  snoozed_until?: string | null;
 };
+
+const BASE_COLS = "id, tenant_id, source, digest, message, stack, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)";
+const TRIAGE_COLS = `${BASE_COLS}, status, assignee_id, note, release, snoozed_until`;
 
 function rel<T>(v: T | T[] | null): T | null {
   if (!v) return null;
@@ -46,6 +57,11 @@ function ne_zaman(iso: string, simdi: number) {
   const sa = Math.round(dk / 60);
   if (sa < 24) return `${sa} sa önce`;
   return `${Math.round(sa / 24)} gün önce`;
+}
+
+function ne_zaman_ileri(iso: string, simdi: number) {
+  const sa = Math.max(0, Math.round((new Date(iso).getTime() - simdi) / 3_600_000));
+  return sa < 1 ? "az kaldı" : sa < 48 ? `${sa} sa kaldı` : `${Math.round(sa / 24)} gün kaldı`;
 }
 
 /*
@@ -100,21 +116,25 @@ export async function ErrorsView({
   const simdi = now();
 
   const admin = createAdminClient();
-  let listQ = admin
-    .from("error_logs")
-    .select("id, tenant_id, source, digest, message, stack, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)", {
-      count: "exact",
-    })
-    .order("last_seen", { ascending: false })
-    .range(...pageRange(sayfa));
-
-  listQ = cozulmusGoster ? listQ.not("resolved_at", "is", null) : listQ.is("resolved_at", null);
-  if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
-  if (kaynak) listQ = listQ.eq("source", kaynak);
-  if (ofis) listQ = listQ.eq("tenant_id", ofis);
-  if (q) listQ = listQ.or(orIlike(["message", "path"], q));
-  // Sürüm geçişi süzgeci: classify.ts ile aynı imzalar (ILIKE OR).
-  if (surumGecisi) listQ = listQ.or(VERSION_SKEW_PATTERNS.map((p) => orIlike(["message"], p)).join(","));
+  // Triyaj durumu (AD10): "Açık" = durum open; yok sayılan/ertelenen ayrı süzgeçte. Sütunlar yoksa (migration
+  // bekliyor) eski kural: açık = resolved_at IS NULL, çözülmüş = dolu.
+  const triageStatus: TriageStatus = DURUM_TO_STATUS[params.durum ?? ""] ?? "open";
+  const buildList = (triage: boolean) => {
+    let listQ = admin
+      .from("error_logs")
+      .select(triage ? TRIAGE_COLS : BASE_COLS, { count: "exact" })
+      .order("last_seen", { ascending: false })
+      .range(...pageRange(sayfa));
+    if (triage) listQ = listQ.eq("status", triageStatus);
+    else listQ = cozulmusGoster ? listQ.not("resolved_at", "is", null) : listQ.is("resolved_at", null);
+    if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
+    if (kaynak) listQ = listQ.eq("source", kaynak);
+    if (ofis) listQ = listQ.eq("tenant_id", ofis);
+    if (q) listQ = listQ.or(orIlike(["message", "path"], q));
+    // Sürüm geçişi süzgeci: classify.ts ile aynı imzalar (ILIKE OR).
+    if (surumGecisi) listQ = listQ.or(VERSION_SKEW_PATTERNS.map((p) => orIlike(["message"], p)).join(","));
+    return listQ;
+  };
 
   // "Son 1 saatte" kartı sayfa dilimine değil, aynı durum filtresindeki TÜM
   // kayıtlara bakar — sayfa 2'de yanlış sayı göstermesin.
@@ -124,15 +144,20 @@ export async function ErrorsView({
     .gte("last_seen", new Date(simdi - 3_600_000).toISOString());
   sonSaatQ = cozulmusGoster ? sonSaatQ.not("resolved_at", "is", null) : sonSaatQ.is("resolved_at", null);
 
-  const [{ data, count }, { count: acikSayi }, { count: sonSaatSayi }, ofisRes] = await Promise.all([
-    listQ,
-    admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null),
+  const [triageList, { count: acikSayi }, { count: sonSaatSayi }, ofisRes, staffRes] = await Promise.all([
+    buildList(true),
+    countOpenErrors(admin),
     sonSaatQ,
     ofis
       ? admin.from("tenants").select("name").eq("id", ofis).maybeSingle()
       : Promise.resolve({ data: null as { name: string } | null }),
+    admin.from("platform_staff").select("id, full_name").eq("is_active", true).order("full_name").limit(200),
   ]);
+  const triageReady = !isMissingColumn(triageList.error);
+  const { data, count } = triageReady ? triageList : await buildList(false);
   const ofisAdi = ofisRes.data?.name ?? null;
+  const staffList = ((staffRes.data ?? []) as { id: string; full_name: string | null }[]).map((st) => ({ id: st.id, name: st.full_name || st.id.slice(0, 8) }));
+  const staffName = new Map(staffList.map((st) => [st.id, st.name] as const));
 
   const rows = (data ?? []) as unknown as Row[];
   const { toplamOlay } = ozetle(rows);
@@ -173,12 +198,13 @@ export async function ErrorsView({
       <nav aria-label="Durum filtresi" className="flex flex-wrap gap-2 rounded-[var(--radius-card)] border border-line bg-surface p-3">
         {[
           { v: "", l: "Açık" },
+          ...(triageReady ? [{ v: "yoksayildi", l: "Yok sayıldı" }, { v: "ertelendi", l: "Ertelendi" }] : []),
           { v: "cozulmus", l: "Çözülmüş" },
         ].map((o) => (
           <FilterChip
             key={o.l}
             href={hrefWith({ ...base, durum: o.v || undefined })}
-            active={(o.v === "cozulmus") === cozulmusGoster}
+            active={triageReady ? DURUM_TO_STATUS[o.v] === triageStatus : (o.v === "cozulmus") === cozulmusGoster}
           >
             {o.l}
           </FilterChip>
@@ -255,7 +281,13 @@ export async function ErrorsView({
             <CheckCircle2 className="h-8 w-8" />
           </span>
           <h2 className="mt-5 font-display text-xl font-bold text-ink-950">
-            {sonBirSaat ? "Son 1 saatte kayıt yok" : cozulmusGoster ? "Çözülmüş kayıt yok" : "Açık hata yok"}
+            {sonBirSaat
+              ? "Son 1 saatte kayıt yok"
+              : cozulmusGoster
+                ? "Çözülmüş kayıt yok"
+                : triageReady && triageStatus !== "open"
+                  ? `${TRIAGE_LABEL[triageStatus]} kayıt yok`
+                  : "Açık hata yok"}
           </h2>
           <p className="mt-2 max-w-lg text-sm leading-relaxed text-text-muted">
             {sonBirSaat
@@ -315,7 +347,24 @@ export async function ErrorsView({
                         <span className="text-xs text-text-muted">Kiracı bilinmiyor</span>
                       )}
                     </p>
+                    {triageReady && (r.status !== "open" || r.assignee_id || r.release) ? (
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                        {r.status && r.status !== "open" ? (
+                          <Badge variant={r.status === "resolved" ? "success" : "info"}>
+                            {TRIAGE_LABEL[r.status]}
+                            {r.status === "snoozed" && r.snoozed_until ? ` · ${ne_zaman_ileri(r.snoozed_until, simdi)}` : ""}
+                          </Badge>
+                        ) : null}
+                        {r.assignee_id ? <span className="font-semibold text-ink-950">Atanan: {staffName.get(r.assignee_id) ?? "personel"}</span> : null}
+                        {r.release ? (
+                          <span className="numeric text-text-faint" title="Hatanın son görüldüğü yayın (RELEASE_SHA)">
+                            sürüm {r.release}
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
                     <p className="mt-2 break-words font-semibold text-ink-950">{r.message}</p>
+                    {triageReady && r.note ? <p className="mt-1 whitespace-pre-wrap break-words text-xs text-text-muted">Not: {r.note}</p> : null}
                     <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-faint">
                       {r.path ? <span className="numeric">{r.path}</span> : null}
                       <span>ilk: {ne_zaman(r.first_seen, simdi)}</span>
@@ -336,6 +385,9 @@ export async function ErrorsView({
                     <ResolveErrorButton id={r.id} />
                   )}
                 </div>
+                {triageReady ? (
+                  <ErrorTriageForm id={r.id} status={r.status ?? "open"} assigneeId={r.assignee_id ?? null} note={r.note ?? null} staff={staffList} />
+                ) : null}
                 {r.digest || r.stack ? (
                   <details className="group mt-3">
                     <summary className="flex w-fit cursor-pointer list-none items-center gap-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950 [&::-webkit-details-marker]:hidden">

@@ -6,13 +6,14 @@ const CELL_COLOR: Record<CronCellStatus, string> = {
   error: "var(--viz-neg)",
   stale: "var(--viz-5)",
   never: "var(--hairline-strong)",
+  paused: "var(--text-faint)",
 };
 
 export type CronStripItem = { job: string; label: string; status: CronCellStatus; when: string };
 
 /**
  * Cron durum şeridi: her iş küçük bir kare (son durum). Tıklayınca aynı sayfadaki iş satırına gider (#cron-<iş>).
- * Yalnız SON durum gösterilir; geçmiş çalışma kaydı tutulmadığı için sahte geçmiş çizilmez.
+ * Yalnız SON durum gösterilir; çalışma geçmişi (süre grafiği) iş satırındaki "Geçmiş" bağlantısındadır.
  */
 export function CronStatusStrip({ items }: { items: readonly CronStripItem[] }) {
   const counts = countByStatus(items.map((i) => i.status));
@@ -25,6 +26,7 @@ export function CronStatusStrip({ items }: { items: readonly CronStripItem[] }) 
           {counts.error ? ` · ${counts.error} hata` : ""}
           {counts.stale ? ` · ${counts.stale} gecikmiş` : ""}
           {counts.never ? ` · ${counts.never} hiç çalışmadı` : ""}
+          {counts.paused ? ` · ${counts.paused} duraklatıldı` : ""}
         </p>
       </div>
       <ul className="m-0 mt-3 grid list-none grid-cols-[repeat(auto-fill,minmax(1.5rem,1fr))] gap-1.5 p-0" style={{ minHeight: 28 }}>
@@ -47,7 +49,7 @@ export function CronStatusStrip({ items }: { items: readonly CronStripItem[] }) 
             {CRON_STATUS_LABEL[s]}
           </span>
         ))}
-        <span className="text-text-faint">Yalnız son durum tutulur; çalışma geçmişi kaydedilmez.</span>
+        <span className="text-text-faint">Kare son durumu gösterir; süre geçmişi için iş satırında “Geçmiş”.</span>
       </p>
     </section>
   );

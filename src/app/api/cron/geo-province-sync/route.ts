@@ -3,6 +3,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { runGeoProvinceSyncWorker } from "@/lib/geo-province-sync";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -10,6 +11,8 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   const denied = authorizeCron(request);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("geo-province-sync", request);
+  if (pausedRun) return pausedRun;
 
   try {
     const summary = await runGeoProvinceSyncWorker();

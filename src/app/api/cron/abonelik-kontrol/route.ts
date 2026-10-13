@@ -5,6 +5,7 @@ import { findNotifiedIds, insertNotifications, type NotificationRow } from "@/li
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { PLATFORM_SETTING_KEYS, parseTrialGraceDays } from "@/lib/platform-setting-keys";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { cronDeadline, isPastDeadline, guardCron } from "@/lib/cron-run";
 import { runLicenseReminders } from "@/lib/license-reminders";
 import { runOfferExpiryReminders } from "@/lib/offer-expiry-reminders";
@@ -35,6 +36,8 @@ const BILLING_HREF = "/app/abonelik";
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("abonelik-kontrol", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const startedMs = Date.now();

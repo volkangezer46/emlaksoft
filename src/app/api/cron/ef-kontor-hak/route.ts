@@ -29,6 +29,7 @@ import {
 } from "@/lib/ef-credits/plan-credits";
 import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 
 export const maxDuration = 300;
@@ -66,6 +67,8 @@ function chunks<T>(items: readonly T[], size: number): T[][] {
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("ef-kontor-hak", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
 

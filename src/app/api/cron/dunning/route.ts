@@ -7,6 +7,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor, failureNote } from "@/lib/cron-heartbeat-status";
 import { runAutoRenewPass } from "@/lib/billing/auto-renew";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 
 /**
  * DUNNING: gecikmiş ödemeler için kademeli tenant bildirimi (e-posta yok).
@@ -63,6 +64,8 @@ export const maxDuration = 300;
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("dunning", req);
+  if (pausedRun) return pausedRun;
 
   const admin = createAdminClient();
   const now = Date.now();

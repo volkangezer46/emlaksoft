@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
+import { beginCronRun } from "@/lib/cron-pause";
 import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,8 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
+  const pausedRun = await beginCronRun("ef-kontor-sweep", req);
+  if (pausedRun) return pausedRun;
 
   try {
     const result = await runBillingReconciliation(0, "ef_sweep");
