@@ -1,23 +1,28 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
+import { getSupportContact } from "@/lib/contact-info-server";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import { LegalPage, LegalSection } from "@/components/legal-page";
+
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/kvkk-aydinlatma");
 }
 
 // Not: alıcı/yurt dışı aktarım satırları ve veri sorumlusu ünvan/adres (VERBİS) alanları işletme sahibince doldurulur.
-export default function KvkkAydinlatmaPage() {
+export default async function KvkkAydinlatmaPage() {
+  const contact = await getSupportContact();
   return (
     <LegalPage
+      slug="kvkk-aydinlatma"
       title="KVKK Aydınlatma Metni"
       intro="6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca, EmlakSoft platformunu kullanan kişilerin kişisel verilerinin işlenmesine ilişkin aydınlatma metnidir."
     >
       <LegalSection no="1." title="Veri Sorumlusu">
         <p>
           Kişisel verileriniz, veri sorumlusu sıfatıyla EmlakSoft (&quot;Platform&quot;) tarafından aşağıda açıklanan
-          kapsamda işlenmektedir. İletişim: <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+          kapsamda işlenmektedir. İletişim: <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>
         </p>
       </LegalSection>
 
@@ -75,7 +80,7 @@ export default function KvkkAydinlatmaPage() {
           Kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silinmesini/yok edilmesini
           isteme, aktarıldığı üçüncü kişileri bilme, otomatik sistemlerle analiz sonucuna itiraz etme ve zarara
           uğramanız hâlinde giderim talep etme haklarına sahipsiniz. Taleplerinizi{" "}
-          <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>{" "}
+          <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>{" "}
           adresine iletebilirsiniz; başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır.
         </p>
       </LegalSection>

@@ -3,6 +3,9 @@ import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/kullanim-sartlari");
 }
@@ -10,6 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function KullanimSartlariPage() {
   return (
     <LegalPage
+      slug="kullanim-sartlari"
       title="Kullanım Şartları"
       intro="Bu şartlar, EmlakSoft platformuna üye olan ve kullanan tüm ofisler ve kullanıcılar için geçerli üyelik sözleşmesidir. Kayıt olarak bu şartları kabul etmiş sayılırsınız."
     >

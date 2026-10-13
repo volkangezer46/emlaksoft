@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { requireModulePage } from "@/lib/require-module-page";
-import { FIRST_30_INTRO, GLOSSARY, HELP_TABS, resolveHelpTab, type HelpTab } from "@/lib/help-content";
+import { FIRST_30_INTRO, HELP_TABS, resolveHelpTab, type GlossaryEntry, type HelpTab } from "@/lib/help-content";
+import { getHelpContent } from "@/lib/help-center/store";
 import { loadOnboardingState } from "../_home/data";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
@@ -28,12 +29,12 @@ function tabHref(tab: HelpTab) {
 
 /**
  * Yardım merkezi: Başlangıç (kurulum kontrol listesi), Rehberler (görev bazlı
- * adımlar), SSS ve Sözlük (jargon → ofis dili). İçerik tek kaynaktan gelir
- * (src/lib/help-content.ts); destek talepleri merkezin "Destek" sekmesidir (/app/destek).
+ * adımlar), SSS ve Sözlük (jargon → ofis dili). İçerik yardım merkezi CMS'inden gelir: koddaki taban
+ * (src/lib/help-content.ts, help-faq.ts) + yayındaki DB makaleleri (src/lib/help-center; /admin/site/yardim). Yayın
+ * önbellek etiketini tazeler: yeni makale hemen aranabilir. Destek talepleri merkezin "Destek" sekmesidir (/app/destek).
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string }> }) {
-  const { tenantId, perms } = await requireModulePage("support");
-  const sp = await searchParams;
+  const [{ tenantId, perms }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
   if (sp?.sekme === "destek") redirect("/app/destek");
   const tab = resolveHelpTab(sp?.sekme);
   const q = (sp?.q ?? "").slice(0, 100);
@@ -57,9 +58,9 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
 
       {tab === "baslangic" ? <TourPicker /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
-      {tab === "rehberler" ? <GuidesSearch initialQ={q} /> : null}
-      {tab === "sss" ? <FaqSearch initialQ={q} /> : null}
-      {tab === "sozluk" ? <GlossaryTab /> : null}
+      {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
+      {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
+      {tab === "sozluk" ? <GlossaryTab glossary={help.glossary} /> : null}
     </div>
   );
 }
@@ -126,14 +127,14 @@ async function StartTab({ tenantId, perms }: { tenantId: string | null; perms: E
   );
 }
 
-function GlossaryTab() {
+function GlossaryTab({ glossary }: { glossary: readonly GlossaryEntry[] }) {
   return (
     <section aria-label="Sözlük" className="space-y-3">
       <p className="text-sm text-text-muted">
         Ekranlarda gördüğünüz terimlerin ofis dilindeki karşılığı. Bir terimin yanındaki ? düğmesi sizi doğrudan buraya getirir.
       </p>
       <dl className="space-y-3">
-        {GLOSSARY.map((g) => (
+        {glossary.map((g) => (
           <div key={g.slug} id={g.slug} className={`${PANEL} scroll-mt-24 target:border-brand-600`}>
             <dt className="font-display text-base font-bold text-ink-950">
               {g.term}

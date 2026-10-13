@@ -3,6 +3,9 @@ import { buildMetadata } from "@/lib/seo/store";
 import Link from "next/link";
 import { LegalPage, LegalSection } from "@/components/legal-page";
 
+/** Sürümlü içerik ve şirket/destek bilgisi DB'den: yayın ya da ayar değişikliği etiketle anında, en geç 5 dk'da yansır. */
+export const revalidate = 300;
+
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/davet-kosullari");
 }
@@ -15,6 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function DavetKosullariPage() {
   return (
     <LegalPage
+      slug="davet-kosullari"
       title="Davet ve Ortaklık Programı Koşulları"
       intro="EmlakSoft'u başka bir ofise önerdiğinizde hesap kredisi kazanabileceğiniz davet programının koşullarıdır. Programa katılan ve davet bağlantısıyla kayıt olan herkes bu koşulları kabul etmiş sayılır."
       updated="5 Ekim 2026"

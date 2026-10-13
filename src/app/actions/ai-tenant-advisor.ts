@@ -13,6 +13,8 @@ import { buildAdvisorScope, gated, type AdvisorScope } from "@/lib/ai/advisor-sc
 import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
 import { faqContextForMessages, selectFaqForQuestion } from "@/lib/ai/faq-context";
+import { getHelpContent } from "@/lib/help-center/store";
+import type { FaqItem } from "@/lib/help-faq";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 // ---------------------------------------------------------------------------
@@ -315,7 +317,10 @@ async function callOpenAI(
   messages: TenantAdvisorMessage[],
   context: TenantAdvisorContext,
   audit: { tenantId: string; actorId: string },
+  faq?: readonly FaqItem[],
 ): Promise<string> {
+  // Ürün kullanımı SSS'si yardım merkezinden (kod + yayındaki DB makaleleri; AD12).
+  const faqCtx = faqContextForMessages(messages, faq);
   const { content } = await openAiChat({
     apiKey,
     purpose: "tenant_advisor",
@@ -331,7 +336,7 @@ async function callOpenAI(
         { role: "system", content: `OFİSİN GÜNCEL VERİLERİ:
 ${contextToText(context)}` },
         // Ürün kullanımı sorusu ise resmî SSS'den ilgili kayıtlar (eşleşme yoksa hiçbir şey eklenmez).
-        ...(faqContextForMessages(messages) ? [{ role: "system" as const, content: faqContextForMessages(messages) }] : []),
+        ...(faqCtx ? [{ role: "system" as const, content: faqCtx }] : []),
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
     },
@@ -355,7 +360,7 @@ function detectTopics(messages: TenantAdvisorMessage[]) {
   };
 }
 
-function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdvisorContext): string {
+function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdvisorContext, faq?: readonly FaqItem[]): string {
   const topic = detectTopics(messages);
   const focused = topic.call || topic.performance || topic.price || topic.tasks;
   const parts: string[] = [];
@@ -363,7 +368,7 @@ function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdviso
   // Yapay zeka yokken de ürün kullanımı sorusuna resmî SSS yanıtı (CRM konusu değilse; eşleşme yoksa eski davranış).
   if (!focused) {
     const lastQ = messages.filter((m) => m.role === "user").pop()?.content ?? "";
-    const hit = selectFaqForQuestion(lastQ, undefined, 1, 3)[0];
+    const hit = selectFaqForQuestion(lastQ, faq, 1, 3)[0];
     if (hit) return `**${hit.item.q}**\n${hit.item.a}${hit.item.href ? `\nİlgili sayfa: ${hit.item.href}` : ""}`;
   }
 
@@ -544,19 +549,19 @@ export async function askTenantAdvisor(
     return { reply: RATE_LIMIT_ERROR, usedAI: false, sessionId: sessionId ?? "" };
   }
 
-  const context = await buildTenantContext(gate.tenantId, await advisorScopeFor(gate));
+  const [context, { faq }] = await Promise.all([buildTenantContext(gate.tenantId, await advisorScopeFor(gate)), getHelpContent()]);
   const apiKey = await getOpenAiKey();
 
   let result: TenantAdvisorResult;
   if (apiKey) {
     try {
-      result = { reply: await callOpenAI(apiKey, clean, context, { tenantId: gate.tenantId, actorId: gate.userId }), usedAI: true };
+      result = { reply: await callOpenAI(apiKey, clean, context, { tenantId: gate.tenantId, actorId: gate.userId }, faq), usedAI: true };
     } catch (e) {
       console.error("askTenantAdvisor:openai", externalErrorMetadata(e));
-      result = { reply: fallbackTenantAdvisor(clean, context), usedAI: false };
+      result = { reply: fallbackTenantAdvisor(clean, context, faq), usedAI: false };
     }
   } else {
-    result = { reply: fallbackTenantAdvisor(clean, context), usedAI: false };
+    result = { reply: fallbackTenantAdvisor(clean, context, faq), usedAI: false };
   }
 
   // DB'ye kaydet (hata olursa sessizce geç — UI kırılmasın)
@@ -604,15 +609,16 @@ export async function prepareTenantAdvisorTurn(
     return { ok: false, error: RATE_LIMIT_ERROR, rateLimited: true };
   }
 
-  const context = await buildTenantContext(gate.tenantId, await advisorScopeFor(gate));
+  const [context, { faq }] = await Promise.all([buildTenantContext(gate.tenantId, await advisorScopeFor(gate)), getHelpContent()]);
+  const faqCtx = faqContextForMessages(clean, faq);
   return {
     ok: true,
     tenantId: gate.tenantId,
     userId: gate.userId,
     clean,
     systemPrompt: SYSTEM_PROMPT,
-    contextText: `OFİSİN GÜNCEL VERİLERİ:\n${contextToText(context)}${faqContextForMessages(clean) ? `\n\n${faqContextForMessages(clean)}` : ""}`,
-    fallbackReply: fallbackTenantAdvisor(clean, context),
+    contextText: `OFİSİN GÜNCEL VERİLERİ:\n${contextToText(context)}${faqCtx ? `\n\n${faqCtx}` : ""}`,
+    fallbackReply: fallbackTenantAdvisor(clean, context, faq),
     fallbackActions: fallbackAdvisorActions(clean, context),
     hotCustomers: context.hotLeads,
   };

@@ -1,24 +1,41 @@
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/contact-info";
 import Link from "next/link";
+import { getSupportContact } from "@/lib/contact-info-server";
+import { legalEntityFields } from "@/lib/legal-entity";
+import type { LegalDocSlug } from "@/lib/legal-docs/core";
+import { readPublishedLegalDoc } from "@/lib/legal-docs/store";
+import { LegalMarkupBody } from "@/components/legal-markup";
 import { Brand } from "@/components/brand/brand";
 import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
 
+const trDate = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" }).format(new Date(iso));
+
 /**
  * Ortak premium yasal sayfa düzeni — mevzuat sayfaları (KVKK, mesafeli satış,
  * çerez, iade...) tek tutarlı kurumsal şablondan çıkar.
+ *
+ * SÜRÜMLÜ İÇERİK (AD12): `slug` verilirse yayındaki DB sürümü (/admin/ayarlar/yasal, `legal_documents`) koddaki
+ * `children` yerine çizilir (başlık, giriş, son güncelleme = yayın tarihi). Yayında sürüm yoksa ya da tablo/DB
+ * okunamazsa koddaki metin (v1) aynen kalır. Destek e-postası ayar defterinden okunur (deploy gerekmez).
  */
-export function LegalPage({
+export async function LegalPage({
   title,
   intro,
   updated = "25 Temmuz 2026",
+  slug,
   children,
 }: {
   title: string;
   intro: string;
   updated?: string;
+  slug?: LegalDocSlug;
   children: React.ReactNode;
 }) {
+  const [contact, doc] = await Promise.all([getSupportContact(), slug ? readPublishedLegalDoc(slug) : null]);
+  const entity = doc && doc.body.includes("{{sirket_kimligi}}") ? await legalEntityFields() : [];
+  const shownTitle = doc?.title || title;
+  const shownIntro = doc?.intro || intro;
+  const shownUpdated = doc?.publishedAt ? trDate(doc.publishedAt) : updated;
   return (
     <main id="main-content" className="min-h-screen bg-canvas">
       {/* Kurumsal başlık bandı */}
@@ -35,15 +52,17 @@ export function LegalPage({
           <span className="mt-8 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/8 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-cyan-300">
             <FileText className="h-3.5 w-3.5" /> Yasal metin
           </span>
-          <h1 className="mt-3 font-display text-3xl font-extrabold sm:text-4xl">{title}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">{intro}</p>
-          <p className="mt-4 text-xs text-white/45">Son güncelleme: {updated}</p>
+          <h1 className="mt-3 font-display text-3xl font-extrabold sm:text-4xl">{shownTitle}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/65">{shownIntro}</p>
+          <p className="mt-4 text-xs text-white/45">Son güncelleme: {shownUpdated}</p>
         </div>
       </section>
 
       {/* Gövde */}
       <section className="mx-auto max-w-3xl px-6 py-12">
-        <article className="legal-body space-y-8">{children}</article>
+        <article className="legal-body space-y-8" data-legal-version={doc ? doc.version : 1}>
+          {doc ? <LegalMarkupBody body={doc.body} contact={contact} entity={entity} /> : children}
+        </article>
 
         <div className="mt-14 flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-5">
           <div className="flex items-center gap-3">
@@ -53,8 +72,8 @@ export function LegalPage({
               <p className="text-xs text-text-muted">Yasal metinlerle ilgili tüm sorularınız için bize yazın.</p>
             </div>
           </div>
-          <a href={SUPPORT_MAILTO} className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
-            {SUPPORT_EMAIL}
+          <a href={contact.mailto} className="inline-flex min-h-11 items-center rounded-[var(--radius-control)] bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700">
+            {contact.email}
           </a>
         </div>
 

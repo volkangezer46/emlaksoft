@@ -37,7 +37,7 @@ Zorunlu (eksikse `next build`/`next start` production'da başlamaz veya readines
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` | Secret yalnız sunucu; legacy anon/service_role kapalı |
 | `NEXT_PUBLIC_APP_URL` | Gerçek HTTPS origin |
-| `NEXT_PUBLIC_SUPPORT_EMAIL` | Opsiyonel. Yasal sayfalar, SSS, menü ve push konusunda görünen TEK destek e-postası (`src/lib/contact-info.ts`). Yoksa `destek@emlaksoft.app`. Gerçek posta kutusu hangi alan adındaysa o yazılır |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | ARTIK GEREKMEZ (AD12). Destek e-postası/telefon/WhatsApp ve şirket kimliği adminden girilir: /admin/ayarlar/yasal?sekme=sirket (ayar defteri `support.*`, `legal.entity_*`; deploy gerekmez). Tanımlıysa yalnız eski kurulum yedeği olarak okunur; sunucu yedeği `SUPPORT_EMAIL` / `SUPPORT_PHONE` / `SUPPORT_WHATSAPP` |
 | `OTP_HMAC_SECRET` | Bağımsız, >=32 byte; diğer sırlarla paylaşılmaz. Değişirse aktif OTP'ler için 5 dk pencere planla |
 | `TWO_FACTOR_COOKIE_SECRET` | Bağımsız, >=32 karakter |
 | `PROPERTY_MEDIA_SIGNING_SECRET` | Bağımsız, >=32 karakter |
