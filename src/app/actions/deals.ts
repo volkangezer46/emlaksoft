@@ -33,7 +33,7 @@ import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-f
 
 export type DealResult = { error?: string; ok?: boolean; dealId?: string };
 
-export const DEAL_STAGES = WORKFLOW_DEAL_STAGES;
+const DEAL_STAGES = WORKFLOW_DEAL_STAGES;
 export type { DealStage };
 
 export async function createPipelineDeal(formData: FormData): Promise<DealResult> {
@@ -498,7 +498,7 @@ export async function updateDealLinks(formData: FormData): Promise<DealResult> {
 // İşlem dosyası — kapora + masraf kalemleri (deal_costs)
 // ============================================================
 
-export const DEAL_COST_KINDS = ["kapora", "tapu_harci", "ekspertiz", "komisyon_dis", "diger"] as const;
+const DEAL_COST_KINDS = ["kapora", "tapu_harci", "ekspertiz", "komisyon_dis", "diger"] as const;
 export type DealCostKind = (typeof DEAL_COST_KINDS)[number];
 
 export type DealCost = {
