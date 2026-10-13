@@ -70,7 +70,10 @@ export const LEGAL_SETTING_DEFS: AnySettingDef[] = [
     category: "uyum",
     label: "Destek e-postası",
     description: "Yasal sayfalar ve askıya alınmış hesap ekranında gösterilen destek adresi.",
-    impact: "Yasal sayfalarda ≤30 sn içinde görünür. Boşsa sunucu yedeği, o da yoksa koddaki varsayılan adres kullanılır.",
+    impact:
+      "Yasal sayfalarda ≤30 sn içinde görünür. Boşsa sunucu yedeği, o da yoksa koddaki varsayılan adres kullanılır. " +
+      "DİKKAT: ana sayfa SSS'si ve site menüsü (destek bağlantısı, menü görseli) bu ayarı okumaz; derleme anındaki adresi " +
+      "(NEXT_PUBLIC_SUPPORT_EMAIL ya da koddaki varsayılan) gösterir. Bu yüzeylerde adres yalnız env değişip uygulama yeniden derlenince güncellenir.",
     risk: "high",
     envFallback: "SUPPORT_EMAIL",
   }),

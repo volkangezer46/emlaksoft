@@ -1,6 +1,8 @@
 "use server";
 
+import { updateTag } from "next/cache";
 import { headers } from "next/headers";
+import { legalConsentUserTag } from "@/lib/legal-docs/consent-cache";
 import { pendingReconsents } from "@/lib/legal-docs/core";
 import { insertConsents, readReconsentDocs, readUserConsentState } from "@/lib/legal-docs/store";
 import { clientIp } from "@/lib/rate-limit";
@@ -29,5 +31,8 @@ export async function acceptLegalUpdates(): Promise<{ ok: boolean; error?: strin
   const ok = await insertConsents(
     pending.map((p) => ({ userId: user.id, tenantId: state.tenantId, document: p.slug, version: p.version, ip: ip ? ip.slice(0, 128) : null, userAgent: ua })),
   );
-  return ok ? { ok: true } : { ok: false, error: "Onay kaydedilemedi; tekrar deneyin." };
+  if (!ok) return { ok: false, error: "Onay kaydedilemedi; tekrar deneyin." };
+  // Kullanıcıya özel bekleyen-onay önbelleği (kabuk kapısı) tazelenir: pencere bir sonraki gezinmede çıkmaz.
+  updateTag(legalConsentUserTag(user.id));
+  return { ok: true };
 }

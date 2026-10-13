@@ -1,11 +1,12 @@
-import { pendingReconsents } from "@/lib/legal-docs/core";
-import { readReconsentDocs, readUserConsentState } from "@/lib/legal-docs/store";
+import { readPendingReconsentsCached } from "@/lib/legal-docs/consent-cache";
+import { readReconsentDocs } from "@/lib/legal-docs/store";
 import { LegalReconsentModal } from "./legal-reconsent-modal";
 
 /**
  * /app kabuğunda yeniden onay kapısı (AD12). "Yeniden onay gerekli" olarak yayınlanmış bir yasal metin varsa ve
  * kullanıcı o sürümü (ya da yenisini) onaylamadıysa kapanmayan onay penceresi çıkar. HIZ: yeniden onay listesi
- * önbellekli (çoğu zaman boş → ek DB turu YOK); liste doluysa kullanıcının onayları tek turda okunur. Okuma hatası
+ * önbellekli (çoğu zaman boş → ek DB turu YOK); liste doluysa kullanıcının bekleyen onayları KULLANICIYA ÖZEL önbellekten
+ * gelir (userId + gerekli sürüm imzası; onay yazımı tazeler) → onay vermiş kullanıcı için de ek DB turu yok. Okuma hatası
  * kullanıcıyı kilitlemez (pencere çıkmaz, sonraki gezinmede yeniden denenir). Kabuktan ayrı Suspense sınırında akar.
  */
 export async function LegalReconsentGate({ userId }: { userId: string }) {
@@ -13,8 +14,7 @@ export async function LegalReconsentGate({ userId }: { userId: string }) {
   if (!docs.length) return null;
   let pending;
   try {
-    const state = await readUserConsentState(userId, docs.map((d) => d.slug));
-    pending = pendingReconsents(docs, state.consents, state.userCreatedAt);
+    pending = await readPendingReconsentsCached(userId, docs);
   } catch {
     return null;
   }

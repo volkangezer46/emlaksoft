@@ -14,11 +14,13 @@ import { describe, expect, it } from "vitest";
  *   yalnız `"use cache: private"` ise serbest: o sunucuda saklanmaz).
  * - Her `unstable_cache(` çağrısı aşağıdaki kayıtta sınıflandırılır: `platform` (ofisten bağımsız; çağrı metninde
  *   oturum istemcisi/çerez/başlık/tenant okuması yok) ya da `tenant` (çağrı metni anahtarda ya da argümanda
- *   `tenantId`/`tenant.id` taşır). Yeni kullanım kayda girmeden test kırılır: önce sınıflandır, gerekçe yaz.
+ *   `tenantId`/`tenant.id` taşır) ya da `user` (yalnız o kullanıcıya ait veri; çağrı metni anahtarda `userId` taşır,
+ *   oturum/çerez/başlık okumaz — kimlik çağırandan argümanla gelir). Yeni kullanım kayda girmeden test kırılır: önce
+ *   sınıflandır, gerekçe yaz.
  */
 const SRC = join(process.cwd(), "src");
 
-type Scope = "platform" | "tenant";
+type Scope = "platform" | "tenant" | "user";
 /** Dosya -> beklenen `unstable_cache(` çağrı sayısı + kapsam. Anahtarlar mevcut önbellek anahtarlarıdır (değiştirilmez). */
 const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why: string }> = {
   "src/app/admin/page.tsx": { calls: 1, scope: "platform", why: "platform paneli toplamları (service_role, ofis filtresi yok)" },
@@ -52,6 +54,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/try-credits/settings.ts": { calls: 1, scope: "platform", why: "TL kredi tavanı" },
   "src/lib/vitrin-seo/store.ts": { calls: 1, scope: "platform", why: "vitrin kalıcı noindex slug listesi (platform_settings)" },
   "src/lib/legal-docs/store.ts": { calls: 2, scope: "platform", why: "AD12: yayındaki yasal belge (slug anahtarda) + yeniden onay listesi; kullanıcı onayları önbellek DIŞINDA" },
+  "src/lib/legal-docs/consent-cache.ts": { calls: 1, scope: "user", why: "AD12: kullanıcının bekleyen yeniden onayları; anahtar userId + gerekli sürüm imzası, service_role, oturum okuması yok" },
   "src/lib/legal-constants/store.ts": { calls: 1, scope: "platform", why: "AD12: mevzuat sabiti tarihli değer geçmişi (platform geneli)" },
   "src/lib/help-center/store.ts": { calls: 1, scope: "platform", why: "AD12: yardım merkezi yayındaki makaleleri (platform geneli; oylar önbellek DIŞINDA)" },
 };
@@ -137,6 +140,19 @@ describe("önbellek tenant izolasyonu", () => {
       for (const call of unstableCacheCalls(text)) {
         const keyed = /\btenantId\b|\btenant\.id\b|\bscope\b/.test(call);
         if (!keyed || /\bcookies\(|\bheaders\(|\bcreateClient\(/.test(call)) offenders.push(`${file}: ${call.slice(0, 80)}…`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("kullanıcı kapsamlı önbellek çağrıları anahtarda userId taşır ve oturum/çerez/başlık okumaz", () => {
+    const offenders: string[] = [];
+    for (const { rel: file, text } of ALL) {
+      const entry = UNSTABLE_CACHE_REGISTRY[file];
+      if (!entry || entry.scope !== "user") continue;
+      for (const call of unstableCacheCalls(text)) {
+        const keyed = /\[[^\]]*\buserId\b[^\]]*\]/.test(call);
+        if (!keyed || SESSION_READ.test(call)) offenders.push(`${file}: ${call.slice(0, 80)}…`);
       }
     }
     expect(offenders).toEqual([]);
