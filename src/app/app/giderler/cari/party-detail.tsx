@@ -16,6 +16,7 @@ import {
   partyKindLabel,
   partyKindOf,
   statementDocLabel,
+  statementRpcArgs,
   toKurus,
   type StatementLine,
 } from "@/lib/finance/party/aging";
@@ -35,10 +36,21 @@ import { NewOpenItemButton, type SettleAccount } from "./settle-dialog";
  * Bakiye = ekstrenin son yürüyen bakiyesi (tarih süzgeci yokken); liste bakiyesiyle aynı kaynaktır.
  */
 
-const PARTY_COLUMNS = "id, kind, name, tax_id, phone, email, note, customer_id, user_id, archived_at";
-const STATEMENT_START = "2000-01-01";
+const PARTY_COLUMNS = "id, kind, name, tax_id, iban_last4, phone, email, note, customer_id, user_id, archived_at";
 
-type PartyRecord = EditableParty & { customer_id: string | null; user_id: string | null };
+type PartyRecord = EditableParty;
+
+/** Düzenleme formundaki bağ seçicileri için bağlı müşteri / kullanıcının adı (yalnız düzenleme yetkisi varsa okunur). */
+async function loadLinkLabels(supabase: SupabaseClient, party: PartyRecord): Promise<{ customer: string | null; user: string | null }> {
+  const [c, u] = await Promise.all([
+    party.customer_id ? supabase.from("customers").select("full_name").eq("id", party.customer_id).maybeSingle() : Promise.resolve({ data: null }),
+    party.user_id ? supabase.from("profiles").select("full_name").eq("id", party.user_id).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  return {
+    customer: (c.data as { full_name?: string | null } | null)?.full_name ?? null,
+    user: (u.data as { full_name?: string | null } | null)?.full_name ?? null,
+  };
+}
 
 type AdvisorEarnings = { available: boolean; earned: number; paid: number; pending: number; count: number };
 
@@ -81,6 +93,8 @@ export async function PartyDetail({
   accounts,
   canCreate,
   canEdit,
+  canSalary,
+  highlightItemId = null,
 }: {
   supabase: SupabaseClient;
   partyId: string;
@@ -92,6 +106,10 @@ export async function PartyDetail({
   accounts: readonly SettleAccount[];
   canCreate: boolean;
   canEdit: boolean;
+  /** Maaş kategorisini görme (ofis sahibi + genel müdür); açık kalemler RPC'lerle aynı kuralla süzülür. */
+  canSalary: boolean;
+  /** `?kalem=<id>` ile gelinen elle girilmiş kalem: açık kalemler tablosunda vurgulanır. */
+  highlightItemId?: string | null;
 }) {
   const back = (
     <Link href={cariHref({}, {})} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 text-sm font-semibold text-accent-text hover:underline">
@@ -124,13 +142,28 @@ export async function PartyDetail({
   const to = isoDateParam(params.to);
   const filtered = Boolean(from || to);
 
-  const [stmtRes, items, balRes, owner, advisor] = await Promise.all([
-    supabase.rpc("finance_party_statement", { p_party_id: party.id, p_from: from || STATEMENT_START, p_to: to || today }),
-    loadOpenItemRows(supabase, { partyId: party.id }, new Set()),
+  // Süzgeç yokken ekstre sınırsız okunur (p_from/p_to null): devir satırı oluşmaz ve ileri tarihli kalemler de girer;
+  // böylece kapanış bakiyesi `finance_party_balances` bakiyesiyle (tarihten bağımsız açık kalemler) aynıdır.
+  const [stmtRes, ownItems, balRes, owner, advisor, linkLabels] = await Promise.all([
+    supabase.rpc("finance_party_statement", statementRpcArgs(party.id, from, to)),
+    loadOpenItemRows(supabase, { partyId: party.id, canSalary }, new Set()),
     supabase.rpc("finance_party_balances", { p_kind: party.kind, p_q: party.name }),
     kind === "malik" ? loadOwnerStatement(supabase, { tenantId, partyId: party.id, customerId: party.customer_id }) : Promise.resolve(null),
     kind === "danisman" ? loadAdvisorEarnings(supabase, tenantId, party.user_id) : Promise.resolve(null),
+    canEdit ? loadLinkLabels(supabase, party) : Promise.resolve(undefined),
   ]);
+
+  // Malik: kira defterinden gelen "Mülk sahibine ödeme" satırları cariye değil kiraya bağlıdır (party_id boş);
+  // malikin kiralarından üretilenler burada açık kalemlere ve KPI'lara katılır (Ödenecek ile aynı tutar).
+  const ownerRentalIds = owner?.available ? owner.rentals.map((r) => r.rentalId) : [];
+  const ownerPayouts = ownerRentalIds.length
+    ? await loadOpenItemRows(supabase, { source: "owner_payout", sourceIds: ownerRentalIds, canSalary }, new Set())
+    : null;
+  const items = {
+    error: ownItems.error || Boolean(ownerPayouts?.error),
+    rows: [...ownItems.rows, ...(ownerPayouts?.rows ?? []).filter((r) => !ownItems.rows.some((o) => o.key === r.key))],
+  };
+  const hasOwnerPayouts = (ownerPayouts?.rows.length ?? 0) > 0;
 
   const lines: StatementLine[] = stmtRes.error ? [] : ((stmtRes.data ?? []) as Record<string, unknown>[]).map(normalizeStatementLine);
   const balRow = balRes.error ? null : ((balRes.data ?? []) as Record<string, unknown>[]).find((r) => r.party_id === party.id) ?? null;
@@ -144,14 +177,14 @@ export async function PartyDetail({
   const kpis: KpiItem[] = [
     { label: "Bakiye", value: formatAccountMoney(Math.abs(balance), "TRY"), icon: <Scale />, tone: toKurus(balance) > 0 ? "success" : toKurus(balance) < 0 ? "danger" : "neutral", href: `${detailHref({})}#ekstre`, hint: balanceCaption(balance) },
     { label: "Açık alacak", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { gorunum: "acik", yon: "alacak", kalem_cari: party.id }), hint: "tahsil edilecek" },
-    { label: "Açık borç", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { gorunum: "acik", yon: "borc", kalem_cari: party.id }), hint: "ödenecek" },
+    { label: "Açık borç", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: hasOwnerPayouts ? `${detailHref({})}#acik-kalemler` : cariHref({}, { gorunum: "acik", yon: "borc", kalem_cari: party.id }), hint: hasOwnerPayouts ? "ödenecek (malik hak edişi dahil)" : "ödenecek" },
     {
       label: "Vadesi geçen",
       value: formatAccountMoney(aging.overdue, "TRY"),
       icon: <AlarmClock />,
       tone: aging.overdue > 0 ? "danger" : "neutral",
       attention: aging.overdue > 0,
-      href: cariHref({}, { gorunum: "acik", kova: "gecikmis", kalem_cari: party.id }),
+      href: hasOwnerPayouts ? `${detailHref({})}#acik-kalemler` : cariHref({}, { gorunum: "acik", kova: "gecikmis", kalem_cari: party.id }),
       hint: `${aging.overdueCount} kalem`,
     },
   ];
@@ -181,7 +214,7 @@ export async function PartyDetail({
         </div>
         <div className="flex flex-wrap items-center gap-2 md:justify-end">
           {canCreate ? <NewOpenItemButton party={{ id: party.id, name: party.name, kind }} today={today} defaultDirection={kind === "tedarikci" || kind === "malik" ? "payable" : "receivable"} /> : null}
-          {canEdit ? <PartyFormButton party={party} variant="outline" /> : null}
+          {canEdit ? <PartyFormButton party={party} variant="outline" canLink linkLabels={linkLabels} /> : null}
         </div>
       </header>
 
@@ -190,7 +223,7 @@ export async function PartyDetail({
       {owner ? <OwnerSection owner={owner} partyId={party.id} /> : null}
       {advisor ? <AdvisorSection advisor={advisor} self={party.user_id === userId} /> : null}
 
-      <section aria-labelledby="cari-acik" className="grid gap-3">
+      <section id="acik-kalemler" aria-labelledby="cari-acik" className="grid scroll-mt-24 gap-3">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 id="cari-acik" className="font-display text-base font-bold text-text">Açık kalemler</h3>
           {items.rows.length > 0 ? (
@@ -204,7 +237,7 @@ export async function PartyDetail({
             Açık alacak ya da borç yok.{canCreate ? " Vadeli bir kalem için 'Yeni alacak / borç' kullanın." : ""}
           </p>
         ) : (
-          <OpenItemsTable rows={items.rows} today={today} accounts={accounts} canSettle={canCreate} showParty={false} />
+          <OpenItemsTable rows={items.rows} today={today} accounts={accounts} canSettle={canCreate} showParty={false} highlightKey={highlightItemId ? `manual:${highlightItemId}` : null} />
         )}
       </section>
 
@@ -261,6 +294,10 @@ function StatementTable({ lines }: { lines: readonly StatementLine[] }) {
           </MobileCard>
         ))}
       </MobileCardList>
+      <div className="flex items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line-strong bg-surface px-4 py-3 md:hidden">
+        <span className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Kapanış bakiyesi</span>
+        <BalanceCell balance={last} />
+      </div>
       <div className="hidden overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface md:block">
         <table className="w-full min-w-[760px] text-sm">
           <caption className="sr-only">Cari ekstresi (borç bize borçlandıran, alacak kapatan kayıttır)</caption>
@@ -323,7 +360,6 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
     { label: "Tahsil edilen kira", value: t.collected, sign: "+", href: "/app/kiralama?yonetim=ucret" },
     { label: "Yönetim ücreti", value: t.fee, sign: "−", href: "/app/kiralama?yonetim=ucret" },
     { label: "Masraf ve aidat", value: t.charges, sign: "−" },
-    { label: "Stopaj", value: t.withholding, sign: "−", href: `/app/giderler?sekme=hareketler&cari=${partyId}` },
     { label: "Hak ediş", value: t.entitlement, sign: "=" },
     { label: "Ödenen", value: t.paidOut, sign: "−", href: `/app/giderler?sekme=hareketler&kategori=mulk_sahibi_odeme&cari=${partyId}` },
   ];
@@ -348,6 +384,15 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
           <dd className="numeric font-display text-lg font-bold text-danger-strong">{formatAccountMoney(t.payable, "TRY")}</dd>
         </div>
       </dl>
+      {t.withholding > 0 ? (
+        <p className="text-xs text-text-muted">
+          Bilgi: bu cariye bağlı hareketlerde{" "}
+          <Link href={`/app/giderler?sekme=hareketler&cari=${partyId}`} className="font-semibold text-accent-text hover:underline">
+            {formatAccountMoney(t.withholding, "TRY")} stopaj
+          </Link>{" "}
+          var. Hak edişten düşülmez; kira tahsilatı kira defterine hangi tutarla girildiyse o esastır (Açık kalemlerdeki &quot;Mülk sahibine ödeme&quot; ile aynı formül).
+        </p>
+      ) : null}
       {t.overpaid > 0 ? <p className="text-xs text-warning-strong">Fazla ödeme: {formatAccountMoney(t.overpaid, "TRY")} (malikten alacak).</p> : null}
       {owner.rentals.length > 0 ? (
         <ul className="grid gap-1 border-t border-line pt-2 text-xs">

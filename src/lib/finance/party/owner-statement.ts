@@ -5,12 +5,19 @@ import { fromKurus, toKurus } from "./aging";
 /**
  * Malik carisi (YALNIZ GÖSTERİM): mülk yönetimi defterinden okunur, veri kopyalanmaz ve yazılmaz.
  *
- *   Hak ediş = tahsil edilen kira − yönetim ücreti − masraf (gider + aidat) − stopaj
- *   Ödenecek = hak ediş − mülk sahibine yapılan ödemeler (negatifse 0; fazla ödeme ayrıca gösterilir)
+ * Tek formül — FN1 `finance_open_items_v` içindeki `owner_payout` satırıyla birebir aynıdır (kira bazında):
+ *   Kira bakiyesi = tahsil edilen kira − yönetim ücreti − masraf (gider + aidat) − mülk sahibine ödenen
+ *   Ödenecek      = Σ max(0, kira bakiyesi)   (görünümde yalnız bakiyesi > 0 olan kira satır üretir)
+ *   Fazla ödeme   = Σ max(0, −kira bakiyesi)
+ *   Hak ediş      = tahsil edilen − ücret − masraf
+ * Yalnız yönetim sözleşmesi `managed` olan kiralar sayılır (görünümle aynı kapsam).
  *
- * Bağ: cari `customer_id` → portföy `owner_customer_id` → o portföylerin kiraları. Stopaj, bu cariye bağlı
- * (party_id) iptal edilmemiş hareketlerin `withholding_amount` toplamıdır (kolon yoksa 0). Kaynak tablolar:
- * rent_payments, owner_charge_links, owner_payouts (mevcut; iptal edilenler hariç). Hesap kuruş üzerinden yapılır.
+ * Stopaj hak edişten DÜŞÜLMEZ (görünüm de düşmez): kira tahsilatı `rent_payments`'a net/brüt nasıl girildiyse o
+ * tutar esastır. `withholding` yalnız bilgi amaçlıdır: bu malik carisine (party_id) bağlı, iptal edilmemiş ofis
+ * hareketlerinin `withholding_amount` toplamı (kiracı carisine bağlı tahsilatların stopajı burada görünmez).
+ *
+ * Bağ: cari `customer_id` → portföy `owner_customer_id` → o portföylerin kiraları. Kaynak tablolar: rent_payments,
+ * owner_charge_links, owner_payouts (iptal edilenler hariç). Hesap kuruş üzerinden yapılır.
  */
 
 export type OwnerStatementRental = {
@@ -34,7 +41,7 @@ export type OwnerStatement = {
 
 const EMPTY_TOTALS: OwnerStatement["totals"] = { collected: 0, fee: 0, charges: 0, withholding: 0, entitlement: 0, paidOut: 0, payable: 0, overpaid: 0 };
 
-/** SAF: kira bazındaki defter toplamlarından ve stopajdan cari özeti. */
+/** SAF: kira bazındaki defter toplamlarından cari özeti (`finance_open_items_v.owner_payout` ile aynı formül). */
 export function summarizeOwnerStatement(
   rentals: readonly Omit<OwnerStatementRental, "balance">[],
   withholding: number,
@@ -43,6 +50,8 @@ export function summarizeOwnerStatement(
   let fee = 0;
   let charges = 0;
   let paidOut = 0;
+  let payable = 0;
+  let overpaid = 0;
   const rows = rentals.map((r) => {
     const c = toKurus(r.collected);
     const f = toKurus(r.fee);
@@ -52,22 +61,22 @@ export function summarizeOwnerStatement(
     fee += f;
     charges += ch;
     paidOut += p;
-    return { ...r, balance: fromKurus(c - f - ch - p) };
+    const bal = c - f - ch - p;
+    if (bal > 0) payable += bal;
+    else overpaid -= bal;
+    return { ...r, balance: fromKurus(bal) };
   });
-  const w = Math.max(0, toKurus(withholding));
-  const entitlement = collected - fee - charges - w;
-  const remaining = entitlement - paidOut;
   return {
     rentals: rows,
     totals: {
       collected: fromKurus(collected),
       fee: fromKurus(fee),
       charges: fromKurus(charges),
-      withholding: fromKurus(w),
-      entitlement: fromKurus(entitlement),
+      withholding: fromKurus(Math.max(0, toKurus(withholding))),
+      entitlement: fromKurus(collected - fee - charges),
       paidOut: fromKurus(paidOut),
-      payable: fromKurus(Math.max(0, remaining)),
-      overpaid: fromKurus(Math.max(0, -remaining)),
+      payable: fromKurus(payable),
+      overpaid: fromKurus(overpaid),
     },
   };
 }
@@ -105,7 +114,19 @@ export async function loadOwnerStatement(
   // Stopaj kolonu henüz yoksa (FN1 migration'ı uygulanmadı) 0 kabul edilir; özet yine çizilir.
   const withholding = whRes.error ? 0 : ((whRes.data ?? []) as { withholding_amount: unknown }[]).reduce((a, r) => a + toKurus(r.withholding_amount), 0) / 100;
 
-  const rentals = (rentalRes.data ?? []) as { id: string; property_id: string }[];
+  const allRentals = (rentalRes.data ?? []) as { id: string; property_id: string }[];
+  if (allRentals.length === 0) return { available: true, reason: null, ...summarizeOwnerStatement([], withholding) };
+  // Görünümle aynı kapsam: yalnız yönetim sözleşmesi `managed` olan kiralar.
+  const agrRes = await db
+    .from("rental_management_agreements")
+    .select("rental_id")
+    .eq("tenant_id", tenantId)
+    .eq("managed", true)
+    .in("rental_id", allRentals.map((r) => r.id))
+    .limit(1000);
+  if (agrRes.error) return { available: false, reason: "no_schema", rentals: [], totals: EMPTY_TOTALS };
+  const managed = new Set(((agrRes.data ?? []) as { rental_id: string }[]).map((a) => a.rental_id));
+  const rentals = allRentals.filter((r) => managed.has(r.id));
   if (rentals.length === 0) return { available: true, reason: null, ...summarizeOwnerStatement([], withholding) };
   const ids = rentals.map((r) => r.id);
 

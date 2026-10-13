@@ -257,6 +257,15 @@ export function normalizeStatementLine(r: Record<string, unknown>): StatementLin
   };
 }
 
+/**
+ * `finance_party_statement` argümanları. Süzgeç yoksa sınırlar null gider: FN1 RPC'si p_from null iken devir satırı
+ * üretmez, p_to null iken ileri tarihli kalemleri de katar; böylece kapanış bakiyesi `finance_party_balances.balance`
+ * (tarihten bağımsız açık kalemler) ile aynıdır. Süzgeçte yalnız verilen sınır gönderilir.
+ */
+export function statementRpcArgs(partyId: string, from: string | null | undefined, to: string | null | undefined): { p_party_id: string; p_from: string | null; p_to: string | null } {
+  return { p_party_id: partyId, p_from: from || null, p_to: to || null };
+}
+
 /** Ekstrenin kapanış bakiyesi = son satırın yürüyen bakiyesi (satır yoksa 0). */
 export function closingBalance(lines: readonly Pick<StatementLine, "running_balance">[]): number {
   return lines.length === 0 ? 0 : lines[lines.length - 1].running_balance;
@@ -271,17 +280,18 @@ export function recomputeRunning(lines: readonly Pick<StatementLine, "debit" | "
   });
 }
 
+/**
+ * Ekstre belge türü etiketleri — `finance_party_statement.doc_type` değerleri (FN1 sözleşmesi:
+ * devir | alacak | borc | tahsilat | odeme | pesin_tahsilat | pesin_odeme). Bilinmeyen tür "Kayıt" olarak gösterilir.
+ */
 export const STATEMENT_DOC_LABEL: Record<string, string> = {
-  entry: "Hareket",
-  open_item: "Açık kalem",
-  receivable: "Alacak",
-  payable: "Borç",
-  settlement: "Tahsilat / ödeme",
-  rent: "Kira",
-  commission: "Komisyon",
-  owner_payout: "Mülk sahibi ödemesi",
-  recurring: "Düzenli ödeme",
-  opening: "Devir",
+  devir: "Devir",
+  alacak: "Alacak",
+  borc: "Borç",
+  tahsilat: "Tahsilat",
+  odeme: "Ödeme",
+  pesin_tahsilat: "Peşin tahsilat",
+  pesin_odeme: "Peşin ödeme",
 };
 
 export function statementDocLabel(docType: string): string {

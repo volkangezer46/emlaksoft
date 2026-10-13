@@ -49,6 +49,7 @@ export type OpenItemRow = {
   direction: "receivable" | "payable";
   party_id: string | null;
   party_label: string;
+  category: string | null;
   title: string;
   amount_open: number;
   currency: string;
@@ -62,9 +63,17 @@ export type OpenItemsFilter = {
   direction?: "receivable" | "payable" | null;
   partyId?: string | null;
   source?: OpenItemSource | null;
+  /** Yalnız bu kaynak kimlikleri (ör. malik detayında kiraların `owner_payout` satırları; boş dizi = satır yok). */
+  sourceIds?: readonly string[] | null;
+  /** Maaş kategorisini göster (yalnız ofis sahibi + genel müdür). false iken `maas` satırları sorguda düşer. */
+  canSalary: boolean;
 };
 
-/** Görünümü okur, elle girilen kalemleri zenginleştirir, tekilleştirir ve gizli carileri (P12) düşer. */
+/**
+ * Görünümü okur, elle girilen kalemleri zenginleştirir, tekilleştirir ve gizli carileri (P12) düşer.
+ * Maaş kuralı RPC'lerle (finance_aging / finance_party_balances / finance_party_statement) aynıdır: `maas` kategorisi
+ * yalnız `canSalary` iken okunur (kategorisiz satırlar her zaman kalır).
+ */
 export async function loadOpenItemRows(
   supabase: SupabaseClient,
   filter: OpenItemsFilter,
@@ -72,11 +81,16 @@ export async function loadOpenItemRows(
 ): Promise<{ rows: OpenItemRow[]; error: boolean; capped: boolean }> {
   let q = supabase
     .from("finance_open_items_v")
-    .select("key, source, source_id, direction, party_id, party_label, title, amount_open, currency, due_date, href")
+    .select("key, source, source_id, direction, party_id, party_label, title, category, amount_open, currency, due_date, href")
     .gt("amount_open", 0);
+  if (!filter.canSalary) q = q.or("category.is.null,category.neq.maas");
   if (filter.direction) q = q.eq("direction", filter.direction);
   if (filter.partyId) q = q.eq("party_id", filter.partyId);
   if (filter.source) q = q.eq("source", filter.source);
+  if (filter.sourceIds) {
+    if (filter.sourceIds.length === 0) return { rows: [], error: false, capped: false };
+    q = q.in("source_id", filter.sourceIds.slice(0, 500));
+  }
   const { data, error } = await q.order("due_date", { ascending: true, nullsFirst: false }).limit(OPEN_ITEMS_CAP);
   if (error) return { rows: [], error: true, capped: false };
 
@@ -88,12 +102,15 @@ export async function loadOpenItemRows(
       direction: r.direction === "payable" ? ("payable" as const) : ("receivable" as const),
       party_id: typeof r.party_id === "string" ? r.party_id : null,
       party_label: String(r.party_label ?? ""),
+      category: typeof r.category === "string" ? r.category : null,
       title: String(r.title ?? ""),
       amount_open: num(r.amount_open),
       currency: String(r.currency ?? "TRY") || "TRY",
       due_date: typeof r.due_date === "string" ? r.due_date.slice(0, 10) : null,
       href: safeHref(r.href),
     }))
+    // İkinci savunma hattı: sorgu süzgeci atlanırsa bile maaş satırı yetkisiz kullanıcıya düşmez.
+    .filter((r) => filter.canSalary || r.category !== "maas")
     .filter((r): r is Omit<OpenItemRow, "manual"> & { source: OpenItemSource } => Boolean(r.key && r.source));
 
   const manualIds = raw.filter((r) => r.source === "manual" && r.source_id).map((r) => r.source_id as string);
@@ -117,8 +134,11 @@ export async function loadOpenItemRows(
     const manual = r.source === "manual" && r.source_id ? (manualInfo.get(r.source_id) ?? null) : null;
     return { ...r, manual, manual_source: manual ? { type: manual.source_type, id: manual.source_id } : null };
   });
+  // P12: gizli danışman carileri düşer. Danışman listesi okunamadıysa ("*danisman") hangi carinin danışman olduğu
+  // bilinmez → cariye bağlı tüm satırlar gizlenir (güvenli taraf; carisiz kaynak satırları kalır).
+  const unknownAdvisors = hidden.has("*danisman");
   const rows = dedupeOpenItems(enriched)
-    .filter((r) => !r.party_id || !isHiddenParty(hidden, r.party_id, null))
+    .filter((r) => !r.party_id || (!unknownAdvisors && !isHiddenParty(hidden, r.party_id, null)))
     .map(({ manual_source: _drop, ...r }) => {
       void _drop;
       return r;
@@ -144,7 +164,9 @@ export async function OpenItemsView({
   hidden,
   accounts,
   canSettle,
+  canSalary,
   partyName,
+  highlightKey = null,
 }: {
   supabase: SupabaseClient;
   params: ParamRecord;
@@ -152,7 +174,10 @@ export async function OpenItemsView({
   hidden: ReadonlySet<string>;
   accounts: readonly SettleAccount[];
   canSettle: boolean;
+  canSalary: boolean;
   partyName: string | null;
+  /** `?kalem=<id>` ile gelinen elle girilmiş kalem (`manual:<id>`): satır vurgulanır ve görünür alana kaydırılır. */
+  highlightKey?: string | null;
 }) {
   const yon = typeof params.yon === "string" && params.yon in DIR_PARAM ? params.yon : "";
   const direction = yon ? DIR_PARAM[yon] : null;
@@ -162,7 +187,7 @@ export async function OpenItemsView({
   const partyId = typeof params.kalem_cari === "string" && /^[0-9a-f-]{36}$/i.test(params.kalem_cari) ? params.kalem_cari : null;
 
   // Tek okuma: yön süzgeci yok → iki yönün çubukları da aynı satırlardan çizilir.
-  const { rows: all, error, capped } = await loadOpenItemRows(supabase, { partyId, source }, hidden);
+  const { rows: all, error, capped } = await loadOpenItemRows(supabase, { partyId, source, canSalary }, hidden);
   const tryRows = all.filter((r) => r.currency === "TRY");
   const recvAging = agingFromItems(tryRows.filter((r) => r.direction === "receivable"), today);
   const payAging = agingFromItems(tryRows.filter((r) => r.direction === "payable"), today);
@@ -217,8 +242,13 @@ export async function OpenItemsView({
         <span className="numeric font-semibold text-text">{rows.length}</span> kalem · toplam{" "}
         <span className="numeric font-semibold text-text">{formatAccountMoney(fromKurus(listTotalK), "TRY")}</span>
         {foreignCount > 0 ? <> · {foreignCount} döviz kalemi toplamlara katılmadı</> : null}
-        {capped ? <> · ilk {OPEN_ITEMS_CAP} kalem gösteriliyor</> : null}
       </p>
+      {capped ? (
+        <p role="status" className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs">
+          Toplamlar eksik: yalnız ilk {OPEN_ITEMS_CAP} kalem okundu; çubuklar ve toplam bu kalemlerden hesaplandı. Süzgeç
+          ekleyerek (yön, kaynak, cari) listeyi daraltın.
+        </p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 text-sm text-text-muted">
@@ -233,11 +263,15 @@ export async function OpenItemsView({
           action={kova || yon || source || partyId ? { href: cariHref({}, { gorunum: "acik" }), label: "Süzgeçleri temizle" } : undefined}
         />
       ) : (
-        <OpenItemsTable rows={rows} today={today} accounts={accounts} canSettle={canSettle} showParty />
+        <OpenItemsTable rows={rows} today={today} accounts={accounts} canSettle={canSettle} showParty highlightKey={highlightKey} />
       )}
     </div>
   );
 }
+
+/** `?kalem=` ile açılan kalemin bağlantı çapası (cari detayı ve açık kalemler; `#kalem` ile kaydırılır). */
+export const HIGHLIGHT_ANCHOR = "kalem";
+const HIGHLIGHT_CLASS = "bg-surface-accent-soft ring-2 ring-inset ring-brand-300";
 
 /** Açık kalem tablosu (masaüstü) ve kartları (mobil); cari detayında da kullanılır. */
 export function OpenItemsTable({
@@ -246,18 +280,20 @@ export function OpenItemsTable({
   accounts,
   canSettle,
   showParty,
+  highlightKey = null,
 }: {
   rows: readonly OpenItemRow[];
   today: string;
   accounts: readonly SettleAccount[];
   canSettle: boolean;
   showParty: boolean;
+  highlightKey?: string | null;
 }) {
   return (
     <>
       <MobileCardList aria-label="Açık kalemler">
         {rows.map((r) => (
-          <MobileCard key={r.key}>
+          <MobileCard key={r.key} id={r.key === highlightKey ? `${HIGHLIGHT_ANCHOR}-m` : undefined} className={r.key === highlightKey ? HIGHLIGHT_CLASS : undefined}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <ItemTitle row={r} />
@@ -293,7 +329,12 @@ export function OpenItemsTable({
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.key} className="border-b border-line last:border-b-0 hover:bg-surface-hover/40">
+              <tr
+                key={r.key}
+                id={r.key === highlightKey ? HIGHLIGHT_ANCHOR : undefined}
+                aria-current={r.key === highlightKey ? "true" : undefined}
+                className={`border-b border-line last:border-b-0 hover:bg-surface-hover/40 ${r.key === highlightKey ? HIGHLIGHT_CLASS : ""}`}
+              >
                 <td className="whitespace-nowrap px-4 py-3"><DueText row={r} today={today} /></td>
                 <td className="px-4 py-3">
                   <ItemTitle row={r} />

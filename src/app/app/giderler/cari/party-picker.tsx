@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { upsertParty } from "@/app/actions/finance-ledger";
 import { useToast } from "@/components/app/toast-provider";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -14,7 +14,10 @@ import { PARTY_KIND_LABEL, partyKindLabel, partyKindOf, type PartyKindKey } from
  * - Türe göre öneri: `kindHint` verilirse o türdeki cariler listenin başına gelir, satır içi oluşturma o türü kullanır.
  * - Satır içinde oluşturma (`allowCreate`): eşleşme yoksa "“…” adlı yeni cari" seçeneği; seçince cari sunucuda
  *   oluşturulur (`upsertParty`, `expenses:create` kapısı) ve hemen seçilir.
- * Supabase tarayıcı istemcisi yalnız ilk aramada dinamik yüklenir (ilk yük JS'ine girmez).
+ * - P12: `advisorOwnerId` verilirse (kullanıcının `earnings_all` izni yok) danışman türündeki cariler yalnız o kullanıcıya
+ *   bağlıysa listelenir; başka danışmanın carisi adıyla bile görünmez.
+ * Supabase tarayıcı istemcisi ve ilk liste yalnız seçici ilk kez açılınca (odak/dokunma) yüklenir; ekranda duran ama hiç
+ * açılmayan seçici sorgu göndermez.
  */
 
 export type PickedParty = { id: string; name: string; kind: PartyKindKey | null };
@@ -22,12 +25,12 @@ export type PickedParty = { id: string; name: string; kind: PartyKindKey | null 
 const NEW_PREFIX = "__yeni__:";
 const SEARCH_LIMIT = 20;
 
-type Row = { id: string; name: string; kind: string | null };
+type Row = { id: string; name: string; kind: string | null; user_id?: string | null };
 
-async function queryParties(q: string | null, kindHint: PartyKindKey | null): Promise<Row[]> {
+async function queryParties(q: string | null, kindHint: PartyKindKey | null, advisorOwnerId: string | null): Promise<Row[]> {
   const { createClient } = await import("@/lib/supabase/client");
   const db = createClient();
-  let query = db.from("finance_parties").select("id, name, kind").is("archived_at", null);
+  let query = db.from("finance_parties").select("id, name, kind, user_id").is("archived_at", null);
   if (q) {
     // ilike joker karakterleri ve PostgREST ayraçları kaçırılır (kullanıcı metni desen olamaz).
     const safe = q.replace(/[\\%_]/g, (c) => `\\${c}`).replace(/[,()]/g, " ").slice(0, 60);
@@ -37,7 +40,7 @@ async function queryParties(q: string | null, kindHint: PartyKindKey | null): Pr
   }
   const { data, error } = await query;
   if (error) return [];
-  const rows = (data ?? []) as Row[];
+  const rows = ((data ?? []) as Row[]).filter((r) => !advisorOwnerId || r.kind !== "danisman" || r.user_id === advisorOwnerId);
   if (!kindHint) return rows;
   return [...rows.filter((r) => r.kind === kindHint), ...rows.filter((r) => r.kind !== kindHint)];
 }
@@ -57,6 +60,7 @@ export function PartyPicker({
   placeholder = "Cari seçin",
   "aria-label": ariaLabel,
   disabled,
+  advisorOwnerId,
 }: {
   name: string;
   defaultValue?: string | null;
@@ -69,6 +73,8 @@ export function PartyPicker({
   placeholder?: string;
   "aria-label"?: string;
   disabled?: boolean;
+  /** `earnings_all` yoksa kullanıcının kimliği: yalnız kendi danışman carisi listelenir (P12). Boş = kısıt yok. */
+  advisorOwnerId?: string | null;
 }) {
   const hint = partyKindOf(kindHint ?? null);
   const { push } = useToast();
@@ -77,19 +83,25 @@ export function PartyPicker({
   const [initial, setInitial] = useState<ComboboxOption[]>([]);
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    queryParties(null, hint).then((rows) => {
-      if (alive) setInitial(rows.map(toOption));
+  const owner = advisorOwnerId ?? null;
+  // Son uzak arama sonuçları: seçilen satırın etiketi buradan alınır (options yalnız ilk liste + seçili).
+  const remote = useRef<Map<string, string>>(new Map());
+  const loadedFor = useRef<string | null>(null);
+
+  // İlk liste yalnız seçici ilk açıldığında (odak/dokunma) yüklenir.
+  const ensureInitial = useCallback(() => {
+    const key = `${hint ?? ""}|${owner ?? ""}`;
+    if (loadedFor.current === key) return;
+    loadedFor.current = key;
+    void queryParties(null, hint, owner).then((rows) => {
+      if (loadedFor.current === key) setInitial(rows.map(toOption));
     });
-    return () => {
-      alive = false;
-    };
-  }, [hint]);
+  }, [hint, owner]);
 
   const onSearch = useCallback(
     async (q: string): Promise<ComboboxOption[]> => {
-      const rows = await queryParties(q, hint);
+      const rows = await queryParties(q, hint, owner);
+      for (const r of rows) remote.current.set(r.id, r.name);
       const options = rows.map(toOption);
       const exact = rows.some((r) => r.name.toLocaleLowerCase("tr") === q.toLocaleLowerCase("tr"));
       if (allowCreate && !exact && q.trim().length >= 2) {
@@ -98,7 +110,7 @@ export function PartyPicker({
       }
       return options;
     },
-    [allowCreate, hint],
+    [allowCreate, hint, owner],
   );
 
   const options = useMemo(() => {
@@ -125,26 +137,28 @@ export function PartyPicker({
       return;
     }
     setValue(next);
-    const opt = options.find((o) => o.value === next);
-    setLabel(opt?.label ?? "");
-    onValueChange?.(next ? { id: next, name: opt?.label ?? "", kind: null } : null);
+    const name = options.find((o) => o.value === next)?.label ?? remote.current.get(next) ?? "";
+    setLabel(name);
+    onValueChange?.(next ? { id: next, name, kind: null } : null);
   }
 
   return (
-    <Combobox
-      id={id}
-      name={name}
-      options={options}
-      value={value}
-      onValueChange={change}
-      onSearch={onSearch}
-      selectedLabel={label || undefined}
-      placeholder={placeholder}
-      searchPlaceholder={allowCreate ? "Ara ya da yeni cari adı yazın…" : "Cari ara…"}
-      emptyText={allowCreate ? "Eşleşme yok. Yeni cari için adı yazmaya devam edin." : "Eşleşen cari yok"}
-      loading={creating}
-      disabled={disabled}
-      aria-label={ariaLabel ?? "Cari"}
-    />
+    <span className="contents" onFocusCapture={ensureInitial} onPointerDownCapture={ensureInitial}>
+      <Combobox
+        id={id}
+        name={name}
+        options={options}
+        value={value}
+        onValueChange={change}
+        onSearch={onSearch}
+        selectedLabel={label || undefined}
+        placeholder={placeholder}
+        searchPlaceholder={allowCreate ? "Ara ya da yeni cari adı yazın…" : "Cari ara…"}
+        emptyText={allowCreate ? "Eşleşme yok. Yeni cari için adı yazmaya devam edin." : "Eşleşen cari yok"}
+        loading={creating}
+        disabled={disabled}
+        aria-label={ariaLabel ?? "Cari"}
+      />
+    </span>
   );
 }

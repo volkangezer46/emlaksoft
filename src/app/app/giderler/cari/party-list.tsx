@@ -75,6 +75,7 @@ export async function PartyList({
 }) {
   const q = (typeof params.q === "string" ? params.q : "").trim().slice(0, 60);
   const kind = partyKindOf(params.tur);
+  const sign = params.bakiye === "alacak" || params.bakiye === "borc" ? params.bakiye : null;
   const page = parsePage(params.sayfa);
 
   const { data, error } = await supabase.rpc("finance_party_balances", { p_kind: null, p_q: q || null });
@@ -82,7 +83,9 @@ export async function PartyList({
 
   const counts = new Map<PartyKindKey, number>();
   for (const r of all) if (r.kind) counts.set(r.kind, (counts.get(r.kind) ?? 0) + 1);
-  const rows = (kind ? all.filter((r) => r.kind === kind) : all).sort(
+  const kindRows = kind ? all.filter((r) => r.kind === kind) : all;
+  // Bakiye süzgeci (KPI kartlarının hedefi): listedeki bakiyelerin toplamı karttaki tutarla birebir aynıdır.
+  const rows = kindRows.filter((r) => !sign || (sign === "alacak" ? toKurus(r.balance) > 0 : toKurus(r.balance) < 0)).sort(
     (a, b) => toKurus(b.overdue_amount) - toKurus(a.overdue_amount) || Math.abs(toKurus(b.balance)) - Math.abs(toKurus(a.balance)) || a.name.localeCompare(b.name, "tr"),
   );
 
@@ -90,7 +93,7 @@ export async function PartyList({
   let payK = 0;
   let overdueK = 0;
   let overdueParties = 0;
-  for (const r of rows) {
+  for (const r of kindRows) {
     const b = toKurus(r.balance);
     if (b > 0) recvK += b;
     else payK -= b;
@@ -99,18 +102,21 @@ export async function PartyList({
       overdueParties += 1;
     }
   }
+  // Kartlar net bakiyeyi toplar ve aynı süzgeçli cari listesine gider (açık kalem listesi brüt olduğundan oraya gitmez).
   const kindPatch = kind ? { tur: kind } : {};
   const kpis: KpiItem[] = [
-    { label: "Bize borçlu", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { gorunum: "acik", yon: "alacak", ...kindPatch }), hint: "açık alacak bakiyesi" },
-    { label: "Biz borçluyuz", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { gorunum: "acik", yon: "borc", ...kindPatch }), hint: "açık borç bakiyesi" },
+    { label: "Bize borçlu", value: formatAccountMoney(fromKurus(recvK), "TRY"), icon: <ArrowDownLeft />, tone: "success", href: cariHref({}, { bakiye: "alacak", ...kindPatch }), hint: "alacaklı carilerin net bakiyesi" },
+    { label: "Biz borçluyuz", value: formatAccountMoney(fromKurus(payK), "TRY"), icon: <ArrowUpRight />, tone: "warning", href: cariHref({}, { bakiye: "borc", ...kindPatch }), hint: "borçlu olduğumuz carilerin net bakiyesi" },
     {
       label: "Vadesi geçen",
       value: formatAccountMoney(fromKurus(overdueK), "TRY"),
       icon: <AlarmClock />,
       tone: overdueK > 0 ? "danger" : "neutral",
       attention: overdueK > 0,
-      href: cariHref({}, { gorunum: "acik", kova: "gecikmis" }),
-      hint: `${overdueParties} cari`,
+      // Tutar yalnız carilere bağlı elle açılmış kalemlerden gelir (finance_party_balances.overdue_amount); hedef liste
+      // de aynı kapsamla (kaynak=manual) açılır ki karttaki tutar ile listenin toplamı eşleşsin.
+      href: cariHref({}, { gorunum: "acik", kova: "gecikmis", kaynak: "manual" }),
+      hint: `${overdueParties} cari · elle açılan kalemler`,
     },
   ];
 
@@ -129,6 +135,11 @@ export async function PartyList({
             {PARTY_KIND_LABEL[k]}
           </FilterChip>
         ))}
+        {sign ? (
+          <FilterChip href={cariHref(params, { bakiye: "" })} active tone="danger" aria-label="Bakiye süzgecini kaldır">
+            {sign === "alacak" ? "Bize borçlu" : "Biz borçluyuz"} ✕
+          </FilterChip>
+        ) : null}
       </nav>
 
       <ListToolbar
@@ -145,7 +156,7 @@ export async function PartyList({
           Cari bakiyeleri okunamadı. Sayfayı yenileyin; sorun sürerse veritabanı güncellemesinin uygulandığından emin olun.
         </p>
       ) : rows.length === 0 ? (
-        q || kind ? (
+        q || kind || sign ? (
           <div className="grid place-items-center rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
             <h2 className="font-display text-lg font-bold text-text">Bu filtreyle cari yok</h2>
             <Link href={cariHref({}, {})} className="mt-2 text-sm font-semibold text-accent-text hover:underline">Filtreleri temizle</Link>

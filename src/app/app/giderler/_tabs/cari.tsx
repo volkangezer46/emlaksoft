@@ -20,16 +20,22 @@ import { NewOpenItemButton, type SettleAccount } from "../cari/settle-dialog";
  *  - varsayılan: cari listesi (tür çipleri, arama, bakiye, vadesi geçen rozeti, son işlem) — `finance_party_balances`
  *  - ?gorunum=acik: açık kalemler + yaşlandırma (0–30 / 31–60 / 61–90 / 90+) — `finance_open_items_v`
  *  - ?cari=<id>: cari detayı (ekstre, açık kalemler, Tahsil et / Öde, Yeni alacak / borç; malik ve danışman bölümleri)
+ *  - ?kalem=<id>: elle girilmiş açık kalemin bağlantısı (FN1 `finance_open_items_v.href` ve ekstre satırları bunu üretir):
+ *    kalemin carisi varsa o carinin detayı, yoksa açık kalemler listesi açılır; kalem satırı vurgulanır.
+ * Maaş kategorisi (`maas`) yalnız `canSalary` (ofis sahibi + genel müdür) iken görünür — RPC'lerle aynı kural.
  * Sekme yalnız kendi verisini çeker; bağımsız okumalar `Promise.all`. P12: danışman carileri `earnings_all` olmadan
  * yalnız kullanıcının kendisine aitse görünür.
  */
 export async function CariTab(props: FinanceTabProps) {
-  const { params, perms, userId, tenantId, canCreate, canEdit } = props;
+  const { params, perms, userId, tenantId, canCreate, canEdit, canSalary } = props;
   const supabase = await createClient();
   const today = trDayKey(now());
   const earningsAll = canSeeAllEarnings(perms);
-  const partyId = uuidParam(params.cari);
-  const view = partyId ? "detay" : params.gorunum === "acik" ? "acik" : "liste";
+  const itemId = uuidParam(params.kalem);
+  // ?kalem=<id> → kalemin carisi (RLS: yalnız kendi ofisi). Maaş kalemi yetkisizse çözülmez (liste de göstermez).
+  const itemParty = itemId && !uuidParam(params.cari) ? await resolveItemParty(supabase, itemId, canSalary) : null;
+  const partyId = uuidParam(params.cari) || itemParty?.partyId || "";
+  const view = partyId ? "detay" : params.gorunum === "acik" || itemId ? "acik" : "liste";
   const listPartyId = uuidParam(params.kalem_cari);
 
   // Hesaplar yalnız Tahsil et / Öde için gerekir (liste görünümünde okunmaz).
@@ -56,6 +62,8 @@ export async function CariTab(props: FinanceTabProps) {
         accounts={accounts}
         canCreate={canCreate}
         canEdit={canEdit}
+        canSalary={canSalary}
+        highlightItemId={itemId || null}
       />
     );
   }
@@ -75,8 +83,8 @@ export async function CariTab(props: FinanceTabProps) {
           >
             <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Raporlarda aç
           </Link>
-          {canCreate ? <NewOpenItemButton today={today} /> : null}
-          {canCreate ? <PartyFormButton defaultKind={kindHint} /> : null}
+          {canCreate ? <NewOpenItemButton today={today} advisorOwnerId={earningsAll ? null : userId} /> : null}
+          {canCreate ? <PartyFormButton defaultKind={kindHint} canLink={canEdit} /> : null}
         </div>
       </div>
 
@@ -88,6 +96,8 @@ export async function CariTab(props: FinanceTabProps) {
           hidden={hidden}
           accounts={accounts}
           canSettle={canCreate}
+          canSalary={canSalary}
+          highlightKey={itemId ? `manual:${itemId}` : null}
           partyName={(filterParty.data as { name?: string } | null)?.name ?? null}
         />
       ) : (
@@ -95,4 +105,13 @@ export async function CariTab(props: FinanceTabProps) {
       )}
     </div>
   );
+}
+
+/** `?kalem=<id>`: elle girilmiş kalemin carisi. Bulunamazsa ya da kalem maaş olup yetki yoksa null. */
+async function resolveItemParty(supabase: Awaited<ReturnType<typeof createClient>>, itemId: string, canSalary: boolean): Promise<{ partyId: string | null } | null> {
+  const { data, error } = await supabase.from("finance_open_items").select("party_id, category").eq("id", itemId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as { party_id: string | null; category: string | null };
+  if (row.category === "maas" && !canSalary) return null;
+  return { partyId: row.party_id };
 }

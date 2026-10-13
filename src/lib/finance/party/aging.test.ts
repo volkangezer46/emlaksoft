@@ -19,6 +19,9 @@ import {
   recomputeRunning,
   remainingOf,
   safeHref,
+  STATEMENT_DOC_LABEL,
+  statementDocLabel,
+  statementRpcArgs,
   statusAfter,
 } from "./aging";
 import { summarizeOwnerStatement } from "./owner-statement";
@@ -195,15 +198,62 @@ describe("malik carisi özeti (yalnız gösterim)", () => {
     expect(s.totals.collected).toBe(30000);
     expect(s.totals.fee).toBe(2400);
     expect(s.totals.charges).toBe(500.5);
+    // Stopaj yalnız bilgi: hak edişten ve ödenecekten düşülmez (finance_open_items_v.owner_payout ile aynı formül).
     expect(s.totals.withholding).toBe(2000.1);
-    expect(s.totals.entitlement).toBe(25099.4);
-    expect(s.totals.payable).toBe(15099.4);
+    expect(s.totals.entitlement).toBe(27099.5);
+    expect(s.totals.payable).toBe(17099.5);
     expect(s.totals.overpaid).toBe(0);
     expect(s.rentals[0].balance).toBe(7899.5);
+    // Ödenecek = görünümün owner_payout satırları toplamı (bakiyesi > 0 olan kiralar).
+    expect(s.totals.payable).toBe(s.rentals.filter((r) => r.balance > 0).reduce((a, r) => a + r.balance, 0));
+  });
+  it("kira bazında: bir kiradaki fazla ödeme diğerinin ödenecek tutarını azaltmaz (görünümle aynı)", () => {
+    const s = summarizeOwnerStatement(
+      [
+        { rentalId: "r1", propertyId: "p1", propertyLabel: "A", collected: 1000, fee: 0, charges: 0, paidOut: 0 },
+        { rentalId: "r2", propertyId: "p2", propertyLabel: "B", collected: 1000, fee: 0, charges: 0, paidOut: 1300 },
+      ],
+      0,
+    );
+    expect(s.totals.payable).toBe(1000);
+    expect(s.totals.overpaid).toBe(300);
   });
   it("fazla ödemede ödenecek 0, fazla ayrı gösterilir", () => {
     const s = summarizeOwnerStatement([{ rentalId: "r", propertyId: "p", propertyLabel: "", collected: 1000, fee: 0, charges: 0, paidOut: 1500 }], 0);
     expect(s.totals.payable).toBe(0);
     expect(s.totals.overpaid).toBe(500);
+  });
+});
+
+describe("ekstre sözleşmesi (FN1 finance_party_statement)", () => {
+  it("doc_type etiketleri RPC değerleriyle birebir", () => {
+    expect(Object.keys(STATEMENT_DOC_LABEL).sort()).toEqual(["alacak", "borc", "devir", "odeme", "pesin_odeme", "pesin_tahsilat", "tahsilat"]);
+    expect(statementDocLabel("alacak")).toBe("Alacak");
+    expect(statementDocLabel("borc")).toBe("Borç");
+    expect(statementDocLabel("tahsilat")).toBe("Tahsilat");
+    expect(statementDocLabel("odeme")).toBe("Ödeme");
+    expect(statementDocLabel("pesin_tahsilat")).toBe("Peşin tahsilat");
+    expect(statementDocLabel("pesin_odeme")).toBe("Peşin ödeme");
+    expect(statementDocLabel("devir")).toBe("Devir");
+    expect(statementDocLabel("bilinmeyen")).toBe("Kayıt");
+  });
+  it("süzgeçsiz ekstre sınırsız okunur (devir yok, ileri tarih dahil → kapanış = liste bakiyesi)", () => {
+    expect(statementRpcArgs("p", "", "")).toEqual({ p_party_id: "p", p_from: null, p_to: null });
+    expect(statementRpcArgs("p", null, undefined)).toEqual({ p_party_id: "p", p_from: null, p_to: null });
+    expect(statementRpcArgs("p", "2026-01-01", "")).toEqual({ p_party_id: "p", p_from: "2026-01-01", p_to: null });
+    expect(statementRpcArgs("p", "", "2026-02-01")).toEqual({ p_party_id: "p", p_from: null, p_to: "2026-02-01" });
+  });
+  it("liste bakiyesi (açık alacak − açık borç) = süzgeçsiz ekstrenin kapanışı", () => {
+    // Fixture: 1000 alacak, 400 kısmi tahsilat (bağlı), 250 borç, bağsız peşin hareket (borç=alacak, nötr).
+    const lines = [
+      { d: "2026-09-01", doc_type: "alacak", ref_id: "a", title: "Hizmet", debit: 1000, credit: 0, running_balance: 1000, href: null },
+      { d: "2026-09-05", doc_type: "tahsilat", ref_id: "t", title: "Tahsilat", debit: 0, credit: 400, running_balance: 600, href: null },
+      { d: "2026-09-10", doc_type: "pesin_odeme", ref_id: "x", title: "Peşin", debit: 75, credit: 75, running_balance: 600, href: null },
+      { d: "2026-12-01", doc_type: "borc", ref_id: "b", title: "İleri tarihli borç", debit: 0, credit: 250, running_balance: 350, href: null },
+    ].map(normalizeStatementLine);
+    const recvOpen = 1000 - 400;
+    const payOpen = 250;
+    expect(closingBalance(lines)).toBe(recvOpen - payOpen);
+    expect(recomputeRunning(lines).at(-1)).toBe(recvOpen - payOpen);
   });
 });
