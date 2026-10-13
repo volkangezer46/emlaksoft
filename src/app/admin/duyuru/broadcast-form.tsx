@@ -4,41 +4,44 @@ import { startTransition, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { TAB_ICONS as TI } from "@/lib/icons";
-import { sendBroadcast, searchTenantsBroadcast, type BroadcastTarget } from "@/app/actions/platform-notifications";
-import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
-import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { sendBroadcast } from "@/app/actions/platform-notifications";
+import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { KIND_OPTIONS } from "./broadcast-options";
 import { BROADCAST_TABS } from "./broadcast-tabs";
+import { SegmentBuilder, type SegmentCount, type SegmentInit, type SegmentOptions } from "./segment-builder";
 
-const TARGET_OPTIONS: { value: BroadcastTarget; label: string; hint: string }[] = [
-  { value: "all", label: "Tüm ofisler", hint: "İptal edilmemiş her ofise gönderir" },
-  { value: "active", label: "Aktif ofisler", hint: "Yalnızca aktif aboneliği olanlar" },
-  { value: "trial", label: "Deneme ofisleri", hint: "14 günlük deneme süreci" },
-  { value: "specific", label: "Belirli ofis", hint: "Ada göre arayıp tekil hedef seçin" },
-];
+const TAB_ICONS = { icerik: TI.icerik, hedef: TI.hedef, kanal: TI.kanal } as const;
+const FIELD_LABELS = { title: "Başlık" };
 
-const TAB_ICONS = { icerik: TI.icerik, hedef: TI.kanal } as const;
-const FIELD_LABELS = { title: "Başlık", tenant_id: "Ofis" };
-
-export type AudienceCounts = { all: number; active: number; trial: number };
+const CHANNEL_OPTIONS = [
+  { value: "in_app", label: "Uygulama içi", hint: "Ofis panelindeki zil (okunma ölçülür)" },
+  { value: "email", label: "E-posta", hint: "Resend anahtarı yoksa 'kanal kapalı' raporlanır" },
+  { value: "push", label: "Push", hint: "Cihaz bildirimi aboneliği olan kullanıcılara" },
+] as const;
 
 /**
- * Duyuru formu (sekmeli kabuk). Hedef kitle sayıları sunucu sayfasında ÖNCEDEN hesaplanıp
- * props ile gelir — hedef değişince ek istek atılmaz, sayı özet panelinde anında görünür.
+ * Duyuru formu (sekmeli kabuk, AD8): içerik → hedef kitle (segment oluşturucu, canlı sayım) → kanal ve zaman.
+ * Gönder = kuyruğa al: istek yalnız arşiv satırı yazar, teslim kuyrukta yapılır (zaman aşımı yok).
  */
 export function BroadcastForm({
-  audienceCounts,
-  tenantOptions,
+  options,
+  init,
+  title: pageTitle = "Yeni duyuru",
+  minLocal,
 }: {
-  audienceCounts: AudienceCounts;
-  tenantOptions: ComboboxOption[];
+  options: SegmentOptions;
+  init?: SegmentInit;
+  title?: string;
+  /** datetime-local alt sınırı (Türkiye saatiyle şimdi; sunucuda hesaplanır). */
+  minLocal: string;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [target, setTarget] = useState<BroadcastTarget>("all");
-  const [tenantId, setTenantId] = useState("");
+  const [channels, setChannels] = useState<string[]>(["in_app"]);
+  const [commercial, setCommercial] = useState(false);
+  const [count, setCount] = useState<SegmentCount>(null);
 
   const tabs: FormTab[] = useMemo(
     () =>
@@ -56,6 +59,10 @@ export function BroadcastForm({
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    if (fd.getAll("channel").length === 0) {
+      setError("En az bir kanal seçin.");
+      return;
+    }
     setError(null);
     setPending(true);
     startTransition(async () => {
@@ -65,7 +72,7 @@ export function BroadcastForm({
         setError(res.error);
         return;
       }
-      router.push("/admin/duyuru");
+      router.push(res.id ? `/admin/duyuru?duyuru=${res.id}` : "/admin/duyuru");
       router.refresh();
     });
   }
@@ -77,65 +84,74 @@ export function BroadcastForm({
           <FormInput name="title" required maxLength={120} placeholder="Örn: Yeni özellik yayında — portallar güncellendi" />
         </FormField>
         <FormField label="Mesaj (isteğe bağlı)" htmlFor="body" className="sm:col-span-2">
-          <FormTextarea name="body" rows={5} placeholder="Detay, link veya açıklama ekleyebilirsiniz…" />
+          <FormTextarea name="body" rows={5} maxLength={2000} placeholder="Detay veya açıklama ekleyebilirsiniz…" />
         </FormField>
-        <FormField label="Bağlantı (isteğe bağlı)" htmlFor="href" hint="https:// veya /app/... ile başlayan adres" className="sm:col-span-2">
-          <FormInput name="href" placeholder="/app/ayarlar" />
+        <FormField label="Bağlantı (isteğe bağlı)" htmlFor="href" hint="/app/... ya da https:// — tıklamalar ölçülür" className="sm:col-span-2">
+          <FormInput name="href" maxLength={500} placeholder="/app/ayarlar" />
         </FormField>
-      </>
-    ),
-    hedef: (
-      <>
         <fieldset className="sm:col-span-2">
           <legend className="mb-2 text-sm font-medium text-ink-950">Bildirim türü</legend>
           <div className="flex flex-wrap gap-2">
             {KIND_OPTIONS.map((k) => (
               <label key={k.value} className="cursor-pointer">
                 <input type="radio" name="kind" value={k.value} defaultChecked={k.value === "info"} className="peer sr-only" />
-                <span className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-2 ring-transparent transition peer-checked:ring-current peer-focus-visible:ring-brand-500 ${k.cls}`}>
+                <span className={`inline-flex min-h-9 items-center rounded-full px-3 py-1.5 text-xs font-semibold ring-2 ring-transparent transition peer-checked:ring-current peer-focus-visible:ring-brand-500 ${k.cls}`}>
                   {k.label}
                 </span>
               </label>
             ))}
           </div>
         </fieldset>
-        <FormField label="Hedef kitle" htmlFor="target" className="sm:col-span-2">
-          <FormSelect name="target" value={target} onChange={(e) => setTarget(e.target.value as BroadcastTarget)}>
-            {TARGET_OPTIONS.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label} — {t.hint}
-              </option>
+      </>
+    ),
+    hedef: <SegmentBuilder init={init} options={options} onChange={({ count: c }) => setCount(c)} />,
+    kanal: (
+      <>
+        <fieldset className="sm:col-span-2">
+          <legend className="mb-2 text-sm font-medium text-ink-950">Kanallar</legend>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {CHANNEL_OPTIONS.map((c) => (
+              <label key={c.value} className="flex min-h-11 cursor-pointer items-start gap-2 rounded-[var(--radius-control)] border border-line bg-surface p-3 text-sm transition has-[:checked]:border-brand-600 has-[:checked]:bg-brand-600/5">
+                <input
+                  type="checkbox"
+                  name="channel"
+                  value={c.value}
+                  checked={channels.includes(c.value)}
+                  onChange={() => setChannels((prev) => (prev.includes(c.value) ? prev.filter((x) => x !== c.value) : [...prev, c.value]))}
+                  className="mt-0.5 h-4 w-4 accent-[var(--brand-600)]"
+                />
+                <span>
+                  <span className="font-semibold text-ink-950">{c.label}</span>
+                  <span className="block text-xs text-text-muted">{c.hint}</span>
+                </span>
+              </label>
             ))}
-          </FormSelect>
+          </div>
+        </fieldset>
+        <label className="flex min-h-11 cursor-pointer items-start gap-2 text-sm text-ink-950 sm:col-span-2">
+          <input type="checkbox" name="commercial" checked={commercial} onChange={(e) => setCommercial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--brand-600)]" />
+          <span>
+            Ticari ileti (kampanya, indirim, tanıtım)
+            <span className="block text-xs text-text-muted">İYS uyumu: yalnız bildirim tercihlerinde pazarlama iletisine izin veren kullanıcılara gider; diğerleri raporda &quot;atlandı&quot; görünür.</span>
+          </span>
+        </label>
+        <FormField label="Gönderim zamanı" htmlFor="scheduled_at" hint="Boş: hemen. Türkiye saatiyle.">
+          <FormInput id="scheduled_at" name="scheduled_at" type="datetime-local" min={minLocal} />
         </FormField>
-        {target === "specific" ? (
-          <FormField label="Ofis" htmlFor="bc-tenant" required inject={false} className="sm:col-span-2">
-            <Combobox
-              id="bc-tenant"
-              name="tenant_id"
-              required
-              clearable={false}
-              options={tenantOptions}
-              onValueChange={setTenantId}
-              onSearch={searchTenantsBroadcast}
-              placeholder="Ofis ara ve seçin"
-              searchPlaceholder="Ofis adı yazın…"
-              emptyText="Eşleşen ofis yok"
-            />
-          </FormField>
-        ) : null}
+        <FormField label="Bitiş (isteğe bağlı)" htmlFor="expires_at" hint="Bu saatten sonra gönderilmemiş alıcılara gitmez.">
+          <FormInput id="expires_at" name="expires_at" type="datetime-local" min={minLocal} />
+        </FormField>
       </>
     ),
   };
 
-  function renderSummary({ values, display }: TabbedSummaryContext) {
+  function renderSummary({ values }: TabbedSummaryContext) {
     const title = (values.title ?? "").trim();
     const body = (values.body ?? "").trim();
     const href = (values.href ?? "").trim();
     const kind = KIND_OPTIONS.find((k) => k.value === (values.kind ?? "info")) ?? KIND_OPTIONS[0];
-    const tgt = TARGET_OPTIONS.find((t) => t.value === target);
-    const count = target === "specific" ? (tenantId ? 1 : null) : audienceCounts[target];
-    const tenantLabel = tenantOptions.find((o) => o.value === tenantId)?.label ?? (tenantId ? (display.tenant_id ?? null) : null);
+    const sched = (values.scheduled_at ?? "").trim();
+    const reach = count ? (commercial ? count.optedIn : count.recipients) : null;
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -146,20 +162,18 @@ export function BroadcastForm({
         </div>
         <SummaryGroup title="Gönderim özeti">
           <SummaryRow label="Başlık" value={title || "Zorunlu"} muted={!title} tab="icerik" field="title" />
-          <SummaryRow label="Mesaj" value={body || "Girilmedi"} muted={!body} tab="icerik" field="body" />
-          <SummaryRow label="Bağlantı" value={href || "Girilmedi"} muted={!href} tab="icerik" field="href" />
-          <SummaryRow label="Tür" value={kind.label} tab="hedef" field="kind" />
-          <SummaryRow label="Hedef" value={tgt?.label ?? "—"} tab="hedef" field="target" />
-          {target === "specific" ? (
-            <SummaryRow label="Ofis" value={tenantLabel ?? "Seçilmedi"} muted={!tenantLabel} tab="hedef" field="tenant_id" />
-          ) : null}
+          <SummaryRow label="Tür" value={kind.label} tab="icerik" field="kind" />
+          <SummaryRow label="Ofis" value={count ? `${count.tenants} ofis` : "—"} muted={!count} tab="hedef" field="seg_status" />
+          <SummaryRow label="Ulaşacağı kişi" value={reach === null ? "—" : `${reach} kişi`} muted={reach === null} tab="hedef" field="seg_status" />
           <SummaryRow
-            label="Ulaşacağı ofis"
-            value={count === null ? "—" : `${count} ofis`}
-            muted={count === null}
-            tab="hedef"
-            field="target"
+            label="Kanal"
+            value={channels.length ? CHANNEL_OPTIONS.filter((c) => channels.includes(c.value)).map((c) => c.label).join(", ") : "Seçilmedi"}
+            muted={channels.length === 0}
+            tab="kanal"
+            field="channel"
           />
+          <SummaryRow label="Zaman" value={sched ? sched.replace("T", " ") : "Hemen"} tab="kanal" field="scheduled_at" />
+          {commercial ? <SummaryRow label="Ticari ileti" value="Yalnız izinli kullanıcılar" tab="kanal" field="commercial" /> : null}
         </SummaryGroup>
       </>
     );
@@ -167,13 +181,13 @@ export function BroadcastForm({
 
   return (
     <TabbedFormShell
-      title="Yeni duyuru"
-      description="Seçilen ofislerin bildirim kutusuna anlık mesaj iletir. Gönderim geri alınamaz."
+      title={pageTitle}
+      description="Segment, kanal ve zaman seçin. Gönderim kuyrukta yapılır; teslim, okunma ve tıklama arşivde izlenir."
       eyebrow="Toplu duyuru"
-      breadcrumbs={[{ label: "Duyurular", href: "/admin/duyuru" }, { label: "Yeni duyuru" }]}
+      breadcrumbs={[{ label: "Duyurular", href: "/admin/duyuru" }, { label: pageTitle }]}
       cancelHref="/admin/duyuru"
-      submitLabel="Duyuruyu gönder"
-      pendingLabel="Gönderiliyor…"
+      submitLabel="Kuyruğa al ve gönder"
+      pendingLabel="Kuyruğa alınıyor…"
       pending={pending}
       error={error}
       onSubmit={onSubmit}

@@ -171,6 +171,7 @@ const FORMS = [
   {
     name: "platform duyurusu",
     source: "src/app/admin/duyuru/broadcast-form.tsx",
+    extraSources: ["src/app/admin/duyuru/segment-builder.tsx"],
     tabs: BROADCAST_TABS as readonly TabLike[],
     draft: BROADCAST_DRAFT_FIELDS as readonly string[],
   },

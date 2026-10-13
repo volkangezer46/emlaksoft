@@ -6,6 +6,7 @@ import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { deleteBroadcast, updateBroadcast } from "@/app/actions/platform-notifications";
+import { DeliveryActions } from "./delivery-actions";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
 import { KIND_OPTIONS } from "./broadcast-options";
@@ -20,7 +21,33 @@ export type BroadcastRowData = {
   tenantName: string | null;
   sentCount: number;
   createdLabel: string;
+  /** AD8 kuyruk alanları (eski satırlarda varsayılan). */
+  status: string;
+  channels: string[];
+  scheduledLabel: string | null;
+  expiresLabel: string | null;
+  queued: boolean;
+  recipients: number;
+  delivered: number;
+  failed: number;
+  reads: number;
+  clicks: number;
+  inAppSent: number;
+  open: number;
+  hasHref: boolean;
+  commercial: boolean;
 };
+
+const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  scheduled: { label: "Zamanlandı", cls: "bg-cyan-400/15 text-cyan-600" },
+  sending: { label: "Gönderiliyor", cls: "bg-brand-600/15 text-brand-600" },
+  sent: { label: "Gönderildi", cls: "bg-mint-500/15 text-mint-600" },
+  partial: { label: "Kısmen", cls: "bg-amber-400/15 text-amber-700" },
+  cancelled: { label: "İptal", cls: "bg-canvas text-text-muted" },
+  expired: { label: "Süresi doldu", cls: "bg-canvas text-text-muted" },
+};
+const CHANNEL_LABEL: Record<string, string> = { in_app: "Uygulama içi", email: "E-posta", push: "Push" };
+const pct = (n: number, d: number) => (d > 0 ? `%${Math.round((n / d) * 100)}` : "—");
 
 /** Duyuru geçmişi satırı: gövdeyi aç/kapat, düzenle (satır içi panel), geri çek (satır içi onay). */
 export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRowData; canEdit: boolean; isSuperAdmin: boolean }) {
@@ -69,9 +96,47 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
             row.audienceLabel
           )}
         </p>
-        <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">{row.sentCount} ofis</span>
-        <p className="text-xs text-text-faint">{row.createdLabel}</p>
+        {row.queued ? (
+          <Link href={`/admin/duyuru?duyuru=${row.id}`} className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600 transition hover:bg-mint-500/20">
+            {row.sentCount} ofis · {row.recipients} kişi
+          </Link>
+        ) : (
+          <span className="numeric w-fit rounded-full bg-mint-500/10 px-2.5 py-1 text-xs font-bold text-mint-600">{row.sentCount} ofis</span>
+        )}
+        <p className="text-xs text-text-faint">{row.scheduledLabel && row.status === "scheduled" ? `Plan: ${row.scheduledLabel}` : row.createdLabel}</p>
       </div>
+
+      {row.queued ? (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className={`rounded-full px-2 py-0.5 font-bold ${STATUS_BADGE[row.status]?.cls ?? "bg-canvas text-text-muted"}`}>{STATUS_BADGE[row.status]?.label ?? row.status}</span>
+          {row.channels.map((c) => (
+            <span key={c} className="rounded-full border border-line px-2 py-0.5 text-text-muted">{CHANNEL_LABEL[c] ?? c}</span>
+          ))}
+          {row.commercial ? <span className="rounded-full border border-amber-400/40 px-2 py-0.5 text-amber-700">Ticari (İYS)</span> : null}
+          {row.expiresLabel ? <span className="text-text-faint">Bitiş: {row.expiresLabel}</span> : null}
+          <Link href={`/admin/duyuru?duyuru=${row.id}&durum=sent`} className="numeric rounded-full bg-mint-500/10 px-2 py-0.5 font-semibold text-mint-600 hover:underline">
+            {row.delivered} teslim
+          </Link>
+          {row.open > 0 ? (
+            <Link href={`/admin/duyuru?duyuru=${row.id}&durum=pending`} className="numeric rounded-full bg-brand-600/10 px-2 py-0.5 font-semibold text-brand-600 hover:underline">
+              {row.open} kuyrukta
+            </Link>
+          ) : null}
+          <Link href={`/admin/duyuru?duyuru=${row.id}&durum=okundu`} className="numeric rounded-full bg-cyan-400/10 px-2 py-0.5 font-semibold text-cyan-600 hover:underline" title="Okunma: zilde okunan / uygulama içi teslim">
+            Okunma {pct(row.reads, row.inAppSent)} ({row.reads})
+          </Link>
+          {row.hasHref ? (
+            <Link href={`/admin/duyuru?duyuru=${row.id}&durum=tiklandi`} className="numeric rounded-full bg-cyan-400/10 px-2 py-0.5 font-semibold text-cyan-600 hover:underline" title="Tıklama: bağlantıya tıklayan / toplam teslim">
+              Tıklama {pct(row.clicks, row.delivered)} ({row.clicks})
+            </Link>
+          ) : null}
+          {row.failed > 0 ? (
+            <Link href={`/admin/duyuru?duyuru=${row.id}&durum=failed`} className="numeric rounded-full bg-danger-500/10 px-2 py-0.5 font-semibold text-danger-600 hover:underline">
+              {row.failed} başarısız
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {expanded ? (
         <div className="mt-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3 text-sm">
@@ -81,6 +146,7 @@ export function BroadcastRow({ row, canEdit, isSuperAdmin }: { row: BroadcastRow
 
       {canEdit ? (
         <div className="mt-2 flex flex-wrap items-start gap-2">
+          {row.queued ? <DeliveryActions id={row.id} status={row.status} failed={row.failed} /> : null}
           <InlineTabbedPanel
             open={editOpen}
             onOpenChange={(v) => {
