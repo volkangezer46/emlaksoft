@@ -23,8 +23,9 @@ satıra yazılır; GET ucu özel anahtarı yüklemez. Yönetim: `/admin/sistem?s
 
 **Anahtar değişimi (rotasyon):** yeni kid üret (`k2`), açık anahtarını `RULE_PUBLIC_KEYS`'e EKLE (eskisini silme), yeni paketi mağazaya gönder; paket
 kullanıcılara yayıldıktan sonra sunucu env'ini `k2`'ye çevir (yeni yayınlar `k2` ile imzalanır, eski satırlar `k1` imzasıyla geçerli kalır). Eski kid en az
-bir paket sürümü boyunca listede tutulur, sonraki pakette çıkarılır. Özel anahtar sızdıysa: hemen env'den kaldır (yayın durur, eklentiler son iyi sürümde
-kalır ve süre dolunca tohuma döner, §6), yeni kid ile hızlandırılmış paket gönder.
+bir paket sürümü boyunca listede tutulur, sonraki pakette çıkarılır. Özel anahtar sızdıysa sıra şudur (§7.3): önce sızmamış/yeni anahtarla tohum
+içerikli geri alma (max+1) yayınla, SONRA sızan özel anahtarı env'den kaldır ve sızan kid'i `rule-keys.ts`'ten çıkarıp sunucuyu yeniden dağıt; yeni kid
+ile hızlandırılmış paket gönder. Env'den kaldırmak yalnız YENİ yayını durdurur; uç saklı imzalı setleri sunmaya devam eder.
 
 ## 2. Tohum yayını (ilk kurulum)
 
@@ -74,10 +75,19 @@ hesabının kiracısı da dışlanır (oyları öğrenmeye girmez).
 
 1. **Doğru adım: tohum içerikli geri alma yayınla (max+1).** Sürüm geçmişinde sürüm 1'e (tohum) geri dön; eklentiler bir sonraki tazelemede
    (EmlakSoft sayfası açılışı ≤6 saat, aktarım başında ≤1 saat) tohum davranışına iner.
-2. **Kural ucunu kapatmak** (imza anahtarını env'den kaldırmak → uç `503 signing_unavailable`) yeni seti dağıtmayı durdurur ama eklenti **son iyi sürümde
-   kalır** — sorunlu set son iyi sürümse o set, süresi (`expiresAt`, yayından 14 gün) dolana kadar kullanılmaya devam eder, süre dolunca tohuma döner.
-   Bu yüzden 503 tek başına kurtarma DEĞİLDİR; yalnız anahtar sızıntısında ya da imzalama bozukken 1. adımla birlikte kullanılır.
-3. Anahtar sızıntısı: env'den kaldır, §1 rotasyonunu hızlandırılmış yap; sızan kid'i sonraki pakette `RULE_PUBLIC_KEYS`'ten çıkar.
+2. **Kural ucunu kapatmak:** GET ucu imzalamaz, satırda saklı imzayı pakete gömülü açık anahtarla (`RULE_PUBLIC_KEYS`) doğrulayıp sunar. Bu yüzden
+   özel anahtarı (`PORTAL_RULES_SIGNING_KEY`) env'den kaldırmak ucu KAPATMAZ: uç `200` ile mevcut imzalı setleri sunmaya devam eder, yalnız yeni yayın
+   (geri alma dahil) durur. Ucu `503 signing_unavailable`'a almak için `rule-keys.ts`'ten kid çıkarılıp sunucu yeniden dağıtılmalı (liste boşalırsa
+   503; yalnız bir kid çıkarılırsa o kid'le imzalı satırlar sunulmaz) ya da route kapatılmalı. Her iki durumda da eklenti **son iyi sürümde kalır** —
+   sorunlu set son iyi sürümse o set, süresi (`expiresAt`, yayından 14 gün) dolana kadar kullanılmaya devam eder, süre dolunca tohuma döner.
+   Bu yüzden 503 tek başına kurtarma DEĞİLDİR; 1. adımın yerine geçmez, ondan SONRA kullanılır.
+3. **Anahtar sızıntısı:** sıra önemlidir, çünkü 1. adım özel anahtarla imzalama ister.
+   a. Sızmamış/yeni anahtar env'de etkinken tohum içerikli geri alma (max+1) yayınla (1. adım). Yeni kid ise önce açık anahtarı `rule-keys.ts`'e
+      eklenip sunucu dağıtılmış olmalı; eklenti yalnız paketine gömülü kid'leri kabul ettiğinden yeni kid'li set ancak yeni paketle etkili olur.
+   b. Sonra sızan özel anahtarı env'den kaldır, sızan kid'i `rule-keys.ts`'ten çıkarıp sunucuyu yeniden dağıt; §1 rotasyonunu hızlandırılmış yap ve
+      sızan kid'i sonraki pakette `RULE_PUBLIC_KEYS`'ten çıkar.
+   c. Sızan anahtar TEK anahtarsa (paketlerde başka kid yoksa) eklentinin kabul edeceği bir geri alma imzalanamaz: eklentiler son iyi sürümde kalır ve
+      `expiresAt` (yayından 14 gün) dolunca tohuma döner; bu süre, yeni kid'li paketin mağazadan yayılmasıyla kısaltılır.
 4. Olay sonrası: `platform_audit_logs` (`entity_type` `portal_rule_set` / `portal_rule_proposal` / `portal_rule_trust` / `portal_rule_ai`) ile kimin hangi
    sürümü yayınladığını incele; `docs/HAFIZA.md`'ye kısa not düş.
 
