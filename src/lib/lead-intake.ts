@@ -8,6 +8,7 @@ import { buildLeadCommunication } from "@/lib/lead-message";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { routeNewLead } from "@/lib/lead-routing/server";
 import { now } from "@/lib/clock";
+import { dispatchAutomationEvent } from "@/lib/automation-engine";
 
 export type LeadInput = {
   fullName: string;
@@ -274,6 +275,20 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     href: `/app/musteriler/${customerId}`,
     kind: "success",
   });
+
+  // Yeni aday = yeni müşteri: ofisin "new_customer" otomasyonları (görev, danışmana bildirim...) panelden
+  // eklenen müşteriyle aynı biçimde tetiklenir. Mükerrerde tetiklenmez (müşteri zaten var). Beklenmez ve
+  // hata talebi asla bozmaz; modül/kural kapıları motorun içindedir. Adaya otomatik mesaj şablonu YOK.
+  if (!duplicate) {
+    void dispatchAutomationEvent(tenantId, "new_customer", {
+      entityType: "customer",
+      entityId: customerId,
+      customerId,
+      label: fullName,
+      assignedTo,
+      fields: { source, channel },
+    }).catch((e) => console.error("intakeLead automation new_customer", e instanceof Error ? e.message : e));
+  }
 
   return { ok: true, customerId, assignedTo, duplicate };
 }

@@ -35,6 +35,20 @@ async function run(req: NextRequest) {
   const overBudget = () => isPastDeadline(Date.now(), deadline);
   /** Sonraki koşuya bırakılan iş (heartbeat teşhisi). */
   const deferred: string[] = [];
+  /** Başarısız toplu yazmalar — heartbeat'e 'failed' notuyla düşer (sessiz yutma yok). */
+  const failures: string[] = [];
+  const noteFailure = (step: string, res: PromiseSettledResult<{ error: unknown }> | { error: unknown }) => {
+    const err = "status" in res ? (res.status === "rejected" ? res.reason : res.value.error) : res.error;
+    if (!err) return;
+    const message =
+      err instanceof Error
+        ? err.message
+        : typeof err === "object" && "message" in err
+          ? String((err as { message: unknown }).message)
+          : String(err);
+    console.error("abonelik-kontrol yazma", step, message);
+    failures.push(`${step}: ${message}`.slice(0, 120));
+  };
 
   const { data: trials } = await admin
     .from("subscriptions")
@@ -46,28 +60,51 @@ async function run(req: NextRequest) {
   if ((trials?.length ?? 0) >= BATCH_LIMIT) deferred.push("deneme bitişi (limit)");
 
   // N+1 freni: satır başına 3 yazma yerine küme başına 3 toplu yazma.
-  // 100 deneme için ~300 gidiş-dönüş → 3'e iner.
+  // YARIŞ GÜVENLİĞİ: güncelleme okuma koşulunu TEKRARLAR (status=trialing + süre geçmiş) — okuma ile yazma
+  // arasında ödeme yapıp 'active' olan abonelik ezilmez. Ofis yalnız dönen (gerçekten güncellenen) aboneliklerden
+  // ve yalnız 'trial'/'active' durumundaysa past_due olur (askıdaki/iptal ofis past_due'ya çekilmez); bildirim
+  // yalnız durumu değişen ofislere gider.
   const rows = trials ?? [];
   const subIds = rows.map((s) => s.id);
-  const tenantIds = [...new Set(rows.map((s) => s.tenant_id))];
+  let updated = 0;
 
   if (subIds.length > 0) {
-    await Promise.all([
-      admin.from("subscriptions").update({ status: "past_due", updated_at: now }).in("id", subIds),
-      admin.from("tenants").update({ status: "past_due", updated_at: now }).in("id", tenantIds),
-      admin.from("notifications").insert(
-        tenantIds.map((tenantId) => ({
-          tenant_id: tenantId,
-          title: "Deneme süresi doldu",
-          body: "Aboneliğinizi yenilemek için Paket & ödeme sayfasına gidin.",
-          href: "/app/abonelik",
-          kind: "warning",
-        })),
-      ),
-    ]);
+    const subRes = await admin
+      .from("subscriptions")
+      .update({ status: "past_due", updated_at: now })
+      .in("id", subIds)
+      .eq("status", "trialing")
+      .lt("trial_ends_at", now)
+      .select("id, tenant_id");
+    noteFailure("deneme bitişi abonelik", subRes);
+    const expired = (subRes.data ?? []) as Array<{ id: string; tenant_id: string }>;
+    updated = expired.length;
+    const tenantIds = [...new Set(expired.map((s) => String(s.tenant_id)))];
+    if (tenantIds.length > 0) {
+      const tenantRes = await admin
+        .from("tenants")
+        .update({ status: "past_due", updated_at: now })
+        .in("id", tenantIds)
+        .in("status", ["trial", "active"])
+        .select("id");
+      noteFailure("deneme bitişi ofis", tenantRes);
+      const changedTenantIds = [...new Set(((tenantRes.data ?? []) as Array<{ id: string }>).map((t) => String(t.id)))];
+      if (changedTenantIds.length > 0) {
+        noteFailure(
+          "deneme bitişi bildirim",
+          await admin.from("notifications").insert(
+            changedTenantIds.map((tenantId) => ({
+              tenant_id: tenantId,
+              title: "Deneme süresi doldu",
+              body: "Aboneliğinizi yenilemek için Paket & ödeme sayfasına gidin.",
+              href: "/app/abonelik",
+              kind: "warning",
+            })),
+          ),
+        );
+      }
+    }
   }
-
-  const updated = subIds.length;
 
   // Deneme bitimi hatırlatması: 3 gün ve 1 gün kala, abonelik başına kademe başına BİR kez (marker ile).
   // Kademe: kalan <=1 gün → trial1, <=3 gün → trial3. Aynı kademe 5 günlük pencerede tekrar yazılmaz.
@@ -149,7 +186,7 @@ async function run(req: NextRequest) {
     if (target.length > 0) {
       const suspSubIds = target.map((s) => s.id);
       const suspTenantIds = [...new Set(target.map((s) => String(s.tenant_id)))];
-      await Promise.all([
+      const results = await Promise.allSettled([
         admin.from("subscriptions").update({ status: "paused", updated_at: now }).in("id", suspSubIds).eq("status", "past_due"),
         admin.from("tenants").update({ status: "suspended", updated_at: now }).in("id", suspTenantIds).eq("status", "past_due"),
         admin.from("notifications").insert(
@@ -162,6 +199,7 @@ async function run(req: NextRequest) {
           })),
         ),
       ]);
+      results.forEach((r, i) => noteFailure(["askıya alma abonelik", "askıya alma ofis", "askıya alma bildirim"][i]!, r));
       suspended = suspSubIds.length;
     }
   }
@@ -198,13 +236,14 @@ async function run(req: NextRequest) {
   if (!cancelReadError && dueCancel.length > 0) {
     const cancelSubIds = dueCancel.map((s) => s.id);
     const cancelTenantIds = [...new Set(dueCancel.map((s) => s.tenant_id))];
-    await Promise.all([
+    const results = await Promise.allSettled([
       admin
         .from("subscriptions")
         .update({ status: "cancelled", cancelled_at: now, updated_at: now })
         .in("id", cancelSubIds),
       admin.from("tenants").update({ status: "cancelled", updated_at: now }).in("id", cancelTenantIds),
     ]);
+    results.forEach((r, i) => noteFailure(["dönem sonu iptali abonelik", "dönem sonu iptali ofis"][i]!, r));
     cancelled = cancelSubIds.length;
   }
 
@@ -237,11 +276,11 @@ async function run(req: NextRequest) {
 
   await recordHeartbeat(
     "abonelik-kontrol",
-    deferred.length > 0 ? "error" : "ok",
-    `${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
+    deferred.length > 0 || failures.length > 0 ? "error" : "ok",
+    `${failures.length > 0 ? `failed — ${failures.join("; ")} · ` : ""}${updated} abonelik güncellendi, ${trialReminded} deneme hatırlatması (${trialEmailed} e-posta), ${suspended} askıya alma, ${cancelled} iptal tamamlandı, yetki belgesi ${license.expiry}+${license.annualFee}, portföy yetkisi ${authority.written}/${authority.candidates}, teklif bitimi ${offerExpiry.notified}, duraklatma devam ${lifecycle.resumed}, planlı düşürme ${lifecycle.downgraded}/${lifecycle.downgradeFailed}${deferred.length > 0 ? ` · sonraki koşuya kaldı: ${deferred.join(", ")}` : ""}`,
   );
 
-  return NextResponse.json({ ok: true, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, deferred });
+  return NextResponse.json({ ok: failures.length === 0, failures, updated, cancelled, trialReminded, suspended, license, authority, offerExpiry, lifecycle, deferred });
 }
 
 export const GET = guardCron("abonelik-kontrol", run);

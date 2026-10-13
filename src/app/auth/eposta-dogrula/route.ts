@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { EMAIL_VERIFIED_META_KEY } from "@/lib/auth/email-verification";
 import { daysFromNowIso } from "@/lib/clock";
@@ -11,7 +12,7 @@ import { daysFromNowIso } from "@/lib/clock";
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
   const back = (path: string) => {
-    const res = NextResponse.redirect(new URL(path, request.nextUrl.origin));
+    const res = publicRedirect(path);
     res.headers.set("Cache-Control", "no-store");
     return res;
   };

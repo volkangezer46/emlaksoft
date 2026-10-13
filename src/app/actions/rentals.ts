@@ -13,6 +13,7 @@ import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { checkRentalExtension } from "@/lib/workflow-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { trDayKey } from "@/lib/clock";
 
 /**
  * Mülk yönetimi (kiralama) server action'ları.
@@ -120,7 +121,7 @@ export async function endRental(id: string): Promise<RentalResult> {
     p_tenant_id: gate.tenantId,
     p_actor_id: gate.userId,
     p_rental_id: id,
-    p_end_date: new Date().toISOString().slice(0, 10),
+    p_end_date: trDayKey(),
   });
   if (error) {
     console.error("endRental atomic", { code: error.code });

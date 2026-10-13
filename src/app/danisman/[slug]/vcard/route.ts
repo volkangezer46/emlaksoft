@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicOrigin } from "@/lib/public-redirect";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
@@ -34,7 +35,7 @@ function asciiSlug(s: string): string {
   );
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   if (!SLUG_RE.test(slug)) {
     return NextResponse.json({ error: "Kartvizit bulunamadı" }, { status: 404 });
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ slug
   const lastName = parts.length > 1 ? (parts.at(-1) ?? "") : "";
   const firstName = parts.length > 1 ? parts.slice(0, -1).join(" ") : fullName;
 
-  const origin = req.nextUrl.origin;
+  const origin = publicOrigin();
   const lines = [
     "BEGIN:VCARD",
     "VERSION:3.0",
