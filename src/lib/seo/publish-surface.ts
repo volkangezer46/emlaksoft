@@ -11,8 +11,12 @@ import { SEO_CACHE_TAG, writeSeoSetting } from "./store";
  *  - Taslak ve sürüm geçmişi AYRI anahtarda: `seo.overrides.draft|history` (createVersionedStore; `.live` yalnız aynadır).
  *  - CANLI tek kaynak değişmez: `seo.pages` (buildMetadata, sitemap). Yayın oraya `writeSeoSetting` ile yazar; böylece
  *    `seo.history` halkası (history.ts) da dolar ve SEO Geçmiş sekmesinden geri dönüş çalışmaya devam eder.
+ *  - TASLAK BİR FARKTIR (patch): `seo.overrides.draft` yalnız taslakta değiştirilen sayfa/alanları tutar, tam harita
+ *    DEĞİL. Okurken (`readState`) her seferinde GÜNCEL canlının üstüne uygulanır; böylece taslak açıkken yapılan doğrudan
+ *    kayıt (`saveSeoPage`) bayat bir tam haritayla ezilmez ve hayalet "yayınlanmamış taslak" görünmez.
  *  - Mevcut doğrudan kaydetme (`saveSeoPage`) KORUNUR. Canlı doğrudan kayıtla değiştiyse bir sonraki yayın önce o
  *    canlıyı geçmişe "önceki canlı" olarak yazar: geri dönüş her zaman yayın öncesi değere ulaşır.
+ *  - Yayından ve taslağı atmadan sonra fark BOŞALTILIR (zamanlı yayında yalnız henüz canlıya geçmemiş alanlar kalır).
  *  - Yüzey kaydı (SURFACES listesi, SurfaceId birleşimi) S2 dikişindedir; burada yalnız nesne dışa verilir.
  */
 
@@ -65,20 +69,51 @@ const entryMeta = (label: string, by: string) => ({
   label: label.slice(0, 80),
 });
 
-/** Bir sayfanın tek alanını TASLAĞA yazar (canlı değişmez). Taslak yoksa canlıdan başlar. */
+type DraftField = "title" | "description" | "ogTitle" | "ogDescription";
+const DRAFT_FIELDS: readonly DraftField[] = ["title", "description", "ogTitle", "ogDescription"];
+
+/** Farkın canlıyla AYNI olan alanlarını atar; boş sayfalar düşer (SAF). Yalnız taslak alanları taşınır. */
+export function pruneDraftPatch(patch: SeoPages, live: SeoPages): SeoPages {
+  const out: SeoPages = {};
+  for (const [path, ov] of Object.entries(patch)) {
+    const kept: SeoPageOverride = {};
+    for (const f of DRAFT_FIELDS) {
+      const v = ov[f];
+      if (typeof v === "string" && v !== live[path]?.[f]) kept[f] = v;
+    }
+    if (Object.keys(kept).length > 0) out[path] = kept;
+  }
+  return out;
+}
+
+/** Farkı canlının üstüne uygular (SAF). Fark boşsa (canlıyla aynıysa) null: yayınlanacak taslak yok. */
+export function applyDraftPatch(live: SeoPages, patch: SeoPages | null): SeoPages | null {
+  const p = pruneDraftPatch(patch ?? {}, live);
+  if (Object.keys(p).length === 0) return null;
+  const out: SeoPages = { ...live };
+  for (const [path, ov] of Object.entries(p)) out[path] = { ...(live[path] ?? {}), ...ov };
+  return out;
+}
+
+/** Bir sayfanın tek alanını TASLAĞA (farka) yazar (canlı değişmez). Canlıyla aynı değer farktan düşer. */
 export async function draftSeoPageField(
   path: string,
-  field: "title" | "description" | "ogTitle" | "ogDescription",
+  field: DraftField,
   value: string,
   staffId: string,
 ): Promise<StoreResult & { before?: string | null }> {
   const [state, live] = await Promise.all([seoOverridesStore.readState(), readLivePages(false)]);
-  const base: SeoPages = state.draft ?? live;
-  const before = base[path]?.[field] ?? null;
-  const next: SeoPages = { ...base, [path]: { ...(base[path] ?? {}), [field]: value } };
-  if (!parsePages(next)) return { ok: false, error: "Taslak SEO kurallarına uymuyor." };
+  const patch = pruneDraftPatch(state.draft ?? {}, live);
+  const before = patch[path]?.[field] ?? live[path]?.[field] ?? null;
+  const next = pruneDraftPatch({ ...patch, [path]: { ...(patch[path] ?? {}), [field]: value } }, live);
+  if (!parsePages(next) || !parsePages(applyDraftPatch(live, next) ?? live)) return { ok: false, error: "Taslak SEO kurallarına uymuyor." };
   const res = await seoOverridesStore.saveDraft(next, staffId);
   return res.ok ? { ok: true, before } : res;
+}
+
+/** Bekleyen taslak farkını atar (canlı değişmez). */
+export async function discardSeoDraftPatch(staffId: string): Promise<StoreResult> {
+  return seoOverridesStore.saveDraft({}, staffId);
 }
 
 /** Son yayında değişen yollar (afterPublish `livePaths`). Süreç içi; yayın öncesi tüm geçersiz kılınan sayfalar. */
@@ -96,7 +131,8 @@ export const seoPublishSurface: Omit<PublishSurface, "id"> & { surfaceId: "seo" 
   defaults: () => ({}),
   async readState(): Promise<SurfaceState> {
     const [s, live] = await Promise.all([seoOverridesStore.readState(), readLivePages(false)]);
-    return { live, draft: s.draft, history: s.history, updatedBy: s.history[0]?.by || null, updatedAt: s.history[0]?.at ?? null };
+    // Taslak = güncel canlı + fark (fark yoksa null).
+    return { live, draft: applyDraftPatch(live, s.draft), history: s.history, updatedBy: s.history[0]?.by || null, updatedAt: s.history[0]?.at ?? null };
   },
   readLiveStrict: () => readLivePages(true),
   async validate(cfg) {
@@ -120,10 +156,11 @@ export const seoPublishSurface: Omit<PublishSurface, "id"> & { surfaceId: "seo" 
     const wrote = await writeSeoSetting("pages", PagesSchema, stamped, staffId, by ?? null);
     if (!wrote.ok) return { ok: false, error: wrote.error };
     lastChanged = changedPagePaths(live, stamped);
-    // Zamanlı yayında editördeki daha yeni taslak korunur.
-    if (opts?.keepDraft && state.draft && changedPagePaths(state.draft, pages).length > 0 && changedPagePaths(state.draft, live).length > 0) {
-      await seoOverridesStore.saveDraft(state.draft, staffId);
-    }
+    // store.publish taslağa TAM haritayı yazdı; fark modelinde taslak boşaltılır. Zamanlı yayında editördeki henüz
+    // canlıya geçmemiş alanlar (fark) korunur.
+    const rest = opts?.keepDraft ? pruneDraftPatch(state.draft ?? {}, stamped) : {};
+    const cleared = await seoOverridesStore.saveDraft(rest, staffId);
+    if (!cleared.ok) return cleared;
     return { ok: true };
   },
   async resetToDefault(staffId, by) {

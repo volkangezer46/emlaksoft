@@ -43,7 +43,7 @@ import { SeoAiOutputSchema, suggestSeoWithAi } from "@/lib/seo/ai-suggest";
 import { seoAfterPublishHook } from "@/lib/seo/after-publish-hook";
 import { seoMetaDraftExecutor } from "@/lib/seo/executors";
 import { auditRunToIssues } from "@/lib/seo/issues-collector";
-import { draftSeoPageField, seoOverridesStore, seoPublishSurface } from "@/lib/seo/publish-surface";
+import { discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
 import { canAutoOptimize } from "@/lib/seo/scope";
 
 export type SeoActionResult = { ok?: boolean; error?: string; message?: string; data?: string };
@@ -444,12 +444,11 @@ export async function publishSeoDraft(): Promise<SeoActionResult> {
   return { ok: true, message: livePaths.length > 0 ? `Yayınlandı: ${livePaths.join(", ")}.` : "Yayınlandı (değişiklik yoktu)." };
 }
 
-/** Taslağı canlıya eşitler (bekleyen değişiklikleri atar). */
+/** Bekleyen taslak farkını atar (canlı değişmez). */
 export async function discardSeoDraft(): Promise<SeoActionResult> {
   const g = await guard(false);
   if ("error" in g) return g;
-  const state = await seoPublishSurface.readState();
-  const res = await seoOverridesStore.saveDraft((state.live ?? {}) as Parameters<typeof seoOverridesStore.saveDraft>[0], g.staff.id);
+  const res = await discardSeoDraftPatch(g.staff.id);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.draft.discard", "pages");
   revalidatePath("/admin/seo");
