@@ -1,4 +1,5 @@
-import { NEVER_INDEX_PREFIXES, seoPages } from "@/lib/seo/registry";
+import { seoPages } from "@/lib/seo/registry";
+import { canAutoOptimize as scopeCanAutoOptimize, normalizePath } from "@/lib/seo/scope";
 import { adsRecommendations, CAMPAIGN_ONLY_AD_GROUP_ID, type AdsMetricRow } from "./ads-rules";
 import { pathOfPage } from "./gsc";
 import { GOOGLE_SERVICES, GOOGLE_SERVICE_LABELS, type GoogleService } from "./keys";
@@ -54,14 +55,14 @@ export function expectedCtr(position: number): number {
 }
 
 /**
- * Otomatik iyileştirilebilir mi (S0 `scope.ts` main'de yokken YEREL kopya): SEO envanterinde, indekslenebilir,
- * hesap grubunda değil (/kayit, /giris dönüşüm/hesap sayfaları elle yönetilir) ve asla-indeks öneklerinin dışında.
+ * Search Console önerisi alabilir mi: kapsam kararı TEK kaynaktan (S0 `seo/scope.ts` canAutoOptimize: üyelik/oturum,
+ * ofis içeriği ve asla-indeks yolları hayır) + sayfa SEO envanterinde ve indekslenebilir (öneri SEO kaydına gider).
  */
 export function canAutoOptimize(path: string): boolean {
-  const p = path.replace(/\/+$/, "") || "/";
-  if (NEVER_INDEX_PREFIXES.some((pre) => p === pre || p.startsWith(`${pre}/`))) return false;
+  const p = normalizePath(path);
+  if (!scopeCanAutoOptimize(p)) return false;
   const def = seoPages().find((d) => d.path === p);
-  return Boolean(def && def.canIndex && def.group !== "hesap");
+  return Boolean(def && def.canIndex);
 }
 
 export function seoRecordHref(path: string): string {
