@@ -16,6 +16,9 @@ services:
     memswap_limit: 2g
     # SIGTERM sonrası açık istekler bitsin (varsayılan 10 sn).
     stop_grace_period: 20s
+    # Yayınlar arası korunan statik parçalar (scripts/sunucu/deploy.sh doldurur; açık sekmelerde ChunkLoadError önlenir).
+    volumes:
+      - /srv/emlaksoft/next-static:/app/.next/static:ro
     networks: [coolify]
     labels:
       traefik.enable: "true"

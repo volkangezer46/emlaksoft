@@ -27,6 +27,19 @@ fi
 DOCKER_BUILDKIT=1 docker build --secret id=appenv,src=.env.production \
   --build-arg RELEASE_SHA="$SHA" -t "emlaksoft-app:$TAG" -t emlaksoft-app:latest .
 
+# Statik dosyalar (/_next/static) yayınlar arasında KORUNUR: yayın anında açık sekmeler eski parça adlarını ister;
+# yalnız yeni imajın dosyaları sunulursa "Failed to load chunk" (ChunkLoadError) olur. Yayındaki ve yeni imajın
+# dosyaları kalıcı klasörde birleşir; konteyner bu klasörü salt-okunur bağlar (deploy/compose.prod.yml). 14 gün tutulur.
+STATIC_DIR=/srv/emlaksoft/next-static
+mkdir -p "$STATIC_DIR"
+docker cp emlaksoft-app:/app/.next/static/. "$STATIC_DIR/" 2>/dev/null || true
+CID=$(docker create "emlaksoft-app:$TAG")
+docker cp "$CID:/app/.next/static/." "$STATIC_DIR/"
+docker rm "$CID" >/dev/null
+find "$STATIC_DIR" -type f -mtime +14 -delete
+find "$STATIC_DIR" -mindepth 1 -type d -empty -delete
+chown -R 1001:1001 "$STATIC_DIR"
+
 # Paket bütçesi yalnız rapor (yayını engellemez; betik --gate bayrağını tanımasa da hata vermez).
 npx tsx scripts/check-bundle-budget.ts --gate || echo "[uyari] paket butcesi"
 
@@ -57,7 +70,15 @@ wait_healthy() {
 
 APP_TAG="$TAG" docker compose -f deploy/compose.prod.yml up -d --remove-orphans
 echo "Yayında: emlaksoft-app:$TAG — sağlık bekleniyor"
+# Disk: son 3 sürüm imajı (+ latest/onceki ve yayındaki) kalır; eski derleme önbelleği temizlenir.
+prune_images() {
+  docker images emlaksoft-app --format '{{.Tag}}' | grep -E '^[0-9]{12}-' | sort -r | tail -n +4 \
+    | while read -r t; do docker rmi "emlaksoft-app:$t" >/dev/null 2>&1 || true; done
+  docker builder prune -f --filter until=72h >/dev/null 2>&1 || true
+}
+
 if wait_healthy; then
+  prune_images
   curl -s https://emlaksoft.com.tr/api/health; echo; exit 0
 fi
 
