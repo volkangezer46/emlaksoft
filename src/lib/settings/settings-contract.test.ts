@@ -40,6 +40,7 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/app/admin/ai-kullanim/actions.ts": "AI kredi maliyet tablosu (kendi ekranı)",
   "src/lib/evds.ts": "TÜFE tablosunun EVDS otomatik doldurması (platform-tufe ile aynı anahtar; resmî satırları ezmez, cron)",
   "src/lib/insights/engine.ts": "içgörü motoru tur imleci (ayar değil, cron durum işaretçisi; tek anahtar, ofis kimliği)",
+  "src/lib/measure/settings.ts": "ölçüm ayarı measure.settings (SP3; doğrudan anahtar — settings/registry/platform.ts başka paketin dosyası; yazım yalnız süper admin eylemi measure-admin.ts, denetim izli)",
   "src/lib/publishing/store.ts":
     "yayın masası zamanlama kuyruğu (publishing.scheduled; ayar değil, iş kuyruğu kaydı — insights/engine imleci gibi; yazım publishing cron'u ve yetkili Yayın masası eylemleriyle, her işlem denetim izli)",
   "src/app/actions/platform-security.ts":

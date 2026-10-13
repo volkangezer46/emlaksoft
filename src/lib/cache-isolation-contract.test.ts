@@ -36,6 +36,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/geo/reader.ts": { calls: 3, scope: "platform", why: "il/ilçe/mahalle sözlüğü" },
   "src/lib/geo/resolve.ts": { calls: 1, scope: "platform", why: "coğrafya takma adları" },
   "src/lib/integrations/emlakfiyati/client.ts": { calls: 1, scope: "platform", why: "dış endeks verisi (bölge + tip argümanı)" },
+  "src/lib/measure/settings.ts": { calls: 1, scope: "platform", why: "ölçüm ayarı measure.settings (platform geneli; altbilgi ve beacon ucu)" },
   "src/lib/office-score.ts": { calls: 1, scope: "tenant", why: "ofis skoru; anahtar tenantId" },
   "src/lib/pricing-page/store.ts": { calls: 1, scope: "platform", why: "/fiyatlar yayındaki metinleri (platform_settings, ofis verisi yok)" },
   "src/lib/reporting/cache.ts": { calls: 1, scope: "tenant", why: "rapor toplamları; anahtar tenantId, RPC sonucu ofis geneli (kullanıcıya göre değişmez)" },

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "prebuild": "tsx scripts/build-extension.ts --soft && tsx scripts/build-static-home.ts",
+    "prebuild": "tsx scripts/build-extension.ts --soft && tsx scripts/build-static-home.ts && tsx scripts/build-measure-client.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -71,6 +71,7 @@
     "recharts": "^3.10.0",
     "tailwind-merge": "^3.6.0",
     "web-push": "^3.6.7",
+    "web-vitals": "4.2.4",
     "zod": "^4.4.3"
   },
   "devDependencies": {
