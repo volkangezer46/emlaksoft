@@ -4,7 +4,9 @@
  *   npm run build && npm run check:bundle               # yalnız rapor (eşik YOK; eski davranış)
  *   npm run check:bundle -- --max-kb=350                # opsiyonel: route başına sıkıştırılmamış JS üst sınırı
  *   npm run check:bundle -- --warn                      # + panel rotaları ilk yük bütçesi; aşımı YAZAR, çıkış 0
- *   npm run check:bundle -- --gate                      # + aynı bütçe; aşımda çıkış kodu 1 (yayın kancası WP3'te)
+ *   npm run check:bundle -- --gate                      # + aynı bütçe; aşımda çıkış kodu 1 (yayın kancası WP3'te).
+ *                                                         #   Ölçülemeyen rota (manifest yok) ya da diskte olmayan chunk da
+ *                                                         #   kapıda ihlaldir: ölçülmeyen rota geçmiş sayılmaz.
  *   npm run check:bundle -- --next-dir=/yol/.next       # başka bir derleme çıktısını ölç (önce/sonra karşılaştırma)
  *
  * İLK YÜK ÖLÇÜMÜ (Next 16 + Turbopack): app-build-manifest.json artık üretilmiyor; rota başına istemci JS'i
@@ -44,6 +46,8 @@ export type RouteLoad = {
   gzipKb: number;
   dupRatio: number;
   requests: number;
+  /** Manifestte geçen ama diskte bulunmayan JS dosyaları (ölçüme girmedi; boyut eksik ölçülmüş olabilir). */
+  missingFiles: string[];
 };
 
 /** page_client-reference-manifest.js → nesne (globalThis.__RSC_MANIFEST["/x/page"] = {...};). */
@@ -133,11 +137,15 @@ export function measureRoute(nextDir: string, route: string, rootMainFiles: stri
   if (!manifest) return null;
   const { js, css } = initialFiles(manifest, rootMainFiles);
   const sources: string[] = [];
+  const missingFiles: string[] = [];
   let raw = 0;
   let gz = 0;
   for (const f of js) {
     const full = path.join(nextDir, f);
-    if (!existsSync(full)) continue;
+    if (!existsSync(full)) {
+      missingFiles.push(f);
+      continue;
+    }
     const buf = readFileSync(full);
     raw += buf.length;
     gz += gzipSync(buf, { level: 6 }).length;
@@ -151,6 +159,7 @@ export function measureRoute(nextDir: string, route: string, rootMainFiles: stri
     gzipKb: gz / 1024,
     dupRatio: duplicateRatio(sources),
     requests: js.length + css.length,
+    missingFiles,
   };
 }
 
@@ -220,14 +229,29 @@ function legacyReport(nextDir: string, maxKb: number | null): number {
   return 0;
 }
 
-function budgetReport(nextDir: string, gate: boolean): number {
+/**
+ * Ölçüm eksikleri: manifesti olmayan bütçe rotası ve diskte olmayan chunk. `--gate` iken ihlal (çıkış 1) — rota adı
+ * değişir ya da gruba taşınırsa kapı o rotayı sessizce "geçmiş" saymaz; `--warn` iken yalnız uyarı.
+ */
+export function coverageGaps(loads: RouteLoad[], routes: readonly string[] = BUDGET_ROUTES): Violation[] {
+  const out: Violation[] = [];
+  const measured = new Set(loads.map((l) => l.route));
+  for (const r of routes) if (!measured.has(r)) out.push({ route: r, message: "page_client-reference-manifest.js bulunamadı; rota ölçülemedi" });
+  for (const l of loads) {
+    if (l.missingFiles.length > 0) {
+      out.push({ route: l.route, message: `${l.missingFiles.length} chunk diskte yok (ölçüme girmedi): ${l.missingFiles.join(", ")}` });
+    }
+  }
+  return out;
+}
+
+export function budgetReport(nextDir: string, gate: boolean): number {
   const rootMain = readManifest(nextDir, "build-manifest.json")?.rootMainFiles;
   const rootMainFiles = Array.isArray(rootMain) ? rootMain.filter((f): f is string => typeof f === "string") : [];
   const loads: RouteLoad[] = [];
   for (const route of BUDGET_ROUTES) {
     const l = measureRoute(nextDir, route, rootMainFiles);
     if (l) loads.push(l);
-    else console.log(`(${route}: page_client-reference-manifest.js bulunamadı; atlandı)`);
   }
   console.log("\nPanel ilk yük bütçesi (gzip; kök + layout zinciri + sayfa)");
   console.log("-".repeat(72));
@@ -243,7 +267,13 @@ function budgetReport(nextDir: string, gate: boolean): number {
     console.error("Ölçülecek panel rotası bulunamadı (derleme eksik?).");
     return gate ? 1 : 0;
   }
-  const violations = checkBudget(loads);
+  const gaps = coverageGaps(loads);
+  if (gaps.length > 0) {
+    const log = gate ? console.error : console.warn;
+    log(`\nÖlçüm eksiği (${gaps.length})${gate ? "" : " — uyarı"}:`);
+    for (const g of gaps) log(`  ${g.route}: ${g.message}`);
+  }
+  const violations = [...checkBudget(loads), ...(gate ? gaps : [])];
   if (violations.length === 0) {
     console.log("Bütçe içinde.");
     return 0;

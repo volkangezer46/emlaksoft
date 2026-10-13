@@ -7,7 +7,9 @@ import {
   BUDGET_ROUTES,
   MAX_DUP_RATIO,
   MAX_REQUESTS,
+  budgetReport,
   checkBudget,
+  coverageGaps,
   duplicateRatio,
   initialFiles,
   measureRoute,
@@ -23,6 +25,7 @@ const load = (over: Partial<RouteLoad> = {}): RouteLoad => ({
   gzipKb: 100,
   dupRatio: 0.01,
   requests: 10,
+  missingFiles: [],
   ...over,
 });
 
@@ -94,6 +97,53 @@ describe("check-bundle-budget", () => {
     expect(m!.gzipKb).toBeGreaterThan(0);
     expect(m!.gzipKb).toBeLessThan(m!.rawKb);
     expect(m!.dupRatio).toBe(0);
+    expect(m!.missingFiles).toEqual(["static/chunks/yok.js"]);
     expect(measureRoute(dir, "/admin", [])).toBeNull();
+  });
+
+  it("coverageGaps: manifesti olmayan rota ve diskte olmayan chunk ihlal adayıdır", () => {
+    const all = BUDGET_ROUTES.map((route) => load({ route }));
+    expect(coverageGaps(all)).toEqual([]);
+    const gaps = coverageGaps(all.filter((l) => l.route !== "/admin"));
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0]!.route).toBe("/admin");
+    expect(coverageGaps([...all.slice(1), load({ missingFiles: ["static/chunks/x.js"] })])[0]!.message).toMatch(/diskte yok/);
+  });
+
+  it("budgetReport --gate: tek rotanın manifesti eksikse çıkış 1; --warn ise 0", () => {
+    const quiet = (fn: () => number) => {
+      const orig = [console.log, console.warn, console.error];
+      console.log = console.warn = console.error = () => {};
+      try {
+        return fn();
+      } finally {
+        [console.log, console.warn, console.error] = orig;
+      }
+    };
+    const d = mkdtempSync(path.join(tmpdir(), "bundle-gate-"));
+    try {
+      mkdirSync(path.join(d, "static/chunks"), { recursive: true });
+      writeFileSync(path.join(d, "static/chunks/p.js"), "console.log(1);");
+      // /admin dışındaki rotaların manifesti var, bütçe içinde.
+      for (const r of BUDGET_ROUTES.filter((x) => x !== "/admin")) {
+        const dirOf = path.join(d, "server/app", r.replace(/^\//, ""));
+        mkdirSync(dirOf, { recursive: true });
+        writeFileSync(
+          path.join(dirOf, "page_client-reference-manifest.js"),
+          `globalThis.__RSC_MANIFEST["${r}/page"] = ${JSON.stringify({ entryJSFiles: { p: ["static/chunks/p.js"] } })};`,
+        );
+      }
+      expect(quiet(() => budgetReport(d, true))).toBe(1);
+      expect(quiet(() => budgetReport(d, false))).toBe(0);
+      const adminDir = path.join(d, "server/app/admin");
+      mkdirSync(adminDir, { recursive: true });
+      writeFileSync(
+        path.join(adminDir, "page_client-reference-manifest.js"),
+        `globalThis.__RSC_MANIFEST["/admin/page"] = ${JSON.stringify({ entryJSFiles: { p: ["static/chunks/p.js"] } })};`,
+      );
+      expect(quiet(() => budgetReport(d, true))).toBe(0);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
   });
 });
