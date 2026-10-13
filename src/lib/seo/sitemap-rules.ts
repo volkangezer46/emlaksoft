@@ -52,8 +52,44 @@ export function filterSafeEntries(entries: readonly SitemapEntry[]): SitemapEntr
   return out;
 }
 
-/** Statik sayfa ve araç girdileri (ayarlar + sayfa override'ları). */
-export function staticSitemapEntries(base: string, pages: SeoPages, settings: SeoSitemapSettings): SitemapEntry[] {
+/** Geçerli ISO zamanlarının en yenisi; hiçbiri geçerli değilse undefined (sahte "bugün" ASLA üretilmez). */
+export function latestIso(...values: ReadonlyArray<string | null | undefined>): string | undefined {
+  let best: number | null = null;
+  for (const v of values) {
+    if (typeof v !== "string" || !v) continue;
+    const t = Date.parse(v);
+    if (Number.isFinite(t) && (best === null || t > best)) best = t;
+  }
+  return best === null ? undefined : new Date(best).toISOString();
+}
+
+/**
+ * Versioned-config geçmişinin (`<prefix>.history`, en yeni başta) son canlı girdisinin `at` değeri.
+ * Geçmiş yoksa/bozuksa undefined: o yayın yüzeyi için lastmod bilinmiyor demektir.
+ */
+export function historyHeadAt(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    if (!Array.isArray(arr) || arr.length === 0) return undefined;
+    const at = (arr[0] as { at?: unknown } | null)?.at;
+    return typeof at === "string" ? latestIso(at) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Statik sayfa ve araç girdileri (ayarlar + sayfa override'ları).
+ * lastmod = en yeni (yayın yüzeyinin son canlı geçmiş girdisi `publishedAt[yol]`, sayfa SEO override'ının `updatedAt`'i);
+ * ikisi de yoksa lastmod YAZILMAZ.
+ */
+export function staticSitemapEntries(
+  base: string,
+  pages: SeoPages,
+  settings: SeoSitemapSettings,
+  publishedAt: Readonly<Record<string, string | undefined>> = {},
+): SitemapEntry[] {
   const out: SitemapEntry[] = [];
   for (const def of seoPages()) {
     const isTool = def.group === "arac";
@@ -68,7 +104,8 @@ export function staticSitemapEntries(base: string, pages: SeoPages, settings: Se
       changeFrequency: ov?.changeFreq ?? def.sitemap.freq,
       priority: ov?.sitemapPriority ?? def.sitemap.priority,
     };
-    if (ov?.updatedAt) entry.lastModified = ov.updatedAt;
+    const lastmod = latestIso(publishedAt[def.path], ov?.updatedAt);
+    if (lastmod) entry.lastModified = lastmod;
     out.push(entry);
   }
   return out;

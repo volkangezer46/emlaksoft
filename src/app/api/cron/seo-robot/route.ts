@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * SEO robotu (günlük). Kendi sitemap'indeki adresleri kendi sunucusundan denetler (harici site YOK),
+ * SEO robotu (günlük). Ana sayfa + kendi sitemap'indeki adresleri ve iç bağlantılarla 2 seviye keşfedilen sayfaları kendi
+ * sunucusundan denetler (harici site YOK),
  * sonucu platform ayarlarına yazar, açıksa IndexNow'a bildirir, eşik aşılırsa platform personeline bildirim atar.
  */
 export async function GET(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat(
       "seo-robot",
       "ok",
-      `${s.pagesChecked} sayfa, ${s.critical} kritik, ${s.warning} uyarı; IndexNow: ${indexNow.sent} URL (${indexNow.status})`,
+      `${s.pagesChecked} sayfa (${run.discovered ?? 0} keşif), ${s.critical} kritik, ${s.warning} uyarı; IndexNow: ${indexNow.sent} URL (${indexNow.status})`,
     );
     return NextResponse.json({ ok: true, summary: s, indexNow, notified });
   } catch (error) {

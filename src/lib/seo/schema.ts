@@ -32,6 +32,10 @@ export const SEO_KEYS = {
   auditHistory: "seo.audit.history",
   patterns: "seo.patterns",
   history: "seo.history",
+  /** AI önerisi ayarı (varsayılan KAPALI; ai-suggest.ts). */
+  ai: "seo.ai",
+  /** IndexNow "Son bildirimler" listesi (son 50; indexnow-events.ts). */
+  indexnowLog: "seo.indexnow.log",
 } as const;
 
 /** Anahtar başına en çok bayt (JSON metni). */
@@ -47,6 +51,8 @@ export const SEO_MAX_BYTES: Record<keyof typeof SEO_KEYS, number> = {
   auditHistory: 64 * 1024,
   patterns: 8 * 1024,
   history: 300 * 1024,
+  ai: 1024,
+  indexnowLog: 32 * 1024,
 };
 
 const plain = (max: number) =>
@@ -367,6 +373,32 @@ export const DEFAULT_INDEXNOW: SeoIndexNowSettings = {
 export function mergeIndexNow(i: z.infer<typeof IndexNowSettingsSchema> | null | undefined): SeoIndexNowSettings {
   return { ...DEFAULT_INDEXNOW, ...(i ?? {}) } as SeoIndexNowSettings;
 }
+
+/* ---------- AI önerisi (seo.ai) ---------- */
+
+export const SeoAiSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  monthlyLimit: z.number().int().min(1).max(5000).optional(),
+});
+export type SeoAiSettings = { enabled: boolean; monthlyLimit: number };
+export const DEFAULT_SEO_AI: SeoAiSettings = { enabled: false, monthlyLimit: 300 };
+export function mergeSeoAi(i: z.infer<typeof SeoAiSettingsSchema> | null | undefined): SeoAiSettings {
+  return { enabled: i?.enabled ?? DEFAULT_SEO_AI.enabled, monthlyLimit: i?.monthlyLimit ?? DEFAULT_SEO_AI.monthlyLimit };
+}
+
+/* ---------- IndexNow son bildirimler (seo.indexnow.log) ---------- */
+
+export const IndexNowLogEntrySchema = z.object({
+  url: z.string().max(500),
+  at: z.string().max(40),
+  /** HTTP durum kodu; bağlantı hatasında 0. */
+  status: z.number().int().min(0).max(999),
+  /** Kaynak: sitemap (günlük robot), yayin (yayın anı), elle. */
+  source: z.enum(["sitemap", "yayin", "elle"]),
+});
+export type IndexNowLogEntry = z.infer<typeof IndexNowLogEntrySchema>;
+export const IndexNowLogSchema = z.array(IndexNowLogEntrySchema).max(50);
+export const INDEXNOW_LOG_MAX = 50;
 
 /** Güvenli JSON ayrıştırma: bozuk/uyumsuz veri null döner (çağıran varsayılana düşer). */
 export function safeParse<T>(schema: z.ZodType<T>, raw: string | null): T | null {
