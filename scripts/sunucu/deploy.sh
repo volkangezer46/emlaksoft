@@ -74,7 +74,7 @@ echo "Yayında: emlaksoft-app:$TAG — sağlık bekleniyor"
 prune_images() {
   docker images emlaksoft-app --format '{{.Tag}}' | grep -E '^[0-9]{12}-' | sort -r | tail -n +4 \
     | while read -r t; do docker rmi "emlaksoft-app:$t" >/dev/null 2>&1 || true; done
-  docker builder prune -f --filter until=72h >/dev/null 2>&1 || true
+  docker builder prune -f --reserved-space 5gb >/dev/null 2>&1 || docker builder prune -f --keep-storage 5gb >/dev/null 2>&1 || true
 }
 
 if wait_healthy; then
