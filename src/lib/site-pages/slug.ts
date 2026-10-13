@@ -42,6 +42,7 @@ export const RESERVED_ROUTE_DIRS = [
   "lead",
   "llms.txt",
   "malik-portali",
+  "medya",
   "mesafeli-satis",
   "musteri-portali",
   "odeme-link",
