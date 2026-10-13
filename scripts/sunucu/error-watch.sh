@@ -9,8 +9,25 @@ OUT=$OUT_DIR/hatalar.jsonl
 STATE=$OUT_DIR/hatalar.cursor
 mkdir -p "$OUT_DIR"
 CURSOR=$(cat "$STATE" 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+TICK=0
+DOWN=0
+# Dakikada bir dış sağlık kontrolü: site/DB yanıt vermezse "KESİNTİ", düzelince "DÜZELDİ" satırı yazılır.
+health_check() {
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://emlaksoft.com.tr/api/health || echo 000)
+  local t; t=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  if [ "$code" != "200" ] && [ "$DOWN" = 0 ]; then
+    DOWN=1
+    printf '{"zaman":"%s","kaynak":"saglik","tekrar":1,"digest":null,"yol":"/api/health","mesaj":"KESİNTİ: sağlık kontrolü HTTP %s"}\n' "$t" "$code" >> "$OUT"
+  elif [ "$code" = "200" ] && [ "$DOWN" = 1 ]; then
+    DOWN=0
+    printf '{"zaman":"%s","kaynak":"saglik","tekrar":1,"digest":null,"yol":"/api/health","mesaj":"DÜZELDİ: sağlık kontrolü yeniden 200"}\n' "$t" >> "$OUT"
+  fi
+}
 
 while true; do
+  TICK=$((TICK + 1))
+  if [ $((TICK % 4)) = 1 ]; then health_check; fi
   ROWS=$(docker exec "$DB" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c "
     select json_build_object(
       'zaman', to_char(last_seen at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
