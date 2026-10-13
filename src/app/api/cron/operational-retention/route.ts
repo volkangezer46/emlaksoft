@@ -9,6 +9,7 @@ import { cronStepsFailed, runCronSteps } from "@/lib/cron-steps";
 import { clampRetentionDays, purgeExpiredFsboPii } from "@/lib/prospecting/retention";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { FSBO_RETENTION_DAYS_KEY } from "@/lib/settings/registry/tenant";
+import { runPortalLearningRetention, runPortalRulesLearn } from "@/lib/portal-rules/server/learn-step";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -44,6 +45,11 @@ export async function GET(req: NextRequest) {
         },
       });
     },
+    // Öğrenen eklenti kuralları: oylar/öneriler/katalog; otomatik yayın yalnız portal_rules.auto_* açıksa (varsayılan kapalı).
+    // Tablo/fonksiyon yoksa 'skipped'. Aynı tembel servis istemcisi.
+    portalRulesLearn: () => runPortalRulesLearn(getAdmin(), { nowMs: now() }),
+    // Gözlem saklama süreleri (olay 180, rapor 90, oy 180 gün; katalog 1 yıl). İdempotent.
+    portalLearningRetention: () => runPortalLearningRetention(getAdmin(), { nowMs: now() }),
   });
   const queue = await storageDeletionQueueStats().catch(() => null);
   const failed = cronStepsFailed(outcome);
