@@ -115,7 +115,9 @@ describe("realtime throttle", () => {
     expect(tablesForPath("/app/musteriler")).toEqual(["customers"]);
     expect(tablesForPath("/app/musteriler/abc")).toEqual(["customers"]);
     expect(tablesForPath("/app/komisyon")).toEqual(["commissions"]);
-    expect(tablesForPath("/app")).toHaveLength(15);
+    // 15 + finans v2 (20261014001000): finance_open_items, finance_parties
+    expect(tablesForPath("/app")).toHaveLength(17);
+    expect(tablesForPath("/app/giderler")).toEqual(["cash_entries", "finance_open_items", "finance_parties"]);
     expect(tablesForPath("/app/teklifler")).toEqual(["offers", "deals"]);
     expect(tablesForPath("/app/portfoyler/anahtarlar")).toEqual(["property_keys", "properties"]);
     expect(tablesForPath("/app/gorevler")).toEqual(["tasks"]);

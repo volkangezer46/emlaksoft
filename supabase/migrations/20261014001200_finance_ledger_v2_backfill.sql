@@ -36,8 +36,8 @@ end $$;
 -- 1) Karşı taraf metinlerinden cari
 with src as (
   select e.tenant_id,
-         pg_catalog.btrim(e.counterparty) as nm,
-         pg_catalog.lower(pg_catalog.btrim(e.counterparty)) as lk,
+         pg_catalog.left(pg_catalog.btrim(e.counterparty), 120) as nm,
+         pg_catalog.lower(pg_catalog.left(pg_catalog.btrim(e.counterparty), 120)) as lk,
          bool_or(e.source_type = 'rent') as any_rent,
          bool_or(e.source_type = 'commission') as any_commission,
          bool_and(e.direction = 'out') as all_out,
@@ -45,7 +45,7 @@ with src as (
          min(e.created_at) as first_at
     from public.cash_entries e
    where nullif(pg_catalog.btrim(coalesce(e.counterparty, '')), '') is not null
-   group by e.tenant_id, pg_catalog.btrim(e.counterparty), pg_catalog.lower(pg_catalog.btrim(e.counterparty))
+   group by e.tenant_id, pg_catalog.left(pg_catalog.btrim(e.counterparty), 120), pg_catalog.lower(pg_catalog.left(pg_catalog.btrim(e.counterparty), 120))
 ),
 -- Aynı ad farklı yazımla (büyük/küçük harf) geçiyorsa ilk görüleni ad olarak alınır.
 one_per_name as (
@@ -64,7 +64,7 @@ select o.tenant_id,
             when o.any_commission then 'musteri'
             when o.all_out then 'tedarikci'
             else 'diger' end,
-       pg_catalog.left(o.nm, 120),
+       o.nm,
        o.all_sample
   from one_per_name o
  where not exists (
@@ -76,7 +76,7 @@ on conflict do nothing;
 update public.cash_entries e
    set party_id = (
      select p.id from public.finance_parties p
-      where p.tenant_id = e.tenant_id and pg_catalog.lower(p.name) = pg_catalog.lower(pg_catalog.btrim(e.counterparty))
+      where p.tenant_id = e.tenant_id and pg_catalog.lower(p.name) = pg_catalog.lower(pg_catalog.left(pg_catalog.btrim(e.counterparty), 120))
         and p.archived_at is null
       order by p.created_at, p.id
       limit 1)
