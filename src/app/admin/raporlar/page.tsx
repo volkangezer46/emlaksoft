@@ -3,7 +3,8 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { moduleAdoption } from "@/lib/admin/platform-metrics";
+import { moduleAdoption, periodChurn, type ChurnSubRow } from "@/lib/admin/platform-metrics";
+import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, TrendingUp, Users } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
@@ -60,13 +61,17 @@ export default async function AdminReportsPage({
   // parametre yoksa mevcut davranış (tüm veri) korunur.
   const now = new Date(clockNow());
   // Plan tanımları RPC'den bağımsız: aynı turda (eskiden RPC'den sonra ardışık).
-  const [aggregateResult, planDefs] = await Promise.all([
+  const [aggregateResult, planDefs, churnSubs] = await Promise.all([
     admin.rpc("platform_reporting_aggregates", {
       p_from: from ?? null,
       p_to: to ?? null,
       p_as_of: now.toISOString(),
     }),
     getPlanDefinitions(),
+    // Dönemsel churn girdisi (yalnız durum/tarih sütunları; sayfalı, 1000 satır sınırına takılmaz). Okunamazsa "veri yok".
+    fetchAllRows<ChurnSubRow>((rangeFrom, rangeTo) =>
+      admin.from("subscriptions").select("tenant_id, status, created_at, cancelled_at").order("id", { ascending: true }).range(rangeFrom, rangeTo),
+    ),
   ]);
   const aggregate = requireReportingData(
     "platform-reporting-aggregates",
@@ -77,12 +82,13 @@ export default async function AdminReportsPage({
   const summary = aggregate.summary;
 
   const active = Number(summary.active_count);
-  const cancelled = Number(summary.cancelled_count);
   const prices = priceMapOf(planDefs);
   const mrr = exactMrr(aggregate.plan_stats, prices);
   const arpa = active ? Math.round(mrr / active) : 0;
   const tenantCount = Number(summary.tenant_count);
-  const churnRate = tenantCount ? Math.round((cancelled / tenantCount) * 100) : 0;
+  // Dönemsel churn: son 30 günde iptal edilen ofis / 30 gün önce aktif ofis (payda 0 → null, "veri yok").
+  // Eski "tüm zamanların iptali / toplam ofis" oranı kaldırıldı (dönem bilgisi taşımıyordu).
+  const churn = churnSubs.error ? null : periodChurn(churnSubs.data, now.getTime(), 30);
 
   // Tarihsel durum tablosu olmadığı için seri, bugün aktif aboneliklerin başlangıç kohortudur.
   const months = Array.from({ length: 12 }, (_, i) => {
@@ -145,11 +151,22 @@ export default async function AdminReportsPage({
     icon: typeof TrendingUp;
     tone: PremiumTone;
     hint?: string;
+    /** Değer null iken gösterilen açıklama (varsayılan: "Henüz ofis kaydı yok"). */
+    emptyHint?: string;
   }[] = [
     { label: "Aylık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr : null, money: true, icon: TrendingUp, tone: "success", hint: `${active} aktif ofis` },
     { label: "Yıllık yinelenen gelir", href: "/admin/billing", value: hasData ? mrr * 12 : null, money: true, icon: LineChart, tone: "brand", hint: "MRR × 12" },
     { label: "Ofis başına gelir", href: "/admin/tenants?durum=active", value: active ? arpa : null, money: true, icon: Users, tone: "gold", hint: "aktif ofis ortalaması" },
-    { label: "Müşteri kaybı oranı", href: "/admin/tenants?durum=cancelled", value: hasData ? churnRate : null, suffix: "%", icon: BarChart3, tone: "danger", hint: `${cancelled} iptal` },
+    {
+      label: "Müşteri kaybı · 30 gün",
+      href: "/admin/tenants?durum=cancelled",
+      value: churn?.rate ?? null,
+      suffix: "%",
+      icon: BarChart3,
+      tone: "danger",
+      hint: churn ? `${churn.cancelled} iptal / ${churn.base} ofis` : undefined,
+      emptyHint: churn === null ? "Abonelikler okunamadı" : "Veri yok: 30 gün önce aktif ofis yok",
+    },
   ];
 
   return (
@@ -175,7 +192,7 @@ export default async function AdminReportsPage({
               href={k.href}
               icon={k.icon}
               tone={k.tone}
-              hint={k.value === null ? "Henüz ofis kaydı yok" : k.hint}
+              hint={k.value === null ? (k.emptyHint ?? "Henüz ofis kaydı yok") : k.hint}
             />
           ))}
         </KpiGrid>

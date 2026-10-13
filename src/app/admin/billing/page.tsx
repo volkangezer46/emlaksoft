@@ -7,6 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { orIlike } from "@/lib/pgrst";
 import { loadPlatformMrr } from "@/lib/accounting/loaders";
+import { loadMrrSnapshotDays } from "@/lib/billing/mrr-snapshot";
+import { monthEndCandidateDays, mrrMonthEndSeries } from "@/lib/admin/platform-metrics";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { AdminEmpty, AdminFilterChip, AdminSearchForm } from "@/components/admin/admin-table";
 import { Pagination, pageRange, parsePage } from "@/app/admin/_components/pagination";
@@ -44,6 +46,9 @@ function idOf(v: Rel) {
   if (!v) return null;
   return Array.isArray(v) ? (v[0]?.id ?? null) : (v.id ?? null);
 }
+
+/** Gelir eğrisi uzunluğu (ay). */
+const TREND_MONTHS = 8;
 
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
@@ -130,6 +135,7 @@ export default async function AdminBillingPage({
     { count: manualReviewCount },
     { count: refundRequiredCount },
     platformMrr,
+    snapshotDays,
   ] = await Promise.all([
     subsQuery,
     admin.from("subscriptions").select("status, amount_try, created_at").limit(1000),
@@ -142,8 +148,10 @@ export default async function AdminBillingPage({
       .limit(20),
     admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "manual_review"),
     admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).eq("status", "refund_required"),
-    // MRR hesabı liste sorgularından bağımsız: aynı turda (eskiden ardışık). RPC okunamazsa null → eski yaklaşık toplam.
+    // MRR: TEK kaynak (`loadPlatformMrr` → exactMrr; panel, muhasebe ve raporlarla aynı). Okunamazsa null → "veri yok".
     loadPlatformMrr(admin, clockNow()).catch(() => null),
+    // Eğri: platform_mrr_daily ay sonu anlık görüntüleri (tablo yoksa null → tüm geçmiş aylar "veri yok").
+    loadMrrSnapshotDays(admin, monthEndCandidateDays(clockNow(), TREND_MONTHS)).catch(() => null),
   ]);
 
   const listRows = subs ?? [];
@@ -152,27 +160,20 @@ export default async function AdminBillingPage({
   const invRows = invoices ?? [];
   const reconciliationRows = captureQueue ?? [];
   const reconciliationCount = captureQueueCount ?? reconciliationRows.length;
-  // MRR: tek hesap (reporting/platform exactMrr; panel ve raporlarla aynı). RPC okunamazsa eski yaklaşık toplam.
-  const mrr = platformMrr?.mrr ?? subRows.filter((s) => s.status === "active").reduce((sum, s) => sum + Number(s.amount_try || 0), 0);
+  // MRR: TEK hesap (loadPlatformMrr → exactMrr). Okunamazsa null: ayrı/yaklaşık toplam UYDURULMAZ, "veri yok" yazılır.
+  const mrr = platformMrr?.mrr ?? null;
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
-  // Aylık yinelenen gelir eğrisi: her ay sonu itibarıyla aktif abonelik tutarı toplamı (8 ay, gerçek kayıttan).
-  const now = new Date(clockNow());
-  const months = Array.from({ length: 8 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (7 - i), 1);
-    return {
-      label: d.toLocaleDateString("tr-TR", { month: "short" }),
-      cutoff: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999),
-    };
-  });
-  const trendVals = months.map((m) =>
-    subRows
-      .filter((s) => s.status === "active" && new Date(s.created_at) <= m.cutoff)
-      .reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
-  );
-  const hasCurve = trendVals.some((v) => v > 0);
-  const mrrTrend = computeTrend(trendVals[7] ?? 0, trendVals[6] ?? 0);
+  // Aylık yinelenen gelir eğrisi: geçmiş aylar platform_mrr_daily'nin AY SONU anlık görüntüsü; bu ay = KPI ile aynı
+  // canlı değer (kart ve eğri aynı sayıyı gösterir). Anlık görüntü öncesi aylar null → gri "veri yok", tıklanamaz.
+  const nowMs = clockNow();
+  const series = mrrMonthEndSeries(snapshotDays ?? [], nowMs, TREND_MONTHS);
+  const trendPoints = series.map((p, i) => (i === series.length - 1 && mrr !== null ? { ...p, value: mrr } : p));
+  const hasCurve = trendPoints.filter((p) => p.value !== null).length >= 2;
+  const lastVal = trendPoints[trendPoints.length - 1]?.value ?? null;
+  const prevVal = trendPoints[trendPoints.length - 2]?.value ?? null;
+  const mrrTrend = lastVal !== null && prevVal !== null ? computeTrend(lastVal, prevVal) : null;
 
   const statusKeys = ["active", "trialing", "past_due", "cancelled", "paused"] as const;
   const statusCounts = statusKeys.map((k) => ({
@@ -195,7 +196,7 @@ export default async function AdminBillingPage({
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {[
-              { key: "active", value: money(mrr), label: "Aktif aylık gelir", tone: "text-text" },
+              { key: "active", value: mrr === null ? "Veri yok" : money(mrr), label: "Aktif aylık gelir", tone: mrr === null ? "text-text-faint" : "text-text" },
               { key: "trialing", value: String(trialing), label: "Deneme", tone: "text-amber-700" },
               { key: "past_due", value: String(pastDue), label: "Gecikmiş", tone: "text-danger-600" },
             ].map((k) => {
@@ -222,26 +223,44 @@ export default async function AdminBillingPage({
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <p className="flex items-center gap-1.5 text-sm font-semibold text-text">
-                <TrendingUp className="h-4 w-4 text-text-faint" aria-hidden /> Aylık gelir trendi · 8 ay
+                <TrendingUp className="h-4 w-4 text-text-faint" aria-hidden /> Aylık gelir trendi · {TREND_MONTHS} ay
               </p>
               <span className="inline-flex items-center gap-2 text-sm tabular-nums">
-                <span className="font-semibold text-text">{money(mrr)}</span>
-                <TrendPill trend={mrrTrend} />
+                <span className="font-semibold text-text">{mrr === null ? "Veri yok" : money(mrr)}</span>
+                {mrrTrend ? <TrendPill trend={mrrTrend} /> : null}
               </span>
             </div>
             <div style={{ height: 280 }}>
               {hasCurve ? (
                 <AreaTrendChart
-                  data={trendVals.map((v, i) => ({ label: months[i]?.label ?? "", value: v, href: "/admin/muhasebe" }))}
+                  data={trendPoints.map((p) => ({ label: p.label, value: p.value, href: p.value === null ? undefined : "/admin/tenants?durum=active" }))}
                   tone="gold"
                   format="money"
                   name="Aylık yinelenen gelir"
-                  ariaLabel="Son 8 ay aylık gelir trendi"
+                  ariaLabel={`Son ${TREND_MONTHS} ay aylık gelir trendi (ay sonu anlık görüntüsü)`}
                 />
               ) : (
-                <p className="py-8 text-center text-sm text-text-muted">Aktif abonelik oluştukça gelir eğrisi burada çizilir.</p>
+                <p className="py-8 text-center text-sm text-text-muted">
+                  Gelir eğrisi günlük anlık görüntülerden çizilir; ilk ay sonu kaydı oluşunca burada görünür. Geçmiş aylar geriye dönük hesaplanmaz.
+                </p>
               )}
             </div>
+            <ul aria-label="Ay sonu MRR kayıtları" className="mt-2 flex flex-wrap gap-1.5 text-xs">
+              {trendPoints.map((p, i) =>
+                p.value === null ? (
+                  <li key={p.key} className="rounded-full border border-hairline px-2 py-0.5 text-text-faint" title="Bu ay için anlık görüntü yok">
+                    {p.label} · veri yok
+                  </li>
+                ) : (
+                  <li key={p.key}>
+                    <Link href="/admin/tenants?durum=active" className="focus-ring inline-flex rounded-full border border-hairline px-2 py-0.5 tabular-nums text-text-muted hover:bg-[var(--surface-sunken)]">
+                      {p.label} · {money(p.value)}
+                      {i === trendPoints.length - 1 ? " (bugün)" : ""}
+                    </Link>
+                  </li>
+                ),
+              )}
+            </ul>
           </div>
         </div>
       </section>
@@ -540,8 +559,8 @@ export default async function AdminBillingPage({
       {/* Deneme ve yenileme ayarları: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
       <RegistrySettings
         title="Ayarlar"
-        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme, oransal paket yükseltme, abonelik duraklatma ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
-        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "billing.plan_change_proration_enabled", "billing.pause_enabled", "billing.pause_max_days", "try_credit.max_invoice_share"]}
+        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme, oransal paket yükseltme, abonelik duraklatma, dönemi biten aboneliğin gecikmişe geçmesi ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
+        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "billing.plan_change_proration_enabled", "billing.pause_enabled", "billing.pause_max_days", "billing.expire_to_past_due", "try_credit.max_invoice_share"]}
         canEdit={staff.role === "super_admin"}
       />
     </div>
