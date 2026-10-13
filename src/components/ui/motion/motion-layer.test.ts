@@ -9,8 +9,8 @@ import { EASE_OUT, MOTION_MS } from "./tokens";
 
 /**
  * Hareket katmanı sözleşmesi (docs/DESIGN_SYSTEM.md "Hareket katmanı"):
- *  - motion/react yalnız bu klasörde, yalnız LazyMotion + domAnimation + m.* ile;
- *  - süreler motion.css ile birebir;
+ *  - kütüphanesiz: motion/react ve framer-motion HİÇBİR yerde içe aktarılmaz (CSS + IntersectionObserver; ilk yük JS'i);
+ *  - süreler motion.css ile birebir; RiseIn/GrowBar keyframes'i yalnız hareket açıkken tanımlı;
  *  - sunucu çıktısı içeriği GÖRÜNÜR basar (opacity:0 ile gizlenmiş SSR yok).
  */
 function files(dir: string, out: string[] = []): string[] {
@@ -23,19 +23,19 @@ function files(dir: string, out: string[] = []): string[] {
 }
 
 describe("hareket katmanı", () => {
-  it("motion/react ve framer-motion içe aktarımı yalnız src/components/ui/motion altında", () => {
-    const bad = files("src").filter((f) => !f.startsWith("src/components/ui/motion/") && /from\s+["'](motion\/react[^"']*|framer-motion[^"']*)["']/.test(readFileSync(f, "utf8")));
+  it("motion/react ve framer-motion hiçbir yerde içe aktarılmaz (hareket katmanı kütüphanesiz)", () => {
+    const bad = files("src").filter((f) => /from\s+["'](motion(\/[^"']*)?|framer-motion[^"']*)["']/.test(readFileSync(f, "utf8")));
     expect(bad).toEqual([]);
   });
 
-  it("tam `motion` bileşeni ve domMax yok; özellik paketi domAnimation", () => {
-    for (const f of files("src/components/ui/motion")) {
-      const src = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-      expect(src, f).not.toMatch(/import\s*\{[^}]*\bmotion\b[^}]*\}\s*from\s*["']motion\/react["']/);
-      expect(src, f).not.toContain("domMax");
-    }
-    expect(readFileSync("src/components/ui/motion/features.ts", "utf8")).toContain("domAnimation");
-    expect(readFileSync("src/components/ui/motion/motion-provider.tsx", "utf8")).toMatch(/LazyMotion[^>]*strict/);
+  it("RiseIn/GrowBar keyframes motion.css'te ve yalnız hareket açıkken (no-preference) tanımlı", () => {
+    const css = readFileSync("src/app/motion.css", "utf8");
+    const block = css.slice(css.indexOf("@media (prefers-reduced-motion: no-preference) {\n  @media (hover: hover)"));
+    expect(block).toMatch(/@keyframes rise-in \{ from \{ opacity: 0; transform: translateY\(12px\); \} \}/);
+    expect(block).toMatch(/@keyframes grow-from-zero \{ from \{ width: 0; \} \}/);
+    const grow = readFileSync("src/components/ui/motion/grow.tsx", "utf8");
+    expect(grow).toContain("rise-in 320ms");
+    expect(grow).toContain("grow-from-zero");
   });
 
   it("TS süre token'ları motion.css ile aynı", () => {
@@ -59,6 +59,8 @@ describe("hareket katmanı", () => {
       ),
     );
     for (const t of ["Görünür A", "Görünür B", "Görünür C", "Görünür D"]) expect(html).toContain(t);
+    // Eski motion/react `initial={false}` çıktısıyla aynı son kare.
+    expect(html).toContain('style="opacity:1;transform:none"');
     expect(html).not.toMatch(/opacity:\s*0[;"]/);
   });
 });

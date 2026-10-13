@@ -1,10 +1,8 @@
 "use client";
 
-import { Children, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
-import * as m from "motion/react-m";
+import { Children, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject, type TransitionEvent } from "react";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
-import { MotionProvider } from "./motion-provider";
-import { EASE_OUT, MOTION_MS, STAGGER_MAX, seconds } from "./tokens";
+import { EASE_OUT, MOTION_MS, STAGGER_MAX } from "./tokens";
 
 /**
  * Görünürlükte giriş (bir kez). İLERLEMECİ GELİŞTİRME:
@@ -12,11 +10,15 @@ import { EASE_OUT, MOTION_MS, STAGGER_MAX, seconds } from "./tokens";
  *  - Hidrasyondan sonra öğe ekranın ALTINDAysa "kurulur" (görünmezken saklanır, kullanıcı
  *    görmez) ve kaydırınca yumuşakça belirir. Zaten ekrandaysa hiçbir şey oynamaz.
  *  - Hareket azaltma tercihinde gözlemci hiç kurulmaz.
- * Yalnız opacity + transform (8 px). Süre `--motion-slow`.
+ * Yalnız opacity + transform (8 px). Süre `--motion-slow`, eğri `--ease-out`.
+ *
+ * Kütüphanesiz: IntersectionObserver + satır içi CSS geçişi (eski motion/react `m.div` sürümüyle aynı değerler:
+ * gizli = opacity 0 + translateY(8px) anında; görünür = 320 ms cubic-bezier(0.22, 1, 0.36, 1), `delay` ms gecikme;
+ * Stagger'da 40 ms aralık, ilk 12 öğe). Geçiş bitince satır içi `transition` kalkar (son kare = sunucu çıktısı).
  */
-type Phase = "idle" | "armed" | "shown";
+type Phase = "idle" | "armed" | "shown" | "done";
 
-function useRevealPhase(ref: RefObject<HTMLElement | null>, disabled: boolean): Phase {
+function useRevealPhase(ref: RefObject<HTMLElement | null>, disabled: boolean): [Phase, (p: Phase) => void] {
   const [phase, setPhase] = useState<Phase>("idle");
   useEffect(() => {
     const el = ref.current;
@@ -41,11 +43,25 @@ function useRevealPhase(ref: RefObject<HTMLElement | null>, disabled: boolean): 
     io.observe(el);
     return () => io.disconnect();
   }, [ref, disabled]);
-  return phase;
+  return [phase, setPhase];
 }
 
-const enter = { duration: seconds(MOTION_MS.slow), ease: EASE_OUT };
-const instant = { duration: 0 };
+const EASE = `cubic-bezier(${EASE_OUT.join(", ")})`;
+/** Sunucu çıktısı ve son kare (motion/react `initial={false}` çıktısıyla aynı). */
+const VISIBLE: CSSProperties = { opacity: 1, transform: "none" };
+const HIDDEN: CSSProperties = { opacity: 0, transform: "translateY(8px)" };
+
+function enterStyle(delayMs: number): CSSProperties {
+  const d = `${MOTION_MS.slow}ms ${EASE} ${delayMs}ms`;
+  return { opacity: 1, transform: "none", transition: `opacity ${d}, transform ${d}` };
+}
+
+/** Geçiş bitince (opacity, öğenin kendisi) satır içi geçişi kaldır. */
+function onEnterEnd(setPhase: (p: Phase) => void) {
+  return (e: TransitionEvent<HTMLElement>) => {
+    if (e.target === e.currentTarget && e.propertyName === "opacity") setPhase("done");
+  };
+}
 
 export function Reveal({
   children,
@@ -59,31 +75,18 @@ export function Reveal({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
-  const phase = useRevealPhase(ref, reduce);
-  const hidden = phase === "armed";
+  const [phase, setPhase] = useRevealPhase(ref, reduce);
+  const style = phase === "armed" ? HIDDEN : phase === "shown" ? enterStyle(delay) : VISIBLE;
   return (
-    <MotionProvider>
-      <m.div
-        ref={ref}
-        className={className}
-        initial={false}
-        animate={hidden ? { opacity: 0, y: 8 } : { opacity: 1, y: 0 }}
-        transition={hidden ? instant : { ...enter, delay: seconds(delay) }}
-      >
-        {children}
-      </m.div>
-    </MotionProvider>
+    <div ref={ref} className={className} style={style} onTransitionEnd={phase === "shown" ? onEnterEnd(setPhase) : undefined}>
+      {children}
+    </div>
   );
 }
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 8, transition: instant },
-  shown: { opacity: 1, y: 0, transition: enter },
-};
-
 /**
  * Stagger — çocuklar sırayla belirir (40 ms aralık, ilk 12 öğe; gerisi beklemeden).
- * Her doğrudan çocuk bir `m.div` sarmalayıcısına alınır; ızgara düzeni için `className`
+ * Her doğrudan çocuk bir sarmalayıcı `div`e alınır; ızgara düzeni için `className`
  * ızgara sınıflarını taşır, `itemClassName` her hücreye verilir (ör. "min-w-0 h-full").
  */
 export function Stagger({
@@ -97,23 +100,27 @@ export function Stagger({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
-  const phase = useRevealPhase(ref, reduce);
+  const [phase, setPhase] = useRevealPhase(ref, reduce);
   const items = Children.toArray(children);
+  const last = Math.min(items.length, STAGGER_MAX) - 1;
   return (
-    <MotionProvider>
-      <m.div
-        ref={ref}
-        className={className}
-        initial={false}
-        animate={phase === "armed" ? "hidden" : "shown"}
-        variants={{ hidden: {}, shown: { transition: { staggerChildren: seconds(MOTION_MS.stagger) } } }}
-      >
-        {items.map((child, i) => (
-          <m.div key={i} className={itemClassName} variants={i < STAGGER_MAX ? itemVariants : undefined}>
+    <div ref={ref} className={className}>
+      {items.map((child, i) => {
+        // İlk 12 öğe kademelenir; sonrakiler hiç gizlenmez (eski sürümde de varyantsızdı).
+        if (i >= STAGGER_MAX) {
+          return (
+            <div key={i} className={itemClassName}>
+              {child}
+            </div>
+          );
+        }
+        const style = phase === "armed" ? HIDDEN : phase === "shown" ? enterStyle(i * MOTION_MS.stagger) : VISIBLE;
+        return (
+          <div key={i} className={itemClassName} style={style} onTransitionEnd={phase === "shown" && i === last ? onEnterEnd(setPhase) : undefined}>
             {child}
-          </m.div>
-        ))}
-      </m.div>
-    </MotionProvider>
+          </div>
+        );
+      })}
+    </div>
   );
 }

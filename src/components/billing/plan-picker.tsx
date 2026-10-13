@@ -16,7 +16,7 @@ import { registrationQuote, type SeatCalcOffers } from "@/lib/billing/seat-calcu
  * hiçbir rakam burada uydurulmaz. Fiyat kırılımı: paket + ek kullanıcı, yıllık toplam ve kişi başı aylık maliyet.
  * "Kullanıcı" çubuğu paketin DAHİL kullanıcılarının ekibi ne kadar karşıladığıdır; diğer satırlar paketlerin
  * sınırını birbirine göre gösterir (∞ = sınırsız). Danışman sayısı değişince elle seçim bırakılır, öneri izlenir.
- * Hareket: LazyMotion + m.*; azaltılmış harekette süre 0.
+ * Hareket: ui/motion RiseIn/GrowBar (CSS keyframes); azaltılmış harekette süre 0.
  */
 
 const nf = new Intl.NumberFormat("tr-TR");
