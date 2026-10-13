@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -15,6 +15,13 @@ import {
   type EidsMatchProperty,
 } from "./match";
 import { eidsNoMatchKey } from "./property-no";
+
+/** Dizindeki .ts/.tsx dosyaları (göreli yol, özyinelemeli). */
+function listTs(dir: string): string[] {
+  return readdirSync(join(process.cwd(), dir), { recursive: true, withFileTypes: false })
+    .map((f) => `${dir}/${String(f)}`)
+    .filter((f) => /\.tsx?$/.test(f));
+}
 
 const prop = (over: Partial<EidsMatchProperty> & { id: string }): EidsMatchProperty => ({
   eids_property_no: null,
@@ -173,6 +180,13 @@ describe("yetki defteri sözleşmesi", () => {
     const direct = actions.match(/\.update\(\{[^}]*authority_eids_status/g) ?? [];
     expect(direct.length).toBe(1);
     expect(actions.indexOf('res.code === "schema_pending"')).toBeLessThan(actions.search(/\.update\(\{[^}]*authority_eids_status/));
+    // Eski yol İSTİSNASININ kapsamı: yalnız defter yokken ve yalnız eski üç durum (iptal/dolmuş/bilinmiyor asla).
+    expect(actions).toMatch(/res\.code === "schema_pending" && \(status === "pending" \|\| status === "approved" \|\| status === "rejected"\)/);
+    // Başka hiçbir uygulama kodu durumu doğrudan yazmaz (örnek veri tohumu hariç: ilk ekleme, değişiklik değil).
+    const writers = ["src/app/actions", "src/lib", "src/app/api"].flatMap((d) => listTs(d))
+      .filter((f) => !/\.test\.ts$/.test(f) && !f.includes("sample-data"))
+      .filter((f) => /\.(update|upsert)\(\{[^}]*authority_eids_status/.test(read(f)));
+    expect(writers).toEqual(["src/app/actions/authority-queue.ts"]);
   });
   it("migration: genişleyen CHECK, yalnız-eklenir tablo, RLS ve rollback", () => {
     const sql = read("supabase/migrations/20261013007100_eids_authority_ledger.sql");

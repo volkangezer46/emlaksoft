@@ -8,6 +8,7 @@ import { isTransferPortal } from "@/lib/portal-transfer/rules";
 import { loadPropertyForTransfer } from "@/lib/portal-transfer/server";
 import { transferWatermarkFromTenant } from "@/lib/portal-transfer/photo-watermark";
 import { guardBridgeRequest, NO_STORE } from "@/lib/portal-transfer/bridge-guard";
+import { authorityPublishGate } from "@/lib/eids/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -49,6 +50,10 @@ export async function POST(request: Request) {
     const status = outcome === "forbidden" ? 403 : outcome === "used" || outcome === "expired" ? 410 : 404;
     return NextResponse.json({ ok: false, error: outcome, message: codeOutcomeMessage(outcome) }, { status, headers: NO_STORE });
   }
+
+  // EİDS kapısı paket verilirken YENİDEN uygulanır: kod alındıktan sonra yetki iptal edildi / süresi dolduysa paket gitmez.
+  const authGate = await authorityPublishGate(db, gate.tenantId, r.property_id);
+  if (authGate.blocked) return NextResponse.json({ ok: false, error: "authority_blocked", message: authGate.error }, { status: 403, headers: NO_STORE });
 
   const input = await loadPropertyForTransfer(db, gate.tenantId, r.property_id);
   if (!input) return NextResponse.json({ ok: false, error: "property_not_found", message: codeOutcomeMessage("property_not_found") }, { status: 404, headers: NO_STORE });

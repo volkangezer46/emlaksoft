@@ -16,8 +16,10 @@
 --       hiçbir role verilmez; olay yalnız bu iki RPC'den yazılır, sahte override/undo satırı eklenemez). Oturumlu çağrıda
 --       kiracı = current_tenant_id(), aktör = auth.uid(), portals:edit zorunlu; portföyü değiştiren olayda ayrıca
 --       properties:edit (properties RLS UPDATE politikasının birebir karşılığı); override yalnız owner. service_role
---       (EP3 e-posta alıcısı / EP4 cron) kiracıyı parametreyle verir. Portföy satırı kilitlenir, güncelleme + olay aynı
---       işlemde yazılır. Elle veriliş tarihi (valid_from) authorization_start'a yazılır.
+--       (EP3 e-posta alıcısı / EP4 cron) kiracıyı parametreyle verir; override'ı o da yalnız ofisin etkin sahibi adına
+--       (actor_id = owner profili) yazabilir. Bildirimdeki taşınmaz no portföydekiyle rakam anahtarında uyuşmalıdır
+--       (bağlamasız uygulamada da); numarasız portföye yalnız açık bağlamayla ("link") işlenir. Portföy satırı
+--       kilitlenir, güncelleme + olay aynı işlemde yazılır. Elle veriliş tarihi (valid_from) authorization_start'a yazılır.
 --   (5) eids_authority_candidates: pg_trgm kuruluysa malik adı benzerliğiyle en çok 100 aday portföy (ön süzgeç;
 --       puan uygulamada hesaplanır). customers.full_name trigram indeksi yoksa kurulur (canlıda zaten var).
 --   (6) eids_properties_by_no_key: taşınmaz no'nun YALNIZ RAKAM anahtarıyla birebir arama (ayraçlı kayıt "34-4410-0141"
@@ -252,6 +254,13 @@ begin
     if v_uid is not null and public.current_profile_role() <> 'owner' then
       return jsonb_build_object('outcome', 'owner_only');
     end if;
+    -- service_role (EP3/EP4) çağrısında da izin yalnız bu ofisin etkin sahibinin adına yazılabilir.
+    if v_uid is null and not exists (
+      select 1 from public.profiles pr
+      where pr.id = v_actor and pr.tenant_id = p_tenant_id and pr.role = 'owner' and pr.is_active
+    ) then
+      return jsonb_build_object('outcome', 'owner_only');
+    end if;
     if char_length(coalesce(v_note, '')) < 10 then
       return jsonb_build_object('outcome', 'note_required');
     end if;
@@ -294,8 +303,15 @@ begin
   v_prev_status := v_prop.authority_eids_status;
   v_prev := public.eids_authority_snapshot(p_property_id);
 
-  if v_bind and v_no is not null and v_prop.eids_property_no is not null and v_prop.eids_property_no <> v_no then
+  -- Numara karşılaştırması rakam anahtarıyla yapılır ("EIDS-34-4410-0141" = "3444100141").
+  if v_no is not null and v_prop.eids_property_no is not null
+     and pg_catalog.regexp_replace(v_prop.eids_property_no, '\D', '', 'g') <> pg_catalog.regexp_replace(v_no, '\D', '', 'g') then
+    -- Bağlamada da, bağlamasız uygulamada da başka portföyün numarası bu portföye işlenmez.
     return jsonb_build_object('outcome', 'no_conflict', 'current_no', v_prop.eids_property_no);
+  end if;
+  if v_no is not null and v_prop.eids_property_no is null and not v_bind then
+    -- Numarasız portföye bildirim ancak açık bağlamayla ("link") uygulanır; aksi halde defter yabancı no taşırdı.
+    return jsonb_build_object('outcome', 'no_unbound');
   end if;
 
   if v_kind <> 'override' then
@@ -307,7 +323,7 @@ begin
       authority_eids_verified_at = case when v_verified then now() else authority_eids_verified_at end,
       authority_last_email_at = case when v_email_seen then now() else authority_last_email_at end,
       authority_grantor_masked = coalesce(v_masked, authority_grantor_masked),
-      eids_property_no = case when v_bind and v_no is not null then v_no else eids_property_no end,
+      eids_property_no = case when v_bind and v_no is not null and eids_property_no is null then v_no else eids_property_no end,
       eids_exempt_reason = case when v_exempt_set then v_exempt else eids_exempt_reason end,
       authority_owner_approved_at = case
         when v_new_status = 'approved' and v_prev_status is distinct from 'approved' then now()

@@ -10,6 +10,7 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
  * - Veriliş tarihi authorization_start'a yazılır ve geri alınır.
  * - Geri alma yalnız olayın değiştirdiği alanları döndürür; o alanlar defter dışından değiştiyse reddeder.
  * - Taşınmaz no rakam anahtarıyla birebir arama (ayraçlı kayıt "EIDS-34-4410-0141").
+ * - Başka portföyün numarası (bağlamasız da) bu portföye işlenmez; service_role override'ı da yalnız owner adına.
  * Bağımlı çekirdek tablolar sadeleştirilmiş kopyadır.
  */
 const mod = await loadPglite();
@@ -33,6 +34,7 @@ create table public.properties(
   authority_eids_status text not null default 'pending', authority_owner_approved_at timestamptz,
   constraint properties_authority_eids_status_check check (authority_eids_status in ('pending', 'approved', 'rejected')));
 create table public.property_owner_info(property_id uuid, tenant_id uuid, customer_id uuid);
+create table public.profiles(id uuid primary key, tenant_id uuid not null, role text not null, is_active boolean not null default true);
 create table public.property_media(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, property_id uuid not null);
 grant usage on schema public to authenticated, service_role;
 grant select on all tables in schema public to authenticated;
@@ -44,6 +46,7 @@ const OWNER = "11111111-1111-4111-8111-111111111111";
 const ADV = "22222222-2222-4222-8222-222222222222";
 const P = "33333333-3333-4333-8333-333333333333";
 const P2 = "44444444-4444-4444-8444-444444444444";
+const P3 = "55555555-5555-4555-8555-555555555555";
 const FULL = "portals:view portals:edit properties:view properties:edit";
 
 describe.skipIf(!mod)("EİDS yetki defteri (pglite)", () => {
@@ -69,7 +72,9 @@ describe.skipIf(!mod)("EİDS yetki defteri (pglite)", () => {
     await db.exec(`insert into public.tenants(id) values ('${T}'), ('${T2}');
       insert into public.properties(id, tenant_id, eids_property_no, authorization_start, authorization_end, authority_eids_status)
         values ('${P}', '${T}', null, '2026-08-01', '2026-11-01', 'pending'),
-               ('${P2}', '${T}', 'EIDS-34-4410-0141', null, null, 'approved');`);
+               ('${P2}', '${T}', 'EIDS-34-4410-0141', null, null, 'approved'),
+               ('${P3}', '${T}', null, null, null, 'pending');
+      insert into public.profiles(id, tenant_id, role) values ('${OWNER}', '${T}', 'owner'), ('${ADV}', '${T}', 'advisor');`);
     await db.exec(read("supabase/migrations/20261013007100_eids_authority_ledger.sql"));
   });
 
@@ -156,6 +161,36 @@ describe.skipIf(!mod)("EİDS yetki defteri (pglite)", () => {
     expect(hit.map((h) => h.id)).toEqual([P2]);
     expect(await q(`select id from public.eids_properties_by_no_key($1::uuid, $2)`, [T2, "3444100141"])).toHaveLength(0);
     expect(await q(`select id from public.eids_properties_by_no_key($1::uuid, $2)`, [T, "34-44"])).toHaveLength(0);
+  });
+
+  it("bildirim numarası portföyün numarasıyla rakam anahtarında uyuşmalı (bağlamasız uygulamada da)", async () => {
+    await as(ADV, T, FULL, "advisor");
+    // Ayraçlı kayıt + ayraçsız bildirim = aynı numara → uygulanır; kayıtlı biçim korunur.
+    const ok = await apply(P2, { kind: "grant", source: "manual", new_status: "approved", eids_property_no: "3444100141" });
+    expect(ok.outcome).toBe("applied");
+    expect(await prop(P2)).toMatchObject({ no: "EIDS-34-4410-0141" });
+    // Başka numara: bağlamasız da bağlamalı da reddedilir, hiçbir şey yazılmaz.
+    await as(ADV, T, FULL, "advisor");
+    expect((await apply(P2, { kind: "revoke", source: "manual", new_status: "revoked", eids_property_no: "99999999" })).outcome).toBe("no_conflict");
+    await as(ADV, T, FULL, "advisor");
+    expect((await apply(P2, { kind: "link", source: "manual", new_status: "revoked", eids_property_no: "99999999", bind_property_no: true })).outcome).toBe("no_conflict");
+    expect(await prop(P2)).toMatchObject({ s: "approved" });
+    // Numarasız portföy: bağlamasız uygulama reddedilir; açık bağlamada numara yazılır.
+    await as(ADV, T, FULL, "advisor");
+    expect((await apply(P3, { kind: "revoke", source: "manual", new_status: "revoked", eids_property_no: "77777777" })).outcome).toBe("no_unbound");
+    await as(ADV, T, FULL, "advisor");
+    expect((await apply(P3, { kind: "link", source: "manual", new_status: "revoked", eids_property_no: "77777777", bind_property_no: true })).outcome).toBe("applied");
+    expect(await prop(P3)).toMatchObject({ s: "revoked", no: "77777777" });
+  });
+
+  it("service_role override'ı yalnız bu ofisin sahibi adına yazılır", async () => {
+    await db.exec(`reset role; select set_config('request.jwt.claim.sub','',false), set_config('test.authrole','service_role',false)`);
+    await db.exec(`set role service_role`);
+    const note = "malik telefonla teyit etti, belge yolda";
+    expect((await apply(P, { kind: "override", source: "system", note, actor_id: ADV })).outcome).toBe("owner_only");
+    expect((await apply(P, { kind: "override", source: "system", note })).outcome).toBe("owner_only");
+    expect((await apply(P, { kind: "override", source: "system", note, actor_id: OWNER }, T)).outcome).toBe("applied");
+    expect((await apply(P, { kind: "override", source: "system", note, actor_id: OWNER }, T2)).outcome).not.toBe("applied");
   });
 
   it("defter yalnız eklenir", async () => {

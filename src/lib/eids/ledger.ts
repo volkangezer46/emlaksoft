@@ -38,7 +38,10 @@ export type ApplyAuthorityEventInput = {
   validFrom?: string | null;
   setValidFrom?: boolean;
   eidsPropertyNo?: string | null;
-  /** true: portföyde no yoksa bu no yazılır (aday bağlama). Farklı no varsa `no_conflict` döner, hiçbir şey yazılmaz. */
+  /**
+   * true: portföyde no yoksa bu no yazılır (aday bağlama). Farklı no varsa (rakam anahtarıyla) `no_conflict` döner.
+   * false iken no verilirse portföydeki numarayla uyuşmalıdır (`no_conflict`); portföyde no yoksa `no_unbound` döner.
+   */
   bindPropertyNo?: boolean;
   dealKind?: EidsDealKind | null;
   /** Açık ad: yalnız maske + özet üretmek için kullanılır, kendisi yazılmaz. */
@@ -64,6 +67,7 @@ export type LedgerErrorCode =
   | "owner_only"
   | "note_required"
   | "no_conflict"
+  | "no_unbound"
   | "not_undoable"
   | "already_undone"
   | "superseded"
@@ -83,6 +87,7 @@ export const LEDGER_ERRORS: Record<LedgerErrorCode, string> = {
   owner_only: "Ne oldu: yayın engelini yalnız ofis sahibi aşabilir. Ne yapmalı: ofis sahibinden izni vermesini isteyin.",
   note_required: "Ne oldu: gerekçe çok kısa. Ne yapmalı: engeli neden aştığınızı en az 10 karakterle yazın.",
   no_conflict: "Ne oldu: bu portföyde başka bir taşınmaz no kayıtlı. Ne yapmalı: doğru portföyü seçin ya da önce portföydeki numarayı düzeltin.",
+  no_unbound: "Ne oldu: bu portföyde taşınmaz no kayıtlı değil; bildirim numarası portföye bağlanmadan işlenemez. Ne yapmalı: Eşleştir sekmesinde adaylardan 'Bağla' ile eşleştirin.",
   not_undoable: "Ne oldu: bu kayıt geri alınamaz (geri alma ve yayın izni kayıtları geri alınmaz). Ne yapmalı: durumu karttan yeniden işaretleyin.",
   already_undone: "Ne oldu: bu işlem zaten geri alınmış. Ne yapmalı: sayfayı yenileyin.",
   superseded: "Ne oldu: bu işlemden sonra başka bir yetki değişikliği yapılmış. Ne yapmalı: önce en son işlemi geri alın ya da durumu karttan yeniden işaretleyin.",
@@ -212,6 +217,24 @@ const GATE_UNAVAILABLE =
   "Ne oldu: portföyün EİDS yetki durumu şu an okunamadı; yayın/aktarım güvenlik için durduruldu. Ne yapmalı: birkaç saniye sonra tekrar deneyin; sürerse destek ekibine bildirin.";
 
 /**
+ * Savunma katmanı: izin satırını yazan kişi bu ofisin etkin sahibi mi? (RPC zaten yalnız owner adına yazar; burada
+ * yeniden doğrulanır ki defterde owner olmayan bir aktörün override satırı hiçbir yoldan engeli açmasın.) Okunamazsa hayır.
+ */
+async function isTenantOwner(db: SupabaseClient, tenantId: string, actorId: string | null): Promise<boolean> {
+  if (!actorId) return false;
+  const { data, error } = await db
+    .from("profiles")
+    .select("id")
+    .eq("id", actorId)
+    .eq("tenant_id", tenantId)
+    .eq("role", "owner")
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) console.error("authorityPublishGate owner", { code: error.code });
+  return Boolean(data);
+}
+
+/**
  * Yayın / portal aktarımı kapısı. Yetkisi iptal edilmiş ya da süresi dolmuş portföy ENGELLENİR; yalnız ofis sahibinin
  * son durum değişikliğinden sonra verdiği ve 24 saati geçmemiş gerekçeli izni (override olayı) engeli kaldırır.
  * Defter sütunları yoksa (migration uygulanmamış) engel UYGULANMAZ, yalnız eski uyarı döner (izin verilemeyen engel olmasın).
@@ -250,7 +273,7 @@ export async function authorityPublishGate(db: SupabaseClient, tenantId: string,
   if (block) {
     const events = await loadAuthorityEvents(db, tenantId, propertyId, 10);
     const override = events.available ? activeOverride(events.events, nowMs, AUTHORITY_OVERRIDE_TTL_HOURS) : null;
-    if (!override) return { blocked: true, error: block.message, code: block.code };
+    if (!override || !(await isTenantOwner(db, tenantId, override.actor_id))) return { blocked: true, error: block.message, code: block.code };
     return { blocked: false, warning: "Uyarı: yetki iptal/dolmuş durumda; ofis sahibinin gerekçeli geçici izniyle yayınlanıyor." };
   }
   const warning = authorityPublishWarning(row, nowMs);
