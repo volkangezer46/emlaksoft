@@ -41,16 +41,36 @@ export default function GizlilikPage() {
         <p><b>Verilerinizi asla satmayız</b> ve reklam ağlarıyla paylaşmayız.</p>
       </LegalSection>
 
-      <LegalSection no="3." title="Veri Güvenliği">
+      <LegalSection no="3." title="Site Ziyaretleri ve Kayıt Kaynağı">
         <ul className="list-disc space-y-1.5 pl-5">
-          <li>Tüm trafik TLS ile şifrelenir; veriler şifreli olarak saklanır.</li>
-          <li>Veriler Avrupa bölgesi (eu-central-1) veri merkezlerinde barındırılır.</li>
+          <li>
+            Herkese açık sayfalarımızda (ana sayfa, fiyatlar, rehber, ofis vitrinleri) ziyaretler <b>çerez kullanılmadan, anonim ve
+            toplu olarak</b> sayılır: hangi sayfanın görüntülendiği, ziyaretin geldiği kaynak türü (arama, reklam, doğrudan vb.),
+            cihaz türü ve sayfa açılış hızı. Kişiyi tanımlayan bir kimlik, çerez ya da cihaz parmak izi kullanılmaz; IP adresi
+            yalnız kötüye kullanımı önlemek için anlık işlenir ve saklanmaz.
+          </li>
+          <li>
+            Kayıt olurken hangi kampanyadan ya da sayfadan geldiğiniz (ör. UTM etiketleri, ilk açılan sayfa) hesabınızla birlikte,
+            pazarlama kanallarımızın etkinliğini ölçmek amacıyla <b>meşru menfaat</b> hukuki sebebine dayanılarak (KVKK m.5/2-f)
+            işlenir ve reklam ağlarıyla paylaşılmaz.
+          </li>
+          <li>Giriş yaptıktan sonra kullandığınız uygulama ve yönetim panelleri bu ziyaret ölçümüne dahil değildir.</li>
+        </ul>
+      </LegalSection>
+
+      <LegalSection no="4." title="Veri Güvenliği">
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            Tüm trafik TLS ile şifrelenir; kimlik numarası, IBAN ve entegrasyon anahtarları gibi hassas alanlar ayrıca şifrelenerek
+            saklanır.
+          </li>
+          <li>Veriler Avrupa Birliği sınırları içinde, Almanya&apos;daki (Nürnberg) veri merkezinde barındırılır.</li>
           <li>Ofis verileri kiracı-izolasyonu (row-level security) ile ayrıştırılır; her ofis yalnızca kendi verisine erişir.</li>
           <li>Kritik işlemler denetim kaydına (audit log) yazılır; erişim rol bazlı yetkilendirmeyle sınırlanır.</li>
         </ul>
       </LegalSection>
 
-      <LegalSection no="4." title="Veri Sahipliği ve Taşınabilirlik">
+      <LegalSection no="5." title="Veri Sahipliği ve Taşınabilirlik">
         <p>
           Platforma girdiğiniz iş verisinin sahibi sizsiniz. Dilediğiniz an dışa aktarım talep edebilir, ayrılırken
           offboarding paketiyle tüm verinizi alabilirsiniz. Silme talepleri, yasal saklama süreleri saklı kalmak
@@ -58,7 +78,7 @@ export default function GizlilikPage() {
         </p>
       </LegalSection>
 
-      <LegalSection no="5." title="EmlakSoft İlan Kontrol Tarayıcı Eklentisi">
+      <LegalSection no="6." title="EmlakSoft İlan Kontrol Tarayıcı Eklentisi">
         <p>
           Eklenti yalnız EmlakSoft hesabına bağlanan ofis kullanıcıları içindir ve yalnız aşağıdaki dört iş için veri işler:
         </p>
@@ -99,7 +119,7 @@ export default function GizlilikPage() {
         </p>
       </LegalSection>
 
-      <LegalSection no="6." title="İletişim">
+      <LegalSection no="7." title="İletişim">
         <p>
           Gizlilikle ilgili sorularınız için:{" "}
           <a className="font-semibold text-brand-600" href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>

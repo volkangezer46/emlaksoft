@@ -50,8 +50,9 @@ export default function CerezPolitikasiPage() {
           </table>
         </div>
         <p>
-          EmlakSoft, üçüncü taraf reklam/izleme çerezi <b>kullanmaz</b>. Zorunlu çerezler olmadan platforma güvenli
-          giriş yapılamayacağı için bunlar açık rızaya tabi değildir.
+          EmlakSoft, üçüncü taraf reklam/izleme çerezi <b>kullanmaz</b>. Herkese açık sayfalardaki ziyaret ve hız ölçümümüz de
+          çerez kullanmadan, anonim ve toplu olarak yapılır (ayrıntı: Gizlilik Politikası). Zorunlu çerezler olmadan platforma
+          güvenli giriş yapılamayacağı için bunlar açık rızaya tabi değildir.
         </p>
       </LegalSection>
 

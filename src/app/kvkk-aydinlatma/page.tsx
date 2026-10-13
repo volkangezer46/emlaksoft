@@ -42,8 +42,8 @@ export default function KvkkAydinlatmaPage() {
 
       <LegalSection no="4." title="Verilerin Aktarılması">
         <p>
-          Verileriniz; barındırma ve altyapı hizmeti aldığımız sunucu sağlayıcılarına (veriler Avrupa bölgesi —
-          eu-central-1 — veri merkezlerinde tutulur), ödeme kuruluşlarına, SMS/e-posta gönderim sağlayıcılarına ve
+          Verileriniz; barındırma ve altyapı hizmeti aldığımız sunucu sağlayıcılarına (veriler Avrupa Birliği
+          sınırları içinde, Almanya&apos;daki veri merkezinde tutulur), ödeme kuruluşlarına, SMS/e-posta gönderim sağlayıcılarına ve
           yasal zorunluluk hâlinde yetkili kamu kurumlarına, amaçla sınırlı olarak aktarılabilir. Üçüncü kişilere
           satış veya pazarlama amaçlı aktarım yapılmaz. Alıcı grupları ve hizmet sağlayıcılar aşağıdadır:
         </p>

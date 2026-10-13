@@ -160,7 +160,7 @@ function defaultFooterBrand(): FooterBrand {
   return {
     description: "Emlak ofisleri için müşteri, portföy, anlaşma ve komisyon akışını tek panelde toplayan abonelikli yazılım.",
     badges: [
-      { label: "Frankfurt veri bölgesi", icon: "shield-check" },
+      { label: "Almanya veri merkezi", icon: "shield-check" },
       { label: "KVKK süreç araçları", icon: "scale" },
       { label: "SMS onaylı imza", icon: "file-signature" },
     ],

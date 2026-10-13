@@ -65,7 +65,7 @@ export function defaultSiteContent(): SiteContent {
       { id: "adim", title: "Adım adım kurulum", text: "Kurulum sihirbazı ofisinizi, ekibinizi ve ilk verilerinizi sırayla hazırlar.", href: "/#nasil", hidden: false },
       { id: "rol", title: "Rol ve izin kontrolü", text: "Danışman, muhasebe ve yönetici erişimi ayrı ayrı tanımlanır.", href: "/#guvenlik", hidden: false },
       { id: "kacak", title: "Kaçan komisyonu ölçün", text: "Zorunlu kapanış formu ve danışman bazında kaçak karnesi.", href: "/#kayip-kacak", hidden: false },
-      { id: "veri", title: "Ofis verisi ayrı tutulur", text: "Satır düzeyinde güvenlik; ana veritabanı Frankfurt bölgesinde.", href: "/#guvenlik", hidden: false },
+      { id: "veri", title: "Ofis verisi ayrı tutulur", text: "Satır düzeyinde güvenlik; ana veritabanı Almanya'daki veri merkezinde.", href: "/#guvenlik", hidden: false },
       { id: "gorev", title: "Arka planda çalışan görevler", text: `Hatırlatma, teyit ve özet işleri ${CRON_JOBS.length} otomatik görevle yürür.`, href: "/#ozellikler", hidden: false },
     ],
     trust: [
@@ -89,14 +89,14 @@ export function defaultSiteContent(): SiteContent {
     ],
     security: {
       chips: [
-        { id: "frankfurt", text: "Frankfurt (eu-central-1)", hidden: false },
+        { id: "frankfurt", text: "Almanya (Nürnberg) veri merkezi", hidden: false },
         { id: "rls", text: "Satır düzeyinde güvenlik", hidden: false },
         { id: "rol", text: "Rol-izin matrisi", hidden: false },
         { id: "kvkk", text: "KVKK süreç araçları", hidden: false },
         { id: "iys", text: "İYS/EİDS hazırlık", hidden: false },
       ],
       items: [
-        { id: "veri", title: "Ofisinizin verisi ayrı tutulur", text: "Her kayıt ofisinize bağlıdır; veritabanı satır düzeyinde güvenlik (RLS) ile ofisler arası erişimi sınırlar. Ana veritabanı Frankfurt (eu-central-1) bölgesindedir.", hidden: false },
+        { id: "veri", title: "Ofisinizin verisi ayrı tutulur", text: "Her kayıt ofisinize bağlıdır; veritabanı satır düzeyinde güvenlik (RLS) ile ofisler arası erişimi sınırlar. Ana veritabanı AB sınırları içinde, Almanya (Nürnberg) veri merkezindedir.", hidden: false },
         { id: "yetki", title: "Her işlem yetki kapısından geçer", text: "Sayfalar ve işlemler izin kontrolünden geçer; yetkisiz kullanıcı ilgili ekranı ve işlemi göremez.", hidden: false },
         { id: "rol", title: "Rol ve izin matrisi", text: "Danışman, muhasebe ve yönetici erişimi ayrı ayrı tanımlanır; kullanıcı bazlı istisnalar eklenebilir.", hidden: false },
         { id: "kvkk", title: "KVKK süreç desteği", text: "Aydınlatma, rıza, dışa aktarım ve silme akışları ile İYS/EİDS hazırlık adımları ürünün içindedir.", hidden: false },
@@ -106,7 +106,7 @@ export function defaultSiteContent(): SiteContent {
     faq: [
       { id: "f1", q: "Deneme için kredi kartı gerekir mi?", a: "Hayır. Kayıt {deneme_gun}ücretsiz denemeyle başlar ve kart bilgisi istemez. Deneme boyunca tüm özellikler açıktır; süre sonunda size uygun paketi seçersiniz.", hidden: false },
       { id: "f2", q: "Kurulum ne kadar sürer?", a: "Kayıttan sonra kurulum sihirbazı ofis bilgilerinizi, ekibinizi ve ilk verilerinizi adım adım hazırlar. Süre; kullanıcı sayınıza ve içeri aktaracağınız veriye göre değişir.", hidden: false },
-      { id: "f3", q: "Verilerim nerede saklanıyor?", a: "Ana uygulama veritabanı seçili Supabase projesinin Avrupa (Frankfurt / eu-central-1) bölgesinde tutulur. Dosya depolama ve etkinleştirdiğiniz dış hizmetler kendi veri işleme koşullarına tabidir. Yetkilendirme, denetim ve veri yaşam döngüsü araçları sunulur; dilediğiniz an dışa aktarabilirsiniz.", hidden: false },
+      { id: "f3", q: "Verilerim nerede saklanıyor?", a: "Ana uygulama veritabanı ve dosyalar AB sınırları içinde, Almanya (Nürnberg) veri merkezindeki kendi sunucularımızda tutulur. Etkinleştirdiğiniz dış hizmetler kendi veri işleme koşullarına tabidir. Yetkilendirme, denetim ve veri yaşam döngüsü araçları sunulur; dilediğiniz an dışa aktarabilirsiniz.", hidden: false },
       { id: "f4", q: "Portal ilanlarımı otomatik çekiyor veya yayınlıyor musunuz?", a: "Hayır. Portallardan izinsiz veri kazımıyoruz ve ilanlarınızı portallara otomatik yayınlamıyoruz. İlan numarası/URL ekliyorsunuz; sistem periyodik teyit ister ve ilan düştüğünde kapanış formuyla kaçağı ölçer.", hidden: false },
       { id: "f5", q: "Dijital imza e-imza mıdır?", a: "Hayır. Sözleşmeler SMS ile doğrulanan dijital imza akışıyla onaylanır; bu bir nitelikli elektronik imza (e-imza) değildir.", hidden: false },
       { id: "f6", q: "Sözleşme veya taahhüt var mı?", a: "Taahhüt yok. Aylık kullanın, istediğiniz an iptal edin. {yillik_metin}", hidden: false },
