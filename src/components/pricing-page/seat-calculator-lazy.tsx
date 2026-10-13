@@ -33,18 +33,26 @@ export function SeatCalculatorLazy(props: {
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [show, setShow] = useState(false);
+  // CLS (lab 0,058): iskelet → hesaplayıcı geçişinde kapsayıcı, iskeletin SON ölçülen yüksekliğini min-height olarak
+  // korur; hesaplayıcı (ve kendi yükleme iskeleti) daha kısa çizilse bile alttaki bölümler yukarı kaymaz.
+  const [minHeight, setMinHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const reveal = () => {
+      const h = el.getBoundingClientRect().height;
+      if (h > 0) setMinHeight(Math.ceil(h));
+      setShow(true);
+    };
     if (typeof IntersectionObserver === "undefined") {
-      const t = setTimeout(() => setShow(true), 0);
+      const t = setTimeout(reveal, 0);
       return () => clearTimeout(t);
     }
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setShow(true);
+          reveal();
           io.disconnect();
         }
       },
@@ -54,5 +62,9 @@ export function SeatCalculatorLazy(props: {
     return () => io.disconnect();
   }, []);
 
-  return <div ref={ref} data-island="seat-calculator">{show ? <SeatCalculator {...props} /> : <Skeleton />}</div>;
+  return (
+    <div ref={ref} data-island="seat-calculator" style={minHeight ? { minHeight } : undefined}>
+      {show ? <SeatCalculator {...props} /> : <Skeleton />}
+    </div>
+  );
 }

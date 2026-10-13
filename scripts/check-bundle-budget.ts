@@ -8,6 +8,13 @@
  *                                                         #   Ölçülemeyen rota (manifest yok) ya da diskte olmayan chunk da
  *                                                         #   kapıda ihlaldir: ölçülmeyen rota geçmiş sayılmaz.
  *   npm run check:bundle -- --next-dir=/yol/.next       # başka bir derleme çıktısını ölç (önce/sonra karşılaştırma)
+ *   npm run check:bundle -- --static-html=/yol/ana.html # statik ana sayfa HTML'ini dosyadan ölç (ör. canlıdan curl)
+ *
+ * STATİK ANA SAYFA HTML BÜTÇESİ (F1; src/lib/perf/budgets.ts): gzip ≤ 80 KB, ham ≤ 360 KB. --warn/--gate iken derleme
+ * çıktısındaki ön çizilmiş ana sayfa (.next/server/app/index.html) rota işleyicisiyle AYNI dönüşümden geçirilir
+ * (src/lib/static-home/transform.ts: Next çalışma zamanı ayıklanır, kullanılan CSS gömülür, runtime.js eklenir) ve
+ * gerçekten ölçülür. Fiyat verisi (birkaç KB JSON) derlemede yoktur; canlı ölçüm için --static-html. Aşım ya da
+ * ölçülemeyen HTML --gate'te çıkış 1'dir.
  *
  * İLK YÜK ÖLÇÜMÜ (Next 16 + Turbopack): app-build-manifest.json artık üretilmiyor; rota başına istemci JS'i
  * .next/server/app/<rota>/page_client-reference-manifest.js içindeki `entryJSFiles` (kök + layout zinciri + sayfa +
@@ -18,6 +25,10 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
+import { STATIC_HTML_BUDGET, checkStaticHtmlBudget, type BudgetViolation } from "../src/lib/perf/budgets";
+import { measureHtml, type HtmlMeasure } from "../src/lib/perf/measure-html";
+import { STATIC_ROUTES } from "../src/lib/static-home/registry";
+import { buildStaticHome } from "../src/lib/static-home/transform";
 
 /** Bütçe ölçülen panel rotaları (ana sayfa statik HTML; Next JS'i yok → hedef değil). */
 export const BUDGET_ROUTES = ["/app", "/app/musteriler", "/app/portfoyler", "/admin"] as const;
@@ -284,6 +295,65 @@ export function budgetReport(nextDir: string, gate: boolean): number {
   return gate ? 1 : 0;
 }
 
+/** Derleme çıktısından statik ana sayfa HTML'i (rota işleyicisiyle aynı dönüşüm; fiyat verisi hariç). Yoksa null. */
+export function staticHomeFromBuild(nextDir: string, publicDir = path.join(process.cwd(), "public")): string | null {
+  const src = path.join(nextDir, "server", "app", "index.html");
+  const manifestPath = path.join(publicDir, "statik", "manifest.json");
+  if (!existsSync(src) || !existsSync(manifestPath)) return null;
+  let m: { runtime: string; islands: Record<string, string>; classTokens: string[] };
+  try {
+    m = JSON.parse(readFileSync(manifestPath, "utf8")) as typeof m;
+  } catch {
+    return null;
+  }
+  const runtimePath = path.join(publicDir, m.runtime.replace(/^\//, ""));
+  if (!existsSync(runtimePath)) return null;
+  const home = STATIC_ROUTES.find((r) => r.id === "home")!;
+  const readStylesheet = (href: string): string | null => {
+    const p = href.split("?")[0]!;
+    if (!p.startsWith("/_next/static/") || p.includes("..")) return null;
+    const full = path.join(nextDir, "static", p.slice("/_next/static/".length));
+    return existsSync(full) ? readFileSync(full, "utf8") : null;
+  };
+  const islands = Object.fromEntries(Object.entries(m.islands).filter(([k]) => (home.islands as readonly string[]).includes(k)));
+  const data = JSON.stringify({ islands }).replace(/</g, "\\u003c");
+  return buildStaticHome({
+    html: readFileSync(src, "utf8"),
+    readStylesheet,
+    purge: { keepPrefixes: home.keepPrefixes, extraClasses: m.classTokens },
+    bodyEnd: `<script type="application/json" id="mk-static">${data}</script><script>${readFileSync(runtimePath, "utf8")}</script>`,
+  });
+}
+
+/** Statik HTML ölçümü → ihlaller (yan etkisiz). Next betiği kalmışsa da ihlaldir (statik sürümde 0 olmalı). */
+export function checkStaticHtml(m: HtmlMeasure): BudgetViolation[] {
+  const out = checkStaticHtmlBudget(m);
+  if (m.nextScripts > 0) out.push({ metric: "raw", actualKb: 0, limitKb: 0, message: `${m.nextScripts} Next betiği kaldı (statik sürümde 0 olmalı)` });
+  return out;
+}
+
+export function staticHtmlReport(html: string | null, gate: boolean, sourceLabel: string): number {
+  const log = gate ? console.error : console.warn;
+  console.log(`\nStatik ana sayfa HTML bütçesi (gzip ≤ ${STATIC_HTML_BUDGET.gzipKb} KB, ham ≤ ${STATIC_HTML_BUDGET.rawKb} KB)`);
+  console.log("-".repeat(72));
+  if (html === null) {
+    log(`Ölçülemedi: ${sourceLabel} (ön çizilmiş ana sayfa / public/statik yok ya da dönüşüm beklenmeyen biçim gördü)`);
+    return gate ? 1 : 0;
+  }
+  const m = measureHtml(html);
+  console.log(
+    `${(m.gzipBytes / 1024).toFixed(1).padStart(7)} KB gz  ${(m.rawBytes / 1024).toFixed(1).padStart(7)} KB ham  Next betiği ${m.nextScripts}  (${sourceLabel})`,
+  );
+  const v = checkStaticHtml(m);
+  if (v.length === 0) {
+    console.log("Statik HTML bütçe içinde.");
+    return 0;
+  }
+  log(`\nStatik HTML bütçe aşımı (${v.length}):`);
+  for (const x of v) log(`  /: ${x.message}`);
+  return gate ? 1 : 0;
+}
+
 function main(): number {
   const nextDir = arg("next-dir") ?? path.join(process.cwd(), ".next");
   const maxArg = arg("max-kb");
@@ -300,6 +370,12 @@ function main(): number {
   }
   let code = legacyReport(nextDir, maxKb);
   if (gate || warn) code = Math.max(code, budgetReport(nextDir, gate));
+  const staticFile = arg("static-html");
+  if (staticFile) {
+    code = Math.max(code, staticHtmlReport(existsSync(staticFile) ? readFileSync(staticFile, "utf8") : null, true, staticFile));
+  } else if (gate || warn) {
+    code = Math.max(code, staticHtmlReport(staticHomeFromBuild(nextDir), gate, "derleme çıktısı (.next/server/app/index.html)"));
+  }
   return code;
 }
 
