@@ -5,10 +5,14 @@ import { getBaseUrl } from "@/lib/base-url";
 import { filterSafeEntries, staticSitemapEntries, tenantInSitemap, chunkEntries, type SitemapEntry } from "./sitemap-rules";
 import { SEO_CACHE_TAG, getSeoSettings } from "./store";
 import { resolveOptInSlugs } from "@/lib/vitrin-settings-logic";
+import { sitePageSitemapEntries } from "@/lib/site-pages/metadata";
+import { listPublishedSitePages } from "@/lib/site-pages/store";
 
 /**
  * Sitemap veri yükleyici (sunucu). Kurallar:
  *  - Statik sayfalar/araçlar: registry + admin override (noindex olanlar girmez).
+ *  - Sayfa oluşturucu (/admin/site/sayfalar): yalnız yayında + index + inSitemap olan özel sayfalar ("Statik sayfalar"
+ *    anahtarına bağlı). Robot denetimi sitemap'i taradığı için onları kendiliğinden kapsar.
  *  - Vitrin ofisi/ilanı/danışman: yalnız aktif ofis + (varsayılan) opt-in verenler. Opt-in TEK kaynağı ofisin
  *    kendi ayarıdır (tenants.vitrin_seo_optin, /app/ayarlar/vitrin); sütun yoksa eski elle slug listesi geçerli kalır.
  *  - İlanlar: yalnız status=live, silinmemiş, is_sample=false. Token'lı portallar HİÇ girmez.
@@ -44,6 +48,7 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
   const settings = await getSeoSettings();
   const entries: SitemapEntry[] = staticSitemapEntries(base, settings.pages, settings.sitemap);
   const sm = settings.sitemap;
+  if (sm.staticPages) entries.push(...sitePageSitemapEntries(base, await listPublishedSitePages()));
 
   if (sm.vitrinOffices || sm.vitrinListings || sm.advisors) {
     try {
