@@ -162,10 +162,11 @@ Hepsi `src/components/ui`; ton/ikon karosu mevcut `.pm-t-*` + `.pm-ico` (yeni to
 
 ### Hareket katmanı (`src/components/ui/motion`)
 
-- `motion` paketi YALNIZ `LazyMotion` (strict) + `domAnimation` (ayrı parçada tembel) + `m.*`; `MotionConfig
-  reducedMotion="user"`. İçe aktarım yalnız bu klasörde (sözleşme testi `motion-layer.test.ts`). Lottie ve GIF YOK.
+- KÜTÜPHANESİZ (2026-10-13): CSS geçişi/keyframes (`src/app/motion.css`) + IntersectionObserver; `motion/react`
+  içe aktarılmaz (sözleşme testi `motion-layer.test.ts`; /admin ilk yükünden ~13 KB çıktı). Lottie ve GIF YOK.
 - `Reveal` / `Stagger`: sunucu çıktısı görünür; yalnız ekranın ALTINDAKİ öğe kurulur ve kaydırınca bir kez belirir
-  (opacity + 8 px, 320 ms; stagger 40 ms, ≤ 12 öğe; motion `m.*`). `FadeSwap`: `?donem=` gibi URL filtresi değişince
+  (opacity + 8 px, 320 ms `--ease-out`; stagger 40 ms, ≤ 12 öğe; satır içi geçiş). `RiseIn` (12 px, 320 ms) ve
+  `GrowBar` (0'dan hedef genişliğe) yalnız istemcide sonradan bağlanınca oynar (keyframes `rise-in` / `grow-from-zero`). `FadeSwap`: `?donem=` gibi URL filtresi değişince
   yeni içerik girişi (motion.css `.motion-swap`, 0 KB; AnimatePresence çıkış animasyonu ilk yüke ~10 KB ekliyordu, ölçülüp
   bırakıldı). Arama parametresi değişimi sayfayı yeniden bağlamaz (Next template belgesi). Sayfa geçişi /app ve /admin `template.tsx` ortak `<ViewTransition>`.
 - Mikro etkileşim: tıklanabilir kart 2 px yükselir + gölge bir kademe (140 ms), yalnız `prefers-reduced-motion:
@@ -697,7 +698,7 @@ Kategorik `--viz-1..8`, sıralı tek hue `--viz-seq-1..5` (ısı haritası), `--
 - **Lottie yok:** yeni bağımlılık + paket büyümesi + tema renklerine bağlanamama; SVG+CSS aynı işi ölçülü ve kurumsal yapar.
 - **Dekoratif degrade:** yalnız `DashboardHero` bandında, çok hafif ve hareketli (yukarıdaki kurallar); kart/panel
   yüzeylerinde degrade dolgu yok (`pm-card-tint` yalnız %8 ton sönmesi). Bulanık (blur) büyük katman yok.
-- **motion:** kuruldu ama yalnız `LazyMotion` + `domAnimation` + `m.*` (bkz. "Hareket katmanı"); `domMax`/layoutId yok.
+- **motion:** paket bağımlılıklarda duruyor ama kaynakta KULLANILMIYOR (bkz. "Hareket katmanı": CSS + IntersectionObserver).
 
 ## Mobil ana sayfa (< 768 px, aşama 1, 2026-10-07)
 

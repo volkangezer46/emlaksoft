@@ -46,11 +46,11 @@ describe("kısa kayıt (TEK ekran, 4 alan) sözleşmesi", () => {
     expect(read("src/components/billing/plan-explorer.tsx")).toContain('import("./plan-picker")');
   });
 
-  it("paket seçici: LazyMotion m.*, reduced-motion, sahte rakam yok (tutar motordan)", () => {
+  it("paket seçici: hareket katmanı (RiseIn/GrowBar), reduced-motion, sahte rakam yok (tutar motordan)", () => {
     const picker = read("src/components/billing/plan-picker.tsx");
-    // Hareket katmanı kuralı: motion yalnız src/components/ui/motion altında (RiseIn/GrowBar = LazyMotion m.*).
+    // Hareket katmanı kuralı: giriş/doluluk hareketi src/components/ui/motion'dan (CSS keyframes, kütüphanesiz).
     expect(picker).toContain('from "@/components/ui/motion/grow"');
-    expect(read("src/components/ui/motion/grow.tsx")).toContain("MotionProvider");
+    expect(read("src/components/ui/motion/grow.tsx")).toContain("useReducedMotion");
     expect(picker).toContain("useReducedMotion");
     expect(picker).toContain("registrationQuote(");
     expect(picker).toContain("AnimatedNumber");

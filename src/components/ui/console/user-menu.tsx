@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { USER_MENU_TRIGGER_CLASS, UserMenuFace } from "./user-menu-face";
+import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import { runWhenIdle } from "@/lib/idle";
 import { lazyPanel } from "@/lib/lazy-panel";
 import type { FontScale } from "@/lib/font-scale";
@@ -23,12 +23,10 @@ export type UserMenuLink = { href: string; label: string } & (
 const panel = lazyPanel(() => import("./user-menu-panel").then((m) => m.UserMenuPanel));
 
 export function UserMenu(props: {
-  initials: string;
   name: string;
   subtitle: string;
-  /** Profil fotoğrafı / hazır avatar (yoksa baş harf). */
-  avatarUrl?: string | null;
-  avatarPreset?: string | null;
+  /** Düğme yüzü: sunucuda çizilmiş `UserMenuFace` (avatar/hazır avatar/baş harf + ad + rol). */
+  face: ReactNode;
   links?: UserMenuLink[];
   /** Sade görünüm (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
@@ -49,19 +47,13 @@ export function UserMenu(props: {
 }
 
 function Trigger({
-  initials,
   name,
-  subtitle,
-  avatarUrl,
-  avatarPreset,
+  face,
   onOpen,
   warm,
 }: {
-  initials: string;
   name: string;
-  subtitle: string;
-  avatarUrl?: string | null;
-  avatarPreset?: string | null;
+  face: ReactNode;
   onOpen?: () => void;
   warm?: () => void;
 }) {
@@ -76,7 +68,7 @@ function Trigger({
       aria-label={`Kullanıcı menüsü: ${name}`}
       className={USER_MENU_TRIGGER_CLASS}
     >
-      <UserMenuFace initials={initials} name={name} subtitle={subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />
+      {face}
     </button>
   );
 }

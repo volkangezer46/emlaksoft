@@ -3,12 +3,12 @@ import { Avatar } from "@/components/ui/avatar";
 import { resolveAvatar } from "@/lib/avatar-presets";
 
 /**
- * Kullanıcı menüsü tetikleyicisinin TEK görünümü (hafif kabuk `user-menu.tsx` ve Radix gövdesi
- * `user-menu-panel.tsx` aynı yüzü çizer; panel yüklenince düğme sıçramaz). Yuvarlak vurgu
- * avatarı + ad + rol + aşağı ok; dar ekranda yalnız avatar.
+ * Kullanıcı menüsü tetikleyicisinin TEK görünümü. SUNUCUDA çizilir (app/admin layout) ve `face` olarak verilir:
+ * hafif kabuk `user-menu.tsx` ve Radix gövdesi `user-menu-panel.tsx` aynı düğümü basar (panel yüklenince düğme
+ * sıçramaz; avatar hazır ayarları/çizimleri istemci paketine girmez). Yuvarlak vurgu avatarı + ad + rol + aşağı ok;
+ * dar ekranda yalnız avatar.
  */
-export const USER_MENU_TRIGGER_CLASS =
-  "focus-ring flex h-11 items-center gap-2.5 rounded-full border border-hairline bg-surface-raised p-1 shadow-[var(--elev-1)] transition-colors hover:border-border-interactive sm:pr-3";
+export { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 
 export function UserMenuFace({
   initials,

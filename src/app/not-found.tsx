@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { SoftLink as Link } from "@/components/ui/soft-link";
 import { ArrowRight, BarChart3, Building2, Compass, Home, LogIn, Sparkles, type LucideIcon } from "lucide-react";
 import { defaultSiteMenu } from "@/lib/site-menu/defaults";
 import type { NotFoundContent } from "@/lib/site-menu/schema";

@@ -92,6 +92,11 @@
   }
   .icon-nudge, .icon-nudge-back { transition: transform var(--motion-fast) var(--ease-out), color var(--motion-fast) var(--ease-out); }
 
+  /* ---- RiseIn / GrowBar (src/components/ui/motion/grow.tsx): yalnız `from`; `to` öğenin kendi (satır içi)
+          son karesidir. Süre/eğri/gecikme bileşende satır içi verilir. ---- */
+  @keyframes rise-in { from { opacity: 0; transform: translateY(12px); } }
+  @keyframes grow-from-zero { from { width: 0; } }
+
   /* ---- Liste giriş: 40 ms aralık, en çok 12 öğe (sonrası anında) ----
      `backwards`: animasyon bitince öğe kendi stiline döner; kalıcı yığın bağlamı
      (açılır menülerin komşu kartın altında kalması) oluşmaz. */

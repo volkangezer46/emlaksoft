@@ -37,7 +37,8 @@ describe("zorunlu parola değişimi kapısı", () => {
       .filter((f) => /getPlatformStaffUnrestricted|requirePlatformStaffForAccount/.test(read(f)))
       .filter((f) => !allowed.has(f))
       .sort();
-    expect(users).toEqual(["src/app/admin/hesabim/page.tsx", "src/app/admin/layout.tsx"]);
+    // Zorunlu parola ekranı yönetim kabuğunun dışındaki kendi rotasındadır (layout oraya yönlendirir).
+    expect(users).toEqual(["src/app/(admin-parola)/admin/parola-yenile/page.tsx", "src/app/admin/hesabim/page.tsx", "src/app/admin/layout.tsx"]);
   });
 
   it("/api/admin rotaları kısıtlı kapıyı kullanır", () => {

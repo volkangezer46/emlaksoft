@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import Link from "@/components/ui/smart-link";
-import { CalendarPlus, MoreVertical, Share2, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, useTransition, type ComponentProps, type ComponentType } from "react";
+import { MoreVertical } from "lucide-react";
 import { deleteCustomer, getCustomerDeleteImpact, type CustomerDeleteImpact } from "@/app/actions/customers";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useInlinePanel } from "@/components/ui/inline-panel";
+import { runWhenIdle } from "@/lib/idle";
+import type { CustomerRowMenuProps } from "./customer-row-menu";
 import { CUSTOMER_PORTAL_PANEL_ID, setPortalTarget } from "./customer-portal-panel";
 import { describeDeleteImpact } from "./delete-impact";
 
@@ -48,6 +48,29 @@ function useCustomerDelete(customerId: string) {
   return { confirming, impact, pending, begin, cancel: () => setConfirming(false) };
 }
 
+/*
+ * Radix DropdownMenu gövdesi (menü + floating-ui + odak/dışarı tıklama katmanları) liste sayfasının ilk yük paketine
+ * girmez: satırda AYNI öznitelikli hafif düğme çizilir, gövde boşta bir kez önceden iner ve ilk etkileşimde
+ * (hover, odak, basma) bağlanır. Basma/klavye ile gelindiyse menü açık bağlanır; odaktaysa odak aynı karede gerçek
+ * tetikleyiciye taşınır. Yüklenince açma/kapama, ok tuşları, Esc ve odak dönüşü tamamen Radix'tedir.
+ */
+let LoadedMenu: ComponentType<CustomerRowMenuProps> | null = null;
+let menuPromise: Promise<ComponentType<CustomerRowMenuProps>> | null = null;
+let idleScheduled = false;
+
+function loadMenu(): Promise<ComponentType<CustomerRowMenuProps>> {
+  menuPromise ??= import("./customer-row-menu").then(
+    (m) => (LoadedMenu = m.CustomerRowMenu),
+    (error: unknown) => {
+      menuPromise = null; // ağ hatasında sonraki etkileşim yeniden dener
+      throw error;
+    },
+  );
+  return menuPromise;
+}
+
+type MenuMount = { Menu: ComponentType<CustomerRowMenuProps>; open: boolean; focus: boolean };
+
 /**
  * Müşteri satırının ikincil eylemleri (⋮): randevu oluştur, müşteri portalı linki, sil. Satırda yalnız birincil
  * eylemler (Aç, Ara, WhatsApp) görünür; silme onayı ⋮'nin yerinde satır içi açılır (popup yok).
@@ -55,59 +78,111 @@ function useCustomerDelete(customerId: string) {
 export function CustomerRowMore({
   customerId,
   name,
-  phone,
+  waMsisdn,
   canEdit,
   canDelete,
 }: {
   customerId: string;
   name: string;
-  phone: string | null;
+  /** WhatsApp numarası (sunucuda `toWhatsAppMsisdn`; telefon kuralları istemci paketine girmez); yoksa null. */
+  waMsisdn: string | null;
   canEdit: boolean;
   canDelete: boolean;
 }) {
   const del = useCustomerDelete(customerId);
   const { openPanel } = useInlinePanel(CUSTOMER_PORTAL_PANEL_ID);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState<MenuMount | null>(null);
+  const lightRef = useRef<HTMLButtonElement>(null);
+  const want = useRef({ open: false });
+  useEffect(() => {
+    if (idleScheduled) return;
+    idleScheduled = true;
+    return runWhenIdle(() => void loadMenu().catch(() => undefined));
+  }, []);
   if (del.confirming) return <DeleteConfirm customerId={customerId} impact={del.impact} onCancel={del.cancel} />;
+
+  // Radix tetikleyicisinin çocuğuna verilen öznitelikler (hafif düğme ve gerçek tetikleyici AYNI).
+  const trigger: ComponentProps<"button"> = {
+    type: "button",
+    disabled: del.pending,
+    "aria-label": `Diğer işlemler: ${name}`,
+    title: "Diğer işlemler",
+    className:
+      "focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-60 touch:h-11 touch:w-11",
+    children: <MoreVertical className="h-4 w-4" aria-hidden="true" />,
+  };
+
+  if (mounted) {
+    const { Menu } = mounted;
+    return (
+      <Menu
+        customerId={customerId}
+        canEdit={canEdit}
+        canDelete={canDelete}
+        trigger={trigger}
+        defaultOpen={mounted.open}
+        focusTrigger={mounted.focus}
+        onPortal={(el) => {
+          setPortalTarget({ id: customerId, name, waMsisdn });
+          openPanel(el);
+        }}
+        onDelete={() => {
+          // Onaydan "Vazgeç" ile dönülünce menü (eskisi gibi) kapalı bağlanır.
+          setMounted((cur) => cur && { ...cur, open: false, focus: false });
+          del.begin();
+        }}
+      />
+    );
+  }
+
+  /**
+   * Gövdeyi bağla: yüklüyse aynı olay içinde, değilse yüklenince (satır hâlâ hafifse). Yüklenmeyi beklerken gelen
+   * istekler birleşir (ör. odak + Enter → açık bağlanır). Odak, bağlandığı anda hafif düğmedeyse gerçek tetikleyiciye geçer.
+   */
+  const mount = (open: boolean) => {
+    want.current.open ||= open;
+    const settle = (Menu: ComponentType<CustomerRowMenuProps>) => {
+      const el = lightRef.current;
+      const focus = Boolean(el && el.ownerDocument.activeElement === el);
+      const req = want.current.open;
+      want.current.open = false;
+      setMounted((cur) => cur ?? { Menu, open: req, focus });
+    };
+    if (LoadedMenu) {
+      settle(LoadedMenu);
+      return;
+    }
+    void loadMenu()
+      .then(settle)
+      .catch(() => undefined);
+  };
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          ref={triggerRef}
-          type="button"
-          disabled={del.pending}
-          aria-label={`Diğer işlemler: ${name}`}
-          title="Diğer işlemler"
-          className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-transparent text-text-muted transition hover:border-border-interactive hover:bg-surface-hover hover:text-brand-700 disabled:opacity-60 touch:h-11 touch:w-11"
-        >
-          <MoreVertical className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem asChild>
-          <Link href={`/app/randevular/yeni?customer=${customerId}`} prefetch={false}>
-            <CalendarPlus aria-hidden="true" /> Randevu oluştur
-          </Link>
-        </DropdownMenuItem>
-        {canEdit ? (
-          <DropdownMenuItem
-            onSelect={() => {
-              setPortalTarget({ id: customerId, name, phone });
-              openPanel(triggerRef.current);
-            }}
-          >
-            <Share2 aria-hidden="true" /> Müşteri portalı linki
-          </DropdownMenuItem>
-        ) : null}
-        {canDelete ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem danger onSelect={del.begin}>
-              <Trash2 aria-hidden="true" /> Sil…
-            </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <button
+      ref={lightRef}
+      {...trigger}
+      aria-haspopup="menu"
+      aria-expanded={false}
+      data-state="closed"
+      onPointerEnter={(e) => {
+        // Dokunmada enter ile basma aynı harekettir: basma (aşağıda) menüyü açık bağlar.
+        if (e.pointerType !== "touch") mount(false);
+      }}
+      onFocus={() => mount(false)}
+      onPointerDown={(e) => {
+        // Radix ile aynı: yalnız birincil tuş, Ctrl'siz (macOS bağlam menüsü) basış menüyü açar; odak düğmeye geçmez.
+        if (e.button === 0 && !e.ctrlKey) {
+          e.preventDefault();
+          mount(true);
+        }
+      }}
+      onKeyDown={(e) => {
+        // Radix ile aynı tuşlar: Enter / Boşluk / Aşağı ok menüyü açar.
+        if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
+          e.preventDefault();
+          mount(true);
+        }
+      }}
+    />
   );
 }

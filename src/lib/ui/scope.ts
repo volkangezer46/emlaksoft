@@ -4,6 +4,9 @@
 
 export type ScopeValue = "ofis" | "ben";
 
+/** Kapsam seçebilen yönetim rolleri (menü düzeni "Benim işlerim"de danışman düzenine geçer). Tek kaynak; nav-roles yeniden dışa aktarır. */
+export const MANAGEMENT_ROLES: readonly string[] = ["owner", "gm", "branch_manager"];
+
 export const SCOPE_COOKIE = "es_scope";
 export const SCOPE_COOKIE_MAX_AGE = 60 * 60 * 24 * 180;
 

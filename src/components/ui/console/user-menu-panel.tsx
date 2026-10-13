@@ -3,7 +3,8 @@
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
-import { USER_MENU_TRIGGER_CLASS, UserMenuFace } from "./user-menu-face";
+import type { ReactNode } from "react";
+import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { clearTourDone, TOUR_RESTART_HREF } from "@/lib/product-tour-storage";
@@ -25,21 +26,18 @@ const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { setti
 
 /** Menü gövdesi (Radix DropdownMenu) — user-menu.tsx tarafından ilk etkileşimde yüklenir. */
 export function UserMenuPanel({
-  initials,
   name,
   subtitle,
-  avatarUrl,
-  avatarPreset,
+  face,
   links = [],
   viewPrefs,
   fontScale,
   initialOpen,
 }: {
-  initials: string;
   name: string;
   subtitle: string;
-  avatarUrl?: string | null;
-  avatarPreset?: string | null;
+  /** Sunucuda çizilmiş düğme yüzü (hafif kabukla AYNI düğüm). */
+  face: ReactNode;
   links?: UserMenuLink[];
   /** Sade görünüm + yazı boyutu (çerez adı ofis+kullanıcı kapsamlı); yoksa bölüm gösterilmez. */
   viewPrefs?: { cookieName: string; initial: UiPrefs };
@@ -52,7 +50,7 @@ export function UserMenuPanel({
   return (
     <DropdownMenu defaultOpen={initialOpen}>
       <DropdownMenuTrigger aria-label={`Kullanıcı menüsü: ${name}`} className={USER_MENU_TRIGGER_CLASS}>
-        <UserMenuFace initials={initials} name={name} subtitle={subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />
+        {face}
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-72">
         <DropdownMenuLabel>

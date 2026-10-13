@@ -8,6 +8,7 @@ import { SidebarBoot } from "@/components/ui/console/sidebar-boot";
 import { NavPending } from "@/components/app/nav-pending";
 import { ClientCacheSync } from "@/components/app/client-cache-sync";
 import { UserMenu } from "@/components/ui/console/user-menu";
+import { UserMenuFace } from "@/components/ui/console/user-menu-face";
 import { AppBreadcrumb } from "@/components/app/app-breadcrumb";
 import { QuickCreateMenu } from "@/components/app/quick-create-menu";
 import { filterNavBadgesByAccess, getNavBadges, getPlanUsage, tabCountsFromUsage } from "@/lib/nav-badges";
@@ -55,6 +56,9 @@ import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
 import { getAppActions } from "@/lib/palette-core";
+import { ICONS } from "@/lib/icons";
+import { navExtraPathOwners } from "@/lib/nav-config";
+import { buildPlaceholderNav, buildShellActions, buildShellNavSet, buildShortcuts, shellIcon } from "@/lib/nav-shell-server";
 import { ClosedModulesProvider } from "@/components/app/closed-modules-context";
 import { getClosedFeatures } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
@@ -103,6 +107,15 @@ const NAV_MODULES: AppModule[] = [
   "prospecting",
 ];
 
+/**
+ * Menü kataloğu, rol düzenleri, ikon sözlüğü ve palet eylemleri SUNUCUDA çözülür; istemci kabuğu (yan menü, kırıntı,
+ * sekme şeridi, kısayollar) yalnız düz veri alır (src/lib/nav-shell.ts). Sabit kısımlar modül düzeyinde bir kez hesaplanır.
+ */
+const SHORTCUTS = buildShortcuts();
+const NAV_EXTRA = navExtraPathOwners();
+const PLACEHOLDER_NAV = buildPlaceholderNav(NAV_MODULES);
+const SIDEBAR_ICONS = { portal: shellIcon(ICONS.portal), tools: shellIcon(ICONS.baslikArac), modules: shellIcon(ICONS.moduller) };
+
 type OfficeSummary = {
   name?: string;
   plan?: string;
@@ -120,10 +133,22 @@ async function NotificationBellStream() {
   return <NotificationBell initial={notifications} />;
 }
 
+type UserMenuShellProps = Omit<React.ComponentProps<typeof UserMenu>, "face"> & { initials: string };
+
+/** Kullanıcı menüsü; düğme yüzü (avatar/hazır avatar/baş harf) SUNUCUDA çizilir (avatar çizimleri istemci paketine girmez). */
+function UserMenuShell({ initials, avatarUrl = null, avatarPreset = null, ...props }: UserMenuShellProps & { avatarUrl?: string | null; avatarPreset?: string | null }) {
+  return (
+    <UserMenu
+      {...props}
+      face={<UserMenuFace initials={initials} name={props.name} subtitle={props.subtitle} avatarUrl={avatarUrl} avatarPreset={avatarPreset} />}
+    />
+  );
+}
+
 /** Kullanıcı menüsü + profil avatarı (tek PK sorgusu, Suspense içinde akar). */
-async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & React.ComponentProps<typeof UserMenu>) {
+async function UserMenuWithAvatar({ userId, ...props }: { userId: string | null } & UserMenuShellProps) {
   const avatar = userId ? await loadOwnProfileAvatar(userId) : null;
-  return <UserMenu {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
+  return <UserMenuShell {...props} avatarUrl={avatar?.avatar_url ?? null} avatarPreset={avatar?.avatar_preset ?? null} />;
 }
 
 /** Ofis skoru rozeti: kabuğu BEKLETMEZ (ilk hesap 5 sorgu; 3 dk önbellekli), kendi sınırında akar. */
@@ -308,6 +333,10 @@ async function buildShellModel() {
   // Hızlı oluştur + komut paleti "Eylemler": yalnız "create" yetkili modüller.
   const creatableModules = NAV_MODULES.filter((mod) => accessibleModules.includes(mod) && canCreate(mod));
   const hasQuickCreate = getAppActions(creatableModules, "", lockedNavHrefs, closedModules).length > 0;
+  // Menü düzenleri + hızlı eylemler (düz veri; yan menü, kırıntı ve sekme şeridi AYNI nesneyi paylaşır).
+  const navRole = platformStaffFullAccess ? "owner" : effectiveRole;
+  const navs = buildShellNavSet({ accessible: accessibleModules, closed: closedModules, role: navRole });
+  const shellActions = buildShellActions(creatableModules, lockedNavHrefs, closedModules);
   // Menü sayı rozetleri: gerçek veri; hata olursa rozet çıkmaz. Spekülatif sorgu
   // etkin izinle süzülür; geçersizse (claim != profil) eski sıralı yol çalışır.
   const navBadges = platformStaffFullAccess
@@ -352,6 +381,9 @@ async function buildShellModel() {
     accessibleModules,
     creatableModules,
     hasQuickCreate,
+    navRole,
+    navs,
+    shellActions,
     lockedNavHrefs,
     closedModules,
     navBadges,
@@ -407,7 +439,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               id="main-content"
               className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center overflow-x-clip p-4 pb-28 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
             >
-              <Suspense fallback={<SectionTabsPlaceholder allModules={NAV_MODULES} />}>
+              <Suspense fallback={<SectionTabsPlaceholder nav={PLACEHOLDER_NAV} extra={NAV_EXTRA} />}>
                 <ShellTabs />
               </Suspense>
               {/* Sayfa içi sekme alanları (InlineTabbedPanel) buraya yerleşir: popup değil, akışta. */}
@@ -448,7 +480,7 @@ async function ShellBoot() {
           kisayol oydu. "g" onekli iki tusluk dizi bilincli — tek harf,
           bir nota yazarken odak kaybolursa sayfayi degistirip yazilani
           kaybettirir. Detay: keyboard-shortcuts.tsx */}
-      <KeyboardShortcuts />
+      <KeyboardShortcuts go={SHORTCUTS.go} create={SHORTCUTS.create} />
     </ClosedModulesProvider>
   );
 }
@@ -463,15 +495,16 @@ async function ShellSidebar() {
         plan={planLabel(office?.plan ?? "office")}
         trial={office?.status === "trial"}
         trialDaysLeft={m.trialDaysLeft}
-        accessibleModules={m.accessibleModules}
-        creatableModules={m.creatableModules}
+        navs={m.navs}
+        actions={m.shellActions}
+        icons={SIDEBAR_ICONS}
         lockedHrefs={m.lockedNavHrefs}
         badges={m.navBadges}
         usage={m.planUsage}
         canUpgrade={m.accessibleModules.includes("billing") && !m.platformStaffFullAccess && (office?.plan ?? "office") !== "enterprise"}
         vitrinHref={m.vitrinHref}
         storageScope={m.storageScope}
-        role={m.platformStaffFullAccess ? "owner" : m.effectiveRole}
+        role={m.navRole}
         simple={m.uiPrefs.simple}
         scopeCookie={m.scopeCookie}
       />
@@ -507,7 +540,7 @@ async function ShellHeader() {
           üstteki şeritlerle (demo/deneme, e-posta doğrulama) artık çakışmaz. */}
       <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
         <MobileMenuTrigger controlsId="app-mobile-navigation" label="Panel menüsünü aç" />
-        <AppBreadcrumb accessibleModules={m.accessibleModules} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} scopeCookie={m.scopeCookie} />
+        <AppBreadcrumb navs={m.navs} role={m.navRole} scopeCookie={m.scopeCookie} />
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
         <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
           <ThemeToggle />
@@ -540,7 +573,7 @@ async function ShellHeader() {
             <NotificationBell initial={[]} />
           )}
           {/* Avatar kabuğu bekletmez: önce baş harfli menü, avatar gelince değişir. */}
-          <Suspense fallback={<UserMenu {...userMenuProps} />}>
+          <Suspense fallback={<UserMenuShell {...userMenuProps} />}>
             <UserMenuWithAvatar userId={m.userId && !m.impersonating ? m.userId : null} {...userMenuProps} />
           </Suspense>
         </div>
@@ -553,7 +586,7 @@ async function ShellTabs() {
   const m = await loadShellModel();
   return (
     <ClosedModulesProvider closed={m.closedModules}>
-      <SectionTabs accessibleModules={m.accessibleModules} scopeCookie={m.scopeCookie} role={m.platformStaffFullAccess ? "owner" : m.effectiveRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
+      <SectionTabs navs={m.navs} scopeCookie={m.scopeCookie} role={m.navRole} lockedHrefs={m.lockedNavHrefs} counts={m.tabCounts} />
     </ClosedModulesProvider>
   );
 }

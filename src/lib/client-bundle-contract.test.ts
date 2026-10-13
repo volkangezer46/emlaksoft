@@ -99,6 +99,41 @@ describe("istemci paketi: zod kabuğa/form kabuğuna sızmaz", () => {
     expect(chainTo(entry, "zod")).toBeNull();
   });
 
+  // /app kabuğu: menü kataloğu (nav-config), rol düzenleri (nav-roles), ikon sözlüğü (icons: ağaç sallanamayan ~105 lucide
+  // ikonu) ve palet eylemleri (palette-core) SUNUCUDA çözülür (nav-shell-server); istemci kabuğu yalnız düz veri alır.
+  it.each([
+    "src/components/app/app-sidebar.tsx",
+    "src/components/app/section-tabs.tsx",
+    "src/components/app/app-breadcrumb.tsx",
+    "src/components/app/keyboard-shortcuts.tsx",
+    "src/components/app/command-search.tsx",
+    "src/components/app/quick-create-menu.tsx",
+    "src/components/admin/command-palette.tsx",
+    "src/components/admin/command-palette-lazy.tsx",
+    "src/components/ui/console/quick-access.tsx",
+  ])("%s → menü kataloğu / ikon sözlüğü / palet çekirdeği zinciri yok", (entry) => {
+    for (const mod of ["@/lib/icons", "@/lib/nav-config", "@/lib/nav-roles", "@/lib/palette-core", "@/lib/nav-shell-server"]) {
+      expect(chainTo(entry, mod), mod).toBeNull();
+    }
+  });
+
+  // Kullanıcı menüsü yüzü (avatar/hazır avatar çizimleri) sunucuda çizilir; yönetim paleti ve zil gövdesi tembel;
+  // zorunlu parola formu yönetim kabuğunda değil kendi rotasında.
+  it("yönetim/ofis üst çubuğu: avatar kataloğu, palet gövdesi ve parola formu ilk yükte yok", () => {
+    for (const entry of ["src/components/admin/admin-topbar.tsx", "src/components/ui/console/user-menu.tsx"]) {
+      expect(chainTo(entry, "@/lib/avatar-presets"), entry).toBeNull();
+    }
+    const topbar = read("src/components/admin/admin-topbar.tsx");
+    expect(topbar).toContain("CommandPaletteLazy");
+    expect(topbar).not.toMatch(/from "@\/components\/admin\/command-palette"/);
+    expect(read("src/components/admin/command-palette-lazy.tsx")).toMatch(/lazyPanel[\s\S]*import\("\.\/command-palette"\)/);
+    expect(read("src/components/admin/notification-bell.tsx")).toMatch(/lazyPanel[\s\S]*import\("\.\/notification-bell-panel"\)/);
+    const adminLayout = read("src/app/admin/layout.tsx");
+    expect(adminLayout).not.toContain("OwnPasswordForm");
+    expect(adminLayout).toContain('redirect("/admin/parola-yenile")');
+    expect(read("src/app/(admin-parola)/admin/parola-yenile/page.tsx")).toContain("<OwnPasswordForm forced />");
+  });
+
   it("hafif sabit modülleri bağımlılıksızdır", () => {
     for (const f of ["src/lib/demand-criteria-labels.ts", "src/lib/matching-weights.ts"]) {
       expect(valueImports(read(f)), f).toEqual([]);

@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MANAGEMENT_ROLES } from "@/lib/nav-roles";
-import { parseScope, type ScopeValue } from "@/lib/ui/scope";
+import { MANAGEMENT_ROLES, parseScope, type ScopeValue } from "@/lib/ui/scope";
 
 /** Kapsam değişince (ScopeSwitch / "Ofis görünümüne dön") menüyü anında günceller; layout yeniden çizilmeden. */
 export const SCOPE_CHANGE_EVENT = "es-scope-change";

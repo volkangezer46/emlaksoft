@@ -3,12 +3,9 @@
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { House } from "lucide-react";
-import { useMemo } from "react";
 import { Breadcrumb, type BreadcrumbItem } from "@/components/ui/breadcrumb";
-import { useClosedModules } from "@/components/app/closed-modules-context";
-import { hubNav, resolveStripHub } from "@/lib/nav-config";
-import type { AppModule } from "@/lib/permissions";
-import { useNavRole } from "@/lib/ui/use-nav-role";
+import { useShellNav } from "@/components/app/nav-glyph";
+import { resolveStripHubIn, type ShellNavSet } from "@/lib/nav-shell";
 
 /**
  * Üst çubuk konum yolu: Bugün > Merkez > Sayfa (en çok 3 seviye). Ara düğüm yan menüyle AYNI kaynaktan gelir:
@@ -16,21 +13,20 @@ import { useNavRole } from "@/lib/ui/use-nav-role";
  * kırıntıdaki ad menüde tıklanan satırla aynıdır. Menüde olmayan yolda gösterilmez. lg altında gizli.
  */
 export function AppBreadcrumb({
-  accessibleModules,
+  navs,
   role = null,
   scopeCookie = null,
 }: {
-  accessibleModules: AppModule[];
+  /** Rolün menü düzenleri (sunucuda yetki + kapalı modül süzülmüş; yan menüyle AYNI nesne). */
+  navs: ShellNavSet;
   /** Etkin rol (yan menüyle aynı merkez düzeni için). */
   role?: string | null;
   scopeCookie?: string | null;
 }) {
   const pathname = usePathname();
-  const closedModules = useClosedModules();
-  const { navRole } = useNavRole(role, scopeCookie);
-  const opts = useMemo(() => ({ role: navRole, closed: closedModules }), [navRole, closedModules]);
-  const tools = useMemo(() => hubNav(accessibleModules, opts).tools, [accessibleModules, opts]);
-  const { hub, pageHref, inTools } = resolveStripHub(pathname, accessibleModules, opts);
+  const { nav, owner, extra } = useShellNav(navs, role, scopeCookie);
+  const tools = nav.tools;
+  const { hub, pageHref, inTools } = resolveStripHubIn(pathname, nav, owner, extra);
   if (!pageHref) return null;
   const page = hub ? hub.pages.find((p) => p.href === pageHref) : tools.find((t) => t.href === pageHref);
   if (!page || (!hub && !inTools)) return null;

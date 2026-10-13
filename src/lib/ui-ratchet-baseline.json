@@ -779,12 +779,6 @@
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/musteriler/customer-bulk-actions.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/app/app/musteriler/customer-row-delete.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
@@ -1388,13 +1382,13 @@
  "src/components/admin/command-palette.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 3,
+  "hamButon": 2,
   "kucukHedef": 0
  },
  "src/components/admin/notification-bell.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 4,
+  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/admin/openai-key-form.tsx": {
@@ -1647,6 +1641,30 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
+  "kucukHedef": 0
+ },
+ "src/app/app/musteriler/customer-bulk-bar.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 1,
+  "kucukHedef": 0
+ },
+ "src/app/app/musteriler/customer-row-menu.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 1,
+  "kucukHedef": 0
+ },
+ "src/components/admin/command-palette-trigger.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 1,
+  "kucukHedef": 0
+ },
+ "src/components/admin/notification-bell-panel.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 3,
   "kucukHedef": 0
  }
 }

@@ -99,8 +99,13 @@ describe("görünürlük sözleşmesi", () => {
     const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
     expect(read("src/app/app/layout.tsx")).toContain("mergeHidden(officeClosedModules, hiddenModules)");
     expect(read("src/app/app/page.tsx")).toContain("getInvisibleFeatures");
-    for (const f of ["src/components/app/app-sidebar.tsx", "src/components/app/command-search-panel.tsx", "src/components/app/section-tabs.tsx"]) {
-      expect(read(f), f).toContain("useClosedModules");
+    expect(read("src/components/app/command-search-panel.tsx")).toContain("useClosedModules");
+    // Yan menü, kırıntı ve sekme şeridi menü düzenini SUNUCUDA aynı kapalı listeyle süzülmüş alır (nav-shell-server).
+    const layout = read("src/app/app/layout.tsx");
+    expect(layout).toContain("buildShellNavSet({ accessible: accessibleModules, closed: closedModules");
+    expect(layout).toContain("buildShellActions(creatableModules, lockedNavHrefs, closedModules)");
+    for (const f of ["src/components/app/app-sidebar.tsx", "src/components/app/app-breadcrumb.tsx", "src/components/app/section-tabs.tsx"]) {
+      expect(read(f), f).toContain("useShellNav(navs");
     }
   });
 

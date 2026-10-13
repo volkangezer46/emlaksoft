@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore, type ComponentType } from "react";
 import { Check, Scale, X } from "lucide-react";
-import { CompareTable, type CompareItem } from "./compare-table";
+import { runWhenIdle } from "@/lib/idle";
+import { lazyPanel } from "@/lib/lazy-panel";
+import type { CompareItem } from "./compare-table";
+
+/*
+ * Tam ekran tablo (Radix Dialog + görseller) ilk yük paketine girmez: 2+ ilan seçilince boşta, düğmeye
+ * gelince (hover/odak) önceden iner; tık anında yüklüyse aynı karede açılır (`lazyPanel`).
+ */
+type CompareTableProps = { items: CompareItem[]; onClose: () => void; onRemove?: (id: string) => void };
+const table = lazyPanel<CompareTableProps>(() => import("./compare-table").then((m) => m.CompareTable));
 
 /* ------------------------------------------------------------------
    Karşılaştırma seçimi — modül seviyesinde küçük dış store (oturumluk,
@@ -131,9 +140,11 @@ export function CompareToggle({
 export function CompareBar() {
   const items = useCompareSelection();
   const [open, setOpen] = useState(false);
+  const [Table, setTable] = useState<ComponentType<CompareTableProps> | null>(null);
+  const ready = items.length >= 2;
+  useEffect(() => (ready ? runWhenIdle(table.preload) : undefined), [ready]);
 
   if (items.length === 0) return null;
-  const ready = items.length >= 2;
 
   return (
     <>
@@ -146,7 +157,12 @@ export function CompareBar() {
           <button
             type="button"
             disabled={!ready}
-            onClick={() => setOpen(true)}
+            onClick={() => {
+              setTable(() => table.resolve());
+              setOpen(true);
+            }}
+            onPointerEnter={table.preload}
+            onFocus={table.preload}
             className="focus-ring press inline-flex items-center gap-1.5 rounded-full bg-mint-500 px-4 py-2 text-xs font-bold text-ink-950 transition hover:bg-mint-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Scale className="h-3.5 w-3.5" /> Karşılaştır ({items.length})
@@ -166,8 +182,10 @@ export function CompareBar() {
         </div>
       </div>
 
-      {open && ready ? (
-        <CompareTable items={items} onClose={() => setOpen(false)} onRemove={removeCompare} />
+      {open && ready && Table ? (
+        <Suspense fallback={null}>
+          <Table items={items} onClose={() => setOpen(false)} onRemove={removeCompare} />
+        </Suspense>
       ) : null}
     </>
   );

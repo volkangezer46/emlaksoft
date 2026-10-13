@@ -1,9 +1,8 @@
 "use client";
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { NAV_SHORTCUTS } from "@/lib/nav-config";
-import { APP_ACTIONS } from "@/lib/palette-core";
+import type { ShellShortcut } from "@/lib/nav-shell";
 
 /**
  * Klavye kısayolları (X12).
@@ -38,18 +37,12 @@ const KisayolDialog = lazy(() =>
   import("./keyboard-shortcuts-dialog").then((m) => ({ default: m.KeyboardShortcutsDialog })),
 );
 
-type Kisayol = { tuslar: string; hedef: string; etiket: string };
-
-/** `g` önekinden sonraki harf → gidilecek yol (TEK kaynak: nav-config `shortcut` alanı → NAV_SHORTCUTS). */
-const GIT: Kisayol[] = NAV_SHORTCUTS.map((k) => ({ tuslar: k.keys, hedef: k.href, etiket: k.label }));
-
-const HARF_YOL = new Map(GIT.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
-
-/** `n` önekinden sonraki harf → "Yeni ..." sayfası (palette-core APP_ACTIONS.shortcut ile birebir). */
-const YENI: Kisayol[] = APP_ACTIONS.flatMap((a) =>
-  a.shortcut ? [{ tuslar: a.shortcut, hedef: a.href, etiket: a.label }] : [],
-);
-const YENI_HARF_YOL = new Map(YENI.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
+/**
+ * Kısayol listeleri SUNUCUDAN gelir (app/layout.tsx → nav-shell-server `buildShortcuts`; menü kataloğu istemci
+ * paketine girmesin diye): `g` önekinden sonraki harf → gidilecek yol (TEK kaynak: nav-config `shortcut` alanı →
+ * NAV_SHORTCUTS); `n` önekinden sonraki harf → "Yeni ..." sayfası (palette-core APP_ACTIONS.shortcut ile birebir).
+ */
+const harfYol = (list: readonly ShellShortcut[]) => new Map(list.map((k) => [k.tuslar.split(" ")[1], k.hedef]));
 
 /** Yazma alanında mıyız? Kısayolların en sık şikâyet sebebi bu kontrol. */
 function yaziyorMu(t: EventTarget | null): boolean {
@@ -67,10 +60,15 @@ function yaziyorMu(t: EventTarget | null): boolean {
   );
 }
 
-export function KeyboardShortcuts() {
+export function KeyboardShortcuts({ go: GIT, create: YENI }: { go: ShellShortcut[]; create: ShellShortcut[] }) {
   const router = useRouter();
   const [yardimAcik, setYardimAcik] = useState(false);
   const [yardimYuklendi, setYardimYuklendi] = useState(false);
+  // Harf → yol tabloları ref'te: sunucu tazelemesi (yeni prop dizisi) dinleyiciyi yeniden kurup bekleyen öneki silmez.
+  const yollar = useRef<{ g: Map<string | undefined, string>; n: Map<string | undefined, string> } | null>(null);
+  useEffect(() => {
+    yollar.current = { g: harfYol(GIT), n: harfYol(YENI) };
+  }, [GIT, YENI]);
 
   useEffect(() => {
     // `g` basıldıktan sonra ikinci tuşu bekleyen durum. Zaman aşımı var:
@@ -106,7 +104,7 @@ export function KeyboardShortcuts() {
       }
 
       if (bekleyen) {
-        const yol = (onek === "n" ? YENI_HARF_YOL : HARF_YOL).get(k);
+        const yol = yollar.current?.[onek].get(k);
         iptal();
         if (yol) {
           e.preventDefault();
