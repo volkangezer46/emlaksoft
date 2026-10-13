@@ -30,6 +30,8 @@ import { SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ProductTourLazy } from "./product-tour-lazy";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
+import { PlatformBannerSlot, WhatsNewSlot } from "@/components/app/office-broadcast-slots";
+import { WhatsNew } from "@/components/app/whats-new";
 import { isEmailVerified } from "@/lib/auth/email-verification";
 import { isDemoEmail } from "@/lib/demo-credentials";
 import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banner";
@@ -536,6 +538,8 @@ async function ShellHeader() {
       ) : null}
       {/* Demo kişilikleri (demo-credentials alan adı) doğrulama e-postası alamaz: şerit onlara gösterilmez. */}
       {m.emailUnverified && !m.demoEmail && !m.platformStaffFullAccess && m.tenantId ? <EmailVerifyStrip /> : null}
+      {/* Platform duyuru banner'ı (AD8): hedef ofis + tarih aralığı RLS'te süzülür; kendi sınırında akar, kabuğu bekletmez. */}
+      {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><PlatformBannerSlot /></Suspense> : null}
       {/* Üst çubuk `sticky` = konumlandırılmış kap: hamburger (yalnız lg altı) mutlak konumla pl-16 boşluğuna oturur,
           üstteki şeritlerle (demo/deneme, e-posta doğrulama) artık çakışmaz. */}
       <header className="glass-bar sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 pl-16 lg:px-6">
@@ -544,6 +548,8 @@ async function ShellHeader() {
         <CommandSearch accessibleModules={m.accessibleModules} creatableModules={m.creatableModules} lockedHrefs={m.lockedNavHrefs} storageScope={m.storageScope} uiPrefCookie={m.uiPrefCookie} />
         <div className="ml-3 flex shrink-0 items-center gap-1.5 sm:ml-4 sm:gap-2">
           <ThemeToggle />
+          {/* Yenilikler (AD8): rozet sayısı aynı tek RPC'den akar; düğme hemen çizilir. */}
+          {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={<WhatsNew unread={0} />}><WhatsNewSlot /></Suspense> : null}
           {m.tenantId && !m.platformStaffFullAccess ? <Suspense fallback={null}><EfCreditBadge tenantId={m.tenantId} role={m.effectiveRole} canAccessValuation={effectiveCanAccessModule(m.effectivePerms ?? {}, "valuation")} valuationClosed={m.closedModules.includes("valuation")} impersonating={m.impersonating} /></Suspense> : null}
           {/* Hızlı eylem menüsü: en sık kullanılan kayıt akışlarına tek tıkla. Mobilde "+ Yeni" alt çubukta olduğundan
               üst çubuktaki kopya yalnız lg ve üstünde (flex sarmalayıcı satır kutusu payı eklemez; masaüstü aynı). */}
