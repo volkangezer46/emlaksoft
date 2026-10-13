@@ -1,3 +1,6 @@
+import { isLifecycleStage, LIFECYCLE_LABELS, type LifecycleStage } from "@/lib/admin/platform-crm";
+import { HEALTH_BAND_LABELS, type HealthBand } from "@/lib/admin/health-score";
+
 /**
  * /admin/tenants saf modeli (DOM/zaman yok; vitest): filtre kontratı (URL ↔ sunucu sorgusu), href üretimi,
  * envanter sayımları (KPI + grafikler), etkinlik rozeti. Zaman eşikleri çağırandan ISO olarak gelir (clock.ts).
@@ -29,10 +32,19 @@ export type TenantFilters = {
   /** `deneme=bitti` penceresi (gün; varsayılan 30). */
   gun?: "7" | "30" | "90";
   dagilim?: "aktif";
+  /** CRM (AD5): etiket kimliği. */
+  etiket?: string;
+  /** CRM: sorumlu personel kimliği, `ben` (oturumdaki personel) ya da `yok` (atanmamış). */
+  sorumlu?: string;
+  asama?: LifecycleStage;
+  skor?: HealthBand;
   sayfa?: number;
 };
 
-export type RawTenantSearch = Partial<Record<"q" | "durum" | "plan" | "veri" | "yeni" | "deneme" | "gun" | "dagilim" | "sayfa", string>>;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const HEALTH_BANDS = new Set<string>(["riskli", "izlenmeli", "saglikli"]);
+
+export type RawTenantSearch = Partial<Record<"q" | "durum" | "plan" | "veri" | "yeni" | "deneme" | "gun" | "dagilim" | "etiket" | "sorumlu" | "asama" | "skor" | "sayfa", string>>;
 
 export function parseTenantFilters(sp: RawTenantSearch, isPlan: (id: string) => boolean): TenantFilters {
   const durum = sp.durum && ((TENANT_STATUS_KEYS as readonly string[]).includes(sp.durum) || VIRTUAL_STATUS.has(sp.durum)) ? (sp.durum as TenantFilters["durum"]) : undefined;
@@ -47,13 +59,17 @@ export function parseTenantFilters(sp: RawTenantSearch, isPlan: (id: string) => 
     deneme,
     gun: deneme === "bitti" ? (sp.gun && DAY_WINDOWS.has(sp.gun) ? (sp.gun as TenantFilters["gun"]) : "30") : undefined,
     dagilim: sp.dagilim === "aktif" ? "aktif" : undefined,
+    etiket: sp.etiket && UUID_RE.test(sp.etiket) ? sp.etiket.toLowerCase() : undefined,
+    sorumlu: sp.sorumlu && (sp.sorumlu === "ben" || sp.sorumlu === "yok" || UUID_RE.test(sp.sorumlu)) ? sp.sorumlu.toLowerCase() : undefined,
+    asama: isLifecycleStage(sp.asama) ? sp.asama : undefined,
+    skor: sp.skor && HEALTH_BANDS.has(sp.skor) ? (sp.skor as HealthBand) : undefined,
     sayfa: Number.isInteger(n) && n > 1 ? n : undefined,
   };
 }
 
 /** Liste süzgeci etkin mi (dağılım tabanı ve sayfa süzgeç değildir). */
 export function isFiltered(f: TenantFilters): boolean {
-  return Boolean(f.q || f.durum || f.plan || f.veri || f.yeni || f.deneme);
+  return Boolean(f.q || f.durum || f.plan || f.veri || f.yeni || f.deneme || f.etiket || f.sorumlu || f.asama || f.skor);
 }
 
 /** Href: verilen süzgeçler + sayfa. Süzgeç değişince sayfa 1'e döner (çağıran `sayfa` vermez). */
@@ -67,6 +83,10 @@ export function tenantsHref(f: TenantFilters): string {
   if (f.deneme) sp.set("deneme", f.deneme);
   if (f.deneme === "bitti" && f.gun && f.gun !== "30") sp.set("gun", f.gun);
   if (f.dagilim) sp.set("dagilim", f.dagilim);
+  if (f.etiket) sp.set("etiket", f.etiket);
+  if (f.sorumlu) sp.set("sorumlu", f.sorumlu);
+  if (f.asama) sp.set("asama", f.asama);
+  if (f.skor) sp.set("skor", f.skor);
   if (f.sayfa && f.sayfa > 1) sp.set("sayfa", String(f.sayfa));
   const s = sp.toString();
   return s ? `/admin/tenants?${s}` : "/admin/tenants";
@@ -82,7 +102,9 @@ export function toggleFilter<K extends keyof TenantFilters>(f: TenantFilters, ke
 
 export type ActiveChip = { key: string; label: string; removeHref: string };
 
-export function activeChips(f: TenantFilters, planName: (id: string) => string, statusName: (id: string) => string): ActiveChip[] {
+export type CrmNames = { tag?: (id: string) => string; staff?: (id: string) => string };
+
+export function activeChips(f: TenantFilters, planName: (id: string) => string, statusName: (id: string) => string, crm: CrmNames = {}): ActiveChip[] {
   const drop = (patch: Partial<TenantFilters>) => tenantsHref({ ...f, ...patch, sayfa: undefined });
   const chips: ActiveChip[] = [];
   if (f.q) chips.push({ key: "q", label: `Arama: ${f.q}`, removeHref: drop({ q: undefined }) });
@@ -94,6 +116,13 @@ export function activeChips(f: TenantFilters, planName: (id: string) => string, 
   if (f.veri) chips.push({ key: "veri", label: `Veri: ${DATA_STATE_LABELS[f.veri]}`, removeHref: drop({ veri: undefined }) });
   if (f.yeni) chips.push({ key: "yeni", label: `Kayıt: son ${f.yeni} gün`, removeHref: drop({ yeni: undefined }) });
   if (f.deneme) chips.push({ key: "deneme", label: `${TRIAL_LABELS[f.deneme]}${f.deneme === "bitti" ? ` · son ${f.gun ?? "30"} gün` : ""}`, removeHref: drop({ deneme: undefined, gun: undefined }) });
+  if (f.etiket) chips.push({ key: "etiket", label: `Etiket: ${crm.tag?.(f.etiket) ?? "seçili etiket"}`, removeHref: drop({ etiket: undefined }) });
+  if (f.sorumlu) {
+    const who = f.sorumlu === "ben" ? "Ben" : f.sorumlu === "yok" ? "Atanmamış" : (crm.staff?.(f.sorumlu) ?? "seçili personel");
+    chips.push({ key: "sorumlu", label: `Sorumlu: ${who}`, removeHref: drop({ sorumlu: undefined }) });
+  }
+  if (f.asama) chips.push({ key: "asama", label: `Aşama: ${LIFECYCLE_LABELS[f.asama]}`, removeHref: drop({ asama: undefined }) });
+  if (f.skor) chips.push({ key: "skor", label: `Sağlık: ${HEALTH_BAND_LABELS[f.skor]}`, removeHref: drop({ skor: undefined }) });
   return chips;
 }
 

@@ -8,6 +8,7 @@ import { beginCronRun } from "@/lib/cron-pause";
 import { formatDateTimeTr } from "@/lib/format";
 import { fetchAllPaged, guardCron } from "@/lib/cron-run";
 import { runLowScoreEscalation } from "@/lib/surveys/escalate";
+import { runPlatformTaskReminders, runTenantHealthDaily, type HealthJobSummary, type TaskReminderSummary } from "@/lib/admin/tenant-health-job";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -95,10 +96,29 @@ async function run(req: NextRequest) {
     failed += 1;
   }
 
+  // Ofis CRM (AD5) ayrık adımları: platform görev hatırlatması + günde bir sağlık skoru. Hata diğer adımları bozmaz.
+  let platformTasks: TaskReminderSummary = { skipped: true, notified: 0, error: null };
+  let health: HealthJobSummary = { skipped: true, written: 0, error: null };
+  try {
+    platformTasks = await runPlatformTaskReminders(admin, now);
+    if (platformTasks.error) failed += 1;
+  } catch (e) {
+    console.error("gorev-hatirlat platform görevleri", e);
+    failed += 1;
+  }
+  try {
+    health = await runTenantHealthDaily(admin, now);
+    if (health.error) failed += 1;
+  } catch (e) {
+    console.error("gorev-hatirlat sağlık skoru", e);
+    failed += 1;
+  }
+  const crmNote = ` · platform görevi: ${platformTasks.skipped ? "atlandı" : `${platformTasks.notified} bildirim`}${platformTasks.error ? ` (hata: ${platformTasks.error.slice(0, 80)})` : ""} · sağlık skoru: ${health.skipped ? "atlandı" : `${health.written} ofis`}${health.error ? ` (hata: ${health.error.slice(0, 80)})` : ""}`;
+
   await recordHeartbeat(
     "gorev-hatirlat",
     heartbeatFor({ failed, truncated: capped }),
-    `${notified} bildirim, ${skipped} atlandı · düşük puan zinciri: ${lowScore.escalated} kademe, ${lowScore.notified} bildirim${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
+    `${notified} bildirim, ${skipped} atlandı · düşük puan zinciri: ${lowScore.escalated} kademe, ${lowScore.notified} bildirim${crmNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
   );
 
   return NextResponse.json({ ok: true, notified, skipped, lowScoreEscalated: lowScore.escalated });

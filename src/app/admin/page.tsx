@@ -1,3 +1,6 @@
+import { HEALTH_DEFAULT_RISK_THRESHOLD } from "@/lib/admin/health-score";
+import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
+import { getSetting } from "@/lib/settings/read";
 import { cache, Suspense, type ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import {
@@ -100,6 +103,7 @@ const getAdminDashboardData = unstable_cache(
       manualRes,
       churnTenants,
       rollupsRes,
+      healthRes,
     ] = await Promise.all([
       admin.rpc("platform_reporting_aggregates", { p_from: null, p_to: null, p_as_of: nowIso }),
       admin.from("tenants").select("id, name, plan, status, created_at, trial_ends_at").order("created_at", { ascending: false }).limit(5),
@@ -123,6 +127,10 @@ const getAdminDashboardData = unstable_cache(
         p_ledger_from: trMonthStartIso(now(), -5),
         p_units: [...LEDGER_UNITS],
       }),
+      // Ofis CRM (AD5): son günlük sağlık skoru. Tablo yoksa (migration bekliyor) hata → skor sinyali yok (uydurulmaz).
+      fetchAllRows<{ tenant_id: string; health_score: number }>((from, to) =>
+        admin.from("platform_tenant_crm").select("tenant_id, health_score").not("health_score", "is", null).order("tenant_id", { ascending: true }).range(from, to),
+      ),
     ]);
     const rollups = rollupsRes.error ? null : parseDashboardRollups(rollupsRes.data);
     const activity: Record<string, number> = {};
@@ -131,6 +139,8 @@ const getAdminDashboardData = unstable_cache(
       activity[a.officeId] = a.events;
       lastActivity[a.officeId] = a.lastAt;
     }
+    const healthScores: Record<string, number> = {};
+    if (!healthRes.error) for (const h of healthRes.data) healthScores[h.tenant_id] = h.health_score;
     return {
       aggregate: requireReportingData("platform-dashboard-aggregates", aggregateResult) as unknown as PlatformReportingAggregate,
       tenants: requireReportingData("platform-recent-tenants", tenantsResult),
@@ -144,13 +154,14 @@ const getAdminDashboardData = unstable_cache(
       churnTenants: churnTenants.error ? [] : (churnTenants.data ?? []),
       activity,
       lastActivity,
+      healthScores,
       funnel: rollups?.funnel ?? null,
       trialConv: rollups?.trial ?? null,
       cancelReasons: rollups ? rollups.cancelReasons : null,
       ledger: rollups ? rollups.ledgerMonths : null,
     };
   },
-  ["admin-dashboard-v5"],
+  ["admin-dashboard-v6"],
   { revalidate: 60, tags: ["admin-dashboard"] },
 );
 
@@ -412,7 +423,7 @@ async function MrrSection({ period }: { period: Period }) {
   );
 }
 
-const SIGNAL_TONE: Record<ChurnSignal["key"], string> = { past_due: "danger", suspended: "danger", inactive: "warn", quiet: "gold" };
+const SIGNAL_TONE: Record<ChurnSignal["key"], string> = { past_due: "danger", suspended: "danger", inactive: "warn", quiet: "gold", low_health: "danger" };
 const LEVEL_PILL: Record<ChurnLevel, { label: string; tone: string }> = {
   yuksek: { label: "Yüksek", tone: "danger" },
   orta: { label: "Orta", tone: "warn" },
@@ -423,12 +434,16 @@ const LEVEL_PILL: Record<ChurnLevel, { label: string; tone: string }> = {
 async function ChurnSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const d = derive(data);
-  const rows = buildChurnRows(data.churnTenants, new Map(Object.entries(data.activity)), now(), 8, new Map(Object.entries(data.lastActivity)));
+  const riskThreshold = await getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD);
+  const rows = buildChurnRows(data.churnTenants, new Map(Object.entries(data.activity)), now(), 8, new Map(Object.entries(data.lastActivity)), {
+    scores: new Map(Object.entries(data.healthScores)),
+    threshold: riskThreshold,
+  });
   return (
     <ChartCard
       as="h2"
       title="Riskli ofisler ve kayıp riski"
-      subtitle="Gecikmiş, askıda veya az kullanan ofisler"
+      subtitle="Gecikmiş, askıda, az kullanan veya sağlık skoru düşük ofisler"
       icon={ShieldAlert}
       tone="danger"
       href="/admin/tenants?durum=risk"
@@ -437,7 +452,7 @@ async function ChurnSection({ period }: { period: Period }) {
       className="h-full"
     >
       {rows.length === 0 ? (
-        <EmptyState variant="compact" illustration="basari" title="Risk sinyali olan ofis yok" description="Ödeme gecikmesi, askıya alma veya 14 gündür düşük kullanım olursa burada listelenir." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
+        <EmptyState variant="compact" illustration="basari" title="Risk sinyali olan ofis yok" description="Ödeme gecikmesi, askıya alma, 14 gündür düşük kullanım ya da eşiğin altında sağlık skoru olursa burada listelenir." action={{ href: "/admin/tenants", label: "Ofisleri gör" }} />
       ) : (
         <div className="-mx-1.5 overflow-x-auto">
           <Table className="pm-tbl min-w-[34rem]">
@@ -461,11 +476,17 @@ async function ChurnSection({ period }: { period: Period }) {
                   </TH>
                   <TD className="pm-l pm-wrap">
                     <span className="flex flex-wrap gap-1.5">
-                      {r.signals.map((s) => (
-                        <span key={s.key} className={`ds-pill pm-t-${SIGNAL_TONE[s.key]}`}>
-                          {s.label}
-                        </span>
-                      ))}
+                      {r.signals.map((s) =>
+                        s.key === "low_health" ? (
+                          <Link key={s.key} href="/admin/tenants?skor=riskli" className={`ds-pill pm-t-${SIGNAL_TONE[s.key]} focus-ring`} title="Sağlık skoru riskli eşiğin altındaki tüm ofisler">
+                            {s.label}
+                          </Link>
+                        ) : (
+                          <span key={s.key} className={`ds-pill pm-t-${SIGNAL_TONE[s.key]}`}>
+                            {s.label}
+                          </span>
+                        ),
+                      )}
                     </span>
                   </TD>
                   <TD className="text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "14+ gün"}</TD>

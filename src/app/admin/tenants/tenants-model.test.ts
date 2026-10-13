@@ -32,6 +32,19 @@ describe("ofis listesi filtre kontratı (URL ↔ sunucu)", () => {
     expect(chips[1]!.label).toContain("Riskli");
     expect(chips[2]!.removeHref).toBe("/admin/tenants?q=a&durum=risk");
   });
+
+  it("CRM süzgeçleri (etiket, sorumlu, aşama, skor): doğrulanır, gidiş-dönüş korunur, çip adları çözülür", () => {
+    const tag = "11111111-2222-4333-8444-555555555555";
+    const f = parseTenantFilters({ etiket: tag, sorumlu: "ben", asama: "genisleme", skor: "riskli" }, isPlan);
+    expect(f).toMatchObject({ etiket: tag, sorumlu: "ben", asama: "genisleme", skor: "riskli" });
+    expect(isFiltered(f)).toBe(true);
+    const back = parseTenantFilters(Object.fromEntries(new URL(tenantsHref(f), "https://x").searchParams), isPlan);
+    expect(back).toEqual(f);
+    expect(parseTenantFilters({ etiket: "x", sorumlu: "kimse", asama: "uydurma", skor: "100" }, isPlan)).toMatchObject({ etiket: undefined, sorumlu: undefined, asama: undefined, skor: undefined });
+    const chips = activeChips(f, (p) => p, (s) => s, { tag: () => "Kurumsal" });
+    expect(chips.map((c) => c.label)).toEqual(["Etiket: Kurumsal", "Sorumlu: Ben", "Aşama: Genişleme", "Sağlık: Riskli"]);
+    expect(toggleFilter(f, "etiket", tag)).toBe("/admin/tenants?sorumlu=ben&asama=genisleme&skor=riskli");
+  });
 });
 
 describe("envanter sayımları", () => {

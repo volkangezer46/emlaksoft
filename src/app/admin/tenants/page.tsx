@@ -48,6 +48,12 @@ import {
 } from "./tenants-model";
 import { TenantTable, type TenantRowData } from "./tenant-table";
 import { IMPERSONATION_REASON_MAX, IMPERSONATION_REASON_MIN } from "@/lib/platform-security/impersonation-reason";
+import { CrmFilterForm, SavedViewsMenu, TagManager } from "./crm-toolbar";
+import { effectiveStage, loadAdminSavedViews, loadCrmCatalog, loadCrmRows, stageFilterOr } from "@/lib/admin/platform-crm";
+import { HEALTH_DEFAULT_RISK_THRESHOLD, healthBand, healthBandRange } from "@/lib/admin/health-score";
+import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
+import { getSetting } from "@/lib/settings/read";
+import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 
 /** Durum renkleri (halka + lejant): token, iki temada çözülür. */
 const STATUS_COLOR: Record<string, string> = {
@@ -71,7 +77,7 @@ export default async function AdminTenantsPage({
   searchParams,
 }: {
   // Açık tip: link kontratı denetimi (check:links) okunan parametreleri buradan görür.
-  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; sayfa?: string; audit?: string; destek?: string }>;
+  searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; etiket?: string; sorumlu?: string; asama?: string; skor?: string; sayfa?: string; audit?: string; destek?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
   const canCreate = officeAdminCan(staff.role, "create");
@@ -81,6 +87,14 @@ export default async function AdminTenantsPage({
     canImpersonate: staff.role === "super_admin" || staff.role === "ops" || staff.role === "support",
     canResend: officeAdminCan(staff.role, "resend_access"),
   };
+  // CRM toplu işlem yetkileri (eylem tarafı aynı kuralları uygular: src/app/actions/platform-crm.ts).
+  const bulkPerms = {
+    crm: officeAdminCan(staff.role, "note"),
+    trial: canChangeTrial(staff.role),
+    status: officeAdminCan(staff.role, "plan_status"),
+    destructiveStatus: staff.role === "super_admin",
+  };
+  const canManageTags = staff.role === "super_admin" || staff.role === "ops";
   const raw = (await searchParams) ?? {};
   const f = parseTenantFilters(raw, isPlanId);
   const page = f.sayfa ?? 1;
@@ -96,10 +110,21 @@ export default async function AdminTenantsPage({
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;
+  // Eşik ayar defterinden (crm.health_risk_threshold); okunamazsa varsayılan. Süzgeç ve rozet aynı eşiği kullanır.
+  const riskThreshold = await getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD);
+  const ownerFilter = f.sorumlu === "ben" ? staff.id : f.sorumlu;
+  // Aşama süzgeci iç birleşim İSTEMEZ: elle seçilmemiş (boş) aşama ve CRM satırı olmayan ofis durumdan türetilir.
+  const needCrm = Boolean((ownerFilter && ownerFilter !== "yok") || f.skor);
   // "Dönemi bitmiş ama aktif": aboneliğe iç birleşim (FK adıyla) — isExpiredActive ile aynı aday: status='active' AND
   // current_period_end < şimdi AND duraklatılmamış AND dönem sonu iptali beklemiyor.
   // Tür: gömme yalnız süzgeç içindir (satırda kullanılmaz), seçim tipi temel sütunlarla aynı kalır.
-  const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
+  // CRM süzgeçleri (AD5) de gömme ile sunucuda uygulanır: etiket ve sorumlu/aşama/skor iç birleşim; "atanmamış" ters birleşim.
+  const crmEmbeds = [
+    f.etiket ? "tl:tenant_tag_links!tenant_tag_links_tenant_id_fkey!inner(tag_id)" : "",
+    needCrm ? "crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(account_owner_staff_id, health_score)" : "",
+    ownerFilter === "yok" ? "own:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey(account_owner_staff_id)" : "",
+  ].filter(Boolean);
+  const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}${crmEmbeds.length ? `, ${crmEmbeds.join(", ")}` : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
   let listQuery = admin
     .from("tenants")
     .select(listCols, { count: "exact" })
@@ -119,9 +144,20 @@ export default async function AdminTenantsPage({
   if (f.plan) listQuery = listQuery.eq("plan", f.plan);
   if (f.veri === "demo") listQuery = listQuery.not("sample_seeded_at", "is", null);
   if (f.veri === "gercek") listQuery = listQuery.is("sample_seeded_at", null);
+  if (f.etiket) listQuery = listQuery.eq("tl.tag_id", f.etiket);
+  if (ownerFilter && ownerFilter !== "yok") listQuery = listQuery.eq("crm.account_owner_staff_id", ownerFilter);
+  if (ownerFilter === "yok") listQuery = listQuery.not("own.account_owner_staff_id", "is", null).is("own", null);
+  if (f.asama) {
+    const stageOr = await stageFilterOr(admin, f.asama);
+    listQuery = stageOr ? listQuery.or(stageOr) : listQuery.eq("id", "00000000-0000-0000-0000-000000000000");
+  }
+  if (f.skor) {
+    const r = healthBandRange(f.skor, riskThreshold);
+    listQuery = listQuery.gte("crm.health_score", r.gte).lt("crm.health_score", r.lt);
+  }
 
   // Envanter (KPI + grafikler) TÜM ofisleri anlatır; PostgREST 1000 satır sınırı için sıralı sayfalı okunur.
-  const [{ data: tenants, count: tenantCount, error: listError }, inventoryRes, planDefs] = await Promise.all([
+  const [{ data: tenants, count: tenantCount, error: listError }, inventoryRes, planDefs, catalog, savedViews] = await Promise.all([
     listQuery,
     fetchAllPaged<InventoryRow>(
       (from, to) => admin.from("tenants").select("plan, status, sample_seeded_at, trial_ends_at, created_at").order("id").range(from, to),
@@ -129,6 +165,8 @@ export default async function AdminTenantsPage({
       50,
     ),
     getPlanDefinitions(),
+    loadCrmCatalog(admin),
+    loadAdminSavedViews(admin, staff.id, "/admin/tenants"),
   ]);
 
   const rows = tenants ?? [];
@@ -136,13 +174,16 @@ export default async function AdminTenantsPage({
   const since14 = daysAgoIso(14);
   // Sayfadaki ofisler için gömülü sayımlar (DB'de sayılır; satır çekilmez → 1000 sınırına takılmaz).
   // Ayrı sorgular: biri hata verirse yalnız o sütun "—" olur, liste düşmez.
-  const [membersRes, activityRes, ownersRes] = ids.length
+  const [membersRes, activityRes, ownersRes, crmRes] = ids.length
     ? await Promise.all([
         admin.from("tenants").select("id, profiles!profiles_tenant_id_fkey(count)").in("id", ids),
         admin.from("tenants").select("id, audit_logs!audit_logs_tenant_id_fkey(count)").in("id", ids).gte("audit_logs.created_at", since14),
         admin.from("profiles").select("tenant_id, is_active").eq("role", "owner").in("tenant_id", ids),
+        catalog.ready ? loadCrmRows(admin, ids) : Promise.resolve(null),
       ])
-    : [null, null, null];
+    : [null, null, null, null];
+  const tagById = new Map(catalog.tags.map((t) => [t.id, t]));
+  const staffById = new Map(catalog.staff.map((s) => [s.id, s]));
 
   const memberCount = new Map<string, number>();
   if (membersRes && !membersRes.error) for (const r of membersRes.data ?? []) memberCount.set(r.id, embeddedCount((r as Record<string, unknown>).profiles));
@@ -174,7 +215,10 @@ export default async function AdminTenantsPage({
       active: f.plan === p.id,
       title: f.plan === p.id ? "Paket süzgecini kaldır" : `Yalnız ${p.name} paketini göster`,
     }));
-  const chips = activeChips(f, planName, statusName);
+  const chips = activeChips(f, planName, statusName, {
+    tag: (id) => tagById.get(id)?.name ?? "silinmiş etiket",
+    staff: (id) => staffById.get(id)?.name ?? "seçili personel",
+  });
 
   const tableRows: TenantRowData[] = rows.map((t) => ({
     id: t.id,
@@ -191,7 +235,32 @@ export default async function AdminTenantsPage({
     sample: Boolean(t.sample_seeded_at),
     owner: ownersRes && !ownersRes.error ? (owners.get(t.id) ?? "none") : null,
     dataHref: toggleFilter(f, "veri", t.sample_seeded_at ? "demo" : "gercek"),
+    crm: (() => {
+      if (!crmRes || !crmRes.ok) return null;
+      const c = crmRes.rows.get(t.id);
+      const st = effectiveStage(c?.stage, t.status);
+      const ownerId = c?.ownerId ?? null;
+      const band = c?.score != null ? healthBand(c.score, riskThreshold) : null;
+      return {
+        score: c?.score ?? null,
+        band,
+        scoreHref: band ? toggleFilter(f, "skor", band) : null,
+        tags: (c?.tagIds ?? []).flatMap((id) => {
+          const tag = tagById.get(id);
+          return tag ? [{ ...tag, href: toggleFilter(f, "etiket", id) }] : [];
+        }),
+        owner: ownerId ? { id: ownerId, name: staffById.get(ownerId)?.name ?? "Pasif personel", href: toggleFilter(f, "sorumlu", ownerId) } : null,
+        stage: st.stage,
+        stageAuto: st.auto,
+        stageHref: toggleFilter(f, "asama", st.stage),
+      };
+    })(),
   }));
+  const viewParams: Record<string, string> = Object.fromEntries(
+    Object.entries({ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }).filter(
+      (e): e is [string, string] => typeof e[1] === "string" && e[1] !== "",
+    ),
+  );
 
   const kpiHref = (durum: "active" | "trial" | "risk") => toggleFilter(f, "durum", durum);
 
@@ -370,7 +439,7 @@ export default async function AdminTenantsPage({
               action="/admin/tenants"
               defaultValue={f.q}
               placeholder="Ofis adı ara…"
-              hidden={{ durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim }}
+              hidden={{ durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim, etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }}
             />
             <nav aria-label="Hızlı süzgeçler" className="flex flex-wrap items-center gap-1.5">
               {QUICK.map((c) => (
@@ -385,6 +454,21 @@ export default async function AdminTenantsPage({
                 </AdminChip>
               ))}
             </nav>
+            {catalog.ready ? (
+              <div className="flex w-full flex-wrap items-end gap-2">
+                <CrmFilterForm
+                  current={{ etiket: f.etiket, sorumlu: f.sorumlu, asama: f.asama, skor: f.skor }}
+                  hidden={{ q: f.q, durum: f.durum, plan: f.plan, veri: f.veri, yeni: f.yeni, deneme: f.deneme, gun: f.gun && f.gun !== "30" ? f.gun : undefined, dagilim: f.dagilim }}
+                  tags={catalog.tags}
+                  staff={catalog.staff}
+                  riskThreshold={riskThreshold}
+                />
+                <SavedViewsMenu views={savedViews} current={viewParams} />
+                {canManageTags ? <TagManager tags={catalog.tags} /> : null}
+              </div>
+            ) : (
+              <AdminInfo>Etiket, sorumlu ve sağlık skoru süzgeçleri Ofis CRM kurulumu (veritabanı güncellemesi) tamamlanınca açılır.</AdminInfo>
+            )}
             <AdminInfo>Değişiklikler kaydedilince anında ofisin paneline yansır. Askıya alma erişimi keser.</AdminInfo>
           </>
         }
@@ -392,7 +476,9 @@ export default async function AdminTenantsPage({
       >
         {listError ? (
           <div role="alert" className="px-5 py-10 text-center text-sm text-[var(--pm-danger-text)]">
-            Ofis listesi okunamadı. Sayfayı yenileyin; sorun sürerse Sistem &gt; Hatalar ekranına bakın.
+            {crmEmbeds.length && !catalog.ready
+              ? "CRM süzgeçleri için veritabanı güncellemesi bekleniyor; etiket, sorumlu, aşama ve skor süzgeçlerini kaldırın."
+              : "Ofis listesi okunamadı. Sayfayı yenileyin; sorun sürerse Sistem > Hatalar ekranına bakın."}
           </div>
         ) : tableRows.length === 0 ? (
           <div className="px-5 py-10">
@@ -404,7 +490,14 @@ export default async function AdminTenantsPage({
             />
           </div>
         ) : (
-          <TenantTable rows={tableRows} plans={planDefs.map((p, i) => ({ id: p.id, name: p.name, order: p.order ?? i, hidden: Boolean(p.hidden) }))} perms={perms} />
+          <TenantTable
+            // Süzgeç/sayfa değişince toplu seçim sıfırlanır (layout-router arama parametresinde durumu korur).
+            key={tenantsHref(f)}
+            rows={tableRows}
+            plans={planDefs.map((p, i) => ({ id: p.id, name: p.name, order: p.order ?? i, hidden: Boolean(p.hidden) }))}
+            perms={perms}
+            bulk={catalog.ready ? { perms: bulkPerms, tags: catalog.tags, staff: catalog.staff } : null}
+          />
         )}
       </AdminListCard>
 

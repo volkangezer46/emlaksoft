@@ -329,6 +329,8 @@ const F = {
   googleData: "20261013003400_google_data.sql",
   // AD1 (2026-10-13): abonelik operasyon konsolu: ofise ozel limit istisnasi + cozucu, taahhut/iptal kodu, tahsil hata metni.
   subscriptionOps: "20261013004000_subscription_ops_entitlement_overrides.sql",
+  // AD5 (2026-10-13): ofis CRM katmani (etiket, sorumlu, asama, not, gorev, gunluk saglik skoru, admin kayitli gorunum; yalniz service_role).
+  platformCrm: "20261013004400_platform_crm.sql",
   storageCleanupReceipts: "20261012001800_storage_cleanup_receipts.sql",
   // EVDS (2026-10-12): TCMB EVDS piyasa oranlari (konut kredisi faizi) icin yeni tablo.
   marketRates: "20261012002000_market_rates.sql",
@@ -553,6 +555,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.googleData]: "ek", // 3 yeni platform tablosu (RLS acik, politika yok, yalniz service_role) + google_data_prune/seo_gsc_summary (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "veri yok"
     [F.subscriptionOps]: "davranis", // kapasite tetikleyicileri + effective_seat_limit ofise ozel istisnayi sayar (istisna yokken sonuc ayni); yeni tablo tenant_entitlement_overrides (RLS+FORCE, personel okur, service_role yazar) + 4 nullable sutun
+    [F.platformCrm]: "ek", // 7 yeni platform tablosu (RLS+FORCE, politika yok, yalniz service_role; FK tenants/platform_staff) + salt-okunur platform_tenant_health_inputs (service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "CRM kurulumu bekliyor"
     [F.portalTransferSessions]: "ek", // yeni tablo portal_transfer_sessions (RLS + acik grant) + 6 JWT SECURITY DEFINER RPC (pt_*; lc_bind_portal_listing sarilir); mevcut tablo/politika/veri degismez, kod tablo yokken sistem guncellemesi bekleniyor durumuna duser
     [F.fsboRealtime]: "ek", // fsbo_leads realtime yayinina eklenir (idempotent) + dar SECURITY DEFINER RPC insight_close_fsbo_lead (yalniz valid_until); tablo/politika/veri degismez
     [F.detailReadRpcs]: "ek", // 2 yeni SECURITY INVOKER okuma RPC'si (deal_side_reads, property_region_days); tablo/politika/veri degismez
@@ -751,6 +754,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "SP5-google-veri", order: 69, title: "Google baglanti merkezi: seo_gsc_daily, seo_url_inspections, ads_daily_metrics + google_data_prune/seo_gsc_summary (bagimsiz; kod tablolar yokken bos durum, cron baglanti yokken atlar; sira serbest, ek)", files: [F.googleData] },
     { id: "AD1-abonelik-operasyon", order: 71, title: "Abonelik operasyon konsolu: tenant_entitlement_overrides + tenant_entitlement_resolve, kapasite tetikleyicileri ve effective_seat_limit istisnayi sayar (20260825000600 govdesi md5 on-kosullu), subscriptions.commitment_end_at/cancel_reason_code/cancel_note, invoices.checkout_error (KOD YAYININDAN ONCE ya da SONRA; kod sutun/tablo yokken 'kurulum bekliyor'; davranis)", files: [F.subscriptionOps] },
+    { id: "AD5-ofis-crm", order: 75, title: "Ofis CRM katmani: tenant_tags, tenant_tag_links, platform_tenant_crm, platform_tenant_notes, platform_tasks, tenant_health_daily, admin_saved_views + platform_tenant_health_inputs (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'CRM kurulumu bekliyor'; sira serbest, ek)", files: [F.platformCrm] },
     { id: "PORTAL-aktarim-oturumlari", order: 56, title: "Portal ice/disa aktarim: portal_transfer_sessions + pt_* JWT RPC'leri (20261007000210 ve 20260826002000/002010 SONRASI; sira serbest, ek)", files: [F.portalTransferSessions] },
     { id: "EVDS-piyasa-oranlari", order: 47, title: "TCMB EVDS piyasa oranlari tablosu market_rates (kod tablo yokken EVDS adimini sessizce atlar; sira serbest, ek)", files: [F.marketRates] },
     { id: "DAVET-service-role-yetki", order: 48, title: "service_role eksik yazma yetkileri: davet kodu, evrak portali, ortak/odul, KVKK kapanis (sira serbest, ek)", files: [F.serviceRoleWriteGrants] },
