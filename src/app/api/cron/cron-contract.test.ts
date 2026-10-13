@@ -95,3 +95,60 @@ describe("cron rotaları: parametrik sözleşme", () => {
     });
   });
 });
+
+/**
+ * EP3 (KVKK): EİDS ham e-posta silme, yeni cron açmadan operational-retention'ın AYRIK adımıdır. Adım 30 günü dolan
+ * ham .eml'i NULL'lar (ayrıştırılmış alanlara dokunmaz) ve 24 saati geçen iletme onay kodunu siler; tablo yoksa atlar.
+ */
+describe("operational-retention: EİDS ham e-posta adımı", () => {
+  it("rota adımı bağlı (yeni cron yolu yok)", () => {
+    const src = readFileSync(join(process.cwd(), "src/app/api/cron/operational-retention/route.ts"), "utf8");
+    expect(src).toContain("eidsInbound: () => purgeEidsInboundRaw(getAdmin(), { nowMs: now() })");
+    expect(jobs.some((j) => j.includes("eids"))).toBe(false);
+  });
+
+  it("yalnız raw_eml_encrypted ve onay kodu NULL'lanır; süre sınırı uygulanır", async () => {
+    const { purgeEidsInboundRaw } = await import("@/lib/eids/inbound-retention");
+    const calls: { patch: Record<string, unknown>; filters: string[] }[] = [];
+    const fake = {
+      from(table: string) {
+        expect(table).toBe("eids_inbound_messages");
+        const call = { patch: {} as Record<string, unknown>, filters: [] as string[] };
+        calls.push(call);
+        const chain = {
+          update(p: Record<string, unknown>) {
+            call.patch = p;
+            return chain;
+          },
+          not(c: string, op: string, v: unknown) {
+            call.filters.push(`not:${c}:${op}:${String(v)}`);
+            return chain;
+          },
+          lt(c: string, v: string) {
+            call.filters.push(`lt:${c}:${v}`);
+            return chain;
+          },
+          or(f: string) {
+            call.filters.push(`or:${f}`);
+            return chain;
+          },
+          select: async () => ({ data: [{ id: "a" }, { id: "b" }], error: null }),
+        };
+        return chain;
+      },
+    };
+    const nowMs = Date.parse("2026-11-20T00:00:00Z");
+    const r = await purgeEidsInboundRaw(fake as never, { nowMs });
+    expect(r).toEqual({ rawPurged: 2, confirmationsCleared: 2 });
+    expect(calls[0]!.patch).toEqual({ raw_eml_encrypted: null });
+    expect(calls[0]!.filters).toContain("lt:raw_purge_after:2026-11-20T00:00:00.000Z");
+    expect(calls[1]!.patch).toEqual({ confirm_code: null, confirm_url: null });
+    expect(calls[1]!.filters).toContain("lt:confirm_expires_at:2026-11-20T00:00:00.000Z");
+  });
+
+  it("tablo yoksa atlanır (migration uygulanmamış ortam)", async () => {
+    const { purgeEidsInboundRaw } = await import("@/lib/eids/inbound-retention");
+    const chain = { update: () => chain, not: () => chain, lt: () => chain, or: () => chain, select: async () => ({ data: null, error: { code: "42P01", message: "relation does not exist" } }) };
+    expect(await purgeEidsInboundRaw({ from: () => chain } as never, { nowMs: 0 })).toEqual({ skipped: true });
+  });
+});
