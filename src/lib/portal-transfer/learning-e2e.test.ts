@@ -146,13 +146,21 @@ describe("öğrenen form kuralları: uçtan uca zincir", () => {
     expect(byKey.price).toMatchObject({ outcome: "corrected", correction: { kind: "value_edited", category: "format" } });
     expect(byKey.heating).toMatchObject({ outcome: "corrected", correction: { kind: "other_option", option: "soba" } });
 
-    // 5) Geri bildirim (rıza varsayılır): değer yok, kişisel denetim yok; süzgeç idempotent.
-    const fb = buildFeedback({ sessionId: SESSION, portal: PORTAL, phase: "checked", plan, descs: FORM, signed, formFp: fp, outcomes });
+    // 5) Geri bildirim (rıza varsayılır): değer yok, kişisel denetim yok; süzgeç idempotent. Popup'taki gibi `values` (payload.fields)
+    // geçilir ve kontrol anındaki sayfa kullanıcı değerlerini taşır; böylece değer sızmama iddiası values→valueKey dalında da sınanır.
+    const atCheck: ControlDescriptor[] = FORM.map((c) =>
+      c.idx === 0 ? { ...c, current: "Kadıköy Moda 3+1" } : c.idx === 1 ? { ...c, current: "6750000" } : c.idx === 2 ? { ...c, current: "Soba" } : c.idx === 3 ? { ...c, current: "0532 123 45 67" } : c,
+    );
+    const fb = buildFeedback({ sessionId: SESSION, portal: PORTAL, phase: "checked", plan, descs: atCheck, signed, formFp: fp, outcomes, values: payload.fields });
     expect(fb.payload).not.toBeNull();
     const body = fb.payload!;
     const text = JSON.stringify(body);
     expect(text).not.toMatch(/"(value|current|checked|text|title|description)"\s*:/);
-    expect(text).not.toMatch(/cep telefonu|Kadıköy|6750000/i);
+    expect(text).not.toMatch(/cep telefonu|Kadıköy|kadikoy|moda 3|6750000|6\.750\.000|6 750 000|0532|5321234567|güzel daire/i);
+    // values dalı gerçekten çalıştı: seçim düzeltmesi yalnız EmlakSoft'un katlanmış sözlük değerini taşır.
+    expect(body.fields.find((f) => f.key === "heating")!.correction).toEqual({ kind: "other_option", option: "soba", valueKey: "kombi dogalgaz" });
+    // Serbest metin/sayı alanı düzeltmesi yalnız kategori taşır.
+    expect(body.fields.find((f) => f.key === "price")!.correction).toEqual({ kind: "value_edited", category: "format" });
     expect(body.fields.some((f) => f.key === null && f.outcome === "unmatched" && f.label === "kimden")).toBe(true);
     const again = sanitizeFeedbackPayload(body);
     expect(again.payload).toEqual(body);

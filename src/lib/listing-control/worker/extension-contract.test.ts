@@ -6,6 +6,9 @@ import { EXTENSION_LIMITS } from "./extension-pacing";
 import { PARSER_VERSION, PORTAL_RULES_VERSION, allPortalHosts } from "../adapters/html";
 import { validateRuleSet } from "@/lib/portal-transfer/rule-format";
 import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
+import { buildFeedback } from "@/lib/portal-transfer/feedback-build";
+import { formShapes, signShapes } from "@/lib/portal-transfer/form-signature";
+import type { ControlDescriptor } from "@/lib/portal-transfer/fill-plan";
 
 /**
  * İLAN KONTROL EKLENTİSİ SÖZLEŞMELERİ (kaynak düzeyi). Değişmez ilkeler: kullanıcının kendi tarayıcısı/oturumu, düşük hız,
@@ -398,13 +401,93 @@ describe("0.6.0 öğrenen form kuralları: kural VERİDİR, motor pakettedir", (
     expect(block.includes("decideAccept(") || viaHelper).toBe(true);
   });
 
-  it("geri bildirim yükü değer taşımaz: feedback-build çıktısında value / current / checked anahtarı yok; çıkış sanitizeFeedbackPayload'tan geçer", () => {
+  it("geri bildirim yükü değer taşımaz (kaynak, ikincil): feedback-build çıktısında value / current / checked anahtarı yok; çıkış sanitizeFeedbackPayload'tan geçer", () => {
     const fb = src("src/lib/portal-transfer/feedback-build.ts");
     expect(fb).toContain("sanitizeFeedbackPayload(");
     expect(fb).not.toMatch(/(^|[{,\s])["']?(value|current|checked)["']?\s*:/m);
   });
 
-  it("popup: rıza denetimi olmadan feedbackPut yok; form gönderimi yok", () => {
+  it("geri bildirim yükü değer taşımaz (davranış): buildFeedback çıktısının anahtar kümesi izin listesinin alt kümesi, kullanıcı değeri yok", async () => {
+    // İzin listesi burada bilerek ELLE yazılır (feedback-format sabitlerinden türetilmez): yeni anahtar bu testte tartışılmadan eklenemez.
+    const ROOT_ALLOWED = ["consentTextVersion", "counts", "engine", "fields", "formFp", "phase", "portal", "ruleSha", "ruleVersion", "rulesRegressed", "sessionId", "v"];
+    const COUNTS_ALLOWED = ["controls", "droppedPii"];
+    const FIELD_ALLOWED = ["anchorHit", "control", "correction", "key", "label", "labelSource", "options", "outcome", "required", "sig"];
+    const CORRECTION_ALLOWED = ["category", "kind", "option", "valueKey"];
+    const d = (p: Partial<ControlDescriptor> & { idx: number; labels: string[] }): ControlDescriptor => ({
+      tag: "input", type: "text", options: [], current: "", checked: false, group: "", optionText: "", disabled: false, visible: true, required: false, sources: ["label_for"], ...p,
+    });
+    const descs: ControlDescriptor[] = [
+      d({ idx: 0, labels: ["İlan Başlığı"], current: "Kadıköy Moda 3+1 deniz manzaralı" }),
+      d({ idx: 1, type: "number", labels: ["Fiyat"], current: "6750000" }),
+      d({ idx: 2, tag: "select", type: "", labels: ["Isıtma"], options: ["Seçiniz", "Soba", "Kombi (Doğalgaz)"], current: "Soba" }),
+      d({ idx: 3, type: "tel", labels: ["Cep Telefonu"], current: "0532 123 45 67" }),
+      d({ idx: 4, labels: ["Kat Sayısı"], current: "12" }),
+    ];
+    const signed = await signShapes(formShapes(descs).shapes);
+    const sigOf = (idx: number) => signed.find((x) => x.idxs.includes(idx))!.sig;
+    const fb = buildFeedback({
+      sessionId: "6f9619ff-8b86-4011-b42d-00c04fc964ff",
+      portal: "sahibinden",
+      phase: "checked",
+      plan: {
+        report: [
+          { idx: 0, key: "title", status: "planned" },
+          { idx: 1, key: "price", status: "planned" },
+          { idx: 2, key: "heating", status: "planned" },
+        ] as Parameters<typeof buildFeedback>[0]["plan"]["report"],
+        unclaimed: [4],
+        ruleVersion: 0,
+        ruleSha: null,
+        rulesRegressed: false,
+      },
+      descs,
+      signed,
+      formFp: "a".repeat(64),
+      outcomes: [
+        { sig: sigOf(0), key: "title", outcome: "corrected", correction: { kind: "value_edited", category: "rewritten" } },
+        { sig: sigOf(1), key: "price", outcome: "corrected", correction: { kind: "value_edited", category: "format" } },
+        { sig: sigOf(2), key: "heating", outcome: "corrected", correction: { kind: "other_option", option: "soba" } },
+      ],
+      // Popup'taki gibi EmlakSoft alan değerleri (payload.fields): serbest metin ve sayı ASLA yüke girmemeli.
+      values: { title: "Kadıköy Moda 3+1 deniz manzaralı", price: 6_750_000, heating: "Kombi (Doğalgaz)" },
+    });
+    expect(fb.payload).not.toBeNull();
+    const body = fb.payload!;
+    const extra = (o: object, allowed: string[]) => Object.keys(o).filter((k) => !allowed.includes(k));
+    expect(extra(body, ROOT_ALLOWED)).toEqual([]);
+    expect(extra(body.counts, COUNTS_ALLOWED)).toEqual([]);
+    expect(body.fields.length).toBeGreaterThan(0);
+    for (const f of body.fields) {
+      expect(extra(f, FIELD_ALLOWED), f.sig).toEqual([]);
+      if (f.correction) expect(extra(f.correction, CORRECTION_ALLOWED), f.sig).toEqual([]);
+    }
+    const text = JSON.stringify(body);
+    expect(text).not.toMatch(/kad[ıi]k[öo]y|manzara|6750000|6\.750\.000|0532|5321234567|cep telefonu/i);
+    // values dalı çalıştı: yalnız seçim alanında katlanmış kısa sözlük değeri.
+    expect(body.fields.find((f) => f.key === "heating")!.correction).toEqual({ kind: "other_option", option: "soba", valueKey: "kombi dogalgaz" });
+  });
+
+  it("arka plan: feedbackPut kuyruğa yazmadan önce rıza kapısından (hasConsent) ve ortak süzgeçten geçer", () => {
+    const bg = src(`${EXT}/src/background.ts`);
+    const start = bg.indexOf('case "feedbackPut":');
+    expect(start).toBeGreaterThan(-1);
+    const block = bg.slice(start, bg.indexOf("case ", start + 10));
+    const consent = block.indexOf("if (!(await hasConsent())) return");
+    const sanitize = block.indexOf("sanitizeFeedbackPayload(msg.payload)");
+    const write = block.indexOf("setLocal(STORAGE_KEYS.feedback");
+    expect(consent).toBeGreaterThan(-1);
+    expect(sanitize).toBeGreaterThan(consent);
+    expect(write).toBeGreaterThan(sanitize);
+    expect(block).toMatch(/if \(sender\.tab\) return \{ ok: false/); // içerik betiği/sayfa gönderemez, yalnız popup
+  });
+
+  it("gözlem ucu: kök, sayaç, alan ve düzeltme şemaları zod .strict() (bilinmeyen/değer anahtarı 400)", () => {
+    const route = src("src/app/api/app/portal-aktar/gozlem/route.ts");
+    expect(route.match(/\.strict\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(6);
+    expect(route).not.toMatch(/\.passthrough\(\)|\.catchall\(/);
+  });
+
+  it("popup: rıza denetimi olmadan feedbackPut yok; form gönderimi yok (ikincil; asıl kapı arka planda)", () => {
     const sends = [...popup.matchAll(/["']feedbackPut["']/g)].map((m) => m.index ?? 0);
     expect(sends.length).toBeGreaterThan(0);
     // Her gönderim noktası rıza denetiminin yanındadır (kapanış önce tanımlanıp rıza varsa çağrılabilir: ±pencere).
