@@ -205,6 +205,21 @@ $$;
 revoke all privileges on function public.effective_seat_limit(uuid) from public, anon, authenticated;
 grant execute on function public.effective_seat_limit(uuid) to service_role;
 
+-- Oturumdaki ofisin KENDI etkin koltuk limiti (ekip > yeni danisman formu, koltuk banti). Istisna tablosu ofis
+-- kullanicisina kapali (yalniz platform personeli okur); bu fonksiyon yalniz SAYIYI dondurur, baska ofis okunamaz.
+create or replace function public.current_tenant_seat_limit()
+returns integer
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.effective_seat_limit(public.current_tenant_id());
+$$;
+
+revoke all privileges on function public.current_tenant_seat_limit() from public, anon;
+grant execute on function public.current_tenant_seat_limit() to authenticated, service_role;
+
 -- ---------------------------------------------------------------------------
 -- E2. enforce_plan_capacity (kaynak: 20260825000600; tam govde + istisna cozucusu)
 -- ---------------------------------------------------------------------------

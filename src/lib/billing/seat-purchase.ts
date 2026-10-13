@@ -179,6 +179,21 @@ export async function readEffectiveSeatLimit(admin: SupabaseClient, tenantId: st
   return included + (await getExtraSeats(admin, tenantId));
 }
 
+/**
+ * Oturumdaki ofisin KENDİ etkin koltuk limiti (RLS istemcisi; `current_tenant_seat_limit()`): plan limiti + ofise özel
+ * limit istisnası + satın alınmış ek kullanıcı. İstisna tablosu ofis kullanıcısına kapalı olduğu için tek okuma yolu
+ * budur. RPC yoksa/hata verirse null: çağıran plan + ek hesabına düşer (eski davranış).
+ */
+export async function readOwnSeatLimit(supabase: SupabaseClient): Promise<number | null> {
+  try {
+    const { data, error } = await supabase.rpc("current_tenant_seat_limit");
+    const n = Number(data);
+    return !error && data != null && Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Koltuk satın alma faturası taslağı (meta.kind = 'extra_seats'); tahsilat tutarı sunucuda hesaplanmıştır. */
 export async function createSeatInvoice(input: {
   tenantId: string;
@@ -272,10 +287,11 @@ export async function loadSeatUsageSummary(
   plan: string,
 ): Promise<SeatUsageSummary | null> {
   try {
-    const [def, settings, extra, head] = await Promise.all([
+    const [def, settings, extra, own, head] = await Promise.all([
       getPlanDefinition(plan),
       getSeatSettings(),
       getExtraSeats(supabase, tenantId),
+      readOwnSeatLimit(supabase),
       supabase
         .from("profiles")
         .select("id", { count: "exact", head: true })
@@ -284,12 +300,14 @@ export async function loadSeatUsageSummary(
     ]);
     if (head.error || head.count == null) return null;
     const included = def.limits.seats;
-    const u = seatUtilization(head.count, included, extra, warnRatioOf(settings));
+    // Ofise özel limit istisnası varsa etkin limit DB'den (tetikleyiciyle aynı sayı); yoksa plan + ek.
+    const limit = own ?? included + extra;
+    const u = seatUtilization(head.count, limit - extra, extra, warnRatioOf(settings));
     return {
       used: head.count,
       included,
       extra,
-      limit: included + extra,
+      limit,
       ratio: u.ratio,
       level: u.level,
       warnPercent: settings.warnPercent,

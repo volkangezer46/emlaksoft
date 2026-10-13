@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
   seatCount: 1,
   seatLimit: 5,
   extraSeats: 0,
+  /** DB `effective_seat_limit` sonucu (istisna dahil); null = RPC yok (eski hesap). */
+  dbSeatLimit: null as number | null,
+  maxSeats: undefined as number | undefined,
   profileError: null as null | { message: string },
   createUser: vi.fn(),
   deleteUser: vi.fn(),
@@ -60,11 +63,13 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (t: string) => chain(t),
+    rpc: async (fn: string) =>
+      fn === "effective_seat_limit" && h.dbSeatLimit != null ? { data: h.dbSeatLimit, error: null } : { data: null, error: { code: "PGRST202" } },
     auth: { admin: { createUser: h.createUser, deleteUser: h.deleteUser } },
   }),
 }));
 vi.mock("@/lib/billing/plan-definitions", () => ({
-  getPlanDefinition: async () => ({ limits: { seats: h.seatLimit } }),
+  getPlanDefinition: async () => ({ name: "Ofis", maxSeats: h.maxSeats, limits: { seats: h.seatLimit } }),
 }));
 vi.mock("@/lib/billing/seat-purchase", () => ({ getExtraSeats: async () => h.extraSeats }));
 
@@ -95,6 +100,8 @@ beforeEach(() => {
   h.seatCount = 1;
   h.seatLimit = 5;
   h.extraSeats = 0;
+  h.dbSeatLimit = null;
+  h.maxSeats = undefined;
   h.profileError = null;
   h.inserts = [];
   h.createUser.mockResolvedValue({ data: { user: { id: "new-user" } }, error: null });
@@ -170,6 +177,29 @@ describe("createTeamMember — şube ve koltuk kapıları (auth kullanıcısı o
     expect(h.createUser).not.toHaveBeenCalled();
     h.seatCount = 2; // limit 3, 2 dolu -> yer var
     expect((await createTeamMember({}, form())).ok).toBe(true);
+  });
+
+  it("ofise özel limit istisnası (+5 koltuk) ofisin kendi ekleme yolunda da sayılır; paket tavanı istisnayı kesmez", async () => {
+    // office paketi: 3 dahil, tavan 3; yönetici +5 istisna verdi → DB etkin limit 8.
+    h.seatLimit = 3;
+    h.maxSeats = 3;
+    h.dbSeatLimit = 8;
+    h.seatCount = 3;
+    expect((await createTeamMember({}, form())).ok).toBe(true);
+    h.seatCount = 7;
+    expect((await createTeamMember({}, form())).ok).toBe(true);
+    h.seatCount = 8;
+    const full = await createTeamMember({}, form());
+    expect(full.error).toMatch(/en fazla 8 kullanıcı/);
+  });
+
+  it("plan limitinin altına inen sabit değer istisnası (seats=2) da uygulanır", async () => {
+    h.seatLimit = 3;
+    h.dbSeatLimit = 2;
+    h.seatCount = 2;
+    const r = await createTeamMember({}, form());
+    expect(r.error).toMatch(/en fazla 2 aktif kullanıcı/);
+    expect(h.createUser).not.toHaveBeenCalled();
   });
 
   it("askıdaki/iptal edilmiş ofise ve doğrulanamayan kapasiteye üye eklenmez", async () => {

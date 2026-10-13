@@ -253,6 +253,7 @@ comment on function public.enforce_tenant_plan_capacity() is
   'Plan degisimi kapasite tetikleyicisi. Koltuk: yeni plan limiti + extra_seats (effective_seat_limit ile ayni formul).';
 
 -- 2. Cozucu ve istisna tablosu
+drop function if exists public.current_tenant_seat_limit();
 drop function if exists public.tenant_entitlement_resolve(uuid, text, integer);
 drop table if exists public.tenant_entitlement_overrides;
 

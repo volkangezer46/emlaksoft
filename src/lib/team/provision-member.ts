@@ -26,7 +26,22 @@ export type ProvisionMemberInput = {
 
 export type ProvisionMemberResult = { ok: true; id: string } | { ok: false; error: string };
 
-type Admin = Pick<SupabaseClient, "from" | "auth">;
+type Admin = Pick<SupabaseClient, "from" | "auth"> & Partial<Pick<SupabaseClient, "rpc">>;
+
+/**
+ * DB'nin etkin koltuk limiti (`effective_seat_limit`: plan limiti ofise özel istisnayla çözülür + satın alınmış ek).
+ * Kapasite tetikleyicisiyle AYNI sayı; RPC yoksa/hata verirse null (çağıran plan + ek hesabına düşer).
+ */
+async function readDbSeatLimit(admin: Admin, tenantId: string): Promise<number | null> {
+  try {
+    if (typeof admin.rpc !== "function") return null;
+    const { data, error } = await admin.rpc("effective_seat_limit", { p_tenant_id: tenantId });
+    const n = Number(data);
+    return !error && data != null && Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function ensureBranchBelongsToTenant(
   admin: Admin,
@@ -62,13 +77,18 @@ export async function ensureSeatAvailable(
     return { ok: false, error: "Askıdaki veya iptal edilmiş ofise üye eklenemez." };
   }
 
-  // Etkin limit = plan limiti + satın alınmış ek kullanıcı (sütun yoksa ek = 0, eski davranış).
+  // Etkin limit = plan limiti + satın alınmış ek kullanıcı (sütun yoksa ek = 0, eski davranış) + ofise özel limit
+  // istisnası (Ofis 360 > Abonelik). İstisna payı DB'den okunur (effective_seat_limit; tetikleyiciyle aynı sayı).
   const def = await getPlanDefinition(String(tenant.plan));
-  const extraSeats = await getExtraSeats(admin as SupabaseClient, tenantId);
+  const [extraSeats, dbLimit] = await Promise.all([getExtraSeats(admin as SupabaseClient, tenantId), readDbSeatLimit(admin, tenantId)]);
+  const purchased = def.limits.seats + extraSeats;
+  // İstisna payı (sabit değer plan limitinin altındaysa negatif olabilir); RPC yoksa 0.
+  const overrideSeats = dbLimit == null ? 0 : dbLimit - purchased;
   // Paket kullanıcı tavanı (plans.ts PLAN_USER_CAPS): dahil + ek toplamı tavanı aşamaz. Tavanı zaten aşmış
-  // eski ofis kilitlenmez; yalnız YENİ ekleme engellenir.
-  const cap = def.maxSeats && def.maxSeats > 0 ? Math.max(def.maxSeats, def.limits.seats) : Number.POSITIVE_INFINITY;
-  const limit = Math.min(def.limits.seats + extraSeats, cap);
+  // eski ofis kilitlenmez; yalnız YENİ ekleme engellenir. Yönetici istisnası tavanın ÜSTÜNE eklenir (bilinçli karar).
+  const planCap = def.maxSeats && def.maxSeats > 0 ? Math.max(def.maxSeats, def.limits.seats) : Number.POSITIVE_INFINITY;
+  const cap = planCap + Math.max(0, overrideSeats);
+  const limit = Math.max(1, Math.min(purchased, planCap) + overrideSeats);
   if (Number.isFinite(cap) && (count ?? 0) >= cap) {
     return {
       ok: false,

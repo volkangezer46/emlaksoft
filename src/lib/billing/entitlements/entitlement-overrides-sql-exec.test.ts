@@ -14,6 +14,7 @@ const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
 const STUB = `
 create role service_role; create role authenticated; create role anon;
 create function public.is_platform_staff() returns boolean language sql stable as $$ select false $$;
+create function public.current_tenant_id() returns uuid language sql stable as $$ select nullif(current_setting('test.tenant', true), '')::uuid $$;
 create table public.platform_staff(id uuid primary key default gen_random_uuid(), role text not null default 'billing', is_active boolean not null default true);
 create table public.tenants(id uuid primary key default gen_random_uuid(), plan text not null default 'office', status text not null default 'active', updated_at timestamptz);
 create table public.profiles(id uuid primary key default gen_random_uuid(), tenant_id uuid references public.tenants(id), is_active boolean not null default true);
@@ -108,6 +109,24 @@ describe.skipIf(!mod)("ofise özel limit istisnası — gerçek PL/pgSQL (pglite
     expect(await seatLimit(t)).toBe(9);
     await q(`update public.tenant_entitlement_overrides set revoked_at = now(), revoked_by = $2 where id = $1`, [id, staff]);
     expect(await seatLimit(t)).toBe(5);
+  });
+
+  it("ofis kullanıcısı yalnız KENDİ etkin koltuk limitini okur (current_tenant_seat_limit; istisna dahil)", async () => {
+    const mine = await office("office", 1);
+    const other = await office("professional");
+    await grant(mine, "seats", 5, null);
+    await q(`select set_config('test.tenant', $1, false)`, [mine]);
+    expect((await q(`select public.current_tenant_seat_limit() as n`))[0]!.n).toBe(9);
+    await q(`select set_config('test.tenant', $1, false)`, [other]);
+    expect((await q(`select public.current_tenant_seat_limit() as n`))[0]!.n).toBe(6);
+    await q(`select set_config('test.tenant', '', false)`);
+    expect((await q(`select public.current_tenant_seat_limit() as n`))[0]!.n).toBeNull();
+    const priv = await q(
+      `select has_function_privilege('authenticated','public.current_tenant_seat_limit()','execute') as au,
+              has_function_privilege('anon','public.current_tenant_seat_limit()','execute') as an,
+              has_function_privilege('authenticated','public.effective_seat_limit(uuid)','execute') as eu`,
+    );
+    expect(priv[0]).toEqual({ au: true, an: false, eu: false });
   });
 
   it("müşteri/portföy/şube: sabit değer ve artış; sınırsız limit sınırsız kalır", async () => {

@@ -68,7 +68,8 @@ export async function loadAdminSeatInfo(
     console.error("loadAdminSeatInfo", e);
   }
   const effective = !effectiveRes.error && effectiveRes.data != null ? Number(effectiveRes.data) : NaN;
-  const overrideSeats = Number.isFinite(effective) ? Math.max(0, Math.floor(effective) - def.limits.seats - extra) : 0;
+  // İstisna payı: sabit değer plan limitinin altındaysa NEGATİF olur (toplam = DB etkin limiti, tetikleyiciyle aynı).
+  const overrideSeats = Number.isFinite(effective) ? Math.floor(effective) - def.limits.seats - extra : 0;
   const u = seatUtilization(used, def.limits.seats + overrideSeats, extra, warnRatioOf(settings));
   return {
     enabled,
@@ -134,7 +135,7 @@ export function SeatInfoCard({
             <dd className="numeric font-display text-lg font-extrabold text-ink-950">{info.included}</dd>
             <dd className="text-xs text-text-faint">
               {info.planName}
-              {info.overrideSeats > 0 ? ` · +${info.overrideSeats} istisna` : ""}
+              {info.overrideSeats !== 0 ? ` · ${info.overrideSeats > 0 ? "+" : "−"}${Math.abs(info.overrideSeats)} istisna` : ""}
             </dd>
           </div>
           <div>
