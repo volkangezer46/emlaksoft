@@ -130,14 +130,15 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/site", core: true,
-        label: "Site ve marka",
+        label: "Site ve SEO",
         short: "Site",
-        description: "Ana sayfa içeriği, site menüsü, SEO, logo ve favicon",
+        description: "Ana sayfa içeriği, fiyatlar ve özel sayfalar, site menüsü, SEO, logo ve favicon",
         icon: Globe,
         modules: ["sitecontent", "sitemenu", "seo", "marka"],
         match: ["/admin/site", "/admin/site-icerik", "/admin/site-menu", "/admin/seo", "/admin/marka"],
         tabs: [
           L("/admin/site", "Genel bakış", "Tüm site yönetim alanları", ["sitecontent", "sitemenu", "seo", "marka"]),
+          L("/admin/site/sayfalar", "Sayfalar", "Fiyatlar ve özel sayfalar (Hakkımızda, İletişim, kampanya)", ["sitecontent"]),
           L("/admin/site-icerik", "Site içeriği", "Ana sayfa metinleri, bölüm düzeni, SSS", ["sitecontent"]),
           L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"]),
           L("/admin/seo", "SEO", "Arama motoru, sitemap, robot", ["seo"]),

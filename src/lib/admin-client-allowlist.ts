@@ -416,6 +416,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/platform-notify.ts", fn: "notifyPlatformStaff", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/platform-settings.ts", fn: "getPlatformSetting", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/platform-settings.ts", fn: "getPlatformSettingsMany", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/lib/platform-settings.ts", fn: "readPlatformSettingStrict", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/platform-settings.ts", fn: "setPlatformSetting", calls: 1, tenantFilter: "var" },
   { file: "src/lib/platform.ts", fn: "bootstrapPlatformStaffIfAllowed", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/playbook-trigger.ts", fn: "triggerPlaybooks", calls: 1, tenantFilter: "uygulanamaz" },

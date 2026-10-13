@@ -218,6 +218,31 @@ export function getSeoPage(path: string): SeoPageDef | undefined {
   return seoPages().find((p) => p.path === path);
 }
 
+/** Sayfa oluşturucudaki yayında bir özel sayfanın SEO özeti (salt bilgi). */
+export type CmsSeoPage = { path: string; label: string; title: string; description: string; index: boolean; inSitemap: boolean };
+
+/**
+ * Sayfa oluşturucuda (/admin/site/sayfalar) YAYINDA olan özel sayfalar — SALT BİLGİ (yönetim ve denetim ekranları için).
+ * `seoPages()` envanterine KATILMAZ (imzası ve içeriği değişmez); özel sayfanın SEO alanları kendi editöründe yönetilir.
+ * Depolama modülü dinamik yüklenir: bu dosyayı içe aktaran saf modüller sunucu deposunu paketlerine çekmez.
+ */
+export async function listCmsSeoPages(): Promise<CmsSeoPage[]> {
+  try {
+    const { listPublishedSitePages } = await import("@/lib/site-pages/store");
+    const pages = await listPublishedSitePages();
+    return pages.map((p) => ({
+      path: `/${p.slug}`,
+      label: `Özel sayfa: ${p.content.title}`,
+      title: p.content.seo.title || p.content.title,
+      description: p.content.seo.description,
+      index: p.content.seo.index,
+      inSitemap: p.content.seo.index && p.content.seo.inSitemap,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Hiçbir koşulda sitemap'e girmeyen ve robots.txt'te taranması kapatılan yol önekleri.
  * Token'lı portallar, oturumlu alanlar, ödeme/imza/anket/randevu, sunum/paylaş.

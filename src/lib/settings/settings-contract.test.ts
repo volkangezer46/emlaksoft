@@ -27,6 +27,7 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/lib/versioned-config/store.ts": "taslak/yayın/10 kayıt geçmişi (seo, site menü, içerik); merkez köprü",
   "src/lib/site-menu/store.ts": "versioned-config tüketicisi",
   "src/lib/seo/store.ts": "versioned-config tüketicisi",
+  "src/lib/site-pages/store.ts": "versioned-config tüketicisi (sayfa başına sitepage.<id>); yalnız sayfa dizini sitepages.index ayrıca yazılır (AP6)",
   "src/lib/brand/store.ts": "marka varlıkları (ikili veri)",
   "src/app/actions/platform-emlakfiyati.ts": "EmlakFiyatı anahtar yönetimi (sealPlatformSecret ile şifreli)",
   "src/lib/integrations/emlakfiyati/keys.ts": "EF anahtarı sealPlatformSecret ile şifreli",

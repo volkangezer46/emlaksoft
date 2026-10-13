@@ -1,173 +1,23 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, FileSignature, ShieldAlert, Sparkles } from "lucide-react";
-import { Pricing } from "@/components/pricing";
-import { SeoJsonLd } from "@/components/seo/seo-json-ld";
 import { buildMetadata } from "@/lib/seo/store";
-import { getPublicPricing } from "@/lib/billing/public-pricing";
-import { yearlyOfferLabel } from "@/lib/billing/plans";
-import { extraSeatTexts } from "@/lib/billing/seat-calculator-model";
-import { buildFaq, lostCommissionPlanName, trialPhrase, yearlyDiscountPercent } from "@/lib/pricing-page-model";
-import { ComparisonTable } from "@/components/pricing-page/comparison-table";
-import { PricingShell, Section } from "@/components/pricing-page/page-shell";
-import { RoiCalculator } from "@/components/pricing-page/roi-calculator";
-import { EfPackTiersTable, EfPlanCreditsTable, EF_PACKS_APP_HREF } from "@/components/marketing/emlakfiyati-section";
-import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
-import { SeatCalculatorLazy } from "@/components/pricing-page/seat-calculator-lazy";
+import { pricingCopy } from "@/lib/pricing-page/copy";
+import { copyContextOf, loadPricingViewData } from "@/lib/pricing-page/data";
+import { defaultPricingPage } from "@/lib/pricing-page/defaults";
+import { getLivePricingPage } from "@/lib/pricing-page/store";
+import { PricingPageView } from "@/lib/pricing-page/view";
 
 export async function generateMetadata(): Promise<Metadata> {
   return buildMetadata("/fiyatlar");
 }
 
+/**
+ * /fiyatlar. Fiyat, limit ve paket kapsamı plan editöründen (plans.ts tanımları + /admin/billing/planlar) gelir;
+ * sayfa METİNLERİ /admin/site/sayfalar/fiyatlar'dan yayınlanır. Hiç yayın yokken bugünkü metinler (defaults.ts) ve
+ * kod içi SSS (buildFaq) kullanılır: çıktı eskisiyle birebir aynıdır. Görünüm: src/lib/pricing-page/view.tsx.
+ */
 export default async function FiyatlarPage() {
-  const { plans, trialDays, offers, founders, efValuationCost, efLive } = await getPublicPricing();
-  const efCatalog = await getEfCatalog();
-  const faq = buildFaq({ trialDays, plans });
-  const discount = yearlyDiscountPercent(plans);
-  const lost = lostCommissionPlanName();
-  const trial = trialPhrase(trialDays);
-  const firstPriced = plans[0];
-  const startLabel = trialDays ? `${trialDays} gün ücretsiz başla` : "Ücretsiz başla";
-  // ROI hesaplayıcı etkin fiyatı (kampanya dahil) seat-pricing motorundan alır.
-  const roiPlans = plans;
-  const defaultPlanId = (roiPlans.find((p) => p.popular) ?? roiPlans[0] ?? plans[0]!).id;
-
-  return (
-    <PricingShell>
-      <SeoJsonLd path="/fiyatlar" faq={faq} />
-
-      <div className="bg-[image:var(--grad-ink)]">
-        <div className="theme-dark mx-auto max-w-6xl px-4 py-14 text-center sm:px-6 sm:py-20">
-          <p className="text-sm font-bold uppercase tracking-[0.08em] text-mint-400">Fiyatlar</p>
-          <h1 className="mx-auto mt-3 max-w-3xl font-display text-3xl font-extrabold text-white sm:text-5xl">
-            Açık fiyat, paket paket net kapsam
-          </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-white/80 sm:text-lg">
-            Deneme boyunca tüm özellikler açık, kredi kartı gerekmez. Tutarlar KDV hariçtir
-            {discount > 0 && firstPriced ? `; yıllık ödemede %${discount} indirim uygulanır (${yearlyOfferLabel(firstPriced)}).` : "."}
-          </p>
-          <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Link
-              href={`/kayit?plan=${defaultPlanId}`}
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-white px-5 text-sm font-semibold text-[#071a38] hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
-              {startLabel} <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
-            </Link>
-            <Link
-              href="#karsilastirma"
-              className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-white/40 px-5 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-            >
-              Paketleri karşılaştır
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      <h2 className="sr-only">Paketler ve ekip hesaplayıcı</h2>
-      <section aria-label="Ekibinize göre paket hesaplayıcı" className="mx-auto max-w-6xl px-4 pt-8 sm:px-6">
-        <SeatCalculatorLazy plans={plans} offers={offers} trialDays={trialDays} />
-      </section>
-
-      <section aria-label="Paketler" className="mx-auto max-w-6xl px-4 pb-4 pt-6 sm:px-6">
-        <Pricing plans={plans} trialDays={trialDays} offers={offers} founders={founders} extraSeats={extraSeatTexts(plans)} efValuationCost={efValuationCost} efLive={efLive} />
-      </section>
-
-      <section aria-label="Bilmeniz gerekenler" className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <ul className="grid gap-4 md:grid-cols-3">
-          <Note icon={<Sparkles aria-hidden className="h-5 w-5" />} title="Deneme boyunca her şey açık">
-            {trial}; tüm paketlerin özellikleri açıktır ve kredi kartı gerekmez.
-          </Note>
-          <Note icon={<FileSignature aria-hidden className="h-5 w-5" />} title="SMS onaylı dijital imza">
-            Sözleşmeler SMS onayıyla imzalanır. Bu, nitelikli elektronik imza (e-imza) değildir.
-          </Note>
-          <Note icon={<ShieldAlert aria-hidden className="h-5 w-5" />} title="Kayıp-kaçak komisyon motoru">
-            Yalnızca {lost} ve üzeri paketlerde açıktır.
-          </Note>
-        </ul>
-      </section>
-
-      <Section id="karsilastirma" title="Paketleri yan yana karşılaştırın" lead="Tablo, uygulamadaki gerçek paket kuralları ve sayfa kilitlerinden üretilir.">
-        <ComparisonTable plans={plans} efValuationCost={efValuationCost} efLive={efLive} />
-      </Section>
-      <Section
-        id="analiz"
-        title="EmlakFiyati analiz bakiyesi"
-        lead={
-          efLive
-            ? "Analiz bakiyesi yalnız ada/parsel değerleme için harcanır (PDF, rapor detayı ve ilan analizi bakiye harcamaz). Paketinizdeki aylık analiz bakiyesi her ay yüklenir ve ay sonunda yanar; yetmezse süreli ek paket alırsınız."
-            : "Değerleme henüz herkese açık değil; aşağıdaki analiz bakiyesi hakları planlanan değerlerdir ve değerleme açılınca geçerli olur."
-        }
-      >
-        <EfPlanCreditsTable plans={plans} tariff={efCatalog.tariff} live={efLive} />
-        <p className="mt-2 text-xs text-text-muted">Aylık analiz bakiyesi o ayın sonunda yanar, devretmez. Sonuçlar ilan ve emsal verisine dayanır; kesin değer veya ekspertiz değildir.</p>
-        <div className="mt-6">
-          <EfPackTiersTable packs={efCatalog.packs} tariff={efCatalog.tariff} live={efLive} />
-          <p className="mt-2 text-xs text-text-muted">Ek paketler 1, 3, 6 ve 12 aylık satılır; süre sonunda kullanılmayan bakiye sona erer. Tutarlar KDV hariçtir.</p>
-          {efLive ? (
-            <p className="mt-2 text-sm">
-              <Link href={EF_PACKS_APP_HREF} className="font-semibold text-brand-700 hover:underline">Ofis panelinde analiz bakiyesi satın al</Link>
-              <span className="text-text-muted"> · Hesabınız yoksa önce <Link href="/kayit" className="font-semibold text-brand-700 hover:underline">denemeyi başlatın</Link>.</span>
-            </p>
-          ) : null}
-        </div>
-      </Section>
-
-      <Section
-        id="kacan-komisyon"
-        title="Kaçan komisyonunuzu kendi sayılarınızla hesaplayın"
-        lead="Aşağıdaki sayı alanlarına kendi rakamlarınızı yazın; sonuç anında hesaplanır. Sektör ortalaması kullanılmaz, alanlar bilerek boş bırakıldı."
-      >
-        <RoiCalculator plans={roiPlans} offers={offers} defaultPlanId={defaultPlanId} />
-      </Section>
-
-      <Section id="sss" title="Fiyatlarla ilgili sık sorulanlar">
-        <div className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface">
-          {faq.map((f) => (
-            <details key={f.q} className="motion-details group px-5 py-1">
-              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 py-3 font-semibold text-ink-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-                {f.q}
-                <span aria-hidden className="text-xl leading-none text-brand-700 transition-transform group-open:rotate-45 motion-reduce:transition-none">+</span>
-              </summary>
-              <p className="pb-4 text-text-muted">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </Section>
-
-      <section className="mx-auto max-w-6xl px-4 pb-16 sm:px-6">
-        <div className="rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-8 text-center sm:p-12">
-          <div className="theme-dark">
-            <h2 className="font-display text-2xl font-extrabold text-white sm:text-3xl">Ofisinizle denemeye başlayın</h2>
-            <p className="mx-auto mt-2 max-w-xl text-white/80">{trial}, kredi kartı gerekmez.</p>
-            <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                href={`/kayit?plan=${defaultPlanId}`}
-                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] bg-white px-5 text-sm font-semibold text-[#071a38] hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                Ücretsiz başla <ArrowRight aria-hidden className="ml-2 h-4 w-4" />
-              </Link>
-              <Link
-                href="#karsilastirma"
-                className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-white/40 px-5 text-sm font-semibold text-white hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-              >
-                Paketleri karşılaştır
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-    </PricingShell>
-  );
+  const [data, live] = await Promise.all([loadPricingViewData(), getLivePricingPage()]);
+  const copy = pricingCopy(live ?? defaultPricingPage(), copyContextOf(data), { faqFromCode: !live });
+  return <PricingPageView data={data} copy={copy} />;
 }
 
-function Note({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return (
-    <li className="flex gap-3 rounded-[var(--radius-card)] border border-line bg-surface-2 p-4">
-      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700">{icon}</span>
-      <div>
-        <h2 className="text-sm font-bold text-ink-950">{title}</h2>
-        <p className="mt-1 text-sm text-text-muted">{children}</p>
-      </div>
-    </li>
-  );
-}

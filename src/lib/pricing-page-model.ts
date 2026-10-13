@@ -111,13 +111,27 @@ export function trialPhrase(trialDays?: number): string {
   return trialDays ? `${trialDays} gün ücretsiz deneme` : "Ücretsiz deneme";
 }
 
+/** Sözleşme özelliğinin asgari paketi (page-gates'ten). */
+export function contractPlanName(): string {
+  const gate = findGate("/app/sozlesmeler");
+  return gate ? requiredPlanName(gate) : getPlan("office").name;
+}
+
+/** Yıllık indirim tüm satılan paketlerde aynı mı ("%17" mi "en az %17" mi yazılır). */
+export function uniformYearlyDiscount(plans?: readonly PlanDef[]): boolean {
+  return !plans || new Set(plans.map((p) => yearlyDiscountPercentOf(p))).size <= 1;
+}
+
+/**
+ * /fiyatlar SSS'sinin kod içi kaynağı. Yayınlanmış özel metin yokken sayfa bunu kullanır; /admin/site/sayfalar/fiyatlar
+ * editörünün varsayılanı (src/lib/pricing-page/defaults.ts) bunun değişkenli hâlidir (eşitlik testli).
+ */
 export function buildFaq(opts: { trialDays?: number; plans?: readonly PlanDef[] } = {}): FaqItem[] {
   const discount = yearlyDiscountPercent(opts.plans);
   const days = opts.trialDays;
-  const uniform = !opts.plans || new Set(opts.plans.map((p) => yearlyDiscountPercentOf(p))).size <= 1;
+  const uniform = uniformYearlyDiscount(opts.plans);
   const lost = lostCommissionPlanName();
-  const contractGate = findGate("/app/sozlesmeler");
-  const contractPlan = contractGate ? requiredPlanName(contractGate) : getPlan("office").name;
+  const contractPlan = contractPlanName();
   return [
     {
       q: "Deneme ücretsiz mi, kredi kartı gerekir mi?",

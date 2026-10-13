@@ -12,6 +12,8 @@ const PAGE_FILES = [
   "src/app/fiyatlar/page.tsx",
   "src/lib/pricing-page-model.ts",
   "src/lib/roi-calculator.ts",
+  // Görünüm ve yönetilebilir metinler (AP6): metinde de TL tutarı yazılmaz; sayılar plan tanımlarından gelir.
+  ...readdirSync(join(root, "src/lib/pricing-page")).map((f) => `src/lib/pricing-page/${f}`),
   ...readdirSync(join(root, "src/components/pricing-page")).map((f) => `src/components/pricing-page/${f}`),
 ];
 
@@ -25,9 +27,10 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
   });
 
   it("sayfa plans.ts'ten okur ve mevcut Pricing bileşenini yeniden kullanır", () => {
-    const page = read("src/app/fiyatlar/page.tsx");
-    expect(page).toContain('from "@/components/pricing"');
-    expect(page).toContain('from "@/lib/billing/plans"');
+    // Görünüm src/lib/pricing-page/view.tsx'e taşındı (personel önizlemesi aynı bileşeni kullanır).
+    expect(read("src/app/fiyatlar/page.tsx")).toContain('from "@/lib/pricing-page/view"');
+    expect(read("src/lib/pricing-page/view.tsx")).toContain('from "@/components/pricing"');
+    expect(read("src/lib/pricing-page/copy.ts")).toContain('from "@/lib/billing/plans"');
     expect(read("src/lib/pricing-page-model.ts")).toContain('from "@/lib/billing/page-gates"');
   });
 
@@ -92,9 +95,12 @@ describe("/fiyatlar sözleşmesi: tek kaynak plans.ts + page-gates.ts", () => {
   });
 
   it("FAQ JSON-LD yalnız görünen SSS'den üretilir", () => {
-    const page = read("src/app/fiyatlar/page.tsx");
-    expect(page).toContain("faq.map");
-    expect(page.match(/const faq = buildFaq\(/g)).toHaveLength(1);
+    // Görünüm aynı `faq` listesini hem çizer hem JSON-LD'ye verir; liste yayın yokken buildFaq'tan, yayında
+    // /admin/site/sayfalar/fiyatlar metninden gelir (src/lib/pricing-page/copy.ts, tek çağrı noktası).
+    const view = read("src/lib/pricing-page/view.tsx");
+    expect(view).toContain("faq.map");
+    expect(view).toContain('<SeoJsonLd path="/fiyatlar" faq={faq} />');
+    expect(read("src/lib/pricing-page/copy.ts").match(/buildFaq\(/g)).toHaveLength(1);
   });
 
   it("hesaplayıcı commission.ts'i yeniden kullanır ve sektör verisi yoktur", () => {

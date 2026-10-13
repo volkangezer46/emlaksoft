@@ -37,6 +37,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/geo/resolve.ts": { calls: 1, scope: "platform", why: "coğrafya takma adları" },
   "src/lib/integrations/emlakfiyati/client.ts": { calls: 1, scope: "platform", why: "dış endeks verisi (bölge + tip argümanı)" },
   "src/lib/office-score.ts": { calls: 1, scope: "tenant", why: "ofis skoru; anahtar tenantId" },
+  "src/lib/pricing-page/store.ts": { calls: 1, scope: "platform", why: "/fiyatlar yayındaki metinleri (platform_settings, ofis verisi yok)" },
   "src/lib/reporting/cache.ts": { calls: 1, scope: "tenant", why: "rapor toplamları; anahtar tenantId, RPC sonucu ofis geneli (kullanıcıya göre değişmez)" },
   "src/lib/seo/sitemap-data.ts": { calls: 1, scope: "platform", why: "sitemap girdileri (yalnız public)" },
   "src/lib/seo/store.ts": { calls: 1, scope: "platform", why: "SEO ayarları" },
@@ -44,6 +45,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/site-content/ef-status.ts": { calls: 1, scope: "platform", why: "ana sayfa EF durumu" },
   "src/lib/site-content/store.ts": { calls: 1, scope: "platform", why: "site içeriği" },
   "src/lib/site-menu/store.ts": { calls: 1, scope: "platform", why: "site menüsü" },
+  "src/lib/site-pages/store.ts": { calls: 3, scope: "platform", why: "sayfa oluşturucu: yayın haritası, sayfa içeriği (kimlik anahtarda), dizin; platform_settings" },
   "src/lib/try-credits/settings.ts": { calls: 1, scope: "platform", why: "TL kredi tavanı" },
 };
 

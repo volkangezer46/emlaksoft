@@ -196,7 +196,8 @@ describe("sözleşme: istemci dosyaları sunucu modülü import etmez, JSON-LD y
   });
 
   it("hesaplayıcı ana sayfa ve /fiyatlar'da yalnız lazy sarmalayıcıyla bağlanır", () => {
-    for (const f of ["src/app/fiyatlar/page.tsx", "src/components/marketing/pricing-section.tsx"]) {
+    // /fiyatlar görünümü src/lib/pricing-page/view.tsx'te (rota dosyası onu çizer).
+    for (const f of ["src/lib/pricing-page/view.tsx", "src/components/marketing/pricing-section.tsx"]) {
       const src = read(f);
       expect(src).toContain("seat-calculator-lazy");
       expect(src).not.toMatch(/from "@\/components\/pricing-page\/seat-calculator"/);
@@ -208,7 +209,7 @@ describe("sözleşme: istemci dosyaları sunucu modülü import etmez, JSON-LD y
     const src = read("src/components/pricing.tsx");
     expect(src).not.toMatch(/import \{[^}]*\} from "@\/lib\/billing\/seat-(pricing|calculator-model)"/);
     expect(src).toContain("extraSeats");
-    expect(read("src/app/fiyatlar/page.tsx")).toContain("extraSeatTexts(plans)");
+    expect(read("src/lib/pricing-page/view.tsx")).toContain("extraSeatTexts(plans)");
     expect(read("src/components/marketing/pricing-section.tsx")).toContain("extraSeatTexts(plans)");
   });
 
