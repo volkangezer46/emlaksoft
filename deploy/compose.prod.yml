@@ -8,6 +8,14 @@ services:
     container_name: emlaksoft-app
     restart: unless-stopped
     env_file: ../.env.production
+    environment:
+      # V8 yığını konteyner sınırının altında kalsın (OOM öldürmesi yerine GC baskısı).
+      NODE_OPTIONS: --max-old-space-size=1536
+    # Bellek sınırı (takas yok): sızıntı sunucudaki Supabase/Coolify'ı aç bırakmasın.
+    mem_limit: 2g
+    memswap_limit: 2g
+    # SIGTERM sonrası açık istekler bitsin (varsayılan 10 sn).
+    stop_grace_period: 20s
     networks: [coolify]
     labels:
       traefik.enable: "true"

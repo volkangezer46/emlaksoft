@@ -90,6 +90,46 @@ curl -s -X POST -H "Authorization: Bearer $(cat /root/.coolify-token)" \
 8. Bakım penceresi: bulut tarafında yazmayı durdur → son fark yedeği → geri yükle → DNS zaten sunucuda → smoke (`npm run smoke:live` BASE ile) → açılış.
 9. 1-2 hafta izleme; sonra son yedek ve Vercel/Supabase silme.
 
+## Yayın, bellek, yedek ve sayaç denetimi (işletme notları)
+
+**Yayın ve geri dönüş (`scripts/sunucu/deploy.sh`):** derlemeden ÖNCE yayındaki imaj `PREV` olarak alınır
+(`docker inspect emlaksoft-app --format '{{.Config.Image}}'`; `latest` ise kimliği `emlaksoft-app:onceki` etiketine bağlanır).
+Yeni sürüm ayağa kalkınca sağlık önce konteyner içinden (`127.0.0.1:3000/api/health`, Traefik'ten bağımsız), sonra dış
+`https://emlaksoft.com.tr/api/health` ile beklenir (toplam 120 sn). Başarısızsa `APP_TAG=${PREV#emlaksoft-app:}` ile önceki imaj
+yeniden ayağa kaldırılır, sağlığı yeniden beklenir, sonuç yazılır ve betik **exit 1** ile biter (yeni sürüm yayında kalmaz).
+Derlemeden sonra `check-bundle-budget.ts --gate` yalnız uyarı verir; ardından `npm run --if-present check:acl -- --warn`
+çalışır — yalnız `ACL_GATE=strict` iken başarısızlık yayını durdurur. RELEASE_MIGRATION kuralı aynı (yukarıda).
+
+**Bellek sınırı (`deploy/compose.prod.yml`):** `mem_limit: 2g`, `memswap_limit: 2g` (takas yok), `NODE_OPTIONS=--max-old-space-size=1536`
+(V8 yığını sınırın altında kalır; kalan ~500 MB yerel bellek/arabellek), `stop_grace_period: 20s`. Konteyner adı, Traefik etiketleri
+aynı; blue/green YOK (yayın anında birkaç saniyelik kesinti olabilir). Dockerfile HEALTHCHECK `--start-interval=2s` (Docker ≥25):
+açılışta sağlık 2 sn arayla denenir, `healthy` durumu daha erken gelir.
+
+**Yedek şifreleme (`scripts/sunucu/backup-db.sh`):**
+- `BACKUP_AGE_RECIPIENT=age1...` (yalnız AÇIK anahtar; gizli anahtar sunucuda TUTULMAZ, sahibin bilgisayarında/kasada) tanımlıysa
+  `db-*.dump.age` ve `storage-*.tgz.age` yazılır; düz döküm bütünlük denetiminden sonra silinir, düz dosya bırakılmaz. İzinler 600.
+- `age` kurulu değilse (`apt install age`) ya da değişken tanımsızsa betik açık UYARI yazar ve eski moda (şifresiz) düşer.
+- `BACKUP_REMOTE` varsa yalnız o geceki çıktı dosyaları (şifreliyse `.age`) rsync ile taşınır.
+- Storage denetimi: `storage.objects` satır sayısı ile tar içindeki dosya sayısı karşılaştırılır; fark varsa uyarı loglanır.
+- Geri açma: `age -d -i anahtar.txt db-....dump.age > db.dump` → `pg_restore`.
+
+**Sayaç kayması (`scripts/sunucu/check-sequences.sql`):** public/auth/storage şemalarında sütuna bağlı her sayaç için sıradaki
+değer sütun azamisini geçmiyorsa NOTICE ile raporlar (2026-10-13 `refresh_tokens_pkey` olayı). Varsayılan salt-okunur;
+düzeltme isteğe bağlı ve idempotent:
+```bash
+docker exec -i supabase-db-moqbebljyeyprktd19zb1ihn psql -U postgres -d postgres < scripts/sunucu/check-sequences.sql            # rapor
+docker exec -i supabase-db-moqbebljyeyprktd19zb1ihn psql -U postgres -d postgres -v fix=1 < scripts/sunucu/check-sequences.sql   # rapor + setval
+```
+`restore-cloud-dump.sh` geri yüklemenin sonunda bu dosyayı (rapor modunda) ve `npm run --if-present check:acl` denetimini çağırır.
+ACL notu: dökümdeki "anon'dan geri alınmış" yetkiler hedefte pg_default_acl yüzünden geri gelebilir (`restore-list.py` başındaki
+açıklama) → geri yüklemeden sonra ACL farkı `check:acl` ile kontrol edilir.
+
+**Destek ve yasal kimlik env'leri (`.env.production`):** `NEXT_PUBLIC_SUPPORT_EMAIL` (varsayılan `destek@emlaksoft.com.tr`),
+isteğe bağlı `NEXT_PUBLIC_SUPPORT_PHONE` / `NEXT_PUBLIC_SUPPORT_WHATSAPP` (tanımsızsa hiçbir yerde görünmez; `NEXT_PUBLIC_*`
+derlemeye gömülür → değişince yeniden yayın), yasal sayfalar için `LEGAL_UNVAN`, `LEGAL_ADRES`, `LEGAL_MERSIS`, `LEGAL_VERGI`,
+`LEGAL_KEP` (boşsa sayfada "Şirket bilgileri tamamlanıyor" notu çıkar; bilgi uydurulmaz; sayfalar derlemede üretilebildiğinden
+değişince yeniden yayın).
+
 ## Bekleyen ürün işleri (taşıma sonrası)
 - Durdurulan "ana beyin" iş akışı (hata avcıları + internet araştırması + karar + uygulama) taşımadan sonra yeniden çalıştırılacak.
 - Sahipten beklenenler: destek e-postasının gerçek adresi (`.app` mı `.com.tr` mi), Chrome eklenti kimliği (0.4.0 incelemede, 0.5.0 hazır), EVDS anahtarı, Nilvera test faturası, portal ortaklık başvuruları.

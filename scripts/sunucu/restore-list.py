@@ -1,5 +1,16 @@
 # pg_restore -l çıktısını süzer: public şeması (yetkiler dahil), pg_trgm, ensure_rls,
 # avatar depolama politikaları ve auth/storage verisi (göç tabloları hariç).
+#
+# ACL girdileri ve anon REVOKE'ları: public şemasının ACL girdileri korunur, ancak bulutta
+# anon'dan geri alınmış (REVOKE) yetkiler hedefte geri GELEBİLİR. Neden: pg_dump ACL'yi nesne
+# türünün yerleşik varsayılanına (acldefault: sahip + PUBLIC) göre yazar; anon o varsayılanda
+# olmadığından dökümde "REVOKE ... FROM anon" satırı hiç yoktur, yalnız verilen GRANT'lar vardır.
+# Hedefte ise Supabase'in pg_default_acl'i (ALTER DEFAULT PRIVILEGES IN SCHEMA public ... TO anon,
+# authenticated, service_role) her CREATE TABLE/FUNCTION/SEQUENCE anında anon'a yetki ekler; DEFAULT
+# ACL girdisi de geri yüklemenin sonunda işlendiğinden nesneler hedefin varsayılanıyla doğar.
+# Sonuç: bulutta anon'a kapalı nesne hedefte anon'a açık kalabilir (RLS yine geçerli, ama
+# SECURITY DEFINER fonksiyonlar/görünümler için tehlikeli). Bu yüzden geri yüklemeden sonra ACL
+# farkı WP1'in `npm run check:acl` denetimiyle kontrol edilir (restore-cloud-dump.sh sonunda çağrılır).
 import re,sys
 MULTI=["TABLE DATA","FK CONSTRAINT","CHECK CONSTRAINT","SEQUENCE SET","SEQUENCE OWNED BY","INDEX ATTACH","TABLE ATTACH","PUBLICATION TABLE","EVENT TRIGGER","ROW SECURITY","DEFAULT ACL","MATERIALIZED VIEW DATA","MATERIALIZED VIEW"]
 out=[]
