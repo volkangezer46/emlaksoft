@@ -54,6 +54,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/deals.ts", fn: "updateDealStageWithGate", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/demo-login.ts", fn: "ensureDemoTenant", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/demo-login.ts", fn: "ensurePersona", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/demo-login.ts", fn: "resetDemoPassword", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/document-request-public.ts", fn: "completeDocRequest", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/document-request-public.ts", fn: "finalizeDocRequestUpload", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/document-request-public.ts", fn: "prepareDocRequestUpload", calls: 1, tenantFilter: "var" },
