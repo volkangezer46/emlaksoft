@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const sendEmailMock = vi.fn(async (_input: { to: string; subject: string; text: string }) => ({ ok: true as const, id: "x" }));
+const sendEmailMock = vi.fn(async (_input: { to: string; subject: string; text: string; html?: string }) => ({ ok: true as const, id: "x" }));
 vi.mock("@/lib/platform-settings", () => ({ getPlatformSettingsMany: vi.fn(async () => ({})) }));
 
 import { resolveEmailChannel } from "./provider";
@@ -62,6 +62,12 @@ describe("kendine test gönderimi yalnız oturumdaki personele", () => {
     sendEmailMock.mockClear();
     vi.resetModules();
     vi.doMock("./provider", async (orig) => ({ ...(await orig<typeof import("./provider")>()), sendEmail: sendEmailMock }));
+    // Günlük sarmalayıcısı (send.ts) DB'ye gitmesin: ortam yok gibi davran (günlük/bastırma atlanır).
+    vi.doMock("@/lib/supabase/admin", () => ({
+      createAdminClient: () => {
+        throw new Error("test: admin yok");
+      },
+    }));
   });
 
   it("alıcı daima staff.email; şablon örneği [Örnek] önekli ve örnek veriyle", async () => {

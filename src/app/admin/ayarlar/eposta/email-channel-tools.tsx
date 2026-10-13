@@ -57,7 +57,7 @@ export function EmailChannelTools({ canEdit, staffEmail, keyConfigured }: { canE
             setBusy("send");
             start(async () => {
               const r = await sendSelfTestEmailAction();
-              setMsg(r.ok ? { ok: true, text: `Test e-postası ${r.sentTo} adresine gönderildi.` } : { ok: false, text: r.error ?? "Gönderilemedi." });
+              setMsg(r.ok ? { ok: true, text: `Test e-postası ${r.sentTo} adresine gönderildi; teslim durumu Günlük sekmesinde.` } : { ok: false, text: r.error ?? "Gönderilemedi." });
             });
           }}
         >

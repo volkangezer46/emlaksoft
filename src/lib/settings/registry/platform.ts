@@ -11,7 +11,6 @@ import {
 import { TRY_DEFAULT_MAX_SHARE, TRY_MAX_SHARE_SETTING_KEY } from "@/lib/try-credits/constants";
 import { parseMaxShare } from "@/lib/try-credits/config";
 import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
-import { EMAIL_TEMPLATES, templateSettingKey } from "@/lib/email/templates";
 import { z } from "zod";
 import type { AnySettingDef } from "../types";
 import { defineBool, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
@@ -455,36 +454,8 @@ const legal: AnySettingDef[] = [
   }),
 ];
 
-/**
- * İşlemsel e-posta şablonları (konu + gövde). Varsayılan = `src/lib/email/templates.ts`. Gönderim yalnız e-posta kanalı
- * (RESEND_API_KEY + EMAIL_FROM) açıkken yapılır; kanal kapalıyken metinler düzenlenebilir ama kullanılmaz.
- */
-export const EMAIL_HOME = { href: "/admin/ayarlar/eposta", label: "Ayarlar > E-posta şablonları" } as const;
-const emailTemplates: AnySettingDef[] = EMAIL_TEMPLATES.flatMap((t) => [
-  defineString({
-    key: templateSettingKey(t.key, "subject"),
-    home: EMAIL_HOME,
-    default: t.defaultSubject,
-    maxLength: 200,
-    minLength: 3,
-    category: "bildirim",
-    label: `${t.label}: e-posta konusu`,
-    description: `Değişkenler: ${t.variables.map((v) => `{${v}}`).join(", ")}.`,
-    impact: `Bu şablonla giden e-postaların konu satırı değişir. Gönderen akış: ${t.usedBy}`,
-  }),
-  defineString({
-    key: templateSettingKey(t.key, "body"),
-    home: EMAIL_HOME,
-    default: t.defaultBody,
-    maxLength: 4000,
-    minLength: 10,
-    multiline: true,
-    category: "bildirim",
-    label: `${t.label}: e-posta gövdesi`,
-    description: `Düz metin. Değişkenler: ${t.variables.map((v) => `{${v}}`).join(", ")}.`,
-    impact: `Bu şablonla giden e-postaların metni değişir. Gönderen akış: ${t.usedBy}`,
-  }),
-]);
+/** E-posta ayarlarının bölüm sayfası. Şablon konu/gövde ayarları `registry/email.ts` içindedir (AD7). */
+export const EMAIL_HOME = { href: "/admin/ayarlar/eposta", label: "Ayarlar > E-posta" } as const;
 
 /** E-posta gönderen biçimi: "Ad <adres@alan.tld>" ya da çıplak "adres@alan.tld" (provider.ts aynı kuralı kullanır). */
 export const EMAIL_FROM_RE = /^(?:[^<>\r\n]{1,100}\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/;
@@ -574,7 +545,6 @@ export const PLATFORM_SETTING_DEFS: readonly AnySettingDef[] = [
   ...bridges,
   ...integrations,
   ...portals,
-  ...emailTemplates,
   ...emailChannel,
   ...ops,
 ];

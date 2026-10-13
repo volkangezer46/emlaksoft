@@ -18,7 +18,7 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const SEND_RE = /\b(sendSignerSms|sendTenantSms|prepareTenantSmsSender|prepareTenantWhatsAppSender|sendTenantWhatsApp\w*|sendSms|sendEmail|sendWhatsApp\w*)\b/;
+const SEND_RE = /\b(sendSignerSms|sendTenantSms|prepareTenantSmsSender|prepareTenantWhatsAppSender|sendTenantWhatsApp\w*|sendSms|sendEmail|sendWhatsApp\w*)\b|\b(sendLoggedEmail|sendTemplateEmail)\s*\(/;
 
 /** Ticari gönderim yolları: gate.ts'i çağırmak ZORUNDA (kampanya teslimi DB'deki eşdeğer kapıyı çağırır). */
 const COMMERCIAL: Record<string, string> = {
@@ -48,6 +48,7 @@ const INFRA = new Set([
   "src/lib/messaging/netgsm.ts",
   "src/lib/messaging/tenant-providers.ts",
   "src/lib/email/provider.ts",
+  "src/lib/email/send.ts", // günlük + bastırma sarmalayıcısı (AD7); ileti kararını çağıran verir
   "src/app/imza/_lib/sms.ts",
 ]);
 

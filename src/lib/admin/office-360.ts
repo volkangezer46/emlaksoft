@@ -5,6 +5,7 @@ import { daysAgoIso } from "@/lib/clock";
 import { auditActionLabel } from "@/lib/admin-format";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
 import type { TimelineEvent } from "@/lib/activity-timeline";
+import { EMAIL_STATUS_LABEL, EMAIL_STATUS_TONE, emailTemplateLabel, loadTenantEmailSends, type EmailSendRow } from "@/lib/email/log-read";
 
 /**
  * Ofis 360 (süper admin ofis detayı) veri katmanı.
@@ -26,6 +27,7 @@ export const TIMELINE_CATEGORIES: { key: string; label: string }[] = [
   { key: "oturum", label: "Oturum" },
   { key: "hesap", label: "Hesap" },
   { key: "personel", label: "Personel" },
+  { key: "iletisim", label: "İletişim" },
 ];
 
 export type OfficeAccess = {
@@ -35,6 +37,8 @@ export type OfficeAccess = {
   members: boolean;
   /** IP adresi yalnız süper admin (KVKK). */
   showIp: boolean;
+  /** E-posta günlüğü ekranı (Ayarlar > E-posta, modül `sistem`); yoksa İletişim olayları bağlantısız. */
+  emailLog: boolean;
 };
 
 export function officeAccess(role: PlatformRole): OfficeAccess {
@@ -44,6 +48,7 @@ export function officeAccess(role: PlatformRole): OfficeAccess {
     activity: platformCanAccess(role, "activity"),
     members: platformCanAccess(role, "members"),
     showIp: role === "super_admin",
+    emailLog: platformCanAccess(role, "sistem"),
   };
 }
 
@@ -295,6 +300,8 @@ export type TimelineInput = {
   iys: IysEventRow[];
   erasures: ErasureRow[];
   profiles: ProfileRow[];
+  /** Ofise giden e-postalar (son 30 gün; maskeli alıcı). Tablo yoksa boş. */
+  emails?: EmailSendRow[];
 };
 
 /** Tüm kaynakları tek TimelineEvent akışına birleştirir (saf; testlenir). */
@@ -462,6 +469,19 @@ export function buildOfficeTimeline(i: TimelineInput): TimelineEvent[] {
       href: i.access.members ? `/admin/members/${p.id}` : undefined,
     });
   }
+  for (const m of i.emails ?? []) {
+    const tone = EMAIL_STATUS_TONE[m.status];
+    ev.push({
+      id: `mail-${m.id}`,
+      at: m.created_at,
+      category: "iletisim",
+      title: `E-posta: ${emailTemplateLabel(m.template)}`,
+      detail: `${m.to_masked} · ${EMAIL_STATUS_LABEL[m.status] ?? m.status}${m.error && tone === "danger" ? ` · ${m.error}` : ""}`,
+      icon: "mail",
+      tone: tone === "neutral" ? undefined : tone,
+      href: i.access.emailLog ? `/admin/ayarlar/eposta?sekme=gunluk&ofis=${i.tenantId}` : undefined,
+    });
+  }
   return ev;
 }
 
@@ -540,7 +560,7 @@ export async function loadOfficeTimeline(
 ): Promise<TimelineInput> {
   const id = tenant.id;
   const empty = Promise.resolve({ data: [] as never[] });
-  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows] = await Promise.all([
+  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows, emails] = await Promise.all([
     access.activity
       ? admin.from("audit_logs").select("id, action, actor_id, ip, created_at").eq("tenant_id", id).or(ACCOUNT_AUDIT_OR).order("created_at", { ascending: false }).limit(150)
       : empty,
@@ -564,6 +584,7 @@ export async function loadOfficeTimeline(
     admin.from("kvkk_erasure_log").select("id, performed_at").eq("tenant_id", id).order("performed_at", { ascending: false }).limit(30),
     admin.from("profiles").select("id, full_name, created_at").eq("tenant_id", id).order("created_at", { ascending: false }).limit(60),
     admin.from("platform_staff").select("id, full_name").limit(200),
+    loadTenantEmailSends(admin, id, 30),
   ]);
 
   const actorNames = new Map<string, string>();
@@ -587,6 +608,7 @@ export async function loadOfficeTimeline(
     iys: (iys.data ?? []) as IysEventRow[],
     erasures: (erasures.data ?? []) as ErasureRow[],
     profiles: ((profiles.data ?? []) as { id: string; created_at: string }[]).map((p) => ({ id: p.id, created_at: p.created_at })),
+    emails,
   };
 }
 
