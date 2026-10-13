@@ -195,6 +195,17 @@ describe("builtin-seo-latest (kapsam sözleşmesi)", () => {
     expect(auditRunToCollectorResult(null)).toMatchObject({ scanned: [], issues: [], sourceAt: null });
   });
 
+  it("kısmi tarama (truncated): bulgular gelir ama kapsam boş, açık bulgu 'dogrulandi' olmaz", () => {
+    const partial = auditRunToCollectorResult({ ...run, truncated: true });
+    expect(partial.scanned).toEqual([]);
+    expect(partial.issues.length).toBe(res.issues.length);
+    expect(partial.note).toContain("kısmi");
+    // Depoda kırpılan ya da taranmayan sayfanın açık bulgusu birleştirmede KAPANMAZ.
+    const plan = planCollectorMerge([row({ url: "/hakkimizda", code: "long-title" })], partial, NOW);
+    expect(plan.updates.some((u) => u.status === "dogrulandi")).toBe(false);
+    expect(plan.counts.dogrulandi).toBe(0);
+  });
+
   it("/kayit bulgusu manualOnly olur ve öneri taşımaz; /fiyatlar önerisi '178→155' özetiyle gelir", () => {
     const kayit = res.issues.find((i) => i.url === "/kayit")!;
     expect(kayit.manualOnly).toBe(true);

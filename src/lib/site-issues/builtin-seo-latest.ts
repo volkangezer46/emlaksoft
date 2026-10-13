@@ -5,7 +5,7 @@ import type { CollectorResult, IssueInput, IssueSeverity } from "./types";
 /**
  * Yerleşik SEO toplayıcısı (K1, area "seo"): SEO robotunun SON denetimini (`seo.audit.latest`, mevcut okuma işlevi
  * `readAuditLatest`) bulgu kuyruğuna çevirir. Robotu çalıştırmaz, SEO deposuna yazmaz. Kapsam "all": robotun son
- * taramasında görünmeyen bulgu doğrulanmış sayılır. Kapsam dışı yollar (oturum, portal) hiç alınmaz; üyelik yolları
+ * TAM taramasında görünmeyen bulgu doğrulanmış sayılır; tarama kısmiyse (`truncated`) kapsam boştur, hiçbir şey kapanmaz. Kapsam dışı yollar (oturum, portal) hiç alınmaz; üyelik yolları
  * (`/kayit`) `manualOnly` olur ve hiçbir zaman "Taslağa al" önerisi taşımaz.
  */
 
@@ -66,6 +66,11 @@ export function auditRunToCollectorResult(run: AuditRun | null): CollectorResult
       href: path.endsWith(".xml") || path.endsWith(".txt") ? "/admin/seo?sekme=robot" : seoHref(path),
       manualOnly: !auto,
     });
+  }
+  // Kısmi tarama (sayfa sınırı, zaman bütçesi ya da depoda kırpılan bulgular): görünmeyen bulgunun düzeldiği
+  // BİLİNEMEZ, bu turda hiçbir şey kapanmaz (taranmayan URL'nin bulgusu kapanmaz).
+  if (run.truncated) {
+    return { collector: BUILTIN_SEO_COLLECTOR, area: "seo", scanned: [], issues, sourceAt: run.at, note: "SEO robotunun son taraması kısmi; bu turda bulgu kapatılmadı." };
   }
   return { collector: BUILTIN_SEO_COLLECTOR, area: "seo", scanned: "all", issues, sourceAt: run.at };
 }
