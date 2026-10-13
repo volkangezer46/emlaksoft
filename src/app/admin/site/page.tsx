@@ -11,9 +11,14 @@ import { readSchedule } from "@/lib/publishing/store";
 import { SURFACES, type SurfaceState } from "@/lib/publishing/surfaces";
 import { HUB_CARDS, type HubCardId } from "@/lib/site-hub/cards";
 import { readLastChanges } from "@/lib/site-hub/last-changes";
-import { CancelScheduleButton, DraftDiffLink, HistoryRowActions, ScheduleButton } from "./publishing-desk";
+import { readVerifyBadges, type VerifyBadge } from "@/lib/publishing/after-publish";
+import { Kokpit } from "./_kokpit/kokpit";
+import { RecheckButton } from "./_kokpit/kokpit-actions";
+import { loadKokpit } from "./_kokpit/load";
+import { parseAreaFilter } from "./_kokpit/model";
+import { CancelScheduleButton, DraftDiffLink, HistoryRowActions, PublishNowButton, ScheduleButton } from "./publishing-desk";
 
-export const metadata = { title: "Site yönetimi" };
+export const metadata = { title: "Site, SEO ve Reklam" };
 
 type Chip = { text: string; tone: "ok" | "warn" | "info" };
 
@@ -41,21 +46,27 @@ function ChipList({ chips }: { chips: Chip[] }) {
 }
 
 /**
- * Site yönetimi "Genel bakış" = YAYIN MASASI: taslak/yayın akışı olan yüzeylerin (site menüsü, site içeriği) durumu,
- * zamanlanmış yayın takvimi, son yayın akışı (fark + bu sürüme dön). Diğer yönetim alanları bağlantı kartı olarak kalır.
+ * Site yönetimi "Genel bakış" = BÜYÜME KOKPİTİ (üstte; `seo` modülü: süper admin + operasyon) + YAYIN MASASI:
+ * taslak/yayın akışı olan yüzeylerin (site menüsü, site içeriği) durumu ve canlı doğrulama rozeti, zamanlanmış yayın
+ * takvimi, son yayın akışı (fark + bu sürüme dön). Diğer yönetim alanları bağlantı kartı olarak kalır.
+ * Sayfa yalnız toplanmış tabloları okur (Promise.all; render sırasında dış çağrı yok).
  */
-export default async function AdminSiteHubPage() {
+export default async function AdminSiteHubPage({ searchParams }: { searchParams: Promise<{ alan?: string | string[] }> }) {
   const staff = await requirePlatformModule("dashboard");
   const canWrite = staff.role === "super_admin";
+  const showKokpit = platformCanAccess(staff.role, "seo");
   const surfaces = SURFACES.filter((s) => platformCanAccess(staff.role, s.module));
   const linkCards = HUB_CARDS.filter((c) => !c.hasDraft && platformCanAccess(staff.role, c.module));
   const wants = (id: HubCardId) => linkCards.some((c) => c.id === id);
+  const filter = parseAreaFilter((await searchParams).alan);
 
-  const [last, general, schedule, states] = await Promise.all([
+  const [last, general, schedule, states, kokpit, badges] = await Promise.all([
     readLastChanges(),
     wants("bakim-kayit") ? getGeneralSettings() : null,
     surfaces.length ? readSchedule() : [],
     Promise.all(surfaces.map((s) => s.readState())),
+    showKokpit ? loadKokpit(filter) : null,
+    surfaces.length ? readVerifyBadges() : {},
   ]);
 
   const nowMs = now();
@@ -71,7 +82,8 @@ export default async function AdminSiteHubPage() {
     const chips: Chip[] = [st.live ? { text: "Yayında", tone: "ok" } : { text: "Varsayılan", tone: "info" }];
     if (changes > 0) chips.push({ text: "Taslak var", tone: "warn" });
     if (pending.length > 0) chips.push({ text: pending.length > 1 ? `Zamanlandı (${pending.length})` : "Zamanlandı", tone: "info" });
-    return { s, st, changes, chips };
+    const badge = (badges as Record<string, VerifyBadge>)[s.id] ?? null;
+    return { s, st, changes, chips, badge };
   });
   const nothingLive = rows.length > 0 && rows.every((r) => !r.st.live);
 
@@ -100,10 +112,12 @@ export default async function AdminSiteHubPage() {
       <AdminPageHeader
         eyebrow="Platform"
         icon={Globe}
-        title="Site yönetimi"
-        description="Yayın masası: herkese açık sitenin taslakları, zamanlanmış yayınlar ve son sürümler tek yerde. Diğer yönetim alanları aşağıda."
+        title="Site, SEO ve Reklam"
+        description="Büyüme kokpiti: Site notu, tek kuyrukta öneriler ve Otopilot. Altında Yayın masası: taslaklar, zamanlanmış yayınlar ve son sürümler."
         glow="brand"
       />
+
+      {kokpit ? <Kokpit model={kokpit.model} role={staff.role} autopilot={kokpit.autopilot} autopilotRun={kokpit.autopilotRun} /> : null}
 
       {surfaces.length ? (
         <section aria-labelledby="yayin-masasi" className="space-y-4">
@@ -119,7 +133,7 @@ export default async function AdminSiteHubPage() {
           ) : null}
 
           <ul className="divide-y divide-line rounded-[var(--radius-panel)] border border-line bg-surface" aria-label="Yayın yüzeyleri">
-            {rows.map(({ s, st, changes, chips }) => (
+            {rows.map(({ s, st, changes, chips, badge }) => (
               <li key={s.id} className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                 <div className="min-w-0 space-y-1.5">
                   <span className="flex flex-wrap items-center gap-2">
@@ -129,6 +143,12 @@ export default async function AdminSiteHubPage() {
                   <span className="block text-xs text-text-faint">
                     {st.updatedAt ? `Son yayın: ${fmt(st.updatedAt)}${st.updatedBy ? ` · ${st.updatedBy}` : ""}` : "Henüz yayın yapılmadı (kod varsayılanı)"}
                   </span>
+                  {badge ? (
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <ChipList chips={[{ text: badge.message, tone: badge.ok ? "ok" : "warn" }]} />
+                      {!badge.ok && showKokpit ? <RecheckButton surface={s.id} /> : null}
+                    </span>
+                  ) : null}
                   {changes > 0 ? <DraftDiffLink surface={s.id} count={changes} /> : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -136,6 +156,7 @@ export default async function AdminSiteHubPage() {
                     Editörü aç <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </Link>
                   <ScheduleButton surface={s.id} surfaceLabel={s.label} minLocal={minLocal} disabled={!canWrite || changes === 0} />
+                  {canWrite && changes > 0 ? <PublishNowButton surface={s.id} surfaceLabel={s.label} /> : null}
                 </div>
               </li>
             ))}
