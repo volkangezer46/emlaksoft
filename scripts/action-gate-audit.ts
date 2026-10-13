@@ -57,6 +57,11 @@ const MUAF: Record<string, string> = {
   "auth.ts::signIn": "Giriş noktasının kendisi — kapı buradan sonra kuruluyor.",
   "auth.ts::signUp": "Kayıt noktası.",
   "demo-login.ts::quickDemoLogin": "Demo girişi; kendi bayrağıyla (ENABLE_DEMO_LOGIN) korunuyor.",
+  // Platform personeli işlemleri: tasarım gereği kiracılar arası; hedef ofis parametredir, kapı platform rol/modül kapısıdır
+  // (kiracı kapısı değil). Her biri UUID doğrular, gerekçe ister ve platform_audit_logs'a önce/sonra yazar.
+  "platform-subscription-fix.ts::markSubscriptionUnpaid": "Platform 'billing' modül kapısı (requirePlatformModule); hedef ofis personel seçimi, denetim izli.",
+  "platform-subscription-fix.ts::extendSubscriptionPeriod": "Platform 'billing' modül kapısı; 1-90 gün sınırı, gerekçe ve denetim izi.",
+  "platform-trial.ts::extendTrial": "Platform personeli + canChangeTrial rol kapısı; yalnız deneme ofisinde, ≤90 gün, gerekçe ve denetim izi.",
   "contracts.ts::signContractByToken": "İmza bağlantısı token ile korunuyor, oturum gerektirmez.",
   "contracts.ts::submitSignatureByToken": "Aynı token akışı.",
 
