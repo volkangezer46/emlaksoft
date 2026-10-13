@@ -156,7 +156,7 @@ describe("keşif taraması: YALNIZ aynı köken (G3)", () => {
   });
 });
 
-describe("kapsam sözleşmesi (S0 ön sürümü)", () => {
+describe("kapsam sözleşmesi (S0)", () => {
   it("üyelik/oturum ve panel yolları otomatik iyileştirilmez", () => {
     for (const p of ["/kayit", "/kayit/tamamla", "/giris", "/admin", "/app", "/app/musteriler", "/sifre-yenile", "/auth/callback", "/vitrin/demo", "/danisman/ali"]) {
       expect(canAutoOptimize(p), p).toBe(false);
@@ -169,9 +169,9 @@ describe("kapsam sözleşmesi (S0 ön sürümü)", () => {
     expect(isOutOfScope("/kayit/tamamla")).toBe(true);
     expect(isOutOfScope("/sifre-yenile")).toBe(true);
   });
-  it("parmak izi normalleştirme: sorgu, parça ve sondaki / atılır", () => {
-    expect(normalizeUrlForFingerprint("https://EmlakSoft.com.tr/fiyatlar/?a=1#b")).toBe("https://emlaksoft.com.tr/fiyatlar");
-    expect(normalizeUrlForFingerprint("https://emlaksoft.com.tr/")).toBe("https://emlaksoft.com.tr/");
+  it("parmak izi normalleştirme: Kokpit parmak izleriyle aynı (yalnız yol; köken, sorgu, parça ve sondaki / atılır)", () => {
+    expect(normalizeUrlForFingerprint("https://EmlakSoft.com.tr/fiyatlar/?a=1#b")).toBe("/fiyatlar");
+    expect(normalizeUrlForFingerprint("https://emlaksoft.com.tr/")).toBe("/");
   });
 });
 

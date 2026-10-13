@@ -61,7 +61,7 @@ export default async function UnmatchedPage({ params }: Props) {
     if (content) {
       const faq = faqLd(sitePageFaq(content));
       return (
-        <PricingShell>
+        <PricingShell measurePath={`/${decision.slug}`}>
           {faq ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd({ "@context": "https://schema.org", "@graph": [faq] }) }} /> : null}
           <SitePageBlocks content={content} contact={contactInfoFrom(seo.global)} />
         </PricingShell>

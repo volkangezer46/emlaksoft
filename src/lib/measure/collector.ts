@@ -8,7 +8,7 @@ import { readMeasureSettingsFresh, type MeasureSettings } from "./settings";
 /**
  * Ölçüm toplayıcısı (K1, alan `olcum`) ve sağlık okuyucusu (SUNUCU).
  * K1 tipleri SP1'in `site-issues/types.ts` sözleşmesinin KOPYASIDIR (paketler birbirini import etmez); Kokpit
- * dikişinde (S4) `measureCollector` kayıt listesine eklenir.
+ * kaydı `src/lib/site-issues/collectors.ts`'tedir (bağdaştırıcı: site-issues/adapters.ts).
  */
 
 /* ---------------------------- K1 sözleşmesi (kopya) ---------------------------- */

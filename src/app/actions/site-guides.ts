@@ -25,7 +25,7 @@ import {
  *  - Operasyon (ops) TASLAK yazabilir: yeni yazı, taslak kaydı.
  *  - Yayınlama, yayından kaldırma ve sürüme dönüş YALNIZ süper admin.
  * Her yazma logPlatformActivity'ye düşer. Canlıyı etkileyen yazmalar `guides` etiketini ve rehber yollarını düşürür.
- * Zamanlama Yayın masasındadır (yüzey: src/lib/guides/publish-surface.ts; kayıt S2 dikişinde).
+ * Zamanlama Yayın masasındadır (yüzey: src/lib/guides/publish-surface.ts; masada `guide:<id>` olarak kayıtlı).
  */
 
 export type GuideActionResult = {

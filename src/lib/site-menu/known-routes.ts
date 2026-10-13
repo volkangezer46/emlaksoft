@@ -12,6 +12,7 @@ export const STATIC_PUBLIC_PATHS = [
   "/kayit",
   "/giris",
   "/araclar",
+  "/rehber",
   "/kvkk-aydinlatma",
   "/gizlilik",
   "/cerez-politikasi",

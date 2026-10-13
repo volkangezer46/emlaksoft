@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import type { AuditRun } from "@/lib/seo/store";
-import { runAutopilot, parseAutopilot, type AutopilotDeps, type AutopilotSettings } from "./autopilot";
+import { DEFAULT_SEO_SETTINGS, type AuditRun } from "@/lib/seo/store";
+import { AUTOPILOT_KINDS, runAutopilot, parseAutopilot, type AutopilotDeps, type AutopilotSettings } from "./autopilot";
 import { auditRunToCollectorResult, BUILTIN_SEO_COLLECTOR } from "./builtin-seo-latest";
 import { EXECUTORS, canDraft, executorFor, hrefExecutor, ignoreExecutor, screenFallback } from "./executors";
 import { canAutoOptimize, fingerprintOf, isInPublicScope, normalizeUrlForFingerprint } from "./fingerprint";
@@ -206,14 +206,24 @@ describe("builtin-seo-latest (kapsam sözleşmesi)", () => {
     expect(plan.counts.dogrulandi).toBe(0);
   });
 
-  it("/kayit bulgusu manualOnly olur ve öneri taşımaz; /fiyatlar önerisi '178→155' özetiyle gelir", () => {
-    const kayit = res.issues.find((i) => i.url === "/kayit")!;
+  it("/kayit bulgusu manualOnly olur ve öneri taşımaz; /fiyatlar önerisi gerçek açıklamadan (SEO kural önerisi) gelir", () => {
+    const LONG = "EmlakSoft paketleri, aylık ve yıllık fiyatlar, kullanıcı ve portföy limitleri ile özellik karşılaştırması. Ücretsiz deneme, kredi kartı gerekmez; dilediğiniz an paketinizi değiştirin.";
+    const settings = { ...DEFAULT_SEO_SETTINGS, pages: { "/fiyatlar": { description: LONG }, "/kayit": { description: LONG } } };
+    const withSettings = auditRunToCollectorResult(run, settings);
+    const kayit = withSettings.issues.find((i) => i.url === "/kayit")!;
     expect(kayit.manualOnly).toBe(true);
     expect(kayit.proposal).toBeNull();
-    const fiyat = res.issues.find((i) => i.url === "/fiyatlar")!;
+    // Eylemsiz öneri (elle) kanıtta kalır.
+    expect(String(kayit.evidence?.suggestion ?? "")).toContain("/kayit açıklaması");
+    const fiyat = withSettings.issues.find((i) => i.url === "/fiyatlar")!;
     expect(fiyat.manualOnly).toBe(false);
-    expect(fiyat.proposal).toMatchObject({ kind: "seo_meta_draft:long-description", summary: "/fiyatlar açıklaması 178→155 karakter" });
+    expect(fiyat.proposal).toMatchObject({ kind: "seo_meta_draft:long-description", params: { field: "description", risk: "guvenli" } });
+    expect(fiyat.proposal!.summary).toMatch(/^\/fiyatlar açıklaması \d+→\d+ karakter$/);
+    expect(String(fiyat.proposal!.after).length).toBeLessThanOrEqual(155);
     expect(fiyat.severity).toBe("bilgi");
+    expect(fiyat.href).toBe("/admin/seo?sekme=sayfalar&sayfa=%2Ffiyatlar#editor");
+    // Ayar okunamazsa öneri üretilmez (bulgu yine gelir).
+    expect(res.issues.find((i) => i.url === "/fiyatlar")!.proposal).toBeNull();
   });
 
   it("/kayit/tamamla ve /giris HİÇBİR ZAMAN 'Taslağa al' almaz (kuyruğa bile girmez; yürütücü kayıtlı olsa da)", () => {
@@ -228,10 +238,18 @@ describe("builtin-seo-latest (kapsam sözleşmesi)", () => {
 });
 
 describe("yürütücü kaydı", () => {
-  it("yerleşik href ve ignore; bilinmeyen tür için ekran bağlantısı", () => {
+  it("yerleşik href ve ignore; Otopilot izin listesindeki her tür kayıtlı, güvenli ve uygulanabilir; bilinmeyen tür için ekran bağlantısı", () => {
     expect(executorFor("href")).toBe(hrefExecutor);
     expect(executorFor("ignore")).toBe(ignoreExecutor);
-    expect(executorFor("seo_meta_draft:long-description")).toBeNull();
+    for (const kind of AUTOPILOT_KINDS) {
+      const ex = executorFor(kind);
+      expect(ex, kind).not.toBeNull();
+      expect(ex!.risk, kind).toBe("guvenli");
+      expect(ex!.mode, kind).not.toBe("link");
+      expect(typeof ex!.plan, kind).toBe("function");
+      expect(typeof ex!.apply, kind).toBe("function");
+    }
+    expect(new Set(EXECUTORS.map((e) => e.kind)).size).toBe(EXECUTORS.length);
     expect(screenFallback({ href: "/admin/seo?sekme=sayfalar", area: "seo" })).toEqual({ href: "/admin/seo?sekme=sayfalar", label: "SEO merkezi" });
     // Bilinmeyen tür taslak düğmesi almaz.
     expect(canDraft({ url: "/fiyatlar", manual_only: false, proposal: { kind: "bilinmeyen", summary: "" } })).toBe(false);

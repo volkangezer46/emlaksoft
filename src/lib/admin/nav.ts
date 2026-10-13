@@ -144,13 +144,14 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         href: "/admin/site", core: true,
         label: "Site, SEO ve Reklam",
         short: "Site",
-        description: "Büyüme kokpiti (Site notu, öneri kuyruğu, Otopilot), içerik ve sayfalar, SEO, site menüsü, logo ve favicon",
+        description: "Büyüme kokpiti (Site notu, öneri kuyruğu, Otopilot), içerik ve sayfalar, SEO, hız, reklam hunisi, medya, rehber, Google bağlantıları, site menüsü, logo ve favicon",
         icon: Globe,
-        modules: ["sitecontent", "sitemenu", "seo", "marka"],
+        modules: ["sitecontent", "sitemenu", "seo", "marka", "reklam"],
         match: ["/admin/site", "/admin/site-icerik", "/admin/site-menu", "/admin/seo", "/admin/marka"],
-        // Hız, Reklam, Medya, Rehber ve Bağlantılar sekmeleri kendi paketlerinin dikişinde (S1) eklenir; 5'i aşan "Diğer ▾" altına girer.
+        // İlk 5 sekme şeritte görünür; Hız, Reklam, Medya, Rehber ve Bağlantılar (S1 dikişi) "Diğer ▾" altındadır.
+        // Sekmenin modülü, açtığı sayfanın kapısıyla (requirePlatformModule) AYNIDIR: görünen sekme her zaman açılır.
         tabs: [
-          L("/admin/site", "Genel bakış", "Büyüme kokpiti: Site notu, öneri kuyruğu, Otopilot ve Yayın masası", ["sitecontent", "sitemenu", "seo", "marka"]),
+          L("/admin/site", "Genel bakış", "Büyüme kokpiti: Site notu, öneri kuyruğu, Otopilot ve Yayın masası", ["sitecontent", "sitemenu", "seo", "marka", "reklam"]),
           L("/admin/site-icerik", "İçerik", "Ana sayfa metinleri, fiyatlar ve özel sayfalar", ["sitecontent"], {
             children: [
               L("/admin/site-icerik", "Ana sayfa", "Ana sayfa metinleri, bölüm düzeni, SSS", ["sitecontent"]),
@@ -160,6 +161,22 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/seo", "SEO", "Arama motoru, sitemap, robot", ["seo"]),
           L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"]),
           L("/admin/marka", "Marka", "Logo ve favicon", ["marka"]),
+          L("/admin/site/hiz", "Hız", "Statik sayfalar, hız bütçesi, saha ve laboratuvar ölçümleri", ["sitecontent"], {
+            children: [
+              L("/admin/site/hiz", "Genel", "Statik sunum ve hız bütçesi", ["sitecontent"]),
+              L("/admin/site/hiz/saha", "Saha", "Gerçek ziyaretçi hız ölçümleri (Core Web Vitals)", ["seo"]),
+              L("/admin/site/hiz/lab", "Laboratuvar", "PageSpeed laboratuvar koşuları", ["sitecontent"]),
+            ],
+          }),
+          L("/admin/site/reklam", "Reklam", "Ziyaretten kayda huni, kayıt kaynakları ve Google Ads önerileri", ["seo"], {
+            children: [
+              L("/admin/site/reklam", "Huni", "Ziyaretten kayda huni ve kayıt kaynakları", ["seo"]),
+              L("/admin/site/reklam/google", "Google Ads", "Kampanya performansı ve kural önerileri", ["reklam"]),
+            ],
+          }),
+          L("/admin/site/medya", "Medya", "Görsel kitaplığı ve görsel bütçesi", ["sitecontent"]),
+          L("/admin/site/rehber", "Rehber", "Rehber (blog) yazıları: taslak, yayın ve sürümler", ["sitecontent"]),
+          L("/admin/site/baglantilar", "Bağlantılar", "Google Search Console ve Google Ads bağlantıları", ["reklam"]),
         ],
       },
     ],

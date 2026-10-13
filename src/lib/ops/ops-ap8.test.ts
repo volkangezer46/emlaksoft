@@ -91,6 +91,8 @@ describe("sistem anahtarı süzgeci", () => {
     ["ops.backup.last", true],
     ["publishing.scheduled", true],
     ["publishing.scheduled_extra", false],
+    ["statik.rev", true],
+    ["statik.routes", false],
     ["seo.auditx", false],
     ["billing.default_trial_days", false],
     [null, false],

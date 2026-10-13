@@ -19,7 +19,7 @@ import {
   type ScheduledEntry,
 } from "@/lib/publishing/schedule";
 import { readScheduleStrict, writeSchedule } from "@/lib/publishing/store";
-import { surfaceById, type PublishSurface } from "@/lib/publishing/surfaces";
+import { resolveSurface, type PublishSurface } from "@/lib/publishing/surfaces";
 import { publishDraftsSequential } from "@/lib/site-issues/publish-all";
 
 /**
@@ -38,7 +38,8 @@ const READONLY = "Yayın masasında yalnız süper admin değişiklik yapabilir;
 const UNKNOWN = "Bilinmeyen yüzey.";
 
 async function gate(surfaceId: string, write: boolean) {
-  const surface = surfaceById(String(surfaceId ?? ""));
+  // Sabit yüzeyler + rehber yazıları (`guide:<id>`; S5 dikişi).
+  const surface = await resolveSurface(String(surfaceId ?? ""));
   if (!surface) return { error: UNKNOWN } as const;
   const staff = await requirePlatformModule(surface.module);
   if (write && staff.role !== "super_admin") return { error: READONLY } as const;
@@ -221,10 +222,11 @@ export async function restoreVersion(surfaceId: string, historyId: string): Prom
   const rl = await checkRateLimit(`publishing-restore:${staff.id}`, { limit: 20, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: "Çok sık işlem yaptınız; birkaç dakika sonra tekrar deneyin." };
 
-  const livePaths = surface.livePaths.map((p) => p.path);
-  const beforeDigests = await captureLiveDigests(livePaths);
+  const beforeDigests = await captureLiveDigests(surface.livePaths.map((p) => p.path));
   const res = await surface.restore(String(historyId ?? ""), staff.id, staff.full_name || staff.email);
   if (!res.ok) return { error: res.error };
+  // Yayın sonrası yollar geri dönüşten SONRA okunur (SEO yüzeyi değişen sayfaları yayında bilir; diğerlerinde aynı).
+  const livePaths = surface.livePaths.map((p) => p.path);
 
   await logPlatformActivity({
     actorId: staff.id,

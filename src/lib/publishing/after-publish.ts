@@ -3,7 +3,10 @@ import { getBaseUrl } from "@/lib/base-url";
 import { now, trParts } from "@/lib/clock";
 import { fetchOwnOriginInspect, readExternalText } from "@/lib/external-fetch";
 import { logPlatformActivity } from "@/lib/platform-activity";
+import { seoAfterPublishHook } from "@/lib/seo/after-publish-hook";
+import { fromSeoHook, fromStaticHook } from "@/lib/site-issues/adapters";
 import { readActions, recordOptimizerAction } from "@/lib/site-issues/store";
+import { staticAfterPublishHook } from "@/lib/static-home/after-publish-hook";
 import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from "@/lib/site-issues/types";
 
 /**
@@ -13,8 +16,7 @@ import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from
  * denetim izine (`publishing.after_publish`) yazılır.
  * Çağrı: server action'da yazımdan önce `captureLiveDigests` (taban), başarılı yayından sonra
  * `afterSafe(() => runAfterPublish(...), "yayın sonrası zinciri")`; cron'da `await` + süre sınırı (tabansız).
- * Yerleşik kanca `verify` (order 20). Diğer paketler kendi kancalarını (statik tazeleme order 10, IndexNow ...) S2/S4
- * dikişinde HOOKS'a ekler.
+ * Yerleşik kanca `verify` (order 20); paket kancaları (statik tazeleme 10, SEO 30) HOOKS listesindedir.
  */
 
 export const HOOK_TIMEOUT_MS = 10_000;
@@ -151,7 +153,15 @@ export function createVerifyHook(deps: VerifyDeps = defaultVerifyDeps): AfterPub
   };
 }
 
-export const HOOKS: AfterPublishHook[] = [createVerifyHook()];
+/**
+ * Kayıtlı kancalar (S2/S3 dikişi tamam): statik tazeleme (10) → canlı doğrulama (20) → SEO: IndexNow + yeniden denetim (30).
+ * Paket kancaları kendi tip kopyalarıyla yazıldı; `site-issues/adapters.ts` Kokpit olayına çevirir.
+ */
+export const HOOKS: AfterPublishHook[] = [
+  fromStaticHook(staticAfterPublishHook),
+  createVerifyHook(),
+  fromSeoHook(seoAfterPublishHook, () => new Date(now()).toISOString()),
+];
 
 export type HookRun = { id: string; order: number; ok: boolean; message: string; ms: number; detail?: Record<string, unknown> };
 export type AfterPublishRunResult = { hooks: HookRun[]; ok: boolean };

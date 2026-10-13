@@ -8,7 +8,7 @@ import { getGeneralSettings } from "@/lib/platform-flags";
 import { diffJson } from "@/lib/publishing/diff";
 import { MIN_LEAD_MS, hashOf, isOpen } from "@/lib/publishing/schedule";
 import { readSchedule } from "@/lib/publishing/store";
-import { SURFACES, type SurfaceState } from "@/lib/publishing/surfaces";
+import { SURFACES, deskGuideSurfaces, type SurfaceState } from "@/lib/publishing/surfaces";
 import { HUB_CARDS, type HubCardId } from "@/lib/site-hub/cards";
 import { readLastChanges } from "@/lib/site-hub/last-changes";
 import { readVerifyBadges, type VerifyBadge } from "@/lib/publishing/after-publish";
@@ -47,7 +47,7 @@ function ChipList({ chips }: { chips: Chip[] }) {
 
 /**
  * Site yönetimi "Genel bakış" = BÜYÜME KOKPİTİ (üstte; `seo` modülü: süper admin + operasyon) + YAYIN MASASI:
- * taslak/yayın akışı olan yüzeylerin (site menüsü, site içeriği) durumu ve canlı doğrulama rozeti, zamanlanmış yayın
+ * taslak/yayın akışı olan yüzeylerin (site menüsü, site içeriği, SEO sayfa ayarları, taslaklı rehber yazıları) durumu ve canlı doğrulama rozeti, zamanlanmış yayın
  * takvimi, son yayın akışı (fark + bu sürüme dön). Diğer yönetim alanları bağlantı kartı olarak kalır.
  * Sayfa yalnız toplanmış tabloları okur (Promise.all; render sırasında dış çağrı yok).
  */
@@ -55,37 +55,48 @@ export default async function AdminSiteHubPage({ searchParams }: { searchParams:
   const staff = await requirePlatformModule("dashboard");
   const canWrite = staff.role === "super_admin";
   const showKokpit = platformCanAccess(staff.role, "seo");
-  const surfaces = SURFACES.filter((s) => platformCanAccess(staff.role, s.module));
+  const fixed = SURFACES.filter((s) => platformCanAccess(staff.role, s.module));
+  // Rehber yazıları (S5 dikişi): yazı başına dinamik yüzey; yalnız bekleyen taslağı ya da zamanlaması olanlar listelenir.
+  const canGuides = platformCanAccess(staff.role, "sitecontent");
   const linkCards = HUB_CARDS.filter((c) => !c.hasDraft && platformCanAccess(staff.role, c.module));
   const wants = (id: HubCardId) => linkCards.some((c) => c.id === id);
   const filter = parseAreaFilter((await searchParams).alan);
 
-  const [last, general, schedule, states, kokpit, badges] = await Promise.all([
+  const [last, general, schedule, fixedStates, kokpit, badges, guideCandidates] = await Promise.all([
     readLastChanges(),
     wants("bakim-kayit") ? getGeneralSettings() : null,
-    surfaces.length ? readSchedule() : [],
-    Promise.all(surfaces.map((s) => s.readState())),
+    fixed.length || canGuides ? readSchedule() : [],
+    Promise.all(fixed.map((s) => s.readState())),
     showKokpit ? loadKokpit(filter) : null,
-    surfaces.length ? readVerifyBadges() : {},
+    fixed.length || canGuides ? readVerifyBadges() : {},
+    canGuides ? deskGuideSurfaces().catch(() => []) : [],
   ]);
+  // Yalnız aday yazıların (en çok 20) durumu ikinci turda okunur; okunamayan yazı masada gösterilmez.
+  const guideStates = await Promise.all(guideCandidates.map((s) => s.readState().catch(() => null)));
+  const guides = guideCandidates.flatMap((s, i) => (guideStates[i] ? [{ s, st: guideStates[i] }] : []));
+  const surfaces = [...fixed, ...guides.map((g) => g.s)];
+  const states: SurfaceState[] = [...fixedStates, ...guides.map((g) => g.st)];
+  const isGuide = (id: string) => id.startsWith("guide:");
 
   const nowMs = now();
   const minLocal = toTrLocalInput(nowMs + MIN_LEAD_MS + 60_000);
-  const visibleIds = new Set(surfaces.map((s) => s.id));
-  const open = schedule.filter((e) => isOpen(e) && visibleIds.has(e.surface as (typeof surfaces)[number]["id"]));
+  const visibleIds = new Set<string>(surfaces.map((s) => s.id));
+  const open = schedule.filter((e) => isOpen(e) && (visibleIds.has(e.surface) || (canGuides && isGuide(e.surface))));
 
-  const rows = surfaces.map((s, i) => {
-    const st = states[i] as SurfaceState;
-    const base = st.live ?? s.defaults();
-    const changes = st.draft && hashOf(st.draft) !== hashOf(base) ? diffJson(base, st.draft).total : 0;
-    const pending = open.filter((e) => e.surface === s.id);
-    const chips: Chip[] = [st.live ? { text: "Yayında", tone: "ok" } : { text: "Varsayılan", tone: "info" }];
-    if (changes > 0) chips.push({ text: "Taslak var", tone: "warn" });
-    if (pending.length > 0) chips.push({ text: pending.length > 1 ? `Zamanlandı (${pending.length})` : "Zamanlandı", tone: "info" });
-    const badge = (badges as Record<string, VerifyBadge>)[s.id] ?? null;
-    return { s, st, changes, chips, badge };
-  });
-  const nothingLive = rows.length > 0 && rows.every((r) => !r.st.live);
+  const rows = surfaces
+    .map((s, i) => {
+      const st = states[i]!;
+      const base = st.live ?? s.defaults();
+      const changes = st.draft && hashOf(st.draft) !== hashOf(base) ? diffJson(base, st.draft).total : 0;
+      const pending = open.filter((e) => e.surface === s.id);
+      const chips: Chip[] = [st.live ? { text: "Yayında", tone: "ok" } : isGuide(s.id) ? { text: "Yayında değil", tone: "info" } : { text: "Varsayılan", tone: "info" }];
+      if (changes > 0) chips.push({ text: "Taslak var", tone: "warn" });
+      if (pending.length > 0) chips.push({ text: pending.length > 1 ? `Zamanlandı (${pending.length})` : "Zamanlandı", tone: "info" });
+      const badge = (badges as Record<string, VerifyBadge>)[s.id] ?? null;
+      return { s, st, changes, chips, badge, pending: pending.length };
+    })
+    .filter((r) => !isGuide(r.s.id) || r.changes > 0 || r.pending > 0);
+  const nothingLive = fixed.length > 0 && rows.filter((r) => !isGuide(r.s.id)).every((r) => !r.st.live);
 
   const horizon = nowMs + 30 * DAY_MS;
   const calendar = open
@@ -97,7 +108,7 @@ export default async function AdminSiteHubPage({ searchParams }: { searchParams:
     .flatMap((r) => r.st.history.map((h) => ({ surface: r.s, h, isLive: liveHashes.get(r.s.id) === hashOf(h.cfg) })))
     .sort((a, b) => Date.parse(b.h.at) - Date.parse(a.h.at))
     .slice(0, FEED_LIMIT);
-  const labelOf = (id: string) => SURFACES.find((s) => s.id === id)?.label ?? id;
+  const labelOf = (id: string) => surfaces.find((s) => s.id === id)?.label ?? (isGuide(id) ? "Rehber yazısı" : id);
 
   const linkChips: Partial<Record<HubCardId, Chip[]>> = {};
   if (general) {

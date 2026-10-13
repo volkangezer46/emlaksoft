@@ -8,7 +8,7 @@ import { RedirectRuleSchema, RedirectsSchema } from "./schema";
 import { canAutoOptimize, pathOfUrl } from "./scope";
 
 /**
- * SEO DÜZELTİCİLERİ (K2). Kayıt (executors listesi) S4 dikişinde; burada nesneler dışa verilir.
+ * SEO DÜZELTİCİLERİ (K2). Kokpit kaydı `site-issues/executors.ts` (bağdaştırıcı: site-issues/adapters.ts).
  *  - seo_meta_draft: kural önerisini SEO yayın yüzeyinin TASLAĞINA yazar (canlı değişmez; yayın insan ya da Otopilot
  *    `publish=true` ile Yayın masasından). Risk "guvenli" YALNIZ long-description ve missing-og-title kodlarında.
  *  - redirect_404_draft: 404 yolu için öneri hedefe KAPALI (enabled=false) yönlendirme kuralı ekler (taslak).

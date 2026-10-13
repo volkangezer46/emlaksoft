@@ -6,8 +6,7 @@ import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, History, Loader2, RotateCcw, Save, Send, Undo2 } from "lucide-react";
 import { discardSiteContentDraft, publishSiteContent, resetSiteContentToDefault, rollbackSiteContent, saveSiteContentDraft } from "@/app/actions/site-content";
-import { acknowledgeHeroBudget } from "@/app/actions/site-media";
-import { kb, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
+import { HERO_BUDGET_REASON_MIN, kb, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
 import { Input } from "@/components/ui/input";
 import { PIONEER_CLAIM } from "@/lib/site-content/claims";
 import { CONTENT_TOKENS, LIMITS, SECTION_KEYS, TOKEN_HELP, firstSentence, hasErrors, newCardId, sameContent, type SectionKey } from "@/lib/site-content/schema-core";
@@ -79,8 +78,12 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
     [media, uploaded],
   );
   // Kalite kapısı: ilk ekran bütçesini aşan hero görseli "Yine de kaydet" + gerekçe ister (yalnız bu yüzey).
+  // Gerekçe SUNUCUDA zorunludur (saveSiteContentDraft kapısı denetim kaydına yazar); burada yalnız toplanıp kayda eklenir.
   const [gate, setGate] = useState<{ action: () => void; reason: string } | null>(null);
   const [ackedFor, setAckedFor] = useState<string | null>(null);
+  const ackRef = useRef<{ mediaId: string; reason: string } | null>(null);
+  /** Kayda eklenecek gerekçe: yalnız onaylanan görsel hâlâ seçiliyse. */
+  const budgetReason = () => (ackRef.current && ackRef.current.mediaId === cfg.hero.image?.mediaId ? ackRef.current.reason : undefined);
 
   // Canlı doğrulama zod gerektirir: ayrı parça, boşta yüklenir (sunucu kaydederken yine doğrular).
   const [validate, setValidate] = useState<typeof validateSiteContent | null>(null);
@@ -143,16 +146,11 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
   const confirmGate = () => {
     if (!gate || !heroMedia) return;
     const { action, reason } = gate;
-    start(async () => {
-      const res = await acknowledgeHeroBudget(heroMedia.id, reason);
-      if (res.error) {
-        setMsg({ kind: "error", text: res.error });
-        return;
-      }
-      setAckedFor(heroMedia.id);
-      setGate(null);
-      action();
-    });
+    if (reason.trim().length < HERO_BUDGET_REASON_MIN) return;
+    ackRef.current = { mediaId: heroMedia.id, reason: reason.trim() };
+    setAckedFor(heroMedia.id);
+    setGate(null);
+    action();
   };
 
   const run = (job: () => Promise<{ ok?: boolean; error?: string; config?: SiteContent }>, okText: string, after?: (c?: SiteContent) => void) => {
@@ -178,7 +176,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
   };
 
   const saveDraft = () =>
-    run(() => saveSiteContentDraft(cfg), "Taslak kaydedildi. Henüz canlı değil.", (c) => {
+    run(() => saveSiteContentDraft(cfg, budgetReason()), "Taslak kaydedildi. Henüz canlı değil.", (c) => {
       const next = c ?? cfg;
       setSaved(next);
       setCfg((cur) => (sameContent(cur, cfg) ? next : cur));
@@ -187,7 +185,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
     run(
       async () => {
         if (dirty) {
-          const s = await saveSiteContentDraft(cfg);
+          const s = await saveSiteContentDraft(cfg, budgetReason());
           if (s.error) return s;
           if (s.config) setSaved(s.config);
         }
@@ -275,7 +273,7 @@ export function SiteContentEditor({ initialDraft, live, defaults, history, canWr
               <Input className="mt-1" value={gate.reason} maxLength={300} onChange={(e) => setGate({ ...gate, reason: e.target.value })} placeholder="ör. Kampanya görseli, bir hafta yayında kalacak" />
             </label>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button type="button" size="sm" variant="primary" disabled={pending || gate.reason.trim().length < 5} onClick={confirmGate}>Yine de kaydet</Button>
+              <Button type="button" size="sm" variant="primary" disabled={pending || gate.reason.trim().length < HERO_BUDGET_REASON_MIN} onClick={confirmGate}>Yine de kaydet</Button>
               <Button type="button" size="sm" variant="outline" onClick={() => setGate(null)}>Vazgeç</Button>
             </div>
           </div>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
+import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { cache } from "react";
@@ -570,6 +571,8 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
           </div>
         </section>
       </main>
+      {/* Birinci taraf ölçüm (S6): yol sunucuda /danisman/[kisi] şablonuna indirgenir. */}
+      <PublicMeasure path={`/danisman/${slug}`} />
 
       {/* --------------------------------------- Mobil yapışkan aksiyon şeridi */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-3 py-2.5 backdrop-blur sm:hidden">

@@ -1,3 +1,4 @@
+import { PublicMeasure } from "@/components/public-measure/public-measure";
 import { RegisterForm } from "./register-form";
 import { isRegistrationOpen } from "@/lib/platform-flags";
 import { isGoogleAuthEnabled } from "@/lib/auth/google-auth";
@@ -17,7 +18,20 @@ export default async function RegisterPage({
   searchParams: Promise<RegisterSearchParams>;
 }) {
   const params = await searchParams;
-  if (!(await isRegistrationOpen())) return <RegistrationClosed />;
+  // Birinci taraf ölçüm (S6): kayıt girişi hunin son adımıdır; yalnız /kayit (alt yolları, ör. /kayit/tamamla, sayılmaz).
+  if (!(await isRegistrationOpen())) {
+    return (
+      <>
+        <RegistrationClosed />
+        <PublicMeasure path="/kayit" />
+      </>
+    );
+  }
   const props = await loadRegisterFormProps(params);
-  return <RegisterForm {...props} googleEnabled={isGoogleAuthEnabled()} />;
+  return (
+    <>
+      <RegisterForm {...props} googleEnabled={isGoogleAuthEnabled()} />
+      <PublicMeasure path="/kayit" />
+    </>
+  );
 }

@@ -1,7 +1,7 @@
 /**
  * Büyüme Kokpiti sözleşme tiplerinin SEO KOPYASI (K1 toplayıcı, K2 düzeltici, K3 yayın sonrası kanca).
  * Asıl tanım SP1'in `src/lib/site-issues/types.ts` dosyasındadır; paketler birbirini İÇE AKTARMAZ, tipler kopyalanır
- * (yapısal tipler: aynı biçim = uyumlu). Kayıt (collectors/executors/HOOKS listeleri) S3/S4 dikişlerinde yapılır.
+ * (yapısal tipler: aynı biçim = uyumlu). Kayıt ve biçim çevirisi `src/lib/site-issues/adapters.ts`'tedir.
  * Burada alan eklenirse SP1 kopyasıyla birlikte güncellenmelidir.
  */
 

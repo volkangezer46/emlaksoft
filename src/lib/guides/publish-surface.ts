@@ -8,8 +8,8 @@ import { guideHasErrors, validateGuide } from "./schema";
 import { GUIDES_CACHE_TAG, guideLinkPaths, guideStore, publishGuideContent, readGuideIndexState, unpublishGuideEntry } from "./store";
 
 /**
- * YAYIN MASASI yüzeyi (K5): rehber yazısı. Kayıt (surfaces.ts SURFACES) S2 dikişindedir; o zamana dek admin ekranı
- * kendi "Yayınla" eylemiyle (src/app/actions/site-guides.ts) aynı depo işlevlerine yazar. Yazı başına bir yüzey
+ * YAYIN MASASI yüzeyi (K5): rehber yazısı. Kayıt: `publishing/surfaces.ts` (`guide:<id>` dinamik yüzeyi; resolveSurface,
+ * deskGuideSurfaces). Admin ekranı ayrıca kendi "Yayınla" eylemiyle (src/app/actions/site-guides.ts) aynı depo işlevlerine yazar. Yazı başına bir yüzey
  * nesnesi üretilir (`surfaceId: 'guide'`, `guideId`). Zamanlı yayın ve bitiş mevcut `yayin-zamanlayici` ile çalışır.
  *  - defaults(): null — yazının kod içi varsayılanı yoktur; "varsayılana dön" = yayından kaldır (durum arşiv).
  *  - publish: bugünkü kurallarla doğrular (hata kalıcıdır), canlıya alır, listeyi yayında işaretler.

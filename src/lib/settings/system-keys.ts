@@ -4,7 +4,9 @@
  * DB tetikleyicisi değişmez (bu kayıtlar yine yazılır); tetikleyici düzeyinde ayırma sonraki migration turuna kaldı.
  * `*` = önek eşleşmesi; yıldızsız = tam eşleşme.
  */
-export const SYSTEM_KEY_PATTERNS = ["insight_engine_cursor", "seo.audit.*", "seo.indexnow.seen*", "ops.*", "publishing.scheduled"] as const;
+// `statik.rev`: statik sayfa önbellek sürümü; her yayın sonrası tazelemede sistem artırır (insan değişikliği değil).
+// `statik.routes` (Hız ekranındaki aç/kapa) BİLEREK listede yok: personel kararıdır.
+export const SYSTEM_KEY_PATTERNS = ["insight_engine_cursor", "seo.audit.*", "seo.indexnow.seen*", "ops.*", "publishing.scheduled", "statik.rev"] as const;
 
 export function isSystemSettingKey(key: string | null | undefined, patterns: readonly string[] = SYSTEM_KEY_PATTERNS): boolean {
   if (!key) return false;

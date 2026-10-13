@@ -32,7 +32,8 @@ export type PricingViewData = {
 /** Tek parçalı metin düz dizgi olarak basılır (eski `{değer}` ile aynı düğüm); çok parçalı metin parça listesi. */
 const parts = (p: string[]) => (p.length === 1 ? p[0] : p);
 
-export function PricingPageView({ data, copy, jsonLd = true }: { data: PricingViewData; copy: PricingCopy; jsonLd?: boolean }) {
+/** `measurePath`: yalnız herkese açık /fiyatlar verir (ölçüm etiketi); personel önizlemesi vermez. */
+export function PricingPageView({ data, copy, jsonLd = true, measurePath }: { data: PricingViewData; copy: PricingCopy; jsonLd?: boolean; measurePath?: string }) {
   const { plans, trialDays, offers, founders, efValuationCost, efLive, efCatalog } = data;
   const faq = copy.faq;
   // ROI hesaplayıcı etkin fiyatı (kampanya dahil) seat-pricing motorundan alır.
@@ -40,7 +41,7 @@ export function PricingPageView({ data, copy, jsonLd = true }: { data: PricingVi
   const defaultPlanId = (roiPlans.find((p) => p.popular) ?? roiPlans[0] ?? plans[0]!).id;
 
   return (
-    <PricingShell>
+    <PricingShell measurePath={measurePath}>
       {jsonLd ? <SeoJsonLd path="/fiyatlar" faq={faq} /> : null}
 
       <div className="bg-[image:var(--grad-ink)]">

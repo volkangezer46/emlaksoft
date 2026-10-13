@@ -5,7 +5,7 @@ import type { StaticRouteMode } from "@/lib/static-home/settings";
 
 /**
  * K1 — BULGU TOPLAYICI `speedCollector` (alan `hiz`). Sözleşme tipleri SP1 `src/lib/site-issues/types.ts`'ten KOPYALANIR
- * (import edilmez); kayıt S4 dikişinde yapılır. Bulgular:
+ * (import edilmez); Kokpit kaydı `src/lib/site-issues/collectors.ts` (bağdaştırıcı: site-issues/adapters.ts). Bulgular:
  *  - statik HTML bütçe aşımı (gzip ≤80 KB / ham ≤360 KB),
  *  - PSI puanında 5 puandan fazla düşüş (cihaz başına, son iki koşu),
  *  - açık statik sayfanın normal sürüme (yedek) düşmesi → öneri `static_refresh`,

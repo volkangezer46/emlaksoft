@@ -120,7 +120,9 @@ export function staticHandlerPath(id: StaticRouteId): string {
 
 /**
  * Üyelik/oturum ve token'lı yüzeyler: hiçbir koşulda statik sunulmaz (proxy kararında da ayrıca denetlenir).
- * S0 `src/lib/seo/scope.ts` main'e girdiğinde bu liste `canAutoOptimize` ile birlikte sözleşme testinde karşılaştırılır.
+ * Kapsamın TEK kaynağı S0 `src/lib/seo/scope.ts`'tir; bu liste proxy'de çalıştığı için (hafif paket, ağır SEO kaydı
+ * içe aktarılmaz) burada tutulur. `src/lib/seo/scope-single-source.test.ts` her statik yolun `canAutoOptimize` olduğunu
+ * ve scope'un üyelik öneklerinin (MEMBER_PREFIXES) bu listede bulunduğunu doğrular.
  */
 export const NEVER_STATIC_PREFIXES = [
   "/app",

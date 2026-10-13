@@ -4,7 +4,7 @@ import type { AfterPublishEvent, AfterPublishHook, AfterPublishHookResult } from
 import { canAutoOptimize, isPublicScope, normalizePath } from "./scope";
 
 /**
- * YAYIN SONRASI SEO KANCASI (K3, order 30). Kayıt (HOOKS listesi) S3 dikişinde; burada nesne dışa verilir.
+ * YAYIN SONRASI SEO KANCASI (K3, order 30). Kayıt: `publishing/after-publish.ts` HOOKS (bağdaştırıcı: site-issues/adapters.ts).
  * Yalnız ETKİLENEN yollar işlenir (ev.livePaths): IndexNow'a bildirilir (kapalıysa dış çağrı yok; yalnız
  * canAutoOptimize + indekslenebilir) ve o adresler yeniden denetlenir (son koşunun o adreslere ait bulguları yenilenir).
  * Hata yayını ETKİLEMEZ: çağıran (runAfterPublish) her kancayı try/catch + zaman aşımıyla yalıtır; burada da yutulur.

@@ -322,7 +322,7 @@ describe("site yönetimi merkezi", () => {
 
   it("kapsamdaki alanların hepsi var; olmayan EmlakFiyati analiz bakiyesi ekranı için kart yok", () => {
     const hrefs = HUB_CARDS.map((c) => c.href);
-    for (const h of ["/admin/site-menu", "/admin/site-icerik", "/admin/seo", "/admin/sistem#ayarlar", "/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing"]) {
+    for (const h of ["/admin/site-menu", "/admin/site-icerik", "/admin/seo", "/admin/sistem#ayarlar", "/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing", "/admin/site/hiz", "/admin/site/reklam", "/admin/site/medya", "/admin/site/rehber", "/admin/site/baglantilar"]) {
       expect(hrefs, h).toContain(h);
     }
     if (!existsSync(join(root, "src/app/admin/analiz-tarifesi/page.tsx"))) expect(hrefs.some((h) => h.includes("ef-kontor"))).toBe(false);

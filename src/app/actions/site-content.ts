@@ -12,11 +12,12 @@ import type { Issue } from "@/lib/site-menu/schema";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import { hasErrors, validateSiteContent, type SiteContent } from "@/lib/site-content/schema";
 import { SITE_CONTENT_CACHE_TAG, siteContentStore } from "@/lib/site-content/store";
-import { listSiteMediaIds } from "@/lib/site-media/store";
+import { HERO_BUDGET_REASON_MIN, SITE_MEDIA_LIMITS, heroBudget, heroBudgetNeedsReason } from "@/lib/site-media/quota";
+import { listSiteMediaIds, readSiteMedia } from "@/lib/site-media/store";
 import { mediaRefs } from "@/lib/site-media/usage";
 import { syncSiteMediaUsage } from "@/lib/site-media/usage-server";
 
-export type SiteContentActionResult = { ok?: boolean; error?: string; issues?: Issue[]; config?: SiteContent };
+export type SiteContentActionResult = { ok?: boolean; error?: string; issues?: Issue[]; config?: SiteContent; heroBudgetReasonRequired?: boolean };
 
 const READONLY = "Site içeriğini yalnız süper admin değiştirebilir; bu hesap salt okunur.";
 
@@ -46,8 +47,40 @@ async function mediaOpts(input: unknown): Promise<{ mediaIds?: ReadonlySet<strin
   return mediaRefs(input as Parameters<typeof mediaRefs>[0]).length ? { mediaIds: await listSiteMediaIds() } : {};
 }
 
-/** Taslağı doğrular ve kaydeder. Hatalar kaydı engeller; uyarılar (riskli kelime vb.) engellemez. */
-export async function saveSiteContentDraft(input: unknown): Promise<SiteContentActionResult> {
+const HERO_BUDGET_REASON_REQUIRED = "Ana başlık görseli ilk ekran bütçesini aşıyor; kaydetmek için gerekçe yazın (en az 5 karakter).";
+
+/**
+ * Kalite kapısı SUNUCUDA: bütçeyi aşan hero görseli YENİ seçiliyorsa (kayıtlı taslakta ve canlıda yoksa) gerekçe zorunludur
+ * ve gerekçe denetim kaydına (`site_media.hero_budget_override`) yazılır. Hero görseli yalnız taslak kaydıyla içeriğe
+ * girer (yayın, zamanlı yayın ve Yayın masası kayıtlı taslağı yayınlar), bu yüzden kapı burada tektir. null = geçti.
+ */
+async function heroBudgetGate(config: SiteContent, reasonInput: unknown, actorId: string): Promise<string | null> {
+  const nextId = config.hero.image?.mediaId ?? null;
+  if (!nextId) return null;
+  const st = await siteContentStore.readState();
+  const draftId = st.draft?.hero.image?.mediaId ?? null;
+  const liveId = st.live?.hero.image?.mediaId ?? null;
+  if (nextId === draftId || nextId === liveId) return null;
+  const media = await readSiteMedia(nextId);
+  const hb = media ? heroBudget(media.variants) : { bytes: 0, over: false };
+  if (!heroBudgetNeedsReason({ nextId, draftId, liveId, over: hb.over })) return null;
+  const reason = typeof reasonInput === "string" ? reasonInput.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+  if (reason.length < HERO_BUDGET_REASON_MIN) return HERO_BUDGET_REASON_REQUIRED;
+  await logPlatformActivity({
+    actorId,
+    action: "site_media.hero_budget_override",
+    entityType: "site_media",
+    entityId: nextId,
+    meta: { bytes: hb.bytes, limit: SITE_MEDIA_LIMITS.heroBudgetBytes, reason, surface: "site_content" },
+  });
+  return null;
+}
+
+/**
+ * Taslağı doğrular ve kaydeder. Hatalar kaydı engeller; uyarılar (riskli kelime vb.) engellemez. `heroBudgetReason`:
+ * bütçeyi aşan yeni hero görseli için "Yine de kaydet" gerekçesi (sunucuda zorunlu; bkz. heroBudgetGate).
+ */
+export async function saveSiteContentDraft(input: unknown, heroBudgetReason?: string): Promise<SiteContentActionResult> {
   const staff = await requireWriter();
   if (!staff) return { error: READONLY };
   const rl = await checkRateLimit(`site-content-draft:${staff.id}`, { limit: 90, windowSec: 600, failurePolicy: "deny" });
@@ -55,6 +88,8 @@ export async function saveSiteContentDraft(input: unknown): Promise<SiteContentA
 
   const { config, issues } = validateSiteContent(input, await mediaOpts(input));
   if (!config || hasErrors(issues)) return { error: "İçerikte düzeltilmesi gereken hatalar var.", issues };
+  const budgetError = await heroBudgetGate(config, heroBudgetReason, staff.id);
+  if (budgetError) return { error: budgetError, issues, heroBudgetReasonRequired: true };
 
   const saved = await siteContentStore.saveDraft(config, staff.id);
   if (!saved.ok) return { error: saved.error, issues };

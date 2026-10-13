@@ -10,6 +10,7 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("next/cache", () => ({ unstable_cache: <T,>(fn: T) => fn }));
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/platform-settings", () => ({
   readPlatformSettingStrict: vi.fn(async (key: string) => {
     if (db.failRead) throw new Error("bağlantı koptu");
@@ -120,9 +121,14 @@ describe("taslak / yayın / geri dönüş", () => {
     const [e] = await getPublishedGuideIndex();
     expect(e).toMatchObject({ publishedAt: "2026-10-05T09:00:00.000Z", firstPublishedAt: "2026-10-01T09:00:00.000Z" });
 
-    // Sitemap lastmod = yayın geçmişindeki en son `at`.
+    // Sitemap lastmod = yayın geçmişindeki en son `at` (yazı, liste ve kategori sayfası aynı gerçek zamanı taşır).
     const sm = await listGuideSitemapEntries("https://x.test");
-    expect(sm).toEqual([expect.objectContaining({ url: "https://x.test/rehber/ofis-rehberi", lastModified: state.history[0]!.at })]);
+    const at = state.history[0]!.at;
+    expect(sm).toEqual([
+      expect.objectContaining({ url: "https://x.test/rehber", lastModified: at }),
+      expect.objectContaining({ url: "https://x.test/rehber/kategori/ofis-yonetimi", lastModified: at }),
+      expect.objectContaining({ url: "https://x.test/rehber/ofis-rehberi", lastModified: at }),
+    ]);
 
     const surface = guidePublishSurface({ id: ID, slug: "ofis-rehberi", category: "ofis-yonetimi", title: "İki" });
     const back = await surface.restore("h1", "s", "Süper");
@@ -166,5 +172,35 @@ describe("taslak / yayın / geri dönüş", () => {
     const res = await publishGuideContent(ID, content("x"), meta("h1", "2026-10-01T00:00:00.000Z"), "s");
     expect(res.ok).toBe(false);
     expect(db.rows.has(guideStore(ID).keys.live)).toBe(false);
+  });
+});
+
+describe("Yayın masası kaydı (S5): rehber yazısı dinamik yüzeydir", () => {
+  it("resolveSurface('guide:<id>') yazının yüzeyini verir; toplu yayın listesinde (SURFACES) rehber yok", async () => {
+    const { SURFACES, resolveSurface } = await import("@/lib/publishing/surfaces");
+    await seed([entry()]);
+    const s = await resolveSurface(`guide:${ID}`);
+    expect(s).toMatchObject({ id: `guide:${ID}`, module: "sitecontent", editorHref: `/admin/site/rehber/${ID}` });
+    expect(s!.livePaths.map((p) => p.path)).toContain("/rehber");
+    expect(await resolveSurface("guide:bbbbbbbbbbbb")).toBeNull();
+    expect(await resolveSurface("guide:../x")).toBeNull();
+    expect(SURFACES.some((x) => x.id.startsWith("guide:"))).toBe(false);
+    // Yayın masası yüzeyi depoyu kullanır: yayın canlıya alır.
+    await guideStore(ID).saveDraft(content("Masadan"), "s");
+    const st = await s!.readState();
+    expect((await s!.publish(st.draft, "s", "Masadan yayın", "Süper")).ok).toBe(true);
+    expect((await getLiveGuide(ID))?.title).toBe("Masadan");
+  });
+
+  it("masa adayları: taslağı yayından yeni ya da hiç yayınlanmamış yazılar (arşiv hariç)", async () => {
+    const { deskGuideSurfaces } = await import("@/lib/publishing/surfaces");
+    await seed([
+      entry(),
+      entry({ id: "bbbbbbbbbbbb", slug: "yayinda", status: "yayinda", publishedAt: "2026-10-05T00:00:00.000Z", updatedAt: "2026-10-05T00:00:00.000Z" }),
+      entry({ id: "cccccccccccc", slug: "duzenlenen", status: "yayinda", publishedAt: "2026-10-01T00:00:00.000Z", updatedAt: "2026-10-06T00:00:00.000Z" }),
+      entry({ id: "dddddddddddd", slug: "arsiv", status: "arsiv" }),
+    ]);
+    expect((await deskGuideSurfaces()).map((s) => s.id).sort()).toEqual([`guide:${ID}`, "guide:cccccccccccc"]);
+    expect((await deskGuideSurfaces(["guide:bbbbbbbbbbbb"])).map((s) => s.id)).toContain("guide:bbbbbbbbbbbb");
   });
 });

@@ -39,7 +39,7 @@ vi.mock("@/lib/publishing/after-publish", () => ({
   captureLiveDigests: async () => ({}),
   lastBaseline: async () => ({}),
 }));
-vi.mock("@/lib/publishing/surfaces", () => ({ SURFACES: [], surfaceById: () => null }));
+vi.mock("@/lib/publishing/surfaces", () => ({ SURFACES: [], surfaceById: () => null, resolveSurface: async () => null }));
 
 import { ignoreIssue, publishAllDrafts, setAutopilot } from "@/app/actions/optimizer";
 
