@@ -268,13 +268,14 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDef[] = [
   },
   {
     key: "auth_recovery",
-    label: "Şifre sıfırlama (giriş)",
+    label: "Şifre belirleme / sıfırlama (giriş)",
     group: "auth",
     variables: ["baglanti", "kod", "eposta", "site"],
-    defaultSubject: "EmlakSoft şifre sıfırlama",
+    defaultSubject: "EmlakSoft şifrenizi belirleyin",
+    // Nötr metin: aynı şablon hem "şifremi unuttum" hem ekip daveti / yeniden davet (resetPasswordForEmail) ile gider.
     defaultBody:
-      "Merhaba,\n\n{eposta} hesabı için şifre sıfırlama isteği aldık. Yeni şifre belirlemek için:\n{baglanti}\n\nBu isteği siz yapmadıysanız e-postayı yok sayın; şifreniz değişmez.\nEmlakSoft",
-    usedBy: AUTH_USED_BY("recovery"),
+      "Merhaba,\n\n{eposta} EmlakSoft hesabınızın şifresini belirlemek ya da yenilemek için:\n{baglanti}\n\nBeklemediğiniz bir e-postaysa yok sayabilirsiniz; şifreniz değişmez.\nEmlakSoft",
+    usedBy: `${AUTH_USED_BY("recovery")} Uygulamada: şifremi unuttum, ekip daveti ve yeniden davet, personel, satış ve platform ofis oluşturma akışlarındaki şifre belirleme bağlantısı (resetPasswordForEmail). Metin davet ve sıfırlama için nötr kalmalı.`,
     authType: "recovery",
   },
   {
@@ -283,8 +284,9 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDef[] = [
     group: "auth",
     variables: ["baglanti", "kod", "eposta", "site"],
     defaultSubject: "EmlakSoft giriş bağlantınız",
-    defaultBody: "Merhaba,\n\nEmlakSoft'a giriş yapmak için:\n{baglanti}\n\nBu isteği siz yapmadıysanız e-postayı yok sayın.\nEmlakSoft",
-    usedBy: AUTH_USED_BY("magic_link"),
+    // Nötr metin: signInWithOtp hem giriş bağlantısı hem uygulama içi e-posta doğrulaması için kullanılır.
+    defaultBody: "Merhaba,\n\nE-posta adresinizi doğrulamak ve EmlakSoft'a giriş yapmak için:\n{baglanti}\n\nBu isteği siz yapmadıysanız e-postayı yok sayın.\nEmlakSoft",
+    usedBy: `${AUTH_USED_BY("magic_link")} Uygulamada: tek tıkla giriş ve hesap ayarlarındaki e-posta doğrulaması (signInWithOtp). Metin her iki amaca uymalı.`,
     authType: "magic_link",
   },
   {
