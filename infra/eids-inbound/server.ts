@@ -83,14 +83,17 @@ async function callApp(payload: Record<string, unknown>): Promise<{ status: numb
 
 const rcptCache = new Map<string, { accept: boolean; at: number }>();
 async function recipientKnown(address: string): Promise<boolean | null> {
+  // Yalnız RET önbelleklenir: yenilenen (kapatılan) adres önbellekten kabul görmesin, hemen 550 alsın.
   const c = rcptCache.get(address);
-  if (c && Date.now() - c.at < 60_000) return c.accept;
+  if (c && !c.accept && Date.now() - c.at < 60_000) return false;
   try {
     const r = await callApp({ op: "rcpt", rcpt: address });
     if (r.status !== 200) return null;
     const accept = r.body.accept === true;
-    rcptCache.set(address, { accept, at: Date.now() });
-    if (rcptCache.size > 10_000) rcptCache.clear();
+    if (!accept) {
+      rcptCache.set(address, { accept, at: Date.now() });
+      if (rcptCache.size > 10_000) rcptCache.clear();
+    }
     return accept;
   } catch {
     return null;
@@ -184,6 +187,7 @@ const server = new SMTPServer({
         const auth = await authenticate(raw, { ip, helo: session.hostNameAppearsAs, sender, mta: MTA, disableBimi: true });
         const evidence = evidenceOf(auth, raw.toString("latin1"));
         let temp = false;
+        let unknown = 0;
         for (const r of session.envelope.rcptTo) {
           const res = await callApp({
             op: "deliver",
@@ -194,8 +198,11 @@ const server = new SMTPServer({
           });
           console.log(`eids-inbound deliver ip=${maskIp(ip)} status=${res.status} outcome=${String(res.body.outcome ?? res.body.error ?? "-")}`);
           if (res.status >= 500 || res.status === 429) temp = true;
+          else if (res.status === 404) unknown += 1;
         }
         if (temp) return callback(smtpError(451, "4.3.0 Gecici hata, daha sonra deneyin"));
+        // Adres RCPT ile DATA arasında kapatıldıysa (adres yenilendi) sessizce kabul edilmez: gönderene geri döner.
+        if (unknown > 0 && unknown === session.envelope.rcptTo.length) return callback(smtpError(550, "5.1.1 Boyle bir posta kutusu yok"));
         return callback(null, "Alindi");
       } catch (e) {
         console.error("eids-inbound hata", e instanceof Error ? e.name : "bilinmiyor");

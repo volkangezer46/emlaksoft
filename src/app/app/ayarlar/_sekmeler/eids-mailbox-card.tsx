@@ -54,8 +54,11 @@ export async function EidsMailboxCard({ canEdit }: { canEdit: boolean }) {
   const canManage = canEdit && (EIDS_ADDRESS_ROLES as readonly string[]).includes(role);
   const address = addr.state === "active" ? addr.address : null;
   const last = summary.available ? summary.lastReceivedAt : null;
-  const connected = Boolean(last ?? (addr.state === "active" ? addr.lastReceivedAt : null));
-  const quiet = last ? msSince(last) > QUIET_DAYS * 86_400_000 : false;
+  // Bağlantı yalnız adrese İLETİLEN e-postadan anlaşılır (last_received_at yalnız SMTP alımında yazılır); .eml yükleme,
+  // yapıştırma ve reddedilen kayıtlar "Bağlı" saydırmaz, onay kodu yoklayıcısını da durdurmaz.
+  const forwardedAt = addr.state === "active" ? addr.lastReceivedAt : null;
+  const connected = Boolean(forwardedAt);
+  const quiet = forwardedAt ? msSince(forwardedAt) > QUIET_DAYS * 86_400_000 : false;
   const waitingConfirmation = addr.state === "active" && !connected;
 
   return (
