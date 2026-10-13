@@ -8,6 +8,7 @@ import { guardCron } from "@/lib/cron-run";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { isOpen, runSchedule, type ScheduleAdapters } from "@/lib/publishing/schedule";
+import { runAfterPublish } from "@/lib/publishing/after-publish";
 import { commitEntry, freshEntry, readScheduleStrict } from "@/lib/publishing/store";
 import { surfaceById } from "@/lib/publishing/surfaces";
 
@@ -17,6 +18,7 @@ import { surfaceById } from "@/lib/publishing/surfaces";
  * gerçek depo, önbellek etiketi (revalidateTag; cron'da updateTag kullanılamaz), bildirim ve denetim izi bağlanır.
  */
 export const maxDuration = 120;
+const AFTER_PUBLISH_BUDGET_MS = 30_000;
 
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
@@ -30,6 +32,7 @@ async function run(req: NextRequest) {
     return NextResponse.json({ ok: true, published: 0, reverted: 0 });
   }
 
+  const touched = new Set<string>();
   const adapters: ScheduleAdapters = {
     fresh: (id) => freshEntry(id),
     commit: (entry) => commitEntry(entry, entry.by),
@@ -54,6 +57,7 @@ async function run(req: NextRequest) {
     revalidate(surface) {
       const s = surfaceById(surface);
       if (!s) return;
+      touched.add(s.id);
       // Bayat içerik sunulmasın: bir sonraki istek taze okur (statik ana sayfa 60 sn içinde kaynaktan yeniler).
       revalidateTag(s.cacheTag, { expire: 0 });
       for (const p of s.livePaths) revalidatePath(p.path, p.type);
@@ -82,6 +86,22 @@ async function run(req: NextRequest) {
   };
 
   const r = await runSchedule(open, now(), adapters);
+  // Yayın sonrası zinciri: canlısı değişen her yüzey için await + süre sınırı (zincir asla fırlatmaz; heartbeat'i etkilemez).
+  if (touched.size > 0) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      Promise.all(
+        [...touched].map((id) => {
+          const s = surfaceById(id);
+          return s ? runAfterPublish({ surface: s.id, kind: "publish", livePaths: s.livePaths.map((p) => p.path), actorId: null, source: "cron" }) : null;
+        }),
+      ),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, AFTER_PUBLISH_BUDGET_MS);
+      }),
+    ]);
+    clearTimeout(timer);
+  }
   await recordHeartbeat(
     "yayin-zamanlayici",
     heartbeatFor({ failed: r.failed }),

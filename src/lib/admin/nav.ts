@@ -38,7 +38,19 @@ import type { PlatformModule } from "@/lib/platform-access";
 
 export type AdminBadgeKey = "tickets" | "risk";
 
-export type AdminNavLink = { href: string; label: string; description: string; modules: readonly PlatformModule[] };
+export type AdminNavLink = {
+  href: string;
+  label: string;
+  description: string;
+  modules: readonly PlatformModule[];
+  /** Sekmenin alt sayfaları: sekme etkinken şeridin İKİNCİ satırında çizilir (ör. İçerik > Ana sayfa · Sayfalar). */
+  children?: readonly AdminNavLink[];
+  /** Sekmeyi her zaman "Diğer ▾" altına koy (5 görünür sekme kuralından bağımsız). */
+  overflow?: boolean;
+};
+
+/** Bölüm sekmesi (sekme şeridi ve komut paleti). */
+export type NavTab = AdminNavLink;
 
 export type AdminNavItem = AdminNavLink & {
   icon: LucideIcon;
@@ -56,7 +68,7 @@ export type AdminNavItem = AdminNavLink & {
 
 export type AdminNavSection = { id: string; title: string | null; items: readonly AdminNavItem[] };
 
-const L = (href: string, label: string, description: string, modules: readonly PlatformModule[]): AdminNavLink => ({ href, label, description, modules });
+const L = (href: string, label: string, description: string, modules: readonly PlatformModule[], extra?: Pick<AdminNavLink, "children" | "overflow">): AdminNavLink => ({ href, label, description, modules, ...extra });
 
 export const ADMIN_NAV: readonly AdminNavSection[] = [
   {
@@ -119,7 +131,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/muhasebe/defter", "Fatura defteri", "Tüm faturalar", ["billing"]),
         ],
       },
-      { href: "/admin/growth", label: "Büyüme", description: "Davet ve ortak programı, kayıt kaynakları", icon: Sprout, modules: ["sales"] },
+      { href: "/admin/growth", label: "Büyüme", description: "Davet ve ortak programı, kayıt kaynakları (site trafiği, SEO ve reklam önerileri: Site, SEO ve Reklam)", icon: Sprout, modules: ["sales"] },
       { href: "/admin/analiz-tarifesi", label: "Analiz tarifesi", description: "Analiz tarifesi, paketler, ofis bakiyeleri", icon: Coins, modules: ["billing"] },
       { href: "/admin/ai-kullanim", label: "AI kullanımı", description: "AI kredi tüketimi ve maliyet tablosu", icon: Sparkles, modules: ["billing"] },
     ],
@@ -130,18 +142,23 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
     items: [
       {
         href: "/admin/site", core: true,
-        label: "Site ve SEO",
+        label: "Site, SEO ve Reklam",
         short: "Site",
-        description: "Ana sayfa içeriği, fiyatlar ve özel sayfalar, site menüsü, SEO, logo ve favicon",
+        description: "Büyüme kokpiti (Site notu, öneri kuyruğu, Otopilot), içerik ve sayfalar, SEO, site menüsü, logo ve favicon",
         icon: Globe,
         modules: ["sitecontent", "sitemenu", "seo", "marka"],
         match: ["/admin/site", "/admin/site-icerik", "/admin/site-menu", "/admin/seo", "/admin/marka"],
+        // Hız, Reklam, Medya, Rehber ve Bağlantılar sekmeleri kendi paketlerinin dikişinde (S1) eklenir; 5'i aşan "Diğer ▾" altına girer.
         tabs: [
-          L("/admin/site", "Genel bakış", "Tüm site yönetim alanları", ["sitecontent", "sitemenu", "seo", "marka"]),
-          L("/admin/site/sayfalar", "Sayfalar", "Fiyatlar ve özel sayfalar (Hakkımızda, İletişim, kampanya)", ["sitecontent"]),
-          L("/admin/site-icerik", "Site içeriği", "Ana sayfa metinleri, bölüm düzeni, SSS", ["sitecontent"]),
-          L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"]),
+          L("/admin/site", "Genel bakış", "Büyüme kokpiti: Site notu, öneri kuyruğu, Otopilot ve Yayın masası", ["sitecontent", "sitemenu", "seo", "marka"]),
+          L("/admin/site-icerik", "İçerik", "Ana sayfa metinleri, fiyatlar ve özel sayfalar", ["sitecontent"], {
+            children: [
+              L("/admin/site-icerik", "Ana sayfa", "Ana sayfa metinleri, bölüm düzeni, SSS", ["sitecontent"]),
+              L("/admin/site/sayfalar", "Sayfalar", "Fiyatlar ve özel sayfalar (Hakkımızda, İletişim, kampanya)", ["sitecontent"]),
+            ],
+          }),
           L("/admin/seo", "SEO", "Arama motoru, sitemap, robot", ["seo"]),
+          L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"]),
           L("/admin/marka", "Marka", "Logo ve favicon", ["marka"]),
         ],
       },
@@ -215,7 +232,12 @@ const canSee = (link: Pick<AdminNavLink, "modules">, allowed: readonly PlatformM
 export function adminNavFor(allowed: readonly PlatformModule[]): AdminNavSection[] {
   return ADMIN_NAV.map((s) => ({
     ...s,
-    items: s.items.filter((i) => canSee(i, allowed)).map((i) => ({ ...i, tabs: i.tabs?.filter((t) => canSee(t, allowed)) })),
+    items: s.items
+      .filter((i) => canSee(i, allowed))
+      .map((i) => ({
+        ...i,
+        tabs: i.tabs?.filter((t) => canSee(t, allowed)).map((t) => (t.children ? { ...t, children: t.children.filter((c) => canSee(c, allowed)) } : t)),
+      })),
   })).filter((s) => s.items.length > 0);
 }
 
@@ -245,14 +267,32 @@ export function adminTabPathname(pathname: string, sekme: string | null | undefi
   return pathname === "/admin/sistem" && sekme === "hatalar" ? "/admin/hatalar" : pathname;
 }
 
-/** Sekme aktif mi: en uzun eşleşen sekme kazanır (/admin/ayarlar/merkez, /admin/ayarlar'ı ezmez). */
+/**
+ * Sekme aktif mi: en uzun eşleşen yol kazanır (/admin/ayarlar/merkez, /admin/ayarlar'ı ezmez). Alt sayfalar (`children`)
+ * da sekmenin yoludur: /admin/site/sayfalar "İçerik" sekmesini etkin yapar ("Genel bakış" /admin/site'ı değil).
+ */
 export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[]): string | null {
-  let best: string | null = null;
+  let best: { len: number; href: string } | null = null;
   for (const t of tabs) {
-    const p = pathOf(t.href);
-    if (under(pathname, p) && (!best || p.length > best.length)) best = p;
+    for (const p of [pathOf(t.href), ...(t.children ?? []).map((c) => pathOf(c.href))]) {
+      if (under(pathname, p) && (!best || p.length > best.len)) best = { len: p.length, href: pathOf(t.href) };
+    }
   }
-  return best;
+  return best?.href ?? null;
+}
+
+/** Etkin sekmenin etkin alt sayfası (ikinci satır vurgusu). */
+export function activeChildHref(pathname: string, tab: AdminNavLink | null | undefined): string | null {
+  return tab?.children?.length ? activeTabHref(pathname, tab.children) : null;
+}
+
+/** En çok 5 görünür sekme; kalanlar ve `overflow` işaretliler "Diğer ▾" altına girer. */
+export const MAX_VISIBLE_TABS = 5;
+
+export function splitTabs(tabs: readonly AdminNavLink[], max = MAX_VISIBLE_TABS): { visible: AdminNavLink[]; more: AdminNavLink[] } {
+  const visible = tabs.filter((t) => !t.overflow).slice(0, max);
+  const shown = new Set(visible.map((t) => t.href));
+  return { visible, more: tabs.filter((t) => !shown.has(t.href)) };
 }
 
 /** Komut paleti komutları: menü öğeleri + sekmeler + palet hedefleri (yinelenen yol bir kez). */
@@ -267,7 +307,10 @@ export function adminPaletteFor(allowed: readonly PlatformModule[]): Array<Admin
   for (const s of ADMIN_NAV) {
     for (const i of s.items) {
       push(i, i.icon);
-      for (const t of i.tabs ?? []) push(t, i.icon);
+      for (const t of i.tabs ?? []) {
+        push(t, i.icon);
+        for (const c of t.children ?? []) push(c, i.icon);
+      }
       for (const p of i.palette ?? []) push(p, i.icon);
     }
   }

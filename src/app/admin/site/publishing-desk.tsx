@@ -2,12 +2,13 @@
 
 import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, GitCompareArrows, Loader2, RotateCcw, X } from "lucide-react";
+import { AlertTriangle, CalendarClock, GitCompareArrows, Loader2, Rocket, RotateCcw, X } from "lucide-react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   cancelScheduled,
   previewDraftDiff,
   previewVersionDiff,
+  publishDraftNow,
   restoreVersion,
   schedulePublish,
   type DiffPreview,
@@ -18,7 +19,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@
 import { FormField, FormInput } from "@/components/ui/form-controls";
 
 /**
- * YAYIN MASASI istemci parçaları: fark çekmecesi, "Taslağı zamanla" diyaloğu, takvimde iptal, akışta "Fark" ve
+ * YAYIN MASASI istemci parçaları: fark çekmecesi, "Taslağı zamanla" diyaloğu, "Şimdi yayınla", takvimde iptal, akışta "Fark" ve
  * "Bu sürüme dön" (dönmeden önce fark onayı). Veri yalnız server action'lardan gelir; sunucu modülü içe aktarılmaz.
  */
 
@@ -205,6 +206,29 @@ export function ScheduleButton({ surface, surfaceLabel, minLocal, disabled }: { 
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** "Şimdi yayınla": bekleyen taslağı hemen canlıya alır (önce onay); yayın sonrası canlı doğrulaması rozette görünür. */
+export function PublishNowButton({ surface, surfaceLabel }: { surface: string; surfaceLabel: string }) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <span className="inline-flex flex-col items-end gap-1">
+      <ConfirmDialog
+        trigger={<Button variant="outline" size="sm" icon={Rocket}>Şimdi yayınla</Button>}
+        title={`${surfaceLabel} yayınlansın mı?`}
+        description="Kayıtlı taslak hemen canlıya alınır ve geçmişe yazılır; istediğiniz an önceki sürüme dönebilirsiniz."
+        confirmLabel="Yayınla"
+        tone="default"
+        onConfirm={async () => {
+          const res = await publishDraftNow(surface);
+          if (res.error) setError(res.error);
+          else router.refresh();
+        }}
+      />
+      {error ? <span role="alert" className="text-xs text-danger-700">{error}</span> : null}
+    </span>
   );
 }
 

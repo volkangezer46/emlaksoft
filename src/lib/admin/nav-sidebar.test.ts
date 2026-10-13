@@ -1,8 +1,17 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_ROLE_MODULES } from "@/lib/platform-access";
-import { ADMIN_NAV, activeTabHref, adminNavFor, adminSidebarModel, adminTabPathname } from "./nav";
+import { SectionTabsView } from "@/components/admin/admin-section-tabs";
+import { ADMIN_NAV, activeChildHref, activeTabHref, adminNavFor, adminPaletteFor, adminSidebarModel, adminTabPathname, splitTabs, type NavTab } from "./nav";
+
+// Görünüm testi: akıllı bağlantı yerine düz <a> (yönlendirici bağlamı yok).
+vi.mock("@/components/ui/smart-link", async () => {
+  const { createElement: h } = await import("react");
+  return { default: ({ href, children, prefetch: _p, ...rest }: { href: string; children?: unknown; prefetch?: unknown }) => h("a", { href, ...rest }, children as never) };
+});
 
 describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
   it("her rolde görünen + katlanan = rolün menüsü; hiçbir sayfa kaybolmaz, tekrar yok", () => {
@@ -55,27 +64,70 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     expect(code).not.toContain('"adm-diger"');
   });
 
-  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site ve SEO -> Site", () => {
+  it("alt çubuk kısa adları: Kontrol paneli -> Panel, Site, SEO ve Reklam -> Site", () => {
     const byHref = new Map(ADMIN_NAV.flatMap((s) => s.items).map((i) => [i.href, i]));
     expect(byHref.get("/admin")?.short).toBe("Panel");
-    expect(byHref.get("/admin/site")?.label).toBe("Site ve SEO");
+    expect(byHref.get("/admin/site")?.label).toBe("Site, SEO ve Reklam");
     expect(byHref.get("/admin/site")?.short).toBe("Site");
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).toContain("{tab.short ?? tab.label}");
   });
 });
 
-describe("Site ve SEO: Sayfalar sekmesi (AP6; yeni menü satırı değil)", () => {
+describe("Site, SEO ve Reklam: sekmeler (SP1; AP6 Sayfalar İçerik'in alt sayfası, yeni menü satırı değil)", () => {
   const site = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
-  it("Sayfalar 'Genel bakış'tan hemen sonra gelir, sitecontent modülüne bağlıdır; menü satırı eklenmez", () => {
-    expect(site.tabs!.map((t) => t.href).slice(0, 2)).toEqual(["/admin/site", "/admin/site/sayfalar"]);
-    expect(site.tabs!.find((t) => t.href === "/admin/site/sayfalar")?.modules).toEqual(["sitecontent"]);
+  it("sekmeler: Genel bakış · İçerik (Ana sayfa, Sayfalar) · SEO · Site menüsü · Marka; menü satırı eklenmez", () => {
+    expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka"]);
+    const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
+    expect(icerik.children!.map((c) => [c.label, c.href])).toEqual([
+      ["Ana sayfa", "/admin/site-icerik"],
+      ["Sayfalar", "/admin/site/sayfalar"],
+    ]);
+    expect(icerik.children!.every((c) => c.modules.join() === "sitecontent")).toBe(true);
     expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === "/admin/site/sayfalar")).toBe(false);
   });
-  it("sayfa editörü ve fiyatlar alt sayfalarında Sayfalar sekmesi etkindir (Genel bakış değil)", () => {
-    expect(activeTabHref("/admin/site/sayfalar/abcdef123456", site.tabs!)).toBe("/admin/site/sayfalar");
-    expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe("/admin/site/sayfalar");
+  it("sayfa editörü ve fiyatlar alt sayfalarında İçerik sekmesi ve Sayfalar alt sekmesi etkindir (Genel bakış değil)", () => {
+    const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
+    expect(activeTabHref("/admin/site/sayfalar/abcdef123456", site.tabs!)).toBe(icerik.href);
+    expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe(icerik.href);
+    expect(activeChildHref("/admin/site/sayfalar/fiyatlar", icerik)).toBe("/admin/site/sayfalar");
+    expect(activeChildHref("/admin/site-icerik", icerik)).toBe("/admin/site-icerik");
     expect(activeTabHref("/admin/site", site.tabs!)).toBe("/admin/site");
+  });
+  it("İçerik alt sayfaları rol süzgecinden geçer ve komut paletinde aranır", () => {
+    const ops = adminNavFor(PLATFORM_ROLE_MODULES.ops).flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
+    expect(ops.tabs!.map((t) => t.label)).not.toContain("Marka");
+    expect(adminPaletteFor(PLATFORM_ROLE_MODULES.super_admin).some((c) => c.href === "/admin/site/sayfalar")).toBe(true);
+  });
+});
+
+describe("AdminSectionTabs: 5 görünür sekme + 'Diğer ▾', alt sayfalar ikinci satırda", () => {
+  const T = (n: number, extra: Partial<NavTab> = {}): NavTab => ({ href: `/admin/x/${n}`, label: `Sekme ${n}`, description: `d${n}`, modules: ["seo"], ...extra });
+  const seven = [T(1), T(2, { children: [T(21, { label: "Alt A" }), T(22, { label: "Alt B" })] }), T(3), T(4), T(5), T(6), T(7)];
+  const html = (current: string | null, child: string | null = null) =>
+    renderToStaticMarkup(createElement(SectionTabsView, { label: "Bölüm", tabs: seven, current, currentChild: child }));
+
+  it("splitTabs: 7 sekmede 5 görünür, 2 'Diğer'de; overflow işaretli sekme hep 'Diğer'de", () => {
+    const s = splitTabs(seven);
+    expect(s.visible.map((t) => t.label)).toEqual(["Sekme 1", "Sekme 2", "Sekme 3", "Sekme 4", "Sekme 5"]);
+    expect(s.more.map((t) => t.label)).toEqual(["Sekme 6", "Sekme 7"]);
+    expect(splitTabs([T(1), T(2, { overflow: true })]).more.map((t) => t.label)).toEqual(["Sekme 2"]);
+  });
+
+  it("render: 5 bağlantı + details/summary 'Diğer'; etkin sekme taşmadaysa 'Diğer' etkin", () => {
+    const out = html("/admin/x/7");
+    const main = out.split("<details")[0]!;
+    expect(main.match(/<a /g)?.length).toBe(5);
+    expect(out).toContain("<summary");
+    expect(out).toMatch(/<summary[^>]*aria-current="page"[^>]*>Diğer/);
+    expect(html("/admin/x/1")).not.toMatch(/<summary[^>]*aria-current/);
+  });
+
+  it("render: etkin sekmenin children listesi ikinci satırda çizilir; diğer sekmede çizilmez", () => {
+    const out = html("/admin/x/2", "/admin/x/22");
+    expect(out).toContain("data-section-children");
+    expect(out).toMatch(/aria-current="page"[^>]*>Alt B/);
+    expect(html("/admin/x/1")).not.toContain("data-section-children");
   });
 });
 

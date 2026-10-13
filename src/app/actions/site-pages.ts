@@ -2,7 +2,9 @@
 
 import { randomBytes } from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { now } from "@/lib/clock";
+import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -173,6 +175,7 @@ export async function publishSitePage(id: string, label: string): Promise<SitePa
 
   const note = String(label ?? "").trim().slice(0, 80) || "Yayın";
   const meta = { id: randomBytes(6).toString("hex"), at: nowIso(), by: who(staff), label: note };
+  const beforeDigests = await captureLiveDigests([`/${entry.slug}`]);
   const res = await store.publish(page, meta, staff.id);
   if (!res.ok) return { error: res.error };
   const next = index.map((e) => (e.id === id ? { ...e, status: "yayinda" as const, title: page.title, updatedAt: meta.at, updatedBy: meta.by } : e));
@@ -181,6 +184,7 @@ export async function publishSitePage(id: string, label: string): Promise<SitePa
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.publish", entityType: "site_page", entityId: id, meta: { slug: entry.slug, label: note } });
   refreshLive(id, entry.slug);
+  afterSafe(() => runAfterPublish({ surface: "sitepage", kind: "publish", publishRef: meta.id, livePaths: [`/${entry.slug}`], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   const notice = (await redirectExistsFor(entry.slug)) ? REDIRECT_NOTICE : undefined;
   return { ok: true, issues, notice };
 }
@@ -201,6 +205,7 @@ export async function unpublishSitePage(id: string): Promise<SitePageActionResul
   if (indexErr) return { error: indexErr };
   await logPlatformActivity({ actorId: staff.id, action: "site_page.unpublish", entityType: "site_page", entityId: id, meta: { slug: entry.slug } });
   refreshLive(id, entry.slug);
+  afterSafe(() => runAfterPublish({ surface: "sitepage", kind: "unpublish", publishRef: id, livePaths: [`/${entry.slug}`], actorId: staff.id, source: "staff" }), "yayın sonrası zinciri");
   return { ok: true };
 }
 
@@ -227,6 +232,7 @@ export async function rollbackSitePage(id: string, versionId: string): Promise<S
   if (!page || hasErrors(issues)) return { error: "Bu sürüm artık kurallara uymuyor; geri dönülemiyor.", issues };
 
   const meta = { id: randomBytes(6).toString("hex"), at: nowIso(), by: who(staff), label: `Geri dönüş: ${version.label}`.slice(0, 80) };
+  const beforeDigests = await captureLiveDigests([`/${entry.slug}`]);
   const res = await store.publish(page, meta, staff.id);
   if (!res.ok) return { error: res.error };
   const next = index.map((e) => (e.id === id ? { ...e, status: "yayinda" as const, title: page.title, updatedAt: meta.at, updatedBy: meta.by } : e));
@@ -235,5 +241,6 @@ export async function rollbackSitePage(id: string, versionId: string): Promise<S
 
   await logPlatformActivity({ actorId: staff.id, action: "site_page.rollback", entityType: "site_page", entityId: id, meta: { slug: entry.slug, version: version.id } });
   refreshLive(id, entry.slug);
+  afterSafe(() => runAfterPublish({ surface: "sitepage", kind: "restore", publishRef: meta.id, livePaths: [`/${entry.slug}`], actorId: staff.id, source: "staff", beforeDigests }), "yayın sonrası zinciri");
   return { ok: true, page };
 }
