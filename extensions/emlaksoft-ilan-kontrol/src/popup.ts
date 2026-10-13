@@ -12,7 +12,7 @@ import { verifyEnvelope } from "@/lib/portal-transfer/rules-verify";
 import type { StoredRules } from "@/lib/portal-transfer/rules-store";
 import { seedRuleSet } from "@/lib/portal-transfer/seed-rules";
 import type { RuleSet } from "@/lib/portal-transfer/rule-format";
-import { buildSnapshot, correctionSummary, diffSnapshot, idxsToRead, resolveSnapshotIdx, type FieldOutcome, type FillSnapshot } from "@/lib/portal-transfer/correction";
+import { buildSnapshot, correctionSummary, diffSnapshot, idxsToRead, mergeSnapshots, releaseOwned, resolveSnapshotIdx, untouchedOwnIdxs, type FieldOutcome, type FillSnapshot } from "@/lib/portal-transfer/correction";
 import { buildFeedback } from "@/lib/portal-transfer/feedback-build";
 import { FEEDBACK_CONSENT_TEXT_VERSION, type FeedbackPhase } from "@/lib/portal-transfer/feedback-format";
 import { extractListingRef, parseListingInput } from "@/lib/portal-transfer/listing-ref";
@@ -638,11 +638,22 @@ async function fillFromEmlakSoft(forceSeed: boolean): Promise<void> {
     if (descriptors.length === 0) throw new Error("empty");
     const { signed, fp } = await pageShapes(descriptors);
     const anchors = anchorIndex(signed);
-    const seedPlan = planFill(descriptors, payload, seedRuleSet(tab.portal), { anchors });
+    // Yeniden doldurma (ör. K3 "varsayılanla yeniden doldur"): önceki turun yazdığı ve kullanıcının dokunmadığı alanlar
+    // plan için boş sayılır, böylece yanlış doldurulmuş alan düzeltilebilir. Kullanıcının yazdığı/değiştirdiği alana dokunulmaz.
+    const prevSnap = await getSnapshot();
+    let owned: number[] = [];
+    if (prevSnap && prevSnap.sessionId === transfer.sessionId && prevSnap.portal === tab.portal && prevSnap.items.length > 0) {
+      const shapesNow = sigIndex(signed);
+      const toRead = idxsToRead(resolveSnapshotIdx(prevSnap, shapesNow));
+      const [prevRead] = toRead.length > 0 ? await runInTab(tab.tabId, readValuesInPage, toRead).catch(() => []) : [];
+      owned = untouchedOwnIdxs(prevSnap, prevRead?.result ?? [], { shapes: shapesNow, descs: descriptors });
+    }
+    const planDescs = owned.length > 0 ? releaseOwned(descriptors, owned) : descriptors;
+    const seedPlan = planFill(planDescs, payload, seedRuleSet(tab.portal), { anchors });
     let plan = seedPlan;
     if (rules.remote) {
       try {
-        plan = pickPlan(planFill(descriptors, payload, rules.set, { ruleSha: rules.sha, anchors }), seedPlan);
+        plan = pickPlan(planFill(planDescs, payload, rules.set, { ruleSha: rules.sha, anchors }), seedPlan);
       } catch {
         plan = { ...seedPlan, rulesRegressed: true };
       }
@@ -658,13 +669,18 @@ async function fillFromEmlakSoft(forceSeed: boolean): Promise<void> {
     $("transferFormWarn").hidden = !(rules.remote && rules.set.fingerprints.length > 0 && !rules.set.fingerprints.includes(fp));
     $("transferSeedFill").hidden = !remoteUsed;
     const sum = summarizeReport(lastReport);
-    $("transferResult").textContent = `${sum.filled} alan dolduruldu, ${sum.manual} alanı elle doldurmanız gerekiyor. Kontrol edip “Yayınla”ya siz basın.`;
+    // Önceki turun yazıp bu turun hedeflemediği alanlar olduğu gibi kalır (silinmez): kullanıcıya söylenir.
+    const targeted = new Set(plan.report.flatMap((r) => (r.idx === undefined ? [] : [r.idx])));
+    const leftover = owned.filter((i) => !targeted.has(i)).length;
+    $("transferResult").textContent =
+      `${sum.filled} alan dolduruldu, ${sum.manual} alanı elle doldurmanız gerekiyor. Kontrol edip “Yayınla”ya siz basın.` +
+      (leftover > 0 ? ` Önceki doldurmadan kalan ${leftover} alan değiştirilmedi; bu alanları kontrol edin.` : "");
     $("transferBind").hidden = false;
 
     // Anlık görüntü (oturum deposu): doldurulan alanların ŞİMDİKİ durumunun özeti; ham değer sayfadan çıkmaz.
     const filled = Array.from(new Set(plan.actions.map((a) => a.idx)));
     const [read] = filled.length > 0 ? await runInTab(tab.tabId, readValuesInPage, filled).catch(() => []) : [];
-    const snapshot = buildSnapshot(
+    const fresh = buildSnapshot(
       { sessionId: transfer.sessionId, portal: tab.portal, ruleVersion: plan.ruleVersion, ruleSha: plan.ruleSha, at: Date.now() },
       plan.actions,
       appliedRes,
@@ -672,6 +688,8 @@ async function fillFromEmlakSoft(forceSeed: boolean): Promise<void> {
       sigIndex(signed),
       descriptors,
     );
+    // Birleştirilir (üzerine yazılmaz): ilk turda doldurulan alanların düzeltme takibi kaybolmasın.
+    const snapshot = mergeSnapshots(prevSnap, fresh, sigIndex(signed));
     await call({ kind: "snapshotPut", snapshot });
     $("transferCheck").hidden = snapshot.items.length === 0;
 
@@ -734,7 +752,8 @@ async function checkCorrections(phase: Exclude<FeedbackPhase, "filled">): Promis
 }
 
 $("transferFill").addEventListener("click", () => void fillFromEmlakSoft(false));
-// Acil durum (K3): kullanıcı uzak kurallar yerine pakete gömülü varsayılanla yeniden doldurabilir.
+// Acil durum (K3): kullanıcı uzak kurallar yerine pakete gömülü varsayılanla yeniden doldurabilir. Önceki turun yazdığı ve
+// el değmemiş alanlar varsayılanla yeniden yazılır; kullanıcının değiştirdiği alanlara dokunulmaz.
 $("transferSeedFill").addEventListener("click", () => void fillFromEmlakSoft(true));
 
 $("transferCheck").addEventListener("click", async () => {

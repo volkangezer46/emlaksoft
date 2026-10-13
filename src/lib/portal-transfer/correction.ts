@@ -210,3 +210,50 @@ export function correctionSummary(outcomes: readonly FieldOutcome[]): { changed:
     missing: outcomes.filter((o) => o.outcome === "not_found").length,
   };
 }
+
+/**
+ * (K3 yeniden doldurma) Önceki doldurmanın yazdığı ve kullanıcının o zamandan beri DEĞİŞTİRMEDİĞİ (accepted) metin ve
+ * seçim denetimlerinin ŞİMDİKİ sıraları. Yeniden doldurmada yalnız bunlar "boş" sayılır (`releaseOwned`): dolu alana
+ * dokunmama ilkesi yalnız eklentinin kendi yazdığı, el değmemiş değerler için gevşer. Radyo dahil edilmez (yeni seçime
+ * tıklamak eskisini zaten bırakır); onay kutusu dahil edilmez (yeniden tıklamak tersine çevirir).
+ */
+export function untouchedOwnIdxs(
+  snapshot: FillSnapshot,
+  readValues: readonly ReadValue[],
+  now: { shapes: ReadonlyMap<number, ShapeRef>; descs: readonly ControlDescriptor[] },
+): number[] {
+  const resolved = resolveSnapshotIdx(snapshot, now.shapes);
+  const outcomes = diffSnapshot(snapshot, readValues, now); // snapshot.items ile aynı sırada, öğe başına bir sonuç
+  const out = new Set<number>();
+  snapshot.items.forEach((it, i) => {
+    const at = resolved.get(it.idx);
+    if (!at || it.group || it.kind === "bool" || outcomes[i]?.outcome !== "accepted") return;
+    out.add(at.idx);
+  });
+  return Array.from(out).sort((a, b) => a - b);
+}
+
+/** Verilen sıralardaki metin/seçim denetimlerini plan için boş gösterir (sayfaya dokunmaz; yalnız betimleyici kopyası). */
+export function releaseOwned(descs: readonly ControlDescriptor[], idxs: readonly number[]): ControlDescriptor[] {
+  const own = new Set(idxs);
+  return descs.map((d) => (own.has(d.idx) && d.type !== "checkbox" && d.type !== "radio" ? { ...d, current: "" } : d));
+}
+
+/**
+ * Yeniden doldurmanın anlık görüntüsünü öncekiyle BİRLEŞTİRİR (üzerine yazmaz): yeni öğeler + önceki öğelerden şimdiki
+ * sayfada imzasıyla bulunan, yeni turun dokunmadığı (aynı denetim ya da aynı alan değil) olanlar şimdiki sıraya taşınarak.
+ * Farklı oturum/portal ise yalnız yeni görüntü.
+ */
+export function mergeSnapshots(prev: FillSnapshot | null, next: FillSnapshot, now: ReadonlyMap<number, ShapeRef>): FillSnapshot {
+  if (!prev || prev.sessionId !== next.sessionId || prev.portal !== next.portal) return next;
+  const resolved = resolveSnapshotIdx(prev, now);
+  const idxs = new Set(next.items.flatMap((it) => it.group ?? [it.idx]));
+  const keys = new Set(next.items.map((it) => it.key));
+  const kept: SnapshotItem[] = [];
+  for (const it of prev.items) {
+    const at = resolved.get(it.idx);
+    if (!at || idxs.has(at.idx) || keys.has(it.key)) continue;
+    kept.push({ ...it, idx: at.idx, ...(it.group ? { group: [...at.idxs] } : {}) });
+  }
+  return { ...next, items: [...next.items, ...kept].slice(0, 120) };
+}

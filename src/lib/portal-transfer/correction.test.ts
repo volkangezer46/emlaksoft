@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSnapshot, correctionSummary, diffSnapshot, fnv1a32, idxsToRead, resolveSnapshotIdx, sanitizeSnapshot, type FillSnapshot } from "./correction";
+import { buildSnapshot, correctionSummary, diffSnapshot, fnv1a32, idxsToRead, mergeSnapshots, releaseOwned, resolveSnapshotIdx, sanitizeSnapshot, untouchedOwnIdxs, type FillSnapshot } from "./correction";
 import type { ControlDescriptor, FillAction } from "./fill-plan";
 import { formShapes, sigIndex, signShapes } from "./form-signature";
 import { readValuesInPage, type ReadValue } from "./page-fns";
@@ -104,5 +104,27 @@ describe("correction: anlık görüntü ↔ şimdiki okuma", () => {
     ]);
     expect(JSON.stringify(out)).not.toContain("1.500.000");
     expect(fnv1a32("")).toBe("811c9dc5");
+  });
+});
+
+describe("correction: yeniden doldurma (K3)", () => {
+  it("untouchedOwnIdxs: yalnız eklentinin yazdığı ve el değmemiş metin/seçim alanları; radyo ve düzeltilen alan hariç", async () => {
+    const snap = await snapshot();
+    const now = await setup();
+    const read: ReadValue[] = [{ idx: 0, kind: "select", option: "Merkezi" }, text(1, "1500000"), text(2, "750"), { idx: 3, kind: "bool", checked: true }, { idx: 4, kind: "bool", checked: false }];
+    expect(untouchedOwnIdxs(snap, read, now)).toEqual([0, 1]); // aidat (2) düzeltildi, radyo (3) hariç
+    const released = releaseOwned(FORM.map((x) => ({ ...x, current: x.idx === 0 ? "Merkezi" : "dolu" })), [0, 1]);
+    expect(released.map((x) => x.current)).toEqual(["", "", "dolu", "dolu", "dolu"]);
+  });
+
+  it("mergeSnapshots: önceki öğeler korunur; yeni turun dokunduğu denetim/alan yeni öğeyle değişir; başka oturum → yalnız yeni", async () => {
+    const prev = await snapshot();
+    const { shapes } = await setup();
+    const next = buildSnapshot({ sessionId: SESSION, portal: "sahibinden", ruleVersion: 0, at: 2 }, [ACTIONS[0]!], [{ idx: 0, ok: true }], [{ idx: 0, kind: "select", option: "Kombi (Doğalgaz)" }], shapes, FORM);
+    const merged = mergeSnapshots(prev, next, shapes);
+    expect(merged.at).toBe(2);
+    expect(merged.items.map((i) => i.key).sort()).toEqual(["dues", "heating", "in_site", "price"]);
+    expect(merged.items.find((i) => i.key === "heating")?.option).toBe("kombi dogalgaz");
+    expect(mergeSnapshots({ ...prev, sessionId: "22222222-2222-4333-8444-555555555555" }, next, shapes)).toBe(next);
   });
 });
