@@ -1,36 +1,50 @@
+import { getPlatformMfaPolicyNow, isMfaSettingOn, mfaEnvMode, mfaRequiredFor } from "@/lib/platform-security/mfa-policy";
+
+export { isMfaSettingOn };
+
 /**
- * Platform (süper admin / ops) için zorunlu iki adımlı doğrulama (TOTP, AAL2) anahtarı.
+ * Platform (süper admin / ops) için iki adımlı doğrulama (TOTP, AAL2) anahtarı.
  *
- * GELİŞTİRME SÜRECİNDE KAPALI: sahibin kararıyla, geliştirme bitene kadar platform paneline
- * yalnız parola ile girilir. Geliştirme bittiğinde tek ortam değişkeniyle yeniden açılır:
- *   PLATFORM_MFA_ENFORCEMENT=on   (Vercel Production env + redeploy)
- *
- * Kapalıyken: middleware /giris/mfa'ya zorlamaz, getPlatformStaffIdentity AAL2 aramaz,
- * girişte MFA sayfasına yönlendirilmez. Açıkken davranış önceki gibidir (zorunlu AAL2).
- * Platform sayfaları ayrıca requirePlatformStaff ile korunur; bu anahtar yalnız AAL2 şartını yönetir.
+ * TEK KAYNAK artık yönetimdedir: Personel > Güvenlik politikası 'platform.mfa_enforced' (+ geçiş süresi
+ * 'platform.mfa_grace_until') yazar; uygulama katmanı (proxy, kimlik kapısı, giriş) ve SQL kapıları aynı ayarı okur.
+ * Ortam değişkeni `PLATFORM_MFA_ENFORCEMENT` (sunucu ortamı `.env.production` + yeniden yayın) yalnız
+ *   "on"        → yönetimden bağımsız zorunlu,
+ *   "force-off" → acil kapatma (kilitlenme kurtarması; ayrıntı platform-security/mfa-policy.ts)
+ * anlamı taşır. Varsayılan: ikisi de kapalı = MFA zorunlu değil (sahip kararı; davranış değişmez).
  */
+
+/** Senkron env okuyucu (yalnız env "on"; geriye dönük uyum ve env tavanı gösterimi için). */
 export function isPlatformMfaRequired(): boolean {
-  return process.env.PLATFORM_MFA_ENFORCEMENT === "on";
+  return mfaEnvMode(process.env.PLATFORM_MFA_ENFORCEMENT) === "on";
 }
 
 /**
- * TEK KAYNAK UYUMU: MFA iki yerde uygulanır — uygulama katmanı (bu env bayrağı: middleware/getPlatformStaffIdentity)
- * ve DB katmanı (`platform_settings` 'platform.mfa_enforced'; `growth_staff_super_admin()` ve benzeri SQL kapıları AAL2'yi
- * yalnız bu AYARA bakarak ister, env'e BAKAMAZ). İkisi ayrışırsa personel RPC'leri MFA'sız çalışır (env on, ayar yok).
- * Yayın runbook'unda ZORUNLU adım: env'i açtığınız anda ayarı da açın (docs/DEPLOY.md "Platform MFA tek kaynak").
- * Bu yardımcılar yalnız TUTARSIZLIĞI saptar; ayarı kendiliğinden YAZMAZ ve MFA'yı AÇMAZ.
+ * Asıl karar (env + DB + geçiş süresi; bayrak önbelleğinden). `hasVerifiedFactor` verilmezse proxy kuralı:
+ * geçiş süresinde yönlendirme yok. Verilirse kişiye özel karar (faktörü olan personel geçişte de AAL2'ye gider).
+ */
+export async function isPlatformMfaRequiredNow(hasVerifiedFactor?: boolean): Promise<boolean> {
+  return mfaRequiredFor(await getPlatformMfaPolicyNow(), hasVerifiedFactor);
+}
+
+/**
+ * DB katmanı (`platform_settings` 'platform.mfa_enforced') SQL kapılarında AAL2'yi belirler. Yönetim anahtarı hep bu
+ * ayarı yazdığı için ayrışma yalnız env "on" iken DB ayarı kapalıysa olur (personel RPC'leri MFA'sız çalışır) ya da
+ * env "force-off" iken DB açıksa (uygulama gevşek, SQL sıkı). Bu yardımcılar yalnız TUTARSIZLIĞI saptar.
  */
 export const PLATFORM_MFA_DB_SETTING_KEY = "platform.mfa_enforced";
 
-export function isMfaSettingOn(raw: string | null | undefined): boolean {
-  const v = (raw ?? "").trim().toLowerCase();
-  return v === "on" || v === "true" || v === "1";
-}
-
-/** env ve DB ayarı ayrışıyor mu? (env açık ama DB ayarı kapalı = tehlikeli; tersi = uygulama katmanı gevşek.) */
-export function platformMfaSyncIssue(envOn: boolean, dbRaw: string | null | undefined): "env_on_db_off" | "env_off_db_on" | null {
+/**
+ * env ve DB ayarı ayrışıyor mu? "env_on_db_off": env açık ama DB kapalı (SQL kapıları MFA istemiyor — tehlikeli).
+ * "env_off_db_on": DB açık ama env acil kapatmada (force-off; uygulama katmanı gevşek). env boşken DB açık olması
+ * artık NORMALDİR (yönetim anahtarı tek kaynak).
+ */
+export function platformMfaSyncIssue(
+  envOn: boolean,
+  dbRaw: string | null | undefined,
+  envForceOff: boolean = mfaEnvMode(process.env.PLATFORM_MFA_ENFORCEMENT) === "force-off",
+): "env_on_db_off" | "env_off_db_on" | null {
   const dbOn = isMfaSettingOn(dbRaw);
   if (envOn && !dbOn) return "env_on_db_off";
-  if (!envOn && dbOn) return "env_off_db_on";
+  if (envForceOff && dbOn) return "env_off_db_on";
   return null;
 }

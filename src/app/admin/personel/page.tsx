@@ -37,6 +37,8 @@ import { daysAgoIso } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { staffKpi } from "./staff-model";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { listStaffMfaStatus, type StaffMfaStatus } from "@/app/actions/platform-security";
+import { PersonelTabs } from "./personel-tabs";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -90,7 +92,20 @@ function staffRisk(d: StaffDraft, s: StaffDraft) {
 // ---------------------------------------------------------------------------
 // Staff row — rol + durum taslağı, tek Kaydet
 // ---------------------------------------------------------------------------
-function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<void> | void }) {
+/** İki adımlı doğrulama durumu: Kurulu (n) / Yok; okunamadıysa tire. */
+function MfaCell({ status }: { status: { verified: number } | null | undefined }) {
+  if (status === undefined) return <span className="text-xs text-text-faint">—</span>;
+  if (status === null) return <span className="text-xs text-text-faint" title="Doğrulayıcı bilgisi okunamadı">?</span>;
+  return status.verified > 0 ? (
+    <span className="inline-flex items-center gap-1 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-700">
+      Kurulu{status.verified > 1 ? ` (${status.verified})` : ""}
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-700">Yok</span>
+  );
+}
+
+function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStatus[string] | undefined; onDone: () => Promise<void> | void }) {
   const draft = useRowDraft<StaffDraft>({
     id: member.id,
     label: member.full_name,
@@ -164,6 +179,9 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<
           className="w-[7.5rem]"
         />
       </TD>
+      <TD>
+        <MfaCell status={mfa} />
+      </TD>
       <TD align="right" className="text-xs text-text-muted">
         {member.last_sign_in_at ? relativeTimeTR(member.last_sign_in_at) : "Hiç giriş yok"}
       </TD>
@@ -182,23 +200,24 @@ function StaffRow({ member, onDone }: { member: StaffRow; onDone: () => Promise<
 }
 
 /** İki tabloda (aktif/pasif) aynı başlıklar — tek yerde tutuluyor. */
-function StaffTable({ rows, onDone }: { rows: StaffRow[]; onDone: () => Promise<void> | void }) {
+function StaffTable({ rows, mfa, onDone }: { rows: StaffRow[]; mfa: StaffMfaStatus; onDone: () => Promise<void> | void }) {
   return (
     <DraftTable>
-      <TableFrame minWidth={860} className="rounded-none border-0 shadow-none">
+      <TableFrame minWidth={960} className="rounded-none border-0 shadow-none">
         <Table>
           <THead>
             <TR>
               <TH>Personel</TH>
               <TH>Rol</TH>
               <TH>Durum</TH>
+              <TH>İki adımlı</TH>
               <TH align="right">Son giriş</TH>
               <TH align="right">Katılım</TH>
               <TH align="right">İşlem</TH>
             </TR>
           </THead>
           <TBody>
-            {rows.map((m) => <StaffRow key={m.id} member={m} onDone={onDone} />)}
+            {rows.map((m) => <StaffRow key={m.id} member={m} mfa={mfa[m.id]} onDone={onDone} />)}
           </TBody>
         </Table>
       </TableFrame>
@@ -235,6 +254,7 @@ function normalizeTr(v: string) {
 
 export default function PersonelPage() {
   const [staff, setStaff] = useState<StaffRow[]>([]);
+  const [mfa, setMfa] = useState<StaffMfaStatus>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<PlatformRole | "all">("all");
@@ -245,6 +265,10 @@ export default function PersonelPage() {
     // gövdesinde yazıldığında React Compiler bunu efektten senkron setState
     // sayıyor. Baştaki `setLoading(true)` de kaldırıldı — `loading` zaten
     // `true` başlıyor; manuel yenilemelerde liste yerinde güncellenir.
+    // Doğrulayıcı durumu (Supabase Auth yönetim API'si) listeyle PARALEL; okunamazsa sütun tire gösterir.
+    void listStaffMfaStatus()
+      .then(setMfa)
+      .catch(() => setMfa({}));
     return fetch("/api/admin/personel")
       .then((res) => (res.ok ? res.json() : null))
       .then((data: StaffRow[] | null) => {
@@ -331,6 +355,8 @@ export default function PersonelPage() {
         </KpiGrid>
       </AdminPageHeader>
 
+      <PersonelTabs active="personel" />
+
       {/* KPI şeridi — her kart listeyi süzer */}
       <KpiGrid>
         {(
@@ -410,7 +436,7 @@ export default function PersonelPage() {
             </p>
           </div>
         ) : (
-          <StaffTable rows={active} onDone={load} />
+          <StaffTable rows={active} mfa={mfa} onDone={load} />
         )}
       </section>
 
@@ -422,7 +448,7 @@ export default function PersonelPage() {
             <h2 className="font-display font-bold text-ink-950">Pasif personel</h2>
             <span className="ml-auto rounded-full bg-canvas px-2.5 py-0.5 text-xs font-bold text-text-faint">{passive.length}</span>
           </div>
-          <StaffTable rows={passive} onDone={load} />
+          <StaffTable rows={passive} mfa={mfa} onDone={load} />
         </section>
       ) : null}
     </div>

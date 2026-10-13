@@ -1,11 +1,14 @@
 "use server";
 
+import { createHmac } from "node:crypto";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, resolveSupabaseAdminKey } from "@/lib/supabase/admin";
 import { restoreImpersonationMetadata } from "@/lib/impersonation";
-import { isPlatformMfaRequired } from "@/lib/platform-mfa";
-import { isDemoLoginEnabled, isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
+import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
+import { getDemoPolicyNow } from "@/lib/platform-security/demo-policy";
+import { isPlatformDemoPersonaAllowed } from "@/lib/demo-environment";
+import { logPlatformActivity } from "@/lib/platform-activity";
 import { getDemoPersona, type DemoPersona } from "@/lib/demo-personas";
 import { planAmountTry } from "@/lib/billing/plans";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
@@ -18,12 +21,17 @@ const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 /** `redirectTo`: istemcinin tarayıcı gezinmesiyle gideceği adres (platform kişilikleri; yeni oturum çerezleri gönderilsin diye). */
 export type DemoLoginResult = { error?: string; redirectTo?: string };
 
+function demoSecret(): string {
+  return process.env.DEMO_LOGIN_SECRET?.trim() || resolveSupabaseAdminKey() || "";
+}
+
 function passwordForDemoIdentity(email: string): string {
-  const secret =
-    process.env.DEMO_LOGIN_SECRET?.trim() ||
-    resolveSupabaseAdminKey() ||
-    "";
-  return deriveDemoPassword(secret, email);
+  return deriveDemoPassword(demoSecret(), email);
+}
+
+/** Denetim izi için IP özeti (anahtarlı; ham IP yazılmaz). */
+function ipHash(ip: string): string {
+  return createHmac("sha256", `demo-login-ip:${demoSecret()}`).update(ip).digest("hex").slice(0, 16);
 }
 
 async function findAuthUserIdByEmail(
@@ -149,9 +157,13 @@ async function ensureDemoTenant(): Promise<string> {
   return created.id;
 }
 
-/** Yalnızca tıklanan kişiliği hazırlar (hızlı ilk giriş). */
-async function ensurePersona(persona: DemoPersona): Promise<void> {
+/** Yalnızca tıklanan kişiliği hazırlar (hızlı ilk giriş). Kimlik id'sini döner. */
+async function ensurePersona(persona: DemoPersona): Promise<string> {
+  // Savunma derinliği: env tavanı doğrudan, ardından politika (env tavanı + yönetim anahtarı) sunucuda bir kez daha denetlenir.
   if (persona.kind === "platform" && !isPlatformDemoPersonaAllowed()) {
+    throw new Error("Platform demo kişilikleri bu ortamda kesin olarak kapalı.");
+  }
+  if (persona.kind === "platform" && !(await getDemoPolicyNow()).platform) {
     throw new Error("Platform demo kişilikleri bu ortamda kesin olarak kapalı.");
   }
 
@@ -188,13 +200,16 @@ async function ensurePersona(persona: DemoPersona): Promise<void> {
     );
     if (error) throw new Error(`Profil kaydı: ${error.message}`);
   }
+  return userId;
 }
 
 /**
- * Tek tıkla demo kişiliğe giriş. Yalnızca demo modu açıkken çalışır.
+ * Tek tıkla demo kişiliğe giriş. Yalnızca demo politikası açıkken çalışır (env tavanı + yönetim anahtarı;
+ * istemcinin gösterdiği karta GÜVENİLMEZ, karar burada yeniden verilir).
  */
 export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult> {
-  if (!isDemoLoginEnabled()) {
+  const policy = await getDemoPolicyNow();
+  if (!policy.tenant) {
     return { error: "Hızlı test girişi bu ortamda kapalı." };
   }
 
@@ -211,14 +226,14 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
   const persona = getDemoPersona(personaId);
   if (!persona) return { error: "Geçersiz test kişiliği." };
 
-  // Defense in depth: even if the general demo gate is changed later, a
-  // privileged platform identity can never be provisioned in production.
-  if (persona.kind === "platform" && !isPlatformDemoPersonaAllowed()) {
+  // Platform (süper admin) kartı: env tavanı + yönetim anahtarı birlikte açık olmalı.
+  if (persona.kind === "platform" && !policy.platform) {
     return { error: "Platform hızlı girişi bu ortamda kapalı." };
   }
 
+  let userId: string;
   try {
-    await ensurePersona(persona);
+    userId = await ensurePersona(persona);
   } catch (e) {
     console.error("quickDemoLogin:ensure", e);
     return { error: actionErrorMessage(e, "Demo hesap hazırlanamadı") };
@@ -242,13 +257,22 @@ export async function quickDemoLogin(personaId: string): Promise<DemoLoginResult
     return { error: actionErrorMessage(error, "Demo giriş başarısız") };
   }
 
+  // Her demo girişi denetim izine düşer (platform kişiliğinde aktör kendisi; ofis kişiliğinde aktör yok).
+  await logPlatformActivity({
+    actorId: persona.kind === "platform" ? userId : null,
+    action: "auth.demo_login",
+    entityType: "auth",
+    entityId: userId,
+    meta: { persona: persona.id, kind: persona.kind, ip_hash: ipHash(ip) },
+  });
+
   // Platform kişilikleri zorunlu iki adımlı doğrulamadan (TOTP) geçer. Sunucu işleminin içinden
   // yönlendirmek, hedef sayfanın işlem sırasında henüz tarayıcıya gitmemiş oturum çerezlerini
   // görememesine yol açıyordu (adres değişiyor, ekran giriş sayfasında kalıyor). Bu yüzden hedef
   // döndürülür ve istemci tarayıcı gezinmesiyle (yeni çerezlerle) doğrulama sayfasına gider.
   if (persona.kind === "platform") {
-    // MFA kapalıyken (geliştirme) doğrudan panel; açıkken doğrulama sayfası.
-    return { redirectTo: isPlatformMfaRequired() ? `/giris/mfa?next=${encodeURIComponent("/admin")}` : "/admin" };
+    // MFA zorunlu değilse (veya geçiş süresindeyse) doğrudan panel; zorunluysa doğrulama sayfası.
+    return { redirectTo: (await isPlatformMfaRequiredNow()) ? `/giris/mfa?next=${encodeURIComponent("/admin")}` : "/admin" };
   }
   redirect("/app");
 }

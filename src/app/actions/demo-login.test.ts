@@ -23,6 +23,9 @@ const h = vi.hoisted(() => ({
   redirect: vi.fn((to: string) => {
     throw new Error(`NEXT_REDIRECT:${to}`);
   }),
+  ceiling: { tenant: true, platform: false },
+  demoLoginRaw: null as string | null,
+  audit: vi.fn(async () => {}),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -31,11 +34,17 @@ vi.mock("@/lib/rate-limit", () => ({
   clientIp: async () => "127.0.0.1",
   checkRateLimit: async () => ({ allowed: true }),
 }));
+// Env tavanı + yönetim anahtarı (bayrak önbelleği) taklit edilir; karar gerçek demo-policy kodundan geçer.
 vi.mock("@/lib/demo-environment", () => ({
-  isDemoLoginEnabled: () => true,
-  isPlatformDemoPersonaAllowed: () => false,
+  isDemoLoginEnabled: () => h.ceiling.tenant,
+  isPlatformDemoPersonaAllowed: () => h.ceiling.platform,
 }));
-vi.mock("@/lib/platform-mfa", () => ({ isPlatformMfaRequired: () => false }));
+vi.mock("@/lib/platform-flags-cache", () => ({
+  SECURITY_SETTING_KEYS: { demoLogin: "platform.demo_login", mfaEnforced: "platform.mfa_enforced", mfaGraceUntil: "platform.mfa_grace_until" },
+  readPlatformFlagsCached: async () => ({ demoLoginRaw: h.demoLoginRaw }),
+}));
+vi.mock("@/lib/platform-activity", () => ({ logPlatformActivity: h.audit }));
+vi.mock("@/lib/platform-mfa", () => ({ isPlatformMfaRequired: () => false, isPlatformMfaRequiredNow: async () => false }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ auth: { signInWithPassword: h.signIn } }),
 }));
@@ -117,6 +126,8 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.test");
   vi.stubEnv("DEMO_LOGIN_SECRET", "demo-test-secret-0123456789abcdefghijklmnop");
   vi.clearAllMocks();
+  h.ceiling = { tenant: true, platform: false };
+  h.demoLoginRaw = null;
   seedFakes();
 });
 
@@ -165,6 +176,38 @@ describe("quickDemoLogin parola davranışı", () => {
     const res = await login("super_admin");
     expect(res).toHaveProperty("error");
     expect(h.createUser).not.toHaveBeenCalled();
+    expect(h.signIn).not.toHaveBeenCalled();
+  });
+});
+
+describe("quickDemoLogin demo politikası (env tavanı + yönetim anahtarı)", () => {
+  it("DB satırı yokken env iki kademe açıksa süper admin girer (sahip kararı) ve denetime yazılır", async () => {
+    h.ceiling = { tenant: true, platform: true };
+    expect(await login("super_admin")).toEqual({ redirectTo: "/admin" });
+    expect(h.audit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "auth.demo_login", meta: expect.objectContaining({ persona: "super_admin", ip_hash: expect.any(String) }) }),
+    );
+    const meta = (h.audit.mock.calls[0] as unknown as [{ meta: Record<string, unknown> }])[0].meta;
+    expect(meta.ip_hash).not.toContain("127.0.0.1");
+  });
+
+  it("DB'de platform kapalıyken (mode tenant) süper admin personası sunucuda reddedilir", async () => {
+    h.ceiling = { tenant: true, platform: true };
+    h.demoLoginRaw = JSON.stringify({ mode: "tenant", until: null });
+    const res = await login("super_admin");
+    expect(res).toHaveProperty("error");
+    expect(h.createUser).not.toHaveBeenCalled();
+    expect(h.signIn).not.toHaveBeenCalled();
+    // ofis personası açık kalır
+    expect(await login("owner")).toEqual({ redirectTo: "/app" });
+  });
+
+  it("süresi dolmuş platform demosu reddedilir; 'off' ofis kartlarını da kapatır", async () => {
+    h.ceiling = { tenant: true, platform: true };
+    h.demoLoginRaw = JSON.stringify({ mode: "tenant_platform", until: "2020-01-01T00:00:00.000Z" });
+    expect(await login("super_admin")).toHaveProperty("error");
+    h.demoLoginRaw = JSON.stringify({ mode: "off", until: null });
+    expect(await login("owner")).toHaveProperty("error");
     expect(h.signIn).not.toHaveBeenCalled();
   });
 });

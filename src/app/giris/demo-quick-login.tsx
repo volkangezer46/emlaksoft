@@ -70,7 +70,10 @@ function PersonaButton({
   );
 }
 
-/** showPlatform: sunucu izni (isPlatformDemoPersonaAllowed); kapalıyken personel kartları hiç gösterilmez (eylem de reddeder). */
+/**
+ * showPlatform: sunucu kararı (getDemoPolicyNow: env tavanı + yönetim anahtarı, süreli). Kapalıyken personel kartları
+ * hiç gösterilmez; gösterilse bile eylem (quickDemoLogin) kararı sunucuda yeniden verir.
+ */
 export function DemoQuickLogin({ showPlatform = false }: { showPlatform?: boolean }) {
   const [pending, startTransition] = useTransition();
   const [activeId, setActiveId] = useState<string | null>(null);
