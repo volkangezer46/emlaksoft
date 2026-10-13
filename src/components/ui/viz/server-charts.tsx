@@ -66,16 +66,38 @@ function axisFormatter(format: ChartValueFormat, compact: boolean) {
   };
 }
 
-function ChartEmpty({ text }: { text?: string }) {
+/** Boş grafik: kanonik EmptyState'i grafik yüksekliğinde ortalar. */
+const emptyChart = (text?: string) => (
+  <div className="grid h-full min-h-28 place-items-center">
+    <EmptyState
+      variant="compact"
+      illustration="rapor"
+      title={text ?? "Bu aralıkta gösterilecek veri yok"}
+      description="Kayıt oluştukça grafik burada çizilir."
+    />
+  </div>
+);
+
+/**
+ * Grafik içi bağlantıların klavye yolu: SVG içindeki bağlantılar `role="img"` altında sunum öğesi sayılır, bu yüzden
+ * odak sırasına girmez (tabIndex -1). Aynı hedefler tekilleştirilip burada listelenir; liste odak alınca görünür olur.
+ */
+function ChartLinks({ links, label }: { links: ReadonlyArray<{ href: string; text: string }>; label: string }) {
+  const seen = new Set<string>();
+  const unique = links.filter((l) => (seen.has(l.href) ? false : (seen.add(l.href), true)));
+  if (unique.length === 0) return null;
   return (
-    <div className="grid h-full min-h-28 place-items-center">
-      <EmptyState
-        variant="compact"
-        illustration="rapor"
-        title={text ?? "Bu aralıkta gösterilecek veri yok"}
-        description="Kayıt oluştukça grafik burada çizilir."
-      />
-    </div>
+    <nav aria-label={label} className="sr-only focus-within:not-sr-only">
+      <ul className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+        {unique.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="focus-ring rounded-[var(--radius-control)] text-text underline-offset-2 hover:underline">
+              {l.text}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -122,7 +144,7 @@ function PlotFrame({
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-y-0 left-0 w-11" aria-hidden="true">
           {ticks.map((t) => (
-            <span key={t} className="absolute right-0 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
+            <span key={t} className="absolute right-0 -translate-y-1/2 whitespace-nowrap text-xs leading-none tabular-nums text-text-muted" style={{ top: pct(y(t)) }}>
               {axis(t)}
             </span>
           ))}
@@ -156,7 +178,7 @@ function PlotFrame({
             <span
               key={i}
               className={cn(
-                "absolute top-1 truncate text-[11px] leading-none text-text-muted",
+                "absolute top-1 truncate text-xs leading-none text-text-muted",
                 l.width !== undefined && "text-center",
                 edge === "center" && "-translate-x-1/2",
                 edge === "right" && "-translate-x-full",
@@ -268,7 +290,7 @@ function LinePlot({
         ticks={ticks}
         y={y}
         axis={axis}
-        xLabels={axisLabelIndices(n, n > 14 ? 5 : 6).map((i) => ({ x: x(i), text: labels[i] ?? "" }))}
+        xLabels={axisLabelIndices(n, n > 14 ? 4 : 5).map((i) => ({ x: x(i), text: labels[i] ?? "" }))}
         overlay={overlay}
       >
         <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img" aria-label={ariaLabel}>
@@ -338,7 +360,7 @@ function LinePlot({
             );
             const href = hrefs?.[i];
             return href ? (
-              <Link key={`h${i}`} href={href} aria-label={title}>
+              <Link key={`h${i}`} href={href} tabIndex={-1} aria-hidden="true">
                 {band}
               </Link>
             ) : (
@@ -347,6 +369,15 @@ function LinePlot({
           })}
         </svg>
       </PlotFrame>
+      {hrefs ? (
+        <ChartLinks
+          label={ariaLabel ? `${ariaLabel} bağlantıları` : "Grafik bağlantıları"}
+          links={labels.flatMap((l, i) => {
+            const href = hrefs[i];
+            return href ? [{ href, text: titleAt(i) || l }] : [];
+          })}
+        />
+      ) : null}
       <table className="sr-only">
         <caption>{ariaLabel}</caption>
         <thead>
@@ -424,7 +455,7 @@ export function AreaTrend({
     fill: i === 0,
   }));
   const hasData = data.length >= 2 && lines.some((l) => l.values.some((v) => v !== null && v !== 0));
-  if (!hasData) return <ChartEmpty text={emptyText} />;
+  if (!hasData) return emptyChart(emptyText);
   const showSummary = rangeable ?? data.length >= 8;
   return (
     <LinePlot
@@ -480,7 +511,7 @@ export function AreaTrendChart({
   const forecast = data.map((d) => finite(d.forecast ?? null));
   const hasForecast = forecast.some((v) => v !== null);
   const realCount = values.filter((v) => v !== null).length;
-  if (realCount === 0 || values.every((v) => v === null || v === 0)) return <ChartEmpty text={emptyText} />;
+  if (realCount === 0 || values.every((v) => v === null || v === 0)) return emptyChart(emptyText);
   const lines: LineSeries[] = [{ name, color, values }];
   if (hasForecast) lines.push({ name: forecastName, color, values: forecast, dashed: true, fill: false });
   const showSummary = rangeable ?? realCount >= 6;
@@ -538,7 +569,7 @@ export function BarCompare({
   };
   const val = (row: Row, s: SeriesDef) => finite(row[s.key]) ?? 0;
   const all = data.flatMap((row) => series.map((s) => val(row, s)));
-  if (data.length === 0 || series.length === 0 || all.every((v) => v === 0)) return <ChartEmpty text={emptyText} />;
+  if (data.length === 0 || series.length === 0 || all.every((v) => v === 0)) return emptyChart(emptyText);
   const values = showValues ?? (series.length === 1 && data.length <= 10);
   const hrefOf = (row: Row) => {
     const h = hrefKey ? row[hrefKey] : undefined;
@@ -624,16 +655,17 @@ export function BarCompare({
       return { i, s, si, v, x: bx, w: barW * (series.length > 1 ? 0.86 : 1), top: Math.min(y(v), y0), h: Math.abs(y(v) - y0), color: colorOf(s, si, row) };
     }),
   );
-  const labelEvery = n > 12 ? Math.ceil(n / 12) : 1;
+  // 12 px etiket: dar ekranda sıkışmasın diye en çok 8 kategori etiketi ve değer etiketi.
+  const labelEvery = n > 8 ? Math.ceil(n / 8) : 1;
   const overlay = values
     ? bars.map((b) => {
-        const text = barLabel(b.v, format);
+        const text = b.i % labelEvery === 0 ? barLabel(b.v, format) : null;
         if (!text) return null;
         return (
           <span
             key={`v${b.i}-${b.si}`}
             className={cn(
-              "pointer-events-none absolute -translate-x-1/2 whitespace-nowrap text-[11px] font-semibold leading-none tabular-nums text-text",
+              "pointer-events-none absolute -translate-x-1/2 whitespace-nowrap text-xs font-semibold leading-none tabular-nums text-text",
               b.v >= 0 ? "-translate-y-[calc(100%+3px)]" : "translate-y-[3px]",
             )}
             style={{ left: pct(b.x + b.w / 2), top: pct(b.v >= 0 ? b.top : b.top + b.h) }}
@@ -685,7 +717,7 @@ export function BarCompare({
               </>
             );
             return href ? (
-              <Link key={i} href={href} aria-label={hint ? `${rowLabel(i, row)}. ${hint}` : rowLabel(i, row)}>
+              <Link key={i} href={href} tabIndex={-1} aria-hidden="true">
                 {content}
               </Link>
             ) : (
@@ -694,6 +726,13 @@ export function BarCompare({
           })}
         </svg>
       </PlotFrame>
+      <ChartLinks
+        label={ariaLabel ? `${ariaLabel} bağlantıları` : "Grafik bağlantıları"}
+        links={data.flatMap((row, i) => {
+          const href = hrefOf(row);
+          return href ? [{ href, text: hint ? `${rowLabel(i, row)}. ${hint}` : rowLabel(i, row) }] : [];
+        })}
+      />
     </figure>
   );
 }
@@ -728,7 +767,7 @@ export function DonutSplit({
     return { label: String(row[nameKey] ?? ""), value, color: CHART_COLORS[i % CHART_COLORS.length]!, href: typeof h === "string" && h ? h : undefined };
   });
   const total = items.reduce((a, it) => a + it.value, 0);
-  if (!(total > 0)) return <ChartEmpty text={emptyText} />;
+  if (!(total > 0)) return emptyChart(emptyText);
   const share = (v: number) => Math.round((v / total) * 100);
   const titleOf = (it: (typeof items)[number]) => `${it.label}: ${fmt(it.value)} (%${share(it.value)})${hint ? ` — ${hint}` : ""}`;
   return (

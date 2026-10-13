@@ -170,7 +170,11 @@ describe("viz kiti: sık sayfalarda sunucu SVG (Recharts ilk yüke girmez)", () 
     }
     // Değer görünürlüğü ve boş durum (sıfır çıkmaz kuralı); hareket ilk görünümde bir kez (motion.css sınıfları).
     expect(src).toContain("<title>");
-    expect(src).toContain("ChartEmpty");
+    expect(src).toMatch(/<EmptyState\b/); // boş durum kanonik ui/empty-state
+    expect(src).toMatch(/return emptyChart\(/);
+    // Bağlantılı grafikte SVG bağlantıları odak dışı; klavye yolu tekilleştirilmiş ChartLinks listesi.
+    expect(src).toMatch(/tabIndex=\{-1\}/);
+    expect(src).toContain("<ChartLinks");
     expect(src).toMatch(/viz-reveal/);
     expect(src).not.toMatch(/#[0-9a-fA-F]{6}\b/); // ham renk yok, yalnız token
   });
