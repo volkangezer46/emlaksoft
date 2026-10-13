@@ -29,7 +29,7 @@ import { DataFreshness } from "@/components/ui/data-freshness";
 import { PERIODS, computeTrend, parsePeriod, periodHref, type Period } from "@/components/ui/premium";
 import { KpiCard, KpiGrid, KpiGridSkeleton } from "@/components/ui/kpi-card";
 import { ChartCard } from "@/components/ui/chart-frame";
-import { AreaTrend, AreaTrendChart, BarCompare } from "@/components/ui/lazy-charts";
+import { AreaTrend, AreaTrendChart, BarCompare } from "@/components/ui/viz/server-charts";
 import { AttentionList } from "@/components/ui/attention-list";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -703,7 +703,7 @@ async function ChurnReasonsSection({ period }: { period: Period }) {
   );
 }
 
-/** Büyüme (ikincil): haftalık yeni ofis ve yeni aktif abonelik, canlı AreaTrend (ipucu, lejant, aralık). */
+/** Büyüme (ikincil): haftalık yeni ofis ve yeni aktif abonelik, sunucu SVG AreaTrend (lejant, nokta başına değer, toplam). */
 async function GrowthSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const weekly = data.aggregate.weekly;

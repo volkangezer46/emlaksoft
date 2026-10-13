@@ -139,3 +139,47 @@ describe("viz kiti: eski dışa aktarımlar ve cam bütçesi", () => {
     }
   });
 });
+
+describe("viz kiti: sık sayfalarda sunucu SVG (Recharts ilk yüke girmez)", () => {
+  // /admin, /admin/raporlar, /app/raporlar, /app/performansim ve ana ekran gelir eğrisi: aynı imzalı sunucu
+  // sarmalayıcılar (viz/server-charts). Diğer kullanımlar ve InteractiveChart tembel kapıda (lazy-charts) kalır.
+  const SIK = [
+    "src/app/admin/page.tsx",
+    "src/app/admin/raporlar/page.tsx",
+    "src/app/app/raporlar/net-bars.tsx",
+    "src/app/app/raporlar/rank-bars.tsx",
+    "src/app/app/performansim/son-30-gun.tsx",
+    "src/app/app/_home/gelir-egrisi.tsx",
+  ];
+
+  it("taşınan dosyalar sunucu setini kullanır, tembel Recharts kapısını içe aktarmaz ve istemci bileşeni değildir", () => {
+    for (const f of SIK) {
+      const src = read(f);
+      expect(src, f).toContain("@/components/ui/viz/server-charts");
+      expect(src, f).not.toMatch(/@\/components\/ui\/(lazy-charts|chart)"/);
+      expect(src, f).not.toMatch(/^["']use client["']/m);
+    }
+  });
+
+  it("sunucu seti Recharts'a ve istemci grafik modülüne bağlı değildir; dört bileşeni aynı adla dışa aktarır", () => {
+    const src = read("src/components/ui/viz/server-charts.tsx");
+    expect(src).not.toMatch(/^["']use client["']/m);
+    expect(src).not.toMatch(/from "recharts"|@\/components\/ui\/(chart|lazy-charts)"/);
+    for (const name of ["AreaTrend", "AreaTrendChart", "BarCompare", "DonutSplit"]) {
+      expect(src, name).toMatch(new RegExp(`export function ${name}\\(`));
+    }
+    // Değer görünürlüğü ve boş durum (sıfır çıkmaz kuralı); hareket ilk görünümde bir kez (motion.css sınıfları).
+    expect(src).toContain("<title>");
+    expect(src).toContain("ChartEmpty");
+    expect(src).toMatch(/viz-reveal/);
+    expect(src).not.toMatch(/#[0-9a-fA-F]{6}\b/); // ham renk yok, yalnız token
+  });
+
+  it("recharts bağımlılığı ve tembel kapı yerinde (diğer kullanımlar için)", () => {
+    const pkg = JSON.parse(read("package.json")) as { dependencies?: Record<string, string> };
+    expect(pkg.dependencies?.recharts).toBeTruthy();
+    for (const name of ["AreaTrend", "AreaTrendChart", "BarCompare", "DonutSplit"]) {
+      expect(read("src/components/ui/lazy-charts.tsx"), name).toMatch(new RegExp(`export const ${name} = withIdleGate`));
+    }
+  });
+});

@@ -1,4 +1,4 @@
-import { BarCompare } from "@/components/ui/lazy-charts";
+import { BarCompare } from "@/components/ui/viz/server-charts";
 import type { ChartValueFormat } from "@/components/ui/chart-format";
 import { cn } from "@/lib/utils";
 
@@ -14,9 +14,9 @@ export type RankItem = {
 };
 
 /**
- * RankBars — sıralı kategori çubukları (7+ kategoride pasta yerine). Ortak canlı grafik seti (`BarCompare`, yatay):
- * üzerine gelince ipucu, çubuğa tıklayınca filtrelenmiş liste. Tam değerler sr-only listede de verilir (renk/grafik tek başına
- * anlam taşımaz). Satır başına ~44 px ayrılır; Recharts tembel yüklenir.
+ * RankBars — sıralı kategori çubukları (7+ kategoride pasta yerine). Sunucu SVG grafik seti (`viz/server-charts`
+ * `BarCompare`, yatay; Recharts yok): satır başında etiket, uçta değer, üzerine gelince `<title>`, satıra tıklayınca
+ * filtrelenmiş liste. Tam değerler sr-only listede de verilir (renk/grafik tek başına anlam taşımaz). Satır başına ~44 px.
  */
 export function RankBars({
   items,

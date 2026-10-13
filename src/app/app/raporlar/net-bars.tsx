@@ -1,4 +1,4 @@
-import { BarCompare } from "@/components/ui/lazy-charts";
+import { BarCompare } from "@/components/ui/viz/server-charts";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { NetPoint } from "./report-math";
@@ -7,9 +7,10 @@ const moneyFmt = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const money = (n: number) => `${moneyFmt.format(n)} ₺`;
 
 /**
- * NetBars — aylık net (gelir - gider) çubukları, ortak canlı grafik seti (`BarCompare`): kâr yukarı (başarı tonu), zarar aşağı
- * (tehlike tonu); üzerine gelince ipucu, çubuğa tıklayınca komisyon (kâr) ya da giderler (zarar) sayfası. Yalnız gerçek veriyle
- * çizilir (çağıran `hasNetData` ile korur). Renk tek başına anlam taşımaz: ipucu ve çubuk ucu işaretli değer verir, sr-only tablo tam veriyi sunar.
+ * NetBars — aylık net (gelir - gider) çubukları, sunucu SVG grafik seti (`viz/server-charts` `BarCompare`; Recharts yok):
+ * kâr yukarı (başarı tonu), zarar aşağı (tehlike tonu); çubuk üstü kısa değer etiketi, üzerine gelince `<title>` ile tam değer,
+ * çubuğa tıklayınca komisyon (kâr) ya da giderler (zarar) sayfası. Yalnız gerçek veriyle çizilir (çağıran `hasNetData` ile
+ * korur). Renk tek başına anlam taşımaz: çubuk ucu işaretli değer verir, sr-only tablo tam veriyi sunar.
  */
 export function NetBars({ points, className }: { points: readonly NetPoint[]; className?: string }) {
   return (

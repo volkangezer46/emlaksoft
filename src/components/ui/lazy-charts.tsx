@@ -10,6 +10,10 @@
  * ÇÖZÜM: `next/dynamic` (docs: 01-app/02-guides/lazy-loading.md). Recharts ayrı bir parçaya
  * (chunk) taşınır; `ssr` KAPATILMADI — sunucu HTML'i aynı kalır, yalnız ilk JS paketi küçülür.
  * Sunucu bileşeninden doğrudan `dynamic()` kod bölmediği için kapı bir istemci modülüdür.
+ *
+ * Sık açılan sayfalar (/admin, /admin/raporlar, /app/raporlar, /app/performansim, ana ekran gelir eğrisi) Recharts'ı
+ * hiç indirmez: aynı prop imzalı sunucu SVG sürümleri `@/components/ui/viz/server-charts`'tan gelir. Etkileşim
+ * (aralık seçici, lejanttan seri gizleme, zengin ipucu) gereken diğer kullanımlar burada kalır.
  */
 import dynamic from "next/dynamic";
 import { useEffect, useState, type ComponentType } from "react";

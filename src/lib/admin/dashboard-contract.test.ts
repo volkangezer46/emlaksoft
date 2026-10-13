@@ -31,10 +31,14 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     expect(read("src/app/admin/_dashboards/shared.tsx")).not.toContain("animate-pulse");
   });
 
-  it("billing ve raporlar canlı AreaTrendChart'ı (tembel kapı) kullanır; statik SVG AreaChart ve el yapımı çizgi yok", () => {
+  it("billing tembel kapıyı, /admin ve raporlar sunucu SVG setini (aynı imzalı AreaTrendChart) kullanır; statik AreaChart ve el yapımı çizgi yok", () => {
+    expect(read("src/app/admin/billing/page.tsx")).toContain("@/components/ui/lazy-charts");
+    for (const p of ["src/app/admin/raporlar/page.tsx", "src/app/admin/page.tsx"]) {
+      expect(read(p)).toContain("@/components/ui/viz/server-charts");
+      expect(read(p)).not.toContain("@/components/ui/lazy-charts");
+    }
     for (const p of ["src/app/admin/billing/page.tsx", "src/app/admin/raporlar/page.tsx", "src/app/admin/page.tsx"]) {
       const src = read(p);
-      expect(src).toContain("@/components/ui/lazy-charts");
       expect(src).not.toMatch(/<AreaChart\b/);
       expect(src).not.toMatch(/<FunnelChart\b/);
       expect(src).not.toContain("<polyline");
