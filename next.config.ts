@@ -7,14 +7,27 @@ import { VIRTUAL_TOUR_FRAME_HOSTS } from "./src/lib/virtual-tour";
 assertProductionEnvironment(process.env);
 
 const isDevelopment = process.env.NODE_ENV === "development";
+// Vercel dışı (Hetzner/Coolify) derleme: standalone Docker imajı, kendi Supabase alan adı.
+const isVercel = Boolean(process.env.VERCEL);
+// Self-hosted Supabase (ör. https://api.emlaksoft.com.tr); bulut *.supabase.co desenleri geçiş süresince kalır.
+const supabaseOrigin = (() => {
+  try {
+    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+    return url.hostname.endsWith(".supabase.co") ? null : url;
+  } catch {
+    return null;
+  }
+})();
+const supabaseHttp = supabaseOrigin ? ` ${supabaseOrigin.origin}` : "";
+const supabaseWs = supabaseOrigin ? ` ${supabaseOrigin.origin.replace(/^http/, "ws")}` : "";
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.supabase.co https://api.qrserver.com https://tile.openstreetmap.org",
+  `img-src 'self' data: blob: https://*.supabase.co${supabaseHttp} https://api.qrserver.com https://tile.openstreetmap.org`,
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
-  "media-src 'self' data: blob: https://*.supabase.co",
+  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${supabaseHttp}${supabaseWs} https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
+  `media-src 'self' data: blob: https://*.supabase.co${supabaseHttp}`,
   `frame-src 'self' https://www.openstreetmap.org ${VIRTUAL_TOUR_FRAME_HOSTS.map((h) => `https://${h}`).join(" ")}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -26,6 +39,8 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  // Hetzner/Coolify: `node server.js` ile çalışan standalone çıktı (Vercel kendi çıktısını kullanır).
+  output: isVercel ? undefined : "standalone",
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
@@ -42,9 +57,8 @@ const nextConfig: NextConfig = {
 
   // Uygulama kodu sharp kullanmıyor (filigran istemcide); Vercel görseli kendi altyapısında optimize eder.
   // Her sunucu fonksiyonunun izine giren sharp + @img ikilileri paketi şişirip soğuk başlangıcı uzatıyordu.
-  outputFileTracingExcludes: {
-    "/*": ["node_modules/sharp/**", "node_modules/@img/**"],
-  },
+  // Kendi sunucumuzda next/image optimizasyonu sharp'a ihtiyaç duyar → hariç tutma yalnız Vercel'de.
+  outputFileTracingExcludes: isVercel ? { "/*": ["node_modules/sharp/**", "node_modules/@img/**"] } : {},
   // Tarayıcı eklentisi paketi (build sırasında public/downloads'a yazılır) ve rapor merkezi PDF yazı tipi
   // (src/assets/fonts) çalışma anında fs ile okunur; izleme dosyaları kendiliğinden bulamaz.
   outputFileTracingIncludes: {
@@ -64,6 +78,15 @@ const nextConfig: NextConfig = {
         hostname: "*.supabase.co",
         pathname: "/storage/v1/object/public/**",
       },
+      ...(supabaseOrigin
+        ? [
+            {
+              protocol: supabaseOrigin.protocol.replace(":", "") as "http" | "https",
+              hostname: supabaseOrigin.hostname,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
     ],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],

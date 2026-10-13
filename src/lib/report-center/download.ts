@@ -42,7 +42,14 @@ async function fetchLogo(url: string | null): Promise<PdfLogo | null> {
   if (!url) return null;
   try {
     const u = new URL(url);
-    if (u.protocol !== "https:" || !u.hostname.endsWith(".supabase.co")) return null;
+    const ownHost = (() => {
+      try {
+        return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").hostname;
+      } catch {
+        return null;
+      }
+    })();
+    if (u.protocol !== "https:" || !(u.hostname.endsWith(".supabase.co") || u.hostname === ownHost)) return null;
     const res = await fetchExternal(u, { method: "GET" }, { timeoutMs: 3_000 });
     if (!res.ok) return null;
     const type = res.headers.get("content-type") ?? "";

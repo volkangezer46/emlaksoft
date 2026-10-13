@@ -22,7 +22,7 @@ describe("public base URL", () => {
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "");
     vi.stubEnv("VERCEL_PROJECT_PRODUCTION_URL", "");
     vi.stubEnv("NODE_ENV", "production");
-    expect(getBaseUrl()).toBe("https://emlaksoft.vercel.app");
+    expect(getBaseUrl()).toBe("https://emlaksoft.com.tr");
   });
 
   it("keeps localhost available for actual local development", () => {

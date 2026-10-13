@@ -1,0 +1,41 @@
+# EmlakSoft uygulaması (Hetzner). Coolify'ın Traefik'i (coolify-proxy) etiketlerle yönlendirir,
+# Let's Encrypt sertifikası `letsencrypt` çözücüsüyle otomatik alınır/yenilenir.
+# Yayın: scripts/sunucu/deploy.sh
+name: emlaksoft
+services:
+  app:
+    image: emlaksoft-app:${APP_TAG:-latest}
+    container_name: emlaksoft-app
+    restart: unless-stopped
+    env_file: ../.env.production
+    networks: [coolify]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.services.emlaksoft.loadbalancer.server.port: "3000"
+      # HTTP → HTTPS
+      traefik.http.middlewares.emlaksoft-https.redirectscheme.scheme: https
+      traefik.http.middlewares.emlaksoft-https.redirectscheme.permanent: "true"
+      traefik.http.routers.emlaksoft-http.entrypoints: http
+      traefik.http.routers.emlaksoft-http.rule: Host(`emlaksoft.com.tr`) || Host(`www.emlaksoft.com.tr`)
+      traefik.http.routers.emlaksoft-http.middlewares: emlaksoft-https
+      traefik.http.routers.emlaksoft-http.service: emlaksoft
+      # www → kök alan adı (kalıcı)
+      traefik.http.middlewares.emlaksoft-www.redirectregex.regex: ^https://www\.emlaksoft\.com\.tr/(.*)
+      traefik.http.middlewares.emlaksoft-www.redirectregex.replacement: https://emlaksoft.com.tr/$${1}
+      traefik.http.middlewares.emlaksoft-www.redirectregex.permanent: "true"
+      traefik.http.middlewares.emlaksoft-gzip.compress: "true"
+      traefik.http.routers.emlaksoft.entrypoints: https
+      traefik.http.routers.emlaksoft.rule: Host(`emlaksoft.com.tr`) || Host(`www.emlaksoft.com.tr`)
+      traefik.http.routers.emlaksoft.middlewares: emlaksoft-www,emlaksoft-gzip
+      traefik.http.routers.emlaksoft.service: emlaksoft
+      traefik.http.routers.emlaksoft.tls: "true"
+      traefik.http.routers.emlaksoft.tls.certresolver: letsencrypt
+      traefik.http.routers.emlaksoft.tls.domains[0].main: emlaksoft.com.tr
+      traefik.http.routers.emlaksoft.tls.domains[0].sans: www.emlaksoft.com.tr
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+networks:
+  coolify:
+    external: true

@@ -8,7 +8,7 @@
  * prod fallback'ini kullanır; localhost'a YALNIZ gerçek geliştirmede düşer.
  */
 
-const PROD_FALLBACK = "https://emlaksoft.vercel.app";
+const PROD_FALLBACK = "https://emlaksoft.com.tr";
 
 export function getBaseUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL?.trim();

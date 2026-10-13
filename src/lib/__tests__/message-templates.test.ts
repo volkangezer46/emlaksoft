@@ -90,7 +90,7 @@ describe("renderTemplate", () => {
         adres: "Çankaya / Birlik Mahallesi",
         randevu_tarih: "12 Ağustos Salı",
         randevu_saat: "14:30",
-        link: "https://emlaksoft.vercel.app/vitrin/vadi-emlak/1042",
+        link: "https://emlaksoft.com.tr/vitrin/vadi-emlak/1042",
         telefon: "0532 123 45 67",
       });
       expect(rendered.length).toBeGreaterThan(0);
