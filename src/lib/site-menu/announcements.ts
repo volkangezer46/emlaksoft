@@ -116,6 +116,24 @@ export function utmValue(v: string): string {
  * UTM oluşturucu: verilen bağlantıya `plan`, `utm_source`, `utm_campaign` ekler/günceller (boş değer parametreyi siler).
  * Bölüm (#...) korunur. Yalnız site yolu ya da http(s) adresi için; diğerleri aynen döner.
  */
+/** Bağlantıdaki mevcut plan/utm_source/utm_campaign değerleri (UTM oluşturucu açılırken alanları doldurmak için; yoksa ""). */
+export function readUtm(href: string): { plan: string; source: string; campaign: string } {
+  const raw = href.trim();
+  const hashAt = raw.indexOf("#");
+  const beforeHash = hashAt === -1 ? raw : raw.slice(0, hashAt);
+  const qAt = beforeHash.indexOf("?");
+  const get = new Map<string, string>();
+  if (qAt !== -1) {
+    for (const kv of beforeHash.slice(qAt + 1).split("&")) {
+      if (!kv) continue;
+      const i = kv.indexOf("=");
+      const k = i === -1 ? kv : kv.slice(0, i);
+      if (!get.has(k)) get.set(k, i === -1 ? "" : kv.slice(i + 1));
+    }
+  }
+  return { plan: get.get("plan") ?? "", source: get.get("utm_source") ?? "", campaign: get.get("utm_campaign") ?? "" };
+}
+
 export function withUtm(href: string, p: { plan?: string; source?: string; campaign?: string }): string {
   const raw = href.trim() || "/";
   if (!raw.startsWith("/") && !/^https?:\/\//i.test(raw)) return raw;

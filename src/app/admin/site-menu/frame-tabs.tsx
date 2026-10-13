@@ -5,7 +5,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Link2, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { PLANS } from "@/lib/billing/plans";
-import { withUtm } from "@/lib/site-menu/announcements";
+import { OG_THEME } from "@/lib/brand/og-theme";
+import { readUtm, withUtm } from "@/lib/site-menu/announcements";
 import { moveInArray } from "@/lib/site-menu/editor-model";
 import { DEFAULT_CTAS, FOOTER_BADGE_ICONS, LIMITS, type CtaKey, type FooterBadgeIcon, type Issue } from "@/lib/site-menu/schema-core";
 import type { SiteMenuConfig } from "@/lib/site-menu/schema";
@@ -50,7 +51,20 @@ export function UtmBuilder({ href, onApply, disabled }: { href: string; onApply:
   const next = withUtm(href, { plan, source, campaign });
   if (!open) {
     return (
-      <Button type="button" variant="ghost" size="xs" disabled={disabled} onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        disabled={disabled}
+        onClick={() => {
+          // Alanlar bağlantının mevcut değerleriyle açılır: yalnız birini değiştirmek diğerlerini sessizce silmez.
+          const cur = readUtm(href);
+          setPlan(cur.plan);
+          setSource(cur.source);
+          setCampaign(cur.campaign);
+          setOpen(true);
+        }}
+      >
         <Link2 className="h-3.5 w-3.5" aria-hidden="true" /> UTM oluştur
       </Button>
     );
@@ -247,21 +261,21 @@ function OgPreview({ card }: { card: SiteMenuConfig["ogCard"] }) {
           transform: `scale(${scale})`,
           transformOrigin: "top left",
           padding: 72,
-          background: "linear-gradient(150deg, #0a2247 0%, #071a38 55%, #05122a 100%)",
-          color: "#ffffff",
+          background: OG_THEME.background,
+          color: OG_THEME.text,
         }}
       >
-        <div style={{ position: "absolute", top: -160, right: -120, width: 520, height: 520, borderRadius: "50%", background: "radial-gradient(circle, rgba(20,99,255,0.55), rgba(20,99,255,0) 70%)" }} />
-        <div style={{ position: "absolute", bottom: -200, left: -140, width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(246,210,122,0.22), rgba(246,210,122,0) 70%)" }} />
+        <div style={{ position: "absolute", top: -160, right: -120, width: 520, height: 520, borderRadius: "50%", background: OG_THEME.glowBlue }} />
+        <div style={{ position: "absolute", bottom: -200, left: -140, width: 480, height: 480, borderRadius: "50%", background: OG_THEME.glowGold }} />
         {/* eslint-disable-next-line @next/next/no-img-element -- önizleme: varsayılan koyu logo */}
         <img src="/brand/logo-horizontal-dark.svg" alt="" style={{ height: 72, width: "auto", position: "relative", alignSelf: "flex-start" }} />
         <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="font-display" style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.05, letterSpacing: -1.5, maxWidth: 900 }}>{card.title}</div>
-          {card.subtitle ? <div style={{ fontSize: 30, color: "rgba(255,255,255,0.66)", maxWidth: 880, lineHeight: 1.35 }}>{card.subtitle}</div> : null}
+          {card.subtitle ? <div style={{ fontSize: 30, color: OG_THEME.subtitle, maxWidth: 880, lineHeight: 1.35 }}>{card.subtitle}</div> : null}
         </div>
         <div style={{ position: "relative", display: "flex", gap: 14 }}>
           {card.chips.map((t, i) => (
-            <div key={i} style={{ fontSize: 24, fontWeight: 600, padding: "12px 22px", borderRadius: 999, border: "1px solid rgba(255,255,255,0.16)", background: "rgba(255,255,255,0.06)", color: "#f6d27a" }}>{t}</div>
+            <div key={i} style={{ fontSize: 24, fontWeight: 600, padding: "12px 22px", borderRadius: 999, border: OG_THEME.chipBorder, background: OG_THEME.chipBackground, color: OG_THEME.chipText }}>{t}</div>
           ))}
         </div>
       </div>

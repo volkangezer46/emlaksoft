@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { ANNOUNCEMENT_BAR_BG } from "@/lib/brand/og-theme";
 import { now } from "@/lib/clock";
 import { endOfDayTrMs, pickAnnouncement, startOfDayTrMs } from "@/lib/site-menu/announcements";
 import { allIds, blankFooterColumn, blankFooterLink, moveInArray, newId } from "@/lib/site-menu/editor-model";
@@ -130,7 +131,7 @@ export function AnnouncementTab({ cfg, update, issues, readOnly }: Props) {
           <p className="pb-2 text-xs text-text-muted">Bu yolda bugün görünecek duyuru:</p>
         </div>
         {picked ? (
-          <div className="flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-card)] px-12 py-1.5 text-center text-sm font-semibold text-white" style={{ background: "linear-gradient(90deg, #0b1e4a, #1b3a8c)" }}>
+          <div className="flex min-h-10 items-center justify-center gap-2 rounded-[var(--radius-card)] px-12 py-1.5 text-center text-sm font-semibold text-white" style={{ background: ANNOUNCEMENT_BAR_BG }}>
             <p className="m-0">
               {picked.text}
               {picked.href ? <> <span className="font-extrabold underline underline-offset-[3px]">{picked.linkLabel}</span></> : null}

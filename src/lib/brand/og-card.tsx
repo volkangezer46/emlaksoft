@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getBrandAsset, getBrandMeta } from "@/lib/brand/store";
+import { OG_THEME } from "@/lib/brand/og-theme";
 import { readPngSize } from "@/lib/brand/upload-validation";
 import { defaultSiteMenu } from "@/lib/site-menu/defaults";
 import type { OgCard } from "@/lib/site-menu/schema";
@@ -75,8 +76,8 @@ export async function renderBrandCard() {
           flexDirection: "column",
           justifyContent: "space-between",
           padding: "72px",
-          background: "linear-gradient(150deg, #0a2247 0%, #071a38 55%, #05122a 100%)",
-          color: "#ffffff",
+          background: OG_THEME.background,
+          color: OG_THEME.text,
           fontFamily: "Manrope",
         }}
       >
@@ -88,7 +89,7 @@ export async function renderBrandCard() {
             width: 520,
             height: 520,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(20,99,255,0.55), rgba(20,99,255,0) 70%)",
+            background: OG_THEME.glowBlue,
             display: "flex",
           }}
         />
@@ -100,7 +101,7 @@ export async function renderBrandCard() {
             width: 480,
             height: 480,
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(246,210,122,0.22), rgba(246,210,122,0) 70%)",
+            background: OG_THEME.glowGold,
             display: "flex",
           }}
         />
@@ -114,7 +115,7 @@ export async function renderBrandCard() {
             {card.title}
           </div>
           {card.subtitle ? (
-            <div style={{ fontSize: 30, color: "rgba(255,255,255,0.66)", maxWidth: 880, lineHeight: 1.35 }}>
+            <div style={{ fontSize: 30, color: OG_THEME.subtitle, maxWidth: 880, lineHeight: 1.35 }}>
               {card.subtitle}
             </div>
           ) : null}
@@ -130,9 +131,9 @@ export async function renderBrandCard() {
                 fontWeight: 600,
                 padding: "12px 22px",
                 borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.16)",
-                background: "rgba(255,255,255,0.06)",
-                color: "#f6d27a",
+                border: OG_THEME.chipBorder,
+                background: OG_THEME.chipBackground,
+                color: OG_THEME.chipText,
               }}
             >
               {t}

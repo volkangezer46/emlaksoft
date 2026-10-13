@@ -1,7 +1,7 @@
 import type { ReactElement } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { addDismissed, announcementKey, endOfDayTrMs, matchesPath, parseDismissed, pickAnnouncement, startOfDayTrMs, withUtm, type AnnouncementTarget } from "./announcements";
+import { addDismissed, announcementKey, endOfDayTrMs, matchesPath, parseDismissed, pickAnnouncement, startOfDayTrMs, readUtm, withUtm, type AnnouncementTarget } from "./announcements";
 import { defaultSiteMenu } from "./defaults";
 import { customCtas, splitYear, toPublicAnnouncements, toPublicCtas } from "./public";
 import { checkHref, checkPageHref, hasErrors, siteMenuSchema, upgradeSiteMenu, validateSiteMenu, type SiteMenuConfig } from "./schema";
@@ -208,6 +208,13 @@ describe("UTM oluşturucu ve düğmeler", () => {
     expect(withUtm("/fiyatlar?x=1#sss", { source: "ig" })).toBe("/fiyatlar?x=1&utm_source=ig#sss");
     expect(withUtm("/kayit?plan=office", { plan: "" })).toBe("/kayit");
     expect(checkPageHref(withUtm("/kayit", { plan: "office", source: "İğüşöç", campaign: "a b" })).ok).toBe(true);
+  });
+
+  it("oluşturucu mevcut değerlerle açılır: yalnız bir alanı değiştirmek diğerlerini silmez", () => {
+    expect(readUtm("/kayit?plan=office&utm_campaign=ekim#x")).toEqual({ plan: "office", source: "", campaign: "ekim" });
+    expect(readUtm("/kayit")).toEqual({ plan: "", source: "", campaign: "" });
+    const cur = readUtm("/kayit?plan=office");
+    expect(withUtm("/kayit?plan=office", { ...cur, source: "ig" })).toBe("/kayit?plan=office&utm_source=ig");
   });
 
   it("varsayılan düğmeler istemciye geçmez; geçersiz hedef varsayılana düşer", () => {
