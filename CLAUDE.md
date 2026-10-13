@@ -2,11 +2,13 @@
 
 # EmlakSoft
 
-Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + Supabase + Vercel).
+Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + self-hosted Supabase, Hetzner sunucusu).
 Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kalkanı, değerleme
 (emsal motoru), otomasyonlar, sözleşmeyle doğrulanan cron envanteri (bkz. `vercel.json`), AI asistan,
 vitrin ve token'lı public portallar.
-Tamamı Türkçe. Canlıda (Vercel `main` → production); deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`.
+Tamamı Türkçe. Canlı: https://emlaksoft.com.tr (Hetzner `emlaksoft-prod`, bu sunucu). Yayın: `scripts/sunucu/deploy.sh`
+(Docker imajı + Coolify Traefik/Let's Encrypt; tek env kaynağı `.env.production`). Sunucu düzeni ve eksikler `docs/SUNUCU_DEVIR.md`;
+deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`. Vercel + bulut Supabase YEDEK olarak duruyor (yeni iş oraya gitmez).
 
 ## Komutlar
 
@@ -89,11 +91,11 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **SEO:** public sayfa metadata'sı yalnız `buildMetadata(path)` (`src/lib/seo/store.ts`); sayfa envanteri `src/lib/seo/registry.ts`, yönetim `/admin/seo` (modül `seo`),
   sitemap/robots/yönlendirme/JSON-LD/robot tek yerde. Token'lı yüzeyler sitemap'e ASLA girmez. Yeni public sayfa kontrol listesi: `docs/MIMARI.md` "SEO sistemi".
 - **Zeka katmanı:** içgörüler tek tablo `insights` (kullanıcı bazlı, kanıtlı, `href` zorunlu, son geçerlilikli); kurallar SAF `src/lib/insights/rules/*` (kayıt `rules/index.ts`), okuyucu `src/lib/insights/read.ts`, üretici cron `insight-engine`. Kural: veri yoksa kart yok, emsal yoksa fiyat önerisi yok, tahmin etiketli, örnek veri içgörü üretmez, LLM anlatımı yalnız opsiyonel ve varsayılan KAPALI (`audit` zorunlu, kota kapısı, girdide olmayan sayı reddedilir). Ayrıntı `docs/HAFIZA.md` §13.
-- **Cron:** 36 route `src/app/api/cron/*` + `vercel.json` (sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
+- **Cron:** 36 route `src/app/api/cron/*` + `vercel.json` (tek kaynak; sunucuda `scripts/sunucu/install-cron.sh` → `/etc/cron.d/emlaksoft`; sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
   ve `recordHeartbeat` yazar.
 
 **PROJE HAFIZASI (önce bunu oku, durumu sıfırdan tarama): `docs/HAFIZA.md`** — yayın durumu, migration sırası, açık işler, kararlar,
 tek-kaynak haritası, çalışma/doğrulama yöntemi.
 
 Ayrıntı: `docs/MIMARI.md` · yol haritası: `docs/ROADMAP.md` · güncel durum: `docs/DURUM.md` · deploy: `docs/DEPLOY.md`.
-Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.vercel.app
+Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.com.tr (yedek: https://emlaksoft.vercel.app)

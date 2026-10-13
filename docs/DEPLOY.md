@@ -1,6 +1,12 @@
 # EmlakSoft — Deploy Rehberi (tek kaynak)
 
-Vercel + Supabase üretim hattı. Bu belge eski iki checklist'i birleştirir
+**2026-10-13'ten beri üretim Hetzner sunucusunda** (https://emlaksoft.com.tr): self-hosted Supabase (Coolify servisi,
+`https://api.emlaksoft.com.tr`) + uygulama Docker imajı. Kod yayını: `scripts/sunucu/deploy.sh` (BuildKit secret ile derleme,
+`deploy/compose.prod.yml`). Aşağıdaki "Vercel ortam değişkenleri" tablosu artık `/root/emlaksoft/.env.production` için geçerlidir
+(değişiklikten sonra `deploy.sh`). Cron: `scripts/sunucu/install-cron.sh`; gece yedeği `scripts/sunucu/backup-db.sh`.
+Ayrıntı ve açık işler: `docs/SUNUCU_DEVIR.md`. Aşağıdaki Vercel ifadeleri yedek ortam içindir.
+
+Vercel + Supabase üretim hattı (YEDEK). Bu belge eski iki checklist'i birleştirir
 (`docs/arsiv/DEPLOY_CHECKLIST_kok.md`, `docs/arsiv/DEPLOY_CHECKLIST_docs.md`). Rota/migration sayıları burada
 sabitlenmez; güncel sayılar `docs/DURUM.md`. Olay/rollback/restore: `docs/runbooks/`.
 
