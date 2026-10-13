@@ -47,6 +47,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/site-menu/store.ts": { calls: 1, scope: "platform", why: "site menüsü" },
   "src/lib/site-pages/store.ts": { calls: 3, scope: "platform", why: "sayfa oluşturucu: yayın haritası, sayfa içeriği (kimlik anahtarda), dizin; platform_settings" },
   "src/lib/try-credits/settings.ts": { calls: 1, scope: "platform", why: "TL kredi tavanı" },
+  "src/lib/vitrin-seo/store.ts": { calls: 1, scope: "platform", why: "vitrin kalıcı noindex slug listesi (platform_settings)" },
 };
 
 /** Paylaşılan önbellek içinde yasak: oturum/istek okuması. */

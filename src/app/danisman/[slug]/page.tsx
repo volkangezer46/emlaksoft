@@ -27,6 +27,8 @@ import { AgentShareCard } from "./agent-share-card";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { getSeoSettings } from "@/lib/seo/store";
 import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
+import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
+import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import {
@@ -116,9 +118,14 @@ export async function generateMetadata({
   if (!agent) return { title: "Danışman bulunamadı", robots: { index: false, follow: false } };
 
   const admin = createAdminClient();
-  const [{ data: tenant }, seo] = await Promise.all([
-    admin.from("tenants").select("name, vitrin_seo_optin").eq("id", agent.tenant_id).maybeSingle(),
+  const [{ data: tenant }, seo, neverIndexList] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("name, slug, vitrin_seo_optin, sample_seeded_at, sample_cleared_at")
+      .eq("id", agent.tenant_id)
+      .maybeSingle(),
     getSeoSettings(),
+    loadNeverIndexList(),
   ]);
   const office = (tenant?.name as string | null) ?? "Emlak ofisi";
   const role = agent.title?.trim() || "Emlak danışmanı";
@@ -137,8 +144,9 @@ export async function generateMetadata({
   return {
     title: { absolute: title },
     description,
-    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
-    robots: vitrinRobots(tenant?.vitrin_seo_optin === true),
+    // Arama motoru görünürlüğü: kalıcı noindex kuralı (örnek/demo/test/platform ofisi; vitrin-seo/never-index.ts)
+    // ÖNCE, sonra ofisin açık onayı (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt. Ofis okunamazsa noindex.
+    robots: vitrinRobots(tenant?.vitrin_seo_optin === true, !tenant || isNeverIndexTenant(tenant, neverIndexList)),
     alternates: { canonical: `/danisman/${slug}` },
     openGraph: {
       type: "profile",

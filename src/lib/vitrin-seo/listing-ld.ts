@@ -1,0 +1,73 @@
+import type { LdNode } from "@/lib/seo/jsonld";
+import { vitrinListingBreadcrumbLd } from "./breadcrumb";
+
+/**
+ * İlan detayı JSON-LD grafiği (SAF): RealEstateListing + BreadcrumbList. Çıktı sayfada `serializeJsonLd` ile basılır.
+ *  - `image[]` yalnız gerçekten var olan public görsellerden (belge değil) üretilir; görsel yoksa alan HİÇ yazılmaz.
+ *  - Offer'a `priceValidUntil` eklenmez (uydurma tarih yok); fiyat yoksa Offer yok.
+ */
+
+export const LISTING_LD_MAX_IMAGES = 10;
+
+export type VitrinListingLdInput = {
+  base: string;
+  slug: string;
+  id: string;
+  name: string;
+  description: string | null;
+  officeName: string | null;
+  imageIds: readonly string[];
+  createdAt?: string | null;
+  price: number | null;
+  sqm: number | null;
+  lat?: number | null;
+  lng?: number | null;
+  streetAddress?: string | null;
+  district?: string | null;
+  province?: string | null;
+};
+
+export function listingImageUrls(base: string, ids: readonly string[], max: number = LISTING_LD_MAX_IMAGES): string[] {
+  return [...new Set(ids.filter(Boolean))].slice(0, max).map((id) => `${base}/api/property-media/${id}`);
+}
+
+export function buildVitrinListingLd(input: VitrinListingLdInput): LdNode {
+  const url = `${input.base}/vitrin/${input.slug}/${input.id}`;
+  const images = listingImageUrls(input.base, input.imageIds);
+  const hasGeo = input.lat != null && input.lng != null && Number.isFinite(input.lat) && Number.isFinite(input.lng);
+  const listing: LdNode = {
+    "@type": "RealEstateListing",
+    name: input.name,
+    ...(input.description ? { description: input.description } : {}),
+    url,
+    ...(images.length > 0 ? { image: images } : {}),
+    ...(input.createdAt ? { datePosted: input.createdAt } : {}),
+    ...(input.price != null
+      ? { offers: { "@type": "Offer", price: input.price, priceCurrency: "TRY", availability: "https://schema.org/InStock" } }
+      : {}),
+    ...(input.sqm ? { floorSize: { "@type": "QuantitativeValue", value: input.sqm, unitCode: "MTK" } } : {}),
+    ...(hasGeo ? { geo: { "@type": "GeoCoordinates", latitude: input.lat, longitude: input.lng } } : {}),
+    address: {
+      "@type": "PostalAddress",
+      ...(input.streetAddress ? { streetAddress: input.streetAddress } : {}),
+      ...(input.district ? { addressLocality: input.district } : {}),
+      ...(input.province ? { addressRegion: input.province } : {}),
+      addressCountry: "TR",
+    },
+    provider: {
+      "@type": "RealEstateAgent",
+      name: input.officeName ?? "EmlakSoft",
+      url: `${input.base}/vitrin/${input.slug}`,
+    },
+  };
+  const breadcrumb = vitrinListingBreadcrumbLd({
+    base: input.base,
+    slug: input.slug,
+    officeName: input.officeName,
+    district: input.district,
+    province: input.province,
+    listingId: input.id,
+    listingName: input.name,
+  });
+  return { "@context": "https://schema.org", "@graph": [listing, breadcrumb] };
+}

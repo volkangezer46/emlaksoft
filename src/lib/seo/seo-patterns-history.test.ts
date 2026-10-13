@@ -68,13 +68,14 @@ describe("dinamik kalıplar: varsayılan = bugünkü sabit çıktı", () => {
     expect(resolveSeoPattern(empty, "office", "title", { ofis: long })).toBe(`${long} | Portföy Vitrini`);
   });
 
-  it("ilan başlık ve açıklaması (sayfanın sonraki sadeleştirme + 160 kesimi dahil)", () => {
+  it("ilan başlık ve açıklaması (SP7: markalı başlık ≤60, açıklamada ham adres yok)", () => {
     const p = { title: "Deniz manzaralı 3+1", code: "ES-1", price: "5.000.000 ₺", type: "Daire", tx: "Satılık", tenant: "Demo Ofis" };
     const loc = "Moda Cd. 5, Kadıköy, İstanbul";
-    const vars = { ofis: p.tenant, ilan_basligi: p.title || p.code, fiyat: p.price, konum: loc || "Türkiye", tip: p.type, islem: p.tx };
-    expect(resolveSeoPattern(empty, "listing", "title", vars)).toBe(`${p.title || p.code} - ${p.price}`);
-    const legacy = `${loc || "Türkiye"} · ${p.type} · ${p.tx} · ${p.price} — ${p.tenant} güvencesiyle.`.replace(/\s+/g, " ").slice(0, 160);
-    expect(resolveSeoPattern(empty, "listing", "description", vars).replace(/\s+/g, " ").slice(0, 160)).toBe(legacy);
+    const vars = { ofis: p.tenant, ilan_basligi: p.title || p.code, fiyat: p.price, konum: loc || "Türkiye", ilce: "Kadıköy", tip: p.type, islem: p.tx, oda: "3+1", metrekare: "120 m²" };
+    expect(resolveSeoPattern(empty, "listing", "title", vars)).toBe(`${p.title} | Kadıköy ${p.tx} ${p.type} – ${p.tenant}`);
+    const desc = resolveSeoPattern(empty, "listing", "description", vars);
+    expect(desc).toBe(`Kadıköy ${p.tx} ${p.type} · 3+1 · 120 m² · ${p.price} — ${p.tenant} güvencesiyle.`);
+    expect(desc).not.toContain("Moda Cd.");
   });
 
   it("danışman başlık ve açıklaması", () => {

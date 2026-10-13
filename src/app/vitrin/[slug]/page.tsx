@@ -2,17 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { Suspense, cache } from "react";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { unstable_cache } from "next/cache";
 import { vitrinSignatureHref } from "@/lib/growth/attribution";
 import { ArrowRight, Building2, Calculator, MapPin, Ruler, BedDouble, Search, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { LeadForm } from "@/app/lead/[token]/lead-form";
-import { SavedSearchBox } from "@/components/public/saved-search-box";
 import { FavChip, FavEmptyNotice, VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "./fav-nav-badge";
-import { VitrinFilterPanel } from "./filter-panel";
-import { CompareBar } from "@/components/public/compare-select";
+import { LazyCompareBar, LazyFilterPanel, LazyLeadForm, LazySavedSearchBox } from "./lazy-islands";
 import { DAY_MS, msSince, now } from "@/lib/clock";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import { orIlike, safeLike } from "@/lib/pgrst";
@@ -25,7 +23,10 @@ import { toTelHref } from "@/lib/phone";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
+import { serializeJsonLd } from "@/lib/seo/jsonld";
 import { introDescription, resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
+import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
+import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -71,22 +72,25 @@ type VitrinSearchParams = {
   tur?: string;
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}): Promise<Metadata> {
-  const { slug } = await params;
+/**
+ * Kabuk + metadata ORTAK verisi — yalnız `params`'a bağlıdır, searchParams OKUMAZ (HIZ-05 / SP7).
+ * React `cache`: generateMetadata ile sayfa aynı istekte tek tur paylaşır. Sayfa kabuğu bu veriyi bekler; metadata da
+ * yalnız bunu beklediği için `<title>`/description kabukla birlikte `<head>`'e girer (akışla gövdeye düşmez).
+ * Filtreli ilan ızgarası searchParams'ı ayrı alt bileşende okur ve <Suspense> içinde akar.
+ */
+const loadOfficeHead = cache(async (slug: string) => {
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, status")
+    .select(
+      "id, name, slug, status, brand_color, logo_url, phone, license_no, address_line, lead_capture_token, lead_capture_enabled, sample_seeded_at, sample_cleared_at",
+    )
     .eq("slug", slug)
     .maybeSingle();
-  if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "Vitrin bulunamadı" };
-  // Ofis ayarı (sütun yoksa varsayılan: açık, tanıtım yok, arama onayı yok -> noindex).
-  // Ayar, ilan sayısı ve SEO kalıpları birbirinden bağımsız: paralel.
-  const [{ settings: vitrinCfg }, { count }, seo] = await Promise.all([
+  if (!tenant || !isPublicTenantActive(tenant.status)) return null;
+  // Ofis ayarı (sütun yoksa varsayılan: açık, tanıtım yok, arama onayı yok -> noindex), aktif ilan sayısı, SEO
+  // kalıpları ve kalıcı noindex listesi birbirinden bağımsız: paralel.
+  const [vitrinState, { count }, seo, neverIndexList] = await Promise.all([
     loadVitrinSettings(admin, tenant.id),
     admin
       .from("properties")
@@ -97,19 +101,43 @@ export async function generateMetadata({
       .eq("is_sample", false)
       .or(OPEN_LISTING_OR_FILTER),
     getSeoSettings(),
+    loadNeverIndexList(),
   ]);
-  if (!vitrinCfg.enabled) return { title: "Vitrin bulunamadı" };
+  return {
+    admin,
+    tenant,
+    vitrinCfg: vitrinState.settings,
+    vitrinCfgAvailable: vitrinState.available,
+    liveCount: count ?? 0,
+    seo,
+    // Örnek/demo/test/platform kiracısı: opt-in açık olsa bile noindex (src/lib/vitrin-seo/never-index.ts).
+    neverIndex: isNeverIndexTenant(tenant, neverIndexList),
+  };
+});
+
+type OfficeHead = NonNullable<Awaited<ReturnType<typeof loadOfficeHead>>>;
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const head = await loadOfficeHead(slug);
+  if (!head || !head.vitrinCfg.enabled) return { title: "Vitrin bulunamadı" };
+  const { tenant, vitrinCfg, seo } = head;
 
   // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
-  const vars = { ofis: tenant.name, ilan_sayisi: count ?? 0 };
+  const vars = { ofis: tenant.name, ilan_sayisi: head.liveCount };
   const title = resolveSeoPattern(seo.patterns, "office", "title", vars);
   const description = introDescription(vitrinCfg.intro) ?? resolveSeoPattern(seo.patterns, "office", "description", vars);
 
   return {
     title: { absolute: title },
     description,
-    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
-    robots: vitrinRobots(vitrinCfg.seoOptin),
+    // Arama motoru görünürlüğü: kalıcı noindex kuralı ÖNCE, sonra ofisin açık onayı (tenants.vitrin_seo_optin);
+    // sitemap ile aynı ölçüt.
+    robots: vitrinRobots(vitrinCfg.seoOptin, head.neverIndex),
     alternates: { canonical: `/vitrin/${slug}` },
     openGraph: {
       type: "website",
@@ -123,45 +151,44 @@ export async function generateMetadata({
   };
 }
 
-export default async function VitrinPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ slug: string }>;
-  searchParams?: Promise<VitrinSearchParams>;
-}) {
-  const { slug } = await params;
-  const sp = (await searchParams) ?? {};
-  const admin = createAdminClient();
+/* ---------- Filtreli ilan verisi (searchParams'a bağlı; yalnız Suspense içindeki alt bileşenler okur) ---------- */
 
-  // provinces hiçbir şeye bağlı değil → tenant ile paralel çek
-  const [{ data: tenant }, { data: provinces }] = await Promise.all([
-    admin
-      .from("tenants")
-      .select("id, name, status, brand_color, logo_url, phone, license_no, address_line, lead_capture_token, lead_capture_enabled")
-      .eq("slug", slug)
-      .maybeSingle(),
-    provinceOptionsResult(),
-  ]);
+type ListingFilters = {
+  q: string;
+  min: number | null;
+  max: number | null;
+  oda: string;
+  tur: string;
+  sirala: "" | "fiyat-artan" | "fiyat-azalan";
+  tx: string;
+  rawMin: string;
+  rawMax: string;
+};
 
-  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
-  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
-  // Ofis vitrin ayarları (ayrı sorgu: sütun yoksa varsayılan = bugünkü davranış).
-  const { settings: vitrinCfg, available: vitrinCfgAvailable } = await loadVitrinSettings(admin, tenant.id);
-  if (!vitrinCfg.enabled) notFound();
+function parseFilters(sp: VitrinSearchParams): ListingFilters {
+  return {
+    q: (sp.q ?? "").trim(),
+    min: parseMoneyParam(sp.min),
+    max: parseMoneyParam(sp.max),
+    oda: (sp.oda ?? "").trim(),
+    tur: (sp.tur ?? "").trim().slice(0, 40),
+    sirala: sp.sirala === "fiyat-artan" || sp.sirala === "fiyat-azalan" ? sp.sirala : "",
+    tx: sp.tx ?? "",
+    rawMin: sp.min ?? "",
+    rawMax: sp.max ?? "",
+  };
+}
 
-  const q = (sp.q ?? "").trim();
-  const min = parseMoneyParam(sp.min);
-  const max = parseMoneyParam(sp.max);
-  const oda = (sp.oda ?? "").trim();
-  const tur = (sp.tur ?? "").trim().slice(0, 40);
-  const sirala = sp.sirala === "fiyat-artan" || sp.sirala === "fiyat-azalan" ? sp.sirala : "";
-
-  // Vitrin listesi searchParams okuduğu için sayfa dinamik render olur ve `revalidate`
-  // devreye girmez; veri katmanı bu yüzden kısa TTL (60 sn) önbellektedir. Anahtar tenant.id +
-  // normalize filtreler; serbest metin araması (q) önbelleğe ALINMAZ (anahtar şişmesi yok).
-  // Tenant durumu (askı/iptal) önbelleğin DIŞINDA her istekte denetlenir. İlan yazma action'ları
-  // revalidatePath ile düşürür; en kötü bayatlık TTL kadardır (ISR ile aynı sözleşme).
+/**
+ * Filtreli ilan listesi. Vitrin listesi searchParams okuduğu için sayfa dinamik render olur ve `revalidate` devreye
+ * girmez; veri katmanı bu yüzden kısa TTL (60 sn) önbellektedir. Anahtar tenant.id + normalize filtreler; serbest metin
+ * araması (q) önbelleğe ALINMAZ (anahtar şişmesi yok). Tenant durumu (askı/iptal) önbelleğin DIŞINDA her istekte
+ * denetlenir (loadOfficeHead). İlan yazma action'ları revalidatePath ile düşürür; en kötü bayatlık TTL kadardır.
+ * React `cache`: üst filtre şeridi, ızgara ve kayıtlı arama kutusu aynı istekte TEK sorgu paylaşır.
+ */
+const loadFilteredListing = cache(async (head: OfficeHead, filterKey: string) => {
+  const { admin, tenant } = head;
+  const { q, min, max, oda, tur, sirala, tx } = JSON.parse(filterKey) as ListingFilters;
   const loadListing = async () => {
     let query = admin
       .from("properties")
@@ -232,11 +259,7 @@ export default async function VitrinPage({
       })();
   const { propsData, roomRows, fxRates } = listing;
 
-  // Kur tarihi ipucu — kartlardaki döviz satırının `title` değeri.
-  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
-
-  const txFilter = sp.tx === "satilik" ? "sale" : sp.tx === "kiralik" ? "rent" : null;
-
+  const txFilter = tx === "satilik" ? "sale" : tx === "kiralik" ? "rent" : null;
   let properties = propsData ?? [];
   if (txFilter) {
     properties = properties.filter((p) => {
@@ -246,85 +269,384 @@ export default async function VitrinPage({
   }
 
   const roomSet = new Set<string>();
+  const typeSet = new Set<string>();
   for (const row of roomRows ?? []) {
     const r = ((row.features ?? {}) as { rooms?: string }).rooms;
     if (r) roomSet.add(r);
-  }
-  const typeSet = new Set<string>();
-  for (const row of roomRows ?? []) {
     const t = (row as { property_type?: string | null }).property_type;
     if (t) typeSet.add(t);
-  }
-  const typeOptions = [...typeSet].sort((a, b) => a.localeCompare(b, "tr"));
-  const roomOptions = [...roomSet].sort((a, b) => a.localeCompare(b, "tr"));
-
-  const activeFilterCount = [q, min != null, max != null, oda, sirala].filter(Boolean).length;
-  const hasFilter = Boolean(q || min != null || max != null || oda || sirala || tur || sp.tx);
-
-  // tx sekmeleri diğer filtreleri korur
-  function txHref(txKey: string) {
-    const p = new URLSearchParams();
-    if (txKey) p.set("tx", txKey);
-    if (q) p.set("q", q);
-    if (sp.min) p.set("min", sp.min);
-    if (sp.max) p.set("max", sp.max);
-    if (oda) p.set("oda", oda);
-    if (sirala) p.set("sirala", sirala);
-    if (tur) p.set("tur", tur);
-    const s = p.toString();
-    return `/vitrin/${slug}${s ? `?${s}` : ""}`;
-  }
-  // Kategori çipleri (emlak türü) tx/q/fiyat/oda/sıralama filtrelerini korur
-  function turHref(t: string) {
-    const p = new URLSearchParams();
-    if (sp.tx) p.set("tx", sp.tx);
-    if (q) p.set("q", q);
-    if (sp.min) p.set("min", sp.min);
-    if (sp.max) p.set("max", sp.max);
-    if (oda) p.set("oda", oda);
-    if (sirala) p.set("sirala", sirala);
-    if (t) p.set("tur", t);
-    const s = p.toString();
-    return `/vitrin/${slug}${s ? `?${s}` : ""}`;
   }
 
   const coverMap = new Map<string, string>(listing.coverEntries);
   // Varsayılan (en yeni) sıralamada fotoğraflı ilanlar öne; fiyat sıralamaları aynen korunur. Kararlı bölme: grup içi sıra değişmez.
   if (!sirala) properties = [...properties.filter((p) => coverMap.has(p.id)), ...properties.filter((p) => !coverMap.has(p.id))];
 
-  // JSON-LD: ofis (RealEstateAgent) + ilan listesi (ItemList) — yalnız doğrulanabilir alanlar.
+  return {
+    properties,
+    coverMap,
+    fxRates,
+    roomOptions: [...roomSet].sort((a, b) => a.localeCompare(b, "tr")),
+    typeOptions: [...typeSet].sort((a, b) => a.localeCompare(b, "tr")),
+  };
+});
+
+async function readListing(head: OfficeHead, searchParams: Promise<VitrinSearchParams> | undefined) {
+  const f = parseFilters((await searchParams) ?? {});
+  return { f, data: await loadFilteredListing(head, JSON.stringify(f)) };
+}
+
+/** Filtre bağlantısı: verilen alanları değiştirip diğer filtreleri korur. */
+function filterHref(slug: string, f: ListingFilters, patch: Partial<Record<"tx" | "tur", string>>) {
+  const p = new URLSearchParams();
+  const tx = patch.tx ?? f.tx;
+  const tur = patch.tur ?? f.tur;
+  if (tx) p.set("tx", tx);
+  if (f.q) p.set("q", f.q);
+  if (f.rawMin) p.set("min", f.rawMin);
+  if (f.rawMax) p.set("max", f.rawMax);
+  if (f.oda) p.set("oda", f.oda);
+  if (f.sirala) p.set("sirala", f.sirala);
+  if (tur) p.set("tur", tur);
+  const s = p.toString();
+  return `/vitrin/${slug}${s ? `?${s}` : ""}`;
+}
+
+const fieldCls =
+  "min-h-11 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
+
+/** Hero altındaki filtre şeridi (sayı satırı, işlem sekmeleri, tür çipleri, GET filtre formu). */
+async function VitrinHeaderFilters({
+  head,
+  slug,
+  searchParams,
+}: {
+  head: OfficeHead;
+  slug: string;
+  searchParams?: Promise<VitrinSearchParams>;
+}) {
+  const { f, data } = await readListing(head, searchParams);
+  const { properties, roomOptions, typeOptions } = data;
+  const activeFilterCount = [f.q, f.min != null, f.max != null, f.oda, f.sirala].filter(Boolean).length;
+  const hasFilter = Boolean(f.q || f.min != null || f.max != null || f.oda || f.sirala || f.tur || f.tx);
+
+  return (
+    <>
+      <p className="mt-2 max-w-xl text-sm text-white/60">
+        {properties.length} aktif ilan · yerinde inceleme ve fiyat bilgisi için hemen talep bırakın.
+      </p>
+      <div className="mt-6 flex flex-wrap gap-2">
+        {[
+          { key: "", label: "Tümü" },
+          { key: "satilik", label: "Satılık" },
+          { key: "kiralik", label: "Kiralık" },
+        ].map((t) => {
+          const active = f.tx === t.key;
+          return (
+            <Link
+              key={t.key}
+              href={filterHref(slug, f, { tx: t.key })}
+              className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-xs font-bold transition ${
+                active ? "bg-white text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+        {/* Favori görünümü — client filtre, SSR listesi değişmez */}
+        <FavChip slug={slug} />
+        {/* Favoriler sayfası + sayaç rozeti (localStorage, hydration-güvenli) */}
+        <FavNavBadge slug={slug} variant="dark" />
+      </div>
+
+      {typeOptions.length > 1 ? (
+        <nav aria-label="Emlak türü" className="mt-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+          {["", ...typeOptions].map((t) => {
+            const active = f.tur === t;
+            return (
+              <Link
+                key={t || "tum"}
+                href={filterHref(slug, f, { tur: t })}
+                aria-current={active ? "true" : undefined}
+                className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  // Koyu hero'da --ink-950 beyazdır: mint zeminde değişmez lacivert metin (kontrast).
+                  active ? "bg-mint-500 text-[color:var(--navy-900)]" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
+                }`}
+              >
+                {t || "Tüm türler"}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
+
+      {/* Sunucu filtreleri — GET formu, JS gerektirmez (panelin istemci kodu görünür alana yaklaşınca yüklenir) */}
+      <LazyFilterPanel activeCount={activeFilterCount}>
+        <form
+          method="get"
+          action={`/vitrin/${slug}`}
+          className="grid max-w-4xl gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1.1fr_1.2fr_auto]"
+        >
+          {f.tx ? <input type="hidden" name="tx" value={f.tx} /> : null}
+          {f.tur ? <input type="hidden" name="tur" value={f.tur} /> : null}
+          <input name="q" defaultValue={f.q} placeholder="Başlık, kod veya adres ara" className={fieldCls} aria-label="Metin arama" />
+          <input name="min" defaultValue={f.rawMin} inputMode="numeric" placeholder="Min ₺" className={fieldCls} aria-label="Minimum fiyat" />
+          <input name="max" defaultValue={f.rawMax} inputMode="numeric" placeholder="Max ₺" className={fieldCls} aria-label="Maksimum fiyat" />
+          <select name="oda" defaultValue={f.oda} className={fieldCls} aria-label="Oda sayısı">
+            <option value="" className="bg-ink-950">Oda (tümü)</option>
+            {roomOptions.map((r) => (
+              <option key={r} value={r} className="bg-ink-950">
+                {r}
+              </option>
+            ))}
+          </select>
+          <select name="sirala" defaultValue={f.sirala} className={fieldCls} aria-label="Sıralama">
+            <option value="" className="bg-ink-950">En yeni</option>
+            <option value="fiyat-artan" className="bg-ink-950">Fiyat (artan)</option>
+            <option value="fiyat-azalan" className="bg-ink-950">Fiyat (azalan)</option>
+          </select>
+          <button
+            type="submit"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
+          >
+            <Search className="h-3.5 w-3.5" /> Filtrele
+          </button>
+        </form>
+      </LazyFilterPanel>
+      {hasFilter ? (
+        <Link
+          href={`/vitrin/${slug}`}
+          className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-white/50 underline-offset-2 transition hover:text-white hover:underline"
+        >
+          Filtreleri temizle
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
+/** Filtre şeridi akarken yer tutucu (düzen sıçraması az olsun diye aynı dikey ritim). */
+function HeaderFiltersFallback() {
+  return (
+    <div aria-hidden="true">
+      <div className="mt-2 h-5 w-64 max-w-full rounded bg-white/10 motion-safe:animate-pulse" />
+      <div className="mt-6 flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="h-11 w-20 rounded-full bg-white/10 motion-safe:animate-pulse" />
+        ))}
+      </div>
+      <div className="mt-5 h-11 w-full max-w-4xl rounded-[var(--radius-card)] bg-white/10 motion-safe:animate-pulse" />
+    </div>
+  );
+}
+
+/** İlan ızgarası + ItemList JSON-LD (filtreli liste). */
+async function VitrinGrid({
+  head,
+  slug,
+  searchParams,
+}: {
+  head: OfficeHead;
+  slug: string;
+  searchParams?: Promise<VitrinSearchParams>;
+}) {
+  const { f, data } = await readListing(head, searchParams);
+  const { properties, coverMap, fxRates } = data;
+  const hasFilter = Boolean(f.q || f.min != null || f.max != null || f.oda || f.sirala || f.tur || f.tx);
+  // Kur tarihi ipucu — kartlardaki döviz satırının `title` değeri.
+  const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
   const siteUrl = getBaseUrl();
-  const jsonLd = {
+  const itemListLd = {
     "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "RealEstateAgent",
-        name: tenant.name,
-        url: `${siteUrl}/vitrin/${slug}`,
-        ...(tenant.logo_url ? { logo: tenant.logo_url } : {}),
-        ...(tenant.phone && vitrinCfg.showPhone ? { telephone: tenant.phone } : {}),
-      },
-      {
-        "@type": "ItemList",
-        itemListElement: properties.slice(0, 20).map((p, i) => ({
-          "@type": "ListItem",
-          position: i + 1,
-          url: `${siteUrl}/vitrin/${slug}/${p.id}`,
-          name: p.title || p.property_code,
-        })),
-      },
-    ],
+    "@type": "ItemList",
+    itemListElement: properties.slice(0, 20).map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${siteUrl}/vitrin/${slug}/${p.id}`,
+      name: p.title || p.property_code,
+    })),
   };
 
-  const fieldCls =
-    "min-h-11 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/[0.06] px-3.5 py-2.5 text-sm text-white placeholder:text-white/40 outline-none transition focus:border-mint-400/50 focus:bg-white/[0.09]";
+  if (properties.length === 0) {
+    return (
+      <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-20 text-center">
+        <Building2 className="mx-auto h-8 w-8 text-text-faint" />
+        <p className="mt-3 text-sm font-semibold text-ink-950">
+          {hasFilter ? "Filtrelere uygun ilan bulunamadı" : "Şu anda yayında ilan yok"}
+        </p>
+        <p className="mt-1 text-xs text-text-muted">Talebinizi bırakın, uygun portföy çıkınca size ulaşalım.</p>
+        {hasFilter ? (
+          <Link
+            href={`/vitrin/${slug}`}
+            className="mt-4 inline-block rounded-full border border-line px-4 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
+          >
+            Filtreleri temizle
+          </Link>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(itemListLd) }} />
+      <FavEmptyNotice slug={slug} ids={properties.map((p) => p.id)} />
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {properties.map((p, idx) => {
+          const feat = (p.features ?? {}) as {
+            rooms?: string;
+            sqm?: number;
+            floor?: number | string;
+            building_age?: number | string;
+          };
+          const coverId = coverMap.get(p.id);
+          const loc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
+          return (
+            <VitrinCardShell
+              key={p.id}
+              slug={slug}
+              item={{
+                id: p.id,
+                title: p.title || p.property_code,
+                href: `/vitrin/${slug}/${p.id}`,
+                coverId: coverId ?? null,
+                price: p.list_price != null ? Number(p.list_price) : null,
+                tx: p.transaction_type,
+                rooms: feat.rooms ?? null,
+                sqm: feat.sqm ?? null,
+                floor: feat.floor ?? null,
+                buildingAge: feat.building_age ?? null,
+                district: relName(p.district as Rel),
+              }}
+            >
+            <Link
+              href={`/vitrin/${slug}/${p.id}`}
+              className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
+            >
+              <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
+                {coverId ? (
+                  <Image
+                    src={`/api/property-media/${coverId}`}
+                    alt={p.title || "Portföy"}
+                    fill
+                    priority={idx < 3}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    unoptimized
+                    className="object-cover transition group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="grid h-full w-full place-items-center text-text-faint">
+                    <div className="text-center">
+                      <Building2 className="mx-auto h-10 w-10" aria-hidden="true" />
+                      <p className="mt-1 text-xs font-semibold">Fotoğraf yakında</p>
+                    </div>
+                  </div>
+                )}
+                <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
+                  {p.transaction_type}
+                </span>
+                {/* Sağ üst köşe favori kalbinin (VitrinCardShell) alanı —
+                    "Yeni" rozeti işlem türü pilinin altına alınır ki kalp
+                    rozetin üstüne binmesin. mint-700 zemin: beyaz metinle ≥4.5:1. */}
+                {isNewListing(p.published_at) ? (
+                  <span className="absolute left-3 top-12 rounded-full bg-mint-700 px-2.5 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">
+                    Yeni
+                  </span>
+                ) : null}
+              </div>
+              <div className="p-4">
+                <p className="line-clamp-1 font-display font-bold text-ink-950">{p.title || p.property_code}</p>
+                <p className="mt-1 flex items-center gap-1 text-xs text-text-muted">
+                  <MapPin className="h-3.5 w-3.5 text-brand-600" /> {loc || "Konum belirtilmedi"}
+                </p>
+                <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
+                  {feat.rooms ? <span className="flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" /> {feat.rooms}</span> : null}
+                  {feat.sqm ? <span className="flex items-center gap-1"><Ruler className="h-3.5 w-3.5" /> {feat.sqm} m²</span> : null}
+                </div>
+                <p className="mt-3 font-display text-xl font-extrabold text-brand-600">
+                  {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
+                </p>
+                {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
+                {(() => {
+                  const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
+                  return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
+                })()}
+              </div>
+            </Link>
+            </VitrinCardShell>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+/** Izgara akarken iskelet kartlar (gerçek kart ölçüsünde). */
+function GridFallback() {
+  return (
+    <div aria-hidden="true" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+          <div className="aspect-[4/3] bg-ink-950/5 motion-safe:animate-pulse" />
+          <div className="space-y-2 p-4">
+            <div className="h-4 w-3/4 rounded bg-ink-950/8 motion-safe:animate-pulse" />
+            <div className="h-3 w-1/2 rounded bg-ink-950/8 motion-safe:animate-pulse" />
+            <div className="h-6 w-1/3 rounded bg-ink-950/8 motion-safe:animate-pulse" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Kayıtlı arama kutusu: oda seçenekleri yayındaki gerçek değerlerden (filtreli liste ile aynı sorgu). */
+async function VitrinSavedSearch({
+  head,
+  slug,
+  searchParams,
+  provinces,
+}: {
+  head: OfficeHead;
+  slug: string;
+  searchParams?: Promise<VitrinSearchParams>;
+  provinces: { id: string; name: string }[];
+}) {
+  const { data } = await readListing(head, searchParams);
+  return <LazySavedSearchBox slug={slug} provinces={provinces} roomOptions={data.roomOptions} />;
+}
+
+export default async function VitrinPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<VitrinSearchParams>;
+}) {
+  const { slug } = await params;
+
+  // Kabuk verisi (metadata ile ortak) ve iller (bağımsız) paralel; searchParams burada OKUNMAZ.
+  const [head, { data: provinces }] = await Promise.all([loadOfficeHead(slug), provinceOptionsResult()]);
+  if (!head) notFound();
+  const { admin, tenant, vitrinCfg, vitrinCfgAvailable } = head;
+  if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
+  if (await isPublicFeatureClosed(admin, tenant.id, "vitrin")) return <PublicModuleClosed officeName={tenant.name} />;
+  // Ofis vitrin ayarları (loadOfficeHead içinde ayrı sorgu: sütun yoksa varsayılan = bugünkü davranış).
+  if (!vitrinCfg.enabled) notFound();
+
+  // JSON-LD: ofis (RealEstateAgent) — yalnız doğrulanabilir alanlar. İlan listesi (ItemList) ızgarayla birlikte akar.
+  const siteUrl = getBaseUrl();
+  const officeLd = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateAgent",
+    name: tenant.name,
+    url: `${siteUrl}/vitrin/${slug}`,
+    ...(tenant.logo_url ? { logo: tenant.logo_url } : {}),
+    ...(tenant.phone && vitrinCfg.showPhone ? { telephone: tenant.phone } : {}),
+  };
 
   return (
     <div className="min-h-screen bg-canvas">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(officeLd) }} />
       {/* Hero */}
       <header className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />
@@ -366,210 +688,22 @@ export default async function VitrinPage({
               Ofisi ara: {tenant.phone}
             </a>
           ) : null}
-          <p className="mt-2 max-w-xl text-sm text-white/60">
-            {properties.length} aktif ilan · yerinde inceleme ve fiyat bilgisi için hemen talep bırakın.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {[
-              { key: "", label: "Tümü" },
-              { key: "satilik", label: "Satılık" },
-              { key: "kiralik", label: "Kiralık" },
-            ].map((f) => {
-              const active = (sp.tx ?? "") === f.key;
-              return (
-                <Link
-                  key={f.key}
-                  href={txHref(f.key)}
-                  className={`inline-flex min-h-11 items-center rounded-full px-4 py-2 text-xs font-bold transition ${
-                    active ? "bg-white text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
-                  }`}
-                >
-                  {f.label}
-                </Link>
-              );
-            })}
-            {/* Favori görünümü — client filtre, SSR listesi değişmez */}
-            <FavChip slug={slug} />
-            {/* Favoriler sayfası + sayaç rozeti (localStorage, hydration-güvenli) */}
-            <FavNavBadge slug={slug} variant="dark" />
-          </div>
 
-          {typeOptions.length > 1 ? (
-            <nav aria-label="Emlak türü" className="mt-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
-              {["", ...typeOptions].map((t) => {
-                const active = tur === t;
-                return (
-                  <Link
-                    key={t || "tum"}
-                    href={turHref(t)}
-                    aria-current={active ? "true" : undefined}
-                    className={`inline-flex min-h-11 shrink-0 items-center rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-                      active ? "bg-mint-500 text-ink-950" : "border border-white/15 bg-white/5 text-white/70 hover:bg-white/10"
-                    }`}
-                  >
-                    {t || "Tüm türler"}
-                  </Link>
-                );
-              })}
-            </nav>
-          ) : null}
-
-          {/* Sunucu filtreleri — GET formu, JS gerektirmez */}
-          <VitrinFilterPanel activeCount={activeFilterCount}>
-          <form
-            method="get"
-            action={`/vitrin/${slug}`}
-            className="grid max-w-4xl gap-2 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1.1fr_1.2fr_auto]"
-          >
-            {sp.tx ? <input type="hidden" name="tx" value={sp.tx} /> : null}
-            {tur ? <input type="hidden" name="tur" value={tur} /> : null}
-            <input name="q" defaultValue={q} placeholder="Başlık, kod veya adres ara" className={fieldCls} aria-label="Metin arama" />
-            <input name="min" defaultValue={sp.min ?? ""} inputMode="numeric" placeholder="Min ₺" className={fieldCls} aria-label="Minimum fiyat" />
-            <input name="max" defaultValue={sp.max ?? ""} inputMode="numeric" placeholder="Max ₺" className={fieldCls} aria-label="Maksimum fiyat" />
-            <select name="oda" defaultValue={oda} className={fieldCls} aria-label="Oda sayısı">
-              <option value="" className="bg-ink-950">Oda (tümü)</option>
-              {roomOptions.map((r) => (
-                <option key={r} value={r} className="bg-ink-950">
-                  {r}
-                </option>
-              ))}
-            </select>
-            <select name="sirala" defaultValue={sirala} className={fieldCls} aria-label="Sıralama">
-              <option value="" className="bg-ink-950">En yeni</option>
-              <option value="fiyat-artan" className="bg-ink-950">Fiyat (artan)</option>
-              <option value="fiyat-azalan" className="bg-ink-950">Fiyat (azalan)</option>
-            </select>
-            <button
-              type="submit"
-              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-card)] bg-white px-4 py-2.5 text-xs font-bold text-ink-950 transition hover:bg-white/90"
-            >
-              <Search className="h-3.5 w-3.5" /> Filtrele
-            </button>
-          </form>
-          </VitrinFilterPanel>
-          {hasFilter ? (
-            <Link
-              href={`/vitrin/${slug}`}
-              className="mt-3 inline-flex min-h-11 items-center text-xs font-semibold text-white/50 underline-offset-2 transition hover:text-white hover:underline"
-            >
-              Filtreleri temizle
-            </Link>
-          ) : null}
+          {/* Filtre şeridi searchParams okur: kabuk ve metadata beklemesin diye ayrı akar */}
+          <Suspense fallback={<HeaderFiltersFallback />}>
+            <VitrinHeaderFilters head={head} slug={slug} searchParams={searchParams} />
+          </Suspense>
         </div>
       </header>
 
       {/* Grid */}
       <main id="main-content" className="mx-auto max-w-6xl px-4 py-10">
-        {properties.length === 0 ? (
-          <div className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface px-5 py-20 text-center">
-            <Building2 className="mx-auto h-8 w-8 text-text-faint" />
-            <p className="mt-3 text-sm font-semibold text-ink-950">
-              {hasFilter ? "Filtrelere uygun ilan bulunamadı" : "Şu anda yayında ilan yok"}
-            </p>
-            <p className="mt-1 text-xs text-text-muted">Talebinizi bırakın, uygun portföy çıkınca size ulaşalım.</p>
-            {hasFilter ? (
-              <Link
-                href={`/vitrin/${slug}`}
-                className="mt-4 inline-block rounded-full border border-line px-4 py-2 text-xs font-bold text-brand-600 transition hover:border-brand-300"
-              >
-                Filtreleri temizle
-              </Link>
-            ) : null}
-          </div>
-        ) : (
-          <>
-          <FavEmptyNotice slug={slug} ids={properties.map((p) => p.id)} />
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {properties.map((p, idx) => {
-              const feat = (p.features ?? {}) as {
-                rooms?: string;
-                sqm?: number;
-                floor?: number | string;
-                building_age?: number | string;
-              };
-              const coverId = coverMap.get(p.id);
-              const loc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
-              return (
-                <VitrinCardShell
-                  key={p.id}
-                  slug={slug}
-                  item={{
-                    id: p.id,
-                    title: p.title || p.property_code,
-                    href: `/vitrin/${slug}/${p.id}`,
-                    coverId: coverId ?? null,
-                    price: p.list_price != null ? Number(p.list_price) : null,
-                    tx: p.transaction_type,
-                    rooms: feat.rooms ?? null,
-                    sqm: feat.sqm ?? null,
-                    floor: feat.floor ?? null,
-                    buildingAge: feat.building_age ?? null,
-                    district: relName(p.district as Rel),
-                  }}
-                >
-                <Link
-                  href={`/vitrin/${slug}/${p.id}`}
-                  className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
-                    {coverId ? (
-                      <Image
-                        src={`/api/property-media/${coverId}`}
-                        alt={p.title || "Portföy"}
-                        fill
-                        priority={idx < 3}
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        unoptimized
-                        className="object-cover transition group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center text-text-faint">
-                        <div className="text-center">
-                          <Building2 className="mx-auto h-10 w-10" aria-hidden="true" />
-                          <p className="mt-1 text-xs font-semibold">Fotoğraf yakında</p>
-                        </div>
-                      </div>
-                    )}
-                    <span className="absolute left-3 top-3 rounded-full bg-ink-950/80 px-2.5 py-1 text-xs font-bold uppercase text-white">
-                      {p.transaction_type}
-                    </span>
-                    {/* Sağ üst köşe favori kalbinin (VitrinCardShell) alanı —
-                        "Yeni" rozeti işlem türü pilinin altına alınır ki kalp
-                        rozetin üstüne binmesin. */}
-                    {isNewListing(p.published_at) ? (
-                      <span className="absolute left-3 top-12 rounded-full bg-mint-500 px-2.5 py-1 text-xs font-bold uppercase text-white shadow-[var(--shadow-xs)]">
-                        Yeni
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="p-4">
-                    <p className="line-clamp-1 font-display font-bold text-ink-950">{p.title || p.property_code}</p>
-                    <p className="mt-1 flex items-center gap-1 text-xs text-text-muted">
-                      <MapPin className="h-3.5 w-3.5 text-brand-600" /> {loc || "Konum belirtilmedi"}
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
-                      {feat.rooms ? <span className="flex items-center gap-1"><BedDouble className="h-3.5 w-3.5" /> {feat.rooms}</span> : null}
-                      {feat.sqm ? <span className="flex items-center gap-1"><Ruler className="h-3.5 w-3.5" /> {feat.sqm} m²</span> : null}
-                    </div>
-                    <p className="mt-3 font-display text-xl font-extrabold text-brand-600">
-                      {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
-                    </p>
-                    {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
-                    {(() => {
-                      const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
-                      return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
-                    })()}
-                  </div>
-                </Link>
-                </VitrinCardShell>
-              );
-            })}
-          </div>
-          </>
-        )}
+        {/* 2+ favori seçilince alt çubuk + tam ekran karşılaştırma tablosu (işaret ızgaranın başında) */}
+        <LazyCompareBar />
 
-        {/* 2+ favori seçilince alt çubuk + tam ekran karşılaştırma tablosu */}
-        <CompareBar />
+        <Suspense fallback={<GridFallback />}>
+          <VitrinGrid head={head} slug={slug} searchParams={searchParams} />
+        </Suspense>
 
         {/* Değerleme CTA — satıcı lead hunisi girişi */}
         {vitrinCfg.showValuation ? (
@@ -597,7 +731,9 @@ export default async function VitrinPage({
         ) : null}
 
         {/* Kayıtlı arama — kriter + telefon bırakılır, cron yeni ilanla eşleşince ofis arar */}
-        <SavedSearchBox slug={slug} provinces={provinces ?? []} roomOptions={roomOptions} />
+        <Suspense fallback={null}>
+          <VitrinSavedSearch head={head} slug={slug} searchParams={searchParams} provinces={provinces ?? []} />
+        </Suspense>
 
         {/* Lead form */}
         {vitrinCfg.showLeadForm ? (
@@ -613,7 +749,7 @@ export default async function VitrinPage({
             </div>
             <div className="theme-dark bg-[#071a38] p-6 sm:p-8">
               {tenant.lead_capture_enabled !== false && tenant.lead_capture_token ? (
-                <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
+                <LazyLeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
               ) : (
                 <p className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
                   Talep formu şu anda kapalı.

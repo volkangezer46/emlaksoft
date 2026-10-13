@@ -22,9 +22,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled, loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
 import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
+import { serializeJsonLd } from "@/lib/seo/jsonld";
+import { listingFactLine, listingSeoVars } from "@/lib/vitrin-seo/describe";
+import { buildVitrinListingLd } from "@/lib/vitrin-seo/listing-ld";
+import { listingImageAlt } from "@/lib/vitrin-seo/alt-text";
+import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
+import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
 import { formatPhoneDisplay, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import dynamicImport from "next/dynamic";
-import { LeadForm } from "@/app/lead/[token]/lead-form";
+import { LazyLeadForm } from "../lazy-islands";
 import { ShareButton } from "@/components/public/share-button";
 import { FavButton } from "@/components/public/fav-button";
 import { VitrinCardShell } from "@/components/public/vitrin-fav";
@@ -131,7 +137,7 @@ export async function generateMetadata({
   const admin = createAdminClient();
 
   const [{ data: tenant }, { data: coverRows }] = await Promise.all([
-    admin.from("tenants").select("id, name, status").eq("slug", slug).maybeSingle(),
+    admin.from("tenants").select("id, name, slug, status, sample_seeded_at, sample_cleared_at").eq("slug", slug).maybeSingle(),
     // KVKK P0-9: OG kapak görseli belge olamaz (is_document; sütun yoksa ad kuralı) -> ilk public görsel.
     selectWithDocumentFlag<PublicCoverCandidate[]>(PUBLIC_COVER_COLUMNS, (columns) =>
       admin
@@ -148,8 +154,8 @@ export async function generateMetadata({
   const cover = coverId ? { id: coverId } : null;
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
 
-  // Vitrin ayarı (açık mı + arama onayı), ilan ve SEO kalıpları bağımsız: paralel.
-  const [{ settings: vitrinCfg }, { data: property }, seo] = await Promise.all([
+  // Vitrin ayarı (açık mı + arama onayı), ilan, SEO kalıpları ve kalıcı noindex listesi bağımsız: paralel.
+  const [{ settings: vitrinCfg }, { data: property }, seo, neverIndexList] = await Promise.all([
     loadVitrinSettings(admin, tenant.id),
     admin
       .from("properties")
@@ -164,24 +170,28 @@ export async function generateMetadata({
       .or(OPEN_LISTING_OR_FILTER)
       .maybeSingle(),
     getSeoSettings(),
+    loadNeverIndexList(),
   ]);
   if (!vitrinCfg.enabled) return { title: "İlan bulunamadı" };
   if (!property) return { title: "İlan bulunamadı" };
 
   const priceText = money(property.list_price != null ? Number(property.list_price) : null, property.transaction_type);
-  const loc = buildLoc(property);
-  // Kalıp yoksa çıktı bugünkü sabit metindir (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS).
-  const vars = {
-    ofis: tenant.name,
-    ilan_basligi: property.title || property.property_code,
-    fiyat: priceText,
-    il: relName(property.province as Rel),
-    ilce: relName(property.district as Rel),
-    konum: loc || "Türkiye",
-    islem: property.transaction_type,
-    tip: property.property_type,
-    oda: ((property.features ?? {}) as Feat).rooms ?? null,
-  };
+  const feat = (property.features ?? {}) as Feat;
+  // Kalıp yoksa varsayılan: markalı başlık (60 karakter) + oda/m²/fiyat/ilçeden açıklama; ham adres alanı yalnız
+  // yöneticinin {konum} kalıbında kullanılır (src/lib/seo/patterns.ts DEFAULT_SEO_PATTERNS, vitrin-seo/describe.ts).
+  const vars = listingSeoVars({
+    office: tenant.name,
+    title: property.title,
+    code: property.property_code,
+    priceText,
+    province: relName(property.province as Rel),
+    district: relName(property.district as Rel),
+    tx: property.transaction_type,
+    type: property.property_type,
+    rooms: feat.rooms ?? null,
+    sqm: feat.sqm ?? null,
+    addressLine: property.address_line,
+  });
   const title = resolveSeoPattern(seo.patterns, "listing", "title", vars);
   const rawDesc = await fetchDescription(admin, id, property.features);
   const description = (rawDesc ?? resolveSeoPattern(seo.patterns, "listing", "description", vars))
@@ -191,8 +201,9 @@ export async function generateMetadata({
   return {
     title: { absolute: title },
     description,
-    // Arama motoru görünürlüğü yalnız ofisin açık onayıyla (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
-    robots: vitrinRobots(vitrinCfg.seoOptin),
+    // Arama motoru görünürlüğü: kalıcı noindex kuralı (örnek/demo/test/platform kiracısı) ÖNCE, sonra ofisin açık
+    // onayı (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
+    robots: vitrinRobots(vitrinCfg.seoOptin, isNeverIndexTenant(tenant, neverIndexList)),
     alternates: { canonical: `/vitrin/${slug}/${id}` },
     openGraph: {
       type: "website",
@@ -469,51 +480,49 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
 
   const hasMobileBar = Boolean(advisorTel ?? officeTel) || Boolean(advisorWhatsApp ?? officeWhatsApp) || Boolean(bookingToken) || leadOpen;
 
-  const coverId = images[0]?.id ?? null;
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateListing",
-    name: property.title || property.property_code,
-    description: description ?? `${loc || "Türkiye"} · ${property.property_type} · ${property.transaction_type}`,
-    url: `${BASE_URL}/vitrin/${slug}/${id}`,
-    ...(coverId ? { image: [`${BASE_URL}/api/property-media/${coverId}`] } : {}),
-    ...(property.created_at ? { datePosted: property.created_at } : {}),
-    ...(price != null
-      ? {
-          offers: {
-            "@type": "Offer",
-            price,
-            priceCurrency: "TRY",
-            availability: "https://schema.org/InStock",
-          },
-        }
-      : {}),
-    ...(sqmNum
-      ? { floorSize: { "@type": "QuantitativeValue", value: sqmNum, unitCode: "MTK" } }
-      : {}),
-    ...(property.lat != null && property.lng != null
-      ? { geo: { "@type": "GeoCoordinates", latitude: Number(property.lat), longitude: Number(property.lng) } }
-      : {}),
-    address: {
-      "@type": "PostalAddress",
-      ...(property.address_line ? { streetAddress: property.address_line } : {}),
-      ...(relName(property.district as Rel) ? { addressLocality: relName(property.district as Rel) } : {}),
-      ...(relName(property.province as Rel) ? { addressRegion: relName(property.province as Rel) } : {}),
-      addressCountry: "TR",
-    },
-    provider: {
-      "@type": "RealEstateAgent",
-      name: tenant.name ?? "EmlakSoft",
-      url: `${BASE_URL}/vitrin/${slug}`,
-    },
-  };
+  const district = relName(property.district as Rel);
+  const province = relName(property.province as Rel);
+  const listingName = property.title || property.property_code || "Portföy";
+  // JSON-LD: RealEstateListing (image[] yalnız mevcut public görsellerden) + BreadcrumbList (Vitrin › İlçe › İlan).
+  const jsonLd = buildVitrinListingLd({
+    base: BASE_URL,
+    slug,
+    id,
+    name: listingName,
+    // Kullanıcı açıklaması yoksa gerçek özellikli tanım (ham adres alanı KULLANILMAZ).
+    description:
+      description ??
+      listingFactLine({
+        title: property.title,
+        office: tenant.name,
+        priceText: money(price, property.transaction_type),
+        province,
+        district,
+        tx: property.transaction_type,
+        type: property.property_type,
+        rooms: feat.rooms ?? null,
+        sqm: sqmNum,
+      }),
+    officeName: tenant.name,
+    imageIds: images.map((m) => m.id),
+    createdAt: property.created_at,
+    price,
+    sqm: sqmNum,
+    lat: property.lat != null ? Number(property.lat) : null,
+    lng: property.lng != null ? Number(property.lng) : null,
+    streetAddress: property.address_line,
+    district,
+    province,
+  });
+  // Görsel alt metni: `{tip} {oda} – {ilçe}, fotoğraf n` (kullanıcı alt metni alanı yok; olursa önceliklidir).
+  const altInput = { type: property.property_type, rooms: feat.rooms ?? null, district, province, title: listingName };
 
   return (
     <div className="min-h-screen bg-canvas">
       <script
         type="application/ld+json"
         // JSON-LD: arama motorları için yapılandırılmış ilan verisi ("<" kaçışı script kırılmasını önler)
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }}
       />
       <main id="main-content" className="mx-auto max-w-5xl px-4 py-8">
         <div className="flex items-center justify-between gap-3">
@@ -529,7 +538,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
             {images.length > 0 ? (
               <div className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
                 <GalleryLightbox
-                  images={images.map((m) => ({ id: m.id }))}
+                  images={images.map((m, i) => ({ id: m.id, alt: listingImageAlt(altInput, i + 1) }))}
                   alt={property.title || property.property_code || "Portföy"}
                   priority
                   sizes="(max-width: 1024px) 100vw, 60vw"
@@ -570,7 +579,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                   </span>
                   {/* Son 7 günde yayına giren ilan — published_at gerçek yayın damgası */}
                   {property.published_at != null && msSince(property.published_at) < 7 * DAY_MS ? (
-                    <span className="rounded-full bg-mint-500 px-2.5 py-1 text-xs font-bold uppercase text-white">
+                    <span className="rounded-full bg-mint-700 px-2.5 py-1 text-xs font-bold uppercase text-white">
                       Yeni
                     </span>
                   ) : null}
@@ -766,7 +775,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
                 ) : null}
 
                 {leadOpen && tenant.lead_capture_token ? (
-                  <LeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
+                  <LazyLeadForm token={tenant.lead_capture_token} provinces={provinces ?? []} vitrinSlug={slug} />
                 ) : (
                   // Form yoksa müşteri çıkmaza girmesin: kapalı olduğunu söylemeden iletişim yolunu öne çıkar.
                   <div className="mt-4 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-5 text-center">

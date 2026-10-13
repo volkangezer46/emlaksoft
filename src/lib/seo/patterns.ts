@@ -6,11 +6,14 @@ import type { SeoPatternEntity, SeoPatterns } from "./schema";
  * Kural: alan boşsa VARSAYILAN kalıp kullanılır ve çıktı bugünkü sabit metinle BİREBİR aynıdır (yalnız değişken
  * yerleştirme; sadeleştirme/kesme yok). Yönetici kalıp kaydederse `renderSeoPattern` uygulanır: bilinmeyen değişken
  * boş kalır, boşluk/ayraç sadeleşir, başlık 70 / açıklama 160 karakterde kelime sınırında kesilir.
+ * İSTİSNA (SP7): ilan varsayılanı markalı başlık (60 karakter) ve sadeleşen açıklamadır (`listingDefaultTitle`).
  * Çıktı yalnız metadata'ya gider (Next kaçışlar); JSON-LD'ye kalıp metni EKLENMEZ.
  */
 
 export const SEO_PATTERN_TITLE_MAX = 70;
 export const SEO_PATTERN_DESC_MAX = 160;
+/** Varsayılan ilan başlığı sınırı (arama sonucunda kesilmeden görünen uzunluk). */
+export const LISTING_TITLE_MAX = 60;
 
 export type SeoPatternField = "title" | "description";
 
@@ -25,6 +28,7 @@ export const SEO_PATTERN_VARS = [
   { key: "islem", label: "Satılık/Kiralık", entities: ["listing"] },
   { key: "tip", label: "Mülk tipi", entities: ["listing"] },
   { key: "oda", label: "Oda sayısı", entities: ["listing"] },
+  { key: "metrekare", label: "Alan (m²)", entities: ["listing"] },
   { key: "danisman", label: "Danışman adı", entities: ["agent"] },
   { key: "unvan", label: "Danışman unvanı", entities: ["agent"] },
 ] as const satisfies readonly { key: string; label: string; entities: readonly SeoPatternEntity[] }[];
@@ -34,7 +38,11 @@ type InternalVar = "unvan_kucuk" | "uzmanlik";
 export type SeoPatternVar = (typeof SEO_PATTERN_VARS)[number]["key"] | InternalVar;
 export type SeoPatternVars = Partial<Record<SeoPatternVar, string | number | null | undefined>>;
 
-/** Bugünkü sabit çıktılar (vitrin/[slug], vitrin/[slug]/[id], danisman/[slug] generateMetadata). */
+/**
+ * Varsayılan kalıplar (vitrin/[slug], vitrin/[slug]/[id], danisman/[slug] generateMetadata). Ofis ve danışman bugünkü
+ * sabit metindir. İlan (SP7): markalı başlık (60 karakter, marka korunarak kelime sınırında kısalır;
+ * `listingDefaultTitle`) ve oda/m²/fiyat/ilçeden açıklama (ham adres alanı KULLANILMAZ).
+ */
 export const DEFAULT_SEO_PATTERNS: Record<SeoPatternEntity, Record<SeoPatternField, string>> = {
   office: {
     title: "{ofis} | Portföy Vitrini",
@@ -42,8 +50,8 @@ export const DEFAULT_SEO_PATTERNS: Record<SeoPatternEntity, Record<SeoPatternFie
       "{ofis} güncel portföy vitrini — {ilan_sayisi} aktif ilan. Satılık ve kiralık portföyleri inceleyin, yerinde inceleme için talep bırakın.",
   },
   listing: {
-    title: "{ilan_basligi} - {fiyat}",
-    description: "{konum} · {tip} · {islem} · {fiyat} — {ofis} güvencesiyle.",
+    title: "{ilan_basligi} | {ilce} {islem} {tip} – {ofis}",
+    description: "{ilce} {islem} {tip} · {oda} · {metrekare} · {fiyat} — {ofis} güvencesiyle.",
   },
   agent: {
     title: "{danisman} — {unvan} | {ofis}",
@@ -104,7 +112,32 @@ export function resolveSeoPattern(
 ): string {
   const custom = patterns?.[entity]?.[field]?.trim();
   if (custom) return renderSeoPattern(custom, vars, field);
+  if (entity === "listing") {
+    return field === "title" ? listingDefaultTitle(vars) : renderSeoPattern(DEFAULT_SEO_PATTERNS.listing.description, vars, "description");
+  }
   return fillSeoPattern(DEFAULT_SEO_PATTERNS[entity][field], vars);
+}
+
+const cleanVar = (v: unknown): string => (v == null ? "" : String(v).replace(/[<>]/g, "").replace(/\s+/g, " ").trim());
+
+/**
+ * Varsayılan ilan başlığı: `{ilan_basligi} | {ilce} {islem} {tip} – {ofis}`, en çok 60 karakter. Aşarsa marka
+ * (` – {ofis}`) korunur, baştaki kısım kelime sınırında kısalır; marka çok uzunsa bütün metin kelime sınırında kesilir.
+ */
+export function listingDefaultTitle(vars: SeoPatternVars, max: number = LISTING_TITLE_MAX): string {
+  const head = cleanVar(vars.ilan_basligi);
+  const mid = [vars.ilce, vars.islem, vars.tip].map(cleanVar).filter(Boolean).join(" ");
+  const brand = cleanVar(vars.ofis);
+  const body = [head, mid].filter(Boolean).join(" | ");
+  const suffix = brand ? ` – ${brand}` : "";
+  const full = `${body}${suffix}`.replace(EDGE_SEP_RE, "").trim();
+  if (full.length <= max) return full;
+  const room = max - suffix.length;
+  if (body && room >= 20) {
+    const cut = cutAtWord(body, room);
+    if (cut) return `${cut}${suffix}`;
+  }
+  return cutAtWord(full, max);
 }
 
 /** Kalıptaki değişkenlerden varlığa uymayan/bilinmeyenleri listeler (yönetim uyarısı). */
@@ -117,9 +150,12 @@ export function unknownPatternVars(tpl: string, entity: SeoPatternEntity): strin
 
 /* ---------- Vitrin robots kararı ---------- */
 
-/** Vitrin/ilan/danışman robots: TEK ölçüt ofisin açık arama onayı (tenants.vitrin_seo_optin). */
-export function vitrinRobots(optin: boolean): { index: boolean; follow: boolean } {
-  return optin ? { index: true, follow: true } : { index: false, follow: true };
+/**
+ * Vitrin/ilan/danışman robots: ofisin açık arama onayı (tenants.vitrin_seo_optin). `neverIndex` (örnek/demo/test/
+ * platform kiracısı; src/lib/vitrin-seo/never-index.ts) onaydan ÖNCE uygulanır: true ise opt-in olsa bile noindex.
+ */
+export function vitrinRobots(optin: boolean, neverIndex: boolean = false): { index: boolean; follow: boolean } {
+  return optin && !neverIndex ? { index: true, follow: true } : { index: false, follow: true };
 }
 
 /** Ofis tanıtım metni açıklama olarak (boşlukları sadeleştirir, 200 karakter). */
