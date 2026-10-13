@@ -1,6 +1,6 @@
 import { readPendingReconsentsCached } from "@/lib/legal-docs/consent-cache";
 import { readReconsentDocs } from "@/lib/legal-docs/store";
-import { LegalReconsentModal } from "./legal-reconsent-modal";
+import { LegalReconsentModalLazy } from "./office-shell-lazy";
 
 /**
  * /app kabuğunda yeniden onay kapısı (AD12). "Yeniden onay gerekli" olarak yayınlanmış bir yasal metin varsa ve
@@ -8,6 +8,7 @@ import { LegalReconsentModal } from "./legal-reconsent-modal";
  * önbellekli (çoğu zaman boş → ek DB turu YOK); liste doluysa kullanıcının bekleyen onayları KULLANICIYA ÖZEL önbellekten
  * gelir (userId + gerekli sürüm imzası; onay yazımı tazeler) → onay vermiş kullanıcı için de ek DB turu yok. Okuma hatası
  * kullanıcıyı kilitlemez (pencere çıkmaz, sonraki gezinmede yeniden denenir). Kabuktan ayrı Suspense sınırında akar.
+ * Pencere kodu tembel parçadır (office-shell-lazy): HTML sunucuda çizilip ekranı hemen kilitler, etkileşim kodu ayrıca iner.
  */
 export async function LegalReconsentGate({ userId }: { userId: string }) {
   const docs = await readReconsentDocs();
@@ -19,5 +20,5 @@ export async function LegalReconsentGate({ userId }: { userId: string }) {
     return null;
   }
   if (!pending.length) return null;
-  return <LegalReconsentModal docs={pending.map((p) => ({ slug: p.slug, title: p.title, version: p.version }))} />;
+  return <LegalReconsentModalLazy docs={pending.map((p) => ({ slug: p.slug, title: p.title, version: p.version }))} />;
 }
