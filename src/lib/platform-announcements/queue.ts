@@ -77,7 +77,7 @@ const ANN_COLS = "id, title, body, kind, href, channels, segment_json, commercia
 /** Şema yok (migration uygulanmadı) hatası mı? Kuyruk sessizce atlar. */
 export function isSchemaMissing(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false;
-  return error.code === "42P01" || error.code === "42703" || error.code === "PGRST202" || error.code === "PGRST204" || error.code === "PGRST205"
+  return error.code === "42P01" || error.code === "42703" || error.code === "PGRST200" || error.code === "PGRST202" || error.code === "PGRST204" || error.code === "PGRST205"
     || /does not exist|could not find/i.test(error.message ?? "");
 }
 
