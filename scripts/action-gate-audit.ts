@@ -54,6 +54,7 @@ const GATES = [
  * Her biri gerekçesiyle burada; listeye ekleme yapmak bilinçli bir karar olmalı.
  */
 const MUAF: Record<string, string> = {
+  "kvkk-public.ts::submitKvkkApplication": "Herkese açık KVKK başvuru formu (vatandaş başvurusu; oturum yok, olamaz): IP başına 5/saat ve e-posta başına 4/saat hız sınırı, zod doğrulaması, başvuru e-posta koduyla doğrulanana kadar işleme alınmaz (verifyKvkkApplication).",
   "kvkk-public.ts::verifyKvkkApplication": "Herkese açık KVKK başvurusunun e-posta doğrulaması (oturum yok, olamaz): IP başına 20/saat hız sınırı, başvuru başına deneme tavanı, süreli kod, kod yalnız HMAC özeti olarak saklı (verifyOtpHash); başarıda denetim kaydı.",
   "auth.ts::signOut": "Çıkış her durumda çalışmalı; oturumu olmayan için de zararsız.",
   "auth.ts::signIn": "Giriş noktasının kendisi — kapı buradan sonra kuruluyor.",
