@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncPendingEInvoices } from "@/lib/integrations/einvoice/service";
 import { notifyTenant } from "@/lib/notify";
+import { appointmentHref } from "@/lib/notification-text";
 import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
 import { gateIysRecipient } from "@/lib/iys/gate";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
@@ -193,7 +194,7 @@ function hrefForEntity(payload: AutomationEventPayload): string {
     case "deal":
       return "/app/anlasmalar";
     case "appointment":
-      return "/app/randevular";
+      return payload.entityId ? appointmentHref(payload.entityId) : "/app/randevular";
     case "fsbo_lead":
       return `/app/portfoy-avi/${payload.entityId}`;
   }

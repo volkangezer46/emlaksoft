@@ -19,6 +19,7 @@ import {
 import { daysFromNowIso } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { taskHref } from "@/lib/notification-text";
 
 export type SettingsResult = { error?: string; ok?: boolean };
 
@@ -192,7 +193,7 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
     );
     if (changes.length > 0) {
       const msg = licenseAmendmentMessage(changes);
-      const { error: taskError } = await supabase.from("tasks").insert({
+      const { data: task, error: taskError } = await supabase.from("tasks").insert({
         tenant_id: tenantId,
         title: msg.title,
         notes: msg.body,
@@ -202,9 +203,10 @@ export async function updateTenantInfo(formData: FormData): Promise<SettingsResu
         due_at: daysFromNowIso(LICENSE_AMENDMENT_DAYS),
         assigned_to: gate.userId,
         created_by: gate.userId,
-      });
+      }).select("id").single();
       if (taskError) console.error("updateTenantInfo amendment task", { code: taskError.code });
-      await notifyTenant({ tenantId, userId: gate.userId, title: msg.title, body: msg.body, href: "/app/gorevler", kind: "warning" }).catch(() => undefined);
+      const href = task?.id ? taskHref(task.id) : "/app/gorevler";
+      await notifyTenant({ tenantId, userId: gate.userId, title: msg.title, body: msg.body, href, kind: "warning" }).catch(() => undefined);
     }
   }
 
