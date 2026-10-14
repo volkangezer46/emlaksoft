@@ -431,6 +431,8 @@ const F = {
   kq2AgentPhotosLimits: "20261015015000_agent_photos_bucket_limits.sql",
   kq2RevokeAnonRpcs: "20261015016000_revoke_anon_definer_rpcs.sql",
   kq2RealtimeTrim: "20261015017000_realtime_publication_trim.sql",
+  // YD2 (2026-10-15): sunumda ilan bazinda musteri geri bildirimi (ilgileniyorum/degil + not; yalniz service_role yazar).
+  presentationFeedback: "20261015042000_presentation_feedback.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -696,6 +698,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.customFields]: "ek", // yeni custom_field_defs/values + RLS (okuma ust kayit gorunurlugu, yazma modul edit) + 2 INVOKER yardimci fonksiyon
     [F.dealGosFields]: "ek", // deals'a 2 nullable kolon (gos_reference_no + CHECK, title_deed_appointment_at) + kismi indeks; politika degismez
     [F.reportSubscriptions]: "ek", // 3 yeni tablo (report_saved_views, report_subscriptions, report_subscription_runs; ofis satirlari tenant+sahip RLS, platform satirlari yalniz service_role) + abonelik tavan/zaman tetikleyicisi ve alici cikis RPC (report_subscription_leave); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
+    [F.presentationFeedback]: "ek", // yeni tablo presentation_feedback (RLS: ofis + properties:view okur; yazma yalniz service_role, bilesik FK ofis siniri); mevcut nesnelere dokunmaz, kod tablo yokken bildirim yine gider, kayit atlanir
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
   },
 
@@ -929,6 +932,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "PB57-mulk-yonetimi-omurgasi", order: 29.999863, title: "Mulk yonetimi omurgasi: kira tahsilat kaydi (kismi odeme, makbuz) + yonetim sozlesmesi + mulk sahibi hakedis defteri (kod tablo yokken eski 'odendi isaretle' akisina duser)", files: [F.propertyManagementCore] },
     { id: "PB55-admin-panel-toplulastirma", order: 29.999864, title: "Admin kontrol paneli SQL toplulastirma RPC'si (sira serbest, ek)", files: [F.platformDashboardRollups] },
     { id: "FIN-A-kasa-banka-hareket-defteri", order: 29.999868, title: "Finans: kasa/banka/kisisel hesap + para hareket defteri (komisyon/kira/aidat tahsilat baglari; kod tablolar yokken eski Giderler akisina duser; 001100 ve 001700'den SONRA)", files: [F.financeAccountsCashEntries] },
+    { id: "YD2-sunum-geri-bildirimi", order: 162, title: "Sunum geri bildirimi: presentation_feedback (ilan bazinda ilgileniyorum/degil + not; bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken bildirim yine gider ve kayit atlanir; sira serbest, ek)", files: [F.presentationFeedback] },
     { id: "PB57-bina-site-yonetimi", order: 29.999867, title: "Bina & site yonetimi: bina/daire modeli, donemlik toplu aidat tahakkuku, ortak gider paylastirma, tahsilat ve daire cari (M1 omurgasina baglanir; kod tablolar yokken sekmeyi gizler)", files: [F.buildingManagement] },
   ],
 

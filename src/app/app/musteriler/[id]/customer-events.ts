@@ -16,6 +16,7 @@ import {
   offerTone,
   tl,
 } from "@/lib/activity-timeline-sources";
+import { PRESENTATION_FEEDBACK_LABEL, isPresentationFeedbackVerdict } from "@/lib/presentation-feedback";
 
 /** Müşteri zaman çizelgesi kategorileri (URL ?kategori=). */
 export const CUSTOMER_TIMELINE_CATEGORIES = [
@@ -100,6 +101,7 @@ export async function buildCustomerEvents(
     { data: iys },
     { data: audit },
     { data: visits },
+    { data: presFeedback },
     dealAudit,
   ] = await Promise.all([
     supabase.from("contracts").select("id, title, status, signed_at, created_at").eq("customer_id", customerId).order("created_at", { ascending: false }).limit(PER_SOURCE),
@@ -110,12 +112,27 @@ export async function buildCustomerEvents(
     supabase.from("iys_consent_events").select("id, channel, to_status, source, actor_id, occurred_at").eq("customer_id", customerId).order("occurred_at", { ascending: false }).limit(PER_SOURCE),
     supabase.from("audit_logs").select("id, action, actor_id, ip, created_at").eq("entity_id", customerId).order("created_at", { ascending: false }).limit(PER_SOURCE),
     supabase.from("open_house_visitors").select("id, registered_at").eq("created_customer_id", customerId).order("registered_at", { ascending: false }).limit(10),
+    // Sunum geri bildirimi (YD2, 20261015042000): tablo yoksa hata -> data null -> kaynak boş.
+    supabase
+      .from("presentation_feedback")
+      .select("id, property_id, verdict, note, updated_at, presentation:presentations(title)")
+      .eq("customer_id", customerId)
+      .order("updated_at", { ascending: false })
+      .limit(PER_SOURCE),
     fetchDealAudit(supabase, dealIds),
   ]);
 
   const contractRows = (contracts ?? []) as { id: string; title: string; status: string; signed_at: string | null; created_at: string }[];
   const feedbackRows = (feedback ?? []) as { id: string; property_id: string; verdict: string; updated_at: string }[];
-  const propIds = [...new Set(feedbackRows.map((f) => f.property_id))];
+  const presFeedbackRows = (presFeedback ?? []) as {
+    id: string;
+    property_id: string;
+    verdict: string;
+    note: string | null;
+    updated_at: string;
+    presentation: { title?: string } | { title?: string }[] | null;
+  }[];
+  const propIds = [...new Set([...feedbackRows, ...presFeedbackRows].map((f) => f.property_id))];
 
   const [{ data: signers }, { data: props }, names] = await Promise.all([
     contractRows.length
@@ -307,6 +324,20 @@ export async function buildCustomerEvents(
       detail: propName.get(f.property_id),
       icon: "portal",
       tone: f.verdict === "liked" ? "success" : "warn",
+      href: `/app/portfoyler/${f.property_id}`,
+    });
+  }
+  for (const f of presFeedbackRows) {
+    if (!isPresentationFeedbackVerdict(f.verdict)) continue;
+    const pres = Array.isArray(f.presentation) ? f.presentation[0] : f.presentation;
+    ev.push({
+      id: `pfb-${f.id}`,
+      at: f.updated_at,
+      category: "portal",
+      title: `Sunumda "${PRESENTATION_FEEDBACK_LABEL[f.verdict]}" dedi · ${propName.get(f.property_id) ?? "Portföy"}`,
+      detail: cut([pres?.title ? `Sunum: ${pres.title}` : null, f.note ? `Not: ${f.note}` : null].filter(Boolean).join(" · ")),
+      icon: "portal",
+      tone: f.verdict === "interested" ? "success" : "warn",
       href: `/app/portfoyler/${f.property_id}`,
     });
   }

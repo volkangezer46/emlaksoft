@@ -26,12 +26,23 @@ import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { loadPresentationOg, publicLinkMetadata } from "@/lib/public-link-og";
+import { cookies } from "next/headers";
+import { createClient } from "@/lib/supabase/server";
+import { notifyTenant } from "@/lib/notify";
+import { trDayKey } from "@/lib/clock";
+import { PresentationFeedback } from "@/components/public/presentation-feedback";
+import { isPresentationFeedbackVerdict, presentationFeedbackHref, type PresentationFeedbackVerdict } from "@/lib/presentation-feedback";
 
-// Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni).
-export const metadata: Metadata = {
-  title: "Portföy sunumu",
-  robots: { index: false, follow: false },
-};
+// Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni). Ana dağıtım kanalı
+// WhatsApp: önizleme ofis markalı (başlık, site adı; görsel `opengraph-image.tsx`, tek kaynak public-link-og).
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadPresentationOg(token), "Portföy sunumu"),
+    robots: { index: false, follow: false },
+  };
+}
 
 // Görüntülenme sayacı her açılışta işlesin; sayfa önbelleğe takılmasın.
 export const dynamic = "force-dynamic";
@@ -54,6 +65,23 @@ type Feat = {
   heating?: string | null;
   description?: string | null;
 };
+
+/**
+ * Sunumu açan, sunumu hazırlayan danışmanın kendisi mi? (panelden "yeni sekmede aç" önizlemesi açılış bildirimi
+ * üretmesin.) Oturum çerezi yoksa Supabase istemcisi hiç kurulmaz; varsa yerel JWT doğrulaması (getClaims).
+ */
+async function viewerIsCreator(createdBy: string | null): Promise<boolean> {
+  if (!createdBy) return false;
+  const jar = await cookies();
+  if (!jar.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("auth-token"))) return false;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.auth.getClaims();
+    return data?.claims?.sub === createdBy;
+  } catch {
+    return false;
+  }
+}
 
 function money(n: number | null, tx: string) {
   if (n == null) return "Fiyat için sorun";
@@ -82,7 +110,7 @@ export default async function PublicPresentationPage({
   const admin = createAdminClient();
   const { data: pres } = await admin
     .from("presentations")
-    .select("id, tenant_id, title, customer_name, property_ids, note, created_by, created_at")
+    .select("id, tenant_id, title, customer_name, customer_id, property_ids, note, created_by, created_at, view_count")
     .eq("public_token", token)
     .maybeSingle();
   if (!pres) notFound();
@@ -124,17 +152,31 @@ export default async function PublicPresentationPage({
     file_name: string | null;
     is_document?: boolean | null;
   };
-  const { data: mediaRows } = await selectWithDocumentFlag<PresentationMediaRow[]>(
-    "id, property_id, is_cover, sort_order, kind, file_type, file_name",
-    (columns) =>
-      admin
-        .from("property_media")
-        .select(columns)
-        .in("property_id", properties.map((p) => p.id as string))
-        .eq("kind", "image")
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true }),
-  );
+  // Görseller + müşterinin önceki geri bildirimi bağımsız: paralel. Geri bildirim tablosu yoksa (migration
+  // uygulanmadı) hata yutulur, düğmeler boş başlar.
+  const [{ data: mediaRows }, { data: feedbackRows }, isCreatorPreview] = await Promise.all([
+    selectWithDocumentFlag<PresentationMediaRow[]>(
+      "id, property_id, is_cover, sort_order, kind, file_type, file_name",
+      (columns) =>
+        admin
+          .from("property_media")
+          .select(columns)
+          .in("property_id", properties.map((p) => p.id as string))
+          .eq("kind", "image")
+          .order("is_cover", { ascending: false })
+          .order("sort_order", { ascending: true }),
+    ),
+    admin
+      .from("presentation_feedback")
+      .select("property_id, verdict, note")
+      .eq("presentation_id", pres.id)
+      .eq("tenant_id", pres.tenant_id),
+    viewerIsCreator((pres.created_by as string | null) ?? null),
+  ]);
+  const feedbackByProperty = new Map<string, { verdict: PresentationFeedbackVerdict; note: string | null }>();
+  for (const f of (feedbackRows ?? []) as { property_id: string; verdict: string; note: string | null }[]) {
+    if (isPresentationFeedbackVerdict(f.verdict)) feedbackByProperty.set(f.property_id, { verdict: f.verdict, note: f.note });
+  }
   const mediaByProperty = new Map<string, { id: string; src: string }[]>();
   // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel sunum linkinde gösterilmez (tek kural).
   for (const m of (mediaRows ?? []).filter((r) => isPublicListingImage(r))) {
@@ -159,10 +201,25 @@ export default async function PublicPresentationPage({
     }
   }
 
-  // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni).
+  // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni). Açılış istihbaratı
+  // (paylas/[token] deseni): sunumu hazırlayan danışmana "sunumunuz açıldı" bildirimi — günde en çok bir kez
+  // (dedupe_key), danışmanın kendi önizlemesi sayılmaz. Bildirim hatası ziyaretçi sayfasını düşürmez.
+  const openCount = Number(pres.view_count ?? 0) + 1;
   after(async () => {
     const { error } = await admin.rpc("increment_presentation_view", { p_id: pres.id });
     if (error) console.error("increment_presentation_view", error.message);
+    if (isCreatorPreview || !pres.created_by) return;
+    const label = pres.customer_name ? `${pres.customer_name} için hazırladığınız` : "Hazırladığınız";
+    await notifyTenant({
+      tenantId: pres.tenant_id,
+      userId: pres.created_by as string,
+      title: openCount <= 1 ? "Sunumunuz ilk kez açıldı" : "Sunumunuz yeniden açıldı",
+      body: `${label} "${pres.title}" sunumu görüntülendi (toplam ${openCount} açılış).`,
+      href: presentationFeedbackHref((pres.customer_id as string | null) ?? null),
+      kind: "info",
+      prefKey: "share",
+      dedupeKey: `presentation-open:${pres.id}:${trDayKey()}`,
+    }).catch((e) => console.error("presentation open notify", e instanceof Error ? e.message : e));
   });
 
   const officeName = tenant?.name ?? "Emlak ofisi";
@@ -367,6 +424,14 @@ export default async function PublicPresentationPage({
                     ))}
                   </div>
                 ) : null}
+
+                {/* Müşteri geri bildirimi: ilgileniyorum / değil + not → danışmana bildirim + müşteri kartı */}
+                <PresentationFeedback
+                  token={token}
+                  propertyId={property.id as string}
+                  initialVerdict={feedbackByProperty.get(property.id as string)?.verdict ?? null}
+                  initialNote={feedbackByProperty.get(property.id as string)?.note ?? null}
+                />
               </div>
             </article>
           );
