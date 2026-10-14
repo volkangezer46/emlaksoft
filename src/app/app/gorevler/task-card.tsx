@@ -3,7 +3,7 @@
 import { useContext, useOptimistic, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Briefcase, CheckCircle2, Clock, FileText, Link2, Loader2, MapPin, Phone, Repeat, RotateCcw, Trash2, User } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
@@ -47,7 +47,13 @@ const KIND_META: Record<string, { label: string; icon: React.ComponentType<{ cla
   visit: { label: "Ziyaret", icon: MapPin },
   document: { label: "Evrak", icon: FileText },
   other: { label: "Diğer", icon: FileText },
+  // EİDS aksiyon motoru (sistem görevleri; elle oluşturulmaz, tür değiştirilmez).
+  eids_publish: { label: "Yetki geldi", icon: Megaphone },
+  eids_takedown: { label: "İlan kaldır", icon: ShieldAlert },
 };
+
+/** Sistem görevleri düzenleme diyaloğunda açılmaz (tür seçicisi bu türleri tanımaz); kaldırma görevi kontrol listesiyle kapanır. */
+const SYSTEM_KINDS = new Set(["eids_publish", "eids_takedown"]);
 
 function relName(v: Rel) {
   if (!v) return null;
@@ -138,8 +144,13 @@ export function TaskCard({
   const due = dueInfo(task.due_at, done);
   const assignee = relName(task.assignee);
   const customer = relName(task.customer);
-  const highPr = task.priority === "high";
-  const href = task.customer_id
+  const highPr = task.priority === "high" || task.priority === "urgent";
+  const urgent = task.priority === "urgent";
+  const systemKind = SYSTEM_KINDS.has(task.kind);
+  const takedown = task.kind === "eids_takedown";
+  const href = takedown
+    ? `/app/gorevler/eids/${task.id}`
+    : task.customer_id
     ? `/app/musteriler/${task.customer_id}`
     : task.property_id
       ? `/app/portfoyler/${task.property_id}`
@@ -158,7 +169,7 @@ export function TaskCard({
     >
       {href ? (
         <Link href={href} className="absolute inset-0 rounded-[var(--radius-card)]" aria-label={`${task.title} kaydını aç`} />
-      ) : canEdit && !done ? (
+      ) : canEdit && !done && !systemKind ? (
         // Müşterisiz/portföysüz görevde gidilecek kayıt yok — kartın kendisi
         // düzenleme diyaloğunu açar (overlay tetikleyicili ikinci diyalog örneği).
         <TaskEditDialog task={editTask} members={members} deals={deals} variant="overlay" />
@@ -183,7 +194,7 @@ export function TaskCard({
             </span>
           ) : null}
           {highPr && !done ? (
-            <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-500">Yüksek</span>
+            <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-500">{urgent ? "Acil" : "Yüksek"}</span>
           ) : null}
           {task.priority === "low" && !done ? (
             <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
@@ -238,10 +249,17 @@ export function TaskCard({
       </div>
 
       <div className="relative z-10 flex shrink-0 items-center gap-1.5">
-        {canEdit && !done ? (
+        {canEdit && !done && !systemKind ? (
           <TaskEditDialog task={editTask} members={members} deals={deals} />
         ) : null}
-        {canEdit ? (
+        {takedown ? (
+          <Link
+            href={`/app/gorevler/eids/${task.id}`}
+            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500/10 px-3 py-2 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/20 touch:min-h-11"
+          >
+            <ListChecks className="h-4 w-4" /> Kontrol listesi
+          </Link>
+        ) : canEdit ? (
           done ? (
             /* `title=""` yerine Tip: klavye odagında da açılır, dokunmatikte
                kilitlenmez ve ekran dışına taşmaz. `aria-label` ayrıca şart —
@@ -268,7 +286,7 @@ export function TaskCard({
             </button>
           )
         ) : null}
-        {canDelete ? (
+        {canDelete && !takedown ? (
           <ConfirmDialog
             title="Görevi sil"
             description={`“${task.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}

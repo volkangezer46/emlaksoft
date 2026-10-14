@@ -51,6 +51,7 @@ import { DanismanAra, DanismanAraIskelet } from "./_home/danisman-ara";
 import { Tahsilat, TahsilatIskelet } from "./_home/tahsilat";
 import { GiderOzeti } from "./_home/gider-ozeti";
 import { OfisNabzi } from "./_home/ofis-nabzi";
+import { EidsYetkiSagligi } from "./_home/eids-yetki-sagligi";
 import { homeHref, type HomeParams } from "./_home/kapsam-anahtari";
 import { homeLayoutFor, type MoreBlock } from "./_home/home-layout";
 
@@ -318,6 +319,8 @@ export default async function AppHomePage({
       rows.push(grid("r1", [cell(7, dikkat, "dikkat"), cell(5, side, "side")]), deferredGrid("r2", bottomItemsBy(6, true)));
       ozetRows.push(
         <Suspense key="nabiz" fallback={null}><OfisNabzi ctx={ctx} /></Suspense>,
+        // EİDS Yetki Sağlığı (yönetim; ofis özeti açıkken). Her sayı kendi kuyruğuna gider.
+        !off("portals") ? grid("oe", [cell(12, <Suspense fallback={<PanelIskelet rows={4} />}><EidsYetkiSagligi ctx={ctx} /></Suspense>, "eids-yetki")]) : null,
         gelir ? grid("o1", [cell(12, gelir, "gelir", { widget: "gelir" })]) : null,
         deferredGrid("o2", [
           ...(layout.team && !off("team_perf") ? [{ span: 7 as const, node: widgetWrap("ekip-perf", ekip) }] : []),

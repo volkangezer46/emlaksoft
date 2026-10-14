@@ -8,6 +8,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { FeedFiltersForm } from "../_components/feed-filters";
 import { FeedList, feedAssignedIds } from "../_components/feed-list";
 import { PrivacyNote } from "../_components/privacy-note";
+import { EidsMine } from "../_components/eids-mine";
+import { Suspense } from "react";
 
 const PATH = "/app/ofis-kontrol/benim";
 
@@ -37,6 +39,12 @@ export default async function BenimAkisimPage({ searchParams }: { searchParams?:
         description="Sistemde yaptığınız işlemlerin kendi kayıtlarınız burada listelenir. Ofis yönetimi iş süreçlerinin düzeni için bu kayıtları görebilir; siz de burada aynısını görürsünüz."
       />
       <OversightNav active="benim" office={office} />
+      {/* EİDS: kendi portföylerimin yetki durumu + açık acil görevler + haftalık "Yetki doğrula" (#yetki-dogrula). */}
+      {tenantId ? (
+        <Suspense fallback={null}>
+          <EidsMine tenantId={tenantId} userId={userId} />
+        </Suspense>
+      ) : null}
       <FeedFiltersForm filters={filters} advisors={[]} basePath={PATH} hideActor />
       <FeedList data={feed} names={names} filters={filters} basePath={PATH} selfView />
       <PrivacyNote audience="advisor" />

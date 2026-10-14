@@ -9,6 +9,7 @@ import { formatDateTimeTr } from "@/lib/format";
 import { fetchAllPaged, guardCron } from "@/lib/cron-run";
 import { runLowScoreEscalation } from "@/lib/surveys/escalate";
 import { runPlatformTaskReminders, runTenantHealthDaily, type HealthJobSummary, type TaskReminderSummary } from "@/lib/admin/tenant-health-job";
+import { runEidsActionSweep, type EidsSweepSummary } from "@/lib/eids/actions";
 
 /** Üst sınır: 10 sayfa x 1000. Aşılırsa heartbeat'e yazılır (sessiz kesme yok); vadesi en eski olanlar önce işlenir. */
 const MAX_PAGES = 10;
@@ -114,11 +115,25 @@ async function run(req: NextRequest) {
     failed += 1;
   }
   const crmNote = ` · platform görevi: ${platformTasks.skipped ? "atlandı" : `${platformTasks.notified} bildirim`}${platformTasks.error ? ` (hata: ${platformTasks.error.slice(0, 80)})` : ""} · sağlık skoru: ${health.skipped ? "atlandı" : `${health.written} ofis`}${health.error ? ` (hata: ${health.error.slice(0, 80)})` : ""}`;
+  // EİDS aksiyon motoru (ayrık adım; yeni cron yok): kaçan yetki olayları, süre bitimi kaldırma görevi, 48 saat yükseltme,
+  // eşleştir kuyruğu günlük bildirimi, Pazartesi "Yetki doğrula" özeti. Hata görev hatırlatmasını bozmaz.
+  let eids: EidsSweepSummary | null = null;
+  try {
+    eids = await runEidsActionSweep(admin, now);
+    failed += eids.errors;
+  } catch (e) {
+    console.error("gorev-hatirlat eids", e instanceof Error ? e.message : "hata");
+    failed += 1;
+  }
+  const eidsNote = eids
+    ? ` · EİDS: ${eids.events} olay, ${eids.created + eids.expired} kaldırma/yayın görevi, ${eids.escalated} yükseltme, ${eids.unmatchedNotified + eids.weeklyNotified} bildirim${eids.schemaMissing.length ? ` (kurulum bekliyor: ${[...new Set(eids.schemaMissing)].join(",")})` : ""}`
+    : " · EİDS adımı hata verdi";
 
   await recordHeartbeat(
     "gorev-hatirlat",
     heartbeatFor({ failed, truncated: capped }),
     `${notified} bildirim, ${skipped} atlandı · düşük puan zinciri: ${lowScore.escalated} kademe, ${lowScore.notified} bildirim${crmNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
+    `${notified} bildirim, ${skipped} atlandı · düşük puan zinciri: ${lowScore.escalated} kademe, ${lowScore.notified} bildirim${eidsNote}${failureNote({ failed })}${capped ? ` · TAVAN: yalnız vadesi en eski ${list.length} görev işlendi, kalanı bu turda İŞLENMEDİ` : ""}`,
   );
 
   return NextResponse.json({ ok: true, notified, skipped, lowScoreEscalated: lowScore.escalated });

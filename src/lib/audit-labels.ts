@@ -34,6 +34,8 @@ export const actionLabel: Record<string, string> = {
   "task.create": "Görev oluşturuldu",
   "task.update": "Görev güncellendi",
   "task.complete": "Görev tamamlandı",
+  "task.eids_takedown_item": "EİDS kaldırma kalemi işaretlendi",
+  "task.eids_restore_surfaces": "EİDS kapatılan vitrin/paylaşım geri açıldı",
   "call.create": "Arama kaydı",
   "appointment.create": "Randevu oluşturuldu",
   "appointment.update": "Randevu güncellendi",

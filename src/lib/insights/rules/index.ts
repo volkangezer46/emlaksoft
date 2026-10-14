@@ -68,6 +68,11 @@ import {
 import { isFeatureEnabledIn } from "@/lib/modules/logic";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import type { FsboFact } from "@/lib/insights/rules/prospecting";
+import { eidsPropertyFactsOnce, loadEidsMailSilentFact } from "@/lib/insights/eids-facts";
+import { EIDS_REVOKED_LIVE_RULE_ID, evaluateEidsRevokedStillLive } from "@/lib/insights/rules/eids-revoked-still-live";
+import { EIDS_UNKNOWN_LIVE_RULE_ID, evaluateEidsUnknownLive } from "@/lib/insights/rules/eids-unknown-live";
+import { EIDS_NO_EMAIL_RULE_ID, evaluateEidsNoEmailSeen } from "@/lib/insights/rules/eids-no-email-seen";
+import { EIDS_MAIL_SILENT_RULE_ID, evaluateEidsMailSilent } from "@/lib/insights/rules/eids-mail-silent";
 
 const categoryLabel = (value: string): string => EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 
@@ -215,6 +220,40 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     label: "Yetki süresi dolmuş ilanlar",
     // Olgu yükleyicisi sayfalı ve eksiksiz (üst sınırsız): canlı küme güvenilir.
     run: async (admin, tenantId, nowMs) => evaluateAuthorityExpiredRun(await loadExpiredAuthorities(admin, tenantId, nowMs), nowMs),
+  },
+  // EİDS YETKİ UYUMU (saf kurallar: rules/eids-*.ts; olgular: eids-facts.ts, dört kural aynı portföy kümesini paylaşır).
+  // E-posta gelmeyen durumun güvenlik ağı: iptal/dolmuş ama portalda yayında, bilinmeyen yetkiyle yayında, 120 gün teyitsiz
+  // onay, 90 gün sessiz alma adresi. Olgu kümesi tam (sayfalı, üst sınırsız): canlı küme kapatma için güvenilir.
+  {
+    id: EIDS_REVOKED_LIVE_RULE_ID,
+    kind: "compliance",
+    label: "Yetkisi sona erdiği hâlde portalda yayında olan ilanlar",
+    run: async (admin, tenantId, nowMs) => {
+      const f = await eidsPropertyFactsOnce(admin, tenantId, nowMs);
+      return evaluateEidsRevokedStillLive(f.facts, f.todayKey, nowMs);
+    },
+  },
+  {
+    id: EIDS_UNKNOWN_LIVE_RULE_ID,
+    kind: "compliance",
+    label: "Yetki durumu bilinmeden yayında olan ilanlar",
+    run: async (admin, tenantId, nowMs) => evaluateEidsUnknownLive((await eidsPropertyFactsOnce(admin, tenantId, nowMs)).facts, nowMs),
+  },
+  {
+    id: EIDS_NO_EMAIL_RULE_ID,
+    kind: "compliance",
+    label: "120 gündür teyit görmemiş onaylı yetkiler",
+    run: async (admin, tenantId, nowMs) => {
+      const f = await eidsPropertyFactsOnce(admin, tenantId, nowMs);
+      if (!f.confirmationsKnown) throw new InsightFactsUnavailable("properties.authority_last_email_at");
+      return evaluateEidsNoEmailSeen(f.facts, nowMs);
+    },
+  },
+  {
+    id: EIDS_MAIL_SILENT_RULE_ID,
+    kind: "compliance",
+    label: "Bakanlık e-postası gelmiyor (iletme kuralı)",
+    run: async (admin, tenantId, nowMs) => noClose(evaluateEidsMailSilent(await loadEidsMailSilentFact(admin, tenantId, nowMs), nowMs)),
   },
   {
     id: UNSHOWN_MATCH_RULE_ID,

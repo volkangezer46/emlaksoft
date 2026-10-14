@@ -152,6 +152,50 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
   return summary;
 }
 
+/** EİDS iptal sonrası kaldırma doğrulaması: en yüksek öncelik (kuyruk `priority desc` sıralar). */
+export const TAKEDOWN_CHECK_PRIORITY = 100;
+
+/**
+ * EİDS yetki iptali / süre bitimi sonrası ÖNCELİKLİ kontrol işi: kaldırma görevindeki portal kayıtları için hemen kuyruğa
+ * girer; eklentinin "kalktı" (confirmed_missing) sonucu DB tetiğiyle kontrol listesi kalemini kendiliğinden işaretler.
+ * Ofiste son 7 günde görülen kontrol istemcisi (eklenti) yoksa iş açılmaz (`hasClient:false`): kalemler elle işaretlenir.
+ * Aynı ilan için açık iş varsa (kısmi unique) yenisi açılmaz; mevcut iş sırasını korur.
+ */
+export async function enqueueTakedownChecks(
+  db: Db,
+  tenantId: string,
+  listingIds: readonly string[],
+  nowMs: number,
+): Promise<{ hasClient: boolean; enqueued: number; schemaMissing: boolean }> {
+  const out = { hasClient: false, enqueued: 0, schemaMissing: false };
+  const ids = [...new Set(listingIds.filter(Boolean))];
+  const { data: clients, error } = await db
+    .from("verification_clients")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .is("revoked_at", null)
+    .gte("last_seen_at", new Date(nowMs - 7 * 86_400_000).toISOString())
+    .limit(1);
+  if (error) {
+    out.schemaMissing = isMissingSchema(error);
+    return out;
+  }
+  out.hasClient = (clients ?? []).length > 0;
+  if (!out.hasClient || ids.length === 0) return out;
+  const nowIso = new Date(nowMs).toISOString();
+  for (const part of chunk(ids, 200)) {
+    const jobs = part.map((id) => ({ portal_listing_id: id, priority: TAKEDOWN_CHECK_PRIORITY, reason: "manual_request", scheduled_at: nowIso, exclude_client_ids: [] }));
+    const { data: n, error: e } = await db.rpc("lc_enqueue_verification_jobs", { p_tenant_id: tenantId, p_jobs: jobs });
+    if (e) {
+      if (isMissingSchema(e)) out.schemaMissing = true;
+      else console.error("enqueueTakedownChecks", { code: e.code });
+      break;
+    }
+    out.enqueued += Number(n ?? 0);
+  }
+  return out;
+}
+
 /** Lease'i dolan işleri kuyruğa döndürür / üçüncü denemede failed yapar. */
 export async function reapJobs(db: Db): Promise<{ requeued: number; failed: number }> {
   const { data, error } = await db.rpc("lc_reap_verification_jobs");

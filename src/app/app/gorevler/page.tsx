@@ -62,6 +62,9 @@ const KIND_FILTERS = [
   { key: "visit", label: "Ziyaret" },
   { key: "document", label: "Evrak" },
   { key: "followup", label: "Takip" },
+  // EİDS aksiyon motoru: yetki iptali/süre bitiminde açılan ACİL kaldırma görevleri ve yetki gelince yayın görevleri.
+  { key: "eids_takedown", label: "İlan kaldır (EİDS)" },
+  { key: "eids_publish", label: "Yetki geldi" },
 ];
 
 // Zaman okuması clock.ts üzerinden (render'da doğrudan Date.now/new Date yok)

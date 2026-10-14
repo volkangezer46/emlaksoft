@@ -28,6 +28,8 @@ import { CronPauseButton } from "./ops-controls";
 import { CronHistoryPanel, type CronRun } from "./cron-history";
 import { countOpenErrors } from "../hatalar/triage";
 import { PORTAL_LABELS } from "@/lib/portals/catalog";
+import { Suspense } from "react";
+import { EidsIntakePanel } from "./eids-intake-panel";
 
 const TOTAL_PROVINCES = 81;
 
@@ -658,6 +660,11 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
         whatsappConfigured={waConfigured}
         whatsappSummary={waHost}
       />
+
+      {/* EİDS Bakanlık e-postası alımı: ofis bazında iletme, doğrulama dağılımı, kalıp dışı örnek (maskeli), SMTP sağlığı */}
+      <Suspense fallback={null}>
+        <EidsIntakePanel admin={admin} />
+      </Suspense>
 
       {/* Bilinçli ertelenenler */}
       <section className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-6">

@@ -12,6 +12,7 @@ import {
   Gauge,
   Map as MapIcon,
   PieChart,
+  ShieldCheck,
   Smile,
   Trophy,
 } from "lucide-react";
@@ -536,6 +537,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
           { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
           { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
+          { href: "/app/raporlar/yetki-uyum", icon: ShieldCheck, title: "Yetki uyum raporu", sub: "EİDS iptali sonrası kaldırma süresi" },
           { href: "/app/kayip-kacak", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
           { href: "/app/talepler?sekme=eslesme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
           { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },

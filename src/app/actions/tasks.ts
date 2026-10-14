@@ -13,6 +13,12 @@ export type TaskResult = { error?: string; ok?: boolean; id?: string };
 
 const KINDS = ["followup", "call", "visit", "document", "other"];
 const PRIORITIES = ["low", "normal", "high"];
+/**
+ * EİDS aksiyon motorunun sistem görevleri (src/lib/eids/actions.ts): elle oluşturulmaz; düzenlemede türleri ve "Acil"
+ * öncelikleri korunur. Kaldırma görevi (eids_takedown) yalnız kontrol listesinden kapanır (DB tetiği de engeller).
+ */
+const SYSTEM_KINDS = ["eids_publish", "eids_takedown"];
+const SYSTEM_PRIORITIES = ["urgent"];
 const RECURRENCES = ["daily", "weekly", "biweekly", "monthly"];
 
 /**
@@ -211,8 +217,8 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   const dealField = formData.has("deal_id") ? String(formData.get("deal_id") ?? "").trim() : undefined;
 
   if (!title) return { error: "Görev başlığı zorunlu." };
-  if (!KINDS.includes(kind)) return { error: "Geçersiz görev türü." };
-  if (!PRIORITIES.includes(priority)) return { error: "Geçersiz öncelik." };
+  if (!KINDS.includes(kind) && !SYSTEM_KINDS.includes(kind)) return { error: "Geçersiz görev türü." };
+  if (!PRIORITIES.includes(priority) && !SYSTEM_PRIORITIES.includes(priority)) return { error: "Geçersiz öncelik." };
   if (recurrenceRaw && !RECURRENCES.includes(recurrenceRaw)) return { error: "Geçersiz tekrar periyodu." };
 
   const references = await validateTenantReferences(gate.tenantId, {
@@ -221,6 +227,13 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
+  // Sistem görevinin türü değişmez, normal görev sistem türüne çevrilemez (kaldırma görevi tür değiştirerek kapatılamaz).
+  const { data: current } = await supabase.from("tasks").select("kind").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle();
+  if (!current) return { error: "Görev bulunamadı." };
+  const currentKind = String((current as { kind: string }).kind);
+  if (kind !== currentKind && (SYSTEM_KINDS.includes(currentKind) || SYSTEM_KINDS.includes(kind))) {
+    return { error: "Bu görevin türü değiştirilemez: EİDS görevleri sistem tarafından açılır." };
+  }
   if (dealField) {
     const { data: ownDeal } = await supabase
       .from("deals")
@@ -344,6 +357,8 @@ export async function completeTask(formData: FormData): Promise<CompleteTaskResu
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
+  // Kaldırma görevi yalnız kontrol listesinden kapanır (/app/gorevler/eids/<id>).
+  if (task?.kind === "eids_takedown") return { nextDueAt: null };
 
   await supabase
     .from("tasks")
@@ -395,7 +410,9 @@ export async function completeTasksBulk(formData: FormData): Promise<void> {
     .update({ status: "done", completed_at: new Date().toISOString() })
     .in("id", ids)
     .eq("tenant_id", gate.tenantId)
-    .eq("status", "open");
+    .eq("status", "open")
+    // Kaldırma görevi toplu tamamlanmaz: bekleyen kalemli tek görev tüm seçimi DB tetiğinde düşürürdü.
+    .neq("kind", "eids_takedown");
 
   if (error) {
     console.error("completeTasksBulk", error);
@@ -440,6 +457,11 @@ export async function deleteTask(formData: FormData): Promise<TaskResult> {
   if (!id) return { error: "Görev bulunamadı." };
 
   const supabase = await createClient();
+  // Kaldırma görevi yasal yükümlülüktür: silinemez (kontrol listesiyle kapanır ya da yetki geri gelince iptal edilir).
+  const { data: current } = await supabase.from("tasks").select("kind").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle();
+  if ((current as { kind?: string } | null)?.kind === "eids_takedown") {
+    return { error: "İlan kaldırma görevi silinemez. Kontrol listesindeki kalemleri işaretleyerek kapatın." };
+  }
   const { data, error } = await supabase
     .from("tasks")
     .delete()

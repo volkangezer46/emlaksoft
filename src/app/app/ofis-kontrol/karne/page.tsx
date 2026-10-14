@@ -6,7 +6,8 @@ import { ROLE_LABELS } from "@/lib/role-labels";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
-import { DAY_MS, now, trDayKey } from "@/lib/clock";
+import { DAY_MS, now, trDayKey, trMonthKey } from "@/lib/clock";
+import { loadComplianceReport } from "@/lib/eids/compliance";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -95,7 +96,8 @@ async function KarneBody({ viewer }: { viewer: Viewer }) {
   // Üç bağımsız kol AYNI ANDA başlar: (1) danışman metrikleri, (2) yetki belgeleri, (3) ayar -> uyarılar.
   // Ayar okuması metrikleri/belgeleri artık beklemez (önceki sıralı bekleme bir tur ekliyordu).
   // TEK HESAP KAYNAĞI: loadAdvisorMetrics (Kıyas, KPI, Lig ve Performansım ile aynı sayılar). Yeni formül yok.
-  const [metrics, alerts, certRes] = await Promise.all([
+  // EİDS yetki uyumu (bu ay): karnenin puan bileşeni; yetki uyum raporuyla AYNI hesap (loadComplianceReport).
+  const [metrics, alerts, certRes, compliance] = await Promise.all([
     loadAdvisorMetrics(supabase, {
       viewer: { userId, role, perms },
       tenantId,
@@ -105,6 +107,7 @@ async function KarneBody({ viewer }: { viewer: Viewer }) {
     }),
     loadOversightSettings(supabase, tenantId).then((settings) => loadAlerts(supabase, tenantId, settings.thresholds, nowMs)),
     supabase.from("advisor_profiles").select("profile_id, authority_cert_expires_on").eq("tenant_id", tenantId).limit(300),
+    loadComplianceReport(supabase, tenantId, trMonthKey(nowMs), nowMs),
   ]);
 
   const certBy = new Map(
@@ -116,6 +119,23 @@ async function KarneBody({ viewer }: { viewer: Viewer }) {
   return (
     <>
       <OversightNav active="karne" office openAlerts={alerts.open.length} />
+
+      {compliance.available ? (
+        <Link
+          href="/app/raporlar/yetki-uyum"
+          className="focus-ring surface-interactive flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-400"
+        >
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-text-muted">Ofis yetki uyum puanı (EİDS, bu ay)</span>
+            <span className="block text-xs text-text-muted">
+              {compliance.report.takedownCount} kaldırma görevi · {compliance.report.lateCount} tanesi 3 günü aştı
+            </span>
+          </span>
+          <span className="numeric font-display text-2xl font-extrabold tabular-nums text-ink-950">
+            {compliance.report.score === null ? "—" : `${compliance.report.score}/100`}
+          </span>
+        </Link>
+      ) : null}
 
       {metrics.failed ? (
         <EmptyState
@@ -166,6 +186,14 @@ async function KarneBody({ viewer }: { viewer: Viewer }) {
                     href={`/app/gorevler?danisman=${m.id}`}
                     attention={(m.overdueTaskCount ?? 0) > 0}
                   />
+                  {compliance.available ? (
+                    <Metric
+                      label="Geciken ilan kaldırma"
+                      value={compliance.byAdvisor.get(m.id)?.lateCount ?? 0}
+                      href={`/app/gorevler?tur=eids_takedown&filter=all&danisman=${m.id}`}
+                      attention={(compliance.byAdvisor.get(m.id)?.lateCount ?? 0) > 0}
+                    />
+                  ) : null}
                   <Metric
                     label="Takipsiz talep"
                     value={m.untrackedDemandCount ?? "—"}
