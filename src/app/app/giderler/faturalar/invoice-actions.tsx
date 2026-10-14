@@ -48,7 +48,7 @@ export function InvoiceRowActions({ id, status, canCancel, sandbox }: Props) {
     <div className="flex flex-wrap items-center justify-end gap-1.5">
       {status === "draft" ? (
         <>
-          <ButtonLink href={`/app/giderler?sekme=faturalar&duzenle=${id}`} variant="secondary" size="sm" icon={Pencil}>
+          <ButtonLink href={`/app/giderler?sekme=belgeler&tur=fatura&duzenle=${id}`} variant="secondary" size="sm" icon={Pencil}>
             Kontrol et
           </ButtonLink>
           <ConfirmDialog
@@ -56,7 +56,7 @@ export function InvoiceRowActions({ id, status, canCancel, sandbox }: Props) {
             title="Taslak silinsin mi?"
             description="Taslak kalıcı olarak silinir. Sağlayıcıya hiçbir şey gönderilmemiştir."
             confirmLabel="Sil"
-            onConfirm={() => run(() => deleteInvoiceDraft(id), () => router.replace("/app/giderler?sekme=faturalar"))}
+            onConfirm={() => run(() => deleteInvoiceDraft(id), () => router.replace("/app/giderler?sekme=belgeler&tur=fatura"))}
           />
         </>
       ) : null}
@@ -85,7 +85,7 @@ export function InvoiceRowActions({ id, status, canCancel, sandbox }: Props) {
         </>
       ) : null}
       {status === "error" ? (
-        <Button type="button" variant="secondary" size="sm" icon={RotateCcw} loading={pending} onClick={() => run(() => reopenInvoice(id), () => router.push(`/app/giderler?sekme=faturalar&duzenle=${id}`))}>
+        <Button type="button" variant="secondary" size="sm" icon={RotateCcw} loading={pending} onClick={() => run(() => reopenInvoice(id), () => router.push(`/app/giderler?sekme=belgeler&tur=fatura&duzenle=${id}`))}>
           Düzeltip yeniden dene
         </Button>
       ) : null}
@@ -122,7 +122,7 @@ export function IssuePanel({ id, sandbox, providerName, docTypeLabel, grossLabel
         title="Fatura resmileştirilsin mi?"
         description={`Bu işlem GERİ ALINAMAZ. Fatura ${providerName} üzerinden gönderilir${sandbox ? " (test kipi)" : " ve resmi belge olur"}. Alıcı bilgilerini ve tutarı kontrol ettiğinizden emin olun.`}
         confirmLabel="Evet, resmileştir"
-        onConfirm={() => run(() => issueInvoice(id, true), () => router.replace("/app/giderler?sekme=faturalar"))}
+        onConfirm={() => run(() => issueInvoice(id, true), () => router.replace("/app/giderler?sekme=belgeler&tur=fatura"))}
       />
     </section>
   );

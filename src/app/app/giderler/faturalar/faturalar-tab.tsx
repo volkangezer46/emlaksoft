@@ -1,6 +1,8 @@
 import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, Ban, CheckCircle2, FilePlus2, FileText, PencilLine, Plug } from "lucide-react";
+import { AlertTriangle, Ban, CheckCircle2, FilePlus2, FileSpreadsheet, FileText, PencilLine, Plug } from "lucide-react";
+import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { reportCenterHref } from "@/lib/report-center/links";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +13,7 @@ import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { DOC_TYPE_LABEL, EINVOICE_PROVIDER_META, MODE_LABEL } from "@/lib/integrations/einvoice/providers";
-import { DEFAULT_VAT_RATE } from "@/lib/integrations/einvoice/invoice-math";
+import { DEFAULT_VAT_RATE, VAT_RATE_OPTIONS, unitNetForGross } from "@/lib/integrations/einvoice/invoice-math";
 import {
   EINVOICE_ROW_COLUMNS,
   getConnectionInfo,
@@ -21,13 +23,22 @@ import { loadSourcePrefill, SOURCE_QUERY, SOURCE_TYPE_LABEL } from "@/lib/integr
 import { InvoiceEditor, type EditorInitial } from "./invoice-editor";
 import { InvoiceRowActions, IssuePanel } from "./invoice-actions";
 
-/** Finans sayfası sekme kaydı: sekme şeridine tek satır eklenir (`?sekme=faturalar`). */
+/**
+ * Eski sekme kaydı (`?sekme=faturalar`): Faturalar artık Muhasebe > Belgeler > Faturalar (`?sekme=belgeler&tur=fatura`);
+ * eski bağlantı sekme takma adıyla oraya düşer. Anahtar geriye uyumluluk için dışa verilir.
+ * BİRLEŞTİRME SIRASI: `?sekme=belgeler` yalnız FN2 yönlendiricisinde (`resolveFinanceTab` + `BelgelerTab`) çözülür;
+ * FN5, FN1 ve FN2 ile birlikte ya da onlardan sonra birleşir (tek başına birleşirse bu adresler genel bakışa düşer).
+ */
 export const FATURALAR_SEKME = { key: "faturalar", label: "Faturalar" } as const;
 
-export type FaturalarParams = { durum?: string; kaynak?: string; id?: string; duzenle?: string; adet?: string };
+/**
+ * `tutar` (KDV dahil) / `kdv` (hareketin KDV oranı) / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu
+ * serbest faturayı önceden doldurur.
+ */
+export type FaturalarParams = { durum?: string; kaynak?: string; id?: string; duzenle?: string; adet?: string; tutar?: string; kdv?: string; aciklama?: string; alici?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const BASE = "/app/giderler?sekme=faturalar";
+const BASE = "/app/giderler?sekme=belgeler&tur=fatura";
 const STATUS_FILTERS = ["draft", "issued", "error", "cancelled"] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 const STATUS_LABEL: Record<StatusFilter, string> = { draft: "Taslak", issued: "Resmileşti", error: "Hata", cancelled: "İptal" };
@@ -57,32 +68,63 @@ function todayIso(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Istanbul" }).format(new Date(now()));
 }
 
-export async function FaturalarTab({ perms, params }: { perms: EffectivePermissions; params: FaturalarParams }) {
+/** `?kdv=`: hareketin `vat_rate`'i; editörün seçicisindeki oranlardan biri değilse (ya da yoksa) varsayılan %20. */
+function vatRateParam(value: string | undefined): number {
+  const n = value ? Number(value) : Number.NaN;
+  return (VAT_RATE_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_VAT_RATE;
+}
+
+const cleanParam = (v: string | undefined) => (v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 200);
+
+/**
+ * Yetki: GÖRÜNTÜLEME `expenses:view` (sayfa kapısı) ya da `commissions:create`; taslak/resmileştirme/iptal MEVCUT kural
+ * (`commissions:create`, einvoice action'ları + RLS). Okuma politikası 20261013008400 ile `expenses:view`'u da kapsar.
+ * `embedded`: Belgeler sekmesinin içinde (başlık h2; sayfanın tek h1'i kabukta).
+ */
+export async function FaturalarTab({ perms, params, embedded = false }: { perms: EffectivePermissions; params: FaturalarParams; embedded?: boolean }) {
   const canInvoice = perms.commissions?.includes("create") ?? false;
+  const canView = canInvoice || (perms.expenses?.includes("view") ?? false);
   const canEditSettings = perms.settings?.includes("edit") ?? false;
+  const reportHref = canSeeAllEarnings(perms) ? reportCenterHref("tenant", "e-fatura-listesi", params.durum ? { durum: params.durum } : {}) : null;
   const hero = (
     <ListHero
-      eyebrow="Finans"
+      as={embedded ? "h2" : "h1"}
+      eyebrow={embedded ? "Belgeler" : "Finans"}
       title="Faturalar"
-      description="Komisyon ve hizmet bedeli için e-Fatura / e-Arşiv kesin, durumunu ve PDF belgesini buradan izleyin."
+      description={
+        canInvoice
+          ? "Komisyon ve hizmet bedeli için e-Fatura / e-Arşiv kesin, durumunu ve PDF belgesini buradan izleyin."
+          : "Kesilen e-Fatura / e-Arşiv belgelerini ve durumlarını görüntüleyin. Fatura kesmek için komisyon yönetimi yetkisi gerekir."
+      }
       actions={
-        canInvoice ? (
-          <ButtonLink href={`${BASE}&kaynak=serbest`} icon={FilePlus2}>
-            Serbest fatura
-          </ButtonLink>
+        canInvoice || reportHref ? (
+          <>
+            {reportHref ? (
+              <ButtonLink href={reportHref} variant="secondary" icon={FileSpreadsheet}>
+                e-Fatura listesi raporu
+              </ButtonLink>
+            ) : null}
+            {canInvoice ? (
+              <ButtonLink href={`${BASE}&kaynak=serbest`} icon={FilePlus2}>
+                Serbest fatura
+              </ButtonLink>
+            ) : null}
+          </>
         ) : null
       }
     />
   );
 
-  if (!canInvoice) {
+  if (!canView) {
     return (
       <ListPage>
         {hero}
-        <EmptyState icon={FileText} title="Faturalar bu hesapta açık değil" description="Fatura kesmek ve görmek için komisyon yönetimi yetkisi gerekir. Ofis yöneticinizle görüşün." tone="amber" />
+        <EmptyState icon={FileText} title="Faturalar bu hesapta açık değil" description="Faturaları görmek için muhasebe görüntüleme yetkisi gerekir. Ofis yöneticinizle görüşün." tone="amber" />
       </ListPage>
     );
   }
+  // Salt görüntüleme: düzenleme / yeni taslak adresleri listeye döner.
+  if (!canInvoice && (params.duzenle || params.kaynak)) redirect(BASE);
 
   const supabase = await createClient();
   const { info, available } = await getConnectionInfo(supabase);
@@ -157,6 +199,10 @@ export async function FaturalarTab({ perms, params }: { perms: EffectivePermissi
   const sourceType = params.kaynak ? SOURCE_QUERY[params.kaynak] : undefined;
   if (sourceType) {
     if (sourceType === "free") {
+      const gross = Number(params.tutar);
+      const prefillVat = vatRateParam(params.kdv);
+      // Net, editörde yeniden hesaplandığında hareketin brütünü verecek şekilde seçilir (kuruş sapması yok).
+      const prefillAmount = Number.isFinite(gross) && gross > 0 && gross < 1e9 ? String(unitNetForGross(gross, prefillVat)) : "";
       return (
         <ListPage>
           {hero}
@@ -167,7 +213,7 @@ export async function FaturalarTab({ perms, params }: { perms: EffectivePermissi
               sourceType: "free",
               sourceId: null,
               sourceLabel: "Serbest fatura",
-              buyerName: "",
+              buyerName: cleanParam(params.alici),
               buyerTaxId: "",
               buyerTaxOffice: "",
               buyerAddress: "",
@@ -175,7 +221,7 @@ export async function FaturalarTab({ perms, params }: { perms: EffectivePermissi
               buyerDistrict: "",
               issueDate: todayIso(),
               note: "",
-              lines: [{ description: "", quantity: "1", unitPrice: "", vatRate: DEFAULT_VAT_RATE }],
+              lines: [{ description: cleanParam(params.aciklama), quantity: "1", unitPrice: prefillAmount, vatRate: prefillVat }],
             }}
           />
         </ListPage>
@@ -302,7 +348,9 @@ export async function FaturalarTab({ perms, params }: { perms: EffectivePermissi
                       {r.error ? <span className="mt-1 block max-w-[260px] text-xs text-danger-600">{r.error}</span> : null}
                     </TD>
                     <TD actions align="right">
-                      <InvoiceRowActions id={r.id} status={r.status} canCancel={canCancelByProvider && r.doc_type === "e-arsiv" && r.provider === info.provider} sandbox={r.mode === "sandbox"} />
+                      {canInvoice ? (
+                        <InvoiceRowActions id={r.id} status={r.status} canCancel={canCancelByProvider && r.doc_type === "e-arsiv" && r.provider === info.provider} sandbox={r.mode === "sandbox"} />
+                      ) : null}
                     </TD>
                   </TR>
                 );

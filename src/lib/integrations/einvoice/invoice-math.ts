@@ -27,6 +27,29 @@ export function lineAmounts(line: EInvoiceLine): LineAmounts {
   return { net, vat, gross: round2(net + vat) };
 }
 
+/**
+ * KDV dahil tutardan tek kalemlik (adet 1) KDV hariç birim fiyat: `lineAmounts` ile yeniden hesaplandığında brütü
+ * TUTTURAN 2 haneli net seçilir (ham bölme + yuvarlama 1 kuruş kaydırabilir). Kuruş adımında bazı brütler hiçbir 2
+ * haneli netle elde edilemez (örn. %20'de 100,05); o zaman en yakın brütü veren (eşitlikte küçük) net döner.
+ */
+export function unitNetForGross(gross: number, vatRate: number): number {
+  const target = round2(gross);
+  const base = round2(target / (1 + vatRate / 100));
+  let best = base;
+  let bestDiff = Number.POSITIVE_INFINITY;
+  for (const step of [-2, -1, 0, 1, 2]) {
+    const net = round2(base + step / 100);
+    if (net <= 0) continue;
+    const g = round2(net + round2((net * vatRate) / 100));
+    const diff = Math.abs(round2(g - target));
+    if (diff < bestDiff || (diff === bestDiff && net < best)) {
+      best = net;
+      bestDiff = diff;
+    }
+  }
+  return best;
+}
+
 export type InvoiceTotals = {
   net: number;
   vat: number;

@@ -56,7 +56,7 @@ export function InvoiceEditor({ initial }: { initial: EditorInitial }) {
     const result = await saveInvoiceDraft(prev, formData);
     if (result.ok && result.id) {
       push(result.message ?? "Taslak kaydedildi", "ok");
-      router.replace(`/app/giderler?sekme=faturalar&duzenle=${result.id}`);
+      router.replace(`/app/giderler?sekme=belgeler&tur=fatura&duzenle=${result.id}`);
       router.refresh();
     }
     return result;
