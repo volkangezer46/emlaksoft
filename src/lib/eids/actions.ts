@@ -38,9 +38,10 @@ import {
  * `createAdminClient` ÇAĞIRMAZ. Yetki durumunu YAZMAZ: tek yazma noktası EP2'nin `applyAuthorityEvent()` defteridir; burada
  * yalnız görev, kontrol listesi, bildirim ve EmlakSoft'un kendi yüzeyleri (vitrin, paylaşım bağlantısı) değişir.
  *
- * Bağlantı (birleştirmeden sonra): `applyAuthorityEvent` başarılı döndüğünde çağıran `onAuthorityEvent(admin, event)`'i
- * aynı istekte çağırır (1 dakika hedefi). Cron (`runEidsActionSweep`) son 3 günün olaylarını yeniden tarar: kaçan olay
- * en geç bir sonraki turda işlenir.
+ * ANLIK AKIŞ: `applyAuthorityEvent` / `undoAuthorityEvent` başarılı döndüğünde çağıran `scheduleAuthorityEventActions`
+ * (`./actions-dispatch`) ile aynı istekte, yanıttan hemen sonra (`after()`) `runAuthorityEventById` çalışır: görev ve
+ * bildirim saniyeler içinde açılır. Cron (`runEidsActionSweep`) son 3 günün olaylarını yeniden tarar (yedek): kaçan olay
+ * en geç bir sonraki turda işlenir; tekil anahtarlar sayesinde anlık akışta açılmış görev ikinci kez açılmaz.
  */
 
 type Db = SupabaseClient;
@@ -523,6 +524,23 @@ export async function onAuthorityEvent(db: Db, ev: AuthorityEventInput, nowMs: n
   }
 }
 
+/** Aksiyon motorunun okuduğu defter sütunları (anlık akış ve cron aynı biçimi okur). */
+const EVENT_COLUMNS = "id, tenant_id, property_id, kind, source, valid_until, prev_status, new_status, created_at";
+
+/**
+ * Anlık akış: deftere yeni yazılmış olayı kimliğiyle (kiracı süzgeciyle) okuyup `onAuthorityEvent` çalıştırır. Eyleme
+ * dönüşmeyen tür ya da eşleşmemiş olay atlanır. Cron aynı olayı yeniden işlese de tekil anahtarlar tekrarı önler.
+ */
+export async function runAuthorityEventById(db: Db, tenantId: string, eventId: string, nowMs: number): Promise<ActionOutcome> {
+  if (!tenantId || !eventId) return { status: "skipped", detail: "kimlik_yok" };
+  const { data, error } = await db.from("eids_authority_events").select(EVENT_COLUMNS).eq("tenant_id", tenantId).eq("id", eventId).maybeSingle();
+  if (error) return { status: isMissingSchema(error) ? "schema_missing" : "error", detail: error.code ?? undefined };
+  const ev = data as AuthorityEventInput | null;
+  if (!ev) return { status: "skipped", detail: "olay_yok" };
+  if (!ev.property_id || !(EIDS_ACTIONABLE_EVENT_KINDS as readonly string[]).includes(ev.kind)) return { status: "skipped", detail: "eylemsiz" };
+  return onAuthorityEvent(db, ev, nowMs);
+}
+
 /* ------------------------------------------------------------------ */
 /* Cron adımı (gorev-hatirlat)                                        */
 /* ------------------------------------------------------------------ */
@@ -550,7 +568,8 @@ const EXPIRE_SCAN_FROM = "2026-10-14";
 
 /**
  * Cron adımı (2 saatte bir, `gorev-hatirlat` içinde AYRIK adım; yeni cron yok):
- *  1. Son 3 günün defter olayları → `onAuthorityEvent` (kaçan olay güvencesi; tekil anahtarlar tekrarı önler).
+ *  1. Son 3 günün defter olayları → `onAuthorityEvent` (anlık akışın yedeği: kaçan olay güvencesi; tekil anahtarlar
+ *     tekrarı önler).
  *  2. `authorization_end` son 14 günde geçmiş ve yayında bir şeyi olan portföy → süre bitimi kaldırma görevi (e-posta
  *     beklenmez; portallar modülü kapalı ofis atlanır).
  *  3. 48 saatte (ayar) kapanmayan kaldırma görevi → ofis sahibine yükseltme (bir kez; `tasks.escalated_at`).
@@ -564,7 +583,7 @@ export async function runEidsActionSweep(db: Db, nowMs: number): Promise<EidsSwe
   const since = new Date(nowMs - EVENT_LOOKBACK_DAYS * DAY_MS).toISOString();
   const { data: events, error: evErr } = await db
     .from("eids_authority_events")
-    .select("id, tenant_id, property_id, kind, source, valid_until, prev_status, new_status, created_at")
+    .select(EVENT_COLUMNS)
     .gte("created_at", since)
     .in("kind", [...EIDS_ACTIONABLE_EVENT_KINDS])
     .not("property_id", "is", null)

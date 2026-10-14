@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyAuthorityEvent } from "./ledger";
+import { scheduleAuthorityEventActions } from "./actions-dispatch";
 import type { InboundApplier } from "./inbound";
 
 /**
  * EP3 → EP2 köprüsü: gelen e-postadan çıkan olay YALNIZ EP2 defterinin tek yazma noktasıyla (`applyAuthorityEvent`)
  * işlenir. Verme → 'approved' (+ bitiş tarihi portföyün authorization_end'ine), iptal → 'revoked'. Doğrulanmış kaynak
  * `verified` işaretini taşır; her durumda "Bakanlık e-postası görüldü" (authority_last_email_at) yazılır.
- * `db`: SMTP köprüsünde service_role (kiracı parametre), onayda oturumlu ya da service_role istemci.
+ * `db`: SMTP köprüsünde service_role (kiracı parametre), onayda service_role istemci.
+ * Başarılı yazımdan sonra aksiyon motoru aynı istekte çalışır (anlık akış; iptal → danışmana ACİL kaldırma görevi).
  */
 export function ledgerApplier(db: SupabaseClient): InboundApplier {
   return async (i) => {
@@ -27,6 +29,8 @@ export function ledgerApplier(db: SupabaseClient): InboundApplier {
       emailSeen: true,
       actorId: i.actorId,
     });
-    return r.ok ? { ok: true, eventId: r.eventId } : { ok: false, error: r.error };
+    if (!r.ok) return { ok: false, error: r.error };
+    scheduleAuthorityEventActions(i.tenantId, r.eventId, db);
+    return { ok: true, eventId: r.eventId };
   };
 }
