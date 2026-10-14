@@ -126,22 +126,29 @@ export function fromRawLine(r: RawInvoiceLine): InvoiceLine {
   };
 }
 
+/**
+ * Otomatik faturanın tek satır açıklaması (fatura meta'sından). AD2 geriye dönük doldurması (20261013004100) ve otomatik
+ * kesilen faturanın yazdığı satır (`autoInvoiceLineRow`) aynı metni kullanır.
+ */
+export function invoiceLineDescription(metaRaw: unknown): string {
+  const meta = (metaRaw && typeof metaRaw === "object" ? metaRaw : {}) as Record<string, unknown>;
+  const kind = typeof meta.kind === "string" ? meta.kind : "";
+  return kind === "extra_seats"
+    ? "Ek kullanıcı"
+    : kind === "credit_pack"
+      ? "EmlakFiyatı analiz bakiyesi paketi"
+      : kind === "plan_upgrade"
+        ? "Paket yükseltme farkı"
+        : typeof meta.plan === "string" && meta.plan
+          ? `Abonelik: ${meta.plan.slice(0, 60)}`
+          : "Hizmet bedeli";
+}
+
 /** Satırı olmayan (otomatik kesilmiş ya da migration öncesi) fatura için tek satır: tutarlar faturadan aynen. */
 export function synthesizeLine(inv: { amount_try: unknown; tax_try: unknown; total_try: unknown; meta?: unknown }): InvoiceLine {
-  const meta = (inv.meta && typeof inv.meta === "object" ? inv.meta : {}) as Record<string, unknown>;
   const net = Number(inv.amount_try ?? 0) || 0;
   const tax = Number(inv.tax_try ?? 0) || 0;
-  const kind = typeof meta.kind === "string" ? meta.kind : "";
-  const description =
-    kind === "extra_seats"
-      ? "Ek kullanıcı"
-      : kind === "credit_pack"
-        ? "EmlakFiyatı analiz bakiyesi paketi"
-        : kind === "plan_upgrade"
-          ? "Paket yükseltme farkı"
-          : typeof meta.plan === "string" && meta.plan
-            ? `Abonelik: ${meta.plan}`
-            : "Hizmet bedeli";
+  const description = invoiceLineDescription(inv.meta);
   return {
     position: 1,
     description,

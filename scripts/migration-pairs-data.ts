@@ -400,6 +400,8 @@ const F = {
   // DG8 (2026-10-14): ozellik bayragi hedefleme kurallari + urun ici NPS anketi + ozellik istek panosu (yalniz service_role).
   flagRulesProductFeedback: "20261014008000_feature_flag_rules_product_feedback.sql",
   clAppCanonicalLinks: "20261014009000_cl_app_canonical_links.sql",
+  // GP2 (2026-10-14): otomatik faturada gecerlilik tarihli KDV: fulfill faturanin meta.vatRate oranini okur (sabit %20 yerine).
+  billingVatRateInvoices: "20261014012000_billing_vat_rate_invoices.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -616,6 +618,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.channelRoiStatusPage]: "ek", // 4 yeni platform tablosu marketing_spend/status_incidents/status_incident_updates/release_history (RLS+FORCE, politika yok, yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken harcama yalniz Google Ads, /durum yalniz olculen erisilebilirlik, deploy.sh satir yazmayi atlar
     [F.officeSecuritySessions]: "ek", // yalniz 2 yeni service_role RPC (office_list_sessions / office_revoke_session; profiles.tenant_id siniri); mevcut nesne/veri degismez, kod RPC yokken oturum listesi "kurulum bekliyor"
     [F.flagRulesProductFeedback]: "ek", // 5 yeni tablo (feature_flag_rules, platform_nps_surveys/responses, product_feature_requests/votes; RLS+FORCE, politika yok, yalniz service_role) + service_role RPC platform_nps_mark_shown + oy sayaci tetikleyicisi; mevcut nesne/veri degismez, kod tablolar yokken bayraklar genel durumla calisir
+    [F.billingVatRateInvoices]: "davranis", // fulfill_billing_payment canli govdesinde yalniz 4 `round(v_amount_try * 0.20, 2)` -> faturanin orani (meta.vatRate yoksa 0.20: mevcut faturalar ayni), growth_cash_net bolen ayni kural; yeni billing_invoice_vat_rate + billing_vat_rate_ready (service_role); veri degismez
     [F.clAppCanonicalLinks]: "davranis", // portal_account_report_login govdesi AYNI, yalniz bildirim href'i yeni Entegrasyonlar sayfasina; notifications/insights.href eski /app yollarindan kanonik yollara (yalniz href, idempotent); kod yayiniyla ayni pencerede
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.platformKvkkRequests]: "ek", // yeni platform_kvkk_requests (RLS+FORCE, politika yok, yalniz service_role) + alert_rules CHECK mevcut tanimdan genisler (kvkk_sla) ve tek tohum satiri; mevcut veri degismez, kod tablo yokken form "e-posta ile yazin" der
@@ -839,6 +842,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DG4-rapor-abonelik", order: 114, title: "Rapor merkezi kayitli gorunum + zamanlanmis rapor aboneligi + teslim gunlugu (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'kurulum bekliyor', gunluk-ozet adimi 'skipped'; sira serbest, ek)", files: [F.reportSubscriptions] },
     { id: "DG1-personel-ozel-rol-dort-goz", order: 111, title: "Personel ozel rolleri + dort goz onay kuyrugu: platform_custom_roles, platform_approval_requests, platform_staff.custom_role_id (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutun yokken sabit role duser ve Roller/Onaylar ekrani kurulum bekliyor der; dort goz ayarlari varsayilan kapali; sira serbest, ek)", files: [F.platformCustomRolesFourEyes] },
     { id: "DG8-bayrak-hedefleme-nps-pano", order: 118, title: "Ozellik bayragi hedefleme (ofis/plan/yuzde/zaman) + urun ici NPS anketi + ozellik istek panosu (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken bayraklar genel durumla calisir, NPS gosterilmez, pano 'kurulum bekliyor'; sira serbest, ek)", files: [F.flagRulesProductFeedback] },
+    { id: "GP2-fatura-kdv-orani", order: 132, title: "Otomatik faturada gecerlilik tarihli KDV: fulfill_billing_payment tutari faturanin kendi oranindan (meta.vatRate; yoksa %20) dogrular, growth_cash_net ayni kural + billing_vat_rate_ready() probu (20261014002000 SONRASI; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod probe yokken yalniz %20 ile otomatik fatura keser, KDV ayari %20'den farkli yapilmadan ONCE uygulanmali; davranis)", files: [F.billingVatRateInvoices] },
     { id: "CL-APP-kanonik-baglantilar", order: 119, title: "Ofis uygulamasi temizligi: kaldirilan /app yollarina giden kayitli baglantilar (bildirim, icgoru) ve portal giris bildirimi kanonik yola cevrilir (bagimsiz; KOD YAYINIYLA AYNI pencerede ya da hemen SONRA; once uygulanirsa yeni yollar kod gelene kadar acilmaz; davranis)", files: [F.clAppCanonicalLinks] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "DG6-kvkk-veri-sahibi", order: 116, title: "KVKK veri sahibi basvurulari: platform_kvkk_requests + kvkk_sla uyari kurali (bagimsiz; AD10 004900 varsa CHECK genisler, yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken form ve kuyruk 'kurulum bekliyor'; sira serbest, ek)", files: [F.platformKvkkRequests] },
@@ -968,6 +972,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.planCatalogEngine, F.planUpgradeFulfillment],
     [F.planCatalogEngine, F.subscriptionPause],
     [F.planCatalogEngine, F.billingAmount],
+    // GP2: fulfill'in canli govdesi (plan_upgrade + billing_plan_known donusumu) ve growth_cash_net once olmali.
+    [F.billingVatRateInvoices, F.planCatalogEngine],
+    [F.billingVatRateInvoices, F.planUpgradeFulfillment],
+    [F.billingVatRateInvoices, F.growthEngine],
     [F.financeIsSample, F.financeAccountsCashEntries],
     [F.financeIsSample, F.recurringRules],
     [F.financeIsSample, F.expenseBudgetsRecurring],
