@@ -47,6 +47,18 @@ describe("bütçe ↔ gerçekleşen (finance_budget_vs_actual)", () => {
     expect(budgetTotals(rows, "out")).toEqual({ budget: 55000, actual: 52250, budgetedActual: 51500, over: 1 });
     expect(budgetTotals(rows, "in")).toEqual({ budget: 210000, actual: 132000, budgetedActual: 132000, over: 0 });
   });
+
+  it("mülk sahibinin parası (kira/aidat tahsilatı) ve transfer gelir gerçekleşenini şişirmez", () => {
+    const withPassThrough = budgetVsActualRows([
+      ...raw,
+      { direction: "in", category: "kira_tahsilat", budget: 0, actual: 90000 },
+      { direction: "in", category: "aidat_tahsilat", budget: 0, actual: 5000 },
+      { direction: "in", category: "transfer", budget: 0, actual: 1000 },
+      { direction: "out", category: "transfer", budget: 0, actual: 300 },
+    ]);
+    expect(withPassThrough.some((r) => r.direction === "in" && ["kira_tahsilat", "aidat_tahsilat", "transfer"].includes(r.category))).toBe(false);
+    expect(budgetTotals(withPassThrough, "in").actual).toBe(132000);
+  });
 });
 
 describe("ay yardımcıları", () => {

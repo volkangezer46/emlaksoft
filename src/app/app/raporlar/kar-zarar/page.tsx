@@ -68,6 +68,8 @@ export default async function ProfitLossPage() {
   );
   const pl = { ...base, months, totals, hasData: base.hasData || totals.other > 0 || totals.expenses > 0 };
   const cashLinked = Array.isArray(data.cashPnl);
+  // SÖZLEŞME (FN3 ledger-filters): `kaynak=elle` → source_type='manual' (komisyon/kira tahsilatı hariç). FN3 desteklemeden
+  // birleşirse bağlantı tüm gelir hareketlerini açar; "Diğer gelir" sayısıyla tutması için bu süzgeç gerekir.
 
   return (
     <div className="space-y-5">
@@ -93,7 +95,7 @@ export default async function ProfitLossPage() {
               <p className="text-xs text-text-faint">{pl.totals.commissions} kayıt</p>
             </Link>
             {pl.totals.other > 0 ? (
-              <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${keys[0]}-01`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+              <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${keys[0]}-01&kaynak=elle`} className="focus-ring rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
                 <p className="text-xs text-text-muted">Diğer gelir (elle)</p>
                 <p className="font-display text-xl font-extrabold text-ink-950">{formatTry(pl.totals.other)}</p>
                 <p className="text-xs text-text-faint">hizmet bedeli, diğer gelir</p>
@@ -150,7 +152,7 @@ export default async function ProfitLossPage() {
                       ) : null}
                       {pl.totals.other > 0 ? (
                         <TD className="text-right tabular-nums">
-                          <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.other)}</Link>
+                          <Link href={`/app/giderler?sekme=hareketler&tur=gelir&from=${r.from}&to=${r.to}&kaynak=elle`} className="hover:underline">{formatTry(m.other)}</Link>
                         </TD>
                       ) : null}
                       <TD className="text-right tabular-nums">{formatTry(m.vat)}</TD>

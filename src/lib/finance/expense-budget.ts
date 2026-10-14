@@ -110,6 +110,12 @@ export type BudgetVsActualRow = {
   remaining: number;
 };
 
+/**
+ * Ofisin geliri SAYILMAYAN giriş kategorileri (bütçe ↔ gerçekleşen): kira/aidat tahsilatı mülk sahibinin parasıdır,
+ * transfer hesaplar arası aktarımdır. Hedef tanımlanamazlar; bütçesiz gerçekleşen satırları da gelir toplamını şişirmesin diye atılır.
+ */
+export const BUDGET_INCOME_PASS_THROUGH: ReadonlySet<string> = new Set(["kira_tahsilat", "aidat_tahsilat", "transfer"]);
+
 /** RPC satırlarını sayıya çevirip durumlarıyla döndürür; bütçesi ve gerçekleşeni olmayan satır atılır. Gelir üstte. */
 export function budgetVsActualRows(raw: readonly BudgetVsActualRaw[]): BudgetVsActualRow[] {
   const rows: BudgetVsActualRow[] = [];
@@ -120,6 +126,7 @@ export function budgetVsActualRows(raw: readonly BudgetVsActualRaw[]): BudgetVsA
     const budget = money(r.budget);
     const actual = money(r.actual);
     if (!(budget > 0) && !(actual > 0)) continue;
+    if (direction === "in" && !(budget > 0) && BUDGET_INCOME_PASS_THROUGH.has(category)) continue;
     const ratio = budget > 0 ? actual / budget : 0;
     const status: BudgetVsActualRow["status"] =
       direction === "out" ? budgetStatus(actual, budget) : budget > 0 && ratio < BUDGET_WARN_RATIO ? "under" : "ok";
@@ -312,7 +319,10 @@ export function cashPnlAdjustments(
     const slot = out.get(c.key);
     if (!slot) continue;
     slot.manualIncome = c.manualIncome;
-    slot.extraExpense = pnlExtraExpense(c.expense, expensesAll.get(c.key) ?? 0);
+    const base = expensesAll.get(c.key) ?? 0;
+    slot.extraExpense = pnlExtraExpense(c.expense, base);
+    // Defter gideri `expenses`ten küçükse fark kırpılır (0); tarih/kapsam uyuşmazlığı sessiz kalmasın diye iz bırakılır.
+    if (c.expense - base < -1) console.warn("finance pnl: defter gideri expenses toplamından küçük, fark kırpıldı", { month: c.key, diff: round2(c.expense - base) });
   }
   return out;
 }

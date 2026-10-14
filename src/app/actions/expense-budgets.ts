@@ -117,32 +117,6 @@ export async function setFinanceBudget(input: { month: string; direction: string
   return { ok: true };
 }
 
-/** Kaynak ayın bütçe satırlarını hedef aya kopyalar (hedefte zaten olan kategoriye dokunmaz). */
-export async function copyFinanceBudgets(fromMonth: string, toMonth: string): Promise<FinanceActionResult> {
-  const gate = await gateEdit();
-  if (!gate.ok) return { ok: false, error: gate.error };
-  const from = parseMonthKey(fromMonth, "");
-  const to = parseMonthKey(toMonth, "");
-  if (!from || !to || from === to) return { ok: false, error: "Kopyalanacak ayları seçin." };
-  const supabase = await createClient();
-  const [src, dst] = await Promise.all([
-    supabase.from("finance_budgets").select("direction, category, amount").eq("tenant_id", gate.tenantId).eq("period_month", monthStart(from)),
-    supabase.from("finance_budgets").select("direction, category").eq("tenant_id", gate.tenantId).eq("period_month", monthStart(to)),
-  ]);
-  if (src.error || dst.error) return rpcFailure(src.error ?? dst.error, "Bütçe kopyalanamadı.");
-  const existing = new Set(((dst.data ?? []) as { direction: string; category: string }[]).map((r) => `${r.direction}:${r.category}`));
-  const rows = ((src.data ?? []) as { direction: string; category: string; amount: number | string }[]).filter((r) => Number(r.amount) > 0 && !existing.has(`${r.direction}:${r.category}`));
-  if (rows.length === 0) return { ok: false, error: "Kopyalanacak yeni bütçe satırı yok." };
-  let count = 0;
-  for (const r of rows) {
-    const { error } = await supabase.rpc("finance_budget_set", { p_month: monthStart(to), p_direction: r.direction, p_category: r.category, p_amount: Number(r.amount) });
-    if (error) return rpcFailure(error, "Bütçe kopyalanamadı.");
-    count += 1;
-  }
-  revalidateTenantData(gate.tenantId, PATHS);
-  return { ok: true, count };
-}
-
 /** Genel muhasebe ayarları: KDV varsayılanı, dahil/hariç, fiş okuma, nakit uyarı eşiği. */
 export async function saveFinanceSettings(input: { defaultVatRate: string | number; vatIncludedDefault: boolean; ocrEnabled: boolean; forecastMinBalance: string | number | null }): Promise<FinanceActionResult> {
   const gate = await gateEdit();

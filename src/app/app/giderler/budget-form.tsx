@@ -2,13 +2,13 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Trash2 } from "lucide-react";
-import { copyFinanceBudgets, saveExpenseBudget, setFinanceBudget, type ExpenseBudgetResult } from "@/app/actions/expense-budgets";
+import { Trash2 } from "lucide-react";
+import { saveExpenseBudget, setFinanceBudget, type ExpenseBudgetResult } from "@/app/actions/expense-budgets";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { FormError, FormField, FormInput } from "@/components/ui/form-controls";
-import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 
@@ -104,24 +104,18 @@ export function FinanceBudgetForm({
 
   return (
     <form onSubmit={submit} aria-busy={pending} className="grid gap-3">
-      <div role="radiogroup" aria-label="Bütçe türü" className="inline-flex w-fit rounded-[var(--radius-control)] border border-line bg-canvas p-0.5">
+      <div role="group" aria-label="Bütçe türü" className="flex flex-wrap gap-2">
         {(["out", "in"] as const).map((d) => (
-          <button
+          <FilterChip
             key={d}
-            type="button"
-            role="radio"
-            aria-checked={direction === d}
+            active={direction === d}
             onClick={() => {
               setDirection(d);
               setCategory((d === "in" ? inOptions : outOptions)[0]?.value ?? "");
             }}
-            className={cn(
-              "focus-ring rounded-[var(--radius-control)] px-3 py-1 text-sm font-semibold transition touch:min-h-11",
-              direction === d ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted",
-            )}
           >
             {d === "out" ? "Gider bütçesi" : "Gelir hedefi"}
-          </button>
+          </FilterChip>
         ))}
       </div>
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
@@ -183,34 +177,6 @@ export function FinanceBudgetRemove({ month, direction, category, label }: { mon
       }
     >
       <span className="sr-only sm:not-sr-only">Kaldır</span>
-    </Button>
-  );
-}
-
-/** Önceki ayın bütçe satırlarını bu aya kopyalar (bu ayda olan kategoriye dokunmaz). */
-export function CopyBudgetsButton({ fromMonth, toMonth, fromLabel, count }: { fromMonth: string; toMonth: string; fromLabel: string; count: number }) {
-  const router = useRouter();
-  const { push } = useToast();
-  const [pending, start] = useTransition();
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      icon={Copy}
-      loading={pending}
-      onClick={() =>
-        start(async () => {
-          const res = await copyFinanceBudgets(fromMonth, toMonth);
-          if (!res.ok) push(res.error, "err");
-          else {
-            push(`${res.count ?? count} bütçe satırı kopyalandı`, "ok");
-            router.refresh();
-          }
-        })
-      }
-    >
-      {fromLabel} bütçesini kopyala ({count})
     </Button>
   );
 }

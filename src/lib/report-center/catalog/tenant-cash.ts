@@ -209,10 +209,15 @@ export const cariEkstresi = defineReport({
       if (error) return [];
       const from = f.from ?? yearStart();
       const to = f.to ?? todayKey();
+      const parties = (data ?? []) as Row[];
       const out: Row[] = [];
-      for (const p of (data ?? []) as Row[]) {
-        const lines = await rpcRows(ctx, "finance_party_statement", { p_party_id: p.id, p_from: from, p_to: to });
-        for (const l of lines) out.push({ ...l, party_name: p.name, party_kind: p.kind });
+      // Sınırlı eşzamanlılık (5'erli): 50 cariyi sırayla beklemek yerine; sıra (cari adı) korunur.
+      for (let i = 0; i < parties.length; i += 5) {
+        const chunk = parties.slice(i, i + 5);
+        const results = await Promise.all(chunk.map((p) => rpcRows(ctx, "finance_party_statement", { p_party_id: p.id, p_from: from, p_to: to })));
+        chunk.forEach((p, j) => {
+          for (const l of results[j]) out.push({ ...l, party_name: p.name, party_kind: p.kind });
+        });
       }
       return out;
     },
@@ -306,6 +311,8 @@ export const kdvOzeti = defineReport({
             .select("id, entry_date, account:finance_accounts!cash_entries_account_fk!inner(owner_scope)")
             .eq("tenant_id", tid(ctx))
             .eq("account.owner_scope", "office")
+            .eq("currency", "TRY")
+            .eq("is_sample", false)
             .is("vat_rate", null)
             .is("voided_at", null)
             .in("kind", ["income", "expense"])
@@ -408,6 +415,89 @@ export const butceGerceklesen = defineReport({
   },
 });
 
+const LEDGER_COLS = "id, entry_date, kind, category, title, counterparty, direction, amount, currency";
+const LEDGER_TERM_COLS = ", party_id, vat_rate, vat_amount, withholding_amount";
+
+/**
+ * Muhasebeci paketinin defteri: ofis hesaplarının hareketleri + deftere bağlanmamış eski giderler ("Hesapsız").
+ * Önce birleşik defter görünümü (finance_ledger_v, FN1) okunur; yoksa cash_entries + bağsız `expenses` satırlarına dönülür.
+ * Örnek (demo) kayıtlar ve iptal edilen hareketler pakete girmez.
+ */
+async function readOfficeLedger(ctx: ReportContext, from: string, to: string): Promise<Row[]> {
+  const accounts = await ctx.supabase.from("finance_accounts").select("id, name, owner_scope").eq("tenant_id", tid(ctx));
+  const office = new Map<string, string>();
+  for (const a of ((accounts.data ?? []) as Row[])) if (a.owner_scope === "office") office.set(String(a.id), String(a.name ?? ""));
+
+  const view = await fetchAllRows<Row>((a, b) =>
+    ctx.supabase
+      .from("finance_ledger_v")
+      .select(`origin, account_id, ${LEDGER_COLS}${LEDGER_TERM_COLS}`)
+      .eq("tenant_id", tid(ctx))
+      .eq("is_sample", false)
+      .is("voided_at", null)
+      .gte("entry_date", from)
+      .lte("entry_date", to)
+      .order("entry_date", { ascending: true })
+      .order("id", { ascending: true })
+      .range(a, b),
+  );
+  let rows: Row[];
+  if (!view.error) {
+    rows = view.data
+      .filter((r) => r.origin === "legacy_expense" || office.has(String(r.account_id)))
+      .map((r) => ({ ...r, account_name: r.account_id ? office.get(String(r.account_id)) : null }));
+  } else {
+    // Görünüm yok (FN1 uygulanmadı): hareketler + bağsız eski giderler ayrı okunur.
+    const readEntries = (cols: string) =>
+      fetchAllRows<Row>((a, b) =>
+        ctx.supabase
+          .from("cash_entries")
+          .select(`${LEDGER_COLS}${cols}, account:finance_accounts!cash_entries_account_fk!inner(name, owner_scope)`)
+          .eq("tenant_id", tid(ctx))
+          .eq("account.owner_scope", "office")
+          .eq("is_sample", false)
+          .is("voided_at", null)
+          .gte("entry_date", from)
+          .lte("entry_date", to)
+          .order("entry_date", { ascending: true })
+          .order("id", { ascending: true })
+          .range(a, b),
+      );
+    let entries = await readEntries(LEDGER_TERM_COLS);
+    if (entries.error) entries = await readEntries("");
+    rows = entries.error ? [] : entries.data.map((r) => ({ ...r, origin: "entry", account_name: one(r.account)?.name ?? null }));
+    rows.push(...(await readLegacyExpenses(ctx, from, to)));
+    rows.sort((x, y) => String(x.entry_date).localeCompare(String(y.entry_date)) || String(x.id).localeCompare(String(y.id)));
+  }
+  await fillPartyNames(ctx, rows.map((r) => r.party_id as string | null));
+  return rows;
+}
+
+/** Hiçbir (iptal edilmemiş) harekete bağlanmamış eski ofis giderleri — finance_ledger_v'nin 'legacy_expense' kolu. */
+async function readLegacyExpenses(ctx: ReportContext, from: string, to: string): Promise<Row[]> {
+  const res = await fetchAllRows<Row>((a, b) =>
+    ctx.supabase
+      .from("expenses")
+      .select("id, expense_date, category, title, amount, currency")
+      .eq("tenant_id", tid(ctx))
+      .eq("is_sample", false)
+      .gte("expense_date", from)
+      .lte("expense_date", to)
+      .order("id", { ascending: true })
+      .range(a, b),
+  );
+  if (res.error || res.data.length === 0) return [];
+  const linked = new Set<string>();
+  const ids = res.data.map((r) => String(r.id));
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data } = await ctx.supabase.from("cash_entries").select("expense_id").eq("tenant_id", tid(ctx)).is("voided_at", null).in("expense_id", ids.slice(i, i + 150));
+    for (const r of (data ?? []) as Row[]) linked.add(String(r.expense_id));
+  }
+  return res.data
+    .filter((r) => !linked.has(String(r.id)))
+    .map((r) => ({ ...r, origin: "legacy_expense", entry_date: r.expense_date, kind: "expense", direction: "out", account_name: null }));
+}
+
 export const muhasebeciPaketi = defineReport({
   id: "muhasebeci-paketi",
   title: "Muhasebeci paketi",
@@ -432,7 +522,7 @@ export const muhasebeciPaketi = defineReport({
     { key: "cikis", label: "Çıkış / borç", type: "money", get: (r) => r.credit },
     { key: "kdvoran", label: "KDV oranı", type: "percent", decimals: 0, get: (r) => r.vatRate },
     { key: "kdv", label: "KDV", type: "money", get: (r) => r.vat },
-    { key: "stopaj", label: "Stopaj", type: "money", get: (r) => r.withholding },
+    { key: "stopaj", label: "Stopaj (KDV satırında: ödenen)", type: "money", get: (r) => r.withholding },
     { key: "bakiye", label: "Bakiye / kalan", type: "money", get: (r) => r.balance },
     { key: "para", label: "Para birimi", type: "text", width: 10, get: (r) => r.currency },
   ],
@@ -446,43 +536,23 @@ export const muhasebeciPaketi = defineReport({
       const out: Row[] = [];
 
       if (want("defter")) {
-        const readLedger = (cols: string) =>
-          fetchAllRows<Row>((a, b) =>
-            ctx.supabase
-              .from("cash_entries")
-              .select(`id, entry_date, kind, category, title, counterparty, direction, amount, currency${cols}, account:finance_accounts!cash_entries_account_fk!inner(name, owner_scope)`)
-              .eq("tenant_id", tid(ctx))
-              .eq("account.owner_scope", "office")
-              .is("voided_at", null)
-              .gte("entry_date", from)
-              .lte("entry_date", to)
-              .order("entry_date", { ascending: true })
-              .order("id", { ascending: true })
-              .range(a, b),
-          );
-        // KDV/cari sütunları (FN1) yoksa defter yine çıkar; yalnız o sütunlar boş kalır.
-        let ledger = await readLedger(", party_id, vat_rate, vat_amount, withholding_amount");
-        if (ledger.error) ledger = await readLedger("");
-        if (!ledger.error) {
-          await fillPartyNames(ctx, ledger.data.map((r) => r.party_id as string | null));
-          for (const r of ledger.data) {
-            out.push({
-              section: "Defter",
-              date: r.entry_date,
-              kind: KIND_LABEL[String(r.kind)] ?? r.kind,
-              title: r.title,
-              party: nameOf(ctx, r.party_id) || r.counterparty,
-              category: labelOf(r.category),
-              account: one(r.account)?.name,
-              debit: r.direction === "in" ? n2(r.amount) : null,
-              credit: r.direction === "out" ? n2(r.amount) : null,
-              vatRate: n2(r.vat_rate),
-              vat: n2(r.vat_amount),
-              withholding: n2(r.withholding_amount),
-              balance: null,
-              currency: r.currency,
-            });
-          }
+        for (const r of await readOfficeLedger(ctx, from, to)) {
+          out.push({
+            section: "Defter",
+            date: r.entry_date,
+            kind: r.origin === "legacy_expense" ? "Gider (hesapsız)" : (KIND_LABEL[String(r.kind)] ?? r.kind),
+            title: r.title,
+            party: nameOf(ctx, r.party_id) || r.counterparty,
+            category: labelOf(r.category),
+            account: r.account_name ?? (r.origin === "legacy_expense" ? "Hesapsız" : null),
+            debit: r.direction === "in" ? n2(r.amount) : null,
+            credit: r.direction === "out" ? n2(r.amount) : null,
+            vatRate: n2(r.vat_rate),
+            vat: n2(r.vat_amount),
+            withholding: n2(r.withholding_amount),
+            balance: null,
+            currency: r.currency,
+          });
         }
       }
 
@@ -521,10 +591,29 @@ export const muhasebeciPaketi = defineReport({
             credit: v.inputVat,
             vatRate: null,
             vat: v.payable,
-            withholding: Math.round((v.withholdingPaid + v.withholdingCollected) * 100) / 100,
+            // Ödenen stopaj (sizin kestiğiniz, örn. kira) bu satırda; müşterinin kestiği stopaj aşağıda ayrı satırdır.
+            withholding: v.withholdingPaid,
             balance: v.payable,
             currency: "TRY",
           });
+          if (v.withholdingCollected > 0) {
+            out.push({
+              section: "KDV",
+              date: `${v.month}-01`,
+              kind: "Kesilen stopaj",
+              title: "Müşterinin tahsilatınızdan kestiği stopaj (mahsup edilebilir)",
+              party: null,
+              category: null,
+              account: null,
+              debit: null,
+              credit: null,
+              vatRate: null,
+              vat: null,
+              withholding: v.withholdingCollected,
+              balance: null,
+              currency: "TRY",
+            });
+          }
         }
       }
 
@@ -534,6 +623,7 @@ export const muhasebeciPaketi = defineReport({
             .from("finance_open_items")
             .select("id, direction, party_id, title, category, amount, paid_amount, currency, due_date, status, vat_rate, vat_amount, withholding_amount")
             .eq("tenant_id", tid(ctx))
+            .eq("is_sample", false)
             .in("status", ["open", "partial"])
             .order("due_date", { ascending: true })
             .order("id", { ascending: true })

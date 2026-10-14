@@ -96,9 +96,9 @@ export function CategoryManager({
       })}
       {archived.length > 0 ? (
         <section aria-label="Arşivlenen kategoriler">
-          <button type="button" onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived} className="focus-ring rounded text-xs font-semibold text-accent-text hover:underline touch:min-h-11">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setShowArchived((v) => !v)} aria-expanded={showArchived}>
             {showArchived ? "Arşivlenenleri gizle" : `Arşivlenen ${archived.length} kategoriyi göster`}
-          </button>
+          </Button>
           {showArchived ? (
             <ul className="mt-2 grid gap-2">
               {archived.map((c) => (

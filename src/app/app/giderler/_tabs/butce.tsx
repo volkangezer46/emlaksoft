@@ -16,6 +16,7 @@ import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { CASH_CATEGORIES, OWNER_PAYOUT_CATEGORY, SALARY_CATEGORY, TRANSFER_CATEGORY } from "@/lib/finance/cash/categories";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import {
+  BUDGET_INCOME_PASS_THROUGH,
   BUDGET_WARN_RATIO,
   addMonths,
   budgetTotals,
@@ -25,7 +26,7 @@ import {
   type BudgetVsActualRaw,
   type BudgetVsActualRow,
 } from "@/lib/finance/expense-budget";
-import { CopyBudgetsButton, FinanceBudgetForm, FinanceBudgetRemove, type BudgetCategoryOption } from "../budget-form";
+import { FinanceBudgetForm, FinanceBudgetRemove, type BudgetCategoryOption } from "../budget-form";
 import { PortalRoiCard, RecurringSeriesCard } from "../finance-panel";
 
 /* ================================================================================================
@@ -106,8 +107,6 @@ export function categoryLabelMap(defs: readonly { value: string; label: string }
   return map;
 }
 
-/** Mülk sahibinin parası (ofis geliri değil): gelir hedefi seçeneklerinde çıkmaz. */
-const PASS_THROUGH_INCOME = new Set(["kira_tahsilat", "aidat_tahsilat"]);
 
 function budgetOptions(direction: "in" | "out", defs: readonly { value: string; label: string }[], custom: readonly CustomCategory[], canSalary: boolean): BudgetCategoryOption[] {
   const out: BudgetCategoryOption[] = [];
@@ -120,7 +119,8 @@ function budgetOptions(direction: "in" | "out", defs: readonly { value: string; 
   for (const c of CASH_CATEGORIES) {
     if (c.direction !== direction) continue;
     if (c.value === SALARY_CATEGORY && !canSalary) continue;
-    if (PASS_THROUGH_INCOME.has(c.value)) continue;
+    // Mülk sahibinin parası / transfer (ofis geliri değil): hedef seçeneklerinde çıkmaz (gerçekleşende de sayılmaz).
+    if (BUDGET_INCOME_PASS_THROUGH.has(c.value)) continue;
     push(c.value, c.label, "Sistem kategorisi");
   }
   if (direction === "out") for (const d of defs) push(d.value, d.label, "Gider kategorisi");
@@ -133,7 +133,7 @@ export const monthLabelOf = (key: string) => MONTH_FMT.format(new Date(`${key}-0
 
 /**
  * Bütçe sekmesi (?sekme=butce&ay=YYYY-MM): aylık gelir hedefi ve gider bütçesi ↔ gerçekleşen (finance_budget_vs_actual),
- * %80 uyarı / %100 aşım, geçen ayın bütçesini kopyalama; altında tekrarlayan gider özeti ve portal getirisi.
+ * %80 uyarı / %100 aşım (bütçe sonraki aylara kendiliğinden taşınır: finance_budget_vs_actual son tanımlı ayı okur); altında tekrarlayan gider özeti ve portal getirisi.
  * Her sayı filtreli Hareketler'e gider. Veri yoksa uydurma yok.
  */
 export async function ButceTab({ params, perms, tenantId, userId, canEdit, canSalary }: FinanceTabProps) {
@@ -143,15 +143,13 @@ export async function ButceTab({ params, perms, tenantId, userId, canEdit, canSa
   const prev = addMonths(month, -1);
   const { from, to } = monthBounds(month);
 
-  const [vsRes, prevRes, defs, custom] = await Promise.all([
+  const [vsRes, defs, custom] = await Promise.all([
     supabase.rpc("finance_budget_vs_actual", { p_month: `${month}-01` }),
-    supabase.rpc("finance_budget_vs_actual", { p_month: `${prev}-01` }),
     getDefinitionsOrDefault("expense_category"),
     loadCustomCategories(supabase),
   ]);
   const schemaMissing = Boolean(vsRes.error && isMissingCashSchema(vsRes.error));
   const rows = vsRes.error ? [] : budgetVsActualRows((vsRes.data ?? []) as BudgetVsActualRaw[]);
-  const prevRows = prevRes.error ? [] : budgetVsActualRows((prevRes.data ?? []) as BudgetVsActualRaw[]);
   const labels = categoryLabelMap(defs, custom.rows);
   const labelOf = (k: string) => labels.get(k) ?? k;
   const monthLabel = monthLabelOf(month);
@@ -164,8 +162,6 @@ export async function ButceTab({ params, perms, tenantId, userId, canEdit, canSa
   const budgetedIn = income.filter((r) => r.budget > 0);
   const unbudgetedOut = expense.filter((r) => r.budget <= 0 && r.actual > 0);
   const overRows = budgetedOut.filter((r) => r.status === "over");
-  const existing = new Set(rows.filter((r) => r.budget > 0).map((r) => `${r.direction}:${r.category}`));
-  const copyable = prevRows.filter((r) => r.budget > 0 && !existing.has(`${r.direction}:${r.category}`)).length;
 
   const tabHref = (m: string, hash = "") => `${FINANCE_PATH}?sekme=butce${m === current ? "" : `&ay=${m}`}${hash}`;
   const entriesHref = (dir: "in" | "out", category?: string) =>
@@ -191,7 +187,7 @@ export async function ButceTab({ params, perms, tenantId, userId, canEdit, canSa
         </Link>
         <FilterChip href={tabHref(current)} active={month === current}>Bu ay</FilterChip>
         <FilterChip href={tabHref(addMonths(current, 1))} active={month === addMonths(current, 1)}>Gelecek ay</FilterChip>
-        {canEdit && copyable > 0 ? <CopyBudgetsButton fromMonth={prev} toMonth={month} fromLabel={monthLabelOf(prev)} count={copyable} /> : null}
+        <p className="ml-auto text-xs text-text-faint">Bütçe sonraki aylara kendiliğinden taşınır; yalnız değişen ayda düzenleyin.</p>
       </nav>
 
       {schemaMissing ? (

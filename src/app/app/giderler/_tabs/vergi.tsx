@@ -37,6 +37,9 @@ export async function VergiTab({ params }: FinanceTabProps) {
       .from("cash_entries")
       .select("entry_date, account:finance_accounts!cash_entries_account_fk!inner(owner_scope)", { count: "exact" })
       .eq("account.owner_scope", "office")
+      // KDV özeti RPC'si yalnız TL ve örnek olmayan hareketleri sayar; sayaç da aynı kapsamda olmalı.
+      .eq("currency", "TRY")
+      .eq("is_sample", false)
       .is("vat_rate", null)
       .is("voided_at", null)
       .in("kind", ["income", "expense"])
@@ -67,6 +70,8 @@ export async function VergiTab({ params }: FinanceTabProps) {
 
   const tabHref = (y: number) => `${FINANCE_PATH}?sekme=vergi${y === thisYear ? "" : `&yil=${y}`}`;
   const entriesHref = (f: string, t: string, extra = "") => `${FINANCE_PATH}?sekme=hareketler&from=${f}&to=${t}${extra}`;
+  // SÖZLEŞME (FN3 ledger-filters, birleştirmede ENGELLEYİCİ): `kdv=yok` → origin=entry, vat_rate is null, kind gelir/gider,
+  // currency TRY, is_sample false. FN3 bu süzgeci eklemeden birleşirse bağlantı yalnız ay aralığını süzer.
   const noVatHref = (f: string, t: string) => entriesHref(f, t, "&kdv=yok");
 
   const kpis: KpiItem[] = [

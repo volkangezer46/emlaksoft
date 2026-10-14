@@ -42,7 +42,11 @@ export type EditableRule = {
 /** Ofis carisi (finance_parties) — kural formunda seçilir. */
 export type RulePartyOption = { id: string; name: string; kindLabel: string };
 
-/** Hazır kural şablonları. "stopajli_kira": kira gideri, %20 stopaj; brüt, stopaj ve net ayrı gösterilir. */
+/**
+ * Hazır kural şablonları. "stopajli_kira": kira gideri, %20 stopaj; brüt, stopaj ve net ayrı GÖSTERİLİR.
+ * DİKKAT: düzenli ödeme döngüsü (recurring_run_due) kuralın KDV/stopaj oranını henüz harekete aktarmaz; hesaba her ay
+ * kuraldaki tutar (brüt) işlenir. Form bunu açıkça söyler; oranlar şimdilik bilgi amaçlıdır (Vergi sekmesine yansımaz).
+ */
 export type RuleTemplate = "stopajli_kira";
 
 const FREQUENCIES = ["monthly", "quarterly", "yearly"] as const;
@@ -175,7 +179,7 @@ function RuleDialog({
           title={editing ? "Düzenli ödemeyi düzenle" : rentTemplate ? "Stopajlı ofis kirası" : "Düzenli ödeme ekle"}
           description={
             rentTemplate
-              ? "Brüt kirayı yazın: %20 stopaj kesilip vergi dairesine, kalan net tutar mal sahibine ödenir. Üçü ayrı gösterilir."
+              ? "Brüt kirayı yazın; %20 stopaj ve mal sahibine giden net tutar ayrıca gösterilir. Hesaba her ay brüt tutar işlenir."
               : "Bir kez tanımlayın; her ay kendiliğinden işlensin ya da size sorulsun. Geçmişe dönük kayıt açılmaz."
           }
           icon={rentTemplate ? <Landmark /> : <Repeat />}
@@ -307,6 +311,12 @@ function RuleDialog({
                         </>
                       )}
                     </dl>
+                  ) : null}
+                  {vatRate || withholdingRate ? (
+                    <p className="text-xs leading-relaxed text-text-muted" role="note">
+                      Oranlar şimdilik bilgi amaçlıdır: hesaba her ay yukarıdaki tutar ({withholdingRate ? "brüt" : "KDV dahil"}) tek hareket olarak işlenir; KDV ve stopaj bu
+                      hareketlere yazılmaz, Vergi sekmesinde sayılmaz.
+                    </p>
                   ) : null}
                 </div>
               ) : null}
