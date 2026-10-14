@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPLORER_TABLES, explorerTable, filterColumns, selectList } from "./registry";
 import { maskValue } from "./mask";
 import { formatRow } from "./cells";
-import { explorerAuditMeta, explorerHref, parseExplorerParams } from "./plan";
+import { EXPLORER_MAX_ROWS, EXPLORER_PAGE_SIZE, explorerAuditMeta, explorerHref, parseExplorerParams } from "./plan";
 import { platformCanAccess, platformModulesFor } from "@/lib/platform-access";
 import { adminNavFor } from "@/lib/admin/nav";
 
@@ -129,6 +129,14 @@ describe("maskeler: ham değer çıktıda görünmez", () => {
 });
 
 describe("güvenli sorgu oluşturucu (plan)", () => {
+  it("sayfalama tavanı: sayfa 400'ü aşmaz, sayfalamaya verilen toplam tavanla sınırlı ve uyarı gösterilir", () => {
+    expect(EXPLORER_MAX_ROWS).toBe(10_000);
+    expect(parseExplorerParams({ tablo: "musteriler", sayfa: "401" })!.page).toBe(EXPLORER_MAX_ROWS / EXPLORER_PAGE_SIZE);
+    const view = readFileSync("src/app/admin/sistem/data-explorer-view.tsx", "utf8");
+    expect(view).toContain("total={Math.min(res.total, EXPLORER_MAX_ROWS)}");
+    expect(view).toContain("süzgeçle daraltın");
+  });
+
   it("bilinmeyen tablo plan üretmez", () => {
     expect(parseExplorerParams({ tablo: "platform_staff" })).toBeNull();
     expect(parseExplorerParams({})).toBeNull();
@@ -246,10 +254,28 @@ describe("yetki: yetkisiz personel ekranı göremez", () => {
     const tabsOf = (mods: Parameters<typeof adminNavFor>[0]) =>
       adminNavFor(mods)
         .flatMap((s) => s.items)
-        .find((i) => i.href === "/admin/sistem")
+        .find((i) => i.label === "Sistem durumu")
         ?.tabs?.map((t) => t.href) ?? [];
     expect(tabsOf(platformModulesFor("super_admin"))).toContain("/admin/sistem?sekme=veri");
     expect(tabsOf(platformModulesFor("ops"))).not.toContain("/admin/sistem?sekme=veri");
+  });
+
+  it("sıfır çıkmaz: yalnız `veri` modülü olan rolün menü satırı Veri gezginine gider (sistem kapısına değil)", () => {
+    const sys = (mods: Parameters<typeof adminNavFor>[0]) =>
+      adminNavFor(mods)
+        .flatMap((s) => s.items)
+        .find((i) => i.label === "Sistem durumu");
+    expect(sys(["veri"])?.href).toBe("/admin/sistem?sekme=veri");
+    expect(sys(["activity"])?.href).toBe("/admin/aktivite");
+    expect(sys(platformModulesFor("super_admin"))?.href).toBe("/admin/sistem");
+  });
+
+  it("hover ısıtması yok: gezgin içi her bağlantı ve sayfalama `prefetch={false}` taşır (açılmamış görüntüleme denetime düşmez)", () => {
+    const view = readFileSync("src/app/admin/sistem/data-explorer-view.tsx", "utf8");
+    const tags = view.match(/<(?:Link|ButtonLink|Pagination)\b[^>]*>/g) ?? [];
+    const explorerTags = tags.filter((t) => /explorerHref|EXPLORER_BASE|hrefFor|href=\{back\}/.test(t));
+    expect(explorerTags.length).toBeGreaterThanOrEqual(8);
+    for (const t of explorerTags) expect(t, t).toContain("prefetch={false}");
   });
 
   it("sayfa kapısı: görünüm veri okumadan önce `veri` modülünü ister; sistem sayfası veri sekmesini sistem kapısına bağlamaz", () => {

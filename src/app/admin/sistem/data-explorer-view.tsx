@@ -1,4 +1,6 @@
 import { ArrowLeft, ArrowUpRight, EyeOff, Filter, Lock, SearchX, ShieldAlert, Table2, X } from "lucide-react";
+// Gezgin içi bağlantıların HEPSİ `prefetch={false}`: SmartLink hover/odakta tam sunucu render'ı ısıtır, bu da açılmamış
+// liste/kayıt için `data_explorer.*` denetim satırı yazar ve maskeli veriyi istemciye taşır (KVKK kanıtı yanlış pozitifsiz kalmalı).
 import Link from "@/components/ui/smart-link";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -9,6 +11,7 @@ import { Pagination } from "@/app/admin/_components/pagination";
 import { requirePlatformModule } from "@/lib/platform";
 import {
   EXPLORER_BASE,
+  EXPLORER_MAX_ROWS,
   EXPLORER_PAGE_SIZE,
   explorerHref,
   filterParam,
@@ -67,6 +70,7 @@ function TablePicker() {
           <Link
             key={t.key}
             href={explorerHref({ table: t.key })}
+            prefetch={false}
             className="focus-ring press group rounded-[var(--radius-card)] border border-line bg-surface p-4 transition hover:border-brand-400"
           >
             <span className="flex items-center justify-between gap-2">
@@ -99,13 +103,14 @@ function TablePicker() {
 function TableSwitcher({ current }: { current: string }) {
   return (
     <nav aria-label="Tablo seçimi" className="flex flex-wrap gap-1.5">
-      <Link href={EXPLORER_BASE} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full border border-line px-3 py-1 text-xs font-semibold text-text-muted hover:border-brand-400">
+      <Link href={EXPLORER_BASE} prefetch={false} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full border border-line px-3 py-1 text-xs font-semibold text-text-muted hover:border-brand-400">
         Tüm tablolar
       </Link>
       {EXPLORER_TABLES.map((t) => (
         <Link
           key={t.key}
           href={explorerHref({ table: t.key })}
+          prefetch={false}
           aria-current={t.key === current ? "page" : undefined}
           className={`focus-ring press inline-flex touch:min-h-11 items-center rounded-full px-3 py-1 text-xs font-semibold ${
             t.key === current ? "bg-brand-600 text-white" : "border border-line text-ink-950 hover:border-brand-400"
@@ -223,7 +228,7 @@ function FilterForm({ plan, officeValue }: { plan: ExplorerPlan; officeValue: st
           Uygula
         </Button>
         {active ? (
-          <ButtonLink variant="outline" size="sm" href={explorerHref({ table: t.key })}>
+          <ButtonLink variant="outline" size="sm" href={explorerHref({ table: t.key })} prefetch={false}>
             <X className="h-3.5 w-3.5" aria-hidden /> Süzgeçleri temizle
           </ButtonLink>
         ) : null}
@@ -235,7 +240,7 @@ function FilterForm({ plan, officeValue }: { plan: ExplorerPlan; officeValue: st
 function OfficeCell({ row, names, hrefFor }: { row: ExplorerDisplayRow; names: Record<string, string>; hrefFor: (officeId: string) => string }) {
   if (!row.tenantId) return <span className="text-text-faint">—</span>;
   return (
-    <Link href={hrefFor(row.tenantId)} className="focus-ring font-semibold text-brand-600 hover:underline" title="Bu ofise süz">
+    <Link href={hrefFor(row.tenantId)} prefetch={false} className="focus-ring font-semibold text-brand-600 hover:underline" title="Bu ofise süz">
       {names[row.tenantId] ?? row.tenantId.slice(0, 8)}
     </Link>
   );
@@ -341,6 +346,7 @@ async function ListView({ plan, actorId }: { plan: ExplorerPlan; actorId: string
                     <td className="px-5 py-2 text-right">
                       <Link
                         href={explorerHref({ ...base, recordId: r.id })}
+                        prefetch={false}
                         className="focus-ring inline-flex touch:min-h-11 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
                       >
                         Ayrıntı <ArrowUpRight className="h-3 w-3" aria-hidden />
@@ -353,7 +359,13 @@ async function ListView({ plan, actorId }: { plan: ExplorerPlan; actorId: string
           </div>
         )}
       </section>
-      <Pagination page={plan.page} total={res.total} pageSize={EXPLORER_PAGE_SIZE} hrefFor={(p) => explorerHref({ ...base, page: p })} />
+      {res.total > EXPLORER_MAX_ROWS ? (
+        <p role="note" className="text-xs text-text-muted">
+          İlk <span className="numeric">{EXPLORER_MAX_ROWS.toLocaleString("tr-TR")}</span> kayıt sayfalanır; tamamını görmek için süzgeçle daraltın.
+        </p>
+      ) : null}
+      {/* Sayfa bağlantıları sayfalama tavanını aşmaz: 401. sayfa bağlantısı 400. sayfayı yeniden göstermesin. */}
+      <Pagination page={plan.page} total={Math.min(res.total, EXPLORER_MAX_ROWS)} pageSize={EXPLORER_PAGE_SIZE} prefetch={false} hrefFor={(p) => explorerHref({ ...base, page: p })} />
     </div>
   );
 }
@@ -363,7 +375,7 @@ async function RecordDetail({ plan, actorId }: { plan: ExplorerPlan; actorId: st
   const officeId = plan.office && "id" in plan.office ? plan.office.id : null;
   const back = explorerHref(planHrefInput(plan, officeId));
   const backLink = (
-    <Link href={back} className="focus-ring inline-flex touch:min-h-11 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+    <Link href={back} prefetch={false} className="focus-ring inline-flex touch:min-h-11 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
       <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {plan.table.label} listesine dön
     </Link>
   );

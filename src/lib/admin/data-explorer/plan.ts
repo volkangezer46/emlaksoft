@@ -10,6 +10,8 @@ import { explorerTable, filterColumns, type ExplorerColumn, type ExplorerTable }
 export const EXPLORER_BASE = "/admin/sistem?sekme=veri";
 export const EXPLORER_PAGE_SIZE = 25;
 const MAX_PAGE = 400;
+/** Sayfalamanın ulaşabildiği en çok kayıt (400 × 25 = 10.000); ötesi süzgeçle daraltılır. */
+export const EXPLORER_MAX_ROWS = MAX_PAGE * EXPLORER_PAGE_SIZE;
 const MAX_TEXT = 80;
 
 export type ExplorerFilter =
