@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { Check, ChevronsUpDown, MapPin, Sparkles, TriangleAlert } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createAppointment } from "@/app/actions/appointments";
@@ -8,8 +8,16 @@ import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
-import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
-import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS } from "./appointment-tabs";
+import {
+  SubmitConfirmBand,
+  SummaryGroup,
+  SummaryRow,
+  TabbedFormShell,
+  type FormTab,
+  type TabbedSummaryContext,
+} from "@/components/ui/tabbed-form-shell";
+import { isPast, parseTrLocalDateTime } from "@/lib/clock";
+import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS, appointmentMissing } from "./appointment-tabs";
 import { PersonSelect } from "@/components/ui/person-select";
 
 type Option = { id: string; label: string };
@@ -45,9 +53,9 @@ export function AppointmentForm({
   defaultCustomerId?: string;
   /** ?property= — eşleştirmeden "Randevu ver" ön seçimi. */
   defaultPropertyId?: string;
-  /** Sunucudan gelen bugün (YYYY-MM-DD) ya da ?tarih= ön dolgusu. */
+  /** Sunucudan gelen gün (YYYY-MM-DD; bugün ya da gece yarısı geçtiyse yarın) ya da ?tarih= ön dolgusu. */
   defaultDate: string;
-  /** ?saat= (HH:MM) ya da 10:00. */
+  /** ?saat= (HH:MM); yoksa şimdiden sonraki ilk yarım saat (ileri gün için 10:00). */
   defaultTime: string;
   userId: string;
   /** Yalnız yönetim katmanında dolu: başka danışman adına randevu açma seçici listesi. */
@@ -61,6 +69,22 @@ export function AppointmentForm({
   });
   const conflictWarning = state.conflictWarning ?? null;
   const error = !conflictWarning && state.error ? state.error : null;
+
+  // Geçmiş saat: ilk gönderimde satır içi onay istenir; onaylanan "tarihTsaat" değeri bir sonraki gönderimde geçer.
+  const [pastAsk, setPastAsk] = useState<string | null>(null);
+  const pastOk = useRef<string | null>(null);
+  function guardedSubmit(e: FormEvent<HTMLFormElement>) {
+    const fd = new FormData(e.currentTarget);
+    const key = `${String(fd.get("date") ?? "")}T${String(fd.get("time") ?? "")}`;
+    const at = parseTrLocalDateTime(key);
+    if (at && isPast(at) && pastOk.current !== key) {
+      e.preventDefault();
+      setPastAsk(key);
+      return;
+    }
+    setPastAsk(null);
+    onSubmit(e);
+  }
 
   const tabs: FormTab[] = useMemo(
     () =>
@@ -122,8 +146,12 @@ export function AppointmentForm({
             />
           </FormField>
         ) : null}
-        <FormField label="Müşteri" htmlFor="appointment-customer">
+        <p className="text-xs text-text-muted sm:col-span-2">
+          Yer göstermede müşteri ve portföy zorunludur; diğer türlerde en az birini seçin.
+        </p>
+        <FormField label="Müşteri" htmlFor="appointment-customer" inject={false}>
           <Combobox
+            id="appointment-customer"
             name="customer_id"
             aria-label="Müşteri"
             placeholder="Seçiniz"
@@ -134,8 +162,9 @@ export function AppointmentForm({
             options={customers.map((c) => ({ value: c.id, label: c.label }))}
           />
         </FormField>
-        <FormField label="Portföy" htmlFor="appointment-property">
+        <FormField label="Portföy" htmlFor="appointment-property" inject={false}>
           <Combobox
+            id="appointment-property"
             name="property_id"
             aria-label="Portföy"
             placeholder="Seçiniz"
@@ -216,8 +245,9 @@ export function AppointmentForm({
       submitIcon={Check}
       pending={pending}
       error={error}
-      onSubmit={onSubmit}
+      onSubmit={guardedSubmit}
       tabs={tabs}
+      rules={appointmentMissing}
       tabPanels={tabPanels}
       summary={renderSummary}
       saveAndNew
@@ -225,6 +255,19 @@ export function AppointmentForm({
       draft={{ userId, formId: APPOINTMENT_FORM_ID, fields: [...APPOINTMENT_DRAFT_FIELDS] }}
       notice={
         <>
+          {pastAsk ? (
+            <SubmitConfirmBand
+              message={`Seçilen zaman geçmişte (${dayLabel(pastAsk.slice(0, 10)) ?? pastAsk.slice(0, 10)} ${pastAsk.slice(11, 16)}). Geçmiş tarihli randevu olarak kaydedilsin mi?`}
+              confirmLabel="Evet, kaydet"
+              backLabel="Saati değiştir"
+              backTab="zaman"
+              backField="time"
+              onConfirm={() => {
+                pastOk.current = pastAsk;
+              }}
+              onBack={() => setPastAsk(null)}
+            />
+          ) : null}
           {conflictWarning ? (
             <div
               className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-400/10 px-4 py-3 text-xs font-medium leading-relaxed text-amber-700"

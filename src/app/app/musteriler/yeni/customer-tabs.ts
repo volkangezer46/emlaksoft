@@ -11,15 +11,15 @@ export const CUSTOMER_TABS = [
   {
     id: "kisi",
     label: "Kişi",
-    description: "Ad soyad zorunludur; müşteri türü ve şube sonradan değiştirilebilir.",
-    fields: ["full_name", "type", "branch_id"],
+    description: "Ad soyad zorunlu; telefon yazılırken ofisteki aynı kişi uyarılır. Tür ve şube sonradan değiştirilebilir.",
+    fields: ["full_name", "phone", "type", "branch_id"],
     required: ["full_name"],
   },
   {
     id: "iletisim",
-    label: "İletişim ve bölge",
+    label: "E-posta ve bölge",
     description: "İlçe, bölge bazlı raporlama ve filtreleme için kullanılır.",
-    fields: ["phone", "email", "province_id", "district_id"],
+    fields: ["email", "province_id", "district_id"],
     required: [],
   },
   {

@@ -25,7 +25,7 @@ import type { BreadcrumbItem } from "@/components/ui/breadcrumb";
 import type { NextStep } from "@/lib/form-logic";
 import { useFormDraft, type FormDraftConfig } from "@/components/app/use-form-draft";
 import { useFormFields } from "@/components/app/use-form-fields";
-import { useFormValues } from "@/components/app/use-form-values";
+import { readFormValues, useFormValues } from "@/components/app/use-form-values";
 import { now } from "@/lib/clock";
 import { fieldLabelFor, fieldTextFor } from "@/lib/form-field-labels";
 import {
@@ -33,7 +33,6 @@ import {
   formatDraftTime,
   neighborTabId,
   nextTabId,
-  progressSummary,
   resolveInitialTab,
   slideDirection,
   tabProgress,
@@ -42,6 +41,7 @@ import {
   type TabState,
 } from "@/lib/form-tabs";
 import { statusBadge } from "@/lib/morph-tabs";
+import type { FormRuleIssue } from "@/lib/form-rules";
 import { cn } from "@/lib/utils";
 
 /**
@@ -133,6 +133,14 @@ export type TabbedFormShellProps = {
   initialTab?: string;
   /** "single": sekmesiz eski görünüm (paneller alt alta). Varsayılan "auto". */
   layout?: "auto" | "single";
+  /**
+   * Alanlar arası zorunluluk kuralları ("müşteri ya da portföyden en az biri"; saf, `src/lib/form-rules.ts`).
+   * Dönen eksikler "N eksik" sayacına, sekme rozetine ve eksik listesine girer; varken gönderim durur ve
+   * ilk eksik alana odaklanılır. Sunucu action'ı aynı kuralı ayrıca uygular.
+   */
+  rules?: (values: FormValues) => FormRuleIssue[];
+  /** Dar ekranda (<1024px) ilk sekmedeyken birincil eylem "Sonraki" olur (Kaydet sonraki adımlarda). */
+  mobileNextFirst?: boolean;
   className?: string;
 };
 
@@ -173,6 +181,8 @@ export function TabbedFormShell({
   destructive,
   initialTab,
   layout = "auto",
+  rules,
+  mobileNextFirst,
   className,
 }: TabbedFormShellProps) {
   const uid = useId();
@@ -198,12 +208,28 @@ export function TabbedFormShell({
 
   const fieldNames = useMemo(() => Array.from(new Set(tabs.flatMap((t) => t.fields))), [tabs]);
   const values = useFormValues(formRef, fieldNames);
+  const ruleIssues = useMemo(() => (rules ? rules(values) : []), [rules, values]);
   const tabStates = useMemo(() => {
     const out: Record<string, TabState> = {};
-    for (const t of tabs) out[t.id] = computeTabState(t, values);
+    for (const t of tabs) {
+      const st = computeTabState(t, values);
+      // Kural eksiği olan sekme "eksik" görünür (zorunlu alanı olmasa bile).
+      out[t.id] = ruleIssues.some((r) => r.tab === t.id) ? { ...st, complete: false, status: "missing" } : st;
+    }
     return out;
-  }, [tabs, values]);
-  const progress = useMemo(() => progressSummary(tabs, values), [tabs, values]);
+  }, [tabs, values, ruleIssues]);
+  // progressSummary ile aynı sayım, kural eksiklerini de içeren sekme durumlarından.
+  const progress = useMemo(() => {
+    let done = 0;
+    let total = 0;
+    for (const t of tabs) {
+      const st = tabStates[t.id];
+      if (!st || st.status === "none") continue;
+      total += 1;
+      if (st.complete) done += 1;
+    }
+    return { done, total };
+  }, [tabs, tabStates]);
   const fieldInfo = useFormFields(formRef, fieldNames);
   const display = useMemo(() => {
     const out: Record<string, string | null> = {};
@@ -220,11 +246,11 @@ export function TabbedFormShell({
           label: t.label,
           icon: t.icon,
           description: t.description,
-          badge: statusBadge(st?.status, errors, st?.missing.length ?? 0),
+          badge: statusBadge(st?.status, errors, (st?.missing.length ?? 0) + ruleIssues.filter((r) => r.tab === t.id).length),
           progress: st && st.status !== "none" ? tabProgress(t, values) : null,
         };
       }),
-    [tabs, tabStates, errorCounts, values],
+    [tabs, tabStates, errorCounts, values, ruleIssues],
   );
 
   const draftApi = useFormDraft(formRef, draft);
@@ -379,9 +405,24 @@ export function TabbedFormShell({
     ) : (
       summary
     );
-  const missingList = tabs.flatMap((t) =>
-    (tabStates[t.id]?.missing ?? []).map((name) => ({ tab: t, name, label: fieldLabelFor(name, fieldLabels?.[name]) })),
-  );
+  const missingList = tabs.flatMap((t) => [
+    ...(tabStates[t.id]?.missing ?? []).map((name) => ({ tab: t, name, label: fieldLabelFor(name, fieldLabels?.[name]) })),
+    ...ruleIssues.filter((r) => r.tab === t.id).map((r) => ({ tab: t, name: r.field, label: r.label })),
+  ]);
+
+  // Kural eksiği varken gönderim durur: ilk eksik alanın sekmesi açılır ve alana odaklanılır (sunucu da reddeder).
+  const handleSubmit: FormEventHandler<HTMLFormElement> = (e) => {
+    // Taze okuma: özet değerleri bir kare geride kalabilir (rAF birleştirmesi).
+    const issues = rules ? rules(readFormValues(e.currentTarget, fieldNames)) : [];
+    const first = tabs.flatMap((t) => issues.filter((r) => r.tab === t.id))[0];
+    if (first) {
+      e.preventDefault();
+      attemptedRef.current = true;
+      goToTab(first.tab, first.field);
+      return;
+    }
+    onSubmit(e);
+  };
   const hasSide = Boolean(summaryNode) || missingList.length > 0 || progress.total > 0;
 
   const summaryBody = (
@@ -466,10 +507,15 @@ export function TabbedFormShell({
   const nextId = neighborTabId(ids, active, 1);
   const prevTab = tabs.find((t) => t.id === prevId);
   const nextTab = tabs.find((t) => t.id === nextId);
+  // Mobil adım akışı: ilk sekmede birincil düğme "Sonraki" (Kaydet son adımlarda; Ctrl+Enter yine kaydeder).
+  const nextPrimary =
+    mobileNextFirst && tabbed && !isDesktop && nextTab && active === ids[0]
+      ? { label: "Sonraki", icon: ChevronRight, onClick: () => select(nextTab.id, { focus: "field" }) }
+      : null;
 
   return (
     <ShellContext.Provider value={{ goToTab }}>
-      <form ref={formRef} onSubmit={onSubmit} onKeyDown={onFormKeyDown} className="tfs-form" data-dir={dir}>
+      <form ref={formRef} onSubmit={handleSubmit} onKeyDown={onFormKeyDown} className="tfs-form" data-dir={dir}>
         <div className={cn("mx-auto w-full max-w-[80rem]", className)}>
           <PageHeader title={title} description={description} eyebrow={eyebrow} breadcrumbs={breadcrumbs} actions={headerActions} />
 
@@ -657,11 +703,81 @@ export function TabbedFormShell({
             missing={missingList.map((m) => ({ label: m.label, onGo: () => goToTab(m.tab.id, m.name) }))}
             draft={draft ? { savedAt: draftApi.savedAt, onSave: draftApi.saveNow } : null}
             saveAndNew={saveAndNew}
+            primaryAction={nextPrimary}
             shortcuts={tabbed ? "save-tabs" : "save"}
           />
         </div>
       </form>
     </ShellContext.Provider>
+  );
+}
+
+const noopGoToTab = () => {};
+
+/** Kabuk içindeki (notice/panel) bileşenler için sekmeye + alana gitme. Kabuk dışında no-op. */
+export function useFormShellNav(): TabbedSummaryContext["goToTab"] {
+  return useContext(ShellContext)?.goToTab ?? noopGoToTab;
+}
+
+/**
+ * Gönderim öncesi satır içi onay bandı (popup yok): "Telefonsuz kaydedilsin mi?", "Saat geçmişte".
+ * Form kendi onSubmit'inde gönderimi durdurup bunu gösterir; "onayla" bayrağı koyar ve formu yeniden gönderir
+ * (Kaydet / Kaydet ve yenisini ekle niyeti korunur). Geri düğmesi ilgili sekmeye ve alana götürür.
+ */
+export function SubmitConfirmBand({
+  message,
+  confirmLabel,
+  backLabel,
+  backTab,
+  backField,
+  onConfirm,
+  onBack,
+}: {
+  message: ReactNode;
+  confirmLabel: string;
+  backLabel: string;
+  backTab: string;
+  backField?: string;
+  /** Onay bayrağını koyar; ardından form yeniden gönderilir. */
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  const goToTab = useFormShellNav();
+  const ref = useRef<HTMLDivElement>(null);
+  return (
+    <div
+      ref={ref}
+      role="alert"
+      className="tone-warning flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-card)] px-4 py-3 text-sm"
+    >
+      <p className="min-w-0 flex-1 basis-60 font-medium">{message}</p>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="touch:h-11"
+          onClick={() => {
+            onBack();
+            goToTab(backTab, backField);
+          }}
+        >
+          {backLabel}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          className="touch:h-11"
+          autoFocus
+          onClick={() => {
+            onConfirm();
+            ref.current?.closest("form")?.requestSubmit();
+          }}
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </div>
   );
 }
 

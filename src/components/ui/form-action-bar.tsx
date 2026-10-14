@@ -77,6 +77,23 @@ function getKeyboardOpen() {
 
 export type MissingField = { label: string; onGo: () => void };
 
+/**
+ * Ortak "N eksik" rozeti: birincil düğmenin içinde eksik zorunlu alan sayısı (FormActionBar, diyalog formları).
+ * Düğme pasif yapılmaz; tıklanınca form ilk eksik alana odaklanır.
+ */
+export function MissingCountBadge({ count, className }: { count: number; className?: string }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      data-missing-count={count}
+      className={cn("rounded-full bg-white/25 px-1.5 text-xs font-semibold leading-5", className)}
+      aria-label={`${count} zorunlu alan eksik`}
+    >
+      {count} eksik
+    </span>
+  );
+}
+
 export type FormActionBarProps = {
   formRef: RefObject<HTMLFormElement | null>;
   pending: boolean;
@@ -102,6 +119,11 @@ export type FormActionBarProps = {
   draft?: { savedAt: number | null; onSave: () => void } | null;
   /** "Kaydet ve yenisini ekle" (yalnız useCreateForm'lu formlar). */
   saveAndNew?: boolean;
+  /**
+   * Birincil düğmeyi geçici olarak gönderim dışı bir eyleme çevirir (ör. mobil adım akışında "Sonraki").
+   * null/undefined: normal Kaydet. Ctrl+Enter kısayolu yine kaydeder.
+   */
+  primaryAction?: { label: string; ariaLabel?: string; icon?: LucideIcon; onClick: () => void } | null;
   /** Klavye kısayol ipucu. */
   shortcuts?: "save" | "save-tabs" | "save-esc" | false;
   /** Sunucu hatasında hata bandına odaklan (panelin kendi odağı varsa false). */
@@ -129,6 +151,7 @@ export function FormActionBar({
   missing = [],
   draft,
   saveAndNew,
+  primaryAction,
   shortcuts = "save",
   focusErrorBand = true,
   mode = "sticky",
@@ -372,6 +395,19 @@ export function FormActionBar({
             ) : null}
             <span className="contents max-sm:hidden">{secondaryButtons}</span>
             <span key={shakeKey} className={cn("inline-flex max-sm:flex-1", shakeKey > 0 && "fab-shake")}>
+              {primaryAction && !busy && !success ? (
+                <Button
+                  type="button"
+                  size="lg"
+                  iconRight={primaryAction.icon}
+                  className="max-sm:w-full"
+                  aria-label={primaryAction.ariaLabel}
+                  onClick={primaryAction.onClick}
+                >
+                  {primaryAction.label}
+                  {missingCount > 0 ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
+                </Button>
+              ) : (
               <Button
                 type="submit"
                 size="lg"
@@ -383,15 +419,9 @@ export function FormActionBar({
               >
                 {success && !busy ? <Check aria-hidden="true" className="fab-pop h-4 w-4" /> : null}
                 {busy ? pendingLabel : success ? "Kaydedildi" : submitLabel}
-                {missingCount > 0 && !busy && !success ? (
-                  <span
-                    className="rounded-full bg-white/25 px-1.5 text-xs font-semibold leading-5 sm:hidden"
-                    aria-label={`${missingCount} zorunlu alan eksik`}
-                  >
-                    {missingCount} eksik
-                  </span>
-                ) : null}
+                {missingCount > 0 && !busy && !success ? <MissingCountBadge count={missingCount} className="sm:hidden" /> : null}
               </Button>
+              )}
             </span>
           </div>
         </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { CustomFieldInputs, type CustomFieldInputDef } from "@/components/app/custom-field-inputs";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "@/components/ui/smart-link";
 import { Save, UserRound } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
@@ -13,7 +13,15 @@ import { isOwnerSideCustomerType, hasDemandContent } from "@/lib/demand-criteria
 import { GeoSelect } from "@/components/app/geo-select";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { FormField, FormInput, FormSelect, FormTextarea, fieldClass } from "@/components/ui/form-controls";
-import { CollapsibleSummaryGroup, SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
+import {
+  CollapsibleSummaryGroup,
+  SubmitConfirmBand,
+  SummaryGroup,
+  SummaryRow,
+  TabbedFormShell,
+  type FormTab,
+  type TabbedSummaryContext,
+} from "@/components/ui/tabbed-form-shell";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { detailOrList } from "@/lib/form-logic";
 import { formatPhoneDisplay, parsePhone } from "@/lib/phone";
@@ -83,6 +91,20 @@ export function CustomerForm({
   // Müşteri kaydedildi ama talep düştü: yeniden gönderim müşteriyi çoğaltır — kilitle, devam bağlantısı ver.
   const partialCustomerId = state.demandError ? state.id : undefined;
 
+  // Telefonsuz kayıt bilinçli olmalı: ilk gönderimde satır içi onay; "Telefonsuz kaydet" bayrağı koyup yeniden gönderir.
+  const [phoneAsk, setPhoneAsk] = useState(false);
+  const noPhoneOk = useRef(false);
+  function guardedSubmit(e: FormEvent<HTMLFormElement>) {
+    const phone = String(new FormData(e.currentTarget).get("phone") ?? "").trim();
+    if (!phone && !noPhoneOk.current) {
+      e.preventDefault();
+      setPhoneAsk(true);
+      return;
+    }
+    setPhoneAsk(false);
+    onSubmit(e);
+  }
+
   const tabs: FormTab[] = useMemo(
     () =>
       CUSTOMER_TABS.map((t) => ({
@@ -103,6 +125,18 @@ export function CustomerForm({
         <FormField label="Ad soyad" htmlFor="full_name" required className="sm:col-span-2">
           <FormInput name="full_name" required placeholder="Örn. Ali Kaya" />
         </FormField>
+        <FormField label="Telefon" htmlFor="customer-phone" hint="Yazarken ofisteki aynı numara kontrol edilir." className="sm:col-span-2">
+          <PhoneInput
+            id="customer-phone"
+            name="phone"
+            aria-describedby="customer-phone-hint"
+            className={fieldClass}
+            defaultValue={initialPhone || undefined}
+          />
+          {linkRef ? <input type="hidden" name={"link_ref"} value={linkRef} /> : null}
+        </FormField>
+        {/* Çift kayıt uyarısı telefonun hemen altında: yazarken (500 ms gecikmeyle) görünür. */}
+        <DuplicateHint kind="customer" />
         <FormField label="Müşteri türü" htmlFor="type">
           <FormSelect name="type" defaultValue="Alıcı" onChange={(e) => setCustomerType(e.target.value)}>
             {types.map((t) => (
@@ -127,10 +161,6 @@ export function CustomerForm({
     ),
     iletisim: (
       <>
-        <FormField label="Telefon" htmlFor="phone">
-          <PhoneInput name="phone" className={fieldClass} defaultValue={initialPhone || undefined} />
-          {linkRef ? <input type="hidden" name={"link_ref"} value={linkRef} /> : null}
-        </FormField>
         <FormField label="E-posta" htmlFor="email">
           <EmailInput name="email" />
         </FormField>
@@ -229,8 +259,8 @@ export function CustomerForm({
             label="Telefon"
             value={!phone ? "Girilmedi" : phone.ok ? formatPhoneDisplay(values.phone ?? "") || String(values.phone) : `${String(values.phone)} · biçim hatalı`}
             muted={!phone}
-            tab="iletisim"
-            field="phone"
+            tab="kisi"
+            field="customer-phone"
           />
           <SummaryRow label="E-posta" value={email ? String(values.email ?? email) : "Girilmedi"} muted={!email} tab="iletisim" field="email" />
           <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="iletisim" />
@@ -276,7 +306,19 @@ export function CustomerForm({
       submitDisabled={Boolean(partialCustomerId)}
       notice={
         <>
-          <DuplicateHint kind="customer" />
+          {phoneAsk ? (
+            <SubmitConfirmBand
+              message="Telefon girilmedi. Müşteri telefonsuz kaydedilsin mi? Telefonsuz kayıtta çift kayıt kontrolü ve arama/WhatsApp kısayolları çalışmaz."
+              confirmLabel="Telefonsuz kaydet"
+              backLabel="Telefon ekle"
+              backTab="kisi"
+              backField="customer-phone"
+              onConfirm={() => {
+                noPhoneOk.current = true;
+              }}
+              onBack={() => setPhoneAsk(false)}
+            />
+          ) : null}
           {partialCustomerId ? (
           <div role="status" className="rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <p className="font-semibold">Müşteri kaydedildi, talep kaydedilemedi.</p>
@@ -296,7 +338,7 @@ export function CustomerForm({
           ) : null}
         </>
       }
-      onSubmit={onSubmit}
+      onSubmit={guardedSubmit}
       tabs={tabs}
       tabPanels={{ ...tabPanels, kisi: <>{tabPanels.kisi}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
