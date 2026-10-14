@@ -28,6 +28,10 @@ import { updateStaffRole } from "@/app/actions/platform-staff";
  *    adına yürür (asıl eylemin tüm kapıları yeniden çalışır). Sonuç talebe yazılır (executed / failed).
  *  - Reddet: aynı yetki kuralı + gerekçe. Geri çek: yalnız talebi açan.
  * Her karar platform denetim izine yazılır (platform.approval.*).
+ *
+ * Kapı istisnası (bilinçli): eylemler `requirePlatformStaff` ile açılır, modül kapısı talep satırı okunduktan SONRA
+ * `checkDecision` içinde uygulanır (talebin modülünde "onayla"; geri çekmede yalnız talebi açan). Modül talebe göre
+ * değiştiği için girişte tek bir `requirePlatformModule` çağrısı yazılamaz; asıl eylem ayrıca kendi kapılarından geçer.
  */
 
 export type ApprovalActionResult = { ok?: boolean; error?: string; notice?: string };

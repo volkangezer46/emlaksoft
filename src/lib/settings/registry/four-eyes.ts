@@ -5,7 +5,8 @@ import { FOUR_EYES_DEFAULTS, FOUR_EYES_KEYS } from "@/lib/platform-security/four
 /**
  * DG1 dört göz onayı ayarları (platform kapsamı, `platform_settings` deposu; Ayar merkezi > Güvenlik). Hepsi varsayılan
  * KAPALI: açılınca ilgili kritik işlem yürümez, Kontrol paneli > Onaylar kuyruğuna düşer ve başka bir yetkili onaylar.
- * Yalnız süper admin değiştirir (personel modülü).
+ * Yalnız süper admin değiştirir (personel modülü). SINIR: ayarın kendisi tek imzayla kapatılabilir (dört göze bağlı
+ * değil); kapatma/eşik değişikliği Ayar merkezi denetim izine düşer. Bu, impact metinlerinde açıkça yazılıdır.
  */
 const HOME = { href: "/admin/onaylar", label: "Kontrol paneli > Onaylar" } as const;
 const PERM = { platformModule: "personel", superAdminOnly: true } as const;
@@ -22,7 +23,8 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
     category: "guvenlik",
     label: "Dört göz: iade eşiği",
     description: "Bu tutar ve üstündeki iade kaydı ikinci bir yetkilinin onayına düşer. 0 = kapalı (iade tek imzayla yürür).",
-    impact: "Açıkken eşik üstü iade, başka bir onay yetkilisi Onaylar kuyruğundan onaylayana dek yazılmaz. Tek süper admin varsa onay verilemez.",
+    impact:
+      "Açıkken eşik üstü iade, başka bir onay yetkilisi Onaylar kuyruğundan onaylayana dek yazılmaz. Tek süper admin varsa onay verilemez. Eşik tek süper admin tarafından değiştirilebilir (denetim izine düşer).",
     risk: "high",
   }),
   defineInt({
@@ -46,8 +48,10 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
     default: FOUR_EYES_DEFAULTS.officeClose,
     category: "guvenlik",
     label: "Dört göz: ofis askıya alma ve arşivleme",
-    description: "Açıkken ofisi askıya alma ya da arşivleme (Ofis 360 > Yönetim) ikinci bir yetkilinin onayıyla yürür.",
-    impact: "Acil askıya alma da onay bekler; onaylayan yoksa ofis açık kalır.",
+    description:
+      "Açıkken ofisi askıya alma ya da arşivleme (Ofis 360 > Yönetim) ikinci bir yetkilinin onayıyla yürür. Toplu işlem, abonelik konsolu ve ofis sahibinin kapatma talebi ofisi tek imzayla kapatamaz.",
+    impact:
+      "Acil askıya alma da onay bekler; onaylayan yoksa ofis açık kalır. Ayarın kendisi tek süper admin tarafından kapatılabilir (denetim izine düşer).",
     risk: "high",
   }),
   defineBool({
@@ -57,8 +61,10 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
     default: FOUR_EYES_DEFAULTS.staffRole,
     category: "guvenlik",
     label: "Dört göz: personel rol değişikliği",
-    description: "Açıkken personelin rolü (sabit ya da özel rol) ikinci bir yetkilinin onayıyla değişir.",
-    impact: "Yetki yükseltme tek kişiyle yapılamaz; rol değişikliği onaylanana dek eski rol geçerlidir.",
+    description:
+      "Açıkken personelin rolü (sabit ya da özel rol) ikinci bir yetkilinin onayıyla değişir. Süper admin doğrudan eklenemez, pasif personel farklı rolle yeniden açılamaz.",
+    impact:
+      "Ayar açıkken yetki yükseltme tek kişiyle yapılamaz; rol değişikliği onaylanana dek eski rol geçerlidir. Sınır: ayarın kendisi tek süper admin tarafından kapatılabilir (denetim izine düşer).",
     risk: "high",
   }),
   defineInt({
