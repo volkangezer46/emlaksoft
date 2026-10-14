@@ -78,7 +78,7 @@ function SortHeaderLink({
   return (
     <Link
       href={href}
-      className={`focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950 ${active ? "text-brand-700" : ""}`}
+      className={`focus-ring inline-flex items-center gap-1.5 rounded-[var(--radius-control)] px-0.5 uppercase tracking-[0.04em] transition hover:text-ink-950 touch:min-h-11 ${active ? "text-brand-700" : ""}`}
     >
       {label}
       <Icon className={`h-3.5 w-3.5 ${active ? "text-brand-600" : "text-text-faint"}`} />
@@ -93,9 +93,9 @@ function occasionLabel(days: number): string {
 }
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 type BaseParams = Record<string, string>;
 type CustomerTypeDefs = Awaited<ReturnType<typeof loadCustomersData>>["customerTypes"];
@@ -200,7 +200,8 @@ async function OccasionsStream({ summary }: { summary: Promise<CustomersSummary>
   const { occasions } = await summary;
   if (occasions.length === 0) return null;
   return (
-    <Card className="p-4">
+    // lp-defer: telefonda sayfalamanın altına iner (liste ilk ekranda başlasın).
+    <Card className="lp-defer p-4">
       <div className="flex items-center gap-2">
         <Gift aria-hidden="true" className="h-4 w-4 text-text-muted" />
         <p className="text-sm font-semibold text-ink-950">
@@ -213,7 +214,7 @@ async function OccasionsStream({ summary }: { summary: Promise<CustomersSummary>
           <li key={`${o.id}-${o.kind}`}>
             <Link
               href={`/app/musteriler/${o.id}`}
-              className="focus-ring group inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300"
+              className="focus-ring group inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 touch:min-h-11"
               title={o.note ?? undefined}
             >
               {o.kind === "birthday" ? (
@@ -246,12 +247,14 @@ type FilterChipsProps = {
   /** "Akıllı listeler ve tavsiyeler" modülü (smart_lists) kapalıysa eylem süzgeçleri görünmez. */
   showActions: boolean;
   baseParams: BaseParams;
+  /** Telefonda dış kopya `max-sm:hidden`; aynı çipler ListToolbar filtre alt sayfasında (`sheetExtras`) çizilir. */
+  className?: string;
 };
 
 /** Tip çipleri + sıcaklık segmentleri. `summary` null iken (akış beklerken) sayaçsız, ama tıklanabilir görünür. */
-function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams }: FilterChipsProps & { summary: CustomersSummary | null }) {
+function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams, className }: FilterChipsProps & { summary: CustomersSummary | null }) {
   return (
-    <div className="space-y-2">
+    <div className={className ? `space-y-2 ${className}` : "space-y-2"}>
       {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
       <CategoryChips
         options={customerTypes.map((t) => ({ value: t.value, label: t.label }))}
@@ -460,6 +463,15 @@ export default async function CustomersPage({
   ]);
   const savedViewParams = Object.fromEntries(Object.entries(baseParams).filter(([k]) => k !== "yogunluk"));
 
+  // Tip / sıcaklık / eylem çipleri: geniş ekranda araç çubuğunun altında, telefonda filtre alt sayfasında (tek yer).
+  const chipsProps: FilterChipsProps = { totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams };
+  const quickChips = (className?: string) =>
+    totalAll > 0 ? (
+      <Suspense fallback={<FilterChipsView summary={null} {...chipsProps} className={className} />}>
+        <FilterChipsStream summary={summary} {...chipsProps} className={className} />
+      </Suspense>
+    ) : null;
+
 
   return (
     <ListPage
@@ -582,36 +594,16 @@ export default async function CustomersPage({
         chips={chips}
         resultCount={chips.length > 0 ? totalFiltered : undefined}
         savedViews={<SavedViews route="/app/musteriler" views={savedViews} currentParams={savedViewParams} />}
+        sheetExtras={
+          <>
+            {quickChips()}
+            <CustomFieldFilterBar path="/app/musteriler" params={baseParams} state={customFilter} />
+          </>
+        }
       />
-      <CustomFieldFilterBar path="/app/musteriler" params={baseParams} state={customFilter} />
+      <CustomFieldFilterBar path="/app/musteriler" params={baseParams} state={customFilter} className="max-sm:hidden" />
 
-      {totalAll > 0 ? (
-        <Suspense
-          fallback={
-            <FilterChipsView
-              summary={null}
-              totalAll={totalAll}
-              customerTypes={customerTypes}
-              typeF={typeF}
-              segmentF={segmentF}
-              actionSeg={actionSeg}
-              showActions={showActions}
-              baseParams={baseParams}
-            />
-          }
-        >
-          <FilterChipsStream
-            summary={summary}
-            totalAll={totalAll}
-            customerTypes={customerTypes}
-            typeF={typeF}
-            segmentF={segmentF}
-            actionSeg={actionSeg}
-            showActions={showActions}
-            baseParams={baseParams}
-          />
-        </Suspense>
-      ) : null}
+      {quickChips("max-sm:hidden")}
 
 
       {actionSeg && totalAll > 0 ? (

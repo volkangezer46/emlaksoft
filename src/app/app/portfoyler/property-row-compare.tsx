@@ -26,7 +26,7 @@ export function PropertyRowCompare({ item }: { item: CompareItem }) {
         active
           ? "border-transparent bg-[var(--success-soft)] text-[var(--success-strong)]"
           : "border-transparent text-text-muted hover:border-line hover:bg-canvas hover:text-brand-700"
-      } touch:min-h-11`}
+      } touch:size-11`}
     >
       {active ? <Check aria-hidden="true" className="h-4 w-4" /> : <Scale aria-hidden="true" className="h-4 w-4" />}
     </button>

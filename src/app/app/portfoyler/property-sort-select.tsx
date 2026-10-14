@@ -32,14 +32,14 @@ export function PropertySortSelect({ value }: { value: string }) {
   }
 
   return (
-    <label className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)] transition focus-within:border-brand-400">
+    <label className="inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 touch:py-0 text-xs font-semibold text-text-muted shadow-[var(--shadow-xs)] transition focus-within:border-brand-400">
       <ArrowDownUp className="h-3.5 w-3.5 text-text-faint" aria-hidden />
       <span className="sr-only">Sıralama</span>
       <select
         value={value || "yeni"}
         onChange={onChange}
         aria-label="Portföyleri sırala"
-        className="cursor-pointer appearance-none bg-transparent pr-1 font-semibold text-ink-950 outline-none"
+        className="cursor-pointer appearance-none bg-transparent pr-1 font-semibold text-ink-950 outline-none touch:min-h-11 touch:text-base"
       >
         {OPTIONS.map((o) => (
           <option key={o.value} value={o.value}>

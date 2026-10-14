@@ -78,13 +78,11 @@ export function CustomerSelectAllCheckbox({ ids }: { ids: string[] }) {
   const { selected, setAll } = useCustomerSelection();
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
   return (
-    <input
-      type="checkbox"
+    <RowCheckbox
       checked={allSelected}
       disabled={ids.length === 0}
-      onChange={() => setAll(ids, !allSelected)}
-      aria-label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm müşterileri seç"}
-      className="h-4 w-4 cursor-pointer accent-brand-600"
+      onToggle={() => setAll(ids, !allSelected)}
+      label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm müşterileri seç"}
     />
   );
 }

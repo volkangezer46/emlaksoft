@@ -147,7 +147,8 @@ describe("liste sayfaları sözleşmesi", () => {
     for (const f of ["src/app/app/musteriler/customer-bulk-actions.tsx", "src/app/app/portfoyler/property-bulk-actions.tsx", "src/app/app/talepler/demand-bulk.tsx"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).toContain("<RowCheckbox ");
-      expect(src.match(/type="checkbox"/g)?.length ?? 0, f).toBe(1);
+      // Başlıktaki "tümünü seç" de RowCheckbox olabilir (müşteri/portföy: YD6) → ham kutu en çok bir tane.
+      expect(src.match(/type="checkbox"/g)?.length ?? 0, f).toBeLessThanOrEqual(1);
     }
   });
 });

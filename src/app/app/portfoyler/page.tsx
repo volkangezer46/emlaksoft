@@ -179,9 +179,9 @@ function healthLabel(health: string | null): string {
 }
 
 const PAGER_BTN =
-  "focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
+  "focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas";
 const PAGER_BTN_DISABLED =
-  "inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
+  "inline-flex touch:min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2.5 py-1.5 font-medium text-ink-950 opacity-40";
 
 const PATH = "/app/portfoyler";
 
@@ -678,6 +678,48 @@ export default async function PropertiesPage({
   ]);
   const anyFilter = chips.length > 0;
 
+  // Tip çipleri (sunucu filtresi, ?kategori=) + fiyat sağlığı dağılımı: geniş ekranda araç çubuğunun altında,
+  // telefonda filtre alt sayfasında (ListToolbar `sheetExtras`) — aynı işaretleme, iki yerleşim.
+  const quickChips = (className: string) =>
+    total > 0 ? (
+      <div className={className}>
+        <CategoryChips
+          className="min-w-0 max-w-full"
+          options={typeDefs.map((d) => ({ value: d.value, label: d.label }))}
+          counts={typeCounts}
+          total={total}
+          active={kategoriF}
+          pathname={PATH}
+          params={urlParams}
+          label="Portföy tipi"
+        />
+        {healthKnownTotal > 0 ? (
+          <div className="flex min-w-[15rem] flex-wrap items-center gap-3" aria-label="Fiyat sağlığı dağılımı">
+            <Gauge aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" />
+            <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-canvas">
+              {healthSegments.map((s) => (
+                <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {healthSegments.map((s) => (
+                <FilterChip
+                  key={s.label}
+                  href={hrefWith({ saglik: saglikFilter === s.param ? "" : s.param, sayfa: "" })}
+                  active={saglikFilter === s.param}
+                  count={s.count}
+                  className={s.count === 0 ? "opacity-55" : undefined}
+                >
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                  {s.label}
+                </FilterChip>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
   return (
     <ListPage>
       <ListHero
@@ -698,8 +740,8 @@ export default async function PropertiesPage({
         }
       />
 
-      {/* İlgili ekranlar — ikincil gezinme */}
-      <div className="-mt-2 flex flex-wrap items-center gap-1">
+      {/* İlgili ekranlar — ikincil gezinme (lp-defer: telefonda sayfalamanın altına iner, liste ilk ekranda başlar) */}
+      <div className="lp-defer -mt-2 flex flex-wrap items-center gap-1 max-sm:mt-0">
         <ButtonLink href="/app/yabanci-satis" variant="ghost" size="sm">Yabancıya satış</ButtonLink>
         <ButtonLink href="/app/portfoyler/sunumlar" variant="ghost" size="sm">Sunumlar &amp; portallar</ButtonLink>
         <ButtonLink href="/app/portfoyler/anahtarlar" variant="ghost" size="sm">Anahtarlar</ButtonLink>
@@ -808,48 +850,17 @@ export default async function PropertiesPage({
         resultCount={anyFilter ? totalFilteredCount : undefined}
         resultNoun="sonuç"
         savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+        sheetExtras={
+          <>
+            {quickChips("grid gap-3")}
+            <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
+          </>
+        }
       />
-      <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} />
+      <CustomFieldFilterBar path={PATH} params={urlParams} state={customFilter} className="max-sm:hidden" />
 
-      {/* Tip çipleri (sunucu filtresi, ?kategori=) + fiyat sağlığı dağılımı */}
-      {total > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <CategoryChips
-            className="min-w-0 max-w-full"
-            options={typeDefs.map((d) => ({ value: d.value, label: d.label }))}
-            counts={typeCounts}
-            total={total}
-            active={kategoriF}
-            pathname={PATH}
-            params={urlParams}
-            label="Portföy tipi"
-          />
-          {healthKnownTotal > 0 ? (
-            <div className="flex min-w-[15rem] items-center gap-3" aria-label="Fiyat sağlığı dağılımı">
-              <Gauge aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" />
-              <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-canvas">
-                {healthSegments.map((s) => (
-                  <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
-                ))}
-              </div>
-              <div className="flex gap-1">
-                {healthSegments.map((s) => (
-                  <FilterChip
-                    key={s.label}
-                    href={hrefWith({ saglik: saglikFilter === s.param ? "" : s.param, sayfa: "" })}
-                    active={saglikFilter === s.param}
-                    count={s.count}
-                    className={s.count === 0 ? "opacity-55" : undefined}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                    {s.label}
-                  </FilterChip>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+      {/* Tip çipleri + fiyat sağlığı: geniş ekranda burada, telefonda filtre alt sayfasında (tek yer) */}
+      {quickChips("flex flex-wrap items-center justify-between gap-x-6 gap-y-3 max-sm:hidden")}
 
       {total === 0 ? (
         <EmptyState

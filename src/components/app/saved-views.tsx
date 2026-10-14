@@ -141,7 +141,7 @@ export function SavedViews({
               type="button"
               onClick={() => router.push(hrefOf(route, view.params))}
               aria-current={isActive ? "page" : undefined}
-              className={`focus-ring press inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              className={`focus-ring press inline-flex touch:min-h-11 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                 isActive
                   ? "border-brand-400/50 bg-brand-600/10 text-brand-600"
                   : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-brand-600"
@@ -164,14 +164,14 @@ export function SavedViews({
                 <button
                   type="button"
                   onClick={() => onDelete(view.id)}
-                  className="rounded-md bg-danger-500 px-2 py-0.5 text-xs font-bold text-white transition hover:opacity-90"
+                  className="focus-ring rounded-md bg-danger-500 px-2 py-0.5 text-xs font-bold text-white transition hover:opacity-90 touch:min-h-11 touch:min-w-11"
                 >
                   Sil
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmId(null)}
-                  className="rounded-md border border-line px-2 py-0.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
+                  className="focus-ring rounded-md border border-line px-2 py-0.5 text-xs font-semibold text-text-muted transition hover:text-ink-950 touch:min-h-11 touch:min-w-11"
                 >
                   Vazgeç
                 </button>
@@ -187,7 +187,7 @@ export function SavedViews({
             type="button"
             onClick={() => setOpen((prev) => !prev)}
             aria-expanded={open}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-full border border-dashed border-line-strong px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
+            className="focus-ring press inline-flex touch:min-h-11 items-center gap-1.5 rounded-full border border-dashed border-line-strong px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
           >
             <BookmarkPlus className="h-3.5 w-3.5" /> Görünümü kaydet
           </button>
@@ -206,20 +206,20 @@ export function SavedViews({
                 maxLength={60}
                 autoFocus
                 placeholder="Ör. Sıcak alıcılar"
-                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
+                className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none transition focus:border-brand-400 focus:bg-surface touch:min-h-11 touch:text-base"
               />
               <div className="flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950"
+                  className="focus-ring rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs font-semibold text-text-muted transition hover:text-ink-950 touch:min-h-11"
                 >
                   Vazgeç
                 </button>
                 <button
                   type="submit"
                   disabled={busy || !name.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
+                  className="focus-ring inline-flex touch:min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-700 disabled:opacity-50"
                 >
                   {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null} Kaydet
                 </button>
