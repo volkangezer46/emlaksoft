@@ -13,7 +13,9 @@ import {
 import { now } from "@/lib/clock";
 import type { AppModule } from "@/lib/permissions";
 import { TOURS, getTour, resolveTourSteps, tourIdForRole, type TourDef, type TourId, type TourStepDef } from "@/lib/product-tour-data";
-import { TOUR_PARAM, isTourDone, markTourDone } from "@/lib/product-tour-storage";
+import { TOUR_PARAM, isTourDone, markServerSynced, markTourDone } from "@/lib/product-tour-storage";
+import { tourStateKey } from "@/lib/ui-state";
+import { markUiState } from "@/app/actions/ui-state";
 import { loadProductTours } from "@/app/actions/onboarding-content";
 
 /**
@@ -27,7 +29,7 @@ import { loadProductTours } from "@/app/actions/onboarding-content";
  * hedef 3 sn içinde görünmezse adım sessizce atlanır.
  *
  * KURALLAR:
- * - Otomatik başlama yalnız ana ekranda, rolün turu daha önce görülmediyse (localStorage, try/catch) ve
+ * - Otomatik başlama yalnız ana ekranda, rolün turu daha önce görülmediyse (profil `ui_state`; localStorage önbellek) ve
  *   prefers-reduced-motion KAPALIYSA olur. Depolama yoksa "bir kez" garantisi verilemez → otomatik başlamaz.
  * - /app?tur=1 → rolün turu; /app?tur=<tur-kimliği> → o tur (Yardım sayfası ve kullanıcı menüsü).
  *   Yeniden başlatma, hareket azaltma açık olsa bile çalışır.
@@ -93,6 +95,12 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
     const resolved = resolveTourSteps(id, { accessible: c.accessible, closed: c.closed, role: c.role }, toursRef.current);
     if (resolved.length === 0) return false;
     markTourDone(id, new Date(now()).toISOString());
+    // Kalıcı işaret profilde (cihazlar arası, YD5); yazılamazsa yerel önbellek yine bu cihazda korur.
+    void markUiState(tourStateKey(id))
+      .then((r) => {
+        if (r.ok) markServerSynced(id);
+      })
+      .catch(() => {});
     dirRef.current = 1;
     setMobile(window.innerWidth < 768);
     setTourId(id);

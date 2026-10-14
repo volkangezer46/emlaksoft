@@ -4,10 +4,13 @@ import { useSyncExternalStore } from "react";
 import Link from "@/components/ui/smart-link";
 import { HeartHandshake, X } from "lucide-react";
 import { NUDGE_COPY, nudgeStorageKey, type NudgeMoment } from "@/lib/growth/program";
+import { nudgeStateKey } from "@/lib/ui-state";
+import { markUiState } from "@/app/actions/ui-state";
 
 /**
  * Davet kartı (kapatılabilir). Metin sabit tutar içermez; ödül ayrıntısı /app/buyume'dedir.
- * Kapatma tercihi yalnız bu tarayıcıda (localStorage) tutulur; erişilemezse kart görünmeye devam eder.
+ * Kapatma tercihi PROFİLDE (`markUiState`, cihazlar arası; YD5); localStorage anında gizleme için önbellektir.
+ * Sunucu bileşeni profilde kapatılmış kartı hiç çizmez.
  */
 function readDismissed(key: string): boolean {
   try {
@@ -65,6 +68,7 @@ export function ReferralNudgeCard({ moment }: { moment: NudgeMoment }) {
             /* depolama yok: kart bu oturumda kalır */
           }
           window.dispatchEvent(new Event("emlaksoft:nudge"));
+          void markUiState(nudgeStateKey(moment)).catch(() => {});
         }}
       >
         <X className="h-4 w-4" aria-hidden />
