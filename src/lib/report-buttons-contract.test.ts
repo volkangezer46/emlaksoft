@@ -24,9 +24,12 @@ const ALLOWED_PREFIXES: { prefix: string; why: string }[] = [
   { prefix: "src/app/api/app/rapor/", why: "İndirme ucunun kendisi" },
   { prefix: "src/app/api/admin/rapor/", why: "İndirme ucunun kendisi" },
   { prefix: "src/components/report-center/", why: "Rapor merkezi bileşenlerinin kendisi" },
+  { prefix: "src/app/app/giderler/_tabs/raporlar.tsx", why: "Muhasebe > Raporlar sekmesi: muhasebe raporlarının listesi" },
+  // GEÇİCİ: e-Fatura listesindeki rapor bağlantısı ayrı temizlik işinde kaldırılacak; yeni dosya eklenmez.
+  { prefix: "src/app/app/giderler/faturalar/faturalar-tab.tsx", why: "Bekleyen temizlik (e-Fatura listesi raporu)" },
 ];
 
-const BANNED: RegExp[] = [/ReportOpenLink/, /Raporlarda aç/, /\/api\/app\/rapor/, /\/api\/admin\/rapor/, /reportDownloadHref/];
+const BANNED: RegExp[] = [/ReportOpenLink/, /Raporlarda aç/, /\/api\/app\/rapor/, /\/api\/admin\/rapor/, /reportDownloadHref/, /reportCenterHref\(/];
 
 describe("rapor düğmeleri yalnız Raporlar sayfasında", () => {
   it("/app ve /admin sayfalarında rapor bağlantısı/indirme ucu yok", () => {

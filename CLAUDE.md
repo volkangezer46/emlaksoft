@@ -9,7 +9,8 @@ vitrin ve token'lı public portallar.
 Tamamı Türkçe. Canlı TEK ortam: https://emlaksoft.com.tr (Hetzner `emlaksoft-prod`, bu sunucu; self-hosted Supabase aynı makinede).
 Yayın tek komut: `bash scripts/sunucu/release.sh` = hızlı kapı `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından
 check:links/cron/migrations, audit:actions) → `npm run db:migrate` → `.env.production` `RELEASE_MIGRATION(_CHECKSUM)` işareti →
-`scripts/sunucu/deploy.sh` (Docker imajı + Coolify Traefik/Let's Encrypt, sağlık kontrolü) → `git push`. Adımlardan biri düşerse durur;
+`scripts/sunucu/deploy.sh` (Docker imajı + Coolify Traefik/Let's Encrypt, sağlık kontrolü) → `git push`. Kapı, ortam işareti ya da deploy düşerse durur;
+migration adımı hatada DURMAZ (`db:migrate` çıktısı süzülür, çıkış kodu yutulur): çıktısını kontrol edin;
 yerel `npm run build` kapıda YOK (derleme Docker içinde; tam zincir `scripts/gate/full.sh`). Tek env kaynağı `.env.production`.
 Sunucu düzeni ve eksikler `docs/SUNUCU_DEVIR.md`; deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`.
 Eski Vercel + bulut Supabase kurulumu dondurulmuştur: yeni iş, env ya da belge oraya yönlendirilmez.
