@@ -164,6 +164,8 @@ export default async function PropertyDetailPage({
   const [{ perms, tenantId, role }, { id }, sp] = await Promise.all([requireModulePage("properties"), params, searchParams]);
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
+  // Şablon listesi `customers:view` ister (listMessageTemplates); yetkisiz kullanıcıya hata veren düğme gösterilmez.
+  const canUseWaTemplates = (perms.customers ?? []).includes("view");
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
   const tab = resolveTab(sp, PROPERTY_TAB_IDS, "ozet");
   const timelineCategory = resolveCategory(sp.kategori, PROPERTY_TIMELINE_CATEGORIES.map((c) => c.key));
@@ -476,7 +478,9 @@ export default async function PropertyDetailPage({
                 Randevular
               </Link>
               {/* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */}
-              <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
+              {canUseWaTemplates ? (
+                <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
+              ) : null}
               <MoreActions>
               {canEdit ? (
                 <EditPropertyDialog

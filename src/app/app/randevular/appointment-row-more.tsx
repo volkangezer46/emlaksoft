@@ -41,6 +41,8 @@ export function AppointmentRowMore({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const completed = status === "completed";
+  // Teyit yalnız henüz gerçekleşmemiş, iptal edilmemiş randevuda anlamlı ("planlandı, teyit/iptal için…" metni).
+  const confirmable = status === "pending" || status === "confirmed";
 
   function toSignature() {
     startTransition(async () => {
@@ -62,7 +64,7 @@ export function AppointmentRowMore({
     }
   }
 
-  const hasItems = Boolean(cardHref) || status === "confirmed" || isShowing || (!completed && confirmToken) || !completed;
+  const hasItems = Boolean(cardHref) || status === "confirmed" || isShowing || (confirmable && confirmToken) || !completed;
   if (!hasItems) return null;
 
   return (
@@ -99,14 +101,14 @@ export function AppointmentRowMore({
               </Link>
             </DropdownMenuItem>
           ) : null}
-          {!completed && confirmWaHref ? (
+          {confirmable && confirmWaHref ? (
             <DropdownMenuItem asChild>
               <a href={confirmWaHref} target="_blank" rel="noopener noreferrer">
                 <MessageCircle aria-hidden="true" /> WhatsApp&apos;ta teyit gönder
               </a>
             </DropdownMenuItem>
           ) : null}
-          {!completed && confirmToken ? (
+          {confirmable && confirmToken ? (
             <DropdownMenuItem onSelect={() => void copyConfirm()}>
               <Link2 aria-hidden="true" /> Teyit linkini kopyala
             </DropdownMenuItem>

@@ -636,8 +636,9 @@ export default async function AppointmentsPage({
         ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(appt.signed_at))
         : null,
       confirmToken: appt.confirm_token,
-      // Hazır teyit mesajı (wa.me): mesajı danışman kendi WhatsApp'ından gönderir; numara geçersizse bağlantı yok.
-      confirmWaHref: customer?.phone
+      // Hazır teyit mesajı (wa.me): mesajı danışman kendi WhatsApp'ından gönderir; numara geçersizse ya da randevu
+      // bekleyen/onaylı değilse (iptal, tamamlandı, imza) bağlantı yok.
+      confirmWaHref: customer?.phone && (appt.status === "pending" || appt.status === "confirmed")
         ? appointmentWhatsAppHref(
             customer.phone,
             appointmentCustomerText({
