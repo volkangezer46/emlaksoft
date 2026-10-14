@@ -53,6 +53,17 @@ describe("kapı ve gerekçe", () => {
     expect(canChangeTrial("support")).toBe(true);
     expect(canChangeTrial("billing")).toBe(true);
   });
+  it("salt okunur özel rol (yalnız görüntüle) denemeyi değiştiremez", () => {
+    const custom = (permissions: Record<string, string[]>) => ({
+      role: "support" as const,
+      customRole: { id: "r1", label: "Özel", baseRole: "support" as const, permissions: permissions as never },
+    });
+    expect(canChangeTrial(custom({ sales: ["view"] }))).toBe(false);
+    expect(canChangeTrial(custom({ sales: ["view"], tenants: ["view"] }))).toBe(false);
+    expect(canChangeTrial(custom({ tenants: ["view", "write"] }))).toBe(false);
+    expect(canChangeTrial(custom({ sales: ["view", "write"] }))).toBe(true);
+    expect(canChangeTrial(custom({ tenants: ["view", "write"], billing: ["view", "write"] }))).toBe(true);
+  });
   it("gerekçe en az 10 karakter", () => {
     expect(cleanReason("kısa")).toBeNull();
     expect(cleanReason("  müşteri   ek süre istedi ")).toBe("müşteri ek süre istedi");

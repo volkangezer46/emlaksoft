@@ -1,7 +1,7 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
-import { fourEyesGate, requireStepUpOrApproved } from "@/lib/platform-security/four-eyes";
+import { fourEyesGate, readFourEyesConfig, requireStepUpOrApproved } from "@/lib/platform-security/four-eyes";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule, type PlatformStaff } from "@/lib/platform";
@@ -13,6 +13,10 @@ import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 const VALID_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
+/** Migration öncesi `custom_role_id` sütunu yok: sorgu/yazım eski biçime düşer. */
+const SCHEMA_COLUMN_MISSING = new Set(["42703", "PGRST204"]);
+const SUPER_ADMIN_ADD_QUEUE_ONLY =
+  "Dört göz onayı açık: süper admin doğrudan eklenemez. Personeli başka bir rolle ekleyin, rolü \"Rol değiştir\"den ikinci onaya gönderin.";
 
 export type StaffActionResult = { ok?: boolean; error?: string; notice?: string; code?: "step_up_required" | "step_up_invalid" | "step_up_no_factor" };
 
@@ -20,9 +24,17 @@ export type StaffActionResult = { ok?: boolean; error?: string; notice?: string;
  * Yeni platform personeli ekle.
  * Supabase Auth'da kayıtlı bir e-posta gerektirir; kullanıcı auth.users'da varsa
  * platform_staff'a eklenir, yoksa davet linki gönderilir (auth.admin.inviteUserByEmail).
+ *
+ * Personel eklemek ya da pasif personeli formdaki rolle yeniden açmak ROL ATAMASIDIR: `updateStaffRole` ile aynı kapı
+ * (personel modülünde "onayla"; sabit rollerde yalnız süper admin). Dört göz (rol değişikliği) açıkken bu yol kuyruğu
+ * olmadığı için ikinci onayı atlayamaz: süper admin olarak yeni personel eklenemez, pasif personel farklı rolle açılamaz
+ * (önce başka rolle ekle / mevcut rolüyle aç, rolü "Rol değiştir"den ikinci onaya gönder).
  */
 export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult> {
   const staff = await requirePlatformModule("personel");
+  if (!platformCan(staff, "personel", "approve")) {
+    return { error: "Personel eklemek rol ataması sayılır; personel yönetiminde onay yetkisi ister." };
+  }
 
   const email = normalizeEmail(fd.get("email") as string | null);
   const fullName = (fd.get("full_name") as string | null)?.trim();
@@ -40,6 +52,7 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
     return { error: "Geçici parola en az 10 karakter olmalıdır." };
   }
 
+  const fourEyesStaffRole = (await readFourEyesConfig()).staffRole;
   const admin = createAdminClient();
 
   // Auth'da kullanıcı var mı?
@@ -47,42 +60,73 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
   const existing = listData?.users?.find((u) => u.email?.toLowerCase() === email);
 
   if (existing) {
-    // Zaten platform_staff'ta mı?
-    const { data: already } = await admin
+    // Zaten platform_staff'ta mı? (custom_role_id migration öncesi yoksa eski sorguya düşülür)
+    let already: { id: string; is_active: boolean; role: string; custom_role_id?: string | null } | null = null;
+    const withCustom = await admin
       .from("platform_staff")
-      .select("id, is_active")
+      .select("id, is_active, role, custom_role_id")
       .eq("id", existing.id)
       .maybeSingle();
+    if (withCustom.error && SCHEMA_COLUMN_MISSING.has(withCustom.error.code ?? "")) {
+      const legacy = await admin.from("platform_staff").select("id, is_active, role").eq("id", existing.id).maybeSingle();
+      if (legacy.error) return { error: actionErrorMessage(legacy.error, "Personel kaydı okunamadı.") };
+      already = legacy.data;
+    } else if (withCustom.error) {
+      return { error: actionErrorMessage(withCustom.error, "Personel kaydı okunamadı.") };
+    } else {
+      already = withCustom.data;
+    }
 
     if (already) {
       if (already.is_active) return { error: "Bu e-posta zaten aktif personel olarak kayıtlı." };
+      if (superAdminTouchDenied(staff, already.role)) return { error: "Süper admini yalnız süper admin yeniden etkinleştirebilir." };
       // Pasif → tekrar aktif et. AD11: formdaki rol (süper admin dahil) yeniden atanır = rol değişikliği; kod ister
       // (aksi halde updateStaffRole'daki kapı "pasifleştir + yeniden davet et" ile atlanırdı).
+      const roleChanges = already.role !== role || Boolean(already.custom_role_id);
+      if (roleChanges && fourEyesStaffRole) {
+        return {
+          error:
+            "Dört göz onayı açık: pasif personeli farklı bir rolle açmak rol değişikliğidir. Personeli listeden mevcut rolüyle yeniden etkinleştirin, rolü \"Rol değiştir\"den ikinci onaya gönderin.",
+        };
+      }
       const stepUp = await requireStepUp(fd, "staff_role", staff.id);
       if (!stepUp.ok) return { error: stepUp.error, code: stepUp.code };
-      await admin
+      const stamp = new Date().toISOString();
+      // Sabit rol atanır: eski özel rol temizlenir (aksi halde yetki hâlâ özel rolden gelirdi; süper admin + özel rol
+      // DB CHECK'e takılır).
+      let { error: upError } = await admin
         .from("platform_staff")
-        .update({ is_active: true, role, full_name: fullName, updated_at: new Date().toISOString() })
+        .update({ is_active: true, role, custom_role_id: null, full_name: fullName, updated_at: stamp })
         .eq("id", existing.id);
+      if (upError && SCHEMA_COLUMN_MISSING.has(upError.code ?? "")) {
+        ({ error: upError } = await admin
+          .from("platform_staff")
+          .update({ is_active: true, role, full_name: fullName, updated_at: stamp })
+          .eq("id", existing.id));
+      }
+      if (upError) return { error: actionErrorMessage(upError, "Personel yeniden etkinleştirilemedi.") };
       await logPlatformActivity({
         actorId: staff.id,
         action: "platform_staff.reactivate",
         entityType: "platform_staff",
         entityId: existing.id,
-        meta: { email, role },
+        meta: { email, role, old_role: already.role, old_custom_role_id: already.custom_role_id ?? null },
       });
       revalidatePath("/admin/personel");
       return { ok: true };
     }
 
+    if (role === "super_admin" && fourEyesStaffRole) return { error: SUPER_ADMIN_ADD_QUEUE_ONLY };
+
     // Auth var ama platform_staff'ta yok → ekle
-    await admin.from("platform_staff").insert({
+    const { error: insError } = await admin.from("platform_staff").insert({
       id: existing.id,
       email,
       full_name: fullName,
       role,
       is_active: true,
     });
+    if (insError) return { error: actionErrorMessage(insError, "Personel eklenemedi.") };
     await logPlatformActivity({
       actorId: staff.id,
       action: "platform_staff.add",
@@ -93,6 +137,8 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
     revalidatePath("/admin/personel");
     return { ok: true };
   }
+
+  if (role === "super_admin" && fourEyesStaffRole) return { error: SUPER_ADMIN_ADD_QUEUE_ONLY };
 
   // Auth'da yok → geçici parolayla hesap aç ya da davet e-postası gönder; ardından platform_staff'a yaz
   const { data: invited, error: invErr } = tempPassword
@@ -111,13 +157,14 @@ export async function addPlatformStaff(fd: FormData): Promise<StaffActionResult>
     return { error: actionErrorMessage(invErr, "Davet gönderilemedi.") };
   }
 
-  await admin.from("platform_staff").insert({
+  const { error: insError } = await admin.from("platform_staff").insert({
     id: invited.user.id,
     email,
     full_name: fullName,
     role,
     is_active: true,
   });
+  if (insError) return { error: actionErrorMessage(insError, "Personel kaydı yazılamadı.") };
 
   await logPlatformActivity({
     actorId: staff.id,

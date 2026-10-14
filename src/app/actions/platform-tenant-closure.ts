@@ -1,6 +1,7 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { revalidatePath } from "next/cache";
 import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 import { logActivity } from "@/lib/activity";
@@ -16,6 +17,9 @@ import { actionErrorMessage } from "@/lib/action-errors";
 
 export type ClosureResult = { ok?: boolean; error?: string; message?: string };
 
+const CLOSURE_QUEUE_ONLY =
+  "Dört göz onayı açık: ofisi önce Ofis 360 > Yönetim'den arşive gönderin (ikinci onayla yürür); arşivlendikten sonra talebi burada tamamlayın.";
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
@@ -26,6 +30,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * başarısız olursa aynı işlem tekrarlanabilir (arşivdeki ofis yeniden arşivlenmez).
  * Veri paketi: ofis sahibi arşiv sonrası /app/askida sayfasından kendi verisini indirir; platform müşteri
  * verisini okumaz. Ayrıca "ayrılış kasası" (JSON) indirmesi ayrı yetkiyle mevcuttur.
+ * DG1 dört göz (ofis kapatma) açıkken bu yol ofisi tek imzayla ARŞİVLEYEMEZ (kuyruğu yok): ofis önce Ofis 360 >
+ * Yönetim'den ikinci onayla arşivlenir, ardından talep burada tamamlanır (arşivdeki ofis için `plan.archive` yanlış).
  */
 export async function processOfficeClosureRequestByAdmin(formData: FormData): Promise<ClosureResult> {
   const staff = await requirePlatformModule("tenants");
@@ -64,6 +70,9 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   if (!confirmationMatches(String(formData.get("confirm_name") ?? ""), String(tenant.name))) {
     return { error: "Onay için ofis adını aynen yazın." };
   }
+  const plan = planClosure(request.request_type, String(tenant.status), reason);
+  if (plan.archive && (await officeCloseBlockedOutsideQueue())) return { error: CLOSURE_QUEUE_ONLY };
+
   // AD11: hesap kapatma (ofis arşivlenir) doğrulayıcı kodu ister.
   if (request.request_type === "account_closure") {
     const stepUp = await requireStepUp(formData, "office_close", staff.id);
@@ -81,8 +90,6 @@ export async function processOfficeClosureRequestByAdmin(formData: FormData): Pr
   if (!requesterMayCloseOffice(requester, tenantId)) {
     return { error: "Talebi açan kullanıcı artık bu ofisin aktif sahibi/genel müdürü değil. Talep işlenemez; reddedin veya ofisle iletişime geçin." };
   }
-
-  const plan = planClosure(request.request_type, String(tenant.status), reason);
 
   if (plan.archive) {
     // Yetki (archive), ofis adı onayı, gerekçe ve kod yukarıda doğrulandı: arşiv kapısız çekirdekten yazılır.
