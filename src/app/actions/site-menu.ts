@@ -33,7 +33,7 @@ async function requireWriter() {
 }
 
 function refreshAdmin() {
-  revalidatePath("/admin/site-menu");
+  revalidatePath("/admin/site/menu");
 }
 
 /** Canlı menüyü etkileyen yazmalar: etiketli önbelleği düşürür ve statik sayfaları yeniden üretir. */

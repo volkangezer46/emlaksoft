@@ -12,7 +12,7 @@ import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
  * Yapı koddadır (kimlik -> ızgara sınıfı, illüstrasyon, koyu zemin, paket rozeti yolu); metinler site içeriğinden
- * (/admin/site-icerik). Paket rozetleri plans.ts / page-gates ile uyumludur. Garanti/ispatsız üstünlük dili yok.
+ * (/admin/site/sayfalar/ana-sayfa). Paket rozetleri plans.ts / page-gates ile uyumludur. Garanti/ispatsız üstünlük dili yok.
  */
 type TileMeta = { id: BentoTile["id"]; cls: string; art: () => ReactNode; gate?: string; dark?: boolean };
 /** Kimlik aynı zamanda sayfa içi bağlantı hedefidir (/#kayip-kacak, /#emsal-degerleme ...; site menüsü testi doğrular). */

@@ -20,7 +20,7 @@ import {
 
 export type CenterResult = { ok?: boolean; error?: string; changed?: boolean; degraded?: boolean };
 
-const REVALIDATE = "/admin/ayarlar/merkez";
+const REVALIDATE = "/admin/ayarlar";
 
 function done(res: Awaited<ReturnType<typeof writeSetting>>): CenterResult {
   if (!res.ok) return { error: res.error };

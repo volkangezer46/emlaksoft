@@ -19,8 +19,8 @@ Kapsam: yalnız süper admin (`billing` platform modülü; iade yazan eylemler s
    - kontör paketi faturasıysa verilen EF kontörü geri alır (kontör KULLANILMIŞSA bakiye yetmez ve kayıt ENGELLENİR: tutarı düşürüp tekrar dene ya da elle değerlendir; idem anahtarı aynı olduğundan tekrar çift düşmez);
    - hesap kredisi kullanılmışsa payını geri yazar (`try_credit_refund_invoice`; başarısızsa kayıt DÜŞÜLMEZ, aynı işlemi tekrar et);
    - son olarak `meta.refund = {amount_try, reason, at}` yazar ve denetim kaydı (`logPlatformActivity`) bırakır.
-5. **Referans/ortak ödülü etkisi.** İade edilen fatura davet edilen ofisin İLK GERÇEK ödemesiyse bağlı referans talebi `reversed` olur ve verilmiş TL kredi clawback edilir (bakiye eksiye düşebilir, eksi bakiye harcanamaz). `growth-claims` cron'u kaçırılan iadeleri de yakalar. Kontrol: `/admin/growth` talep kuyruğu ve ofisin kredi hareketleri.
-6. **Doğrula.** Fatura detayında iade görünür; `/admin/muhasebe` iade kartı ve defter (durum "iade") güncellenir; muhasebeci CSV'sinde "İade Tutarı" dolu olur. Ofis kredisi/kontör bakiyesi beklenen değerde mi bak.
+5. **Referans/ortak ödülü etkisi.** İade edilen fatura davet edilen ofisin İLK GERÇEK ödemesiyse bağlı referans talebi `reversed` olur ve verilmiş TL kredi clawback edilir (bakiye eksiye düşebilir, eksi bakiye harcanamaz). `growth-claims` cron'u kaçırılan iadeleri de yakalar. Kontrol: `/admin/ortaklik` talep kuyruğu ve ofisin kredi hareketleri.
+6. **Doğrula.** Fatura detayında iade görünür; `/admin/billing/muhasebe` iade kartı ve defter (durum "iade") güncellenir; muhasebeci CSV'sinde "İade Tutarı" dolu olur. Ofis kredisi/kontör bakiyesi beklenen değerde mi bak.
 7. **Muhasebe/vergi:** iade belgesi (iade/gider pusulası, e-fatura iptal/iade) EmlakSoft'ta üretilmez; mali müşavire iletilir.
 
 Yarım kalma durumları:

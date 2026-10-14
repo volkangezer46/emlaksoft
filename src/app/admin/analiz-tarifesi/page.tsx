@@ -21,6 +21,9 @@ import { now as clockNow } from "@/lib/clock";
 import { getPlatformSetting } from "@/lib/platform-settings";
 import { resolvePeriod } from "@/lib/accounting/period";
 import { EF_WHOLESALE_SETTING_KEY, parseEfWholesale } from "@/lib/accounting/ef-economics";
+import { getEfTariff } from "@/lib/billing/plan-definitions";
+import { EF_WELCOME_SETTING_KEY, efEntryValuationUnits, parseEfWelcomeUnits } from "@/lib/ef-credits/config";
+import { WelcomeUnitsEditor } from "./welcome-units-editor";
 
 export const metadata = { title: "Analiz tarifesi" };
 
@@ -41,7 +44,8 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
 
   const [ready, catalog] = await Promise.all([getEfCreditReady(), getEfCatalog()]);
   const period = resolvePeriod({ donem: sp.donem }, clockNow());
-  const wholesale = parseEfWholesale(await getPlatformSetting(EF_WHOLESALE_SETTING_KEY));
+  const [wholesaleRaw, welcomeRaw, efTariff] = await Promise.all([getPlatformSetting(EF_WHOLESALE_SETTING_KEY), getPlatformSetting(EF_WELCOME_SETTING_KEY), getEfTariff()]);
+  const wholesale = parseEfWholesale(wholesaleRaw);
   // Ekonomi verisi, bakiye listesinin (allowlist'li) service_role istemcisini ödünç alır: yeni service_role kullanımı yok.
   const list = ready ? await listTenantEfBalances({ q, page }, (admin) => loadEfEconomicsData(admin, period, wholesale)) : null;
 
@@ -61,7 +65,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
         icon={Coins}
         eyebrow="Faturalama · analiz bakiyesi"
         title="Analiz tarifesi"
-        description="Tarife, paket kataloğu, ofis bakiyeleri ve manuel yükleme tek merkezde. Analiz bakiyesi YALNIZ Emlaksoft'ta tutulur."
+        description="Tarife, paket kataloğu, hoş geldin bakiyesi, ofis bakiyeleri ve manuel yükleme tek merkezde. Analiz bakiyesi YALNIZ Emlaksoft'ta tutulur."
       />
 
       {!ready ? (
@@ -82,6 +86,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       />
 
       <EconomicsSection data={list?.extra ?? null} period={period} wholesale={wholesale} canWrite={canWrite} />
+      <WelcomeUnitsEditor welcomeUnits={parseEfWelcomeUnits(welcomeRaw)} valuationCost={efEntryValuationUnits(efTariff)} canWrite={canWrite} />
       {canWrite ? <MarketExportCard /> : null}
 
       <LastReconciliationCard />

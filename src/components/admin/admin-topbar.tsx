@@ -9,27 +9,17 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { UserMenu } from "@/components/ui/console/user-menu";
 import { now } from "@/lib/clock";
-import {
-  Building2,
-  CreditCard,
-  LifeBuoy,
-  MapPin,
-  Plus,
-  Undo2,
-  UserRound,
-} from "lucide-react";
+import { Building2, LifeBuoy, Plus, Undo2, UserRound } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
 import type { FontScale } from "@/lib/font-scale";
 import type { AdminHealth } from "@/lib/admin-badges";
 import { activeAdminItem } from "@/lib/admin/nav";
 import { SystemStatusChip } from "@/components/admin/system-status-chip";
 
+/** "+ Yeni" menüsü YALNIZ eylemlerdir (sayfa gezintisi yan menü ve ⌘K'dadır; kopya kısayol yok). */
 const QUICK: { label: string; href: string; icon: typeof Building2; module: PlatformModule }[] = [
-  { label: "Yeni ofis aç", href: "/admin/tenants/yeni", icon: Plus, module: "sales" },
-  { label: "Ofisler", href: "/admin/tenants", icon: Building2, module: "tenants" },
-  { label: "Abonelikler", href: "/admin/billing", icon: CreditCard, module: "billing" },
-  { label: "Destek talepleri", href: "/admin/tickets", icon: LifeBuoy, module: "tickets" },
-  { label: "Coğrafya", href: "/admin/geo", icon: MapPin, module: "geo" },
+  { label: "Yeni ofis aç", href: "/admin/tenants/yeni", icon: Building2, module: "tenants" },
+  { label: "Yeni destek talebi", href: "/admin/tickets/yeni", icon: LifeBuoy, module: "tickets" },
 ];
 
 // Not: `tagline` prop'u alınıyor ama hiçbir yerde render edilmiyordu (h-14
@@ -85,11 +75,11 @@ export function AdminTopbar({
 
   return (
     <header className="glass-bar topbar-platform sticky top-0 z-40 flex h-16 items-center gap-3 pl-16 pr-4 md:px-6">
-      {/* Sol: ev ikonlu konum şeridi — platform / rol / sayfa (süper admin ofis uygulamasından ayrışsın) */}
+      {/* Sol: ev ikonlu konum şeridi — platform / sayfa (rol, kullanıcı menüsünde ve yan menü başlığında görünür) */}
       <Breadcrumb
         className="hidden shrink-0 lg:block"
         home={{ href: "/admin", label: "Kontrol paneli" }}
-        items={[{ label: "Platform", href: "/admin" }, { label: roleLabel }, { label: title }]}
+        items={[{ label: "Platform", href: "/admin" }, { label: title }]}
       />
 
       {/* Orta: arama — flex-1 ile boş alanı kapla, çok geniş ekranda okunur genişlikte kal */}
@@ -108,7 +98,7 @@ export function AdminTopbar({
               aria-controls="admin-quick-menu"
               className="focus-ring press inline-flex h-11 items-center gap-1.5 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-[0_8px_20px_-10px_color-mix(in_srgb,var(--accent)_80%,transparent)] transition-colors hover:bg-accent-hover"
             >
-              <Plus className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Hızlı erişim</span>
+              <Plus className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Yeni</span>
             </button>
             {quickOpen ? (
               <div id="admin-quick-menu" role="menu" className="absolute right-0 top-12 w-56 overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[0_24px_50px_-20px_rgba(10,34,71,0.5)]">

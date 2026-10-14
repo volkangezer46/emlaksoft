@@ -244,7 +244,7 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDef[] = [
     defaultSubject: "KVKK başvurunuz ({basvuru_no}) hakkında",
     defaultBody:
       "Sayın {ad},\n\n{tarih} tarihli {basvuru_no} numaralı 6698 sayılı KVKK kapsamındaki başvurunuz sonuçlandırılmıştır:\n\n{yanit}\n\nSaygılarımızla,\nEmlakSoft",
-    usedBy: "KVKK başvurusu sonuçlandırılınca (Destek > KVKK talepleri > Doğrudan başvurular > başvuru ayrıntısı), başvuru sahibine.",
+    usedBy: "KVKK başvurusu sonuçlandırılınca (Talepler > KVKK başvuruları > Doğrudan başvurular > başvuru ayrıntısı), başvuru sahibine.",
   },
   {
     key: "kvkk_verify",

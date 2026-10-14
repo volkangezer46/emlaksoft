@@ -16,7 +16,7 @@ import {
 } from "./platform-access";
 import { adminNavFor } from "./admin/nav";
 import { officeAdminCan, OFFICE_ADMIN_ACTIONS } from "./admin/office-admin-access";
-import { homeVariantFor, platformHomeSections } from "./admin/dashboard-layout";
+import { homeVariantFor, platformReportSections } from "./admin/dashboard-layout";
 
 const ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];
 
@@ -72,9 +72,9 @@ describe("DG1 sabit roller matrise birebir haritalanır (mevcut personel davran�
     expect(homeVariantFor("billing")).toBe("billing");
     expect(homeVariantFor("support")).toBe("support");
     expect(homeVariantFor({ role: "ops" })).toBe("platform");
-    expect(platformHomeSections("super_admin")).toContain("mrr");
-    expect(platformHomeSections("ops")).not.toContain("mrr");
-    expect(platformHomeSections("ops")).toContain("health");
+    expect(platformReportSections("super_admin")).toContain("mrr");
+    expect(platformReportSections("ops")).not.toContain("mrr");
+    expect(platformReportSections("ops")).toContain("churn");
   });
 });
 
@@ -127,7 +127,7 @@ describe("DG1 özel rol: yalnız izin verilen modüller", () => {
   it("panel: ofisleri görmeyen özel rol ofis metriklerini görmez", () => {
     expect(homeVariantFor(finance)).toBe("billing");
     expect(homeVariantFor(custom({ tickets: ["write"] }))).toBe("support");
-    const sections = platformHomeSections(custom({ geo: ["view"] }, "ops"));
-    expect(sections).toEqual(["attention", "geo"]);
+    const sections = platformReportSections(custom({ geo: ["view"] }, "ops"));
+    expect(sections).toEqual([]);
   });
 });

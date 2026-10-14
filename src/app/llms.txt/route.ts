@@ -2,7 +2,7 @@ import { getBaseUrl } from "@/lib/base-url";
 import { buildLlmsTxt } from "@/lib/seo/robots-rules";
 import { getSeoSettings } from "@/lib/seo/store";
 
-/** llms.txt: isteğe bağlı site özeti. Varsayılan KAPALI (404); /admin/seo'dan açılır. Otomatik içerik yalnız canAutoOptimize sayfalarından. */
+/** llms.txt: isteğe bağlı site özeti. Varsayılan KAPALI (404); /admin/site/seo'dan açılır. Otomatik içerik yalnız canAutoOptimize sayfalarından. */
 export async function GET() {
   const s = await getSeoSettings();
   const body = buildLlmsTxt(s.global, s.robots, getBaseUrl(), s.pages);

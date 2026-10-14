@@ -11,7 +11,7 @@ import { getSeoPage } from "@/lib/seo/registry";
 import { effectivePageView } from "@/lib/seo/metadata";
 import { loadSitemapFresh } from "@/lib/seo/sitemap-data";
 import { SEO_HISTORY_KEYS, listSeoHistory, type SeoHistoryKey } from "@/lib/seo/history";
-import { pageImpact, robotsImpact, sitemapImpact, type SeoImpact } from "@/app/admin/seo/noindex-impact";
+import { pageImpact, robotsImpact, sitemapImpact, type SeoImpact } from "@/app/admin/site/seo/noindex-impact";
 import { executeSeoRobot } from "@/lib/seo/robot";
 import { validateNewRule, analyzeRedirects } from "@/lib/seo/redirects";
 import {
@@ -33,7 +33,7 @@ import {
   type SeoPageOverride,
   type SeoRedirectRule,
 } from "@/lib/seo/schema";
-import { SEO_CACHE_TAG, readAuditLatest, readIndexNow, readSeoSettingsFresh, writeIndexNow, writeSeoSetting } from "@/lib/seo/store";
+import { SEO_CACHE_TAG, readIndexNow, readSeoSettingsFresh, writeIndexNow, writeSeoSetting } from "@/lib/seo/store";
 import type { PlatformStaff } from "@/lib/platform";
 import { afterSafe } from "@/lib/after-safe";
 import { getBaseUrl } from "@/lib/base-url";
@@ -42,8 +42,6 @@ import { visibleText } from "@/lib/seo/audit-rules";
 import { SeoAiOutputSchema, suggestSeoWithAi } from "@/lib/seo/ai-suggest";
 import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publish";
 import { hashOf } from "@/lib/publishing/schedule";
-import { seoMetaDraftExecutor } from "@/lib/seo/executors";
-import { auditRunToIssues } from "@/lib/seo/issues-collector";
 import { changedPagePaths, discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
 import { canAutoOptimize } from "@/lib/seo/scope";
 
@@ -53,7 +51,7 @@ const SUPER_ONLY = "Bu ayar yalnız süper admin tarafından değiştirilebilir 
 
 function refresh() {
   updateTag(SEO_CACHE_TAG);
-  revalidatePath("/admin/seo");
+  revalidatePath("/admin/site/seo");
   revalidatePath("/", "layout");
   revalidatePath("/sitemap.xml");
 }
@@ -352,32 +350,8 @@ export async function saveSeoAiSettings(fd: FormData): Promise<SeoActionResult> 
   const res = await writeSeoSetting("ai", SeoAiSettingsSchema, input, g.staff.id, g.staff.full_name);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, input.enabled ? "seo.ai.enable" : "seo.ai.disable", "ai", { monthlyLimit: input.monthlyLimit });
-  revalidatePath("/admin/seo");
+  revalidatePath("/admin/site/seo");
   return { ok: true, message: input.enabled ? "AI önerisi açıldı." : "AI önerisi kapalı." };
-}
-
-/* ------------------------------ Öneri → taslak ------------------------------ */
-
-/**
- * Robot bulgusunun KURAL önerisini SEO taslağına yazar (canlı değişmez). Bulgu son koşudan bulunur; öneri sunucuda
- * yeniden hesaplanır (istemciden değer alınmaz). Kapsam dışı/üyelik sayfası bulgusu taslak ALMAZ.
- */
-export async function draftSeoRuleFix(fd: FormData): Promise<SeoActionResult> {
-  const g = await guard(false);
-  if ("error" in g) return g;
-  const url = text(fd, "url") ?? "";
-  const code = text(fd, "code") ?? "";
-  const [run, settings] = await Promise.all([readAuditLatest(), readSeoSettingsFresh()]);
-  if (!run) return { error: "Robot henüz çalışmadı." };
-  const finding = run.findings.find((f) => f.url === url && f.code === code);
-  if (!finding) return { error: "Bulgu artık yok (robot yeniden çalışmış olabilir)." };
-  const issue = auditRunToIssues({ ...run, findings: [finding] }, settings).issues[0];
-  if (!issue || !seoMetaDraftExecutor.canHandle(issue)) return { error: "Bu bulgu için otomatik taslak yok; sayfayı elle düzenleyin." };
-  const res = await seoMetaDraftExecutor.apply(issue, { actorId: g.staff.id, source: "staff" });
-  if (!res.ok) return { error: res.error };
-  await audit(g.staff, "seo.draft.rule", issue.url, { code, before: res.before, after: res.after });
-  revalidatePath("/admin/seo");
-  return { ok: true, message: res.message };
 }
 
 /** Sayfanın görünür metnini KENDİ kökenimizden okur (yalnız AI önerisi girdisi; dış adres YOK). */
@@ -426,7 +400,7 @@ export async function draftSeoAiSuggestion(fd: FormData): Promise<SeoActionResul
     if (!res.ok) return { error: res.error };
   }
   await audit(g.staff, "seo.draft.ai", path);
-  revalidatePath("/admin/seo");
+  revalidatePath("/admin/site/seo");
   return { ok: true, message: "AI önerisi taslağa yazıldı (yayınlanmadı)." };
 }
 
@@ -458,7 +432,7 @@ export async function discardSeoDraft(): Promise<SeoActionResult> {
   const res = await discardSeoDraftPatch(g.staff.id);
   if (!res.ok) return { error: res.error };
   await audit(g.staff, "seo.draft.discard", "pages");
-  revalidatePath("/admin/seo");
+  revalidatePath("/admin/site/seo");
   return { ok: true, message: "Taslak atıldı." };
 }
 
@@ -473,7 +447,7 @@ export async function runSeoRobotNow(): Promise<SeoActionResult> {
   try {
     const { run, indexNow } = await executeSeoRobot("manual");
     await audit(g.staff, "seo.robot.run", "robot", { critical: run.summary.critical, warning: run.summary.warning });
-    revalidatePath("/admin/seo");
+    revalidatePath("/admin/site/seo");
     return {
       ok: true,
       message: `${run.summary.pagesChecked} sayfa denetlendi: ${run.summary.critical} kritik, ${run.summary.warning} uyarı. IndexNow: ${indexNow.status}.`,

@@ -16,7 +16,9 @@ export type SettingValueType = "bool" | "int" | "number" | "string" | "enum" | "
 
 /** Sistem Ayarlari Merkezi kategorileri (12; sira ekran sirasidir). */
 export const SETTING_CATEGORIES = [
-  { id: "faturalama", label: "Faturalama ve planlar", description: "Plan fiyatları, koltuk, deneme ve otomatik yenileme." },
+  { id: "faturalama", label: "Faturalama ve planlar", description: "Plan fiyatları, koltuk, fatura vadesi ve tahsilat." },
+  { id: "deneme-yenileme", label: "Deneme ve yenileme", description: "Deneme süresi ve toleransı, otomatik yenileme, oransal yükseltme, duraklatma ve dönemi biten aboneliğin gecikmişe geçmesi." },
+  { id: "kayit-bakim", label: "Kayıt ve bakım", description: "Yeni ofis kaydı, bakım modu ve bakım mesajı." },
   { id: "emlakfiyati", label: "EmlakFiyatı ve analiz bakiyesi", description: "Analiz tarifesi, paketler, hoş geldin analiz bakiyesi ve mutabakat." },
   { id: "buyume", label: "Büyüme ve davet", description: "Referans ve ortak programı bayrakları, kurallar, TL kredi." },
   { id: "uyum", label: "Uyum ve mevzuat", description: "TÜFE, KVKK, KDV ve yetki belgesi sabitleri." },
@@ -26,7 +28,7 @@ export const SETTING_CATEGORIES = [
   { id: "entegrasyon", label: "Entegrasyonlar ve anahtarlar", description: "Üçüncü taraf anahtarları (maskeli) ve e-fatura." },
   { id: "ai", label: "AI ve kota", description: "OpenAI anahtarı ve kredi maliyet tablosu." },
   { id: "gorunum", label: "Görünüm ve marka", description: "Marka, SEO, site menüsü ve içerik (taslak/yayın)." },
-  { id: "bayrak", label: "Özellik bayrakları", description: "Bakım modu ve kayıt gibi genel açma/kapama bayrakları." },
+  { id: "bayrak", label: "Özellik bayrakları", description: "Genel açma/kapama bayrakları (hedefleme Özellik bayrakları sekmesinde)." },
   { id: "saglik", label: "Sağlık ve izleme", description: "Sistem sağlığı, hata kayıtları ve cron nabzı." },
 ] as const;
 export type SettingCategoryId = (typeof SETTING_CATEGORIES)[number]["id"];

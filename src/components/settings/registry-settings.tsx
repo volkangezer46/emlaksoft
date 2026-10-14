@@ -32,7 +32,7 @@ export async function RegistrySettings({
           </h2>
           {description ? <p className="text-xs text-text-muted">{description}</p> : null}
         </div>
-        <Link href="/admin/ayarlar/merkez" className="text-xs font-semibold text-brand-600 hover:underline">
+        <Link href="/admin/ayarlar" className="text-xs font-semibold text-brand-600 hover:underline">
           Tüm ayarlar →
         </Link>
       </div>

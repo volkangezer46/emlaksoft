@@ -156,6 +156,8 @@ function ActivityFilterBar({ filters, total }: { filters: ActivityFilters; total
   );
 }
 
+export const metadata = { title: "Aktivite" };
+
 export default async function AdminActivityPage({
   searchParams,
 }: {

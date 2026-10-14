@@ -1,51 +1,24 @@
-"use client";
-
-import { Button } from "@/components/ui/button";
-import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
-import { useRouter } from "next/navigation";
-import { saveEfWelcomeUnits } from "@/app/actions/platform-billing-plans";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
-import { opFieldClass } from "../inline-op";
-
-const lbl = "block text-xs font-semibold text-text-muted";
 
 type Row = { id: string; name: string; units: number; perExtraSeat?: number };
 
-/** "Analiz bakiyesi hakları": paket başına aylık hak özeti (canlı yaklaşık değerleme) + hoş geldin analiz bakiyesi ayarı. */
+/**
+ * "Analiz bakiyesi hakları" SALT OKUNUR özeti: paket başına aylık hak (canlı yaklaşık değerleme) ve hoş geldin analiz
+ * bakiyesinin güncel değeri. Hoş geldin bakiyesi ve toptan maliyet Kullanım ve krediler > Analiz tarifesi'nde düzenlenir.
+ */
 export function EfCreditsSection({
   rows,
   valuationCost,
   welcomeUnits,
   wholesaleKnown,
-  canWrite,
 }: {
   rows: Row[];
   valuationCost: number;
   welcomeUnits: number;
   /** ef.wholesale tanımlı mı (iki tarife de 0 değilse). */
   wholesaleKnown: boolean;
-  canWrite: boolean;
 }) {
-  const router = useRouter();
-  const [value, setValue] = useState(String(welcomeUnits));
-  const [confirm, setConfirm] = useState(false);
-  const [pending, start] = useTransition();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const valid = /^\d+$/.test(value.trim()) && Number(value.trim()) <= 1000;
-
-  function submit() {
-    if (pending || !valid) return;
-    const fd = new FormData();
-    fd.set("welcome_units", value.trim());
-    start(async () => {
-      const r = await saveEfWelcomeUnits(fd);
-      setMsg(r.error ? { ok: false, text: r.error } : { ok: true, text: r.notice ?? "Kaydedildi." });
-      setConfirm(false);
-      if (!r.error) router.refresh();
-    });
-  }
-
   return (
     <section aria-label="Analiz bakiyesi hakları" className="space-y-4 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <div>
@@ -57,7 +30,9 @@ export function EfCreditsSection({
         </p>
         <p className="mt-1 text-xs text-text-muted">
           Toptan maliyet (EmlakFiyatı işlem başı tarifesi): {wholesaleKnown ? "tanımlı" : "BİLİNMİYOR, varsayılan 0 kullanılıyor; marj gerçek değildir"}.{" "}
-          <Link href="/admin/analiz-tarifesi#ekonomi" className="font-semibold text-brand-600 hover:underline">Analiz bakiyesi ekonomisi ve maliyet girişi</Link>
+          <Link href="/admin/analiz-tarifesi#ekonomi" className="font-semibold text-brand-600 hover:underline">
+            Analiz bakiyesi ekonomisi ve maliyet girişi
+          </Link>
         </p>
       </div>
       <ul className="space-y-1 text-sm">
@@ -68,58 +43,13 @@ export function EfCreditsSection({
           </li>
         ))}
       </ul>
-      <div className="space-y-2 border-t border-line pt-4">
-        <h3 className="text-sm font-bold text-ink-950">Hoş geldin analiz bakiyesi (yalnız deneme/yeni ofis, tek sefer)</h3>
-        <label className={lbl}>
-          Analiz bakiyesi (0 = kapalı)
-          <input
-            inputMode="numeric"
-            value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setConfirm(false);
-            }}
-            disabled={!canWrite}
-            className={`mt-1 w-40 ${opFieldClass}`}
-          />
-        </label>
-        {valid ? (
-          <p className="text-xs text-text-muted">
-            {Number(value.trim()) === 0
-              ? "Kapalı: yeni hoş geldin hibesi verilmez."
-              : (efCreditsLine(Number(value.trim()), valuationCost)?.replace("Her ay ", "") ?? "")}
-            {" "}Hoş geldin analiz bakiyesi yalnız deneme/yeni ofise bir kez verilir; mevcut ofislere geriye dönük dağıtılmaz.
-          </p>
-        ) : (
-          <p role="alert" className="text-xs font-semibold text-danger-600">0-1000 arasında tam sayı girin.</p>
-        )}
-        {canWrite ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {!confirm ? (
-              <Button variant="outline" size="sm" type="button" disabled={!valid || pending} onClick={() => setConfirm(true)}>
-                Kaydet
-              </Button>
-            ) : (
-              <>
-                <span className="text-xs text-text-muted">Değer {value.trim()} olarak kaydedilecek. Onaylıyor musunuz?</span>
-                <Button variant="navy" size="sm" type="button" disabled={pending} onClick={submit}>
-                  {pending ? "Kaydediliyor…" : "Onayla"}
-                </Button>
-                <Button type="button" disabled={pending} onClick={() => setConfirm(false)} variant="ghost" size="sm">
-                  Vazgeç
-                </Button>
-              </>
-            )}
-            {msg ? (
-              <span role={msg.ok ? "status" : "alert"} className={`text-xs font-semibold ${msg.ok ? "text-mint-700" : "text-danger-600"}`}>
-                {msg.text}
-              </span>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-xs text-text-muted">Bu ayarı yalnız süper admin değiştirir.</p>
-        )}
-      </div>
+      <p className="border-t border-line pt-3 text-sm text-text-muted">
+        Hoş geldin analiz bakiyesi (yalnız deneme/yeni ofis, tek sefer):{" "}
+        <strong className="text-ink-950">{welcomeUnits === 0 ? "kapalı" : `${welcomeUnits} birim`}</strong>.{" "}
+        <Link href="/admin/analiz-tarifesi#hos-geldin" className="font-semibold text-brand-600 hover:underline">
+          Analiz tarifesinde düzenle →
+        </Link>
+      </p>
     </section>
   );
 }

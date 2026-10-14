@@ -7,8 +7,8 @@ import { ArrowDown, ArrowUp, Eye, History, Plus, RotateCcw, Save, Send, Trash2, 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publishPricingPage, resetPricingPageToDefault, rollbackPricingPage, savePricingPageDraft } from "@/app/actions/pricing-page";
-import { Card, Full, Txt } from "@/app/admin/site-icerik/editor-fields";
-import { InlineConfirm } from "@/app/admin/site-menu/editor-ui";
+import { Card, Full, Txt } from "@/app/admin/site/sayfalar/ana-sayfa/editor-fields";
+import { InlineConfirm } from "@/app/admin/site/menu/editor-ui";
 import { moveInArray } from "@/lib/site-menu/editor-model";
 import type { Issue } from "@/lib/site-menu/schema-core";
 import { ALL_PRICING_TOKENS, PRICING_LIMITS as L, samePricing, type PricingPageContent } from "@/lib/pricing-page/schema-core";

@@ -15,7 +15,7 @@ import { getLiveSitePage, getPublishedSlugMap } from "@/lib/site-pages/store";
 /**
  * Hiçbir sayfayla eşleşmeyen yolların tek durağı (Next, daha özgül rotaları önce eşler; bu yalnız 404'e düşecek
  * yollarda çalışır — mevcut sayfaların performansına dokunmaz). Sıra (resolveCatchAll):
- *  1) /admin/seo "Yönlendirmeler" kuralı varsa 308/307 ile yönlendirir (DEĞİŞMEZ ve önceliklidir; sayfa akışından önce).
+ *  1) /admin/site/seo "Yönlendirmeler" kuralı varsa 308/307 ile yönlendirir (DEĞİŞMEZ ve önceliklidir; sayfa akışından önce).
  *  2) Sayfa oluşturucuda (/admin/site/sayfalar) yayında bir sayfa bu yoldaysa onu çizer.
  *  3) Yoksa 404'ü sayaçla (yalnız yol; IP/sorgu yok) ve 404 sayfasını gösterir.
  * Yönlendirme haritası süreç içi önbellekli (60 sn); yayınlı sayfa haritası ve içerikleri etiketli önbellekten

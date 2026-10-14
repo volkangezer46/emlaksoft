@@ -12,7 +12,7 @@ import { SITE_MEDIA_ID_RE } from "@/lib/site-media/types";
 /**
  * Site içeriği (ana sayfa ve genel pazarlama metinleri): tür, sınırlar ve doğrulama.
  * Saf modül (sunucu ve istemci ortak). Yalnız DÜZ METİN: HTML/script girilemez; sınırlı biçim = satır sonu.
- * Fiyat, paket, kontor ve SEO meta alanları BURADA YOK (tek kaynakları /admin/billing/planlar ve /admin/seo).
+ * Fiyat, paket, kontor ve SEO meta alanları BURADA YOK (tek kaynakları /admin/billing/planlar ve /admin/site/seo).
  * Bağlantılar site menüsünün doğrulayıcısını (`checkHref`) kullanır: yalnız var olan yol, /#bölüm, http(s), mailto, tel.
  */
 

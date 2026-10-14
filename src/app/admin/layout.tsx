@@ -10,6 +10,7 @@ import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
 import { platformModulesFor, platformRoleLabel } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
+import { getPlanSupport } from "@/lib/billing/plan-support";
 import { loadStaffAvatar } from "@/lib/avatar-read";
 import "@/app/console-base.css";
 import "@/app/console.css";
@@ -70,10 +71,13 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
 
   // Sidebar rozet sayıları — 30 sn önbellekli (bkz. admin-badges.ts); her
   // gezinmede 3 count sorgusu koşmasın.
-  const [badges, health] = await Promise.all([
+  // Sekme koşulları (nav.ts `when`): kupon şeması yoksa Abonelikler > Kuponlar sekmesi çizilmez (önbellekli okuma).
+  const [badges, health, planSupport] = await Promise.all([
     getAdminBadges(modules),
     modules.includes("sistem") ? getAdminHealth().catch(() => null) : Promise.resolve(null),
+    modules.includes("billing") ? getPlanSupport().catch(() => null) : Promise.resolve(null),
   ]);
+  const navConditions = { coupons: planSupport?.coupons ?? false };
 
   // MFA tek kaynak uyumu: env ile DB ayarı (SQL kapıları yalnız ayara bakar) ayrışırsa uyarı şeridi.
   const mfaSyncIssue = platformMfaSyncIssue(isPlatformMfaRequired(), mfaPolicy.dbRaw);
@@ -150,7 +154,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
           className="grid min-w-0 max-w-full flex-1 grid-cols-[minmax(0,1600px)] content-start justify-center gap-4 overflow-x-clip p-4 pb-24 md:px-5 md:pt-5 lg:px-6 lg:pb-6 lg:pt-5"
         >
           {strips.length > 0 ? <div className="space-y-2">{strips}</div> : null}
-          <AdminSectionTabs modules={modules} />
+          <AdminSectionTabs modules={modules} conditions={navConditions} />
           {children}
         </main>
       </div>

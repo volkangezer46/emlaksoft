@@ -9,6 +9,8 @@ import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 
 const money = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 
+export const metadata = { title: "AI danışmanı" };
+
 export default async function AdvisorPage() {
   const staff = await requirePlatformModule("advisor");
   const [ctx, aiEnabled] = await Promise.all([buildAdvisorContext(), isAiConfigured()]);

@@ -11,7 +11,6 @@ import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeDeskReport, formatDurationHours, type BreakdownRow, type DeskCsatRow, type DeskTicketRow } from "@/lib/support/desk-report";
 import { isMissingRelationError } from "@/lib/support/desk-data";
-import { TicketsTabs } from "../kvkk/tickets-tabs";
 
 export const metadata = { title: "Destek raporları" };
 
@@ -141,7 +140,6 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
 
   return (
     <div className="space-y-4">
-      <TicketsTabs active="raporlar" />
       <AdminPageHeader
         eyebrow="Destek"
         icon={BarChart3}

@@ -134,7 +134,7 @@ describe("Google toplayıcısı (K1)", () => {
     expect(canAutoOptimize("/fiyatlar")).toBe(true);
     expect(canAutoOptimize("/kayit")).toBe(false);
     expect(canAutoOptimize("/giris")).toBe(false);
-    expect(canAutoOptimize("/admin/seo")).toBe(false);
+    expect(canAutoOptimize("/admin/site/seo")).toBe(false);
     expect(canAutoOptimize("/kayit/tamamla")).toBe(false);
   });
 
@@ -142,7 +142,7 @@ describe("Google toplayıcısı (K1)", () => {
     const r = buildGoogleIssues({ snapshot: connectedSnapshot(), inspections: [], pages28: [page("/fiyatlar"), page("/kayit"), page("/giris")], adsRows: [] });
     const ctr = r.issues.filter((i) => i.code === "gsc-ctr-opportunity");
     expect(ctr.map((i) => i.url)).toEqual(["https://emlaksoft.com.tr/fiyatlar"]);
-    expect(ctr[0].href).toBe("/admin/seo?sekme=sayfalar&sayfa=%2Ffiyatlar#editor");
+    expect(ctr[0].href).toBe("/admin/site/seo?sekme=sayfalar&sayfa=%2Ffiyatlar#editor");
     expect(ctr[0].area).toBe("seo");
   });
 

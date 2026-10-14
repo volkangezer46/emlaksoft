@@ -24,7 +24,7 @@ export const KVKK_SETTING_DEFS: AnySettingDef[] = [
     category: "uyum",
     label: "KVKK başvuru formu açık",
     description:
-      "/kvkk-basvuru sayfasındaki herkese açık başvuru formu. Başvuru e-posta doğrulama koduyla tamamlanır ve Destek > KVKK talepleri > Doğrudan başvurular kuyruğuna düşer.",
+      "/kvkk-basvuru sayfasındaki herkese açık başvuru formu. Başvuru e-posta doğrulama koduyla tamamlanır ve Talepler > KVKK başvuruları > Doğrudan başvurular kuyruğuna düşer.",
     impact:
       "Kapatılırsa form yerine destek e-posta adresi gösterilir; yeni başvuru alınmaz (KVKK m.13 başvuru kanalı sağlama yükümlülüğü için e-posta kanalı açık kalmalıdır). Kuyruktaki başvurular etkilenmez.",
     risk: "high",

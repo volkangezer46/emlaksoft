@@ -12,7 +12,7 @@ describe("muhasebe sözleşmesi", () => {
   const loaders = read("src/lib/accounting/loaders.ts");
 
   it("dışa aktarım Rapor merkezindedir: oturum + modül yetkisi + hız sınırı + denetim kaydı; eski uç kaldırıldı", () => {
-    expect(() => read("src/app/admin/muhasebe/disa-aktar/route.ts")).toThrow();
+    expect(() => read("src/app/admin/billing/muhasebe/disa-aktar/route.ts")).toThrow();
     expect(download).toContain("getPlatformStaff()");
     expect(download).toContain("platformReportAllowed(");
     expect(download).toContain("checkRateLimit(");
@@ -44,8 +44,8 @@ describe("muhasebe sözleşmesi", () => {
   });
 
   it("muhasebe sayfaları billing modül kapısından geçer", () => {
-    expect(read("src/app/admin/muhasebe/page.tsx")).toContain('requirePlatformModule("billing")');
-    expect(read("src/app/admin/muhasebe/defter/page.tsx")).toContain('requirePlatformModule("billing")');
+    expect(read("src/app/admin/billing/muhasebe/page.tsx")).toContain('requirePlatformModule("billing")');
+    expect(read("src/app/admin/billing/defter/page.tsx")).toContain('requirePlatformModule("billing")');
   });
 
   it("MRR/ARR tek hesaptan: loaders exactMrr/exactArr kullanır, kendi formülü yok", () => {

@@ -534,6 +534,7 @@ export async function saveEfWelcomeUnits(formData: FormData): Promise<PlanOpResu
   if (!(await setPlatformSetting(EF_WELCOME_SETTING_KEY, String(units), g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
   updateTag(PLAN_DEFINITIONS_TAG);
   revalidatePath("/admin/billing/planlar");
+  revalidatePath("/admin/analiz-tarifesi");
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.ef_welcome.save",

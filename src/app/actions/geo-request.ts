@@ -12,7 +12,7 @@ export type GeoRequestResult = { error?: string; ok?: boolean };
 
 /**
  * Ofis sahibinin "eksik / yanlış mahalle bildir" talebi. Basit kayıt (geo_change_requests, tenant RLS);
- * platform tarafı /admin/geo/bildirimler kuyruğunda onaylar/reddeder. Tablo yoksa (migration uygulanmadı)
+ * platform tarafı /admin/geo/talepler kuyruğunda onaylar/reddeder. Tablo yoksa (migration uygulanmadı)
  * "etkin değil" döner, hiçbir şey bozulmaz.
  */
 export async function submitGeoChangeRequest(formData: FormData): Promise<GeoRequestResult> {

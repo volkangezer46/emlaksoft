@@ -2,7 +2,6 @@ import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, History, KeyRound, Layers, MapPin, PauseCircle, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { RegistrySettings } from "@/components/settings/registry-settings";
 import { geoRowCount } from "@/lib/geo/reader";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { probeSchema } from "./schema-checks";
@@ -22,8 +21,9 @@ import { CronPauseButton } from "./ops-controls";
 import { CronHistoryPanel, type CronRun } from "./cron-history";
 import { countOpenErrors } from "./_hatalar/triage";
 import { PORTAL_LABELS } from "@/lib/portals/catalog";
-import { Suspense } from "react";
-import { EidsIntakePanel } from "./eids-intake-panel";
+import { INTEGRATIONS_HREF } from "@/lib/admin/integration-hub/model";
+import { portalRulesHref } from "@/lib/portal-rules/admin-model";
+import type { TransferPortal } from "@/lib/portal-transfer/rules";
 
 const TOTAL_PROVINCES = 81;
 
@@ -96,7 +96,8 @@ function portalRulesSummary(proposals: PortalRows, alerts: PortalRows): PortalRu
 
 /** Tek satır özet: "Portal kuralları: bekleyen öneri sahibinden 3 · Emlakjet 2 — form uyarısı …"; ikisi de yoksa "sorun yok". */
 function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
-  const base = "/admin/sistem?sekme=portal-kurallari";
+  const base = `${INTEGRATIONS_HREF}#portal-kurallari`;
+  const filtered = (portal: string, view: string) => portalRulesHref(portal as TransferPortal, view);
   if (summary.proposals.length === 0 && summary.alerts.length === 0) {
     return (
       <p className="text-sm text-text-muted">
@@ -114,7 +115,7 @@ function PortalRulesLine({ summary }: { summary: PortalRulesSummary }) {
         {items.map((c, i) => (
           <span key={c.portal}>
             {i > 0 ? " · " : null}
-            <Link href={`${base}&portal=${c.portal}&gorunum=${view}`} className={`font-semibold tabular-nums hover:underline ${tone}`}>
+            <Link href={filtered(c.portal, view)} className={`font-semibold tabular-nums hover:underline ${tone}`}>
               {PORTAL_SHORT[c.portal] ?? c.portal} {c.n}
             </Link>
           </span>
@@ -516,18 +517,17 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
         </p>
       </section>
 
-      {/* Kayıt ve bakım: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
-      <RegistrySettings
-        title="Kayıt ve bakım"
-        description="Yeni ofis kaydı ve bakım modu. Değişiklikler doğrulanır, gerekçesiyle geçmişe yazılır ve geri alınabilir."
-        keys={["platform.registration_open", "platform.maintenance_mode", "platform.maintenance_message"]}
-        canEdit={staff.role === "super_admin"}
-      />
-
-      {/* EİDS Bakanlık e-postası alımı: ofis bazında iletme, doğrulama dağılımı, kalıp dışı örnek (maskeli), SMTP sağlığı */}
-      <Suspense fallback={null}>
-        <EidsIntakePanel admin={admin} />
-      </Suspense>
+      {/* Kayıt ve bakım ayarları Ayarlar merkezinde (kategori "Kayıt ve bakım"); EİDS e-posta alımı Entegrasyonlar'da. */}
+      <p className="text-xs text-text-muted">
+        Yeni kayıt ve bakım modu:{" "}
+        <Link href="/admin/ayarlar?kategori=kayit-bakim" className="font-semibold text-brand-600 hover:underline">
+          Ayarlar &gt; Kayıt ve bakım
+        </Link>
+        {" · "}EİDS e-posta alımı:{" "}
+        <Link href="/admin/sistem?sekme=entegrasyonlar#eids-alim" className="font-semibold text-brand-600 hover:underline">
+          Entegrasyonlar
+        </Link>
+      </p>
 
       {/* Bilinçli ertelenenler */}
       <section className="rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface px-6 py-6">

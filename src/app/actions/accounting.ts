@@ -48,7 +48,7 @@ export async function saveEfWholesale(formData: FormData): Promise<AccountingOpR
     entityId: EF_WHOLESALE_SETTING_KEY,
     meta: { before, after: next },
   });
-  revalidatePath("/admin/muhasebe");
+  revalidatePath("/admin/billing/muhasebe");
   revalidatePath("/admin/analiz-tarifesi");
   return { ok: true, notice: "Toptan maliyet kaydedildi." };
 }

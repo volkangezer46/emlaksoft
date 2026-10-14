@@ -57,7 +57,7 @@ describe("mega menü canlı önizleme eşlemesi", () => {
     expect(scenes).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
     // site üst barı ve admin önizlemesi aynı dönüştürücüyü kullanır (kopya eşleme yok)
     expect(read("src/components/site-header.tsx")).toContain("toClientGroups(menu)");
-    expect(read("src/app/admin/site-menu/menu-preview.tsx")).toContain("toClientGroups(menu)");
+    expect(read("src/app/admin/site/menu/menu-preview.tsx")).toContain("toClientGroups(menu)");
   });
 });
 

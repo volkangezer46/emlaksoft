@@ -8,7 +8,7 @@ import { evaluateDrill, formatDurationTr } from "@/lib/ops/restore-drill-status"
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const DATE = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium", timeStyle: "short" });
-const SETTINGS_HREF = "/admin/ayarlar/merkez?ara=ops.backup";
+const SETTINGS_HREF = "/admin/ayarlar?ara=ops.backup";
 
 type RunRow = { id: number; finished_at: string; status: string; db_file: string | null; size_bytes: number | null; encrypted: boolean; remote: boolean };
 

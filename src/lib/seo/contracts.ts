@@ -32,7 +32,7 @@ export type IssueInput = {
   title: string;
   /** Teknik olmayan Türkçe tek cümle, ≤240 karakter. */
   explain: string;
-  /** İlgili düzeltme ekranı (ör. /admin/seo?sekme=sayfalar&sayfa=/kayit). */
+  /** İlgili düzeltme ekranı (ör. /admin/site/seo?sekme=sayfalar&sayfa=/kayit). */
   href: string;
   /** true: otomatik eylem (taslak/AI) ALMAZ; yalnız ekrana yönlendirilir. */
   manualOnly: boolean;

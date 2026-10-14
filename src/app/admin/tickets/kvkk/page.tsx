@@ -19,10 +19,9 @@ import {
   parseKvkkFilters,
   type KvkkTone,
 } from "@/lib/compliance/kvkk-queue";
-import { TicketsTabs } from "./tickets-tabs";
 import { PlatformKvkkQueueSection } from "./platform-queue";
 
-export const metadata = { title: "KVKK talepleri" };
+export const metadata = { title: "KVKK başvuruları" };
 
 const TONE_CLASS: Record<KvkkTone, string> = {
   late: "bg-danger-500/10 text-danger-600",
@@ -37,7 +36,7 @@ const fmtDay = (iso: string | null) =>
 /** Kaynak şeridi: EmlakSoft'a doğrudan gelen başvurular (DG6) | ofislerin kendi kaydettiği talepler. */
 function SourceTabs({ active, directOpen }: { active: "basvuru" | "ofis"; directOpen: number | null }) {
   return (
-    <nav aria-label="KVKK talep kaynağı" className="flex flex-wrap gap-1.5">
+    <nav aria-label="KVKK başvuru kaynağı" className="flex flex-wrap gap-1.5">
       <FilterChip href="/admin/tickets/kvkk?kaynak=basvuru" active={active === "basvuru"}>
         Doğrudan başvurular{directOpen ? ` · ${directOpen} açık` : ""}
       </FilterChip>
@@ -66,11 +65,10 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
   const admin = createAdminClient();
   const header = (
     <>
-      <TicketsTabs active="kvkk" />
       <AdminPageHeader
         eyebrow="Müşteri operasyon merkezi"
         icon={ShieldCheck}
-        title="KVKK talepleri"
+        title="KVKK başvuruları"
         description="Doğrudan başvurular ve ofislerin kaydettiği ilgili kişi talepleri · yasal yanıt süresi 30 gün. Dosya çıktısı: Raporlar > KVKK başvuru defteri, KVKK talep defteri, KVKK veri paketi."
       />
     </>
@@ -158,7 +156,7 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
       </section>
 
       {q.error ? (
-        <EmptyState variant="compact" illustration="liste" title="KVKK talepleri okunamadı" description="Kısa süre sonra yeniden deneyin; sorun sürerse sistem sağlığını kontrol edin." />
+        <EmptyState variant="compact" illustration="liste" title="KVKK başvuruları okunamadı" description="Kısa süre sonra yeniden deneyin; sorun sürerse sistem sağlığını kontrol edin." />
       ) : q.rows.length === 0 ? (
         <EmptyState
           variant="compact"
@@ -169,7 +167,7 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
           <table className="w-full min-w-[720px] text-sm">
-            <caption className="sr-only">KVKK talepleri (en eski önce)</caption>
+            <caption className="sr-only">KVKK başvuruları (en eski önce)</caption>
             <thead className="border-b border-line text-left text-xs text-text-muted">
               <tr>
                 <th scope="col" className="px-4 py-2.5 font-semibold">Ofis</th>

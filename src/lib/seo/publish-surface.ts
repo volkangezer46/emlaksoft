@@ -123,7 +123,7 @@ export const seoPublishSurface: Omit<PublishSurface, "id"> & { surfaceId: "seo" 
   surfaceId: "seo",
   label: "SEO sayfa ayarları",
   module: "seo",
-  editorHref: "/admin/seo?sekme=sayfalar",
+  editorHref: "/admin/site/seo?sekme=sayfalar",
   cacheTag: SEO_CACHE_TAG,
   get livePaths() {
     return lastChanged.map((path) => ({ path }));

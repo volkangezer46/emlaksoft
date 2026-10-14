@@ -9,7 +9,6 @@ import { ArrowUpRight, BarChart3, Building2, LayoutGrid, LineChart, PieChart, Tr
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { ReportCenter, ReportCenterEntry } from "@/components/report-center/report-center";
-import { ReportTabs } from "@/components/report-center/report-tabs";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import type { PremiumTone } from "@/components/ui/premium/premium-math";
@@ -22,6 +21,87 @@ import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingData } from "@/lib/reporting/result";
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { PERIODS, parsePeriod, periodHref, type Period } from "@/components/ui/premium";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { platformReportSections, type ReportSection } from "@/lib/admin/dashboard-layout";
+import type { PlatformAccessSubject } from "@/lib/platform-access";
+import {
+  ActivationSection,
+  ChurnReasonsSection,
+  ChurnSection,
+  CompositionSection,
+  GrowthSection,
+  MrrSection,
+  UnitEconomicsSection,
+  UsageSection,
+} from "@/app/admin/_dashboards/platform-sections";
+
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
+  const sekme = ((await searchParams) ?? {}).sekme;
+  return { title: (Array.isArray(sekme) ? sekme[0] : sekme) === "merkez" ? "Rapor merkezi" : "Raporlar" };
+}
+
+const SECTION_SPAN: Record<ReportSection, string> = {
+  mrr: "xl:col-span-12",
+  churn: "xl:col-span-12",
+  activation: "xl:col-span-6",
+  unitEconomics: "xl:col-span-6",
+  usage: "xl:col-span-6",
+  churnReasons: "xl:col-span-6",
+  composition: "xl:col-span-6",
+  growth: "xl:col-span-12",
+};
+
+function renderReportSection(section: ReportSection, period: Period): ReactNode {
+  switch (section) {
+    case "mrr":
+      return <MrrSection period={period} />;
+    case "churn":
+      return <ChurnSection period={period} />;
+    case "activation":
+      return <ActivationSection period={period} />;
+    case "unitEconomics":
+      return <UnitEconomicsSection period={period} />;
+    case "usage":
+      return <UsageSection period={period} />;
+    case "churnReasons":
+      return <ChurnReasonsSection period={period} />;
+    case "composition":
+      return <CompositionSection period={period} />;
+    case "growth":
+      return <GrowthSection period={period} />;
+  }
+}
+
+/** Kontrol panelinden taşınan analiz bölümleri (dönem: ?donem=7|30|90; rol bazlı, bkz. platformReportSections). */
+function AnalysisSections({ role, period, params }: { role: PlatformAccessSubject; period: Period; params: Record<string, string | undefined> }) {
+  const sections = platformReportSections(role);
+  if (sections.length === 0) return null;
+  return (
+    <section id="analiz" aria-labelledby="analiz-baslik" className="scroll-mt-24 space-y-4">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 id="analiz-baslik" className="font-display text-lg font-extrabold text-ink-950">Gelir, büyüme ve kullanım analizi</h2>
+          <p className="text-xs text-text-muted">MRR ve tahmin, churn riski, aktivasyon, birim ekonomisi, tüketim, iptal nedenleri, gelir kompozisyonu ve büyüme.</p>
+        </div>
+        <SegmentedControl
+          label="Analiz dönemi"
+          value={String(period)}
+          options={PERIODS.map((p) => ({ value: String(p), label: `${p} gün`, href: `${periodHref("/admin/raporlar", params, p)}#analiz` }))}
+        />
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-6 xl:grid-cols-12">
+        {sections.map((section) => (
+          <div key={section} className={`min-w-0 md:col-span-6 ${SECTION_SPAN[section]}`}>
+            <Suspense fallback={<SkeletonCard height={320} label="Yükleniyor" />}>{renderReportSection(section, period)}</Suspense>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 const statusLabel: Record<string, string> = { trial: "Deneme", active: "Aktif", past_due: "Gecikmiş", suspended: "Askıda", cancelled: "İptal" };
 
@@ -37,13 +117,12 @@ export default async function AdminReportsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requirePlatformModule("reports");
+  const staff = await requirePlatformModule("reports");
   const rawSp = (await searchParams) ?? {};
   // Rapor merkezi sekmesi (?sekme=merkez): tüm dışa aktarma (Excel / PDF / CSV) burada; dashboard sorguları çalışmaz.
   if ((Array.isArray(rawSp.sekme) ? rawSp.sekme[0] : rawSp.sekme) === "merkez") {
     return (
       <div className="space-y-5">
-        <ReportTabs scope="platform" active="merkez" overviewLabel="Platform analizi" />
         <Suspense fallback={<SkeletonCard height={480} label="Rapor merkezi yükleniyor" />}>
           <ReportCenter scope="platform" params={rawSp} />
         </Suspense>
@@ -51,6 +130,9 @@ export default async function AdminReportsPage({
     );
   }
   const sp = { from: Array.isArray(rawSp.from) ? rawSp.from[0] : rawSp.from, to: Array.isArray(rawSp.to) ? rawSp.to[0] : rawSp.to };
+  const analysisParams: Record<string, string | undefined> = {};
+  for (const [k, v] of Object.entries(rawSp)) analysisParams[k] = Array.isArray(v) ? v[0] : v;
+  const analysisPeriod = parsePeriod(rawSp.donem);
   const from = parseDateParam(sp.from);
   const to = parseDateParam(sp.to);
   const dateFiltered = Boolean(from || to);
@@ -171,7 +253,6 @@ export default async function AdminReportsPage({
 
   return (
     <div className="space-y-5">
-      <ReportTabs scope="platform" active="ozet" overviewLabel="Platform analizi" />
       <Suspense fallback={<SkeletonCard height={168} label="Rapor merkezi yükleniyor" />}>
         <ReportCenterEntry scope="platform" />
       </Suspense>
@@ -179,7 +260,7 @@ export default async function AdminReportsPage({
         eyebrow="Platform analizi"
         icon={BarChart3}
         title="Platform raporları"
-        description="Gelir, büyüme, paket dağılımı ve destek performansı — tüm ofislerin toplu görünümü."
+        description="Gelir, büyüme, paket dağılımı, churn, aktivasyon ve tüketim — tüm ofislerin toplu görünümü."
         glow="mint"
       >
         <KpiGrid label="Platform göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
@@ -278,8 +359,9 @@ export default async function AdminReportsPage({
               <p className="text-sm text-text-muted">Henüz ofis kaydı yok.</p>
             )}
           </div>
-          <Link href="/admin/tickets" className="focus-ring group mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
-            <span className="text-text-muted transition group-hover:text-brand-600">Destek çözüm oranı</span>
+          {/* Destek: tek gösterge; ayrıntılı destek raporu Talepler > Raporlar'da (kopya bölüm yok). */}
+          <Link href="/admin/tickets/raporlar" className="focus-ring group mt-4 flex items-center justify-between border-t border-line pt-3 text-xs">
+            <span className="text-text-muted transition group-hover:text-brand-600">Destek çözüm oranı · destek raporu</span>
             <span className="flex items-center gap-1 font-display text-lg font-extrabold text-mint-600">
               %{resolvedRate}
               <ArrowUpRight className="hover-action h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
@@ -342,6 +424,8 @@ export default async function AdminReportsPage({
           ))}
         </div>
       </section>
+
+      <AnalysisSections role={staff} period={analysisPeriod} params={analysisParams} />
     </div>
   );
 }

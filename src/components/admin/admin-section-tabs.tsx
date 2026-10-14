@@ -4,19 +4,19 @@ import Link from "@/components/ui/smart-link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { activeAdminItem, activeChildHref, activeTabHref, adminNavFor, splitTabs, type NavTab } from "@/lib/admin/nav";
+import { activeAdminItem, activeChildHref, activeTabHref, adminNavFor, splitTabs, type AdminNavConditions, type NavTab } from "@/lib/admin/nav";
 
 /**
- * Bölüm sekmeleri: bulunulan sayfanın menü öğesinin `tabs` listesi varsa (Site, Sistem, Ayarlar) kabuk üstünde sekme
- * şeridi çizer. Alt araçlar menüde ayrı satır olmaz, burada sekme olur. Sekme = ayrı sayfa (popup yok).
+ * Bölüm sekmeleri: bulunulan sayfanın menü öğesinin `tabs` listesi varsa kabuk üstünde sekme şeridi çizer. /admin'in TEK
+ * bölüm sekmesi mekanizmasıdır (sayfalar kendi bölüm sekmesi bileşenini taşımaz). Alt araçlar menüde ayrı satır olmaz, burada sekme olur. Sekme = ayrı sayfa (popup yok).
  * Sekmeler rol modüllerine göre süzülür; tek sekme kalırsa şerit çizilmez. En çok 5 görünür sekme: kalanlar (ve
  * `overflow` işaretliler) "Diğer ▾" (details/summary; klavyeyle açılır) altına girer; etkin sekme oradaysa "Diğer" etkin
  * görünür. Etkin sekmenin `children` listesi ikinci satırda çizilir.
  */
-export function AdminSectionTabs({ modules }: { modules: readonly PlatformModule[] }) {
+export function AdminSectionTabs({ modules, conditions }: { modules: readonly PlatformModule[]; conditions?: AdminNavConditions }) {
   const pathname = usePathname() ?? "";
   const sekme = useSearchParams()?.get("sekme");
-  const item = activeAdminItem(pathname, adminNavFor(modules));
+  const item = activeAdminItem(pathname, adminNavFor(modules, conditions));
   const tabs = item?.tabs ?? [];
   if (tabs.length < 2) return null;
   // `?sekme=` taşıyan sekme (ör. Hata kayıtları = /admin/sistem?sekme=hatalar) aynı sekmede etkindir; bkz. activeTabHref.

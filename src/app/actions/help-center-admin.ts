@@ -32,7 +32,7 @@ function refreshLiveHelp() {
     /* eylem dışı bağlam: 5 dk önbellek süresi yeter */
   }
   revalidatePath("/app/yardim");
-  revalidatePath("/admin/site/yardim");
+  revalidatePath("/admin/tickets/yardim");
 }
 
 const str = (v: unknown, max: number) => String(v ?? "").slice(0, max);
@@ -88,7 +88,7 @@ export async function saveHelpArticleAction(form: HelpArticleForm, isNew: boolea
     return { ok: false, error: "Kaydedilemedi; tekrar deneyin." };
   }
   await logPlatformActivity({ actorId: g.staff.id, action: "help_article.save", entityType: "help_article", entityId: `${p.kind}:${p.slug}` });
-  revalidatePath("/admin/site/yardim");
+  revalidatePath("/admin/tickets/yardim");
   return { ok: true, slug: p.slug, message: existing?.status === "published" ? "Düzenleme taslak olarak kaydedildi; yayınlayınca görünür." : "Taslak kaydedildi." };
 }
 
@@ -134,7 +134,7 @@ export async function discardHelpDraftAction(kind: string, slug: string): Promis
   if (!row || !row.draft) return { ok: false, error: "Bekleyen düzenleme yok." };
   if (!(await discardHelpDraft(row.id, g.staff.id))) return { ok: false, error: "Atılamadı; tekrar deneyin." };
   await logPlatformActivity({ actorId: g.staff.id, action: "help_article.discard_draft", entityType: "help_article", entityId: `${kind}:${slug}` });
-  revalidatePath("/admin/site/yardim");
+  revalidatePath("/admin/tickets/yardim");
   return { ok: true, message: "Bekleyen düzenleme atıldı." };
 }
 

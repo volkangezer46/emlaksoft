@@ -42,8 +42,8 @@ describe("URL filtreleri", () => {
     expect(parseView(undefined)).toEqual({ kind: "genel" });
   });
   it("derin bağlantı sekmeyi, portalı ve görünümü taşır", () => {
-    expect(portalRulesHref("hepsiemlak", "alan:heating")).toBe("/admin/sistem?sekme=portal-kurallari&portal=hepsiemlak&gorunum=alan%3Aheating");
-    expect(portalRulesHref("sahibinden")).toBe("/admin/sistem?sekme=portal-kurallari&portal=sahibinden");
+    expect(portalRulesHref("hepsiemlak", "alan:heating")).toBe("/admin/sistem?sekme=entegrasyonlar&portal=hepsiemlak&gorunum=alan%3Aheating#portal-kurallari");
+    expect(portalRulesHref("sahibinden")).toBe("/admin/sistem?sekme=entegrasyonlar&portal=sahibinden#portal-kurallari");
   });
 });
 

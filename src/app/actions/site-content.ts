@@ -28,7 +28,7 @@ async function requireWriter() {
 }
 
 function refreshAdmin() {
-  revalidatePath("/admin/site-icerik");
+  revalidatePath("/admin/site/sayfalar/ana-sayfa");
   revalidatePath("/admin/site");
 }
 

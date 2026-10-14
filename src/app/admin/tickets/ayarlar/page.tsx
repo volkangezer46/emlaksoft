@@ -12,7 +12,6 @@ import { loadDeskConfig } from "@/lib/support/desk-data";
 import { resolveSlaTarget, SLA_PLAN_LABEL, SLA_PRIORITY_LABEL } from "@/lib/support/sla-policy";
 import { TICKET_CATEGORIES_FALLBACK } from "@/lib/support/ticket-contract";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { TicketsTabs } from "../kvkk/tickets-tabs";
 import { AssignmentRules, BusinessHoursForm, HolidayList, SlaMatrixForm, StaffAvailabilityList } from "./desk-settings-forms";
 
 export const metadata = { title: "Destek ayarları" };
@@ -79,7 +78,6 @@ export default async function SupportSettingsPage({ searchParams }: { searchPara
 
   return (
     <div className="space-y-4">
-      <TicketsTabs active="ayarlar" />
       <AdminPageHeader
         eyebrow="Destek"
         icon={Settings2}

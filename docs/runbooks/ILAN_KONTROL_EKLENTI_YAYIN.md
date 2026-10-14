@@ -192,7 +192,7 @@ denetler. Portaldan kalkan ama kaydı işlem görmeyen ilan EmlakSoft'ta uyarı 
 
 > **0.6.0 notu (form doldurma):** canlı doğrulama artık **sürekli öğrenme**dir; ilk yayında **personel onayı** ile ilerler. Portal "İlan ver" formu için
 > tek seferlik `verified:true` adımı yoktur: tohum kurallar `unverified` başlar, izin veren ofislerin düzeltmeleri toplanır, eşiği dolan öneri
-> `/admin/sistem?sekme=portal-kurallari` ekranında personel onayıyla yeni imzalı sürüm olur (`portal_rules.auto_publish` kapalı). Alan durumu ancak ofis
+> `/admin/sistem?sekme=entegrasyonlar#portal-kurallari` ekranında personel onayıyla yeni imzalı sürüm olur (`portal_rules.auto_publish` kapalı). Alan durumu ancak ofis
 > oylarıyla `verified` olur. Aşağıdaki adımlar ilan KONTROLÜ ayrıştırıcıları (`portal-rules.json`) içindir ve aynen geçerlidir. Ayrıntı: `docs/runbooks/PORTAL_KURALLARI.md`.
 
 Ayrıştırıcılar yalnız temsili (sentetik) sayfalarla test edildi; `portal-rules.json` `verified:false`. Gerçek sayfalar JSON-LD/meta/durum JSON'u/DOM düzeni açısından
@@ -227,7 +227,7 @@ farklı olabilir. Güvenli düşüş: tutmayan kalıp "kontrol edilemedi" üreti
 - [ ] `src/lib/portal-transfer/rule-keys.ts` dolu: açık JWK `{ "<kid>": {...} }` yapıştırıldı, commit edildi (paket derlenmeden ÖNCE).
 - [ ] P1 migration'ları canlıda: `20261013002000_portal_rules_core` → `002010_portal_rules_rpcs` → `002020_portal_rules_learn` (yedek + dry-run sonrası).
 - [ ] Uygulama deploy edildi (kural/gözlem uçları ve yönetim sekmesi).
-- [ ] Tohum v1 yayında: `/admin/sistem?sekme=portal-kurallari` → "Tohumu yayınla (sürüm 1)" (üç portal).
+- [ ] Tohum v1 yayında: `/admin/sistem?sekme=entegrasyonlar#portal-kurallari` → "Tohumu yayınla (sürüm 1)" (üç portal).
 - [ ] Paketlenmemiş eklentide imza doğrulandı: geliştirici modunda yükle, EmlakSoft sayfasını aç; açılır pencerede kural sürümü 1 görünür; bozuk/yabancı imzalı set reddedilir.
 - [ ] `--release` ile ZIP üretildi ve Chrome Web Store'a (sonra Edge) yüklendi; §4b metinleri ve §5 eki mağaza formuna birebir girildi.
 

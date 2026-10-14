@@ -22,6 +22,7 @@ import {
   type MaintenanceScope,
 } from "@/lib/platform-security/maintenance-scope";
 import { getFeatureFlagDef } from "@/lib/feature-flags/registry";
+import { growthFlagOpenError } from "@/lib/growth/flag-gate";
 import { getSettingDef, storageKeyOf } from "@/lib/settings/registry";
 import { SETTINGS_PLATFORM_TAG } from "@/lib/settings/read";
 import { applyPlatformWrites, writeSetting } from "@/lib/settings/write";
@@ -298,6 +299,9 @@ export async function setFeatureFlagFromAdmin(input: { flagKey: string; on: bool
   if (!flag || flag.source !== "setting" || !flag.settingKey) return { error: "Bu bayrak buradan değiştirilemez." };
   const def = getSettingDef(flag.settingKey);
   if (!def || def.editMode !== "center") return { error: "Bu bayrak kendi ekranından düzenlenir." };
+  // Büyüme programı bayrakları: açarken hazırlık kontrolü (eskiden Ortaklık ekranındaki ayrı formdaydı).
+  const growthBlock = await growthFlagOpenError(flag.key, Boolean(input.on));
+  if (growthBlock) return { error: growthBlock };
 
   const storage = storageKeyOf(def);
   const before = await getPlatformSetting(storage);

@@ -221,7 +221,7 @@ describe("builtin-seo-latest (kapsam sözleşmesi)", () => {
     expect(fiyat.proposal!.summary).toMatch(/^\/fiyatlar açıklaması \d+→\d+ karakter$/);
     expect(String(fiyat.proposal!.after).length).toBeLessThanOrEqual(155);
     expect(fiyat.severity).toBe("bilgi");
-    expect(fiyat.href).toBe("/admin/seo?sekme=sayfalar&sayfa=%2Ffiyatlar#editor");
+    expect(fiyat.href).toBe("/admin/site/seo?sekme=sayfalar&sayfa=%2Ffiyatlar#editor");
     // Ayar okunamazsa öneri üretilmez (bulgu yine gelir).
     expect(res.issues.find((i) => i.url === "/fiyatlar")!.proposal).toBeNull();
   });
@@ -250,7 +250,7 @@ describe("yürütücü kaydı", () => {
       expect(typeof ex!.apply, kind).toBe("function");
     }
     expect(new Set(EXECUTORS.map((e) => e.kind)).size).toBe(EXECUTORS.length);
-    expect(screenFallback({ href: "/admin/seo?sekme=sayfalar", area: "seo" })).toEqual({ href: "/admin/seo?sekme=sayfalar", label: "SEO merkezi" });
+    expect(screenFallback({ href: "/admin/site/seo?sekme=sayfalar", area: "seo" })).toEqual({ href: "/admin/site/seo?sekme=sayfalar", label: "SEO merkezi" });
     // Bilinmeyen tür taslak düğmesi almaz.
     expect(canDraft({ url: "/fiyatlar", manual_only: false, proposal: { kind: "bilinmeyen", summary: "" } })).toBe(false);
   });

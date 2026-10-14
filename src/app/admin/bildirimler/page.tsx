@@ -39,6 +39,8 @@ function buildHref(p: { tur?: string; durum?: string; sayfa?: number }) {
   return s ? `/admin/bildirimler?${s}` : "/admin/bildirimler";
 }
 
+export const metadata = { title: "Bildirimler" };
+
 export default async function AdminNotificationsPage({
   searchParams,
 }: {

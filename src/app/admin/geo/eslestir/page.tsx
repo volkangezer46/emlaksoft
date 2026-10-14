@@ -6,6 +6,8 @@ import { ApplyMatchButton } from "./apply-button";
 
 const VIA: Record<string, string> = { exact: "tam eşleşme", alias: "takma ad", fuzzy: "yazım toleransı" };
 
+export const metadata = { title: "Coğrafya: eşleştir" };
+
 export default async function AdminGeoMatchPage() {
   const staff = await requirePlatformModule("geo");
   const canWrite = staff.role === "super_admin";

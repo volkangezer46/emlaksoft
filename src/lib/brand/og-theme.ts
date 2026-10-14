@@ -1,6 +1,6 @@
 /**
  * Site çerçevesi görsel sabitleri — tek kaynak. Paylaşım kartı (og-card.tsx, satori) ile yönetimdeki ölçekli önizlemesi
- * (admin/site-menu/frame-tabs.tsx) ve duyuru çubuğu önizlemesi aynı renkleri buradan okur; böylece önizleme canlıdan
+ * (admin/site/menu/frame-tabs.tsx) ve duyuru çubuğu önizlemesi aynı renkleri buradan okur; böylece önizleme canlıdan
  * sapmaz ve admin yüzeyinde ham renk birikmez (ui-ratchet). Saf modül: istemci bileşenlerinden de içe aktarılabilir.
  */
 export const OG_THEME = {

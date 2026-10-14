@@ -5,7 +5,7 @@ import { getSeoPage } from "@/lib/seo/registry";
 import { getSeoSettings } from "@/lib/seo/store";
 
 /**
- * Sayfa yapılandırılmış verisi (JSON-LD). Türler: sayfa kaydı varsayılanı, /admin/seo "Sayfalar" ile değiştirilebilir.
+ * Sayfa yapılandırılmış verisi (JSON-LD). Türler: sayfa kaydı varsayılanı, /admin/site/seo "Sayfalar" ile değiştirilebilir.
  * - FAQPage yalnız çağıranın geçirdiği GÖRÜNEN SSS listesinden üretilir.
  * - Fiyatlar admin paket tanımlarındaki (plan-definitions) gerçek KDV hariç aylık tutarlardır; AggregateRating/Review ASLA üretilmez.
  * - Çıktı serializeJsonLd ile kaçışlıdır (HTML/XSS yok).

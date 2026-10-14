@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { RegistrySettings } from "@/components/settings/registry-settings";
 import { DUNNING_KEYS, loadDunningPolicy } from "@/lib/billing/dunning-policy";
 import { computeRecoveryReport, parseRecoveryList, RECOVERY_WINDOW_DAYS, type RecoveryList, type ReportInvoice } from "@/lib/billing/dunning-report";
-import { BillingNav } from "../billing-nav";
+import { AGING_BUCKETS, AGING_BUCKET_LABELS, agingBucketOf, daysPastDue, isAgingBucket, type AgingBucket } from "@/lib/accounting/aging";
 
 export const metadata = { title: "Tahsilat" };
 
@@ -54,21 +54,26 @@ function pct(n: number | null): string {
   return `%${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(n * 100)}`;
 }
 
-function href(p: { liste?: RecoveryList; sonuc?: string }) {
+function href(p: { liste?: RecoveryList; sonuc?: string; kova?: AgingBucket }) {
   const sp = new URLSearchParams();
   if (p.liste && p.liste !== "basarisiz") sp.set("liste", p.liste);
   if (p.sonuc) sp.set("sonuc", p.sonuc);
+  if (p.kova) sp.set("kova", p.kova);
   const s = sp.toString();
   return s ? `/admin/billing/tahsilat?${s}` : "/admin/billing/tahsilat";
 }
 
+type OpenRow = { id: string; tenant_id: string; invoice_no: string; total_try: number | string | null; due_at: string | null; tenant: unknown };
+
 /**
- * Abonelik & fatura > Tahsilat: kurtarma raporu (son 90 gün, fatura verisinden; tanımlar `dunning-report.ts`),
- * tahsilat günlüğü (`dunning_events`) ve dunning politikası ayarları (tek düzenleme yeri).
+ * Abonelikler > Tahsilat: kurtarma raporu (son 90 gün, fatura verisinden; tanımlar `dunning-report.ts`),
+ * tahsilat günlüğü (`dunning_events`), açık alacak yaşlandırması (`?kova=0-30|31-60|61-90|90+`; Muhasebe'deki kovalar buraya
+ * gelir) ve dunning politikası ayarları (tek düzenleme yeri).
  */
-export default async function DunningPage({ searchParams }: { searchParams?: Promise<{ liste?: string; sonuc?: string }> }) {
+export default async function DunningPage({ searchParams }: { searchParams?: Promise<{ liste?: string; sonuc?: string; kova?: string }> }) {
   const staff = await requirePlatformModule("billing");
   const sp = (await searchParams) ?? {};
+  const kova = isAgingBucket(sp.kova) ? sp.kova : undefined;
   const list = parseRecoveryList(sp.liste);
   const sonuc = sp.sonuc && RESULT_LABEL[sp.sonuc] ? sp.sonuc : undefined;
   const nowMs = clockNow();
@@ -83,7 +88,7 @@ export default async function DunningPage({ searchParams }: { searchParams?: Pro
     .limit(50);
   if (sonuc) eventsQuery = eventsQuery.eq("result", sonuc);
 
-  const [policy, invRes, payingRes, eventsRes, resultRes] = await Promise.all([
+  const [policy, invRes, payingRes, eventsRes, resultRes, openRes] = await Promise.all([
     loadDunningPolicy(),
     admin
       .from("invoices")
@@ -96,7 +101,11 @@ export default async function DunningPage({ searchParams }: { searchParams?: Pro
     admin.from("subscriptions").select("id", { count: "exact", head: true }).in("status", ["active", "past_due"]),
     eventsQuery,
     admin.from("dunning_events").select("result").gte("sent_at", since).limit(LIST_LIMIT),
+    kova
+      ? admin.from("invoices").select("id, tenant_id, invoice_no, total_try, due_at, tenant:tenants(name)").eq("status", "open").order("due_at", { ascending: true }).limit(LIST_LIMIT)
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  const agingRows = kova ? ((openRes.data ?? []) as OpenRow[]).filter((r) => agingBucketOf(daysPastDue({ dueAt: r.due_at }, nowMs)) === kova) : [];
 
   const invoices = (invRes.data ?? []) as (ReportInvoice & { tenant: unknown })[];
   const lastStageDays = policy.stages[policy.stages.length - 1]?.days ?? 8;
@@ -120,7 +129,6 @@ export default async function DunningPage({ searchParams }: { searchParams?: Pro
         title="Tahsilat"
         description={`Gecikmiş ödemelerin takibi (dunning): son ${RECOVERY_WINDOW_DAYS} günün kurtarma raporu, gönderilen hatırlatmaların günlüğü ve tahsilat politikası. Kademeler şu an ${policy.stages.map((s) => s.days).join(" / ")}. gün; otomatik askı ${policy.autoSuspendDays > 0 ? `${policy.autoSuspendDays}. gün` : "kapalı"}.`}
       />
-      <BillingNav active="tahsilat" />
 
       <StatRow
         label="Kurtarma raporu"
@@ -144,6 +152,46 @@ export default async function DunningPage({ searchParams }: { searchParams?: Pro
         gündür açık ya da tahsil edilemedi işaretli faturası olan ofis ÷ aktif + gecikmiş abonelikli ofis.
         {truncated ? ` Liste ${LIST_LIMIT} faturada kesildi; sayılar eksik olabilir.` : ""}
       </p>
+
+      {kova ? (
+        <section id="yaslandirma" className="scroll-mt-24 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">
+            <h2 className="font-display font-bold text-ink-950">
+              Açık alacak: {AGING_BUCKET_LABELS[kova]} <span className="ml-1 rounded-full bg-brand-600/10 px-2.5 py-0.5 text-xs font-bold text-brand-600">{agingRows.length}</span>
+            </h2>
+            <nav aria-label="Yaşlandırma kovası" className="flex flex-wrap gap-1">
+              {AGING_BUCKETS.map((b) => (
+                <FilterChip key={b} href={`${href({ liste: list, sonuc, kova: b })}#yaslandirma`} active={kova === b}>
+                  {AGING_BUCKET_LABELS[b]}
+                </FilterChip>
+              ))}
+              <FilterChip href={href({ liste: list, sonuc })}>Kovayı kaldır ✕</FilterChip>
+            </nav>
+          </div>
+          {agingRows.length === 0 ? (
+            <EmptyState variant="compact" bare icon={HandCoins} tone="mint" title="Bu kovada açık fatura yok" description="Vadeden bu yana geçen güne göre (vadesi gelmemiş ya da vadesiz fatura 0-30 kovasındadır)." />
+          ) : (
+            <ul className="divide-y divide-line">
+              {agingRows.slice(0, 100).map((inv) => (
+                <li key={inv.id}>
+                  <Link href={`/admin/billing/faturalar/${inv.id}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm hover:bg-surface-hover">
+                    <span className="min-w-0">
+                      <span className="font-semibold text-ink-950">{inv.invoice_no}</span>
+                      <span className="ml-2 text-text-muted">{tenantName(inv.tenant)}</span>
+                    </span>
+                    <span className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
+                      <span>Vade {inv.due_at ? formatDateTr(inv.due_at) : "yok"}</span>
+                      <span>{daysPastDue({ dueAt: inv.due_at }, nowMs)} gün</span>
+                      <span className="font-semibold text-ink-950">{formatTryAmount(Number(inv.total_try ?? 0))}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          {agingRows.length > 100 ? <p className="border-t border-line px-5 py-3 text-xs text-text-muted">İlk 100 fatura gösteriliyor.</p> : null}
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">

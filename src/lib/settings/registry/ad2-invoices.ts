@@ -6,7 +6,7 @@ import { defineInt, defineString } from "./define";
  * AD2 — elle fatura / tek seferlik ücret ayarları (platform kapsamı, `platform_settings` deposu). Tek düzenleme yeri
  * "Yeni fatura" ekranının Ayarlar bölümüdür (merkez oraya bağlanır).
  */
-export const INVOICE_HOME = { href: "/admin/billing/faturalar/yeni#ayarlar", label: "Abonelik & fatura > Yeni fatura > Ayarlar" } as const;
+export const INVOICE_HOME = { href: "/admin/billing/faturalar/yeni#ayarlar", label: "Abonelikler > Yeni fatura > Ayarlar" } as const;
 
 const vatBase = defineString({
   key: "billing.vat_rate",

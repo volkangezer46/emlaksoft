@@ -144,7 +144,7 @@ describe("viz kiti: sık sayfalarda sunucu SVG (Recharts ilk yüke girmez)", () 
   // /admin, /admin/raporlar, /app/raporlar, /app/performansim ve ana ekran gelir eğrisi: aynı imzalı sunucu
   // sarmalayıcılar (viz/server-charts). Diğer kullanımlar ve InteractiveChart tembel kapıda (lazy-charts) kalır.
   const SIK = [
-    "src/app/admin/page.tsx",
+    "src/app/admin/_dashboards/platform-sections.tsx",
     "src/app/admin/raporlar/page.tsx",
     "src/app/app/raporlar/net-bars.tsx",
     "src/app/app/raporlar/rank-bars.tsx",

@@ -5,7 +5,6 @@ import { requirePlatformModule } from "@/lib/platform";
 import { PLATFORM_MODULES, PLATFORM_ROLE_LABELS, fixedRoleMatrix, type PlatformAction, type PlatformRole } from "@/lib/platform-access";
 import { listCustomRoles } from "@/app/actions/platform-roles";
 import { PLATFORM_MODULE_LABELS, PLATFORM_ROLES } from "../staff-model";
-import { PersonelTabs } from "../personel-tabs";
 import { RoleEditor } from "./role-editor";
 
 export const metadata = { title: "Personel rolleri" };
@@ -37,7 +36,6 @@ export default async function RolesPage() {
         description="Özel rol: hangi ekranı görür, hangisinde işlem yapar, hangi kritik işlemi onaylar. Atama Personel listesindeki Rol sütunundan yapılır."
         art="shield"
       />
-      <PersonelTabs active="roller" />
 
       {list.ok ? (
         <RoleEditor roles={list.roles} canEdit={canEdit} modules={PLATFORM_MODULES.map((m) => ({ id: m, label: PLATFORM_MODULE_LABELS[m] }))} />

@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { AlertTriangle, CircleDollarSign, Megaphone, Target, UserPlus, Users, Wallet } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
+import { platformCanAccess } from "@/lib/platform-access";
 import { now as clockNow } from "@/lib/clock";
 import { formatDateTr, formatTry } from "@/lib/format";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -12,7 +13,6 @@ import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 import { CHANNEL_LABEL, isChannel } from "@/lib/measure/channel";
 import { loadChannelRoi } from "@/lib/channel-roi/read";
 import { monthLabel, parseRoiPeriod, ROI_PERIODS, roiChannelLabel, SPEND_CHANNELS, type ChannelRoiRow, type RoiChannel, type RoiPeriod } from "@/lib/channel-roi/model";
-import { BillingNav } from "../billing-nav";
 import { SpendDeleteButton, SpendForm } from "./spend-controls";
 
 export const metadata = { title: "Kanal ROI" };
@@ -53,7 +53,7 @@ function NumLink({ to, children, title }: { to: string; children: React.ReactNod
  * (`donem`, `kanal`, `odeyen`); harcama satırları ve dönem ofisleri aynı sayfada süzülür (her sayı kaynağına gider).
  */
 export default async function ChannelRoiPage({ searchParams }: { searchParams?: Promise<{ donem?: string; kanal?: string; odeyen?: string }> }) {
-  await requirePlatformModule("billing");
+  const staff = await requirePlatformModule("billing");
   const sp = (await searchParams) ?? {};
   const donem = parseRoiPeriod(sp.donem);
   const kanal = parseChannel(sp.kanal);
@@ -110,7 +110,15 @@ export default async function ChannelRoiPage({ searchParams }: { searchParams?: 
         title="Kanal ROI"
         description={`Pazarlama harcamasından kayda, ödeyen ofise ve gelire kanal bazında huni (${periodText}). CAC, kayıt başı maliyet ve geri ödeme süresi gerçekleşen veriden hesaplanır; tahmin yoktur.`}
       />
-      <BillingNav active="kanal-roi" />
+      {/* Çapraz bağlantı: ziyaretten kayda huni (iniş yolları, ölçüm) Site > Reklam'da; burası para tarafı. */}
+      {platformCanAccess(staff, "reklam") ? (
+        <p className="text-xs text-text-muted">
+          Ziyaret, iniş yolu ve ölçüm sağlığı:{" "}
+          <Link href="/admin/site/reklam" className="font-semibold text-brand-600 hover:underline">
+            Site &gt; Reklam &gt; Huni →
+          </Link>
+        </p>
+      ) : null}
 
       <nav aria-label="Dönem" className="flex flex-wrap items-center gap-2">
         {ROI_PERIODS.map((p) => (

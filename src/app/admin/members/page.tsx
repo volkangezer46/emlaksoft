@@ -135,6 +135,8 @@ async function loadMembers(admin: ReturnType<typeof createAdminClient>, f: Filte
   return { rows, total: count ?? 0, error: Boolean(error), legacy: true };
 }
 
+export const metadata = { title: "Üyeler" };
+
 export default async function AdminMembersPage({
   searchParams,
 }: {

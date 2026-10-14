@@ -41,7 +41,7 @@ function schemaMissing(error: { code?: string; message?: string } | null | undef
 
 function refresh(invoiceId?: string) {
   revalidatePath("/admin/billing");
-  revalidatePath("/admin/muhasebe");
+  revalidatePath("/admin/billing/muhasebe");
   if (invoiceId) revalidatePath(`/admin/billing/faturalar/${invoiceId}`);
 }
 

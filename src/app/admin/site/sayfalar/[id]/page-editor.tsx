@@ -7,9 +7,9 @@ import { AlertTriangle, ArrowDown, ArrowUp, Copy, Eye, History, Plus, Send, Tras
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { publishSitePage, rollbackSitePage, saveSitePageDraft, unpublishSitePage } from "@/app/actions/site-pages";
-import { Card, Full, Txt } from "@/app/admin/site-icerik/editor-fields";
-import { InlineConfirm, TargetDatalist } from "@/app/admin/site-menu/editor-ui";
-import { SerpPreview } from "@/app/admin/seo/seo-ui";
+import { Card, Full, Txt } from "@/app/admin/site/sayfalar/ana-sayfa/editor-fields";
+import { InlineConfirm, TargetDatalist } from "@/app/admin/site/menu/editor-ui";
+import { SerpPreview } from "@/app/admin/site/seo/seo-ui";
 import { MENU_ICON_LIST } from "@/lib/site-menu/icon-registry";
 import { moveInArray } from "@/lib/site-menu/editor-model";
 import type { Issue } from "@/lib/site-menu/schema-core";
@@ -141,7 +141,7 @@ export function SitePageEditor({ id, entry, initialDraft, live, history, canWrit
       {readOnly ? <Banner tone="info">Bu hesap salt okunur; sayfaları yalnız süper admin değiştirebilir.</Banner> : null}
       {hasRedirect ? (
         <Banner tone="warn">
-          Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için <Link href="/admin/seo?sekme=yonlendirme" className="font-semibold underline">yönlendirme kuralını</Link> kapatın.
+          Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için <Link href="/admin/site/seo?sekme=yonlendirme" className="font-semibold underline">yönlendirme kuralını</Link> kapatın.
         </Banner>
       ) : null}
 
@@ -169,7 +169,7 @@ export function SitePageEditor({ id, entry, initialDraft, live, history, canWrit
             </Button>
             {published ? <InlineConfirm label="Yayından kaldır (arşiv)" confirmLabel="Kaldır" tone="danger" icon={<Archive className="h-3.5 w-3.5" aria-hidden="true" />} onConfirm={unpublish} disabled={pending} /> : null}
             {entry.status === "arsiv" ? (
-              <Link href="/admin/seo?sekme=yonlendirme" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline">
+              <Link href="/admin/site/seo?sekme=yonlendirme" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-700 hover:underline">
                 Bu yol için yönlendirme ekle
               </Link>
             ) : null}
@@ -469,7 +469,7 @@ function BlockFields(props: FieldProps<PageBlock>) {
           <Check label="Adres göster" checked={b.showAddress} disabled={readOnly} onChange={(v) => onChange({ ...b, showAddress: v })} />
           <Full>
             <p className="text-xs text-text-faint">
-              Bilgiler <Link href="/admin/seo" className="font-semibold underline">SEO &gt; Kurum bilgisi</Link>&apos;nden salt okunur gelir; boş alan sayfada gösterilmez. Adres alanı kurum bilgisinde henüz yok.
+              Bilgiler <Link href="/admin/site/seo" className="font-semibold underline">SEO &gt; Kurum bilgisi</Link>&apos;nden salt okunur gelir; boş alan sayfada gösterilmez. Adres alanı kurum bilgisinde henüz yok.
             </p>
           </Full>
         </div>

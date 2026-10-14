@@ -67,6 +67,7 @@ describe("panel metinleri kısa", () => {
   it("admin panel KpiCard etiketleri kısa", () => {
     const files = [
       "src/app/admin/page.tsx",
+      "src/app/admin/_dashboards/platform-sections.tsx",
       "src/app/admin/_dashboards/billing-home.tsx",
       "src/app/admin/_dashboards/support-home.tsx",
     ];
@@ -81,6 +82,7 @@ describe("panel metinleri kısa", () => {
   it("kart alt başlıkları tek satıra sığar", () => {
     const files = [
       "src/app/admin/page.tsx",
+      "src/app/admin/_dashboards/platform-sections.tsx",
       "src/app/admin/_dashboards/billing-home.tsx",
       "src/app/admin/_dashboards/support-home.tsx",
       "src/app/app/_home/gelir-egrisi.tsx",

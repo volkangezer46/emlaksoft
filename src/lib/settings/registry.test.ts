@@ -30,7 +30,7 @@ describe("ayar kayıt defteri: yapı sözleşmesi", () => {
 
   it("her ayarda kategori, etiket, açıklama ve ETKİSİ dolu; kategori geçerli", () => {
     const cats = new Set<string>(SETTING_CATEGORIES.map((c) => c.id));
-    expect(SETTING_CATEGORIES).toHaveLength(12);
+    expect(SETTING_CATEGORIES).toHaveLength(14);
     for (const d of ALL_SETTING_DEFS) {
       expect(cats.has(d.category), d.key).toBe(true);
       expect(d.label.trim().length, d.key).toBeGreaterThan(2);
@@ -229,7 +229,7 @@ describe("görünüm ve arama", () => {
   it("arama etiket/anahtar/eski anahtarla bulur ve merkeze bağlanır", () => {
     const hits = searchSettings(ALL_SETTING_DEFS, "deneme");
     expect(hits.length).toBeGreaterThan(0);
-    expect(hits[0].href.startsWith("/admin/ayarlar/merkez?ara=")).toBe(true);
+    expect(hits[0].href.startsWith("/admin/ayarlar?ara=")).toBe(true);
     expect(searchSettings(ALL_SETTING_DEFS, "maintenance_mode").some((h) => h.key === "platform.maintenance_mode")).toBe(true);
     expect(searchSettings(ALL_SETTING_DEFS, "").length).toBe(0);
   });

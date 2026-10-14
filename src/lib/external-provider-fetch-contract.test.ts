@@ -50,8 +50,8 @@ describe("external provider request contract", () => {
       .sort();
     const browserFetchFiles = [
       "src/app/admin/danisman/advisor-chat.tsx",
-      "src/app/admin/personel/[id]/page.tsx",
-      "src/app/admin/personel/page.tsx",
+      "src/app/admin/personel/[id]/staff-detail-view.tsx",
+      "src/app/admin/personel/personel-view.tsx",
       "src/app/admin/site/medya/upload-client.ts", // aynı kökene, medya dosyası yükleme (/admin/site/medya/yukle)
       "src/app/app/asistan/advisor-chat.tsx",
       "src/app/app/destek/ticket-attachment-input.tsx",

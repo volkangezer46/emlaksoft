@@ -18,6 +18,15 @@ async function lastSignIns(admin: ReturnType<typeof createAdminClient>): Promise
   return map;
 }
 
+/** Personelin özel rolü (ad + temel rol); atanmamışsa ya da şema yoksa null. */
+async function readCustomRole(admin: ReturnType<typeof createAdminClient>, id: string): Promise<{ id: string; label: string; base_role: string } | null> {
+  const { data: row } = await admin.from("platform_staff").select("custom_role_id").eq("id", id).maybeSingle();
+  const roleId = (row?.custom_role_id as string | null | undefined) ?? null;
+  if (!roleId) return null;
+  const { data: role } = await admin.from("platform_custom_roles").select("id, label, base_role").eq("id", roleId).maybeSingle();
+  return role ? { id: role.id as string, label: role.label as string, base_role: role.base_role as string } : null;
+}
+
 export async function GET(req: Request) {
   const staff = await getPlatformStaff();
   if (!staff || !platformCanAccess(staff, "personel")) {
@@ -59,9 +68,11 @@ export async function GET(req: Request) {
     // Zorunlu parola değişimi bekliyor mu (auth user_metadata). Okunamazsa false: yalnız bilgi amaçlı.
     const authUser = await admin.auth.admin.getUserById(id).then((r) => r.data?.user ?? null).catch(() => null);
     const mustChangePassword = authUser?.user_metadata?.must_change_password === true;
+    // DG1 özel rol: atanmışsa adı gösterilir (sütun/tablo yoksa hata yutulur, sabit rol görünür).
+    const customRole = await readCustomRole(admin, id);
 
     return NextResponse.json({
-      member: { ...member, last_sign_in_at: logins.get(id) ?? null, must_change_password: mustChangePassword },
+      member: { ...member, last_sign_in_at: logins.get(id) ?? null, must_change_password: mustChangePassword, custom_role: customRole },
       activity,
     });
   }

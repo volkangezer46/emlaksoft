@@ -13,7 +13,7 @@ import { AutomationScreen, CommissionScreen, CustomersScreen, DealsScreen, Portf
 import { SpriteIcon } from "@/components/icons/sprite-icon";
 
 /**
- * Radyo girdili ürün turu (sekme seçimi JS'siz): radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm sekmelerin metni DOM'dadır (SEO); ilk ekranın çizimi sunucuda, kalanlar boşta yüklenir. Oklar radyo grubunda yerel olarak gezinir. Metinler site içeriğinden (yönetim: /admin/site-icerik);
+ * Radyo girdili ürün turu (sekme seçimi JS'siz): radyo girdileri + kardeş seçiciler (marketing-sections.css). Tüm sekmelerin metni DOM'dadır (SEO); ilk ekranın çizimi sunucuda, kalanlar boşta yüklenir. Oklar radyo grubunda yerel olarak gezinir. Metinler site içeriğinden (yönetim: /admin/site/sayfalar/ana-sayfa);
  * ekran çizimi sekme kimliğinden seçilir, paket rozeti sayfa kilidinden (gateBadge) eklenir. Radyo/ekran sınıfı
  * SIRAYA göredir (tt1..tt7), böylece sıralama/gizleme CSS'i bozmaz.
  */

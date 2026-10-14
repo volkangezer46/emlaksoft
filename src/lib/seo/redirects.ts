@@ -33,7 +33,7 @@ export type RedirectMap = Map<string, SeoRedirectRule>;
 
 /**
  * Yerleşik (kodla gelen) kalıcı yönlendirmeler — kaldırılan public sayfaların eski adresleri. Admin kuralları
- * (/admin/seo) bunların ÖNÜNE geçer (aynı kaynak için admin kuralı varsa o kazanır). `next.config.ts` aynı listeyi
+ * (/admin/site/seo) bunların ÖNÜNE geçer (aynı kaynak için admin kuralı varsa o kazanır). `next.config.ts` aynı listeyi
  * ayrıca kenarda uygular (sayfa akışına hiç girmeden 308); burası sayfa dosyası silinince çalışan güvenlik ağıdır.
  * Sözleşme testi iki yerin tutarlılığını doğrular (src/lib/seo/seo-legacy-redirects.test.ts).
  */

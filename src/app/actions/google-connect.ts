@@ -42,7 +42,7 @@ async function superGuard() {
 
 function refresh() {
   revalidatePath(PAGE);
-  revalidatePath("/admin/seo/performans");
+  revalidatePath("/admin/site/seo");
   revalidatePath("/admin/site/reklam/google");
 }
 

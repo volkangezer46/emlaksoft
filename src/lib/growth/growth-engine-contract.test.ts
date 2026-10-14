@@ -311,8 +311,8 @@ describe("service_role: yeni kullanım YOK, allowlist gevşetilmedi", () => {
     "src/components/app/referral-nudge-card.tsx",
     "src/app/kayit/invite-banner.tsx",
     "src/app/app/buyume/page.tsx",
-    "src/app/admin/growth/page.tsx",
-    "src/app/admin/growth/growth-forms.tsx",
+    "src/app/admin/ortaklik/page.tsx",
+    "src/app/admin/ortaklik/growth-forms.tsx",
   ];
   it("yeni/yeniden yazılan dosyalar createAdminClient çağırmaz", () => {
     for (const f of NEW_FILES) expect(read(f), f).not.toMatch(/createAdminClient\s*\(/);
@@ -330,17 +330,21 @@ describe("service_role: yeni kullanım YOK, allowlist gevşetilmedi", () => {
     expect(a).toMatch(/hasTaxNo: Boolean\(taxNo\)/);
     expect(a).not.toMatch(/meta: \{[^}]*tax_no/);
   });
-  it("saveGrowthFlags: kapalıdan açığa geçişte hazırlık kontrolü zorunlu; nakit ortak programsız açılmaz", () => {
-    const a = read("src/app/actions/growth.ts");
-    expect(a).toContain("readinessBlockers(checks)");
-    expect(a).toContain("Hazırlık kontrolü geçmedi");
-    expect(a).toContain("Nakit ödeme yalnız ortak programı açıkken açılabilir.");
+  it("büyüme bayrakları (Özellik bayrakları tek yer): kapalıdan açığa geçişte hazırlık kontrolü zorunlu; nakit ortak programsız açılmaz", () => {
+    const gate = read("src/lib/growth/flag-gate.ts");
+    expect(gate).toContain("readinessBlockers(checks)");
+    expect(gate).toContain("Hazırlık kontrolü geçmedi");
+    expect(gate).toContain("Nakit ödeme yalnız ortak programı açıkken açılabilir.");
+    expect(read("src/app/actions/platform-security.ts")).toContain("growthFlagOpenError(flag.key, Boolean(input.on))");
+    // Ortaklık ekranında ayrı bayrak formu yok (kopya düzenleme yeri yasak).
+    expect(read("src/app/actions/growth.ts")).not.toContain("saveGrowthFlags");
+    expect(read("src/app/admin/ortaklik/growth-forms.tsx")).not.toContain("FlagsForm");
   });
 });
 
 describe("arayüz sözleşmesi", () => {
   const office = read("src/app/app/buyume/page.tsx");
-  const admin = read("src/app/admin/growth/page.tsx");
+  const admin = read("src/app/admin/ortaklik/page.tsx");
   it("ofis panosu: sıfır çıkmaz metrik (her StatCard href'li), sabit tutar yok, /r/KOD bağlantısı", () => {
     const cards = office.match(/<StatCard\b/g)?.length ?? 0;
     const hrefs = office.match(/<StatCard\b[^>]*\bhref=/g)?.length ?? 0;
@@ -373,7 +377,7 @@ describe("arayüz sözleşmesi", () => {
     expect(hrefs).toBe(cards);
     expect(admin.match(/<Link\b[^>]*\bhref=\{(?:hrefFor|queueHref)\(/g)?.length ?? 0).toBeGreaterThanOrEqual(8);
     for (const k of ["K-faktör", "CAC geri dönüşü", "Kötüye kullanım oranı", "Ödül maliyeti", "Deneme → ödeme dönüşümü", "Bağlantı tıklaması"]) {
-      expect(admin + read("src/app/admin/growth/funnel-model.ts")).toContain(k);
+      expect(admin + read("src/app/admin/ortaklik/funnel-model.ts")).toContain(k);
     }
     expect(admin).toContain("ReadinessPanel");
     expect(admin).toContain('id="kuyruk"');
@@ -383,7 +387,7 @@ describe("arayüz sözleşmesi", () => {
     for (const f of [
       "src/app/app/buyume/invite-panel.tsx",
       "src/components/app/referral-nudge-card.tsx",
-      "src/app/admin/growth/growth-forms.tsx",
+      "src/app/admin/ortaklik/growth-forms.tsx",
       "src/app/kayit/invite-banner.tsx",
     ]) {
       const s = read(f);

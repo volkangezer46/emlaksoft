@@ -1,37 +1,38 @@
-import { Ban, FileText, Mail, PlugZap, ScrollText } from "lucide-react";
+import Link from "@/components/ui/smart-link";
+import { Ban, FileText, Mail, ScrollText } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
-import { PageTabs } from "@/components/app/page-tabs";
-import { Alert } from "@/components/ui/alert";
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+import { RegistrySettings } from "@/components/settings/registry-settings";
 import { requirePlatformModule } from "@/lib/platform";
 import { emailChannelStatus } from "@/lib/email/provider";
-import { ChannelView } from "./channel-view";
+import { EMAIL_FOOTER_KEY } from "@/lib/settings/registry/email";
 import { LogView } from "./log-view";
 import { SuppressionView } from "./suppression-view";
 import { TemplatesView } from "./templates-view";
 
-export const metadata = { title: "E-posta" };
+export const metadata = { title: "E-posta şablonları" };
 
+const BASE = "/admin/ayarlar/eposta";
 const TABS = [
-  { id: "kanal", label: "Kanal", icon: PlugZap },
   { id: "sablonlar", label: "Şablonlar", icon: FileText },
-  { id: "gunluk", label: "Günlük", icon: ScrollText },
-  { id: "bastirma", label: "Bastırma", icon: Ban },
+  { id: "gunluk", label: "Gönderim günlüğü", icon: ScrollText },
+  { id: "bastirma", label: "Engel listesi", icon: Ban },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
 export type EmailPageSearch = { sekme?: string; durum?: string; sablon?: string; ofis?: string; sayfa?: string };
 
 /**
- * Ayarlar > E-posta (AD7): kanal durumu + gönderen alan adı DNS rozeti, şablon merkezi (değişken kataloğu, HTML
- * önizleme, kendine örnek gönderim), gönderim günlüğü (Resend webhook durumlarıyla) ve bastırma listesi. Tek kapı:
- * `sistem` modülü; düzenleme/test/bastırma yalnız süper admin. Çözüm sırası: sunucu ortamı > panel > kapalı; kanal
- * kapalıyken hiçbir e-posta gönderilmez ve günlüğe "kanal kapalı" düşer.
+ * Ayarlar > E-posta şablonları (AD7): şablon merkezi (değişken kataloğu, HTML önizleme, kendine örnek gönderim), ortak alt
+ * bilgi, gönderim günlüğü (Resend webhook durumlarıyla) ve engel (bastırma) listesi. Kanal (Resend anahtarı, gönderen, alan
+ * adı SPF/DKIM, webhook) Sistem > Entegrasyonlar'dadır; burada yalnız tek satır durum + bağlantı. Tek kapı: `sistem`
+ * modülü; düzenleme/test/bastırma yalnız süper admin.
  */
 export default async function EmailSettingsPage({ searchParams }: { searchParams?: Promise<EmailPageSearch> }) {
   const staff = await requirePlatformModule("sistem");
   const canEdit = staff.role === "super_admin";
   const sp = (await searchParams) ?? {};
-  const active: TabId = TABS.some((t) => t.id === sp.sekme) ? (sp.sekme as TabId) : "kanal";
+  const active: TabId = TABS.some((t) => t.id === sp.sekme) ? (sp.sekme as TabId) : "sablonlar";
   const status = await emailChannelStatus();
 
   return (
@@ -39,28 +40,32 @@ export default async function EmailSettingsPage({ searchParams }: { searchParams
       <AdminPageHeader
         eyebrow="Ayarlar"
         icon={Mail}
-        title="E-posta"
-        description="Kanal ve gönderen alan adı, işlemsel ve giriş e-postası şablonları, gönderim günlüğü ve bastırma listesi. Sağlayıcı: Resend."
+        title="E-posta şablonları"
+        description="İşlemsel ve giriş e-postası şablonları, ortak alt bilgi, gönderim günlüğü ve engel listesi."
       />
-      <PageTabs base="/admin/ayarlar/eposta" label="E-posta sekmeleri" tabs={TABS} active={active} />
-      {status.enabled ? (
-        <Alert tone="success" title="E-posta kanalı açık">
-          Gönderen: {status.from}. Şablonlardaki değişiklik bir sonraki gönderimde kullanılır.
-        </Alert>
-      ) : (
-        <Alert tone="warning" title="E-posta kanalı kapalı">
-          {status.reason}. Kanal kapalıyken e-posta gönderilmez (günlüğe &quot;kanal kapalı&quot; düşer); bildirimler uygulama içinde sürer.
-          Açmak için &quot;Kanal&quot; sekmesinden Resend anahtarı ve doğrulanmış alan adından gönderen adresi girin.
-        </Alert>
-      )}
-      {active === "sablonlar" ? (
-        <TemplatesView canEdit={canEdit} channelEnabled={status.enabled} />
-      ) : active === "gunluk" ? (
+      <p className="text-sm text-text-muted" role="status">
+        E-posta kanalı{" "}
+        <strong className={status.enabled ? "text-mint-700" : "text-amber-700"}>{status.enabled ? `açık (gönderen: ${status.from})` : "kapalı"}</strong>
+        {status.enabled ? null : <> ({status.reason}; kapalıyken e-posta gönderilmez, bildirimler uygulama içinde sürer)</>}
+        {" · "}
+        <Link href="/admin/sistem?sekme=entegrasyonlar#anahtar-eposta" className="font-semibold text-brand-600 hover:underline">
+          Kanal, anahtar ve alan adı: Entegrasyonlar →
+        </Link>
+      </p>
+      <SegmentTabs
+        items={TABS.map((t) => ({ id: t.id, label: t.label, icon: t.icon, href: t.id === "sablonlar" ? BASE : `${BASE}?sekme=${t.id}` }))}
+        active={active}
+        label="E-posta sekmeleri"
+      />
+      {active === "gunluk" ? (
         <LogView sp={sp} />
       ) : active === "bastirma" ? (
         <SuppressionView sp={sp} canEdit={canEdit} />
       ) : (
-        <ChannelView status={status} canEdit={canEdit} staffEmail={staff.email} />
+        <>
+          <TemplatesView canEdit={canEdit} channelEnabled={status.enabled} />
+          <RegistrySettings id="alt-bilgi" title="Ortak alt bilgi" description="Tüm işlemsel ve giriş e-postalarının alt satırı." keys={[EMAIL_FOOTER_KEY]} canEdit={canEdit} />
+        </>
       )}
     </div>
   );

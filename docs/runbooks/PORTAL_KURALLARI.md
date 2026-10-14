@@ -9,7 +9,7 @@ seçici, URL, betik YOK). Kural değişikliği mağaza incelemesi gerektirmez; m
 Akış: EmlakSoft sayfasındaki içerik betiği `GET /api/app/portal-aktar/kurallar?engine=f1` (aynı köken + köprü başlığı + oturum + `portals/view` +
 `x-emlaksoft-ext ≥ 0.6.0`) → arka plan her zarfı sırayla doğrular (boyut → şema → format → portal → `minExtension` → süre → sürüm ileri mi → sha → imza)
 → kabul edilen set "son iyi sürüm" olur; herhangi bir adım başarısızsa eski set kalır, o da yoksa tohum kullanılır. İmza **yayın anında** üretilir ve
-satıra yazılır; GET ucu özel anahtarı yüklemez. Yönetim: `/admin/sistem?sekme=portal-kurallari` (super_admin/ops; yayın ve geri alma super_admin).
+satıra yazılır; GET ucu özel anahtarı yüklemez. Yönetim: `/admin/sistem?sekme=entegrasyonlar#portal-kurallari` (super_admin/ops; yayın ve geri alma super_admin).
 
 ## 1. Anahtar üretimi ve yerleştirme (paket derlenmeden ÖNCE)
 
@@ -30,7 +30,7 @@ ile hızlandırılmış paket gönder. Env'den kaldırmak yalnız YENİ yayını
 ## 2. Tohum yayını (ilk kurulum)
 
 - Önkoşul: P1 migration'ları canlıda (`20261013002000_portal_rules_core` → `002010_portal_rules_rpcs` → `002020_portal_rules_learn`), uygulama deploy, env dolu.
-- `/admin/sistem?sekme=portal-kurallari` → portal seç → **"Tohumu yayınla (sürüm 1)"** (yalnız hiç set yoksa görünür; `seed-rules.ts` içeriği, sürüm 1, imzalı).
+- `/admin/sistem?sekme=entegrasyonlar#portal-kurallari` → portal seç → **"Tohumu yayınla (sürüm 1)"** (yalnız hiç set yoksa görünür; `seed-rules.ts` içeriği, sürüm 1, imzalı).
   Üç portal için ayrı ayrı yapılır.
 - Doğrulama: paketlenmemiş eklentiyle EmlakSoft sayfasını aç → açılır pencerede kural sürümü 1; geliştirici araçlarında `es_form_rules_meta.lastRejectReason` boş.
 

@@ -1,6 +1,6 @@
 import type { AnySettingDef } from "../types";
 import { defineSecret, defineString } from "./define";
-import { EMAIL_HOME } from "./platform";
+import { EMAIL_CHANNEL_HOME, EMAIL_HOME } from "./platform";
 import { DEFAULT_EMAIL_FOOTER, EMAIL_TEMPLATES, hasEditableSubject, templateSettingKey, templateTextRule } from "@/lib/email/templates";
 
 /**
@@ -63,7 +63,7 @@ export const EMAIL_SETTING_DEFS: AnySettingDef[] = [
   }),
   defineSecret({
     key: EMAIL_WEBHOOK_SECRET_KEY,
-    home: EMAIL_HOME,
+    home: EMAIL_CHANNEL_HOME,
     maxLength: 200,
     minLength: 20,
     pattern: /^whsec_[A-Za-z0-9+/=]+$/,

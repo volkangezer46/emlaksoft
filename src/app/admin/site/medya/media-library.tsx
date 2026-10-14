@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { kb, SITE_MEDIA_LIMITS } from "@/lib/site-media/quota";
 import { mediaUrl, type SiteMediaRow } from "@/lib/site-media/types";
-import { InlineConfirm } from "../../site-menu/editor-ui";
+import { InlineConfirm } from "../menu/editor-ui";
 import { ACCEPT_IMAGES, postSiteMedia } from "./upload-client";
 
 export type MediaCard = SiteMediaRow & { usage: string[]; heroBytes: number; heroOver: boolean; large: boolean };
@@ -149,7 +149,7 @@ function MediaItem({ m, canWrite }: { m: MediaCard; canWrite: boolean }) {
         {used ? (
           <p className="text-xs text-ink-950">
             <span className="font-semibold">Kullanım:</span>{" "}
-            <Link href="/admin/site-icerik" className="text-brand-700 underline">{m.usage.join(", ")}</Link>
+            <Link href="/admin/site/sayfalar/ana-sayfa" className="text-brand-700 underline">{m.usage.join(", ")}</Link>
           </p>
         ) : null}
         <div>

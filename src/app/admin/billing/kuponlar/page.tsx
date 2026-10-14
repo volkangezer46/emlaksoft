@@ -6,7 +6,6 @@ import { TicketPercent } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { getPlanSupport } from "@/lib/billing/plan-support";
-import { BillingNav } from "../billing-nav";
 import { CouponRowView, NewCoupon, type CouponRow } from "./coupon-forms";
 
 export const metadata = { title: "Kuponlar" };
@@ -38,7 +37,6 @@ export default async function CouponsPage() {
         title="Kuponlar"
         description="Kupon ve indirim kodları. Kod ödeme sırasında tek seferlik, kota ve geçerlilik tek kilitle doğrulanarak uygulanır."
       />
-      <BillingNav active="kuponlar" />
       <NewCoupon plans={plans} />
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
         <div className="border-b border-line px-5 py-4">

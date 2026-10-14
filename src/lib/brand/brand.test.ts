@@ -111,9 +111,9 @@ describe("sözleşme: marka kayıtları ve tek Brand bileşeni", () => {
       expect(mods.includes("marka"), role).toBe(role === "super_admin");
     }
     // Menü ve komut paleti tek kaynaktan beslenir (src/lib/admin/nav.ts).
-    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/marka", "Marka", "Logo ve favicon", ["marka"])');
+    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/site/marka", "Marka", "Logo ve favicon", ["marka"])');
     expect(read("src/components/admin/command-palette.tsx")).toContain("adminPaletteFor(modules)");
-    expect(read("src/app/admin/marka/page.tsx")).toContain('requirePlatformModule("marka")');
+    expect(read("src/app/admin/site/marka/page.tsx")).toContain('requirePlatformModule("marka")');
     const actions = read("src/app/actions/platform-brand.ts");
     expect(actions.match(/requirePlatformModule\("marka"\)/g)?.length).toBe(2);
     expect(actions).toContain("checkRateLimit");

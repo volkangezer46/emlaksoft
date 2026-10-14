@@ -72,6 +72,8 @@ async function applyItems(
         actorId: actor.id,
         action: "settings.write",
         entityType: "platform_settings",
+        // Ayar anahtarı kayıt kimliğidir: "son değişiklik" ve aktivite süzgeci anahtara göre eşler (meta okunmadan).
+        entityId: it.def.key,
         meta: {
           key: it.def.key,
           storage: it.storage,

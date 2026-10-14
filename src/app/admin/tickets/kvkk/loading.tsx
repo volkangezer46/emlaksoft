@@ -2,7 +2,7 @@ import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 
 export default function Loading() {
   return (
-    <SkeletonBlock label="KVKK talepleri yükleniyor" className="space-y-4">
+    <SkeletonBlock label="KVKK başvuruları yükleniyor" className="space-y-4">
       <div className="flex gap-1">
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-28 rounded-full" />

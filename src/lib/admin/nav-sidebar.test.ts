@@ -27,7 +27,13 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     const visible = groups.flatMap((g) => g.items.map((i) => i.href));
     expect(visible).toEqual(["/admin", "/admin/tenants", "/admin/billing", "/admin/site", "/admin/tickets", "/admin/sistem"]);
     const folded = groups.flatMap((g) => g.folded.map((i) => i.href));
-    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar/merkez", "/admin/personel", "/admin/geo"]));
+    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar", "/admin/personel", "/admin/geo"]));
+  });
+
+  it("her grup başlığıyla çizilir (tek öğeli grup başlıksız satır olmaz: Site, SEO ve Reklam Gelir'in altında görünmez)", () => {
+    const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
+    expect(code).not.toContain("folded.length === 0 && items.length === 1");
+    expect(ADMIN_NAV.find((s) => s.id === "icerik")?.title).toBe("İçerik");
   });
 
   it("çekirdeği olmayan grup (rol süzgeci sonrası) tam gösterilir; boş grup yoktur", () => {
@@ -53,12 +59,12 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
 
   it("eski ortak 'Diğer' grubu yok: ek öğeler ilgili gruptadır (Gelir, Destek, Sistem)", () => {
     const groupOf = (href: string) => ADMIN_NAV.find((s) => s.items.some((i) => i.href === href))?.id;
-    expect(groupOf("/admin/growth")).toBe("gelir");
+    expect(groupOf("/admin/ortaklik")).toBe("gelir");
     expect(groupOf("/admin/analiz-tarifesi")).toBe("gelir");
     expect(groupOf("/admin/duyuru")).toBe("destek");
     expect(groupOf("/admin/geo")).toBe("sistem");
     expect(groupOf("/admin/personel")).toBe("sistem");
-    expect(groupOf("/admin/ayarlar/merkez")).toBe("sistem");
+    expect(groupOf("/admin/ayarlar")).toBe("sistem");
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).not.toContain("diger-acik");
     expect(code).not.toContain('"adm-diger"');
@@ -76,22 +82,21 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
 
 describe("Site, SEO ve Reklam: sekmeler (SP1; AP6 Sayfalar İçerik'in alt sayfası, yeni menü satırı değil)", () => {
   const site = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")!;
-  it("sekmeler: Genel bakış · İçerik (Ana sayfa, Sayfalar) · SEO · Site menüsü · Marka; menü satırı eklenmez", () => {
+  it("sekmeler: Genel bakış · İçerik · SEO · Site menüsü · Marka; İçerik'te ayrı 'Ana sayfa' alt satırı yok; menü satırı eklenmez", () => {
     expect(site.tabs!.map((t) => t.label)).toEqual(["Genel bakış", "İçerik", "SEO", "Site menüsü", "Marka", "Hız", "Reklam", "Medya", "Rehber", "Bağlantılar"]);
     const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
-    expect(icerik.children!.map((c) => [c.label, c.href])).toEqual([
-      ["Ana sayfa", "/admin/site-icerik"],
-      ["Sayfalar", "/admin/site/sayfalar"],
-    ]);
-    expect(icerik.children!.every((c) => c.modules.join() === "sitecontent")).toBe(true);
+    expect(icerik.href).toBe("/admin/site/sayfalar");
+    expect(icerik.children).toBeUndefined();
     expect(ADMIN_NAV.flatMap((s) => s.items).some((i) => i.href === "/admin/site/sayfalar")).toBe(false);
+    // Site URL'leri tek kök altında: eski kök yollar yok.
+    expect(site.match).toEqual(undefined);
   });
   it("sayfa editörü ve fiyatlar alt sayfalarında İçerik sekmesi ve Sayfalar alt sekmesi etkindir (Genel bakış değil)", () => {
     const icerik = site.tabs!.find((t) => t.label === "İçerik")!;
     expect(activeTabHref("/admin/site/sayfalar/abcdef123456", site.tabs!)).toBe(icerik.href);
     expect(activeTabHref("/admin/site/sayfalar/fiyatlar", site.tabs!)).toBe(icerik.href);
-    expect(activeChildHref("/admin/site/sayfalar/fiyatlar", icerik)).toBe("/admin/site/sayfalar");
-    expect(activeChildHref("/admin/site-icerik", icerik)).toBe("/admin/site-icerik");
+    expect(activeTabHref("/admin/site/sayfalar/ana-sayfa", site.tabs!)).toBe(icerik.href);
+    expect(activeChildHref("/admin/site/sayfalar/fiyatlar", icerik)).toBeNull();
     expect(activeTabHref("/admin/site", site.tabs!)).toBe("/admin/site");
   });
   it("S1 dikişi: Hız, Reklam, Medya, Rehber ve Bağlantılar 'Diğer ▾' altında; ilk 5 sekme değişmez, menü satırı eklenmez", () => {
@@ -178,7 +183,8 @@ describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekm
   it("hata görünümü Hata kayıtları, diğer görünümler Sağlık sekmesidir", () => {
     expect(activeTabHref("/admin/sistem", sistem.tabs!, "hatalar")).toBe("/admin/sistem?sekme=hatalar");
     expect(activeTabHref("/admin/sistem", sistem.tabs!, null)).toBe("/admin/sistem");
-    expect(activeTabHref("/admin/sistem", sistem.tabs!, "emlakfiyati")).toBe("/admin/sistem");
+    expect(activeTabHref("/admin/sistem", sistem.tabs!, "bilinmeyen")).toBe("/admin/sistem");
+    expect(activeTabHref("/admin/sistem", sistem.tabs!, "durum")).toBe("/admin/sistem?sekme=durum");
     expect(activeTabHref("/admin/aktivite", sistem.tabs!, null)).toBe("/admin/aktivite");
     // Başka sayfadaki `sekme=hatalar` sorgu sekmesini etkin yapmaz.
     expect(activeTabHref("/admin/aktivite", sistem.tabs!, "hatalar")).toBe("/admin/aktivite");

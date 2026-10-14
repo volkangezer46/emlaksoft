@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatTry } from "@/lib/format";
 import Link from "@/components/ui/smart-link";
@@ -14,6 +14,7 @@ import {
   History,
   KeyRound,
   LifeBuoy,
+  Megaphone,
   ReceiptText,
   ScrollText,
   Settings2,
@@ -60,7 +61,7 @@ import { PaymentProfilePanel } from "./payment-profile-panel";
 import { loadPaymentProfile, loadSubscriptionOps } from "@/lib/billing/subscription-ops";
 import { resolveEntitlementLimit, resolveSeatLimit } from "@/lib/billing/entitlements/overrides";
 import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { OfficeFinanceCard } from "@/app/admin/muhasebe/office-finance-card";
+import { OfficeFinanceCard } from "@/app/admin/billing/muhasebe/office-finance-card";
 import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
 import {
@@ -104,6 +105,8 @@ const TAB_META: Record<OfficeTab, { label: string; icon: typeof History }> = {
 const TIMELINE_PAGE = 40;
 
 type SP = Record<string, string | string[] | undefined>;
+
+export const metadata = { title: "Ofis 360" };
 
 export default async function AdminTenantDetailPage({
   params,
@@ -507,6 +510,12 @@ export default async function AdminTenantDetailPage({
               currentStatus={tenant.status ?? "trial"}
               plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
             />
+            {/* Tek ofise mesaj: Toplu duyuru formu bu ofise ön dolu açılır (kanal, zaman ve önizleme orada). */}
+            {platformCanAccess(staff, "broadcast") ? (
+              <ButtonLink variant="outline" size="md" href={`/admin/duyuru?yeni=1&ofis=${tenant.id}`}>
+                <Megaphone className="h-4 w-4" aria-hidden /> Mesaj gönder
+              </ButtonLink>
+            ) : null}
             <form action={stopImpersonation}>
               <Button variant="outline" size="md" type="submit">
                 Önizlemeyi bitir

@@ -86,7 +86,7 @@ export const COLLECTORS: readonly IssueCollector[] = [seoIssueCollector, googleG
 
 /** Kutucukların kurulum/ayrıntı ekranları (her bağlantı GERÇEK bir sayfaya gider). */
 export const AREA_META: Record<Exclude<IssueArea, "icerik">, { label: string; setupHref: string; setupLabel: string }> = {
-  seo: { label: "SEO", setupHref: "/admin/seo", setupLabel: "SEO merkezi" },
+  seo: { label: "SEO", setupHref: "/admin/site/seo", setupLabel: "SEO merkezi" },
   hiz: { label: "Hız", setupHref: "/admin/site/hiz", setupLabel: "Hız" },
   olcum: { label: "Ölçüm", setupHref: "/admin/site/reklam", setupLabel: "Huni ve ziyaret sayacı" },
   reklam: { label: "Reklam", setupHref: "/admin/site/baglantilar", setupLabel: "Google bağlantıları" },

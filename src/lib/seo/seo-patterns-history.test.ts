@@ -21,7 +21,7 @@ import {
   pushSeoHistory,
   type SeoHistoryEntry,
 } from "./history";
-import { pageImpact, robotsImpact, robotsPatternMatches, sitemapImpact } from "@/app/admin/seo/noindex-impact";
+import { pageImpact, robotsImpact, robotsPatternMatches, sitemapImpact } from "@/app/admin/site/seo/noindex-impact";
 import { mergeRobots, mergeSitemap } from "./schema";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");

@@ -142,6 +142,8 @@ function eventDetail(event: TicketEvent) {
   return event.visibility === "internal" ? "Yalnız personel" : "Müşteriye görünür";
 }
 
+export const metadata = { title: "Destek talebi" };
+
 export default async function AdminTicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const viewer = await requirePlatformModule("tickets");
   const { id } = await params;

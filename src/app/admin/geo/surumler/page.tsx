@@ -19,6 +19,8 @@ function summaryText(summary: Record<string, unknown>): string {
   return "";
 }
 
+export const metadata = { title: "Coğrafya: sürümler" };
+
 export default async function AdminGeoVersionsPage() {
   const staff = await requirePlatformModule("geo");
   const canWrite = staff.role === "super_admin";

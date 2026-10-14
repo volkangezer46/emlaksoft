@@ -4,13 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/require-permission";
 import { guardPlatformAction } from "@/lib/platform-guards";
 import { logPlatformActivity } from "@/lib/platform-activity";
-import { setPlatformSetting } from "@/lib/platform-settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { ensureReferralCode, getAdminGrowthOverview, getGrowthFlags } from "@/lib/growth/store";
+import { ensureReferralCode, getGrowthFlags } from "@/lib/growth/store";
 import { GROWTH_RPC, SETTINGS_KEYS, decisionErrorText, staffRpc } from "@/lib/growth/engine";
-import { readinessBlockers } from "@/lib/growth/program";
-import { GROWTH_SETTING_KEYS, isMissingTableError } from "@/lib/growth/settings";
+import { isMissingTableError } from "@/lib/growth/settings";
 import { isPartnerCode } from "@/lib/growth/attribution";
 import { actionErrorMessage } from "@/lib/action-errors";
 
@@ -42,50 +40,6 @@ const ADMIN_GATE = {
   roles: ["super_admin"],
   rate: { key: "platform-growth", limit: 40, windowSec: 600 },
 } as const;
-
-/**
- * Program anahtarları (varsayılan KAPALI). Yalnız süper admin.
- * KAPALI -> AÇIK geçişinde "hazırlık kontrolü" ZORUNLUDUR: engelleyici madde (migration/cüzdan/kural) varsa açılmaz.
- * Nakit ödeme bayrağı ortak programı açık değilse açılamaz.
- */
-export async function saveGrowthFlags(fd: FormData): Promise<GrowthResult> {
-  const gate = await guardPlatformAction(ADMIN_GATE);
-  if ("error" in gate) return { error: gate.error };
-  const before = await getGrowthFlags();
-  const referral = fd.get("referral_enabled") === "on";
-  const partner = fd.get("partner_enabled") === "on";
-  const cash = fd.get("cash_payout_enabled") === "on";
-  if (cash && !partner) return { error: "Nakit ödeme yalnız ortak programı açıkken açılabilir." };
-
-  const opening = (referral && !before.referralEnabled) || (partner && !before.partnerEnabled) || (cash && !before.cashPayoutEnabled);
-  if (opening) {
-    const ov = await getAdminGrowthOverview();
-    const checks = [
-      ...(referral && !before.referralEnabled ? ov.readiness.referral : []),
-      ...(partner && !before.partnerEnabled ? ov.readiness.partner : []),
-      ...(cash && !before.cashPayoutEnabled ? ov.readiness.cash : []),
-    ];
-    const blockers = readinessBlockers(checks);
-    if (blockers.length) {
-      const names = [...new Set(blockers.map((b) => b.label))].join("; ");
-      return { error: `Hazırlık kontrolü geçmedi, program açılamaz: ${names}.` };
-    }
-  }
-
-  const a = await setPlatformSetting(GROWTH_SETTING_KEYS.referralEnabled, referral ? "on" : "off", gate.staff.id);
-  const b = await setPlatformSetting(GROWTH_SETTING_KEYS.partnerEnabled, partner ? "on" : "off", gate.staff.id);
-  const c = await setPlatformSetting(GROWTH_SETTING_KEYS.cashPayoutEnabled, cash ? "on" : "off", gate.staff.id);
-  if (!a || !b || !c) return { error: actionErrorMessage(null, "Ayarlar kaydedilemedi.") };
-  await logPlatformActivity({
-    actorId: gate.staff.id,
-    action: "growth.flags_update",
-    entityType: "platform_settings",
-    meta: { old: before, new: { referralEnabled: referral, partnerEnabled: partner, cashPayoutEnabled: cash } },
-  });
-  revalidatePath("/admin/growth");
-  revalidatePath("/app/buyume");
-  return { ok: true };
-}
 
 function num(raw: FormDataEntryValue | null): number | null {
   const s = String(raw ?? "").trim().replace(",", ".");
@@ -155,7 +109,7 @@ export async function createRewardRule(fd: FormData): Promise<GrowthResult> {
     entityId: data?.id as string | undefined,
     meta: { kind, rewardType, value, duration, hold, cap, creditExpires },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -174,7 +128,7 @@ export async function setRewardRuleActive(id: string, active: boolean): Promise<
     entityId: id,
     meta: { active },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -206,7 +160,7 @@ export async function createPartner(fd: FormData): Promise<GrowthResult> {
     entityId: data?.id as string | undefined,
     meta: { type, code },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -225,7 +179,7 @@ export async function setPartnerStatus(id: string, status: string): Promise<Grow
     entityId: id,
     meta: { status },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -252,7 +206,7 @@ export async function decideClaim(claimId: string, decision: string, reason: str
     entityId: claimId,
     meta: { decision, reason: why, status: res.status ?? null },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -282,7 +236,7 @@ export async function saveReferralSettings(fd: FormData): Promise<GrowthResult> 
     entityType: "growth_referral_settings",
     meta: { keys: Object.keys(values), values },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   revalidatePath("/app/buyume");
   return { ok: true };
 }
@@ -318,7 +272,7 @@ export async function updatePartnerDetails(partnerId: string, fd: FormData): Pro
     // Vergi numarası denetim kaydına YAZILMAZ (yalnız var/yok).
     meta: { isTaxPayer: values.is_tax_payer, hasTaxNo: Boolean(taxNo), owner: owner || null, rule: rule || null },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }
 
@@ -353,6 +307,6 @@ export async function createPartnerPayout(partnerId: string, fd: FormData): Prom
     entityId: partnerId,
     meta: { method, amount: res.amount ?? null, documentNo: method === "bank_transfer_external" ? doc : null, payoutId: res.payout_id ?? null },
   });
-  revalidatePath("/admin/growth");
+  revalidatePath("/admin/ortaklik");
   return { ok: true };
 }

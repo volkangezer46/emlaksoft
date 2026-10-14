@@ -11,7 +11,7 @@ import { FAQ, FAQ_CATEGORIES, type FaqCategory, type FaqItem } from "@/lib/help-
  */
 export type HelpKind = "guide" | "faq" | "glossary";
 export const HELP_KINDS: readonly { id: HelpKind; label: string }[] = [
-  { id: "guide", label: "Rehber" },
+  { id: "guide", label: "Nasıl yapılır" },
   { id: "faq", label: "SSS" },
   { id: "glossary", label: "Sözlük" },
 ];
