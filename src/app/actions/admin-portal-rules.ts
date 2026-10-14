@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requirePlatformModule } from "@/lib/platform";
+import { platformCan } from "@/lib/platform-access";
 import { createClient } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { now } from "@/lib/clock";
@@ -18,7 +19,7 @@ import { needsPiiAck } from "@/lib/portal-rules/admin-model";
 
 /**
  * Yönetim > Sistem > Portal kuralları eylemleri. KAPI: her eylem `requirePlatformModule("sistem")` (super_admin + ops);
- * yayın üreten eylemler (onay, geri alma, tohum) yalnız super_admin (K1). Veri yolu OTURUMLU istemci + SECURITY DEFINER
+ * yayın üreten eylemler (onay, geri alma, tohum) yalnız `sistem` onay yetkisi (sabit rollerde super_admin; K1, DB pt_rules_is_super_admin ile aynı). Veri yolu OTURUMLU istemci + SECURITY DEFINER
  * RPC'ler (rol kapısı ve denetim kaydı SQL'de, P1); `createAdminClient` YOK (allowlist değişmez).
  * Yayın ve geri alma P1'in `publishRuleSet`/`rollbackRuleSet` yardımcılarıyla yapılır: damga (max+1, şimdi, 14 gün) →
  * `validateRuleSet` → sha → imza → RPC (sürüm çakışmasında bir kez yeniden dener). İmza anahtarı yoksa yayın yapılmaz.
@@ -118,7 +119,7 @@ export async function decideProposal(input: z.input<typeof decideSchema>): Promi
     return { ok: true, notice: "Öneri reddedildi." };
   }
 
-  if (staff.role !== "super_admin") return { error: SUPER_ONLY };
+  if (!platformCan(staff, "sistem", "approve")) return { error: SUPER_ONLY };
 
   const { data: proposal, error: pErr } = await db
     .from("portal_rule_proposals")
@@ -190,7 +191,7 @@ export async function rollbackTo(portal: string, version: number): Promise<Porta
   const staff = await requirePlatformModule("sistem");
   const parsed = rollbackSchema.safeParse({ portal, version });
   if (!parsed.success) return { error: "Geçersiz sürüm." };
-  if (staff.role !== "super_admin") return { error: SUPER_ONLY };
+  if (!platformCan(staff, "sistem", "approve")) return { error: SUPER_ONLY };
   const db = await createClient();
 
   const { data: target, error: tErr } = await db
@@ -219,7 +220,7 @@ export async function publishSeed(portal: string): Promise<PortalRulesResult> {
   const staff = await requirePlatformModule("sistem");
   const parsed = portalSchema.safeParse(portal);
   if (!parsed.success) return { error: "Geçersiz portal." };
-  if (staff.role !== "super_admin") return { error: SUPER_ONLY };
+  if (!platformCan(staff, "sistem", "approve")) return { error: SUPER_ONLY };
   const db = await createClient();
 
   const { count, error: cErr } = await db.from("portal_rule_sets").select("id", { count: "exact", head: true }).eq("portal", parsed.data);

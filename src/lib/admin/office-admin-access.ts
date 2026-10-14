@@ -5,8 +5,9 @@ import { baseRoleOf, platformCan, platformCanAccess, type PlatformAccessSubject 
  *
  * Kural: her eylem önce "tenants" modülünü ister (tüm roller görür); eylem bazında:
  *  - Ofis açma kapısı, demo dönüşümü (`convertDemoToTenant`) ile AYNI: "sales" modülü.
- *    Veritabanı tarafı da aynı listeyi ister (`convert_demo_request_to_tenant`: super_admin, ops, support).
- *  - Paket/durum/deneme: "billing" modülü (`update_tenant_plan_subscription` RPC'si super_admin + billing ister).
+ *    Veritabanı tarafı da aynı kuralı ister (`convert_demo_request_to_tenant`: platform_staff_can sales:write; sabit rollerde super_admin, ops, support).
+ *  - Paket/durum/deneme: "billing" modülü (`update_tenant_plan_subscription` RPC'si platform_staff_can billing:write ister;
+ *    sabit rollerde super_admin + billing, özel rolde matris).
  *  - Yıkıcı ya da hesap ele geçirmeye açık eylemler (askıya alma, arşivleme, vitrin adresi değişimi,
  *    sahip e-postası, sahiplik devri, kullanıcı pasifleştirme) YALNIZ süper admin.
  */
