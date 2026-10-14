@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
 import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
-import { activeTabHref, adminSidebarModel, adminTabPathname, isAdminNavActive, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
+import { activeTabHref, adminSidebarModel, isAdminNavActive, tabKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
 import { NavFlyout, NavScroller } from "@/components/ui/console/nav-kit";
@@ -177,7 +177,7 @@ export function AdminSidebar({
 
   const railFlyoutItems = (item: Item) =>
     item.tabs && item.tabs.length > 1
-      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(adminTabPathname(pathname, sekme), item.tabs ?? []) === t.href.split(/[?#]/)[0] }))
+      ? item.tabs.map((t) => ({ href: t.href, label: t.label, icon: item.icon, active: isActive(pathname, item) && activeTabHref(pathname, item.tabs ?? [], sekme) === tabKey(t.href) }))
       : [];
 
   const renderContent = (variant: "desktop" | "drawer") => (

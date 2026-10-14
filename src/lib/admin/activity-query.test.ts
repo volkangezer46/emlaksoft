@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activityHref, hasActivityFilter, parseActivityFilters } from "./activity-query";
-import { hrefWith } from "@/app/admin/hatalar/errors-href";
+import { hrefWith } from "@/app/admin/sistem/_hatalar/errors-href";
 import {
   DEFAULT_TRIAL_DAYS,
   parseSettingBool,

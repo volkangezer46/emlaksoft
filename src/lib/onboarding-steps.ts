@@ -183,14 +183,7 @@ const LEGACY_STEP_ALIASES: Record<string, WizardStepKey> = {
   demand: FINISH_STEP,
   appointment: FINISH_STEP,
   defs: FINISH_STEP,
-  // profil-tamamla adımları
-  konum: "office",
-  iletisim: "office",
-  fatura: "office",
-  marka: "office",
-  odak: "you",
-  ekip: "team",
-  // EİDS kurulum bağlantıları (görev, Yardım, eski profil-tamamla adresi)
+  // EİDS kurulum bağlantıları (görev, Yardım)
   yetki: "yetki-belgesi",
   eids: "eids-eposta",
 };

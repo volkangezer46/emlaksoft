@@ -4,7 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { PlatformModule } from "@/lib/platform-access";
-import { activeAdminItem, activeChildHref, activeTabHref, adminNavFor, adminTabPathname, splitTabs, type NavTab } from "@/lib/admin/nav";
+import { activeAdminItem, activeChildHref, activeTabHref, adminNavFor, splitTabs, type NavTab } from "@/lib/admin/nav";
 
 /**
  * Bölüm sekmeleri: bulunulan sayfanın menü öğesinin `tabs` listesi varsa (Site, Sistem, Ayarlar) kabuk üstünde sekme
@@ -19,11 +19,10 @@ export function AdminSectionTabs({ modules }: { modules: readonly PlatformModule
   const item = activeAdminItem(pathname, adminNavFor(modules));
   const tabs = item?.tabs ?? [];
   if (tabs.length < 2) return null;
-  // `?sekme=hatalar` (hata listesi) "Hata kayıtları" sekmesini etkin yapar; bkz. adminTabPathname.
-  const path = adminTabPathname(pathname, sekme);
-  const current = activeTabHref(path, tabs);
+  // `?sekme=` taşıyan sekme (ör. Hata kayıtları = /admin/sistem?sekme=hatalar) aynı sekmede etkindir; bkz. activeTabHref.
+  const current = activeTabHref(pathname, tabs, sekme);
   const tab = tabs.find((t) => t.href === current) ?? null;
-  return <SectionTabsView label={item!.label} tabs={tabs} current={current} currentChild={activeChildHref(path, tab)} />;
+  return <SectionTabsView label={item!.label} tabs={tabs} current={current} currentChild={activeChildHref(pathname, tab)} />;
 }
 
 const TAB_CLS = "focus-ring shrink-0 rounded-t-[var(--radius-control)] border-b-2 px-3.5 py-2 text-sm font-semibold transition-colors";

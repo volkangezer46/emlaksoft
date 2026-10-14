@@ -33,7 +33,7 @@ describe("kanonik UI bileşenleri", () => {
       "src/components/admin/count-up.tsx",
       "src/app/app/odometer-number.tsx",
       "src/app/app/_home/format.ts",
-      "src/app/app/ofis-merkezi/_tabs/settings-tab.tsx",
+      "src/app/app/ekip/_tabs/settings-tab.tsx",
       "src/components/app/office-center/module-shortcuts.tsx",
     ]) {
       expect(existsSync(join(ROOT, f)), f).toBe(false);

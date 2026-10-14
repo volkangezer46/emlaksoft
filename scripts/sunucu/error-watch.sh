@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Anlık hata akışı: public.error_logs'ta (/admin/hatalar; sunucu + istemci hataları) yeni görülen veya tekrarlayan
+# Anlık hata akışı: public.error_logs'ta (/admin/sistem?sekme=hatalar; sunucu + istemci hataları) yeni görülen veya tekrarlayan
 # her çözülmemiş (ve yok sayılmamış/ertelenmemiş) hata için /var/log/emlaksoft/hatalar.jsonl'a TEK SATIR JSON yazar. 15 sn aralık.
 # systemd: /etc/systemd/system/emlaksoft-error-watch.service (scripts/sunucu/install-error-watch.sh).
 #

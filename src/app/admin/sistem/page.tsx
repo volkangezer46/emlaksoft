@@ -1,7 +1,7 @@
 import { BellRing, Database, Landmark, Radar, Server, Workflow } from "lucide-react";
 import { PageTabs } from "@/components/app/page-tabs";
 import { requirePlatformModule } from "@/lib/platform";
-import { ErrorsView } from "../hatalar/errors-view";
+import { ErrorsView } from "./_hatalar/errors-view";
 import { EmlakFiyatiView } from "./emlakfiyati-view";
 import { PortalRulesView } from "./portal-rules/portal-rules-view";
 import { SystemView } from "./system-view";
@@ -25,7 +25,7 @@ const TABS = [
 ] as const;
 
 /**
- * Sistem sağlığı + Üretim hataları (eski /admin/hatalar) tek sayfada.
+ * Sistem sağlığı + Üretim hataları tek sayfada (hata listesi bileşenleri `./_hatalar`).
  * İki sekme de aynı `sistem` platform modülündedir (tek kapı).
  * `?sekme=hatalar` hata listesini açar; durum/son/sayfa parametreleri ona aittir.
  * `?sekme=portal-kurallari` portal form kurallarını açar; `portal` ve `gorunum` parametreleri ona aittir.

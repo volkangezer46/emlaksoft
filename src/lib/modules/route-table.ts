@@ -42,7 +42,6 @@ const ROUTES: ReadonlyArray<readonly [string, FeatureKey]> = [
   ["/app/belgeler", "documents"],
   ["/app/asistan", "ai_assistant"],
   ["/app/portfoy-avi", "prospecting"],
-  ["/app/ofis-merkezi", "office_center"],
 ];
 
 /** En uzun önek önce. */

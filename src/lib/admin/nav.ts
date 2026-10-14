@@ -207,10 +207,10 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         description: "Sağlık, cron nabzı, entegrasyonlar, hata ve aktivite kaydı",
         icon: Radar,
         modules: ["sistem", "activity"],
-        match: ["/admin/sistem", "/admin/hatalar", "/admin/aktivite"],
+        match: ["/admin/sistem", "/admin/aktivite"],
         tabs: [
           L("/admin/sistem", "Sağlık ve entegrasyonlar", "Cron, veritabanı, anahtarlar, kayıt ve bakım", ["sistem"]),
-          L("/admin/hatalar", "Hata kayıtları", "Uygulama hataları", ["sistem"]),
+          L("/admin/sistem?sekme=hatalar", "Hata kayıtları", "Uygulama hataları", ["sistem"]),
           L("/admin/aktivite", "Aktivite kaydı", "Denetim izi", ["activity"]),
         ],
       },
@@ -275,22 +275,28 @@ export function activeAdminItem(pathname: string, sections: readonly AdminNavSec
   return null;
 }
 
-/**
- * Sekme etkinliği için yol: hata listesi `/admin/sistem?sekme=hatalar` adresinde açılır (eski /admin/hatalar oraya
- * yönlenir) ama bölüm şeridinde "Hata kayıtları" sekmesi `/admin/hatalar` yoludur. Sorgu dizgesi yol eşleşmesine
- * girmediğinden bu görünüm sekme açısından `/admin/hatalar` sayılır; yoksa "Sağlık ve entegrasyonlar" etkin görünürdü.
- */
-export function adminTabPathname(pathname: string, sekme: string | null | undefined): string {
-  return pathname === "/admin/sistem" && sekme === "hatalar" ? "/admin/hatalar" : pathname;
-}
+const sekmeOf = (href: string): string | null => {
+  const q = href.split("#")[0]!.split("?")[1];
+  return q ? new URLSearchParams(q).get("sekme") : null;
+};
+
+/** Sekmenin şeritteki anahtarı: `?sekme=` taşıyan sekmede tam adres, diğerlerinde yol (bkz. activeTabHref). */
+export const tabKey = (href: string): string => (sekmeOf(href) ? href : pathOf(href));
 
 /**
  * Sekme aktif mi: en uzun eşleşen yol kazanır (/admin/ayarlar/yasal/[slug], /admin/ayarlar/yasal sekmesini etkin yapar). Alt sayfalar (`children`)
  * da sekmenin yoludur: /admin/site/sayfalar "İçerik" sekmesini etkin yapar ("Genel bakış" /admin/site'ı değil).
+ * Sorgu sekmesi: href'i `?sekme=X` taşıyan sekme (ör. "Hata kayıtları" = `/admin/sistem?sekme=hatalar`) yalnız aynı yolda
+ * `sekme` X iken etkindir ve yol eşleşmesinden önce gelir; o zaman tam href döner (yol sekmesi etkin görünmez).
  */
-export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[]): string | null {
+export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[], sekme?: string | null): string | null {
+  if (sekme) {
+    const hit = tabs.find((t) => sekmeOf(t.href) === sekme && pathOf(t.href) === pathname);
+    if (hit) return hit.href;
+  }
   let best: { len: number; href: string } | null = null;
   for (const t of tabs) {
+    if (sekmeOf(t.href)) continue;
     for (const p of [pathOf(t.href), ...(t.children ?? []).map((c) => pathOf(c.href))]) {
       if (under(pathname, p) && (!best || p.length > best.len)) best = { len: p.length, href: pathOf(t.href) };
     }
@@ -298,7 +304,6 @@ export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[]): 
   return best?.href ?? null;
 }
 
-/** Etkin sekmenin etkin alt sayfası (ikinci satır vurgusu). */
 export function activeChildHref(pathname: string, tab: AdminNavLink | null | undefined): string | null {
   return tab?.children?.length ? activeTabHref(pathname, tab.children) : null;
 }

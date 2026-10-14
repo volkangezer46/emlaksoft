@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { PLATFORM_ROLE_MODULES } from "@/lib/platform-access";
 import { SectionTabsView } from "@/components/admin/admin-section-tabs";
-import { ADMIN_NAV, activeChildHref, activeTabHref, adminNavFor, adminPaletteFor, adminSidebarModel, adminTabPathname, splitTabs, type NavTab } from "./nav";
+import { ADMIN_NAV, activeChildHref, activeTabHref, adminNavFor, adminPaletteFor, adminSidebarModel, splitTabs, tabKey, type NavTab } from "./nav";
 
 // Görünüm testi: akıllı bağlantı yerine düz <a> (yönlendirici bağlamı yok).
 vi.mock("@/components/ui/smart-link", async () => {
@@ -170,13 +170,28 @@ describe("AdminSectionTabs: 5 görünür sekme + 'Diğer ▾', alt sayfalar ikin
   });
 });
 
-describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekmesini etkin yapar", () => {
+describe("/admin/sistem?sekme=hatalar bölüm şeridinde 'Hata kayıtları' sekmesini etkin yapar (sorgu sekmesi)", () => {
   const sistem = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/sistem")!;
+  it("Hata kayıtları sekmesi kanonik adrese (Sistem sayfasının hatalar sekmesi) gider", () => {
+    expect(sistem.tabs!.map((t) => t.href)).toContain("/admin/sistem?sekme=hatalar");
+  });
   it("hata görünümü Hata kayıtları, diğer görünümler Sağlık sekmesidir", () => {
-    expect(activeTabHref(adminTabPathname("/admin/sistem", "hatalar"), sistem.tabs!)).toBe("/admin/hatalar");
-    expect(activeTabHref(adminTabPathname("/admin/sistem", null), sistem.tabs!)).toBe("/admin/sistem");
-    expect(activeTabHref(adminTabPathname("/admin/sistem", "emlakfiyati"), sistem.tabs!)).toBe("/admin/sistem");
-    // Başka sayfadaki `sekme=hatalar` eşlemeye girmez.
-    expect(adminTabPathname("/admin/aktivite", "hatalar")).toBe("/admin/aktivite");
+    expect(activeTabHref("/admin/sistem", sistem.tabs!, "hatalar")).toBe("/admin/sistem?sekme=hatalar");
+    expect(activeTabHref("/admin/sistem", sistem.tabs!, null)).toBe("/admin/sistem");
+    expect(activeTabHref("/admin/sistem", sistem.tabs!, "emlakfiyati")).toBe("/admin/sistem");
+    expect(activeTabHref("/admin/aktivite", sistem.tabs!, null)).toBe("/admin/aktivite");
+    // Başka sayfadaki `sekme=hatalar` sorgu sekmesini etkin yapmaz.
+    expect(activeTabHref("/admin/aktivite", sistem.tabs!, "hatalar")).toBe("/admin/aktivite");
+  });
+  it("tabKey: sorgu sekmesinde tam adres, yol sekmesinde yol", () => {
+    expect(tabKey("/admin/sistem?sekme=hatalar")).toBe("/admin/sistem?sekme=hatalar");
+    expect(tabKey("/admin/sistem")).toBe("/admin/sistem");
+  });
+  it("render: sorgu sekmesi etkinken yalnız o sekme aria-current taşır", () => {
+    const out = renderToStaticMarkup(
+      createElement(SectionTabsView, { label: "Sistem", tabs: sistem.tabs!, current: activeTabHref("/admin/sistem", sistem.tabs!, "hatalar"), currentChild: null }),
+    );
+    expect(out.match(/aria-current="page"/g)?.length).toBe(1);
+    expect(out).toMatch(/aria-current="page"[^>]*>Hata kayıtları/);
   });
 });

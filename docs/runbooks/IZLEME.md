@@ -24,7 +24,7 @@ Sahip: hesap kurulumunu platform sahibi yapar (UptimeRobot / Better Stack hesab�
 ## 3. Cron kaçırma
 
 1. `/api/health/cron` 503 ise gövdedeki `problems` listesine bak; ya da `/admin/sistem` Cron sağlığı.
-2. `reason: error` ise `/admin/hatalar` ve Vercel Logs'ta o işi (`/api/cron/<job>`) ara.
+2. `reason: error` ise `/admin/sistem?sekme=hatalar` ve Vercel Logs'ta o işi (`/api/cron/<job>`) ara.
 3. `reason: stale / never_ran`: Vercel > Cron Jobs ekranında işi gör, gerekirse "Run" ile elle tetikle; `CRON_SECRET` ve dağıtım durumunu doğrula.
 4. Tek seferlik kaçırma yan etkileri için ilgili iş kılavuzuna bak (ör. `docs/runbooks/GEO_PROVINCE_SYNC.md`, `CORE_WORKFLOW_RECONCILIATION.md`).
 
@@ -34,4 +34,4 @@ Her iş günü `/admin/billing` mutabakat kuyruğunda `manual_review` durumundak
 
 ## 5. Sunucu hataları
 
-Sunucu tarafı hatalar `/admin/hatalar` listesine `Sunucu` kaynağıyla düşer (`src/instrumentation.ts`, PII maskeli). Günlük bak; aynı hata sayacı artıyorsa öncelik ver.
+Sunucu tarafı hatalar `/admin/sistem?sekme=hatalar` listesine `Sunucu` kaynağıyla düşer (`src/instrumentation.ts`, PII maskeli). Günlük bak; aynı hata sayacı artıyorsa öncelik ver.
