@@ -13,6 +13,9 @@ import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { CALL_DISPOSITIONS } from "@/app/app/gelen-kutusu/call-console";
 import { quickCreateAppointment, quickCreateCustomer, quickCreateProperty, quickLogCall } from "./actions";
 import { QUICK_INTENTS, QUICK_ROOM_OPTIONS } from "./quick-intents";
+import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
+import { missingFieldsError } from "@/lib/form-rules";
+import { MissingCountBadge } from "@/components/ui/form-action-bar";
 import dynamic from "next/dynamic";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -92,12 +95,13 @@ function Success({ title, openHref, openLabel, onAgain }: { title: string; openH
   );
 }
 
-function SubmitRow({ pending, label }: { pending: boolean; label: string }) {
+function SubmitRow({ pending, label, missingCount = 0 }: { pending: boolean; label: string; missingCount?: number }) {
   return (
     <div className="flex flex-col gap-1.5">
       <button type="submit" disabled={pending} className={SUBMIT}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
         {pending ? "Kaydediliyor…" : label}
+        {!pending ? <MissingCountBadge count={missingCount} /> : null}
       </button>
       <p className="hidden text-xs text-text-faint md:block">Ctrl/Cmd + Enter ile de kaydedebilirsiniz.</p>
     </div>
@@ -228,17 +232,65 @@ function AppointmentTab({
 }) {
   const q = useQuick(quickCreateAppointment);
   const conflict = q.result.conflictWarning ?? null;
+  const [apptType, setApptType] = useState(typeOptions[0]?.value ?? "showing");
+  const [customerId, setCustomerId] = useState("");
+  const [propertyId, setPropertyId] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
+  // Sunucu (createAppointment) ile AYNI kural: yer göstermede müşteri + portföy, diğer türlerde en az biri.
+  const missing = appointmentMissing({ appointment_type: apptType, customer_id: customerId, property_id: propertyId });
+  const isShowing = apptType === "showing";
   if (q.done) {
-    return <Success title="Randevu planlandı" openHref="/app/randevular" openLabel="Kaydı aç (randevular)" onAgain={q.again} />;
+    return (
+      <Success
+        title="Randevu planlandı"
+        openHref="/app/randevular"
+        openLabel="Kaydı aç (randevular)"
+        onAgain={() => {
+          setCustomerId("");
+          setPropertyId("");
+          setLocalError(null);
+          q.again();
+        }}
+      />
+    );
+  }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    if (missing.length > 0) {
+      event.preventDefault();
+      setLocalError(missingFieldsError(missing));
+      const first = missing[0];
+      document.getElementById(first.key === "property" ? "hq-appt-property" : "hq-appt-customer")?.focus();
+      return;
+    }
+    setLocalError(null);
+    q.onSubmit(event, conflict ? { confirm_conflict: "1" } : undefined);
   }
   return (
-    <form
-      key={q.round}
-      onSubmit={(e) => q.onSubmit(e, conflict ? { confirm_conflict: "1" } : undefined)}
-      onKeyDown={q.onKeyDown}
-      className="flex flex-col gap-4"
-    >
-      <FormField label="Müşteri" htmlFor="hq-appt-customer" inject={false}>
+    <form key={q.round} onSubmit={submit} onKeyDown={q.onKeyDown} className="flex flex-col gap-4">
+      <FormField
+        label="Tür"
+        htmlFor="hq-appt-type"
+        required
+        inject={false}
+        hint={isShowing ? "Yer göstermede müşteri ve portföy birlikte gerekir." : "Müşteri ya da portföyden en az biri gerekir."}
+      >
+        <div className="relative">
+          <FormSelect
+            id="hq-appt-type"
+            name="appointment_type"
+            required
+            value={apptType}
+            onChange={(e) => setApptType(e.target.value)}
+            className={`${BIG} cursor-pointer appearance-none pr-9`}
+          >
+            {typeOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </FormSelect>
+          <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" aria-hidden />
+        </div>
+      </FormField>
+      <FormField label={isShowing ? "Müşteri" : "Müşteri (ya da portföy)"} htmlFor="hq-appt-customer" required={isShowing} inject={false}>
         <Combobox
           id="hq-appt-customer"
           name="customer_id"
@@ -248,10 +300,11 @@ function AppointmentTab({
           emptyText="Eşleşen müşteri yok"
           onSearch={searchCustomers}
           options={customers}
+          onValueChange={setCustomerId}
           className="[&_button]:min-h-11"
         />
       </FormField>
-      <FormField label="Portföy (isteğe bağlı)" htmlFor="hq-appt-property" inject={false}>
+      <FormField label={isShowing ? "Portföy" : "Portföy (ya da müşteri)"} htmlFor="hq-appt-property" required={isShowing} inject={false}>
         <Combobox
           id="hq-appt-property"
           name="property_id"
@@ -261,31 +314,20 @@ function AppointmentTab({
           emptyText="Eşleşen portföy yok"
           onSearch={searchProperties}
           options={properties}
+          onValueChange={setPropertyId}
           className="[&_button]:min-h-11"
         />
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Tarih ve saat" htmlFor="hq-appt-when" required>
-          <FormInput id="hq-appt-when" name="when" type="datetime-local" required defaultValue={defaultWhen} className={BIG} />
-        </FormField>
-        <FormField label="Tür" htmlFor="hq-appt-type" required inject={false}>
-          <div className="relative">
-            <FormSelect id="hq-appt-type" name="appointment_type" required defaultValue={typeOptions[0]?.value ?? "showing"} className={`${BIG} cursor-pointer appearance-none pr-9`}>
-              {typeOptions.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </FormSelect>
-            <ChevronsUpDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" aria-hidden />
-          </div>
-        </FormField>
-      </div>
+      <FormField label="Tarih ve saat" htmlFor="hq-appt-when" required>
+        <FormInput id="hq-appt-when" name="when" type="datetime-local" required defaultValue={defaultWhen} className={BIG} />
+      </FormField>
       {conflict ? (
         <p role="alert" className="flex items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {conflict}
         </p>
       ) : null}
-      <ErrorBand error={q.result.error} />
-      <SubmitRow pending={q.pending} label={conflict ? "Yine de kaydet" : "Randevuyu kaydet"} />
+      <ErrorBand error={localError ?? q.result.error} />
+      <SubmitRow pending={q.pending} label={conflict ? "Yine de kaydet" : "Randevuyu kaydet"} missingCount={missing.length} />
     </form>
   );
 }

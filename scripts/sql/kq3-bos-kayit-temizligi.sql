@@ -8,7 +8,11 @@
 -- 2026-10-14 salt-okunur kontrol (canlı): 4 satır var, hepsi demo-ofis'te; anlaşmalarda müşteri/portföy/tutar boş
 -- (stage=new), randevular katılımcısız yer gösterme (07:00 UTC = 10:00 TR). Anlaşmaya FK ile bağlı tablolar:
 -- commissions, deal_checklist_items, deal_costs, deal_notes, deal_process_steps, offers, rentals, surveys, survey_tasks,
--- tasks; randevuya FK yok. Bağlı satır SAYIMI henüz çalıştırılmadı (aşağıdaki ÖN KONTROL çıktısına bakın).
+-- tasks; randevuya FK yok.
+-- 2026-10-14 ÖN KONTROL (canlı, `begin transaction read only` + rollback): deals=2, appointments=2, bağlı FK satırı
+-- toplamı 0 (deal_process_steps/checklist dahil; deals/appointments üzerinde satır açan tetikleyici yok — yalnız
+-- deals_guard_atomic_stage ve trg_block_readonly_identity_writes), audit_logs=2, notifications=0. Koruma durmaz.
+-- SİLME ÇALIŞTIRILMADI: sahip/yayın yetkili oturum çalıştırıp "kalan = 0" çıktısını kayda geçirir.
 -- Silme bağlı FK satırı varsa ya da kayıt boş değilse DURUR (DO bloğu). audit_logs/notifications FK değildir;
 -- ön kontrolde sayılır, silinmez (denetim izi kalır).
 

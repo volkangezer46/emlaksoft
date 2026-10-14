@@ -45,6 +45,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { createPipelineDeal } from "./deals";
 import { createAppointment } from "./appointments";
+import { quickCreateAppointment } from "@/app/app/hizli/actions";
 
 function fd(entries: Record<string, string>): FormData {
   const f = new FormData();
@@ -102,6 +103,24 @@ describe("createAppointment — boş randevu reddi", () => {
 
   it("ofis görüşmesi yalnız müşteriyle kabul edilir (kural engellemez)", async () => {
     const res = await createAppointment(fd({ appointment_type: "office", date: "2026-10-20", time: "10:00", customer_id: "c1" }));
+    expect(res.error).toBeUndefined();
+    expect(inserts.filter((i) => i.table === "appointments")).toHaveLength(1);
+  });
+});
+
+describe("quickCreateAppointment — hızlı formun varsayılan akışı aynı kurala tabi", () => {
+  it("yer gösterme + yalnız müşteri (portföy boş) kayıt oluşturmaz, eksik alanı adıyla söyler", async () => {
+    const res = await quickCreateAppointment(
+      fd({ appointment_type: "showing", when: "2026-10-20T10:00", customer_id: "c1", property_id: "" }),
+    );
+    expect(res.error).toBe("Eksik alan: Portföy.");
+    expect(inserts).toHaveLength(0);
+  });
+
+  it("yer gösterme + müşteri + portföy kabul edilir", async () => {
+    const res = await quickCreateAppointment(
+      fd({ appointment_type: "showing", when: "2026-10-20T10:00", customer_id: "c1", property_id: "p1" }),
+    );
     expect(res.error).toBeUndefined();
     expect(inserts.filter((i) => i.table === "appointments")).toHaveLength(1);
   });

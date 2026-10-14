@@ -84,3 +84,16 @@ describe("KQ3 form sözleşmesi", () => {
     expect(src).toContain('disabled={upload.status === "uploading"}');
   });
 });
+
+describe("KQ3 odak sırası ve tek seferlik onaylar", () => {
+  it("anlaşma tutarında native required yok: ilk eksik odağı dealMissing sırasıyla (önce taraf, sonra tutar)", () => {
+    const src = read("src/app/app/anlasmalar/yeni/new-deal-form.tsx");
+    expect(src).toMatch(/<FormInput name="deal_value"(?![^>]*\brequired\b)[^>]*\/>/);
+    expect(dealMissing({}).map((i) => i.key)).toEqual(["party", "value"]);
+  });
+
+  it("telefonsuz kayıt onayı kullanıldıktan sonra sıfırlanır", () => {
+    const src = read("src/app/app/musteriler/yeni/customer-form.tsx");
+    expect(src).toMatch(/noPhoneOk\.current = false;/);
+  });
+});

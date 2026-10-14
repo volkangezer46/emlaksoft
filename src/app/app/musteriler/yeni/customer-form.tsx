@@ -101,6 +101,8 @@ export function CustomerForm({
       setPhoneAsk(true);
       return;
     }
+    // Onay yalnız bu gönderim için geçerli: sunucu hatası/çift kayıt reddi sonrası ya da sonraki kayıtta yeniden sorulur.
+    noPhoneOk.current = false;
     setPhoneAsk(false);
     onSubmit(e);
   }
