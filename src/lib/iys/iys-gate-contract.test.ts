@@ -32,6 +32,7 @@ const COMMERCIAL: Record<string, string> = {
 const TRANSACTIONAL: Record<string, string> = {
   "src/app/actions/auth.ts": "doğrulama kodu / hesap güvenliği",
   "src/app/giris/dogrulama/actions.ts": "giriş doğrulama kodu",
+  "src/app/giris/iki-adim-kurulum/actions.ts": "iki adımlı doğrulama kurulum kodu (DG7)",
   "src/app/actions/contract-reminders.ts": "sözleşme imza hatırlatması",
   "src/app/actions/contract-signers.ts": "sözleşme imza daveti",
   "src/app/actions/contracts.ts": "sözleşme imza akışı",

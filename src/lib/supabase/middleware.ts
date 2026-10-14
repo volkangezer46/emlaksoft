@@ -28,6 +28,9 @@ import { staticRewriteTarget } from "@/lib/static-home/request";
 import { staticHandlerPath } from "@/lib/static-home/registry";
 import { enabledStaticIds } from "@/lib/static-home/settings";
 import { STATIC_REWRITE_HEADER, staticRewriteToken } from "@/lib/static-home/internal-token";
+import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
+import { APP_IDLE_COOKIE, MFA_SETUP_PATH, OFFICE_IP_ENV_OVERRIDE, policyNeedsProxy } from "@/lib/office-security/policy";
+import { decideOfficeGate } from "@/lib/office-security/proxy-gate";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
 function maintenanceResponse(request: NextRequest, retryAfterSec: number = DEFAULT_RETRY_AFTER_SEC) {
@@ -167,7 +170,11 @@ export async function updateSession(request: NextRequest) {
     const impersonating = user.app_metadata?.impersonating === true;
     // profil + personel + ofis durumu tek RPC'de (yoksa eski üç sorgu; bkz. proxy-gates.ts);
     const tGates0 = timing ? performance.now() : 0;
-    const gate = await readProxyGateData(supabase, user.id, tenantId);
+    // DG7 ofis güvenlik politikası kapı okumasıyla PARALEL (30 sn önbellekli tüm-ofis görüntüsü; sıcakken ağ yok).
+    const [gate, officePolicy] = await Promise.all([
+      readProxyGateData(supabase, user.id, tenantId),
+      isApp && tenantId && !impersonating ? readOfficeSecurityPolicyCached(tenantId) : Promise.resolve(null),
+    ]);
     const { profile, profileError } = gate;
     const staff = gate.staff ? { id: user.id } : null;
     const tenant = gate.tenantStatus === null ? null : { status: gate.tenantStatus };
@@ -274,6 +281,46 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
+    // DG7 ofis güvenlik politikası (yalnız politika belirlemiş ofisin kanonik kullanıcısında; destek oturumu muaf).
+    let officeIdleCookie: string | null = null;
+    if (isApp && canonicalTenantUser && policyNeedsProxy(officePolicy)) {
+      const decision = await decideOfficeGate({
+        policy: officePolicy,
+        userId: user.id,
+        role: profile?.role,
+        twoFactorOn: Boolean(profile?.two_factor_sms),
+        ip: request.headers.get("x-real-ip")?.trim() || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+        claims,
+        idleCookieValue: request.cookies.get(APP_IDLE_COOKIE)?.value,
+        passive: request.headers.get("next-router-prefetch") === "1" || request.headers.get("purpose") === "prefetch",
+        nowSec: Math.floor(now() / 1000),
+        secret: process.env.TWO_FACTOR_COOKIE_SECRET,
+        envIpOverride: process.env[OFFICE_IP_ENV_OVERRIDE],
+      });
+      if (decision.kind === "end") {
+        // Yalnız BU cihazın oturumu kapanır; temizlenen auth çerezleri yönlendirmeye taşınır (yoksa yerel JWT geçerli kalır).
+        await supabase.auth.signOut({ scope: "local" });
+        const redirect = request.nextUrl.clone();
+        redirect.pathname = "/giris";
+        redirect.search = "";
+        redirect.searchParams.set("reason", decision.reason);
+        if (decision.reason !== "office_ip") redirect.searchParams.set("next", path);
+        const res = NextResponse.redirect(redirect);
+        for (const cookie of supabaseResponse.cookies.getAll()) res.cookies.set(cookie);
+        res.cookies.delete(APP_IDLE_COOKIE);
+        res.cookies.delete(TWO_FACTOR_COOKIE);
+        return res;
+      }
+      if (decision.kind === "mfa_setup") {
+        const redirect = request.nextUrl.clone();
+        redirect.pathname = MFA_SETUP_PATH;
+        redirect.search = "";
+        redirect.searchParams.set("next", path);
+        return NextResponse.redirect(redirect);
+      }
+      officeIdleCookie = decision.idleCookie;
+    }
+
     if (profile?.is_active && profile.two_factor_sms) {
       const binding = twoFactorBindingFromClaims(
         user.id,
@@ -300,6 +347,15 @@ export async function updateSession(request: NextRequest) {
       request.headers.set(AUTH_VERIFIED_HEADER, user.id);
       const verified = NextResponse.next({ request });
       for (const cookie of supabaseResponse.cookies.getAll()) verified.cookies.set(cookie);
+      if (officeIdleCookie) {
+        verified.cookies.set(APP_IDLE_COOKIE, officeIdleCookie, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 86_400,
+        });
+      }
       supabaseResponse = verified;
     }
   }
