@@ -19,7 +19,7 @@ import {
   type PlanCatalogSettings,
 } from "./plan-overrides";
 import { PLAN_GATES, gatesIncludedIn, gatesLockedAfterTrial, lockedGate, lockedHrefs, planIncludesGate } from "./page-gates";
-import { BASE_PLAN_IDS, planAmountOf, planTierOf, visiblePlans, type PlanDef } from "./plans";
+import { BASE_PLAN_IDS, getPlan, planAmountOf, planLabel, planLabelIn, planTierOf, resolvePlanDef, visiblePlans, type PlanDef } from "./plans";
 import { evaluatePlanChange } from "./plan-change-core";
 import { defaultTeamSizeForPlan, registrationPlanForTeamSize } from "./registration-plan";
 import { buildComparison } from "@/lib/pricing-page-model";
@@ -225,5 +225,35 @@ describe("fiyat değişikliği fiyat kilitli aboneliği etkilemez", () => {
     expect(sql).not.toMatch(/price_lock_/i);
     // Taban fiyat yedeği değişmedi (749/2790/5490/8990/14900)
     for (const [id, g] of Object.entries(GOLDEN)) expect(sql).toContain(`when '${id}' then ${g.monthly}`);
+  });
+});
+
+describe("eklenen paketin limit ve adı (resolvePlanDef / planLabelIn)", () => {
+  const custom: PlanDef = {
+    ...getPlan("office"),
+    id: "ofis_plus",
+    tier: "office",
+    custom: true,
+    name: "Ofis Plus",
+    limits: { seats: 10, customers: null, activeProperties: null, branches: 5 },
+  };
+  const catalog = [...catalogPlanDefs({ overrides: {} }), custom];
+
+  it("eklenen pakette limit ve ad katalog kaydından (Ofis'e düşmez)", () => {
+    expect(resolvePlanDef("ofis_plus", catalog).limits).toEqual(custom.limits);
+    expect(planLabelIn("ofis_plus", catalog)).toBe("Ofis Plus");
+  });
+
+  it("taban kimlikte davranış aynı (kod tanımı; katalog verilse de)", () => {
+    for (const id of BASE_PLAN_IDS) {
+      expect(resolvePlanDef(id, catalog)).toBe(getPlan(id));
+      expect(planLabelIn(id, catalog)).toBe(planLabel(id));
+    }
+    expect(resolvePlanDef(null)).toBe(getPlan("office"));
+  });
+
+  it("katalog yoksa / kayıt bulunamazsa eski davranış: limit Ofis, ad kimlik", () => {
+    expect(resolvePlanDef("ofis_plus")).toBe(getPlan("office"));
+    expect(planLabelIn("ofis_plus")).toBe("ofis_plus");
   });
 });

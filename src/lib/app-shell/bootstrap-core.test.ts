@@ -69,6 +69,17 @@ describe("usageRowsFromCounts", () => {
     if (seats) expect(seats).toMatchObject({ label: "Kullanıcı", used: 2, href: "/app/ekip" });
   });
 
+  it("adminden eklenen pakette limit katalogdan (Ofis limiti gösterilmez)", () => {
+    const custom = { ...getPlan("office"), id: "ofis_plus", tier: "office" as const, custom: true, limits: { seats: 12, customers: null, activeProperties: 400, branches: 5 } };
+    const rows = usageRowsFromCounts("ofis_plus", { seats: 3, activeProperties: 10, customers: 1 }, [custom]);
+    expect(rows.find((r) => r.key === "seats")?.limit).toBe(12);
+    expect(rows.find((r) => r.key === "properties")?.limit).toBe(400);
+    // Taban kimlikte katalog verilse de kod tanımı (davranış aynı)
+    expect(usageRowsFromCounts("office", { seats: 1, activeProperties: 1, customers: 1 }, [custom])).toEqual(
+      usageRowsFromCounts("office", { seats: 1, activeProperties: 1, customers: 1 }),
+    );
+  });
+
   it("bilinmeyen plan ofis paketine düşer (getPlanUsage ile aynı)", () => {
     expect(usageRowsFromCounts(undefined, { seats: 1, activeProperties: 1, customers: 1 })).toEqual(
       usageRowsFromCounts("office", { seats: 1, activeProperties: 1, customers: 1 }),

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
-import { getPlan } from "@/lib/billing/plans";
+import { planLabelIn, resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { daysAgoIso } from "@/lib/clock";
 import { auditActionLabel } from "@/lib/admin-format";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
@@ -85,8 +85,10 @@ export function buildLimitRows(
   plan: string | null | undefined,
   used: { seats: number; properties: number; customers: number; branches: number },
   seatsHref?: string,
+  /** Katalog listesi (getPlanDefinitions): adminden eklenen paketin limitleri buradan; taban kimlikte kod tanımı. */
+  catalog?: readonly PlanDef[],
 ): LimitRow[] {
-  const l = getPlan(plan ?? "office").limits;
+  const l = resolvePlanDef(plan, catalog).limits;
   return [
     { key: "seats", label: "Kullanıcı", used: used.seats, limit: l.seats, href: seatsHref },
     { key: "properties", label: "Aktif ilan", used: used.properties, limit: l.activeProperties },
@@ -353,6 +355,8 @@ export type TimelineInput = {
   emails?: EmailSendRow[];
   /** Tahsilat günlüğü (tablo yoksa boş). */
   dunning?: DunningEventRow[];
+  /** Katalog listesi: adminden eklenen paketin adı için (yoksa taban ad/kimlik). */
+  catalog?: readonly PlanDef[];
 };
 
 /** Tüm kaynakları tek TimelineEvent akışına birleştirir (saf; testlenir). */
@@ -393,7 +397,7 @@ export function buildOfficeTimeline(i: TimelineInput): TimelineEvent[] {
   }
   if (i.access.billing && i.sub) {
     const s = i.sub;
-    ev.push({ id: "sub-created", at: s.created_at, category: "abonelik", title: `Abonelik kaydı oluştu (${getPlan(s.plan).name})`, icon: "spark" });
+    ev.push({ id: "sub-created", at: s.created_at, category: "abonelik", title: `Abonelik kaydı oluştu (${planLabelIn(s.plan, i.catalog)})`, icon: "spark" });
     if (s.current_period_start && s.status === "active") {
       ev.push({ id: "sub-period", at: s.current_period_start, category: "abonelik", title: "Abonelik dönemi başladı", icon: "spark", tone: "success" });
     }

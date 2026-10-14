@@ -25,7 +25,7 @@ import { AccountCreditPanel, type CreditGrantOption, type CreditMovementRow } fr
 import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
-import { getPlan, planLabel } from "@/lib/billing/plans";
+import { getPlan, planLabelIn } from "@/lib/billing/plans";
 import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
@@ -144,6 +144,7 @@ export default async function AdminTenantDetailPage({
     tenant.plan,
     { seats: kpiData.seats, properties: kpiData.properties, customers: kpiData.customers, branches: kpiData.branches },
     access.members ? tabHref("ekip") : undefined,
+    catalogDefs,
   );
   const seatRow = limitRows[0];
   const propRow = limitRows[1];
@@ -155,7 +156,7 @@ export default async function AdminTenantDetailPage({
   const kpis: { label: string; value: string; hint?: string; icon: typeof Users; href: string }[] = [
     {
       label: "Paket",
-      value: planLabel(tenant.plan),
+      value: planLabelIn(tenant.plan, catalogDefs),
       hint: endIso ? `${kpiData.sub?.status === "trialing" ? "Deneme bitişi" : "Bitiş"} ${fmtDay(endIso)}` : undefined,
       icon: Wallet,
       href: access.billing ? tabHref("abonelik") : tabHref("kullanim"),
@@ -262,7 +263,7 @@ export default async function AdminTenantDetailPage({
   } else if (active === "zaman" || active === "yasal") {
     const tdata = await loadOfficeTimeline(admin, { id, name: tenant.name, created_at: tenant.created_at }, access, kpiData.sub);
     if (active === "zaman") {
-      const all = buildOfficeTimeline(tdata);
+      const all = buildOfficeTimeline({ ...tdata, catalog: catalogDefs });
       const counts = countByCategory(all);
       const cats = TIMELINE_CATEGORIES.filter((c) => (counts[c.key] ?? 0) > 0).map((c) => ({ ...c, count: counts[c.key] }));
       const kategori = resolveCategory(sp.kategori, cats.map((c) => c.key));
@@ -488,7 +489,7 @@ export default async function AdminTenantDetailPage({
       <AdminPageHeader
         eyebrow="Ofis 360"
         title={tenant.name}
-        description={`${planLabel(tenant.plan)} · ${tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma`}
+        description={`${planLabelIn(tenant.plan, catalogDefs)} · ${tenantStatusLabel[tenant.status] ?? tenant.status} · yönetici erişimiyle güvenli okuma`}
         actions={
           <>
             <SubscriptionPanel

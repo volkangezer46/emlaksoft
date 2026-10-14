@@ -11,7 +11,7 @@ import {
 } from "@/lib/billing/plan-overrides";
 import { EF_TARIFF_SETTING_KEY, parseEfTariff, type EfTariff } from "@/lib/ef-credits/config";
 import { SEAT_SETTINGS_KEY, parseSeatSettings, type SeatSettings } from "@/lib/billing/seat-settings";
-import { PLANS, isPlanId, planAmountOf, planTierOf, visiblePlans, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { PLANS, isPlanId, planAmountOf, planLabelIn, planTierOf, visiblePlans, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { getFoundersStatus, getEffectiveTrialDays, type FoundersStatus } from "@/lib/billing/plan-support";
 
 /**
@@ -82,6 +82,20 @@ export async function getPublicPlanDefinitions(): Promise<PlanDef[]> {
 export async function getPlanDefinition(id: string): Promise<PlanDef> {
   const defs = await getPlanDefinitions();
   return defs.find((p) => p.id === id) ?? defs.find((p) => p.id === "office") ?? PLANS[1]!;
+}
+
+/**
+ * Limit/ad okuması için katalog listesi: yalnız eklenen (taban olmayan) kimlikte okunur. Taban kimlikte `undefined`
+ * döner ve `resolvePlanDef`/`planLabelIn` kod tanımını kullanır (sıcak yol: layout; katalog okunmaz, davranış aynı).
+ */
+export async function getCatalogForPlan(planId: string | null | undefined): Promise<PlanDef[] | undefined> {
+  if (!planId || isPlanId(planId)) return undefined;
+  return getPlanDefinitions().catch(() => undefined);
+}
+
+/** Müşteriye görünen paket adı (eklenen pakette katalogdaki ad; taban kimlikte katalog okunmaz). */
+export async function getPlanName(planId: string): Promise<string> {
+  return planLabelIn(planId, await getCatalogForPlan(planId));
 }
 
 /**

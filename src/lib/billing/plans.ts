@@ -324,6 +324,23 @@ export function planLabel(id: string): string {
   return isPlanId(id) ? getPlan(id).name : id;
 }
 
+/**
+ * Limit/ad okuması için paket tanımı: TABAN kimlikte kod tanımı (`getPlan`; davranış değişmez), adminden eklenen
+ * pakette katalog kaydı (`getPlanDefinitions()` listesi). Katalog verilmemişse/kayıt yoksa eski davranışla Ofis.
+ * `getPlan` eklenen paketi tanımaz (Ofis'e düşer); eklenen paketin kullanım kartı/limit satırları buradan okunmalı.
+ */
+export function resolvePlanDef(id: string | null | undefined, catalog?: readonly PlanDef[] | null): PlanDef {
+  const key = id ?? "office";
+  if (isPlanId(key)) return getPlan(key);
+  return catalog?.find((p) => p.id === key) ?? getPlan(key);
+}
+
+/** Müşteriye görünen paket adı: taban kimlikte `planLabel`, eklenen pakette katalogdaki ad; bulunamazsa kimlik. */
+export function planLabelIn(id: string, catalog?: readonly PlanDef[] | null): string {
+  if (isPlanId(id)) return planLabel(id);
+  return catalog?.find((p) => p.id === id)?.name ?? id;
+}
+
 export function planLimit(planId: string, key: keyof PlanLimits): number | null {
   return getPlan(planId).limits[key];
 }

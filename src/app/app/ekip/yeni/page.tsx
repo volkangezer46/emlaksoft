@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
 import { getPlanUsage } from "@/lib/nav-badges";
+import { getCatalogForPlan } from "@/lib/billing/plan-definitions";
 import { getExtraSeats, readOwnSeatLimit } from "@/lib/billing/seat-purchase";
 import { assignableRolesFor } from "@/lib/team/assignable-roles";
 import type { AppRole } from "@/lib/permissions";
@@ -25,7 +26,8 @@ export default async function NewAdvisorPage() {
   const [{ data: branches }, usage, ...roleMatrices] = await Promise.all([
     supabase.from("branches").select("id, name").eq("tenant_id", ctx.tenantId).eq("is_active", true).order("name"),
     // Plan kullanımı: yan menüyle aynı kaynak (gerçek aktif profil sayısı + paket limiti).
-    getPlanUsage(supabase, ctx.tenantId, tenant?.plan),
+    // Adminden eklenen pakette limit katalogdan (taban kimlikte katalog okunmaz).
+    getCatalogForPlan(tenant?.plan).then((catalog) => getPlanUsage(supabase, ctx.tenantId, tenant?.plan, catalog)),
     // Rolün ETKİN izinleri (varsayılan matris + ofisin rol istisnaları), kullanıcı istisnası olmadan.
     ...roles.map((r) => getEffectivePermissions(ctx.tenantId, r as AppRole)),
   ]);

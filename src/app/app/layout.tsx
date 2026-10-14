@@ -56,9 +56,9 @@ import { loadShellBootstrap, shellRpcKnownMissing } from "@/lib/app-shell/bootst
 import { navBadgesFromCounts, usageRowsFromCounts } from "@/lib/app-shell/bootstrap-core";
 import { resolveModuleState } from "@/lib/modules/logic";
 import type { AppModule } from "@/lib/permissions";
-import { planLabel } from "@/lib/billing/plans";
+import { planLabelIn } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
-import { getPlanTier } from "@/lib/billing/plan-definitions";
+import { getCatalogForPlan, getPlanTier } from "@/lib/billing/plan-definitions";
 import { getAppActions } from "@/lib/palette-core";
 import { ICONS } from "@/lib/icons";
 import { navExtraPathOwners } from "@/lib/nav-config";
@@ -294,12 +294,14 @@ async function buildShellModel() {
         : speculationValid && specPermsPromise
           ? specPermsPromise
           : getEffectivePermissions(tenantId, effectiveRole, user?.id);
+  // Adminden eklenen pakette limit ve ad katalogdan (taban kimlikte okunmaz: undefined, kod tanımı).
+  const planCatalogPromise = getCatalogForPlan(office?.plan);
   // Plan kullanım kartı (gerçek sayım) yalnız tenant+plana bağlı: RPC'den ya da head-count sorgularından.
   const usagePromise =
     user && tenantId && !platformStaffFullAccess
       ? bootUsable && boot
-        ? Promise.resolve(usageRowsFromCounts(office?.plan, boot.usage))
-        : getPlanUsage(supabase, tenantId, office?.plan).catch(() => [])
+        ? planCatalogPromise.then((catalog) => usageRowsFromCounts(office?.plan, boot.usage, catalog))
+        : planCatalogPromise.then((catalog) => getPlanUsage(supabase, tenantId, office?.plan, catalog)).catch(() => [])
       : Promise.resolve([]);
   // Ofisin kapattığı modüller (menü, sekme, palet ve hızlı oluşturmadan çıkar). Platform personeli etkilenmez.
   const closedModulesPromise: Promise<string[]> =
@@ -392,6 +394,7 @@ async function buildShellModel() {
     closedModules,
     navBadges,
     planUsage,
+    planName: planLabelIn(office?.plan ?? "office", await planCatalogPromise),
     tabCounts,
     vitrinHref,
     uiPrefCookie,
@@ -502,7 +505,7 @@ async function ShellSidebar() {
     <ClosedModulesProvider closed={m.closedModules}>
       <AppSidebar
         officeName={office?.name ?? "EmlakSoft Ofis"}
-        plan={planLabel(office?.plan ?? "office")}
+        plan={m.planName}
         trial={office?.status === "trial"}
         trialDaysLeft={m.trialDaysLeft}
         navs={m.navs}
@@ -528,7 +531,7 @@ async function ShellHeader() {
   const userMenuProps = {
     initials: m.initials,
     name: m.fullName,
-    subtitle: `${planLabel(m.office?.plan ?? "office")} plan`,
+    subtitle: `${m.planName} plan`,
     links: [
       { href: "/app/hesabim", label: "Hesabım", iconName: "account" as const },
       ...(m.accessibleModules.includes("settings") ? [{ href: "/app/ayarlar", label: "Ayarlar", iconName: "settings" as const }] : []),

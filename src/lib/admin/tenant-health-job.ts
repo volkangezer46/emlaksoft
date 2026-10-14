@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getPlan } from "@/lib/billing/plans";
+import { isPlanId, resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { DAY_MS, trDayKey } from "@/lib/clock";
 import { formatDateTimeTr } from "@/lib/format";
 import { getSettings } from "@/lib/settings/read";
@@ -49,7 +49,25 @@ async function readWeights(): Promise<HealthWeights> {
   }
 }
 
-export async function runTenantHealthDaily(admin: SupabaseClient, nowMs: number, opts: { weights?: HealthWeights; force?: boolean } = {}): Promise<HealthJobSummary> {
+/**
+ * Adminden eklenen paketin dahil kullanıcı sayısı katalogdadır (kod tanımı onu Ofis sanır). Katalog yalnız taban dışı
+ * kimlik görülürse okunur; okunamazsa eski davranış (Ofis limiti) sürer.
+ */
+async function readCatalogIfNeeded(rows: readonly InputRow[]): Promise<PlanDef[] | undefined> {
+  if (!rows.some((r) => r.plan && !isPlanId(r.plan))) return undefined;
+  try {
+    const { getPlanDefinitions } = await import("@/lib/billing/plan-definitions");
+    return await getPlanDefinitions();
+  } catch {
+    return undefined;
+  }
+}
+
+export async function runTenantHealthDaily(
+  admin: SupabaseClient,
+  nowMs: number,
+  opts: { weights?: HealthWeights; force?: boolean; catalog?: readonly PlanDef[] } = {},
+): Promise<HealthJobSummary> {
   const day = trDayKey(nowMs);
   if (!opts.force) {
     // Tek satır yetmez: o günün satır sayısı skorlanacak ofis sayısına ulaşmadıysa tur yarım kalmıştır → yeniden hesapla.
@@ -68,11 +86,13 @@ export async function runTenantHealthDaily(admin: SupabaseClient, nowMs: number,
   if (error) return isCrmMissing(error) ? { skipped: true, written: 0, error: null } : { skipped: false, written: 0, error: error.message };
 
   const weights = opts.weights ?? (await readWeights());
+  const rows = (data ?? []) as InputRow[];
+  const catalog = opts.catalog ?? (await readCatalogIfNeeded(rows));
   const computedAt = new Date(nowMs).toISOString();
   const daily: Record<string, unknown>[] = [];
   const latest: Record<string, unknown>[] = [];
-  for (const r of (data ?? []) as InputRow[]) {
-    const plan = getPlan(r.plan ?? "office");
+  for (const r of rows) {
+    const plan = resolvePlanDef(r.plan, catalog);
     const seatLimit = plan.limits.seats > 0 ? plan.limits.seats + Math.max(0, Number(r.extra_seats) || 0) : null;
     const csatAvg = r.csat_avg === null || r.csat_avg === undefined ? null : Number(r.csat_avg);
     const inputs = {

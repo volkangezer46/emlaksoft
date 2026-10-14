@@ -19,7 +19,7 @@ import { getPlatformStaff } from "@/lib/platform";
 import { PageHeader } from "@/components/ui/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { planLabel } from "@/lib/billing/plans";
+import { getPlanName } from "@/lib/billing/plan-definitions";
 import { closureDownloadAllowed } from "@/lib/admin/office-closure";
 import { ClosureDataPanel } from "./closure-data-panel";
 
@@ -48,7 +48,7 @@ export default async function SuspendedPage() {
     | null
     | undefined;
   const office = (Array.isArray(tenant) ? tenant[0] : tenant) ?? undefined;
-  const staff = await getPlatformStaff();
+  const [staff, planName] = await Promise.all([getPlatformStaff(), office?.plan ? getPlanName(office.plan) : Promise.resolve(null)]);
   const isCancelled = office?.status === "cancelled";
   // Arşivlenmiş ofisin sahibi: kapatma talebi sonrası veri paketi (CSV) sunulur.
   let showClosureData = false;
@@ -150,7 +150,7 @@ export default async function SuspendedPage() {
         {[
           { label: "Ofis", value: office?.name ?? "—" },
           { label: "Durum", value: isCancelled ? "İptal" : "Askıda", danger: true },
-          { label: "Paket", value: office?.plan ? planLabel(office.plan) : "—" },
+          { label: "Paket", value: planName ?? "—" },
         ].map((r) => (
           <Link
             key={r.label}

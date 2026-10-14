@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getPlan } from "@/lib/billing/plans";
 import {
   buildLimitRows,
   buildOfficeTimeline,
@@ -67,6 +68,13 @@ describe("office-360", () => {
     expect(limitPercent(rows[0])).toBe(60);
     expect(limitText(rows[1])).toBe("10 / sınırsız");
     expect(limitPercent(rows[1])).toBeNull();
+  });
+
+  it("limit satırları: adminden eklenen paket katalogdan (Ofis'e düşmez)", () => {
+    const custom = { ...getPlan("office"), id: "ofis_plus", tier: "office" as const, custom: true, limits: { seats: 10, customers: null, activeProperties: null, branches: 6 } };
+    const rows = buildLimitRows("ofis_plus", { seats: 3, properties: 10, customers: 5, branches: 1 }, undefined, [custom]);
+    expect(limitText(rows[0])).toBe("3 / 10");
+    expect(rows[3]!.limit).toBe(6);
   });
 });
 
