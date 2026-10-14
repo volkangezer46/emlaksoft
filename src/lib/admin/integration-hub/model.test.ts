@@ -8,6 +8,7 @@ import {
   HUB_KEYS,
   HUB_META,
   INTEGRATIONS_HREF,
+  LEGACY_TEST_ACTIONS,
   cardTone,
   errorRate,
   hostOf,
@@ -54,7 +55,7 @@ describe("entegrasyon merkezi modeli", () => {
   it("ton: yapılandırılmamış off; alarm/başarısız test/yüksek hata danger; düşük hata warn", () => {
     expect(cardTone(base({ configured: false, alarm: "x" }))).toBe("off");
     expect(cardTone(base({ alarm: "401" }))).toBe("danger");
-    expect(cardTone(base({ lastTest: { at: "2026-10-14T00:00:00Z", ok: false, message: null, durationMs: 1 } }))).toBe("danger");
+    expect(cardTone(base({ lastTest: { at: "2026-10-14T00:00:00Z", ok: false, message: null, durationMs: 1, action: "integration.openai.test" } }))).toBe("danger");
     expect(cardTone(base({ stats: { ok: 1, fail: 1, source: "", href: "/" } }))).toBe("danger");
     expect(cardTone(base({ stats: { ok: 99, fail: 1, source: "", href: "/" } }))).toBe("warn");
     expect(cardTone(base())).toBe("ok");
@@ -69,9 +70,18 @@ describe("entegrasyon merkezi modeli", () => {
       { action: "integration.emlakfiyati.test", created_at: "2026-10-12T10:00:00Z", meta: { state: "connected" } },
       { action: "integration.bilinmeyen.test", created_at: "2026-10-12T10:00:00Z", meta: { ok: true } },
     ]);
-    expect(t.openai).toEqual({ at: "2026-10-14T10:00:00Z", ok: false, message: "OpenAI anahtarı reddedildi (yetkisiz).", durationMs: 120 });
+    expect(t.openai).toEqual({ at: "2026-10-14T10:00:00Z", ok: false, message: "OpenAI anahtarı reddedildi (yetkisiz).", durationMs: 120, action: "integration.openai.test" });
     expect(t.emlakfiyati?.ok).toBe(true);
     expect(Object.keys(t).sort()).toEqual(["emlakfiyati", "openai"]);
+  });
+
+  it("son test: e-posta ayarlarındaki bağlantı testi Resend kartına sayılır", () => {
+    const t = lastTestsFrom([
+      { action: "integration.email.test_connection", created_at: "2026-10-14T09:00:00Z", meta: { ok: true, domains: 1 } },
+      { action: testAction("resend"), created_at: "2026-10-13T09:00:00Z", meta: { ok: false } },
+    ]);
+    expect(t.resend).toMatchObject({ ok: true, at: "2026-10-14T09:00:00Z", action: "integration.email.test_connection" });
+    expect(LEGACY_TEST_ACTIONS["integration.email.test_connection"]).toBe("resend");
   });
 
   it("parmak izi sırrı sızdırmaz; webhook adresinden yalnız host", () => {
@@ -98,7 +108,8 @@ describe("entegrasyon merkezi modeli", () => {
     expect(parseNetgsmBalance("00 157,40")).toMatchObject({ ok: true, credit: "157,40" });
     expect(parseNetgsmBalance("30")).toMatchObject({ ok: false, code: "30" });
     expect(parseNetgsmBalance("70")).toMatchObject({ ok: false, code: "70" });
-    expect(parseNetgsmBalance("<xml/>")).toMatchObject({ ok: true, code: null });
+    expect(parseNetgsmBalance("<xml/>")).toMatchObject({ ok: false, code: "unrecognized" });
+    expect(parseNetgsmBalance("<html>bakım</html>").ok).toBe(false);
   });
 
   it("menü: Sistem bölümünde 'Entegrasyonlar' sorgu sekmesi; ?sekme=entegrasyonlar onu etkin yapar", () => {

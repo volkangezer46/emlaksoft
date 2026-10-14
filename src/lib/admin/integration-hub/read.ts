@@ -1,6 +1,8 @@
 import "server-only";
+import { access } from "node:fs/promises";
+import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { daysAgoIso, trMonthKey } from "@/lib/clock";
+import { daysAgoIso, trDayKey, trMonthKey } from "@/lib/clock";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSecretsMany } from "@/lib/settings/secret-read";
 import { secretFingerprint } from "@/lib/settings/secrets";
@@ -12,12 +14,14 @@ import { getIyzicoConfig } from "@/lib/billing/iyzico";
 import { evdsApiKey } from "@/lib/evds";
 import { readConnectionView } from "@/lib/google/read";
 import { normalizeAllowedWhatsAppApiUrl } from "@/lib/messaging/netgsm";
-import { EXTENSION_VERSION, extensionStoreEnv } from "@/lib/listing-control/worker/extension-release";
+import { EXTENSION_PACKAGE_DIR, EXTENSION_VERSION, extensionStoreEnv, extensionZipFileName } from "@/lib/listing-control/worker/extension-release";
+import { activityHref } from "@/lib/admin/activity-query";
 import { PORTAL_LABELS } from "@/lib/portals/catalog";
 import {
   HUB_META,
   hostOf,
   INTEGRATIONS_HREF,
+  LEGACY_TEST_ACTIONS,
   latest,
   lastTestsFrom,
   sortCards,
@@ -155,6 +159,7 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
     wdPending,
     wdRows,
     failingEndpoints,
+    extensionZipReady,
   ] = await Promise.all([
     getPlatformSecretsMany([...secretKeys, ...plainKeys], secretKeys),
     getPortalConfigs(["sahibinden", "hepsiemlak", "emlakjet"]),
@@ -162,7 +167,12 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
     getEmlakFiyatiAdminStatus(),
     resolveEmlakFiyatiKeys(),
     readConnectionView(),
-    admin.from("platform_audit_logs").select("action, created_at, meta").like("action", "integration.%.test").order("created_at", { ascending: false }).limit(200),
+    admin
+      .from("platform_audit_logs")
+      .select("action, created_at, meta")
+      .or(["action.like.integration.%.test", ...Object.keys(LEGACY_TEST_ACTIONS).map((a) => `action.eq.${a}`)].join(","))
+      .order("created_at", { ascending: false })
+      .limit(200),
     sourceStats(admin, "email_sends", "created_at", (q) => q, (q) => q.in("status", ["sent", "delivered", "delayed", "opened", "clicked"]), (q) => q.in("status", ["bounced", "complained", "failed"])),
     sourceStats(admin, "billing_payment_captures", "captured_at", (q) => q, (q) => q.in("status", ["fulfilled", "refunded"]), (q) => q.in("status", ["manual_review", "refund_required"])),
     sourceStats(admin, "webhook_events", "received_at", (q) => q.eq("provider", "netgsm"), (q) => q.in("status", ["processed", "ignored"]), (q) => q.in("status", ["failed", "quarantined"])),
@@ -201,6 +211,7 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       .order("created_at", { ascending: false })
       .limit(DELIVERY_ROWS),
     admin.from("webhook_endpoints").select("*", { count: "exact", head: true }).eq("active", true).gt("failure_count", 0),
+    access(path.join(process.cwd(), EXTENSION_PACKAGE_DIR, extensionZipFileName())).then(() => true, () => false),
   ]);
 
   const tests = lastTestsFrom(((testRows.error ? [] : testRows.data) ?? []) as { action: string; created_at: string; meta: Record<string, unknown> | null }[]);
@@ -287,7 +298,8 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       fingerprints: iyzico ? [...fp("API anahtarı", "env:IYZICO_API_KEY", iyzico.apiKey), ...fp("Gizli anahtar", "env:IYZICO_SECRET_KEY", iyzico.secretKey)] : [],
       lastOkAt: iyzicoStats.lastOkAt,
       lastFailAt: iyzicoStats.lastFailAt,
-      stats: stats(iyzicoStats, "tahsilat kaydı (tamamlanan / incelemedeki)", "/admin/muhasebe"),
+      // 7 günlük sayı gösterilmez: tamamlanan tahsilatları listeleyen süzülmüş ekran yok (sıfır çıkmaz metrik).
+      stats: null,
       usage: null,
     }),
     card("netgsm", {
@@ -300,7 +312,8 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       fingerprints: fp("Parola", settings.netgsm_password ? "netgsm_password" : "env:NETGSM_PASSWORD", netgsmPass),
       lastOkAt: netgsmStats.lastOkAt,
       lastFailAt: netgsmStats.lastFailAt,
-      stats: stats(netgsmStats, "Netgsm webhook olayı (teslim raporu, gelen SMS)", "/admin/sistem?sekme=uyarilar"),
+      // webhook_events'i listeleyen admin ekranı yok → 7 günlük sayı gösterilmez; son başarılı/başarısız zaman kalır.
+      stats: null,
       usage: tests.netgsm?.message?.startsWith("Kalan kredi") ? { text: tests.netgsm.message, href: `${INTEGRATIONS_HREF}#entegrasyon-netgsm` } : null,
     }),
     card("resend", {
@@ -324,7 +337,7 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       fingerprints: fp("Erişim belirteci", settings.whatsapp_api_token ? "whatsapp_api_token" : "env:WHATSAPP_API_TOKEN", waToken),
       lastOkAt: waStats.lastOkAt,
       lastFailAt: waStats.lastFailAt,
-      stats: stats(waStats, "Meta webhook olayı (teslim durumu, gelen mesaj)", "/admin/sistem?sekme=uyarilar"),
+      stats: null,
       usage: null,
     }),
     googleCard("google_gsc", gsc),
@@ -336,7 +349,7 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       fingerprints: aiFingerprint ? [{ label: "API anahtarı", value: aiFingerprint }] : [],
       lastOkAt: aiStats.lastOkAt,
       lastFailAt: aiStats.lastFailAt,
-      stats: stats(aiStats, "ofis AI çağrısı (denetim kaydı)", "/admin/ai-kullanim"),
+      stats: stats(aiStats, "ofis AI çağrısı (denetim kaydı)", activityHref({ kaynak: "tenant", islem: "ai.openai_call", baslangic: trDayKey(since) })),
       usage: quotaText ? { text: `Platform AI kotası bu ay: ${quotaText}`, href: "/admin/ai-kullanim" } : { text: "Ofis kredi tüketimi", href: "/admin/ai-kullanim" },
     }),
     card("evds", {
@@ -373,17 +386,21 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
       usage: { text: "Analiz tarifesi ve ofis bakiyeleri", href: "/admin/analiz-tarifesi" },
     }),
     card("portal_extension", {
-      configured: Boolean(store.chrome || store.edge),
+      // Mağaza bağlantısı yokken sunucudaki ZIP paketiyle de dağıtılabilir → o durumda yapılandırılmış sayılır, not düşülür.
+      configured: Boolean(store.chrome || store.edge || extensionZipReady),
       notes: [
         `Güncel sürüm ${EXTENSION_VERSION}`,
         store.chrome ? "Chrome mağaza bağlantısı tanımlı" : "Chrome mağaza bağlantısı yok (NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL)",
+        ...(store.edge ? ["Edge mağaza bağlantısı tanımlı"] : []),
+        ...(!store.chrome && !store.edge ? [extensionZipReady ? "Yalnız ZIP paketiyle dağıtılıyor (mağaza bağlantısı yok)" : "İndirme paketi de sunucuda yok"] : []),
         `${clientRows.length} etkin eşleşme · ${seenWeek} tanesi son 7 günde görüldü`,
       ],
       alarm: null,
       fingerprints: [],
       lastOkAt: latest(clientRows[0]?.last_seen_at, transferStats.lastOkAt),
       lastFailAt: transferStats.lastFailAt,
-      stats: stats(transferStats, "portala aktarım oturumu (başarısız = hata)", "/admin/sistem?sekme=portal-kurallari"),
+      // Aktarım oturumlarını listeleyen ekran yok → 7 günlük sayı gösterilmez; son başarılı/başarısız zaman kalır.
+      stats: null,
       usage: null,
     }),
     card("portal_api", {
@@ -436,8 +453,9 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
         tenantId: r.tenant_id,
         tenantName: tenantName(r),
         provider: `e-fatura · ${r.provider}`,
-        active: r.status !== "disabled",
-        status: r.last_test_ok === false ? "degraded" : r.status,
+        // status yalnız active|error (CHECK); hatalı ya da son testi başarısız bağlantı "Sorunlu" sayılır.
+        active: true,
+        status: r.status === "error" || r.last_test_ok === false ? "degraded" : r.status,
         lastCheckedAt: r.last_test_at,
         lastError: r.last_error ? r.last_error.slice(0, 160) : null,
       })),

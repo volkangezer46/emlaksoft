@@ -135,8 +135,9 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     label: "Portal eklentisi",
     category: "portal",
     description: "Tarayıcı eklentisi: portala aktarım ve ilan kontrolü.",
-    configureHref: "/admin/sistem?sekme=portal-kurallari",
-    configureLabel: "Sistem > Portal kuralları",
+    // Mağaza bağlantısı yalnız sunucu ortamından gelir (extension-release.ts); panelde girilecek ekran yok.
+    configureHref: null,
+    configureLabel: "Sunucu ortamı (.env.production): NEXT_PUBLIC_LISTING_EXTENSION_CWS_URL, NEXT_PUBLIC_LISTING_EXTENSION_EDGE_URL",
     testNote: "İndirme paketi sunucuda var mı denetlenir",
   },
   portal_api: {
@@ -158,7 +159,8 @@ export type CallStats = {
   href: string;
 };
 
-export type LastTest = { at: string; ok: boolean; message: string | null; durationMs: number | null };
+/** `action`: kaydın gerçek denetim eylemi (eski akışlar farklı ad taşır; kart bağlantısı bununla süzer). */
+export type LastTest = { at: string; ok: boolean; message: string | null; durationMs: number | null; action: string };
 
 export type Fingerprint = { label: string; value: string };
 
@@ -213,20 +215,33 @@ export const testAction = (key: HubKey): string => `integration.${key}.test`;
 
 type AuditRow = { action: string; created_at: string; meta: Record<string, unknown> | null };
 
+/** Merkezden önce var olan test akışlarının eylem adları (kartın "son test" satırı bunları da okur). */
+export const LEGACY_TEST_ACTIONS: Readonly<Record<string, HubKey>> = {
+  "integration.email.test_connection": "resend",
+};
+
+function testKeyOf(action: string): HubKey | null {
+  const legacy = LEGACY_TEST_ACTIONS[action];
+  if (legacy) return legacy;
+  const m = action.match(/^integration\.([a-z_]+)\.test$/);
+  return m && isHubKey(m[1]) ? m[1] : null;
+}
+
 /**
  * Denetim kayıtlarından her entegrasyonun SON test sonucu (satırlar yeniden eskiye sıralı gelir).
- * EmlakFiyati'nin eski kayıtları `meta.state` taşır ("connected" = başarılı).
+ * EmlakFiyati'nin eski kayıtları `meta.state` taşır ("connected" = başarılı); e-posta ayarlarındaki bağlantı testi
+ * (`integration.email.test_connection`) Resend kartına sayılır.
  */
 export function lastTestsFrom(rows: readonly AuditRow[]): Partial<Record<HubKey, LastTest>> {
   const out: Partial<Record<HubKey, LastTest>> = {};
   for (const r of rows) {
-    const m = r.action.match(/^integration\.([a-z_]+)\.test$/);
-    if (!m || !isHubKey(m[1]) || out[m[1]]) continue;
+    const key = testKeyOf(r.action);
+    if (!key || out[key]) continue;
     const meta = r.meta ?? {};
     const ok = meta.ok === true || meta.state === "connected";
     const message = typeof meta.message === "string" ? meta.message : typeof meta.state === "string" ? `Durum: ${meta.state}` : null;
     const durationMs = typeof meta.duration_ms === "number" ? meta.duration_ms : null;
-    out[m[1]] = { at: r.created_at, ok, message, durationMs };
+    out[key] = { at: r.created_at, ok, message, durationMs, action: r.action };
   }
   return out;
 }

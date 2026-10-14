@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityHref, hasActivityFilter, parseActivityFilters } from "./activity-query";
+import { actionLike, activityHref, hasActivityFilter, parseActivityFilters } from "./activity-query";
 import { hrefWith } from "@/app/admin/sistem/_hatalar/errors-href";
 import {
   DEFAULT_TRIAL_DAYS,
@@ -23,6 +23,12 @@ describe("aktivite süzgeci", () => {
     expect(f.baslangic).toBeUndefined();
     expect(f.bitis).toBe("2026-08-16");
     expect(f.kisi).toHaveLength(80);
+  });
+
+  it("işlem süzgeci noktalı/alt çizgili işlem adlarıyla eşleşir (dilbilgisi karakterleri temizlenir)", () => {
+    expect(actionLike("ai.openai_call")).toBe("%ai_openai_call%");
+    expect(actionLike("integration.resend.test")).toBe("%integration_resend_test%");
+    expect(actionLike('x,(y):*%"\\z')).toBe("%x y z%");
   });
 
   it("adres süzgeci iki yönlü taşır", () => {

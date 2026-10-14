@@ -12,7 +12,6 @@ import {
   TONE_LABELS,
   cardTone,
   errorRate,
-  testAction,
   type HubCard,
   type HubTone,
 } from "@/lib/admin/integration-hub/model";
@@ -47,12 +46,13 @@ const OFFICE_STATUS: Record<string, { label: string; tone: HubTone }> = {
   configured: { label: "Yapılandırıldı", tone: "ok" },
   active: { label: "Etkin", tone: "ok" },
   degraded: { label: "Sorunlu", tone: "danger" },
+  error: { label: "Hatalı", tone: "danger" },
   disabled: { label: "Kapalı", tone: "off" },
 };
 
 const PROVIDER_LABEL: Record<string, string> = { whatsapp: "WhatsApp Business", netgsm: "Netgsm SMS", resend: "E-posta" };
 
-const auditHref = (key: HubCard["key"]) => `/admin/aktivite?kaynak=platform&islem=${encodeURIComponent(testAction(key))}`;
+const auditHref = (action: string) => `/admin/aktivite?kaynak=platform&islem=${encodeURIComponent(action)}`;
 
 function IntegrationCard({ card }: { card: HubCard }) {
   const tone = cardTone(card);
@@ -131,7 +131,7 @@ function IntegrationCard({ card }: { card: HubCard }) {
       <div className="mt-auto flex flex-wrap items-start justify-between gap-2 border-t border-line pt-3">
         <div className="min-w-0 text-xs text-text-muted">
           {card.lastTest ? (
-            <Link href={auditHref(card.key)} className="hover:underline">
+            <Link href={auditHref(card.lastTest.action)} className="hover:underline">
               Son test {relativeTimeTR(card.lastTest.at)}:{" "}
               <span className={`font-semibold ${card.lastTest.ok ? "text-mint-700" : "text-danger-600"}`}>{card.lastTest.ok ? "başarılı" : "başarısız"}</span>
               {card.lastTest.message ? <span className="block truncate text-text-faint">{card.lastTest.message}</span> : null}

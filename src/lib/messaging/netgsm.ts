@@ -502,7 +502,8 @@ export function parseNetgsmBalance(body: string): ProviderProbeResult {
   if (head === "30") return { ok: false, code: "30", message: "Netgsm kullanıcı kodu veya parolası reddedildi." };
   if (/^\d{2,3}$/.test(head)) return { ok: false, code: head, message: `Netgsm sorguyu reddetti (kod ${head}).` };
   if (/^\d+(?:[.,]\d+)?$/.test(head)) return { ok: true, code: "00", message: "Netgsm kimlik bilgileri kabul edildi.", credit: head.slice(0, 32) };
-  return { ok: true, code: null, message: "Netgsm'e ulaşıldı (yanıt biçimi tanınmadı; kimlik reddi yok)." };
+  // Bakım/HTML sayfası ya da beklenmeyen XML: kimlik doğrulanmadı → başarı sayılmaz.
+  return { ok: false, code: "unrecognized", message: "Netgsm'e ulaşıldı ama yanıt tanınmadı (kimlik bilgisi doğrulanamadı)." };
 }
 
 /**
