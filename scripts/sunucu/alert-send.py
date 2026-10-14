@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sunucu tarafı uyarı gönderici (AD10). error-watch.sh kesinti/düzelme anında çağırır.
+Sunucu tarafı uyarı gönderici (AD10). error-watch.sh kesinti/düzelme anında ve dakikada bir motor nabzı için çağırır.
 
 NEDEN SUNUCUDA: site çöktüğünde uygulama kendi kesintisini bildiremez. Bu betik uygulamaya hiç bağlı değildir:
 kanalları (alert_channels) DB'den okur, şifreli yapılandırmayı uygulama ile AYNI anahtarla çözer
@@ -13,10 +13,14 @@ diske düz sır yazılmaz. Olay kaydı DB erişilebilirse alert_events'e (source
 
 Kullanım:
   alert-send.py refresh                         # kanal/kural önbelleğini tazeler (error-watch 5 dk'da bir)
-  alert-send.py rule                            # health_down kuralını "enabled threshold muted repeat_dk" yazdırır
-  alert-send.py fire  --title T --body B        # kesinti uyarısı (kural sessizse yalnız kayıt)
+  alert-send.py rule [--rule K]                 # kuralı (varsayılan health_down) "enabled threshold muted repeat_dk" yazdırır
+  alert-send.py fire  --title T --body B        # kesinti uyarısı (kural sessizse yalnız kayıt); --rule K (varsayılan health_down)
   alert-send.py fire  --reminder 1 ...          # kesinti sürüyor hatırlatması (tekrar aralığı dolunca)
   alert-send.py resolve --title T --body B      # düzeldi mesajı (yalnız uyarı gönderildiyse)
+  alert-send.py engine-check                    # uyarı motoru nabzı (engine_stalled): uyari-motoru kalp atışı eşik dakikası
+                                                # boyunca gelmezse uyarı, dönünce düzeldi; durum /run/emlaksoft/engine-watch.json.
+                                                # Simülasyon: --age-sec N (DB okumaz), --engine-enabled 0|1. Bir şey olduysa
+                                                # tek özet satırı yazar (error-watch JSONL'e ekler), olmadıysa boş.
 Sahte gönderim yok: kanal yoksa teslim günlüğüne "kanal kapalı" düşer.
 
 ÇIKIŞ KODU (fire/resolve): en az bir kanala iletildiyse 0, iletilmediyse 3. error-watch.sh "bildirildi mi"
@@ -32,6 +36,7 @@ import os
 import socket
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -40,16 +45,28 @@ DB = "supabase-db-moqbebljyeyprktd19zb1ihn"
 ENV_FILE = "/root/emlaksoft/.env.production"
 CACHE_DIR = "/run/emlaksoft"
 CACHE = os.path.join(CACHE_DIR, "alert-channels.json")
-FINGERPRINT = "health_down"
+# Sunucu tarafı kurallar (src/lib/alerts/rules.ts evaluatedBy: "host" ile aynı varsayılanlar; DB satırı yoksa bunlar).
+HOST_RULES = {
+    "health_down": {"threshold": 2.0, "repeat": 30},
+    "engine_stalled": {"threshold": 20.0, "repeat": 60},
+}
+ENGINE_HEARTBEAT = "uyari-motoru"  # src/lib/alerts/engine.ts ALERT_ENGINE_HEARTBEAT
+ENGINE_SETTING = "ops.alerts.engine_enabled"  # src/lib/settings/registry/ops-alerts.ts
+ENGINE_STATE = os.path.join(CACHE_DIR, "engine-watch.json")
 HKDF_SALT = b"emlaksoft:platform-secrets:salt:v1"
 HKDF_INFO = b"emlaksoft/platform-secrets/v1"
 DERIVE_SOURCES = ("OTP_HMAC_SECRET", "TWO_FACTOR_COOKIE_SECRET", "PROPERTY_MEDIA_SIGNING_SECRET")
 EXIT_NOT_SENT = 3
 DEFAULT_REPEAT_MIN = 30
+ALERTS_HREF = "/admin/sistem?sekme=uyarilar"
 
 
 def now_iso():
     return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def now_epoch():
+    return int(time.time())
 
 
 def read_env():
@@ -142,6 +159,10 @@ def refresh():
           'rule', (select json_build_object('enabled', enabled, 'threshold', threshold, 'repeat_minutes', repeat_minutes,
                                             'muted_until', muted_until)
                    from public.alert_rules where key = 'health_down'),
+          'rules', (select json_object_agg(key, json_build_object('enabled', enabled, 'threshold', threshold,
+                                                                  'repeat_minutes', repeat_minutes, 'muted_until', muted_until))
+                    from public.alert_rules where key in ('health_down', 'engine_stalled')),
+          'engine_enabled', (select value from public.platform_settings where key = 'ops.alerts.engine_enabled'),
           'email', (select json_object_agg(key, value) from public.platform_settings
                     where key in ('email.resend_api_key', 'email.from', 'email.reply_to')),
           'app_url', null
@@ -169,19 +190,23 @@ def load_state():
             return {"channels": [], "rule": None, "email": {}}
 
 
-def rule_info(state):
-    r = state.get("rule") or {}
+def rule_info(state, key="health_down"):
+    defaults = HOST_RULES.get(key, HOST_RULES["health_down"])
+    r = (state.get("rules") or {}).get(key)
+    if r is None and key == "health_down":
+        r = state.get("rule")  # eski önbellek biçimi (yalnız health_down)
+    r = r or {}
     enabled = r.get("enabled", True) is not False
     try:
-        threshold = float(r.get("threshold")) if r.get("threshold") is not None else 2.0
+        threshold = float(r.get("threshold")) if r.get("threshold") is not None else defaults["threshold"]
     except (TypeError, ValueError):
-        threshold = 2.0
+        threshold = defaults["threshold"]
     try:
-        repeat = int(r.get("repeat_minutes")) if r.get("repeat_minutes") is not None else DEFAULT_REPEAT_MIN
+        repeat = int(r.get("repeat_minutes")) if r.get("repeat_minutes") is not None else defaults["repeat"]
     except (TypeError, ValueError):
-        repeat = DEFAULT_REPEAT_MIN
+        repeat = defaults["repeat"]
     if repeat < 5 or repeat > 10_080:  # rules.ts mergeRuleConfigs ile aynı sınır
-        repeat = DEFAULT_REPEAT_MIN
+        repeat = defaults["repeat"]
     muted = False
     mu = r.get("muted_until")
     if mu:
@@ -304,16 +329,17 @@ def send(state, env, keys, subject, text, payload):
     return deliveries
 
 
-def record(event, title, body, deliveries, notified):
-    """alert_events'e yazar (DB yoksa sessizce geçer; JSONL kaydı error-watch'ta zaten var)."""
-    v = {"title": title[:200], "body": body[:2000], "deliv": json.dumps(deliveries), "notified": "1" if notified else "0", "fp": FINGERPRINT}
+def record(event, title, body, deliveries, notified, rule="health_down"):
+    """alert_events'e yazar (DB yoksa sessizce geçer; JSONL kaydı error-watch'ta zaten var). Parmak izi = kural anahtarı."""
+    v = {"title": title[:200], "body": body[:2000], "deliv": json.dumps(deliveries), "notified": "1" if notified else "0", "fp": rule,
+         "rule": rule}
     try:
         if event == "firing":
             psql(
                 """
                 insert into public.alert_events (rule_key, fingerprint, severity, source, title, body, href, deliveries,
                                                  last_notified_at, notify_count)
-                values ('health_down', :'fp', 'critical', 'host', :'title', :'body', '/admin/sistem?sekme=uyarilar', :'deliv'::jsonb,
+                values (:'rule', :'fp', 'critical', 'host', :'title', :'body', '/admin/sistem?sekme=uyarilar', :'deliv'::jsonb,
                         case when :'notified' = '1' then now() end, case when :'notified' = '1' then 1 else 0 end)
                 on conflict (fingerprint) where resolved_at is null
                 do update set last_at = now(), title = excluded.title, body = excluded.body,
@@ -338,6 +364,129 @@ def record(event, title, body, deliveries, notified):
         print(f"alert_events yazılamadı: {e}", file=sys.stderr)
 
 
+def notify(state, env, rule, event, title, body, reminder=False, notified_before=True):
+    """Kuralın sessiz/kapalı durumuna göre gönderir, alert_events'e yazar. (iletildi_mi, özet) döner."""
+    enabled, _threshold, muted, _repeat = rule_info(state, rule)
+    app_url = (env.get("NEXT_PUBLIC_APP_URL") or "https://emlaksoft.com.tr").rstrip("/")
+    prefix = "[SÜRÜYOR]" if reminder else ("[UYARI]" if event == "firing" else "[DÜZELDİ]")
+    subject = f"{prefix} {title}"
+    text = f"{subject}\n\n{body}\n\n{app_url}{ALERTS_HREF}".strip()
+    payload = {"event": "reminder" if reminder else event, "rule": rule, "fingerprint": rule, "title": title, "body": body,
+               "href": ALERTS_HREF, "at": now_iso()}
+    send_now = enabled and not muted
+    if event == "resolved":
+        send_now = send_now and notified_before
+    deliveries = send(state, env, candidate_keys(env), subject, text, payload) if send_now else [
+        {"at": now_iso(), "state": event, "channel": None, "kind": None, "ok": False,
+         "detail": "kural sessizde" if muted else ("kural kapalı" if not enabled else "uyarı gönderilmemişti")}
+    ]
+    record(event, title, body, deliveries, send_now, rule)
+    ok = any(d.get("ok") for d in deliveries)
+    return ok, ("gönderildi" if ok else "gönderilmedi") + ": " + "; ".join(str(d.get("detail")) for d in deliveries)
+
+
+def engine_pulse_state(age_sec, threshold_min, engine_enabled, rule_enabled):
+    """src/lib/alerts/rules.ts enginePulseState ile AYNI karar: off | unknown | stalled | ok."""
+    if not engine_enabled or not rule_enabled:
+        return "off"
+    if age_sec is None:
+        return "unknown"
+    return "stalled" if age_sec > threshold_min * 60 else "ok"
+
+
+def setting_bool(raw, fallback=True):
+    """platform-setting-keys.ts parseSettingBool ile aynı."""
+    v = str(raw if raw is not None else "").strip().lower()
+    if v in ("on", "true", "1"):
+        return True
+    if v in ("off", "false", "0"):
+        return False
+    return fallback
+
+
+def read_engine_pulse():
+    """(nabız yaşı sn | None, motor açık mı) — DB okunamazsa RuntimeError."""
+    out = psql(
+        f"""
+        select json_build_object(
+          'age', (select extract(epoch from (now() - last_run_at))::bigint from public.cron_heartbeats where job = '{ENGINE_HEARTBEAT}'),
+          'enabled', (select value from public.platform_settings where key = '{ENGINE_SETTING}')
+        )
+        """
+    )
+    data = json.loads(out or "{}")
+    age = data.get("age")
+    return (int(age) if age is not None else None), setting_bool(data.get("enabled"))
+
+
+def load_engine_state():
+    try:
+        with open(ENGINE_STATE, encoding="utf-8") as f:
+            st = json.load(f)
+            if isinstance(st, dict):
+                return st
+    except Exception:
+        pass
+    return {"alerted": False, "notified": False, "last_fire": 0}
+
+
+def save_engine_state(st):
+    os.makedirs(CACHE_DIR, mode=0o700, exist_ok=True)
+    tmp = ENGINE_STATE + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(st, f)
+    os.replace(tmp, ENGINE_STATE)
+
+
+def engine_check(args):
+    """Uyarı motoru nabız kuralı (engine_stalled). Her zaman 0 döner; olay olduysa tek özet satırı yazar."""
+    state = load_state()
+    if "--age-sec" in args:
+        age = int(args["--age-sec"])
+        engine_enabled = setting_bool(args.get("--engine-enabled", state.get("engine_enabled")))
+    else:
+        try:
+            age, engine_enabled = read_engine_pulse()
+        except Exception as e:
+            # DB yok: karar verilmez (site/DB kesintisi health_down kuralının işi); durum korunur.
+            print(f"motor nabzı okunamadı: {e}", file=sys.stderr)
+            return 0
+    enabled, threshold, _muted, repeat = rule_info(state, "engine_stalled")
+    pulse = engine_pulse_state(age, threshold, engine_enabled, enabled)
+    st = load_engine_state()
+    env = read_env()
+    now = now_epoch()
+    title = "Uyarı motoru durdu"
+    line = ""
+    if pulse == "stalled":
+        mins = age // 60
+        body = (f"Uyarı motorunun ({ENGINE_HEARTBEAT}) son nabzı {mins} dakika önce (eşik {threshold:g} dk). Uygulama içi uyarı "
+                "kuralları (cron gecikmesi, yedek, disk, ödeme...) şu an değerlendirilmiyor; ticket-sla cron'u ve uygulama kontrol edilmeli.")
+        if not st.get("alerted"):
+            ok, res = notify(state, env, "engine_stalled", "firing", title, body)
+            st = {"alerted": True, "notified": ok, "last_fire": now, "since": now_iso()}
+            line = f"MOTOR DURDU: {res}"
+        elif now - int(st.get("last_fire") or 0) >= repeat * 60:
+            ok, res = notify(state, env, "engine_stalled", "firing", title, body, reminder=bool(st.get("notified")))
+            st["last_fire"] = now
+            st["notified"] = bool(st.get("notified")) or ok
+            line = f"MOTOR SÜRÜYOR: {res}"
+    elif st.get("alerted"):
+        body = {
+            "ok": "Uyarı motorunun nabzı yeniden geliyor; uygulama içi kurallar değerlendiriliyor.",
+            "off": "Uyarı motoru ya da nabız kuralı kapatıldı; nabız izlemesi durdu.",
+        }.get(pulse, "Motor nabız kaydı bulunamadı; izleme kayıt gelince sürer.")
+        _ok, res = notify(state, env, "engine_stalled", "resolved", "Uyarı motoru yeniden çalışıyor", body,
+                          notified_before=bool(st.get("notified")))
+        st = {"alerted": False, "notified": False, "last_fire": 0}
+        line = f"MOTOR DÜZELDİ: {res}"
+    save_engine_state(st)
+    if line:
+        print(line)
+    return 0
+
+
 def main(argv):
     if not argv:
         print(__doc__)
@@ -350,36 +499,28 @@ def main(argv):
         except Exception as e:
             print(f"önbellek tazelenemedi: {e}", file=sys.stderr)
             return 1
+    args = dict(zip(argv[1::2], argv[2::2]))
+    if cmd == "engine-check":
+        return engine_check(args)
+    rule = args.get("--rule", "health_down")
+    if rule not in HOST_RULES:
+        print(f"bilinmeyen kural: {rule}", file=sys.stderr)
+        return 2
     state = load_state()
-    enabled, threshold, muted, repeat = rule_info(state)
     if cmd == "rule":
+        enabled, threshold, muted, repeat = rule_info(state, rule)
         print(f"{1 if enabled else 0} {threshold:g} {1 if muted else 0} {repeat}")
         return 0
     if cmd not in ("fire", "resolve"):
         print(__doc__)
         return 2
-    args = dict(zip(argv[1::2], argv[2::2]))
     title = args.get("--title", "Site yanıt vermiyor")
     body = args.get("--body", "")
     event = "firing" if cmd == "fire" else "resolved"
     reminder = event == "firing" and args.get("--reminder") == "1"
-    env = read_env()
-    app_url = (env.get("NEXT_PUBLIC_APP_URL") or "https://emlaksoft.com.tr").rstrip("/")
-    prefix = "[SÜRÜYOR]" if reminder else ("[UYARI]" if event == "firing" else "[DÜZELDİ]")
-    subject = f"{prefix} {title}"
-    text = f"{subject}\n\n{body}\n\n{app_url}/admin/sistem?sekme=uyarilar".strip()
-    payload = {"event": "reminder" if reminder else event, "rule": "health_down", "fingerprint": FINGERPRINT, "title": title, "body": body,
-               "href": "/admin/sistem?sekme=uyarilar", "at": now_iso()}
-    send_now = enabled and not muted
-    if event == "resolved":
-        send_now = send_now and args.get("--notified", "1") == "1"
-    deliveries = send(state, env, candidate_keys(env), subject, text, payload) if send_now else [
-        {"at": now_iso(), "state": event, "channel": None, "kind": None, "ok": False,
-         "detail": "kural sessizde" if muted else ("kural kapalı" if not enabled else "uyarı gönderilmemişti")}
-    ]
-    record(event, title, body, deliveries, send_now)
-    ok = any(d.get("ok") for d in deliveries)
-    print(("gönderildi" if ok else "gönderilmedi") + ": " + "; ".join(str(d.get("detail")) for d in deliveries))
+    ok, res = notify(state, read_env(), rule, event, title, body, reminder=reminder,
+                     notified_before=args.get("--notified", "1") == "1")
+    print(res)
     return 0 if ok else EXIT_NOT_SENT
 
 

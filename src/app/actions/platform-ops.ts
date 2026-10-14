@@ -30,6 +30,9 @@ export type OpsResult = { ok?: boolean; error?: string; detail?: string };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SETUP_PENDING = "Uyarı merkezi tabloları henüz kurulmadı (migration 20261013004900 bekliyor).";
 const missingTable = (e: { code?: string } | null) => Boolean(e && (e.code === "42P01" || e.code === "PGRST205" || e.code === "42703" || e.code === "PGRST204"));
+// Kural anahtarı CHECK'te yok: kuralı ekleyen migration bekliyor (ör. engine_stalled, 20261014022000).
+const ruleSetupPending = (e: { code?: string } | null) => Boolean(e && e.code === "23514");
+const RULE_SETUP_PENDING = "Bu kural için veritabanı kurulumu bekliyor (kuralı ekleyen migration henüz uygulanmadı); kural varsayılan değerlerle çalışır.";
 
 async function opsGate(opts: { superAdmin?: boolean; rate?: { key: string; limit: number; windowSec: number } }): Promise<{ staff: PlatformStaff } | { error: string }> {
   const staff = await requirePlatformModule("sistem");
@@ -179,7 +182,7 @@ export async function updateAlertRule(fd: FormData): Promise<OpsResult> {
   const { error } = await admin
     .from("alert_rules")
     .upsert({ key, enabled, threshold, repeat_minutes: repeat, updated_by: g.staff.id, updated_at: new Date(now()).toISOString() }, { onConflict: "key" });
-  if (error) return { error: missingTable(error) ? SETUP_PENDING : actionErrorMessage(error, "Kural kaydedilemedi.") };
+  if (error) return { error: missingTable(error) ? SETUP_PENDING : ruleSetupPending(error) ? RULE_SETUP_PENDING : actionErrorMessage(error, "Kural kaydedilemedi.") };
   await logPlatformActivity({ actorId: g.staff.id, action: "alert_rule.update", entityType: "alert_rule", meta: { key, enabled, threshold, repeat_minutes: repeat } });
   refresh();
   return { ok: true };
@@ -197,7 +200,7 @@ export async function muteAlertRule(key: string, minutes: number): Promise<OpsRe
   const { error } = await admin
     .from("alert_rules")
     .upsert({ key, muted_until: until, updated_by: g.staff.id, updated_at: new Date(now()).toISOString() }, { onConflict: "key" });
-  if (error) return { error: missingTable(error) ? SETUP_PENDING : actionErrorMessage(error, "Kural güncellenemedi.") };
+  if (error) return { error: missingTable(error) ? SETUP_PENDING : ruleSetupPending(error) ? RULE_SETUP_PENDING : actionErrorMessage(error, "Kural güncellenemedi.") };
   await logPlatformActivity({ actorId: g.staff.id, action: m > 0 ? "alert_rule.mute" : "alert_rule.unmute", entityType: "alert_rule", meta: { key, muted_until: until } });
   refresh();
   return { ok: true };

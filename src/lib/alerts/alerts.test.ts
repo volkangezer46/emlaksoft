@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CRON_JOBS } from "@/lib/cron-jobs";
-import { ALERT_RULE_KEYS, isMuted, mergeRuleConfigs, notifyDecision } from "./rules";
+import { ALERT_RULE_KEYS, ALERT_RULES, enginePulseState, isMuted, mergeRuleConfigs, notifyDecision } from "./rules";
 import { evaluateAlerts, formatAlertText, isPausedJobEvent, type AlertSnapshot } from "./evaluate";
 import { channelTargetHint, decodeChannelConfig, encodeChannelConfig, isBlockedWebhookHost, parseChannelInput, parseWebhookUrl } from "./channel-config";
 import { readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ describe("uyarı kuralları", () => {
 
   it("anahtar listesi migration CHECK ve tohum satırlarıyla aynı", () => {
     // Anahtarlar AD10 migration'ı ve sonradan kural ekleyen migration'larda (CHECK genişletme + tohum satırı) tanımlıdır.
-    const sql = ["20261013004900_ops_alerts.sql", "20261014006000_platform_kvkk_requests.sql"]
+    const sql = ["20261013004900_ops_alerts.sql", "20261014006000_platform_kvkk_requests.sql", "20261014022000_alert_engine_pulse_rule.sql"]
       .map((f) => readFileSync(join(process.cwd(), "supabase/migrations", f), "utf8"))
       .join("\n");
     for (const k of ALERT_RULE_KEYS) {
@@ -188,5 +188,28 @@ describe("uyarı kanalı yapılandırması", () => {
       expect(ts).toContain(lit);
       expect(py).toContain(lit);
     }
+  });
+});
+
+describe("uyarı motoru nabzı (engine_stalled)", () => {
+  const on = { engineEnabled: true, ruleEnabled: true };
+
+  it("eşik aşılınca durdu; eşik içinde ok; kapalıyken ve nabız yokken uyarı yok", () => {
+    expect(enginePulseState(ago(25), NOW, 20, on)).toEqual({ state: "stalled", ageMinutes: 25 });
+    expect(enginePulseState(ago(20), NOW, 20, on).state).toBe("ok");
+    expect(enginePulseState(ago(4), NOW, null, on).state).toBe("ok");
+    expect(enginePulseState(ago(21), NOW, null, on).state).toBe("stalled");
+    expect(enginePulseState(ago(999), NOW, 20, { engineEnabled: false, ruleEnabled: true }).state).toBe("off");
+    expect(enginePulseState(ago(999), NOW, 20, { engineEnabled: true, ruleEnabled: false }).state).toBe("off");
+    expect(enginePulseState(null, NOW, 20, on).state).toBe("unknown");
+  });
+
+  it("sunucu kuralı: uygulama motoru değerlendirmez, varsayılanlar betikle aynı", () => {
+    expect(ALERT_RULES.engine_stalled.evaluatedBy).toBe("host");
+    expect(mergeRuleConfigs([]).engine_stalled).toMatchObject({ threshold: 20, repeatMinutes: 60, enabled: true });
+    const py = readFileSync(join(process.cwd(), "scripts/sunucu/alert-send.py"), "utf8");
+    expect(py).toContain('"engine_stalled": {"threshold": 20.0, "repeat": 60}');
+    expect(py).toContain('ENGINE_HEARTBEAT = "uyari-motoru"');
+    expect(py).toContain('ENGINE_SETTING = "ops.alerts.engine_enabled"');
   });
 });

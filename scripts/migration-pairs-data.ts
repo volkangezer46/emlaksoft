@@ -406,6 +406,8 @@ const F = {
   billingVatRateInvoices: "20261014012000_billing_vat_rate_invoices.sql",
   // GP4 (2026-10-14): herkese acik randevu bildirimleri (online randevu, teyit yaniti) tek randevuyu acar (?randevu=<id>).
   appointmentNotificationDeepLinks: "20261014014000_appointment_notification_deep_links.sql",
+  // SN2 (2026-10-14): uyari motoru nabiz kurali (engine_stalled; sunucu betigi error-watch/alert-send degerlendirir).
+  alertEnginePulseRule: "20261014022000_alert_engine_pulse_rule.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -627,6 +629,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financePartyAdvisorScope]: "siki", // finance_parties/finance_open_items SELECT politikasi + 8 finance_* RPC govdesi: earnings_all olmayan kullanici baska danismanin carisini goremez/yazamaz; finance_aging ek "vadesiz" kova satiri (imza ayni)
     [F.appointmentNotificationDeepLinks]: "davranis", // create_public_booking_atomic / respond_appointment_confirmation_atomic govdeleri AYNI, yalniz bildirim href'i /app/randevular?randevu=<id>; mevcut bildirim satirlari degismez
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
+    [F.alertEnginePulseRule]: "ek", // alert_rules CHECK mevcut tanimdan genisler (engine_stalled) + tek tohum satiri (acik, 20 dk, 60 dk); mevcut veri degismez, kod satir yokken varsayilanla calisir
     [F.platformKvkkRequests]: "ek", // yeni platform_kvkk_requests (RLS+FORCE, politika yok, yalniz service_role) + alert_rules CHECK mevcut tanimdan genisler (kvkk_sla) ve tek tohum satiri; mevcut veri degismez, kod tablo yokken form "e-posta ile yazin" der
     [F.legalHelpContent]: "ek", // 5 yeni tablo (legal_documents/consents/constants, help_articles/votes; RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken koddaki icerikle calisir
     [F.financeEntriesManualReconcile]: "ek", // yeni DEFINER RPC finance_entries_set_reconciled (hesap edit erisimi + maas gizliligi; yalniz cash_entries.reconciled_at yazar); mevcut veri degismez, kod RPC yokken "kurulum bekliyor" der
@@ -853,6 +856,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "GP1-finans-danisman-kapsami", order: 131, title: "Finans: danisman carisi kapsami (P12) veritabaninda (RLS + finance_party_* / acik kalem / yaslandirma RPC) ve finance_aging vadesiz kovasi. 20261014001100 SONRASI; kod yayinindan ONCE ya da SONRA uygulanabilir (arayuz zaten ayni kurali uygular, vadesiz kovasini kod tanir; eski kod bilinmeyen kovayi yok sayar) (siki)", files: [F.financePartyAdvisorScope] },
     { id: "GP4-randevu-bildirim-baglantisi", order: 120, title: "Herkese acik randevu bildirimleri (online randevu, teyit/iptal yaniti) tek randevuyu acar: /app/randevular?randevu=<id> (bagimsiz; govdeler ayni, yalniz bildirim href'i; KOD YAYINIYLA AYNI pencerede ya da SONRA, once uygulanirsa eski kod parametreyi yok sayar ve genel listeyi acar; davranis)", files: [F.appointmentNotificationDeepLinks] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
+    { id: "SN2-uyari-motoru-nabzi", order: 142, title: "Uyari motoru nabiz kurali: alert_rules engine_stalled (CHECK mevcut tanimdan genisler + tohum; bagimsiz, AD10 004900 yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod satir yokken varsayilan esikle calisir, kural kaydetme 'kurulum bekliyor'; sira serbest, ek)", files: [F.alertEnginePulseRule] },
     { id: "DG6-kvkk-veri-sahibi", order: 116, title: "KVKK veri sahibi basvurulari: platform_kvkk_requests + kvkk_sla uyari kurali (bagimsiz; AD10 004900 varsa CHECK genisler, yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken form ve kuyruk 'kurulum bekliyor'; sira serbest, ek)", files: [F.platformKvkkRequests] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },
     { id: "FN3-elle-mutabakat", order: 102, title: "Muhasebe > Hareketler: toplu Mutabik isaretle / Mutabakati kaldir RPC'si (20261011001200 sonrasi; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod RPC yokken 'kurulum bekliyor' der; sira serbest, ek)", files: [F.financeEntriesManualReconcile] },
