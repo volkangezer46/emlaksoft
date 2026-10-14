@@ -369,6 +369,8 @@ const F = {
   // SURELI KONTOR (2026-10-10): kontor partileri (ef_credit_lots) + FIFO harcama + yanma RPC'si; ef_credit_balance/commit/grant yeniden tanimlanir,
   // eski suresiz bakiyeler 12 aylik partiye doner. fulfill govdelerine DOKUNMAZ (sure fatura meta'sindan okunur). Kod sema yokken eski akisa duser; paket satisi kapali kalir.
   efCreditLots: "20261010000300_ef_credit_lots_expiry.sql",
+  // EP3 (2026-10-13): Bakanlik (EIDS) e-postalari: ofise ozel alma adresi + islenmis e-posta kayitlari (yalniz service_role yazar).
+  eidsInbound: "20261013007200_eids_inbound.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -573,6 +575,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.portalListingsNameNormalize]: "davranis", // portal_listings BEFORE INSERT/UPDATE OF portal_name tetikleyicisi lower(btrim()) + CHECK (NOT VALID + VALIDATE); yalniz harf/bosluk
     [F.tenantPortalAccounts]: "davranis", // yeni tablo tenant_portal_accounts (RLS: ofis okur, owner/gm yazar) + portal_account_report_login (JWT SECURITY DEFINER; seri 3'te owner'a tek seferlik bildirim) + portal_listings.portal_name lower(btrim()) veri duzeltmesi (yalniz harf/bosluk); kod tablo yokken oneriye duser
     [F.pushSubscriptionsRepairFirst]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
+    [F.eidsInbound]: "ek", // 2 yeni tablo eids_inbound_addresses/eids_inbound_messages (RLS: ofis ici okuma, yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.supportDeskV2]: "davranis", // 5 yeni tablo (yalniz service_role) + support_tickets.tags + ticket_macros eylem/sayac kolonlari; SLA hedefi IS SAATINE gore (support_set_derived_ticket_fields degisir), BEFORE INSERT otomatik atama tetikleyicisi, billing rolu destek personeli sayilir; kod tablolar yokken eski davranis
     [F.legalHelpContent]: "ek", // 5 yeni tablo (legal_documents/consents/constants, help_articles/votes; RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken koddaki icerikle calisir
@@ -781,6 +784,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "EP1-portal-uyelikleri", order: 91, title: "Portal uyelikleri tek kaynak: tenant_portal_accounts + portal_account_report_login + portal_name kucuk harf duzeltmesi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken canli ilan/gider/talep onerisine duser; sira serbest, davranis; 007100 portal_name tetikleyicisi + CHECK 007000'dan SONRA)", files: [F.tenantPortalAccounts, F.portalListingsNameNormalize] },
     { id: "EP2-eids-yetki-defteri", order: 92, title: "EIDS yetki defteri: genisletilmis yetki durumu + 5 sutun, yalniz-eklenir eids_authority_events, eids_apply/undo_authority_event (tek yazma noktasi) ve aday on suzgeci (20261008001300 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod yokken eski yola duser; davranis)", files: [F.eidsAuthorityLedger] },
     { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions ilk onarimi (canlida 004910 oncesi uygulandi): eksik tablo asil tanimla idempotent kurulur; 004910 politikayi sikilastirir (sira serbest, ek)", files: [F.pushSubscriptionsRepairFirst] },
+    { id: "EP3-eids-eposta-alimi", order: 93, title: "Bakanlik (EIDS) e-posta alimi: eids_inbound_addresses + eids_inbound_messages (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'kurulum bekliyor'; EP2 olay defteriyle FK yok, sira serbest, ek)", files: [F.eidsInbound] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "AD2-fatura-satirlari-dekont", order: 72, title: "Fatura satirlari (geriye donuk tek satir) + numarali alacak dekontu (iade kaydi tetikleyicisi; mevcut iadeler dekontlanir) + elle fatura taslak RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken satiri faturadan turetir, elle fatura formu 'kurulum bekliyor' der; sira serbest)", files: [F.invoiceLinesCreditNotes] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },

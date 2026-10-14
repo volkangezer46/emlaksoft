@@ -7,8 +7,12 @@ import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-provide
 import { IntegrationsForm } from "../integrations-form";
 import { ReadOnlyGate } from "../read-only-gate";
 import { PortalMembershipsSection } from "./portal-memberships-section";
+import { EidsMailboxCard } from "./eids-mailbox-card";
 
-/** Sekme: ofise özel Netgsm SMS + WhatsApp Cloud API. Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok). */
+/**
+ * Sekme: ofise özel Netgsm SMS + WhatsApp Cloud API. Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok).
+ * Altında "Bakanlık (EİDS) e-postaları" kartı (EP3; kendi verisini okur).
+ */
 export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
   const supabase = await createClient();
   const [{ data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
@@ -72,6 +76,9 @@ export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
           </Suspense>
         </div>
       </section>
+      <div className="mt-6">
+        <EidsMailboxCard canEdit={canEdit} />
+      </div>
     </>
   );
 }

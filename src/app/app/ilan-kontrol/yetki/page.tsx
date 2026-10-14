@@ -16,6 +16,7 @@ import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { AuthorityRowActions } from "@/components/listing-control/authority-row-actions";
 import { AuthorityMatchPanel } from "@/components/listing-control/authority-match-panel";
+import { EidsInboxSection } from "./eids-inbox";
 import { loadAuthorityQueue, type AuthorityQueueItem } from "@/lib/eids/authority-queue";
 import { loadLatestUndoable } from "@/lib/eids/load";
 import { EIDS_EVENT_KIND_LABELS } from "@/lib/eids/event-labels";
@@ -49,15 +50,17 @@ const STATUS_VARIANT: Record<EidsDisplayStatus, BadgeVariant> = {
   exempt: "info",
 };
 
-type Sekme = "kuyruk" | "eslestir";
+type Sekme = "kuyruk" | "eslestir" | "eposta";
 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function YetkiKuyrukPage({ searchParams }: { searchParams: SearchParams }) {
-  const { perms, tenantId } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms, tenantId, role } = await requireModulePage("portals", "/app/ilan-kontrol");
   const canEdit = (perms.portals ?? []).includes("edit");
   const sp = await searchParams;
-  const sekme: Sekme = one(sp.sekme) === "eslestir" ? "eslestir" : "kuyruk";
+  const sekmeRaw = one(sp.sekme);
+  // ?sekme=eposta: Bakanlık (EİDS) e-postaları (EP3). ?sekme=eslestir: ilan-yetki eşleştirme (EP2). Varsayılan: kuyruk.
+  const sekme: Sekme = sekmeRaw === "eslestir" ? "eslestir" : sekmeRaw === "eposta" ? "eposta" : "kuyruk";
   const kovaRaw = one(sp.kova);
   const kova = isAuthorityQueueFilter(kovaRaw) ? kovaRaw : null;
   const page = Math.max(1, Math.floor(Number(one(sp.sayfa)) || 1));
@@ -81,8 +84,13 @@ export default async function YetkiKuyrukPage({ searchParams }: { searchParams: 
       <nav aria-label="Yetki sekmeleri" className="mb-4 flex flex-wrap gap-1.5">
         <FilterChip href={`${CONTROL_BASE}/yetki`} active={sekme === "kuyruk"}>Kuyruk</FilterChip>
         <FilterChip href={`${CONTROL_BASE}/yetki?sekme=eslestir`} active={sekme === "eslestir"}>Eşleştir</FilterChip>
+        <FilterChip href={`${CONTROL_BASE}/yetki?sekme=eposta`} active={sekme === "eposta"}>Bakanlık e-postaları</FilterChip>
       </nav>
-      {sekme === "eslestir" ? (
+      {sekme === "eposta" ? (
+        <Suspense fallback={<SkeletonCard height={320} label="Bakanlık e-postaları yükleniyor" />}>
+          <EidsInboxSection tenantId={tenantId} role={role} canEdit={canEdit} />
+        </Suspense>
+      ) : sekme === "eslestir" ? (
         <Suspense fallback={<SkeletonCard height={320} label="Eşleştirme yükleniyor" />}>
           <MatchBody canEdit={canEdit} tenantId={tenantId} prefill={prefill} />
         </Suspense>
