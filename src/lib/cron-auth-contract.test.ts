@@ -63,8 +63,10 @@ describe("cron yetki kapısı sözleşmesi", () => {
   });
 
   it("R7: hatırlatma cron'ları saat dilimli TR biçimleyici kullanır", () => {
+    // randevu-hatirlat metni YD3'ten beri saf katmanda (`appointment-messages.ts`): cron ile birlikte denetlenir.
+    const extra: Record<string, string> = { "randevu-hatirlat": readFileSync(join(root, "src/lib/appointment-messages.ts"), "utf8") };
     for (const job of ["gorev-hatirlat", "randevu-hatirlat"]) {
-      const src = read(job);
+      const src = read(job) + (extra[job] ?? "");
       expect(src, job).toContain("formatDateTimeTr");
       expect(src, job).not.toContain("toLocaleString");
     }

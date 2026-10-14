@@ -20,6 +20,8 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { formatOfficeTime, officeDayWindow } from "@/lib/time/office-tz";
 import { missingFieldsError } from "@/lib/form-rules";
 import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
+import { sendAppointmentConfirmation, type ConfirmSendOutcome } from "@/lib/appointment-customer-messages";
+import { getBaseUrl } from "@/lib/base-url";
 
 export type AppointmentResult = {
   error?: string;
@@ -30,6 +32,11 @@ export type AppointmentResult = {
    * `confirm_conflict` alanıyla yeniden gönderirse kayıt geçer.
    */
   conflictWarning?: string;
+  /**
+   * Yeni randevuda müşteriye teyit iletisinin sonucu (YD3): `sms_sent` gönderildi; `no_channel` ayar açık ama SMS
+   * hesabı yok (danışman satırdaki "WhatsApp'ta teyit gönder" ile iletir); diğerleri bilgi amaçlı.
+   */
+  customerMessage?: ConfirmSendOutcome;
 };
 
 const TYPES = ["showing", "office", "valuation", "contract"];
@@ -203,18 +210,24 @@ export async function createAppointment(formData: FormData): Promise<Appointment
     });
   }
 
+  // Müşteriye teyit SMS'i (işlem amaçlı; ofis ayarı açık + SMS hesabı + cep numarası). Hata kaydı geri almaz.
+  const customerMessage: ConfirmSendOutcome =
+    created?.id && customerId
+      ? await sendAppointmentConfirmation(supabase, { tenantId: gate.tenantId, appointmentId: String(created.id), appUrl: getBaseUrl() })
+      : "off";
+
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "appointment.create",
     entityType: "appointment",
-    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString() },
+    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString(), customer_message: customerMessage },
   });
 
   revalidatePath("/app/randevular");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true };
+  return { ok: true, customerMessage };
 }
 
 /**

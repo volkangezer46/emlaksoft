@@ -3,14 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Eye, FileSignature, Link2, MoreVertical, PenLine, XCircle } from "lucide-react";
+import { Eye, FileSignature, Link2, MessageCircle, MoreVertical, PenLine, XCircle } from "lucide-react";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { useToast } from "@/components/app/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 /**
- * Randevu satırının ikincil eylemleri (⋮): detay, imzaya al, tutanak, teyit linkini kopyala, iptal.
+ * Randevu satırının ikincil eylemleri (⋮): detay, imzaya al, tutanak, WhatsApp'ta teyit gönder, teyit linkini kopyala, iptal.
  * Satırda yalnız birincil eylemler (Tamamla / Onayla / Düzenle) görünür. İptal onayı denetimli ConfirmDialog
  * ile açılır (menü kapanınca da diyalog açık kalır).
  */
@@ -23,6 +23,7 @@ export function AppointmentRowMore({
   tutanakHref,
   isShowing,
   confirmToken,
+  confirmWaHref,
 }: {
   id: string;
   status: string;
@@ -32,6 +33,8 @@ export function AppointmentRowMore({
   tutanakHref: string;
   isShowing: boolean;
   confirmToken: string | null;
+  /** Müşteriye hazır teyit mesajı (wa.me); danışman kendi WhatsApp'ından gönderir. */
+  confirmWaHref?: string | null;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -94,6 +97,13 @@ export function AppointmentRowMore({
               <Link href={tutanakHref} prefetch={false}>
                 <FileSignature aria-hidden="true" /> Yer gösterme tutanağı
               </Link>
+            </DropdownMenuItem>
+          ) : null}
+          {!completed && confirmWaHref ? (
+            <DropdownMenuItem asChild>
+              <a href={confirmWaHref} target="_blank" rel="noopener noreferrer">
+                <MessageCircle aria-hidden="true" /> WhatsApp&apos;ta teyit gönder
+              </a>
             </DropdownMenuItem>
           ) : null}
           {!completed && confirmToken ? (

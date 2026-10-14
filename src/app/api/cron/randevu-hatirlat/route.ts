@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { findNotifiedIds, findNotifiedKeys, insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
+import { findNotifiedIds, findNotifiedKeys, insertNotificationsDetailed } from "@/lib/notify-batch";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { getBaseUrl } from "@/lib/base-url";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
-import { buildDedupeKey } from "@/lib/notify-dedupe";
-import { formatDateTimeTr } from "@/lib/format";
+import { appointmentReminderKey, planAdvisorReminders, type ReminderAppointment } from "@/lib/appointment-messages";
+import { runCustomerReminderStep } from "@/lib/appointment-customer-messages";
 import { runWebhookRetries } from "@/lib/integrations-api/webhooks";
 
 const APP_URL = getBaseUrl();
@@ -15,12 +15,16 @@ const APP_URL = getBaseUrl();
 /** Çok ofisli toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
 
+/** Hatırlatma penceresi: önümüzdeki 24 SAAT (eski hesap 24 * 86_400_000 = 24 gündü; 3 hafta sonraki randevu "yaklaşan" sayılıyordu). */
+const REMINDER_WINDOW_MS = 24 * 3_600_000;
+
 type ApptRow = {
   id: string;
   tenant_id: string;
-  appointment_type: string | null;
   scheduled_at: string;
   confirm_token: string | null;
+  assigned_to: string | null;
+  created_by: string | null;
   customer: { full_name?: string } | { full_name?: string }[] | null;
 };
 
@@ -33,14 +37,14 @@ async function run(req: NextRequest) {
   const admin = createAdminClient();
   const startedAt = Date.now();
   const from = new Date(startedAt);
-  const to = new Date(startedAt + 24 * 86_400_000);
+  const to = new Date(startedAt + REMINDER_WINDOW_MS);
 
   // Global .limit(200) kaldırıldı: order(id) + range sayfalama; sorgu hatası heartbeat'e 'error' olarak yansır.
   const { rows: list, error: listError } = await fetchAllPaged<ApptRow>(
     (rangeFrom, rangeTo) =>
       admin
         .from("appointments")
-        .select("id, tenant_id, appointment_type, scheduled_at, confirm_token, customer:customers!appointments_customer_id_fkey(full_name)")
+        .select("id, tenant_id, scheduled_at, confirm_token, assigned_to, created_by, customer:customers!appointments_customer_id_fkey(full_name)")
         .gte("scheduled_at", from.toISOString())
         .lte("scheduled_at", to.toISOString())
         .neq("status", "cancelled")
@@ -58,9 +62,21 @@ async function run(req: NextRequest) {
   const windowStart = new Date(startedAt - 20 * 3600_000).toISOString();
 
   // N+1 KALDIRILDI: randevu başına 1 SELECT + 1 INSERT yerine toplam birkaç sorgu.
-  // Tekrar önleme: (1) dedupe_key (migration varsa; anahtar randevu + saat), (2) eski gövde izi `appt:<uuid>`.
-  const tenantIds = [...new Set(list.map((a) => String(a.tenant_id)))];
-  const keyOf = (a: ApptRow) => buildDedupeKey("appt-hatirlat", a.id, new Date(a.scheduled_at).getTime());
+  // Tekrar önleme: (1) dedupe_key (randevu + saat), (2) geçiş dönemi: eski ofis geneli bildirimlerin gövde izi `appt:<uuid>`
+  // (href "/app/randevular"); yeni satırlar kişiye ve tek randevu bağlantısıyla yazılır, iz taşımaz.
+  const appointments: ReminderAppointment[] = list.map((a) => {
+    const cust = Array.isArray(a.customer) ? a.customer[0] : a.customer;
+    return {
+      id: a.id,
+      tenant_id: String(a.tenant_id),
+      scheduled_at: a.scheduled_at,
+      confirm_token: a.confirm_token,
+      assigned_to: a.assigned_to,
+      created_by: a.created_by,
+      customerName: cust?.full_name ?? null,
+    };
+  });
+  const tenantIds = [...new Set(appointments.map((a) => a.tenant_id))];
   const [alreadyNotified, alreadyKeys] = await Promise.all([
     findNotifiedIds(admin, {
       href: "/app/randevular",
@@ -68,35 +84,30 @@ async function run(req: NextRequest) {
       sinceIso: windowStart,
       markerPrefix: "appt",
     }),
-    findNotifiedKeys(admin, { tenantIds, keys: list.map(keyOf) }),
+    findNotifiedKeys(admin, { tenantIds, keys: appointments.map(appointmentReminderKey) }),
   ]);
 
-  const toInsert: NotificationRow[] = [];
-  let skipped = 0;
+  // Hatırlatma YALNIZ randevunun sahibine (atanan danışman, yoksa açan); sahipsiz randevu ofis geneline bildirim üretmez.
+  const plan = planAdvisorReminders(appointments, {
+    appUrl: APP_URL,
+    isAlreadyNotified: (a) => alreadyNotified.has(String(a.id).toLowerCase()) || Boolean(alreadyKeys?.has(appointmentReminderKey(a))),
+  });
 
-  for (const a of list) {
-    if (alreadyNotified.has(String(a.id).toLowerCase()) || alreadyKeys?.has(keyOf(a))) {
-      skipped += 1;
-      continue;
-    }
-    const cust = a.customer;
-    const name = Array.isArray(cust) ? cust[0]?.full_name : cust?.full_name;
-    // Teyit linki mesajın gövdesinde: danışman SMS/WhatsApp'a kopyalarken hazır
-    // olsun. Kısa tutuluyor (mesaj SMS'e gidebilir); appt:{id} işareti dedupe
-    // için SONDA kalmalı (findNotifiedIds markerPrefix bunu okur).
-    const teyit = a.confirm_token ? ` · Teyit: ${APP_URL}/randevu-teyit/${a.confirm_token}` : "";
-    toInsert.push({
-      tenant_id: String(a.tenant_id),
-      title: "Yaklaşan randevu",
-      body: `${name ?? "Müşteri"} · ${formatDateTimeTr(a.scheduled_at)}${teyit} · appt:${a.id}`,
-      href: "/app/randevular",
-      kind: "info",
-      dedupe_key: keyOf(a),
-    });
-  }
-
-  const result = await insertNotificationsDetailed(admin, toInsert);
+  const result = await insertNotificationsDetailed(admin, plan.rows);
   const notified = result.written;
+
+  // Müşteriye hatırlatma SMS'i (ofis ayarı açıksa; bu cron'un ayrık adımı, YENİ cron yok). Hata danışman adımını etkilemez.
+  let customerNote = "";
+  let customerFailed = 0;
+  try {
+    const cr = await runCustomerReminderStep(admin, { nowMs: startedAt, appUrl: APP_URL });
+    customerFailed = cr.failed;
+    if (cr.sent > 0 || cr.failed > 0) customerNote = `, müşteriye SMS ${cr.sent}${cr.failed ? ` (${cr.failed} hata)` : ""}`;
+    else if (cr.note) customerNote = `, ${cr.note}`;
+  } catch (e) {
+    console.error("randevu-hatirlat müşteri", e instanceof Error ? e.message : "hata");
+    customerNote = ", müşteri adımı hata";
+  }
 
   // Giden webhook yeniden denemeleri (30 dk'lık bu cron'un adımı; YENİ cron yok). Kanal kapalı/şema yoksa atlanır.
   let webhookNote = "";
@@ -107,17 +118,19 @@ async function run(req: NextRequest) {
     console.error("randevu-hatirlat webhook", e instanceof Error ? e.message : "hata");
   }
 
+  const skipped = plan.skipped + result.duplicates;
+  const unownedNote = plan.unowned > 0 ? `, ${plan.unowned} sahipsiz randevu atlandı` : "";
   const hb = heartbeatFor({
     total: list.length,
     processed: list.length,
-    failed: result.failed,
+    failed: result.failed + customerFailed,
     timedOut: false,
     listError,
-    summary: `${notified} hatırlatma, ${skipped + result.duplicates} atlandı${webhookNote}`,
+    summary: `${notified} hatırlatma, ${skipped} atlandı${unownedNote}${customerNote}${webhookNote}`,
   });
   await recordHeartbeat("randevu-hatirlat", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: hb.status === "ok", notified, skipped: skipped + result.duplicates, failed: result.failed });
+  return NextResponse.json({ ok: hb.status === "ok", notified, skipped, unowned: plan.unowned, failed: result.failed });
 }
 
 export const GET = guardCron("randevu-hatirlat", run);

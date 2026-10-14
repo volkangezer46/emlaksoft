@@ -64,7 +64,13 @@ export function AppointmentForm({
   // Sunucu çakışma bulursa kayıt YAPILMAZ ve conflictWarning döner; form uyarı
   // bandı + gizli confirm_conflict=1 ile ikinci gönderimde kayıt geçer.
   const { state, onSubmit, pending } = useCreateForm((fd) => createAppointment(fd), {
-    successMessage: "Randevu planlandı",
+    // Müşteri iletisi sonucu dürüstçe söylenir: SMS gittiyse "gönderildi", kanal yoksa satırdaki WhatsApp bağlantısı.
+    successMessage: (r) =>
+      r.customerMessage === "sms_sent"
+        ? "Randevu planlandı · müşteriye teyit SMS'i gönderildi"
+        : r.customerMessage === "no_channel" || r.customerMessage === "sms_failed"
+          ? "Randevu planlandı · teyidi satırdaki ⋮ > WhatsApp'ta teyit gönder ile iletin"
+          : "Randevu planlandı",
     redirectTo: () => "/app/randevular",
   });
   const conflictWarning = state.conflictWarning ?? null;

@@ -47,6 +47,8 @@ const SOURCE_LABEL: Record<string, string> = {
   automation: "Otomasyon",
   survey: "Memnuniyet anketi",
   rent_reminder: "Kira hatırlatması",
+  appointment_confirm: "Randevu teyidi",
+  appointment_reminder: "Randevu hatırlatması",
   owner_report: "Malik raporu",
 };
 

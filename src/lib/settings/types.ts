@@ -43,7 +43,7 @@ export const OFFICE_SETTING_GROUPS = [
   { id: "dagitim", label: "Talep dağıtımı", description: "Yeni talebin hangi danışmana gideceği, mesai kuralı ve ilk dönüş süresi dolunca yeniden atama." },
   { id: "ai", label: "Yapay zekâ özellikleri", description: "AI ilan metni/çeviri ve sesli not özeti (hepsi varsayılan kapalı; kişisel veri maskelenir)." },
   { id: "erisim", label: "Erişim kapsamı", description: "Liste ekranlarının kullanıcı kapsamıyla (kendi / takım / şube) daraltılması." },
-  { id: "iletisim", label: "Malik ve müşteri iletişimi", description: "Malik haftalık raporu, müşteri portalında güncel değer özeti ve vitrin sohbet asistanı (hepsi varsayılan kapalı)." },
+  { id: "iletisim", label: "Malik ve müşteri iletişimi", description: "Malik haftalık raporu, müşteriye randevu teyit/hatırlatma SMS'i, müşteri portalında güncel değer özeti ve vitrin sohbet asistanı (hepsi varsayılan kapalı)." },
   { id: "uyum", label: "Uyum ve veri paylaşımı", description: "Yetki belgesi yıllık harç hatırlatması ve anonim piyasa verisi paylaşım izni (varsayılan kapalı)." },
   { id: "guvenlik", label: "Güvenlik politikası", description: "İki adımlı doğrulama zorunluluğu, izinli IP adresleri, oturum süreleri ve yeni cihaz bildirimi (Ayarlar > Güvenlik'te düzenlenir)." },
 ] as const;
