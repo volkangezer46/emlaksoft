@@ -46,7 +46,9 @@ import { CustomerOwnedListings } from "@/components/app/customer-owned-listings"
 import { Wallet } from "lucide-react";
 import { ReassignAdvisorForm } from "./reassign-advisor-form";
 import { computeNextBestAction } from "./next-best-action";
-import { isPast, msSince, DAY_MS } from "@/lib/clock";
+import { isPast, msSince, DAY_MS, formatTrTime } from "@/lib/clock";
+import { appointmentConfirmUrl } from "@/lib/appointment-messages";
+import { formatDateTr } from "@/lib/format";
 import { getBaseUrl } from "@/lib/base-url";
 import { SellerPotentialCard } from "@/components/app/seller-potential-card";
 import { CustomerIntelCard } from "./customer-intel-card";
@@ -95,6 +97,7 @@ type Appt = {
   scheduled_at: string;
   location: string | null;
   status: string;
+  confirm_token?: string | null;
 };
 
 function relName(value: Rel) {
@@ -182,7 +185,7 @@ export default async function CustomerDetailPage({
       .limit(50),
     supabase
       .from("appointments")
-      .select("id, appointment_type, scheduled_at, location, status")
+      .select("id, appointment_type, scheduled_at, location, status, confirm_token")
       .eq("customer_id", id)
       .order("scheduled_at", { ascending: false })
       .limit(50),
@@ -286,6 +289,18 @@ export default async function CustomerDetailPage({
 
   // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
   const publicBase = getBaseUrl();
+
+  // WhatsApp şablonlarının {randevu_tarih}/{randevu_saat}/{teyit_linki} değişkenleri: en yakın gelecek randevu (TR saati) ve
+  // teyit bağlantısı. Genel `{link}` (ilan vitrin bağlantısı) EZİLMEZ; `{adres}` randevu yeriyle yalnız randevu şablonlarında dolar. Liste tarihe göre azalan geldiği için gelecekteki en erken randevu, geçmiş olmayanların sonuncusudur.
+  const nextAppt = appts.filter((a) => (a.status === "pending" || a.status === "confirmed") && !isPast(a.scheduled_at)).at(-1) ?? null;
+  const nextApptVars = nextAppt
+    ? {
+        randevu_tarih: formatDateTr(nextAppt.scheduled_at, { day: "numeric", month: "long", weekday: "long" }),
+        randevu_saat: formatTrTime(nextAppt.scheduled_at),
+        teyit_linki: appointmentConfirmUrl(publicBase, nextAppt.confirm_token) ?? "",
+      }
+    : {};
+  const nextApptCategoryVars = nextAppt?.location ? { randevu: { adres: nextAppt.location } } : undefined;
 
   // Portföy öneri widget'ı için
   const activeDemands = demands
@@ -547,7 +562,9 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
                       danisman: waAdvisor?.full_name ?? "",
                       ofis: waTenant?.name ?? "",
                       telefon: waTenant?.phone ?? "",
+                      ...nextApptVars,
                     }}
+                    categoryVars={nextApptCategoryVars}
                   />
                 ) : null}
                 <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">

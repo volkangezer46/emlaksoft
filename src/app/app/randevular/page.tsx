@@ -22,6 +22,8 @@ import { resolveLazyTotal } from "@/lib/lazy-total";
 import { requireModulePage } from "@/lib/require-module-page";
 import { calendarDateToTrIso, formatTrTime, now, trDayKey, trTodayCalendarDate } from "@/lib/clock";
 import { APPOINTMENT_OUTCOME_META, isAppointmentOutcome } from "@/lib/appointment-outcome";
+import { appointmentConfirmUrl, appointmentCustomerText, appointmentWhatsAppHref } from "@/lib/appointment-messages";
+import { getBaseUrl } from "@/lib/base-url";
 import { getDefinitions } from "@/lib/definitions";
 import { AppointmentCalendar } from "./appointment-calendar";
 import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-week-view";
@@ -71,7 +73,7 @@ export const metadata = { title: "Randevular" };
 
 const PATH = "/app/randevular";
 
-type RelRow = { id?: string; full_name?: string; title?: string; property_code?: string; lat?: number | null; lng?: number | null };
+type RelRow = { id?: string; full_name?: string; phone?: string | null; title?: string; property_code?: string; lat?: number | null; lng?: number | null };
 type Rel = RelRow | RelRow[] | null;
 
 type AppointmentRow = {
@@ -240,7 +242,7 @@ export default async function AppointmentsPage({
     return query;
   };
   const APPT_SELECT =
-    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, signed_at, customer:customers!appointments_customer_id_fkey(id, full_name), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)";
+    "id, appointment_type, scheduled_at, duration_min, location, status, notes, confirm_token, customer_response, assigned_to, outcome, outcome_note, signed_at, customer:customers!appointments_customer_id_fkey(id, full_name, phone), property:properties!appointments_property_id_fkey(id, title, property_code, lat, lng)";
 
   // Durum/tür sayaçları — pencereden bağımsız gerçek toplamlar (head-count; danışman kapsamlı);
   // iptaller hariç. KPI/çip sayıları bu sayıları filtreye çevirir.
@@ -323,11 +325,12 @@ export default async function AppointmentsPage({
     leaveRows,
     { data: advisorRows },
     savedViews,
+    { data: officeRow },
   ] = await batchAll("Randevular", [
     "appointments", "appointments-total", "appointment-types", "filter-customer", "filter-property",
     "count-today", "count-pending", "count-confirmed", "count-signature", "count-completed",
     "count-showing", "count-office", "count-valuation", "count-contract",
-    "week-bar", "own-profile", "leaves", "advisors", "saved-views",
+    "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name",
   ], [
     apptP,
     apptTotalP,
@@ -369,6 +372,8 @@ export default async function AppointmentsPage({
       ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name").limit(200)
       : Promise.resolve({ data: null as { id: string; full_name: string | null }[] | null }),
     savedViewsPromise,
+    // Satırdaki "WhatsApp'ta teyit gönder" taslağında ofis adı (tek satır, RLS kendi ofisi).
+    supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
   ]);
 
   // Tür başına gerçek toplam (KPI + çipler).
@@ -579,6 +584,7 @@ export default async function AppointmentsPage({
 
   // ---- Satır modelleri (tablo + mobil liste ortak veri) ---------------------
   const nowMs = now();
+  const appUrl = getBaseUrl();
   const win = pageWindow(page, rows.length, PAGE_SIZE, rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).length);
   const pageRows = rows.slice(win.offset, win.offset + PAGE_SIZE);
   const viewModels: AppointmentVM[] = pageRows.map((appt) => {
@@ -630,6 +636,21 @@ export default async function AppointmentsPage({
         ? new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "short", timeStyle: "short" }).format(new Date(appt.signed_at))
         : null,
       confirmToken: appt.confirm_token,
+      // Hazır teyit mesajı (wa.me): mesajı danışman kendi WhatsApp'ından gönderir; numara geçersizse ya da randevu
+      // bekleyen/onaylı değilse (iptal, tamamlandı, imza) bağlantı yok.
+      confirmWaHref: customer?.phone && (appt.status === "pending" || appt.status === "confirmed")
+        ? appointmentWhatsAppHref(
+            customer.phone,
+            appointmentCustomerText({
+              kind: "confirm",
+              customerName: customer.full_name ?? null,
+              officeName: (officeRow as { name?: string | null } | null)?.name ?? null,
+              appointmentType: appt.appointment_type,
+              scheduledAt: appt.scheduled_at,
+              confirmUrl: appointmentConfirmUrl(appUrl, appt.confirm_token),
+            }),
+          )
+        : null,
       isShowing: appt.appointment_type === "showing",
       tutanakHref: `/app/sozlesmeler?${tutanakParams.toString()}`,
       edit: {

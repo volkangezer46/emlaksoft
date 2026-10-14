@@ -15,10 +15,10 @@ import {
   CATEGORY_BADGE,
   CATEGORY_LABELS,
   TEMPLATE_CATEGORIES,
-  renderTemplate,
   type TemplateCategory,
   type TemplateVars,
 } from "@/lib/message-templates";
+import { buildWhatsAppDraft, varsForCategory, type CategoryVars } from "@/lib/whatsapp-draft";
 import {
   listMessageTemplates,
   recordTemplateUsage,
@@ -40,18 +40,30 @@ function fold(value: string): string {
  *
  * Şablon listesi dialog ilk açılışta BİR KEZ çekilir (server action), sonraki
  * açılışlarda bellekten okunur.
+ *
+ * `share`: numara yoksa (portföy taslağı) alıcıyı kullanıcı WhatsApp'ta seçer (`wa.me/?text=`); bağlantı tek
+ * kaynaktan (`buildWhatsAppDraft`) kurulur. `note` diyalogda bilgi satırı olarak görünür (ör. ticari ileti uyarısı).
  */
 export function WaTemplateMenu({
   phone,
   vars,
+  categoryVars,
   variant = "hero",
   label = "WhatsApp",
+  share = false,
+  note,
 }: {
   phone: string | null | undefined;
   /** Şablon değişken değerleri — verilmeyen alanlar render'da temizlenir. */
   vars: TemplateVars;
+  /** Yalnız ilgili kategorideki şablonlarda geçerli değerler (ör. randevu şablonunda `{adres}` = randevu yeri). */
+  categoryVars?: CategoryVars;
   variant?: "hero" | "row";
   label?: string;
+  /** Numara yokken alıcı seçtiren paylaşım taslağı (portföy). */
+  share?: boolean;
+  /** Diyalogda gösterilecek kısa bilgi notu. */
+  note?: string | null;
 }) {
   const { push } = useToast();
   const [open, setOpen] = useState(false);
@@ -65,7 +77,7 @@ export function WaTemplateMenu({
   const counted = useRef<Set<string>>(new Set());
 
   const plainLink = toWhatsAppLink(phone);
-  if (!plainLink) return null;
+  if (!plainLink && !share) return null;
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -94,8 +106,10 @@ export function WaTemplateMenu({
     }
   }
 
-  const message = selected ? renderTemplate(selected.body, vars) : "";
-  const waHref = selected ? (toWhatsAppLink(phone, message) ?? plainLink) : plainLink;
+  const draft = buildWhatsAppDraft(phone, selected?.body, varsForCategory(selected?.category, vars, categoryVars));
+  const message = draft.message;
+  // Şablon seçilmeden: numara varsa boş sohbet açılır; paylaşım kipinde metin olmadan bağlantı yok.
+  const waHref = draft.href ?? plainLink;
 
   const filtered = (templates ?? []).filter((t) => {
     if (!query.trim()) return true;
@@ -144,10 +158,19 @@ export function WaTemplateMenu({
         <DialogHeader
           icon={<MessageCircle />}
           title="WhatsApp mesajı"
-          description="Şablon seçin — değişkenler otomatik dolar, mesaj kendi WhatsApp'ınızda açılır."
+          description={
+            plainLink
+              ? "Şablon seçin — değişkenler otomatik dolar, mesaj kendi WhatsApp'ınızda açılır."
+              : "Şablon seçin — değişkenler otomatik dolar; alıcıyı WhatsApp'ta siz seçersiniz."
+          }
         />
 
         <div className="space-y-4 p-6">
+          {note ? (
+            <p className="rounded-[var(--radius-control)] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-semibold text-amber-700">
+              {note}
+            </p>
+          ) : null}
           {/* Arama */}
           {(templates?.length ?? 0) > 0 ? (
             <div className="relative">
@@ -242,16 +265,20 @@ export function WaTemplateMenu({
                 {copied ? "Kopyalandı" : "Metni kopyala"}
               </button>
             ) : null}
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() => setOpen(false)}
-              className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
-            >
-              <ExternalLink className="h-4 w-4" />
-              {selected ? "WhatsApp'ta aç" : "Boş mesajla aç"}
-            </a>
+            {waHref ? (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setOpen(false)}
+                className="btn-shine focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-mint-700 touch:min-h-11"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {selected ? "WhatsApp'ta aç" : "Boş mesajla aç"}
+              </a>
+            ) : (
+              <p className="self-center text-xs text-text-muted">Göndermek için bir şablon seçin.</p>
+            )}
           </div>
         </div>
       </DialogContent>

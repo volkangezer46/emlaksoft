@@ -39,6 +39,8 @@ export type AppointmentVM = {
   /** Gösterim belgesi imza zamanı (appointments.signed_at); imzasızsa null. */
   signedLabel?: string | null;
   confirmToken: string | null;
+  /** Müşteriye hazır teyit mesajı (wa.me + metin); müşteri cep numarası yoksa null. */
+  confirmWaHref: string | null;
   /** Derin bağlantıyla (?randevu=<id>) açılan randevu: vurgulanır, düzenleme paneli açık gelir. */
   focused?: boolean;
   isShowing: boolean;
@@ -86,6 +88,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
           tutanakHref={a.tutanakHref}
           isShowing={a.isShowing}
           confirmToken={a.confirmToken}
+          confirmWaHref={a.confirmWaHref}
         />
       </RowActions>
       {withCalendar ? <AddToCalendarButton event={a.calendarEvent} /> : null}

@@ -3,14 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Eye, FileSignature, Link2, MoreVertical, PenLine, XCircle } from "lucide-react";
+import { Eye, FileSignature, Link2, MessageCircle, MoreVertical, PenLine, XCircle } from "lucide-react";
 import { setAppointmentStatus } from "@/app/actions/appointments";
 import { useToast } from "@/components/app/toast-provider";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 /**
- * Randevu satırının ikincil eylemleri (⋮): detay, imzaya al, tutanak, teyit linkini kopyala, iptal.
+ * Randevu satırının ikincil eylemleri (⋮): detay, imzaya al, tutanak, WhatsApp'ta teyit gönder, teyit linkini kopyala, iptal.
  * Satırda yalnız birincil eylemler (Tamamla / Onayla / Düzenle) görünür. İptal onayı denetimli ConfirmDialog
  * ile açılır (menü kapanınca da diyalog açık kalır).
  */
@@ -23,6 +23,7 @@ export function AppointmentRowMore({
   tutanakHref,
   isShowing,
   confirmToken,
+  confirmWaHref,
 }: {
   id: string;
   status: string;
@@ -32,12 +33,16 @@ export function AppointmentRowMore({
   tutanakHref: string;
   isShowing: boolean;
   confirmToken: string | null;
+  /** Müşteriye hazır teyit mesajı (wa.me); danışman kendi WhatsApp'ından gönderir. */
+  confirmWaHref?: string | null;
 }) {
   const router = useRouter();
   const { push } = useToast();
   const [cancelOpen, setCancelOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const completed = status === "completed";
+  // Teyit yalnız henüz gerçekleşmemiş, iptal edilmemiş randevuda anlamlı ("planlandı, teyit/iptal için…" metni).
+  const confirmable = status === "pending" || status === "confirmed";
 
   function toSignature() {
     startTransition(async () => {
@@ -59,7 +64,7 @@ export function AppointmentRowMore({
     }
   }
 
-  const hasItems = Boolean(cardHref) || status === "confirmed" || isShowing || (!completed && confirmToken) || !completed;
+  const hasItems = Boolean(cardHref) || status === "confirmed" || isShowing || (confirmable && confirmToken) || !completed;
   if (!hasItems) return null;
 
   return (
@@ -96,7 +101,14 @@ export function AppointmentRowMore({
               </Link>
             </DropdownMenuItem>
           ) : null}
-          {!completed && confirmToken ? (
+          {confirmable && confirmWaHref ? (
+            <DropdownMenuItem asChild>
+              <a href={confirmWaHref} target="_blank" rel="noopener noreferrer">
+                <MessageCircle aria-hidden="true" /> WhatsApp&apos;ta teyit gönder
+              </a>
+            </DropdownMenuItem>
+          ) : null}
+          {confirmable && confirmToken ? (
             <DropdownMenuItem onSelect={() => void copyConfirm()}>
               <Link2 aria-hidden="true" /> Teyit linkini kopyala
             </DropdownMenuItem>
