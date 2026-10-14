@@ -4,6 +4,7 @@ import { DAY_MS, trDayKey } from "@/lib/clock";
 import { loadLeagueData, periodOf } from "@/lib/gamification-query";
 import { loadLeadResponses } from "@/lib/response-time/load";
 import { buildCoachPlan, type CoachFacts, type CoachItem, type CoachPlan } from "@/lib/league/coach";
+import { portalDisplayName } from "@/lib/portals/catalog";
 
 type Row = Record<string, unknown>;
 
@@ -100,7 +101,7 @@ export async function loadCoachPlan(
     .filter(({ p }) => p?.assigned_to === userId)
     .map(({ l, p }) => ({
       id: String(l.id),
-      label: `${p?.title ?? "İlan"} · ${String(l.portal_name ?? "portal")}`,
+      label: `${p?.title ?? "İlan"} · ${portalDisplayName(l.portal_name as string | null)}`,
       href: "/app/ilan-kontrol",
     }));
 

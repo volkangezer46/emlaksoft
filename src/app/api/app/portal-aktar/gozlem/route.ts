@@ -1,3 +1,4 @@
+import { CURRENT_PORTALS } from "@/lib/portals/catalog";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
@@ -50,7 +51,7 @@ const bodySchema = z
   .object({
     v: z.literal(1),
     sessionId: z.string().uuid(),
-    portal: z.enum(["sahibinden", "hepsiemlak", "emlakjet"]),
+    portal: z.enum(CURRENT_PORTALS),
     engine: z.literal("f1"),
     ruleVersion: z.number().int().min(0).max(2_147_483_647),
     ruleSha: z.string().regex(/^[0-9a-f]{16,64}$/),

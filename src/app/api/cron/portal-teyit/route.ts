@@ -9,6 +9,8 @@ import { resolvePriceHealth } from "@/lib/comparables";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { runControlStepBroad } from "@/lib/listing-control/server/cron-steps";
+import { portalDisplayName } from "@/lib/portals/catalog";
+import { WEEK_MS, isNonMemberListing, outOfMembershipText, planPortalTeyit, weeklySummaryText, type NonePortals, type TeyitListing } from "@/lib/portals/teyit-plan";
 
 /** Toplu işlem + fiyat sağlığı adımı: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -115,6 +117,44 @@ async function recentlyVerifiedListingIds(
   return out;
 }
 
+/**
+ * EP1 üyelik girdileri: üyeliği "none" olan portallar (ofis → portal) ve eklentisi (iptal edilmemiş verification_clients) olan
+ * ofisler. Tablo yoksa/okunamazsa: none boş, eklenti kümesi null (eski davranış: ilan başına günlük uyarı).
+ */
+async function loadMembershipInputs(admin: ReturnType<typeof createAdminClient>): Promise<{ nonePortals: NonePortals; withExtension: Set<string> | null }> {
+  const nonePortals = new Map<string, Set<string>>();
+  const [accounts, clients] = await Promise.all([
+    admin.from("tenant_portal_accounts").select("tenant_id, portal").eq("status", "none").limit(5000),
+    admin.from("verification_clients").select("tenant_id").is("revoked_at", null).limit(5000),
+  ]);
+  if (!accounts.error) {
+    for (const r of (accounts.data ?? []) as { tenant_id: string; portal: string }[]) {
+      const set = nonePortals.get(r.tenant_id) ?? new Set<string>();
+      set.add(r.portal);
+      nonePortals.set(r.tenant_id, set);
+    }
+  }
+  const withExtension = clients.error ? null : new Set(((clients.data ?? []) as { tenant_id: string }[]).map((r) => String(r.tenant_id)));
+  return { nonePortals, withExtension };
+}
+
+/**
+ * Üyeliği "none" olan portallardaki canlı ilanlar (tek seferlik uyarı için). portal_name birebir süzülmez: eski ya da
+ * aktarım/eşleme yoluyla "Sahibinden" yazılmış satırlar da yakalansın diye eşleme bellekte (planPortalTeyit →
+ * portalIdFromName) yapılır; burada yalnız ilgili ofislerin canlı ilanları okunur.
+ */
+async function loadNonMemberLive(admin: ReturnType<typeof createAdminClient>, none: NonePortals): Promise<TeyitListing[]> {
+  if (none.size === 0) return [];
+  const { data, error } = await admin
+    .from("portal_listings")
+    .select("id, tenant_id, portal_name, portal_listing_id")
+    .eq("status", "live")
+    .in("tenant_id", [...none.keys()])
+    .limit(5000);
+  if (error) return [];
+  return ((data ?? []) as TeyitListing[]).filter((l) => isNonMemberListing(l, none));
+}
+
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
   if (denied) return denied;
@@ -150,9 +190,22 @@ async function run(req: NextRequest) {
   // Çoğaltma yok: ilan kontrol sistemi (portal_listing_health) son 7 günde başarılı kontrol kaydettiyse "teyit gecikti"
   // uyarısı yazılmaz; yalnız gerçekten kontrolsüz kalanlar bildirilir. Tablo yoksa eski davranış (hepsi).
   const recentlyVerified = await recentlyVerifiedListingIds(admin, listings.map((l) => String(l.id)), due);
-  const eligible = listings.filter(
+  const eligibleRaw = listings.filter(
     (row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals") && !recentlyVerified.has(String(row.id)),
   );
+  // EP1: üyelik süzgeci. "none" portaldaki ilan teyit uyarısı almaz (tek seferlik "üyelik dışı" uyarısı); eklentisi olmayan
+  // ofise ilan başına günlük uyarı yerine haftalık tek özet gider.
+  const membership = await loadMembershipInputs(admin);
+  const nonMemberLive = (await loadNonMemberLive(admin, membership.nonePortals)).filter(
+    (row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"),
+  );
+  const plan = planPortalTeyit({
+    overdue: eligibleRaw,
+    nonMemberLive,
+    nonePortals: membership.nonePortals,
+    tenantsWithExtension: membership.withExtension,
+  });
+  const eligible = plan.daily;
 
   // Tekrar önleme: ilan başına 24 saatte en fazla 1 bildirim (cron 6 saatte bir çalışır).
   // dedupe_key kolonu yoksa (migration uygulanmamış) `recent` null → eski davranış (dedupe yok).
@@ -179,10 +232,39 @@ async function run(req: NextRequest) {
     rows.push({
       tenant_id: String(row.tenant_id),
       title: "Portal teyit gecikti",
-      body: `${row.portal_name}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
+      body: `${portalDisplayName(row.portal_name)}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
       href: "/app/portallar",
       kind: "warning",
       dedupe_key: recent ? buildDedupeKey("portal-teyit", row.id, bucket) : null,
+    });
+  }
+
+  // Tek seferlik "üyelik dışı portalda canlı ilan" (kova yok: ilan başına bir kez) + haftalık "elle teyit edin" özeti.
+  // Bu satırlar YALNIZ dedupe_key ile anlamlıdır (yoksa her turda tekrar eder): kolon yoksa (`recent` null ya da yoklama
+  // null) hiç eklenmez; günlük uyarılar eski davranışla yazılmaya devam eder.
+  const extraTenants = [...new Set([...plan.outOfMembership.map((l) => String(l.tenant_id)), ...plan.weekly.map((w) => w.tenantId)])];
+  const dedupeReady =
+    extraTenants.length > 0 &&
+    (eligible.length > 0
+      ? recent !== null
+      : (await findRecentKeysByPrefix(admin, { tenantIds: extraTenants, prefix: "portal-teyit-ozet:", sinceIso: new Date(startedAt - WEEK_MS).toISOString() })) !== null);
+  const weekBucket = timeBucket(startedAt, WEEK_MS);
+  for (const l of dedupeReady ? plan.outOfMembership : []) {
+    rows.push({
+      tenant_id: String(l.tenant_id),
+      ...outOfMembershipText(l),
+      href: "/app/portallar",
+      kind: "warning",
+      dedupe_key: buildDedupeKey("portal-uyelik-disi", l.id),
+    });
+  }
+  for (const w of dedupeReady ? plan.weekly : []) {
+    rows.push({
+      tenant_id: w.tenantId,
+      ...weeklySummaryText(w.count),
+      href: "/app/portallar",
+      kind: "warning",
+      dedupe_key: buildDedupeKey("portal-teyit-ozet", weekBucket),
     });
   }
 
@@ -207,7 +289,7 @@ async function run(req: NextRequest) {
     failed: insertResult.failed,
     timedOut: false,
     listError,
-    summary: `${notified} teyit uyarısı · ${skippedRecent + insertResult.duplicates} son 24 saatte bildirilmiş · ${recentlyVerified.size} kontrol sistemince doğrulanmış · ${priceHealthUpdated} fiyat sağlığı · ${control.text}${skippedTenantsNote(disabledModules, "portals")}`,
+    summary: `${notified} teyit uyarısı · ${plan.weekly.length} haftalık elle teyit özeti (eklentisiz ofis) · ${plan.outOfMembership.length} üyelik dışı canlı ilan · ${skippedRecent + insertResult.duplicates} daha önce bildirilmiş · ${recentlyVerified.size} kontrol sistemince doğrulanmış · ${priceHealthUpdated} fiyat sağlığı · ${control.text}${skippedTenantsNote(disabledModules, "portals")}${extraTenants.length > 0 && !dedupeReady ? " · özet ve üyelik dışı uyarıları atlandı (dedupe kolonu yok)" : ""}`,
   });
   await recordHeartbeat("portal-teyit", hb.status, hb.detail);
 

@@ -1,3 +1,4 @@
+import { CURRENT_PORTALS, PORTAL_CATALOG } from "@/lib/portals/catalog";
 import type { ScanStatusView } from "./extension-status-view";
 
 /**
@@ -51,10 +52,6 @@ export function hasReadResult(portals: readonly ScanRunPortal[]): boolean {
 }
 
 /** Portal ana sayfaları (kullanıcı oturum açıp tekrar dener). */
-export const PORTAL_HOME: Record<string, string> = {
-  sahibinden: "https://www.sahibinden.com/",
-  hepsiemlak: "https://www.hepsiemlak.com/",
-  emlakjet: "https://www.emlakjet.com/",
-};
+export const PORTAL_HOME: Record<string, string> = Object.fromEntries(CURRENT_PORTALS.map((id) => [id, `https://www.${PORTAL_CATALOG[id].host}/`]));
 
-export const PORTAL_HOST_LABEL: Record<string, string> = { sahibinden: "sahibinden.com", hepsiemlak: "hepsiemlak.com", emlakjet: "emlakjet.com" };
+export const PORTAL_HOST_LABEL: Record<string, string> = Object.fromEntries(CURRENT_PORTALS.map((id) => [id, PORTAL_CATALOG[id].host]));

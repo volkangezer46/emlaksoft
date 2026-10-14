@@ -11,7 +11,7 @@ import {
 import { isPairingActive, type Pairing } from "./extension-pairing";
 import { EXTENSION_LIMITS, pacingDecision, todayCount, type PacingState } from "./extension-pacing";
 import { SCAN_LIMITS, type ScanProgress, type ScanResultKind, type ScanStates } from "./extension-scan";
-import { hoursLabel, msUntilWindowOpens, portalEnabled, withinWorkingHours, type ExtensionSettings } from "./extension-settings";
+import { hoursLabel, msUntilWindowOpens, portalAllowed, portalEnabled, withinWorkingHours, type ExtensionSettings, type ServerPortals } from "./extension-settings";
 
 /**
  * EKLENTİ DURUM GÖRÜNÜMÜ (SAF, testli). Açılır pencere, uygulama içi sayfa (köprü `status-response`) ve rozet AYNI görünümü
@@ -23,7 +23,12 @@ export type RunState = "disconnected" | "paused" | "login_required" | "cooldown"
 
 export type PortalHealthView = {
   id: string;
+  /** İstek atılır mı: ofis üye + kontrol açık (sunucu) VE yerel ayarda açık. */
   enabled: boolean;
+  /** Sunucu bu portalı bildirdi mi (ofis üye ve otomatik kontrol açık). Eski sürüm girdisinde yok. */
+  member?: boolean;
+  /** Yerel aç/kapa ayarı. */
+  localOn?: boolean;
   level: HealthLevel;
   total: number;
   unreadable: number;
@@ -95,6 +100,8 @@ export type StatusInput = {
   outboxCount: number;
   leaderActive: boolean;
   portalIds: readonly string[];
+  /** Sunucunun bildirdiği izinli portallar (EP1). Verilmezse (eski çağıran) yalnız yerel ayar. */
+  serverPortals?: ServerPortals;
   nowMs: number;
   dayKey: string;
   tzOffsetMinutes: number;
@@ -125,7 +132,10 @@ export function buildStatusView(i: StatusInput): ExtensionStatusView {
   const cooldownActive = i.pacing.cooldownUntilMs > nowMs;
   const portals: PortalHealthView[] = i.portalIds.map((id) => {
     const h = portalHealth(i.health[id], cooldownActive);
-    return { id, enabled: portalEnabled(i.settings, id), ...h };
+    const localOn = portalEnabled(i.settings, id);
+    if (i.serverPortals === undefined) return { id, enabled: localOn, localOn, ...h };
+    const member = !!i.serverPortals && i.serverPortals.ids.includes(id);
+    return { id, enabled: portalAllowed(i.settings, id, i.serverPortals), member, localOn, ...h };
   });
   const hourAgo = nowMs - 3_600_000;
   return {

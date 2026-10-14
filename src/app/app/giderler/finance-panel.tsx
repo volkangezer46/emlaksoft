@@ -15,6 +15,7 @@ import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
 import { BUDGET_WARN_RATIO } from "@/lib/finance/expense-budget";
 import { RECURRENCE_LABEL, monthlyEquivalent, renewalInfo } from "@/lib/finance/recurring-expenses";
+import { PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
 import { PORTAL_LABEL, ROI_WINDOW_DAYS, leadSourceOf, pickLeastEfficientPortal, unusedPortalSubscriptions } from "@/lib/finance/portal-roi";
 
 type Category = { value: string; label: string };
@@ -290,10 +291,20 @@ function PortalRoiTable({ portal, showEarnings }: { portal: NonNullable<Awaited<
           </THead>
           <TBody>
             {portal.rows.map((r) => (
-              <TR key={r.portalKey}>
+              // Üye olunmayan portal yalnız geçmiş verisi için görünür ve soluk durur; üye olunan ama verisi olmayan portal da listelenir.
+              <TR key={r.portalKey} className={r.member === false ? "opacity-60" : undefined}>
                 <TD primary className="font-semibold text-text">
                   {r.label}
-                  <span className="mt-0.5 block text-xs font-normal text-text-faint">{r.liveListings} ilan yayında</span>
+                  <span className="mt-0.5 block text-xs font-normal text-text-faint">
+                    {r.member === true && r.cost === 0 && r.leads === 0 && r.wonDeals === 0 && r.liveListings === 0
+                      ? "henüz veri yok"
+                      : `${r.liveListings} ilan yayında`}
+                  </span>
+                  {r.member === false ? (
+                    <Link href={PORTAL_MEMBERSHIP_HREF} className="focus-ring mt-0.5 inline-block rounded text-xs font-semibold text-accent-text hover:underline">
+                      Üye değilsiniz, ekle
+                    </Link>
+                  ) : null}
                 </TD>
                 <TD label="Gider payı" align="right" className="numeric">
                   <Link href={`/app/giderler?portal=${r.portalKey}#portal-getirisi`} className="focus-ring rounded hover:underline">

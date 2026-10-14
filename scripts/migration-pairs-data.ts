@@ -327,6 +327,10 @@ const F = {
   ad11SecurityHardening: "20261013005000_ad11_security_hardening.sql",
   // AD12 (2026-10-13): surumlu yasal belgeler + yeniden onay kayitlari + tarihli mevzuat sabitleri + yardim merkezi makale/oy tablolari.
   legalHelpContent: "20261013005100_legal_help_content.sql",
+  // EP1 (2026-10-13): portal uyeliginin tek kaynagi tenant_portal_accounts + eklenti giris sonucu RPC'si + portal_name kucuk harf.
+  tenantPortalAccounts: "20261013007000_tenant_portal_accounts.sql",
+  // EP1 duzeltme: portal_name her yazimda lower(btrim()) (tetikleyici + CHECK); initcap gecen eski RPC'ler zararsizlasir.
+  portalListingsNameNormalize: "20261013007100_portal_listings_name_normalize.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
   // AD1 (2026-10-13): abonelik operasyon konsolu: ofise ozel limit istisnasi + cozucu, taahhut/iptal kodu, tahsil hata metni.
@@ -563,6 +567,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.pushSubscriptionsRepair]: "ek", // canlida eksik push_subscriptions tablosu (ledger'da 20260722000013 uygulanmis gorunuyor) idempotent yeniden kurulur; politika current_tenant_id() + WITH CHECK; baska nesneye dokunmaz
     [F.ad11SecurityHardening]: "siki", // platform_audit_logs append-only tetik (UPDATE/DELETE/TRUNCATE yasak; FK set-null istisnasi) + 4 nullable kolon; platform_impersonation_sessions'a 3 nullable kolon; yeni tablolar (platform_impersonation_history, backup_runs, restore_drills; yalniz service_role) + 2 service_role RPC; kod tablolar yokken eski yola duser
     [F.siteMedia]: "ek", // yeni ozel kova site-media (raster mime, 8 MB) + site_media tablosu (RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablo yokken "kurulum bekliyor" + gorselsiz ana sayfa
+    [F.portalListingsNameNormalize]: "davranis", // portal_listings BEFORE INSERT/UPDATE OF portal_name tetikleyicisi lower(btrim()) + CHECK (NOT VALID + VALIDATE); yalniz harf/bosluk
+    [F.tenantPortalAccounts]: "davranis", // yeni tablo tenant_portal_accounts (RLS: ofis okur, owner/gm yazar) + portal_account_report_login (JWT SECURITY DEFINER; seri 3'te owner'a tek seferlik bildirim) + portal_listings.portal_name lower(btrim()) veri duzeltmesi (yalniz harf/bosluk); kod tablo yokken oneriye duser
     [F.pushSubscriptionsRepairFirst]: "ek", // tablo yoksa 20260722000013 tanimiyla kurulur (if not exists + politika varsa atla); varsa degisiklik yok
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.supportDeskV2]: "davranis", // 5 yeni tablo (yalniz service_role) + support_tickets.tags + ticket_macros eylem/sayac kolonlari; SLA hedefi IS SAATINE gore (support_set_derived_ticket_fields degisir), BEFORE INSERT otomatik atama tetikleyicisi, billing rolu destek personeli sayilir; kod tablolar yokken eski davranis
@@ -769,6 +775,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AD11-guvenlik-yedek", order: 81, title: "AD11 guvenlik sertlestirmesi: denetim izi append-only + ip/ua/once/sonra, destek erisimi gecmisi (gerekce+bilet), backup_runs/restore_drills, personel oturum RPC'leri (bagimsiz; kod tablolar yokken eski yola duser; sira serbest, siki)", files: [F.ad11SecurityHardening] },
     { id: "AD9-destek-masasi-2", order: 79, title: "Destek masasi 2.0: SLA matrisi (oncelik x plan, is saati + tatil), kategori kurali + sirali dagitimla otomatik atama, bilet etiketleri, makro eylemleri/kullanim sayaci, yanit bekleyen bilet otomasyonu RPC'si (20260802000540 SONRASI; bagimsiz, sira serbest; davranis)", files: [F.supportDeskV2] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
+    { id: "EP1-portal-uyelikleri", order: 91, title: "Portal uyelikleri tek kaynak: tenant_portal_accounts + portal_account_report_login + portal_name kucuk harf duzeltmesi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken canli ilan/gider/talep onerisine duser; sira serbest, davranis; 007100 portal_name tetikleyicisi + CHECK 007000'dan SONRA)", files: [F.tenantPortalAccounts, F.portalListingsNameNormalize] },
     { id: "ONARIM-push-abonelikleri", order: 90, title: "push_subscriptions ilk onarimi (canlida 004910 oncesi uygulandi): eksik tablo asil tanimla idempotent kurulur; 004910 politikayi sikilastirir (sira serbest, ek)", files: [F.pushSubscriptionsRepairFirst] },
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "AD2-fatura-satirlari-dekont", order: 72, title: "Fatura satirlari (geriye donuk tek satir) + numarali alacak dekontu (iade kaydi tetikleyicisi; mevcut iadeler dekontlanir) + elle fatura taslak RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken satiri faturadan turetir, elle fatura formu 'kurulum bekliyor' der; sira serbest)", files: [F.invoiceLinesCreditNotes] },

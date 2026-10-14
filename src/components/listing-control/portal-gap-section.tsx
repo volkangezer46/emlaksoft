@@ -5,6 +5,7 @@ import { getDb } from "@/components/listing-control/readers";
 import { loadPortalGaps } from "@/components/listing-control/portal-gap-readers";
 import { kpiHref, type SummaryNumbers } from "@/components/listing-control/helpers";
 import { Panel } from "@/components/listing-control/ui-parts";
+import { requireActiveTenant } from "@/lib/tenant-guard";
 
 /**
  * "Portal farkları" (İlan Kontrol ana ekranı): EKSİK PORTAL (yayında portföy, ofisin kullandığı portalda ilanı yok) ve
@@ -12,8 +13,9 @@ import { Panel } from "@/components/listing-control/ui-parts";
  * (eksik portal → `/app/ilan-kontrol/eksik-portal?portal=…`, fark kartları → KPI listesi).
  */
 export async function PortalGapSection({ summary }: { summary: Pick<SummaryNumbers, "price_mismatch" | "portal_missing"> }) {
-  const db = await getDb();
-  const { gaps } = await loadPortalGaps(db);
+  const [db, gate] = await Promise.all([getDb(), requireActiveTenant()]);
+  // Üyelik süzgeci: yalnız ofisin üye olduğu portallar (ilanı olmasa da) kart olur.
+  const { gaps } = await loadPortalGaps(db, gate.ok ? gate.tenantId : null);
   const diffs = differenceCards(summary, (k) => kpiHref(k));
   if (gaps.length === 0 && diffs.length === 0) return null;
   return (

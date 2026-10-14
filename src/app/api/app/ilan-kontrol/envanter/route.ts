@@ -5,6 +5,7 @@ import { importPortalInventory } from "@/app/actions/listing-control-inventory";
 import { workerReportParser } from "@/app/actions/listing-control-worker";
 import { isSameOriginBridgeRequest } from "@/lib/listing-control/worker/bridge-request";
 import { sanitizeUpload, UPLOAD_LIMITS, type ValidUpload } from "@/lib/listing-control/worker/extension-scan";
+import { reportPortalLogin } from "@/lib/portals/membership";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400, headers: NO_STORE });
   }
   if (!up) return NextResponse.json({ ok: false, error: "invalid_input" }, { status: 400, headers: NO_STORE });
+
+  // Portal oturumu (EP1, en iyi çaba): "giriş istedi" → last_login_fail_at + seri; liste okunduysa → last_login_ok_at, seri sıfır.
+  // Üst üste 3 başarısızlıkta ofis sahibine tek seferlik "üyelik bitti mi?" bildirimi RPC'de gider.
+  if (up.kind === "blocked" && up.reason === "login_required") {
+    await reportPortalLogin(up.portal, false);
+    return NextResponse.json({ ok: true, outcome: "login_reported" }, { headers: NO_STORE });
+  }
+  if (up.kind === "blocked") return NextResponse.json({ ok: true, outcome: "ignored" }, { headers: NO_STORE });
+  if (up.read > 0) await reportPortalLogin(up.portal, true);
 
   // Ayrıştırıcı sayacı (en iyi çaba, kişisel veri yok): okunamayan yapı "ayrıştırılamadı" olarak sayılır.
   if (up.parserVersion) {

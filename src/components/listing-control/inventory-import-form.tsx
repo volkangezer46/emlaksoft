@@ -11,6 +11,7 @@ import { bridgeInstalled, bridgePaused, requestInventoryPage } from "@/lib/listi
 import { importPortalInventory, type InventoryImportResult } from "@/app/actions/listing-control-inventory";
 import { CONTROL_BASE, kpiHref } from "./helpers";
 import { isLegacyXls, isXlsxFile } from "@/lib/xlsx-import";
+import { CURRENT_PORTALS, PORTAL_CATALOG, PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
 
 /**
  * Portal envanteri karşılaştırma formu. Kaynak: portal hesabından indirilen CSV veya .xlsx (dinamik okunur, CSV metnine çevrilir) ya da
@@ -19,11 +20,7 @@ import { isLegacyXls, isXlsxFile } from "@/lib/xlsx-import";
  * "listede yok" kayıp sayılmaz.
  */
 
-const PORTALS = [
-  { id: "sahibinden", label: "Sahibinden" },
-  { id: "hepsiemlak", label: "Hepsiemlak" },
-  { id: "emlakjet", label: "Emlakjet" },
-] as const;
+const PORTALS = CURRENT_PORTALS.map((id) => ({ id, label: PORTAL_CATALOG[id].label }));
 
 type Source = "csv" | "paste" | "extension";
 
@@ -33,10 +30,13 @@ const fieldClass =
 const MAX_FILE_BYTES = 3_500_000;
 const MAX_STORE_PAGES = 10;
 
-export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
+export function InventoryImportForm({ canOffice, activePortals }: { canOffice: boolean; activePortals?: readonly string[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [portal, setPortal] = useState<string>("sahibinden");
+  // Üyelik süzgeci: yalnız ofisin üye olduğu portallar seçilebilir; diğerleri soluk + "Üye değilsiniz, ekle".
+  const isMember = (id: string) => !activePortals || activePortals.includes(id);
+  const hasNonMember = PORTALS.some((p) => !isMember(p.id));
+  const [portal, setPortal] = useState<string>(() => PORTALS.find((p) => isMember(p.id))?.id ?? "");
   const [scope, setScope] = useState<"mine" | "office">(canOffice ? "office" : "mine");
   const [source, setSource] = useState<Source>("csv");
   const [fileText, setFileText] = useState<string>("");
@@ -78,6 +78,7 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
     setError(null);
     setStoreItems([]);
     setStoreComplete(false);
+    if (!portal) return setError("Önce ofisin üye olduğu portalı Portal üyelikleri kartında işaretleyin.");
     if (!bridgeInstalled()) return setError("Tarayıcı eklentisi bulunamadı.");
     if (bridgePaused()) return setError("Eklenti duraklatılmış; eklenti simgesinden sürdürün.");
     let url: string | null = storeUrl.trim();
@@ -119,6 +120,7 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
   function submit() {
     setError(null);
     setResult(null);
+    if (!portal) return setError("Önce ofisin üye olduğu portalı Portal üyelikleri kartında işaretleyin.");
     const text = source === "csv" ? fileText : source === "paste" ? pasteText : "";
     if (source === "csv" && !text) return setError("Önce bir CSV dosyası seçin.");
     if (source === "paste" && !text.trim()) return setError("İlan numaralarını ya da bağlantılarını yapıştırın.");
@@ -157,12 +159,18 @@ export function InventoryImportForm({ canOffice }: { canOffice: boolean }) {
         <label className="text-sm font-medium text-text">
           Portal
           <select value={portal} onChange={(e) => setPortal(e.target.value)} className={`${fieldClass} mt-1.5`}>
+            {portal === "" ? <option value="">Üye olunan portal yok</option> : null}
             {PORTALS.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
+              <option key={p.id} value={p.id} disabled={!isMember(p.id)}>
+                {isMember(p.id) ? p.label : `${p.label} (üye değilsiniz)`}
               </option>
             ))}
           </select>
+          {hasNonMember ? (
+            <Link href={PORTAL_MEMBERSHIP_HREF} className="mt-1 inline-block text-xs font-semibold text-accent-text hover:underline">
+              Üye değilsiniz, ekle
+            </Link>
+          ) : null}
         </label>
         <fieldset className="text-sm font-medium text-text">
           <legend>Karşılaştırma kapsamı</legend>

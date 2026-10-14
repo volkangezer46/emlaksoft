@@ -97,6 +97,12 @@ inceleme farkı 0.4.0 → 0.6.0'dır: portal aktarımı (form doldurma, fotoğra
 (`crypto.subtle`) ve `chrome.storage.session` yeni izin istemez. Arka planın ağ isteği hâlâ TEKTİR (portal okuması); kurallar yalnız EmlakSoft sayfasındaki
 içerik betiğinden, aynı kökenli oturumlu uçtan alınır.
 
+**0.6.1 (EP1, portal üyeliği):** mağazaya gönderilecek paket artık **0.6.1**'dir (0.6.0 + üyelik süzgeci; izin listesi ve tek amaç AYNI). Eklenti
+yalnız sunucunun bildirdiği portallara (ofis üye + otomatik kontrol açık; eşleşme yanıtı ve kural yenileme başlığında gelir) istek atar; liste yoksa ya da
+boşsa hiçbir portala istek atmaz (eski "varsayılan açık" kalktı). "Giriş istedi" taraması sunucuya ilansız bildirilir. 0.6.0 yüklü kurulumlar uygulama
+içinde "güncelleme var" görür. Canlı doğrulama (yayın sonrası, sahip/orkestratör): üyeliği "Üye değiliz" olan bir portal için 24 saat boyunca
+`extension-scan` logunda o portala SIFIR istek görülmeli.
+
 **Kısa açıklama (manifest `description`, ≤ 132 karakter; sınır sözleşme testiyle kilitli; 0.5.0 ile aynı):**
 "Portföyünüzü portallarla eşitler: ilanları karşılaştırır, portal formunu onayınızla doldurur, ilanlarınızı EmlakSoft'a alır."
 

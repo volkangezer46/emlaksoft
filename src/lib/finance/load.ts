@@ -1,3 +1,4 @@
+import { getActivePortals } from "@/lib/portals/membership";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import { shiftMonthKey, trDayKey, trMonthKey } from "@/lib/clock";
@@ -284,5 +285,12 @@ export async function loadPortalRoi(db: SupabaseClient, tenantId: string, nowMs:
     if (when && Date.parse(when) >= startMs) listingsInWindow[key] = (listingsInWindow[key] ?? 0) + 1;
   }
 
-  return { available: true, windowStart, windowEnd, rows: computePortalRoi({ expenses, leads, won, liveListings, listingsInWindow, windowStart, windowEnd }) };
+  // Üyelik (tek kaynak `portals/membership.ts`): üye olunan portal verisi olmasa da satır olur; geçmiş verisi olanlar kalır.
+  const activePortals = await getActivePortals(tenantId, db).catch(() => undefined);
+  return {
+    available: true,
+    windowStart,
+    windowEnd,
+    rows: computePortalRoi({ expenses, leads, won, liveListings, listingsInWindow, windowStart, windowEnd, activePortals }),
+  };
 }

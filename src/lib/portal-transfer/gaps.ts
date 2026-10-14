@@ -1,13 +1,18 @@
 import { PORTAL_FORM_RULES, TRANSFER_PORTALS, type TransferPortal } from "./rules";
 
 /**
- * EKSİK PORTAL (SAF, testli): portföy yayında ama ofisin kullandığı bir portalda canlı ilanı yok. "Ofisin kullandığı portal" =
- * ofiste o portalda EN AZ BİR canlı ilan var (ayrı ayar tutulmaz, migration yok); hiçbir portalda kaydı olmayan ofis için kart üretilmez
- * (veri yoksa kart yok). Sayılar ve hedef liste AYNI fonksiyondan gelir (sıfır çıkmaz metrik).
+ * EKSİK PORTAL (SAF, testli): portföy yayında ama ofisin üye olduğu bir portalda canlı ilanı yok. "Ofisin portalı" =
+ * `activePortals` (üyelik okuyucusu `portals/membership.ts`): üye olunan portal HİÇ ilanı olmasa da listelenir, üye olunmayan
+ * portal hiç listelenmez (aktarım önerilmez). `activePortals` verilmezse eski kural: o portalda en az bir canlı ilan varsa.
+ * Sayılar ve hedef liste AYNI fonksiyondan gelir (sıfır çıkmaz metrik).
  */
 export type PortalGap = { portal: TransferPortal; label: string; used: number; missing: string[] };
 
-export function computeMissingPortals(liveProperties: readonly string[], liveListings: readonly { propertyId: string; portal: string }[]): PortalGap[] {
+export function computeMissingPortals(
+  liveProperties: readonly string[],
+  liveListings: readonly { propertyId: string; portal: string }[],
+  activePortals?: readonly string[],
+): PortalGap[] {
   const byPortal = new Map<TransferPortal, Set<string>>();
   for (const l of liveListings) {
     const p = TRANSFER_PORTALS.find((x) => x === l.portal.trim().toLowerCase());
@@ -18,8 +23,8 @@ export function computeMissingPortals(liveProperties: readonly string[], liveLis
   }
   const out: PortalGap[] = [];
   for (const portal of TRANSFER_PORTALS) {
-    const has = byPortal.get(portal);
-    if (!has || has.size === 0) continue;
+    const has = byPortal.get(portal) ?? new Set<string>();
+    if (activePortals ? !activePortals.includes(portal) : has.size === 0) continue;
     const missing = liveProperties.filter((id) => !has.has(id));
     if (missing.length > 0) out.push({ portal, label: PORTAL_FORM_RULES[portal].label, used: has.size, missing });
   }

@@ -21,6 +21,7 @@ import type { StoredTransfer } from "@/lib/portal-transfer/ext-queue";
 import { photoSummary } from "@/lib/portal-transfer/photo-prep";
 import { parsePriceText } from "@/lib/listing-control/adapters/inventory-csv";
 import { extractListing, type PageSnapshot } from "@/lib/prospecting/extension-extract";
+import type { CurrentPortal } from "@/lib/portals/catalog";
 import type { FeedbackConsent, StatusReply } from "./messages";
 
 /**
@@ -105,10 +106,12 @@ function renderSettings(s: StatusReply) {
     const label = el("label", "field");
     const box = el("input");
     box.type = "checkbox";
-    box.checked = p.enabled;
+    // Yerel ayar yalnız daraltır: ofisin üye olmadığı (ya da kontrolü kapattığı) portal seçilemez.
+    box.checked = p.localOn ?? p.enabled;
+    box.disabled = p.member === false;
     box.dataset.portal = p.id;
     box.addEventListener("change", () => (settingsDirty = true));
-    label.append(box, el("span", "", PORTAL_LABEL[p.id] ?? p.id));
+    label.append(box, el("span", "", `${PORTAL_LABEL[p.id] ?? p.id}${p.member === false ? " (ofis üye değil / kontrol kapalı)" : ""}`));
     toggles.append(label);
   }
   const from = $<HTMLSelectElement>("hoursFrom");
@@ -433,7 +436,7 @@ void initFsbo();
 // konum seçimine kullanıcı basar. Parola/e-posta/telefon/dosya (fotoğraf hariç) denetimlerine dokunulmaz. Portal sayfası değiştirilmez.
 
 type TransferGet = { transfer: StoredTransfer | null; doneLast: { at: number; ok: boolean; summary: string } | null; donePending: number };
-type PortalTab = { tabId: number; portal: "sahibinden" | "hepsiemlak" | "emlakjet"; url: string };
+type PortalTab = { tabId: number; portal: CurrentPortal; url: string };
 let portalTab: PortalTab | null = null;
 let loadedTransfer: StoredTransfer | null = null;
 let lastReport: FieldReport[] = [];

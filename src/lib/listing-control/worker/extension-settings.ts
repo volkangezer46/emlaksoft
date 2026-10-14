@@ -2,6 +2,9 @@ import { EXTENSION_LIMITS } from "./extension-pacing";
 
 /**
  * EKLENTİ AYARLARI (SAF, testli). Kullanıcı yalnız KISABİLİR: portal aç/kapa, çalışma saatleri, günlük üst sınır.
+ * PORTAL İZNİ (EP1): bir portala istek atılması için portalın SUNUCUNUN bildirdiği listede olması (ofis üye + otomatik kontrol
+ * açık; `tenant_portal_accounts`) VE yerel ayarda kapatılmamış olması gerekir (`portalAllowed`). Yerel ayar listeyi yalnız
+ * daraltır. Sunucu listesi hiç gelmediyse ya da boşsa HİÇBİR portala istek atılmaz (eski "kayıt yoksa AÇIK" varsayılanı kalktı).
  * Hız tavanları (20 sn aralık, saatte 60, günde `EXTENSION_LIMITS.maxPerDay`, engel beklemesi) ayarla GEVŞETİLEMEZ:
  * günlük sınır tavanı aşamaz; saatlik/aralık/engel kuralları ayar kapsamında değildir.
  */
@@ -50,8 +53,29 @@ export function sanitizeSettings(raw: unknown): ExtensionSettings {
   };
 }
 
+/** Yerel ayar: kullanıcı bu portalı kapatmadı mı (tek başına istek izni DEĞİLDİR; bkz. `portalAllowed`). */
 export function portalEnabled(settings: ExtensionSettings, portal: string): boolean {
   return settings.portals[portal] !== false;
+}
+
+/** Sunucunun eşleşmede / kural yenilemede bildirdiği, ofisin üye olduğu ve kontrolü açık portallar. */
+export type ServerPortals = { ids: string[]; at: number } | null;
+
+const PORTAL_ID_RE = /^[a-z0-9-]{2,40}$/;
+
+/** Sunucudan/depodan gelen ham listeyi temizler (geçersizse null = "bildirilmedi"). */
+export function sanitizeServerPortals(raw: unknown, nowMs: number): ServerPortals {
+  const list = Array.isArray(raw) ? raw : typeof raw === "object" && raw !== null && Array.isArray((raw as { ids?: unknown }).ids) ? (raw as { ids: unknown[] }).ids : null;
+  if (!list) return null;
+  const ids = [...new Set(list.filter((x): x is string => typeof x === "string" && PORTAL_ID_RE.test(x)))].slice(0, 20);
+  const at = typeof raw === "object" && raw !== null && typeof (raw as { at?: unknown }).at === "number" ? (raw as { at: number }).at : nowMs;
+  return { ids, at };
+}
+
+/** İstek izni: sunucu listesinde (üye + kontrol açık) VE yerel ayarda kapatılmamış. Liste yoksa/boşsa her zaman hayır. */
+export function portalAllowed(settings: ExtensionSettings, portal: string, server: ServerPortals): boolean {
+  if (!server || !server.ids.includes(portal)) return false;
+  return portalEnabled(settings, portal);
 }
 
 /** Yerel saat (0..23). `tzOffsetMinutes` = `Date#getTimezoneOffset()` (UTC − yerel). */

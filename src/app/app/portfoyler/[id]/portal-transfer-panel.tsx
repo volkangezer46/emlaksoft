@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { bridgeInstalled, requestTransfer, type TransferResult } from "@/lib/listing-control/worker/bridge";
 import { preparePortalTransfer, type PrepareTransferResult } from "@/app/actions/portal-transfer";
+import Link from "@/components/ui/smart-link";
+import { PORTAL_MEMBERSHIP_HREF, type CurrentPortal, type MembershipStatus } from "@/lib/portals/catalog";
 
 /**
  * "Portala aktar" (portföy detayı → Yayın ve portallar). Akış: 1) sunucu kısa ömürlü, TEK KULLANIMLIK aktarım kodu üretir
@@ -14,12 +16,16 @@ import { preparePortalTransfer, type PrepareTransferResult } from "@/app/actions
  * EmlakSoft'tan alır; 3) kullanıcı portalın "İlan ver" sayfasında eklenti penceresinden "EmlakSoft'tan doldur"a basar;
  * 4) "Yayınla"ya KULLANICI basar; 5) ilan no/URL EmlakSoft'a geri bağlanır. Sunucu portala istek atmaz, ilan yayınlamaz.
  * Eksikler (hazırlık kontrolü) uyarıdır, ENGELLEMEZ. Mobilde eklenti çalışmadığı için düğme yerine bilgi gösterilir.
+ * ÜYELİK: yalnız ofisin üye olduğu portal (ilanı olmasa da) aktarım önerir; üye olunmayan / belirtilmemiş portal soluk durur,
+ * aktarım düğmesi yerine "Üye değilsiniz, ekle" bağlantısı gösterilir (tek kaynak `portals/membership.ts`).
  */
 
 export type TransferPortalState = {
-  id: "sahibinden" | "hepsiemlak" | "emlakjet";
+  id: CurrentPortal;
   label: string;
   live: { externalId: string | null; url: string | null } | null;
+  /** Ofisin bu portaldaki etkin üyeliği; verilmezse üye sayılır. */
+  membership?: MembershipStatus;
 };
 
 type Outcome = { prepared: Extract<PrepareTransferResult, { ok: true }>; bridge: TransferResult | null; noExtension: boolean };
@@ -65,8 +71,9 @@ export function PortalTransferPanel({ propertyId, portals, closed }: { propertyI
         {portals.map((p) => {
           const out = outcome[p.id];
           const busy = pending && active === p.id;
+          const member = (p.membership ?? "active") === "active";
           return (
-            <article key={p.id} className="px-5 py-4">
+            <article key={p.id} className={`px-5 py-4 ${member ? "" : "opacity-60"}`}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink-950">{p.label}</p>
@@ -81,20 +88,28 @@ export function PortalTransferPanel({ propertyId, portals, closed }: { propertyI
                       ) : null}
                     </p>
                   ) : (
-                    <p className="mt-0.5 text-xs text-text-muted">Bu portalda ilan kaydı yok.</p>
+                    <p className="mt-0.5 text-xs text-text-muted">
+                      {member ? "Bu portalda ilan kaydı yok." : p.membership === "none" ? "Ofis bu portala üye değil." : "Üyelik belirtilmedi."}
+                    </p>
                   )}
                 </div>
-                <Button
-                  variant={p.live ? "outline" : "primary"}
-                  size="sm"
-                  icon={Send}
-                  loading={busy}
-                  disabled={pending || closed}
-                  onClick={() => run(p.id)}
-                  className="hidden md:inline-flex"
-                >
-                  {p.live ? `${p.label}'e yeniden aktar` : `${p.label}'e aktar`}
-                </Button>
+                {member ? (
+                  <Button
+                    variant={p.live ? "outline" : "primary"}
+                    size="sm"
+                    icon={Send}
+                    loading={busy}
+                    disabled={pending || closed}
+                    onClick={() => run(p.id)}
+                    className="hidden md:inline-flex"
+                  >
+                    {p.live ? `${p.label}'e yeniden aktar` : `${p.label}'e aktar`}
+                  </Button>
+                ) : (
+                  <Link href={PORTAL_MEMBERSHIP_HREF} className="focus-ring rounded text-xs font-semibold text-accent-text hover:underline">
+                    Üye değilsiniz, ekle
+                  </Link>
+                )}
               </div>
 
               {error && active === p.id && !pending ? <Alert tone="danger" className="mt-3">{error}</Alert> : null}

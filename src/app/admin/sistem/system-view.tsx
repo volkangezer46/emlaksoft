@@ -27,6 +27,7 @@ import { BACKUP_HEARTBEAT_JOB, BACKUP_STATUS_KEY } from "@/lib/ops/backup-status
 import { CronPauseButton } from "./ops-controls";
 import { CronHistoryPanel, type CronRun } from "./cron-history";
 import { countOpenErrors } from "../hatalar/triage";
+import { PORTAL_LABELS } from "@/lib/portals/catalog";
 
 const TOTAL_PROVINCES = 81;
 
@@ -86,7 +87,7 @@ type PortalRows = { data: unknown; error: unknown };
 type PortalCount = { portal: string; n: number };
 type PortalRulesSummary = { proposals: PortalCount[]; alerts: PortalCount[] };
 
-const PORTAL_SHORT: Record<string, string> = { sahibinden: "sahibinden", hepsiemlak: "Hepsiemlak", emlakjet: "Emlakjet" };
+const PORTAL_SHORT: Record<string, string> = PORTAL_LABELS;
 
 /** Portal başına sayım (çoktan aza); her sayı kendi portalının filtreli görünümüne bağlanır (sayı = hedef). */
 function perPortal(rows: { portal?: string }[]): PortalCount[] {

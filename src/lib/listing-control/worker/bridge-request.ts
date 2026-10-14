@@ -44,3 +44,8 @@ export const BRIDGE_RULES_ENDPOINT = "/api/app/portal-aktar/kurallar";
 export const BRIDGE_FEEDBACK_ENDPOINT = "/api/app/portal-aktar/gozlem";
 /** İçerik betiğinin gönderdiği eklenti sürümü (chrome.runtime.getManifest().version). Kimlik değildir; yalnız uyumluluk. */
 export const EXT_VERSION_HEADER = "x-emlaksoft-ext";
+/**
+ * (EP1) Sunucunun eklentiye bildirdiği portal listesi (ofis üye + otomatik kontrol açık), kural yenileme yanıt başlığında:
+ * virgülle ayrılmış kimlikler; boş değer = hiçbir portal. Eşleşmede (`register`) aynı liste gövdede `portals` olarak döner.
+ */
+export const BRIDGE_PORTALS_HEADER = "x-emlaksoft-portals";

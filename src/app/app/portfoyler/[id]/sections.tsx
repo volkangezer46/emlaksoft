@@ -24,6 +24,8 @@ import { isDocumentMedia, selectWithDocumentFlag } from "@/lib/public-property-m
 import { computeListingQuality, computePropertyHealth } from "@/lib/property-health";
 import { PropertyHealthCard, ListingQualityCard } from "@/components/app/property-health-card";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
+import { getActivePortals } from "@/lib/portals/membership";
+import { requireActiveTenant } from "@/lib/tenant-guard";
 import { getPropertyStatusHistory } from "@/app/actions/property-management";
 import { getPropertyPriceHistory } from "@/app/actions/property-price-history";
 import { getPropertyTimeline } from "@/app/actions/property-timeline";
@@ -486,8 +488,10 @@ export async function HealthSection({
 // ---------------------------------------------------------------------------
 
 export async function PublishSection({ propertyId }: { propertyId: string }) {
-  const configuredPortals = await getConfiguredPortals();
-  return <PublishToPortalsPanel propertyId={propertyId} configuredPortals={configuredPortals} />;
+  const [configuredPortals, gate] = await Promise.all([getConfiguredPortals(), requireActiveTenant()]);
+  // Üyelik süzgeci: yalnız üye olunan portala yayın önerilir; API'si tanımlı ama üyeliği olmayan portal soluk durur.
+  const activePortals = gate.ok ? await getActivePortals(gate.tenantId) : undefined;
+  return <PublishToPortalsPanel propertyId={propertyId} configuredPortals={configuredPortals} activePortals={activePortals} />;
 }
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,8 @@ import { ControlSubNav } from "@/components/listing-control/sub-nav";
 import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { getDb, loadPropertyBriefs } from "@/components/listing-control/readers";
 import { loadPortalGaps } from "@/components/listing-control/portal-gap-readers";
+import { getActivePortals } from "@/lib/portals/membership";
+import { PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
 
 export const metadata = { title: "Portalda olmayan portföyler" };
 
@@ -25,12 +27,15 @@ const PAGE_SIZE = 50;
 /**
  * EKSİK PORTAL listesi: yayındaki portföy, ofisin kullandığı portalda canlı ilan taşımıyor. İlan Kontrol ana ekranındaki
  * "Portal farkları" kartıyla AYNI kaynaktan (`portal-gap-readers`) beslenir. Her satırda tek eylem: "Portala aktar".
+ * Portal çipleri ofisin ÜYELİKLERİYLE süzülür: üye olunan portal (ilanı olmasa da) seçilebilir; üye olunmayan portal soluk
+ * durur ve "Üye değilsiniz, ekle" bağlantısı üyelik kartına götürür (aktarım önerilmez).
  */
 export default async function EksikPortalPage({ searchParams }: { searchParams: SearchParams }) {
-  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol");
-  const sp = await searchParams;
+  const { perms, tenantId } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const [sp, active] = await Promise.all([searchParams, tenantId ? getActivePortals(tenantId) : Promise.resolve([...TRANSFER_PORTALS])]);
   const raw = Array.isArray(sp.portal) ? sp.portal[0] : sp.portal;
-  const portal: TransferPortal = isTransferPortal(raw) ? raw : "sahibinden";
+  const portal: TransferPortal = isTransferPortal(raw) ? raw : (active[0] ?? "sahibinden");
+  const isMember = (active as readonly string[]).includes(portal);
   const sayfa = Math.max(1, Math.min(200, Number.parseInt(String(Array.isArray(sp.sayfa) ? sp.sayfa[0] : sp.sayfa ?? "1"), 10) || 1));
   return (
     <>
@@ -42,22 +47,38 @@ export default async function EksikPortalPage({ searchParams }: { searchParams: 
       />
       <ControlSubNav active="liste" closures={effectiveCanAccessModule(perms, "leak")} />
       <nav aria-label="Portal" className="mb-4 flex flex-wrap gap-1.5">
-        {TRANSFER_PORTALS.map((p) => (
-          <FilterChip key={p} href={`${CONTROL_BASE}/eksik-portal?portal=${p}`} active={p === portal}>
-            {PORTAL_FORM_RULES[p].label}
-          </FilterChip>
-        ))}
+        {TRANSFER_PORTALS.map((p) =>
+          (active as readonly string[]).includes(p) ? (
+            <FilterChip key={p} href={`${CONTROL_BASE}/eksik-portal?portal=${p}`} active={p === portal}>
+              {PORTAL_FORM_RULES[p].label}
+            </FilterChip>
+          ) : (
+            <span key={p} className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-line px-3 py-1 text-xs text-text-faint opacity-70">
+              {PORTAL_FORM_RULES[p].label}
+              <Link href={PORTAL_MEMBERSHIP_HREF} className="font-semibold text-accent-text hover:underline">Üye değilsiniz, ekle</Link>
+            </span>
+          ),
+        )}
       </nav>
-      <Suspense fallback={<SkeletonCard height={420} label="Liste yükleniyor" />}>
-        <Body portal={portal} sayfa={sayfa} />
-      </Suspense>
+      {isMember ? (
+        <Suspense fallback={<SkeletonCard height={420} label="Liste yükleniyor" />}>
+          <Body portal={portal} sayfa={sayfa} tenantId={tenantId} />
+        </Suspense>
+      ) : (
+        <EmptyState
+          variant="panel"
+          title={`${PORTAL_FORM_RULES[portal].label} üyeliğiniz kayıtlı değil`}
+          description="Bu portala üye değilseniz aktarım önerilmez. Üyeyseniz Portal üyelikleri kartında işaretleyin; liste burada görünür."
+          secondary={{ href: PORTAL_MEMBERSHIP_HREF, label: "Üye değilsiniz, ekle" }}
+        />
+      )}
     </>
   );
 }
 
-async function Body({ portal, sayfa }: { portal: TransferPortal; sayfa: number }) {
+async function Body({ portal, sayfa, tenantId }: { portal: TransferPortal; sayfa: number; tenantId: string | null }) {
   const db = await getDb();
-  const res = await loadPortalGaps(db);
+  const res = await loadPortalGaps(db, tenantId);
   if (!res.available) return <ControlUnavailable />;
   const gap = res.gaps.find((g) => g.portal === portal);
   if (!gap) {
@@ -65,7 +86,7 @@ async function Body({ portal, sayfa }: { portal: TransferPortal; sayfa: number }
       <EmptyState
         variant="panel"
         title={`${PORTAL_FORM_RULES[portal].label} için eksik portföy yok`}
-        description="Bu portalda henüz hiç ilanınız yok ya da yayındaki bütün portföyler bu portalda görünüyor."
+        description="Yayındaki bütün portföyler bu portalda görünüyor ya da yayında portföy yok."
         secondary={{ href: CONTROL_BASE, label: "Genel görünüme dön" }}
       />
     );

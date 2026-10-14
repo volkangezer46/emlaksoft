@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { now as clockNow } from "@/lib/clock";
 import { guardBridgeRequest, NO_STORE } from "@/lib/portal-transfer/bridge-guard";
-import { EXT_VERSION_HEADER } from "@/lib/listing-control/worker/bridge-request";
+import { BRIDGE_PORTALS_HEADER, EXT_VERSION_HEADER } from "@/lib/listing-control/worker/bridge-request";
+import { getExtensionPortalsForRequest } from "@/lib/portals/membership";
 import { FORM_RULES_ENGINE } from "@/lib/portal-transfer/rule-format";
 import { isSupportedExtension, loadServableRuleSets, matchesIfNoneMatch } from "@/lib/portal-rules/server/serve";
 
@@ -30,18 +31,20 @@ export async function GET(request: Request) {
   }
 
   const db = await createClient();
-  const r = await loadServableRuleSets(db, { nowMs: clockNow() });
+  const [r, portals] = await Promise.all([loadServableRuleSets(db, { nowMs: clockNow() }), getExtensionPortalsForRequest()]);
+  // EP1: kural yenilemede ofisin üye + kontrolü açık portal listesi başlıkta döner (okunamazsa başlık yok: eklenti listeyi korur).
+  const portalHeader: Record<string, string> = portals ? { [BRIDGE_PORTALS_HEADER]: portals.join(",") } : {};
   switch (r.status) {
     case "signing_unavailable":
       return NextResponse.json({ ok: false, error: "signing_unavailable" }, { status: 503, headers: { ...NO_STORE, "Retry-After": "3600" } });
     case "schema_pending":
-      return NextResponse.json({ engine: FORM_RULES_ENGINE, sets: [] }, { headers: NO_STORE });
+      return NextResponse.json({ engine: FORM_RULES_ENGINE, sets: [] }, { headers: { ...NO_STORE, ...portalHeader } });
     case "forbidden":
       return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403, headers: NO_STORE });
     case "error":
       return NextResponse.json({ ok: false, error: "rpc_error" }, { status: 502, headers: NO_STORE });
   }
-  const headers = { ...REVALIDATE, ETag: r.etag };
+  const headers = { ...REVALIDATE, ETag: r.etag, ...portalHeader };
   if (matchesIfNoneMatch(request.headers.get("if-none-match"), r.etag)) {
     return new NextResponse(null, { status: 304, headers });
   }

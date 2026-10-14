@@ -3,7 +3,7 @@
  * adını ve uygulama içi "güncel mi" denetimini buradan alır (`manifest.base.json` ile eşitliği test kilitler).
  */
 
-export const EXTENSION_VERSION = "0.6.0";
+export const EXTENSION_VERSION = "0.6.1";
 export const EXTENSION_ZIP_PREFIX = "emlaksoft-ilan-kontrol";
 /** Derleme çıktısı ZIP'in kopyalandığı klasör (depoya girmez; indirme ucu buradan okur). */
 export const EXTENSION_PACKAGE_DIR = "public/downloads";

@@ -24,6 +24,8 @@ export type BgRequest =
   /** İçerik betiği: EmlakSoft sekmesi görüldü / oturum durumu. */
   | { kind: "appSeen"; session: AppSession }
   | { kind: "saveSettings"; settings: unknown }
+  /** (EP1) Sunucunun bildirdiği izinli portal listesi (ofis üye + otomatik kontrol açık); eşleşme ve kural yenilemede gelir. */
+  | { kind: "serverPortals"; portals: unknown }
   | { kind: "lease"; token: string }
   | { kind: "releaseLease"; token: string }
   | { kind: "deviceKey" }
@@ -100,6 +102,8 @@ export const STORAGE_KEYS = {
   pairing: "es_pairing",
   app: "es_app",
   settings: "es_settings",
+  /** (EP1) Sunucunun bildirdiği izinli portallar {ids, at}. Yoksa HİÇBİR portala istek atılmaz. */
+  serverPortals: "es_server_portals",
   health: "es_health",
   history: "es_history",
   recent: "es_recent",

@@ -163,6 +163,23 @@ describe("portal ROI", () => {
     expect(pickLeastEfficientPortal(rows)).toBeNull();
   });
 
+  it("üyelik: üye olunan portal verisi olmasa da satır olur; üye olunmayan yalnız geçmiş verisiyle ve member=false", () => {
+    const rows = computePortalRoi({
+      ...base,
+      activePortals: ["hepsiemlak"],
+      expenses: [{ portalKey: "sahibinden", amount: 6000, date: "2026-07-15", recurrence: null }],
+      liveListings: { emlakjet: 3 },
+    });
+    expect(rows.map((r) => [r.portalKey, r.member])).toEqual([
+      ["sahibinden", false],
+      ["hepsiemlak", true],
+    ]);
+    const empty = rows.find((r) => r.portalKey === "hepsiemlak")!;
+    expect([empty.cost, empty.leads, empty.wonDeals, empty.liveListings]).toEqual([0, 0, 0, 0]);
+    // Üyelik bilinmiyorsa (activePortals yok) eski kural: yalnız veri olan portal, member null.
+    expect(computePortalRoi({ ...base, leads: { zingat: 1 } }).map((r) => r.member)).toEqual([null]);
+  });
+
   it("gider eşlenmemiş portal: maliyet 0 ve yetersiz (talep sayısı yine görünür)", () => {
     const rows = computePortalRoi({ ...base, leads: { zingat: 5 } });
     expect(rows).toHaveLength(1);

@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { portalDisplayName } from "@/lib/portals/catalog";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getExpiringAuthorizations } from "@/app/actions/property-management";
@@ -329,7 +330,7 @@ export default async function PortalsPage({
                 <Link
                   key={p.name}
                   href={portalHref(durum, portal === p.name ? "" : p.name, undefined, propertyF)}
-                  aria-label={`${p.name} ilanlarını listele`}
+                  aria-label={`${portalDisplayName(p.name)} ilanlarını listele`}
                   className={`focus-ring group flex h-full flex-1 flex-col items-center gap-1.5 rounded-[var(--radius-control)] px-1 pt-1 transition hover:bg-brand-600/[0.04] ${
                     portal === p.name ? "bg-brand-600/[0.06]" : ""
                   }`}
@@ -342,7 +343,7 @@ export default async function PortalsPage({
                     />
                   </div>
                   <span className={`max-w-[72px] truncate text-xs transition group-hover:text-brand-600 ${portal === p.name ? "font-bold text-brand-600" : "text-text-muted"}`}>
-                    {p.name}
+                    {portalDisplayName(p.name)}
                   </span>
                 </Link>
               ))}
@@ -432,7 +433,7 @@ export default async function PortalsPage({
                       type="checkbox"
                       name="ids"
                       value={row.id}
-                      aria-label={`${property?.property_code ?? row.portal_name} ilanını seç`}
+                      aria-label={`${property?.property_code ?? portalDisplayName(row.portal_name)} ilanını seç`}
                       className="focus-ring h-4 w-4 shrink-0 accent-[var(--brand-600)]"
                     />
                   ) : (
@@ -447,12 +448,12 @@ export default async function PortalsPage({
                             {property.title ?? "İsimsiz portföy"}
                             <ArrowUpRight className="ml-1 inline h-3 w-3 text-text-faint opacity-0 transition group-hover/prop:text-brand-600 group-hover/prop:opacity-100" />
                           </p>
-                          <p className="mt-0.5 text-xs text-text-muted">{property.property_code} · {row.portal_name}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">{property.property_code} · {portalDisplayName(row.portal_name)}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
                         </Link>
                       ) : (
                         <>
                           <p className="truncate text-sm font-semibold text-ink-950">Portföy bulunamadı</p>
-                          <p className="mt-0.5 text-xs text-text-muted">— · {row.portal_name}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
+                          <p className="mt-0.5 text-xs text-text-muted">— · {portalDisplayName(row.portal_name)}{row.portal_listing_id ? ` #${row.portal_listing_id}` : ""}</p>
                         </>
                       )}
                     </div>
@@ -468,7 +469,7 @@ export default async function PortalsPage({
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     {isLive ? <ConfirmListingButton listingId={row.id} /> : null}
-                    <PortalRowMore listingId={row.id} label={`${property?.property_code ?? ""} · ${row.portal_name}`} portalUrl={row.portal_url} isLive={isLive} />
+                    <PortalRowMore listingId={row.id} label={`${property?.property_code ?? ""} · ${portalDisplayName(row.portal_name)}`} portalUrl={row.portal_url} isLive={isLive} />
                   </div>
                 </article>
               );

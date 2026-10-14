@@ -105,8 +105,11 @@ export const ONBOARDING_STEP_DEFS = [
     requires: SETTINGS_EDIT,
     short: "Portallar",
     title: "Vitrin ve portallar",
-    description: "İlanların vitrininde ve portallarda yayınlansın, talepler sana düşsün.",
-    isDone: (f) => f.publishedProperties > 0 || f.activeIntegrations > 0,
+    description: "Hangi portallarda ilan verdiğini işaretle; ilanların vitrininde ve portallarda yayınlansın, talepler sana düşsün.",
+    // EP1: portal üyelikleri beyan edildiyse tamam. Beyan yoksa (mevcut ofis) adım yeniden açılır ve öneriler onaya gelir;
+    // üyelik tablosu henüz yoksa (olgu yok) eski kural geçerli.
+    isDone: (f) =>
+      f.extra["portal-uyelik"] === true || (f.extra["portal-uyelik"] === undefined && (f.publishedProperties > 0 || f.activeIntegrations > 0)),
   },
   {
     id: "giderler-kasa",

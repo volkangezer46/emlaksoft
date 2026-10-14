@@ -11,6 +11,7 @@ import { validateTenantReferences } from "@/lib/tenant-references";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { closedListingBlock } from "@/lib/closed-listing-guard";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { normalizePortalName } from "@/lib/portals/catalog";
 
 export type PortalResult = { error?: string; ok?: boolean };
 
@@ -20,7 +21,8 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
 
   const admin = createAdminClient();
   const propertyId = String(formData.get("property_id") ?? "").trim();
-  const portalName = String(formData.get("portal_name") ?? "").trim();
+  // Tek biçim: portal adı her zaman küçük harf + kırpılmış saklanır (DB'deki lower(btrim(portal_name)) ile aynı; EP1).
+  const portalName = normalizePortalName(String(formData.get("portal_name") ?? ""));
   const portalListingId = String(formData.get("portal_listing_id") ?? "").trim();
   const portalUrl = String(formData.get("portal_url") ?? "").trim();
 

@@ -12,6 +12,7 @@ import { tristateLabel, unionPublishedDays } from "./lifecycle-model";
 import { getDb, loadLifecycle, type LifecycleData } from "./readers";
 import { loadClosureChecklist } from "./closure-reader";
 import { PortalBindForm } from "./portal-bind-form";
+import { getActivePortals } from "@/lib/portals/membership";
 import { SkeletonCard } from "@/components/ui/viz";
 
 
@@ -33,7 +34,10 @@ const SCORE_LABEL: Record<string, string> = { green: "Sağlıklı", yellow: "Kon
 async function LifecycleBody({ propertyId, tenantId, canCreate }: { propertyId: string; tenantId: string | null; canCreate: boolean }) {
   const db = await getDb();
   const nowMs = now();
-  const data = await loadLifecycle(db, tenantId, propertyId, nowMs);
+  const [data, activePortals] = await Promise.all([
+    loadLifecycle(db, tenantId, propertyId, nowMs),
+    canCreate && tenantId ? getActivePortals(tenantId) : Promise.resolve(undefined),
+  ]);
   if (!data.available) {
     return (
       <Panel title="Yaşam döngüsü & portal geçmişi">
@@ -96,7 +100,7 @@ async function LifecycleBody({ propertyId, tenantId, canCreate }: { propertyId: 
 
       {canCreate ? (
         <Panel id="portal-bagla" title="Portal ilanı bağla" description="Yeni ilanı bağlayın ya da ilan numarası değiştiyse eski kaydı zincire ekleyin">
-          <PortalBindForm propertyId={propertyId} liveListings={liveListings} />
+          <PortalBindForm propertyId={propertyId} liveListings={liveListings} activePortals={activePortals} />
         </Panel>
       ) : null}
     </div>

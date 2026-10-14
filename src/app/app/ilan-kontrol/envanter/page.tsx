@@ -12,6 +12,7 @@ import { Panel } from "@/components/listing-control/ui-parts";
 import { InventoryImportForm } from "@/components/listing-control/inventory-import-form";
 import { listRecentImports, type ImportHistoryRow } from "@/components/listing-control/ops-readers";
 import { getDb, loadProfileNames } from "@/components/listing-control/readers";
+import { getActivePortals } from "@/lib/portals/membership";
 
 export const metadata = { title: "Portal listesiyle karşılaştır" };
 
@@ -24,8 +25,10 @@ const SOURCE_LABEL: Record<ImportHistoryRow["source"], string> = { csv: "Dosya",
  * danışman / fiyat farkı). Listede olup CRM'de olmayan ilanlar eşleşme kuyruğuna düşer.
  */
 export default async function EnvanterPage() {
-  const { perms, role } = await requireModulePage("portals", "/app/ilan-kontrol");
+  const { perms, role, tenantId } = await requireModulePage("portals", "/app/ilan-kontrol");
   const canEdit = effectiveHasPermission(perms, "portals", "edit");
+  // Portal seçimi üyelikle süzülür (tek kaynak `portals/membership.ts`); ofis bağlamı yoksa süzgeç yok.
+  const activePortals = canEdit && tenantId ? await getActivePortals(tenantId) : undefined;
   return (
     <>
       <PageHeader
@@ -38,7 +41,7 @@ export default async function EnvanterPage() {
       <div className="space-y-6">
         <Panel title="Listeyi yükle" description="Dosya, yapıştırma ya da tarayıcı eklentisiyle portal mağaza sayfasından okuma.">
           {canEdit ? (
-            <InventoryImportForm canOffice={MANAGER_ROLES.has(role ?? "")} />
+            <InventoryImportForm canOffice={MANAGER_ROLES.has(role ?? "")} activePortals={activePortals} />
           ) : (
             <p className="text-sm text-text-muted">Portal listesi yüklemek için portal düzenleme yetkisi gerekir.</p>
           )}

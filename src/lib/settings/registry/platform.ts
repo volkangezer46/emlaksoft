@@ -12,6 +12,7 @@ import { TRY_DEFAULT_MAX_SHARE, TRY_MAX_SHARE_SETTING_KEY } from "@/lib/try-cred
 import { parseMaxShare } from "@/lib/try-credits/config";
 import { DEFAULT_LEAD_FORM_COPY } from "@/lib/legal-copy";
 import { z } from "zod";
+import { ALL_PORTALS } from "@/lib/portals/catalog";
 import type { AnySettingDef } from "../types";
 import { defineBool, defineInt, defineJson, defineNumber, defineSecret, defineString } from "./define";
 
@@ -26,7 +27,8 @@ const SUPER = { platformModule: "sistem", superAdminOnly: true } as const;
 export const SYSTEM_HOME = { href: "/admin/sistem#ayarlar", label: "Sistem > Kayıt ve bakım" } as const;
 export const BILLING_HOME = { href: "/admin/billing#ayarlar", label: "Abonelik & fatura > Ayarlar" } as const;
 
-export const PORTAL_NAMES = ["sahibinden", "hepsiemlak", "zingat", "emlakjet"] as const;
+/** Portal ayar anahtarları: katalogdaki bütün portallar (tek kaynak `src/lib/portals/catalog.ts`). */
+export const PORTAL_NAMES = ALL_PORTALS;
 
 const general: AnySettingDef[] = [
   defineBool({

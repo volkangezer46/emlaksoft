@@ -87,7 +87,7 @@ describe("form değişti", () => {
     const a = toFormAlert({ fingerprint: "f", alert_state: "warning", field_count: 40, tenants_n: 2, jaccard_prev: "0.62" })!;
     expect(a).toMatchObject({ alertState: "warning", fieldCount: 40, tenantsN: 2, jaccardPrev: 0.62 });
     expect(formChangedText("sahibinden", a)).toBe(
-      "sahibinden.com ilan formu değişti: yeni yapı 2 ofiste görüldü (40 alan · önceki yapıyla benzerlik %62). Eşleşmeyen alanları kontrol edin.",
+      "Sahibinden ilan formu değişti: yeni yapı 2 ofiste görüldü (40 alan · önceki yapıyla benzerlik %62). Eşleşmeyen alanları kontrol edin.",
     );
     expect(formChangedText("emlakjet", { alertState: "info", tenantsN: 1, fieldCount: 12, jaccardPrev: null })).toMatch(/olası değişiklik/);
   });

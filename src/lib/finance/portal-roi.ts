@@ -5,17 +5,14 @@
  * DÜRÜSTLÜK: "gösterim" portal bazında ölçülmez (portal gösterim sayısı sisteme gelmiyor) — burada gösterilmez.
  * Kaynak eşlemesi: `customers.lead_source = portal_<anahtar>`; gider eşlemesi: `expenses.portal_key`.
  */
+import { ALL_PORTALS, PORTAL_CATALOG, portalIdFromName, type PortalId } from "@/lib/portals/catalog";
 import { addDaysKey, addMonthsKey, daysBetweenKeys, isRecurrence, RECURRENCE_MONTHS, type Recurrence } from "@/lib/finance/recurring-expenses";
 
-export const PORTAL_KEYS = ["sahibinden", "hepsiemlak", "zingat", "emlakjet"] as const;
-export type PortalKey = (typeof PORTAL_KEYS)[number];
+/** Gider/talep eşlemesinde bilinen portallar: katalogdaki güncel + geçmiş (Zingat yalnız geçmiş veri için). */
+export const PORTAL_KEYS = ALL_PORTALS;
+export type PortalKey = PortalId;
 
-export const PORTAL_LABEL: Record<PortalKey, string> = {
-  sahibinden: "Sahibinden.com",
-  hepsiemlak: "Hepsiemlak",
-  zingat: "Zingat",
-  emlakjet: "Emlak Jet",
-};
+export const PORTAL_LABEL: Record<PortalKey, string> = Object.fromEntries(ALL_PORTALS.map((k) => [k, PORTAL_CATALOG[k].brandLabel])) as Record<PortalKey, string>;
 
 /** Analiz penceresi (gün). */
 export const ROI_WINDOW_DAYS = 90;
@@ -43,10 +40,7 @@ export function portalKeyFromLeadSource(source: string | null | undefined): Port
 
 /** `portal_listings.portal_name` serbest metindir ("Sahibinden.com", "sahibinden"): içerme ile eşler. */
 export function portalKeyFromName(name: string | null | undefined): PortalKey | null {
-  const s = (name ?? "").trim().toLocaleLowerCase("tr-TR").replace(/ı/g, "i");
-  for (const key of PORTAL_KEYS) if (s.includes(key)) return key;
-  if (s.includes("emlak jet")) return "emlakjet";
-  return null;
+  return portalIdFromName(name);
 }
 
 export type PortalExpense = { portalKey: PortalKey; amount: number; date: string; recurrence: Recurrence | null };
@@ -82,11 +76,18 @@ export type PortalRoiInput = {
   listingsInWindow: Readonly<Partial<Record<PortalKey, number>>>;
   windowStart: string;
   windowEnd: string;
+  /**
+   * Ofisin üye olduğu portallar (`portals/membership.ts`). Verilirse üye olunan portal verisi olmasa da satır olur; üye
+   * olunmayan portal yalnız GEÇMİŞ verisi (gider/talep/anlaşma) varsa görünür. Verilmezse eski kural (yalnız veri olan).
+   */
+  activePortals?: readonly string[];
 };
 
 export type PortalRoiRow = {
   portalKey: PortalKey;
   label: string;
+  /** Ofis bu portala şu an üye mi (üyelik bilinmiyorsa null). */
+  member?: boolean | null;
   cost: number;
   /** En eski portal gideri tarihi (null = hiç gider eşlenmemiş). */
   firstCostDate: string | null;
@@ -109,7 +110,8 @@ export function computePortalRoi(input: PortalRoiInput): PortalRoiRow[] {
   const rows: PortalRoiRow[] = [];
   for (const key of PORTAL_KEYS) {
     const own = input.expenses.filter((e) => e.portalKey === key);
-    if (own.length === 0 && !(input.leads[key] ?? 0) && !(input.won[key]?.deals ?? 0)) continue;
+    const member = input.activePortals ? input.activePortals.includes(key) : null;
+    if (own.length === 0 && !(input.leads[key] ?? 0) && !(input.won[key]?.deals ?? 0) && member !== true) continue;
     const cost = own.reduce((s, e) => s + allocatedCost(e, input.windowStart, input.windowEnd), 0);
     const firstCostDate = own.length ? own.map((e) => e.date).sort()[0]! : null;
     const history = firstCostDate ? daysBetweenKeys(firstCostDate, input.windowEnd) : 0;
@@ -122,6 +124,7 @@ export function computePortalRoi(input: PortalRoiInput): PortalRoiRow[] {
     rows.push({
       portalKey: key,
       label: PORTAL_LABEL[key],
+      member,
       cost: Math.round(cost),
       firstCostDate,
       sufficient,

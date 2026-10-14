@@ -1,3 +1,4 @@
+import { CURRENT_PORTALS } from "@/lib/portals/catalog";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
@@ -15,7 +16,7 @@ const MAX_BODY = 20_000;
 const bodySchema = z.object({
   sessionId: z.string().uuid(),
   state: z.enum(["filled", "published", "failed"]),
-  portal: z.enum(["sahibinden", "hepsiemlak", "emlakjet"]),
+  portal: z.enum(CURRENT_PORTALS),
   externalId: z.string().max(40).nullish(),
   url: z.string().max(2048).nullish(),
   /** Alan başına durum (dolduruldu / bulunamadı / seçenek yok). Değer içermez, yalnız durum ve etiket. */
