@@ -39,6 +39,21 @@ export function parseActivityFilters(sp: Record<string, string | undefined>): Ac
   };
 }
 
+/**
+ * İşlem adı süzgeci için LIKE deseni. `safeLike` nokta ve alt çizgiyi boşluğa çevirir; işlem adları
+ * (`ai.openai_call`, `integration.resend.test`) bunlardan oluştuğu için eşleşme hiç bulunmazdı. Burada `.` ve `_`
+ * tek karakter jokerine (`_`) çevrilir (kendileriyle eşleşir); kalan dilbilgisi karakterleri yine temizlenir.
+ */
+export function actionLike(raw: string, maxLen = 80): string {
+  const cleaned = raw
+    .slice(0, maxLen)
+    .replace(/[,():*\\"%]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[._]/g, "_");
+  return `%${cleaned}%`;
+}
+
 export function hasActivityFilter(f: ActivityFilters): boolean {
   return Object.values(f).some(Boolean);
 }
@@ -152,8 +167,8 @@ export async function queryActivity(f: ActivityFilters, fetchEnd: number): Promi
     platformQ = platformQ.lte("created_at", endIso);
   }
   if (f.islem) {
-    tenantQ = tenantQ.ilike("action", safeLike(f.islem));
-    platformQ = platformQ.ilike("action", safeLike(f.islem));
+    tenantQ = tenantQ.ilike("action", actionLike(f.islem));
+    platformQ = platformQ.ilike("action", actionLike(f.islem));
   }
   if (f.q) {
     const or = orIlike(["action", "entity_type"], f.q);

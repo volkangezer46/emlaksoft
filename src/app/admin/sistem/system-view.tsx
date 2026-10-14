@@ -1,6 +1,6 @@
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, History, KeyRound, Landmark, Layers, MapPin, PauseCircle, Radar, XCircle } from "lucide-react";
+import { ArrowUpRight, Bug, CheckCircle2, Clock3, Database, HeartPulse, History, KeyRound, Layers, MapPin, PauseCircle, Radar, XCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { RegistrySettings } from "@/components/settings/registry-settings";
 import { geoRowCount } from "@/lib/geo/reader";
@@ -9,16 +9,10 @@ import { probeSchema } from "./schema-checks";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { getPlatformSetting } from "@/lib/platform-settings";
-import { getPlatformSecret } from "@/lib/settings/secret-read";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { msSince, now as clockNow } from "@/lib/clock";
 import { CRON_JOBS } from "@/lib/cron-jobs";
-import { OpenAiKeyForm } from "@/components/admin/openai-key-form";
-import { getEmlakFiyatiAdminStatus } from "@/lib/integrations/emlakfiyati/admin-status";
-import { PortalApiKeysSection } from "@/components/admin/portal-keys-form";
-import { getPortalConfig } from "@/lib/integrations/portals";
 import { CronRunButton } from "./cron-run-button";
-import { MessagingKeysSection } from "./messaging-keys-form";
 import { RadialGauge } from "@/components/ui/viz";
 import { CronStatusStrip } from "./cron-status-strip";
 import { classifyCron, geoCoverage, schemaGauge } from "./cron-strip-model";
@@ -77,12 +71,6 @@ function StatusPill({ ok, okLabel, badLabel }: { ok: boolean; okLabel: string; b
       {ok ? okLabel : badLabel}
     </span>
   );
-}
-
-function mask(value: string | null, prefixLen = 6, suffixLen = 4): string | null {
-  if (!value) return null;
-  if (value.length <= prefixLen + suffixLen) return `${value.slice(0, 3)}••••`;
-  return `${value.slice(0, prefixLen)}••••••••${value.slice(-suffixLen)}`;
 }
 
 type PortalRows = { data: unknown; error: unknown };
@@ -153,32 +141,17 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
 
   // Tüm platform ayarları + geo sayımları tek turda (bağımsız → tam paralel)
   const [
-    dbKey,
-    emlakFiyatiStatus,
-    dbNetgsmUser, dbNetgsmPass, dbNetgsmHeader, dbWaUrl, dbWaToken,
-    sahibindenConfig, hepsiemlakConfig, emlakjetConfig,
     { count: provinces }, { count: districts }, { count: neighborhoods },
     { data: heartbeatRows },
     schemaRows,
     { count: openErrors },
     { data: manualRunRows },
-    { data: evdsRows },
     backupRaw,
     portalProposalRes,
     portalAlertRes,
     cronStateRes,
     cronRunsRes,
   ] = await Promise.all([
-    getPlatformSecret("openai_api_key"),
-    getEmlakFiyatiAdminStatus(),
-    getPlatformSetting("netgsm_usercode"),
-    getPlatformSecret("netgsm_password"),
-    getPlatformSetting("netgsm_msgheader"),
-    getPlatformSetting("whatsapp_api_url"),
-    getPlatformSecret("whatsapp_api_token"),
-    getPortalConfig("sahibinden"),
-    getPortalConfig("hepsiemlak"),
-    getPortalConfig("emlakjet"),
     geoRowCount("province"),
     geoRowCount("district"),
     geoRowCount("neighborhood"),
@@ -191,7 +164,6 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
       .eq("action", "platform_cron.run")
       .order("created_at", { ascending: false })
       .limit(20),
-    admin.from("market_rates").select("key, fetched_at").in("key", ["housing_loan_rate_annual", "cpi_12m_avg"]),
     getPlatformSetting(BACKUP_STATUS_KEY),
     // Portal kuralları özeti (tablo yoksa hata → satır gizlenir; yeni service_role çağrısı yok, aynı istemci)
     admin.from("portal_rule_proposals").select("portal").eq("state", "ready").limit(500),
@@ -211,13 +183,6 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
   const pausedJobs = new Map(((cronStateRes.error ? [] : (cronStateRes.data ?? [])) as PausedRow[]).map((r) => [r.job, r] as const));
   const cronRuns = (cronRunsRes.data ?? []) as CronRun[];
   const cronRunsPending = Boolean(cronRunsRes.error);
-  const evdsConfigured = Boolean(process.env.EVDS_API_KEY?.trim());
-  const evdsLastFetch =
-    ((evdsRows ?? []) as { fetched_at: string | null }[])
-      .map((r) => r.fetched_at)
-      .filter((v): v is string => Boolean(v))
-      .sort()
-      .at(-1) ?? null;
   const canRun = staff.role === "super_admin";
   type ManualRun = { id: string; actor_id: string | null; meta: { job?: string; label?: string; status?: number; ok?: boolean; duration_ms?: number } | null; created_at: string };
   const manualRuns = (manualRunRows ?? []) as ManualRun[];
@@ -240,39 +205,6 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
   }).length;
   const schemaMissing = schemaRows.filter((r) => !r.ok);
 
-  // OpenAI
-  const envKey = process.env.OPENAI_API_KEY?.trim() || null;
-  const activeKey = (dbKey?.trim() || envKey) ?? null;
-  const keySource: "db" | "env" | "none" = dbKey?.trim() ? "db" : envKey ? "env" : "none";
-  const maskedKey = activeKey ? mask(activeKey) : null;
-
-  // EmlakFiyati — anahtar admin'de şifreli (veya env yedek); değeri ASLA gösterilmez (yalnız durum).
-  const emlakFiyatiConfigured = emlakFiyatiStatus.configured;
-  const emlakFiyatiLastOk = emlakFiyatiStatus.lastOkAt;
-  const emlakFiyatiAlarm = emlakFiyatiStatus.authAlarm;
-
-  // Portal API anahtarları
-  const sahibindenKey  = sahibindenConfig?.apiKey ?? null;
-  const hepsiemlakKey  = hepsiemlakConfig?.apiKey ?? null;
-  const emlakjetKey    = emlakjetConfig?.apiKey ?? null;
-
-  const maskedSahibinden  = sahibindenKey  ? mask(sahibindenKey)  : null;
-  const maskedHepsiemlak  = hepsiemlakKey  ? mask(hepsiemlakKey)  : null;
-  const maskedEmlakjet    = emlakjetKey    ? mask(emlakjetKey)    : null;
-
-  // Netgsm / WhatsApp — DB öncelikli, env yedek; ekrana yalnız maskeli özet düşer (parola/anahtar asla)
-  const netgsmUser = dbNetgsmUser?.trim() || process.env.NETGSM_USERCODE?.trim() || null;
-  const netgsmHeader = dbNetgsmHeader?.trim() || process.env.NETGSM_MSGHEADER?.trim() || null;
-  const netgsmConfigured = Boolean(netgsmUser && (dbNetgsmPass?.trim() || process.env.NETGSM_PASSWORD) && netgsmHeader);
-  const waUrl = dbWaUrl?.trim() || process.env.WHATSAPP_API_URL?.trim() || null;
-  const waConfigured = Boolean(waUrl && (dbWaToken?.trim() || process.env.WHATSAPP_API_TOKEN));
-  let waHost: string | null = null;
-  try {
-    waHost = waUrl ? new URL(waUrl).hostname : null;
-  } catch {
-    waHost = null;
-  }
-
   const provinceCoverage = geoCoverage(provinces ?? null, TOTAL_PROVINCES);
   const nowMs = clockNow();
   const stripItems = CRON_JOBS.map(({ job, label, staleAfterMinutes }) => {
@@ -282,8 +214,6 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
   const schemaG = schemaGauge(schemaRows);
   const portalRules = portalRulesSummary(portalProposalRes, portalAlertRes);
   const cronConfigured = Boolean(process.env.CRON_SECRET?.trim());
-  const pushConfigured = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
-  const iyzicoConfigured = Boolean(process.env.IYZICO_API_KEY && process.env.IYZICO_SECRET_KEY);
 
   return (
     <div className="space-y-6">
@@ -291,8 +221,8 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
       <AdminPageHeader
         eyebrow="Sistem sağlığı"
         icon={Radar}
-        title="Altyapı & entegrasyon durumu"
-        description="Geo kapsama, cron güvenliği, şema sürümü ve opsiyonel entegrasyonların (iyzico, EmlakFiyati, yapay zeka) canlı yapılandırma durumu."
+        title="Altyapı durumu"
+        description="Geo kapsama, cron güvenliği, yedek ve şema sürümü. Dış entegrasyonların (iyzico, SMS, e-posta, Google, yapay zeka…) durumu, testi ve anahtarları Entegrasyonlar sekmesindedir."
       >
         <KpiGrid label="Sistem göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
           <KpiCard
@@ -508,53 +438,14 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
               <span className="text-sm font-semibold text-ink-950">CRON_SECRET</span>
               <StatusPill ok={cronConfigured} okLabel="Tanımlı" badLabel="Eksik" />
             </div>
-            <div className="flex min-h-10 items-center justify-between py-1">
-              <span className="text-sm font-semibold text-ink-950">iyzico (canlı tahsilat)</span>
-              <StatusPill ok={iyzicoConfigured} okLabel="Tanımlı" badLabel="Demo mod" />
-            </div>
-            <div className="flex min-h-10 items-center justify-between gap-3 py-1">
-              <span className="min-w-0 text-sm font-semibold text-ink-950">
-                TCMB EVDS (konut faizi, TÜFE)
-                <span className="mt-0.5 block text-xs font-normal text-text-muted">
-                  {evdsConfigured
-                    ? evdsLastFetch
-                      ? `Son çekim: ${relativeTimeTR(evdsLastFetch)}`
-                      : "Henüz çekim yok (tcmb-kur cron'u bekleniyor)"
-                    : "EVDS_API_KEY tanımlı değil (opsiyonel)"}
-                </span>
-              </span>
-              <StatusPill ok={evdsConfigured} okLabel="Tanımlı" badLabel="Kapalı" />
-            </div>
-            <div className="flex min-h-10 items-center justify-between py-1">
-              <span className="text-sm font-semibold text-ink-950">VAPID push (bildirim)</span>
-              <StatusPill ok={pushConfigured} okLabel="Tanımlı" badLabel="Kapalı" />
-            </div>
-            <div className="flex min-h-10 items-center justify-between gap-3 py-1">
-              <span className="min-w-0 text-sm font-semibold text-ink-950">
-                <span className="flex items-center gap-1.5">
-                  <Landmark className="h-3.5 w-3.5 text-cyan-600" /> EmlakFiyati (bölge endeksi)
-                </span>
-                <span className="mt-0.5 block text-xs font-normal text-text-muted">
-                  {emlakFiyatiAlarm
-                    ? "Anahtar reddedildi (401): yeni anahtar girin"
-                    : emlakFiyatiConfigured
-                      ? emlakFiyatiLastOk
-                        ? `Son başarılı çağrı: ${relativeTimeTR(emlakFiyatiLastOk)}`
-                        : "Henüz başarılı çağrı kaydı yok"
-                      : "API anahtarı tanımlı değil"}
-                  {" · "}
-                  <Link href="/admin/sistem?sekme=emlakfiyati" className="font-semibold text-brand-600 hover:underline">
-                    Yönet
-                  </Link>
-                </span>
-              </span>
-              <StatusPill
-                ok={emlakFiyatiConfigured && !emlakFiyatiAlarm}
-                okLabel="Bağlı"
-                badLabel={emlakFiyatiAlarm ? "Anahtar reddedildi" : "Bağlantı yok"}
-              />
-            </div>
           </div>
+          <p className="mt-3 text-sm text-text-muted">
+            iyzico, Netgsm, e-posta, WhatsApp, Google, OpenAI, EVDS, VAPID, EmlakFiyati ve portal bağlantılarının durumu, “Test et” ve
+            anahtar girişi:{" "}
+            <Link href="/admin/sistem?sekme=entegrasyonlar" className="font-semibold text-brand-600 hover:underline">
+              Entegrasyon merkezi
+            </Link>
+          </p>
           <p className="mt-4 text-xs text-text-muted">Deploy sonrası cron doğrulaması:</p>
           <code className="mt-2 block rounded-[var(--radius-control)] bg-ink-950 px-3 py-2 text-xs text-mint-300">
             npm run cron:smoke
@@ -631,34 +522,6 @@ export async function SystemView({ cronJob }: { cronJob?: string } = {}) {
         description="Yeni ofis kaydı ve bakım modu. Değişiklikler doğrulanır, gerekçesiyle geçmişe yazılır ve geri alınabilir."
         keys={["platform.registration_open", "platform.maintenance_mode", "platform.maintenance_message"]}
         canEdit={staff.role === "super_admin"}
-      />
-
-      {/* Yapay zeka anahtarı */}
-      <OpenAiKeyForm
-        configured={Boolean(activeKey)}
-        source={keySource}
-        masked={maskedKey}
-        canEdit={staff.role === "super_admin"}
-      />
-
-      {/* Portal API anahtarları */}
-      <PortalApiKeysSection
-        canEdit={staff.role === "super_admin"}
-        sahibindenConfigured={Boolean(sahibindenConfig)}
-        hepsiemlakConfigured={Boolean(hepsiemlakConfig)}
-        emlakjetConfigured={Boolean(emlakjetConfig)}
-        maskedSahibinden={maskedSahibinden}
-        maskedHepsiemlak={maskedHepsiemlak}
-        maskedEmlakjet={maskedEmlakjet}
-      />
-
-      {/* SMS / WhatsApp sağlayıcı bilgileri */}
-      <MessagingKeysSection
-        canEdit={staff.role === "super_admin"}
-        netgsmConfigured={netgsmConfigured}
-        netgsmSummary={netgsmUser ? `${netgsmUser}${netgsmHeader ? ` · ${netgsmHeader}` : ""}` : null}
-        whatsappConfigured={waConfigured}
-        whatsappSummary={waHost}
       />
 
       {/* EİDS Bakanlık e-postası alımı: ofis bazında iletme, doğrulama dağılımı, kalıp dışı örnek (maskeli), SMTP sağlığı */}

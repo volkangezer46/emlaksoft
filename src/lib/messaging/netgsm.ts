@@ -457,3 +457,82 @@ function netgsmErrorMessage(code: string): string {
   };
   return errors[code] ?? `Bilinmeyen hata kodu: ${code}`;
 }
+
+// ---------------------------------------------------------------------------
+// Zararsız bağlantı yoklamaları (Admin > Sistem > Entegrasyonlar "Test et")
+// ---------------------------------------------------------------------------
+
+export type ProviderProbeResult = { ok: boolean; code: string | null; message: string; credit?: string | null };
+
+/**
+ * Netgsm bakiye sorgusu (XML, `stip=2` kredi bilgisi): SMS GÖNDERMEZ, ücret doğurmaz. Yanıt "00 <kredi>" ya da yalnız hata
+ * kodudur ("30" kimlik, "40"/"70" sorgu hatası). Ayrıştırma bağışlayıcıdır: tanınmayan başarılı gövde "ulaşıldı" sayılır.
+ */
+export async function probeNetgsmCredentials(cfg: NetgsmConfig): Promise<ProviderProbeResult> {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<mainbody>
+  <header>
+    <usercode>${xmlEscape(cfg.usercode)}</usercode>
+    <password>${xmlEscape(cfg.password)}</password>
+    <stip>2</stip>
+  </header>
+</mainbody>`;
+  try {
+    const res = await fetchExternal("https://api.netgsm.com.tr/balance/list/xml", {
+      method: "POST",
+      headers: { "Content-Type": "text/xml; charset=UTF-8" },
+      body: xml,
+      redirect: "error",
+    }, { timeoutMs: PROVIDER_TIMEOUT_MS });
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      return { ok: false, code: `http_${res.status}`, message: `Netgsm HTTP ${res.status} döndürdü.` };
+    }
+    return parseNetgsmBalance(await readExternalText(res, NETGSM_MAX_RESPONSE_BYTES));
+  } catch {
+    return { ok: false, code: "transport_error", message: "Netgsm sağlayıcısına erişilemedi." };
+  }
+}
+
+/** SAF: Netgsm bakiye yanıtını yorumlar (testli). */
+export function parseNetgsmBalance(body: string): ProviderProbeResult {
+  const text = body.trim();
+  const [head, rest] = [text.split(/\s+/)[0] ?? "", text.split(/\s+/).slice(1).join(" ")];
+  if (head === "00") return { ok: true, code: "00", message: "Netgsm kimlik bilgileri kabul edildi.", credit: rest ? rest.slice(0, 32) : null };
+  if (head === "30") return { ok: false, code: "30", message: "Netgsm kullanıcı kodu veya parolası reddedildi." };
+  if (/^\d{2,3}$/.test(head)) return { ok: false, code: head, message: `Netgsm sorguyu reddetti (kod ${head}).` };
+  if (/^\d+(?:[.,]\d+)?$/.test(head)) return { ok: true, code: "00", message: "Netgsm kimlik bilgileri kabul edildi.", credit: head.slice(0, 32) };
+  // Bakım/HTML sayfası ya da beklenmeyen XML: kimlik doğrulanmadı → başarı sayılmaz.
+  return { ok: false, code: "unrecognized", message: "Netgsm'e ulaşıldı ama yanıt tanınmadı (kimlik bilgisi doğrulanamadı)." };
+}
+
+/**
+ * WhatsApp yoklaması: yalnız Meta Graph adresinde (…/vXX.X/<telefon-kimliği>/messages) telefon numarası kaydı OKUNUR
+ * (GET, mesaj gönderilmez). Üçüncü taraf ağ geçidinde zararsız uç bilinmediği için test yapılmaz.
+ */
+export async function probeWhatsAppConfig(config: WhatsAppConfig): Promise<ProviderProbeResult> {
+  const apiUrl = normalizeAllowedWhatsAppApiUrl(config.apiUrl);
+  if (!apiUrl) return { ok: false, code: "provider_config_invalid", message: "WhatsApp API adresi geçersiz." };
+  const url = new URL(apiUrl);
+  const m = url.pathname.match(/^\/(v\d{1,2}\.\d)\/(\d{5,32})\/messages\/?$/);
+  if (url.origin !== WHATSAPP_GRAPH_ORIGIN || !m) {
+    return { ok: false, code: "unsupported", message: "Bu WhatsApp ağ geçidi için zararsız test tanımlı değil (yalnız Meta Graph adresi sınanır)." };
+  }
+  try {
+    const res = await fetchExternal(`${WHATSAPP_GRAPH_ORIGIN}/${m[1]}/${m[2]}?fields=id,quality_rating`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${config.apiToken}` },
+      redirect: "error",
+    }, { timeoutMs: PROVIDER_TIMEOUT_MS });
+    if (!res.ok) {
+      await discardExternalResponse(res);
+      if (res.status === 401 || res.status === 403) return { ok: false, code: `http_${res.status}`, message: "WhatsApp erişim belirteci reddedildi." };
+      return { ok: false, code: `http_${res.status}`, message: `Meta Graph HTTP ${res.status} döndürdü.` };
+    }
+    const data = await readExternalJson<{ id?: unknown; quality_rating?: unknown }>(res, WHATSAPP_MAX_RESPONSE_BYTES).catch(() => null);
+    const quality = typeof data?.quality_rating === "string" ? ` (kalite: ${data.quality_rating.slice(0, 16)})` : "";
+    return { ok: true, code: null, message: `Telefon numarası kaydı okundu${quality}.` };
+  } catch {
+    return { ok: false, code: "transport_error", message: "Meta Graph'a erişilemedi." };
+  }
+}

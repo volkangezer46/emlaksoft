@@ -193,7 +193,7 @@ export async function publishPropertyToPortal(
   // API yapılandırıldı mı?
   const configured = await isPortalConfigured(portalName);
   if (!configured) {
-    return { error: `${portalName} API anahtarı tanımlanmamış. /admin/sistem'den ekleyin.` };
+    return { error: `${portalName} API anahtarı tanımlanmamış. Admin > Sistem > Entegrasyonlar'dan ekleyin.` };
   }
 
   // Yetki (EİDS) kapısı: iptal edilmiş / süresi dolmuş yetkide yeni yayın ENGELLENİR (yalnız ofis sahibinin gerekçeli

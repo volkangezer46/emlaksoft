@@ -372,6 +372,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/admin-badges.ts", fn: "cachedBadges", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/admin/activity-query.ts", fn: "queryActivity", calls: 1, tenantFilter: "var" },
   { file: "src/lib/admin/activity-query.ts", fn: "resolveActorNames", calls: 1, tenantFilter: "yok" },
+  { file: "src/lib/admin/integration-hub/read.ts", fn: "loadIntegrationHub", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ai-advisor.ts", fn: "buildAdvisorContext", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/ai/credits/meter.ts", fn: "charge", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ai/credits/meter.ts", fn: "getTenantQuotas", calls: 1, tenantFilter: "uygulanamaz" },

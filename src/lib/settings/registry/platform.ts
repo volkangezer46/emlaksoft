@@ -308,7 +308,7 @@ const integrations: AnySettingDef[] = [
     description: "Platform yedek SMS hesabı kullanıcı kodu.",
     impact: "Platform SMS gönderimi bu hesapla yapılır.",
     editMode: "bridge",
-    editHref: "/admin/sistem",
+    editHref: "/admin/sistem?sekme=entegrasyonlar",
     envFallback: "NETGSM_USERCODE",
   }),
   defineSecret({
@@ -318,7 +318,7 @@ const integrations: AnySettingDef[] = [
     category: "bildirim",
     label: "Netgsm parolası",
     description: "Platform yedek SMS hesabı parolası. Şifreli saklanır.",
-    impact: "Yanlış parola SMS gönderimini durdurur. Kullanıcı kodu ve başlık /admin/sistem ekranındadır.",
+    impact: "Yanlış parola SMS gönderimini durdurur. Kullanıcı kodu ve başlık Sistem > Entegrasyonlar ekranındadır.",
     envFallback: "NETGSM_PASSWORD",
   }),
   defineString({
@@ -331,7 +331,7 @@ const integrations: AnySettingDef[] = [
     description: "Onaylı SMS başlığı (1-11 karakter).",
     impact: "Gönderilen SMS'lerde gönderici adı olarak görünür.",
     editMode: "bridge",
-    editHref: "/admin/sistem",
+    editHref: "/admin/sistem?sekme=entegrasyonlar",
     envFallback: "NETGSM_MSGHEADER",
   }),
   defineString({
@@ -344,7 +344,7 @@ const integrations: AnySettingDef[] = [
     description: "İzinli sağlayıcı alan adına sahip HTTPS adresi (SSRF koruması).",
     impact: "WhatsApp gönderimi bu adrese yapılır.",
     editMode: "bridge",
-    editHref: "/admin/sistem",
+    editHref: "/admin/sistem?sekme=entegrasyonlar",
     envFallback: "WHATSAPP_API_URL",
   }),
   defineSecret({
@@ -354,7 +354,7 @@ const integrations: AnySettingDef[] = [
     category: "bildirim",
     label: "WhatsApp API anahtarı",
     description: "WhatsApp sağlayıcı erişim anahtarı. Şifreli saklanır.",
-    impact: "Yanlış anahtar WhatsApp gönderimini durdurur. API adresi /admin/sistem ekranındadır.",
+    impact: "Yanlış anahtar WhatsApp gönderimini durdurur. API adresi Sistem > Entegrasyonlar ekranındadır.",
     envFallback: "WHATSAPP_API_TOKEN",
   }),
 ];
@@ -366,7 +366,7 @@ const portals: AnySettingDef[] = PORTAL_NAMES.flatMap((p) => [
     maxLength: 4096,
     category: "entegrasyon",
     label: `${p[0].toUpperCase()}${p.slice(1)} API anahtarı`,
-    description: "Portal ilan yayını için kurumsal sözleşme anahtarı. Şifreli saklanır. Adres ve ofis kimliği /admin/sistem ekranındadır.",
+    description: "Portal ilan yayını için kurumsal sözleşme anahtarı. Şifreli saklanır. Adres ve ofis kimliği Sistem > Entegrasyonlar ekranındadır.",
     impact: "Yanlış anahtar bu portala ilan yayınını durdurur.",
     envFallback: `${p.toUpperCase()}_API_KEY`,
   }),
@@ -390,7 +390,7 @@ const portals: AnySettingDef[] = PORTAL_NAMES.flatMap((p) => [
     description: "Portalın ofise verdiği kurumsal kimlik.",
     impact: "Portal ilan yayınlarında ofis tanımlayıcısı olarak gönderilir.",
     editMode: "bridge",
-    editHref: "/admin/sistem",
+    editHref: "/admin/sistem?sekme=entegrasyonlar",
     envFallback: `${p.toUpperCase()}_AGENCY_ID`,
   }),
   defineString({
@@ -404,7 +404,7 @@ const portals: AnySettingDef[] = PORTAL_NAMES.flatMap((p) => [
     impact: "Yanlış adres bu portala yayını durdurur.",
     risk: "high",
     editMode: "bridge",
-    editHref: "/admin/sistem",
+    editHref: "/admin/sistem?sekme=entegrasyonlar",
     envFallback: `${p.toUpperCase()}_BASE_URL`,
   }),
 ]);
