@@ -8,6 +8,7 @@ import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { loadManagementPnlInputs } from "@/lib/property-management/load";
+import { cashPnlAdjustments, monthBounds, pnlCashMonths, type PnlRaw } from "@/lib/finance/expense-budget";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { loadDefLabels, memoLabels, STATUS } from "../labels";
 import { applyActorScope, applyDateRange, applyTimestampRange, enrichProfiles, label, nameOf, one } from "../query-helpers";
@@ -57,7 +58,7 @@ export const giderler = defineReport({
 export const karZarar = defineReport({
   id: "kar-zarar",
   title: "Kâr / zarar (aylık)",
-  description: "Ay bazında komisyon geliri, KDV, dağıtılan paylar, gider ve net sonuç. Yalnız tüm kazancı görme yetkisi olanlara açıktır; örnek veri hariç.",
+  description: "Ay bazında komisyon geliri, elle girilen diğer gelir, KDV, dağıtılan paylar, gider ve net sonuç. Yalnız tüm kazancı görme yetkisi olanlara açıktır; örnek veri hariç.",
   category: "finans",
   scope: "tenant",
   module: "reports",
@@ -72,6 +73,7 @@ export const karZarar = defineReport({
     { key: "kdv", label: "KDV", type: "money", total: true, get: (r) => r.vat },
     { key: "pay", label: "Dağıtılan paylar", type: "money", total: true, get: (r) => r.shares },
     { key: "ucret", label: "Yönetim ücreti", type: "money", total: true, get: (r) => r.fees },
+    { key: "diger", label: "Diğer gelir (elle)", type: "money", total: true, get: (r) => r.other },
     { key: "gider", label: "Gider", type: "money", total: true, get: (r) => r.expenses },
     { key: "net", label: "Net sonuç", type: "money", total: true, get: (r) => r.net },
   ],
@@ -125,7 +127,16 @@ export const karZarar = defineReport({
       const pm = await loadManagementPnlInputs(ctx.supabase, { tenantId: tid(ctx), firstMonthKey: keys[0]! });
       const expenses: PlExpense[] = expRes.data.map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0, passThrough: pm.passThroughExpenseIds.has(String(e.id)) }));
       const pl = buildProfitLoss(keys, commissions, splits, expenses, pm.fees);
-      return pl.months.map((m) => ({ ...m, label: `${m.key.slice(5, 7)}.${m.key.slice(0, 4)}` })).reverse();
+      // Muhasebe v2 (finance_pnl): elle girilen gelir + gidere dönüşmemiş çıkışlar; komisyon ve kira iki kez sayılmaz. RPC yoksa ek yok.
+      const pnlRes = await Promise.resolve(ctx.supabase.rpc("finance_pnl", { p_from: `${keys[0]}-01`, p_to: monthBounds(keys[keys.length - 1]!).to })).catch(() => ({ data: null, error: { message: "rpc" } }));
+      const cash = pnlRes.error ? null : pnlCashMonths(((pnlRes.data ?? []) as PnlRaw[]));
+      const adj = cashPnlAdjustments(keys, cash, expenses);
+      return pl.months
+        .map((m) => {
+          const a = adj.get(m.key) ?? { manualIncome: 0, extraExpense: 0 };
+          return { ...m, other: a.manualIncome, expenses: m.expenses + a.extraExpense, net: m.net + a.manualIncome - a.extraExpense, label: `${m.key.slice(5, 7)}.${m.key.slice(0, 4)}` };
+        })
+        .reverse();
     },
   },
 });

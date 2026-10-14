@@ -10,12 +10,13 @@ import { isUuid } from "@/lib/finance/cash/input";
 import { canHandleSalary, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import { parseRuleInput, recurringOutcomeMessage, type ParsedRule } from "@/lib/finance/recurring/rules";
+import { parseRatePct } from "@/lib/finance/expense-budget";
 
 /**
  * Düzenli ödeme / gelir kuralları (Paket B). Yetki: OFİS kuralları `expenses` modülüne bağlıdır (maaş yalnız owner/gm);
  * KİŞİSEL kurallar yalnız oturum sahibinindir (kapı `dashboard:view`, asıl kural RPC + RLS'de). Tüm yazmalar recurring_* RPC'leridir.
  */
-export type RecurringResult = { ok?: boolean; error?: string; id?: string };
+export type RecurringResult = { ok?: boolean; error?: string; id?: string; /** Kural kaydedildi ama ek koşullar (cari/KDV/stopaj) yazılamadı. */ warning?: string };
 
 const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 const MISSING_MSG = "Düzenli ödemeler için veritabanı güncellemesi henüz uygulanmamış.";
@@ -95,6 +96,10 @@ export async function createRecurringRule(input: Record<string, unknown>): Promi
     return { error: "Maaş ödemelerini yalnız ofis sahibi ve genel müdür tanımlayabilir." };
   }
   const res = await insertRuleCore(parsed.value);
+  if (res.ok && res.id && scope === "office" && hasTerms(input)) {
+    const terms = await writeTermsCore(res.id, input);
+    if (!terms.ok) res.warning = terms.error;
+  }
   if (res.ok) revalidateTenantData(gate.tenantId, PATHS);
   return res;
 }
@@ -127,6 +132,53 @@ export async function updateRecurringRule(ruleId: string, input: Record<string, 
   if (error) return rpcFailure(error, "Düzenli ödeme güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: recurringOutcomeMessage(String(res.outcome ?? "")) };
+  let warning: string | undefined;
+  if (scope === "office" && hasTerms(input)) {
+    const terms = await writeTermsCore(ruleId, input);
+    if (!terms.ok) warning = terms.error;
+  }
+  revalidateTenantData(gate.tenantId, PATHS);
+  return { ok: true, id: ruleId, warning };
+}
+
+/* ------------------------------------------------------------------ Muhasebe v2 (FN6): cari, KDV, stopaj */
+
+const TERMS_MISSING = "Kural kaydedildi; cari/KDV/stopaj alanları muhasebe güncellemesi uygulanınca kaydedilebilecek.";
+
+/** Formda koşul alanlarından en az biri gönderildi mi (eski çağıranlar göndermez -> koşullara dokunulmaz). */
+function hasTerms(input: Record<string, unknown>): boolean {
+  return "partyId" in input || "vatRate" in input || "withholdingRate" in input;
+}
+
+/** Ofis kuralına cari, KDV ve stopaj oranı yazar (recurring_rule_set_terms; yetki RPC'de recurring_rule_access edit). */
+async function writeTermsCore(ruleId: string, input: Record<string, unknown>): Promise<{ ok: true } | { ok: false; error: string }> {
+  const partyRaw = String(input.partyId ?? "").trim();
+  const partyId = partyRaw && isUuid(partyRaw) ? partyRaw : null;
+  if (partyRaw && !partyId) return { ok: false, error: "Cari bulunamadı." };
+  const vatRate = parseRatePct(input.vatRate);
+  const withholdingRate = parseRatePct(input.withholdingRate);
+  if (vatRate === undefined || withholdingRate === undefined) return { ok: false, error: "KDV ve stopaj oranı 0 ile 100 arasında olmalı." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("recurring_rule_set_terms", { p_rule_id: ruleId, p_party_id: partyId, p_vat_rate: vatRate, p_withholding_rate: withholdingRate });
+  if (error) {
+    if (isMissingCashSchema(error)) return { ok: false, error: TERMS_MISSING };
+    console.error("recurring-rules terms", { code: error.code });
+    return { ok: false, error: actionErrorMessage(error, "Cari/KDV/stopaj kaydedilemedi.") };
+  }
+  const outcome = String(asObject(data).outcome ?? "");
+  if (outcome !== "updated") return { ok: false, error: outcome === "not_found" ? "Cari bulunamadı ya da arşivlenmiş." : recurringOutcomeMessage(outcome) };
+  return { ok: true };
+}
+
+/** Yalnız koşulları günceller (ör. listeden "cari bağla"). */
+export async function setRecurringRuleTerms(ruleId: string, input: { partyId?: string | null; vatRate?: string | number | null; withholdingRate?: string | number | null }): Promise<RecurringResult> {
+  if (!isUuid(ruleId)) return { error: "Kayıt bulunamadı." };
+  const scope = await ruleScope(ruleId);
+  if (scope !== "office") return { error: "Cari, KDV ve stopaj yalnız ofis düzenli ödemelerinde tutulur." };
+  const gate = await gateFor(scope, "edit");
+  if (!gate.ok) return { error: gate.error };
+  const res = await writeTermsCore(ruleId, input);
+  if (!res.ok) return { error: res.error };
   revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true, id: ruleId };
 }

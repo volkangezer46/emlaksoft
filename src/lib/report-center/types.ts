@@ -112,6 +112,8 @@ export type ReportDef<R = Row> = {
   customFields?: CustomFieldEntity;
   /** Kişisel veri (ad, telefon, e-posta...) içerir: dosya üstbilgisine KVKK notu eklenir. */
   personalData?: boolean;
+  /** XLSX'te bu sütunun değerine göre satırlar ayrı sayfalara bölünür (ör. muhasebeci paketi: defter, cari, KDV...). */
+  xlsxSheetBy?: string;
 };
 
 export type ReportContext = {

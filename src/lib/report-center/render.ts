@@ -74,7 +74,7 @@ export async function renderReport(opts: {
   const createdIso = new Date(now()).toISOString();
 
   let body: Uint8Array;
-  if (format === "xlsx") body = buildXlsx(meta, table, createdIso);
+  if (format === "xlsx") body = buildXlsx(meta, table, createdIso, { sheetBy: def.xlsxSheetBy });
   else if (format === "pdf") body = await buildPdf(meta, table, createdIso, opts.logo);
   else body = new TextEncoder().encode(buildCsv(meta, table));
 
