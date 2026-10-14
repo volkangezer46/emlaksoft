@@ -45,6 +45,7 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/email/test-send.ts": "yönetimden e-posta kanalı test gönderimi (yalnız giriş yapmış platform personelinin kendi adresine; ticari değil)",
   "src/app/api/cron/dunning/route.ts": "gecikmiş abonelik faturası tahsilat hatırlatması ve askı öncesi son uyarı (yalnız borçlu ofisin sahibine, kendi faturası ve ödeme/kart bağlantısıyla sınırlı; ticari değil)",
   "src/lib/alerts/channels.ts": "operasyon uyarısı (AD10): yalnız süper adminin tanımladığı iç kanallara (Telegram/e-posta/webhook) sistem arıza bildirimi; ticari değil",
+  "src/lib/report-center/delivery-run.ts": "zamanlanmış rapor aboneliği (DG4): kullanıcının kendi kurduğu rapor e-postası, yalnız aynı ofisin kullanıcılarına / platform personeline; ticari değil",
 };
 
 /** Altyapı: sağlayıcı sarmalayıcıları (kendileri ileti kararı vermez). */

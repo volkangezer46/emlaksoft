@@ -8,6 +8,7 @@ import { runControlReportDelivery } from "@/lib/listing-control/server/report-de
 import { getDisabledModulesByTenant, isDisabledFor, tenantsDisabledFor } from "@/lib/modules/state";
 import { runLeagueDailyForTenant } from "@/lib/league/daily";
 import { runLicenseSetupTasks } from "@/lib/eids/license-setup";
+import { deliverDueReportSubscriptions } from "@/lib/report-center/delivery-run";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 
@@ -154,13 +155,30 @@ async function run(req: NextRequest) {
     failed += 1;
   }
 
+  // DG4: zamanlanmış rapor abonelikleri (ofis + admin; günlük/haftalık/aylık e-posta eki). Ayrık adım: tablo yoksa
+  // atlanır, hata özet işini bozmaz; kanal kapalıysa AD7 günlüğüne "kanal kapalı" düşer.
+  let reportSubs = 0;
+  let reportSubsChannelOff = 0;
+  try {
+    const r = await deliverDueReportSubscriptions(admin, Date.now(), {
+      disabledModules: await getDisabledModulesByTenant(admin),
+      shouldStop: () => isPastDeadline(Date.now(), deadline),
+    });
+    reportSubs = r.sent;
+    reportSubsChannelOff = r.channelDisabled;
+    failed += r.failed;
+  } catch (e) {
+    console.error("gunluk-ozet rapor abonelikleri", e);
+    failed += 1;
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
     timedOut,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi (${licenseTasksClosed} kapandı)`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi (${licenseTasksClosed} kapandı), ${reportSubs} rapor aboneliği (${reportSubsChannelOff} kanal kapalı)`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 

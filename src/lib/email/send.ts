@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings/read";
 import { EMAIL_FOOTER_KEY } from "@/lib/settings/registry/email";
-import { sendEmail, type EmailSendResult } from "./provider";
+import { sendEmail, type EmailAttachment, type EmailSendResult } from "./provider";
 import { DEFAULT_EMAIL_FOOTER, renderBrandedHtml, renderTemplate, templateDef, templateSettingKey, type EmailTemplateKey } from "./templates";
 
 /**
@@ -41,6 +41,8 @@ export type LoggedSendInput = {
   subject: string;
   text: string;
   html?: string;
+  /** Dosya ekleri (zamanlanmış rapor). Gövde gibi ekler de saklanmaz. */
+  attachments?: readonly EmailAttachment[];
   /** Şablon anahtarı ya da serbest etiket ("test" vb.). */
   template: string;
   /** Gönderen akış (cron adı, "admin_test" ...). */
@@ -78,7 +80,7 @@ export async function sendLoggedEmail(input: LoggedSendInput): Promise<LoggedSen
   const suppressed = admin ? await isSuppressedHash(admin, hash) : false;
   const res: LoggedSendResult = suppressed
     ? { ok: false, code: "suppressed", error: SUPPRESSED_ERROR }
-    : await sendEmail({ to, subject: input.subject, text: input.text, html: input.html });
+    : await sendEmail({ to, subject: input.subject, text: input.text, html: input.html, attachments: input.attachments });
 
   if (admin) {
     const status = res.ok ? "sent" : res.code === "suppressed" ? "suppressed" : res.code === "disabled" ? "disabled" : "failed";
