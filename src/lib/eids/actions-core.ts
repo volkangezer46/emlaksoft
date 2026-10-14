@@ -119,6 +119,12 @@ export type EventDecision =
 
 const REVOKED_STATES = new Set(["revoked", "expired"]);
 
+/**
+ * Motorun işlediği defter türleri (EP2 `eids_authority_events.kind` kümesinin tamamı). `link` = Eşleştir kuyruğundan
+ * adayla bağlanan bildirim (yeni durum `new_status`'ta: approved ya da revoked), `override` = sahibin aktarım izni.
+ */
+export const EIDS_ACTIONABLE_EVENT_KINDS = ["grant", "extend", "revoke", "expire", "undo", "manual_set", "link", "override"] as const;
+
 export function decideForEvent(ev: AuthorityEventInput): EventDecision {
   if (!ev.property_id) return { action: "none", reason: "eslesmemis" };
   switch (ev.kind) {
@@ -134,9 +140,14 @@ export function decideForEvent(ev: AuthorityEventInput): EventDecision {
     }
     case "undo":
     case "manual_set":
-      // Geri alma ya da elle düzeltme yetkiyi yeniden geçerli kıldıysa açık kaldırma görevi iptal edilir, yüzeyler geri açılır.
+    case "link":
+    case "override":
+      // Durum geçişinden karar: geri alma / elle düzeltme / bağlama yetkiyi yeniden geçerli kıldıysa açık kaldırma görevi
+      // iptal edilir, yüzeyler geri açılır; iptal/süre bitimine geçtiyse kaldırma görevi açılır.
       if (ev.prev_status && REVOKED_STATES.has(ev.prev_status) && ev.new_status && !REVOKED_STATES.has(ev.new_status)) return { action: "undo_takedown" };
       if (ev.new_status && REVOKED_STATES.has(ev.new_status)) return { action: "takedown", cause: { kind: "revoke", eventId: ev.id } };
+      // Eşleştir kuyruğundan bağlanan "yetki verildi" bildirimi = verme olayı (yayın görevi ya da bilgi notu).
+      if ((ev.kind === "link" || ev.kind === "override") && ev.new_status === "approved" && ev.prev_status !== "approved") return { action: "publish_or_note" };
       return { action: "none", reason: "durum_degismedi" };
     default:
       return { action: "none", reason: "bilinmeyen_tur" };

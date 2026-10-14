@@ -7,13 +7,16 @@ import { enqueueTakedownChecks } from "@/lib/listing-control/server/queue";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
 import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import { DAY_MS, trDayKey, trParts } from "@/lib/clock";
+import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 import {
   EIDS_MATCH_QUEUE_STATUSES,
   PUBLISH_DUE_BUSINESS_DAYS,
   TAKEDOWN_DUE_DAYS,
   TAKEDOWN_ESCALATE_HOURS,
+  EIDS_ACTIONABLE_EVENT_KINDS,
   addBusinessDaysMs,
   decideForEvent,
+  isAuthorityEndPast,
   planTakedownItems,
   propertyLabel,
   publishDedupeKey,
@@ -50,9 +53,10 @@ type PropertyRow = {
   branch_id: string | null;
   status: string | null;
   authorization_end: string | null;
+  authority_eids_status: string | null;
 };
 
-const PROPERTY_COLUMNS = "id, tenant_id, title, property_code, assigned_to, branch_id, status, authorization_end";
+const PROPERTY_COLUMNS = "id, tenant_id, title, property_code, assigned_to, branch_id, status, authorization_end, authority_eids_status";
 const MANAGEMENT_ROLES = ["owner", "gm", "branch_manager"] as const;
 
 export type ActionOutcome = { status: "created" | "exists" | "skipped" | "schema_missing" | "error"; taskId?: string; detail?: string };
@@ -203,6 +207,32 @@ export async function restoreOwnSurfaces(db: Db, tenantId: string, taskId: strin
   return { restored };
 }
 
+/** Kalemler yazılamadan geri alınan görevde otomatik kapatılan yüzeyleri (kalem kaydı olmadan) eski haline döndürür. */
+async function restoreFromPlan(db: Db, p: PropertyRow, own: { vitrin: ItemRow; paylasim: ItemRow } | null): Promise<void> {
+  if (!own) return;
+  if (own.vitrin.verified_by === "system" && typeof own.vitrin.restore_meta?.prev_status === "string") {
+    await db.from("properties").update({ status: own.vitrin.restore_meta.prev_status }).eq("id", p.id).eq("tenant_id", p.tenant_id).eq("status", "draft");
+  }
+  const links = own.paylasim.restore_meta?.links;
+  if (own.paylasim.verified_by === "system" && Array.isArray(links)) {
+    for (const l of links as { id?: string; expires_at?: string }[]) {
+      if (l.id && l.expires_at) await db.from("share_links").update({ expires_at: l.expires_at }).eq("id", l.id).eq("tenant_id", p.tenant_id);
+    }
+  }
+}
+
+/**
+ * Kaldırma yükümlülüğü hâlâ sürüyor mu? Portföyün GÜNCEL yetki durumu iptal/süresi dolmuş ya da bitiş tarihi geçmişse
+ * evet: o zaman hiçbir geri alma/verme olayı (özellikle cron'un yeniden oynattığı eski olay) açık görevi iptal etmez.
+ */
+function takedownStillRequired(p: PropertyRow, nowMs: number): boolean {
+  return (p.authority_eids_status !== null && REVOKED_STATUSES.has(p.authority_eids_status)) || isAuthorityEndPast(p.authorization_end, nowMs);
+}
+const REVOKED_STATUSES = new Set(["revoked", "expired"]);
+
+/** Olay anı (ISO): defter satırının created_at'i; yoksa (doğrudan çağrı) şimdi. */
+const eventAtIso = (ev: AuthorityEventInput, nowMs: number): string => (ev.created_at && Number.isFinite(Date.parse(ev.created_at)) ? ev.created_at : new Date(nowMs).toISOString());
+
 /* ------------------------------------------------------------------ */
 /* Kaldırma görevi                                                    */
 /* ------------------------------------------------------------------ */
@@ -278,7 +308,14 @@ export async function openTakedownTask(db: Db, input: { tenantId: string; proper
     };
   });
   const { error: itemErr } = await db.from("eids_takedown_items").insert(rows);
-  if (itemErr) console.error("eids takedown items", { code: itemErr.code });
+  if (itemErr) {
+    // Kalemsiz görev hiç kapanamaz (canCloseTakedown) ve dedupe yüzünden yeniden kurulmaz: görev geri alınır, yüzeyler
+    // geri açılır; sonraki tur (cron) baştan dener.
+    console.error("eids takedown items", { code: itemErr.code });
+    await restoreFromPlan(db, p, own);
+    await db.from("tasks").delete().eq("id", taskId).eq("tenant_id", input.tenantId);
+    return { status: isMissingSchema(itemErr) ? "schema_missing" : "error", detail: itemErr.code ?? "kalem_yazilamadi" };
+  }
 
   // Eklentili ofiste öncelikli kontrol işi: "kalktı" sonucu kalemi kendiliğinden işaretler (DB tetiği).
   const portalIds = planned.map((i) => i.portal_listing_id).filter((v): v is string => Boolean(v));
@@ -303,15 +340,22 @@ export async function openTakedownTask(db: Db, input: { tenantId: string; proper
   return { status: "created", taskId };
 }
 
-/** Yetki geri geldi (geri alma / elle düzeltme): açık kaldırma görevi iptal edilir, otomatik kapatılan yüzeyler açılır. */
-export async function cancelOpenTakedown(db: Db, tenantId: string, propertyId: string): Promise<number> {
+/**
+ * Yetki geri geldi (geri alma / elle düzeltme / bağlama): açık kaldırma görevi iptal edilir, otomatik kapatılan yüzeyler
+ * açılır. YENİDEN OYNATMA GÜVENLİ: yalnız olaydan ÖNCE açılmış görevler kapanır ve portföy hâlâ iptal/süresi dolmuş
+ * durumdaysa (ör. geri almadan sonra yeni bir iptal geldi) hiçbir şey iptal edilmez.
+ */
+export async function cancelOpenTakedown(db: Db, tenantId: string, propertyId: string, opts: { beforeIso: string; nowMs: number }): Promise<number> {
+  const p = await loadProperty(db, tenantId, propertyId);
+  if (!p || takedownStillRequired(p, opts.nowMs)) return 0;
   const { data } = await db
     .from("tasks")
     .select("id")
     .eq("tenant_id", tenantId)
     .eq("property_id", propertyId)
     .eq("kind", "eids_takedown")
-    .eq("status", "open");
+    .eq("status", "open")
+    .lt("created_at", opts.beforeIso);
   let n = 0;
   for (const t of (data ?? []) as { id: string }[]) {
     await restoreOwnSurfaces(db, tenantId, t.id);
@@ -338,7 +382,7 @@ async function onGrant(db: Db, ev: AuthorityEventInput, nowMs: number): Promise<
   const p = await loadProperty(db, ev.tenant_id, String(ev.property_id));
   if (!p) return { status: "skipped", detail: "portfoy_yok" };
   // Daha ileri tarihli yeni yetki: süre bitimiyle açılmış kaldırma görevi artık gereksiz.
-  await cancelExpireTakedowns(db, ev.tenant_id, p.id);
+  await cancelExpireTakedowns(db, ev.tenant_id, p.id, { beforeIso: eventAtIso(ev, nowMs), nowMs });
   const label = propertyLabel(p);
   const live = p.status === "live" || (await hasLivePortalListing(db, ev.tenant_id, p.id));
   const assignee = p.assigned_to;
@@ -394,18 +438,25 @@ async function onGrant(db: Db, ev: AuthorityEventInput, nowMs: number): Promise<
   return { status: "created", taskId };
 }
 
-/** Yenileme/hatırlatma görevleri: portföye bağlı, açık, başlığında "yetki" geçen (otomasyon + içgörüden kabul edilen). */
-async function closeRenewalTasks(db: Db, tenantId: string, propertyId: string, nowMs: number): Promise<number> {
+/** Otomasyon (`[oto:…]`) ya da içgörüden kabul edilen (`[ins:…]`) görevin notundaki iz. Elle açılan görev bunu taşımaz. */
+const GENERATED_TASK_MARKER = /\[(?:oto|ins):[0-9a-f]/i;
+
+/**
+ * Yenileme/hatırlatma görevleri: portföye bağlı, açık, başlığında "yetki" geçen ve YALNIZ otomasyon/içgörüden gelen
+ * (elle açılan "Yetki belgesi imzalat" gibi görevlere dokunulmaz). Yeniden oynatmada uzatmadan SONRA açılan görev kapanmaz.
+ */
+async function closeRenewalTasks(db: Db, tenantId: string, propertyId: string, nowMs: number, beforeIso: string): Promise<number> {
   const { data } = await db
     .from("tasks")
-    .select("id")
+    .select("id, notes")
     .eq("tenant_id", tenantId)
     .eq("property_id", propertyId)
     .eq("status", "open")
     .not("kind", "in", "(eids_publish,eids_takedown)")
     .ilike("title", "%yetki%")
+    .lt("created_at", beforeIso)
     .limit(50);
-  const ids = ((data ?? []) as { id: string }[]).map((t) => t.id);
+  const ids = ((data ?? []) as { id: string; notes: string | null }[]).filter((t) => GENERATED_TASK_MARKER.test(t.notes ?? "")).map((t) => t.id);
   if (ids.length === 0) return 0;
   const { error } = await db
     .from("tasks")
@@ -416,8 +467,13 @@ async function closeRenewalTasks(db: Db, tenantId: string, propertyId: string, n
   return error ? 0 : ids.length;
 }
 
-/** Süre bitimiyle açılmış (iptalle değil) açık kaldırma görevleri: uzatma/yeni yetki gelince iptal edilir. */
-async function cancelExpireTakedowns(db: Db, tenantId: string, propertyId: string): Promise<number> {
+/**
+ * Süre bitimiyle açılmış (iptalle değil) açık kaldırma görevleri: uzatma/yeni yetki gelince iptal edilir. Yeniden oynatma
+ * güvenli: yalnız olaydan önce açılmış görevler ve yalnız portföyün güncel yetkisi geçerliyse (bitiş geçmemiş, iptal yok).
+ */
+async function cancelExpireTakedowns(db: Db, tenantId: string, propertyId: string, opts: { beforeIso: string; nowMs: number }): Promise<number> {
+  const p = await loadProperty(db, tenantId, propertyId);
+  if (!p || takedownStillRequired(p, opts.nowMs)) return 0;
   const { data } = await db
     .from("tasks")
     .select("id")
@@ -425,7 +481,8 @@ async function cancelExpireTakedowns(db: Db, tenantId: string, propertyId: strin
     .eq("property_id", propertyId)
     .eq("kind", "eids_takedown")
     .eq("status", "open")
-    .like("dedupe_key", `eids:takedown:${propertyId}:expire:%`);
+    .like("dedupe_key", `eids:takedown:${propertyId}:expire:%`)
+    .lt("created_at", opts.beforeIso);
   let n = 0;
   for (const t of (data ?? []) as { id: string }[]) {
     await restoreOwnSurfaces(db, tenantId, t.id);
@@ -450,14 +507,15 @@ export async function onAuthorityEvent(db: Db, ev: AuthorityEventInput, nowMs: n
       return onGrant(db, ev, nowMs);
     case "extend": {
       const pid = String(ev.property_id);
-      const closed = await closeRenewalTasks(db, ev.tenant_id, pid, nowMs);
-      const cancelled = await cancelExpireTakedowns(db, ev.tenant_id, pid);
+      const beforeIso = eventAtIso(ev, nowMs);
+      const closed = await closeRenewalTasks(db, ev.tenant_id, pid, nowMs, beforeIso);
+      const cancelled = await cancelExpireTakedowns(db, ev.tenant_id, pid, { beforeIso, nowMs });
       return { status: "skipped", detail: `uzatma: ${closed} yenileme gorevi kapandi, ${cancelled} kaldirma iptal` };
     }
     case "takedown":
       return openTakedownTask(db, { tenantId: ev.tenant_id, propertyId: String(ev.property_id), cause: d.cause, nowMs });
     case "undo_takedown": {
-      const n = await cancelOpenTakedown(db, ev.tenant_id, String(ev.property_id));
+      const n = await cancelOpenTakedown(db, ev.tenant_id, String(ev.property_id), { beforeIso: eventAtIso(ev, nowMs), nowMs });
       return { status: "skipped", detail: `geri alma: ${n} kaldirma iptal` };
     }
     case "none":
@@ -482,11 +540,19 @@ export type EidsSweepSummary = {
 
 const EVENT_LOOKBACK_DAYS = 3;
 const EXPIRE_SCAN_LIMIT = 500;
+/**
+ * Süre bitimi taraması yalnız YAKIN geçmişte biten yetkilere bakar: son 14 gün ve özelliğin devreye girdiği günden
+ * (2026-10-14) sonra. Daha eski birikim (göç öncesi bitmiş, hâlâ yayında portföyler) otomatik gizlemeye düşmez;
+ * onlar haftalık "Yetki doğrula" özeti ve pano kartıyla görünür, gerekirse ayrı ve kontrollü geri doldurma yapılır.
+ */
+const EXPIRE_LOOKBACK_DAYS = 14;
+const EXPIRE_SCAN_FROM = "2026-10-14";
 
 /**
  * Cron adımı (2 saatte bir, `gorev-hatirlat` içinde AYRIK adım; yeni cron yok):
  *  1. Son 3 günün defter olayları → `onAuthorityEvent` (kaçan olay güvencesi; tekil anahtarlar tekrarı önler).
- *  2. `authorization_end` geçmiş ve yayında bir şeyi olan portföy → süre bitimi kaldırma görevi (e-posta beklenmez).
+ *  2. `authorization_end` son 14 günde geçmiş ve yayında bir şeyi olan portföy → süre bitimi kaldırma görevi (e-posta
+ *     beklenmez; portallar modülü kapalı ofis atlanır).
  *  3. 48 saatte (ayar) kapanmayan kaldırma görevi → ofis sahibine yükseltme (bir kez; `tasks.escalated_at`).
  *  4. Eşleşmeyen Bakanlık e-postası → owner + gm'e günde tek bildirim (iptal e-postası varsa ACİL).
  *  5. Pazartesi: danışmana haftalık "Yetki doğrula" özeti (hafta başına tek).
@@ -500,7 +566,7 @@ export async function runEidsActionSweep(db: Db, nowMs: number): Promise<EidsSwe
     .from("eids_authority_events")
     .select("id, tenant_id, property_id, kind, source, valid_until, prev_status, new_status, created_at")
     .gte("created_at", since)
-    .in("kind", ["grant", "extend", "revoke", "expire", "undo", "manual_set"])
+    .in("kind", [...EIDS_ACTIONABLE_EVENT_KINDS])
     .not("property_id", "is", null)
     .order("created_at", { ascending: true })
     .limit(1000);
@@ -521,12 +587,16 @@ export async function runEidsActionSweep(db: Db, nowMs: number): Promise<EidsSwe
     }
   }
 
-  // 2. Süre bitimi (olay beklenmez).
+  // 2. Süre bitimi (olay beklenmez). Yalnız yakın geçmişte bitenler ve portallar modülü açık ofisler.
   const today = trDayKey(nowMs);
+  const lookbackDay = trDayKey(nowMs - EXPIRE_LOOKBACK_DAYS * DAY_MS);
+  const scanFrom = lookbackDay > EXPIRE_SCAN_FROM ? lookbackDay : EXPIRE_SCAN_FROM;
+  const disabledModules = await getDisabledModulesByTenant(db);
   const { data: expiredRows, error: exErr } = await db
     .from("properties")
     .select("id, tenant_id, authorization_end, status")
     .lt("authorization_end", today)
+    .gte("authorization_end", scanFrom)
     .is("deleted_at", null)
     .eq("is_sample", false)
     .not("status", "in", "(sold,rented,archived,withdrawn,passive,removed)")
@@ -534,7 +604,9 @@ export async function runEidsActionSweep(db: Db, nowMs: number): Promise<EidsSwe
     .limit(EXPIRE_SCAN_LIMIT);
   if (exErr) s.errors += 1;
   else {
-    const rows = (expiredRows ?? []) as { id: string; tenant_id: string; authorization_end: string; status: string | null }[];
+    const rows = ((expiredRows ?? []) as { id: string; tenant_id: string; authorization_end: string; status: string | null }[]).filter(
+      (r) => !isDisabledFor(disabledModules, r.tenant_id, "portals"),
+    );
     // Yalnız yayında bir şeyi olan portföy: vitrinde (live) ya da canlı portal kaydı var.
     const notLive = rows.filter((r) => r.status !== "live").map((r) => r.id);
     const withPortal = new Set<string>();

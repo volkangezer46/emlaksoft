@@ -72,6 +72,15 @@ describe.skipIf(!mod)("EİDS aksiyon motoru şeması (pglite)", () => {
     expect((await q(`select status from public.tasks where id = $1`, [task]))[0]!.status).toBe("done");
   });
 
+  it("tür değiştirerek kapatma engellenir (kind='other' + done tek UPDATE'te; normal görev de kaldırma türüne çevrilemez)", async () => {
+    const { task } = await mkTakedown();
+    await expect(q(`update public.tasks set kind = 'other', status = 'done' where id = $1`, [task])).rejects.toThrow(/eids_takedown_kind_locked/);
+    await expect(q(`update public.tasks set kind = 'other' where id = $1`, [task])).rejects.toThrow(/eids_takedown_kind_locked/);
+    expect((await q(`select kind, status from public.tasks where id = $1`, [task]))[0]).toEqual({ kind: "eids_takedown", status: "open" });
+    const plain = (await q(`insert into public.tasks(tenant_id, kind) values ($1,'other') returning id`, [T]))[0]!.id as string;
+    await expect(q(`update public.tasks set kind = 'eids_takedown' where id = $1`, [plain])).rejects.toThrow(/eids_takedown_kind_locked/);
+  });
+
   it("görev iptal edilebilir (kalem beklese de)", async () => {
     const { task } = await mkTakedown();
     await q(`update public.tasks set status = 'cancelled' where id = $1`, [task]);

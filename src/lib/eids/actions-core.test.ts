@@ -7,6 +7,7 @@ import {
   canCloseTakedown,
   computeComplianceReport,
   decideForEvent,
+  EIDS_ACTIONABLE_EVENT_KINDS,
   forwardingState,
   maskSampleForAdmin,
   ownerConfirmRequestText,
@@ -41,6 +42,18 @@ describe("olay → karar", () => {
     expect(decideForEvent(ev({ kind: "undo", prev_status: "revoked", new_status: "approved" })).action).toBe("undo_takedown");
     expect(decideForEvent(ev({ kind: "manual_set", prev_status: "approved", new_status: "revoked" })).action).toBe("takedown");
     expect(decideForEvent(ev({ kind: "undo", prev_status: "pending", new_status: "approved" })).action).toBe("none");
+  });
+  it("Eşleştir kuyruğundan bağlama (link) durum geçişiyle karar verir; cron süzgeci link/override'ı kapsar", () => {
+    expect(decideForEvent(ev({ id: "e7", kind: "link", prev_status: "approved", new_status: "revoked" }))).toEqual({
+      action: "takedown",
+      cause: { kind: "revoke", eventId: "e7" },
+    });
+    expect(decideForEvent(ev({ kind: "link", prev_status: "unknown", new_status: "revoked" })).action).toBe("takedown");
+    expect(decideForEvent(ev({ kind: "link", prev_status: "unknown", new_status: "approved" })).action).toBe("publish_or_note");
+    expect(decideForEvent(ev({ kind: "link", prev_status: "revoked", new_status: "approved" })).action).toBe("undo_takedown");
+    expect(decideForEvent(ev({ kind: "override", prev_status: "approved", new_status: "approved" })).action).toBe("none");
+    expect(decideForEvent(ev({ kind: "link", property_id: null, new_status: "revoked" })).action).toBe("none");
+    expect([...EIDS_ACTIONABLE_EVENT_KINDS]).toEqual(expect.arrayContaining(["link", "override", "undo", "manual_set"]));
   });
   it("aynı olay aynı anahtarı üretir (ikinci görev açılmaz)", () => {
     const c = { kind: "revoke" as const, eventId: "e9" };
