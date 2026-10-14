@@ -32,7 +32,7 @@ export default async function KvkkBasvuruPage() {
       <LegalSection no="1." title="Başvuru nasıl işler?">
         <ol className="list-decimal space-y-1.5 pl-5">
           <li>Formu doldurun; e-posta adresinize 6 haneli doğrulama kodu gönderilir (30 dakika geçerli).</li>
-          <li>Kodu girdiğinizde başvurunuz alınır ve size bir başvuru numarası verilir. Yasal 30 günlük süre bu anda başlar.</li>
+          <li>Kodu girdiğinizde başvurunuz alınır ve size bir başvuru numarası verilir. Yasal 30 günlük süre formu ilk gönderdiğiniz andan itibaren işler.</li>
           <li>Verilerinizi paylaşmadan ya da silmeden önce kimliğinizi teyit etmek için sizinle iletişime geçebiliriz.</li>
           <li>Sonuç, başvuruda yazdığınız e-posta adresine gönderilir.</li>
         </ol>

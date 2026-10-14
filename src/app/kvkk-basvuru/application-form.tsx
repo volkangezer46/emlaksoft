@@ -65,6 +65,7 @@ export function KvkkApplicationForm() {
       const res = await verifyKvkkApplication(fd);
       if (res.error) {
         setError(res.error);
+        // Kod süresi doldu / deneme hakkı bitti: forma dönülür, alanlar son gönderilen bilgilerle dolu kalır (lastForm).
         if (res.restart) setStage({ step: "form" });
         return;
       }
@@ -141,6 +142,11 @@ export function KvkkApplicationForm() {
     );
   }
 
+  const prev = (k: string) => {
+    const v = lastForm?.get(k);
+    return typeof v === "string" ? v : undefined;
+  };
+
   return (
     <form
       onSubmit={(e) => {
@@ -177,13 +183,13 @@ export function KvkkApplicationForm() {
           <label htmlFor="kvkk-ad" className={labelCls}>
             Ad soyad *
           </label>
-          <input id="kvkk-ad" name="full_name" required minLength={2} maxLength={120} autoComplete="name" className={inputCls} />
+          <input id="kvkk-ad" name="full_name" defaultValue={prev("full_name")} required minLength={2} maxLength={120} autoComplete="name" className={inputCls} />
         </div>
         <div>
           <label htmlFor="kvkk-eposta" className={labelCls}>
             E-posta *
           </label>
-          <EmailInput id="kvkk-eposta" name="email" required maxLength={254} className={inputCls} />
+          <EmailInput id="kvkk-eposta" name="email" defaultValue={prev("email")} required maxLength={254} className={inputCls} />
         </div>
         <div>
           <label htmlFor="kvkk-telefon" className={labelCls}>
@@ -195,7 +201,7 @@ export function KvkkApplicationForm() {
           <label htmlFor="kvkk-ofis" className={labelCls}>
             İlgili emlak ofisi <span className="font-normal text-text-faint">(biliyorsanız)</span>
           </label>
-          <input id="kvkk-ofis" name="office_hint" maxLength={160} autoComplete="off" className={inputCls} />
+          <input id="kvkk-ofis" name="office_hint" defaultValue={prev("office_hint")} maxLength={160} autoComplete="off" className={inputCls} />
         </div>
       </div>
 
@@ -206,6 +212,7 @@ export function KvkkApplicationForm() {
         <textarea
           id="kvkk-talep"
           name="details"
+          defaultValue={prev("details")}
           required
           minLength={10}
           maxLength={DETAILS_MAX}
@@ -216,7 +223,7 @@ export function KvkkApplicationForm() {
       </div>
 
       <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3.5 py-3 text-xs leading-relaxed text-text-muted transition hover:border-brand-300">
-        <input type="checkbox" name="consent" required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
+        <input type="checkbox" name="consent" defaultChecked={prev("consent") !== undefined} required className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600" />
         <span>
           Bu başvuruyu kendi adıma yaptığımı ve verdiğim bilgilerin doğru olduğunu beyan ederim. Bilgilerim yalnız başvurumun sonuçlandırılması amacıyla işlenir (
           <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-brand-600 underline-offset-2 hover:underline">
@@ -229,12 +236,13 @@ export function KvkkApplicationForm() {
       {error ? (
         <p role="alert" className="text-xs font-semibold text-danger-600">
           {error}
+          {lastForm ? " Bilgileriniz korundu; yeni kod isteyebilirsiniz." : ""}
         </p>
       ) : null}
 
       <button type="submit" disabled={pending} className={btnCls}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-        Doğrulama kodu gönder
+        {lastForm ? "Yeni doğrulama kodu gönder" : "Doğrulama kodu gönder"}
       </button>
     </form>
   );
