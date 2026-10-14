@@ -355,10 +355,10 @@ export const GUIDES: readonly Guide[] = [
     title: "Rol ve izinler",
     intro: "Kim hangi sayfada neyi yapabilir, ofis olarak sizin elinizdedir.",
     steps: [
-      "Ayarlar > Roller sayfasını açın; satırlar sayfa grupları, sütunlar roldür. Dört yetki vardır: görüntüle, ekle, düzenle, sil.",
+      "Ayarlar > Yetkiler > Roller sekmesini açın; satırlar sayfa grupları, sütunlar roldür. Dört yetki vardır: görüntüle, ekle, düzenle, sil.",
       "Bir rolün izni değişince yalnız sizin ofisinizi etkiler ve hemen geçerli olur.",
       "Tek kişiye istisna vermek için \"İzin istisnaları\" sekmesini kullanın.",
-      "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporları görür; Giderler sayfasını açmak için o kullanıcıya (veya muhasebe rolüne) expenses modülü izni verin.",
+      "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporları görür; Muhasebe sayfasını açmak için o kullanıcıya (veya muhasebe rolüne) Muhasebe (expenses) modülü izni verin.",
       "Paketiniz bir sayfayı kilitliyorsa izin olsa bile sayfa açılmaz; bu durumda Abonelik sayfasına yönlendirilirsiniz.",
     ],
     href: "/app/ayarlar/yetkilendirme?sekme=roller",
@@ -450,7 +450,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Giderler ve aidat",
     intro: "Ofis giderlerini ve portföy aidat/vergi ödemelerini kayıt altında tutun.",
     steps: [
-      "Finans bölümünden Giderler sayfasını açın ve gider ekleyin.",
+      "Finans bölümünden Muhasebe sayfasını açın ve gider ekleyin.",
       "Kategori dağılımı grafiği ve tablo giderlerinizi özetler.",
       "Mülk yönetimi sayfasındaki \"Aidatlar\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
       "İki sayfa da paketinize bağlıdır; kilitliyse Abonelik sayfası hangi pakette açıldığını söyler.",

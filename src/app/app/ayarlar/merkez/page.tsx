@@ -51,7 +51,7 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > Gecikenler", href: "/app/ilan-havuzu?atama=gecikmis" },
   "office.alert.unassigned_pool_count": { label: "Ekip > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
 };
-const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
+const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/hesabim?sekme=bildirimler" };
 
 const ACTIONS = {
   save: saveOfficeSettingAction,

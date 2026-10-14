@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "@/components/ui/smart-link";
-import { redirect } from "next/navigation";
 import { Eye, MonitorPlay, Presentation, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -40,23 +39,11 @@ function appUrl() {
  * linklerinin listesi + yeni sunum sihirbazı. Portföy modülünün alt sayfası:
  * sidebar'a girmez, /app/portfoyler araç çubuğundan ve portföy detayından ulaşılır.
  */
-export default async function PresentationsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ portfoy?: string; musteri?: string }>;
-}) {
+export default async function PresentationsPage() {
   const { perms } = await requireModulePage("properties", "/app/portfoyler/sunumlar");
   const canDelete = (perms.properties ?? []).includes("edit");
   // Müşteri seçici yalnız müşteri görebilenlere; göremeyene liste sızmasın.
   const canSeeCustomers = (perms.customers ?? []).includes("view");
-  const params = (await searchParams) ?? {};
-  // Eski girişler (?portfoy= / ?musteri=) tam sayfa forma taşınır, ön seçim korunur.
-  if (params.portfoy || params.musteri) {
-    const sp = new URLSearchParams();
-    if (params.portfoy) sp.set("portfoy", params.portfoy);
-    if (params.musteri) sp.set("musteri", params.musteri);
-    redirect(`/app/portfoyler/sunumlar/yeni?${sp.toString()}`);
-  }
 
   const supabase = await createClient();
   const [{ data: presentationData }] = await Promise.all([

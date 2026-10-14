@@ -213,7 +213,7 @@ export const FAQ: readonly FaqItem[] = [
   {
     id: "muhasebe-gider",
     category: "ekip",
-    q: "Muhasebe rolü neden Giderler sayfasını göremiyor?",
+    q: "Muhasebe rolü neden Muhasebe sayfasını göremiyor?",
     a: "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporlara erişir; Giderler ve Aidat expenses modülündedir. Ofis sahibi Ayarlar > Yetkiler > Roller sekmesinden bu izni vermelidir.",
     href: "/app/ayarlar/yetkilendirme?sekme=roller",
     hrefLabel: "İzin matrisi",
@@ -279,7 +279,7 @@ export const FAQ: readonly FaqItem[] = [
     id: "gider-aidat",
     category: "komisyon",
     q: "Giderleri ve aidatı nerede takip ederim?",
-    a: "Finans bölümündeki Giderler sayfasında ofis giderlerini, Aidat sayfasında portföy aidat ve vergi ödemelerini vade ve durumla izlersiniz. İkisi de paketinize bağlıdır.",
+    a: "Finans bölümündeki Muhasebe sayfasında ofis giderlerini, Mülk yönetimi > Aidatlar sayfasında portföy aidat ve vergi ödemelerini vade ve durumla izlersiniz. İkisi de paketinize bağlıdır.",
     href: "/app/giderler",
     hrefLabel: "Muhasebe",
   },

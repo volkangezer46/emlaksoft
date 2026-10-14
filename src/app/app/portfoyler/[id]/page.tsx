@@ -506,7 +506,7 @@ export default async function PropertyDetailPage({
                 <Printer className="h-4 w-4" /> Broşür
               </ButtonLink>
               {/* Müşteriye özel sunum — bu portföy ön seçili olarak sunum sihirbazını açar */}
-              <Link href={`/app/portfoyler/sunumlar?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              <Link href={`/app/portfoyler/sunumlar/yeni?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Sunuma ekle
               </Link>
               <Link href="/app/ilan-kontrol/kapanis" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
