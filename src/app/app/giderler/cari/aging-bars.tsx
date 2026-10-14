@@ -4,7 +4,7 @@ import { AGING_LABEL, bucketShare, type AgingBucketKey, type AgingSummary } from
 import { cn } from "@/lib/utils";
 
 /**
- * Yaşlandırma çubukları (0–30 / 31–60 / 61–90 / 90+ ve vadesi gelmemiş). Her kova tıklanınca açık kalemler o kovaya
+ * Yaşlandırma çubukları (0–30 / 31–60 / 61–90 / 90+, vadesi gelmemiş ve — kalem varsa — vadesiz). Her kova tıklanınca açık kalemler o kovaya
  * süzülür (sıfır çıkmaz metrik). Üstteki yığılmış şerit tutar payını, altındaki satırlar adet ve tutarı gösterir.
  * Kovaların toplamı başlıktaki toplamla aynıdır (kuruş hesabı, `normalizeAging`).
  */
@@ -15,6 +15,7 @@ const BUCKET_TONE: Record<AgingBucketKey, { bar: string; dot: string }> = {
   "31-60": { bar: "bg-warning-600", dot: "bg-warning-600" },
   "61-90": { bar: "bg-danger-400", dot: "bg-danger-400" },
   "90+": { bar: "bg-danger-600", dot: "bg-danger-600" },
+  vadesiz: { bar: "bg-text-muted", dot: "bg-text-muted" },
 };
 
 export function AgingBars({
@@ -48,7 +49,7 @@ export function AgingBars({
       </div>
 
       <ul className="mt-3 grid gap-1">
-        {summary.rows.map((r) => {
+        {summary.rows.filter((r) => r.bucket !== "vadesiz" || r.cnt > 0).map((r) => {
           const active = activeBucket === r.bucket;
           return (
             <li key={r.bucket}>

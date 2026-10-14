@@ -12,6 +12,7 @@ import {
   agingBucketOf,
   agingFromItems,
   bucketDueRange,
+  isOverdueBucket,
   daysPastDue,
   dedupeOpenItems,
   fromKurus,
@@ -147,9 +148,9 @@ export async function loadOpenItemRows(
 
 /** Kova filtresi (gecikmis = vadesi geçen tüm kovalar). */
 export function inBucket(row: Pick<OpenItemRow, "due_date">, bucket: AgingBucketKey | "gecikmis", today: string): boolean {
-  if (bucket === "gecikmis") return agingBucketOf(row.due_date, today) !== "vadesi_gelmedi";
+  if (bucket === "gecikmis") return isOverdueBucket(agingBucketOf(row.due_date, today));
   const r = bucketDueRange(bucket, today);
-  if (!row.due_date) return r.includeNull;
+  if (!row.due_date || r.nullOnly) return !row.due_date && r.nullOnly;
   return (r.dueFrom === null || row.due_date >= r.dueFrom) && (r.dueTo === null || row.due_date <= r.dueTo);
 }
 

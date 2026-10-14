@@ -400,6 +400,8 @@ const F = {
   // DG8 (2026-10-14): ozellik bayragi hedefleme kurallari + urun ici NPS anketi + ozellik istek panosu (yalniz service_role).
   flagRulesProductFeedback: "20261014008000_feature_flag_rules_product_feedback.sql",
   clAppCanonicalLinks: "20261014009000_cl_app_canonical_links.sql",
+  // GP1 (2026-10-14): danisman carisi kapsami (P12) RLS + finance_party_* RPC; finance_aging vadesiz kovasi.
+  financePartyAdvisorScope: "20261014011000_finance_party_advisor_scope.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -617,6 +619,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.officeSecuritySessions]: "ek", // yalniz 2 yeni service_role RPC (office_list_sessions / office_revoke_session; profiles.tenant_id siniri); mevcut nesne/veri degismez, kod RPC yokken oturum listesi "kurulum bekliyor"
     [F.flagRulesProductFeedback]: "ek", // 5 yeni tablo (feature_flag_rules, platform_nps_surveys/responses, product_feature_requests/votes; RLS+FORCE, politika yok, yalniz service_role) + service_role RPC platform_nps_mark_shown + oy sayaci tetikleyicisi; mevcut nesne/veri degismez, kod tablolar yokken bayraklar genel durumla calisir
     [F.clAppCanonicalLinks]: "davranis", // portal_account_report_login govdesi AYNI, yalniz bildirim href'i yeni Entegrasyonlar sayfasina; notifications/insights.href eski /app yollarindan kanonik yollara (yalniz href, idempotent); kod yayiniyla ayni pencerede
+    [F.financePartyAdvisorScope]: "siki", // finance_parties/finance_open_items SELECT politikasi + 8 finance_* RPC govdesi: earnings_all olmayan kullanici baska danismanin carisini goremez/yazamaz; finance_aging ek "vadesiz" kova satiri (imza ayni)
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.platformKvkkRequests]: "ek", // yeni platform_kvkk_requests (RLS+FORCE, politika yok, yalniz service_role) + alert_rules CHECK mevcut tanimdan genisler (kvkk_sla) ve tek tohum satiri; mevcut veri degismez, kod tablo yokken form "e-posta ile yazin" der
     [F.legalHelpContent]: "ek", // 5 yeni tablo (legal_documents/consents/constants, help_articles/votes; RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken koddaki icerikle calisir
@@ -840,6 +843,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DG1-personel-ozel-rol-dort-goz", order: 111, title: "Personel ozel rolleri + dort goz onay kuyrugu: platform_custom_roles, platform_approval_requests, platform_staff.custom_role_id (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutun yokken sabit role duser ve Roller/Onaylar ekrani kurulum bekliyor der; dort goz ayarlari varsayilan kapali; sira serbest, ek)", files: [F.platformCustomRolesFourEyes] },
     { id: "DG8-bayrak-hedefleme-nps-pano", order: 118, title: "Ozellik bayragi hedefleme (ofis/plan/yuzde/zaman) + urun ici NPS anketi + ozellik istek panosu (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken bayraklar genel durumla calisir, NPS gosterilmez, pano 'kurulum bekliyor'; sira serbest, ek)", files: [F.flagRulesProductFeedback] },
     { id: "CL-APP-kanonik-baglantilar", order: 119, title: "Ofis uygulamasi temizligi: kaldirilan /app yollarina giden kayitli baglantilar (bildirim, icgoru) ve portal giris bildirimi kanonik yola cevrilir (bagimsiz; KOD YAYINIYLA AYNI pencerede ya da hemen SONRA; once uygulanirsa yeni yollar kod gelene kadar acilmaz; davranis)", files: [F.clAppCanonicalLinks] },
+    { id: "GP1-finans-danisman-kapsami", order: 131, title: "Finans: danisman carisi kapsami (P12) veritabaninda (RLS + finance_party_* / acik kalem / yaslandirma RPC) ve finance_aging vadesiz kovasi. 20261014001100 SONRASI; kod yayinindan ONCE ya da SONRA uygulanabilir (arayuz zaten ayni kurali uygular, vadesiz kovasini kod tanir; eski kod bilinmeyen kovayi yok sayar) (siki)", files: [F.financePartyAdvisorScope] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "DG6-kvkk-veri-sahibi", order: 116, title: "KVKK veri sahibi basvurulari: platform_kvkk_requests + kvkk_sla uyari kurali (bagimsiz; AD10 004900 varsa CHECK genisler, yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken form ve kuyruk 'kurulum bekliyor'; sira serbest, ek)", files: [F.platformKvkkRequests] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },
@@ -963,6 +967,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeLedgerV2Rpc, F.financeLedgerV2],
     [F.financeLedgerV2Rpc, F.financeOwnerPayoutSource],
     [F.financeLedgerV2Backfill, F.financeLedgerV2Rpc],
+    [F.financePartyAdvisorScope, F.financeLedgerV2Rpc],
     // DG2: canli govdeleri donusturulen fonksiyonlarin son tanimlari ve plan_monthly_amount'un 20261008001000 govdesi once olmali.
     [F.planCatalogEngine, F.planPricesEfTariff],
     [F.planCatalogEngine, F.planUpgradeFulfillment],

@@ -10,6 +10,7 @@ import { entryAmounts, splitVat } from "./vat";
  * Kabul: taşıma sonrası hareket sayısı ve bakiyeler birebir aynı, defter görünümü = hareket + bağlanmamış eski gider,
  * karşı taraf → cari, bütçe kopyası, muhasebe izni; v2 kayıt (KDV/stopaj vat.ts ile aynı), ay kilidi (DONEM_KILITLI),
  * kilit açma yalnız owner/gm, açık kalem kısmi/tam kapama, kâr/zarar elle gelir + çift sayım yok, ofis izolasyonu, rollback.
+ * GP1 (20261014011000): danışman carisi kapsamı (P12) RLS + RPC'de; finance_aging vadesiz kalemi ayrı 'vadesiz' kovasında.
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -73,6 +74,7 @@ const V2 = [
   "supabase/migrations/20261014001000_finance_ledger_v2.sql",
   "supabase/migrations/20261014001100_finance_ledger_v2_rpc.sql",
   "supabase/migrations/20261014001200_finance_ledger_v2_backfill.sql",
+  "supabase/migrations/20261014011000_finance_party_advisor_scope.sql",
 ];
 
 describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
@@ -211,6 +213,41 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     }
   });
 
+  it("kuruş yuvarlaması DB ile vat.ts geniş ızgarada birebir (eski %8/%18, stopaj %15/%17, kayan nokta tuzakları; GP1)", async () => {
+    const amounts = [0.01, 0.05, 0.15, 0.25, 0.35, 1.005, 2.675, 8.345, 99.995, 117.35, 333.33, 10_000_000];
+    let seed = 7;
+    for (let i = 0; i < 60; i++) {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      amounts.push((seed % 1_000_000_000) / 100 + 0.01);
+    }
+    for (const rate of [0, 1, 8, 10, 18, 20]) {
+      for (const included of [true, false]) {
+        for (const wh of [null, 15, 17, 20]) {
+          const rows = await q(`select x.ord::int as i, e.net::float8 as net, e.vat::float8 as vat, e.gross::float8 as gross, e.withheld::float8 as withheld, e.cash::float8 as cash
+                                  from unnest($1::numeric[]) with ordinality x(a, ord)
+                                  cross join lateral public.finance_entry_amounts(x.a, $2::numeric, $3, $4::numeric) e order by x.ord`, [amounts, rate, included, wh]);
+          expect(rows.length).toBe(amounts.length);
+          for (const r of rows) {
+            const { i, ...db } = r;
+            expect(db, `${amounts[Number(i) - 1]} %${rate} ${included} stopaj ${wh}`).toEqual(entryAmounts(amounts[Number(i) - 1]!, rate, included, wh));
+          }
+        }
+      }
+    }
+    // Açık kalem: tutar KDV dahil brüt; KDV ve stopaj (KDV hariç net üzerinden) vat.ts ile aynı kuruşa yazılır.
+    await asOwner();
+    for (const [amount, rate, whr] of [[1234.57, 20, 20], [0.15, 10, 15], [99999.99, 18, 17], [333.33, 1, 20]] as const) {
+      const id = await one<string>(`public.finance_open_item_create($1::jsonb)`, [JSON.stringify({
+        direction: "payable", party_name: "Yuvarlama Ltd", title: "Kuruş testi", amount, vat_rate: rate, withholding_rate: whr,
+        issue_date: "2026-10-03", due_date: "2026-10-03" })]);
+      const row = (await q(`select vat_amount::float8 as vat, withholding_amount::float8 as wh from public.finance_open_items where id = $1`, [id]))[0]!;
+      const split = splitVat(amount, rate, true);
+      expect(row).toEqual({ vat: split.vat, wh: entryAmounts(amount, rate, true, whr).withheld });
+      await q(`select public.finance_open_item_cancel($1::uuid, 'test kalemi')`, [id]);
+    }
+    await db.exec(`reset role`);
+  });
+
   it("muhasebe rolü v2 kayıt yapar (KDV/stopaj, cari adı ile yeni cari), silemez (iptal yok)", async () => {
     await asAccountant();
     const id = await v2({ account_id: KASA, direction: "out", amount: 10000, entry_date: "2026-10-02", category: "kira", title: "Ofis kirası",
@@ -287,7 +324,7 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     // Yaşlandırma + görünüm
     await asAccountant();
     const aging = await q(`select bucket, cnt, amount::float8 as a from public.finance_aging('receivable')`);
-    expect(aging.map((r) => r.bucket)).toEqual(["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+"]);
+    expect(aging.map((r) => r.bucket)).toEqual(["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+", "vadesiz"]);
     expect(aging.reduce((s, r) => s + Number(r.a), 0)).toBeGreaterThanOrEqual(3500);
   });
 
@@ -473,11 +510,106 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     expect(await fails(`insert into public.finance_saved_views(tenant_id, user_id, tab, name) values ($1, $2, 'hareketler', 'Sızma')`, [T, OTHER])).toMatch(/row-level security/);
   });
 
+  it("P12 (GP1): danışman başka danışmanın carisini RPC ve RLS ile okuyamaz/yazamaz; kendi carisi ve earnings_all açık", async () => {
+    await db.exec(`reset role`);
+    const ADV1 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
+    const ADV2 = (await q(`insert into public.profiles(tenant_id) values ($1) returning id`, [T]))[0]!.id as string;
+    const asBoss = () => as(OWNER, T, `${FULL} earnings_all:view`, "owner");
+    // Kaynak izinleri (kira/komisyon) patronla aynı: yaşlandırma farkı yalnız danışman carisinden gelsin.
+    const ADVISOR = "expenses:view expenses:create expenses:edit expenses:delete commissions:view rentals:view";
+    const asAdv1 = () => as(ADV1, T, ADVISOR, "advisor");
+
+    await asBoss();
+    const own = await one<string>(`public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ kind: "danisman", name: "Danışman Ayşe", user_id: ADV1 })]);
+    const foreign = await one<string>(`public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ kind: "danisman", name: "Danışman Bora", user_id: ADV2 })]);
+    const unbound = await one<string>(`public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ kind: "danisman", name: "Bağsız Danışman" })]);
+    const item = (party: string, amount: number) =>
+      one<string>(`public.finance_open_item_create($1::jsonb)`, [JSON.stringify({
+        direction: "payable", party_id: party, title: "Prim hak edişi", amount, issue_date: "2026-10-01", due_date: "2026-10-30" })]);
+    const ownItem = await item(own, 1000);
+    const foreignItem = await item(foreign, 2000);
+    const unboundItem = await item(unbound, 3000);
+    await db.exec(`reset role`);
+    await q(`insert into public.recurring_rules(tenant_id, direction, category, title, amount, account_id, next_due, party_id)
+      values ($1, 'out', 'diger_gider', 'Aylık prim', 500, $2, '2026-11-01', $3), ($1, 'out', 'diger_gider', 'Aylık prim', 400, $2, '2026-11-01', $4)`, [T, KASA, own, foreign]);
+    await asBoss();
+    expect((await q(`select count(*)::int as n from public.finance_open_items_v where source = 'recurring' and party_id in ($1, $2)`, [own, foreign]))[0]!.n).toBe(2);
+    const bossAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('payable')`))[0]!.a as number;
+    const bossNames = (await q(`select name from public.finance_party_balances('danisman', null)`)).map((r) => r.name);
+    expect(bossNames).toEqual(expect.arrayContaining(["Danışman Ayşe", "Danışman Bora", "Bağsız Danışman"]));
+    expect((await q(`select * from public.finance_party_statement($1::uuid, null, null)`, [foreign])).length).toBe(1);
+
+    await asAdv1();
+    // Okuma: bakiye listesi, ekstre, yaşlandırma, tablo/görünüm okuması
+    expect((await q(`select name from public.finance_party_balances('danisman', null)`)).map((r) => r.name)).toEqual(["Danışman Ayşe"]);
+    expect((await q(`select name from public.finance_party_balances(null, 'bora')`)).length).toBe(0);
+    expect(await fails(`select * from public.finance_party_statement($1::uuid, null, null)`, [foreign])).toBe("FN:not_found");
+    expect(await fails(`select * from public.finance_party_statement($1::uuid, null, null)`, [unbound])).toBe("FN:not_found");
+    expect((await q(`select * from public.finance_party_statement($1::uuid, null, null)`, [own])).length).toBe(1);
+    expect((await q(`select id from public.finance_parties where kind = 'danisman'`)).map((r) => r.id)).toEqual([own]);
+    expect((await q(`select id from public.finance_open_items where party_id = any($1::uuid[])`, [[own, foreign, unbound]])).map((r) => r.id)).toEqual([ownItem]);
+    expect((await q(`select count(*)::int as n from public.finance_open_items_v where party_id in ($1, $2)`, [foreign, unbound]))[0]!.n).toBe(0);
+    const advAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('payable')`))[0]!.a as number;
+    expect(bossAging - advAging).toBe(2000 + 3000 + 400); // gizli iki elle kalem + gizli carinin düzenli ödemesi
+    // Yazma: düzenleme, arşiv, kalem kapama/iptal, kalemi gizli cariye bağlama (id ya da adla)
+    expect(await fails(`select public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ id: foreign, kind: "danisman", name: "Ele geçir", user_id: ADV1 })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_party_set_archived($1::uuid, true)`, [foreign])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_open_item_settle($1::uuid, $2::uuid, 1::numeric, '2026-10-05'::date, null)`, [foreignItem, KASA])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_open_item_cancel($1::uuid, 'gizli kalem')`, [foreignItem])).toBe("FN:not_found");
+    // Hareket kaydı yolu (open_item_id): settle kapısı aşılamaz; tutar/durum hatası da varlığı sızdırmaz.
+    const pay = { account_id: KASA, direction: "out", amount: 10, entry_date: "2026-10-05", category: "diger_gider", title: "Gizli kapama" };
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, party_id: own, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, amount: 999999, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, open_item_id: unboundItem })])).toBe("FN:not_found");
+    // Kural: gizli cariye set_party_id verilemez (var/yok aynı hata), kendi carisi verilebilir.
+    const rule = (party: string) => ({ direction: "out", match_text: "prim", set_category: "diger_gider", set_party_id: party });
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(foreign))])).toBe("FN:party_not_found");
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(unbound))])).toBe("FN:party_not_found");
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(own))])).toBeNull();
+    // Düzenli ödeme kolu: gizli cariye bağlı düzenli kalem açık kalem görünümünde yok, kendi carisininki var.
+    expect((await q(`select party_id from public.finance_open_items_v where source = 'recurring' and party_id in ($1, $2)`, [own, foreign])).map((r) => r.party_id)).toEqual([own]);
+    const link = (p: Record<string, unknown>) => fails(`select public.finance_open_item_create($1::jsonb)`, [JSON.stringify({
+      direction: "payable", title: "Bağla", amount: 5, issue_date: "2026-10-02", due_date: "2026-10-02", ...p })]);
+    expect(await link({ party_id: foreign })).toBe("FN:party_not_found");
+    expect(await link({ party_name: "Danışman Bora", party_kind: "danisman" })).toBe("FN:party_not_found");
+    expect(await link({ party_id: own })).toBeNull();
+    await q(`select public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ id: own, kind: "danisman", name: "Danışman Ayşe Y.", user_id: ADV1 })]);
+
+    await asBoss();
+    expect((await q(`select paid_amount::float8 as p, status from public.finance_open_items where id = $1`, [foreignItem]))).toEqual([{ p: 0, status: "open" }]);
+    expect((await q(`select name from public.finance_parties where id = $1`, [foreign]))[0]!.name).toBe("Danışman Bora");
+    expect((await q(`select name from public.finance_parties where id = $1`, [own]))[0]!.name).toBe("Danışman Ayşe Y.");
+    await db.exec(`reset role`);
+  });
+
+  it("finance_aging (GP1): vadesiz kalem 'vadesiz' kovasında görünür, '90+'ya girmez", async () => {
+    // Bugünkü kaynakların hepsi vade taşır; vadesiz satır şemayı gevşeterek (yalnız bu testte) taklit edilir.
+    await db.exec(`reset role; alter table public.finance_open_items alter column due_date drop not null`);
+    await as(OWNER, T, `${FULL} earnings_all:view`, "owner");
+    const before = Object.fromEntries((await q(`select bucket, cnt, amount::float8 as a from public.finance_aging('receivable')`)).map((r) => [r.bucket, r]));
+    await db.exec(`reset role`);
+    const id = (await q(`insert into public.finance_open_items(tenant_id, direction, title, amount, issue_date, due_date)
+      values ($1, 'receivable', 'Vadesiz alacak', 777.77, '2020-01-01', null) returning id`, [T]))[0]!.id as string;
+    await as(OWNER, T, `${FULL} earnings_all:view`, "owner");
+    const after = await q(`select bucket, cnt, amount::float8 as a from public.finance_aging('receivable')`);
+    expect(after.map((r) => r.bucket)).toEqual(["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+", "vadesiz"]);
+    const byB = Object.fromEntries(after.map((r) => [r.bucket, r]));
+    expect(byB["vadesiz"]).toEqual({ bucket: "vadesiz", cnt: Number(before["vadesiz"]!.cnt) + 1, a: Number(before["vadesiz"]!.a) + 777.77 });
+    expect(byB["90+"]).toEqual(before["90+"]);
+    await db.exec(`reset role`);
+    await q(`delete from public.finance_open_items where id = $1`, [id]);
+    await db.exec(`alter table public.finance_open_items alter column due_date set not null`);
+  });
+
   it("rollback dosyaları ters sırayla temiz çalışır; hareketler ve bakiyeler korunur", async () => {
     await asOwner();
     const before = await balances();
     await db.exec(`reset role`);
     const n = Number((await q(`select count(*)::int as n from public.cash_entries`))[0]!.n);
+    await db.exec(read("supabase/rollbacks/20261014011000_finance_party_advisor_scope.rollback.sql"));
+    expect(await q(`select to_regprocedure('public.finance_party_foreign_advisor(uuid)') as f`)).toEqual([{ f: null }]);
+    expect((await q(`select bucket from public.finance_aging('receivable')`)).map((r) => r.bucket)).toEqual(["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+"]);
     await db.exec(read("supabase/rollbacks/20261014001200_finance_ledger_v2_backfill.rollback.sql"));
     await db.exec(read("supabase/rollbacks/20261014001100_finance_ledger_v2_rpc.rollback.sql"));
     await db.exec(read("supabase/rollbacks/20261014001000_finance_ledger_v2.rollback.sql"));

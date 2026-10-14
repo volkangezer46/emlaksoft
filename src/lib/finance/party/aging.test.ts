@@ -7,6 +7,7 @@ import {
   balanceCaption,
   bucketDueRange,
   bucketShare,
+  isOverdueBucket,
   closingBalance,
   daysPastDue,
   dedupeOpenItems,
@@ -45,7 +46,8 @@ describe("yaşlandırma kovası", () => {
   it("sınırlar: bugün/ileri vadesi gelmedi, 1–30, 31–60, 61–90, 91+", () => {
     expect(agingBucketOf("2026-10-13", TODAY)).toBe("vadesi_gelmedi");
     expect(agingBucketOf("2026-11-01", TODAY)).toBe("vadesi_gelmedi");
-    expect(agingBucketOf(null, TODAY)).toBe("vadesi_gelmedi");
+    expect(agingBucketOf(null, TODAY)).toBe("vadesiz");
+    expect(agingBucketOf("", TODAY)).toBe("vadesiz");
     expect(agingBucketOf(addDays(TODAY, -1), TODAY)).toBe("0-30");
     expect(agingBucketOf(addDays(TODAY, -30), TODAY)).toBe("0-30");
     expect(agingBucketOf(addDays(TODAY, -31), TODAY)).toBe("31-60");
@@ -66,14 +68,17 @@ describe("yaşlandırma kovası", () => {
       for (const other of AGING_BUCKETS) {
         if (other === bucket) continue;
         const o = bucketDueRange(other, TODAY);
+        if (o.nullOnly) continue;
         const inside = (o.dueFrom === null || due >= o.dueFrom) && (o.dueTo === null || due <= o.dueTo);
         expect(inside, `${due} hem ${bucket} hem ${other}`).toBe(false);
       }
     }
-    expect(bucketDueRange("vadesi_gelmedi", TODAY).includeNull).toBe(true);
+    // Vadesiz kalem yalnız kendi kovasında: tarihli kovalar null'u kapsamaz.
+    expect(bucketDueRange("vadesiz", TODAY).nullOnly).toBe(true);
+    for (const b of AGING_BUCKETS) if (b !== "vadesiz") expect(bucketDueRange(b, TODAY).nullOnly).toBe(false);
   });
 
-  it("normalizeAging 5 kovayı sabit sırayla doldurur, toplam = kova toplamı", () => {
+  it("normalizeAging 6 kovayı sabit sırayla doldurur, toplam = kova toplamı", () => {
     const s = normalizeAging([
       { bucket: "90+", cnt: 1, amount: "100.10" },
       { bucket: "0-30", cnt: 2, amount: 200.2 },
@@ -99,9 +104,25 @@ describe("yaşlandırma kovası", () => {
     const s = agingFromItems(items, TODAY);
     expect(s.total).toBe(1254.86);
     expect(s.count).toBe(6);
-    expect(s.rows.find((r) => r.bucket === "vadesi_gelmedi")).toEqual({ bucket: "vadesi_gelmedi", cnt: 2, amount: 3.1 });
+    expect(s.rows.find((r) => r.bucket === "vadesi_gelmedi")).toEqual({ bucket: "vadesi_gelmedi", cnt: 1, amount: 0.1 });
+    expect(s.rows.find((r) => r.bucket === "vadesiz")).toEqual({ bucket: "vadesiz", cnt: 1, amount: 3 });
     expect(s.overdue).toBe(1251.76);
     expect(s.overdueCount).toBe(4);
+  });
+
+  it("vadesiz kalem 'vadesiz' kovasında; 90+'ya ve gecikmeye girmez (finance_aging ile aynı)", () => {
+    const s = agingFromItems([{ due_date: null, amount_open: 500 }, { due_date: addDays(TODAY, -400), amount_open: 7 }], TODAY);
+    expect(s.rows.find((r) => r.bucket === "90+")).toEqual({ bucket: "90+", cnt: 1, amount: 7 });
+    expect(s.rows.find((r) => r.bucket === "vadesiz")).toEqual({ bucket: "vadesiz", cnt: 1, amount: 500 });
+    expect(s.overdue).toBe(7);
+    expect(s.total).toBe(507);
+    expect(isOverdueBucket("vadesiz")).toBe(false);
+    expect(isOverdueBucket("vadesi_gelmedi")).toBe(false);
+    expect(isOverdueBucket("90+")).toBe(true);
+    const fromRpc = normalizeAging([{ bucket: "vadesiz", cnt: 2, amount: "40.05" }, { bucket: "61-90", cnt: 1, amount: 10 }]);
+    expect(fromRpc.overdue).toBe(10);
+    expect(fromRpc.total).toBe(50.05);
+    expect(fromRpc.rows.at(-1)).toEqual({ bucket: "vadesiz", cnt: 2, amount: 40.05 });
   });
 
   it("bucketShare: boşta 0, doluda en az %2", () => {
