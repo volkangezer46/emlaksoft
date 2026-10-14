@@ -123,7 +123,17 @@ export function OnboardingContentEditor({ initial, defaults, tourOrder, tourRole
 
   const save = () =>
     start(async () => {
-      const res = await saveOnboardingContent({ content, reason });
+      // Seçici alanı yazarken ham satırları tutar (boşluk/yeni satır anında silinmesin); temizlik kayıtta yapılır.
+      const clean: OnboardingContentFull = {
+        ...content,
+        tours: Object.fromEntries(
+          Object.entries(content.tours).map(([k, t]) => [
+            k,
+            { ...t, steps: t.steps.map((st) => ({ ...st, selectors: st.selectors.map((x) => x.trim()).filter(Boolean) })) },
+          ]),
+        ) as OnboardingContentFull["tours"],
+      };
+      const res = await saveOnboardingContent({ content: clean, reason });
       setMsg(res.error ? { tone: "danger", text: res.error } : { tone: "success", text: res.message ?? "Kaydedildi." });
     });
   const reset = async () => {
@@ -210,7 +220,7 @@ export function OnboardingContentEditor({ initial, defaults, tourOrder, tourRole
                         value={s.selectors.join("\n")}
                         disabled={ro}
                         className="min-h-16 font-mono text-xs"
-                        onChange={(e) => setStep(i, { selectors: e.target.value.split("\n").map((x) => x.trim()).filter(Boolean) })}
+                        onChange={(e) => setStep(i, { selectors: e.target.value.split("\n") })}
                       />
                     </FormField>
                   </div>
