@@ -743,7 +743,7 @@ export function CommandSearchPanel({
             </div>
 
             {/* Klavye ipuçları çubuğu */}
-            <div className="flex items-center gap-3 border-t border-line px-4 py-2 text-xs text-text-faint">
+            <div className="kbd-hint flex items-center gap-3 border-t border-line px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-1">
                 <Kbd>↑↓</Kbd> gezin
               </span>

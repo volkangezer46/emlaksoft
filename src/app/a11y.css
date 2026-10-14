@@ -238,3 +238,13 @@ html:not([data-theme="dark"]) .bg-danger-500.text-white { background-color: var(
     font-size: 16px;
   }
 }
+
+/* Klavye ipuçları (YD5): fare/klavyesi olmayan dokunmatik cihazda gösterilmez ("Ctrl K", "↑↓ gezin", "Ctrl + Enter ile
+   kaydet" telefonda anlamsız). Her <kbd> ve ipucu metnini taşıyan `.kbd-hint` sarmalayıcısı gizlenir; dar masaüstü
+   penceresi (fareli) ipuçlarını görmeye devam eder. Sözleşme: src/lib/keyboard-hints-contract.test.ts. */
+@media (hover: none) and (pointer: coarse) {
+  kbd,
+  .kbd-hint {
+    display: none !important;
+  }
+}

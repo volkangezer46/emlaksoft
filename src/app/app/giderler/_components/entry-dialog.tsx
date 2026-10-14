@@ -630,7 +630,7 @@ export function EntryDialog({
       >
         <DialogHeader
           title={headerTitle}
-          description={office ? "Tek satır yazın ya da alanları doldurun. Ctrl K komutlar, Esc kapatır." : "Tutar, ne için ve hangi hesap; gerisi isteğe bağlı."}
+          description={office ? "Tek satır yazın ya da alanları doldurun." : "Tutar, ne için ve hangi hesap; gerisi isteğe bağlı."}
           icon={isTransfer ? <ArrowLeftRight /> : direction === "in" ? <ArrowDownCircle /> : <ArrowUpCircle />}
         />
         {accounts.length === 0 && !office ? (

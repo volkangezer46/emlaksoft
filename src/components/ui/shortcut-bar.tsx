@@ -11,7 +11,7 @@ export type ShortcutBarItem = { keys: readonly string[]; label: string };
  */
 export function ShortcutBar({ items, className = "" }: { items: readonly ShortcutBarItem[]; className?: string }) {
   return (
-    <nav aria-label="Klavye kısayolları" className={`hidden items-center gap-x-5 gap-y-2 text-xs text-text-muted md:flex md:flex-wrap ${className}`.trim()}>
+    <nav aria-label="Klavye kısayolları" className={`kbd-hint hidden items-center gap-x-5 gap-y-2 text-xs text-text-muted md:flex md:flex-wrap ${className}`.trim()}>
       {items.map((it) => (
         <span key={it.label} className="inline-flex items-center gap-1.5">
           <KbdCombo keys={it.keys} />
