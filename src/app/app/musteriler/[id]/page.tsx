@@ -290,17 +290,17 @@ export default async function CustomerDetailPage({
   // Memnuniyet & Paylaşımlar — public link tabanı sunum/anket sayfalarıyla aynı
   const publicBase = getBaseUrl();
 
-  // WhatsApp şablonlarının {randevu_tarih}/{randevu_saat}/{link} değişkenleri: en yakın gelecek randevu (TR saati) ve teyit
-  // bağlantısı. Liste tarihe göre azalan geldiği için gelecekteki en erken randevu, geçmiş olmayanların sonuncusudur.
+  // WhatsApp şablonlarının {randevu_tarih}/{randevu_saat}/{teyit_linki} değişkenleri: en yakın gelecek randevu (TR saati) ve
+  // teyit bağlantısı. Genel `{link}` (ilan vitrin bağlantısı) EZİLMEZ; `{adres}` randevu yeriyle yalnız randevu şablonlarında dolar. Liste tarihe göre azalan geldiği için gelecekteki en erken randevu, geçmiş olmayanların sonuncusudur.
   const nextAppt = appts.filter((a) => (a.status === "pending" || a.status === "confirmed") && !isPast(a.scheduled_at)).at(-1) ?? null;
   const nextApptVars = nextAppt
     ? {
         randevu_tarih: formatDateTr(nextAppt.scheduled_at, { day: "numeric", month: "long", weekday: "long" }),
         randevu_saat: formatTrTime(nextAppt.scheduled_at),
-        link: appointmentConfirmUrl(publicBase, nextAppt.confirm_token) ?? "",
-        adres: nextAppt.location ?? "",
+        teyit_linki: appointmentConfirmUrl(publicBase, nextAppt.confirm_token) ?? "",
       }
     : {};
+  const nextApptCategoryVars = nextAppt?.location ? { randevu: { adres: nextAppt.location } } : undefined;
 
   // Portföy öneri widget'ı için
   const activeDemands = demands
@@ -564,6 +564,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
                       telefon: waTenant?.phone ?? "",
                       ...nextApptVars,
                     }}
+                    categoryVars={nextApptCategoryVars}
                   />
                 ) : null}
                 <Link href={`/app/randevular?customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">

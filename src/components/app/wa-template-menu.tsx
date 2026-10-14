@@ -18,7 +18,7 @@ import {
   type TemplateCategory,
   type TemplateVars,
 } from "@/lib/message-templates";
-import { buildWhatsAppDraft } from "@/lib/whatsapp-draft";
+import { buildWhatsAppDraft, varsForCategory, type CategoryVars } from "@/lib/whatsapp-draft";
 import {
   listMessageTemplates,
   recordTemplateUsage,
@@ -47,6 +47,7 @@ function fold(value: string): string {
 export function WaTemplateMenu({
   phone,
   vars,
+  categoryVars,
   variant = "hero",
   label = "WhatsApp",
   share = false,
@@ -55,6 +56,8 @@ export function WaTemplateMenu({
   phone: string | null | undefined;
   /** Şablon değişken değerleri — verilmeyen alanlar render'da temizlenir. */
   vars: TemplateVars;
+  /** Yalnız ilgili kategorideki şablonlarda geçerli değerler (ör. randevu şablonunda `{adres}` = randevu yeri). */
+  categoryVars?: CategoryVars;
   variant?: "hero" | "row";
   label?: string;
   /** Numara yokken alıcı seçtiren paylaşım taslağı (portföy). */
@@ -103,7 +106,7 @@ export function WaTemplateMenu({
     }
   }
 
-  const draft = buildWhatsAppDraft(phone, selected?.body, vars);
+  const draft = buildWhatsAppDraft(phone, selected?.body, varsForCategory(selected?.category, vars, categoryVars));
   const message = draft.message;
   // Şablon seçilmeden: numara varsa boş sohbet açılır; paylaşım kipinde metin olmadan bağlantı yok.
   const waHref = draft.href ?? plainLink;

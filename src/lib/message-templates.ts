@@ -59,6 +59,7 @@ export const TEMPLATE_VARIABLES = [
   "adres",
   "randevu_tarih",
   "randevu_saat",
+  "teyit_linki",
   "link",
   "telefon",
 ] as const;
@@ -79,6 +80,7 @@ export const VARIABLE_HELP: { key: TemplateVariable; token: string; label: strin
   { key: "adres", token: "{adres}", label: "Adres", desc: "İlanın konumu — ilçe / mahalle." },
   { key: "randevu_tarih", token: "{randevu_tarih}", label: "Randevu tarihi", desc: "Planlanan görüşme tarihi." },
   { key: "randevu_saat", token: "{randevu_saat}", label: "Randevu saati", desc: "Planlanan görüşme saati." },
+  { key: "teyit_linki", token: "{teyit_linki}", label: "Teyit bağlantısı", desc: "Müşterinin randevuyu teyit/iptal edeceği sayfa (yaklaşan randevu varsa)." },
   { key: "link", token: "{link}", label: "Bağlantı", desc: "İlan vitrin bağlantısı veya paylaşım linki." },
   { key: "telefon", token: "{telefon}", label: "Telefon", desc: "Ofis/danışman iletişim numarası." },
 ];
@@ -94,6 +96,7 @@ export const SAMPLE_VARS: Required<Record<TemplateVariable, string>> = {
   adres: "Çankaya / Birlik Mahallesi",
   randevu_tarih: "12 Ağustos Salı",
   randevu_saat: "14:30",
+  teyit_linki: "https://emlaksoft.com.tr/randevu-teyit/ornek",
   link: "https://emlaksoft.com.tr/vitrin/vadi-emlak/1042",
   telefon: "0532 123 45 67",
 };
