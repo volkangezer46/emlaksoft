@@ -8,12 +8,14 @@
 --    Bu yüzden authenticated için insert/update/delete politikası ve yetkisi bilinçli olarak YOK.
 --  * unique(presentation_id, property_id): müşteri fikrini değiştirebilir; upsert ile ilan başına tek satır.
 --  * customer_id sunumun o anki müşteri bağının anlık kopyasıdır (müşteri kartı sorgusu indeksle gider);
---    müşteri silinirse satır kalır, bağ boşalır. Ofis sınırı bileşik FK ile (crm_tenant_relationship_boundaries deseni).
+--    müşteri silinirse satır kalır, bağ boşalır. Ofis sınırı sunum, ilan ve müşteri için bileşik (id, tenant_id) FK
+--    ile (crm_tenant_relationship_boundaries deseni): presentations'a bunun için idx_presentations_id_tenant_unique
+--    eklenir (id zaten PK → mevcut veriyle çakışma olamaz; tablo küçük).
 --  * Okuma: ofis içi, portföy görme izni (Sunumlar portföy modülünün alt sayfasıdır) — capability_* + InitPlan deseni.
 -- KOD DAVRANIŞI: tablo yokken public action bildirimi yine gönderir (geri bildirim danışmana ulaşır), kayıt atlanır;
 --   müşteri kartı ve Sunumlar listesi kaynağı boş sayar.
 -- GERİ ALMA: supabase/rollbacks/20261015042000_presentation_feedback.rollback.sql (yalnız bu tablo).
--- RİSK: düşük (yeni tablo; mevcut nesnelere dokunmaz). İdempotent.
+-- RİSK: düşük (yeni tablo + presentations'a tek benzersiz indeks; veri değişmez). İdempotent.
 
 create table if not exists public.presentation_feedback (
   id              uuid        primary key default gen_random_uuid(),
@@ -33,8 +35,18 @@ comment on table public.presentation_feedback is
 comment on column public.presentation_feedback.customer_id is
   'Sunumun geri bildirim anındaki müşteri bağı (presentations.customer_id kopyası); müşteri kartı geçmişi bunu okur.';
 
+create unique index if not exists idx_presentations_id_tenant_unique
+  on public.presentations (id, tenant_id);
+
 do $$
 begin
+  if not exists (select 1 from pg_constraint where conname = 'presentation_feedback_presentation_tenant_fkey') then
+    alter table public.presentation_feedback
+      add constraint presentation_feedback_presentation_tenant_fkey
+      foreign key (presentation_id, tenant_id)
+      references public.presentations(id, tenant_id)
+      on delete cascade;
+  end if;
   if not exists (select 1 from pg_constraint where conname = 'presentation_feedback_property_tenant_fkey') then
     alter table public.presentation_feedback
       add constraint presentation_feedback_property_tenant_fkey
