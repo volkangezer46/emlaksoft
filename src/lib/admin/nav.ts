@@ -193,7 +193,10 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         icon: LifeBuoy,
         modules: ["tickets"],
         badgeKey: "tickets",
-        palette: [L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"])],
+        palette: [
+          L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"]),
+          L("/admin/tickets/kvkk?kaynak=basvuru", "KVKK başvuruları", "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", ["tickets"]),
+        ],
       },
       { href: "/admin/duyuru", label: "Toplu duyuru", description: "Ofislere duyuru ve bildirim gönder", icon: Megaphone, modules: ["broadcast"] },
     ],

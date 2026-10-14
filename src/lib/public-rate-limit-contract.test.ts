@@ -10,6 +10,7 @@ const FAIL_CLOSED_RATE_LIMIT_FILES = [
   "src/app/actions/booking-public.ts",
   "src/app/actions/contracts.ts",
   "src/app/actions/demo-login.ts",
+  "src/app/actions/kvkk-public.ts",
   "src/app/actions/open-house-public.ts",
   "src/app/actions/password-reset.ts",
   "src/app/actions/payment-links.ts",

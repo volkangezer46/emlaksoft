@@ -20,6 +20,7 @@ import {
   type KvkkTone,
 } from "@/lib/compliance/kvkk-queue";
 import { TicketsTabs } from "./tickets-tabs";
+import { PlatformKvkkQueueSection } from "./platform-queue";
 
 export const metadata = { title: "KVKK talepleri" };
 
@@ -33,30 +34,70 @@ const TONE_CLASS: Record<KvkkTone, string> = {
 const fmtDay = (iso: string | null) =>
   iso ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeZone: "Europe/Istanbul" }).format(new Date(iso)) : "—";
 
+/** Kaynak şeridi: EmlakSoft'a doğrudan gelen başvurular (DG6) | ofislerin kendi kaydettiği talepler. */
+function SourceTabs({ active, directOpen }: { active: "basvuru" | "ofis"; directOpen: number | null }) {
+  return (
+    <nav aria-label="KVKK talep kaynağı" className="flex flex-wrap gap-1.5">
+      <FilterChip href="/admin/tickets/kvkk?kaynak=basvuru" active={active === "basvuru"}>
+        Doğrudan başvurular{directOpen ? ` · ${directOpen} açık` : ""}
+      </FilterChip>
+      <FilterChip href="/admin/tickets/kvkk" active={active === "ofis"}>
+        Ofis kayıtları
+      </FilterChip>
+    </nav>
+  );
+}
+
 /**
- * KVKK TALEP KUYRUĞU: tüm ofislerin ilgili kişi başvuruları, YALNIZ META (ofis, tür, durum, oluşturma, son tarih,
- * kalan gün). Kişi adı ve içerik gösterilmez; satır ilgili ofisin Ofis 360 akışına (kapanış/dışa aktarma ya da yasal
- * kayıtlar) gider. Dosya çıktısı yalnız Raporlar sayfasındaki rapor merkezinden ("KVKK talep defteri"; ürün kararı:
- * diğer sayfalarda rapor bağlantısı yok, report-buttons-contract).
+ * KVKK TALEP KUYRUĞU: iki kaynak tek ekranda.
+ *  - Ofis kayıtları (varsayılan): tüm ofislerin ilgili kişi başvuruları, YALNIZ META (ofis, tür, durum, oluşturma, son
+ *    tarih, kalan gün). Kişi adı ve içerik gösterilmez; satır ilgili ofisin Ofis 360 akışına (kapanış/dışa aktarma ya da
+ *    yasal kayıtlar) gider.
+ *  - Doğrudan başvurular (`?kaynak=basvuru`, DG6): /kvkk-basvuru formundan gelen, e-postası doğrulanmış başvurular;
+ *    satır başvuru ayrıntısına (kimlik → veri paketi → silme → yanıt) gider.
+ * Dosya çıktısı yalnız Raporlar sayfasındaki rapor merkezinden ("KVKK talep defteri", "KVKK başvuru defteri", "KVKK veri
+ * paketi"; ürün kararı: diğer sayfalarda rapor bağlantısı yok, report-buttons-contract).
  */
 export default async function KvkkQueuePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   await requirePlatformModule("tickets");
-  const f = parseKvkkFilters((await searchParams) ?? {});
+  const sp = (await searchParams) ?? {};
   const nowMs = now();
-  // service_role: tüm ofislerin talepleri (YALNIZ meta sütunlar; kişi adı/içerik okunmaz). Kapı: tickets modülü.
-  const q = await loadKvkkQueue(createAdminClient(), f, nowMs);
-  const filtered = Boolean(f.tur || f.durum || f.sure);
-  const toggle = (patch: Partial<typeof f>) => kvkkQueueHref({ ...f, ...patch, sayfa: 1 });
-
-  return (
-    <div className="space-y-4">
+  // service_role: kapı tickets modülü. Ofis kayıtlarında YALNIZ meta sütunlar okunur (kişi adı/içerik okunmaz).
+  const admin = createAdminClient();
+  const header = (
+    <>
       <TicketsTabs active="kvkk" />
       <AdminPageHeader
         eyebrow="Müşteri operasyon merkezi"
         icon={ShieldCheck}
         title="KVKK talepleri"
-        description="Tüm ofislerin ilgili kişi başvuruları · yasal yanıt süresi 30 gün · yalnız meta veri (kişi adı ve içerik gösterilmez). Dosya çıktısı: Raporlar > KVKK talep defteri."
+        description="Doğrudan başvurular ve ofislerin kaydettiği ilgili kişi talepleri · yasal yanıt süresi 30 gün. Dosya çıktısı: Raporlar > KVKK başvuru defteri, KVKK talep defteri, KVKK veri paketi."
       />
+    </>
+  );
+
+  if (sp.kaynak === "basvuru") {
+    return (
+      <div className="space-y-4">
+        {header}
+        <SourceTabs active="basvuru" directOpen={null} />
+        <PlatformKvkkQueueSection admin={admin} searchParams={sp} nowMs={nowMs} />
+      </div>
+    );
+  }
+
+  const f = parseKvkkFilters(sp);
+  const [q, direct] = await Promise.all([
+    loadKvkkQueue(admin, f, nowMs),
+    admin.from("platform_kvkk_requests").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
+  ]);
+  const filtered = Boolean(f.tur || f.durum || f.sure);
+  const toggle = (patch: Partial<typeof f>) => kvkkQueueHref({ ...f, ...patch, sayfa: 1 });
+
+  return (
+    <div className="space-y-4">
+      {header}
+      <SourceTabs active="ofis" directOpen={direct.error ? null : (direct.count ?? 0)} />
 
       <KpiGrid label="KVKK özeti">
         <KpiCard layout="inline" label="Açık talep" value={q.open} href={toggle({ durum: "acik", sure: undefined })} icon={Hourglass} tone="brand" hint="Açık + işlemde" />

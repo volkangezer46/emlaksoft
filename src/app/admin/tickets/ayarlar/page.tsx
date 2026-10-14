@@ -6,6 +6,7 @@ import { RegistrySettings } from "@/components/settings/registry-settings";
 import { requirePlatformModule } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { SUPPORT_SETTING_KEYS } from "@/lib/settings/registry/support";
+import { KVKK_SETTING_KEYS } from "@/lib/settings/registry/kvkk";
 import { addBusinessMinutes } from "@/lib/support/business-hours";
 import { loadDeskConfig } from "@/lib/support/desk-data";
 import { resolveSlaTarget, SLA_PLAN_LABEL, SLA_PRIORITY_LABEL } from "@/lib/support/sla-policy";
@@ -20,6 +21,7 @@ const TABS = [
   { id: "sla", label: "SLA ve iş saatleri" },
   { id: "atama", label: "Atama" },
   { id: "otomasyon", label: "Otomasyon" },
+  { id: "kvkk", label: "KVKK" },
 ] as const;
 type TabId = (typeof TABS)[number]["id"];
 
@@ -92,7 +94,7 @@ export default async function SupportSettingsPage({ searchParams }: { searchPara
         ))}
       </nav>
 
-      {!config.installed && tab !== "otomasyon" ? (
+      {!config.installed && (tab === "sla" || tab === "atama") ? (
         <Alert tone="warning" title="Kurulum bekliyor">
           Destek masası tabloları henüz veritabanında yok (migration 20261013004800). Bu sürede SLA sabit takvim saatleriyle işler ve otomatik atama yapılmaz.
         </Alert>
@@ -169,6 +171,16 @@ export default async function SupportSettingsPage({ searchParams }: { searchPara
           title="Otomasyon ve e-posta"
           description="Otomatik atama ana anahtarı, yanıt bekleyen talep hatırlatma/kapanış eşikleri ve destek yanıtının e-postayla gönderimi. Değişiklikler gerekçeli geçmişe yazılır."
           keys={SUPPORT_SETTING_KEYS}
+          canEdit={canEdit}
+        />
+      ) : null}
+
+      {tab === "kvkk" ? (
+        <RegistrySettings
+          id="kvkk"
+          title="KVKK başvuruları"
+          description="Herkese açık başvuru formu (/kvkk-basvuru). Yasal yanıt süresi 30 gündür ve ayar değildir; süre uyarısının eşiği Sistem > Uyarılar > KVKK başvuru süresi kuralındadır."
+          keys={Object.values(KVKK_SETTING_KEYS)}
           canEdit={canEdit}
         />
       ) : null}

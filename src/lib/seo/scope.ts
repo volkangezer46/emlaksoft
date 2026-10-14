@@ -129,6 +129,7 @@ const MEASURE_EXACT = new Set([
   "/araclar",
   "/gizlilik",
   "/kvkk-aydinlatma",
+  "/kvkk-basvuru",
   "/kullanim-sartlari",
   "/cerez-politikasi",
   "/mesafeli-satis",

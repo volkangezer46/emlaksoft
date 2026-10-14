@@ -144,6 +144,17 @@ const BASE_PAGES: SeoPageDef[] = [
     jsonLd: [],
   },
   {
+    path: "/kvkk-basvuru",
+    label: "KVKK başvuru formu",
+    group: "yasal",
+    title: "KVKK Başvuru Formu",
+    description: "KVKK m.11 kapsamındaki haklarınız için EmlakSoft'a çevrim içi başvurun: bilgi, düzeltme, silme, veri taşıma ve itiraz talepleri 30 gün içinde ücretsiz sonuçlandırılır.",
+    index: true,
+    canIndex: true,
+    sitemap: LEGAL,
+    jsonLd: [],
+  },
+  {
     path: "/iptal-iade",
     label: "İptal ve iade politikası",
     group: "yasal",

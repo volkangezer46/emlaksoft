@@ -52,6 +52,18 @@ export function auditActionLabel(action: string): string {
     "integration.emlakfiyati.previous_delete": "EmlakFiyati eski anahtarı silindi",
     "integration.emlakfiyati.test": "EmlakFiyati bağlantısı denendi",
     "integration.emlakfiyati.ortak_flag": "EmlakFiyati ortak uç bayrağı değişti",
+    // KVKK veri sahibi başvuruları (DG6)
+    "kvkk.public.submitted":        "KVKK başvurusu alındı (e-posta doğrulaması bekliyor)",
+    "kvkk.public.code_resent":      "KVKK başvurusu için yeni doğrulama kodu gönderildi",
+    "kvkk.public.verified":         "KVKK başvurusunun e-postası doğrulandı",
+    "kvkk.request.identity":        "KVKK başvurusunda kimlik kontrolü kaydedildi",
+    "kvkk.request.package":         "KVKK veri paketi hazırlandı",
+    "kvkk.request.scope":           "KVKK başvurusunda telefon eşleşmesi kapsamı güncellendi",
+    "kvkk.request.erasure_started": "KVKK silmesi başlatıldı",
+    "kvkk.request.erasure":         "KVKK silmesi uygulandı",
+    "kvkk.request.closed":          "KVKK başvurusu sonuçlandırıldı",
+    "kvkk.request.assigned":        "KVKK başvurusu üstlenildi",
+    "kvkk.request.released":        "KVKK başvurusu bırakıldı",
   };
   if (map[action]) return map[action];
   // Fallback: "customer.create" → "customer · create"

@@ -5,7 +5,7 @@
 export const STEP_UP_REQUIRED_KEY = "platform.step_up_required";
 export const STEP_UP_FIELD = "step_up_code";
 
-/** Kritik işlemler: iade, kredi, sahiplik devri, ofis kapatma, rol değişikliği (denetim izinde bu ad yazılır). */
+/** Kritik işlemler: iade, kredi, sahiplik devri, ofis kapatma, rol değişikliği, KVKK silmesi (denetim izinde bu ad yazılır). */
 export const STEP_UP_ACTIONS = {
   refund: "İade",
   chargeback: "Ters ibraz",
@@ -17,6 +17,7 @@ export const STEP_UP_ACTIONS = {
   member_role: "Ofis kullanıcısı rol değişikliği",
   security_policy: "Kritik işlem doğrulamasını kapatma",
   office_security_reset: "Ofis güvenlik politikasını sıfırlama",
+  kvkk_erasure: "KVKK silme talebinin uygulanması",
 } as const;
 export type StepUpAction = keyof typeof STEP_UP_ACTIONS;
 

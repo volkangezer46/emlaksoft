@@ -40,6 +40,7 @@ export const RESERVED_ROUTE_DIRS = [
   "kayit",
   "kullanim-sartlari",
   "kvkk-aydinlatma",
+  "kvkk-basvuru",
   "lead",
   "llms.txt",
   "malik-portali",
