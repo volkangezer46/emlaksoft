@@ -145,6 +145,8 @@ export function identityBlocker(r: PlatformKvkkGateRow): string | null {
 export function packageBlocker(r: PlatformKvkkGateRow): string | null {
   if (!isOpen(r)) return "Başvuru sonuçlanmış.";
   if (r.identity_status !== "verified") return "Önce başvuru sahibinin kimliğini doğrulayın.";
+  // Silinen küme incelenen taramadır; silmeden sonra tarama kaydı (kimlikler) kanıt olarak değişmez.
+  if (r.erasure_applied_at) return "Silme uygulandı; tarama kaydı artık değiştirilemez.";
   return null;
 }
 
@@ -175,6 +177,17 @@ export function respondBlocker(r: PlatformKvkkGateRow, outcome: PlatformKvkkOutc
 // Kayıt eşleşmesi özeti + yasal saklama
 // ---------------------------------------------------------------------------------------------------------------------
 
+/**
+ * Eşleşme gerekçesi: `email` = başvuranın KODLA DOĞRULANMIŞ e-postası (varsayılan kapsam); `phone` = başvuranın yazdığı
+ * ama doğrulanmamış telefon. Telefonla (yalnız) eşleşen kayıt başka bir kişiye ait olabilir: veri paketine ve silmeye
+ * ancak personel o kaydı tek tek onaylarsa girer (`approvedPhone`).
+ */
+export type MatchBasis = "email" | "phone";
+export const MATCH_BASIS_LABELS: Record<MatchBasis, string> = {
+  email: "Doğrulanmış e-posta",
+  phone: "Telefon (doğrulanmamış)",
+};
+
 export type SubjectCustomer = {
   id: string;
   tenantId: string;
@@ -190,15 +203,16 @@ export type SubjectCustomer = {
   customerTypes: string[];
   /** İlişkili kayıt sayıları (anlaşma, randevu, çağrı, iletişim, teklif, görev, İYS onayı). */
   related: Record<string, number>;
+  matchedBy: MatchBasis;
 };
 
-export type SubjectSimple = { id: string; label: string; createdAt: string | null; fields: Record<string, string | null> };
+export type SubjectSimple = { id: string; label: string; createdAt: string | null; fields: Record<string, string | null>; matchedBy: MatchBasis };
 
 export type SubjectRecords = {
   customers: SubjectCustomer[];
   demoRequests: SubjectSimple[];
   visitors: SubjectSimple[];
-  /** Silinmeyen (yasal saklama) kayıt türü sayıları: imzacı, muhasebe cari kaydı. */
+  /** Silinmeyen (yasal saklama) kayıt türü sayıları: imzacı, muhasebe cari kaydı (yalnız doğrulanmış e-postayla). */
   signers: number;
   financeParties: number;
 };
@@ -220,29 +234,162 @@ export const LEGAL_HOLD_REASONS = {
   financeParties: "Muhasebe cari kayıtları (213 VUK m.253) korunur.",
 } as const;
 
+/** Taramada bulunan tek kayıt (kimliğiyle saklanır: silme YALNIZ incelenen bu kümeye uygulanır). */
+export type ScannedKind = "customer" | "demo" | "visitor";
+export const SCANNED_KIND_LABELS: Record<ScannedKind, string> = {
+  customer: "Ofis müşteri kaydı",
+  demo: "EmlakSoft demo talebi",
+  visitor: "Açık ev ziyaretçi kaydı",
+};
+export type ScannedRecord = {
+  key: string;
+  kind: ScannedKind;
+  id: string;
+  tenantId: string | null;
+  office: string;
+  /** Maskeli ad (personel uyuşmazlığı görsün diye; tam ad yalnız veri paketinde). */
+  name: string;
+  matchedBy: MatchBasis;
+  related: Record<string, number>;
+};
+
+export const customerKey = (tenantId: string, id: string) => `customer:${tenantId}:${id}`;
+export const demoKey = (id: string) => `demo:${id}`;
+export const visitorKey = (id: string) => `visitor:${id}`;
+
+/** "Ayşe Yılmaz" → "A*** Y***" (boşsa "İsimsiz"). */
+export function maskPersonName(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "İsimsiz";
+  return parts.map((p) => `${Array.from(p)[0] ?? ""}***`).join(" ");
+}
+
+export function scanRecords(r: SubjectRecords): ScannedRecord[] {
+  return [
+    ...r.customers.map((c) => ({
+      key: customerKey(c.tenantId, c.id),
+      kind: "customer" as const,
+      id: c.id,
+      tenantId: c.tenantId,
+      office: c.tenantName,
+      name: maskPersonName(c.fullName),
+      matchedBy: c.matchedBy,
+      related: c.related,
+    })),
+    ...r.demoRequests.map((d) => ({
+      key: demoKey(d.id),
+      kind: "demo" as const,
+      id: d.id,
+      tenantId: null,
+      office: "EmlakSoft",
+      name: maskPersonName(d.fields["Ad soyad"]),
+      matchedBy: d.matchedBy,
+      related: {},
+    })),
+    ...r.visitors.map((v) => ({
+      key: visitorKey(v.id),
+      kind: "visitor" as const,
+      id: v.id,
+      tenantId: null,
+      office: v.label,
+      name: maskPersonName(v.fields["Ad soyad"]),
+      matchedBy: v.matchedBy,
+      related: {},
+    })),
+  ];
+}
+
+/** Kapsam: doğrulanmış e-postayla eşleşen her kayıt + personelin tek tek onayladığı telefon eşleşmeleri. */
+export function inScope(rec: { key: string; matchedBy: MatchBasis }, approvedPhone: ReadonlySet<string>): boolean {
+  return rec.matchedBy === "email" || approvedPhone.has(rec.key);
+}
+
 export type PackageSummary = {
+  /** KAPSAMDAKİ kayıt sayıları (veri paketi ve silme bunlara uygulanır). */
   customers: number;
   offices: number;
   demoRequests: number;
   visitors: number;
   related: Record<string, number>;
   legalHolds: string[];
+  /** Onay bekleyen (kapsam dışı) telefon eşleşmesi sayısı. */
+  phoneCandidates: number;
+  /** Taramada bulunan TÜM kayıtlar (kimlik + ofis + maskeli ad + eşleşme gerekçesi). */
+  records: ScannedRecord[];
+  /** Personelin kapsama aldığı telefon eşleşmelerinin anahtarları. */
+  approvedPhone: string[];
+  signers: number;
+  financeParties: number;
 };
 
-export function summarizeRecords(r: SubjectRecords): PackageSummary {
+export function summarizeScan(records: ScannedRecord[], approvedPhone: string[], signers: number, financeParties: number): PackageSummary {
+  const phoneKeys = new Set(records.filter((r) => r.matchedBy === "phone").map((r) => r.key));
+  const approved = [...new Set(approvedPhone)].filter((k) => phoneKeys.has(k));
+  const approvedSet = new Set(approved);
+  const scoped = records.filter((r) => inScope(r, approvedSet));
   const related: Record<string, number> = {};
-  for (const c of r.customers) for (const [k, n] of Object.entries(c.related)) related[k] = (related[k] ?? 0) + n;
+  for (const c of scoped) for (const [k, n] of Object.entries(c.related)) related[k] = (related[k] ?? 0) + n;
   const legalHolds: string[] = [];
   if ((related.deals ?? 0) > 0) legalHolds.push(LEGAL_HOLD_REASONS.deals);
-  if (r.signers > 0) legalHolds.push(LEGAL_HOLD_REASONS.signers);
-  if (r.financeParties > 0) legalHolds.push(LEGAL_HOLD_REASONS.financeParties);
+  if (signers > 0) legalHolds.push(LEGAL_HOLD_REASONS.signers);
+  if (financeParties > 0) legalHolds.push(LEGAL_HOLD_REASONS.financeParties);
+  const customers = scoped.filter((r) => r.kind === "customer");
   return {
-    customers: r.customers.length,
-    offices: new Set(r.customers.map((c) => c.tenantId)).size,
-    demoRequests: r.demoRequests.length,
-    visitors: r.visitors.length,
+    customers: customers.length,
+    offices: new Set(customers.map((c) => c.tenantId)).size,
+    demoRequests: scoped.filter((r) => r.kind === "demo").length,
+    visitors: scoped.filter((r) => r.kind === "visitor").length,
     related,
     legalHolds,
+    phoneCandidates: phoneKeys.size - approved.length,
+    records,
+    approvedPhone: approved,
+    signers,
+    financeParties,
+  };
+}
+
+export function summarizeRecords(r: SubjectRecords, approvedPhone: string[] = []): PackageSummary {
+  return summarizeScan(scanRecords(r), approvedPhone, r.signers, r.financeParties);
+}
+
+/** Taramadan yalnız kapsamdaki kayıtlar (veri paketi bunu kullanır). */
+export function scopeSubjectRecords(r: SubjectRecords, approvedPhone: string[]): SubjectRecords {
+  const approved = new Set(approvedPhone);
+  return {
+    ...r,
+    customers: r.customers.filter((c) => inScope({ key: customerKey(c.tenantId, c.id), matchedBy: c.matchedBy }, approved)),
+    demoRequests: r.demoRequests.filter((d) => inScope({ key: demoKey(d.id), matchedBy: d.matchedBy }, approved)),
+    visitors: r.visitors.filter((v) => inScope({ key: visitorKey(v.id), matchedBy: v.matchedBy }, approved)),
+  };
+}
+
+/**
+ * Silme anındaki yeni taramada, incelenen (kaydedilmiş) kapsamda OLMAYAN ama kapsama girecek kayıtlar. Boş değilse silme
+ * yapılmaz, yeniden tarama istenir (incelenmeyen kayıt anonimleşmez).
+ */
+export function scopeDrift(stored: PackageSummary, current: ScannedRecord[]): string[] {
+  const approved = new Set(stored.approvedPhone);
+  const reviewed = new Set(stored.records.filter((r) => inScope(r, approved)).map((r) => r.key));
+  return current.filter((r) => inScope(r, approved) && !reviewed.has(r.key)).map((r) => r.key);
+}
+
+const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+function parseScanned(v: unknown): ScannedRecord | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Partial<ScannedRecord>;
+  if (typeof o.key !== "string" || typeof o.id !== "string") return null;
+  if (o.kind !== "customer" && o.kind !== "demo" && o.kind !== "visitor") return null;
+  return {
+    key: o.key,
+    kind: o.kind,
+    id: o.id,
+    tenantId: typeof o.tenantId === "string" ? o.tenantId : null,
+    office: String(o.office ?? ""),
+    name: String(o.name ?? "İsimsiz"),
+    matchedBy: o.matchedBy === "email" ? "email" : "phone",
+    related: o.related && typeof o.related === "object" ? (o.related as Record<string, number>) : {},
   };
 }
 
@@ -250,12 +397,17 @@ export function parsePackageSummary(v: unknown): PackageSummary | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Partial<PackageSummary>;
   return {
-    customers: Number(o.customers ?? 0),
-    offices: Number(o.offices ?? 0),
-    demoRequests: Number(o.demoRequests ?? 0),
-    visitors: Number(o.visitors ?? 0),
+    customers: num(o.customers),
+    offices: num(o.offices),
+    demoRequests: num(o.demoRequests),
+    visitors: num(o.visitors),
     related: o.related && typeof o.related === "object" ? (o.related as Record<string, number>) : {},
     legalHolds: Array.isArray(o.legalHolds) ? o.legalHolds.map(String) : [],
+    phoneCandidates: num(o.phoneCandidates),
+    records: Array.isArray(o.records) ? o.records.map(parseScanned).filter((r): r is ScannedRecord => r !== null) : [],
+    approvedPhone: Array.isArray(o.approvedPhone) ? o.approvedPhone.map(String) : [],
+    signers: num(o.signers),
+    financeParties: num(o.financeParties),
   };
 }
 

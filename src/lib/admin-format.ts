@@ -58,6 +58,7 @@ export function auditActionLabel(action: string): string {
     "kvkk.public.verified":         "KVKK başvurusunun e-postası doğrulandı",
     "kvkk.request.identity":        "KVKK başvurusunda kimlik kontrolü kaydedildi",
     "kvkk.request.package":         "KVKK veri paketi hazırlandı",
+    "kvkk.request.scope":           "KVKK başvurusunda telefon eşleşmesi kapsamı güncellendi",
     "kvkk.request.erasure_started": "KVKK silmesi başlatıldı",
     "kvkk.request.erasure":         "KVKK silmesi uygulandı",
     "kvkk.request.closed":          "KVKK başvurusu sonuçlandırıldı",

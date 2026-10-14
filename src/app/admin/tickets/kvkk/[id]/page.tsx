@@ -27,6 +27,7 @@ import {
 } from "@/lib/compliance/platform-kvkk";
 import { loadPlatformKvkkRequest, type ErasureResult } from "@/lib/compliance/platform-kvkk-service";
 import { KvkkRequestSteps } from "./request-steps";
+import { KvkkScanRecords } from "./scan-records";
 
 export const metadata = { title: "KVKK başvurusu" };
 
@@ -152,20 +153,22 @@ export default async function KvkkRequestPage({ params }: { params: Promise<{ id
         <Section title="Bulunan kayıtlar" icon={FileSearch} id="kayitlar">
           {!summary ? (
             <p className="text-xs text-text-muted">
-              Kimlik doğrulandıktan sonra &quot;Kayıtları tara&quot; ile kişinin e-posta adresi ve telefonuyla eşleşen kayıtlar (ofis müşteri kayıtları,
-              EmlakSoft demo talepleri, açık ev ziyaretçi kayıtları) bulunur. Ad ile eşleştirme yapılmaz.
+              Kimlik doğrulandıktan sonra &quot;Kayıtları tara&quot; ile kişinin doğrulanmış e-posta adresi ve yazdığı telefonla eşleşen kayıtlar (ofis
+              müşteri kayıtları, EmlakSoft demo talepleri, açık ev ziyaretçi kayıtları) bulunur. Ad ile eşleştirme yapılmaz; yalnız telefonla eşleşen
+              kayıtlar siz onaylamadan veri paketine ve silmeye girmez.
             </p>
           ) : (
             <>
               <p className="text-sm text-ink-950">
                 {found > 0 ? (
                   <>
-                    <b>{found}</b> kayıt bulundu
+                    <b>{found}</b> kayıt kapsamda
                     {summary.offices > 0 ? ` · ${summary.offices} ofis` : ""} · taranma {fmt(row.package_prepared_at, true)}
                   </>
                 ) : (
-                  <>Eşleşen kayıt bulunmadı · taranma {fmt(row.package_prepared_at, true)}</>
+                  <>Kapsamda kayıt yok · taranma {fmt(row.package_prepared_at, true)}</>
                 )}
+                {summary.phoneCandidates > 0 ? <span className="text-amber-800"> · {summary.phoneCandidates} telefon eşleşmesi onay bekliyor</span> : null}
               </p>
               <ul className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
                 <li className="rounded-[var(--radius-control)] border border-line px-2.5 py-1.5">Ofis müşteri kaydı: <b>{summary.customers}</b></li>
@@ -177,6 +180,12 @@ export default async function KvkkRequestPage({ params }: { params: Promise<{ id
                   </li>
                 ))}
               </ul>
+              <KvkkScanRecords
+                id={row.id}
+                records={summary.records}
+                approved={summary.approvedPhone}
+                editable={!closed && !row.erasure_applied_at && row.identity_status === "verified"}
+              />
               {summary.legalHolds.length ? (
                 <div className="rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 p-3 text-xs text-ink-950">
                   <p className="font-semibold">Yasal saklama nedeniyle silinmeyecek kayıtlar</p>
@@ -197,6 +206,7 @@ export default async function KvkkRequestPage({ params }: { params: Promise<{ id
               <p className="font-semibold text-ink-950">
                 Silme sonucu ({fmt(erasure.at, true)}): {erasure.anonymized} müşteri kaydı anonimleşti
                 {erasure.already ? `, ${erasure.already} kayıt zaten anonimdi` : ""}
+                {erasure.gone ? `, ${erasure.gone} kayıt ofiste artık yok` : ""}
                 {erasure.demoRequests ? `, ${erasure.demoRequests} demo talebi` : ""}
                 {erasure.visitors ? `, ${erasure.visitors} açık ev kaydı` : ""}.
               </p>

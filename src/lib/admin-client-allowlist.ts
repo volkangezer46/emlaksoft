@@ -19,6 +19,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/admin-account-credit.ts", fn: "grantAccountCredit", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-account-credit.ts", fn: "reverseAccountCredit", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-kvkk-requests.ts", fn: "applyKvkkErasure", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/app/actions/admin-kvkk-requests.ts", fn: "approveKvkkPhoneMatches", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-kvkk-requests.ts", fn: "assignKvkkRequest", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-kvkk-requests.ts", fn: "prepareKvkkPackage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/actions/admin-kvkk-requests.ts", fn: "recordKvkkIdentity", calls: 1, tenantFilter: "uygulanamaz" },

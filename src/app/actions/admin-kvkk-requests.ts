@@ -10,6 +10,7 @@ import { now } from "@/lib/clock";
 import { sendTemplateEmail } from "@/lib/email/send";
 import {
   applyErasure,
+  approvePhoneMatches,
   assignRequest,
   preparePackage,
   recordIdentityCheck,
@@ -78,11 +79,35 @@ export async function prepareKvkkPackage(fd: FormData): Promise<AdminKvkkResult>
     action: "kvkk.request.package",
     entityType: "kvkk_request",
     entityId: id,
-    meta: { ref: res.row.ref, customers: s.customers, offices: s.offices, demo_requests: s.demoRequests, visitors: s.visitors, legal_holds: s.legalHolds.length },
+    meta: { ref: res.row.ref, customers: s.customers, offices: s.offices, demo_requests: s.demoRequests, visitors: s.visitors, phone_candidates: s.phoneCandidates, legal_holds: s.legalHolds.length },
   });
   refresh(id);
   const total = s.customers + s.demoRequests + s.visitors;
-  return { ok: true, message: total > 0 ? `${total} kayıt bulundu; veri paketi hazır.` : "Eşleşen kayıt bulunmadı; paket boş olarak kaydedildi." };
+  const pending = s.phoneCandidates ? ` ${s.phoneCandidates} kayıt yalnız telefonla eşleşti; incelenip onaylanmadan pakete ve silmeye girmez.` : "";
+  return { ok: true, message: (total > 0 ? `${total} kayıt bulundu; veri paketi hazır.` : "Doğrulanmış e-postayla eşleşen kayıt bulunmadı.") + pending };
+}
+
+/**
+ * Telefonla (yalnız) eşleşen kayıtları kapsama alır/çıkarır. Telefon doğrulanmadığı için bu kayıtlar varsayılan olarak
+ * veri paketine ve silmeye girmez; personel ofis + maskeli ad + gerekçeyi inceleyip tek tek onaylar (`kayit` alanları).
+ */
+export async function approveKvkkPhoneMatches(fd: FormData): Promise<AdminKvkkResult> {
+  const staff = await requirePlatformModule("tickets");
+  const id = idOf(fd);
+  if (!id) return { error: "Geçersiz istek." };
+  const keys = [...new Set(fd.getAll("kayit").map(String))].slice(0, 200);
+  const res = await approvePhoneMatches(createAdminClient(), id, staff.id, keys, now());
+  if (!res.ok) return { error: res.error };
+  const s = res.summary;
+  await logPlatformActivity({
+    actorId: staff.id,
+    action: "kvkk.request.scope",
+    entityType: "kvkk_request",
+    entityId: id,
+    meta: { ref: res.row.ref, approved_phone: s.approvedPhone.length, pending_phone: s.phoneCandidates },
+  });
+  refresh(id);
+  return { ok: true, message: s.approvedPhone.length ? `${s.approvedPhone.length} telefon eşleşmesi kapsama alındı.` : "Telefon eşleşmeleri kapsam dışında." };
 }
 
 /** Silme başvurusunu uygular (mevcut anonimleştirme akışı). Kritik: doğrulayıcı kodu + önce denetim kaydı. */
@@ -110,7 +135,7 @@ export async function applyKvkkErasure(fd: FormData): Promise<AdminKvkkResult> {
     action: "kvkk.request.erasure",
     entityType: "kvkk_request",
     entityId: id,
-    meta: { ref: res.row.ref, anonymized: r.anonymized, already: r.already, failed: r.failed.length, demo_requests: r.demoRequests, visitors: r.visitors, retained: r.retained.length },
+    meta: { ref: res.row.ref, anonymized: r.anonymized, already: r.already, gone: r.gone ?? 0, failed: r.failed.length, demo_requests: r.demoRequests, visitors: r.visitors, retained: r.retained.length },
   });
   refresh(id);
   if (r.failed.length > 0) return { error: `${r.failed.length} kayıtta anonimleştirme yapılamadı; ayrıntı aşağıda. Sorun giderilince yeniden uygulayın.` };

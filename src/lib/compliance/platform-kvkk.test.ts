@@ -1,7 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  MAX_MATCH,
   applyErasure,
+  approvePhoneMatches,
+  classifyErasureError,
   findSubjectRecords,
   loadPlatformKvkkQueue,
   parseApplication,
@@ -17,6 +20,8 @@ import {
 import {
   buildKvkkRef,
   defaultResponseText,
+  maskPersonName,
+  parsePackageSummary,
   erasureBlocker,
   platformKvkkDaysLeft,
   respondBlocker,
@@ -121,6 +126,7 @@ class FakeQuery implements PromiseLike<Res> {
   }
 
   private exec(): Res {
+    if (this.op === "select" && this.db.failTables.has(this.table)) return { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } };
     const rows = (this.db.tables[this.table] ??= []);
     const match = () => rows.filter((r) => this.filters.every((f) => f(r)));
     if (this.op === "insert") {
@@ -152,6 +158,8 @@ class FakeQuery implements PromiseLike<Res> {
 
 class FakeDb {
   tables: Record<string, Row[]> = {};
+  /** Okuması hata dönen tablolar (geçici sorgu hatası benzetimi). */
+  failTables = new Set<string>();
   rpcCalls: { fn: string; args: Row }[] = [];
   from(t: string) {
     return new FakeQuery(this, t);
@@ -307,13 +315,23 @@ describe("platform KVKK başvurusu: uçtan uca akış", () => {
     expect(row.identity_status).toBe("verified");
     expect(row.assignee_id).toBe(STAFF);
 
-    // 6) Veri paketi: e-posta (büyük/küçük harf ve `_` düz metin) + telefonla eşleşme; yasal saklama işaretleri
+    // 6) Veri paketi: e-posta (büyük/küçük harf ve `_` düz metin) kapsamda; YALNIZ telefonla eşleşen kayıt (telefon
+    // doğrulanmadı, başka kişiye ait olabilir) aday olarak listelenir ama onaylanmadan kapsama girmez; yasal saklama işaretleri
     const pkg = await preparePackage(asDb(db), sub.requestId, STAFF, T0 + DAY);
     expect(pkg.ok).toBe(true);
     if (!pkg.ok) return;
-    expect(pkg.summary.customers).toBe(2);
-    expect(pkg.summary.offices).toBe(2);
+    expect(pkg.summary.customers).toBe(1);
+    expect(pkg.summary.offices).toBe(1);
+    expect(pkg.summary.phoneCandidates).toBe(1);
     expect(pkg.summary.demoRequests).toBe(1);
+    expect(pkg.summary.records.map((r) => [r.key, r.matchedBy])).toEqual([
+      [`customer:${TENANT_A}:${CUST_A}`, "email"],
+      [`customer:${TENANT_B}:${CUST_B}`, "phone"],
+      ["demo:dr1", "email"],
+    ]);
+    // Ayrıntı sayfası için: ofis + maskeli ad + gerekçe (tam ad özete yazılmaz)
+    expect(pkg.summary.records[1]).toMatchObject({ office: "Güney Gayrimenkul", name: "A*** Y***", matchedBy: "phone" });
+    expect(JSON.stringify(row.package_summary)).not.toContain("Ayşe Yılmaz");
     expect(pkg.summary.related).toEqual({ deals: 1, appointments: 1 });
     expect(pkg.summary.legalHolds.join(" ")).toMatch(/Anlaşma/);
     expect(pkg.summary.legalHolds.join(" ")).toMatch(/İmzalı sözleşme/);
@@ -327,19 +345,23 @@ describe("platform KVKK başvurusu: uçtan uca akış", () => {
     expect(rows.some((r) => r.alan === "Anlaşma" && r.deger === "1 kayıt")).toBe(true);
     expect(rows.some((r) => r.bolum === "EmlakSoft kayıtları")).toBe(true);
     expect(rows.some((r) => r.deger === "Başka Kişi")).toBe(false);
+    // Onaylanmamış telefon eşleşmesi (başka ofis, başka kişi olabilir) pakete girmez
+    expect(rows.some((r) => r.ofis === "Güney Gayrimenkul" || r.deger === "A. Yılmaz")).toBe(false);
     expect(await kvkkVeriPaketi.source.run(ctx, { basvuru: "KVKK-2026-YOKYOK" })).toEqual([]);
 
     // 7) Silme başvurusu silme uygulanmadan sonuçlandırılamaz
     const tooEarly = await respondAndClose(asDb(db), sub.requestId, STAFF, { outcome: "completed", text: "x".repeat(40), sendEmail: true }, { nowMs: T0 + DAY, send: mail.send });
     expect(tooEarly.ok).toBe(false);
 
-    // 8) Silme: MEVCUT anonymize_customer akışı; anlaşma ve imzacı kayıtları (yasal saklama) korunur
+    // 8) Silme: MEVCUT anonymize_customer akışı YALNIZ incelenen kapsama; anlaşma ve imzacı kayıtları (yasal saklama) korunur
     const er = await applyErasure(asDb(db), sub.requestId, STAFF, T0 + 2 * DAY);
     expect(er.ok).toBe(true);
     if (!er.ok) return;
-    expect(db.rpcCalls.map((c) => c.fn)).toEqual(["anonymize_customer", "anonymize_customer"]);
+    expect(db.rpcCalls.map((c) => c.args.p_customer_id)).toEqual([CUST_A]);
     expect(db.rpcCalls.every((c) => c.args.p_actor_id === STAFF && String(c.args.p_reason).includes(sub.ref))).toBe(true);
-    expect(er.result).toMatchObject({ anonymized: 2, already: 0, failed: [], demoRequests: 1 });
+    expect(er.result).toMatchObject({ anonymized: 1, already: 0, failed: [], demoRequests: 1 });
+    // Yalnız telefonla eşleşen (onaylanmamış) kayıt anonimleşmez
+    expect(db.tables.customers!.find((c) => c.id === CUST_B)!.full_name).toBe("A. Yılmaz");
     const custA = db.tables.customers!.find((c) => c.id === CUST_A)!;
     expect(custA).toMatchObject({ full_name: "Anonimlestirilmis kayit", phone: null, email: null, notes: null });
     expect(db.tables.customers!.find((c) => c.id === CUST_OTHER)!.full_name).toBe("Başka Kişi");
@@ -350,9 +372,11 @@ describe("platform KVKK başvurusu: uçtan uca akış", () => {
     expect(row.erasure_applied_at).toBe(new Date(T0 + 2 * DAY).toISOString());
     // Silme ikinci kez uygulanmaz
     expect((await applyErasure(asDb(db), sub.requestId, STAFF, T0 + 2 * DAY)).ok).toBe(false);
-    // Silmeden sonra kişiye ait kayıt kalmaz (yalnız saklanan imzacı sayısı)
+    // Silmeden sonra e-postayla eşleşen kayıt kalmaz (yalnız saklanan imzacı sayısı ve onaylanmamış telefon adayı)
     const after = await findSubjectRecords(asDb(db), { email: "ayse_yilmaz@ornek.com", phone: "05321234567" });
-    expect(after.customers).toHaveLength(0);
+    expect(after.customers.map((c) => [c.id, c.matchedBy])).toEqual([[CUST_B, "phone"]]);
+    // Silmeden sonra tarama kaydı (silinen kümenin kanıtı) yeniden yazılmaz
+    expect((await preparePackage(asDb(db), sub.requestId, STAFF, T0 + 2 * DAY)).ok).toBe(false);
     expect(after.signers).toBe(1);
 
     // 9) Yanıt (AD7 kvkk_reply) + sonuç kaydı; sayaç durur
@@ -444,6 +468,139 @@ describe("platform KVKK başvurusu: uçtan uca akış", () => {
     expect(parseApplication({ ...base, phone: "12" }).ok).toBe(false);
     expect(parseApplication({ ...base, details: "kısa" }).ok).toBe(false);
     expect(parseApplication({ ...base, consent: false }).ok).toBe(false);
+  });
+});
+
+/** Kimliği doğrulanmış, kayıtları henüz taranmamış silme başvurusu (ayse_yilmaz@ornek.com + 05321234567). */
+function verifiedErasure(db: FakeDb) {
+  seed(db);
+  db.tables.platform_kvkk_requests = [
+    {
+      id: "r1",
+      ref: "KVKK-2026-ABCDEF",
+      request_type: "erasure",
+      status: "open",
+      requester_name: "Ayşe Yılmaz",
+      email: "ayse_yilmaz@ornek.com",
+      phone: "05321234567",
+      identity_status: "verified",
+      package_prepared_at: null,
+      package_summary: null,
+      erasure_applied_at: null,
+      assignee_id: STAFF,
+      created_at: "2026-10-01T10:00:00Z",
+      due_at: "2026-10-31T10:00:00Z",
+    },
+  ];
+  return db.tables.platform_kvkk_requests[0]!;
+}
+
+describe("platform KVKK kapsam: telefon eşleşmesi, tarama hatası, incelenen küme", () => {
+  it("telefon eşleşmesi personel tek tek onaylarsa pakete ve silmeye girer; onay geri alınabilir", async () => {
+    const db = new FakeDb();
+    const row = verifiedErasure(db);
+    const pkg = await preparePackage(asDb(db), "r1", STAFF, T0);
+    if (!pkg.ok) throw new Error(pkg.error);
+    const keyB = `customer:${TENANT_B}:${CUST_B}`;
+    // Taramada olmayan anahtar reddedilir; e-posta eşleşmesi "onaylanacak" bir aday değildir
+    expect((await approvePhoneMatches(asDb(db), "r1", STAFF, [`customer:${TENANT_A}:${CUST_OTHER}`], T0)).ok).toBe(false);
+    expect((await approvePhoneMatches(asDb(db), "r1", STAFF, [`customer:${TENANT_A}:${CUST_A}`], T0)).ok).toBe(false);
+    const ap = await approvePhoneMatches(asDb(db), "r1", STAFF, [keyB], T0);
+    if (!ap.ok) throw new Error(ap.error);
+    expect(ap.summary).toMatchObject({ customers: 2, offices: 2, phoneCandidates: 0, approvedPhone: [keyB] });
+    // Yeniden tarama onayı korur
+    const again = await preparePackage(asDb(db), "r1", STAFF, T0 + 1000);
+    if (!again.ok) throw new Error(again.error);
+    expect(again.summary.approvedPhone).toEqual([keyB]);
+    // Onaylanan kayıt veri paketine girer
+    const ctx = { supabase: asDb(db) } as unknown as ReportContext;
+    if (kvkkVeriPaketi.source.kind !== "compute") throw new Error("compute bekleniyordu");
+    const rows = (await kvkkVeriPaketi.source.run(ctx, { basvuru: "KVKK-2026-ABCDEF" })) as Row[];
+    expect(rows.some((r) => r.ofis === "Güney Gayrimenkul" && r.deger === "A. Yılmaz")).toBe(true);
+    // Silme ikisine de uygulanır
+    const er = await applyErasure(asDb(db), "r1", STAFF, T0 + DAY);
+    if (!er.ok) throw new Error(er.error);
+    expect(db.rpcCalls.map((c) => c.args.p_customer_id).sort()).toEqual([CUST_A, CUST_B].sort());
+    expect(row.erasure_applied_at).not.toBeNull();
+    // Silmeden sonra kapsam değiştirilemez
+    expect((await approvePhoneMatches(asDb(db), "r1", STAFF, [], T0 + DAY)).ok).toBe(false);
+  });
+
+  it("taramadan sonra yeni eşleşme çıkarsa silme yapılmaz; yeniden tarama sonrası uygulanır", async () => {
+    const db = new FakeDb();
+    const row = verifiedErasure(db);
+    expect((await preparePackage(asDb(db), "r1", STAFF, T0)).ok).toBe(true);
+    const NEW = "c4444444-4444-4444-8444-444444444444";
+    db.tables.customers!.push({ id: NEW, tenant_id: TENANT_B, full_name: "Ayşe Y.", phone: null, email: "ayse_yilmaz@ornek.com", created_at: "2026-10-14T10:00:00Z", deleted_at: null, source: null, notes: null, birth_date: null, customer_types: [] });
+    const blocked = await applyErasure(asDb(db), "r1", STAFF, T0 + DAY);
+    expect(blocked.ok).toBe(false);
+    if (!blocked.ok) expect(blocked.error).toMatch(/1 yeni eşleşen kayıt.*yeniden tarayıp/);
+    expect(db.rpcCalls).toHaveLength(0);
+    expect(row.erasure_applied_at).toBeNull();
+    // Yeni bir YALNIZ telefon adayı silmeyi durdurmaz (kapsama zaten girmez)
+    expect((await preparePackage(asDb(db), "r1", STAFF, T0 + DAY)).ok).toBe(true);
+    db.tables.customers!.push({ id: "c5555555-5555-4555-8555-555555555555", tenant_id: TENANT_B, full_name: "Başkası", phone: "05321234567", email: null, created_at: null, deleted_at: null, source: null, notes: null, birth_date: null, customer_types: [] });
+    const er = await applyErasure(asDb(db), "r1", STAFF, T0 + DAY);
+    if (!er.ok) throw new Error(er.error);
+    expect(db.rpcCalls.map((c) => c.args.p_customer_id).sort()).toEqual([CUST_A, NEW].sort());
+    // Silinen küme kaydedilen taramayla aynıdır (kimlikler özette)
+    const stored = parsePackageSummary(row.package_summary)!;
+    expect(stored.records.filter((r) => r.matchedBy === "email" && r.kind === "customer").map((r) => r.id).sort()).toEqual([CUST_A, NEW].sort());
+  });
+
+  it("herhangi bir tarama sorgusu hata verirse paket ve silme tamamlanmış sayılmaz", async () => {
+    for (const table of ["customers", "demo_requests", "open_house_visitors", "contract_signers", "finance_parties", "tenants", "deals"]) {
+      const db = new FakeDb();
+      const row = verifiedErasure(db);
+      db.failTables.add(table);
+      const pkg = await preparePackage(asDb(db), "r1", STAFF, T0);
+      expect(pkg.ok, table).toBe(false);
+      if (!pkg.ok) expect(pkg.error).toMatch(/taranamadı/);
+      expect(row.package_prepared_at, table).toBeNull();
+      // Tarama başarılıyken hazırlanmış pakette silme anında hata: silme yazılmaz
+      db.failTables.delete(table);
+      expect((await preparePackage(asDb(db), "r1", STAFF, T0)).ok).toBe(true);
+      db.failTables.add(table);
+      const er = await applyErasure(asDb(db), "r1", STAFF, T0 + DAY);
+      expect(er.ok, table).toBe(false);
+      expect(row.erasure_applied_at, table).toBeNull();
+      expect(db.rpcCalls).toHaveLength(0);
+    }
+  });
+
+  it("eşleşme sınırı aşılırsa tarama eksik sayılır (sessizce kesilmez)", async () => {
+    const db = new FakeDb();
+    verifiedErasure(db);
+    for (let i = 0; i <= MAX_MATCH; i++) db.tables.demo_requests!.push({ id: `dx${String(i).padStart(4, "0")}`, full_name: "X", email: "ayse_yilmaz@ornek.com", phone: null, created_at: null });
+    const pkg = await preparePackage(asDb(db), "r1", STAFF, T0);
+    expect(pkg.ok).toBe(false);
+    if (!pkg.ok) expect(pkg.error).toMatch(/aşıyor/);
+  });
+
+  it("RPC hataları sınıflandırılır; ham DB metni sonuca yazılmaz", async () => {
+    expect(classifyErasureError({ message: "Customer was already anonymized." })).toBe("already");
+    expect(classifyErasureError({ message: "Customer not found in tenant." })).toBe("gone");
+    expect(classifyErasureError({ message: "Tenant not found." })).toEqual({ reason: "Ofis kaydı bulunamadı." });
+    expect(classifyErasureError({ message: "Actor is not authorized for this tenant." })).toMatchObject({ reason: expect.stringMatching(/yetkisi/) });
+    expect(classifyErasureError({ message: "deadlock detected on relation customers" })).toMatchObject({ reason: expect.not.stringMatching(/deadlock/) });
+    const db = new FakeDb();
+    const row = verifiedErasure(db);
+    expect((await preparePackage(asDb(db), "r1", STAFF, T0)).ok).toBe(true);
+    db.rpc = async (fn: string, args: Row) => {
+      db.rpcCalls.push({ fn, args });
+      return { data: null, error: { code: "40P01", message: "deadlock detected on relation customers" } };
+    };
+    const er = await applyErasure(asDb(db), "r1", STAFF, T0 + DAY);
+    if (!er.ok) throw new Error(er.error);
+    expect(er.result.failed).toHaveLength(1);
+    expect(JSON.stringify(row.erasure_result)).not.toContain("deadlock");
+    expect(row.erasure_applied_at).toBeNull();
+  });
+
+  it("maskeli ad", () => {
+    expect(maskPersonName("Ayşe Yılmaz")).toBe("A*** Y***");
+    expect(maskPersonName("  ")).toBe("İsimsiz");
+    expect(maskPersonName(null)).toBe("İsimsiz");
   });
 });
 

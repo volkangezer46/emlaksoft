@@ -156,7 +156,8 @@ export function KvkkRequestSteps(p: Props) {
 
       <Step no={2} title="Kayıtları tara (veri paketi)" icon={FileSearch} done={p.packageDone}>
         <p className="text-xs text-text-muted">
-          Kişinin e-posta ve telefonuyla eşleşen kayıtlar tüm ofislerde taranır ve özet kaydedilir. Dosya: Raporlar &gt; Rapor merkezi &gt; &quot;KVKK veri
+          Kişinin doğrulanmış e-postası ve yazdığı telefonla eşleşen kayıtlar tüm ofislerde taranır; her kaydın ofisi, maskeli adı ve eşleşme gerekçesi
+          kaydedilir. Yalnız telefonla eşleşenler, &quot;Bulunan kayıtlar&quot; listesinde onaylanmadıkça pakete ve silmeye girmez. Dosya: Raporlar &gt; Rapor merkezi &gt; &quot;KVKK veri
           paketi&quot; raporu, başvuru no <b>{p.refNo}</b>.
         </p>
         <div className="flex flex-wrap items-center gap-3">
@@ -177,8 +178,10 @@ export function KvkkRequestSteps(p: Props) {
       {p.isErasure ? (
         <Step no={3} title="Silme / anonimleştirme" icon={Eraser} done={p.erasureDone}>
           <p className="text-xs text-text-muted">
-            Eşleşen ofis müşteri kayıtlarına mevcut anonimleştirme akışı uygulanır (ad, telefon, e-posta, notlar silinir; anlaşma, çağrı ve muhasebe
-            satırları yasal saklama gereği korunur, kişi alanları maskelenir). EmlakSoft demo talepleri ve açık ev kayıtları anonimleşir. Geri alınamaz.
+            Yalnız son taramada kapsamda görünen kayıtlara (doğrulanmış e-posta eşleşmeleri ve onaylanan telefon eşleşmeleri) mevcut anonimleştirme
+            akışı uygulanır (ad, telefon, e-posta, notlar silinir; anlaşma, çağrı ve muhasebe satırları yasal saklama gereği korunur, kişi alanları
+            maskelenir). Taramadan sonra yeni eşleşme çıkarsa silme durur ve yeniden tarama istenir. EmlakSoft demo talepleri ve açık ev kayıtları
+            anonimleşir. Geri alınamaz.
           </p>
           {p.erasureBlock && !p.erasureDone ? <p className="text-xs text-text-muted">{p.erasureBlock}</p> : null}
           {!p.erasureDone ? (

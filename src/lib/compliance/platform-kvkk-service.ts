@@ -20,6 +20,7 @@ import {
   VERIFY_MAX_SENDS,
   buildKvkkRef,
   buildPackageRows,
+  customerKey,
   erasureBlocker,
   identityBlocker,
   isIdentityMethod,
@@ -29,8 +30,14 @@ import {
   platformKvkkDueIso,
   platformKvkkTone,
   respondBlocker,
+  scanRecords,
+  scopeDrift,
+  scopeSubjectRecords,
   summarizeRecords,
+  summarizeScan,
+  parsePackageSummary,
   type IdentityMethod,
+  type MatchBasis,
   type PackageRow,
   type PackageSummary,
   type PlatformKvkkOutcome,
@@ -40,6 +47,7 @@ import {
   type SubjectSimple,
 } from "./platform-kvkk";
 import type { KvkkTone } from "./kvkk-queue";
+import { log } from "@/lib/log";
 
 /**
  * PLATFORM KVKK BAŞVURULARI — SUNUCU servisi (DG6). Tüm işlevler service_role istemcisini PARAMETRE alır (istemciyi
@@ -394,7 +402,11 @@ export async function loadPlatformKvkkQueue(db: Db, f: PlatformQueueFilters, now
     openCount().lt("due_at", lateBefore),
     openCount().gte("due_at", lateBefore).lt("due_at", warnBefore),
   ]);
-  if (list.error) return { rows: [], total: 0, open: 0, late: 0, warn: 0, error: list.error.message, missing: MISSING(list.error) };
+  if (list.error) {
+    const missing = MISSING(list.error);
+    if (!missing) log.error("kvkk_queue_read_failed", { code: list.error.code ?? null, message: list.error.message ?? null });
+    return { rows: [], total: 0, open: 0, late: 0, warn: 0, error: "Başvurular okunamadı.", missing };
+  }
   const rows = ((list.data ?? []) as Pick<PlatformKvkkRow, "id" | "ref" | "request_type" | "status" | "identity_status" | "created_at" | "due_at">[]).map((r) => {
     const daysLeft = platformKvkkDaysLeft(r.due_at, r.status, nowMs);
     return {
@@ -438,9 +450,21 @@ export async function loadPlatformKvkkRequest(db: Db, id: string): Promise<Platf
 
 /** ilike deseninde joker karakterleri düz metin yapar (e-postadaki `_` joker değildir). */
 const likeExact = (v: string) => v.replace(/[\\%_]/g, (c) => `\\${c}`);
-const MAX_MATCH = 50;
+/** Tek sorguda okunan en çok eşleşme; aşılırsa tarama EKSİK sayılır ve hata döner (sessizce kesilmez). */
+export const MAX_MATCH = 100;
 const CUSTOMER_COLS = "id, tenant_id, full_name, phone, email, created_at, deleted_at, source, notes, birth_date, customer_types";
+const DEMO_COLS = "id, full_name, email, phone, company, city, message, created_at";
 const RELATED_TABLES = ["deals", "appointments", "calls", "communications", "offers", "tasks", "iys_consents"] as const;
+
+/** Tarama eksik kaldı (sorgu hatası ya da sınır aşımı): adım tamamlanmış sayılmaz, kullanıcıya bu metin gösterilir. */
+export class SubjectScanError extends Error {
+  constructor(public readonly userMessage: string, detail: string) {
+    super(detail);
+    this.name = "SubjectScanError";
+  }
+}
+const scanFailMessage = (e: unknown) =>
+  e instanceof SubjectScanError ? e.userMessage : "Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.";
 
 type CustomerRaw = {
   id: string;
@@ -455,40 +479,78 @@ type CustomerRaw = {
   birth_date: string | null;
   customer_types: string[] | null;
 };
+type QErr = { code?: string; message?: string } | null;
+type QRes = { data?: unknown; error: QErr; count?: number | null };
 
-/** Kişinin e-posta ve (varsa) telefonuyla eşleşen kayıtlar: ofis müşterileri (+ ilişkili kayıt sayıları), demo talepleri, açık ev ziyaretçileri, saklanan imzacı/cari sayıları. */
+/**
+ * Kişinin DOĞRULANMIŞ e-postası ve (varsa) yazdığı telefonla eşleşen kayıtlar: ofis müşterileri (+ ilişkili kayıt
+ * sayıları), demo talepleri, açık ev ziyaretçileri, saklanan imzacı/cari sayıları. Her kayıt eşleşme gerekçesini taşır
+ * (`matchedBy`; hem e-posta hem telefonla eşleşen kayıt `email` sayılır). Herhangi bir sorgu hata verirse ya da eşleşme
+ * sınırı aşılırsa `SubjectScanError` fırlatılır: eksik tarama "kayıt yok" sanılıp silme/paket tamamlanmış sayılmaz.
+ */
 export async function findSubjectRecords(db: Db, who: { email: string; phone: string | null }): Promise<SubjectRecords> {
   const email = likeExact(normalizeEmail(who.email));
-  const byEmail = db.from("customers").select(CUSTOMER_COLS).ilike("email", email).order("id").limit(MAX_MATCH);
-  const byPhone = who.phone ? db.from("customers").select(CUSTOMER_COLS).eq("phone", who.phone).order("id").limit(MAX_MATCH) : null;
-  const demoEmail = db.from("demo_requests").select("id, full_name, email, phone, company, city, message, created_at").ilike("email", email).order("id").limit(MAX_MATCH);
-  const demoPhone = who.phone ? db.from("demo_requests").select("id, full_name, email, phone, company, city, message, created_at").eq("phone", who.phone).order("id").limit(MAX_MATCH) : null;
-  const visitors = db.from("open_house_visitors").select("id, full_name, email, phone, registered_at, created_customer_id").ilike("email", email).order("id").limit(MAX_MATCH);
-  const signers = db.from("contract_signers").select("id", { count: "exact", head: true }).ilike("email", email);
-  const parties = db.from("finance_parties").select("id", { count: "exact", head: true }).ilike("email", email);
-  const empty = Promise.resolve({ data: [] as unknown[], error: null });
-  const [ce, cp, de, dp, vi, si, fp] = await Promise.all([byEmail, byPhone ?? empty, demoEmail, demoPhone ?? empty, visitors, signers, parties]);
-  if (ce.error) throw new Error(`Müşteri kayıtları taranamadı: ${ce.error.code ?? ""}`);
+  const empty = Promise.resolve({ data: [] as unknown[], error: null } as QRes);
+  const lim = MAX_MATCH + 1;
+  const [ce, cp, de, dp, vi, si, fp] = (await Promise.all([
+    db.from("customers").select(CUSTOMER_COLS).ilike("email", email).order("id").limit(lim),
+    who.phone ? db.from("customers").select(CUSTOMER_COLS).eq("phone", who.phone).order("id").limit(lim) : empty,
+    db.from("demo_requests").select(DEMO_COLS).ilike("email", email).order("id").limit(lim),
+    who.phone ? db.from("demo_requests").select(DEMO_COLS).eq("phone", who.phone).order("id").limit(lim) : empty,
+    db.from("open_house_visitors").select("id, full_name, email, phone, registered_at, created_customer_id").ilike("email", email).order("id").limit(lim),
+    db.from("contract_signers").select("id", { count: "exact", head: true }).ilike("email", email),
+    db.from("finance_parties").select("id", { count: "exact", head: true }).ilike("email", email),
+  ])) as QRes[];
+  const failed = (
+    [
+      ["customers.email", ce],
+      ["customers.phone", cp],
+      ["demo_requests.email", de],
+      ["demo_requests.phone", dp],
+      ["open_house_visitors", vi],
+      ["contract_signers", si],
+      ["finance_parties", fp],
+    ] as const
+  ).filter(([, r]) => r!.error);
+  if (failed.length) {
+    throw new SubjectScanError(
+      "Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.",
+      `scan failed: ${failed.map(([n, r]) => `${n}:${r!.error?.code ?? "?"}`).join(",")}`,
+    );
+  }
+  const rows = <T,>(r: QRes) => (r.data ?? []) as T[];
+  if ([ce, cp, de, dp, vi].some((r) => rows(r!).length > MAX_MATCH)) {
+    throw new SubjectScanError(
+      `Eşleşen kayıt sayısı ${MAX_MATCH}'ü aşıyor; tarama eksik kalacağı için tamamlanmadı. Başvuruyu teknik ekiple birlikte ele alın.`,
+      "scan overflow",
+    );
+  }
 
-  const customers = new Map<string, CustomerRaw>();
-  for (const r of [...((ce.data ?? []) as CustomerRaw[]), ...((cp.data ?? []) as CustomerRaw[])]) customers.set(r.id, r);
-  const list = [...customers.values()].slice(0, MAX_MATCH);
+  const customers = new Map<string, CustomerRaw & { matchedBy: MatchBasis }>();
+  for (const r of rows<CustomerRaw>(ce!)) customers.set(r.id, { ...r, matchedBy: "email" });
+  for (const r of rows<CustomerRaw>(cp!)) if (!customers.has(r.id)) customers.set(r.id, { ...r, matchedBy: "phone" });
+  const list = [...customers.values()];
+  if (list.length > MAX_MATCH) throw new SubjectScanError(`Eşleşen kayıt sayısı ${MAX_MATCH}'ü aşıyor; tarama eksik kalacağı için tamamlanmadı. Başvuruyu teknik ekiple birlikte ele alın.`, "scan overflow");
 
   const tenantIds = [...new Set(list.map((c) => c.tenant_id))];
   const tenantNames = new Map<string, string>();
   if (tenantIds.length) {
-    const { data } = await db.from("tenants").select("id, name").in("id", tenantIds);
+    const { data, error } = await db.from("tenants").select("id, name").in("id", tenantIds);
+    if (error) throw new SubjectScanError("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.", `scan failed: tenants:${error.code ?? "?"}`);
     for (const t of (data ?? []) as { id: string; name: string | null }[]) tenantNames.set(t.id, t.name ?? "Ofis");
   }
 
   const subjectCustomers: SubjectCustomer[] = await Promise.all(
     list.map(async (c) => {
-      const counts = await Promise.all(
+      const counts = (await Promise.all(
         RELATED_TABLES.map((t) => db.from(t).select("id", { count: "exact", head: true }).eq("tenant_id", c.tenant_id).eq("customer_id", c.id)),
-      );
+      )) as QRes[];
       const related: Record<string, number> = {};
       RELATED_TABLES.forEach((t, i) => {
-        const n = counts[i]?.error ? 0 : (counts[i]?.count ?? 0);
+        const res = counts[i];
+        // Sayım hatası yasal saklama gerekçesini (anlaşma) listeden düşürebilir: sessizce 0 sayılmaz.
+        if (!res || res.error) throw new SubjectScanError("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.", `scan failed: ${t}:${res?.error?.code ?? "?"}`);
+        const n = res.count ?? 0;
         if (n > 0) related[t] = n;
       });
       return {
@@ -505,36 +567,41 @@ export async function findSubjectRecords(db: Db, who: { email: string; phone: st
         birthDate: c.birth_date,
         customerTypes: c.customer_types ?? [],
         related,
+        matchedBy: c.matchedBy,
       };
     }),
   );
 
   type DemoRaw = { id: string; full_name: string | null; email: string | null; phone: string | null; company: string | null; city: string | null; message: string | null; created_at: string | null };
-  const demos = new Map<string, DemoRaw>();
-  for (const d of [...((de.error ? [] : de.data ?? []) as DemoRaw[]), ...((dp.error ? [] : dp.data ?? []) as DemoRaw[])]) demos.set(d.id, d);
+  const demos = new Map<string, DemoRaw & { matchedBy: MatchBasis }>();
+  for (const d of rows<DemoRaw>(de!)) demos.set(d.id, { ...d, matchedBy: "email" });
+  for (const d of rows<DemoRaw>(dp!)) if (!demos.has(d.id)) demos.set(d.id, { ...d, matchedBy: "phone" });
   const demoRequests: SubjectSimple[] = [...demos.values()].map((d, i) => ({
     id: d.id,
     label: `Demo talebi ${i + 1}`,
     createdAt: d.created_at,
     fields: { "Ad soyad": d.full_name, "E-posta": d.email, Telefon: d.phone, Firma: d.company, Şehir: d.city, Mesaj: d.message },
+    matchedBy: d.matchedBy,
   }));
 
   type VisitorRaw = { id: string; full_name: string | null; email: string | null; phone: string | null; registered_at: string | null; created_customer_id: string | null };
-  // Müşteriye bağlı ziyaretçi kaydı müşteri anonimleştirmesiyle birlikte işlenir; burada yalnız bağsızlar listelenir.
-  const visitorRows = ((vi.error ? [] : vi.data ?? []) as VisitorRaw[]).filter((v) => !v.created_customer_id || !customers.has(v.created_customer_id));
+  // E-postayla eşleşen müşteriye bağlı ziyaretçi kaydı o müşterinin anonimleştirmesiyle birlikte işlenir (müşteri her zaman
+  // kapsamda); burada yalnız bağsızlar ve kapsamı onaya bağlı (telefon) müşteriye bağlananlar listelenir.
+  const visitorRows = rows<VisitorRaw>(vi!).filter((v) => !v.created_customer_id || customers.get(v.created_customer_id)?.matchedBy !== "email");
   const visitorList: SubjectSimple[] = visitorRows.map((v) => ({
     id: v.id,
     label: "Açık ev etkinliği",
     createdAt: v.registered_at,
     fields: { "Ad soyad": v.full_name, "E-posta": v.email, Telefon: v.phone },
+    matchedBy: "email",
   }));
 
   return {
     customers: subjectCustomers,
     demoRequests,
     visitors: visitorList,
-    signers: si.error ? 0 : (si.count ?? 0),
-    financeParties: fp.error ? 0 : (fp.count ?? 0),
+    signers: si!.count ?? 0,
+    financeParties: fp!.count ?? 0,
   };
 }
 
@@ -586,10 +653,12 @@ export async function preparePackage(db: Db, id: string, staffId: string, nowMs:
   let records: SubjectRecords;
   try {
     records = await findSubjectRecords(db, { email: row.email, phone: row.phone });
-  } catch {
-    return fail("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.");
+  } catch (e) {
+    log.warn("kvkk_scan_failed", { ref: row.ref, detail: e instanceof Error ? e.message : null });
+    return fail(scanFailMessage(e));
   }
-  const summary = summarizeRecords(records);
+  // Yeniden taramada önceki onaylar, kayıt hâlâ telefonla eşleşiyorsa korunur (summarizeScan geçersizleri atar).
+  const summary = summarizeRecords(records, parsePackageSummary(row.package_summary)?.approvedPhone ?? []);
   const patch = {
     package_summary: summary,
     package_prepared_at: iso(nowMs),
@@ -603,58 +672,119 @@ export async function preparePackage(db: Db, id: string, staffId: string, nowMs:
   return { ok: true, row: { ...row, ...patch }, summary };
 }
 
+/**
+ * Telefonla (yalnız) eşleşen kayıtları kapsama alma: personel ofis + maskeli ad + gerekçeyi inceleyip kaydı TEK TEK onaylar.
+ * Verilen anahtarlar onay kümesinin TAMAMIDIR (işaret kaldırılan kayıt kapsamdan çıkar). Silme uygulandıktan sonra değişmez.
+ */
+export async function approvePhoneMatches(
+  db: Db,
+  id: string,
+  staffId: string,
+  keys: string[],
+  nowMs: number,
+): Promise<StepOk<{ summary: PackageSummary }> | Fail> {
+  const row = await loadOr(db, id);
+  if ("ok" in row) return row;
+  const blocked = packageBlocker(row);
+  if (blocked) return fail(blocked);
+  const prev = parsePackageSummary(row.package_summary);
+  if (!row.package_prepared_at || !prev) return fail("Önce kayıtları tarayın.");
+  const phoneKeys = new Set(prev.records.filter((r) => r.matchedBy === "phone").map((r) => r.key));
+  if (keys.some((k) => !phoneKeys.has(k))) return fail("Seçilen kayıt taramada yok; kayıtları yeniden tarayın.");
+  const summary = summarizeScan(prev.records, keys, prev.signers, prev.financeParties);
+  const patch = { package_summary: summary, assignee_id: row.assignee_id ?? staffId, updated_at: iso(nowMs) };
+  const { error } = await db.from(PLATFORM_KVKK_TABLE).update(patch).eq("id", id).is("erasure_applied_at", null);
+  if (error) return fail("Kapsam kaydedilemedi.");
+  return { ok: true, row: { ...row, ...patch }, summary };
+}
+
 export type ErasureResult = {
   at: string;
   anonymized: number;
   already: number;
+  /** Kaydedilmiş kapsamda olup ofiste artık bulunmayan müşteri kaydı (silinmiş). */
+  gone?: number;
   failed: { office: string; reason: string }[];
   demoRequests: number;
   visitors: number;
   retained: string[];
 };
 
+/** anonymize_customer RPC hatasını sınıflandırır (ham DB metni personele/denetim kaydına yazılmaz). */
+export function classifyErasureError(e: { code?: string; message?: string }): "already" | "gone" | { reason: string } {
+  const m = e.message ?? "";
+  if (/already anonymized|daha önce anonimleştirilmiş/i.test(m)) return "already";
+  if (/Customer not found|Müşteri bulunamadı/i.test(m)) return "gone";
+  if (/Tenant not found|Kiracı/i.test(m)) return { reason: "Ofis kaydı bulunamadı." };
+  if (/not authorized|Service role required/i.test(m)) return { reason: "Anonimleştirme yetkisi reddedildi (sistem yapılandırması)." };
+  return { reason: "Anonimleştirme yapılamadı; kısa süre sonra yeniden deneyin." };
+}
+
 /**
  * Silme: MEVCUT anonimleştirme akışı (`anonymize_customer`, /app/uyum ile aynı RPC; yasal saklama gereken anlaşma/çağrı
- * satırları korunur, kişi alanları maskelenir, kvkk_erasure_log'a kanıt yazılır) her eşleşen ofis müşterisine uygulanır.
- * EmlakSoft'un kendi demo talepleri ve bağsız açık ev ziyaretçi kayıtları anonimleşir. İmzacı ve muhasebe cari kayıtları
- * yasal saklama gereği DOKUNULMADAN kalır ve sonuçta gerekçesiyle listelenir. Hata olursa adım tamamlanmış sayılmaz
- * (yeniden denenir; anonimleşmiş kayıt "zaten" sayılır).
+ * satırları korunur, kişi alanları maskelenir, kvkk_erasure_log'a kanıt yazılır) YALNIZ personelin incelediği taramanın
+ * kapsamındaki kayıtlara (kaydedilmiş kimlikler: doğrulanmış e-posta eşleşmeleri + tek tek onaylanan telefon eşleşmeleri)
+ * uygulanır. Silme anında yeniden tarama yapılır; incelenen kapsamda olmayan yeni bir eşleşme çıkarsa silme yapılmaz,
+ * yeniden tarama istenir. EmlakSoft'un kendi demo talepleri ve bağsız açık ev ziyaretçi kayıtları anonimleşir. İmzacı ve
+ * muhasebe cari kayıtları yasal saklama gereği DOKUNULMADAN kalır ve sonuçta gerekçesiyle listelenir. Hata olursa adım
+ * tamamlanmış sayılmaz (yeniden denenir; anonimleşmiş kayıt "zaten" sayılır).
  */
 export async function applyErasure(db: Db, id: string, staffId: string, nowMs: number): Promise<StepOk<{ result: ErasureResult }> | Fail> {
   const row = await loadOr(db, id);
   if ("ok" in row) return row;
   const blocked = erasureBlocker(row);
   if (blocked) return fail(blocked);
-  let records: SubjectRecords;
+  const stored = parsePackageSummary(row.package_summary);
+  if (!stored) return fail("Önce kayıtları tarayın.");
+  let current: SubjectRecords;
   try {
-    records = await findSubjectRecords(db, { email: row.email, phone: row.phone });
-  } catch {
-    return fail("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.");
+    current = await findSubjectRecords(db, { email: row.email, phone: row.phone });
+  } catch (e) {
+    log.warn("kvkk_scan_failed", { ref: row.ref, detail: e instanceof Error ? e.message : null });
+    return fail(scanFailMessage(e));
   }
-  const result: ErasureResult = { at: iso(nowMs), anonymized: 0, already: 0, failed: [], demoRequests: 0, visitors: 0, retained: summarizeRecords(records).legalHolds };
-  for (const c of records.customers) {
+  const drift = scopeDrift(stored, scanRecords(current));
+  if (drift.length) {
+    return fail(`Taramadan sonra ${drift.length} yeni eşleşen kayıt çıktı; silme yapılmadı. Kayıtları yeniden tarayıp inceleyin, sonra silmeyi uygulayın.`);
+  }
+  const approved = new Set(stored.approvedPhone);
+  const targets = stored.records.filter((r) => r.matchedBy === "email" || approved.has(r.key));
+  const result: ErasureResult = { at: iso(nowMs), anonymized: 0, already: 0, gone: 0, failed: [], demoRequests: 0, visitors: 0, retained: stored.legalHolds };
+  for (const c of targets.filter((r) => r.kind === "customer" && r.tenantId)) {
     const { error } = await db.rpc("anonymize_customer", {
       p_tenant_id: c.tenantId,
       p_customer_id: c.id,
       p_reason: `KVKK başvurusu ${row.ref}`,
       p_actor_id: staffId,
     });
-    if (!error) result.anonymized += 1;
-    else if (/already anonymized/i.test(error.message ?? "")) result.already += 1;
-    else result.failed.push({ office: c.tenantName, reason: (error.message ?? "bilinmeyen hata").slice(0, 160) });
+    if (!error) {
+      result.anonymized += 1;
+      continue;
+    }
+    const kind = classifyErasureError(error);
+    if (kind === "already") result.already += 1;
+    else if (kind === "gone") result.gone = (result.gone ?? 0) + 1;
+    else {
+      log.error("kvkk_erasure_rpc_failed", { ref: row.ref, key: customerKey(c.tenantId!, c.id), code: error.code ?? null, message: error.message ?? null });
+      result.failed.push({ office: c.office, reason: kind.reason });
+    }
   }
-  for (const d of records.demoRequests) {
+  for (const d of targets.filter((r) => r.kind === "demo")) {
     const { error } = await db
       .from("demo_requests")
       .update({ full_name: "Anonim", email: null, phone: null, company: null, message: null, notes: null })
       .eq("id", d.id);
-    if (error) result.failed.push({ office: "EmlakSoft demo talebi", reason: error.code ?? "yazılamadı" });
-    else result.demoRequests += 1;
+    if (error) {
+      log.error("kvkk_erasure_demo_failed", { ref: row.ref, code: error.code ?? null, message: error.message ?? null });
+      result.failed.push({ office: "EmlakSoft demo talebi", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
+    } else result.demoRequests += 1;
   }
-  for (const v of records.visitors) {
+  for (const v of targets.filter((r) => r.kind === "visitor")) {
     const { error } = await db.from("open_house_visitors").update({ full_name: "Anonim", email: null, phone: null, notes: null }).eq("id", v.id);
-    if (error) result.failed.push({ office: "Açık ev ziyaretçi kaydı", reason: error.code ?? "yazılamadı" });
-    else result.visitors += 1;
+    if (error) {
+      log.error("kvkk_erasure_visitor_failed", { ref: row.ref, code: error.code ?? null, message: error.message ?? null });
+      result.failed.push({ office: "Açık ev ziyaretçi kaydı", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
+    } else result.visitors += 1;
   }
   const done = result.failed.length === 0;
   const patch = {
@@ -727,15 +857,22 @@ export async function assignRequest(db: Db, id: string, staffId: string | null, 
 
 /**
  * Veri paketi satırları: YALNIZ kimliği doğrulanmış ve paketi hazırlanmış (kayıtları taranmış) başvuru için; aksi halde
- * boş (rapor açıklaması bunu söyler). Kayıtlar dosya üretimi anında yeniden okunur (güncel veri).
+ * boş (rapor açıklaması bunu söyler). Kayıtlar dosya üretimi anında yeniden okunur (güncel veri) ama YALNIZ kapsamdakiler
+ * girer: doğrulanmış e-postayla eşleşenler + personelin onayladığı telefon eşleşmeleri (başkasının kaydı pakete girmez).
+ * Tarama eksik kalırsa hata fırlatılır (eksik paket üretilmez).
  */
 export async function loadPackageRowsByRef(db: Db, ref: string): Promise<PackageRow[]> {
   const r = ref.trim().toUpperCase();
   if (!/^KVKK-\d{4}-[0-9A-Z]{6}$/.test(r)) return [];
-  const { data } = await db.from(PLATFORM_KVKK_TABLE).select("id, ref, email, phone, identity_status, package_prepared_at, status, request_type, created_at").eq("ref", r).maybeSingle();
-  const row = data as Pick<PlatformKvkkRow, "email" | "phone" | "identity_status" | "package_prepared_at" | "status" | "request_type" | "created_at" | "ref"> | null;
+  const { data } = await db
+    .from(PLATFORM_KVKK_TABLE)
+    .select("id, ref, email, phone, identity_status, package_prepared_at, package_summary, status, request_type, created_at")
+    .eq("ref", r)
+    .maybeSingle();
+  const row = data as Pick<PlatformKvkkRow, "email" | "phone" | "identity_status" | "package_prepared_at" | "package_summary" | "status" | "request_type" | "created_at" | "ref"> | null;
   if (!row || row.identity_status !== "verified" || !row.package_prepared_at) return [];
-  const records = await findSubjectRecords(db, { email: row.email, phone: row.phone });
+  const approved = parsePackageSummary(row.package_summary)?.approvedPhone ?? [];
+  const records = scopeSubjectRecords(await findSubjectRecords(db, { email: row.email, phone: row.phone }), approved);
   const head: PackageRow[] = [
     { bolum: "Başvuru", ofis: "EmlakSoft", kayit: row.ref, alan: "Başvuru türü", deger: PLATFORM_KVKK_TYPE_LABELS[row.request_type] ?? row.request_type, tarih: row.created_at },
     { bolum: "Başvuru", ofis: "EmlakSoft", kayit: row.ref, alan: "Durum", deger: PLATFORM_KVKK_STATUS_LABELS[row.status as keyof typeof PLATFORM_KVKK_STATUS_LABELS] ?? row.status, tarih: row.created_at },
