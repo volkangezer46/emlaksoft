@@ -110,9 +110,11 @@ export async function createFeatureRequest(input: { tenantId: string; userId: st
     if (isSchemaMissing(error)) throw new ActionUserError("Öneri panosu henüz kurulmadı (veritabanı güncellemesi bekleniyor).");
     throw new Error("Öneri kaydedilemedi.");
   }
-  await admin
+  // Otomatik oy yazılamazsa öneri kaydı geri alınmaz (ofis sonradan oy verebilir) ama hata görünür kalsın.
+  const vote = await admin
     .from("product_feature_request_votes")
     .upsert({ request_id: data.id, tenant_id: input.tenantId, user_id: input.userId }, { onConflict: "request_id,tenant_id", ignoreDuplicates: true });
+  if (vote.error) console.error("[product-feedback] öneren ofisin otomatik oyu yazılamadı", { requestId: data.id, error: vote.error.message });
   return data.id as string;
 }
 

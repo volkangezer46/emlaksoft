@@ -61,7 +61,7 @@ export function NpsPrompt({ surveyId, question }: { surveyId: string; question: 
   return (
     <aside
       aria-label="Kısa memnuniyet anketi"
-      className="fixed inset-x-4 bottom-20 z-40 mx-auto max-w-md rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-xl sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-[26rem] lg:bottom-6"
+      className="fixed inset-x-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 mx-auto max-w-md rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-xl sm:inset-x-auto sm:right-6 sm:w-[26rem] lg:bottom-6"
     >
       <div className="flex items-start gap-2">
         <MessageSquareHeart className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden />

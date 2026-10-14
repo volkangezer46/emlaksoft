@@ -78,12 +78,13 @@ export async function saveNpsSurvey(fd: FormData): Promise<PlatformFeedbackResul
     tenant_ids: tenantIds,
     owners_only: Boolean(seg.value.ownersOnly),
     segment_json: seg.value,
-    is_active: true,
     updated_at: new Date(now()).toISOString(),
   };
+  // Yayın durumu (is_active) yalnız setNpsSurveyActive ile değişir: kaldırılmış anketi düzenlemek onu sessizce
+  // yeniden yayına almamalı.
   const res = id
     ? await admin.from("platform_nps_surveys").update(row).eq("id", id).select("id").maybeSingle()
-    : await admin.from("platform_nps_surveys").insert({ ...row, created_by: staff.id }).select("id").single();
+    : await admin.from("platform_nps_surveys").insert({ ...row, is_active: true, created_by: staff.id }).select("id").single();
   if (res.error || !res.data) {
     if (isSchemaMissing(res.error)) return { error: "NPS tablosu henüz kurulmadı (veritabanı güncellemesi bekleniyor)." };
     return { error: actionErrorMessage(res.error, "Anket kaydedilemedi") };
