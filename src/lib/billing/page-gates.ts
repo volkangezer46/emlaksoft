@@ -1,4 +1,4 @@
-import { getPlan, normalizePlanId, type PlanId } from "@/lib/billing/plans";
+import { getPlan, normalizePlanId, planTierOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
 
 /**
  * Paket → sayfa kilidi. Paket kartlarındaki özellikler bugüne kadar yalnız satış
@@ -69,11 +69,34 @@ export function planRank(plan: PlanId): number {
 
 export type GateContext = {
   plan: string | null | undefined;
+  /**
+   * Paketin modül kademesi (adminden eklenen pakette katalogdaki `tier`; `getPlanTier`). Yoksa `plan` taban kimlik
+   * olarak okunur (eski davranış: bilinmeyen kimlik Ofis kademesi).
+   */
+  tier?: PlanId | null;
   /** tenants.status === "trial": deneme boyunca her şey açık. */
   trial: boolean;
   /** tenants.created_at; kesim tarihinden önce açılmış tenant kilitlenmez. */
   tenantCreatedAt: string | null | undefined;
 };
+
+/** Kapı hesabında kullanılan kademe: verilmişse `tier`, değilse taban kimlik (bilinmeyen -> Ofis). */
+export function gateTierOf(ctx: Pick<GateContext, "plan" | "tier">): PlanId {
+  return ctx.tier ?? normalizePlanId(ctx.plan, "office");
+}
+
+/**
+ * MODÜL-PLAN EŞLEMESİNİN TEK KAYNAĞI: paket (taban ya da eklenen) bu kilidi açıyor mu? Fiyat sayfası karşılaştırması,
+ * admin "dahil modüller" listesi ve sayfa kapısı aynı kuralı kullanır.
+ */
+export function planIncludesGate(def: Pick<PlanDef, "id" | "tier">, gate: Pick<PlanGate, "minPlan">): boolean {
+  return planRank(planTierOf(def)) >= planRank(gate.minPlan);
+}
+
+/** Paketin açtığı (dahil) kilitli sayfalar; PLAN_GATES sırasıyla. */
+export function gatesIncludedIn(def: Pick<PlanDef, "id" | "tier">): PlanGate[] {
+  return PLAN_GATES.filter((g) => planIncludesGate(def, g));
+}
 
 /** Bu tenant için paket kilidi uygulanır mı? */
 export function planGatingApplies(ctx: GateContext): boolean {
@@ -105,17 +128,20 @@ export function lockedGate(path: string, ctx: GateContext): PlanGate | null {
   if (!planGatingApplies(ctx)) return null;
   const gate = findGate(path);
   if (!gate) return null;
-  const plan = normalizePlanId(ctx.plan, "office");
-  return planRank(plan) >= planRank(gate.minPlan) ? null : gate;
+  return planRank(gateTierOf(ctx)) >= planRank(gate.minPlan) ? null : gate;
 }
 
 /**
  * Deneme bittiğinde bu paket/tenant için kilitlenecek sayfalar (PLAN_GATES'ten üretilir, sabit liste yok).
  * Kilit hiç uygulanmayan tenant'ta (kesim tarihinden eski) boş döner.
  */
-export function gatesLockedAfterTrial(ctx: { plan: string | null | undefined; tenantCreatedAt: string | null | undefined }): PlanGate[] {
+export function gatesLockedAfterTrial(ctx: {
+  plan: string | null | undefined;
+  tier?: PlanId | null;
+  tenantCreatedAt: string | null | undefined;
+}): PlanGate[] {
   if (!planGatingApplies({ plan: ctx.plan, trial: false, tenantCreatedAt: ctx.tenantCreatedAt })) return [];
-  const rank = planRank(normalizePlanId(ctx.plan, "office"));
+  const rank = planRank(gateTierOf(ctx));
   return PLAN_GATES.filter((g) => rank < planRank(g.minPlan));
 }
 

@@ -100,7 +100,7 @@ export function evaluatePlanChange(input: PlanChangeInput): PlanChangeEval {
   const base = { ...empty, fromPeriodTry, toPeriodTry };
 
   if (from.id === to.id) return { ...base, status: "same_plan", message: "Zaten bu paketi kullanıyorsunuz." };
-  if (to.hidden) return { ...base, status: "not_sold", message: "Bu paket çevrimiçi seçilemiyor." };
+  if (to.hidden || to.archived) return { ...base, status: "not_sold", message: "Bu paket çevrimiçi seçilemiyor." };
   if (toPeriodTry === fromPeriodTry) {
     return { ...base, status: "same_price", message: "İki paketin tutarı aynı; paket değişikliği için destek ile iletişime geçin." };
   }

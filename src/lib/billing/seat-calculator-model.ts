@@ -1,4 +1,4 @@
-import { yearlyOfferLabel, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { yearlyOfferLabel, type BillingCycle, type PlanDef, type CatalogPlanId } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan, type RegistrationTeamSize } from "@/lib/billing/registration-plan";
 import {
   findCrossoverSeat,
@@ -89,7 +89,7 @@ export type SeatCalcResult = {
   status: "ok" | "over_max";
   seats: number;
   cycle: BillingCycle;
-  planId: PlanId;
+  planId: CatalogPlanId;
   planName: string;
   /** Etkin (kampanya dahil) teklif; "over_max" durumunda tutar gösterilmez. */
   quote: SeatQuote;
@@ -166,7 +166,7 @@ export function computeSeatCalc(
     status: exceeded ? "over_max" : "ok",
     seats,
     cycle,
-    planId: rec.planId as PlanId,
+    planId: rec.planId as CatalogPlanId,
     planName,
     quote: q,
     monthlyEquivalentTry: monthlyEq,
@@ -250,7 +250,7 @@ export function extraSeatTexts(plans: readonly PlanDef[]): Record<string, ExtraS
 // ---------------------------------------------------------------------------
 
 export type RegistrationSelection = {
-  planId: PlanId;
+  planId: CatalogPlanId;
   /** Sunucu eylemi (`agents` alanı) için kova: önerilen planın minimum kovası, böylece sunucu planı yükseltmez/düşürmez. */
   teamSize: RegistrationTeamSize;
   calc: SeatCalcResult;
@@ -269,16 +269,16 @@ export function registrationSelection(
   honorPlanId?: string | null,
 ): RegistrationSelection {
   const calc = computeSeatCalc(plans, offers, seats, cycle);
-  let planId: PlanId = calc.planId;
+  let planId: CatalogPlanId = calc.planId;
   if (honorPlanId && honorPlanId !== planId) {
     const order: string[] = plans.map((p) => p.id);
     const honorIdx = order.indexOf(honorPlanId);
     const recIdx = order.indexOf(planId);
-    if (honorIdx >= 0 && recIdx >= 0 && honorIdx > recIdx) planId = honorPlanId as PlanId;
+    if (honorIdx >= 0 && recIdx >= 0 && honorIdx > recIdx) planId = honorPlanId as CatalogPlanId;
   }
   return {
     planId,
-    teamSize: defaultTeamSizeForPlan(planId),
+    teamSize: defaultTeamSizeForPlan(planId, plans.find((p) => p.id === planId)?.tier),
     calc,
   };
 }

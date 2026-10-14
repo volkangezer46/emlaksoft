@@ -4,8 +4,9 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { PLANS, planAmountOf, type BillingCycle, type PlanId } from "@/lib/billing/plans";
+import { PLANS, planAmountOf, type BillingCycle, type CatalogPlanId } from "@/lib/billing/plans";
 import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { isCustomPlanIdFormat } from "@/lib/billing/plan-overrides";
 import { evaluateSeatChange } from "@/lib/billing/seat-purchase-core";
 import { evaluatePlanChange } from "@/lib/billing/plan-change-core";
 import { isPlanChangeEnabled, loadPlanChangeState } from "@/lib/billing/plan-change";
@@ -70,9 +71,10 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   const gate = await requirePermission("billing", "edit", { allowSuspended: true });
   if (!gate.ok) return { error: gate.error };
 
-  const plan = String(formData.get("plan") ?? "").trim() as PlanId;
+  const plan = String(formData.get("plan") ?? "").trim() as CatalogPlanId;
   const cycle = (String(formData.get("cycle") ?? "monthly").trim() || "monthly") as BillingCycle;
-  if (!PLAN_IDS.has(plan)) return { error: "Geçersiz paket." };
+  // Taban satış paketleri (gizli Business hariç, eski davranış) + adminden eklenen paketler (varlığı katalogdan doğrulanır).
+  if (!PLAN_IDS.has(plan) && !isCustomPlanIdFormat(plan)) return { error: "Geçersiz paket." };
   if (cycle !== "monthly" && cycle !== "yearly") return { error: "Geçersiz dönem." };
   // "Hesap kredimi kullan" (TL kredi cüzdanı): tutar istemciden ALINMAZ; sunucu bakiye ve pay sınırıyla hesaplar.
   const useCredit = String(formData.get("use_credit") ?? "") === "1";
@@ -137,8 +139,11 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     return { error: actionErrorMessage(error, "Paket kapasitesi doğrulanamadı.") };
   }
 
+  // Bilinmeyen kimlikte okuyucu Ofis'e düşer: kimlik eşleşmiyorsa paket katalogda yok demektir.
   const planDef = await getPlanDefinition(plan);
-  if (planDef.hidden) {
+  if (planDef.id !== plan) return { error: "Geçersiz paket." };
+  // Arşivli paket yeni satışa kapalıdır; o pakette olan ofis kendi paketini yenileyebilir.
+  if (planDef.hidden || (planDef.archived && tenant.plan !== plan)) {
     return { error: "Bu paket çevrimiçi satın alınamıyor." };
   }
   const listAmountTry = planAmountOf(planDef, cycle);
@@ -416,7 +421,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
       walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
       tenantId: gate.tenantId,
       subscriptionId: state.subscriptionId,
-      plan: state.planId as PlanId,
+      plan: state.planId as CatalogPlanId,
       cycle: state.cycle,
       conversationId,
       chargeNetTry: chargeNet,
@@ -449,7 +454,7 @@ export async function startSeatPurchase(formData: FormData): Promise<SeatPurchas
     try {
       await fulfillInvoiceWithWalletCredit({
         tenantId: gate.tenantId,
-        plan: state.planId as PlanId,
+        plan: state.planId as CatalogPlanId,
         cycle: state.cycle,
         conversationId,
       });

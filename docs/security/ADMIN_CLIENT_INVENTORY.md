@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **525** (273 dosya) — risk: P0=16, P1=40, P2=469
-- Tenant filtresi: var=281, uygulanamaz=158, yok=56, param=18, devir=12
-- Kapı türü: public-token=35, dosya-duzeyi=129, platform=99, belirsiz=127, elle-dogrulandi=26, oturum-izin=82, cron=24, webhook-imza=3
+- Toplam birim: **526** (273 dosya) — risk: P0=16, P1=40, P2=470
+- Tenant filtresi: var=281, uygulanamaz=159, yok=56, param=18, devir=12
+- Kapı türü: public-token=35, dosya-duzeyi=130, platform=99, belirsiz=127, elle-dogrulandi=26, oturum-izin=82, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **68**; RLS'li client'a taşıma adayı: **66**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -24,8 +24,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform-members.ts:360` | `bulkDeactivateMembers` | Gerekçe doğrulanmadı. | belirsiz | devir | P0 |
 | `src/app/actions/platform-members.ts:230` | `setMemberActiveAsStaff` | Gerekçe doğrulanmadı. | belirsiz | devir | P0 |
 | `src/app/admin/_dashboards/support-home.tsx:42` | `SupportHome` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
-| `src/lib/billing/plan-support.ts:93` | `getFoundersStatus` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
-| `src/lib/billing/plan-support.ts:35` | `getPlanSupport` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/billing/plan-support.ts:97` | `getFoundersStatus` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
+| `src/lib/billing/plan-support.ts:37` | `getPlanSupport` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/ef-credits/credit-reader.ts:35` | `cachedReady` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/ef-credits/wallet.ts:42` | `efCreditReady` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
 | `src/lib/geo/admin-store.ts:344` | `countOf` | Gerekçe doğrulanmadı. | belirsiz | yok | P0 |
@@ -63,7 +63,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/ai-advisor.ts:49` | `buildAdvisorContext` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
 | `src/lib/alerts/engine.ts:137` | `runAlertEvaluation` | Gerekçe doğrulanmadı. | dosya-duzeyi | devir (yazma) | P1 |
 | `src/lib/billing/fulfillment.ts:74` | `transitionCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | yok | P1 |
-| `src/lib/billing/reconciliation.ts:204` | `runBillingReconciliation` | Gerekçe doğrulanmadı. | dosya-duzeyi | param (yazma) | P1 |
+| `src/lib/billing/reconciliation.ts:205` | `runBillingReconciliation` | Gerekçe doğrulanmadı. | dosya-duzeyi | param (yazma) | P1 |
 | `src/lib/ef-credits/wallet.ts:51` | `efBalance` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
 | `src/lib/ef-credits/wallet.ts:81` | `efCommit` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
 | `src/lib/ef-credits/wallet.ts:93` | `efRelease` | Gerekçe doğrulanmadı. | belirsiz | param | P1 |
@@ -164,7 +164,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/payment-links.ts:124` | `startPaymentLinkCheckout` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/platform-access-policy.ts:94` | `revokeStaffSession` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/app/actions/platform-account.ts:39` | `updateOwnProfile` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz (yazma) | P2 |
-| `src/app/actions/platform-billing-plans.ts:74` | `syncEntitlements` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-billing-plans.ts:136` | `syncEntitlements` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/platform-billing-plans.ts:96` | `writePlanRegistry` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/platform-billing.ts:73` | `markInvoicePaid` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/platform-billing.ts:182` | `recordInvoiceRefund` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/platform-billing.ts:357` | `resolveCapture` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -308,7 +309,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/billing/faturalar/yeni/page.tsx:20` | `NewInvoicePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/billing/kuponlar/page.tsx:20` | `CouponsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/billing/page.tsx:92` | `AdminBillingPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/billing/planlar/page.tsx:50` | `PlansAdminPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
+| `src/app/admin/billing/planlar/page.tsx:51` | `PlansAdminPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
 | `src/app/admin/billing/tahsilat/page.tsx:77` | `DunningPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/duyuru/banner-panel.tsx:45` | `BannerPanel` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/admin/duyuru/changelog-panel.tsx:18` | `ChangelogPanel` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
@@ -318,7 +319,6 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/geo/[provinceId]/page.tsx:35` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/geo/bildirimler/page.tsx:29` | `AdminGeoRequestsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/geo/page.tsx:22` | `AdminGeoPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/sistem/_hatalar/errors-view.tsx:118` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/[id]/page.tsx:116` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:158` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/muhasebe/defter/page.tsx:46` | `FaturaDefteriPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
@@ -326,6 +326,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/page.tsx:90` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/raporlar/page.tsx:58` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/seo/pattern-samples.ts:45` | `loadPatternData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/admin/sistem/_hatalar/errors-view.tsx:118` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/sistem/alerts-view.tsx:55` | `AlertsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/sistem/backup-card.tsx:20` | `BackupHistory` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/admin/sistem/database-view.tsx:31` | `DatabaseView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -437,8 +438,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/billing/fulfillment.ts:412` | `markCheckoutInvoiceFailed` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/billing/fulfillment.ts:388` | `markCheckoutInvoiceInitialized` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/billing/payment-link-fulfill.ts:22` | `fulfillPaymentLink` | Oturumsuz dış çağrı (webhook/ödeme geri dönüşü). | webhook-imza | var | P2 |
-| `src/lib/billing/reconciliation.ts:69` | `reconcileCapture` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/lib/billing/reconciliation.ts:45` | `transitionCapture` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | yok | P2 |
+| `src/lib/billing/reconciliation.ts:70` | `reconcileCapture` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/lib/billing/reconciliation.ts:46` | `transitionCapture` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | yok | P2 |
 | `src/lib/billing/seat-purchase.ts:53` | `cachedSeatSupport` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/billing/seat-purchase.ts:212` | `createSeatInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/campaign-delivery.ts:524` | `runCampaignDeliveryWorker` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |

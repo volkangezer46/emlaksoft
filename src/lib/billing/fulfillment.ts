@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId } from "@/lib/billing/plans";
 import { ActionUserError } from "@/lib/action-errors";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCreditRequest } from "@/lib/try-credits/checkout";
@@ -10,7 +10,7 @@ import { registerClaimSafe } from "@/lib/growth/engine";
 
 export type FulfillInput = {
   tenantId: string;
-  plan: PlanId;
+  plan: CatalogPlanId;
   cycle: BillingCycle;
   conversationId: string;
   paymentId?: string | null;
@@ -35,7 +35,7 @@ export type AtomicFulfillmentResult = {
   tenantId?: string;
   invoiceId?: string;
   paymentLinkId?: string;
-  plan?: PlanId;
+  plan?: CatalogPlanId;
   cycle?: BillingCycle;
   commissionUpdated?: boolean;
 };
@@ -51,7 +51,7 @@ type AtomicFulfillmentInput = {
   source: FulfillInput["source"];
   targetType: FulfillmentTarget;
   expectedTenantId?: string | null;
-  expectedPlan?: PlanId | null;
+  expectedPlan?: CatalogPlanId | null;
   expectedCycle?: BillingCycle | null;
   expectedAmountTry?: number | null;
   expectedCurrency: typeof IYZICO_CURRENCY;
@@ -259,7 +259,7 @@ export async function fulfillSuccessfulPayment(input: FulfillInput) {
  */
 export async function fulfillInvoiceWithWalletCredit(input: {
   tenantId: string;
-  plan: PlanId;
+  plan: CatalogPlanId;
   cycle: BillingCycle;
   conversationId: string;
 }) {
@@ -295,7 +295,7 @@ export type CheckoutInvoiceResult = {
 export async function createCheckoutInvoice(input: {
   tenantId: string;
   subscriptionId: string | null;
-  plan: PlanId;
+  plan: CatalogPlanId;
   cycle: BillingCycle;
   conversationId: string;
   amountTry: number;
@@ -423,7 +423,7 @@ export async function markCheckoutInvoiceFailed(input: {
   await tryReleaseInvoice(admin, input.tenantId, input.invoiceId, "checkout_failed");
 }
 
-export async function assertBillingPlanPreflight(tenantId: string, plan: PlanId) {
+export async function assertBillingPlanPreflight(tenantId: string, plan: CatalogPlanId) {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("billing_plan_change_preflight", {
     p_tenant_id: tenantId,

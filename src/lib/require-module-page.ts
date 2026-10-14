@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { lockedGate } from "@/lib/billing/page-gates";
+import { getPlanTier } from "@/lib/billing/plan-definitions";
 import { getRequestProfile, getTenantGateContext } from "@/lib/cache/request";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaff } from "@/lib/platform";
@@ -69,7 +70,12 @@ export async function requireModulePage(mod: AppModule, href?: string) {
   if (href && tenantId) {
     const gateCtx =
       bootOwn && bootOwn.profile.tenantId === tenantId && bootOwn.office
-        ? { plan: bootOwn.office.plan ?? null, trial: bootOwn.office.status === "trial", tenantCreatedAt: bootOwn.office.created_at ?? null }
+        ? {
+            plan: bootOwn.office.plan ?? null,
+            tier: await getPlanTier(bootOwn.office.plan),
+            trial: bootOwn.office.status === "trial",
+            tenantCreatedAt: bootOwn.office.created_at ?? null,
+          }
         : await getTenantGateContext(tenantId);
     const gate = lockedGate(href, gateCtx);
     if (gate) redirect(`/app/paket?ozellik=${encodeURIComponent(gate.href)}`);

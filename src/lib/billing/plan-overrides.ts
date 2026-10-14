@@ -1,4 +1,5 @@
 import {
+  BASE_PLAN_IDS,
   BUSINESS_PLAN_TEMPLATE,
   PLANS,
   type PlanDef,
@@ -7,6 +8,9 @@ import {
   type SeatRounding,
   type SeatTier,
   PLAN_USER_CAPS,
+  isPlanId,
+  planAmountOf,
+  type BillingCycle,
 } from "@/lib/billing/plans";
 
 /**
@@ -35,7 +39,25 @@ export const PLAN_FIELD_LIMITS = {
 } as const;
 
 /** Veritabanında plan kimliği kısıtı olan (satılabilir) kimlikler; business migration ister. */
-export const ALL_PLAN_IDS: readonly PlanId[] = ["advisor", "office", "professional", "business", "enterprise"];
+export const ALL_PLAN_IDS: readonly PlanId[] = BASE_PLAN_IDS;
+
+/**
+ * ADMİNDEN EKLENEN PAKETLER (plan katalog motoru, 20261014002000): kimlik küçük harf slug'ıdır, taban kimliklerle
+ * çakışamaz; DB'de `billing_plans` satırı (FK hedefi) + bu belgede `plans.<id>` altında TAM tanım (`custom: true`, `tier`).
+ * SQL `plan_monthly_amount` aynı `plans.<id>.monthlyTry` alanını okur (TS ile tek kaynak).
+ */
+export const CUSTOM_PLAN_ID_RE = /^[a-z][a-z0-9_]{2,31}$/;
+export const CUSTOM_PLANS_MAX = 20;
+
+/** Taban olmayan, biçimi geçerli paket kimliği mi (varlığı katalogdan ayrıca doğrulanır). */
+export function isCustomPlanIdFormat(id: string): boolean {
+  return CUSTOM_PLAN_ID_RE.test(id) && !isPlanId(id);
+}
+
+/** Taban ya da biçimi geçerli eklenen paket kimliği (form/URL girdisi ön süzgeci; satılabilirlik `findSellablePlan`). */
+export function isCatalogPlanKey(id: string): boolean {
+  return isPlanId(id) || isCustomPlanIdFormat(id);
+}
 
 export type PlanOverride = {
   name?: string;
@@ -76,6 +98,8 @@ export const DEFAULT_CAMPAIGN: PlanCampaignSettings = { name: "Founders", quota:
 export type PlanCatalogSettings = {
   overrides: PlanOverrides;
   campaign: PlanCampaignSettings;
+  /** Adminden eklenen paketler (tam tanım; taban katalogda karşılığı yok). Eski kayıtlarda yoktur = boş. */
+  customPlans?: PlanDef[];
 };
 
 function isInt(n: unknown, min: number, max: number): n is number {
@@ -201,7 +225,13 @@ export function parsePlanCatalogSettings(raw: string | null | undefined): PlanCa
       const o = sanitizePlanOverride(parsed?.plans?.[id]);
       if (Object.keys(o).length > 0) overrides[id] = o;
     }
-    return { overrides, campaign: sanitizeCampaign(parsed?.campaign) };
+    const customPlans: PlanDef[] = [];
+    for (const [id, raw] of Object.entries(parsed?.plans ?? {})) {
+      if (customPlans.length >= CUSTOM_PLANS_MAX) break;
+      const def = sanitizeCustomPlan(id, raw);
+      if (def) customPlans.push(def);
+    }
+    return { overrides, campaign: sanitizeCampaign(parsed?.campaign), customPlans };
   } catch {
     return empty;
   }
@@ -224,7 +254,61 @@ export function parsePlanOverrides(raw: string | null | undefined): PlanOverride
 }
 
 export function serializePlanCatalogSettings(settings: PlanCatalogSettings): string {
-  return JSON.stringify({ v: 2, plans: settings.overrides, campaign: settings.campaign });
+  const plans: Record<string, unknown> = { ...settings.overrides };
+  for (const def of settings.customPlans ?? []) plans[def.id] = customPlanRecord(def);
+  return JSON.stringify({ v: 2, plans, campaign: settings.campaign });
+}
+
+/**
+ * Eklenen paketin depo kaydı (kimlik anahtardır). Alanlar taban düzenlemesiyle AYNI adları taşır; böylece SQL
+ * (`plan_monthly_amount`, `plan_yearly_paid_months`, `plan_campaign_lock_amount`) eklenen paketi de aynı yoldan okur.
+ */
+export function customPlanRecord(def: PlanDef): Record<string, unknown> {
+  const { id: _id, ...rest } = def;
+  void _id;
+  return { ...rest, custom: true, tier: rest.tier ?? "office", archived: rest.archived === true };
+}
+
+/** Depodaki eklenen paket kaydını doğrular; eksik/bozuk kayıt null (sessizce katalog dışı kalır). */
+export function sanitizeCustomPlan(id: string, raw: unknown): PlanDef | null {
+  if (!isCustomPlanIdFormat(id) || !raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (r.custom !== true) return null;
+  const tier = typeof r.tier === "string" && isPlanId(r.tier) ? r.tier : null;
+  if (!tier) return null;
+  const o = sanitizePlanOverride(raw);
+  if (!o.name || !o.monthlyTry || !o.blurb || !o.eyebrow || !o.features || !o.limits?.seats) return null;
+  const def: PlanDef = {
+    id,
+    tier,
+    custom: true,
+    name: o.name,
+    monthlyTry: o.monthlyTry,
+    blurb: o.blurb,
+    eyebrow: o.eyebrow,
+    features: o.features,
+    limits: {
+      seats: o.limits.seats,
+      customers: o.limits.customers ?? null,
+      activeProperties: o.limits.activeProperties ?? null,
+      branches: o.limits.branches ?? null,
+    },
+  };
+  if (o.popular) def.popular = true;
+  if (o.hidden !== undefined) def.hidden = o.hidden;
+  if (r.archived === true) def.archived = true;
+  if (o.order !== undefined) def.order = o.order;
+  if (o.yearlyPaidMonths !== undefined) def.yearlyPaidMonths = o.yearlyPaidMonths;
+  if (o.extraSeatMonthlyTry !== undefined) def.extraSeatMonthlyTry = o.extraSeatMonthlyTry;
+  if (o.extraSeatTiers !== undefined) def.extraSeatTiers = o.extraSeatTiers;
+  if (o.maxSeats !== undefined) def.maxSeats = o.maxSeats;
+  if (o.seatRounding !== undefined) def.seatRounding = o.seatRounding;
+  if (o.aiCreditsMonthly !== undefined) def.aiCreditsMonthly = o.aiCreditsMonthly;
+  if (o.valuationReportsMonthly !== undefined) def.valuationReportsMonthly = o.valuationReportsMonthly;
+  if (o.efCreditsMonthly !== undefined) def.efCreditsMonthly = o.efCreditsMonthly;
+  if (o.efCreditsPerExtraSeat !== undefined) def.efCreditsPerExtraSeat = o.efCreditsPerExtraSeat;
+  if (o.campaignMonthlyTry !== undefined) def.campaignMonthlyTry = o.campaignMonthlyTry;
+  return def;
 }
 
 export function serializePlanOverrides(overrides: PlanOverrides): string {
@@ -242,10 +326,17 @@ function nullable<T>(override: T | null | undefined, base: T | null | undefined)
   return override !== undefined ? override : base;
 }
 
-/** plans.ts varsayılanı + düzenleme = etkin tanımlar. Aynı anda en fazla bir "popüler" paket kalır; sıraya göre dizilir. */
-export function applyPlanOverrides(overrides: PlanOverrides, base: readonly PlanDef[] = BASE_CATALOG): PlanDef[] {
-  const merged = base.map((plan): PlanDef => {
-    const o = overrides[plan.id];
+/**
+ * plans.ts varsayılanı + düzenleme (+ adminden eklenen paketler) = etkin tanımlar. Aynı anda en fazla bir "popüler"
+ * paket kalır; sıraya göre dizilir. Eklenen paketler varsayılan sırada tabanların ARKASINA düşer.
+ */
+export function applyPlanOverrides(
+  overrides: PlanOverrides,
+  base: readonly PlanDef[] = BASE_CATALOG,
+  customPlans: readonly PlanDef[] = [],
+): PlanDef[] {
+  const baseMerged = base.map((plan): PlanDef => {
+    const o = isPlanId(plan.id) ? overrides[plan.id] : undefined;
     if (!o) return plan;
     const next: PlanDef = {
       ...plan,
@@ -282,6 +373,7 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     if (o.order !== undefined) next.order = o.order;
     return next;
   });
+  const merged = [...baseMerged, ...customPlans.filter((c) => !base.some((b) => b.id === c.id))];
   const sorted = merged
     .map((plan, i) => ({ plan, key: orderKey(plan, i), i }))
     .sort((a, b) => a.key - b.key || a.i - b.i)
@@ -289,7 +381,7 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
   let seen = false;
   return sorted.map((plan0) => {
     // Paket kullanıcı tavanı (plans.ts PLAN_USER_CAPS): panel kaydı tavanı yükseltemez.
-    const cap = PLAN_USER_CAPS[plan0.id];
+    const cap = isPlanId(plan0.id) ? PLAN_USER_CAPS[plan0.id] : undefined;
     const plan: PlanDef =
       cap && (!plan0.maxSeats || plan0.maxSeats > cap) ? { ...plan0, maxSeats: Math.max(cap, plan0.limits.seats) } : plan0;
     if (!plan.popular) return plan;
@@ -301,6 +393,20 @@ export function applyPlanOverrides(overrides: PlanOverrides, base: readonly Plan
     seen = true;
     return plan;
   });
+}
+
+/** Ayar kaydının etkin katalogu: taban + düzenleme + eklenen paketler (arşivliler dahil; satış listeleri `visiblePlans`). */
+export function catalogPlanDefs(settings: Pick<PlanCatalogSettings, "overrides" | "customPlans">): PlanDef[] {
+  return applyPlanOverrides(settings.overrides, BASE_CATALOG, settings.customPlans ?? []);
+}
+
+/**
+ * Yeni satışta (kayıt, paket değiştirme, yenileme ekranı) seçilebilir paket: katalogda var, gizli ve arşivli değil.
+ * Mevcut abonenin KENDİ paketi (arşivli olsa da) yenilemede geçerlidir; o yol `defs.find` ile ayrıca okunur.
+ */
+export function findSellablePlan(defs: readonly PlanDef[], id: string): PlanDef | null {
+  const def = defs.find((p) => p.id === id);
+  return def && !def.hidden && !def.archived ? def : null;
 }
 
 /** Düzenleme, varsayılanla aynıysa kaydedilmez (kayıt şişmesin, varsayılan değişirse izlensin). */
@@ -401,4 +507,46 @@ export function effectiveMonthlyTry(def: PlanDef, campaign: Pick<PlanCampaignSet
     return def.campaignMonthlyTry;
   }
   return def.monthlyTry;
+}
+
+export type PlanQuote = {
+  /** Ödenecek dönem tutarı (KDV hariç). */
+  amountTry: number;
+  /** Etkin aylık fiyat (kampanya/kilit dahil). */
+  monthlyTry: number;
+  listMonthlyTry: number;
+  source: "list" | "campaign" | "locked";
+  campaignName?: string;
+};
+
+/**
+ * SAF teklif kuralı (golden test: plan-catalog-engine.test.ts). Fiyat KİLİDİ önce gelir: kilitli aylık fiyat güncel liste
+ * fiyatından düşükse aynen korunur; admin liste fiyatını ARTIRSA da kilitli abone etkilenmez. Liste fiyatı kilidin altına
+ * inerse abone düşük olan liste fiyatını öder (kilit hiçbir zaman zam aracı değildir).
+ */
+export function quoteFromDefinition(
+  def: PlanDef,
+  cycle: BillingCycle,
+  opts: { lockedMonthlyTry?: number | null; campaign: PlanCampaignSettings; campaignOpen: boolean },
+): PlanQuote {
+  const list = def.monthlyTry;
+  const lock = opts.lockedMonthlyTry;
+  if (lock && lock > 0 && lock < list) {
+    return {
+      amountTry: planAmountOf({ ...def, monthlyTry: lock }, cycle),
+      monthlyTry: lock,
+      listMonthlyTry: list,
+      source: "locked",
+      campaignName: opts.campaign.name,
+    };
+  }
+  const monthly = effectiveMonthlyTry(def, opts.campaign, opts.campaignOpen);
+  const isCampaign = monthly < list;
+  return {
+    amountTry: planAmountOf({ ...def, monthlyTry: monthly }, cycle),
+    monthlyTry: monthly,
+    listMonthlyTry: list,
+    source: isCampaign ? "campaign" : "list",
+    campaignName: isCampaign ? opts.campaign.name : undefined,
+  };
 }

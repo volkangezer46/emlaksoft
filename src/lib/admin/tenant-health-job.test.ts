@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/settings/read", () => ({ getSettings: async () => ({}) }));
 
 import { runPlatformTaskReminders, runTenantHealthDaily } from "./tenant-health-job";
+import { getPlan } from "@/lib/billing/plans";
 
 type Call = { table: string; op: string; payload?: unknown; filters: string[] };
 
@@ -72,6 +73,15 @@ describe("günlük sağlık skoru işi", () => {
     const r = await runTenantHealthDaily(f.client, NOW);
     expect(f.rpc).toHaveBeenCalled();
     expect(r).toEqual({ skipped: false, written: 3, error: null });
+  });
+
+  it("adminden eklenen pakette koltuk sınırı katalogdan (Ofis'e düşmez); taban kimlik aynı", async () => {
+    const custom = { ...getPlan("office"), id: "ofis_plus", tier: "office" as const, custom: true, limits: { seats: 20, customers: null, activeProperties: null, branches: 5 } };
+    const f = fakeAdmin({ inputs: [row("a", { plan: "ofis_plus", active_users: 4 }), row("b", { active_users: 4 })] });
+    await runTenantHealthDaily(f.client, NOW, { weights: { usage: 100, payment: 0, support: 0 }, catalog: [custom] });
+    const daily = f.calls.find((c) => c.table === "tenant_health_daily" && c.op === "upsert")!.payload as { tenant_id: string; inputs: { seatLimit: number } }[];
+    expect(daily.find((d) => d.tenant_id === "a")!.inputs.seatLimit).toBe(20);
+    expect(daily.find((d) => d.tenant_id === "b")!.inputs.seatLimit).toBe(getPlan("office").limits.seats);
   });
 
   it("aşamayı kalıcı yazmaz (boş aşama okuma anında durumdan türetilir)", async () => {

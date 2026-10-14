@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { isApprovalDeciderRole } from "@/lib/approvals";
 import type { AppModule } from "@/lib/permissions";
-import { getPlan } from "@/lib/billing/plans";
+import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 
 /**
  * Yan menü sayı rozetleri — YALNIZ gerçek veri (oturum açmış kullanıcının RLS'li
@@ -115,9 +115,15 @@ export async function hybridCount(
   return est;
 }
 
-export async function getPlanUsage(supabase: SupabaseClient, tenantId: string | null, plan: string | undefined): Promise<PlanUsageRow[]> {
+/** `catalog`: adminden eklenen pakette limit kaynağı (getCatalogForPlan); taban kimlikte kod tanımı kullanılır. */
+export async function getPlanUsage(
+  supabase: SupabaseClient,
+  tenantId: string | null,
+  plan: string | undefined,
+  catalog?: readonly PlanDef[],
+): Promise<PlanUsageRow[]> {
   if (!tenantId) return [];
-  const limits = getPlan(plan ?? "office").limits;
+  const limits = resolvePlanDef(plan, catalog).limits;
   const jobs: Promise<PlanUsageRow | null>[] = [];
   if (limits.seats != null) {
     const limit = limits.seats;

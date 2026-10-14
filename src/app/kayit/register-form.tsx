@@ -15,7 +15,7 @@ import {
   signupPhoneClientError,
   type SignupField,
 } from "@/lib/signup-errors";
-import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId, PlanId } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan } from "@/lib/billing/registration-plan";
 
 import { AttributionFields, type SignupAttributionFields } from "./attribution-fields";
@@ -38,6 +38,7 @@ const primaryBtn =
  */
 export function RegisterForm({
   initialPlan,
+  initialPlanTier,
   initialCycle,
   trialDays,
   attribution,
@@ -56,7 +57,9 @@ export function RegisterForm({
   /** Üst metinler (Site içeriği, sunucuda değişkenleri çözülmüş düz metin); yoksa bugünkü metin. */
   copy?: { title: string; text: string; panelText: string };
   /** Yalnız fiyat sayfasından AÇIK plan seçimiyle gelindiyse (?plan=); yoksa sunucu varsayılan planı kullanır. */
-  initialPlan?: PlanId;
+  initialPlan?: CatalogPlanId;
+  /** Adminden eklenen paketin modül kademesi (kayıt bandı için); taban pakette yok. */
+  initialPlanTier?: PlanId | null;
   initialCycle?: BillingCycle;
   /** Gerçekte verilen deneme günü (sunucuda getEffectiveTrialDays); yoksa sayı yazılmaz. */
   trialDays?: number;
@@ -164,7 +167,7 @@ export function RegisterForm({
             <>
               <input type="hidden" name="plan" value={initialPlan} />
               <input type="hidden" name="cycle" value={initialCycle ?? "monthly"} />
-              <input type="hidden" name="agents" value={defaultTeamSizeForPlan(initialPlan)} />
+              <input type="hidden" name="agents" value={defaultTeamSizeForPlan(initialPlan, initialPlanTier)} />
             </>
           ) : null}
           {/* Demo verili ofis: örnek kayıtlar "Örnek veri" rozetiyle ayrışır, tek tuşla silinir */}

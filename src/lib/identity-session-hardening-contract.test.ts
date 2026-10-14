@@ -165,7 +165,7 @@ describe("identity and session hardening contract", () => {
     // Provizyon çekirdeği e-posta ve Google kayıt yolunda ortak (signUp → provisionOfficeForUser).
     const core = read("src/lib/registration/provision-office.ts");
     expect(auth).toContain("provisionOfficeForUser(admin, publicClient");
-    expect(core).toContain("registrationPlanForTeamSize(requestedPlan, teamSize)");
+    expect(core).toContain("registrationPlanForTeamSize(requestedPlan, teamSize, catalog)");
     expect(core).toContain("normalizeBillingCycle(requestedCycle)");
     expect(core).toContain('"provision_registration"');
     expect(core).toContain("p_billing_cycle: billingCycle");

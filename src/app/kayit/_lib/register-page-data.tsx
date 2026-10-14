@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import type { ComponentProps } from "react";
 import type { RegisterForm } from "../register-form";
 import { REGISTRATION_CLOSED_MESSAGE } from "@/lib/platform-setting-keys";
-import { normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
+import { isPlanId, normalizeBillingCycle, normalizePlanId } from "@/lib/billing/plans";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
 import { REF_COOKIE, REFERRAL_CODE_LENGTH, parseRefCookie, parseRefParam } from "@/lib/growth/attribution";
@@ -39,6 +39,7 @@ export async function loadRegisterFormProps(params: RegisterSearchParams): Promi
     getLiveSiteContent(),
   ]);
   const tokenCtx = { trialDays, plans, efLive };
+  const customPlan = params.plan && !isPlanId(params.plan) ? (plans.find((p) => p.custom && p.id === params.plan) ?? null) : null;
   // Davet bağlantısı (çerez ya da ?ref): "X sizi davet etti" + hoş geldin avantajı. Hata/kapalı program = banner yok.
   const jar = await cookies();
   const touch = parseRefCookie(jar.get(REF_COOKIE)?.value) ?? parseRefParam(params.ref);
@@ -56,7 +57,9 @@ export async function loadRegisterFormProps(params: RegisterSearchParams): Promi
     },
     trialDays,
     // Plan kayıtta sorulmaz: yalnız fiyat sayfasındaki açık seçim (?plan=) taşınır; yoksa sunucu varsayılan planı kullanır.
-    initialPlan: params.plan ? normalizePlanId(params.plan) : undefined,
+    // Adminden eklenen yayındaki paket (?plan=<slug>) aynen taşınır; bilinmeyen kimlik eski davranışla Ofis'e düşer.
+    initialPlan: params.plan ? (customPlan?.id ?? normalizePlanId(params.plan)) : undefined,
+    initialPlanTier: customPlan?.tier ?? null,
     initialCycle: params.plan ? normalizeBillingCycle(params.cycle) : undefined,
     invite: preview ? { officeName: preview.office_name, welcomeCreditTry: preview.welcome_credit_try } : null,
     attribution: {

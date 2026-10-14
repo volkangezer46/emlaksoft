@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ComponentType } from "react";
-import { PLANS, planAmountOf, yearlyOfferLabel, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { PLANS, planAmountOf, planTierOf, yearlyOfferLabel, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { trialCtaShort } from "@/lib/marketing-copy";
 import { BriefcaseBusiness, Building2, Crown, Sparkles, UserRound } from "lucide-react";
 import { formatNumberTr } from "@/lib/format";
@@ -125,7 +125,7 @@ export function Pricing({
 
       <div className={`pricing-grid mt-9 grid gap-4 sm:grid-cols-2 ${cols}`}>
         {plans.map((plan) => {
-          const PlanIcon = PLAN_ICONS[plan.id];
+          const PlanIcon = PLAN_ICONS[planTierOf(plan)];
           const offer = offers?.[plan.id];
           const effectiveMonthly = offer?.monthlyTry ?? plan.monthlyTry;
           const onCampaign = Boolean(offer?.campaign);

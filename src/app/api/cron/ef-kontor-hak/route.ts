@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { trMonthKey } from "@/lib/clock";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
-import { PLAN_DEFINITIONS_SETTING_KEY, applyPlanOverrides, resolveCatalogSettings } from "@/lib/billing/plan-overrides";
+import { PLAN_DEFINITIONS_SETTING_KEY, catalogPlanDefs, resolveCatalogSettings } from "@/lib/billing/plan-overrides";
 import {
   EF_RPC,
   EF_RPC_BURN_EXPIRED,
@@ -86,7 +86,8 @@ async function run(req: NextRequest) {
     }
 
     const settings = await getPlatformSettingsMany([PLAN_DEFINITIONS_SETTING_KEY, EF_WELCOME_SETTING_KEY, EF_WELCOME_SINCE_SETTING_KEY]);
-    const defs = applyPlanOverrides(resolveCatalogSettings(settings[PLAN_DEFINITIONS_SETTING_KEY]).overrides);
+    // Adminden eklenen paketler dahil (arşivli paketteki ofis de aylık hakkını alır).
+    const defs = catalogPlanDefs(resolveCatalogSettings(settings[PLAN_DEFINITIONS_SETTING_KEY]));
     const planMonthly: Record<string, number> = {};
     const planPerExtraSeat: Record<string, number> = {};
     for (const p of defs) {

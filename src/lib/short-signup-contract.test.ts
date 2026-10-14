@@ -39,7 +39,7 @@ describe("kısa kayıt (TEK ekran, 4 alan) sözleşmesi", () => {
     expect(form).toContain('name="plan" value={initialPlan}');
     expect(form).toContain("{initialPlan ? (");
     const page = read("src/app/kayit/_lib/register-page-data.tsx");
-    expect(page).toContain("params.plan ? normalizePlanId(params.plan) : undefined");
+    expect(page).toContain("params.plan ? (customPlan?.id ?? normalizePlanId(params.plan)) : undefined");
   });
 
   it("paket seçici kayıttan çıktı: ortak bileşen olarak kurulum sihirbazında ve /app/abonelik'te", () => {

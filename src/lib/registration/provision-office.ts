@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { normalizeBillingCycle } from "@/lib/billing/plans";
+import { isPlanId, normalizeBillingCycle } from "@/lib/billing/plans";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { normalizeRegistrationTeamSize, registrationPlanForTeamSize } from "@/lib/billing/registration-plan";
 import { recordSignupAttributionFromRequest } from "@/lib/growth/capture";
 import { DEMO_SEED_FAILED_COOKIE, seedDemoDataForNewTenant, wantsDemoData } from "@/lib/sample-registration-seed";
@@ -57,7 +58,9 @@ export async function provisionOfficeForUser(
   // Fiyat sayfasından gelen paket/dönem yalnız izinli değerlere normalize edilir (allowlist).
   const requestedPlan = String(formData.get("plan") ?? "").trim();
   const requestedCycle = String(formData.get("cycle") ?? "").trim();
-  const plan = registrationPlanForTeamSize(requestedPlan, teamSize);
+  // Adminden eklenen paket yalnız katalogda yayındaysa korunur (getPlanDefinitions önbellekli; taban kimlikte okunmaz).
+  const catalog = requestedPlan && !isPlanId(requestedPlan) ? await getPlanDefinitions() : [];
+  const plan = registrationPlanForTeamSize(requestedPlan, teamSize, catalog);
   const billingCycle = normalizeBillingCycle(requestedCycle);
 
   const { data: provisioned, error: provisionError } = await admin.rpc("provision_registration", {

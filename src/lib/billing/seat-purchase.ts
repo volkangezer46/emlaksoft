@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
-import type { BillingCycle, PlanId, SeatTier } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId, SeatTier } from "@/lib/billing/plans";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { now } from "@/lib/clock";
@@ -198,7 +198,7 @@ export async function readOwnSeatLimit(supabase: SupabaseClient): Promise<number
 export async function createSeatInvoice(input: {
   tenantId: string;
   subscriptionId: string | null;
-  plan: PlanId;
+  plan: CatalogPlanId;
   cycle: BillingCycle;
   conversationId: string;
   chargeNetTry: number;

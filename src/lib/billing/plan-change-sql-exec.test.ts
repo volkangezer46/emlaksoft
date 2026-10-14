@@ -446,4 +446,40 @@ describe.skipIf(!mod)("duraklatma / planlı düşürme / plan_upgrade fulfill �
       expect(await call(`select public.subscription_pause_ready()`)).toBe(true);
     });
   });
+
+  // 20261014002000 (DG2): satış kapısı billing_plan_is_hidden arşivli paketi de kapatır. Yalnız o fonksiyon dosyadan
+  // OLDUĞU GİBİ yüklenir (migration'ın geri kalanı canlı gövdeleri dönüştürür; pglite şeması onları taşımaz). Planlı
+  // düşürme RPC'si kendi JWT'siyle doğrudan çağrılsa da arşivli pakete yazamaz (arşiv yalnız TS'de engellenmez).
+  describe("DG2: arşivli paket satışa kapalı (billing_plan_is_hidden, 20261014002000)", () => {
+    it("belgede archived=true ya da billing_plans.archived_at dolu -> not_sold; arşivden çıkınca izin verilir", async () => {
+      const sql = read("supabase/migrations/20261014002000_plan_catalog_engine.sql");
+      const start = sql.indexOf("create or replace function public.billing_plan_is_hidden(");
+      const end = sql.indexOf("grant execute on function public.billing_plan_is_hidden(text) to service_role;", start);
+      expect(start).toBeGreaterThan(0);
+      expect(end).toBeGreaterThan(start);
+      await as("service_role");
+      await db.exec(`create table if not exists public.billing_plans(id text primary key, archived_at timestamptz)`);
+      await db.exec(sql.slice(start, end));
+
+      await setFlag("billing.plan_change_proration_enabled", "on");
+      const o = await office({ plan: "professional" });
+      await q(`delete from public.profiles where tenant_id = $1 and role <> 'owner'`, [o.t]);
+      await as("authenticated", o.owner, o.t);
+      // Belge: arşivli (gizli değil) -> satışa kapalı
+      await setFlag("billing.plan_definitions", JSON.stringify({ v: 2, plans: { office: { archived: true, hidden: false } } }));
+      expect(await call(`select public.subscription_schedule_downgrade('office')`)).toMatchObject({ ok: false, code: "not_sold" });
+      expect((await subRow(o.t)).pending_plan).toBeNull();
+      // Kayıt defteri: archived_at dolu -> belge ne derse desin satışa kapalı
+      await setFlag("billing.plan_definitions", JSON.stringify({ v: 2, plans: { office: { archived: false } } }));
+      await q(`insert into public.billing_plans(id, archived_at) values ('office', now())`);
+      expect(await call(`select public.subscription_schedule_downgrade('office')`)).toMatchObject({ ok: false, code: "not_sold" });
+      // Arşivden çıkınca eski davranış (gizli kuralı + 'business' yedeği aynı)
+      await q(`update public.billing_plans set archived_at = null where id = 'office'`);
+      expect(await call(`select public.subscription_schedule_downgrade('office')`)).toMatchObject({ ok: true, plan: "office" });
+      await setFlag("billing.plan_definitions", null);
+      await as("service_role");
+      expect(await call(`select public.billing_plan_is_hidden('business')`)).toBe(true);
+      expect(await call(`select public.billing_plan_is_hidden('advisor')`)).toBe(false);
+    });
+  });
 });

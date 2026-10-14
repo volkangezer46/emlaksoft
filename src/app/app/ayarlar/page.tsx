@@ -3,7 +3,7 @@ import { CheckCircle2, Square } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { planLabel } from "@/lib/billing/plans";
+import { getPlanName } from "@/lib/billing/plan-definitions";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { RadialGauge } from "@/components/ui/viz";
@@ -34,6 +34,8 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
     supabase.from("tenants").select(SETTINGS_TENANT_COLUMNS).limit(1).maybeSingle(),
   ]);
   const tenant: SettingsTenant = { ...EMPTY_SETTINGS_TENANT, ...((tenantRow as Partial<SettingsTenant> | null) ?? {}) };
+  // Adminden eklenen pakette ad katalogdan (taban kimlikte katalog okunmaz).
+  const planName = await getPlanName(tenant.plan);
 
   // Kurulum kontrol listesi — ilk madde her zaman tamam (hesap zaten açık),
   // diğerleri tenant/hesap verisinden hesaplanır; eksikler ilgili forma bağlanır.
@@ -59,7 +61,7 @@ export default async function SettingsPage({ searchParams }: { searchParams?: Pr
   return (
     <div className="space-y-6">
       {/* premium header */}
-      <PageHeader title={tenant.name || "Ayarlar"} eyebrow="Ofis yapılandırması" description={`${planLabel(tenant.plan)} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.`} />
+      <PageHeader title={tenant.name || "Ayarlar"} eyebrow="Ofis yapılandırması" description={`${planName} planı · ofis, ekip, uyum ve entegrasyonları tek merkezden yönetin.`} />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <details className="group/ring text-left">

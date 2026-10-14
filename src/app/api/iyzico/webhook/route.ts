@@ -9,7 +9,7 @@ import {
 } from "@/lib/billing/iyzico";
 import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
-import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId } from "@/lib/billing/plans";
 import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
 import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
   }
 
   const meta = (invoice.meta ?? {}) as {
-    plan?: PlanId;
+    plan?: CatalogPlanId;
     cycle?: BillingCycle;
     saveCard?: boolean;
     saveCardConsentBy?: string;

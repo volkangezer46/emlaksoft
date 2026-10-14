@@ -1,4 +1,4 @@
-import { getPlan } from "@/lib/billing/plans";
+import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { isApprovalDeciderRole } from "@/lib/approvals";
 import type { ModuleRow } from "@/lib/modules/logic";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
@@ -137,10 +137,11 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
 
 /**
  * Yan menü "Kullanım" kartı satırları — `getPlanUsage` ile aynı anahtar/etiket/hedef ve aynı kural:
- * limitsiz (null) kalem hiç döndürülmez. Sayımlar RPC'den (kesin sayım) gelir.
+ * limitsiz (null) kalem hiç döndürülmez. Sayımlar RPC'den (kesin sayım) gelir. Adminden eklenen pakette limitler
+ * `catalog` (getCatalogForPlan) kaydından okunur; taban kimlikte kod tanımı.
  */
-export function usageRowsFromCounts(plan: string | undefined, counts: ShellUsageCounts): PlanUsageRow[] {
-  const limits = getPlan(plan ?? "office").limits;
+export function usageRowsFromCounts(plan: string | undefined, counts: ShellUsageCounts, catalog?: readonly PlanDef[]): PlanUsageRow[] {
+  const limits = resolvePlanDef(plan, catalog).limits;
   const rows: PlanUsageRow[] = [];
   if (limits.seats != null) rows.push({ key: "seats", label: "Kullanıcı", used: counts.seats, limit: limits.seats, href: "/app/ekip" });
   if (limits.activeProperties != null) {

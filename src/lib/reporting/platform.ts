@@ -75,7 +75,7 @@ export function priceMapOf(defs: readonly { id: string; monthlyTry: number }[]):
   return new Map(defs.map((d) => [d.id, d.monthlyTry]));
 }
 
-export function monthlyPrice(plan: PlanId, prices: PlanPriceMap = defaultPrices): number {
+export function monthlyPrice(plan: string, prices: PlanPriceMap = defaultPrices): number {
   return prices.get(plan) ?? defaultPrices.get(plan) ?? 0;
 }
 

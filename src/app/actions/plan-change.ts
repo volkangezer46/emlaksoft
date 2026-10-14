@@ -4,7 +4,8 @@ import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { isPlanId, type PlanId } from "@/lib/billing/plans";
+import type { CatalogPlanId } from "@/lib/billing/plans";
+import { isCatalogPlanKey } from "@/lib/billing/plan-overrides";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { evaluatePlanChange } from "@/lib/billing/plan-change-core";
 import { isPlanChangeEnabled, loadPaidCapNetTry, loadPlanChangeState } from "@/lib/billing/plan-change";
@@ -81,7 +82,7 @@ export async function startPlanUpgrade(formData: FormData): Promise<PlanUpgradeR
   }
 
   const toPlan = String(formData.get("plan") ?? "").trim();
-  if (!isPlanId(toPlan)) return { error: "Geçersiz paket." };
+  if (!isCatalogPlanKey(toPlan)) return { error: "Geçersiz paket." };
   const confirmRaw = String(formData.get("confirm_try") ?? "").trim();
   const confirmTry = confirmRaw === "" ? null : Number(confirmRaw);
   const useCredit = String(formData.get("use_credit") ?? "") === "1";
@@ -186,7 +187,7 @@ export async function startPlanUpgrade(formData: FormData): Promise<PlanUpgradeR
     invoice = await createCheckoutInvoice({
       tenantId: gate.tenantId,
       subscriptionId: state.subscriptionId,
-      plan: toPlan as PlanId,
+      plan: toPlan as CatalogPlanId,
       cycle: state.cycle,
       conversationId,
       amountTry: ev.chargeNetTry,
@@ -225,7 +226,7 @@ export async function startPlanUpgrade(formData: FormData): Promise<PlanUpgradeR
     try {
       await fulfillInvoiceWithWalletCredit({
         tenantId: gate.tenantId,
-        plan: toPlan as PlanId,
+        plan: toPlan as CatalogPlanId,
         cycle: state.cycle,
         conversationId,
       });
@@ -277,7 +278,7 @@ export async function scheduleDowngrade(formData: FormData): Promise<PlanChangeR
     return { error: DOWNGRADE_CODE_MESSAGES.not_owner };
   }
   const toPlan = String(formData.get("plan") ?? "").trim();
-  if (!isPlanId(toPlan)) return { error: "Geçersiz paket." };
+  if (!isCatalogPlanKey(toPlan)) return { error: "Geçersiz paket." };
 
   const { allowed } = await checkRateLimit(`plandown:${gate.userId}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla deneme yapıldı. Birkaç dakika sonra tekrar deneyin." };

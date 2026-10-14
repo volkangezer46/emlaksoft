@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { startPlanCheckout } from "@/app/actions/billing";
-import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId } from "@/lib/billing/plans";
 import { WalletCreditToggle, type WalletCheckoutInfo } from "@/components/app/wallet-credit-toggle";
 
 export function CheckoutButton({
@@ -21,7 +21,7 @@ export function CheckoutButton({
   wallet?: WalletCheckoutInfo | null;
   /** KDV dahil tahmini toplam (yalnız ön izleme; asıl hesap sunucuda). */
   totalTry?: number | null;
-  plan: PlanId;
+  plan: CatalogPlanId;
   cycle: BillingCycle;
   label: string;
   variant?: "primary" | "ghost";

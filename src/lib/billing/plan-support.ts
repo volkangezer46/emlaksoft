@@ -26,14 +26,16 @@ export type PlanSupport = {
   pauseReady: boolean;
   /** 20261007001010: fulfill gövdeleri plan_upgrade faturasını işliyor (plan_upgrade_ready()). */
   upgradeReady: boolean;
+  /** 20261014002000 (DG2): billing_plans kayıt defteri + FK; adminden yeni paket eklenebilir (plan_catalog_engine_ready()). */
+  catalogEngine: boolean;
 };
 
 export const getPlanSupport = unstable_cache(
   async (): Promise<PlanSupport> => {
-    const out: PlanSupport = { priceLock: false, trialSetting: false, trialDays: 14, businessPlan: false, coupons: false, entitlementWrite: false, pauseReady: false, upgradeReady: false };
+    const out: PlanSupport = { priceLock: false, trialSetting: false, trialDays: 14, businessPlan: false, coupons: false, entitlementWrite: false, pauseReady: false, upgradeReady: false, catalogEngine: false };
     try {
       const admin = createAdminClient();
-      const [lock, trial, business, coupons, write, pause, upgrade] = await Promise.all([
+      const [lock, trial, business, coupons, write, pause, upgrade, catalog] = await Promise.all([
         admin.from("subscriptions").select("price_lock_campaign").limit(1),
         admin.rpc("platform_default_trial_days"),
         admin.from("plan_entitlements").select("plan").eq("plan", "business").maybeSingle(),
@@ -41,6 +43,7 @@ export const getPlanSupport = unstable_cache(
         admin.rpc("plan_entitlements_writable"),
         admin.rpc("subscription_pause_ready"),
         admin.rpc("plan_upgrade_ready"),
+        admin.rpc("plan_catalog_engine_ready"),
       ]);
       out.priceLock = !lock.error;
       out.trialSetting = !trial.error && typeof trial.data === "number";
@@ -50,12 +53,13 @@ export const getPlanSupport = unstable_cache(
       out.entitlementWrite = !write.error && write.data === true;
       out.pauseReady = !pause.error && pause.data === true;
       out.upgradeReady = out.pauseReady && !upgrade.error && upgrade.data === true;
+      out.catalogEngine = !catalog.error && catalog.data === true;
     } catch (e) {
       console.error("getPlanSupport", e);
     }
     return out;
   },
-  ["plan-support-v3"],
+  ["plan-support-v4"],
   { tags: [PLAN_SUPPORT_TAG], revalidate: 60 },
 );
 
