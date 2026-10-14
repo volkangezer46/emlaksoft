@@ -71,7 +71,8 @@ describe("admin-account-credit action sözleşmesi", () => {
   it("platform billing modülü + yalnız süper admin + hız sınırı", () => {
     expect(src.startsWith('"use server";')).toBe(true);
     expect(src).toContain('requirePlatformModule("billing")');
-    expect(src).toContain('staff.role !== "super_admin"');
+    // DG1: "yalnız süper admin" = faturalamada onay yetkisi (sabit rollerde yalnız süper admin).
+    expect(src).toContain('platformCan(staff, "billing", "approve")');
     expect(src).toContain("checkRateLimit(");
   });
   it("denetim kaydı kredi işleminden ÖNCE yazılır ve yazılamazsa işlem yapılmaz (fail-closed)", () => {

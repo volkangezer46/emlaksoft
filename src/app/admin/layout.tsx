@@ -8,7 +8,7 @@ import { MobileMenuProvider, MobileMenuTrigger } from "@/components/app/mobile-m
 import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { AdminSectionTabs } from "@/components/admin/admin-section-tabs";
 import { mustChangePassword, requirePlatformStaffForAccount } from "@/lib/platform";
-import { PLATFORM_ROLE_LABELS, platformModulesFor } from "@/lib/platform-access";
+import { platformModulesFor, platformRoleLabel } from "@/lib/platform-access";
 import { getAdminBadges, getAdminHealth } from "@/lib/admin-badges";
 import { loadStaffAvatar } from "@/lib/avatar-read";
 import "@/app/console-base.css";
@@ -65,8 +65,8 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
     metadataValue: user?.user_metadata?.[FONT_SCALE_META_KEY],
   });
 
-  const roleLabel = PLATFORM_ROLE_LABELS[staff.role] ?? staff.role;
-  const modules = platformModulesFor(staff.role);
+  const roleLabel = platformRoleLabel(staff);
+  const modules = platformModulesFor(staff);
 
   // Sidebar rozet sayıları — 30 sn önbellekli (bkz. admin-badges.ts); her
   // gezinmede 3 count sorgusu koşmasın.
@@ -120,7 +120,7 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
       <SidebarBoot />
       <NavPending />
       <ClientCacheSync identity={`admin:${staff.id}`} />
-      <AdminSidebar staffName={staff.full_name} role={staff.role} roleLabel={roleLabel} badges={badges} />
+      <AdminSidebar staffName={staff.full_name} modules={modules} roleLabel={roleLabel} badges={badges} />
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobil hamburger: üst çubukla birlikte yapışkan, sıfır yükseklikli kapta (akışa yer kaplamaz); üst çubuğun
             pl-16 boşluğunda dikey ortalı durur (eskiden `fixed` idi, üstteki şeritlerle çakışabiliyordu). */}

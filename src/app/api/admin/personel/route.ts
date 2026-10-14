@@ -20,7 +20,7 @@ async function lastSignIns(admin: ReturnType<typeof createAdminClient>): Promise
 
 export async function GET(req: Request) {
   const staff = await getPlatformStaff();
-  if (!staff || !platformCanAccess(staff.role, "personel")) {
+  if (!staff || !platformCanAccess(staff, "personel")) {
     return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
   }
 
@@ -80,12 +80,17 @@ export async function GET(req: Request) {
   } catch {
     /* avatar süs */
   }
+  // DG1 özel rol ataması: sütun yokken (migration öncesi) hata yutulur, herkes sabit rolüyle listelenir.
+  const customRoles = new Map<string, string | null>();
+  const { data: cr } = await admin.from("platform_staff").select("id, custom_role_id");
+  for (const r of cr ?? []) customRoles.set(r.id as string, (r.custom_role_id as string | null) ?? null);
   return NextResponse.json(
     (data ?? []).map((m) => ({
       ...m,
       last_sign_in_at: logins.get(m.id) ?? null,
       avatar_url: avatars.get(m.id)?.avatar_url ?? null,
       avatar_preset: avatars.get(m.id)?.avatar_preset ?? null,
+      custom_role_id: customRoles.get(m.id) ?? null,
     })),
   );
 }

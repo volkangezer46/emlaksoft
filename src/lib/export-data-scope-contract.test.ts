@@ -121,7 +121,7 @@ describe("service_role sınırı", () => {
     const fn = s.slice(s.indexOf("export async function authorizePlatformReport"), s.indexOf("export async function handleReportDownload"));
     expect(fn.indexOf("getPlatformStaff()")).toBeGreaterThan(-1);
     expect(fn.indexOf("buildPlatformContext(")).toBeGreaterThan(fn.indexOf("platformReportAllowed("));
-    expect(fn).toContain('platformCanAccess(staff.role, "reports")');
+    expect(fn).toContain('platformCanAccess(staff, "reports")');
   });
 
   it("kiracı raporu: oturum + reports modülü + raporun modülü, sonra bağlam", () => {

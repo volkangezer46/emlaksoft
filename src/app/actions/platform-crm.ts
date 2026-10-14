@@ -20,6 +20,7 @@ import { requirePlatformModule } from "@/lib/platform";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
 import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { OFFICE_CLOSE_STATUSES, statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
@@ -114,7 +115,7 @@ async function tenantExists(admin: ReturnType<typeof db>, tenantId: string): Pro
 
 export async function setTenantTags(tenantId: string, tagIds: string[]): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const wanted = [...new Set((Array.isArray(tagIds) ? tagIds : []).map(uuid).filter(Boolean))].slice(0, 30);
@@ -149,7 +150,7 @@ async function upsertCrm(admin: ReturnType<typeof db>, tenantId: string, patch: 
 
 export async function setTenantAccountOwner(tenantId: string, ownerStaffId: string | null): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const owner = ownerStaffId ? uuid(ownerStaffId) : "";
@@ -180,7 +181,7 @@ export async function setTenantAccountOwner(tenantId: string, ownerStaffId: stri
 
 export async function setTenantLifecycleStage(tenantId: string, stage: string | null): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   if (stage !== null && !isLifecycleStage(stage)) return { error: "Geçersiz aşama." };
@@ -199,7 +200,7 @@ export async function setTenantLifecycleStage(tenantId: string, stage: string | 
 
 export async function saveTenantCrmNote(formData: FormData): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const noteId = uuid(text(formData, "id"));
   const tenantId = uuid(text(formData, "tenant_id"));
   const category = text(formData, "category") || "genel";
@@ -226,7 +227,7 @@ export async function saveTenantCrmNote(formData: FormData): Promise<CrmActionRe
 
 export async function setTenantCrmNotePinned(noteId: string, pinned: boolean): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(noteId);
   if (!id) return { error: "Not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const admin = db();
@@ -241,7 +242,7 @@ export async function setTenantCrmNotePinned(noteId: string, pinned: boolean): P
 
 export async function deleteTenantCrmNote(noteId: string): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(noteId);
   if (!id) return { error: "Not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const admin = db();
@@ -263,7 +264,7 @@ export async function deleteTenantCrmNote(noteId: string): Promise<CrmActionResu
 
 export async function createPlatformTask(formData: FormData): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const tenantId = uuid(text(formData, "tenant_id"));
   const title = text(formData, "title");
   const body = text(formData, "body").slice(0, 1000) || null;
@@ -302,7 +303,7 @@ export async function createPlatformTask(formData: FormData): Promise<CrmActionR
 
 export async function setPlatformTaskDone(taskId: string, done: boolean): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(taskId);
   if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const admin = db();
@@ -322,7 +323,7 @@ export async function setPlatformTaskDone(taskId: string, done: boolean): Promis
 
 export async function deletePlatformTask(taskId: string): Promise<CrmActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(taskId);
   if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const admin = db();
@@ -364,14 +365,14 @@ export async function bulkTenantAction(tenantIds: string[], action: BulkTenantOp
   const op = action?.op;
 
   // Rol kapısı işlem türüne göre (UI de aynı kuralla düğmeyi gizler).
-  if (op === "trial_extend" && !canChangeTrial(staff.role)) return { error: DENIED, done: 0, failed: [] };
+  if (op === "trial_extend" && !canChangeTrial(staff)) return { error: DENIED, done: 0, failed: [] };
   if (op === "status") {
     const st = (action as { status: string }).status;
     if (!BULK_STATUSES.has(st)) return { error: "Geçersiz durum.", done: 0, failed: [] };
-    if (!officeAdminCan(staff.role, "plan_status")) return { error: DENIED, done: 0, failed: [] };
+    if (!officeAdminCan(staff, "plan_status")) return { error: DENIED, done: 0, failed: [] };
     if ((st === "suspended" || st === "cancelled") && staff.role !== "super_admin") return { error: "Toplu askıya alma/iptal yalnız süper admin.", done: 0, failed: [] };
   }
-  if ((op === "tag_add" || op === "tag_remove" || op === "owner") && !officeAdminCan(staff.role, "note")) return { error: DENIED, done: 0, failed: [] };
+  if ((op === "tag_add" || op === "tag_remove" || op === "owner") && !officeAdminCan(staff, "note")) return { error: DENIED, done: 0, failed: [] };
   if (!op || !["tag_add", "tag_remove", "owner", "trial_extend", "status"].includes(op)) return { error: "Geçersiz işlem.", done: 0, failed: [] };
 
   const admin = db();
@@ -446,7 +447,8 @@ export async function bulkTenantAction(tenantIds: string[], action: BulkTenantOp
     const closing = OFFICE_CLOSE_STATUSES.includes(nextStatus) && tenants.some((t) => statusChangeNeedsStepUp(nextStatus, t.status));
     if (closing) {
       // Tekil yol (`updateTenantPlanStatus`) "billing" modülü + kod ister; toplu yol aynı kapıyı atlamaz.
-      if (!platformCanAccess(staff.role, "billing")) return { error: DENIED, done: 0, failed: [] };
+      if (!platformCanAccess(staff, "billing")) return { error: DENIED, done: 0, failed: [] };
+      if (await officeCloseBlockedOutsideQueue()) return { error: OFFICE_CLOSE_QUEUE_ONLY, done: 0, failed: [] };
       const su = await requireStepUp({ code: stepUpCode }, "office_close", staff.id);
       if (!su.ok) return { error: su.error, code: su.code, done: 0, failed: [] };
       for (const t of tenants) {

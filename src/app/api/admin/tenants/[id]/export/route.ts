@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformModule } from "@/lib/platform";
+import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -8,9 +9,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * Sadece platform staff erişebilir.
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const staff = await requirePlatformModule("tenants");
-  // Tam veri paketi hassas → yalnızca ops/super_admin (destek/muhasebe indiremez)
-  if (staff.role !== "ops" && staff.role !== "super_admin") {
+  // Route handler'lar Next'te "action" evresinde açılır: eylem AÇIKÇA verilir (tam veri paketi = yazma düzeyi işlem).
+  const staff = await requirePlatformModule("tenants", "write");
+  // Tam veri paketi hassas → yalnızca ops/super_admin (destek/muhasebe indiremez); Ofis 360 düğmesiyle aynı kural.
+  if (!officeAdminCan(staff, "export_vault")) {
     return NextResponse.json({ error: "Bu işlem için yetkiniz yok." }, { status: 403 });
   }
   const { id: tenantId } = await params;

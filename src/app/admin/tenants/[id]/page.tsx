@@ -52,7 +52,7 @@ import { OfficeSecurityPanel } from "./office-security-panel";
 import { loadOfficePolicyForm, policyIsActive } from "@/lib/office-security/read";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
-import { platformCanAccess } from "@/lib/platform-access";
+import { platformCan, platformCanAccess } from "@/lib/platform-access";
 import { ModulePanel } from "./module-panel";
 import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionOpsConsole, SubscriptionPanel, type LimitView } from "./subscription-panel";
@@ -115,7 +115,7 @@ export default async function AdminTenantDetailPage({
   const staff = await requirePlatformModule("tenants");
   const { id } = await params;
   const sp = (await searchParams) ?? {};
-  const access = officeAccess(staff.role);
+  const access = officeAccess(staff);
   const tabs = visibleTabs(access);
   const active = resolveOfficeTab(sp.sekme, tabs);
   const admin = createAdminClient();
@@ -191,7 +191,7 @@ export default async function AdminTenantDetailPage({
   let content: ReactNode = null;
   const nowMs = now();
   const staffName = (sid: string) => crmCatalog.staff.find((s) => s.id === sid)?.name ?? null;
-  const crmCanEdit = officeAdminCan(staff.role, "note");
+  const crmCanEdit = officeAdminCan(staff, "note");
   const crmStage = effectiveStage(crm.stage, tenant.status ?? "trial");
 
   if (active === "iliski") {
@@ -212,7 +212,7 @@ export default async function AdminTenantDetailPage({
   }
 
   else if (active === "yonetim") {
-    const can = officeAdminCanMap(staff.role);
+    const can = officeAdminCanMap(staff);
     const [mgmt, moduleState, securityPolicy] = await Promise.all([
       loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note }),
       loadTenantModuleState(admin, id),
@@ -248,8 +248,8 @@ export default async function AdminTenantDetailPage({
         plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
         legalHref={tabHref("yasal")}
         closureRequests={mgmt.closureRequests.map((r) => ({ ...r, dueLabel: r.dueAt.slice(0, 10) }))}
-        canChangeTrial={canChangeTrial(staff.role)}
-        canFixSubscription={platformCanAccess(staff.role, "billing")}
+        canChangeTrial={canChangeTrial(staff)}
+        canFixSubscription={platformCanAccess(staff, "billing")}
         expiredSubscription={
           kpiData.sub && isExpiredActive(kpiData.sub, now()) ? { periodEndLabel: fmtDay(kpiData.sub.current_period_end ?? null) ?? "—" } : null
         }
@@ -325,7 +325,7 @@ export default async function AdminTenantDetailPage({
       // Koltuk bilgisi ve (yalnız süper admin için) hesap kredisi faturalarla birlikte, tek turda.
       loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats),
       // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
-      staff.role === "super_admin" ? loadCreditData(admin, id) : Promise.resolve(null),
+      platformCan(staff, "billing", "approve") ? loadCreditData(admin, id) : Promise.resolve(null),
       // Abonelik operasyon konsolu (AD1) + ödeme profili: aynı turda, aynı admin istemcisi.
       loadSubscriptionOps(admin, id, nowMs),
       loadPaymentProfile(admin, id),

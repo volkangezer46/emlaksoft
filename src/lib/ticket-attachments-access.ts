@@ -86,7 +86,7 @@ export async function authorizeTicketAttachmentAccess(
   const impersonating = Boolean(user.app_metadata?.impersonating);
   const staff = await getPlatformStaff();
   if (staff && !impersonating) {
-    if (!platformCanAccess(staff.role, "tickets")) {
+    if (!platformCanAccess(staff, "tickets")) {
       return { ok: false, status: 403, error: "Bu işlem için yetkiniz yok." };
     }
     return {

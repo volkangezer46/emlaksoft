@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const staff = await getPlatformStaff();
   if (!staff) return NextResponse.json({ error: "Oturum gerekli." }, { status: 401 });
-  if (!platformCanAccess(staff.role, "billing") || staff.role !== "super_admin") {
+  if (!platformCanAccess(staff, "billing") || staff.role !== "super_admin") {
     return NextResponse.json({ error: "Bu dışa aktarım yalnız süper admin içindir." }, { status: 403 });
   }
   const rl = await checkRateLimit(`market-export:${staff.id}`, { limit: 6, windowSec: 600, failurePolicy: "deny" });

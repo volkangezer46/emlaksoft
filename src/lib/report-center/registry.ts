@@ -4,7 +4,7 @@
  * `registry-contract.test.ts` ile doğrulanır.
  */
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
-import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
+import { platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 import { PLATFORM_REPORTS } from "./catalog/platform";
 import { PLATFORM_ACCOUNTING_REPORTS } from "./catalog/platform-accounting";
 import { PLATFORM_KVKK_REPORTS } from "./catalog/platform-kvkk";
@@ -70,7 +70,7 @@ export function tenantReportAllowed(def: ReportDef, v: TenantViewer): boolean {
   return true;
 }
 
-export function platformReportAllowed(def: ReportDef, role: PlatformRole): boolean {
+export function platformReportAllowed(def: ReportDef, role: PlatformAccessSubject): boolean {
   return def.scope === "platform" && !!def.platformModule && platformCanAccess(role, def.platformModule);
 }
 
@@ -78,7 +78,7 @@ export function visibleTenantReports(v: TenantViewer): ReportDef[] {
   return TENANT_REPORT_LIST.filter((d) => tenantReportAllowed(d, v));
 }
 
-export function visiblePlatformReports(role: PlatformRole): ReportDef[] {
+export function visiblePlatformReports(role: PlatformAccessSubject): ReportDef[] {
   return PLATFORM_REPORT_LIST.filter((d) => platformReportAllowed(d, role));
 }
 

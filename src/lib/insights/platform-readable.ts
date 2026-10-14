@@ -1,6 +1,6 @@
 import { INSIGHT_CONFIDENCES, INSIGHT_SEVERITIES, type InsightConfidence, type InsightEvidence, type InsightSeverity } from "@/lib/insights/types";
 import { isReadable, toEvidence } from "@/lib/insights/readable";
-import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
+import { platformCanAccess, type PlatformAccessSubject, type PlatformModule} from "@/lib/platform-access";
 
 /**
  * Platform içgörüsü: DB satırı -> tipli kayıt ve rol süzgeci (SAF; sunucu modülü yok, test edilir).
@@ -99,7 +99,7 @@ function mapRow(r: PlatformInsightDbRow): PlatformInsight | null {
 }
 
 /** Okunabilir (kapanmamış, süresi geçmemiş, uyanmış) + rolün görebildiği satırlar; öncelik azalan, sonra yeni önce. */
-export function selectPlatformReadable(rows: readonly PlatformInsightDbRow[], nowMs: number, role: PlatformRole, limit: number): PlatformInsight[] {
+export function selectPlatformReadable(rows: readonly PlatformInsightDbRow[], nowMs: number, role: PlatformAccessSubject, limit: number): PlatformInsight[] {
   const out: PlatformInsight[] = [];
   for (const r of rows) {
     if (!isReadable(r, nowMs)) continue;

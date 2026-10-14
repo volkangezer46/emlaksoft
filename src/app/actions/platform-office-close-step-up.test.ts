@@ -18,6 +18,7 @@ const db = vi.hoisted(() => ({
   updates: [] as { table: string; values: Row }[],
   verifyCalls: 0,
   verifyError: null as null | { message: string },
+  officeCloseFourEyes: false,
 }));
 
 vi.mock("server-only", () => ({}));
@@ -32,7 +33,13 @@ vi.mock("@/lib/rate-limit", () => ({ checkRateLimit: vi.fn(async () => ({ allowe
 vi.mock("@/lib/activity", () => ({ logActivity: vi.fn(async () => undefined) }));
 vi.mock("@/lib/platform-activity", () => ({ logPlatformActivity: vi.fn(async () => undefined), clientIpFrom: () => null }));
 vi.mock("@/lib/error-log", () => ({ logError: vi.fn(async () => undefined) }));
-vi.mock("@/lib/settings/read", () => ({ getSetting: vi.fn(async () => true) }));
+vi.mock("@/lib/settings/read", () => ({
+  getSetting: vi.fn(async () => true),
+  // DG1 dört göz ayarları: yalnız "ofis kapatma" anahtarı teste göre açılır, diğerleri kapalı.
+  getSettings: vi.fn(async (keys: string[]) =>
+    Object.fromEntries(keys.map((k) => [k, k === "platform.four_eyes_office_close" ? db.officeCloseFourEyes : undefined])),
+  ),
+}));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
@@ -109,6 +116,7 @@ beforeEach(() => {
   db.updates = [];
   db.verifyCalls = 0;
   db.verifyError = null;
+  db.officeCloseFourEyes = false;
 });
 
 describe("ofis kapatma talebi (account_closure)", () => {
@@ -138,6 +146,23 @@ describe("ofis kapatma talebi (account_closure)", () => {
     expect(r.error).toMatch(/hatalı/);
     expect(db.rpcCalls).toHaveLength(0);
     expect(db.kvkk[0].status).toBe("open");
+  });
+
+  it("dört göz (ofis kapatma) açıkken talep yolu ofisi tek imzayla arşivleyemez; arşivdeki ofiste talep tamamlanır", async () => {
+    db.officeCloseFourEyes = true;
+    const r = await processOfficeClosureRequestByAdmin(form({ ...base, step_up_code: "123456" }));
+    expect(r.error).toMatch(/Dört göz onayı açık/);
+    expect(db.verifyCalls).toBe(0);
+    expect(db.rpcCalls).toHaveLength(0);
+    expect(db.tenants[0].status).toBe("active");
+    expect(db.kvkk[0].status).toBe("open");
+
+    // Ofis ikinci onayla (Ofis 360 > Yönetim) arşivlendikten sonra talep burada kapanır; yeniden arşiv yazılmaz.
+    db.tenants[0].status = "cancelled";
+    const done = await processOfficeClosureRequestByAdmin(form({ ...base, step_up_code: "123456" }));
+    expect(done).toMatchObject({ ok: true });
+    expect(db.rpcCalls).toHaveLength(0);
+    expect(db.kvkk[0].status).toBe("completed");
   });
 });
 

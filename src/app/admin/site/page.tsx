@@ -54,11 +54,11 @@ function ChipList({ chips }: { chips: Chip[] }) {
 export default async function AdminSiteHubPage({ searchParams }: { searchParams: Promise<{ alan?: string | string[] }> }) {
   const staff = await requirePlatformModule("dashboard");
   const canWrite = staff.role === "super_admin";
-  const showKokpit = platformCanAccess(staff.role, "seo");
-  const fixed = SURFACES.filter((s) => platformCanAccess(staff.role, s.module));
+  const showKokpit = platformCanAccess(staff, "seo");
+  const fixed = SURFACES.filter((s) => platformCanAccess(staff, s.module));
   // Rehber yazıları (S5 dikişi): yazı başına dinamik yüzey; yalnız bekleyen taslağı ya da zamanlaması olanlar listelenir.
-  const canGuides = platformCanAccess(staff.role, "sitecontent");
-  const linkCards = HUB_CARDS.filter((c) => !c.hasDraft && platformCanAccess(staff.role, c.module));
+  const canGuides = platformCanAccess(staff, "sitecontent");
+  const linkCards = HUB_CARDS.filter((c) => !c.hasDraft && platformCanAccess(staff, c.module));
   const wants = (id: HubCardId) => linkCards.some((c) => c.id === id);
   const filter = parseAreaFilter((await searchParams).alan);
 

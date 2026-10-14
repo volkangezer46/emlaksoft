@@ -89,7 +89,7 @@ export async function POST(req: Request) {
   if (!staff) {
     return NextResponse.json({ error: "Oturum bulunamadı. Lütfen tekrar giriş yapın." }, { status: 401 });
   }
-  if (!platformCanAccess(staff.role, "advisor")) {
+  if (!platformCanAccess(staff, "advisor")) {
     return NextResponse.json({ error: "Bu modüle erişim yetkiniz yok." }, { status: 403 });
   }
 

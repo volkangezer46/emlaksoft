@@ -1,6 +1,7 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { fourEyesGate, requireStepUpOrApproved } from "@/lib/platform-security/four-eyes";
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { updateTenantPlanStatus } from "@/app/actions/platform";
@@ -231,13 +232,13 @@ export async function checkOfficeSlugAvailability(formData: FormData): Promise<S
 export async function createTenantByAdmin(formData: FormData): Promise<CreateOfficeResult> {
   // Kapı demo dönüşümüyle (`convertDemoToTenant`) AYNI: "sales" modülü.
   const staff = await requirePlatformModule("sales");
-  if (!officeAdminCan(staff.role, "create")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "create")) return { error: OFFICE_ADMIN_DENIED };
 
   const parsed = parseOfficeCreateInput(formRecord(formData));
   if (!parsed.ok) return { error: parsed.error, field: parsed.field };
   const input = parsed.data;
 
-  if (input.initialStatus === "active" && !officeAdminCan(staff.role, "create_active")) {
+  if (input.initialStatus === "active" && !officeAdminCan(staff, "create_active")) {
     return {
       error: "Ofisi doğrudan aktif açmak için faturalama yetkisi gerekir. Deneme olarak açın; paket ekibi aktifleştirir.",
       field: "initial_status",
@@ -462,8 +463,8 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
 export async function updateTenantProfileByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
   const scope = {
-    profile: officeAdminCan(staff.role, "edit_profile"),
-    billing: officeAdminCan(staff.role, "edit_billing_profile"),
+    profile: officeAdminCan(staff, "edit_profile"),
+    billing: officeAdminCan(staff, "edit_billing_profile"),
   };
   if (!scope.profile && !scope.billing) return { error: OFFICE_ADMIN_DENIED };
 
@@ -532,7 +533,7 @@ export async function updateTenantProfileByAdmin(formData: FormData): Promise<Of
 /** Vitrin adresi değişimi: eski bağlantılar kırılır (yönlendirme yok) — yalnız süper admin, açık onayla. */
 export async function changeTenantSlugByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "change_slug")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "change_slug")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };
@@ -603,7 +604,7 @@ export async function setTenantLifecycleByAdmin(formData: FormData): Promise<Off
   if (!(modeRaw in LIFECYCLE)) return { error: "Geçersiz işlem." };
   const mode = modeRaw as LifecycleMode;
   const rule = LIFECYCLE[mode];
-  if (!officeAdminCan(staff.role, rule.gate)) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, rule.gate)) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };
@@ -627,12 +628,24 @@ export async function setTenantLifecycleByAdmin(formData: FormData): Promise<Off
   if (mode === "suspend" && tenant.status === "suspended") return { error: "Ofis zaten askıda." };
   // AD11: ofis kapatma (askıya alma / arşiv) doğrulayıcı kodu ister.
   if (rule.status === "suspended" || rule.status === "cancelled") {
-    const stepUp = await requireStepUp(formData, "office_close", staff.id);
+    const stepUp = await requireStepUpOrApproved(formData, "office_close", staff.id);
     if (!stepUp.ok) return { error: stepUp.error };
   }
   if (mode === "archive" && tenant.status === "cancelled") return { error: "Ofis zaten arşivde." };
   if (mode === "reactivate" && tenant.status !== "suspended") return { error: "Yalnız askıdaki ofis yeniden etkinleştirilir." };
   if (mode === "restore" && tenant.status !== "cancelled") return { error: "Yalnız arşivdeki ofis geri yüklenir." };
+
+  // DG1 dört göz: askıya alma / arşivleme (ayar açıksa) ikinci bir yetkilinin onayıyla yürür.
+  if (rule.status === "suspended" || rule.status === "cancelled") {
+    const fourEyes = await fourEyesGate({
+      kind: "office_close",
+      staffId: staff.id,
+      form: formData,
+      entityId: tenantId,
+      summary: `${String(tenant.name)}: ${mode === "archive" ? "arşivleme" : "askıya alma"}${reason ? ` · ${reason}` : ""}`,
+    });
+    if (!fourEyes.proceed) return "error" in fourEyes ? { error: fourEyes.error } : { ok: true, message: fourEyes.notice };
+  }
 
   // Kod yukarıda doğrulandı: kapısız çekirdek (updateTenantPlanStatus aynı kodu ikinci kez isterdi).
   const result = await applyTenantPlanStatus(admin, staff.id, { id: tenantId, status: nextStatus });
@@ -662,7 +675,7 @@ export async function setTenantLifecycleByAdmin(formData: FormData): Promise<Off
 
 export async function resendTenantOwnerAccessLink(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "resend_access")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "resend_access")) return { error: OFFICE_ADMIN_DENIED };
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };
   if (await rateLimited(`access-link:${tenantId}`, staff.id, 3, 900)) {
@@ -695,7 +708,7 @@ export async function resendTenantOwnerAccessLink(formData: FormData): Promise<O
 /** Sahip e-postası hesabın anahtarıdır: yalnız süper admin, ofis adını yazarak onayla. */
 export async function changeTenantOwnerEmailByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "change_owner_email")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "change_owner_email")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };
@@ -777,7 +790,7 @@ export async function changeTenantOwnerEmailByAdmin(formData: FormData): Promise
  */
 export async function transferTenantOwnershipByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "transfer_ownership")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "transfer_ownership")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   const newOwnerId = uuidField(formData, "new_owner_id");
@@ -901,7 +914,7 @@ async function seatAvailable(admin: Admin, tenantId: string): Promise<{ ok: true
 
 export async function addTenantUserByAdmin(formData: FormData): Promise<OfficeUserResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "add_user")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "add_user")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };
@@ -979,7 +992,7 @@ export async function addTenantUserByAdmin(formData: FormData): Promise<OfficeUs
 export async function setTenantUserActiveByAdmin(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
   const next = field(formData, "active") === "true";
-  if (!officeAdminCan(staff.role, next ? "reactivate_user" : "deactivate_user")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, next ? "reactivate_user" : "deactivate_user")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   const memberId = uuidField(formData, "member_id");
@@ -1071,7 +1084,7 @@ export async function setTenantUserActiveByAdmin(formData: FormData): Promise<Of
 
 export async function addTenantPlatformNote(formData: FormData): Promise<OfficeActionResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "note")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "note")) return { error: OFFICE_ADMIN_DENIED };
 
   const tenantId = uuidField(formData, "id");
   if (!tenantId) return { error: NOT_FOUND };

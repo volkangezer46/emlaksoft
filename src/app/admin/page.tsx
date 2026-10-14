@@ -63,7 +63,7 @@ import {
   type HomeSection,
 } from "@/lib/admin/dashboard-layout";
 import { arpaSeries, linearForecast, moduleAdoption, nextMonthLabels } from "@/lib/admin/platform-metrics";
-import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
+import { platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 import { auditActionLabel, relativeTimeTR } from "@/lib/admin-format";
 import { formatTry } from "@/lib/format";
 import { planLabel as catalogPlanLabel } from "@/lib/billing/plans";
@@ -205,7 +205,7 @@ function derive(data: Data) {
  * Dikkat kuyruğu tek okuma (hero özeti + kart). Churn kartı görünen rolde "Riskli ofis" satırı
  * YOK (risk: null): riskli ofisler churn kartında tek listede (sayı + filtreli bağlantı) toplanır.
  */
-const loadAttention = cache(async (period: Period, role: PlatformRole) => {
+const loadAttention = cache(async (period: Period, role: PlatformAccessSubject) => {
   const data = await loadDashboard(period);
   const d = derive(data);
   const canBilling = platformCanAccess(role, "billing");
@@ -264,7 +264,7 @@ const weekLabel = (iso: string) => {
 };
 
 /** Hero özeti: KPI'ları TEKRARLAMAZ; en öncelikli işi adıyla ve bağlantısıyla söyler. */
-async function HeroSummary({ period, role }: { period: Period; role: PlatformRole }) {
+async function HeroSummary({ period, role }: { period: Period; role: PlatformAccessSubject }) {
   const queue = await loadAttention(period, role);
   const top = queue[0];
   if (!top) return <p>Platform sakin: bekleyen öncelikli iş yok.</p>;
@@ -279,7 +279,7 @@ async function HeroSummary({ period, role }: { period: Period; role: PlatformRol
   );
 }
 
-async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }) {
+async function KpiStrip({ period, role }: { period: Period; role: PlatformAccessSubject }) {
   const data = await loadDashboard(period);
   const d = derive(data);
   const conv = data.trialConv;
@@ -331,7 +331,7 @@ async function KpiStrip({ period, role }: { period: Period; role: PlatformRole }
 }
 
 /** DİKKAT GEREKTİRENLER: rol filtreli, önem sırasına göre iş kuyruğu + platform içgörüleri. */
-async function AttentionSection({ period, role }: { period: Period; role: PlatformRole }) {
+async function AttentionSection({ period, role }: { period: Period; role: PlatformAccessSubject }) {
   const [queue, insights] = await Promise.all([loadAttention(period, role), getPlatformInsights({ limit: 3 })]);
   return (
     <AttentionList
@@ -504,7 +504,7 @@ async function ChurnSection({ period }: { period: Period }) {
 }
 
 /** Sistem sağlığı: zamanlanmış işler + veritabanı yanıtı + son cron + EF mutabakat (yetkiliye). */
-async function HealthSection({ role }: { role: PlatformRole }) {
+async function HealthSection({ role }: { role: PlatformAccessSubject }) {
   const sys = await loadSystemSignals(platformCanAccess(role, "billing"));
   const h = sys.health;
   const tiles: ReactNode[] = [];
@@ -931,7 +931,7 @@ export default async function AdminHomePage({
   const staff = await requirePlatformStaff();
 
   // Departmana özel açılış ekranı — aynı /admin adresi, role göre farklı panel.
-  const variant = homeVariantFor(staff.role);
+  const variant = homeVariantFor(staff);
   if (variant === "billing") return <BillingHome staffName={staff.full_name} />;
   if (variant === "support") return <SupportHome staffName={staff.full_name} />;
 
@@ -941,7 +941,7 @@ export default async function AdminHomePage({
   for (const [k, v] of Object.entries(sp)) params[k] = Array.isArray(v) ? v[0] : v;
 
   const nowMs = now();
-  const role = staff.role;
+  const role: PlatformAccessSubject = staff;
   const sections = platformHomeSections(role);
   const firstName = firstNameOf(staff.full_name);
 

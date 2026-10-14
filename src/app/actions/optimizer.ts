@@ -219,7 +219,7 @@ const visibleSurfaces = (role: Parameters<typeof platformCanAccess>[0]) => SURFA
 export async function previewAllDrafts(): Promise<AllDraftsPreview> {
   const g = await gate(false);
   if ("error" in g) return { error: g.error };
-  const surfaces = visibleSurfaces(g.staff.role);
+  const surfaces = visibleSurfaces(g.staff);
   const states = await Promise.all(surfaces.map((s) => s.readState()));
   const groups: DraftDiffGroup[] = [];
   surfaces.forEach((s, i) => {
@@ -255,7 +255,7 @@ export async function publishAllDrafts(input: { surface: string; hash: string }[
   const expected = Object.fromEntries(parsed.data.map((x) => [x.surface, x.hash]));
   const rl = await checkRateLimit(`publishing-all:${g.staff.id}`, { limit: 10, windowSec: 600, failurePolicy: "deny" });
   if (!rl.allowed) return { error: TOO_FAST };
-  const surfaces = visibleSurfaces(g.staff.role);
+  const surfaces = visibleSurfaces(g.staff);
   const items = await publishDraftsSequential(
     surfaces,
     { id: g.staff.id, name: g.staff.full_name || g.staff.email, source: "staff" },

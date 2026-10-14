@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OFFICE_ADMIN_ACTIONS, officeAdminCan, type OfficeAdminAction } from "@/lib/admin/office-admin-access";
-import type { PlatformRole } from "@/lib/platform-access";
+import type { PlatformAccessSubject } from "@/lib/platform-access";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 
 /**
@@ -37,7 +37,7 @@ export type OfficeManagementData = {
 
 export type OfficeAdminCanMap = Record<OfficeAdminAction, boolean>;
 
-export function officeAdminCanMap(role: PlatformRole): OfficeAdminCanMap {
+export function officeAdminCanMap(role: PlatformAccessSubject): OfficeAdminCanMap {
   const out = {} as OfficeAdminCanMap;
   for (const action of OFFICE_ADMIN_ACTIONS) out[action] = officeAdminCan(role, action);
   return out;

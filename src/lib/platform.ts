@@ -4,7 +4,16 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
-import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
+import {
+  isPlatformBaseRole,
+  normalizeMatrix,
+  platformCan,
+  type PlatformAction,
+  type PlatformCustomRole,
+  type PlatformModule,
+  type PlatformRole,
+} from "@/lib/platform-access";
+import { gateAction } from "@/lib/platform-action-phase";
 import { sessionExpired, sessionStartSec } from "@/lib/platform-security/admin-access";
 import { readAdminAccessPolicyCached } from "@/lib/platform-security/admin-access-cache";
 import { now } from "@/lib/clock";
@@ -17,7 +26,39 @@ export type PlatformStaff = {
   full_name: string;
   role: PlatformRole;
   is_active: boolean;
+  /** DG1 özel rolü: atanmışsa modül × eylem yetkisi YALNIZ bundan gelir (`role` = özel rolün taban rolü). */
+  customRole?: PlatformCustomRole | null;
 };
+
+const STAFF_COLS = "id, email, full_name, role, is_active";
+/** DG1: özel rol gömmesi (FK platform_staff.custom_role_id -> platform_custom_roles). */
+const STAFF_COLS_WITH_ROLE = `${STAFF_COLS}, custom_role_id, custom_role:platform_custom_roles!platform_staff_custom_role_id_fkey(id, label, base_role, permissions)`;
+/** Migration uygulanmadan önce sütun/ilişki yok hataları: eski sorguya düşülür (yetki taban roldür, özel rol yoktur). */
+const SCHEMA_PENDING = new Set(["42703", "42P01", "PGRST200", "PGRST204"]);
+
+export type StaffRowWithRole = Omit<PlatformStaff, "customRole"> & {
+  custom_role_id?: string | null;
+  custom_role?: { id: string; label: string; base_role: string; permissions: unknown } | null;
+};
+
+/**
+ * Satırdan personel kimliğini kurar. FAIL-CLOSED: `custom_role_id` dolu ama rol okunamadıysa (RLS, silinme yarışı)
+ * taban rolün yetkileri VERİLMEZ; yalnız Genel bakış görünür (boş matris).
+ */
+export function staffFromRow(row: StaffRowWithRole): PlatformStaff {
+  const { custom_role_id, custom_role, ...base } = row;
+  if (!custom_role_id) return { ...base, customRole: null };
+  const r = custom_role;
+  const customRole: PlatformCustomRole = r
+    ? {
+        id: r.id,
+        label: r.label,
+        baseRole: isPlatformBaseRole(r.base_role) ? r.base_role : "support",
+        permissions: normalizeMatrix(r.permissions),
+      }
+    : { id: custom_role_id, label: "Özel rol (okunamadı)", baseRole: "support", permissions: {} };
+  return { ...base, customRole };
+}
 
 function allowlist(): string[] {
   return (process.env.PLATFORM_ADMIN_EMAILS ?? "")
@@ -95,14 +136,22 @@ export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | n
   if (!user?.email) return null;
 
   const supabase = await createClient();
-  const { data } = await supabase
+  const withRole = await supabase
     .from("platform_staff")
-    .select("id, email, full_name, role, is_active")
+    .select(STAFF_COLS_WITH_ROLE)
     .eq("id", user.id)
     .eq("is_active", true)
     .maybeSingle();
+  let data = (withRole.data as unknown as StaffRowWithRole | null) ?? null;
+  if (withRole.error && SCHEMA_PENDING.has(withRole.error.code ?? "")) {
+    const legacy = await supabase.from("platform_staff").select(STAFF_COLS).eq("id", user.id).eq("is_active", true).maybeSingle();
+    data = (legacy.data as StaffRowWithRole | null) ?? null;
+  } else if (withRole.error) {
+    // Okuma hatası: ön-izin listesi önyüklemesine DÜŞÜLMEZ (o yol özel rolü okumaz; taban rol yetkisi sızardı).
+    return null;
+  }
 
-  if (data) return data as PlatformStaff;
+  if (data) return staffFromRow(data);
 
   const name =
     (user.user_metadata?.full_name as string | undefined) ??
@@ -210,11 +259,11 @@ export async function requirePlatformStaffForAccount(): Promise<PlatformStaff> {
 
 /**
  * Sayfa/aksiyon seviyesi departman yetkisi. Personel değilse `requirePlatformStaff`
- * gibi yönlendirir; modüle erişimi yoksa kendi dashboard'una (/admin) döner.
+ * gibi yönlendirir; modüle (ya da istenen eyleme) yetkisi yoksa kendi dashboard'una (/admin) döner.
  */
-export async function requirePlatformModule(module: PlatformModule): Promise<PlatformStaff> {
+export async function requirePlatformModule(module: PlatformModule, action?: PlatformAction): Promise<PlatformStaff> {
   const staff = await requirePlatformStaff();
-  if (!platformCanAccess(staff.role, module)) {
+  if (!platformCan(staff, module, gateAction(action))) {
     redirect("/admin");
   }
   return staff;

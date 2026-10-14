@@ -80,18 +80,18 @@ export default async function AdminTenantsPage({
   searchParams?: Promise<{ q?: string; durum?: string; plan?: string; veri?: string; yeni?: string; deneme?: string; gun?: string; dagilim?: string; etiket?: string; sorumlu?: string; asama?: string; skor?: string; sayfa?: string; audit?: string; destek?: string }>;
 }) {
   const staff = await requirePlatformModule("tenants");
-  const canCreate = officeAdminCan(staff.role, "create");
+  const canCreate = officeAdminCan(staff, "create");
   const perms = {
     // Satır içi durum/paket: mevcut eylem `updateTenantPlanStatus` billing modülü ister (aynı kapı).
-    canEdit: officeAdminCan(staff.role, "plan_status") && platformCanAccess(staff.role, "billing"),
+    canEdit: officeAdminCan(staff, "plan_status") && platformCanAccess(staff, "billing"),
     canImpersonate: staff.role === "super_admin" || staff.role === "ops" || staff.role === "support",
-    canResend: officeAdminCan(staff.role, "resend_access"),
+    canResend: officeAdminCan(staff, "resend_access"),
   };
   // CRM toplu işlem yetkileri (eylem tarafı aynı kuralları uygular: src/app/actions/platform-crm.ts).
   const bulkPerms = {
-    crm: officeAdminCan(staff.role, "note"),
-    trial: canChangeTrial(staff.role),
-    status: officeAdminCan(staff.role, "plan_status"),
+    crm: officeAdminCan(staff, "note"),
+    trial: canChangeTrial(staff),
+    status: officeAdminCan(staff, "plan_status"),
     destructiveStatus: staff.role === "super_admin",
   };
   const canManageTags = staff.role === "super_admin" || staff.role === "ops";

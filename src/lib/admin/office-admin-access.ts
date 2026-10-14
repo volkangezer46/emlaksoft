@@ -1,4 +1,4 @@
-import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
+import { baseRoleOf, platformCan, platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 
 /**
  * Platform personelinin OFİS YÖNETİMİ eylem matrisi (saf; sunucu action'ları ve arayüz aynı kaynağı kullanır).
@@ -46,25 +46,28 @@ const SUPER_ONLY: ReadonlySet<OfficeAdminAction> = new Set([
   "reset_security_policy",
 ]);
 
-export function officeAdminCan(role: PlatformRole, action: OfficeAdminAction): boolean {
-  if (!platformCanAccess(role, "tenants")) return false;
+export function officeAdminCan(who: PlatformAccessSubject, action: OfficeAdminAction): boolean {
+  const role = baseRoleOf(who);
+  if (!platformCanAccess(who, "tenants")) return false;
   if (role === "super_admin") return true;
-  if (SUPER_ONLY.has(action)) return false;
+  // DG1: yazma eylemleri modülde `write`, yıkıcı olanlar `approve` ister (sabit rollerde approve yalnız süper adminde).
+  if (!platformCan(who, "tenants", "write")) return false;
+  if (SUPER_ONLY.has(action)) return platformCan(who, "tenants", "approve");
   switch (action) {
     case "create":
     case "resend_access":
-      return platformCanAccess(role, "sales");
+      return platformCan(who, "sales", "write");
     case "create_active":
-      return platformCanAccess(role, "sales") && platformCanAccess(role, "billing");
+      return platformCan(who, "sales", "write") && platformCan(who, "billing", "write");
     case "edit_profile":
       return role === "ops" || role === "support";
     case "edit_billing_profile":
     case "plan_status":
     case "reactivate":
-      return platformCanAccess(role, "billing");
+      return platformCan(who, "billing", "write");
     case "add_user":
     case "reactivate_user":
-      return platformCanAccess(role, "members");
+      return platformCan(who, "members", "write");
     case "note":
       return true;
     case "export_vault":
@@ -75,8 +78,8 @@ export function officeAdminCan(role: PlatformRole, action: OfficeAdminAction): b
 }
 
 /** Rolün yapabildiği eylemler (Yönetim sekmesi yalnız bunları çizer). */
-export function officeAdminActionsFor(role: PlatformRole): OfficeAdminAction[] {
-  return OFFICE_ADMIN_ACTIONS.filter((a) => officeAdminCan(role, a));
+export function officeAdminActionsFor(who: PlatformAccessSubject): OfficeAdminAction[] {
+  return OFFICE_ADMIN_ACTIONS.filter((a) => officeAdminCan(who, a));
 }
 
 export const OFFICE_ADMIN_DENIED = "Bu işlem için yetkiniz yok.";
