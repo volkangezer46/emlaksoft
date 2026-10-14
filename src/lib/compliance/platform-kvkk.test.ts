@@ -32,6 +32,7 @@ import { evaluateAlerts } from "@/lib/alerts/evaluate";
 import { mergeRuleConfigs } from "@/lib/alerts/rules";
 import { kvkkVeriPaketi } from "@/lib/report-center/catalog/platform-kvkk";
 import type { ReportContext } from "@/lib/report-center/types";
+import { resetRpcProbes } from "@/lib/supabase/rpc-probe";
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Bellek içi sahte Supabase (yalnız servisin kullandığı zincir: select/insert/update/delete + eq/neq/in/is/lt/gte/ilike,
@@ -164,7 +165,29 @@ class FakeDb {
   from(t: string) {
     return new FakeQuery(this, t);
   }
+  /** kvkk_customer_related_counts (YD7) yokmuş gibi davran: eski müşteri başına sayım yolu sınanır. */
+  relatedRpcMissing = false;
+  relatedRpcCalls = 0;
+  /** YD7 kvkk_customer_related_counts: müşteri × ilişkili tablo sayımı tek çağrıda (SQL'in bellek içi eşi). */
+  relatedCounts(args: Row): Res {
+    this.relatedRpcCalls += 1;
+    if (this.relatedRpcMissing) return { data: null, error: { code: "PGRST202", message: "Could not find the function public.kvkk_customer_related_counts" } };
+    const tables = ["deals", "appointments", "calls", "communications", "offers", "tasks", "iys_consents"];
+    if (tables.some((t) => this.failTables.has(t)) || this.failTables.has("customers")) {
+      return { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } };
+    }
+    const ids = new Set<string>(args.p_customer_ids as string[]);
+    const out: Row[] = [];
+    for (const c of (this.tables.customers ?? []).filter((r) => ids.has(r.id))) {
+      for (const t of tables) {
+        const n = (this.tables[t] ?? []).filter((r) => r.customer_id === c.id && r.tenant_id === c.tenant_id).length;
+        if (n > 0) out.push({ customer_id: c.id, tbl: t, n });
+      }
+    }
+    return { data: out, error: null };
+  }
   async rpc(fn: string, args: Row): Promise<Res> {
+    if (fn === "kvkk_customer_related_counts") return this.relatedCounts(args);
     this.rpcCalls.push({ fn, args });
     if (fn !== "anonymize_customer") return { data: null, error: { message: "unknown rpc" } };
     // Mevcut anonimleştirme RPC'sinin davranışı: kişi alanları silinir, anlaşma satırları korunur, kanıt yazılır.
@@ -568,6 +591,25 @@ describe("platform KVKK kapsam: telefon eşleşmesi, tarama hatası, incelenen k
     }
   });
 
+  it("ilişkili kayıt sayımı tek RPC turunda; fonksiyon yokken müşteri başına eski sayımla AYNI sonuç (YD7)", async () => {
+    const who = { email: "ayse_yilmaz@ornek.com", phone: "05321234567" };
+    const fast = new FakeDb();
+    seed(fast);
+    fast.tables.tasks = [{ id: "t1", tenant_id: TENANT_A, customer_id: CUST_A }, { id: "t2", tenant_id: TENANT_B, customer_id: CUST_A }];
+    const a = await findSubjectRecords(asDb(fast), who);
+    expect(fast.relatedRpcCalls).toBe(1);
+    resetRpcProbes();
+    const slow = new FakeDb();
+    seed(slow);
+    slow.tables.tasks = fast.tables.tasks;
+    slow.relatedRpcMissing = true;
+    const b = await findSubjectRecords(asDb(slow), who);
+    resetRpcProbes();
+    expect(a.customers.map((c) => [c.id, c.related])).toEqual(b.customers.map((c) => [c.id, c.related]));
+    // başka ofisin aynı müşteri kimliğiyle yazılmış görev satırı sayılmaz (tenant_id eşitliği)
+    expect(a.customers.find((c) => c.id === CUST_A)?.related).toEqual({ deals: 1, appointments: 1, tasks: 1 });
+  });
+
   it("eşleşme sınırı aşılırsa tarama eksik sayılır (sessizce kesilmez)", async () => {
     const db = new FakeDb();
     verifiedErasure(db);
@@ -587,6 +629,7 @@ describe("platform KVKK kapsam: telefon eşleşmesi, tarama hatası, incelenen k
     const row = verifiedErasure(db);
     expect((await preparePackage(asDb(db), "r1", STAFF, T0)).ok).toBe(true);
     db.rpc = async (fn: string, args: Row) => {
+      if (fn === "kvkk_customer_related_counts") return db.relatedCounts(args);
       db.rpcCalls.push({ fn, args });
       return { data: null, error: { code: "40P01", message: "deadlock detected on relation customers" } };
     };

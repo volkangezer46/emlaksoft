@@ -4,12 +4,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { compareTr } from "@/lib/tr-text";
 import { geoKey } from "./normalize";
 import { applyImportPlan, geoVersionsAvailable, loadExistingGeo, rollbackImportVersion } from "./import-apply";
+import { readGeoLevelCounts, refreshGeoStatsQuietly } from "./stats";
 import type { GeoLevel } from "./types";
 
 /**
  * YÖNETİM VERİ KATMANI (yalnız /admin/geo ve geo action'ları). Yetki kontrolü ÇAĞIRANDA
  * (requirePlatformModule + rol), burada yok. Önbellek tazeleme action katmanında (updateTag).
  * SİLME YOK: pasife alma / birleştirme / taşıma vardır.
+ * Sayımı değiştiren her yazım (ekle, pasife al, taşı, birleştir, geri al, içe aktar) başarıdan sonra geo sayım
+ * görünümlerini (materialized, `./stats`) aynı servis istemcisiyle tazeler.
  */
 
 const TABLE: Record<GeoLevel, string> = { province: "geo_provinces", district: "geo_districts", neighborhood: "geo_neighborhoods" };
@@ -184,6 +187,7 @@ export async function createEntity(level: GeoLevel, input: EntityInput, actorId:
   }
   if (res.error || !res.data) return { ok: false, error: dupMsg(res.error?.code, "Kayıt eklenemedi.") };
   void actorId;
+  await refreshGeoStatsQuietly(admin);
   return { ok: true, id: res.data.id as string };
 }
 
@@ -220,8 +224,13 @@ export async function setActive(level: GeoLevel, ids: string[], active: boolean)
     if (res.error && /column .* does not exist|schema cache/i.test(res.error.message)) {
       res = await admin.from(TABLE[level]).update({ is_active: active }).in("id", part);
     }
-    if (res.error) return { ok: false, error: "Durum güncellenemedi." };
+    if (res.error) {
+      // Önceki parçalar yazılmış olabilir: sayımlar yine de güncel kalsın.
+      if (i > 0) await refreshGeoStatsQuietly(admin);
+      return { ok: false, error: "Durum güncellenemedi." };
+    }
   }
+  await refreshGeoStatsQuietly(admin);
   return { ok: true };
 }
 
@@ -233,6 +242,7 @@ export async function moveEntity(level: "district" | "neighborhood", id: string,
     if (/does not exist|schema cache|Could not find/i.test(error.message)) return { ok: false, error: "Taşıma altyapısı bu ortamda etkin değil (geo migration uygulanmamış)." };
     return { ok: false, error: "Taşıma yapılamadı." };
   }
+  await refreshGeoStatsQuietly(admin);
   return { ok: true };
 }
 
@@ -245,13 +255,16 @@ export async function mergeEntity(level: "district" | "neighborhood", fromId: st
     return { ok: false, error: "Birleştirme yapılamadı." };
   }
   const r = (data ?? {}) as { version_id?: string; moved_rows?: number };
+  await refreshGeoStatsQuietly(admin);
   return { ok: true, moved: r.moved_rows ?? 0, versionId: r.version_id };
 }
 
 export async function undoMerge(versionId: string, actorId: string): Promise<WriteResult> {
   const admin = createAdminClient();
   const { error } = await admin.rpc("geo_merge_undo", { p_version: versionId, p_actor: actorId });
-  return error ? { ok: false, error: "Birleştirme geri alınamadı." } : { ok: true };
+  if (error) return { ok: false, error: "Birleştirme geri alınamadı." };
+  await refreshGeoStatsQuietly(admin);
+  return { ok: true };
 }
 
 // -------------------------------------------------------------------- alias
@@ -310,6 +323,8 @@ export async function rollbackVersion(versionId: string, actorId: string): Promi
   const { data } = await admin.from("geo_data_versions").select("kind").eq("id", versionId).maybeSingle();
   if (data?.kind === "merge") return undoMerge(versionId, actorId);
   const r = await rollbackImportVersion(admin, versionId, actorId);
+  // Yarıda kalan geri alma da satır değiştirmiş olabilir: sonuçtan bağımsız tazelenir.
+  await refreshGeoStatsQuietly(admin);
   return r.ok ? { ok: true, reverted: r.reverted } : { ok: false, error: r.error };
 }
 
@@ -320,6 +335,7 @@ export async function loadExisting() {
 }
 
 export async function applyPlan(plan: Parameters<typeof applyImportPlan>[1], ctx: Parameters<typeof applyImportPlan>[2]) {
+  // Geo sayım görünümleri applyImportPlan içinde (bitişte, kısmi uygulamada da) tazelenir.
   return applyImportPlan(createAdminClient(), plan, ctx);
 }
 
@@ -351,13 +367,19 @@ async function countOf(table: string, active?: boolean): Promise<number> {
 export async function getGeoHealth(): Promise<GeoHealth> {
   const admin = createAdminClient();
   // Sayımlar + istatistik görünümleri + sürüm listesi + bekleyen bildirim birbirinden BAĞIMSIZ → tek tur (önceden 4 sıralı tur).
-  // Tutarsızlıklar: mevcut istatistik görünümlerinden (geo_province_stats / geo_district_stats).
-  const [[pa, pi, da, di, na, ni], { data: pstats }, { data: dstats }, { data: provs }, { data: dists }, versions, { count: pending, error: pendErr }] = await Promise.all([
-    Promise.all([
+  // Tutarsızlıklar: istatistik görünümlerinden (geo_province_stats / geo_district_stats; YD7'den beri materialized).
+  // 6 sayım (il/ilçe/mahalle × aktif/pasif) tek okumayla geo_level_counts'tan; görünüm yoksa (migration öncesi) ayrı sayımlar.
+  const levelCounts = async (): Promise<[number, number, number, number, number, number]> => {
+    const c = await readGeoLevelCounts(admin);
+    if (c) return [c.province.active, c.province.inactive, c.district.active, c.district.inactive, c.neighborhood.active, c.neighborhood.inactive];
+    return Promise.all([
       countOf("geo_provinces", true), countOf("geo_provinces", false),
       countOf("geo_districts", true), countOf("geo_districts", false),
       countOf("geo_neighborhoods", true), countOf("geo_neighborhoods", false),
-    ]),
+    ]);
+  };
+  const [[pa, pi, da, di, na, ni], { data: pstats }, { data: dstats }, { data: provs }, { data: dists }, versions, { count: pending, error: pendErr }] = await Promise.all([
+    levelCounts(),
     admin.from("geo_province_stats").select("province_id, district_count"),
     admin.from("geo_district_stats").select("district_id, neighborhood_count"),
     admin.from("geo_provinces").select("id, name").eq("is_active", true),

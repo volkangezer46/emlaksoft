@@ -4,6 +4,7 @@ import { DAY_MS, trDayStartMs } from "@/lib/clock";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { hashOtpForStorage, verifyOtpHash } from "@/lib/otp-hmac";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { isMissingFunctionError, rpcKnownMissing, recordRpcOutcome } from "@/lib/supabase/rpc-probe";
 import {
   DETAILS_MAX,
   DETAILS_MIN,
@@ -482,6 +483,50 @@ type CustomerRaw = {
 type QErr = { code?: string; message?: string } | null;
 type QRes = { data?: unknown; error: QErr; count?: number | null };
 
+const RELATED_COUNTS_RPC = "kvkk_customer_related_counts";
+
+/**
+ * Eşleşen müşterilerin ilişkili kayıt sayıları TEK sorguda (YD7, 20261015047020): müşteri × 7 tablo ayrı head-count yerine.
+ * Fonksiyon yoksa (migration uygulanmadı) null → çağıran müşteri başına eski sayıma düşer. Başka hata taramayı durdurur
+ * (sayım hatası yasal saklama gerekçesini düşürebilir: sessizce 0 sayılmaz).
+ */
+async function relatedCountsBatch(db: Db, customerIds: string[]): Promise<Map<string, Record<string, number>> | null> {
+  const out = new Map<string, Record<string, number>>();
+  if (customerIds.length === 0) return out;
+  if (rpcKnownMissing(RELATED_COUNTS_RPC)) return null;
+  const { data, error } = (await db.rpc(RELATED_COUNTS_RPC, { p_customer_ids: customerIds })) as QRes;
+  recordRpcOutcome(RELATED_COUNTS_RPC, error);
+  if (error) {
+    if (isMissingFunctionError(error)) return null;
+    throw new SubjectScanError("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.", `scan failed: related:${error.code ?? "?"}`);
+  }
+  const known = new Set<string>(RELATED_TABLES);
+  for (const r of (data ?? []) as { customer_id: string; tbl: string; n: number | string }[]) {
+    const n = Number(r.n);
+    if (!known.has(r.tbl) || !Number.isFinite(n) || n <= 0) continue;
+    const cur = out.get(r.customer_id) ?? {};
+    cur[r.tbl] = n;
+    out.set(r.customer_id, cur);
+  }
+  return out;
+}
+
+/** Eski yol (fonksiyon yokken): müşteri başına 7 head-count. */
+async function relatedCountsOne(db: Db, c: { id: string; tenant_id: string }): Promise<Record<string, number>> {
+  const counts = (await Promise.all(
+    RELATED_TABLES.map((t) => db.from(t).select("id", { count: "exact", head: true }).eq("tenant_id", c.tenant_id).eq("customer_id", c.id)),
+  )) as QRes[];
+  const related: Record<string, number> = {};
+  RELATED_TABLES.forEach((t, i) => {
+    const res = counts[i];
+    // Sayım hatası yasal saklama gerekçesini (anlaşma) listeden düşürebilir: sessizce 0 sayılmaz.
+    if (!res || res.error) throw new SubjectScanError("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.", `scan failed: ${t}:${res?.error?.code ?? "?"}`);
+    const n = res.count ?? 0;
+    if (n > 0) related[t] = n;
+  });
+  return related;
+}
+
 /**
  * Kişinin DOĞRULANMIŞ e-postası ve (varsa) yazdığı telefonla eşleşen kayıtlar: ofis müşterileri (+ ilişkili kayıt
  * sayıları), demo talepleri, açık ev ziyaretçileri, saklanan imzacı/cari sayıları. Her kayıt eşleşme gerekçesini taşır
@@ -540,19 +585,10 @@ export async function findSubjectRecords(db: Db, who: { email: string; phone: st
     for (const t of (data ?? []) as { id: string; name: string | null }[]) tenantNames.set(t.id, t.name ?? "Ofis");
   }
 
+  const batched = await relatedCountsBatch(db, list.map((c) => c.id));
   const subjectCustomers: SubjectCustomer[] = await Promise.all(
     list.map(async (c) => {
-      const counts = (await Promise.all(
-        RELATED_TABLES.map((t) => db.from(t).select("id", { count: "exact", head: true }).eq("tenant_id", c.tenant_id).eq("customer_id", c.id)),
-      )) as QRes[];
-      const related: Record<string, number> = {};
-      RELATED_TABLES.forEach((t, i) => {
-        const res = counts[i];
-        // Sayım hatası yasal saklama gerekçesini (anlaşma) listeden düşürebilir: sessizce 0 sayılmaz.
-        if (!res || res.error) throw new SubjectScanError("Kayıtlar taranamadı. Kısa süre sonra tekrar deneyin.", `scan failed: ${t}:${res?.error?.code ?? "?"}`);
-        const n = res.count ?? 0;
-        if (n > 0) related[t] = n;
-      });
+      const related: Record<string, number> = batched ? { ...(batched.get(c.id) ?? {}) } : await relatedCountsOne(db, c);
       return {
         id: c.id,
         tenantId: c.tenant_id,

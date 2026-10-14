@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AlarmClock, Crosshair, Flame, PieChart, Plus, Search, Sparkles, Target, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
+import { loadDemandCounts, type DemandCounts } from "@/lib/supabase/list-count-rpcs";
 import { getProvince } from "@/lib/geo/reader";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
@@ -291,50 +292,62 @@ export async function DemandsView({
     ),
   };
 
-  // ── Hızlı (head-count) veriler: KPI + çip sayaçları + araç çubuğu ───────────────
+  // ── Hızlı veriler: KPI + çip sayaçları + araç çubuğu ───────────────
+  // 7 sayaç (4 durum + açık acil/yüksek + yaşlanan) TEK sorguda (demand_counts, RLS geçerli; kapsam müşteri üzerinden).
+  // Fonksiyon yoksa eski 7 head-count; onların hatası `error` alanıyla batchAll'a taşınır (sessiz sıfır yok).
   const nowMs = now();
+  const agingBeforeIso = daysAgoIso(AGING_DAYS);
+  const countsP = loadDemandCounts(supabase, {
+    scope: listScope.filter,
+    advisorId: danismanF || null,
+    openStatuses: OPEN_STATUSES,
+    agingBeforeIso,
+  }).then(async (fast): Promise<{ data: DemandCounts | null; error: unknown }> => {
+    if (fast) return { data: fast, error: null };
+    const res = await Promise.all([
+      scopeHead().eq("status", "new"),
+      scopeHead().eq("status", "active"),
+      scopeHead().eq("status", "matched"),
+      scopeHead().eq("status", "closed"),
+      scopeHead().in("status", OPEN_STATUSES).eq("urgency", "urgent"),
+      scopeHead().in("status", OPEN_STATUSES).eq("urgency", "high"),
+      scopeHead().in("status", OPEN_STATUSES).lte("created_at", agingBeforeIso),
+    ]);
+    const failed = res.find((r) => r.error);
+    if (failed) return { data: null, error: failed.error };
+    const [n, a, m, c, u, h, g] = res.map((r) => r.count ?? 0);
+    return { data: { new: n!, active: a!, matched: m!, closed: c!, urgent: u!, high: h!, aging: g! }, error: null };
+  });
   const [
     advisorsRes,
     savedViews,
-    newRes,
-    activeRes,
-    matchedRes,
-    closedRes,
-    urgentRes,
-    highRes,
-    agingRes,
+    countsRes,
     seriesRes,
     ilRes,
   ] = await batchAll("Talepler", [
-    "profiles", "saved-views", "count-new", "count-active", "count-matched", "count-closed",
-    "count-urgent", "count-high", "count-aging", "series", "province",
+    "profiles", "saved-views", "demand-counts", "series", "province",
   ], [
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
     savedViewsPromise,
-    scopeHead().eq("status", "new"),
-    scopeHead().eq("status", "active"),
-    scopeHead().eq("status", "matched"),
-    scopeHead().eq("status", "closed"),
-    scopeHead().in("status", OPEN_STATUSES).eq("urgency", "urgent"),
-    scopeHead().in("status", OPEN_STATUSES).eq("urgency", "high"),
-    scopeHead().in("status", OPEN_STATUSES).lte("created_at", daysAgoIso(AGING_DAYS)),
+    countsP,
     buildBase(`created_at${scopeEmbed}`, undefined, false).gte("created_at", daysAgoIso(56)).limit(SERIES_SCAN_LIMIT),
     ilF ? getProvince(ilF).then((p) => ({ data: p ? { name: p.name } : null })) : Promise.resolve({ data: null }),
   ]);
 
   const advisors = (advisorsRes.data ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "") }));
   const advisorName = new Map(advisors.map((a) => [a.id, a.name]));
+  const counts = countsRes.data;
   const statusCounts: Record<string, number> = {
-    new: newRes.count ?? 0,
-    active: activeRes.count ?? 0,
-    matched: matchedRes.count ?? 0,
-    closed: closedRes.count ?? 0,
+    new: counts?.new ?? 0,
+    active: counts?.active ?? 0,
+    matched: counts?.matched ?? 0,
+    closed: counts?.closed ?? 0,
   };
   const openTotal = statusCounts.new! + statusCounts.active! + statusCounts.matched!;
   const allTotal = openTotal + statusCounts.closed!;
-  const urgentCounts: Record<string, number> = { urgent: urgentRes.count ?? 0, high: highRes.count ?? 0 };
+  const urgentCounts: Record<string, number> = { urgent: counts?.urgent ?? 0, high: counts?.high ?? 0 };
   const urgentTotal = urgentCounts.urgent! + urgentCounts.high!;
-  const agingCount = agingRes.count ?? 0;
+  const agingCount = counts?.aging ?? 0;
   const seriesIsos = ((seriesRes.data ?? []) as unknown as Array<{ created_at: string }>).map((r) => r.created_at);
   const weekly = weeklySeriesOf(seriesIsos, nowMs, SERIES_SCAN_LIMIT);
   // Grafik kovaları: PostgREST tavanı (1000) ile SERIES_SCAN_LIMIT'ten küçüğüne göre kesilme denetlenir (kesildiyse grafik yok).

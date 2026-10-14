@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { EF_RPC, EF_UNIT, type EfBalance } from "@/lib/ef-credits/config";
 import { parseEfBalance } from "@/lib/ef-credits/credit-view";
 import type { EfAdminGrantInput } from "@/lib/ef-credits/admin-grant";
+import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
 
 /**
  * Admin analiz bakiyesi verisi (service_role; çağıran action/sayfa requirePlatformModule geçmiştir).
@@ -9,6 +10,24 @@ import type { EfAdminGrantInput } from "@/lib/ef-credits/admin-grant";
  */
 
 export const ADMIN_BALANCE_PAGE_SIZE = 25;
+
+export const EF_BALANCES_BATCH_RPC = "ef_credit_balances";
+
+type BatchClient = { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: { code?: string | null; message?: string | null } | null }> };
+
+/**
+ * Ofis listesinin bakiyeleri tek RPC turunda. Dönüş: ofis → bakiye (ofis hata verdiyse null); fonksiyon yoksa ya da
+ * toplu çağrı hata verirse `null` (çağıran ofis başına eski çağrıya düşer; sahte sıfır üretilmez).
+ */
+export async function loadEfBalancesBatch(admin: BatchClient, tenantIds: string[]): Promise<Map<string, EfBalance | null> | null> {
+  if (rpcKnownMissing(EF_BALANCES_BATCH_RPC)) return null;
+  const { data, error } = await admin.rpc(EF_BALANCES_BATCH_RPC, { p_tenants: tenantIds });
+  recordRpcOutcome(EF_BALANCES_BATCH_RPC, error);
+  if (error || !Array.isArray(data)) return null;
+  const out = new Map<string, EfBalance | null>();
+  for (const r of data as { tenant_id: string; balance: unknown }[]) out.set(r.tenant_id, parseEfBalance(r.balance));
+  return out;
+}
 
 export type TenantBalanceRow = { tenantId: string; name: string; balance: EfBalance | null };
 
@@ -71,10 +90,15 @@ export async function listTenantEfBalances<X = null>(
         tenants = pageIds.map((id) => byId.get(id) ?? { id, name: null });
       }
     }
+    // Sayfanın bakiyeleri TEK turda (YD7 ef_credit_balances: aynı ef_credit_balance gövdesi, ofis listesiyle). Fonksiyon
+    // yoksa (migration uygulanmadı) ofis başına eski çağrıya düşer.
+    const batch = tenants.length > 0 ? await loadEfBalancesBatch(admin, tenants.map((t) => t.id)) : new Map<string, EfBalance | null>();
     const rows = await Promise.all(
       tenants.map(async (t): Promise<TenantBalanceRow> => {
+        const name = t.name ?? "(adsız ofis)";
+        if (batch) return { tenantId: t.id, name, balance: batch.get(t.id) ?? null };
         const { data, error } = await admin.rpc(EF_RPC.balance, { p_tenant: t.id });
-        return { tenantId: t.id, name: t.name ?? "(adsız ofis)", balance: error ? null : parseEfBalance(data) };
+        return { tenantId: t.id, name, balance: error ? null : parseEfBalance(data) };
       }),
     );
     return { enabled: true, rows, total, extra };

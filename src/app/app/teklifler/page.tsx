@@ -4,6 +4,7 @@ import { daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
+import { loadOfferCounts } from "@/lib/supabase/list-count-rpcs";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -147,15 +148,27 @@ export default async function TekliflerPage({
     return c;
   };
   const statusKeys = Object.keys(OFFER_STATUS_LABELS);
+  // Toplam + 6 durum sayacı TEK sorguda (offer_counts, RLS geçerli). Fonksiyon yoksa eski 7 head-count; onların hatası
+  // `error` alanıyla batchAll'a taşınır (sessiz sıfır yok).
+  const countsP = loadOfferCounts(supabase, danismanF || null).then(async (fast) => {
+    if (fast) return { data: fast, error: null };
+    const [all, ...per] = await Promise.all([countOf(), ...statusKeys.map((s) => countOf(s))]);
+    const failed = [all, ...per].find((r) => r.error);
+    if (failed) return { data: null, error: failed.error };
+    const byStatus: Record<string, number> = {};
+    statusKeys.forEach((s, i) => {
+      byStatus[s] = per[i]!.count ?? 0;
+    });
+    return { data: { total: all.count ?? 0, byStatus }, error: null };
+  });
 
-  const [listRes, advisorsRes, totalRes, openVolumeRes, seriesRes, savedViews, ...statusRes] = await batchAll("Teklifler", ["offers", "profiles", "offers-total", "open-volume", "series", "saved-views", ...statusKeys.map((s) => `status-${s}`)], [
+  const [listRes, advisorsRes, countsRes, openVolumeRes, seriesRes, savedViews] = await batchAll("Teklifler", ["offers", "profiles", "offer-counts", "open-volume", "series", "saved-views"], [
     search.empty ? Promise.resolve({ data: [], count: 0 }) : listQuery,
     supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
-    countOf(),
+    countsP,
     supabase.from("offers").select("amount, counter_amount").match(scope).in("status", ["submitted", "countered"]).limit(SCAN_LIMIT),
     supabase.from("offers").select("created_at").match(scope).gte("created_at", daysAgoIso(56)).limit(SERIES_SCAN_LIMIT),
     savedViewsPromise,
-    ...statusKeys.map((s) => countOf(s)),
   ]);
 
   const advisors = (advisorsRes.data ?? []).map((a) => ({ id: String(a.id), name: String(a.full_name ?? "") }));
@@ -191,11 +204,9 @@ export default async function TekliflerPage({
     };
   });
 
-  const totalAll = totalRes.count ?? 0;
+  const totalAll = countsRes.data?.total ?? 0;
   const statusCounts: Record<string, number> = {};
-  statusKeys.forEach((s, i) => {
-    statusCounts[s] = (statusRes[i] as { count: number | null }).count ?? 0;
-  });
+  for (const s of statusKeys) statusCounts[s] = countsRes.data?.byStatus[s] ?? 0;
   const totalFiltered = listRes.count ?? viewModels.length;
   const win = pageWindow(page, totalFiltered, PAGE_SIZE, viewModels.length);
 
