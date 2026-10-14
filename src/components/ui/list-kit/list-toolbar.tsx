@@ -4,6 +4,7 @@ import { Rows3, Rows4, Search, SlidersHorizontal, X } from "lucide-react";
 import { buildHref, formatCount, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { densityOf, hiddenFields, type ActiveChip } from "./list-logic";
+import { PanelSearchCarry, SheetClose } from "./sheet-close";
 import { ViewSwitcher, type ViewOption } from "./view-switcher";
 
 /**
@@ -11,16 +12,22 @@ import { ViewSwitcher, type ViewOption } from "./view-switcher";
  * "Filtreler (n)" paneli, sıralama, yoğunluk anahtarı, kayıtlı görünümler ve
  * kaldırılabilir aktif-filtre çipleri.
  *
- * Sunucu bileşenidir, JS gerektirmez. Arama ve panel alanları tek bir
- * `<form method="get">` ile URL'e yazılır; formun sahip olmadığı parametreler
- * (görünüm, sıralama, kategori, yoğunluk…) gizli alan olarak taşınır, sayfalama sıfırlanır.
+ * Sunucu bileşenidir, JS gerektirmez (yalnız alt sayfanın kapat düğmesi küçük bir istemci adası). Arama ve panel
+ * alanları iki ayrı `<form method="get">` ile URL'e yazılır; formun sahip olmadığı parametreler (görünüm, sıralama,
+ * kategori, yoğunluk, öteki formun alanları…) gizli alan olarak taşınır, sayfalama sıfırlanır.
  * Filtre kontratı: URL ↔ sunucu sorgusu iki yönlü; bu bileşen yalnız URL'i üretir.
+ *
+ * Mobil (<640 px): üstte yalnız arama + "Filtreler" kalır; panel alanları, görünüm anahtarı, sıralama, yoğunluk,
+ * `sheetExtras` ve kayıtlı görünümler TEK alt sayfada (`.lk-sheet`, list-page.css) açılır — liste ilk ekranda başlar.
+ * Masaüstü görünüm değişmez.
  *
  * Basit sayfalar için `FilterBar` (sekme + panel) yeterlidir; görünüm anahtarı,
  * çipler ve yoğunluk gereken liste ekranları bunu kullanır.
  */
 const CONTROL =
   "min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
+
+const FILTER_BADGE = "numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white";
 
 export function ListToolbar({
   pathname,
@@ -39,6 +46,8 @@ export function ListToolbar({
   resultCount,
   resultNoun = "sonuç",
   actions,
+  sheetExtras,
+  sheetParamKeys = [],
   className,
 }: {
   pathname: string;
@@ -65,24 +74,55 @@ export function ListToolbar({
   resultNoun?: string;
   /** Sağ uca ek eylemler. */
   actions?: ReactNode;
+  /**
+   * Yalnız dar ekranda (<640 px) filtre alt sayfasında çizilen hızlı süzgeçler (bağlantı çipleri, özel alan formu…).
+   * Sayfa aynı öğelerin geniş ekran kopyasını `max-sm:hidden` ile saklar; böylece telefonda liste ilk ekranda başlar.
+   */
+  sheetExtras?: ReactNode;
+  /**
+   * Alt sayfaya taşınan hızlı süzgeçlerin/sıralamanın param anahtarları (ör. tip, sıcaklık, sıralama): telefonda
+   * "Filtreler" rozeti bunları da sayar (dış kopyalar gizli olduğundan etkin süzgeç başka türlü görünmez).
+   */
+  sheetParamKeys?: readonly string[];
   className?: string;
 }) {
   const q = typeof params[searchName] === "string" ? (params[searchName] as string) : "";
-  const panelActive = panelParamKeys.filter((k) => {
+  const isActive = (k: string) => {
     const v = params[k];
     return Array.isArray(v) ? v.some(Boolean) : Boolean(v);
-  }).length;
-  const hidden = hiddenFields(params, [searchName, ...panelParamKeys]);
+  };
+  const panelActive = panelParamKeys.filter(isActive).length;
+  // Telefon rozeti: panel + alt sayfadaki hızlı süzgeçler (aynı anahtar iki listede olsa da bir kez sayılır).
+  const sheetActive = [...new Set([...panelParamKeys, ...sheetParamKeys])].filter(isActive).length;
+  // Arama formu panel alanlarını, panel formu aramayı gizli alan olarak taşır.
+  const searchHidden = hiddenFields(params, [searchName]);
+  const panelHidden = hiddenFields(params, panelParamKeys);
   const density = densityParam ? densityOf(typeof params[densityParam] === "string" ? (params[densityParam] as string) : null) : null;
   const clearAll = chips.length > 0 ? pathname : null;
+  const hasViews = Boolean(views && activeView && views.length > 1);
+  // Dar ekranda görünüm anahtarı, sıralama, yoğunluk, hızlı süzgeçler ve kayıtlı görünümler alt sayfaya taşınır.
+  const mobileExtras = hasViews || Boolean(sort) || Boolean(density) || Boolean(sheetExtras) || Boolean(savedViews);
+  const showSheet = Boolean(panel) || mobileExtras;
+
+  const densityLink =
+    density && densityParam ? (
+      <Link
+        href={buildHref(pathname, mergeParams(params, { [densityParam]: density === "kompakt" ? "" : "kompakt" }, { resetPage: false }))}
+        aria-label={density === "kompakt" ? "Rahat satır yoğunluğuna geç" : "Kompakt satır yoğunluğuna geç"}
+        title={density === "kompakt" ? "Rahat görünüm" : "Kompakt görünüm"}
+        className={cn(CONTROL, "focus-ring press surface-interactive inline-grid w-9 touch:w-11 place-items-center text-text-muted hover:text-text", density === "kompakt" && "border-brand-300 bg-surface-selected text-brand-700")}
+      >
+        {density === "kompakt" ? <Rows4 aria-hidden="true" className="h-4 w-4" /> : <Rows3 aria-hidden="true" className="h-4 w-4" />}
+      </Link>
+    ) : null;
 
   return (
     <div className={cn("surface-card relative rounded-[var(--radius-panel)] p-3", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        {views && activeView ? <ViewSwitcher options={views} active={activeView} /> : null}
+        {hasViews ? <ViewSwitcher options={views!} active={activeView!} className="max-sm:hidden" /> : null}
 
         <form method="get" action={pathname} role="search" className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-          {hidden.map(([k, v]) => (
+          {searchHidden.map(([k, v]) => (
             <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
           ))}
           <label className="relative min-w-44 flex-1">
@@ -96,48 +136,74 @@ export function ListToolbar({
               className={cn(CONTROL, "w-full bg-canvas pl-9 pr-3 focus:bg-surface")}
             />
           </label>
-          {panel ? (
-            <details className="group relative">
-              <summary
-                className={cn(
-                  CONTROL,
-                  "focus-ring surface-interactive inline-flex cursor-pointer list-none items-center gap-1.5 px-3 font-semibold select-none [&::-webkit-details-marker]:hidden",
-                )}
-              >
-                <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
-                Filtreler
-                {panelActive > 0 ? (
-                  <span className="numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">{panelActive}</span>
-                ) : null}
-              </summary>
-              <div className="mt-2 grid min-w-64 gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 sm:absolute sm:right-0 sm:z-30 sm:w-96 sm:shadow-[var(--shadow-lg)]">
-                {panel}
-                <button
-                  type="submit"
-                  className="focus-ring press min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-accent-hover"
-                >
-                  Filtreleri uygula
-                </button>
-              </div>
-            </details>
-          ) : null}
           <button type="submit" className="sr-only">
             Ara
           </button>
         </form>
 
-        {sort}
-
-        {density && densityParam ? (
-          <Link
-            href={buildHref(pathname, mergeParams(params, { [densityParam]: density === "kompakt" ? "" : "kompakt" }, { resetPage: false }))}
-            aria-label={density === "kompakt" ? "Rahat satır yoğunluğuna geç" : "Kompakt satır yoğunluğuna geç"}
-            title={density === "kompakt" ? "Rahat görünüm" : "Kompakt görünüm"}
-            className={cn(CONTROL, "focus-ring press surface-interactive inline-grid w-9 touch:w-11 place-items-center text-text-muted hover:text-text", density === "kompakt" && "border-brand-300 bg-surface-selected text-brand-700")}
-          >
-            {density === "kompakt" ? <Rows4 aria-hidden="true" className="h-4 w-4" /> : <Rows3 aria-hidden="true" className="h-4 w-4" />}
-          </Link>
+        {showSheet ? (
+          // key: URL değişince yeniden kurulur → uygulanan alt sayfa açık kalmaz (`open`, React'in yönetmediği DOM durumu).
+          <details key={JSON.stringify(params)} className={cn("lk-filter group relative", !panel && "sm:hidden")}>
+            <summary
+              className={cn(
+                CONTROL,
+                "focus-ring surface-interactive inline-flex cursor-pointer list-none items-center gap-1.5 px-3 font-semibold select-none [&::-webkit-details-marker]:hidden",
+              )}
+            >
+              <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
+              Filtreler
+              {panelActive > 0 ? (
+                <span className={cn(FILTER_BADGE, sheetActive !== panelActive && "max-sm:hidden")}>{panelActive}</span>
+              ) : null}
+              {sheetActive > 0 && sheetActive !== panelActive ? <span className={cn(FILTER_BADGE, "sm:hidden")}>{sheetActive}</span> : null}
+            </summary>
+            <div
+              role="group"
+              aria-label="Filtreler"
+              className="lk-sheet mt-2 grid min-w-64 gap-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 sm:absolute sm:right-0 sm:z-30 sm:w-96 sm:shadow-[var(--shadow-lg)]"
+            >
+              <div className="flex items-center justify-between gap-2 sm:hidden">
+                <p className="text-base font-semibold text-text">Filtreler</p>
+                <SheetClose />
+              </div>
+              {mobileExtras ? (
+                <div className="grid gap-3 sm:hidden">
+                  {hasViews || sort || densityLink ? (
+                    <div className="grid gap-1.5">
+                      <p className="text-xs font-semibold text-text-muted">Görünüm ve sıralama</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {hasViews ? <ViewSwitcher options={views!} active={activeView!} /> : null}
+                        {sort}
+                        {densityLink}
+                      </div>
+                    </div>
+                  ) : null}
+                  {sheetExtras}
+                  {savedViews}
+                </div>
+              ) : null}
+              {panel ? (
+                <form method="get" action={pathname} className="grid gap-3">
+                  {panelHidden.map(([k, v]) => (
+                    <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
+                  ))}
+                  <PanelSearchCarry name={searchName} />
+                  {panel}
+                  <button
+                    type="submit"
+                    className="focus-ring press min-h-9 touch:min-h-11 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-accent-hover"
+                  >
+                    Filtreleri uygula
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          </details>
         ) : null}
+
+        {sort ? <div className="hidden sm:contents">{sort}</div> : null}
+
+        {densityLink ? <div className="hidden sm:contents">{densityLink}</div> : null}
 
         {actions}
       </div>
@@ -157,7 +223,10 @@ export function ListToolbar({
             </Link>
           ))}
           {clearAll ? (
-            <Link href={clearAll} className="focus-ring rounded-[var(--radius-control)] px-1.5 text-xs font-semibold text-text-muted underline-offset-2 hover:text-text hover:underline">
+            <Link
+              href={clearAll}
+              className="focus-ring inline-flex items-center touch:min-h-11 rounded-[var(--radius-control)] px-1.5 text-xs font-semibold text-text-muted underline-offset-2 hover:text-text hover:underline"
+            >
               Tümünü temizle
             </Link>
           ) : null}
@@ -169,7 +238,7 @@ export function ListToolbar({
         </div>
       ) : null}
 
-      {savedViews ? <div className="mt-2.5">{savedViews}</div> : null}
+      {savedViews ? <div className="mt-2.5 max-sm:hidden">{savedViews}</div> : null}
     </div>
   );
 }

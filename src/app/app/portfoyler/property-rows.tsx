@@ -44,7 +44,10 @@ function PortalCell({ live, total }: { live: number; total: number }) {
   );
 }
 
-/** md+ tablo görünümü: kapak önizleme, kapsüller, satır eylemleri. */
+/**
+ * md+ tablo görünümü: kapak önizleme, kapsüller, satır eylemleri. <768 px'te kompakt kart (list-page.css `.tbl-stack`):
+ * kapak + başlık + eylemler bir satır, tip · işlem / fiyat / durum ikinci satır — 390×844'te ilk ekranda ≥4 portföy.
+ */
 export function PropertyTable({
   rows,
   ids,
@@ -96,7 +99,7 @@ export function PropertyTable({
                     <EntityThumb src={p.coverSrc} alt="" icon={Building2} />
                     <div className="min-w-0">
                       <p className="flex items-center gap-1.5 font-semibold text-text">
-                        <span className="max-w-[16rem] truncate">{p.title}</span>
+                        <span className="min-w-0 max-w-[16rem] truncate">{p.title}</span>
                         {p.isNew ? <StatusPill tone="success" dot={false}>Yeni</StatusPill> : null}
                         {p.isClosed ? <StatusPill tone="warning" dot={false}>Kapalı portföy</StatusPill> : null}
                       </p>
@@ -108,10 +111,11 @@ export function PropertyTable({
                   </div>
                 </TD>
                 <TD>
-                  <p className="font-medium text-text">{p.type}</p>
-                  <p className="text-xs text-text-muted">{p.tx}</p>
+                  {/* Kartta (<768 px) tip ve işlem tek satır: kart yüksekliği bir satır kısalır. */}
+                  <p className="font-medium text-text max-md:inline">{p.type}</p>
+                  <p className="text-xs text-text-muted max-md:ml-1.5 max-md:inline">{p.tx}</p>
                 </TD>
-                <TD className="hidden text-text-muted xl:table-cell">
+                <TD stackHide className="hidden text-text-muted xl:table-cell">
                   <span className="flex items-center gap-1.5">
                     <SpriteIcon name="map-pin" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
                     <span className="max-w-[12rem] truncate">{p.location}</span>
@@ -123,16 +127,16 @@ export function PropertyTable({
                 <TD>
                   <StatusPill tone={p.statusTone}>{p.statusLabel}</StatusPill>
                 </TD>
-                <TD className="hidden xl:table-cell">
+                <TD stackHide className="hidden xl:table-cell">
                   {p.health ? <StatusPill tone={p.health.tone}>{p.health.label}</StatusPill> : <span className="text-text-faint">—</span>}
                 </TD>
-                <TD className="hidden 2xl:table-cell">
+                <TD stackHide className="hidden 2xl:table-cell">
                   <PortalCell live={p.portalsLive} total={p.portalsTotal} />
                 </TD>
-                <TD className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
+                <TD stackHide className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
                 <TD actions>
                   <RowActions>
-                    <RowActionLink href={p.href} label={`${p.title} detayını aç`} icon={Eye} />
+                    <RowActionLink href={p.href} label={`${p.title} detayını aç`} icon={Eye} hideWhenStacked />
                     <PropertyRowCompare item={p.compareItem} />
                     {canEdit ? <OwnerPortalLinkButton propertyId={p.id} propertyLabel={p.title} /> : null}
                   </RowActions>

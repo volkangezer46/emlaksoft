@@ -58,12 +58,12 @@ function TypeCell({ types, tags }: { types: string[]; tags: string[] }) {
         </span>
       ) : null}
       {tags.slice(0, 2).map((t) => (
-        <span key={t} className="rounded-full border border-line px-2 py-0.5 text-xs font-medium text-text-muted">
+        <span key={t} className="rounded-full border border-line px-2 py-0.5 text-xs font-medium text-text-muted max-md:hidden">
           {t}
         </span>
       ))}
       {tags.length > 2 ? (
-        <span className="text-xs font-semibold text-text-faint" title={tags.slice(2).join(", ")}>
+        <span className="text-xs font-semibold text-text-faint max-md:hidden" title={tags.slice(2).join(", ")}>
           +{tags.length - 2}
         </span>
       ) : null}
@@ -89,7 +89,10 @@ function HeatCell({ c }: { c: CustomerVM }) {
   );
 }
 
-/** md+ tablo görünümü. */
+/**
+ * md+ tablo görünümü; <768 px'te kompakt kart (list-page.css `.tbl-stack`): kimlik + eylemler bir satır, tür/sıcaklık/
+ * telefon ikinci satır. Etiketler ve e-posta kartta gizli (detayda var) — 390×844'te ilk ekranda ≥4 müşteri.
+ */
 export function CustomerTable({
   rows,
   ids,
@@ -144,7 +147,8 @@ export function CustomerTable({
                 <TD primary>
                   <IntentLink href={c.href} className="absolute inset-0" aria-label={`${c.name} detayları`} />
                   <div className="flex items-center gap-3">
-                    <EntityThumb alt="" name={c.name} size="sm" />
+                    {/* Kartta (<768 px) baş harf avatarı gizli: üç eylem düğmesinin yanında ada yer kalsın. */}
+                    <EntityThumb alt="" name={c.name} size="sm" className="max-md:hidden" />
                     <div className="min-w-0">
                       <p className="max-w-[14rem] truncate font-semibold text-text">{c.name}</p>
                       <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted">
@@ -178,20 +182,20 @@ export function CustomerTable({
                     <p className="text-text-faint">—</p>
                   )}
                   {c.email ? (
-                    <p className="mt-0.5 flex max-w-[14rem] items-center gap-1.5 truncate text-xs text-text-faint">
+                    <p className="mt-0.5 flex max-w-[14rem] items-center gap-1.5 truncate text-xs text-text-faint max-md:hidden">
                       <SpriteIcon name="mail" className="h-3 w-3 shrink-0" />
                       <span className="truncate">{c.email}</span>
                     </p>
                   ) : null}
                 </TD>
-                <TD className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
-                <TD className="hidden text-text-muted lg:table-cell">
+                <TD stackHide className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
+                <TD stackHide className="hidden text-text-muted lg:table-cell">
                   {c.lastContact ?? <span className="text-text-faint">Temas yok</span>}
                 </TD>
-                <TD className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
+                <TD stackHide className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
                 <TD actions>
                   <RowActions>
-                    <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} />
+                    <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} hideWhenStacked />
                     {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
                     {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
                     <CustomerRowMore customerId={c.id} name={c.name} waMsisdn={toWhatsAppMsisdn(c.phone) || null} canEdit={canEdit} canDelete={canDelete} />

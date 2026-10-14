@@ -184,6 +184,7 @@ export function TD({
   label,
   actions = false,
   primary = false,
+  stackHide = false,
   ...props
 }: Omit<ComponentProps<"td">, "align"> & {
   align?: keyof typeof alignClass;
@@ -195,6 +196,11 @@ export function TD({
   actions?: boolean;
   /** Kart görünümünde kartın başlığı (kalın, satırın geri kalanını kaplar). */
   primary?: boolean;
+  /**
+   * Kart görünümünde gizli (`data-stack-hide`). Masaüstünde `hidden xl:table-cell` ile saklanan sütunlar kartta bunu
+   * taşımalı: `.tbl-stack td { display: block }` katmansızdır ve Tailwind'in katmanlı `.hidden`'ını ezer.
+   */
+  stackHide?: boolean;
 }) {
   const title =
     truncate && props.title === undefined && typeof props.children === "string" ? props.children : props.title;
@@ -205,6 +211,7 @@ export function TD({
       {...(label !== undefined ? { "data-label": label } : null)}
       {...(actions ? { "data-actions": "" } : null)}
       {...(primary ? { "data-primary": "" } : null)}
+      {...(stackHide ? { "data-stack-hide": "" } : null)}
       {...(title !== undefined ? { title } : null)}
       className={cn(
         "px-4 py-3",

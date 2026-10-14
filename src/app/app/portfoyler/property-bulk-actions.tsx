@@ -67,13 +67,11 @@ export function PropertySelectAllCheckbox({ ids }: { ids: string[] }) {
   const { selected, setAll } = useSelection();
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
   return (
-    <input
-      type="checkbox"
+    <RowCheckbox
       checked={allSelected}
       disabled={ids.length === 0}
-      onChange={() => setAll(ids, !allSelected)}
-      aria-label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm portföyleri seç"}
-      className="h-4 w-4 cursor-pointer accent-brand-600"
+      onToggle={() => setAll(ids, !allSelected)}
+      label={allSelected ? "Sayfadaki seçimi kaldır" : "Sayfadaki tüm portföyleri seç"}
     />
   );
 }
@@ -125,7 +123,7 @@ export function PropertyBulkBar() {
                     key={s.value}
                     type="button"
                     onClick={() => apply(s.value)}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-text transition hover:bg-canvas"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-text transition hover:bg-canvas touch:min-h-11"
                   >
                     {s.label}
                   </button>

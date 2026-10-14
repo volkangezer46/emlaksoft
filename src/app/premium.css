@@ -541,9 +541,12 @@ html[data-theme="dark"] .ds-hero {
   }
   .kpi-flow.kpi-compact > * { flex: 0 0 auto; min-width: 8.5rem; max-width: 12rem; scroll-snap-align: start; }
   .kpi-flow.kpi-compact > .kpi-zero { display: none; }
-  .kpi-compact .pm-card { padding: 0.5rem 0.75rem; }
-  .kpi-compact .pm-ico, .kpi-compact .pm-card-bars, .kpi-compact .pm-chart, .kpi-compact .pm-card-arrow { display: none; }
+  /* Tek satırlık çip (YD6): etiket + değer yan yana, 44 px dokunma hedefi; şerit ~44 px yer kaplar. */
+  .kpi-compact .pm-card { flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; padding: 0.25rem 0.75rem; }
+  .kpi-compact .pm-card > * { margin-top: 0; }
+  .kpi-compact .pm-card-head { min-width: 0; flex: 0 1 auto; }
+  .kpi-compact .pm-ico, .kpi-compact .pm-card-bars, .kpi-compact .pm-chart, .kpi-compact .pm-card-arrow, .kpi-compact .pm-pill { display: none; }
   .kpi-compact .pm-sub { display: none; }
   .kpi-compact .pm-card-title { -webkit-line-clamp: 1; line-clamp: 1; }
-  .kpi-compact .pm-value { font-size: 1.125rem; }
+  .kpi-compact .pm-value { font-size: 1rem; }
 }

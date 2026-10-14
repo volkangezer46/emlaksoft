@@ -95,19 +95,39 @@
 @media (max-width: 767.98px) {
   .lp > .lp-charts { order: 10; }
 }
+/* Telefonda (<640 px) liste ilk ekranda başlasın: ikincil bloklar (`.lp-defer`: ilgili ekran bağlantıları, özel gün
+   hatırlatması, özel alan süzgeci) sayfalamanın ALTINA iner; masaüstü sırası aynı. */
+@media (max-width: 639.98px) {
+  .lp > .lp-defer { order: 9; }
+}
 
 /* ---- Tablo → kart (<768 px): `TableFrame stack` + `TD label`; ayrı mobil kart listesi yok (tek işaretleme) ---- */
 @media (max-width: 767.98px) {
-  .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; overflow: visible; }
+  /* max-height: masaüstü kaydırma kabının satır içi `maxHeight`'ı (ör. 75vh) kart listesinde içeriği kesip sayfalamanın
+     üstüne taşırıyordu; kart listesi sayfayla birlikte kayar. */
+  .tbl-stack > div, .tbl-stack > div > div { width: 100% !important; min-width: 0 !important; max-height: none !important; overflow: visible; }
   .tbl-stack table, .tbl-stack tbody, .tbl-stack tfoot { display: block; width: 100%; }
   .tbl-stack thead { display: none; }
-  .tbl-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; padding: 0.75rem 0.875rem; }
-  .tbl-stack td { display: block; padding: 0 !important; border: 0; text-align: left !important; max-width: 100%; }
-  .tbl-stack td[data-primary] { flex: 1 1 70%; font-weight: 600; }
+  /* Kompakt kart (YD6): 1. satır = seçim kutusu + kimlik + eylemler, 2. satır = kalan hücreler. Sıra `order` ile
+     kurulur; sıfır yükseklikli `::after` (order 2) satırı böler. 390×844'te ilk ekranda ≥4 kart (liste sözleşmesi). */
+  .tbl-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; padding: 0.625rem 0.875rem; }
+  .tbl-stack td { order: 3; display: block; padding: 0 !important; border: 0; text-align: left !important; max-width: 100%; }
+  .tbl-stack tr:has(td[data-primary])::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
+  .tbl-stack td[data-primary], .tbl-stack td:first-child:has(input[type="checkbox"]) { order: 0; }
+  /* min-width 7rem: 390 px'te (kart iç genişliği ~330 px) seçim kutusu 44 + üç eylem 3×44 yanında kimlik sığar; 9rem'de
+     müşteri kartının eylemleri ayrı satıra kayıp kartı ~48 px uzatıyordu (Playwright ölçümü). */
+  .tbl-stack td[data-primary] { flex: 1 1 0%; min-width: min(7rem, 100%); font-weight: 600; }
+  /* globals.css'teki katmansız `p { text-wrap: pretty }` kısayolu text-wrap-mode'u `wrap`a çeker ve katmanlı `.truncate`'in
+     nowrap'ını ezer: kartta kimlik adı 2–3 satıra kırılıp kartı uzatıyordu. Kartta kırpma geri gelir. */
+  .tbl-stack td p.truncate { text-wrap-mode: nowrap; }
   .tbl-stack tr:not(:has(td[data-primary])) td:first-child { flex-basis: 100%; font-weight: 600; }
   .tbl-stack td[data-label]::before { content: attr(data-label) " · "; color: var(--text-faint); font-size: 0.75rem; font-weight: 500; }
   .tbl-stack td[data-actions] { flex-basis: 100%; }
   .tbl-stack td[data-actions] > * { justify-content: flex-start; }
+  .tbl-stack tr:has(td[data-primary]) td[data-actions] { order: 1; flex: 0 0 auto; margin-left: auto; }
+  .tbl-stack tr:has(td[data-primary]) td[data-actions] > * { justify-content: flex-end; }
+  /* Satırın tamamı zaten detay bağlantısı (bindirme): kartta yinelenen "detayı aç" eylemi yer kaplamasın. */
+  .tbl-stack [data-stack-hide] { display: none; }
 }
 
 /* Mobil: hero kompakt (özet cümlesi gizli) — liste ilk ekranda başlasın. */
@@ -115,4 +135,34 @@
   .lp-hero { padding-block: 0.625rem; }
   .lp-hero-summary { display: none; }
   .lp-eyebrow { display: none; }
+}
+/* Telefonda hero eylemleri TEK satır: kaydırılabilir şerit (sayfa taşmaz), birincil eylem (DOM'da sonda) başa alınır. */
+@media (max-width: 639.98px) {
+  .lp-hero-row { row-gap: 0.5rem; }
+  .lp-hero-actions { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -0.25rem; padding-inline: 0.25rem; }
+  .lp-hero-actions > * { flex: 0 0 auto; }
+  .lp-hero-actions > :last-child { order: -1; }
+}
+
+/* ---- Filtre alt sayfası (ListToolbar `.lk-filter` / `.lk-sheet`, <640 px) ----------------------------------------
+   Panel alanları + görünüm/sıralama + hızlı süzgeçler tek alt sayfada. JS'siz: `<details>` açıkken `summary::before`
+   tam ekran zemindir; zemine dokunmak `summary`'e düşer ve sayfayı kapatır. Masaüstü açılır panel aynen kalır. */
+@media (max-width: 639.98px) {
+  .lk-filter[open] > summary::before {
+    content: ""; position: fixed; inset: 0; z-index: 60; cursor: default;
+    background: color-mix(in srgb, var(--color-ink-950) 55%, transparent);
+  }
+  .lk-filter > .lk-sheet {
+    position: fixed; inset-inline: 0; bottom: 0; z-index: 61; margin: 0; min-width: 0;
+    max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain;
+    border-bottom: 0; border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-lg);
+  }
+  /* Alt sayfa açıkken arkadaki liste kaymasın (zemin tam ekran; JS'siz kilit). */
+  html:has(.lk-filter[open]) { overflow: hidden; }
+}
+@media (max-width: 639.98px) and (prefers-reduced-motion: no-preference) {
+  @keyframes lk-sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+  .lk-filter[open] > .lk-sheet { animation: lk-sheet-in var(--motion-fast, 160ms) var(--ease-out, ease-out) both; }
 }

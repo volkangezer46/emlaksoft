@@ -23,6 +23,7 @@ export function RowActionLink({
   icon: Icon,
   external,
   tone = "default",
+  hideWhenStacked = false,
 }: {
   href: string;
   label: string;
@@ -30,6 +31,11 @@ export function RowActionLink({
   /** Dış bağlantı (tel:, wa.me …) yeni sekmede açılır. */
   external?: boolean;
   tone?: "default" | "success";
+  /**
+   * Mobil kart listesinde (TableFrame `stack`, <768 px) gizlenir: satırın tamamı zaten aynı hedefe giden bindirme
+   * bağlantısıysa ("detayı aç") kartta yinelenen 44 px düğme yer kaplamaz. Masaüstü tabloda görünür kalır.
+   */
+  hideWhenStacked?: boolean;
 }) {
   // `hover:text-brand-700` tekrarı: .lk-row-act bileşen katmanında; yardımcı katmandaki yeşil metin hover'da onu
   // ezerdi. Eski dizgide hover rengi marka tonuydu — görünüm birebir korunur.
@@ -38,15 +44,16 @@ export function RowActionLink({
     tone === "success" && "text-[var(--success-strong)] hover:bg-[var(--success-soft)] hover:text-brand-700",
   );
   const icon = <SmartIcon icon={Icon} className="h-4 w-4" />;
+  const stackHide = hideWhenStacked ? { "data-stack-hide": "" } : null;
   if (external) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className={cls}>
+      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={label} title={label} className={cls} {...stackHide}>
         {icon}
       </a>
     );
   }
   return (
-    <Link href={href} aria-label={label} title={label} prefetch={false} className={cls}>
+    <Link href={href} aria-label={label} title={label} prefetch={false} className={cls} {...stackHide}>
       {icon}
     </Link>
   );

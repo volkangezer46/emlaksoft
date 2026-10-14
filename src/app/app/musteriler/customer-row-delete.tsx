@@ -19,7 +19,7 @@ function DeleteConfirm({ customerId, impact, onCancel }: { customerId: string; i
         <form action={deleteCustomer}>
           <input type="hidden" name="id" value={customerId} />
           <input type="hidden" name="confirm_linked" value="1" />
-          <button type="submit" className="rounded-[var(--radius-control)] bg-danger-500 px-2 py-1 text-xs font-bold text-white hover:bg-danger-600">
+          <button type="submit" className="focus-ring rounded-[var(--radius-control)] bg-danger-500 px-2 py-1 text-xs font-bold text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11">
             Sil
           </button>
         </form>
@@ -27,7 +27,7 @@ function DeleteConfirm({ customerId, impact, onCancel }: { customerId: string; i
           type="button"
           onClick={onCancel}
           autoFocus
-          className="rounded-[var(--radius-control)] px-1.5 py-1 text-xs font-semibold text-text-muted hover:text-ink-950"
+          className="focus-ring rounded-[var(--radius-control)] px-1.5 py-1 text-xs font-semibold text-text-muted hover:text-ink-950 touch:min-h-11 touch:min-w-11"
         >
           Vazgeç
         </button>
