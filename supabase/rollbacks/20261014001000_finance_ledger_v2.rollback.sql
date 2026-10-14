@@ -32,6 +32,7 @@ drop function if exists public.finance_entry_open_item_sync();
 drop function if exists public.finance_open_item_recompute(uuid);
 drop function if exists public.finance_period_lock_guard();
 drop function if exists public.finance_period_is_locked(uuid, date);
+drop function if exists public.finance_account_is_office(uuid);
 
 alter table public.recurring_rules drop column if exists withholding_rate;
 alter table public.recurring_rules drop column if exists vat_rate;

@@ -170,6 +170,40 @@ begin
 end;
 $$;
 
+-- Açık kalem kaynağının modül izni: definer RPC'ler finance_open_items_v'yi sahibin yetkisiyle okur; doğrudan okumadaki
+-- RLS ile aynı sonucu vermek için kira/hakediş satırları `rentals:view`, komisyon satırları `commissions:view` ister.
+create or replace function public.finance_v2_source_visible(p_source text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select case
+    when p_source in ('rent', 'owner_payout') then public.has_effective_permission('rentals', 'view')
+    when p_source = 'commission' then public.has_effective_permission('commissions', 'view')
+    else true
+  end;
+$$;
+
+-- Bütçe kategorisi: gider yönünde hareket kategorisi (CASH_CATEGORIES.expenseCategory, src/lib/finance/cash/categories.ts)
+-- gider kaydı kategorisine eşlenir; böylece eski gider bütçesi (expense_budgets kategorileri) ve gider kaydı olmayan çıkışlar
+-- aynı satırda buluşur. Maaş, ofis kategorisi (x_…) ve gelir yönü olduğu gibi kalır.
+create or replace function public.finance_v2_budget_category(p_category text, p_direction text)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case
+    when p_direction <> 'out' or p_category is null then p_category
+    when p_category in ('kira', 'aidat', 'muhasebe', 'ofis') then 'ofis'
+    when p_category in ('portal', 'reklam') then 'reklam'
+    when p_category in ('sgk', 'diger_gider') then 'diger'
+    else p_category
+  end;
+$$;
+
 -- ===========================================================================
 -- Hareket
 -- ===========================================================================
@@ -272,6 +306,8 @@ begin
     select * into v_item from public.finance_open_items o where o.id = v_item_id and o.tenant_id = v_tenant for update;
     if not found then perform public.finance_v2_raise('not_found'); end if;
     select a.currency into v_acc_currency from public.finance_accounts a where a.id = v_account and a.tenant_id = v_tenant;
+    -- Ofis kalemi yalnız ofis hesabına tahsil/ödeme olur (kişisel Kasam hesabına kapatma = zimmet riski + cari ekstresinde kayıp).
+    if v_acc_currency is not null and not public.finance_account_is_office(v_account) then perform public.finance_v2_raise('invalid_input'); end if;
     if v_item.status not in ('open', 'partial') then perform public.finance_v2_raise('item_closed'); end if;
     if (v_item.direction = 'receivable') <> (v_dir = 'in') or v_acc_currency is distinct from v_item.currency then
       perform public.finance_v2_raise('invalid_input');
@@ -283,12 +319,25 @@ begin
     if v_party is null then v_party := v_item.party_id; end if;
   end if;
 
+  -- Ek (fiş kutusu) yalnız ofis hesabı hareketine bağlanır.
+  if v_att is not null and not public.finance_account_is_office(v_account)
+     and exists (select 1 from public.finance_accounts a where a.id = v_account and a.tenant_id = v_tenant) then
+    perform public.finance_v2_raise('invalid_input');
+  end if;
+
   v_res := public.finance_record_entry(
     v_account, v_dir, v_amt.cash, v_date, v_cat, v_title, v_counterparty,
     nullif(pg_catalog.btrim(coalesce(p ->> 'document_url', '')), ''), nullif(pg_catalog.btrim(coalesce(p ->> 'note', '')), ''),
     v_source_type, v_source_id, v_create_expense, nullif(p ->> 'expense_category', ''), v_expense_id);
   if coalesce(v_res ->> 'outcome', '') <> 'recorded' then perform public.finance_v2_raise(coalesce(v_res ->> 'outcome', 'error')); end if;
   v_id := (v_res ->> 'entry_id')::uuid;
+
+  -- create_expense ile AÇILAN gider kaydı belge tutarını taşır (eski RPC nakdi yazar): KDV biliniyorsa KDV hariç net,
+  -- bilinmiyorsa brüt; stopaj dahil. Kâr/zarar ve bütçe bu gideri expenses'tan okur → giriş yolundan bağımsız aynı tutar.
+  if v_expense_id is null and nullif(v_res ->> 'expense_id', '') is not null then
+    update public.expenses x set amount = v_amt.net
+     where x.id = (v_res ->> 'expense_id')::uuid and x.tenant_id = v_tenant and x.amount is distinct from v_amt.net;
+  end if;
 
   update public.cash_entries e
      set party_id = v_party,
@@ -417,6 +466,12 @@ begin
      and (e.party_id is distinct from v_party or e.vat_rate is distinct from v_rate or e.vat_amount is distinct from v_amt.vat
           or e.withholding_rate is distinct from v_whr or e.withholding_amount is distinct from v_amt.withheld
           or e.property_id is distinct from v_property);
+
+  -- Hareketin AÇTIĞI gider kaydı belge tutarını izler (finance_update_entry nakdi yazar; KDV/stopaj değişimi de yansır).
+  if v_e.expense_id is not null and v_e.created_expense then
+    update public.expenses x set amount = v_amt.net
+     where x.id = v_e.expense_id and x.tenant_id = v_tenant and x.amount is distinct from v_amt.net;
+  end if;
 
   if not v_core and v_scope = 'office' then
     insert into public.audit_logs (tenant_id, actor_id, action, entity_type, entity_id, new_value)
@@ -815,6 +870,10 @@ begin
   select * into v_item from public.finance_open_items o where o.id = p_id and o.tenant_id = v_tenant for update;
   if not found then perform public.finance_v2_raise('not_found'); end if;
   if v_item.status not in ('open', 'partial') then perform public.finance_v2_raise('item_closed'); end if;
+  if exists (select 1 from public.finance_accounts a where a.id = p_account_id and a.tenant_id = v_tenant)
+     and not public.finance_account_is_office(p_account_id) then
+    perform public.finance_v2_raise('invalid_input');
+  end if;
 
   v_wh_left := case when coalesce(v_item.withholding_amount, 0) > 0 and not exists (
                       select 1 from public.cash_entries e
@@ -871,7 +930,7 @@ begin
                 else '90+' end as bk
       from public.finance_open_items_v o
      where o.tenant_id = v_tenant and o.direction = p_direction and o.amount_open > 0 and o.currency = 'TRY'
-       and (o.category is distinct from 'maas' or v_gm)
+       and (o.category is distinct from 'maas' or v_gm) and public.finance_v2_source_visible(o.source)
   ) v on v.bk = b.bucket
   group by b.bucket, b.ord
   order by b.ord;
@@ -944,7 +1003,7 @@ begin
     into v_rec, v_pay, v_overdue
     from public.finance_open_items_v o
    where o.tenant_id = v_tenant and o.amount_open > 0 and public.finance_fx(o.currency, p_rates) is not null
-     and (o.category is distinct from 'maas' or v_gm);
+     and (o.category is distinct from 'maas' or v_gm) and public.finance_v2_source_visible(o.source);
 
   v_review :=
       (select pg_catalog.count(*) from public.finance_statement_lines l
@@ -1022,6 +1081,7 @@ begin
       from public.finance_open_items_v o
      where o.tenant_id = v_tenant and o.source <> 'recurring' and o.amount_open > 0 and o.due_date <= v_end
        and public.finance_fx(o.currency, p_rates) is not null and (o.category is distinct from 'maas' or v_gm)
+       and public.finance_v2_source_visible(o.source)
     union all
     select occ.dd, case when rr.direction = 'in' then 'receivable' else 'payable' end, rr.amount * public.finance_fx(a.currency, p_rates)
       from public.recurring_rules rr
@@ -1062,6 +1122,8 @@ $$;
 -- Kâr/zarar (TL). Gelir = komisyon (brüt − KDV − ofis dışı paylar; mevcut mantık) + yönetim ücreti
 --   + elle girilen gelir hareketleri (kaynak 'manual'; komisyon/kira tahsilatı/kira yönetimi kategorileri çift sayılmaz).
 -- Gider = expenses (mülk sahibine yansıtılanlar hariç) + gider kaydı olmayan çıkışlar (transfer ve mülk sahibi ödemesi hariç).
+--   v2'nin create_expense ile açtığı gider kaydı belge tutarını taşır (KDV hariç net + stopaj; finance_record_entry_v2), bu yüzden
+--   aynı gider gider kaydıyla ya da kaydı olmadan girilse de aynı tutarla sayılır.
 -- KDV biliniyorsa hareket tutarı KDV hariç sayılır; stopaj belge tutarına eklenir. Maaş satırları yalnız owner/gm için girer.
 create or replace function public.finance_pnl(p_from date, p_to date)
 returns table (month date, income numeric, expense numeric, net numeric, income_by_category jsonb, expense_by_category jsonb)
@@ -1446,9 +1508,9 @@ as $$
 declare
   v_tenant uuid := public.finance_v2_ctx('edit');
   v_month date := pg_catalog.date_trunc('month', p_month)::date;
-  v_cat text := pg_catalog.btrim(coalesce(p_category, ''));
+  v_cat text := public.finance_v2_budget_category(pg_catalog.btrim(coalesce(p_category, '')), p_direction);
 begin
-  if p_month is null or p_direction is null or p_direction not in ('in', 'out') or char_length(v_cat) not between 1 and 60
+  if p_month is null or p_direction is null or p_direction not in ('in', 'out') or char_length(coalesce(v_cat, '')) not between 1 and 60
      or (p_amount is not null and (p_amount < 0 or p_amount > 9999999999.99 or pg_catalog.round(p_amount, 2) <> p_amount)) then
     perform public.finance_v2_raise('invalid_input');
   end if;
@@ -1465,6 +1527,8 @@ begin
 end;
 $$;
 
+-- Bütçe/gerçekleşen TEK TABAN: kâr/zarar ile aynı — KDV hariç net, stopaj dahil (gider kaydı: expenses.amount; gider kaydı
+-- olmayan hareket: tutar + stopaj − KDV). Gider yönünde kategori finance_v2_budget_category ile gider kategorisine eşlenir.
 create or replace function public.finance_budget_vs_actual(p_month date)
 returns table (direction text, category text, budget numeric, actual numeric)
 language plpgsql
@@ -1488,13 +1552,14 @@ begin
      order by fb.direction, fb.category, fb.period_month desc
   ),
   a as (
-    select 'out'::text as adir, x.category::text as acat, x.amount as aamt
+    select 'out'::text as adir, public.finance_v2_budget_category(x.category::text, 'out') as acat, x.amount as aamt
       from public.expenses x
      where x.tenant_id = v_tenant and x.is_sample = false and x.expense_date >= v_m and x.expense_date < v_m_end
        and not exists (select 1 from public.owner_charge_links l where l.kind = 'expense' and l.ref_id = x.id and l.tenant_id = x.tenant_id)
     union all
-    select e.direction, coalesce(e.category, case when e.direction = 'in' then 'diger_gelir' else 'diger_gider' end),
-           e.amount + coalesce(e.withholding_amount, 0)
+    select e.direction,
+           public.finance_v2_budget_category(coalesce(e.category, case when e.direction = 'in' then 'diger_gelir' else 'diger_gider' end), e.direction),
+           e.amount + coalesce(e.withholding_amount, 0) - coalesce(e.vat_amount, 0)
       from public.cash_entries e
       join public.finance_accounts ac on ac.id = e.account_id and ac.tenant_id = e.tenant_id and ac.owner_scope = 'office'
      where e.tenant_id = v_tenant and e.voided_at is null and e.is_sample = false and e.currency = 'TRY'
@@ -1537,6 +1602,12 @@ begin
   if p_entry_id is not null and not exists (select 1 from public.cash_entries e where e.id = p_entry_id and e.tenant_id = v_tenant) then
     perform public.finance_v2_raise('not_found');
   end if;
+  -- Ek yalnız ofis hesabı hareketine bağlanır (kişisel Kasam hareketleri ofis ekine açılmaz).
+  if p_entry_id is not null and not exists (
+    select 1 from public.cash_entries e where e.id = p_entry_id and e.tenant_id = v_tenant and public.finance_account_is_office(e.account_id)
+  ) then
+    perform public.finance_v2_raise('invalid_input');
+  end if;
   if p_open_item_id is not null and not exists (select 1 from public.finance_open_items o where o.id = p_open_item_id and o.tenant_id = v_tenant) then
     perform public.finance_v2_raise('not_found');
   end if;
@@ -1564,6 +1635,12 @@ declare
 begin
   if p_entry_id is not null and not exists (select 1 from public.cash_entries e where e.id = p_entry_id and e.tenant_id = v_tenant) then
     perform public.finance_v2_raise('not_found');
+  end if;
+  -- Ek yalnız ofis hesabı hareketine bağlanır (kişisel Kasam hareketleri ofis ekine açılmaz).
+  if p_entry_id is not null and not exists (
+    select 1 from public.cash_entries e where e.id = p_entry_id and e.tenant_id = v_tenant and public.finance_account_is_office(e.account_id)
+  ) then
+    perform public.finance_v2_raise('invalid_input');
   end if;
   if p_open_item_id is not null and not exists (select 1 from public.finance_open_items o where o.id = p_open_item_id and o.tenant_id = v_tenant) then
     perform public.finance_v2_raise('not_found');
@@ -1643,6 +1720,8 @@ revoke all on function public.finance_v2_ctx(text) from public, anon, authentica
 revoke all on function public.finance_v2_resolve_party(uuid, uuid, text, text) from public, anon, authenticated;
 revoke all on function public.finance_v2_check_category(uuid, text, text) from public, anon, authenticated;
 revoke all on function public.finance_v2_cash_total(jsonb) from public, anon, authenticated;
+revoke all on function public.finance_v2_source_visible(text) from public, anon, authenticated;
+revoke all on function public.finance_v2_budget_category(text, text) from public, anon, authenticated;
 grant execute on function public.finance_v2_raise(text) to service_role;
 grant execute on function public.finance_v2_ctx(text) to service_role;
 

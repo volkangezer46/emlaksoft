@@ -33,6 +33,8 @@ drop function if exists public.finance_attachment_link(uuid, uuid, uuid);
 drop function if exists public.finance_attachment_set_ocr(uuid, text, jsonb);
 drop function if exists public.finance_settings_save(jsonb);
 drop function if exists public.finance_v2_cash_total(jsonb);
+drop function if exists public.finance_v2_source_visible(text);
+drop function if exists public.finance_v2_budget_category(text, text);
 drop function if exists public.finance_v2_check_category(uuid, text, text);
 drop function if exists public.finance_v2_resolve_party(uuid, uuid, text, text);
 drop function if exists public.finance_v2_ctx(text);

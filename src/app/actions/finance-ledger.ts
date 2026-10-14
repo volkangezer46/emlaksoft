@@ -24,7 +24,7 @@ export type LedgerResult = { ok: true; id?: string; count?: number } | { ok: fal
 const PATHS = ["/app/giderler", "/app/hesabim"] as const;
 const MISSING_MSG = "Muhasebe güncellemesi veritabanına henüz uygulanmamış. Kısa süre sonra yeniden deneyin.";
 const PERIOD_LOCKED_MESSAGE =
-  "Bu ay kapatılmış (ay kilidi). Kayıt eklemek, değiştirmek ya da iptal etmek için önce Ayarlar > Dönem kapanışı bölümünden kilidi açın.";
+  "Bu ay kapatılmış (ay kilidi); kayıt eklenemez, değiştirilemez ya da iptal edilemez. Kilidi ofis sahibi ya da genel müdür Ayarlar > Dönem kapanışı bölümünden açabilir.";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

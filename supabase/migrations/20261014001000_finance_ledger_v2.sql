@@ -13,6 +13,10 @@
 --      recurring_rules'a 3 null'lanabilir kolon (party_id, vat_rate, withholding_rate).
 --   3) Dönem kilidi tetiği: kilitli aya hareket/açık kalem ekleme, tutar/tarih/yön/kategori/KDV değişikliği ve iptal
 --      `DONEM_KILITLI` ile reddedilir (mutabakat işareti, cari bağı, not gibi parasal olmayan alanlar serbest).
+--      Kilit YALNIZ OFİS hesaplarının hareketlerine uygulanır; kişisel hesap (owner_scope='user', Kasam) etkilenmez.
+--      ÜRÜN KARARI: kilit kaynak bağlı ofis hareketlerine de (kira/komisyon tahsilatı, mülk sahibi ödemesi, düzenli ödeme,
+--      ekstre onayı ve bunların iptali) uygulanır — kapanmış ayın kasası hiçbir yoldan değişmez. Bu modüllerin action'ları
+--      DONEM_KILITLI'yi ortak hata katmanında (src/lib/action-errors.ts, tür 'period_locked') Türkçe mesaja çevirir.
 --   4) Açık kaleme bağlı hareket yazılınca/iptal edilince kalemin ödenen tutarı ve durumu kendiliğinden yeniden hesaplanır.
 --   5) Görünümler (security_invoker): finance_ledger_v (hareketler + deftere bağlanmamış eski giderler 'legacy_expense'),
 --      finance_open_items_v (elle kalemler + kira tahakkuku + hesaplanmış komisyon + düzenli ödeme + mülk sahibi hakedişi).
@@ -371,6 +375,19 @@ as $$
   );
 $$;
 
+-- Hesap ofis hesabı mı (kilit ve ofis-kalem kuralları için; hesap yoksa false).
+create or replace function public.finance_account_is_office(p_account uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select p_account is not null and exists (
+    select 1 from public.finance_accounts a where a.id = p_account and a.owner_scope = 'office'
+  );
+$$;
+
 create or replace function public.finance_period_lock_guard()
 returns trigger
 language plpgsql
@@ -388,9 +405,12 @@ begin
        and new.withholding_amount is not distinct from old.withholding_amount then
       return new; -- parasal olmayan alan (mutabakat, cari bağı, not ...) kilitli ayda da güncellenebilir
     end if;
-    if public.finance_period_is_locked(new.tenant_id, new.entry_date)
-       or (tg_op = 'UPDATE' and public.finance_period_is_locked(old.tenant_id, old.entry_date)) then
-      raise exception 'DONEM_KILITLI' using errcode = 'P0001', hint = 'Bu ay kilitli; önce ay kilidini açın.';
+    -- Kilit yalnız OFİS hesaplarına uygulanır: kişisel hesap (owner_scope='user', Kasam) ofisten bağımsızdır.
+    if (public.finance_account_is_office(new.account_id) and public.finance_period_is_locked(new.tenant_id, new.entry_date))
+       or (tg_op = 'UPDATE' and public.finance_account_is_office(old.account_id)
+           and public.finance_period_is_locked(old.tenant_id, old.entry_date)) then
+      raise exception 'DONEM_KILITLI' using errcode = 'P0001',
+        hint = 'Bu ay kilitli; kilidi ofis sahibi ya da genel müdür açabilir.';
     end if;
   else
     if tg_op = 'UPDATE'
@@ -402,7 +422,8 @@ begin
     end if;
     if public.finance_period_is_locked(new.tenant_id, new.issue_date)
        or (tg_op = 'UPDATE' and public.finance_period_is_locked(old.tenant_id, old.issue_date)) then
-      raise exception 'DONEM_KILITLI' using errcode = 'P0001', hint = 'Bu ay kilitli; önce ay kilidini açın.';
+      raise exception 'DONEM_KILITLI' using errcode = 'P0001',
+        hint = 'Bu ay kilitli; kilidi ofis sahibi ya da genel müdür açabilir.';
     end if;
   end if;
   return new;
@@ -479,10 +500,12 @@ create trigger trg_cash_entries_open_item_upd
   execute function public.finance_entry_open_item_sync();
 
 revoke all on function public.finance_period_is_locked(uuid, date) from public, anon, authenticated;
+revoke all on function public.finance_account_is_office(uuid) from public, anon, authenticated;
 revoke all on function public.finance_period_lock_guard() from public, anon, authenticated;
 revoke all on function public.finance_open_item_recompute(uuid) from public, anon, authenticated;
 revoke all on function public.finance_entry_open_item_sync() from public, anon, authenticated;
 grant execute on function public.finance_period_is_locked(uuid, date) to service_role;
+grant execute on function public.finance_account_is_office(uuid) to service_role;
 grant execute on function public.finance_open_item_recompute(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------

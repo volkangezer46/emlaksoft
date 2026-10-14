@@ -89,7 +89,7 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
       set_config('test.perms','${perms}',false), set_config('test.role','${role}',false)`);
     await db.exec(`set role authenticated`);
   };
-  const FULL = "expenses:view expenses:create expenses:edit expenses:delete commissions:edit rentals:edit rentals:delete";
+  const FULL = "expenses:view expenses:create expenses:edit expenses:delete commissions:view commissions:edit rentals:view rentals:edit rentals:delete";
   const ACCOUNTING = "expenses:view expenses:create expenses:edit";
   const asOwner = () => as(OWNER, T, FULL, "owner");
   const asAccountant = () => as(ACC, T, ACCOUNTING, "accounting");
@@ -319,6 +319,63 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     expect(rows[0]!.e).toBe(6000 + 900 + 1200 + 800 + 350);
   });
 
+  it("create_expense: gider kaydı belge tutarını taşır (stopaj dahil, KDV hariç); kâr/zarar giriş yolundan bağımsız", async () => {
+    await asOwner();
+    // %20 stopajlı 10.000 TL ofis kirası, gider kaydıyla: nakit 8000, gider 10000
+    const rent = await v2({ account_id: KASA, direction: "out", amount: 10000, entry_date: "2026-08-20", category: "kira", title: "Ağustos kirası",
+      withholding_rate: 20, create_expense: true, expense_category: "ofis" });
+    // KDV dahil 1200 TL reklam, gider kaydıyla: gider 1000 (KDV hariç)
+    const ad = await v2({ account_id: KASA, direction: "out", amount: 1200, entry_date: "2026-08-21", category: "reklam", title: "Afiş baskı",
+      vat_rate: 20, vat_included: true, create_expense: true, expense_category: "reklam" });
+    // Aynı reklam gider kaydı OLMADAN: kâr/zarar yine 1000
+    await v2({ account_id: KASA, direction: "out", amount: 1200, entry_date: "2026-08-22", category: "reklam", title: "Afiş baskı 2", vat_rate: 20, vat_included: true });
+    await db.exec(`reset role`);
+    const exp = async (entry: string) =>
+      (await q(`select x.amount::float8 as a, e.amount::float8 as cash from public.cash_entries e join public.expenses x on x.id = e.expense_id where e.id = $1`, [entry]))[0];
+    expect(await exp(rent)).toEqual({ a: 10000, cash: 8000 });
+    expect(await exp(ad)).toEqual({ a: 1000, cash: 1200 });
+    await asOwner();
+    const pnl = (await q(`select expense::float8 as e, expense_by_category as ec from public.finance_pnl('2026-08-01'::date, '2026-08-31'::date)`))[0]!;
+    expect(pnl.ec).toEqual({ ofis: 10000, reklam: 2000 });
+    expect(pnl.e).toBe(12000);
+    // Güncelleme: KDV eklenince (belge 10000 KDV dahil, %20 stopaj) gider kaydı yeni neti izler
+    await q(`select public.finance_update_entry_v2($1::uuid, $2::jsonb)`, [rent, JSON.stringify({ amount: 10000, vat_rate: 20, vat_included: true, withholding_rate: 20 })]);
+    await db.exec(`reset role`);
+    const want = entryAmounts(10000, 20, true, 20);
+    expect(await exp(rent)).toEqual({ a: want.net, cash: want.cash });
+  });
+
+  it("ay kilidi yalnız ofis hesaplarına uygulanır; ofis kalemi ve eki kişisel hesaba bağlanamaz", async () => {
+    await asOwner();
+    const mine = (await one<Record<string, string>>(`public.finance_account_create('user','cash','Cebim',null,'TRY',0::numeric,'2026-08-01'::date)`)).account_id!;
+    await q(`select public.finance_period_lock('2026-08-01'::date, 'Ağustos kapandı')`);
+    // Kişisel hesap kilitli ayda kayıt yapar, düzenler, iptal eder
+    const rec = await recordV1(mine, "out", 250, "2026-08-25", "ulasim", "Taksi", null);
+    expect(rec.outcome).toBe("recorded");
+    const upd = await one<Record<string, unknown>>(`public.finance_update_entry($1::uuid, 300::numeric, '2026-08-26'::date, 'ulasim', 'Taksi', null, null, null, null)`, [rec.entry_id]);
+    expect(upd.outcome).toBe("updated");
+    expect((await one<Record<string, unknown>>(`public.finance_void_entry($1::uuid, 'yanlış kayıt')`, [rec.entry_id])).outcome).toBe("voided");
+    // Ofis hesabı aynı ayda kilitli
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ account_id: KASA, direction: "out", amount: 10, entry_date: "2026-08-25", title: "Geç gider" })]))
+      .toBe("DONEM_KILITLI");
+    await q(`select public.finance_period_unlock('2026-08-01'::date)`);
+    // Ofis alacak kalemi kişisel hesaba tahsil edilemez (v2 ve settle)
+    const item = await one<string>(`public.finance_open_item_create($1::jsonb)`, [JSON.stringify({
+      direction: "receivable", party_name: "Demir Ltd", title: "Danışmanlık", category: "hizmet_bedeli", amount: 1000, issue_date: "2026-10-01", due_date: "2026-10-30" })]);
+    expect(await fails(`select public.finance_open_item_settle($1::uuid, $2::uuid, null, '2026-10-05'::date, null)`, [item, mine])).toBe("FN:invalid_input");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ account_id: mine, direction: "in", amount: 1000, entry_date: "2026-10-05", title: "Tahsilat", open_item_id: item })]))
+      .toBe("FN:invalid_input");
+    await db.exec(`reset role`);
+    expect((await q(`select status, paid_amount::float8 as p from public.finance_open_items where id = $1`, [item]))[0]).toEqual({ status: "open", p: 0 });
+    // Ek kişisel hesap hareketine bağlanamaz
+    await asOwner();
+    const own = await recordV1(mine, "out", 40, "2026-10-05", "ulasim", "Otopark", null);
+    const att = await one<string>(`public.finance_attachment_register($1, 'fis.jpg', 'image/jpeg', 1000::bigint, null, null)`, [`${T}/ledger/fis.jpg`]);
+    expect(await fails(`select public.finance_attachment_link($1::uuid, $2::uuid, null)`, [att, own.entry_id])).toBe("FN:invalid_input");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ account_id: mine, direction: "out", amount: 5, entry_date: "2026-10-05", title: "Çay", attachment_ids: [att] })]))
+      .toBe("FN:invalid_input");
+  });
+
   it("KDV özeti, genel bakış, tahmin, bütçe ve kural önerisi çalışır", async () => {
     await asOwner();
     const vat = await q(`select month::text as m, output_vat::float8 as o, input_vat::float8 as i, withholding_paid::float8 as wp from public.finance_vat_summary('2026-09-01'::date, '2026-10-31'::date)`);
@@ -327,12 +384,18 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     expect(vat[1]).toMatchObject({ m: "2026-10-01", i: 2000, wp: 2000 });
     const ov = await one<Record<string, unknown>>(`public.finance_overview('2026-09-01'::date, '2026-09-30'::date, '{"USD": 41.2}'::jsonb)`);
     expect(ov).toMatchObject({ legacy_unadopted_count: 3, in_total: 42750 });
-    expect(Number(ov.cash_total_try)).toBe(Object.values(await balances()).reduce((s, b) => s + b, 0));
+    const bal = await balances();
+    expect(Number(ov.cash_total_try)).toBe(bal[KASA]! + bal[BANKA]!); // yalnız ofis hesapları (kişisel 'Cebim' hariç)
     const fc = await q(`select is_actual, balance::float8 as b from public.finance_cashflow_forecast(30, null)`);
     expect(fc.filter((r) => r.is_actual === false)).toHaveLength(31);
+    // Hareket kategorisi 'kira' gider kategorisi 'ofis'e eşlenir (eski gider bütçesiyle aynı satır); taban KDV hariç net + stopaj:
+    // ofis kirası (12000 KDV dahil → 10000 net) + stopajlı kira ödemesi (8000 nakit + 2000 stopaj) = 20000.
     await q(`select public.finance_budget_set('2026-10-01'::date, 'out', 'kira', 15000::numeric)`);
-    const bva = await q(`select direction, category, budget::float8 as b, actual::float8 as a from public.finance_budget_vs_actual('2026-10-01'::date) where category in ('kira', 'reklam')`);
-    expect(bva).toEqual([{ direction: "out", category: "kira", b: 15000, a: 22000 }, { direction: "out", category: "reklam", b: 5000, a: 0 }]);
+    const bva = await q(`select direction, category, budget::float8 as b, actual::float8 as a from public.finance_budget_vs_actual('2026-10-01'::date) where category in ('kira', 'ofis', 'reklam')`);
+    expect(bva).toEqual([{ direction: "out", category: "ofis", b: 15000, a: 20000 }, { direction: "out", category: "reklam", b: 5000, a: 0 }]);
+    // Eylül: gider kaydı olmayan 'portal' çıkışları 'reklam' bütçesiyle buluşur (6000) + eski reklam gideri 1200.
+    const sep = await q(`select category, budget::float8 as b, actual::float8 as a from public.finance_budget_vs_actual('2026-09-01'::date) where direction = 'out' and category in ('portal', 'reklam')`);
+    expect(sep).toEqual([{ category: "reklam", b: 5000, a: 7200 }]);
     const rule = await one<string>(`public.finance_rule_upsert('{"match_text": "SAHIBINDEN", "set_category": "portal", "mode": "auto", "direction": "out"}'::jsonb)`);
     const sug = await q(`select rule_id, category, mode from public.finance_rule_suggest('EFT sahibinden.com 4500', 4500, null, 'out')`);
     expect(sug).toEqual([{ rule_id: rule, category: "portal", mode: "auto" }]);
@@ -360,7 +423,17 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
       { source: "recurring", direction: "payable", a: 4500, href: "/app/giderler?sekme=duzenli" },
       { source: "rent", direction: "receivable", a: 15000, href: `/app/kiralama/${rental}` },
     ]);
+    // Kaynak izni: definer RPC'ler doğrudan okumadaki RLS ile aynı sonucu verir — kira/komisyon izni olmayan muhasebe rolü
+    // kira ve komisyon alacağını yaşlandırma/genel bakış toplamlarında görmez.
+    await asAccountant();
+    const accAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('receivable')`))[0]!.a as number;
+    const accOv = await one<Record<string, number>>(`public.finance_overview('2026-10-01'::date, '2026-10-31'::date, null)`);
     await asOwner();
+    const ownAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('receivable')`))[0]!.a as number;
+    const ownOv = await one<Record<string, number>>(`public.finance_overview('2026-10-01'::date, '2026-10-31'::date, null)`);
+    expect(ownAging - accAging).toBe(12000 + 15000);
+    expect(Number(ownOv.receivable_open) - Number(accOv.receivable_open)).toBe(12000 + 15000);
+    expect(Number(ownOv.payable_open) - Number(accOv.payable_open)).toBe(4500); // hakediş (rentals)
     const fc = await q(`select sum(outflow)::float8 as o from public.finance_cashflow_forecast(90, null) where not is_actual`);
     // düzenli ödeme 90 günde en az 3 kez (+ hakediş 4500) çıkış olarak tahmine girer
     expect(Number(fc[0]!.o)).toBeGreaterThanOrEqual(4500 * 3 + 4500);
