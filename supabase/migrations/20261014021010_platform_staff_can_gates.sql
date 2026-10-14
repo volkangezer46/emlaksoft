@@ -63,7 +63,7 @@ set search_path = ''
 as $$
   select case
     when p_role = 'super_admin' and p_module = any (array['dashboard', 'sales', 'tenants', 'members', 'billing', 'tickets', 'reports',
-      'advisor', 'activity', 'geo', 'sistem', 'broadcast', 'personel', 'marka', 'seo', 'sitemenu', 'sitecontent', 'reklam'])
+      'advisor', 'activity', 'geo', 'sistem', 'broadcast', 'personel', 'marka', 'seo', 'sitemenu', 'sitecontent', 'reklam', 'veri'])
       then array['view', 'write', 'approve']
     when p_role = 'ops' and p_module = 'reklam' then array['view']
     when p_role = 'ops' and p_module = any (array['dashboard', 'sales', 'tenants', 'members', 'tickets', 'reports', 'advisor', 'activity',
@@ -89,7 +89,7 @@ as $$
     select case
       when p_action not in ('view', 'write', 'approve') then false
       when p_module <> all (array['dashboard', 'sales', 'tenants', 'members', 'billing', 'tickets', 'reports', 'advisor', 'activity', 'geo',
-        'sistem', 'broadcast', 'personel', 'marka', 'seo', 'sitemenu', 'sitecontent', 'reklam']) then false
+        'sistem', 'broadcast', 'personel', 'marka', 'seo', 'sitemenu', 'sitecontent', 'reklam', 'veri']) then false
       when s.custom_role_id is null then p_action = any (public.platform_fixed_role_actions(s.role, p_module))
       when p_module = 'dashboard' and p_action = 'view' then true
       else coalesce((
