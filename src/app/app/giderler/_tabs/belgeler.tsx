@@ -14,7 +14,7 @@ import { ReceiptInbox, type InboxItem, type InboxLink } from "../belgeler/receip
  * MUHASEBE > BELGELER (FN5). Alt görünümler (`?tur=`):
  *  - `fis`    Fiş kutusu: harekete ya da açık kaleme bağlı OLMAYAN ekler (varsayılan)
  *  - `tumu`   Tüm ekler (bağlı olanlar kayda gider; gelir hareketinde "Fatura kes")
- *  - `fatura` e-Fatura / e-Arşiv ekranı (mevcut `faturalar/*`; eski `?sekme=faturalar` buraya düşer)
+ *  - `fatura` e-Fatura / e-Arşiv ekranı (`faturalar/*`; kanonik adres `?sekme=belgeler&tur=fatura`)
  * Her görünüm yalnız kendi verisini çeker (sorgular Promise.all). Yükleme `/api/app/finans/belge`.
  * Fiş okuma yalnız `finance_settings.ocr_enabled` açıkken; okunan değerler YALNIZ öneri.
  */

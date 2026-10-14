@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { agingBucketKeyOf } from "@/lib/finance/party/aging";
-import { parseLedgerFilters } from "../hareketler/ledger-filters";
+import { parseLedgerFilters } from "../_hareketler/ledger-filters";
 import { FINANCE_TAB_META, FINANCE_VISIBLE_TABS, financeHref, overviewLinks, resolveFinanceTab } from "./finance-shell";
 
 /** Adresi sekme + parametrelere ayırır (sayfanın `resolveFinanceTab` ile yaptığı gibi). */
@@ -11,18 +11,17 @@ function target(href: string) {
 }
 
 describe("Muhasebe sekme çözümü (FN2)", () => {
-  it("takma adlar: ozet → genel; faturalar → belgeler + tur=fatura; bilinmeyen → genel", () => {
-    expect(resolveFinanceTab({ sekme: "ozet" }).tab).toBe("genel");
-    expect(resolveFinanceTab({ sekme: "faturalar" })).toMatchObject({ tab: "belgeler", params: { tur: "fatura" } });
-    expect(resolveFinanceTab({ sekme: "yok-boyle" }).tab).toBe("genel");
+  it("yalnız kanonik sekmeler: takma ad yok; bilinmeyen ya da boş → genel", () => {
+    for (const removed of ["ozet", "faturalar", "yok-boyle"]) expect(resolveFinanceTab({ sekme: removed }).tab, removed).toBe("genel");
     expect(resolveFinanceTab({}).tab).toBe("genel");
     expect(resolveFinanceTab({ sekme: "cari" }).tab).toBe("cari");
+    expect(resolveFinanceTab({ sekme: "belgeler", tur: "fatura" })).toMatchObject({ tab: "belgeler", params: { tur: "fatura" } });
   });
 
-  it("eski derin bağlantılar: ?portfoy= / ?from= → Hareketler, ?portal= → Bütçe (filtreler korunur)", () => {
-    expect(resolveFinanceTab({ portfoy: "x" })).toMatchObject({ tab: "hareketler", params: { portfoy: "x" } });
-    expect(resolveFinanceTab({ from: "2026-10-01", to: "2026-10-31" })).toMatchObject({ tab: "hareketler", params: { from: "2026-10-01" } });
-    expect(resolveFinanceTab({ portal: "sahibinden" }).tab).toBe("butce");
+  it("sekmesiz süzgeç parametreleri sekme seçmez (eski ?portal= / ?kategori= / ?portfoy= çözümü kaldırıldı)", () => {
+    expect(resolveFinanceTab({ portfoy: "x" }).tab).toBe("genel");
+    expect(resolveFinanceTab({ portal: "sahibinden" }).tab).toBe("genel");
+    expect(resolveFinanceTab({ sekme: "hareketler", from: "2026-10-01" })).toMatchObject({ tab: "hareketler", params: { from: "2026-10-01" } });
   });
 
   it("şerit: 10 sekme, 5 görünür + Diğer; ilk sekme parametresiz adres", () => {

@@ -20,18 +20,18 @@ export type DetailTabDef = {
   icon?: ComponentType<{ className?: string }>;
   /** Sayaç rozeti; null/undefined ise gösterilmez. 0 da gösterilir. */
   count?: number | null;
-  /** Eski (`?tab=`) kimlikler gibi takma adlar için gerekmez; yalnız görünür sekmeler. */
+  /** true: sekme şeritte çizilmez (yalnız görünür sekmeler listelenir). */
   hidden?: boolean;
 };
 
-/** URL'deki `sekme` (veya eski `tab`) değerini geçerli bir sekmeye çevirir. */
+/** URL'deki `sekme` değerini geçerli bir sekmeye çevirir (bilinmeyen değer `fallback`). */
 export function resolveTab(
   sp: Record<string, string | string[] | undefined>,
   ids: readonly string[],
   fallback: string,
   aliases: Record<string, string> = {},
 ): string {
-  const raw = sp.sekme ?? sp.tab;
+  const raw = sp.sekme;
   const v = Array.isArray(raw) ? raw[0] : raw;
   if (!v) return fallback;
   const mapped = aliases[v] ?? v;

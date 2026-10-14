@@ -8,7 +8,7 @@ import { formatTry } from "@/lib/format";
  * Kendi sorgusunu yapar (sayfa künye batch'ine dokunmaz); sütun yoksa (eski şema) sessizce gizlenir.
  * - source_agent: portföyü getiren danışman · assigned_at: danışmana atanma anı (geriye doldurulmaz)
  * - foreign_eligible / foreign_note: yabancıya satış uygunluğu (düzenleme: Yabancıya satış ekranı)
- * - expenses.property_id: bu portföy için yapılan giderler (liste: /app/giderler?portfoy=)
+ * - expenses.property_id: bu portföy için yapılan giderler (liste: Muhasebe > Hareketler > Eski giderler, `portfoy=` süzgeci)
  */
 export async function PropertyExtraPanel({ propertyId, canSeeExpenses, canCreateExpense }: { propertyId: string; canSeeExpenses: boolean; canCreateExpense: boolean }) {
   const supabase = await createClient();
@@ -77,7 +77,7 @@ export async function PropertyExtraPanel({ propertyId, canSeeExpenses, canCreate
         <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Receipt className="h-4 w-4 text-brand-600" /> Giderler</h2>
-            <Link href={`/app/giderler?portfoy=${propertyId}`} className="text-xs font-semibold text-brand-600 hover:underline">
+            <Link href={`/app/giderler?sekme=hareketler&gorunum=eski-giderler&portfoy=${propertyId}`} className="text-xs font-semibold text-brand-600 hover:underline">
               {expenseCount > 0 ? `Tümü (${expenseCount}) →` : canCreateExpense ? "Gider ekle →" : "Giderler →"}
             </Link>
           </div>

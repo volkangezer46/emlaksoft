@@ -77,7 +77,7 @@ const CLIENT_ENTRIES = [
   "src/components/ui/tabbed-form-shell.tsx",
   "src/app/app/ayarlar/matching-weights-form.tsx",
   "src/app/app/ayarlar/company-form.tsx",
-  "src/app/app/ayarlar/integrations-form.tsx",
+  "src/app/app/ayarlar/entegrasyonlar/integrations-form.tsx",
   "src/app/app/ayarlar/logo-upload-form.tsx",
   "src/components/app/notification-prefs.tsx",
   // P3 (PB52 turu): talep ölçütü doğrulaması el yazımı (demand-criteria zod'suz), parsel ön doğrulaması tıklamada yüklenir.
@@ -89,7 +89,6 @@ const CLIENT_ENTRIES = [
   "src/components/app/structured-demand-fields.tsx",
   "src/components/app/demand-summary.tsx",
   "src/components/app/duplicate-hint.tsx",
-  "src/app/app/giderler/expense-create-form.tsx",
   "src/app/app/sozlesmeler/[id]/remind-signer.tsx",
 ];
 

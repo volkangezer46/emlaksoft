@@ -8,7 +8,7 @@ import {
   wizardNeighbors,
   type OnboardingFacts,
 } from "./onboarding-checklist";
-import { ONBOARDING_STEP_DEFS, ONBOARDING_STEP_IDS, resolveLegacyStep } from "./onboarding-steps";
+import { ONBOARDING_STEP_DEFS, ONBOARDING_STEP_IDS, isWizardStepKey } from "./onboarding-steps";
 import { DEFAULT_MATRIX } from "./permissions";
 import type { EffectivePermissions } from "./permissions-effective";
 import { computeProfileCompletion, isOfficeLocationDone, type ProfileFacts } from "./profile-completion";
@@ -42,12 +42,10 @@ describe("onboarding-steps kaydı", () => {
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
   });
 
-  it("eski bağlantılar yeni adıma eşlenir; bilinmeyen null", () => {
-    expect(resolveLegacyStep("konum")).toBeNull();
-    expect(resolveLegacyStep("data")).toBe("bitis");
-    expect(resolveLegacyStep("portals")).toBe("portals");
-    expect(resolveLegacyStep("yok")).toBeNull();
-    expect(resolveLegacyStep(undefined)).toBeNull();
+  it("yalnız gerçek adım kimlikleri geçerlidir; eski takma adlar (data, yetki, eids) tanınmaz", () => {
+    expect(isWizardStepKey("portals")).toBe(true);
+    expect(isWizardStepKey("bitis")).toBe(true);
+    for (const old of ["konum", "data", "property", "defs", "yetki", "eids", "yok", undefined]) expect(isWizardStepKey(old), String(old)).toBe(false);
   });
 });
 
@@ -129,14 +127,12 @@ describe("onboarding-checklist", () => {
 });
 
 describe("EİDS kurulum adımları (EP5)", () => {
-  it("yetki belgesi no ve Bakanlık e-postaları gerçek olgudan tamamlanır; eski adresler eşlenir", () => {
+  it("yetki belgesi no ve Bakanlık e-postaları gerçek olgudan tamamlanır", () => {
     const done = (id: string, extra: Record<string, boolean>) => buildOnboarding({ ...empty, extra }).steps.find((x) => x.id === id)?.done;
     expect(done("yetki-belgesi", {})).toBe(false);
     expect(done("yetki-belgesi", { "yetki-belgesi": true })).toBe(true);
     expect(done("eids-eposta", {})).toBe(false);
     expect(done("eids-eposta", { "eids-eposta": true })).toBe(true);
-    expect(resolveLegacyStep("yetki")).toBe("yetki-belgesi");
-    expect(resolveLegacyStep("eids")).toBe("eids-eposta");
   });
 });
 

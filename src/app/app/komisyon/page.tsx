@@ -225,6 +225,7 @@ export default async function CommissionPage({
   // e-Fatura: satırda "Fatura kes" / "Faturayı gör" / "e-Fatura'yı bağla" (commissions.create; sayfa başına tek tur).
   const invoiceCtx = await loadInvoiceButtonContext(
     supabase,
+    tenantId,
     (perms.commissions ?? []).includes("create"),
     "commission",
     rows.map((r) => r.id),

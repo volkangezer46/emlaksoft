@@ -25,7 +25,7 @@ import { EidsLegalNote } from "@/components/eids/legal-note";
 import { EIDS_HELP_HREF, EIDS_MAILBOX_SETTINGS_HREF } from "@/lib/eids/links";
 import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { getTenantModuleState } from "@/lib/modules/state";
-import { PortalMembershipsSection } from "@/app/app/ayarlar/_sekmeler/portal-memberships-section";
+import { PortalMembershipsSection } from "@/app/app/ayarlar/entegrasyonlar/portal-memberships-section";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
 export type StepBodyProps = {

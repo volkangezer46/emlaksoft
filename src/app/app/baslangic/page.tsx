@@ -5,7 +5,6 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
 import { resolveWizardStep } from "@/lib/onboarding-checklist";
-import { resolveLegacyStep } from "@/lib/onboarding-steps";
 import { createClient } from "@/lib/supabase/server";
 import { SetupWizard } from "./setup-wizard";
 
@@ -43,8 +42,8 @@ export default async function OnboardingPage({
   }
 
   const { state, skipped, tenant, counts } = snap;
-  // Kaldırılan sihirbaz adımlarının kimlikleri yeni adıma eşlenir.
-  const current = resolveWizardStep(resolveLegacyStep(adim) ?? undefined, state);
+  // Yalnız gerçek adım kimliği; bilinmeyen değer ilk eksik adıma düşer.
+  const current = resolveWizardStep(adim ?? undefined, state);
   const showSampleData =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
   // Demo yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts).

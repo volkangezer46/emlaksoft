@@ -94,7 +94,7 @@ describe("dönem", () => {
   it("periodHref diğer paramları korur, varsayılanda donem düşer", () => {
     expect(periodHref("/app", {}, 30)).toBe("/app");
     expect(periodHref("/app", {}, 7)).toBe("/app?donem=7");
-    expect(periodHref("/app", { tv: "1", donem: "90" }, 7)).toBe("/app?tv=1&donem=7");
+    expect(periodHref("/app", { kapsam: "ekip", donem: "90" }, 7)).toBe("/app?kapsam=ekip&donem=7");
     expect(periodHref("/app", { x: undefined }, 30)).toBe("/app");
   });
   it("bucketCountFor", () => {

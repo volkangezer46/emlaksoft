@@ -4,7 +4,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
  * Oturumlu E2E akışları — 5. dalga (Dalga N kanıtlama):
  *  - Anlaşma evrak dosyası (şablondan oluştur + checkbox toggle + ilerleme)
  *  - Duyuru panosu uçtan uca (/app/bildirimler?sekme=yonetim → dashboard bandı → Okudum)
- *  - NPS anketi uçtan uca (/app/raporlar/memnuniyet → public /anket/[token])
+ *  - NPS anketi uçtan uca (/app/anketler?sekme=sonuc → public /anket/[token])
  *  - Günün rotası görünümü (/app/randevular?gorunum=rota)
  *  - Vitrin v2: favori kalbi + /vitrin/demo-ofis/favoriler + fiyat alarmı formu
  *
@@ -148,16 +148,16 @@ test.describe("Duyuru panosu uctan uca (/app/bildirimler?sekme=yonetim -> dashbo
   });
 });
 
-test.describe("NPS anketi uctan uca (/app/raporlar/memnuniyet -> /anket/[token])", () => {
+test.describe("NPS anketi uctan uca (/app/anketler?sekme=sonuc -> /anket/[token])", () => {
   test("won anlasmadan anket uretilir; public sayfada 9 puan + tesekkur; ikinci acilis 'Yanitiniz alinmis'", async ({
     page,
     browser,
   }) => {
     test.slow(); // anket üretimi + auth'suz ikinci context + iki public yükleme
 
-    await page.goto("/app/raporlar/memnuniyet");
+    await page.goto("/app/anketler?sekme=sonuc");
     await expectAppShell(page);
-    await expect(page.getByRole("heading", { name: "Müşteri memnuniyeti (NPS)" })).toBeVisible({
+    await expect(page.getByRole("heading", { name: "Anket sonuçları" })).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.getByRole("heading", { name: "Anket oluştur" })).toBeVisible();

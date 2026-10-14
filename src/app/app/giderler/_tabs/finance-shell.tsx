@@ -18,8 +18,8 @@ import type { FinanceTabId } from "@/lib/finance/ledger/types";
 import { QuickEntryButtons, type AccountOption, type EntryCategoryOption, type RuleSuggestFn } from "../quick-entry";
 
 /**
- * Muhasebe merkezinin ortak üst kısmı (TEK kaynak): sekme kimlikleri ve KULLANICIYA GÖRÜNEN etiketler, takma adlar,
- * eski derin bağlantıların sekmeye eşlenmesi, "Yeni kayıt" eylemi ve sekme şeridi (5 görünür + "Diğer").
+ * Muhasebe merkezinin ortak üst kısmı (TEK kaynak): sekme kimlikleri ve KULLANICIYA GÖRÜNEN etiketler, sekme çözümü,
+ * "Yeni kayıt" eylemi ve sekme şeridi (5 görünür + "Diğer").
  * Sekme etiketleri başka dosyada kopyalanmaz; komut çubuğu da listeyi buradan (prop olarak) alır.
  */
 export const FINANCE_BASE = "/app/giderler";
@@ -57,34 +57,19 @@ export function financeHref(tab: FinanceTabId, query: Record<string, string | nu
   return s ? `${FINANCE_BASE}?${s}` : FINANCE_BASE;
 }
 
-/**
- * `?sekme=` çözümü. Takma adlar: 'ozet' → genel; 'faturalar' → belgeler + tur=fatura. Bilinmeyen değer genel'e düşer.
- * Eski derin bağlantılar (sekmesiz): `?portal=` → Bütçe (portal getirisi kartı), `?kategori=/from=/to=/portfoy=` → Hareketler
- * (portföy detayı ve kâr-zarar raporu bağlantıları liste filtresiyle gelir; filtreler korunur).
- */
+/** `?sekme=` çözümü: yalnız kanonik sekme kimlikleri; boş ya da bilinmeyen değer Genel bakış'a düşer (takma ad yok). */
 export function resolveFinanceTab(raw: Record<string, string | undefined>): { tab: FinanceTabId; params: Record<string, string | undefined> } {
   const sekme = (raw.sekme ?? "").trim();
-  if (sekme === "ozet") return { tab: "genel", params: { ...raw, sekme: "genel" } };
-  if (sekme === "faturalar") return { tab: "belgeler", params: { ...raw, sekme: "belgeler", tur: raw.tur || "fatura" } };
   if (TAB_IDS.has(sekme)) return { tab: sekme as FinanceTabId, params: raw };
-  if (!sekme) {
-    if (raw.portal) return { tab: "butce", params: { ...raw, sekme: "butce" } };
-    if (raw.kategori || raw.from || raw.to || raw.portfoy) return { tab: "hareketler", params: { ...raw, sekme: "hareketler" } };
-  }
   return { tab: "genel", params: { ...raw, sekme: "genel" } };
 }
 
-/** Eski API (FN öncesi çağıranlar için): yalnız sekme kimliği. */
-export function financeTabOf(value: string | string[] | undefined): FinanceTabId {
-  const v = Array.isArray(value) ? value[0] : value;
-  return resolveFinanceTab({ sekme: v }).tab;
-}
 
 /**
  * Genel bakış KPI / uyarı / grafik hedefleri (TEK kaynak; sözleşme testi finance-shell.test.ts). Yalnız hedef sekmenin
  * GERÇEKTEN okuduğu parametreler kullanılır (sıfır çıkmaz metrik: tıklayan filtreli listeye düşer, filtresiz sayfaya değil):
  *  - Cari (FN4, cari/open-items.tsx): `gorunum=acik` + `yon=alacak|borc` + `kova=gecikmis|vadesi_gelmedi|0-30|…`
- *  - Hareketler (FN3, hareketler/ledger-filters.ts): `kaynak=eski` (hesaba bağlanmamış eski giderler), `from`/`to`
+ *  - Hareketler (FN3, _hareketler/ledger-filters.ts): `kaynak=eski` (hesaba bağlanmamış eski giderler), `from`/`to`
  *  - Kasa ve banka (FN3): "İncelenecek" mutabakat kuyruğu sekmenin kendisindedir (ek parametre yok)
  */
 export function overviewLinks() {

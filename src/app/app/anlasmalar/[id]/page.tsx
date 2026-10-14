@@ -285,6 +285,7 @@ export default async function DealDetailPage({
     tab === "finans"
       ? await loadInvoiceButtonContext(
           supabase,
+          tenantId,
           canSeeCommission && (perms.commissions ?? []).includes("create"),
           "commission",
           komisyonlar.map((c) => c.id as string),
@@ -363,7 +364,7 @@ export default async function DealDetailPage({
           ? { title: `${acikGorev} açık görevi tamamlayın`, reason: "Bu anlaşmaya bağlı bekleyen görev var.", href: `/app/anlasmalar/${deal.id}?sekme=gorevler`, label: "Görevlere git" }
           : (offers ?? []).length === 0 && capraz
             ? { title: "Teklif oluşturun", reason: "Bu portföy + müşteri için teklif kaydı yok.", href: "/app/teklifler", label: "Teklifler" }
-            : { title: "Müşteriyle iletişimde kalın", reason: `Sistem tahmini %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=iletisim` : null, label: "İletişim kaydı" };
+            : { title: "Müşteriyle iletişimde kalın", reason: `Sistem tahmini %${skor.score} — ${skor.label}`, href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : null, label: "İletişim kaydı" };
 
   const tabDefs: DetailTabDef[] = [
     { id: "ozet", label: "Özet", icon: LayoutDashboard },

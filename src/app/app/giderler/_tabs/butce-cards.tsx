@@ -1,26 +1,26 @@
 import Link from "@/components/ui/smart-link";
-import { CalendarClock, PiggyBank, Radio } from "lucide-react";
+import { CalendarClock, Radio } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { formatDateTr, formatTry } from "@/lib/format";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { BudgetForm, BudgetRemoveButton } from "./budget-form";
-import { ConvertSeriesButton } from "./recurring-panel";
-import type { AccountOption } from "./quick-entry";
+import { ConvertSeriesButton } from "../recurring-panel";
+import type { AccountOption } from "../quick-entry";
 import { cachedTenantAggregate } from "@/lib/cache/tenant-aggregate";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { loadAccountsWithBalances } from "@/lib/finance/cash/load";
-import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
-import { BUDGET_WARN_RATIO } from "@/lib/finance/expense-budget";
+import { loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
 import { RECURRENCE_LABEL, monthlyEquivalent, renewalInfo } from "@/lib/finance/recurring-expenses";
 import { PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
 import { PORTAL_LABEL, ROI_WINDOW_DAYS, leadSourceOf, pickLeastEfficientPortal, unusedPortalSubscriptions } from "@/lib/finance/portal-roi";
 
-type Category = { value: string; label: string };
+/**
+ * Bütçe sekmesinin alt kartları: tekrarlayan giderler / abonelikler (`#abonelikler`) ve portal getirisi (`#portal-getirisi`).
+ * Her sayı filtreli bir hedefe gider. Yöntem `src/lib/finance/*` (saf, testli). Veri yoksa kart yok, uydurma sayı yok.
+ */
 
 /** Veritabanı güncellemesi (20261008000700) beklenirken gösterilen sakin not. */
 function PendingNote({ what }: { what: string }) {
@@ -28,127 +28,6 @@ function PendingNote({ what }: { what: string }) {
     <Alert tone="info">
       {what} için veritabanı güncellemesi bekleniyor; güncelleme uygulanınca bu bölüm otomatik açılır.
     </Alert>
-  );
-}
-
-/**
- * Giderler sayfası "bütçe ve verimlilik" bölümü: kategori bütçesi (gerçekleşen ↔ bütçe), tekrarlayan giderler / abonelikler
- * ve portal getirisi (talep ve anlaşma başına maliyet). Her sayı filtreli bir hedefe gider. Yöntem:
- * `src/lib/finance/*` (saf, testli). Veri yoksa kart yok, uydurma sayı yok.
- */
-export async function FinancePanel({
-  tenantId,
-  userId,
-  canEdit,
-  categories,
-  showEarnings,
-  convertAccounts = [],
-}: {
-  tenantId: string;
-  /** Önbellek anahtarı (ofis + kullanıcı): RLS kapsamı başka kullanıcıya sızmaz. */
-  userId: string;
-  canEdit: boolean;
-  categories: readonly Category[];
-  /** Komisyon tutarları ofis geneli kazançtır: yalnız tüm kazancı görenlere. */
-  showEarnings: boolean;
-  /** "Kurala çevir" için yazılabilir ofis hesapları (boşsa düğme görünmez). */
-  convertAccounts?: readonly AccountOption[];
-}) {
-  const supabase = await createClient();
-  const nowMs = now();
-  const [budget, recurring, portal] = await Promise.all([
-    loadBudgetContext(supabase, tenantId, nowMs).catch(() => null),
-    loadRecurringSeries(supabase, tenantId, nowMs).catch(() => null),
-    // Portal getirisi en ağır okuma (5 tablo, 13 ay): 2 dk önbellek; gider/anlaşma/portföy yazmaları etiketi düşürür.
-    cachedTenantAggregate("portal-roi", { tenantId, userId }, () => loadPortalRoi(supabase, tenantId, nowMs), 120).catch(() => null),
-  ]);
-  const catLabel = (v: string) => categories.find((c) => c.value === v)?.label ?? v;
-  const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(new Date(nowMs));
-
-  return (
-    <div className="space-y-4">
-      {/* ---------------------------------------------------------------- Bütçe */}
-      <Card id="butce" className="scroll-mt-24">
-        <CardHeader>
-          <div>
-            <CardTitle className="flex items-center gap-2"><PiggyBank className="h-4 w-4 text-brand-600" aria-hidden /> Aylık gider bütçesi</CardTitle>
-            <CardDescription>
-              {monthLabel} · kategori bazlı bütçe ↔ gerçekleşen. %{Math.round(BUDGET_WARN_RATIO * 100)} dolunca uyarı, %100&apos;de aşım bildirimi gelir. Örnek veri hariç.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {budget === null ? (
-            <Alert tone="warning">Bütçe verisi şu an yüklenemedi; sayfayı yenileyin.</Alert>
-          ) : !budget.available ? (
-            <PendingNote what="Gider bütçesi" />
-          ) : (
-            <>
-              {budget.rows.length === 0 ? (
-                <p className="text-sm text-text-muted">
-                  Henüz bütçe tanımlı değil. {canEdit ? "Aşağıdan bir kategoriye aylık bütçe girin" : "Bütçe tanımlamak için giderleri düzenleme yetkisi gerekir"}: harcama bütçenin %80&apos;ine
-                  ulaşınca yöneticilere uyarı düşer.
-                </p>
-              ) : (
-                <>
-                  {budget.rows.some((r) => r.status === "over") ? (
-                    <Alert tone="danger">
-                      {budget.rows.filter((r) => r.status === "over").length} kategoride bu ayın bütçesi aşıldı.
-                    </Alert>
-                  ) : null}
-                  <ul className="space-y-3">
-                    {budget.rows.map((r) => {
-                      const tone = r.status === "over" ? "danger" : r.status === "warn" ? "warning" : "success";
-                      const href = `/app/giderler?kategori=${encodeURIComponent(r.category)}&from=${budget.monthStart}&to=${budget.monthEnd}`;
-                      return (
-                        <li key={r.category} className="rounded-[var(--radius-card)] border border-line p-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Link href={href} className="focus-ring rounded font-semibold text-text hover:underline">{catLabel(r.category)}</Link>
-                            <span className="flex flex-wrap items-center gap-2 text-xs">
-                              <span className="numeric text-text-muted">
-                                {formatTry(r.spent)} / {formatTry(r.budget)}
-                              </span>
-                              <Badge variant={r.status === "over" ? "danger" : r.status === "warn" ? "warning" : "success"} size="sm">
-                                %{Math.round(r.ratio * 100)}
-                              </Badge>
-                              {r.deltaPctVsPrev !== null ? (
-                                <Link
-                                  href={`/app/giderler?kategori=${encodeURIComponent(r.category)}&from=${budget.prevMonthStart}&to=${budget.prevMonthEnd}`}
-                                  className="focus-ring rounded text-text-faint hover:underline"
-                                  title="Önceki ayın giderleri"
-                                >
-                                  geçen aya göre {r.deltaPctVsPrev >= 0 ? "+" : ""}%{r.deltaPctVsPrev}
-                                </Link>
-                              ) : (
-                                <span className="text-text-faint">{r.prevSpent > 0 ? "geçen ay: " + formatTry(r.prevSpent) : "geçen ay gider yok"}</span>
-                              )}
-                              {canEdit ? <BudgetRemoveButton category={r.category} label={catLabel(r.category)} /> : null}
-                            </span>
-                          </div>
-                          <Progress value={r.ratio * 100} tone={tone} label={`${catLabel(r.category)} bütçe kullanımı`} className="mt-2" />
-                          <p className="mt-1 text-xs text-text-muted">
-                            {r.remaining >= 0 ? `${formatTry(r.remaining)} kaldı` : `${formatTry(Math.abs(r.remaining))} aşıldı`}
-                          </p>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              )}
-              {canEdit ? (
-                <div className="border-t border-line pt-4">
-                  <BudgetForm categories={categories} budgets={Object.fromEntries(budget.budgets)} />
-                </div>
-              ) : null}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ---------------------------------------------------- Tekrarlayan giderler */}
-      <RecurringSeriesView recurring={recurring} catLabel={catLabel} convertAccounts={convertAccounts} />
-      <PortalRoiView portal={portal} showEarnings={showEarnings} />
-    </div>
   );
 }
 

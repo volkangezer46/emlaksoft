@@ -149,7 +149,7 @@ export const MEMBERSHIP_STATUS_LABEL: Readonly<Record<MembershipStatus, string>>
 };
 
 /** Üyelik kartının adresi (soluk portal satırlarındaki "Üye değilsiniz, ekle" bağlantısı). */
-export const PORTAL_MEMBERSHIP_HREF = "/app/ayarlar?sekme=entegrasyon#portal-uyelikleri";
+export const PORTAL_MEMBERSHIP_HREF = "/app/ayarlar/entegrasyonlar#portal-uyelikleri";
 
 /** Üst üste bu kadar "giriş istedi" sonucunda ofis sahibine tek seferlik "üyelik bitti mi?" bildirimi gider. */
 export const LOGIN_FAIL_NOTIFY_STREAK = 3;

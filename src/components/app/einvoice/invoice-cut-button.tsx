@@ -30,7 +30,7 @@ export function InvoiceCutButton({
   }
   const found = ctx.existing[sourceId];
   if (found) {
-    const href = found.status === "draft" ? `/app/giderler?sekme=faturalar&duzenle=${found.id}` : `/app/giderler?sekme=faturalar&durum=${found.status}`;
+    const href = found.status === "draft" ? `/app/giderler?sekme=belgeler&tur=fatura&duzenle=${found.id}` : `/app/giderler?sekme=belgeler&tur=fatura&durum=${found.status}`;
     return (
       <Link href={href} className={cls}>
         <FileText className="h-3.5 w-3.5" aria-hidden="true" /> {STATUS_TEXT[found.status]}
@@ -38,7 +38,7 @@ export function InvoiceCutButton({
     );
   }
   return (
-    <Link href={`/app/giderler?sekme=faturalar&kaynak=${kaynak}&id=${sourceId}`} className={cls}>
+    <Link href={`/app/giderler?sekme=belgeler&tur=fatura&kaynak=${kaynak}&id=${sourceId}`} className={cls}>
       <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Fatura kes
     </Link>
   );

@@ -62,7 +62,7 @@ export async function EidsMailboxCard({ canEdit }: { canEdit: boolean }) {
   const waitingConfirmation = addr.state === "active" && !connected;
 
   return (
-    <section id="eids-eposta" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+    <section id="eids" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
         <div className="flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-500/10 text-brand-600">

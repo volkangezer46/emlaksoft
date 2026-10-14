@@ -1,3 +1,4 @@
+import { settingsTabHref } from "@/app/app/ayarlar/_sekmeler/tabs";
 import Link from "@/components/ui/smart-link";
 import { Alert } from "@/components/ui/alert";
 import { loadTenantLicense, tenantLicenseStatus } from "@/lib/license-server";
@@ -22,7 +23,7 @@ export async function LicenseStatusCard({ className }: { className?: string }) {
       title={status.label}
       className={className}
       action={
-        <Link href="/app/ayarlar#marka-kimlik" className="text-xs font-semibold underline underline-offset-2">
+        <Link href={settingsTabHref("kimlik")} className="text-xs font-semibold underline underline-offset-2">
           Firma bilgileri
         </Link>
       }

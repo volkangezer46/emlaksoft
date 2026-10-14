@@ -176,20 +176,3 @@ export function getOnboardingStepDef(id: string): OnboardingStepDef | null {
   return (ONBOARDING_STEP_DEFS as readonly OnboardingStepDef[]).find((d) => d.id === id) ?? null;
 }
 
-/** Eski bağlantılar: kaldırılan/birleşen adım kimlikleri yeni adıma eşlenir (kırık `?adim=` yok). */
-const LEGACY_STEP_ALIASES: Record<string, WizardStepKey> = {
-  data: FINISH_STEP,
-  property: FINISH_STEP,
-  demand: FINISH_STEP,
-  appointment: FINISH_STEP,
-  defs: FINISH_STEP,
-  // EİDS kurulum bağlantıları (görev, Yardım)
-  yetki: "yetki-belgesi",
-  eids: "eids-eposta",
-};
-
-export function resolveLegacyStep(v: string | null | undefined): WizardStepKey | null {
-  if (!v) return null;
-  if (isWizardStepKey(v)) return v;
-  return LEGACY_STEP_ALIASES[v] ?? null;
-}

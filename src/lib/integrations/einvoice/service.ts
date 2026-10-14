@@ -374,14 +374,16 @@ export type InvoiceButtonContext = {
 /** "Fatura kes" düğmesi bağlamı: sayfa başına TEK tur (bağlantı + kaynakların mevcut faturaları). */
 export async function loadInvoiceButtonContext(
   supabase: SupabaseClient,
+  tenantId: string | null,
   canInvoice: boolean,
   sourceType: "commission" | "rent_management_fee",
   sourceIds: readonly string[],
 ): Promise<InvoiceButtonContext> {
   const none: InvoiceButtonContext = { canInvoice: false, connected: false, existing: {} };
-  if (!canInvoice) return none;
-  const { info, available } = await getConnectionInfo(supabase);
-  if (!available) return none; // tablo yok: düğme gösterilmez (sahte vaat yok)
+  if (!canInvoice || !tenantId) return none;
+  const { info, available, readError } = await getConnectionInfo(tenantId);
+  // Tablo yok ya da bağlantı okunamadı: düğme gösterilmez (yanlışlıkla "bağla" vaadi yok).
+  if (!available || readError) return none;
   const existing: InvoiceButtonContext["existing"] = {};
   if (info && sourceIds.length > 0) {
     const { data } = await supabase

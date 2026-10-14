@@ -1,3 +1,4 @@
+import { settingsTabHref } from "@/app/app/ayarlar/_sekmeler/tabs";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import {
@@ -361,10 +362,10 @@ export default async function BillingPage({
 
       {billingMissing.length > 0 && isSeatOwner ? (
         <Link
-          href="/app/ayarlar#marka-kimlik"
+          href={settingsTabHref("kimlik")}
           className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
         >
-          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Şirket bölümünden tamamlayın.
+          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Marka ve kimlik bölümünden tamamlayın.
         </Link>
       ) : null}
 

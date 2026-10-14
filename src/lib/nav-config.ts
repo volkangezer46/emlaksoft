@@ -352,7 +352,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/franchise", label: "Şube karşılaştırma", icon: ICONS.sube, module: "reports", description: "Şube ve ofis bazlı karşılaştırma", keywords: ["franchise", "şube"] },
           { href: "/app/raporlar/kar-zarar", label: "Kâr / zarar", icon: ICONS.karZarar, module: "reports", description: "Komisyon, gider ve danışman payıyla aylık net sonuç", keywords: ["kâr", "zarar", "net", "gelir gider"] },
         ],
-        matchPaths: ["/app/raporlar/memnuniyet"],
         description: "Ofis, bölge, talep-arz, memnuniyet, anket ve şube raporları",
         keywords: ["analiz", "istatistik", "rapor", "bölge", "grafik"],
       },

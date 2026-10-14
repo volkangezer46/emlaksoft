@@ -4,7 +4,7 @@ import { PortalMembershipsCard, type PortalMembershipCardItem } from "./portal-m
 
 /**
  * Portal üyelikleri kartının sunucu tarafı: üyelik okuyucusundan (`portals/membership.ts`) beyan + öneriyi alır, formun
- * başlangıç seçimlerini hazırlar. Ayarlar > Entegrasyonlar (`#portal-uyelikleri`) ve Kurulum > "Vitrin ve portallar" aynı
+ * başlangıç seçimlerini hazırlar. /app/ayarlar/entegrasyonlar (`#portal-uyelikleri`) ve Kurulum > "Vitrin ve portallar" aynı
  * bileşeni kullanır. Düzenleme yetkisi owner/gm (eylem ve RLS ayrıca denetler).
  */
 export async function PortalMembershipsSection({ question = false }: { question?: boolean }) {

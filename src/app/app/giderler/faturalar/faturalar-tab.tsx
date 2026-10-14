@@ -24,14 +24,6 @@ import { InvoiceEditor, type EditorInitial } from "./invoice-editor";
 import { InvoiceRowActions, IssuePanel } from "./invoice-actions";
 
 /**
- * Eski sekme kaydı (`?sekme=faturalar`): Faturalar artık Muhasebe > Belgeler > Faturalar (`?sekme=belgeler&tur=fatura`);
- * eski bağlantı sekme takma adıyla oraya düşer. Anahtar geriye uyumluluk için dışa verilir.
- * BİRLEŞTİRME SIRASI: `?sekme=belgeler` yalnız FN2 yönlendiricisinde (`resolveFinanceTab` + `BelgelerTab`) çözülür;
- * FN5, FN1 ve FN2 ile birlikte ya da onlardan sonra birleşir (tek başına birleşirse bu adresler genel bakışa düşer).
- */
-export const FATURALAR_SEKME = { key: "faturalar", label: "Faturalar" } as const;
-
-/**
  * `tutar` (KDV dahil) / `kdv` (hareketin KDV oranı) / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu
  * serbest faturayı önceden doldurur.
  */

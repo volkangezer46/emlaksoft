@@ -4,16 +4,16 @@ import { SkeletonCard } from "@/components/ui/viz";
 import { createClient } from "@/lib/supabase/server";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { platformMessagingFallbackAllowed } from "@/lib/messaging/tenant-providers";
-import { IntegrationsForm } from "../integrations-form";
+import { IntegrationsForm } from "./integrations-form";
 import { ReadOnlyGate } from "../read-only-gate";
 import { PortalMembershipsSection } from "./portal-memberships-section";
 import { EidsMailboxCard } from "./eids-mailbox-card";
 
 /**
- * Sekme: ofise özel Netgsm SMS + WhatsApp Cloud API. Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok).
- * Altında "Bakanlık (EİDS) e-postaları" kartı (EP3; kendi verisini okur).
+ * /app/ayarlar/entegrasyonlar bölümleri: ofise özel Netgsm SMS + WhatsApp Cloud API (`#sms-whatsapp`), portal üyelikleri
+ * (`#portal-uyelikleri`) ve Bakanlık (EİDS) e-postaları (`#eids`). Şifre / erişim anahtarı istemciye ASLA gitmez (yalnız var/yok).
  */
-export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
+export async function OfficeIntegrationSections({ canEdit }: { canEdit: boolean }) {
   const supabase = await createClient();
   const [{ data: netgsmRow }, { data: whatsappRow }, netgsmPlatformConfigured] = await Promise.all([
     // Tablo henüz oluşmadıysa error döner, data null kalır — form boş başlar
@@ -47,11 +47,11 @@ export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
     : null;
   return (
     <>
-      <section id="entegrasyonlar" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+      <section id="sms-whatsapp" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-cyan-400/12 text-cyan-500"><Plug className="h-5 w-5" /></span>
           <div>
-            <h2 className="font-display font-bold text-ink-950">Entegrasyonlar</h2>
+            <h2 className="font-display font-bold text-ink-950">SMS ve WhatsApp</h2>
             <p className="text-xs text-text-muted">Ofise özel Netgsm SMS ve WhatsApp Cloud API bağlantıları</p>
           </div>
         </div>
@@ -62,7 +62,7 @@ export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
         </div>
       </section>
       {/* Portal üyelikleri (EP1): eklenti, gece işleri ve portal ekranlarının tek kaynağı. Düzenleme owner/gm. */}
-      <section id="portal-uyelikleri" className="dashboard-panel mt-6 scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+      <section id="portal-uyelikleri" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
         <div className="flex items-center gap-3 border-b border-line pb-4">
           <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600"><Store className="h-5 w-5" /></span>
           <div>
@@ -76,9 +76,7 @@ export async function EntegrasyonTab({ canEdit }: { canEdit: boolean }) {
           </Suspense>
         </div>
       </section>
-      <div className="mt-6">
-        <EidsMailboxCard canEdit={canEdit} />
-      </div>
+      <EidsMailboxCard canEdit={canEdit} />
     </>
   );
 }

@@ -204,7 +204,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "faturalar",
     label: "Faturalar",
     description: "Kestiğin ve aldığın faturalar (e-Fatura)",
-    href: "/app/giderler?sekme=faturalar",
+    href: "/app/giderler?sekme=belgeler&tur=fatura",
     icon: ICONS.gider,
     needs: "access",
     module: "expenses",

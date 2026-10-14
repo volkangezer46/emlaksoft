@@ -75,7 +75,7 @@ describe("eids_mail_silent@1", () => {
     const d = evaluateEidsMailSilent({ addressCreatedAt: iso(200 * DAY), lastReceivedAt: iso(95 * DAY), manualGrants90d: 3 }, NOW);
     expect(d).toHaveLength(1);
     expect(d[0].audience).toEqual({ type: "management" });
-    expect(d[0].href).toBe("/app/ayarlar?sekme=entegrasyon");
+    expect(d[0].href).toBe("/app/ayarlar/entegrasyonlar#eids");
   });
   it("adres yok, yeni adres, az elle giriş ya da yakın e-posta: kart yok", () => {
     expect(evaluateEidsMailSilent(null, NOW)).toHaveLength(0);

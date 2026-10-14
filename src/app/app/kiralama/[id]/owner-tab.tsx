@@ -54,7 +54,7 @@ export async function OwnerTab({
   // Yönetim ücreti faturası: kaynak = tahsilat kaydı (rent_payments.id; defter satırı kimliği "fee:<id>").
   const feeEntries = [...ledger.entries].filter((e) => e.kind === "fee").reverse();
   const invoiceCtx = managed && feeEntries.length > 0
-    ? await loadInvoiceButtonContext(supabase, canInvoice, "rent_management_fee", feeEntries.map((e) => e.id.slice(4)))
+    ? await loadInvoiceButtonContext(supabase, tenantId, canInvoice, "rent_management_fee", feeEntries.map((e) => e.id.slice(4)))
     : null;
 
   return (

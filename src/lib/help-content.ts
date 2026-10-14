@@ -590,7 +590,7 @@ export function matchesQuery(parts: readonly string[], q: string): boolean {
 export const FIRST_30_INTRO =
   "Ofisinizi çalışır hale getirmek için aşağıdaki adımlar yeterlidir. Hepsi birlikte yaklaşık yarım saat sürer. İstediğiniz adımı sonraya bırakabilirsiniz.";
 
-export type HelpTab = "baslangic" | "rehberler" | "sss" | "sozluk" | "oneriler" | "destek";
+export type HelpTab = "baslangic" | "rehberler" | "sss" | "sozluk" | "oneriler";
 
 export const HELP_TABS: readonly { id: HelpTab; label: string }[] = [
   { id: "baslangic", label: "Başlangıç" },
@@ -599,7 +599,6 @@ export const HELP_TABS: readonly { id: HelpTab; label: string }[] = [
   { id: "sozluk", label: "Sözlük" },
   // DG8: özellik istek panosu (hedeflenebilir `feature_board` bayrağı kapalıysa sayfa bu sekmeyi göstermez).
   { id: "oneriler", label: "Öneri panosu" },
-  { id: "destek", label: "Destek talebi" },
 ];
 
 export function resolveHelpTab(raw: string | undefined): HelpTab {

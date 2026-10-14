@@ -16,8 +16,8 @@ const TABS = [
 
 /**
  * Hesaplayıcılar: alım maliyeti & kredi + yatırım getirisi tek sayfada, iki sekme.
- * `?sekme=satici` satıcı net/vergi hesabını, `?sekme=yatirim` yatırım analizini açar; diğer değerler ("kredi", "maliyet", boş)
- * alım maliyeti sekmesine gider (eski `?sekme=kredi` bağlantıları çalışır).
+ * `?sekme=satici` satıcı net/vergi hesabını, `?sekme=yatirim` yatırım analizini açar; boş ya da bilinmeyen değer alım
+ * maliyeti sekmesidir.
  *
  * MODÜL KAPISI: iki sekme de `valuation` — tek kapı.
  */

@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { ArrowRight, CheckCircle2, Circle, ListChecks } from "lucide-react";
@@ -19,11 +18,8 @@ export const metadata = { title: "Yardım ve Destek" };
 
 const PANEL = "rounded-[var(--radius-panel)] border border-line bg-surface p-5";
 
-/**
- * Sayfa içi sekmeler. "Destek talebi" sekmesi kaldırıldı: üstteki şeritte zaten "Destek" (/app/destek) var, aynı yere
- * giden iki sekme kafa karıştırıyordu. Eski derin bağlantı (?sekme=destek) Destek sayfasına yönlenir.
- */
-const PAGE_TABS = HELP_TABS.filter((t) => t.id !== "destek");
+/** Sayfa içi sekmeler. Destek talepleri üstteki şeridin "Destek" sekmesidir (/app/destek); burada kopyası yok. */
+const PAGE_TABS = HELP_TABS;
 
 function tabHref(tab: HelpTab) {
   return tab === "baslangic" ? "/app/yardim" : `/app/yardim?sekme=${tab}`;
@@ -38,7 +34,6 @@ function tabHref(tab: HelpTab) {
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string; durum?: string }> }) {
   const [{ tenantId, perms }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
-  if (sp?.sekme === "destek") redirect("/app/destek");
   // Öneri panosu (DG8) hedeflenebilir bayraktır: kapalı/hedef dışı ofiste sekme görünmez, adres Başlangıç'a düşer.
   const boardOn = tenantId ? await boardEnabledFor(tenantId).catch(() => false) : false;
   const tabs = boardOn ? PAGE_TABS : PAGE_TABS.filter((t) => t.id !== "oneriler");

@@ -271,7 +271,7 @@ async function resolveOverrideRows(supabase: Supabase, rows: OverrideDbRow[], na
   });
 }
 
-/** (c) Kişi bazlı izin istisnaları — roller ekranından buraya taşındı (tek ekran; eski adres yönlendirir). */
+/** (c) Kişi bazlı izin istisnaları (tek ekran). */
 async function PermissionExceptions({
   ctx,
   profiles,

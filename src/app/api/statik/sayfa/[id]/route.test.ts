@@ -35,7 +35,7 @@ const call = async (path: string, headers: Record<string, string> = {}) => {
   return GET(new Request(`http://localhost${path}`, { headers }), { params: Promise.resolve({ id }) });
 };
 
-describe("/api/statik/sayfa/[id] ve /api/statik/ana-sayfa", () => {
+describe("/api/statik/sayfa/[id]", () => {
   const saved = { ...process.env };
   beforeEach(() => {
     Object.assign(process.env, ENV);
@@ -53,8 +53,6 @@ describe("/api/statik/sayfa/[id] ve /api/statik/ana-sayfa", () => {
   it("jetonsuz ya da yanlış jetonla 404 (kaynak hiç çekilmez)", async () => {
     expect((await call("/api/statik/sayfa/home")).status).toBe(404);
     expect((await call("/api/statik/sayfa/home", { "x-static-rewrite": "yanlis" })).status).toBe(404);
-    const { GET } = await import("../../ana-sayfa/route");
-    expect((await GET(new Request("http://localhost/api/statik/ana-sayfa"))).status).toBe(404);
     expect(h.fetched).toEqual([]);
   });
 
@@ -83,14 +81,5 @@ describe("/api/statik/sayfa/[id] ve /api/statik/ana-sayfa", () => {
     expect(h.fetched).toEqual(["http://127.0.0.1:3000/gizlilik".replace("3000", process.env.PORT || "3000")]);
     const c = await call("/api/statik/sayfa/gizlilik", { "x-static-rewrite": t, "if-none-match": a.headers.get("etag")! });
     expect(c.status).toBe(304);
-  });
-
-  it("eski ana sayfa adresi aynı kapıyla korunur ve jetonla home önbelleğini kullanır", async () => {
-    const t = await token();
-    const { GET } = await import("../../ana-sayfa/route");
-    const res = await GET(new Request("http://localhost/api/statik/ana-sayfa", { headers: { "x-static-rewrite": t } }));
-    expect(res.status).toBe(200);
-    expect(res.headers.get("x-static-home")).toBe(res.headers.get("x-static"));
-    expect(h.fetched.at(-1)).toMatch(/\/$/);
   });
 });
