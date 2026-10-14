@@ -4,7 +4,7 @@ const inserted: Record<string, unknown>[] = [];
 const updated: Record<string, unknown>[] = [];
 const importExisting: string[][] = [];
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), updateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 // after() istek kapsamı ister; birim testte geri çağrı hemen çalıştırılır.
 vi.mock("next/server", () => ({ after: (fn: () => unknown) => void fn() }));
 vi.mock("@/lib/billing/plan-definitions", async () => {
