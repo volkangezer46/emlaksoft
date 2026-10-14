@@ -64,9 +64,7 @@ export const ANON_FUNCTION_ALLOWLIST: Readonly<Record<string, { reason: AnonAllo
 
   // --- Herkese açık veri ---
   "public.vitrin_chat_context(text,uuid)": { reason: "public-veri", note: "vitrin sohbeti; yalnız yayındaki ilan + açık ayar" },
-  "public.tcmb_rate_on(date)": { reason: "public-veri", note: "TCMB kurları (kiracıdan bağımsız)" },
 
-  // --- İncelenecek (zincir böyle kuruyor; davranışta kiracı sınırı içeride var) ---
-  "public.increment_template_usage(uuid)": { reason: "incelenecek", note: "DEFINER; tenant_id = current_tenant_id() ile sınırlı, anon için etkisiz" },
-  "public.aidat_kpi()": { reason: "incelenecek", note: "DEFINER; gövde current_tenant_id() ile sınırlı, anon için sıfırlar" },
+  // --- İncelenecek: KQ2 (20261015016000) ile kapandı. aidat_kpi / increment_template_usage / tcmb_rate_on anon'a
+  //     KAPALI (anon çağıran yok; /app sayfası ve oturumlu action authenticated ile çağırır, kur tablodan okunur). ---
 };
