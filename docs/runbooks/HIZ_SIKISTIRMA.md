@@ -39,7 +39,7 @@ curl -s -o /dev/null -w '%{size_download}\n' -H 'accept-encoding: br' https://em
 ```
 
 Ardından `/admin/site/hiz` → **Sıkıştırmayı sına**: "Brotli (br) — en iyi seçenek açık". Kokpitteki `compression_no_br`
-bilgisi bir sonraki denetimde kapanır. Statik sayfalar (`X-Static: 1`) ve `/_next/static` dosyaları aynı yoldan sıkıştırılır.
+bilgisi bir sonraki denetimde kapanır. Statik sayfalar (öz testte `X-Static: 1`) ve `/_next/static` dosyaları aynı yoldan sıkıştırılır.
 
 ## Geri dönüş
 

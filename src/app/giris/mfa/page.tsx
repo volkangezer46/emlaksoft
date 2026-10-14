@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { safeNextPath } from "@/lib/auth/safe-next";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformMfaCandidate } from "@/lib/platform";
 import { isPlatformMfaRequiredNow } from "@/lib/platform-mfa";
@@ -11,7 +12,8 @@ export const metadata = {
 };
 
 function safeAdminNext(value: string | undefined) {
-  return value && /^\/admin(?:\/|$|\?)/.test(value) ? value : "/admin";
+  const next = safeNextPath(value, "/admin");
+  return /^\/admin(?:\/|$|\?)/.test(next) ? next : "/admin";
 }
 
 export default async function PlatformMfaPage({

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { GOOGLE_CALLBACK_PATH, safeNextPath } from "@/lib/auth/google-auth";
+import { GOOGLE_CALLBACK_PATH } from "@/lib/auth/google-auth";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 /** Google'ın resmi çok renkli "G" işareti (marka kılavuzu: değiştirilmez, 18 px). */
 export function GoogleGIcon({ className = "h-[18px] w-[18px]" }: { className?: string }) {

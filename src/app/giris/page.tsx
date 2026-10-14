@@ -5,6 +5,7 @@ import { officeSecurityLoginNotice } from "@/lib/office-security/policy";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import { LoginForm } from "./login-form";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 // Giriş sayfası HER ZAMAN noindex'tir (registry canIndex=false kilidi; admin indekslenebilir yapamaz).
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,7 +21,7 @@ export default async function LoginPage({
   const [params, demo] = await Promise.all([searchParams, getDemoPolicyNow()]);
   return (
     <LoginForm
-      next={params.next ?? "/app"}
+      next={safeNextPath(params.next)}
       demoEnabled={demo.tenant}
       platformDemoEnabled={demo.platform}
       googleEnabled={isGoogleAuthEnabled()}

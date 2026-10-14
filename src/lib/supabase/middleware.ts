@@ -24,6 +24,7 @@ import { now } from "@/lib/clock";
 import { readProxyGateData } from "@/lib/supabase/proxy-gates";
 import { isSuspendedAllowedPath } from "@/lib/suspended-access";
 import { GOOGLE_ONBOARDING_PATH, needsOAuthOnboarding, userProviders } from "@/lib/auth/google-auth";
+import { safeNextPath } from "@/lib/auth/safe-next";
 import { staticRewriteTarget } from "@/lib/static-home/request";
 import { staticHandlerPath } from "@/lib/static-home/registry";
 import { enabledStaticIds } from "@/lib/static-home/settings";
@@ -365,8 +366,11 @@ export async function updateSession(request: NextRequest) {
     const next = request.nextUrl.searchParams.get("next");
     const redirect = request.nextUrl.clone();
     redirect.search = "";
-    if (next && /^\/(?![/\\])/.test(next) && next !== "/app") {
-      redirect.pathname = next;
+    const safe = safeNextPath(next, "");
+    if (safe && safe !== "/app") {
+      const target = new URL(safe, "http://emlaksoft.invalid");
+      redirect.pathname = target.pathname;
+      redirect.search = target.search;
     } else {
       const { data: staff } = await supabase
         .from("platform_staff")

@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Statik rota iç jetonu: `/api/statik/**` yalnız proxy yeniden yazmasıyla ulaşılabilir.
  *
@@ -50,10 +51,26 @@ function safeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-/** Rota işleyicisi kapısı: başlık var ve jetonla birebir aynı mı? */
-export async function hasValidStaticRewrite(headers: { get(name: string): string | null }, env: Env = process.env): Promise<boolean> {
-  const given = headers.get(STATIC_REWRITE_HEADER);
+type HeaderLike = { get(name: string): string | null };
+
+async function headerMatchesToken(headers: HeaderLike, name: string, env: Env): Promise<boolean> {
+  const given = headers.get(name);
   if (!given) return false;
   const want = await staticRewriteToken(env);
   return want !== null && safeEqual(given, want);
+}
+
+/** Rota işleyicisi kapısı: başlık var ve jetonla birebir aynı mı? */
+export async function hasValidStaticRewrite(headers: HeaderLike, env: Env = process.env): Promise<boolean> {
+  return headerMatchesToken(headers, STATIC_REWRITE_HEADER, env);
+}
+
+/**
+ * Tanı başlığı isteği: `X-Static` (statik / yedek) yalnız bu başlık aynı jetonla gelirse yanıta konur (Hız ekranı öz testi).
+ * Herkese açık yanıtta iç sunum ayrıntısı (x-static, x-static-home) görünmez.
+ */
+export const STATIC_PROBE_HEADER = "x-static-probe";
+
+export async function hasValidStaticProbe(headers: HeaderLike, env: Env = process.env): Promise<boolean> {
+  return headerMatchesToken(headers, STATIC_PROBE_HEADER, env);
 }

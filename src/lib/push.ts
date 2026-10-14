@@ -1,3 +1,4 @@
+import "server-only";
 import { SUPPORT_MAILTO } from "@/lib/contact-info";
 import type WebPush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";

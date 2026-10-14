@@ -14,6 +14,7 @@ import {
   type StaticCache,
 } from "@/lib/static-home/cache";
 import { STATIC_ROUTES, staticRouteById, type StaticRouteDef, type StaticRouteId } from "@/lib/static-home/registry";
+import { hasValidStaticProbe } from "@/lib/static-home/internal-token";
 import { STATIC_HOME_SOURCE_HEADER } from "@/lib/static-home/request";
 import { staticRouteMode } from "@/lib/static-home/settings";
 import { buildStaticHome } from "@/lib/static-home/transform";
@@ -22,7 +23,7 @@ import { buildStaticHome } from "@/lib/static-home/transform";
  * STATİK SAYFA ÇİZİMİ (sunucu): kayıt defterindeki bir sayfanın normal Next HTML'i KENDİ sürecinden çekilir
  * (`http://127.0.0.1:$PORT<yol>`, sorgu dizesi yok; ISR önbellekli, yönetimden düzenlenen içerik aynen), Next/React
  * çalışma zamanı ayıklanır, kullanılan CSS gömülür, düz JS + adacık verisi eklenir. Dönüşüm beklenmeyen biçim görürse
- * normal Next HTML'i sunulur (`X-Static: fallback`) ve nedeni yönetim ekranında görünür.
+ * normal Next HTML'i sunulur (öz testte `X-Static: fallback`) ve nedeni yönetim ekranında görünür.
  *
  * Önbellek süreç başına TEK örnektir (globalThis): rota işleyicisi, yönetim eylemleri ve yayın kancası aynı nesneyi
  * görür (Next her rotayı ayrı paketlese de modül durumu çoğalmaz).
@@ -198,10 +199,9 @@ export async function respondStatic(route: StaticRouteDef, request: Request): Pr
     "Content-Type": "text/html; charset=utf-8",
     "Cache-Control": "public, max-age=0, must-revalidate",
     ETag: c.etag,
-    "X-Static": c.isStatic ? "1" : "fallback",
   });
-  // Geriye uyum: eski izleme/duman testleri ana sayfada bu başlığı okur.
-  if (route.id === "home") headers.set("X-Static-Home", c.isStatic ? "1" : "fallback");
+  // Tanı başlığı yalnız iç jetonlu öz test isteğine (herkese açık yanıtta x-static / x-static-home yok).
+  if (await hasValidStaticProbe(request.headers)) headers.set("X-Static", c.isStatic ? "1" : "fallback");
   if (request.headers.get("if-none-match") === c.etag) return new Response(null, { status: 304, headers });
   return new Response(request.method === "HEAD" ? null : c.html, { status: 200, headers });
 }

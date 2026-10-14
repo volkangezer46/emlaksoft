@@ -76,7 +76,13 @@ describe("/api/statik/sayfa/[id]", () => {
     const b = await call("/api/statik/sayfa/gizlilik?baska=1", { "x-static-rewrite": t });
     expect(a.status).toBe(200);
     expect(b.status).toBe(200);
-    expect(a.headers.get("x-static")).toMatch(/^(1|fallback)$/);
+    // Herkese açık yanıtta iç sunum başlığı yok; yalnız jetonlu tanı isteğinde döner.
+    expect(a.headers.get("x-static")).toBeNull();
+    expect(a.headers.get("x-static-home")).toBeNull();
+    const probed = await call("/api/statik/sayfa/gizlilik", { "x-static-rewrite": t, "x-static-probe": t });
+    expect(probed.headers.get("x-static")).toMatch(/^(1|fallback)$/);
+    const wrong = await call("/api/statik/sayfa/gizlilik", { "x-static-rewrite": t, "x-static-probe": "yanlis" });
+    expect(wrong.headers.get("x-static")).toBeNull();
     expect(a.headers.get("etag")).toBe(b.headers.get("etag"));
     expect(h.fetched).toEqual(["http://127.0.0.1:3000/gizlilik".replace("3000", process.env.PORT || "3000")]);
     const c = await call("/api/statik/sayfa/gizlilik", { "x-static-rewrite": t, "if-none-match": a.headers.get("etag")! });

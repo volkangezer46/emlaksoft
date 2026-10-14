@@ -1,3 +1,4 @@
+import "server-only";
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { parsePiiKey } from "@/lib/advisor/pii-crypto";
 import { normalizePersonName } from "./mail-parse";

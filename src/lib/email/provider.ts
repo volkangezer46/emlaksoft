@@ -1,3 +1,4 @@
+import "server-only";
 import { fetchExternal, externalErrorMetadata } from "@/lib/external-fetch";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { revealSecret } from "@/lib/settings/secrets";

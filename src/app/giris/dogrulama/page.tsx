@@ -8,6 +8,7 @@ import {
 } from "@/lib/two-factor";
 import { maskPhone } from "@/app/imza/_lib/sms";
 import { VerifyForm } from "./verify-form";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 export const metadata = {
   title: "Giris Dogrulama",
@@ -21,7 +22,7 @@ export default async function VerifyPage({
   searchParams: Promise<{ next?: string; kaynak?: string }>;
 }) {
   const params = await searchParams;
-  const next = params.next && /^\/(?![/\\])/.test(params.next) ? params.next : "/app";
+  const next = safeNextPath(params.next);
 
   const supabase = await createClient();
   const {

@@ -20,6 +20,7 @@ import {
   twoFactorCookieValue,
 } from "@/lib/two-factor";
 import { logLoginEvent } from "../_lib/login-events";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 /**
  * DG7 iki adımlı doğrulama KURULUMU (ofis politikası rolü için zorunlu kıldığında proxy buraya yönlendirir).
@@ -28,8 +29,6 @@ import { logLoginEvent } from "../_lib/login-events";
  * girilirse 2FA hiç açılmadığından kullanıcı kilitlenmez; numarayı düzeltip yeniden kod ister.
  */
 export type SetupResult = { error?: string; sent?: true; masked?: string };
-
-const SAFE_NEXT = /^\/(?![/\\])/;
 
 async function currentProfile() {
   const supabase = await createClient();
@@ -114,7 +113,7 @@ export async function sendSetupCode(_prev: SetupResult, fd: FormData): Promise<S
 export async function confirmSetupCode(_prev: SetupResult, fd: FormData): Promise<SetupResult> {
   const code = String(fd.get("code") ?? "").replace(/\D/g, "");
   const rawNext = String(fd.get("next") ?? "/app");
-  const next = SAFE_NEXT.test(rawNext) ? rawNext : "/app";
+  const next = safeNextPath(rawNext);
   if (!/^\d{6}$/.test(code)) return { error: "6 haneli doğrulama kodunu girin.", sent: true };
 
   const { supabase, admin, user, profile, tenantId } = await currentProfile();

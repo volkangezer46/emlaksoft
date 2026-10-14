@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * SMS tabanli ikinci adim icin kisa omurlu, oturuma bagli kanit cookie'si.
  *

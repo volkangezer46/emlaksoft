@@ -31,6 +31,7 @@ import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
 import { now } from "@/lib/clock";
 import { APP_IDLE_COOKIE } from "@/lib/office-security/policy";
 import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 export type AuthResult = {
   error?: string;
@@ -80,7 +81,7 @@ export async function signIn(
   }
 
   const userId = signInData.user?.id ?? null;
-  const target = /^\/(?![/\\])/.test(next) ? next : "/app";
+  const target = safeNextPath(next);
   const cookieStore = await cookies();
   cookieStore.delete(TWO_FACTOR_COOKIE);
   // AD11/DG7: önceki oturumdan kalan boşta kalma çerezleri yeni oturumu hemen kapatmasın.

@@ -10,11 +10,12 @@ assertProductionEnvironment(process.env);
 const isDevelopment = process.env.NODE_ENV === "development";
 // Vercel dışı (Hetzner/Coolify) derleme: standalone Docker imajı, kendi Supabase alan adı.
 const isVercel = Boolean(process.env.VERCEL);
-// Self-hosted Supabase (ör. https://api.emlaksoft.com.tr); bulut *.supabase.co desenleri geçiş süresince kalır.
+// Supabase kökü YALNIZ yapılandırılmış tek origin'dir (canlı: self-hosted https://api.emlaksoft.com.tr). Joker bulut
+// desenleri (*.supabase.co / wss://*.supabase.co) CSP'de yok: herhangi bir başka Supabase projesine veri sızdırma yolu açmasın.
 const supabaseOrigin = (() => {
   try {
     const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
-    return url.hostname.endsWith(".supabase.co") ? null : url;
+    return url.protocol === "https:" || url.protocol === "http:" ? url : null;
   } catch {
     return null;
   }
@@ -25,10 +26,10 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  `img-src 'self' data: blob: https://*.supabase.co${supabaseHttp} https://api.qrserver.com https://tile.openstreetmap.org`,
+  `img-src 'self' data: blob:${supabaseHttp} https://api.qrserver.com https://tile.openstreetmap.org`,
   "font-src 'self' data:",
-  `connect-src 'self' https://*.supabase.co wss://*.supabase.co${supabaseHttp}${supabaseWs} https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
-  `media-src 'self' data: blob: https://*.supabase.co${supabaseHttp}`,
+  `connect-src 'self'${supabaseHttp}${supabaseWs} https://api.qrserver.com${isDevelopment ? " ws: wss:" : ""}`,
+  `media-src 'self' data: blob:${supabaseHttp}`,
   `frame-src 'self' https://www.openstreetmap.org ${VIRTUAL_TOUR_FRAME_HOSTS.map((h) => `https://${h}`).join(" ")}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
@@ -76,12 +77,7 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
     remotePatterns: [
-      // Supabase storage
-      {
-        protocol: "https",
-        hostname: "*.supabase.co",
-        pathname: "/storage/v1/object/public/**",
-      },
+      // Supabase storage (yalnız yapılandırılmış origin; joker bulut deseni yok)
       ...(supabaseOrigin
         ? [
             {

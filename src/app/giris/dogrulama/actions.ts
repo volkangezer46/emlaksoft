@@ -20,6 +20,7 @@ import { sendSignerSms } from "@/app/imza/_lib/sms";
 import { sendSms } from "@/lib/messaging/netgsm";
 import { logLoginEvent } from "../_lib/login-events";
 import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 export type VerifyResult = { error?: string; ok?: true; resent?: true };
 
@@ -34,8 +35,8 @@ export async function verifyLoginCode(
 ): Promise<VerifyResult> {
   const code = String(fd.get("code") ?? "").replace(/\D/g, "");
   const rawNext = String(fd.get("next") ?? "/app");
-  // Açık yönlendirme koruması: yalnız site-içi mutlak yol ("//host" ve "/\host" dışlanır)
-  const next = /^\/(?![/\\])/.test(rawNext) ? rawNext : "/app";
+  // Açık yönlendirme koruması: tek süzgeç (kontrol karakteri, ters bölü, %XX kaçışı ve origin denetimi).
+  const next = safeNextPath(rawNext);
   if (!/^\d{6}$/.test(code)) return { error: "6 haneli doğrulama kodunu girin." };
 
   const supabase = await createClient();

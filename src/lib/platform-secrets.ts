@@ -1,3 +1,4 @@
+import "server-only";
 import { createHmac, hkdfSync } from "node:crypto";
 import { decryptPii, encryptPii, parsePiiKey } from "@/lib/advisor/pii-crypto";
 

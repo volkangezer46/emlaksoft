@@ -9,7 +9,6 @@ import {
   oauthErrorCode,
   parseOAuthFlow,
   resolveOAuthLanding,
-  safeNextPath,
   type OAuthLandingInput,
 } from "./google-auth";
 
@@ -29,32 +28,6 @@ describe("isGoogleAuthEnabled", () => {
   it("yalnız tam 'true' değerinde açık", () => {
     expect(isGoogleAuthEnabled("true")).toBe(true);
     for (const v of [undefined, "", "1", "TRUE", "yes", "false"]) expect(isGoogleAuthEnabled(v)).toBe(false);
-  });
-});
-
-describe("safeNextPath (açık yönlendirme yok)", () => {
-  it("uygulama içi göreli yolları korur", () => {
-    expect(safeNextPath("/app/musteriler?durum=yeni")).toBe("/app/musteriler?durum=yeni");
-    expect(safeNextPath("/app/hesabim#google")).toBe("/app/hesabim#google");
-  });
-  it.each([
-    "https://evil.com",
-    "//evil.com",
-    "/\\evil.com",
-    "\\\\evil.com",
-    "javascript:alert(1)",
-    "app",
-    "/app\n/evil",
-    "/a\\b",
-    "/auth/callback?next=//evil.com",
-    "",
-    null,
-    undefined,
-  ])("%s → varsayılan", (raw) => {
-    expect(safeNextPath(raw as string | null | undefined)).toBe("/app");
-  });
-  it("aşırı uzun yol reddedilir", () => {
-    expect(safeNextPath(`/${"a".repeat(600)}`)).toBe("/app");
   });
 });
 
