@@ -24,6 +24,20 @@ export const MAX_REPORTS_PER_REQUEST = 20;
 const EXTENSION_RE = /^(chrome|moz|safari|safari-web|ms-browser)-extension:/i;
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 
+/**
+ * Rapor modu politikası (csp-report-only.ts) yalnız betik yükleme modelini ölçer: script-src (+ ondan türeyen -elem/-attr
+ * ve worker-src yedeği), object-src, base-uri. Başka yönerge adı gerçek bir tarayıcı raporu olamaz; uydurma raporla
+ * (uç oturumsuzdur) error_logs'ta sınırsız farklı satır açılmasın diye atılır.
+ */
+const KNOWN_DIRECTIVES: ReadonlySet<string> = new Set([
+  "script-src",
+  "script-src-elem",
+  "script-src-attr",
+  "worker-src",
+  "object-src",
+  "base-uri",
+]);
+
 type Raw = Record<string, unknown>;
 
 const str = (v: unknown, max = 300): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
@@ -32,6 +46,19 @@ const num = (v: unknown): number | null => (typeof v === "number" && Number.isFi
 /** Sayfa yolu: sorgu/parça atılır, UUID ve 4+ haneli sayılar maskelenir. */
 export function maskPath(pathname: string): string {
   return (pathname.split(/[?#]/)[0] || "/").replace(UUID_RE, "<id>").replace(/\/\d{4,}(?=\/|$)/g, "/<n>").slice(0, 200);
+}
+
+/**
+ * Betik örneği (`'report-sample'`, tarayıcı en çok 40 karakter gönderir): hangi satır içi betiğin kırılacağını ayırt eder.
+ * Kişisel veri izi bırakmasın: UUID, e-posta ve 4+ haneli sayılar (telefon, TC, tutar) maskelenir.
+ */
+function maskSample(sample: string): string {
+  return sample
+    .replace(UUID_RE, "<id>")
+    .replace(/[^\s"'`<>()@]+@[^\s"'`<>()@]+/g, "<e>")
+    .replace(/\d{4,}/g, "<n>")
+    .replace(/\s+/g, " ")
+    .slice(0, 40);
 }
 
 /** URL → yalnız `origin + yol` (aynı site için yalnız yol); sürüm özetli Next parçaları sabit ada iner. */
@@ -64,7 +91,7 @@ function normalizeOne(r: Raw, siteOrigin: string): CspViolation | null {
   const directive = (str(pick("effective-directive", "effectiveDirective")) ?? str(pick("violated-directive", "violatedDirective")) ?? "")
     .split(/\s+/)[0]!
     .toLowerCase();
-  if (!/^[a-z-]{3,40}$/.test(directive)) return null;
+  if (!KNOWN_DIRECTIVES.has(directive)) return null;
   const blockedRaw = str(pick("blocked-uri", "blockedURL"), 2000) ?? "";
   const sourceRaw = str(pick("source-file", "sourceFile"), 2000);
   if (EXTENSION_RE.test(blockedRaw) || (sourceRaw && EXTENSION_RE.test(sourceRaw))) return null;
@@ -84,7 +111,7 @@ function normalizeOne(r: Raw, siteOrigin: string): CspViolation | null {
     sourceFile,
     line: sourceFile ? num(pick("line-number", "lineNumber")) : null,
     column: sourceFile ? num(pick("column-number", "columnNumber")) : null,
-    sample: sample ? sample.replace(UUID_RE, "<id>").replace(/\s+/g, " ").slice(0, 40) : null,
+    sample: sample ? maskSample(sample) : null,
   };
 }
 

@@ -53,12 +53,14 @@ const NONCE_RE = /^[A-Za-z0-9+/]{16,64}={0,2}$/;
 /**
  * Önerilen sıkı politika (rapor modunda). `'unsafe-inline'` ve `https:` yalnız nonce/strict-dynamic bilmeyen eski
  * tarayıcılar için yedektir; bilen tarayıcı ikisini de yok sayar. Diğer yönergeler yürürlükteki politikayla aynı
- * kalır (ölçülen tek değişiklik betik yükleme modeli).
+ * kalır (ölçülen tek değişiklik betik yükleme modeli). `'report-sample'`: rapor betiğin ilk 40 karakterini taşır;
+ * satır içi ihlallerin kaynağı belgenin kendisi olduğundan hangi betiğin kırılacağı ancak örnekle ayırt edilir
+ * (örnek csp-report.ts'te maskelenir).
  */
 export function buildReportOnlyCsp(nonce: string, reportUrl: string): string {
   if (!NONCE_RE.test(nonce)) throw new Error("geçersiz nonce");
   return [
-    `script-src 'nonce-${nonce}' 'strict-dynamic' '${INLINE_SCRIPT_HASHES.themeBoot}' '${INLINE_SCRIPT_HASHES.sidebarBoot}' 'unsafe-inline' https:`,
+    `script-src 'nonce-${nonce}' 'strict-dynamic' '${INLINE_SCRIPT_HASHES.themeBoot}' '${INLINE_SCRIPT_HASHES.sidebarBoot}' 'report-sample' 'unsafe-inline' https:`,
     "object-src 'none'",
     "base-uri 'self'",
     `report-uri ${reportUrl}`,

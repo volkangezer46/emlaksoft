@@ -70,6 +70,20 @@ describe("CSP rapor ayrıştırıcı", () => {
     expect(parseCspReports(api(many), ORIGIN)).toHaveLength(MAX_REPORTS_PER_REQUEST);
   });
 
+  it("yalnız rapor modu politikasının yönergeleri kabul edilir (uydurma yönerge adıyla yeni satır açılamaz)", () => {
+    const one = (d: string) => parseCspReports(legacy({ "document-uri": `${ORIGIN}/app`, "effective-directive": d, "blocked-uri": "inline" }), ORIGIN);
+    for (const d of ["script-src", "script-src-elem", "script-src-attr", "worker-src", "object-src", "base-uri"]) expect(one(d), d).toHaveLength(1);
+    for (const d of ["style-src", "img-src", "uydurma-yonerge", "frame-src"]) expect(one(d), d).toEqual([]);
+  });
+
+  it("betik örneğinde kişisel veri izi kalmaz (e-posta, uzun sayı, UUID maskelenir)", () => {
+    const [v] = parseCspReports(
+      legacy({ "document-uri": `${ORIGIN}/app`, "effective-directive": "script-src-attr", "blocked-uri": "inline", "script-sample": "ara('ali@ornek.com',05321234567)" }),
+      ORIGIN,
+    );
+    expect(v?.sample).toBe("ara('<e>',<n>)");
+  });
+
   it("maskPath: UUID ve uzun sayılar maskelenir, sorgu atılır", () => {
     expect(maskPath("/app/portfoyler/123456/duzenle?x=1")).toBe("/app/portfoyler/<n>/duzenle");
     expect(maskPath("/app/gorevler")).toBe("/app/gorevler");

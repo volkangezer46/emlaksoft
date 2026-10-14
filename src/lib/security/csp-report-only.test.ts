@@ -29,6 +29,8 @@ describe("CSP rapor modu politikası", () => {
     expect(p).toContain(`script-src 'nonce-${nonce}' 'strict-dynamic'`);
     expect(p).toContain(`'${INLINE_SCRIPT_HASHES.themeBoot}'`);
     expect(p).toContain(`'${INLINE_SCRIPT_HASHES.sidebarBoot}'`);
+    // Satır içi ihlaller ancak betik örneğiyle ayırt edilir.
+    expect(p).toMatch(/script-src [^;]*'report-sample'/);
     expect(p).toContain("object-src 'none'");
     expect(p).toContain("base-uri 'self'");
     expect(p).toContain(`report-uri ${REPORT_URL}`);

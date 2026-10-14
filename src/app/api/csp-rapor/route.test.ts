@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const logError = vi.fn(async () => {});
@@ -70,9 +72,75 @@ describe("POST /api/csp-rapor", () => {
     expect(logError).not.toHaveBeenCalled();
   });
 
-  it("süreç başına dakikada en çok 30 yazım", async () => {
+  it("süreç başına dakikada en çok 30 yazım; bütçe doluyken DB hız sınırına da gidilmez", async () => {
     const { POST } = await import("./route");
     for (let i = 0; i < 40; i++) await POST(report(`farkli-${i}`));
     expect(logError).toHaveBeenCalledTimes(30);
+    expect(checkRateLimit).toHaveBeenCalledTimes(30);
+  });
+
+  it("hız sınırına takılan ihlal işaretlenmez: aynı gerçek ihlal sonraki raporda yazılır", async () => {
+    const { POST } = await import("./route");
+    checkRateLimit.mockResolvedValueOnce({ allowed: false });
+    await POST(report("gercek"));
+    expect(logError).not.toHaveBeenCalled();
+    await POST(report("gercek"));
+    expect(logError).toHaveBeenCalledTimes(1);
+  });
+
+  it("uydurma raporla sınırsız yeni satır açılamaz: saatte en çok 60 yeni ihlal, bilinen ihlalin tekrarı yine yazılır", async () => {
+    const { POST } = await import("./route");
+    await POST(report("bilinen"));
+    for (let m = 0; m < 4; m++) {
+      for (let i = 0; i < 30; i++) await POST(report(`sahte-${m}-${i}`));
+      clock += 61_000;
+    }
+    expect(logError).toHaveBeenCalledTimes(60);
+    logError.mockClear();
+    clock += 10 * 60_000;
+    await POST(report("bilinen"));
+    await POST(report("yepyeni"));
+    expect(logError).toHaveBeenCalledTimes(1);
+    expect(logError).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("«bilinen»") }));
+    clock += 60 * 60_000;
+    await POST(report("yepyeni"));
+    expect(logError).toHaveBeenCalledTimes(2);
+  });
+
+  it("Content-Length'siz (parçalı) büyük gövde 32 KB'tan fazla okunmaz", async () => {
+    const { POST } = await import("./route");
+    const chunk = new TextEncoder().encode(" ".repeat(16 * 1024));
+    let sent = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        sent += 1;
+        if (sent > 64) controller.close();
+        else controller.enqueue(chunk);
+      },
+    });
+    const req = new Request(`${ORIGIN}/api/csp-rapor`, {
+      method: "POST",
+      headers: { "content-type": "application/csp-report" },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" });
+    const res = await POST(req);
+    expect(res.status).toBe(204);
+    expect(sent).toBeLessThan(10);
+    expect(logError).not.toHaveBeenCalled();
+    expect(checkRateLimit).not.toHaveBeenCalled();
+  });
+});
+
+describe("CSP ölçüm satırları hata triyajını kirletmez (kaynak sözleşmesi)", () => {
+  const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+
+  it("'Açık hata türü' sayımı (Sistem özeti + Hatalar) ve varsayılan liste 'csp' kaynağını dışlar", () => {
+    const triage = read("src/app/admin/sistem/_hatalar/triage.ts");
+    expect(triage).toContain('export const CSP_MEASUREMENT_SOURCE = "csp";');
+    expect(triage.match(/\.neq\("source", CSP_MEASUREMENT_SOURCE\)/g)).toHaveLength(2);
+    const view = read("src/app/admin/sistem/_hatalar/errors-view.tsx");
+    expect(view).toContain('listQ = kaynak ? listQ.eq("source", kaynak) : listQ.neq("source", CSP_MEASUREMENT_SOURCE);');
+    expect(view).toContain('sonSaatQ.neq("source", CSP_MEASUREMENT_SOURCE)');
   });
 });

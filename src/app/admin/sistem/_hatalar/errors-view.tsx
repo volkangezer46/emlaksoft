@@ -17,7 +17,7 @@ import { hrefWith, type Filters } from "./errors-href";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { ErrorTriageForm } from "./error-triage";
-import { countOpenErrors, DURUM_TO_STATUS, isMissingColumn, TRIAGE_LABEL, type TriageStatus } from "./triage";
+import { countOpenErrors, CSP_MEASUREMENT_SOURCE, DURUM_TO_STATUS, isMissingColumn, TRIAGE_LABEL, type TriageStatus } from "./triage";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -134,7 +134,8 @@ export async function ErrorsView({
     if (triage) listQ = listQ.eq("status", triageStatus);
     else listQ = cozulmusGoster ? listQ.not("resolved_at", "is", null) : listQ.is("resolved_at", null);
     if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
-    if (kaynak) listQ = listQ.eq("source", kaynak);
+    // CSP ölçümü hata değildir: yalnız kendi süzgeciyle listelenir (countOpenErrors ile aynı küme).
+    listQ = kaynak ? listQ.eq("source", kaynak) : listQ.neq("source", CSP_MEASUREMENT_SOURCE);
     if (ofis) listQ = listQ.eq("tenant_id", ofis);
     // Sürüm sütunu yalnız triyaj şemasında var; şema yokken süzgeç uygulanmaz (eski liste).
     if (yayin && triage) listQ = listQ.eq("release", yayin);
@@ -151,6 +152,7 @@ export async function ErrorsView({
     .select("id", { count: "exact", head: true })
     .gte("last_seen", new Date(simdi - 3_600_000).toISOString());
   sonSaatQ = cozulmusGoster ? sonSaatQ.not("resolved_at", "is", null) : sonSaatQ.is("resolved_at", null);
+  sonSaatQ = kaynak === CSP_MEASUREMENT_SOURCE ? sonSaatQ.eq("source", kaynak) : sonSaatQ.neq("source", CSP_MEASUREMENT_SOURCE);
 
   const [triageList, { count: acikSayi }, { count: sonSaatSayi }, ofisRes, staffRes] = await Promise.all([
     buildList(true),
@@ -253,7 +255,7 @@ export async function ErrorsView({
           aria-label="Kaynak"
           className="focus-ring rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
         >
-          <option value="">Tüm kaynaklar</option>
+          <option value="">Tüm hata kaynakları</option>
           <option value="server">Sunucu</option>
           <option value="client">İstemci</option>
           <option value="csp">CSP ölçümü</option>
