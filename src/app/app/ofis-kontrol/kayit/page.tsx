@@ -88,7 +88,7 @@ export default async function AuditPage({
 }: {
   searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string; tur?: string; ara?: string }>;
 }) {
-  const { role } = await requireModulePage("settings", PATH);
+  const { role } = await requireModulePage("settings", "/app/ofis-kontrol/kayit");
   const params = (await searchParams) ?? {};
   const filters = normalizeAuditFilters(params);
   const { from: fromF, to: toF, aktor: aktorF, risk: riskF, tur: turF, ara: araF } = filters;

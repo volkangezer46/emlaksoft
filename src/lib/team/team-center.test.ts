@@ -175,7 +175,7 @@ describe("hedef gerçekleşmesi (canlı)", () => {
   });
 });
 
-describe("Ekip Merkezi menü ve kapılar", () => {
+describe("Ekip menü ve kapılar", () => {
   const ALL: AppModule[] = [
     "dashboard", "customers", "demands", "matching", "commissions", "offers", "contracts", "calls",
     "appointments", "tasks", "properties", "portals", "open_house", "rentals", "network", "projects",
@@ -183,10 +183,11 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     "compliance", "support",
   ];
 
-  it("Ekip Merkezi yönetim sekmeleri; performans TEK 'Ekip performansı' öğesinde (Özet/Lig/Kıyas), tekrar yok", () => {
+  it("Ekip yönetim sekmeleri; performans TEK 'Ekip performansı' öğesinde (Özet/Lig/Kıyas), tekrar yok", () => {
     const ofis = visibleSections(ALL).find((s) => s.id === "ofis")!;
     const item = ofis.items.find((i) => i.href === "/app/ekip")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Hedefler", "Danışman devri", "Şubeler", "Takımlar"]);
+    expect(item.label).toBe("Ekip");
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Ekip", "Hedefler", "Danışman devri", "Şubeler", "Takımlar"]);
     const perf = visibleSections(ALL).find((s) => s.id === "performans")!;
     expect(perf.items.some((i) => i.href === "/app/hedefler")).toBe(false);
     const ekipPerf = perf.items.find((i) => i.label === "Ekip karnesi")!;
@@ -196,7 +197,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     expect(ALL_NAV_HREFS).toContain("/app/hedefler");
   });
 
-  it("sekme sayfaları sahibi öğeyi etkin yapar (yönetim: Ekip Merkezi, performans: Ekip performansı)", () => {
+  it("sekme sayfaları sahibi öğeyi etkin yapar (yönetim: Ekip, performans: Ekip performansı)", () => {
     const sections = visibleSections(ALL);
     for (const p of ["/app/ekip/devir", "/app/hedefler", "/app/ekip/subeler"]) {
       expect(resolveActiveNav(p, sections).href, p).toBe("/app/ekip");
@@ -206,18 +207,18 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     }
   });
 
-  it("ekip modülü olmayan rolde (danışman) Ekip Merkezi çıkmaz, yerine Performansım vardır", () => {
+  it("ekip modülü olmayan rolde (danışman) Ekip çıkmaz, yerine Performansım vardır", () => {
     const items = visibleSections(["dashboard", "reports", "commissions"]).flatMap((s) => s.items);
-    expect(items.some((i) => i.label === "Ekip merkezi")).toBe(false);
+    expect(items.some((i) => i.href === "/app/ekip")).toBe(false);
     expect(items.some((i) => i.href === "/app/performansim" && i.label === "Performansım")).toBe(true);
   });
 
   it("yetkisiz sekme gizlenir: ekip modülü olan ama hedef izni olmayan rolde Hedefler çıkmaz", () => {
-    const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip merkezi")!;
-    expect(item.tabs?.map((t) => t.label)).toEqual(["Genel", "Danışman devri", "Şubeler", "Takımlar"]);
+    const item = visibleSections(["dashboard", "team", "reports"]).flatMap((s) => s.items).find((i) => i.label === "Ekip")!;
+    expect(item.tabs?.map((t) => t.label)).toEqual(["Ekip", "Danışman devri", "Şubeler", "Takımlar"]);
   });
 
-  it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip Merkezi'nde ayrı Kazanç sekmesi yok", () => {
+  it("Kazanç tek sayfa: Finans > Komisyon sekmesi, Ekip'te ayrı Kazanç sekmesi yok", () => {
     const fin = visibleSections(ALL).find((s) => s.id === "finans")!;
     const kom = fin.items.find((i) => i.href === "/app/komisyon")!;
     expect(kom.tabs?.map((t) => t.label)).toContain("Kazanç");
