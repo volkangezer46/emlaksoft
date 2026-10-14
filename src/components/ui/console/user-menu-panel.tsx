@@ -30,9 +30,9 @@ const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { setti
  * Çıkış: hızlı kayıt taslakları ve çevrimdışı kuyruk (ad, telefon) bu cihazda bir sonraki kullanıcıya kalmasın diye
  * silinir. Gönderilmemiş kayıt varsa önce ConfirmDialog ile sorulur; vazgeçilirse çıkış yapılmaz.
  */
-async function signOutClearingDevice(formData: FormData) {
+async function signOutClearingDevice() {
   clearFieldCaptureStorage();
-  await signOut(formData);
+  await signOut();
 }
 
 /** Menü gövdesi (Radix DropdownMenu) — user-menu.tsx tarafından ilk etkileşimde yüklenir. */
