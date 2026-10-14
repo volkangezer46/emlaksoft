@@ -62,7 +62,7 @@ type Loaded = { ctx: ReportContext; reports: ReportDef[]; error?: string };
 async function load(scope: ReportScope): Promise<Loaded> {
   if (scope === "platform") {
     const staff = await requirePlatformModule("reports");
-    return { ctx: buildPlatformContext({ id: staff.id, role: staff.role }), reports: visiblePlatformReports(staff.role) };
+    return { ctx: buildPlatformContext({ id: staff.id, role: staff.role }), reports: visiblePlatformReports(staff) };
   }
   const gate = await requirePermission("reports", "view");
   if (!gate.ok) throw new Error(gate.error);

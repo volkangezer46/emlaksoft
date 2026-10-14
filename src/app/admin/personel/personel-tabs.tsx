@@ -1,9 +1,10 @@
 import Link from "@/components/ui/smart-link";
-import { ShieldCheck, Users } from "lucide-react";
+import { KeyRound, ShieldCheck, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/admin/personel", id: "personel", label: "Personel", icon: Users },
+  { href: "/admin/personel/roller", id: "roller", label: "Roller", icon: KeyRound },
   { href: "/admin/personel/guvenlik", id: "guvenlik", label: "Güvenlik politikası", icon: ShieldCheck },
 ] as const;
 

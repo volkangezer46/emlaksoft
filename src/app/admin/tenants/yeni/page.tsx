@@ -13,7 +13,7 @@ export const metadata = { title: "Yeni ofis" };
  */
 export default async function YeniOfisPage() {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "create")) redirect("/admin/tenants");
+  if (!officeAdminCan(staff, "create")) redirect("/admin/tenants");
 
   // İl listesi coğrafya merkezinden gelir (aktif iller).
   const [{ data: provinces }, trialDays] = await Promise.all([provinceOptionsResult(), getEffectiveTrialDays()]);
@@ -21,7 +21,7 @@ export default async function YeniOfisPage() {
   return (
     <OfficeForm
       provinces={(provinces ?? []) as { id: string; name: string }[]}
-      canCreateActive={officeAdminCan(staff.role, "create_active")}
+      canCreateActive={officeAdminCan(staff, "create_active")}
       trialDays={trialDays}
     />
   );

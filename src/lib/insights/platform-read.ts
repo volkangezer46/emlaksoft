@@ -28,7 +28,7 @@ export async function getPlatformInsights(opts?: { limit?: number }): Promise<Pl
       .order("created_at", { ascending: false })
       .limit(Math.min(100, limit * 6));
     if (error || !data) return [];
-    return selectPlatformReadable(data as PlatformInsightDbRow[], nowMs, staff.role, limit);
+    return selectPlatformReadable(data as PlatformInsightDbRow[], nowMs, staff, limit);
   } catch {
     return [];
   }

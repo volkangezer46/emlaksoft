@@ -3,7 +3,7 @@ import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { getPlan } from "@/lib/billing/plans";
 import { daysAgoIso } from "@/lib/clock";
 import { auditActionLabel } from "@/lib/admin-format";
-import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
+import { baseRoleOf, platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 import { EMAIL_STATUS_LABEL, EMAIL_STATUS_TONE, emailTemplateLabel, loadTenantEmailSends, type EmailSendRow } from "@/lib/email/log-read";
 
@@ -42,13 +42,13 @@ export type OfficeAccess = {
   emailLog: boolean;
 };
 
-export function officeAccess(role: PlatformRole): OfficeAccess {
+export function officeAccess(role: PlatformAccessSubject): OfficeAccess {
   return {
     billing: platformCanAccess(role, "billing"),
     tickets: platformCanAccess(role, "tickets"),
     activity: platformCanAccess(role, "activity"),
     members: platformCanAccess(role, "members"),
-    showIp: role === "super_admin",
+    showIp: baseRoleOf(role) === "super_admin",
     emailLog: platformCanAccess(role, "sistem"),
   };
 }

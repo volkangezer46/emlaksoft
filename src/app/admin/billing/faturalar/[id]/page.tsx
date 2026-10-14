@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { platformCan } from "@/lib/platform-access";
 import { PageHeader } from "@/components/ui/page-header";
 import { now as clockNow, trDayKey } from "@/lib/clock";
 import { getSetting } from "@/lib/settings/read";
@@ -273,7 +274,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               totalTry={Number(inv.total_try)}
               refunded={Boolean(refund)}
               chargedBack={Boolean(meta.chargeback)}
-              isSuperAdmin={staff.role === "super_admin"}
+              isSuperAdmin={platformCan(staff, "billing", "approve")}
               today={trDayKey(clockNow())}
             />
           </div>

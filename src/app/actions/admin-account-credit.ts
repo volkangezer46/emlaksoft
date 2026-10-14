@@ -1,6 +1,8 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { fourEyesGate, requireStepUpOrApproved } from "@/lib/platform-security/four-eyes";
+import { platformCan } from "@/lib/platform-access";
 import { revalidatePath } from "next/cache";
 import { requirePlatformModule, type PlatformStaff } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -23,11 +25,11 @@ import { parseAdminGrantInput, parseAdminReverseInput } from "@/lib/try-credits/
 
 export type AdminCreditResult = { ok?: boolean; error?: string; message?: string; already?: boolean };
 
-const DENIED = "Hesap kredisi işlemlerini yalnız süper admin yapabilir.";
+const DENIED = "Hesap kredisi işlemleri faturalamada onay yetkisi ister (süper admin ya da Faturalama: Onayla).";
 
-/** Süper admin + hız sınırı (platform kapısı her action gövdesinde ayrıca çağrılır). */
+/** Faturalamada onay yetkisi (sabit rollerde yalnız süper admin; DG1 özel rol verebilir) + hız sınırı. */
 async function superAdminOnly(staff: PlatformStaff) {
-  if (staff.role !== "super_admin") return { error: DENIED } as const;
+  if (!platformCan(staff, "billing", "approve")) return { error: DENIED } as const;
   const { allowed } = await checkRateLimit(`admin-try-credit:${staff.id}`, { limit: 30, windowSec: 3600, failurePolicy: "deny" });
   if (!allowed) return { error: "Çok fazla kredi işlemi yapıldı. Bir saat sonra tekrar deneyin." } as const;
   return { staff } as const;
@@ -44,12 +46,23 @@ export async function grantAccountCredit(formData: FormData): Promise<AdminCredi
   const parsed = parseAdminGrantInput(formData, now());
   if (!parsed.ok) return { error: parsed.error };
   const input = parsed.value;
-  const stepUp = await requireStepUp(formData, "credit_grant", g.staff.id);
+  const stepUp = await requireStepUpOrApproved(formData, "credit_grant", g.staff.id);
   if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
   const { data: tenant } = await admin.from("tenants").select("id").eq("id", input.tenantId).maybeSingle();
   if (!tenant) return { error: "Ofis bulunamadı." };
+
+  // DG1 dört göz: eşik üstü kredi yüklenmez, kuyruğa düşer; başka bir yetkili onaylayınca bu eylem onun adına yürür.
+  const fourEyes = await fourEyesGate({
+    kind: "credit_grant",
+    staffId: g.staff.id,
+    form: formData,
+    entityId: input.tenantId,
+    amountTry: input.amountTry,
+    summary: `Hesap kredisi: ${money(input.amountTry)} · ${input.reason}`,
+  });
+  if (!fourEyes.proceed) return "error" in fourEyes ? { error: fourEyes.error } : { ok: true, message: fourEyes.notice };
 
   const { error: auditError } = await admin.from("platform_audit_logs").insert({
     actor_id: g.staff.id,

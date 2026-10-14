@@ -96,7 +96,8 @@ describe("kritik eylemler kodu ilk yazımdan önce ister (sözleşme)", () => {
       // İmza satırı atlanır (ör. `updateTenantPlanStatus(` kendi adını yazım sanmasın).
       const full = src.slice(start, next === -1 ? undefined : next);
       const body = full.slice(full.indexOf("\n"));
-      const gate = body.indexOf("requireStepUp(");
+      // DG1: dört göz onaylı yürütmede kodu onaylayan girer (`requireStepUpOrApproved`; yine AD11 `requireStepUp`a düşer).
+      const gate = body.search(/requireStepUp(OrApproved)?\(/);
       expect(gate, `${c.fn}: requireStepUp yok`).toBeGreaterThan(-1);
       expect(body.slice(gate, gate + 80)).toContain(c.action);
       // İlk yazım (update/insert/upsert/delete/yazan rpc) kod kapısından sonra gelir.
@@ -104,6 +105,35 @@ describe("kritik eylemler kodu ilk yazımdan önce ister (sözleşme)", () => {
         .map((w) => body.indexOf(w))
         .filter((i) => i > -1);
       if (writes.length) expect(Math.min(...writes), `${c.fn}: yazım kapıdan önce`).toBeGreaterThan(gate);
+    });
+  }
+
+  // DG1: dört göz kapısı (eşik/ayar) koddan SONRA, ilk yazımdan ÖNCE çalışır; kapı yürümezse eylem döner.
+  const FOUR_EYES: { file: string; fn: string; kind: string; after?: string }[] = [
+    // Ters ibraz dalı (dört göz dışı) ayrı ve önce gelir; iade dalı fatura okunduktan sonra başlar.
+    { file: "src/app/actions/platform-billing.ts", fn: "recordInvoiceRefund", kind: '"refund"', after: "const { data: inv }" },
+    { file: "src/app/actions/admin-account-credit.ts", fn: "grantAccountCredit", kind: '"credit_grant"' },
+    { file: "src/app/actions/platform-tenants.ts", fn: "setTenantLifecycleByAdmin", kind: '"office_close"' },
+    { file: "src/app/actions/platform-staff.ts", fn: "updateStaffRole", kind: '"staff_role"' },
+  ];
+  for (const c of FOUR_EYES) {
+    it(`${c.fn}: dört göz kapısı ilk yazımdan önce`, () => {
+      const src = readFileSync(join(ROOT, c.file), "utf8");
+      const start = src.indexOf(`export async function ${c.fn}(`);
+      const next = src.indexOf("\nexport async function ", start + 10);
+      const body = src.slice(start, next === -1 ? undefined : next);
+      const gate = body.indexOf("fourEyesGate(");
+      expect(gate, `${c.fn}: fourEyesGate yok`).toBeGreaterThan(-1);
+      expect(body.slice(gate, gate + 60)).toContain(c.kind);
+      expect(body.search(/requireStepUp(OrApproved)?\(/)).toBeLessThan(gate);
+      expect(body.slice(gate)).toContain("if (!fourEyes.proceed) return");
+      const from = c.after ? body.indexOf(c.after) : 0;
+      expect(from, `${c.fn}: ${c.after}`).toBeGreaterThan(-1);
+      expect(gate).toBeGreaterThan(from);
+      const writes = [".update(", ".insert(", ".upsert(", "applyTenantPlanStatus(", "tryGrant(", "efReserve("]
+        .map((w) => body.indexOf(w, from))
+        .filter((i) => i > -1);
+      expect(Math.min(...writes), `${c.fn}: yazım dört göz kapısından önce`).toBeGreaterThan(gate);
     });
   }
 });

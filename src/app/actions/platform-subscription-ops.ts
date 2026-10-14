@@ -1,6 +1,7 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -176,6 +177,7 @@ export async function adminSetPlanStatus(_prev: SubOpsResult, formData: FormData
   if ((!plan || plan === tenant.plan) && (!status || status === tenant.status)) return { ok: true, message: "Değişiklik yok." };
   // AD11: askıya alma / iptal (ofis kapatma) kritik işlemdir; doğrulayıcı kodu sunucuda istenir.
   if (statusChangeNeedsStepUp(status, String(tenant.status ?? ""))) {
+    if (await officeCloseBlockedOutsideQueue()) return { error: OFFICE_CLOSE_QUEUE_ONLY };
     const stepUp = await requireStepUp(formData, "office_close", ctx.staff.id);
     if (!stepUp.ok) return { error: stepUp.error };
   }
@@ -215,6 +217,7 @@ export async function adminCancelSubscription(_prev: SubOpsResult, formData: For
   if (!isCancelReasonCode(code)) return { error: "İptal nedenini seçin." };
   // AD11: hemen iptal ofisi kapatır (kritik işlem); dönem sonu iptali gece kontrolüne kalır.
   if (mode === "now") {
+    if (await officeCloseBlockedOutsideQueue()) return { error: OFFICE_CLOSE_QUEUE_ONLY };
     const stepUp = await requireStepUp(formData, "office_close", ctx.staff.id);
     if (!stepUp.ok) return { error: stepUp.error };
   }

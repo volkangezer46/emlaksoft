@@ -3,13 +3,14 @@
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { createContext, useState, useEffect, useCallback, useContext, useMemo } from "react";
 import Link from "@/components/ui/smart-link";
 import {
   Clock,
   Crown,
   Eye,
   Headphones,
+  KeyRound,
   Plus,
   Receipt,
   Search,
@@ -39,6 +40,7 @@ import { relativeTimeTR } from "@/lib/admin-format";
 import { staffKpi } from "./staff-model";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { listStaffMfaStatus, type StaffMfaStatus } from "@/app/actions/platform-security";
+import { listCustomRoles, type CustomRoleRow } from "@/app/actions/platform-roles";
 import { PersonelTabs } from "./personel-tabs";
 
 // ---------------------------------------------------------------------------
@@ -54,7 +56,18 @@ type StaffRow = {
   last_sign_in_at?: string | null;
   avatar_url?: string | null;
   avatar_preset?: string | null;
+  /** DG1 özel rol (atanmışsa Rol sütunu `custom:<id>` gösterir). */
+  custom_role_id?: string | null;
 };
+
+/** Satırın rol seçimi değeri: özel rol `custom:<id>`, yoksa sabit rol adı (updateStaffRole aynı biçimi okur). */
+const roleValueOf = (m: Pick<StaffRow, "role" | "custom_role_id">) => (m.custom_role_id ? `custom:${m.custom_role_id}` : m.role);
+
+/** Rol seçenekleri + kuyruğa düşen işlem bildirimi (satırlar arası ortak; prop zinciri yerine bağlam). */
+const PersonelCtx = createContext<{ roleOptions: InlineSelectOption[]; onNotice: (text: string) => void }>({
+  roleOptions: [],
+  onNotice: () => undefined,
+});
 
 type StatusFilter = "all" | "active" | "passive" | "recent" | "never";
 
@@ -108,10 +121,11 @@ function MfaCell({ status }: { status: { verified: number } | null | undefined }
 
 function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStatus[string] | undefined; onDone: () => Promise<void> | void }) {
   const stepUp = useStepUpPrompt();
+  const { roleOptions, onNotice } = useContext(PersonelCtx);
   const draft = useRowDraft<StaffDraft>({
     id: member.id,
     label: member.full_name,
-    saved: { role: member.role, active: member.is_active ? "1" : "0" },
+    saved: { role: roleValueOf(member), active: member.is_active ? "1" : "0" },
     validate: validateStaffRow,
     risk: staffRisk,
     save: async (d, { saved }) => {
@@ -132,6 +146,8 @@ function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStat
           await onDone();
           return { error: r.error };
         }
+        // DG1 dört göz: değişiklik ikinci onaya düştüyse rol henüz değişmedi; kullanıcıya söylenir.
+        if (r.notice) onNotice(`${member.full_name}: ${r.notice}`);
       }
       if (d.active === "0" && saved.active === "1") {
         const r = await deactivateStaff(fd);
@@ -167,7 +183,7 @@ function StaffRow({ member, mfa, onDone }: { member: StaffRow; mfa: StaffMfaStat
         <InlineSelect
           value={draft.draft.role}
           onValueChange={(v) => draft.set("role", v)}
-          options={ROLE_OPTIONS}
+          options={roleOptions}
           label={`${member.full_name} rolü`}
           changed={draft.changed.has("role")}
           disabled={draft.locked}
@@ -265,6 +281,33 @@ export default function PersonelPage() {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<PlatformRole | "all">("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [customRoles, setCustomRoles] = useState<CustomRoleRow[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Özel roller (Personel > Roller) rol seçiminde sabit rollerin altında; kurulmamışsa liste yalnız sabit rollerdir.
+  useEffect(() => {
+    void listCustomRoles()
+      .then((r) => {
+        if (r.ok) setCustomRoles(r.roles);
+      })
+      .catch(() => undefined);
+  }, []);
+  const ctx = useMemo(
+    () => ({
+      roleOptions: [
+        ...ROLE_OPTIONS,
+        ...customRoles.map((r) => ({
+          value: `custom:${r.id}`,
+          label: r.label,
+          icon: KeyRound,
+          tone: "brand" as const,
+          hint: `Özel rol · taban: ${PLATFORM_ROLE_LABELS[r.base_role]}`,
+        })),
+      ],
+      onNotice: setNotice,
+    }),
+    [customRoles],
+  );
 
   const load = useCallback(() => {
     // Durum güncellemeleri bilinçli olarak `.then()` içinde: `async/await`
@@ -293,7 +336,7 @@ export default function PersonelPage() {
       (Object.keys(PLATFORM_ROLE_LABELS) as PlatformRole[]).map((r) => ({
         role: r,
         label: PLATFORM_ROLE_LABELS[r],
-        count: staff.filter((s) => s.is_active && s.role === r).length,
+        count: staff.filter((s) => s.is_active && s.role === r && !s.custom_role_id).length,
       })),
     [staff],
   );
@@ -321,6 +364,7 @@ export default function PersonelPage() {
   const searching = Boolean(query.trim()) || roleFilter !== "all" || statusFilter !== "all";
 
   return (
+    <PersonelCtx.Provider value={ctx}>
     <div className="space-y-6">
       {/* Hero */}
       <AdminPageHeader
@@ -362,6 +406,11 @@ export default function PersonelPage() {
       </AdminPageHeader>
 
       <PersonelTabs active="personel" />
+      {notice ? (
+        <p role="status" className="tone-warning rounded-[var(--radius-control)] px-3.5 py-2 text-xs font-medium">
+          {notice}
+        </p>
+      ) : null}
 
       {/* KPI şeridi — her kart listeyi süzer */}
       <KpiGrid>
@@ -458,5 +507,6 @@ export default function PersonelPage() {
         </section>
       ) : null}
     </div>
+    </PersonelCtx.Provider>
   );
 }

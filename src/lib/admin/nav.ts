@@ -80,14 +80,16 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         href: "/admin", core: true,
         label: "Kontrol paneli",
         short: "Panel",
-        description: "Canlı metrikler, dikkat kuyruğu, raporlar ve AI danışmanı",
+        description: "Canlı metrikler, dikkat kuyruğu, raporlar, AI danışmanı ve onay kuyruğu",
         icon: LayoutDashboard,
         modules: ["dashboard", "reports", "advisor"],
-        match: ["/admin/raporlar", "/admin/danisman"],
+        match: ["/admin/raporlar", "/admin/danisman", "/admin/onaylar"],
         tabs: [
           L("/admin", "Kontrol paneli", "Canlı metrikler, dikkat kuyruğu, öneriler", ["dashboard"]),
           L("/admin/raporlar", "Raporlar", "Platform analizi: gelir, aktivasyon, modül kullanımı", ["reports"]),
           L("/admin/danisman", "AI danışmanı", "Platform verisinden içgörü ve soru-cevap", ["advisor"]),
+          // DG1 dört göz kuyruğu: kritik işlem (iade, kredi, ofis kapatma, rol) yapabilen herkes kendi talebini, onay yetkilisi bekleyenleri görür.
+          L("/admin/onaylar", "Onaylar", "Dört göz onayı bekleyen kritik işlemler", ["billing", "tenants", "personel"]),
         ],
       },
     ],

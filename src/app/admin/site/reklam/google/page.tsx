@@ -18,7 +18,7 @@ type SP = { donem?: string };
  */
 export default async function GoogleAdsPage({ searchParams }: { searchParams?: Promise<SP> }) {
   const staff = await requirePlatformModule("reklam");
-  const readonly = platformModuleMode(staff.role, "reklam") !== "write";
+  const readonly = platformModuleMode(staff, "reklam") !== "write";
   const sp = (await searchParams) ?? {};
   const period: AdsPeriod = sp.donem === "90" ? 90 : 30;
 

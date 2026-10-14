@@ -35,7 +35,7 @@ function parseInput(raw: unknown): TrialChangeInput | null {
 
 export async function extendTrial(tenantId: string, change: TrialChangeInput, reason: string): Promise<TrialChangeActionResult> {
   const staff = await requirePlatformStaff();
-  if (!canChangeTrial(staff.role)) return { error: "Bu işlem için yetkiniz yok." };
+  if (!canChangeTrial(staff)) return { error: "Bu işlem için yetkiniz yok." };
   if (typeof tenantId !== "string" || !UUID_RE.test(tenantId)) return { error: "Ofis bulunamadı." };
   const input = parseInput(change);
   if (!input) return { error: "Gün sayısı ya da tarih seçin." };

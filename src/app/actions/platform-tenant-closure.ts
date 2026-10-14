@@ -29,7 +29,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 export async function processOfficeClosureRequestByAdmin(formData: FormData): Promise<ClosureResult> {
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "archive")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "archive")) return { error: OFFICE_ADMIN_DENIED };
 
   const requestId = String(formData.get("request_id") ?? "").trim();
   const tenantId = String(formData.get("id") ?? "").trim();

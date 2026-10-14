@@ -1,6 +1,6 @@
 import { DAY_MS, TR_OFFSET_MS, trDayStartMs } from "@/lib/clock";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
-import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
+import { platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 
 /**
  * Platform personelinin abonelik düzeltme kuralları (SAF; `app/actions/platform-trial.ts` ve
@@ -23,7 +23,7 @@ export type TrialChangeResult = { ok: true; endIso: string } | { ok: false; erro
  * Deneme değiştirme yetkisi: "sales" ya da "tenants" modülü + yazma yetkisi
  * (satış modülü olan rol ya da ofis paket/durum yazma yetkisi olan rol).
  */
-export function canChangeTrial(role: PlatformRole): boolean {
+export function canChangeTrial(role: PlatformAccessSubject): boolean {
   const hasModule = platformCanAccess(role, "sales") || platformCanAccess(role, "tenants");
   const canWrite = platformCanAccess(role, "sales") || officeAdminCan(role, "plan_status");
   return hasModule && canWrite;

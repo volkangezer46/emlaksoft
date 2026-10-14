@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 
   const tasks: PromiseLike<void>[] = [];
 
-  if (platformCanAccess(staff.role, "tenants")) {
+  if (platformCanAccess(staff, "tenants")) {
     tasks.push(
       admin
         .from("tenants")
@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (platformCanAccess(staff.role, "members")) {
+  if (platformCanAccess(staff, "members")) {
     tasks.push(
       admin
         .from("profiles")
@@ -124,7 +124,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (platformCanAccess(staff.role, "tickets")) {
+  if (platformCanAccess(staff, "tickets")) {
     tasks.push(
       admin
         .from("support_tickets")
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  if (platformCanAccess(staff.role, "billing")) {
+  if (platformCanAccess(staff, "billing")) {
     tasks.push(
       searchInvoices(admin, q)
         .then((found) => {
@@ -156,7 +156,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Ayarlar (Sistem Ayarları Merkezi): registry indeksinden, rol filtreli (modül "sistem"); gizli ayarlarda değer YOK.
-  if (platformCanAccess(staff.role, "sistem")) {
+  if (platformCanAccess(staff, "sistem")) {
     for (const h of searchSettings(ALL_SETTING_DEFS.filter((d) => d.scope === "platform"), q, 5)) {
       hits.push({
         id: `setting:${h.key}`,

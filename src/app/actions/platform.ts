@@ -19,6 +19,7 @@ import { logPlatformActivity } from "@/lib/platform-activity";
 import { logError } from "@/lib/error-log";
 import { parseImpersonationReason } from "@/lib/platform-security/impersonation-reason";
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { OFFICE_CLOSE_STATUSES, statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 
@@ -60,6 +61,7 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
       }
     }
     if (statusChangeNeedsStepUp(status, String(current.status ?? ""))) {
+      if (await officeCloseBlockedOutsideQueue()) return { error: OFFICE_CLOSE_QUEUE_ONLY };
       const stepUp = await requireStepUp(formData, "office_close", staff.id);
       if (!stepUp.ok) return { error: stepUp.error, code: stepUp.code };
     }

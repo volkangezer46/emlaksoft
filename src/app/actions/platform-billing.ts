@@ -1,6 +1,8 @@
 "use server";
 
 import { requireStepUp } from "@/lib/platform-security/step-up";
+import { fourEyesGate, requireStepUpOrApproved } from "@/lib/platform-security/four-eyes";
+import { platformCan } from "@/lib/platform-access";
 import { revalidatePath } from "next/cache";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
@@ -20,7 +22,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function guard(action: string, destructive: boolean) {
   const staff = await requirePlatformModule("billing");
-  if (destructive && staff.role !== "super_admin") {
+  // DG1: yıkıcı işlem = faturalamada "onayla" yetkisi (sabit rollerde yalnız süper admin; özel rol açıkça verebilir).
+  if (destructive && !platformCan(staff, "billing", "approve")) {
     return { error: "Bu işlem yalnız süper admin tarafından yapılabilir." } as const;
   }
   const rl = await checkRateLimit(`billing-op:${action}:${staff.id}`, { limit: 30, windowSec: 600, failurePolicy: "deny" });
@@ -176,7 +179,8 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
   if (reason.length < 3) return { error: isChargeback ? "Ters ibraz nedenini yazın." : "İade nedeni yazın." };
   // AD11: iade/ters ibraz doğrulayıcı kodu olmadan tamamlanmaz.
-  const stepUp = await requireStepUp(formData, isChargeback ? "chargeback" : "refund", g.staff.id);
+  // DG1: dört göz onaylı yürütmede onaylayan kodunu onay ekranında girdi (iade); ters ibraz her zaman kod ister.
+  const stepUp = !isChargeback ? await requireStepUpOrApproved(formData, "refund", g.staff.id) : await requireStepUp(formData, "chargeback", g.staff.id);
   if (!stepUp.ok) return { error: stepUp.error };
 
   const admin = createAdminClient();
@@ -228,6 +232,17 @@ export async function recordInvoiceRefund(formData: FormData): Promise<BillingOp
 
   const amount = validateRefundAmount(String(formData.get("amount_try") ?? ""), Number(inv.total_try));
   if ("error" in amount) return { error: amount.error };
+
+  // DG1 dört göz: eşik üstü iade ilk yazımdan ÖNCE kuyruğa düşer; başka bir yetkili onaylayınca bu eylem onun adına yürür.
+  const fourEyes = await fourEyesGate({
+    kind: "refund",
+    staffId: g.staff.id,
+    form: formData,
+    entityId: invoiceId,
+    amountTry: amount.value,
+    summary: `Fatura iadesi: ${amount.value.toLocaleString("tr-TR", { maximumFractionDigits: 2 })} TL · ${reason}`,
+  });
+  if (!fourEyes.proceed) return "error" in fourEyes ? { error: fourEyes.error } : { ok: true, notice: fourEyes.notice };
 
   // Analiz paketi faturası: verilen EF analiz bakiyesi GERİ ALINIR (clawback = rezerv + commit, kalem pack_refund; idem fatura+birim).
   // Analiz bakiyesi kullanılmışsa bakiye yetmez ve iade ENGELLENİR (para iadesi + analiz bakiyesi birlikte kalamaz). İade kaydı düşmezse

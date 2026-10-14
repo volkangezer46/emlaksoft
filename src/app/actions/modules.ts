@@ -259,7 +259,7 @@ export async function applyModuleSetup(answers: Record<string, boolean>): Promis
 export async function setTenantModuleByAdmin(officeId: string, moduleKey: string, mode: string): Promise<ModuleActionResult> {
   const tenantId = officeId;
   const staff = await requirePlatformModule("tenants");
-  if (!officeAdminCan(staff.role, "plan_status")) return { error: OFFICE_ADMIN_DENIED };
+  if (!officeAdminCan(staff, "plan_status")) return { error: OFFICE_ADMIN_DENIED };
   if (!UUID_RE.test(tenantId)) return { error: "Ofis bulunamadı." };
   if (!isFeatureKey(moduleKey)) return { error: "Çekirdek ve sistem modülleri kapatılamaz." };
   if (mode !== "force_on" && mode !== "force_off" && mode !== "release") return { error: "Geçersiz işlem." };

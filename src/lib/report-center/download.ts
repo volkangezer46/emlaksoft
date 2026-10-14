@@ -88,7 +88,7 @@ export async function authorizePlatformReport(id: string): Promise<Authorized> {
   if (!def || !def.platformModule) return { ok: false, status: 404, error: "Rapor bulunamadı." };
   const staff = await getPlatformStaff();
   if (!staff) return { ok: false, status: 401, error: "Oturum bulunamadı." };
-  if (!platformCanAccess(staff.role, "reports") || !platformReportAllowed(def, staff.role)) {
+  if (!platformCanAccess(staff, "reports") || !platformReportAllowed(def, staff.role)) {
     return { ok: false, status: 403, error: "Bu rapor için yetkiniz yok." };
   }
   return { ok: true, def, ctx: buildPlatformContext({ id: staff.id, role: staff.role }), actorId: staff.id, actorName: staff.full_name, tenantId: null };

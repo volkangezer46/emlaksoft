@@ -9,12 +9,23 @@
  * insight-engine cron'unda); bkz. `ATTENTION_INSIGHT_SLOT` (page.tsx). Okunamaz/boşsa hiçbir şey çizilmez.
  * Büyüme/gelir metriklerinin saf hesabı ayrı modüldedir: `platform-metrics.ts`.
  */
-import { platformCanAccess, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
+import { baseRoleOf, platformCanAccess, type PlatformAccessSubject, type PlatformModule, type PlatformRole } from "@/lib/platform-access";
 
 export type HomeVariant = "platform" | "billing" | "support";
 
-/** billing/support kendi paneline sahiptir; super_admin ve ops platform panelini görür. */
-export function homeVariantFor(role: PlatformRole): HomeVariant {
+/**
+ * billing/support kendi paneline sahiptir; super_admin ve ops platform panelini görür. Özel rol (DG1) panelini
+ * modüllerinden alır: ofisleri gören platform panelini, yalnız faturalamayı gören muhasebe panelini, yalnız destek
+ * kuyruğunu gören destek panelini açar.
+ */
+export function homeVariantFor(who: PlatformAccessSubject): HomeVariant {
+  if (typeof who !== "string" && who.customRole) {
+    if (platformCanAccess(who, "tenants")) return "platform";
+    if (platformCanAccess(who, "billing")) return "billing";
+    if (platformCanAccess(who, "tickets")) return "support";
+    return "platform";
+  }
+  const role: PlatformRole = baseRoleOf(who);
   if (role === "billing") return "billing";
   if (role === "support") return "support";
   return "platform";
@@ -43,14 +54,17 @@ const BILLING_SECTIONS: ReadonlySet<HomeSection> = new Set(["mrr", "composition"
  * tüketim, churn nedenleri, kompozisyon); ops gelire erişemez (billing modülü yok): sağlık, churn,
  * aktivasyon ve modül kullanımı öne çıkar.
  */
-export function platformHomeSections(role: PlatformRole): HomeSection[] {
+export function platformHomeSections(who: PlatformAccessSubject): HomeSection[] {
+  const role = baseRoleOf(who);
   const base: HomeSection[] =
     role === "super_admin"
       ? ["attention", "mrr", "churn", "health", "activation", "modules", "unitEconomics", "usage", "churnReasons", "composition", "growth", "activity"]
       : ["attention", "health", "churn", "activation", "modules", "growth", "activity"];
-  if (platformCanAccess(role, "geo")) base.push("geo");
+  // Özel rol ofisleri göremiyorsa ofis metrikleri (sağlık, churn, aktivasyon...) çizilmez; yalnız dikkat kuyruğu kalır.
+  if (!platformCanAccess(who, "tenants")) base.splice(1);
+  if (platformCanAccess(who, "geo")) base.push("geo");
   // Bir bölüm yalnız bir kez ve tanımlı modül kapısıyla çıkar.
-  return base.filter((s, i) => base.indexOf(s) === i && (!BILLING_SECTIONS.has(s) || platformCanAccess(role, "billing")));
+  return base.filter((s, i) => base.indexOf(s) === i && (!BILLING_SECTIONS.has(s) || platformCanAccess(who, "billing")));
 }
 
 export type AttentionInput = {
@@ -89,7 +103,7 @@ export const ATTENTION_LIMIT = 7;
  * Kuyruk: sayısı 0/null olan satır yoktur, role kapalı modülün satırı yoktur,
  * şiddete (ardından sayıya) göre azalan sıralanır ve ATTENTION_LIMIT ile sınırlanır.
  */
-export function buildAttentionQueue(input: AttentionInput, role: PlatformRole): AttentionRow[] {
+export function buildAttentionQueue(input: AttentionInput, role: PlatformAccessSubject): AttentionRow[] {
   const efCount = input.efReconciliation === "drift" || input.efReconciliation === "error" ? 1 : null;
   const nonUrgentOpen =
     input.openTickets === null ? null : Math.max(0, input.openTickets - Math.max(0, input.urgentTickets ?? 0));

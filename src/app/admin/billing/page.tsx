@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Activity, AlertTriangle, ArrowUpRight, CreditCard, FileText, RefreshCw, TrendingUp, X } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
+import { platformCan } from "@/lib/platform-access";
 import { orIlike } from "@/lib/pgrst";
 import { loadPlatformMrr } from "@/lib/accounting/loaders";
 import { loadMrrSnapshotDays } from "@/lib/billing/mrr-snapshot";
@@ -351,7 +352,7 @@ export default async function AdminBillingPage({
                     <p className="text-text-muted">{new Date(capture.captured_at).toLocaleString("tr-TR")}</p>
                     {capture.last_error_code ? <p className="font-mono text-xs text-danger-600">{capture.last_error_code}</p> : null}
                   </div>
-                  <CaptureActions captureId={capture.id} status={capture.status} isSuperAdmin={staff.role === "super_admin"} />
+                  <CaptureActions captureId={capture.id} status={capture.status} isSuperAdmin={platformCan(staff, "billing", "approve")} />
                 </div>
               );
             })}

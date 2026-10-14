@@ -5,7 +5,7 @@ import { Brand } from "@/components/brand/brand";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useSyncExternalStore } from "react";
 import { ChevronDown, Crown, ExternalLink, Globe, Menu, Pin, PinOff } from "lucide-react";
-import { platformModulesFor, type PlatformRole } from "@/lib/platform-access";
+import type { PlatformModule } from "@/lib/platform-access";
 import { activeTabHref, adminSidebarModel, isAdminNavActive, tabKey, type AdminNavItem, type AdminSidebarGroup } from "@/lib/admin/nav";
 import { getHrefStore } from "@/lib/nav-memory";
 import { SidebarCollapseButton } from "@/components/ui/console/sidebar-collapse";
@@ -27,12 +27,13 @@ const ADMIN_SCOPE = "admin";
 
 export function AdminSidebar({
   staffName,
-  role,
+  modules: allowed,
   roleLabel,
   badges,
 }: {
   staffName: string;
-  role: PlatformRole;
+  /** Personelin görebildiği modüller (sunucuda özel rol dahil hesaplanır: `platformModulesFor(staff)`). */
+  modules: readonly PlatformModule[];
   roleLabel: string;
   badges?: { tickets?: number; risk?: number };
 }) {
@@ -47,7 +48,6 @@ export function AdminSidebar({
     if (!window.matchMedia(SMALL_SCREEN_QUERY).matches) return;
     return runWhenIdle(drawerPanel.preload);
   }, []);
-  const allowed = platformModulesFor(role);
 
   // Menü tek kaynaktan (src/lib/admin/nav.ts): role göre süzülür, her grupta çekirdek öğeler görünür, kalanı "+N daha".
   const groups = useMemo(() => adminSidebarModel(allowed), [allowed]);

@@ -15,7 +15,7 @@ const clip = (v: string | undefined) => (typeof v === "string" && v.length > 0 ?
  */
 export default async function GoogleConnectionsPage({ searchParams }: { searchParams?: Promise<{ ileti?: string; hata?: string }> }) {
   const staff = await requirePlatformModule("reklam");
-  const canWrite = platformModuleMode(staff.role, "reklam") === "write" && staff.role === "super_admin";
+  const canWrite = platformModuleMode(staff, "reklam") === "write" && staff.role === "super_admin";
   const [view, sp] = await Promise.all([readConnectionView(), searchParams ?? Promise.resolve({} as SP)]);
   return <ConnectionsView view={view} canWrite={canWrite} flash={{ ok: clip(sp.ileti), error: clip(sp.hata) }} />;
 }
