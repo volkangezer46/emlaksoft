@@ -13,6 +13,15 @@ import {
   verifyIdleCookie,
 } from "@/lib/platform-security/admin-access";
 import { readAdminAccessPolicyCached } from "@/lib/platform-security/admin-access-cache";
+import { getBaseUrl } from "@/lib/base-url";
+import {
+  CSP_REPORT_PATH,
+  buildReportOnlyCsp,
+  isReportOnlyPath,
+  newCspNonce,
+  reportOnlyEnabled,
+  reportingEndpointsHeader,
+} from "@/lib/security/csp-report-only";
 
 /** Traefik X-Real-Ip/X-Forwarded-For'u kendisi yazar (istemcinin gönderdiğini geçirmez). */
 function clientIp(request: NextRequest): string | null {
@@ -67,11 +76,34 @@ async function applyIdlePolicy(request: NextRequest, response: NextResponse, idl
   return response;
 }
 
+const CSP_REPORT_ONLY_REQUEST_HEADER = "content-security-policy-report-only";
+
+/**
+ * CSP ölçümü (yalnız rapor modu; src/lib/security/csp-report-only.ts): /app ve /admin belgelerinde istek başına nonce.
+ * Politika İSTEK başlığına da yazılır: Next nonce'u buradan okuyup kendi betiklerine ekler; yanıt başlığı tarayıcıya
+ * gider. İstemcinin gönderdiği aynı adlı başlık her yolda silinir (nonce'u dışarıdan dayatamasın).
+ */
+function prepareReportOnlyCsp(request: NextRequest, path: string): string | null {
+  request.headers.delete(CSP_REPORT_ONLY_REQUEST_HEADER);
+  if (!reportOnlyEnabled() || !isReportOnlyPath(path)) return null;
+  const policy = buildReportOnlyCsp(newCspNonce(), `${getBaseUrl()}${CSP_REPORT_PATH}`);
+  request.headers.set(CSP_REPORT_ONLY_REQUEST_HEADER, policy);
+  return policy;
+}
+
+function withReportOnlyCsp(response: NextResponse, policy: string | null): NextResponse {
+  if (!policy) return response;
+  response.headers.set("Content-Security-Policy-Report-Only", policy);
+  response.headers.set("Reporting-Endpoints", reportingEndpointsHeader(`${getBaseUrl()}${CSP_REPORT_PATH}`));
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
+  const cspPolicy = prepareReportOnlyCsp(request, path);
   if (!isAdminPolicyPath(path)) {
     // AD11/DG7: giriş sayfalarında eski boşta kalma çerezleri updateSession'da, YALNIZ oturum yokken düşer.
-    return updateSession(request);
+    return withReportOnlyCsp(await updateSession(request), cspPolicy);
   }
 
   // AD11: yönetim IP izin listesi kimlik çözümünden ÖNCE (izinsiz IP oturum çerezi bile işletmez).
@@ -85,7 +117,7 @@ export async function proxy(request: NextRequest) {
   }
 
   const response = await updateSession(request);
-  return applyIdlePolicy(request, response, policy.idleMinutes);
+  return withReportOnlyCsp(await applyIdlePolicy(request, response, policy.idleMinutes), cspPolicy);
 }
 
 export const config = {

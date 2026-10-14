@@ -29,10 +29,24 @@ export function isMissingColumn(e: { code?: string } | null | undefined): boolea
 
 type Admin = ReturnType<typeof createAdminClient>;
 
-/** "Açık hata türü": triyaj varsa yalnız durumu açık olanlar, yoksa çözülmemiş tümü. */
+/**
+ * error_logs.source = "csp": CSP rapor modu ölçümü (src/app/api/csp-rapor). Hata DEĞİLDİR ve uç oturumsuz olduğundan
+ * uydurulabilir: "Açık hata" sayılarına ve varsayılan hata listesine girmez; yalnız `kaynak=csp` süzgeciyle görünür.
+ */
+export const CSP_MEASUREMENT_SOURCE = "csp";
+
+/** "Açık hata türü": triyaj varsa yalnız durumu açık olanlar, yoksa çözülmemiş tümü (CSP ölçümü hariç). */
 export async function countOpenErrors(admin: Admin): Promise<{ count: number | null }> {
-  const r = await admin.from("error_logs").select("id", { count: "exact", head: true }).eq("status", "open");
+  const r = await admin
+    .from("error_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "open")
+    .neq("source", CSP_MEASUREMENT_SOURCE);
   if (!r.error) return { count: r.count ?? 0 };
-  const legacy = await admin.from("error_logs").select("id", { count: "exact", head: true }).is("resolved_at", null);
+  const legacy = await admin
+    .from("error_logs")
+    .select("id", { count: "exact", head: true })
+    .is("resolved_at", null)
+    .neq("source", CSP_MEASUREMENT_SOURCE);
   return { count: legacy.count ?? null };
 }

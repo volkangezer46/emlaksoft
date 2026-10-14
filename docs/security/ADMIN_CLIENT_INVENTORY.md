@@ -357,7 +357,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/members/page.tsx:160` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/onaylar/page.tsx:73` | `ApprovalsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/raporlar/page.tsx:140` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
-| `src/app/admin/sistem/_hatalar/errors-view.tsx:121` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
+| `src/app/admin/sistem/_hatalar/errors-view.tsx:124` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/sistem/alerts-view.tsx:56` | `AlertsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/sistem/backup-card.tsx:20` | `BackupHistory` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/admin/sistem/database-view.tsx:31` | `DatabaseView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -508,7 +508,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/email/log-read.ts:90` | `loadEmailLog` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/email/log-read.ts:124` | `loadEmailSuppressions` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/email/webhook.ts:148` | `applyResendEvent` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/lib/error-log.ts:91` | `logError` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/lib/error-log.ts:92` | `logError` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/feature-flags/rules.ts:50` | `loadFlagRules` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/feature-flags/rules.ts:78` | `tenantNamesFor` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/geo-province-sync.ts:94` | `failClaimedJob` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |

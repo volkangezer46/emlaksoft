@@ -242,31 +242,6 @@ aside::-webkit-scrollbar-thumb,
 .surface-interactive:hover { background-image: linear-gradient(var(--surface-hover), var(--surface-hover)); }
 .surface-interactive:active { background-image: linear-gradient(var(--surface-pressed), var(--surface-pressed)); }
 
-/* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
-   yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
-.lift-hover { transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out); }
-.lift-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--inner-top), var(--elev-3);
-}
-
-/* Gradient saç teli kenar — vurgulu kartlar için (fiyat, KPI, plan kartı).
-   `border-image` yerine maskeli pseudo-element: köşe yarıçapına uyar. */
-.grad-hairline { position: relative; }
-.grad-hairline::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(140deg, rgba(20, 99, 255, 0.35), rgba(16, 185, 163, 0.28) 50%, rgba(10, 34, 71, 0.06));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
 /* SAYISAL HİZALAMA — finansal tablolarda kritik.
    Orantılı rakamlarda "1" ile "8" farklı genişlikte olduğu için tutar kolonu
    titrek görünür. tabular-nums tüm rakamları eşit genişliğe alır; tutarlar
@@ -285,15 +260,6 @@ h1, h2, h3 {
 p {
   /* Paragrafta yetim satır (orphan) önler */
   text-wrap: pretty;
-}
-
-.text-gradient {
-  background: linear-gradient(100deg, var(--brand-600), var(--cyan-400) 50%, var(--mint-500));
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient-pan 6s ease infinite;
 }
 
 .text-gradient-static {
@@ -327,26 +293,6 @@ p {
 }
 
 .glow-brand { box-shadow: var(--shadow-glow-brand); }
-.glow-mint { box-shadow: var(--shadow-glow-mint); }
-
-.grad-border {
-  position: relative;
-  background: var(--surface);
-  border-radius: var(--radius-panel);
-}
-.grad-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: var(--grad-brand);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-  opacity: 0.6;
-}
 
 /* patterned backgrounds */
 .grid-overlay {
@@ -362,10 +308,6 @@ p {
     linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
-}
-.dot-overlay {
-  background-image: radial-gradient(rgba(10, 34, 71, 0.08) 1px, transparent 1px);
-  background-size: 22px 22px;
 }
 
 .blob {
@@ -391,24 +333,6 @@ p {
 }
 .btn-shine:hover::after { left: 150%; }
 
-/* marquee */
-.marquee { overflow: hidden; -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent); }
-.marquee-track { display: flex; width: max-content; animation: marquee 32s linear infinite; }
-.marquee:hover .marquee-track { animation-play-state: paused; }
-
-/* pulse ring (phone) */
-.pulse-ring { position: relative; }
-.pulse-ring::before,
-.pulse-ring::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  border: 2px solid var(--mint-500);
-  animation: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-.pulse-ring::after { animation-delay: 1.2s; }
-
 /* scroll reveal — fade + kayma birlikte. Başlangıç opaklığı yalnızca JS
    çalışan tarayıcıda 0'a düşer (scripting media query); JS yoksa içerik
    her zaman görünür kalır (FOUC/boş sayfa güvencesi). */
@@ -417,19 +341,10 @@ p {
   transform: translateY(10px);
   transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease;
 }
-.reveal-scale { opacity: 1; transform: scale(0.99); transition: transform 0.42s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease; }
 @media (scripting: enabled) {
-  .reveal, .reveal-scale { opacity: 0; }
+  .reveal { opacity: 0; }
 }
 .reveal[data-shown="true"] { opacity: 1; transform: none; }
-.reveal-scale[data-shown="true"] { opacity: 1; transform: none; }
-
-/* svg chart draw-in */
-.path-draw {
-  stroke-dasharray: 1000;
-  stroke-dashoffset: 1000;
-  animation: draw 2.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
 
 /* nav underline */
 .nav-link { position: relative; }
@@ -457,37 +372,9 @@ p {
   letter-spacing: 0.01em;
 }
 
-.premium-shadow {
-  box-shadow:
-    0 50px 100px -35px rgba(7, 26, 56, 0.55),
-    0 20px 45px -25px rgba(20, 99, 255, 0.35);
-}
-
-.glow-conic {
-  background: conic-gradient(
-    from 180deg at 50% 50%,
-    rgba(20, 99, 255, 0.0),
-    rgba(20, 99, 255, 0.35),
-    rgba(34, 211, 238, 0.35),
-    rgba(16, 185, 163, 0.35),
-    rgba(20, 99, 255, 0.0)
-  );
-  filter: blur(60px);
-}
-
-.mask-fade-b { -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent); mask-image: linear-gradient(to bottom, #000 72%, transparent); }
-
-.noise {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-}
-
-.window-chrome {
-  background: linear-gradient(180deg, #0b2247, #0a1e3f);
-}
-
 /* Hover yükselmesi — TEK sistem: -2px + bir elevation adımı, 0.2s.
    Büyük sıçramalar (-6/-8px) oyuncaksı duruyordu; premium ürünler
-   1-3px + gölge adımıyla yetinir. Vitrin kartları için .lift-lg (-4px). */
+   1-3px + gölge adımıyla yetinir. */
 .lift {
   transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
 }
@@ -495,28 +382,6 @@ p {
   transform: translateY(-2px);
   box-shadow: var(--inner-top), var(--elev-3);
 }
-.lift-lg {
-  transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out), border-color var(--motion-base) var(--ease-out);
-}
-.lift-lg:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--inner-top), var(--elev-4);
-}
-
-/* animated conic ring border */
-@keyframes spin-conic { to { transform: rotate(360deg); } }
-.ring-anim { position: relative; overflow: hidden; }
-.ring-anim::before {
-  content: "";
-  position: absolute;
-  inset: -60%;
-  background: conic-gradient(from 0deg, transparent 0 60%, rgba(20,99,255,0.5) 75%, rgba(16,185,163,0.5) 85%, transparent 100%);
-  animation: spin-conic 6s linear infinite;
-}
-
-.dropdown-in { animation: dropIn var(--motion-base) var(--ease-out-expo) both; }
-@keyframes dropIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-
 /* ------------------------------------------------------------
    Radix durum animasyonları (dialog / select / menü / tooltip)
    src/components/ui/* bileşenleri bu sınıfları kullanır.
@@ -536,9 +401,6 @@ p {
   from { opacity: 1; transform: none; }
   to { opacity: 0; transform: translateY(4px) scale(0.99); }
 }
-@keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
-.tour-fade { animation: tour-fade var(--motion-base) var(--ease-out) both; }
-@media (prefers-reduced-motion: reduce) { .tour-fade { animation: none; } }
 @keyframes popover-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
   to { opacity: 1; transform: none; }
@@ -554,18 +416,6 @@ p {
 .popover-in[data-state="open"],
 .popover-in[data-state="delayed-open"] { animation: popover-in var(--motion-fast) var(--ease-out-expo) both; }
 .popover-in[data-state="closed"] { animation: popover-out var(--motion-exit-fast) var(--ease-in) both; }
-
-/* Toast giriş/çıkış — spring hissi veren easing ile */
-@keyframes toast-in {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes toast-out {
-  from { opacity: 1; transform: none; }
-  to { opacity: 0; transform: translateY(6px); }
-}
-.toast-in { animation: toast-in var(--motion-slow) var(--ease-out-expo) both; }
-.toast-out { animation: toast-out var(--motion-exit-base) var(--ease-in) both; } /* <= toast-provider EXIT_MS */
 
 .mega-surface {
   background:
@@ -616,207 +466,6 @@ p {
   --heading: var(--navy-900);
 }
 
-.photo-stage {
-  isolation: isolate;
-  box-shadow:
-    0 70px 130px -55px rgba(7, 26, 56, 0.7),
-    0 30px 70px -38px rgba(20, 99, 255, 0.35);
-}
-
-.hero-lux {
-  background:
-    radial-gradient(ellipse 55% 44% at 50% 22%, rgba(255, 255, 255, 0.98), transparent 76%),
-    radial-gradient(circle at 8% 18%, rgba(20, 99, 255, 0.105), transparent 27%),
-    radial-gradient(circle at 92% 24%, rgba(16, 185, 163, 0.09), transparent 25%),
-    linear-gradient(180deg, #f9fbff 0%, #f3f7fd 58%, #eef4fb 100%);
-}
-
-/* Ultra-premium canlı aurora mesh — hero'nun arkasında yumuşak, hareketli renk bulutu */
-.hero-aurora {
-  position: absolute;
-  inset: -28% -12% auto -12%;
-  height: 760px;
-  pointer-events: none;
-  background:
-    radial-gradient(38% 40% at 18% 28%, rgba(20, 99, 255, 0.26), transparent 70%),
-    radial-gradient(34% 36% at 82% 18%, rgba(34, 211, 238, 0.22), transparent 70%),
-    radial-gradient(42% 42% at 52% 66%, rgba(16, 185, 163, 0.20), transparent 70%),
-    radial-gradient(30% 32% at 90% 58%, rgba(122, 169, 255, 0.18), transparent 70%);
-  filter: blur(46px) saturate(1.15);
-  opacity: 0.85;
-  animation: hero-aurora 22s ease-in-out infinite alternate;
-}
-@keyframes hero-aurora {
-  0%   { transform: translate3d(-2%, -1%, 0) scale(1); }
-  50%  { transform: translate3d(3%, 2%, 0) scale(1.07); }
-  100% { transform: translate3d(-1%, 1.5%, 0) scale(1.03); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-aurora { animation: none; }
-}
-
-/* Premium dönen gradient çerçeve — dashboard showcase için (içeriği döndürmez) */
-@property --ring-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
-}
-.premium-ring {
-  position: relative;
-  border-radius: 26px;
-}
-/* Statik, rafine gradient hairline çerçeve — dönme yok (kurumsal premium görünüm) */
-.premium-ring::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    color-mix(in oklab, var(--brand-500) 75%, transparent),
-    color-mix(in oklab, var(--cyan-400) 45%, transparent) 35%,
-    transparent 62%,
-    color-mix(in oklab, var(--mint-500) 30%, transparent) 100%
-  );
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.hero-lux::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image: radial-gradient(rgba(20, 99, 255, 0.16) 0.65px, transparent 0.65px);
-  background-size: 22px 22px;
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.5), transparent 48%);
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,.5), transparent 48%);
-  opacity: 0.24;
-}
-
-.photo-stage::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(4, 17, 39, 0.96) 0%, rgba(4, 17, 39, 0.8) 32%, rgba(4, 17, 39, 0.18) 70%, rgba(4, 17, 39, 0.05) 100%),
-    linear-gradient(0deg, rgba(4, 17, 39, 0.78) 0%, transparent 42%);
-}
-
-.photo-copy {
-  position: relative;
-  z-index: 4;
-  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.34);
-}
-
-.premium-section {
-  position: relative;
-}
-
-.premium-section::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(20, 99, 255, 0.055), transparent 30%),
-    radial-gradient(circle at 90% 100%, rgba(16, 185, 163, 0.05), transparent 28%);
-}
-
-.feature-rich-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(110deg, transparent 15%, rgba(20, 99, 255, 0.035) 45%, rgba(16, 185, 163, 0.04) 62%, transparent 85%);
-  transform: translateX(-110%);
-  transition: transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
-}
-.feature-rich-card:hover::before { transform: translateX(110%); }
-
-.property-card {
-  position: relative;
-  transition:
-    transform var(--motion-slow) var(--ease-out-expo),
-    border-color var(--motion-slow) var(--ease-out),
-    box-shadow var(--motion-slow) var(--ease-out);
-}
-
-.property-card::after {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.5), transparent 35%, transparent 70%, rgba(16, 185, 163, 0.45));
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--motion-slow) var(--ease-out);
-}
-
-.property-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(34, 211, 238, 0.22);
-  box-shadow:
-    0 38px 80px -34px rgba(0, 0, 0, 0.92),
-    0 18px 42px -24px rgba(34, 211, 238, 0.35);
-}
-
-.property-card:hover::after { opacity: 1; }
-
-.workflow-card,
-.persona-card,
-.integration-card,
-.quote-card {
-  isolation: isolate;
-}
-
-.workflow-card::before,
-.persona-card::before,
-.integration-card::before,
-.quote-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 0% 0%, rgba(20, 99, 255, 0.075), transparent 34%),
-    radial-gradient(circle at 100% 100%, rgba(16, 185, 163, 0.045), transparent 32%);
-  opacity: 0;
-  transition: opacity var(--motion-slow) var(--ease-out);
-}
-
-.workflow-card:hover::before,
-.persona-card:hover::before,
-.integration-card:hover::before,
-.quote-card:hover::before {
-  opacity: 1;
-}
-
-.workflow-card {
-  box-shadow: 0 12px 36px -30px rgba(7, 26, 56, 0.48);
-  transition:
-    transform var(--motion-slow) var(--ease-out-expo),
-    border-color var(--motion-slow) var(--ease-out),
-    box-shadow var(--motion-slow) var(--ease-out);
-}
-
-.workflow-card:hover {
-  transform: translateY(-5px);
-  border-color: var(--brand-300);
-  box-shadow: 0 24px 54px -32px rgba(20, 99, 255, 0.38);
-}
-
 .pricing-card::before {
   content: "";
   position: absolute;
@@ -828,57 +477,6 @@ p {
     radial-gradient(circle at 100% 100%, rgba(16, 185, 163, 0.055), transparent 28%);
 }
 
-.faq-card {
-  box-shadow: 0 10px 32px -30px rgba(7, 26, 56, 0.5);
-}
-
-.faq-card[open] {
-  background:
-    radial-gradient(circle at 0% 0%, rgba(20, 99, 255, 0.055), transparent 28%),
-    #fff;
-}
-
-.footer-premium {
-  position: relative;
-  background:
-    radial-gradient(circle at 8% 0%, rgba(20, 99, 255, 0.16), transparent 26%),
-    radial-gradient(circle at 92% 100%, rgba(16, 185, 163, 0.1), transparent 24%),
-    #041127;
-}
-
-.footer-premium::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(to right, rgba(255,255,255,.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px);
-  background-size: 42px 42px;
-  -webkit-mask-image: linear-gradient(to bottom, #000, transparent 70%);
-  mask-image: linear-gradient(to bottom, #000, transparent 70%);
-}
-
-.footer-premium > * { position: relative; }
-.footer-premium .text-text-muted { color: rgba(255, 255, 255, 0.56) !important; }
-.footer-premium .text-brand-600 { color: var(--cyan-400) !important; }
-.footer-premium a:hover { color: var(--mint-400) !important; }
-
-/* application command center */
-.dashboard-panel {
-  box-shadow: 0 14px 42px -36px rgba(7, 26, 56, 0.58);
-  transition:
-    transform var(--motion-base) var(--ease-out-expo),
-    border-color var(--motion-base) var(--ease-out),
-    box-shadow var(--motion-base) var(--ease-out);
-}
-
-.dashboard-panel:hover {
-  transform: translateY(-2px);
-  border-color: rgba(20, 99, 255, 0.24);
-  box-shadow: 0 24px 58px -38px rgba(20, 99, 255, 0.34);
-}
-
 @keyframes dashboard-line {
   from { stroke-dashoffset: 1200; }
   to { stroke-dashoffset: 0; }
@@ -888,16 +486,6 @@ p {
   stroke-dasharray: 1200;
   stroke-dashoffset: 1200;
   animation: dashboard-line var(--motion-draw) var(--ease-out-expo) forwards;
-}
-
-@keyframes pipeline-grow {
-  from { transform: scaleX(0); }
-  to { transform: scaleX(1); }
-}
-
-.pipeline-fill {
-  transform-origin: left;
-  animation: pipeline-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Halka kendi yarı saydam katmanında scale+opacity ile genişler (bileşik katman; box-shadow animasyonu her karede
@@ -939,16 +527,11 @@ p {
   animation: chart-draw var(--motion-draw) var(--ease-out-expo) forwards;
 }
 
-/* çizgi uç noktası: süs sonsuz nabız kaldırıldı, durağan nokta */
-.glow-dot { transform-box: fill-box; transform-origin: center; }
-
 /* bar rise: tek seferlik çubuk dolumu (sürekli "nefes" kaldırıldı) */
 @keyframes bar-rise {
   from { transform: scaleY(0); }
   to { transform: scaleY(1); }
 }
-.bar-rise { transform-origin: bottom; animation: bar-rise var(--motion-draw) var(--ease-out-expo) both; }
-
 .bar-live { transform-origin: bottom; animation: bar-rise var(--motion-draw) var(--ease-out-expo) both; }
 
 /* radial gauge / donut sweep */
@@ -966,34 +549,12 @@ p {
 /* Süs dönüşü kaldırıldı: sınıf durağan. */
 .conic-spin { animation: none; }
 
-/* soft number ticker flash */
-@keyframes value-flash {
-  0%, 100% { color: inherit; }
-  50% { color: var(--mint-400); }
-}
-
-/* ticket/tape sliding row highlight */
-@keyframes row-sweep {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* live call audio waveform */
-@keyframes wave {
-  0%, 100% { transform: scaleY(0.35); }
-  50% { transform: scaleY(1); }
-}
-.wave-bar {
-  transform-origin: center;
-  animation: wave 1s ease-in-out infinite;
-}
-
 /* Reduced-motion: genel kural TEK yerde (a11y.css). Burada yalnız bitiş-durumu zorlamaları. */
 @media (prefers-reduced-motion: reduce) {
-  .reveal, .reveal-scale { opacity: 1 !important; transform: none !important; }
-  .path-draw, .chart-draw, .dashboard-chart-line { stroke-dashoffset: 0 !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .chart-draw, .dashboard-chart-line { stroke-dashoffset: 0 !important; }
   .ring-sweep { animation: none !important; stroke-dashoffset: var(--dash, 110) !important; }
-  .bar-live, .bar-rise { animation: none !important; transform: none !important; }
+  .bar-live { animation: none !important; transform: none !important; }
 }
 
 /* Panel sayfa geçişi: /app ve /admin template.tsx + motion.css `.motion-page` (yalnız CSS). */
@@ -1085,45 +646,6 @@ p {
   }
 }
 
-/* ============================================================
-   DASHBOARD 3D KATMANI — /app ana sayfası (yalnız yeni sınıflar)
-   ============================================================ */
-
-/* KPI ikon çipine hafif iç parlaklık — üstten ışık, alttan gölge */
-.kpi-chip-shine {
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.6),
-    inset 0 -8px 14px -10px rgba(10, 34, 71, 0.25);
-}
-
-/* Kart arkasında ton renkli yumuşak glow — hover'da belirir */
-.kpi-glow {
-  position: relative;
-}
-.kpi-glow::after {
-  content: "";
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: -12px;
-  height: 26px;
-  border-radius: 999px;
-  background: var(--kpi-glow, rgba(20, 99, 255, 0.38));
-  filter: blur(18px);
-  opacity: 0;
-  transition: opacity var(--motion-slow) var(--ease-out);
-  z-index: -1;
-  pointer-events: none;
-}
-.kpi-glow:hover::after {
-  opacity: 0.6;
-}
-.kpi-glow-brand { --kpi-glow: rgba(20, 99, 255, 0.4); }
-.kpi-glow-mint { --kpi-glow: rgba(16, 185, 163, 0.38); }
-.kpi-glow-amber { --kpi-glow: rgba(224, 165, 58, 0.38); }
-.kpi-glow-warn { --kpi-glow: rgba(245, 165, 36, 0.38); }
-.kpi-glow-danger { --kpi-glow: rgba(229, 72, 77, 0.36); }
-
 /* Kart ızgarası stagger girişi: motion.css `.list-stagger` (tek tanım). */
 
 
@@ -1136,7 +658,7 @@ p {
 /* ---- 1) Sayfa geçişi: View Transitions KALDIRILDI (zorunlu düzen maliyeti, bkz. app/template.tsx);
    yerine motion.css `.motion-page` (opacity, --motion-nav). ---- */
 
-/* ---- 2) @starting-style — yalnız .reveal / .reveal-scale ----
+/* ---- 2) @starting-style — yalnız .reveal ----
    Eleman DOM'a girdiği anda (ilk stil karesi) buradaki değerlerden mevcut
    transition ile hedefe akar. JS'li akışta başlangıç değerleri zaten aynı
    olduğu için no-op (IntersectionObserver davranışı değişmez); JS'siz
@@ -1146,66 +668,14 @@ p {
    çift mekanizma / Radix çıkış animasyonu riskini getirirdi. */
 @starting-style {
   .reveal { opacity: 0; transform: translateY(10px); }
-  .reveal-scale { opacity: 0; transform: scale(0.99); }
-}
-
-/* ---- 3) SCROLL-DRIVEN ANIMATIONS (landing, saf CSS) ----
-   Yalnız YENİ sınıflar (.sda-*) — Reveal'ın kendi elemanlarına eklenmedi.
-   .sda-title: bölüm başlığı, viewport'a girerken fade + rise (view() timeline).
-   .sda-parallax: vitrin kartı görseli, kart viewport'ta ilerlerken hafif lag
-   (translate) — taşma payı için sabit scale, kart overflow-hidden içinde.
-   Reduced-motion'da blok tamamen devre dışı. */
-@supports (animation-timeline: view()) {
-  @media (prefers-reduced-motion: no-preference) {
-    @keyframes sda-title-in {
-      from { opacity: 0.15; transform: translateY(22px); }
-      to { opacity: 1; transform: none; }
-    }
-    .sda-title {
-      animation: sda-title-in linear both;
-      animation-timeline: view();
-      animation-range: entry 10% entry 70%;
-    }
-
-    @keyframes sda-parallax-y {
-      from { translate: 0 -12px; }
-      to { translate: 0 12px; }
-    }
-    .sda-parallax {
-      /* translate kayması kenar boşluğu açmasın diye sabit taşma payı.
-         Not: bu tarayıcılarda hover zoom'un (scale-[1.06]) yerini alır. */
-      scale: 1.12;
-      animation: sda-parallax-y linear both;
-      animation-timeline: view();
-      animation-range: cover 0% cover 100%;
-    }
-  }
-}
-
-/* ---- 4) CONTAINER QUERIES — dashboard widget kartları için hazır utility ----
-   Kullanım (henüz hiçbir sayfaya uygulanmadı): widget kartının dış sarmalayıcısına
-   .cq-panel, içindeki büyük KPI değerine .cq-kpi-value verilir; kart hangi grid
-   kolonuna düşerse düşsün darlaştığında font kendiliğinden küçülür.
-   Tailwind v4 alternatifi: parent'a `@container`, child'a `@max-[22rem]:text-xl`
-   gibi container variant'ları — ikisi aynı motoru kullanır, karışık kullanılabilir. */
-.cq-panel { container-type: inline-size; }
-
-@container (max-width: 22rem) {
-  .cq-panel .cq-kpi-value,
-  .cq-kpi-value {
-    font-size: 1.25rem;
-    letter-spacing: -0.01em;
-  }
 }
 
 /* ---- 5) DOKUNMATİK — hover'a bağlı hızlı aksiyonlar ----
    Masaüstünde davranış aynen korunur (opacity-0 + group-hover:opacity-100);
    hover'ı olmayan cihazlarda (telefon/tablet) aksiyon her zaman görünür olur.
-   Kullanım: hover'da beliren fonksiyonel butona/linke `.hover-action`,
-   varsa hover'da gizlenen karşıt öğeye `.hover-action-hide`. */
+   Kullanım: hover'da beliren fonksiyonel butona/linke `.hover-action`. */
 @media (hover: none) {
   .hover-action { opacity: 1 !important; }
-  .hover-action-hide { opacity: 0 !important; }
 }
 
 /* ============================================================================
@@ -1297,33 +767,13 @@ p {
 /* KURTARMA: koyu bolum icinde acik zeminli her yeni yuzey — ink/text
    token'lari .theme-dark icinde beyaza dondugu icin burada geri koyulasir.
    (Mevcut `.theme-dark :is(.bg-white, .bg-amber-400)` kuralinin devami.) */
-.theme-dark :is(.tone-success, .tone-warning, .tone-danger, .tone-info, .tone-neutral, .glass-card, .surface-mesh, .skeleton) {
+.theme-dark :is(.tone-success, .tone-warning, .tone-danger, .tone-info, .tone-neutral, .glass-card, .skeleton) {
   --ink-950: var(--navy-900);
   --ink-900: var(--navy-800);
   --text: #172033;
   --text-muted: #667085;
   --text-faint: #98a2b3;
   --line: #e6eaf2;
-}
-
-/* ---- 5) Gradient / doku katmani ------------------------------------------- */
-
-/* Cok hafif mesh degrade — panel/hero zeminleri. Okunabilirligi bozmasin diye
-   toplam renk yuku %6'nin altinda tutuldu. */
-.surface-mesh {
-  background-color: var(--surface);
-  background-image:
-    radial-gradient(60% 55% at 8% 0%, color-mix(in srgb, var(--brand-600) 6%, transparent), transparent 62%),
-    radial-gradient(55% 50% at 98% 8%, color-mix(in srgb, var(--cyan-400) 5%, transparent), transparent 58%),
-    radial-gradient(70% 60% at 50% 100%, color-mix(in srgb, var(--mint-500) 4%, transparent), transparent 60%);
-}
-/* Koyu baglamda ayni doku — beyaz zemin bastirmadan */
-.surface-mesh-dark {
-  background-color: var(--navy-900);
-  background-image:
-    radial-gradient(60% 55% at 8% 0%, rgba(20, 99, 255, 0.22), transparent 62%),
-    radial-gradient(55% 50% at 98% 8%, rgba(34, 211, 238, 0.16), transparent 58%),
-    radial-gradient(70% 60% at 50% 100%, rgba(16, 185, 163, 0.14), transparent 60%);
 }
 
 /* Cam kart — blur + ince kenar + ust isik. `.glass`ten farki: kart
@@ -1336,20 +786,11 @@ p {
   box-shadow: var(--inner-top), var(--elev-3);
 }
 
-/* Renkli halka parillitisi — vurgulanmak istenen TEK kart icin. */
-.ring-glow-brand { box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-600) 22%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--brand-600) 70%, transparent); }
-.ring-glow-mint  { box-shadow: 0 0 0 1px color-mix(in srgb, var(--mint-500) 26%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--mint-500) 66%, transparent); }
-.ring-glow-amber { box-shadow: 0 0 0 1px color-mix(in srgb, var(--amber-400) 30%, transparent), 0 10px 34px -18px color-mix(in srgb, var(--amber-500) 62%, transparent); }
-
 /* ---- 6) Mikro animasyonlar ------------------------------------------------
    Hepsi 120-320ms. `both` fill mode: giris oncesi gorunmez, sonrasi sabit. */
 @keyframes anim-rise {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: none; }
-}
-@keyframes anim-pop {
-  0% { opacity: 0; transform: scale(0.94); }
-  100% { opacity: 1; transform: none; }
 }
 @keyframes anim-pulse-soft {
   0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 34%, transparent); }
@@ -1357,16 +798,9 @@ p {
 }
 
 .anim-rise { animation: anim-rise var(--motion-base) var(--ease-out-expo) both; }
-.anim-pop { animation: anim-pop var(--motion-base) var(--ease-spring) both; }
 /* Dikkat cekilmesi gereken TEK oge icin (or. onay bekleyen sayac). Surekli
    dongu oldugu icin sayfada birden fazla kullanilmamali. */
 .anim-pulse-soft { animation: anim-pulse-soft 2s var(--ease-out-quart) infinite; }
-
-/* Gecikme yardimcilari — .stagger-grid'in tekil karsiligi (liste disi ogeler). */
-.anim-d1 { animation-delay: 40ms; }
-.anim-d2 { animation-delay: 80ms; }
-.anim-d3 { animation-delay: 120ms; }
-.anim-d4 { animation-delay: 160ms; }
 
 /* Iskelet yuzeyi (`.skeleton`): tek tanim src/app/motion.css icindedir. */
 
@@ -1376,14 +810,12 @@ p {
    `both` fill mode yuzunden icerik gorunmez kalmasin. */
 @media (prefers-reduced-motion: reduce) {
   .anim-rise,
-  .anim-pop,
   .anim-pulse-soft {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
   }
   .anim-pulse-soft { box-shadow: none !important; }
-  .anim-d1, .anim-d2, .anim-d3, .anim-d4 { animation-delay: 0ms !important; }
 }
 
 /* AA kontrast: açık zeminde amber-600 / mint-500 METİN tonları koyulaştırılır
@@ -1395,16 +827,6 @@ p {
    TEMA KATMANI v3 — tipografi ölçeği · etkileşim · cam · erişilebilirlik
    Kural: yeni değerler token'dan gelir (tokens.css); bu blok yalnız EKLER.
    ========================================================================== */
-
-/* Tipografi ölçeği: display / h1 / h2 / body / small / caption. Sayısal
-   içerik için eşit genişlikli rakam (tabular-nums) otomatik uygulanır. */
-.type-display { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-display); line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; color: var(--heading); text-wrap: balance; }
-.type-h1 { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-h1); line-height: 1.2; font-weight: 700; letter-spacing: -0.025em; color: var(--heading); text-wrap: balance; }
-.type-h2 { font-family: var(--font-manrope), system-ui, sans-serif; font-size: var(--fs-h2); line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; color: var(--heading); }
-.type-body { font-size: var(--fs-body); line-height: 1.55; color: var(--text); }
-.type-small { font-size: var(--fs-small); line-height: 1.45; color: var(--text-muted); }
-.type-caption { font-size: var(--fs-caption); line-height: 1.35; letter-spacing: 0.01em; color: var(--text-muted); }
-.type-display, .type-h1, [data-numeric] { font-variant-numeric: tabular-nums; }
 
 /* ---- CAM YÜZEY BÜTÇESİ (docs/DESIGN_SYSTEM.md "Cam yüzey bütçesi") ----------------
    backdrop-filter pahalıdır: altındaki her piksel değişiminde (kaydırma, animasyon)
@@ -1446,16 +868,6 @@ main [class*="backdrop-blur"] {
 }
 
 /* ---- Ana sayfa hero ürün illüstrasyonu (saf SVG; JS yok) ---- */
-.hero-gradient-text {
-  /* Büyük metin için AA (>=3:1) kalan statik gradient; animasyon yok. */
-  background: linear-gradient(100deg, var(--brand-700), var(--brand-600) 55%, var(--mint-600));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
 .hero-phone {
   filter: drop-shadow(0 28px 32px rgba(7, 26, 56, 0.3));
-}
-@media (prefers-reduced-motion: reduce) {
-  .hero-chip { animation: none !important; }
 }

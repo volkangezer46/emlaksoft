@@ -17,7 +17,7 @@ import { hrefWith, type Filters } from "./errors-href";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { KpiCard, KpiGrid } from "@/components/ui/kpi-card";
 import { ErrorTriageForm } from "./error-triage";
-import { countOpenErrors, DURUM_TO_STATUS, isMissingColumn, TRIAGE_LABEL, type TriageStatus } from "./triage";
+import { countOpenErrors, CSP_MEASUREMENT_SOURCE, DURUM_TO_STATUS, isMissingColumn, TRIAGE_LABEL, type TriageStatus } from "./triage";
 
 export const metadata = { title: "Üretim hataları" };
 
@@ -41,6 +41,9 @@ type Row = {
   release?: string | null;
   snoozed_until?: string | null;
 };
+
+/** error_logs.source etiketleri; "csp" = CSP rapor modu ölçümü (src/app/api/csp-rapor), engellenen bir şey yok. */
+const SOURCE_LABELS: Record<string, string> = { server: "Sunucu", client: "İstemci", csp: "CSP ölçümü" };
 
 const BASE_COLS = "id, tenant_id, source, digest, message, stack, path, occurrences, first_seen, last_seen, resolved_at, tenant:tenants(name)";
 const TRIAGE_COLS = `${BASE_COLS}, status, assignee_id, note, release, snoozed_until`;
@@ -101,7 +104,7 @@ export async function ErrorsView({
   const cozulmusGoster = params.durum === "cozulmus";
   const sonBirSaat = params.son === "1saat";
   const q = (params.q ?? "").trim().slice(0, 80);
-  const kaynak = params.kaynak === "server" || params.kaynak === "client" ? params.kaynak : undefined;
+  const kaynak = params.kaynak === "server" || params.kaynak === "client" || params.kaynak === "csp" ? params.kaynak : undefined;
   const ofis = /^[0-9a-f-]{36}$/i.test(params.ofis ?? "") ? params.ofis : undefined;
   const surumGecisi = params.tur === "surum";
   // Yayın süzgeci (Sistem > Durum sayfası > Sürüm geçmişi "açık hata"): error_logs.release = SHA'nın ilk 12 karakteri.
@@ -131,7 +134,8 @@ export async function ErrorsView({
     if (triage) listQ = listQ.eq("status", triageStatus);
     else listQ = cozulmusGoster ? listQ.not("resolved_at", "is", null) : listQ.is("resolved_at", null);
     if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
-    if (kaynak) listQ = listQ.eq("source", kaynak);
+    // CSP ölçümü hata değildir: yalnız kendi süzgeciyle listelenir (countOpenErrors ile aynı küme).
+    listQ = kaynak ? listQ.eq("source", kaynak) : listQ.neq("source", CSP_MEASUREMENT_SOURCE);
     if (ofis) listQ = listQ.eq("tenant_id", ofis);
     // Sürüm sütunu yalnız triyaj şemasında var; şema yokken süzgeç uygulanmaz (eski liste).
     if (yayin && triage) listQ = listQ.eq("release", yayin);
@@ -148,6 +152,7 @@ export async function ErrorsView({
     .select("id", { count: "exact", head: true })
     .gte("last_seen", new Date(simdi - 3_600_000).toISOString());
   sonSaatQ = cozulmusGoster ? sonSaatQ.not("resolved_at", "is", null) : sonSaatQ.is("resolved_at", null);
+  sonSaatQ = kaynak === CSP_MEASUREMENT_SOURCE ? sonSaatQ.eq("source", kaynak) : sonSaatQ.neq("source", CSP_MEASUREMENT_SOURCE);
 
   const [triageList, { count: acikSayi }, { count: sonSaatSayi }, ofisRes, staffRes] = await Promise.all([
     buildList(true),
@@ -250,9 +255,10 @@ export async function ErrorsView({
           aria-label="Kaynak"
           className="focus-ring rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm"
         >
-          <option value="">Tüm kaynaklar</option>
+          <option value="">Tüm hata kaynakları</option>
           <option value="server">Sunucu</option>
           <option value="client">İstemci</option>
+          <option value="csp">CSP ölçümü</option>
         </select>
         <Button variant="navy" size="sm" type="submit">
           Filtrele
@@ -266,7 +272,7 @@ export async function ErrorsView({
             ) : null}
             {kaynak ? (
               <Link href={hrefWith({ ...base, kaynak: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
-                Kaynak: {kaynak === "server" ? "Sunucu" : "İstemci"} <X className="h-3 w-3" />
+                Kaynak: {SOURCE_LABELS[kaynak]} <X className="h-3 w-3" />
               </Link>
             ) : null}
             {yayin ? (
@@ -326,8 +332,8 @@ export async function ErrorsView({
                   ) : null}
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2">
-                      <Badge variant={r.source === "server" ? "danger" : "warning"}>
-                        {r.source === "server" ? "Sunucu" : "İstemci"}
+                      <Badge variant={r.source === "server" ? "danger" : r.source === "csp" ? "info" : "warning"}>
+                        {SOURCE_LABELS[r.source] ?? "İstemci"}
                       </Badge>
                       {classifyError(r.message) === "surum_gecisi" ? (
                         <span title="Yeni sürüm yayınlandıktan sonra eski sekmenin artık olmayan dosyayı istemesi; sayfa yenilenince geçer.">
