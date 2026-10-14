@@ -189,16 +189,16 @@ export function PhoneInput(props: PhoneInputProps) {
     <div className="@container">
     <div className="flex flex-nowrap items-stretch gap-2 @max-[18rem]:flex-wrap">
       <label
-        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-[0.4375rem] text-sm text-ink transition focus-within:border-brand-400"
+        className="relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-[0.4375rem] text-sm text-ink-950 transition focus-within:border-brand-400"
       >
         <span
           aria-hidden="true"
-          className="rounded-[var(--radius-control)] bg-line/60 px-1.5 py-0.5 text-xs font-semibold leading-none tracking-wide text-ink"
+          className="rounded-[var(--radius-control)] bg-line/60 px-1.5 py-0.5 text-xs font-semibold leading-none tracking-wide text-ink-950"
         >
           {country.iso}
         </span>
         <span className="tabular-nums">+{country.dial}</span>
-        <span aria-hidden="true" className="text-xs text-muted">
+        <span aria-hidden="true" className="text-xs text-text-muted">
           ▾
         </span>
         <select
@@ -262,7 +262,7 @@ export function PhoneInput(props: PhoneInputProps) {
       </p>
     ) : null}
     {notice ? (
-      <p role="status" className="mt-1 text-xs text-muted">
+      <p role="status" className="mt-1 text-xs text-text-muted">
         {notice}
       </p>
     ) : null}

@@ -9,7 +9,7 @@ import { createAdvisor, type CreateAdvisorResult } from "../invite-actions";
 import { saveAdvisorExtras } from "@/app/actions/advisor-profile";
 import { clearFormDraft } from "@/components/app/use-form-draft";
 import { useToast } from "@/components/app/toast-provider";
-import { MODULE_LABELS } from "@/app/app/ayarlar/yetkilendirme/role-permissions-matrix";
+import { MODULE_LABELS } from "@/lib/permission-module-labels";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { EmailInput } from "@/components/ui/email-input";

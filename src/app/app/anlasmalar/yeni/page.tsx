@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { NewDealForm } from "./new-deal-form";
 import { getStageLabels } from "@/lib/definitions";
@@ -10,7 +10,7 @@ export const metadata = { title: "Yeni anlaşma" };
 
 export default async function NewDealPage() {
   const { perms, userId, tenantId } = await requireModulePage("commissions");
-  if (!(perms.commissions ?? []).includes("create")) redirect("/app/anlasmalar");
+  if (!(perms.commissions ?? []).includes("create")) redirect(deniedPageHref("commissions"));
   const supabase = await createClient();
 
   // Aşama etiketleri, portföy/müşteri listeleri ve özel alanlar bağımsız: TEK turda.

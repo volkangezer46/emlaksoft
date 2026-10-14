@@ -27,7 +27,7 @@ function Trigger({ onOpen, onWarm }: { onOpen?: () => void; onWarm?: () => void 
       aria-haspopup="menu"
       aria-expanded={false}
       className="focus-ring press inline-flex h-11 min-w-11 items-center justify-center gap-1.5 sm:h-10 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
-      aria-label="Hızlı yeni kayıt menüsü"
+      aria-label="Hızlı ekle menüsü"
     >
       <Plus className="h-4 w-4" />
       <span className="hidden sm:inline">Yeni</span>

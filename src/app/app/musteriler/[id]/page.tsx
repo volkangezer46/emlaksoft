@@ -24,6 +24,7 @@ import { CustomerTagChips } from "./customer-tag-chips";
 import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs, CUSTOMER_TAB_IDS } from "./customer-360-tabs";
+import { customerCtaPermissions } from "./customer-cta-perms";
 import { resolveTab } from "@/components/app/detail-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { RentReminderPref } from "./rent-reminder-pref";
@@ -687,6 +688,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
             files={filesData ?? []}
             communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
             canCreateComm={(perms.customers ?? []).includes("create")}
+            can={customerCtaPermissions(perms)}
             active={tab}
             counts={{
               demands: demands.length,

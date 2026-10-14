@@ -60,6 +60,8 @@ export const APP_ACTIONS: readonly AppAction[] = [
   { label: "Yeni anlaşma", href: "/app/anlasmalar/yeni", icon: ICONS.anlasma, module: "commissions", shortcut: "n a" },
   { label: "Yeni teklif", href: "/app/teklifler/yeni", icon: ICONS.teklif, module: "offers" },
   { label: "Yeni sözleşme", href: "/app/sozlesmeler/yeni", icon: ICONS.sozlesme, module: "contracts" },
+  // Muhasebe kaydı ayrı bir /yeni sayfası değildir: Muhasebe başlığındaki "Yeni kayıt" penceresi (expenses izni).
+  { label: "Gelir/Gider kaydı", href: "/app/giderler", icon: ICONS.gider, module: "expenses" },
   { label: "Yeni kiralama", href: "/app/kiralama/yeni", icon: ICONS.anahtar, module: "rentals" },
   { label: "Yeni proje", href: "/app/projeler/yeni", icon: ICONS.proje, module: "projects" },
   { label: "Yeni açık ev", href: "/app/acik-ev/yeni", icon: ICONS.acikEv, module: "open_house" },

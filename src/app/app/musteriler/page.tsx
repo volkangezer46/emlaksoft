@@ -264,7 +264,8 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ac
         label="Müşteri tipi"
       />
 
-      {/* Sıcaklık segmentleri (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
+      {/* Sıcaklık segmentleri (çip = filtre; aktifken tekrar tıklamak kaldırır). Çip tam opak (soluk opaklık AA kontrastı
+          bozuyordu); seçili durum halka + aria-current ile verilir: çip bir BAĞLANTIDIR, aria-pressed yalnız düğme rolünde geçerli. */}
       <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
         {SEGMENT_CARDS.map((card) => {
@@ -275,7 +276,7 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ac
               href={on ? customersHref(baseParams, { segment: undefined, sayfa: undefined }) : customersHref(baseParams, { segment: card.key, sayfa: undefined })}
               aria-current={on ? "true" : undefined}
               title={on ? "Filtre aktif — kaldır" : `${HEAT_SEGMENTS[card.key].label} müşterileri göster`}
-              className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "opacity-85 hover:opacity-100"} touch:min-h-11`}
+              className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition ${PILL_TONE_CLASS[heatTone(card.key)]} ${on ? "ring-2 ring-brand-500" : "hover:brightness-95"} touch:min-h-11`}
             >
               <card.icon aria-hidden="true" className="h-3.5 w-3.5" />
               {HEAT_SEGMENTS[card.key].label}

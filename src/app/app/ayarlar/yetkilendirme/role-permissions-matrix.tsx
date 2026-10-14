@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Check, RotateCcw } from "lucide-react";
 import { updateTenantPermission, resetRolePermissions } from "@/app/actions/permissions";
 import { DEFAULT_MATRIX, type AppAction, type AppModule, type AppRole } from "@/lib/permissions";
+import { MODULE_LABELS } from "@/lib/permission-module-labels";
 
 const ACTIONS: { value: AppAction; label: string }[] = [
   { value: "view", label: "Görüntüle" },
@@ -15,39 +16,6 @@ const ACTIONS: { value: AppAction; label: string }[] = [
   { value: "delete", label: "Sil" },
 ];
 
-export const MODULE_LABELS: Record<AppModule, string> = {
-  dashboard:   "Ana ekran",
-  customers:   "Müşteriler",
-  demands:     "Talepler",
-  properties:  "Portföyler",
-  matching:    "Eşleştirme",
-  portals:     "Portal kontrol",
-  leak:        "Kayıp-kaçak",
-  appointments:"Randevular",
-  calls:       "Akıllı arama",
-  commissions: "Komisyon / Anlaşmalar",
-  tasks:       "Görevler",
-  team:        "Ekip",
-  support:     "Destek",
-  settings:    "Ayarlar",
-  billing:     "Abonelik",
-  reports:     "Raporlar",
-  valuation:   "Değerleme",
-  compliance:  "Uyum",
-  campaigns:   "Kampanyalar",
-  contracts:   "Sözleşmeler",
-  expenses:    "Muhasebe",
-  offers:      "Teklifler",
-  targets:     "Hedefler",
-  open_house:  "Açık Ev",
-  rentals:     "Mülk yönetimi",
-  projects:    "Proje Satış",
-  network:     "Ofisler Arası Ağ",
-  surveys:     "Anketler ve anketör",
-  earnings_all: "Başkasının kazancı (yalnız Görüntüle)",
-  office_center: "Ofis Merkezi",
-  prospecting: "Sahibinden ilanlar",
-};
 
 function cellKey(mod: AppModule, action: AppAction) {
   return `${mod}:${action}`;

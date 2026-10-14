@@ -35,6 +35,14 @@ export function resolvePageRole(
   return typeof role === "string" && role.trim() ? role : null;
 }
 
+/**
+ * Yetkisiz sayfa isteğinin gideceği Bugün ekranı: `?yetki=yok&sayfa=<modül>` (şerit hangi sayfanın kapalı olduğunu
+ * adıyla söyler). Sayfa içi ek kapılar (ör. /app/anlasmalar/yeni "create" izni) da aynı adresi kullanır.
+ */
+export function deniedPageHref(mod: AppModule): string {
+  return `/app?yetki=yok&sayfa=${encodeURIComponent(mod)}`;
+}
+
 export async function requireModulePage(mod: AppModule, href?: string) {
   const user = await getRequestUser();
   if (!user) redirect("/giris");
@@ -65,7 +73,7 @@ export async function requireModulePage(mod: AppModule, href?: string) {
       ? mergeEffectivePermissions(role, bootOwn.roleOverrides, bootOwn.userOverrides)
       : await getEffectivePermissions(tenantId, role, user.id);
   if (!effectiveCanAccessModule(perms, mod)) {
-    redirect("/app?yetki=yok");
+    redirect(deniedPageHref(mod));
   }
   if (href && tenantId) {
     const gateCtx =

@@ -9,11 +9,11 @@ import {
   markAllNotificationsReadForm,
   markNotificationReadForm,
 } from "@/app/actions/notifications";
-import { relativeTimeTR } from "@/lib/admin-format";
-import { daysAgoIso } from "@/lib/clock";
+import { daysAgoIso, now } from "@/lib/clock";
 import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { groupNotifications, notificationTimeLabel } from "./group-notifications";
 /**
  * Tenant bildirim arşivi — zil panelindeki son 30 kaydın sayfalı/filtreli tam
  * listesi. Sorgu mantığı zil ile aynı (bkz. listMyNotifications): RLS + kendi
@@ -88,6 +88,9 @@ export async function NotificationsView({
 
   // Gövde sonundaki makine izi (` · task:<uuid>`) gösterilmez; izden kayda daha yakın bağlantı türetilir.
   const rows = (data ?? []).map((r) => ({ ...r, body: stripNotificationMarker(r.body), href: notificationHref(r) }));
+  // Aynı başlık + türdeki tekrarlı kayıtlar (ör. cron uyarıları) bu sayfada tek satır: "× N".
+  const groups = groupNotifications(rows);
+  const nowMs = now();
   const total = count ?? rows.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageParam, totalPages);
@@ -259,7 +262,7 @@ export async function NotificationsView({
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {rows.map((n) => (
+            {groups.map(({ head: n, count: groupCount, unreadIds }) => (
               <div
                 key={n.id}
                 className={`relative flex items-start gap-3 px-5 py-3.5 transition hover:bg-canvas/60 ${
@@ -269,9 +272,11 @@ export async function NotificationsView({
                 {/* Satır tıklaması: href varsa gezinme, yoksa tekil okundu işaretleme */}
                 {n.href ? (
                   <Link href={n.href} className="absolute inset-0" aria-label={n.title} />
-                ) : !n.read_at ? (
+                ) : unreadIds.length > 0 ? (
                   <form action={markNotificationReadForm} className="absolute inset-0">
-                    <input type="hidden" name="id" value={n.id} />
+                    {unreadIds.map((id) => (
+                      <input key={id} type="hidden" name="id" value={id} />
+                    ))}
                     <button
                       type="submit"
                       className="h-full w-full cursor-pointer"
@@ -284,6 +289,14 @@ export async function NotificationsView({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className={`truncate text-sm ${n.read_at ? "font-medium" : "font-semibold"} text-ink-950`}>{n.title}</p>
+                    {groupCount > 1 ? (
+                      <span
+                        className="shrink-0 rounded-full bg-canvas px-1.5 py-0.5 text-xs font-semibold tabular-nums text-text-muted"
+                        title={`Bu sayfada aynı başlıkta ${groupCount} bildirim`}
+                      >
+                        × {groupCount}
+                      </span>
+                    ) : null}
                     <Link
                       href={buildHref({ tur: tur === n.kind ? null : n.kind })}
                       title={`"${kindLabel[n.kind] ?? n.kind}" türünü filtrele`}
@@ -295,9 +308,11 @@ export async function NotificationsView({
                   {n.body ? <p className="mt-0.5 truncate text-xs text-text-muted">{n.body}</p> : null}
                 </div>
                 {/* href'li okunmamış satırda gezinmeden bağımsız okundu düğmesi */}
-                {n.href && !n.read_at ? (
+                {n.href && unreadIds.length > 0 ? (
                   <form action={markNotificationReadForm} className="relative z-10 shrink-0">
-                    <input type="hidden" name="id" value={n.id} />
+                    {unreadIds.map((id) => (
+                      <input key={id} type="hidden" name="id" value={id} />
+                    ))}
                     <button
                       type="submit"
                       title="Okundu işaretle"
@@ -308,7 +323,9 @@ export async function NotificationsView({
                     </button>
                   </form>
                 ) : null}
-                <span className="shrink-0 text-xs text-text-faint">{relativeTimeTR(n.created_at)}</span>
+                <span className="shrink-0 text-xs text-text-faint">
+                  <time dateTime={n.created_at}>{notificationTimeLabel(n.created_at, nowMs)}</time>
+                </span>
               </div>
             ))}
           </div>

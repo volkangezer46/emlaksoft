@@ -4,7 +4,9 @@ import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { resolveScope, SCOPE_COOKIE } from "@/lib/ui/scope";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
+import { moduleLabelFor } from "@/lib/permission-module-labels";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getRequestSampleScope } from "@/lib/cache/request";
 import type { SampleKpiScope } from "@/lib/sample-scope";
@@ -74,11 +76,13 @@ export const metadata = { title: "Ana ekran" };
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string }>;
+  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string }>;
 }) {
   // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
   const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
-  const { donem, kapsam, daha, icgoru, ozet } = sp ?? {};
+  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa } = sp ?? {};
+  // Yetkisiz sayfadan gelindi (requireModulePage → ?yetki=yok&sayfa=<modül>): kapatılabilir bilgi şeridi.
+  const deniedNotice = yetki === "yok" ? { label: moduleLabelFor(sayfa) } : null;
 
   const { tenantId, perms, role, userId } = gate;
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
@@ -385,6 +389,24 @@ export default async function AppHomePage({
       <DashboardStack>
         <div className="flex flex-col gap-3">
           <AnaHero ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
+          {deniedNotice ? (
+            <Alert
+              tone="info"
+              title={deniedNotice.label ? `Bu sayfa rolünüz için kapalı (${deniedNotice.label})` : "Bu sayfa rolünüz için kapalı"}
+              action={
+                <Link
+                  href={homeHref(params, {})}
+                  scroll={false}
+                  aria-label="Bilgi şeridini kapat"
+                  className="focus-ring press grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-full text-current transition hover:bg-black/5"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              }
+            >
+              Erişim için ofis yöneticinizden yetki isteyebilirsiniz.
+            </Alert>
+          ) : null}
           <NeYapmak chips={neYapmakChips(layout.variant, role === "owner")} />
           {layout.statusBar ? (
             <DurumCubugu>

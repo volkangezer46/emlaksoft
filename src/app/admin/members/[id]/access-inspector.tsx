@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown, Eye, EyeOff, Loader2, Search, ShieldAlert, ShieldCheck, SlidersHorizontal, UserCog } from "lucide-react";
 import { setMemberOverrideAsStaff, setMemberScopeAsStaff, setTenantRolePermissionAsStaff, type AccessActionResult } from "@/app/actions/platform-member-access";
-import { MODULE_LABELS } from "@/app/app/ayarlar/yetkilendirme/role-permissions-matrix";
+import { MODULE_LABELS } from "@/lib/permission-module-labels";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, FormInput, FormSelect } from "@/components/ui/form-controls";
