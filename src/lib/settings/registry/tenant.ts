@@ -528,7 +528,7 @@ const aiFeatures: AnySettingDef[] = [
     group: "ai",
     default: false,
     label: "Sesli not ve AI özeti",
-    description: "Müşteri ve randevu kartında ses kaydı yapılır; kayıt yazıya çevrilip özetlenir ve not olarak saklanır. Ses dosyası SAKLANMAZ, yalnız metin tutulur. Kayıttan önce ilgili kişinin açık rızası onay kutusuyla alınır.",
+    description: "Müşteri ve randevu kartında ses kaydı yapılır; kayıt yazıya çevrilip özetlenir ve not olarak saklanır. Ses dosyası SAKLANMAZ, yalnız metin tutulur. Kayıttan önce ilgili kişinin açık rızası onay kutusuyla alınır. Açıkken hızlı kayıt notundan alan önerisinde (bütçe, oda, bölge, tarih, görev) kuralın bulamadığı alanları AI tamamlar; kapalıyken öneriler yalnız kural tabanlıdır.",
     impact: "Ses kaydı yapay zekâ sağlayıcısına yazıya çevrilmek üzere gönderilir (KVKK aydınlatma/rıza sorumluluğu ofistedir). AI kotanızdan harcar. Kapalıyken düğme hiç görünmez.",
   }),
 ];

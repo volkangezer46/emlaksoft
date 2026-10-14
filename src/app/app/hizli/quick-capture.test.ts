@@ -68,6 +68,31 @@ describe("hızlı kayıt", () => {
     expect(buildQuickPropertyTitle({})).toBe("Yeni portföy (taslak)");
   });
 
+  it("saha: istek kimliği + çevrimdışı kuyruk + yerel taslak; sunucuda her action çift kayıt freninden geçer", () => {
+    expect(ui).toContain('fd.set("client_request_id", id)');
+    expect(ui).toContain("enqueueOutbox(");
+    expect(ui).toContain("isNetworkFailure(e)");
+    expect(ui).toContain("<OutboxPanel");
+    expect(ui).toContain('useFormDraft("musteri")');
+    expect(ui).toContain("draft.clear()");
+    for (const kind of ['"customer"', '"call"', '"appointment"', '"property"']) {
+      expect(actions).toMatch(new RegExp(`guarded\\(formData, ${kind}`));
+    }
+    expect(actions).toContain("onceByRequest(");
+  });
+
+  it("nottan öneri: yalnız onaylanan fx_* alanları uygulanır, mevcut action'lar sarılır (talep + görev)", () => {
+    const assist = read("field-assist.tsx");
+    expect(assist).toContain("approved.rooms && f.rooms");
+    expect(assist).toContain('name="fx_task_title"');
+    expect(actions).toContain("createDemand({}, demand)");
+    expect(actions).toContain("createTask({}, fd)");
+    expect(actions).not.toMatch(/\.from\("(customer_demands|tasks)"\)\s*\.insert/);
+    // GPS önerisi yalnız "Uygula" ile forma girer ve sunucuda zincir doğrulanır
+    expect(assist).toMatch(/loc\.applied && s\.districtId \? <input type="hidden" name="district_id"/);
+    expect(actions).toContain("validateGeoChain(");
+  });
+
   it("randevu: sunucuyla aynı katılımcı kuralı istemcide (yer göstermede portföy 'isteğe bağlı' DEĞİL)", () => {
     expect(ui).toContain("appointmentMissing(");
     expect(ui).not.toContain("Portföy (isteğe bağlı)");

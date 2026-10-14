@@ -1,21 +1,34 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
-import { Check, ChevronsUpDown, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
+import { CalendarClock, Check, ChevronsUpDown, CloudOff, History, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { Button } from "@/components/ui/button";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { CALL_DISPOSITIONS } from "@/app/app/gelen-kutusu/call-console";
 import { quickCreateAppointment, quickCreateCustomer, quickCreateProperty, quickLogCall } from "./actions";
-import { QUICK_INTENTS, QUICK_ROOM_OPTIONS } from "./quick-intents";
+import { QUICK_INTENTS, QUICK_INTENT_TRANSACTION, QUICK_ROOM_OPTIONS, type QuickIntent } from "./quick-intents";
 import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
 import { missingFieldsError } from "@/lib/form-rules";
 import { MissingCountBadge } from "@/components/ui/form-action-bar";
+import { now } from "@/lib/clock";
+import {
+  browserStore,
+  enqueueOutbox,
+  isNetworkFailure,
+  outcomeFromResult,
+  removeOutboxItem,
+  type DraftValues,
+  type OutboxItem,
+  type OutboxKind,
+} from "@/lib/field-capture/outbox";
+import { LocationSuggestionRow, NoteAssist, OutboxPanel, outboxChanged, restoreDraft, useFormDraft, useLocationSuggestion } from "./field-assist";
 import dynamic from "next/dynamic";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -28,6 +41,8 @@ const TAB_META: Record<QuickTabId, { label: string; icon: MorphTabItem["icon"] }
   portfoy: { label: "Portföy", icon: ICONS.portfoy },
 };
 
+const KIND_TAB: Record<OutboxKind, QuickTabId> = { customer: "musteri", call: "gorusme", appointment: "randevu", property: "portfoy" };
+
 // Medya yükleyicisi (filigran tuvali dahil) yalnız taslak kaydedildikten sonra yüklenir: /app/hizli ilk yükü büyümez.
 const PropertyMediaManager = dynamic(() => import("@/app/app/portfoyler/[id]/property-media-manager").then((m) => m.PropertyMediaManager), {
   loading: () => <p className="text-sm text-text-muted">Fotoğraf yükleyici açılıyor…</p>,
@@ -39,23 +54,93 @@ const GHOST =
   "focus-ring press inline-flex min-h-11 items-center justify-center rounded-[var(--radius-control)] border border-line px-4 text-sm font-semibold text-ink-950 transition hover:border-brand-300";
 const BIG = "min-h-11";
 
-type Result = { error?: string; ok?: boolean; id?: string; conflictWarning?: string; duplicate?: boolean };
+type Result = {
+  error?: string;
+  ok?: boolean;
+  id?: string;
+  conflictWarning?: string;
+  duplicate?: boolean;
+  applied?: string[];
+  skipped?: string[];
+};
 
-/** Ortak gönderim akışı: pending + hata + başarı; Ctrl/Cmd+Enter formu gönderir. */
-function useQuick(action: (fd: FormData) => Promise<Result>) {
+/** Sunucuya gidecek eylemler (çevrimdışı kuyruk aynı eylemi istek kimliğiyle yeniden çağırır). */
+const ACTIONS: Record<OutboxKind, (fd: FormData) => Promise<Result>> = {
+  customer: quickCreateCustomer,
+  call: quickLogCall,
+  appointment: quickCreateAppointment,
+  property: quickCreateProperty,
+};
+
+function newRequestId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    // Eski tarayıcı: kimliksiz gönderim (sunucu freni atlanır, mevcut mükerrer frenleri geçerli)
+    return "";
+  }
+}
+
+/**
+ * Ortak gönderim akışı: pending + hata + başarı; Ctrl/Cmd+Enter formu gönderir. Saha: her form turu tek istek kimliği
+ * taşır; bağlantı yoksa ya da istek ağ hatasıyla düşerse form bu cihazda sıraya girer (bağlantı gelince bir kez gönderilir).
+ * Başarıda (ya da sıraya alınınca) yerel taslak silinir.
+ */
+function useQuick(kind: OutboxKind, draft: ReturnType<typeof useFormDraft>, labelOf: (fd: FormData) => string) {
+  const action = ACTIONS[kind];
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<Result>({});
-  const [done, setDone] = useState<Result | null>(null);
+  const [done, setDone] = useState<(Result & { fields: DraftValues }) | null>(null);
+  const [queued, setQueued] = useState(false);
   const [round, setRound] = useState(0);
+  const requestId = useRef<string | null>(null);
+
+  function queue(fd: FormData, id: string) {
+    const fields: [string, string][] = [];
+    for (const [k, v] of fd.entries()) if (typeof v === "string" && k !== "client_request_id") fields.push([k, v]);
+    const ok = id ? enqueueOutbox(browserStore(), { id, kind, fields, label: labelOf(fd), nowMs: now() }) : false;
+    if (ok) {
+      outboxChanged();
+      draft.clear();
+      // Sıradaki öğe kendi kimliğini taşır; bu formdan sonraki gönderim (ör. kuyruktan geri yüklenen) yeni istektir.
+      requestId.current = null;
+      setQueued(true);
+    } else {
+      setResult({ error: "Bağlantı yok ve kayıt bu cihazda sıraya alınamadı (tarayıcı deposu kapalı). Bağlantı gelince tekrar kaydedin." });
+    }
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>, extra?: Record<string, string>) {
     event.preventDefault();
+    setQueued(false);
     const fd = new FormData(event.currentTarget);
     for (const [k, v] of Object.entries(extra ?? {})) fd.set(k, v);
+    requestId.current ??= newRequestId();
+    const id = requestId.current;
+    if (id) fd.set("client_request_id", id);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      queue(fd, id);
+      return;
+    }
     startTransition(async () => {
-      const res = await action(fd);
+      let res: Result;
+      try {
+        res = await action(fd);
+      } catch (e) {
+        if (isNetworkFailure(e)) queue(fd, id);
+        else setResult({ error: "Kayıt şu an gönderilemedi. Tekrar deneyin." });
+        return;
+      }
       setResult(res);
-      if (res.ok) setDone(res);
+      if (res.ok) {
+        const fields: DraftValues = {};
+        for (const [k, v] of fd.entries()) if (typeof v === "string") fields[k] = v;
+        draft.clear();
+        setDone({ ...res, fields });
+      } else if (!res.conflictWarning && !res.duplicate) {
+        // Reddedildi (eksik/yanlış alan): düzeltilen form yeni istek olarak gider.
+        requestId.current = null;
+      }
     });
   }
   function onKeyDown(event: KeyboardEvent<HTMLFormElement>) {
@@ -66,10 +151,12 @@ function useQuick(action: (fd: FormData) => Promise<Result>) {
   }
   function again() {
     setDone(null);
+    setQueued(false);
     setResult({});
+    requestId.current = null;
     setRound((r) => r + 1);
   }
-  return { pending, result, done, round, onSubmit, onKeyDown, again };
+  return { pending, result, done, queued, round, onSubmit, onKeyDown, again };
 }
 
 function ErrorBand({ error }: { error?: string }) {
@@ -80,17 +167,45 @@ function ErrorBand({ error }: { error?: string }) {
   ) : null;
 }
 
-function Success({ title, openHref, openLabel, onAgain }: { title: string; openHref: string; openLabel: string; onAgain: () => void }) {
+function ExtrasNote({ result }: { result: Result }) {
+  if (!result.applied?.length && !result.skipped?.length) return null;
+  return (
+    <ul className="space-y-0.5 text-sm">
+      {(result.applied ?? []).map((a) => (
+        <li key={a} className="flex items-center gap-1.5 text-mint-700"><Check className="h-3.5 w-3.5" aria-hidden /> {a}</li>
+      ))}
+      {(result.skipped ?? []).map((s) => (
+        <li key={s} className="flex items-center gap-1.5 text-amber-700"><TriangleAlert className="h-3.5 w-3.5" aria-hidden /> {s}</li>
+      ))}
+    </ul>
+  );
+}
+
+function Success({ title, openHref, openLabel, onAgain, children }: { title: string; openHref: string; openLabel: string; onAgain: () => void; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-4" role="status">
       <p className="flex items-center gap-2 text-base font-bold text-mint-600">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-mint-500/15"><Check className="h-4 w-4" aria-hidden /></span>
         {title}
       </p>
+      {children}
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="button" onClick={onAgain} className={SUBMIT} autoFocus>Bir tane daha</button>
         <Link href={openHref} className={GHOST}>{openLabel}</Link>
       </div>
+    </div>
+  );
+}
+
+function Queued({ onAgain }: { onAgain: () => void }) {
+  return (
+    <div className="flex flex-col gap-4" role="status">
+      <p className="flex items-center gap-2 text-base font-bold text-amber-700">
+        <span className="grid h-8 w-8 place-items-center rounded-full bg-amber-400/20"><CloudOff className="h-4 w-4" aria-hidden /></span>
+        Bağlantı yok — kayıt bu cihazda sıraya alındı
+      </p>
+      <p className="text-sm text-text-muted">Bağlantı gelince otomatik ve bir kez gönderilir. Sayfayı kapatsanız da sırada kalır.</p>
+      <Button onClick={onAgain} className="w-full sm:w-auto" autoFocus>Bir tane daha</Button>
     </div>
   );
 }
@@ -108,28 +223,67 @@ function SubmitRow({ pending, label, missingCount = 0 }: { pending: boolean; lab
   );
 }
 
+function DraftBadge({ show, onDiscard }: { show: boolean; onDiscard: () => void }) {
+  if (!show) return null;
+  return (
+    <p className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
+      <History className="h-3.5 w-3.5" aria-hidden /> Yarım kalan taslak geri yüklendi.
+      <Button variant="ghost" size="xs" onClick={onDiscard}>Taslağı sil</Button>
+    </p>
+  );
+}
+
+/** Randevu sekmesini ön doldurma (nottan onaylanan randevu saati + kaydedilen müşteri). */
+export type AppointmentPrefill = { customerId: string; customerLabel: string; when: string; seq: number };
+
+function PlanAppointmentButton({ when, onPlan }: { when: string | undefined; onPlan?: (when: string) => void }) {
+  if (!when || !onPlan) return null;
+  return (
+    <Button variant="outline" size="lg" icon={CalendarClock} onClick={() => onPlan(when)} className="w-full sm:w-auto">
+      Randevuyu planla ({when.replace("T", " ")})
+    </Button>
+  );
+}
+
 /* ------------------------------- Müşteri ------------------------------- */
 
-function CustomerTab() {
-  const q = useQuick(quickCreateCustomer);
-  const [intent, setIntent] = useState<string>("al");
-  if (q.done) {
+function CustomerTab({ onPlanAppointment }: { onPlanAppointment?: (p: Omit<AppointmentPrefill, "seq">) => void }) {
+  const draft = useFormDraft("musteri");
+  const q = useQuick("customer", draft, (fd) => `Müşteri: ${String(fd.get("full_name") ?? "").trim() || "isimsiz"}`);
+  if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
+  if (q.done && !draft.restored) {
+    const d = q.done;
     return (
       <Success
         title="Müşteri kaydedildi"
-        openHref={q.done.id ? `/app/musteriler/${q.done.id}` : "/app/musteriler"}
+        openHref={d.id ? `/app/musteriler/${d.id}` : "/app/musteriler"}
         openLabel="Tam forma devam et (kaydı aç)"
         onAgain={q.again}
-      />
+      >
+        <ExtrasNote result={d} />
+        {d.id ? (
+          <PlanAppointmentButton
+            when={d.fields.fx_appt_at}
+            onPlan={onPlanAppointment ? (when) => onPlanAppointment({ customerId: d.id as string, customerLabel: d.fields.full_name ?? "", when }) : undefined}
+          />
+        ) : null}
+      </Success>
     );
   }
+  return <CustomerForm key={`${q.round}-${draft.formKey}`} q={q} draft={draft} />;
+}
+
+function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: ReturnType<typeof useFormDraft> }) {
+  const v = draft.values;
+  const [intent, setIntent] = useState<string>(v?.intent && v.intent in QUICK_INTENT_TRANSACTION ? v.intent : "al");
   return (
-    <form key={q.round} onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} className="flex flex-col gap-4">
+    <form onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} onInput={(e) => draft.track(e.currentTarget)} onChange={(e) => draft.track(e.currentTarget)} className="flex flex-col gap-4">
+      <DraftBadge show={draft.restored} onDiscard={draft.clear} />
       <FormField label="Ad soyad" htmlFor="hq-full-name" required>
-        <FormInput id="hq-full-name" name="full_name" required autoComplete="name" autoFocus placeholder="Örn. Ali Kaya" className={BIG} />
+        <FormInput id="hq-full-name" name="full_name" required autoComplete="name" autoFocus placeholder="Örn. Ali Kaya" defaultValue={v?.full_name} className={BIG} />
       </FormField>
       <FormField label="Telefon" htmlFor="hq-phone" required inject={false}>
-        <PhoneInput id="hq-phone" name="phone" required />
+        <PhoneInput id="hq-phone" name="phone" required defaultValue={v?.phone} />
       </FormField>
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium text-ink-950">Ne arıyor?</legend>
@@ -148,8 +302,9 @@ function CustomerTab() {
         </div>
       </fieldset>
       <FormField label="Not (isteğe bağlı)" htmlFor="hq-cust-notes">
-        <FormTextarea id="hq-cust-notes" name="notes" rows={2} placeholder="Bütçe, semt, oda sayısı…" />
+        <FormTextarea id="hq-cust-notes" name="notes" rows={3} placeholder="Bütçe, semt, oda sayısı… (ör. iki artı bir, 3 milyon bütçe, Kadıköy)" defaultValue={v?.notes} />
       </FormField>
+      <NoteAssist textareaId="hq-cust-notes" demand={Boolean(QUICK_INTENT_TRANSACTION[intent as QuickIntent])} />
       <ErrorBand error={q.result.error} />
       <SubmitRow pending={q.pending} label="Müşteriyi kaydet" />
     </form>
@@ -158,15 +313,39 @@ function CustomerTab() {
 
 /* ------------------------------ Görüşme notu ------------------------------ */
 
-function CallTab({ customers }: { customers: ComboboxOption[] }) {
-  const q = useQuick(quickLogCall);
-  const [direction, setDirection] = useState("outbound");
-  const [disposition, setDisposition] = useState<string>("Ulaşıldı");
-  if (q.done) {
-    return <Success title="Görüşme kaydedildi" openHref="/app/gelen-kutusu?sekme=cagri" openLabel="Kaydı aç (görüşmeler)" onAgain={q.again} />;
+function CallTab({ customers, onPlanAppointment }: { customers: ComboboxOption[]; onPlanAppointment?: (p: Omit<AppointmentPrefill, "seq">) => void }) {
+  const draft = useFormDraft("gorusme", ["customer_id"]);
+  const q = useQuick("call", draft, () => "Görüşme notu");
+  if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
+  if (q.done && !draft.restored) {
+    const d = q.done;
+    const customerId = d.fields.customer_id ?? "";
+    return (
+      <Success title="Görüşme kaydedildi" openHref="/app/gelen-kutusu?sekme=cagri" openLabel="Kaydı aç (görüşmeler)" onAgain={q.again}>
+        <ExtrasNote result={d} />
+        {customerId ? (
+          <PlanAppointmentButton
+            when={d.fields.fx_appt_at}
+            onPlan={
+              onPlanAppointment
+                ? (when) => onPlanAppointment({ customerId, customerLabel: customers.find((c) => c.value === customerId)?.label ?? "", when })
+                : undefined
+            }
+          />
+        ) : null}
+      </Success>
+    );
   }
+  return <CallForm key={`${q.round}-${draft.formKey}`} q={q} draft={draft} customers={customers} />;
+}
+
+function CallForm({ q, draft, customers }: { q: ReturnType<typeof useQuick>; draft: ReturnType<typeof useFormDraft>; customers: ComboboxOption[] }) {
+  const v = draft.values;
+  const [direction, setDirection] = useState(v?.direction === "inbound" ? "inbound" : "outbound");
+  const [disposition, setDisposition] = useState<string>(v?.disposition && (CALL_DISPOSITIONS as readonly string[]).includes(v.disposition) ? v.disposition : "Ulaşıldı");
   return (
-    <form key={q.round} onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} className="flex flex-col gap-4">
+    <form onSubmit={q.onSubmit} onKeyDown={q.onKeyDown} onInput={(e) => draft.track(e.currentTarget)} onChange={(e) => draft.track(e.currentTarget)} className="flex flex-col gap-4">
+      <DraftBadge show={draft.restored} onDiscard={draft.clear} />
       <FormField label="Müşteri" htmlFor="hq-call-customer" inject={false}>
         <Combobox
           id="hq-call-customer"
@@ -181,7 +360,7 @@ function CallTab({ customers }: { customers: ComboboxOption[] }) {
         />
       </FormField>
       <FormField label="ya da telefonla" htmlFor="hq-call-phone" inject={false} hint="Müşteri seçtiyseniz boş bırakabilirsiniz.">
-        <PhoneInput id="hq-call-phone" name="phone" />
+        <PhoneInput id="hq-call-phone" name="phone" defaultValue={v?.phone} />
       </FormField>
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium text-ink-950">Kim aradı?</legend>
@@ -209,8 +388,9 @@ function CallTab({ customers }: { customers: ComboboxOption[] }) {
         </div>
       </fieldset>
       <FormField label="Not" htmlFor="hq-call-notes">
-        <FormTextarea id="hq-call-notes" name="notes" rows={3} placeholder="Ne konuşuldu, sonraki adım…" />
+        <FormTextarea id="hq-call-notes" name="notes" rows={3} placeholder="Ne konuşuldu, sonraki adım… (ör. cuma saat 3'te yer gösterme, yarın tekrar ara)" defaultValue={v?.notes} />
       </FormField>
+      <NoteAssist textareaId="hq-call-notes" demand={false} />
       <ErrorBand error={q.result.error} />
       <SubmitRow pending={q.pending} label="Görüşmeyi kaydet" />
     </form>
@@ -224,36 +404,62 @@ function AppointmentTab({
   properties,
   typeOptions,
   defaultWhen,
+  prefill,
 }: {
   customers: ComboboxOption[];
   properties: ComboboxOption[];
   typeOptions: { value: string; label: string }[];
   defaultWhen: string;
+  prefill: AppointmentPrefill | null;
 }) {
-  const q = useQuick(quickCreateAppointment);
+  const draft = useFormDraft("randevu", ["customer_id", "property_id", "confirm_conflict"]);
+  const q = useQuick("appointment", draft, () => "Randevu");
+  if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
+  if (q.done && !draft.restored) {
+    return <Success title="Randevu planlandı" openHref="/app/randevular" openLabel="Kaydı aç (randevular)" onAgain={q.again} />;
+  }
+  return (
+    <AppointmentForm
+      key={`${q.round}-${draft.formKey}-${prefill?.seq ?? 0}`}
+      q={q}
+      draft={draft}
+      customers={customers}
+      properties={properties}
+      typeOptions={typeOptions}
+      defaultWhen={prefill?.when ?? draft.values?.when ?? defaultWhen}
+      prefill={prefill}
+    />
+  );
+}
+
+function AppointmentForm({
+  q,
+  draft,
+  customers,
+  properties,
+  typeOptions,
+  defaultWhen,
+  prefill,
+}: {
+  q: ReturnType<typeof useQuick>;
+  draft: ReturnType<typeof useFormDraft>;
+  customers: ComboboxOption[];
+  properties: ComboboxOption[];
+  typeOptions: { value: string; label: string }[];
+  defaultWhen: string;
+  prefill: AppointmentPrefill | null;
+}) {
   const conflict = q.result.conflictWarning ?? null;
-  const [apptType, setApptType] = useState(typeOptions[0]?.value ?? "showing");
-  const [customerId, setCustomerId] = useState("");
+  const v = draft.values;
+  const [apptType, setApptType] = useState(
+    v?.appointment_type && typeOptions.some((o) => o.value === v.appointment_type) ? v.appointment_type : (typeOptions[0]?.value ?? "showing"),
+  );
+  const [customerId, setCustomerId] = useState(prefill?.customerId ?? "");
   const [propertyId, setPropertyId] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   // Sunucu (createAppointment) ile AYNI kural: yer göstermede müşteri + portföy, diğer türlerde en az biri.
   const missing = appointmentMissing({ appointment_type: apptType, customer_id: customerId, property_id: propertyId });
   const isShowing = apptType === "showing";
-  if (q.done) {
-    return (
-      <Success
-        title="Randevu planlandı"
-        openHref="/app/randevular"
-        openLabel="Kaydı aç (randevular)"
-        onAgain={() => {
-          setCustomerId("");
-          setPropertyId("");
-          setLocalError(null);
-          q.again();
-        }}
-      />
-    );
-  }
   function submit(event: FormEvent<HTMLFormElement>) {
     if (missing.length > 0) {
       event.preventDefault();
@@ -266,7 +472,13 @@ function AppointmentTab({
     q.onSubmit(event, conflict ? { confirm_conflict: "1" } : undefined);
   }
   return (
-    <form key={q.round} onSubmit={submit} onKeyDown={q.onKeyDown} className="flex flex-col gap-4">
+    <form onSubmit={submit} onKeyDown={q.onKeyDown} onInput={(e) => draft.track(e.currentTarget)} onChange={(e) => draft.track(e.currentTarget)} className="flex flex-col gap-4">
+      <DraftBadge show={draft.restored} onDiscard={draft.clear} />
+      {prefill ? (
+        <p className="flex items-center gap-1.5 text-xs text-text-muted">
+          <CalendarClock className="h-3.5 w-3.5" aria-hidden /> Nottan önerilen saat ve müşteri dolduruldu; kontrol edip kaydedin.
+        </p>
+      ) : null}
       <FormField
         label="Tür"
         htmlFor="hq-appt-type"
@@ -300,6 +512,8 @@ function AppointmentTab({
           emptyText="Eşleşen müşteri yok"
           onSearch={searchCustomers}
           options={customers}
+          defaultValue={prefill?.customerId}
+          selectedLabel={prefill?.customerLabel || undefined}
           onValueChange={setCustomerId}
           className="[&_button]:min-h-11"
         />
@@ -341,31 +555,13 @@ export type QuickPropertyBrand = { watermark: WatermarkSettings; officeName: str
  * Sahadan hızlı portföy (mal sahibinin evinde): 1) tür, işlem, fiyat, oda, m², "konumumu kullan" → TASLAK kaydedilir;
  * 2) aynı ekranda fotoğraf çek/yükle (portföy detayındaki yükleyicinin AYNISI: filigran, küçültme, belge türü).
  * Başlık ve komisyon oranı sunucuda üretilir/ofis varsayılanından gelir; kalan alanlar "Sonra tamamla" ile tam formda.
+ * Konum alınınca il/ilçe/mahalle ÖNERİSİ gelir; kullanıcı "Uygula" derse portföye yazılır.
  */
 function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: string; label: string }[]; txOptions: { value: string; label: string }[]; brand: QuickPropertyBrand }) {
-  const q = useQuick(quickCreateProperty);
-  const [tx, setTx] = useState(txOptions[0]?.value ?? "Satılık");
-  const [rooms, setRooms] = useState("");
-  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
-
-  function locate() {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGeoState("error");
-      return;
-    }
-    setGeoState("busy");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGeo({ lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 });
-        setGeoState("idle");
-      },
-      () => setGeoState("error"),
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-    );
-  }
-
-  if (q.done?.id) {
+  const draft = useFormDraft("portfoy", ["lat", "lng", "province_id", "district_id", "neighborhood_id", "allow_duplicate"]);
+  const q = useQuick("property", draft, (fd) => `Portföy: ${[fd.get("rooms"), fd.get("transaction_type"), fd.get("property_type")].filter(Boolean).join(" ")}`);
+  if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
+  if (q.done?.id && !draft.restored) {
     return (
       <div className="flex flex-col gap-4">
         <p role="status" className="flex items-center gap-2 text-base font-bold text-mint-600">
@@ -375,18 +571,59 @@ function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: 
         <PropertyMediaManager propertyId={q.done.id} media={[]} canEdit watermark={brand.watermark} officeName={brand.officeName} logoUrl={brand.logoUrl} />
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link href={`/app/portfoyler/${q.done.id}`} className={SUBMIT}>Sonra tamamla (kaydı aç)</Link>
-          <button type="button" onClick={() => { setGeo(null); setRooms(""); q.again(); }} className={GHOST}>Bir portföy daha</button>
+          <button type="button" onClick={q.again} className={GHOST}>Bir portföy daha</button>
         </div>
       </div>
     );
   }
+  return <PropertyForm key={`${q.round}-${draft.formKey}`} q={q} draft={draft} typeOptions={typeOptions} txOptions={txOptions} />;
+}
+
+function PropertyForm({
+  q,
+  draft,
+  typeOptions,
+  txOptions,
+}: {
+  q: ReturnType<typeof useQuick>;
+  draft: ReturnType<typeof useFormDraft>;
+  typeOptions: { value: string; label: string }[];
+  txOptions: { value: string; label: string }[];
+}) {
+  const v = draft.values;
+  const [tx, setTx] = useState(v?.transaction_type && txOptions.some((o) => o.value === v.transaction_type) ? v.transaction_type : (txOptions[0]?.value ?? "Satılık"));
+  const [rooms, setRooms] = useState(v?.rooms ?? "");
+  const [geo, setGeo] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoState, setGeoState] = useState<"idle" | "busy" | "error">("idle");
+  const loc = useLocationSuggestion();
+
+  function locate() {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoState("error");
+      return;
+    }
+    setGeoState("busy");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const point = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
+        setGeo(point);
+        setGeoState("idle");
+        loc.request(point.lat, point.lng);
+      },
+      () => setGeoState("error"),
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
+
   return (
     <form
-      key={q.round}
       onSubmit={(e) => q.onSubmit(e, q.result.duplicate ? { allow_duplicate: "1" } : undefined)}
       onKeyDown={q.onKeyDown}
+      onInput={(e) => draft.track(e.currentTarget)}
+      onChange={(e) => draft.track(e.currentTarget)}
       className="flex flex-col gap-4"
     >
+      <DraftBadge show={draft.restored} onDiscard={draft.clear} />
       <fieldset>
         <legend className="mb-1.5 text-sm font-medium text-ink-950">İşlem *</legend>
         <div className="grid grid-cols-2 gap-2">
@@ -401,7 +638,7 @@ function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Portföy türü" htmlFor="hq-prop-type" required inject={false}>
           <div className="relative">
-            <FormSelect id="hq-prop-type" name="property_type" required defaultValue={typeOptions[0]?.value ?? "Daire"} className={`${BIG} cursor-pointer appearance-none pr-9`}>
+            <FormSelect id="hq-prop-type" name="property_type" required defaultValue={v?.property_type ?? typeOptions[0]?.value ?? "Daire"} className={`${BIG} cursor-pointer appearance-none pr-9`}>
               {typeOptions.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
@@ -410,7 +647,7 @@ function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: 
           </div>
         </FormField>
         <FormField label={tx === "Kiralık" ? "Aylık kira (₺)" : "Fiyat (₺)"} htmlFor="hq-prop-price" required>
-          <FormInput id="hq-prop-price" name="list_price" inputMode="numeric" required placeholder="Örn. 4.500.000" className={BIG} />
+          <FormInput id="hq-prop-price" name="list_price" inputMode="numeric" required placeholder="Örn. 4.500.000" defaultValue={v?.list_price} className={BIG} />
         </FormField>
       </div>
       <fieldset>
@@ -425,10 +662,10 @@ function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: 
         </div>
       </fieldset>
       <FormField label="m² (brüt)" htmlFor="hq-prop-sqm">
-        <FormInput id="hq-prop-sqm" name="sqm" inputMode="decimal" placeholder="Örn. 120" className={BIG} />
+        <FormInput id="hq-prop-sqm" name="sqm" inputMode="decimal" placeholder="Örn. 120" defaultValue={v?.sqm} className={BIG} />
       </FormField>
       <FormField label="Adres / semt (isteğe bağlı)" htmlFor="hq-prop-address">
-        <FormInput id="hq-prop-address" name="address_line" maxLength={200} placeholder="Mahalle, sokak…" className={BIG} />
+        <FormInput id="hq-prop-address" name="address_line" maxLength={200} placeholder="Mahalle, sokak…" defaultValue={v?.address_line} className={BIG} />
       </FormField>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={locate} disabled={geoState === "busy"} className={GHOST}>
@@ -440,6 +677,7 @@ function PropertyTab({ typeOptions, txOptions, brand }: { typeOptions: { value: 
         <input type="hidden" name="lat" value={geo ? String(geo.lat) : ""} />
         <input type="hidden" name="lng" value={geo ? String(geo.lng) : ""} />
       </div>
+      {geo ? <LocationSuggestionRow loc={loc} addressInputId="hq-prop-address" /> : null}
       <p className="text-xs text-text-faint">Başlık otomatik oluşur, komisyon oranı ofis varsayılanıdır; kaydettikten sonra fotoğrafları bu ekranda eklersiniz.</p>
       <ErrorBand error={q.result.error} />
       <SubmitRow pending={q.pending} label={q.result.duplicate ? "Yine de yeni taslak aç" : "Taslak olarak kaydet"} />
@@ -471,6 +709,7 @@ export function QuickCapture({
   brand?: QuickPropertyBrand;
 }) {
   const [active, setActive] = useState<QuickTabId>(initial);
+  const [prefill, setPrefill] = useState<AppointmentPrefill | null>(null);
   const items: MorphTabItem[] = tabs.map((t) => ({ id: t, label: TAB_META[t].label, icon: TAB_META[t].icon }));
 
   function select(id: string) {
@@ -483,15 +722,59 @@ export function QuickCapture({
     }
   }
 
+  const planAppointment = tabs.includes("randevu")
+    ? (p: Omit<AppointmentPrefill, "seq">) => {
+        setPrefill((prev) => ({ ...p, seq: (prev?.seq ?? 0) + 1 }));
+        select("randevu");
+      }
+    : undefined;
+
+  /** Kuyruktaki öğeyi gönderir (aynı action, aynı istek kimliği → sunucuda en çok bir kayıt). */
+  async function sendQueued(item: OutboxItem) {
+    const fd = new FormData();
+    for (const [k, v] of item.fields) fd.append(k, v);
+    fd.set("client_request_id", item.id);
+    try {
+      return outcomeFromResult(await ACTIONS[item.kind](fd));
+    } catch (e) {
+      return isNetworkFailure(e) ? ({ kind: "retry" } as const) : ({ kind: "retry", error: "Sunucu yanıt vermedi." } as const);
+    }
+  }
+
+  function restoreQueued(item: OutboxItem) {
+    const tab = KIND_TAB[item.kind];
+    const values: DraftValues = {};
+    for (const [k, v] of item.fields) values[k] = v;
+    restoreDraft(tab, values);
+    removeOutboxItem(browserStore(), item.id);
+    outboxChanged();
+    if (tabs.includes(tab)) select(tab);
+  }
+
   const panels: Record<QuickTabId, ReactNode> = {
-    musteri: <CustomerTab />,
-    gorusme: <CallTab customers={customers} />,
-    randevu: <AppointmentTab customers={customers} properties={properties} typeOptions={typeOptions} defaultWhen={defaultWhen} />,
+    musteri: <CustomerTab onPlanAppointment={planAppointment} />,
+    gorusme: <CallTab customers={customers} onPlanAppointment={planAppointment} />,
+    randevu: <AppointmentTab customers={customers} properties={properties} typeOptions={typeOptions} defaultWhen={defaultWhen} prefill={prefill} />,
     portfoy: brand ? <PropertyTab typeOptions={propertyTypeOptions} txOptions={transactionOptions} brand={brand} /> : null,
   };
 
   return (
     <div className="flex flex-col gap-4">
+      <OutboxPanel
+        send={sendQueued}
+        onRestore={restoreQueued}
+        hrefFor={(item, id) =>
+          item.kind === "customer" && id
+            ? `/app/musteriler/${id}`
+            : item.kind === "property" && id
+              ? `/app/portfoyler/${id}`
+              : item.kind === "appointment"
+                ? "/app/randevular"
+                : item.kind === "call"
+                  ? "/app/gelen-kutusu?sekme=cagri"
+                  : null
+        }
+      />
       <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" />
       {tabs.map((t) => (
         <section
