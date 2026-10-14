@@ -142,7 +142,7 @@ açıklama) → geri yüklemeden sonra ACL farkı `check:acl` ile kontrol edilir
 fatura başlığı ve yasal sayfalar ≤30 sn'de yansır, deploy gerekmez. Env yalnız YEDEK: `LEGAL_UNVAN`, `LEGAL_ADRES`,
 `LEGAL_MERSIS`, `LEGAL_VERGI_DAIRESI`, `LEGAL_VERGI_NO` (eski birleşik `LEGAL_VERGI`), `LEGAL_KEP`, `LEGAL_TELEFON`,
 `SUPPORT_EMAIL`/`SUPPORT_PHONE`/`SUPPORT_WHATSAPP` (eski `NEXT_PUBLIC_SUPPORT_*` son yedek). Boş alan gösterilmez; bilgi uydurulmaz.
-Yasal sayfa metinleri sürümlü (/admin/ayarlar/yasal, `legal_documents`); yardım merkezi /admin/site/yardim (`help_articles`).
+Yasal sayfa metinleri sürümlü (/admin/ayarlar/yasal, `legal_documents`); yardım merkezi /admin/tickets/yardim (`help_articles`).
 
 ## Bekleyen ürün işleri (taşıma sonrası)
 - Durdurulan "ana beyin" iş akışı (hata avcıları + internet araştırması + karar + uygulama) taşımadan sonra yeniden çalıştırılacak.

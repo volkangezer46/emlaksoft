@@ -3,11 +3,11 @@ import { defineEnum, defineInt, defineString } from "./define";
 
 /**
  * DUNNING (gecikmiş ödeme tahsilat politikası) ayarları — platform kapsamı, `platform_settings` deposu.
- * Tek düzenleme yeri: Abonelik & fatura > Tahsilat sekmesi (`/admin/billing/tahsilat#ayarlar`). Okuyucu:
+ * Tek düzenleme yeri: Abonelikler > Tahsilat sekmesi (`/admin/billing/tahsilat#ayarlar`). Okuyucu:
  * `src/lib/billing/dunning-policy.ts` (cron + otomatik yenileme). Varsayılanlar BUGÜNKÜ davranıştır:
  * kademeler 1/4/8 gün, yalnız uygulama içi bildirim, otomatik askıya alma KAPALI (0), otomatik yenileme 3 deneme / 3 gün.
  */
-export const DUNNING_HOME = { href: "/admin/billing/tahsilat#ayarlar", label: "Abonelik & fatura > Tahsilat" } as const;
+export const DUNNING_HOME = { href: "/admin/billing/tahsilat#ayarlar", label: "Abonelikler > Tahsilat" } as const;
 
 export const DUNNING_CHANNEL_OPTIONS = [
   { value: "in_app", label: "Yalnız uygulama içi" },

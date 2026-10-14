@@ -293,18 +293,20 @@ export async function listRequestsForAdmin(input: { status: RequestStatus | null
   const admin = createAdminClient();
   let q = admin
     .from("product_feature_requests")
-    .select("id, title, body, status, vote_count, admin_note, created_at, tenant_id, tenant:tenants(name)", { count: "exact" });
+    .select("id, title, body, status, vote_count, admin_note, created_at, tenant_id", { count: "exact" });
   if (input.status) q = q.eq("status", input.status);
   const { data, error, count } = await q.order("vote_count", { ascending: false }).order("created_at", { ascending: false }).range(input.from, input.to);
   if (error) {
     if (isSchemaMissing(error)) return { ready: false, rows: [], total: 0 };
     throw new Error("Öneriler okunamadı.");
   }
-  type Row = { id: string; title: string; body: string | null; status: RequestStatus; vote_count: number; admin_note: string | null; created_at: string; tenant_id: string; tenant: { name?: string } | { name?: string }[] | null };
+  type Row = { id: string; title: string; body: string | null; status: RequestStatus; vote_count: number; admin_note: string | null; created_at: string; tenant_id: string };
+  const rows = (data ?? []) as unknown as Row[];
+  const names = await tenantNamesFor(rows.map((r) => r.tenant_id));
   return {
     ready: true,
     total: count ?? 0,
-    rows: ((data ?? []) as unknown as Row[]).map((r) => ({
+    rows: rows.map((r) => ({
       id: r.id,
       title: r.title,
       body: r.body,
@@ -313,9 +315,22 @@ export async function listRequestsForAdmin(input: { status: RequestStatus | null
       adminNote: r.admin_note,
       createdAt: r.created_at,
       tenantId: r.tenant_id,
-      tenantName: (Array.isArray(r.tenant) ? r.tenant[0]?.name : r.tenant?.name) ?? null,
+      tenantName: names.get(r.tenant_id) ?? null,
     })),
   };
+}
+
+/**
+ * Ofis adları ayrı sorguyla (in('id', ids)): öneri ve NPS tablolarında `tenants` ile PostgREST ilişkisi yok
+ * (gömme `tenant:tenants(name)` PGRST200 verir ve sayfa "kurulmadı" durumuna düşerdi).
+ */
+async function tenantNamesFor(ids: readonly string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  const out = new Map<string, string>();
+  if (unique.length === 0) return out;
+  const { data } = await createAdminClient().from("tenants").select("id, name").in("id", unique);
+  for (const t of (data ?? []) as Array<{ id: string; name: string | null }>) if (t.name) out.set(t.id, t.name);
+  return out;
 }
 
 /** Durum başına öneri sayısı (süzgeç çipleri için; her sayı kendi süzgecine götürür). */
@@ -391,7 +406,7 @@ export async function listSurveyComments(input: { surveyId: string; band: "detra
   const admin = createAdminClient();
   let q = admin
     .from("platform_nps_responses")
-    .select("id, score, comment, responded_at, tenant_id, tenant:tenants(name)", { count: "exact" })
+    .select("id, score, comment, responded_at, tenant_id", { count: "exact" })
     .eq("survey_id", input.surveyId)
     .not("comment", "is", null);
   if (input.band === "detractor") q = q.lte("score", 6);
@@ -399,16 +414,18 @@ export async function listSurveyComments(input: { surveyId: string; band: "detra
   else if (input.band === "promoter") q = q.gte("score", 9);
   const { data, error, count } = await q.order("responded_at", { ascending: false }).range(input.from, input.to);
   if (error) return { rows: [], total: 0 };
-  type Row = { id: string; score: number; comment: string; responded_at: string; tenant_id: string; tenant: { name?: string } | { name?: string }[] | null };
+  type Row = { id: string; score: number; comment: string; responded_at: string; tenant_id: string };
+  const rows = (data ?? []) as unknown as Row[];
+  const names = await tenantNamesFor(rows.map((r) => r.tenant_id));
   return {
     total: count ?? 0,
-    rows: ((data ?? []) as unknown as Row[]).map((r) => ({
+    rows: rows.map((r) => ({
       id: r.id,
       score: r.score,
       comment: r.comment,
       respondedAt: r.responded_at,
       tenantId: r.tenant_id,
-      tenantName: (Array.isArray(r.tenant) ? r.tenant[0]?.name : r.tenant?.name) ?? null,
+      tenantName: names.get(r.tenant_id) ?? null,
     })),
   };
 }

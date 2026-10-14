@@ -1,7 +1,7 @@
 /**
  * Platform markası: slot tanımları ve çözümleme (saf, istemci/sunucu ortak).
  * Varsayılan dosyalar public/brand/* altındadır (scripts/generate-brand.mjs üretir);
- * süper admin /admin/marka'dan slot başına özel dosya yükleyebilir.
+ * süper admin /admin/site/marka'dan slot başına özel dosya yükleyebilir.
  */
 
 export const BRAND_SLOTS = ["logo-light", "logo-dark", "mark", "favicon"] as const;

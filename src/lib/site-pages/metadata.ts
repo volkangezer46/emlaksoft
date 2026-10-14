@@ -5,7 +5,7 @@ import { suggestSeo, type SitePageContent } from "./schema-core";
 
 /**
  * Özel sayfa SEO çevirileri (SAF). Metadata `buildMetadata(path, extra)` ile üretilir: başlık şablonu (getSeoSettings)
- * orada uygulanır; /admin/seo'da aynı yol için override varsa o kazanır.
+ * orada uygulanır; /admin/site/seo'da aynı yol için override varsa o kazanır.
  */
 
 /** Sayfa seo alanından metadata girdisi: canonical = site tabanı + yol; index=false ise noindex. Boş başlık/açıklama ilk girişten önerilir. */

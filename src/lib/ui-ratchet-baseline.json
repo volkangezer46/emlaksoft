@@ -1295,37 +1295,37 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/marka/brand-manager.tsx": {
+ "src/app/admin/site/marka/brand-manager.tsx": {
   "hamRenk": 4,
   "hamPalet": 2,
   "hamButon": 0,
   "kucukHedef": 0
  },
- "src/app/admin/personel/page.tsx": {
+ "src/app/admin/personel/personel-view.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/admin/personel/[id]/page.tsx": {
+ "src/app/admin/personel/[id]/staff-detail-view.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/seo/seo-ui.tsx": {
+ "src/app/admin/site/seo/seo-ui.tsx": {
   "hamRenk": 0,
   "hamPalet": 3,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/admin/site-menu/editor-ui.tsx": {
+ "src/app/admin/site/menu/editor-ui.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/admin/site-menu/site-menu-editor.tsx": {
+ "src/app/admin/site/menu/site-menu-editor.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,

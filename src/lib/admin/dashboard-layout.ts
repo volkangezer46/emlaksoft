@@ -1,6 +1,6 @@
 /**
- * /admin ana ekran mantığı (saf, yan etkisiz, testli):
- *  - rol bazlı yerleşim (hangi bölüm, hangi sırayla),
+ * /admin ana ekran ve Raporlar analiz bölümleri mantığı (saf, yan etkisiz, testli):
+ *  - rol bazlı Raporlar bölümleri (hangi bölüm, hangi sırayla),
  *  - "Dikkat gerektirenler" kuyruğu (rol filtresi, gizleme, sıralama),
  *  - churn riski satırları (yalnız mevcut veriden: durum, deneme bitişi, 14 gün aktivite).
  *
@@ -31,40 +31,26 @@ export function homeVariantFor(who: PlatformAccessSubject): HomeVariant {
   return "platform";
 }
 
-export type HomeSection =
-  | "attention"
-  | "mrr"
-  | "churn"
-  | "health"
-  | "activation"
-  | "modules"
-  | "unitEconomics"
-  | "usage"
-  | "churnReasons"
-  | "growth"
-  | "composition"
-  | "activity"
-  | "geo";
+/**
+ * /admin/raporlar analiz bölümleri (eskiden kontrol panelindeydi; /admin artık yalnız dikkat kuyruğu + 4 özet gösterge).
+ * Modül kullanımı Raporlar'ın kendi "Modül benimseme" kartındadır (kopya bölüm yok); sistem sağlığı, aktivite akışı ve
+ * coğrafya kendi menü öğelerindedir.
+ */
+export type ReportSection = "mrr" | "churn" | "activation" | "unitEconomics" | "usage" | "churnReasons" | "growth" | "composition";
 
 /** Gelir/fatura verisi taşıyan bölümler: yalnız `billing` modülü olan rol görür. */
-const BILLING_SECTIONS: ReadonlySet<HomeSection> = new Set(["mrr", "composition", "unitEconomics", "usage", "churnReasons"]);
+const BILLING_SECTIONS: ReadonlySet<ReportSection> = new Set(["mrr", "composition", "unitEconomics", "usage", "churnReasons"]);
 
 /**
- * Platform panelinin bölüm sırası. super_admin gelir odaklıdır (MRR en üstte; birim ekonomisi,
- * tüketim, churn nedenleri, kompozisyon); ops gelire erişemez (billing modülü yok): sağlık, churn,
- * aktivasyon ve modül kullanımı öne çıkar.
+ * Raporlar analiz bölümlerinin sırası (rol bazlı). Gelir bölümleri yalnız `billing` modülüyle; ofis metrikleri (churn,
+ * aktivasyon, büyüme) yalnız `tenants` modülüyle çizilir. Bölüm yalnız bir kez çıkar.
  */
-export function platformHomeSections(who: PlatformAccessSubject): HomeSection[] {
-  const role = baseRoleOf(who);
-  const base: HomeSection[] =
-    role === "super_admin"
-      ? ["attention", "mrr", "churn", "health", "activation", "modules", "unitEconomics", "usage", "churnReasons", "composition", "growth", "activity"]
-      : ["attention", "health", "churn", "activation", "modules", "growth", "activity"];
-  // Özel rol ofisleri göremiyorsa ofis metrikleri (sağlık, churn, aktivasyon...) çizilmez; yalnız dikkat kuyruğu kalır.
-  if (!platformCanAccess(who, "tenants")) base.splice(1);
-  if (platformCanAccess(who, "geo")) base.push("geo");
-  // Bir bölüm yalnız bir kez ve tanımlı modül kapısıyla çıkar.
-  return base.filter((s, i) => base.indexOf(s) === i && (!BILLING_SECTIONS.has(s) || platformCanAccess(who, "billing")));
+export function platformReportSections(who: PlatformAccessSubject): ReportSection[] {
+  const order: ReportSection[] = ["mrr", "churn", "activation", "unitEconomics", "usage", "churnReasons", "composition", "growth"];
+  const tenantSections: ReadonlySet<ReportSection> = new Set(["churn", "activation", "growth"]);
+  return order.filter(
+    (s) => (!BILLING_SECTIONS.has(s) || platformCanAccess(who, "billing")) && (!tenantSections.has(s) || platformCanAccess(who, "tenants")),
+  );
 }
 
 export type AttentionInput = {

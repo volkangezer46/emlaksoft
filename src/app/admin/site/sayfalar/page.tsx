@@ -48,7 +48,7 @@ export default async function AdminSitePagesPage() {
         <h2 id="sistem-sayfalari" className="font-display text-base font-extrabold text-ink-950">Sistem sayfaları</h2>
         <ul className="grid gap-3 sm:grid-cols-2">
           <li>
-            <Link href="/admin/site-icerik" className="focus-ring group flex h-full items-start gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-400">
+            <Link href="/admin/site/sayfalar/ana-sayfa" className="focus-ring group flex h-full items-start gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-400">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-text-faint" aria-label="Sistem sayfası (yolu sabit)" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center justify-between gap-2">

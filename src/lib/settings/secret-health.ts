@@ -45,7 +45,7 @@ export const EMLAKFIYATI_SECRET_CANDIDATE: SecretCandidate = {
   key: "emlakfiyati.api_key",
   storageKey: EF_SETTING.current,
   label: "EmlakFiyati API anahtarı",
-  href: "/admin/sistem?sekme=emlakfiyati",
+  href: "/admin/sistem?sekme=entegrasyonlar#anahtar-emlakfiyati",
 };
 
 export function secretCandidates(): SecretCandidate[] {
@@ -55,7 +55,7 @@ export function secretCandidates(): SecretCandidate[] {
       key: d.key,
       storageKey: storageKeyOf(d),
       label: d.label,
-      href: d.home?.href ?? d.editHref ?? `/admin/ayarlar/merkez?ara=${encodeURIComponent(d.key)}`,
+      href: d.home?.href ?? d.editHref ?? `/admin/ayarlar?ara=${encodeURIComponent(d.key)}`,
     }));
   return [...fromRegistry, EMLAKFIYATI_SECRET_CANDIDATE];
 }

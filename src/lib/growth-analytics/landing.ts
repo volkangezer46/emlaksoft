@@ -2,7 +2,7 @@
  * İniş yolu tablosu (SAF): her yol şablonundan düzenleme ekranlarına bağlantı ("sıfır çıkmaz metrik").
  *  - İçerik: ana sayfa → Site içeriği, fiyatlar → Fiyatlar sayfası metinleri, sayfa oluşturucu yolu → o sayfanın
  *    editörü (yayın dizininden slug eşlemesiyle), diğerleri → Sayfalar listesi.
- *  - SEO kaydı: /admin/seo "Sayfalar" sekmesinde o yol (kayıt yoksa editör kayıt oluşturmayı önerir).
+ *  - SEO kaydı: /admin/site/seo "Sayfalar" sekmesinde o yol (kayıt yoksa editör kayıt oluşturmayı önerir).
  * Şablon yollar (/vitrin/[ofis]...) tek bir sayfa değildir: içerik bağlantısı yoktur, SEO bağlantısı kalıp sekmesidir.
  */
 import type { LandingRow } from "./funnel";
@@ -13,10 +13,10 @@ export type SitePageRef = { id: string; slug: string };
 
 export function landingLinks(path: string, pages: readonly SitePageRef[]): LandingLinks {
   if (path.includes("[") || path === "(taşma)") {
-    return { content: null, seo: { href: "/admin/seo?sekme=kaliplar", label: "SEO kalıbı" } };
+    return { content: null, seo: { href: "/admin/site/seo?sekme=kaliplar", label: "SEO kalıbı" } };
   }
-  const seo = { href: `/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`, label: "SEO kaydı" };
-  if (path === "/") return { content: { href: "/admin/site-icerik", label: "Site içeriği" }, seo };
+  const seo = { href: `/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`, label: "SEO kaydı" };
+  if (path === "/") return { content: { href: "/admin/site/sayfalar/ana-sayfa", label: "Site içeriği" }, seo };
   if (path === "/fiyatlar") return { content: { href: "/admin/site/sayfalar/fiyatlar", label: "Sayfa metinleri" }, seo };
   const page = pages.find((p) => `/${p.slug}` === path);
   if (page) return { content: { href: `/admin/site/sayfalar/${encodeURIComponent(page.id)}`, label: "Sayfa editörü" }, seo };

@@ -194,7 +194,7 @@ select conname, pg_get_constraintdef(oid) from pg_constraint where conname in ('
 ```
 Smoke: **owner** ile Ayarlar > Modüller aç/kapa; kapalı modül menüde yok; **danışman** kendi ofisinin modül satırını okur, başka ofisinki görünmez
 (platform kilidi `locked_by_platform` ofiste değişmez). Yeni test kaydı (demo → ofis dönüşümü) deneme günü sabiti.
-**Gözlem (etkin değil → etkin):** Ayarlar > Modüller ekranındaki "tablo yok / unavailable" notu kalkar; `/admin/seo` 404 listesi dolmaya başlar;
+**Gözlem (etkin değil → etkin):** Ayarlar > Modüller ekranındaki "tablo yok / unavailable" notu kalkar; `/admin/site/seo` 404 listesi dolmaya başlar;
 `/admin/billing/planlar` Business ve fiyat kilidi alanları. **Dikkat (fiyat kararı bekliyor):** `update_tenant_plan_subscription` hâlâ eski sabit
 tutarları yazar (`docs/HAFIZA.md` §3); Business "satılmaz" kalmalı.
 

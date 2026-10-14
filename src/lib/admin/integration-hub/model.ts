@@ -71,8 +71,8 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     label: "E-posta (Resend)",
     category: "iletisim",
     description: "İşlemsel e-postalar: doğrulama, fatura, bildirim.",
-    configureHref: "/admin/ayarlar/eposta",
-    configureLabel: "Ayarlar > E-posta şablonları",
+    configureHref: `${INTEGRATIONS_HREF}#anahtar-eposta`,
+    configureLabel: "Bu sayfada: E-posta kanalı",
     testNote: "Alan adı listesi okunur (e-posta göndermez)",
   },
   whatsapp: {
@@ -127,8 +127,8 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     label: "EmlakFiyati",
     category: "veri",
     description: "Bölge endeksi, değerleme ve analiz raporları.",
-    configureHref: "/admin/sistem?sekme=emlakfiyati",
-    configureLabel: "Sistem > EmlakFiyati",
+    configureHref: `${INTEGRATIONS_HREF}#anahtar-emlakfiyati`,
+    configureLabel: "Bu sayfada: EmlakFiyati API anahtarı",
     testNote: "İstanbul konut endeksi okunur",
   },
   portal_extension: {

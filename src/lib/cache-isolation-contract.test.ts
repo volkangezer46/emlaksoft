@@ -23,7 +23,7 @@ const SRC = join(process.cwd(), "src");
 type Scope = "platform" | "tenant" | "user";
 /** Dosya -> beklenen `unstable_cache(` çağrı sayısı + kapsam. Anahtarlar mevcut önbellek anahtarlarıdır (değiştirilmez). */
 const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why: string }> = {
-  "src/app/admin/page.tsx": { calls: 1, scope: "platform", why: "platform paneli toplamları (service_role, ofis filtresi yok)" },
+  "src/app/admin/_dashboards/platform-sections.tsx": { calls: 1, scope: "platform", why: "platform paneli toplamları (service_role, ofis filtresi yok)" },
   "src/app/vitrin/[slug]/page.tsx": { calls: 1, scope: "tenant", why: "vitrin ilan listesi; anahtar tenant.id + filtreler, is_sample=false" },
   "src/components/app/ef-credit-badge.tsx": { calls: 1, scope: "tenant", why: "EF bakiyesi; tenantId argümanı anahtara girer" },
   "src/lib/admin-badges.ts": { calls: 1, scope: "platform", why: "platform rozet sayıları" },

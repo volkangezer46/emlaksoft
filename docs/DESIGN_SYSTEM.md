@@ -726,7 +726,7 @@ icon-192/512, maskable-192/512, apple-touch-icon, favicon-32), `public/icon.svg`
 **Kullanım kuralı:** logo gösteren HER yer `src/components/brand/brand.tsx` içindeki `<Brand variant tone>` bileşenini
 kullanır (elle "E" kutusu yazma). Özel marka kök layout'taki `BrandProvider` ile gelir.
 
-**Süper admin ayarı:** `/admin/marka` (`marka` platform modülü, yalnız super_admin; yükleme hız sınırlı + denetim kaydı).
+**Süper admin ayarı:** `/admin/site/marka` (`marka` platform modülü, yalnız super_admin; yükleme hız sınırlı + denetim kaydı).
 Depolama mevcut `platform_settings` (anahtarlar `brand.meta`, `brand.asset.<slot>`; yeni migration yok). SVG katı izin
 listesiyle doğrulanır (script/olay özniteliği/dış kaynak/foreignObject REDDEDİLİR), PNG imza + boyut kontrolü; sunum
 `/brand-asset/<slot>` (nosniff + CSP sandbox, `<img>` ile). Önbellek `unstable_cache` etiketi `platform-brand` + `updateTag`.

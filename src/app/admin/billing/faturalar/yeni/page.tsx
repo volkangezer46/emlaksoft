@@ -5,13 +5,14 @@ import { RegistrySettings } from "@/components/settings/registry-settings";
 import { getVatSchedule } from "@/lib/billing/vat-rate";
 import { vatRateAt } from "@/lib/billing/plans";
 import { now as clockNow, trDayKey } from "@/lib/clock";
-import { BillingNav } from "../../billing-nav";
 import { ManualInvoiceForm } from "./manual-invoice-form";
 
 export const dynamic = "force-dynamic";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TENANT_LIMIT = 1000;
+export const metadata = { title: "Yeni fatura" };
+
 
 /** Elle fatura / tek seferlik ücret (kurulum, eğitim, elle yıllık ödeme): taslak oluşturma + KDV ayarları. */
 export default async function NewInvoicePage({ searchParams }: { searchParams?: Promise<{ ofis?: string }> }) {
@@ -41,7 +42,6 @@ export default async function NewInvoicePage({ searchParams }: { searchParams?: 
         description="Kurulum, eğitim ya da elle alınan yıllık ödeme için kalemli fatura. Önce taslak kaydedilir, detayda kontrol edilip kesilir."
         breadcrumbs={[{ label: "Faturalama", href: "/admin/billing" }, { label: "Yeni fatura" }]}
       />
-      <BillingNav active="fatura" />
 
       {list.length >= TENANT_LIMIT ? (
         <p role="status" className="text-xs text-warn-600">

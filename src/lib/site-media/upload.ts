@@ -33,7 +33,7 @@ export function refreshSiteMediaCaches(live: boolean, ctx: CacheContext) {
   const expire = (tag: string) => (ctx === "action" ? updateTag(tag) : revalidateTag(tag, { expire: 0 }));
   expire(SITE_MEDIA_CACHE_TAG);
   revalidatePath("/admin/site/medya");
-  revalidatePath("/admin/site-icerik");
+  revalidatePath("/admin/site/sayfalar/ana-sayfa");
   if (live) {
     expire(SITE_CONTENT_CACHE_TAG);
     revalidatePath("/");

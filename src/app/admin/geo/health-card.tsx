@@ -58,8 +58,8 @@ export async function GeoHealthCard() {
           </Link>
         </li>
         <li>
-          <Link href="/admin/geo/bildirimler" className="text-text-muted hover:text-brand-600 hover:underline">
-            Bekleyen ofis bildirimi: {h.pendingRequests === null ? "—" : h.pendingRequests}
+          <Link href="/admin/geo/talepler" className="text-text-muted hover:text-brand-600 hover:underline">
+            Bekleyen değişiklik talebi: {h.pendingRequests === null ? "—" : h.pendingRequests}
           </Link>
         </li>
       </ul>

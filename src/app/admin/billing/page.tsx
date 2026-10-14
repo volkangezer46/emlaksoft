@@ -18,8 +18,6 @@ import { planLabel } from "@/lib/billing/plans";
 import { AreaTrendChart } from "@/components/ui/lazy-charts";
 import { StackedBar } from "@/components/admin/admin-bars";
 import { TrendPill, computeTrend } from "@/components/ui/premium";
-import { BillingNav } from "./billing-nav";
-import { RegistrySettings } from "@/components/settings/registry-settings";
 import { CaptureActions } from "./capture-actions";
 
 const subStatus: Record<string, string> = {
@@ -72,6 +70,8 @@ function billingHref(p: { durum?: string; from?: string; to?: string; q?: string
   const s = sp.toString();
   return s ? `/admin/billing?${s}` : "/admin/billing";
 }
+
+export const metadata = { title: "Abonelikler" };
 
 export default async function AdminBillingPage({
   searchParams,
@@ -190,9 +190,8 @@ export default async function AdminBillingPage({
         icon={CreditCard}
         title="Gelir operasyonu"
         art="invoice"
-        description="Abonelik, fatura ve tahsilat tek ekranda · iyzico bağlanınca tahsilat otomatikleşir"
+        description="Abonelikler ve faturalar tek ekranda · iyzico bağlanınca ödemeler otomatikleşir"
       />
-      <BillingNav active="genel" />
       <section aria-label="Gelir özeti" className="bx min-w-0 p-5" style={{ boxShadow: "var(--elev-3)" }}>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] lg:items-start">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
@@ -317,7 +316,7 @@ export default async function AdminBillingPage({
             <p>Mutabakat kuyruğu okunamadı. Billing reconciliation migration ve servis erişimini doğrulayın.</p>
           </div>
         ) : reconciliationRows.length === 0 ? (
-          <EmptyState variant="compact" bare icon={CreditCard} tone="mint" title="Mutabakat kuyruğu temiz" description="Bekleyen, inceleme veya iade kuyruğunda tahsilat yok." action={{ href: "/admin/muhasebe/defter", label: "Defteri aç" }} />
+          <EmptyState variant="compact" bare icon={CreditCard} tone="mint" title="Mutabakat kuyruğu temiz" description="Bekleyen, inceleme veya iade kuyruğunda tahsilat yok." action={{ href: "/admin/billing/defter", label: "Defteri aç" }} />
         ) : (
           <div className="divide-y divide-line">
             {reconciliationRows.map((capture) => {
@@ -557,13 +556,17 @@ export default async function AdminBillingPage({
         </div>
       </section>
 
-      {/* Deneme ve yenileme ayarları: ayar defterinden, tek düzenleme yeri burası (merkez buraya bağlanır). */}
-      <RegistrySettings
-        title="Ayarlar"
-        description="Deneme süresi, deneme sonrası tolerans, otomatik yenileme, oransal paket yükseltme, abonelik duraklatma, dönemi biten aboneliğin gecikmişe geçmesi ve TL kredinin fatura payı. Fiyatlar Plan editöründedir."
-        keys={["billing.default_trial_days", "billing.trial_grace_days", "billing.auto_renew_enabled", "billing.plan_change_proration_enabled", "billing.pause_enabled", "billing.pause_max_days", "billing.expire_to_past_due", "try_credit.max_invoice_share"]}
-        canEdit={staff.role === "super_admin"}
-      />
+      {/* Deneme ve yenileme ayarları Ayarlar merkezinde (tek düzenleme yeri); burada yalnız bağlantı. */}
+      <p className="text-xs text-text-muted">
+        Deneme süresi, tolerans, otomatik yenileme, oransal yükseltme ve duraklatma:{" "}
+        <Link href="/admin/ayarlar?kategori=deneme-yenileme" className="font-semibold text-brand-600 hover:underline">
+          Ayarlar &gt; Deneme ve yenileme
+        </Link>
+        {" · "}TL kredinin fatura payı:{" "}
+        <Link href="/admin/ayarlar?kategori=emlakfiyati" className="font-semibold text-brand-600 hover:underline">
+          Ayarlar &gt; EmlakFiyatı ve analiz bakiyesi
+        </Link>
+      </p>
     </div>
   );
 }

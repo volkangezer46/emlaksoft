@@ -73,7 +73,7 @@ export function canAutoOptimize(path: string): boolean {
 }
 
 export function seoRecordHref(path: string): string {
-  return `/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
+  return `/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
 }
 
 function normUrl(u: string | null | undefined): string {
@@ -127,7 +127,7 @@ export function buildGoogleIssues(input: GoogleIssueInput): CollectorResult {
     for (const r of input.inspections) {
       scanned.push(r.url);
       const path = pathOfPage(r.url);
-      const href = path && canAutoOptimize(path) ? seoRecordHref(path) : "/admin/seo/performans?sekme=inceleme";
+      const href = path && canAutoOptimize(path) ? seoRecordHref(path) : "/admin/site/seo?sekme=performans&alt=inceleme";
       if (r.verdict !== "PASS") {
         issues.push({
           area: "seo",

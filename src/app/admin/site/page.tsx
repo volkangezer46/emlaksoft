@@ -2,7 +2,9 @@ import Link from "@/components/ui/smart-link";
 import { AlertTriangle, ArrowUpRight, CalendarClock, Globe, History, Info, Rocket } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DAY_MS, now, toTrLocalInput } from "@/lib/clock";
-import { requirePlatformModule } from "@/lib/platform";
+import { redirect } from "next/navigation";
+import { requirePlatformStaff } from "@/lib/platform";
+import { ADMIN_NAV } from "@/lib/admin/nav";
 import { platformCanAccess } from "@/lib/platform-access";
 import { getGeneralSettings } from "@/lib/platform-flags";
 import { diffJson } from "@/lib/publishing/diff";
@@ -19,6 +21,9 @@ import { parseAreaFilter } from "./_kokpit/model";
 import { CancelScheduleButton, DraftDiffLink, HistoryRowActions, PublishNowButton, ScheduleButton } from "./publishing-desk";
 
 export const metadata = { title: "Site, SEO ve Reklam" };
+
+/** Sayfa kapısı menü öğesinin modülleriyle aynıdır (tek kaynak: nav.ts); öğe görünüyorsa sayfa açılır. */
+const SITE_MODULES = ADMIN_NAV.flatMap((s) => s.items).find((i) => i.href === "/admin/site")?.modules ?? [];
 
 type Chip = { text: string; tone: "ok" | "warn" | "info" };
 
@@ -52,7 +57,9 @@ function ChipList({ chips }: { chips: Chip[] }) {
  * Sayfa yalnız toplanmış tabloları okur (Promise.all; render sırasında dış çağrı yok).
  */
 export default async function AdminSiteHubPage({ searchParams }: { searchParams: Promise<{ alan?: string | string[] }> }) {
-  const staff = await requirePlatformModule("dashboard");
+  // Kapı = menü öğesinin modülleri (nav.ts "Site, SEO ve Reklam"): en az biri açık olmalı; aksi halde /admin.
+  const staff = await requirePlatformStaff();
+  if (!SITE_MODULES.some((m) => platformCanAccess(staff, m))) redirect("/admin");
   const canWrite = staff.role === "super_admin";
   const showKokpit = platformCanAccess(staff, "seo");
   const fixed = SURFACES.filter((s) => platformCanAccess(staff, s.module));
@@ -113,7 +120,8 @@ export default async function AdminSiteHubPage({ searchParams }: { searchParams:
   const linkChips: Partial<Record<HubCardId, Chip[]>> = {};
   if (general) {
     linkChips["bakim-kayit"] = [
-      general.maintenanceMode ? { text: "Bakım modu AÇIK: site ziyaretçilere kapalı", tone: "warn" } : { text: "Bakım modu kapalı", tone: "ok" },
+      // Bakım kapsamı varsayılan yalnız ofis panelidir (ana sayfa açık kalır); kapsam Özellik bayraklarında ayarlanır.
+      general.maintenanceMode ? { text: "Bakım modu AÇIK: kapsamdaki sayfalar bakım ekranında", tone: "warn" } : { text: "Bakım modu kapalı", tone: "ok" },
       general.registrationOpen ? { text: "Kayıt açık", tone: "ok" } : { text: "Yeni kayıt kapalı", tone: "warn" },
     ];
   }

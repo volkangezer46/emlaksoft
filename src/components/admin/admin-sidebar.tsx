@@ -124,16 +124,10 @@ export function AdminSidebar({
     );
   };
 
-  // Tek öğeli grup: başlıksız düz satır. Çok öğeli grup: başlık + çekirdek satır(lar) hep görünür (menü bütçesi <= 6);
-  // grubun ek öğeleri başlıktaki düğmeyle açılır (varsayılan kapalı, tercih hatırlanır; etkin öğe içerideyse hep açık).
+  // Her grup başlığıyla çizilir (tek öğeli grup da; başlıksız satır üstteki grubun parçası gibi görünüyordu: "Site, SEO ve
+  // Reklam" Gelir'in altında). Çekirdek satır(lar) hep görünür (menü bütçesi <= 6); grubun ek öğeleri başlıktaki düğmeyle
+  // açılır (varsayılan kapalı, tercih hatırlanır; etkin öğe içerideyse hep açık).
   const renderGroup = ({ section, items, folded }: AdminSidebarGroup) => {
-    if (folded.length === 0 && items.length === 1) {
-      return (
-        <div key={section.id} className="pt-1">
-          {renderItem(items[0]!, { group: section.id })}
-        </div>
-      );
-    }
     const foldedActive = folded.some((i) => isActive(pathname, i));
     const expanded = foldedActive || closed.includes(`o-${section.id}`);
     return (

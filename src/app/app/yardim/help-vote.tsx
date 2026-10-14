@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 /**
  * "Bu yazı işe yaradı mı?" — tıklama anında görsel tepki (iyimser), oy arka planda yazılır. Hata olursa düğmeler geri
- * gelir ve kısa not çıkar. Sonuçlar yalnız yöneticide (/admin/site/yardim) görünür.
+ * gelir ve kısa not çıkar. Sonuçlar yalnız yöneticide (/admin/tickets/yardim) görünür.
  */
 export function HelpVote({ kind, slug }: { kind: "guide" | "faq" | "glossary"; slug: string }) {
   const [state, setState] = useState<"idle" | "yes" | "no" | "error">("idle");

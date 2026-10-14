@@ -1,7 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableFrame, TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
-import { formatDateTimeTr } from "@/lib/format";
 import { pctText, rate, type FunnelChannelRow, type GrowthFunnel } from "@/lib/growth-analytics/funnel";
 import type { LandingView } from "@/lib/growth-analytics/landing";
 import type { HealthGrade } from "@/lib/measure/health";
@@ -143,41 +142,25 @@ export function LandingTable({ rows }: { rows: LandingView[] }) {
   );
 }
 
+/**
+ * Kayıp trafik (404) TEK SATIR sayaç: liste ve kural ekleme SEO > Yönlendirmeler sekmesindedir (tek yer). Sayı en çok
+ * ziyaret alan ilk 100 adresten hesaplanır (100 ise "100+").
+ */
 export function LostTraffic({ rows, available }: { rows: NotFoundRow[]; available: boolean }) {
+  const hits = rows.reduce((sum, r) => sum + r.hits, 0);
   return (
-    <Card>
-      <CardHeader>
-        <div>
-          <CardTitle>Kayıp trafik</CardTitle>
-          <CardDescription>Ziyaretçinin bulamadığı (404) adresler. Bir yönlendirme kuralıyla bu ziyaretleri doğru sayfaya geri kazanabilirsiniz.</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {!available ? (
-          <p className="text-sm text-text-muted">404 kaydı henüz etkin değil.</p>
-        ) : rows.length === 0 ? (
-          <p className="text-sm text-text-muted">Kayıp trafik yok: bulunamayan adres kaydı boş.</p>
-        ) : (
-          <ul className="divide-y divide-line">
-            {rows.map((r) => (
-              <li key={r.path} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <span className="min-w-0 truncate font-mono text-xs" title={r.path}>{r.path}</span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className="text-xs text-text-muted">son {formatDateTimeTr(r.last_seen_at)}</span>
-                  <Link
-                    href={`/admin/seo?sekme=yonlendirme&kaynak=${encodeURIComponent(r.path)}`}
-                    className="focus-ring rounded font-semibold tabular-nums text-brand-700 hover:underline"
-                    aria-label={`${r.path}: ${r.hits} kayıp ziyaret, yönlendirme ekle`}
-                  >
-                    {r.hits.toLocaleString("tr-TR")} ziyaret
-                  </Link>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <p className="text-sm text-text-muted" data-lost-traffic="">
+      <span className="font-semibold text-ink-950">Kayıp trafik (404):</span>{" "}
+      {!available ? (
+        "404 kaydı henüz etkin değil."
+      ) : rows.length === 0 ? (
+        "bulunamayan adres kaydı boş."
+      ) : (
+        <Link href="/admin/site/seo?sekme=yonlendirme" className="focus-ring rounded font-semibold tabular-nums text-brand-700 hover:underline">
+          {rows.length >= 100 ? "100+" : rows.length.toLocaleString("tr-TR")} adres, {hits.toLocaleString("tr-TR")} ziyaret · SEO &gt; Yönlendirmeler&apos;de kural ekleyin →
+        </Link>
+      )}
+    </p>
   );
 }
 

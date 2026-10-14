@@ -57,12 +57,12 @@ describe("huni çözümleyici", () => {
 describe("iniş yolu bağlantıları", () => {
   const pages = [{ id: "p1", slug: "hakkimizda" }];
   it("her yoldan içerik editörüne ve SEO kaydına", () => {
-    expect(landingLinks("/", pages).content?.href).toBe("/admin/site-icerik");
+    expect(landingLinks("/", pages).content?.href).toBe("/admin/site/sayfalar/ana-sayfa");
     expect(landingLinks("/fiyatlar", pages).content?.href).toBe("/admin/site/sayfalar/fiyatlar");
     expect(landingLinks("/hakkimizda", pages).content?.href).toBe("/admin/site/sayfalar/p1");
     expect(landingLinks("/araclar", pages).content?.href).toBe("/admin/site/sayfalar");
-    expect(landingLinks("/hakkimizda", pages).seo.href).toBe("/admin/seo?sekme=sayfalar&sayfa=%2Fhakkimizda#editor");
-    expect(landingLinks("/vitrin/[ofis]", pages)).toEqual({ content: null, seo: { href: "/admin/seo?sekme=kaliplar", label: "SEO kalıbı" } });
+    expect(landingLinks("/hakkimizda", pages).seo.href).toBe("/admin/site/seo?sekme=sayfalar&sayfa=%2Fhakkimizda#editor");
+    expect(landingLinks("/vitrin/[ofis]", pages)).toEqual({ content: null, seo: { href: "/admin/site/seo?sekme=kaliplar", label: "SEO kalıbı" } });
   });
 
   it("tablo: ziyarete göre sıralı, kayıt oranı payda 0'da null", () => {

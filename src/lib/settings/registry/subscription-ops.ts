@@ -1,6 +1,5 @@
 import type { AnySettingDef } from "../types";
 import { defineInt } from "./define";
-import { BILLING_HOME } from "./platform";
 
 /**
  * ABONELİK OPERASYON KONSOLU ayarları (AD1; Ofis 360 > Abonelik). Ayrı dosya: diğer paketlerin registry
@@ -9,7 +8,6 @@ import { BILLING_HOME } from "./platform";
 export const SUBSCRIPTION_OPS_SETTING_DEFS: AnySettingDef[] = [
   defineInt({
     key: "billing.admin_invoice_due_days",
-    home: BILLING_HOME,
     default: 7,
     min: 1,
     max: 60,

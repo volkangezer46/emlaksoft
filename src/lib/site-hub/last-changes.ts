@@ -3,9 +3,16 @@ import { HUB_CARDS, type HubCardId } from "./cards";
 
 export type LastChange = { at: string; actorName: string | null; action: string };
 
-/** Bir `action` hangi karta ait (ilk eşleşen önek). Saf; testlenir. */
-export function cardForAction(action: string): HubCardId | null {
-  for (const c of HUB_CARDS) if (c.audit.some((p) => action.startsWith(p))) return c.id;
+/**
+ * Bir kayıt hangi karta ait (ilk eşleşen). Saf; testlenir. Önek `eylem#kimlik` biçimindeyse eylem TAM eşleşir ve kayıt
+ * kimliği (`entity_id`, ör. ayar anahtarı) verilen değere eşit olmalıdır; aksi halde eylem öneki eşlenir.
+ */
+export function cardForAction(action: string, entityId?: string | null): HubCardId | null {
+  const hit = (p: string) => {
+    const i = p.indexOf("#");
+    return i < 0 ? action.startsWith(p) : action === p.slice(0, i) && entityId === p.slice(i + 1);
+  };
+  for (const c of HUB_CARDS) if (c.audit.some(hit)) return c.id;
   return null;
 }
 
@@ -22,7 +29,7 @@ export async function readLastChanges(): Promise<Partial<Record<HubCardId, LastC
     const res = await queryActivity({ kaynak: "platform" }, 999);
     const picked: Array<{ card: HubCardId; actorId: string | null }> = [];
     for (const r of res.platformRows) {
-      const card = cardForAction(r.action);
+      const card = cardForAction(r.action, r.entity_id);
       if (card && !out[card]) {
         out[card] = { at: r.created_at, actorName: null, action: r.action };
         picked.push({ card, actorId: r.actor_id });

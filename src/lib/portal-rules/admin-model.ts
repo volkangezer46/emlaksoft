@@ -2,13 +2,15 @@ import { FIELD_RULES, TRANSFER_PORTALS, fold, type TransferPortal } from "@/lib/
 import { PORTAL_CATALOG } from "@/lib/portals/catalog";
 
 /**
- * Yönetim > Sistem > Portal kuralları sekmesinin SAF modeli (sunucu ve istemci ortak; DB/IO yok, testli).
+ * Yönetim > Sistem > Entegrasyonlar > Portal kuralları bölümünün SAF modeli (sunucu ve istemci ortak; DB/IO yok, testli).
  * Güven kovası, durum/kaynak etiketleri, change_summary → okunur fark satırları, "form değişti" metni ve
  * `pt_rules_admin_overview` yanıtının savunmacı ayrıştırılması burada. Kiracı adı bu modelde YOK (yalnız uygunluk paneli).
  */
 
-export const PORTAL_RULES_TAB = "portal-kurallari";
+/** Portal kuralları Entegrasyonlar sekmesinde, portal kartının altında bölümdür (ayrı sekme yok). */
+export const PORTAL_RULES_TAB = "entegrasyonlar";
 export const PORTAL_RULES_BASE = "/admin/sistem";
+export const PORTAL_RULES_ANCHOR = "portal-kurallari";
 
 export const PORTAL_LABELS: Record<TransferPortal, string> = Object.fromEntries(TRANSFER_PORTALS.map((id) => [id, PORTAL_CATALOG[id].label])) as Record<TransferPortal, string>;
 
@@ -46,7 +48,7 @@ export function parseView(raw: string | null | undefined): PortalRulesView {
 export function portalRulesHref(portal: TransferPortal, view?: string | null): string {
   const q = new URLSearchParams({ sekme: PORTAL_RULES_TAB, portal });
   if (view) q.set("gorunum", view);
-  return `${PORTAL_RULES_BASE}?${q.toString()}`;
+  return `${PORTAL_RULES_BASE}?${q.toString()}#${PORTAL_RULES_ANCHOR}`;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

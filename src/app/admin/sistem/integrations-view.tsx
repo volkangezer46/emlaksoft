@@ -9,20 +9,30 @@ import { relativeTimeTR } from "@/lib/admin-format";
 import { loadIntegrationHub, type OfficeIntegrationRow } from "@/lib/admin/integration-hub/read";
 import {
   HUB_CATEGORY_LABELS,
+  INTEGRATIONS_HREF,
   TONE_LABELS,
   cardTone,
   errorRate,
   type HubCard,
   type HubTone,
 } from "@/lib/admin/integration-hub/model";
+import { Suspense } from "react";
+import { DAY_MS, now } from "@/lib/clock";
+import { getEmlakFiyatiAdminStatus } from "@/lib/integrations/emlakfiyati/admin-status";
 import { MessagingKeysSection } from "./messaging-keys-form";
 import { IntegrationTestButton } from "./integration-test-button";
+import { EmlakFiyatiPanel } from "./emlakfiyati-panel";
+import { PortalRulesView } from "./portal-rules/portal-rules-view";
+import { EidsIntakePanel } from "./eids-intake-panel";
+import { EmailChannelView } from "./email-channel-view";
+import { emailChannelStatus } from "@/lib/email/provider";
 
 /**
  * ENTEGRASYON MERKEZİ (Admin > Sistem > Entegrasyonlar, `?sekme=entegrasyonlar`). Platform entegrasyonlarının tek ekranı:
  * kart başına yapılandırma durumu, son başarılı/başarısız çağrı, 7 günlük hata oranı, kota/maliyet, "Test et" ve anahtarın
- * girildiği yer. Altında anahtar formları (OpenAI, portal API, SMS/WhatsApp; eskiden sağlık sekmesindeydi), ofislerin bağlı
- * entegrasyonları, API anahtarları ve webhook teslim günlüğü (salt okunur). Sırlar YALNIZ parmak iziyle görünür.
+ * girildiği yer. Altında anahtar formları (OpenAI, portal API + portal kuralları, SMS/WhatsApp, EmlakFiyatı; eskiden ayrı
+ * sekmelerdeydi), EİDS e-posta alımı, ofislerin bağlı entegrasyonları, API anahtarları ve webhook teslim günlüğü (salt
+ * okunur). Sırlar YALNIZ parmak iziyle görünür.
  */
 
 const TONE_PILL: Record<HubTone, string> = {
@@ -58,6 +68,9 @@ function IntegrationCard({ card }: { card: HubCard }) {
   const tone = cardTone(card);
   const rate = errorRate(card.stats);
   const { meta } = card;
+  // Kurulumu başka ekranda olan entegrasyon (ör. Google: Site > Bağlantılar) burada yalnız durum + test + "Kur" bağlantısıdır;
+  // düzenleme formu kanonik ekrandadır (iki yerde form yok).
+  const elsewhere = meta.configureHref && !meta.configureHref.startsWith(INTEGRATIONS_HREF) ? meta.configureHref : null;
   return (
     <section id={`entegrasyon-${card.key}`} className="flex scroll-mt-24 flex-col gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
@@ -71,7 +84,11 @@ function IntegrationCard({ card }: { card: HubCard }) {
 
       {card.alarm ? <p className="rounded-[var(--radius-control)] bg-danger-500/[0.06] px-2.5 py-1.5 text-xs font-semibold text-danger-600">{card.alarm}</p> : null}
 
-      {!card.configured ? (
+      {elsewhere ? (
+        <Link href={elsewhere} className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+          {card.configured ? "Yönet" : "Kur"}: {meta.configureLabel} <ArrowUpRight className="h-3 w-3" aria-hidden />
+        </Link>
+      ) : !card.configured ? (
         <p className="text-xs text-text-muted">
           <strong className="text-ink-950">Yapılandırılmadı.</strong> Nereden girilir:{" "}
           {meta.configureHref ? (
@@ -207,10 +224,11 @@ function Panel({ id, icon: Icon, eyebrow, title, children }: { id: string; icon:
   );
 }
 
-export async function IntegrationsView() {
+export async function IntegrationsView({ portal, portalView }: { portal?: string; portalView?: string } = {}) {
   const staff = await requirePlatformModule("sistem");
-  const hub = await loadIntegrationHub();
+  const [hub, ef, email] = await Promise.all([loadIntegrationHub(), getEmlakFiyatiAdminStatus(), emailChannelStatus()]);
   const canEdit = staff.role === "super_admin";
+  const efPreviousDaysLeft = ef.previous.validUntil ? Math.max(1, Math.ceil((new Date(ef.previous.validUntil).getTime() - now()) / DAY_MS)) : null;
 
   const tones = hub.cards.map(cardTone);
   const configured = hub.cards.filter((c) => c.configured).length;
@@ -274,6 +292,10 @@ export async function IntegrationsView() {
           maskedEmlakjet={hub.forms.portals.emlakjet.fingerprint}
         />
       </div>
+      {/* Portal kuralları (öğrenen eklenti): portal kartının altında bölüm; `portal` ve `gorunum` parametreleri buna aittir. */}
+      <div id="portal-kurallari" className="scroll-mt-24">
+        <PortalRulesView portal={portal} view={portalView} />
+      </div>
       <div id="anahtar-mesaj" className="scroll-mt-24">
         <MessagingKeysSection
           canEdit={canEdit}
@@ -283,6 +305,39 @@ export async function IntegrationsView() {
           whatsappSummary={hub.forms.messaging.whatsappSummary}
         />
       </div>
+      {/* E-posta kanalı (Resend anahtarı, gönderen, alan adı SPF/DKIM, test gönderimi, webhook imza anahtarı). Şablonlar Ayarlar'da. */}
+      <div id="anahtar-eposta" className="scroll-mt-24">
+        <EmailChannelView status={email} canEdit={canEdit} staffEmail={staff.email} />
+      </div>
+      {/* EmlakFiyatı API anahtarı: süper admin yazar, ops salt okur; anahtar asla geri gösterilmez. */}
+      <div id="anahtar-emlakfiyati" className="scroll-mt-24">
+        <EmlakFiyatiPanel
+          canEdit={canEdit}
+          secretsEnabled={ef.secretsEnabled}
+          secretsKeySource={ef.secretsKeySource}
+          configured={ef.configured}
+          source={ef.source}
+          masked={ef.masked}
+          decryptFailed={ef.decryptFailed}
+          changedAtLabel={ef.changedAt ? relativeTimeTR(ef.changedAt) : null}
+          lastOkLabel={ef.lastOkAt ? relativeTimeTR(ef.lastOkAt) : null}
+          lastErrorClass={ef.lastErrorClass}
+          lastErrorLabel={ef.lastErrorAt ? relativeTimeTR(ef.lastErrorAt) : null}
+          authAlarm={ef.authAlarm}
+          previousPresent={ef.previous.present}
+          previousDaysLeft={efPreviousDaysLeft}
+          previousUsedLabel={ef.previousUsedAt ? relativeTimeTR(ef.previousUsedAt) : null}
+          ortakFlagOn={ef.ortakFlagOn}
+          ortakEndpointsVerified={ef.ortakEndpointsVerified}
+          ortakProbeOkLabel={ef.ortakProbeOkAt ? relativeTimeTR(ef.ortakProbeOkAt) : null}
+          ortakProbeInfo={ef.ortakProbeInfo}
+        />
+      </div>
+
+      {/* EİDS Bakanlık e-postası alımı: ofis bazında iletme, doğrulama dağılımı, kalıp dışı örnek (maskeli), SMTP sağlığı */}
+      <Suspense fallback={null}>
+        <EidsIntakePanel />
+      </Suspense>
 
       <Panel id="ofis-baglantilari" icon={Building2} eyebrow="Ofis başına" title={`Ofislerin bağlı entegrasyonları (${officeRows.length})`}>
         {officeRows.length ? (

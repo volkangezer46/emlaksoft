@@ -39,7 +39,6 @@ import {
   type TicketListFilters,
 } from "./ticket-list-model";
 import { Combobox } from "@/components/ui/combobox";
-import { TicketsTabs } from "./kvkk/tickets-tabs";
 
 const STATUS_COLOR: Record<string, string> = {
   open: "var(--brand-500)",
@@ -213,6 +212,8 @@ function queryFailure(errors: unknown[]) {
   );
   throw new Error("Destek kuyruğu verileri yüklenemedi. Lütfen tekrar deneyin.");
 }
+
+export const metadata = { title: "Destek talepleri" };
 
 export default async function AdminTicketsPage({
   searchParams,
@@ -478,7 +479,6 @@ export default async function AdminTicketsPage({
 
   return (
     <div className="space-y-4">
-      <TicketsTabs active="talepler" />
       <AdminPageHeader
         eyebrow="Müşteri operasyon merkezi"
         icon={LifeBuoy}

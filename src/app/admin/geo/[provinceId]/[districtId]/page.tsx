@@ -11,6 +11,8 @@ import { PageHeader } from "@/components/ui/page-header";
 
 const PAGE_SIZE = 300;
 
+export const metadata = { title: "Coğrafya: ilçe" };
+
 export default async function AdminGeoDistrictPage({
   params,
   searchParams,

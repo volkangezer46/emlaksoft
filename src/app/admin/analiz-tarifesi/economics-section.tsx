@@ -76,8 +76,8 @@ export function EconomicsSection({
   canWrite: boolean;
 }) {
   const donem = period.preset === "ozel" ? "bu-ay" : period.preset;
-  const ledgerHref = `/admin/muhasebe/defter?${new URLSearchParams({ ...periodSearchParams(period), durum: "paid", tur: "credit_pack" }).toString()}`;
-  const muhasebeHref = `/admin/muhasebe?${new URLSearchParams(periodSearchParams(period)).toString()}`;
+  const ledgerHref = `/admin/billing/defter?${new URLSearchParams({ ...periodSearchParams(period), durum: "paid", tur: "credit_pack" }).toString()}`;
+  const muhasebeHref = `/admin/billing/muhasebe?${new URLSearchParams(periodSearchParams(period)).toString()}`;
 
   return (
     <Card id="ekonomi">

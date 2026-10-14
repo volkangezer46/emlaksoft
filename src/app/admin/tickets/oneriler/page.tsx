@@ -9,7 +9,6 @@ import { platformModuleMode } from "@/lib/platform-access";
 import { isRequestStatus, REQUEST_STATUS_LABEL, REQUEST_STATUSES, type RequestStatus } from "@/lib/product-feedback/model";
 import { countRequestsByStatus, listRequestsForAdmin } from "@/lib/product-feedback/store";
 import { FEEDBACK_SETTING_KEYS } from "@/lib/settings/registry/feedback";
-import { TicketsTabs } from "../kvkk/tickets-tabs";
 import { RequestStatusForm } from "./request-status-form";
 
 export const metadata = { title: "Öneri panosu" };
@@ -42,7 +41,6 @@ export default async function FeatureRequestsAdminPage({ searchParams }: { searc
 
   return (
     <div className="space-y-6">
-      <TicketsTabs active="oneriler" />
       <PageHeader
         eyebrow="Destek"
         title="Öneri panosu"

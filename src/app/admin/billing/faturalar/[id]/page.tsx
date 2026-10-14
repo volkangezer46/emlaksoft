@@ -9,7 +9,6 @@ import { getSetting } from "@/lib/settings/read";
 import { canIssueManual, fromRawLine, isManualInvoice, manualCategoryLabel, synthesizeLine, type RawInvoiceLine } from "@/lib/billing/manual-invoice";
 import { TBody, TD, TFoot, TH, THead, TR, Table } from "@/components/ui/table";
 import { InvoiceActions } from "../../invoice-actions";
-import { BillingNav } from "../../billing-nav";
 import { DocumentActions } from "./document-actions";
 import { ledgerFilterParams } from "@/lib/accounting/ledger";
 
@@ -36,6 +35,8 @@ const PRINT_CSS = `@media print {
 }`;
 
 type CreditNote = { id: string; credit_no: string; amount_try: number; net_try: number; tax_try: number; reason: string; issued_at: string };
+
+export const metadata = { title: "Fatura" };
 
 export default async function InvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requirePlatformModule("billing");
@@ -100,7 +101,6 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
         description={`${tenant?.name ?? "Ofis"} · ${invStatus[inv.status] ?? inv.status}`}
         breadcrumbs={[{ label: "Faturalama", href: "/admin/billing" }, { label: inv.invoice_no }]}
       />
-      <BillingNav active="fatura" />
 
       {isDraftManual ? (
         <div role="status" className="rounded-[var(--radius-card)] border border-warn-500/30 bg-warn-500/10 p-3 text-sm text-warn-600">
@@ -223,7 +223,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
               </li>
             ))}
           </ul>
-          <Link href={`/admin/muhasebe/defter?${new URLSearchParams({ donem: "tumu", ...ledgerFilterParams({ durum: "dekont", q: inv.invoice_no }) })}`} className="focus-ring mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline">
+          <Link href={`/admin/billing/defter?${new URLSearchParams({ donem: "tumu", ...ledgerFilterParams({ durum: "dekont", q: inv.invoice_no }) })}`} className="focus-ring mt-2 inline-block text-xs font-semibold text-brand-600 hover:underline">
             Defterde göster
           </Link>
         </section>

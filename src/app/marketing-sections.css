@@ -237,7 +237,7 @@
 /* Kaydırmayla giriş kaldırıldı: animation-timeline:view() ekran dışı bölümleri boş (opacity 0) bırakıyordu.
    .mk-reveal / .mk-stagger sınıfları DOM'da durur, görsel etkisi yoktur. */
 
-/* ---- mega menü + duyuru şeridi (içerik: admin /admin/site-menu; varsayılan: src/lib/site-menu/defaults.ts) ----
+/* ---- mega menü + duyuru şeridi (içerik: admin /admin/site/menu; varsayılan: src/lib/site-menu/defaults.ts) ----
    Hareket yalnız transform/opacity (motion.css süreleri); reduced-motion marketing.css'te kapatılır.
    Cam: YALNIZ panel yüzeyinin arkasında hafif bulanıklık (.mk-mega-in, envanter glass-budget-contract.test.ts; opak yedek
    aşağıda). Panel açıkken arkadaki sonsuz demo animasyonu durur (bulanıklık her karede yeniden hesaplanmasın).

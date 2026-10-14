@@ -7,7 +7,6 @@ import { DEMO_MODE_LABELS, getDemoPolicyNow, type DemoMode } from "@/lib/platfor
 import { getPlatformMfaPolicyNow } from "@/lib/platform-security/mfa-policy";
 import { DAY_MS } from "@/lib/clock";
 import { listStaffMfaStatus } from "@/app/actions/platform-security";
-import { PersonelTabs } from "../personel-tabs";
 import { CopyLine, DemoModeForm, MfaEnforcementForm } from "./security-forms";
 import { AccessPolicyForm, RevokeSessionButton } from "./access-policy-forms";
 import { createClient } from "@/lib/supabase/server";
@@ -110,7 +109,6 @@ export default async function SecurityPolicyPage() {
         description="Hızlı demo girişi ve personel iki adımlı doğrulaması. Her değişiklik gerekçesiyle denetim izine yazılır."
         art="shield"
       />
-      <PersonelTabs active="guvenlik" />
 
       <section aria-labelledby="guvenlik-durumu" className="space-y-3 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <h2 id="guvenlik-durumu" className="font-display font-bold text-ink-950">Güvenlik durumu</h2>

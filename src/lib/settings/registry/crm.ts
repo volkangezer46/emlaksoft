@@ -4,7 +4,7 @@ import { HEALTH_DEFAULT_RISK_THRESHOLD, HEALTH_DEFAULT_WEIGHTS } from "@/lib/adm
 
 /**
  * OFİS CRM ayarları (AD5; platform kapsamı, `platform_settings` deposu). Ofis sağlık skoru ağırlıkları ve riskli eşiği.
- * Ayar merkezinde (/admin/ayarlar/merkez, "Sağlık ve izleme") düzenlenir; skor günlük hesaplandığı için değişiklik
+ * Ayar merkezinde (/admin/ayarlar, "Sağlık ve izleme") düzenlenir; skor günlük hesaplandığı için değişiklik
  * ERTESİ hesaplamaya yansır (geçmiş günler yeniden yazılmaz). Ağırlıkların toplamı 0 olursa varsayılanlara dönülür.
  */
 const CRM_PERMISSION = { platformModule: "tenants", superAdminOnly: true } as const;

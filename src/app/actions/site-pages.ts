@@ -37,7 +37,7 @@ export type SitePageActionResult = {
 const INDEX_UNREADABLE = "Sayfa listesi şu an okunamadı; mevcut sayfaları korumak için kayıt yapılmadı. Biraz sonra tekrar deneyin.";
 const INDEX_CONFLICT = "Sayfa listesi bu arada başka bir oturumda değişti; sayfayı yenileyip tekrar deneyin.";
 const READONLY = "Sayfaları yalnız süper admin değiştirebilir; bu hesap salt okunur.";
-const REDIRECT_NOTICE = "Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için /admin/seo'daki kuralı kapatın.";
+const REDIRECT_NOTICE = "Bu yolda yönlendirme var; yönlendirme önceliklidir. Sayfanın görünmesi için /admin/site/seo'daki kuralı kapatın.";
 
 async function requireWriter() {
   const staff = await requirePlatformModule("sitecontent");

@@ -365,12 +365,12 @@ describe("sözleşme: yetki, kayıt ve önbellek", () => {
   });
 
   it("admin sayfası okuma kapısı ile açılır; ops okur, destek/muhasebe okuyamaz", () => {
-    expect(read("src/app/admin/site-menu/page.tsx")).toContain('requirePlatformModule("sitemenu")');
+    expect(read("src/app/admin/site/menu/page.tsx")).toContain('requirePlatformModule("sitemenu")');
     expect(platformCanAccess("super_admin", "sitemenu")).toBe(true);
     expect(platformCanAccess("ops", "sitemenu")).toBe(true);
     expect(platformCanAccess("support", "sitemenu")).toBe(false);
     expect(platformCanAccess("billing", "sitemenu")).toBe(false);
-    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/site-menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"])');
+    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/site/menu", "Site menüsü", "Menü, alt bilgi, duyuru şeridi", ["sitemenu"])');
   });
 
   it("yayın medya rotası SVG'yi sandbox/nosniff ile sunar ve Range destekler", () => {

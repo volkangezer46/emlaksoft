@@ -69,7 +69,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Kapatılırsa yeni ofis açılamaz; mevcut hesaplar giriş yapar.",
     source: "setting",
     settingKey: "platform.registration_open",
-    editHref: "/admin/sistem#ayarlar",
+    editHref: "/admin/ayarlar?kategori=kayit-bakim",
   },
   {
     key: "maintenance_mode",
@@ -78,7 +78,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Kapsamdaki sayfalar bakım ekranı gösterir (varsayılan yalnız ofis paneli; ana sayfa açık kalır); platform personeli etkilenmez.",
     source: "setting",
     settingKey: "platform.maintenance_mode",
-    editHref: "/admin/sistem#ayarlar",
+    editHref: "/admin/ayarlar?kategori=kayit-bakim",
   },
   {
     key: "auto_renew",
@@ -87,7 +87,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Açılırsa rıza veren ofislerin kartından yenileme denenir.",
     source: "setting",
     settingKey: "billing.auto_renew_enabled",
-    editHref: "/admin/billing#ayarlar",
+    editHref: "/admin/ayarlar?kategori=deneme-yenileme",
   },
   {
     key: "growth_referral",
@@ -96,7 +96,6 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Açılırsa ofislerde Büyüme ekranı davet bağlantısı üretir; ödül kuralları ayrıca tanımlanır.",
     source: "setting",
     settingKey: "growth.referral_enabled",
-    editHref: "/admin/growth",
   },
   {
     key: "growth_partner",
@@ -105,7 +104,6 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Açılırsa ortak kodlarıyla gelen kayıtlar atfedilir.",
     source: "setting",
     settingKey: "growth.partner_enabled",
-    editHref: "/admin/growth",
   },
   {
     key: "growth_cash_payout",
@@ -114,7 +112,6 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     impact: "Yalnız ortak programı da açıkken etkindir.",
     source: "setting",
     settingKey: "growth.cash_payout_enabled",
-    editHref: "/admin/growth",
     requires: "growth_partner",
   },
   {
@@ -125,7 +122,7 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     source: "platform",
     storageKey: "emlakfiyati_ortak_enabled",
     onValue: "1",
-    editHref: "/admin/sistem?sekme=emlakfiyati",
+    editHref: "/admin/sistem?sekme=entegrasyonlar#anahtar-emlakfiyati",
   },
   {
     key: "platform_mfa",

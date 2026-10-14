@@ -14,7 +14,7 @@ const HARD_FILE_LIMIT = 512 * 1024; // belleğe okumadan önce üst sınır (slo
 
 function refresh() {
   updateTag(BRAND_CACHE_TAG);
-  revalidatePath("/admin/marka");
+  revalidatePath("/admin/site/marka");
   revalidatePath("/", "layout");
 }
 

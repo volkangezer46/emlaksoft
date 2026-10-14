@@ -6,7 +6,7 @@ import {
   buildChurnRows,
   churnLevel,
   homeVariantFor,
-  platformHomeSections,
+  platformReportSections,
   type AttentionInput,
 } from "./dashboard-layout";
 
@@ -22,7 +22,7 @@ const EMPTY: AttentionInput = {
   newTrials: 0,
 };
 
-describe("homeVariantFor / platformHomeSections", () => {
+describe("homeVariantFor / platformReportSections", () => {
   it("billing ve support kendi panelini, diğerleri platform panelini görür", () => {
     expect(homeVariantFor("billing")).toBe("billing");
     expect(homeVariantFor("support")).toBe("support");
@@ -30,23 +30,22 @@ describe("homeVariantFor / platformHomeSections", () => {
     expect(homeVariantFor("ops")).toBe("platform");
   });
 
-  it("super_admin gelir bölümlerini görür, ops görmez (billing modülü yok)", () => {
-    const sa = platformHomeSections("super_admin");
-    const ops = platformHomeSections("ops");
+  it("Raporlar: super_admin gelir bölümlerini görür, ops görmez (billing modülü yok)", () => {
+    const sa = platformReportSections("super_admin");
+    const ops = platformReportSections("ops");
     expect(sa).toContain("mrr");
     expect(sa).toContain("composition");
     expect(ops).not.toContain("mrr");
     expect(ops).not.toContain("composition");
-    expect(sa[0]).toBe("attention");
-    expect(ops[0]).toBe("attention");
+    expect(ops).toContain("churn");
   });
 
-  it("bölümler tekrarsızdır ve geo yalnız erişimi olan rolde çıkar", () => {
-    for (const r of ["super_admin", "ops"] as const) {
-      const s = platformHomeSections(r);
-      expect(new Set(s).size).toBe(s.length);
-      expect(s).toContain("geo");
-    }
+  it("bölümler tekrarsızdır; panelden taşınan kartlar Raporlar'dadır, kopya modül kartı yok", () => {
+    const s = platformReportSections("super_admin");
+    expect(new Set(s).size).toBe(s.length);
+    for (const id of ["unitEconomics", "composition", "growth", "churnReasons", "usage"] as const) expect(s).toContain(id);
+    expect(s as string[]).not.toContain("modules");
+    expect(s as string[]).not.toContain("attention");
   });
 });
 

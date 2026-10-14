@@ -44,14 +44,18 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
     expect(activeAdminItem("/admin/raporlar")?.href).toBe("/admin");
     expect(activeAdminItem("/admin/danisman")?.href).toBe("/admin");
     expect(activeAdminItem("/admin/members/abc")?.href).toBe("/admin/tenants");
-    expect(activeAdminItem("/admin/seo")?.href).toBe("/admin/site");
-    expect(activeAdminItem("/admin/muhasebe/defter")?.href).toBe("/admin/billing");
+    expect(activeAdminItem("/admin/site/seo")?.href).toBe("/admin/site");
+    expect(activeAdminItem("/admin/billing/defter")?.href).toBe("/admin/billing");
     expect(activeAdminItem("/admin/aktivite")?.href).toBe("/admin/sistem");
-    expect(activeAdminItem("/admin/ayarlar/bayraklar")?.href).toBe("/admin/ayarlar/merkez");
+    expect(activeAdminItem("/admin/ayarlar/bayraklar")?.href).toBe("/admin/ayarlar");
+    expect(activeAdminItem("/admin/ai-kullanim")?.href).toBe("/admin/analiz-tarifesi");
+    expect(activeAdminItem("/admin/tickets/yardim/duzenle")?.href).toBe("/admin/tickets");
+    expect(activeAdminItem("/admin/geo/talepler")?.href).toBe("/admin/geo");
+    expect(activeAdminItem("/admin/personel/guvenlik")?.href).toBe("/admin/personel");
     expect(isAdminNavActive("/admin/tenants", { href: "/admin" })).toBe(false);
     expect(isAdminNavActive("/admin/sitex", { href: "/admin/site" })).toBe(false);
-    const ayarlar = items.find((i) => i.href === "/admin/ayarlar/merkez")!;
-    expect(activeTabHref("/admin/ayarlar/merkez", ayarlar.tabs!)).toBe("/admin/ayarlar/merkez");
+    const ayarlar = items.find((i) => i.href === "/admin/ayarlar")!;
+    expect(activeTabHref("/admin/ayarlar", ayarlar.tabs!)).toBe("/admin/ayarlar");
   });
 
   it("rol süzgeci: görünür her öğe en az bir rol modülüyle eşleşir; destek rolü site/sistem görmez", () => {
@@ -93,17 +97,75 @@ describe("özellik bayrakları ve tek-yer ayarlar", () => {
     expect(read("src/app/actions/payment-links.ts")).toContain("paymentLinkDemoAllowed()");
   });
 
-  it("konuya ait ayarın evi gerçek bir sayfadır ve o sayfa ayarı RegistrySettings ile çizer", () => {
-    const homes = new Map<string, string[]>();
-    for (const key of ["platform.registration_open", "platform.maintenance_mode", "billing.default_trial_days", "legal.lead_consent_text"]) {
+  it("konuya ait ayarın evi gerçek bir sayfadır; alan sahibi olmayan ayarlar (kayıt/bakım, deneme/yenileme) Ayar merkezindedir", () => {
+    for (const key of ["legal.lead_consent_text", "email.resend_api_key", "dunning.auto_suspend_days"]) {
       const home = getSettingDef(key)?.home;
-      expect(home, key).toBeTruthy();
-      expect(existsSync(pageFile(home!.href)), home!.href).toBe(true);
-      homes.set(home!.href, [...(homes.get(home!.href) ?? []), key]);
+      if (!home) continue;
+      expect(existsSync(pageFile(home.href)), home.href).toBe(true);
     }
-    expect(read("src/app/admin/sistem/system-view.tsx")).toContain('"platform.registration_open"');
-    expect(read("src/app/admin/billing/page.tsx")).toContain('"billing.default_trial_days"');
-    expect(read("src/app/admin/ayarlar/merkez/page.tsx")).toContain("getSettingDef(v.key)?.home");
+    for (const key of ["platform.registration_open", "platform.maintenance_mode", "billing.default_trial_days", "billing.auto_renew_enabled"]) {
+      const def = getSettingDef(key)!;
+      expect(def.home, key).toBeUndefined();
+      expect(["kayit-bakim", "deneme-yenileme"], key).toContain(def.category);
+    }
+    // Eski kopya formlar yok: sistem sağlığı ve abonelik genel ekranı bu ayarları düzenlemez (tek yer: /admin/ayarlar).
+    expect(read("src/app/admin/sistem/system-view.tsx")).not.toContain('"platform.registration_open"');
+    expect(read("src/app/admin/billing/page.tsx")).not.toContain('"billing.default_trial_days"');
+    expect(read("src/app/admin/billing/page.tsx")).toContain("/admin/ayarlar?kategori=deneme-yenileme");
+    expect(read("src/app/admin/ayarlar/page.tsx")).toContain("getSettingDef(v.key)?.home");
     expect(existsSync(join(root, "src/app/admin/ayarlar/general-settings-form.tsx"))).toBe(false);
+  });
+});
+
+describe("tek sekme kaynağı ve kaldırılan kopyalar (CL-ADMIN)", () => {
+  const byHref = new Map(items.map((i) => [i.href, i]));
+  const labels = (href: string) => byHref.get(href)!.tabs!.map((t) => t.label);
+
+  it("bölüm sekmeleri nav.ts'ten gelir; sayfa içi kopya sekme bileşenleri silindi", () => {
+    expect(labels("/admin")).toEqual(["Panel", "Raporlar", "Rapor merkezi", "AI danışmanı", "Onaylar"]);
+    expect(labels("/admin/billing")).toEqual(["Genel", "Planlar", "Kuponlar", "Tahsilat", "Muhasebe", "Fatura defteri", "Kanal ROI"]);
+    expect(labels("/admin/tickets")).toEqual(["Talepler", "Hazır yanıtlar", "KVKK başvuruları", "Yardım merkezi", "Öneri panosu", "Raporlar", "Ayarlar"]);
+    expect(labels("/admin/personel")).toEqual(["Personel", "Roller", "Güvenlik politikası"]);
+    expect(labels("/admin/geo")).toEqual(["Gezgin", "İçe aktar", "Sürümler", "Değişiklik talepleri", "Veri tutarlılığı", "Eşleştir"]);
+    expect(labels("/admin/sistem")).toEqual(["Sağlık", "Entegrasyonlar", "Hata kayıtları", "Uyarılar", "Durum sayfası", "Kaynaklar", "Veritabanı", "Aktivite"]);
+    expect(labels("/admin/analiz-tarifesi")).toEqual(["Analiz tarifesi", "AI kullanımı"]);
+    for (const f of [
+      "src/app/admin/billing/billing-nav.tsx",
+      "src/app/admin/tickets/kvkk/tickets-tabs.tsx",
+      "src/app/admin/personel/personel-tabs.tsx",
+      "src/app/admin/geo/geo-tabs.tsx",
+      "src/app/admin/geo/layout.tsx",
+      "src/app/admin/sistem/emlakfiyati-view.tsx",
+    ]) {
+      expect(existsSync(join(root, f)), f).toBe(false);
+    }
+    expect(read("src/app/admin/sistem/page.tsx")).not.toMatch(/PageTabs|sekme=emlakfiyati|"emlakfiyati"|EmlakFiyatiView|sekme=portal-kurallari|"portal-kurallari"/);
+    expect(read("src/app/admin/raporlar/page.tsx")).not.toContain("ReportTabs");
+  });
+
+  it("kupon sekmesi koşulludur (şema yoksa çizilmez); palet sekmelerden türer, elle hedef kopyası yok", () => {
+    const kupon = byHref.get("/admin/billing")!.tabs!.find((t) => t.label === "Kuponlar")!;
+    expect(kupon.when).toBe("coupons");
+    const billing = (c: boolean) => adminNavFor(PLATFORM_ROLE_MODULES.super_admin, { coupons: c }).flatMap((s) => s.items).find((i) => i.href === "/admin/billing")!;
+    expect(billing(false).tabs!.some((t) => t.label === "Kuponlar")).toBe(false);
+    expect(billing(true).tabs!.some((t) => t.label === "Kuponlar")).toBe(true);
+    const manual = items.flatMap((i) => i.palette ?? []).map((p) => p.href);
+    for (const h of ["/admin/tickets/kvkk?kaynak=basvuru", "/admin/tickets/oneriler", "/admin/sistem?sekme=durum"]) expect(manual, h).not.toContain(h);
+    const palette = adminPaletteFor(PLATFORM_ROLE_MODULES.super_admin).map((p) => p.href);
+    for (const h of ["/admin/tickets/kvkk", "/admin/tickets/oneriler", "/admin/sistem?sekme=durum"]) expect(palette, h).toContain(h);
+  });
+
+  it("Gelir menüsü: Kullanım ve krediler (Analiz tarifesi + AI kullanımı) ve Ortaklık ve davet; AI kullanımı ayrı menü öğesi değil", () => {
+    expect(byHref.get("/admin/analiz-tarifesi")?.label).toBe("Kullanım ve krediler");
+    expect(byHref.has("/admin/ai-kullanim")).toBe(false);
+    const ortak = byHref.get("/admin/ortaklik")!;
+    expect(ortak.label).toBe("Ortaklık ve davet");
+    expect(ortak.description).not.toMatch(/Site|SEO|Reklam/);
+  });
+
+  it("silinen rotaların klasörü yok (yönlendirme/takma ad bırakılmaz)", () => {
+    for (const dir of ["site-icerik", "site-menu", "seo", "marka", "growth", "muhasebe", "ayarlar/merkez", "site/yardim", "geo/bildirimler", "site/seo/performans"]) {
+      expect(existsSync(join(root, "src/app/admin", dir)), dir).toBe(false);
+    }
   });
 });

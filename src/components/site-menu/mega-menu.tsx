@@ -14,7 +14,7 @@ import type { SceneCopy } from "./scene-copy";
 const FeaturedPreview = lazy(() => import("./featured-preview").then((m) => ({ default: m.FeaturedPreview })));
 
 /**
- * Herkese açık üst bar + MEGA MENÜ (istemci). İçerik admin'den (/admin/site-menu) gelir; varsayılan içerik
+ * Herkese açık üst bar + MEGA MENÜ (istemci). İçerik admin'den (/admin/site/menu) gelir; varsayılan içerik
  * src/lib/site-menu/defaults.ts. Veri sunucudan hazır gelir (ikonlar sunucuda çizilir, istemci paketine ikon listesi girmez).
  * Erişilebilirlik (APG "disclosure navigation"): düğme aria-expanded/aria-controls; Enter/Boşluk/Aşağı ok açar ve ilk
  * bağlantıya odaklanır; Sol/Sağ ok üst düzey düğmeler arasında gezer; panel içinde Yukarı/Aşağı/Home/End bağlantıları

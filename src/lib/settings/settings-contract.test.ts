@@ -35,7 +35,6 @@ const LEGACY_WRITERS: Record<string, string> = {
   "src/lib/integrations/emlakfiyati/adapter.ts": "EF durum anahtarları",
   "src/lib/integrations/emlakfiyati/ortak-client.ts": "EF ortak istemci durum anahtarları",
   "src/app/actions/platform-billing-plans.ts": "plan/koltuk/kampanya JSON (kendi ekranı)",
-  "src/app/actions/growth.ts": "büyüme bayrakları (kendi ekranı, kendi denetimi)",
   "src/app/actions/accounting.ts": "muhasebe ayarları",
   "src/app/admin/analiz-tarifesi/actions.ts": "EF tarife/paket JSON (kendi ekranı)",
   "src/app/admin/ai-kullanim/actions.ts": "AI kredi maliyet tablosu (kendi ekranı)",

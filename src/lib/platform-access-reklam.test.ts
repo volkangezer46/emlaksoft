@@ -29,7 +29,7 @@ describe("platform rolü × reklam modülü", () => {
     const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
     expect(read("src/app/admin/site/baglantilar/page.tsx")).toContain('requirePlatformModule("reklam")');
     expect(read("src/app/admin/site/reklam/google/page.tsx")).toContain('requirePlatformModule("reklam")');
-    expect(read("src/app/admin/seo/performans/page.tsx")).toContain('requirePlatformModule("seo")');
+    expect(read("src/app/admin/site/seo/page.tsx")).toContain('requirePlatformModule("seo")');
     const actions = read("src/app/actions/google-connect.ts");
     expect(actions).toContain('module: "reklam", roles: ["super_admin"]');
     // Her dışa açık eylem super_admin kapısıyla başlar.

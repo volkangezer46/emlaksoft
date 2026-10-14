@@ -92,7 +92,7 @@ describe("önizleme rotası sözleşmesi", () => {
     expect(block).toMatch(/X-Robots-Tag", value: "noindex/);
   });
   it("şematik önizlemede sabit deneme günü yok", () => {
-    const preview = readFileSync(join(process.cwd(), "src/app/admin/site-icerik/content-preview.tsx"), "utf8");
+    const preview = readFileSync(join(process.cwd(), "src/app/admin/site/sayfalar/ana-sayfa/content-preview.tsx"), "utf8");
     expect(preview).not.toMatch(/trialDays\s*=\s*\d/);
     expect(preview).not.toContain("PLANS");
   });

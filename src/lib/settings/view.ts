@@ -112,7 +112,7 @@ export function searchSettings(defs: readonly AnySettingDef[], q: string, limit 
     key: d.key,
     label: d.label,
     category: d.category,
-    href: `/admin/ayarlar/merkez?ara=${encodeURIComponent(d.label)}#${encodeURIComponent(d.key)}`,
+    href: `/admin/ayarlar?ara=${encodeURIComponent(d.label)}#${encodeURIComponent(d.key)}`,
   }));
 }
 

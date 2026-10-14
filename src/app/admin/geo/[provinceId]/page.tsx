@@ -10,6 +10,8 @@ import { GeoEntityList, type EntityRowData } from "../entity-list";
 import { NewEntityForm } from "../new-entity-form";
 import { PageHeader } from "@/components/ui/page-header";
 
+export const metadata = { title: "Coğrafya: il" };
+
 export default async function AdminGeoProvincePage({
   params,
   searchParams,

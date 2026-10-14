@@ -9,6 +9,8 @@ import { ProvinceRow, type ProvinceRowData } from "./province-row";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 
+export const metadata = { title: "Coğrafya" };
+
 export default async function AdminGeoPage({
   searchParams,
 }: {

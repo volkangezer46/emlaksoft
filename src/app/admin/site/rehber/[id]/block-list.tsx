@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/core";
 import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Txt } from "@/app/admin/site-icerik/editor-fields";
+import { Txt } from "@/app/admin/site/sayfalar/ana-sayfa/editor-fields";
 import type { Issue } from "@/lib/site-menu/schema-core";
 import {
   CALLOUT_TONES,

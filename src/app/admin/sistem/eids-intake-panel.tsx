@@ -1,14 +1,14 @@
 import Link from "@/components/ui/smart-link";
 import { MailCheck } from "lucide-react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { DAY_MS, now as clockNow } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { fetchAllRowsKeepError } from "@/lib/supabase/fetch-all";
 import { FORWARDING_LABELS, forwardingState, maskSampleForAdmin, type ForwardingState } from "@/lib/eids/actions-core";
 
 /**
- * EİDS ALIMI paneli (Sistem): ofis bazında iletme durumu, doğrulama dağılımı (son 90 gün), unknown_format sayısı ve
- * platform genelinde son maskeli örnek, SMTP alıcı sağlığı. İstemci `SystemView`'dan gelir (yeni service_role yok).
+ * EİDS ALIMI paneli (Sistem > Entegrasyonlar): ofis bazında iletme durumu, doğrulama dağılımı (son 90 gün), unknown_format
+ * sayısı ve platform genelinde son maskeli örnek, SMTP alıcı sağlığı. Platform geneli salt okuma (kapı: IntegrationsView).
  * GİZLİLİK: malik adı/özeti hiçbir sütunda OKUNMAZ; örnek metin EP3'te maskeli saklanır ve burada ikinci kez maskelenir.
  * Tablolar yoksa (EP3 migration'ı uygulanmamış) "kurulum bekliyor" der.
  */
@@ -22,7 +22,8 @@ const STATE_CLS: Record<ForwardingState, string> = {
   kurulmadi: "bg-ink-950/[0.06] text-text-muted",
 };
 
-export async function EidsIntakePanel({ admin }: { admin: SupabaseClient }) {
+export async function EidsIntakePanel() {
+  const admin = createAdminClient();
   const nowMs = clockNow();
   const since = new Date(nowMs - 90 * DAY_MS).toISOString();
   const [msgRes, addrRes, sampleRes] = await Promise.all([
@@ -44,7 +45,7 @@ export async function EidsIntakePanel({ admin }: { admin: SupabaseClient }) {
 
   if (msgRes.error || addrRes.error) {
     return (
-      <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+      <section id="eids-alim" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
           <MailCheck className="h-3.5 w-3.5" /> EİDS e-posta alımı
         </p>
@@ -81,7 +82,7 @@ export async function EidsIntakePanel({ admin }: { admin: SupabaseClient }) {
   const sample = maskSampleForAdmin((sampleRes.data as { sample_masked?: string | null } | null)?.sample_masked ?? null);
 
   return (
-    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
+    <section id="eids-alim" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
         <MailCheck className="h-3.5 w-3.5" /> EİDS e-posta alımı
       </p>

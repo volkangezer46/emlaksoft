@@ -345,7 +345,7 @@ export async function runSeoAudit(trigger: "cron" | "manual"): Promise<AuditRun>
           severity: status === 404 || status === 410 ? "critical" : "warning",
           url: job.page,
           message: `Kırık iç bağlantı: ${new URL(job.target).pathname} (${status === 0 ? "yanıt yok" : `HTTP ${status}`}).`,
-          fix: "Bağlantıyı düzeltin ya da /admin/seo Yönlendirmeler'den eski yolu yönlendirin.",
+          fix: "Bağlantıyı düzeltin ya da /admin/site/seo Yönlendirmeler'den eski yolu yönlendirin.",
         });
       }
     }

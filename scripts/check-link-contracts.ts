@@ -2,9 +2,10 @@
  * check-link-contracts.ts
  *
  * Tıklanabilirlik kontratı doğrulayıcı:
- *   - src/app altında üretilen her iç link (/app/... veya /admin/...) query
- *     parametrelerini toplar (string literal + template literal href'leri).
- *   - Hedef rotanın page.tsx dosyasında bu parametrenin gerçekten okunduğunu
+ *   - src/app, src/lib ve src/components altında üretilen her iç link (/app/... veya /admin/...) toplanır (string
+ *     literal + template literal; test dosyaları hariç). Sorgusuz bağlantılar da denetlenir: hedef rota (page.tsx ya da
+ *     route.ts) yoksa uyumsuzluktur (silinen rotaya kalan bağlantı / takma ad yakalanır).
+ *   - Query parametresi taşıyan linklerde hedef rotanın page.tsx dosyasında bu parametrenin gerçekten okunduğunu
  *     doğrular (searchParams tip bildirimi, destructuring veya sp.X erişimi).
  *   - Uyumsuzlukları tablo halinde basar; varsa exit code 1 döner.
  *
@@ -15,6 +16,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const ROOT = join(process.cwd(), "src", "app");
+/** Link taranan kökler (rota tablosu yalnız src/app'ten kurulur). */
+const SCAN_ROOTS = ["app", "lib", "components"].map((d) => join(process.cwd(), "src", d));
 
 // ---------------------------------------------------------------------------
 // ALLOWLIST — bilinçli istisnalar. Her giriş gerekçeli olmalı.
@@ -40,6 +43,8 @@ const ALLOWLIST: Record<string, string> = {
 // 1) Rota tablosu: src/app altındaki tüm page.tsx dosyaları
 // ---------------------------------------------------------------------------
 type Route = { pattern: string[]; pagePath: string };
+/** Yalnız yol varlığı için geçerli hedefler: GET dışı rota işleyicileri de (ör. yükleme ucu POST) bağlantı hedefidir. */
+const anyRoutes: Route[] = [];
 
 function collectRoutes(dir: string, segs: string[], out: Route[]) {
   for (const entry of readdirSync(dir)) {
@@ -54,6 +59,8 @@ function collectRoutes(dir: string, segs: string[], out: Route[]) {
     } else if (entry === "route.ts" && /export\s+async\s+function\s+GET\b/.test(readFileSync(full, "utf8"))) {
       // GET rota işleyicisi (ör. /app/ara?tel= kısayolu, vCard indirme) da geçerli bağlantı hedefidir.
       out.push({ pattern: segs, pagePath: full });
+    } else if (entry === "route.ts") {
+      anyRoutes.push({ pattern: segs, pagePath: full });
     }
   }
 }
@@ -61,9 +68,9 @@ function collectRoutes(dir: string, segs: string[], out: Route[]) {
 const routes: Route[] = [];
 collectRoutes(ROOT, [], routes);
 
-function matchRoute(pathSegs: string[]): Route | undefined {
+function matchRoute(pathSegs: string[], pool: readonly Route[] = routes): Route | undefined {
   // Önce tam eşleşme, sonra dinamik segment ([id]) eşleşmesi
-  const candidates = routes.filter((r) => r.pattern.length === pathSegs.length);
+  const candidates = pool.filter((r) => r.pattern.length === pathSegs.length);
   const score = (r: Route) =>
     r.pattern.reduce((acc, seg, i) => {
       if (seg === pathSegs[i]) return acc + 2; // literal
@@ -116,8 +123,17 @@ function targetParams(pagePath: string): Target {
   // a2) Rota işleyicisi: req.nextUrl.searchParams.get("X") / new URL(req.url).searchParams.get("X")
   for (const m of src.matchAll(/searchParams\.get\(\s*["']([\w-]+)["']\s*\)/g)) params.add(m[1]);
 
-  // c) sp.X erişimi (sp = await searchParams yaygın deseni)
-  if (/=\s*\(?await\s+searchParams/.test(src)) {
+  // a3) Adlandırılmış tip: searchParams?: Promise<Sp> / searchParams: SearchParams → aynı dosyadaki `type Sp = {...}`
+  //     (ya da `type SearchParams = Promise<{...}>`) anahtarları.
+  for (const m of src.matchAll(/searchParams\??\s*:\s*(?:Promise<\s*)?([A-Z][\w$]*)\b/g)) {
+    const decl = new RegExp(`(?:type|interface)\\s+${m[1]}\\s*=?\\s*(?:Promise<\\s*)?\\{([\\s\\S]*?)\\}`).exec(src);
+    if (!decl) continue;
+    for (const key of decl[1].matchAll(/([A-Za-z_$][\w$]*)\??\s*:/g)) params.add(key[1]);
+    if (/\[\s*key\s*:/.test(decl[1])) acceptsAll = true;
+  }
+
+  // c) sp.X erişimi (sp = await searchParams ya da Promise.all ile çözülen `sp` yaygın deseni)
+  if (/=\s*\(?await\s+searchParams/.test(src) || /\[\s*sp\b[^\]]*\]\s*=\s*await\s+Promise\.all\(\s*\[\s*searchParams/.test(src)) {
     for (const m of src.matchAll(/\bsp\.([A-Za-z_$][\w$]*)/g)) params.add(m[1]);
   }
 
@@ -145,12 +161,13 @@ function walkFiles(dir: string, out: string[]) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) walkFiles(full, out);
-    else if (/\.(tsx?|jsx?)$/.test(entry)) out.push(full);
+    // Test dosyaları bilinçli olarak OLMAYAN rotaları da anar (silinen rota sözleşmeleri); taranmaz.
+    else if (/\.(tsx?|jsx?)$/.test(entry) && !/\.(test|spec)\.[jt]sx?$/.test(entry)) out.push(full);
   }
 }
 
 const files: string[] = [];
-walkFiles(ROOT, files);
+for (const root of SCAN_ROOTS) walkFiles(root, files);
 
 // String literal ("..."/'...') ve template literal (`...`) içindeki
 // /app/... veya /admin/... + ?query kalıpları. Basit ama kapsayıcı.
@@ -160,13 +177,30 @@ const LITERALS = [
   /`(\/(?:app|admin)\/[^`?#\s]*)\?([^`#]*)/g,
 ];
 
+// Sorgusuz bağlantılar: dizgenin TAMAMI yol (+ isteğe bağlı #çapa) olmalı; ön ek karşılaştırmaları ("/admin/" ile
+// başlıyor mu) ve yol parçaları bu kalıba girmez (sonu "/" ya da "-" olanlar atlanır).
+const PATH_ONLY = [/"(\/(?:app|admin)(?:\/[^"?#\s]*)?)(?:#[^"\s]*)?"/g, /'(\/(?:app|admin)(?:\/[^'?#\s]*)?)(?:#[^'\s]*)?'/g, /`(\/(?:app|admin)(?:\/[^`?#\s]*)?)(?:#[^`\s]*)?`/g];
+
 const links: Link[] = [];
+const pathLinks: Omit<Link, "query">[] = [];
+/** Sorgusuz tarama yalnız kodda: JSDoc blokları ve satır başı `//` yorumları (örnek/anlatım yolları) atlanır. */
+const stripComments = (src: string) => src.replace(/\/\*\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")).replace(/^\s*\/\/.*$/gm, (c) => c.replace(/[^\n]/g, " "));
+
 for (const file of files) {
   const src = readFileSync(file, "utf8");
+  const code = stripComments(src);
   for (const re of LITERALS) {
     for (const m of src.matchAll(re)) {
       const line = src.slice(0, m.index).split("\n").length;
       links.push({ file, line, path: m[1], query: m[2] });
+    }
+  }
+  for (const re of PATH_ONLY) {
+    for (const m of code.matchAll(re)) {
+      // Ön ek / parça (".../" ya da "...-" ile biten) ve yer tutucu ("/app/...", "rota::param") bağlantı değildir.
+      if ((/[/-]$/.test(m[1]) && m[1].length > 5) || m[1].includes("...") || m[1].includes("::")) continue;
+      const line = code.slice(0, m.index).split("\n").length;
+      pathLinks.push({ file, line, path: m[1] });
     }
   }
 }
@@ -220,6 +254,14 @@ for (const link of links) {
   }
 }
 
+// Sorgusuz bağlantılar: yalnız hedef rotanın varlığı (page.tsx / route.ts).
+for (const link of pathLinks) {
+  const segs = link.path.split("/").filter(Boolean).map((s) => (s.includes("${") ? "[dyn]" : s));
+  if (matchRoute(segs) || matchRoute(segs, anyRoutes)) continue;
+  const rel = relative(process.cwd(), link.file).split(sep).join("/");
+  issues.push({ route: link.path, param: "-", source: `${rel}:${link.line}`, note: "rota bulunamadı (page.tsx/route.ts yok)" });
+}
+
 // Tekrarlanan (rota,param) girişlerini kaynaklarıyla grupla
 const grouped = new Map<string, Issue[]>();
 for (const i of issues) {
@@ -227,7 +269,7 @@ for (const i of issues) {
   grouped.set(key, [...(grouped.get(key) ?? []), i]);
 }
 
-console.log(`Link kontrat kontrolü — ${links.length} link, ${checkedParams} param kontrol edildi, ${routes.length} rota.\n`);
+console.log(`Link kontrat kontrolü — ${links.length} sorgulu + ${pathLinks.length} sorgusuz link, ${checkedParams} param kontrol edildi, ${routes.length} rota.\n`);
 
 if (grouped.size === 0) {
   console.log("UYUMSUZLUK YOK ✔");

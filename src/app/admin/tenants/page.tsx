@@ -73,6 +73,8 @@ const QUICK = [
   { key: "gercek", label: "Gerçek veride", param: "veri" as const, value: "gercek" as const },
 ];
 
+export const metadata = { title: "Ofisler" };
+
 export default async function AdminTenantsPage({
   searchParams,
 }: {

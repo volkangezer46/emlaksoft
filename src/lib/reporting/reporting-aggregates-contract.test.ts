@@ -10,7 +10,8 @@ const migration = source("supabase/migrations/20260802000340_reporting_aggregate
 const commission = source("src/app/app/komisyon/page.tsx");
 const tenantReports = source("src/app/app/raporlar/page.tsx");
 const reportsCache = source("src/lib/reporting/cache.ts");
-const adminHome = source("src/app/admin/page.tsx");
+// Kontrol paneli ve Raporlar analiz bölümlerinin veri katmanı (/admin page.tsx yalnız kuyruk + 4 özet çizer).
+const adminHome = source("src/app/admin/_dashboards/platform-sections.tsx");
 const adminReports = source("src/app/admin/raporlar/page.tsx");
 
 describe("exact reporting aggregate contract", () => {
@@ -45,7 +46,7 @@ describe("exact reporting aggregate contract", () => {
 
   it("admin pages use the central plan catalog instead of duplicating prices", () => {
     for (const page of [adminHome, adminReports]) {
-      expect(page).toContain('@/lib/billing/plans');
+      expect(page).toMatch(/@\/lib\/billing\/(plans|plan-definitions)/);
       expect(page).not.toContain("advisor: 990");
       expect(page).not.toContain("office: 2490");
     }

@@ -8,6 +8,8 @@ import { formatDateTimeTr } from "@/lib/format";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export const metadata = { title: "Coğrafya: kullanım" };
+
 export default async function AdminGeoUsagePage({ searchParams }: { searchParams: Promise<{ level?: string; id?: string; tablo?: string }> }) {
   await requirePlatformModule("geo");
   const { level, id, tablo } = await searchParams;

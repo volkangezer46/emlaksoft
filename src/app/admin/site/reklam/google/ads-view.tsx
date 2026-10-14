@@ -124,7 +124,7 @@ export function AdsView({ data }: { data: AdsViewData }) {
                 <Stat
                   label="CAC (gerçek kayıt)"
                   value={money(d.total.cac)}
-                  href="/admin/growth"
+                  href="/admin/site/reklam#kanallar"
                   hint={`${int(d.total.signups)} atıflı kayıt${d.unmatchedSignups > 0 ? ` · ${d.unmatchedSignups} eşleşmeyen` : ""}`}
                 />
               </section>

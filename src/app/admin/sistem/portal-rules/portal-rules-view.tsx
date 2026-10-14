@@ -1,6 +1,5 @@
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Settings2, Workflow } from "lucide-react";
-import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { requirePlatformModule } from "@/lib/platform";
 import { createClient } from "@/lib/supabase/server";
 import { getSettings } from "@/lib/settings/read";
@@ -305,7 +304,7 @@ export async function PortalRulesView({ portal: portalRaw, view: viewRaw }: { po
           <Threshold label="Otomatik geriletme" value={thr("portal_rules.auto_degrade") ? "Açık" : "Kapalı"} />
           <Threshold label="AI girdisi için ofis" value={String(aiMin)} />
         </dl>
-        <Link href="/admin/ayarlar/merkez?ara=portal_rules" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
+        <Link href="/admin/ayarlar?ara=portal_rules" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline">
           Platform ayarlarında değiştir <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </section>
@@ -318,7 +317,7 @@ function Threshold({ label, value }: { label: string; value: string }) {
     <div className="min-w-0">
       <dt className="text-xs text-text-muted">{label}</dt>
       <dd className="m-0 font-semibold tabular-nums text-ink-950">
-        <Link href="/admin/ayarlar/merkez?ara=portal_rules" className="hover:underline">
+        <Link href="/admin/ayarlar?ara=portal_rules" className="hover:underline">
           {value}
         </Link>
       </dd>
@@ -328,11 +327,14 @@ function Threshold({ label, value }: { label: string; value: string }) {
 
 function Header({ portal }: { portal: TransferPortal }) {
   return (
-    <AdminPageHeader
-      eyebrow="Portal aktarımı"
-      icon={Workflow}
-      title="Portal kuralları"
-      description={`${PORTAL_LABELS[portal]} ilan formu eşleştirme kuralları: alan güveni, ofislerden gelen öneriler, sürüm geçmişi ve geri alma. Kurallar düz veridir; eklenti yalnız imzalı ve doğrulanmış seti kabul eder.`}
-    />
+    <div>
+      <p className="flex items-center gap-2 text-xs font-semibold text-brand-600">
+        <Workflow className="h-4 w-4" aria-hidden /> Portal aktarımı
+      </p>
+      <h2 className="mt-1 font-display text-lg font-bold text-ink-950">Portal kuralları</h2>
+      <p className="mt-0.5 text-sm text-text-muted">
+        {PORTAL_LABELS[portal]} ilan formu eşleştirme kuralları: alan güveni, ofislerden gelen öneriler, sürüm geçmişi ve geri alma. Kurallar düz veridir; eklenti yalnız imzalı ve doğrulanmış seti kabul eder.
+      </p>
+    </div>
   );
 }

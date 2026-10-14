@@ -2,6 +2,8 @@ import { FileUp } from "lucide-react";
 import { requirePlatformModule } from "@/lib/platform";
 import { ImportPanel } from "./import-panel";
 
+export const metadata = { title: "Coğrafya: içe aktar" };
+
 export default async function AdminGeoImportPage() {
   const staff = await requirePlatformModule("geo");
   const canWrite = staff.role === "super_admin";

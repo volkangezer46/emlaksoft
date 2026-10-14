@@ -22,7 +22,7 @@ vi.mock("@/app/actions/google-connect", () => {
 
 const { buildConnectionView, serviceCard } = await import("./view-model");
 const { ConnectionsView, ADS_HONESTY_SENTENCE } = await import("@/app/admin/site/baglantilar/connections-view");
-const { PerformanceView } = await import("@/app/admin/seo/performans/performance-view");
+const { PerformanceView } = await import("@/app/admin/site/seo/performance-view");
 const { AdsView } = await import("@/app/admin/site/reklam/google/ads-view");
 
 const empty = buildConnectionView({

@@ -217,7 +217,7 @@ describe("seoCollector read dönüşümü ve eylem kapsamı", () => {
     expect(kayit.proposal?.before?.length).toBe(178);
     expect(kayit.proposal?.after?.length).toBeLessThanOrEqual(155);
     expect(kayit.proposal?.action).toBeUndefined();
-    expect(kayit.href).toBe("/admin/seo?sekme=sayfalar&sayfa=%2Fkayit#editor");
+    expect(kayit.href).toBe("/admin/site/seo?sekme=sayfalar&sayfa=%2Fkayit#editor");
     expect(kayit.explain.length).toBeGreaterThan(10);
     expect(seoMetaDraftExecutor.canHandle(kayit)).toBe(false);
     expect(indexNowExecutor.canHandle(kayit)).toBe(false);

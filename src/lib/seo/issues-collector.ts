@@ -12,7 +12,7 @@ import type { AuditRun, SeoSettings } from "./store";
  *  - "read": son robot koşusunu (`seo.audit.latest`) okur; ağ çağrısı YOK.
  *  - "audit": robotu çalıştırır (keşif + kurallar), sonra aynı dönüşümü uygular.
  * `scanned`: o koşuda taranan adresler (eski kayıtlarda h1 anahtarları). Her bulguda Türkçe `explain` ve ilgili
- * `/admin/seo?sekme=…` ekranı (`href`) vardır. Kapsam dışı/üyelik/ofis sayfası bulguları `manualOnly`: eylem ALMAZ.
+ * `/admin/site/seo?sekme=…` ekranı (`href`) vardır. Kapsam dışı/üyelik/ofis sayfası bulguları `manualOnly`: eylem ALMAZ.
  */
 
 const SEVERITY: Record<Finding["severity"], IssueSeverity> = { critical: "kritik", warning: "uyari", info: "bilgi" };
@@ -67,11 +67,11 @@ const PAGE_EDIT_CODES = new Set(["missing-title", "long-title", "missing-descrip
 /** İlgili düzeltme ekranı (SAF). Yönetilebilir sayfa bulgusu sayfa editörüne, diğerleri ilgili sekmeye gider. */
 export function seoIssueHref(code: string, url: string): string {
   const path = pathOfUrl(url);
-  if (code === "broken-link") return "/admin/seo?sekme=yonlendirme";
-  if (PAGE_EDIT_CODES.has(code) && path && getSeoPage(path)) return `/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
-  if (SITEMAP_CODES.has(code)) return "/admin/seo?sekme=sitemap";
-  if (code.startsWith("jsonld")) return "/admin/seo?sekme=veri";
-  return "/admin/seo?sekme=robot";
+  if (code === "broken-link") return "/admin/site/seo?sekme=yonlendirme";
+  if (PAGE_EDIT_CODES.has(code) && path && getSeoPage(path)) return `/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(path)}#editor`;
+  if (SITEMAP_CODES.has(code)) return "/admin/site/seo?sekme=sitemap";
+  if (code.startsWith("jsonld")) return "/admin/site/seo?sekme=veri";
+  return "/admin/site/seo?sekme=robot";
 }
 
 /** Kural önerisi (yalnız long-description ve missing-og-title; yönetilebilir sayfada). manualOnly ise eylemsiz. */

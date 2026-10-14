@@ -123,8 +123,8 @@ describe("SEO sözleşmesi: cron ve yetki", () => {
     const actions = read("src/app/actions/seo-admin.ts");
     expect(actions).not.toContain("CRON_SECRET");
     expect(actions).toContain("executeSeoRobot(");
-    for (const f of readdirSync(join(root, "src/app/admin/seo")).filter((n) => n.endsWith(".tsx"))) {
-      expect(read(`src/app/admin/seo/${f}`), f).not.toContain("CRON_SECRET");
+    for (const f of readdirSync(join(root, "src/app/admin/site/seo")).filter((n) => n.endsWith(".tsx"))) {
+      expect(read(`src/app/admin/site/seo/${f}`), f).not.toContain("CRON_SECRET");
     }
   });
   it("seo modülü yalnız super_admin ve ops'ta; sidebar, palet ve sayfa kapılı", () => {
@@ -132,9 +132,9 @@ describe("SEO sözleşmesi: cron ve yetki", () => {
       expect(mods.includes("seo"), role).toBe(role === "super_admin" || role === "ops");
     }
     // Menü ve komut paleti tek kaynaktan beslenir (src/lib/admin/nav.ts).
-    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/seo", "SEO", "Arama motoru, sitemap, robot", ["seo"])');
+    expect(read("src/lib/admin/nav.ts")).toContain('L("/admin/site/seo", "SEO", "Arama motoru, sitemap, robot ve arama performansı", ["seo"])');
     expect(read("src/components/admin/command-palette.tsx")).toContain("adminPaletteFor(modules)");
-    expect(read("src/app/admin/seo/page.tsx")).toContain('requirePlatformModule("seo")');
+    expect(read("src/app/admin/site/seo/page.tsx")).toContain('requirePlatformModule("seo")');
   });
   it("her yazan action seo modülünü doğrular ve duyarlı olanlar süper admine kilitli", () => {
     const actions = read("src/app/actions/seo-admin.ts");

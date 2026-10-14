@@ -7,9 +7,9 @@ import { AlertTriangle, Archive, Eye, History, Plus, Save, Send, Undo2 } from "l
 import { publishGuide, rollbackGuide, saveGuideDraft, unpublishGuide } from "@/app/actions/site-guides";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, Full, Txt } from "@/app/admin/site-icerik/editor-fields";
-import { InlineConfirm } from "@/app/admin/site-menu/editor-ui";
-import { SerpPreview } from "@/app/admin/seo/seo-ui";
+import { Card, Full, Txt } from "@/app/admin/site/sayfalar/ana-sayfa/editor-fields";
+import { InlineConfirm } from "@/app/admin/site/menu/editor-ui";
+import { SerpPreview } from "@/app/admin/site/seo/seo-ui";
 import type { Issue } from "@/lib/site-menu/schema-core";
 import {
   GUIDE_CATEGORIES,

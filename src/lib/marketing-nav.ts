@@ -2,7 +2,7 @@ import { defaultSiteMenu } from "@/lib/site-menu/defaults";
 
 /**
  * ÜST MENÜ (mega menü) VARSAYILAN İÇERİĞİNİN SALT OKUNUR GÖRÜNÜMÜ.
- * Menünün tek kaynağı artık admin'in yayınladığı yapılandırmadır (`/admin/site-menu`, `src/lib/site-menu/`); hiç yayın
+ * Menünün tek kaynağı artık admin'in yayınladığı yapılandırmadır (`/admin/site/menu`, `src/lib/site-menu/`); hiç yayın
  * yokken `src/lib/site-menu/defaults.ts` içeriği gösterilir. Bu dosya o varsayılanı eski "sütunlu grup" biçiminde sunar ve
  * `marketing-nav.test.ts` sözleşmesinin (her bağlantı var olan sayfaya/bölüm kimliğine gider; menüde fiyat/paket adı yok)
  * dayanağıdır. Menü içeriğini değiştirmek için `defaults.ts` (varsayılan) veya admin ekranı kullanılır, burası değil.

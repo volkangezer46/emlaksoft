@@ -32,7 +32,7 @@ function tabHref(tab: HelpTab) {
 /**
  * Yardım merkezi: Başlangıç (kurulum kontrol listesi), Rehberler (görev bazlı
  * adımlar), SSS ve Sözlük (jargon → ofis dili). İçerik yardım merkezi CMS'inden gelir: koddaki taban
- * (src/lib/help-content.ts, help-faq.ts) + yayındaki DB makaleleri (src/lib/help-center; /admin/site/yardim). Yayın
+ * (src/lib/help-content.ts, help-faq.ts) + yayındaki DB makaleleri (src/lib/help-center; /admin/tickets/yardim). Yayın
  * önbellek etiketini tazeler: yeni makale hemen aranabilir. Destek talepleri merkezin "Destek" sekmesidir (/app/destek).
  * Öneri panosu (DG8): ofisler özellik önerir ve oy verir (ofis başına tek oy); EmlakSoft durumu günceller.
  */

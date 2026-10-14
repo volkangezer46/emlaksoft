@@ -1,9 +1,6 @@
-import { BellRing, Database, Landmark, Megaphone, Radar, Server, Workflow } from "lucide-react";
-import { PageTabs } from "@/components/app/page-tabs";
+import type { Metadata } from "next";
 import { requirePlatformModule } from "@/lib/platform";
 import { ErrorsView } from "./_hatalar/errors-view";
-import { EmlakFiyatiView } from "./emlakfiyati-view";
-import { PortalRulesView } from "./portal-rules/portal-rules-view";
 import { SystemView } from "./system-view";
 import { AlertsView } from "./alerts-view";
 import { ResourcesView } from "./resources-view";
@@ -11,53 +8,51 @@ import { DatabaseView } from "./database-view";
 import { IntegrationsView } from "./integrations-view";
 import { StatusPageView } from "./status-page-view";
 
-export const metadata = { title: "Sistem sağlığı" };
+type Sp = { sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string };
 
 /**
- * Sayfa içi pill'ler. "Üretim hataları" pill'i kaldırıldı: bölüm şeridinde aynı yere giden "Hata kayıtları" sekmesi
- * var (iki şeritte kopya sekme). `?sekme=hatalar` derin bağlantısı aynen çalışır (hata listesi açılır).
+ * Sistem durumu görünümleri. Sekme şeridi TEK kaynaktan (src/lib/admin/nav.ts "Sistem durumu" tabs; kabuktaki
+ * AdminSectionTabs); bu sayfa ikinci bir sekme şeridi çizmez. Her görünümün kendi sekme başlığı (<title>) vardır.
  */
-const TABS = [
-  { id: "saglik", label: "Sistem sağlığı", icon: Radar },
-  { id: "uyarilar", label: "Uyarılar", icon: BellRing },
-  { id: "durum", label: "Durum sayfası", icon: Megaphone },
-  { id: "kaynaklar", label: "Kaynaklar", icon: Server },
-  { id: "veritabani", label: "Veritabanı", icon: Database },
-  { id: "emlakfiyati", label: "EmlakFiyati", icon: Landmark },
-  { id: "portal-kurallari", label: "Portal kuralları", icon: Workflow },
-] as const;
+const VIEWS = {
+  saglik: "Sistem sağlığı",
+  entegrasyonlar: "Entegrasyon merkezi",
+  hatalar: "Hata kayıtları",
+  uyarilar: "Operasyon uyarıları",
+  durum: "Durum sayfası",
+  kaynaklar: "Sunucu kaynakları",
+  veritabani: "Veritabanı",
+} as const;
+type ViewId = keyof typeof VIEWS;
+
+const viewOf = (sekme: string | undefined): ViewId => (sekme && Object.hasOwn(VIEWS, sekme) ? (sekme as ViewId) : "saglik");
+
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Sp> }): Promise<Metadata> {
+  const sp = (await searchParams) ?? {};
+  return { title: VIEWS[viewOf(sp.sekme)] };
+}
 
 /**
- * Sistem sağlığı + Üretim hataları tek sayfada (hata listesi bileşenleri `./_hatalar`).
- * İki sekme de aynı `sistem` platform modülündedir (tek kapı).
- * `?sekme=hatalar` hata listesini açar; durum/son/sayfa parametreleri ona aittir.
- * `?sekme=entegrasyonlar` entegrasyon merkezi (DG3): bölüm şeridindeki "Entegrasyonlar" sekmesi (hatalar gibi pill'de kopyası yok).
- * `?sekme=portal-kurallari` portal form kurallarını açar; `portal` ve `gorunum` parametreleri ona aittir.
- * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci,
- * `is=<cron işi>` sağlık sekmesinde o işin son 30 çalışmasını (süre grafiği) açar.
- * `?sekme=durum` kamuya açık /durum sayfasının olay/bakım yönetimi ve sürüm (deploy) geçmişi (DG5); `yayin=<sha>` hata listesini o sürüme süzer.
+ * `?sekme=hatalar` hata listesi (durum/son/sayfa/yayin parametreleri ona aittir).
+ * `?sekme=entegrasyonlar` entegrasyon merkezi (DG3): kartlar, anahtar formları (OpenAI, portal API + portal kuralları
+ * `#portal-kurallari` — `portal` ve `gorunum` parametreleri ona aittir —, SMS/WhatsApp, EmlakFiyatı `#anahtar-emlakfiyati`),
+ * EİDS e-posta alımı, ofis bağlantıları ve webhook günlüğü.
+ * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci.
+ * `?sekme=durum` kamuya açık /durum sayfasının olay/bakım yönetimi ve sürüm (deploy) geçmişi (DG5).
+ * Sekmesiz: sağlık (cron nabzı; `is=<cron işi>` o işin son 30 çalışmasını açar). Kayıt ve bakım ayarları Ayarlar
+ * merkezindedir (`/admin/ayarlar?kategori=kayit-bakim`).
  */
-export default async function AdminSystemPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string }>;
-}) {
+export default async function AdminSystemPage({ searchParams }: { searchParams?: Promise<Sp> }) {
   await requirePlatformModule("sistem");
   const sp = (await searchParams) ?? {};
-  const KNOWN = ["hatalar", "entegrasyonlar", "emlakfiyati", "portal-kurallari", "uyarilar", "kaynaklar", "veritabani", "durum"] as const;
-  const active = (KNOWN as readonly string[]).includes(sp.sekme ?? "") ? (sp.sekme as (typeof KNOWN)[number]) : "saglik";
+  const active = viewOf(sp.sekme);
 
   return (
     <div className="space-y-6">
-      <PageTabs base="/admin/sistem" label="Sistem sekmeleri" tabs={TABS} active={active} />
       {active === "hatalar" ? (
         <ErrorsView searchParams={Promise.resolve(sp)} />
       ) : active === "entegrasyonlar" ? (
-        <IntegrationsView />
-      ) : active === "emlakfiyati" ? (
-        <EmlakFiyatiView />
-      ) : active === "portal-kurallari" ? (
-        <PortalRulesView portal={sp.portal} view={sp.gorunum} />
+        <IntegrationsView portal={sp.portal} portalView={sp.gorunum} />
       ) : active === "uyarilar" ? (
         <AlertsView filter={sp.olay} />
       ) : active === "kaynaklar" ? (

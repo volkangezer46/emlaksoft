@@ -6,7 +6,7 @@ import { isThinGuide } from "./schema";
 
 /**
  * Rehber sayfa çevirileri (SAF). Metadata `buildMetadata(path, extra)` ile üretilir (registry girişi S5 dikişinde
- * gelene dek parametreler buradan doğrudan verilir); /admin/seo'da aynı yol için override varsa o kazanır.
+ * gelene dek parametreler buradan doğrudan verilir); /admin/site/seo'da aynı yol için override varsa o kazanır.
  */
 
 export const GUIDE_HUB_TITLE = "Emlak ofisi rehberi";

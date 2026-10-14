@@ -66,7 +66,7 @@ function Cell({ metric, s }: { metric: Metric; s: MetricSummary }) {
  * okur (tek RPC); p75 sorgu anında histogramdan hesaplanır. Kutucuklarda teknik terim yalnız ikincil satırdadır.
  */
 export default async function AdminFieldDataPage({ searchParams }: { searchParams?: Promise<SP> }) {
-  await requirePlatformModule("seo");
+  await requirePlatformModule("sitecontent");
   const sp = (await searchParams) ?? {};
   const days = parsePeriod(sp.gun);
   const { cur } = periodRange(days, now());
@@ -144,7 +144,7 @@ export default async function AdminFieldDataPage({ searchParams }: { searchParam
                           {r.path.includes("[") || r.path === "(taşma)" ? (
                             r.path
                           ) : (
-                            <Link href={`/admin/seo?sekme=sayfalar&sayfa=${encodeURIComponent(r.path)}#editor`} className="focus-ring rounded hover:underline">
+                            <Link href={`/admin/site/seo?sekme=sayfalar&sayfa=${encodeURIComponent(r.path)}#editor`} className="focus-ring rounded hover:underline">
                               {r.path}
                             </Link>
                           )}

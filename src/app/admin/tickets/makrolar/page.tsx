@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { loadMacros, SUPPORT_STAFF_ROLES } from "@/lib/support/desk-data";
 import { canEditMacros, describeMacroActions, parseMacroActions } from "@/lib/support/macro-template";
-import { TicketsTabs } from "../kvkk/tickets-tabs";
 import { MacroList, type MacroRow } from "./macro-editor";
 
 export const metadata = { title: "Hazır yanıtlar" };
@@ -26,7 +25,6 @@ export default async function MacrosPage() {
 
   return (
     <div className="space-y-6">
-      <TicketsTabs active="makrolar" />
       {/* Satır içi düzenleme paneli burada açılır; popup yok. */}
       <div id="inline-panel-host" className="min-w-0 empty:hidden" />
       <PageHeader

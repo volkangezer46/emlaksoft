@@ -302,7 +302,7 @@ describe("public sayfa statik kalır", () => {
   });
 
   it("istemci bileşenleri sunucu modülü içe aktarmaz (store/admin client yok)", () => {
-    for (const f of walk(join(root, "src/app/admin/site-icerik")).filter((x) => /\.tsx$/.test(x) && !/page\.tsx$|loading\.tsx$/.test(x))) {
+    for (const f of walk(join(root, "src/app/admin/site/sayfalar/ana-sayfa")).filter((x) => /\.tsx$/.test(x) && !/page\.tsx$|loading\.tsx$/.test(x))) {
       const s = readFileSync(f, "utf8");
       expect(s.split("\n")[0], f).toBe('"use client";');
       expect(s, f).not.toMatch(/site-content\/store|site-hub\/last-changes|platform-settings|supabase/);
@@ -322,8 +322,12 @@ describe("site yönetimi merkezi", () => {
 
   it("kapsamdaki alanların hepsi var; olmayan EmlakFiyati analiz bakiyesi ekranı için kart yok", () => {
     const hrefs = HUB_CARDS.map((c) => c.href);
-    for (const h of ["/admin/site-menu", "/admin/site-icerik", "/admin/seo", "/admin/sistem#ayarlar", "/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing", "/admin/site/hiz", "/admin/site/reklam", "/admin/site/medya", "/admin/site/rehber", "/admin/site/baglantilar"]) {
+    for (const h of ["/admin/site/menu", "/admin/site/sayfalar/ana-sayfa", "/admin/site/seo", "/admin/ayarlar?kategori=kayit-bakim", "/admin/site/hiz", "/admin/site/reklam", "/admin/site/medya", "/admin/site/rehber", "/admin/site/baglantilar", "/admin/tickets/yardim"]) {
       expect(hrefs, h).toContain(h);
+    }
+    // Kokpitte başka menü öğelerinin kopya kartı yok (abonelik, personel, sistem, duyuru kendi bölümlerinde).
+    for (const h of ["/admin/duyuru", "/admin/billing/planlar", "/admin/billing/kuponlar", "/admin/personel", "/admin/sistem", "/admin/billing"]) {
+      expect(hrefs, h).not.toContain(h);
     }
   });
 
@@ -331,9 +335,10 @@ describe("site yönetimi merkezi", () => {
     expect(cardForAction("seo.page.save")).toBe("seo");
     expect(cardForAction("site_menu.publish")).toBe("site-menu");
     expect(cardForAction("site_content.publish")).toBe("site-icerik");
-    expect(cardForAction("billing.coupon.create")).toBe("kuponlar");
-    expect(cardForAction("billing.plan.save")).toBe("planlar");
-    expect(cardForAction("billing.invoice.void")).toBe("muhasebe");
+    expect(cardForAction("billing.coupon.create")).toBeNull();
+    expect(cardForAction("settings.write", "platform.maintenance_mode")).toBe("bakim-kayit");
+    expect(cardForAction("settings.write", "billing.default_trial_days")).toBeNull();
+    expect(cardForAction("platform_settings.tufe_update")).toBeNull();
     expect(cardForAction("bilinmeyen.islem")).toBeNull();
   });
 

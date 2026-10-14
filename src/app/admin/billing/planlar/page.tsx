@@ -1,4 +1,3 @@
-import Link from "@/components/ui/smart-link";
 import { requirePlatformModule } from "@/lib/platform";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { Layers } from "lucide-react";
@@ -12,7 +11,6 @@ import { warnRatioOf } from "@/lib/billing/seat-settings";
 import { BASE_PLAN_IDS, isPlanId, planLabel, type PlanDef } from "@/lib/billing/plans";
 import { PLAN_GATES, gatesIncludedIn } from "@/lib/billing/page-gates";
 import { getFoundersStatus, getPlanSupport } from "@/lib/billing/plan-support";
-import { BillingNav } from "../billing-nav";
 import { ApplyRecommended } from "./apply-recommended";
 import { EfCreditsSection } from "./ef-credits-section";
 import { EF_WHOLESALE_SETTING_KEY, isWholesaleUnknown, parseEfWholesale } from "@/lib/accounting/ef-economics";
@@ -22,12 +20,14 @@ import { SeatAnalyticsPanel, type SeatListKey } from "./seat-analytics-panel";
 import { loadSeatSubscriberRows } from "./seat-data";
 import { SeatSettingsForm } from "./seat-settings-form";
 
+import { SegmentTabs } from "@/components/ui/segment-tabs";
+
 export const metadata = { title: "Plan tanımları" };
 
 const SECTIONS = [
   { id: "planlar", label: "Plan tanımları" },
   { id: "simulator", label: "Fiyat simülatörü" },
-  { id: "analitik", label: "Gelir analitiği" },
+  { id: "analitik", label: "Koltuk analizi" },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -76,26 +76,17 @@ export default async function PlansAdminPage({
         description="Paket ekleme, fiyat, limit, kota, modül kademesi ve özellik listesi buradan yönetilir; kayıt, fiyat sayfası, paket değiştirme ve yeni ödemeler bu katalogdan beslenir. Mevcut abonelikler kendi tutarını ve fiyat kilidini korur."
         actions={isSuper ? <ApplyRecommended /> : undefined}
       />
-      <BillingNav active="planlar" />
       {!isSuper ? (
         <p role="note" className="rounded-[var(--radius-card)] border border-line bg-surface p-3 text-sm text-text-muted">
           Paket tanımlarını yalnız süper admin değiştirir; bu sayfa salt okunurdur.
         </p>
       ) : null}
-      <nav aria-label="Plan sayfası bölümleri" className="flex flex-wrap gap-1 rounded-[var(--radius-card)] border border-line bg-surface p-1">
-        {SECTIONS.map((x) => (
-          <Link
-            key={x.id}
-            href={x.id === "planlar" ? "/admin/billing/planlar" : `/admin/billing/planlar?sekme=${x.id}`}
-            aria-current={section === x.id ? "page" : undefined}
-            className={`focus-ring min-h-9 rounded-[var(--radius-control)] px-3.5 py-1.5 text-sm font-semibold transition ${
-              section === x.id ? "bg-ink-950 text-white" : "text-text-muted hover:bg-canvas hover:text-ink-950"
-            } touch:min-h-11`}
-          >
-            {x.label}
-          </Link>
-        ))}
-      </nav>
+      {/* Sayfa içi ikinci seviye (bölüm şeridi Abonelikler sekmeleridir; bkz. nav.ts). */}
+      <SegmentTabs
+        items={SECTIONS.map((x) => ({ id: x.id, label: x.label, href: x.id === "planlar" ? "/admin/billing/planlar" : `/admin/billing/planlar?sekme=${x.id}` }))}
+        active={section}
+        label="Plan sayfası bölümleri"
+      />
       {section === "planlar" ? (
         <>
           <section aria-label="Ek kullanıcı çapraz noktaları" className="space-y-2 rounded-[var(--radius-panel)] border border-line bg-surface p-4">
@@ -146,7 +137,6 @@ export default async function PlansAdminPage({
             valuationCost={efValuationCost}
             welcomeUnits={welcomeUnits}
             wholesaleKnown={!isWholesaleUnknown(parseEfWholesale(await getPlatformSetting(EF_WHOLESALE_SETTING_KEY)))}
-            canWrite={isSuper}
           />
         </>
       ) : null}

@@ -63,7 +63,7 @@ const DEFAULT_MAX_RESPONSE_BYTES = 256 * 1024;
 const AUTH_BLOCK_MS = 5 * 60 * 1000;
 const PERSIST_THROTTLE_MS = 10 * 60 * 1000;
 const NOTIFY_THROTTLE_MS = 60 * 60 * 1000;
-const ADMIN_HREF = "/admin/sistem?sekme=emlakfiyati";
+const ADMIN_HREF = "/admin/sistem?sekme=entegrasyonlar#anahtar-emlakfiyati";
 
 /** Tek izinli kök (https + emlakfiyati.com); başka host/şema fail-closed. */
 const ALLOWED_ORIGIN = normalizeProviderBaseUrl(EMLAKFIYATI_BASE_URL, ["emlakfiyati.com"]);

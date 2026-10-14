@@ -7,8 +7,9 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
   const pages = [
     "src/app/admin/page.tsx",
+    "src/app/admin/_dashboards/platform-sections.tsx",
     "src/app/admin/billing/page.tsx",
-    "src/app/admin/muhasebe/page.tsx",
+    "src/app/admin/billing/muhasebe/page.tsx",
     "src/app/admin/raporlar/page.tsx",
   ];
 
@@ -33,11 +34,11 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
 
   it("billing tembel kapıyı, /admin ve raporlar sunucu SVG setini (aynı imzalı AreaTrendChart) kullanır; statik AreaChart ve el yapımı çizgi yok", () => {
     expect(read("src/app/admin/billing/page.tsx")).toContain("@/components/ui/lazy-charts");
-    for (const p of ["src/app/admin/raporlar/page.tsx", "src/app/admin/page.tsx"]) {
+    for (const p of ["src/app/admin/raporlar/page.tsx", "src/app/admin/_dashboards/platform-sections.tsx"]) {
       expect(read(p)).toContain("@/components/ui/viz/server-charts");
       expect(read(p)).not.toContain("@/components/ui/lazy-charts");
     }
-    for (const p of ["src/app/admin/billing/page.tsx", "src/app/admin/raporlar/page.tsx", "src/app/admin/page.tsx"]) {
+    for (const p of ["src/app/admin/billing/page.tsx", "src/app/admin/raporlar/page.tsx", "src/app/admin/page.tsx", "src/app/admin/_dashboards/platform-sections.tsx"]) {
       const src = read(p);
       expect(src).not.toMatch(/<AreaChart\b/);
       expect(src).not.toMatch(/<FunnelChart\b/);
@@ -47,16 +48,16 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     expect(read("src/app/admin/raporlar/page.tsx")).toContain("AreaTrendChart");
   });
 
-  it("/app/raporlar ve /admin/growth statik HBarList/NetDiffChart/FunnelChart yerine canlı çubuk grafik kullanır", () => {
+  it("/app/raporlar ve /admin/ortaklik statik HBarList/NetDiffChart/FunnelChart yerine canlı çubuk grafik kullanır", () => {
     const app = read("src/app/app/raporlar/page.tsx");
     expect(app).toContain("RankBars");
     expect(app).toContain("NetBars");
     expect(app).not.toMatch(/HBarList|NetDiffChart/);
-    expect(read("src/app/admin/growth/page.tsx")).not.toMatch(/<FunnelChart\b/);
+    expect(read("src/app/admin/ortaklik/page.tsx")).not.toMatch(/<FunnelChart\b/);
   });
 
   it("kontrol paneli satır çekip saymaz: aktivite/huni/deneme/iptal/defter tek SQL toplulaştırma RPC'sinden gelir", () => {
-    const src = read("src/app/admin/page.tsx");
+    const src = read("src/app/admin/_dashboards/platform-sections.tsx");
     expect(src).toContain("platform_dashboard_rollups");
     expect(src).not.toContain("fetchAllPaged");
     expect(src).not.toMatch(/from\("audit_logs"\)\.select\("tenant_id, created_at"\)/);
@@ -71,9 +72,16 @@ describe("/admin paneller: süs animasyonu ve ham iskelet borcu", () => {
     expect(sql).not.toMatch(/\b(insert|update|delete)\s+(into|from)?\s*public\./i);
   });
 
-  it("ana ekran rol bazlı yerleşim ve dikkat kuyruğu saf fonksiyonlarını kullanır", () => {
-    const src = read("src/app/admin/page.tsx");
-    expect(src).toContain("platformHomeSections");
+  it("ana ekran yalnız dikkat kuyruğu + 4 özet; analiz bölümleri Raporlar'da (rol bazlı saf yerleşim)", () => {
+    const home = read("src/app/admin/page.tsx");
+    expect(home).toContain("AttentionSection");
+    expect(home).toContain("KpiStrip");
+    for (const moved of ["UnitEconomicsSection", "CompositionSection", "GrowthSection", "ChurnReasonsSection", "UsageSection", "MrrSection"]) {
+      expect(home, moved).not.toContain(moved);
+      expect(read("src/app/admin/raporlar/page.tsx"), moved).toContain(moved);
+    }
+    expect(read("src/app/admin/raporlar/page.tsx")).toContain("platformReportSections");
+    const src = read("src/app/admin/_dashboards/platform-sections.tsx");
     expect(src).toContain("buildAttentionQueue");
     expect(src).toContain("buildChurnRows");
     // Platform insight okuyucusu yokken sahte içgörü üretilmez; yer işaretçisi bırakılır.

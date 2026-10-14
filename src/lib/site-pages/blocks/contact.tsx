@@ -2,7 +2,7 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import type { ContactBlock } from "../schema-core";
 import { Container } from "./shared";
 
-/** Sayfaya basılabilir kurum iletişim bilgisi: /admin/seo kurum bilgisinden (organization) SALT OKUNUR gelir. */
+/** Sayfaya basılabilir kurum iletişim bilgisi: /admin/site/seo kurum bilgisinden (organization) SALT OKUNUR gelir. */
 export type ContactInfo = { email: string; phone: string; address: string };
 
 const telHref = (v: string) => `tel:${(v.trim().startsWith("+") ? "+" : "") + v.replace(/\D/g, "")}`;

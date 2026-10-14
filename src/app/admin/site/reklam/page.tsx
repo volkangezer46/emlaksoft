@@ -11,6 +11,8 @@ import { PERIODS, coverageRate, parsePeriod, pctText, periodRange, readGrowthFun
 import { landingTable } from "@/lib/growth-analytics/landing";
 import { loadMeasureHealth } from "@/lib/measure/collector";
 import { requirePlatformModule } from "@/lib/platform";
+import { platformCanAccess } from "@/lib/platform-access";
+import Link from "@/components/ui/smart-link";
 import { listNotFound } from "@/lib/seo/store";
 import { readSitePageIndex } from "@/lib/site-pages/store";
 import { ChannelTable, HealthCard, LandingTable, LostTraffic } from "./_huni/sections";
@@ -25,10 +27,10 @@ const EMPTY_TEXT = "Ölçüm 13.10'da başladı; ilk veriler yarın";
 /**
  * Huni ve kanallar: ziyaret → kayıt → ilk ilan → ödeme, kanal başına; iniş yolları, kayıp trafik (404), atıf
  * kapsaması, ölçüm sağlığı ve ayarlar. Yalnız toplanmış veriyi okur (tek huni RPC'si + önceki dönem + 404 listesi +
- * sayfa dizini paralel). Modül: şimdilik `seo` (SP5'in `reklam` modülü S1 dikişinde bağlanır).
+ * sayfa dizini paralel). Modül: `reklam` (Reklam sekmesi; Google Ads ile aynı kapı).
  */
 export default async function AdminFunnelPage({ searchParams }: { searchParams?: Promise<SP> }) {
-  const staff = await requirePlatformModule("seo");
+  const staff = await requirePlatformModule("reklam");
   const sp = (await searchParams) ?? {};
   const days = parsePeriod(sp.gun);
   const { cur, prev } = periodRange(days, now());
@@ -37,7 +39,7 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
     readGrowthFunnel(cur.from, cur.to),
     readGrowthFunnel(prev.from, prev.to),
     readSitePageIndex().catch(() => []),
-    listNotFound(10),
+    listNotFound(100),
     loadMeasureHealth(),
   ]);
   const funnel: GrowthFunnel | null = curRes.ok ? curRes.data : null;
@@ -70,6 +72,15 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
           />
         }
       />
+      {/* Çapraz bağlantı: harcama, CAC, gelir ve geri ödeme süresi (para tarafı) Abonelikler > Kanal ROI'de. */}
+      {platformCanAccess(staff, "billing") ? (
+        <p className="text-xs text-text-muted">
+          Kanal başına harcama, CAC, gelir ve geri ödeme süresi:{" "}
+          <Link href="/admin/billing/kanal-roi" className="font-semibold text-brand-600 hover:underline">
+            Abonelikler &gt; Kanal ROI →
+          </Link>
+        </p>
+      ) : null}
 
       {!curRes.ok && curRes.reason === "missing" ? (
         <EmptyState
@@ -124,10 +135,8 @@ export default async function AdminFunnelPage({ searchParams }: { searchParams?:
         </>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <LostTraffic rows={lost.rows} available={lost.available} />
-        <HealthCard health={health} />
-      </div>
+      <LostTraffic rows={lost.rows} available={lost.available} />
+      <HealthCard health={health} />
 
       <Card id="olcum-ayarlari">
         <CardHeader>

@@ -1,3 +1,4 @@
+import { platformCanAccess } from "@/lib/platform-access";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
@@ -9,8 +10,9 @@ import {
   History,
   KeyRound,
   LayoutList,
-  Pencil,
   Mail,
+  Megaphone,
+  Pencil,
   Phone,
   ShieldCheck,
   SlidersHorizontal,
@@ -102,6 +104,8 @@ async function loadAccessData(admin: Admin, profile: { id: string; tenant_id: st
   };
 }
 
+export const metadata = { title: "Üye ayrıntısı" };
+
 export default async function AdminMemberDetailPage({
   params,
   searchParams,
@@ -189,9 +193,17 @@ export default async function AdminMemberDetailPage({
         }
         actions={
           profile.tenant_id ? (
-            <ButtonLink variant="outline" size="md" href={`/admin/tenants/${profile.tenant_id}`}>
-              <Building2 className="h-4 w-4" aria-hidden /> {tenantName ?? "Ofis"} <ArrowUpRight className="h-4 w-4" aria-hidden />
-            </ButtonLink>
+            <>
+              {/* Tek kullanıcıya mesaj: Toplu duyuru formu bu ofis ve kullanıcıya ön dolu açılır. */}
+              {platformCanAccess(staff, "broadcast") ? (
+                <ButtonLink variant="outline" size="md" href={`/admin/duyuru?yeni=1&ofis=${profile.tenant_id}&uye=${id}`}>
+                  <Megaphone className="h-4 w-4" aria-hidden /> Mesaj gönder
+                </ButtonLink>
+              ) : null}
+              <ButtonLink variant="outline" size="md" href={`/admin/tenants/${profile.tenant_id}`}>
+                <Building2 className="h-4 w-4" aria-hidden /> {tenantName ?? "Ofis"} <ArrowUpRight className="h-4 w-4" aria-hidden />
+              </ButtonLink>
+            </>
           ) : null
         }
       >

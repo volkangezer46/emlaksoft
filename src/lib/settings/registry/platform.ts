@@ -23,9 +23,6 @@ import { defineBool, defineInt, defineJson, defineNumber, defineSecret, defineSt
 
 const SUPER = { platformModule: "sistem", superAdminOnly: true } as const;
 
-/** Konuya ait ayarların düzenlendiği bölüm sayfaları (merkez bunları bağlantı olarak gösterir). */
-export const SYSTEM_HOME = { href: "/admin/sistem#ayarlar", label: "Sistem > Kayıt ve bakım" } as const;
-export const BILLING_HOME = { href: "/admin/billing#ayarlar", label: "Abonelik & fatura > Ayarlar" } as const;
 
 /** Portal ayar anahtarları: katalogdaki bütün portallar (tek kaynak `src/lib/portals/catalog.ts`). */
 export const PORTAL_NAMES = ALL_PORTALS;
@@ -33,11 +30,10 @@ export const PORTAL_NAMES = ALL_PORTALS;
 const general: AnySettingDef[] = [
   defineBool({
     key: "platform.maintenance_mode",
-    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.maintenanceMode,
     legacyKeys: ["maintenance_mode"],
     default: false,
-    category: "bayrak",
+    category: "kayit-bakim",
     label: "Bakım modu",
     description: "Açıkken ofis panelleri bakım ekranı gösterir.",
     impact: "Tüm ofis kullanıcıları bakım ekranını görür; yöneticiler etkilenmez. Kapatınca anında normale döner.",
@@ -47,13 +43,12 @@ const general: AnySettingDef[] = [
   }),
   defineString({
     key: "platform.maintenance_message",
-    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.maintenanceMessage,
     legacyKeys: ["maintenance_message"],
     default: "",
     maxLength: MAX_MAINTENANCE_MESSAGE,
     multiline: true,
-    category: "bayrak",
+    category: "kayit-bakim",
     label: "Bakım mesajı",
     description: "Bakım ekranında gösterilen kısa açıklama.",
     impact: "Yalnız bakım modu açıkken kullanıcıya görünür.",
@@ -61,11 +56,10 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "platform.registration_open",
-    home: SYSTEM_HOME,
     storageKey: PLATFORM_SETTING_KEYS.registrationOpen,
     legacyKeys: ["registration_open"],
     default: true,
-    category: "bayrak",
+    category: "kayit-bakim",
     label: "Yeni kayıt açık",
     description: "Kapatıldığında yeni ofis kaydı alınmaz.",
     impact: "Kayıt sayfası ve signUp kapalı mesajı gösterir; mevcut hesaplar giriş yapabilir.",
@@ -74,27 +68,25 @@ const general: AnySettingDef[] = [
   }),
   defineInt({
     key: "billing.default_trial_days",
-    home: BILLING_HOME,
     storageKey: PLATFORM_SETTING_KEYS.defaultTrialDays,
     legacyKeys: ["default_trial_days"],
     default: DEFAULT_TRIAL_DAYS,
     min: MIN_TRIAL_DAYS,
     max: MAX_TRIAL_DAYS,
     unit: "gün",
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Varsayılan deneme süresi",
     description: "Yeni kayıt ve demo dönüşümünde uygulanan deneme günü.",
     impact: "Yalnız bundan sonra açılan denemeleri etkiler; sürmekte olan denemeler değişmez. SQL platform_default_trial_days() ayrıca korunur.",
   }),
   defineInt({
     key: "billing.trial_grace_days",
-    home: BILLING_HOME,
     storageKey: PLATFORM_SETTING_KEYS.trialGraceDays,
     default: DEFAULT_TRIAL_GRACE_DAYS,
     min: MIN_TRIAL_GRACE_DAYS,
     max: MAX_TRIAL_GRACE_DAYS,
     unit: "gün",
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Deneme sonrası tolerans",
     description: "Deneme bitip ödeme yapılmazsa ofis bu süre sonunda otomatik askıya alınır.",
     impact: "Süreyi kısaltmak, ödeme yapmamış ofislerin daha erken askıya alınmasına yol açar. Ödeme yapılınca askı kalkar.",
@@ -102,10 +94,9 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "billing.auto_renew_enabled",
-    home: BILLING_HOME,
     default: false,
     truthy: "true-false",
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Otomatik yenileme (kart)",
     description: "Kayıtlı karttan otomatik abonelik yenileme yönetici bayrağı. Kapalıyken ödeme kod yolu çalışmaz.",
     impact: "Açılırsa rıza veren ofislerin kartından yenileme tahsilatı denenir. Açmadan önce sözleşme ve rıza metni onaylanmalıdır.",
@@ -113,9 +104,8 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "billing.plan_change_proration_enabled",
-    home: BILLING_HOME,
     default: false,
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Oransal paket yükseltme / planlı düşürme",
     description: "Aktif ücretli abonelikte üst pakete kalan gün oranında fark faturasıyla geçiş; daha ucuz pakete geçiş dönem sonunda uygulanır (iade yok).",
     impact: "Açılırsa ofisler Paket & ödeme ekranında oransal yükseltme ve planlı düşürme görür; aktif aboneliğin tam fiyatlı paket değişimi kapanır. Önce 20261007001000 ve 20261007001010 migration'ları uygulanmalıdır; SQL de bu ayarı kontrol eder.",
@@ -123,9 +113,8 @@ const general: AnySettingDef[] = [
   }),
   defineBool({
     key: "billing.pause_enabled",
-    home: BILLING_HOME,
     default: false,
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Abonelik duraklatma",
     description: "Ofis sahibi, aktif aboneliğini ayarlanan en çok gün kadar duraklatabilir (yılda 1 kez). Duraklatmada veri salt-okunur olur; dönem bitişi duraklatma süresi kadar uzar.",
     impact: "Açılırsa ofis sahipleri Paket & ödeme ekranında duraklatma görür. Duraklatılmış ofiste yazma işlemleri kapanır; faturalama ve gecikme kontrolleri durur. Önce 20261007001000 migration'ı uygulanmalıdır; SQL de bu ayarı kontrol eder.",
@@ -133,19 +122,17 @@ const general: AnySettingDef[] = [
   }),
   defineInt({
     key: "billing.pause_max_days",
-    home: BILLING_HOME,
     default: 30,
     min: 1,
     max: 90,
     unit: "gün",
-    category: "faturalama",
+    category: "deneme-yenileme",
     label: "Duraklatma azami süresi",
     description: "Bir duraklatmanın en uzun süresi (gün). Yılda en çok 1 duraklatma yapılabilir.",
     impact: "Yalnız bundan sonra başlayan duraklatmalara uygulanır; süren duraklatmalar planlanan bitişte devam eder.",
   }),
   defineNumber({
     key: "try_credit.max_invoice_share",
-    home: BILLING_HOME,
     storageKey: TRY_MAX_SHARE_SETTING_KEY,
     default: TRY_DEFAULT_MAX_SHARE,
     min: 0.0001,
@@ -160,8 +147,8 @@ const general: AnySettingDef[] = [
   }),
 ];
 
-/** Öğrenen eklenti kuralları (/admin/sistem?sekme=portal-kurallari). SQL `pt_rules_learn` aynı anahtarları okur. */
-export const PORTAL_RULES_HOME = { href: "/admin/sistem?sekme=portal-kurallari", label: "Sistem > Portal kuralları" } as const;
+/** Öğrenen eklenti kuralları (Sistem > Entegrasyonlar > Portal kuralları). SQL `pt_rules_learn` aynı anahtarları okur. */
+export const PORTAL_RULES_HOME = { href: "/admin/sistem?sekme=entegrasyonlar#portal-kurallari", label: "Sistem > Entegrasyonlar > Portal kuralları" } as const;
 const portalRules: AnySettingDef[] = [
   defineInt({
     key: "portal_rules.min_tenants",
@@ -244,7 +231,7 @@ const BRIDGES: { key: string; storageKey: string; category: AnySettingDef["categ
   { key: "ef.packs", storageKey: "ef.packs", category: "emlakfiyati", label: "Analiz paketleri", description: "Satışa açık analiz paketleri.", impact: "Ofislerin satın alabileceği paketleri değiştirir.", href: "/admin/analiz-tarifesi" },
   { key: "ef.welcome_units", storageKey: "ef.welcome_units", category: "emlakfiyati", label: "Hoş geldin analiz bakiyesi", description: "Yeni ofise verilen analiz bakiyesi miktarı.", impact: "Yalnız bundan sonra açılan ofisleri etkiler.", href: "/admin/billing/planlar" },
   { key: "ef.welcome_since", storageKey: "ef.welcome_since", category: "emlakfiyati", label: "Hoş geldin analiz bakiyesi başlangıç tarihi", description: "Hoş geldin analiz bakiyesinin geçerli olduğu başlangıç.", impact: "Tarihten önce açılan ofisler analiz bakiyesi almaz.", href: "/admin/billing/planlar" },
-  { key: "ef.wholesale", storageKey: "ef.wholesale", category: "emlakfiyati", label: "Toptan analiz bakiyesi maliyeti", description: "Analiz bakiyesi ekonomisi (maliyet) hesabında kullanılan toptan birim.", impact: "Muhasebe ekranındaki analiz bakiyesi kârlılığı hesabını etkiler.", href: "/admin/muhasebe" },
+  { key: "ef.wholesale", storageKey: "ef.wholesale", category: "emlakfiyati", label: "Toptan analiz bakiyesi maliyeti", description: "Analiz bakiyesi ekonomisi (maliyet) hesabında kullanılan toptan birim.", impact: "Muhasebe ekranındaki analiz bakiyesi kârlılığı hesabını etkiler.", href: "/admin/billing/muhasebe" },
   { key: "ai.credit_cost_table", storageKey: "ai.credit_cost_table", category: "ai", label: "AI kredi maliyet tablosu", description: "AI özelliklerinin kredi bedelleri.", impact: "Ofislerin AI kullanımında düşen kredi miktarını değiştirir.", href: "/admin/ai-kullanim" },
 ];
 
@@ -276,10 +263,8 @@ const growth: AnySettingDef[] = GROWTH_FLAGS.map((g) =>
     category: "buyume",
     label: g.label,
     description: g.description,
-    impact: "Kapalıyken ilgili program ekranları ve ödül hesapları çalışmaz.",
+    impact: "Kapalıyken ilgili program ekranları ve ödül hesapları çalışmaz. Açarken hazırlık kontrolü uygulanır (engelleyici madde varsa açılmaz).",
     risk: "high",
-    editMode: "bridge",
-    editHref: "/admin/growth",
   }),
 );
 
@@ -457,7 +442,9 @@ const legal: AnySettingDef[] = [
 ];
 
 /** E-posta ayarlarının bölüm sayfası. Şablon konu/gövde ayarları `registry/email.ts` içindedir (AD7). */
-export const EMAIL_HOME = { href: "/admin/ayarlar/eposta", label: "Ayarlar > E-posta" } as const;
+export const EMAIL_HOME = { href: "/admin/ayarlar/eposta", label: "Ayarlar > E-posta şablonları" } as const;
+/** E-posta KANALI (anahtar, gönderen, webhook): Entegrasyonlar'daki E-posta bölümü (şablonlar EMAIL_HOME'da). */
+export const EMAIL_CHANNEL_HOME = { href: "/admin/sistem?sekme=entegrasyonlar#anahtar-eposta", label: "Sistem > Entegrasyonlar > E-posta" } as const;
 
 /** E-posta gönderen biçimi: "Ad <adres@alan.tld>" ya da çıplak "adres@alan.tld" (provider.ts aynı kuralı kullanır). */
 export const EMAIL_FROM_RE = /^(?:[^<>\r\n]{1,100}\s<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>|[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+)$/;
@@ -470,7 +457,7 @@ const PLAIN_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 const emailFromDef = defineString({
   key: "email.from",
-  home: EMAIL_HOME,
+  home: EMAIL_CHANNEL_HOME,
   default: "",
   maxLength: 200,
   category: "bildirim",
@@ -481,7 +468,7 @@ const emailFromDef = defineString({
 });
 const emailReplyToDef = defineString({
   key: "email.reply_to",
-  home: EMAIL_HOME,
+  home: EMAIL_CHANNEL_HOME,
   default: "",
   maxLength: 254,
   category: "bildirim",
@@ -493,7 +480,7 @@ const emailReplyToDef = defineString({
 const emailChannel: AnySettingDef[] = [
   defineSecret({
     key: "email.resend_api_key",
-    home: EMAIL_HOME,
+    home: EMAIL_CHANNEL_HOME,
     maxLength: 256,
     minLength: 20,
     pattern: /^re_[A-Za-z0-9_]+$/,

@@ -12,7 +12,7 @@ import { IconSpriteDefs } from "@/components/icons/sprite-defs";
 // Inter ve Manrope kendi sunucumuzdan (src/app/fonts + globals.css @font-face; Türkçe harfler aynı dosyada).
 // Geist Mono yalnız konsol layout'larında yüklenir (components/ui/console/mono-font.tsx).
 
-// Başlık, açıklama, Open Graph, Twitter ve arama motoru doğrulama kodları /admin/seo "Genel" sekmesinden
+// Başlık, açıklama, Open Graph, Twitter ve arama motoru doğrulama kodları /admin/site/seo "Genel" sekmesinden
 // gelir (src/lib/seo/store.ts buildRootMetadata); ayar yokken değerler eskisiyle birebir aynıdır.
 // Canonical kökte VERİLMEZ: her sayfa kendi canonical'ını buildMetadata ile taşır (aksi halde
 // canonical'ı olmayan sayfalar ana sayfaya işaret ederdi).
@@ -41,7 +41,7 @@ const baseMetadata: Metadata = {
   },
 };
 
-/** Favicon/ana ekran simgesi süper admin ayarından gelir (/admin/marka); ayar yoksa varsayılan dosyalar. */
+/** Favicon/ana ekran simgesi süper admin ayarından gelir (/admin/site/marka); ayar yoksa varsayılan dosyalar. */
 export async function generateMetadata(): Promise<Metadata> {
   const [brand, seoRoot] = await Promise.all([getBrandMeta(), buildRootMetadata()]);
   return { ...baseMetadata, ...seoRoot, icons: brandIcons(brand) };
