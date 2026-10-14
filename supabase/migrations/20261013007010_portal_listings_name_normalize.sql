@@ -1,7 +1,7 @@
--- MIGRATION 20261013007100_portal_listings_name_normalize.sql (EP1 — portal adı tek biçim, kalıcı)
+-- MIGRATION 20261013007010_portal_listings_name_normalize.sql (EP1 — portal adı tek biçim, kalıcı)
 -- UYGULANMADI: 20261013007000_tenant_portal_accounts.sql'den SONRA, yalnız restore edilebilir backup/PITR doğrulandıktan
--- sonra SAHİBİ `npm run db:migrate -- --only 20261013007100_portal_listings_name_normalize.sql` ile uygular.
--- Geri alma: supabase/rollbacks/20261013007100_portal_listings_name_normalize.rollback.sql
+-- sonra SAHİBİ `npm run db:migrate -- --only 20261013007010_portal_listings_name_normalize.sql` ile uygular.
+-- Geri alma: supabase/rollbacks/20261013007010_portal_listings_name_normalize.rollback.sql
 --
 -- NEDEN: 20261013007000 portal_listings.portal_name'i tek seferlik küçük harfe çevirdi ve createPortalListing küçük harf
 --   yazıyor; ancak pt_complete_session / pt_import_bind (20261012002700) ve lc_match_decide (20261007000210)

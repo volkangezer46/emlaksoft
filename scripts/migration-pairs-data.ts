@@ -330,7 +330,7 @@ const F = {
   // EP1 (2026-10-13): portal uyeliginin tek kaynagi tenant_portal_accounts + eklenti giris sonucu RPC'si + portal_name kucuk harf.
   tenantPortalAccounts: "20261013007000_tenant_portal_accounts.sql",
   // EP1 duzeltme: portal_name her yazimda lower(btrim()) (tetikleyici + CHECK); initcap gecen eski RPC'ler zararsizlasir.
-  portalListingsNameNormalize: "20261013007100_portal_listings_name_normalize.sql",
+  portalListingsNameNormalize: "20261013007010_portal_listings_name_normalize.sql",
   // EP2 (2026-10-13): EIDS yetki defteri (yalniz eklenir) + genisletilmis yetki durumu + tek yazma noktasi RPC'leri + aday on suzgeci.
   eidsAuthorityLedger: "20261013007100_eids_authority_ledger.sql",
   // EP4 (2026-10-13): EIDS aksiyon motoru: tasks.kind/priority genislemesi, tasks.dedupe_key/escalated_at, eids_takedown_items,

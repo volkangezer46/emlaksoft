@@ -69,7 +69,7 @@ describe.skipIf(!mod)("portal aktarım oturumu (pglite)", () => {
     P1 = (await q(`insert into public.properties(tenant_id, assigned_to) values ($1,$2) returning id`, [T1, U1]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261012002700_portal_transfer_sessions.sql"));
     // EP1: portal_name tetikleyicisi (initcap geçen RPC'ler de tek biçim yazar).
-    await db.exec(read("supabase/migrations/20261013007100_portal_listings_name_normalize.sql"));
+    await db.exec(read("supabase/migrations/20261013007010_portal_listings_name_normalize.sql"));
   });
 
   it("kod TEK KULLANIMLIK: ilk tüketim ok, ikinci 'used'", async () => {

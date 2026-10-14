@@ -1,4 +1,4 @@
--- GERİ ALMA: 20261013007100_portal_listings_name_normalize.sql (EP1)
+-- GERİ ALMA: 20261013007010_portal_listings_name_normalize.sql (EP1)
 -- Tetikleyici ve CHECK kalkar; küçük harfe çevrilmiş veri GERİ ALINMAZ (yalnız büyük/küçük harf ve boşluk; kod ve tekil
 -- indeksler lower(btrim(portal_name)) ile çalışır). Kod bellekte portalIdFromName ile eşlediğinden geri alma onu bozmaz.
 set local lock_timeout = '5s';
