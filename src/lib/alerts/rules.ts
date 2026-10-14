@@ -1,6 +1,6 @@
 /**
  * Uyarı kuralları (SAF; DB yok). Anahtar listesi `alert_rules.key` CHECK kısıtıyla aynıdır
- * (supabase/migrations/20261013004900_ops_alerts.sql). Varsayılanlar migration'daki tohum satırlarıyla aynıdır;
+ * (supabase/migrations/20261013004900_ops_alerts.sql; `kvkk_sla` 20261014006000_platform_kvkk_requests.sql ile eklenir). Varsayılanlar migration'daki tohum satırlarıyla aynıdır;
  * tablo yoksa ya da satır silinmişse kod bu varsayılanlarla çalışır.
  *
  * `health_down` SUNUCU tarafında değerlendirilir (scripts/sunucu/error-watch.sh): uygulama çökükken uygulama
@@ -16,6 +16,7 @@ export const ALERT_RULE_KEYS = [
   "disk_usage",
   "payment_capture",
   "mrr_drop",
+  "kvkk_sla",
 ] as const;
 
 export type AlertRuleKey = (typeof ALERT_RULE_KEYS)[number];
@@ -103,6 +104,16 @@ export const ALERT_RULES: Record<AlertRuleKey, AlertRuleDef> = {
     description: "Son günlük MRR anlık görüntüsü 7 gün öncesine göre eşikten fazla düştü.",
     severity: "warning",
     threshold: { label: "7 günde düşüş", unit: "%", min: 1, max: 100, default: 10 },
+    defaultRepeatMinutes: 1440,
+    evaluatedBy: "app",
+  },
+  kvkk_sla: {
+    key: "kvkk_sla",
+    label: "KVKK başvuru süresi",
+    description:
+      "EmlakSoft'a doğrudan gelen KVKK başvurusunun 30 günlük yasal yanıt süresi geçti ya da eşik kadar gün kaldı (yanıtlanmamış başvurular).",
+    severity: "warning",
+    threshold: { label: "Kalan gün", unit: "gün", min: 0, max: 20, default: 3 },
     defaultRepeatMinutes: 1440,
     evaluatedBy: "app",
   },

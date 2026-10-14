@@ -16,6 +16,7 @@ import { autoResolveCutoffIso } from "@/lib/errors/classify";
 import { runPortalLearningRetention, runPortalRulesLearn } from "@/lib/portal-rules/server/learn-step";
 import { pruneEmailLog } from "@/lib/email/log-read";
 import { purgeEidsInboundRaw } from "@/lib/eids/inbound-retention";
+import { purgeUnverifiedApplications } from "@/lib/compliance/platform-kvkk-service";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -77,6 +78,9 @@ export async function GET(req: NextRequest) {
     // EİDS e-postaları (EP3, KVKK): 30 günü dolan ham .eml (şifreli) silinir, ayrıştırılmış alanlar kalır; 24 saati
     // geçen iletme onay kodu/bağlantısı silinir. Tablo yoksa 'skipped'. İdempotent.
     eidsInbound: () => purgeEidsInboundRaw(getAdmin(), { nowMs: now() }),
+    // KVKK başvuruları (DG6): e-postası 7 günde doğrulanmayan başvuru silinir (amaçsız kişisel veri tutulmaz).
+    // Tablo yoksa 'skipped'. İdempotent.
+    kvkkUnverified: () => purgeUnverifiedApplications(getAdmin(), now()),
   });
   const queue = await storageDeletionQueueStats().catch(() => null);
   const failed = cronStepsFailed(outcome);

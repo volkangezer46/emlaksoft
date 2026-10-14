@@ -45,6 +45,8 @@ const TRANSACTIONAL: Record<string, string> = {
   "src/lib/email/test-send.ts": "yönetimden e-posta kanalı test gönderimi (yalnız giriş yapmış platform personelinin kendi adresine; ticari değil)",
   "src/app/api/cron/dunning/route.ts": "gecikmiş abonelik faturası tahsilat hatırlatması ve askı öncesi son uyarı (yalnız borçlu ofisin sahibine, kendi faturası ve ödeme/kart bağlantısıyla sınırlı; ticari değil)",
   "src/lib/alerts/channels.ts": "operasyon uyarısı (AD10): yalnız süper adminin tanımladığı iç kanallara (Telegram/e-posta/webhook) sistem arıza bildirimi; ticari değil",
+  "src/lib/compliance/platform-kvkk-service.ts": "KVKK başvurusu (DG6): başvuranın kendi adresine e-posta doğrulama kodu ve başvurusunun yasal yanıtı (KVKK m.13); ticari değil",
+  "src/app/actions/admin-kvkk-requests.ts": "KVKK başvurusunun sonuç yanıtı (DG6): yalnız başvuru sahibine, başvurusuyla sınırlı yasal yanıt; ticari değil",
 };
 
 /** Altyapı: sağlayıcı sarmalayıcıları (kendileri ileti kararı vermez). */

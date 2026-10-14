@@ -13,7 +13,7 @@ const OTP_CODE_PATTERN = /^\d{6}$/;
 const HEX_SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const MIN_SECRET_BYTES = 32;
 
-export type OtpPurpose = "login" | "contract-signature";
+export type OtpPurpose = "login" | "contract-signature" | "kvkk-request";
 export type OtpHashEnvironment = Readonly<Record<string, string | undefined>>;
 
 export class OtpHashConfigurationError extends Error {

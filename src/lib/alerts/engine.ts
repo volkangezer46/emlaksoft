@@ -70,7 +70,7 @@ function appendLog(prev: Delivery[] | null, next: Delivery[]): Delivery[] {
 
 async function readSnapshot(admin: Admin, nowMs: number): Promise<{ snapshot: AlertSnapshot; rules: Record<AlertRuleKey, AlertRuleConfig> } | null> {
   const since5 = new Date(nowMs - 5 * 60_000).toISOString();
-  const [rulesRes, hbRes, stateRes, rateRes, backupRaw, hostRes, capRes, mrrHeadRes] = await Promise.all([
+  const [rulesRes, hbRes, stateRes, rateRes, backupRaw, hostRes, capRes, mrrHeadRes, kvkkRes] = await Promise.all([
     admin.from("alert_rules").select("key, enabled, threshold, repeat_minutes, muted_until"),
     admin.from("cron_heartbeats").select("job, last_run_at, last_status, last_detail"),
     admin.from("cron_job_state").select("job").eq("paused", true),
@@ -79,6 +79,8 @@ async function readSnapshot(admin: Admin, nowMs: number): Promise<{ snapshot: Al
     admin.from("host_metrics").select("host, at, disk_used_pct").order("at", { ascending: false }).limit(1),
     admin.from("billing_payment_captures").select("id", { count: "exact", head: true }).in("status", ["manual_review", "refund_required"]),
     admin.from("platform_mrr_daily").select("day").order("day", { ascending: false }).limit(1),
+    // DG6: yanıtlanmamış platform KVKK başvurularının son tarihleri (kvkk_sla); tablo yoksa kural değerlendirilmez.
+    admin.from("platform_kvkk_requests").select("ref, due_at").in("status", ["open", "in_progress"]).order("due_at", { ascending: true }).limit(500),
   ]);
   if (missing(rulesRes.error)) return null; // migration bekliyor
   const rules = mergeRuleConfigs(rulesRes.error ? [] : rulesRes.data);
@@ -113,6 +115,7 @@ async function readSnapshot(admin: Admin, nowMs: number): Promise<{ snapshot: Al
     disk: host && host.disk_used_pct != null ? { host: host.host, at: host.at, pct: Number(host.disk_used_pct) } : null,
     captureProblems: capRes.error ? null : (capRes.count ?? 0),
     mrr,
+    kvkkOpen: kvkkRes.error ? null : ((kvkkRes.data ?? []) as { ref: string; due_at: string | null }[]),
   };
   return { snapshot, rules };
 }

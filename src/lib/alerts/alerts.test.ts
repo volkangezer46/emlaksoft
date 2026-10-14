@@ -20,6 +20,7 @@ function snap(over: Partial<AlertSnapshot> = {}): AlertSnapshot {
     disk: { host: "prod", pct: 40, at: ago(1) },
     captureProblems: 0,
     mrr: { latest: 1000, latestDay: "2026-10-13", previous: 1000, previousDay: "2026-10-06" },
+    kvkkOpen: [],
     ...over,
   };
 }
@@ -28,7 +29,10 @@ describe("uyarı kuralları", () => {
   const rules = mergeRuleConfigs([]);
 
   it("anahtar listesi migration CHECK ve tohum satırlarıyla aynı", () => {
-    const sql = readFileSync(join(process.cwd(), "supabase/migrations/20261013004900_ops_alerts.sql"), "utf8");
+    // Anahtarlar AD10 migration'ı ve sonradan kural ekleyen migration'larda (CHECK genişletme + tohum satırı) tanımlıdır.
+    const sql = ["20261013004900_ops_alerts.sql", "20261014006000_platform_kvkk_requests.sql"]
+      .map((f) => readFileSync(join(process.cwd(), "supabase/migrations", f), "utf8"))
+      .join("\n");
     for (const k of ALERT_RULE_KEYS) {
       expect(sql).toContain(`'${k}'`);
       expect(sql).toMatch(new RegExp(`\\('${k}', true,`));
@@ -47,7 +51,7 @@ describe("uyarı kuralları", () => {
   it("her şey sağlıklıysa tetik yok, tüm kurallar değerlendirildi", () => {
     const r = evaluateAlerts(snap(), rules);
     expect(r.firing).toEqual([]);
-    expect([...r.evaluated].sort()).toEqual(["backup_failed", "cron_error", "cron_late", "disk_usage", "error_burst", "mrr_drop", "payment_capture"]);
+    expect([...r.evaluated].sort()).toEqual(["backup_failed", "cron_error", "cron_late", "disk_usage", "error_burst", "kvkk_sla", "mrr_drop", "payment_capture"]);
   });
 
   it("cron gecikmesi ve hatası; duraklatılan iş uyarı üretmez", () => {
@@ -90,6 +94,27 @@ describe("uyarı kuralları", () => {
     expect(
       evaluateAlerts(snap({ backup: { raw: JSON.stringify({ at: ago(60) }), heartbeat: { last_status: "error", last_run_at: ago(5) } } }), rules).firing[0]?.title,
     ).toBe("Yedek başarısız");
+  });
+
+  it("KVKK başvuru süresi: gecikmiş ve eşik içindeki açık başvurular ayrı olay, tablo yoksa değerlendirilmez", () => {
+    const day = 86_400_000;
+    const r = evaluateAlerts(
+      snap({
+        kvkkOpen: [
+          { ref: "KVKK-2026-AAAAAA", due_at: new Date(NOW - 2 * day).toISOString() },
+          { ref: "KVKK-2026-BBBBBB", due_at: new Date(NOW + 2 * day).toISOString() },
+          { ref: "KVKK-2026-CCCCCC", due_at: new Date(NOW + 20 * day).toISOString() },
+        ],
+      }),
+      rules,
+    );
+    const fps = r.firing.filter((f) => f.ruleKey === "kvkk_sla").map((f) => f.fingerprint).sort();
+    expect(fps).toEqual(["kvkk_sla:late", "kvkk_sla:warn"]);
+    const late = r.firing.find((f) => f.fingerprint === "kvkk_sla:late")!;
+    expect(late.body).toContain("KVKK-2026-AAAAAA");
+    expect(late.href).toBe("/admin/tickets/kvkk?kaynak=basvuru&sure=gecikmis");
+    expect(evaluateAlerts(snap({ kvkkOpen: null }), rules).evaluated.has("kvkk_sla")).toBe(false);
+    expect(evaluateAlerts(snap({ kvkkOpen: [{ ref: "KVKK-2026-CCCCCC", due_at: new Date(NOW + 20 * day).toISOString() }] }), rules).firing).toEqual([]);
   });
 
   it("kapalı kural tetiklemez", () => {

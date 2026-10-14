@@ -70,6 +70,7 @@ export type EmailTemplateKey =
   | "plan_changed"
   | "ticket_reply"
   | "kvkk_reply"
+  | "kvkk_verify"
   | "auth_invite"
   | "auth_confirmation"
   | "auth_recovery"
@@ -243,7 +244,17 @@ export const EMAIL_TEMPLATES: readonly EmailTemplateDef[] = [
     defaultSubject: "KVKK başvurunuz ({basvuru_no}) hakkında",
     defaultBody:
       "Sayın {ad},\n\n{tarih} tarihli {basvuru_no} numaralı 6698 sayılı KVKK kapsamındaki başvurunuz sonuçlandırılmıştır:\n\n{yanit}\n\nSaygılarımızla,\nEmlakSoft",
-    usedBy: NOT_WIRED("KVKK başvuru yanıtı"),
+    usedBy: "KVKK başvurusu sonuçlandırılınca (Destek > KVKK talepleri > Doğrudan başvurular > başvuru ayrıntısı), başvuru sahibine.",
+  },
+  {
+    key: "kvkk_verify",
+    label: "KVKK başvurusu doğrulama kodu",
+    group: "destek",
+    variables: ["ad", "basvuru_no", "kod"],
+    defaultSubject: "KVKK başvurunuz için doğrulama kodu",
+    defaultBody:
+      "Sayın {ad},\n\n{basvuru_no} numaralı KVKK başvurunuzu tamamlamak için doğrulama kodunuz:\n\n{kod}\n\nKod 30 dakika geçerlidir. Bu başvuruyu siz yapmadıysanız bu e-postayı dikkate almayın; doğrulanmayan başvuru 7 gün içinde silinir.\n\nEmlakSoft",
+    usedBy: "KVKK başvuru formu (/kvkk-basvuru): e-posta adresini doğrulamak için tek kullanımlık kod.",
   },
   {
     key: "auth_invite",

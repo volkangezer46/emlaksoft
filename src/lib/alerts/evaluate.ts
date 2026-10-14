@@ -1,6 +1,7 @@
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { evaluateCronHealth, type HeartbeatRow } from "@/lib/cron-staleness";
 import { parseBackupRecord } from "@/lib/ops/backup-status";
+import { platformKvkkDaysLeft } from "@/lib/compliance/platform-kvkk";
 import type { AlertRuleConfig, AlertRuleKey, AlertSeverity } from "./rules";
 import { ALERT_RULES } from "./rules";
 
@@ -35,6 +36,8 @@ export type AlertSnapshot = {
   captureProblems: number | null;
   /** Son günlük MRR ve 7 gün önceki; null = yeterli anlık görüntü yok. */
   mrr: { latest: number; latestDay: string; previous: number; previousDay: string } | null;
+  /** Yanıtlanmamış (açık) platform KVKK başvurularının son tarihleri; null = tablo yok / okunamadı (değerlendirilmez). */
+  kvkkOpen?: readonly { ref: string; due_at: string | null }[] | null;
 };
 
 /** Ölçüm bu kadar eskiyse disk kuralı değerlendirilmez (betik durmuş olabilir; ayrıca "ölçüm bayat" denir). */
@@ -176,6 +179,35 @@ export function evaluateAlerts(
           href: "/admin/raporlar",
         });
       }
+    }
+  }
+
+  // KVKK başvuru süresi (DG6): gecikmiş ve eşik içindeki açık başvurular ayrı olaylardır (gecikme ayrıca bildirilir).
+  if (s.kvkkOpen) {
+    evaluated.add("kvkk_sla");
+    const warnDays = rules.kvkk_sla.threshold ?? 3;
+    const days = s.kvkkOpen.map((r) => ({ ref: r.ref, left: platformKvkkDaysLeft(r.due_at, "open", s.nowMs) })).filter((r) => r.left !== null) as { ref: string; left: number }[];
+    const late = days.filter((d) => d.left < 0).sort((a, b) => a.left - b.left);
+    const soon = days.filter((d) => d.left >= 0 && d.left <= warnDays);
+    if (on("kvkk_sla") && late.length > 0) {
+      firing.push({
+        ruleKey: "kvkk_sla",
+        fingerprint: "kvkk_sla:late",
+        severity: "critical",
+        title: `KVKK yanıt süresi geçti: ${late.length} başvuru`,
+        body: `${late.length} KVKK başvurusu 30 günlük yasal süreyi aştı (en eski ${late[0]!.ref}, ${Math.abs(late[0]!.left)} gün gecikti).`,
+        href: "/admin/tickets/kvkk?kaynak=basvuru&sure=gecikmis",
+      });
+    }
+    if (on("kvkk_sla") && soon.length > 0) {
+      firing.push({
+        ruleKey: "kvkk_sla",
+        fingerprint: "kvkk_sla:warn",
+        severity: sev("kvkk_sla"),
+        title: `KVKK yanıt süresi yaklaşıyor: ${soon.length} başvuru`,
+        body: `${soon.length} KVKK başvurusunun yanıt süresinin dolmasına ${warnDays} gün ya da daha az kaldı.`,
+        href: "/admin/tickets/kvkk?kaynak=basvuru&sure=yaklasan",
+      });
     }
   }
 
