@@ -29,7 +29,8 @@ import { staticHandlerPath } from "@/lib/static-home/registry";
 import { enabledStaticIds } from "@/lib/static-home/settings";
 import { STATIC_REWRITE_HEADER, staticRewriteToken } from "@/lib/static-home/internal-token";
 import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
-import { APP_IDLE_COOKIE, MFA_SETUP_PATH, OFFICE_IP_ENV_OVERRIDE, policyNeedsProxy } from "@/lib/office-security/policy";
+import { APP_IDLE_COOKIE, MFA_SETUP_PATH, OFFICE_IP_ENV_OVERRIDE, officePolicyIp, policyNeedsProxy } from "@/lib/office-security/policy";
+import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
 import { decideOfficeGate } from "@/lib/office-security/proxy-gate";
 
 /** Bakım sayfası: 503 + Retry-After; yol /bakim'e yeniden yazılır (URL değişmez). */
@@ -289,7 +290,7 @@ export async function updateSession(request: NextRequest) {
         userId: user.id,
         role: profile?.role,
         twoFactorOn: Boolean(profile?.two_factor_sms),
-        ip: request.headers.get("x-real-ip")?.trim() || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+        ip: officePolicyIp(request.headers),
         claims,
         idleCookieValue: request.cookies.get(APP_IDLE_COOKIE)?.value,
         passive: request.headers.get("next-router-prefetch") === "1" || request.headers.get("purpose") === "prefetch",
@@ -376,6 +377,16 @@ export async function updateSession(request: NextRequest) {
       redirect.pathname = staff ? "/admin" : "/app";
     }
     return NextResponse.redirect(redirect);
+  }
+
+  // AD11/DG7: giriş sayfaları önceki oturumdan kalan boşta kalma çerezlerini YALNIZ oturum yokken düşürür (yoksa yeni
+  // açılan oturum ilk isteğinde eski etkinlik zamanıyla hemen kapanırdı). Oturum açıkken silinirse /giris'e uğrayıp
+  // dönen kişi boşta kalma süresini sıfırlamış olurdu (paylaşılan bilgisayar); o durumda yukarıdaki yönlendirme
+  // /app ya da /admin'e gider ve oradaki boşta kalma kararı eski çerezle verilir. signIn/signOut da siler.
+  if (!user && path.startsWith("/giris")) {
+    for (const name of [IDLE_COOKIE, APP_IDLE_COOKIE]) {
+      if (request.cookies.has(name)) supabaseResponse.cookies.delete(name);
+    }
   }
 
   // Ölçüm (yalnız EMLAKSOFT_SERVER_TIMING=1): proxy'nin ağ doğrulaması ve kapı okumaları ayrı görünür.

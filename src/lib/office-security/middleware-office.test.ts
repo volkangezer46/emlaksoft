@@ -48,6 +48,9 @@ vi.mock("@supabase/ssr", () => ({
 
 import { updateSession } from "@/lib/supabase/middleware";
 import { resetRpcProbes } from "@/lib/supabase/rpc-probe";
+import { signIdleCookie } from "@/lib/platform-security/admin-access";
+import { now } from "@/lib/clock";
+import { proxy } from "@/proxy";
 
 function req(path: string, ip = "198.51.100.7") {
   return new NextRequest(new URL(`https://emlaksoft.test${path}`), { headers: { "x-real-ip": ip } });
@@ -116,6 +119,33 @@ describe("DG7 ofis güvenlik politikası (proxy)", () => {
     const res = await updateSession(req("/app"));
     expect(res.headers.get("location")).toBeNull();
     expect(res.cookies.get("es_app_seen")?.value).toMatch(/^v1\.u1\./);
+  });
+
+  it("oturum açıkken /giris boşta kalma çerezini SİLMEZ; /app'e dönüşte süre dolmuşsa oturum kapanır", async () => {
+    state.rows = [{ key: "office.security.idle_minutes", value: "15" }];
+    const stale = await signIdleCookie("u1", Math.floor(now() / 1000) - 3600, "x".repeat(40));
+    const withCookie = (path: string) => {
+      const r = req(path);
+      r.cookies.set("es_app_seen", stale);
+      return r;
+    };
+    // Gerçek proxy (giriş yolu dalı). next verildiği için platform_staff okuması yapılmaz (sahte istemcide tablo okuması hata verir).
+    const login = await proxy(withCookie("/giris?next=/app/musteriler"));
+    expect(login.headers.get("location")).toContain("/app/musteriler");
+    expect(login.cookies.get("es_app_seen")).toBeUndefined();
+    const back = await updateSession(withCookie("/app/musteriler"));
+    expect(back.headers.get("location")).toContain("/giris?reason=office_idle");
+    expect(state.signOut).toBe(1);
+  });
+
+  it("oturum yokken giriş sayfası eski boşta kalma çerezlerini düşürür", async () => {
+    state.user = null;
+    const r = req("/giris");
+    r.cookies.set("es_app_seen", "v1.u1.1.x");
+    r.cookies.set("es_admin_seen", "v1.u1.1.x");
+    const res = await proxy(r);
+    expect(res.cookies.get("es_app_seen")?.value).toBe("");
+    expect(res.cookies.get("es_admin_seen")?.value).toBe("");
   });
 
   it("destek oturumu (impersonation) politikadan muaf; politika okunmaz", async () => {
