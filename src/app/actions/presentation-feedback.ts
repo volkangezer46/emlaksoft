@@ -5,12 +5,14 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { notifyTenant } from "@/lib/notify";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
+import { now, trDayKey, trParts } from "@/lib/clock";
 import {
   isMissingFeedbackTable,
   isPresentationFeedbackVerdict,
   normalizeFeedbackNote,
   noteTooLong,
   PRESENTATION_FEEDBACK_NOTE_MAX,
+  presentationFeedbackDedupeKey,
   presentationFeedbackHref,
   presentationFeedbackNotification,
   type PresentationFeedbackVerdict,
@@ -32,7 +34,8 @@ const INVALID = "Bu sunum bağlantısı artık geçerli değil.";
  * customer_id kullanıcıdan alınmaz, sunumdan gelir.
  *
  * Kayıt `presentation_feedback`'e upsert edilir (müşteri fikrini değiştirebilir; ilan başına tek satır), sunumu
- * hazırlayan danışmana bildirim düşer (aynı seçim + aynı not tekrar gönderilirse bildirim yok). Tablo henüz yoksa
+ * hazırlayan danışmana bildirim düşer (aynı seçim + aynı not tekrar gönderilirse bildirim yok; gidip gelen seçimler
+ * ilan + seçim + TR saati dedupe_key'iyle saatte en çok iki bildirime iner). Tablo henüz yoksa
  * (migration uygulanmadı) bildirim yine gider — geri bildirim danışmana ulaştığı için başarı dürüsttür; ikisi de
  * olmazsa hata döner.
  */
@@ -131,6 +134,8 @@ export async function submitPresentationFeedback(input: {
     propertyLabel: String(property.title || property.property_code || "portföy"),
     note,
   });
+  const at = now();
+  const hourKey = `${trDayKey(at)}T${String(trParts(at).hour).padStart(2, "0")}`;
   let notified = false;
   try {
     await notifyTenant({
@@ -141,6 +146,7 @@ export async function submitPresentationFeedback(input: {
       href: presentationFeedbackHref(customerId),
       kind: message.kind,
       prefKey: "share",
+      dedupeKey: presentationFeedbackDedupeKey(pres.id as string, propertyId, verdict, hourKey),
     });
     notified = true;
   } catch (e) {

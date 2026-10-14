@@ -106,6 +106,8 @@ describe("submitPresentationFeedback", () => {
         href: `/app/musteriler/${CUSTOMER}?sekme=gecmis&kategori=portal`,
         title: "Müşteri sunumdaki bir portföyle ilgileniyor",
         body: expect.stringContaining('Kadıköy 3+1 için "İlgileniyorum" dedi. Not: "Hafta sonu bakabilir miyiz?"'),
+        // Gidip gelen seçimler bildirim yağdırmasın: ilan + seçim + TR saati penceresi.
+        dedupeKey: expect.stringMatching(new RegExp(`^presentation-feedback:${PRES}:${PROP}:interested:\\d{4}-\\d{2}-\\d{2}T\\d{2}$`)),
       }),
     );
   });

@@ -45,6 +45,22 @@ export function presentationFeedbackHref(customerId: string | null | undefined):
   return customerId ? `/app/musteriler/${customerId}?sekme=gecmis&kategori=portal` : "/app/portfoyler/sunumlar";
 }
 
+/**
+ * Bildirim tekrar anahtarı: aynı ilan + aynı seçim için TR saat penceresinde tek bildirim. Müşteri (ya da linki alan
+ * biri) İlgileniyorum ⇄ İlgilenmiyorum arasında gidip gelirse danışmana saatte ilan başına en çok iki zil düşer (hız
+ * sınırının izin verdiği 30 değil); tablo yokken "aynı seçim" kontrolü çalışmasa da tekrar bastırılır. Kayıt her
+ * değişiklikte güncellenir — pencere içindeki not değişikliği bildirimsiz kalır ama Müşteri 360 / Sunumlar'da görünür.
+ * Saat anahtarı çağırandan gelir (saf kalsın; ör. `2026-10-14T21`, TR duvar saati).
+ */
+export function presentationFeedbackDedupeKey(
+  presentationId: string,
+  propertyId: string,
+  verdict: PresentationFeedbackVerdict,
+  hourKey: string,
+): string {
+  return `presentation-feedback:${presentationId}:${propertyId}:${verdict}:${hourKey}`;
+}
+
 /** Danışmana giden bildirim metni (zil + push). Not varsa tırnak içinde eklenir. */
 export function presentationFeedbackNotification(input: {
   verdict: PresentationFeedbackVerdict;

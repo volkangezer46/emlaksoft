@@ -27,12 +27,11 @@ import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-prope
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { loadPresentationOg, publicLinkMetadata } from "@/lib/public-link-og";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { notifyTenant } from "@/lib/notify";
-import { trDayKey } from "@/lib/clock";
+import { isLinkPreviewRequest, recordPresentationOpen } from "@/lib/presentation-open";
 import { PresentationFeedback } from "@/components/public/presentation-feedback";
-import { isPresentationFeedbackVerdict, presentationFeedbackHref, type PresentationFeedbackVerdict } from "@/lib/presentation-feedback";
+import { isPresentationFeedbackVerdict, type PresentationFeedbackVerdict } from "@/lib/presentation-feedback";
 
 // Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni). Ana dağıtım kanalı
 // WhatsApp: önizleme ofis markalı (başlık, site adı; görsel `opengraph-image.tsx`, tek kaynak public-link-og).
@@ -154,7 +153,7 @@ export default async function PublicPresentationPage({
   };
   // Görseller + müşterinin önceki geri bildirimi bağımsız: paralel. Geri bildirim tablosu yoksa (migration
   // uygulanmadı) hata yutulur, düğmeler boş başlar.
-  const [{ data: mediaRows }, { data: feedbackRows }, isCreatorPreview] = await Promise.all([
+  const [{ data: mediaRows }, { data: feedbackRows }, isCreatorPreview, requestHeaders] = await Promise.all([
     selectWithDocumentFlag<PresentationMediaRow[]>(
       "id, property_id, is_cover, sort_order, kind, file_type, file_name",
       (columns) =>
@@ -172,6 +171,7 @@ export default async function PublicPresentationPage({
       .eq("presentation_id", pres.id)
       .eq("tenant_id", pres.tenant_id),
     viewerIsCreator((pres.created_by as string | null) ?? null),
+    headers(),
   ]);
   const feedbackByProperty = new Map<string, { verdict: PresentationFeedbackVerdict; note: string | null }>();
   for (const f of (feedbackRows ?? []) as { property_id: string; verdict: string; note: string | null }[]) {
@@ -203,24 +203,24 @@ export default async function PublicPresentationPage({
 
   // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni). Açılış istihbaratı
   // (paylas/[token] deseni): sunumu hazırlayan danışmana "sunumunuz açıldı" bildirimi — günde en çok bir kez
-  // (dedupe_key), danışmanın kendi önizlemesi sayılmaz. Bildirim hatası ziyaretçi sayfasını düşürmez.
-  const openCount = Number(pres.view_count ?? 0) + 1;
-  after(async () => {
-    const { error } = await admin.rpc("increment_presentation_view", { p_id: pres.id });
-    if (error) console.error("increment_presentation_view", error.message);
-    if (isCreatorPreview || !pres.created_by) return;
-    const label = pres.customer_name ? `${pres.customer_name} için hazırladığınız` : "Hazırladığınız";
-    await notifyTenant({
-      tenantId: pres.tenant_id,
-      userId: pres.created_by as string,
-      title: openCount <= 1 ? "Sunumunuz ilk kez açıldı" : "Sunumunuz yeniden açıldı",
-      body: `${label} "${pres.title}" sunumu görüntülendi (toplam ${openCount} açılış).`,
-      href: presentationFeedbackHref((pres.customer_id as string | null) ?? null),
-      kind: "info",
-      prefKey: "share",
-      dedupeKey: `presentation-open:${pres.id}:${trDayKey()}`,
-    }).catch((e) => console.error("presentation open notify", e instanceof Error ? e.message : e));
-  });
+  // (dedupe_key), danışmanın kendi önizlemesi sayılmaz; WhatsApp/Telegram önizleme botu ve ön-yükleme ne sayaca ne
+  // bildirime girer (presentation-open.ts). Bildirim hatası ziyaretçi sayfasını düşürmez.
+  const isPreviewBot = isLinkPreviewRequest(requestHeaders.get("user-agent"), requestHeaders.get("sec-purpose") ?? requestHeaders.get("purpose"));
+  after(() =>
+    recordPresentationOpen(
+      admin,
+      {
+        id: pres.id as string,
+        tenant_id: pres.tenant_id as string,
+        title: String(pres.title ?? ""),
+        customer_name: (pres.customer_name as string | null) ?? null,
+        customer_id: (pres.customer_id as string | null) ?? null,
+        created_by: (pres.created_by as string | null) ?? null,
+        view_count: (pres.view_count as number | null) ?? null,
+      },
+      { isPreviewBot, isCreatorPreview },
+    ),
+  );
 
   const officeName = tenant?.name ?? "Emlak ofisi";
   const brand = tenant?.brand_color?.trim() || BRAND_FALLBACK;

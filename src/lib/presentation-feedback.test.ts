@@ -4,6 +4,7 @@ import {
   isPresentationFeedbackVerdict,
   normalizeFeedbackNote,
   noteTooLong,
+  presentationFeedbackDedupeKey,
   presentationFeedbackHref,
   presentationFeedbackNotification,
   summarizePresentationFeedback,
@@ -24,6 +25,13 @@ describe("presentation-feedback yardımcıları", () => {
     expect(noteTooLong("a".repeat(500))).toBe(false);
     expect(noteTooLong("a".repeat(501))).toBe(true);
     expect(noteTooLong(null)).toBe(false);
+  });
+
+  it("dedupe anahtarı ilan + seçim + saat penceresine bağlı", () => {
+    const a = presentationFeedbackDedupeKey("p", "x", "interested", "2026-10-14T21");
+    expect(a).toBe("presentation-feedback:p:x:interested:2026-10-14T21");
+    expect(presentationFeedbackDedupeKey("p", "x", "not_interested", "2026-10-14T21")).not.toBe(a);
+    expect(presentationFeedbackDedupeKey("p", "x", "interested", "2026-10-14T22")).not.toBe(a);
   });
 
   it("bağlantı: müşteri varsa kartın geçmişi, yoksa Sunumlar", () => {
