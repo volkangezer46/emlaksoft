@@ -11,10 +11,23 @@
  * istatistikleri unique kısıt üzerinden upsert ile korunur.
  * ASLA demo-ofis dışındaki bir tenant'a yazmaz.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import dotenv from "dotenv";
+import sharp from "sharp";
 import { createClient } from "@supabase/supabase-js";
 import { deriveDemoPassword } from "../src/lib/demo-credentials";
 import { seedModuleData } from "../src/lib/sample-data/modules-seed";
+import {
+  DEMO_NEIGHBORHOODS,
+  DEMO_OFFICE_PHONE,
+  DEMO_STAFF_PHONES,
+  closedTimeline,
+  demoDescription,
+  demoSceneSvg,
+  demoScenesFor,
+} from "../src/lib/sample-data/demo-showcase";
+import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "../src/lib/demo-tenant";
 import {
   buildDemoCommissionRow,
   buildMissingWonCommissionRows,
@@ -49,8 +62,6 @@ if (!isLocalDb && process.env.SEED_CONFIRM !== "1") {
 const admin = createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 
 const DEMO_LOGIN_SECRET = process.env.DEMO_LOGIN_SECRET?.trim() || key;
-const DEMO_TENANT_SLUG = "demo-ofis";
-const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
 // src/lib/demo-personas.ts'teki ofis kişiliklerinden seed'in kullandıkları
 const PERSONAS = [
@@ -375,6 +386,126 @@ async function normalizeDemoGeo(tenantId: string, geo: Geo): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// YD1 vitrin zenginleştirmesi (idempotent; yalnız demo-ofis satırları)
+// ---------------------------------------------------------------------------
+type ShowcaseSeed = {
+  code: string; title: string; tx: "Satılık" | "Kiralık"; type: string; rooms: string; m2: number;
+  floor?: number; heating?: string; age?: number; district: string;
+};
+
+async function enrichShowcase(
+  tenantId: string,
+  props: ShowcaseSeed[],
+  geo: Geo,
+  ids: { ownerId: string; gmId: string; advisorId: string },
+  rows: { id: string; property_code: string | null }[],
+): Promise<void> {
+  const idByCode = new Map(rows.map((r) => [r.property_code, r.id]));
+  const districtIdOf: Record<string, string> = {
+    kadikoy: geo.kadikoyId, besiktas: geo.besiktasId, maltepe: geo.maltepeId, atasehir: geo.atasehirId, uskudar: geo.uskudarId, sisli: geo.sisliId,
+  };
+  const nowMs = Date.now();
+
+  // 1) Mahalle (geo_neighborhoods'ta ilçe içinde adla aranır; bulunamazsa portföy mahallesiz kalır).
+  let hoods = 0;
+  for (const p of props) {
+    const propId = idByCode.get(p.code);
+    const name = DEMO_NEIGHBORHOODS[p.code];
+    const districtId = districtIdOf[p.district];
+    if (!propId || !name || !districtId) continue;
+    const { data: hood } = await admin.from("geo_neighborhoods").select("id").eq("district_id", districtId).eq("name", name).limit(1).maybeSingle();
+    if (!hood?.id) {
+      console.log(`- Mahalle bulunamadı: ${name} (${p.code})`);
+      continue;
+    }
+    const { error } = await admin.from("properties").update({ neighborhood_id: hood.id }).eq("id", propId).eq("tenant_id", tenantId);
+    if (!error) hoods += 1;
+  }
+
+  // 2) Kapanmış portföyler: kayıt/yayın tarihi kapanıştan önceye çekilir (listede gelecek tarih kalmaz).
+  let dated = 0;
+  for (const p of props) {
+    const propId = idByCode.get(p.code);
+    const t = closedTimeline(p.code, nowMs);
+    if (!propId || !t) continue;
+    const { error } = await admin
+      .from("properties")
+      .update({ created_at: t.createdAt, published_at: t.publishedAt, updated_at: t.closedAt })
+      .eq("id", propId)
+      .eq("tenant_id", tenantId);
+    if (error) console.warn(`  ! ${p.code} tarih düzeltmesi atlandı: ${error.message}`);
+    else dated += 1;
+  }
+
+  // 3) Örnek görseller: medyası olmayan portföye türüne göre 2-4 görsel (ilki kapak). Müstakil evin kapağı ofisin kendi
+  //    tanıtım fotoğrafı (public/listing-bosphorus-villa-800.webp); diğerleri SVG'den üretilen "Örnek görsel" çizimleri.
+  let photos = 0;
+  let villa: Buffer | null = null;
+  try {
+    villa = readFileSync(resolve(process.cwd(), "public/listing-bosphorus-villa-800.webp"));
+  } catch {
+    villa = null;
+  }
+  for (const p of props) {
+    const propId = idByCode.get(p.code);
+    if (!propId) continue;
+    const { count } = await admin
+      .from("property_media")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("property_id", propId);
+    if ((count ?? 0) > 0) continue;
+    const files: { name: string; body: Buffer }[] = [];
+    if (p.type === "Müstakil ev" && villa) files.push({ name: "ornek-dis-cephe.webp", body: villa });
+    for (const scene of demoScenesFor(p.type)) {
+      if (files.length >= 4) break;
+      if (p.type === "Müstakil ev" && villa && scene === "exterior") continue;
+      files.push({ name: `ornek-${scene}.webp`, body: await sharp(Buffer.from(demoSceneSvg(scene, p.code))).webp({ quality: 82 }).toBuffer() });
+    }
+    for (const [i, f] of files.entries()) {
+      const path = `${tenantId}/${propId}/${f.name}`;
+      const { error: upErr } = await admin.storage
+        .from("property-media")
+        .upload(path, f.body, { contentType: "image/webp", upsert: true, cacheControl: "31536000" });
+      if (upErr) {
+        console.warn(`  ! ${p.code} görsel yüklenemedi: ${upErr.message}`);
+        break;
+      }
+      const { error: insErr } = await admin.from("property_media").insert({
+        tenant_id: tenantId,
+        property_id: propId,
+        kind: "image",
+        storage_path: path,
+        file_name: f.name,
+        file_type: "image/webp",
+        file_size: f.body.length,
+        is_cover: i === 0,
+        sort_order: i,
+        uploaded_by: ids.ownerId,
+      });
+      if (insErr) {
+        console.warn(`  ! ${p.code} görsel kaydı yazılamadı: ${insErr.message}`);
+        break;
+      }
+      photos += 1;
+    }
+  }
+
+  // 4) Danışman ve ofis telefonları (broşür/sunum/vitrin "ara" ve WhatsApp düğmeleri). Elle girilmiş numara ezilmez.
+  const phoneUpdates: [string, string][] = [
+    [ids.ownerId, DEMO_STAFF_PHONES.owner],
+    [ids.gmId, DEMO_STAFF_PHONES.gm],
+    [ids.advisorId, DEMO_STAFF_PHONES.advisor],
+  ];
+  for (const [id, phone] of phoneUpdates) {
+    await admin.from("profiles").update({ phone }).eq("id", id).eq("tenant_id", tenantId).is("phone", null);
+  }
+  await admin.from("tenants").update({ phone: DEMO_OFFICE_PHONE }).eq("id", tenantId).is("phone", null);
+
+  console.log(`✓ Vitrin zenginleştirme: ${hoods} mahalle · ${dated} geçmiş tarihli kapanış · ${photos} örnek görsel · telefonlar`);
+}
+
+// ---------------------------------------------------------------------------
 // Ana akış
 // ---------------------------------------------------------------------------
 async function main() {
@@ -498,6 +629,8 @@ async function main() {
     floor: p.floor ?? null,
     heating: p.heating ?? null,
     building_age: p.age ?? null,
+    // YD1: ilan açıklaması (broşür/sunum/paylaş/vitrin `features.description`'dan okur).
+    description: demoDescription(p),
   });
   const districtId = (k: string) =>
     k === "kadikoy" ? geo.kadikoyId : k === "besiktas" ? geo.besiktasId : k === "maltepe" ? geo.maltepeId : k === "atasehir" ? geo.atasehirId : geo.uskudarId;
@@ -594,6 +727,9 @@ async function main() {
     throw new Error(`properties zenginleştirme sonrası okunamadı: ${refreshedPropsError?.message}`);
   }
   const propsData = refreshedPropsData;
+
+  // ---- YD1 vitrin zenginleştirmesi: mahalle, geçmiş tarihli kapanışlar, örnek görseller, telefonlar ----
+  await enrichShowcase(tenantId, PROPS, geo, { ownerId, gmId, advisorId }, propsData);
 
   // ---------------- Talepler (9) ----------------
   const DEMANDS = [
@@ -1876,6 +2012,15 @@ async function main() {
     ];
     return (await insertRows("notifications", rows)).length;
   });
+
+  // YD1 gece sıfırlaması tabanı: bu ana kadar yazılan veri "tohum" sayılır; gece adımı yalnız bundan SONRA eklenenleri siler.
+  {
+    const { error } = await admin
+      .from("demo_reset_state")
+      .upsert({ tenant_id: tenantId, baseline_at: iso(new Date()) }, { onConflict: "tenant_id" });
+    if (error) console.log(`- Gece sıfırlama tabanı: atlandı (${error.message})`);
+    else console.log("✓ Gece sıfırlama tabanı yenilendi");
+  }
 
   console.log("— Demo veri üretimi tamamlandı —");
   console.log(`Tenant: ${DEMO_TENANT_NAME} (${DEMO_TENANT_SLUG}) · ${tenantId}`);

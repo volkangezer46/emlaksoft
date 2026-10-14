@@ -30,3 +30,14 @@ export function withDescription(features: Record<string, unknown> | null | undef
   else next.description = value;
   return next;
 }
+
+/**
+ * TEK OKUMA YERİ: ilan açıklaması yalnız `features.description`'dan okunur. `properties` tablosunda `description`
+ * kolonu YOKTUR; broşür/sunum/paylaş/vitrin eskiden ayrıca `select("description")` yapıyor, her açılışta hata alıp
+ * bu yedeğe düşüyordu (boşa bir sorgu turu). Boş/beyaz boşluk = null.
+ */
+export function readPropertyDescription(features: unknown): string | null {
+  const raw = (features && typeof features === "object" ? (features as { description?: unknown }).description : null) ?? "";
+  const text = String(raw).trim();
+  return text || null;
+}

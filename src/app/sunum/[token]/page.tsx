@@ -26,6 +26,7 @@ import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { readPropertyDescription } from "@/lib/property-description";
 
 // Sunum linkleri kişiye özeldir → arama motorlarına kapalı (degerleme-raporu deseni).
 export const metadata: Metadata = {
@@ -141,22 +142,6 @@ export default async function PublicPresentationPage({
     const list = mediaByProperty.get(m.property_id) ?? [];
     list.push({ id: m.id, src: createShortLivedPropertyMediaUrl(m.id, "presentation") });
     mediaByProperty.set(m.property_id, list);
-  }
-
-  // İlan açıklaması: `description` kolonu her kurulumda bulunmayabilir → ana
-  // sorgudan ayrı ve hataya toleranslı okunur (vitrin/[slug]/[id] deseni);
-  // kolon yoksa features.description'a düşülür.
-  const descById = new Map<string, string>();
-  {
-    const { data: descRows } = await admin
-      .from("properties")
-      .select("id, description")
-      .in("id", properties.map((p) => p.id as string))
-      .eq("is_sample", false);
-    for (const d of (descRows ?? []) as { id: string; description?: string | null }[]) {
-      const text = String(d.description ?? "").trim();
-      if (text) descById.set(d.id, text);
-    }
   }
 
   // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni).
@@ -278,7 +263,7 @@ export default async function PublicPresentationPage({
               : null,
             feat.heating ? { icon: Flame, label: feat.heating } : null,
           ].filter(Boolean) as { icon: typeof BedDouble; label: string }[];
-          const description = descById.get(property.id as string) ?? String(feat.description ?? "").trim();
+          const description = readPropertyDescription(feat) ?? "";
 
           return (
             <article

@@ -16,6 +16,7 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { readPropertyDescription } from "@/lib/property-description";
 
 type ShareMediaRow = {
   id: string;
@@ -39,31 +40,6 @@ const GalleryLightbox = dynamicImport(
 function money(n: number | null) {
   if (n == null) return "Fiyat için sorun";
   return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
-}
-
-/**
- * İlan açıklaması: `description` kolonu her kurulumda bulunmayabilir → ana sorgudan
- * ayrı ve hataya toleranslı okunur (kolon yoksa data null kalır, sayfa çalışmaya
- * devam eder). Eski kayıtlar için features.description'a düşülür.
- */
-async function fetchDescription(
-  admin: ReturnType<typeof createAdminClient>,
-  propertyId: string,
-  tenantId: string,
-  features: unknown,
-): Promise<string | null> {
-  const { data } = await admin
-    .from("properties")
-    .select("description")
-    .eq("id", propertyId)
-    .eq("tenant_id", tenantId)
-    .eq("is_sample", false)
-    .is("deleted_at", null)
-    .maybeSingle();
-  const col = (data as { description?: string | null } | null)?.description;
-  const feat = ((features ?? {}) as { description?: string }).description;
-  const text = String(col ?? feat ?? "").trim();
-  return text || null;
 }
 
 // Paylaşım linkleri kişiye özeldir → arama motorlarına kapalı; ana dağıtım kanalı
@@ -105,7 +81,7 @@ export async function generateMetadata({
   const office = (Array.isArray(tenantRel) ? tenantRel[0]?.name : tenantRel?.name) ?? "EmlakSoft";
   const priceText = money(property.list_price != null ? Number(property.list_price) : null);
   const title = `${property.title || property.property_code} - ${priceText}`;
-  const rawDesc = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
+  const rawDesc = readPropertyDescription(property.features);
   const description = (
     rawDesc ?? `${property.transaction_type} ${property.property_type} · ${priceText} — ${office} tarafından paylaşıldı.`
   )
@@ -231,7 +207,7 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
     }).catch((e) => console.error("share first-view notify", e));
   }
 
-  const description = await fetchDescription(admin, share.entity_id, share.tenant_id, property.features);
+  const description = readPropertyDescription(property.features);
 
   const media = mediaRows ?? [];
   // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel paylaşım linkinde gösterilmez (tek kural).
