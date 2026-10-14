@@ -37,6 +37,42 @@ const SOURCE_LABEL: Record<string, string> = {
 const SELECT =
   "id, entry_date, direction, amount, currency, kind, category, title, counterparty, document_url, source_type, created_at, account:finance_accounts!cash_entries_account_fk!inner(name, owner_scope, currency)";
 
+/**
+ * Kazanç gizliliği (P12, SN1): `earnings_all` yoksa başka danışmanın carisine bağlı hareket / kalem rapora girmez. Kullanıcı
+ * istemcisinde RLS (cash_entries / finance_open_items SELECT) zaten süzer; zamanlanmış teslim servis istemcisiyle çalıştığı için
+ * aynı kural sorguda da uygulanır: yalnız "gizli cari" (danışman türünde, kullanıcıya ait olmayan) gömmesi boş kalan satırlar
+ * döner (PostgREST anti-join). Kullanıcıya bağlanmamış danışman carisi de gizlidir (DB kuralıyla aynı).
+ */
+const HIDDEN_PARTY = "gizli_cari";
+const hiddenPartyEmbed = (ctx: ReportContext, fk: string): string => (ctx.seeAllEarnings ? "" : `, ${HIDDEN_PARTY}:finance_parties!${fk}(id)`);
+function hideForeignAdvisorRows<Q>(ctx: ReportContext, query: Q): Q {
+  if (ctx.seeAllEarnings) return query;
+  const q = query as unknown as {
+    eq: (c: string, v: unknown) => unknown;
+    or: (f: string, o: { referencedTable: string }) => unknown;
+    is: (c: string, v: null) => unknown;
+  };
+  const step1 = q.eq(`${HIDDEN_PARTY}.kind`, "danisman") as typeof q;
+  const step2 = step1.or(`user_id.is.null,user_id.neq.${ctx.userId}`, { referencedTable: HIDDEN_PARTY }) as typeof q;
+  return step2.is(HIDDEN_PARTY, null) as unknown as Q;
+}
+
+/** Bellekte süzülen (hesaplanan) raporlar için gizli danışman carilerinin kimlikleri; `earnings_all` varsa boş küme. */
+async function hiddenAdvisorPartyIds(ctx: ReportContext): Promise<Set<string>> {
+  if (ctx.seeAllEarnings) return new Set();
+  const hit = ctx.memo.get("finance:hiddenAdvisorParties") as Set<string> | undefined;
+  if (hit) return hit;
+  const { data } = await ctx.supabase
+    .from("finance_parties")
+    .select("id")
+    .eq("tenant_id", tid(ctx))
+    .eq("kind", "danisman")
+    .or(`user_id.is.null,user_id.neq.${ctx.userId}`);
+  const ids = new Set(((data ?? []) as Row[]).map((r) => String(r.id)));
+  ctx.memo.set("finance:hiddenAdvisorParties", ids);
+  return ids;
+}
+
 export const hesapEkstresi = defineReport({
   id: "hesap-ekstresi",
   title: "Hesap ekstresi (kasa / banka)",
@@ -66,8 +102,9 @@ export const hesapEkstresi = defineReport({
   source: {
     kind: "query",
     build: (ctx, f) => {
-      let q = ctx.supabase.from("cash_entries").select(SELECT, { count: "exact" }).eq("tenant_id", tid(ctx)).is("voided_at", null);
+      let q = ctx.supabase.from("cash_entries").select(SELECT + hiddenPartyEmbed(ctx, "cash_entries_party_id_fkey"), { count: "exact" }).eq("tenant_id", tid(ctx)).is("voided_at", null);
       q = applyActorScope(ctx, q, { actorColumn: "created_by" });
+      q = hideForeignAdvisorRows(ctx, q);
       if (f.hesap) q = q.ilike("account.name", `%${f.hesap.replace(/[%,()*\\]/g, " ").trim()}%`);
       if (f.tur) q = q.eq("kind", f.tur);
       q = applyDateRange(q, "entry_date", f);
@@ -104,8 +141,14 @@ export const gelirGiderDokumu = defineReport({
   source: {
     kind: "query",
     build: (ctx, f) => {
-      let q = ctx.supabase.from("cash_entries").select(SELECT, { count: "exact" }).eq("tenant_id", tid(ctx)).is("voided_at", null).in("kind", ["income", "expense"]);
+      let q = ctx.supabase
+        .from("cash_entries")
+        .select(SELECT + hiddenPartyEmbed(ctx, "cash_entries_party_id_fkey"), { count: "exact" })
+        .eq("tenant_id", tid(ctx))
+        .is("voided_at", null)
+        .in("kind", ["income", "expense"]);
       q = applyActorScope(ctx, q, { actorColumn: "created_by" });
+      q = hideForeignAdvisorRows(ctx, q);
       q = q.eq("account.owner_scope", f.kapsam === "kisisel" ? "user" : "office");
       if (f.tur) q = q.eq("kind", f.tur);
       q = applyDateRange(q, "entry_date", f);
@@ -256,9 +299,13 @@ export const acikKalemler = defineReport({
     build: (ctx, f) => {
       let q = ctx.supabase
         .from("finance_open_items")
-        .select("id, direction, party_id, title, amount, currency, due_date, paid_amount, status, source_type, created_by", { count: "exact" })
+        .select(
+          `id, direction, party_id, title, amount, currency, due_date, paid_amount, status, source_type, created_by${hiddenPartyEmbed(ctx, "finance_open_items_party_id_fkey")}`,
+          { count: "exact" },
+        )
         .eq("tenant_id", tid(ctx));
       q = applyActorScope(ctx, q, { actorColumn: "created_by", sample: true });
+      q = hideForeignAdvisorRows(ctx, q);
       if (f.yon) q = q.eq("direction", f.yon);
       if (!f.durum || f.durum === "acik") q = q.in("status", ["open", "partial"]);
       else if (f.durum !== "tumu") q = q.eq("status", f.durum);
@@ -469,6 +516,8 @@ async function readOfficeLedger(ctx: ReportContext, from: string, to: string): P
     rows.push(...(await readLegacyExpenses(ctx, from, to)));
     rows.sort((x, y) => String(x.entry_date).localeCompare(String(y.entry_date)) || String(x.id).localeCompare(String(y.id)));
   }
+  const hidden = await hiddenAdvisorPartyIds(ctx);
+  if (hidden.size > 0) rows = rows.filter((r) => !r.party_id || !hidden.has(String(r.party_id)));
   await fillPartyNames(ctx, rows.map((r) => r.party_id as string | null));
   return rows;
 }
@@ -630,8 +679,10 @@ export const muhasebeciPaketi = defineReport({
             .range(a, b),
         );
         if (!items.error) {
-          await fillPartyNames(ctx, items.data.map((r) => r.party_id as string | null));
-          for (const r of items.data) {
+          const hidden = await hiddenAdvisorPartyIds(ctx);
+          const visible = items.data.filter((r) => !r.party_id || !hidden.has(String(r.party_id)));
+          await fillPartyNames(ctx, visible.map((r) => r.party_id as string | null));
+          for (const r of visible) {
             const open = (n2(r.amount) ?? 0) - (n2(r.paid_amount) ?? 0);
             out.push({
               section: "Açık kalem",
