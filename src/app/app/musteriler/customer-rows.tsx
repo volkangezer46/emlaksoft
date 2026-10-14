@@ -24,7 +24,6 @@ export type CustomerVM = {
   types: string[];
   tags: string[];
   heat: { label: string; tone: PillTone; title: string } | null;
-  lead: { score: number; hot: boolean } | null;
   /** Müşteri durumu okuyucusunun riski (yalnız yüksek risk gösterilir); yoksa null. */
   risk?: { label: string; title: string } | null;
   blacklist: boolean;
@@ -84,14 +83,6 @@ function HeatCell({ c }: { c: CustomerVM }) {
       {c.risk ? (
         <span title={c.risk.title}>
           <StatusPill tone="danger">{c.risk.label}</StatusPill>
-        </span>
-      ) : null}
-      {c.lead ? (
-        <span
-          title={`Aday skoru: ${c.lead.score}`}
-          className={`numeric rounded-full px-1.5 text-xs font-semibold ${c.lead.hot ? "tone-warning" : "bg-canvas text-text-faint"}`}
-        >
-          {c.lead.score}
         </span>
       ) : null}
     </div>

@@ -155,7 +155,7 @@ const insight: AnySettingDef[] = [
     max: 365,
     label: "Uykuda müşteri eşiği",
     description: "Temas olmayan bir müşteri kaç günden sonra \"uykuda\" segmentine alınsın.",
-    impact: "Müşteri listesindeki ısı segmenti (uykuda/soğuk) ve uykuda filtresi değişir; ısı puanı hesabı aynı kalır.",
+    impact: "Müşteri listesindeki sıcaklık segmenti (uykuda/soğuk) ve uykuda filtresi değişir; sıcaklık puanı hesabı aynı kalır.",
     unit: "gün",
   }),
 ];

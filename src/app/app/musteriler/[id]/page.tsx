@@ -36,7 +36,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
 import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
-import { heatTitle } from "@/lib/customer-state/heat";
+import { heatBadge, heatTitle } from "@/lib/customer-state/heat";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
@@ -457,9 +457,10 @@ export default async function CustomerDetailPage({
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ${leadTierCls(state.temperature === "sicak" ? "hot" : state.temperature === "ilik" ? "warm" : "cold")}`}
                     title={`${heatTitle(state.scores.heat)}
-Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`}
+Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`).join(" · ")}`}
                   >
-                    {state.temperature === "sicak" ? "🔥" : state.temperature === "ilik" ? "🌤️" : "❄️"} {TEMPERATURE_LABELS[state.temperature]} · {lead.score}
+                    {/* Tek dil + tek sayı: liste satırı ve Müşteri sıcaklığı kartıyla aynı `heatBadge` metni (YD5). */}
+                    <span aria-hidden>{heatBadge(state.scores.heat).emoji}</span> {heatBadge(state.scores.heat).text}
                   </span>
                 )}
                 {customer.blacklist || state.risk !== "yuksek" ? null : (
@@ -482,7 +483,7 @@ Aday skoru ${lead.score}: ${lead.factors.map((f) => `${f.label}: ${f.points > 0 
               {customer.blacklist ? null : (
                 /* Rozet/skor tek cümleyle açıklanır + tek eylem (lib/customer-state nedenleri; sahte/açıklamasız sayı yok). */
                 <p className="mt-2 max-w-xl text-sm text-white/75">
-                  {TEMPERATURE_LABELS[state.temperature]}:{" "}
+                  {heatBadge(state.scores.heat).label}:{" "}
                   {state.reasons[0]
                     ? `${state.reasons[0].label} (${state.reasons[0].evidence}).`
                     : state.daysSinceContact !== null

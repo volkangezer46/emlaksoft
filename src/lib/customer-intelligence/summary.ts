@@ -138,7 +138,7 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
       suggestions.push({
         key: "talep_ac",
         title: "Canlı müşteri, açık talebi yok",
-        reason: `Isı ${heat.score}/100 (${heat.label}) ama açık talep ve teklif/anlaşma yok; ne aradığını kayda geçirin.`,
+        reason: `Sıcaklık ${heat.label} · ${heat.score} ama açık talep ve teklif/anlaşma yok; ne aradığını kayda geçirin.`,
         href: `/app/talepler/yeni?musteri=${input.customerId}`,
         cta: "Talep oluştur",
       });
@@ -147,7 +147,7 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
       suggestions.push({
         key: "uykuda",
         title: "Uykuda müşteri",
-        reason: `${heat.daysSinceContact ?? "—"} gündür temassız ve ısı düşük; yeniden iletişim planlayın.`,
+        reason: `${heat.daysSinceContact ?? "—"} gündür temassız ve sıcaklık düşük; yeniden iletişim planlayın.`,
         href: "/app/musteriler?segment=uykuda",
         cta: "Uykuda müşteriler",
       });

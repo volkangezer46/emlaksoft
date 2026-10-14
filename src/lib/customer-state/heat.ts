@@ -144,6 +144,16 @@ export function scoreCustomerHeat(inputs: CustomerHeatInputs, nowMs: number, opt
   return { score, segment, label: HEAT_SEGMENTS[segment].label, daysSinceContact, factors };
 }
 
+/**
+ * Müşteri sıcaklığı rozeti — TEK dil ve TEK sayı (YD5). Müşteri kartı başlığı, Müşteri sıcaklığı kartı ve liste satırı
+ * aynı metni çizer: "<segment etiketi> · <ısı 0..100>" (ör. "İlgili · 55"). Aday skoru ayrı bir başlık sayısı DEĞİLDİR;
+ * yalnız ayrıntıda (title / açılır panel) bir kalem olarak görünür. Uykuda gün sayısı `title`'dadır.
+ */
+export function heatBadge(heat: CustomerHeat): { label: string; score: number; text: string; emoji: string; badgeCls: string } {
+  const seg = HEAT_SEGMENTS[heat.segment];
+  return { label: seg.label, score: heat.score, text: `${seg.label} · ${heat.score}`, emoji: seg.emoji, badgeCls: seg.badgeCls };
+}
+
 /** Satır rozetinin `title` metni — hangi bileşen kaç puan + uykudaysa temassız gün. */
 export function heatTitle(heat: CustomerHeat): string {
   const parts = heat.factors.map((f) => `${f.label}: ${f.points > 0 ? "+" : ""}${f.points}`);

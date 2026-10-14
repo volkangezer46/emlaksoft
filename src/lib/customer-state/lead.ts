@@ -27,7 +27,8 @@ export type LeadSignals = {
 export type LeadScore = {
   score: number;          // 0..100
   tier: "hot" | "warm" | "cold";
-  label: string;          // "Sıcak" | "Ilık" | "Soğuk"
+  /** Aday değeri kademesi: "Yüksek" | "Orta" | "Düşük" (müşteri sıcaklığı kelimeleri BİLEREK kullanılmaz; YD5). */
+  label: string;
   factors: { label: string; points: number }[];
 };
 
@@ -123,7 +124,7 @@ export function computeLeadScore(s: LeadSignals): LeadScore {
 
   score = Math.max(0, Math.min(100, Math.round(score)));
   const tier: LeadScore["tier"] = score >= LEAD_CUTS.hot ? "hot" : score >= LEAD_CUTS.warm ? "warm" : "cold";
-  const label = tier === "hot" ? "Sıcak" : tier === "warm" ? "Ilık" : "Soğuk";
+  const label = tier === "hot" ? "Yüksek" : tier === "warm" ? "Orta" : "Düşük";
   return { score, tier, label, factors };
 }
 

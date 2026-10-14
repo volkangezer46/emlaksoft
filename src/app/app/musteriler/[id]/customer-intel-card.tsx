@@ -1,7 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Gauge } from "lucide-react";
 import { now } from "@/lib/clock";
-import { heatTitle, HEAT_SEGMENTS, type CustomerHeat } from "@/lib/customer-state/heat";
+import { heatBadge, heatTitle, type CustomerHeat } from "@/lib/customer-state/heat";
 import { formatMinutes } from "@/lib/response-time/core";
 import { buildCustomerIntel, type IntelTouch } from "@/lib/customer-intelligence/summary";
 
@@ -59,7 +59,7 @@ export async function CustomerIntelCard({
     { customerId, createdAt, blacklist, touches, openDemands, hasOpenOfferOrDeal, heat, heatSignals: null },
     now(),
   );
-  const seg = HEAT_SEGMENTS[intel.heat.segment];
+  const badge = heatBadge(intel.heat);
   const fr = intel.firstResponse;
 
   return (
@@ -69,13 +69,13 @@ export async function CustomerIntelCard({
     >
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
-          <Gauge className="h-3.5 w-3.5" /> Müşteri ısısı
+          <Gauge className="h-3.5 w-3.5" /> Müşteri sıcaklığı
         </p>
         <span
           title={heatTitle(intel.heat)}
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${seg.badgeCls}`}
+          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${badge.badgeCls}`}
         >
-          {intel.heat.label} · {intel.heat.score}/100
+          {badge.text}
         </span>
       </div>
 
@@ -90,7 +90,7 @@ export async function CustomerIntelCard({
           ))}
       </ul>
       <p className="mt-2 text-xs text-text-faint">
-        Isı, bu kalemlerin toplamıdır (üst sınır 100).{intel.heatApproximate ? " Portal beğenisi/acil talep verisi okunamadı; ısı alt sınırdır." : ""}
+        Sıcaklık, bu kalemlerin toplamıdır (0-100).{intel.heatApproximate ? " Portal beğenisi/acil talep verisi okunamadı; ısı alt sınırdır." : ""}
       </p>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-xs">

@@ -92,12 +92,12 @@ describe("kademe eşikleri", () => {
       }),
     );
     expect(sicak.tier).toBe("hot");
-    expect(sicak.label).toBe("Sıcak");
+    expect(sicak.label).toBe("Yüksek");
     expect(sicak.score).toBeGreaterThanOrEqual(65);
 
     const soguk = computeLeadScore(ile({ createdAt: gunOnce(400) }));
     expect(soguk.tier).toBe("cold");
-    expect(soguk.label).toBe("Soğuk");
+    expect(soguk.label).toBe("Düşük");
     expect(soguk.score).toBeLessThan(35);
   });
 
