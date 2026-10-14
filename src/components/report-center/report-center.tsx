@@ -38,7 +38,9 @@ import { computeTotals, displayValue, formatDateTimeTr } from "@/lib/report-cent
 import { requirePermission } from "@/lib/require-permission";
 import { requirePlatformModule } from "@/lib/platform";
 import { REPORT_FORMAT_LABELS } from "@/lib/report-center/types";
+import { loadPersonalization } from "@/lib/report-center/personal";
 import { ReportDownloadButtons } from "./download-buttons";
+import { PersonalOverview, ReportChartPreview, SavedViewsCard, SubscriptionsCard } from "./personal-panels";
 
 type Params = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -75,6 +77,7 @@ async function load(scope: ReportScope): Promise<Loaded> {
  * RAPOR MERKEZİ — /app/raporlar ve /admin/raporlar `?sekme=merkez`. Katalog (arama + kategori) → rapor çalışma alanı
  * (filtre formu, sunucuda önizleme, Excel / PDF / CSV indirme) → son indirmeler. Filtre kontratı: durum URL'dedir
  * (`rapor`, rapora özel filtre anahtarları, `ara`, `kategori`); Rapor merkezi girişi (`ReportCenterEntry`) ve son indirmeler aynı adresi üretir.
+ * DG4: kayıtlı görünümler, zamanlanmış e-posta abonelikleri ve önizleme grafiği `personal-panels.tsx`'tedir.
  */
 export async function ReportCenter({ scope, params }: { scope: ReportScope; params: Params }) {
   const { ctx, reports } = await load(scope);
@@ -84,10 +87,11 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
   // Son indirmeler, önizleme ve filtre seçenekleri birbirine bağlı değil: TEK turda başlar (eskiden 3 ardışık tur).
   const parsed = selected ? parseFilters(selected, params) : null;
   const filters: Filters = parsed?.ok ? parsed.filters : {};
-  const [history, preview, options] = await Promise.all([
+  const [history, preview, options, personal] = await Promise.all([
     loadRecentDownloads(ctx),
     selected && parsed?.ok ? previewReport(selected, ctx, filters) : Promise.resolve(null),
     selected ? loadFilterOptions(selected, ctx) : Promise.resolve(null),
+    loadPersonalization(ctx, reports, selected?.id ?? null),
   ]);
   const crumbs = [{ label: "Raporlar", href: pathname }, { label: "Rapor merkezi" }];
 
@@ -105,6 +109,7 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
             Bu rapor yok ya da görüntüleme yetkiniz bulunmuyor. Aşağıdaki listeden seçebilirsiniz.
           </Alert>
         ) : null}
+        <PersonalOverview scope={scope} data={personal} />
         <Catalog scope={scope} pathname={pathname} reports={reports} params={params} />
         <RecentDownloads scope={scope} items={history} />
       </div>
@@ -178,6 +183,7 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
               )}
             </CardContent>
           </Card>
+          {preview?.ok ? <ReportChartPreview table={preview.table} /> : null}
         </div>
 
         <div className="min-w-0 space-y-5">
@@ -203,6 +209,8 @@ export async function ReportCenter({ scope, params }: { scope: ReportScope; para
               </ul>
             </CardContent>
           </Card>
+          <SavedViewsCard scope={scope} def={selected} filters={filters} data={personal} />
+          <SubscriptionsCard scope={scope} def={selected} filters={filters} data={personal} />
           <RecentDownloads scope={scope} items={history.filter((h) => h.reportId === selected.id)} title="Bu rapordaki son indirmeleriniz" compact />
         </div>
       </div>
