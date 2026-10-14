@@ -416,6 +416,16 @@ const F = {
   messageLog: "20261014023000_message_log.sql",
   // SN5 (2026-10-14): ofis bazinda kurulum ilerlemesi olgulari (salt-okunur service_role fonksiyonu).
   tenantOnboardingFacts: "20261014025000_platform_tenant_onboarding_facts.sql",
+  // KQ2 (2026-10-15): RLS maliyeti ve DB yuzeyi (komisyon/ilan kontrol/ekstre politikalari InitPlan, kimlik islem ici onbellegi,
+  // tek gecisli metrik ozeti, indeks hijyeni, agent-photos sinirlari, anon RPC daraltma, Realtime yayin listesi).
+  kq2CommissionsRls: "20261015010000_commissions_rls_initplan.sql",
+  kq2LcFinanceRls: "20261015011000_lc_finance_rls_initplan.sql",
+  kq2IdentityCache: "20261015012000_identity_txn_cache.sql",
+  kq2MetricsSinglePass: "20261015013000_metrics_snapshot_single_pass.sql",
+  kq2IndexHygiene: "20261015014000_index_hygiene.sql",
+  kq2AgentPhotosLimits: "20261015015000_agent_photos_bucket_limits.sql",
+  kq2RevokeAnonRpcs: "20261015016000_revoke_anon_definer_rpcs.sql",
+  kq2RealtimeTrim: "20261015017000_realtime_publication_trim.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -637,6 +647,14 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financePartyAdvisorScope]: "siki", // finance_parties/finance_open_items SELECT politikasi + 8 finance_* RPC govdesi: earnings_all olmayan kullanici baska danismanin carisini goremez/yazamaz; finance_aging ek "vadesiz" kova satiri (imza ayni)
     [F.financeEntriesAdvisorScopeRecurringTerms]: "siki", // cash_entries SELECT politikasi: earnings_all olmayan kullanici baska danismanin carisine bagli hareketi goremez (finance_ledger_v / finance_cash_summary devralir); yeni recurring_post_occurrence 4 arg (cari/KDV/stopaj, eski 3 arg ona devreder: kosulsuz kuralda ayni); finance_statement_apply canli govdesinde yalniz duzenli odeme cagrisi nakit kipine (eslesme sayisi dogrulanir)
     [F.platformStaffCanGates]: "davranis", // yeni platform_staff_can / platform_fixed_role_actions; 7 fonksiyon + 2 politikada rol adi -> modul x eylem (sabit rollerde sonuc ayni; ozel rolde matris); 2 buyuk govde canli tanim uzerinden tek ifade
+    [F.kq2CommissionsRls]: "davranis", // commissions_select yeniden yazimi: anlam ayni (can_view_commission_earnings ile esdeger, pgTAP), satir basina DEFINER cagrisi yerine InitPlan + korelasyonsuz IN; plan degisir
+    [F.kq2LcFinanceRls]: "davranis", // 6 ilan kontrol + 2 ekstre SELECT politikasi: anlam ayni (lc_row_visible / finance_account_access ile esdeger, pgTAP); 4 yeni INVOKER kapsam yardimcisi (yalniz authenticated)
+    [F.kq2IdentityCache]: "davranis", // current_active_tenant_id / current_profile_role / has_effective_permission sonuc islem-yerel onbellek (app.ctx_*); mantik ayni; 8 kimlik tablosuna AFTER STATEMENT nesil tetikleyicisi
+    [F.kq2MetricsSinglePass]: "davranis", // get_metrics_snapshot govdesi tablo basina tek gecis (count FILTER); cikti sozlesmesi ayni (eski govdeyle anahtar anahtar esit, pgTAP)
+    [F.kq2IndexHygiene]: "davranis", // 1 yeni kismi indeks (commission_splits commission_id, profile_id) + 2 kesin yinelenen indeks (idx_customers_tenant, idx_demands_tenant_status) dusurulur; kapsayan indeks dogrulanir
+    [F.kq2AgentPhotosLimits]: "siki", // agent-photos kovasi: 3 MB + jpeg/png/webp (uygulama zaten ayni siniri uygular); mevcut nesneler etkilenmez
+    [F.kq2RevokeAnonRpcs]: "siki", // anon/PUBLIC EXECUTE geri alinir: aidat_kpi, tcmb_rate_on, increment_template_usage (+ tetikleyici fonksiyonlari); anon cagiran yok, authenticated/service_role korunur
+    [F.kq2RealtimeTrim]: "davranis", // supabase_realtime yayininda kodda abone olunmayan tablo DROP (canlida 21/21 abone listesinde: hicbir tablo cikmaz); iz yayin yorumunda
     [F.tenantOnboardingFacts]: "ek", // yalniz yeni salt-okunur service_role fonksiyonu platform_tenant_onboarding_facts (ofis bazinda kurulum olgulari); mevcut nesne/veri degismez, kod fonksiyon yokken kurulum ilerlemesi "kurulum bekliyor", saglik skoru kurulum girdisiz
     [F.appointmentNotificationDeepLinks]: "davranis", // create_public_booking_atomic / respond_appointment_confirmation_atomic govdeleri AYNI, yalniz bildirim href'i /app/randevular?randevu=<id>; mevcut bildirim satirlari degismez
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
@@ -868,6 +886,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "GP1-finans-danisman-kapsami", order: 131, title: "Finans: danisman carisi kapsami (P12) veritabaninda (RLS + finance_party_* / acik kalem / yaslandirma RPC) ve finance_aging vadesiz kovasi. 20261014001100 SONRASI; kod yayinindan ONCE ya da SONRA uygulanabilir (arayuz zaten ayni kurali uygular, vadesiz kovasini kod tanir; eski kod bilinmeyen kovayi yok sayar) (siki)", files: [F.financePartyAdvisorScope] },
     { id: "SN1-finans-hareket-kapsami-duzenli-kdv", order: 141, title: "Finans: hareket satirinda danisman carisi kapsami (cash_entries RLS; GP1 20261014011000 SONRASI) + duzenli odeme hareketine kuraldaki cari/KDV/stopaj (FN1 + FN6 + 20261011001400 SONRASI). KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod RLS'e ve hareket kolonlarina zaten hazir); stopajli ofis kuralinin yeni donemleri hesaptan net dusmeye baslar (siki)", files: [F.financeEntriesAdvisorScopeRecurringTerms] },
     { id: "SN1-personel-kapilari-matris", order: 142, title: "Personel SQL kapilari DG1 ozel rol matrisine: platform_staff_can + update_tenant_plan_subscription / convert_demo_request_to_tenant / destek / portal kurali / buyume kapilari + platform_mrr_daily politikasi (platform_settings bilerek sabit super_admin'de) (DG1 20261014001300 ve DG2 20261014002000 SONRASI; KOD YAYINIYLA AYNI pencerede ya da SONRA: sabit rollerde davranis ayni; davranis)", files: [F.platformStaffCanGates] },
+    { id: "KQ2-rls-maliyeti-db-yuzeyi", order: 152, title: "RLS maliyeti ve DB yuzeyi: commissions_select / ilan kontrol / ekstre politikalari InitPlan (anlam ayni), kimlik fonksiyonlarina islem ici onbellek, get_metrics_snapshot tek gecis (cikti ayni), commission_splits indeksi + 2 yinelenen indeks, agent-photos sinirlari, 3 RPC'de anon EXECUTE geri alma, Realtime yayin listesi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod hicbir yeni nesneye dayanmaz, anon'dan geri alinan RPC'leri yalniz oturumlu cagirir; sira dosya numarasiyla; ONCE restore edilebilir yedek dogrulanir)", files: [F.kq2CommissionsRls, F.kq2LcFinanceRls, F.kq2IdentityCache, F.kq2MetricsSinglePass, F.kq2IndexHygiene, F.kq2AgentPhotosLimits, F.kq2RevokeAnonRpcs, F.kq2RealtimeTrim] },
     { id: "SN5-kurulum-ilerlemesi", order: 145, title: "Ofis bazinda kurulum ilerlemesi: platform_tenant_onboarding_facts salt-okunur fonksiyonu (admin toplu liste, Ofis 360, saglik skoru girdisi; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod fonksiyon yokken ilerleme 'kurulum bekliyor' der ve saglik skoru eski bilesenlerle hesaplanir; sira serbest, ek)", files: [F.tenantOnboardingFacts] },
     { id: "GP4-randevu-bildirim-baglantisi", order: 120, title: "Herkese acik randevu bildirimleri (online randevu, teyit/iptal yaniti) tek randevuyu acar: /app/randevular?randevu=<id> (bagimsiz; govdeler ayni, yalniz bildirim href'i; KOD YAYINIYLA AYNI pencerede ya da SONRA, once uygulanirsa eski kod parametreyi yok sayar ve genel listeyi acar; davranis)", files: [F.appointmentNotificationDeepLinks] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1110,6 +1129,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // SP3: huni RPC'si sayac tablosunu (003200) ve signup_attributions.channel sutununu (003210) okur.
     [F.growthFunnel, F.publicMeasurement],
     [F.growthFunnel, F.signupAttributionExt],
+    // KQ2: politika yeniden yazimlari mevcut yardimcilara ve ifadelere dayanir.
+    [F.kq2CommissionsRls, F.earningsPrivacy],
+    [F.kq2LcFinanceRls, F.lcScopeHelpers],
+    [F.kq2LcFinanceRls, F.lcLifecycleEvents],
+    [F.kq2LcFinanceRls, F.earningsStatementPrivacy],
+    [F.kq2MetricsSinglePass, F.dashboardSnapshotRpcs],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
