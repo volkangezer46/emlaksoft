@@ -6,7 +6,7 @@ import { runDemoNightlyReset } from "@/lib/demo-reset";
 
 /**
  * YD1 demo gece sıfırlaması — İŞLEVSEL SQL TESTİ (pglite, migration 20261015041000 gerçek PL/pgSQL ile). Şema sadeleştirilmiş
- * taklittir (tenants/customers/properties/deals/notifications/api_keys/webhook_endpoints). Kanıtlanan: (1) gerçek kiracı
+ * taklittir (tenants/customers/properties/deals/calls/referrals/surveys/notifications/api_keys/webhook_endpoints). Kanıtlanan: (1) gerçek kiracı
  * kimliğiyle çağrı HATA verir ve hiçbir satıra dokunmaz; (2) demo kiracıda yalnız tabandan SONRA eklenen iş kayıtları ve
  * dış bağlantı yüzeyleri silinir; tohum, gelecek tarihli tohum ve başka kiracının satırları kalır.
  */
@@ -19,6 +19,10 @@ create table public.tenants(id uuid primary key default gen_random_uuid(), slug 
 create table public.customers(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, full_name text, created_at timestamptz default now());
 create table public.properties(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, title text, owner_customer_id uuid references public.customers(id) on delete set null, created_at timestamptz default now());
 create table public.deals(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, property_id uuid references public.properties(id), customer_id uuid references public.customers(id), created_at timestamptz default now());
+-- created_at'i olmayan, NO ACTION FK'li bağımlılar (canlıdaki gibi)
+create table public.calls(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, customer_id uuid references public.customers(id));
+create table public.referrals(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, referrer_customer_id uuid references public.customers(id), created_customer_id uuid references public.customers(id), created_at timestamptz default now());
+create table public.surveys(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, deal_id uuid references public.deals(id), customer_id uuid references public.customers(id));
 create table public.notifications(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, title text, created_at timestamptz default now());
 create table public.api_keys(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, name text, created_at timestamptz default now());
 create table public.webhook_endpoints(id uuid primary key default gen_random_uuid(), tenant_id uuid not null, url text, created_at timestamptz default now());
@@ -78,16 +82,27 @@ describe.skipIf(!mod)("demo gece sıfırlaması — gerçek PL/pgSQL (pglite)", 
       const seedProp = (await q(`select id from public.properties where tenant_id = $1 and title = 'Tohum ilan'`, [t]))[0]!.id;
       // Ziyaretçi anlaşması TOHUM portföye bağlı (FK no action): önce anlaşma silinmeli
       await q(`insert into public.deals(tenant_id, property_id, customer_id, created_at) values ($1, $2, $3, '2026-10-04')`, [t, seedProp, c]);
-      await q(`insert into public.deals(tenant_id, property_id, created_at) values ($1, $2, '2026-10-04')`, [t, p]);
+      const d = (await q(`insert into public.deals(tenant_id, property_id, created_at) values ($1, $2, '2026-10-04') returning id`, [t, p]))[0]!.id;
+      // NO ACTION bağımlılar: bunlar silinmezse customers/deals silmesi her gece engellenirdi
+      await q(`insert into public.calls(tenant_id, customer_id) values ($1, $2)`, [t, c]);
+      await q(`insert into public.surveys(tenant_id, deal_id) values ($1, $2)`, [t, d]);
+      const seedCust = (await q(`select id from public.customers where tenant_id = $1 and full_name = 'Tohum'`, [t]))[0]!.id;
+      await q(`insert into public.referrals(tenant_id, referrer_customer_id, created_customer_id, created_at) values ($1, $2, $3, '2026-09-01')`, [t, seedCust, c]);
       await q(`insert into public.notifications(tenant_id, title, created_at) values ($1, 'gürültü', '2026-10-04')`, [t]);
     }
     const ep = (await q(`insert into public.webhook_endpoints(tenant_id, url, created_at) values ($1, 'https://ornek.com', '2026-09-01') returning id`, [DEMO]))[0]!.id;
     await q(`insert into public.webhook_deliveries(tenant_id, endpoint_id) values ($1, $2)`, [DEMO, ep]);
-    const realBefore = await Promise.all(["customers", "properties", "deals", "notifications", "api_keys"].map((t) => count(t, REAL)));
+    // Tohum müşteriye bağlı tohum araması kalmalı
+    const seedCustDemo = (await q(`select id from public.customers where tenant_id = $1 and full_name = 'Tohum'`, [DEMO]))[0]!.id;
+    await q(`insert into public.calls(tenant_id, customer_id) values ($1, $2)`, [DEMO, seedCustDemo]);
+    const realBefore = await Promise.all(["customers", "properties", "deals", "notifications", "api_keys", "calls", "surveys", "referrals"].map((t) => count(t, REAL)));
 
     const r = (await reset(DEMO, LATER))[0]!.r as { deleted: Record<string, number>; skipped: Record<string, string> };
     expect(r.skipped).toEqual({});
-    expect(r.deleted).toMatchObject({ customers: 1, properties: 1, deals: 2, notifications: 1, webhook_endpoints: 1, webhook_deliveries: 1 });
+    expect(r.deleted).toMatchObject({ customers: 1, properties: 1, deals: 2, notifications: 1, webhook_endpoints: 1, webhook_deliveries: 1, calls: 1, surveys: 1, referrals: 1 });
+    expect(await count("calls", DEMO)).toBe(1);
+    expect(await count("surveys", DEMO)).toBe(0);
+    expect(await count("referrals", DEMO)).toBe(0);
 
     expect((await q(`select title from public.properties where tenant_id = $1 order by title`, [DEMO])).map((x) => x.title)).toEqual([
       "Gelecek tarihli tohum",
@@ -97,7 +112,7 @@ describe.skipIf(!mod)("demo gece sıfırlaması — gerçek PL/pgSQL (pglite)", 
     expect(await count("deals", DEMO)).toBe(1);
     expect(await count("notifications", DEMO)).toBe(0);
     // Gerçek kiracı: hiçbir satır değişmedi
-    const realAfter = await Promise.all(["customers", "properties", "deals", "notifications", "api_keys"].map((t) => count(t, REAL)));
+    const realAfter = await Promise.all(["customers", "properties", "deals", "notifications", "api_keys", "calls", "surveys", "referrals"].map((t) => count(t, REAL)));
     expect(realAfter).toEqual(realBefore);
   });
 

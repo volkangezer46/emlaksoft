@@ -7,7 +7,10 @@
 --   entegrasyon tanimlayabiliyor. Gece cron'u (operational-retention, ayri adim `demoReset`) bu fonksiyonu cagirir:
 --   (1) dis baglanti yuzeyleri (api_keys, webhook_endpoints, webhook_deliveries, tenant_integrations) demo kiracida
 --       TAMAMEN silinir (demo ofiste bunlarin hic olmamasi gerekir);
---   (2) TABANDAN SONRA eklenen is kayitlari (created_at > baseline_at ve <= now()) silinir: musteri, portfoy, anlasma,
+--   (2) created_at kolonu OLMAYAN ve ON DELETE NO ACTION ile musteri/anlasmaya bagli tablolar (calls, referrals,
+--       surveys) once, tabandan sonra eklenen musteri/anlasmaya BAGLI satirlari uzerinden silinir; aksi halde bu
+--       satirlar customers/deals silmesini kalici olarak (her gece) engellerdi;
+--   (3) TABANDAN SONRA eklenen is kayitlari (created_at > baseline_at ve <= now()) silinir: musteri, portfoy, anlasma,
 --       randevu, gorev ... (asagidaki sabit liste; once cocuk tablolar). Taban ilk cagrida now() olarak yazilir ve
 --       `npm run seed:demo` her calistiginda yeniden yazilir (tohumlanan veri silinmez). Gelecek tarihli tohum satirlari
 --       (created_at > now()) dokunulmaz.
@@ -66,6 +69,7 @@ declare
   v_deleted jsonb := '{}'::jsonb;
   v_skipped jsonb := '{}'::jsonb;
   v_result jsonb;
+  v_dep text[];
   -- Dis baglanti yuzeyleri: demo ofiste HIC olmamali (tarih kosulu yok).
   v_outbound text[] := array['webhook_deliveries', 'webhook_endpoints', 'api_keys', 'tenant_integrations'];
   -- Tabandan sonra eklenen is kayitlari; SIRA ONEMLI (once cocuk, sonra ebeveyn).
@@ -76,6 +80,12 @@ declare
     'approval_requests', 'presentations', 'share_links', 'open_houses', 'valuations', 'property_key_events',
     'property_keys', 'customer_demands', 'deals', 'cash_entries', 'expenses', 'campaigns', 'automations',
     'message_templates', 'saved_views', 'targets', 'playbooks', 'projects', 'properties', 'customers'
+  ];
+  -- Musteri/anlasmaya NO ACTION FK ile bagli bagimli tablolar: {tablo, kolon, ebeveyn}. Tabandan sonra eklenen
+  -- ebeveyne bagli satirlar silinir (created_at'e bakilmaz; calls/surveys'te bu kolon yok).
+  v_dependents text[] := array[
+    'calls:customer_id:customers', 'referrals:created_customer_id:customers', 'referrals:referrer_customer_id:customers',
+    'surveys:deal_id:deals', 'surveys:customer_id:customers'
   ];
 begin
   if p_tenant_id is null then
@@ -102,6 +112,28 @@ begin
       if v_n > 0 then v_deleted := v_deleted || jsonb_build_object(v_table, v_n); end if;
     exception when others then
       v_skipped := v_skipped || jsonb_build_object(v_table, sqlstate);
+    end;
+  end loop;
+
+  foreach v_table in array v_dependents loop
+    v_dep := string_to_array(v_table, ':');
+    if pg_catalog.to_regclass('public.' || v_dep[1]) is null then continue; end if;
+    if not exists (
+      select 1 from information_schema.columns c
+      where c.table_schema = 'public' and c.table_name = v_dep[1] and c.column_name = v_dep[2]
+    ) then continue; end if;
+    begin
+      execute format(
+        'delete from public.%I d where d.tenant_id = $1 and d.%I in '
+        || '(select x.id from public.%I x where x.tenant_id = $1 and x.created_at > $2 and x.created_at <= $3)',
+        v_dep[1], v_dep[2], v_dep[3]
+      ) using p_tenant_id, v_baseline, p_now;
+      get diagnostics v_n = row_count;
+      if v_n > 0 then
+        v_deleted := v_deleted || jsonb_build_object(v_dep[1], coalesce((v_deleted ->> v_dep[1])::bigint, 0) + v_n);
+      end if;
+    exception when others then
+      v_skipped := v_skipped || jsonb_build_object(v_dep[1] || '.' || v_dep[2], sqlstate);
     end;
   end loop;
 
