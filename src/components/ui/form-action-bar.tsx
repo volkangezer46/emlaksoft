@@ -339,7 +339,7 @@ export function FormActionBar({
               ) : null
             ) : null}
             {shortcuts ? (
-              <span className="hidden min-w-0 truncate text-xs text-text-faint lg:inline">
+              <span className="kbd-hint hidden min-w-0 truncate text-xs text-text-faint lg:inline">
                 <Kbd mod />
                 {" + "}
                 <Kbd>Enter</Kbd> ile kaydet

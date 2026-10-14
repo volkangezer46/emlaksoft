@@ -21,7 +21,7 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { buildCustomerState, computeCustomerHeat, type CustomerState } from "@/lib/customer-state/core";
 import { fetchOwnerHistory, fetchUpcomingAppointmentIds } from "@/lib/customer-state/load";
 import { isOwnerCustomer } from "@/lib/customer-state/seller";
-import { HEAT_SEGMENTS, heatTitle, type HeatSegment } from "@/lib/customer-state/heat";
+import { heatBadge, heatTitle, type HeatSegment } from "@/lib/customer-state/heat";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { fetchLeadSignals, type LeadSignalRow } from "@/lib/lead-signals";
 import { getSetting } from "@/lib/settings/read";
@@ -482,12 +482,12 @@ export async function loadCustomersData(input: CustomersDataInput) {
       tags: c.tags ?? [],
       heat: heat
         ? {
-            label: `${HEAT_SEGMENTS[heat.segment].label}${heat.segment === "uykuda" && heat.daysSinceContact !== null ? ` · ${heat.daysSinceContact} gün` : ""}`,
+            // Kart başlığı ve Müşteri sıcaklığı kartıyla aynı metin (YD5); aday skoru yalnız ayrıntıda.
+            label: heatBadge(heat).text,
             tone: heatTone(heat.segment),
-            title: heatTitle(heat),
+            title: state && !c.blacklist ? `${heatTitle(heat)} · Aday skoru ${state.scores.lead.score} (ayrı ölçek)` : heatTitle(heat),
           }
         : null,
-      lead: state && !c.blacklist ? { score: state.scores.lead.score, hot: state.temperature === "sicak" } : null,
       risk: state && !c.blacklist && state.risk === "yuksek" ? { label: "Yüksek risk", title: state.reasons[0] ? `${state.reasons[0].label}: ${state.reasons[0].evidence}` : "Kayıp riski yüksek" } : null,
       blacklist: Boolean(c.blacklist),
       sourceLabel: formatLeadSource(c.source, sourceLabel),

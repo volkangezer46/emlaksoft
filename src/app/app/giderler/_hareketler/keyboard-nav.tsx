@@ -5,7 +5,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 /**
  * Hareketler klavye kısayolları: "/" arama kutusuna odaklanır, J / K görünür satırlar arasında gezer, Enter odaktaki
  * satırı düzenler (satırın birincil düzenleme düğmesi ya da ilk satır içi alan). Yazı alanındayken, açık diyalogda ya da
- * Ctrl/⌘/Alt basılıyken kısayollar devre dışıdır (komut çubuğu Ctrl/⌘K ile çakışmaz).
+ * Ctrl/⌘/Alt basılıyken kısayollar devre dışıdır (genel palet Ctrl/⌘K ile çakışmaz).
  */
 
 /** Kısayolun yutulmaması gereken hedef: yazı alanları ve düzenlenebilir içerik. */

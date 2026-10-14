@@ -13,7 +13,7 @@ export function useSearchShortcut(): string {
 export function ShortcutHint({ className }: { className?: string }) {
   const label = useSearchShortcut();
   return (
-    <kbd className={className} suppressHydrationWarning>
+    <kbd className={`kbd-hint ${className ?? ""}`.trim()} suppressHydrationWarning>
       {label}
     </kbd>
   );

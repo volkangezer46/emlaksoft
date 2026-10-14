@@ -87,7 +87,7 @@ export function overviewLinks() {
 
 export const FINANCE_HERO_TEXT = {
   eyebrow: "Mini muhasebe",
-  description: "Kasa ve banka, cari hesaplar, vadeler, belgeler ve KDV tek yerde. Yeni kayıt için Ctrl K ya da G (gelir), E (gider), T (transfer).",
+  description: "Kasa ve banka, cari hesaplar, vadeler, belgeler ve KDV tek yerde. Yeni kayıt için G (gelir), E (gider), T (transfer); muhasebe komutları için M.",
 } as const;
 
 /** Komut çubuğuna giden sekme listesi (etiket kopyası yok: buradan türetilir). */

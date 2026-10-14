@@ -113,6 +113,13 @@ export const TERMS = {
     canonical: "Yetki belgesi",
     definition: "Gayrimenkul satış yetki belgesi numarası (EİDS kısaltması yalnız 'Yetki belgesi' açıklamasıyla birlikte yazılır).",
   },
+  musteriSicakligi: {
+    canonical: "Müşteri sıcaklığı",
+    definition:
+      "Müşterinin şu an ne kadar canlı olduğu (0-100) ve dört kelimesi: Sıcak, İlgili, Soğuk, Uykuda (`heatBadge`). " +
+      "'Ilık' ve 'müşteri ısısı' kullanılmaz; aday skoru ayrı ölçektir ve sıcaklık kelimeleriyle anılmaz.",
+    forbidden: [/\bIlık\b/, /müşteri ısısı/i, /ısı puanı/i],
+  },
 } as const satisfies Record<string, Term>;
 
 /**

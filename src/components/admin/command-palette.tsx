@@ -251,7 +251,7 @@ export function CommandPalette({ modules, initialOpen = false }: { modules: Plat
               ) : null}
             </div>
 
-            <div className="hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-xs text-text-faint">
+            <div className="kbd-hint hairline-t surface-sunken flex items-center justify-between px-4 py-2 text-xs text-text-faint">
               <span className="flex items-center gap-2">
                 <Kbd>↑↓</Kbd> gezin
                 <Kbd>↵</Kbd> aç

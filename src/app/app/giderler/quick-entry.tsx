@@ -11,7 +11,7 @@ import type { RuleSuggestion } from "@/lib/finance/ledger/types";
  * "Yeni kayıt": eski iki popup (Gelir ekle / Gider ekle) yerine TEK pencere (Gelir / Gider / Transfer).
  * API GERİYE UYUMLU: Kasam (`/app/hesabim?sekme=kasam`) `QuickEntryButtons accounts defaultDate canSalary` ile aynen çalışır
  * (kişisel hesap → eski `recordCashEntry` yolu). Muhasebe sayfası `office` + `hotkeys` ile cari, vade, KDV, ek, komut çubuğu
- * ve klavye kısayollarını (Ctrl/⌘K, G, E, T) açar.
+ * ve klavye kısayollarını (M komut çubuğu, G, E, T) açar. Ctrl/⌘K burada da genel komut paletidir (her yerde aynı anlam).
  *
  * HIZ: pencere ve komut çubuğu `next/dynamic` ile yalnız gerektiğinde iner (boşta / üzerine gelince önceden ısıtılır);
  * tıklama anında yükleme yer tutucusu aynı karede çizilir.
@@ -124,7 +124,7 @@ export function QuickEntryButtons({
   /** Ofis kategorileri dahil kategori listesi; verilmezse sistem kategorileri kullanılır. */
   categories?: readonly EntryCategoryOption[];
   suggestRule?: RuleSuggestFn;
-  /** Ctrl/⌘K komut çubuğu + G / E / T kısayolları (yalnız Muhasebe sayfası). */
+  /** M komut çubuğu + G / E / T kısayolları (yalnız Muhasebe sayfası). */
   hotkeys?: boolean;
   commandTabs?: readonly CommandTab[];
 }) {
@@ -157,20 +157,23 @@ export function QuickEntryButtons({
     return () => window.removeEventListener(NEW_ENTRY_EVENT, onEvent);
   }, [open]);
 
-  // Klavye: Ctrl/⌘K komut çubuğu (genel arama paletinden önce yakalanır; çubukta "Tüm uygulamada ara" var),
-  // G gelir · E gider · T transfer. Yazı alanında / açık pencerede tek harf kısayolu çalışmaz.
+  // Klavye: M muhasebe komut çubuğu · G gelir · E gider · T transfer. Ctrl/⌘K YAKALANMAZ: her sayfada olduğu gibi genel
+  // komut paletini açar (YD5: kısayol tek anlam). Yazı alanında / açık pencerede tek harf kısayolu çalışmaz.
   useEffect(() => {
     if (!hotkeys) return;
+    // "n m" (Yeni müşteri) genel zinciri bozulmasın: hemen önce "n" basıldıysa M komut çubuğunu açmaz.
+    let prev = { key: "", at: -Infinity };
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        setCommand(true);
-        return;
-      }
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       if (isTypingTarget(e.target) || document.querySelector("[role='dialog']")) return;
       const k = e.key.toLowerCase();
+      const chained = prev.key === "n" && e.timeStamp - prev.at < 1200;
+      prev = { key: k, at: e.timeStamp };
+      if (k === "m" && !chained) {
+        e.preventDefault();
+        setCommand(true);
+        return;
+      }
       const direction: EntryDirection | null = k === "g" ? "in" : k === "e" ? "out" : k === "t" ? "transfer" : null;
       if (!direction) return;
       e.preventDefault();
@@ -184,7 +187,7 @@ export function QuickEntryButtons({
 
   return (
     <>
-      <Button variant="primary" icon={Plus} onClick={() => open({})} onPointerEnter={warmDialog} onFocus={warmDialog} aria-keyshortcuts={hotkeys ? "Control+K" : undefined}>
+      <Button variant="primary" icon={Plus} onClick={() => open({})} onPointerEnter={warmDialog} onFocus={warmDialog}>
         Yeni kayıt
       </Button>
       <span className="hidden items-center gap-1 sm:inline-flex">

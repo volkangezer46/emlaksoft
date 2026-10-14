@@ -12,10 +12,10 @@ describe("portföy etiketleri", () => {
   });
 
   it("fiyat sağlığı Türkçe'ye çevrilir", () => {
-    expect(priceHealthLabel("green")).toBe("uygun");
-    expect(priceHealthLabel("Sarı")).toBe("izlenmeli");
-    expect(priceHealthLabel("red")).toBe("riskli");
-    expect(priceHealthLabel(null)).toBe("bekliyor");
-    expect(priceHealthLabel("pending")).toBe("bekliyor");
+    expect(priceHealthLabel("green")).toBe("Uygun");
+    expect(priceHealthLabel("Sarı")).toBe("İzlenmeli");
+    expect(priceHealthLabel("red")).toBe("Riskli");
+    expect(priceHealthLabel(null)).toBe("Bekliyor");
+    expect(priceHealthLabel("pending")).toBe("Bekliyor");
   });
 });

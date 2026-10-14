@@ -1,5 +1,7 @@
 /**
- * Ürün turu durumu (tek kaynak): "gösterildi" işaretleri ve yeniden başlatma bağlantıları.
+ * Ürün turu durumu: "gösterildi" işaretleri ve yeniden başlatma bağlantıları.
+ * KALICI kaynak profildir (`profiles.ui_state`, `tour:<id>`; YD5, cihazlar arası): tur açılınca `markUiState` ile yazılır,
+ * yeni cihazda otomatik başlatmadan önce `loadUiState` ile sorulur. Buradaki localStorage YALNIZ önbellektir.
  * Tüm localStorage erişimleri try/catch içindedir; depolama kapalıysa sessizce geçilir.
  */
 
@@ -47,6 +49,32 @@ export function markTourDone(id: string, at: string): void {
     window.localStorage.setItem(TOURS_DONE_KEY, JSON.stringify(map));
   } catch {
     /* yazılamazsa tur yine bu oturumda çalışır */
+  }
+}
+
+/** Profile aktarılmış tur işaretleri (`[turId]`): eski cihazlarda yerelde "görüldü" olan tur bir kez sunucuya yazılır. */
+export const TOURS_SYNCED_KEY = "emlaksoft:tours-synced";
+
+/** Yerelde görülmüş ama profile henüz aktarılmamış mı? Depolama yoksa false (aktarılacak bir şey yok). */
+export function needsServerSync(id: string): boolean {
+  try {
+    if (isTourDone(id) !== true) return false;
+    const raw = window.localStorage.getItem(TOURS_SYNCED_KEY);
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    return !(Array.isArray(list) && list.includes(id));
+  } catch {
+    return false;
+  }
+}
+
+export function markServerSynced(id: string): void {
+  try {
+    const raw = window.localStorage.getItem(TOURS_SYNCED_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+    if (!list.includes(id)) window.localStorage.setItem(TOURS_SYNCED_KEY, JSON.stringify([...list, id].slice(-8)));
+  } catch {
+    /* yazılamazsa bir sonraki açılışta yeniden denenir */
   }
 }
 

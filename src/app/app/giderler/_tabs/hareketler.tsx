@@ -450,7 +450,7 @@ async function LedgerTab(props: FinanceTabProps) {
             </Link>
           );
         })}
-        <p className="ml-auto hidden items-center gap-1 text-xs text-text-faint lg:flex" aria-hidden="true">
+        <p className="kbd-hint ml-auto hidden items-center gap-1 text-xs text-text-faint lg:flex" aria-hidden="true">
           <Kbd>/</Kbd> ara · <Kbd>J</Kbd><Kbd>K</Kbd> satır · <Kbd>Enter</Kbd> düzenle
         </p>
       </nav>

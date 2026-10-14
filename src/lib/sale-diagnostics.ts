@@ -62,24 +62,50 @@ export function diagnoseSaleBlockers(input: SaleDiagnosticsInput): SaleDiagnosis
   const kelime = isRent ? "kiralanamıyor" : "satılamıyor";
 
   // --- Fiyat: emsal bandı --------------------------------------------------
-  const over = input.priceDeltaPct != null && input.priceDeltaPct > 0
-    ? ` (emsalin ~%${Math.round(input.priceDeltaPct)} üzerinde)`
-    : "";
+  // Bant mutlak sapmadan gelir: emsal ALTI fiyat da kırmızı/sarı olabilir. Başlık yönü işaretli sapmadan okur;
+  // yön bilinmiyorsa (sapma yok) "üzerinde" iddia etmez.
+  const delta = input.priceDeltaPct;
+  const dir: "over" | "under" | null = delta == null || delta === 0 ? null : delta > 0 ? "over" : "under";
+  const pct = delta != null && dir ? ` (emsalin ~%${Math.round(Math.abs(delta))} ${dir === "over" ? "üzerinde" : "altında"})` : "";
   if (input.priceHealth === "red") {
     blockers.push({
       key: "price_red",
       severity: "critical",
-      title: `Fiyat emsalin belirgin üzerinde${over}`,
-      detail: "Aşırı fiyat, ilanı arama sonuçlarında ve alıcı kısa listesinde geri plana atar.",
-      action: "Fiyatı emsal bandına çekin veya pazarlık payını netleştirin.",
+      title:
+        dir === "over"
+          ? `Fiyat emsalin belirgin üzerinde${pct}`
+          : dir === "under"
+            ? `Fiyat emsalin belirgin altında${pct}`
+            : "Fiyat emsal bandının belirgin dışında",
+      detail:
+        dir === "under"
+          ? "Emsalin çok altındaki fiyat alıcıda kusur şüphesi uyandırır ve sahibine değer kaybettirebilir."
+          : dir === "over"
+            ? "Aşırı fiyat, ilanı arama sonuçlarında ve alıcı kısa listesinde geri plana atar."
+            : "Emsalden belirgin sapan fiyat, alıcı ilgisini ve teklif hızını düşürür.",
+      action:
+        dir === "under"
+          ? "Fiyatı ve ilan bilgilerini (m², oda, kat) doğrulayın; gerekirse emsal bandına çekin."
+          : dir === "over"
+            ? "Fiyatı emsal bandına çekin veya pazarlık payını netleştirin."
+            : "Emsal raporunu açıp fiyatı emsal bandına göre gözden geçirin.",
     });
   } else if (input.priceHealth === "yellow") {
     blockers.push({
       key: "price_yellow",
       severity: "warning",
-      title: `Fiyat emsal üstünde${over}`,
-      detail: "Hafif yüksek fiyat, gösterim ve teklif hızını yavaşlatıyor olabilir.",
-      action: "Emsal raporunu paylaşıp küçük bir güncelleme değerlendirin.",
+      title:
+        dir === "over" ? `Fiyat emsal üstünde${pct}` : dir === "under" ? `Fiyat emsal altında${pct}` : "Fiyat emsal bandının dışında",
+      detail:
+        dir === "under"
+          ? "Emsal altı fiyat hızlı ilgi çeker ama sahibine değer kaybettirebilir."
+          : dir === "over"
+            ? "Hafif yüksek fiyat, gösterim ve teklif hızını yavaşlatıyor olabilir."
+            : "Emsalden sapan fiyat, gösterim ve teklif hızını etkileyebilir.",
+      action:
+        dir === "under"
+          ? "Fiyatı ve ilan bilgilerini doğrulayın; sahibiyle emsal raporunu paylaşın."
+          : "Emsal raporunu paylaşıp küçük bir güncelleme değerlendirin.",
     });
   } else if (input.priceHealth === "green") {
     positives.push("Fiyat emsal bandında — rekabetçi.");

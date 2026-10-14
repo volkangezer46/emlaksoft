@@ -18,6 +18,60 @@ export type PriceHealthResult = {
   confidence: PriceHealthConfidence;
 };
 
+/** Saklanan `properties.price_health` ham değerini (green/yellow/red ve Türkçe eşleri) banda çevirir; bilinmeyen → pending. */
+export function normalizePriceHealth(raw: string | null | undefined): PriceHealth {
+  if (raw === "green" || raw === "Yeşil") return "green";
+  if (raw === "yellow" || raw === "Sarı") return "yellow";
+  if (raw === "red" || raw === "Kırmızı") return "red";
+  return "pending";
+}
+
+/**
+ * Portföy sayfasında GÖSTERİLEN tek fiyat sağlığı (YD5). Rozet, "Fiyat & değerleme" kutusu, satış teşhisi ve yatırım
+ * kartı bu sonucu okur; liste, sayaçlar ve süzgeç de aynı saklanan kolona baktığı için tek kaynak `properties.price_health`
+ * (emsal motoru önce, yetersizse m² referans modeli: `resolvePriceHealthWithSource`, kayıtta ve gece tazelemesinde yazılır).
+ *
+ * - Saklanan bant varsa O kazanır. Anlık referans modeli aynı bandı veriyorsa sapma yüzdesi ve not ondan gelir; farklı
+ *   bant verirse sapma GÖSTERİLMEZ (aynı sayfada "Fiyat uygun" ile "~%43 üzerinde" birlikte çıkmasın).
+ * - Saklanan değer yoksa/pending ise bant da "pending" kalır: liste "Bekliyor" derken detay renk uydurmaz.
+ */
+export function resolveShownPriceHealth(stored: string | null | undefined, reference: PriceHealthResult): PriceHealthResult {
+  const band = normalizePriceHealth(stored);
+  if (band === "pending") {
+    return {
+      health: "pending",
+      mid: null,
+      deltaPct: null,
+      note: reference.health === "pending" ? reference.note : "Fiyat sağlığı henüz hesaplanmadı; kayıtta ve gece tazelemesinde yazılır.",
+      sqmPrice: reference.sqmPrice,
+      source: "yok",
+      confidence: null,
+    };
+  }
+  if (reference.health === band) return reference;
+  return {
+    health: band,
+    mid: null,
+    deltaPct: null,
+    note: "Kayıtlı fiyat sağlığı (önce emsal, yetersizse bölge referansı); portföy listesiyle aynı değer.",
+    sqmPrice: reference.sqmPrice,
+    // Kaynak kolonda saklanmaz: sayfa uydurmaz.
+    source: "yok",
+    confidence: null,
+  };
+}
+
+/**
+ * Satış teşhisinin beklediği İŞARETLİ sapma (+ = emsal üstü, - = emsal altı). Model mutlak yüzde verir; yön liste
+ * fiyatının orta değere göre konumundan çıkar. Orta değer ya da sapma yoksa (ör. bantlar farklı) null: teşhis yön uydurmaz.
+ */
+export function signedPriceDelta(listPrice: number | string | null | undefined, result: Pick<PriceHealthResult, "mid" | "deltaPct">): number | null {
+  if (result.deltaPct == null || result.mid == null || listPrice == null) return null;
+  const price = Number(listPrice);
+  if (!Number.isFinite(price)) return null;
+  return price >= result.mid ? result.deltaPct : -result.deltaPct;
+}
+
 /** Kaynak + güven (saf). Canlı m² fiyatı varsa emsal/orta, yoksa sabit tablo/düşük. */
 export function priceHealthProvenance(hasLiveSqmPrice: boolean): { source: PriceHealthSource; confidence: PriceHealthConfidence } {
   return hasLiveSqmPrice ? { source: "emsal", confidence: "orta" } : { source: "referans_modeli", confidence: "dusuk" };

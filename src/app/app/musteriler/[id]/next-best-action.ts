@@ -15,7 +15,7 @@ import { DAY_MS, msSince } from "@/lib/clock";
 export type NextBestActionInput = {
   customerId: string;
   leadTier: "hot" | "warm" | "cold";
-  leadLabel: string;            // "Sıcak" | "Ilık" | "Soğuk"
+  leadLabel: string;            // "Sıcak" | "İlgili" | "Soğuk" (TEMPERATURE_LABELS)
   hasPhone: boolean;
   lastActivityAt: string | null; // en son çağrı/randevu/iletişim (ISO)
   createdAt: string;             // müşteri kaydı (ISO)

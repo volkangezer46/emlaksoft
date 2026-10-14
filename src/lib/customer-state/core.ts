@@ -73,7 +73,12 @@ export const STAGE_LABELS: Record<CustomerStage, string> = {
   kayit: "Kayıtlı müşteri",
 };
 
-export const TEMPERATURE_LABELS: Record<Temperature, string> = { sicak: "Sıcak", ilik: "Ilık", soguk: "Soğuk" };
+/** Kaba sıcaklık (3 kova) etiketleri ısı segmentlerinin kelimeleriyle AYNI ("Ilık" diye ikinci bir kelime yok; YD5). */
+export const TEMPERATURE_LABELS: Record<Temperature, string> = {
+  sicak: HEAT_SEGMENTS.sicak.label,
+  ilik: HEAT_SEGMENTS.ilgili.label,
+  soguk: HEAT_SEGMENTS.soguk.label,
+};
 export const RISK_LABELS: Record<RiskLevel, string> = { yuksek: "Yüksek risk", orta: "Orta risk", dusuk: "Düşük risk" };
 
 export type StateReason = { label: string; evidence: string; href: string };
@@ -217,7 +222,7 @@ export function buildCustomerState(input: CustomerStateInput, nowMs: number, opt
       "Son temas": `/app/gelen-kutusu?customer=${id}`,
     };
     for (const f of [...heat.factors].filter((x) => x.points > 0).sort((a, b) => b.points - a.points)) {
-      reasons.push({ label: f.label, evidence: `+${f.points} ısı puanı`, href: HEAT_HREF[f.label] ?? me });
+      reasons.push({ label: f.label, evidence: `+${f.points} sıcaklık puanı`, href: HEAT_HREF[f.label] ?? me });
     }
     if (input.hasUpcomingAppointment) reasons.push({ label: "Planlı randevu var", evidence: "Sonraki temas noktası belli", href: me });
     if (seller && seller.tier !== "low") reasons.push({ label: "Portföy verme olasılığı", evidence: seller.reasons[0] ?? seller.label, href: me });
@@ -250,13 +255,6 @@ export function buildCustomerState(input: CustomerStateInput, nowMs: number, opt
   };
 }
 
-/** Rozet etiketi (liste/360 ortak): "Sıcak", "Ilık", "Soğuk" — uykuda ise ısı segmentinin etiketi korunur. */
-export function temperatureBadgeLabel(state: CustomerState): string {
-  const seg = HEAT_SEGMENTS[state.scores.heat.segment];
-  return state.scores.heat.segment === "uykuda" && state.scores.heat.daysSinceContact !== null
-    ? `${seg.label} · ${state.scores.heat.daysSinceContact} gün`
-    : seg.label;
-}
 
 /**
  * "Bugün ara" içgörüsü uygunluğu: ofis tanımlı sessizlik eşiği + en az 1 açık talep (veri RPC'den gelir).

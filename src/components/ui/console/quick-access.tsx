@@ -5,7 +5,6 @@ import { RotateCcw, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { OPEN_PALETTE_EVENT } from "@/lib/palette-events";
 import { bumpUsage, getHrefStore, getUsageStore, pushRecent, togglePin, topUsed } from "@/lib/nav-memory";
-import { ShortcutHint } from "@/components/app/shortcut-hint";
 
 /**
  * Yan menü "Hızlı erişim" (/app ve /admin AYNI davranış): sabitlenenler + otomatik "en çok kullandıkların".
@@ -111,7 +110,10 @@ export function QuickAccessSection({
   );
 }
 
-/** "Menüde ara": komut paletini (Ctrl K) açar; palet menü sayfalarını açıklama ve eş anlamlılarıyla süzer. */
+/**
+ * "Menüde ara": komut paletini açar; palet menü sayfalarını açıklama ve eş anlamlılarıyla süzer. Ctrl/⌘K ipucunu
+ * yalnız üst çubuktaki arama kutusu gösterir (iki ayrı "Ctrl K" tetikleyicisi görünmesin; YD5).
+ */
 export function MenuSearchButton({ onActivate }: { onActivate?: () => void }) {
   return (
     <button
@@ -126,7 +128,6 @@ export function MenuSearchButton({ onActivate }: { onActivate?: () => void }) {
     >
       <Search className="h-3.5 w-3.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 truncate">Ara</span>
-      <ShortcutHint className="rounded border border-white/15 px-1.5 text-[0.6875rem] leading-5 text-white/65" />
     </button>
   );
 }

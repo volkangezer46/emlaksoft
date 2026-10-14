@@ -16,7 +16,7 @@ export function useModKey(): string {
 }
 
 const BASE =
-  "inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline bg-canvas px-1.5 py-0.5 font-sans text-xs font-semibold leading-none text-text-muted";
+  "kbd-hint inline-flex items-center justify-center rounded-[var(--radius-control)] border border-hairline bg-canvas px-1.5 py-0.5 font-sans text-xs font-semibold leading-none text-text-muted";
 
 /**
  * Klavye tuşu etiketi. `mod` verilirse tuş platforma göre Ctrl/⌘ olur ("Ctrl" ya da "⌘" yazmayın,
@@ -42,7 +42,7 @@ export function Kbd({
 /** Kısayol grubu (["mod", "K"] ya da ["G", "M"]). "mod" ve "Ctrl" öğeleri platform tuşuna (Ctrl/⌘) çevrilir. */
 export function KbdCombo({ keys, className = "" }: { keys: readonly string[]; className?: string }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="kbd-hint inline-flex items-center gap-1">
       {keys.map((k, i) => (
         <Kbd key={`${k}-${i}`} mod={k === "mod" || k === "Ctrl"} className={className}>
           {k}

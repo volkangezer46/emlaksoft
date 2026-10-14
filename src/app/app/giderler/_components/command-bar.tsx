@@ -12,11 +12,11 @@ import { cn } from "@/lib/utils";
 import type { CommandTab, EntryCategoryOption, NewEntryDetail } from "../quick-entry";
 
 /**
- * Muhasebe komut çubuğu (Ctrl/⌘K). Yalnız açılınca iner (`next/dynamic`). Satırlar:
+ * Muhasebe komut çubuğu (M tuşu; Ctrl/⌘K her yerde olduğu gibi genel paleti açar). Yalnız açılınca iner (`next/dynamic`). Satırlar:
  *  1) Yazılan metin bir kayda benziyorsa "Kaydet: …" (tek satır akıllı giriş; pencere önceden dolu açılır),
  *  2) Yeni gelir (G) / Yeni gider (E) / Transfer (T),
  *  3) sekmelere git (etiketler finance-shell.tsx'ten prop olarak gelir; kopya yok),
- *  4) "Tüm uygulamada ara" (genel komut paleti; Muhasebe sayfasında Ctrl K bu çubuğu açar).
+ *  4) "Tüm uygulamada ara" (genel komut paleti; Ctrl/⌘K ile de doğrudan açılır).
  * Klavye: ↑/↓ seçer, Enter çalıştırır, Esc kapatır.
  */
 
@@ -157,7 +157,7 @@ export function CommandBar({
             </li>
           ))}
         </ul>
-        <p className="border-t border-line px-4 py-2 text-xs text-text-faint">↑ ↓ seç · Enter çalıştır · Muhasebe dışında G, E, T kısayolları çalışmaz</p>
+        <p className="kbd-hint border-t border-line px-4 py-2 text-xs text-text-faint">↑ ↓ seç · Enter çalıştır · Muhasebe dışında G, E, T kısayolları çalışmaz</p>
       </DialogContent>
     </Dialog>
   );

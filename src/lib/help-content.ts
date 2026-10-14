@@ -114,7 +114,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     term: "Aday skoru",
     aka: "Lead skoru",
     short:
-      "Yeni gelen aday müşterinin ne kadar değerli olduğunu 0-100 arası gösterir. 65 ve üstü Sıcak, 35-64 Ilık, altı Soğuk.",
+      "Yeni gelen aday müşterinin ne kadar değerli olduğunu 0-100 arası gösterir: 65 ve üstü yüksek, 35-64 orta, altı düşük. Müşteri sıcaklığından (Sıcak/İlgili/Soğuk/Uykuda) ayrıdır; müşteri kartında sıcaklık rozetinin ayrıntısında görünür.",
     detail:
       "Telefon ve e-posta bilgisi, adayın geldiği kaynak, açık talep, görüşme, randevu, çağrı, teklif ve açık anlaşma puanı artırır. Kara listedeki müşteri 0 alır.",
     href: "/app/ayarlar/lead",
