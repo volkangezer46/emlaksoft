@@ -88,6 +88,7 @@ export async function finalizePropertyMediaUpload(
   propertyIdValue: string,
   sessionIdValue: string,
   isDocument = false,
+  dims?: { width: number; height: number } | null,
 ): Promise<DirectFileUploadFinalizeResult> {
   const gate = await requirePermission("properties", "edit");
   if (!gate.ok) return { error: gate.error };
@@ -115,6 +116,21 @@ export async function finalizePropertyMediaUpload(
     // Kayıt adı `belge-` önekli olduğu için tetikleyici/ad kuralı zaten belge sayar; işaret burada da açıkça
     // yazılır (kapak olmaz). Sütun yoksa (migration öncesi) yalnız kapak kaldırılır, ad kuralı korur.
     await writeDocumentFlag(await createClient(), gate.tenantId, propertyId, [result.id], true);
+  }
+
+  // Fotoğraf boyutu (istemci ölçtü; galeri kalite uyarısı ve kapak önerisi okur). Sütun yoksa (migration öncesi) sessizce atlanır.
+  const width = Math.round(Number(dims?.width));
+  const height = Math.round(Number(dims?.height));
+  if (Number.isFinite(width) && Number.isFinite(height) && width >= 1 && height >= 1 && width <= 100_000 && height <= 100_000) {
+    const { error: dimError } = await (await createClient())
+      .from("property_media")
+      .update({ width, height })
+      .eq("id", result.id)
+      .eq("tenant_id", gate.tenantId)
+      .eq("property_id", propertyId);
+    if (dimError && dimError.code !== "42703" && dimError.code !== "PGRST204") {
+      console.error("property media dimensions", { code: dimError.code });
+    }
   }
 
   if (result.created) {

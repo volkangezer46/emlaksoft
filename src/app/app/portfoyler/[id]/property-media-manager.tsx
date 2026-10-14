@@ -19,9 +19,11 @@ import {
   type PropertyDocFields,
 } from "@/app/actions/property-media";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
 import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
 import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
+import { assessPhoto, suggestCover, type PhotoIssue } from "@/lib/field-capture/photo-quality";
 
 export type MediaItem = {
   id: string;
@@ -33,6 +35,9 @@ export type MediaItem = {
   sort_order?: number | null;
   /** KVKK P0-9: belge (tapu, yetki belgesi...) — public yüzeylerde gösterilmez. Sunucu etkin değeri hesaplar. */
   is_document?: boolean | null;
+  /** Yüklemede ölçülen piksel boyutu (eski kayıtta yok → kalite uyarısı üretilmez). */
+  width?: number | null;
+  height?: number | null;
 };
 
 /** OCR sonuç dialogundaki düzenlenebilir alanlar (C8). */
@@ -68,6 +73,29 @@ type QueueItem = {
   error?: string;
   /** Yükleme türü "Belge" seçiliyken kuyruğa girdi (yeniden denemede de korunur). */
   asDocument: boolean;
+  /** Yüklenen son dosyanın ölçüsü ve kalite uyarısı (düşük çözünürlük / dikey / panorama). */
+  dims?: { width: number; height: number };
+  warning?: string | null;
+};
+
+/** Yüklenecek son dosyanın piksel boyutu (EXIF yönü uygulanmış). Ölçülemezse null — yükleme yine sürer. */
+async function measureImage(file: File): Promise<{ width: number; height: number } | null> {
+  if (!file.type.startsWith("image/")) return null;
+  let bitmap: ImageBitmap | null = null;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    return bitmap.width > 0 && bitmap.height > 0 ? { width: bitmap.width, height: bitmap.height } : null;
+  } catch {
+    return null;
+  } finally {
+    bitmap?.close();
+  }
+}
+
+const ISSUE_BADGE: Record<PhotoIssue, string> = {
+  low_resolution: "Düşük çözünürlük",
+  portrait: "Dikey",
+  panorama: "Çok geniş",
 };
 
 /** Uzun kenar bu değeri aşan görseller yüklemeden önce küçültülür (süre + kota). */
@@ -191,6 +219,10 @@ export function PropertyMediaManager({
         stamped = res.applied;
         patchQueue(item.key, { status: "uploading" });
       }
+      // Kalite: yüklenen SON dosya ölçülür (belgede uyarı yok — okunurluk ayrı konu).
+      const dims = await measureImage(file);
+      const warning = dims && !item.asDocument ? assessPhoto(dims).warning : null;
+      if (dims) patchQueue(item.key, { dims, warning });
       const prepared = await preparePropertyMediaUpload({
         propertyId,
         fileName: file.name,
@@ -210,7 +242,7 @@ export function PropertyMediaManager({
         return;
       }
 
-      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId, item.asDocument);
+      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId, item.asDocument, dims);
       if (!finalized.ok) {
         patchQueue(item.key, { status: "error", error: finalized.error });
         return;
@@ -456,6 +488,8 @@ export function PropertyMediaManager({
   }
 
   const unstamped = images.filter((m) => !m.has_watermark).length;
+  // Kapak önerisi yalnız ölçülmüş fotoğraflardan (boyut yoksa öneri yok) ve yalnız düzenleyene.
+  const coverSuggestion = canEdit ? suggestCover(images) : null;
 
   const [urlState, urlAction, urlPending] = useActionState<MediaResult, FormData>(
     addPropertyMediaUrl,
@@ -568,8 +602,8 @@ export function PropertyMediaManager({
         {queue.length > 0 ? (
           <div className="mb-4 space-y-1.5">
             {queue.map((q) => (
+              <div key={q.key}>
               <div
-                key={q.key}
                 className="flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs"
               >
                 <span className="grid h-5 w-5 shrink-0 place-items-center">
@@ -605,6 +639,12 @@ export function PropertyMediaManager({
                     <RefreshCw className="h-3 w-3" /> Yeniden dene
                   </button>
                 ) : null}
+              </div>
+              {q.warning ? (
+                <p role="status" className="mt-1 flex items-start gap-1.5 px-3 text-xs font-medium text-amber-700">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> {q.warning}
+                </p>
+              ) : null}
               </div>
             ))}
             {!uploading ? (
@@ -712,6 +752,18 @@ export function PropertyMediaManager({
           <p className="mb-3 text-sm font-medium text-danger-500">{orderError ?? bulkError}</p>
         ) : null}
 
+        {coverSuggestion ? (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-amber-400/50 bg-amber-500/10 px-3 py-2 text-xs">
+            <Star className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
+            <span className="min-w-0 flex-1 font-medium text-ink-950">
+              Kapak önerisi: {coverSuggestion.reason} ({images.findIndex((m) => m.id === coverSuggestion.id) + 1}. fotoğraf)
+            </span>
+            <Button variant="secondary" size="sm" icon={Star} onClick={() => makeCover(coverSuggestion.id)}>
+              Kapak yap
+            </Button>
+          </div>
+        ) : null}
+
         {images.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {images.map((m, i) => (
@@ -786,6 +838,19 @@ export function PropertyMediaManager({
                       <Droplets className="h-3 w-3" /> Filigran yok
                     </span>
                   ) : null}
+                  {canEdit
+                    ? (() => {
+                        const q = assessPhoto(m);
+                        return q.issues.length > 0 ? (
+                          <span
+                            title={q.warning ?? undefined}
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
+                          >
+                            <AlertCircle className="h-3 w-3" aria-hidden /> {ISSUE_BADGE[q.issues[0]]}
+                          </span>
+                        ) : null;
+                      })()
+                    : null}
                 </div>
                 {canEdit ? (
                   <div className="hover-action absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-ink-950/80 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
