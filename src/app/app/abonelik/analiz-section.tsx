@@ -455,7 +455,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
             <KontorPanel packs={cards} canBuy={canBuy} blockReason={blockReason} wallet={props.wallet ?? null} autoOpenId={props.onerilen ? (suggested?.id ?? null) : null} />
           )}
         </div>
-        <p className="mt-3 text-xs text-text-muted">Kupon kodları analiz paketlerinde geçerli değildir. Fiyatlara %20 KDV eklenir.</p>
+        <p className="mt-3 text-xs text-text-muted">Kupon kodları analiz paketlerinde geçerli değildir. Fiyatlara %{Math.round(vatRate * 100)} KDV eklenir.</p>
       </section>
 
       <section id="gecmis" className="scroll-mt-24 rounded-[var(--radius-panel)] bg-surface p-5 shadow-[var(--elev-1)]">

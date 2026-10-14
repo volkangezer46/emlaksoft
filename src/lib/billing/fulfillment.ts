@@ -141,10 +141,14 @@ export async function writeAutoInvoiceLine(
   }
 }
 
+/** invoices.checkout_error üst sınırı (invoices_checkout_error_check: char_length <= 300); aşılırsa UPDATE tümüyle düşer. */
+export const CHECKOUT_ERROR_MAX = 300;
+
 /** Sağlayıcının ret yanıtından faturaya yazılacak metin: "<errorCode>: <errorMessage>" (ödeme profilinde gösterilir). */
 export function checkoutErrorText(errorCode: unknown, errorMessage: unknown): string | null {
   const code = String(errorCode ?? "").trim().slice(0, 40);
-  const message = String(errorMessage ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
+  const room = code ? CHECKOUT_ERROR_MAX - code.length - 2 : CHECKOUT_ERROR_MAX;
+  const message = String(errorMessage ?? "").replace(/\s+/g, " ").trim().slice(0, room);
   if (!code && !message) return null;
   return code && message ? `${code}: ${message}` : code || message;
 }
@@ -479,7 +483,7 @@ export async function markCheckoutInvoiceFailed(input: {
     .from("invoices")
     .update(
       input.checkoutError
-        ? { checkout_status: "initialization_failed", checkout_error: input.checkoutError.slice(0, 500) }
+        ? { checkout_status: "initialization_failed", checkout_error: input.checkoutError.slice(0, CHECKOUT_ERROR_MAX) }
         : { checkout_status: "initialization_failed" },
     )
     .eq("id", input.invoiceId)

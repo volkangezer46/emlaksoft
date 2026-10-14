@@ -85,7 +85,7 @@ async function handle(token: string | null) {
       saveCardConsentBy?: string;
     };
     // Faturanın KESİLDİĞİ andaki KDV oranı (meta.vatRate; yoksa %20): ayar sonradan değişse de doğrulama bozulmaz.
-  const amounts = invoiceAmountsTry(Number(invoice.amount_try), invoiceVatRateOf(invoice.meta));
+    const amounts = invoiceAmountsTry(Number(invoice.amount_try), invoiceVatRateOf(invoice.meta));
     if (
       String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
       !Number.isFinite(Number(invoice.tax_try)) ||
