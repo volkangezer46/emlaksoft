@@ -3,7 +3,7 @@
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
-import type { FormEvent, ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
@@ -17,6 +17,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ViewPrefs } from "@/components/ui/console/view-prefs";
 import { FontScalePicker } from "@/components/font-scale-picker";
 import type { FontScale } from "@/lib/font-scale";
@@ -27,15 +28,11 @@ const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { setti
 
 /**
  * Çıkış: hızlı kayıt taslakları ve çevrimdışı kuyruk (ad, telefon) bu cihazda bir sonraki kullanıcıya kalmasın diye
- * silinir. Gönderilmemiş kayıt varsa önce sorulur; vazgeçilirse çıkış yapılmaz.
+ * silinir. Gönderilmemiş kayıt varsa önce ConfirmDialog ile sorulur; vazgeçilirse çıkış yapılmaz.
  */
-function onSignOutSubmit(event: FormEvent<HTMLFormElement>) {
-  const unsent = countUnsentOnDevice();
-  if (unsent > 0 && !window.confirm(`Bu cihazda gönderilmemiş ${unsent} hızlı kayıt var. Çıkış yaparsanız bu cihazdan silinir. Yine de çıkılsın mı?`)) {
-    event.preventDefault();
-    return;
-  }
+async function signOutClearingDevice(formData: FormData) {
   clearFieldCaptureStorage();
+  await signOut(formData);
 }
 
 /** Menü gövdesi (Radix DropdownMenu) — user-menu.tsx tarafından ilk etkileşimde yüklenir. */
@@ -61,61 +58,85 @@ export function UserMenuPanel({
 }) {
   // Ürün turu yalnız ofis panelinde (/app) vardır; yönetim konsolunda gösterilmez.
   const inApp = (usePathname() ?? "").startsWith("/app");
+  // Onay penceresi menünün DIŞINDA durur: menü kapanınca içeriği sökülür, pencere açık kalmalı.
+  const [unsentToConfirm, setUnsentToConfirm] = useState(0);
+  function onSignOutSubmit(event: FormEvent<HTMLFormElement>) {
+    const unsent = countUnsentOnDevice();
+    if (unsent > 0) {
+      event.preventDefault();
+      setUnsentToConfirm(unsent);
+      return;
+    }
+    clearFieldCaptureStorage();
+  }
   return (
-    <DropdownMenu defaultOpen={initialOpen}>
-      <DropdownMenuTrigger aria-label={`Kullanıcı menüsü: ${name}`} className={USER_MENU_TRIGGER_CLASS}>
-        {face}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-72">
-        <DropdownMenuLabel>
-          <span className="block truncate text-sm font-semibold text-text">{name}</span>
-          <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {links.map((l) => (
-          <DropdownMenuItem key={l.href} asChild>
-            <Link href={l.href}>
-              {(() => {
-                const Icon = l.icon ?? NAMED_ICONS[l.iconName];
-                return <Icon aria-hidden />;
-              })()}
-              {l.label}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-        {inApp ? (
-          <DropdownMenuItem
-            onSelect={() => {
-              clearTourDone();
-              window.location.assign(TOUR_RESTART_HREF);
-            }}
-          >
-            <MapIcon aria-hidden />
-            Turları yeniden başlat
-          </DropdownMenuItem>
-        ) : null}
-        {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
-        {viewPrefs ? (
-          <>
-            <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        {fontScale ? (
-          <>
-            <FontScalePicker initial={fontScale} className="px-3 py-2" />
-            <DropdownMenuSeparator />
-          </>
-        ) : null}
-        <form action={signOut} onSubmit={onSignOutSubmit}>
-          <DropdownMenuItem asChild danger>
-            <button type="submit" className="w-full">
-              <LogOut aria-hidden />
-              Çıkış yap
-            </button>
-          </DropdownMenuItem>
-        </form>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu defaultOpen={initialOpen}>
+        <DropdownMenuTrigger aria-label={`Kullanıcı menüsü: ${name}`} className={USER_MENU_TRIGGER_CLASS}>
+          {face}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className="w-72">
+          <DropdownMenuLabel>
+            <span className="block truncate text-sm font-semibold text-text">{name}</span>
+            <span className="block truncate text-xs font-normal text-text-muted">{subtitle}</span>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {links.map((l) => (
+            <DropdownMenuItem key={l.href} asChild>
+              <Link href={l.href}>
+                {(() => {
+                  const Icon = l.icon ?? NAMED_ICONS[l.iconName];
+                  return <Icon aria-hidden />;
+                })()}
+                {l.label}
+              </Link>
+            </DropdownMenuItem>
+          ))}
+          {inApp ? (
+            <DropdownMenuItem
+              onSelect={() => {
+                clearTourDone();
+                window.location.assign(TOUR_RESTART_HREF);
+              }}
+            >
+              <MapIcon aria-hidden />
+              Turları yeniden başlat
+            </DropdownMenuItem>
+          ) : null}
+          {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
+          {viewPrefs ? (
+            <>
+              <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          {fontScale ? (
+            <>
+              <FontScalePicker initial={fontScale} className="px-3 py-2" />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
+          <form action={signOut} onSubmit={onSignOutSubmit}>
+            <DropdownMenuItem asChild danger>
+              <button type="submit" className="w-full">
+                <LogOut aria-hidden />
+                Çıkış yap
+              </button>
+            </DropdownMenuItem>
+          </form>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDialog
+        open={unsentToConfirm > 0}
+        onOpenChange={(next) => {
+          if (!next) setUnsentToConfirm(0);
+        }}
+        title="Gönderilmemiş hızlı kayıtlar var"
+        description={`Bu cihazda gönderilmemiş ${unsentToConfirm} hızlı kayıt var. Çıkış yaparsanız bu cihazdan silinir.`}
+        confirmLabel="Yine de çıkış yap"
+        tone="danger"
+        formAction={signOutClearingDevice}
+      />
+    </>
   );
 }
