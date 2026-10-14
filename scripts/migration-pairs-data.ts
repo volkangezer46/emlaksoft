@@ -345,6 +345,8 @@ const F = {
   financeEntriesManualReconcile: "20261013008200_finance_entries_manual_reconcile.sql",
   // FN6 (2026-10-13): duzenli odeme kuralina cari/KDV/stopaj yazan ayri RPC (sutunlar FN1 20261014001000_finance_ledger_v2).
   financeRecurringRuleTerms: "20261013008600_finance_recurring_rule_terms.sql",
+  // DG2 (2026-10-14): plan katalog motoru: billing_plans kayit defteri (FK), eklenen paket fiyati, 4 fonksiyonda plan listesi -> billing_plan_known.
+  planCatalogEngine: "20261014002000_plan_catalog_engine.sql",
   // SP5 (2026-10-13): Google baglanti merkezi veri tablolari (GSC gunluk, URL Inspection, Ads gunluk) + budama/ozet RPC.
   googleData: "20261013003400_google_data.sql",
   // FN5 (2026-10-13): Muhasebe > Belgeler: {tenant}/ledger/ nesneleri icin JWT kimlikli depolama politikalari + e-Fatura okuma (expenses:view).
@@ -596,6 +598,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeLedgerV2]: "ek", // 9 yeni tablo (RLS: tenant + expenses:view; yazma yalniz RPC, kayitli gorunum kendi satiri) + cash_entries 8 / recurring_rules 3 nullable kolon + 2 security_invoker gorunum + ay kilidi ve acik kalem tetikleri (kilit tablosu bos dogar) + realtime yayini; mevcut satir/davranis degismez
     [F.financeLedgerV2Rpc]: "ek", // ~30 yeni SECURITY DEFINER finance_* RPC (v2 kayit/guncelleme eski RPC'leri sarar; eski imza ve govdeler degismez)
     [F.financeLedgerV2Backfill]: "davranis", // karsi taraf metinlerinden cari + cash_entries.party_id (tutar/tarih/hesap degismez, bakiye ayni), expense_budgets -> finance_budgets kopyasi, permission_defaults muhasebe expenses create+edit; idempotent
+    [F.planCatalogEngine]: "davranis", // yeni billing_plans (RLS, yalniz service_role; 5 taban kimlik seed) + tenants/subscriptions(plan, pending_plan)/plan_entitlements CHECK listesi -> FK (mevcut satirlar ayni); plan_monthly_amount taban davranisi ayni, eklenen paket belgeden; 4 fonksiyonda yalniz plan listesi kontrolu billing_plan_known'a cevrilir (canli govde, eslesme sayisi dogrulanir)
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.legalHelpContent]: "ek", // 5 yeni tablo (legal_documents/consents/constants, help_articles/votes; RLS+FORCE, REVOKE; yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken koddaki icerikle calisir
     [F.financeEntriesManualReconcile]: "ek", // yeni DEFINER RPC finance_entries_set_reconciled (hesap edit erisimi + maas gizliligi; yalniz cash_entries.reconciled_at yazar); mevcut veri degismez, kod RPC yokken "kurulum bekliyor" der
@@ -810,6 +813,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "AD7-eposta-gunlugu", order: 77, title: "E-posta altyapisi: email_sends + email_events + email_suppressions + email_log_prune (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken gonderim surer, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.emailLog] },
     { id: "AD2-fatura-satirlari-dekont", order: 72, title: "Fatura satirlari (geriye donuk tek satir) + numarali alacak dekontu (iade kaydi tetikleyicisi; mevcut iadeler dekontlanir) + elle fatura taslak RPC'si (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken satiri faturadan turetir, elle fatura formu 'kurulum bekliyor' der; sira serbest)", files: [F.invoiceLinesCreditNotes] },
     { id: "FN1-finans-v2-defter", order: 101, title: "Finans v2 (Muhasebe mini muhasebe programi): sema + RPC + veri tasima AYNI PENCEREDE ve bu sirayla (001000 -> 001100 -> 001200; 20261010000600/000900, 20261011001200, 20261012000400, 20261012002900 ve 20261008001100 SONRASI). KOD YAYININDAN ONCE uygulanir; kod sema yokken 'veritabani guncellemesi bekliyor' der. Dogrulama: cash_entries sayisi ve finance_account_balances once/sonra ayni (davranis)", files: [F.financeLedgerV2, F.financeLedgerV2Rpc, F.financeLedgerV2Backfill] },
+    { id: "DG2-plan-katalog", order: 112, title: "Plan katalog motoru: billing_plans + plan CHECK -> FK + eklenen paket fiyati + 4 fonksiyonda plan dogrulamasi billing_plan_known (20261007001000/001010 ve 20261008001000 SONRASI; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod plan_catalog_engine_ready() yokken 'yeni paket' eklemez; davranis)", files: [F.planCatalogEngine] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },
     { id: "FN3-elle-mutabakat", order: 102, title: "Muhasebe > Hareketler: toplu Mutabik isaretle / Mutabakati kaldir RPC'si (20261011001200 sonrasi; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod RPC yokken 'kurulum bekliyor' der; sira serbest, ek)", files: [F.financeEntriesManualReconcile] },
@@ -932,6 +936,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeLedgerV2Rpc, F.financeLedgerV2],
     [F.financeLedgerV2Rpc, F.financeOwnerPayoutSource],
     [F.financeLedgerV2Backfill, F.financeLedgerV2Rpc],
+    // DG2: canli govdeleri donusturulen fonksiyonlarin son tanimlari ve plan_monthly_amount'un 20261008001000 govdesi once olmali.
+    [F.planCatalogEngine, F.planPricesEfTariff],
+    [F.planCatalogEngine, F.planUpgradeFulfillment],
+    [F.planCatalogEngine, F.subscriptionPause],
+    [F.planCatalogEngine, F.billingAmount],
     [F.financeIsSample, F.financeAccountsCashEntries],
     [F.financeIsSample, F.recurringRules],
     [F.financeIsSample, F.expenseBudgetsRecurring],
