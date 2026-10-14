@@ -67,7 +67,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Ekip Merkezi"
+        eyebrow="Ekip"
         title="Danışman devri"
         description="Bir danışmanın müşteri, portföy, açık anlaşma, görev ve randevularını başka bir danışmana devredin. Her devir denetim kaydına yazılır."
       />

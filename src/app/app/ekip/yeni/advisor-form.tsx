@@ -445,7 +445,7 @@ export function AdvisorForm({
       title="Yeni danışman"
       description="Üç kısa adım: kimlik ve rol, uzmanlık ve bölge, davet. Diğer bilgiler sonra doldurulur."
       eyebrow="Ekip & yetkiler"
-      breadcrumbs={[{ label: "Ekip Merkezi", href: "/app/ekip" }, { label: "Yeni danışman" }]}
+      breadcrumbs={[{ label: "Ekip", href: "/app/ekip" }, { label: "Yeni danışman" }]}
       cancelHref="/app/ekip"
       submitLabel="Danışmanı ekle"
       pendingLabel="Ekleniyor…"

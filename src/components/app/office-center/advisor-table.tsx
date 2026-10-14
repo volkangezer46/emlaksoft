@@ -11,7 +11,7 @@ import { loadAvatarMap } from "@/lib/avatar-read";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
 /**
- * TEK danışman listesi (Ofis Merkezi > Danışmanlar ve Ekip Merkezi > Genel aynı bileşen + aynı kaynak `loadOfficeAdvisors`).
+ * TEK danışman listesi (Ekip sayfası, tek bileşen + aynı kaynak `loadOfficeAdvisors`).
  * Her sayı danışmanla süzülmüş listeye gider (sıfır çıkmaz). Sıralama bağlantıları çağırandan (`sort`), satır işlemleri
  * (rol/şube/takım, pasife alma + devir) yalnız `actions` verilirse çizilir. `extra`: sayfaya özgü satır rozeti (ör. son giriş).
  */

@@ -371,7 +371,7 @@ export async function ClosuresSection({ portalIds }: { portalIds: string[] }) {
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Siren className="h-4 w-4 text-danger-500" /> Kapanış / kayıp kayıtları
         </h2>
-        <Link href="/app/ilan-kontrol/kapanis" className="text-xs font-semibold text-brand-600">Kayıp-kaçak panosu</Link>
+        <Link href="/app/ilan-kontrol/kapanis" className="text-xs font-semibold text-brand-600">Kapanış kayıpları</Link>
       </div>
       <div className="divide-y divide-line">
         {closures.map((c) => (
