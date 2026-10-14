@@ -22,6 +22,8 @@ import { requireStepUp } from "@/lib/platform-security/step-up";
 import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { OFFICE_CLOSE_STATUSES, statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
 import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { isPlanId } from "@/lib/billing/plans";
 
 export type PlatformResult = {
   error?: string;
@@ -30,7 +32,6 @@ export type PlatformResult = {
   code?: "stale" | "step_up_required" | "step_up_invalid" | "step_up_no_factor";
 };
 
-const PLANS = ["advisor", "office", "professional", "business", "enterprise"] as const;
 const STATUSES = ["trial", "active", "past_due", "suspended", "cancelled"] as const;
 const IMPERSONATION_ROLES: ReadonlySet<string> = new Set(["super_admin", "ops", "support"]);
 
@@ -41,11 +42,20 @@ export async function updateTenantPlanStatus(formData: FormData): Promise<Platfo
   const plan = String(formData.get("plan") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
   if (!id) return { error: "Tenant bulunamadı." };
-  if (plan && !(PLANS as readonly string[]).includes(plan)) return { error: "Geçersiz paket." };
   if (status && !(STATUSES as readonly string[]).includes(status)) return { error: "Geçersiz durum." };
   if (!plan && !status) return { ok: true };
 
   const admin = createAdminClient();
+  // Paket kataloğu (DG2): taban kimlikler + adminden eklenenler. Arşivli paket yalnız ofisin ZATEN o paketteyse geçer
+  // (satır içi kaydetme paketi her zaman gönderir); son hakem `update_tenant_plan_subscription` (billing_plan_known).
+  if (plan && !isPlanId(plan)) {
+    const def = (await getPlanDefinitions().catch(() => [])).find((p) => p.id === plan);
+    if (!def) return { error: "Geçersiz paket." };
+    if (def.archived) {
+      const { data: row } = await admin.from("tenants").select("plan").eq("id", id).maybeSingle();
+      if (row?.plan !== plan) return { error: "Bu paket arşivlendi; yeni atama yapılamaz." };
+    }
+  }
   // İsteğe bağlı iyimser eşzamanlılık (satır içi kaydetme standardı): satır, okunduğu sürümden (`updated_at`)
   // sonra başkası tarafından değiştiyse yazmadan "bayat" döner. Alan gönderilmezse eski davranış aynen sürer.
   // AD11: askıya alma / iptal (ofis kapatma) YENİ geçişi doğrulayıcı kodu ister; mevcut durum bunun için okunur.

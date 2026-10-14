@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { OFFICE_ADMIN_ACTIONS, officeAdminCan } from "./office-admin-access";
 import { parseOfficeCreateInput } from "./office-create-input";
-import { confirmationMatches } from "./office-create-rules";
+import { confirmationMatches, teamSizeForPlan } from "./office-create-rules";
+import { adminAssignablePlans, BUSINESS_PLAN_TEMPLATE, getPlan, PLANS, type PlanDef } from "@/lib/billing/plans";
 import { officeSlugCandidates, slugifyOffice, validateOfficeSlug } from "./office-slug";
 import type { PlatformRole } from "@/lib/platform-access";
 
@@ -53,6 +54,33 @@ describe("ofis oluşturma girdisi", () => {
     expect(parseOfficeCreateInput({ ...base, office_name: "" }).ok).toBe(false);
     expect(parseOfficeCreateInput({ ...base, tax_number: "123" }).ok).toBe(false);
     expect(parseOfficeCreateInput({ ...base, plan: "yok" }).ok).toBe(false);
+  });
+  it("adminden eklenen paket katalogla seçilebilir; provizyon kademesi tier'dan; arşivli/şablon seçilemez", () => {
+    const office = getPlan("office");
+    const catalog: PlanDef[] = [
+      ...PLANS,
+      { ...BUSINESS_PLAN_TEMPLATE },
+      { ...office, id: "ofis_plus", tier: "professional", custom: true, name: "Ofis Plus" },
+      { ...office, id: "eski_paket", tier: "office", custom: true, archived: true },
+    ];
+    const r = parseOfficeCreateInput({ ...base, plan: "ofis_plus" }, catalog);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.data.plan).toBe("ofis_plus");
+      expect(r.data.tier).toBe("professional");
+      expect(r.data.teamSize).toBe(teamSizeForPlan("professional"));
+    }
+    // Katalog verilmeden eklenen paket kabul edilmez (eski davranış).
+    expect(parseOfficeCreateInput({ ...base, plan: "ofis_plus" }).ok).toBe(false);
+    const archived = parseOfficeCreateInput({ ...base, plan: "eski_paket" }, catalog);
+    expect(archived.ok).toBe(false);
+    if (!archived.ok) expect(archived.field).toBe("plan");
+    expect(parseOfficeCreateInput({ ...base, plan: "business" }, catalog).ok).toBe(false);
+    const baseOk = parseOfficeCreateInput({ ...base, plan: "advisor" }, catalog);
+    if (baseOk.ok) expect(baseOk.data.tier).toBe("advisor");
+    expect(adminAssignablePlans(catalog).map((p) => p.id)).toEqual(["advisor", "office", "professional", "enterprise", "ofis_plus"]);
+    // Ofisin kendi (arşivli) paketi listede kalır.
+    expect(adminAssignablePlans(catalog, "eski_paket").map((p) => p.id)).toContain("eski_paket");
   });
 });
 

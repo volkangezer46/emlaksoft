@@ -23,6 +23,7 @@ import { officeSlugCandidates, provisionSafeCompanyName, validateOfficeSlug } fr
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvince } from "@/lib/geo/reader";
 import { getEffectiveTrialDays } from "@/lib/billing/plan-support";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { planLabel } from "@/lib/billing/plans";
 import { readEffectiveSeatLimit } from "@/lib/billing/seat-purchase";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
@@ -234,9 +235,20 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
   const staff = await requirePlatformModule("sales");
   if (!officeAdminCan(staff, "create")) return { error: OFFICE_ADMIN_DENIED };
 
-  const parsed = parseOfficeCreateInput(formRecord(formData));
+  // Paket kataloğu (DG2): adminden eklenen paketler de seçilebilir; katalog okunamazsa yalnız taban paketler.
+  const catalog = await getPlanDefinitions().catch(() => undefined);
+  const parsed = parseOfficeCreateInput(formRecord(formData), catalog);
   if (!parsed.ok) return { error: parsed.error, field: parsed.field };
   const input = parsed.data;
+  // Eklenen paket provizyondan SONRA atanır (provizyon RPC'si paketi ekip büyüklüğünden, yalnız taban kademeden türetir);
+  // paket atama RPC'si faturalama yetkisi ister. Yetki yoksa hiçbir şey yazılmadan durulur (yarım kayıt yok).
+  const customPlan = input.plan !== input.tier;
+  if (customPlan && !officeAdminCan(staff, "plan_status")) {
+    return {
+      error: "Eklenen paketle ofis açmak için faturalama yetkisi gerekir. Taban paketle açın; paket ekibi değiştirir.",
+      field: "plan",
+    };
+  }
 
   if (input.initialStatus === "active" && !officeAdminCan(staff, "create_active")) {
     return {
@@ -364,15 +376,28 @@ export async function createTenantByAdmin(formData: FormData): Promise<CreateOff
     }
   }
 
-  // (6e) Başlangıç durumu: aktif (mevcut atomik paket/durum yolu; denetim kaydını RPC yazar)
+  // (6e) Başlangıç durumu: aktif (mevcut atomik paket/durum yolu; denetim kaydını RPC yazar). Eklenen paket aynı
+  // çağrıda atanır; denemede yalnız paket atanır (tutar katalogdan, `plan_monthly_amount`).
+  const tierName = catalog?.find((p) => p.id === input.tier)?.name ?? planLabel(input.tier);
   if (input.initialStatus === "active") {
     const statusForm = new FormData();
     statusForm.set("id", tenantId);
     statusForm.set("status", "active");
+    if (customPlan) statusForm.set("plan", input.plan);
     const statusResult = await updateTenantPlanStatus(statusForm);
     if (!statusResult.ok) {
       console.error("createTenantByAdmin:status", statusResult.error);
-      warnings.push("Ofis aktif duruma alınamadı; deneme olarak açıldı.");
+      warnings.push(
+        customPlan
+          ? `Ofis aktif duruma alınamadı ve seçilen paket atanamadı; ${tierName} paketiyle deneme olarak açıldı.`
+          : "Ofis aktif duruma alınamadı; deneme olarak açıldı.",
+      );
+    }
+  } else if (customPlan) {
+    const planResult = await applyTenantPlanStatus(admin, staff.id, { id: tenantId, plan: input.plan });
+    if (!planResult.ok) {
+      console.error("createTenantByAdmin:plan", planResult.error);
+      warnings.push(`Seçilen paket atanamadı; ofis ${tierName} paketiyle açıldı. Abonelik sekmesinden değiştirin.`);
     }
   }
 

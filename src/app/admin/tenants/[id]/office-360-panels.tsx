@@ -181,7 +181,7 @@ export function SupportTab({ tickets, tenantId }: { tickets: TicketRow[]; tenant
 // ---------------------------------------------------------------------------
 export function LimitsPanel({ rows, planName }: { rows: LimitRow[]; planName: string }) {
   return (
-    <Panel title={`Plan limitleri · ${planName}`}>
+    <Panel title={`Limitler · ${planName}`}>
       <div className="space-y-4 p-5">
         {rows.map((r) => {
           const pct = limitPercent(r);
@@ -206,7 +206,10 @@ export function LimitsPanel({ rows, planName }: { rows: LimitRow[]; planName: st
                   />
                 ) : null}
               </div>
-              <p className="mt-1 text-xs text-text-faint">{pct == null ? "Pakette sınır yok" : `Limitin %${pct}'i kullanılıyor`}</p>
+              <p className="mt-1 text-xs text-text-faint">
+                {pct == null ? "Pakette sınır yok" : `Limitin %${pct}'i kullanılıyor`}
+                {r.extra && r.planLimit != null ? ` · paket ${new Intl.NumberFormat("tr-TR").format(r.planLimit)}, ${r.extra}` : ""}
+              </p>
             </>
           );
           return r.href ? (

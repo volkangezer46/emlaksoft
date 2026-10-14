@@ -13,6 +13,7 @@ import { loadPlatformMrr } from "@/lib/accounting/loaders";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 import { PLANS } from "@/lib/billing/plans";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 
 const invStatusLabel: Record<string, string> = {
   draft: "Taslak",
@@ -49,7 +50,7 @@ function money(n: number) {
 export async function BillingHome({ staffName }: { staffName: string }) {
   const admin = createAdminClient();
 
-  const [{ data: subs }, { data: invoices }, platformMrr] = await Promise.all([
+  const [{ data: subs }, { data: invoices }, platformMrr, catalogDefs] = await Promise.all([
     admin
       .from("subscriptions")
       .select("id, plan, status, amount_try, current_period_end, pause_started_at, cancel_at_period_end, created_at")
@@ -61,6 +62,8 @@ export async function BillingHome({ staffName }: { staffName: string }) {
       .limit(60),
     // MRR TEK kaynak (exactMrr; panel, /admin/billing ve raporlarla aynı). Okunamazsa null → "Veri yok".
     loadPlatformMrr(admin, now()).catch(() => null),
+    // Paket kataloğu (DG2): adminden eklenen paketler de gelir dağılımında; okunamazsa kod tanımlı taban paketler.
+    getPlanDefinitions().catch(() => PLANS),
   ]);
 
   const subRows = subs ?? [];
@@ -84,11 +87,15 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const openTotal = invRows.filter((i) => i.status === "open").reduce((sum, i) => sum + Number(i.total_try || 0), 0);
 
   // Plan bazlı gelir dağılımı (aktif abonelikler)
-  const planRevenue = PLANS.map((plan) => ({
-    key: plan.id,
-    label: plan.name,
-    value: subRows.filter((s) => s.status === "active" && s.plan === plan.id).reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
-  }));
+  // Satıştaki paketler her zaman; gizli/arşivli paket yalnız aktif geliri varsa listelenir.
+  const planRevenue = catalogDefs
+    .map((plan) => ({
+      key: plan.id,
+      label: plan.name,
+      listed: !plan.hidden && !plan.archived,
+      value: subRows.filter((s) => s.status === "active" && s.plan === plan.id).reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
+    }))
+    .filter((p) => p.listed || p.value > 0);
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));
 
   const overdueQueue = [...overdue].sort((a, b) => new Date(a.due_at as string).getTime() - new Date(b.due_at as string).getTime());
