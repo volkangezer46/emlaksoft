@@ -227,6 +227,13 @@ export async function updateTask(_prev: TaskResult, formData: FormData): Promise
   if (!references.ok) return { error: references.error };
 
   const supabase = await createClient();
+  // Sistem görevinin türü değişmez, normal görev sistem türüne çevrilemez (kaldırma görevi tür değiştirerek kapatılamaz).
+  const { data: current } = await supabase.from("tasks").select("kind").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle();
+  if (!current) return { error: "Görev bulunamadı." };
+  const currentKind = String((current as { kind: string }).kind);
+  if (kind !== currentKind && (SYSTEM_KINDS.includes(currentKind) || SYSTEM_KINDS.includes(kind))) {
+    return { error: "Bu görevin türü değiştirilemez: EİDS görevleri sistem tarafından açılır." };
+  }
   if (dealField) {
     const { data: ownDeal } = await supabase
       .from("deals")
@@ -450,6 +457,11 @@ export async function deleteTask(formData: FormData): Promise<TaskResult> {
   if (!id) return { error: "Görev bulunamadı." };
 
   const supabase = await createClient();
+  // Kaldırma görevi yasal yükümlülüktür: silinemez (kontrol listesiyle kapanır ya da yetki geri gelince iptal edilir).
+  const { data: current } = await supabase.from("tasks").select("kind").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle();
+  if ((current as { kind?: string } | null)?.kind === "eids_takedown") {
+    return { error: "İlan kaldırma görevi silinemez. Kontrol listesindeki kalemleri işaretleyerek kapatın." };
+  }
   const { data, error } = await supabase
     .from("tasks")
     .delete()

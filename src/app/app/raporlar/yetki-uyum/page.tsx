@@ -10,7 +10,7 @@ import { KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiCard } from "@/components/ui/premium";
 import { EmptyState } from "@/components/ui/empty-state";
 import { loadComplianceReport } from "@/lib/eids/compliance";
-import { EIDS_LEGAL_NOTE, TAKEDOWN_DUE_DAYS } from "@/lib/eids/actions-core";
+import { EIDS_LEGAL_NOTE, TAKEDOWN_DUE_DAYS, computeComplianceReport } from "@/lib/eids/actions-core";
 
 export const metadata = { title: "Yetki uyum raporu" };
 export const dynamic = "force-dynamic";
@@ -75,7 +75,8 @@ export default async function YetkiUyumPage({ searchParams }: { searchParams: Pr
   }
 
   const tasks = officeWide ? load.tasks : load.tasks.filter((t) => t.assigned_to === userId);
-  const r = officeWide ? load.report : (load.byAdvisor.get(userId) ?? load.report);
+  // Kişisel kapsam: bu ay görevi olmayan danışmana ofis geneli rapor DEĞİL, boş kişisel rapor gösterilir.
+  const r = officeWide ? load.report : (load.byAdvisor.get(userId) ?? computeComplianceReport({ tasks: [], portfolio: null, nowMs }));
   const advisorIds = [...load.byAdvisor.keys()].filter(Boolean);
   const { data: profiles } = officeWide && advisorIds.length
     ? await supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).in("id", advisorIds)

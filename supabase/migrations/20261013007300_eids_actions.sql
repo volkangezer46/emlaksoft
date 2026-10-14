@@ -7,7 +7,7 @@
 --      tasks.escalated_at: 48 saatte kapanmayan kaldırma görevinin ofis sahibine yükseltildiği an (tek kez).
 --   C. public.eids_takedown_items: kaldırma görevinin kontrol listesi (portal kaydı / vitrin / paylaşım / sosyal).
 --      Okuma ve işaretleme ofis içi görev yetkisiyle (RLS); kalem ekleme/silme yalnız sunucu (service_role).
---   D. Tetik: eids_takedown görevi bekleyen kalem varken 'done' yapılamaz (iptal edilebilir).
+--   D. Tetik: eids_takedown görevi bekleyen kalem varken 'done' yapılamaz (iptal edilebilir); türü değiştirilemez.
 --   E. Tetik: listing-control sağlık kaydı 'confirmed_missing' olunca ilgili bekleyen kalem kendiliğinden
 --      "kaldırıldı (eklenti)" işaretlenir.
 --   F. properties.authority_reminder_channel CHECK'ine 'email' eklenir.
@@ -126,6 +126,11 @@ as $$
 declare
   v_pending integer;
 begin
+  -- Tür değiştirerek kapıyı aşmak (kind='other' + status='done' tek UPDATE'te) engellenir: kaldırma görevi türü sabittir.
+  if (old.kind = 'eids_takedown' or new.kind = 'eids_takedown') and new.kind is distinct from old.kind then
+    raise exception 'eids_takedown_kind_locked: kaldırma görevinin türü değiştirilemez'
+      using errcode = 'P0001';
+  end if;
   if new.kind = 'eids_takedown' and new.status = 'done' and old.status is distinct from 'done' then
     select count(*) into v_pending
       from public.eids_takedown_items i
@@ -141,7 +146,7 @@ $$;
 
 drop trigger if exists trg_eids_takedown_guard_complete on public.tasks;
 create trigger trg_eids_takedown_guard_complete
-  before update of status on public.tasks
+  before update of status, kind on public.tasks
   for each row execute function public.eids_takedown_guard_complete();
 
 -- ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, CircleDashed, ExternalLink, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatDateTimeTr } from "@/lib/format";
 import { useToast } from "@/components/app/toast-provider";
 import { completeTakedownTask, markTakedownItem, restoreTakedownSurfaces, type TakedownActionResult } from "@/app/actions/eids-takedown";
 import {
@@ -91,7 +92,7 @@ export function TakedownChecklist({
                 <p className="text-xs text-text-muted">
                   {TAKEDOWN_ITEM_STATUS_LABELS[st]}
                   {it.verified_by ? ` · ${TAKEDOWN_VERIFIED_LABELS[it.verified_by] ?? it.verified_by}` : ""}
-                  {it.done_at ? ` · ${it.done_at.slice(0, 16).replace("T", " ")}` : ""}
+                  {it.done_at ? ` · ${formatDateTimeTr(it.done_at)}` : ""}
                 </p>
               </div>
               {it.portal_url ? (
