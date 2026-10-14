@@ -330,10 +330,10 @@ async function processClaimedCampaign(
   // prepared sender performs network I/O only, keeping consent verification as
   // the final database operation before delivery.
   const smsSender = campaign.channel === "sms"
-    ? await prepareTenantSmsSender(campaign.tenantId)
+    ? await prepareTenantSmsSender(campaign.tenantId, { source: "campaign", audience: "contact" })
     : null;
   const whatsAppSender = campaign.channel === "whatsapp"
-    ? await prepareTenantWhatsAppSender(campaign.tenantId)
+    ? await prepareTenantWhatsAppSender(campaign.tenantId, { source: "campaign", audience: "contact" })
     : null;
 
   for (let index = 0; index < recipientBatchSize; index += 1) {

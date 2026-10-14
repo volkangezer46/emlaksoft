@@ -104,7 +104,7 @@ export async function runOwnerWeeklyReports(db: SupabaseClient, input: { todayKe
     if (stored && isSmsEligibleStoredPhone(stored) && (smsCount.get(t.tenant_id) ?? 0) < SMS_PER_TENANT) {
       if (!smsReady.has(t.tenant_id)) smsReady.set(t.tenant_id, await isTenantSmsAvailable(t.tenant_id).catch(() => false));
       if (smsReady.get(t.tenant_id)) {
-        const res = await sendTenantSms(t.tenant_id, stored, buildOwnerReportSms(tenantName.get(t.tenant_id) ?? "Ofisiniz", label, url)).catch(() => null);
+        const res = await sendTenantSms(t.tenant_id, stored, buildOwnerReportSms(tenantName.get(t.tenant_id) ?? "Ofisiniz", label, url), { source: "owner_report", audience: "contact" }).catch(() => null);
         if (res && res.ok) {
           smsSent = true;
           smsCount.set(t.tenant_id, (smsCount.get(t.tenant_id) ?? 0) + 1);

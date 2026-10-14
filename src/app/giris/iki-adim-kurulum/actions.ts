@@ -95,7 +95,7 @@ export async function sendSetupCode(_prev: SetupResult, fd: FormData): Promise<S
   });
   if (chError) return { error: "Kod oluşturulamadı. Lütfen tekrar deneyin." };
 
-  const sms = await sendSignerSms(tenantId, parsed.stored, `EmlakSoft doğrulama kodunuz: ${code}`);
+  const sms = await sendSignerSms(tenantId, parsed.stored, `EmlakSoft doğrulama kodunuz: ${code}`, { source: "two_factor_setup", audience: "office" });
   if (!sms.ok) {
     await admin.from("login_challenges").delete().eq("user_id", user.id);
     return { error: "SMS gönderilemedi. Numarayı kontrol edin ya da ofis sahibinize SMS ayarını sorun." };

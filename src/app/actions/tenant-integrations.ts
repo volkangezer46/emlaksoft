@@ -267,6 +267,7 @@ export async function sendNetgsmTestSms(): Promise<TenantIntegrationResult> {
     gate.tenantId,
     phone,
     "EmlakSoft Netgsm baglanti testi: SMS ayarlariniz calisiyor.",
+    { source: "integration_test", audience: "office" },
   );
   if (!result.ok) {
     console.error("sendNetgsmTestSms", { code: result.code ?? "provider_error" });

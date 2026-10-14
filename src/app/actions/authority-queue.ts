@@ -260,7 +260,7 @@ export async function sendAuthorityReminder(
     if (!(await isSignerSmsAvailable(gate.tenantId, owner.phone))) {
       return { error: "SMS yapılandırması yok — Ayarlar → Entegrasyonlar bölümünden Netgsm bilgilerinizi girin." };
     }
-    const res = await sendSignerSms(gate.tenantId, owner.phone, text);
+    const res = await sendSignerSms(gate.tenantId, owner.phone, text, { source: "authority_request", audience: "contact" });
     if (!res.ok) {
       if (res.code === "50" || res.code === "51") return { error: "SMS kredisi yetersiz — Netgsm bakiyenizi kontrol edin." };
       return { error: res.error ?? "SMS gönderilemedi; birkaç dakika sonra tekrar deneyin." };

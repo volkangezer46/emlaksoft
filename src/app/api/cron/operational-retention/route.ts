@@ -15,6 +15,7 @@ import { getSettings } from "@/lib/settings/read";
 import { autoResolveCutoffIso } from "@/lib/errors/classify";
 import { runPortalLearningRetention, runPortalRulesLearn } from "@/lib/portal-rules/server/learn-step";
 import { pruneEmailLog } from "@/lib/email/log-read";
+import { pruneMessageLog } from "@/lib/messaging/message-log-read";
 import { purgeEidsInboundRaw } from "@/lib/eids/inbound-retention";
 import { purgeUnverifiedApplications } from "@/lib/compliance/platform-kvkk-service";
 
@@ -75,6 +76,8 @@ export async function GET(req: NextRequest) {
     portalLearningRetention: () => runPortalLearningRetention(getAdmin(), { nowMs: now() }),
     // E-posta günlüğü (AD7): olaylar 180, gönderimler 400 gün; bastırma listesi silinmez. RPC yoksa 'skipped'. İdempotent.
     emailLog: () => pruneEmailLog(getAdmin()),
+    // SMS/WhatsApp gönderim günlüğü (SN3): gönderimler 400 gün. RPC yoksa 'skipped'. İdempotent.
+    messageLog: () => pruneMessageLog(getAdmin()),
     // EİDS e-postaları (EP3, KVKK): 30 günü dolan ham .eml (şifreli) silinir, ayrıştırılmış alanlar kalır; 24 saati
     // geçen iletme onay kodu/bağlantısı silinir. Tablo yoksa 'skipped'. İdempotent.
     eidsInbound: () => purgeEidsInboundRaw(getAdmin(), { nowMs: now() }),

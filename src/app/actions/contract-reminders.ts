@@ -61,7 +61,7 @@ export async function remindContractSignerBySms(contractId: string, signerId: st
   const name = String(res.full_name ?? "").slice(0, 80);
   const title = String(res.contract_title ?? "Sözleşme").slice(0, 80);
   const text = `Sayin ${name}, "${title}" sozlesmesi imzanizi bekliyor: ${link}`;
-  const sent = await sendSignerSms(gate.tenantId, phone, text);
+  const sent = await sendSignerSms(gate.tenantId, phone, text, { source: "contract_reminder", audience: "contact" });
   if (!sent.ok) {
     console.error("remindContractSignerBySms sms", { code: sent.code ?? "provider_error" });
     return { error: "SMS gönderilemedi; WhatsApp veya bağlantıyı kopyala ile iletebilirsiniz." };

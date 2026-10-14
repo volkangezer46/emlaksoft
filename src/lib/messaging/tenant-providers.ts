@@ -17,6 +17,7 @@ import {
   isAllowedWhatsAppGraphVersion,
   isValidWhatsAppAccessToken,
 } from "@/lib/messaging/whatsapp-contract";
+import { withSmsLog, withWhatsAppLog, type MessageLogContext } from "@/lib/messaging/message-log";
 import {
   discardExternalResponse,
   fetchExternal,
@@ -195,16 +196,28 @@ export async function isTenantWhatsAppAvailable(tenantId: string): Promise<boole
   return (await getWhatsAppConfig()) !== null;
 }
 
-export async function prepareTenantSmsSender(tenantId: string): Promise<TenantSmsSender> {
+/** Günlük etiketi: kaynak akış ve kitle çağırandan; ofis kimliği her zaman bu ofis. */
+export type TenantMessageLog = Omit<MessageLogContext, "tenantId">;
+const DEFAULT_TENANT_LOG: TenantMessageLog = { source: "tenant", audience: "contact" };
+
+/**
+ * Ofisin SMS göndericisi. Sağlayıcıya giden HER gönderim günlüğe yazılır (`message_sends`; hesap: ofisin kendi Netgsm'i
+ * "tenant", platform yedeği "platform"). Sağlayıcı çözülemediyse istek atılmaz ve günlük yazılmaz.
+ */
+export async function prepareTenantSmsSender(
+  tenantId: string,
+  log: TenantMessageLog = DEFAULT_TENANT_LOG,
+): Promise<TenantSmsSender> {
+  const ctx: MessageLogContext = { ...log, tenantId };
   const resolution = await resolveTenantNetgsm(tenantId);
   if (resolution.state === "ready") {
-    return (to, text) => sendSmsWithConfig(resolution.config, to, text);
+    return (to, text) => withSmsLog("tenant", ctx, to, text, () => sendSmsWithConfig(resolution.config, to, text));
   }
 
   if (resolution.state === "missing" && platformMessagingFallbackAllowed()) {
     const platformConfig = await getNetgsmConfig();
     if (platformConfig) {
-      return (to, text) => sendSmsWithConfig(platformConfig, to, text);
+      return (to, text) => withSmsLog("platform", ctx, to, text, () => sendSmsWithConfig(platformConfig, to, text));
     }
   }
 
@@ -227,8 +240,9 @@ export async function sendTenantSms(
   tenantId: string,
   to: string,
   text: string,
+  log: TenantMessageLog = DEFAULT_TENANT_LOG,
 ): Promise<SmsSendResult> {
-  const sender = await prepareTenantSmsSender(tenantId);
+  const sender = await prepareTenantSmsSender(tenantId, log);
   return sender(to, text);
 }
 
@@ -382,16 +396,18 @@ async function sendPreparedTenantWhatsApp(
 
 export async function prepareTenantWhatsAppSender(
   tenantId: string,
+  log: TenantMessageLog = DEFAULT_TENANT_LOG,
 ): Promise<TenantWhatsAppSender> {
+  const ctx: MessageLogContext = { ...log, tenantId };
   const lookup = await getActiveTenantIntegration(tenantId, "whatsapp");
   if (lookup.state === "ready") {
-    return (to, text) => sendPreparedTenantWhatsApp(lookup.integration, to, text);
+    return (to, template) => withWhatsAppLog("tenant", ctx, to, () => sendPreparedTenantWhatsApp(lookup.integration, to, template));
   }
 
   if (lookup.state === "missing" && platformMessagingFallbackAllowed()) {
     const platformConfig = await getWhatsAppConfig();
     if (platformConfig) {
-      return (to, template) => sendWhatsAppTemplateWithConfig(platformConfig, to, template);
+      return (to, template) => withWhatsAppLog("platform", ctx, to, () => sendWhatsAppTemplateWithConfig(platformConfig, to, template));
     }
   }
 
@@ -414,8 +430,9 @@ export async function sendTenantWhatsApp(
   tenantId: string,
   to: string,
   template: WhatsAppTemplateMessage,
+  log: TenantMessageLog = DEFAULT_TENANT_LOG,
 ): Promise<TenantWhatsAppSendResult> {
-  const sender = await prepareTenantWhatsAppSender(tenantId);
+  const sender = await prepareTenantWhatsAppSender(tenantId, log);
   return sender(to, template);
 }
 
@@ -434,12 +451,20 @@ export async function sendTenantWhatsAppSessionText(
   tenantId: string,
   to: string,
   text: string,
+  log: TenantMessageLog = { source: "inbox_reply", audience: "contact" },
 ): Promise<TenantWhatsAppSendResult> {
   const lookup = await getActiveTenantIntegration(tenantId, "whatsapp");
   if (lookup.state !== "ready") {
     return { ok: false, code: "tenant_provider_unconfigured", error: "Bu ofis için WhatsApp kanalı kapalı (entegrasyon yok)." };
   }
-  const integration = lookup.integration;
+  return withWhatsAppLog("tenant", { ...log, tenantId }, to, () => sendSessionText(lookup.integration, to, text));
+}
+
+async function sendSessionText(
+  integration: ActiveTenantIntegration,
+  to: string,
+  text: string,
+): Promise<TenantWhatsAppSendResult> {
   const token = stringValue(integration.credentials, "access_token", "accessToken", "api_token", "apiToken", "token");
   const endpoint = tenantWhatsAppEndpoint(integration);
   const phone = normalizeTrMobile(to);

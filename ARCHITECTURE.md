@@ -83,6 +83,10 @@ ile değişir); anahtar yoksa özellikler "bağlantı bekliyor" durumuna düşer
   `src/lib/webhooks/netgsm-inbound.ts` (idempotent ingest, `webhook_events` tablosunda
   claim-then-process). Tenant eşlemesi yalnızca `subscriberNumber` →
   `tenant_integrations.external_account_id` üzerinden (müşteri telefonundan ASLA).
+- **Giden SMS/WhatsApp günlüğü (SN3):** her gönderim `src/lib/messaging/message-log.ts` (`withSmsLog` /
+  `withWhatsAppLog`) ile `message_sends`'e yazılır (maskeli alıcı + özet, gövde yok, SMS kredi boyu). Netgsm iletim
+  raporu `src/app/api/webhooks/netgsm-rapor/route.ts` (NETGSM_WEBHOOK_SECRET) ve Meta durum webhook'u durumu ilerletir;
+  görünüm Admin > Sistem > Entegrasyonlar `#mesaj-gunlugu` ve Ofis 360 "İletişim". Budama: operational-retention.
 - **iyzico (ödeme):** `src/app/api/iyzico/{callback,webhook}/route.ts` — resmi
   X-IYZ-SIGNATURE-V3 şeması (alan-bazlı HMAC, ham-body değil); atomik fulfillment
   RPC'si (`fulfill_billing_payment`) conversationId ile kendi idempotency'sini sağlar.

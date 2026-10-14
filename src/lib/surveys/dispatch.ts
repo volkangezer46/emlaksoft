@@ -106,8 +106,8 @@ export async function dispatchSurveyLinks(
   const recentlySent = new Set(((recent ?? []) as { customer_id: string | null }[]).map((r) => String(r.customer_id)));
   const office = String((tenant as { name?: string } | null)?.name ?? "");
 
-  const smsSender = smsReady ? await prepareTenantSmsSender(tenantId) : null;
-  const waSender = waReady ? await prepareTenantWhatsAppSender(tenantId) : null;
+  const smsSender = smsReady ? await prepareTenantSmsSender(tenantId, { source: "survey", audience: "contact" }) : null;
+  const waSender = waReady ? await prepareTenantWhatsAppSender(tenantId, { source: "survey", audience: "contact" }) : null;
 
   for (const t of tasks) {
     if (summary.sent >= TENANT_SEND_CAP_PER_RUN) break;

@@ -202,7 +202,7 @@ export async function sendCustomerSms(customerId: string, message: string): Prom
     return { error: "SMS yapılandırması yok — Ayarlar → Entegrasyonlar bölümünden Netgsm bilgilerinizi girin." };
   }
 
-  const result = await sendSignerSms(gate.tenantId, customer.phone, text);
+  const result = await sendSignerSms(gate.tenantId, customer.phone, text, { source: "manual_sms", audience: "contact" });
   if (!result.ok) {
     if (result.code === "50" || result.code === "51") {
       return { error: "SMS kredisi yetersiz — Netgsm bakiyenizi kontrol edin." };

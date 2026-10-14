@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTurkishPhone, isValidTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
 import { notifyTenant } from "@/lib/notify";
+import { applyMessageLogStatus } from "@/lib/messaging/message-log";
 import {
   advanceMetaDeliveryState,
   decideMetaEventClaim,
@@ -248,6 +249,18 @@ async function claimEvent(input: {
 export async function ingestMetaDeliveryStatus(
   status: ParsedMetaDeliveryStatus,
 ): Promise<MetaIngestResult> {
+  // Gönderim günlüğü (SN3, platform verisi): imzası doğrulanmış olay, wamid ile günlük satırını ilerletir. Platform
+  // numarasından giden mesaj kiracıya bağlanmadığı için bu adım kiracı çözümünden ÖNCE ve ondan bağımsız çalışır;
+  // en iyi çabadır (hata webhook sonucunu değiştirmez), durum geri çekilmez (idempotent).
+  await applyMessageLogStatus({
+    channel: "whatsapp",
+    providerId: status.messageId,
+    status: status.status,
+    occurredAt: status.occurredAt,
+    errorCode: status.errorCode,
+    error: status.status === "failed" ? `Meta hata kodu ${status.errorCode ?? "bilinmiyor"}` : null,
+  }).catch(() => null);
+
   const claimed = await claimEvent({
     providerEventId: `delivery:${status.messageId}:${status.status}:${status.occurredAt}`,
     routingKey: `${status.wabaId}:${status.phoneNumberId}`,

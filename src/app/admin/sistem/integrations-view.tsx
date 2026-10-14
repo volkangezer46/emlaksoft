@@ -25,6 +25,7 @@ import { EmlakFiyatiPanel } from "./emlakfiyati-panel";
 import { PortalRulesView } from "./portal-rules/portal-rules-view";
 import { EidsIntakePanel } from "./eids-intake-panel";
 import { EmailChannelView } from "./email-channel-view";
+import { MessageLogView, type MessageLogSearch } from "./message-log-view";
 import { emailChannelStatus } from "@/lib/email/provider";
 
 /**
@@ -32,7 +33,7 @@ import { emailChannelStatus } from "@/lib/email/provider";
  * kart başına yapılandırma durumu, son başarılı/başarısız çağrı, 7 günlük hata oranı, kota/maliyet, "Test et" ve anahtarın
  * girildiği yer. Altında anahtar formları (OpenAI, portal API + portal kuralları, SMS/WhatsApp, EmlakFiyatı; eskiden ayrı
  * sekmelerdeydi), EİDS e-posta alımı, ofislerin bağlı entegrasyonları, API anahtarları ve webhook teslim günlüğü (salt
- * okunur). Sırlar YALNIZ parmak iziyle görünür.
+ * okunur) ve SMS/WhatsApp gönderim günlüğü (`#mesaj-gunlugu`). Sırlar YALNIZ parmak iziyle görünür.
  */
 
 const TONE_PILL: Record<HubTone, string> = {
@@ -224,7 +225,7 @@ function Panel({ id, icon: Icon, eyebrow, title, children }: { id: string; icon:
   );
 }
 
-export async function IntegrationsView({ portal, portalView }: { portal?: string; portalView?: string } = {}) {
+export async function IntegrationsView({ portal, portalView, messageLog = {} }: { portal?: string; portalView?: string; messageLog?: MessageLogSearch } = {}) {
   const staff = await requirePlatformModule("sistem");
   const [hub, ef, email] = await Promise.all([loadIntegrationHub(), getEmlakFiyatiAdminStatus(), emailChannelStatus()]);
   const canEdit = staff.role === "super_admin";
@@ -448,6 +449,11 @@ export async function IntegrationsView({ portal, portalView }: { portal?: string
           Uç adresinin yalnız host kısmı gösterilir (yol ve sorgu belirteç taşıyabilir). Teslim gövdesi bu ekrana getirilmez.
         </p>
       </Panel>
+
+      {/* SMS ve WhatsApp gönderim günlüğü (SN3): `kanal`, `durum`, `ofis`, `sayfa` parametreleri buna aittir. */}
+      <Suspense fallback={null}>
+        <MessageLogView sp={messageLog} />
+      </Suspense>
 
       <p className="text-xs text-text-faint">
         Test kayıtları{" "}
