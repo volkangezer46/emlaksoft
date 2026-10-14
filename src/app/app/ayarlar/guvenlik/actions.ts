@@ -8,6 +8,7 @@ import { getNetgsmConfig } from "@/lib/messaging/netgsm";
 import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { TWO_FACTOR_COOKIE } from "@/lib/two-factor";
 import { requireActiveTenant } from "@/lib/tenant-guard";
+import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
 
 export type TwoFactorToggleResult = { error?: string; ok?: true };
 
@@ -33,6 +34,14 @@ export async function setTwoFactorSms(
     .maybeSingle();
   if (!profile?.is_active || profile.tenant_id !== gate.tenantId) {
     return { error: "Aktif kullanici profili dogrulanamadi." };
+  }
+
+  // DG7: ofis politikası bu rol için 2FA'yı zorunlu kıldıysa kapatılamaz (kapatılsa proxy kurulum ekranına döndürürdü).
+  if (!enable) {
+    const policy = await readOfficeSecurityPolicyCached(gate.tenantId);
+    if (policy && policy.mfaRoles.includes(gate.role)) {
+      return { error: "Ofisinizin güvenlik politikası rolünüz için iki adımlı doğrulamayı zorunlu kılıyor; kapatılamaz." };
+    }
   }
 
   if (enable) {

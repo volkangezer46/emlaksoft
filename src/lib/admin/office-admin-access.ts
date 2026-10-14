@@ -29,6 +29,7 @@ export const OFFICE_ADMIN_ACTIONS = [
   "archive",
   "restore",
   "export_vault",
+  "reset_security_policy",
 ] as const;
 
 export type OfficeAdminAction = (typeof OFFICE_ADMIN_ACTIONS)[number];
@@ -41,6 +42,8 @@ const SUPER_ONLY: ReadonlySet<OfficeAdminAction> = new Set([
   "deactivate_user",
   "archive",
   "restore",
+  // DG7: ofis güvenlik politikasının acil sıfırlanması (sahip kilitlendiğinde); doğrulayıcı kodu ister.
+  "reset_security_policy",
 ]);
 
 export function officeAdminCan(role: PlatformRole, action: OfficeAdminAction): boolean {

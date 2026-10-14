@@ -1,7 +1,12 @@
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { PageHeader } from "@/components/ui/page-header";
-import { History, ShieldCheck } from "lucide-react";
+import { Building2, History, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { clientIp } from "@/lib/rate-limit";
+import { loadOfficePolicyForm, loadOfficeSessions, policyIsActive } from "@/lib/office-security/read";
+import { roleLabel } from "@/lib/role-labels";
+import { OfficePolicyForm, RevokeOfficeSessionButton } from "./office-policy-form";
 import { requireModulePage } from "@/lib/require-module-page";
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
@@ -53,8 +58,12 @@ function formatDate(iso: string): string {
 export default async function SecuritySettingsPage() {
   const ctx = await requireModulePage("settings");
   const supabase = await createClient();
+  // DG7: ofis politikası sahip ve genel müdüre görünür (yalnız sahip düzenler); açık oturumlar yalnız sahibe.
+  const tenantId = ctx.tenantId;
+  const isOwner = ctx.role === "owner" && Boolean(tenantId);
+  const showPolicy = Boolean(tenantId) && (ctx.role === "owner" || ctx.role === "gm");
 
-  const [{ data: profile }, { data: events }, tenantCfg, platformConfigured] = await Promise.all([
+  const [{ data: profile }, { data: events }, tenantCfg, platformConfigured, officePolicy, officeSessions, currentIp, claims] = await Promise.all([
     supabase.from("profiles").select("two_factor_sms, phone").eq("id", ctx.userId).maybeSingle(),
     supabase
       .from("login_events")
@@ -64,7 +73,12 @@ export default async function SecuritySettingsPage() {
       .limit(20),
     ctx.tenantId ? getTenantNetgsmConfig(ctx.tenantId) : Promise.resolve(null),
     isNetgsmConfigured(),
+    showPolicy && tenantId ? loadOfficePolicyForm(supabase, tenantId) : Promise.resolve(null),
+    isOwner && tenantId ? loadOfficeSessions(createAdminClient(), tenantId) : Promise.resolve(null),
+    showPolicy ? clientIp() : Promise.resolve(null),
+    isOwner ? supabase.auth.getClaims() : Promise.resolve(null),
   ]);
+  const currentSessionId = typeof claims?.data?.claims?.session_id === "string" ? claims.data.claims.session_id : null;
 
   // Kimlik bilgisi client'a gitmez — yalnız var/yok bilgisi kullanılır
   const smsConfigured = tenantCfg !== null || platformConfigured;
@@ -75,7 +89,7 @@ export default async function SecuritySettingsPage() {
       <PageHeader
         breadcrumbs={[{ label: "Ayarlar", href: "/app/ayarlar" }, { label: "Güvenlik" }]}
         title="Güvenlik"
-        description="Hesabınız için iki adımlı doğrulama ve giriş geçmişi."
+        description={showPolicy ? "Hesabınız ve ofisiniz için iki adımlı doğrulama, erişim politikası, açık oturumlar ve giriş geçmişi." : "Hesabınız için iki adımlı doğrulama ve giriş geçmişi."}
         className="mb-0"
       />
 
@@ -100,6 +114,77 @@ export default async function SecuritySettingsPage() {
           />
         </div>
       </section>
+
+      {/* DG7 ofis güvenlik politikası */}
+      {officePolicy ? (
+        <section id="ofis-politikasi" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+          <div className="flex items-center gap-3 border-b border-line pb-4">
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
+              <Building2 className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-display font-bold text-ink-950">Ofis güvenlik politikası</h2>
+              <p className="text-xs text-text-muted">
+                {policyIsActive(officePolicy)
+                  ? "Politika etkin: tüm ofis kullanıcılarına uygulanır (değişiklik en geç 30 sn içinde)."
+                  : "Politika kapalı: bugünkü davranış. Açtığınız kural tüm ofis kullanıcılarına uygulanır."}
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 max-w-2xl">
+            <OfficePolicyForm initial={officePolicy} currentIp={currentIp} canEdit={isOwner} />
+          </div>
+          {isOwner ? (
+            <details className="mt-5 max-w-2xl rounded-[var(--radius-card)] border border-line px-4 py-3 text-xs text-text-muted">
+              <summary className="cursor-pointer font-semibold text-ink-900">Kendinizi kilitlerseniz</summary>
+              <p className="mt-2">
+                Sahip muafiyeti açıkken IP listesi sizi engellemez. Muafiyeti kapatıp listede olmayan bir ağda kaldıysanız EmlakSoft
+                destek ekibine yazın: politika doğrulamalı bir işlemle sıfırlanır ve tüm kullanıcılar yeniden girebilir.
+              </p>
+            </details>
+          ) : null}
+        </section>
+      ) : null}
+
+      {officeSessions ? (
+        <section id="oturumlar" className="dashboard-panel scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">
+          <div className="flex items-center gap-3 border-b border-line pb-4">
+            <span className="grid h-11 w-11 place-items-center rounded-[var(--radius-card)] bg-brand-600/10 text-brand-600">
+              <MonitorSmartphone className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-display font-bold text-ink-950">Açık oturumlar ({officeSessions.rows.length})</h2>
+              <p className="text-xs text-text-muted">Ofisinizdeki kullanıcıların açık oturumları; tanımadığınız oturumu kapatın.</p>
+            </div>
+          </div>
+          {officeSessions.pending ? (
+            <p className="mt-5 text-sm text-text-muted">Oturum listesi veritabanı güncellemesinden sonra görünür (kurulum bekliyor).</p>
+          ) : officeSessions.rows.length === 0 ? (
+            <p className="mt-5 text-sm text-text-muted">Açık oturum yok.</p>
+          ) : (
+            <ul className="mt-4 divide-y divide-line rounded-[var(--radius-card)] border border-line">
+              {officeSessions.rows.map((r) => {
+                const current = r.sessionId === currentSessionId;
+                return (
+                  <li key={r.sessionId} className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-ink-950">{r.name}</span>
+                      {r.role ? <span className="ml-2 text-xs text-text-muted">{roleLabel(r.role)}</span> : null}
+                      {current ? <span className="ml-2 rounded-full bg-mint-500/15 px-2 py-0.5 text-xs font-bold text-mint-700">Bu oturum</span> : null}
+                      <p className="text-xs text-text-muted" title={r.userAgent ?? undefined}>
+                        {deviceLabel(r.userAgent)} · {r.ip ?? "IP yok"}
+                        {r.createdAt ? ` · giriş ${formatDate(r.createdAt)}` : ""}
+                        {r.lastSeenAt ? ` · son etkinlik ${formatDate(r.lastSeenAt)}` : ""}
+                      </p>
+                    </div>
+                    {current ? null : <RevokeOfficeSessionButton sessionId={r.sessionId} label={r.name} />}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {/* Son girişler */}
       <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface p-4 md:p-6">

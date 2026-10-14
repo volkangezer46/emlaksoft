@@ -16,6 +16,7 @@ export const STEP_UP_ACTIONS = {
   staff_role: "Personel rol değişikliği",
   member_role: "Ofis kullanıcısı rol değişikliği",
   security_policy: "Kritik işlem doğrulamasını kapatma",
+  office_security_reset: "Ofis güvenlik politikasını sıfırlama",
 } as const;
 export type StepUpAction = keyof typeof STEP_UP_ACTIONS;
 
