@@ -139,6 +139,18 @@ for (const rpc of ["ok", "missing", "error", "garbage"] as const) {
       expect(admin.headers.get("location")).toBeNull();
     });
 
+    it("oturumlu giriş sayfası: nokta segmentli next dış adrese değil panele yönlenir", async () => {
+      for (const next of ["/.//evil.com", "/x/..//evil.com", "/%2e//evil.com"]) {
+        const res = await updateSession(req(`/giris?next=${encodeURIComponent(next)}`));
+        const loc = new URL(res.headers.get("location") ?? "");
+        expect(loc.host, next).toBe("emlaksoft.test");
+        expect(loc.pathname, next).toBe("/app");
+      }
+      const ok = await updateSession(req(`/giris?next=${encodeURIComponent("/app/musteriler?durum=yeni")}`));
+      const okLoc = new URL(ok.headers.get("location") ?? "");
+      expect(`${okLoc.pathname}${okLoc.search}`).toBe("/app/musteriler?durum=yeni");
+    });
+
     it("ofis kullanıcısı /admin'den /app'e atılır", async () => {
       const res = await updateSession(req("/admin"));
       expect(res.headers.get("location")).toContain("/app");

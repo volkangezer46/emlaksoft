@@ -6,7 +6,8 @@
  *  - boş, 512 karakterden uzun, "/" ile başlamayan ya da "//" / "/\" ile başlayan (protokolsüz dış alan),
  *  - kontrol karakteri (\t \n \r, 0x00-0x1f, 0x7f) ya da ters bölü içeren (tarayıcılar "/\t/evil.com"u "//evil.com" sayar),
  *  - yüzde kodlu biçimi (%XX) çözülünce aynı kurallara takılan ("/%09/evil.com", "/%2F/evil.com", "/%5Cevil.com"),
- *  - başka origin'e çözülen ya da OAuth callback'in kendisine dönen.
+ *  - başka origin'e çözülen ya da OAuth callback'in kendisine dönen,
+ *  - nokta segmentleri çözüldükten sonra "//" ile başlayan ("/.//evil.com", "/x/..//evil.com", "/%2e//evil.com").
  */
 
 /** OAuth dönüş yolu (google-auth.ts `GOOGLE_CALLBACK_PATH` ile aynı); döngü olmasın diye hedef olamaz. */
@@ -36,7 +37,11 @@ export function safeNextPath(raw: string | null | undefined, fallback = "/app"):
     const u = new URL(v, PROBE_ORIGIN);
     if (u.origin !== PROBE_ORIGIN) return fallback;
     if (u.pathname === AUTH_CALLBACK_PATH || u.pathname.startsWith(`${AUTH_CALLBACK_PATH}/`)) return fallback;
-    return `${u.pathname}${u.search}${u.hash}`;
+    // Nokta segmentleri ("/.//x", "/x/..//x", "/%2e//x") çözülünce yol "//" ile başlayabilir → normalleştirilmiş
+    // sonuç da aynı şekil kurallarından geçmeli, yoksa protokolsüz dış adrese yönlendirir.
+    const out = `${u.pathname}${u.search}${u.hash}`;
+    if (isUnsafeShape(out)) return fallback;
+    return out;
   } catch {
     return fallback;
   }

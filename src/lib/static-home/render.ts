@@ -14,7 +14,7 @@ import {
   type StaticCache,
 } from "@/lib/static-home/cache";
 import { STATIC_ROUTES, staticRouteById, type StaticRouteDef, type StaticRouteId } from "@/lib/static-home/registry";
-import { hasValidStaticProbe } from "@/lib/static-home/internal-token";
+import { STATIC_PROBE_HEADER, hasValidStaticProbe } from "@/lib/static-home/internal-token";
 import { STATIC_HOME_SOURCE_HEADER } from "@/lib/static-home/request";
 import { staticRouteMode } from "@/lib/static-home/settings";
 import { buildStaticHome } from "@/lib/static-home/transform";
@@ -201,7 +201,12 @@ export async function respondStatic(route: StaticRouteDef, request: Request): Pr
     ETag: c.etag,
   });
   // Tanı başlığı yalnız iç jetonlu öz test isteğine (herkese açık yanıtta x-static / x-static-home yok).
-  if (await hasValidStaticProbe(request.headers)) headers.set("X-Static", c.isStatic ? "1" : "fallback");
+  // Probe yanıtı paylaşımlı önbelleğe girmesin (X-Static herkese sızmasın): private + no-store; Vary her yanıtta.
+  headers.set("Vary", STATIC_PROBE_HEADER);
+  if (await hasValidStaticProbe(request.headers)) {
+    headers.set("X-Static", c.isStatic ? "1" : "fallback");
+    headers.set("Cache-Control", "private, no-store");
+  }
   if (request.headers.get("if-none-match") === c.etag) return new Response(null, { status: 304, headers });
   return new Response(request.method === "HEAD" ? null : c.html, { status: 200, headers });
 }
