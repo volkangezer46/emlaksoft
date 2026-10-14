@@ -11,3 +11,5 @@ import dynamic from "next/dynamic";
  */
 export const PlatformBannerLazy = dynamic(() => import("./platform-banner").then((m) => m.PlatformBanner));
 export const LegalReconsentModalLazy = dynamic(() => import("./legal-reconsent-modal").then((m) => m.LegalReconsentModal));
+/** Ürün içi NPS kartı (DG8): yalnız sorulacak anket varken (nps-prompt-slot) çizilir; SSR kapalı (gösterim istemcide yazılır). */
+export const NpsPromptLazy = dynamic(() => import("./nps-prompt").then((m) => m.NpsPrompt), { ssr: false });

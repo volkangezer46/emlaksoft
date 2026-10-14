@@ -4,6 +4,9 @@ import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { requirePlatformModule } from "@/lib/platform";
 import { getFeatureFlagStates } from "@/lib/feature-flags/server";
+import { tenantNamesFor } from "@/lib/feature-flags/rules";
+import { describeFlagRule, FLAG_RULE_PLANS } from "@/lib/feature-flags/targeting";
+import { planLabel } from "@/lib/billing/plans";
 import { getSettingDef } from "@/lib/settings/registry";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { MAINTENANCE_SCOPE_SETTING_KEY, parseMaintenanceScope } from "@/lib/platform-security/maintenance-scope";
@@ -11,6 +14,7 @@ import { PLATFORM_SETTING_KEYS } from "@/lib/platform-setting-keys";
 import { toTrLocalInput } from "@/lib/clock";
 import { CopyLine } from "@/app/admin/personel/guvenlik/security-forms";
 import { FlagSwitch, MaintenanceCard } from "./flag-controls";
+import { FlagTargetingForm } from "./flag-targeting-form";
 
 export const metadata = { title: "Özellik bayrakları" };
 
@@ -22,6 +26,7 @@ const ENV_FILE = "/root/emlaksoft/.env.production";
  * okuyucu `isFeatureEnabled`). Her satır gerçek durumu, açıklamayı ve etkiyi gösterir. Ayar kaynaklı bayraklarda
  * süper admin için satır içi anahtar (onay + gerekçe; mevcut ayar yazım yolu, geçmiş `settings_history`); ortam
  * bayrakları buradan değiştirilemez: TAVAN olarak gösterilir ve açma komutu kopyalanabilir.
+ * Hedefleme (DG8): `targetable` bayraklar için ofis listesi / plan / yüzde / zaman penceresi kuralı (`feature_flag_rules`).
  */
 export default async function FeatureFlagsPage() {
   const staff = await requirePlatformModule("sistem");
@@ -31,6 +36,10 @@ export default async function FeatureFlagsPage() {
     getPlatformSettingsMany([MAINTENANCE_SCOPE_SETTING_KEY, PLATFORM_SETTING_KEYS.maintenanceMessage]),
   ]);
   const on = states.filter((s) => s.enabled).length;
+  const targetable = states.filter((s) => s.def.targetable);
+  const names = await tenantNamesFor(targetable.flatMap((s) => s.rule?.tenantIds ?? []));
+  const fmtDate = (iso: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(iso));
+  const planOptions = FLAG_RULE_PLANS.map((p) => ({ value: p, label: planLabel(p) }));
   const scope = parseMaintenanceScope(raw[MAINTENANCE_SCOPE_SETTING_KEY]);
   const maintenanceOn = states.find((s) => s.def.key === "maintenance_mode")?.enabled ?? false;
 
@@ -63,7 +72,7 @@ export default async function FeatureFlagsPage() {
             </TR>
           </THead>
           <TBody>
-            {states.map(({ def, raw: rawOn, enabled }) => {
+            {states.map(({ def, raw: rawOn, enabled, rule }) => {
               const inline = isSuper && def.source === "setting" && def.settingKey && getSettingDef(def.settingKey)?.editMode === "center";
               const vars = def.envVars ?? (def.envVar ? [def.envVar] : []);
               return (
@@ -79,8 +88,13 @@ export default async function FeatureFlagsPage() {
                       }`}
                     >
                       <span className={`h-1.5 w-1.5 rounded-full ${enabled ? "bg-mint-500" : "bg-text-faint"}`} aria-hidden />
-                      {enabled ? "Açık" : rawOn && def.requires ? "Açık ama bağlı bayrak kapalı" : "Kapalı"}
+                      {enabled ? (rule ? "Hedefli açık" : "Açık") : rawOn && def.requires ? "Açık ama bağlı bayrak kapalı" : "Kapalı"}
                     </span>
+                    {rule ? (
+                      <a href={`#hedef-${def.key}`} className="mt-1 block text-xs text-brand-600 hover:underline">
+                        {describeFlagRule(rule, fmtDate)}
+                      </a>
+                    ) : null}
                   </TD>
                   <TD className="max-w-xs text-xs text-text-muted">{def.impact}</TD>
                   <TD className="text-xs text-text-muted">
@@ -122,6 +136,41 @@ export default async function FeatureFlagsPage() {
           </TBody>
         </Table>
       </TableFrame>
+      {targetable.length ? (
+        <section aria-labelledby="hedefleme" className="space-y-3">
+          <div>
+            <h2 id="hedefleme" className="font-display font-bold text-ink-950">Hedefleme (ofis, plan, yüzde, zaman)</h2>
+            <p className="text-xs text-text-muted">
+              Pilot yayın için: genel anahtar açıkken yalnız kurala uyan ofislerde açılır. Yüzde, bayrak ve ofis kimliğinden hesaplanır; aynı ofis hep aynı
+              sonucu alır, yüzde büyütülünce açık ofisler açık kalır. Değişiklik en geç 30 saniyede tüm sunuculara yansır.
+            </p>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {targetable.map(({ def, enabled, rule }) => (
+              <FlagTargetingForm
+                key={`${def.key}:${rule?.updatedAt ?? "yok"}`}
+                flagKey={def.key}
+                label={def.label}
+                globalOn={enabled}
+                planOptions={planOptions}
+                canEdit={isSuper}
+                init={
+                  rule
+                    ? {
+                        tenants: rule.tenantIds.map((id) => ({ id, name: names.get(id) ?? "Silinmiş ofis" })),
+                        plans: [...rule.plans],
+                        percentage: rule.percentage,
+                        startsLocal: rule.startsAt ? toTrLocalInput(rule.startsAt) : "",
+                        endsLocal: rule.endsAt ? toTrLocalInput(rule.endsAt) : "",
+                        note: rule.note ?? "",
+                      }
+                    : null
+                }
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

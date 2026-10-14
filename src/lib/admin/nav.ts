@@ -198,9 +198,17 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         palette: [
           L("/admin/tickets/yeni", "Yeni destek talebi", "Ofis adına talep aç", ["tickets"]),
           L("/admin/tickets/kvkk?kaynak=basvuru", "KVKK başvuruları", "Veri sahibi başvuruları, 30 gün sayacı ve yanıt", ["tickets"]),
+          L("/admin/tickets/oneriler", "Öneri panosu", "Ofislerin özellik önerileri, oylar ve durum (planlandı / yapılıyor / yayında)", ["tickets"]),
         ],
       },
-      { href: "/admin/duyuru", label: "Toplu duyuru", description: "Ofislere duyuru ve bildirim gönder", icon: Megaphone, modules: ["broadcast"] },
+      {
+        href: "/admin/duyuru",
+        label: "Toplu duyuru",
+        description: "Ofislere duyuru ve bildirim gönder, banner, Yenilikler ve NPS anketi",
+        icon: Megaphone,
+        modules: ["broadcast"],
+        palette: [L("/admin/duyuru?sekme=nps", "NPS anketi", "Ürün içi memnuniyet anketi ve sonuçları", ["broadcast"])],
+      },
     ],
   },
   {

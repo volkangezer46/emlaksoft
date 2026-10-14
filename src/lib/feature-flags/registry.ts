@@ -34,6 +34,12 @@ export type FeatureFlagDef = {
   env?: (env: NodeJS.ProcessEnv) => boolean;
   editHref?: string;
   requires?: string;
+  /**
+   * Ofis bazında hedeflenebilir (DG8, `feature_flag_rules`: ofis listesi, plan, yüzde, zaman penceresi). Yalnız TÜKETİCİSİ
+   * `isFeatureEnabled(key, { tenantId, plan })` ile ofis bağlamında okuyan bayraklarda açılır; aksi hâlde kural ekranda
+   * görünür ama hiçbir yeri değiştirmezdi (boş vaat). Genel anahtar kapalıyken kural etkisizdir.
+   */
+  targetable?: boolean;
 };
 
 /** ALLOW_BILLING_DEMO: canlıda yalnız "true" iken iyzico'suz demo abonelik ödemesi (geliştirmede her zaman açık). */
@@ -143,6 +149,26 @@ export const FEATURE_FLAGS: readonly FeatureFlagDef[] = [
     envOn: "PRODUCTION_DEMO_LOGIN_OPT_IN=true PRODUCTION_PLATFORM_DEMO_OPT_IN=true",
     env: (env) => isDemoLoginEnabled(env),
     editHref: "/admin/personel/guvenlik",
+  },
+  {
+    key: "nps_survey",
+    label: "Ürün içi NPS anketi",
+    description: "Ofis kullanıcılarına 0-10 tavsiye sorusu (Toplu duyuru > NPS anketi; soru sıklığı ayarla sınırlı).",
+    impact: "Kapalıysa ya da ofis hedefleme dışındaysa anket gösterilmez; toplanan yanıtlar korunur.",
+    source: "setting",
+    settingKey: "feedback.nps_enabled",
+    editHref: "/admin/duyuru?sekme=nps",
+    targetable: true,
+  },
+  {
+    key: "feature_board",
+    label: "Özellik istek panosu",
+    description: "Ofisler Yardım > Öneri panosu'nda öneri yazar ve oy verir (ofis başına tek oy).",
+    impact: "Kapalıysa ya da ofis hedefleme dışındaysa sekme görünmez, yeni öneri ve oy kabul edilmez; kayıtlar korunur.",
+    source: "setting",
+    settingKey: "feedback.board_enabled",
+    editHref: "/admin/tickets/oneriler",
+    targetable: true,
   },
   {
     key: "billing_demo",
