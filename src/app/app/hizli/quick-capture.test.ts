@@ -3,6 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_ACTIONS } from "@/lib/palette-core";
 import { QUICK_INTENTS, QUICK_INTENT_TYPES, buildQuickPropertyTitle } from "./quick-intents";
+import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
 
 /**
  * Hızlı kayıt sözleşmesi: sekmeli tek sayfa (popup yok), mevcut server action'lar sarılır,
@@ -65,5 +66,13 @@ describe("hızlı kayıt", () => {
   it("otomatik başlık: oda + işlem + tür + m²; boşsa taslak adı", () => {
     expect(buildQuickPropertyTitle({ rooms: "3+1", transactionType: "Satılık", propertyType: "Daire", sqm: 120 })).toBe("3+1 Satılık Daire, 120 m²");
     expect(buildQuickPropertyTitle({})).toBe("Yeni portföy (taslak)");
+  });
+
+  it("randevu: sunucuyla aynı katılımcı kuralı istemcide (yer göstermede portföy 'isteğe bağlı' DEĞİL)", () => {
+    expect(ui).toContain("appointmentMissing(");
+    expect(ui).not.toContain("Portföy (isteğe bağlı)");
+    expect(ui).toContain("<MissingCountBadge");
+    // varsayılan akış: yer gösterme + yalnız müşteri → istemci de "Portföy" eksik der (sunucu mesajıyla aynı)
+    expect(appointmentMissing({ appointment_type: "showing", customer_id: "c1", property_id: "" }).map((i) => i.label)).toEqual(["Portföy"]);
   });
 });

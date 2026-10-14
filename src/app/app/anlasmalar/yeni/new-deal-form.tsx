@@ -22,7 +22,7 @@ import { detailOrList } from "@/lib/form-logic";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
-import { DEAL_DRAFT_FIELDS, DEAL_FORM_ID, DEAL_TABS } from "./deal-tabs";
+import { DEAL_DRAFT_FIELDS, DEAL_FORM_ID, DEAL_TABS, dealMissing } from "./deal-tabs";
 
 type Prop = { id: string; property_code: string; title: string | null; list_price: number | null; transaction_type: string };
 type Cust = { id: string; full_name: string };
@@ -73,6 +73,9 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
   const tabPanels = {
     taraflar: (
       <>
+        <p className="text-xs text-text-muted sm:col-span-2">
+          Müşteri ya da portföyden en az birini seçin; {nameOf("negotiation")} aşaması için ikisi de gerekir.
+        </p>
         <FormField label="Portföy" htmlFor="deal-property" inject={false}>
           <Combobox
             id="deal-property"
@@ -124,7 +127,7 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
             ))}
           </FormSelect>
         </FormField>
-        <FormField label="Tutar (₺)" htmlFor="deal-value" className="sm:col-span-2">
+        <FormField label="Tutar (₺)" htmlFor="deal-value" required className="sm:col-span-2">
           <FormInput name="deal_value" inputMode="decimal" placeholder="örn. 4.500.000" />
         </FormField>
         <label className="flex items-start gap-2 rounded-[var(--radius-control)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs sm:col-span-2">
@@ -218,6 +221,8 @@ export function NewDealForm({ properties, customers, userId, stageNames = stageL
       error={error}
       onSubmit={onSubmit}
       tabs={tabs}
+      rules={dealMissing}
+      mobileNextFirst
       tabPanels={{ ...tabPanels, detay: <>{tabPanels.detay}<CustomFieldInputs defs={customFields} /></> }}
       summary={renderSummary}
       draft={{ userId, formId: DEAL_FORM_ID, fields: [...DEAL_DRAFT_FIELDS] }}

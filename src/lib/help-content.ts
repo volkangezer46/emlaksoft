@@ -212,8 +212,8 @@ export const GUIDES: readonly Guide[] = [
     steps: [
       "Soldaki menüden Müşteriler sayfasını açın.",
       "Sağ üstteki \"Yeni müşteri\" düğmesine basın.",
-      "Kişi sekmesinde ad soyadı yazın. Zorunlu olan tek alan budur.",
-      "İsterseniz telefon ve ilçeyi \"İletişim ve bölge\" sekmesine yazın.",
+      "Kişi sekmesinde ad soyadı ve telefonu yazın. Zorunlu olan tek alan ad soyaddır; telefonsuz kayıtta onay istenir.",
+      "İsterseniz e-posta ve ilçeyi \"E-posta ve bölge\" sekmesine yazın.",
       "Müşteri bir şey arıyorsa \"Talep ve kriterler\" sekmesine bütçe ve oda sayısını girin; eşleştirme bunları kullanır.",
       "Kaydet düğmesine basın.",
     ],

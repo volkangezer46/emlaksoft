@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import { MissingCountBadge } from "@/components/ui/form-action-bar";
 import Link from "@/components/ui/smart-link";
 import { Switch } from "@/components/ui/switch";
 import { CASH_CATEGORIES, SALARY_CATEGORY, expenseCategoryFor } from "@/lib/finance/cash/categories";
@@ -422,9 +423,24 @@ export function EntryDialog({
     }
   }
 
+  // Eksik zorunlu alanlar: düğme pasif yapılmaz; "N eksik" rozeti gösterilir, gönderimde ilk eksiğe odaklanılır.
+  const needsAccount = !deferredMode;
+  const missing: { key: string; label: string; selector: string }[] = [];
+  if (amount == null) missing.push({ key: "amount", label: "Tutar", selector: "#qe-amount" });
+  if (!isTransfer && !category) missing.push({ key: "category", label: "Ne için", selector: 'input[name="qe-r-category"]' });
+  if (needsAccount && !accountId) missing.push({ key: "account", label: isTransfer ? "Kaynak hesap" : "Hesap", selector: "#qe-account" });
+  if (isTransfer && !toAccountId) missing.push({ key: "to-account", label: "Hedef hesap", selector: "#qe-to-account" });
+  const [missingShown, setMissingShown] = useState(false);
+
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
+    if (missing.length > 0) {
+      setMissingShown(true);
+      setError(null);
+      e.currentTarget.querySelector<HTMLElement>(missing[0].selector)?.focus();
+      return;
+    }
     // Aynı karede görsel tepki: düğme hemen "kaydediliyor" durumuna geçer.
     setBusy(true);
     setError(null);
@@ -600,7 +616,6 @@ export function EntryDialog({
 
   const headerTitle = isTransfer ? "Transfer" : direction === "in" ? "Yeni gelir" : "Yeni gider";
   const saveLabel = isTransfer ? "Transferi kaydet" : deferredMode ? (direction === "in" ? "Alacağı kaydet" : "Borcu kaydet") : direction === "in" ? "Geliri kaydet" : "Gideri kaydet";
-  const needsAccount = !deferredMode;
 
   return (
     <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
@@ -1018,6 +1033,11 @@ export function EntryDialog({
                 </div>
               </details>
 
+              {missingShown && missing.length > 0 ? (
+                <p role="status" className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold">
+                  {missing.length} zorunlu alan eksik: {missing.map((m) => m.label).join(", ")}.
+                </p>
+              ) : null}
               <FormError error={error} nextStep={null} />
             </DialogBody>
             <DialogFooter className="sticky bottom-0 bg-surface">
@@ -1028,9 +1048,10 @@ export function EntryDialog({
                 type="submit"
                 variant="primary"
                 loading={busy}
-                disabled={amount == null || (!isTransfer && !category) || (needsAccount && !accountId) || (isTransfer && !toAccountId) || upload.status === "uploading"}
+                disabled={upload.status === "uploading"}
               >
                 {busy ? "Kaydediliyor…" : saveLabel}
+                {!busy ? <MissingCountBadge count={missing.length} /> : null}
               </Button>
             </DialogFooter>
           </form>

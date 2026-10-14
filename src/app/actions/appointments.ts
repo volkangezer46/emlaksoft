@@ -17,6 +17,9 @@ import {
   isAppointmentTransitionAllowed,
 } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { formatOfficeTime, officeDayWindow } from "@/lib/time/office-tz";
+import { missingFieldsError } from "@/lib/form-rules";
+import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
 
 export type AppointmentResult = {
   error?: string;
@@ -71,9 +74,8 @@ async function findConflictWarning(opts: {
   excludeId?: string;
 }): Promise<string | null> {
   const { supabase, tenantId, advisorId, scheduledAt, durationMin, excludeId } = opts;
-  // Gün penceresi: randevu süreleri saatlik ölçekte, ±1 gün fazlasıyla yeter.
-  const dayStart = new Date(scheduledAt.getTime() - 86_400_000);
-  const dayEnd = new Date(scheduledAt.getTime() + 86_400_000);
+  // Gün penceresi ofis gününe göre (UTC değil): önceki günden uzayan / ertesi güne taşan randevular için ±1 gün pay.
+  const { start: dayStart, end: dayEnd } = officeDayWindow(scheduledAt, 1);
 
   let query = supabase
     .from("appointments")
@@ -96,9 +98,8 @@ async function findConflictWarning(opts: {
   });
   if (!clash) return null;
 
-  const saat = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(
-    new Date(clash.scheduled_at),
-  );
+  // Ofis saati: sunucu UTC'de çalışır; saat dilimi verilmezse 10:00 randevu uyarıda "07:00" görünürdü.
+  const saat = formatOfficeTime(clash.scheduled_at);
   const clashCustomer = Array.isArray(clash.customer) ? clash.customer[0] : clash.customer;
   const kim = clashCustomer?.full_name ?? "başka bir randevu";
   return `Bu saatte ${kim} ile çakışıyor (${saat}). Kaydetmek için tekrar gönderin.`;
@@ -124,6 +125,9 @@ export async function createAppointment(formData: FormData): Promise<Appointment
   if (!date || !time) {
     return { error: "Tarih ve saat zorunlu." };
   }
+  // Boş randevu açılmaz: yer göstermede müşteri + portföy, diğer türlerde en az biri (istemciyle aynı kural).
+  const missing = appointmentMissing({ appointment_type: appointmentType, customer_id: customerId, property_id: propertyId });
+  if (missing.length > 0) return { error: missingFieldsError(missing) };
   const advisor = await resolveAdvisor(gate, String(formData.get("assigned_to") ?? "").trim(), gate.userId);
   if (!advisor.ok) return { error: advisor.error };
 

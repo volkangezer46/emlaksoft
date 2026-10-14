@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { trDayKey } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
+import { nextHalfHourOffice } from "@/lib/time/office-tz";
 import { getDefinitions } from "@/lib/definitions";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { MANAGEMENT_TIER_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
@@ -58,9 +59,17 @@ export default async function NewAppointmentPage({
       ? typeDefs.map((t) => ({ value: t.value, label: t.label }))
       : [...DEFAULT_DEFINITIONS.appointment_type];
 
-  // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM).
-  const defaultDate = DATE_RE.test(sp.tarih ?? "") ? sp.tarih! : trDayKey();
-  const defaultTime = TIME_RE.test(sp.saat ?? "") ? sp.saat! : "10:00";
+  // Takvimden gelen tarih/saat ön dolgusu (?tarih=YYYY-MM-DD&saat=HH:MM). Saat verilmediyse bugün için
+  // şimdiden sonraki ilk yarım saat (gece yarısını geçerse yarın), ileri bir gün için 10:00 — varsayılan geçmişte olmaz.
+  const today = trDayKey();
+  const askedDate = DATE_RE.test(sp.tarih ?? "") ? sp.tarih! : null;
+  const askedTime = TIME_RE.test(sp.saat ?? "") ? sp.saat! : null;
+  const soon = nextHalfHourOffice(now());
+  const [defaultDate, defaultTime] = askedTime
+    ? [askedDate ?? today, askedTime]
+    : askedDate && askedDate !== today
+      ? [askedDate, "10:00"]
+      : [soon.date, soon.time];
 
   return (
     <AppointmentForm
