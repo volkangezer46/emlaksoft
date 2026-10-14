@@ -6,7 +6,9 @@
  *   2. route folders
  *   3. admin monitoring inventory
  *   4. authorization + heartbeat instrumentation
+ *   5. heartbeat names without a route (static; `--db` also reads live cron_heartbeats, SELECT only)
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { CRON_JOBS } from "../src/lib/cron-jobs.ts";
@@ -105,6 +107,72 @@ for (const definition of CRON_JOBS) {
         break;
       }
     }
+  }
+}
+
+// ── Route'u olmayan nabız satırı (KQ4) ─────────────────────────────────────────────────────────────────────────────
+// cron_heartbeats satırı yalnız (a) bir cron route'unun işi (CRON_JOBS) ya da (b) aşağıdaki route'suz sunucu/motor
+// nabızlarından biri için yazılabilir. Silinen/yeniden adlandırılan bir işin eski nabzı panelde "bilinmeyen iş" olarak
+// kalır (ör. 2026-07'den beri güncellenmeyen 'kampanya-gonder'); statik denetim koddaki her sabit iş adını, --db
+// bayrağı ise canlı tabloyu (yalnız SELECT, salt-okunur işlem) bu kümeye karşı sınar.
+const NON_ROUTE_HEARTBEATS = new Map<string, string>([
+  ["uyari-motoru", "uygulama içi uyarı motoru (ticket-sla adımı; src/lib/alerts/engine.ts)"],
+  ["yedek-gece", "gece yedeği (scripts/sunucu/backup-db.sh)"],
+  ["geri-yukleme-tatbikati", "geri yükleme tatbikatı (scripts/sunucu/restore-drill.sh)"],
+]);
+const knownHeartbeat = (job: string) =>
+  routeSet.has(`/api/cron/${job}`) || monitoredJobs.includes(job as (typeof monitoredJobs)[number]) || NON_ROUTE_HEARTBEATS.has(job);
+
+function walk(dir: string, exts: string[], out: string[] = []): string[] {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name !== "node_modules" && !entry.name.startsWith(".")) walk(full, exts, out);
+    } else if (exts.some((e) => entry.name.endsWith(e)) && !/\.test\.tsx?$/.test(entry.name)) {
+      out.push(full);
+    }
+  }
+  return out;
+}
+
+/** Kodda sabit adla yazılan nabızlar: recordHeartbeat("iş", …) ve sunucu betiklerindeki `insert into public.cron_heartbeats … values ('iş'`. */
+function heartbeatJobsInSource(source: string): string[] {
+  const jobs = new Set<string>();
+  for (const m of source.matchAll(/recordHeartbeat\(\s*["']([^"']+)["']/g)) jobs.add(m[1]);
+  for (const m of source.matchAll(/insert\s+into\s+public\.cron_heartbeats\s*\([^)]*\)\s*values\s*\(\s*'([^']+)'/gi)) jobs.add(m[1]);
+  return [...jobs];
+}
+
+for (const file of [...walk(join(root, "src"), [".ts", ".tsx"]), ...walk(join(root, "scripts", "sunucu"), [".sh", ".py"])]) {
+  for (const job of heartbeatJobsInSource(readFileSync(file, "utf8"))) {
+    if (!knownHeartbeat(job)) {
+      issues.push(`${file.slice(root.length + 1)}: '${job}' nabzı yazılıyor ama route'u yok (CRON_JOBS ya da NON_ROUTE_HEARTBEATS'te değil)`);
+    }
+  }
+}
+
+if (process.argv.includes("--db")) {
+  // Canlı tablo: yalnız okuma (read only işlem). Sunucuda docker üzerinden; erişilemezse sorun değil, uyarı basılır.
+  const res = spawnSync(
+    "docker",
+    ["exec", "-i", "supabase-db-moqbebljyeyprktd19zb1ihn", "psql", "-U", "postgres", "-d", "postgres", "-At", "-v", "ON_ERROR_STOP=1"],
+    {
+      input: "begin read only;\nselect job || '|' || to_char(last_run_at at time zone 'UTC', 'YYYY-MM-DD') from public.cron_heartbeats order by job;\nrollback;\n",
+      encoding: "utf8",
+      timeout: 20_000,
+    },
+  );
+  if (res.status !== 0) {
+    console.warn(`[uyari] --db: cron_heartbeats okunamadı (${(res.stderr || res.error?.message || "").trim().slice(0, 200)})`);
+  } else {
+    const rows = res.stdout.split("\n").filter((l) => l.includes("|"));
+    for (const row of rows) {
+      const [job, last] = row.split("|");
+      if (!knownHeartbeat(job)) {
+        issues.push(`cron_heartbeats: '${job}' satırının route'u yok (son nabız ${last}); eski iş adı — satır elle silinmeli (bu denetim silmez)`);
+      }
+    }
+    console.log(`--db: ${rows.length} nabız satırı okundu.`);
   }
 }
 

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getDeploymentStage } from "@/lib/deployment-env";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { evaluateCronHealth } from "@/lib/cron-staleness";
+import { probeSupabaseServices } from "@/lib/health-service-probes";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +139,16 @@ export async function GET(request: Request) {
           .limit(1)
           .maybeSingle();
 
-    const [databaseResult, migrationResult] = await Promise.all([databasePromise, migrationPromise]);
+    // Alt servis yoklamaları yalnız ayrıntılı modda (secret sahibi); genel durumu düşürmez (bkz. health-service-probes).
+    const servicesPromise = detailed
+      ? probeSupabaseServices(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+      : Promise.resolve(null);
+
+    const [databaseResult, migrationResult, services] = await Promise.all([
+      databasePromise,
+      migrationPromise,
+      servicesPromise,
+    ]);
     const databaseLatencyMs = Date.now() - databaseStarted;
     const databaseReady = !databaseResult.error;
 
@@ -180,19 +190,22 @@ export async function GET(request: Request) {
     // connectivity probe. Missing release SHA or expected migration fails shut.
     const ready = databaseReady && migrationReady !== false && releaseIdentityReady;
     const elapsedMs = Date.now() - started;
-    const publicPayload = {
-      ok: ready,
-      status: ready ? "ready" : "not_ready",
-      // Backward-compatible aliases for existing uptime probes.
-      db: databaseReady ? "up" : "down",
-      ms: elapsedMs,
-      at,
-    };
+    // Herkese açık yanıt YALNIZ {ok}: DB durumu, gecikme ve zaman bilgisi yalnız HEALTHCHECK_SECRET sahibine döner.
+    const publicPayload = { ok: ready };
     return NextResponse.json(
       detailed
         ? {
             ...publicPayload,
+            status: ready ? "ready" : "not_ready",
+            db: databaseReady ? "up" : "down",
+            ms: elapsedMs,
+            at,
+            // Alt servisler (auth/storage/realtime): "degraded" yalnız raporlanır, ok/status/HTTP kodunu değiştirmez.
+            services: services?.overall ?? "degraded",
             checks: {
+              auth: services?.auth ?? null,
+              storage: services?.storage ?? null,
+              realtime: services?.realtime ?? null,
               database: {
                 status: databaseReady ? "up" : "down",
                 latencyMs: databaseLatencyMs,
@@ -216,17 +229,16 @@ export async function GET(request: Request) {
     console.error("health check failed", {
       error: error instanceof Error ? error.name : "unknown",
     });
-    const publicPayload = {
-      ok: false,
-      status: "not_ready",
-      db: "down",
-      ms: Date.now() - started,
-      at,
-    };
+    const publicPayload = { ok: false };
     return NextResponse.json(
       detailed
         ? {
             ...publicPayload,
+            status: "not_ready",
+            db: "down",
+            ms: Date.now() - started,
+            at,
+            services: "degraded",
             checks: {
               database: { status: "down", latencyMs: Date.now() - started },
               migrations: {

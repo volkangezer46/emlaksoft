@@ -417,4 +417,4 @@ Sıra: `001100` → `001000` → `000900` → `000800` → `000700` → `000600`
 - **000600:** bayrakları KAPAT; `growth_reward_claims` doluysa denetim izi kaybolur (`set local emlaksoft.rollback_force = 'on'` gerekir). Verilmiş TL krediler KALIR.
 - **000500:** önce `select count(*) from public.try_credit_reservations where state='reserved'` boşalt. Harcanmış kredi ve committed rezervler KALIR.
 - **000400:** try RPC'leri kalkar, kredi akışı "etkin değil"e düşer; defter append-only, try satırları KALIR; rezerv tablosu yalnız boşsa düşer.
-Kod rollback'i veri restore'u değildir (`docs/runbooks/ROLLBACK.md`).
+Kod rollback'i veri restore'u değildir (`docs/runbooks/GERI_DONUS.md`).

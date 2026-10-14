@@ -38,8 +38,14 @@ MEM_TOTAL=$(awk '/^MemTotal:/ {print $2 * 1024}' /proc/meminfo)
 MEM_AVAIL=$(awk '/^MemAvailable:/ {print $2 * 1024}' /proc/meminfo)
 read -r L1 L5 L15 _ < /proc/loadavg
 CPUS=$(nproc)
-# Konteynerler: ad, durum (running/exited…), docker durum metni (Up 3 days (healthy)…), imaj
-CONTAINERS=$(docker ps -a --format '{{json .}}' 2>/dev/null | python3 -I -c '
+# Konteynerler: ad, durum (running/exited…), docker durum metni (Up 3 days (healthy)…), imaj.
+# KQ4: çıktı HER ZAMAN tek geçerli JSON dizisidir. Eskiden docker hata verince pipefail ile `|| echo '[]'` Python'un
+# kendi "[]" çıktısına eklenip "[]\n[]" (geçersiz jsonb) oluyor ve satır hiç yazılmıyordu. Artık docker çıktısı ayrı
+# alınır, ayrıştırma hatası "[]" verir ve sonuç yazmadan önce bir kez daha doğrulanır.
+containers_json() {
+  local raw out
+  raw=$(docker ps -a --format '{{json .}}' 2>/dev/null) || raw=""
+  out=$(printf '%s\n' "$raw" | python3 -I -c '
 import sys, json
 out = []
 for line in sys.stdin:
@@ -47,13 +53,22 @@ for line in sys.stdin:
         c = json.loads(line)
     except ValueError:
         continue
-    status = c.get("Status", "")
+    if not isinstance(c, dict):
+        continue
+    status = str(c.get("Status") or "")
     health = "healthy" if "(healthy)" in status else "unhealthy" if "(unhealthy)" in status else None
-    out.append({"name": c.get("Names", "")[:80], "state": c.get("State", "")[:20], "status": status[:80],
-                "health": health, "image": c.get("Image", "")[:120]})
+    out.append({"name": str(c.get("Names") or "")[:80], "state": str(c.get("State") or "")[:20], "status": status[:80],
+                "health": health, "image": str(c.get("Image") or "")[:120]})
 out.sort(key=lambda c: (c["state"] == "running", c["name"]))
 print(json.dumps(out[:80]))
-' || echo '[]')
+' 2>/dev/null) || out=""
+  if printf '%s' "$out" | python3 -I -c 'import sys, json; v = json.loads(sys.stdin.read()); sys.exit(0 if isinstance(v, list) else 1)' 2>/dev/null; then
+    printf '%s' "$out"
+  else
+    printf '[]'
+  fi
+}
+CONTAINERS=$(containers_json)
 
 ROW=$(python3 -I -c '
 import json, sys

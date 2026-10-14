@@ -114,7 +114,7 @@ CI'daki manuel `workflow_dispatch` hattı `app_url` ile aynı kontrolleri uzak d
 
 - [ ] İlk 30 dk: error log, DB bağlantısı, auth, cron heartbeat.
 - [ ] Release sahibi, izleme sahibi, rollback yetkilisi belli.
-- [ ] Başarısızlıkta kod rollback'i: `docs/runbooks/ROLLBACK.md`. Veri bütünlüğü etkilendiyse incident:
+- [ ] Başarısızlıkta kod rollback'i: `docs/runbooks/GERI_DONUS.md`. Veri bütünlüğü etkilendiyse incident:
       `docs/runbooks/INCIDENT_RESPONSE.md`, restore: `docs/runbooks/RESTORE.md`. Kod rollback'i veri restore'u değildir.
 - [ ] Release kaydına eklenir: CI run + SHA, migration dry-run + checksum sonucu, yetkili health sonucu,
       auth-only cron smoke + public E2E sonucu, ilk gözlem özeti.

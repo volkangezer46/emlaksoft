@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { maskPii, sanitizeLogText, shortTenantId } from "@/lib/pii-mask";
-import { buildServerErrorEntry } from "@/lib/server-error-report";
+import { buildServerErrorEntry, classifyServerError } from "@/lib/server-error-report";
 import { buildLogLine } from "@/lib/log";
 import { evaluateCronHealth } from "@/lib/cron-staleness";
 import { computeRefreshDelay, tablesForPath } from "@/lib/realtime-throttle";
@@ -52,6 +52,13 @@ describe("buildServerErrorEntry", () => {
     expect(buildServerErrorEntry(new Error("The destination stream closed early."), "/app")).toBeNull();
     expect(buildServerErrorEntry(Object.assign(new Error("This operation was aborted"), { name: "AbortError" }), "/app")).toBeNull();
     expect(buildServerErrorEntry(new Error('A "use server" file can only export async functions'), "/app")).not.toBeNull();
+  });
+  it("okunamayan router state başlığı istemci hatasıdır (400), kaydedilmez", () => {
+    const msg = "The router state header was sent but could not be parsed.";
+    expect(classifyServerError(msg)).toBe("client_bad_request");
+    expect(buildServerErrorEntry(new Error(msg), "/app/portfoyler")).toBeNull();
+    expect(classifyServerError("The destination stream closed early.")).toBe("client_abort");
+    expect(classifyServerError("relation does not exist")).toBe("server");
   });
 });
 

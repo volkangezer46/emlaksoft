@@ -1,0 +1,51 @@
+# Geri dönüş (runbook)
+
+Uygulama geri dönüşü ile veri kurtarma ayrı kararlardır. Güvenliği geri getiren en küçük geri alınabilir adım seçilir.
+
+## Tek satır
+
+```bash
+bash scripts/sunucu/rollback.sh --dry-run && bash scripts/sunucu/rollback.sh
+```
+
+- `--dry-run`: yayındaki sürümü, hedef imajı ve çalıştırılacak `docker compose` komutunu yazar; hiçbir şey değiştirmez.
+- Hedef verilmezse `public.release_history`'de yayındakinden önce `ok` biten ve sonradan geri alınmamış en yeni sürüm seçilir.
+  Belirli bir sürüm için: `bash scripts/sunucu/rollback.sh 202610141107-62e14a2e`.
+- Betik hedef imajın yerelde olduğunu doğrular (`deploy.sh` `prune_images` son iki `ok` sürümün imajını her zaman korur),
+  hedefin statik parçalarını `/srv/emlaksoft/next-static`'e ekler, `docker compose up` çalıştırır, sağlığı 120 sn bekler
+  (konteyner içi + `https://emlaksoft.com.tr/api/health`) ve geri alınan sürüm için `release_history`'ye `rolled_back`
+  satırı yazar (`/admin/sistem?sekme=durum`). Hedef sağlıklı olmazsa önceki imaja geri çıkılır, `failed` yazılır, çıkış 1.
+- Yeni sürüm yayın sırasında 120 sn içinde sağlıklı olmazsa `deploy.sh` zaten kendiliğinden önceki imaja döner;
+  `rollback.sh` yayından SONRA fark edilen sorunlar içindir.
+
+## Şema uyumu
+
+- Migration'lar forward-only'dir; geri dönüş DB'yi geri ALMAZ, `.env.production` `RELEASE_MIGRATION` değişmez (DB o
+  migration'dadır, `/api/health` hazır döner).
+- Eski kod yeni şemayla çalışmalıdır. Eklemeli (yeni tablo/kolon/indeks/fonksiyon) migration'lar uyumludur; kolon
+  silme/yeniden adlandırma, NOT NULL ya da CHECK sıkılaştırma, eski kodun yazdığı değeri reddeden kısıt uyumsuzdur.
+- `--dry-run` hedefin yayınlandığı migration'ı DB'dekinden farklıysa "Şema notu" satırı basar: o aralıktaki
+  migration'ları (`supabase/migrations/`) uyumluluk için gözden geçirin.
+- Yeni sürüm eski kodun anlamadığı veri yazdıysa körlemesine geri dönmeyin: etkilenen yolu kapatın (bayrak/bakım) ve
+  ileri düzeltme (yeni kod ya da yeni migration) yayınlayın. Uygulanmış migration düzenlenmez, elle "down" SQL'i
+  çalıştırılmaz.
+- Satırlar bozulduysa ya da kaybolduysa kod geri dönüşü veri geri getirmez: yazmayı durdurun, `docs/runbooks/RESTORE.md`.
+
+## Doğrulama
+
+1. `curl -s https://emlaksoft.com.tr/api/health` → `{"ok":true}`.
+2. Ayrıntı (secret ile): `curl -s -H "Authorization: Bearer $HEALTHCHECK_SECRET" https://emlaksoft.com.tr/api/health`
+   → `release.sha` hedef sürümün SHA'sı, `checks.migrations.status = ready`; `services` / `checks.auth|storage|realtime`
+   yalnız bilgi amaçlıdır (`degraded` genel durumu düşürmez).
+3. Giriş, kiracı izolasyonu ve olaya özgü iş akışı elle denenir; `hatalar.jsonl` ve `/admin/sistem?sekme=hatalar`
+   bir olağan cron aralığı boyunca izlenir (`docs/runbooks/IZLEME.md`).
+
+## Durdurma ölçütleri
+
+Hedef imaj doğrulanamıyorsa, migration hazırlığı başarısızsa, ortam değerleri beklenmedik biçimde farklıysa ya da eski
+kod uyumsuz veri yazacaksa geri dönüşü durdurun; günlükleri saklayın ve ileri düzeltme ya da kontrollü restore seçin.
+
+## Kayıt
+
+Olay kaydına yayındaki/hedef etiketler, `--dry-run` çıktısı, sağlık yanıtı, şema uyumu kararı, onaylayan ve zaman
+damgaları eklenir. `release_history` satırını betik yazar.

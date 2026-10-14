@@ -17,9 +17,21 @@ describe("health endpoint privacy contract", () => {
       /return NextResponse\.json\(\s*detailed\s*\?[\s\S]*?:\s*publicPayload/,
     );
     expect(route).toContain("const publicPayload");
+    // Herkese açık yanıt yalnız {ok}: db/ms/at/status ayrıntısı yalnız secret sahibine.
+    const publicPayloads = [...route.matchAll(/const publicPayload = (\{[^}]*\});/g)].map((m) => m[1]);
+    expect(publicPayloads).toEqual(["{ ok: ready }", "{ ok: false }"]);
     expect(route).toContain("const release = releaseMetadata()");
     expect(route).toContain("release: { ...release, ready: releaseIdentityReady }");
     expect(env).toContain("HEALTHCHECK_SECRET=");
+  });
+
+  it("probes auth/storage/realtime only in detailed mode and never lets them fail readiness", () => {
+    expect(route).toMatch(/const servicesPromise = detailed\s*\?\s*probeSupabaseServices\(/);
+    expect(route).toContain('services: services?.overall ?? "degraded"');
+    // Genel hazır olma kararı alt servislere bağlı değildir.
+    const readyLine = route.match(/const ready = ([^;]+);/)?.[1] ?? "";
+    expect(readyLine).toBe("databaseReady && migrationReady !== false && releaseIdentityReady");
+    expect(readyLine).not.toContain("services");
   });
 
   it("tolerates Next build constants that are not runtime strings", () => {

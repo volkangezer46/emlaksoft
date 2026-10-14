@@ -86,6 +86,6 @@ değiştirebilir. Yalnızca açıkça onaylanmış post-deploy doğrulamasında 
 - [ ] İlk 30 dakika error log, DB bağlantısı, auth ve cron heartbeat izlendi.
 - [ ] Release sahibi, izleme sahibi ve rollback karar yetkilisi belli.
 - [ ] Başarısızlık halinde kod rollback'i için
-      [`docs/runbooks/ROLLBACK.md`](docs/runbooks/ROLLBACK.md) açıldı.
+      [`docs/runbooks/GERI_DONUS.md`](docs/runbooks/GERI_DONUS.md) açıldı.
 - [ ] Veri bütünlüğü etkilenmişse incident ilan edilip
       [`docs/runbooks/RESTORE.md`](docs/runbooks/RESTORE.md) izlendi.

@@ -5,7 +5,8 @@
 # DB'ye yeni migration uygulandıysa önce .env.production'daki RELEASE_MIGRATION(_CHECKSUM) güncellenir
 # (`npm run check:migrations -- --release`), yoksa /api/health 503 döner.
 # Geri dönüş: yeni sürüm 120 sn içinde sağlıklı olmazsa önceki imaj (PREV) yeniden ayağa kaldırılır
-# ve betik exit 1 ile biter. ACL_GATE=strict → ACL denetimi başarısızsa yayın durur (varsayılan: uyarı).
+# ve betik exit 1 ile biter. Yayından SONRA elle geri dönüş: scripts/sunucu/rollback.sh (docs/runbooks/GERI_DONUS.md).
+# ACL_GATE=strict → ACL denetimi başarısızsa yayın durur (varsayılan: uyarı).
 # Sürüm geçmişi (DG5): yayın sonunda (yayında / geri dönüldü / başarısız) public.release_history'ye bir satır yazılır
 # (/admin/sistem?sekme=durum). Tablo yoksa ya da yazım başarısızsa yalnız uyarı basılır; yayın sonucu değişmez.
 # Yayından önce düşen çalışmalar (derleme, paket bütçesi, ACL strict…) EXIT tuzağıyla "failed" olarak yazılır.
@@ -47,6 +48,7 @@ SQL
 }
 
 # Yayın öncesi düşen çalışma (set -e ya da açık exit 1) için tek satır; sonucu kaydedilmiş çalışmada no-op.
+# shellcheck disable=SC2317  # EXIT tuzağıyla dolaylı çağrılır
 on_exit() {
   local rc=$?
   if [ "$rc" -ne 0 ] && [ "$RECORDED" = 0 ]; then
@@ -110,8 +112,8 @@ fi
 # Sağlık: önce konteyner içinden (Traefik'ten bağımsız), sonra dış adresten 200 beklenir.
 # Traefik yeni konteyneri görene kadar dış adres 502/503 verebilir. Toplam süre 120 sn.
 wait_healthy() {
-  local i
-  for i in $(seq 1 60); do
+  local _i
+  for _i in $(seq 1 60); do
     if docker exec emlaksoft-app node -e \
       "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" \
       >/dev/null 2>&1 \
@@ -128,9 +130,22 @@ NEW_MIG=$(docker inspect emlaksoft-app --format '{{range .Config.Env}}{{println 
   | sed -n 's/^RELEASE_MIGRATION=//p' | head -n1 || true)
 echo "Yayında: emlaksoft-app:$TAG — sağlık bekleniyor"
 # Disk: son 3 sürüm imajı (+ latest/onceki ve yayındaki) kalır; eski derleme önbelleği temizlenir.
+# KQ4: release_history'deki SON İKİ "ok" sürümün imajı (yayındaki + bir önceki = scripts/sunucu/rollback.sh hedefi) ve
+# çalışan konteynerin imajı yaşına bakılmadan HER ZAMAN korunur. Tablo okunamazsa yalnız son 3 kuralı uygulanır.
 prune_images() {
+  local keep running
+  keep=$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -At -c \
+    "select tag from public.release_history where outcome = 'ok' order by finished_at desc, id desc limit 2" 2>/dev/null || true)
+  running=$(docker inspect emlaksoft-app --format '{{.Config.Image}}' 2>/dev/null || true)
+  keep=$(printf '%s\n%s\n' "$keep" "${running#emlaksoft-app:}")
   docker images emlaksoft-app --format '{{.Tag}}' | grep -E '^[0-9]{12}-' | sort -r | tail -n +4 \
-    | while read -r t; do docker rmi "emlaksoft-app:$t" >/dev/null 2>&1 || true; done
+    | while read -r t; do
+        if printf '%s\n' "$keep" | grep -qxF -- "$t"; then
+          echo "[bilgi] imaj korundu (son ok sürüm / yayındaki): emlaksoft-app:$t"
+          continue
+        fi
+        docker rmi "emlaksoft-app:$t" >/dev/null 2>&1 || true
+      done
   docker builder prune -f --reserved-space 5gb >/dev/null 2>&1 || docker builder prune -f --keep-storage 5gb >/dev/null 2>&1 || true
 }
 
