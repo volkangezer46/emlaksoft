@@ -127,7 +127,7 @@ describe("tek sekme kaynağı ve kaldırılan kopyalar (CL-ADMIN)", () => {
     expect(labels("/admin/tickets")).toEqual(["Talepler", "Hazır yanıtlar", "KVKK başvuruları", "Yardım merkezi", "Öneri panosu", "Raporlar", "Ayarlar"]);
     expect(labels("/admin/personel")).toEqual(["Personel", "Roller", "Güvenlik politikası"]);
     expect(labels("/admin/geo")).toEqual(["Gezgin", "İçe aktar", "Sürümler", "Değişiklik talepleri", "Veri tutarlılığı", "Eşleştir"]);
-    expect(labels("/admin/sistem")).toEqual(["Sağlık", "Entegrasyonlar", "Hata kayıtları", "Uyarılar", "Durum sayfası", "Kaynaklar", "Veritabanı", "Aktivite"]);
+    expect(labels("/admin/sistem")).toEqual(["Sağlık", "Entegrasyonlar", "Hata kayıtları", "Uyarılar", "Durum sayfası", "Kaynaklar", "Veritabanı", "Veri gezgini", "Aktivite"]);
     expect(labels("/admin/analiz-tarifesi")).toEqual(["Analiz tarifesi", "AI kullanımı"]);
     for (const f of [
       "src/app/admin/billing/billing-nav.tsx",

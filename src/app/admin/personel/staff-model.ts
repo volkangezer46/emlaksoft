@@ -26,6 +26,7 @@ export const PLATFORM_MODULE_LABELS: Record<PlatformModule, string> = {
   sitemenu: "Site menüsü (ops: salt okunur)",
   sitecontent: "Site içeriği (ops: salt okunur)",
   reklam: "Google bağlantıları ve reklam (ops: salt okunur)",
+  veri: "Veri gezgini (salt okunur, kişisel veri maskeli)",
 };
 
 export const PLATFORM_ROLES: PlatformRole[] = ["super_admin", "ops", "support", "billing"];

@@ -20,6 +20,8 @@ type Props = {
   pageSize?: number;
   /** Sayfa numarasından href üretir — mevcut filtreler çağıran sayfada korunur. */
   hrefFor: (page: number) => string;
+  /** Verilirse bağlantılara aynen geçer; `false` hover/odak ısıtmasını da kapatır (ör. her görüntülemesi denetlenen sayfalar). */
+  prefetch?: false;
 };
 
 /**
@@ -29,7 +31,7 @@ type Props = {
  * çubuk durmasın. `total` count:"exact" ile gelmeli; toplam sayfa sayısı
  * ondan türetilir.
  */
-export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor }: Props) {
+export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor, prefetch }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   if (totalPages <= 1) return null;
 
@@ -50,6 +52,7 @@ export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor }: Props
     >
       <Link
         href={hrefFor(page - 1)}
+        prefetch={prefetch}
         aria-disabled={prevDisabled || undefined}
         tabIndex={prevDisabled ? -1 : undefined}
         className={btnCls(prevDisabled)}
@@ -63,6 +66,7 @@ export function Pagination({ page, total, pageSize = PAGE_SIZE, hrefFor }: Props
       </p>
       <Link
         href={hrefFor(page + 1)}
+        prefetch={prefetch}
         aria-disabled={nextDisabled || undefined}
         tabIndex={nextDisabled ? -1 : undefined}
         className={btnCls(nextDisabled)}

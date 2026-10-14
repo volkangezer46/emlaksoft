@@ -237,9 +237,9 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/sistem", core: true,
         label: "Sistem durumu",
-        description: "Sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı ve aktivite",
+        description: "Sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı, veri gezgini ve aktivite",
         icon: Radar,
-        modules: ["sistem", "activity"],
+        modules: ["sistem", "activity", "veri"],
         match: ["/admin/aktivite"],
         tabs: [
           L("/admin/sistem", "Sağlık", "Cron nabzı, veritabanı, yedek ve şema", ["sistem"]),
@@ -249,6 +249,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/sistem?sekme=durum", "Durum sayfası", "Kamuya açık /durum: olay, planlı bakım, erişilebilirlik; sürüm geçmişi", ["sistem"]),
           L("/admin/sistem?sekme=kaynaklar", "Kaynaklar", "Sunucu kaynakları ve depolama", ["sistem"]),
           L("/admin/sistem?sekme=veritabani", "Veritabanı", "Tablo boyutları, bağlantılar ve yavaş sorgular", ["sistem"]),
+          // SN4: kendi modülü (`veri`) var; varsayılan yalnız süper admin, başka personel yalnız özel rolle görür.
+          L("/admin/sistem?sekme=veri", "Veri gezgini", "İzinli tablolarda salt okunur arama: ofis ve sütun süzgeci, maskeli kişisel veri, denetim izli", ["veri"]),
           L("/admin/aktivite", "Aktivite", "Denetim izi", ["activity"]),
         ],
       },
@@ -308,18 +310,28 @@ export const ICONS_FOR_TABS: Record<string, LucideIcon> = { activity: Activity, 
 const canSee = (link: Pick<AdminNavLink, "modules" | "when">, allowed: readonly PlatformModule[], conditions: AdminNavConditions = {}) =>
   link.modules.some((m) => allowed.includes(m)) && (!link.when || conditions[link.when] !== false);
 
+/**
+ * Sıfır çıkmaz: öğenin kendi sekmesi (href'i) rolde görünmüyorsa satır ilk GÖRÜNÜR sekmeye gider (ör. yalnız `veri`
+ * modülü olan özel rol "Sistem durumu"na tıklayınca `sistem` kapısından /admin'e geri atılmaz, Veri gezgini açılır).
+ * Kök /admin herkesin iniş sayfasıdır; değiştirilmez.
+ */
+const reachableHref = (item: AdminNavItem, tabs: readonly AdminNavLink[] | undefined): string => {
+  if (item.href === "/admin" || !tabs?.length || !item.tabs?.some((t) => t.href === item.href)) return item.href;
+  return tabs.some((t) => t.href === item.href) ? item.href : tabs[0]!.href;
+};
+
 /** Role (ve koşullara) göre görünür menü (boş bölümler atılır; sekmeler de role göre süzülür). */
 export function adminNavFor(allowed: readonly PlatformModule[], conditions: AdminNavConditions = {}): AdminNavSection[] {
   return ADMIN_NAV.map((s) => ({
     ...s,
     items: s.items
       .filter((i) => canSee(i, allowed, conditions))
-      .map((i) => ({
-        ...i,
-        tabs: i.tabs
+      .map((i) => {
+        const tabs = i.tabs
           ?.filter((t) => canSee(t, allowed, conditions))
-          .map((t) => (t.children ? { ...t, children: t.children.filter((c) => canSee(c, allowed, conditions)) } : t)),
-      })),
+          .map((t) => (t.children ? { ...t, children: t.children.filter((c) => canSee(c, allowed, conditions)) } : t));
+        return { ...i, href: reachableHref(i, tabs), tabs };
+      }),
   })).filter((s) => s.items.length > 0);
 }
 
