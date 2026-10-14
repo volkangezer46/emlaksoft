@@ -469,6 +469,24 @@ export function isStoredCardAlreadyGone(result: StoredCardDeleteResult): boolean
   return String(result.status).toLowerCase() !== "success" && /(not\s*found|bulunamad|mevcut\s*de[gğ]il)/i.test(msg);
 }
 
+/**
+ * Zararsız kimlik yoklaması (Admin > Sistem > Entegrasyonlar "Test et"): POST /payment/bin/check ile sabit, herkese açık bir
+ * BIN sorgulanır. Ödeme/kart/iade oluşturmaz; yalnız imzalı isteğin kabul edildiğini doğrular. Anahtar sonuca girmez.
+ */
+export async function probeIyzicoCredentials(): Promise<{ ok: boolean; errorCode: string | null; errorMessage: string | null }> {
+  const res = await iyzicoPost<{ status?: string; errorCode?: string | number; errorMessage?: string }>("/payment/bin/check", {
+    locale: "tr",
+    conversationId: "emlaksoft-baglanti-testi",
+    binNumber: "554960",
+  });
+  const ok = String(res.status ?? "").toLowerCase() === "success";
+  return {
+    ok,
+    errorCode: ok || res.errorCode == null ? null : String(res.errorCode).slice(0, 16),
+    errorMessage: ok || !res.errorMessage ? null : String(res.errorMessage).slice(0, 160),
+  };
+}
+
 export type StoredCardPaymentResult = {
   status: string;
   paymentId?: string | number;

@@ -39,6 +39,7 @@ const CATEGORY_LINKS: Partial<Record<SettingCategoryId, { label: string; href: s
   saglik: [
     { label: "Sistem sağlığı ve cron nabzı", href: "/admin/sistem" },
     { label: "Hata kayıtları", href: "/admin/sistem?sekme=hatalar" },
+    { label: "Entegrasyon merkezi (durum, test, anahtarlar)", href: "/admin/sistem?sekme=entegrasyonlar" },
   ],
 };
 
@@ -226,7 +227,8 @@ export default async function SettingsCenterPage({ searchParams }: { searchParam
             ["Deneme süresi ve otomatik yenileme", "/admin/billing#ayarlar"],
             ["Özellik bayrakları", "/admin/ayarlar/bayraklar"],
             ["Yasal metinler ve mevzuat sabitleri", "/admin/ayarlar/yasal"],
-            ["Sistem sağlığı, cron nabzı ve entegrasyon formları", "/admin/sistem"],
+            ["Sistem sağlığı ve cron nabzı", "/admin/sistem"],
+            ["Entegrasyon merkezi (durum, test, anahtarlar)", "/admin/sistem?sekme=entegrasyonlar"],
           ].map(([label, to]) => (
             <li key={to}>
               <Link href={to} className="font-semibold text-brand-600 hover:underline">

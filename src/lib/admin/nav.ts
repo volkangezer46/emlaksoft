@@ -209,7 +209,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         modules: ["sistem", "activity"],
         match: ["/admin/sistem", "/admin/aktivite"],
         tabs: [
-          L("/admin/sistem", "Sağlık ve entegrasyonlar", "Cron, veritabanı, anahtarlar, kayıt ve bakım", ["sistem"]),
+          L("/admin/sistem", "Sağlık", "Cron, veritabanı, yedek, şema, kayıt ve bakım", ["sistem"]),
+          L("/admin/sistem?sekme=entegrasyonlar", "Entegrasyonlar", "Ödeme, SMS, e-posta, WhatsApp, Google, AI: durum, test, anahtarlar, ofis bağlantıları ve webhook günlüğü", ["sistem"]),
           L("/admin/sistem?sekme=hatalar", "Hata kayıtları", "Uygulama hataları", ["sistem"]),
           L("/admin/aktivite", "Aktivite kaydı", "Denetim izi", ["activity"]),
         ],

@@ -353,3 +353,24 @@ export async function openAiChat(opts: OpenAiRequestOptions): Promise<OpenAiChat
   const content = typeof raw === "string" && raw ? redactor.restoreText(raw) : null;
   return { content, redactor };
 }
+
+const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
+
+/**
+ * Anahtar yoklaması (Admin > Sistem > Entegrasyonlar "Test et"): GET /v1/models. Ücretsizdir, istem/kişisel veri GİTMEZ,
+ * kredi düşmez. Yalnız sonuç sınıfı döner (anahtar ve yanıt gövdesi dönmez).
+ */
+export async function probeOpenAiKey(apiKey: string): Promise<{ ok: true; models: number } | { ok: false; kind: OpenAiErrorKind }> {
+  try {
+    const response = await fetchExternal(
+      OPENAI_MODELS_URL,
+      { method: "GET", headers: { Authorization: `Bearer ${apiKey}` } },
+      { timeoutMs: 8_000 },
+    );
+    await requireExternalSuccess(response);
+    const json = await readExternalJson<{ data?: unknown[] }>(response, 512 * 1024);
+    return { ok: true, models: Array.isArray(json?.data) ? json.data.length : 0 };
+  } catch (error) {
+    return { ok: false, kind: classifyOpenAiError(error) };
+  }
+}

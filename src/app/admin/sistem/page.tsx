@@ -8,6 +8,7 @@ import { SystemView } from "./system-view";
 import { AlertsView } from "./alerts-view";
 import { ResourcesView } from "./resources-view";
 import { DatabaseView } from "./database-view";
+import { IntegrationsView } from "./integrations-view";
 
 export const metadata = { title: "Sistem sağlığı" };
 
@@ -28,6 +29,7 @@ const TABS = [
  * Sistem sağlığı + Üretim hataları tek sayfada (hata listesi bileşenleri `./_hatalar`).
  * İki sekme de aynı `sistem` platform modülündedir (tek kapı).
  * `?sekme=hatalar` hata listesini açar; durum/son/sayfa parametreleri ona aittir.
+ * `?sekme=entegrasyonlar` entegrasyon merkezi (DG3): bölüm şeridindeki "Entegrasyonlar" sekmesi (hatalar gibi pill'de kopyası yok).
  * `?sekme=portal-kurallari` portal form kurallarını açar; `portal` ve `gorunum` parametreleri ona aittir.
  * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci,
  * `is=<cron işi>` sağlık sekmesinde o işin son 30 çalışmasını (süre grafiği) açar.
@@ -39,7 +41,7 @@ export default async function AdminSystemPage({
 }) {
   await requirePlatformModule("sistem");
   const sp = (await searchParams) ?? {};
-  const KNOWN = ["hatalar", "emlakfiyati", "portal-kurallari", "uyarilar", "kaynaklar", "veritabani"] as const;
+  const KNOWN = ["hatalar", "entegrasyonlar", "emlakfiyati", "portal-kurallari", "uyarilar", "kaynaklar", "veritabani"] as const;
   const active = (KNOWN as readonly string[]).includes(sp.sekme ?? "") ? (sp.sekme as (typeof KNOWN)[number]) : "saglik";
 
   return (
@@ -47,6 +49,8 @@ export default async function AdminSystemPage({
       <PageTabs base="/admin/sistem" label="Sistem sekmeleri" tabs={TABS} active={active} />
       {active === "hatalar" ? (
         <ErrorsView searchParams={Promise.resolve(sp)} />
+      ) : active === "entegrasyonlar" ? (
+        <IntegrationsView />
       ) : active === "emlakfiyati" ? (
         <EmlakFiyatiView />
       ) : active === "portal-kurallari" ? (
