@@ -1,10 +1,12 @@
 /**
  * Uyarı kuralları (SAF; DB yok). Anahtar listesi `alert_rules.key` CHECK kısıtıyla aynıdır
- * (supabase/migrations/20261013004900_ops_alerts.sql; `kvkk_sla` 20261014006000_platform_kvkk_requests.sql ile eklenir). Varsayılanlar migration'daki tohum satırlarıyla aynıdır;
- * tablo yoksa ya da satır silinmişse kod bu varsayılanlarla çalışır.
+ * (supabase/migrations/20261013004900_ops_alerts.sql; `kvkk_sla` 20261014006000_platform_kvkk_requests.sql,
+ * `engine_stalled` 20261014022000_alert_engine_pulse_rule.sql ile eklenir). Varsayılanlar migration'daki tohum satırlarıyla
+ * aynıdır; tablo yoksa ya da satır silinmişse kod bu varsayılanlarla çalışır.
  *
- * `health_down` SUNUCU tarafında değerlendirilir (scripts/sunucu/error-watch.sh): uygulama çökükken uygulama
- * kendi kesintisini bildiremez. Diğer kurallar uygulama içi motorda (`engine.ts`) değerlendirilir.
+ * `health_down` ve `engine_stalled` SUNUCU tarafında değerlendirilir (scripts/sunucu/error-watch.sh + alert-send.py):
+ * uygulama çökükken kendi kesintisini, motor durmuşken kendi durduğunu bildiremez. Diğer kurallar uygulama içi
+ * motorda (`engine.ts`) değerlendirilir.
  */
 
 export const ALERT_RULE_KEYS = [
@@ -17,6 +19,7 @@ export const ALERT_RULE_KEYS = [
   "payment_capture",
   "mrr_drop",
   "kvkk_sla",
+  "engine_stalled",
 ] as const;
 
 export type AlertRuleKey = (typeof ALERT_RULE_KEYS)[number];
@@ -117,6 +120,16 @@ export const ALERT_RULES: Record<AlertRuleKey, AlertRuleDef> = {
     defaultRepeatMinutes: 1440,
     evaluatedBy: "app",
   },
+  engine_stalled: {
+    key: "engine_stalled",
+    label: "Uyarı motoru durdu",
+    description:
+      "Uygulama içi uyarı motorunun nabzı (uyari-motoru, 5 dakikada bir) eşik süresi boyunca gelmezse sunucu betiği uyarır; nabız dönünce 'düzeldi' mesajı gider. Motor ayardan kapatıldıysa uyarı üretilmez.",
+    severity: "critical",
+    threshold: { label: "Nabızsız süre", unit: "dk", min: 10, max: 240, default: 20 },
+    defaultRepeatMinutes: 60,
+    evaluatedBy: "host",
+  },
 };
 
 export type AlertRuleRow = {
@@ -185,4 +198,26 @@ export function notifyDecision(
   const last = Date.parse(ev.last_notified_at);
   if (!Number.isFinite(last)) return "notify";
   return nowMs - last >= cfg.repeatMinutes * 60_000 ? "notify" : "wait";
+}
+
+/** Motor nabzı durumu: "ok" (nabız taze), "stalled" (eşik aşıldı), "off" (motor ayardan kapalı), "unknown" (hiç nabız yok). */
+export type EnginePulseState = "ok" | "stalled" | "off" | "unknown";
+
+/**
+ * Uyarı motoru nabız kararı (SAF; Uyarılar sekmesindeki "motor durdu" rozeti). Sunucu betiğindeki karar
+ * (alert-send.py `engine_pulse_state`) ile AYNI kural: nabız yaşı eşik dakikasını AŞARSA durdu; motor kapalıysa ya da
+ * kural kapalıysa değerlendirme yok ("off"); hiç nabız yazılmadıysa "unknown" (kurulum/ilk tur; uyarı üretmez).
+ */
+export function enginePulseState(
+  lastRunIso: string | null | undefined,
+  nowMs: number,
+  thresholdMinutes: number | null,
+  opts: { engineEnabled: boolean; ruleEnabled: boolean },
+): { state: EnginePulseState; ageMinutes: number | null } {
+  if (!opts.engineEnabled || !opts.ruleEnabled) return { state: "off", ageMinutes: null };
+  const t = lastRunIso ? Date.parse(lastRunIso) : NaN;
+  if (!Number.isFinite(t)) return { state: "unknown", ageMinutes: null };
+  const ageMinutes = Math.max(0, Math.floor((nowMs - t) / 60_000));
+  const limit = thresholdMinutes ?? ALERT_RULES.engine_stalled.threshold!.default;
+  return { state: nowMs - t > limit * 60_000 ? "stalled" : "ok", ageMinutes };
 }

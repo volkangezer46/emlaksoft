@@ -9,7 +9,8 @@ import { relativeTimeTR } from "@/lib/admin-format";
 import { now as clockNow } from "@/lib/clock";
 import { secretsWritable } from "@/lib/settings/secrets";
 import { ALERT_CHANNEL_LABEL, type AlertChannelKind } from "@/lib/alerts/channel-config";
-import { ALERT_RULE_KEYS, ALERT_RULES, isMuted, mergeRuleConfigs, type AlertRuleRow } from "@/lib/alerts/rules";
+import { ALERT_RULE_KEYS, ALERT_RULES, enginePulseState, isMuted, mergeRuleConfigs, type AlertRuleRow } from "@/lib/alerts/rules";
+import { getSetting } from "@/lib/settings/read";
 import { ALERT_ENGINE_HEARTBEAT } from "@/lib/alerts/engine";
 import { OPS_ALERT_SETTING_KEYS } from "@/lib/settings/registry/ops-alerts";
 import { AlertChannelActions, AlertChannelForm, AlertRuleEditor } from "./ops-controls";
@@ -61,12 +62,13 @@ export async function AlertsView({ filter }: { filter?: string }) {
     .limit(50);
   if (onlyOpen) eventsQ = eventsQ.is("resolved_at", null);
 
-  const [chRes, ruleRes, evRes, openCountRes, engineRes] = await Promise.all([
+  const [chRes, ruleRes, evRes, openCountRes, engineRes, engineEnabled] = await Promise.all([
     admin.from("alert_channels").select("id, kind, name, enabled, target_hint, last_test_at, last_test_ok, last_test_detail").order("created_at"),
     admin.from("alert_rules").select("key, enabled, threshold, repeat_minutes, muted_until"),
     eventsQ,
     admin.from("alert_events").select("id", { count: "exact", head: true }).is("resolved_at", null),
     admin.from("cron_heartbeats").select("last_run_at, last_status, last_detail").eq("job", ALERT_ENGINE_HEARTBEAT).maybeSingle(),
+    getSetting<boolean>(OPS_ALERT_SETTING_KEYS.engineEnabled).catch(() => true),
   ]);
 
   if (missing(chRes.error) || missing(ruleRes.error)) {
@@ -94,6 +96,12 @@ export async function AlertsView({ filter }: { filter?: string }) {
   const mutedRules = ALERT_RULE_KEYS.filter((k) => isMuted(rules[k], nowMs)).length;
   const engine = (engineRes.data ?? null) as { last_run_at: string; last_status: string; last_detail: string | null } | null;
   const writable = secretsWritable();
+  // Motor nabzı (engine_stalled kuralıyla aynı eşik; sunucu betiği aynı kuralla dışarıya uyarır).
+  const pulse = enginePulseState(engine?.last_run_at, nowMs, rules.engine_stalled.threshold, {
+    engineEnabled: engineEnabled !== false,
+    ruleEnabled: rules.engine_stalled.enabled,
+  });
+  const stalled = pulse.state === "stalled";
 
   return (
     <div className="space-y-6">
@@ -101,7 +109,7 @@ export async function AlertsView({ filter }: { filter?: string }) {
         eyebrow="Operasyon"
         icon={BellRing}
         title="Uyarı merkezi"
-        description="Site kesintisi, cron gecikmesi/hatası, hata patlaması, yedek, disk, ödeme yakalama ve MRR düşüşü uyarıları. Kanal eklenene kadar dışarıya hiçbir şey gönderilmez."
+        description="Site kesintisi, uyarı motoru nabzı, cron gecikmesi/hatası, hata patlaması, yedek, disk, ödeme yakalama ve MRR düşüşü uyarıları. Kanal eklenene kadar dışarıya hiçbir şey gönderilmez."
       >
         <KpiGrid label="Uyarı göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
           <KpiCard layout="inline" label="Açık uyarı" value={openCount} href={`${BASE}#olaylar`} icon={ShieldAlert} tone={openCount > 0 ? "danger" : "success"} attention={openCount > 0} />
@@ -122,11 +130,33 @@ export async function AlertsView({ filter }: { filter?: string }) {
             value={engine ? relativeTimeTR(engine.last_run_at) : "henüz yok"}
             href="/admin/sistem#cron-ticket-sla"
             icon={Radio}
-            tone={engine?.last_status === "error" ? "danger" : engine ? "success" : "warn"}
-            hint={engine?.last_detail ? engine.last_detail.slice(0, 60) : "ticket-sla cron'u içinde, 5 dk'da bir"}
+            tone={stalled || engine?.last_status === "error" ? "danger" : engine ? "success" : "warn"}
+            attention={stalled}
+            hint={
+              stalled
+                ? `motor durdu · ${pulse.ageMinutes} dk'dır nabız yok`
+                : pulse.state === "off"
+                  ? "motor ya da nabız kuralı kapalı"
+                  : engine?.last_detail
+                    ? engine.last_detail.slice(0, 60)
+                    : "ticket-sla cron'u içinde, 5 dk'da bir"
+            }
           />
         </KpiGrid>
       </AdminPageHeader>
+
+      {stalled ? (
+        <p role="alert" className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-4 py-3 text-sm text-danger-600">
+          <span className="rounded-full bg-danger-500 px-2 py-0.5 text-xs font-bold text-white">motor durdu</span>
+          <span>
+            Uyarı motorunun son nabzı {pulse.ageMinutes} dakika önce (eşik {rules.engine_stalled.threshold} dk). Uygulama içi kurallar şu an
+            değerlendirilmiyor; sunucu betiği kanallara uyarı gönderir.{" "}
+            <Link href="/admin/sistem#cron-ticket-sla" className="font-semibold underline">
+              Cron durumunu aç
+            </Link>
+          </span>
+        </p>
+      ) : null}
 
       {/* Kanallar */}
       <section id="kanallar" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
@@ -200,6 +230,9 @@ export async function AlertsView({ filter }: { filter?: string }) {
                   <p className="text-sm font-semibold text-ink-950">
                     {def.label}
                     {!cfg.enabled ? <span className="ml-2 rounded-full bg-canvas px-2 py-0.5 text-xs font-bold text-text-muted">kapalı</span> : null}
+                    {key === "engine_stalled" && stalled ? (
+                      <span className="ml-2 rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-600">motor durdu</span>
+                    ) : null}
                     {muted && cfg.mutedUntil ? (
                       <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-700">sessiz: {fmt(cfg.mutedUntil)}&apos;e kadar</span>
                     ) : null}

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { planLabelIn, resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 import { daysAgoIso } from "@/lib/clock";
+import { isOverrideActive, resolveEntitlementLimit, resolveSeatLimit, type EntitlementKey, type EntitlementOverride } from "@/lib/billing/entitlements/overrides";
 import { auditActionLabel } from "@/lib/admin-format";
 import { baseRoleOf, platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 import type { TimelineEvent } from "@/lib/activity-timeline";
@@ -68,8 +69,12 @@ export function resolveOfficeTab(raw: string | string[] | undefined, allowed: re
   return (allowed as readonly string[]).includes(v ?? "") ? (v as OfficeTab) : "zaman";
 }
 
-/** Plan limiti karşısında kullanım satırı. limit null = sınırsız. */
-export type LimitRow = { key: string; label: string; used: number; limit: number | null; href?: string };
+/**
+ * Limit karşısında kullanım satırı. `limit` ETKİN sınırdır (plan + AD1 limit istisnası + koltukta satın alınmış ek
+ * kullanıcı; SQL `tenant_entitlement_resolve` / `effective_seat_limit` ile aynı kural); `planLimit` paketin kendi
+ * sınırı. null = sınırsız. `extra` etkin sınırın plandan farkını açıklar ("+2 ek koltuk · 1 istisna").
+ */
+export type LimitRow = { key: string; label: string; used: number; limit: number | null; planLimit?: number | null; extra?: string; href?: string };
 
 export function limitPercent(row: Pick<LimitRow, "used" | "limit">): number | null {
   if (row.limit == null || row.limit <= 0) return null;
@@ -81,19 +86,37 @@ export function limitText(row: Pick<LimitRow, "used" | "limit">): string {
   return `${nf.format(row.used)} / ${row.limit == null ? "sınırsız" : nf.format(row.limit)}`;
 }
 
+/** Etkin limit girdisi (Ofis 360): satın alınmış ek kullanıcı + ofise özel limit istisnaları (AD1). */
+export type LimitEffectiveInput = { extraSeats: number; overrides: readonly EntitlementOverride[]; nowMs: number };
+
 export function buildLimitRows(
   plan: string | null | undefined,
   used: { seats: number; properties: number; customers: number; branches: number },
   seatsHref?: string,
-  /** Katalog listesi (getPlanDefinitions): adminden eklenen paketin limitleri buradan; taban kimlikte kod tanımı. */
+  /** Katalog listesi (getPlanDefinitions): paket limitleri buradan (taban pakette admin düzenlemesi dahil); yoksa kod tanımı. */
   catalog?: readonly PlanDef[],
+  /** Verilirse `limit` etkin sınırdır (istisna + ek koltuk); verilmezse yalnız plan limiti (eski davranış). */
+  effective?: LimitEffectiveInput,
 ): LimitRow[] {
-  const l = resolvePlanDef(plan, catalog).limits;
+  const l = (catalog?.find((p) => p.id === (plan ?? "office")) ?? resolvePlanDef(plan, catalog)).limits;
+  const row = (key: string, entitlement: EntitlementKey, label: string, planLimit: number | null, count: number, href?: string): LimitRow => {
+    if (!effective) return { key, label, used: count, limit: planLimit, href };
+    const active = effective.overrides.filter((o) => o.key === entitlement && isOverrideActive(o, effective.nowMs));
+    const seats = entitlement === "seats" ? Math.max(0, Math.floor(effective.extraSeats || 0)) : 0;
+    const limit =
+      entitlement === "seats"
+        ? resolveSeatLimit(planLimit, effective.extraSeats, effective.overrides, effective.nowMs)
+        : resolveEntitlementLimit(planLimit, entitlement, effective.overrides, effective.nowMs);
+    const parts: string[] = [];
+    if (seats > 0 && planLimit != null) parts.push(`+${seats} ek koltuk`);
+    if (active.length > 0 && planLimit != null) parts.push(`${active.length} istisna`);
+    return { key, label, used: count, limit, planLimit, href, ...(parts.length ? { extra: parts.join(" · ") } : {}) };
+  };
   return [
-    { key: "seats", label: "Kullanıcı", used: used.seats, limit: l.seats, href: seatsHref },
-    { key: "properties", label: "Aktif ilan", used: used.properties, limit: l.activeProperties },
-    { key: "customers", label: "Müşteri", used: used.customers, limit: l.customers },
-    { key: "branches", label: "Şube", used: used.branches, limit: l.branches },
+    row("seats", "seats", "Kullanıcı", l.seats, used.seats, seatsHref),
+    row("properties", "active_properties", "Aktif ilan", l.activeProperties, used.properties),
+    row("customers", "customers", "Müşteri", l.customers, used.customers),
+    row("branches", "branches", "Şube", l.branches, used.branches),
   ];
 }
 

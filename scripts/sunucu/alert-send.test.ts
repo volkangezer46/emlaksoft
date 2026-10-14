@@ -121,3 +121,125 @@ describe("error-watch.sh alert_call", () => {
     expect(readFileSync(path.join(tmp, "err.log"), "utf8")).toContain("alert_events yazılamadı");
   });
 });
+
+describe("alert-send.py engine-check (uyarı motoru nabzı, simülasyon)", () => {
+  // DB yazımları yakalanır (alert_events insert/update = "uyarı olayı oluştu"); önbellek okuması DB'siz kalır.
+  const ENGINE_HARNESS = `
+import importlib.util, json, sys
+cfg = json.loads(sys.argv[1])
+spec = importlib.util.spec_from_file_location("alert_send", cfg["script"])
+m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+m.CACHE_DIR = cfg["tmp"]; m.CACHE = cfg["tmp"] + "/engine-cache.json"; m.ENGINE_STATE = cfg["tmp"] + "/engine-watch.json"
+json.dump(cfg["state"], open(m.CACHE, "w"))
+calls = []
+def psql(sql, variables=None, timeout=15):
+    if "public.alert_events" in sql:
+        calls.append({"op": "insert" if "insert into" in sql else "update", "vars": variables}); return ""
+    raise RuntimeError("DB yok (test)")
+m.psql = psql
+m.read_env = lambda: {}
+m.now_epoch = lambda: cfg["now"]
+sent = []
+def post_json(url, payload, headers=None, timeout=8):
+    sent.append({"url": url, "payload": payload}); return True, "HTTP 200"
+m.post_json = post_json
+code = m.main(cfg["argv"])
+print("@@SENT " + json.dumps(sent))
+print("@@CALLS " + json.dumps(calls))
+sys.exit(code)
+`;
+  const dir = mkdtempSync(path.join(tmpdir(), "engine-check-test-"));
+  afterAll(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(path.join(dir, "harness.py"), ENGINE_HARNESS);
+  const engineState = { ...baseState, rules: { engine_stalled: { enabled: true, threshold: 20, repeat_minutes: 60, muted_until: null } } };
+  const stateFile = path.join(dir, "engine-watch.json");
+
+  function check(ageSec: number, nowSec: number, opts: { state?: unknown; enabled?: "0" | "1" } = {}) {
+    const argv = ["engine-check", "--age-sec", String(ageSec), ...(opts.enabled ? ["--engine-enabled", opts.enabled] : [])];
+    const r = spawnSync(
+      "python3",
+      ["-I", "-B", path.join(dir, "harness.py"), JSON.stringify({ script: SCRIPT, tmp: dir, argv, now: nowSec, state: opts.state ?? engineState })],
+      { encoding: "utf8" },
+    );
+    const pick = (tag: string) => JSON.parse(r.stdout.split("\n").find((l) => l.startsWith(`@@${tag} `))?.slice(tag.length + 3) ?? "[]");
+    const line = r.stdout.split("\n").find((l) => l && !l.startsWith("@@")) ?? "";
+    return {
+      code: r.status,
+      line,
+      stderr: r.stderr,
+      sent: pick("SENT") as { payload: { text?: string } }[],
+      calls: pick("CALLS") as { op: string; vars: Record<string, string> }[],
+    };
+  }
+
+  it("nabız eşik altında: olay yok, satır yok", () => {
+    rmSync(stateFile, { force: true });
+    const r = check(10 * 60, 1_000_000);
+    expect(r.code).toBe(0);
+    expect(r.line).toBe("");
+    expect(r.sent).toHaveLength(0);
+    expect(r.calls).toHaveLength(0);
+  });
+
+  it("nabız kesilince uyarı satırı + host olayı; tekrar aralığında hatırlatma; dönünce düzeldi", () => {
+    rmSync(stateFile, { force: true });
+    const t0 = 2_000_000;
+    const fire = check(25 * 60, t0);
+    expect(fire.code).toBe(0);
+    expect(fire.line.startsWith("MOTOR DURDU: gönderildi")).toBe(true);
+    expect(fire.sent).toHaveLength(1);
+    expect(fire.sent[0]!.payload.text).toContain("[UYARI] Uyarı motoru durdu");
+    expect(fire.calls).toEqual([expect.objectContaining({ op: "insert", vars: expect.objectContaining({ rule: "engine_stalled", fp: "engine_stalled" }) })]);
+    expect(JSON.parse(readFileSync(stateFile, "utf8"))).toMatchObject({ alerted: true, notified: true });
+
+    // Aynı kesinti, tekrar aralığı (60 dk) dolmadan: yeni gönderim yok.
+    expect(check(35 * 60, t0 + 10 * 60).sent).toHaveLength(0);
+    // Aralık doldu: [SÜRÜYOR] hatırlatması.
+    const reminder = check(90 * 60, t0 + 61 * 60);
+    expect(reminder.line.startsWith("MOTOR SÜRÜYOR")).toBe(true);
+    expect(reminder.sent[0]!.payload.text).toContain("[SÜRÜYOR]");
+
+    const resolved = check(2 * 60, t0 + 70 * 60);
+    expect(resolved.line.startsWith("MOTOR DÜZELDİ: gönderildi")).toBe(true);
+    expect(resolved.sent[0]!.payload.text).toContain("[DÜZELDİ]");
+    expect(resolved.calls[0]).toMatchObject({ op: "update", vars: { fp: "engine_stalled" } });
+    expect(JSON.parse(readFileSync(stateFile, "utf8"))).toMatchObject({ alerted: false });
+  });
+
+  it("motor ayardan kapalıysa ya da kural kapalıysa uyarı üretilmez", () => {
+    rmSync(stateFile, { force: true });
+    expect(check(999 * 60, 3_000_000, { enabled: "0" }).sent).toHaveLength(0);
+    const off = { ...engineState, rules: { engine_stalled: { enabled: false, threshold: 20, repeat_minutes: 60, muted_until: null } } };
+    const r = check(999 * 60, 3_000_000, { state: off });
+    expect(r.sent).toHaveLength(0);
+    expect(r.calls).toHaveLength(0);
+  });
+
+  it("kural satırı yoksa kod varsayılanı (20 dk / 60 dk); health_down eski önbellek biçimiyle okunur", () => {
+    rmSync(stateFile, { force: true });
+    expect(check(19 * 60, 4_000_000, { state: baseState }).sent).toHaveLength(0);
+    expect(check(21 * 60, 4_000_060, { state: baseState }).sent).toHaveLength(1);
+    expect(run(["rule", "--rule", "engine_stalled"]).stdout.split("\n")[0]).toBe("1 20 0 60");
+    expect(run(["rule"]).stdout.split("\n")[0]).toBe("1 2 0 15");
+  });
+});
+
+describe("error-watch.sh engine_check", () => {
+  const watch = readFileSync(path.join(DIR, "error-watch.sh"), "utf8");
+  const fn = watch.match(/^engine_check\(\) \{[\s\S]*?^\}/m)?.[0] ?? "";
+
+  it("özet satırı JSONL'e 'uyari-motoru' yoluyla yazılır; boş çıktı satır yazmaz", () => {
+    expect(fn).not.toBe("");
+    expect(watch).toMatch(/TICK % 4\)\) = 2 \]; then engine_check/);
+    const out = path.join(tmp, "hatalar.jsonl");
+    for (const [i, msg] of [["a", "MOTOR DURDU: gönderildi: Telegram iletildi"], ["b", ""]] as const) {
+      const fake = path.join(tmp, `engine-${i}.py`);
+      writeFileSync(fake, `print(${JSON.stringify(msg)}, end="")\n`);
+      const sh = `ALERT=${JSON.stringify(fake)}\nALERT_ERR=${JSON.stringify(path.join(tmp, "err.log"))}\nOUT=${JSON.stringify(out)}\n${fn}\nengine_check`;
+      spawnSync("bash", ["-c", sh], { encoding: "utf8" });
+    }
+    const lines = readFileSync(out, "utf8").trim().split("\n");
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0]!)).toMatchObject({ kaynak: "uyari", yol: "uyari-motoru", mesaj: "MOTOR DURDU: gönderildi: Telegram iletildi" });
+  });
+});

@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { isPlanId, normalizeBillingCycle, type BillingCycle, type PlanId } from "@/lib/billing/plans";
+import { adminAssignablePlans, isPlanId, normalizeBillingCycle, planTierOf, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { isCustomPlanIdFormat } from "@/lib/billing/plan-overrides";
 import type { RegistrationTeamSize } from "@/lib/billing/registration-plan";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
@@ -105,9 +106,11 @@ function trMobile(label: string) {
 }
 const ownerPhone = trMobile("Sahip telefonu");
 
-const plan = z.unknown().transform((v, ctx): PlanId => {
+// Biçim denetimi: taban kimlik ya da eklenen paket kimliği biçimi. Katalogda var mı / atanabilir mi
+// `parseOfficeCreateInput` içinde katalogla çözülür (şema saf kalır).
+const plan = z.unknown().transform((v, ctx): string => {
   const s = text(v) || "office";
-  if (!isPlanId(s)) {
+  if (!isPlanId(s) && !isCustomPlanIdFormat(s)) {
     ctx.addIssue({ code: "custom", message: "Paket seçimi geçersiz." });
     return z.NEVER;
   }
@@ -188,7 +191,10 @@ export type OfficeCreateInput = {
   ownerEmail: string;
   ownerPhone: string | null;
   accessMode: OfficeAccessMode;
-  plan: PlanId;
+  /** Seçilen paket kimliği (taban ya da adminden eklenen). */
+  plan: string;
+  /** Paketin modül kademesi: provizyon bu kademenin ekip büyüklüğüyle açar; eklenen pakette sonra paket atanır. */
+  tier: PlanId;
   teamSize: RegistrationTeamSize;
   billingCycle: BillingCycle;
   initialStatus: OfficeInitialStatus;
@@ -202,7 +208,11 @@ export type OfficeCreateParse =
   | { ok: false; error: string; field: string | null };
 
 /** FormData/kayıt -> doğrulanmış girdi. İlk hatayı (alan adıyla) döndürür. */
-export function parseOfficeCreateInput(raw: Record<string, unknown>): OfficeCreateParse {
+/**
+ * `catalog` (getPlanDefinitions) verilirse adminden eklenen paket de kabul edilir (arşivli/gizli şablon hariç,
+ * `adminAssignablePlans`); verilmezse yalnız taban kimlikler (eski davranış).
+ */
+export function parseOfficeCreateInput(raw: Record<string, unknown>, catalog?: readonly PlanDef[]): OfficeCreateParse {
   // Formda gönderilmeyen alan (işaretsiz onay kutusu, boş bırakılan isteğe bağlı alan) undefined gelir.
   const keys = [
     "office_name", "slug", "office_phone", "province_id", "district_id", "address_line", "license_no",
@@ -219,6 +229,16 @@ export function parseOfficeCreateInput(raw: Record<string, unknown>): OfficeCrea
     return { ok: false, error: issue?.message ?? "Form bilgileri doğrulanamadı.", field };
   }
   const v = parsed.data;
+  let tier: PlanId;
+  if (catalog) {
+    const def = adminAssignablePlans(catalog).find((p) => p.id === v.plan);
+    if (!def) return { ok: false, error: "Paket seçimi geçersiz ya da satışa kapalı.", field: "plan" };
+    tier = planTierOf(def);
+  } else if (isPlanId(v.plan)) {
+    tier = v.plan;
+  } else {
+    return { ok: false, error: "Paket seçimi geçersiz.", field: "plan" };
+  }
   return {
     ok: true,
     data: {
@@ -234,7 +254,8 @@ export function parseOfficeCreateInput(raw: Record<string, unknown>): OfficeCrea
       ownerPhone: v.owner_phone,
       accessMode: v.access_mode,
       plan: v.plan,
-      teamSize: teamSizeForPlan(v.plan),
+      tier,
+      teamSize: teamSizeForPlan(tier),
       // Deneme süresi platform politikasıdır (formdan gelmez); faturalama döngüsü yalnız aktif açılışta seçilir,
       // denemede ofis ödeme anında kendisi seçer.
       billingCycle: v.initial_status === "active" ? v.billing_cycle : "monthly",

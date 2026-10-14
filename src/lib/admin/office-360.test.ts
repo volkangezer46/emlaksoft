@@ -76,6 +76,37 @@ describe("office-360", () => {
     expect(limitText(rows[0])).toBe("3 / 10");
     expect(rows[3]!.limit).toBe(6);
   });
+
+  it("limit satırları: etkin sınır = plan + AD1 istisnası + ek koltuk (süresi dolan/geri alınan sayılmaz)", () => {
+    const nowMs = Date.parse("2026-10-14T12:00:00Z");
+    const ov = (id: string, key: "seats" | "customers" | "branches" | "active_properties", delta: number | null, value: number | null, extra: Partial<{ expiresAtMs: number; revokedAtMs: number }> = {}) => ({
+      id,
+      key,
+      delta,
+      value,
+      expiresAtMs: extra.expiresAtMs ?? null,
+      revokedAtMs: extra.revokedAtMs ?? null,
+      createdAtMs: nowMs - 1000,
+    });
+    const overrides = [
+      ov("a", "seats", 3, null),
+      ov("b", "customers", null, 5000),
+      ov("c", "branches", 4, null, { expiresAtMs: nowMs - 1 }),
+      ov("d", "seats", 10, null, { revokedAtMs: nowMs - 1 }),
+    ];
+    const rows = buildLimitRows("office", { seats: 3, properties: 10, customers: 5, branches: 1 }, undefined, undefined, { extraSeats: 2, overrides, nowMs });
+    // Ofis: 5 koltuk + 3 istisna + 2 ek koltuk = 10.
+    expect(rows[0]).toMatchObject({ limit: 10, planLimit: 5, extra: "+2 ek koltuk · 1 istisna" });
+    expect(limitText(rows[0]!)).toBe("3 / 10");
+    // Sınırsız aktif ilan istisnayla sınırlanmaz.
+    expect(rows[1]).toMatchObject({ limit: null, planLimit: null });
+    expect(rows[1]!.extra).toBeUndefined();
+    // Süresi dolan şube istisnası sayılmaz.
+    expect(rows[3]!.limit).toBe(rows[3]!.planLimit);
+    // Katalogdaki (admin düzenlemeli) taban paket limiti kod tanımının önüne geçer.
+    const edited = { ...getPlan("office"), limits: { ...getPlan("office").limits, seats: 7 } };
+    expect(buildLimitRows("office", { seats: 1, properties: 0, customers: 0, branches: 0 }, undefined, [edited])[0]!.limit).toBe(7);
+  });
 });
 
 describe("Ofis 360 tahsilat (dunning) olayları", () => {

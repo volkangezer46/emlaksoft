@@ -320,6 +320,19 @@ export function visiblePlans<T extends Pick<PlanDef, "hidden" | "order" | "archi
     .map(({ d }) => d);
 }
 
+/**
+ * Platform yönetiminde (Yeni ofis formu, Ofis 360 paket seçimi, ofis listesi satır içi seçim) ATANABİLİR paketler:
+ * katalogdaki tüm paketler (adminden eklenenler dahil) — arşivli olanlar ve gizli Business şablonu hariç. Ofisin
+ * kendi paketi (arşivli olsa da) her zaman listede kalır. Herkese açık satış listesi değildir (`visiblePlans`):
+ * fiyat sayfasında gizlenen paket admin tarafından yine atanabilir.
+ */
+export function adminAssignablePlans<T extends Pick<PlanDef, "id" | "hidden" | "archived">>(
+  defs: readonly T[],
+  current?: string | null,
+): T[] {
+  return defs.filter((p) => p.id === current || (!p.archived && !(p.id === "business" && p.hidden)));
+}
+
 export function planLabel(id: string): string {
   return isPlanId(id) ? getPlan(id).name : id;
 }

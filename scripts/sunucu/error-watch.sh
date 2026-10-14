@@ -10,6 +10,11 @@
 # stderr ayrı dosyaya (alert-send.err) gider, stdout yalnız günlük satırıdır. Uygulama çökükken de çalışır
 # (kanallar şifreli önbellekten). Hata akışındaki olaylar ise error_rate_minutely sayacıyla uygulama içi
 # "hata patlaması" kuralına girer (record_error_occurrence). Betik değişince: scripts/sunucu/install-error-watch.sh.
+#
+# MOTOR NABZI (SN2, kural "engine_stalled"): dakikada bir `alert-send.py engine-check` uygulama içi uyarı motorunun
+# kalp atışını (cron_heartbeats 'uyari-motoru', 5 dk'da bir) okur; eşik dakikası (varsayılan 20; Sistem > Uyarılar)
+# boyunca gelmezse kanallara uyarı + alert_events (source='host'), tekrar aralığında hatırlatma, nabız dönünce "düzeldi".
+# Karar ve durum Python tarafında (/run/emlaksoft/engine-watch.json); burada yalnız özet satırı JSONL'e yazılır.
 set -uo pipefail
 DB=supabase-db-moqbebljyeyprktd19zb1ihn
 OUT_DIR=/var/log/emlaksoft
@@ -95,11 +100,22 @@ health_check() {
   fi
 }
 
+# Motor nabzı: karar alert-send.py'de; olay olduysa tek özet satırı döner ve JSONL'e yazılır (boşsa sessiz).
+engine_check() {
+  local out t
+  out=$(python3 -I "$ALERT" engine-check 2>>"$ALERT_ERR") || out=""
+  [ -n "$out" ] || return 0
+  t=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '{"zaman":"%s","kaynak":"uyari","tekrar":1,"digest":null,"yol":"uyari-motoru","mesaj":%s}\n' "$t" \
+    "$(printf '%s' "$out" | python3 -I -c 'import sys,json; print(json.dumps(sys.stdin.read()[:400]))')" >> "$OUT"
+}
+
 python3 -I "$ALERT" refresh >/dev/null 2>&1 || true
 
 while true; do
   TICK=$((TICK + 1))
   if [ $((TICK % 2)) = 1 ]; then health_check; fi
+  if [ $((TICK % 4)) = 2 ]; then engine_check; fi
   # Kanal/kural önbelleği 5 dakikada bir (DB çökerse son şifreli kopya kullanılır).
   if [ $((TICK % 20)) = 0 ]; then python3 -I "$ALERT" refresh >/dev/null 2>&1 || true; fi
   ROWS=$(docker exec "$DB" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c "

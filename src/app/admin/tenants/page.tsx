@@ -31,7 +31,8 @@ import { requirePlatformModule } from "@/lib/platform";
 import { platformCanAccess } from "@/lib/platform-access";
 import { fetchAllPaged } from "@/lib/cron-run";
 import { Pagination, PAGE_SIZE, pageRange } from "@/app/admin/_components/pagination";
-import { isPlanId } from "@/lib/billing/plans";
+import { adminAssignablePlans, isPlanId } from "@/lib/billing/plans";
+import { isCustomPlanIdFormat } from "@/lib/billing/plan-overrides";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import {
   DISTRIBUTION_LABELS,
@@ -98,7 +99,8 @@ export default async function AdminTenantsPage({
   };
   const canManageTags = staff.role === "super_admin" || staff.role === "ops";
   const raw = (await searchParams) ?? {};
-  const f = parseTenantFilters(raw, isPlanId);
+  // Paket süzgeci: taban kimlik ya da adminden eklenen paket kimliği (dağılım çubukları eklenen paketi de süzer).
+  const f = parseTenantFilters(raw, (id) => isPlanId(id) || isCustomPlanIdFormat(id));
   const page = f.sayfa ?? 1;
   const filtered = isFiltered(f);
   const auditFailed = raw.audit === "failed";
@@ -496,7 +498,8 @@ export default async function AdminTenantsPage({
             // Süzgeç/sayfa değişince toplu seçim sıfırlanır (layout-router arama parametresinde durumu korur).
             key={tenantsHref(f)}
             rows={tableRows}
-            plans={planDefs.map((p, i) => ({ id: p.id, name: p.name, order: p.order ?? i, hidden: Boolean(p.hidden) }))}
+            // Satır içi paket seçimi: atanabilir paketler (adminden eklenenler dahil); diğerleri yalnız ofisin kendi paketiyse görünür.
+            plans={planDefs.map((p, i) => ({ id: p.id, name: p.name, order: p.order ?? i, hidden: !adminAssignablePlans([p]).length }))}
             perms={perms}
             bulk={catalog.ready ? { perms: bulkPerms, tags: catalog.tags, staff: catalog.staff } : null}
           />

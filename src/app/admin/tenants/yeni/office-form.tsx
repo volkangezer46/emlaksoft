@@ -35,7 +35,7 @@ import {
   type OfficeInitialStatus,
 } from "@/lib/admin/office-create-rules";
 import { OFFICE_SLUG_MAX, sanitizeSlugTyping, slugifyOffice, validateOfficeSlug } from "@/lib/admin/office-slug";
-import { getPlan, isPlanId, normalizeBillingCycle, planAmountTry, PLANS, type PlanDef } from "@/lib/billing/plans";
+import { normalizeBillingCycle, planAmountOf, type PlanDef } from "@/lib/billing/plans";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 import { OFFICE_CREATE_TABS, tabLabelForField } from "./office-tabs";
@@ -96,11 +96,14 @@ export function OfficeForm({
   provinces,
   canCreateActive,
   trialDays,
+  plans,
 }: {
   provinces: Province[];
   canCreateActive: boolean;
   /** Platform politikası (Ayar Kayıt Defteri); formdan değiştirilemez. */
   trialDays: number;
+  /** Atanabilir paketler (katalog: taban + adminden eklenen; `adminAssignablePlans`), sıralı. */
+  plans: PlanDef[];
 }) {
   const [result, setResult] = useState<CreateOfficeResult | null>(null);
   // "Bir ofis daha ekle": formu sıfırdan kurmak için anahtar değişir (tüm alanlar ve parola bellekten gider).
@@ -117,20 +120,26 @@ export function OfficeForm({
       />
     );
   }
-  return <OfficeFormInner key={formKey} provinces={provinces} canCreateActive={canCreateActive} trialDays={trialDays} onCreated={setResult} />;
+  return (
+    <OfficeFormInner key={formKey} provinces={provinces} canCreateActive={canCreateActive} trialDays={trialDays} plans={plans} onCreated={setResult} />
+  );
 }
 
 function OfficeFormInner({
   provinces,
   canCreateActive,
   trialDays,
+  plans,
   onCreated,
 }: {
   provinces: Province[];
   canCreateActive: boolean;
   trialDays: number;
+  plans: PlanDef[];
   onCreated: (result: CreateOfficeResult) => void;
 }) {
+  // Varsayılan seçim Ofis paketi; katalogda yoksa ilk paket.
+  const defaultPlan = plans.find((p) => p.id === "office") ?? plans[0]!;
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [officeName, setOfficeName] = useState("");
@@ -389,11 +398,11 @@ function OfficeFormInner({
             Paket<span aria-hidden="true" className="ml-0.5 text-danger-500">*</span>
           </legend>
           <div className="grid gap-3 sm:grid-cols-2">
-            {PLANS.filter((p) => !p.hidden).map((p) => {
-              const yearlyMonthly = Math.round(planAmountTry(p.id, "yearly") / 12);
+            {plans.map((p) => {
+              const yearlyMonthly = Math.round(planAmountOf(p, "yearly") / 12);
               return (
                 <label key={p.id} className="group relative cursor-pointer">
-                  <input type="radio" name="plan" value={p.id} defaultChecked={p.id === "office"} required className="peer sr-only" />
+                  <input type="radio" name="plan" value={p.id} defaultChecked={p.id === defaultPlan.id} required className="peer sr-only" />
                   <span className={planCard}>
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0">
@@ -599,8 +608,7 @@ function OfficeFormInner({
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
-    const planId = isPlanId(values.plan ?? "") ? (values.plan as string) : "office";
-    const plan = getPlan(planId);
+    const plan = plans.find((p) => p.id === values.plan) ?? defaultPlan;
     const cycle = normalizeBillingCycle(values.billing_cycle);
     const status = ((values.initial_status as OfficeInitialStatus | undefined) ?? "trial") as OfficeInitialStatus;
     const mode = ((values.access_mode as OfficeAccessMode | undefined) ?? "link") as OfficeAccessMode;
@@ -654,7 +662,7 @@ function OfficeFormInner({
               status !== "active"
                 ? `${tl(plan.monthlyTry)}/ay · döngü ödemede seçilir`
                 : cycle === "yearly"
-                  ? `${tl(planAmountTry(plan.id, "yearly"))}/yıl`
+                  ? `${tl(planAmountOf(plan, "yearly"))}/yıl`
                   : `${tl(plan.monthlyTry)}/ay`
             }
             tab="paket"

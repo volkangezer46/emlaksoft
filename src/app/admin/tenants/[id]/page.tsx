@@ -26,7 +26,7 @@ import { AccountCreditPanel, type CreditGrantOption, type CreditMovementRow } fr
 import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
-import { getPlan, planLabelIn } from "@/lib/billing/plans";
+import { adminAssignablePlans, getPlan, planLabelIn } from "@/lib/billing/plans";
 import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
@@ -59,8 +59,7 @@ import { loadTenantModuleState } from "@/lib/modules/state";
 import { SubscriptionOpsConsole, SubscriptionPanel, type LimitView } from "./subscription-panel";
 import { PaymentProfilePanel } from "./payment-profile-panel";
 import { loadPaymentProfile, loadSubscriptionOps } from "@/lib/billing/subscription-ops";
-import { resolveEntitlementLimit, resolveSeatLimit } from "@/lib/billing/entitlements/overrides";
-import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { OfficeFinanceCard } from "@/app/admin/billing/muhasebe/office-finance-card";
 import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
@@ -125,7 +124,9 @@ export default async function AdminTenantDetailPage({
 
   // Ofis satırı ve KPI okumaları yalnız `id`'ye bağlı → tek tur (önceden ardışık iki tur; ofis yoksa notFound yine kesinti).
   // CRM (AD5) başlığı da aynı turda: skor/aşama/sorumlu/etiket + "Görevlerim"; not/görev/trend yalnız İlişki sekmesinde.
-  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold, catalogDefs] = await Promise.all([
+  // Etkin limit (AD1 istisnası + ek koltuk) KPI şeridinde ve her sekmede gerekir: abonelik/istisna okuması da aynı turda.
+  const nowMs = now();
+  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold, catalogDefs, ops] = await Promise.all([
     admin
       .from("tenants")
       .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
@@ -136,11 +137,12 @@ export default async function AdminTenantDetailPage({
     loadCrmCatalog(admin),
     getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD),
     getPlanDefinitions(),
+    loadSubscriptionOps(admin, id, nowMs),
   ]);
   if (!tenant) notFound();
   // Paket seçenekleri katalogdan (adminden eklenenler dahil; arşivli paket yalnız ofisin kendi paketiyse listelenir).
-  // Business (gizli şablon) eskisi gibi listede yok; ofisin kendi paketi her zaman listede.
-  const planOptions = catalogDefs.filter((p) => p.id === tenant.plan || (!p.archived && p.id !== "business"));
+  // Business (gizli şablon) listede yok; ofisin kendi paketi her zaman listede (tek kural: adminAssignablePlans).
+  const planOptions = adminAssignablePlans(catalogDefs, tenant.plan);
 
   const base = `/admin/tenants/${id}`;
   const tabHref = (t: OfficeTab) => `${base}?sekme=${t}`;
@@ -150,6 +152,7 @@ export default async function AdminTenantDetailPage({
     { seats: kpiData.seats, properties: kpiData.properties, customers: kpiData.customers, branches: kpiData.branches },
     access.members ? tabHref("ekip") : undefined,
     catalogDefs,
+    { extraSeats: ops.sub.extraSeats, overrides: ops.overrides, nowMs },
   );
   const seatRow = limitRows[0];
   const propRow = limitRows[1];
@@ -192,7 +195,6 @@ export default async function AdminTenantDetailPage({
 
   // ---- Aktif sekmenin içeriği (yalnız gereken veri çekilir) ----
   let content: ReactNode = null;
-  const nowMs = now();
   const staffName = (sid: string) => crmCatalog.staff.find((s) => s.id === sid)?.name ?? null;
   const crmCanEdit = officeAdminCan(staff, "note");
   const crmStage = effectiveStage(crm.stage, tenant.status ?? "trial");
@@ -245,7 +247,7 @@ export default async function AdminTenantDetailPage({
         ownerCount={mgmt.ownerCount}
         members={mgmt.members}
         activeSeats={mgmt.activeSeats}
-        seatLimit={plan.limits.seats}
+        seatLimit={seatRow?.limit ?? plan.limits.seats}
         notes={mgmt.notes.map((n) => ({ ...n, createdLabel: relativeTimeTR(n.createdAt) }))}
         provinces={mgmt.provinces}
         plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
@@ -311,8 +313,7 @@ export default async function AdminTenantDetailPage({
       );
     }
   } else if (active === "abonelik") {
-    const nowMs = now();
-    const [{ data: invoices }, { data: captures }, seatInfo, creditData, ops, payment, planDef] = await Promise.all([
+    const [{ data: invoices }, { data: captures }, seatInfo, creditData, payment] = await Promise.all([
       admin
         .from("invoices")
         .select("id, invoice_no, status, total_try, due_at, paid_at, created_at")
@@ -329,17 +330,12 @@ export default async function AdminTenantDetailPage({
       loadAdminSeatInfo(admin, id, tenant.plan ?? "office", kpiData.seats),
       // Hesap kredisi yalnız süper admin: bakiye (RPC), son hareketler ve geri alma seçimi (aynı admin istemcisi).
       platformCan(staff, "billing", "approve") ? loadCreditData(admin, id) : Promise.resolve(null),
-      // Abonelik operasyon konsolu (AD1) + ödeme profili: aynı turda, aynı admin istemcisi.
-      loadSubscriptionOps(admin, id, nowMs),
+      // Ödeme profili: aynı turda (abonelik operasyon verisi `ops` sayfa başında okundu).
       loadPaymentProfile(admin, id),
-      getPlanDefinition(tenant.plan ?? "office"),
     ]);
-    const opsLimits: LimitView[] = [
-      { key: "seats", plan: planDef.limits.seats, effective: resolveSeatLimit(planDef.limits.seats, ops.sub.extraSeats, ops.overrides, nowMs), used: kpiData.seats },
-      { key: "active_properties", plan: planDef.limits.activeProperties, effective: resolveEntitlementLimit(planDef.limits.activeProperties, "active_properties", ops.overrides, nowMs), used: kpiData.properties },
-      { key: "customers", plan: planDef.limits.customers, effective: resolveEntitlementLimit(planDef.limits.customers, "customers", ops.overrides, nowMs), used: kpiData.customers },
-      { key: "branches", plan: planDef.limits.branches, effective: resolveEntitlementLimit(planDef.limits.branches, "branches", ops.overrides, nowMs), used: kpiData.branches },
-    ];
+    // Konsol limit tablosu sayfa başındaki etkin limit satırlarıyla AYNI kaynaktan (çift hesap yok).
+    const OPS_KEY: Record<string, LimitView["key"]> = { seats: "seats", properties: "active_properties", customers: "customers", branches: "branches" };
+    const opsLimits: LimitView[] = limitRows.map((r) => ({ key: OPS_KEY[r.key]!, plan: r.planLimit ?? null, effective: r.limit, used: r.used }));
     content = (
       <div className="space-y-6">
         {access.billing ? (
