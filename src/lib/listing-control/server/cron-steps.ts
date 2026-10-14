@@ -17,6 +17,11 @@ import { runDailyMatch } from "./daily-match";
 
 export type ControlStepSummary = { text: string; ok: boolean };
 
+/** Üyelik süzgeci satır tavanında kesildiyse heartbeat metnine açık not (kısmi süzgeç sessiz geçmez). */
+function truncNote(plan: { skipListTruncated: number }): string {
+  return plan.skipListTruncated > 0 ? ` (üyelik süzgeci ${plan.skipListTruncated} ofiste kısmi: satır tavanı)` : "";
+}
+
 export async function runControlStepFrequent(db: Db, disabledTenantIds: ReadonlySet<string>): Promise<ControlStepSummary> {
   const startedAt = now();
   const cache = new Map<string, Awaited<ReturnType<typeof loadListingControlConfig>>>();
@@ -36,7 +41,7 @@ export async function runControlStepFrequent(db: Db, disabledTenantIds: Readonly
     const plan = await planVerificationJobs(db, loadCfg, now());
     return {
       ok: true,
-      text: `ilan kontrol: ${events.taken} olay, ${sweep.examined} portföy, ${sweep.anomaliesOpened}+${sweep.anomaliesReopened} anomali açıldı, ${sweep.anomaliesClosed} kapandı, ${plan.enqueued} iş, ${reaped.requeued}/${reaped.failed} hasat`,
+      text: `ilan kontrol: ${events.taken} olay, ${sweep.examined} portföy, ${sweep.anomaliesOpened}+${sweep.anomaliesReopened} anomali açıldı, ${sweep.anomaliesClosed} kapandı, ${plan.enqueued} iş${truncNote(plan)}, ${reaped.requeued}/${reaped.failed} hasat`,
     };
   } catch (err) {
     console.error("runControlStepFrequent", err);
@@ -91,7 +96,7 @@ export async function runControlStepBroad(db: Db, opts: { disabledTenantIds?: Re
         dupText += " · günlük eşleştirme başarısız";
       }
     }
-    return { ok: true, text: `${plan.enqueued} kontrol işi planlandı (${plan.tenantsWithClients} cihazlı ofis), ${reaped.requeued} hasat${dupText}` };
+    return { ok: true, text: `${plan.enqueued} kontrol işi planlandı (${plan.tenantsWithClients} cihazlı ofis)${truncNote(plan)}, ${reaped.requeued} hasat${dupText}` };
   } catch (err) {
     console.error("runControlStepBroad", err);
     return { ok: false, text: "kontrol planlama başarısız" };

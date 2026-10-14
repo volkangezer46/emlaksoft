@@ -4,6 +4,7 @@ import { findRecentKeysByPrefix, insertNotificationsDetailed, type NotificationR
 import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { buildDedupeKey, timeBucket } from "@/lib/notify-dedupe";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { getDisabledModulesByTenant, isDisabledFor, skippedTenantsNote, tenantsDisabledFor } from "@/lib/modules/state";
 import { resolvePriceHealth } from "@/lib/comparables";
 import { authorizeCron } from "@/lib/cron-auth";
@@ -117,42 +118,74 @@ async function recentlyVerifiedListingIds(
   return out;
 }
 
+/** Üyelik girdileri için açık satır tavanı (sayfalı okuma; aşılırsa heartbeat'e "kısmi" notu düşer). */
+const MEMBERSHIP_MAX_ROWS = 20_000;
+
 /**
  * EP1 üyelik girdileri: üyeliği "none" olan portallar (ofis → portal) ve eklentisi (iptal edilmemiş verification_clients) olan
  * ofisler. Tablo yoksa/okunamazsa: none boş, eklenti kümesi null (eski davranış: ilan başına günlük uyarı).
+ * `truncated`: satır tavanına ulaşan okumaların adları (liste TAM DEĞİL; heartbeat 'error' olur).
  */
-async function loadMembershipInputs(admin: ReturnType<typeof createAdminClient>): Promise<{ nonePortals: NonePortals; withExtension: Set<string> | null }> {
+async function loadMembershipInputs(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<{ nonePortals: NonePortals; withExtension: Set<string> | null; truncated: string[] }> {
   const nonePortals = new Map<string, Set<string>>();
   const [accounts, clients] = await Promise.all([
-    admin.from("tenant_portal_accounts").select("tenant_id, portal").eq("status", "none").limit(5000),
-    admin.from("verification_clients").select("tenant_id").is("revoked_at", null).limit(5000),
+    readAllPaged<{ tenant_id: string; portal: string }>(
+      (from, to) =>
+        admin
+          .from("tenant_portal_accounts")
+          .select("tenant_id, portal")
+          .eq("status", "none")
+          .order("tenant_id", { ascending: true })
+          .order("portal", { ascending: true })
+          .range(from, to),
+      { maxRows: MEMBERSHIP_MAX_ROWS },
+    ),
+    readAllPaged<{ id: string; tenant_id: string }>(
+      (from, to) =>
+        admin.from("verification_clients").select("id, tenant_id").is("revoked_at", null).order("id", { ascending: true }).range(from, to),
+      { maxRows: MEMBERSHIP_MAX_ROWS },
+    ),
   ]);
   if (!accounts.error) {
-    for (const r of (accounts.data ?? []) as { tenant_id: string; portal: string }[]) {
+    for (const r of accounts.rows) {
       const set = nonePortals.get(r.tenant_id) ?? new Set<string>();
       set.add(r.portal);
       nonePortals.set(r.tenant_id, set);
     }
   }
-  const withExtension = clients.error ? null : new Set(((clients.data ?? []) as { tenant_id: string }[]).map((r) => String(r.tenant_id)));
-  return { nonePortals, withExtension };
+  const withExtension = clients.error ? null : new Set(clients.rows.map((r) => String(r.tenant_id)));
+  const truncated: string[] = [];
+  if (accounts.truncated) truncated.push("portal üyelikleri");
+  if (clients.truncated) truncated.push("eklenti istemcileri");
+  return { nonePortals, withExtension, truncated };
 }
 
 /**
  * Üyeliği "none" olan portallardaki canlı ilanlar (tek seferlik uyarı için). portal_name birebir süzülmez: eski ya da
  * aktarım/eşleme yoluyla "Sahibinden" yazılmış satırlar da yakalansın diye eşleme bellekte (planPortalTeyit →
- * portalIdFromName) yapılır; burada yalnız ilgili ofislerin canlı ilanları okunur.
+ * portalIdFromName) yapılır; burada yalnız ilgili ofislerin canlı ilanları okunur (sayfalı, açık tavanlı).
  */
-async function loadNonMemberLive(admin: ReturnType<typeof createAdminClient>, none: NonePortals): Promise<TeyitListing[]> {
-  if (none.size === 0) return [];
-  const { data, error } = await admin
-    .from("portal_listings")
-    .select("id, tenant_id, portal_name, portal_listing_id")
-    .eq("status", "live")
-    .in("tenant_id", [...none.keys()])
-    .limit(5000);
-  if (error) return [];
-  return ((data ?? []) as TeyitListing[]).filter((l) => isNonMemberListing(l, none));
+async function loadNonMemberLive(
+  admin: ReturnType<typeof createAdminClient>,
+  none: NonePortals,
+): Promise<{ rows: TeyitListing[]; truncated: boolean }> {
+  if (none.size === 0) return { rows: [], truncated: false };
+  const tenantIds = [...none.keys()];
+  const res = await readAllPaged<TeyitListing>(
+    (from, to) =>
+      admin
+        .from("portal_listings")
+        .select("id, tenant_id, portal_name, portal_listing_id")
+        .eq("status", "live")
+        .in("tenant_id", tenantIds)
+        .order("id", { ascending: true })
+        .range(from, to),
+    { maxRows: MEMBERSHIP_MAX_ROWS },
+  );
+  if (res.error) return { rows: [], truncated: false };
+  return { rows: res.rows.filter((l) => isNonMemberListing(l, none)), truncated: res.truncated };
 }
 
 async function run(req: NextRequest) {
@@ -196,7 +229,8 @@ async function run(req: NextRequest) {
   // EP1: üyelik süzgeci. "none" portaldaki ilan teyit uyarısı almaz (tek seferlik "üyelik dışı" uyarısı); eklentisi olmayan
   // ofise ilan başına günlük uyarı yerine haftalık tek özet gider.
   const membership = await loadMembershipInputs(admin);
-  const nonMemberLive = (await loadNonMemberLive(admin, membership.nonePortals)).filter(
+  const nonMemberRead = await loadNonMemberLive(admin, membership.nonePortals);
+  const nonMemberLive = nonMemberRead.rows.filter(
     (row) => !isDisabledFor(disabledModules, String(row.tenant_id), "portals"),
   );
   const plan = planPortalTeyit({
@@ -283,12 +317,15 @@ async function run(req: NextRequest) {
   // Gece turunda kopya portföy taraması da burada yürür (portals modülü kapalı ofisler atlanır).
   const control = await runControlStepBroad(admin, { disabledTenantIds: new Set(tenantsDisabledFor(disabledModules, "portals")) });
 
+  // Sayfalı okumada satır tavanına ulaşıldıysa liste TAM DEĞİL: sessizce "ok" sayılmaz.
+  const truncatedReads = [...membership.truncated, ...(nonMemberRead.truncated ? ["üyelik dışı canlı ilanlar"] : [])];
+  const truncatedNote = truncatedReads.length > 0 ? `kısmi okuma (satır tavanı ${MEMBERSHIP_MAX_ROWS}): ${truncatedReads.join(", ")}` : null;
   const hb = heartbeatFor({
     total: listings.length,
     processed: listings.length,
     failed: insertResult.failed,
     timedOut: false,
-    listError,
+    listError: [listError, truncatedNote].filter(Boolean).join(" · ") || null,
     summary: `${notified} teyit uyarısı · ${plan.weekly.length} haftalık elle teyit özeti (eklentisiz ofis) · ${plan.outOfMembership.length} üyelik dışı canlı ilan · ${skippedRecent + insertResult.duplicates} daha önce bildirilmiş · ${recentlyVerified.size} kontrol sistemince doğrulanmış · ${priceHealthUpdated} fiyat sağlığı · ${control.text}${skippedTenantsNote(disabledModules, "portals")}${extraTenants.length > 0 && !dedupeReady ? " · özet ve üyelik dışı uyarıları atlandı (dedupe kolonu yok)" : ""}`,
   });
   await recordHeartbeat("portal-teyit", hb.status, hb.detail);

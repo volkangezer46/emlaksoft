@@ -4,6 +4,7 @@ import type { CheckState } from "../types";
 import { chunk, isMissingSchema, type Db } from "./db";
 import { loadPortalAccountsForTenants, type PortalAccountRow } from "@/lib/portals/membership";
 import { portalIdFromName } from "@/lib/portals/catalog";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 
 /**
  * Kontrol KUYRUĞU (sunucu): planlama, hasat, talep. Kuyruk yalnız çevrimiçi kontrol istemcisi (cihaz) olan ofisler
@@ -20,7 +21,14 @@ export function excludedCheckPortals(rows: readonly PortalAccountRow[]): string[
   return rows.filter((r) => r.status === "none" || !r.check_enabled).map((r) => r.portal);
 }
 
-export type PlanSummary = { tenantsWithClients: number; considered: number; enqueued: number; schemaMissing: boolean };
+export type PlanSummary = {
+  tenantsWithClients: number;
+  considered: number;
+  enqueued: number;
+  schemaMissing: boolean;
+  /** Üyelik süzgeci listesi satır tavanında kesilen ofis sayısı (süzgeç kısmi: tavan dışındaki ilanlara iş açılabilir). */
+  skipListTruncated: number;
+};
 
 type HealthDue = {
   portal_listing_id: string;
@@ -36,9 +44,11 @@ type HealthDue = {
 /** Planlanan iş sayısı için üst sınır (tur başına; adil paylaşım ofis başına eşit parçalanır). */
 const PER_TENANT_LIMIT = 100;
 const TOTAL_LIMIT = 1000;
+/** Üyelik süzgeci için ofis başına okunan canlı ilan tavanı (sayfalı). */
+const SKIP_LIST_MAX_ROWS = 10_000;
 
 export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) => Promise<ListingControlConfig>, nowMs: number): Promise<PlanSummary> {
-  const summary: PlanSummary = { tenantsWithClients: 0, considered: 0, enqueued: 0, schemaMissing: false };
+  const summary: PlanSummary = { tenantsWithClients: 0, considered: 0, enqueued: 0, schemaMissing: false, skipListTruncated: 0 };
   const { data: clients, error: cErr } = await db
     .from("verification_clients")
     .select("id, tenant_id")
@@ -97,8 +107,13 @@ export async function planVerificationJobs(db: Db, cfgFor: (tenantId: string) =>
     const excluded = new Set(excludedCheckPortals(accounts.get(tenantId) ?? []));
     const skip = new Set<string>();
     if (excluded.size > 0) {
-      const { data: ex } = await db.from("portal_listings").select("id, portal_name").eq("tenant_id", tenantId).eq("status", "live").limit(5000);
-      for (const r of (ex ?? []) as { id: string; portal_name: string | null }[]) {
+      const ex = await readAllPaged<{ id: string; portal_name: string | null }>(
+        (from, to) =>
+          db.from("portal_listings").select("id, portal_name").eq("tenant_id", tenantId).eq("status", "live").order("id", { ascending: true }).range(from, to),
+        { maxRows: SKIP_LIST_MAX_ROWS },
+      );
+      if (ex.truncated) summary.skipListTruncated += 1;
+      for (const r of ex.rows) {
         const id = portalIdFromName(r.portal_name);
         if (id && excluded.has(id)) skip.add(r.id);
       }

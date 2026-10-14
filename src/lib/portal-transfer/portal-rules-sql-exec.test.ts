@@ -218,7 +218,11 @@ describe.skipIf(!mod)("öğrenen portal kuralları (pglite)", () => {
     expect(votes.filter((v) => v.tenant_id === big)).toEqual([{ tenant_id: big, stance: 1, sessions_n: 10, eligible: true }]);
     expect(votes.find((v) => v.tenant_id === bad)).toMatchObject({ stance: -1, eligible: false });
     const p = (await q(`select state, support_tenants, contradict_tenants, support_sessions, weeks_n, confidence from public.portal_rule_proposals where proposal_key = $1`, [key]))[0]!;
-    expect(p).toMatchObject({ state: "ready", support_tenants: 4, contradict_tenants: 0, weeks_n: 2 });
+    expect(p).toMatchObject({ state: "ready", support_tenants: 4, contradict_tenants: 0 });
+    // Olaylar now()'a göre 2–12 gün önce: takvim haftası sayısı haftanın gününe göre 2 ya da 3 olur (10 ve 2 gün önce her
+    // zaman ayrı haftalardır). Kural yalnız ≥2 hafta ister; sabit 2 beklemek testi güne bağımlı yapıyordu.
+    expect(Number(p.weeks_n)).toBeGreaterThanOrEqual(2);
+    expect(Number(p.weeks_n)).toBeLessThanOrEqual(3);
     expect(Number(p.support_sessions)).toBe(16);
     expect(Number(p.confidence)).toBeCloseTo(0.596, 3);
     expect((summary.ready as { field_key: string }[]).some((r) => r.field_key === "heating")).toBe(true);

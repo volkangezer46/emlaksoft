@@ -233,8 +233,8 @@ describe("öneri kanıtı kullanıcının yetkisinden bağımsız (portal_member
     const chain = (table: string) => {
       const result = { data: opts.visible[table] ?? [], error: null };
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "not", "gte", "like"]) q[m] = () => q;
-      q.limit = async () => result;
+      for (const m of ["select", "eq", "not", "gte", "like", "order"]) q[m] = () => q;
+      q.range = async () => result;
       return q;
     };
     return { rpc: async () => opts.rpc, from: chain } as unknown as Parameters<typeof loadPortalEvidence>[0];

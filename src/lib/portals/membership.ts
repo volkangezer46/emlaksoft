@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { daysAgoIso } from "@/lib/clock";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import {
   CURRENT_PORTALS,
@@ -70,6 +71,8 @@ export type PortalMembership = {
   suggestion: PortalSuggestion | null;
 };
 
+/** Doğrudan kanıt okumasında tablo başına açık satır tavanı (RPC yokken; sayfalı). */
+const EVIDENCE_MAX_ROWS = 5000;
 const EMPTY_EVIDENCE: PortalEvidence = { liveListings: 0, expenses: 0, leads: 0 };
 const ROW_COLUMNS =
   "portal, status, check_enabled, source, account_label, store_url, plan_ends_at, last_login_ok_at, last_login_fail_at, login_fail_streak, updated_at";
@@ -233,16 +236,31 @@ export async function loadPortalEvidence(db: Db, tenantId: string): Promise<Reco
   if (rpc.error && !isMissing(rpc.error) && !/could not find the function/i.test(String(rpc.error.message ?? ""))) {
     console.error("portal_membership_evidence", { code: rpc.error.code });
   }
+  // Sayfalı okuma (PostgREST max_rows 1000'de sessizce kesmesin), deterministik sıra + açık tavan. Tavana ulaşılırsa sayılar
+  // ALT SINIRDIR (öneri yalnız "> 0" kanıta bakar, karar değişmez); kesinti yine de günlüğe yazılır, sessiz geçilmez.
   const since = daysAgoIso(365);
   const [listings, expenses, leads] = await Promise.all([
-    db.from("portal_listings").select("portal_name").eq("tenant_id", tenantId).eq("status", "live").limit(5000),
-    db.from("expenses").select("portal_key").eq("tenant_id", tenantId).not("portal_key", "is", null).gte("created_at", since).limit(2000),
-    db.from("customers").select("lead_source").eq("tenant_id", tenantId).like("lead_source", "portal_%").gte("created_at", since).limit(2000),
+    readAllPaged<{ id: string; portal_name: string | null }>(
+      (from, to) => db.from("portal_listings").select("id, portal_name").eq("tenant_id", tenantId).eq("status", "live").order("id", { ascending: true }).range(from, to),
+      { maxRows: EVIDENCE_MAX_ROWS },
+    ),
+    readAllPaged<{ id: string; portal_key: string | null }>(
+      (from, to) =>
+        db.from("expenses").select("id, portal_key").eq("tenant_id", tenantId).not("portal_key", "is", null).gte("created_at", since).order("id", { ascending: true }).range(from, to),
+      { maxRows: EVIDENCE_MAX_ROWS },
+    ),
+    readAllPaged<{ id: string; lead_source: string | null }>(
+      (from, to) =>
+        db.from("customers").select("id, lead_source").eq("tenant_id", tenantId).like("lead_source", "portal_%").gte("created_at", since).order("id", { ascending: true }).range(from, to),
+      { maxRows: EVIDENCE_MAX_ROWS },
+    ),
   ]);
+  const truncated = [listings.truncated && "portal_listings", expenses.truncated && "expenses", leads.truncated && "customers"].filter(Boolean);
+  if (truncated.length > 0) console.warn("portal kanıtı satır tavanında kesildi (sayılar alt sınır)", { tables: truncated, maxRows: EVIDENCE_MAX_ROWS });
   return tallyEvidence({
-    liveListingPortals: listings.error ? [] : ((listings.data ?? []) as { portal_name: string | null }[]).map((r) => r.portal_name),
-    expensePortalKeys: expenses.error ? [] : ((expenses.data ?? []) as { portal_key: string | null }[]).map((r) => r.portal_key),
-    leadSources: leads.error ? [] : ((leads.data ?? []) as { lead_source: string | null }[]).map((r) => r.lead_source),
+    liveListingPortals: listings.error ? [] : listings.rows.map((r) => r.portal_name),
+    expensePortalKeys: expenses.error ? [] : expenses.rows.map((r) => r.portal_key),
+    leadSources: leads.error ? [] : leads.rows.map((r) => r.lead_source),
   });
 }
 

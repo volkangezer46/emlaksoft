@@ -8,6 +8,7 @@
  * kaldırılması). İdari para cezası aralığı 2026 için 28.620 – 858.620 TL'dir (yılbaşında yeniden değerleme: TEK YER burası).
  */
 import { DAY_MS, TR_OFFSET_MS, trDayKey } from "@/lib/clock";
+import { PORTAL_LABELS } from "@/lib/portals/catalog";
 
 export const EIDS_TASK_KINDS = ["eids_publish", "eids_takedown"] as const;
 export type EidsTaskKind = (typeof EIDS_TASK_KINDS)[number];
@@ -36,10 +37,8 @@ export const TAKEDOWN_TARGET_LABELS: Record<string, string> = {
   vitrin: "EmlakSoft vitrini",
   paylasim: "Paylaşım bağlantıları",
   sosyal: "Sosyal medya kartı / paylaşımları",
-  sahibinden: "Sahibinden",
-  hepsiemlak: "Hepsiemlak",
-  emlakjet: "Emlakjet",
-  zingat: "Zingat",
+  // Portal adları katalogdan (tek kaynak); geçmiş portal da eski kalemleri göstermek için dahil.
+  ...PORTAL_LABELS,
 };
 
 export function takedownTargetLabel(target: string): string {
