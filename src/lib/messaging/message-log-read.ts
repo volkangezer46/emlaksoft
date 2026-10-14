@@ -114,20 +114,37 @@ export async function loadMessageLog(f: MessageLogFilters): Promise<MessageLogPa
   const [list, ...counts] = await Promise.all([q.range(from, from + f.pageSize - 1), ...MESSAGE_STATUSES.map(countFor)]);
   if (list.error) {
     if (MISSING.has(list.error.code ?? "")) return { installed: false, rows: [], total: 0, tenantNames: new Map(), statusCounts: {} };
+    // Sayfa sınır dışı (elle yazılan ?sayfa=999 ya da süzgeç sonrası bayat bağlantı): Entegrasyon merkezi hata ekranına
+    // düşmesin; boş sayfa + süzgecin gerçek toplamı (durum sayılarının toplamı ya da seçili durumun sayısı) döner.
+    if (list.error.code === "PGRST103") {
+      const statusCounts = countsOf(counts);
+      const total = f.status ? (statusCounts[f.status] ?? 0) : Object.values(statusCounts).reduce((a, b) => a + (b ?? 0), 0);
+      return { installed: true, rows: [], total, tenantNames: await tenantNamesFor(admin, tenantId ? [tenantId] : []), statusCounts };
+    }
     throw new Error(`message_sends read failed: ${list.error.code}`);
   }
   const rows = (list.data ?? []) as MessageSendRow[];
-  const statusCounts: Partial<Record<MessageLogStatus, number>> = {};
+  const statusCounts = countsOf(counts);
+  const tenantNames = await tenantNamesFor(admin, [...rows.map((r) => r.tenant_id), tenantId]);
+  return { installed: true, rows, total: list.count ?? rows.length, tenantNames, statusCounts };
+}
+
+function countsOf(counts: { count: number | null }[]): Partial<Record<MessageLogStatus, number>> {
+  const out: Partial<Record<MessageLogStatus, number>> = {};
   MESSAGE_STATUSES.forEach((s, i) => {
-    statusCounts[s] = counts[i]?.count ?? 0;
+    out[s] = counts[i]?.count ?? 0;
   });
-  const ids = [...new Set([...rows.map((r) => r.tenant_id), tenantId].filter((x): x is string => Boolean(x)))];
+  return out;
+}
+
+async function tenantNamesFor(admin: SupabaseClient, raw: (string | null)[]): Promise<Map<string, string>> {
+  const ids = [...new Set(raw.filter((x): x is string => Boolean(x)))];
   const tenantNames = new Map<string, string>();
   if (ids.length > 0) {
     const { data } = await admin.from("tenants").select("id, name").in("id", ids);
     for (const t of (data ?? []) as { id: string; name: string }[]) tenantNames.set(t.id, t.name);
   }
-  return { installed: true, rows, total: list.count ?? rows.length, tenantNames, statusCounts };
+  return tenantNames;
 }
 
 /**

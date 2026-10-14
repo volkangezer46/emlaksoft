@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,6 +79,7 @@ beforeEach(() => {
   table.length = 0;
   vi.unstubAllEnvs();
   vi.stubEnv("NETGSM_WEBHOOK_SECRET", SECRET);
+  vi.stubEnv("OTP_HMAC_SECRET", "test-otp-hmac-secret-0123456789abcdef");
 });
 
 describe("saf yardımcılar", () => {
@@ -88,6 +90,17 @@ describe("saf yardımcılar", () => {
     expect(recipientHash("05321234542")).toBe(recipientHash("+90 532 123 45 42"));
     expect(recipientHash("5321234542")).toMatch(/^[0-9a-f]{64}$/);
     expect(recipientHash("12")).toBeNull();
+  });
+
+  it("alıcı özeti anahtarlıdır: düz SHA-256'ya eşit değil, anahtar değişince değişir, anahtar yoksa null", () => {
+    const h = recipientHash("05321234542");
+    expect(h).not.toBe(createHash("sha256").update("905321234542", "utf8").digest("hex"));
+    vi.stubEnv("OTP_HMAC_SECRET", "baska-bir-sunucu-sirri-0123456789abcdef");
+    expect(recipientHash("05321234542")).not.toBe(h);
+    vi.stubEnv("OTP_HMAC_SECRET", "");
+    vi.stubEnv("TWO_FACTOR_COOKIE_SECRET", "");
+    vi.stubEnv("PROPERTY_MEDIA_SIGNING_SECRET", "");
+    expect(recipientHash("05321234542")).toBeNull();
   });
 
   it("SMS kredi boyu: GSM-7 160/153, Türkçe karakterde 70/67", () => {
@@ -155,6 +168,15 @@ describe("gönderim → günlük → teslim raporu", () => {
     const r = await POST(report(JSON.stringify([{ jobid: "JOB-9", status: 11 }]), { type: "application/json" }));
     expect(r.status).toBe(200);
     expect(table[0]).toMatchObject({ status: "failed", error_code: "netgsm_11", error: "Operatör mesajı kabul etmedi." });
+  });
+
+  it("200'den fazla raporlu JSON gövde sessizce kesilmez: 413 ve hiçbir satır değişmez", async () => {
+    await withSmsLog("tenant", { source: "campaign" }, "05321234542", "x", async () => ({ ok: true, jobid: "JOB-0" }));
+    const body = JSON.stringify(Array.from({ length: 201 }, (_, i) => ({ jobid: `JOB-${i}`, status: 1 })));
+    const r = await POST(report(body, { type: "application/json" }));
+    expect(r.status).toBe(413);
+    expect(await r.json()).toMatchObject({ ok: false, error: "too_many_reports", max: 200 });
+    expect(table[0].status).toBe("queued");
   });
 
   it("rapor numarası günlükteki alıcıyla eşleşmezse güncelleme yapılmaz", async () => {

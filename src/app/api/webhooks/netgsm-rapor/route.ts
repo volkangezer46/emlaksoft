@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { applyMessageLogStatus } from "@/lib/messaging/message-log";
-import { netgsmReportFieldSets, parseNetgsmReport } from "@/lib/webhooks/netgsm-report";
+import { MAX_NETGSM_REPORTS, netgsmReportFieldSets, parseNetgsmReport } from "@/lib/webhooks/netgsm-report";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
   readRequestBodyLimited,
@@ -21,7 +21,7 @@ function secretMatches(actual: string, expected: string): boolean {
 }
 
 /** Sorgu dizesi + gövde (JSON / form) → rapor alan kümeleri. Desteklenmeyen içerik türü fırlatır. */
-async function collectReports(req: NextRequest): Promise<Record<string, string>[] | null> {
+async function collectReports(req: NextRequest): Promise<Record<string, string>[] | "too_many" | null> {
   const query: Record<string, string> = {};
   req.nextUrl.searchParams.forEach((value, key) => {
     if (key.toLowerCase() !== "secret") query[key.toLowerCase()] = value;
@@ -57,13 +57,17 @@ export async function POST(req: NextRequest) {
   if (!secretMatches(actual, expected)) return json({ ok: false, error: "unauthorized" }, 401);
   if (requestBodyTooLarge(req.headers, PUBLIC_REQUEST_MAX_BYTES)) return json({ ok: false, error: "payload_too_large" }, 413);
 
-  let sets: Record<string, string>[] | null;
+  let sets: Record<string, string>[] | "too_many" | null;
   try {
     sets = await collectReports(req);
   } catch {
     return json({ ok: false, error: "invalid_payload" }, 400);
   }
   if (sets === null) return json({ ok: false, error: "payload_too_large" }, 413);
+  if (sets === "too_many") {
+    console.warn("[netgsm-rapor] too many reports in one body", { max: MAX_NETGSM_REPORTS });
+    return json({ ok: false, error: "too_many_reports", max: MAX_NETGSM_REPORTS }, 413);
+  }
 
   let applied = 0;
   let ignored = 0;

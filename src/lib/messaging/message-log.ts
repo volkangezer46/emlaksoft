@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHmac, hkdfSync } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
+import { PLATFORM_SECRETS_DERIVE_SOURCES } from "@/lib/platform-secrets";
 
 /**
  * SMS VE WHATSAPP GÖNDERİM GÜNLÜĞÜ (SN3; e-posta günlüğünün eşi, `src/lib/email/send.ts`). Uygulamadaki her giden SMS ve
@@ -55,10 +56,33 @@ export function recipientDigits(raw: string): string | null {
   return intl.length >= 8 && intl.length <= 15 ? intl : null;
 }
 
-/** Alıcı özeti (teslim raporundaki numarayı doğrulamak ve aynı alıcıyı süzmek için); geçersiz numarada null. */
+const RECIPIENT_HKDF_SALT = "emlaksoft:message-log-recipient:v1";
+const RECIPIENT_HKDF_INFO = "emlaksoft/message-log-recipient/v1";
+
+/**
+ * Alıcı özeti anahtarı: canlıda zaten zorunlu sunucu sırrından HKDF ile türetilmiş ALAN-AYRIMLI anahtar (phone-hash.ts deseni).
+ * Düz SHA-256 kullanılmaz: TR cep numarası uzayı küçük (~10^10), maskeli alıcıyla birlikte saniyeler içinde çözülür.
+ */
+function recipientKey(): Buffer | null {
+  for (const name of PLATFORM_SECRETS_DERIVE_SOURCES) {
+    const secret = process.env[name]?.trim();
+    if (!secret || secret.length < 24) continue;
+    return Buffer.from(hkdfSync("sha256", secret, RECIPIENT_HKDF_SALT, RECIPIENT_HKDF_INFO, 32));
+  }
+  return null;
+}
+
+/**
+ * Alıcı özeti (teslim raporundaki numarayı doğrulamak ve aynı alıcıyı süzmek için): E.164 rakamlarının HMAC-SHA256'sı.
+ * Geçersiz numarada ya da sunucu anahtarı yoksa null (o satırda rapordaki numara denetimi atlanır).
+ * UYARI: kaynak sır döndürülürse, döndürmeden önce gönderilip raporu henüz gelmemiş satırlarda numara "uyuşmaz" sayılır ve
+ * o rapor işlenmez (kısa pencere; satır son durumunda kalır).
+ */
 export function recipientHash(raw: string): string | null {
   const d = recipientDigits(raw);
-  return d ? createHash("sha256").update(d, "utf8").digest("hex") : null;
+  if (!d) return null;
+  const key = recipientKey();
+  return key ? createHmac("sha256", key).update(d, "utf8").digest("hex") : null;
 }
 
 /** "05321234542" → "05** *** ** 42"; yabancı numara "+49*** 23". Yalnız son iki hane görünür. */

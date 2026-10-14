@@ -73,7 +73,7 @@ export function parseNetgsmReport(fields: Record<string, string>): NetgsmReport 
   };
 }
 
-const MAX_REPORTS = 200;
+export const MAX_NETGSM_REPORTS = 200;
 
 function lowerScalars(o: unknown): Record<string, string> | null {
   if (!o || typeof o !== "object" || Array.isArray(o)) return null;
@@ -85,16 +85,18 @@ function lowerScalars(o: unknown): Record<string, string> | null {
 }
 
 /**
- * JSON gövdeyi rapor alan kümelerine açar: tek nesne, dizi ya da `{ reports|data|items: [...] }`. En çok 200 satır.
+ * JSON gövdeyi rapor alan kümelerine açar: tek nesne, dizi ya da `{ reports|data|items: [...] }`. En çok 200 satır; fazlası
+ * SESSİZCE KESİLMEZ (kesilen raporlar kalıcı olarak "Kuyrukta" kalırdı): `too_many` döner, route 413 ile reddeder ve
+ * sağlayıcı daha küçük partiyle yeniden dener.
  */
-export function netgsmReportFieldSets(json: unknown): Record<string, string>[] {
+export function netgsmReportFieldSets(json: unknown): Record<string, string>[] | "too_many" {
   const list = Array.isArray(json)
     ? json
     : json && typeof json === "object"
       ? (["reports", "data", "items"].map((k) => (json as Record<string, unknown>)[k]).find(Array.isArray) as unknown[] | undefined) ?? [json]
       : [];
+  if (list.length > MAX_NETGSM_REPORTS) return "too_many";
   return list
-    .slice(0, MAX_REPORTS)
     .map(lowerScalars)
     .filter((x): x is Record<string, string> => x !== null);
 }
