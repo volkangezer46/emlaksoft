@@ -9,20 +9,20 @@
 # sonradan geri alınmamış ("rolled_back") en yeni sürüm; (3) hedef imajın yerelde varlığı doğrulanır (deploy.sh'in
 # prune_images'ı son iki ok sürümü korur); (4) hedef imajın statik parçaları kalıcı klasöre eklenir (14 gün budaması
 # eski parçaları silmiş olabilir); (5) `docker compose up`; (6) sağlık 120 sn beklenir (konteyner içi + dış adres);
-# (7) release_history'ye geri alınan sürüm için "rolled_back" satırı yazılır. Hedef sağlıklı olmazsa önceki imaja
-# geri çıkılır ve "failed" yazılır; betik 1 ile biter.
+# (7) `latest` etiketi hedefe taşınır; release_history'ye geri alınan sürüm için "rolled_back" satırı yazılır.
+# Hedef sağlıklı olmazsa önceki imaja geri çıkılır ve "failed" yazılır; betik 1 ile biter.
 #
 # ŞEMA UYUMU: migration'lar forward-only'dir; geri dönüş DB'yi geri ALMAZ. Hedef kod mevcut (daha yeni) şemayla
 # çalışmalıdır (eklemeli migration'lar uyumludur). .env.production RELEASE_MIGRATION'ı değişmez: DB zaten o
 # migration'dadır, /api/health hazır döner. Ayrıntı: docs/runbooks/GERI_DONUS.md.
-# Ortam (yalnız test): ROLLBACK_HEALTH_URL (dış sağlık adresi), ROLLBACK_LOCK_DIR.
+# Ortam (yalnız test): ROLLBACK_HEALTH_URL (dış sağlık adresi), ROLLBACK_LOCK_DIR, ROLLBACK_STATIC_DIR.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 DB_CONTAINER=supabase-db-moqbebljyeyprktd19zb1ihn
 APP=emlaksoft-app
 COMPOSE=deploy/compose.prod.yml
-STATIC_DIR=/srv/emlaksoft/next-static
+STATIC_DIR=${ROLLBACK_STATIC_DIR:-/srv/emlaksoft/next-static}
 HEALTH_URL=${ROLLBACK_HEALTH_URL:-https://emlaksoft.com.tr/api/health}
 TAG_RE='^[0-9]{12}-[0-9a-f]{4,40}(-dirty)?$'
 
@@ -97,18 +97,35 @@ if ! docker image inspect "$APP:$TARGET" >/dev/null 2>&1; then
   exit 1
 fi
 
-TARGET_MIG=$(psql_ro -v t="$TARGET" -c "select coalesce(release_migration, '') from public.release_history where tag = :'t' and outcome = 'ok' order by finished_at desc limit 1" 2>/dev/null </dev/null || true)
+# Hedefin yayınlandığı migration. Sorgu stdin'den geçer: psql `-c` komutunda :'t' değişkenini YERLEŞTİRMEZ.
+TARGET_MIG=$(psql_ro -v t="$TARGET" <<'SQL' 2>/dev/null || true
+begin read only;
+select coalesce(release_migration, '') from public.release_history
+where tag = :'t' and outcome = 'ok' order by finished_at desc, id desc limit 1;
+rollback;
+SQL
+)
+TARGET_MIG=$(printf '%s\n' "$TARGET_MIG" | grep -E '^[0-9]{14}[A-Za-z0-9_.-]*$' | head -n 1 || true)
 ENV_MIG=$(sed -n 's/^RELEASE_MIGRATION=//p' .env.production 2>/dev/null | head -n 1 || true)
 CMD="APP_TAG=$TARGET docker compose -f $COMPOSE up -d --remove-orphans"
 
 echo "Yayındaki sürüm : $APP:$CUR"
 echo "Hedef imaj      : $APP:$TARGET"
 echo "Komut           : $CMD"
+SCHEMA_DIFF=0
 if [ -n "$TARGET_MIG" ] && [ -n "$ENV_MIG" ] && [ "$TARGET_MIG" != "$ENV_MIG" ]; then
+  SCHEMA_DIFF=1
   echo "Şema notu       : hedef $TARGET_MIG ile yayınlanmıştı; DB $ENV_MIG'de kalır (forward-only). Hedef kod yeni şemayla uyumlu olmalı."
 fi
 if [ "$DRY" = 1 ]; then
-  echo "[kuru] hiçbir şey değiştirilmedi"; exit 0
+  echo "[kuru] hiçbir şey değiştirilmedi"
+  # Şema farkı varsa 3: `--dry-run && rollback.sh` tek satırı burada durur; aradaki migration'lar gözden geçirilip
+  # geri dönüş ayrı komutla çalıştırılır (docs/runbooks/GERI_DONUS.md "Şema uyumu").
+  if [ "$SCHEMA_DIFF" = 1 ]; then
+    echo "[kuru] şema farkı var — $TARGET_MIG sonrası migration'ları gözden geçirip 'bash scripts/sunucu/rollback.sh $TARGET' çalıştırın"
+    exit 3
+  fi
+  exit 0
 fi
 
 START_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -159,6 +176,8 @@ echo "Geri dönülüyor: $APP:$CUR → $APP:$TARGET"
 APP_TAG="$TARGET" docker compose -f "$COMPOSE" up -d --remove-orphans
 if wait_healthy; then
   echo "Geri dönüş başarılı: $APP:$TARGET yayında"
+  # latest de hedefi göstermeli: APP_TAG'siz sonraki bir `compose up` (elle ya da başka betik) geri alınan imaja dönmesin.
+  docker tag "$APP:$TARGET" "$APP:latest" || echo "[uyari] $APP:latest hedefe taşınamadı — elle: docker tag $APP:$TARGET $APP:latest"
   record_rollback rolled_back "elle geri dönüş: $APP:$CUR → $APP:$TARGET (sağlık 200)"
   curl -s "$HEALTH_URL"; echo
   exit 0

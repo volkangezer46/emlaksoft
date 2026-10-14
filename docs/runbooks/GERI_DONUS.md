@@ -14,7 +14,9 @@ bash scripts/sunucu/rollback.sh --dry-run && bash scripts/sunucu/rollback.sh
 - Betik hedef imajın yerelde olduğunu doğrular (`deploy.sh` `prune_images` son iki `ok` sürümün imajını her zaman korur),
   hedefin statik parçalarını `/srv/emlaksoft/next-static`'e ekler, `docker compose up` çalıştırır, sağlığı 120 sn bekler
   (konteyner içi + `https://emlaksoft.com.tr/api/health`) ve geri alınan sürüm için `release_history`'ye `rolled_back`
-  satırı yazar (`/admin/sistem?sekme=durum`). Hedef sağlıklı olmazsa önceki imaja geri çıkılır, `failed` yazılır, çıkış 1.
+  satırı yazar (`/admin/sistem?sekme=durum`). Başarılı dönüşte `emlaksoft-app:latest` etiketi de hedef imaja taşınır:
+  `APP_TAG`'siz sonraki bir `docker compose up` (elle ya da başka bir betik) geri alınan imaja dönmez. Taşıma başarısız
+  olursa betik uyarır; elle `docker tag emlaksoft-app:<hedef> emlaksoft-app:latest`. Hedef sağlıklı olmazsa önceki imaja geri çıkılır, `failed` yazılır, çıkış 1.
 - Yeni sürüm yayın sırasında 120 sn içinde sağlıklı olmazsa `deploy.sh` zaten kendiliğinden önceki imaja döner;
   `rollback.sh` yayından SONRA fark edilen sorunlar içindir.
 
@@ -24,8 +26,10 @@ bash scripts/sunucu/rollback.sh --dry-run && bash scripts/sunucu/rollback.sh
   migration'dadır, `/api/health` hazır döner).
 - Eski kod yeni şemayla çalışmalıdır. Eklemeli (yeni tablo/kolon/indeks/fonksiyon) migration'lar uyumludur; kolon
   silme/yeniden adlandırma, NOT NULL ya da CHECK sıkılaştırma, eski kodun yazdığı değeri reddeden kısıt uyumsuzdur.
-- `--dry-run` hedefin yayınlandığı migration'ı DB'dekinden farklıysa "Şema notu" satırı basar: o aralıktaki
-  migration'ları (`supabase/migrations/`) uyumluluk için gözden geçirin.
+- `--dry-run` hedefin yayınlandığı migration'ı (`release_history.release_migration`) `.env.production`
+  `RELEASE_MIGRATION`'dan farklıysa "Şema notu" satırı basar ve **3 ile çıkar**; böylece "Tek satır" komutu orada durur.
+  O aralıktaki migration'ları (`supabase/migrations/`) uyumluluk için gözden geçirin, sonra geri dönüşü ayrı komutla
+  (`bash scripts/sunucu/rollback.sh <hedef>`) çalıştırın.
 - Yeni sürüm eski kodun anlamadığı veri yazdıysa körlemesine geri dönmeyin: etkilenen yolu kapatın (bayrak/bakım) ve
   ileri düzeltme (yeni kod ya da yeni migration) yayınlayın. Uygulanmış migration düzenlenmez, elle "down" SQL'i
   çalıştırılmaz.

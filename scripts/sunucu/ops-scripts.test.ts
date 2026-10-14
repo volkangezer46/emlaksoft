@@ -25,12 +25,15 @@ case "$1" in
     if has curl "$@"; then
       n=$(cat "$FAKE_DIR/curl_n" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_DIR/curl_n"
       read -r -a codes <<< "\${FAKE_CODES:-200}"
-      printf '%s' "\${codes[$((n - 1))]:-200}"; exit 0
+      read -r -a rcs <<< "\${FAKE_CURL_RCS:-}"
+      printf '%s' "\${codes[$((n - 1))]:-200}"; exit "\${rcs[$((n - 1))]:-0}"
     fi
     if has psql "$@"; then
       input=$(cat)
       printf -- '--ARGS %s\\n%s\\n' "$*" "$input" >> "$FAKE_DIR/psql.log"
-      if [ -n "\${FAKE_PSQL_OUT:-}" ]; then cat "$FAKE_PSQL_OUT"; fi
+      if [ -n "\${FAKE_PSQL_MIG_OUT:-}" ] && [[ "$input" == *"select coalesce(release_migration"* ]]; then
+        cat "$FAKE_PSQL_MIG_OUT"
+      elif [ -n "\${FAKE_PSQL_OUT:-}" ]; then cat "$FAKE_PSQL_OUT"; fi
       exit "\${FAKE_PSQL_RC:-0}"
     fi
     exit 0 ;;
@@ -88,11 +91,12 @@ function bind(sql: string, vars: Record<string, string>): string {
 }
 
 describe("cron-call.sh: yeniden deneme + hata nabzı", () => {
-  function cronCall(codes: string, name: string) {
+  function cronCall(codes: string, name: string, curlRcs = "") {
     const { dir, bin } = fakeBin(name);
     writeFileSync(path.join(dir, "env"), "CRON_SECRET=test-secret\n");
     const r = run(path.join(DIR, "cron-call.sh"), ["/api/cron/ornek-is"], {
-      FAKE_DIR: dir, FAKE_CODES: codes, CRON_ENV_FILE: path.join(dir, "env"), CRON_LOCK_DIR: dir, CRON_RETRY_DELAY: "0",
+      FAKE_DIR: dir, FAKE_CODES: codes, FAKE_CURL_RCS: curlRcs, CRON_ENV_FILE: path.join(dir, "env"), CRON_LOCK_DIR: dir,
+      CRON_RETRY_DELAY: "0",
     }, bin);
     return { ...r, dir, curls: Number(read(path.join(dir, "curl_n")) || 0), psql: read(path.join(dir, "psql.log")) };
   }
@@ -112,14 +116,37 @@ describe("cron-call.sh: yeniden deneme + hata nabzı", () => {
     expect(r.psql).toBe("");
   });
 
-  it("500 iki kez → tam bir yeniden deneme, cron_heartbeats'e error satırı", () => {
-    const r = cronCall("500 500 500", "cc-fail");
+  it("bağlantı yok (000, curl 7) sonra 200 → bir yeniden deneme", () => {
+    const r = cronCall("000 200", "cc-conn", "7 0");
+    expect(r.code).toBe(0);
+    expect(r.curls).toBe(2);
+    expect(r.psql).toBe("");
+  });
+
+  it("503 iki kez → tam bir yeniden deneme, cron_heartbeats'e error satırı", () => {
+    const r = cronCall("503 503 503", "cc-fail");
     expect(r.code).toBe(1);
     expect(r.curls).toBe(2);
     expect(r.psql).toContain("insert into public.cron_heartbeats");
     expect(r.psql).toContain("job=ornek-is");
-    expect(r.psql).toContain("detail=HTTP 500 (çağrı)");
+    expect(r.psql).toContain("detail=HTTP 503 (çağrı)");
     expect(r.psql).toContain("'error'");
+  });
+
+  it("500 → yeniden DENENMEZ (rota kısmi ilerlemiş olabilir), hata nabzı yazılır", () => {
+    const r = cronCall("500 200", "cc-500");
+    expect(r.code).toBe(1);
+    expect(r.curls).toBe(1);
+    expect(r.out).not.toContain("yeniden denenecek");
+    expect(r.psql).toContain("detail=HTTP 500 (çağrı)");
+  });
+
+  it("zaman aşımı (000, curl 28) → yeniden DENENMEZ, 'zaman aşımı' nabzı yazılır", () => {
+    const r = cronCall("000 200", "cc-timeout", "28 0");
+    expect(r.code).toBe(1);
+    expect(r.curls).toBe(1);
+    expect(r.out).toContain("zaman aşımı; yeniden denenmedi");
+    expect(r.psql).toContain("detail=zaman aşımı (çağrı, ");
   });
 
   it("nabız SQL'i: error yazar; rotanın aynı çağrıdaki hata ayrıntısını korur", async () => {
@@ -223,15 +250,27 @@ describe("release.sh: migration başarısızsa yayın durur", () => {
 });
 
 describe("rollback.sh --dry-run", () => {
-  function rollback(args: string[], name: string, opts: { imageRc?: string; psqlOut?: string } = {}) {
+  function rollback(
+    args: string[],
+    name: string,
+    opts: { imageRc?: string; psqlOut?: string; migOut?: string; envMig?: string } = {},
+  ) {
     const { dir, bin } = fakeBin(name);
     const repo = path.join(dir, "repo");
     mkdirSync(path.join(repo, "scripts/sunucu"), { recursive: true });
     copyFileSync(path.join(DIR, "rollback.sh"), path.join(repo, "scripts/sunucu/rollback.sh"));
     writeFileSync(path.join(dir, "psql-out"), opts.psqlOut ?? "BEGIN\n202610141107-62e14a2e\nROLLBACK\n");
+    const mig: Record<string, string> = {};
+    if (opts.migOut !== undefined) {
+      writeFileSync(path.join(dir, "mig-out"), opts.migOut);
+      mig.FAKE_PSQL_MIG_OUT = path.join(dir, "mig-out");
+    }
+    if (opts.envMig) writeFileSync(path.join(repo, ".env.production"), `X=1\nRELEASE_MIGRATION=${opts.envMig}\n`);
     const r = run(path.join(repo, "scripts/sunucu/rollback.sh"), args, {
       FAKE_DIR: dir, FAKE_IMAGE: "emlaksoft-app:202610141340-65ed9f68", FAKE_PSQL_OUT: path.join(dir, "psql-out"),
       FAKE_IMAGE_RC: opts.imageRc ?? "0", ROLLBACK_LOCK_DIR: dir, FAKE_TAGS: "202610141340-65ed9f68 202610141107-62e14a2e",
+      ROLLBACK_STATIC_DIR: path.join(dir, "yok"), ROLLBACK_HEALTH_URL: `file://${path.join(dir, "psql-out")}`,
+      ...mig,
     }, bin, repo);
     return { ...r, calls: read(path.join(dir, "calls.log")), psql: read(path.join(dir, "psql.log")) };
   }
@@ -248,6 +287,51 @@ describe("rollback.sh --dry-run", () => {
     expect(r.psql).toContain("begin read only");
     expect(r.psql).toContain("cur=202610141340-65ed9f68");
     expect(r.psql).not.toMatch(/insert into/i);
+  });
+
+  it("hedefin migration'ı DB'dekinden farklıysa 'Şema notu' basar ve 3 ile durur (sorgu stdin'den, -c değil)", () => {
+    const r = rollback(["--dry-run"], "rb-schema", {
+      migOut: "BEGIN\n20261014022000_alert_engine_pulse_rule.sql\nROLLBACK\n",
+      envMig: "20261014025000_platform_tenant_onboarding_facts.sql",
+    });
+    expect(r.code).toBe(3);
+    expect(r.out).toContain("Şema notu       : hedef 20261014022000_alert_engine_pulse_rule.sql ile yayınlanmıştı");
+    expect(r.out).toContain("DB 20261014025000_platform_tenant_onboarding_facts.sql'de kalır");
+    // psql -c değişken yerleştirmez: sorgu stdin'den, t değişkeniyle gitmeli.
+    expect(r.psql).toMatch(/--ARGS [^\n]*-v t=202610141107-62e14a2e[^\n]*\n[^]*where tag = :'t'/);
+    expect(r.psql).not.toMatch(/--ARGS [^\n]* -c /);
+    expect(r.calls).not.toContain("compose");
+  });
+
+  it("hedefin migration'ı DB ile aynıysa şema notu yok, kuru çalışma 0", () => {
+    const r = rollback(["--dry-run"], "rb-schema-same", {
+      migOut: "BEGIN\n20261014025000_platform_tenant_onboarding_facts.sql\nROLLBACK\n",
+      envMig: "20261014025000_platform_tenant_onboarding_facts.sql",
+    });
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain("Şema notu");
+  });
+
+  it("hedef migration sorgusu gerçek SQL'de çalışır (pglite)", async () => {
+    const db = new PGlite();
+    await db.exec(`create table public.release_history (id bigserial primary key, tag text, outcome text,
+      finished_at timestamptz not null default now(), release_migration text);
+      insert into public.release_history (tag, outcome, finished_at, release_migration) values
+        ('202610141107-62e14a2e', 'ok', now() - interval '2 hour', '20261014022000_a.sql'),
+        ('202610141107-62e14a2e', 'failed', now() - interval '1 hour', '20261014029000_x.sql'),
+        ('202610141340-65ed9f68', 'ok', now(), '20261014025000_b.sql');`);
+    const sql = heredoc("rollback.sh", "TARGET_MIG=").replace(/^begin read only;|^rollback;/gm, "");
+    const rows = (await db.query<Record<string, string>>(bind(sql, { t: "202610141107-62e14a2e" }))).rows;
+    expect(rows.map((r) => Object.values(r)[0])).toEqual(["20261014022000_a.sql"]);
+  });
+
+  it("gerçek dönüş (sahte docker): compose hedef etiketle, latest hedefe taşınır, rolled_back yazılır", () => {
+    const r = rollback([], "rb-real");
+    expect(r.code).toBe(0);
+    expect(r.calls).toContain("docker compose -f deploy/compose.prod.yml up -d --remove-orphans");
+    expect(r.calls).toContain("docker tag emlaksoft-app:202610141107-62e14a2e emlaksoft-app:latest");
+    expect(r.psql).toContain("outcome=rolled_back");
+    expect(r.psql).toMatch(/insert into public\.release_history/);
   });
 
   it("imaj yerelde yoksa 1 ile durur", () => {

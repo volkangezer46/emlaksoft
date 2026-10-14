@@ -29,8 +29,13 @@ raporlanır, ama `ok`/`status`/HTTP kodu DEĞİŞMEZ (genel durum yalnız DB + m
 
 1. `/api/health/cron` 503 ise gövdedeki `problems` listesine bak; ya da `/admin/sistem` Cron sağlığı.
 2. `reason: error` ise `/admin/sistem?sekme=hatalar` ve `/var/log/emlaksoft-cron.log`'da o işi (`/api/cron/<job>`) ara.
-   `last_detail` `HTTP <kod> (çağrı)` ise rota hiç başarıyla yanıt vermemiştir: `scripts/sunucu/cron-call.sh` 200 dışı yanıtta
-   30 sn sonra bir kez yeniden dener, yine başarısızsa nabzı `error` yazar (rotanın kendi hata ayrıntısı arkasında korunur).
+   `last_detail` `HTTP <kod> (çağrı)` ise rota hiç başarıyla yanıt vermemiştir; `zaman aşımı (çağrı, N sn)` ise 300 sn
+   içinde yanıt gelmemiştir (rota Next içinde sürmüş olabilir). `scripts/sunucu/cron-call.sh` YALNIZ rota hiç çalışmadığında
+   30 sn sonra bir kez yeniden dener: bağlantı kurulamadı/konteyner yok (kod 000, curl zaman aşımı değil) ya da 502/503/504.
+   Zaman aşımı ve 500 dahil diğer kodlar yeniden DENENMEZ: rota kısmi ilerlemeden sonra düşmüş ya da hâlâ çalışıyor olabilir;
+   idempotent olmayan işlerde (randevu-hatirlat, gorev-hatirlat, kira-tahakkuk, proje-vade, ef-kontor-* …) ikinci çağrı çift
+   bildirim/tahakkuk üretir. Bu durumda bir sonraki zamanlanmış çağrı beklenir ya da önce yan etkiler kontrol edilip
+   `/admin/sistem`'den elle tetiklenir. Başarısız sonuçta nabız `error` yazılır (rotanın kendi hata ayrıntısı arkasında korunur).
 3. `reason: stale / never_ran`: `/etc/cron.d/emlaksoft` satırını gör (`scripts/sunucu/install-cron.sh`), gerekirse
    `/admin/sistem` üzerinden elle tetikle; `CRON_SECRET` ve konteyner durumunu doğrula.
 4. Route'u olmayan nabız satırı: `npm run check:cron -- --db` canlı `cron_heartbeats`'i salt-okunur okur ve route'u
@@ -49,9 +54,13 @@ Sunucu tarafı hatalar `/admin/sistem?sekme=hatalar` listesine `Sunucu` kaynağ�
 Anlık akış: `scripts/sunucu/error-watch.sh` (systemd `emlaksoft-error-watch`) yeni/yeniden görülen her açık hatayı
 `/var/log/emlaksoft/hatalar.jsonl`'a tek satır yazar. İmleç `hatalar.cursor` dosyasında `<last_seen µs>|<id>` çiftidir;
 sorgu `(last_seen, id) > imleç` ile ilerler, böylece servis yeniden başlatıldığında aynı `id` için yinelenen satır
-yazılmaz (yalnız `last_seen`'i ilerleyen hata yeni satır üretir). Betik değişince `scripts/sunucu/install-error-watch.sh`.
+yazılmaz. BİLİNÇLİ TASARIM: hata yeniden görüldüğünde (`last_seen` ilerler, `occurrences` artar) aynı `id` için YENİ
+satır yazılır — her satır bir görülme olayıdır, alıcı tarafı (uyarı/izleme) tekrar sıklığını bundan okur. "Yinelenen satır
+yok" ölçütü yalnız yeniden BAŞLATMA/yeniden okuma yinelemesini kapsar; aynı `id`'nin farklı `last_seen` değerli satırları
+yineleme değildir. Betik değişince `scripts/sunucu/install-error-watch.sh`.
 Doğrulama: yeniden kurulumdan 10 dk sonra
-`jq -r .id /var/log/emlaksoft/hatalar.jsonl | tail -n 500 | sort | uniq -d` yalnız gerçekten yeniden görülen hataları vermeli.
+`jq -r '"\(.id) \(.last_seen)"' /var/log/emlaksoft/hatalar.jsonl | tail -n 500 | sort | uniq -d` boş olmalı (aynı id +
+aynı last_seen iki kez yazılmamalı); `jq -r .id … | sort | uniq -d` yalnız gerçekten yeniden görülen hataları vermeli.
 
 İstemci kaynaklı istekler kayda girmez (`src/lib/server-error-report.ts`): bağlantı iptalleri ve okunamayan
 `Next-Router-State-Tree` başlığı ("router state header ... could not be parsed"; 400 niteliğinde istemci hatası).
