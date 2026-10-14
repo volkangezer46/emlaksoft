@@ -86,8 +86,10 @@ function customRecordValid(def: PlanDef): boolean {
 }
 
 /**
- * Paket kimliği kayıt defteri (`billing_plans`, 20261014002000): FK hedefi. Yeni paket satırı, kademe değişimi ve
- * arşiv durumu buraya yazılır; tanımın kendisi platform_settings belgesinde kalır.
+ * Paket kimliği kayıt defteri (`billing_plans`, 20261014002000): FK hedefi. Yeni paket satırı, kademe ve arşiv durumu
+ * buraya yazılır; tanımın kendisi platform_settings belgesinde kalır. `archived_at`'ı SQL satış kapısı
+ * (billing_plan_is_hidden) da okur; ayrışma her zaman "satışa kapalı" yönündedir ve her kayıtta defter belgeyle eşitlenir.
+ * Sıra: önce defter, sonra belge (belge yazılamazsa defter yeniden denemede aynı değere yazılır; idempotent).
  */
 async function writePlanRegistry(
   id: string,
@@ -178,7 +180,9 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
   const nextOverrides = { ...settings.overrides };
   let nextCustom = settings.customPlans ?? [];
   let diff: unknown;
-  let tierChange: PlanId | null = null;
+  // Eklenen pakette kayıt defteri satırı (tier/archived_at) her kayıtta belgedeki değere eşitlenir (idempotent):
+  // önceki bir denemede defter ile belge ayrıştıysa bu kayıt onları yeniden hizalar.
+  let registrySync: { tier: PlanId; archived: boolean } | null = null;
   if (target.kind === "base") {
     const d = diffAgainstDefault(target.base, parsed.plan);
     if (Object.keys(d).length > 0) nextOverrides[target.id] = d;
@@ -189,7 +193,7 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
     const next: PlanDef = { ...parsed.plan, id, tier, custom: true };
     if (target.def.archived) next.archived = true;
     if (!customRecordValid(next)) return { error: "Paket tanımı eksik ya da geçersiz." };
-    if (tier !== target.def.tier) tierChange = tier;
+    registrySync = { tier, archived: Boolean(next.archived) };
     nextCustom = replaceCustom(settings, next);
     diff = { tier, monthlyTry: next.monthlyTry, limits: next.limits, hidden: Boolean(next.hidden) };
   }
@@ -207,8 +211,8 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
     if (err) return { error: err };
     notice = "Limitler kota tablosuyla senkronlandı. Mevcut aboneliklerin tutarı değişmez.";
   }
-  if (tierChange) {
-    const err = await writePlanRegistry(id, { tier: tierChange });
+  if (registrySync) {
+    const err = await writePlanRegistry(id, registrySync);
     if (err) return { error: err };
   }
 
@@ -472,7 +476,11 @@ export async function setCustomPlanArchived(formData: FormData): Promise<PlanOpR
   const target = resolveTarget(settings, id);
   if (!target) return { error: "Geçersiz paket." };
   if (target.kind === "base") return { error: "Taban paketler arşivlenmez; gizleyebilirsiniz." };
-  if (Boolean(target.def.archived) === archived) return { ok: true, notice: "Değişiklik yok." };
+  if (Boolean(target.def.archived) === archived) {
+    // Belge zaten istenen durumda: defter satırı yine eşitlenir (önceki yarım kalan denemeyi onarır).
+    const syncErr = await writePlanRegistry(id, { archived });
+    return syncErr ? { error: syncErr } : { ok: true, notice: "Değişiklik yok." };
+  }
   const next: PlanDef = { ...target.def };
   if (archived) next.archived = true;
   else delete next.archived;

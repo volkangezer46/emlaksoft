@@ -23,6 +23,8 @@
 --      degistirilerek yeniden tanimlanir (pg_get_functiondef; govdenin geri kalani, imza, SECURITY DEFINER, search_path ve
 --      yetkiler aynen kalir). Beklenen eslesme sayisi tutmazsa (govde beklenenden farkli) HICBIR sey yazilmaz.
 --      billing_plan_known(null) = null: eski `null not in (...)` anlamini korur.
+--   4b) billing_plan_is_hidden: arsivli paket (belge `archived` ya da billing_plans.archived_at) de satisa kapali sayilir;
+--      planli dusurme RPC'si arsivli pakete yazamaz (DB son hakem; yalniz TS kontrolune guvenilmez).
 --   5) plan_catalog_engine_ready(): kod probu (yalniz true); kod bu yoklama true olmadan "yeni paket" eklemez.
 --
 -- BU DOSYA NE YAPMAZ: 'billing.plan_definitions' belgesine, abonelik/fatura tutarlarina ve price_lock_* alanlarina DOKUNMAZ.
@@ -233,6 +235,47 @@ grant execute on function public.plan_monthly_amount(text) to service_role;
 
 comment on function public.plan_monthly_amount(text) is
   'Aylik liste fiyati (KDV haric). Taban: TS resolveCatalogSettings ile ayni kural (ayar yoksa 749/2790/5490/8990/14900). Eklenen paket (DG2): billing_plans + belgede custom=true monthlyTry; yoksa null.';
+
+-- ---------------------------------------------------------------------------
+-- 3b. billing_plan_is_hidden: arsivli paket de satisa kapali (planli dusurme RPC'sinin son hakemi)
+-- ---------------------------------------------------------------------------
+-- subscription_schedule_downgrade (authenticated) plan kontrolunu billing_plan_known'a cevirir; o fonksiyon arsivli paketi
+-- de kabul eder (yenileme surer). Satis kapisi billing_plan_is_hidden yalniz `hidden` alanina bakiyordu: arsiv yalniz TS
+-- tarafinda engelleniyordu, RPC dogrudan cagrilinca arsivli pakete dusurme planlanabiliyordu. Arsiv = belgede
+-- `archived: true` YA DA billing_plans.archived_at dolu. Gizli kurali ve 'business' yedegi 20261007001000 ile ayni.
+-- Tek cagiran subscription_schedule_downgrade'dir (yenileme/fulfill bu fonksiyonu kullanmaz).
+create or replace function public.billing_plan_is_hidden(p_plan text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_plan text := lower(btrim(coalesce(p_plan, '')));
+  v_doc jsonb;
+  v_val jsonb;
+begin
+  if exists (select 1 from public.billing_plans b where b.id = v_plan and b.archived_at is not null) then
+    return true;
+  end if;
+  v_doc := public.plan_catalog_document();
+  if v_doc is not null then
+    if jsonb_typeof(v_doc -> 'plans' -> v_plan -> 'archived') = 'boolean'
+       and (v_doc -> 'plans' -> v_plan ->> 'archived')::boolean then
+      return true;
+    end if;
+    v_val := v_doc -> 'plans' -> v_plan -> 'hidden';
+    if jsonb_typeof(v_val) = 'boolean' then
+      return (v_val #>> '{}')::boolean;
+    end if;
+  end if;
+  return v_plan = 'business';
+end;
+$$;
+
+revoke all privileges on function public.billing_plan_is_hidden(text) from public, anon, authenticated;
+grant execute on function public.billing_plan_is_hidden(text) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- 4. Sabit plan listesi kontrolu -> billing_plan_known (canli govde uzerinden, yalniz o ifade)

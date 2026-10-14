@@ -121,6 +121,33 @@ alter table public.subscriptions
 alter table public.plan_entitlements
   add constraint plan_entitlements_plan_check check (plan in ('advisor', 'office', 'professional', 'business', 'enterprise'));
 
+-- billing_plan_is_hidden: 20261007001000 govdesi (arsiv kontrolu kalkar; yalniz `hidden` + 'business' yedegi)
+create or replace function public.billing_plan_is_hidden(p_plan text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_plan text := lower(btrim(coalesce(p_plan, '')));
+  v_doc jsonb;
+  v_val jsonb;
+begin
+  v_doc := public.plan_catalog_document();
+  if v_doc is not null then
+    v_val := v_doc -> 'plans' -> v_plan -> 'hidden';
+    if jsonb_typeof(v_val) = 'boolean' then
+      return (v_val #>> '{}')::boolean;
+    end if;
+  end if;
+  return v_plan = 'business';
+end;
+$$;
+
+revoke all privileges on function public.billing_plan_is_hidden(text) from public, anon, authenticated;
+grant execute on function public.billing_plan_is_hidden(text) to service_role;
+
 drop function if exists public.plan_catalog_engine_ready();
 drop function if exists public.billing_plan_known(text);
 drop table if exists public.billing_plans;
