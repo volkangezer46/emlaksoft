@@ -110,7 +110,9 @@ export default async function AdminTenantsPage({
       ? `Destek erişimi başlatılmadı: gerekçe ${IMPERSONATION_REASON_MIN}-${IMPERSONATION_REASON_MAX} karakter olmalı.`
       : raw.destek === "bilet"
         ? "Destek erişimi başlatılmadı: destek bileti numarasını yazın (boşluksuz; harf, rakam, # . _ / -)."
-        : null;
+        : raw.destek === "demo"
+          ? "Destek erişimi başlatılmadı: demo hesapları yalnız demo ofise girebilir."
+          : null;
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;

@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { now } from "@/lib/clock";
 import { PLATFORM_SECRETS_DERIVE_SOURCES } from "@/lib/platform-secrets";
+import { isDemoTenantId } from "@/lib/demo-sandbox";
+import { DEMO_SANDBOX_CODE, DEMO_SANDBOX_MESSAGE } from "@/lib/demo-tenant";
 
 /**
  * SMS VE WHATSAPP GÖNDERİM GÜNLÜĞÜ (SN3; e-posta günlüğünün eşi, `src/lib/email/send.ts`). Uygulamadaki her giden SMS ve
@@ -167,7 +169,17 @@ export async function recordMessageSend(input: RecordMessageInput, client?: Supa
   }
 }
 
-/** SMS gönderimini sarar: sağlayıcı çağrılır, sonuç günlüğe yazılır, sonuç AYNEN döner. */
+/**
+ * YD1 demo sandbox: demo kiracının gönderimi sağlayıcıya GİTMEZ; yerine başarısız sonuç döner ve günlüğe
+ * `demo_sandbox` / "demo: gönderilmedi" yazılır (kampanya, otomasyon, kira hatırlatma, imza SMS'i dahil tüm akışlar
+ * bu iki sarmalayıcıdan geçer). Demo değilse null.
+ */
+async function demoSandboxOutcome<T extends ProviderSendOutcome>(context: MessageLogContext): Promise<T | null> {
+  if (!(await isDemoTenantId(context.tenantId))) return null;
+  return { ok: false, code: DEMO_SANDBOX_CODE, error: DEMO_SANDBOX_MESSAGE } as T;
+}
+
+/** SMS gönderimini sarar: sağlayıcı çağrılır (demo kiracıda çağrılmaz), sonuç günlüğe yazılır, sonuç AYNEN döner. */
 export async function withSmsLog<T extends ProviderSendOutcome>(
   account: MessageAccount,
   context: MessageLogContext,
@@ -175,7 +187,7 @@ export async function withSmsLog<T extends ProviderSendOutcome>(
   text: string,
   send: () => Promise<T>,
 ): Promise<T> {
-  const result = await send();
+  const result = (await demoSandboxOutcome<T>(context)) ?? (await send());
   await recordMessageSend({ channel: "sms", account, context, to, result, segments: smsSegments(text) });
   return result;
 }
@@ -187,7 +199,7 @@ export async function withWhatsAppLog<T extends ProviderSendOutcome>(
   to: string,
   send: () => Promise<T>,
 ): Promise<T> {
-  const result = await send();
+  const result = (await demoSandboxOutcome<T>(context)) ?? (await send());
   await recordMessageSend({ channel: "whatsapp", account, context, to, result });
   return result;
 }

@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { safeWebhookPost } from "@/lib/integrations-api/safe-delivery";
 import { deriveEndpointSecret, signWebhookBody, signingSecretReady, type WebhookEvent } from "@/lib/integrations-api/core";
+import { loadDemoTenantIds } from "@/lib/demo-sandbox";
+import { DEMO_SANDBOX_MESSAGE } from "@/lib/demo-tenant";
 
 /**
  * Giden webhook teslimi. Olay üretimi server action'ların başarılı yazmasından SONRA `after()` içinde yapılır
@@ -98,7 +100,13 @@ export async function runWebhookRetries(db: SupabaseClient, nowMs: number, limit
   const byId = new Map(((endpoints ?? []) as { id: string; tenant_id: string; url: string; active: boolean; secret_version: number; failure_count: number }[]).map((e) => [e.id, e]));
   let delivered = 0;
   const now = Math.floor(nowMs / 1000);
+  const demoTenants = await loadDemoTenantIds(db);
   for (const r of rows as { id: string; tenant_id: string; endpoint_id: string; payload: unknown; attempts: number }[]) {
+    // YD1: demo kiracının teslimi dışarı gitmez (uç oluşturma da kapalı; eski satır kalmışsa burada kapanır).
+    if (demoTenants.has(r.tenant_id)) {
+      await db.from("webhook_deliveries").update({ status: "failed", last_error: DEMO_SANDBOX_MESSAGE }).eq("id", r.id).eq("tenant_id", r.tenant_id);
+      continue;
+    }
     const ep = byId.get(r.endpoint_id);
     if (!ep || ep.tenant_id !== r.tenant_id || !ep.active) {
       await db.from("webhook_deliveries").update({ status: "failed", last_error: "Uç kapalı veya silindi" }).eq("id", r.id).eq("tenant_id", r.tenant_id);

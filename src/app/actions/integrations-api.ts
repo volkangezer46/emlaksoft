@@ -14,6 +14,8 @@ import {
 } from "@/lib/integrations-api/core";
 import { postWebhook, webhookSigningSecret } from "@/lib/integrations-api/webhooks";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { isDemoTenantId } from "@/lib/demo-sandbox";
+import { DEMO_SANDBOX_BLOCKED } from "@/lib/demo-tenant";
 
 const PATH = "/app/ayarlar/api-webhook";
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -31,6 +33,8 @@ function missing(error: { code?: string | null } | null): boolean {
 export async function createApiKey(_prev: IntegrationResult, formData: FormData): Promise<IntegrationResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  // YD1: demo ofisten dışarıya bağlantı (API anahtarı / webhook) açılmaz.
+  if (await isDemoTenantId(gate.tenantId)) return { error: DEMO_SANDBOX_BLOCKED };
   const name = String(formData.get("name") ?? "").replace(/\s+/g, " ").trim();
   if (name.length < 1 || name.length > 80) return { error: "Anahtar adı 1-80 karakter olmalı." };
   const scopes = parseApiScopes(formData.getAll("scopes"));
@@ -74,6 +78,8 @@ export async function revokeApiKey(formData: FormData): Promise<IntegrationResul
 export async function createWebhookEndpoint(_prev: IntegrationResult, formData: FormData): Promise<IntegrationResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  // YD1: demo ofisten dışarıya bağlantı (API anahtarı / webhook) açılmaz.
+  if (await isDemoTenantId(gate.tenantId)) return { error: DEMO_SANDBOX_BLOCKED };
   if (!webhookSigningSecret()) return { error: "Webhook kanalı kapalı: platform imza anahtarı (WEBHOOK_SIGNING_SECRET) tanımlı değil." };
   const url = validateWebhookUrl(formData.get("url"));
   if (!url.ok) return { error: url.error };
@@ -155,6 +161,8 @@ export async function revealWebhookSecret(formData: FormData): Promise<Integrati
 export async function sendTestWebhook(formData: FormData): Promise<IntegrationResult> {
   const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
+  // YD1: demo ofisten dışarıya bağlantı (API anahtarı / webhook) açılmaz.
+  if (await isDemoTenantId(gate.tenantId)) return { error: DEMO_SANDBOX_BLOCKED };
   const serverSecret = webhookSigningSecret();
   if (!serverSecret) return { error: "Webhook kanalı kapalı." };
   const id = String(formData.get("id") ?? "");
