@@ -307,12 +307,18 @@ function PnlSection({
                           <Link href={entries(r.from, r.to, "&tur=gelir&kaynak=elle")} className="hover:underline">{formatTry(m.other)}</Link>
                         </TD>
                       ) : null}
-                      <TD label="KDV" align="right" className="numeric">{formatTry(m.vat)}</TD>
-                      <TD label="Paylar" align="right" className="numeric">{formatTry(m.shares)}</TD>
+                      <TD label="KDV" align="right" className="numeric">
+                        <Link href={`/app/komisyon?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.vat)}</Link>
+                      </TD>
+                      <TD label="Paylar" align="right" className="numeric">
+                        <Link href={`/app/komisyon?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.shares)}</Link>
+                      </TD>
                       <TD label="Gider" align="right" className="numeric">
                         <Link href={entries(r.from, r.to, "&tur=gider")} className="hover:underline">{formatTry(m.expenses)}</Link>
                       </TD>
-                      <TD label="Net" align="right" className={`numeric font-semibold ${m.net < 0 ? "text-danger-600" : ""}`}>{formatTry(m.net)}</TD>
+                      <TD label="Net" align="right" className={`numeric font-semibold ${m.net < 0 ? "text-danger-600" : ""}`}>
+                        <Link href={entries(r.from, r.to)} className="hover:underline">{formatTry(m.net)}</Link>
+                      </TD>
                     </TR>
                   );
                 })}

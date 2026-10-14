@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { adoptOutcomeText, adoptSelectionSummary, bulkOutcomeText, ledgerFilterParams, ledgerQueryOps, lockReasonFor, parseLedgerFilters } from "./ledger-filters";
+import { PNL_INCOME_EXCLUDED } from "@/lib/finance/expense-budget";
+import {
+  LEDGER_MANUAL_INCOME_EXCLUDED,
+  adoptOutcomeText,
+  adoptSelectionSummary,
+  bulkOutcomeText,
+  ledgerFilterParams,
+  ledgerNeedsOfficeScope,
+  ledgerQueryOps,
+  lockReasonFor,
+  parseLedgerFilters,
+} from "./ledger-filters";
 import { nextRowIndex } from "./keyboard-nav";
 import { dailyBalanceSeries, sparkPoints } from "../kasa-banka/account-sparkline";
 
@@ -44,6 +55,48 @@ describe("Hareketler filtre kontratı (URL -> sunucu sorgusu)", () => {
     const ops = ledgerQueryOps(f, { omitKaynak: true });
     expect(ops.some((o) => o.op === "eq" && o.col === "origin")).toBe(false);
     expect(ops).toContainEqual({ op: "eq", col: "kind", val: "income" });
+  });
+
+  it("kdv=yok: vergi sekmesi sayacıyla aynı küme (ofis hesabı, TL, örnek değil, gelir/gider, oran boş)", () => {
+    const f = parseLedgerFilters({ kdv: "yok", from: "2026-10-01", to: "2026-10-31" }, { canSalary: false });
+    expect(ledgerNeedsOfficeScope(f)).toBe(true);
+    expect(ledgerFilterParams(f)).toEqual({ kdv: "yok", from: "2026-10-01", to: "2026-10-31" });
+    const ops = ledgerQueryOps(f, { officeAccountIds: [ID] });
+    expect(ops).toEqual(
+      expect.arrayContaining([
+        { op: "eq", col: "origin", val: "entry" },
+        { op: "is", col: "vat_rate", val: null },
+        { op: "in", col: "kind", val: ["income", "expense"] },
+        { op: "eq", col: "currency", val: "TRY" },
+        { op: "eq", col: "is_sample", val: false },
+        { op: "in", col: "account_id", val: [ID] },
+      ]),
+    );
+    // Ofis hesabı listesi verilmezse süzgeç gevşemez: hiç satır gelmez.
+    expect(ledgerQueryOps(f)).toContainEqual({ op: "in", col: "account_id", val: [] });
+    expect(parseLedgerFilters({ kdv: "var" }, { canSalary: false }).kdvYok).toBe(false);
+  });
+
+  it("kaynak=elle: kâr/zarar 'Diğer gelir (elle)' kapsamı (finance_pnl ile aynı dışlanan kategoriler)", () => {
+    expect([...LEDGER_MANUAL_INCOME_EXCLUDED].sort()).toEqual([...PNL_INCOME_EXCLUDED].sort());
+    const f = parseLedgerFilters({ tur: "gelir", kaynak: "elle" }, { canSalary: false });
+    expect(f.kaynak).toBe("elle");
+    const ops = ledgerQueryOps(f, { officeAccountIds: [ID] });
+    expect(ops).toEqual(
+      expect.arrayContaining([
+        { op: "eq", col: "kind", val: "income" },
+        { op: "eq", col: "origin", val: "entry" },
+        { op: "eq", col: "source_type", val: "manual" },
+        { op: "eq", col: "currency", val: "TRY" },
+        { op: "eq", col: "is_sample", val: false },
+        { op: "or", val: "category.is.null,category.not.in.(komisyon,kira_tahsilat,aidat_tahsilat,kira_yonetimi,transfer)" },
+        { op: "in", col: "account_id", val: [ID] },
+      ]),
+    );
+    // Kaynak sayaçları (omitKaynak) elle kapsamını kendileri eklemez.
+    const base = ledgerQueryOps(f, { omitKaynak: true, officeAccountIds: [ID] });
+    expect(base.some((o) => o.op === "eq" && o.col === "source_type")).toBe(false);
+    expect(base.some((o) => o.op === "in" && o.col === "account_id")).toBe(false);
   });
 
   it("gelir/gider kind ile süzülür: transfer ve düzeltme (adjust) girmez; 'mutabık değil' düzeltmeyi dışlar", () => {

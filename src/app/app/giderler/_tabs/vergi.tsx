@@ -70,8 +70,7 @@ export async function VergiTab({ params }: FinanceTabProps) {
 
   const tabHref = (y: number) => `${FINANCE_PATH}?sekme=vergi${y === thisYear ? "" : `&yil=${y}`}`;
   const entriesHref = (f: string, t: string, extra = "") => `${FINANCE_PATH}?sekme=hareketler&from=${f}&to=${t}${extra}`;
-  // SÖZLEŞME (FN3 ledger-filters, birleştirmede ENGELLEYİCİ): `kdv=yok` → origin=entry, vat_rate is null, kind gelir/gider,
-  // currency TRY, is_sample false. FN3 bu süzgeci eklemeden birleşirse bağlantı yalnız ay aralığını süzer.
+  // `kdv=yok` (ledger-filters): ofis hesabı, origin=entry, vat_rate boş, gelir/gider, TL, örnek değil — sayaçla aynı küme.
   const noVatHref = (f: string, t: string) => entriesHref(f, t, "&kdv=yok");
 
   const kpis: KpiItem[] = [
@@ -199,12 +198,24 @@ export async function VergiTab({ params }: FinanceTabProps) {
                 <tfoot>
                   <tr className="border-t border-line-strong text-xs font-semibold text-text">
                     <th scope="row" className="px-3 py-2 text-left">{year} toplam</th>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.outputVat)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.inputVat)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.payable)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.withholdingCollected)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.withholdingPaid)}</td>
-                    <td className="numeric px-3 py-2 text-right">{noVatTotal}</td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={entriesHref(from, to, "&tur=gelir")} className="hover:underline">{formatTry(totals.outputVat)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={entriesHref(from, to, "&tur=gider")} className="hover:underline">{formatTry(totals.inputVat)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={entriesHref(from, to)} className="hover:underline">{formatTry(totals.payable)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={entriesHref(from, to, "&tur=gelir")} className="hover:underline">{formatTry(totals.withholdingCollected)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={entriesHref(from, to, "&tur=gider")} className="hover:underline">{formatTry(totals.withholdingPaid)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={noVatHref(from, to)} className="hover:underline">{noVatTotal}</Link>
+                    </td>
                   </tr>
                 </tfoot>
               </table>

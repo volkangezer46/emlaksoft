@@ -111,7 +111,9 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
   if (result.salesAnalyzed === 0) return null;
 
   const maxLeak = Math.max(1, ...result.months.map((m) => m.leak));
-  const topDeals = result.deals.slice(0, 8);
+  // İndirimli satış listesi (kaçan gelire göre sıralı): "İndirimli satış" ve "kaçan gelir" sayıları buraya iner.
+  const DEAL_LIST_LIMIT = 50;
+  const topDeals = result.deals.slice(0, DEAL_LIST_LIMIT);
 
   return (
     <Card id="indirim-analizi" className="scroll-mt-24">
@@ -130,16 +132,16 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
             <p className="numeric font-display text-xl font-extrabold text-text">{result.salesAnalyzed}</p>
           </Link>
           {/* İndirimli satış ve kaçan gelir, portföyün GÜNCEL oranı ile ofis standardı karşılaştırılarak burada hesaplanır;
-              anlaşma listesinde bu kümeyi veren bir sunucu süzgeci yok. Sahte bağlantı verilmez: kalemler aşağıdaki
-              "En büyük indirimler" tablosunda tek tek anlaşmaya iner. */}
-          <div className="rounded-[var(--radius-card)] border border-line p-3">
+              anlaşma listesinde bu kümeyi veren bir sunucu süzgeci yok. Sayılar aşağıdaki "İndirimli satışlar" listesine
+              iner; her satır anlaşmanın kendisine gider. */}
+          <Link href={result.discountedCount > 0 ? "#indirimli-satislar" : salesHref(`${months[0]}-01`)} className="focus-ring rounded-[var(--radius-card)] border border-line p-3">
             <p className="text-xs text-text-muted">İndirimli satış</p>
             <p className="numeric font-display text-xl font-extrabold text-text">{result.discountedCount}</p>
-          </div>
-          <div className="rounded-[var(--radius-card)] border border-line p-3">
+          </Link>
+          <Link href={result.discountedCount > 0 ? "#indirimli-satislar" : salesHref(`${months[0]}-01`)} className="focus-ring rounded-[var(--radius-card)] border border-line p-3">
             <p className="text-xs text-text-muted">İndirimle kaçan gelir</p>
             <p className={`numeric font-display text-xl font-extrabold ${result.totalLeak > 0 ? "text-danger-600" : "text-text"}`}>{formatTry(result.totalLeak)}</p>
-          </div>
+          </Link>
           <Link
             href={rule.enabled ? "/app/onaylar?tur=komisyon_indirimi" : "/app/ofis-kontrol/kurallar"}
             className="focus-ring rounded-[var(--radius-card)] border border-line p-3"
@@ -177,8 +179,10 @@ export async function DiscountAnalysisCard({ tenantId, userId, showAdvisors }: {
               </ul>
             </div>
 
-            <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">En büyük indirimler</h3>
+            <div id="indirimli-satislar" className="scroll-mt-24">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">
+                İndirimli satışlar ({result.deals.length > DEAL_LIST_LIMIT ? `kaçan gelire göre ilk ${DEAL_LIST_LIMIT} / ${result.deals.length}` : result.deals.length})
+              </h3>
               <TableFrame minWidth={560} stack>
                 <Table>
                   <THead>
