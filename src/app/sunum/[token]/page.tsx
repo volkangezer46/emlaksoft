@@ -186,22 +186,6 @@ export default async function PublicPresentationPage({
     mediaByProperty.set(m.property_id, list);
   }
 
-  // İlan açıklaması: `description` kolonu her kurulumda bulunmayabilir → ana
-  // sorgudan ayrı ve hataya toleranslı okunur (vitrin/[slug]/[id] deseni);
-  // kolon yoksa features.description'a düşülür.
-  const descById = new Map<string, string>();
-  {
-    const { data: descRows } = await admin
-      .from("properties")
-      .select("id, description")
-      .in("id", properties.map((p) => p.id as string))
-      .eq("is_sample", false);
-    for (const d of (descRows ?? []) as { id: string; description?: string | null }[]) {
-      const text = String(d.description ?? "").trim();
-      if (text) descById.set(d.id, text);
-    }
-  }
-
   // Görüntülenme: yanıt gönderildikten SONRA atomik +1 (increment_listing_view deseni). Açılış istihbaratı
   // (paylas/[token] deseni): sunumu hazırlayan danışmana "sunumunuz açıldı" bildirimi — günde en çok bir kez
   // (dedupe_key), danışmanın kendi önizlemesi sayılmaz; WhatsApp/Telegram önizleme botu ve ön-yükleme ne sayaca ne
@@ -336,7 +320,7 @@ export default async function PublicPresentationPage({
               : null,
             feat.heating ? { icon: Flame, label: feat.heating } : null,
           ].filter(Boolean) as { icon: typeof BedDouble; label: string }[];
-          const description = descById.get(property.id as string) ?? readPropertyDescription(feat) ?? "";
+          const description = readPropertyDescription(feat) ?? "";
 
           return (
             <article
