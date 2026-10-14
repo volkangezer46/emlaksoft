@@ -528,7 +528,12 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
         direction: "payable", party_id: party, title: "Prim hak edişi", amount, issue_date: "2026-10-01", due_date: "2026-10-30" })]);
     const ownItem = await item(own, 1000);
     const foreignItem = await item(foreign, 2000);
-    await item(unbound, 3000);
+    const unboundItem = await item(unbound, 3000);
+    await db.exec(`reset role`);
+    await q(`insert into public.recurring_rules(tenant_id, direction, category, title, amount, account_id, next_due, party_id)
+      values ($1, 'out', 'diger_gider', 'Aylık prim', 500, $2, '2026-11-01', $3), ($1, 'out', 'diger_gider', 'Aylık prim', 400, $2, '2026-11-01', $4)`, [T, KASA, own, foreign]);
+    await asBoss();
+    expect((await q(`select count(*)::int as n from public.finance_open_items_v where source = 'recurring' and party_id in ($1, $2)`, [own, foreign]))[0]!.n).toBe(2);
     const bossAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('payable')`))[0]!.a as number;
     const bossNames = (await q(`select name from public.finance_party_balances('danisman', null)`)).map((r) => r.name);
     expect(bossNames).toEqual(expect.arrayContaining(["Danışman Ayşe", "Danışman Bora", "Bağsız Danışman"]));
@@ -545,12 +550,25 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     expect((await q(`select id from public.finance_open_items where party_id = any($1::uuid[])`, [[own, foreign, unbound]])).map((r) => r.id)).toEqual([ownItem]);
     expect((await q(`select count(*)::int as n from public.finance_open_items_v where party_id in ($1, $2)`, [foreign, unbound]))[0]!.n).toBe(0);
     const advAging = (await q(`select sum(amount)::float8 as a from public.finance_aging('payable')`))[0]!.a as number;
-    expect(bossAging - advAging).toBe(2000 + 3000);
+    expect(bossAging - advAging).toBe(2000 + 3000 + 400); // gizli iki elle kalem + gizli carinin düzenli ödemesi
     // Yazma: düzenleme, arşiv, kalem kapama/iptal, kalemi gizli cariye bağlama (id ya da adla)
     expect(await fails(`select public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ id: foreign, kind: "danisman", name: "Ele geçir", user_id: ADV1 })])).toBe("FN:not_found");
     expect(await fails(`select public.finance_party_set_archived($1::uuid, true)`, [foreign])).toBe("FN:not_found");
     expect(await fails(`select public.finance_open_item_settle($1::uuid, $2::uuid, 1::numeric, '2026-10-05'::date, null)`, [foreignItem, KASA])).toBe("FN:not_found");
     expect(await fails(`select public.finance_open_item_cancel($1::uuid, 'gizli kalem')`, [foreignItem])).toBe("FN:not_found");
+    // Hareket kaydı yolu (open_item_id): settle kapısı aşılamaz; tutar/durum hatası da varlığı sızdırmaz.
+    const pay = { account_id: KASA, direction: "out", amount: 10, entry_date: "2026-10-05", category: "diger_gider", title: "Gizli kapama" };
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, party_id: own, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, amount: 999999, open_item_id: foreignItem })])).toBe("FN:not_found");
+    expect(await fails(`select public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ ...pay, open_item_id: unboundItem })])).toBe("FN:not_found");
+    // Kural: gizli cariye set_party_id verilemez (var/yok aynı hata), kendi carisi verilebilir.
+    const rule = (party: string) => ({ direction: "out", match_text: "prim", set_category: "diger_gider", set_party_id: party });
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(foreign))])).toBe("FN:party_not_found");
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(unbound))])).toBe("FN:party_not_found");
+    expect(await fails(`select public.finance_rule_upsert($1::jsonb)`, [JSON.stringify(rule(own))])).toBeNull();
+    // Düzenli ödeme kolu: gizli cariye bağlı düzenli kalem açık kalem görünümünde yok, kendi carisininki var.
+    expect((await q(`select party_id from public.finance_open_items_v where source = 'recurring' and party_id in ($1, $2)`, [own, foreign])).map((r) => r.party_id)).toEqual([own]);
     const link = (p: Record<string, unknown>) => fails(`select public.finance_open_item_create($1::jsonb)`, [JSON.stringify({
       direction: "payable", title: "Bağla", amount: 5, issue_date: "2026-10-02", due_date: "2026-10-02", ...p })]);
     expect(await link({ party_id: foreign })).toBe("FN:party_not_found");
@@ -559,7 +577,7 @@ describe.skipIf(!mod)("finans v2 defter / cari / vade / kilit (pglite)", () => {
     await q(`select public.finance_party_upsert($1::jsonb)`, [JSON.stringify({ id: own, kind: "danisman", name: "Danışman Ayşe Y.", user_id: ADV1 })]);
 
     await asBoss();
-    expect((await q(`select id from public.finance_open_items where id = $1`, [foreignItem])).length).toBe(1);
+    expect((await q(`select paid_amount::float8 as p, status from public.finance_open_items where id = $1`, [foreignItem]))).toEqual([{ p: 0, status: "open" }]);
     expect((await q(`select name from public.finance_parties where id = $1`, [foreign]))[0]!.name).toBe("Danışman Bora");
     expect((await q(`select name from public.finance_parties where id = $1`, [own]))[0]!.name).toBe("Danışman Ayşe Y.");
     await db.exec(`reset role`);
