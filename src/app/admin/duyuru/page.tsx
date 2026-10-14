@@ -1,5 +1,5 @@
 import { ButtonLink } from "@/components/ui/button";
-import { Bell, Filter, History, Megaphone, PanelTop, Send, Sparkles } from "lucide-react";
+import { Bell, Filter, History, Megaphone, PanelTop, Send, Smile, Sparkles } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePlatformModule } from "@/lib/platform";
 import { PageTabs } from "@/components/app/page-tabs";
@@ -16,6 +16,7 @@ import { KIND_OPTIONS } from "./broadcast-options";
 import { DeliveryDetail } from "./delivery-detail";
 import { BannerPanel } from "./banner-panel";
 import { ChangelogPanel } from "./changelog-panel";
+import { NpsPanel } from "./nps-panel";
 import { SegmentExplorer } from "./segment-explorer";
 import type { SegmentInit, SegmentOptions } from "./segment-builder";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -36,6 +37,7 @@ const TABS = [
   { id: "segmentler", label: "Segmentler", icon: Filter },
   { id: "banner", label: "Banner", icon: PanelTop },
   { id: "yenilikler", label: "Yenilikler", icon: Sparkles },
+  { id: "nps", label: "NPS anketi", icon: Smile },
 ] as const;
 
 type AnnouncementRow = {
@@ -73,6 +75,8 @@ type SP = {
   kanal?: string;
   ofis?: string;
   uye?: string;
+  anket?: string;
+  grup?: string;
 } & Record<string, string | string[] | undefined>;
 
 function tenantNameOf(v: AnnouncementRow["tenant"]) {
@@ -121,7 +125,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
     return <DeliveryDetail id={sp.duyuru} status={sp.durum} channel={sp.kanal} page={page} canEdit={canEdit} />;
   }
 
-  const needsOptions = sp.yeni === "1" || active === "segmentler" || active === "banner";
+  const needsOptions = sp.yeni === "1" || active === "segmentler" || active === "banner" || active === "nps";
   const { data: recentTenants } = needsOptions
     ? await admin.from("tenants").select("id, name, slug, status").neq("status", "cancelled").order("created_at", { ascending: false }).limit(20)
     : { data: null };
@@ -161,7 +165,7 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
         eyebrow="Toplu duyuru"
         icon={Megaphone}
         title="Duyuru, mesaj ve Yenilikler"
-        description="Segmente zamanlanmış duyuru (uygulama içi, e-posta, push), ofis paneline banner, tek ofise/kullanıcıya mesaj ve Yenilikler çekmecesi."
+        description="Segmente zamanlanmış duyuru (uygulama içi, e-posta, push), ofis paneline banner, tek ofise/kullanıcıya mesaj, Yenilikler çekmecesi ve NPS anketi."
       />
       <PageTabs base="/admin/duyuru" label="Duyuru sekmeleri" tabs={TABS} active={active} />
 
@@ -169,6 +173,16 @@ export default async function BroadcastPage({ searchParams }: { searchParams: Pr
         <SegmentExplorer options={options} />
       ) : active === "banner" ? (
         <BannerPanel options={options} canEdit={canEdit} minLocal={toTrLocalInput(now())} editId={UUID_RE.test(one(sp.duzenle)) ? one(sp.duzenle) : undefined} segInit={segmentInitFromQuery(sp)} />
+      ) : active === "nps" ? (
+        <NpsPanel
+          options={options}
+          canEdit={canEdit}
+          isSuperAdmin={isSuperAdmin}
+          editId={UUID_RE.test(one(sp.duzenle)) ? one(sp.duzenle) : undefined}
+          surveyId={UUID_RE.test(sp.anket ?? "") ? sp.anket : undefined}
+          band={sp.grup === "promoter" || sp.grup === "passive" || sp.grup === "detractor" ? sp.grup : null}
+          page={page}
+        />
       ) : active === "yenilikler" ? (
         <ChangelogPanel canEdit={canEdit} isSuperAdmin={isSuperAdmin} editId={UUID_RE.test(one(sp.duzenle)) ? one(sp.duzenle) : undefined} />
       ) : (

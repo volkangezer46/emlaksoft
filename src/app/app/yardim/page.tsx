@@ -9,9 +9,11 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { FIRST_30_INTRO, HELP_TABS, resolveHelpTab, type GlossaryEntry, type HelpTab } from "@/lib/help-content";
 import { getHelpContent } from "@/lib/help-center/store";
 import { loadOnboardingState } from "../_home/data";
-import type { EffectivePermissions } from "@/lib/permissions-effective";
+import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
+import { boardEnabledFor } from "@/lib/product-feedback/store";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
 import { FaqSearch, GuidesSearch } from "./help-search";
+import { FeatureBoardTab } from "./feature-board";
 
 export const metadata = { title: "Yardım ve Destek" };
 
@@ -32,11 +34,16 @@ function tabHref(tab: HelpTab) {
  * adımlar), SSS ve Sözlük (jargon → ofis dili). İçerik yardım merkezi CMS'inden gelir: koddaki taban
  * (src/lib/help-content.ts, help-faq.ts) + yayındaki DB makaleleri (src/lib/help-center; /admin/site/yardim). Yayın
  * önbellek etiketini tazeler: yeni makale hemen aranabilir. Destek talepleri merkezin "Destek" sekmesidir (/app/destek).
+ * Öneri panosu (DG8): ofisler özellik önerir ve oy verir (ofis başına tek oy); EmlakSoft durumu günceller.
  */
-export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string }> }) {
+export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string; durum?: string }> }) {
   const [{ tenantId, perms }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
   if (sp?.sekme === "destek") redirect("/app/destek");
-  const tab = resolveHelpTab(sp?.sekme);
+  // Öneri panosu (DG8) hedeflenebilir bayraktır: kapalı/hedef dışı ofiste sekme görünmez, adres Başlangıç'a düşer.
+  const boardOn = tenantId ? await boardEnabledFor(tenantId).catch(() => false) : false;
+  const tabs = boardOn ? PAGE_TABS : PAGE_TABS.filter((t) => t.id !== "oneriler");
+  const resolved = resolveHelpTab(sp?.sekme);
+  const tab = resolved === "oneriler" && !boardOn ? "baslangic" : resolved;
   const q = (sp?.q ?? "").slice(0, 100);
 
   return (
@@ -49,7 +56,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       />
 
       <nav aria-label="Yardım bölümleri" className="flex flex-wrap gap-2">
-        {PAGE_TABS.map((t) => (
+        {tabs.map((t) => (
           <FilterChip key={t.id} href={tabHref(t.id)} active={t.id === tab}>
             {t.label}
           </FilterChip>
@@ -61,6 +68,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
       {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
       {tab === "sozluk" ? <GlossaryTab glossary={help.glossary} /> : null}
+      {tab === "oneriler" && tenantId ? <FeatureBoardTab tenantId={tenantId} filter={sp?.durum} canWrite={effectiveHasPermission(perms, "support", "create")} /> : null}
     </div>
   );
 }
