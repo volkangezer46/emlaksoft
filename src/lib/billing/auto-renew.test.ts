@@ -15,10 +15,12 @@ const createCheckoutInvoice = vi.fn();
 const fulfillSuccessfulPayment = vi.fn();
 const markCheckoutInvoiceFailed = vi.fn();
 const markCheckoutInvoiceInitialized = vi.fn();
-vi.mock("@/lib/billing/fulfillment", () => {
+vi.mock("@/lib/billing/fulfillment", async (orig) => {
   class DuplicateAutoRenewAttemptError extends Error {}
+  const real = await orig<typeof import("@/lib/billing/fulfillment")>();
   return {
     DuplicateAutoRenewAttemptError,
+    checkoutErrorText: real.checkoutErrorText,
     createCheckoutInvoice: (...a: unknown[]) => createCheckoutInvoice(...a),
     fulfillSuccessfulPayment: (...a: unknown[]) => fulfillSuccessfulPayment(...a),
     invoiceAmountsTry: () => ({ amountTry: 100, taxTry: 20, totalTry: 120 }),
@@ -128,6 +130,23 @@ describe("otomatik yenileme: çift tahsilat ve sıra", () => {
     const res = await runAutoRenewPass(fakeAdmin(), 1_000);
     expect(markCheckoutInvoiceFailed).toHaveBeenCalled();
     expect(res.failed).toBe(1);
+  });
+
+  it("kart reddinde bankanın gerçek mesajı faturaya '<errorCode>: <errorMessage>' olarak yazılır", async () => {
+    chargeStoredCard.mockResolvedValue({ status: "failure", errorCode: "10051", errorMessage: "Kart limiti yetersiz, yetersiz bakiye" });
+    await runAutoRenewPass(fakeAdmin(), 1_000);
+    expect(markCheckoutInvoiceFailed).toHaveBeenCalledWith({
+      invoiceId: "inv1",
+      tenantId: "t1",
+      checkoutError: "10051: Kart limiti yetersiz, yetersiz bakiye",
+    });
+  });
+
+  it("kart, faturaya yazılan toplamla (kesim anındaki KDV oranı) çekilir; net tutar abonelikten", async () => {
+    createCheckoutInvoice.mockResolvedValue({ invoiceId: "inv1", totalTry: 118, vatRate: 0.18, credit: null });
+    await runAutoRenewPass(fakeAdmin(), 1_000);
+    expect(createCheckoutInvoice.mock.calls[0]![0]).toMatchObject({ amountTry: 100 });
+    expect(chargeStoredCard.mock.calls[0]![0]).toMatchObject({ price: 118 });
   });
 
   it("tahsilat doğrulandıktan sonra fulfill hatası faturayı başarısız İŞARETLEMEZ", async () => {

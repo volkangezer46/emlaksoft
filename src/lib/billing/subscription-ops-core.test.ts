@@ -174,6 +174,14 @@ describe("tahsil denemeleri", () => {
     expect(providerErrorText("99999: Bilinmeyen")).toBe("99999: Bilinmeyen");
     expect(providerErrorText("")).toBeNull();
   });
+
+  it("otomatik yenileme reddi: bankanın gerçek mesajı açıklamayla birlikte görünür", () => {
+    const t = providerErrorText("10051: Kartınızın limiti bu işlem için yetersiz");
+    expect(t).toContain("(kod 10051)");
+    expect(t).toContain("Banka yanıtı: Kartınızın limiti bu işlem için yetersiz");
+    // Yalnız kod yazılmışsa (eski kayıt) açıklama tek başına kalır.
+    expect(providerErrorText("10051")).not.toContain("Banka yanıtı");
+  });
 });
 
 describe("özel anlaşma ve bitiş tarihi", () => {

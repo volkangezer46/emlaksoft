@@ -14,7 +14,8 @@ import { getSetting } from "@/lib/settings/read";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { cleanReason } from "@/lib/billing/admin-billing-fixes";
-import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
+import { invoiceAmountsTry, writeAutoInvoiceLine } from "@/lib/billing/fulfillment";
+import { getBillingVatRate } from "@/lib/billing/vat-rate";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { isCatalogPlanKey } from "@/lib/billing/plan-overrides";
@@ -127,13 +128,18 @@ async function dueDays(): Promise<number> {
   }
 }
 
-/** Yönetici fark faturası: açık (open) satır, checkout yok; ödeme Faturalama ekranından elle kapatılır. */
+/**
+ * Yönetici fark faturası: açık (open) satır, checkout yok; ödeme Faturalama ekranından elle kapatılır. KDV oranı kesim
+ * anındaki ayardır (`billing.vat_rate`) ve faturaya (meta.vatRate + satır) yazılır.
+ */
 async function createAdminInvoice(
   ctx: Ctx,
   input: { subscriptionId: string; netTry: number; prefix: string; meta: Record<string, unknown> },
 ): Promise<{ id: string; invoiceNo: string; totalTry: number } | { error: string }> {
-  const amounts = invoiceAmountsTry(input.netTry);
   const nowMs = now();
+  const vatRate = await getBillingVatRate(nowMs);
+  const amounts = invoiceAmountsTry(input.netTry, vatRate);
+  const meta = { ...input.meta, source: "admin", created_by: ctx.staff.id, reason: ctx.reason, vatRate };
   const invoiceNo = `${input.prefix}-${ctx.tenantId.replace(/-/g, "").slice(0, 6).toUpperCase()}-${randomBytes(5).toString("hex").toUpperCase()}`;
   const { data, error } = await ctx.admin
     .from("invoices")
@@ -147,7 +153,7 @@ async function createAdminInvoice(
       total_try: amounts.totalTry,
       currency: IYZICO_CURRENCY,
       due_at: new Date(nowMs + (await dueDays()) * 86_400_000).toISOString(),
-      meta: { ...input.meta, source: "admin", created_by: ctx.staff.id, reason: ctx.reason },
+      meta,
     })
     .select("id")
     .single();
@@ -155,6 +161,7 @@ async function createAdminInvoice(
     console.error("createAdminInvoice", error?.message);
     return { error: "Fatura satırı oluşturulamadı; Faturalama ekranından elle kesin." };
   }
+  await writeAutoInvoiceLine(ctx.admin, { invoiceId: String(data.id), tenantId: ctx.tenantId, meta, amounts, vatRate });
   return { id: String(data.id), invoiceNo, totalTry: amounts.totalTry };
 }
 
@@ -445,7 +452,7 @@ export async function previewAdminPlanChangeAction(formData: FormData): Promise<
   const r = await planPreview(ctx, formData, quotedAtMs);
   if ("error" in r) return { error: r.error };
   if (!r.preview.ok) return { error: r.preview.error };
-  const amounts = r.preview.invoiceNetTry > 0 ? invoiceAmountsTry(r.preview.invoiceNetTry) : { taxTry: 0, totalTry: 0 };
+  const amounts = r.preview.invoiceNetTry > 0 ? invoiceAmountsTry(r.preview.invoiceNetTry, await getBillingVatRate(quotedAtMs)) : { taxTry: 0, totalTry: 0 };
   return { preview: { ...r.preview, totalTry: amounts.totalTry, taxTry: amounts.taxTry, quotedAtMs } };
 }
 
@@ -668,7 +675,7 @@ export async function previewAdminSeatChange(formData: FormData): Promise<SeatPr
       status: r.ev.status,
       message: r.ev.message,
       chargeNetTry: net,
-      totalTry: net > 0 ? invoiceAmountsTry(net).totalTry : 0,
+      totalTry: net > 0 ? invoiceAmountsTry(net, await getBillingVatRate(quotedAtMs)).totalTry : 0,
       fromTotal: r.ev.fromQuote.totalSeats,
       toTotal: r.ev.toQuote.totalSeats,
       minTotal: r.ev.minTotalSeats,

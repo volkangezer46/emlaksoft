@@ -104,7 +104,7 @@ export default async function AdminEfKontorPage({ searchParams }: { searchParams
       <Card id="paketler">
         <CardHeader>
           <CardTitle>Paket kataloğu</CardTitle>
-          <CardDescription>Varsayılan katalog boştur: fiyatlar sahibin kararıdır. Net fiyatlar KDV hariçtir (faturada %20 KDV eklenir).</CardDescription>
+          <CardDescription>Varsayılan katalog boştur: fiyatlar sahibin kararıdır. Net fiyatlar KDV hariçtir (faturada geçerli KDV oranı eklenir).</CardDescription>
         </CardHeader>
         <CardContent>
           <PacksEditor initial={catalog.packs} tariff={catalog.tariff} canWrite={canWrite} />

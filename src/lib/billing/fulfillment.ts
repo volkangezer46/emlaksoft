@@ -7,6 +7,14 @@ import { applyWalletCreditToInvoice, type AppliedWalletCredit, type WalletCredit
 import { TRY_RPC } from "@/lib/try-credits/config";
 import { tryInvoiceHold, tryReleaseInvoice } from "@/lib/try-credits/wallet";
 import { registerClaimSafe } from "@/lib/growth/engine";
+import { DEFAULT_BILLING_VAT_RATE } from "@/lib/billing/plans";
+import { getBillingVatRate } from "@/lib/billing/vat-rate";
+import { autoInvoiceLineRow, invoiceAmountsTry, isValidVatRate } from "@/lib/billing/invoice-amounts";
+import { now as clockNow } from "@/lib/clock";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Tutar kuralı saf modülde (istemci ön izlemesi + test ortak); mevcut sunucu çağıranları buradan alır.
+export { invoiceAmountsTry };
 
 export type FulfillInput = {
   tenantId: string;
@@ -87,14 +95,62 @@ async function transitionCapture(
   }
 }
 
-export function invoiceAmountsTry(netAmountTry: number) {
-  if (!Number.isFinite(netAmountTry) || netAmountTry <= 0) {
-    throw new Error("Fatura tutarı geçersiz.");
+export const VAT_RATE_NOT_READY_MESSAGE =
+  "Yeni KDV oranıyla ödeme alınabilmesi için ödeme altyapısı güncellemesi bekleniyor; lütfen biraz sonra tekrar deneyin.";
+
+/**
+ * Fulfill SQL'i faturadaki oranı okuyor mu (20261014012000 `billing_vat_rate_ready()`)? Okumuyorsa SQL tutarı sabit %20 ile
+ * yeniden hesaplar: farklı oranla kesilen fatura TAHSİLATTAN SONRA reddedilirdi (iade gerekir). RPC yok/hata = hazır değil.
+ */
+async function billingVatRateReady(admin: SupabaseClient): Promise<boolean> {
+  try {
+    const { data, error } = await admin.rpc("billing_vat_rate_ready");
+    return !error && data === true;
+  } catch {
+    return false;
   }
-  const amountTry = Math.round(netAmountTry * 100) / 100;
-  const taxTry = Math.round(amountTry * 0.2 * 100) / 100;
-  const totalTry = Math.round((amountTry + taxTry) * 100) / 100;
-  return { amountTry, taxTry, totalTry };
+}
+
+/**
+ * Otomatik faturanın KDV oranı: kesim anında ayar defterinde geçerli oran (`billing.vat_rate`, geçerlilik tarihli).
+ * Oran kod varsayılanından (%20) farklıysa ve DB tarafı hazır değilse FAIL-CLOSED: fatura açılmaz, kart çekilmez.
+ * `requested` verilirse (ekranda gösterilen tutar o oranla hesaplandı) aynı oran kullanılır; yalnız hazırlık doğrulanır.
+ */
+export async function resolveAutoInvoiceVatRate(admin: SupabaseClient, requested?: number | null): Promise<number> {
+  const rate = isValidVatRate(requested) ? requested : await getBillingVatRate(clockNow());
+  if (Math.abs(rate - DEFAULT_BILLING_VAT_RATE) < 1e-9) return rate;
+  if (!(await billingVatRateReady(admin))) throw new ActionUserError(VAT_RATE_NOT_READY_MESSAGE);
+  return rate;
+}
+
+/**
+ * Otomatik faturaya `invoice_lines` satırı (AD2 ile tutarlı tek kalem). Fatura ile AYNI işlemde yazılamadığı için hata
+ * ödeme akışını BOZMAZ: satır yoksa okuyucular faturadan tek satır türetir (`synthesizeLine`), tutarlar aynıdır.
+ */
+export async function writeAutoInvoiceLine(
+  admin: SupabaseClient,
+  input: Parameters<typeof autoInvoiceLineRow>[0],
+): Promise<void> {
+  try {
+    const { error } = await admin.from("invoice_lines").insert(autoInvoiceLineRow(input));
+    if (error && error.code !== "PGRST205" && error.code !== "42P01" && error.code !== "23505") {
+      console.error("writeAutoInvoiceLine", { code: error.code, message: error.message });
+    }
+  } catch (e) {
+    console.error("writeAutoInvoiceLine", e instanceof Error ? e.message : "error");
+  }
+}
+
+/** invoices.checkout_error üst sınırı (invoices_checkout_error_check: char_length <= 300); aşılırsa UPDATE tümüyle düşer. */
+export const CHECKOUT_ERROR_MAX = 300;
+
+/** Sağlayıcının ret yanıtından faturaya yazılacak metin: "<errorCode>: <errorMessage>" (ödeme profilinde gösterilir). */
+export function checkoutErrorText(errorCode: unknown, errorMessage: unknown): string | null {
+  const code = String(errorCode ?? "").trim().slice(0, 40);
+  const room = code ? CHECKOUT_ERROR_MAX - code.length - 2 : CHECKOUT_ERROR_MAX;
+  const message = String(errorMessage ?? "").replace(/\s+/g, " ").trim().slice(0, room);
+  if (!code && !message) return null;
+  return code && message ? `${code}: ${message}` : code || message;
 }
 
 /** Service-role RPC is the only fulfillment write boundary. */
@@ -288,6 +344,8 @@ export class DuplicateAutoRenewAttemptError extends Error {
 export type CheckoutInvoiceResult = {
   invoiceId: string;
   totalTry: number;
+  /** Faturaya yazılan KDV oranı (kesim anındaki ayar). */
+  vatRate: number;
   /** Kullanıcı kredi istediyse uygulanan kredi (rezerv açıldı); yoksa null. */
   credit: AppliedWalletCredit | null;
 };
@@ -318,7 +376,8 @@ export async function createCheckoutInvoice(input: {
   extraMeta?: Record<string, unknown>;
 }): Promise<CheckoutInvoiceResult> {
   const admin = createAdminClient();
-  const amounts = invoiceAmountsTry(input.amountTry);
+  const vatRate = await resolveAutoInvoiceVatRate(admin);
+  const amounts = invoiceAmountsTry(input.amountTry, vatRate);
   const now = new Date();
   const checkoutExpiresAt = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 
@@ -345,6 +404,7 @@ export async function createCheckoutInvoice(input: {
         plan: input.plan,
         cycle: input.cycle,
         source: input.source ?? "checkout",
+        vatRate,
         ...(input.autoRenewAttemptKey ? { autoRenewAttemptKey: input.autoRenewAttemptKey } : {}),
         ...(input.saveCard
           ? { saveCard: true, saveCardConsentBy: input.saveCard.consentUserId, saveCardConsentVersion: "card-save-v1" }
@@ -360,7 +420,14 @@ export async function createCheckoutInvoice(input: {
     throw new Error("Fatura oluşturulamadı.");
   }
   const invoiceId = data.id as string;
-  if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
+  await writeAutoInvoiceLine(admin, {
+    invoiceId,
+    tenantId: input.tenantId,
+    meta: { kind: input.kind, plan: input.plan },
+    amounts,
+    vatRate,
+  });
+  if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, vatRate, credit: null };
 
   const applied = await applyWalletCreditToInvoice(admin, {
     tenantId: input.tenantId,
@@ -378,7 +445,7 @@ export async function createCheckoutInvoice(input: {
       .eq("status", "draft");
     throw new ActionUserError(applied.error);
   }
-  return { invoiceId, totalTry: amounts.totalTry, credit: applied.applied };
+  return { invoiceId, totalTry: amounts.totalTry, vatRate, credit: applied.applied };
 }
 
 export async function markCheckoutInvoiceInitialized(input: {
@@ -408,11 +475,17 @@ export async function markCheckoutInvoiceInitialized(input: {
 export async function markCheckoutInvoiceFailed(input: {
   invoiceId: string;
   tenantId: string;
+  /** Sağlayıcının kesin ret metni ("<errorCode>: <errorMessage>", `checkoutErrorText`); ödeme profilinde gösterilir. */
+  checkoutError?: string | null;
 }) {
   const admin = createAdminClient();
   const { error } = await admin
     .from("invoices")
-    .update({ checkout_status: "initialization_failed" })
+    .update(
+      input.checkoutError
+        ? { checkout_status: "initialization_failed", checkout_error: input.checkoutError.slice(0, CHECKOUT_ERROR_MAX) }
+        : { checkout_status: "initialization_failed" },
+    )
     .eq("id", input.invoiceId)
     .eq("tenant_id", input.tenantId)
     .eq("status", "draft")

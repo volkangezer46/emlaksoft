@@ -1,10 +1,11 @@
-import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
+import { invoiceAmountsTry } from "@/lib/billing/invoice-amounts";
 import { EF_PACK_MONTHS_LABEL, efPackDisplayName, efPackMonthlyUnits, efPackUnitPriceTry, type EfPack, type EfTariff } from "@/lib/ef-credits/config";
 
 /**
  * ANALİZ PAKETİ SATIN ALMA: SAF ÇEKİRDEK (I/O yok).
  * Ekran önizlemesi ve bağlayıcı sunucu hesabı AYNI fonksiyonları kullanır; istemciden tutar/analiz bakiyesi alınmaz.
- * KDV kuralı tek kaynaktan gelir: `invoiceAmountsTry` (net x 1,20).
+ * KDV kuralı tek kaynaktan gelir: `invoiceAmountsTry` (net x (1 + oran)); oran sunucuda kesim anındaki ayardır
+ * (`getBillingVatRate`), verilmezse kod varsayılanı (%20, yalnız tanıtım ön izlemesi).
  */
 
 export type CreditPackQuote = {
@@ -20,8 +21,8 @@ export type CreditPackQuote = {
   unitGrossTry: number;
 };
 
-export function quoteCreditPack(pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">): CreditPackQuote {
-  const a = invoiceAmountsTry(pack.priceNetTry);
+export function quoteCreditPack(pack: Pick<EfPack, "id" | "units" | "months" | "priceNetTry">, vatRate?: number): CreditPackQuote {
+  const a = invoiceAmountsTry(pack.priceNetTry, vatRate);
   return {
     packId: pack.id,
     units: pack.units,

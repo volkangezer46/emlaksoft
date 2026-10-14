@@ -20,7 +20,13 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { fulfillInvoiceWithWalletCredit, fulfillSuccessfulPayment, markCheckoutInvoiceFailed } from "./fulfillment";
+import {
+  CHECKOUT_ERROR_MAX,
+  checkoutErrorText,
+  fulfillInvoiceWithWalletCredit,
+  fulfillSuccessfulPayment,
+  markCheckoutInvoiceFailed,
+} from "./fulfillment";
 
 const TENANT = "11111111-1111-4111-8111-111111111111";
 const INVOICE = "22222222-2222-4222-8222-222222222222";
@@ -188,5 +194,22 @@ describe("başarısız checkout kredi rezervini bırakır", () => {
     vi.clearAllMocks();
     db.rpc.mockImplementation(async () => ({ data: null, error: { code: "PGRST202", message: "x" } }));
     await expect(markCheckoutInvoiceFailed({ invoiceId: INVOICE, tenantId: TENANT })).resolves.toBeUndefined();
+  });
+});
+
+describe("checkout_error şema kısıtına (char_length <= 300) sığar", () => {
+  it("uzun banka ret metni kodla birlikte 300 karaktere kırpılır", () => {
+    const text = checkoutErrorText("10051", "x".repeat(1000));
+    expect(text).not.toBeNull();
+    expect(text!.length).toBe(CHECKOUT_ERROR_MAX);
+    expect(text!.startsWith("10051: ")).toBe(true);
+  });
+
+  it("markCheckoutInvoiceFailed 300 karakteri aşan metni kırparak yazar (UPDATE düşmez)", async () => {
+    vi.clearAllMocks();
+    db.updates.length = 0;
+    wire({ data: { has_hold: false }, error: null });
+    await markCheckoutInvoiceFailed({ invoiceId: INVOICE, tenantId: TENANT, checkoutError: "y".repeat(700) });
+    expect(db.updates.at(-1)).toEqual({ checkout_status: "initialization_failed", checkout_error: "y".repeat(300) });
   });
 });

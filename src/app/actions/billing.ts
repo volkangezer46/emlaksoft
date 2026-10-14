@@ -25,7 +25,6 @@ import {
   createCheckoutInvoice,
   fulfillInvoiceWithWalletCredit,
   fulfillSuccessfulPayment,
-  invoiceAmountsTry,
   markCheckoutInvoiceFailed,
   markCheckoutInvoiceInitialized,
 } from "@/lib/billing/fulfillment";
@@ -34,6 +33,7 @@ import { validateCheckoutBuyer, type ValidatedCheckoutBuyer } from "@/lib/billin
 import { getBaseUrl } from "@/lib/base-url";
 import { getTenantCardUserKey } from "@/lib/billing/card-store";
 import { createCreditPackInvoice } from "@/lib/billing/credit-pack-purchase";
+import { getBillingVatRate } from "@/lib/billing/vat-rate";
 import { creditPackBasketName, findPurchasablePack, quoteCreditPack } from "@/lib/billing/credit-pack-purchase-core";
 import { getEfCatalog, getEfCreditReady, getEfLotsReady } from "@/lib/ef-credits/credit-reader";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
@@ -158,7 +158,6 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
     couponNormalized = quote.code;
   }
   const amountTry = Math.round((listAmountTry - couponDiscountTry) * 100) / 100;
-  const invoiceAmounts = invoiceAmountsTry(amountTry);
   const conversationId = `es-${gate.tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const configured = isIyzicoConfigured();
   const demoAllowed = billingDemoAllowed(); // tek tanım: lib/feature-flags/registry.ts (ALLOW_BILLING_DEMO)
@@ -193,6 +192,8 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
   }
 
   let invoiceId: string;
+  // Fatura toplamı (KDV dahil) faturanın kesildiği andaki orandan gelir (createCheckoutInvoice; ayar defteri).
+  let invoiceTotalTry: number;
   let credit: AppliedWalletCredit | null = null;
   try {
     const created = await createCheckoutInvoice({
@@ -206,6 +207,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
       walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
     invoiceId = created.invoiceId;
+    invoiceTotalTry = created.totalTry;
     credit = created.credit;
   } catch (error) {
     return { error: actionErrorMessage(error, "Fatura taslağı oluşturulamadı.") };
@@ -235,7 +237,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
         cycle,
         conversationId,
         paymentId: `demo-${conversationId}`,
-        expectedAmountTry: invoiceAmounts.totalTry,
+        expectedAmountTry: invoiceTotalTry,
         expectedCurrency: IYZICO_CURRENCY,
         source: "demo",
       });
@@ -268,7 +270,7 @@ export async function startPlanCheckout(formData: FormData): Promise<CheckoutRes
 
   try {
     // Kısmi kredi: iyzico YALNIZ kalan nakit tutarı tahsil eder (fatura toplamı/KDV değişmez).
-    const chargeTry = credit ? credit.cashTry : invoiceAmounts.totalTry;
+    const chargeTry = credit ? credit.cashTry : invoiceTotalTry;
     const init = await initializeCheckoutForm({
       conversationId,
       price: chargeTry,
@@ -535,7 +537,9 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
   const catalog = await getEfCatalog();
   const pack = findPurchasablePack(catalog.packs, packId);
   if (!pack) return { error: "Bu paket artık satışta değil. Sayfayı yenileyip güncel paketleri görün." };
-  const quote = quoteCreditPack(pack);
+  // Onay tutarı ve fatura AYNI oranla (kesim anındaki ayar) hesaplanır.
+  const vatRate = await getBillingVatRate();
+  const quote = quoteCreditPack(pack, vatRate);
   if (confirmTry !== null && (!Number.isFinite(confirmTry) || Math.abs(confirmTry - quote.totalTry) > 0.01)) {
     return { error: "Tutar güncellendi; lütfen yeni tutarı inceleyip yeniden onaylayın.", quotedTotalTry: quote.totalTry };
   }
@@ -578,6 +582,7 @@ export async function startCreditPackPurchase(formData: FormData): Promise<Credi
       tenantId: gate.tenantId,
       pack,
       conversationId,
+      vatRate,
       walletCredit: useCredit ? { userId: user.id, maxShare: await getTryMaxShare() } : null,
     });
   } catch (error) {

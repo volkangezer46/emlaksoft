@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
-import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
+import { invoiceAmountsTry, resolveAutoInvoiceVatRate, writeAutoInvoiceLine } from "@/lib/billing/fulfillment";
 import { buildCreditPackMeta } from "@/lib/billing/credit-pack-purchase-core";
 import { now } from "@/lib/clock";
 import { ActionUserError } from "@/lib/action-errors";
@@ -25,9 +25,13 @@ export async function createCreditPackInvoice(input: {
   conversationId: string;
   /** "Hesap kredimi kullan": rezerv fatura taslağından hemen sonra, iyzico açılmadan ÖNCE yapılır. */
   walletCredit?: WalletCreditRequest | null;
+  /** Onay ekranındaki tutarın hesaplandığı KDV oranı (kesim anındaki ayar); yoksa burada okunur. */
+  vatRate?: number | null;
 }): Promise<{ invoiceId: string; totalTry: number; credit?: AppliedWalletCredit | null }> {
   const admin = createAdminClient();
-  const amounts = invoiceAmountsTry(input.pack.priceNetTry);
+  const vatRate = await resolveAutoInvoiceVatRate(admin, input.vatRate);
+  const amounts = invoiceAmountsTry(input.pack.priceNetTry, vatRate);
+  const meta = { ...buildCreditPackMeta(input.pack), conversationId: input.conversationId, source: "checkout", vatRate };
   const expiresAt = new Date(now() + 2 * 60 * 60 * 1000);
   const { data, error } = await admin
     .from("invoices")
@@ -45,7 +49,7 @@ export async function createCreditPackInvoice(input: {
       period_start: null,
       period_end: null,
       due_at: null,
-      meta: { ...buildCreditPackMeta(input.pack), conversationId: input.conversationId, source: "checkout" },
+      meta,
     })
     .select("id")
     .single();
@@ -54,6 +58,7 @@ export async function createCreditPackInvoice(input: {
     throw new Error("Analiz paketi faturası oluşturulamadı.");
   }
   const invoiceId = data.id as string;
+  await writeAutoInvoiceLine(admin, { invoiceId, tenantId: input.tenantId, meta, amounts, vatRate });
   if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
   const applied = await applyWalletCreditToInvoice(admin, {
     tenantId: input.tenantId,

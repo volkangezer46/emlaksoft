@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { BillingCycle, CatalogPlanId, SeatTier } from "@/lib/billing/plans";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
-import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
+import { invoiceAmountsTry, resolveAutoInvoiceVatRate, writeAutoInvoiceLine } from "@/lib/billing/fulfillment";
 import { now } from "@/lib/clock";
 import { getPlanDefinition, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { seatUtilization } from "@/lib/billing/seat-pricing";
@@ -210,7 +210,8 @@ export async function createSeatInvoice(input: {
   walletCredit?: WalletCreditRequest | null;
 }): Promise<{ invoiceId: string; totalTry: number; credit: AppliedWalletCredit | null }> {
   const admin = createAdminClient();
-  const amounts = invoiceAmountsTry(input.chargeNetTry);
+  const vatRate = await resolveAutoInvoiceVatRate(admin);
+  const amounts = invoiceAmountsTry(input.chargeNetTry, vatRate);
   const expiresAt = new Date(now() + 2 * 60 * 60 * 1000);
   const { data, error } = await admin
     .from("invoices")
@@ -239,6 +240,7 @@ export async function createSeatInvoice(input: {
         targetTotalSeats: input.targetTotalSeats,
         chargeNetTry: input.chargeNetTry,
         quotedPeriodTry: input.quotedPeriodTry,
+        vatRate,
       },
     })
     .select("id")
@@ -248,6 +250,7 @@ export async function createSeatInvoice(input: {
     throw new Error("Koltuk faturası oluşturulamadı.");
   }
   const invoiceId = data.id as string;
+  await writeAutoInvoiceLine(admin, { invoiceId, tenantId: input.tenantId, meta: { kind: "extra_seats" }, amounts, vatRate });
   if (!input.walletCredit) return { invoiceId, totalTry: amounts.totalTry, credit: null };
   const applied = await applyWalletCreditToInvoice(admin, {
     tenantId: input.tenantId,
