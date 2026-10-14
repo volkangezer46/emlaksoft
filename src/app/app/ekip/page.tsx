@@ -42,11 +42,11 @@ import { loadOfficeAdvisors } from "@/lib/office-center/store";
 import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permissions-effective";
 import { parseTab, tabHref } from "@/lib/office-center/logic";
 import { OFFICE_CENTER_TABS } from "@/lib/office-center/types";
-import { AdvisorsTab } from "../ofis-merkezi/_tabs/advisors-tab";
-import { DefinitionsTab } from "../ofis-merkezi/_tabs/definitions-tab";
-import { RoutingTab } from "../ofis-merkezi/_tabs/routing-tab";
-import { StatsTab } from "../ofis-merkezi/_tabs/stats-tab";
-import type { TabContext } from "../ofis-merkezi/_tabs/context";
+import { AdvisorsTab } from "./_tabs/advisors-tab";
+import { DefinitionsTab } from "./_tabs/definitions-tab";
+import { RoutingTab } from "./_tabs/routing-tab";
+import { StatsTab } from "./_tabs/stats-tab";
+import type { TabContext } from "./_tabs/context";
 
 export const metadata = { title: "Ekip Merkezi" };
 const RING_C = 2 * Math.PI * 42;
@@ -93,7 +93,7 @@ type Sp = { sekme?: string; durum?: string; q?: string; rol?: string; sube?: str
 
 /**
  * EKİP MERKEZİ — tek hub. Sekmeler: Ekip (danışman listesi, şubeler, rol karışımı) · Talep dağıtımı · Tanımlar ·
- * İstatistikler. Eski "Ofis Merkezi" içeriği buraya taşındı (`/app/ofis-merkezi` bu hub'a yönlenir); son üç sekme
+ * İstatistikler. Eski "Ofis Merkezi" içeriği buraya taşındı (ayrı sayfası kaldırıldı; sekmeler `./_tabs`); son üç sekme
  * `office_center` iznini ister, izni olmayan yalnız Ekip sekmesini görür.
  */
 export default async function TeamPage({ searchParams }: { searchParams: Promise<Sp> }) {

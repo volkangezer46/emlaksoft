@@ -13,7 +13,7 @@ import { buildLeague, computeTeamHealth, type LeagueEntry } from "@/lib/office-c
 import { loadPropertyForAssign, rankForProperty } from "@/lib/office-center/smart-assign-load";
 import { topSuggestions, toStoredScore, type SmartSuggestion } from "@/lib/office-center/smart-assign";
 import { loadOfficeStatistics, loadUnassignedProperties } from "@/lib/office-center/store";
-import type { OfficeStatistics, TeamHealth } from "@/lib/office-center/types";
+import { TEAM_HUB_PATH, type OfficeStatistics, type TeamHealth } from "@/lib/office-center/types";
 import {
   alertThresholdSchema,
   assignFromPoolSchema,
@@ -51,12 +51,10 @@ import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
  */
 export type OfficeCenterResult = { ok?: boolean; error?: string; message?: string; warning?: string };
 
-const PAGE = "/app/ofis-merkezi";
 type OkGate = Extract<PermissionGate, { ok: true }>;
 
 function revalidate(propertyId?: string) {
-  revalidatePath(PAGE);
-  revalidatePath("/app/ekip");
+  revalidatePath(TEAM_HUB_PATH);
   revalidatePath("/app/ilan-havuzu");
   revalidatePath("/app/portfoyler");
   if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
@@ -371,7 +369,7 @@ export async function cancelAssignment(input: unknown): Promise<OfficeCenterResu
   const title = (prop?.[0] as { title?: string | null; property_code?: string | null } | undefined)?.title ?? (prop?.[0] as { property_code?: string | null } | undefined)?.property_code ?? "İlan";
   await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "office_center.assign_cancel", entityType: "property", entityId: row.property_id, oldValue: { assigned_to: row.assigned_to }, newValue: { assignment_id: v.assignmentId, reason: v.reason, unassigned: Boolean(prop?.length) } });
   if (row.assigned_to !== gate.userId) {
-    await safeNotify({ tenantId: gate.tenantId, userId: row.assigned_to, title: `İlan ataması iptal edildi: ${title}`, body: v.reason, href: PAGE, kind: "warning", dedupeKey: `oc-cancel:${v.assignmentId}` });
+    await safeNotify({ tenantId: gate.tenantId, userId: row.assigned_to, title: `İlan ataması iptal edildi: ${title}`, body: v.reason, href: TEAM_HUB_PATH, kind: "warning", dedupeKey: `oc-cancel:${v.assignmentId}` });
   }
   revalidate(row.property_id);
   return { ok: true, message: prop?.length ? "Atama iptal edildi; ilan yeniden danışmansız." : "Atama iptal edildi (ilan bu arada başka danışmana geçmişti; dokunulmadı)." };
@@ -425,7 +423,7 @@ async function writeMany(gate: OkGate, writes: { key: string; value: string }[],
   }
   if (changed) {
     await logActivity({ tenantId: gate.tenantId, actorId: gate.userId, action: "office_center.settings", entityType: "tenant", entityId: gate.tenantId, newValue: { keys: writes.map((w) => w.key), reason } });
-    for (const p of [PAGE, "/app/ayarlar/merkez", "/app/anlasmalar", "/app/talepler", "/app/komisyon", "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
+    for (const p of [TEAM_HUB_PATH, "/app/ayarlar/merkez", "/app/anlasmalar", "/app/talepler", "/app/komisyon", "/app/raporlar/lead-hizi", "/app/ayarlar"]) revalidatePath(p);
   }
   return { ok: true, message: changed ? `${changed} tanım güncellendi.` : "Değişiklik yok." };
 }
@@ -493,7 +491,7 @@ export async function toggleModuleFromOfficeCenter(input: unknown): Promise<Modu
   const parsed = moduleToggleSchema.safeParse(input);
   if (!parsed.success) return { error: firstIssue(parsed.error) };
   const res = await setModuleEnabled(parsed.data.moduleKey, parsed.data.enabled, parsed.data.cascade);
-  if (res.ok) revalidatePath(PAGE);
+  if (res.ok) revalidatePath(TEAM_HUB_PATH);
   return res;
 }
 

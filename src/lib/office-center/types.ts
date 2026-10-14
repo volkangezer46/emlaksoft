@@ -14,8 +14,7 @@ export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }
   { id: "tanimlar", label: "Tanımlar" },
   { id: "istatistikler", label: "İstatistikler" },
 ];
-export const OFFICE_CENTER_PATH = "/app/ofis-merkezi";
-/** Ofis Merkezi içeriğinin yaşadığı tek ekip merkezi (/app/ofis-merkezi buraya yönlenir). */
+/** Ofis Merkezi içeriğinin yaşadığı tek ekip merkezi (ayrı Ofis Merkezi sayfası yok; sekmeler `?sekme=`). */
 export const TEAM_HUB_PATH = "/app/ekip";
 
 /** Danışmanlar sekmesi satırı: her sayı filtreli hedefe gider (sıfır çıkmaz metrik). */

@@ -84,6 +84,8 @@ describe("ofis profili eksiklik hesabı", () => {
   it("komşular ve bağlantı", () => {
     expect(profileStepNeighbors("konum")).toEqual({ prev: null, next: "iletisim" });
     expect(profileStepNeighbors("ekip")).toEqual({ prev: "odak", next: null });
-    expect(profileStepHref("marka")).toBe("/app/ayarlar/profil-tamamla?adim=marka");
+    expect(profileStepHref("marka")).toBe("/app/baslangic?adim=office");
+    expect(profileStepHref("odak")).toBe("/app/baslangic?adim=you");
+    expect(profileStepHref("ekip")).toBe("/app/baslangic?adim=team");
   });
 });

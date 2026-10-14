@@ -84,7 +84,7 @@ export const MODULES = [
   { key: "vitrin", label: "Vitrin ve danışman sayfaları", desc: "Herkese açık ofis vitrini, danışman sayfaları ve randevu al.", group: "pazarlama", routes: [], publicRoutes: ["/vitrin", "/danisman", "/randevu-al"], dependsOn: [], stops: "Herkese açık vitrin sayfaları \"kapalı\" gösterir; vitrin alarmları çalışmaz." },
   { key: "client_portals", label: "Müşteri ve malik portalı", desc: "Müşteriye ve ev sahibine özel, bağlantıyla açılan bilgi sayfaları.", group: "pazarlama", routes: [], publicRoutes: ["/musteri-portali", "/malik-portali"], dependsOn: [] },
   { key: "prospecting", label: "Sahibinden ilanlar", desc: "Sahibinden ilan veren mal sahiplerini arayıp portföy kazanın: ilanı kaydedin, takip ritmiyle arayın, portföye dönüştürün.", group: "pazarlama", routes: ["/app/portfoy-avi"], publicRoutes: [], dependsOn: [], stops: "Sahibinden ilan içgörüleri üretilmez; eklentide Kaydet düğmesi gizlenir (kayıtlar silinmez)." },
-  { key: "office_center", label: "Ofis Merkezi", desc: "Danışman yönetimi, havuzdan atama, ofis ayarları ve tanımlamalar.", group: "ekip", routes: ["/app/ofis-merkezi"], publicRoutes: [], dependsOn: [], stops: "Ofis merkezi yönetim sayfası gizlenir." },
+  { key: "office_center", label: "Ofis Merkezi", desc: "Danışman yönetimi, havuzdan atama, ofis ayarları ve tanımlamalar.", group: "ekip", routes: [], publicRoutes: [], dependsOn: [] },
 ] as const satisfies readonly ModuleDef[];
 
 export type FeatureKey = (typeof MODULES)[number]["key"];

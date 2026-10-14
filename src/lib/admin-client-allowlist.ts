@@ -263,7 +263,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/admin/geo/[provinceId]/page.tsx", fn: "AdminGeoProvincePage", calls: 1, tenantFilter: "yok" },
   { file: "src/app/admin/geo/bildirimler/page.tsx", fn: "AdminGeoRequestsPage", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/admin/geo/page.tsx", fn: "AdminGeoPage", calls: 1, tenantFilter: "yok" },
-  { file: "src/app/admin/hatalar/errors-view.tsx", fn: "ErrorsView", calls: 1, tenantFilter: "var" },
+  { file: "src/app/admin/sistem/_hatalar/errors-view.tsx", fn: "ErrorsView", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/members/[id]/page.tsx", fn: "AdminMemberDetailPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/members/page.tsx", fn: "AdminMembersPage", calls: 1, tenantFilter: "var" },
   { file: "src/app/admin/muhasebe/defter/page.tsx", fn: "FaturaDefteriPage", calls: 1, tenantFilter: "devir" },

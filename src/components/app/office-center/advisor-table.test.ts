@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 /** Danışman listesi TEK bileşen + TEK kaynak: Ofis Merkezi > Danışmanlar ve Ekip Merkezi > Genel aynı tabloyu çizer. */
 describe("tek danışman listesi", () => {
-  const office = readFileSync("src/app/app/ofis-merkezi/_tabs/advisors-tab.tsx", "utf8");
+  const office = readFileSync("src/app/app/ekip/_tabs/advisors-tab.tsx", "utf8");
   const team = readFileSync("src/app/app/ekip/page.tsx", "utf8");
   it("iki ekran AdvisorTable + loadOfficeAdvisors kullanır", () => {
     for (const src of [office, team]) {

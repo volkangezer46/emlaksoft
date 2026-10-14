@@ -11,7 +11,7 @@ const row = (o: Partial<PlatformInsightDbRow> = {}): PlatformInsightDbRow => ({
   // Ayrı içgörüler ayrı başlık taşır (aynı tür + başlık tekilleştirilir).
   title: `Başlık ${o.id ?? "id-1"}`,
   why: "Neden",
-  evidence: [{ label: "Hata", value: "3", href: "/admin/hatalar" }],
+  evidence: [{ label: "Hata", value: "3", href: "/admin/sistem?sekme=hatalar" }],
   href: "/admin/sistem",
   is_forecast: false,
   confidence: null,

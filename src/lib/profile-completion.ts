@@ -1,10 +1,12 @@
 /**
- * Ofis profili eksiklik hesabı — SAF (I/O yok; ana ekran kartı ve /app/ayarlar/profil-tamamla sihirbazı AYNI kaynağı kullanır).
+ * Ofis profili eksiklik hesabı — SAF (I/O yok; ana ekran kartı ve /app/baslangic Kurulum sihirbazı AYNI kaynağı kullanır).
  *
  * Kısa kayıt yalnız hesap + ofis adı + paket ister; konum, iletişim, belge, marka, odak ve ekip bilgisi uygulama içinde
  * adım adım tamamlanır. Tamamlanma yalnız tenants/profiles'taki gerçek alanlardan çıkar (sahte ilerleme yok).
  * `extAvailable=false` (genişletme sütunları — ofis türü, odak, ilçeler — henüz yok) ise bu maddeler listeye hiç girmez.
  */
+
+import type { WizardStepKey } from "@/lib/onboarding-steps";
 
 export type ProfileStepKey = "konum" | "iletisim" | "fatura" | "marka" | "odak" | "ekip";
 
@@ -110,11 +112,21 @@ export function isOfficeLocationDone(c: ProfileCompletion): boolean {
   return c.items.filter((i) => i.step === "konum").every((i) => i.done);
 }
 
-/** Eski "Ofis profilini tamamla" adresi: artık Kurulum sihirbazına yönlenir (eski bağlantılar kırılmaz). */
-export const PROFILE_WIZARD_HREF = "/app/ayarlar/profil-tamamla";
+/** Ofis profili adımları tek Kurulum sihirbazında tamamlanır. */
+export const PROFILE_WIZARD_HREF = "/app/baslangic";
+
+/** Profil adımı → Kurulum sihirbazının kendi adımı (`/app/baslangic?adim=`): konum/iletişim/fatura/marka ofis adımında. */
+export const PROFILE_STEP_TO_WIZARD: Readonly<Record<ProfileStepKey, WizardStepKey>> = {
+  konum: "office",
+  iletisim: "office",
+  fatura: "office",
+  marka: "office",
+  odak: "you",
+  ekip: "team",
+};
 
 export function profileStepHref(step: ProfileStepKey): string {
-  return `${PROFILE_WIZARD_HREF}?adim=${step}`;
+  return `${PROFILE_WIZARD_HREF}?adim=${PROFILE_STEP_TO_WIZARD[step]}`;
 }
 
 /** Adım sırası içinde komşular (kaydet-ve-devam). */

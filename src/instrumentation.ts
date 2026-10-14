@@ -11,7 +11,7 @@ export async function register(): Promise<void> {
 }
 
 /**
- * Sunucu hatalarını /admin/hatalar'a (source: "server") yazar.
+ * Sunucu hatalarını /admin/sistem?sekme=hatalar listesine (source: "server") yazar.
  * Yalnız Node runtime: logError service_role + Node bağımlılıkları kullanır.
  * Hiçbir koşulda fırlatmaz.
  */

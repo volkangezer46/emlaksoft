@@ -101,7 +101,7 @@ describe("SLA ve ekip sağlığı", () => {
     expect(crit.alerts[0].href).toBe("/app/ilan-havuzu?atama=gecikmis");
     const warn = computeTeamHealth({ stats: { ...stats, cancelledAssignmentsThisMonth: 4 }, breachedUnassigned: 0, unassignedThreshold: 5, advisorsWithoutActivity30d: 0 });
     expect(warn.level).toBe("warning");
-    expect(warn.alerts.every((a) => a.href.startsWith("/app/ofis-merkezi") || a.href.startsWith("/app/ilan-havuzu"))).toBe(true);
+    expect(warn.alerts.every((a) => a.href.startsWith("/app/ekip") || a.href.startsWith("/app/ilan-havuzu"))).toBe(true);
   });
 });
 

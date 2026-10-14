@@ -5,6 +5,8 @@ import { PLANS } from "@/lib/billing/plans";
 import { defaultTeamSizeForPlan, registrationPlanForTeamSize } from "@/lib/billing/registration-plan";
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { registrationQuote, registrationSelection } from "@/lib/billing/seat-calculator-model";
+import { isWizardStepKey } from "@/lib/onboarding-steps";
+import { PROFILE_STEPS, profileStepHref } from "@/lib/profile-completion";
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
@@ -92,11 +94,12 @@ describe("paket seçimi: kullanıcı seçimine saygı, kapasite kuralı", () => 
 });
 
 describe("tek Kurulum sihirbazı sözleşmesi", () => {
-  it("eski profil-tamamla adresi sihirbaza yönlenir, eski ?adim= değerleri eşlenir", () => {
-    const page = read("src/app/app/ayarlar/profil-tamamla/page.tsx");
-    expect(page).toContain('requireModulePage("dashboard")');
-    expect(page).toContain("resolveLegacyStep(adim)");
-    expect(page).toContain("/app/baslangic");
+  it("profil adımı bağlantıları doğrudan Kurulum sihirbazının kendi adımlarına gider (ayrı profil sayfası yok)", () => {
+    for (const step of PROFILE_STEPS) {
+      const href = profileStepHref(step.key);
+      expect(href.startsWith("/app/baslangic?adim=")).toBe(true);
+      expect(isWizardStepKey(href.split("adim=")[1])).toBe(true);
+    }
   });
 
   it("ofis adımı telefon/logo/geo mevcut yoldan", () => {

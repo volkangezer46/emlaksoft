@@ -2,7 +2,7 @@ import { sanitizeLogText } from "@/lib/pii-mask";
 
 /**
  * İstemci bağlantıyı kapatınca (sayfadan ayrılma, iptal edilen önceden yükleme/akış) oluşan, hata OLMAYAN durumlar.
- * Kaydedilirse /admin/hatalar gerçek hataları gömüyordu (2026-10-13: yüzlerce "destination stream closed early").
+ * Kaydedilirse hata listesi (/admin/sistem?sekme=hatalar) gerçek hataları gömüyordu (2026-10-13: yüzlerce "destination stream closed early").
  */
 const CLIENT_ABORT = /destination stream closed early|^aborted$|The operation was aborted|ECONNRESET|socket hang up|Response body object should not be disturbed or locked/i;
 

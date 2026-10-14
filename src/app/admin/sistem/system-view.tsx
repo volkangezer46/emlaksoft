@@ -26,7 +26,7 @@ import { BackupCard } from "./backup-card";
 import { BACKUP_HEARTBEAT_JOB, BACKUP_STATUS_KEY } from "@/lib/ops/backup-status";
 import { CronPauseButton } from "./ops-controls";
 import { CronHistoryPanel, type CronRun } from "./cron-history";
-import { countOpenErrors } from "../hatalar/triage";
+import { countOpenErrors } from "./_hatalar/triage";
 import { PORTAL_LABELS } from "@/lib/portals/catalog";
 import { Suspense } from "react";
 import { EidsIntakePanel } from "./eids-intake-panel";

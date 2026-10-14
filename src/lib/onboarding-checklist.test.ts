@@ -43,9 +43,7 @@ describe("onboarding-steps kaydı", () => {
   });
 
   it("eski bağlantılar yeni adıma eşlenir; bilinmeyen null", () => {
-    expect(resolveLegacyStep("konum")).toBe("office");
-    expect(resolveLegacyStep("odak")).toBe("you");
-    expect(resolveLegacyStep("ekip")).toBe("team");
+    expect(resolveLegacyStep("konum")).toBeNull();
     expect(resolveLegacyStep("data")).toBe("bitis");
     expect(resolveLegacyStep("portals")).toBe("portals");
     expect(resolveLegacyStep("yok")).toBeNull();

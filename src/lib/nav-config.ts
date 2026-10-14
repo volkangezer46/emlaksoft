@@ -600,7 +600,6 @@ export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/hos-geldin": "Danışman ilk giriş karşılaması; koşul sağlanmazsa ana ekrana yönlendirir",
   "/app/ice-aktarma": "Toplu yükleme bir EYLEM sayfasıdır: Müşteriler/Portföyler başlığındaki 'İçe aktar' düğmesi ve komut paleti eylemi",
   "/app/modul-kapali": "Kapalı modül bilgilendirme sayfası (modül kapısı yönlendirir)",
-  "/app/ofis-merkezi": "eski yer imi yönlendirmesi: sayfa Ekip merkezi/Danışmanlar ve Ayarlar'a dağıldı; palette 'ofis merkezi' Ekip merkezi'ni bulur",
   "/app/paket": "Paket yükseltme sayfası (kilitli sayfadan ve Abonelik'ten ulaşılır)",
 };
 

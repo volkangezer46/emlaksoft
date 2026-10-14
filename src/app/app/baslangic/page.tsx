@@ -43,7 +43,7 @@ export default async function OnboardingPage({
   }
 
   const { state, skipped, tenant, counts } = snap;
-  // Eski bağlantılar (profil-tamamla adımları, kaldırılan sihirbaz adımları) yeni adıma eşlenir.
+  // Kaldırılan sihirbaz adımlarının kimlikleri yeni adıma eşlenir.
   const current = resolveWizardStep(resolveLegacyStep(adim) ?? undefined, state);
   const showSampleData =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
