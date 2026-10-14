@@ -198,6 +198,12 @@ async function main() {
          (select count(*)::int from public.geo_neighborhoods) as mahalle`,
     );
     console.log("Son durum:", counts.rows[0]);
+    // YD7: geo sayim gorunumleri (materialized) senkron sonrasi tazelenir; fonksiyon yoksa (migration oncesi) atlanir.
+    const fn = await client.query(`select to_regprocedure('public.refresh_geo_stats()') is not null as ok`);
+    if (fn.rows[0]?.ok) {
+      await client.query("select public.refresh_geo_stats()");
+      console.log("Geo sayim gorunumleri yenilendi.");
+    }
   } finally {
     await client.end();
   }

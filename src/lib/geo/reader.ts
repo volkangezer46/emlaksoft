@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { compareTr } from "@/lib/tr-text";
 import { geoFold } from "./normalize";
 import { validateChain } from "./validate";
+import { readGeoLevelCounts } from "./stats";
 import {
   GEO_CACHE_TAG,
   type GeoChain,
@@ -237,10 +238,15 @@ export async function getParentsOf(chain: GeoChain): Promise<{ provinceId: strin
 
 /** Yönetici sağlık/sayım ekranları için toplam sayılar (aktif+pasif). */
 export async function getGeoTotals(): Promise<{ provinces: number; districts: number; neighborhoods: number | null }> {
-  const [p, d] = await Promise.all([loadProvinces(), loadDistricts()]);
   const admin = createAdminClient();
-  const { count } = await admin.from("geo_neighborhoods").select("id", { count: "exact", head: true });
-  return { provinces: p.length, districts: d.length, neighborhoods: count ?? null };
+  // Mahalle toplamı materialized geo_level_counts'tan (32 bin satır taranmaz); görünüm yoksa eski count(*).
+  const neighborhoodsP = readGeoLevelCounts(admin).then(async (c) => {
+    if (c) return c.neighborhood.active + c.neighborhood.inactive;
+    const { count } = await admin.from("geo_neighborhoods").select("id", { count: "exact", head: true });
+    return count ?? null;
+  });
+  const [p, d, neighborhoods] = await Promise.all([loadProvinces(), loadDistricts(), neighborhoodsP]);
+  return { provinces: p.length, districts: d.length, neighborhoods };
 }
 
 /** Kimlik listesiyle mahalle okuma (yinelenmeyen, sınırlı). Bilinmeyen kimlik sonuçta yok. */
@@ -270,6 +276,8 @@ export async function getProvincesByIds(ids: Iterable<string>): Promise<GeoProvi
 /** Toplam kayıt sayısı (aktif+pasif) — sistem durumu ekranı: `{ count }` biçimi. */
 export async function geoRowCount(level: "province" | "district" | "neighborhood"): Promise<{ count: number | null }> {
   const admin = createAdminClient();
+  const c = await readGeoLevelCounts(admin);
+  if (c) return { count: c[level].active + c[level].inactive };
   const table = level === "province" ? "geo_provinces" : level === "district" ? "geo_districts" : "geo_neighborhoods";
   const { count } = await admin.from(table).select("id", { count: "exact", head: true });
   return { count: count ?? null };

@@ -5,6 +5,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { now, shiftMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
 import { targetPeriodRange } from "@/lib/team/target-actuals";
 import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
+import { loadTargetActivityCounts, type TargetActivity, type TargetActivityItem } from "@/lib/supabase/list-count-rpcs";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -69,12 +70,61 @@ export default async function HedeflerPage() {
     const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
     return { id: t.id, period: t.period, period_start: t.period_start, profile_id: (prof as { id?: string } | null)?.id ?? null };
   });
-  const actuals = await loadTargetActualsLive(supabase, {
-    viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
-    tenantId: ctx.tenantId,
-    targets: targetLikes,
-    names: new Map(((members ?? []) as { id: string; full_name: string }[]).map((m) => [m.id, m.full_name])),
+  // Faaliyet hedefleri (randevu / yeni portföy) gerçekleşmesi: canlı sayım, yalnız hedefi > 0 olanlar.
+  // Randevu = iptal edilmemiş, dönem içinde planlanan (atanan danışmana göre); portföy = dönemde eklenen, örnek veri hariç.
+  // Gerçekleşme okumasıyla AYNI turda başlar (bağımsız) ve tüm hedefler için TEK sorgudur (target_activity_counts);
+  // fonksiyon yoksa hedef başına eski 2 head-count.
+  type ActivityRow = { id: string; period: string; period_start: string; target_appointments?: number | null; target_listings?: number | null; profile: unknown };
+  const activityItems: TargetActivityItem[] = (rawTargets as unknown as ActivityRow[]).flatMap((t) => {
+    const wantA = Number(t.target_appointments ?? 0) > 0;
+    const wantL = Number(t.target_listings ?? 0) > 0;
+    if (!wantA && !wantL) return [];
+    const r = targetPeriodRange(t.period_start, t.period);
+    const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
+    return [{
+      id: t.id,
+      startIso: new Date(r.start).toISOString(),
+      endIso: new Date(r.end).toISOString(),
+      profileId: (prof as { id?: string } | null)?.id ?? null,
+      appointments: wantA,
+      listings: wantL,
+    }];
   });
+  const activityP = (ctx.tenantId ? loadTargetActivityCounts(supabase, ctx.tenantId, activityItems) : Promise.resolve(null)).then(async (fast) => {
+    if (fast) return fast;
+    const out = new Map<string, TargetActivity>();
+    await Promise.all(
+      activityItems.map(async (it) => {
+        const [ap, li] = await Promise.all([
+          it.appointments
+            ? (() => {
+                let q = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).neq("status", "cancelled").gte("scheduled_at", it.startIso).lt("scheduled_at", it.endIso);
+                if (it.profileId) q = q.eq("assigned_to", it.profileId);
+                return q;
+              })()
+            : Promise.resolve({ count: null }),
+          it.listings
+            ? (() => {
+                let q = supabase.from("properties").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).is("deleted_at", null).eq("is_sample", false).gte("created_at", it.startIso).lt("created_at", it.endIso);
+                if (it.profileId) q = q.eq("assigned_to", it.profileId);
+                return q;
+              })()
+            : Promise.resolve({ count: null }),
+        ]);
+        out.set(it.id, { appointments: it.appointments ? (ap.count ?? 0) : null, listings: it.listings ? (li.count ?? 0) : null });
+      }),
+    );
+    return out;
+  });
+  const [actuals, activityById] = await Promise.all([
+    loadTargetActualsLive(supabase, {
+      viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
+      tenantId: ctx.tenantId,
+      targets: targetLikes,
+      names: new Map(((members ?? []) as { id: string; full_name: string }[]).map((m) => [m.id, m.full_name])),
+    }),
+    activityP,
+  ]);
   const targets = rawTargets.map((t) => {
     const a = actuals.get(t.id);
     return {
@@ -85,40 +135,6 @@ export default async function HedeflerPage() {
     };
   });
   const memberList = (members ?? []) as { id: string; full_name: string }[];
-
-  // Faaliyet hedefleri (randevu / yeni portföy) gerçekleşmesi: canlı sayım, yalnız hedefi > 0 olanlar.
-  // Randevu = iptal edilmemiş, dönem içinde planlanan (atanan danışmana göre); portföy = dönemde eklenen, örnek veri hariç.
-  type ActivityRow = { id: string; period: string; period_start: string; target_appointments?: number | null; target_listings?: number | null; profile: unknown };
-  const activityById = new Map<string, { appointments: number | null; listings: number | null }>();
-  await Promise.all(
-    (rawTargets as unknown as ActivityRow[]).map(async (t) => {
-      const wantA = Number(t.target_appointments ?? 0) > 0;
-      const wantL = Number(t.target_listings ?? 0) > 0;
-      if (!wantA && !wantL) return;
-      const r = targetPeriodRange(t.period_start, t.period);
-      const startIso = new Date(r.start).toISOString();
-      const endIso = new Date(r.end).toISOString();
-      const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
-      const pid = (prof as { id?: string } | null)?.id ?? null;
-      const [ap, li] = await Promise.all([
-        wantA
-          ? (() => {
-              let q = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).neq("status", "cancelled").gte("scheduled_at", startIso).lt("scheduled_at", endIso);
-              if (pid) q = q.eq("assigned_to", pid);
-              return q;
-            })()
-          : Promise.resolve({ count: null }),
-        wantL
-          ? (() => {
-              let q = supabase.from("properties").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).is("deleted_at", null).eq("is_sample", false).gte("created_at", startIso).lt("created_at", endIso);
-              if (pid) q = q.eq("assigned_to", pid);
-              return q;
-            })()
-          : Promise.resolve({ count: null }),
-      ]);
-      activityById.set(t.id, { appointments: wantA ? (ap.count ?? 0) : null, listings: wantL ? (li.count ?? 0) : null });
-    }),
-  );
 
   // Kart hesapları tek yerde: özet KPI'lar, takım kıyası ve kartlar aynı sayıları okur.
   // Varsayılan görünüm GÜNCEL dönem: şimdi içinde bulunduğumuz dönemin hedefleri listenin ve takım kıyasının başına

@@ -10,6 +10,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { geoKey } from "./normalize";
+import { refreshGeoStatsQuietly } from "./stats";
 import { chunk, type GeoOp, type ImportLevel, type ImportMeta, type ImportPlan } from "./import-plan";
 
 const TABLE: Record<ImportLevel, string> = {
@@ -104,6 +105,8 @@ export async function applyImportPlan(
         summary: { ...plan.summary, partial: Boolean(error), ...(error ? { error } : {}) },
       })
       .eq("id", versionId);
+    // Kısmi uygulama da satır yazmış olabilir: geo sayım görünümleri (materialized) sonuçtan bağımsız tazelenir.
+    await refreshGeoStatsQuietly(client);
     return error ? { ok: false, error, versionId } : { ok: true, versionId, summary: plan.summary };
   };
 

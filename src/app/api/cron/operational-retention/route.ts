@@ -18,6 +18,7 @@ import { pruneEmailLog } from "@/lib/email/log-read";
 import { pruneMessageLog } from "@/lib/messaging/message-log-read";
 import { purgeEidsInboundRaw } from "@/lib/eids/inbound-retention";
 import { purgeUnverifiedApplications } from "@/lib/compliance/platform-kvkk-service";
+import { refreshGeoStats } from "@/lib/geo/stats";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -84,6 +85,9 @@ export async function GET(req: NextRequest) {
     // KVKK başvuruları (DG6): e-postası 7 günde doğrulanmayan başvuru silinir (amaçsız kişisel veri tutulmaz).
     // Tablo yoksa 'skipped'. İdempotent.
     kvkkUnverified: () => purgeUnverifiedApplications(getAdmin(), now()),
+    // Geo sayım görünümleri (YD7, materialized): /admin/geo yazımları zaten anında tazeler; bu adım elle/SQL ile yapılan
+    // değişiklikleri ve yazım sonrası başarısız tazelemeleri günde bir yakalar. Fonksiyon yoksa 'skipped'. İdempotent.
+    geoStats: () => refreshGeoStats(getAdmin()),
   });
   const queue = await storageDeletionQueueStats().catch(() => null);
   const failed = cronStepsFailed(outcome);
