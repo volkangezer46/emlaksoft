@@ -164,16 +164,17 @@ export function OpenItemDialog({
           <DialogBody className="grid gap-4">
             <div role="radiogroup" aria-label="Kalem yönü" className="grid grid-cols-2 gap-2">
               {(["receivable", "payable"] as const).map((d) => (
-                <button
+                <Button
                   key={d}
-                  type="button"
+                  variant="ghost"
+                  size="lg"
                   role="radio"
                   aria-checked={direction === d}
                   onClick={() => setDirection(d)}
-                  className={`focus-ring press min-h-10 touch:min-h-11 rounded-[var(--radius-control)] border px-3 text-sm font-semibold transition ${direction === d ? (d === "receivable" ? "tone-success border-current" : "tone-danger border-current") : "border-line bg-surface text-text-muted hover:bg-surface-hover"}`}
+                  className={`h-auto min-h-10 border px-3 text-center touch:h-auto touch:min-h-11 ${direction === d ? (d === "receivable" ? "tone-success border-current" : "tone-danger border-current") : "border-line bg-surface text-text-muted hover:text-text-muted"}`}
                 >
                   {d === "receivable" ? "Alacak (bize ödenecek)" : "Borç (biz ödeyeceğiz)"}
-                </button>
+                </Button>
               ))}
             </div>
             {party ? (

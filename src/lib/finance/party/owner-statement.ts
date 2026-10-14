@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { computeOwnerLedger, type LedgerCharge, type LedgerPayment, type LedgerPayout } from "@/lib/property-management/ledger";
 import { fromKurus, toKurus } from "./aging";
 
@@ -36,8 +37,16 @@ export type OwnerStatement = {
   available: boolean;
   reason: "no_customer" | "no_schema" | null;
   rentals: OwnerStatementRental[];
+  /**
+   * Defter satırlarından biri (tahsilat / masraf / ödeme / stopaj) üst sınıra (`OWNER_STATEMENT_MAX_ROWS`) takıldı:
+   * toplamlar EKSİK olabilir; arayüz bunu açıkça söyler (sessizce tam sayılmaz).
+   */
+  truncated: boolean;
   totals: { collected: number; fee: number; charges: number; withholding: number; entitlement: number; paidOut: number; payable: number; overpaid: number };
 };
+
+/** Tek malik için defter tablosu başına açık üst sınır (satır); aşılırsa `truncated: true`. */
+export const OWNER_STATEMENT_MAX_ROWS = 20_000;
 
 const EMPTY_TOTALS: OwnerStatement["totals"] = { collected: 0, fee: 0, charges: 0, withholding: 0, entitlement: 0, paidOut: 0, payable: 0, overpaid: 0 };
 
@@ -92,7 +101,7 @@ export async function loadOwnerStatement(
   input: { tenantId: string; partyId: string; customerId: string | null },
 ): Promise<OwnerStatement> {
   const { tenantId, partyId, customerId } = input;
-  if (!customerId) return { available: false, reason: "no_customer", rentals: [], totals: EMPTY_TOTALS };
+  if (!customerId) return { available: false, reason: "no_customer", rentals: [], truncated: false, totals: EMPTY_TOTALS };
 
   const propRes = await db
     .from("properties")
@@ -100,7 +109,7 @@ export async function loadOwnerStatement(
     .eq("tenant_id", tenantId)
     .eq("owner_customer_id", customerId)
     .limit(500);
-  if (propRes.error) return { available: false, reason: "no_schema", rentals: [], totals: EMPTY_TOTALS };
+  if (propRes.error) return { available: false, reason: "no_schema", rentals: [], truncated: false, totals: EMPTY_TOTALS };
   const props = (propRes.data ?? []) as { id: string; property_code: string | null; title: string | null }[];
   const propLabel = new Map(props.map((p) => [p.id, [p.property_code, p.title].filter(Boolean).join(" · ") || "Portföy"]));
 
@@ -108,14 +117,20 @@ export async function loadOwnerStatement(
     props.length
       ? db.from("rentals").select("id, property_id").eq("tenant_id", tenantId).in("property_id", props.map((p) => p.id)).limit(1000)
       : Promise.resolve({ data: [] as { id: string; property_id: string }[], error: null }),
-    db.from("cash_entries").select("withholding_amount").eq("tenant_id", tenantId).eq("party_id", partyId).is("voided_at", null).gt("withholding_amount", 0).limit(5000),
+    readAllPaged<{ withholding_amount: unknown }>(
+      (from, to) =>
+        db.from("cash_entries").select("withholding_amount").eq("tenant_id", tenantId).eq("party_id", partyId).is("voided_at", null).gt("withholding_amount", 0).order("id").range(from, to),
+      { maxRows: OWNER_STATEMENT_MAX_ROWS },
+    ),
   ]);
-  if (rentalRes.error) return { available: false, reason: "no_schema", rentals: [], totals: EMPTY_TOTALS };
+  if (rentalRes.error) return { available: false, reason: "no_schema", rentals: [], truncated: false, totals: EMPTY_TOTALS };
   // Stopaj kolonu henüz yoksa (FN1 migration'ı uygulanmadı) 0 kabul edilir; özet yine çizilir.
-  const withholding = whRes.error ? 0 : ((whRes.data ?? []) as { withholding_amount: unknown }[]).reduce((a, r) => a + toKurus(r.withholding_amount), 0) / 100;
+  const withholding = whRes.error ? 0 : whRes.rows.reduce((a, r) => a + toKurus(r.withholding_amount), 0) / 100;
+  // Portföy (500) ve kira (1000) okumaları tavanlıdır; tavana değen liste de eksik sayılır.
+  const whTruncated = (!whRes.error && whRes.truncated) || props.length >= 500 || (rentalRes.data ?? []).length >= 1000;
 
   const allRentals = (rentalRes.data ?? []) as { id: string; property_id: string }[];
-  if (allRentals.length === 0) return { available: true, reason: null, ...summarizeOwnerStatement([], withholding) };
+  if (allRentals.length === 0) return { available: true, reason: null, truncated: whTruncated, ...summarizeOwnerStatement([], withholding) };
   // Görünümle aynı kapsam: yalnız yönetim sözleşmesi `managed` olan kiralar.
   const agrRes = await db
     .from("rental_management_agreements")
@@ -124,27 +139,38 @@ export async function loadOwnerStatement(
     .eq("managed", true)
     .in("rental_id", allRentals.map((r) => r.id))
     .limit(1000);
-  if (agrRes.error) return { available: false, reason: "no_schema", rentals: [], totals: EMPTY_TOTALS };
+  if (agrRes.error) return { available: false, reason: "no_schema", rentals: [], truncated: false, totals: EMPTY_TOTALS };
   const managed = new Set(((agrRes.data ?? []) as { rental_id: string }[]).map((a) => a.rental_id));
   const rentals = allRentals.filter((r) => managed.has(r.id));
-  if (rentals.length === 0) return { available: true, reason: null, ...summarizeOwnerStatement([], withholding) };
+  if (rentals.length === 0) return { available: true, reason: null, truncated: whTruncated, ...summarizeOwnerStatement([], withholding) };
   const ids = rentals.map((r) => r.id);
 
+  const paged = { maxRows: OWNER_STATEMENT_MAX_ROWS };
   const [payRes, linkRes, outRes] = await Promise.all([
-    db.from("rent_payments").select("id, rental_id, paid_on, amount, management_fee").eq("tenant_id", tenantId).in("rental_id", ids).is("voided_at", null).limit(5000),
-    db.from("owner_charge_links").select("id, rental_id, kind, amount, entry_date, label").eq("tenant_id", tenantId).in("rental_id", ids).limit(5000),
-    db.from("owner_payouts").select("id, rental_id, paid_on, amount").eq("tenant_id", tenantId).in("rental_id", ids).is("voided_at", null).limit(5000),
+    readAllPaged<{ id: string; rental_id: string; paid_on: string; amount: unknown; management_fee: unknown }>(
+      (from, to) => db.from("rent_payments").select("id, rental_id, paid_on, amount, management_fee").eq("tenant_id", tenantId).in("rental_id", ids).is("voided_at", null).order("id").range(from, to),
+      paged,
+    ),
+    readAllPaged<{ id: string; rental_id: string; kind: string; amount: unknown; entry_date: string; label: string }>(
+      (from, to) => db.from("owner_charge_links").select("id, rental_id, kind, amount, entry_date, label").eq("tenant_id", tenantId).in("rental_id", ids).order("id").range(from, to),
+      paged,
+    ),
+    readAllPaged<{ id: string; rental_id: string; paid_on: string; amount: unknown }>(
+      (from, to) => db.from("owner_payouts").select("id, rental_id, paid_on, amount").eq("tenant_id", tenantId).in("rental_id", ids).is("voided_at", null).order("id").range(from, to),
+      paged,
+    ),
   ]);
-  if (payRes.error || linkRes.error || outRes.error) return { available: false, reason: "no_schema", rentals: [], totals: EMPTY_TOTALS };
+  if (payRes.error || linkRes.error || outRes.error) return { available: false, reason: "no_schema", rentals: [], truncated: false, totals: EMPTY_TOTALS };
+  const truncated = whTruncated || managed.size >= 1000 || payRes.truncated || linkRes.truncated || outRes.truncated;
 
   const group = <T extends { rental_id: string }>(rows: readonly T[]) => {
     const m = new Map<string, T[]>();
     for (const r of rows) m.set(r.rental_id, [...(m.get(r.rental_id) ?? []), r]);
     return m;
   };
-  const pays = group((payRes.data ?? []) as { id: string; rental_id: string; paid_on: string; amount: unknown; management_fee: unknown }[]);
-  const links = group((linkRes.data ?? []) as { id: string; rental_id: string; kind: string; amount: unknown; entry_date: string; label: string }[]);
-  const outs = group((outRes.data ?? []) as { id: string; rental_id: string; paid_on: string; amount: unknown }[]);
+  const pays = group(payRes.rows);
+  const links = group(linkRes.rows);
+  const outs = group(outRes.rows);
 
   const perRental = rentals.map((r) => {
     const payments: LedgerPayment[] = (pays.get(r.id) ?? []).map((p) => ({ id: p.id, paidOn: String(p.paid_on).slice(0, 10), amount: n(p.amount), managementFee: n(p.management_fee) }));
@@ -161,5 +187,5 @@ export async function loadOwnerStatement(
       paidOut: l.totals.paidOut,
     };
   });
-  return { available: true, reason: null, ...summarizeOwnerStatement(perRental, withholding) };
+  return { available: true, reason: null, truncated, ...summarizeOwnerStatement(perRental, withholding) };
 }

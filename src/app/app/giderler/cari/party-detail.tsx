@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { AlarmClock, ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, FileSpreadsheet, Mail, Phone, Receipt, Scale, ShieldOff } from "lucide-react";
+import { AlarmClock, ArrowDownLeft, ArrowLeft, ArrowLeftRight, ArrowUpRight, Mail, Phone, Receipt, Scale, ShieldOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterDate, KpiStrip, MobileCard, MobileCardList, StatusPill, type KpiItem } from "@/components/ui/list-kit";
 import { isoDateParam } from "@/components/ui/list-kit/list-logic";
@@ -20,9 +21,9 @@ import {
   toKurus,
   type StatementLine,
 } from "@/lib/finance/party/aging";
-import { loadOwnerStatement, type OwnerStatement } from "@/lib/finance/party/owner-statement";
+import { OWNER_STATEMENT_MAX_ROWS, loadOwnerStatement, type OwnerStatement } from "@/lib/finance/party/owner-statement";
 import { formatPhoneDisplay } from "@/lib/phone";
-import { reportCenterHref } from "@/lib/report-center/links";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { OpenItemsTable, loadOpenItemRows } from "./open-items";
 import { PartyFormButton, type EditableParty } from "./party-form";
 import { BalanceCell, CARI_BASE, cariHref } from "./party-list";
@@ -52,14 +53,20 @@ async function loadLinkLabels(supabase: SupabaseClient, party: PartyRecord): Pro
   };
 }
 
-type AdvisorEarnings = { available: boolean; earned: number; paid: number; pending: number; count: number };
+/** Tek danışmanın komisyon payı okumasının açık üst sınırı (satır); aşılırsa `truncated` ile arayüzde söylenir. */
+const ADVISOR_SPLITS_MAX_ROWS = 20_000;
+
+type AdvisorEarnings = { available: boolean; earned: number; paid: number; pending: number; count: number; truncated: boolean };
 
 async function loadAdvisorEarnings(supabase: SupabaseClient, tenantId: string, profileId: string | null): Promise<AdvisorEarnings> {
-  const empty = { available: false, earned: 0, paid: 0, pending: 0, count: 0 };
+  const empty = { available: false, earned: 0, paid: 0, pending: 0, count: 0, truncated: false };
   if (!profileId) return empty;
-  const splits = await supabase.from("commission_splits").select("commission_id, amount").eq("tenant_id", tenantId).eq("profile_id", profileId).limit(5000);
+  const splits = await readAllPaged<{ commission_id: string; amount: unknown }>(
+    (from, to) => supabase.from("commission_splits").select("commission_id, amount").eq("tenant_id", tenantId).eq("profile_id", profileId).order("id").range(from, to),
+    { maxRows: ADVISOR_SPLITS_MAX_ROWS },
+  );
   if (splits.error) return empty;
-  const rows = (splits.data ?? []) as { commission_id: string; amount: unknown }[];
+  const rows = splits.rows;
   if (rows.length === 0) return { ...empty, available: true };
   const ids = [...new Set(rows.map((r) => r.commission_id))];
   const status = new Map<string, string>();
@@ -79,7 +86,7 @@ async function loadAdvisorEarnings(supabase: SupabaseClient, tenantId: string, p
     count += 1;
     if (st === "paid") paidK += k;
   }
-  return { available: true, earned: fromKurus(earnedK), paid: fromKurus(paidK), pending: fromKurus(earnedK - paidK), count };
+  return { available: true, earned: fromKurus(earnedK), paid: fromKurus(paidK), pending: fromKurus(earnedK - paidK), count, truncated: splits.truncated };
 }
 
 export async function PartyDetail({
@@ -248,9 +255,6 @@ export async function PartyDetail({
             <Link href={`/app/giderler?sekme=hareketler&cari=${party.id}`} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 text-xs font-semibold text-accent-text hover:underline">
               <ArrowLeftRight className="h-3.5 w-3.5" aria-hidden="true" /> Hareketlerde gör
             </Link>
-            <Link href={reportCenterHref("tenant", "cari-ekstresi", { cari: party.id, from: from || undefined, to: to || undefined })} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 text-xs font-semibold text-accent-text hover:underline">
-              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Raporlarda aç
-            </Link>
           </div>
         </div>
         <form method="get" action={CARI_BASE} className="flex flex-wrap items-end gap-2" aria-label="Ekstre tarih aralığı">
@@ -258,7 +262,7 @@ export async function PartyDetail({
           <input type="hidden" name="cari" value={party.id} />
           <FilterDate name="from" label="Başlangıç" value={from} />
           <FilterDate name="to" label="Bitiş" value={to} />
-          <button type="submit" className="focus-ring press min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-xs font-semibold text-text hover:bg-surface-hover">Uygula</button>
+          <Button type="submit" variant="outline" size="sm" className="h-9">Uygula</Button>
           {filtered ? <Link href={cariHref({}, { cari: party.id })} className="min-h-9 touch:min-h-11 px-2 text-xs font-semibold leading-9 text-accent-text hover:underline">Tümü</Link> : null}
         </form>
         {stmtRes.error ? (
@@ -393,9 +397,14 @@ function OwnerSection({ owner, partyId }: { owner: OwnerStatement; partyId: stri
           var. Hak edişten düşülmez; kira tahsilatı kira defterine hangi tutarla girildiyse o esastır (Açık kalemlerdeki &quot;Mülk sahibine ödeme&quot; ile aynı formül).
         </p>
       ) : null}
+      {owner.truncated ? (
+        <p role="status" className="text-xs text-warning-strong">
+          Kayıt sayısı üst sınıra ulaştı: her defterden ilk {OWNER_STATEMENT_MAX_ROWS.toLocaleString("tr-TR")} kayıt hesaba katıldı; toplamlar eksik olabilir.
+        </p>
+      ) : null}
       {t.overpaid > 0 ? <p className="text-xs text-warning-strong">Fazla ödeme: {formatAccountMoney(t.overpaid, "TRY")} (malikten alacak).</p> : null}
       {owner.rentals.length > 0 ? (
-        <ul className="grid gap-1 border-t border-line pt-2 text-xs">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1 border-t border-line pt-2 text-xs">
           {owner.rentals.map((r) => (
             <li key={r.rentalId}>
               <Link href={`/app/kiralama/${r.rentalId}`} className="focus-ring flex min-h-9 touch:min-h-11 items-center justify-between gap-3 rounded-[var(--radius-control)] px-1 hover:bg-surface-hover">
@@ -438,6 +447,11 @@ function AdvisorSection({ advisor, self }: { advisor: AdvisorEarnings; self: boo
           </li>
         ))}
       </ul>
+      {advisor.truncated ? (
+        <p role="status" className="text-xs text-warning-strong">
+          Kayıt sayısı üst sınıra ulaştı: ilk {ADVISOR_SPLITS_MAX_ROWS.toLocaleString("tr-TR")} komisyon payı gösteriliyor; toplamlar eksik olabilir.
+        </p>
+      ) : null}
     </section>
   );
 }

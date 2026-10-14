@@ -1,12 +1,9 @@
-import Link from "@/components/ui/smart-link";
-import { FileSpreadsheet } from "lucide-react";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { uuidParam } from "@/components/ui/list-kit/list-logic";
 import { now, trDayKey } from "@/lib/clock";
 import { loadAccountsWithBalances } from "@/lib/finance/cash/load";
 import type { FinanceTabProps } from "@/lib/finance/ledger/types";
 import { partyKindOf } from "@/lib/finance/party/aging";
-import { reportCenterHref } from "@/lib/report-center/links";
 import { createClient } from "@/lib/supabase/server";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { OpenItemsView } from "../cari/open-items";
@@ -77,12 +74,6 @@ export async function CariTab(props: FinanceTabProps) {
           <FilterChip href={cariHref({}, { gorunum: "acik" })} active={view === "acik"}>Açık kalemler ve vade</FilterChip>
         </nav>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={view === "acik" ? reportCenterHref("tenant", "acik-kalemler") : reportCenterHref("tenant", "cari-ekstresi")}
-            className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 px-1 text-xs font-semibold text-accent-text hover:underline"
-          >
-            <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Raporlarda aç
-          </Link>
           {canCreate ? <NewOpenItemButton today={today} advisorOwnerId={earningsAll ? null : userId} /> : null}
           {canCreate ? <PartyFormButton defaultKind={kindHint} canLink={canEdit} /> : null}
         </div>

@@ -8,6 +8,7 @@ import { pageWindow, parsePage } from "@/components/ui/list-kit/list-logic";
 import { formatDateTr } from "@/lib/format";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { balanceCaption, fromKurus, num, PARTY_KIND_LABEL, PARTY_KINDS, partyKindLabel, partyKindOf, toKurus, type PartyKindKey } from "@/lib/finance/party/aging";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import { buildHref, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 
 /** Finans kökü (sekme parametresi `?sekme=cari`). */
@@ -46,6 +47,9 @@ export function normalizeBalanceRow(r: Record<string, unknown>): PartyBalanceRow
   };
 }
 
+/** Danışman carisi gizlilik listesinin açık üst sınırı (satır). */
+const HIDDEN_PARTY_MAX_ROWS = 20_000;
+
 /**
  * P12 kazanç gizliliği: `earnings_all` izni olmayan kullanıcı başka danışmanın carisini (bakiye, ekstre, prim) GÖRMEZ.
  * Dönen küme gizlenecek cari kimlikleridir: türü danışman olup kullanıcıya bağlı olmayanlar (bağsız danışman carisi de
@@ -53,10 +57,14 @@ export function normalizeBalanceRow(r: Record<string, unknown>): PartyBalanceRow
  */
 export async function loadHiddenPartyIds(supabase: SupabaseClient, input: { userId: string; earningsAll: boolean }): Promise<Set<string>> {
   if (input.earningsAll) return new Set();
-  const { data, error } = await supabase.from("finance_parties").select("id, user_id").eq("kind", "danisman").limit(2000);
-  // Okunamıyorsa güvenli taraf: hiçbir danışman carisi bilinmiyor → liste RPC'sinden gelen danışman türü süzülür (aşağıda).
-  if (error) return new Set(["*danisman"]);
-  return new Set(((data ?? []) as { id: string; user_id: string | null }[]).filter((p) => p.user_id !== input.userId).map((p) => p.id));
+  const { rows, error, truncated } = await readAllPaged<{ id: string; user_id: string | null }>(
+    (from, to) => supabase.from("finance_parties").select("id, user_id").eq("kind", "danisman").order("id").range(from, to),
+    { maxRows: HIDDEN_PARTY_MAX_ROWS },
+  );
+  // Okunamıyorsa ya da liste üst sınıra takıldıysa (tam değil) güvenli taraf: hiçbir danışman carisi kesin bilinmiyor →
+  // liste RPC'sinden gelen danışman türü süzülür (aşağıda). Kesik listeyle gizlilik sessizce delinmez.
+  if (error || truncated) return new Set(["*danisman"]);
+  return new Set(rows.filter((p) => p.user_id !== input.userId).map((p) => p.id));
 }
 
 export function isHiddenParty(hidden: ReadonlySet<string>, id: string, kind: string | null): boolean {

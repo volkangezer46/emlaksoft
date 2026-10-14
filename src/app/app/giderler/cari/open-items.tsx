@@ -1,6 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ArrowRight, FileSpreadsheet, ListChecks } from "lucide-react";
+import { ArrowRight, ListChecks } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { MobileCard, MobileCardList, StatusPill } from "@/components/ui/list-kit";
@@ -25,7 +25,6 @@ import {
   type AgingBucketKey,
   type OpenItemSource,
 } from "@/lib/finance/party/aging";
-import { reportCenterHref } from "@/lib/report-center/links";
 import type { ParamRecord } from "@/lib/ui/filter-params";
 import { AgingBars } from "./aging-bars";
 import { cariHref, isHiddenParty } from "./party-list";
@@ -230,12 +229,6 @@ export async function OpenItemsView({
             {partyName ?? "Seçili cari"} ✕
           </FilterChip>
         ) : null}
-        <Link
-          href={reportCenterHref("tenant", "acik-kalemler", { yon: yon || undefined, kova: kova ?? undefined, kaynak: source ?? undefined })}
-          className="focus-ring ml-auto inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 text-xs font-semibold text-accent-text hover:underline"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Raporlarda aç
-        </Link>
       </div>
 
       <p className="text-xs text-text-muted" aria-live="polite">
