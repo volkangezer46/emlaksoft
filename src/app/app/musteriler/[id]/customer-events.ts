@@ -201,7 +201,7 @@ export async function buildCustomerEvents(
       title: `${done ? "Görev tamamlandı" : t.status === "cancelled" ? "Görev iptal edildi" : "Görev açıldı"} · ${t.title}`,
       icon: "task",
       tone: done ? "success" : t.status === "cancelled" ? "neutral" : "warn",
-      href: "/app/gorevler",
+      href: `/app/gorevler?gorev=${t.id}`,
     });
   }
 

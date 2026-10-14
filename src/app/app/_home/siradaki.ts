@@ -65,7 +65,7 @@ export function buildNextActions(i: NextActionInput): NextAction[] {
       label: "Randevulara git",
       title: i.appointmentsToday === 1 ? "Bugün 1 randevun var" : `Bugün ${i.appointmentsToday} randevun var`,
       reason: first ? `İlki ${first.time} · ${first.type}` : "Hazırlığını yap, müşteriyi önceden teyit et.",
-      href: "/app/randevular",
+      href: "/app/randevular?gorunum=gun",
       tone: "brand",
     });
   }

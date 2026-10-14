@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { loadTodayAppointments, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
+import { appointmentHref } from "@/lib/notification-text";
 import { buildRoutePlan, directionsHref, routeDirectionsHref } from "@/lib/route-plan";
 import { scheduleWarnings, scheduleWarningText } from "./home-brief";
 
@@ -94,7 +95,7 @@ export async function Program({ ctx }: { ctx: HomeCtx }) {
               const a = items.find((i) => i.id === s.id)!;
               return (
                 <li key={a.id} className="flex items-center gap-1">
-                  <Link href="/app/randevular" className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
+                  <Link href={appointmentHref(a.id)} className="pm-r36 focus-ring group min-h-10 min-w-0 flex-1 touch:min-h-11">
                     <span aria-hidden="true" className="grid h-5 w-5 flex-none place-items-center rounded-full bg-[var(--accent-soft,var(--surface-hover))] text-xs font-bold text-[var(--accent-text)]">
                       {idx + 1}
                     </span>

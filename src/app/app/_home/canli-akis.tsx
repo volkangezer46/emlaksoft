@@ -57,7 +57,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
       text: `Randevu: ${a.appointment_type === "showing" ? "Yer gösterme" : a.appointment_type}`,
       time: a.scheduled_at,
       tone: "text-amber-600",
-      href: "/app/randevular",
+      href: `/app/randevular?randevu=${a.id}`,
     })),
   ]
     .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())

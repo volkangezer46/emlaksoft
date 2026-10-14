@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { notificationHref, notificationMarker, stripNotificationMarker, taskListHref } from "./notification-text";
+import { appointmentHref, notificationHref, notificationMarker, stripNotificationMarker, taskHref } from "./notification-text";
 
 const ID = "3f2b8c1e-9a4d-4e5f-8b6a-1c2d3e4f5a6b";
 
@@ -23,17 +23,15 @@ describe("stripNotificationMarker", () => {
 });
 
 describe("notificationHref", () => {
-  it("görev: başlıkla süzülmüş görev listesine götürür (başlıkta ' · ' olsa da)", () => {
-    expect(notificationHref({ href: "/app/gorevler", body: `Ara · tekrar · 29.09.2026 10:00 · task:${ID}` })).toBe(
-      `/app/gorevler?q=${encodeURIComponent("Ara · tekrar")}`,
-    );
+  it("görev: kaydın kendisini açan derin bağlantı (?gorev=<id>)", () => {
+    expect(notificationHref({ href: "/app/gorevler", body: `Ara · tekrar · 29.09.2026 10:00 · task:${ID}` })).toBe(`/app/gorevler?gorev=${ID}`);
   });
 
-  it("randevu: müşteri adıyla süzülmüş randevu listesi; ad bilinmiyorsa mevcut bağlantı", () => {
+  it("randevu: kaydın kendisini açan derin bağlantı (?randevu=<id>), müşteri adı bilinmese de", () => {
     expect(
       notificationHref({ href: "/app/randevular", body: `Ayşe Kaya · 29.09.2026 14:30 · Teyit: https://x/randevu-teyit/t · appt:${ID}` }),
-    ).toBe(`/app/randevular?q=${encodeURIComponent("Ayşe Kaya")}`);
-    expect(notificationHref({ href: "/app/randevular", body: `Müşteri · 29.09.2026 14:30 · appt:${ID}` })).toBe("/app/randevular");
+    ).toBe(`/app/randevular?randevu=${ID}`);
+    expect(notificationHref({ href: "/app/randevular", body: `Müşteri · 29.09.2026 14:30 · appt:${ID}` })).toBe(`/app/randevular?randevu=${ID}`);
   });
 
   it("desteklenmeyen tür, özel href ya da izsiz gövde: mevcut href kalır", () => {
@@ -43,8 +41,8 @@ describe("notificationHref", () => {
     expect(notificationHref({ href: "/app/gorevler", body: null })).toBe("/app/gorevler");
   });
 
-  it("taskListHref boş başlıkta listeye düşer, uzunu 80 karaktere kırpar", () => {
-    expect(taskListHref("  ")).toBe("/app/gorevler");
-    expect(taskListHref("a".repeat(100))).toBe(`/app/gorevler?q=${"a".repeat(80)}`);
+  it("taskHref / appointmentHref tekil kayıt parametresini üretir", () => {
+    expect(taskHref(ID)).toBe(`/app/gorevler?gorev=${ID}`);
+    expect(appointmentHref(ID)).toBe(`/app/randevular?randevu=${ID}`);
   });
 });

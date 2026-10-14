@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowUpRight, FileSpreadsheet, HelpCircle, Landmark, Percent, Receipt, Scale } from "lucide-react";
+import { ArrowUpRight, HelpCircle, Landmark, Percent, Receipt, Scale } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -10,7 +10,6 @@ import { now, trDayKey } from "@/lib/clock";
 import { formatTry } from "@/lib/format";
 import { isMissingCashSchema } from "@/lib/finance/cash/load";
 import { countByMonth, monthBounds, vatSummaryRows, vatTotals, type VatSummaryRaw } from "@/lib/finance/expense-budget";
-import { reportCenterHref } from "@/lib/report-center/links";
 import { FINANCE_PATH, monthLabelOf, type FinanceTabProps } from "./butce";
 
 /** "KDV bilgisi yok" sayacının okuyacağı en çok satır (yalnız tarih sütunu). */
@@ -19,7 +18,8 @@ const NO_VAT_SCAN_LIMIT = 5000;
 /**
  * Vergi sekmesi (?sekme=vergi&yil=YYYY): aylık KDV özeti (hesaplanan − indirilecek = ödenecek), kesilen ve ödenen stopaj.
  * KDV'si boş eski hareketlere KDV uydurulmaz: "KDV bilgisi yok" sayacına düşer ve tıklanınca filtreli Hareketler açılır.
- * Bilgi amaçlıdır; beyanname yerine geçmez. Dışa aktarma yalnız rapor merkezinden (KDV özeti, muhasebeci paketi).
+ * Her sayı aynı kümeyle Hareketler'e gider: KDV tutarları `kdv=var`, stopajlar `stopaj=var` (ledger-filters; ofis hesabı,
+ * TL, gelir/gider, tutar sıfırdan farklı). Bilgi amaçlıdır; beyanname yerine geçmez.
  */
 export async function VergiTab({ params }: FinanceTabProps) {
   const supabase = await createClient();
@@ -70,19 +70,22 @@ export async function VergiTab({ params }: FinanceTabProps) {
 
   const tabHref = (y: number) => `${FINANCE_PATH}?sekme=vergi${y === thisYear ? "" : `&yil=${y}`}`;
   const entriesHref = (f: string, t: string, extra = "") => `${FINANCE_PATH}?sekme=hareketler&from=${f}&to=${t}${extra}`;
-  // SÖZLEŞME (FN3 ledger-filters, birleştirmede ENGELLEYİCİ): `kdv=yok` → origin=entry, vat_rate is null, kind gelir/gider,
-  // currency TRY, is_sample false. FN3 bu süzgeci eklemeden birleşirse bağlantı yalnız ay aralığını süzer.
+  // `kdv=yok` (ledger-filters): ofis hesabı, origin=entry, vat_rate boş, gelir/gider, TL, örnek değil — sayaçla aynı küme.
   const noVatHref = (f: string, t: string) => entriesHref(f, t, "&kdv=yok");
+  // `kdv=var` / `stopaj=var`: finance_vat_summary'nin topladığı satırlar (ofis hesabı, TL, gelir/gider, tutar ≠ 0).
+  // Hesaplanan KDV'nin komisyon payı komisyon kaydından (Komisyonlar) gelir; Hareketler listesinde yer almaz.
+  const vatHref = (f: string, t: string, tur = "") => entriesHref(f, t, `&kdv=var${tur ? `&tur=${tur}` : ""}`);
+  const whHref = (f: string, t: string, tur: "gelir" | "gider") => entriesHref(f, t, `&stopaj=var&tur=${tur}`);
 
   const kpis: KpiItem[] = [
-    { label: "Hesaplanan KDV", value: formatTry(totals.outputVat), icon: <Receipt />, tone: "info", href: entriesHref(from, to, "&tur=gelir"), hint: `${year} · satışlar` },
-    { label: "İndirilecek KDV", value: formatTry(totals.inputVat), icon: <Scale />, tone: "success", href: entriesHref(from, to, "&tur=gider"), hint: `${year} · alışlar` },
+    { label: "Hesaplanan KDV", value: formatTry(totals.outputVat), icon: <Receipt />, tone: "info", href: vatHref(from, to, "gelir"), hint: `${year} · satışlar` },
+    { label: "İndirilecek KDV", value: formatTry(totals.inputVat), icon: <Scale />, tone: "success", href: vatHref(from, to, "gider"), hint: `${year} · alışlar` },
     {
       label: totals.payable >= 0 ? "Ödenecek KDV" : "Devreden KDV",
       value: formatTry(Math.abs(totals.payable)),
       icon: <Landmark />,
       tone: totals.payable > 0 ? "warning" : "neutral",
-      href: entriesHref(from, to),
+      href: vatHref(from, to),
       hint: "hesaplanan − indirilecek",
     },
     { label: "KDV bilgisi yok", value: noVatTotal, icon: <HelpCircle />, tone: noVatTotal > 0 ? "warning" : "neutral", href: noVatHref(from, to), hint: "eski / eksik hareket", attention: noVatTotal > 0 },
@@ -96,12 +99,6 @@ export async function VergiTab({ params }: FinanceTabProps) {
             {y}
           </FilterChip>
         ))}
-        <Link
-          href={reportCenterHref("tenant", "muhasebeci-paketi", { from, to })}
-          className="focus-ring press ml-auto inline-flex min-h-8 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-xs font-semibold text-accent-text hover:border-brand-300 touch:min-h-11"
-        >
-          <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" /> Muhasebeci paketi (rapor merkezi)
-        </Link>
       </nav>
 
       <Alert tone="info" title="Bilgi amaçlıdır">
@@ -169,19 +166,19 @@ export async function VergiTab({ params }: FinanceTabProps) {
                           </Link>
                         </td>
                         <td className="numeric px-3 py-2.5 text-right">
-                          <Link href={entriesHref(b.from, b.to, "&tur=gelir")} className="hover:underline">{formatTry(r?.outputVat ?? 0)}</Link>
+                          <Link href={vatHref(b.from, b.to, "gelir")} className="hover:underline">{formatTry(r?.outputVat ?? 0)}</Link>
                         </td>
                         <td className="numeric px-3 py-2.5 text-right">
-                          <Link href={entriesHref(b.from, b.to, "&tur=gider")} className="hover:underline">{formatTry(r?.inputVat ?? 0)}</Link>
+                          <Link href={vatHref(b.from, b.to, "gider")} className="hover:underline">{formatTry(r?.inputVat ?? 0)}</Link>
                         </td>
                         <td className={`numeric px-3 py-2.5 text-right font-bold ${(r?.payable ?? 0) > 0 ? "text-warning-strong" : "text-text-muted"}`}>
-                          <Link href={href} className="hover:underline">{formatTry(r?.payable ?? 0)}</Link>
+                          <Link href={vatHref(b.from, b.to)} className="hover:underline">{formatTry(r?.payable ?? 0)}</Link>
                         </td>
                         <td className="numeric px-3 py-2.5 text-right">
-                          <Link href={entriesHref(b.from, b.to, "&tur=gelir")} className="hover:underline">{formatTry(r?.withholdingCollected ?? 0)}</Link>
+                          <Link href={whHref(b.from, b.to, "gelir")} className="hover:underline">{formatTry(r?.withholdingCollected ?? 0)}</Link>
                         </td>
                         <td className="numeric px-3 py-2.5 text-right">
-                          <Link href={entriesHref(b.from, b.to, "&tur=gider")} className="hover:underline">{formatTry(r?.withholdingPaid ?? 0)}</Link>
+                          <Link href={whHref(b.from, b.to, "gider")} className="hover:underline">{formatTry(r?.withholdingPaid ?? 0)}</Link>
                         </td>
                         <td className="numeric px-3 py-2.5 text-right">
                           {missing > 0 ? (
@@ -199,22 +196,32 @@ export async function VergiTab({ params }: FinanceTabProps) {
                 <tfoot>
                   <tr className="border-t border-line-strong text-xs font-semibold text-text">
                     <th scope="row" className="px-3 py-2 text-left">{year} toplam</th>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.outputVat)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.inputVat)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.payable)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.withholdingCollected)}</td>
-                    <td className="numeric px-3 py-2 text-right">{formatTry(totals.withholdingPaid)}</td>
-                    <td className="numeric px-3 py-2 text-right">{noVatTotal}</td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={vatHref(from, to, "gelir")} className="hover:underline">{formatTry(totals.outputVat)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={vatHref(from, to, "gider")} className="hover:underline">{formatTry(totals.inputVat)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={vatHref(from, to)} className="hover:underline">{formatTry(totals.payable)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={whHref(from, to, "gelir")} className="hover:underline">{formatTry(totals.withholdingCollected)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={whHref(from, to, "gider")} className="hover:underline">{formatTry(totals.withholdingPaid)}</Link>
+                    </td>
+                    <td className="numeric px-3 py-2 text-right">
+                      <Link href={noVatHref(from, to)} className="hover:underline">{noVatTotal}</Link>
+                    </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
             <p className="mt-3 text-xs leading-relaxed text-text-faint">
               Hesaplanan KDV: satış/gelir hareketlerindeki KDV. İndirilecek KDV: alış/gider hareketlerindeki KDV. Kesilen stopaj: müşterinin tahsilatınızdan
-              kestiği; ödenen stopaj: sizin kira gibi ödemelerden kesip vergi dairesine yatırdığınız tutardır.{" "}
-              <Link href={reportCenterHref("tenant", "kdv-ozeti", { from, to })} className="font-semibold text-accent-text hover:underline">
-                KDV özeti raporu
-              </Link>
+              kestiği; ödenen stopaj: sizin kira gibi ödemelerden kesip vergi dairesine yatırdığınız tutardır. Hesaplanan KDV&apos;nin
+              komisyon payı komisyon kaydından ve kayıt tarihine göre sayılır; Hareketler listesinde yer almaz.
             </p>
           </CardContent>
         </Card>

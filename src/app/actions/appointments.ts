@@ -193,7 +193,7 @@ export async function createAppointment(formData: FormData): Promise<Appointment
       userId: advisor.advisorId,
       title: `Adınıza randevu açıldı: ${when} · ${appointmentTypeLabel(appointmentType)}`,
       body: `${(creator?.full_name as string | undefined) ?? "Bir ekip arkadaşınız"} sizin adınıza randevu oluşturdu${location ? ` (${location.slice(0, 80)})` : ""}.`,
-      href: "/app/randevular",
+      href: created?.id ? `/app/randevular?randevu=${created.id}` : "/app/randevular",
       dedupeKey: `appt-assigned:${created?.id ?? `${advisor.advisorId}:${scheduledAt.toISOString()}`}`,
       prefKey: "appointment",
     });

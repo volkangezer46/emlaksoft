@@ -153,7 +153,7 @@ export async function buildDealEvents(
       title: `${done ? "Görev tamamlandı" : t.status === "cancelled" ? "Görev iptal edildi" : "Görev açıldı"} · ${t.title}`,
       icon: "task",
       tone: done ? "success" : "neutral",
-      href: "/app/gorevler",
+      href: `/app/gorevler?gorev=${t.id}`,
     });
   }
 

@@ -7,7 +7,6 @@
  */
 
 const MARKER_RE = / · ([a-z0-9_]+):([0-9a-f-]{36})$/;
-const SEP = " · ";
 
 /** Gövdenin sonundaki makine izini (` · task:<uuid>`) siler; iz yoksa gövde aynen döner. */
 export function stripNotificationMarker(body: string): string;
@@ -23,38 +22,28 @@ export function notificationMarker(body: string | null | undefined): { kind: str
   return m ? { kind: m[1], id: m[2].toLowerCase() } : null;
 }
 
-/**
- * Görev listesinde tek göreve süzülmüş bağlantı. `/app/gorevler` tekil görev parametresi (`?gorev=`) sunmaz;
- * sunucu taraflı başlık araması (`?q=`, başlık + not, en çok 80 karakter) o kaydı listeler.
- */
-export function taskListHref(title: string): string {
-  const q = title.trim().slice(0, 80);
-  return q ? `/app/gorevler?q=${encodeURIComponent(q)}` : "/app/gorevler";
+/** Tek görevi açan bağlantı: `/app/gorevler?gorev=<id>` yalnız o görevi listeler, düzenleme paneli açık gelir. */
+export function taskHref(id: string): string {
+  return `/app/gorevler?gorev=${encodeURIComponent(id)}`;
+}
+
+/** Tek randevuyu açan bağlantı: `/app/randevular?randevu=<id>` yalnız o randevuyu listeler, düzenleme paneli açık gelir. */
+export function appointmentHref(id: string): string {
+  return `/app/randevular?randevu=${encodeURIComponent(id)}`;
 }
 
 /**
- * Bildirimin götüreceği yol. Gövdedeki izden kayda daha yakın bir hedef türetilebiliyorsa onu, yoksa mevcut
+ * Bildirimin götüreceği yol. Gövdedeki izden kaydın kendisine giden hedef türetilebiliyorsa onu, yoksa mevcut
  * `href`'i döndürür. Yalnız genel liste bağlantısı (`/app/gorevler`, `/app/randevular`) iyileştirilir; özel bir
- * `href` taşıyan bildirim olduğu gibi kalır. Hedef sayfa tekil kayıt parametresi sunmadığından:
- *  - task → `/app/gorevler?q=<görev başlığı>` (gövde: `<başlık> · <vade> · task:<id>`),
- *  - appt → `/app/randevular?q=<müşteri adı>` (gövde: `<müşteri> · <zaman>[ · Teyit: …] · appt:<id>`;
- *    ad bilinmiyorsa ("Müşteri") mevcut bağlantı kalır),
+ * `href` taşıyan bildirim olduğu gibi kalır (cron'lar tekrar önleme için genel `href` yazar, DB değişmez):
+ *  - task → `/app/gorevler?gorev=<id>` (gövde: `<başlık> · <vade> · task:<id>`),
+ *  - appt → `/app/randevular?randevu=<id>` (gövde: `<müşteri> · <zaman>[ · Teyit: …] · appt:<id>`),
  *  - diğer türler → mevcut `href`.
  */
 export function notificationHref(n: { href: string | null; body: string | null }): string | null {
   const marker = notificationMarker(n.body);
   if (!marker || !n.body) return n.href;
-  const text = stripNotificationMarker(n.body);
-  if (marker.kind === "task" && n.href === "/app/gorevler") {
-    const cut = text.lastIndexOf(SEP);
-    const title = cut > 0 ? text.slice(0, cut) : text;
-    return taskListHref(title);
-  }
-  if (marker.kind === "appt" && n.href === "/app/randevular") {
-    const cut = text.indexOf(SEP);
-    const name = (cut > 0 ? text.slice(0, cut) : "").trim();
-    if (!name || name === "Müşteri") return n.href;
-    return `/app/randevular?q=${encodeURIComponent(name.slice(0, 80))}`;
-  }
+  if (marker.kind === "task" && n.href === "/app/gorevler") return taskHref(marker.id);
+  if (marker.kind === "appt" && n.href === "/app/randevular") return appointmentHref(marker.id);
   return n.href;
 }

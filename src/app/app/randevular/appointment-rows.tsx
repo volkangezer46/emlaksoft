@@ -39,6 +39,8 @@ export type AppointmentVM = {
   /** Gösterim belgesi imza zamanı (appointments.signed_at); imzasızsa null. */
   signedLabel?: string | null;
   confirmToken: string | null;
+  /** Derin bağlantıyla (?randevu=<id>) açılan randevu: vurgulanır, düzenleme paneli açık gelir. */
+  focused?: boolean;
   isShowing: boolean;
   tutanakHref: string;
   edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null; assigned_to: string | null; customer_id: string | null; customer_label: string | null; property_id: string | null; property_label: string | null };
@@ -69,7 +71,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
           </button>
         </form>
       )}
-      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} /> : null}
+      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} defaultOpen={a.focused} /> : null}
       <RowActions>
         {a.status === "pending" ? (
           <OptimisticConfirmButton id={a.id} className="text-[var(--success-strong)] hover:text-[var(--success-strong)]" />
@@ -154,7 +156,7 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
           <TBody>
             {rows.map((a) => (
               // id: takvimdeki gün öğeleri #randevu-{id} çapasıyla buraya kaydırır
-              <TR key={a.id} id={`randevu-${a.id}`} interactive className="scroll-mt-24 target:bg-brand-600/[0.06]">
+              <TR key={a.id} id={`randevu-${a.id}`} interactive className={`scroll-mt-24 target:bg-brand-600/[0.06]${a.focused ? " bg-brand-600/[0.06]" : ""}`} aria-current={a.focused ? "true" : undefined}>
                 <TD className="w-28">
                   {a.cardHref ? <IntentLink href={a.cardHref} className="absolute inset-0" aria-label={`${a.customerName} randevusu detayı`} /> : null}
                   <p className="numeric font-display text-base font-extrabold text-ink-950">{a.timeLabel}</p>

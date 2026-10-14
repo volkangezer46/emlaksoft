@@ -50,8 +50,11 @@ export function TaskEditDialog({
   variant = "icon",
   members,
   deals,
+  defaultOpen = false,
 }: {
   task: Task;
+  /** Panel açık başlar (görev derin bağlantısı `?gorev=<id>`). */
+  defaultOpen?: boolean;
   /** Atanan seçici (görev devri); verilmezse atama alanı gösterilmez. */
   members?: { id: string; name: string }[];
   /** Anlaşma bağı seçici; verilmezse alan gösterilmez (eski bağ korunur). */
@@ -63,7 +66,7 @@ export function TaskEditDialog({
    */
   variant?: "icon" | "overlay";
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.
   const [due, setDue] = useState(() => toLocalInput(task.due_at));
   // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt

@@ -1,6 +1,6 @@
 # EmlakSoft — Mimari Özet (1 sayfa)
 
-Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `supabase/migrations/` (2026-10-05). Güncel sayılar: `docs/DURUM.md`; proje kuralları: `CLAUDE.md` (çelişirse CLAUDE.md geçerlidir).
+Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `supabase/migrations/` (2026-10-14). Çalışma ortamı: tek üretim sunucusu Hetzner `emlaksoft-prod` (Docker + Coolify, self-hosted Supabase); yayın `scripts/sunucu/release.sh` (bkz. "Yayın ve altyapı"). Güncel sayılar: `docs/DURUM.md`; proje kuralları: `CLAUDE.md` (çelişirse CLAUDE.md geçerlidir).
 
 ## Katmanlar (URL uzayı)
 
@@ -9,10 +9,10 @@ Yeni katılan biri için sistemin haritası. Doğrulama kaynağı: `src/` + `sup
 | Landing + public | `/`, `/demo`, `/kayit`, `/giris`, KVKK/politika sayfaları, `robots`, `sitemap`, OG image | Açık |
 | Tenant paneli | `/app/*` (menü 9 iş başlığı / 42 öğe, tek kaynak `src/lib/nav-config.ts`; bkz. "Menü" bölümü) | Oturum + `requireModulePage` + ofis modül kapısı + paket kapısı |
 | Ofis panosu (TV) | `/app/pano-tv` (kabuksuz, tam ekran, canlı) | Oturum + ofis geneli rol (`canViewTv`) |
-| Platform admin | `/admin/*` (tenant, fatura, ticket, cron sağlık, SEO, impersonation) | `platform_staff` + `PLATFORM_ADMIN_EMAILS` bootstrap |
+| Platform admin | `/admin/*` (Kontrol paneli, Ofisler, Abonelikler, Kullanım ve krediler, Ortaklık, Site/SEO/Reklam, Talepler [KVKK, öneri panosu], Toplu duyuru [NPS], Sistem durumu, Coğrafya, Personel [roller, dört göz], Ayarlar [bayraklar, e-posta şablonları]; menü+sekme tek kaynak `src/lib/admin/nav.ts`) | `platform_staff` + `PLATFORM_ADMIN_EMAILS` bootstrap |
 | Vitrin | `/vitrin/[slug]` — tenant'ın halka açık ofis sitesi | Açık, slug bazlı |
 | Token sayfaları | `/paylas/[token]` (portföy paylaşım) · `/musteri-portali/[token]` · `/malik-portali/[token]` · `/imza/[token]` (SMS OTP e-imza) · `/odeme-link/[token]` (iyzico) · `/degerleme-raporu/[token]` · `/lead` | Tekil token, oturumsuz |
-| API | `/api/cron/*` (36), `/api/app/*` (bootstrap, tv-data), `/api/app/rapor/[id]` + `/api/admin/rapor/[id]` (Rapor merkezi: Excel/PDF/CSV), `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
+| API | `/api/cron/*` (40), `/api/app/*` (bootstrap, tv-data), `/api/app/rapor/[id]` + `/api/admin/rapor/[id]` (Rapor merkezi: Excel/PDF/CSV), `/api/property-media/[id]` | Bearer `CRON_SECRET` / oturum |
 
 Veri erişimi: Server Component + server action ağırlıklı; mutasyonlar `src/app/actions/*` ve modül içi `actions.ts`.
 
@@ -36,7 +36,7 @@ Ofis kurulumu, Otomasyon, Uyum, Belge Merkezi, Denetim, Davet et ve kazan).
 alias ya da yalnız `redirect()` yapan `page.tsx` olarak BIRAKMAZ; eski sayfa ve ona giden her bağlantı silinir. `next.config.ts`
 `redirects()` yalnız herkese açık `/demo → /kayit` kaydını taşır (`NAV_ALIASES` kaldırıldı).
 
-## Veri modeli ana hatları (243 migration dosyası; TL hesap kredisi, referans/ortak motoru, kayıtlı kart ve EF kontör için `docs/HAFIZA.md` §2/§6)
+## Veri modeli ana hatları (418 migration dosyası, canlıda 418; TL hesap kredisi, referans/ortak motoru, kayıtlı kart ve EF kontör için `docs/HAFIZA.md` §2/§6)
 
 - **Çekirdek:** `tenants` → `profiles` (rol) → `customers` (360: dosyalar, tarihler, lead sinyalleri, birleştirme) · `demands` (talep) · `properties` (+medya, fiyat geçmişi trigger'lı, lat/lng, aidat) · `portal_listings` (ilan no/URL teyidi — scrape yok).
 - **İşlem hattı:** eşleştirme → `appointments` → `offers`/`offer_rounds` → `deals` (+masraf) → `commissions` → `contracts` (şablon + sürüm + OTP imza) → kayıp-kaçak (`leak-sla`).
@@ -74,7 +74,7 @@ Hepsi `CRON_SECRET` Bearer + `recordHeartbeat` (admin cron sağlık panosu). Mod
 ## Yetki, paket, modül: üç ayrı kapı
 
 Yetki = kim ne yapabilir (rol matrisi, yukarıdaki 3 katman). Paket = ne satın alındı (`src/lib/billing/page-gates.ts` sayfa bazlı kilit, `plans.ts` varsayılan, `plan-definitions.ts` **plan okuyucu**: `getPlanDefinitions`, `getPublicPlanDefinitions`, `quotePlan`, `getFoundersStatus`; panel düzenlemesi `plan-overrides.ts`, yazma sonrası `updateTag(PLAN_DEFINITIONS_TAG)`, hata olursa `plans.ts` varsayılanı).
-Modül = ofiste açık mı (`src/lib/modules/*`): `registry.ts` ürün modülü anahtarları (rota önekleri, bağımlılıklar, kapanınca neyin durduğu), `logic.ts` saf durum (SATIR YOKSA AÇIK, çekirdek kapatılamaz), `guard.ts` sayfa/action kapısı (`actionBlockedByModule`), `pending.ts` kapatırken bekleyen iş uyarısı, ekran `/app/ayarlar/moduller`. Kapalı modülün token'lı public yolları "kapalı" sayfası gösterir; ilgili cron'lar o ofisi atlar.
+Modül = ofiste açık mı (`src/lib/modules/*`): `registry.ts` ürün modülü anahtarları (29 modül, 7 paket) (rota önekleri, bağımlılıklar, kapanınca neyin durduğu), `logic.ts` saf durum (SATIR YOKSA AÇIK, çekirdek kapatılamaz), `guard.ts` sayfa/action kapısı (`actionBlockedByModule`), `pending.ts` kapatırken bekleyen iş uyarısı, ekran `/app/ayarlar/moduller`. Kapalı modülün token'lı public yolları "kapalı" sayfası gösterir; ilgili cron'lar o ofisi atlar.
 Not: `FeatureKey` (ürün alanı) ile `AppModule` (izin modülü) aynı şey değildir; yeni izin modülü için CLAUDE.md'deki 4 kayıt yeri geçerlidir.
 
 ## Platform bayrakları, TV, telefon
@@ -115,6 +115,14 @@ Yetki: platform modülü `seo` — süper admin (hepsi) ve operasyon (sayfa içe
 4. JSON-LD: `SeoJsonLd` bileşeni; FAQPage yalnız görünen SSS ile; AggregateRating/Review ASLA; fiyat KDV hariç ve gerçek (plans.ts).
 5. Eski yol değişirse `/admin/site/seo` > Yönlendirmeler'den 308 kuralı ekle (çözücü yalnız 404'e düşen yollarda çalışır: `src/app/[...slug]/page.tsx`).
 6. Robot (`seo-robot` cron, günlük 04:20) yalnız kendi alan adını tarar; sonuç `/admin/site/seo` Robot sekmesindedir. IndexNow varsayılan KAPALI ve yalnız süper admin açar.
+
+## Yayın ve altyapı (Hetzner)
+
+- **Tek ortam:** Hetzner `emlaksoft-prod` (Docker imajı, Coolify Traefik + Let's Encrypt, self-hosted Supabase aynı makinede); env tek kaynak `.env.production`. Eski Vercel + bulut Supabase dondurulmuştur.
+- **Yayın:** `bash scripts/sunucu/release.sh` → `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından check:links/cron/migrations ve audit:actions; yerel build yok) → `npm run db:migrate` → `check:migrations -- --release` ile `RELEASE_MIGRATION(_CHECKSUM)` işareti → `scripts/sunucu/deploy.sh` (Docker build + sağlık) → `git push`. Tam zincir (yerel build dahil) `scripts/gate/full.sh`.
+- **Cron:** zamanlama listesi `vercel.json`, sunucuda `scripts/sunucu/install-cron.sh` → `/etc/cron.d/emlaksoft` (`cron-call.sh`). Yedek/geri yükleme `backup-db.sh`, `restore-drill.sh`, `restore-list.py`; izleme `error-watch.sh`, `host-metrics.sh`, `alert-send.py` (hepsi `scripts/sunucu/`). Ayrıntı `docs/SUNUCU_DEVIR.md`, `docs/DEPLOY.md`.
+- **Sahip kuralı — yönlendirme yok:** taşınan/birleşen sayfa eski yolunu bırakmaz; kayıtlı bağlantılar migration ile kanonik yola çekilir (ör. `20261014009000_cl_app_canonical_links`).
+- **Derin bağlantılar:** tek kayda giden bağlantı kaydı açar: `/app/gorevler?gorev=<id>`, `/app/randevular?randevu=<id>`; bildirim izleri (`task:`/`appt:`) `notificationHref` ile bunlara çevrilir. Finans: Hareketler süzgeçleri `src/app/app/giderler/_hareketler/ledger-filters.ts` (`kdv=yok` = Vergi sayacı kümesi, `kaynak=elle` = kâr/zarar "Diğer gelir").
 
 ## Değişmezler
 

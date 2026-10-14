@@ -38,13 +38,16 @@ export function AppointmentEditDialog({
   appointment,
   typeOptions,
   advisors,
+  defaultOpen = false,
 }: {
   appointment: Appointment;
+  /** Panel açık başlar (randevu derin bağlantısı `?randevu=<id>`). */
+  defaultOpen?: boolean;
   typeOptions?: TypeOption[];
   /** Yalnız yönetim katmanında dolu; danışman değiştirme seçicisi. */
   advisors?: { id: string; label: string }[];
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [error, setError] = useState<string | null>(null);
   // Çakışma freni: sunucu uyarı döndüyse kayıt YAPILMAMIŞTIR; amber bant
   // gösterilir ve gizli confirm_conflict=1 ile ikinci gönderim kaydeder.

@@ -188,7 +188,7 @@ export async function createTask(_prev: TaskResult, formData: FormData): Promise
       userId: assignedTo,
       title: "Yeni görev atandı",
       body: title,
-      href: "/app/gorevler",
+      href: `/app/gorevler?gorev=${data.id}`,
       kind: "info",
     });
   }

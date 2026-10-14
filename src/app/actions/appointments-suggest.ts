@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { appointmentHref } from "@/lib/notification-text";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -76,7 +77,7 @@ export async function suggestAlternativeTimesByToken(fd: FormData): Promise<Sugg
     user_id: appt.assigned_to ?? null,
     title: "Müşteri başka zaman önerdi",
     body: `${(cust as { full_name?: string } | null)?.full_name ?? "Müşteri"}: ${list}`,
-    href: "/app/randevular",
+    href: appointmentHref(appt.id),
     kind: "warning",
     meta: { appointment_id: appt.id, workflow: "appointment_alt_time" },
   });

@@ -70,7 +70,7 @@ export function buildDailyBriefing(input: BriefingInput): BriefingItem[] {
         input.todayAppointments === 1
           ? `1 randevun var${first ? `: ${first.time} ${first.type}` : ""}`
           : `${input.todayAppointments} randevun var${first ? `, ilki ${first.time} ${first.type}` : ""}`,
-      href: "/app/randevular",
+      href: "/app/randevular?gorunum=gun",
       tone: "brand",
     });
   }

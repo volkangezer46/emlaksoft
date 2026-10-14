@@ -92,7 +92,7 @@ export default async function AsistanPage({
     { label: "Portföy", value: snapshot?.properties ?? 0, icon: Building2, tone: "text-cyan-400", href: "/app/portfoyler" },
     { label: "Sıcak müşteri", value: snapshot?.hotLeads ?? 0, icon: Flame, tone: "text-amber-400", href: "/app/musteriler?sort=hot" },
     { label: "Geciken görev", value: snapshot?.tasksOverdue ?? 0, icon: ListChecks, tone: "text-amber-300", href: "/app/gorevler?filter=overdue" },
-    { label: "Bugünkü randevu", value: insights.todayAppointments, icon: CalendarClock, tone: "text-mint-400", href: "/app/randevular" },
+    { label: "Bugünkü randevu", value: insights.todayAppointments, icon: CalendarClock, tone: "text-mint-400", href: "/app/randevular?gorunum=gun" },
     { label: "Yeni talep", value: insights.newDemands, icon: FileSearch, tone: "text-cyan-400", href: "/app/talepler" },
     { label: "Aktif anlaşma", value: insights.activeDeals, icon: Handshake, tone: "text-brand-300", href: "/app/anlasmalar" },
     { label: "Bu ay kazanılan", value: insights.wonThisMonth, icon: Trophy, tone: "text-mint-300", href: "/app/anlasmalar" },
@@ -153,7 +153,7 @@ export default async function AsistanPage({
       tone: "bg-mint-500/12 text-mint-600",
       title: `Bugün ${insights.todayAppointments} randevu`,
       description: "Randevu öncesi müşteri geçmişini ve portföy notlarını gözden geçirin.",
-      href: "/app/randevular",
+      href: "/app/randevular?gorunum=gun",
       hrefLabel: "Randevulara git",
       ask: "Bugünkü randevularıma nasıl hazırlanmalıyım?",
     });
