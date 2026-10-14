@@ -16,6 +16,7 @@ import {
 } from "@/lib/comparables";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ShareButton } from "@/components/public/share-button";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
@@ -36,10 +37,14 @@ function rel<T>(value: T | T[] | null): T | null {
 }
 
 // Paylaşım linkleri kişiye özeldir → arama motorlarına kapalı (paylas/[token] deseni).
-export const metadata: Metadata = {
-  title: "Değerleme raporu",
-  robots: { index: false, follow: false },
-};
+// WhatsApp önizlemesi ofis markalı; yalnız ofis adı + belge türü (public-link-og), görsel `opengraph-image.tsx`.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("valuation", token), "Değerleme raporu"),
+    robots: { index: false, follow: false },
+  };
+}
 
 /**
  * Değerleme raporunun PUBLIC, salt okunur sürümü.

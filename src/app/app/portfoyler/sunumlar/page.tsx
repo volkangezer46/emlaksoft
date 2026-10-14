@@ -10,6 +10,7 @@ import { SharedPortals, type SharedPortalRow } from "./shared-portals";
 import { WhatsAppShareButton } from "@/components/app/whatsapp-share-button";
 import { now } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
+import { presentationFeedbackHref, summarizePresentationFeedback } from "@/lib/presentation-feedback";
 
 export const metadata = { title: "Sunumlar · Portföyler" };
 
@@ -63,7 +64,9 @@ export default async function PresentationsPage() {
   // ---- Paylaşılan portallar ------------------------------------------------
   // Müşteri portalı token'ları müşteri adı taşıdığı için yalnız müşteri
   // görebilenlere gösterilir (sunum müşteri seçicisiyle aynı kapı).
-  const [{ data: ownerTokenData }, { data: customerTokenData }] = await Promise.all([
+  // Müşteri geri bildirimi özeti (YD2): sunum başına ilgilenilen / ilgilenilmeyen ilan sayısı (tablo yoksa boş);
+  // sunum id'lerine bağlı ama portal sorgularından bağımsız → aynı turda.
+  const [{ data: ownerTokenData }, { data: customerTokenData }, { data: feedbackData }] = await Promise.all([
     supabase
       .from("owner_portal_tokens")
       .select("id, token, owner_name, property_id, expires_at, created_at, last_seen_at, property:properties!owner_portal_tokens_property_id_fkey(property_code, title)")
@@ -76,7 +79,14 @@ export default async function PresentationsPage() {
           .order("created_at", { ascending: false })
           .limit(100)
       : Promise.resolve({ data: null }),
+    presentations.length
+      ? supabase
+          .from("presentation_feedback")
+          .select("presentation_id, verdict")
+          .in("presentation_id", presentations.map((p) => p.id))
+      : Promise.resolve({ data: [] }),
   ]);
+  const feedbackSummary = summarizePresentationFeedback((feedbackData ?? []) as { presentation_id: string; verdict: string }[]);
 
   const nowMs = now();
   const relOne = <T,>(v: T | T[] | null | undefined): T | null =>
@@ -152,7 +162,7 @@ export default async function PresentationsPage() {
           </div>
         </div>
       ) : (
-        <TableFrame stack minWidth={760}>
+        <TableFrame stack minWidth={880}>
           <Table>
             <THead>
               <TR>
@@ -160,6 +170,7 @@ export default async function PresentationsPage() {
                 <TH>Müşteri</TH>
                 <TH align="right">Portföy</TH>
                 <TH align="right">Görüntülenme</TH>
+                <TH>Geri bildirim</TH>
                 <TH>Son görüntüleme</TH>
                 <TH>Oluşturulma</TH>
                 <TH align="right">İşlem</TH>
@@ -168,6 +179,12 @@ export default async function PresentationsPage() {
             <TBody>
               {presentations.map((p) => {
                 const url = `${base}/sunum/${p.public_token}`;
+                const fb = feedbackSummary.get(p.id);
+                const fbText = fb
+                  ? [fb.interested ? `${fb.interested} ilgileniyor` : null, fb.notInterested ? `${fb.notInterested} ilgilenmiyor` : null]
+                      .filter(Boolean)
+                      .join(" · ")
+                  : "";
                 return (
                   <TR key={p.id}>
                     <TD primary className="font-semibold text-ink-950">
@@ -204,6 +221,21 @@ export default async function PresentationsPage() {
                       <span className="inline-flex items-center gap-1 font-semibold text-ink-950">
                         <Eye className="h-3.5 w-3.5 text-text-faint" /> {p.view_count ?? 0}
                       </span>
+                    </TD>
+                    <TD label="Geri bildirim">
+                      {/* Bağlı müşteride kartın geçmişine (geri bildirim + not orada) gider; yoksa yalnız özet */}
+                      {fbText && p.customer_id && canSeeCustomers ? (
+                        <Link
+                          href={presentationFeedbackHref(p.customer_id)}
+                          className={`font-semibold underline-offset-2 transition hover:underline ${fb?.interested ? "text-mint-700" : "text-text-muted"}`}
+                        >
+                          {fbText}
+                        </Link>
+                      ) : fbText ? (
+                        <span className={`font-semibold ${fb?.interested ? "text-mint-700" : "text-text-muted"}`}>{fbText}</span>
+                      ) : (
+                        <span className="text-text-faint">—</span>
+                      )}
                     </TD>
                     <TD label="Son görüntüleme" className="text-text-muted">{tarih(p.last_viewed_at)}</TD>
                     <TD label="Oluşturulma" className="text-text-muted">{tarih(p.created_at)}</TD>

@@ -101,6 +101,8 @@ const MUAF: Record<string, string> = {
   "vitrin-alerts.ts::createVitrinPriceAlert": "Vitrin fiyat alarmi; yayindaki ilana sabit, ofis ici bildirim uretir.",
   "vitrin.ts::createVitrinSavedSearch": "Vitrin kayitli arama; ziyaretci oturum acmaz.",
   "vitrin.ts::likePublicShare": "Paylasim baglantisinda begeni sayaci.",
+  "presentation-feedback.ts::submitPresentationFeedback":
+    "Sunum linkinde ilan bazinda ilgileniyorum/degil + not: UUID token tek sunuma cozulur, ilan sunumun property_ids listesinde olmali, IP+token hiz siniri (deny), honeypot, ofis aktif + modul acik; tenant/musteri sunumdan gelir.",
 
   // --- Halka acik huniler (pazarlama/vitrin) ---
   "public-valuation.ts::listPublicDistricts": "Salt okunur geo listesi; kiraciya ozel veri icermez.",

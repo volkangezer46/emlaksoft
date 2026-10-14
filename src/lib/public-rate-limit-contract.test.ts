@@ -14,6 +14,7 @@ const FAIL_CLOSED_RATE_LIMIT_FILES = [
   "src/app/actions/open-house-public.ts",
   "src/app/actions/password-reset.ts",
   "src/app/actions/payment-links.ts",
+  "src/app/actions/presentation-feedback.ts",
   "src/app/actions/referral-public.ts",
   "src/app/actions/survey-public.ts",
   "src/app/actions/vitrin-alerts.ts",
