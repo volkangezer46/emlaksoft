@@ -11,6 +11,10 @@
  * `null` kalır (uydurma yok); pencere yalnız dolu alanları önceden doldurur.
  */
 import { AMOUNT_SUFFIX_PATTERN, parseAmountShorthand } from "./amount-shorthand";
+import { LEDGER_VAT_RATES } from "./ledger/vat";
+
+/** Yalnız penceredeki KDV çiplerinin karşılığı olan oranlar kabul edilir (ör. "%18" oran sayılmaz, açıklamada kalır). */
+const VAT_RATES = new Set<number>(LEDGER_VAT_RATES);
 
 export type SmartDirection = "in" | "out" | "transfer";
 
@@ -65,7 +69,6 @@ const SYNONYMS: readonly { words: string; value: string; when?: "in" | "out" }[]
   { words: "maaş", value: "maas" },
   { words: "maas", value: "maas" },
   { words: "sgk", value: "sgk" },
-  { words: "vergi", value: "sgk" },
   { words: "muhasebe", value: "muhasebe" },
   { words: "muhasebeci", value: "muhasebe" },
   { words: "portal", value: "portal" },
@@ -108,7 +111,7 @@ export function parseSmartEntry(text: string, categories: readonly SmartCategory
   for (let i = 0; i < tokens.length; i++) {
     const t = low[i]!;
     const pct = /^%(\d{1,2})$/.exec(t) ?? /^(\d{1,2})%$/.exec(t);
-    if (pct) {
+    if (pct && VAT_RATES.has(Number(pct[1]))) {
       out.vatRate = Number(pct[1]);
       used[i] = true;
       continue;
@@ -123,7 +126,8 @@ export function parseSmartEntry(text: string, categories: readonly SmartCategory
       const next = low[i + 1];
       const rate = next ? /^%?(\d{1,2})%?$/.exec(next) : null;
       if (rate) {
-        out.vatRate = Number(rate[1]);
+        // "kdv 18" gibi çipte olmayan oran sayılmaz; sayı tutar diye de okunmasın diye tüketilir.
+        if (VAT_RATES.has(Number(rate[1]))) out.vatRate = Number(rate[1]);
         used[i + 1] = true;
       } else if (next === "dahil") {
         out.vatIncluded = true;
@@ -139,7 +143,7 @@ export function parseSmartEntry(text: string, categories: readonly SmartCategory
   for (let i = 0; i < tokens.length; i++) {
     if (used[i]) continue;
     const t = low[i]!;
-    if (t === "vadeli" || t === "vade" || t === "veresiye" || t === "borç") {
+    if (t === "vadeli" || t === "vade" || t === "veresiye") {
       out.deferred = true;
       used[i] = true;
       const next = low[i + 1];

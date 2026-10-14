@@ -26,7 +26,7 @@ import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import Link from "@/components/ui/smart-link";
 import { Switch } from "@/components/ui/switch";
-import { CASH_CATEGORIES, SALARY_CATEGORY } from "@/lib/finance/cash/categories";
+import { CASH_CATEGORIES, SALARY_CATEGORY, expenseCategoryFor } from "@/lib/finance/cash/categories";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { formatAmountInput, parseAmountShorthand } from "@/lib/finance/amount-shorthand";
 import { LEDGER_VAT_RATES, RENT_WITHHOLDING_RATE, entryAmounts, splitVat } from "@/lib/finance/ledger/vat";
@@ -118,9 +118,60 @@ const DIRECTIONS: { id: EntryDirection; label: string; icon: typeof ArrowDownCir
 
 function chipClass(on: boolean) {
   return cn(
-    "focus-ring press inline-flex min-h-9 touch:min-h-11 items-center gap-1 rounded-full border px-3 text-xs font-semibold transition",
+    "press inline-flex min-h-9 touch:min-h-11 cursor-pointer items-center gap-1 rounded-full border px-3 text-xs font-semibold transition",
     on ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-ink-950",
   );
+}
+
+/** Odak halkası gizli yerel radyoya düşer; etiket görünür halkayı taşır (klavye: Tab gruba, oklar seçer). */
+const RADIO_FOCUS = "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-offset-1";
+
+/**
+ * Seçim çipi: ham düğme (role=radio) yerine gizli yerel `input[type=radio]` + `label` (FN5 bağlama penceresiyle aynı desen).
+ * Klavye ve ekran okuyucu yerel radyo davranışını alır; dokunma hedefi `chipClass`/çağıranın sınıfında 44px'tir.
+ */
+function RadioChip({
+  name,
+  checked,
+  onSelect,
+  className,
+  children,
+  ...rest
+}: {
+  name: string;
+  checked: boolean;
+  onSelect: () => void;
+  className: string;
+  children: React.ReactNode;
+} & Omit<React.LabelHTMLAttributes<HTMLLabelElement>, "onSelect" | "className" | "children">) {
+  return (
+    <label className={cn(className, RADIO_FOCUS)} {...rest}>
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
+      {children}
+    </label>
+  );
+}
+
+/** Akıllı girişin doldurabildiği alanlar. Son ayrıştırmanın doldurduğu ve kullanıcının sonradan elle değiştirmediği alanlar
+ *  bir sonraki ayrıştırmada metinden kalkarsa varsayılana döner (silinen "Ahmet" cari olarak kalmaz). */
+type SmartField = "amount" | "category" | "title" | "party" | "vat" | "vatIncluded" | "deferred" | "date";
+
+function smartFieldsOf(p: SmartEntry): Set<SmartField> {
+  const out = new Set<SmartField>();
+  if (p.amount != null) out.add("amount");
+  if (p.category != null) out.add("category");
+  if (p.title != null) out.add("title");
+  if (p.partyName != null) out.add("party");
+  if (p.vatRate != null) out.add("vat");
+  if (p.vatIncluded != null) out.add("vatIncluded");
+  if (p.deferred) out.add("deferred");
+  if (p.dayOffset != null) out.add("date");
+  return out;
+}
+
+/** Vadeli (açık kalem) yalnız ofis kipinde vardır; Kasam'da "vadeli" sözcüğü yok sayılır (çip de çıkmaz). */
+function smartFor(p: SmartEntry, office: boolean): SmartEntry {
+  return office ? p : { ...p, deferred: false, dueInDays: null };
 }
 
 export function EntryDialog({
@@ -156,7 +207,7 @@ export function EntryDialog({
 
   // Başlangıç değerleri: olay ayrıntısı + (komut çubuğundan gelen) tek satır metin bir kez ayrıştırılır.
   const [seed] = useState(() => {
-    const parsed = initial.text ? parseSmartEntry(initial.text, allCategories.map((c) => ({ value: c.value, label: c.label, direction: c.direction }))) : null;
+    const parsed = initial.text ? smartFor(parseSmartEntry(initial.text, allCategories.map((c) => ({ value: c.value, label: c.label, direction: c.direction }))), office) : null;
     return { parsed: parsed && hasSmartSignal(parsed) ? parsed : null };
   });
   const sp = seed.parsed;
@@ -174,7 +225,11 @@ export function EntryDialog({
   const [deferred, setDeferred] = useState(sp?.deferred ?? false);
   const [dueDate, setDueDate] = useState(() => shiftDayKey(defaultDate, sp?.dueInDays ?? 30));
   const [partyName, setPartyName] = useState<string | null>(sp?.partyName ?? null);
-  const [pickedParty, setPickedParty] = useState<string | null>(null);
+  // Seçicide seçili cari (olayla gelen `partyId` dahil); temizlenince kayıt cari kimliği taşımaz.
+  const [pickedParty, setPickedParty] = useState<string | null>(initial.partyId ? (initial.partyName ?? null) : null);
+  const [partySelected, setPartySelected] = useState(Boolean(initial.partyId));
+  // Vadeli kayıtta hesap seçilmez: para birimi açıkça seçilir (varsayılan TL; gizli son hesaptan gelmez).
+  const [openCurrency, setOpenCurrency] = useState<"TRY" | "USD" | "EUR">("TRY");
   const [vatRate, setVatRate] = useState<number | null>(sp?.vatRate ?? null);
   const [vatIncluded, setVatIncluded] = useState(sp?.vatIncluded ?? true);
   const [withholdingRate, setWithholdingRate] = useState<number | null>(null);
@@ -189,13 +244,21 @@ export function EntryDialog({
   const amountRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const categoryTouched = useRef(Boolean(sp?.category));
+  const smartOwned = useRef<Set<SmartField>>(sp ? smartFieldsOf(sp) : new Set());
+  // Elle değiştirilen alanlar: akıllı giriş bunları ne geri alır ne de üzerine yazar.
+  const manualFields = useRef<Set<SmartField>>(new Set());
+  const release = (field: SmartField) => {
+    smartOwned.current.delete(field);
+    manualFields.current.add(field);
+  };
 
   const chosen = accounts.find((a) => a.id === accountId);
   const personal = chosen?.scope === "user";
   const officeMode = office && !personal;
   const isTransfer = direction === "transfer";
   const amount = parseAmountShorthand(amountText);
-  const currency = chosen?.currency ?? "TRY";
+  const deferredMode = officeMode && deferred && !isTransfer;
+  const currency = deferredMode ? openCurrency : (chosen?.currency ?? "TRY");
   const cats = isTransfer ? [] : allCategories.filter((c) => c.direction === direction);
   const catMeta = allCategories.find((c) => c.value === category && c.direction === direction) ?? null;
   const isRent = direction === "out" && (category === "kira" || catMeta?.label.toLocaleLowerCase("tr-TR").includes("kira") === true);
@@ -214,6 +277,7 @@ export function EntryDialog({
 
   // Kategori varsayılan KDV/stopaj oranı (ofis kategorisi tanımından); kullanıcı oranı elle seçtiyse dokunulmaz.
   function pickCategory(value: string) {
+    release("category");
     categoryTouched.current = true;
     setCategory(value);
     setSuggestion(null);
@@ -233,31 +297,70 @@ export function EntryDialog({
 
   function applySmart(text: string) {
     setSmartText(text);
-    const parsed = parseSmartEntry(
-      text,
-      allCategories.map((c) => ({ value: c.value, label: c.label, direction: c.direction })),
+    const parsed = smartFor(
+      parseSmartEntry(
+        text,
+        allCategories.map((c) => ({ value: c.value, label: c.label, direction: c.direction })),
+      ),
+      office,
     );
     setSmart(hasSmartSignal(parsed) ? parsed : null);
     if (parsed.direction) setDirection(parsed.direction);
-    if (parsed.amount != null) setAmountText(formatAmountInput(parsed.amount));
-    if (parsed.category) {
-      categoryTouched.current = true;
-      setCategory(parsed.category);
-    }
-    if (parsed.title) setTitle(parsed.title);
-    if (parsed.partyName) {
-      setPartyName(parsed.partyName);
-    }
-    if (parsed.vatRate != null) setVatRate(parsed.vatRate);
-    if (parsed.vatIncluded != null) setVatIncluded(parsed.vatIncluded);
-    if (parsed.deferred) {
-      setDeferred(true);
-      if (parsed.dueInDays != null) setDueDate(shiftDayKey(defaultDate, parsed.dueInDays));
-    }
-    if (parsed.dayOffset != null) {
-      setDate(shiftDayKey(defaultDate, parsed.dayOffset));
-      setShowDate(parsed.dayOffset !== 0);
-    }
+    // Her ayrıştırma bir öncekinin doldurduklarını yeniden kurar: metinden kalkan alan (ör. silinen cari adı, yazarken
+    // kalan "Ah") varsayılana döner. Kullanıcının elle değiştirdiği alanlara (release) dokunulmaz.
+    const owned = smartOwned.current;
+    const next = new Set<SmartField>();
+    const take = (field: SmartField, present: boolean, apply: () => void, reset: () => void) => {
+      if (present) {
+        if (owned.has(field) || !manualFields.current.has(field)) {
+          apply();
+          next.add(field);
+        }
+      } else if (owned.has(field)) reset();
+    };
+    take("amount", parsed.amount != null, () => setAmountText(formatAmountInput(parsed.amount!)), () => setAmountText(""));
+    take(
+      "category",
+      parsed.category != null,
+      () => {
+        categoryTouched.current = true;
+        setCategory(parsed.category!);
+      },
+      () => {
+        categoryTouched.current = false;
+        setCategory("");
+      },
+    );
+    take("title", parsed.title != null, () => setTitle(parsed.title!), () => setTitle(""));
+    take("party", parsed.partyName != null, () => setPartyName(parsed.partyName), () => setPartyName(null));
+    take("vat", parsed.vatRate != null, () => setVatRate(parsed.vatRate), () => setVatRate(null));
+    take("vatIncluded", parsed.vatIncluded != null, () => setVatIncluded(parsed.vatIncluded!), () => setVatIncluded(true));
+    take(
+      "deferred",
+      parsed.deferred,
+      () => {
+        setDeferred(true);
+        setRepeat(false);
+        setDueDate(shiftDayKey(defaultDate, parsed.dueInDays ?? 30));
+      },
+      () => {
+        setDeferred(false);
+        setDueDate(shiftDayKey(defaultDate, 30));
+      },
+    );
+    take(
+      "date",
+      parsed.dayOffset != null,
+      () => {
+        setDate(shiftDayKey(defaultDate, parsed.dayOffset!));
+        setShowDate(parsed.dayOffset !== 0);
+      },
+      () => {
+        setDate(defaultDate);
+        setShowDate(false);
+      },
+    );
+    smartOwned.current = next;
   }
 
   // Kurala dayalı kategori önerisi (finance_rule_suggest): açıklama/cari yazıldıkça, kategori elle seçilmemişse.
@@ -330,7 +433,8 @@ export function EntryDialog({
     const propertyId = String(fd.get("property_id") ?? "").trim() || null;
     const partyRaw = String(fd.get("party") ?? "").trim();
     const isUuidLike = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(partyRaw);
-    const partyId = isUuidLike ? partyRaw : initial.partyId && !partyRaw ? initial.partyId : null;
+    // Seçici alanı tek kaynak: olayla gelen cari seçicide varsayılan değerdir; kullanıcı temizlediyse kayıt carisiz gider.
+    const partyId = isUuidLike ? partyRaw : null;
     const newPartyName = !partyId ? (partyRaw || partyName || "").trim() || null : null;
     const attachmentId = upload.status === "done" ? upload.id : null;
     const catLabel = catMeta?.label ?? "";
@@ -400,7 +504,7 @@ export function EntryDialog({
       }
 
       // Vadeli: hareket OLUŞMAZ; açık kalem (alacak/borç) açılır, Genel bakışta "Tahsil edilecek / Ödenecek"e yansır.
-      if (deferred) {
+      if (deferredMode) {
         if (!partyId && !newPartyName) {
           setError("Vadeli kayıt için cari (kişi ya da firma) seçin.");
           return;
@@ -416,7 +520,7 @@ export function EntryDialog({
           partyKind,
           title: entryTitle,
           category,
-          currency: currency === "USD" || currency === "EUR" ? currency : "TRY",
+          currency: openCurrency,
           amount: vatPreview ? vatPreview.gross : amount,
           vatRate,
           withholdingRate,
@@ -441,6 +545,9 @@ export function EntryDialog({
         setError("Hesap seçin.");
         return;
       }
+      // Ofis gideri eski `expenses` satırını da açar (portföy detayı "Giderler", portal getirisi, gider bütçesi ve kategori
+      // grafikleri bunu okur); eski recordCashEntry ile aynı kural: maaş gider kaydına dönüşmez.
+      const expenseCategory = direction === "out" && category !== SALARY_CATEGORY ? (catMeta?.expenseCategory ?? expenseCategoryFor(category)) : null;
       const res = (await recordEntryV2({
         accountId,
         direction,
@@ -460,6 +567,8 @@ export function EntryDialog({
         note: note || null,
         attachmentIds: attachmentId ? [attachmentId] : [],
         ruleId: suggestion && suggestion.category === category ? suggestion.ruleId : null,
+        createExpense: expenseCategory !== null,
+        expenseCategory,
       })) as ActionResult;
       const err = errorOf(res);
       if (err) {
@@ -490,8 +599,8 @@ export function EntryDialog({
   }
 
   const headerTitle = isTransfer ? "Transfer" : direction === "in" ? "Yeni gelir" : "Yeni gider";
-  const saveLabel = isTransfer ? "Transferi kaydet" : deferred && officeMode ? (direction === "in" ? "Alacağı kaydet" : "Borcu kaydet") : direction === "in" ? "Geliri kaydet" : "Gideri kaydet";
-  const needsAccount = isTransfer || !(deferred && officeMode);
+  const saveLabel = isTransfer ? "Transferi kaydet" : deferredMode ? (direction === "in" ? "Alacağı kaydet" : "Borcu kaydet") : direction === "in" ? "Geliri kaydet" : "Gideri kaydet";
+  const needsAccount = !deferredMode;
 
   return (
     <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
@@ -519,19 +628,18 @@ export function EntryDialog({
               {/* Yön seçimi */}
               <div className="grid grid-cols-3 gap-1 rounded-full border border-line bg-canvas p-1" role="radiogroup" aria-label="Kayıt türü">
                 {DIRECTIONS.map((d) => (
-                  <button
+                  <RadioChip
                     key={d.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={direction === d.id}
+                    name="qe-r-direction"
+                    checked={direction === d.id}
+                    onSelect={() => changeDirection(d.id)}
                     data-on={direction === d.id}
-                    onClick={() => changeDirection(d.id)}
-                    className={cn("focus-ring press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-text-muted transition", d.tone)}
+                    className={cn("press inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-full text-sm font-semibold text-text-muted transition", d.tone)}
                   >
                     <d.icon className="h-4 w-4" aria-hidden="true" />
                     {d.label}
                     {office ? <kbd className="ml-1 hidden rounded border border-current/30 px-1 text-xs opacity-60 sm:inline">{d.id === "in" ? "G" : d.id === "out" ? "E" : "T"}</kbd> : null}
-                  </button>
+                  </RadioChip>
                 ))}
               </div>
 
@@ -556,7 +664,7 @@ export function EntryDialog({
                       {smart.category ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{allCategories.find((c) => c.value === smart.category)?.label ?? smart.category}</li> : null}
                       {smart.partyName ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Cari: {smart.partyName}</li> : null}
                       {smart.vatRate != null ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">KDV %{smart.vatRate}</li> : null}
-                      {smart.deferred ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Vadeli</li> : null}
+                      {smart.deferred && officeMode ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Vadeli</li> : null}
                     </ul>
                   ) : null}
                 </div>
@@ -571,7 +679,10 @@ export function EntryDialog({
                   autoComplete="off"
                   placeholder="0,00"
                   value={amountText}
-                  onChange={(e) => setAmountText(e.target.value)}
+                  onChange={(e) => {
+                    release("amount");
+                    setAmountText(e.target.value);
+                  }}
                   onBlur={() => (amount != null ? setAmountText(formatAmountInput(amount)) : undefined)}
                   className="numeric text-lg font-bold"
                 />
@@ -584,38 +695,49 @@ export function EntryDialog({
                   </p>
                   <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Ne için">
                     {cats.map((c) => (
-                      <button key={c.value} type="button" role="radio" aria-checked={category === c.value} onClick={() => pickCategory(c.value)} className={chipClass(category === c.value)}>
+                      <RadioChip key={c.value} name="qe-r-category" checked={category === c.value} onSelect={() => pickCategory(c.value)} className={chipClass(category === c.value)}>
                         {c.label}
-                      </button>
+                      </RadioChip>
                     ))}
                   </div>
                   {suggestion && suggestion.category !== category ? (
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Wand2}
                       onClick={() => pickCategory(suggestion.category)}
-                      className="focus-ring mt-2 inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-full border border-dashed border-brand-300 px-3 text-xs font-semibold text-accent-text hover:bg-surface-accent-soft"
+                      className="mt-2 rounded-full border-dashed text-accent-text"
                     >
-                      <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
                       Kurala göre öneri: {allCategories.find((c) => c.value === suggestion.category)?.label ?? suggestion.category}
-                    </button>
+                    </Button>
                   ) : suggestion?.mode === "auto" && suggestion.category === category ? (
                     <p className="mt-1.5 flex items-center gap-1 text-xs text-text-muted">
                       <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Kategori kurala göre otomatik seçildi.
                     </p>
                   ) : null}
-                  <FormInput value={title} onChange={(e) => setTitle(e.target.value)} name="title" maxLength={160} placeholder="Açıklama (isteğe bağlı)" aria-label="Açıklama" className="mt-2" />
+                  <FormInput
+                    value={title}
+                    onChange={(e) => {
+                      release("title");
+                      setTitle(e.target.value);
+                    }}
+                    name="title" maxLength={160} placeholder="Açıklama (isteğe bağlı)" aria-label="Açıklama" className="mt-2" />
                 </div>
               ) : null}
 
               {officeMode && !isTransfer ? (
-                <FormField label={direction === "in" ? "Kimden? (cari)" : "Kime? (cari)"} htmlFor="qe-party" hint={partyName && !pickedParty && !initial.partyId ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni cari açılır.` : undefined}>
+                <FormField label={direction === "in" ? "Kimden? (cari)" : "Kime? (cari)"} htmlFor="qe-party" hint={partyName && !partySelected ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni cari açılır.` : undefined}>
                   <PartyPicker
                     id="qe-party"
                     name="party"
                     defaultValue={initial.partyId ?? null}
+                    defaultLabel={initial.partyId ? (initial.partyName ?? null) : null}
                     kindHint={partyKind}
                     allowCreate
-                    onValueChange={(p) => setPickedParty(p?.name ?? null)}
+                    onValueChange={(p) => {
+                      setPickedParty(p?.name ?? null);
+                      setPartySelected(p != null);
+                    }}
                   />
                 </FormField>
               ) : null}
@@ -628,29 +750,47 @@ export function EntryDialog({
                       { on: !deferred, label: direction === "in" ? "Tahsil edildi" : "Ödendi", icon: Check, set: false },
                       { on: deferred, label: "Vadeli", icon: CalendarClock, set: true },
                     ].map((o) => (
-                      <button
+                      <RadioChip
                         key={o.label}
-                        type="button"
-                        role="radio"
-                        aria-checked={o.on}
-                        onClick={() => {
+                        name="qe-r-paid"
+                        checked={o.on}
+                        onSelect={() => {
+                          release("deferred");
                           setDeferred(o.set);
                           if (o.set) setRepeat(false);
                         }}
                         className={cn(
-                          "focus-ring press inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-sm font-semibold transition",
+                          "press inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-sm font-semibold transition",
                           o.on ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950",
                         )}
                       >
                         <o.icon className="h-4 w-4" aria-hidden="true" />
                         {o.label}
-                      </button>
+                      </RadioChip>
                     ))}
                   </div>
                   {deferred ? (
-                    <FormField label="Vade tarihi" htmlFor="qe-due" hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Cari'den kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Cari'den kapatılır. Hareket şimdi oluşmaz."}>
-                      <FormInput id="qe-due" type="date" value={dueDate} min={date} onChange={(e) => setDueDate(e.target.value)} />
-                    </FormField>
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                      <FormField label="Vade tarihi" htmlFor="qe-due" hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Cari'den kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Cari'den kapatılır. Hareket şimdi oluşmaz."}>
+                        <FormInput
+                          id="qe-due"
+                          type="date"
+                          value={dueDate}
+                          min={date}
+                          onChange={(e) => {
+                            release("deferred");
+                            setDueDate(e.target.value);
+                          }}
+                        />
+                      </FormField>
+                      <FormField label="Para birimi" htmlFor="qe-open-currency">
+                        <FormSelect id="qe-open-currency" value={openCurrency} onChange={(e) => setOpenCurrency(e.target.value === "USD" || e.target.value === "EUR" ? e.target.value : "TRY")}>
+                          <option value="TRY">TL</option>
+                          <option value="USD">USD</option>
+                          <option value="EUR">EUR</option>
+                        </FormSelect>
+                      </FormField>
+                    </div>
                   ) : null}
                 </div>
               ) : null}
@@ -698,14 +838,22 @@ export function EntryDialog({
 
               {showDate ? (
                 <FormField label="Tarih" htmlFor="qe-date">
-                  <FormInput id="qe-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} max={defaultDate} min="2000-01-01" />
+                  <FormInput
+                    id="qe-date"
+                    name="date"
+                    type="date"
+                    value={date}
+                    onChange={(e) => {
+                      release("date");
+                      setDate(e.target.value);
+                    }} max={defaultDate} min="2000-01-01" />
                 </FormField>
               ) : (
                 <p className="text-xs text-text-muted">
                   Tarih: bugün.{" "}
-                  <button type="button" onClick={() => setShowDate(true)} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center font-semibold text-accent-text hover:underline">
+                  <Button variant="ghost" size="xs" onClick={() => setShowDate(true)} className="text-accent-text">
                     Tarihi değiştir
-                  </button>
+                  </Button>
                 </p>
               )}
 
@@ -714,20 +862,45 @@ export function EntryDialog({
                 <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="KDV oranı">
                     <span className="mr-1 text-xs font-semibold text-text-muted">KDV</span>
-                    <button type="button" role="radio" aria-checked={vatRate == null} onClick={() => setVatRate(null)} className={chipClass(vatRate == null)}>
+                    <RadioChip
+                      name="qe-r-vat"
+                      checked={vatRate == null}
+                      onSelect={() => {
+                        release("vat");
+                        setVatRate(null);
+                      }}
+                      className={chipClass(vatRate == null)}
+                    >
                       Yok
-                    </button>
+                    </RadioChip>
                     {LEDGER_VAT_RATES.filter((r) => r > 0).map((r) => (
-                      <button key={r} type="button" role="radio" aria-checked={vatRate === r} onClick={() => setVatRate(r)} className={chipClass(vatRate === r)}>
+                      <RadioChip
+                        key={r}
+                        name="qe-r-vat"
+                        checked={vatRate === r}
+                        onSelect={() => {
+                          release("vat");
+                          setVatRate(r);
+                        }}
+                        className={chipClass(vatRate === r)}
+                      >
                         %{r}
-                      </button>
+                      </RadioChip>
                     ))}
                     {vatRate != null && vatRate > 0 ? (
                       <span className="ml-auto inline-flex items-center gap-2 text-xs">
                         <label htmlFor="qe-vat-incl" className="font-semibold text-text-muted">
                           {vatIncluded ? "Tutara dahil" : "Tutara ek"}
                         </label>
-                        <Switch id="qe-vat-incl" checked={vatIncluded} onCheckedChange={setVatIncluded} aria-label="KDV tutara dahil" />
+                        <Switch
+                          id="qe-vat-incl"
+                          checked={vatIncluded}
+                          onCheckedChange={(v) => {
+                            release("vatIncluded");
+                            setVatIncluded(v);
+                          }}
+                          aria-label="KDV tutara dahil"
+                        />
                       </span>
                     ) : null}
                   </div>
@@ -737,28 +910,22 @@ export function EntryDialog({
                     </p>
                   ) : null}
                   {suggestedWh && withholdingRate == null ? (
-                    <button
-                      type="button"
-                      onClick={() => setWithholdingRate(suggestedWh)}
-                      className="focus-ring mt-2 inline-flex min-h-9 touch:min-h-11 items-center gap-1.5 rounded-full border border-dashed border-amber-400 px-3 text-xs font-semibold text-warning-strong hover:bg-warning-soft"
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => setWithholdingRate(suggestedWh)} className="mt-2 rounded-full border-dashed text-warning-strong">
                       {isRent ? `İşyeri kirasında %${suggestedWh} stopaj kesilir. Uygula` : `Bu kategoride %${suggestedWh} stopaj önerilir. Uygula`}
-                    </button>
+                    </Button>
                   ) : null}
                   {withholdingRate ? (
                     <p className="numeric mt-2 flex flex-wrap items-center gap-1 text-xs text-text-muted">
                       Stopaj %{withholdingRate}
                       {whPreview ? <>: {formatAccountMoney(whPreview.withheld ?? 0, currency)} vergi dairesine; hesaptan çıkan {formatAccountMoney(whPreview.cash, currency)}.</> : null}
-                      <button type="button" onClick={() => setWithholdingRate(null)} className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center rounded px-1 font-semibold text-text-faint hover:text-danger-600" aria-label="Stopajı kaldır">
-                        <X className="h-3.5 w-3.5" aria-hidden="true" />
-                      </button>
+                      <Button variant="ghost" size="icon" icon={X} onClick={() => setWithholdingRate(null)} className="hover:text-danger-600" aria-label="Stopajı kaldır" />
                     </p>
                   ) : null}
                 </div>
               ) : null}
 
               {/* Her ay tekrarla (ödenen kayıtlarda) */}
-              {!isTransfer && !(deferred && officeMode) ? (
+              {!isTransfer && !deferredMode ? (
                 <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
                   <div className="flex items-center justify-between gap-3">
                     <label htmlFor="qe-repeat" className="text-sm font-semibold text-text">
@@ -805,17 +972,17 @@ export function EntryDialog({
                           {upload.status === "done" ? <span className="font-semibold text-success-strong">Eklendi</span> : null}
                           {upload.status === "error" ? <span className="text-danger-strong">{upload.error}</span> : null}
                           {upload.status !== "uploading" ? (
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              icon={X}
                               onClick={() => {
                                 setUpload({ status: "idle" });
                                 if (fileRef.current) fileRef.current.value = "";
                               }}
-                              className="focus-ring grid h-9 w-9 touch:h-11 touch:w-11 place-items-center rounded text-text-faint hover:text-danger-600"
+                              className="hover:text-danger-600"
                               aria-label="Eki kaldır"
-                            >
-                              <X className="h-4 w-4" aria-hidden="true" />
-                            </button>
+                            />
                           ) : null}
                         </div>
                       )}
@@ -835,7 +1002,10 @@ export function EntryDialog({
                   {!officeMode && !isTransfer ? (
                     <>
                       <FormField label={direction === "in" ? "Kimden?" : "Kime?"} htmlFor="qe-counterparty">
-                        <FormInput id="qe-counterparty" maxLength={120} value={partyName ?? ""} onChange={(e) => setPartyName(e.target.value || null)} placeholder={direction === "in" ? "Müşteri / kurum" : "Firma / kişi"} />
+                        <FormInput id="qe-counterparty" maxLength={120} value={partyName ?? ""} onChange={(e) => {
+                            release("party");
+                            setPartyName(e.target.value || null);
+                          }} placeholder={direction === "in" ? "Müşteri / kurum" : "Firma / kişi"} />
                       </FormField>
                       <FormField label="Belge bağlantısı" htmlFor="qe-doc" hint="Fiş, makbuz veya fatura (https://…)">
                         <FormInput id="qe-doc" name="documentUrl" type="url" inputMode="url" maxLength={500} placeholder="https://" />

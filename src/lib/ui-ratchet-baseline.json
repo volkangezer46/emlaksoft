@@ -563,18 +563,6 @@
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/giderler/page.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/app/giderler/quick-entry.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 2,
-  "kucukHedef": 0
- },
  "src/app/app/giderler/recurring-panel.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,

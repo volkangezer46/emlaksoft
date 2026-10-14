@@ -27,6 +27,8 @@ export type EntryCategoryOption = {
   custom?: boolean;
   vatRate?: number | null;
   withholdingRate?: number | null;
+  /** Ofis gideri kaydında `expenses.category` (FinanceCategory.expenseCategory); yoksa sistem eşlemesi kullanılır. */
+  expenseCategory?: string | null;
 };
 
 export type EntryDirection = "in" | "out" | "transfer";
@@ -36,6 +38,8 @@ export const NEW_ENTRY_EVENT = "finance:new-entry";
 export type NewEntryDetail = {
   direction?: EntryDirection;
   partyId?: string;
+  /** `partyId` verilirse carinin adı (seçicide "Cari seçin" yerine görünür; ek arama yapılmaz). */
+  partyName?: string;
   openItemId?: string;
   attachmentId?: string;
   amount?: number;
@@ -142,6 +146,7 @@ export function QuickEntryButtons({
       open({
         direction: d.direction === "in" || d.direction === "out" || d.direction === "transfer" ? d.direction : undefined,
         partyId: typeof d.partyId === "string" ? d.partyId : undefined,
+        partyName: typeof d.partyId === "string" && typeof d.partyName === "string" ? d.partyName.slice(0, 120) : undefined,
         openItemId: typeof d.openItemId === "string" ? d.openItemId : undefined,
         attachmentId: typeof d.attachmentId === "string" ? d.attachmentId : undefined,
         amount: typeof d.amount === "number" && Number.isFinite(d.amount) && d.amount > 0 ? d.amount : undefined,
@@ -203,7 +208,7 @@ export function QuickEntryButtons({
           onClose={() => setEntry(null)}
         />
       ) : null}
-      {command ? <CommandBar tabs={commandTabs ?? []} onClose={() => setCommand(false)} onNewEntry={(d: NewEntryDetail) => open(d)} /> : null}
+      {command ? <CommandBar tabs={commandTabs ?? []} categories={categories} onClose={() => setCommand(false)} onNewEntry={(d: NewEntryDetail) => open(d)} /> : null}
     </>
   );
 }

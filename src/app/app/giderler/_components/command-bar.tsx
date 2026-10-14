@@ -9,7 +9,7 @@ import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { CASH_CATEGORIES, cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { hasSmartSignal, parseSmartEntry } from "@/lib/finance/smart-entry";
 import { cn } from "@/lib/utils";
-import type { CommandTab, NewEntryDetail } from "../quick-entry";
+import type { CommandTab, EntryCategoryOption, NewEntryDetail } from "../quick-entry";
 
 /**
  * Muhasebe komut çubuğu (Ctrl/⌘K). Yalnız açılınca iner (`next/dynamic`). Satırlar:
@@ -26,26 +26,33 @@ const SYSTEM_CATS = CASH_CATEGORIES.map((c) => ({ value: c.value, label: c.label
 
 export function CommandBar({
   tabs,
+  categories,
   onClose,
   onNewEntry,
 }: {
   tabs: readonly CommandTab[];
+  /** Pencereyle AYNI kategori listesi (ofisin `x_…` kategorileri dahil); verilmezse sistem kategorileri. */
+  categories?: readonly EntryCategoryOption[];
   onClose: () => void;
   onNewEntry: (detail: NewEntryDetail) => void;
 }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [index, setIndex] = useState(0);
+  const cats = useMemo(
+    () => (categories && categories.length > 0 ? categories.map((c) => ({ value: c.value, label: c.label, direction: c.direction })) : SYSTEM_CATS),
+    [categories],
+  );
 
   const commands = useMemo<Command[]>(() => {
     const list: Command[] = [];
     const text = q.trim();
-    const smart = text ? parseSmartEntry(text, SYSTEM_CATS) : null;
+    const smart = text ? parseSmartEntry(text, cats) : null;
     if (smart && hasSmartSignal(smart) && smart.amount != null) {
       const parts = [
         smart.direction === "in" ? "Gelir" : smart.direction === "transfer" ? "Transfer" : smart.direction === "out" ? "Gider" : null,
         formatAccountMoney(smart.amount, "TRY"),
-        smart.category ? cashCategoryLabel(smart.category) : null,
+        smart.category ? (cats.find((c) => c.value === smart.category)?.label ?? cashCategoryLabel(smart.category)) : null,
         smart.partyName,
         smart.deferred ? "vadeli" : null,
       ].filter(Boolean);
@@ -80,7 +87,7 @@ export function CommandBar({
       });
     }
     return list;
-  }, [q, tabs, onNewEntry, onClose, router]);
+  }, [q, tabs, cats, onNewEntry, onClose, router]);
 
   const active = Math.min(index, Math.max(commands.length - 1, 0));
 
@@ -123,17 +130,20 @@ export function CommandBar({
         </div>
         <ul id="finance-command-list" role="listbox" aria-label="Komutlar" className="max-h-[min(60vh,26rem)] overflow-y-auto p-2">
           {commands.map((c, i) => (
-            <li key={c.id} id={`fc-${c.id}`} role="option" aria-selected={i === active}>
-              <button
-                type="button"
-                tabIndex={-1}
-                onMouseMove={() => setIndex(i)}
-                onClick={() => c.run()}
-                className={cn(
-                  "flex min-h-11 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm transition",
-                  i === active ? "bg-surface-accent-soft text-ink-950" : "text-text hover:bg-surface-hover",
-                )}
-              >
+            <li
+              key={c.id}
+              id={`fc-${c.id}`}
+              role="option"
+              aria-selected={i === active}
+              onPointerEnter={() => setIndex(i)}
+              // Odak giriş alanında kalır (combobox + aria-activedescendant); seçenek fareyle tıklanır, klavyede Enter çalıştırır.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => c.run()}
+              className={cn(
+                "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3 text-left text-sm transition",
+                i === active ? "bg-surface-accent-soft text-ink-950" : "text-text hover:bg-surface-hover",
+              )}
+            >
                 <c.icon className={cn("h-4 w-4 shrink-0", c.id === "smart" ? "text-accent-text" : "text-text-faint")} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{c.label}</span>
@@ -144,7 +154,6 @@ export function CommandBar({
                     {c.kbd === "Enter" ? <CornerDownLeft className="h-3 w-3" aria-hidden="true" /> : c.kbd}
                   </kbd>
                 ) : null}
-              </button>
             </li>
           ))}
         </ul>

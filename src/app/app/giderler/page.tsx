@@ -45,8 +45,8 @@ const TABS: Record<FinanceTabId, (props: FinanceTabProps) => Promise<ReactNode>>
 function toEntryCategories(list: readonly FinanceCategory[]): EntryCategoryOption[] {
   const out = list
     .filter((c) => !c.archived && c.key && c.label)
-    .map((c) => ({ value: c.key, label: c.label, direction: c.direction, custom: c.source === "custom", vatRate: c.defaultVatRate, withholdingRate: c.defaultWithholdingRate }));
-  return out.length > 0 ? out : CASH_CATEGORIES.map((c) => ({ value: c.value, label: c.label, direction: c.direction }));
+    .map((c) => ({ value: c.key, label: c.label, direction: c.direction, custom: c.source === "custom", vatRate: c.defaultVatRate, withholdingRate: c.defaultWithholdingRate, expenseCategory: c.expenseCategory }));
+  return out.length > 0 ? out : CASH_CATEGORIES.map((c) => ({ value: c.value, label: c.label, direction: c.direction, expenseCategory: c.direction === "out" ? (c.expenseCategory ?? null) : null }));
 }
 
 /** Kural önerisi (finance_rule_suggest): yeni kayıt penceresi açıklama/cari yazıldıkça çağırır. Yalnız okuma; `expenses:view`. */
@@ -64,6 +64,30 @@ async function suggestRule(input: { text: string; amount: number | null; directi
   const row = data[0] as { rule_id?: string | null; category?: string | null; party_id?: string | null; mode?: string | null };
   if (!row.category) return null;
   return { ruleId: String(row.rule_id ?? ""), category: String(row.category), partyId: row.party_id ?? null, mode: row.mode === "auto" ? "auto" : "suggest" };
+}
+
+/** "Yeni kayıt" eylemi: hesap ve kategori listesini kendisi çeker (paralel), sekmeden bağımsız akar. */
+async function HeroActions({ canCreate, canSalary }: { canCreate: boolean; canSalary: boolean }) {
+  const supabase = await createClient();
+  const [cash, categories] = await Promise.all([loadAccountsWithBalances(supabase), loadCategories()]);
+  const accounts: AccountOption[] = cash.accounts
+    .filter((a) => !a.archived_at && (a.owner_scope === "user" || canCreate))
+    .map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
+  if (!canCreate && accounts.length === 0) return null;
+  return (
+    <FinanceActions
+      accounts={accounts}
+      defaultDate={trDayKey(nowMs())}
+      canSalary={canSalary}
+      canCreate={canCreate}
+      categories={toEntryCategories(categories)}
+      suggestRule={canCreate ? suggestRule : undefined}
+    />
+  );
+}
+
+function HeroActionsSkeleton() {
+  return <div className="skeleton h-9 w-32 rounded-[var(--radius-control)] touch:h-11" aria-hidden="true" />;
 }
 
 export default async function GiderlerPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -88,12 +112,6 @@ export default async function GiderlerPage({ searchParams }: { searchParams?: Pr
     isOwnerGm: role === "owner" || role === "gm",
   };
 
-  // Yeni kayıt penceresinin hesap ve kategori listesi (sekme verisinden bağımsız; paralel).
-  const supabase = await createClient();
-  const [cash, categories] = await Promise.all([loadAccountsWithBalances(supabase), loadCategories()]);
-  const accounts: AccountOption[] = cash.accounts
-    .filter((a) => !a.archived_at && (a.owner_scope === "user" || canCreate))
-    .map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
   const Tab = TABS[tab];
 
   return (
@@ -104,16 +122,10 @@ export default async function GiderlerPage({ searchParams }: { searchParams?: Pr
         title="Muhasebe"
         description={FINANCE_HERO_TEXT.description}
         actions={
-          canCreate || accounts.length > 0 ? (
-            <FinanceActions
-              accounts={accounts}
-              defaultDate={trDayKey(nowMs())}
-              canSalary={canSalary}
-              canCreate={canCreate}
-              categories={toEntryCategories(categories)}
-              suggestRule={canCreate ? suggestRule : undefined}
-            />
-          ) : null
+          // Pencerenin hesap/kategori verisi sekme verisini BEKLETMEZ (şelale yok): kendi Suspense sınırında akar.
+          <Suspense fallback={<HeroActionsSkeleton />}>
+            <HeroActions canCreate={canCreate} canSalary={canSalary} />
+          </Suspense>
         }
       />
       <FinanceTabs active={tab} />

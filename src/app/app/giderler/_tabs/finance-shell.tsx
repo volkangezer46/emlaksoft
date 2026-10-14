@@ -80,6 +80,26 @@ export function financeTabOf(value: string | string[] | undefined): FinanceTabId
   return resolveFinanceTab({ sekme: v }).tab;
 }
 
+/**
+ * Genel bakış KPI / uyarı / grafik hedefleri (TEK kaynak; sözleşme testi finance-shell.test.ts). Yalnız hedef sekmenin
+ * GERÇEKTEN okuduğu parametreler kullanılır (sıfır çıkmaz metrik: tıklayan filtreli listeye düşer, filtresiz sayfaya değil):
+ *  - Cari (FN4, cari/open-items.tsx): `gorunum=acik` + `yon=alacak|borc` + `kova=gecikmis|vadesi_gelmedi|0-30|…`
+ *  - Hareketler (FN3, hareketler/ledger-filters.ts): `kaynak=eski` (hesaba bağlanmamış eski giderler), `from`/`to`
+ *  - Kasa ve banka (FN3): "İncelenecek" mutabakat kuyruğu sekmenin kendisindedir (ek parametre yok)
+ */
+export function overviewLinks() {
+  return {
+    receivable: financeHref("cari", { gorunum: "acik", yon: "alacak" }),
+    payable: financeHref("cari", { gorunum: "acik", yon: "borc" }),
+    overdue: financeHref("cari", { gorunum: "acik", kova: "gecikmis" }),
+    openItems: financeHref("cari", { gorunum: "acik" }),
+    /** Tahmin noktası (gelecek gün): vadesi henüz gelmemiş açık kalemler (Cari'de tek gün süzgeci yok). */
+    forecastDay: financeHref("cari", { gorunum: "acik", kova: "vadesi_gelmedi" }),
+    review: financeHref("kasa-banka"),
+    legacy: financeHref("hareketler", { kaynak: "eski" }),
+  } as const;
+}
+
 export const FINANCE_HERO_TEXT = {
   eyebrow: "Mini muhasebe",
   description: "Kasa ve banka, cari hesaplar, vadeler, belgeler ve KDV tek yerde. Yeni kayıt için Ctrl K ya da G (gelir), E (gider), T (transfer).",

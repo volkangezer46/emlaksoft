@@ -11,13 +11,14 @@ import { createClient } from "@/lib/supabase/server";
 import { now as nowMs, trDayKey } from "@/lib/clock";
 import { loadSampleKpiScope } from "@/lib/sample-scope";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
-import { loadForecast, loadOverview, loadSettings, loadUpcoming } from "@/lib/finance/ledger/load";
+import { loadForecast, loadOverview, loadSettings } from "@/lib/finance/ledger/load";
 import type { FinanceTabProps } from "@/lib/finance/ledger/types";
 import { cn } from "@/lib/utils";
-import { UpcomingList, type UpcomingRow } from "../_components/upcoming-list";
+import { UpcomingList } from "../_components/upcoming-list";
+import { loadUpcomingWindow } from "../_components/upcoming-load";
 import type { ForecastChartPoint } from "../_components/forecast-chart";
 import { NewEntryButton } from "../quick-entry";
-import { financeHref } from "./finance-shell";
+import { financeHref, overviewLinks } from "./finance-shell";
 import { PendingApprovalsCard } from "./pending-card";
 import { ManagementFeeCard, OwnerPayoutsCard } from "./management-fee-card";
 
@@ -41,13 +42,31 @@ export async function GenelBakisTab(props: FinanceTabProps) {
   const days = params.gun === "90" ? 90 : 30;
   const supabase = await createClient();
 
-  const [overview, forecast, upcomingItems, settings, sample] = await Promise.all([
+  const links = overviewLinks();
+  const [overview, forecast, upcoming, settings, sample] = await Promise.all([
     loadOverview(monthFrom, today),
     loadForecast(days),
-    loadUpcoming(7),
+    loadUpcomingWindow(today, 7, links.openItems),
     loadSettings(),
     loadSampleKpiScope(supabase, tenantId),
   ]);
+
+  // Özet okunamadıysa (hata ya da veritabanı güncellemesi bekliyor) "hiç veri yok" gibi görünmesin: ayrı durum.
+  if (!overview) {
+    return (
+      <div className="grid gap-4">
+        <EmptyState
+          illustration="error"
+          icon={AlertTriangle}
+          title="Muhasebe özeti şu an okunamadı"
+          description="Kayıtlarınız yerinde; özet hesaplanırken bir sorun oldu. Biraz sonra yeniden deneyin ya da hareketleri doğrudan açın."
+          action={{ href: financeHref("genel", { gun: days === 90 ? 90 : null }), label: "Yeniden dene" }}
+          secondary={{ href: financeHref("hareketler"), label: "Hareketlere git" }}
+          tone="amber"
+        />
+      </div>
+    );
+  }
 
   const byCurrency = overview?.byCurrency ?? [];
   const cashTotal = overview?.cashTotalTry ?? 0;
@@ -70,25 +89,11 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     inflow: p.inflow,
     outflow: p.outflow,
     actual: p.isActual,
-    href: p.isActual ? financeHref("hareketler", { from: p.date, to: p.date }) : financeHref("cari", { vade: p.date }),
+    href: p.isActual ? financeHref("hareketler", { from: p.date, to: p.date }) : links.forecastDay,
   }));
 
-  const upcoming: UpcomingRow[] = upcomingItems
-    .filter((r) => r.amountOpen > 0)
-    .map((r) => ({
-      key: r.key,
-      source: r.source,
-      direction: r.direction,
-      title: r.title,
-      partyLabel: r.partyLabel || null,
-      amount: r.amountOpen,
-      currency: r.currency,
-      dueDate: r.dueDate || null,
-      href: r.href || financeHref("cari"),
-    }));
-
   const hasAccounts = byCurrency.length > 0;
-  const hasAnything = hasAccounts || receivable > 0 || payable > 0 || inTotal > 0 || outTotal > 0 || upcoming.length > 0 || legacyCount > 0;
+  const hasAnything = hasAccounts || receivable > 0 || payable > 0 || overdueCount > 0 || inTotal > 0 || outTotal > 0 || upcoming.length > 0 || legacyCount > 0;
   const canRentals = perms.rentals?.includes("edit") ?? false;
 
   if (!hasAnything) {
@@ -132,7 +137,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
       value: money(receivable),
       icon: <ArrowDownCircle />,
       tone: "success",
-      href: financeHref("cari", { yon: "alacak" }),
+      href: links.receivable,
       hint: "açık alacak, kira ve komisyon",
     },
     {
@@ -140,7 +145,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
       value: money(payable),
       icon: <ArrowUpCircle />,
       tone: "warning",
-      href: financeHref("cari", { yon: "borc" }),
+      href: links.payable,
       hint: "açık borç ve düzenli ödemeler",
       attention: overdueCount > 0,
     },
@@ -164,15 +169,15 @@ export async function GenelBakisTab(props: FinanceTabProps) {
     });
   }
   if (overdueCount > 0) {
-    alerts.push({ key: "overdue", href: financeHref("cari", { vade: "gecmis" }), icon: AlertTriangle, tone: "warning", title: `Vadesi geçen ${overdueCount} kalem`, text: "Tahsil edilmemiş alacaklar ve ödenmemiş borçlar." });
+    alerts.push({ key: "overdue", href: links.overdue, icon: AlertTriangle, tone: "warning", title: `Vadesi geçen ${overdueCount} kalem`, text: "Tahsil edilmemiş alacaklar ve ödenmemiş borçlar." });
   }
   if (reviewCount > 0) {
-    alerts.push({ key: "review", href: financeHref("kasa-banka", { incele: "1" }), icon: Inbox, tone: "info", title: `İncelenecek ${reviewCount} kayıt`, text: "Ekstre satırları, onay bekleyen düzenli ödemeler ve eşleşmemiş fişler." });
+    alerts.push({ key: "review", href: links.review, icon: Inbox, tone: "info", title: `İncelenecek ${reviewCount} kayıt`, text: "Ekstre satırları, onay bekleyen düzenli ödemeler ve eşleşmemiş fişler." });
   }
   if (legacyCount > 0) {
     alerts.push({
       key: "legacy",
-      href: financeHref("hareketler", { origin: "legacy_expense" }),
+      href: links.legacy,
       icon: ArchiveRestore,
       tone: "info",
       title: `Hesaba bağlı olmayan ${legacyCount} eski gider`,
@@ -251,7 +256,7 @@ export async function GenelBakisTab(props: FinanceTabProps) {
         </section>
 
         <div className="grid content-start gap-4">
-          <UpcomingList rows={upcoming} today={today} overdueHref={financeHref("cari", { vade: "gecmis" })} allHref={financeHref("cari", { yon: "tumu" })} />
+          <UpcomingList rows={upcoming} today={today} overdueCount={overdueCount} overdueHref={links.overdue} allHref={links.openItems} />
 
           {vatMonth !== 0 ? (
             <Link

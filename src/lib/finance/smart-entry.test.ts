@@ -80,4 +80,12 @@ describe("parseSmartEntry (tek satır akıllı giriş)", () => {
     expect(empty.amount).toBeNull();
     expect(hasSmartSignal(empty)).toBe(false);
   });
+
+  it("belirsiz eş anlamlılar yok: 'vergi' SGK değil, 'borç' vadeli değil; çipte olmayan KDV oranı alınmaz", () => {
+    expect(parse("gider 2000 vergi").category).toBeNull();
+    expect(parse("gider 2000 borç").deferred).toBe(false);
+    expect(parse("gider 1000 ofis %18").vatRate).toBeNull();
+    expect(parse("gider 1000 ofis kdv 18")).toMatchObject({ vatRate: null, amount: 1000 });
+    expect(parse("gider 1000 ofis %10").vatRate).toBe(10);
+  });
 });

@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * Genel bakış: önümüzdeki 7 günün zaman çizelgesi (alacak / borç / kira / komisyon / düzenli ödeme / mülk sahibi ödemesi).
- * Kaynak `finance_open_items_v` (veri kopyalanmaz); her satır kendi hedefine gider. Vadesi geçenler en üstte ayrı rozetle.
+ * Kaynak `finance_open_items_v` (veri kopyalanmaz; `upcoming-load.ts`, yalnız bugün..+7); her satır kendi hedefine gider.
+ * Vadesi geçenlerin SAYISI pano özetinden (`overdueCount`, kesilmemiş) gelir ve rozetle Cari'deki "vadesi geçen" süzgecine gider.
  */
 
 export type UpcomingRow = {
@@ -38,8 +39,19 @@ function dayLabel(day: string, today: string): string {
   return DAY_FMT.format(Date.UTC(y!, m! - 1, d!));
 }
 
-export function UpcomingList({ rows, today, overdueHref, allHref }: { rows: readonly UpcomingRow[]; today: string; overdueHref: string; allHref: string }) {
-  const overdue = rows.filter((r) => r.dueDate != null && r.dueDate < today);
+export function UpcomingList({
+  rows,
+  today,
+  overdueCount,
+  overdueHref,
+  allHref,
+}: {
+  rows: readonly UpcomingRow[];
+  today: string;
+  overdueCount: number;
+  overdueHref: string;
+  allHref: string;
+}) {
   const upcoming = rows.filter((r) => r.dueDate == null || r.dueDate >= today).sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
   const groups = new Map<string, UpcomingRow[]>();
   for (const r of upcoming) {
@@ -54,9 +66,9 @@ export function UpcomingList({ rows, today, overdueHref, allHref }: { rows: read
           <CalendarClock className="h-4 w-4 text-accent-text" aria-hidden="true" /> Önümüzdeki 7 gün
         </h2>
         <div className="flex items-center gap-2">
-          {overdue.length > 0 ? (
+          {overdueCount > 0 ? (
             <Link href={overdueHref} className="focus-ring press inline-flex min-h-8 touch:min-h-11 items-center gap-1 rounded-full bg-danger-500 px-2.5 text-xs font-bold text-white">
-              Vadesi geçen {overdue.length}
+              Vadesi geçen {overdueCount}
             </Link>
           ) : null}
           <Link href={allHref} className="focus-ring inline-flex min-h-8 touch:min-h-11 items-center gap-1 text-xs font-semibold text-accent-text hover:underline">
@@ -69,11 +81,11 @@ export function UpcomingList({ rows, today, overdueHref, allHref }: { rows: read
           Önümüzdeki 7 günde vadesi gelen tahsilat ya da ödeme yok.
         </p>
       ) : (
-        <ol className="grid gap-3">
+        <ol className="grid grid-cols-[minmax(0,1fr)] gap-3">
           {[...groups.entries()].map(([day, items]) => (
             <li key={day} className="grid gap-1.5">
               <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">{dayLabel(day, today)}</p>
-              <ul className="grid gap-1">
+              <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
                 {items.map((r) => {
                   const inbound = r.direction === "receivable";
                   return (
