@@ -44,6 +44,11 @@ export type StaticRouteDef = {
   keepPrefixes: readonly string[];
   /** DB ayarı (`statik.routes`) yokken açık mı? */
   defaultEnabled: boolean;
+  /**
+   * DOM diyeti: ilk yükte gerekmeyen işaretleme `<template>`'e alınır, çalışma zamanı gerektiğinde açar
+   * (src/lib/static-home/lazy-dom.ts). Yalnız pazarlama çalışma zamanının tüm parçalarını taşıyan sayfalarda açılır.
+   */
+  lazyDom?: boolean;
   /** Kalıcı kapalı (anahtar gösterilir ama açılamaz) — nedeni yönetim ekranında yazar. */
   disabled?: string;
 };
@@ -65,7 +70,7 @@ const legal = (id: StaticRouteId, label: string): StaticRouteDef => ({
 });
 
 export const STATIC_ROUTES: readonly StaticRouteDef[] = [
-  { id: "home", path: "/", label: "Ana sayfa", islands: ["pricing", "seat", "tour", "preview"], keepPrefixes: KEEP_PREFIXES, defaultEnabled: true },
+  { id: "home", path: "/", label: "Ana sayfa", islands: ["pricing", "seat", "tour", "preview"], keepPrefixes: KEEP_PREFIXES, defaultEnabled: true, lazyDom: true },
   legal("gizlilik", "Gizlilik politikası"),
   legal("kvkk-aydinlatma", "KVKK aydınlatma metni"),
   legal("kullanim-sartlari", "Kullanım şartları"),

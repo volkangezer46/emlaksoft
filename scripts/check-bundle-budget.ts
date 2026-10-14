@@ -322,6 +322,7 @@ export function staticHomeFromBuild(nextDir: string, publicDir = path.join(proce
     readStylesheet,
     purge: { keepPrefixes: home.keepPrefixes, extraClasses: m.classTokens },
     bodyEnd: `<script type="application/json" id="mk-static">${data}</script><script>${readFileSync(runtimePath, "utf8")}</script>`,
+    lazyDom: home.lazyDom === true,
   });
 }
 
