@@ -93,3 +93,40 @@ describe("Ofis 360 tahsilat (dunning) olayları", () => {
     expect(noBilling.some((e) => e.category === "tahsilat")).toBe(false);
   });
 });
+
+describe("Ofis 360 İletişim: SMS/WhatsApp (SN3)", () => {
+  const msg = (over: Record<string, unknown>) => ({
+    id: "m1",
+    created_at: "2026-10-14T10:00:00Z",
+    tenant_id: "t1",
+    channel: "sms" as const,
+    account: "platform" as const,
+    audience: "office" as const,
+    source: "dunning",
+    to_masked: "05** *** ** 42",
+    status: "delivered" as const,
+    error_code: null,
+    error: null,
+    segments: 1,
+    pricing_category: null,
+    delivered_at: "2026-10-14T10:01:00Z",
+    read_at: null,
+    ...over,
+  });
+
+  it("ofise giden SMS/WhatsApp İletişim kategorisinde listelenir ve günlüğe ofis süzgeciyle bağlanır", () => {
+    const messages = [msg({}), msg({ id: "m2", channel: "whatsapp", source: "login_otp", status: "failed", error: "Meta hata kodu 131026" })];
+    const ev = buildOfficeTimeline(empty({ messages: messages as TimelineInput["messages"] })).filter((e) => e.category === "iletisim");
+    expect(ev.map((e) => e.title)).toEqual(["SMS: Tahsilat hatırlatması", "WhatsApp: Giriş doğrulama kodu"]);
+    expect(ev[0]).toMatchObject({ detail: "05** *** ** 42 · Teslim edildi", tone: "success" });
+    expect(ev[1]).toMatchObject({ tone: "danger", detail: "05** *** ** 42 · Başarısız · Meta hata kodu 131026" });
+    expect(ev[0].href).toBe("/admin/sistem?sekme=entegrasyonlar&kanal=sms&ofis=t1#mesaj-gunlugu");
+  });
+
+  it("sistem modülü olmayan rol satırı görür ama günlüğe bağlantı almaz", () => {
+    const messages = [msg({})] as TimelineInput["messages"];
+    const ev = buildOfficeTimeline(empty({ messages, access: officeAccess("billing") })).find((e) => e.id === "msg-m1");
+    expect(ev).toBeDefined();
+    expect(ev?.href).toBeUndefined();
+  });
+});

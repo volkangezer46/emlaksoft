@@ -6,7 +6,7 @@
  * A platform sender is used only when ALLOW_PLATFORM_MESSAGING_FALLBACK=true.
  */
 
-import { isTenantSmsAvailable, sendTenantSms } from "@/lib/messaging/tenant-providers";
+import { isTenantSmsAvailable, sendTenantSms, type TenantMessageLog } from "@/lib/messaging/tenant-providers";
 import type { SmsSendResult } from "@/lib/messaging/netgsm";
 
 export async function isSignerSmsAvailable(
@@ -21,8 +21,9 @@ export async function sendSignerSms(
   tenantId: string,
   to: string,
   text: string,
+  log: TenantMessageLog = { source: "contract_sign", audience: "contact" },
 ): Promise<SmsSendResult> {
-  return sendTenantSms(tenantId, to, text);
+  return sendTenantSms(tenantId, to, text, log);
 }
 
 /** Telefonun yalnızca son iki hanesini gösterir (ör. "05** *** ** 42"). */

@@ -6,6 +6,7 @@ import { auditActionLabel } from "@/lib/admin-format";
 import { baseRoleOf, platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-access";
 import type { TimelineEvent } from "@/lib/activity-timeline";
 import { EMAIL_STATUS_LABEL, EMAIL_STATUS_TONE, emailTemplateLabel, loadTenantEmailSends, type EmailSendRow } from "@/lib/email/log-read";
+import { MESSAGE_CHANNEL_LABEL, MESSAGE_STATUS_LABEL, MESSAGE_STATUS_TONE, loadTenantMessageSends, messageSourceLabel, type MessageSendRow } from "@/lib/messaging/message-log-read";
 
 /**
  * Ofis 360 (süper admin ofis detayı) veri katmanı.
@@ -38,7 +39,7 @@ export type OfficeAccess = {
   members: boolean;
   /** IP adresi yalnız süper admin (KVKK). */
   showIp: boolean;
-  /** E-posta günlüğü ekranı (Ayarlar > E-posta, modül `sistem`); yoksa İletişim olayları bağlantısız. */
+  /** E-posta günlüğü (Ayarlar > E-posta) ve SMS/WhatsApp günlüğü (Entegrasyon merkezi) ekranları (modül `sistem`); yoksa İletişim olayları bağlantısız. */
   emailLog: boolean;
 };
 
@@ -353,6 +354,8 @@ export type TimelineInput = {
   profiles: ProfileRow[];
   /** Ofise giden e-postalar (son 30 gün; maskeli alıcı). Tablo yoksa boş. */
   emails?: EmailSendRow[];
+  /** Ofise giden SMS/WhatsApp (son 30 gün; kitle "office"; maskeli alıcı). Tablo yoksa boş. */
+  messages?: MessageSendRow[];
   /** Tahsilat günlüğü (tablo yoksa boş). */
   dunning?: DunningEventRow[];
   /** Katalog listesi: adminden eklenen paketin adı için (yoksa taban ad/kimlik). */
@@ -538,6 +541,21 @@ export function buildOfficeTimeline(i: TimelineInput): TimelineEvent[] {
       href: i.access.emailLog ? `/admin/ayarlar/eposta?sekme=gunluk&ofis=${i.tenantId}` : undefined,
     });
   }
+  for (const m of i.messages ?? []) {
+    const tone = MESSAGE_STATUS_TONE[m.status];
+    ev.push({
+      id: `msg-${m.id}`,
+      at: m.created_at,
+      category: "iletisim",
+      title: `${MESSAGE_CHANNEL_LABEL[m.channel] ?? m.channel}: ${messageSourceLabel(m.source)}`,
+      detail: `${m.to_masked} · ${MESSAGE_STATUS_LABEL[m.status] ?? m.status}${m.error && tone === "danger" ? ` · ${m.error}` : ""}`,
+      icon: "message",
+      tone: tone === "neutral" ? undefined : tone,
+      href: i.access.emailLog
+        ? `/admin/sistem?sekme=entegrasyonlar&kanal=${m.channel}&ofis=${i.tenantId}#mesaj-gunlugu`
+        : undefined,
+    });
+  }
   return ev;
 }
 
@@ -616,7 +634,7 @@ export async function loadOfficeTimeline(
 ): Promise<TimelineInput> {
   const id = tenant.id;
   const empty = Promise.resolve({ data: [] as never[] });
-  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows, emails, dunning] = await Promise.all([
+  const [audit, platformAudit, invoices, captures, tickets, logins, consents, iys, erasures, profiles, staffRows, emails, messages, dunning] = await Promise.all([
     access.activity
       ? admin.from("audit_logs").select("id, action, actor_id, ip, created_at").eq("tenant_id", id).or(ACCOUNT_AUDIT_OR).order("created_at", { ascending: false }).limit(150)
       : empty,
@@ -641,6 +659,7 @@ export async function loadOfficeTimeline(
     admin.from("profiles").select("id, full_name, created_at").eq("tenant_id", id).order("created_at", { ascending: false }).limit(60),
     admin.from("platform_staff").select("id, full_name").limit(200),
     loadTenantEmailSends(admin, id, 30),
+    loadTenantMessageSends(admin, id, 30),
     // Tahsilat günlüğü: tablo yoksa (migration bekliyor) hata → boş liste.
     access.billing
       ? admin.from("dunning_events").select("id, invoice_id, stage, channel, result, detail, sent_at").eq("tenant_id", id).order("sent_at", { ascending: false }).limit(60)
@@ -669,6 +688,7 @@ export async function loadOfficeTimeline(
     erasures: (erasures.data ?? []) as ErasureRow[],
     profiles: ((profiles.data ?? []) as { id: string; created_at: string }[]).map((p) => ({ id: p.id, created_at: p.created_at })),
     emails,
+    messages,
     dunning: (dunning.data ?? []) as DunningEventRow[],
   };
 }

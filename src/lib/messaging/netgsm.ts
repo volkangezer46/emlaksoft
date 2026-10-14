@@ -21,6 +21,7 @@ import {
   providerAllowedHosts,
 } from "@/lib/integrations/provider-url";
 import { isAmbiguousWhatsAppHttpStatus } from "@/lib/messaging/whatsapp-contract";
+import { withSmsLog, withWhatsAppLog, type MessageLogContext } from "@/lib/messaging/message-log";
 
 const PROVIDER_TIMEOUT_MS = 10_000;
 const WHATSAPP_MAX_RESPONSE_BYTES = 256 * 1024;
@@ -77,18 +78,26 @@ export async function isNetgsmConfigured(): Promise<boolean> {
 // ---------------------------------------------------------------------------
 
 /**
- * Tek alıcıya SMS gönderir.
+ * Tek alıcıya PLATFORM hesabıyla SMS gönderir ve gönderimi günlüğe yazar (`message_sends`, hesap "platform").
  * @param to   Telefon no (başında 0 veya +90 olabilir, normalize edilir)
  * @param text Mesaj metni (max 160 karakter, Türkçe karakter varsa 70)
+ * @param log  Günlük etiketi (akış adı, ilgili ofis, kitle); varsayılan sistem → ofis personeli.
  */
-export async function sendSms(to: string, text: string): Promise<SmsSendResult> {
+export async function sendSms(
+  to: string,
+  text: string,
+  log: MessageLogContext = { source: "system", audience: "office" },
+): Promise<SmsSendResult> {
   const cfg = await getNetgsmConfig();
   if (!cfg) return { ok: false, error: "Netgsm yapılandırılmamış." };
 
-  return sendSmsWithConfig(cfg, to, text);
+  return withSmsLog("platform", log, to, text, () => sendSmsWithConfig(cfg, to, text));
 }
 
-/** Server-only tenant callers can provide an already isolated Netgsm config. */
+/**
+ * Server-only tenant callers can provide an already isolated Netgsm config.
+ * Ham çağrıdır: gönderim günlüğünü (`message_sends`) çağıran `withSmsLog` ile yazar.
+ */
 export async function sendSmsWithConfig(
   cfg: NetgsmConfig,
   to: string,
@@ -204,18 +213,19 @@ export async function getWhatsAppConfig(): Promise<WhatsAppConfig | null> {
 /**
  * WhatsApp mesajı gönderir.
  * Şu an iskelet — gerçek entegrasyon için platform_settings'te
- * whatsapp_api_url + whatsapp_api_token tanımlanmalı.
+ * whatsapp_api_url + whatsapp_api_token tanımlanmalı. Gönderim günlüğe yazılır (hesap "platform").
  */
 export async function sendWhatsApp(
   to: string,
   text: string,
+  log: MessageLogContext = { source: "system", audience: "office" },
 ): Promise<WhatsAppSendResult> {
   const config = await getWhatsAppConfig();
   if (!config) {
     return { ok: false, error: "WhatsApp API yapılandırılmamış." };
   }
 
-  return sendWhatsAppWithConfig(config, to, text);
+  return withWhatsAppLog("platform", log, to, () => sendWhatsAppWithConfig(config, to, text));
 }
 
 export async function sendWhatsAppWithConfig(

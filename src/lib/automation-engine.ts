@@ -333,7 +333,7 @@ async function executeAction(
       case "send_sms": {
         // Resolve tenant-owned credentials before consent, then keep the
         // send-time IYS lookup as the final database operation before network I/O.
-        const sender = await prepareTenantSmsSender(automation.tenant_id);
+        const sender = await prepareTenantSmsSender(automation.tenant_id, { source: "automation", audience: "contact" });
         const recipient = await resolveConsentedMarketingPhone(
           admin,
           automation.tenant_id,

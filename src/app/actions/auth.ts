@@ -296,8 +296,8 @@ export async function signIn(
 
       const message = `EmlakSoft giriş kodunuz: ${code}`;
       const sms = tenantId
-        ? await sendSignerSms(tenantId, profile.phone, message)
-        : await sendSms(profile.phone, message);
+        ? await sendSignerSms(tenantId, profile.phone, message, { source: "login_otp", audience: "office" })
+        : await sendSms(profile.phone, message, { source: "login_otp", audience: "office" });
       if (!sms.ok) {
         console.error("signIn 2fa sms", sms.error);
         await admin.from("login_challenges").delete().eq("user_id", userId);

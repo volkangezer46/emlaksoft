@@ -221,7 +221,7 @@ export async function runRentReminders(input: {
       let ok = false;
       let reason: string | null = null;
       try {
-        const res = await sendTenantSms(rental.tenant_id, phone.stored, text);
+        const res = await sendTenantSms(rental.tenant_id, phone.stored, text, { source: "rent_reminder", audience: "contact" });
         ok = res.ok === true;
         if (!ok) reason = String((res as { code?: string }).code ?? "gonderilemedi").slice(0, 200);
       } catch {

@@ -8,7 +8,7 @@ import { DatabaseView } from "./database-view";
 import { IntegrationsView } from "./integrations-view";
 import { StatusPageView } from "./status-page-view";
 
-type Sp = { sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string };
+type Sp = { sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string; kanal?: string };
 
 /**
  * Sistem durumu görünümleri. Sekme şeridi TEK kaynaktan (src/lib/admin/nav.ts "Sistem durumu" tabs; kabuktaki
@@ -36,7 +36,8 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
  * `?sekme=hatalar` hata listesi (durum/son/sayfa/yayin parametreleri ona aittir).
  * `?sekme=entegrasyonlar` entegrasyon merkezi (DG3): kartlar, anahtar formları (OpenAI, portal API + portal kuralları
  * `#portal-kurallari` — `portal` ve `gorunum` parametreleri ona aittir —, SMS/WhatsApp, EmlakFiyatı `#anahtar-emlakfiyati`),
- * EİDS e-posta alımı, ofis bağlantıları ve webhook günlüğü.
+ * EİDS e-posta alımı, ofis bağlantıları, webhook günlüğü ve SMS/WhatsApp gönderim günlüğü (`#mesaj-gunlugu`; `kanal`, `durum`,
+ * `ofis`, `sayfa` parametreleri ona aittir).
  * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci.
  * `?sekme=durum` kamuya açık /durum sayfasının olay/bakım yönetimi ve sürüm (deploy) geçmişi (DG5).
  * Sekmesiz: sağlık (cron nabzı; `is=<cron işi>` o işin son 30 çalışmasını açar). Kayıt ve bakım ayarları Ayarlar
@@ -52,7 +53,7 @@ export default async function AdminSystemPage({ searchParams }: { searchParams?:
       {active === "hatalar" ? (
         <ErrorsView searchParams={Promise.resolve(sp)} />
       ) : active === "entegrasyonlar" ? (
-        <IntegrationsView portal={sp.portal} portalView={sp.gorunum} />
+        <IntegrationsView portal={sp.portal} portalView={sp.gorunum} messageLog={{ kanal: sp.kanal, durum: sp.durum, ofis: sp.ofis, sayfa: sp.sayfa }} />
       ) : active === "uyarilar" ? (
         <AlertsView filter={sp.olay} />
       ) : active === "kaynaklar" ? (

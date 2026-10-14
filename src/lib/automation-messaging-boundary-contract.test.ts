@@ -15,7 +15,7 @@ describe("automation marketing messaging boundary", () => {
   it("binds SMS to a tenant-owned provider and current exact-channel consent", () => {
     expect(engine).toContain('from "@/lib/messaging/tenant-providers"');
     expect(engine).not.toContain('from "@/lib/messaging/netgsm"');
-    expect(engine).toContain("prepareTenantSmsSender(automation.tenant_id)");
+    expect(engine).toContain('prepareTenantSmsSender(automation.tenant_id, { source: "automation"');
     expect(engine).toContain("resolveConsentedMarketingPhone(");
     // Kanal bazlı izin kararı merkezi İYS kapısındadır (tenant + müşteri + kanal sorgusu, granted ve geri alınmamış kuralı).
     expect(engine).toContain('from "@/lib/iys/gate"');

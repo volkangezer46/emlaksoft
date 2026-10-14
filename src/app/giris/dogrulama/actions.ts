@@ -247,7 +247,8 @@ export async function resendLoginCode(
 
   const tenantId = (profile.tenant_id as string | null) ?? null;
   const text = `EmlakSoft giriş kodunuz: ${code}`;
-  const sms = tenantId ? await sendSignerSms(tenantId, profile.phone, text) : await sendSms(profile.phone, text);
+  const LOGIN_OTP_LOG = { source: "login_otp", audience: "office" } as const;
+  const sms = tenantId ? await sendSignerSms(tenantId, profile.phone, text, LOGIN_OTP_LOG) : await sendSms(profile.phone, text, LOGIN_OTP_LOG);
   if (!sms.ok) {
     console.error("resendLoginCode sms", sms.error);
     return { error: "SMS gönderilemedi. Lütfen tekrar deneyin." };

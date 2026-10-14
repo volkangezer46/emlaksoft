@@ -464,8 +464,13 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
             detail = r.ok ? null : r.code === "disabled" ? `kanal kapalı: ${r.error}` : r.error;
           }
         } else if (owner.phone) {
-          const { sendSmsWithConfig } = await import("@/lib/messaging/netgsm");
-          const r = await sendSmsWithConfig(smsCfg!, owner.phone, j.body.slice(0, 300));
+          const [{ sendSmsWithConfig }, { withSmsLog }] = await Promise.all([import("@/lib/messaging/netgsm"), import("@/lib/messaging/message-log")]);
+          const phone = owner.phone;
+          const text = j.body.slice(0, 300);
+          // SMS/WhatsApp günlüğü (SN3): ofise giden tahsilat SMS'i Ofis 360 "İletişim"te görünür.
+          const r = await withSmsLog("platform", { source: "dunning", tenantId: j.tenantId, audience: "office" }, phone, text, () =>
+            sendSmsWithConfig(smsCfg!, phone, text),
+          );
           result = r.ok ? "sent" : "failed";
           detail = r.ok ? null : (r.error ?? r.code ?? "SMS gönderilemedi");
         }
