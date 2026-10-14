@@ -19,6 +19,7 @@ import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { AccountFormButton, ArchiveAccountButton, TransferButton } from "../accounts-panel";
 import { AccountSparkline, dailyBalanceSeries, type DayMove } from "../kasa-banka/account-sparkline";
 import { ReconcileQueue, type QueueItem } from "../kasa-banka/reconcile-queue";
+import { loadMovesForAccounts } from "../kasa-banka/moves";
 import { loadFinanceRules, StatementReview } from "../statement-review";
 import { StatementUploadButton } from "../statement-upload";
 import { FINANCE_BASE } from "./finance-shell";
@@ -194,41 +195,11 @@ async function AccountsBoard({
   );
 }
 
-/**
- * Son 30 günün (ve ileri tarihli) hareketleri, çizgi için. Hesap başına paralel sorgu ve hesap başına tavan: tek ortak
- * sınır yoğun bir hesabın diğerlerini kesmesine yol açardı. Tavanı aşan hesap `null` döner (çizgi çizilmez, yanlış çizilmez).
- * İleri tarihli hareketler de gelir: bakiye onları içerir, seri onları başlangıçtan düşer (dailyBalanceSeries).
- */
-const MOVES_CAP = 2000;
+/** Son 30 günün hareketleri: hesap sayısından bağımsız tek sorgu (bkz. `../kasa-banka/moves.ts`). */
 async function loadMoves(supabase: SupabaseClient, accountIds: readonly string[], since: string): Promise<Map<string, DayMove[] | null>> {
-  const out = new Map<string, DayMove[] | null>();
-  if (accountIds.length === 0) return out;
-  const results = await Promise.all(
-    accountIds.map(async (id) => {
-      const { data, error } = await supabase
-        .from("cash_entries")
-        .select("direction, amount, entry_date")
-        .eq("account_id", id)
-        .is("voided_at", null)
-        .gte("entry_date", since)
-        .limit(MOVES_CAP + 1);
-      return { id, data, error };
-    }),
-  );
-  for (const { id, data, error } of results) {
-    if (error) {
-      if (!isMissingCashSchema(error)) console.error("loadMoves", { code: error.code });
-      out.set(id, null);
-      continue;
-    }
-    const rows = (data ?? []) as Record<string, unknown>[];
-    if (rows.length > MOVES_CAP) {
-      out.set(id, null);
-      continue;
-    }
-    out.set(id, rows.map((r) => ({ date: String(r.entry_date), direction: r.direction === "in" ? "in" : "out", amount: Number(r.amount ?? 0) })));
-  }
-  return out;
+  const { moves, error } = await loadMovesForAccounts(supabase, accountIds, since);
+  if (error && !isMissingCashSchema(error)) console.error("loadMoves", { message: error.message });
+  return moves;
 }
 
 /** Döviz -> TL (TCMB satış kuru, tcmb_rates). Kur yoksa null: uydurma kur kullanılmaz. */

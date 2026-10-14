@@ -28,7 +28,9 @@ import {
 import { MapView } from "./map-view-lazy";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
-import { loadPortfolioCounts, portfolioCountsKnownMissing } from "@/lib/supabase/count-rpcs";
+import { loadPortfolioCounts } from "@/lib/supabase/count-rpcs";
+import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { loadShellBootstrap } from "@/lib/app-shell/bootstrap";
 import { requireModulePage } from "@/lib/require-module-page";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
@@ -101,6 +103,7 @@ type PropertyRow = {
   province: { name: string } | { name: string }[] | null;
   district: { name: string } | { name: string }[] | null;
   portal_listings: { portal_name: string; status: string; last_confirmed_at: string | null }[] | null;
+  cover: { id: string }[] | { id: string } | null;
 };
 
 type MapRow = {
@@ -182,6 +185,26 @@ const PAGER_BTN_DISABLED =
 
 const PATH = "/app/portfoyler";
 
+/**
+ * Liste kapsamını sayfa kapısını beklemeden başlatır (kimlik + rol + ofis istek-içi önbellekli kabuk RPC'sinden).
+ * Impersonation / kabuk yok / hata → null (çağıran kapının sonucuyla okur). Yalnız okuma; kapı reddederse sonuç atılır.
+ */
+async function earlyListScope(): Promise<{
+  input: { userId: string; tenantId: string; role: string };
+  scope: Awaited<ReturnType<typeof getListScope>>;
+} | null> {
+  try {
+    const user = await getRequestUser();
+    if (!user || user.app_metadata?.impersonating) return null;
+    const boot = await loadShellBootstrap();
+    if (!boot || boot.profile.id !== user.id) return null;
+    const input = { userId: user.id, tenantId: boot.profile.tenantId, role: boot.profile.role };
+    return { input, scope: await getListScope(input) };
+  } catch {
+    return null;
+  }
+}
+
 export default async function PropertiesPage({
   searchParams,
 }: {
@@ -214,9 +237,16 @@ export default async function PropertiesPage({
     yetki?: string;
   }>;
 }) {
-  const { perms, tenantId, userId, role } = await requireModulePage("properties");
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
-  const [listScope, sp0] = await Promise.all([getListScope({ userId, tenantId, role }), searchParams]);
+  // Kapsam okuması sayfa kapısıyla AYNI turda başlar: kimlik/rol/ofis istek-içi önbellekli kabuk RPC'sinden
+  // (`loadShellBootstrap`, kapı da aynısını kullanır) gelir. Kapının sonucu farklı çıkarsa (personel, impersonation,
+  // kabuk yok) erken sonuç atılır ve kapsam kapının kimliğiyle yeniden okunur. Kapı reddederse yönlendirme önce gelir.
+  const earlyScopeP = earlyListScope();
+  const [{ perms, tenantId, userId, role }, early, sp0] = await Promise.all([requireModulePage("properties"), earlyScopeP, searchParams]);
+  const listScope =
+    early && early.input.userId === userId && early.input.tenantId === tenantId && early.input.role === role
+      ? early.scope
+      : await getListScope({ userId, tenantId, role });
   const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   const canCreate = (perms.properties ?? []).includes("create");
   const canEditProperty = (perms.properties ?? []).includes("edit");
@@ -336,14 +366,18 @@ export default async function PropertiesPage({
   const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customPre?.active;
 
   const LIST_COLS =
-    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at)";
+    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at), cover:property_media!property_media_property_id_fkey(id)";
   const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
 
   // Liste/Kart görünümleri sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
   const listQuery =
     view !== "harita"
       ? (() => {
-          const base = buildFilteredQuery(LIST_COLS);
+          // Kapak görseli listeye GÖMÜLÜ gelir (aynı istek; eskiden liste bitince ayrı property_media turu).
+          const base = buildFilteredQuery(LIST_COLS)
+            .eq("cover.kind", "image")
+            .eq("cover.is_cover", true)
+            .limit(1, { referencedTable: "cover" });
           const ordered =
             siralaF === "eski"
               ? base.order("created_at", { ascending: true })
@@ -364,80 +398,47 @@ export default async function PropertiesPage({
           .limit(MAP_LIMIT)
       : Promise.resolve({ data: null, count: null });
 
-  // Liste promise'i bir kez başlatılır; kapak sorgusu liste biter bitmez DİĞER sorgularla
-  // paralel koşar (eskiden tüm Promise.all'dan sonra seri çalışıyordu).
   const listP = Promise.resolve(listQuery);
-  const coversP = listP.then(async (res) => {
-    const ids = ((res.data ?? []) as unknown as PropertyRow[]).map((p) => p.id);
-    if (ids.length === 0) return [] as { id: string; property_id: string }[];
-    const { data: covers, error: coversError } = await supabase
-      .from("property_media")
-      .select("id, property_id")
-      .in("property_id", ids)
-      .eq("kind", "image")
-      .eq("is_cover", true);
-    if (coversError) throw new Error(`Portföyler verileri eksik yüklendi (covers:${coversError.code ?? "?"}).`);
-    return (covers ?? []) as { id: string; property_id: string }[];
-  });
 
-  // KPI sayımları: portfolio_counts RPC'si tek taramada (FILTER) döner; RPC yoksa/hata verirse eski head-count
-  // sorgularına düşülür (bilinen-yok iken sorgular aynı turda başlar, aksi halde yalnız RPC yoksa ikinci turda).
+  // KPI sayımları: portfolio_counts RPC'si tek taramada (FILTER) döner (20261012002200, canlıda uygulandı). RPC hata
+  // verirse sayılar bilinmiyor (null) kalır; ikinci tur head-count yapılmaz.
   const rpcCountArgs = {
     scope: listScope.filter,
     live: STATUS_DB_VALUES.live, pending: STATUS_DB_VALUES.pending, draft: STATUS_DB_VALUES.draft,
     green: SAGLIK_DB_VALUES.iyi, yellow: SAGLIK_DB_VALUES.izle, red: SAGLIK_DB_VALUES.riskli,
     recentSince: daysAgoIso(28),
   };
-  const useRpcCounts = !portfolioCountsKnownMissing();
-  // Sağlık dağılımı yalnız kapsam dışı süzgeç yoksa RPC'den gelir (q/durum/kategori... bağlamı RPC'de yok).
-  const healthFromRpc = useRpcCounts && !statusValues && !qOrClause && !kategoriF && !addedSince && !danismanF
+  // Sağlık dağılımı süzgeçsizken RPC'den gelir; kapsam dışı süzgeç (q/durum/kategori...) varken o bağlamda sayılır
+  // (RPC'de bu süzgeçler yok): sağlık değeri başına bir head-count.
+  const healthFromRpc = !statusValues && !qOrClause && !kategoriF && !addedSince && !danismanF
     && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customPre?.active;
   type CountOnly = { count: number | null };
   const none: Promise<CountOnly> = Promise.resolve({ count: null });
-  const headScoped = () => scoped(supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null));
-  const legacyKpi = () => ({
-    total: headScoped(),
-    live: headScoped().in("status", STATUS_DB_VALUES.live),
-    recent: headScoped().gte("created_at", daysAgoIso(28)),
-    pending: headScoped().in("status", STATUS_DB_VALUES.pending),
-    draft: headScoped().in("status", STATUS_DB_VALUES.draft),
-    sale: headScoped().eq("transaction_type", "Satılık"),
-    rent: headScoped().eq("transaction_type", "Kiralık"),
-  });
-  const legacyHealth = () => ({
-    green: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
-    yellow: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
-    red: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
-  });
-  const legacyKpiNow = useRpcCounts ? null : legacyKpi();
-  const legacyHealthNow = healthFromRpc ? null : legacyHealth();
+  const contextHealth = healthFromRpc
+    ? null
+    : {
+        green: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.iyi),
+        yellow: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.izle),
+        red: buildBaseQuery("id", { count: "exact", head: true }).in("price_health", SAGLIK_DB_VALUES.riskli),
+      };
 
   const [
     { data },
     { data: mapData, count: mapLocatedTotal },
     { count: filteredTotal },
     fxRates,
-    { count: totalCountQ },
-    { count: liveCountQ },
     { count: portalCount },
     { count: greenCountQ },
     { count: yellowCountQ },
     { count: redCountQ },
-    { count: recentCountQ },
     { data: scanRows },
     typeDefs,
     savedViews,
-    coverRows,
-    { count: pendingCountQ },
-    { count: draftCountQ },
-    { count: saleCountQ },
-    { count: rentCountQ },
     rpcCounts,
   ] = await batchAll("Portföyler", [
-    "properties", "properties-map", "properties-filtered-total", "fx-rates", "properties-total", "properties-live",
-    "portal-live", "health-green", "health-yellow", "health-red", "properties-recent", "properties-scan",
-    "property-types", "saved-views", "covers", "properties-pending", "properties-draft", "properties-sale", "properties-rent",
-    "portfolio-counts-rpc",
+    "properties", "properties-map", "properties-filtered-total", "fx-rates",
+    "portal-live", "health-green", "health-yellow", "health-red", "properties-scan",
+    "property-types", "saved-views", "portfolio-counts-rpc",
   ], [
     listP,
     mapQuery,
@@ -449,17 +450,11 @@ export default async function PropertiesPage({
       : buildFilteredQuery("id", { count: "exact", head: true }),
     // TCMB kuru — yoksa null döner ve döviz satırı hiç basılmaz (uydurma kur yok).
     fetchLatestRates(supabase),
-    // KPI sayıları — liste artık sayfalı olduğundan head-count sorgularıyla
-    // gerçek toplamlar çekilir (satır taşımaz, yalnızca sayım döner).
-    legacyKpiNow ? legacyKpiNow.total : none,
-    legacyKpiNow ? legacyKpiNow.live : none,
     supabase.from("portal_listings").select("id", { count: "exact", head: true }).eq("status", "live"),
-    // Sağlık dağılımı — aktif q+durum bağlamında (sağlık HARİÇ) gerçek sayımlar
-    legacyHealthNow ? legacyHealthNow.green : none,
-    legacyHealthNow ? legacyHealthNow.yellow : none,
-    legacyHealthNow ? legacyHealthNow.red : none,
-    // Son 4 haftada eklenen (KPI) — ?eklenen=28 hedefiyle aynı koşul.
-    legacyKpiNow ? legacyKpiNow.recent : none,
+    // Sağlık dağılımı — aktif q+durum bağlamında (sağlık HARİÇ) gerçek sayımlar (süzgeçsizken RPC'den).
+    contextHealth ? contextHealth.green : none,
+    contextHealth ? contextHealth.yellow : none,
+    contextHealth ? contextHealth.red : none,
     // Tek hafif tarama: portföy değeri + tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt).
     scoped(supabase
       .from("properties")
@@ -469,36 +464,16 @@ export default async function PropertiesPage({
       .limit(SCAN_LIMIT),
     getDefinitionsOrDefault("property_type"),
     savedViewsPromise,
-    coversP,
-    // Grafik: durum dağılımı (yayında + toplam zaten yukarıda) ve işlem türü — kapsamlı gerçek sayımlar.
-    legacyKpiNow ? legacyKpiNow.pending : none,
-    legacyKpiNow ? legacyKpiNow.draft : none,
-    legacyKpiNow ? legacyKpiNow.sale : none,
-    legacyKpiNow ? legacyKpiNow.rent : none,
-    useRpcCounts ? loadPortfolioCounts(supabase, rpcCountArgs) : Promise.resolve(null),
+    // KPI + grafik sayıları (toplam, yayında, bekleyen, taslak, satılık, kiralık, son 4 hafta, sağlık) tek RPC turu.
+    loadPortfolioCounts(supabase, rpcCountArgs),
   ]);
 
-  // RPC denendi ve başarısızsa (yoksa/hata) eski sayımlar ikinci turda çalışır; aksi halde RPC değerleri kullanılır.
-  let kpi: Record<"total" | "live" | "recent" | "pending" | "draft" | "sale" | "rent", number | null>;
-  let health: Record<"green" | "yellow" | "red", number | null>;
-  if (rpcCounts) {
-    kpi = { total: rpcCounts.total, live: rpcCounts.live, recent: rpcCounts.recent, pending: rpcCounts.pending, draft: rpcCounts.draft, sale: rpcCounts.sale, rent: rpcCounts.rent };
-    health = healthFromRpc
-      ? { green: rpcCounts.green, yellow: rpcCounts.yellow, red: rpcCounts.red }
-      : { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
-  } else if (!legacyKpiNow) {
-    const l = legacyKpi();
-    const h = healthFromRpc ? legacyHealth() : null;
-    const [t, lv, rc, pe, dr, sa, re, hg, hy, hr] = await batchAll("Portföyler", [
-      "properties-total", "properties-live", "properties-recent", "properties-pending", "properties-draft", "properties-sale", "properties-rent",
-      "health-green", "health-yellow", "health-red",
-    ], [l.total, l.live, l.recent, l.pending, l.draft, l.sale, l.rent, h ? h.green : none, h ? h.yellow : none, h ? h.red : none]);
-    kpi = { total: t.count, live: lv.count, recent: rc.count, pending: pe.count, draft: dr.count, sale: sa.count, rent: re.count };
-    health = h ? { green: hg.count, yellow: hy.count, red: hr.count } : { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
-  } else {
-    kpi = { total: totalCountQ, live: liveCountQ, recent: recentCountQ, pending: pendingCountQ, draft: draftCountQ, sale: saleCountQ, rent: rentCountQ };
-    health = { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
-  }
+  const kpi: Record<"total" | "live" | "recent" | "pending" | "draft" | "sale" | "rent", number | null> = rpcCounts
+    ? { total: rpcCounts.total, live: rpcCounts.live, recent: rpcCounts.recent, pending: rpcCounts.pending, draft: rpcCounts.draft, sale: rpcCounts.sale, rent: rpcCounts.rent }
+    : { total: null, live: null, recent: null, pending: null, draft: null, sale: null, rent: null };
+  const health: Record<"green" | "yellow" | "red", number | null> = healthFromRpc
+    ? { green: rpcCounts?.green ?? null, yellow: rpcCounts?.yellow ?? null, red: rpcCounts?.red ?? null }
+    : { green: greenCountQ, yellow: yellowCountQ, red: redCountQ };
   const totalCount = kpi.total;
   const liveCount = kpi.live;
   const recentCount = kpi.recent;
@@ -512,7 +487,8 @@ export default async function PropertiesPage({
 
   const customFilter = customPre ?? (await customFilterP);
   const rows = (data ?? []) as unknown as PropertyRow[];
-  const totalFilteredCount = (filtersEmpty ? totalCount : filteredTotal) ?? 0;
+  // Sayım okunamadıysa (RPC hatası) görünen satırlardan alt sınır: liste "sonuç yok" demez, sayfalama çökmez.
+  const totalFilteredCount = (filtersEmpty ? totalCount : filteredTotal) ?? (rows.length > 0 ? offset + rows.length : 0);
   const totalPages = Math.max(1, Math.ceil(totalFilteredCount / PAGE_SIZE));
   const rangeStart = totalFilteredCount === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + rows.length, totalFilteredCount);
@@ -533,11 +509,11 @@ export default async function PropertiesPage({
       ? bucketByWeek(scan.map((r) => r.created_at), nowMs, TREND_WEEKS)
       : undefined;
 
-  // Kapak görselleri — tek ek sorgu; property_id -> media id eşlemesi.
-  // Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
+  // Kapak görselleri — listeye gömülü (property_id -> media id). Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
   const coverByProperty = new Map<string, string>();
-  for (const cover of coverRows) {
-    if (!coverByProperty.has(cover.property_id)) coverByProperty.set(cover.property_id, cover.id);
+  for (const p of rows) {
+    const first = Array.isArray(p.cover) ? p.cover[0] : p.cover;
+    if (first?.id) coverByProperty.set(p.id, first.id);
   }
 
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).

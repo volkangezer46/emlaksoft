@@ -197,9 +197,11 @@ describe("üyelik kararı (resolveMemberships)", () => {
     expect(step.isDone({ ...facts, extra: { "portal-uyelik": true } })).toBe(true);
     expect(step.isDone({ ...facts, extra: { "portal-uyelik": false }, publishedProperties: 3 })).toBe(false);
     expect(step.isDone({ ...facts, publishedProperties: 3 })).toBe(true);
-    const state = readFileSync(join(ROOT, "src/lib/onboarding-state.ts"), "utf8");
+    // Kurulum olguları: tek tur RPC (onboarding_snapshot) + RPC yokken eski sorgu; ikisi de yalnız sahibin beyanını sayar.
+    const state = readFileSync(join(ROOT, "src/lib/onboarding-snapshot-core.ts"), "utf8");
     expect(state).toContain('.eq("source", "owner_declared")');
-    expect(state).toContain("PORTAL_MEMBERSHIP_EDITOR_ROLES.has(viewerRole)");
+    expect(state).toContain("PORTAL_MEMBERSHIP_EDITOR_ROLES.has(raw.viewerRole)");
+    expect(readFileSync(join(ROOT, "supabase/migrations/20261015021000_onboarding_snapshot_rpc.sql"), "utf8")).toContain("tpa.source = 'owner_declared'");
     expect([...PORTAL_MEMBERSHIP_EDITOR_ROLES].sort()).toEqual(["gm", "owner"]);
   });
 

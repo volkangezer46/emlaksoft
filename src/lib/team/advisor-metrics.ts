@@ -43,6 +43,7 @@ import { conversionPct, targetProgressPct } from "@/lib/team/scorecard";
 import { computeTargetActuals, targetPeriodRange, type TargetLike } from "@/lib/team/target-actuals";
 import { summarizeByAdvisor } from "@/lib/response-time/core";
 import { loadLeadResponses } from "@/lib/response-time/load";
+import { recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
 
 export const METRIC_ROLES = ["owner", "gm", "branch_manager", "team_lead", "advisor"] as const;
 export const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
@@ -50,7 +51,6 @@ export const LIVE_PROPERTY_STATUSES = ["live", "Yayında"];
 const PROFILE_LIMIT = 200;
 const SCAN_LIMIT = 10_000;
 const COMMISSION_LIMIT = 5_000;
-const HEAD_COUNT_MAX_ADVISORS = 80;
 
 /* -------------------------------------------------------------------------- */
 /* Dönem yardımcıları (TR takvimi)                                             */
@@ -450,6 +450,45 @@ type Q = any;
 const asRows = (res: { data: unknown } | null | undefined): Row[] =>
   res && Array.isArray(res.data) ? (res.data as Row[]) : [];
 
+export const ADVISOR_COUNTS_RPC = "advisor_counts";
+
+/**
+ * `advisor_counts` RPC'si (20261015020000, SECURITY INVOKER): danışman başına atanmış silinmemiş müşteri ve yayındaki
+ * portföy sayısı tek turda. RPC yoksa/hata verirse `null` (çağıran tek taramaya düşer; sahte sıfır üretilmez).
+ * Örnek veri ve kiracı süzgeci istemci yoluyla aynıdır (`sample.apply` = is_sample=false, `tq` = tenant_id).
+ */
+export async function loadAdvisorCountsRpc(
+  supabase: Pick<SupabaseClient, "rpc">,
+  ids: readonly string[],
+  opts: { tenantId: string | null; includeSample: boolean },
+): Promise<[Map<string, number>, Map<string, number>] | null> {
+  if (ids.length === 0) return [new Map(), new Map()];
+  if (rpcKnownMissing(ADVISOR_COUNTS_RPC)) return null;
+  try {
+    const res = await supabase.rpc(ADVISOR_COUNTS_RPC, {
+      p_ids: [...new Set(ids)],
+      p_tenant_id: opts.tenantId,
+      p_include_sample: opts.includeSample,
+      p_live_statuses: LIVE_PROPERTY_STATUSES,
+    });
+    recordRpcOutcome(ADVISOR_COUNTS_RPC, res.error);
+    if (res.error || !Array.isArray(res.data)) return null;
+    const customers = new Map<string, number>();
+    const live = new Map<string, number>();
+    for (const row of res.data as { profile_id?: unknown; customers?: unknown; live_properties?: unknown }[]) {
+      if (typeof row.profile_id !== "string") return null;
+      const c = Number(row.customers);
+      const p = Number(row.live_properties);
+      if (!Number.isFinite(c) || !Number.isFinite(p)) return null;
+      if (c > 0) customers.set(row.profile_id, c);
+      if (p > 0) live.set(row.profile_id, p);
+    }
+    return [customers, live];
+  } catch {
+    return null;
+  }
+}
+
 export async function loadAdvisorMetrics(
   supabase: SupabaseClient,
   opts: LoadAdvisorMetricsOptions,
@@ -507,21 +546,11 @@ export async function loadAdvisorMetrics(
     if (rows.length >= SCAN_LIMIT) partial = true;
   };
 
-  // Kişi başına sayım: küçük ekipte head count (satır taşımaz), büyükte tek tarama.
-  const countPerAdvisor = async (table: string, col: string, refine: (q: Q) => Q): Promise<Map<string, number>> => {
+  // Kişi başına müşteri / yayındaki portföy sayımı: `advisor_counts` RPC'si iki tabloyu kimlik listesine göre TEK turda
+  // sayar (eskiden küçük ekipte danışman başına 2 head-count isteği: 10 danışmanda 20 tur). RPC yoksa (migration
+  // uygulanmadı) ya da hata verirse tablo başına tek tarama (2 istek) yapılır; danışman başına istek atılmaz.
+  const scanPerAdvisor = async (table: string, col: string, refine: (q: Q) => Q): Promise<Map<string, number>> => {
     const out = new Map<string, number>();
-    if (ids.length === 0) return out;
-    if (ids.length <= HEAD_COUNT_MAX_ADVISORS) {
-      const counts = await Promise.all(
-        ids.map(async (id) => {
-          const r = await refine(tsq(supabase.from(table).select("id", { count: "exact", head: true }))).eq(col, id);
-          if (r.error) failed = true;
-          return [id, r.count ?? 0] as const;
-        }),
-      );
-      for (const [id, n] of counts) if (n > 0) out.set(id, n);
-      return out;
-    }
     const r = await refine(tsq(supabase.from(table).select(col))).not(col, "is", null).limit(SCAN_LIMIT);
     if (r.error) failed = true;
     const data = (r.data ?? []) as Row[];
@@ -531,6 +560,15 @@ export async function loadAdvisorMetrics(
       if (id && idSet.has(id)) out.set(id, (out.get(id) ?? 0) + 1);
     }
     return out;
+  };
+  const advisorCounts = async (): Promise<[Map<string, number>, Map<string, number>]> => {
+    if (ids.length === 0) return [new Map(), new Map()];
+    const viaRpc = await loadAdvisorCountsRpc(supabase, ids, { tenantId: tenantId || null, includeSample: sample.include });
+    if (viaRpc) return viaRpc;
+    return Promise.all([
+      scanPerAdvisor("customers", "assigned_to", (q) => q.is("deleted_at", null)),
+      scanPerAdvisor("properties", "assigned_to", (q) => q.is("deleted_at", null).in("status", LIVE_PROPERTY_STATUSES)),
+    ]);
   };
 
   const monthKey = period.startDateKey;
@@ -546,8 +584,7 @@ export async function loadAdvisorMetrics(
     : Promise.resolve({ rows: [] as MetricsCommission[], error: false, partial: false });
 
   const [
-    customerTotals,
-    liveProperties,
+    [customerTotals, liveProperties],
     newCustRes,
     callRes,
     apptRes,
@@ -557,8 +594,7 @@ export async function loadAdvisorMetrics(
     demandRes,
     taskRes,
   ] = await Promise.all([
-    countPerAdvisor("customers", "assigned_to", (q) => q.is("deleted_at", null)),
-    countPerAdvisor("properties", "assigned_to", (q) => q.is("deleted_at", null).in("status", LIVE_PROPERTY_STATUSES)),
+    advisorCounts(),
     ids.length
       ? scan(
           tsq(supabase.from("customers").select("assigned_to").is("deleted_at", null)).gte("created_at", period.startIso).lt("created_at", period.endIso).not("assigned_to", "is", null),
