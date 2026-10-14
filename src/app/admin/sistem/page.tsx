@@ -7,8 +7,13 @@ import { ResourcesView } from "./resources-view";
 import { DatabaseView } from "./database-view";
 import { IntegrationsView } from "./integrations-view";
 import { StatusPageView } from "./status-page-view";
+import { DataExplorerView } from "./data-explorer-view";
 
-type Sp = { sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string };
+// Veri gezgini sütun süzgeçleri `f_<sütun>` adlarıyla gelir (açık uçlu; yalnız kayıttaki sütunlar yorumlanır).
+type Sp = { sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string } & Record<
+  string,
+  string | undefined
+>;
 
 /**
  * Sistem durumu görünümleri. Sekme şeridi TEK kaynaktan (src/lib/admin/nav.ts "Sistem durumu" tabs; kabuktaki
@@ -22,6 +27,7 @@ const VIEWS = {
   durum: "Durum sayfası",
   kaynaklar: "Sunucu kaynakları",
   veritabani: "Veritabanı",
+  veri: "Veri gezgini",
 } as const;
 type ViewId = keyof typeof VIEWS;
 
@@ -38,14 +44,23 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
  * `#portal-kurallari` — `portal` ve `gorunum` parametreleri ona aittir —, SMS/WhatsApp, EmlakFiyatı `#anahtar-emlakfiyati`),
  * EİDS e-posta alımı, ofis bağlantıları ve webhook günlüğü.
  * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci.
+ * `?sekme=veri` salt okunur veri gezgini (SN4; `tablo/ofis/f_<sütun>/bas/bit/sayfa/kayit`). Kapısı `sistem` DEĞİL, kendi
+ * `veri` modülüdür (varsayılan yalnız süper admin; başka personel özel rolle).
  * `?sekme=durum` kamuya açık /durum sayfasının olay/bakım yönetimi ve sürüm (deploy) geçmişi (DG5).
  * Sekmesiz: sağlık (cron nabzı; `is=<cron işi>` o işin son 30 çalışmasını açar). Kayıt ve bakım ayarları Ayarlar
  * merkezindedir (`/admin/ayarlar?kategori=kayit-bakim`).
  */
 export default async function AdminSystemPage({ searchParams }: { searchParams?: Promise<Sp> }) {
-  await requirePlatformModule("sistem");
   const sp = (await searchParams) ?? {};
   const active = viewOf(sp.sekme);
+  if (active === "veri") {
+    return (
+      <div className="space-y-6">
+        <DataExplorerView params={sp} />
+      </div>
+    );
+  }
+  await requirePlatformModule("sistem");
 
   return (
     <div className="space-y-6">

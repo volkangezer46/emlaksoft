@@ -237,9 +237,9 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       {
         href: "/admin/sistem", core: true,
         label: "Sistem durumu",
-        description: "Sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı ve aktivite",
+        description: "Sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı, veri gezgini ve aktivite",
         icon: Radar,
-        modules: ["sistem", "activity"],
+        modules: ["sistem", "activity", "veri"],
         match: ["/admin/aktivite"],
         tabs: [
           L("/admin/sistem", "Sağlık", "Cron nabzı, veritabanı, yedek ve şema", ["sistem"]),
@@ -249,6 +249,8 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/sistem?sekme=durum", "Durum sayfası", "Kamuya açık /durum: olay, planlı bakım, erişilebilirlik; sürüm geçmişi", ["sistem"]),
           L("/admin/sistem?sekme=kaynaklar", "Kaynaklar", "Sunucu kaynakları ve depolama", ["sistem"]),
           L("/admin/sistem?sekme=veritabani", "Veritabanı", "Tablo boyutları, bağlantılar ve yavaş sorgular", ["sistem"]),
+          // SN4: kendi modülü (`veri`) var; varsayılan yalnız süper admin, başka personel yalnız özel rolle görür.
+          L("/admin/sistem?sekme=veri", "Veri gezgini", "İzinli tablolarda salt okunur arama: ofis ve sütun süzgeci, maskeli kişisel veri, denetim izli", ["veri"]),
           L("/admin/aktivite", "Aktivite", "Denetim izi", ["activity"]),
         ],
       },

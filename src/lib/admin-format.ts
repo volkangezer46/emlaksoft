@@ -71,6 +71,9 @@ export function auditActionLabel(action: string): string {
     "error_log.reopen":                 "Hata kaydı yeniden açıldı",
     "error_log.bulk_resolve":           "Hatalar toplu çözüldü",
     "activity.export":                  "Aktivite kaydı dışa aktarıldı",
+    // SN4: salt okunur veri gezgini (her görüntüleme)
+    "data_explorer.list":               "Veri gezgininde tablo görüntülendi",
+    "data_explorer.record":             "Veri gezgininde kayıt görüntülendi",
     // Entegrasyon anahtarları
     "integration.netgsm.save":    "Netgsm bilgileri kaydedildi",
     "integration.netgsm.clear":   "Netgsm bilgileri silindi",
