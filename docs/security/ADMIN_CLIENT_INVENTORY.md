@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **576** (292 dosya) — risk: P0=16, P1=44, P2=516
-- Tenant filtresi: var=296, uygulanamaz=186, yok=61, param=21, devir=12
-- Kapı türü: public-token=35, dosya-duzeyi=157, platform=114, belirsiz=134, elle-dogrulandi=26, oturum-izin=83, cron=24, webhook-imza=3
+- Toplam birim: **577** (293 dosya) — risk: P0=16, P1=44, P2=517
+- Tenant filtresi: var=297, uygulanamaz=186, yok=61, param=21, devir=12
+- Kapı türü: public-token=35, dosya-duzeyi=157, platform=114, belirsiz=135, elle-dogrulandi=26, oturum-izin=83, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **67**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -533,6 +533,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/growth/store.ts:159` | `recordSignupAttributionSafe` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/help-center/store.ts:22` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/integrations/einvoice/server-writes.ts:24` | `writeEInvoiceResult` | Gerekçe doğrulanmadı. | dosya-duzeyi | param | P2 |
+| `src/lib/integrations/einvoice/service.ts:142` | `getConnectionInfo` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/lead-intake.ts:103` | `intakeLead` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/lib/legal-constants/store.ts:17` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/legal-docs/store.ts:18` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |

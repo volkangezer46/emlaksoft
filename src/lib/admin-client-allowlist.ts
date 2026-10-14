@@ -511,6 +511,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/growth/store.ts", fn: "recordSignupAttributionSafe", calls: 1, tenantFilter: "var" },
   { file: "src/lib/help-center/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/integrations/einvoice/server-writes.ts", fn: "writeEInvoiceResult", calls: 1, tenantFilter: "param" },
+  { file: "src/lib/integrations/einvoice/service.ts", fn: "getConnectionInfo", calls: 1, tenantFilter: "var" },
   { file: "src/lib/lead-intake.ts", fn: "intakeLead", calls: 1, tenantFilter: "var" },
   { file: "src/lib/legal-constants/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/legal-docs/store.ts", fn: "db", calls: 1, tenantFilter: "uygulanamaz" },

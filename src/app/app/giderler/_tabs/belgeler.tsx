@@ -145,7 +145,7 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
     return (
       <div className="flex flex-col gap-4">
         <SubviewChips active="fatura" />
-        <FaturalarTab perms={perms} params={fp} embedded />
+        <FaturalarTab tenantId={tenantId} perms={perms} params={fp} embedded />
       </div>
     );
   }

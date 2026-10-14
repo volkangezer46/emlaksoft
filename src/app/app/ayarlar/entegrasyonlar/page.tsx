@@ -96,7 +96,7 @@ export default async function EntegrasyonlarPage() {
         );
       })}
 
-      <EInvoiceCard canEdit={canEditSettings} />
+      <EInvoiceCard tenantId={tenantId} canEdit={canEditSettings} />
 
       <p className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
         Kurulum gerekli durumundaki bağlantılar için kimlik bilgileri ve sağlayıcı doğrulaması tamamlanmalıdır. “Planlandı”
