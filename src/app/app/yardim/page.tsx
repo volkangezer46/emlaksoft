@@ -11,6 +11,9 @@ import { loadOnboardingState } from "../_home/data";
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
 import { boardEnabledFor } from "@/lib/product-feedback/store";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
+import { loadOnboardingContent } from "@/lib/onboarding-content-read";
+import { resolveTours } from "@/lib/onboarding-content";
+import { createClient } from "@/lib/supabase/server";
 import { FaqSearch, GuidesSearch } from "./help-search";
 import { FeatureBoardTab } from "./feature-board";
 
@@ -37,7 +40,7 @@ function tabHref(tab: HelpTab) {
  * Öneri panosu (DG8): ofisler özellik önerir ve oy verir (ofis başına tek oy); EmlakSoft durumu günceller.
  */
 export default async function HelpPage({ searchParams }: { searchParams?: Promise<{ sekme?: string; q?: string; durum?: string }> }) {
-  const [{ tenantId, perms }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
+  const [{ tenantId, perms, role }, sp, help] = await Promise.all([requireModulePage("support"), searchParams, getHelpContent()]);
   // Öneri panosu (DG8) hedeflenebilir bayraktır: kapalı/hedef dışı ofiste sekme görünmez, adres Başlangıç'a düşer.
   const boardOn = tenantId ? await boardEnabledFor(tenantId).catch(() => false) : false;
   const tabs = boardOn ? PAGE_TABS : PAGE_TABS.filter((t) => t.id !== "oneriler");
@@ -62,7 +65,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
         ))}
       </nav>
 
-      {tab === "baslangic" ? <TourPicker /> : null}
+      {tab === "baslangic" ? <TourPickerSection tenantId={tenantId} role={role} /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
       {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
@@ -164,4 +167,29 @@ function GlossaryTab({ glossary }: { glossary: readonly GlossaryEntry[] }) {
       </dl>
     </section>
   );
+}
+
+/** Tur kartları: adminden düzenlenen ad/açıklama (Ofisler > Kurulum > İçerik); okunamazsa koddaki varsayılan. */
+/**
+ * Tur kartları, turun açılacağı bağlamla (rol + paket) aynı süzgeçten geçer: adminden tüm adımları kapatılan ya da bu
+ * kullanıcının rolü/paketi için boş kalan turun kartı gösterilmez (tıklanınca hiçbir şey olmayan çıkmaz kart olmasın).
+ */
+async function TourPickerSection({ tenantId, role }: { tenantId: string | null; role: string }) {
+  const supabase = await createClient();
+  const [content, planRow] = await Promise.all([
+    loadOnboardingContent(),
+    tenantId
+      ? supabase
+          .from("tenants")
+          .select("plan")
+          .eq("id", tenantId)
+          .maybeSingle()
+          .then((r) => r.data as { plan?: string | null } | null, () => null)
+      : Promise.resolve(null),
+  ]);
+  const tours = resolveTours(content, { role, plan: planRow?.plan ?? null })
+    .filter((t) => t.steps.length > 0)
+    .map((t) => ({ id: t.id, label: t.label, description: t.description }));
+  if (tours.length === 0) return null;
+  return <TourPicker tours={tours} />;
 }

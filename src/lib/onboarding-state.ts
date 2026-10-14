@@ -13,6 +13,8 @@ import { parseSkipped, setupSkipCookieName } from "@/lib/setup-skip";
 import { loadProfileSnapshot, type ProfileSnapshot } from "@/lib/profile-completion-data";
 import { isOfficeLocationDone } from "@/lib/profile-completion";
 import { PORTAL_MEMBERSHIP_EDITOR_ROLES } from "@/lib/portals/membership";
+import { resolveChecklistDefs } from "@/lib/onboarding-content";
+import { loadOnboardingContent } from "@/lib/onboarding-content-read";
 
 export type OnboardingSnapshot = {
   state: OnboardingState;
@@ -42,8 +44,10 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const skipped = user ? parseSkipped(jar.get(setupSkipCookieName(user.id))?.value) : [];
   const userId = user?.id ?? null;
 
-  const [profile, optional, ...results] = await Promise.all([
+  const [profile, content, optional, ...results] = await Promise.all([
     loadProfileSnapshot(tenantId),
+    // Adminden düzenlenen adım sırası/metni/açık-kapalı/hedefleme (SN5); okunamazsa koddaki liste.
+    loadOnboardingContent(),
     Promise.all([
       userId ? supabase.from("profiles").select("title, role").eq("id", userId).maybeSingle() : Promise.resolve({ data: null, error: null }),
       userId
@@ -75,7 +79,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     ]),
     supabase
       .from("tenants")
-      .select("name, slug, sample_seeded_at")
+      .select("name, slug, sample_seeded_at, plan")
       .eq("id", tenantId)
       .maybeSingle(),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("is_sample", false),
@@ -98,7 +102,10 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   ]);
   if (!profile || results.some((r) => r.error)) return null;
 
-  const tenant = results[0].data as OnboardingSnapshot["tenant"];
+  const tenantRow = results[0].data as (NonNullable<OnboardingSnapshot["tenant"]> & { plan?: string | null }) | null;
+  const tenant: OnboardingSnapshot["tenant"] = tenantRow
+    ? { name: tenantRow.name, slug: tenantRow.slug, sample_seeded_at: tenantRow.sample_seeded_at }
+    : null;
   const customers = results[1].count ?? 0;
   const properties = results[2].count ?? 0;
   const demands = results[8].count ?? 0;
@@ -132,7 +139,9 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
     planPaid: subRes.error ? false : (subRes.data as { status?: string } | null)?.status === "active",
     extra,
   };
-  const state = buildOnboarding(facts, skipped);
+  // Rol/paket hedefi: kullanıcının rolü ve ofisin paketi (bilinmiyorsa o hedef uygulanmaz).
+  const defs = resolveChecklistDefs(content, { role: viewerRole, plan: tenantRow?.plan ?? null });
+  const state = buildOnboarding(facts, skipped, defs);
   const firstTasks = buildFirstTasks({ customers, properties, demands, appointments, customDefinitions });
   return { state, firstTasks, skipped, tenant, profile, counts: { customers, properties, sampleCustomers: results[7].count ?? 0 } };
 });

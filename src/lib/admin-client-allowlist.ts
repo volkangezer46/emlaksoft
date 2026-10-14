@@ -406,6 +406,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/admin/data-explorer/read.ts", fn: "readExplorerList", calls: 1, tenantFilter: "param" },
   { file: "src/lib/admin/data-explorer/read.ts", fn: "readExplorerRecord", calls: 1, tenantFilter: "param" },
   { file: "src/lib/admin/integration-hub/read.ts", fn: "loadIntegrationHub", calls: 1, tenantFilter: "var" },
+  { file: "src/lib/admin/onboarding-progress.ts", fn: "loadOfficeProgress", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ai-advisor.ts", fn: "buildAdvisorContext", calls: 1, tenantFilter: "yok" },
   { file: "src/lib/ai/credits/meter.ts", fn: "charge", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ai/credits/meter.ts", fn: "getTenantQuotas", calls: 1, tenantFilter: "uygulanamaz" },

@@ -44,7 +44,7 @@ const href = (k: WizardStepKey) => `/app/baslangic?adim=${k}`;
  */
 export function SetupWizard(props: SetupWizardProps) {
   const { state, skipped, current } = props;
-  const { prev, next } = wizardNeighbors(current);
+  const { prev, next } = wizardNeighbors(current, state.steps.map((s) => s.id));
   const step = state.steps.find((s) => s.id === current) ?? null;
   const nextHref = href(next ?? FINISH_STEP);
   const chips = [

@@ -12,12 +12,14 @@ import {
 } from "@/components/ui/dialog";
 import { now } from "@/lib/clock";
 import type { AppModule } from "@/lib/permissions";
-import { TOURS, getTour, resolveTourSteps, tourIdForRole, type TourId, type TourStepDef } from "@/lib/product-tour-data";
+import { TOURS, getTour, resolveTourSteps, tourIdForRole, type TourDef, type TourId, type TourStepDef } from "@/lib/product-tour-data";
 import { TOUR_PARAM, isTourDone, markTourDone } from "@/lib/product-tour-storage";
+import { loadProductTours } from "@/app/actions/onboarding-content";
 
 /**
  * Rol bazlı ürün turları — ölçümü yerel, modal davranışı ortak Radix altyapısında çalışan spotlight.
- * Turların içeriği TEK veri dosyasındadır: `src/lib/product-tour-data.ts`.
+ * Turların varsayılan içeriği `src/lib/product-tour-data.ts`; adminden düzenlenen hali (Ofisler > Kurulum > İçerik) tur
+ * açılmadan önce `loadProductTours` eylemiyle bir kez alınır (rol/paket hedefi sunucuda uygulanır), alınamazsa varsayılan.
  *
  * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran katman içinde hedef boyutunda şeffaf bir
  * "delik" konumlanır ve devasa bir box-shadow geri kalanı karartır. Konum yalnız transform ile verilir,
@@ -42,10 +44,23 @@ const FIND_TRIES = 30; // 30 x 100 ms = 3 sn hedef bekleme
 type Rect = { top: number; left: number; width: number; height: number };
 type Phase = "idle" | "run" | "final" | "off";
 
-/** Seçicilerden ilk *görünür* elementi döndürür (mobilde gizli aside vb. elenir). */
+/** Düzenlenmiş turlar sayfa ömründe bir kez istenir (tur yeniden başlatılınca aynı yanıt). Hata = null (varsayılan turlar). */
+let toursRequest: Promise<TourDef[] | null> | null = null;
+function fetchTours(): Promise<TourDef[] | null> {
+  toursRequest ??= loadProductTours().catch(() => null);
+  return toursRequest;
+}
+
+/** Seçicilerden ilk *görünür* elementi döndürür (mobilde gizli aside vb. elenir). Geçersiz seçici (adminden) atlanır. */
 function findTarget(selectors: readonly string[]): HTMLElement | null {
   for (const selector of selectors) {
-    for (const el of document.querySelectorAll<HTMLElement>(selector)) {
+    let found: NodeListOf<HTMLElement>;
+    try {
+      found = document.querySelectorAll<HTMLElement>(selector);
+    } catch {
+      continue;
+    }
+    for (const el of found) {
       const r = el.getBoundingClientRect();
       if (r.width > 4 && r.height > 4) return el;
     }
@@ -59,6 +74,8 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   const closed = useClosedModules();
   const [phase, setPhase] = useState<Phase>("idle");
   const [tourId, setTourId] = useState<TourId | null>(null);
+  const [tours, setTours] = useState<readonly TourDef[]>(TOURS);
+  const toursRef = useRef<readonly TourDef[]>(TOURS);
   const [steps, setSteps] = useState<TourStepDef[]>([]);
   const [index, setIndex] = useState(0);
   const [measured, setMeasured] = useState<{ index: number; rect: Rect } | null>(null);
@@ -73,7 +90,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
 
   const begin = useCallback((id: TourId): boolean => {
     const c = ctxRef.current;
-    const resolved = resolveTourSteps(id, { accessible: c.accessible, closed: c.closed, role: c.role });
+    const resolved = resolveTourSteps(id, { accessible: c.accessible, closed: c.closed, role: c.role }, toursRef.current);
     if (resolved.length === 0) return false;
     markTourDone(id, new Date(now()).toISOString());
     dirRef.current = 1;
@@ -94,14 +111,15 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
     const raw = params.get(TOUR_PARAM);
     let id: TourId;
     if (raw) {
-      id = getTour(raw)?.id ?? tourIdForRole(role);
+      id = getTour(raw, toursRef.current)?.id ?? tourIdForRole(role);
     } else {
       if (pathname !== "/app") return;
       id = tourIdForRole(role);
       if (isTourDone(id) !== false) return; // görüldü ya da depolama yok → rahatsız etme
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     }
-    // Giriş animasyonları otursun, sayfa ölçülebilir olsun
+    // Giriş animasyonları otursun, sayfa ölçülebilir olsun; düzenlenmiş turlar bu sürede gelir (gelmezse varsayılan).
+    let cancelled = false;
     const t = window.setTimeout(() => {
       if (raw) {
         // Adres çubuğunda ?tur=… kalmasın: sayfa yenilenince tur tekrar açılmasın.
@@ -109,9 +127,19 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
         const qs = params.toString();
         window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
       }
-      begin(id);
+      void fetchTours().then((list) => {
+        if (cancelled) return;
+        if (list && list.length > 0) {
+          toursRef.current = list;
+          setTours(list);
+        }
+        begin(id);
+      });
     }, 800);
-    return () => window.clearTimeout(t);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
   }, [pathname, phase, role, begin]);
 
   const close = useCallback(() => setPhase("off"), []);
@@ -198,8 +226,8 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
 
   // ---- Bitiş ekranı: delik yok, ortalanmış kart ----
   if (phase === "final") {
-    const tour = tourId ? getTour(tourId) : null;
-    const others = TOURS.filter((t) => t.id !== tourId && resolveTourSteps(t.id, { accessible, closed, role }).length > 0);
+    const tour = tourId ? getTour(tourId, tours) : null;
+    const others = tours.filter((t) => t.id !== tourId && resolveTourSteps(t.id, { accessible, closed, role }, tours).length > 0);
     return (
       <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
         <DialogFullscreenContent
@@ -287,7 +315,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   }
   cardLeft = mobile ? 16 : Math.max(16, Math.min(cardLeft, vw - CARD_W - 16));
   cardTop = Math.max(16, cardTop);
-  const tourLabel = tourId ? (getTour(tourId)?.label ?? "Tur") : "Tur";
+  const tourLabel = tourId ? (getTour(tourId, tours)?.label ?? "Tur") : "Tur";
 
   return (
     <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>

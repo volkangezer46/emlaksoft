@@ -3,7 +3,9 @@ import type { AppModule } from "@/lib/permissions";
 import { TOUR_ROLES, tourIdForRole, type TourId } from "@/lib/product-tour-roles";
 
 /**
- * Ürün turları — TEK veri dosyası. Tek uzun tur yerine rol bazlı kısa turlar (her biri 4-6 adım).
+ * Ürün turları — VARSAYILAN içerik (kodda yedek). Tek uzun tur yerine rol bazlı kısa turlar (her biri 4-6 adım).
+ * Adminden düzenlenen metin/sıra/açık-kapalı/hedefleme `src/lib/onboarding-content.ts` (ayar `onboarding.content`) ile bunun
+ * üstüne biner; çalıştırıcı turları `loadProductTours` eyleminden alır, alamazsa bu dosyadaki turlarla çalışır.
  *
  * Her adım bir SAYFA + o sayfadaki bir ÖĞE seçicisidir. Çalıştırıcı (`product-tour.tsx`) gerekirse sayfaya
  * gider, seçiciyi bekler; bulunamazsa adımı sessizce atlar. Ek olarak çalıştırmadan ÖNCE
@@ -213,8 +215,9 @@ export const TOURS: readonly TourDef[] = [
   },
 ];
 
-export function getTour(id: string): TourDef | null {
-  return TOURS.find((t) => t.id === id) ?? null;
+/** `tours`: adminden düzenlenmiş turlar (`loadProductTours`); verilmezse koddaki varsayılanlar. */
+export function getTour(id: string, tours: readonly TourDef[] = TOURS): TourDef | null {
+  return tours.find((t) => t.id === id) ?? null;
 }
 
 
@@ -225,8 +228,9 @@ export function getTour(id: string): TourDef | null {
 export function resolveTourSteps(
   id: TourId,
   ctx: { accessible: readonly AppModule[]; closed: readonly string[]; role?: string | null },
+  tours: readonly TourDef[] = TOURS,
 ): TourStepDef[] {
-  const tour = getTour(id);
+  const tour = getTour(id, tours);
   if (!tour) return [];
   const sections = visibleSections(ctx.accessible, { closed: ctx.closed });
   const allowed = new Set<string>(["/app"]);
