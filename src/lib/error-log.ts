@@ -57,7 +57,8 @@ function fingerprint(parts: (string | null | undefined)[]): string {
 
 export type ErrorLogInput = {
   message: string;
-  source?: "client" | "server";
+  /** "csp": CSP rapor modu ihlali (src/app/api/csp-rapor; ölçüm, hata patlaması sayacına girmez). */
+  source?: "client" | "server" | "csp";
   digest?: string | null;
   stack?: string | null;
   path?: string | null;
@@ -106,7 +107,8 @@ export async function logError(input: ErrorLogInput): Promise<void> {
     };
     // Sürüm (AD10 hata triyajı): p_release 20261013004900 ile gelir. Fonksiyon henüz eski imzadaysa
     // (PGRST202 = eşleşen fonksiyon yok) sürümsüz eski çağrıya düşülür; kayıt kaybolmaz.
-    const release = releaseSha();
+    // CSP ölçüm satırları sürüme bağlanmaz: durum sayfasındaki "bu sürümde açık hata" sayısına girmesin.
+    const release = source === "csp" ? null : releaseSha();
     let { error: yazmaHatasi } = await admin.rpc("record_error_occurrence", release ? { ...args, p_release: release } : args);
     if (release && yazmaHatasi?.code === "PGRST202") {
       ({ error: yazmaHatasi } = await admin.rpc("record_error_occurrence", args));
