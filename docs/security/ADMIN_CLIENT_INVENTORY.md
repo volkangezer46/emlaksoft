@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **579** (294 dosya) — risk: P0=16, P1=44, P2=519
-- Tenant filtresi: var=298, uygulanamaz=188, yok=61, param=20, devir=12
-- Kapı türü: public-token=35, dosya-duzeyi=157, platform=114, belirsiz=137, elle-dogrulandi=26, oturum-izin=83, cron=24, webhook-imza=3
+- Toplam birim: **580** (295 dosya) — risk: P0=16, P1=44, P2=520
+- Tenant filtresi: var=298, uygulanamaz=189, yok=61, param=20, devir=12
+- Kapı türü: public-token=35, dosya-duzeyi=157, platform=114, belirsiz=138, elle-dogrulandi=26, oturum-izin=83, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **66**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -497,6 +497,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/ef-credits/wallet.ts:127` | `insertEfReport` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/ef-credits/wallet.ts:171` | `listEfReports` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/ef-credits/wallet.ts:192` | `markEfPdfCharged` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
+| `src/lib/eids/actions-dispatch.ts:24` | `scheduleAuthorityEventActions` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/email/log-read.ts:90` | `loadEmailLog` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/email/log-read.ts:124` | `loadEmailSuppressions` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/email/send.ts:75` | `sendLoggedEmail` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |

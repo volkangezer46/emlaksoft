@@ -22,6 +22,7 @@ import {
   type EidsSource,
 } from "@/lib/eids/authority-status";
 import { applyAuthorityEvent, undoAuthorityEvent, type LedgerResult } from "@/lib/eids/ledger";
+import { scheduleAuthorityEventActions } from "@/lib/eids/actions-dispatch";
 import { findAuthorityMatch, type AuthorityMatchLoad } from "@/lib/eids/load";
 import { AUTHORITY_OVERRIDE_MIN_REASON, AUTHORITY_OVERRIDE_TTL_HOURS } from "@/lib/authority-shield";
 import { EIDS_MATCH_WARNING_LABELS, type EidsDealKind } from "@/lib/eids/match";
@@ -146,6 +147,9 @@ export async function updateAuthorityStatus(
       if (!data || data.length === 0) return { error: "Portföy bulunamadı ya da güncelleme yetkiniz yok." };
     } else if (!res.ok) {
       return { error: res.error };
+    } else {
+      // Anlık akış: iptal/süre bitimi → ACİL kaldırma görevi, onay → yayın görevi (cron yedek; tekil anahtar).
+      scheduleAuthorityEventActions(gate.tenantId, res.eventId);
     }
   }
 
@@ -392,6 +396,7 @@ export async function setPropertyAuthority(propertyId: string, input: ManualAuth
     note: input.note ?? null,
   });
   if (!res.ok) return ledgerError(res);
+  scheduleAuthorityEventActions(gate.tenantId, res.eventId);
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -426,6 +431,7 @@ export async function setAuthorityExemption(propertyId: string, reason: string |
     note: note ?? null,
   });
   if (!res.ok) return ledgerError(res);
+  scheduleAuthorityEventActions(gate.tenantId, res.eventId);
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -446,6 +452,7 @@ export async function undoAuthorityChange(propertyId: string, eventId: string): 
   const supabase = await createClient();
   const res = await undoAuthorityEvent(supabase, gate.tenantId, eventId);
   if (!res.ok) return ledgerError(res);
+  scheduleAuthorityEventActions(gate.tenantId, res.eventId);
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -474,6 +481,7 @@ export async function overrideAuthorityBlock(propertyId: string, reason: string)
   const supabase = await createClient();
   const res = await applyAuthorityEvent(supabase, { tenantId: gate.tenantId, propertyId, kind: "override", source: "manual", note: text });
   if (!res.ok) return ledgerError(res);
+  scheduleAuthorityEventActions(gate.tenantId, res.eventId);
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -557,6 +565,7 @@ export async function applyAuthorityMatch(propertyId: string, input: AuthorityMa
     note: bind ? "Aday listesinden elle bağlandı." : null,
   });
   if (!res.ok) return ledgerError(res);
+  scheduleAuthorityEventActions(gate.tenantId, res.eventId);
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,

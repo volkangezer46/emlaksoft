@@ -457,6 +457,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/lib/ef-credits/wallet.ts", fn: "insertEfReport", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ef-credits/wallet.ts", fn: "listEfReports", calls: 1, tenantFilter: "var" },
   { file: "src/lib/ef-credits/wallet.ts", fn: "markEfPdfCharged", calls: 1, tenantFilter: "var" },
+  { file: "src/lib/eids/actions-dispatch.ts", fn: "scheduleAuthorityEventActions", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/email/log-read.ts", fn: "loadEmailLog", calls: 1, tenantFilter: "var" },
   { file: "src/lib/email/log-read.ts", fn: "loadEmailSuppressions", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/lib/email/send.ts", fn: "sendLoggedEmail", calls: 1, tenantFilter: "var" },
