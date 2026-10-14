@@ -4,6 +4,9 @@
  * ligi ve tazelik etiketleri dolu görünür. Fark: en yeni müşteri kaydı dün olacak şekilde hesaplanır; zaten
  * tazeyse (fark < 1 gün) hiçbir şey yapmaz.
  *
+ * Gece sıfırlama tabanı (demo_reset_state.baseline_at) aynı işlemde aynı farkla ileri alınır; kaydırılan tohum
+ * satırları gece sıfırlamasında "ziyaretçi kaydı" sayılıp silinmez.
+ *
  * Güvenlik: yalnız `tenants.slug = 'demo-ofis'`; varsayılan DRY-RUN (transaction geri alınır), yazmak için `--apply`.
  * Kullanım: npx tsx scripts/demo-time-shift.ts [--apply]
  */
@@ -65,6 +68,20 @@ async function main() {
       const set = present.map((c) => `${c} = ${c} + make_interval(days => $2)`).join(", ");
       const r = await client.query(`update public.${table} set ${set} where tenant_id = $1`, [tenantId, days]);
       console.log(`  ${table}: ${r.rowCount} satır (${present.join(", ")})`);
+    }
+
+    // Gece sıfırlama tabanı (YD1, demo_reset_state) aynı farkla ileri alınır: aksi halde tabandan sonraya düşen
+    // tohum satırları o gece demo_tenant_nightly_reset ile KALICI olarak silinirdi. Tablo yoksa sıfırlama da
+    // kurulmamıştır (fonksiyon yok); güvenle atlanır. Satır yoksa ilk sıfırlama tabanı now() yazar (kaydırmadan sonra).
+    const reg = await client.query<{ ok: boolean }>("select to_regclass('public.demo_reset_state') is not null as ok");
+    if (reg.rows[0]?.ok) {
+      const b = await client.query(
+        `update public.demo_reset_state set baseline_at = baseline_at + make_interval(days => $2) where tenant_id = $1`,
+        [tenantId, days],
+      );
+      console.log(`  demo_reset_state: taban ${days} gün ileri alındı (${b.rowCount} satır)`);
+    } else {
+      console.log("  demo_reset_state yok: gece sıfırlaması kurulu değil, taban güncellenmedi");
     }
 
     await client.query(apply ? "commit" : "rollback");

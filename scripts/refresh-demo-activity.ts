@@ -2,7 +2,8 @@
  * demo-ofis'in "bu ay" ekranlarının boş görünmemesi için son etkinlikleri günceller:
  *  - en yeni 3 komisyonun tarihini son güne/ikiye çeker (bu ay içinde kalır) (Komisyon / Raporlar "dönem" KPI'ları dolar),
  *  - ilgili kazanılmış anlaşmaların updated_at'ini aynı güne hizalar,
- *  - kayıp-kaçak için bu aya iki rakip-kapanış kaydı ekler (yalnızca yoksa).
+ *  - kayıp-kaçak için bu aya iki rakip-kapanış kaydı ekler (yalnızca yoksa),
+ *  - gece sıfırlama tabanını (demo_reset_state) şimdiye yeniler; güncellenen satırlar o gece silinmez.
  *
  * Güvenlik: yalnız `tenant_id = demo-ofis`; varsayılan DRY-RUN (transaction geri alınır),
  * yazmak için `--apply`. Gerçek tenant'lara dokunmaz. Tutarlar demo verisi içindir.
@@ -86,6 +87,20 @@ async function main() {
       }
     } else {
       console.log("  = bu ay için kapanış kaydı zaten var, eklenmedi");
+    }
+
+    // Gece sıfırlama tabanı (YD1): bu betik komisyon/anlaşma/kapanış tarihlerini şimdiye çektiği için taban now()'a
+    // yenilenir; aksi halde bu tohum satırları o gece "ziyaretçi kaydı" sayılıp demo_tenant_nightly_reset ile silinirdi.
+    const reg = await client.query<{ ok: boolean }>("select to_regclass('public.demo_reset_state') is not null as ok");
+    if (reg.rows[0]?.ok) {
+      const b = await client.query(
+        `insert into public.demo_reset_state (tenant_id, baseline_at) values ($1, now())
+         on conflict (tenant_id) do update set baseline_at = greatest(public.demo_reset_state.baseline_at, excluded.baseline_at)`,
+        [tenantId],
+      );
+      console.log(`  ~ demo_reset_state tabanı şimdiye yenilendi (${b.rowCount} satır)`);
+    } else {
+      console.log("  = demo_reset_state yok: gece sıfırlaması kurulu değil, taban güncellenmedi");
     }
 
     await kpi("SONRA");
