@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getSupportContact } from "@/lib/contact-info-server";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
@@ -81,6 +82,7 @@ export default async function KvkkAydinlatmaPage() {
           Kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silinmesini/yok edilmesini
           isteme, aktarıldığı üçüncü kişileri bilme, otomatik sistemlerle analiz sonucuna itiraz etme ve zarara
           uğramanız hâlinde giderim talep etme haklarına sahipsiniz. Taleplerinizi{" "}
+          <Link className="font-semibold text-brand-600" href="/kvkk-basvuru">KVKK başvuru formu</Link> ile ya da{" "}
           <a className="font-semibold text-brand-600" href={contact.mailto}>{contact.email}</a>{" "}
           adresine iletebilirsiniz; başvurular en geç 30 gün içinde ücretsiz sonuçlandırılır.
         </p>
