@@ -68,22 +68,10 @@ function dateTime(iso: string) {
 }
 
 /**
- * Sekme kimlikleri (URL: ?sekme=). Eski `?tab=` linkleri de çalışır:
- * Eski kimlikler (ozet/aktivite/gecmis/gorevler/dosyalar) takma adla yeni sekmelere gider.
+ * Sekme kimlikleri (URL: ?sekme=; takma ad yok). Anlaşma/teklif, randevu/görev, notlar ve iletişim tercihleri "Özet"
+ * içinde bölümdür; zaman çizelgesi + iletişim kayıtları "Geçmiş".
  */
 export const CUSTOMER_TAB_IDS = ["ozet", "talepler", "gecmis", "belgeler"] as const;
-/** 8 sekme 4'e indi: anlaşma/teklif, randevu/görev, notlar ve iletişim tercihleri "Özet" içinde bölüm; zaman çizelgesi + iletişim kayıtları "Geçmiş". */
-export const CUSTOMER_TAB_ALIASES: Record<string, string> = {
-  aktivite: "gecmis",
-  zaman: "gecmis",
-  iletisim: "gecmis",
-  anlasmalar: "ozet",
-  randevu: "ozet",
-  gorevler: "ozet",
-  izinler: "ozet",
-  notlar: "ozet",
-  dosyalar: "belgeler",
-};
 
 /** Aktif olmayan sekmenin içeriği (ve onun async bölümleri) hiç çizilmez. */
 function Pane({ id, active, children }: { id: string; active: string; children: ReactNode }) {

@@ -66,7 +66,7 @@ export const TERMS = {
   analizBakiyesi: {
     canonical: "Analiz bakiyesi",
     definition: "EmlakFiyati değerleme analizlerinde harcanan TL bakiyesi (1 birim = 1 TL); aylık plan hakkı ve süreli analiz paketleriyle yüklenir. Eski ad kullanıcıya görünmez (iç ad ef_credit_* kalır).",
-    // "ef-kontor-*" cron/rota tanımlayıcıları ve eski ?sekme=kontor takma adı iç addır; görünür metinde "kontör" geçmez.
+    // "ef-kontor-*" cron/rota tanımlayıcıları iç addır; görünür metinde "kontör" geçmez.
     forbidden: [/(?<!ef-|sekme=|#)kont[öo]r(?!-)/i],
   },
   davet: {
@@ -125,7 +125,7 @@ export const LOSS_TERMS = {
   leak: {
     canonical: "Kaçan komisyon",
     shield: "Kayıp-kaçak kalkanı",
-    definition: "Portal teyidiyle kaçan ilanın tahmini komisyon kaybı (para). Sayfa: /app/kayip-kacak.",
+    definition: "Portal teyidiyle kaçan ilanın tahmini komisyon kaybı (para). Sayfa: /app/ilan-kontrol/kapanis.",
   },
   lostDeal: {
     canonical: "Kaybedilen anlaşma",
@@ -134,7 +134,7 @@ export const LOSS_TERMS = {
   },
   atRisk: {
     canonical: "Risk altındaki müşteriler",
-    definition: "Uzun süredir ilgilenilmeyen, kaybedilme riski taşıyan müşteri ve talepler. Yer: Akıllı listeler, 'Kaybedilme riski yüksek' bölümü (/app/akilli-listeler?segment=churn).",
+    definition: "Uzun süredir ilgilenilmeyen, kaybedilme riski taşıyan müşteri ve talepler. Yer: Müşteriler, 'Kaybedilme riski' süzgeci (/app/musteriler?segment=risk).",
   },
 } as const;
 

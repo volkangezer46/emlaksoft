@@ -17,11 +17,11 @@ import { SpriteIcon } from "@/components/icons/sprite-icon";
 type TileMeta = { id: BentoTile["id"]; cls: string; art: () => ReactNode; gate?: string; dark?: boolean };
 /** Kimlik aynı zamanda sayfa içi bağlantı hedefidir (/#kayip-kacak, /#emsal-degerleme ...; site menüsü testi doğrular). */
 const TILE_LIST: TileMeta[] = [
-  { id: "kayip-kacak", cls: "mk-b-leak", dark: true, gate: "/app/kayip-kacak", art: () => <LeakArt /> },
+  { id: "kayip-kacak", cls: "mk-b-leak", dark: true, gate: "/app/ilan-kontrol/kapanis", art: () => <LeakArt /> },
   { id: "emsal-degerleme", cls: "mk-b-val", art: () => <ValuationArt /> },
   { id: "otomasyon", cls: "mk-b-auto", gate: "/app/otomasyonlar", art: () => <AutomationArt /> },
   { id: "ai-asistan", cls: "mk-b-ai", art: () => <AssistantArt /> },
-  { id: "portal-kontrol", cls: "mk-b-portal", gate: "/app/portallar", art: () => <PortalArt /> },
+  { id: "portal-kontrol", cls: "mk-b-portal", gate: "/app/ilan-kontrol/portallar", art: () => <PortalArt /> },
   { id: "imza", cls: "mk-b-sign", gate: "/app/sozlesmeler", art: () => <SignatureArt /> },
   { id: "vitrin", cls: "mk-b-show", art: () => <ShowcaseArt /> },
   { id: "performans", cls: "mk-b-team", gate: "/app/danisman-kpi", art: () => <TeamArt /> },

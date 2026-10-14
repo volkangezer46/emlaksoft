@@ -1,5 +1,7 @@
-import Link from "@/components/ui/smart-link";
 import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid, Wallet } from "lucide-react";
+import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
+import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
+import { TwoFactorForm } from "./two-factor-form";
 import { trDayKey, now as nowMs } from "@/lib/clock";
 import { KasamTab } from "./kasam-tab";
 import { PageHeader } from "@/components/ui/page-header";
@@ -12,7 +14,6 @@ import { loadNotificationChannels } from "@/lib/notification-channels";
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
-import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { formatDateTimeTr } from "@/lib/format";
 import { deviceLabel, summarizeDevices } from "@/lib/account/device-label";
 import { Alert } from "@/components/ui/alert";
@@ -26,7 +27,11 @@ import { getTenantModuleState } from "@/lib/modules/state";
 import { getUserHiddenModules } from "@/lib/modules/prefs";
 import { googleErrorMessage, isGoogleAuthEnabled } from "@/lib/auth/google-auth";
 
-export const metadata = { title: "Hesabım" };
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = (await searchParams) ?? {};
+  const tab = TABS.find((t) => t.id === resolveTab(sp, TABS.map((x) => x.id), "profil"));
+  return { title: tab && tab.id !== "profil" ? `${tab.label} · Hesabım` : "Hesabım" };
+}
 
 const RESULT_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
   success: { label: "Başarılı", variant: "success" },
@@ -38,13 +43,14 @@ const RESULT_BADGE: Record<string, { label: string; variant: BadgeVariant }> = {
 const TABS: DetailTabDef[] = [
   { id: "profil", label: "Profil", icon: UserRound },
   { id: "parola", label: "Parola", icon: KeyRound },
+  { id: "guvenlik", label: "Güvenlik", icon: ShieldCheck },
   { id: "oturumlar", label: "Oturumlar", icon: MonitorSmartphone },
   { id: "bildirimler", label: "Bildirimler", icon: Bell },
   { id: "gorunum", label: "Görünüm", icon: LayoutGrid },
   { id: "kasam", label: "Kasam", icon: Wallet },
 ];
 
-/** Kullanıcının kendi hesabı: profil, parola, oturumlar, bildirim tercihleri, 2FA bağlantısı. */
+/** Kullanıcının kendi hesabı: profil, parola, güvenlik (2FA + giriş geçmişi), oturumlar, bildirim ve görünüm tercihleri. */
 export default async function AccountPage({
   searchParams,
 }: {
@@ -64,9 +70,8 @@ export default async function AccountPage({
 
   // Avatar sütunları ayrı ve hata-toleranslı okunur (migration gecikse bile profil formu bozulmaz).
   const avatar = active === "profil" ? await loadOwnProfileAvatar(auth.userId) : null;
-  const canSecurityPage = effectiveCanAccessModule(auth.perms, "settings");
   const events =
-    active === "oturumlar"
+    active === "oturumlar" || active === "guvenlik"
       ? ((
           await supabase
             .from("login_events")
@@ -77,6 +82,11 @@ export default async function AccountPage({
         ).data ?? [])
       : [];
   const devices = summarizeDevices(events);
+  // 2FA: SMS kanalı (ofis Netgsm'i ya da platform) hazır mı; kimlik bilgisi istemciye gitmez, yalnız var/yok.
+  const smsConfigured =
+    active === "guvenlik"
+      ? (auth.tenantId ? (await getTenantNetgsmConfig(auth.tenantId)) !== null : false) || (await isNetgsmConfigured())
+      : false;
   // Google bağlama dönüşü (/auth/callback?akis=link → ?google=baglandi | hata kodu).
   const googleEnabled = isGoogleAuthEnabled();
   const googleParam = typeof sp.google === "string" ? sp.google : null;
@@ -96,7 +106,7 @@ export default async function AccountPage({
     <div className="space-y-6">
       <PageHeader
         title="Hesabım"
-        description="Kendi profiliniz, parolanız, oturumlarınız, bildirim ve görünüm tercihleriniz."
+        description="Kendi profiliniz, parolanız, iki adımlı doğrulamanız, oturumlarınız, bildirim ve görünüm tercihleriniz."
         className="mb-0"
       />
       <DetailSegmentTabs basePath="/app/hesabim" tabs={TABS} active={active} label="Hesap sekmeleri" />
@@ -175,7 +185,7 @@ export default async function AccountPage({
       ) : null}
 
       {active === "parola" ? (
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="max-w-2xl">
           <Card>
             <CardHeader>
               <div>
@@ -187,20 +197,50 @@ export default async function AccountPage({
               <PasswordForm />
             </CardContent>
           </Card>
+        </div>
+      ) : null}
+
+      {active === "guvenlik" ? (
+        <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>İki adımlı doğrulama</CardTitle>
-                <CardDescription>{profile?.two_factor_sms ? "SMS ile doğrulama açık." : "SMS ile doğrulama kapalı."}</CardDescription>
+                <CardTitle>İki adımlı doğrulama (SMS)</CardTitle>
+                <CardDescription>Açıkken her girişte telefonunuza gönderilen 6 haneli kod istenir.</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
-              {canSecurityPage ? (
-                <Link href="/app/ayarlar/guvenlik" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600 hover:underline">
-                  <ShieldCheck className="h-4 w-4" /> Güvenlik ayarlarını aç
-                </Link>
+              <TwoFactorForm enabled={Boolean(profile?.two_factor_sms)} phone={profile?.phone ?? null} smsConfigured={smsConfigured} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Son girişler</CardTitle>
+                <CardDescription>Hesabınıza ait son giriş denemeleri. Tanımadığınız bir giriş görürseniz parolanızı değiştirin.</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {events.length === 0 ? (
+                <p className="text-sm text-text-muted">Henüz giriş kaydı yok. Kayıtlar bir sonraki girişinizden itibaren burada listelenir.</p>
               ) : (
-                <p className="text-sm text-text-muted">İki adımlı doğrulamayı ofis yöneticiniz Güvenlik ayarlarından yönetir.</p>
+                <ul className="divide-y divide-line">
+                  {events.slice(0, 20).map((e) => {
+                    const badge = RESULT_BADGE[e.result] ?? { label: e.result, variant: "default" as BadgeVariant };
+                    return (
+                      <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                        <span className="text-text">
+                          {formatDateTimeTr(e.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                          <span className="ml-2 text-xs text-text-muted" title={e.user_agent ?? undefined}>
+                            {deviceLabel(e.user_agent)}
+                            {e.ip ? ` · ${e.ip}` : ""}
+                          </span>
+                        </span>
+                        <Badge variant={badge.variant}>{badge.label}</Badge>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </CardContent>
           </Card>
@@ -208,7 +248,7 @@ export default async function AccountPage({
       ) : null}
 
       {active === "oturumlar" ? (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="max-w-2xl">
           <Card>
             <CardHeader>
               <div>
@@ -234,42 +274,6 @@ export default async function AccountPage({
                 </ul>
               ) : null}
               <OtherDevicesForm />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <div>
-                <CardTitle>Son girişler</CardTitle>
-                <CardDescription>Tanımadığınız bir giriş görürseniz parolanızı değiştirin.</CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {events.length === 0 ? (
-                <p className="text-sm text-text-muted">Henüz giriş kaydı yok.</p>
-              ) : (
-                <ul className="divide-y divide-line">
-                  {events.slice(0, 8).map((e) => {
-                    const badge = RESULT_BADGE[e.result] ?? { label: e.result, variant: "default" as BadgeVariant };
-                    return (
-                      <li key={e.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                        <span className="text-text">
-                          {formatDateTimeTr(e.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
-                          <span className="ml-2 text-xs text-text-muted">
-                            {deviceLabel(e.user_agent)}
-                            {e.ip ? ` · ${e.ip}` : ""}
-                          </span>
-                        </span>
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {canSecurityPage ? (
-                <Link href="/app/ayarlar/guvenlik" className="mt-3 inline-block text-xs font-semibold text-brand-600 hover:underline">
-                  Tüm giriş geçmişi
-                </Link>
-              ) : null}
             </CardContent>
           </Card>
         </div>

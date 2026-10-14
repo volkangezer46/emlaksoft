@@ -5,7 +5,7 @@ import { computeComplianceReport, type ComplianceReport, type ComplianceTask } f
 
 /**
  * Yetki uyum raporu okuyucusu (aylık) — oturumlu istemci (RLS), service_role yok. Hem /app/raporlar/yetki-uyum hem
- * ofis karnesi (ofis-kontrol/karne) AYNI hesabı kullanır (tek kaynak: `computeComplianceReport`).
+ * Ekip karnesi (/app/danisman-kpi, "Yetki uyumu" sütunu) AYNI hesabı kullanır (tek kaynak: `computeComplianceReport`).
  *
  * Kaldırma kalemleri ay içinde AÇILAN `eids_takedown` görevlerinden; portföy oranları bugünkü kapsamdaki portföylerden
  * (e-posta teyidi EP2 `authority_eids_source`'tan; sütun yoksa oran gösterilmez). Tablo/sütun yoksa `available:false`.

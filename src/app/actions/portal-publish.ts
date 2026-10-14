@@ -231,7 +231,7 @@ export async function publishPropertyToPortal(
     };
   }
 
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
   return { ok: true, externalId: result.externalId, externalUrl: result.externalUrl, warning };
 }
@@ -292,7 +292,7 @@ export async function updatePropertyOnPortal(
     };
   }
 
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath(`/app/portfoyler/${propertyId}`);
   return { ok: true, externalId: result.externalId, externalUrl: result.externalUrl };
 }
@@ -341,7 +341,7 @@ export async function unpublishPropertyFromPortal(
     return { error: `${portalName} ilanı kaldırıldı ancak yerel kayıt kapanamadı. Operasyon ekibine bildirin.` };
   }
 
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   return { ok: true };
 }
 

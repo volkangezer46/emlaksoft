@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { copyTitle } from "@/lib/record-copy";
 import { NewCampaignForm, type CampaignInitial } from "./new-campaign-form";
 
+export const metadata = { title: "Yeni kampanya" };
+
 export default async function YeniKampanyaPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { perms, userId, tenantId } = await requireModulePage("campaigns", "/app/kampanyalar");
   if (!(perms.campaigns ?? []).includes("create")) redirect("/app/kampanyalar");

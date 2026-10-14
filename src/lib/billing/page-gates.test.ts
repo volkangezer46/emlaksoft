@@ -43,7 +43,7 @@ describe("paket kilidi", () => {
     for (const open of ["/app", "/app/musteriler", "/app/portfoyler", "/app/talepler", "/app/randevular", "/app/komisyon", "/app/degerleme", "/app/abonelik", "/app/ayarlar"]) {
       expect(lockedGate(open, c), open).toBeNull();
     }
-    for (const locked of ["/app/teklifler", "/app/sozlesmeler", "/app/ekip", "/app/kayip-kacak", "/app/otomasyonlar", "/app/projeler"]) {
+    for (const locked of ["/app/teklifler", "/app/sozlesmeler", "/app/ekip", "/app/ilan-kontrol/kapanis", "/app/otomasyonlar", "/app/projeler"]) {
       expect(lockedGate(locked, c), locked).not.toBeNull();
     }
   });
@@ -52,12 +52,12 @@ describe("paket kilidi", () => {
     const c = ctx("office");
     expect(lockedGate("/app/ekip", c)).toBeNull();
     expect(lockedGate("/app/sozlesmeler/abc", c)).toBeNull();
-    expect(lockedGate("/app/kayip-kacak", c)?.title).toContain("Kayıp-kaçak");
+    expect(lockedGate("/app/ilan-kontrol/kapanis", c)?.title).toContain("Kayıp-kaçak");
     expect(lockedGate("/app/otomasyonlar", c)).not.toBeNull();
   });
 
   it("Profesyonel kayıp-kaçak ve otomasyonu açar, proje satışını açmaz; Kurumsal hepsini açar", () => {
-    expect(lockedGate("/app/kayip-kacak", ctx("professional"))).toBeNull();
+    expect(lockedGate("/app/ilan-kontrol/kapanis", ctx("professional"))).toBeNull();
     expect(lockedGate("/app/otomasyonlar", ctx("professional"))).toBeNull();
     expect(lockedGate("/app/projeler", ctx("professional"))?.minPlan).toBe("enterprise");
     expect(lockedHrefs(ctx("enterprise"))).toEqual([]);
@@ -72,13 +72,15 @@ describe("paket kilidi", () => {
 
   it("bilinmeyen paket Ofis gibi davranır (güvenli varsayılan)", () => {
     expect(lockedGate("/app/ekip", ctx("bilinmeyen"))).toBeNull();
-    expect(lockedGate("/app/kayip-kacak", ctx("bilinmeyen"))).not.toBeNull();
+    expect(lockedGate("/app/ilan-kontrol/kapanis", ctx("bilinmeyen"))).not.toBeNull();
   });
 
   it("her kilit menüde bir sayfaya karşılık gelir ve tekrar etmez", () => {
     const hrefs = PLAN_GATES.map((g) => g.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    const orphans = hrefs.filter((h) => !ALL_NAV_HREFS.includes(h) && h !== "/app/franchise" && h !== "/app/ofis-kontrol/kurallar");
+    // Kilit ya menüdeki bir sayfadır ya da bir menü sayfasının alt sayfasıdır (ör. /app/ilan-kontrol/kapanis, /app/ofis-kontrol/kayit).
+    const inMenu = (h: string) => ALL_NAV_HREFS.some((n) => n !== "/app" && (h === n || h.startsWith(`${n}/`)));
+    const orphans = hrefs.filter((h) => !inMenu(h) && h !== "/app/franchise");
     expect(orphans).toEqual([]);
     expect(requiredPlanName(PLAN_GATES[0]!)).toBe("Ofis");
   });

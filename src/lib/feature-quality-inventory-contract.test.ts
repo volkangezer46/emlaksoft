@@ -62,10 +62,6 @@ describe("product feature quality inventory", () => {
 
   it("validates expense property ownership and never reports a missing mutation as successful", () => {
     const source = readFileSync(resolve(process.cwd(), "src/app/actions/expenses.ts"), "utf8");
-    const createForm = readFileSync(
-      resolve(process.cwd(), "src/app/app/giderler/expense-create-form.tsx"),
-      "utf8",
-    );
     const table = readFileSync(
       resolve(process.cwd(), "src/app/app/giderler/expenses-table.tsx"),
       "utf8",
@@ -77,9 +73,6 @@ describe("product feature quality inventory", () => {
     expect(source).toContain('if (!data) return { error: "Gider kaydı bulunamadı." };');
     expect(source).toContain('return { error: actionErrorMessage(error, "Gider silinemedi.") };');
     expect(source).toContain('throw new Error("Gider kayıtları güvenli şekilde yüklenemedi.")');
-    expect(createForm).toContain("useActionState<ExpenseResult, FormData>");
-    expect(createForm).toContain('role="alert"');
-    expect(createForm).toContain("aria-busy={pending}");
     expect(table).toContain("const result = await deleteExpense(e.id)");
     expect(table).toContain('push(result.error, "err")');
   });

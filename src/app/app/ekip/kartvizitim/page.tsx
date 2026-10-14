@@ -7,6 +7,8 @@ import { slugifyAgentName } from "@/lib/agent-profile";
 import { KartvizitForm, type KartvizitView } from "./kartvizit-form";
 
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata = { title: "Kartvizitim" };
 /**
  * "Kartvizitim" — danışmanın kendi public mini profilini (/danisman/[slug])
  * düzenlediği sayfa.

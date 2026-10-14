@@ -7,6 +7,8 @@ import { sanitizeWatermarkSettings } from "@/lib/watermark";
 import { WatermarkForm } from "./watermark-form";
 
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata = { title: "Filigran · Ayarlar" };
 export const dynamic = "force-dynamic";
 
 export default async function WatermarkSettingsPage() {

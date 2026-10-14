@@ -6,6 +6,8 @@ import { AutomationWizard } from "../automation-wizard";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
 
+export const metadata = { title: "Yeni otomasyon" };
+
 export default async function YeniOtomasyonPage() {
   const { perms } = await requireModulePage("settings", "/app/otomasyonlar");
   // Oluşturma yetkisi (settings:edit) yoksa listeye dön; sunucu eylemi de ayrıca doğrular.

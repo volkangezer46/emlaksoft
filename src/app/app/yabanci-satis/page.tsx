@@ -27,6 +27,8 @@ import { FOREIGN_SALE_CHECKLIST, FOREIGN_SALE_GUIDE, guideCardVerification } fro
 import { LegalStatusBadge } from "@/components/app/legal-constants-panel";
 import { ApplyChecklistForm, MarkForeignForm } from "./foreign-sale-forms";
 
+export const metadata = { title: "Yabancıya satış" };
+
 /**
  * Yabancıya satış merkezi.
  *

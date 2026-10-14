@@ -127,9 +127,9 @@ describe("tek grafik seti", () => {
 
   it("elle çizilmiş halka grafikleri tek setten (RadialGauge / DonutRing); yerel kopya dosyaları silindi", () => {
     expect(read("src/app/app/komisyon/commission-simulator.tsx")).toContain("DonutRing");
-    expect(read("src/app/app/kayip-kacak/page.tsx")).toContain("RadialGauge");
+    expect(read("src/app/app/ilan-kontrol/kapanis/page.tsx")).toContain("RadialGauge");
     expect(read("src/app/app/pano-tv/tv-board.tsx")).toContain("RadialGauge");
-    for (const f of ["src/app/app/komisyon/commission-simulator.tsx", "src/app/app/kayip-kacak/page.tsx", "src/app/app/pano-tv/tv-board.tsx"]) {
+    for (const f of ["src/app/app/komisyon/commission-simulator.tsx", "src/app/app/ilan-kontrol/kapanis/page.tsx", "src/app/app/pano-tv/tv-board.tsx"]) {
       expect(read(f), f).not.toMatch(/strokeDasharray=\{`?\$?\{?(DONUT_C|RING_C|circ)\b/);
     }
     for (const gone of ["src/app/app/danisman-kpi/revenue-chart.tsx", "src/app/app/giderler/category-donut.tsx"]) {

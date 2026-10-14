@@ -269,7 +269,7 @@ export async function lockFinancePeriod(month: string, note?: string | null): Pr
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_period_lock", { p_month: monthStart(key), p_note: String(note ?? "").trim().slice(0, 200) || null });
   if (error) return rpcFailure(error, "Dönem kilitlenemedi.");
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true };
 }
 
@@ -283,6 +283,6 @@ export async function unlockFinancePeriod(month: string): Promise<FinanceActionR
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_period_unlock", { p_month: monthStart(key) });
   if (error) return rpcFailure(error, "Dönem kilidi açılamadı.");
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true };
 }

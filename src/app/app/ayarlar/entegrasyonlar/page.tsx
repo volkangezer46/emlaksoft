@@ -5,6 +5,7 @@ import { listIntegrations, type IntegrationCategory } from "@/lib/integrations/r
 
 import { PageHeader } from "@/components/ui/page-header";
 import { EInvoiceCard } from "./einvoice-card";
+import { OfficeIntegrationSections } from "./messaging-sections";
 export const metadata = { title: "Entegrasyonlar" };
 
 const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; sub: string }[] = [
@@ -15,6 +16,18 @@ const CATS: { key: IntegrationCategory; label: string; icon: typeof Landmark; su
   { key: "operasyon", label: "Ödeme, fatura & yayın", icon: CreditCard, sub: "Para ve ilan akışlarını doğrulanmış sağlayıcı sözleşmeleriyle yürüt." },
 ];
 
+const JUMPS = [
+  { href: "#sms-whatsapp", label: "SMS ve WhatsApp" },
+  { href: "#portal-uyelikleri", label: "Portal üyelikleri" },
+  { href: "#eids", label: "Bakanlık e-postaları" },
+  { href: "#e-fatura", label: "e-Fatura" },
+  { href: "#servis-durumu", label: "Servis durumu" },
+] as const;
+
+/**
+ * Entegrasyonların TEK sayfası: ofise özel bağlantılar (SMS/WhatsApp, portal üyelikleri, EİDS e-postaları, e-Fatura)
+ * bölüm olarak burada; altında tüm dış servislerin yapılandırma durumu. API ve webhook ayrı sayfadır (/app/ayarlar/api-webhook).
+ */
 export default async function EntegrasyonlarPage() {
   const { tenantId, perms } = await requireModulePage("settings");
   const canEditSettings = perms.settings?.includes("edit") ?? false;
@@ -29,7 +42,19 @@ export default async function EntegrasyonlarPage() {
 
       <PageHeader title="Entegrasyonlar" eyebrow="Bağlantı merkezi" description="Dış servis bağlantılarının ofisinize ait yapılandırma durumunu izleyin. “Yapılandırıldı” yalnız gerekli yerel kimlik ve güvenlik sözleşmesi tamamlandığında gösterilir; sağlayıcı sağlığı işlem anında ayrıca doğrulanır." />
 
-      <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
+      <nav aria-label="Entegrasyon bölümleri" className="flex flex-wrap gap-2">
+        {JUMPS.map((j) => (
+          <a key={j.href} href={j.href} className="focus-ring rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600">
+            {j.label}
+          </a>
+        ))}
+      </nav>
+
+      <OfficeIntegrationSections canEdit={canEditSettings} />
+
+      {tenantId ? <EInvoiceCard tenantId={tenantId} canEdit={canEditSettings} /> : null}
+
+      <section id="servis-durumu" className="theme-dark grid scroll-mt-24 gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <div className="rounded-[var(--radius-card)] border border-white/12 bg-white/8 px-5 py-4 text-center">
             <p className="font-display text-3xl font-extrabold">{configured}/{integrations.length}</p>
             <p className="text-xs text-white/60">yapılandırılmış bağlantı</p>
@@ -95,8 +120,6 @@ export default async function EntegrasyonlarPage() {
           </section>
         );
       })}
-
-      <EInvoiceCard canEdit={canEditSettings} />
 
       <p className="rounded-[var(--radius-card)] border border-line bg-canvas/60 px-4 py-3 text-xs text-text-muted">
         Kurulum gerekli durumundaki bağlantılar için kimlik bilgileri ve sağlayıcı doğrulaması tamamlanmalıdır. “Planlandı”

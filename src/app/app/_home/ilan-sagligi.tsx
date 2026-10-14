@@ -161,7 +161,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
         <ul className={`ds-sep -mx-1.5 ${hasSummary ? "mt-3" : ""}`}>
           {unconfirmed > 0 ? (
             <Satir
-              href="/app/portallar?durum=teyit"
+              href="/app/ilan-kontrol/portallar?durum=teyit"
               tone="warn"
               icon={<FileClock />}
               title={`${unconfirmed} ilan 7+ gündür teyitsiz`}
@@ -179,7 +179,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
           ) : null}
           {lost.length > 0 ? (
             <Satir
-              href="/app/kayip-kacak"
+              href="/app/ilan-kontrol/kapanis"
               tone="danger"
               icon={<Radar />}
               title={`Son kapanışlarda tahmini kaçan komisyon: ${moneyTry(lostTotal)}`}
@@ -201,7 +201,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
           ) : null}
           {(listings?.length ?? 0) > 0 ? (
             <Satir
-              href="/app/portallar"
+              href="/app/ilan-kontrol/portallar"
               tone={portalPct >= 90 ? "brand" : portalPct >= 70 ? "warn" : "danger"}
               icon={<Gauge />}
               title={`Portal teyit oranı %${portalPct}`}
@@ -215,7 +215,7 @@ async function IlanSagligiGovde({ ctx, closed }: { ctx: HomeCtx; closed: IlanSag
           {portals.map((p) => (
             <li key={p.name}>
               <Link
-                href={`/app/portallar?portal=${encodeURIComponent(p.name)}`}
+                href={`/app/ilan-kontrol/portallar?portal=${encodeURIComponent(p.name)}`}
                 title="Portala göre teyit durumu"
                 className="focus-ring inline-flex min-h-10 touch:min-h-11 items-center gap-2 rounded-full border border-hairline bg-surface-raised px-3 text-sm transition hover:border-brand-400"
               >

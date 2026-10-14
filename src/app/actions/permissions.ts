@@ -69,7 +69,7 @@ export async function updateTenantPermission(
     newValue: { role, module: mod, action, allowed },
   });
 
-  revalidatePath("/app/ayarlar/roller");
+  revalidatePath("/app/ayarlar/yetkilendirme");
   revalidatePath("/app");
   return { ok: true };
 }
@@ -132,7 +132,7 @@ async function auditPermissionChange(
 }
 
 function revalidateExceptionPaths() {
-  revalidatePath("/app/ayarlar/roller");
+  revalidatePath("/app/ayarlar/yetkilendirme");
   revalidatePath("/app/ayarlar/yetkilendirme");
   revalidatePath("/app");
 }
@@ -260,7 +260,7 @@ export async function resetRolePermissions(role: AppRole): Promise<PermissionAct
     newValue: { role },
   });
 
-  revalidatePath("/app/ayarlar/roller");
+  revalidatePath("/app/ayarlar/yetkilendirme");
   revalidatePath("/app");
   return { ok: true };
 }

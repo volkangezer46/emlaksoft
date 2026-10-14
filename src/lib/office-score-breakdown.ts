@@ -52,7 +52,7 @@ export function explainOfficeScore(input: OfficeScoreInputs): { components: Offi
       points: Math.min(16, input.livePortals * 3),
       max: 16,
       value: input.livePortals,
-      href: "/app/portallar",
+      href: "/app/ilan-kontrol/portallar",
       hint: `${input.livePortals} canlı ilan · ilan başına 3 puan, en çok 16`,
     },
     {
@@ -88,7 +88,7 @@ export function explainOfficeScore(input: OfficeScoreInputs): { components: Offi
       points: -Math.min(28, input.overdueConfirmations * 7),
       max: -28,
       value: input.overdueConfirmations,
-      href: "/app/portallar?durum=teyit",
+      href: "/app/ilan-kontrol/portallar?durum=teyit",
       hint: `${input.overdueConfirmations} teyitsiz ilan · ilan başına -7 puan, en çok -28`,
     },
   ];

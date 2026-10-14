@@ -20,15 +20,15 @@
 
 | Öğe | Şu an | Olması gereken hedef |
 |---|---|---|
-| 6 KPI kartı (page.tsx:528-574) | düz div | Toplam müşteri → `/app/musteriler` · Bugünkü arama → `/app/arama` · Aktif portföy → `/app/portfoyler` · Teyitsiz ilan → `/app/portallar?durum=teyitsiz` · Bekleyen komisyon → `/app/komisyon?durum=bekleyen` · Tahmini kayıp → `/app/kayip-kacak` |
+| 6 KPI kartı (page.tsx:528-574) | düz div | Toplam müşteri → `/app/musteriler` · Bugünkü arama → `/app/arama` · Aktif portföy → `/app/portfoyler` · Teyitsiz ilan → `/app/ilan-kontrol/portallar?durum=teyitsiz` · Bekleyen komisyon → `/app/komisyon?durum=bekleyen` · Tahmini kayıp → `/app/ilan-kontrol/kapanis` |
 | Ofis skoru kutusu | tıklanamaz | `/app/raporlar` + "skoru nasıl yükseltirim" açıklaması |
 | TAHSİL / BEKLEYEN mini statlar | tıklanamaz | `/app/komisyon` (durum filtreli) |
 | Komisyon grafiği ayları | statik SVG | aya tıkla → o ayın komisyon listesi |
 | Satış hunisi aşamaları | düz div | `/app/talepler?status=new\|active\|matched`, Kazanılan → `/app/anlasmalar` |
 | Kazanma oranı / Açık anlaşma | tıklanamaz | `/app/anlasmalar` |
 | Bugünkü görevler satırları | düz li | ilgili modüle (portallar/kayıp-kaçak/anlaşmalar); başlık → `/app/gorevler` |
-| Kayıp-kaçak kapanış kartları | tıklanamaz | `/app/kayip-kacak` / ilgili portföy |
-| Portal sağlığı satırları | tıklanamaz | `/app/portallar` (portal filtreli) |
+| Kayıp-kaçak kapanış kartları | tıklanamaz | `/app/ilan-kontrol/kapanis` / ilgili portföy |
+| Portal sağlığı satırları | tıklanamaz | `/app/ilan-kontrol/portallar` (portal filtreli) |
 | Ekip performansı satırları | hover VAR, link YOK | `/app/ekip/{member.id}` |
 | Son 24s canlı akış öğeleri | düz metin (id'ler feed key'lerinde zaten var!) | müşteri → `/app/musteriler/{id}`, portföy → `/app/portfoyler/{id}`, arama → `/app/arama`, randevu → `/app/randevular` |
 
@@ -64,7 +64,7 @@
 - `/app/hedefler` — "X/Y anlaşma" → `/app/anlasmalar` (danışman filtreli); ofis kartı → `/app/raporlar`
 - `/app/bolge-analizi` — satır linki `?q=<ilçe adı>` yerine `?district=<id>` kesin filtre; grafik çubukları tıklanabilir
 - `/app/giderler` — donut segmentleri kategori filtresi; satır → düzenleme diyaloğu
-- `/app/aidat`, `/app/kayip-kacak`, `/app/kayip-satis`, `/app/franchise`, `/app/degerleme`, `/app/portallar` (**portföy başlığı linksiz — en kritik**), `/app/kampanyalar`, `/app/otomasyonlar`, `/app/destek`, `/app/denetim` (entity_id → ilgili kayıt), `/app/uyum`, `/app/acik-ev` — hepsinde aynı desen: KPI → filtre, satır → detay, grafik → drill-down
+- `/app/aidat`, `/app/ilan-kontrol/kapanis`, `/app/kayip-satis`, `/app/franchise`, `/app/degerleme`, `/app/ilan-kontrol/portallar` (**portföy başlığı linksiz — en kritik**), `/app/kampanyalar`, `/app/otomasyonlar`, `/app/destek`, `/app/ofis-kontrol/kayit` (entity_id → ilgili kayıt), `/app/uyum`, `/app/acik-ev` — hepsinde aynı desen: KPI → filtre, satır → detay, grafik → drill-down
 - Topbar "Ofis skoru" rozeti → `/app/raporlar`
 
 **Admin tarafı:** `/admin/aktivite` (satır → diff detayı; "Ofis" linki mobilde gizli!), `/admin/bildirimler` (href'siz bildirim en azından okundu işaretlemeli), `/admin/billing` (fatura → fatura detayı/PDF), `/admin/danisman` (KPI'lar + AI yanıtındaki ofis adlarına derin link), `/admin/geo` (il/ilçe ADI tıklanabilir olmalı, sadece sağdaki buton değil), `/admin/sistem?sekme=hatalar` (kiracı adı → tenant; kart → stack detayı), `/admin/members` (ROW_HREF set edilmemiş!), `/admin/personel` (personel → aktivite aktör filtresi), `/admin/satis` (KPI'lar mevcut `?durum=` filtresine bağlanmalı — **en kolay kazanç**), `/admin/tenants` (üye sayısı → members; slug → public site), `/admin/tenants/[id]` (4 KPI → ilgili modüller), `/admin/tickets` (ofis adı → tenant; sayaçlar/halka/barlar → filtre)
@@ -282,7 +282,7 @@ Kalan işlerin tam listesi sohbet kaydında ve aşağıdaki Faz 2-3 bölümlerin
 
 **EK GÜNCELLEME (dalga M — 5 ajan + kanıtlama):** Talep-Arz Haritası raporu (/app/raporlar/talep-arz: il denge haritası + ilçe boşluk analizi "Fırsat: portföy topla / Talep üret") · ICS takvim aboneliği (/api/takvim/[token], Google Takvim linki, "Linki yenile") + randevu çakışma freni ("Yine de kaydet" akışı, create+update) · portföy sunum dosyası (/app/portfoyler/sunumlar + /sunum/[token] markalı public sunum, yazdır=A4 PDF, görüntülenme sayacı) · müşteri sıcaklık segmentasyonu (0-100 skor, Sıcak/İlgili/Soğuk/Uykuda rozetleri + ?segment= filtre + toplu "Yeniden ısıt" görevi, tek RPC ile N+1'siz) · vitrin ISR invalidation düzeltmesi (publish→revalidatePath) · geo tutarlılık cron'u (16. cron, çeyreklik) · TCMB kur backfill scripti (npm run kur:backfill). Migration 099–102 dev DB'de. Durum: 116 rota, 180 birim + 33 E2E test, build/lint/tsc/link kontratı yeşil.
 
-**EK GÜNCELLEME — 2026-07-27 (dalga N — 5 ajan + kanıtlama):** Anlaşma evrak kontrol listesi (satılık/kiralık şablonları, ilerleme çubuğu, kanban "3/7" rozeti, migration 103) · NPS müşteri memnuniyet anketi (/anket/[token] public 0-10 + /app/raporlar/memnuniyet NPS raporu, düşük puanda anında uyarı, migration 104) · Günün rotası (/app/randevular?gorunum=rota: durak listesi + numaralı harita + "Sıkışık geçiş" uyarısı + Google Maps yol tarifi) · Vitrin v2 (benzer ilanlar ±%30, favoriler localStorage + /vitrin/[slug]/favoriler, "Fiyat düşünce haber ver" alarmı + vitrin-alarm cron'u, migration 105) · Ofis duyuru panosu (/app/ayarlar/duyurular + dashboard bandı + okundu takibi, migration 106). Durum: 120 rota, 103–106 migration'lar dev DB'de, 17 cron, 188 birim + 38 E2E test (32 passed / 3 retry-yeşil / 3 bilinçli skip), build/lint/tsc/link kontratı yeşil.
+**EK GÜNCELLEME — 2026-07-27 (dalga N — 5 ajan + kanıtlama):** Anlaşma evrak kontrol listesi (satılık/kiralık şablonları, ilerleme çubuğu, kanban "3/7" rozeti, migration 103) · NPS müşteri memnuniyet anketi (/anket/[token] public 0-10 + /app/anketler?sekme=sonuc NPS raporu, düşük puanda anında uyarı, migration 104) · Günün rotası (/app/randevular?gorunum=rota: durak listesi + numaralı harita + "Sıkışık geçiş" uyarısı + Google Maps yol tarifi) · Vitrin v2 (benzer ilanlar ±%30, favoriler localStorage + /vitrin/[slug]/favoriler, "Fiyat düşünce haber ver" alarmı + vitrin-alarm cron'u, migration 105) · Ofis duyuru panosu (/app/ayarlar/duyurular + dashboard bandı + okundu takibi, migration 106). Durum: 120 rota, 103–106 migration'lar dev DB'de, 17 cron, 188 birim + 38 E2E test (32 passed / 3 retry-yeşil / 3 bilinçli skip), build/lint/tsc/link kontratı yeşil.
 
 ---
 

@@ -29,7 +29,7 @@ describe("potansiyel kayıp tek kaynak", () => {
 
   it("closure_loss motorun eşitlediği türlerden değil (otomatik kapanmaz); ekran ve cron tek kaynağa bağlı", () => {
     expect(PROPERTY_MANAGED_ANOMALY_TYPES).not.toContain("closure_loss");
-    const page = readFileSync("src/app/app/kayip-kacak/page.tsx", "utf8");
+    const page = readFileSync("src/app/app/ilan-kontrol/kapanis/page.tsx", "utf8");
     expect(page).toContain("loadPotentialLosses(");
     expect(page).toContain("summarizeLosses(");
     expect(readFileSync("src/app/api/cron/leak-sla/route.ts", "utf8")).toContain("20261007000610");

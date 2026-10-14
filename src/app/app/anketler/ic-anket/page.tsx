@@ -19,6 +19,8 @@ import { loadPulseFormState, pulseEligibleRole, pulsePeriod } from "@/lib/survey
 import { SurveyNav, SurveyNotReady } from "../survey-nav";
 import { PulseForm, type PulseQuestionVM } from "./pulse-form";
 
+export const metadata = { title: "İç anket · Anketler" };
+
 const BASE = "/app/anketler/ic-anket";
 const TREND_MONTHS = 6;
 

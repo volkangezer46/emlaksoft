@@ -74,13 +74,11 @@ export const metadata = { title: "Ana ekran" };
 export default async function AppHomePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ tv?: string; donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string }>;
+  searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string }>;
 }) {
   // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
   const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
-  const { tv = "", donem, kapsam, daha, icgoru, ozet } = sp ?? {};
-  // Eski `/app?tv=1` bağlantıları tek TV rotasına gider (kabuksuz, canlı, tam ekran).
-  if (tv === "1") redirect("/app/pano-tv");
+  const { donem, kapsam, daha, icgoru, ozet } = sp ?? {};
 
   const { tenantId, perms, role, userId } = gate;
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.

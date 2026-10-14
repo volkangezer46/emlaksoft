@@ -105,7 +105,7 @@ export function buildNextActions(i: NextActionInput): NextAction[] {
       label: "İlanları teyit et",
       title: `${i.unconfirmedListings} ilan 7+ gündür teyitsiz`,
       reason: "Portallarda yayında görünmeyen ilan müşteri kaçırır.",
-      href: "/app/portallar?durum=teyit",
+      href: "/app/ilan-kontrol/portallar?durum=teyit",
       tone: "warn",
     });
   }

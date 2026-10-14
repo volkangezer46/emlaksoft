@@ -61,7 +61,7 @@ const BUGUN: HubDef = {
   label: "Bugün",
   group: "Günlük işler",
   icon: "baslikBugun",
-  pages: [p("/app", "Özet"), p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
+  pages: [p("/app", "Bugün"), p("/app/randevular", "Randevular"), p("/app/gorevler", "Görevler")],
 };
 
 const MUSTERILER: HubDef = {
@@ -73,7 +73,6 @@ const MUSTERILER: HubDef = {
     p("/app/musteriler", "Müşteriler"),
     p("/app/talepler", "Talepler"),
     p("/app/gelen-kutusu", "Gelen kutusu"),
-    p("/app/akilli-listeler", "Akıllı listeler"),
     p("/app/tavsiyeler", "Tavsiyeler"),
     p("/app/kampanyalar", "Kampanyalar"),
   ],
@@ -90,7 +89,6 @@ const ILANLAR: HubDef = {
     p("/app/portfoy-avi", "Sahibinden ilanlar"),
     p("/app/ilan-havuzu", "Havuz ve atama"),
     p("/app/ilan-kontrol", "İlan kontrolü"),
-    p("/app/portallar", "Portallar"),
     p("/app/portfoyler/anahtarlar", "Anahtarlar"),
     p("/app/portfoyler/sunumlar", "Sunumlar"),
     p("/app/ayarlar/filigran", "Filigran"),
@@ -130,22 +128,27 @@ const KIRALAMA_AIDAT: HubDef = {
   pages: [p("/app/kiralama", "Kiralar"), p("/app/aidat", "Aidatlar"), p("/app/kira-artis", "Kira artışı")],
 };
 
+/** Ofis içi duyuru yönetimi (Bildirimler sayfasının yönetim sekmesi; `settings` izniyle görünür). */
+export const DUYURU_YONETIM_HREF = "/app/bildirimler?sekme=yonetim";
+
 const EKIBIM: HubDef = {
   id: "ekibim",
   label: "Ekibim",
   group: "Yönetim",
   icon: "ekip",
   pages: [
-    p("/app/ekip", "Danışmanlar"),
+    p("/app/ekip", "Ekip"),
     p("/app/hedefler", "Hedefler"),
     p("/app/danisman-kpi", "Karne"),
-    p("/app/pano-tv", "TV ekranı"),
     p("/app/ofis-kontrol", "Ofis kontrolü"),
+    p("/app/belgeler", "Belgeler"),
+    p("/app/uyum", "Uyum"),
+    p(DUYURU_YONETIM_HREF, "Duyurular"),
+    p("/app/pano-tv", "TV ekranı"),
     p("/app/ekip/takimlar", "Takımlar"),
     p("/app/ekip/subeler", "Şubeler"),
     p("/app/ekip/devir", "Danışman devri"),
     p("/app/lig", "Lig"),
-    p("/app/denetim", "Denetim"),
   ],
 };
 
@@ -158,7 +161,6 @@ const RAPORLAR: HubDef = {
     p("/app/raporlar", "Genel"),
     p("/app/bolge-analizi", "Bölge"),
     p("/app/raporlar/talep-arz", "Talep ve arz"),
-    p("/app/raporlar/kar-zarar", "Kâr-zarar"),
     p("/app/anketler", "Anketler"),
     p("/app/raporlar/lead-hizi", "Yanıt hızı"),
     p("/app/franchise"),
@@ -189,7 +191,9 @@ const BEN: HubDef = {
   short: "Ben",
   group: "Kişisel",
   icon: "rozet",
-  pages: [p("/app/performansim", "Performansım"), p("/app/hedefler", "Hedefim", true), p("/app/hesabim", "Profilim")],
+  // Hedef: danışmanın varsayılan yetkisinde `targets` modülü yok (hedefi yönetim belirler); izin verilen danışman hedefine
+  // Performansım'daki "Hedefler" bağlantısından ve 360 "Hedef" sekmesinden ulaşır. Ölü menü satırı tutulmaz.
+  pages: [p("/app/performansim", "Performansım"), p("/app/hesabim", "Profilim")],
 };
 
 /* ------------------------------- Muhasebe / çağrı / salt okunur ------------------------------- */
@@ -209,18 +213,27 @@ const AYARLAR: HubDef = {
   id: "ayarlar",
   label: "Ayarlar",
   icon: "ayar",
+  // İlk 5 şeritte görünür; seyrek kullanılanlar "Diğer" altındadır (şerit sırası = dizi sırası).
   pages: [
     p("/app/ayarlar", "Genel"),
-    p("/app/ayarlar/roller", "Roller"),
     p("/app/ayarlar/yetkilendirme", "Yetkiler"),
+    p("/app/ayarlar/guvenlik", "Güvenlik"),
+    p("/app/ayarlar/entegrasyonlar", "Entegrasyonlar"),
     p("/app/ayarlar/moduller", "Modüller"),
+    p("/app/ayarlar/tanimlar", "Seçim listeleri"),
+    p("/app/ayarlar/merkez", "Kurallar ve varsayılanlar"),
+    p("/app/ayarlar/lead", "Aday yakalama"),
+    p("/app/ayarlar/vitrin", "Vitrin"),
     p("/app/ayarlar/ozel-alanlar", "Özel alanlar"),
-    p("/app/ayarlar/api-webhook", "API"),
+    p("/app/ayarlar/api-webhook", "API ve webhook"),
     p("/app/otomasyonlar", "Otomasyonlar"),
     p("/app/ayarlar/is-akislari", "İş akışları"),
-    p("/app/uyum", "Uyum"),
-    p("/app/belgeler", "Belgeler"),
+    p("/app/ayarlar/etiketler", "Etiketler"),
+    p("/app/ayarlar/mesaj-sablonlari", "Mesaj şablonları"),
     p("/app/ayarlar/ai-kullanim", "AI kullanımı"),
+    p("/app/ayarlar/cop-kutusu", "Çöp kutusu"),
+    p("/app/ayarlar/cografya-bildir", "Bölge bildirimi"),
+    p("/app/ayarlar/gercek-kullanim", "Gerçek kullanım"),
     p("/app/ayarlar/sahiplik-devri", "Sahiplik devri"),
   ],
 };
@@ -238,9 +251,6 @@ const TOOLS_COMMON = [
   "/app/ag",
   "/app/acik-ev",
   "/app/projeler",
-  // Ayarlar dizininde de kart olarak bulunur; müşteri şeridinden çıkarıldı (şerit 6 sekme), kaybolmasın diye araç listesinde.
-  "/app/ayarlar/etiketler",
-  "/app/ayarlar/mesaj-sablonlari",
 ] as const;
 
 /* ------------------------------- Rol düzenleri ------------------------------- */
@@ -343,3 +353,9 @@ export function isManagementRole(role: string | null | undefined): boolean {
 export function layoutHrefs(layout: RoleNav): string[] {
   return [...layout.hubs, ...layout.dock].flatMap((h) => h.pages.map((pg) => pg.href)).concat(layout.tools);
 }
+
+/**
+ * Yan menü grup başlıkları (ofis yönetimi düzeni, menü sırasıyla): tanıtım sayfasındaki "iş başlığı" sayısı ve menü
+ * anlatımları buradan türetilir (sabit sayı yazılmaz).
+ */
+export const NAV_GROUPS: readonly string[] = [...new Set(MANAGER.hubs.flatMap((h) => (h.group ? [h.group] : [])))];

@@ -41,8 +41,8 @@ export async function DanismanAra({ ctx }: { ctx: HomeCtx }) {
         <h2 id="ara-baslik" className="pm-bx-eyebrow">
           Bugün ara
         </h2>
-        <Link href="/app/akilli-listeler" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
-          Akıllı listeler
+        <Link href="/app/musteriler?segment=risk" className="focus-ring rounded-[var(--radius-control)] px-1 text-xs font-semibold text-[var(--accent-text)]">
+          Kaybedilme riski
         </Link>
       </div>
       {rows.length === 0 ? (

@@ -23,6 +23,8 @@ import { getPlanName } from "@/lib/billing/plan-definitions";
 import { closureDownloadAllowed } from "@/lib/admin/office-closure";
 import { ClosureDataPanel } from "./closure-data-panel";
 
+export const metadata = { title: "Hesap askıda" };
+
 
 const nf = new Intl.NumberFormat("tr-TR");
 

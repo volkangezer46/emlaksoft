@@ -1,12 +1,12 @@
 import { FilterChip } from "@/components/ui/filter-chip";
 
-export type OversightTab = "akis" | "uyarilar" | "karne" | "kurallar" | "benim";
+export type OversightTab = "akis" | "uyarilar" | "kayit" | "kurallar" | "benim";
 
 const TABS: { id: OversightTab; label: string; href: string; officeOnly: boolean }[] = [
   { id: "akis", label: "İşlem akışı", href: "/app/ofis-kontrol", officeOnly: true },
   { id: "uyarilar", label: "Uyarılar", href: "/app/ofis-kontrol/uyarilar", officeOnly: true },
-  { id: "karne", label: "Danışman karnesi", href: "/app/ofis-kontrol/karne", officeOnly: true },
   { id: "kurallar", label: "Kurallar ve eşikler", href: "/app/ofis-kontrol/kurallar", officeOnly: true },
+  { id: "kayit", label: "Denetim kaydı", href: "/app/ofis-kontrol/kayit", officeOnly: true },
   { id: "benim", label: "Benim akışım", href: "/app/ofis-kontrol/benim", officeOnly: false },
 ];
 

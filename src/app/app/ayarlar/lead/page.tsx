@@ -8,6 +8,8 @@ import { getBaseUrl } from "@/lib/base-url";
 
 import { ReadOnlyGate } from "../read-only-gate";
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata = { title: "Aday yakalama · Ayarlar" };
 export const dynamic = "force-dynamic";
 
 export default async function LeadCaptureSettingsPage() {
@@ -39,7 +41,19 @@ export default async function LeadCaptureSettingsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Gelen aday & hızlı yanıt" eyebrow="Aday yakalama" description="Web sitesi formu, reklam veya portal adaylarını CRM'e otomatik düşürün. Her aday sırayla en uygun danışmana atanır ve anında bildirim gönderilir." />
+      <PageHeader
+        title="Gelen aday & hızlı yanıt"
+        eyebrow="Aday yakalama"
+        description={
+          <>
+            Web sitesi formu, reklam veya portal adaylarını CRM&apos;e otomatik düşürün. Her aday{" "}
+            <Link href="/app/ayarlar/merkez?grup=dagitim" className="font-semibold text-brand-600 hover:underline">
+              sırayla atanır
+            </Link>{" "}
+            (dağıtım yöntemi Kurallar ve varsayılanlar ekranında) ve anında bildirim gönderilir.
+          </>
+        }
+      />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <Link

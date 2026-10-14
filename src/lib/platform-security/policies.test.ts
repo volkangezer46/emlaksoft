@@ -102,7 +102,7 @@ describe("isPathUnderMaintenance", () => {
     ["/fiyatlar", "site", true],
     ["/admin", "site", false],
     ["/giris/mfa", "site", false],
-    ["/api/statik/ana-sayfa", "site", false],
+    ["/api/statik/sayfa/home", "site", false],
     ["/bakim", "site", false],
   ];
   it.each(table)("%s · %s → %s", (path, scope, expected) => {

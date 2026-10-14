@@ -252,7 +252,7 @@ export async function approveRecurringOccurrence(occurrenceId: string, amount?: 
   if (error) return rpcFailure(error, "Ödeme onaylanamadı.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "approved") return { error: recurringOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true, id: occurrenceId };
 }
 

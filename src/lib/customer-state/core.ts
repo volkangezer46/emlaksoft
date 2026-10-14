@@ -1,5 +1,5 @@
 /**
- * Müşteri durumu okuyucusu — TEK KAPI. Müşteri listesi rozetleri, müşteri 360, Akıllı Listeler,
+ * Müşteri durumu okuyucusu — TEK KAPI. Müşteri listesi rozetleri ve risk/satıcı süzgeçleri, müşteri 360,
  * ana ekran "bugün ara", AI danışman ve içgörü kuralları aynı müşteri için AYNI sıcaklık/riski bu
  * fonksiyondan okur. Yeni skor icat etmez: iç parçalar mevcut modellerdir
  * (`heat.ts`, `lead.ts`, `churn.ts`, `seller.ts`; anlaşma puanı `deal.ts`), eşikler `thresholds.ts`.
@@ -213,7 +213,7 @@ export function buildCustomerState(input: CustomerStateInput, nowMs: number, opt
     const HEAT_HREF: Record<string, string> = {
       "Açık talep": `/app/talepler?customer=${id}`,
       "Acil talep": `/app/talepler?customer=${id}`,
-      "Açık teklif/anlaşma": `/app/teklifler?musteri=${id}`,
+      "Açık teklif/anlaşma": `/app/musteriler/${id}?sekme=ozet`,
       "Son temas": `/app/gelen-kutusu?customer=${id}`,
     };
     for (const f of [...heat.factors].filter((x) => x.points > 0).sort((a, b) => b.points - a.points)) {

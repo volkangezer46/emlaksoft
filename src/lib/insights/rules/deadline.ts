@@ -66,7 +66,7 @@ export function evaluateDeadlinesRun(facts: readonly DeadlineFact[], nowMs: numb
         title: `İlan teyidi ${silentDays} gündür yapılmadı: ${name}`,
         why: "Teyitsiz kalan portal ilanı eski bilgiyle yayında kalabilir; ilanı kontrol edip teyit edin.",
         evidence: [{ label: "Son teyitten beri", value: `${silentDays} gün` }],
-        href: "/app/portallar?durum=teyit",
+        href: "/app/ilan-kontrol/portallar?durum=teyit",
         entityType: "property",
         entityId: f.entityId,
         isForecast: false,

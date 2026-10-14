@@ -192,7 +192,7 @@ export async function recordCashEntry(direction: CashDirection, input: Record<st
   if (error) return rpcFailure(error, "Hareket kaydedilemedi.");
   const res = asObject(data);
   if (res.outcome !== "recorded") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   // "Her ay tekrarla": kayıt bugün girildi; kural gelecek aydan başlar (aynı ay iki kez yazılmaz).
   let info: string | undefined;
   if (input.repeatMonthly === true || input.repeatMonthly === "1") {
@@ -238,7 +238,7 @@ export async function updateCashEntry(entryId: string, input: Record<string, unk
   if (error) return rpcFailure(error, "Hareket güncellenemedi.");
   const res = asObject(data);
   if (res.outcome !== "updated") return { error: financeOutcomeMessage(String(res.outcome ?? ""), { openingDate: res.opening_date as string | undefined }) };
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true, id: entryId };
 }
 
@@ -258,7 +258,7 @@ export async function voidCashEntry(entryId: string, reason: string): Promise<Fi
   if (error) return rpcFailure(error, "Hareket iptal edilemedi.");
   const outcome = String(asObject(data).outcome ?? "");
   if (outcome !== "voided") return { error: financeOutcomeMessage(outcome) };
-  revalidateTenantData(gate.tenantId, [...PATHS, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(gate.tenantId, PATHS);
   return { ok: true, id: entryId };
 }
 

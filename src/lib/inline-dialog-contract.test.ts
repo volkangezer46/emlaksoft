@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
  * (`@/components/ui/dialog`) geri gelmesin. Kısa evet/hayır onayı `ConfirmDialog` ile kalabilir.
  */
 const INLINE_FLOWS = [
-  "src/app/app/portallar/portal-dialogs.tsx",
+  "src/app/app/ilan-kontrol/portallar/portal-dialogs.tsx",
   "src/components/app/portal-link-dialog.tsx",
   "src/app/app/ag/demand-response-dialog.tsx",
   "src/app/app/ag/collab-request-dialog.tsx",

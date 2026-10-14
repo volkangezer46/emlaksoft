@@ -1,6 +1,6 @@
 import { ICONS } from "@/lib/icons";
 import { featureForHref } from "@/lib/modules/route-table";
-import { navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
+import { NAV_PAGE_LABELS, navSearchText, PALETTE_ONLY_PAGES, visibleSections, type NavIcon } from "@/lib/nav-config";
 import type { AppModule } from "@/lib/permissions";
 import { ACCENTS, writeAccentPref, writeThemePref, type AccentPref, type ThemePref } from "@/lib/theme";
 import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
@@ -100,21 +100,21 @@ export function getAppActions(
   ).map(({ label, href, icon, shortcut }) => ({ label, href, icon, shortcut }));
 }
 /**
- * "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). Arama etiket +
- * açıklama + eş anlamlılarda yapılır ("lead" → Talepler); sekmeler "Öğe · Sekme" adıyla listelenir
- * (Raporlar · Bölge), öğenin kendi sekmesi öğe adını ve `g` kısayolunu taşır.
+ * "Git" grubu: nav-config'teki yetkili sayfalar (menüyle birebir aynı süzgeç). Ad menüdeki GÖRÜNEN addır
+ * (`NAV_PAGE_LABELS`, nav-roles tek kaynak: "Bugün", "Ekip", "Yetkiler", "Destek"); menüde olmayan sekme "Öğe · Sekme"
+ * adıyla listelenir. Arama ad + açıklama + eş anlamlılarda yapılır ("lead" → Talepler); öğenin kendi sekmesi `g` kısayolunu taşır.
  */
 export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: readonly string[] = []): PaletteEntry[] {
   return visibleSections(accessible, { closed })
     .flatMap((s) => s.items)
     .flatMap((i) => {
       if (!i.tabs || i.tabs.length <= 1) {
-        return [{ label: i.label, href: i.href, icon: i.icon, description: i.description, keywords: i.keywords, shortcut: i.shortcut }];
+        return [{ label: NAV_PAGE_LABELS.get(i.href) ?? i.label, href: i.href, icon: i.icon, description: i.description, keywords: i.keywords, shortcut: i.shortcut }];
       }
       return i.tabs.map((t) => {
         const own = t.href === i.href;
         return {
-          label: own ? i.label : `${i.label} · ${t.label}`,
+          label: NAV_PAGE_LABELS.get(t.href) ?? (own ? i.label : `${i.label} · ${t.label}`),
           href: t.href,
           icon: t.icon,
           description: own ? i.description : t.description,
@@ -126,7 +126,7 @@ export function getAppGoItems(accessible: readonly AppModule[], q = "", closed: 
     .concat(
       // Menüde olmayan ama aranabilir sayfalar (ör. Bildirimler: üst çubuk zili).
       PALETTE_ONLY_PAGES.filter((p) => accessible.includes(p.module) && !isClosedFeatureHref(p.href, closed)).map((p) => ({
-        label: p.label,
+        label: NAV_PAGE_LABELS.get(p.href) ?? p.label,
         href: p.href,
         icon: p.icon,
         description: p.description,
@@ -204,7 +204,7 @@ export const PALETTE_INTENTS: readonly PaletteIntent[] = [
     id: "faturalar",
     label: "Faturalar",
     description: "Kestiğin ve aldığın faturalar (e-Fatura)",
-    href: "/app/giderler?sekme=faturalar",
+    href: "/app/giderler?sekme=belgeler&tur=fatura",
     icon: ICONS.gider,
     needs: "access",
     module: "expenses",

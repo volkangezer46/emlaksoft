@@ -17,7 +17,7 @@ const p = (id: string, text: string, gate = "") => ({ id, text, gate, hidden: fa
  * " (Profesyonel pakette)". Özellik en düşük pakette açılırsa etiket kendiliğinden kalkar.
  */
 function leakPlanNote(): string {
-  const gate = findGate("/app/kayip-kacak");
+  const gate = findGate("/app/ilan-kontrol/kapanis");
   return gate && gate.minPlan !== "advisor" ? ` (${getPlan(gate.minPlan).name} pakette)` : "";
 }
 const c = (id: string, text: string) => ({ id, text, hidden: false });
@@ -52,8 +52,8 @@ export function defaultSiteContent(): SiteContent {
       },
     },
     sections: {
-      tur: { eyebrow: "Ürün turu", title: "Panelin içine", em: "bir bakın.", tail: "", text: "Yedi ana ekranın örnek görünümü. Menüdeki dokuz iş başlığının hepsi aynı müşteri ve portföy kaydını kullanır." },
-      ozellikler: { eyebrow: "Ürün", title: "Bir ofisin ihtiyacı olan her şey,", em: "birbirine bağlı.", tail: "", text: "Menü dokuz iş başlığına ayrılır; hepsi aynı müşteri ve portföy kaydını kullanır, veriyi tekrar girmezsiniz." },
+      tur: { eyebrow: "Ürün turu", title: "Panelin içine", em: "bir bakın.", tail: "", text: "Yedi ana ekranın örnek görünümü. Menüdeki tüm iş başlıkları aynı müşteri ve portföy kaydını kullanır." },
+      ozellikler: { eyebrow: "Ürün", title: "Bir ofisin ihtiyacı olan her şey,", em: "birbirine bağlı.", tail: "", text: "Menü az sayıda iş başlığına ayrılır; hepsi aynı müşteri ve portföy kaydını kullanır, veriyi tekrar girmezsiniz." },
       diger: { eyebrow: "Ayrıntılar", title: "Günlük işi kolaylaştıran", em: "küçük büyük şeyler.", tail: "", text: "Vitrin, portal ve otomasyonun yanında ofisin her günü kullandığı yardımcı özellikler." },
       neden: { eyebrow: "Neden EmlakSoft", title: "Excel, WhatsApp ve defterle", em: "karşılaştırın.", tail: "", text: "Bugün işi nasıl yürütüyorsanız, aynı işin ürün içindeki karşılığı." },
       nasil: { eyebrow: "Nasıl çalışır", title: "Üç adımda", em: "başlayın.", tail: "", text: "" },
@@ -175,7 +175,7 @@ export function defaultSiteContent(): SiteContent {
       { id: "portfoy", label: "Portföy", text: "Portföyleriniz durumlarıyla kart görünümünde; yayın teyidi bekleyenler ayrışır.", points: [p("p1", "Kiralama, proje ve açık ev yönetimi"), p("p2", "Portal kontrolü ve anahtar takibi"), p("p3", "Sunumlar ve ofisler arası ağ")], hidden: false },
       { id: "anlasmalar", label: "Anlaşmalar", text: "Tekliften tamamlanmaya anlaşmalar aşamalarına göre sütunlarda ilerler.", points: [p("p1", "Teklif ve sözleşme aynı kayıtta"), p("p2", "SMS onaylı dijital imza", "/app/sozlesmeler"), p("p3", "Aşama bazlı takip")], hidden: false },
       { id: "komisyon", label: "Komisyon", text: "Komisyon kayıtları, bölüşüm ve hakediş durumu aylık dağılımla birlikte.", points: [p("p1", "Bölüşüm ve hakediş kayıt altında"), p("p2", "Onay akışı"), p("p3", "Cüzdan, gider ve aidat takibi")], hidden: false },
-      { id: "raporlar", label: "Raporlar", text: "Satış hunisi, danışman karnesi ve kaçan komisyon özeti.", points: [p("p1", "Satış hunisi ve trendler"), p("p2", "Danışman KPI ve ekip ligi"), p("p3", "Kayıp-kaçak karnesi", "/app/kayip-kacak")], hidden: false },
+      { id: "raporlar", label: "Raporlar", text: "Satış hunisi, danışman karnesi ve kaçan komisyon özeti.", points: [p("p1", "Satış hunisi ve trendler"), p("p2", "Danışman KPI ve ekip ligi"), p("p3", "Kayıp-kaçak karnesi", "/app/ilan-kontrol/kapanis")], hidden: false },
       { id: "otomasyon", label: "Otomasyon", text: "Hatırlatma, teyit ve özet işleri arka planda zamanlanmış görevlerle çalışır.", points: [p("p1", "{gorev} otomatik görev"), p("p2", "İş akışı ve onay akışları", "/app/onaylar"), p("p3", "Çalışmalar kayıt altına alınır")], hidden: false },
     ],
     // Özellik ızgarası: kimlik = illüstrasyon + ızgara yerleşimi + paket rozeti yolu (bento-grid.tsx TILE_META).
@@ -198,7 +198,7 @@ export function defaultSiteContent(): SiteContent {
       rows: [
         { id: "musteri", topic: "Müşteri ve talep", old: "Dosyalara ve sohbetlere dağılmış kayıtlar; talep unutulabilir.", now: "Tek müşteri kartı; talep ve portföy eşleşmesi aynı akışta.", gate: "", hidden: false },
         { id: "takip", topic: "Takip ve hatırlatma", old: "Hatırlatma sizin hafızanızda ve not defterinizde.", now: "Görev ve randevu hatırlatmaları otomatik görevlerle gelir.", gate: "", hidden: false },
-        { id: "kacak", topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: "Zorunlu kapanış formu ve kaçak karnesi.", gate: "/app/kayip-kacak", hidden: false },
+        { id: "kacak", topic: "Kaçan fırsat", old: "Bir ilanın neden kaybedildiği çoğu zaman bilinmez.", now: "Zorunlu kapanış formu ve kaçak karnesi.", gate: "/app/ilan-kontrol/kapanis", hidden: false },
         { id: "komisyon", topic: "Komisyon", old: "Elle hesap; bölüşümde ve hakedişte tartışma çıkar.", now: "Bölüşüm, hakediş ve onay durumu kayıt altında.", gate: "", hidden: false },
         { id: "erisim", topic: "Ekip erişimi", old: "Dosyaya ulaşan herkes her şeyi görür.", now: "Rol ve izin matrisi; ofis verisi ayrı tutulur.", gate: "", hidden: false },
         { id: "imza", topic: "Sözleşme ve imza", old: "Kâğıt, fotoğraf ve mesajlaşma ile onay.", now: "SMS onaylı dijital imza akışı.", gate: "/app/sozlesmeler", hidden: false },

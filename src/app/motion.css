@@ -117,8 +117,6 @@
   .list-stagger > :nth-child(10) { animation-delay: calc(var(--motion-stagger) * 9); }
   .list-stagger > :nth-child(11) { animation-delay: calc(var(--motion-stagger) * 10); }
   .list-stagger > :nth-child(12) { animation-delay: calc(var(--motion-stagger) * 11); }
-  /* TV modu hareketsizdir (DASHBOARD_SPEC). */
-  .tv-zoom .list-stagger > * { animation: none; }
 
   /* ---- İlerleme çubuğu dolumu (genişlik zaten doğru; yalnız ilk çizim) ---- */
   @keyframes progress-fill { from { transform: scaleX(0); } to { transform: none; } }

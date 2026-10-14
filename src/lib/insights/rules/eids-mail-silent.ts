@@ -29,7 +29,7 @@ export function evaluateEidsMailSilent(fact: EidsMailSilentFact | null, nowMs: n
         { label: "Son e-posta", value: fact.lastReceivedAt ? String(fact.lastReceivedAt).slice(0, 10) : "Hiç gelmedi" },
         { label: "Elle girilen yetki (90 gün)", value: String(fact.manualGrants90d) },
       ],
-      href: "/app/ayarlar?sekme=entegrasyon",
+      href: "/app/ayarlar/entegrasyonlar#eids",
       entityType: null,
       entityId: null,
       isForecast: false,

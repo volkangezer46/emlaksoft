@@ -506,7 +506,7 @@ export default async function FranchiseBiPage({
                 ? "Seçili dönemde kayıp-kaçak kaydı yok."
                 : "Henüz kayıp-kaçak kaydı yok. Portal kapanışları burada şube bazında konsolide edilir."}
             </p>
-            <Link href="/app/kayip-kacak" className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
+            <Link href="/app/ilan-kontrol/kapanis" className="mt-3 inline-flex text-xs font-semibold text-brand-600 hover:underline">
               Kayıp-kaçak modülüne git →
             </Link>
           </div>
@@ -516,7 +516,7 @@ export default async function FranchiseBiPage({
               .filter((r) => r.lost > 0)
               .sort((a, b) => b.lost - a.lost)
               .map((r) => (
-                <Link key={r.id} href="/app/kayip-kacak" className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
+                <Link key={r.id} href="/app/ilan-kontrol/kapanis" className="focus-ring group block rounded-[var(--radius-control)] p-1 -m-1">
                   <div className="min-w-0">
                     <div className="mb-1 flex justify-between text-xs">
                       <span className="flex items-center gap-1 truncate font-semibold text-ink-950">

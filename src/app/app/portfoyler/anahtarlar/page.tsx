@@ -34,6 +34,8 @@ import {
 } from "@/lib/key-overdue";
 import { PersonSelect } from "@/components/ui/person-select";
 
+export const metadata = { title: "Anahtarlar · Portföyler" };
+
 /**
  * Anahtar panosu — ofis genelinde "hangi anahtar kimde?".
  *

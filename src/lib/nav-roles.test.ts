@@ -76,11 +76,9 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     expect(navLayoutFor(null)).toBe(NAV_BY_ROLE.readonly);
   });
 
-  it("katalogdaki hiçbir sayfa hiçbir rolün menüsünde kaybolmaz: roller birleşimi tüm sayfaları kapsar (eski yollar ve ek yollar hariç)", () => {
+  it("katalogdaki hiçbir sayfa hiçbir rolün menüsünde kaybolmaz: roller birleşimi tüm sayfaları kapsar (takma ad yok)", () => {
     const union = new Set(ROLES.flatMap((r) => layoutHrefs(NAV_BY_ROLE[r])));
-    // Sekme çizilmeyen ek yollar (matchPaths) sayfa değil, eşleşme yoludur.
-    const aliasLike = new Set(["/app/kayip-kacak", "/app/raporlar/memnuniyet"]);
-    const missing = ALL_NAV_HREFS.filter((h) => !union.has(h) && !aliasLike.has(h));
+    const missing = ALL_NAV_HREFS.filter((h) => !union.has(h));
     expect(missing).toEqual([]);
   });
 });

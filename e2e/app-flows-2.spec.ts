@@ -258,13 +258,21 @@ test.describe("Bildirimler ve guvenlik", () => {
     await expect(panelTitle).toBeHidden();
   });
 
-  test("/app/ayarlar/guvenlik: 2FA paneli + giris listesi basligi", async ({ page }) => {
+  test("/app/hesabim?sekme=guvenlik: 2FA paneli + giris listesi basligi", async ({ page }) => {
+    await page.goto("/app/hesabim?sekme=guvenlik");
+    await expectAppShell(page);
+
+    await expect(page.getByRole("heading", { name: "Hesabım" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(/İki adımlı doğrulama/).first()).toBeVisible();
+    await expect(page.getByText("Son girişler").first()).toBeVisible();
+  });
+
+  test("/app/ayarlar/guvenlik: yalnız ofis politikası ve ofis oturumları", async ({ page }) => {
     await page.goto("/app/ayarlar/guvenlik");
     await expectAppShell(page);
 
     await expect(page.getByRole("heading", { name: "Güvenlik" })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("heading", { name: /İki adımlı doğrulama/ })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Son girişler" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Hesabım > Güvenlik/ })).toBeVisible();
   });
 });
 

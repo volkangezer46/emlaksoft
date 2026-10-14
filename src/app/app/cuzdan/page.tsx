@@ -60,6 +60,11 @@ function money(value: number) {
 const MONTH_LABELS = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
 const LIST_LIMIT = 100;
 
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const raw = (await searchParams)?.sekme;
+  return { title: (Array.isArray(raw) ? raw[0] : raw) === "ofis" ? "Ofis geneli · Kazanç" : "Kazanç" };
+}
+
 export default async function CuzdanPage({
   searchParams,
 }: {

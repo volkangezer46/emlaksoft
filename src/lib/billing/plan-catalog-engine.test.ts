@@ -176,7 +176,7 @@ describe("adminden eklenen paket", () => {
 
   it("kilit bağlamı: eklenen paketin kademesi uygulanır, deneme sonrası kilit listesi kademeden", () => {
     const ctx = { trial: false, tenantCreatedAt: "2026-10-05T00:00:00.000Z", plan: "ofis_plus" };
-    expect(lockedGate("/app/kayip-kacak", { ...ctx, tier: "professional" })).toBeNull();
+    expect(lockedGate("/app/ilan-kontrol/kapanis", { ...ctx, tier: "professional" })).toBeNull();
     expect(lockedGate("/app/projeler", { ...ctx, tier: "professional" })?.minPlan).toBe("enterprise");
     expect(gatesLockedAfterTrial({ ...ctx, tier: "professional" })).toHaveLength(2);
   });

@@ -338,6 +338,6 @@ export async function decidePortalMatch(formData: FormData): Promise<MatchDecisi
   if (outcome !== "ok") return { error: MATCH_ERRORS[outcome] ?? actionErrorMessage(null, "Karar kaydedilemedi.") };
   revalidatePath("/app/ilan-kontrol/eslesme");
   revalidatePath("/app/ilan-kontrol/anomaliler");
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   return { ok: true };
 }

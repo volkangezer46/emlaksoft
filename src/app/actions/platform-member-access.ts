@@ -136,8 +136,8 @@ export async function resetMemberTwoFactor(fd: FormData): Promise<AccessActionRe
         userId: member.id,
         kind: "warning",
         title: "İki adımlı doğrulamanız sıfırlandı",
-        body: "EmlakSoft destek ekibi talebiniz üzerine SMS doğrulamasını kapattı ve açık oturumlarınızı sonlandırdı. Güvenlik ayarlarından yeni telefonunuzla yeniden açın. Bu işlemi siz istemediyseniz hemen ofis yöneticinize ve desteğe bildirin.",
-        href: "/app/ayarlar/guvenlik",
+        body: "EmlakSoft destek ekibi talebiniz üzerine SMS doğrulamasını kapattı ve açık oturumlarınızı sonlandırdı. Hesabım > Güvenlik sekmesinden yeni telefonunuzla yeniden açın. Bu işlemi siz istemediyseniz hemen ofis yöneticinize ve desteğe bildirin.",
+        href: "/app/hesabim?sekme=guvenlik",
       });
     } catch (e) {
       console.error("resetMemberTwoFactor notify", e);

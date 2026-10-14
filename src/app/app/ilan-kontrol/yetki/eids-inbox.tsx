@@ -30,7 +30,7 @@ export async function EidsInboxSection({ tenantId, role, canEdit }: { tenantId: 
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-text-muted">
         Alma adresi ve iletme kurulumu:{" "}
-        <Link href="/app/ayarlar?sekme=entegrasyon#eids-eposta" className="focus-ring rounded font-semibold text-accent-text hover:underline">
+        <Link href="/app/ayarlar/entegrasyonlar#eids" className="focus-ring rounded font-semibold text-accent-text hover:underline">
           Ayarlar &gt; Entegrasyonlar
         </Link>
       </p>

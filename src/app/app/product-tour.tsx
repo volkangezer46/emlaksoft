@@ -30,7 +30,7 @@ import { TOUR_PARAM, isTourDone, markTourDone } from "@/lib/product-tour-storage
  * - /app?tur=1 → rolün turu; /app?tur=<tur-kimliği> → o tur (Yardım sayfası ve kullanıcı menüsü).
  *   Yeniden başlatma, hareket azaltma açık olsa bile çalışır.
  * - Klavye: sağ/sol ok = ileri/geri, Esc = kapat, düğmeler odaklanabilir. Dar ekranda balon alta sabitlenir.
- * - ?tv=1 ve TV panosunda hiç başlamaz. SSR güvenli: yalnız effect sonrası render edilir.
+ * - TV panosunda hiç başlamaz. SSR güvenli: yalnız effect sonrası render edilir.
  */
 
 const PAD = 8; // delik ile hedef arası nefes payı (px)
@@ -90,7 +90,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   useEffect(() => {
     if (phase === "run" || phase === "final" || !role) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("tv") === "1" || pathname.startsWith("/app/pano-tv")) return;
+    if (pathname.startsWith("/app/pano-tv")) return;
     const raw = params.get(TOUR_PARAM);
     let id: TourId;
     if (raw) {

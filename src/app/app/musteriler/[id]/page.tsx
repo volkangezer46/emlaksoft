@@ -23,7 +23,7 @@ import { EditCustomerDialog } from "./edit-customer-dialog";
 import { CustomerTagChips } from "./customer-tag-chips";
 import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
-import { Customer360Tabs, CUSTOMER_TAB_IDS, CUSTOMER_TAB_ALIASES } from "./customer-360-tabs";
+import { Customer360Tabs, CUSTOMER_TAB_IDS } from "./customer-360-tabs";
 import { resolveTab } from "@/components/app/detail-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { RentReminderPref } from "./rent-reminder-pref";
@@ -56,6 +56,8 @@ import { PortalRequestsCard } from "./portal-requests-card";
 import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
+
+export const metadata = { title: "Müşteri" };
 
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -118,8 +120,8 @@ export default async function CustomerDetailPage({
   const canTaskEdit = (perms.tasks ?? []).includes("edit");
   const canTaskDelete = (perms.tasks ?? []).includes("delete");
   const canTaskView = (perms.tasks ?? []).includes("view");
-  // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir (eski ?tab= linkleri de çalışır)
-  const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet", CUSTOMER_TAB_ALIASES);
+  // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir.
+  const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet");
   const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;

@@ -12,6 +12,8 @@ import { KvkkTransferCard } from "./kvkk-transfer-card";
 import { loadEidsStatus } from "@/lib/eids/load";
 import { EIDS_FILTER_LABELS, EIDS_FILTER_VALUES } from "@/lib/eids/status";
 
+export const metadata = { title: "Uyum" };
+
 const channelLabel: Record<string, string> = {
   sms: "SMS",
   email: "E-posta",

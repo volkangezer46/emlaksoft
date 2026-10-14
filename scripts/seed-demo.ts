@@ -1859,7 +1859,7 @@ async function main() {
         tenant_id: tenantId, user_id: advisorId, kind: "warning",
         title: "Portal ilan teyidi gecikti",
         body: "DEMO-010 ve DEMO-012 ilanları 7 günden uzun süredir teyit edilmedi.",
-        href: "/app/portallar",
+        href: "/app/ilan-kontrol/portallar",
       },
       {
         tenant_id: tenantId, user_id: advisorId, kind: "info",

@@ -119,7 +119,7 @@ export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre 
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Ekip Merkezi"
+        eyebrow="Ekip"
         title="Danışman karnesi: karşılaştırma"
         description={`${monthLabel} dönemi: arama, randevu, teklif, anlaşma, hedef.`}
       />

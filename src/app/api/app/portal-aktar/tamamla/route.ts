@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: outcome, message: completeOutcomeMessage(outcome) }, { status, headers: NO_STORE });
   }
   if (body.state === "published") {
-    revalidatePath("/app/portallar");
+    revalidatePath("/app/ilan-kontrol/portallar");
     revalidatePath("/app/portfoyler");
     revalidatePath("/app/ilan-kontrol");
   }

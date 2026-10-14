@@ -12,7 +12,6 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
-import { TvAutoRefresh, TvClock } from "@/app/app/tv-mode";
 import { now } from "@/lib/clock";
 import { measure } from "@/lib/server-timing";
 import { getSampleScope } from "@/lib/sample-scope";
@@ -55,7 +54,7 @@ export const metadata = { title: "Ekip Ligi" };
  * NE ÇÖZÜYOR: Ofiste "kim ne kadar üretti" sorusu ya hiç sorulmuyor ya da ay
  * sonu toplantısında tek seferde konuşuluyor. Lig tablosu bunu HAFTALIK/AYLIK ve
  * ŞEFFAF yapıyor: puan kuralı herkese açık ve ofis ayarlı, sıralama canlı, her adet
- * tıklanınca kanıt kayıtlarına gider, rozet kalıcı. `?tv=1` ile ofis ekranına asılır.
+ * tıklanınca kanıt kayıtlarına gider, rozet kalıcı. Ofis ekranı (TV) görünümü tek yerdedir: /app/pano-tv.
  *
  * KAZANÇ GİZLİLİĞİ (P12): ligde CİRO/KOMİSYON TUTARI GÖSTERİLMEZ — yalnız puan ve adet.
  * Tutar sütunu/sıralaması ofis yöneticisi `Kurallar` sekmesinden bilinçli açmadıkça hiç sorgulanmaz.
@@ -119,12 +118,11 @@ function RankTrend({ current, previous, unit }: { current: number; previous: num
   );
 }
 
-type SearchParams = { donem?: string; kapsam?: string; tv?: string; sekme?: string; sirala?: string };
+type SearchParams = { donem?: string; kapsam?: string; sekme?: string; sirala?: string };
 
 export default async function LigPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
   const { tenantId, userId, role, perms } = await requireModulePage("reports", "/app/lig");
   const sp = (await searchParams) ?? {};
-  const tvMode = sp.tv === "1";
   const sekme = sp.sekme === "meydan" ? "meydan" : sp.sekme === "kurallar" ? "kurallar" : "siralama";
 
   // Platform ekibi (impersonation dışı) tek bir ofise bağlı değil — lig
@@ -169,8 +167,8 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
   const branches = branchRes.data ?? [];
   const branchId = branches.some((b) => String(b.id) === sp.kapsam) ? sp.kapsam! : null;
 
-  const showAmounts = settings.showAmounts && !tvMode && range.kind === "month";
-  const wantsPrev = !tvMode && sekme === "siralama";
+  const showAmounts = settings.showAmounts && range.kind === "month";
+  const wantsPrev = sekme === "siralama";
   const badgeMonth = range.kind === "week" ? periodOf(new Date(nowMs)) : period;
 
   // Tutar sütunu (P12): YALNIZ ofis yöneticisi "tutar bazlı sıralamayı aç" dediyse sorgulanır. Kapalıyken ligde
@@ -336,89 +334,6 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
       )
     : [];
 
-  // ── TV MODU ─────────────────────────────────────────────────────────────
-  // Ofis ekranına asılan sade tablo: yalnız sıra/ad/puan/seri. Filtre yok,
-  // link yok (kimse TV'ye tıklamaz), 30 sn'de bir sunucu verisi tazelenir.
-  if (tvMode) {
-    return (
-      <div className="tv-zoom space-y-5">
-        <TvAutoRefresh intervalMs={30_000} />
-        <div className="theme-dark flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] bg-[image:var(--grad-ink)] px-6 py-4">
-          <div className="flex items-center gap-3">
-            <span className="status-pulse h-3 w-3 rounded-full bg-mint-400" />
-            <p className="font-display text-2xl font-extrabold text-white">
-              Ekip Ligi · <span className="capitalize">{range.label}</span>
-            </p>
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-sm font-semibold text-white/70">
-              30 sn’de bir yenilenir
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <TvClock />
-            <Link
-              href={`/app/lig?donem=${period}${keepScope}`}
-              className="focus-ring press rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 hover:text-white"
-            >
-              Çık
-            </Link>
-          </div>
-        </div>
-
-        {hasActivity ? (
-          <TableFrame stack minWidth={640}>
-            <Table>
-              <THead>
-                <TR>
-                  <TH>#</TH>
-                  <TH>Danışman</TH>
-                  <TH align="right">Puan</TH>
-                  <TH align="right">Anlaşma</TH>
-                  <TH align="right">Seri</TH>
-                </TR>
-              </THead>
-              <TBody>
-                {rows.filter((r) => r.total > 0).slice(0, 12).map((r) => (
-                  <TR key={r.staffId}>
-                    <TD>
-                      <span
-                        className={`numeric font-display text-2xl font-extrabold ${
-                          r.rank === 1 ? "text-amber-500" : r.rank === 2 ? "text-text-muted" : r.rank === 3 ? "text-amber-700" : "text-text-faint"
-                        }`}
-                      >
-                        {r.rank}
-                      </span>
-                    </TD>
-                    <TD primary>
-                      <span className="flex items-center gap-3 font-display text-xl font-bold text-text">
-                        <Avatar name={r.agent!.fullName} src={avatars.get(r.staffId)?.avatar_url} preset={avatars.get(r.staffId)?.avatar_preset} size="lg" />
-                        {r.agent!.fullName}
-                      </span>
-                    </TD>
-                    <TD label="Puan" align="right">
-                      <span className="numeric font-display text-2xl font-extrabold text-accent-text">{r.total}</span>
-                    </TD>
-                    <TD label="Anlaşma" align="right">
-                      <span className="numeric text-xl font-bold text-text">{r.breakdown.deal_won.count}</span>
-                    </TD>
-                    <TD label="Seri" align="right">
-                      <span className="numeric text-xl font-bold text-amber-600">
-                        {r.streak > 0 ? `🔥 ${r.streak}` : "—"}
-                      </span>
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
-            </Table>
-          </TableFrame>
-        ) : (
-          <p className="py-20 text-center font-display text-2xl font-bold text-text-muted">
-            Bu dönemde henüz aktivite yok.
-          </p>
-        )}
-      </div>
-    );
-  }
-
   // ── NORMAL MOD ──────────────────────────────────────────────────────────
   const podiumStyle = [
     { order: "sm:order-2", bar: "h-24 bg-amber-400", ring: "bg-amber-400 text-ink-950", medal: "🥇", tone: "border-amber-400/60" },
@@ -448,7 +363,7 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
 
   return (
     <div className="space-y-6">
-      {/* Hero: dönem seçici + kapsam + TV modu girişi */}
+      {/* Hero: dönem seçici + kapsam + ofis ekranı (TV) girişi */}
       <PageHeader title="Lig Tablosu" eyebrow="Ekip ligi" description={<>Haftalık ve aylık puan sıralaması, meydan okumalar, rozetler ve çalışma serileri. <HelpTip topic="lig" /></>} actions={
 <div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-3">
             <Link
@@ -458,9 +373,9 @@ export default async function LigPage({ searchParams }: { searchParams?: Promise
               Danışman KPI karnesi
             </Link>
             <Link
-              href={`/app/lig?donem=${period}${keepScope}&tv=1`}
-              title="TV modu — ofis ekranı görünümü"
-              aria-label="TV modunu aç"
+              href="/app/pano-tv"
+              title="Ofis ekranı (TV) panosu"
+              aria-label="Ofis ekranını (TV) aç"
               className="focus-ring press grid h-9 w-9 place-items-center rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:bg-surface-2 hover:text-text touch:min-h-11 touch:min-w-11"
             >
               <Tv className="h-4 w-4" />

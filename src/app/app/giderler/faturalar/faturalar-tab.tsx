@@ -24,14 +24,6 @@ import { InvoiceEditor, type EditorInitial } from "./invoice-editor";
 import { InvoiceRowActions, IssuePanel } from "./invoice-actions";
 
 /**
- * Eski sekme kaydı (`?sekme=faturalar`): Faturalar artık Muhasebe > Belgeler > Faturalar (`?sekme=belgeler&tur=fatura`);
- * eski bağlantı sekme takma adıyla oraya düşer. Anahtar geriye uyumluluk için dışa verilir.
- * BİRLEŞTİRME SIRASI: `?sekme=belgeler` yalnız FN2 yönlendiricisinde (`resolveFinanceTab` + `BelgelerTab`) çözülür;
- * FN5, FN1 ve FN2 ile birlikte ya da onlardan sonra birleşir (tek başına birleşirse bu adresler genel bakışa düşer).
- */
-export const FATURALAR_SEKME = { key: "faturalar", label: "Faturalar" } as const;
-
-/**
  * `tutar` (KDV dahil) / `kdv` (hareketin KDV oranı) / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu
  * serbest faturayı önceden doldurur.
  */
@@ -81,7 +73,7 @@ const cleanParam = (v: string | undefined) => (v ?? "").replace(/[\u0000-\u001f\
  * (`commissions:create`, einvoice action'ları + RLS). Okuma politikası 20261013008400 ile `expenses:view`'u da kapsar.
  * `embedded`: Belgeler sekmesinin içinde (başlık h2; sayfanın tek h1'i kabukta).
  */
-export async function FaturalarTab({ perms, params, embedded = false }: { perms: EffectivePermissions; params: FaturalarParams; embedded?: boolean }) {
+export async function FaturalarTab({ tenantId, perms, params, embedded = false }: { tenantId: string; perms: EffectivePermissions; params: FaturalarParams; embedded?: boolean }) {
   const canInvoice = perms.commissions?.includes("create") ?? false;
   const canView = canInvoice || (perms.expenses?.includes("view") ?? false);
   const canEditSettings = perms.settings?.includes("edit") ?? false;
@@ -127,7 +119,15 @@ export async function FaturalarTab({ perms, params, embedded = false }: { perms:
   if (!canInvoice && (params.duzenle || params.kaynak)) redirect(BASE);
 
   const supabase = await createClient();
-  const { info, available } = await getConnectionInfo(supabase);
+  const { info, available, readError } = await getConnectionInfo(tenantId);
+  if (readError) {
+    return (
+      <ListPage>
+        {hero}
+        <EmptyState icon={FileText} title="e-Fatura bağlantısı okunamadı" description="Bağlantı bilgisi şu an alınamadı; bu, bağlı olmadığınız anlamına gelmez. Sayfayı birazdan yenileyin, sorun sürerse destekle görüşün." tone="amber" />
+      </ListPage>
+    );
+  }
   if (!available) {
     return (
       <ListPage>

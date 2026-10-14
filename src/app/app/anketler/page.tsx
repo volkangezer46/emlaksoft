@@ -128,6 +128,11 @@ function ScoreChip({ score, low }: { score: number | null; low: boolean }) {
   );
 }
 
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const raw = (await searchParams).sekme;
+  return { title: (Array.isArray(raw) ? raw[0] : raw) === "sonuc" ? "Müşteri memnuniyeti · Anketler" : "Anketler" };
+}
+
 /**
  * Anket sonuçları (tek ölçek 0-10): NPS (9-10 destekleyen, 0-6 kötüleyen), CSAT (7-10 oranı), cevaplama oranı;
  * kitle grubu, olay × kitle ve danışman kırılımı (danışman puanı dahil), 6 aylık trend ve düşük puan takibi
@@ -458,11 +463,11 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
                 </ul>
               )}
               <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3 text-xs">
-                <Link href="/app/akilli-listeler?segment=churn" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
+                <Link href="/app/musteriler?segment=risk" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
                   Riskli müşteriler
                 </Link>
                 <span className="text-text-faint">·</span>
-                <Link href="/app/kayip-kacak" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
+                <Link href="/app/ilan-kontrol/kapanis" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
                   Kaçan komisyonlar
                 </Link>
                 <span className="text-text-faint">·</span>

@@ -1,3 +1,4 @@
+import { settingsTabHref } from "@/app/app/ayarlar/_sekmeler/tabs";
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import {
@@ -68,6 +69,14 @@ const statusLabel: Record<string, string> = {
   paused: "Duraklatıldı",
 };
 
+const ABONELIK_TAB_IDS = ["plan", "analiz", "cuzdan", "faturalar", "iptal"] as const;
+const ABONELIK_TAB_LABELS: Record<(typeof ABONELIK_TAB_IDS)[number], string> = { plan: "Paket", analiz: "Analiz bakiyesi", cuzdan: "Hesap kredisi", faturalar: "Faturalar", iptal: "İptal" };
+
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ sekme?: string }> }) {
+  const active = resolveTab(await searchParams, ABONELIK_TAB_IDS, "plan") as (typeof ABONELIK_TAB_IDS)[number];
+  return { title: active === "plan" ? "Abonelik" : `${ABONELIK_TAB_LABELS[active]} · Abonelik` };
+}
+
 export default async function BillingPage({
   searchParams,
 }: {
@@ -75,7 +84,7 @@ export default async function BillingPage({
 }) {
   const auth = await requireModulePage("billing");
   const sp = await searchParams;
-  const active = resolveTab(sp, ["plan", "analiz", "cuzdan", "faturalar", "iptal"], "plan", { kontor: "analiz" });
+  const active = resolveTab(sp, ABONELIK_TAB_IDS, "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
   const configured = isIyzicoConfigured();
@@ -361,10 +370,10 @@ export default async function BillingPage({
 
       {billingMissing.length > 0 && isSeatOwner ? (
         <Link
-          href="/app/ayarlar#marka-kimlik"
+          href={settingsTabHref("kimlik")}
           className="block rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-warning-strong"
         >
-          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Şirket bölümünden tamamlayın.
+          Fatura bilgileriniz eksik: {billingMissing.join(", ")}. Ödeme ve fatura için Ayarlar &gt; Marka ve kimlik bölümünden tamamlayın.
         </Link>
       ) : null}
 

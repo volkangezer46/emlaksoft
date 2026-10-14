@@ -67,7 +67,7 @@ async function loadRows(tenantId: string): Promise<Row[] | null> {
   }
   if (!address.error) {
     const st: ForwardingState = forwardingState((address.data as { created_at: string; last_received_at: string | null } | null) ?? null, nowMs);
-    rows.push({ key: "iletme", label: "Bakanlık e-postası iletimi", value: FORWARDING_LABELS[st], href: "/app/ayarlar?sekme=entegrasyon", tone: st === "bagli" ? "ok" : st === "sessiz" ? "danger" : "warn" });
+    rows.push({ key: "iletme", label: "Bakanlık e-postası iletimi", value: FORWARDING_LABELS[st], href: "/app/ayarlar/entegrasyonlar#eids", tone: st === "bagli" ? "ok" : st === "sessiz" ? "danger" : "warn" });
   }
   return rows;
 }

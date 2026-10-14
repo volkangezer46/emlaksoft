@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   openEInvoiceCredentials,
   sealEInvoiceCredentials,
@@ -122,20 +122,41 @@ export function rowToRef(row: EInvoiceRow): EInvoiceRef | null {
   return { ...ref, externalId: ref.externalId, docType: row.doc_type, alias: ref.alias ?? row.buyer_alias } as EInvoiceRef;
 }
 
-export async function getConnectionInfo(supabase: SupabaseClient): Promise<{ info: ConnectionInfo | null; available: boolean }> {
-  const { data, error } = await supabase.from("einvoice_connections").select(CONNECTION_COLUMNS).maybeSingle();
+export type ConnectionInfoResult = {
+  info: ConnectionInfo | null;
+  /** Tablo var mı (migration uygulandı mı). */
+  available: boolean;
+  /** Bağlantı OKUNAMADI (yetki/ağ hatası): "bağlı değil" sayılmaz, ekran hata gösterir. */
+  readError: boolean;
+};
+
+/**
+ * Ofisin e-Fatura bağlantı ÖZETİ (gizli alan yok).
+ *
+ * einvoice_connections tablosu authenticated rolü için sütun bazlı SELECT ile korunur ve canlıda
+ * 42501 verdiği görüldü; bu yüzden okuma servis anahtarıyla ve AÇIK `tenant_id` süzgeciyle yapılır.
+ * `credentials_sealed` HİÇBİR ZAMAN seçilmez (CONNECTION_COLUMNS). Çağıran sayfa kendi modül
+ * kapısını (`settings` / `expenses` görüntüleme) zaten geçmiş olmalıdır.
+ */
+export async function getConnectionInfo(tenantId: string): Promise<ConnectionInfoResult> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("einvoice_connections")
+    .select(CONNECTION_COLUMNS)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
   if (error) {
-    if (!isMissingEInvoiceTable(error)) console.error("einvoice getConnectionInfo", error.code);
-    return { info: null, available: false };
+    if (isMissingEInvoiceTable(error)) return { info: null, available: false, readError: false };
+    console.error("einvoice getConnectionInfo", error.code);
+    return { info: null, available: true, readError: true };
   }
-  return { info: (data as ConnectionInfo | null) ?? null, available: true };
+  return { info: (data as ConnectionInfo | null) ?? null, available: true, readError: false };
 }
 
-/** Entegrasyon kayıt defteri için: ofis bağlı mı (tablo yoksa false). */
-export async function isTenantEInvoiceConnected(): Promise<boolean> {
+/** Entegrasyon kayıt defteri için: ofis bağlı mı (tablo yoksa ya da okunamazsa false). */
+export async function isTenantEInvoiceConnected(tenantId: string): Promise<boolean> {
   try {
-    const supabase = await createClient();
-    const { info } = await getConnectionInfo(supabase);
+    const { info } = await getConnectionInfo(tenantId);
     return info !== null;
   } catch {
     return false;
@@ -353,14 +374,16 @@ export type InvoiceButtonContext = {
 /** "Fatura kes" düğmesi bağlamı: sayfa başına TEK tur (bağlantı + kaynakların mevcut faturaları). */
 export async function loadInvoiceButtonContext(
   supabase: SupabaseClient,
+  tenantId: string | null,
   canInvoice: boolean,
   sourceType: "commission" | "rent_management_fee",
   sourceIds: readonly string[],
 ): Promise<InvoiceButtonContext> {
   const none: InvoiceButtonContext = { canInvoice: false, connected: false, existing: {} };
-  if (!canInvoice) return none;
-  const { info, available } = await getConnectionInfo(supabase);
-  if (!available) return none; // tablo yok: düğme gösterilmez (sahte vaat yok)
+  if (!canInvoice || !tenantId) return none;
+  const { info, available, readError } = await getConnectionInfo(tenantId);
+  // Tablo yok ya da bağlantı okunamadı: düğme gösterilmez (yanlışlıkla "bağla" vaadi yok).
+  if (!available || readError) return none;
   const existing: InvoiceButtonContext["existing"] = {};
   if (info && sourceIds.length > 0) {
     const { data } = await supabase

@@ -32,6 +32,8 @@ import { now } from "@/lib/clock";
 import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
+export const metadata = { title: "Sözleşme" };
+
 const TYPE_LABELS: Record<string, string> = {
   satis:        "Satış",
   kira:         "Kira",
@@ -77,7 +79,7 @@ export default async function ContractDetailPage({
   const canCreate = perms.contracts?.includes("create") ?? false;
   const { id } = await params;
   // Seçili sekme sunucuda çözülür; sürüm geçmişi yalnız o sekmede sorgulanır
-  const tab = resolveTab(await searchParams, CONTRACT_TAB_IDS, "icerik", { ozet: "icerik", imzalayanlar: "imza" });
+  const tab = resolveTab(await searchParams, CONTRACT_TAB_IDS, "icerik");
   const supabase = await createClient();
 
   const contractP = supabase

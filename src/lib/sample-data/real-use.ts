@@ -18,7 +18,7 @@ export type NextStep = { title: string; description: string; href: string };
 export const REAL_USE_NEXT_STEPS: readonly NextStep[] = [
   { title: "İlk portföyünü ekle", description: "Gerçek bir ilanla başla; vitrin ve eşleştirme bunun üzerinden çalışır.", href: "/app/portfoyler/yeni" },
   { title: "Ekibini davet et", description: "Danışmanlarına e-posta ile erişim bağlantısı gönder.", href: "/app/ekip/yeni" },
-  { title: "Portal bağla", description: "Sahibinden / Hepsiemlak ilanlarını eşle; kayıp-kaçak kalkanı devreye girsin.", href: "/app/portallar" },
+  { title: "Portal bağla", description: "Sahibinden / Hepsiemlak ilanlarını eşle; kayıp-kaçak kalkanı devreye girsin.", href: "/app/ilan-kontrol/portallar" },
 ];
 
 /** Şeridin tek satırlık metni: örnek veri ve/veya deneme. */

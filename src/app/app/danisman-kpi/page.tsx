@@ -13,6 +13,7 @@ import { BarCompare, ChartFrame } from "@/app/app/_ui/lazy-chart";
 import { TBody, TD, TH, THead, TR, Table, TableFrame } from "@/components/ui/table";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { loadAdvisorMetrics, trMonthPeriod } from "@/lib/team/advisor-metrics";
+import { loadComplianceReport } from "@/lib/eids/compliance";
 import { now, TR_OFFSET_MS, trParts } from "@/lib/clock";
 import { buildCoachActions, type CoachAction } from "@/lib/advisor-coach";
 import { CoachPanel, type CoachActionWithLink } from "./coach-panel";
@@ -158,6 +159,7 @@ export default async function DanismanKpiPage({
     { count: pahaliPortfoy },
     { count: soguyanMusteri },
     { data: office },
+    compliance,
   ] = await Promise.all([
     loadAdvisorMetrics(supabase, { viewer, tenantId, period, nowMs }),
     loadAdvisorMetrics(supabase, { viewer, tenantId, period: prevPeriod, nowMs }),
@@ -194,6 +196,10 @@ export default async function DanismanKpiPage({
       .lt("updated_at", otuzGunOnce),
     // Karne çıktısının başlık bandı: ofis adı belgeye kimlik verir.
     supabase.from("tenants").select("name").eq("id", tenantId).maybeSingle(),
+    // EİDS yetki uyumu (seçili ay): yetki uyum raporuyla AYNI hesap (loadComplianceReport); tablo yoksa sütun çizilmez.
+    tenantId
+      ? loadComplianceReport(supabase, tenantId, `${mp.year}-${String(mp.month + 1).padStart(2, "0")}`, nowMs).catch(() => ({ available: false as const }))
+      : Promise.resolve({ available: false as const }),
   ]);
 
   // Çıktı başlığındaki dönem etiketi ("Temmuz 2026" gibi).
@@ -619,6 +625,7 @@ export default async function DanismanKpiPage({
                 <TH align="right">Satış</TH>
                 <TH align="right">Dönüşüm</TH>
                 <TH align="right">Gelir (komisyon payı)</TH>
+                {compliance.available ? <TH align="right">Yetki uyumu</TH> : null}
                 <TH>Skor</TH>
               </TR>
             </THead>
@@ -690,6 +697,25 @@ export default async function DanismanKpiPage({
                   <TD label="Dönüşüm" align="right" className="text-text-muted">{a.conversionRate}</TD>
                   {/* gelir: başarı tonu (viz-pos) */}
                   <TD label="Gelir (komisyon payı)" align="right" className="font-bold text-[color:var(--viz-pos)]">{a.revenue > 0 && showRevenue(a.id) ? money(a.revenue) : "—"}</TD>
+                  {compliance.available ? (
+                    <TD label="Yetki uyumu" align="right" className="text-text-muted">
+                      {(() => {
+                        const c = compliance.byAdvisor.get(a.id);
+                        const late = c?.lateCount ?? 0;
+                        return (
+                          <Link
+                            href={`/app/gorevler?tur=eids_takedown&filter=all&danisman=${a.id}`}
+                            className={`focus-ring relative z-10 rounded-[var(--radius-control)] hover:text-accent-text hover:underline ${late > 0 ? "font-semibold text-[color:var(--viz-neg)]" : ""}`}
+                            aria-label={`${a.full_name}: ${c?.takedownCount ?? 0} ilan kaldırma görevi, ${late} geciken`}
+                            title="EİDS yetki iptali sonrası ilan kaldırma: geciken / toplam (bu dönem)"
+                          >
+                            {c?.score == null ? "—" : `${c.score}/100`}
+                            {late > 0 ? ` · ${late} gecikme` : ""}
+                          </Link>
+                        );
+                      })()}
+                    </TD>
+                  ) : null}
                   <TD label="Skor">
                     <div className="flex items-center gap-2">
                       <Progress className="w-16" value={(a.score / topScore) * 100} label={`${a.full_name} skoru`} />

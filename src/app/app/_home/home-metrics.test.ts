@@ -31,7 +31,7 @@ describe("metrik bağlamı", () => {
   });
   it("bağlamsız metrik tanınır", () => {
     expect(hasContext({ trend: null, context: " ", series: null })).toBe(false);
-    const c = contextMetric({ key: "teyit", label: "Teyit", value: 90, format: "percent", context: "3 ilan 7+ gün teyitsiz", href: "/app/portallar", seriesLabel: "x" });
+    const c = contextMetric({ key: "teyit", label: "Teyit", value: 90, format: "percent", context: "3 ilan 7+ gün teyitsiz", href: "/app/ilan-kontrol/portallar", seriesLabel: "x" });
     expect(hasContext(c)).toBe(true);
     expect(c.trend).toBeNull();
   });

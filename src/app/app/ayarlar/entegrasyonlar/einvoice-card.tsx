@@ -1,12 +1,10 @@
 import { FileText } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
 import { getConnectionInfo } from "@/lib/integrations/einvoice/service";
 import { EInvoiceConnectPanel, type EInvoiceConnectionView } from "./einvoice-connect-panel";
 
 /** Ayarlar > Entegrasyonlar: e-Fatura kartı (sağlayıcı seç -> anahtar bağla -> bağlantıyı test et). Tüm paketlerde, ek ücretsiz. */
-export async function EInvoiceCard({ canEdit }: { canEdit: boolean }) {
-  const supabase = await createClient();
-  const { info, available } = await getConnectionInfo(supabase);
+export async function EInvoiceCard({ tenantId, canEdit }: { tenantId: string; canEdit: boolean }) {
+  const { info, available, readError } = await getConnectionInfo(tenantId);
   const view: EInvoiceConnectionView | null = info
     ? {
         provider: info.provider,
@@ -34,7 +32,9 @@ export async function EInvoiceCard({ canEdit }: { canEdit: boolean }) {
         </div>
       </div>
       <div className="mt-3 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
-        {available ? (
+        {readError ? (
+          <p className="text-sm text-amber-700">Bağlantı bilgisi şu an okunamadı; bu, bağlı olmadığınız anlamına gelmez. Sayfayı birazdan yenileyin.</p>
+        ) : available ? (
           <EInvoiceConnectPanel connection={view} canEdit={canEdit} />
         ) : (
           <p className="text-sm text-text-muted">e-Fatura henüz etkin değil (veritabanı güncellemesi bekleniyor).</p>

@@ -161,7 +161,7 @@ async function run(req: NextRequest) {
         tenant_id: c.tenant_id,
         title: "Kayıp-kaçak gecikme uyarısı",
         body,
-        href: "/app/kayip-kacak",
+        href: "/app/ilan-kontrol/kapanis",
         kind: severity === "critical" ? "danger" : severity === "high" ? "warning" : "info",
         dedupe_key: buildDedupeKey("leak-sla", c.id),
       },

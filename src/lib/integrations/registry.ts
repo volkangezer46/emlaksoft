@@ -46,7 +46,7 @@ export type Integration = {
 export async function listIntegrations(tenantId: string | null = null): Promise<Integration[]> {
   const emlakFiyatiConfigured = await isEmlakFiyatiConfigured();
   // Oturumlu sayfa bağlamında ofisin e-Fatura bağlantısı (tenantId yoksa platform görünümü: bağlı sayılmaz).
-  const einvoiceConnected = tenantId ? await isTenantEInvoiceConnected() : false;
+  const einvoiceConnected = tenantId ? await isTenantEInvoiceConnected(tenantId) : false;
   const [
     netgsmConfigured,
     whatsappConfigured,

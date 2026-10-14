@@ -117,9 +117,9 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
     }
   }
 
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath("/app/portfoyler");
-  revalidatePath("/app/kayip-kacak");
+  revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
   return { ok: true };
@@ -166,8 +166,8 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
   }
   await recordManualPresent([id]);
 
-  revalidatePath("/app/portallar");
-  revalidatePath("/app/kayip-kacak");
+  revalidatePath("/app/ilan-kontrol/portallar");
+  revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
 }
@@ -196,8 +196,8 @@ export async function confirmPortalListingsBulk(formData: FormData): Promise<voi
   }
   await recordManualPresent(ids);
 
-  revalidatePath("/app/portallar");
-  revalidatePath("/app/kayip-kacak");
+  revalidatePath("/app/ilan-kontrol/portallar");
+  revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
 }
@@ -259,8 +259,8 @@ export async function closePortalListing(formData: FormData): Promise<PortalResu
   if (outcome === "commission_rate_required") return { error: "Kapanıştan önce portföyde 0'dan büyük geçerli bir komisyon oranı tanımlayın." };
   if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Kapanış kaydı oluşturulamadı.") };
 
-  revalidatePath("/app/portallar");
-  revalidatePath("/app/kayip-kacak");
+  revalidatePath("/app/ilan-kontrol/portallar");
+  revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app/komisyon");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);

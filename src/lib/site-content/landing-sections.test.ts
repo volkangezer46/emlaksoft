@@ -94,7 +94,7 @@ describe("ana sayfa bölümleri admin'den yönetilir", () => {
 
   it("paket rozeti noktadan önce eklenir; rozet yoksa metin aynen", () => {
     expect(withGateBadge("Kaçak karnesi.", "")).toBe("Kaçak karnesi.");
-    const badged = withGateBadge("Kaçak karnesi.", "/app/kayip-kacak");
+    const badged = withGateBadge("Kaçak karnesi.", "/app/ilan-kontrol/kapanis");
     expect(badged).toMatch(/^Kaçak karnesi \(.+ ve üzeri\)\.$/);
     expect(withGateBadge("İmza", "/app/sozlesmeler")).toMatch(/^İmza \(.+ ve üzeri\)$/);
   });

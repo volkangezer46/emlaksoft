@@ -54,7 +54,7 @@ function asObject(v: unknown): Record<string, unknown> {
 }
 
 function refresh(tenantId: string, rentalId: string) {
-  revalidateTenantData(tenantId, ["/app/kiralama", `/app/kiralama/${rentalId}`, "/app/raporlar/kar-zarar"]);
+  revalidateTenantData(tenantId, ["/app/kiralama", `/app/kiralama/${rentalId}`, "/app/giderler"]);
 }
 
 /** Tahakkuka tahsilat kaydı (kısmi ödeme dahil): makbuz no otomatik sıralı, durum ödenen toplamdan türer. */

@@ -8,7 +8,11 @@
  *    `kind = 'office'` ofiste kalır. Paylaşımı tanımlanmamış komisyon sayılır ve uyarılır (payı bilinmiyor).
  *  - Gider: `expenses.amount`, ay = `expense_date`.
  *  - Örnek veri hariç. Vergi (gelir/kurumlar) hesaplanmaz.
+ *
+ * TEK KAYNAK: ekranlar ve raporlar `computeOfficePnl`'i kullanır (Muhasebe > Raporlar, Rapor merkezi "Kâr / zarar").
+ * `buildProfitLoss` defter eki olmadan taban hesaptır; doğrudan ekranda kullanılmaz.
  */
+import { cashPnlAdjustments, type PnlCashMonth } from "@/lib/finance/expense-budget";
 
 export type PlCommission = { id: string; createdAt: string; gross: number; vat: number; status: string };
 export type PlSplit = { commissionId: string; kind: string; amount: number };
@@ -72,4 +76,42 @@ export function buildProfitLoss(monthKeys: readonly string[], commissions: reado
     { revenue: 0, vat: 0, shares: 0, expenses: 0, net: 0, commissions: 0, fees: 0 },
   );
   return { months: list, totals, unsplitCount, hasData: totals.revenue > 0 || totals.expenses > 0 || totals.fees > 0 };
+}
+
+export type OfficePnlMonth = PlMonth & { /** Muhasebe'de elle girilen gelir (hizmet bedeli, diğer gelir...). */ other: number };
+export type OfficePnl = {
+  months: OfficePnlMonth[];
+  totals: Omit<OfficePnlMonth, "key">;
+  unsplitCount: number;
+  hasData: boolean;
+  /** Defter eki (finance_pnl) bağlı mı: değilse elle girilen gelir ve expenses dışı çıkışlar sayılmaz. */
+  cashLinked: boolean;
+};
+
+/**
+ * Ofis kâr/zararının TEK hesabı: taban (`buildProfitLoss`: komisyon tahakkuku − KDV − dış paylar + yönetim ücreti − gider)
+ * + Muhasebe v2 defter eki (`cashPnlAdjustments`: elle girilen gelir, `expenses` dışı çıkışlar). Komisyon ve kira tahsilatı
+ * iki kez sayılmaz. `cash` null ise (RPC yok) ek sıfırdır. Ay net'i, finance_pnl'in (gelir − gider) net'iyle aynıdır.
+ */
+export function computeOfficePnl(
+  monthKeys: readonly string[],
+  input: { commissions: readonly PlCommission[]; splits: readonly PlSplit[]; expenses: readonly PlExpense[]; fees?: readonly PlFee[]; cash?: readonly PnlCashMonth[] | null },
+): OfficePnl {
+  const base = buildProfitLoss(monthKeys, input.commissions, input.splits, input.expenses, input.fees ?? []);
+  const adj = cashPnlAdjustments(monthKeys, input.cash ?? null, input.expenses);
+  const months: OfficePnlMonth[] = base.months.map((m) => {
+    const a = adj.get(m.key) ?? { manualIncome: 0, extraExpense: 0 };
+    return { ...m, other: a.manualIncome, expenses: m.expenses + a.extraExpense, net: m.net + a.manualIncome - a.extraExpense };
+  });
+  const totals = months.reduce(
+    (t, m) => ({ ...t, other: t.other + m.other, expenses: t.expenses + m.expenses, net: t.net + m.net }),
+    { ...base.totals, other: 0, expenses: 0, net: 0 },
+  );
+  return {
+    months,
+    totals,
+    unsplitCount: base.unsplitCount,
+    hasData: base.hasData || totals.other > 0 || totals.expenses > 0,
+    cashLinked: Array.isArray(input.cash),
+  };
 }

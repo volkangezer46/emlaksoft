@@ -106,7 +106,7 @@ export function buildDailyBriefing(input: BriefingInput): BriefingItem[] {
       priority: 4,
       icon: "📣",
       text: `${input.unconfirmedListings} ilan 7+ gündür teyitsiz — portalları kontrol et`,
-      href: "/app/portallar?durum=teyit",
+      href: "/app/ilan-kontrol/portallar?durum=teyit",
       tone: "amber",
     });
   }

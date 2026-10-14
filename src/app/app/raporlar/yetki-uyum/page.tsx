@@ -104,7 +104,7 @@ export default async function YetkiUyumPage({ searchParams }: { searchParams: Pr
         {officeWide ? (
           <KpiCard label="Yetkisi bilinmeyen" value={fmtPct(r.unknownPct)} icon={ShieldQuestion} tone={(r.unknownPct ?? 0) > 0 ? "warn" : "success"} href="/app/ilan-kontrol/yetki?kova=bilinmiyor" />
         ) : null}
-        <KpiCard label="Uyum puanı" value={r.score === null ? "—" : `${r.score}/100`} icon={Gauge} tone="gold" href="/app/ofis-kontrol/karne" hint="Zamanında kaldırma %60 + bilinen yetki %40" />
+        <KpiCard label="Uyum puanı" value={r.score === null ? "—" : `${r.score}/100`} icon={Gauge} tone="gold" href="/app/danisman-kpi" hint="Zamanında kaldırma %60 + bilinen yetki %40" />
       </KpiGrid>
 
       {officeWide && load.byAdvisor.size > 0 ? (

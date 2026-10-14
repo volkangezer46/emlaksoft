@@ -1,8 +1,7 @@
 /**
  * Ofis Merkezi saf mantık (veri çekmez, saat okumaz): liste süzme/sıralama, URL filtre kontratı,
- * atanmamış ilan SLA durumu, ekip sağlığı uyarıları, danışman ligi (kazanç gizliliği korunur).
+ * atanmamış ilan SLA durumu ve ekip sağlığı uyarıları.
  */
-import type { AdvisorMetricRow } from "@/lib/team/advisor-metrics";
 import { OFFICE_CENTER_TABS, TEAM_HUB_PATH, type AdvisorListFilters, type AdvisorSortKey, type OfficeAdvisorRow, type OfficeCenterTab, type OfficeStatistics, type TeamHealth } from "./types";
 
 type Sp = Record<string, string | string[] | undefined>;
@@ -10,12 +9,8 @@ const first = (v: string | string[] | undefined): string => (Array.isArray(v) ? 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SORT_KEYS: readonly AdvisorSortKey[] = ["ad", "portfoy", "talep", "kapanis", "sla", "aktivite"];
 
-/** Eski sekme adları (yer imleri) birleşik sekmeye düşer. */
-const LEGACY_TABS: Readonly<Record<string, OfficeCenterTab>> = { ayarlar: "tanimlar", tanimlamalar: "tanimlar" };
-
 export function parseTab(raw: string | string[] | undefined): OfficeCenterTab {
   const v = first(raw);
-  if (Object.hasOwn(LEGACY_TABS, v)) return LEGACY_TABS[v]!;
   return OFFICE_CENTER_TABS.some((t) => t.id === v) ? (v as OfficeCenterTab) : "danismanlar";
 }
 
@@ -129,44 +124,4 @@ export function computeTeamHealth(input: {
   if (input.stats.failed) alerts.push({ text: "Bazı sayılar okunamadı; sağlık değerlendirmesi eksik olabilir", href: tabHref("istatistikler") });
   const level: TeamHealth["level"] = alerts.length === 0 ? "healthy" : alerts.length >= 3 || input.breachedUnassigned > 0 ? "critical" : "warning";
   return { level, alerts };
-}
-
-export type LeagueEntry = {
-  rank: number;
-  advisorId: string;
-  name: string;
-  dealCount: number;
-  offerCount: number;
-  conversionPct: number | null;
-  appointCount: number;
-  callCount: number;
-  /** Yalnız `revenueVisible` ise sayı; aksi halde null (kazanç gizliliği). */
-  revenue: number | null;
-};
-
-/**
- * Danışman ligi: anlaşma, dönüşüm, randevu, çağrı sırasıyla; kazanç yalnız izleyici görebiliyorsa (advisor-metrics
- * başkasının gelirini zaten null verir; burada ayrıca `seeAllEarnings` yoksa kendi dışındakiler null kalır).
- */
-export function buildLeague(rows: readonly AdvisorMetricRow[], opts: { viewerId: string; seeAllEarnings: boolean }): LeagueEntry[] {
-  return [...rows]
-    .sort(
-      (a, b) =>
-        b.dealCount - a.dealCount ||
-        (b.conversionPct ?? -1) - (a.conversionPct ?? -1) ||
-        b.appointCount - a.appointCount ||
-        b.callCount - a.callCount ||
-        a.fullName.localeCompare(b.fullName, "tr"),
-    )
-    .map((r, i) => ({
-      rank: i + 1,
-      advisorId: r.id,
-      name: r.fullName,
-      dealCount: r.dealCount,
-      offerCount: r.offerCount,
-      conversionPct: r.conversionPct,
-      appointCount: r.appointCount,
-      callCount: r.callCount,
-      revenue: opts.seeAllEarnings || r.id === opts.viewerId ? r.revenue : null,
-    }));
 }

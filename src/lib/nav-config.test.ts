@@ -22,17 +22,17 @@ const MOVED_UNDER_PARENTS = [
 ];
 const LEGACY_HREFS = [
   "/app", "/app/asistan",
-  "/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/talepler",
+  "/app/musteriler", "/app/tavsiyeler", "/app/talepler",
   "/app/anlasmalar", "/app/teklifler", "/app/sozlesmeler", "/app/gelen-kutusu",
   "/app/randevular", "/app/gorevler",
-  "/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/portallar",
+  "/app/portfoyler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-kontrol",
   "/app/acik-ev", "/app/kiralama", "/app/ag", "/app/projeler", "/app/degerleme", "/app/hesaplayici",
   "/app/yabanci-satis",
   "/app/komisyon", "/app/cuzdan", "/app/performansim", "/app/giderler", "/app/aidat", "/app/kira-artis", "/app/abonelik",
   "/app/raporlar", "/app/danisman-kpi", "/app/lig", "/app/pano-tv", "/app/hedefler",
-  "/app/bolge-analizi", "/app/kayip-kacak",
+  "/app/bolge-analizi",
   "/app/ekip", "/app/otomasyonlar", "/app/kampanyalar", "/app/uyum", "/app/onaylar",
-  "/app/belgeler", "/app/denetim", "/app/destek", "/app/ayarlar", "/app/ayarlar/is-akislari",
+  "/app/belgeler", "/app/ofis-kontrol", "/app/destek", "/app/ayarlar", "/app/ayarlar/is-akislari",
 ];
 
 const ALL_MODULES: AppModule[] = [
@@ -62,7 +62,7 @@ describe("menü yapısı", () => {
   it("tüm modüller en az bir başlıkta erişilebilir", () => {
     const used = new Set(NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.module, ...(i.tabs?.map((t) => t.module) ?? [])])));
     // `matching`: Talepler sayfasının "Eşleşme" sekmesi (sayfa içi sekme, ?sekme=eslesme); kendi izniyle gizlenir.
-    // `leak`: Kayıp-Kaçak Kalkanı İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesi (matchPaths; tek menü girişi).
+    // `leak`: Kapanış kayıpları İlan Kontrol alt gezinmesinin sekmesidir (/app/ilan-kontrol/kapanis; tek menü girişi).
     const missing = ALL_MODULES.filter((m) => !used.has(m) && m !== "dashboard" && m !== "matching" && m !== "leak");
     expect(missing).toEqual([]);
   });
@@ -82,9 +82,9 @@ describe("menü yapısı", () => {
     expect(resolveActiveNav("/app/ayarlar/cop-kutusu", sections).href).toBe("/app/ayarlar");
     // Anahtar Takibi ve Sunumlar Portföyler öğesinin sekmesidir (yol aynı, menü öğesi Portföyler).
     expect(resolveActiveNav("/app/portfoyler/anahtarlar", sections).href).toBe("/app/portfoyler");
-    expect(resolveActiveNav("/app/akilli-listeler", sections).href).toBe("/app/musteriler");
+    expect(resolveActiveNav("/app/ofis-kontrol/kayit", sections).href).toBe("/app/ofis-kontrol");
     expect(resolveActiveNav("/app/teklifler", sections).href).toBe("/app/anlasmalar");
-    expect(resolveActiveNav("/app/portallar", sections).href).toBe("/app/ilan-kontrol");
+    expect(resolveActiveNav("/app/ilan-kontrol/portallar", sections).href).toBe("/app/ilan-kontrol");
     expect(resolveActiveNav("/app/portfoyler/42", sections).href).toBe("/app/portfoyler");
   });
 
@@ -98,10 +98,13 @@ describe("menü yapısı", () => {
 
 describe("mükerrer menü girişi yok (2026-10)", () => {
   const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
-  it("Kayıp-kaçak yalnız İlan Kontrol alt sekmesidir; sayfa yolu korunur ve İlan Kontrol öğesini etkin yapar", () => {
-    expect(menu).not.toContain("/app/kayip-kacak");
-    expect(ALL_NAV_HREFS).toContain("/app/kayip-kacak");
-    expect(resolveActiveNav("/app/kayip-kacak", visibleSections(ALL_MODULES)).href).toBe("/app/ilan-kontrol");
+  it("Kapanış kayıpları ve Portal ilanları İlan Kontrol'ün alt sayfasıdır: menüde ayrı giriş ve ek eşleşme yolu yok", () => {
+    for (const sub of ["/app/ilan-kontrol/kapanis", "/app/ilan-kontrol/portallar"]) {
+      expect(menu).not.toContain(sub);
+      expect(ALL_NAV_HREFS).not.toContain(sub);
+      expect(resolveActiveNav(sub, visibleSections(ALL_MODULES)).href).toBe("/app/ilan-kontrol");
+    }
+    expect(NAV_SECTIONS.flatMap((s) => s.items).every((i) => !(i.matchPaths ?? []).some((m) => m.startsWith("/app/ilan-kontrol")))).toBe(true);
   });
   it("TV panosu menü öğesi değil (ana ekran 'TV modu' düğmesi)", () => {
     expect(menu).not.toContain("/app/pano-tv");
@@ -117,18 +120,18 @@ describe("mükerrer menü girişi yok (2026-10)", () => {
 
 describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
   const items = NAV_SECTIONS.flatMap((s) => s.items);
-  it("Portal ilanları ve Teklifler ayrı öğe değil, sahip öğenin sekmesi; Riskli müşteriler Müşteriler sekmesi", () => {
+  it("Teklifler ayrı öğe değil, sahip öğenin sekmesi; risk süzgeci Müşteriler listesinin ?segment= süzgecidir", () => {
     const hrefs = items.map((i) => i.href);
-    for (const gone of ["/app/portallar", "/app/teklifler", "/app/bildirimler"]) expect(hrefs, gone).not.toContain(gone);
+    for (const gone of ["/app/teklifler", "/app/bildirimler"]) expect(hrefs, gone).not.toContain(gone);
     const tabsOf = (h: string) => items.find((i) => i.href === h)?.tabs?.map((t) => t.href) ?? [];
-    expect(tabsOf("/app/ilan-kontrol")).toEqual(["/app/ilan-kontrol", "/app/portallar"]);
+    expect(tabsOf("/app/ilan-kontrol")).toEqual([]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
   });
   it("Ofis kataloğu 9 sayfa tutar (yan menüde görünürlük rol bazlı merkezlerle belirlenir, bkz. nav-roles)", () => {
     const ofis = NAV_SECTIONS.find((s) => s.id === "ofis")!;
     expect(ofis.items.map((i) => i.href).sort()).toEqual(
-      ["/app/abonelik", "/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/denetim", "/app/ekip", "/app/otomasyonlar", "/app/uyum", "/app/yardim"].sort(),
+      ["/app/abonelik", "/app/ayarlar", "/app/belgeler", "/app/buyume", "/app/ofis-kontrol", "/app/ekip", "/app/otomasyonlar", "/app/uyum", "/app/yardim"].sort(),
     );
   });
   it("'Ayarlar' adlı ilgisiz sekme kalmadı: sekmeler gerçek adlarıyla anılır", () => {
@@ -176,7 +179,7 @@ describe("sekmeli menü öğeleri", () => {
 
   it("Raporlar ve Otomasyon tek öğe, yolları sabit sekmedir", () => {
     expect(tabsOf(ALL_MODULES, "/app/raporlar")).toEqual([
-      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise", "/app/raporlar/kar-zarar",
+      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise",
     ]);
     expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/ayarlar/is-akislari"]);
     const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));
@@ -219,7 +222,7 @@ describe("bilgi mimarisi 2026-10 (docs/design/MENU_IA_2026_10.md)", () => {
     expect(sectionOf("/app/ice-aktarma")).toBeUndefined();
     expect(HIDDEN_APP_PAGES["/app/ice-aktarma"]).toBeTruthy();
     expect(sectionOf("/app/mahalle-notlari")).toBe("araclar");
-    for (const h of ["/app/ayarlar/roller", "/app/ayarlar/yetkilendirme", "/app/ayarlar/moduller"]) {
+    for (const h of ["/app/ayarlar/yetkilendirme", "/app/ayarlar/guvenlik", "/app/ayarlar/entegrasyonlar", "/app/ayarlar/moduller"]) {
       expect(ALL_NAV_HREFS, h).toContain(h);
       expect(resolveActiveNav(h, sections).href, h).toBe("/app/ayarlar");
     }

@@ -46,6 +46,8 @@ import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { PersonSelect } from "@/components/ui/person-select";
 
+export const metadata = { title: "Onaylar" };
+
 const PAGE_SIZE = 20;
 
 /** Ofis Kontrol Merkezi'nin otomatik açtığı talepler açıklamanın başında "[oversight:...]" izi taşır. */

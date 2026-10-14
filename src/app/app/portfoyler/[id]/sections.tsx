@@ -371,14 +371,14 @@ export async function ClosuresSection({ portalIds }: { portalIds: string[] }) {
         <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
           <Siren className="h-4 w-4 text-danger-500" /> Kapanış / kayıp kayıtları
         </h2>
-        <Link href="/app/kayip-kacak" className="text-xs font-semibold text-brand-600">Kayıp-kaçak panosu</Link>
+        <Link href="/app/ilan-kontrol/kapanis" className="text-xs font-semibold text-brand-600">Kapanış kayıpları</Link>
       </div>
       <div className="divide-y divide-line">
         {closures.map((c) => (
           // Satır kayıp-kaçak panosuna gider; ?neden= değeri listing_closures.reason kolonunun ham hali
           <Link
             key={c.id}
-            href={`/app/kayip-kacak?neden=${encodeURIComponent(c.reason)}#kapanislar`}
+            href={`/app/ilan-kontrol/kapanis?neden=${encodeURIComponent(c.reason)}#kapanislar`}
             className="group flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition hover:bg-canvas/60"
           >
             <div>

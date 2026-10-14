@@ -11,6 +11,8 @@ import { stageLabelMap } from "@/lib/deal-stage-labels";
 import { TRIGGER_LABELS, ACTION_LABELS, STATUS_LABELS, TRIGGER_CONFIG_LABELS, CONDITION_OP_LABELS } from "../labels";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
+export const metadata = { title: "Otomasyon kuralı" };
+
 function dateTime(iso: string | null) {
   if (!iso) return "—";
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));

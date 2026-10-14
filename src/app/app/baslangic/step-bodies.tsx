@@ -25,7 +25,7 @@ import { EidsLegalNote } from "@/components/eids/legal-note";
 import { EIDS_HELP_HREF, EIDS_MAILBOX_SETTINGS_HREF } from "@/lib/eids/links";
 import { getEffectiveLegalValues } from "@/lib/legal-constants/store";
 import { getTenantModuleState } from "@/lib/modules/state";
-import { PortalMembershipsSection } from "@/app/app/ayarlar/_sekmeler/portal-memberships-section";
+import { PortalMembershipsSection } from "@/app/app/ayarlar/entegrasyonlar/portal-memberships-section";
 
 /** Her adım gövdesinin aldığı ortak bağlam (sunucuda `page.tsx` doldurur). */
 export type StepBodyProps = {
@@ -165,7 +165,7 @@ function PortalsBody(p: StepBodyProps) {
       {p.canEditSettings ? <PortalMembershipsSection question /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <ChoiceLink
-          href="/app/portallar"
+          href="/app/ilan-kontrol/portallar"
           icon={<ExternalLink className="h-5 w-5" aria-hidden />}
           title="Portal yayınları"
           text="İlanları portallara gönderin, yayın durumunu ve onay bekleyenleri izleyin."

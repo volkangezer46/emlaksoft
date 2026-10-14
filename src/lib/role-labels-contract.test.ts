@@ -11,7 +11,6 @@ import { ROLE_LABELS, roleLabel } from "./role-labels";
 const EXEMPT: Record<string, string> = {
   "src/lib/role-labels.ts": "tek kaynak",
   "src/lib/demo-personas.ts": "demo giriş kartı başlığı (persona adı, rol etiketi değil)",
-  "src/app/app/ayarlar/roller/page.tsx": "roller ekranı MODULES/ROLES listesi (Modüller paketi sahibi; birleşimden sonra ROLE_LABELS'a bağlanacak)",
   "src/lib/role-labels-contract.test.ts": "bu test",
 };
 

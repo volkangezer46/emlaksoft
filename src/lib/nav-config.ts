@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import { ICONS } from "@/lib/icons";
 import { findActiveNavigationHref } from "@/lib/navigation";
 import type { AppModule } from "@/lib/permissions";
-import { layoutHrefs, navLayoutFor, type HubDef, type MobileSlot } from "@/lib/nav-roles";
+import { DUYURU_YONETIM_HREF, layoutHrefs, navLayoutFor, NAV_BY_ROLE, type HubDef, type MobileSlot } from "@/lib/nav-roles";
 import { featureForHref } from "@/lib/modules/route-table";
 import { resolveActiveHubIn } from "@/lib/nav-shell";
 
@@ -51,8 +51,7 @@ export type NavItem = {
   /** Birden çok sayfayı tek menü öğesinde toplar; ilk sekme öğenin girişidir. */
   tabs?: readonly NavTab[];
   /**
-   * Sekme şeridi ÇİZİLMEYEN ama öğeyi etkin yapan ek yollar: sayfa kendi alt gezinmesini taşır (ör. İlan Kontrol
-   * alt gezinmesindeki "Kapanış kayıpları" = /app/kayip-kacak) ya da sayfaya bir düğmeden gidilir (TV panosu).
+   * Sekme şeridi ÇİZİLMEYEN ama öğeyi etkin yapan ek yollar: sayfaya bir düğmeden gidilir (TV panosu).
    * Menüde ayrı öğe olmaz (mükerrer giriş yok), yolu değişmez; yetim sayfa sözleşmesi bu yolları menüde sayar.
    */
   matchPaths?: readonly string[];
@@ -84,7 +83,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     items: [
       {
         href: "/app",
-        label: "Ana ekran",
+        label: "Bugün",
         icon: ICONS.dashboard,
         module: "dashboard",
         description: "Günün özeti, içgörüler ve hızlı eylemler",
@@ -118,20 +117,19 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     description: "Müşteri kartları, talepler, gelen mesajlar, çağrı kaydı ve toplu veri girişi.",
     items: [
       {
-        // Akıllı Listeler ve Tavsiyeler Müşteriler öğesinin sekmesidir (yollar değişmez; modül kapalıysa sekme gizlenir).
+        // Tavsiyeler Müşteriler öğesinin sekmesidir; eylem süzgeçleri (kaybedilme riski, satışa çıkabilir) listenin ?segment= süzgecidir.
         href: "/app/musteriler",
         label: "Müşteriler",
         icon: ICONS.musteri,
         module: "customers",
         tabs: [
           { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
-          { href: "/app/akilli-listeler", label: "Akıllı listeler", icon: ICONS.akilliListe, module: "customers", description: "Kimi aramalıyım? Kaybedilme riski, sıcak ve sessiz müşteri grupları", keywords: ["segment", "sıcak", "risk", "kayıp", "riskli müşteriler", "kaybedilme", "neden"] },
           { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", description: "Müşteri tavsiye bağlantıları ve referans zinciri", keywords: ["referans", "tavsiye"] },
           // Modül ayarı modülün içinde (yol sabit; aynı sayfa Ayarlar dizininden de açılır — tek form, iki giriş).
           { href: "/app/ayarlar/etiketler", label: "Etiketler", icon: ICONS.musteri, module: "customers", description: "Müşteri etiketlerini yeniden adlandır, birleştir ya da kaldır", keywords: ["etiket", "ayar"] },
         ],
-        description: "Müşteri kartları, akıllı listeler (riskli müşteriler dahil) ve tavsiyeler",
-        keywords: ["kişi", "alıcı", "malik", "mülk sahibi", "aday", "cari"],
+        description: "Müşteri kartları, sıcaklık ve risk süzgeçleri, tavsiyeler",
+        keywords: ["kişi", "alıcı", "malik", "mülk sahibi", "aday", "cari", "segment", "sıcak", "risk", "kaybedilme", "riskli müşteriler", "akıllı liste", "satışa çıkabilir"],
         shortcut: "g m",
       },
       // Talepler sayfasının ikinci sekmesi "Eşleşme" (?sekme=eslesme, matching izniyle gizlenir).
@@ -181,21 +179,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["ilan", "mülk", "emlak", "gayrimenkul", "daire", "arsa", "konut"],
         shortcut: "g p",
       },
-      // İlan Kontrol Merkezi: kayıp/kaçak ve portal doğrulama özeti (modül `portals`; yeni izin modülü yok).
+      // İlan Kontrol Merkezi: portal ilanları, kayıp/kaçak ve kapanış kayıpları TEK merkez (modül `portals`; alt sayfalar
+      // /app/ilan-kontrol altında ve kendi alt gezinmesinde: Portal ilanları, Kapanış kayıpları …).
       {
         href: "/app/ilan-kontrol",
         label: "İlan kontrolü",
         icon: ICONS.ilanKontrol,
         module: "portals",
-        // Portal ilanları (teyit/yenileme/kapanış kaydı) İlan Kontrol'ün sekmesidir; aynı `portals` modülü, yol sabit.
-        tabs: [
-          { href: "/app/ilan-kontrol", label: "İlan kontrolü", icon: ICONS.ilanKontrol, module: "portals" },
-          { href: "/app/portallar", label: "Portal ilanları", icon: ICONS.portal, module: "portals", description: "Portal ilanlarının teyit, yenileme ve kapanış kaydı", keywords: ["sahibinden", "hepsiemlak", "emlakjet", "portal", "teyit"] },
-        ],
-        description: "Portal yayın takibi, kayıp ve kaçak uyarıları, kapanış kayıpları",
-        keywords: ["kayıp", "kaçak", "anomali", "sla", "yayın", "kaçan komisyon", "kapanış kaybı", "kalkan", "rakip"],
-        // Kayıp-Kaçak Kalkanı İlan Kontrol alt gezinmesinin "Kapanış kayıpları" sekmesidir (tek menü girişi).
-        matchPaths: ["/app/kayip-kacak"],
+        description: "Portal ilanları, yayın takibi, kayıp-kaçak uyarıları ve kapanış kayıpları",
+        keywords: ["kayıp", "kaçak", "anomali", "sla", "yayın", "kaçan komisyon", "kapanış kaybı", "kalkan", "rakip", "portal ilanları", "portal", "teyit", "sahibinden", "hepsiemlak", "emlakjet"],
       },
       {
         href: "/app/kiralama",
@@ -317,8 +309,8 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         label: "Muhasebe",
         icon: ICONS.gider,
         module: "expenses",
-        description: "Mini muhasebe: kasa ve banka, cari, vadeler, belgeler ve KDV",
-        keywords: ["masraf", "harcama", "fiş", "kar zarar", "gelir", "gider", "cari", "alacak", "borç", "vade", "stopaj", "nakit akışı"],
+        description: "Mini muhasebe: kasa ve banka, cari, vadeler, belgeler, KDV ve kâr-zarar",
+        keywords: ["masraf", "harcama", "fiş", "kar zarar", "kâr", "zarar", "kâr-zarar", "net", "danışman kârlılığı", "gelir", "gider", "cari", "alacak", "borç", "vade", "stopaj", "nakit akışı"],
       },
     ],
   },
@@ -350,9 +342,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/anketler", label: "Anketler", icon: ICONS.anketor, module: "surveys", description: "Anketör kuyruğu, şablonlar, sonuçlar ve müşteri memnuniyeti (NPS)", keywords: ["anket", "anketör", "nps", "memnuniyet"] },
           { href: "/app/raporlar/lead-hizi", label: "Yanıt hızı", icon: ICONS.leadHizi, module: "reports", description: "Adaya ilk dönüş süresi", keywords: ["hız", "dönüş süresi", "lead"] },
           { href: "/app/franchise", label: "Şube karşılaştırma", icon: ICONS.sube, module: "reports", description: "Şube ve ofis bazlı karşılaştırma", keywords: ["franchise", "şube"] },
-          { href: "/app/raporlar/kar-zarar", label: "Kâr / zarar", icon: ICONS.karZarar, module: "reports", description: "Komisyon, gider ve danışman payıyla aylık net sonuç", keywords: ["kâr", "zarar", "net", "gelir gider"] },
         ],
-        matchPaths: ["/app/raporlar/memnuniyet"],
         description: "Ofis, bölge, talep-arz, memnuniyet, anket ve şube raporları",
         keywords: ["analiz", "istatistik", "rapor", "bölge", "grafik"],
       },
@@ -436,42 +426,50 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     description: "Ekip, abonelik, yardım ve katlanır Yönetim bölümü (ayarlar, uyum, denetim, otomasyon).",
     items: [
       {
-        // Ekip Merkezi: tek kabuk, mevcut sayfalar sekme olarak yeniden kullanılır
-        // (Hedefler eskiden Performans başlığındaydı; yolu değişmedi).
+        // Ekip: tek kabuk, mevcut sayfalar sekme olarak yeniden kullanılır.
         href: "/app/ekip",
-        label: "Ekip merkezi",
+        label: "Ekip",
         icon: ICONS.ekip,
         module: "team",
         tabs: [
-          { href: "/app/ekip", label: "Genel", icon: ICONS.ekip, module: "team" },
+          { href: "/app/ekip", label: "Ekip", icon: ICONS.ekip, module: "team" },
           // Kıyas / Danışman KPI / Lig sekmeleri "Ekip performansı" öğesine taşındı (Performans ve Raporlar).
           { href: "/app/hedefler", label: "Hedefler", icon: ICONS.hedef, module: "targets", description: "Aylık ciro ve anlaşma hedefleri", keywords: ["hedef", "kota", "target"] },
           { href: "/app/ekip/devir", label: "Danışman devri", icon: ICONS.devir, module: "team", description: "Müşteri ve portföyleri danışmanlar arasında devret", keywords: ["devir", "atama", "transfer"] },
           { href: "/app/ekip/subeler", label: "Şubeler", icon: ICONS.ekip, module: "team", description: "Şube tanımları ve bölgeleri", keywords: ["şube", "branş"] },
           { href: "/app/ekip/takimlar", label: "Takımlar", icon: ICONS.ekip, module: "team", description: "Takımlar ve takım liderleri", keywords: ["takım", "lider"] },
         ],
-        // Ekip Merkezi ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
+        // Ekip, ekip modülü olanın girişidir; modülsüz rolde (danışman) yerine Performansım vardır.
         needsItemModule: true,
         description: "Danışmanlar, hedefler, devir, şube ve takımlar",
         keywords: ["danışman", "çalışan", "personel", "ekip", "şube", "takım", "izin", "ofis merkezi"],
       },
       {
-        // Ayarlar kabuğu: Genel ayar sayfası + erişim yönetimi sekmeleri (yollar sabit, her sayfa kendi kapısını korur).
+        // Ayarlar kabuğu: Genel ayar sayfası + ayar sayfaları (yollar sabit, her sayfa kendi kapısını korur). Görünen şerit
+        // sırası ve adları nav-roles AYARLAR merkezindedir.
         href: "/app/ayarlar",
         label: "Ayarlar",
         icon: ICONS.ayar,
         module: "settings",
         tabs: [
           { href: "/app/ayarlar", label: "Genel", icon: ICONS.ayar, module: "settings" },
-          { href: "/app/ayarlar/roller", label: "Roller", icon: ICONS.roller, module: "settings", description: "Rol izin matrisi ve kullanıcı istisnaları", keywords: ["rol", "izin", "yetki", "matris"] },
-          { href: "/app/ayarlar/yetkilendirme", label: "Yetkilendirme", icon: ICONS.yetkilendirme, module: "settings", description: "Kapsamlar ve kişi istisnaları", keywords: ["kapsam", "istisna", "yetkilendirme", "erişim"] },
+          { href: "/app/ayarlar/yetkilendirme", label: "Yetkiler", icon: ICONS.yetkilendirme, module: "settings", description: "Rol izin matrisi, kapsamlar, kişi istisnaları ve denetim günlüğü", keywords: ["rol", "roller", "izin", "yetki", "matris", "kapsam", "istisna", "yetkilendirme", "erişim"] },
+          { href: "/app/ayarlar/guvenlik", label: "Güvenlik", icon: ICONS.guvenlik, module: "settings", description: "Ofis güvenlik politikası (2FA zorunluluğu, IP, oturum süresi) ve açık oturumlar", keywords: ["güvenlik", "2fa", "iki adımlı", "ip", "oturum", "politika"] },
+          { href: "/app/ayarlar/entegrasyonlar", label: "Entegrasyonlar", icon: ICONS.entegrasyon, module: "settings", description: "SMS, WhatsApp, portal üyelikleri, Bakanlık e-postaları ve e-Fatura", keywords: ["entegrasyon", "netgsm", "sms", "whatsapp", "portal üyeliği", "eids", "e-fatura", "paraşüt", "nilvera"] },
           { href: "/app/ayarlar/moduller", label: "Modüller", icon: ICONS.moduller, module: "settings", description: "Kullanılmayan alanları kapat, menü sadeleşsin", keywords: ["modül", "aç kapa", "sadeleştir"] },
+          { href: "/app/ayarlar/tanimlar", label: "Seçim listeleri", icon: ICONS.secimListesi, module: "settings", description: "Formlardaki açılır liste seçenekleri ve anlaşma aşama adları", keywords: ["tanım", "tanımlar", "seçim listesi", "kaynak", "kayıp nedeni", "aşama"] },
+          { href: "/app/ayarlar/merkez", label: "Kurallar ve varsayılanlar", icon: ICONS.kurallar, module: "settings", description: "Yanıt süreleri, uyarı eşikleri, talep dağıtımı, komisyon ve bildirim varsayılanları", keywords: ["kural", "eşik", "sla", "yanıt süresi", "talep dağıtımı", "akıllı atama", "varsayılan", "tanımlar merkezi"] },
+          { href: "/app/ayarlar/lead", label: "Aday yakalama", icon: ICONS.adayYakalama, module: "settings", description: "Web formu ve bağlantıdan gelen adaylar, sırayla atama ve hızlı yanıt", keywords: ["aday", "form", "web formu", "başvuru", "hızlı yanıt"] },
+          { href: "/app/ayarlar/vitrin", label: "Vitrin", icon: ICONS.vitrin, module: "settings", description: "Ofis vitrininde görünecek bölümler ve tanıtım metni", keywords: ["vitrin", "web sitesi", "tanıtım", "seo"] },
+          { href: "/app/ayarlar/cop-kutusu", label: "Çöp kutusu", icon: ICONS.copKutusu, module: "settings", description: "Silinen müşteri ve portföyleri 90 gün içinde geri alın", keywords: ["çöp", "geri al", "silinen", "kurtar"] },
+          { href: "/app/ayarlar/cografya-bildir", label: "Bölge bildirimi", icon: ICONS.bolgeBildir, module: "settings", description: "Eksik ya da yanlış mahalleyi platform ekibine bildirin", keywords: ["mahalle", "il", "ilçe", "bölge", "eksik"] },
+          { href: "/app/ayarlar/gercek-kullanim", label: "Gerçek kullanım", icon: ICONS.gercekKullanim, module: "settings", description: "Örnek verileri tek tuşla temizleyip gerçek kullanıma geçin", keywords: ["örnek veri", "demo sil", "gerçek kullanım", "temizle"] },
           { href: "/app/ayarlar/ozel-alanlar", label: "Özel alanlar", icon: ICONS.ozelAlan, module: "settings", description: "Müşteri, portföy, talep ve anlaşmaya ofise özel alanlar ekle", keywords: ["özel alan", "custom field", "alan ekle"] },
           { href: "/app/ayarlar/api-webhook", label: "API ve webhook", icon: ICONS.apiWebhook, module: "settings", description: "API anahtarı ve imzalı webhook olayları", keywords: ["api", "webhook", "entegrasyon"] },
           // Sayfa her üyeye açıktır (devralması istenen kişi onayı burada verir; bildirim buraya götürür); sekme ayar yetkisiyle görünür.
           { href: "/app/ayarlar/sahiplik-devri", label: "Sahiplik devri", icon: ICONS.sahiplik, module: "settings", description: "Ofis sahipliğini ekipten birine iki adımda devret", keywords: ["sahip", "devir", "devret", "ofis sahibi"] },
         ],
-        description: "Ofis kimliği, roller, yetkilendirme, modüller ve entegrasyonlar",
+        description: "Ofis kimliği, yetkiler, güvenlik, entegrasyonlar ve modüller",
         keywords: ["settings", "yapılandırma", "entegrasyon", "rol", "izin", "logo", "netgsm", "kurulum", "sihirbaz"],
       },
       {
@@ -490,7 +488,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "support",
         tabs: [
           { href: "/app/yardim", label: "Yardım", icon: ICONS.destek, module: "support" },
-          { href: "/app/destek", label: "Destek talepleri", icon: ICONS.destek, module: "support", description: "EmlakSoft ekibine açılan destek talepleri", keywords: ["ticket", "destek", "talep"] },
+          { href: "/app/destek", label: "Destek", icon: ICONS.destek, module: "support", description: "EmlakSoft ekibine açılan destek talepleri", keywords: ["ticket", "destek", "talep"] },
         ],
         description: "Yardım merkezi, rehberler ve destek talepleri",
         keywords: ["sss", "destek", "yardım", "ticket", "rehber", "nasıl"],
@@ -525,17 +523,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["dosya", "evrak", "döküman", "arşiv"],
       },
       {
-        // Denetim kaydı + Ofis Kontrol Merkezi (danışman işlem akışı, uyarılar, onay kuralları) tek menü öğesi.
-        href: "/app/denetim",
-        label: "Denetim",
+        // Ofis Kontrol Merkezi: danışman işlem akışı, uyarılar, kurallar ve denetim kaydı (/app/ofis-kontrol/kayit) TEK öğe.
+        href: "/app/ofis-kontrol",
+        label: "Ofis kontrolü",
         icon: ICONS.denetim,
-        module: "settings",
-        tabs: [
-          { href: "/app/denetim", label: "Denetim kaydı", icon: ICONS.denetim, module: "settings" },
-          { href: "/app/ofis-kontrol", label: "Ofis kontrolü", icon: ICONS.denetim, module: "team", description: "Danışman işlem akışı, uyarılar ve onay kuralları", keywords: ["kontrol", "uyarı", "kural"] },
-        ],
-        description: "Kim ne zaman neyi değiştirdi; Ofis Kontrol Merkezi",
-        keywords: ["audit", "log", "kayıt", "izleme", "geçmiş"],
+        module: "team",
+        description: "Danışman işlem akışı, uyarılar, onay kuralları ve denetim kaydı",
+        keywords: ["kontrol", "uyarı", "kural", "audit", "log", "denetim", "kayıt", "izleme", "geçmiş"],
       },
       {
         href: "/app/buyume",
@@ -556,6 +550,15 @@ export const NAV_SECTIONS: readonly NavSection[] = [
  * katalogda Ekip karnesi `matchPaths`'iyle tanımlıdır). Yetki = `module`.
  */
 export const PALETTE_ONLY_PAGES: readonly (NavTab & { description: string })[] = [
+  {
+    // Ekibim şeridinin "Duyurular" sekmesi (nav-roles DUYURU_YONETIM_HREF): Bildirimler sayfasının yönetim görünümü.
+    href: DUYURU_YONETIM_HREF,
+    label: "Duyurular",
+    icon: ICONS.duyuru,
+    module: "settings",
+    description: "Ekibe duyuru yayınlayın, kim okudu takip edin",
+    keywords: ["duyuru", "duyuru panosu", "ilan et", "ekip mesajı"],
+  },
   {
     href: "/app/bildirimler",
     label: "Bildirimler",
@@ -726,6 +729,27 @@ const PAGE_INDEX: ReadonlyMap<string, PageInfo> = (() => {
     if (!map.has(pg.href)) map.set(pg.href, { href: pg.href, label: pg.label, icon: pg.icon, module: pg.module, description: pg.description, keywords: pg.keywords, itemHref: pg.href, itemNeeds: null });
   }
   return map;
+})();
+
+/**
+ * Menüdeki GÖRÜNEN ad (TEK kaynak: nav-roles merkez şeritleri; ofis yönetimi + danışman düzeni). Komut paleti ve
+ * kırıntı bu adı kullanır, böylece "Ekip", "Yetkiler", "Destek", "Portal ilanları" gibi adlar her yerde aynıdır. Aynı ad
+ * birden çok sayfada geçiyorsa (ör. "Genel") merkez adıyla ayrıştırılır: "Ayarlar · Genel". Menüde olmayan sayfa
+ * katalog adını kullanır.
+ */
+export const NAV_PAGE_LABELS: ReadonlyMap<string, string> = (() => {
+  const raw = new Map<string, { hub: string; label: string }>();
+  for (const layout of [NAV_BY_ROLE.owner, NAV_BY_ROLE.advisor]) {
+    for (const hub of [...layout.hubs, ...layout.dock]) {
+      for (const pg of hub.pages) {
+        if (raw.has(pg.href)) continue;
+        raw.set(pg.href, { hub: hub.label, label: pg.label ?? PAGE_INDEX.get(pg.href)?.label ?? hub.label });
+      }
+    }
+  }
+  const counts = new Map<string, number>();
+  for (const v of raw.values()) counts.set(v.label, (counts.get(v.label) ?? 0) + 1);
+  return new Map([...raw].map(([href, v]) => [href, (counts.get(v.label) ?? 0) > 1 && v.label !== v.hub ? `${v.hub} · ${v.label}` : v.label]));
 })();
 
 /** Katalogda sekme çizilmeyen ek yollar (matchPaths) -> sahibi sayfa: Kapanış kayıpları İlan Kontrol'ü etkin yapar. */

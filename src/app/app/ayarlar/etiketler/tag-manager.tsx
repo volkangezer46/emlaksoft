@@ -25,7 +25,7 @@ export function TagManager({ tags, canEdit }: { tags: { tag: string; count: numb
         title="Henüz etiket yok"
         description="Etiketler müşteri kartından ya da müşteri listesindeki toplu işlemle eklenir; burada yeniden adlandırır, birleştirir veya kaldırırsınız."
         action={{ href: "/app/musteriler", label: "Müşteri listesine git" }}
-        secondary={{ href: "/app/ayarlar/tanimlar", label: "Tanımlar ve seçim listeleri" }}
+        secondary={{ href: "/app/ayarlar/tanimlar", label: "Seçim listeleri" }}
       />
     );
   }

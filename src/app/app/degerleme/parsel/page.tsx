@@ -11,6 +11,8 @@ import { DegerlemeTabs } from "../degerleme-tabs";
 import { ParselClient } from "./parsel-client";
 import { ReportArchive, type ArchiveParams } from "./report-archive";
 
+export const metadata = { title: "Parsel sorgu · Değerleme" };
+
 // Değerleme çağrısı EmlakFiyati'nda 90 sn'ye kadar sürebilir (sözleşme: istemci zaman aşımı >= 90 sn); server action bu süreyi devralır.
 export const maxDuration = 300;
 

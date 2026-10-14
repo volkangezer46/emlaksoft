@@ -15,6 +15,8 @@ import { FeedFiltersForm } from "./_components/feed-filters";
 import { FeedList, feedAssignedIds } from "./_components/feed-list";
 import { PrivacyNote } from "./_components/privacy-note";
 
+export const metadata = { title: "Ofis kontrolü" };
+
 const PATH = "/app/ofis-kontrol";
 
 export default async function OfisKontrolPage({ searchParams }: { searchParams?: Promise<Record<string, string | undefined>> }) {

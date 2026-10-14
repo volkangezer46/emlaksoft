@@ -104,7 +104,7 @@ describe("TTBS / EİDS adlandırması", () => {
     for (const p of [
       "src/app/actions/portal-listings.ts",
       "src/app/app/anlasmalar/yeni/new-deal-form.tsx",
-      "src/app/app/portallar/portal-dialogs.tsx",
+      "src/app/app/ilan-kontrol/portallar/portal-dialogs.tsx",
       "src/app/app/portfoyler/[id]/property-workflow.tsx",
     ]) {
       expect(read(p), p).not.toMatch(/yetki\s*\/\s*EİDS|EİDS\s*\/\s*yazılı yetki/i);

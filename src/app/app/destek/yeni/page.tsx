@@ -3,6 +3,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { getDefinitions } from "@/lib/definitions";
 import { NewTicketForm } from "./new-ticket-form";
 
+export const metadata = { title: "Yeni destek talebi" };
+
 export default async function YeniDestekTalebiPage() {
   const { userId, perms } = await requireModulePage("support", "/app/destek");
   if (!(perms.support ?? []).includes("create")) redirect("/app/destek");

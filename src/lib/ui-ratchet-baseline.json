@@ -215,7 +215,7 @@
   "hamButon": 5,
   "kucukHedef": 0
  },
- "src/app/app/ayarlar/guvenlik/two-factor-form.tsx": {
+ "src/app/app/hesabim/two-factor-form.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
@@ -249,12 +249,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 8,
-  "kucukHedef": 0
- },
- "src/app/app/ayarlar/roller/role-permissions-matrix.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 2,
   "kucukHedef": 0
  },
  "src/app/app/ayarlar/sozlesme-sablonlari/contract-templates-manager.tsx": {
@@ -291,12 +285,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 5,
-  "kucukHedef": 0
- },
- "src/app/app/ayarlar/_sekmeler/tum-tab.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/baslangic/steps/giderler-kasa-step.tsx": {
@@ -381,12 +369,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/app/app/denetim/page.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/app/app/destek/page.tsx": {
@@ -539,12 +521,6 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/giderler/expense-create-form.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/app/app/giderler/expense-edit-dialog.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
@@ -653,7 +629,7 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/kayip-kacak/page.tsx": {
+ "src/app/app/ilan-kontrol/kapanis/page.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
@@ -881,31 +857,25 @@
   "hamButon": 6,
   "kucukHedef": 0
  },
- "src/app/app/pano-tv/tv-live.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
- "src/app/app/portallar/bulk-confirm-form.tsx": {
+ "src/app/app/ilan-kontrol/portallar/bulk-confirm-form.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/portallar/confirm-listing-button.tsx": {
+ "src/app/app/ilan-kontrol/portallar/confirm-listing-button.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/portallar/portal-dialogs.tsx": {
+ "src/app/app/ilan-kontrol/portallar/portal-dialogs.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/portallar/portal-row-more.tsx": {
+ "src/app/app/ilan-kontrol/portallar/portal-row-more.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
@@ -1653,6 +1623,18 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
+  "kucukHedef": 0
+ },
+ "src/app/app/ayarlar/yetkilendirme/role-permissions-matrix.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 2,
+  "kucukHedef": 0
+ },
+ "src/app/app/ofis-kontrol/kayit/page.tsx": {
+  "hamRenk": 0,
+  "hamPalet": 0,
+  "hamButon": 1,
   "kucukHedef": 0
  }
 }

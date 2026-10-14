@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
 import { Target } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { now, trParts } from "@/lib/clock";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { AdvisorDetailView } from "@/app/app/ekip/[id]/advisor-view";
@@ -10,7 +9,6 @@ import { DashboardHero } from "@/components/ui/dashboard-hero";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { SkeletonCard } from "@/components/ui/viz";
 import { CoachInsightSlot } from "@/app/app/danisman-kpi/coach-insight-slot";
-import { greetingFor } from "@/app/app/_home/helpers";
 import { PersonalGoal } from "./personal-goal";
 import { Son30Gun } from "./son-30-gun";
 import { Komisyonum } from "./komisyonum";
@@ -24,7 +22,7 @@ const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz"
 const WEEKDAYS = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 
 /**
- * Performansım (tasarım sistemi v4): DashboardHero → kişisel hedef halkası + son 30 gün aktivite eğrisi → sıradaki en
+ * Performansım (tasarım sistemi v4): DashboardHero (h1 "Performansım"; selamlama yok) → kişisel hedef halkası + son 30 gün aktivite eğrisi → sıradaki en
  * iyi eylem (kişinin GERÇEK içgörüleri; yoksa çizilmez) → Danışman 360 gövdesi (`/app/ekip/[id]` ile ortak; aylık
  * KPI'lar "Özet" sekmesinde KpiTile ızgarası olarak). Paket kapısı yok; başkasının verisi sunucudan hiç çekilmez.
  */
@@ -33,10 +31,9 @@ export default async function PerformansimPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [auth, sp, user] = await Promise.all([requireModulePage("dashboard"), searchParams, getRequestUser()]);
+  const [auth, sp] = await Promise.all([requireModulePage("dashboard"), searchParams]);
   const nowMs = now();
   const p = trParts(nowMs);
-  const firstName = ((user?.user_metadata?.full_name as string | undefined) ?? "").trim().split(/\s+/)[0] ?? "";
   const canTargets = effectiveCanAccessModule(auth.perms, "targets");
   // Profil adı TEK okuma: Hedef ve Komisyonum kartları aynı sözü bekler (her biri ayrı sorgu atmaz; sayfa kabuğunu bloklamaz).
   const fullNameP: Promise<string | null> = createClient()
@@ -45,8 +42,8 @@ export default async function PerformansimPage({
   return (
     <div className="space-y-5">
       <DashboardHero
-        eyebrow={`${p.day} ${MONTHS[p.month]} ${WEEKDAYS[p.weekday]} · Performansım`.toLocaleUpperCase("tr-TR")}
-        title={`${greetingFor(p.hour)}${firstName ? `, ${firstName}` : ""}`}
+        eyebrow={`${p.day} ${MONTHS[p.month]} ${WEEKDAYS[p.weekday]}`.toLocaleUpperCase("tr-TR")}
+        title="Performansım"
         summary={<p>Bu ayın karnesi, hedef ilerlemen ve sıradaki en iyi eylem.</p>}
         freshness={<DataFreshness asOf={nowMs} />}
         aside={
@@ -88,7 +85,7 @@ export default async function PerformansimPage({
       </Suspense>
       {/* Danışman 360 gövdesi en ağır blok: kabuk + hero + hedef anında gelir, bu kısım akıtılır (sabit yükseklikli iskelet). */}
       <Suspense fallback={<SkeletonCard height={520} label="Danışman karnesi yükleniyor" />}>
-        <AdvisorDetailView memberId={auth.userId} basePath="/app/performansim" searchParams={sp ?? {}} auth={auth} headingAs="h2" />
+        <AdvisorDetailView memberId={auth.userId} basePath="/app/performansim" searchParams={sp ?? {}} auth={auth} headingAs="h2" personalView />
       </Suspense>
     </div>
   );

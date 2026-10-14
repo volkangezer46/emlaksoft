@@ -9,6 +9,8 @@ import { handoffEditableScopes } from "@/lib/team/handoff";
 import { MemberHandoff } from "../[id]/member-handoff";
 import { ROLE_LABELS } from "@/lib/role-labels";
 
+export const metadata = { title: "Danışman devri · Ekip" };
+
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -65,7 +67,7 @@ export default async function TeamHandoffPage({ searchParams }: { searchParams?:
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="Ekip Merkezi"
+        eyebrow="Ekip"
         title="Danışman devri"
         description="Bir danışmanın müşteri, portföy, açık anlaşma, görev ve randevularını başka bir danışmana devredin. Her devir denetim kaydına yazılır."
       />

@@ -27,6 +27,8 @@ import { DonutRing, RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
 
+export const metadata = { title: "Destek" };
+
 /** Sayfa başına kayıt — gerçek sayfalama, 100'lük dilim + bellek filtresi yerine. */
 const PAGE_SIZE = 50;
 

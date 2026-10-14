@@ -27,7 +27,7 @@ import {
   type BudgetVsActualRow,
 } from "@/lib/finance/expense-budget";
 import { FinanceBudgetForm, FinanceBudgetRemove, type BudgetCategoryOption } from "../budget-form";
-import { PortalRoiCard, RecurringSeriesCard } from "../finance-panel";
+import { PortalRoiCard, RecurringSeriesCard } from "./butce-cards";
 
 /* ================================================================================================
  * FN6 ortak sekme sözleşmesi (paketler arası sözleşme §0). FN1'in `src/lib/finance/ledger/types.ts` dosyasındaki

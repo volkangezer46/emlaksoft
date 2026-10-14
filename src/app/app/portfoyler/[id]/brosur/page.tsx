@@ -16,6 +16,8 @@ import {
   type PublicCoverCandidate,
 } from "@/lib/public-property-media";
 
+export const metadata = { title: "Broşür · Portföy" };
+
 type Rel = { name?: string } | { name?: string }[] | null;
 
 function relName(value: Rel) {

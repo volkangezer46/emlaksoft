@@ -46,6 +46,8 @@ import { CustomerTasks, type CustomerTaskRow } from "../../musteriler/[id]/custo
 import { buildDemandEvents, DEMAND_TIMELINE_CATEGORIES, type DemandApptRow, type DemandTaskRow } from "./demand-events";
 import { DemandReminder } from "./demand-followup";
 
+export const metadata = { title: "Talep" };
+
 type Rel = { id?: string; name?: string; full_name?: string } | { id?: string; name?: string; full_name?: string }[] | null;
 
 function relOne<T extends { id?: string; name?: string; full_name?: string }>(value: Rel): T | null {

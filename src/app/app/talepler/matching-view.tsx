@@ -499,7 +499,7 @@ export async function MatchingView({
                         ?customer=&property=, teklifler ?musteri=&portfoy=). */}
                     <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
                       <Link
-                        href={`/app/portfoyler/sunumlar?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                        href={`/app/portfoyler/sunumlar/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
                         className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Bu portföyle müşteriye özel sunum linki hazırla"
                       >
@@ -513,7 +513,7 @@ export async function MatchingView({
                         <CalendarPlus className="h-3 w-3" /> Randevu ver
                       </Link>
                       <Link
-                        href={`/app/teklifler?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
+                        href={`/app/teklifler/yeni?portfoy=${pair.property.id}${customer ? `&musteri=${customer.id}` : ""}`}
                         className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 text-xs font-semibold text-ink-950 transition hover:border-brand-300 hover:text-brand-600"
                         title="Müşterinin teklifini ön dolgulu kaydet"
                       >

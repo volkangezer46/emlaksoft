@@ -126,7 +126,7 @@ export async function buildDemandEvents(
       title: `${done ? "Görev tamamlandı" : t.status === "cancelled" ? "Görev iptal edildi" : "Görev açıldı"} · ${t.title}`,
       icon: "task",
       tone: done ? "success" : t.status === "cancelled" ? "neutral" : "warn",
-      href: customerId ? `/app/musteriler/${customerId}?sekme=gorevler` : "/app/gorevler",
+      href: customerId ? `/app/musteriler/${customerId}?sekme=ozet` : "/app/gorevler",
     });
   }
 
@@ -155,7 +155,7 @@ export async function buildDemandEvents(
       detail: cut(c.subject || c.body),
       icon: isNote ? "note" : c.channel === "email" ? "mail" : c.channel === "call" ? "phone" : "message",
       tone: "neutral",
-      href: customerId ? `/app/musteriler/${customerId}?sekme=zaman&kategori=gorusme` : undefined,
+      href: customerId ? `/app/musteriler/${customerId}?sekme=gecmis&kategori=gorusme` : undefined,
     });
   }
 

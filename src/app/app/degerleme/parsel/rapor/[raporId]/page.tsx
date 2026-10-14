@@ -16,6 +16,8 @@ import {
 import { DegerlemeTabs } from "../../../degerleme-tabs";
 import { ReportDetailClient } from "./report-detail-client";
 
+export const metadata = { title: "Parsel raporu · Değerleme" };
+
 export const maxDuration = 300;
 
 export default async function ParselReportPage({ params }: { params: Promise<{ raporId: string }> }) {

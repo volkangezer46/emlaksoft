@@ -40,7 +40,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
       time: p.created_at,
       tone: "text-mint-600",
       href: `/app/portfoyler/${p.id}`,
-      actions: [{ key: "portal", kind: "link" as const, href: `/app/portallar?property=${p.id}`, label: "Portala bas →" }],
+      actions: [{ key: "portal", kind: "link" as const, href: `/app/ilan-kontrol/portallar?property=${p.id}`, label: "Portala bas →" }],
     })),
     ...feed.calls.map((c) => ({
       key: `call-${c.id}`,
@@ -73,7 +73,7 @@ export async function CanliAkis({ ctx, auditLink = false }: { ctx: HomeCtx; audi
             </p>
             <h2 className="mt-1 font-display font-bold text-ink-950">Son 24 saat</h2>
           </div>
-          {auditLink ? <PanelLink href="/app/denetim">Denetim</PanelLink> : null}
+          {auditLink ? <PanelLink href="/app/ofis-kontrol/kayit">Denetim</PanelLink> : null}
         </div>
         <div className="relative mt-5 space-y-3 before:absolute before:bottom-2 before:left-[15px] before:top-2 before:w-px before:bg-line">
           {items.length === 0 ? (

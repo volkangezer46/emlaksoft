@@ -5,10 +5,10 @@ import { now, trDayKey, trMonthKey } from "@/lib/clock";
 import { computeUnitCari, type CariCharge, type CariPayment } from "@/lib/building-management/unit-ledger";
 import { LEDGER_FLAG_LABELS, LEDGER_METHOD_LABELS, LEDGER_PARTY_LABELS, LEDGER_TX_LABELS } from "@/lib/compliance/ledger";
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
-import { buildProfitLoss, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
+import { computeOfficePnl, lastMonthKeys, type PlCommission, type PlExpense, type PlSplit } from "@/lib/reporting/profit-loss";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { loadManagementPnlInputs } from "@/lib/property-management/load";
-import { cashPnlAdjustments, monthBounds, pnlCashMonths, type PnlRaw } from "@/lib/finance/expense-budget";
+import { monthBounds, pnlCashMonths, type PnlRaw } from "@/lib/finance/expense-budget";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { loadDefLabels, memoLabels, STATUS } from "../labels";
 import { applyActorScope, applyDateRange, applyTimestampRange, enrichProfiles, label, nameOf, one } from "../query-helpers";
@@ -126,17 +126,11 @@ export const karZarar = defineReport({
       }
       const pm = await loadManagementPnlInputs(ctx.supabase, { tenantId: tid(ctx), firstMonthKey: keys[0]! });
       const expenses: PlExpense[] = expRes.data.map((e) => ({ date: String(e.expense_date), amount: Number(e.amount) || 0, passThrough: pm.passThroughExpenseIds.has(String(e.id)) }));
-      const pl = buildProfitLoss(keys, commissions, splits, expenses, pm.fees);
-      // Muhasebe v2 (finance_pnl): elle girilen gelir + gidere dönüşmemiş çıkışlar; komisyon ve kira iki kez sayılmaz. RPC yoksa ek yok.
+      // Muhasebe v2 (finance_pnl): elle girilen gelir + gidere dönüşmemiş çıkışlar; RPC yoksa ek yok. Hesap TEK fonksiyonda.
       const pnlRes = await Promise.resolve(ctx.supabase.rpc("finance_pnl", { p_from: `${keys[0]}-01`, p_to: monthBounds(keys[keys.length - 1]!).to })).catch(() => ({ data: null, error: { message: "rpc" } }));
       const cash = pnlRes.error ? null : pnlCashMonths(((pnlRes.data ?? []) as PnlRaw[]));
-      const adj = cashPnlAdjustments(keys, cash, expenses);
-      return pl.months
-        .map((m) => {
-          const a = adj.get(m.key) ?? { manualIncome: 0, extraExpense: 0 };
-          return { ...m, other: a.manualIncome, expenses: m.expenses + a.extraExpense, net: m.net + a.manualIncome - a.extraExpense, label: `${m.key.slice(5, 7)}.${m.key.slice(0, 4)}` };
-        })
-        .reverse();
+      const pl = computeOfficePnl(keys, { commissions, splits, expenses, fees: pm.fees, cash });
+      return pl.months.map((m) => ({ ...m, label: `${m.key.slice(5, 7)}.${m.key.slice(0, 4)}` })).reverse();
     },
   },
 });

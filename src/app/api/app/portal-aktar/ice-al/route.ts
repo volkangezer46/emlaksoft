@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       newValue: { portal, ...run.counts },
     });
     revalidatePath("/app/portfoyler");
-    revalidatePath("/app/portallar");
+    revalidatePath("/app/ilan-kontrol/portallar");
     revalidatePath("/app/ilan-kontrol");
     revalidatePath("/app/ilan-kontrol/eslesme");
   }

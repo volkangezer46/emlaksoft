@@ -236,14 +236,14 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     expect(NAV_SECTIONS.flatMap((s) => s.items).length).toBe(34);
   });
 
-  it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
+  it("Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
     const items = NAV_SECTIONS.flatMap((s) => s.items);
     const topHrefs = items.map((i) => i.href);
-    for (const gone of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar"]) {
+    for (const gone of ["/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar"]) {
       expect(topHrefs).not.toContain(gone);
     }
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/akilli-listeler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoy-avi", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
   });
@@ -252,7 +252,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     const closed = ["smart_lists", "keys", "presentations", "lost_sales", "rentals", "projects", "campaigns"];
     const open = allHrefs(visibleSections(ALL_MODULES));
     const shut = allHrefs(visibleSections(ALL_MODULES, { closed }));
-    for (const href of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/kiralama", "/app/kira-artis", "/app/projeler", "/app/kampanyalar"]) {
+    for (const href of ["/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/kiralama", "/app/kira-artis", "/app/projeler", "/app/kampanyalar"]) {
       expect(open, `açıkken ${href}`).toContain(href);
       expect(shut, `kapalıyken ${href}`).not.toContain(href);
     }
@@ -270,10 +270,10 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
   it("komut paleti: Git ve Eylemler kapalı modülü göstermez", () => {
     const closed = ["offers", "contracts", "rentals", "projects", "presentations", "open_house", "campaigns", "automation", "smart_lists"];
     const go = getAppGoItems(ALL_MODULES, "", closed).map((e) => e.href);
-    for (const href of ["/app/teklifler", "/app/sozlesmeler", "/app/kiralama", "/app/projeler", "/app/akilli-listeler", "/app/otomasyonlar"]) {
+    for (const href of ["/app/teklifler", "/app/sozlesmeler", "/app/kiralama", "/app/projeler", "/app/tavsiyeler", "/app/otomasyonlar"]) {
       expect(go).not.toContain(href);
     }
-    expect(getAppGoItems(ALL_MODULES).map((e) => e.href)).toContain("/app/akilli-listeler");
+    expect(getAppGoItems(ALL_MODULES).map((e) => e.href)).toContain("/app/tavsiyeler");
     const actions = getAppActions(ALL_MODULES, "", [], closed).map((a) => a.href);
     for (const href of ["/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/kiralama/yeni", "/app/projeler/yeni", "/app/portfoyler/sunumlar/yeni", "/app/acik-ev/yeni", "/app/kampanyalar/yeni", "/app/otomasyonlar/yeni"]) {
       expect(actions).not.toContain(href);

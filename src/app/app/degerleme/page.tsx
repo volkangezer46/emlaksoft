@@ -26,6 +26,8 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { PageHeader } from "@/components/ui/page-header";
 import { getDistrictNameMap, provinceOptionsResult } from "@/lib/geo/reader";
 import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
+
+export const metadata = { title: "Değerleme" };
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
 const nf0 = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });

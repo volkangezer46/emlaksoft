@@ -97,7 +97,7 @@ export async function CustomerIntelCard({
         <div>
           <dt className="text-text-faint">Son 30 gün gelen</dt>
           <dd className="font-semibold text-ink-950">
-            <Link href={`/app/musteriler/${customerId}?sekme=zaman`} className="focus-ring rounded hover:text-brand-600">
+            <Link href={`/app/musteriler/${customerId}?sekme=gecmis`} className="focus-ring rounded hover:text-brand-600">
               {intel.last30.inbound}
             </Link>
           </dd>
@@ -105,7 +105,7 @@ export async function CustomerIntelCard({
         <div>
           <dt className="text-text-faint">Son 30 gün giden</dt>
           <dd className="font-semibold text-ink-950">
-            <Link href={`/app/musteriler/${customerId}?sekme=zaman`} className="focus-ring rounded hover:text-brand-600">
+            <Link href={`/app/musteriler/${customerId}?sekme=gecmis`} className="focus-ring rounded hover:text-brand-600">
               {intel.last30.outbound}
             </Link>
           </dd>

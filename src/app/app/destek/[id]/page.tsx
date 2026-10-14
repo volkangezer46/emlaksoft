@@ -23,6 +23,8 @@ import { TicketCsatForm } from "./ticket-csat-form";
 import { TenantTicketControls } from "./tenant-ticket-controls";
 import { TicketThread, type TicketMessage } from "./ticket-thread";
 
+export const metadata = { title: "Destek talebi" };
+
 const statusLabel: Record<string, string> = {
   open: "Açık",
   in_progress: "İşleniyor",

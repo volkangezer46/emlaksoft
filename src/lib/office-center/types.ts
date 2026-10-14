@@ -4,17 +4,15 @@
  */
 
 /**
- * Sekmeler: "Ayarlar" ve "Tanımlamalar" AYNI ayar anahtarlarına yazıyordu → tek "Tanımlar" sekmesi (tüm ayarlar,
- * geçmiş ve geri alma Ayarlar > Tanımlar merkezinde). "Atamalar" yalnız özet + İlan Havuzu bağlantısıdır (atama tek ekranda).
+ * Ekip sayfası sekmeleri: Ekip (danışman listesi) ve İstatistikler (ekip sağlığı). Ofis kuralları, talep dağıtımı ve
+ * akıllı atama ağırlıkları TEK yerde: Ayarlar > Kurallar ve varsayılanlar (/app/ayarlar/merkez).
  */
-export type OfficeCenterTab = "danismanlar" | "dagitim" | "tanimlar" | "istatistikler";
+export type OfficeCenterTab = "danismanlar" | "istatistikler";
 export const OFFICE_CENTER_TABS: readonly { id: OfficeCenterTab; label: string }[] = [
   { id: "danismanlar", label: "Ekip" },
-  { id: "dagitim", label: "Talep dağıtımı" },
-  { id: "tanimlar", label: "Tanımlar" },
   { id: "istatistikler", label: "İstatistikler" },
 ];
-/** Ofis Merkezi içeriğinin yaşadığı tek ekip merkezi (ayrı Ofis Merkezi sayfası yok; sekmeler `?sekme=`). */
+/** Ekip sayfası (sekmeler `?sekme=`). */
 export const TEAM_HUB_PATH = "/app/ekip";
 
 /** Danışmanlar sekmesi satırı: her sayı filtreli hedefe gider (sıfır çıkmaz metrik). */
