@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  RECEIPT_OCR_REQUEST_LIMIT_BYTES,
+  fitsReceiptOcrRequest,
   parseReceiptDate,
   parseReceiptResponse,
   parseTrAmount,
@@ -95,6 +97,25 @@ describe("shouldRunReceiptOcr (varsayılan kapalı)", () => {
     expect(shouldRunReceiptOcr({ enabled: true, fileType: "application/pdf", quotaOpen: true })).toBe(false);
     expect(shouldRunReceiptOcr({ enabled: true, fileType: "image/png", quotaOpen: false })).toBe(false);
     expect(shouldRunReceiptOcr({ enabled: true, fileType: "image/webp", quotaOpen: true })).toBe(true);
+  });
+});
+
+describe("fitsReceiptOcrRequest (istek sınırı)", () => {
+  it("küçük görsel sığar, ~8,9 MB üstü sığmaz; sınır openai-client ile aynı", () => {
+    expect(fitsReceiptOcrRequest(2 * 1024 * 1024)).toBe(true);
+    expect(fitsReceiptOcrRequest(8.5 * 1024 * 1024)).toBe(true);
+    expect(fitsReceiptOcrRequest(9.5 * 1024 * 1024)).toBe(false);
+    expect(fitsReceiptOcrRequest(10 * 1024 * 1024)).toBe(false);
+    expect(fitsReceiptOcrRequest(0)).toBe(false);
+    expect(read("src/lib/ai/openai-client.ts")).toMatch(/OPENAI_MAX_REQUEST_BYTES = 12 \* 1024 \* 1024;/);
+    expect(RECEIPT_OCR_REQUEST_LIMIT_BYTES).toBe(12 * 1024 * 1024);
+  });
+
+  it("sınırı aşan görselde dış çağrı ve kota denetimi yapılmaz", () => {
+    const ocr = read("src/lib/finance/ocr/receipt-ocr.ts");
+    const sizeAt = ocr.indexOf('reason: "size"');
+    expect(sizeAt).toBeGreaterThan(0);
+    expect(ocr.indexOf("canAutoCallAi(")).toBeGreaterThan(sizeAt);
   });
 });
 

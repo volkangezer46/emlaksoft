@@ -6,6 +6,10 @@
 --    (yükleme ucu `/api/app/finans/belge` oturumlu istemciyle yazar; createAdminClient kullanılmaz).
 --    Mevcut gider fişi yolları (`{tenant}/{expense_id}/...`) bu politikalara girmez; eski hat (service_role imzalı
 --    jeton) aynen sürer.
+--    Silme istisnası (yetim nesne): yükleme ucu RPC kaydı başarısız olunca nesneyi geri siler. Yalnız `expenses:create`
+--    yetkili kullanıcının bunu yapabilmesi için silme, AYNI kullanıcının son 15 dakikada yüklediği ve
+--    `finance_attachments`'ta karşılığı OLMAYAN nesneye de izin verir (`finance_ledger_object_orphan`). Kayda geçmiş
+--    belgeyi silmek yine `expenses:edit` ister.
 -- 2) e-Fatura okuma tutarsızlığı: Faturalar artık Muhasebe > Belgeler altında; listeyi `expenses:view` olan da görür.
 --    Taslak/resmileştirme yazma politikaları DEĞİŞMEZ (commissions:create).
 --
@@ -32,6 +36,34 @@ comment on function public.finance_ledger_object_allowed(text, text) is
 revoke all privileges on function public.finance_ledger_object_allowed(text, text) from public, anon;
 grant execute on function public.finance_ledger_object_allowed(text, text) to authenticated, service_role;
 
+-- Yetim nesne: kendi yüklediği, 15 dk'dan yeni, kayda geçmemiş. finance_attachments FN1 migration'ında (20261014001000)
+-- oluşur; bu dosya ondan önce uygulanabildiği için tablo yoksa "kayıt yok" sayılır (plpgsql: gövde çalışma anında çözülür).
+create or replace function public.finance_ledger_object_orphan(p_name text, p_owner text, p_created timestamptz)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if auth.uid() is null or p_owner is null or p_owner <> auth.uid()::text
+     or p_created is null or p_created < pg_catalog.now() - interval '15 minutes'
+     or not public.finance_ledger_object_allowed(p_name, 'create') then
+    return false;
+  end if;
+  if pg_catalog.to_regclass('public.finance_attachments') is null then
+    return true;
+  end if;
+  return not exists (select 1 from public.finance_attachments fa where fa.storage_path = p_name);
+end;
+$$;
+
+comment on function public.finance_ledger_object_orphan(text, text, timestamptz) is
+  'FN5: kayit RPC basarisiz olunca yukleyenin kendi yeni ve kayitsiz {tenant}/ledger nesnesini geri silebilmesi.';
+
+revoke all privileges on function public.finance_ledger_object_orphan(text, text, timestamptz) from public, anon;
+grant execute on function public.finance_ledger_object_orphan(text, text, timestamptz) to authenticated, service_role;
+
 do $$
 begin
   if pg_catalog.to_regclass('storage.objects') is not null then
@@ -43,7 +75,8 @@ begin
     execute $p$create policy finance_ledger_objects_insert on storage.objects for insert to authenticated
       with check (bucket_id = 'expense-receipts' and public.finance_ledger_object_allowed(name, 'create'))$p$;
     execute $p$create policy finance_ledger_objects_delete on storage.objects for delete to authenticated
-      using (bucket_id = 'expense-receipts' and public.finance_ledger_object_allowed(name, 'edit'))$p$;
+      using (bucket_id = 'expense-receipts' and (public.finance_ledger_object_allowed(name, 'edit')
+             or public.finance_ledger_object_orphan(name, owner_id, created_at)))$p$;
   end if;
 end $$;
 

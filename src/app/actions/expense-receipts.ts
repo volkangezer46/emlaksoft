@@ -13,8 +13,8 @@ import type {
   DirectFileUploadPrepareResult,
 } from "@/lib/direct-file-uploads";
 import { isMissingExpenseReceiptSchema } from "@/lib/expense-receipts";
-import { actionErrorMessage } from "@/lib/action-errors";
 import { orIlike, safeLike } from "@/lib/pgrst";
+import { financeAttachmentErrorMessage } from "@/lib/finance/attachment-errors";
 
 /**
  * Gider fişi DOSYASI (20261007000700): mevcut güvenli doğrudan yükleme hattı (imzalı tek nesne jetonu → bayt imzası
@@ -141,24 +141,18 @@ export async function deleteExpenseReceipt(expenseIdValue: string): Promise<{ ok
 // bağlantısı ve bağlanacak kayıt araması var. Yazma yalnız RPC; okuma RLS ile kendi ofisi.
 // ---------------------------------------------------------------------------
 
-const LEDGER_NOT_READY = "Belgeler henüz etkin değil (veritabanı güncellemesi bekleniyor).";
-
-function isMissingFinanceSchema(error: { code?: string } | null | undefined): boolean {
-  return error?.code === "PGRST202" || error?.code === "42883" || error?.code === "42P01" || error?.code === "PGRST205";
-}
-
-async function attachmentWriteGate() {
-  const edit = await requirePermission("expenses", "edit");
-  return edit.ok ? edit : requirePermission("expenses", "create");
-}
-
-/** Fiş kutusundaki eki bir harekete ya da açık kaleme bağlar (ikisi birden değil). */
+/**
+ * Fiş kutusundaki eki bir harekete ya da açık kaleme bağlar (ikisi birden değil). Kapı FN1 `linkAttachment` ve
+ * `finance_attachment_link` RPC'si ile AYNI: `expenses:edit`. Hata metinleri tek kaynak `@/lib/finance/attachment-errors`.
+ * Birleştirme notu: FN1 `src/app/actions/finance-ledger.ts` geldiğinde bu action onun `linkAttachment`'ına ince
+ * sarmalayıcı olur (aynı RPC, aynı kapı); burada yalnız "tam bir hedef" ön denetimi ve etkinlik kaydı kalır.
+ */
 export async function linkFinanceAttachment(input: {
   id: string;
   entryId?: string | null;
   openItemId?: string | null;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const gate = await attachmentWriteGate();
+  const gate = await requirePermission("expenses", "edit");
   if (!gate.ok) return { ok: false, error: gate.error };
   const id = String(input?.id ?? "").trim();
   const entryId = input?.entryId ? String(input.entryId).trim() : null;
@@ -168,11 +162,7 @@ export async function linkFinanceAttachment(input: {
   if ((entryId && !UUID_RE.test(entryId)) || (openItemId && !UUID_RE.test(openItemId))) return { ok: false, error: "Bağlanacak kayıt bulunamadı." };
   const supabase = await createClient();
   const { error } = await supabase.rpc("finance_attachment_link", { p_id: id, p_entry_id: entryId, p_open_item_id: openItemId });
-  if (error) {
-    if (isMissingFinanceSchema(error)) return { ok: false, error: LEDGER_NOT_READY };
-    if ((error.message ?? "").includes("DONEM_KILITLI")) return { ok: false, error: "Bu ay kapatılmış (dönem kilidi); kilitli aydaki kayda belge bağlanamaz." };
-    return { ok: false, error: actionErrorMessage(error, "Belge bağlanamadı") };
-  }
+  if (error) return { ok: false, error: financeAttachmentErrorMessage(error, "Belge bağlama") };
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -208,7 +198,7 @@ export async function financeAttachmentPreview(idValue: string): Promise<Attachm
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (error) return { ok: false, error: isMissingFinanceSchema(error) ? LEDGER_NOT_READY : actionErrorMessage(error, "Belge açılamadı") };
+  if (error) return { ok: false, error: financeAttachmentErrorMessage(error, "Belge önizleme") };
   const row = data as { storage_path: string; file_type: string | null; file_name: string | null } | null;
   if (!row || !isLedgerObjectPath(row.storage_path, gate.tenantId)) return { ok: false, error: "Belge bulunamadı." };
   const signed = await supabase.storage.from("expense-receipts").createSignedUrl(row.storage_path, 120);
@@ -253,7 +243,7 @@ export async function searchFinanceLinkTargets(qValue: string): Promise<{ ok: tr
   }
   const [e, o] = await Promise.all([entries, items]);
   if (e.error && o.error) {
-    return { ok: false, error: isMissingFinanceSchema(e.error) ? LEDGER_NOT_READY : actionErrorMessage(e.error, "Kayıtlar okunamadı") };
+    return { ok: false, error: financeAttachmentErrorMessage(e.error, "Bağlanacak kayıt listesi") };
   }
   const out: LinkTarget[] = [];
   for (const r of (e.data ?? []) as Array<{ id: string; title: string | null; amount: number | string; direction: string; entry_date: string | null; counterparty: string | null }>) {

@@ -13,7 +13,7 @@ import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { DOC_TYPE_LABEL, EINVOICE_PROVIDER_META, MODE_LABEL } from "@/lib/integrations/einvoice/providers";
-import { DEFAULT_VAT_RATE } from "@/lib/integrations/einvoice/invoice-math";
+import { DEFAULT_VAT_RATE, VAT_RATE_OPTIONS, unitNetForGross } from "@/lib/integrations/einvoice/invoice-math";
 import {
   EINVOICE_ROW_COLUMNS,
   getConnectionInfo,
@@ -26,11 +26,16 @@ import { InvoiceRowActions, IssuePanel } from "./invoice-actions";
 /**
  * Eski sekme kaydı (`?sekme=faturalar`): Faturalar artık Muhasebe > Belgeler > Faturalar (`?sekme=belgeler&tur=fatura`);
  * eski bağlantı sekme takma adıyla oraya düşer. Anahtar geriye uyumluluk için dışa verilir.
+ * BİRLEŞTİRME SIRASI: `?sekme=belgeler` yalnız FN2 yönlendiricisinde (`resolveFinanceTab` + `BelgelerTab`) çözülür;
+ * FN5, FN1 ve FN2 ile birlikte ya da onlardan sonra birleşir (tek başına birleşirse bu adresler genel bakışa düşer).
  */
 export const FATURALAR_SEKME = { key: "faturalar", label: "Faturalar" } as const;
 
-/** `tutar` / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu serbest faturayı önceden doldurur. */
-export type FaturalarParams = { durum?: string; kaynak?: string; id?: string; duzenle?: string; adet?: string; tutar?: string; aciklama?: string; alici?: string };
+/**
+ * `tutar` (KDV dahil) / `kdv` (hareketin KDV oranı) / `aciklama` / `alici`: gelir hareketinden "Fatura kes" kısayolu
+ * serbest faturayı önceden doldurur.
+ */
+export type FaturalarParams = { durum?: string; kaynak?: string; id?: string; duzenle?: string; adet?: string; tutar?: string; kdv?: string; aciklama?: string; alici?: string };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BASE = "/app/giderler?sekme=belgeler&tur=fatura";
@@ -63,9 +68,10 @@ function todayIso(): string {
   return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Istanbul" }).format(new Date(now()));
 }
 
-/** Gelir hareketinden serbest fatura: KDV dahil tutardan KDV hariç birim fiyat (2 hane). */
-function netFromGross(gross: number, rate: number): string {
-  return String(Math.round((gross / (1 + rate / 100)) * 100) / 100);
+/** `?kdv=`: hareketin `vat_rate`'i; editörün seçicisindeki oranlardan biri değilse (ya da yoksa) varsayılan %20. */
+function vatRateParam(value: string | undefined): number {
+  const n = value ? Number(value) : Number.NaN;
+  return (VAT_RATE_OPTIONS as readonly number[]).includes(n) ? n : DEFAULT_VAT_RATE;
 }
 
 const cleanParam = (v: string | undefined) => (v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 200);
@@ -194,7 +200,9 @@ export async function FaturalarTab({ perms, params, embedded = false }: { perms:
   if (sourceType) {
     if (sourceType === "free") {
       const gross = Number(params.tutar);
-      const prefillAmount = Number.isFinite(gross) && gross > 0 && gross < 1e9 ? netFromGross(gross, DEFAULT_VAT_RATE) : "";
+      const prefillVat = vatRateParam(params.kdv);
+      // Net, editörde yeniden hesaplandığında hareketin brütünü verecek şekilde seçilir (kuruş sapması yok).
+      const prefillAmount = Number.isFinite(gross) && gross > 0 && gross < 1e9 ? String(unitNetForGross(gross, prefillVat)) : "";
       return (
         <ListPage>
           {hero}
@@ -213,7 +221,7 @@ export async function FaturalarTab({ perms, params, embedded = false }: { perms:
               buyerDistrict: "",
               issueDate: todayIso(),
               note: "",
-              lines: [{ description: cleanParam(params.aciklama), quantity: "1", unitPrice: prefillAmount, vatRate: DEFAULT_VAT_RATE }],
+              lines: [{ description: cleanParam(params.aciklama), quantity: "1", unitPrice: prefillAmount, vatRate: prefillVat }],
             }}
           />
         </ListPage>

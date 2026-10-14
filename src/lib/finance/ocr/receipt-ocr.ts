@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { externalErrorMetadata } from "@/lib/external-fetch";
 import { getOpenAiVisionModel, openAiChat } from "@/lib/ai/openai-client";
 import { canAutoCallAi } from "@/lib/ai/auto-call-gate";
-import { isReceiptOcrType, parseReceiptResponse, shouldRunReceiptOcr, type ReceiptSuggestion } from "./parse-receipt";
+import { fitsReceiptOcrRequest, isReceiptOcrType, parseReceiptResponse, shouldRunReceiptOcr, type ReceiptSuggestion } from "./parse-receipt";
 
 /**
  * FİŞ OKUMA (FN5, isteğe bağlı, VARSAYILAN KAPALI: finance_settings.ocr_enabled).
@@ -32,7 +32,7 @@ const USER_PROMPT = `Bu görsel bir fiş, fatura ya da makbuz olabilir. TAM OLAR
 Görsel bir fiş/fatura değilse tüm alanları null yap.`;
 
 export type ReceiptOcrOutcome =
-  | { status: "skipped"; reason: "disabled" | "type" | "quota" }
+  | { status: "skipped"; reason: "disabled" | "type" | "quota" | "size" }
   | { status: "done"; suggestion: ReceiptSuggestion }
   | { status: "failed" };
 
@@ -57,6 +57,8 @@ export async function readReceipt(input: {
 }): Promise<ReceiptOcrOutcome> {
   if (!input.enabled) return { status: "skipped", reason: "disabled" };
   if (!isReceiptOcrType(input.fileType)) return { status: "skipped", reason: "type" };
+  // Sınırı aşan görsel her durumda "failed" olurdu (ve isteği boşuna bekletirdi): hiç çağrılmaz, kota da harcanmaz.
+  if (!fitsReceiptOcrRequest(input.bytes.byteLength)) return { status: "skipped", reason: "size" };
   const quotaOpen = await canAutoCallAi(input.tenantId);
   if (!shouldRunReceiptOcr({ enabled: input.enabled, fileType: input.fileType, quotaOpen })) return { status: "skipped", reason: "quota" };
   const apiKey = process.env.OPENAI_API_KEY;

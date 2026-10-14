@@ -59,7 +59,17 @@ type AttachmentRow = {
   ocr_json: Record<string, unknown> | null;
   created_at: string;
 };
-type EntryRow = { id: string; title: string | null; amount: number | string; direction: string; counterparty: string | null; source_type: string | null; source_id: string | null };
+type EntryRow = {
+  id: string;
+  title: string | null;
+  amount: number | string;
+  direction: string;
+  counterparty: string | null;
+  source_type: string | null;
+  source_id: string | null;
+  entry_date: string | null;
+  vat_rate: number | string | null;
+};
 type OpenItemRow = { id: string; title: string | null; amount: number | string; direction: string };
 
 const isMissing = (e: { code?: string } | null | undefined) => e?.code === "42P01" || e?.code === "PGRST205" || e?.code === "PGRST200";
@@ -78,9 +88,25 @@ function invoiceHrefFor(e: EntryRow): string | null {
   if (e.source_type === "commission" && e.source_id) return `${BASE}&tur=fatura&kaynak=komisyon&id=${e.source_id}`;
   if (e.source_type && e.source_type !== "manual") return null;
   const sp = new URLSearchParams({ kaynak: "serbest", tutar: String(Number(e.amount) || "") });
+  // Hareketin KDV oranı (FN1 `vat_rate`): net birim fiyat bu oranla brütten geri hesaplanır.
+  if (e.vat_rate != null && e.vat_rate !== "" && Number.isFinite(Number(e.vat_rate))) sp.set("kdv", String(Number(e.vat_rate)));
   if (e.title) sp.set("aciklama", e.title.slice(0, 120));
   if (e.counterparty) sp.set("alici", e.counterparty.slice(0, 120));
   return `${BASE}&tur=fatura&${sp.toString()}`;
+}
+
+/**
+ * Bağlı harekete gidiş: Hareketler (FN3) kimlikle açma parametresi sunmuyor; başlık araması (`q`) hareketin GÜNÜNE
+ * daraltılır (`from`/`to`), aynı başlıklı başka günlerdeki kayıtlar karışmaz. Birleştirme notu: FN3 `hareket=<id>`
+ * eklerse burası ona geçer.
+ */
+function entryHref(title: string, entryDate: string | null): string {
+  const sp = new URLSearchParams({ sekme: "hareketler", q: title.slice(0, 60) });
+  if (entryDate && /^\d{4}-\d{2}-\d{2}$/.test(entryDate)) {
+    sp.set("from", entryDate);
+    sp.set("to", entryDate);
+  }
+  return `/app/giderler?${sp.toString()}`;
 }
 
 function SubviewChips({ active, counts }: { active: BelgeTur; counts?: Partial<Record<BelgeTur, number | null>> }) {
@@ -112,6 +138,7 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
       duzenle: params.duzenle,
       adet: params.adet,
       tutar: params.tutar,
+      kdv: params.kdv,
       aciklama: params.aciklama,
       alici: params.alici,
     };
@@ -164,7 +191,7 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
   const itemIds = [...new Set(rows.map((r) => r.open_item_id).filter((v): v is string => !!v))];
   const [entriesRes, itemsRes] = await Promise.all([
     entryIds.length
-      ? supabase.from("cash_entries").select("id, title, amount, direction, counterparty, source_type, source_id").eq("tenant_id", tenantId).in("id", entryIds)
+      ? supabase.from("cash_entries").select("id, title, amount, direction, counterparty, source_type, source_id, entry_date, vat_rate").eq("tenant_id", tenantId).in("id", entryIds)
       : Promise.resolve({ data: [] as EntryRow[], error: null }),
     itemIds.length
       ? supabase.from("finance_open_items").select("id, title, amount, direction").eq("tenant_id", tenantId).in("id", itemIds)
@@ -184,7 +211,7 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
         title,
         amount: e ? Number(e.amount) : null,
         incoming: e?.direction === "in",
-        href: `/app/giderler?sekme=hareketler&q=${encodeURIComponent(title.slice(0, 60))}`,
+        href: entryHref(title, e?.entry_date ?? null),
         invoiceHref: e && canInvoice ? invoiceHrefFor(e) : null,
       };
     } else if (r.open_item_id) {
@@ -213,7 +240,8 @@ export async function BelgelerTab(props: BelgelerTabProps): Promise<JSX.Element>
   const allCount = allRes.count ?? 0;
   const ocrCount = ocrRes.count ?? 0;
   const ocrEnabled = (settingsRes.data as { ocr_enabled?: boolean } | null)?.ocr_enabled === true;
-  const canLink = canEdit || canCreate;
+  // Bağlama kapısı FN1 `finance_attachment_link` RPC ile aynı: expenses:edit.
+  const canLink = canEdit;
 
   const kpis: KpiItem[] = [
     { label: "Fiş kutusunda", value: inboxCount, icon: <Inbox />, tone: inboxCount > 0 ? "info" : "neutral", href: `${BASE}&tur=fis`, hint: "kayda bağlanmayı bekliyor" },

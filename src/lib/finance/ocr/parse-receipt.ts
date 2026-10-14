@@ -21,6 +21,20 @@ export function isReceiptOcrType(fileType: string): boolean {
   return (RECEIPT_OCR_TYPES as readonly string[]).includes(fileType);
 }
 
+/**
+ * Görsel, base64 (data URL) hâliyle OpenAI istek sınırına (`OPENAI_MAX_REQUEST_BYTES` = 12 MB) sığıyor mu.
+ * base64 4/3 büyütür; istem metni ve JSON için 64 KB pay bırakılır. Sığmazsa okuma hiç denenmez ("size").
+ * Değer `src/lib/ai/openai-client.ts` ile aynı tutulur (bu modül saf kalsın diye kopyalanır; test eşitliği doğrular).
+ */
+export const RECEIPT_OCR_REQUEST_LIMIT_BYTES = 12 * 1024 * 1024;
+const RECEIPT_OCR_OVERHEAD_BYTES = 64 * 1024;
+
+export function fitsReceiptOcrRequest(byteLength: number): boolean {
+  if (!Number.isFinite(byteLength) || byteLength <= 0) return false;
+  const base64 = Math.ceil(byteLength / 3) * 4;
+  return base64 + RECEIPT_OCR_OVERHEAD_BYTES <= RECEIPT_OCR_REQUEST_LIMIT_BYTES;
+}
+
 /** OCR çalışmalı mı: ayar açık, görsel tür ve kota açık. Kapalıysa HİÇBİR dış çağrı yapılmaz. */
 export function shouldRunReceiptOcr(input: { enabled: boolean; fileType: string; quotaOpen: boolean }): boolean {
   if (!input.enabled) return false;

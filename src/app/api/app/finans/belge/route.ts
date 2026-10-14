@@ -9,6 +9,7 @@ import { canonicalExtensionForMime, normalizeUploadedFileName, verifyDocumentFil
 import { trDayKey } from "@/lib/clock";
 import { safeObjectName, type ReceiptSuggestion } from "@/lib/finance/ocr/parse-receipt";
 import { isReceiptOcrEnabled, readReceipt } from "@/lib/finance/ocr/receipt-ocr";
+import { financeAttachmentErrorMessage } from "@/lib/finance/attachment-errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,10 @@ export const dynamic = "force-dynamic";
  * - Dosya: JPEG/PNG/WEBP/PDF, en çok 10 MB; tür bayt imzasıyla doğrulanır (`verifyDocumentFile`).
  * - Yazım: OTURUMLU istemciyle 'expense-receipts' kovasına `{tenant}/ledger/{uuid}-{ad}` (storage politikası
  *   20261013008400 yalnız kendi ofis önekine izin verir; service_role YOK), ardından `finance_attachment_register` RPC.
- *   Kayıt başarısızsa nesne geri silinir.
+ *   Kayıt başarısızsa nesne geri silinir: silme politikası, aynı kullanıcının son 15 dakikada yüklediği ve
+ *   `finance_attachments`'ta karşılığı OLMAYAN nesneye `expenses:create` ile de izin verir (yalnız create yetkili
+ *   kullanıcıda yetim nesne kalmaz).
+ * - Fiş okuma görsel, base64 hâliyle istek sınırını aşacaksa hiç çağrılmaz (`ocrSkipped: "size"`).
  * - Fiş okuma yalnız `finance_settings.ocr_enabled` açıksa; sonuç yalnız ÖNERİ (kayıt oluşturmaz).
  * Dosya adı ve içeriği loglanmaz.
  */
@@ -32,7 +36,8 @@ const ALLOWED = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BUCKET = "expense-receipts";
 
-type Body = { ok: true; id: string; ocr?: ReceiptSuggestion } | { ok: false; error: string };
+/** `ocrSkipped: "size"`: görsel fiş okuma isteği sınırını aşar; okuma hiç denenmez (kullanıcı bilgileri elle girer). */
+type Body = { ok: true; id: string; ocr?: ReceiptSuggestion; ocrSkipped?: "size" } | { ok: false; error: string };
 
 function fail(error: string, status: number, extra?: Record<string, string>) {
   return NextResponse.json<Body>({ ok: false, error }, { status, headers: { ...NO_STORE, ...extra } });
@@ -42,14 +47,6 @@ function optionalUuid(v: FormDataEntryValue | null): string | null | false {
   const s = typeof v === "string" ? v.trim() : "";
   if (!s) return null;
   return UUID_RE.test(s) ? s : false;
-}
-
-function registerError(error: { code?: string; message?: string }): string {
-  const msg = error.message ?? "";
-  if (error.code === "PGRST202" || error.code === "42883" || error.code === "42P01") return "Belgeler henüz etkin değil (veritabanı güncellemesi bekleniyor).";
-  if (msg.includes("DONEM_KILITLI")) return "Bu ay kapatılmış (dönem kilidi). Belge kilitli aydaki bir kayda bağlanamaz.";
-  if (error.code === "42501") return "Belge yüklemek için yetkiniz yok.";
-  return "Belge kaydedilemedi. Sayfayı yenileyip yeniden deneyin.";
 }
 
 export async function POST(request: Request) {
@@ -102,11 +99,13 @@ export async function POST(request: Request) {
   if (error || typeof data !== "string") {
     await supabase.storage.from(BUCKET).remove([path]).catch(() => undefined);
     if (error) console.error("finans belge register", { code: error.code ?? null });
-    return fail(error ? registerError(error) : "Belge kaydedilemedi. Sayfayı yenileyip yeniden deneyin.", error?.code === "42501" ? 403 : 500);
+    const forbidden = error?.code === "42501" || (error?.message ?? "").includes("FN:forbidden");
+    return fail(error ? financeAttachmentErrorMessage(error, "Belge kaydı") : "Belge kaydedilemedi. Sayfayı yenileyip yeniden deneyin.", forbidden ? 403 : 500);
   }
   const id = data;
 
   let ocr: ReceiptSuggestion | undefined;
+  let ocrSkipped: "size" | undefined;
   const enabled = await isReceiptOcrEnabled(supabase, gate.tenantId);
   if (enabled) {
     const outcome = await readReceipt({ enabled, tenantId: gate.tenantId, userId: gate.userId, fileType: type, bytes, todayIso: trDayKey() });
@@ -115,9 +114,11 @@ export async function POST(request: Request) {
       await supabase.rpc("finance_attachment_set_ocr", { p_id: id, p_status: "done", p_json: outcome.suggestion });
     } else if (outcome.status === "failed") {
       await supabase.rpc("finance_attachment_set_ocr", { p_id: id, p_status: "failed", p_json: null });
+    } else if (outcome.reason === "size") {
+      ocrSkipped = "size";
     }
   }
 
   revalidatePath("/app/giderler");
-  return NextResponse.json<Body>(ocr ? { ok: true, id, ocr } : { ok: true, id }, { headers: NO_STORE });
+  return NextResponse.json<Body>(ocr ? { ok: true, id, ocr } : ocrSkipped ? { ok: true, id, ocrSkipped } : { ok: true, id }, { headers: NO_STORE });
 }

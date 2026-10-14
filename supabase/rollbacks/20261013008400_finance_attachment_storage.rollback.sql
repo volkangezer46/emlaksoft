@@ -30,5 +30,6 @@ begin
       )$p$;
   end if;
 end $$;
+drop function if exists public.finance_ledger_object_orphan(text, text, timestamptz);
 drop function if exists public.finance_ledger_object_allowed(text, text);
 notify pgrst, 'reload schema';

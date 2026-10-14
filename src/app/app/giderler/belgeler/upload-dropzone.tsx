@@ -23,7 +23,7 @@ const CONCURRENCY = 3;
 
 export type OcrSuggestion = { amount?: number; date?: string; vatRate?: number; vendor?: string };
 
-type UploadResponse = { ok: true; id: string; ocr?: OcrSuggestion } | { ok: false; error: string };
+type UploadResponse = { ok: true; id: string; ocr?: OcrSuggestion; ocrSkipped?: "size" } | { ok: false; error: string };
 
 type QueueItem = {
   key: string;
@@ -32,6 +32,7 @@ type QueueItem = {
   error?: string;
   id?: string;
   ocr?: OcrSuggestion;
+  ocrSkipped?: "size";
 };
 
 const money = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY" }).format(n);
@@ -129,7 +130,7 @@ export function UploadDropzone({ canUpload, compact = false }: { canUpload: bool
         const res = await uploadOne(item.file);
         if (res.ok) {
           ok += 1;
-          patch(item.key, { status: "done", id: res.id, ocr: res.ocr && suggestionText(res.ocr) ? res.ocr : undefined });
+          patch(item.key, { status: "done", id: res.id, ocr: res.ocr && suggestionText(res.ocr) ? res.ocr : undefined, ocrSkipped: res.ocrSkipped });
         } else {
           patch(item.key, { status: "error", error: res.error });
         }
@@ -228,7 +229,11 @@ export function UploadDropzone({ canUpload, compact = false }: { canUpload: bool
               {q.status === "waiting" ? <span className="text-text-faint">Sırada</span> : null}
               {q.status === "uploading" ? <span className="text-text-muted">Yükleniyor…</span> : null}
               {q.status === "error" ? <span className="w-full text-danger-600 sm:w-auto">{q.error}</span> : null}
-              {q.status === "done" && !q.ocr ? <span className="text-text-muted">Fiş kutusuna eklendi</span> : null}
+              {q.status === "done" && !q.ocr ? (
+                <span className="text-text-muted">
+                  {q.ocrSkipped === "size" ? "Fiş kutusuna eklendi · görsel fiş okuma için çok büyük (en çok ~8 MB); bilgileri elle girin" : "Fiş kutusuna eklendi"}
+                </span>
+              ) : null}
               {q.status === "done" && q.ocr && q.id ? (
                 <span className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                   <span className="inline-flex items-center gap-1 rounded-full bg-brand-500/10 px-2 py-0.5 text-brand-700">
