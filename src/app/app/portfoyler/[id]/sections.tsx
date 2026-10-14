@@ -121,7 +121,7 @@ export async function MediaSection({
 }) {
   const supabase = await createClient();
   type MediaRow = Omit<MediaItem, "is_document"> & { file_name: string | null; is_document?: boolean | null };
-  const [{ data: mediaData, hasDocumentColumn }, { data: tenantBrand }] = await Promise.all([
+  const [{ data: mediaData, hasDocumentColumn }, { data: tenantBrand }, { data: dimRows }] = await Promise.all([
     // Sıralama sürükle-bırak ile yönetiliyor → `sort_order` TEK ölçüt. is_document (KVKK P0-9) sütun yoksa
     // sütunsuz tekrar edilir; belge ayrımı o zaman ad kuralıyla gösterilir (public kuralla aynı).
     selectWithDocumentFlag<MediaRow[]>(
@@ -138,9 +138,12 @@ export async function MediaSection({
     tenantId
       ? supabase.from("tenants").select("name, logo_url, watermark_settings").eq("id", tenantId).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Fotoğraf boyutları (kalite uyarısı + kapak önerisi). Ayrı sorgu: sütun yoksa (migration öncesi) hata → boyutsuz devam.
+    supabase.from("property_media").select("id, width, height").eq("property_id", propertyId).eq("kind", "image"),
   ]);
 
   const brand = (tenantBrand ?? null) as { name: string | null; logo_url: string | null; watermark_settings: unknown } | null;
+  const dims = new Map(((dimRows ?? []) as { id: string; width: number | null; height: number | null }[]).map((r) => [r.id, r]));
 
   return (
     <PropertyMediaManager
@@ -148,6 +151,8 @@ export async function MediaSection({
       media={(mediaData ?? []).map(({ file_name, is_document, ...m }) => ({
         ...m,
         is_document: m.kind === "image" && isDocumentMedia({ is_document, file_name }),
+        width: dims.get(m.id)?.width ?? null,
+        height: dims.get(m.id)?.height ?? null,
       }))}
       documentFlagAvailable={hasDocumentColumn}
       canEdit={canEdit}

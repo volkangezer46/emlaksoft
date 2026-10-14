@@ -19,7 +19,7 @@ export default async function QuickCapturePage({
   searchParams?: Promise<{ sekme?: string }>;
 }) {
   // Ana ekran kapısı; sekmeler ilgili modülün "create" iznine göre belirlenir, hiçbiri yoksa erişim yok.
-  const { perms, tenantId } = await requireModulePage("dashboard");
+  const { perms, tenantId, userId } = await requireModulePage("dashboard");
   const can = (mod: "customers" | "calls" | "appointments" | "properties") => (perms[mod] ?? []).includes("create");
   const tabs: QuickTabId[] = [];
   if (can("customers")) tabs.push("musteri");
@@ -78,6 +78,7 @@ export default async function QuickCapturePage({
         defaultWhen={defaultWhen}
         propertyTypeOptions={defs(propTypeDefs, DEFAULT_DEFINITIONS.property_type)}
         transactionOptions={defs(txDefs, DEFAULT_DEFINITIONS.transaction_type)}
+        scope={{ tenantId: tenantId ?? "", userId }}
         brand={
           wantsProperty
             ? { watermark: sanitizeWatermarkSettings(brand?.watermark_settings ?? null), officeName: brand?.name ?? "", logoUrl: brand?.logo_url ?? null }

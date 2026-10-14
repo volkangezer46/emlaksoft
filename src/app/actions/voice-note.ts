@@ -14,6 +14,8 @@ import { AI_VOICE_NOTES_KEY } from "@/lib/settings/registry/tenant";
 import { now } from "@/lib/clock";
 import { formatDateTimeTr } from "@/lib/format";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { extractNoteFieldsForTenant } from "@/lib/field-capture/note-fields-server";
+import type { NoteFieldSuggestions } from "@/lib/field-capture/note-fields";
 import {
   VOICE_NOTE_MAX_BYTES,
   VOICE_NOTE_MAX_TEXT,
@@ -102,6 +104,26 @@ export async function transcribeVoiceNote(formData: FormData): Promise<VoiceDraf
   } catch (e) {
     console.error("transcribeVoiceNote", externalErrorMetadata(e));
     return { error: "Sesli not şu an işlenemedi. Biraz sonra tekrar deneyin." };
+  }
+}
+
+export type VoiceFieldsResult = { ok?: boolean; error?: string; fields?: NoteFieldSuggestions };
+
+/**
+ * Transkriptten yapılandırılmış alan önerisi (bütçe, oda, bölge, randevu tarihi, sonraki görev): kural tabanlı, AI açıksa
+ * eksikleri tamamlar. Hiçbir şey kaydedilmez; kullanıcı önerileri özete ekleyip onaylar.
+ */
+export async function extractVoiceNoteFields(transcript: string): Promise<VoiceFieldsResult> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const text = String(transcript ?? "").trim();
+  if (!text) return { error: "Transkript boş." };
+  try {
+    const { fields } = await extractNoteFieldsForTenant(text, { tenantId: gate.tenantId, userId: gate.userId, allowAi: true });
+    return { ok: true, fields };
+  } catch (e) {
+    console.error("extractVoiceNoteFields", e instanceof Error ? e.message : "bilinmeyen hata");
+    return { error: "Alan önerisi çıkarılamadı." };
   }
 }
 

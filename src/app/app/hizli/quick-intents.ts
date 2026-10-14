@@ -15,6 +15,14 @@ export const QUICK_INTENT_TYPES: Record<QuickIntent, string> = {
   "kiraya-ver": "Mülk sahibi",
 };
 
+/** Alıcı/kiracı tarafında nottan onaylanan talebin işlem türü (satıcı/mülk sahibi tarafında talep açılmaz). */
+export const QUICK_INTENT_TRANSACTION: Record<QuickIntent, string | null> = {
+  al: "Satılık",
+  kirala: "Kiralık",
+  sat: null,
+  "kiraya-ver": null,
+};
+
 /** Hızlı portföy oda seçenekleri (serbest değer de girilebilir; tam formla aynı biçim). */
 export const QUICK_ROOM_OPTIONS = ["1+0", "1+1", "2+1", "3+1", "4+1", "5+1"] as const;
 

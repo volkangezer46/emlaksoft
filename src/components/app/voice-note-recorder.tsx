@@ -2,7 +2,26 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Loader2, Mic, Square } from "lucide-react";
-import { getVoiceNoteAvailability, saveVoiceNote, transcribeVoiceNote, type VoiceNoteKind } from "@/app/actions/voice-note";
+import { extractVoiceNoteFields, getVoiceNoteAvailability, saveVoiceNote, transcribeVoiceNote, type VoiceNoteKind } from "@/app/actions/voice-note";
+import type { NoteFieldSuggestions } from "@/lib/field-capture/note-fields";
+
+/** Önerileri "Etiket: değer" satırlarına çevirir (özete eklenecek metin). */
+function suggestionLines(f: NoteFieldSuggestions | null): { key: string; text: string; assumed: boolean }[] {
+  if (!f) return [];
+  const out: { key: string; text: string; assumed: boolean }[] = [];
+  if (f.rooms) out.push({ key: "rooms", text: `Oda: ${f.rooms}`, assumed: false });
+  if (f.budgetLabel) out.push({ key: "budget", text: `Bütçe: ${f.budgetLabel}`, assumed: false });
+  if (f.region) out.push({ key: "region", text: `Bölge: ${f.region.label}`, assumed: false });
+  if (f.appointment) out.push({ key: "appointment", text: `Randevu: ${f.appointment.label}`, assumed: f.appointment.assumed });
+  if (f.nextTask) {
+    out.push({
+      key: "task",
+      text: `Sonraki görev: ${f.nextTask.title}${f.nextTask.due ? ` (${f.nextTask.due.label})` : ""}`,
+      assumed: Boolean(f.nextTask.due?.assumed),
+    });
+  }
+  return out;
+}
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +42,8 @@ export function VoiceNoteRecorder({ kind, id }: { kind: VoiceNoteKind; id: strin
   const [summary, setSummary] = useState("");
   const [transcript, setTranscript] = useState("");
   const [draft, setDraft] = useState(false);
+  const [fields, setFields] = useState<NoteFieldSuggestions | null>(null);
+  const [added, setAdded] = useState<string[]>([]);
   const [pending, start] = useTransition();
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
@@ -92,7 +113,11 @@ export function VoiceNoteRecorder({ kind, id }: { kind: VoiceNoteKind; id: strin
       setSummary(res.summary ?? "");
       setTranscript(res.transcript ?? "");
       setDraft(true);
+      setAdded([]);
       if (!res.summary) push("Özet üretilemedi; transkripti düzenleyip kaydedebilirsiniz", "info");
+      // Yapılandırılmış alan önerisi (bütçe/oda/bölge/randevu/görev): yalnız öneri, kullanıcı özete ekler.
+      const extracted = res.transcript ? await extractVoiceNoteFields(res.transcript).catch(() => null) : null;
+      setFields(extracted?.ok && extracted.fields ? extracted.fields : null);
     });
   }
 
@@ -138,6 +163,34 @@ export function VoiceNoteRecorder({ kind, id }: { kind: VoiceNoteKind; id: strin
             Özet (taslak, düzenleyebilirsiniz)
             <Textarea rows={4} value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={1500} />
           </label>
+          {suggestionLines(fields).length > 0 ? (
+            <div className="rounded-[var(--radius-control)] border border-line bg-canvas p-2.5">
+              <p className="mb-1.5 text-xs font-semibold text-text-muted">
+                Konuşmadan çıkan bilgiler ({fields?.source === "kural+ai" ? "kural + AI" : "kural tabanlı"}) — onayladıklarınız özete eklenir
+              </p>
+              <ul className="space-y-1">
+                {suggestionLines(fields).map((s) => (
+                  <li key={s.key} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-semibold text-ink-950">{s.text}</span>
+                    {s.assumed ? <span className="rounded-full bg-amber-400/20 px-2 py-0.5 font-semibold text-amber-700">varsayım</span> : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto"
+                      disabled={added.includes(s.key) || pending}
+                      onClick={() => {
+                        setSummary((prev) => [prev.trim(), `- ${s.text}`].filter(Boolean).join("\n").slice(0, 1500));
+                        setAdded((a) => [...a, s.key]);
+                      }}
+                    >
+                      {added.includes(s.key) ? "Eklendi" : "Özete ekle"}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <label className="block text-xs font-semibold text-ink-950">
             Transkript
             <Textarea rows={4} value={transcript} onChange={(e) => setTranscript(e.target.value)} maxLength={4000} />

@@ -3,11 +3,12 @@
 import Link from "@/components/ui/smart-link";
 import { usePathname } from "next/navigation";
 import { LogOut, Map as MapIcon, Settings, Undo2, UserRound } from "lucide-react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { USER_MENU_TRIGGER_CLASS } from "./user-menu-class";
 import type { LucideIcon } from "lucide-react";
 import { signOut } from "@/app/actions/auth";
 import { clearTourDone, TOUR_RESTART_HREF } from "@/lib/product-tour-storage";
+import { clearFieldCaptureStorage, countUnsentOnDevice } from "@/lib/field-capture/outbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +24,19 @@ import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
 
 const NAMED_ICONS: Record<"settings" | "back" | "account", LucideIcon> = { settings: Settings, back: Undo2, account: UserRound };
+
+/**
+ * Çıkış: hızlı kayıt taslakları ve çevrimdışı kuyruk (ad, telefon) bu cihazda bir sonraki kullanıcıya kalmasın diye
+ * silinir. Gönderilmemiş kayıt varsa önce sorulur; vazgeçilirse çıkış yapılmaz.
+ */
+function onSignOutSubmit(event: FormEvent<HTMLFormElement>) {
+  const unsent = countUnsentOnDevice();
+  if (unsent > 0 && !window.confirm(`Bu cihazda gönderilmemiş ${unsent} hızlı kayıt var. Çıkış yaparsanız bu cihazdan silinir. Yine de çıkılsın mı?`)) {
+    event.preventDefault();
+    return;
+  }
+  clearFieldCaptureStorage();
+}
 
 /** Menü gövdesi (Radix DropdownMenu) — user-menu.tsx tarafından ilk etkileşimde yüklenir. */
 export function UserMenuPanel({
@@ -93,7 +107,7 @@ export function UserMenuPanel({
             <DropdownMenuSeparator />
           </>
         ) : null}
-        <form action={signOut}>
+        <form action={signOut} onSubmit={onSignOutSubmit}>
           <DropdownMenuItem asChild danger>
             <button type="submit" className="w-full">
               <LogOut aria-hidden />
