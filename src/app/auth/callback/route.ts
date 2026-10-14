@@ -7,7 +7,6 @@ import {
   oauthErrorCode,
   parseOAuthFlow,
   resolveOAuthLanding,
-  safeNextPath,
   type GoogleErrorCode,
   type OAuthFlow,
 } from "@/lib/auth/google-auth";
@@ -18,6 +17,7 @@ import { logLoginEvent } from "@/app/giris/_lib/login-events";
 import { clientIp } from "@/lib/rate-limit";
 import { APP_IDLE_COOKIE } from "@/lib/office-security/policy";
 import { officeLoginIpAllowed } from "@/lib/office-security/enforce";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 /**
  * Google OAuth dönüşü (Supabase PKCE). Kod, tarayıcı çerezindeki doğrulayıcıyla oturuma çevrilir

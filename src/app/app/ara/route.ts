@@ -1,4 +1,5 @@
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
@@ -11,12 +12,8 @@ import { callerRedirectPath, phoneSearchNeedle } from "@/lib/caller-lookup";
  * (menüde öğe olmaz). Kapsam üst çubuk aramasıyla aynı: ofis geneli yetkisi yoksa yalnız kendine atanan müşteriler.
  */
 export async function GET(req: NextRequest) {
-  const base = req.nextUrl.clone();
-  base.search = "";
-  const go = (path: string) => {
-    const u = new URL(path, base);
-    return NextResponse.redirect(u, 303);
-  };
+  // Kök istekten DEĞİL getBaseUrl'den (ters vekil arkasında req.nextUrl konteynerin iç adresidir: 0.0.0.0:3000).
+  const go = (path: string) => publicRedirect(path, 303);
 
   const gate = await requirePermission("customers", "view");
   if (!gate.ok) return go("/app");

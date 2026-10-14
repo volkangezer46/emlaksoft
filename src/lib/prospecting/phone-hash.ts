@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash, createHmac, hkdfSync } from "node:crypto";
 import { PLATFORM_SECRETS_DERIVE_SOURCES } from "@/lib/platform-secrets";
 

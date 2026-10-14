@@ -36,9 +36,12 @@ services:
       traefik.http.middlewares.emlaksoft-www.redirectregex.replacement: https://emlaksoft.com.tr/$${1}
       traefik.http.middlewares.emlaksoft-www.redirectregex.permanent: "true"
       traefik.http.middlewares.emlaksoft-gzip.compress: "true"
+      # Next 16 proxy rewrite'ında x-middleware-rewrite başlığını istemci yanıtına kendisi yazar (resolve-routes);
+      # uygulamadan silmek rewrite'ı bozar, bu yüzden dış yanıttan vekilde silinir (boş değer = başlığı kaldır).
+      traefik.http.middlewares.emlaksoft-strip.headers.customresponseheaders.X-Middleware-Rewrite: ""
       traefik.http.routers.emlaksoft.entrypoints: https
       traefik.http.routers.emlaksoft.rule: Host(`emlaksoft.com.tr`) || Host(`www.emlaksoft.com.tr`)
-      traefik.http.routers.emlaksoft.middlewares: emlaksoft-www,emlaksoft-gzip
+      traefik.http.routers.emlaksoft.middlewares: emlaksoft-www,emlaksoft-strip,emlaksoft-gzip
       traefik.http.routers.emlaksoft.service: emlaksoft
       traefik.http.routers.emlaksoft.tls: "true"
       traefik.http.routers.emlaksoft.tls.certresolver: letsencrypt

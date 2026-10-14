@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
 import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
 import { SetupForm } from "./setup-form";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 export const metadata = {
   title: "İki adımlı doğrulama kurulumu",
@@ -16,7 +17,7 @@ export const metadata = {
  */
 export default async function TwoFactorSetupPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
   const params = await searchParams;
-  const next = params.next && /^\/(?![/\\])/.test(params.next) ? params.next : "/app";
+  const next = safeNextPath(params.next);
 
   const supabase = await createClient();
   const {

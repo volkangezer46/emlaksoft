@@ -8,6 +8,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { EmailInput } from "@/components/ui/email-input";
 import { AuthDivider, GoogleAuthButton } from "@/components/auth/google-button";
 import { DemoQuickLogin } from "./demo-quick-login";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 const initial: AuthResult = {};
 
@@ -49,13 +50,13 @@ export function LoginForm({
 
         {googleEnabled ? (
           <div className="mt-8">
-            <GoogleAuthButton next={next} />
+            <GoogleAuthButton next={safeNextPath(next)} />
             <AuthDivider />
           </div>
         ) : null}
 
         <form action={action} className={googleEnabled ? "space-y-4" : "mt-8 space-y-4"}>
-          <input type="hidden" name="next" value={next} />
+          <input type="hidden" name="next" value={safeNextPath(next)} />
 
           <div>
             <label className="mb-1.5 block text-sm font-semibold text-ink-900" htmlFor="email">

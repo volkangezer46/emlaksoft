@@ -8,6 +8,7 @@
  * Runbook: docs/runbooks/GOOGLE_GIRIS.md.
  */
 import { DEMO_PERSONAS } from "@/lib/demo-personas";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 /** Düğmeler yalnız sahip sağlayıcıyı Supabase'de açıp bayrağı verdiyse görünür (kırık düğme yok). */
 export function isGoogleAuthEnabled(value: string | undefined = process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED): boolean {
@@ -16,30 +17,6 @@ export function isGoogleAuthEnabled(value: string | undefined = process.env.NEXT
 
 export const GOOGLE_ONBOARDING_PATH = "/kayit/tamamla";
 export const GOOGLE_CALLBACK_PATH = "/auth/callback";
-
-/**
- * Yalnız uygulama içi göreli yol kabul edilir (açık yönlendirme yok): "/" ile başlar, "//" veya "/\"
- * değildir, kontrol karakteri içermez, başka origin'e çözülmez ve callback'in kendisine dönmez.
- */
-export function safeNextPath(raw: string | null | undefined, fallback = "/app"): string {
-  const v = (raw ?? "").trim();
-  if (!v || v.length > 512) return fallback;
-  if (!/^\/(?![/\\])/.test(v)) return fallback;
-  // Kontrol karakterleri (sekme/yeni satır vb.) ve ters bölü: tarayıcılar "/\evil.com"u farklı çözebilir.
-  for (let i = 0; i < v.length; i += 1) {
-    const c = v.charCodeAt(i);
-    if (c < 0x20 || c === 0x7f || c === 0x5c) return fallback;
-  }
-  try {
-    const base = "http://emlaksoft.invalid";
-    const u = new URL(v, base);
-    if (u.origin !== base) return fallback;
-    if (u.pathname === GOOGLE_CALLBACK_PATH || u.pathname.startsWith(`${GOOGLE_CALLBACK_PATH}/`)) return fallback;
-    return `${u.pathname}${u.search}${u.hash}`;
-  } catch {
-    return fallback;
-  }
-}
 
 /** Demo hesapları (hızlı giriş kişilikleri ve demo alan adı) Google ile ofis açamaz. */
 export function isDemoIdentityEmail(email: string | null | undefined): boolean {

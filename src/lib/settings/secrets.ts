@@ -1,3 +1,4 @@
+import "server-only";
 import { createHash } from "node:crypto";
 import { openPlatformSecret, platformSecretsEnabled, sealPlatformSecret } from "@/lib/platform-secrets";
 

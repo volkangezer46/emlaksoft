@@ -201,9 +201,10 @@ describe("metadata ve sitemap", () => {
     expect(sitePageFaq(p)).toEqual([{ q: "Soru?", a: "Cevap." }]);
   });
 
-  it("registry: seoPages imzası değişmedi, listCmsSeoPages eklendi (async, salt bilgi)", () => {
+  it("registry: seoPages imzası değişmedi; saf kayıt defteri sunucu deposunu (site-pages/store) içe aktarmaz", () => {
     const src = read("src/lib/seo/registry.ts");
     expect(src).toContain("export function seoPages(): SeoPageDef[]");
-    expect(src).toContain("export async function listCmsSeoPages(): Promise<CmsSeoPage[]>");
+    // registry istemci bileşenlerine de girer (robots-rules → SEO formu); depo service_role istemcisini çeker.
+    expect(src).not.toContain("site-pages/store");
   });
 });

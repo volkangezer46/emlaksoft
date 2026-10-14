@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
-import { NextResponse, type NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+import { publicRedirect } from "@/lib/public-redirect";
 import { createClient } from "@/lib/supabase/server";
 import { TWO_FACTOR_COOKIE } from "@/lib/two-factor";
 import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
@@ -35,9 +36,6 @@ export async function GET(request: NextRequest) {
   const jar = await cookies();
   jar.delete(IDLE_COOKIE);
   if (isStaff) jar.delete(TWO_FACTOR_COOKIE);
-  const url = request.nextUrl.clone();
-  url.pathname = "/giris";
-  url.search = "";
-  if (isStaff) url.searchParams.set("next", "/admin");
-  return NextResponse.redirect(url);
+  // Kök getBaseUrl'den (istekten kurulan adres ters vekil arkasında 0.0.0.0:3000 olur).
+  return publicRedirect(isStaff ? "/giris?next=%2Fadmin" : "/giris");
 }

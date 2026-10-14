@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Netgsm SMS API entegrasyonu
  * Docs: https://www.netgsm.com.tr/dokuman/

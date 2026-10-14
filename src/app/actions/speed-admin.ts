@@ -16,6 +16,7 @@ import { publicOrigin } from "@/lib/public-redirect";
 import { STATIC_ROUTES, staticRouteById, staticRouteByPath, type StaticRouteId } from "@/lib/static-home/registry";
 import { enabledIdsNow, invalidateStatic, purgeAndWarm, selfOrigin, staticSnapshots, staticWarmLock, type WarmResult } from "@/lib/static-home/render";
 import { staticRouteMode } from "@/lib/static-home/settings";
+import { STATIC_PROBE_HEADER, staticRewriteToken } from "@/lib/static-home/internal-token";
 
 /**
  * HIZ MERKEZİ eylemleri (/admin/site/hiz). Modül `sitecontent` (süper admin + operasyon).
@@ -126,10 +127,13 @@ export async function runStaticSelfTest(): Promise<SpeedActionResult<SelfTestRow
   const g = await guard(false);
   if ("error" in g) return { ok: false, error: g.error };
   const origin = selfOrigin();
+  // X-Static yalnız iç jetonlu tanı isteğine döner (herkese açık yanıtta yok); jeton yoksa sütun "yok" görünür.
+  const probe = await staticRewriteToken();
+  const headers: Record<string, string> = probe ? { accept: "text/html", [STATIC_PROBE_HEADER]: probe } : { accept: "text/html" };
   const rows = await Promise.all(
     STATIC_ROUTES.map(async (r): Promise<SelfTestRow> => {
       try {
-        const res = await fetchOwnOriginInspect(`${origin}${r.path}`, { headers: { accept: "text/html" }, cache: "no-store" }, { timeoutMs: 20_000 });
+        const res = await fetchOwnOriginInspect(`${origin}${r.path}`, { headers, cache: "no-store" }, { timeoutMs: 20_000 });
         const xStatic = res.headers.get("x-static");
         if (res.status !== 200) {
           await discardExternalResponse(res);
