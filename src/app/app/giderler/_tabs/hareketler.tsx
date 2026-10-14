@@ -1,6 +1,7 @@
 import Link from "@/components/ui/smart-link";
 import { Archive, ArrowDownCircle, ArrowLeftRight, ArrowUpCircle, BookOpen, CalendarClock, FileBarChart, Inbox, Paperclip, Scale } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Kbd } from "@/components/ui/kbd";
 import { FilterDate, FilterGrid, FilterSelect, KpiStrip, ListPager, ListToolbar, MobileCard, MobileCardList, StatusPill, ViewSwitcher, type KpiItem, type ViewOption } from "@/components/ui/list-kit";
@@ -173,7 +174,13 @@ const CATEGORY_EDITABLE_SOURCES = new Set(["manual"]);
 const KAYNAK_LABEL: Record<string, string> = {
   hareket: "Hesaba işlenen hareketler",
   eski: "Hesapsız eski giderler",
-  elle: "Elle girilen (kâr/zarar kapsamı)",
+  elle: "Elle girilen gelir (kâr/zarar kapsamı)",
+};
+
+/** KDV süzgecinin etiketleri (vergi sekmesi kümeleri; ledger-filters `kdv`). */
+const KDV_LABEL: Record<string, string> = {
+  var: "KDV'li (KDV özeti kapsamı)",
+  yok: "KDV bilgisi yok",
 };
 
 function hrefOf(params: Record<string, string>, patch: Record<string, string>): string {
@@ -192,11 +199,19 @@ async function LedgerTab(props: FinanceTabProps) {
 
   const f = parseLedgerFilters(params, { canSalary });
   const filterParams = ledgerFilterParams(f);
-  // KDV özeti ve kâr/zarar süzgeçleri (kdv=yok, kaynak=elle) yalnız ofis hesaplarını sayar; görünümde hesap kapsamı
+  // KDV özeti ve kâr/zarar süzgeçleri (kdv, stopaj, kaynak=elle) yalnız ofis hesaplarını sayar; görünümde hesap kapsamı
   // sütunu yok. Bu tek küçük sorgu yalnız o süzgeçler açıkken çalışır (arşivliler dahil; RPC'ler de arşivi sayar).
-  const officeAccountIds = ledgerNeedsOfficeScope(f)
-    ? (((await supabase.from("finance_accounts").select("id").eq("owner_scope", "office").limit(500)).data ?? []) as { id: string }[]).map((a) => a.id)
-    : null;
+  // Hata verirse liste boş kalır (süzgeç gevşemez); kullanıcıya uyarı gösterilir.
+  let officeScopeFailed = false;
+  let officeAccountIds: string[] | null = null;
+  if (ledgerNeedsOfficeScope(f)) {
+    const officeRes = await supabase.from("finance_accounts").select("id").eq("owner_scope", "office").limit(500);
+    if (officeRes.error) {
+      officeScopeFailed = true;
+      console.error("LedgerTab office accounts", { code: officeRes.error.code });
+    }
+    officeAccountIds = ((officeRes.data ?? []) as { id: string }[]).map((a) => a.id);
+  }
   const ops = ledgerQueryOps(f, { officeAccountIds });
   const baseOps = ledgerQueryOps(f, { omitKaynak: true, officeAccountIds });
   const from = (f.page - 1) * LEDGER_PAGE_SIZE;
@@ -287,9 +302,9 @@ async function LedgerTab(props: FinanceTabProps) {
   const net = sumByCurrency([...incomes, ...expenses.map((e) => ({ currency: e.currency, amount: -e.amount }))]);
   // Kartlar hesap özet RPC'sinden gelir: yalnız hesap, kategori ve tarih kapsamını uygular. Cari / arama / kaynak / mutabakat /
   // belge süzgeci açıkken liste ile kart farklı kümeyi sayar; ipucu bunu açıkça söyler.
-  const cardsIgnoreFilters = Boolean(f.cari || f.q || f.kaynak || f.kdvYok || f.mutabikYok || f.belgeYok);
+  const cardsIgnoreFilters = Boolean(f.cari || f.q || f.kaynak || f.kdv || f.stopaj || f.mutabikYok || f.belgeYok);
   const scopeHint = f.from || f.to ? "seçili aralık" : "tüm zamanlar";
-  const rangeHint = cardsIgnoreFilters ? `${scopeHint}; cari, arama, kaynak, KDV, mutabakat ve belge süzgecinden bağımsız` : scopeHint;
+  const rangeHint = cardsIgnoreFilters ? `${scopeHint}; cari, arama, kaynak, KDV, stopaj, mutabakat ve belge süzgecinden bağımsız` : scopeHint;
   const legacyN = legacyCount.count ?? 0;
   const entryN = entryCount.count ?? 0;
 
@@ -316,7 +331,8 @@ async function LedgerTab(props: FinanceTabProps) {
     { key: "kategori", label: "Kategori", format: (v) => customLabel.get(v) ?? legacyCatLabel.get(v) ?? cashCategoryLabel(v) },
     { key: "cari", label: "Cari", format: (v) => partyName.get(v) ?? parties.find((p) => p.id === v)?.name ?? "Seçili cari" },
     { key: "kaynak", label: "Kaynak", format: (v) => KAYNAK_LABEL[v] ?? "Hareketler" },
-    { key: "kdv", label: "KDV", format: () => "KDV bilgisi yok" },
+    { key: "kdv", label: "KDV", format: (v) => KDV_LABEL[v] ?? "KDV" },
+    { key: "stopaj", label: "Stopaj", format: () => "Stopajlı" },
     { key: "mutabik", label: "Mutabakat", format: () => "Mutabık değil" },
     { key: "belge", label: "Belge", format: () => "Ekli belge yok" },
     { key: "from", label: "Başlangıç", format: (v) => formatDateTr(v) },
@@ -379,6 +395,8 @@ async function LedgerTab(props: FinanceTabProps) {
     <LedgerKeyboardNav>
       <KpiStrip items={kpis} />
 
+      {officeScopeFailed ? <Alert tone="warning">Ofis hesapları şu an yüklenemedi; bu süzgeçle liste boş görünebilir. Sayfayı yenileyin.</Alert> : null}
+
       <ListToolbar
         pathname={FINANCE_BASE}
         params={pathParams}
@@ -386,7 +404,7 @@ async function LedgerTab(props: FinanceTabProps) {
         activeView="defter"
         searchPlaceholder="Açıklama veya karşı taraf ara…  ( / )"
         searchLabel="Hareketlerde ara"
-        panelParamKeys={["hesap", "tur", "kategori", "cari", "kaynak", "kdv", "mutabik", "belge", "from", "to"]}
+        panelParamKeys={["hesap", "tur", "kategori", "cari", "kaynak", "kdv", "stopaj", "mutabik", "belge", "from", "to"]}
         panel={
           <FilterGrid>
             <FilterSelect name="hesap" label="Hesap" value={f.accountId} options={accountOptions} />
@@ -394,7 +412,8 @@ async function LedgerTab(props: FinanceTabProps) {
             <FilterSelect name="kategori" label="Kategori" value={f.kategori} options={allCategoryOptions} />
             <FilterSelect name="cari" label="Cari" value={f.cari} options={[{ value: "", label: "Tüm cariler" }, ...parties.map((p) => ({ value: p.id, label: p.name }))]} />
             <FilterSelect name="kaynak" label="Kaynak" value={f.kaynak} options={[{ value: "", label: "Tümü" }, ...Object.entries(KAYNAK_LABEL).map(([value, label]) => ({ value, label }))]} />
-            <FilterSelect name="kdv" label="KDV" value={f.kdvYok ? "yok" : ""} options={[{ value: "", label: "Tümü" }, { value: "yok", label: "KDV bilgisi yok" }]} />
+            <FilterSelect name="kdv" label="KDV" value={f.kdv} options={[{ value: "", label: "Tümü" }, ...Object.entries(KDV_LABEL).map(([value, label]) => ({ value, label }))]} />
+            <FilterSelect name="stopaj" label="Stopaj" value={f.stopaj ? "var" : ""} options={[{ value: "", label: "Tümü" }, { value: "var", label: "Stopajlı" }]} />
             <FilterSelect name="mutabik" label="Mutabakat" value={f.mutabikYok ? "hayir" : ""} options={[{ value: "", label: "Tümü" }, { value: "hayir", label: "Mutabık değil" }]} />
             <FilterSelect name="belge" label="Belge" value={f.belgeYok ? "yok" : ""} options={[{ value: "", label: "Tümü" }, { value: "yok", label: "Ekli belge yok" }]} />
             <FilterDate name="from" label="Başlangıç" value={f.from} />

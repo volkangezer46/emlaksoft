@@ -7,7 +7,7 @@
 export const LEDGER_PAGE_SIZE = 50;
 
 /** URL'de filtre anahtarları (sekme/sayfa/görünüm hariç). Kayıtlı görünümler yalnız bunları saklar. */
-export const LEDGER_FILTER_KEYS = ["hesap", "tur", "kategori", "cari", "kaynak", "kdv", "mutabik", "belge", "from", "to", "q"] as const;
+export const LEDGER_FILTER_KEYS = ["hesap", "tur", "kategori", "cari", "kaynak", "kdv", "stopaj", "mutabik", "belge", "from", "to", "q"] as const;
 export type LedgerFilterKey = (typeof LEDGER_FILTER_KEYS)[number];
 
 export type LedgerFilters = {
@@ -17,12 +17,17 @@ export type LedgerFilters = {
   cari: string;
   /**
    * hareket = deftere işlenmiş (origin entry); eski = hesaba bağlanmamış eski gider (origin legacy_expense);
-   * elle = kâr/zararın "Diğer gelir (elle)" kapsamı (finance_pnl ile aynı: elle girilmiş, ofis hesabı, TL, örnek değil,
-   * komisyon/kira/aidat/transfer kategorisinde değil).
+   * elle = kâr/zararın "Diğer gelir (elle)" kapsamı (finance_pnl ile aynı: elle girilmiş GELİR, ofis hesabı, TL, örnek
+   * değil, komisyon/kira/aidat/transfer kategorisinde değil). Gider tarafının kâr/zarar kapsamı farklıdır; süzgeç yalnız gelir.
    */
   kaynak: "" | "hareket" | "eski" | "elle";
-  /** Vergi sekmesinin "KDV bilgisi yok" sayacı (kdv=yok): ofis hesabı, TL, örnek değil, gelir/gider, KDV oranı boş. */
-  kdvYok: boolean;
+  /**
+   * Vergi sekmesi kümeleri: yok = "KDV bilgisi yok" sayacı (ofis hesabı, TL, örnek değil, gelir/gider, KDV oranı boş);
+   * var = KDV özetine (finance_vat_summary) giren hareketler (ofis hesabı, TL, gelir/gider, KDV tutarı sıfırdan farklı).
+   */
+  kdv: "" | "yok" | "var";
+  /** Vergi sekmesinin stopaj sayıları (stopaj=var): KDV özetiyle aynı kapsam, stopaj tutarı sıfırdan farklı. */
+  stopaj: boolean;
   mutabikYok: boolean;
   belgeYok: boolean;
   from: string;
@@ -47,6 +52,7 @@ export function parseLedgerFilters(raw: Raw, opts: { canSalary: boolean }): Ledg
   const tur = one(raw, "tur");
   const kaynak = one(raw, "kaynak");
   const kategori = one(raw, "kategori");
+  const kdv = one(raw, "kdv");
   const from = one(raw, "from");
   const to = one(raw, "to");
   const page = Math.max(1, Number.parseInt(one(raw, "sayfa"), 10) || 1);
@@ -56,7 +62,8 @@ export function parseLedgerFilters(raw: Raw, opts: { canSalary: boolean }): Ledg
     kategori: CATEGORY_RE.test(kategori) && (opts.canSalary || kategori !== "maas") ? kategori : "",
     cari: UUID_RE.test(one(raw, "cari")) ? one(raw, "cari") : "",
     kaynak: kaynak === "hareket" || kaynak === "eski" || kaynak === "elle" ? kaynak : "",
-    kdvYok: one(raw, "kdv") === "yok",
+    kdv: kdv === "yok" || kdv === "var" ? kdv : "",
+    stopaj: one(raw, "stopaj") === "var",
     mutabikYok: one(raw, "mutabik") === "hayir",
     belgeYok: one(raw, "belge") === "yok",
     from: ISO_RE.test(from) ? from : "",
@@ -74,7 +81,8 @@ export function ledgerFilterParams(f: LedgerFilters): Record<string, string> {
   if (f.kategori) out.kategori = f.kategori;
   if (f.cari) out.cari = f.cari;
   if (f.kaynak) out.kaynak = f.kaynak;
-  if (f.kdvYok) out.kdv = "yok";
+  if (f.kdv) out.kdv = f.kdv;
+  if (f.stopaj) out.stopaj = "var";
   if (f.mutabikYok) out.mutabik = "hayir";
   if (f.belgeYok) out.belge = "yok";
   if (f.from) out.from = f.from;
@@ -101,7 +109,7 @@ export const LEDGER_MANUAL_INCOME_EXCLUDED = ["komisyon", "kira_tahsilat", "aida
  * sayar; görünümde hesap kapsamı sütunu olmadığından sayfa ofis hesap kimliklerini `officeAccountIds` ile verir.
  */
 export function ledgerNeedsOfficeScope(f: LedgerFilters): boolean {
-  return f.kdvYok || f.kaynak === "elle";
+  return f.kdv !== "" || f.stopaj || f.kaynak === "elle";
 }
 
 /**
@@ -124,8 +132,10 @@ export function ledgerQueryOps(f: LedgerFilters, opts: { omitKaynak?: boolean; o
   if (kaynak === "hareket") ops.push({ op: "eq", col: "origin", val: "entry" });
   else if (kaynak === "eski") ops.push({ op: "eq", col: "origin", val: "legacy_expense" });
   else if (kaynak === "elle") {
-    // finance_pnl "elle girilen gelir" kapsamı: kaynaksız (manual) hareket, dışlanan kategoride değil (boş kategori sayılır).
+    // finance_pnl "elle girilen gelir" kapsamı: kaynaksız (manual) GELİR hareketi, dışlanan kategoride değil (boş kategori
+    // sayılır). Gider tarafının kâr/zarar kapsamı başka kurallarla çalışır; tur=gider ile birlikte seçilirse liste boş kalır.
     ops.push(
+      { op: "eq", col: "kind", val: "income" },
       { op: "eq", col: "origin", val: "entry" },
       { op: "eq", col: "source_type", val: "manual" },
       { op: "eq", col: "currency", val: "TRY" },
@@ -133,17 +143,23 @@ export function ledgerQueryOps(f: LedgerFilters, opts: { omitKaynak?: boolean; o
       { op: "or", val: `category.is.null,category.not.in.(${LEDGER_MANUAL_INCOME_EXCLUDED.join(",")})` },
     );
   }
-  // KDV özeti kapsamı (finance_vat_summary + vergi sekmesi sayacı): TL, örnek değil, gelir/gider, oran boş.
-  if (f.kdvYok) {
+  // KDV özeti kapsamı (finance_vat_summary): deftere işlenmiş, TL, gelir/gider (ofis hesabı aşağıda).
+  const vatScope = f.kdv !== "" || f.stopaj;
+  if (vatScope) {
     ops.push(
       { op: "eq", col: "origin", val: "entry" },
-      { op: "is", col: "vat_rate", val: null },
       { op: "in", col: "kind", val: ["income", "expense"] },
       { op: "eq", col: "currency", val: "TRY" },
-      { op: "eq", col: "is_sample", val: false },
     );
   }
-  if (f.kdvYok || kaynak === "elle") ops.push({ op: "in", col: "account_id", val: opts.officeAccountIds ?? [] });
+  // "KDV bilgisi yok" sayacı ayrıca örnek hareketleri dışlar ve oranı boş olanı sayar.
+  if (f.kdv === "yok") ops.push({ op: "is", col: "vat_rate", val: null }, { op: "eq", col: "is_sample", val: false });
+  // KDV özetindeki tutarlar: KDV / stopaj tutarı sıfırdan farklı satırlar (neq boş değeri de dışlar). RPC örnek hareketi
+  // ayırmadığı için burada da ayrılmaz. Hesaplanan KDV komisyon tahsilatı hareketini saymaz (komisyonun KDV'si komisyon
+  // kaydından gelir); liste de saymaz.
+  if (f.kdv === "var") ops.push({ op: "neq", col: "vat_amount", val: 0 }, { op: "or", val: "kind.eq.expense,source_type.neq.commission" });
+  if (f.stopaj) ops.push({ op: "neq", col: "withholding_amount", val: 0 });
+  if (vatScope || kaynak === "elle") ops.push({ op: "in", col: "account_id", val: opts.officeAccountIds ?? [] });
   // Düzeltme (adjust) mutabakata girmez (ekstre eşleştirmesi ve elle mutabakat yalnız gelir/gider/transfer).
   if (f.mutabikYok) ops.push({ op: "is", col: "reconciled_at", val: null }, { op: "eq", col: "origin", val: "entry" }, { op: "neq", col: "kind", val: "adjust" });
   if (f.belgeYok) ops.push({ op: "eq", col: "attachment_count", val: 0 });
