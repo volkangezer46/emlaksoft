@@ -55,3 +55,72 @@ describe("entryAmounts", () => {
     expect(entryAmounts(1200, 20, true, null)).toEqual({ net: 1000, vat: 200, gross: 1200, withheld: null, cash: 1200 });
   });
 });
+
+/** Kuruş (tamsayı) mı: kayan nokta artığı taşımayan iki ondalıklı tutar. */
+const isKurus = (n: number) => Math.abs(n * 100 - Math.round(n * 100)) < 1e-6;
+const k = (n: number) => Math.round(n * 100);
+
+/** Belirlenimci tutar ızgarası (LCG): 0,01 TL – 10.000.000 TL arası kuruşlu tutarlar + bilinen kayan nokta tuzakları. */
+function amountGrid(): number[] {
+  const out = [0.01, 0.03, 0.05, 0.15, 0.25, 0.35, 1.005, 2.675, 8.345, 99.995, 117.35, 333.33, 1234.56, 10_000_000];
+  let seed = 20261014;
+  for (let i = 0; i < 400; i++) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    out.push((seed % 1_000_000_000) / 100 + 0.01);
+  }
+  return out;
+}
+
+describe("kuruş yuvarlama tutarlılığı (KDV / stopaj, GP1)", () => {
+  const RATES = [0, 1, 8, 10, 18, 20];
+  const WH = [15, 17, 20];
+
+  it("her çıktı kuruştur; net + KDV = brüt ve nakit + stopaj = brüt kuruşu kuruşuna", () => {
+    for (const amount of amountGrid()) {
+      for (const rate of RATES) {
+        for (const included of [true, false]) {
+          for (const wh of WH) {
+            const e = entryAmounts(amount, rate, included, wh);
+            for (const v of [e.net, e.vat!, e.gross, e.withheld!, e.cash]) expect(isKurus(v), `${amount} %${rate} ${included} stopaj %${wh}: ${v}`).toBe(true);
+            expect(k(e.net) + k(e.vat!)).toBe(k(e.gross));
+            expect(k(e.cash) + k(e.withheld!)).toBe(k(e.gross));
+            expect(e.vat!).toBeGreaterThanOrEqual(0);
+            expect(e.withheld!).toBeGreaterThanOrEqual(0);
+          }
+        }
+      }
+    }
+  });
+
+  it("yuvarlama hatası yarım kuruşu aşmaz: hariçte KDV ≤ 0,005, dahilde ≤ (1 + oran) × 0,005; stopaj ≤ 0,005", () => {
+    for (const amount of amountGrid()) {
+      for (const rate of RATES) {
+        const ex = splitVat(amount, rate, false);
+        expect(Math.abs(k(ex.vat) - (k(ex.net) * rate) / 100)).toBeLessThanOrEqual(0.5 + 1e-6);
+        const inc = splitVat(amount, rate, true);
+        expect(Math.abs(k(inc.vat) - (k(inc.net) * rate) / 100)).toBeLessThanOrEqual(0.5 * (1 + rate / 100) + 1e-6);
+        for (const wh of WH) expect(Math.abs(k(withholding(inc.net, wh).withheld) - (k(inc.net) * wh) / 100)).toBeLessThanOrEqual(0.5 + 1e-6);
+      }
+    }
+  });
+
+  it("kayan nokta tuzakları yarım yukarı kuruşa yuvarlanır (DB round ile aynı)", () => {
+    // 1,005 × 100 = 100,49999… (ikili gösterim) → yine 1,01; 2,675 → 2,68.
+    expect(splitVat(1.005, 0, true).gross).toBe(1.01);
+    expect(splitVat(2.675, 0, true).gross).toBe(2.68);
+    // 0,15 × %10 = 0,015 (kayan noktada 0,01499…) → 0,02
+    expect(withholding(0.15, 10)).toEqual({ withheld: 0.02, net: 0.13 });
+    expect(splitVat(0.15, 10, false)).toEqual({ net: 0.15, vat: 0.02, gross: 0.17 });
+    // Eski %18 oranı: 100 TL dahil → 84,75 + 15,25
+    expect(splitVat(100, 18, true)).toEqual({ net: 84.75, vat: 15.25, gross: 100 });
+    expect(entryAmounts(1.005, 18, false, 17)).toEqual({ net: 1.01, vat: 0.18, gross: 1.19, withheld: 0.17, cash: 1.02 });
+  });
+
+  it("satır satır yuvarlanan toplam ile kuruş toplamı aynı (toplamda kayan nokta sapması yok)", () => {
+    const lines = amountGrid().slice(0, 200).map((a) => entryAmounts(a, 20, true, 20));
+    const sumK = lines.reduce((s, l) => s + k(l.cash), 0);
+    const sumF = lines.reduce((s, l) => s + l.cash, 0);
+    expect(Math.round(sumF * 100)).toBe(sumK);
+    expect(lines.reduce((s, l) => s + k(l.net) + k(l.vat!), 0)).toBe(lines.reduce((s, l) => s + k(l.gross), 0));
+  });
+});
