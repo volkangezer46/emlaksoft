@@ -6,11 +6,39 @@
 # (`npm run check:migrations -- --release`), yoksa /api/health 503 döner.
 # Geri dönüş: yeni sürüm 120 sn içinde sağlıklı olmazsa önceki imaj (PREV) yeniden ayağa kaldırılır
 # ve betik exit 1 ile biter. ACL_GATE=strict → ACL denetimi başarısızsa yayın durur (varsayılan: uyarı).
+# Sürüm geçmişi (DG5): yayın sonunda (yayında / geri dönüldü / başarısız) public.release_history'ye bir satır yazılır
+# (/admin/sistem?sekme=durum). Tablo yoksa ya da yazım başarısızsa yalnız uyarı basılır; yayın sonucu değişmez.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env.production ] || { echo ".env.production yok"; exit 1; }
 SHA=$(git rev-parse --short HEAD)$(git diff --quiet && git diff --cached --quiet || echo "-dirty")
 TAG=$(date -u +%Y%m%d%H%M)-$SHA
+START_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+START_S=$(date +%s)
+DB_CONTAINER=supabase-db-moqbebljyeyprktd19zb1ihn
+
+# Sürüm satırı: sonuç (ok | rolled_back | failed) + isteğe bağlı ayrıntı. Değerler psql değişkeni olarak geçer (:'ad'
+# tırnaklaması psql'de; SQL'e metin birleştirilmez). Asla betiği düşürmez.
+record_release() {
+  local outcome="$1" detail="${2:-}" has mig subject actor dur
+  has=$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select pg_catalog.to_regclass('public.release_history') is not null" 2>/dev/null || echo f)
+  if [ "$has" != "t" ]; then
+    echo "[bilgi] release_history yok (migration 20261014005000 bekliyor); sürüm satırı yazılmadı"
+    return 0
+  fi
+  mig=$(docker exec emlaksoft-app printenv RELEASE_MIGRATION 2>/dev/null || true)
+  subject=$(git log -1 --format=%s 2>/dev/null || true)
+  actor="${SUDO_USER:-${USER:-root}}"
+  dur=$(( $(date +%s) - START_S ))
+  docker exec -i "$DB_CONTAINER" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 \
+    -v sha="${SHA:0:64}" -v tag="${TAG:0:120}" -v outcome="$outcome" -v started="$START_TS" -v dur="$dur" \
+    -v mig="${mig:0:200}" -v subject="${subject:0:200}" -v actor="${actor:0:80}" -v host="$(hostname -s | cut -c1-80)" \
+    -v detail="${detail:0:500}" <<'SQL' >/dev/null 2>&1 || echo "[uyari] sürüm satırı yazılamadı (yayın sonucu etkilenmedi)"
+insert into public.release_history (sha, tag, outcome, started_at, duration_sec, release_migration, subject, actor, host, detail)
+values (:'sha', :'tag', :'outcome', :'started'::timestamptz, :'dur'::integer, nullif(:'mig', ''), nullif(:'subject', ''),
+        nullif(:'actor', ''), nullif(:'host', ''), nullif(:'detail', ''));
+SQL
+}
 
 # Geri dönüş için yayındaki imaj (ilk kurulumda boş). Derleme `latest` etiketini yeni imaja taşıdığından
 # yayındaki imaj `latest` ise kimliği önce sabit bir etikete bağlanır.
@@ -89,19 +117,24 @@ prune_images() {
 }
 
 if wait_healthy; then
+  record_release ok
   prune_images
   curl -s https://emlaksoft.com.tr/api/health; echo; exit 0
 fi
 
 echo "Uygulama 120 sn içinde açılmadı"; docker logs --tail 50 emlaksoft-app || true
 if [ -z "$PREV" ] || [ "$PREV" = "emlaksoft-app:$TAG" ]; then
-  echo "Geri dönülecek önceki imaj yok — elle müdahale gerekiyor"; exit 1
+  echo "Geri dönülecek önceki imaj yok — elle müdahale gerekiyor"
+  record_release failed "120 sn içinde sağlıklı olmadı; geri dönülecek önceki imaj yok"
+  exit 1
 fi
 echo "Geri dönülüyor: $PREV"
 APP_TAG="${PREV#emlaksoft-app:}" docker compose -f deploy/compose.prod.yml up -d --remove-orphans
 if wait_healthy; then
   echo "Geri dönüş başarılı: $PREV yayında (yeni sürüm emlaksoft-app:$TAG yayınlanmadı)"
+  record_release rolled_back "120 sn içinde sağlıklı olmadı; $PREV yeniden yayında"
 else
   echo "Geri dönüş de sağlıklı değil: $PREV — elle müdahale gerekiyor"
+  record_release failed "120 sn içinde sağlıklı olmadı; geri dönüş ($PREV) de sağlıklı değil"
 fi
 exit 1

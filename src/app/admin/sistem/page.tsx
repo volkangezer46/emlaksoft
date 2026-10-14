@@ -1,4 +1,4 @@
-import { BellRing, Database, Landmark, Radar, Server, Workflow } from "lucide-react";
+import { BellRing, Database, Landmark, Megaphone, Radar, Server, Workflow } from "lucide-react";
 import { PageTabs } from "@/components/app/page-tabs";
 import { requirePlatformModule } from "@/lib/platform";
 import { ErrorsView } from "./_hatalar/errors-view";
@@ -8,6 +8,7 @@ import { SystemView } from "./system-view";
 import { AlertsView } from "./alerts-view";
 import { ResourcesView } from "./resources-view";
 import { DatabaseView } from "./database-view";
+import { StatusPageView } from "./status-page-view";
 
 export const metadata = { title: "Sistem sağlığı" };
 
@@ -18,6 +19,7 @@ export const metadata = { title: "Sistem sağlığı" };
 const TABS = [
   { id: "saglik", label: "Sistem sağlığı", icon: Radar },
   { id: "uyarilar", label: "Uyarılar", icon: BellRing },
+  { id: "durum", label: "Durum sayfası", icon: Megaphone },
   { id: "kaynaklar", label: "Kaynaklar", icon: Server },
   { id: "veritabani", label: "Veritabanı", icon: Database },
   { id: "emlakfiyati", label: "EmlakFiyati", icon: Landmark },
@@ -31,15 +33,16 @@ const TABS = [
  * `?sekme=portal-kurallari` portal form kurallarını açar; `portal` ve `gorunum` parametreleri ona aittir.
  * `?sekme=uyarilar|kaynaklar|veritabani` operasyon merkezi (AD10); `olay=tumu` uyarı günlüğü süzgeci,
  * `is=<cron işi>` sağlık sekmesinde o işin son 30 çalışmasını (süre grafiği) açar.
+ * `?sekme=durum` kamuya açık /durum sayfasının olay/bakım yönetimi ve sürüm (deploy) geçmişi (DG5); `yayin=<sha>` hata listesini o sürüme süzer.
  */
 export default async function AdminSystemPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string }>;
+  searchParams?: Promise<{ sekme?: string; durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; portal?: string; gorunum?: string; olay?: string; is?: string; yayin?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const sp = (await searchParams) ?? {};
-  const KNOWN = ["hatalar", "emlakfiyati", "portal-kurallari", "uyarilar", "kaynaklar", "veritabani"] as const;
+  const KNOWN = ["hatalar", "emlakfiyati", "portal-kurallari", "uyarilar", "kaynaklar", "veritabani", "durum"] as const;
   const active = (KNOWN as readonly string[]).includes(sp.sekme ?? "") ? (sp.sekme as (typeof KNOWN)[number]) : "saglik";
 
   return (
@@ -57,6 +60,8 @@ export default async function AdminSystemPage({
         <ResourcesView />
       ) : active === "veritabani" ? (
         <DatabaseView />
+      ) : active === "durum" ? (
+        <StatusPageView />
       ) : (
         <SystemView cronJob={sp.is} />
       )}

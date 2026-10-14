@@ -94,7 +94,7 @@ function ozetle(rows: Row[]) {
 export async function ErrorsView({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; tur?: string }>;
+  searchParams?: Promise<{ durum?: string; son?: string; sayfa?: string; q?: string; kaynak?: string; ofis?: string; tur?: string; yayin?: string }>;
 }) {
   await requirePlatformModule("sistem");
   const params = (await searchParams) ?? {};
@@ -104,6 +104,8 @@ export async function ErrorsView({
   const kaynak = params.kaynak === "server" || params.kaynak === "client" ? params.kaynak : undefined;
   const ofis = /^[0-9a-f-]{36}$/i.test(params.ofis ?? "") ? params.ofis : undefined;
   const surumGecisi = params.tur === "surum";
+  // Yayın süzgeci (Sistem > Durum sayfası > Sürüm geçmişi "açık hata"): error_logs.release = SHA'nın ilk 12 karakteri.
+  const yayin = /^[0-9a-z-]{4,12}$/i.test(params.yayin ?? "") ? params.yayin : undefined;
   const base: Filters = {
     tur: surumGecisi ? "surum" : undefined,
     durum: params.durum,
@@ -111,6 +113,7 @@ export async function ErrorsView({
     q: q || undefined,
     kaynak,
     ofis,
+    yayin,
   };
   const sayfa = parsePage(params.sayfa);
   const simdi = now();
@@ -130,6 +133,8 @@ export async function ErrorsView({
     if (sonBirSaat) listQ = listQ.gte("last_seen", new Date(simdi - 3_600_000).toISOString());
     if (kaynak) listQ = listQ.eq("source", kaynak);
     if (ofis) listQ = listQ.eq("tenant_id", ofis);
+    // Sürüm sütunu yalnız triyaj şemasında var; şema yokken süzgeç uygulanmaz (eski liste).
+    if (yayin && triage) listQ = listQ.eq("release", yayin);
     if (q) listQ = listQ.or(orIlike(["message", "path"], q));
     // Sürüm geçişi süzgeci: classify.ts ile aynı imzalar (ILIKE OR).
     if (surumGecisi) listQ = listQ.or(VERSION_SKEW_PATTERNS.map((p) => orIlike(["message"], p)).join(","));
@@ -227,6 +232,7 @@ export async function ErrorsView({
         {sonBirSaat ? <input type="hidden" name="son" value="1saat" /> : null}
         {ofis ? <input type="hidden" name="ofis" value={ofis} /> : null}
         {surumGecisi ? <input type="hidden" name="tur" value="surum" /> : null}
+        {yayin ? <input type="hidden" name="yayin" value={yayin} /> : null}
         <label className="relative min-w-0 flex-1 basis-56">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-faint" aria-hidden />
           <Input
@@ -251,7 +257,7 @@ export async function ErrorsView({
         <Button variant="navy" size="sm" type="submit">
           Filtrele
         </Button>
-        {q || kaynak || ofis ? (
+        {q || kaynak || ofis || yayin ? (
           <span className="flex flex-wrap items-center gap-2">
             {q ? (
               <Link href={hrefWith({ ...base, q: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
@@ -261,6 +267,11 @@ export async function ErrorsView({
             {kaynak ? (
               <Link href={hrefWith({ ...base, kaynak: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
                 Kaynak: {kaynak === "server" ? "Sunucu" : "İstemci"} <X className="h-3 w-3" />
+              </Link>
+            ) : null}
+            {yayin ? (
+              <Link href={hrefWith({ ...base, yayin: undefined })} className="focus-ring press inline-flex touch:min-h-11 items-center gap-1 rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-bold text-brand-600">
+                Sürüm: {yayin} <X className="h-3 w-3" />
               </Link>
             ) : null}
             {ofis ? (

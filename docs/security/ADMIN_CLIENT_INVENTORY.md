@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **525** (273 dosya) — risk: P0=16, P1=40, P2=469
-- Tenant filtresi: var=281, uygulanamaz=158, yok=56, param=18, devir=12
-- Kapı türü: public-token=35, dosya-duzeyi=129, platform=99, belirsiz=127, elle-dogrulandi=26, oturum-izin=82, cron=24, webhook-imza=3
+- Toplam birim: **532** (277 dosya) — risk: P0=16, P1=40, P2=476
+- Tenant filtresi: var=281, uygulanamaz=165, yok=56, param=18, devir=12
+- Kapı türü: public-token=35, dosya-duzeyi=134, platform=99, belirsiz=129, elle-dogrulandi=26, oturum-izin=82, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **68**; RLS'li client'a taşıma adayı: **66**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -107,6 +107,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/bulk-property.ts:70` | `bulkUpdatePropertyStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:140` | `createCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/campaigns.ts:242` | `sendCampaign` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/channel-roi.ts:63` | `deleteMarketingSpend` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/channel-roi.ts:44` | `saveMarketingSpend` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/compliance.ts:27` | `upsertIysConsent` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/contract-signers.ts:89` | `resendSignerSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/contract-signers.ts:42` | `updateContractSigner` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
@@ -267,6 +269,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/rentals.ts:181` | `updateRental` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/sample-data.ts:149` | `clearSampleData` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | uygulanamaz | P2 |
 | `src/app/actions/sample-data.ts:94` | `seedSampleData` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param (yazma) | P2 |
+| `src/app/actions/status-page.ts:98` | `addStatusUpdate` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/status-page.ts:66` | `createStatusIncident` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
+| `src/app/actions/status-page.ts:125` | `deleteStatusIncident` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/app/actions/subscription-cancel.ts:38` | `requestSubscriptionCancel` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/subscription-cancel.ts:87` | `undoSubscriptionCancel` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/support-desk.ts:113` | `addSupportHoliday` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
@@ -318,7 +323,6 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/geo/[provinceId]/page.tsx:35` | `AdminGeoProvincePage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
 | `src/app/admin/geo/bildirimler/page.tsx:29` | `AdminGeoRequestsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/geo/page.tsx:22` | `AdminGeoPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
-| `src/app/admin/sistem/_hatalar/errors-view.tsx:118` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/[id]/page.tsx:116` | `AdminMemberDetailPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/members/page.tsx:158` | `AdminMembersPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/muhasebe/defter/page.tsx:46` | `FaturaDefteriPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | devir | P2 |
@@ -326,6 +330,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/admin/page.tsx:90` | `getAdminDashboardData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/admin/raporlar/page.tsx:58` | `AdminReportsPage` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/seo/pattern-samples.ts:45` | `loadPatternData` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/app/admin/sistem/_hatalar/errors-view.tsx:121` | `ErrorsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | var | P2 |
 | `src/app/admin/sistem/alerts-view.tsx:55` | `AlertsView` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
 | `src/app/admin/sistem/backup-card.tsx:20` | `BackupHistory` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/admin/sistem/database-view.tsx:31` | `DatabaseView` | Platform personeli: kiracılar arası yönetim paneli. | platform | yok | P2 |
@@ -442,6 +447,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/billing/seat-purchase.ts:53` | `cachedSeatSupport` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/billing/seat-purchase.ts:212` | `createSeatInvoice` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/campaign-delivery.ts:524` | `runCampaignDeliveryWorker` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/channel-roi/read.ts:26` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/cron-heartbeat.ts:24` | `recordHeartbeat` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | uygulanamaz (yazma) | P2 |
 | `src/lib/cron-pause.ts:50` | `beginCronRun` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/definitions.ts:28` | `loadDefinitions` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
@@ -535,6 +541,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/seo/store.ts:339` | `prune404` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/site-issues/store.ts:29` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/site-media/store.ts:19` | `db` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
+| `src/lib/status-page/read.ts:22` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/storage-deletion-outbox.ts:66` | `enqueueStorageDeletion` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/support/desk-data.ts:46` | `loadDeskConfig` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
 | `src/lib/support/desk-data.ts:93` | `loadMacros` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz | P2 |
