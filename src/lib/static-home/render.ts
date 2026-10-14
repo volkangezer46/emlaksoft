@@ -97,6 +97,7 @@ export async function renderStaticRoute(route: StaticRouteDef, origin = selfOrig
       readStylesheet: (href) => readBuiltStylesheet(href),
       purge: { keepPrefixes: route.keepPrefixes, extraClasses: m.classTokens },
       bodyEnd: await bodyEndFor(route, m, runtime),
+      lazyDom: route.lazyDom === true,
     });
     if (html) return { html, isStatic: true };
     console.error(`[statik:${route.id}] dönüşüm beklenmeyen biçim; normal HTML sunuluyor`);

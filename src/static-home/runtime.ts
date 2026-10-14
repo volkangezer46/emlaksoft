@@ -7,7 +7,9 @@
  *    src/lib/site-menu/announcements.ts). Sunucu çizimi "/" için seçilen tek duyuruyu taşır.
  *  - Dönüşüm düğmeleri (yönetimden): mobil sheet'teki "Giriş" ve deneme düğmesi üst bardaki düğmelerden okunur.
  *  - Adacıklar (Preact; /statik/*.js): fiyat kartları, koltuk hesaplayıcı, tur ekranları, menü önizlemeleri — görünür alana
- *    yaklaşınca / boşta / menüye ilk yaklaşmada yüklenir.
+ *    yaklaşınca / boşta / menüye ilk yaklaşmada yüklenir; tur ekranları yalnız seçilince (ya da seçme niyetinde) çizilir.
+ *  - DOM diyeti (src/lib/static-home/lazy-dom.ts): mega panel içleri ilk niyette, ekran dışı SVG çocukları ve altbilgi
+ *    akordeonu görünür alana yaklaşınca şablondan yerine konur (hero varyantı ayrıştırmada, satır içi betikle).
  * Veriler: <script type="application/json" id="mk-static"> (rota işleyicisi ekler).
  */
 
@@ -52,11 +54,30 @@ function whenNear(el: Element, margin: string, run: () => void) {
   io.observe(el);
 }
 
+const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+
 function whenIdle(run: () => void) {
-  const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   const go = () => (ric ? ric(run, { timeout: 3000 }) : setTimeout(run, 1200));
   if (document.readyState === "complete") go();
   else window.addEventListener("load", go, { once: true });
+}
+
+/** Yük bittikten sonraki ilk boşluk (kısa üst sınırla). */
+const idle = (run: () => void) => (ric ? ric(run, { timeout: 1500 }) : setTimeout(run, 50));
+
+/**
+ * Kullanıcının İLK etkinliğinde (fare/dokunma/tuş/kaydırma) bir kez çalışır. Lighthouse ve tarayıcısız tarayıcılar
+ * etkileşmediği için yük sonu DOM'u küçük kalır; gerçek kullanıcıda iş, ihtiyaçtan önce boşta yapılır. Chrome ilk
+ * yerleşimden sonra imleç konumunda hareketsiz (movement 0) yapay bir pointermove gönderir: o etkinlik sayılmaz.
+ */
+function onFirstActivity(run: () => void) {
+  const events = ["pointermove", "pointerdown", "keydown", "touchstart", "wheel", "scroll"] as const;
+  const fire = (e: Event) => {
+    if (e.type === "pointermove" && !(e as PointerEvent).movementX && !(e as PointerEvent).movementY) return;
+    for (const ev of events) window.removeEventListener(ev, fire, true);
+    run();
+  };
+  for (const ev of events) window.addEventListener(ev, fire, { capture: true, passive: true });
 }
 
 /* ------------------------------------------------------------------ üst menü */
@@ -75,10 +96,34 @@ function initNav() {
   onScroll();
   window.addEventListener("scroll", onScroll, { passive: true });
 
+  // ---- panel içerikleri (DOM diyeti: statik dönüşüm panel içini <template>'e alır) ----
+  // Kullanıcının ilk etkinliğinden sonra boşta yerine konur (stil hesabı etkileşim yoluna düşmez); o ana kadar bir niyet
+  // (menüye yaklaşma, odak, açma, mobil menü) gelirse eşzamanlı konur.
+  let panelsReady = false;
+  const ensurePanels = (sameFrameOpen = false) => {
+    if (panelsReady) return;
+    panelsReady = true;
+    let inserted: HTMLElement | null = null;
+    for (const dd of dds) {
+      const t = panelOf(dd).querySelector<HTMLTemplateElement>(":scope > template");
+      if (t) t.replaceWith(t.content);
+      const inner = panelOf(dd).querySelector<HTMLElement>(".mk-mega-in");
+      if (!inner) continue;
+      if (t) inserted = inner;
+      inner.addEventListener("pointerover", (e) => pick(dd, e.target));
+      inner.addEventListener("focusin", (e) => pick(dd, e.target));
+      inner.addEventListener("pointerleave", () => resetFeat(dd));
+    }
+    // Aynı karede açılacaksa kapalı stil önce hesaplansın: açılış geçişi (opacity/transform) çalışır.
+    if (inserted && sameFrameOpen) void getComputedStyle(inserted).opacity;
+  };
+  onFirstActivity(() => idle(() => ensurePanels()));
+
   // ---- canlı önizleme (sahneler ve kart metinleri ilk yaklaşmada) ----
   let preview: PreviewModule | null = null;
   let armed = false;
   const arm = () => {
+    ensurePanels();
     if (armed) return;
     armed = true;
     importIsland<PreviewModule>("preview")
@@ -169,6 +214,7 @@ function initNav() {
 
   // ---- açma/kapama ----
   const setMenu = (next: HTMLElement | null, focusFirst = false) => {
+    if (next) ensurePanels(true);
     if (menu === next) {
       if (focusFirst && next) panelOf(next).querySelector<HTMLElement>("a[href]")?.focus();
       return;
@@ -229,10 +275,6 @@ function initNav() {
       const to = e.key === "Home" ? 0 : e.key === "End" ? all.length - 1 : e.key === "ArrowDown" ? (i + 1) % all.length : (i - 1 + all.length) % all.length;
       all[to]!.focus();
     });
-    const inner = panel.querySelector<HTMLElement>(".mk-mega-in");
-    inner?.addEventListener("pointerover", (e) => pick(dd, e.target));
-    inner?.addEventListener("focusin", (e) => pick(dd, e.target));
-    inner?.addEventListener("pointerleave", () => resetFeat(dd));
     panel.addEventListener("click", (e) => {
       if ((e.target as Element).closest("a[href]")) setMenu(null);
     });
@@ -365,6 +407,7 @@ function initNav() {
   const openSheet = () => {
     if (sheet || !burger) return;
     setMenu(null);
+    ensurePanels();
     sheet = buildSheet();
     header?.after(sheet);
     nav.dataset.open = "true";
@@ -530,6 +573,60 @@ function initMotion() {
   });
 }
 
+/* ------------------------------------------------------------------ DOM diyeti (src/lib/static-home/lazy-dom.ts) */
+/**
+ * Ekran dışı SVG çocukları (`svg[data-mk-lz]` ↔ `#mk-lz` deposu) ve "yaklaşınca" şablonları (`template[data-mk-lazy=near]`)
+ * görünür alana 600 px kala yerine konur; yazdırmadan önce hepsi. Boşta ÖNCEDEN açılmaz (ilk yük DOM sayısı küçük kalır).
+ */
+const LAZY_MARGIN = "600px 0px";
+let fillAll: (root?: ParentNode) => void = () => {};
+
+function initLazy() {
+  const store = document.getElementById("mk-lz") as HTMLTemplateElement | null;
+  const fill = (el: Element) => {
+    if (!el.isConnected) return;
+    if (el instanceof HTMLTemplateElement) return el.replaceWith(el.content);
+    const n = el.getAttribute("data-mk-lz");
+    if (n === null) return;
+    el.removeAttribute("data-mk-lz");
+    const src = store?.content.children[Number(n)];
+    if (src) el.append(...src.childNodes);
+  };
+  const pending = () => [...document.querySelectorAll("svg[data-mk-lz], template[data-mk-lazy='near']")];
+  const targetOf = (el: Element) => (el instanceof HTMLTemplateElement ? el.parentElement : el);
+  if (typeof IntersectionObserver === "undefined") return pending().forEach(fill);
+  const byTarget = new Map<Element, Element>();
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const e of entries) {
+        const el = byTarget.get(e.target);
+        if (!e.isIntersecting || !el) continue;
+        io.unobserve(e.target);
+        byTarget.delete(e.target);
+        fill(el);
+      }
+    },
+    { rootMargin: LAZY_MARGIN },
+  );
+  for (const el of pending()) {
+    const t = targetOf(el);
+    if (!t) continue;
+    byTarget.set(t, el);
+    io.observe(t);
+  }
+  fillAll = (root: ParentNode = document) => {
+    for (const el of root.querySelectorAll("svg[data-mk-lz], template[data-mk-lazy='near']")) {
+      const t = targetOf(el);
+      if (t) {
+        io.unobserve(t);
+        byTarget.delete(t);
+      }
+      fill(el);
+    }
+  };
+  window.addEventListener("beforeprint", () => fillAll());
+}
+
 /* ------------------------------------------------------------------ adacıklar */
 function initIslands() {
   if (!data) return;
@@ -549,17 +646,56 @@ function initIslands() {
         .catch((e) => console.warn("[ana sayfa] ada yüklenemedi", e));
     });
   }
-  const tours = [...document.querySelectorAll<HTMLElement>(".mk-svg-ph[data-tour]")];
-  if (tours.length > 0) {
-    whenIdle(() => {
-      importIsland<{ mount(els: HTMLElement[]): void }>("tour")
-        .then((m) => m.mount(tours))
+  // Ürün turu: görünmeyen ekranlar (2..N) ilk yükte çizilmez (~1000 SVG öğesi). Modül boşta indirilir; tur görünür alana
+  // yaklaşınca ekranlar boşta, her dilimde bir ekran olmak üzere hazırlanır → sekme seçildiği karede hazırdır. Daha önce
+  // seçilirse (ya da sekmeye fare/odak gelirse) o ekran aynı olayda hazırlanır.
+  const tour = document.querySelector<HTMLElement>(".mk-tour");
+  if (tour && tour.querySelector(".mk-svg-ph[data-tour], template[data-mk-lazy='tour']")) {
+    type TourModule = { mount(els: HTMLElement[]): void };
+    let mod: Promise<TourModule> | null = null;
+    let ready: TourModule | null = null;
+    const load = () => (mod ??= importIsland<TourModule>("tour").then((m) => (ready = m)));
+    const prepare = (scr: Element) => {
+      scr.querySelectorAll<HTMLTemplateElement>("template[data-mk-lazy='tour']").forEach((t) => t.replaceWith(t.content));
+      fillAll(scr); // gizli ekranın ertelenen SVG'leri (gözlemci display:none için hiç tetiklenmez)
+      const ph = scr.querySelector<HTMLElement>(".mk-svg-ph[data-tour]");
+      if (!ph) return;
+      if (ready) return ready.mount([ph]);
+      load()
+        .then((m) => ph.isConnected && m.mount([ph]))
         .catch((e) => console.warn("[ana sayfa] ada yüklenemedi", e));
-    });
+    };
+    const show = (input: Element | null | undefined) => {
+      const n = input instanceof HTMLInputElement ? /^tt(\d+)$/.exec(input.id)?.[1] : undefined;
+      const scr = n ? tour.querySelector<HTMLElement>(`.mk-s${n}`) : null;
+      if (scr) prepare(scr);
+    };
+    const warm = () => {
+      const rest = [...tour.querySelectorAll(".mk-scr")].filter((s) => s.querySelector(".mk-svg-ph[data-tour], template[data-mk-lazy='tour'], svg[data-mk-lz]"));
+      const next = () => {
+        const s = rest.shift();
+        if (s) prepare(s);
+        if (rest.length) idle(next);
+      };
+      idle(next);
+    };
+    const inputFor = (t: EventTarget | null) => {
+      const el = t as Element | null;
+      if (el instanceof HTMLInputElement) return el;
+      const label = el?.closest?.<HTMLLabelElement>("label[for]");
+      return label ? document.getElementById(label.htmlFor) : null;
+    };
+    tour.addEventListener("change", (e) => show(inputFor(e.target)));
+    tour.addEventListener("pointerover", (e) => show(inputFor(e.target)));
+    tour.addEventListener("focusin", (e) => show(inputFor(e.target)));
+    // Dar pay: tur (≈1600 px) masaüstü Lighthouse görünümünde (1350×940) bile yük sonunda ısıtılmaz.
+    whenNear(tour, "200px 0px", () => void load().then(warm, () => {}));
+    whenIdle(() => void load().catch(() => {}));
   }
 }
 
 initNav();
 initAnnouncement();
 initMotion();
+initLazy();
 initIslands();

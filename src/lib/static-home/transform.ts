@@ -1,4 +1,5 @@
 import postcss, { type AtRule, type Rule } from "postcss";
+import { deferHomeDom } from "./lazy-dom";
 
 /**
  * Next'in ürettiği ana sayfa HTML'inden saf HTML üretir (SAF fonksiyonlar; G/Ç yok → birim testli).
@@ -7,6 +8,7 @@ import postcss, { type AtRule, type Rule } from "postcss";
  *  2. Next/React çalışma zamanı ayıklanır: dış betikler, RSC verisi (`self.__next_f`), akış betikleri, betik
  *     önceden yüklemeleri, React yorum işaretleri. Kalan: JSON-LD, speculationrules, sitenin kendi küçük betikleri.
  *  3. Dış stil dosyaları tek `<style>`'a gömülür; yalnız sayfada (ve adacıklarda) geçen sınıfların kuralları kalır.
+ *  4. (İsteğe bağlı, `lazyDom`) ilk yükte gerekmeyen işaretleme `<template>`'e alınır (./lazy-dom.ts).
  */
 
 const NEXT_INLINE_MARKERS = ["self.__next_f", "$RC", "$RB=", "$RT=", "$RS(", "$RX(", "__next_s"];
@@ -204,13 +206,17 @@ export type BuildStaticHomeInput = {
   purge: PurgeOptions;
   /** `</body>` öncesine eklenecek ham HTML (veri + çalışma zamanı betiği). */
   bodyEnd: string;
+  /** DOM diyeti (mega panel / hero varyantı / ekran dışı SVG şablonları; ./lazy-dom.ts). Çalışma zamanı gerektirir. */
+  lazyDom?: boolean;
 };
 
 /** Tam dönüşüm; beklenmeyen biçimde `null` döner (çağıran normal Next HTML'ini sunar). */
 export function buildStaticHome(input: BuildStaticHomeInput): string | null {
   const resolved = resolveSuspenseBoundaries(input.html);
   if (/<template id="B:/.test(resolved) || /<div hidden(?:="")? id="S:/.test(resolved)) return null;
-  const { html, stylesheets } = stripNextRuntime(resolved);
+  const stripped = stripNextRuntime(resolved);
+  const { stylesheets } = stripped;
+  const html = input.lazyDom ? deferHomeDom(stripped.html).html : stripped.html;
   if (stylesheets.length === 0 || !html.includes("</head>") || !html.includes("</body>")) return null;
   const css: string[] = [];
   for (const href of stylesheets) {
