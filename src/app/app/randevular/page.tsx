@@ -131,6 +131,7 @@ export default async function AppointmentsPage({
     sayfa?: string;
     yogunluk?: string;
     yeni?: string;
+    randevu?: string;
   }>;
 }) {
   const gate = await requireModulePage("appointments");
@@ -166,6 +167,9 @@ export default async function AppointmentsPage({
   const danismanF = isYonetici ? uuidParam(sp.danisman) : "";
   // Şube filtresi (appointments.branch_id): yalnız yönetim katmanı; doğrulanmış uuid.
   const subeF = isYonetici ? uuidParam(sp.sube) : "";
+  // Derin bağlantı (?randevu=<id>, bildirimler): liste yalnız o randevuyu gösterir (pencere ve iptal süzgeci
+  // uygulanmaz; RLS görme yetkisini sınırlar), düzenleme paneli açık gelir.
+  const randevuF = uuidParam(sp.randevu);
   const tarihMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(sp.tarih ?? "");
   // todayStart: TR takvim günü (sunucu UTC'de olsa da gece 00–03 TRT arası doğru gün).
   // "Sahte yerel" Date — yalnız gün bileşenleri anlamlı; DB sınırı için toIso() kullan.
@@ -218,6 +222,7 @@ export default async function AppointmentsPage({
   const APPT_LIMIT = 500;
   // Liste ve (tavana dayanınca) head-count aynı filtre kurucusunu paylaşır.
   const buildApptQuery = (search: Awaited<typeof searchP>, select: string, opts?: { count: "exact"; head: true }) => {
+    if (randevuF) return supabase.from("appointments").select(select, opts).eq("id", randevuF);
     let query = supabase
       .from("appointments")
       .select(select, opts)
@@ -434,6 +439,7 @@ export default async function AppointmentsPage({
   if (gorunum === "rota" && rotaGun !== "bugun") urlParams.gun = rotaGun;
   if (danismanF) urlParams.danisman = danismanF;
   if (subeF) urlParams.sube = subeF;
+  if (randevuF) urlParams.randevu = randevuF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const savedViewParams = Object.fromEntries(
     Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "gorunum", "danisman"].includes(k)),
@@ -595,6 +601,7 @@ export default async function AppointmentsPage({
     const outcome = appt.outcome && isAppointmentOutcome(appt.outcome) ? APPOINTMENT_OUTCOME_META[appt.outcome] : null;
     return {
       id: appt.id,
+      focused: appt.id === randevuF,
       status: appt.status,
       dateLabel: new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date),
       timeLabel: formatTrTime(date),
@@ -672,6 +679,7 @@ export default async function AppointmentsPage({
     { key: "property", label: "Portföy", format: () => filteredProperty?.title || filteredProperty?.property_code || "Seçili portföy" },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
     { key: "sube", label: "Şube", format: (v) => branchList.find((b) => b.id === v)?.name ?? "Seçili şube" },
+    { key: "randevu", label: "Randevu", format: () => (rows[0] ? `${rel(rows[0].customer)?.full_name ?? "Seçili randevu"} · ${formatTrTime(new Date(rows[0].scheduled_at))}` : "Seçili randevu") },
   ]);
 
   return (

@@ -77,6 +77,7 @@ export function TaskCard({
   members,
   deals,
   compact = false,
+  focused = false,
 }: {
   task: TaskRow;
   canEdit: boolean;
@@ -87,6 +88,8 @@ export function TaskCard({
   deals?: { id: string; label: string }[];
   /** Kanban sütunu: notu ve ikonu gizleyen dar kart. */
   compact?: boolean;
+  /** Derin bağlantıyla (?gorev=<id>) açılan görev: vurgulanır, düzenleme paneli açık gelir. */
+  focused?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -165,7 +168,8 @@ export function TaskCard({
     <article
       className={`group relative flex items-start gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition ${
         done ? "border-line opacity-70" : highPr ? "border-danger-500/25" : "border-line"
-      }`}
+      }${focused ? " ring-2 ring-brand-300" : ""}`}
+      aria-current={focused ? "true" : undefined}
     >
       {href ? (
         <Link href={href} className="absolute inset-0 rounded-[var(--radius-card)]" aria-label={`${task.title} kaydını aç`} />
@@ -250,7 +254,7 @@ export function TaskCard({
 
       <div className="relative z-10 flex shrink-0 items-center gap-1.5">
         {canEdit && !done && !systemKind ? (
-          <TaskEditDialog task={editTask} members={members} deals={deals} />
+          <TaskEditDialog task={editTask} members={members} deals={deals} defaultOpen={focused} />
         ) : null}
         {takedown ? (
           <Link

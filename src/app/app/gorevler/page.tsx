@@ -81,7 +81,7 @@ export default async function TasksPage({
 }: {
   searchParams?: Promise<{
     q?: string; filter?: string; mine?: string; tur?: string; tekrar?: string; sayfa?: string; yeni?: string; danisman?: string;
-    gorunum?: string; ay?: string; gun?: string; zincir?: string; anlasma?: string;
+    gorunum?: string; ay?: string; gun?: string; zincir?: string; anlasma?: string; gorev?: string;
   }>;
 }) {
   const ctx = await requireModulePage("tasks");
@@ -90,7 +90,10 @@ export default async function TasksPage({
   const canCreate = (ctx.perms.tasks ?? []).includes("create");
   const params = (await searchParams) ?? {};
   if (params.yeni === "1") redirect("/app/gorevler/yeni");
-  const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : "open";
+  // Derin bağlantı (?gorev=<id>, bildirimler): yalnız o görev listelenir, düzenleme paneli açık gelir.
+  // Tamamlanmış görev de bulunsun diye zaman süzgeci verilmemişse "tümü" kullanılır.
+  const gorev = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.gorev ?? "") ? params.gorev!.toLowerCase() : "";
+  const filter = FILTERS.some((f) => f.key === params.filter) ? params.filter! : gorev ? "all" : "open";
   const mine = params.mine === "1";
   const tur = KIND_FILTERS.some((k) => k.key === params.tur) ? params.tur! : "";
   const tekrar = params.tekrar === "1";
@@ -119,6 +122,7 @@ export default async function TasksPage({
   if (gun) urlParams.gun = gun;
   if (zincir) urlParams.zincir = zincir;
   if (anlasma) urlParams.anlasma = anlasma;
+  if (gorev) urlParams.gorev = gorev;
   if (gorunum !== "liste") urlParams.gorunum = gorunum;
   if (gorunum === "takvim" && params.ay && isMonthKey(params.ay)) urlParams.ay = ay;
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
@@ -153,6 +157,7 @@ export default async function TasksPage({
     if (q) out = out.or(orIlike(["title", "notes"], q));
     if (zincir) out = out.or(`id.eq.${zincir},recurrence_parent_id.eq.${zincir}`);
     if (anlasma) out = out.eq("deal_id", anlasma);
+    if (gorev) out = out.eq("id", gorev);
     if (Number.isFinite(gunStartMs)) {
       out = out.gte("due_at", new Date(gunStartMs).toISOString()).lt("due_at", new Date(gunStartMs + DAY_MS).toISOString());
     }
@@ -360,7 +365,7 @@ export default async function TasksPage({
         bulkItems.push({
           id: t.id,
           selectable: canEdit && t.status === "open",
-          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} />,
+          card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} focused={t.id === gorev} />,
         });
       }
     }
@@ -369,7 +374,7 @@ export default async function TasksPage({
       bulkItems.push({
         id: t.id,
         selectable: canEdit && t.status === "open",
-        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} />,
+        card: <TaskCard task={t} canEdit={canEdit} canDelete={canDelete} members={members} deals={dealOptions} focused={t.id === gorev} />,
       });
     }
   }
@@ -393,6 +398,7 @@ export default async function TasksPage({
     { key: "gun", label: "Vade günü", format: (v) => v.split("-").reverse().join(".") },
     { key: "zincir", label: "Tekrar zinciri", format: () => "Seçili zincir" },
     { key: "anlasma", label: "Anlaşma", format: () => tasks.find((t) => t.deal_id === anlasma)?.deal_label ?? "Seçili anlaşma" },
+    { key: "gorev", label: "Görev", format: () => tasks.find((t) => t.id === gorev)?.title ?? "Seçili görev" },
   ]);
 
   const emptyAll = counts.all === 0;
