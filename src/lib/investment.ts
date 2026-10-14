@@ -3,7 +3,7 @@
  * SAF fonksiyonlar: I/O yok, `Date.now()` yok, rastgelelik yok.
  *
  * NEDEN AYRI MODÜL: "Bu daireyi alsam kaç yılda kendini amorti eder, aylık
- * cebime ne kalır?" sorusu üç ekranda birden soruluyor — panel `/app/yatirim`,
+ * cebime ne kalır?" sorusu üç ekranda birden soruluyor — panel `/app/hesaplayici?sekme=yatirim`,
  * vitrin ilan detayındaki müşteri kaydırıcıları ve birim testler. Oranların
  * kopyalanması, biri güncellenince diğerlerinin unutulması demekti.
  *

@@ -28,11 +28,13 @@ Ofis kurulumu, Otomasyon, Uyum, Belge Merkezi, Denetim, Davet et ve kazan).
 
 Öğe alanları: `description` (palet + menü ipucu, zorunlu), `keywords` (yalnız arama eş anlamlıları; "lead" → Talepler), `advanced`
 (yan menüde ayracın altı), `shortcut` ("g m"; `NAV_SHORTCUTS` → `keyboard-shortcuts.tsx` ve palet rozeti), `tier` (sade görünüm çekirdeği,
-`nav-roles.ts`). Türetilenler: `ALL_NAV_HREFS` (öğe+sekme+eski yol), `HIDDEN_APP_PAGES` (menüde bilerek olmayan 8 sayfa, gerekçeli),
+`nav-roles.ts`). Türetilenler: `ALL_NAV_HREFS` (öğe+sekme+ek eşleşme yolu), `HIDDEN_APP_PAGES` (menüde bilerek olmayan 8 sayfa, gerekçeli),
 `MOBILE_TAB_SECTIONS` (alt çubuk: Bugün, Müşteriler, Portföy, Anlaşmalar + Daha fazla). Tüketiciler aynı kaynaktan beslenir: `app-sidebar`,
 `section-tabs`, `app-breadcrumb`, `palette-core` (Git/Eylemler), `product-tour-data`, `trust-strip` (başlık sayısı).
 **Yeni sayfa kuralı:** `page.tsx` eklenince ya nav-config'e öğe/sekme eklenir ya da `HIDDEN_APP_PAGES`'e gerekçesiyle yazılır; aksi hâlde
-`nav-pages-contract.test.ts` kırılır. Yollar değişmez; eski yollar `NAV_ALIASES` ile yönlendirir.
+`nav-pages-contract.test.ts` kırılır. **Takma ad yok (sahip kuralı, 2026-10-13):** birleşen/taşınan sayfa eski yolunu yönlendirme,
+alias ya da yalnız `redirect()` yapan `page.tsx` olarak BIRAKMAZ; eski sayfa ve ona giden her bağlantı silinir. `next.config.ts`
+`redirects()` yalnız herkese açık `/demo → /kayit` kaydını taşır (`NAV_ALIASES` kaldırıldı).
 
 ## Veri modeli ana hatları (243 migration dosyası; TL hesap kredisi, referans/ortak motoru, kayıtlı kart ve EF kontör için `docs/HAFIZA.md` §2/§6)
 
@@ -84,7 +86,7 @@ Not: `FeatureKey` (ürün alanı) ile `AppModule` (izin modülü) aynı şey de�
 ## Terim, rol etiketi ve zaman: tek kaynak
 
 - **Terim sözlüğü:** `src/lib/terminology.ts` (kanonik ad + yasaklı varyant; `terminology-contract.test.ts` kullanıcıya görünen metinde "lead", "cüzdan", "kişisel hakediş" yakalar). Yol adları (`/app/ayarlar/lead`, `/lead/[token]`) değişmez, yalnız metin.
-- **"Kayıp" üç ayrı kavram:** (1) **Kaçan komisyon** = portal teyidiyle kaçan ilanın tahmini para kaybı (kayıp-kaçak kalkanı, `/app/kayip-kacak`, ana ekran "Kaçan komisyonlar" kartı); (2) **Kaybedilen anlaşma / kayıp nedeni** = anlaşma kapanışında seçilen sebep (anlaşma kapanış diyaloğu, `lib/loss-reason.ts`, raporlar "Kaybedilen anlaşmalar" kartı); (3) **Risk altındaki müşteriler** = ilgilenilmeyen müşteri/talep (`/app/kayip-satis`). Yeni ekranda "kayıp" kelimesi yalnız bu üç adın biriyle kullanılır.
+- **"Kayıp" üç ayrı kavram:** (1) **Kaçan komisyon** = portal teyidiyle kaçan ilanın tahmini para kaybı (kayıp-kaçak kalkanı, `/app/kayip-kacak`, ana ekran "Kaçan komisyonlar" kartı); (2) **Kaybedilen anlaşma / kayıp nedeni** = anlaşma kapanışında seçilen sebep (anlaşma kapanış diyaloğu, `lib/loss-reason.ts`, raporlar "Kaybedilen anlaşmalar" kartı); (3) **Risk altındaki müşteriler** = ilgilenilmeyen müşteri/talep (Akıllı listeler "Kaybedilme riski yüksek" bölümü, `/app/akilli-listeler?segment=churn`). Yeni ekranda "kayıp" kelimesi yalnız bu üç adın biriyle kullanılır.
 - **Rol etiketi:** `src/lib/role-labels.ts` (`ROLE_LABELS`, `roleLabel()`); yerel kopya yazma (`role-labels-contract.test.ts`).
 - **Zaman:** sunucu UTC'de çalışır, iş günü/ayı Türkiye takvimidir (UTC+3, DST yok). Gün/ay sınırı `src/lib/clock.ts` yardımcılarıyla kurulur: `trDayStartIso`, `trMonthStartIso`, `trMonthKey`, `shiftMonthKey`. `Date.UTC(...)`, `setDate(1)`, `getUTCMonth()` ile ay sınırı kurma; ayın ilk 3 saati önceki aya yazılır.
 

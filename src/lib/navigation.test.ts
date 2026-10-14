@@ -3,7 +3,7 @@ import { findActiveNavigationHref } from "./navigation";
 
 const appHrefs = [
   "/app",
-  "/app/arama",
+  "/app/talepler",
   "/app/ayarlar",
   "/app/ayarlar/filigran",
 ] as const;
@@ -26,7 +26,7 @@ describe("findActiveNavigationHref", () => {
 
   it("matches complete path segments instead of similar prefixes", () => {
     expect(
-      findActiveNavigationHref("/app/arama-sonuclari", appHrefs, "/app"),
+      findActiveNavigationHref("/app/talepler-arsivi", appHrefs, "/app"),
     ).toBeNull();
   });
 

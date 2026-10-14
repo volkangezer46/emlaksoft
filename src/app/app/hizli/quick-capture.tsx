@@ -10,7 +10,7 @@ import { MorphTabs, type MorphTabItem } from "@/components/ui/morph-tabs";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
-import { CALL_DISPOSITIONS } from "@/app/app/arama/call-console";
+import { CALL_DISPOSITIONS } from "@/app/app/gelen-kutusu/call-console";
 import { quickCreateAppointment, quickCreateCustomer, quickCreateProperty, quickLogCall } from "./actions";
 import { QUICK_INTENTS, QUICK_ROOM_OPTIONS } from "./quick-intents";
 import dynamic from "next/dynamic";

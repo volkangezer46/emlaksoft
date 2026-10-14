@@ -13,8 +13,7 @@ const ROOT = join(process.cwd(), "src");
 
 /** Bilinçli istisnalar (gerekçeli). Yeni istisna eklemek yerine metni düzelt. */
 const ALLOW: Record<string, string> = {
-  // /admin satış CRM'i platform satış adayını "lead" diye anar (ofis kullanıcısına görünmez).
-  "src/app/admin/satis": "platform satış CRM'i (yalnız /admin)",
+  // Platform satış CRM'i eylemleri platform satış adayını "lead" diye anar (ofis kullanıcısına görünmez).
   "src/app/actions/platform-sales.ts": "platform satış CRM'i mesajları (yalnız /admin)",
   // Sözlük ve test dosyaları yasaklı terimi tanımlamak/anlatmak için anar.
   "src/lib/terminology.ts": "sözlük tanımı",

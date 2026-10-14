@@ -134,7 +134,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["kişi", "alıcı", "malik", "mülk sahibi", "aday", "cari"],
         shortcut: "g m",
       },
-      // Talepler sayfasının ikinci sekmesi "Eşleşme" (matching izniyle gizlenir); /app/eslestirme yönlendirir.
+      // Talepler sayfasının ikinci sekmesi "Eşleşme" (?sekme=eslesme, matching izniyle gizlenir).
       {
         href: "/app/talepler",
         label: "Talepler",
@@ -144,7 +144,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         keywords: ["lead", "aday", "istek", "başvuru", "eşleştirme", "eşleşme"],
         shortcut: "g t",
       },
-      // İkinci sekme "Çağrı kaydı" (eski /app/arama, yönlendirir): iki sekme de `calls` modülünde.
+      // İkinci sekme "Çağrı kaydı" (?sekme=cagri): iki sekme de `calls` modülünde.
       {
         href: "/app/gelen-kutusu",
         label: "Gelen kutusu",
@@ -369,7 +369,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
           { href: "/app/danisman-kpi", label: "Özet", icon: ICONS.kpi, module: "reports", description: "Arama, randevu, teklif ve anlaşma performansı", keywords: ["kpi", "performans", "danışman", "kıyas", "karşılaştır", "karne"] },
           { href: "/app/lig", label: "Lig", icon: ICONS.lig, module: "reports", description: "Sıralama, rozetler ve motivasyon panosu", keywords: ["lig", "sıralama", "rozet"] },
         ],
-        matchPaths: ["/app/pano-tv", "/app/ekip/kiyas"],
+        matchPaths: ["/app/pano-tv"],
         description: "Danışman KPI özeti, ekip ligi ve danışman kıyası",
         keywords: ["kpi", "lig", "kıyas", "sıralama", "performans"],
       },
@@ -585,16 +585,6 @@ export const PALETTE_ONLY_PAGES: readonly (NavTab & { description: string })[] =
 export type VisibleSection = NavSection & { href: string };
 
 /**
- * Menüden kalkan ama yolu çalışmaya devam eden eski sayfalar (yer imleri):
- * eski yol → birleşik sayfa. Yönlendirme next.config.ts redirects() içindedir (sorgu parametreleri korunur).
- */
-export const NAV_ALIASES: Readonly<Record<string, string>> = {
-  "/app/yatirim": "/app/hesaplayici?sekme=yatirim",
-  "/app/arama": "/app/gelen-kutusu?sekme=cagri",
-  "/app/eslestirme": "/app/talepler?sekme=eslesme",
-};
-
-/**
  * Menüde BİLEREK olmayan /app sayfaları (yönlendirme, kabuktan açılan yüzey, iç akış).
  * Anahtar = yol, değer = gerekçe. `nav-pages-contract.test.ts` her page.tsx'in ya menüde, ya bir
  * menü öğesinin alt yolu, ya da burada olduğunu doğrular; bayat kayıt (sayfası silinmiş ya da
@@ -611,7 +601,6 @@ export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/ice-aktarma": "Toplu yükleme bir EYLEM sayfasıdır: Müşteriler/Portföyler başlığındaki 'İçe aktar' düğmesi ve komut paleti eylemi",
   "/app/modul-kapali": "Kapalı modül bilgilendirme sayfası (modül kapısı yönlendirir)",
   "/app/ofis-merkezi": "eski yer imi yönlendirmesi: sayfa Ekip merkezi/Danışmanlar ve Ayarlar'a dağıldı; palette 'ofis merkezi' Ekip merkezi'ni bulur",
-  "/app/kayip-satis": "eski yer imi yönlendirmesi: Riskli müşteriler Akıllı listeler'in 'Kaybedilme riski yüksek' bölümüne taşındı (/app/akilli-listeler?segment=churn)",
   "/app/paket": "Paket yükseltme sayfası (kilitli sayfadan ve Abonelik'ten ulaşılır)",
 };
 
@@ -660,12 +649,9 @@ export function visibleSections(accessible: readonly AppModule[], opts: NavViewO
   }).filter((section) => section.items.length > 0);
 }
 
-/** Menü öğeleri, sekmeleri ve eski (yönlendirmeli) yollar: hiçbir sayfa kaybolmaz. */
+/** Menü öğeleri, sekmeleri ve ek eşleşme yolları: hiçbir sayfa kaybolmaz. */
 export const ALL_NAV_HREFS: readonly string[] = [
-  ...new Set([
-    ...NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? []), ...(i.matchPaths ?? [])])),
-    ...Object.keys(NAV_ALIASES),
-  ]),
+  ...new Set(NAV_SECTIONS.flatMap((s) => s.items.flatMap((i) => [i.href, ...(i.tabs?.map((t) => t.href) ?? []), ...(i.matchPaths ?? [])]))),
 ];
 
 /** Komut paleti arama metni: etiket + açıklama + eş anlamlılar (eş anlamlılar ekranda görünmez). */

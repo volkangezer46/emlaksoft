@@ -857,8 +857,8 @@ function LostFinish(p: BodyProps & { taskCreated: boolean }) {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <ButtonLink href="/app/kayip-satis" variant="secondary">
-          Kayıp satış analizi
+        <ButtonLink href="/app/akilli-listeler?segment=churn" variant="secondary">
+          Riskli müşteriler
         </ButtonLink>
         <ButtonLink href="/app/anlasmalar">Anlaşmalara dön</ButtonLink>
       </div>

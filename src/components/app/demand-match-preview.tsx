@@ -11,7 +11,7 @@ import { AnimatedNumber } from "@/components/ui/animated-number";
 /**
  * Formda salt-okunur CANLI eşleşme önizlemesi. Değerler debounce ile `previewDemandMatches`
  * action'ına gider (gerçek portföy sorgusu + scoreDemandProperty). Sayı, filtreli
- * `/app/eslestirme?kriter=` sayfasına bağlanır (sıfır çıkmaz metrik). Sahte sayı yok:
+ * Talepler'in Eşleşme sekmesine (`/app/talepler?sekme=eslesme&kriter=`) bağlanır (sıfır çıkmaz metrik). Sahte sayı yok:
  * sonuç gelene dek "hesaplanıyor", kriter yoksa açıklama gösterilir.
  *
  * Özet paneli iki yerde render edilir (sağ panel + dar ekran `<details>`); aynı girdi için

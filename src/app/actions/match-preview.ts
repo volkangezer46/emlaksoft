@@ -24,7 +24,7 @@ export type MatchPreviewResult =
 
 /**
  * Formdaki (henüz kaydedilmemiş) talebin canlı eşleşme önizlemesi — SALT OKUNUR.
- * `/app/eslestirme` ile aynı parse (parseDemandValues), aynı aday sorgusu
+ * Talepler > Eşleşme sekmesi ile aynı parse (parseDemandValues), aynı aday sorgusu
  * (fetchMatchCandidateProperties), aynı skorlayıcı ve aynı eşik (skor >= 35, elenmeyen):
  * sayı bağlantıdaki sayfayla tutar. Hiçbir kayıt yazılmaz.
  */

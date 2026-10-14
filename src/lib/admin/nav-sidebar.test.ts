@@ -27,7 +27,7 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     const visible = groups.flatMap((g) => g.items.map((i) => i.href));
     expect(visible).toEqual(["/admin", "/admin/tenants", "/admin/billing", "/admin/site", "/admin/tickets", "/admin/sistem"]);
     const folded = groups.flatMap((g) => g.folded.map((i) => i.href));
-    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar", "/admin/personel", "/admin/geo"]));
+    expect(folded).toEqual(expect.arrayContaining(["/admin/ayarlar/merkez", "/admin/personel", "/admin/geo"]));
   });
 
   it("çekirdeği olmayan grup (rol süzgeci sonrası) tam gösterilir; boş grup yoktur", () => {
@@ -58,7 +58,7 @@ describe("/admin yan menü görünümü (çekirdek + katlanan)", () => {
     expect(groupOf("/admin/duyuru")).toBe("destek");
     expect(groupOf("/admin/geo")).toBe("sistem");
     expect(groupOf("/admin/personel")).toBe("sistem");
-    expect(groupOf("/admin/ayarlar")).toBe("sistem");
+    expect(groupOf("/admin/ayarlar/merkez")).toBe("sistem");
     const code = readFileSync(join(process.cwd(), "src/components/admin/admin-sidebar.tsx"), "utf8");
     expect(code).not.toContain("diger-acik");
     expect(code).not.toContain('"adm-diger"');

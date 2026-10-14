@@ -1,6 +1,5 @@
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import Link from "@/components/ui/smart-link";
-import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BadgeCheck,
@@ -46,12 +45,11 @@ function deliveryLabel(iso: string) {
 export default async function ProjelerPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; yeni?: string }>;
+  searchParams?: Promise<{ durum?: string }>;
 }) {
   const { perms } = await requireModulePage("projects", "/app/projeler");
   const canCreate = (perms.projects ?? []).includes("create");
   const params = (await searchParams) ?? {};
-  if (params.yeni) redirect("/app/projeler/yeni");
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;
 
   const projects = await listProjects();

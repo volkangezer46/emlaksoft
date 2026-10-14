@@ -37,9 +37,8 @@ export const PLAN_GATES: readonly PlanGate[] = [
   { href: "/app/kampanyalar", title: "Kampanyalar", minPlan: "office", pitch: "İYS izinlerine uygun toplu SMS ve mesaj kampanyaları gönderin." },
   { href: "/app/giderler", title: "Muhasebe", minPlan: "office", pitch: "Ofis giderlerini kaydedin, kâr-zarar tablosunda komisyonla karşılaştırın." },
   { href: "/app/aidat", title: "Aidat", minPlan: "office", pitch: "Portföy aidat ve vergi ödemelerini vade ve durumla takip edin." },
-  // kazanc: eski yol, yalnız /app/cuzdan?sekme=ofis yönlendirmesi (Kazanç tek sayfa, Danışman paketinde de açık).
   // [id]: kendi profili her pakette açık (Performansım ile ortak gövde); başkasının profili sayfa içinde aynı Ofis kapısından geçer.
-  { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim", "/app/ekip/kazanc", "/app/ekip/[id]"] },
+  { href: "/app/ekip", title: "Ekip yönetimi", minPlan: "office", pitch: "Danışman ekleyin, rol ve izinleri yönetin, izin takvimini tutun.", except: ["/app/ekip/kartvizitim", "/app/ekip/[id]"] },
   { href: "/app/yabanci-satis", title: "Yabancıya Satış", minPlan: "office", pitch: "Yabancı alıcı için vatandaşlık eşiği, belge ve süreç kontrol listesi." },
   { href: "/app/denetim", title: "Denetim kaydı", minPlan: "office", pitch: "Kim ne zaman neyi değiştirdi veya indirdi, tam denetim izi." },
   { href: "/app/anketler", title: "Anketler ve anketör", minPlan: "office", pitch: "Yayından kalkan, uzayan ve işlem gören işlemler için anketör aramaları, şablonlar ve neden analizi." },
@@ -47,11 +46,9 @@ export const PLAN_GATES: readonly PlanGate[] = [
   // Profesyonel
   { href: "/app/kayip-kacak", title: "Kayıp-kaçak kalkanı", minPlan: "professional", pitch: "Portal ilanlarınızdan rakibe kapanan satışları otomatik bulur ve kaçan komisyonu tahmin eder." },
   { href: "/app/danisman-kpi", title: "Danışman KPI", minPlan: "professional", pitch: "Her danışmanın arama, randevu, teklif ve anlaşma performansı." },
-  { href: "/app/ekip/kiyas", title: "Danışman karşılaştırma", minPlan: "professional", pitch: "Danışman karnesi: dönüşüm, aktif iş yükü, randevu ve hedef gerçekleşmesi tek tabloda." },
   { href: "/app/lig", title: "Ekip Ligi", minPlan: "professional", pitch: "Danışmanlar arası sıralama, rozetler ve motivasyon panosu." },
   { href: "/app/hedefler", title: "Hedefler", minPlan: "professional", pitch: "Ofis ve danışman bazlı aylık ciro ve anlaşma hedefleri, gerçekleşme takibi." },
   { href: "/app/bolge-analizi", title: "Bölge Analizi", minPlan: "professional", pitch: "Bölge bazlı fiyat trendi, satış süresi ve talep-arz dengesi." },
-  { href: "/app/kayip-satis", title: "Risk altındaki müşteriler", minPlan: "professional", pitch: "Kaybedilme riski taşıyan müşteri ve talepleri erken yakalayın." },
   { href: "/app/pano-tv", title: "Ofis Panosu (TV)", minPlan: "professional", pitch: "Ofis ekranı için canlı skor ve günün özeti panosu." },
   { href: "/app/otomasyonlar", title: "Otomasyonlar", minPlan: "professional", pitch: "Tetikleyici ve şablonlarla takip, hatırlatma ve görev otomasyonu." },
   { href: "/app/ofis-kontrol/kurallar", title: "Ofis Kontrol kuralları", minPlan: "professional", pitch: "Hangi işlemlerin uyarı üreteceğini ve yönetici onayı gerektireceğini ofisinize göre belirleyin." },

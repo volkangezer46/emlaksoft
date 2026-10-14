@@ -201,7 +201,7 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     for (const p of ["/app/ekip/devir", "/app/hedefler", "/app/ekip/subeler"]) {
       expect(resolveActiveNav(p, sections).href, p).toBe("/app/ekip");
     }
-    for (const p of ["/app/ekip/kiyas", "/app/danisman-kpi", "/app/lig"]) {
+    for (const p of ["/app/danisman-kpi", "/app/lig"]) {
       expect(resolveActiveNav(p, sections).href, p).toBe("/app/danisman-kpi");
     }
   });
@@ -222,14 +222,13 @@ describe("Ekip Merkezi menü ve kapılar", () => {
     const kom = fin.items.find((i) => i.href === "/app/komisyon")!;
     expect(kom.tabs?.map((t) => t.label)).toContain("Kazanç");
     const ekip = visibleSections(ALL).flatMap((s) => s.items).find((i) => i.href === "/app/ekip")!;
-    expect(ekip.tabs?.some((t) => t.label === "Kazanç" || t.href === "/app/ekip/kazanc")).toBe(false);
+    expect(ekip.tabs?.some((t) => t.label === "Kazanç")).toBe(false);
   });
 
   it("Kıyas profesyonel pakette, diğer ekip sekmeleri ofis paketinde", () => {
-    expect(findGate("/app/ekip/kiyas")?.minPlan).toBe("professional");
+    expect(findGate("/app/danisman-kpi")?.minPlan).toBe("professional");
     expect(findGate("/app/ekip/devir")?.minPlan).toBe("office");
-    // Kazanç tek sayfa (/app/cuzdan) ve eski yolu kilitsiz: Danışman paketinde de kendi kazancı açık.
-    expect(findGate("/app/ekip/kazanc")).toBeNull();
+    // Kazanç tek sayfa (/app/cuzdan) kilitsiz: Danışman paketinde de kendi kazancı açık.
     expect(findGate("/app/cuzdan")).toBeNull();
     expect(findGate("/app/performansim")).toBeNull();
   });

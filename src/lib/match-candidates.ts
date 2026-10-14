@@ -3,7 +3,7 @@ import { locationVariants, type MatchDemand, type MatchProperty } from "@/lib/ma
 import { parseDemandCriteria } from "@/lib/demand-criteria";
 
 /**
- * Eşleştirme aday portföyleri — `/app/eslestirme` ve form içi canlı önizleme AYNI sorguyu
+ * Eşleştirme aday portföyleri — Talepler > Eşleşme sekmesi ve form içi canlı önizleme AYNI sorguyu
  * kullanır (önizleme sayısı ile sayfa sayısı sapmasın). Portföyler taleplerin il ve işlem
  * türü kümesine göre TEK sorguda daraltılır; skor bellekte hesaplanır.
  *

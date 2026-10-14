@@ -79,7 +79,7 @@ describe("buildAttentionQueue", () => {
     expect(buildAttentionQueue(input, "super_admin").map((r) => r.id)).toEqual(["refund", "manual-review", "cron", "ef-drift"]);
   });
 
-  it("EF sapması yalnız drift/error durumunda görünür ve ef-kontor sayfasına bağlanır", () => {
+  it("EF sapması yalnız drift/error durumunda görünür ve Analiz tarifesi sayfasına bağlanır", () => {
     expect(buildAttentionQueue({ ...EMPTY, efReconciliation: null }, "super_admin")).toEqual([]);
     const q = buildAttentionQueue({ ...EMPTY, efReconciliation: "error" }, "super_admin");
     expect(q[0]?.href).toBe("/admin/analiz-tarifesi");

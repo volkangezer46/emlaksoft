@@ -29,14 +29,12 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
     expect(new Set(items.map((i) => i.href)).size).toBe(items.length);
   });
 
-  it("Demo & aday kaldırıldı; eski /admin/satis self-servis deneme hunisine yönlenir", () => {
+  it("Demo & aday kaldırıldı; eski satış CRM yolu iz bırakmadan silindi (yönlendirme yok)", () => {
     const all = JSON.stringify(ADMIN_NAV);
-    expect(all).not.toContain("/admin/satis");
     expect(all).not.toMatch(/Demo & aday/);
-    expect(read("next.config.ts")).toContain('source: "/admin/satis", destination: "/admin/tenants?durum=trial"');
-    expect(read("next.config.ts")).toContain('source: "/admin/satis/:path*", destination: "/admin/tenants?durum=trial"');
+    expect(read("next.config.ts")).not.toMatch(/source: "\/(app|admin)\//);
     for (const f of ["src/components/admin/admin-topbar.tsx", "src/components/admin/command-palette.tsx", "src/components/admin/admin-sidebar.tsx", "src/lib/admin-badges.ts"]) {
-      expect(read(f), f).not.toMatch(/admin\/satis|demo_requests/);
+      expect(read(f), f).not.toMatch(/demo_requests/);
     }
   });
 
@@ -49,10 +47,10 @@ describe("/admin menüsü (tek kaynak, bilgi mimarisi)", () => {
     expect(activeAdminItem("/admin/seo")?.href).toBe("/admin/site");
     expect(activeAdminItem("/admin/muhasebe/defter")?.href).toBe("/admin/billing");
     expect(activeAdminItem("/admin/aktivite")?.href).toBe("/admin/sistem");
-    expect(activeAdminItem("/admin/ayarlar/bayraklar")?.href).toBe("/admin/ayarlar");
+    expect(activeAdminItem("/admin/ayarlar/bayraklar")?.href).toBe("/admin/ayarlar/merkez");
     expect(isAdminNavActive("/admin/tenants", { href: "/admin" })).toBe(false);
     expect(isAdminNavActive("/admin/sitex", { href: "/admin/site" })).toBe(false);
-    const ayarlar = items.find((i) => i.href === "/admin/ayarlar")!;
+    const ayarlar = items.find((i) => i.href === "/admin/ayarlar/merkez")!;
     expect(activeTabHref("/admin/ayarlar/merkez", ayarlar.tabs!)).toBe("/admin/ayarlar/merkez");
   });
 

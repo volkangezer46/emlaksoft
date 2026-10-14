@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { grantSegments, marginFlow, officeUsageBars, reconTone } from "./viz-model";
 
-describe("ef-kontor viz model", () => {
+describe("analiz tarifesi viz model", () => {
   it("ofis çubukları: sıralı, ortak ölçek, sınırlı, sıfır çizilmez", () => {
     const offices = [
       { tenantId: "a", units: 10 },

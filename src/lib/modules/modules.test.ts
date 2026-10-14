@@ -85,7 +85,7 @@ describe("modül kayıt defteri", () => {
     expect(featureForHref("/app/ayarlar/is-akislari")).toBe("automation");
     expect(featureForHref("/app/ayarlar/moduller")).toBeNull();
     expect(featureForHref("/app/ayarlar")).toBeNull();
-    expect(featureForHref("/app/ekip/kiyas")).toBe("team_perf");
+    expect(featureForHref("/app/danisman-kpi")).toBe("team_perf");
     expect(featureForHref("/app/ekip")).toBeNull();
     expect(featureForHref("/app/kira-artis")).toBe("rentals");
     expect(featureForHref("/app/komisyon")).toBeNull();
@@ -239,7 +239,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
   it("Akıllı Listeler/Tavsiyeler, Kayıp nedenleri, Anahtar/Sunumlar menüden çıkar, sekme olarak kalır", () => {
     const items = NAV_SECTIONS.flatMap((s) => s.items);
     const topHrefs = items.map((i) => i.href);
-    for (const gone of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/kayip-satis", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar"]) {
+    for (const gone of ["/app/akilli-listeler", "/app/tavsiyeler", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar"]) {
       expect(topHrefs).not.toContain(gone);
     }
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
@@ -288,6 +288,5 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
     expect(items(["commissions"])?.tabs?.map((t) => t.href)).toEqual(["/app/anlasmalar"]);
     expect(items(["commissions", "offers"])?.tabs?.map((t) => t.href)).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(items(["customers"])).toBeUndefined();
-    expect(items(["customers"], "Müşteriler")?.tabs?.map((t) => t.href)).not.toContain("/app/kayip-satis");
   });
 });

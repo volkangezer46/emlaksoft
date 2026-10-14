@@ -73,7 +73,7 @@ Bilinçli fark: pasif kayıt yeni seçimde görünmez (GeoSelect aktif listeyi a
 | `tenants.city` — ayarlar `company-form`, kurulum `office-step`, `settings.ts`/`onboarding-setup.ts` | **ÇEVRİLDİ**: GeoSelect; sunucu `resolveOfficeGeo` ile doğrular (geçersiz il reddedilir), `province_id/district_id` + `city` (görünen ad) birlikte yazılır. Eski metin gelirse servisle çözülür, çözülemezse reddedilir |
 | Platform ofis oluşturma (`admin/tenants/yeni`) | Zaten GeoSelect + `resolveGeo` (platform-tenants.ts) |
 | Eski kimliksiz `tenants.city` kayıtları | `/admin/geo/eslestir`: toplu çözümleme raporu; kesin eşleşmeler toplu, yazım toleranslı olanlar satır onayıyla; belirsizler "eşleşmeyen" |
-| `demo_requests.city`, `platform ön satış lead city` (`admin/satis/lead-panel`) | İSTİSNA (ön satış potansiyel müşteri metni); `demo_requests.province_id/district_id` taslakta |
+| `demo_requests.city`, `platform ön satış lead city` (kaldırılan platform satış CRM ekranı) | İSTİSNA (ön satış potansiyel müşteri metni); `demo_requests.province_id/district_id` taslakta |
 | Ödeme alıcısı şehri (`odeme-link/[token]/pay-buttons`, `billing.ts`, `lib/billing/buyer.ts`) | İSTİSNA: sağlayıcıya serbest adres gider; ödeme akışı bu görev dışı |
 | `register-form` (kayıt), `/demo`, şube kayıtları (`branches.province_id` zaten FK + GeoSelect), danışman kimlik/adres | Kayıt formunda il/ilçe alanı yok; şubeler FK'li; danışman adresi yok |
 | İçe aktarma (müşteri/portföy CSV) | Bu dalda geo alanı okuyan içe aktarma yok; yeni içe aktarmalar `resolveGeo` + "eşleşmeyen" raporu kullanmalı |
