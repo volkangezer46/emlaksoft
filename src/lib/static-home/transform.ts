@@ -219,5 +219,6 @@ export function buildStaticHome(input: BuildStaticHomeInput): string | null {
     css.push(absolutizeCssUrls(text, href));
   }
   const purged = purgeCss(css.join("\n"), html, input.purge);
-  return html.replace("</head>", `<style>${purged}</style></head>`).replace("</body>", `${input.bodyEnd}</body>`);
+  // İşlevli değiştirme: küçültülmüş JS/CSS'teki `$&`, `$'`, "$`" dizgeleri değiştirme kalıbı olarak yorumlanmasın.
+  return html.replace("</head>", () => `<style>${purged}</style></head>`).replace("</body>", () => `${input.bodyEnd}</body>`);
 }

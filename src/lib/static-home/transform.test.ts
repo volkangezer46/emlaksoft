@@ -114,6 +114,11 @@ describe("statik ana sayfa — HTML dönüşümü", () => {
     const out = buildStaticHome({ html, readStylesheet: () => ".a{color:red}.b{color:blue}", purge: {}, bodyEnd: "<script>1</script>" });
     expect(out).toBe('<html><head><style>.a{color:red}</style></head><body><p class="a">x</p><script>1</script></body></html>');
     expect(buildStaticHome({ html, readStylesheet: () => null, purge: {}, bodyEnd: "" })).toBeNull();
+    // Küçültülmüş çalışma zamanı `$&` / `$'` / "$`" içerebilir: değiştirme kalıbı olarak yorumlanmamalı (betik bozulurdu).
+    const tricky = "<script>$&&$.x;a=$'+$`;</script>";
+    expect(buildStaticHome({ html, readStylesheet: () => ".a{content:'$&'}", purge: {}, bodyEnd: tricky })).toBe(
+      `<html><head><style>.a{content:'$&'}</style></head><body><p class="a">x</p>${tricky}</body></html>`,
+    );
     expect(buildStaticHome({ html: "<html><body>stil yok</body></html>", readStylesheet: () => "", purge: {}, bodyEnd: "" })).toBeNull();
   });
 });
