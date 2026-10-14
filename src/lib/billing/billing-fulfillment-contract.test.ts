@@ -82,7 +82,9 @@ describe("atomic billing fulfillment contract", () => {
 
   it("charges gross VAT totals, verifies provider responses and uses the real request IP", () => {
     // Kredi yokken iyzico fatura TOPLAMINI (KDV dahil) tahsil eder; TL kredi rezervi varsa yalnız kalan nakit tutarı.
-    expect(billingAction).toContain("const chargeTry = credit ? credit.cashTry : invoiceAmounts.totalTry");
+    // Toplam faturanın kesildiği andaki KDV oranından gelir (createCheckoutInvoice sonucu).
+    expect(billingAction).toContain("const chargeTry = credit ? credit.cashTry : invoiceTotalTry");
+    expect(billingAction).toContain("invoiceTotalTry = created.totalTry");
     expect(billingAction).toContain("price: chargeTry");
     expect(billingAction).toContain("paidPrice: chargeTry");
     expect(billingAction).toContain("ip: await clientIp()");

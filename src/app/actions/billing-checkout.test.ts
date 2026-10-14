@@ -113,6 +113,7 @@ vi.mock("@/lib/ef-credits/public-state", () => ({
   getEfPublicState: async () => ({ purchasable: h.efPurchasable }),
 }));
 vi.mock("@/lib/try-credits/settings", () => ({ getTryMaxShare: async () => 0.5 }));
+vi.mock("@/lib/billing/vat-rate", () => ({ getBillingVatRate: async () => 0.2 }));
 
 import { ActionUserError } from "@/lib/action-errors";
 import { startCreditPackPurchase, startPlanCheckout } from "./billing";

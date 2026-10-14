@@ -18,6 +18,7 @@ import { EF_WELCOME_VALID_DAYS, efEntryValuationUnits, efPackDisplayName, efUnit
 import { DAY_MS, now, trNextMonthStartMs } from "@/lib/clock";
 import { monthlyAllowanceView } from "@/lib/ef-credits/visibility";
 import { EF_PURCHASE_CLOSED_MESSAGE, getEfPublicState } from "@/lib/ef-credits/public-state";
+import { getBillingVatRate } from "@/lib/billing/vat-rate";
 import {
   activePacks,
   lowBalanceState,
@@ -82,7 +83,13 @@ export type KontorSectionProps = {
 
 export async function KontorSection(props: KontorSectionProps & { tenantId: string }) {
   const { tenantId, canBuy, iyzicoConfigured, latestInvoice, invoiceIsRecent, allowance } = props;
-  const [ready, lotsReady, catalog, efState] = await Promise.all([getEfCreditReady(), getEfLotsReady(), getEfCatalog(), getEfPublicState()]);
+  const [ready, lotsReady, catalog, efState, vatRate] = await Promise.all([
+    getEfCreditReady(),
+    getEfLotsReady(),
+    getEfCatalog(),
+    getEfPublicState(),
+    getBillingVatRate(),
+  ]);
   const [balance, history] = ready
     ? await Promise.all([readEfBalance(tenantId), readEfHistory(tenantId)])
     : [null, null];
@@ -92,7 +99,7 @@ export async function KontorSection(props: KontorSectionProps & { tenantId: stri
   const suggested = suggestPack(packs, tariff);
   const low = balance ? lowBalanceState(balance.available, tariff) : null;
   const cards: KontorPackCard[] = sellable.map((p) => {
-    const q = quoteCreditPack(p);
+    const q = quoteCreditPack(p, vatRate);
     return {
       id: p.id,
       name: efPackDisplayName(p),

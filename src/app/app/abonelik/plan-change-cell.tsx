@@ -42,12 +42,15 @@ export function PlanChangeCell({
   canChange,
   scheduled,
   wallet,
+  vatRate = BILLING_VAT_RATE,
 }: {
   quote: PlanChangeQuoteView;
   canChange: boolean;
   /** Bu paket zaten dönem sonu için planlı: geri alma gösterilir. */
   scheduled: boolean;
   wallet?: WalletCheckoutInfo | null;
+  /** Bugün geçerli KDV oranı (sunucu, ayar defteri); ön izleme toplamı bununla hesaplanır. */
+  vatRate?: number;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -166,7 +169,7 @@ export function PlanChangeCell({
                 wallet={wallet}
                 checked={useCredit}
                 onChange={setUseCredit}
-                totalTry={Math.round(quote.chargeNetTry * (1 + BILLING_VAT_RATE) * 100) / 100}
+                totalTry={Math.round(quote.chargeNetTry * (1 + vatRate) * 100) / 100}
                 disabled={pending}
                 idPrefix={`upg-${quote.planId}`}
               />

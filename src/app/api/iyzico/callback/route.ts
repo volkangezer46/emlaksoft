@@ -7,6 +7,7 @@ import {
   verifyCheckoutPayment,
 } from "@/lib/billing/iyzico";
 import { fulfillSuccessfulPayment, invoiceAmountsTry } from "@/lib/billing/fulfillment";
+import { invoiceVatRateOf } from "@/lib/billing/invoice-amounts";
 import { fulfillPaymentLinkByConversation } from "@/lib/billing/payment-link-fulfill";
 import type { BillingCycle, CatalogPlanId } from "@/lib/billing/plans";
 import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
@@ -83,7 +84,8 @@ async function handle(token: string | null) {
       saveCard?: boolean;
       saveCardConsentBy?: string;
     };
-    const amounts = invoiceAmountsTry(Number(invoice.amount_try));
+    // Faturanın KESİLDİĞİ andaki KDV oranı (meta.vatRate; yoksa %20): ayar sonradan değişse de doğrulama bozulmaz.
+  const amounts = invoiceAmountsTry(Number(invoice.amount_try), invoiceVatRateOf(invoice.meta));
     if (
       String(invoice.currency ?? "").toUpperCase() !== IYZICO_CURRENCY ||
       !Number.isFinite(Number(invoice.tax_try)) ||

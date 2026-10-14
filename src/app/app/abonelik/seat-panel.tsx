@@ -40,6 +40,8 @@ export type SeatPanelProps = {
   warnPercent: number;
   /** TL hesap kredisi cüzdanı (yoksa/etkin değilse null: onay kutusu gösterilmez). */
   wallet?: WalletCheckoutInfo | null;
+  /** Bugün geçerli KDV oranı (sunucu, ayar defteri); yoksa kod varsayılanı. */
+  vatRate?: number;
 };
 
 export function SeatPanel(props: SeatPanelProps) {
@@ -335,7 +337,7 @@ export function SeatPanel(props: SeatPanelProps) {
                 wallet={props.wallet}
                 checked={useCredit}
                 onChange={setUseCredit}
-                totalTry={Math.round(ev.immediateChargeTry * (1 + BILLING_VAT_RATE) * 100) / 100}
+                totalTry={Math.round(ev.immediateChargeTry * (1 + (props.vatRate ?? BILLING_VAT_RATE)) * 100) / 100}
                 disabled={pending}
                 idPrefix="seat"
               />

@@ -119,14 +119,19 @@ const CAPTURE_ERRORS: Record<string, string> = {
   max_attempts_exceeded: "Yeniden deneme sınırı aşıldı; elle inceleme gerekli",
 };
 
-/** Saklanan hata metnini okunur Türkçeye çevirir: "10051: ..." → banka açıklaması (kodla). */
+/**
+ * Saklanan hata metnini okunur Türkçeye çevirir: "10051: <banka mesajı>" → açıklama (kodla) + bankanın gerçek mesajı
+ * (otomatik yenileme reddi `checkout_error`'a "<errorCode>: <errorMessage>" yazar). Mesaj açıklamayla aynıysa tekrarlanmaz.
+ */
 export function providerErrorText(raw: string | null | undefined): string | null {
   const v = String(raw ?? "").trim();
   if (!v) return null;
   const code = /^([A-Za-z0-9_]+)/.exec(v)?.[1] ?? "";
-  if (PROVIDER_ERRORS[code]) return `${PROVIDER_ERRORS[code]} (kod ${code})`;
-  if (CAPTURE_ERRORS[code]) return `${CAPTURE_ERRORS[code]} (kod ${code})`;
-  return v.slice(0, 300);
+  const known = PROVIDER_ERRORS[code] ?? CAPTURE_ERRORS[code];
+  if (!known) return v.slice(0, 300);
+  const message = v.slice(code.length).replace(/^\s*:\s*/, "").trim().slice(0, 240);
+  const head = `${known} (kod ${code})`;
+  return message && message.toLocaleLowerCase("tr-TR") !== known.toLocaleLowerCase("tr-TR") ? `${head}. Banka yanıtı: ${message}` : head;
 }
 
 const SOURCE_LABEL: Record<string, string> = {

@@ -16,7 +16,8 @@ export async function getVatSchedule(): Promise<VatRateEntry[]> {
 
 /**
  * Faturalama KDV oranı OKUYUCUSU (sunucu): verilen andaki (varsayılan: şimdi, TR günü) geçerli oran. `BILLING_VAT_RATE`
- * sabiti yalnız istemci ön izlemesidir; kesilen elle fatura oranını buradan alır ve satırına yazar.
+ * sabiti yalnız kod varsayılanıdır; kesilen elle VE otomatik fatura (abonelik, ek kullanıcı, analiz paketi, yönetici fark
+ * faturası) oranı buradan alır ve faturaya yazar (`resolveAutoInvoiceVatRate`, fulfillment.ts).
  */
 export async function getBillingVatRate(atMs: number = now()): Promise<number> {
   return vatRateAt(await getVatSchedule(), trDayKey(atMs), DEFAULT_BILLING_VAT_RATE);

@@ -17,7 +17,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, msSince, msUntil, now } from "@/lib/clock";
-import { BILLING_VAT_RATE, planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
+import { planAmountOf, yearlyOfferLabel, type BillingCycle } from "@/lib/billing/plans";
+import { getBillingVatRate } from "@/lib/billing/vat-rate";
 import { getPlanDefinition, getPublicPlanDefinitions, getSeatSettings } from "@/lib/billing/plan-definitions";
 import { getSeatSupport, loadSeatState, type SeatUsageSummary } from "@/lib/billing/seat-purchase";
 import { seatUtilization } from "@/lib/billing/seat-pricing";
@@ -189,7 +190,13 @@ export default async function BillingPage({
   const isSeatOwner = auth.role === "owner" || auth.role === "gm";
 
   // Oransal paket değişikliği + duraklatma (varsayılan KAPALI bayraklar; şema yoksa durum null ve bölümler hiç görünmez).
-  const [planChangeOn, pauseOn, pauseMaxDays] = await Promise.all([isPlanChangeEnabled(), isPauseEnabled(), getPauseMaxDays()]);
+  // KDV ön izlemesi: bugün geçerli oran (ayar defteri, geçerlilik tarihli); kesilen fatura aynı orandan hesaplanır.
+  const [planChangeOn, pauseOn, pauseMaxDays, vatRate] = await Promise.all([
+    isPlanChangeEnabled(),
+    isPauseEnabled(),
+    getPauseMaxDays(),
+    getBillingVatRate(),
+  ]);
   const changeState = tenantId && planSupport.pauseReady ? await loadPlanChangeState(supabase, tenantId) : null;
   const subPaused = changeState?.pause.paused === true;
   const fmtLongDate = (ms: number | null) =>
@@ -531,6 +538,7 @@ export default async function BillingPage({
           subscriptionActive={seatState.status === "active"}
           warnPercent={seatSettings.warnPercent}
           wallet={walletCheckout}
+          vatRate={vatRate}
         />
       ) : (
         <section id="koltuk" className="scroll-mt-24 rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface p-5">
@@ -633,6 +641,7 @@ export default async function BillingPage({
                     canChange={isSeatOwner}
                     scheduled={changeState?.pendingPlan === plan.id}
                     wallet={walletCheckout}
+                    vatRate={vatRate}
                   />
                 ) : sellable && subPaused ? (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
@@ -650,7 +659,7 @@ export default async function BillingPage({
                       cardsSupported && configured && isSeatOwner && defaultSavedCard ? maskedCardLabel(defaultSavedCard) : null
                     }
                     wallet={current || sellable ? walletCheckout : null}
-                    totalTry={Math.round(amount * (1 + BILLING_VAT_RATE) * 100) / 100}
+                    totalTry={Math.round(amount * (1 + vatRate) * 100) / 100}
                   />
                 ) : (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">

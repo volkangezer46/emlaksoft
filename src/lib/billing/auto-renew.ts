@@ -8,10 +8,10 @@ import {
   verifyStoredCardPayment,
 } from "@/lib/billing/iyzico";
 import {
+  checkoutErrorText,
   createCheckoutInvoice,
   DuplicateAutoRenewAttemptError,
   fulfillSuccessfulPayment,
-  invoiceAmountsTry,
   markCheckoutInvoiceFailed,
   markCheckoutInvoiceInitialized,
 } from "@/lib/billing/fulfillment";
@@ -183,12 +183,15 @@ async function renewOne(
   const plan = sub.plan as CatalogPlanId;
   const cycle = (sub.billing_cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const conversationId = `es-${tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
-  const amounts = invoiceAmountsTry(Number(sub.amount_try));
+  // Net tutar abonelikten; KDV oranı ve toplam faturanın kesildiği andaki ayardan (createCheckoutInvoice). Kart, faturaya
+  // yazılan toplamla çekilir (oran değişse de fatura ile tahsilat aynı kalır).
+  const netTry = Math.round(Number(sub.amount_try) * 100) / 100;
   // Çift tahsilat koruması: `<abonelik>:<dönem sonu>:<deneme no>` anahtarı DB'de benzersizdir (kısmi indeks). Eş zamanlı
   // ikinci koşu aynı anahtarla fatura açamaz → sessizce atlanır; kart ÇEKİLMEZ.
   const periodKey = typeof sub.current_period_end === "string" ? sub.current_period_end.slice(0, 10) : "none";
   const autoRenewAttemptKey = autoRenewAttemptKeyOf(String(sub.id), periodKey, (prior?.length ?? 0) + 1);
   let invoiceId: string;
+  let totalTry: number;
   try {
     const created = await createCheckoutInvoice({
       tenantId,
@@ -196,11 +199,12 @@ async function renewOne(
       plan,
       cycle,
       conversationId,
-      amountTry: amounts.amountTry,
+      amountTry: netTry,
       source: "auto_renew",
       autoRenewAttemptKey,
     });
     invoiceId = created.invoiceId;
+    totalTry = created.totalTry;
   } catch (e) {
     if (e instanceof DuplicateAutoRenewAttemptError) return "skipped";
     throw e;
@@ -225,7 +229,7 @@ async function renewOne(
   try {
     result = await chargeStoredCard({
       conversationId,
-      price: amounts.totalTry,
+      price: totalTry,
       basketId: conversationId,
       cardUserKey: p.provider_card_user_key,
       cardToken: card.provider_card_token as string,
@@ -238,7 +242,8 @@ async function renewOne(
     return "failed";
   }
   if (isDefinitiveStoredCardDecline(result)) {
-    await markCheckoutInvoiceFailed({ invoiceId, tenantId });
+    // Bankanın/sağlayıcının gerçek ret metni faturaya yazılır: ödeme profili "Son tahsil denemeleri"nde görünür.
+    await markCheckoutInvoiceFailed({ invoiceId, tenantId, checkoutError: checkoutErrorText(result.errorCode, result.errorMessage) });
     console.error("autoRenew charge declined", { code: result.errorCode });
     return "failed";
   }
@@ -247,7 +252,7 @@ async function renewOne(
     verified = verifyStoredCardPayment(result, {
       conversationId,
       basketId: conversationId,
-      amountTry: amounts.totalTry,
+      amountTry: totalTry,
     });
   } catch (e) {
     console.error("autoRenew verify (belirsiz: fatura initialized kalır)", e instanceof Error ? e.message : "error");
