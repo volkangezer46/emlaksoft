@@ -1,7 +1,10 @@
 # EmlakSoft — Güncel Durum
 
-**Tarih:** 2026-10-05 · **Dal:** main (`origin/main` = canlı, `c5a6d32f`). Yol haritası: `docs/ROADMAP.md`.
-Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; eskirler, gerektiğinde komutla yeniden sayın.
+**Tarih:** 2026-10-14 · **Dal:** main (`92354e17` tabanı). **Canlı:** https://emlaksoft.com.tr — Hetzner `emlaksoft-prod`
+(bu sunucu; self-hosted Supabase aynı makinede, Coolify Traefik). Eski Vercel + bulut Supabase dondurulmuştur, iş oraya gitmez.
+**Yayın akışı:** `bash scripts/sunucu/release.sh` → `scripts/gate/fast.sh` (tsc + lint + tam vitest, check:links/cron/migrations,
+audit:actions) → `npm run db:migrate` → `.env.production` sürüm işareti → `scripts/sunucu/deploy.sh` (Docker build + sağlık) → `git push`.
+Yol haritası: `docs/ROADMAP.md`. Sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; eskirler, komutla yeniden sayın.
 
 ## Sürümler (package.json)
 
@@ -20,17 +23,33 @@ Bu sayılar bu tarihte dosya sisteminden/`package.json`'dan sayılmıştır; esk
 
 | Konu | Sayı | Nasıl sayıldı |
 |---|---|---|
-| Migration dosyası | 243 | `supabase/migrations/*.sql` (main'de 242; 001000 yeni eklendi, diğer ajanların 000900/001100 dosyaları kendi dallarında); son uygulanan: `20260826000800_default_program_settings.sql`; yeni uygulanmamış: 000900, 001000, 001100 (`docs/runbooks/YAYIN_PENCERESI_2.md` §8) |
-| Canlıda uygulanmış migration | `20260826000800`a kadar HEPSİ (2026-10-05) | `check:migrations -- --database` salt-okunur; bekleyen yok, yukarıdaki 3 yeni dosya hariç |
-| `route.ts` dosyası | 70 | `src/app/**/route.ts` |
-| Cron route / `vercel.json` zamanlaması | 40 / 40 | `src/app/api/cron/*`, `vercel.json` (31. cron: `ef-kontor-hak`, günlük 01:10 UTC = 04:10 TR, aylık EmlakFiyati kontör hakkı + hoş geldin kontörü; cüzdan hazır değilse atlar; 32. cron: `growth-claims`, günlük 03:40 UTC = 06:40 TR, referans/ortak ödül işleyicisi, cüzdan hazır değilse ödül yüklemez; 33. cron: `ef-kontor-sweep`, 10 dakikada bir, 15 dakikadan eski açık EF kontör rezervlerini `ef_credit_sweep` ile serbest bırakır); 34. cron: `ef-kontor-saglik`, günlük 01:50 UTC = 04:50 TR, EmlakFiyati ortak probe'u ile `emlakfiyati_ortak_probe_ok_at` damgasını yeniler/siler); 35. cron: `ef-kontor-mutabakat`, günlük 02:10 UTC = 05:10 TR, EmlakFiyati kullanım ile kontör defterini mutabık eder, sonuç `ef_reconciliation_runs`; 36. cron: `insight-engine`, 30 dakikada bir (:12/:42), ofis başına kural tabanlı içgörü üretir (`insights`), migration yoksa "etkin değil" kaydı düşer; 37. cron: `yayin-zamanlayici`, 5 dakikada bir, yayın masasında zamanlanan site menüsü/içeriği taslaklarını yayınlar ve bitişte önceki sürüme döndürür (`publishing.scheduled`); 38. cron: `olcum-bakim`, günlük 02:40 UTC = 05:40 TR, ölçüm tamponunu boşaltır ve eski sayaçları budar (`analytics_prune`: sayfa 400 gün, hız 90 gün); 39. cron: `hiz-robotu`, günlük 02:55 UTC = 05:55 TR, statik sunumu açık sayfalar ile `/` ve `/fiyatlar` için PageSpeed mobil+masaüstü ölçümü (`perf_lab_runs`), anahtar yoksa "atlandı"; 40. cron: `google-senkron`, günlük 03:10 UTC = 06:10 TR, Search Console/URL denetimi/Google Ads (yalnız okuma) senkronu, bağlantı yoksa dış çağrı yapmadan atlar; sayı `npm run check:cron` ile doğrulanır |
-| `page.tsx` | 229 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
-| Test dosyası | 368 | `src/**/*.test.ts(x)` (Playwright `e2e/*.spec.ts` hariç) |
+| Migration dosyası | 418 | `supabase/migrations/*.sql`; `npm run check:migrations` → "418 dosya · son `20261014009000_cl_app_canonical_links.sql` · sha256 `b2f6f1bf72c060f4`"; geri alma dosyaları `supabase/rollbacks/` (237) |
+| Canlıda uygulanmış migration | 418 / 418 (2026-10-14) | `public.schema_migrations` salt-okunur sayım; son kayıt `20261014009000_cl_app_canonical_links.sql`; bekleyen yok |
+| `route.ts` dosyası | 110 | `src/app/**/route.ts` |
+| Ürün modülü (ofis aç/kapat) | 29 (7 paket) | `src/lib/modules/registry.ts` `MODULES` / `BUNDLES` |
+| Cron route / `vercel.json` zamanlaması | 40 / 40 | `src/app/api/cron/*`, `vercel.json` (31. cron: `ef-kontor-hak`, günlük 01:10 UTC = 04:10 TR, aylık EmlakFiyati kontör hakkı + hoş geldin kontörü; cüzdan hazır değilse atlar; 32. cron: `growth-claims`, günlük 03:40 UTC = 06:40 TR, referans/ortak ödül işleyicisi, cüzdan hazır değilse ödül yüklemez; 33. cron: `ef-kontor-sweep`, 10 dakikada bir, 15 dakikadan eski açık EF kontör rezervlerini `ef_credit_sweep` ile serbest bırakır); 34. cron: `ef-kontor-saglik`, günlük 01:50 UTC = 04:50 TR, EmlakFiyati ortak probe'u ile `emlakfiyati_ortak_probe_ok_at` damgasını yeniler/siler); 35. cron: `ef-kontor-mutabakat`, günlük 02:10 UTC = 05:10 TR, EmlakFiyati kullanım ile kontör defterini mutabık eder, sonuç `ef_reconciliation_runs`; 36. cron: `insight-engine`, 30 dakikada bir (:12/:42), ofis başına kural tabanlı içgörü üretir (`insights`), migration yoksa "etkin değil" kaydı düşer; 37. cron: `yayin-zamanlayici`, 5 dakikada bir, yayın masasında zamanlanan site menüsü/içeriği taslaklarını yayınlar ve bitişte önceki sürüme döndürür (`publishing.scheduled`); 38. cron: `olcum-bakim`, günlük 02:40 UTC = 05:40 TR, ölçüm tamponunu boşaltır ve eski sayaçları budar (`analytics_prune`: sayfa 400 gün, hız 90 gün); 39. cron: `hiz-robotu`, günlük 02:55 UTC = 05:55 TR, statik sunumu açık sayfalar ile `/` ve `/fiyatlar` için PageSpeed mobil+masaüstü ölçümü (`perf_lab_runs`), anahtar yoksa "atlandı"; 40. cron: `google-senkron`, günlük 03:10 UTC = 06:10 TR, Search Console/URL denetimi/Google Ads (yalnız okuma) senkronu, bağlantı yoksa dış çağrı yapmadan atlar; sayı `npm run check:cron` ile doğrulanır ("Cron kontratı sağlıklı: 40 rota"); sunucuda `/etc/cron.d/emlaksoft` 40 satır (`scripts/sunucu/install-cron.sh`) |
+| `page.tsx` | 280 (hepsi `src/app` altında) | `src/app/**/page.tsx` |
+| Test dosyası | 906 | `src/**/*.test.ts(x)` (Playwright `e2e/*.spec.ts` hariç) |
 | Test (case) sayısı | **doğrulanmadı** | `npm run test` çıktısından alınmalı |
 
 Not: eski belgelerdeki "113 rota, 170 birim + 28 E2E test, 15 cron" gibi sayılar tarihseldir.
 
 ## Kapılar (son koşum durumu)
+
+Her yayında `scripts/gate/fast.sh` koşar (sonuç `/tmp/emlaksoft-gate/fast.log`, son satır `GATE_OK`); başarısızsa `release.sh` durur.
+GP4 paketinde (2026-10-14, worktree): `tsc --noEmit` temiz, dokunulan dosyalarda `eslint` temiz, ilgili vitest dosyaları yeşil,
+`check:cron` 40 rota, `check:migrations` 418 dosya. Tam takım birleştirmeden sonra koşulur.
+
+## 2026-10-13/14 turu (özet; ayrıntı `docs/HAFIZA.md` başı)
+
+- **Altyapı:** üretim Hetzner'e taşındı (Docker + Coolify, self-hosted Supabase); cron'lar `/etc/cron.d/emlaksoft` üzerinden; yedek/geri yükleme betikleri `scripts/sunucu/{backup-db,restore-drill,restore-list}.*`; hata/uyarı izleme `error-watch.sh`, `alert-send.py`.
+- **Admin 2. dalga (AD1–AD12, DG1–DG8):** abonelik konsolu (askıya alma/iptal doğrulayıcı kodla), e-posta şablon merkezi (`/admin/ayarlar/eposta`), personel özel rolleri + dört göz (`/admin/personel/roller`, `/admin/personel/guvenlik`), KVKK talep akışı (`/admin/tickets/kvkk`), bayrak hedefleme (`/admin/ayarlar/bayraklar`), NPS (`/admin/duyuru?sekme=nps`), öneri panosu (`/admin/tickets/oneriler`), sistem sekmeleri (sağlık, entegrasyonlar, hata kayıtları, uyarılar, durum sayfası, kaynaklar, veritabanı), site/SEO/reklam/hız merkezi (`/admin/site/*`), faturalama alt ekranları (planlar, kuponlar, tahsilat, muhasebe, fatura defteri, kanal ROI). Menü ve sekmeler tek kaynak `src/lib/admin/nav.ts`.
+- **Finans mini muhasebe (FN1–FN6):** Hareketler defteri v2 (`finance_ledger_v`), KDV/stopaj (Vergi sekmesi), cari, dönem kilidi, düzenli kurallar. GP4: Hareketler'e `kdv=yok` ve `kaynak=elle` süzgeçleri; Vergi ve Kâr/zarar sayıları süzgeçli listeye iner.
+- **EİDS / portal üyeliği (EP1–EP5)** ve **sahibinden ilanlar (FSBO)**.
+- **Temizlik (CL-APP, CL-ADMIN):** mükerrer sayfalar ve eski yol takma adları kalıntısız silindi (sahip kuralı: yönlendirme yok); kayıtlı bağlantılar `20261014009000_cl_app_canonical_links` ile kanonik yola çekildi.
+- **Derin bağlantılar (GP4):** `/app/gorevler?gorev=<id>`, `/app/randevular?randevu=<id>`; bildirimler kaydın kendisini açar.
+
+## Geçmiş turlar (tarihsel; sayılar o günün)
 
 Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz; dokunulan dosyalarda `eslint` temiz; `vitest run` 273 dosya / 2824 test yeşil; `check:links` ve `audit:actions` temiz; `next build` (preview ortam değişkenleriyle) başarılı. Bu sonuçlar o dal içindir; main'e birleşimden sonra ve deploy öncesi `docs/DEPLOY.md` §1 kapıları yeniden koşulmalıdır. `check:migrations -- --database` ve canlı doğrulama bu turda koşulmadı.
 
@@ -48,7 +67,7 @@ Dalga 1 tutarlılık paketi dalında (2026-10-04) koşulan: `tsc --noEmit` temiz
 
 - Secret döndürme ve Git geçmişi temizliği açık (sahip sorumluluğu).
 - Yedek/PITR doğrulaması ve restore provası açık.
-- Canlı ledger ile depo: 2026-10-05 itibarıyla `20260826000800`a kadar eşit; yeni dosyalar uygulanana dek `check:migrations -- --database` bunları "bekleyen" gösterir (beklenen).
+- Canlı ledger ile depo: 2026-10-14 itibarıyla 418 / 418 eşit (son `20261014009000`); yeni dosya `release.sh` içindeki `db:migrate` ile uygulanana dek `check:migrations -- --database` onu "bekleyen" gösterir (beklenen).
 - `tenant_reporting_aggregates` RPC'si (`/app/raporlar`) ve `tenant_commission_aggregates` (ana ekran komisyon özeti) `is_sample` süzmez: eşik dışlaması bu iki toplulaştırmaya SQL değişikliği olmadan uygulanamaz. Örnek veri yüklüyse etiketlenir ("Örnek veri dahil"); süzgeç için yeni migration gerekir (sahip kararı).
 
 ## 2026-10-02/03 turu (yol haritası v2)

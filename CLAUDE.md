@@ -6,9 +6,13 @@ Türk emlak ofisleri için multi-tenant SaaS (Next.js 16 App Router + self-hoste
 Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kalkanı, değerleme
 (emsal motoru), otomasyonlar, sözleşmeyle doğrulanan cron envanteri (bkz. `vercel.json`), AI asistan,
 vitrin ve token'lı public portallar.
-Tamamı Türkçe. Canlı: https://emlaksoft.com.tr (Hetzner `emlaksoft-prod`, bu sunucu). Yayın: `scripts/sunucu/deploy.sh`
-(Docker imajı + Coolify Traefik/Let's Encrypt; tek env kaynağı `.env.production`). Sunucu düzeni ve eksikler `docs/SUNUCU_DEVIR.md`;
-deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`. Vercel + bulut Supabase YEDEK olarak duruyor (yeni iş oraya gitmez).
+Tamamı Türkçe. Canlı TEK ortam: https://emlaksoft.com.tr (Hetzner `emlaksoft-prod`, bu sunucu; self-hosted Supabase aynı makinede).
+Yayın tek komut: `bash scripts/sunucu/release.sh` = hızlı kapı `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından
+check:links/cron/migrations, audit:actions) → `npm run db:migrate` → `.env.production` `RELEASE_MIGRATION(_CHECKSUM)` işareti →
+`scripts/sunucu/deploy.sh` (Docker imajı + Coolify Traefik/Let's Encrypt, sağlık kontrolü) → `git push`. Adımlardan biri düşerse durur;
+yerel `npm run build` kapıda YOK (derleme Docker içinde; tam zincir `scripts/gate/full.sh`). Tek env kaynağı `.env.production`.
+Sunucu düzeni ve eksikler `docs/SUNUCU_DEVIR.md`; deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`.
+Eski Vercel + bulut Supabase kurulumu dondurulmuştur: yeni iş, env ya da belge oraya yönlendirilmez.
 
 ## Komutlar
 
@@ -22,6 +26,10 @@ npm run test:e2e:public # playwright (salt-okunur public smoke)
 npm run db:rls-audit   # RLS denetimi
 npm run check:migrations -- --database # salt-okunur ledger/checksum kontrolü
 npm run db:migrate -- --dry-run         # salt-okunur migration önizleme
+npm run check:cron     # cron envanteri (route + vercel.json + heartbeat) tutarlı mı
+npm run check:bundle -- --gate          # panel ilk yük JS bütçesi (derlemeden sonra)
+bash scripts/gate/fast.sh               # yayın öncesi hızlı kapı (sonuç /tmp/emlaksoft-gate/fast.log, son satır GATE_OK)
+bash scripts/sunucu/release.sh          # kapı → migration → sürüm işareti → deploy → push (yalnız yayın yetkisiyle)
 ```
 
 Migration POLİTİKASI: uygulanmış dosyalar forward-only ve değiştirilemezdir. Yeni dosya
@@ -49,7 +57,12 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **Dışa aktarma = Rapor merkezi:** sayfalara indirme/CSV/Excel düğmesi KOYMA. Dosya çıktısı yalnız `src/lib/report-center/` (rapor tanımı `catalog/*`, `/app/raporlar?sekme=merkez` ve `/admin/raporlar?sekme=merkez`);
   /app ve /admin sayfaları rapor bağlantısı ya da indirme ucu TAŞIMAZ ("Raporlarda aç" dahil; `report-buttons-contract.test.ts` kilitler) — kullanıcı raporu Raporlar sayfasından açar. Her rapor kiracı sınırı + aktör kapsamı taşır (sözleşme testi gerçek sorguyu çalıştırır); XLSX/PDF üreticileri yalnız sunucuda.
 - **Sıfır çıkmaz metrik:** görünen her sayı/kart/satır tıklanabilir olmalı ve filtrelenmiş
-  hedefe götürmeli (StatCard `href`). Sahte skor/boş vaat yasak.
+  hedefe götürmeli (StatCard `href`). Sahte skor/boş vaat yasak. Hedef liste o kümeyi veren süzgeci taşımalı
+  (ör. Hareketler `kdv=yok`, `kaynak=elle`); tek kayda giden bağlantı kaydın kendisini açar
+  (`/app/gorevler?gorev=<id>`, `/app/randevular?randevu=<id>`; bildirimler `notificationHref` ile).
+- **Yönlendirme / takma ad YOK (sahip kuralı):** birleşen ya da yerine yenisi gelen sayfa eski yolunu yönlendirme,
+  alias veya yalnız `redirect()` yapan `page.tsx` olarak bırakmaz; eski sayfa ve ona giden her bağlantı (menü, palet,
+  test, belge) kalıntısız silinir. Tek istisna herkese açık `/demo → /kayit`.
 - **Filtre kontratı:** liste sayfaları searchParams'ı iki yönlü işler — URL'deki filtre
   sunucu sorgusuna yansır, UI kontrolleri URL'i günceller (sunucu filtre + gerçek sayfalama).
 - **Zaman:** bileşenlerde `Date.now()` / `new Date()` doğrudan YASAK — `src/lib/clock.ts`
@@ -65,8 +78,9 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
   TAM önceden yükleme (`src/lib/client-prefetch.ts`: boşta, rolün menü merkezleri + sekme şeridi, ≤2 eşzamanlı, saveData/2g-3g'de kapalı; hover/ilk 5 satır `prefetchFullNow`) + realtime (`realtime-throttle.ts` tablo listesi, tenant filtreli); mutasyon = `revalidatePath`/`router.refresh`;
   menü tıklaması `NavPending` ile anında vurgulanır; yeni ağır sorgu önce ölçülür
   (`scripts/perf/measure-live.mts`, `profile-nav.mts`). Sözleşme: `src/lib/perf-budget-contract.test.ts`. Ayrıntı `docs/design/HIZ_MIMARI_ARASTIRMA_2026-10.md`.
-- **Menü ve paketler:** /app sayfa kataloğu 9 iş başlığı, tek kaynak `src/lib/nav-config.ts`; görünür menü rol bazlı merkezlerdir (`src/lib/nav-roles.ts`) (sayfa yolları değişmez,
-  yeni sayfa buraya eklenir). Paket kilidi sayfa bazlıdır: `src/lib/billing/page-gates.ts` +
+- **Menü ve paketler:** /app sayfa kataloğu 9 iş başlığı, tek kaynak `src/lib/nav-config.ts`; görünür menü rol bazlı merkezlerdir (`src/lib/nav-roles.ts`) (yeni sayfa buraya eklenir;
+  taşınan sayfa eski yolu yönlendirmesiz siler, bkz. "Yönlendirme / takma ad YOK"). Ofis modülleri (29 ürün modülü, 7 paket)
+  `src/lib/modules/registry.ts`; /admin menüsü ve sekmeleri tek kaynak `src/lib/admin/nav.ts`. Paket kilidi sayfa bazlıdır: `src/lib/billing/page-gates.ts` +
   `requireModulePage(mod, href)`; yeni/değişen paket kuralı orada ve `src/lib/billing/plans.ts`'te yapılır.
   Yeni tasarım bileşenleri `src/components/ui` (PageHeader, Card, StatRow, FilterBar...), kılavuz `docs/DESIGN_SYSTEM.md`.
 - **AI:** OpenAI çağrıları yalnız `src/lib/ai/openai-client.ts` üzerinden gider ve kişisel veri (telefon, TC, e-posta,
@@ -91,11 +105,11 @@ Oturumlu E2E yalnız izole test DB'de, açık `E2E_MUTATION_ALLOWED=true` ve ben
 - **SEO:** public sayfa metadata'sı yalnız `buildMetadata(path)` (`src/lib/seo/store.ts`); sayfa envanteri `src/lib/seo/registry.ts`, yönetim `/admin/site/seo` (modül `seo`),
   sitemap/robots/yönlendirme/JSON-LD/robot tek yerde. Token'lı yüzeyler sitemap'e ASLA girmez. Yeni public sayfa kontrol listesi: `docs/MIMARI.md` "SEO sistemi".
 - **Zeka katmanı:** içgörüler tek tablo `insights` (kullanıcı bazlı, kanıtlı, `href` zorunlu, son geçerlilikli); kurallar SAF `src/lib/insights/rules/*` (kayıt `rules/index.ts`), okuyucu `src/lib/insights/read.ts`, üretici cron `insight-engine`. Kural: veri yoksa kart yok, emsal yoksa fiyat önerisi yok, tahmin etiketli, örnek veri içgörü üretmez, LLM anlatımı yalnız opsiyonel ve varsayılan KAPALI (`audit` zorunlu, kota kapısı, girdide olmayan sayı reddedilir). Ayrıntı `docs/HAFIZA.md` §13.
-- **Cron:** 40 route `src/app/api/cron/*` + `vercel.json` (tek kaynak; sunucuda `scripts/sunucu/install-cron.sh` → `/etc/cron.d/emlaksoft`; sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
-  ve `recordHeartbeat` yazar.
+- **Cron:** 40 route `src/app/api/cron/*` + `vercel.json` (yalnız zamanlama listesi, tek kaynak; sunucuda `scripts/sunucu/install-cron.sh` → `/etc/cron.d/emlaksoft`; sayı `npm run check:cron` ile doğrulanır); hepsi `CRON_SECRET` Bearer doğrular
+  ve `recordHeartbeat` yazar. Yeni iş mümkünse mevcut cron'a adım olarak eklenir.
 
 **PROJE HAFIZASI (önce bunu oku, durumu sıfırdan tarama): `docs/HAFIZA.md`** — yayın durumu, migration sırası, açık işler, kararlar,
 tek-kaynak haritası, çalışma/doğrulama yöntemi.
 
 Ayrıntı: `docs/MIMARI.md` · yol haritası: `docs/ROADMAP.md` · güncel durum: `docs/DURUM.md` · deploy: `docs/DEPLOY.md`.
-Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.com.tr (yedek: https://emlaksoft.vercel.app)
+Eski devir/sprint belgeleri: `docs/arsiv/`. CANLI: https://emlaksoft.com.tr (Hetzner).
