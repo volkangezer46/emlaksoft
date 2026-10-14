@@ -406,6 +406,10 @@ const F = {
   billingVatRateInvoices: "20261014012000_billing_vat_rate_invoices.sql",
   // GP4 (2026-10-14): herkese acik randevu bildirimleri (online randevu, teyit yaniti) tek randevuyu acar (?randevu=<id>).
   appointmentNotificationDeepLinks: "20261014014000_appointment_notification_deep_links.sql",
+  // SN1 (2026-10-14): hareket satirinda danisman carisi kapsami (cash_entries RLS) + duzenli odeme hareketine cari/KDV/stopaj.
+  financeEntriesAdvisorScopeRecurringTerms: "20261014021000_finance_entries_advisor_scope_recurring_terms.sql",
+  // SN1 (2026-10-14): platform_staff_can (DG1 ozel rol matrisi) + rol adina bakan SQL kapilari matrise.
+  platformStaffCanGates: "20261014021010_platform_staff_can_gates.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -625,6 +629,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.billingVatRateInvoices]: "davranis", // fulfill_billing_payment canli govdesinde yalniz 4 `round(v_amount_try * 0.20, 2)` -> faturanin orani (meta.vatRate yoksa 0.20: mevcut faturalar ayni), growth_cash_net bolen ayni kural; yeni billing_invoice_vat_rate + billing_vat_rate_ready (service_role); veri degismez
     [F.clAppCanonicalLinks]: "davranis", // portal_account_report_login govdesi AYNI, yalniz bildirim href'i yeni Entegrasyonlar sayfasina; notifications/insights.href eski /app yollarindan kanonik yollara (yalniz href, idempotent); kod yayiniyla ayni pencerede
     [F.financePartyAdvisorScope]: "siki", // finance_parties/finance_open_items SELECT politikasi + 8 finance_* RPC govdesi: earnings_all olmayan kullanici baska danismanin carisini goremez/yazamaz; finance_aging ek "vadesiz" kova satiri (imza ayni)
+    [F.financeEntriesAdvisorScopeRecurringTerms]: "siki", // cash_entries SELECT politikasi: earnings_all olmayan kullanici baska danismanin carisine bagli hareketi goremez (finance_ledger_v / finance_cash_summary devralir); yeni recurring_post_occurrence 4 arg (cari/KDV/stopaj, eski 3 arg ona devreder: kosulsuz kuralda ayni); finance_statement_apply canli govdesinde yalniz duzenli odeme cagrisi nakit kipine (eslesme sayisi dogrulanir)
+    [F.platformStaffCanGates]: "davranis", // yeni platform_staff_can / platform_fixed_role_actions; 7 fonksiyon + 2 politikada rol adi -> modul x eylem (sabit rollerde sonuc ayni; ozel rolde matris); 2 buyuk govde canli tanim uzerinden tek ifade
     [F.appointmentNotificationDeepLinks]: "davranis", // create_public_booking_atomic / respond_appointment_confirmation_atomic govdeleri AYNI, yalniz bildirim href'i /app/randevular?randevu=<id>; mevcut bildirim satirlari degismez
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.platformKvkkRequests]: "ek", // yeni platform_kvkk_requests (RLS+FORCE, politika yok, yalniz service_role) + alert_rules CHECK mevcut tanimdan genisler (kvkk_sla) ve tek tohum satiri; mevcut veri degismez, kod tablo yokken form "e-posta ile yazin" der
@@ -851,6 +857,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "GP2-fatura-kdv-orani", order: 132, title: "Otomatik faturada gecerlilik tarihli KDV: fulfill_billing_payment tutari faturanin kendi oranindan (meta.vatRate; yoksa %20) dogrular, growth_cash_net ayni kural + billing_vat_rate_ready() probu (20261014002000 SONRASI; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod probe yokken yalniz %20 ile otomatik fatura keser, KDV ayari %20'den farkli yapilmadan ONCE uygulanmali; davranis)", files: [F.billingVatRateInvoices] },
     { id: "CL-APP-kanonik-baglantilar", order: 119, title: "Ofis uygulamasi temizligi: kaldirilan /app yollarina giden kayitli baglantilar (bildirim, icgoru) ve portal giris bildirimi kanonik yola cevrilir (bagimsiz; KOD YAYINIYLA AYNI pencerede ya da hemen SONRA; once uygulanirsa yeni yollar kod gelene kadar acilmaz; davranis)", files: [F.clAppCanonicalLinks] },
     { id: "GP1-finans-danisman-kapsami", order: 131, title: "Finans: danisman carisi kapsami (P12) veritabaninda (RLS + finance_party_* / acik kalem / yaslandirma RPC) ve finance_aging vadesiz kovasi. 20261014001100 SONRASI; kod yayinindan ONCE ya da SONRA uygulanabilir (arayuz zaten ayni kurali uygular, vadesiz kovasini kod tanir; eski kod bilinmeyen kovayi yok sayar) (siki)", files: [F.financePartyAdvisorScope] },
+    { id: "SN1-finans-hareket-kapsami-duzenli-kdv", order: 141, title: "Finans: hareket satirinda danisman carisi kapsami (cash_entries RLS; GP1 20261014011000 SONRASI) + duzenli odeme hareketine kuraldaki cari/KDV/stopaj (FN1 + FN6 + 20261011001400 SONRASI). KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod RLS'e ve hareket kolonlarina zaten hazir); stopajli ofis kuralinin yeni donemleri hesaptan net dusmeye baslar (siki)", files: [F.financeEntriesAdvisorScopeRecurringTerms] },
+    { id: "SN1-personel-kapilari-matris", order: 142, title: "Personel SQL kapilari DG1 ozel rol matrisine: platform_staff_can + update_tenant_plan_subscription / convert_demo_request_to_tenant / destek / portal kurali / buyume kapilari + platform_mrr_daily politikasi (platform_settings bilerek sabit super_admin'de) (DG1 20261014001300 ve DG2 20261014002000 SONRASI; KOD YAYINIYLA AYNI pencerede ya da SONRA: sabit rollerde davranis ayni; davranis)", files: [F.platformStaffCanGates] },
     { id: "GP4-randevu-bildirim-baglantisi", order: 120, title: "Herkese acik randevu bildirimleri (online randevu, teyit/iptal yaniti) tek randevuyu acar: /app/randevular?randevu=<id> (bagimsiz; govdeler ayni, yalniz bildirim href'i; KOD YAYINIYLA AYNI pencerede ya da SONRA, once uygulanirsa eski kod parametreyi yok sayar ve genel listeyi acar; davranis)", files: [F.appointmentNotificationDeepLinks] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "DG6-kvkk-veri-sahibi", order: 116, title: "KVKK veri sahibi basvurulari: platform_kvkk_requests + kvkk_sla uyari kurali (bagimsiz; AD10 004900 varsa CHECK genisler, yoksa atlar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken form ve kuyruk 'kurulum bekliyor'; sira serbest, ek)", files: [F.platformKvkkRequests] },
@@ -976,6 +984,19 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.financeLedgerV2Rpc, F.financeOwnerPayoutSource],
     [F.financeLedgerV2Backfill, F.financeLedgerV2Rpc],
     [F.financePartyAdvisorScope, F.financeLedgerV2Rpc],
+    // SN1: GP1 yardimcisi (finance_party_foreign_advisor), FN1 kolon/RPC'leri ve ekstre govdesi (001400) once olmali.
+    [F.financeEntriesAdvisorScopeRecurringTerms, F.financePartyAdvisorScope],
+    [F.financeEntriesAdvisorScopeRecurringTerms, F.financeLedgerV2Rpc],
+    [F.financeEntriesAdvisorScopeRecurringTerms, F.statementApplyRecurringCommission],
+    [F.financeEntriesAdvisorScopeRecurringTerms, F.financeRecurringRuleTerms],
+    // SN1: custom_role_id (DG1) ve canli govdesi donusturulen fonksiyonlarin son tanimlari (DG2 plan katalog, destek v2, portal kurallari) once olmali.
+    [F.platformStaffCanGates, F.platformCustomRolesFourEyes],
+    [F.platformStaffCanGates, F.planCatalogEngine],
+    [F.platformStaffCanGates, F.billingAmount],
+    [F.platformStaffCanGates, F.supportDeskV2],
+    [F.platformStaffCanGates, F.portalRulesCore],
+    [F.platformStaffCanGates, F.growthEngine],
+    [F.platformStaffCanGates, F.platformMrrDaily],
     // DG2: canli govdeleri donusturulen fonksiyonlarin son tanimlari ve plan_monthly_amount'un 20261008001000 govdesi once olmali.
     [F.planCatalogEngine, F.planPricesEfTariff],
     [F.planCatalogEngine, F.planUpgradeFulfillment],

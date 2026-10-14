@@ -35,9 +35,10 @@ export async function createMyReferralCode(): Promise<GrowthResult> {
 
 /* ------------------------------------------------------------ admin tarafı ------------------------------------------------------------ */
 
+// Satış modülünde onay yetkisi (sabit rollerde yalnız super_admin; DB growth_staff_super_admin = platform_staff_can sales:approve).
 const ADMIN_GATE = {
   module: "sales",
-  roles: ["super_admin"],
+  action: "approve",
   rate: { key: "platform-growth", limit: 40, windowSec: 600 },
 } as const;
 
