@@ -3,7 +3,10 @@ import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
-import { isPast } from "@/lib/clock";
+import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { isPast, now } from "@/lib/clock";
+import type { FeatureKey } from "@/lib/modules/registry";
+import { isSurveyTaskLinkExpired } from "@/lib/surveys/task-expiry";
 import {
   firstPublicImageByProperty,
   PUBLIC_COVER_COLUMNS,
@@ -21,9 +24,10 @@ import { renderVitrinOg, type VitrinOgInput } from "@/lib/vitrin-og";
  * markasıyla (ad, logo, marka rengi) çizilir; sunum/paylaşımda ilk ilan fotoğrafı arka plan olur.
  *
  * KURALLAR:
- *  - Token sayfanın kendi kapılarıyla aynı çözülür: ofis aktif (isPublicTenantActive), süresi dolmuş paylaşım yok,
- *    kapalı modülde (presentations) içerik yok, örnek/silinmiş/taslak portföy yok. Kapı geçmezse `null` → kart
- *    genel ("Bağlantı bulunamadı") çizilir; içerik sızmaz.
+ *  - Token sayfanın kendi asgari kapılarıyla çözülür (kart sayfadan GEVŞEK olamaz; belge türlerinde bilerek daha
+ *    sıkı: iptal/süresi dolmuş randevu ve sözleşme kart vermez): ofis aktif (isPublicTenantActive), süresi dolmuş
+ *    paylaşım yok, kapalı modülde (presentations, valuation, surveys, contracts) içerik yok, örnek/silinmiş/taslak
+ *    kayıt yok (ayrıntı `resolveDocTenant`). Kapı geçmezse `null` → kart genel ("Bağlantı bulunamadı") çizilir.
  *  - Kişisel/ticari ayrıntı karta YAZILMAZ: değerleme, randevu, anket ve imza kartında yalnız ofis adı + belge türü
  *    (ileten kişiye adres, tarih, tutar ya da sözleşme başlığı açılmaz). Sunum/paylaşım zaten ilan vitrinidir.
  *  - Fotoğraf yalnız public ilan görseli kuralından geçen ilk görseldir (KVKK P0-9, `isPublicListingImage`) ve
@@ -172,10 +176,26 @@ const DOC_LABEL: Record<PublicDocKind, { title: string; description: (office: st
   contract: { title: "Sözleşme imzası", description: (o) => `${o} tarafından imzanıza sunulan sözleşme.` },
 };
 
-/** Token → kiracı markası (belge türüne göre bir-iki sorgu; anket kapanış anketi yoksa anketör görevi denenir). */
-async function resolveDocTenant(kind: PublicDocKind, token: string): Promise<{ tenantId: string; tenant: TenantBrand } | null> {
+type DocTenant = { tenantId: string; tenant: TenantBrand; feature: FeatureKey | null };
+
+/**
+ * Token → kiracı markası, sayfanın kendi asgari kapısıyla (kapı geçmezse null → genel kart):
+ *  - değerleme: modül `valuation` kapalıysa kart yok (sayfa PublicModuleClosed gösterir);
+ *  - randevu: örnek kayıt, iptal edilmiş ya da saati geçmiş randevu kart vermez;
+ *  - anket: kapanış anketi örnek/silinmiş müşteriye bağlıysa yok; anketör görevi şablonsuz, örnek kayda bağlı,
+ *    süresi dolmuş (cevaplanmamış) ya da `surveys` modülü kapalıysa yok;
+ *  - imza: iptal edilmiş, süresi dolmuş ya da örnek sözleşme ve kapalı `contracts` modülü kart vermez.
+ * Ofis durumu (isPublicTenantActive) ve modül kapısı tüm türlerde ortak uygulanır.
+ */
+async function resolveDocTenant(kind: PublicDocKind, token: string): Promise<DocTenant | null> {
   const admin = createAdminClient();
   const brand = "name, status, logo_url, brand_color";
+  const pick = async (row: { tenant_id?: string; tenant?: unknown } | null | undefined, feature: FeatureKey | null): Promise<DocTenant | null> => {
+    const tenant = one(row?.tenant as Rel<TenantBrand>);
+    if (!row?.tenant_id || !tenant || !isPublicTenantActive(tenant.status)) return null;
+    if (feature && (await isPublicFeatureClosed(admin, row.tenant_id, feature))) return null;
+    return { tenantId: row.tenant_id, tenant, feature };
+  };
   if (kind === "contract") {
     const clean = (token ?? "").trim();
     if (!clean || clean.length > 128) return null;
@@ -183,40 +203,65 @@ async function resolveDocTenant(kind: PublicDocKind, token: string): Promise<{ t
     if (!signer?.contract_id) return null;
     const { data: contract } = await admin
       .from("contracts")
-      .select(`tenant_id, tenant:tenants(${brand})`)
+      .select(`tenant_id, status, expires_at, is_sample, tenant:tenants(${brand})`)
       .eq("id", signer.contract_id)
       .maybeSingle();
-    const tenant = one(contract?.tenant as Rel<TenantBrand>);
-    return contract && tenant ? { tenantId: contract.tenant_id, tenant } : null;
+    if (!contract || contract.status === "cancelled" || contract.is_sample === true || isPast(contract.expires_at)) return null;
+    return pick(contract, "contracts");
   }
   if (!UUID_RE.test(token)) return null;
-  const pick = (row: { tenant_id?: string; tenant?: unknown } | null | undefined) => {
-    const tenant = one(row?.tenant as Rel<TenantBrand>);
-    return row?.tenant_id && tenant ? { tenantId: row.tenant_id, tenant } : null;
-  };
   if (kind === "valuation") {
     const { data } = await admin.from("valuations").select(`tenant_id, tenant:tenants(${brand})`).eq("share_token", token).maybeSingle();
-    return pick(data);
+    return pick(data, "valuation");
   }
   if (kind === "appointment") {
     const { data } = await admin
       .from("appointments")
-      .select(`tenant_id, tenant:tenants(${brand})`)
+      .select(`tenant_id, status, scheduled_at, tenant:tenants(${brand})`)
       .eq("confirm_token", token)
       .eq("is_sample", false)
       .maybeSingle();
-    return pick(data);
+    if (!data || data.status === "cancelled" || isPast(data.scheduled_at)) return null;
+    return pick(data, null);
   }
-  const { data: survey } = await admin.from("surveys").select(`tenant_id, tenant:tenants(${brand})`).eq("public_token", token).maybeSingle();
-  if (survey) return pick(survey);
-  const { data: task, error } = await admin.from("survey_tasks").select(`tenant_id, tenant:tenants(${brand})`).eq("public_token", token).maybeSingle();
-  return error ? null : pick(task);
+  const { data: survey } = await admin
+    .from("surveys")
+    .select(`tenant_id, customer_id, tenant:tenants(${brand})`)
+    .eq("public_token", token)
+    .maybeSingle();
+  if (survey) {
+    const { data: customer } = await admin
+      .from("customers")
+      .select("id")
+      .eq("id", survey.customer_id)
+      .eq("tenant_id", survey.tenant_id)
+      .eq("is_sample", false)
+      .is("deleted_at", null)
+      .maybeSingle();
+    return customer ? pick(survey, null) : null;
+  }
+  const { data: task, error } = await admin
+    .from("survey_tasks")
+    .select(`tenant_id, status, template_id, customer_id, property_id, due_at, tenant:tenants(${brand})`)
+    .eq("public_token", token)
+    .maybeSingle();
+  if (error || !task?.template_id) return null;
+  if (task.status !== "completed" && isSurveyTaskLinkExpired(task.due_at as string | null, now())) return null;
+  const [{ data: c }, { data: p }] = await Promise.all([
+    task.customer_id
+      ? admin.from("customers").select("id").eq("id", task.customer_id).eq("tenant_id", task.tenant_id).eq("is_sample", false).is("deleted_at", null).maybeSingle()
+      : Promise.resolve({ data: { id: "" } }),
+    task.property_id
+      ? admin.from("properties").select("id").eq("id", task.property_id).eq("tenant_id", task.tenant_id).eq("is_sample", false).maybeSingle()
+      : Promise.resolve({ data: { id: "" } }),
+  ]);
+  return c && p ? pick(task, "surveys") : null;
 }
 
 /** Belge linkleri (değerleme, randevu teyidi, anket, imza): yalnız ofis markası + belge türü; ayrıntı yazılmaz. */
 export async function loadDocLinkOg(kind: PublicDocKind, token: string): Promise<PublicLinkOg | null> {
   const resolved = await resolveDocTenant(kind, token);
-  if (!resolved || !isPublicTenantActive(resolved.tenant.status)) return null;
+  if (!resolved) return null;
   const office = resolved.tenant.name?.trim() || "Emlak ofisi";
   const label = DOC_LABEL[kind];
   return {
@@ -245,6 +290,40 @@ export function publicLinkMetadata(og: PublicLinkOg | null, fallbackTitle: strin
     openGraph: { type: "website", locale: "tr_TR", siteName: og.office, title, description: og.description },
     twitter: { card: "summary_large_image", title, description: og.description },
   };
+}
+
+/**
+ * Maliyet kalkanı: token'lı kart rotaları önbelleksiz (kapılar her istekte değerlendirilir), ama pahalı kısım —
+ * depodan ≤15 MB indirme + sharp — ayni görsel için isolate-yerel kısa önbellekten gelir (anahtar: medya id + depo
+ * yolu; görsel kapıdan düşerse sorgu onu seçmez, önbellek de kullanılmaz). Önbellekte olmayan her yeniden kodlama
+ * IP başına sınırlanır; aşımda fotoğrafsız markalı kart çizilir (önizleme kırılmaz). WhatsApp/Meta tarayıcıları ortak
+ * IP'lerden geldiği için sınır cömerttir ve yalnız fotoğrafı keser, kartı değil.
+ */
+const PHOTO_CACHE_TTL_MS = 10 * 60 * 1000;
+const PHOTO_CACHE_MAX = 64;
+const photoCache = new Map<string, { dataUrl: string; expiresAt: number }>();
+
+function cachedPhoto(key: string, at: number): string | null {
+  const hit = photoCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= at) {
+    photoCache.delete(key);
+    return null;
+  }
+  return hit.dataUrl;
+}
+
+function rememberPhoto(key: string, dataUrl: string, at: number) {
+  if (photoCache.size >= PHOTO_CACHE_MAX) {
+    for (const [k, v] of photoCache) if (v.expiresAt <= at) photoCache.delete(k);
+    while (photoCache.size >= PHOTO_CACHE_MAX) photoCache.delete(photoCache.keys().next().value as string);
+  }
+  photoCache.set(key, { dataUrl, expiresAt: at + PHOTO_CACHE_TTL_MS });
+}
+
+/** Test yardımcısı: isolate-yerel fotoğraf önbelleğini boşaltır. */
+export function __resetOgPhotoCacheForTests() {
+  photoCache.clear();
 }
 
 /**
@@ -277,6 +356,18 @@ export async function loadOgPhoto(tenantId: string, propertyIds: readonly string
     const media = mediaId ? usable.find((r) => r.id === mediaId) : null;
     if (!media?.storage_path) return null;
 
+    const at = now();
+    const cacheKey = `${tenantId}:${media.id}:${media.storage_path}`;
+    const hit = cachedPhoto(cacheKey, at);
+    if (hit) return hit;
+    const { allowed } = await checkRateLimit(`og-photo:${await clientIp()}`, {
+      limit: 60,
+      windowSec: 600,
+      failurePolicy: "allow",
+      localAllowance: 15,
+    });
+    if (!allowed) return null;
+
     const { data: blob, error } = await admin.storage.from("property-media").download(media.storage_path);
     if (error || !blob) return null;
     const { default: sharp } = await import("sharp");
@@ -285,7 +376,9 @@ export async function loadOgPhoto(tenantId: string, propertyIds: readonly string
       .resize(1200, 630, { fit: "cover", position: "attention" })
       .jpeg({ quality: 72, mozjpeg: true })
       .toBuffer();
-    return `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+    const dataUrl = `data:image/jpeg;base64,${jpeg.toString("base64")}`;
+    rememberPhoto(cacheKey, dataUrl, at);
+    return dataUrl;
   } catch (e) {
     console.error("loadOgPhoto", e instanceof Error ? e.message : e);
     return null;

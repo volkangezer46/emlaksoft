@@ -18,16 +18,26 @@ const h = vi.hoisted(() => ({
   closed: false,
   photoBytes: null as Buffer | null,
   downloaded: [] as string[],
+  single: {} as Record<string, Row | null>,
+  allowed: true,
+  rateKeys: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/modules/public", () => ({ isPublicFeatureClosed: async () => h.closed }));
+vi.mock("@/lib/rate-limit", () => ({
+  clientIp: async () => "203.0.113.9",
+  checkRateLimit: async (key: string) => {
+    h.rateKeys.push(key);
+    return { allowed: h.allowed };
+  },
+}));
 vi.mock("@/lib/supabase/admin", () => ({
   createAdminClient: () => ({
     from: (table: string) => {
       const chain: Record<string, unknown> = {};
       for (const m of ["select", "eq", "is", "in", "order", "limit"]) chain[m] = () => chain;
-      chain.maybeSingle = async () => ({ data: table === "presentations" ? h.presentation : null, error: null });
+      chain.maybeSingle = async () => ({ data: table === "presentations" ? h.presentation : (h.single[table] ?? null), error: null });
       chain.then = (resolve: (r: unknown) => unknown) =>
         Promise.resolve({ data: table === "properties" ? h.properties : table === "property_media" ? h.media : [], error: null }).then(resolve);
       return chain;
@@ -43,7 +53,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { loadOgPhoto, loadPresentationOg, publicLinkMetadata } from "./public-link-og";
+import { __resetOgPhotoCacheForTests, loadDocLinkOg, loadOgPhoto, loadPresentationOg, publicLinkMetadata } from "./public-link-og";
 import { renderVitrinOg } from "./vitrin-og";
 
 beforeEach(() => {
@@ -61,6 +71,10 @@ beforeEach(() => {
   h.closed = false;
   h.photoBytes = null;
   h.downloaded = [];
+  h.single = {};
+  h.allowed = true;
+  h.rateKeys = [];
+  __resetOgPhotoCacheForTests();
 });
 
 describe("loadPresentationOg", () => {
@@ -117,5 +131,84 @@ describe("loadOgPhoto + kart", () => {
     expect(await loadOgPhoto("t-1", [P1])).toBeNull();
     h.media = [{ id: "m-1", property_id: P1, kind: "image", file_type: "image/png", file_name: "a.png", is_document: false, storage_path: "x", file_size: 10 }];
     expect(await loadOgPhoto("t-1", [P1])).toBeNull();
+  });
+});
+
+describe("loadOgPhoto maliyet kalkanı", () => {
+  const MEDIA = [{ id: "m-1", property_id: P1, kind: "image", file_type: "image/png", file_name: "a.png", is_document: false, storage_path: "t-1/p1.png", file_size: 10 }];
+
+  it("aynı görsel ikinci istekte önbellekten gelir (indirme + sharp tek kez)", async () => {
+    h.photoBytes = await sharp({ create: { width: 32, height: 24, channels: 3, background: "#aa3366" } }).png().toBuffer();
+    h.media = MEDIA;
+    const a = await loadOgPhoto("t-1", [P1]);
+    const b = await loadOgPhoto("t-1", [P1]);
+    expect(a).toMatch(/^data:image\/jpeg;base64,/);
+    expect(b).toBe(a);
+    expect(h.downloaded).toEqual(["t-1/p1.png"]);
+    expect(h.rateKeys).toEqual(["og-photo:203.0.113.9"]);
+  }, 30_000);
+
+  it("IP sınırı aşılınca indirme yok, fotoğrafsız kart (null)", async () => {
+    h.photoBytes = await sharp({ create: { width: 32, height: 24, channels: 3, background: "#aa3366" } }).png().toBuffer();
+    h.media = MEDIA;
+    h.allowed = false;
+    expect(await loadOgPhoto("t-1", [P1])).toBeNull();
+    expect(h.downloaded).toEqual([]);
+  });
+});
+
+describe("loadDocLinkOg sayfa kapıları", () => {
+  const TENANT = { name: "Deniz Emlak", status: "active", logo_url: null, brand_color: null };
+
+  it("değerleme: açık modülde ofis kartı, kapalı modülde yok", async () => {
+    h.single.valuations = { tenant_id: "t-1", tenant: TENANT };
+    expect(await loadDocLinkOg("valuation", TOKEN)).toMatchObject({ office: "Deniz Emlak", title: "Değerleme raporu" });
+    h.closed = true;
+    expect(await loadDocLinkOg("valuation", TOKEN)).toBeNull();
+  });
+
+  it("randevu: iptal edilmiş ya da saati geçmiş randevu kart vermez", async () => {
+    h.single.appointments = { tenant_id: "t-1", status: "scheduled", scheduled_at: "2999-01-01T10:00:00Z", tenant: TENANT };
+    expect(await loadDocLinkOg("appointment", TOKEN)).not.toBeNull();
+    h.single.appointments = { ...h.single.appointments, status: "cancelled" };
+    expect(await loadDocLinkOg("appointment", TOKEN)).toBeNull();
+    h.single.appointments = { ...h.single.appointments, status: "scheduled", scheduled_at: "2000-01-01T10:00:00Z" };
+    expect(await loadDocLinkOg("appointment", TOKEN)).toBeNull();
+  });
+
+  it("imza: iptal, süresi dolmuş, örnek sözleşme ve kapalı modül kart vermez", async () => {
+    h.single.contract_signers = { contract_id: "k-1" };
+    const live = { tenant_id: "t-1", status: "sent", expires_at: null, is_sample: false, tenant: TENANT };
+    h.single.contracts = live;
+    expect(await loadDocLinkOg("contract", "imza-token")).toMatchObject({ title: "Sözleşme imzası" });
+    h.single.contracts = { ...live, status: "cancelled" };
+    expect(await loadDocLinkOg("contract", "imza-token")).toBeNull();
+    h.single.contracts = { ...live, expires_at: "2000-01-01T00:00:00Z" };
+    expect(await loadDocLinkOg("contract", "imza-token")).toBeNull();
+    h.single.contracts = { ...live, is_sample: true };
+    expect(await loadDocLinkOg("contract", "imza-token")).toBeNull();
+    h.single.contracts = live;
+    h.closed = true;
+    expect(await loadDocLinkOg("contract", "imza-token")).toBeNull();
+  });
+
+  it("anket: örnek/silinmiş müşteriye bağlı kapanış anketi kart vermez", async () => {
+    h.single.surveys = { tenant_id: "t-1", customer_id: "c-1", tenant: TENANT };
+    expect(await loadDocLinkOg("survey", TOKEN)).toBeNull();
+    h.single.customers = { id: "c-1" };
+    expect(await loadDocLinkOg("survey", TOKEN)).toMatchObject({ title: "Memnuniyet anketi" });
+  });
+
+  it("anketör görevi: süresi dolmuş, şablonsuz ya da kapalı modülde kart yok", async () => {
+    const task = { tenant_id: "t-1", status: "pending", template_id: "tpl", customer_id: null, property_id: null, due_at: null, tenant: TENANT };
+    h.single.survey_tasks = task;
+    expect(await loadDocLinkOg("survey", TOKEN)).not.toBeNull();
+    h.single.survey_tasks = { ...task, due_at: "2000-01-01T00:00:00Z" };
+    expect(await loadDocLinkOg("survey", TOKEN)).toBeNull();
+    h.single.survey_tasks = { ...task, template_id: null };
+    expect(await loadDocLinkOg("survey", TOKEN)).toBeNull();
+    h.single.survey_tasks = task;
+    h.closed = true;
+    expect(await loadDocLinkOg("survey", TOKEN)).toBeNull();
   });
 });
