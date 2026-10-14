@@ -12,7 +12,8 @@ const requirePermission = vi.fn(async (..._a: unknown[]) => ({ ok: true, tenantI
 vi.mock("@/lib/require-permission", () => ({ requirePermission: (...a: unknown[]) => requirePermission(...a) }));
 const rpc = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc: (...a: unknown[]) => rpc(...a) }) }));
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+// unstable_cache: rota zinciri (membership → tenant-guard → cache/request → plan-definitions) modül yüklenirken sarmalayıcı kurar.
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 const publicKeys: Record<string, JsonWebKey> = {};
 vi.mock("@/lib/portal-transfer/rule-keys", () => ({ RULE_PUBLIC_KEYS: publicKeys }));
 

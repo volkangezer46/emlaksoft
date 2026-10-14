@@ -16,7 +16,7 @@ import { readConnectionView } from "@/lib/google/read";
 import { normalizeAllowedWhatsAppApiUrl } from "@/lib/messaging/netgsm";
 import { EXTENSION_PACKAGE_DIR, EXTENSION_VERSION, extensionStoreEnv, extensionZipFileName } from "@/lib/listing-control/worker/extension-release";
 import { activityHref } from "@/lib/admin/activity-query";
-import { PORTAL_LABELS } from "@/lib/portals/catalog";
+import { CURRENT_PORTALS, PORTAL_LABELS, type CurrentPortal } from "@/lib/portals/catalog";
 import {
   HUB_META,
   hostOf,
@@ -117,7 +117,7 @@ export type IntegrationHub = {
   /** Anahtar formlarının girdisi (değer yok; parmak izi + özet). */
   forms: {
     openai: { configured: boolean; source: "db" | "env" | "none"; fingerprint: string | null };
-    portals: Record<"sahibinden" | "hepsiemlak" | "emlakjet", { configured: boolean; fingerprint: string | null }>;
+    portals: Record<CurrentPortal, { configured: boolean; fingerprint: string | null }>;
     messaging: { netgsmConfigured: boolean; netgsmSummary: string | null; whatsappConfigured: boolean; whatsappSummary: string | null };
   };
 };
@@ -162,7 +162,7 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
     extensionZipReady,
   ] = await Promise.all([
     getPlatformSecretsMany([...secretKeys, ...plainKeys], secretKeys),
-    getPortalConfigs(["sahibinden", "hepsiemlak", "emlakjet"]),
+    getPortalConfigs(CURRENT_PORTALS),
     resolveEmailChannelConfig(),
     getEmlakFiyatiAdminStatus(),
     resolveEmlakFiyatiKeys(),
@@ -284,11 +284,11 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
   const efFp = efKeys.current ? secretFingerprint(efStatus.source === "env" ? "env:EMLAKFIYATI_API_KEY" : "emlakfiyati.api_key", efKeys.current) : null;
 
   // --- Portal API ---
-  const portalFp = (p: "sahibinden" | "hepsiemlak" | "emlakjet") => {
+  const portalFp = (p: CurrentPortal) => {
     const c = portalConfigs[p];
     return c ? secretFingerprint(`${p}_api_key`, c.apiKey) : null;
   };
-  const portalsConfigured = (["sahibinden", "hepsiemlak", "emlakjet"] as const).filter((p) => portalConfigs[p]);
+  const portalsConfigured = CURRENT_PORTALS.filter((p) => portalConfigs[p]);
 
   const cards: HubCard[] = [
     card("iyzico", {
@@ -495,11 +495,9 @@ export async function loadIntegrationHub(): Promise<IntegrationHub> {
     },
     forms: {
       openai: { configured: Boolean(aiKey), source: aiSource, fingerprint: aiFingerprint },
-      portals: {
-        sahibinden: { configured: Boolean(portalConfigs.sahibinden), fingerprint: portalFp("sahibinden") },
-        hepsiemlak: { configured: Boolean(portalConfigs.hepsiemlak), fingerprint: portalFp("hepsiemlak") },
-        emlakjet: { configured: Boolean(portalConfigs.emlakjet), fingerprint: portalFp("emlakjet") },
-      },
+      portals: Object.fromEntries(
+        CURRENT_PORTALS.map((p) => [p, { configured: Boolean(portalConfigs[p]), fingerprint: portalFp(p) }]),
+      ) as Record<CurrentPortal, { configured: boolean; fingerprint: string | null }>,
       messaging: {
         netgsmConfigured,
         netgsmSummary: netgsmUser ? `${netgsmUser}${netgsmHeader ? ` · ${netgsmHeader}` : ""}` : null,
