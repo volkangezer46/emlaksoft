@@ -36,8 +36,26 @@ describe("property media security contract", () => {
       expect(page).toContain('export const dynamic = "force-dynamic"');
       expect(page).toContain("createShortLivedPropertyMediaUrl");
     }
-    expect(pages[0]).not.toContain("summary_large_image");
+    // Önizleme (YD2): sayfa metadata'sı görsel URL'i TAŞIMAZ (imzalı/kısa ömürlü medya adresi og:image'e sızmaz).
+    // Görsel yalnız token kapısını her istekte yeniden değerlendiren, önbelleksiz dosya rotasından gelir; fotoğraf
+    // public ilan görseli kuralından geçer ve sunucuda yeniden kodlanır (ham bayt/EXIF dışarı çıkmaz).
     expect(pages[0]).not.toContain("images: cover");
+    expect(pages[0]).not.toMatch(/images:\s*\[/);
+    expect(pages[1]).not.toMatch(/images:\s*\[/);
+    for (const dir of ["paylas", "sunum"]) {
+      for (const file of ["opengraph-image.tsx", "twitter-image.tsx"]) {
+        const og = read(`src/app/${dir}/[token]/${file}`);
+        expect(og).toContain('export const dynamic = "force-dynamic"');
+        expect(og).toContain("renderPublicLinkOgImage");
+        expect(og).not.toContain("revalidate");
+      }
+    }
+    const ogLib = read("src/lib/public-link-og.ts");
+    expect(ogLib).toContain("firstPublicImageByProperty");
+    expect(ogLib).toContain("isPublicTenantActive");
+    expect(ogLib).toContain(".rotate()");
+    expect(ogLib).toContain("no-store");
+    expect(ogLib).not.toContain("createShortLivedPropertyMediaUrl");
     expect(read("src/components/public/gallery-lightbox.tsx")).toContain("unoptimized");
     expect(pages.slice(1).every((page) => page.includes("unoptimized"))).toBe(true);
   });

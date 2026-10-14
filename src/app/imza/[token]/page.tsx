@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Clock3, FileText, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -9,11 +10,17 @@ import { isPast } from "@/lib/clock";
 import { isSignerSmsAvailable, maskPhone } from "../_lib/sms";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { formatDateTimeTr } from "@/lib/format";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 
-export const metadata = {
-  title: "Sözleşme imzası",
-  robots: { index: false, follow: false },
-};
+// İmza linkleri kişiye özeldir → arama motorlarına kapalı.
+// WhatsApp önizlemesi ofis markalı; yalnız ofis adı + belge türü (public-link-og), görsel `opengraph-image.tsx`.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("contract", token), "Sözleşme imzası"),
+    robots: { index: false, follow: false },
+  };
+}
 
 // İmza/tenant durumu her açılışta canlı okunmalı; sayfa önbelleğe takılmasın
 // (sunum/[token] deseni) — aksi halde imzalanmış/iptal/askıya alınmış durum

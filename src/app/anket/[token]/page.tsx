@@ -13,12 +13,17 @@ import { OFFICE_GOOGLE_REVIEW_URL } from "@/lib/settings/registry/tenant";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { SurveyForm } from "./survey-form";
 import { TaskSurveyForm } from "./task-survey-form";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 
 // Anket linkleri kişiye özeldir → arama motorlarına kapalı (randevu-teyit deseni).
-export const metadata: Metadata = {
-  title: "Memnuniyet anketi",
-  robots: { index: false, follow: false },
-};
+// WhatsApp önizlemesi ofis markalı; yalnız ofis adı + belge türü (public-link-og), görsel `opengraph-image.tsx`.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("survey", token), "Memnuniyet anketi"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = "force-dynamic";
 

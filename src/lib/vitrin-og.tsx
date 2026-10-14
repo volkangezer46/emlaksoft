@@ -19,6 +19,11 @@ export type VitrinOgInput = {
   location?: string | null;
   price?: string | null;
   specs?: string[];
+  /**
+   * Arka plan fotoğrafı (data: URL, JPEG; `loadOgPhoto` üretir). Verilirse kart fotoğraflı çizilir: tam kaplayan
+   * görsel + okunabilirlik için koyu degrade. Verilmezse (fotoğrafsız ilan) markalı yedek kart aynen çizilir.
+   */
+  photo?: string | null;
 };
 
 function safeLogo(url?: string | null): string | null {
@@ -30,11 +35,16 @@ function safeColor(c?: string | null): string {
   return c && /^#[0-9a-f]{6}$/i.test(c) ? c : "#1463ff";
 }
 
-export async function renderVitrinOg(input: VitrinOgInput): Promise<ImageResponse> {
+/**
+ * `init.headers`: ImageResponse üretimde 1 yıllık `immutable` önbellek başlığı yazar; token'lı kartlar (kapı her
+ * istekte değerlendirilir) `no-store` geçer. Vitrin kartları varsayılanı kullanır.
+ */
+export async function renderVitrinOg(input: VitrinOgInput, init?: { headers?: Record<string, string> }): Promise<ImageResponse> {
   const manrope = await readFile(join(process.cwd(), "src/assets/manrope-800.woff"));
   const logo = safeLogo(input.logoUrl);
   const accent = safeColor(input.brandColor);
   const title = input.title.length > 90 ? `${input.title.slice(0, 87)}...` : input.title;
+  const photo = input.photo && input.photo.startsWith("data:image/") ? input.photo : null;
 
   return new ImageResponse(
     (
@@ -51,6 +61,29 @@ export async function renderVitrinOg(input: VitrinOgInput): Promise<ImageRespons
           fontFamily: "Manrope",
         }}
       >
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element -- next/og (satori) img kullanır
+          <img
+            src={photo}
+            alt=""
+            width={OG_SIZE.width}
+            height={OG_SIZE.height}
+            style={{ position: "absolute", top: 0, left: 0, width: OG_SIZE.width, height: OG_SIZE.height, objectFit: "cover" }}
+          />
+        ) : null}
+        {photo ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: OG_SIZE.width,
+              height: OG_SIZE.height,
+              display: "flex",
+              background: "linear-gradient(180deg, rgba(5,18,42,0.78) 0%, rgba(5,18,42,0.18) 34%, rgba(5,18,42,0.35) 55%, rgba(5,18,42,0.92) 100%)",
+            }}
+          />
+        ) : null}
         <div
           style={{
             position: "absolute",
@@ -60,7 +93,7 @@ export async function renderVitrinOg(input: VitrinOgInput): Promise<ImageRespons
             height: 520,
             borderRadius: "50%",
             background: `radial-gradient(circle, ${accent}88, ${accent}00 70%)`,
-            display: "flex",
+            display: photo ? "none" : "flex",
           }}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
@@ -140,6 +173,7 @@ export async function renderVitrinOg(input: VitrinOgInput): Promise<ImageRespons
     {
       ...OG_SIZE,
       fonts: [{ name: "Manrope", data: manrope, weight: 800, style: "normal" }],
+      ...(init?.headers ? { headers: init.headers } : {}),
     },
   );
 }

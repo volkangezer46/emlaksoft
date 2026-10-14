@@ -12,14 +12,19 @@ import {
 import { ConfirmButtons } from "./confirm-buttons";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { toWhatsAppLink } from "@/lib/phone";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 
 export const dynamic = "force-dynamic";
 
 // Teyit linkleri kişiye özeldir → arama motorlarına kapalı (paylas/[token] deseni).
-export const metadata: Metadata = {
-  title: "Randevu teyidi",
-  robots: { index: false, follow: false },
-};
+// WhatsApp önizlemesi ofis markalı; yalnız ofis adı + belge türü (public-link-og), görsel `opengraph-image.tsx`.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("appointment", token), "Randevu teyidi"),
+    robots: { index: false, follow: false },
+  };
+}
 
 const typeLabel = APPOINTMENT_TYPE_LABELS;
 

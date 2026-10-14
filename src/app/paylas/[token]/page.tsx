@@ -67,7 +67,8 @@ async function fetchDescription(
 }
 
 // Paylaşım linkleri kişiye özeldir → arama motorlarına kapalı; ana dağıtım kanalı
-// WhatsApp olduğundan og:image (kapak fotoğrafı) önizleme kartı için kritiktir.
+// WhatsApp olduğundan önizleme kartı kritiktir: görsel `opengraph-image.tsx` (ofis markası + kapak fotoğrafı,
+// fotoğrafsız ilanda markalı yedek kart; tek kaynak src/lib/public-link-og.ts).
 export async function generateMetadata({
   params,
 }: {
@@ -123,7 +124,7 @@ export async function generateMetadata({
       title,
       description,
     },
-    twitter: { card: "summary", title, description },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 
