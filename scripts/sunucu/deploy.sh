@@ -8,6 +8,7 @@
 # ve betik exit 1 ile biter. ACL_GATE=strict → ACL denetimi başarısızsa yayın durur (varsayılan: uyarı).
 # Sürüm geçmişi (DG5): yayın sonunda (yayında / geri dönüldü / başarısız) public.release_history'ye bir satır yazılır
 # (/admin/sistem?sekme=durum). Tablo yoksa ya da yazım başarısızsa yalnız uyarı basılır; yayın sonucu değişmez.
+# Yayından önce düşen çalışmalar (derleme, paket bütçesi, ACL strict…) EXIT tuzağıyla "failed" olarak yazılır.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 [ -f .env.production ] || { echo ".env.production yok"; exit 1; }
@@ -16,17 +17,22 @@ TAG=$(date -u +%Y%m%d%H%M)-$SHA
 START_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 START_S=$(date +%s)
 DB_CONTAINER=supabase-db-moqbebljyeyprktd19zb1ihn
+# YENİ sürümün RELEASE_MIGRATION'ı: yeni konteyner oluşturulunca yapılandırmasından okunur (geri dönüşten sonra
+# çalışan konteyner eski sürümdür; oradan okumak başarısız SHA'ya eski migration'ı yazardı). Erken çıkışta boş kalır.
+NEW_MIG=""
+RECORDED=0
 
 # Sürüm satırı: sonuç (ok | rolled_back | failed) + isteğe bağlı ayrıntı. Değerler psql değişkeni olarak geçer (:'ad'
 # tırnaklaması psql'de; SQL'e metin birleştirilmez). Asla betiği düşürmez.
 record_release() {
   local outcome="$1" detail="${2:-}" has mig subject actor dur
+  RECORDED=1
   has=$(docker exec "$DB_CONTAINER" psql -U postgres -d postgres -Atc "select pg_catalog.to_regclass('public.release_history') is not null" 2>/dev/null || echo f)
   if [ "$has" != "t" ]; then
     echo "[bilgi] release_history yok (migration 20261014005000 bekliyor); sürüm satırı yazılmadı"
     return 0
   fi
-  mig=$(docker exec emlaksoft-app printenv RELEASE_MIGRATION 2>/dev/null || true)
+  mig="$NEW_MIG"
   subject=$(git log -1 --format=%s 2>/dev/null || true)
   actor="${SUDO_USER:-${USER:-root}}"
   dur=$(( $(date +%s) - START_S ))
@@ -39,6 +45,16 @@ values (:'sha', :'tag', :'outcome', :'started'::timestamptz, :'dur'::integer, nu
         nullif(:'actor', ''), nullif(:'host', ''), nullif(:'detail', ''));
 SQL
 }
+
+# Yayın öncesi düşen çalışma (set -e ya da açık exit 1) için tek satır; sonucu kaydedilmiş çalışmada no-op.
+on_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ "$RECORDED" = 0 ]; then
+    record_release failed "yayından önce durdu (çıkış kodu $rc; derleme, paket bütçesi ya da ACL denetimi)" || true
+  fi
+  return "$rc"
+}
+trap on_exit EXIT
 
 # Geri dönüş için yayındaki imaj (ilk kurulumda boş). Derleme `latest` etiketini yeni imaja taşıdığından
 # yayındaki imaj `latest` ise kimliği önce sabit bir etikete bağlanır.
@@ -108,6 +124,8 @@ wait_healthy() {
 }
 
 APP_TAG="$TAG" docker compose -f deploy/compose.prod.yml up -d --remove-orphans
+NEW_MIG=$(docker inspect emlaksoft-app --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+  | sed -n 's/^RELEASE_MIGRATION=//p' | head -n1 || true)
 echo "Yayında: emlaksoft-app:$TAG — sağlık bekleniyor"
 # Disk: son 3 sürüm imajı (+ latest/onceki ve yayındaki) kalır; eski derleme önbelleği temizlenir.
 prune_images() {

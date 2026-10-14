@@ -3,10 +3,13 @@ import {
   dailyUptime,
   formatDuration,
   formatUptime,
+  isMissingTableError,
   maintenanceActive,
+  maintenanceOverdue,
   overallStatus,
   overallUptime,
   parseIstanbulLocal,
+  statusReadable,
   toIstanbulLocal,
   type PublicIncident,
 } from "./model";
@@ -103,5 +106,35 @@ describe("overallStatus", () => {
     expect(maintenanceActive(m, Date.parse("2026-10-14T11:00:00Z"))).toBe(false);
     expect(overallStatus({ incidents: [m], outageOpen: false, nowMs: NOW, readable: true })).toBe("maintenance");
     expect(maintenanceActive({ ...m, status: "completed" }, NOW)).toBe(false);
+  });
+});
+
+describe("maintenanceOverdue", () => {
+  const m = inc({ kind: "maintenance", status: "scheduled", scheduledStart: "2026-10-14T08:00:00Z", scheduledEnd: "2026-10-14T10:00:00Z" });
+  it("pencere geçmiş ve hâlâ Planlandı → kapatılmayı bekliyor", () => {
+    expect(maintenanceOverdue(m, Date.parse("2026-10-14T11:00:00Z"))).toBe(true);
+    expect(maintenanceOverdue(m, NOW)).toBe(false);
+  });
+  it("sürüyor/tamamlandı ya da olay türü ise değil", () => {
+    const later = Date.parse("2026-10-14T11:00:00Z");
+    expect(maintenanceOverdue({ ...m, status: "in_progress" }, later)).toBe(false);
+    expect(maintenanceOverdue({ ...m, status: "completed" }, later)).toBe(false);
+    expect(maintenanceOverdue(inc({ scheduledEnd: "2026-10-14T10:00:00Z" }), later)).toBe(false);
+  });
+});
+
+describe("statusReadable", () => {
+  const boom = { code: "57014", message: "timeout" };
+  it("ölçüm hatası → okunamaz", () => {
+    expect(statusReadable({ outage: boom, incidents: [] })).toBe(false);
+  });
+  it("olay okuması tablo eksikliği dışında düşerse okunamaz (açık kritik olay sessizce kaybolmasın)", () => {
+    expect(statusReadable({ outage: null, incidents: [null, boom, null] })).toBe(false);
+    expect(overallStatus({ incidents: [], outageOpen: false, nowMs: NOW, readable: statusReadable({ outage: null, incidents: [boom] }) })).toBe("unknown");
+  });
+  it("tablo yok (kurulum bekliyor) okunamama sayılmaz", () => {
+    expect(isMissingTableError({ code: "42P01" })).toBe(true);
+    expect(isMissingTableError({ code: "PGRST205" })).toBe(true);
+    expect(statusReadable({ outage: null, incidents: [{ code: "42P01" }, { code: "PGRST205" }, null] })).toBe(true);
   });
 });

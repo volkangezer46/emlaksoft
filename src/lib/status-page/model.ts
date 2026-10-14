@@ -173,6 +173,32 @@ export function maintenanceActive(i: Pick<PublicIncident, "kind" | "status" | "s
 }
 
 /**
+ * Penceresi geçmiş ama hâlâ "Planlandı" duran bakım (admin kapatmayı unutmuş). Kamu sayfasında güncel listede
+ * gösterilmez (bitmiş bakım "Planlandı" kalmasın); admin ekranında "kapatılmayı bekliyor" uyarısı alır.
+ */
+export function maintenanceOverdue(i: Pick<PublicIncident, "kind" | "status" | "scheduledEnd">, nowMs: number): boolean {
+  if (i.kind !== "maintenance" || i.status !== "scheduled" || !i.scheduledEnd) return false;
+  const e = new Date(i.scheduledEnd).getTime();
+  return Number.isFinite(e) && nowMs >= e;
+}
+
+type ReadError = { code?: string; message?: string } | null | undefined;
+
+/** Tablo yok hatası (migration bekliyor): okunamama sayılmaz, "kurulum bekliyor" olarak gösterilir. */
+export function isMissingTableError(e: ReadError): boolean {
+  return Boolean(e && (e.code === "42P01" || e.code === "PGRST205"));
+}
+
+/**
+ * Kamu durumu güvenilir mi: ölçüm (alert_events) okunmalı VE olay/güncelleme okumaları tablo eksikliği dışında
+ * bir hatayla düşmemeli. Aksi halde açık kritik olay sessizce kaybolup "Tüm sistemler çalışıyor" görünürdü.
+ */
+export function statusReadable(errors: { outage: ReadError; incidents: readonly ReadError[] }): boolean {
+  if (errors.outage) return false;
+  return errors.incidents.every((e) => !e || isMissingTableError(e));
+}
+
+/**
  * Genel durum: açık olayların en ağır etkisi; olay yokken ölçülen kesinti açıksa "Kısmi kesinti", bakım sürüyorsa
  * "Planlı bakım", aksi halde "Tüm sistemler çalışıyor". Veri okunamadıysa "unknown" (sahte yeşil yok).
  */

@@ -14,6 +14,7 @@ import {
   isClosedStatus,
   KIND_LABEL,
   maintenanceActive,
+  maintenanceOverdue,
   OVERALL_LABEL,
   overallStatus,
   overallUptime,
@@ -103,12 +104,13 @@ export default async function StatusPage() {
   const nowMs = clockNow();
   const status = await loadPublicStatus(nowMs);
   const days = dailyUptime(status.outages, nowMs, UPTIME_DAYS);
-  const total = status.readable ? overallUptime(days) : null;
+  const total = status.uptimeReadable ? overallUptime(days) : null;
   const level = overallStatus({ incidents: status.incidents, outageOpen: status.outageOpen, nowMs, readable: status.readable });
   const Tone = TONE[level];
 
-  // Üstte: açık olaylar ve sürmekte/yaklaşan bakımlar. Altta: son 14 günde kapananlar.
-  const current = status.incidents.filter((i) => !isClosedStatus(i.status)).sort((a, b) => {
+  // Üstte: açık olaylar ve sürmekte/yaklaşan bakımlar (penceresi geçmiş "Planlandı" bakım gösterilmez; admin
+  // ekranında "kapatılmayı bekliyor" uyarısı alır). Altta: son 14 günde kapananlar.
+  const current = status.incidents.filter((i) => !isClosedStatus(i.status) && !maintenanceOverdue(i, nowMs)).sort((a, b) => {
     const rank = (x: PublicIncident) => (x.kind === "incident" ? 0 : maintenanceActive(x, nowMs) ? 1 : 2);
     return rank(a) - rank(b) || (a.scheduledStart ?? a.startedAt).localeCompare(b.scheduledStart ?? b.startedAt);
   });

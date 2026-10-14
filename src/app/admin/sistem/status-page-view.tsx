@@ -19,6 +19,7 @@ import {
   INCIDENT_STATUSES,
   isClosedStatus,
   KIND_LABEL,
+  maintenanceOverdue,
   OVERALL_LABEL,
   overallStatus,
   overallUptime,
@@ -115,6 +116,7 @@ export async function StatusPageView() {
           <ul className="divide-y divide-line">
             {data.incidents.map((i) => {
               const closed = isClosedStatus(i.status);
+              const overdue = maintenanceOverdue(i, nowMs);
               return (
                 <li key={i.id} className="space-y-3 px-5 py-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -123,6 +125,7 @@ export async function StatusPageView() {
                         <Badge variant={i.kind === "maintenance" ? "info" : closed ? "neutral" : i.impact === "critical" ? "danger" : "warning"}>{KIND_LABEL[i.kind]}</Badge>
                         {i.kind === "incident" ? <span className="text-text-muted">{IMPACT_LABEL[i.impact]}</span> : null}
                         <span className="font-semibold text-ink-950">{STATUS_LABEL[i.status]}</span>
+                        {overdue ? <Badge variant="warning">Pencere geçti · kapatılmayı bekliyor</Badge> : null}
                       </p>
                       <p className="mt-1 font-semibold text-ink-950">{i.title}</p>
                       <p className="text-xs text-text-muted">

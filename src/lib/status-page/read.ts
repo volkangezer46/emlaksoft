@@ -2,9 +2,11 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   isIncidentKind,
+  isMissingTableError as missingTable,
   isImpact,
   isStatusFor,
   PAST_INCIDENT_DAYS,
+  statusReadable,
   UPTIME_DAYS,
   type AnyStatus,
   type Outage,
@@ -23,7 +25,6 @@ function db() {
 }
 
 const DAY_MS = 86_400_000;
-const missingTable = (e: { code?: string; message?: string } | null) => Boolean(e && (e.code === "42P01" || e.code === "PGRST205"));
 
 type IncidentRow = {
   id: string;
@@ -60,20 +61,23 @@ function toIncident(r: IncidentRow, updates: UpdateRow[]): PublicIncident | null
   };
 }
 
-async function readUpdates(ids: string[]): Promise<UpdateRow[]> {
-  if (ids.length === 0) return [];
+/** Güncelleme metinleri; hata da döner (kamu okuyucusu tablo eksikliği dışındaki hatayı "okunamadı" sayar). */
+async function readUpdates(ids: string[]): Promise<{ rows: UpdateRow[]; error: { code?: string; message?: string } | null }> {
+  if (ids.length === 0) return { rows: [], error: null };
   const { data, error } = await db()
     .from("status_incident_updates")
     .select("incident_id, status, message, created_at")
     .in("incident_id", ids)
     .order("created_at", { ascending: false })
     .limit(500);
-  return error ? [] : ((data ?? []) as UpdateRow[]);
+  return error ? { rows: [], error } : { rows: (data ?? []) as UpdateRow[], error: null };
 }
 
 export type PublicStatus = {
-  /** Ölçüm (alert_events) okunabildi mi; okunamadıysa genel durum "bilinmiyor". */
+  /** Ölçüm (alert_events) ve olaylar okunabildi mi (tablo eksikliği hariç); okunamadıysa genel durum "bilinmiyor". */
   readable: boolean;
+  /** Yalnız ölçüm (alert_events) okunabildi mi; erişilebilirlik çubuğu buna bağlı. */
+  uptimeReadable: boolean;
   /** Olay tabloları yok (migration 20261014005000 bekliyor). */
   setupPending: boolean;
   /** Açık olaylar, sürmekte/yaklaşan bakımlar ve son 14 günde kapananlar. */
@@ -102,17 +106,19 @@ export async function loadPublicStatus(nowMs: number): Promise<PublicStatus> {
     const setupPending = missingTable(openRes.error) || missingTable(recentRes.error);
     const rows = [...((openRes.error ? [] : openRes.data) ?? []), ...((recentRes.error ? [] : recentRes.data) ?? [])] as IncidentRow[];
     const updates = await readUpdates(rows.map((r) => r.id));
-    const incidents = rows.flatMap((r) => toIncident(r, updates) ?? []);
+    const incidents = rows.flatMap((r) => toIncident(r, updates.rows) ?? []);
     const outages: Outage[] = outageRes.error ? [] : ((outageRes.data ?? []) as { first_at: string; resolved_at: string | null }[]).map((o) => ({ start: o.first_at, end: o.resolved_at }));
     return {
-      readable: !outageRes.error,
+      // Olay/güncelleme okuması (tablo eksikliği dışında) düştüyse açık olay kaybolmuş olabilir → "okunamıyor".
+      readable: statusReadable({ outage: outageRes.error, incidents: [openRes.error, recentRes.error, updates.error] }),
+      uptimeReadable: !outageRes.error,
       setupPending,
       incidents,
       outages,
       outageOpen: outages.some((o) => o.end === null),
     };
   } catch {
-    return { readable: false, setupPending: false, incidents: [], outages: [], outageOpen: false };
+    return { readable: false, uptimeReadable: false, setupPending: false, incidents: [], outages: [], outageOpen: false };
   }
 }
 
@@ -161,7 +167,7 @@ export async function loadAdminStatus(nowMs: number): Promise<AdminStatusData> {
       .limit(1000),
   ]);
   const rows = (incRes.error ? [] : (incRes.data ?? [])) as (IncidentRow & { created_at: string; updated_at: string })[];
-  const updates = await readUpdates(rows.map((r) => r.id));
+  const updates = (await readUpdates(rows.map((r) => r.id))).rows;
   const incidents = rows
     .flatMap((r) => {
       const i = toIncident(r, updates);

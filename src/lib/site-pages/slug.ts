@@ -29,6 +29,7 @@ export const RESERVED_ROUTE_DIRS = [
   "danisman",
   "davet-kosullari",
   "degerleme-raporu",
+  "durum",
   "evrak",
   "fiyatlar",
   "fonts",
