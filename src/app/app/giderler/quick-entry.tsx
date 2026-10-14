@@ -1,253 +1,214 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowDownCircle, ArrowUpCircle, ChevronDown } from "lucide-react";
-import { recordCashEntry } from "@/app/actions/finance-accounts";
-import { useToast } from "@/components/app/toast-provider";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
-import { FormField, FormInput, FormSelect, FormError, FormTextarea } from "@/components/ui/form-controls";
-import Link from "@/components/ui/smart-link";
-import { Switch } from "@/components/ui/switch";
-import { categoriesFor, type CashDirection } from "@/lib/finance/cash/categories";
-import { cn } from "@/lib/utils";
-import { Combobox } from "@/components/ui/combobox";
+import { runWhenIdle } from "@/lib/idle";
+import type { RuleSuggestion } from "@/lib/finance/ledger/types";
+
+/**
+ * "Yeni kayıt": eski iki popup (Gelir ekle / Gider ekle) yerine TEK pencere (Gelir / Gider / Transfer).
+ * API GERİYE UYUMLU: Kasam (`/app/hesabim?sekme=kasam`) `QuickEntryButtons accounts defaultDate canSalary` ile aynen çalışır
+ * (kişisel hesap → eski `recordCashEntry` yolu). Muhasebe sayfası `office` + `hotkeys` ile cari, vade, KDV, ek, komut çubuğu
+ * ve klavye kısayollarını (Ctrl/⌘K, G, E, T) açar.
+ *
+ * HIZ: pencere ve komut çubuğu `next/dynamic` ile yalnız gerektiğinde iner (boşta / üzerine gelince önceden ısıtılır);
+ * tıklama anında yükleme yer tutucusu aynı karede çizilir.
+ */
 
 export type AccountOption = { id: string; name: string; kind: string; currency: string; scope: "office" | "user" };
 
-const LAST_ACCOUNT_KEY = "emlaksoft:finance:last-account";
+/** Pencerenin kategori çipleri: sistem (`CASH_CATEGORIES`) + ofisin kendi kategorileri (`x_…`). */
+export type EntryCategoryOption = {
+  value: string;
+  label: string;
+  direction: "in" | "out";
+  custom?: boolean;
+  vatRate?: number | null;
+  withholdingRate?: number | null;
+  /** Ofis gideri kaydında `expenses.category` (FinanceCategory.expenseCategory); yoksa sistem eşlemesi kullanılır. */
+  expenseCategory?: string | null;
+};
 
-function initialAccount(accounts: readonly AccountOption[]): string {
-  let saved = "";
-  try {
-    saved = window.localStorage.getItem(LAST_ACCOUNT_KEY) ?? "";
-  } catch {
-    saved = "";
-  }
-  if (accounts.some((a) => a.id === saved)) return saved;
-  return (accounts.find((a) => a.scope === "office" && a.kind === "cash") ?? accounts[0])?.id ?? "";
+export type EntryDirection = "in" | "out" | "transfer";
+
+/** Ortak istemci olayı: `window.dispatchEvent(new CustomEvent("finance:new-entry", { detail }))` pencereyi önceden doldurulmuş açar. */
+export const NEW_ENTRY_EVENT = "finance:new-entry";
+export type NewEntryDetail = {
+  direction?: EntryDirection;
+  partyId?: string;
+  /** `partyId` verilirse carinin adı (seçicide "Cari seçin" yerine görünür; ek arama yapılmaz). */
+  partyName?: string;
+  openItemId?: string;
+  attachmentId?: string;
+  amount?: number;
+  /** Komut çubuğundan gelen tek satır akıllı giriş metni. */
+  text?: string;
+};
+
+export function openNewEntry(detail: NewEntryDetail = {}): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<NewEntryDetail>(NEW_ENTRY_EVENT, { detail }));
 }
 
-/** Sayfa üstündeki iki birincil düğme: "Gelir ekle" ve "Gider ekle" (her sekmede). Tek form, 3 zorunlu alan. */
+/** Sunucu bileşenlerinden (boş durum, kartlar) "Yeni kayıt" penceresini açan küçük düğme; sayfadaki tek pencereyi olayla açar. */
+export function NewEntryButton({ detail, children, variant = "primary" }: { detail?: NewEntryDetail; children: ReactNode; variant?: "primary" | "outline" }) {
+  return (
+    <Button variant={variant} icon={Plus} onClick={() => openNewEntry(detail ?? {})} onPointerEnter={warmDialog} onFocus={warmDialog}>
+      {children}
+    </Button>
+  );
+}
+
+/** Kural önerisi (finance_rule_suggest) — sunucu eylemi olarak sayfadan gelir. */
+export type { RuleSuggestion };
+export type RuleSuggestFn = (input: { text: string; amount: number | null; direction: "in" | "out" }) => Promise<RuleSuggestion | null>;
+
+export type CommandTab = { id: string; label: string; hint: string; href: string };
+
+const loadDialog = () => import("./_components/entry-dialog");
+const loadCommandBar = () => import("./_components/command-bar");
+
+function OpeningPlaceholder() {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-end bg-ink-950/40 backdrop-blur-sm sm:place-items-center" role="status" aria-live="polite">
+      <div className="w-full rounded-t-[var(--radius-panel)] bg-surface p-6 shadow-[var(--shadow-lg)] sm:max-w-lg sm:rounded-[var(--radius-panel)]">
+        <div className="skeleton h-6 w-40 rounded" />
+        <div className="skeleton mt-4 h-11 w-full rounded-[var(--radius-control)]" />
+        <div className="skeleton mt-3 h-24 w-full rounded-[var(--radius-control)]" />
+        <span className="sr-only">Yeni kayıt penceresi açılıyor</span>
+      </div>
+    </div>
+  );
+}
+
+const EntryDialog = dynamic(() => loadDialog().then((m) => m.EntryDialog), { ssr: false, loading: OpeningPlaceholder });
+const CommandBar = dynamic(() => loadCommandBar().then((m) => m.CommandBar), { ssr: false, loading: OpeningPlaceholder });
+
+function warmDialog() {
+  loadDialog().catch(() => undefined);
+}
+
+/** Yazı alanında, değiştirici tuşla ya da açık bir pencere varken tek harf kısayolu devreye girmez. */
+function isTypingTarget(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  if (!el || typeof el.tagName !== "string") return false;
+  const tag = el.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    tag === "SELECT" ||
+    el.isContentEditable === true ||
+    el.getAttribute?.("role") === "combobox" ||
+    el.closest?.("[role='dialog'], [role='listbox'], [role='menu']") != null
+  );
+}
+
 export function QuickEntryButtons({
   accounts,
   defaultDate,
   canSalary,
+  office = false,
+  categories,
+  suggestRule,
+  hotkeys = false,
+  commandTabs,
 }: {
   accounts: readonly AccountOption[];
   /** Bugün (YYYY-MM-DD, İstanbul); sunucudan gelir — istemci saati kullanılmaz. */
   defaultDate: string;
   canSalary: boolean;
+  /** Ofis kipi: cari, vadeli, KDV/stopaj, portföy, ek ve kural önerisi alanları (Muhasebe sayfası). */
+  office?: boolean;
+  /** Ofis kategorileri dahil kategori listesi; verilmezse sistem kategorileri kullanılır. */
+  categories?: readonly EntryCategoryOption[];
+  suggestRule?: RuleSuggestFn;
+  /** Ctrl/⌘K komut çubuğu + G / E / T kısayolları (yalnız Muhasebe sayfası). */
+  hotkeys?: boolean;
+  commandTabs?: readonly CommandTab[];
 }) {
-  const [open, setOpen] = useState<CashDirection | null>(null);
+  const [entry, setEntry] = useState<(NewEntryDetail & { seq: number }) | null>(null);
+  const [command, setCommand] = useState(false);
+
+  const open = useCallback((detail: NewEntryDetail) => {
+    setCommand(false);
+    setEntry((prev) => ({ ...detail, seq: (prev?.seq ?? 0) + 1 }));
+  }, []);
+
+  // Pencere parçası boşta önceden iner: ilk tık ağ turu beklemez.
+  useEffect(() => runWhenIdle(warmDialog), []);
+
+  // Ortak olay: Cari'deki "Tahsil et", Belgeler'deki "Fişten kayıt" vb. pencereyi önceden doldurulmuş açar.
+  useEffect(() => {
+    const onEvent = (e: Event) => {
+      const d = (e as CustomEvent<NewEntryDetail | undefined>).detail ?? {};
+      open({
+        direction: d.direction === "in" || d.direction === "out" || d.direction === "transfer" ? d.direction : undefined,
+        partyId: typeof d.partyId === "string" ? d.partyId : undefined,
+        partyName: typeof d.partyId === "string" && typeof d.partyName === "string" ? d.partyName.slice(0, 120) : undefined,
+        openItemId: typeof d.openItemId === "string" ? d.openItemId : undefined,
+        attachmentId: typeof d.attachmentId === "string" ? d.attachmentId : undefined,
+        amount: typeof d.amount === "number" && Number.isFinite(d.amount) && d.amount > 0 ? d.amount : undefined,
+        text: typeof d.text === "string" ? d.text.slice(0, 300) : undefined,
+      });
+    };
+    window.addEventListener(NEW_ENTRY_EVENT, onEvent);
+    return () => window.removeEventListener(NEW_ENTRY_EVENT, onEvent);
+  }, [open]);
+
+  // Klavye: Ctrl/⌘K komut çubuğu (genel arama paletinden önce yakalanır; çubukta "Tüm uygulamada ara" var),
+  // G gelir · E gider · T transfer. Yazı alanında / açık pencerede tek harf kısayolu çalışmaz.
+  useEffect(() => {
+    if (!hotkeys) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setCommand(true);
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      if (isTypingTarget(e.target) || document.querySelector("[role='dialog']")) return;
+      const k = e.key.toLowerCase();
+      const direction: EntryDirection | null = k === "g" ? "in" : k === "e" ? "out" : k === "t" ? "transfer" : null;
+      if (!direction) return;
+      e.preventDefault();
+      // "g" genel gezinme önekidir; Muhasebe sayfasında G "Yeni gelir"dir (önek dinleyicisine gitmez).
+      e.stopImmediatePropagation();
+      open({ direction });
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [hotkeys, open]);
+
   return (
     <>
-      <Button variant="primary" icon={ArrowDownCircle} onClick={() => setOpen("in")}>
-        Gelir ekle
+      <Button variant="primary" icon={Plus} onClick={() => open({})} onPointerEnter={warmDialog} onFocus={warmDialog} aria-keyshortcuts={hotkeys ? "Control+K" : undefined}>
+        Yeni kayıt
       </Button>
-      <Button variant="outline" icon={ArrowUpCircle} onClick={() => setOpen("out")}>
-        Gider ekle
-      </Button>
-      {open ? (
-        <EntryDialog direction={open} accounts={accounts} defaultDate={defaultDate} canSalary={canSalary} onClose={() => setOpen(null)} />
-      ) : null}
-    </>
-  );
-}
-
-function EntryDialog({
-  direction,
-  accounts,
-  defaultDate,
-  canSalary,
-  onClose,
-}: {
-  direction: CashDirection;
-  accounts: readonly AccountOption[];
-  defaultDate: string;
-  canSalary: boolean;
-  onClose: () => void;
-}) {
-  const router = useRouter();
-  const { push } = useToast();
-  const income = direction === "in";
-  const categories = categoriesFor(direction).filter((c) => canSalary || c.value !== "maas");
-  const [category, setCategory] = useState("");
-  const [accountId, setAccountId] = useState(() => initialAccount(accounts));
-  const [showDate, setShowDate] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [repeat, setRepeat] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<"auto" | "approve">("auto");
-  const office = accounts.filter((a) => a.scope === "office");
-  const personal = accounts.filter((a) => a.scope === "user");
-  const chosen = accounts.find((a) => a.id === accountId);
-
-  async function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    setBusy(true);
-    setError(null);
-    const res = await recordCashEntry(direction, {
-      accountId,
-      amount: String(fd.get("amount") ?? ""),
-      category,
-      title: String(fd.get("title") ?? ""),
-      date: String(fd.get("date") ?? ""),
-      counterparty: String(fd.get("counterparty") ?? ""),
-      documentUrl: String(fd.get("documentUrl") ?? ""),
-      note: String(fd.get("note") ?? ""),
-      repeatMonthly: repeat,
-      repeatDay: String(fd.get("repeatDay") ?? ""),
-      repeatMode,
-    });
-    setBusy(false);
-    if (res.error) {
-      setError(res.error);
-      return;
-    }
-    try {
-      window.localStorage.setItem(LAST_ACCOUNT_KEY, accountId);
-    } catch {
-      /* tercih saklanamadı: sorun değil */
-    }
-    push(income ? "Gelir kaydedildi" : "Gider kaydedildi", "ok");
-    if (res.info) push(res.info, "err");
-    else if (repeat) push("Gelecek aydan itibaren her ay tekrarlanacak", "ok");
-    onClose();
-    router.refresh();
-  }
-
-  return (
-    <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
-      <DialogContent size="md">
-        <DialogHeader
-          title={income ? "Gelir ekle" : "Gider ekle"}
-          description="Tutar, ne için ve hangi hesap — gerisi isteğe bağlı."
-          icon={income ? <ArrowDownCircle /> : <ArrowUpCircle />}
+      <span className="hidden items-center gap-1 sm:inline-flex">
+        <Button variant="outline" size="sm" icon={ArrowDownCircle} onClick={() => open({ direction: "in" })} onPointerEnter={warmDialog} aria-keyshortcuts={hotkeys ? "G" : undefined} title={hotkeys ? "Gelir (G)" : undefined}>
+          Gelir
+        </Button>
+        <Button variant="outline" size="sm" icon={ArrowUpCircle} onClick={() => open({ direction: "out" })} onPointerEnter={warmDialog} aria-keyshortcuts={hotkeys ? "E" : undefined} title={hotkeys ? "Gider (E)" : undefined}>
+          Gider
+        </Button>
+      </span>
+      {entry ? (
+        <EntryDialog
+          key={entry.seq}
+          initial={entry}
+          accounts={accounts}
+          defaultDate={defaultDate}
+          canSalary={canSalary}
+          office={office}
+          categories={categories}
+          suggestRule={suggestRule}
+          onClose={() => setEntry(null)}
         />
-        {accounts.length === 0 ? (
-          <DialogBody>
-            <p className="text-sm text-text-muted">Önce bir hesap açın (örneğin ofis kasası); hareketler hesaba yazılır.</p>
-            <Link href="/app/giderler?sekme=kasa-banka" className="mt-3 inline-block text-sm font-semibold text-accent-text hover:underline" onClick={onClose}>
-              Kasa ve banka sekmesine git
-            </Link>
-          </DialogBody>
-        ) : (
-          <form onSubmit={submit}>
-            <DialogBody className="grid gap-4">
-              <FormField label="Tutar" htmlFor="qe-amount" required>
-                <FormInput id="qe-amount" name="amount" inputMode="decimal" autoComplete="off" placeholder="0,00" autoFocus required />
-              </FormField>
-
-              <div>
-                <p className="mb-1.5 text-sm font-medium text-ink-950">
-                  Ne için? <span aria-hidden="true" className="text-danger-500">*</span>
-                </p>
-                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Ne için">
-                  {categories.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={category === c.value}
-                      onClick={() => setCategory(c.value)}
-                      className={cn(
-                        "focus-ring press rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11",
-                        category === c.value
-                          ? "border-brand-400/60 bg-surface-accent-soft text-accent-text"
-                          : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-accent-text",
-                      )}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-                <FormInput name="title" maxLength={160} placeholder="Açıklama (isteğe bağlı)" aria-label="Açıklama" className="mt-2" />
-              </div>
-
-              <FormField label="Hangi hesap?" htmlFor="qe-account" required hint={chosen?.scope === "user" ? "Kişisel hesap: yalnız siz görürsünüz, ofis kâr-zararına girmez." : undefined}>
-                <Combobox
-                id="qe-account"
-                value={accountId}
-                onValueChange={setAccountId}
-                required
-                options={[
-                  ...office.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Ofis hesabı" })),
-                  ...personal.map((a) => ({ value: a.id, label: `${a.name} (${a.currency})`, hint: "Kişisel hesabım" })),
-                ]}
-                placeholder="Hesap seçin"
-                searchPlaceholder="Hesap ara…"
-                emptyText="Eşleşen hesap yok"
-              />
-              </FormField>
-
-              {showDate ? (
-                <FormField label="Tarih" htmlFor="qe-date">
-                  <FormInput id="qe-date" name="date" type="date" defaultValue={defaultDate} max={defaultDate} min="2000-01-01" />
-                </FormField>
-              ) : (
-                <p className="text-xs text-text-muted">
-                  Tarih: bugün.{" "}
-                  <button type="button" onClick={() => setShowDate(true)} className="focus-ring font-semibold text-accent-text hover:underline">
-                    Tarihi değiştir
-                  </button>
-                </p>
-              )}
-
-              <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
-                <div className="flex items-center justify-between gap-3">
-                  <label htmlFor="qe-repeat" className="text-sm font-semibold text-text">
-                    Her ay tekrarla
-                    <span className="block text-xs font-normal text-text-muted">Gelecek aydan itibaren aynı tutar kendiliğinden işlenir.</span>
-                  </label>
-                  <Switch id="qe-repeat" checked={repeat} onCheckedChange={setRepeat} aria-label="Her ay tekrarla" />
-                </div>
-                {repeat ? (
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <FormField label="Ayın kaçıncı günü?" htmlFor="qe-repeat-day" hint="31 = ayın son günü">
-                      <FormInput id="qe-repeat-day" name="repeatDay" type="number" min={1} max={31} defaultValue={Number(defaultDate.slice(8, 10))} />
-                    </FormField>
-                    <FormField label="Nasıl işlensin?" htmlFor="qe-repeat-mode">
-                      <FormSelect id="qe-repeat-mode" value={repeatMode} onChange={(e) => setRepeatMode(e.target.value as "auto" | "approve")}>
-                        <option value="auto">Otomatik kaydet</option>
-                        <option value="approve">Bana sor</option>
-                      </FormSelect>
-                    </FormField>
-                  </div>
-                ) : null}
-              </div>
-
-              <details className="group rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
-                <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-text-muted [&::-webkit-details-marker]:hidden">
-                  Ayrıntı ekle
-                  <ChevronDown className="h-4 w-4 transition group-open:rotate-180" aria-hidden="true" />
-                </summary>
-                <div className="mt-3 grid gap-3">
-                  <FormField label={income ? "Kimden?" : "Kime?"} htmlFor="qe-counterparty">
-                    <FormInput id="qe-counterparty" name="counterparty" maxLength={120} placeholder={income ? "Müşteri / kurum" : "Firma / kişi"} />
-                  </FormField>
-                  <FormField label="Belge bağlantısı" htmlFor="qe-doc" hint="Fiş, makbuz veya fatura (https://…)">
-                    <FormInput id="qe-doc" name="documentUrl" type="url" inputMode="url" maxLength={500} placeholder="https://" />
-                  </FormField>
-                  <FormField label="Not" htmlFor="qe-note">
-                    <FormTextarea id="qe-note" name="note" rows={2} maxLength={1000} />
-                  </FormField>
-                </div>
-              </details>
-
-              <FormError error={error} nextStep={null} />
-            </DialogBody>
-            <DialogFooter>
-              <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
-              <Button type="submit" variant="primary" loading={busy} disabled={!category || !accountId}>
-                {income ? "Geliri kaydet" : "Gideri kaydet"}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
-      </DialogContent>
-    </Dialog>
+      ) : null}
+      {command ? <CommandBar tabs={commandTabs ?? []} categories={categories} onClose={() => setCommand(false)} onNewEntry={(d: NewEntryDetail) => open(d)} /> : null}
+    </>
   );
 }
