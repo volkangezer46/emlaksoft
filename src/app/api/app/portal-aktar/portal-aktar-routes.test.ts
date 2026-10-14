@@ -12,6 +12,11 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({ rpc: (...
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/prospecting/district", () => ({ resolveDistrict: async () => null }));
 vi.mock("@/lib/activity", () => ({ logActivity: async () => ({ ok: true }) }));
+const authorityPublishGate = vi.fn();
+vi.mock("@/lib/eids/ledger", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/eids/ledger")>()),
+  authorityPublishGate: (...a: unknown[]) => authorityPublishGate(...a),
+}));
 
 const post = (path: string, body: unknown, headers: Record<string, string> = { "x-emlaksoft-bridge": "1", origin: "https://emlaksoft.vercel.app" }) =>
   new Request(`https://emlaksoft.vercel.app${path}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
@@ -22,6 +27,7 @@ describe("portal-aktar uçları", () => {
     getRequestUser.mockReset().mockResolvedValue({ id: "u1" });
     requirePermission.mockReset().mockResolvedValue({ ok: true, tenantId: "t1", userId: "u1", role: "advisor" });
     rpc.mockReset();
+    authorityPublishGate.mockReset().mockResolvedValue({ blocked: false });
   });
 
   it("aynı köken + özel başlık yoksa 403; oturum yoksa 401; hız sınırı (deny) 429", async () => {
@@ -60,6 +66,16 @@ describe("portal-aktar uçları", () => {
     const sent = rpc.mock.calls.at(-1)![1] as { p_code_hash: string };
     expect(sent.p_code_hash).toMatch(/^[0-9a-f]{64}$/);
     expect(JSON.stringify(rpc.mock.calls)).not.toContain("ABCDE");
+  });
+
+  it("al: kod alındıktan sonra yetki iptal edildiyse paket verilmez (EİDS kapısı tüketimde yeniden)", async () => {
+    const { POST } = await import("./al/route");
+    rpc.mockResolvedValueOnce({ data: { outcome: "ok", session_id: "s1", property_id: "p1", portal: "sahibinden" }, error: null });
+    authorityPublishGate.mockResolvedValueOnce({ blocked: true, code: "revoked", error: "Ne oldu: yetki iptal edildi. Ne yapmalı: yenileyin." });
+    const res = await POST(post("/api/app/portal-aktar/al", { code: "ABCDE-FGHJK" }));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ ok: false, error: "authority_blocked", message: expect.stringMatching(/^Ne oldu:/) });
+    expect(authorityPublishGate).toHaveBeenCalledWith(expect.anything(), "t1", "p1");
   });
 
   it("al: migration yoksa 502 schema_pending (sessiz hata değil)", async () => {

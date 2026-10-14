@@ -34,6 +34,17 @@ export function parseEidsPropertyNo(raw: unknown): EidsNoParse {
   return { ok: true, value: normalized };
 }
 
+/**
+ * Eşleştirme anahtarı (SAF): taşınmaz numarasının YALNIZ rakamları; baştaki sıfırlar KORUNUR ("00123456" aynen kalır).
+ * Bakanlık e-postasındaki "12.345.678" ile portföyde girilmiş "12345678" aynı anahtara iner. En az 6 rakam yoksa null
+ * (boş ya da anlamsız değer hiçbir portföyle eşleşmez).
+ */
+export function eidsNoMatchKey(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  const digits = String(raw).normalize("NFKC").replace(/\D+/g, "");
+  return digits.length >= EIDS_NO_MIN && digits.length <= EIDS_NO_MAX ? digits : null;
+}
+
 /** Sağlık skoru / süzgeç için: numara var ve biçimi geçerli mi. */
 export function hasValidEidsNo(value: string | null | undefined): boolean {
   return typeof value === "string" && EIDS_NO_PATTERN.test(value);

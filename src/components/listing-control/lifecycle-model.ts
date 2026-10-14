@@ -153,6 +153,10 @@ export type HealthFacts = {
   eidsNoPresent?: boolean | null;
   /** Yetki süresi 3 aydan kısa mı (EİDS kuralı). */
   authorityShort?: boolean;
+  /** Yetki defteri durumu (authority_eids_status); iptal/dolmuş/reddedilmiş = EİDS bileşeni 0. Okunamadıysa belirtilmez. */
+  eidsStatus?: string | null;
+  /** EİDS istisnası işaretli (tapu yok / yabancı malik): bileşen ölçüm dışı. */
+  eidsExempt?: boolean;
   listings: { live: boolean; verified: boolean; externalId: string | null; url: string | null; portalPrice: number | null; lastSuccessAt: string | null }[];
 };
 
@@ -175,7 +179,7 @@ export function buildHealthInputs(f: HealthFacts, nowMs: number, cfg: Pick<Listi
     freshness: f.updatedAt ? freshnessValue((nowMs - Date.parse(f.updatedAt)) / 86_400_000) : null,
     idUrlValid: live.length === 0 ? null : live.filter((l) => (l.externalId ?? "").trim() !== "" || (l.url ?? "").trim() !== "").length / live.length,
     contact: null,
-    eids: eidsHealthValue(f.eidsNoPresent ?? null, f.authorityShort ?? false),
+    eids: eidsHealthValue(f.eidsNoPresent ?? null, f.authorityShort ?? false, { status: f.eidsStatus ?? null, exempt: f.eidsExempt ?? false }),
     checkRecency: newest === null ? null : nowMs - newest <= staleMs ? 1 : 0,
   };
 }

@@ -11,6 +11,8 @@ export type EidsPropertyRow = {
   eids_property_no: string | null;
   authorization_start: string | null;
   authorization_end: string | null;
+  /** EİDS istisnası (tapu yok / yabancı malik): işaretliyse "EİDS no eksik" sayılmaz. Okunamadıysa undefined. */
+  eids_exempt_reason?: string | null;
 };
 
 /** ?yetki= süzgeç değerleri (portföy listesi URL kontratı). */
@@ -50,7 +52,7 @@ export function summarizeEids(rows: readonly EidsPropertyRow[], nowMs: number): 
     if (!isEidsInScope(r.status)) continue;
     scope += 1;
     if (hasValidEidsNo(r.eids_property_no)) withEidsNo += 1;
-    else ids.eids_eksik.push(r.id);
+    else if (!r.eids_exempt_reason) ids.eids_eksik.push(r.id);
     const t = evaluateAuthorityTerm({ start: r.authorization_start, end: r.authorization_end }, nowMs);
     if (t.state === "missing") ids.yetki_eksik.push(r.id);
     if (t.state === "expired") ids.dolmus.push(r.id);
