@@ -32,11 +32,11 @@ type RowState = { checked: boolean; action: "create" | "match" | "skip"; categor
 function initial(l: ReviewLine): RowState {
   const s = l.suggestion;
   if (s.kind === "existing") return { checked: true, action: "match", category: l.fallbackCategory };
-  if (s.kind === "collection" || s.kind === "recurring" || s.kind === "category") return { checked: true, action: "create", category: s.category };
+  if (s.kind === "collection" || s.kind === "recurring" || s.kind === "rule" || s.kind === "category") return { checked: true, action: "create", category: s.category };
   return { checked: false, action: "create", category: l.fallbackCategory };
 }
 
-const PILL: Record<Suggestion["kind"], "success" | "info" | "warning" | "neutral"> = { existing: "success", collection: "info", recurring: "info", category: "warning", none: "neutral" };
+const PILL: Record<Suggestion["kind"], "success" | "info" | "warning" | "neutral"> = { existing: "success", collection: "info", recurring: "info", rule: "info", category: "warning", none: "neutral" };
 
 /** Tek ekranda onay/düzeltme: her satır için öneri, işlem (hareket oluştur / mevcutla eşle / atla) ve kategori. */
 export function StatementReviewTable({ accountId, importIds, currency, canSalary, lines }: { accountId: string; importIds: readonly string[]; currency: string; canSalary: boolean; lines: readonly ReviewLine[] }) {

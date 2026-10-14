@@ -50,7 +50,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: async () => ({ from: (t: string) => chain(t), rpc: h.rpc }),
 }));
 
-import { createFinanceAccount, recordCashEntry, transferBetweenAccounts, updateFinanceAccount, voidCashEntry } from "./finance-accounts";
+import { createFinanceAccount, recordCashEntry, setEntriesReconciled, transferBetweenAccounts, updateFinanceAccount, voidCashEntry } from "./finance-accounts";
 import { approveRecurringOccurrence, createRecurringRule, deleteRecurringRule, setRecurringRuleActive } from "./recurring-rules";
 import { applyStatementDecisions, discardStatementImport } from "./finance-statement";
 import { saveExpensesCashSetup } from "./setup-finance";
@@ -143,6 +143,21 @@ describe("finance-accounts", () => {
     h.rpc.mockResolvedValue({ data: null, error: { code: "XX000", message: "relation \"cash_entries\" internal failure" } });
     const r = await recordCashEntry("in", { accountId: UUID_A, amount: "100", date: "2020-01-02", category: "diger", title: "Tahsilat" });
     if (r.error) expect(r.error).not.toMatch(/relation|internal/);
+  });
+
+  it("toplu mutabakat: geçersiz kimlikler RPC'ye gitmez, expenses:edit kapısı, sayı RPC'den gelir", async () => {
+    expect((await setEntriesReconciled(["abc"], true)).error).toBe("Hareket seçin.");
+    expect(h.rpc).not.toHaveBeenCalled();
+    h.denied.add("expenses:edit");
+    expect((await setEntriesReconciled([UUID_A], true)).error).toBe("Bu işlem için yetkiniz yok.");
+    expect(h.rpc).not.toHaveBeenCalled();
+    h.denied.clear();
+    h.rpc.mockResolvedValue({ data: 1, error: null });
+    const r = await setEntriesReconciled([UUID_A, UUID_A, UUID_B, "x"], true);
+    expect(r).toMatchObject({ ok: true, count: 1 });
+    expect(h.rpc).toHaveBeenCalledWith("finance_entries_set_reconciled", { p_ids: [UUID_A, UUID_B], p_reconciled: true });
+    h.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "could not find the function" } });
+    expect((await setEntriesReconciled([UUID_A], false)).error).toMatch(/kurulum bekliyor/);
   });
 });
 

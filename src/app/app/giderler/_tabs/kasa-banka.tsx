@@ -1,18 +1,25 @@
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, Landmark, Lock, ScanLine, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, FileBarChart, FileSpreadsheet, Inbox, Landmark, Lock, ScanLine, Wallet } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusPill } from "@/components/ui/list-kit";
 import { formatDateTr } from "@/lib/format";
-import { loadReconStatus, type ReconStatus } from "@/lib/finance/statement/load";
+import { now, trDayKey } from "@/lib/clock";
+import { createClient } from "@/lib/supabase/server";
+import { fetchLatestRates, type FxRates } from "@/lib/fx";
+import type { FinanceTabProps } from "@/lib/finance/ledger/types";
+import { loadMatchContext, loadPendingLines, loadReconStatus, type ReconStatus } from "@/lib/finance/statement/load";
+import { guessCategory, shiftIso, suggestAll } from "@/lib/finance/statement/match";
 import { cashCategoryLabel } from "@/lib/finance/cash/categories";
-import { ACCOUNT_KIND_LABEL } from "@/lib/finance/cash/input";
-import { loadRecentEntriesByAccount, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
+import { ACCOUNT_KIND_LABEL, isUuid } from "@/lib/finance/cash/input";
+import { isMissingCashSchema, loadAccountsWithBalances, loadRecentEntriesByAccount, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { AccountFormButton, ArchiveAccountButton, TransferButton } from "../accounts-panel";
-import { StatementReview } from "../statement-review";
+import { AccountSparkline, dailyBalanceSeries, type DayMove } from "../kasa-banka/account-sparkline";
+import { ReconcileQueue, type QueueItem } from "../kasa-banka/reconcile-queue";
+import { loadFinanceRules, StatementReview } from "../statement-review";
 import { StatementUploadButton } from "../statement-upload";
 import { FINANCE_BASE } from "./finance-shell";
 
@@ -21,20 +28,8 @@ const KIND_ICON = { cash: Banknote, bank: Landmark, card: CreditCard } as const;
 const hareketlerHref = (accountId: string) => `${FINANCE_BASE}?sekme=hareketler&hesap=${accountId}`;
 const ekstreHref = (accountId: string) => `${FINANCE_BASE}?sekme=kasa-banka&ekstre=${accountId}`;
 
-/**
- * Kasa ve banka sekmesi: hesap kartları (bakiye, son hareketler). Bakiye ve her hareket filtreli Hareketler sekmesine gider
- * (sıfır çıkmaz metrik). Kişisel hesaplar ayrı bölümde ve yalnız sahibine görünür (RLS).
- */
-export async function KasaBankaTab({
-  supabase,
-  accounts,
-  today,
-  canOffice,
-  entriesHref = hareketlerHref,
-  statementHref = ekstreHref,
-  reviewAccountId = null,
-  canSalary = false,
-}: {
+/** Kasam (ve eski çağıranlar) için: istemci ve hesaplar dışarıdan gelir. */
+export type KasaBankaProps = {
   /** Hesap -> ekstre onay ekranı adresi (Kasam kendi sayfasına yönlendirir). */
   statementHref?: (accountId: string) => string;
   /** ?ekstre= ile açılan hesap: üstte ekstre taslağı gösterilir. */
@@ -48,30 +43,111 @@ export async function KasaBankaTab({
   today: string;
   /** `expenses` oluşturma/düzenleme yetkisi: ofis hesabı açabilir ve düzenleyebilir. */
   canOffice: boolean;
-}) {
+};
+
+/**
+ * Kasa ve banka sekmesi: hesap kartları (bakiye, son 30 gün çizgisi, TL karşılığı, son hareketler), ekstre yükleme ve
+ * "İncelenecek" mutabakat kuyruğu. Bakiye ve her sayı filtreli Hareketler'e gider (sıfır çıkmaz metrik). Kişisel hesaplar
+ * ayrı bölümde ve yalnız sahibine görünür (RLS). Kasam (`KasaBankaProps`) eski görünümü aynen kullanır.
+ */
+export async function KasaBankaTab(props: FinanceTabProps | KasaBankaProps) {
+  if ("supabase" in props) return <AccountsBoard {...props} />;
+  const supabase = await createClient();
+  const cash = await loadAccountsWithBalances(supabase);
+  const ekstre = props.params.ekstre;
+  return (
+    <AccountsBoard
+      supabase={supabase}
+      accounts={cash.accounts}
+      today={trDayKey(now())}
+      canOffice={props.canCreate}
+      canSalary={props.canSalary}
+      reviewAccountId={isUuid(ekstre) ? ekstre : null}
+      finance
+      canRule={props.canEdit}
+    />
+  );
+}
+
+async function AccountsBoard({
+  supabase,
+  accounts,
+  today,
+  canOffice,
+  entriesHref = hareketlerHref,
+  statementHref = ekstreHref,
+  reviewAccountId = null,
+  canSalary = false,
+  finance = false,
+  canRule = false,
+}: KasaBankaProps & { finance?: boolean; canRule?: boolean }) {
   const active = accounts.filter((a) => !a.archived_at);
   const archived = accounts.filter((a) => a.archived_at);
   const office = active.filter((a) => a.owner_scope === "office");
   const personal = active.filter((a) => a.owner_scope === "user");
-  const [recent, recon] = await Promise.all([
+  const [recent, recon, moves, rates] = await Promise.all([
     loadRecentEntriesByAccount(supabase, active.map((a) => a.id), 3),
     loadReconStatus(supabase),
+    finance ? loadMoves(supabase, active.map((a) => a.id), shiftIso(today, -30)) : Promise.resolve(new Map<string, DayMove[] | null>()),
+    finance && active.some((a) => a.currency !== "TRY") ? fetchLatestRates(supabase) : Promise.resolve(null),
   ]);
   const reviewAccount = reviewAccountId && recon.available ? active.find((a) => a.id === reviewAccountId && (a.owner_scope === "user" || canOffice)) ?? null : null;
   const transferable = active.filter((a) => a.owner_scope === "user" || canOffice).map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
+  // Hareketi tavanı aşan hesapta (null) çizgi yanlış çıkmasın diye hiç çizilmez.
+  const series = (a: AccountWithBalance) => {
+    if (!finance) return null;
+    const m = moves.get(a.id);
+    return m === null ? null : dailyBalanceSeries(a.balance, m ?? [], today, 30);
+  };
+  const statementAccounts = active.filter((a) => a.kind !== "cash" && (a.owner_scope === "user" || canOffice));
+  const pendingTotal = recon.available ? [...recon.byAccount.values()].filter((r) => active.some((a) => a.id === r.account_id)).reduce((s, r) => s + r.pending_lines, 0) : 0;
+  const officeTry = tryTotal(office, rates);
 
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-2">
         <AccountFormButton canOffice={canOffice} today={today} />
         <TransferButton accounts={transferable} today={today} />
+        {finance ? (
+          <Link
+            href={`${FINANCE_BASE}?sekme=raporlar&rapor=hesap-ekstresi`}
+            className="focus-ring inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-control)] px-2.5 text-xs font-semibold text-accent-text hover:bg-surface-hover touch:min-h-11"
+          >
+            <FileBarChart className="h-3.5 w-3.5" aria-hidden="true" /> Hesap ekstresi raporu
+          </Link>
+        ) : null}
         <p className="text-xs text-text-muted">Bakiye = açılış bakiyesi + girişler − çıkışlar. Hesap bakiyesi hareketlerden hesaplanır, elle değiştirilmez.</p>
       </div>
+
+      {finance && office.length > 1 && officeTry !== null ? (
+        <Link href={`${FINANCE_BASE}?sekme=hareketler&kaynak=hareket`} className="focus-ring surface-card group flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[var(--radius-panel)] px-4 py-3">
+          <span className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Ofis hesapları toplamı (TL karşılığı)</span>
+          <span className="numeric font-display text-xl font-extrabold text-text">{formatAccountMoney(officeTry.total, "TRY")}</span>
+          {officeTry.note ? <span className="text-xs text-text-muted">{officeTry.note}</span> : null}
+        </Link>
+      ) : null}
 
       {reviewAccount ? (
         <Suspense fallback={<Skeleton className="h-40 w-full" />}>
           <StatementReview supabase={supabase} account={reviewAccount} canSalary={canSalary} />
         </Suspense>
+      ) : null}
+
+      {finance && recon.available && statementAccounts.length > 0 ? (
+        <StatementStrip accounts={statementAccounts} recon={recon.byAccount} statementHref={statementHref} pendingTotal={pendingTotal} />
+      ) : null}
+
+      {finance && recon.available && pendingTotal > 0 && !reviewAccount ? (
+        <section aria-label="İncelenecek" className="grid gap-2">
+          <h2 className="flex items-center gap-1.5 font-display text-base font-bold text-text">
+            <Inbox className="h-4 w-4 text-accent-text" aria-hidden="true" /> İncelenecek
+            <span className="numeric rounded-full bg-surface-accent-soft px-2 text-xs text-accent-text">{pendingTotal}</span>
+          </h2>
+          <p className="text-xs text-text-muted">Ekstre satırları için önerilen eşleşmeyi tek tıkla onaylayın. Sık gelen açıklamaları kural olarak kaydedin; sonraki ekstrede aynı kategori önerilir.</p>
+          <Suspense fallback={<Skeleton className="h-32 w-full" />}>
+            <ReconcileQueueSection supabase={supabase} accounts={active.filter((a) => (recon.byAccount.get(a.id)?.pending_lines ?? 0) > 0 && (a.owner_scope === "user" || canOffice))} canSalary={canSalary} canRule={canRule} statementHref={statementHref} />
+          </Suspense>
+        </section>
       ) : null}
 
       {active.length === 0 ? (
@@ -87,7 +163,7 @@ export async function KasaBankaTab({
       {office.length > 0 ? (
         <Section title="Ofis hesapları" hint="Ofis kasası ve bankaları. Gelir ve giderleri ofis kâr-zararına yansır.">
           {office.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage={canOffice} canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} series={series(a)} rates={rates} />
           ))}
         </Section>
       ) : null}
@@ -95,7 +171,7 @@ export async function KasaBankaTab({
       {personal.length > 0 ? (
         <Section title="Kişisel hesaplarım" hint="Yalnız siz görürsünüz; ofis sahibi dahil kimse göremez ve ofis kâr-zararına girmez." icon={<Lock className="h-3.5 w-3.5" aria-hidden="true" />}>
           {personal.map((a) => (
-            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} />
+            <AccountCard key={a.id} account={a} recent={recent.get(a.id) ?? []} today={today} canManage canOffice={canOffice} entriesHref={entriesHref} statementHref={statementHref} recon={recon.available ? recon.byAccount.get(a.id) ?? null : undefined} series={series(a)} rates={rates} />
           ))}
         </Section>
       ) : null}
@@ -118,6 +194,140 @@ export async function KasaBankaTab({
   );
 }
 
+/**
+ * Son 30 günün (ve ileri tarihli) hareketleri, çizgi için. Hesap başına paralel sorgu ve hesap başına tavan: tek ortak
+ * sınır yoğun bir hesabın diğerlerini kesmesine yol açardı. Tavanı aşan hesap `null` döner (çizgi çizilmez, yanlış çizilmez).
+ * İleri tarihli hareketler de gelir: bakiye onları içerir, seri onları başlangıçtan düşer (dailyBalanceSeries).
+ */
+const MOVES_CAP = 2000;
+async function loadMoves(supabase: SupabaseClient, accountIds: readonly string[], since: string): Promise<Map<string, DayMove[] | null>> {
+  const out = new Map<string, DayMove[] | null>();
+  if (accountIds.length === 0) return out;
+  const results = await Promise.all(
+    accountIds.map(async (id) => {
+      const { data, error } = await supabase
+        .from("cash_entries")
+        .select("direction, amount, entry_date")
+        .eq("account_id", id)
+        .is("voided_at", null)
+        .gte("entry_date", since)
+        .limit(MOVES_CAP + 1);
+      return { id, data, error };
+    }),
+  );
+  for (const { id, data, error } of results) {
+    if (error) {
+      if (!isMissingCashSchema(error)) console.error("loadMoves", { code: error.code });
+      out.set(id, null);
+      continue;
+    }
+    const rows = (data ?? []) as Record<string, unknown>[];
+    if (rows.length > MOVES_CAP) {
+      out.set(id, null);
+      continue;
+    }
+    out.set(id, rows.map((r) => ({ date: String(r.entry_date), direction: r.direction === "in" ? "in" : "out", amount: Number(r.amount ?? 0) })));
+  }
+  return out;
+}
+
+/** Döviz -> TL (TCMB satış kuru, tcmb_rates). Kur yoksa null: uydurma kur kullanılmaz. */
+function tryOf(a: Pick<AccountWithBalance, "balance" | "currency">, rates: FxRates | null): number | null {
+  if (a.currency === "TRY") return a.balance;
+  const rate = a.currency === "USD" ? rates?.usd : a.currency === "EUR" ? rates?.eur : null;
+  return rate ? Math.round(a.balance * rate * 100) / 100 : null;
+}
+
+function tryTotal(accounts: readonly AccountWithBalance[], rates: FxRates | null): { total: number; note: string | null } | null {
+  if (accounts.length === 0) return null;
+  let total = 0;
+  let missing = 0;
+  for (const a of accounts) {
+    const v = tryOf(a, rates);
+    if (v === null) missing += 1;
+    else total += v;
+  }
+  const hasFx = accounts.some((a) => a.currency !== "TRY");
+  const note = missing > 0 ? `${missing} döviz hesabı kur bulunamadığı için dahil değil` : hasFx && rates ? `TCMB satış kuru, ${formatDateTr(rates.rateDate)}` : null;
+  return { total: Math.round(total * 100) / 100, note };
+}
+
+/** Ekstre yükleme şeridi: banka/kart hesabı başına belirgin düğme; henüz hiç ekstre yoksa adımları anlatır. */
+function StatementStrip({ accounts, recon, statementHref, pendingTotal }: { accounts: readonly AccountWithBalance[]; recon: Map<string, ReconStatus>; statementHref: (id: string) => string; pendingTotal: number }) {
+  const anyImport = accounts.some((a) => recon.get(a.id)?.has_import);
+  return (
+    <section aria-label="Banka ekstresi" className="surface-card grid gap-3 rounded-[var(--radius-panel)] p-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)] bg-surface-accent-soft text-accent-text">
+          <FileSpreadsheet className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-base font-bold text-text">{anyImport ? "Ekstre yükle" : "Bankanızla mutabık kalın"}</h2>
+          {anyImport ? (
+            <p className="text-xs text-text-muted">
+              Yeni ekstreyi yükleyin; kayıtlı hareketler otomatik eşleşir, kalanlar için öneri çıkar.{pendingTotal > 0 ? ` Şu an ${pendingTotal} satır inceleme bekliyor.` : ""}
+            </p>
+          ) : (
+            <ol className="mt-1 grid gap-0.5 text-xs text-text-muted sm:grid-cols-3 sm:gap-3">
+              <li><strong className="text-text">1. Yükleyin:</strong> bankanızın internet şubesinden aldığınız CSV, Excel ya da OFX dosyası.</li>
+              <li><strong className="text-text">2. Eşleştirin:</strong> kayıtlı hareketler, tahsilatlar ve düzenli ödemeler otomatik bulunur.</li>
+              <li><strong className="text-text">3. Onaylayın:</strong> kalan satırlar tek tıkla hesaba işlenir ve mutabık sayılır.</li>
+            </ol>
+          )}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {accounts.map((a) => (
+          <StatementUploadButton key={a.id} accountId={a.id} accountName={a.name} reviewHref={statementHref(a.id)} currency={a.currency} prominent />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Kuyruk verisi: bekleyen satırlar + öneriler (hesap başına paralel; ofis kuralları tek okuma). Akışla gelir (Suspense). */
+const QUEUE_LIMIT = 25;
+async function ReconcileQueueSection({
+  supabase,
+  accounts,
+  canSalary,
+  canRule,
+  statementHref,
+}: {
+  supabase: SupabaseClient;
+  accounts: readonly AccountWithBalance[];
+  canSalary: boolean;
+  canRule: boolean;
+  statementHref: (id: string) => string;
+}) {
+  const financeRules = await loadFinanceRules(supabase);
+  const perAccount = await Promise.all(
+    accounts.slice(0, 6).map(async (account) => {
+      const lines = await loadPendingLines(supabase, account.id);
+      if (lines.length === 0) return [] as QueueItem[];
+      const ctx = await loadMatchContext(supabase, account.id, lines, account.owner_scope === "office" && account.currency === "TRY");
+      const suggestions = suggestAll(lines, { ...ctx, financeRules: account.owner_scope === "office" ? financeRules : [], canSalary });
+      return lines.map((l): QueueItem => ({
+        lineId: l.id,
+        accountId: account.id,
+        accountName: account.name,
+        currency: account.currency,
+        date: l.date,
+        dir: l.dir,
+        amount: l.amount,
+        description: l.description,
+        suggestion: suggestions.get(l.id) ?? { kind: "none" },
+        fallbackCategory: guessCategory(l.description, l.dir, canSalary).category,
+        reviewHref: statementHref(account.id),
+        scope: account.owner_scope === "user" ? "personal" : "office",
+      }));
+    }),
+  );
+  // Önerisi olan satırlar önce (tek tıkla bitecek iş), sonra yeniden eskiye.
+  const all = perAccount.flat().sort((a, b) => Number(b.suggestion.kind !== "none") - Number(a.suggestion.kind !== "none") || b.date.localeCompare(a.date));
+  return <ReconcileQueue items={all.slice(0, QUEUE_LIMIT)} total={all.length} canSalary={canSalary} canRule={canRule} />;
+}
+
 function Section({ title, hint, icon, children }: { title: string; hint: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section aria-label={title}>
@@ -137,6 +347,8 @@ function AccountCard({
   entriesHref,
   statementHref,
   recon,
+  series,
+  rates,
 }: {
   entriesHref: (accountId: string) => string;
   statementHref: (accountId: string) => string;
@@ -147,9 +359,17 @@ function AccountCard({
   today: string;
   canManage: boolean;
   canOffice: boolean;
+  /** Son 30 gün gün sonu bakiyeleri (Kasam'da yok). */
+  series: { date: string; balance: number }[] | null;
+  rates: FxRates | null;
 }) {
   const Icon = KIND_ICON[a.kind];
   const negative = a.balance < 0;
+  const tl = a.currency !== "TRY" ? tryOf(a, rates) : null;
+  // 30 günlük değişim serinin kendi uçlarından: bakiye ileri tarihli hareketleri içerebilir, bugünkü nokta içermez.
+  const first = series?.[0]?.balance ?? null;
+  const last = series?.[series.length - 1]?.balance ?? null;
+  const delta = first !== null && last !== null ? Math.round((last - first) * 100) / 100 : null;
   return (
     <article className="flex flex-col gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
       <header className="flex items-start justify-between gap-2">
@@ -166,9 +386,19 @@ function AccountCard({
         {a.owner_scope === "user" ? <StatusPill tone="neutral" dot={false}>Kişisel</StatusPill> : null}
       </header>
 
-      <Link href={entriesHref(a.id)} className="focus-ring group rounded-[var(--radius-control)] -mx-1 px-1" aria-label={`${a.name} hareketlerini gör`}>
-        <p className="text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Bakiye</p>
-        <p className={`numeric font-display text-2xl font-extrabold ${negative ? "text-danger-strong" : "text-text"}`}>{formatAccountMoney(a.balance, a.currency)}</p>
+      <Link href={entriesHref(a.id)} className="focus-ring group -mx-1 flex items-end justify-between gap-3 rounded-[var(--radius-control)] px-1" aria-label={`${a.name} hareketlerini gör`}>
+        <span className="min-w-0">
+          <span className="block text-xs font-semibold uppercase tracking-[0.06em] text-text-faint">Bakiye</span>
+          <span className={`numeric block font-display text-2xl font-extrabold ${negative ? "text-danger-strong" : "text-text"}`}>{formatAccountMoney(a.balance, a.currency)}</span>
+          {tl !== null ? <span className="numeric block text-xs text-text-muted">≈ {formatAccountMoney(tl, "TRY")}</span> : null}
+          {delta !== null && delta !== 0 ? (
+            <span className={`numeric block text-xs ${delta > 0 ? "text-success-strong" : "text-danger-strong"}`}>
+              {delta > 0 ? "+" : "−"}
+              {formatAccountMoney(Math.abs(delta), a.currency)} son 30 gün
+            </span>
+          ) : null}
+        </span>
+        {series ? <AccountSparkline series={series} label={`${a.name}: son 30 gün bakiye çizgisi`} /> : null}
       </Link>
 
       <dl className="grid grid-cols-2 gap-2 text-xs">

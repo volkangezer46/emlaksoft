@@ -27,13 +27,29 @@ export type Suggestion =
   | { kind: "existing"; entryId: string; label: string; confidence: "high" | "medium" }
   | { kind: "collection"; source: "commission" | "rent" | "building"; sourceId: string; category: string; label: string }
   | { kind: "recurring"; ruleId: string; category: string; title: string; label: string }
+  | { kind: "rule"; ruleId: string; category: string; partyId: string | null; mode: "suggest" | "auto"; label: string }
   | { kind: "category"; category: string; label: string }
   | { kind: "none" };
+
+/** Ofisin kaydettiği otomatik kategori kuralı (finance_rules satırının eşleştirmede kullanılan kısmı). */
+export type FinanceRuleLike = {
+  id: string;
+  direction: CashDirection | null;
+  matchText: string | null;
+  ibanLast4: string | null;
+  amountMin: number | null;
+  amountMax: number | null;
+  category: string;
+  partyId: string | null;
+  mode: "suggest" | "auto";
+};
 
 export type MatchContext = {
   entries: readonly EntryCandidate[];
   collections: readonly CollectionCandidate[];
   rules: readonly RuleCandidate[];
+  /** Ofisin kategori kuralları (finance_rules); düzenli ödemeden sonra, anahtar sözcük tahmininden önce denenir. */
+  financeRules?: readonly FinanceRuleLike[];
   /** Maaş kategorisini önerebilir mi (yalnız ofis sahibi / GM). */
   canSalary: boolean;
 };
@@ -213,8 +229,62 @@ export function suggestAll(lines: readonly MatchLine[], ctx: MatchContext): Map<
       continue;
     }
 
+    const byRule = ctx.financeRules?.length ? suggestFromRules(l, ctx.financeRules, ctx.canSalary) : null;
+    if (byRule) {
+      out.set(l.id, byRule);
+      continue;
+    }
+
     const guess = guessCategory(l.description, l.dir, ctx.canSalary);
     out.set(l.id, guess.matched ? { kind: "category", category: guess.category, label: "Açıklamaya göre tahmin" } : { kind: "none" });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// Ofis kuralları (finance_rules): "kural olarak kaydet" -> sonraki benzer satırda öneri
+// ---------------------------------------------------------------------------
+
+/** Banka açıklamalarında her satırda geçen, kuralı ayırt etmeyen sözcükler. */
+const RULE_NOISE = new Set([
+  "eft", "havale", "fast", "swift", "odeme", "odemesi", "islem", "islemi", "ref", "referans", "aciklama", "tl", "try", "trl",
+  "gelen", "giden", "hesap", "hesaptan", "hesaba", "musteri", "no", "nolu", "tarih", "pos", "kart", "kredi", "banka", "sube", "virman",
+]);
+
+/** Ekstre açıklamasından kural metni: ilk 3 anlamlı sözcük (rakam, kısa ve banka gürültüsü sözcükleri atılır). Boşsa "". */
+export function ruleTextFromDescription(description: string): string {
+  const words = foldHeader(description)
+    .split(" ")
+    .filter((w) => w.length >= 3 && !/^\d+$/.test(w) && !RULE_NOISE.has(w));
+  return words.slice(0, 3).join(" ");
+}
+
+/** Kural satıra uyar mı: yön, IBAN son 4, tutar aralığı ve kural metninin TÜM sözcükleri açıklamada (sözcük başı) geçmeli. */
+export function ruleMatchesLine(rule: FinanceRuleLike, line: { dir: CashDirection; amount: number; description: string; ibanLast4?: string | null }): boolean {
+  if (rule.direction && rule.direction !== line.dir) return false;
+  if (rule.amountMin !== null && line.amount < rule.amountMin) return false;
+  if (rule.amountMax !== null && line.amount > rule.amountMax) return false;
+  if (rule.ibanLast4 && rule.ibanLast4 !== (line.ibanLast4 ?? null)) return false;
+  const words = rule.matchText ? foldHeader(rule.matchText).split(" ").filter(Boolean) : [];
+  // Hiçbir koşulu olmayan kural her satıra uymasın (yalnız yön/tutar aralığıyla eşleşme yeterli değildir).
+  if (words.length === 0 && !rule.ibanLast4) return false;
+  const folded = ` ${foldHeader(line.description)} `;
+  return words.every((w) => folded.includes(` ${w}`));
+}
+
+/** İlk uyan kuraldan öneri; daha uzun metinli (daha özel) kural önce denenir. Maaş yalnız yetkiliye, kategori yönle uyumlu olmalı. */
+export function suggestFromRules(
+  line: { dir: CashDirection; amount: number; description: string; ibanLast4?: string | null },
+  rules: readonly FinanceRuleLike[],
+  canSalary: boolean,
+): Extract<Suggestion, { kind: "rule" }> | null {
+  const ordered = [...rules].sort((a, b) => (b.matchText?.length ?? 0) - (a.matchText?.length ?? 0));
+  for (const r of ordered) {
+    if (!ruleMatchesLine(r, line)) continue;
+    if (r.category === SALARY_CATEGORY && !canSalary) continue;
+    // Ekstre onayı yalnız sistem kategorisiyle hareket üretir (finance_statement_apply); ofis kategorili kural burada önerilmez.
+    if (!isCashCategory(r.category, line.dir)) continue;
+    return { kind: "rule", ruleId: r.id, category: r.category, partyId: r.partyId, mode: r.mode, label: r.matchText ? `Kural: "${r.matchText}"` : "Ofis kuralı" };
+  }
+  return null;
 }

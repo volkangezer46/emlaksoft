@@ -262,6 +262,26 @@ export async function voidCashEntry(entryId: string, reason: string): Promise<Fi
   return { ok: true, id: entryId };
 }
 
+/**
+ * Hareketleri toplu "mutabık" işaretler ya da mutabakatı kaldırır (yalnız reconciled_at; tutar/tarih değişmez, kilitli
+ * ayda da çalışır). Hesap erişimi ve maaş gizliliği RPC'de satır satır denetlenir; uygun olmayanlar sayıya girmez.
+ * `count` = değişen satır sayısı.
+ */
+export async function setEntriesReconciled(entryIds: readonly string[], reconciled: boolean): Promise<FinanceResult & { count?: number }> {
+  const ids = [...new Set((entryIds ?? []).filter((id) => isUuid(id)))].slice(0, 500);
+  if (ids.length === 0) return { error: "Hareket seçin." };
+  const gate = await requirePermission("expenses", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("finance_entries_set_reconciled", { p_ids: ids, p_reconciled: reconciled === true });
+  if (error) {
+    if (isMissingCashSchema(error)) return { error: "Elle mutabakat için veritabanı güncellemesi henüz uygulanmamış (kurulum bekliyor)." };
+    return rpcFailure(error, "Mutabakat güncellenemedi.");
+  }
+  revalidateTenantData(gate.tenantId, [...PATHS]);
+  return { ok: true, count: Number(data ?? 0) };
+}
+
 export async function transferBetweenAccounts(input: {
   fromAccountId: string;
   toAccountId: string;
