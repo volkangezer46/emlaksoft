@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  createCustomPlan,
   resetPlanDefinition,
   saveCampaignSettings,
   savePlanDefinition,
+  setCustomPlanArchived,
   type PlanOpResult,
 } from "@/app/actions/platform-billing-plans";
 import { planAmountOf, type PlanDef } from "@/lib/billing/plans";
@@ -44,6 +46,33 @@ function Msg({ msg }: { msg: { ok: boolean; text: string } | null }) {
   );
 }
 
+/** Modül kademesi seçeneği (taban paket kimliği + görünen adı). */
+export type TierOption = { id: string; name: string };
+
+/** Paketin modül kapsamı (tek kaynak PLAN_GATES; sunucuda `gatesIncludedIn` ile hesaplanır). */
+export type ModuleScope = { included: string[]; excluded: string[] };
+
+function ModuleScopeList({ scope }: { scope: ModuleScope }) {
+  return (
+    <details className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs">
+      <summary className="cursor-pointer font-semibold text-ink-950 touch:min-h-11">
+        Dahil modüller: {scope.included.length} / {scope.included.length + scope.excluded.length} paket kilitli sayfa
+      </summary>
+      <p className="mt-2 text-text-muted">
+        Modül-paket eşlemesi kademeden gelir (tek kaynak: paket kilidi tanımları). Kademe değişirse bu paketteki ofislerin kilitleri de değişir.
+      </p>
+      <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+        {scope.included.map((t) => (
+          <li key={t} className="text-mint-700">Dahil: {t}</li>
+        ))}
+        {scope.excluded.map((t) => (
+          <li key={t} className="text-text-faint">Pakette yok: {t}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function PlanEditor({
   plan,
   customized,
@@ -51,6 +80,8 @@ export function PlanEditor({
   businessReady,
   plans,
   efValuationCost,
+  moduleScope,
+  tierOptions,
 }: {
   /** Bir değerlemenin analiz bakiyesi bedeli (tarifeden; sunucuda okunur): "yaklaşık N değerleme" canlı hesabı için. */
   efValuationCost: number;
@@ -60,6 +91,8 @@ export function PlanEditor({
   customized: boolean;
   subscribers: number;
   businessReady: boolean;
+  moduleScope: ModuleScope;
+  tierOptions: TierOption[];
 }) {
   const [open, setOpen] = useState(false);
   const { pending, msg, run } = useOp();
@@ -79,6 +112,8 @@ export function PlanEditor({
         <span>
           <span className="font-display text-base font-bold text-ink-950">{plan.name}</span>
           <span className="ml-2 font-mono text-xs text-text-faint">{plan.id}</span>
+          {plan.custom ? <span className="ml-2 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">Eklenen</span> : null}
+          {plan.archived ? <span className="ml-2 rounded-full bg-line px-2 py-0.5 text-xs font-bold text-text-muted">Arşivli</span> : null}
           {plan.hidden ? <span className="ml-2 rounded-full bg-warn-500/10 px-2 py-0.5 text-xs font-bold text-warn-600">Gizli</span> : null}
           {plan.popular ? <span className="ml-2 rounded-full bg-brand-600/10 px-2 py-0.5 text-xs font-bold text-brand-600">Öne çıkan</span> : null}
           {customized ? <span className="ml-2 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Düzenlenmiş</span> : null}
@@ -98,6 +133,17 @@ export function PlanEditor({
           }}
         >
           <input type="hidden" name="plan_id" value={plan.id} />
+          {plan.custom ? (
+            <label className={`${lbl} max-w-sm`}>
+              Modül kademesi (dahil modüller bu paketten gelir)
+              <select name="tier" defaultValue={plan.tier ?? "office"} className={`mt-1 w-full ${opFieldClass}`}>
+                {tierOptions.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <ModuleScopeList scope={moduleScope} />
           <div className="grid gap-3 sm:grid-cols-3">
             <label className={lbl}>Ad<input name="name" required maxLength={40} defaultValue={plan.name} className={`mt-1 w-full ${opFieldClass}`} /></label>
             <label className={lbl}>Üst etiket<input name="eyebrow" required maxLength={30} defaultValue={plan.eyebrow} className={`mt-1 w-full ${opFieldClass}`} /></label>
@@ -167,6 +213,22 @@ export function PlanEditor({
             <Button variant="navy" size="sm" type="submit" disabled={pending || draft.report.errors.length > 0}>
               {pending ? "Kaydediliyor…" : "Paketi kaydet"}
             </Button>
+            {plan.custom ? (
+              <Button
+                variant="outline"
+                size="sm"
+                type="button"
+                disabled={pending}
+                onClick={() => {
+                  const fd = new FormData();
+                  fd.set("plan_id", plan.id);
+                  fd.set("archived", plan.archived ? "0" : "1");
+                  run(() => setCustomPlanArchived(fd));
+                }}
+              >
+                {plan.archived ? "Arşivden çıkar" : "Arşivle (satışa kapat)"}
+              </Button>
+            ) : null}
             {customized ? (
               <Button variant="outline" size="sm"
  type="button"
@@ -186,6 +248,61 @@ export function PlanEditor({
         <div className="px-5 pb-4"><Msg msg={msg} /></div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Yeni paket ekleme. Limit, özellik, ek kullanıcı ve analiz bakiyesi seçilen kademenin güncel tanımından kopyalanır;
+ * ekledikten sonra paket kartından düzenlenir. Migration (paket kayıt defteri) yokken form kapalıdır.
+ */
+export function NewPlanForm({ tierOptions, ready }: { tierOptions: TierOption[]; ready: boolean }) {
+  const { pending, msg, run } = useOp();
+  return (
+    <details className="group rounded-[var(--radius-panel)] border border-dashed border-line-strong bg-surface">
+      <summary className="focus-ring flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-5 py-4 touch:min-h-11">
+        <span className="font-display text-base font-bold text-ink-950">Yeni paket ekle</span>
+        <span className="text-xs text-text-muted">Kademe seçin; limit ve özellikler o paketten kopyalanır</span>
+      </summary>
+      <form
+        className="space-y-3 border-t border-line px-5 py-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          run(() => createCustomPlan(fd));
+        }}
+      >
+        {!ready ? (
+          <p role="note" className="text-xs text-warn-600">
+            Yeni paket için veritabanı güncellemesi (20261014002000, paket kayıt defteri) bekleniyor; mevcut paketler düzenlenebilir.
+          </p>
+        ) : null}
+        <div className="grid gap-3 sm:grid-cols-4">
+          <label className={lbl}>
+            Kimlik (bağlantıda görünür)
+            <input name="plan_id" required pattern="[a-z][a-z0-9_]{2,31}" maxLength={32} placeholder="ör. kobi_plus" className={`mt-1 w-full font-mono ${opFieldClass}`} />
+          </label>
+          <label className={lbl}>Ad<input name="name" required maxLength={40} placeholder="ör. Ofis Plus" className={`mt-1 w-full ${opFieldClass}`} /></label>
+          <label className={lbl}>
+            Modül kademesi
+            <select name="tier" defaultValue="office" className={`mt-1 w-full ${opFieldClass}`}>
+              {tierOptions.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className={lbl}>Aylık fiyat (KDV hariç)<input name="monthly_try" required inputMode="numeric" placeholder="ör. 3990" className={`mt-1 w-full ${opFieldClass}`} /></label>
+        </div>
+        <label className="inline-flex items-center gap-2 text-xs font-semibold text-text-muted">
+          <input type="checkbox" name="hidden" /> Gizli başlat (önce ayrıntıları düzenleyip sonra yayına alın)
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="navy" size="sm" type="submit" disabled={pending || !ready}>
+            {pending ? "Ekleniyor…" : "Paketi ekle"}
+          </Button>
+          <Msg msg={msg} />
+        </div>
+      </form>
+    </details>
   );
 }
 

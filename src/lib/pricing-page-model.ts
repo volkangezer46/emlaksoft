@@ -1,7 +1,7 @@
 import { DEFAULT_YEARLY_PAID_MONTHS, PLANS, getPlan, planAmountOf, planAmountTry, yearlyDiscountPercentOf, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { EF_PLANNED_SUFFIX } from "@/lib/ef-credits/public-state-core";
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
-import { PLAN_GATES, findGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
+import { PLAN_GATES, findGate, planIncludesGate, planRank, requiredPlanName } from "@/lib/billing/page-gates";
 
 /**
  * /fiyatlar için veri modeli. Fiyat, limit ve özellik kapsamı YALNIZ
@@ -89,7 +89,7 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
     group.rows.push({
       label: gate.title,
       cells: plans.map((p) => {
-        const included = planRank(p.id) >= planRank(gate.minPlan);
+        const included = planIncludesGate(p, gate);
         return { text: included ? "Dahil" : "Pakette yok", included };
       }),
     });

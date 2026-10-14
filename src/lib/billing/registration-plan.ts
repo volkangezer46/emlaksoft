@@ -1,5 +1,9 @@
 import {
+  isPlanId,
   normalizePlanId,
+  planTierOf,
+  type CatalogPlanId,
+  type PlanDef,
   type PlanId,
 } from "@/lib/billing/plans";
 
@@ -44,15 +48,24 @@ export function minimumPlanForTeamSize(teamSize: RegistrationTeamSize): PlanId {
   return MINIMUM_PLAN_BY_TEAM_SIZE[teamSize];
 }
 
+/** Kayıtta seçilebilir katalog paketi (eklenen paket için): gizli/arşivli olmayan, kademesi bilinen. */
+export type RegistrationCatalogPlan = Pick<PlanDef, "id" | "tier" | "custom" | "hidden" | "archived">;
+
 /**
  * Keeps an intentional higher-tier pricing selection, but never provisions a
  * plan below the capacity implied by the registration team-size answer.
+ * Adminden eklenen paket (`catalog` verilirse) yayında ve kademesi bandın tabanından düşük değilse korunur.
  */
 export function registrationPlanForTeamSize(
   requestedPlan: string | null | undefined,
   teamSize: RegistrationTeamSize,
-): PlanId {
+  catalog: readonly RegistrationCatalogPlan[] = [],
+): CatalogPlanId {
   const minimumPlan = minimumPlanForTeamSize(teamSize);
+  if (requestedPlan && !isPlanId(requestedPlan)) {
+    const def = catalog.find((p) => p.id === requestedPlan && p.custom && !p.hidden && !p.archived);
+    if (def) return PLAN_RANK[planTierOf(def)] >= PLAN_RANK[minimumPlan] ? def.id : minimumPlan;
+  }
   const normalizedPlan = normalizePlanId(requestedPlan, minimumPlan);
 
   return PLAN_RANK[normalizedPlan] >= PLAN_RANK[minimumPlan]
@@ -60,11 +73,13 @@ export function registrationPlanForTeamSize(
     : minimumPlan;
 }
 
-export function defaultTeamSizeForPlan(planId: PlanId): RegistrationTeamSize {
+/** Paketin kayıt bandı; eklenen pakette (taban olmayan kimlik) `tier` kademesinin bandı. */
+export function defaultTeamSizeForPlan(planId: CatalogPlanId, tier?: PlanId | null): RegistrationTeamSize {
+  const base: PlanId = isPlanId(planId) ? planId : (tier ?? "office");
   // Gizli Business (40 kullanıcıya kadar) Profesyonel ile Kurumsal arasındadır: taban "10-50" (Profesyonel).
-  if (planId === "business") return "10-50";
+  if (base === "business") return "10-50";
   return (
-    Object.entries(MINIMUM_PLAN_BY_TEAM_SIZE).find(([, plan]) => plan === planId)?.[0] as
+    Object.entries(MINIMUM_PLAN_BY_TEAM_SIZE).find(([, plan]) => plan === base)?.[0] as
       | RegistrationTeamSize
       | undefined
   ) ?? DEFAULT_TEAM_SIZE;

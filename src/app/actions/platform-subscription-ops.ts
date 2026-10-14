@@ -16,7 +16,7 @@ import { cleanReason } from "@/lib/billing/admin-billing-fixes";
 import { invoiceAmountsTry } from "@/lib/billing/fulfillment";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
 import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { isPlanId } from "@/lib/billing/plans";
+import { isCatalogPlanKey } from "@/lib/billing/plan-overrides";
 import { loadPaidCapNetTry } from "@/lib/billing/plan-change";
 import { evaluatePause, PAUSE_ABSOLUTE_MAX_DAYS, resumedPeriodEndMs } from "@/lib/billing/pause-core";
 import { evaluateSeatChange, type SeatChangeEval } from "@/lib/billing/seat-purchase-core";
@@ -168,7 +168,7 @@ export async function adminSetPlanStatus(_prev: SubOpsResult, formData: FormData
   if ("error" in ctx) return { error: ctx.error };
   const plan = String(formData.get("plan") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
-  if (plan && !isPlanId(plan)) return { error: "Geçersiz paket." };
+  if (plan && !(isCatalogPlanKey(plan) && (await getPlanDefinitions()).some((p) => p.id === plan))) return { error: "Geçersiz paket." };
   if (status && !(TENANT_STATUSES as readonly string[]).includes(status)) return { error: "Geçersiz durum." };
 
   const { data: tenant } = await ctx.admin.from("tenants").select("plan, status, slug").eq("id", ctx.tenantId).maybeSingle();
@@ -393,7 +393,7 @@ export async function adminResumeSubscription(_prev: SubOpsResult, formData: For
 
 async function planPreview(ctx: Ctx, formData: FormData, nowMs: number): Promise<{ row: OpsSubRow; preview: AdminPlanChangePreview } | { error: string }> {
   const toPlan = String(formData.get("plan") ?? "").trim();
-  if (!isPlanId(toPlan)) return { error: "Geçersiz paket." };
+  if (!isCatalogPlanKey(toPlan)) return { error: "Geçersiz paket." };
   const timing: AdminPlanTiming = formData.get("timing") === "period_end" ? "period_end" : "now";
   const proration: AdminProration = formData.get("proration") === "none" ? "none" : "prorate";
   const loaded = await loadSub(ctx);

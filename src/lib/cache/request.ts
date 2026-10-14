@@ -2,6 +2,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { buildSampleKpiScope, getSampleScope, type SampleKpiScope } from "@/lib/sample-scope";
+import { getPlanTier } from "@/lib/billing/plan-definitions";
 
 /**
  * İstek-içi (React `cache()`) tekilleştirme yardımcıları. Süreçler/istekler
@@ -91,8 +92,11 @@ export const getTenantGateContext = cache(async (tenantId: string) => {
     : ((await (await createClient()).from("tenants").select("plan, status, created_at").eq("id", tenantId).maybeSingle()).data as
         | Pick<RequestTenantRow, "plan" | "status" | "created_at">
         | null);
+  const plan = data?.plan ?? null;
   return {
-    plan: data?.plan ?? null,
+    plan,
+    // Adminden eklenen pakette modül kademesi katalogdan (taban kimlikte katalog okunmaz).
+    tier: await getPlanTier(plan),
     trial: data?.status === "trial",
     tenantCreatedAt: data?.created_at ?? null,
   };

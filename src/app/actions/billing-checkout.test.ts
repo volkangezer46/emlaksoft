@@ -58,7 +58,13 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 vi.mock("@/lib/billing/plan-definitions", () => ({
-  getPlanDefinition: async () => ({ id: "office", monthlyTry: 2490, yearlyPaidMonths: 10, hidden: h.planHidden }),
+  // Gerçek okuyucu gibi: katalogda olmayan kimlik Ofis tanımına düşer.
+  getPlanDefinition: async (id: string) => ({
+    id: ["advisor", "office", "professional", "business", "enterprise"].includes(id) ? id : "office",
+    monthlyTry: 2490,
+    yearlyPaidMonths: 10,
+    hidden: h.planHidden,
+  }),
   getPlanDefinitions: async () => h.plans,
 }));
 vi.mock("@/lib/billing/plan-change", () => ({

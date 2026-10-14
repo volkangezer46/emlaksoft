@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLAN_USER_CAPS, PLANS, BUSINESS_PLAN_TEMPLATE } from "@/lib/billing/plans";
+import { PLAN_USER_CAPS, PLANS, BUSINESS_PLAN_TEMPLATE, type PlanId } from "@/lib/billing/plans";
 import { RECOMMENDED_CATALOG_OVERRIDES, applyPlanOverrides } from "@/lib/billing/plan-overrides";
 import { maxTotalSeats } from "@/lib/billing/seat-pricing";
 import { isEmailVerified } from "@/lib/auth/email-verification";
@@ -7,7 +7,7 @@ import { isEmailVerified } from "@/lib/auth/email-verification";
 describe("paket kullanıcı tavanları (sahip kararı 2026-10-10)", () => {
   it("tavanlar: Danışman 3, Ofis 15, Profesyonel 50, Kurumsal 500, Business 100", () => {
     expect(PLAN_USER_CAPS).toEqual({ advisor: 3, office: 15, professional: 50, business: 100, enterprise: 500 });
-    for (const p of [...PLANS, BUSINESS_PLAN_TEMPLATE]) expect(p.maxSeats).toBe(PLAN_USER_CAPS[p.id]);
+    for (const p of [...PLANS, BUSINESS_PLAN_TEMPLATE]) expect(p.maxSeats).toBe(PLAN_USER_CAPS[p.id as PlanId]);
   });
 
   it("panel kaydı tavanı yükseltemez; düşürebilir", () => {

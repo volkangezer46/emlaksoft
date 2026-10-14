@@ -58,6 +58,7 @@ import { resolveModuleState } from "@/lib/modules/logic";
 import type { AppModule } from "@/lib/permissions";
 import { planLabel } from "@/lib/billing/plans";
 import { lockedHrefs } from "@/lib/billing/page-gates";
+import { getPlanTier } from "@/lib/billing/plan-definitions";
 import { getAppActions } from "@/lib/palette-core";
 import { ICONS } from "@/lib/icons";
 import { navExtraPathOwners } from "@/lib/nav-config";
@@ -327,7 +328,7 @@ async function buildShellModel() {
   // Paket kilidi: menüde kilit simgesi gösterilecek sayfalar (platform personeli hariç)
   const lockedNavHrefs = platformStaffFullAccess
     ? []
-    : lockedHrefs({ plan: office?.plan, trial: office?.status === "trial", tenantCreatedAt: office?.created_at });
+    : lockedHrefs({ plan: office?.plan, tier: await getPlanTier(office?.plan), trial: office?.status === "trial", tenantCreatedAt: office?.created_at });
   const accessibleModules = platformStaffFullAccess
     ? NAV_MODULES
     : NAV_MODULES.filter((mod) => effectiveCanAccessModule(effectivePerms ?? {}, mod));

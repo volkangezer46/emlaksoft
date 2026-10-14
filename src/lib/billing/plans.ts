@@ -1,4 +1,12 @@
+/**
+ * TABAN (sözleşmeli) paket kimlikleri: modül/sayfa kilidi kademeleri (page-gates PLAN_ORDER) ve SQL yedek fiyatları bunlara bağlıdır.
+ * Adminden eklenen paketlerin kimliği serbesttir (`CatalogPlanId`); her biri `tier` ile bir taban kademeye bağlanır
+ * (dahil modüller o kademeden gelir; modül-plan eşlemesinin tek kaynağı `PLAN_GATES`).
+ */
 export type PlanId = "advisor" | "office" | "professional" | "business" | "enterprise";
+
+/** Katalogdaki her paketin kimliği: taban kimlikler + adminden eklenenler (`billing_plans` tablosu, slug). */
+export type CatalogPlanId = string;
 
 /** Kod varsayılanı KDV oranı (%20): ayar defterinde `billing.vat_rate` yokken/bozukken kullanılır. */
 export const DEFAULT_BILLING_VAT_RATE = 0.2;
@@ -80,7 +88,16 @@ export type SeatTier = { fromSeat: number; toSeat: number | null; monthlyTry: nu
 export type SeatRounding = "none" | "x9" | "x0";
 
 export type PlanDef = {
-  id: PlanId;
+  id: CatalogPlanId;
+  /**
+   * Modül kademesi: paketin hangi taban kademenin sayfa/modül kilitlerini açtığı (page-gates). Taban paketlerde
+   * yoktur (= kendi kimliği); adminden eklenen pakette zorunludur. Okuma her zaman `planTierOf` ile yapılır.
+   */
+  tier?: PlanId;
+  /** true: adminden eklenmiş paket (kod varsayılanı yok; tanımın tamamı katalog kaydındadır). */
+  custom?: boolean;
+  /** true: arşivlenmiş (yalnız adminden eklenen paket): satışa kapalı, listelerde yok; mevcut aboneler aynen yenilenir. */
+  archived?: boolean;
   name: string;
   monthlyTry: number;
   blurb: string;
@@ -241,7 +258,10 @@ export const PLAN_USER_CAPS: Readonly<Record<PlanId, number>> = {
   enterprise: 500,
 };
 
-const PLAN_IDS = new Set<PlanId>([...PLANS.map((plan) => plan.id), "business"]);
+/** Taban kimlikler (DB `billing_plans` seed'i ve page-gates kademeleri ile aynı küme). */
+export const BASE_PLAN_IDS: readonly PlanId[] = ["advisor", "office", "professional", "business", "enterprise"];
+
+const PLAN_IDS = new Set<string>(BASE_PLAN_IDS);
 
 export function isPlanId(value: string): value is PlanId {
   return PLAN_IDS.has(value as PlanId);
@@ -255,12 +275,18 @@ export function normalizeBillingCycle(value: string | null | undefined): Billing
   return value === "yearly" ? "yearly" : "monthly";
 }
 
+/** Paketin modül kademesi (taban pakette kendi kimliği; eklenen pakette `tier`, yoksa Ofis). */
+export function planTierOf(def: Pick<PlanDef, "id" | "tier">): PlanId {
+  if (def.tier && isPlanId(def.tier)) return def.tier;
+  return isPlanId(def.id) ? def.id : "office";
+}
+
 export function getPlan(id: string): PlanDef {
   return PLANS.find((plan) => plan.id === id) ?? PLANS[1]!;
 }
 
 /** Yıllık tutar = aylık x yıllık ödenen ay sayısı (varsayılan 10). */
-export function planAmountTry(planId: PlanId, cycle: BillingCycle): number {
+export function planAmountTry(planId: string, cycle: BillingCycle): number {
   return planAmountOf(getPlan(planId), cycle);
 }
 
@@ -285,11 +311,11 @@ export function yearlyOfferLabel(def: Pick<PlanDef, "yearlyPaidMonths">): string
   return `${months} öde 12 kullan`;
 }
 
-/** Kayıt/fiyat sayfası ve yeni ödemede gösterilecek (gizli olmayan) tanımlar, sıraya göre. */
-export function visiblePlans<T extends Pick<PlanDef, "hidden" | "order">>(defs: readonly T[]): T[] {
+/** Kayıt/fiyat sayfası ve yeni ödemede gösterilecek (gizli ve arşivli olmayan) tanımlar, sıraya göre. */
+export function visiblePlans<T extends Pick<PlanDef, "hidden" | "order" | "archived">>(defs: readonly T[]): T[] {
   return defs
     .map((d, i) => ({ d, i }))
-    .filter(({ d }) => !d.hidden)
+    .filter(({ d }) => !d.hidden && !d.archived)
     .sort((a, b) => (a.d.order ?? a.i) - (b.d.order ?? b.i))
     .map(({ d }) => d);
 }

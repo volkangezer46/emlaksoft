@@ -25,7 +25,7 @@ import { AccountCreditPanel, type CreditGrantOption, type CreditMovementRow } fr
 import { tryBalance } from "@/lib/try-credits/wallet";
 import { requirePlatformModule } from "@/lib/platform";
 import { stopImpersonation } from "@/app/actions/platform";
-import { getPlan, planLabel, PLANS } from "@/lib/billing/plans";
+import { getPlan, planLabel } from "@/lib/billing/plans";
 import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { relativeTimeTR } from "@/lib/admin-format";
 import { ActivityTimeline } from "@/components/ui/activity-timeline";
@@ -57,7 +57,7 @@ import { SubscriptionOpsConsole, SubscriptionPanel, type LimitView } from "./sub
 import { PaymentProfilePanel } from "./payment-profile-panel";
 import { loadPaymentProfile, loadSubscriptionOps } from "@/lib/billing/subscription-ops";
 import { resolveEntitlementLimit, resolveSeatLimit } from "@/lib/billing/entitlements/overrides";
-import { getPlanDefinition } from "@/lib/billing/plan-definitions";
+import { getPlanDefinition, getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { OfficeFinanceCard } from "@/app/admin/muhasebe/office-finance-card";
 import { SeatInfoCard, loadAdminSeatInfo } from "./seat-info";
 import { CORE_MODULES, moduleForAction } from "./module-map";
@@ -120,7 +120,7 @@ export default async function AdminTenantDetailPage({
 
   // Ofis satırı ve KPI okumaları yalnız `id`'ye bağlı → tek tur (önceden ardışık iki tur; ofis yoksa notFound yine kesinti).
   // CRM (AD5) başlığı da aynı turda: skor/aşama/sorumlu/etiket + "Görevlerim"; not/görev/trend yalnız İlişki sekmesinde.
-  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold] = await Promise.all([
+  const [{ data: tenant }, kpiData, crm, crmCatalog, riskThreshold, catalogDefs] = await Promise.all([
     admin
       .from("tenants")
       .select("id, name, slug, plan, status, created_at, trial_ends_at, province_id, district_id, tax_office, tax_number, license_no, address_line, city, phone")
@@ -130,12 +130,16 @@ export default async function AdminTenantDetailPage({
     loadOfficeCrm(admin, id, staff.id, active === "iliski"),
     loadCrmCatalog(admin),
     getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD),
+    getPlanDefinitions(),
   ]);
   if (!tenant) notFound();
+  // Paket seçenekleri katalogdan (adminden eklenenler dahil; arşivli paket yalnız ofisin kendi paketiyse listelenir).
+  // Business (gizli şablon) eskisi gibi listede yok; ofisin kendi paketi her zaman listede.
+  const planOptions = catalogDefs.filter((p) => p.id === tenant.plan || (!p.archived && p.id !== "business"));
 
   const base = `/admin/tenants/${id}`;
   const tabHref = (t: OfficeTab) => `${base}?sekme=${t}`;
-  const plan = getPlan(tenant.plan ?? "office");
+  const plan = catalogDefs.find((p) => p.id === tenant.plan) ?? getPlan(tenant.plan ?? "office");
   const limitRows = buildLimitRows(
     tenant.plan,
     { seats: kpiData.seats, properties: kpiData.properties, customers: kpiData.customers, branches: kpiData.branches },
@@ -237,7 +241,7 @@ export default async function AdminTenantDetailPage({
         seatLimit={plan.limits.seats}
         notes={mgmt.notes.map((n) => ({ ...n, createdLabel: relativeTimeTR(n.createdAt) }))}
         provinces={mgmt.provinces}
-        plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
+        plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry, seats: p.limits.seats }))}
         legalHref={tabHref("yasal")}
         closureRequests={mgmt.closureRequests.map((r) => ({ ...r, dueLabel: r.dueAt.slice(0, 10) }))}
         canChangeTrial={canChangeTrial(staff.role)}
@@ -331,7 +335,7 @@ export default async function AdminTenantDetailPage({
         <SubscriptionOpsConsole
           tenantId={id}
           data={ops}
-          plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
+          plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
           limits={opsLimits}
           todayKey={trDayKey(nowMs)}
         />
@@ -491,7 +495,7 @@ export default async function AdminTenantDetailPage({
               tenantId={tenant.id}
               currentPlan={tenant.plan ?? "office"}
               currentStatus={tenant.status ?? "trial"}
-              plans={PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
+              plans={planOptions.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }))}
             />
             <form action={stopImpersonation}>
               <Button variant="outline" size="md" type="submit">

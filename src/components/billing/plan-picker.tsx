@@ -6,7 +6,7 @@ import { AnimatedNumber } from "@/components/ui/animated-number";
 import { GrowBar, RiseIn } from "@/components/ui/motion/grow";
 import { useReducedMotion } from "@/components/ui/use-reduced-motion";
 import { cn } from "@/lib/utils";
-import { yearlyDiscountPercentOf, yearlyOfferLabel, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { yearlyDiscountPercentOf, yearlyOfferLabel, type BillingCycle, type PlanDef, type CatalogPlanId } from "@/lib/billing/plans";
 import type { SeatQuote } from "@/lib/billing/seat-pricing";
 import { registrationQuote, type SeatCalcOffers } from "@/lib/billing/seat-calculator-model";
 
@@ -30,9 +30,9 @@ type Props = {
   onSeatsChange: (n: number) => void;
   cycle: BillingCycle;
   onCycleChange: (c: BillingCycle) => void;
-  recommendedId: PlanId;
-  selectedId: PlanId;
-  onSelect: (id: PlanId) => void;
+  recommendedId: CatalogPlanId;
+  selectedId: CatalogPlanId;
+  onSelect: (id: CatalogPlanId) => void;
   /** Motor hiçbir paketle karşılayamıyorsa (ofis başına en çok kullanıcı aşıldı) açıklama. */
   overMaxNote: string | null;
   trialText: string;

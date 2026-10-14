@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { fulfillBillingPaymentAtomic } from "@/lib/billing/fulfillment";
 import { IYZICO_CURRENCY } from "@/lib/billing/iyzico";
-import { isPlanId, type BillingCycle } from "@/lib/billing/plans";
+import type { BillingCycle } from "@/lib/billing/plans";
+import { isCatalogPlanKey } from "@/lib/billing/plan-overrides";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EF_RPC } from "@/lib/ef-credits/config";
 import { compareReconciliation, type EfReconcileResult } from "@/lib/ef-credits/reconcile";
@@ -88,7 +89,7 @@ async function reconcileCapture(capture: CaptureRow): Promise<"fulfilled" | "ret
       const meta = (invoice?.meta ?? {}) as { plan?: string; cycle?: string };
       const plan = meta.plan ?? "";
       const cycle = meta.cycle ?? "";
-      if (!invoice || !isPlanId(plan) || !["monthly", "yearly"].includes(cycle)) {
+      if (!invoice || !isCatalogPlanKey(plan) || !["monthly", "yearly"].includes(cycle)) {
         await transitionCapture(capture.id, "refund_required", "invoice_contract_missing");
         return "refund_required";
       }

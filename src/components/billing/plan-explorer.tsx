@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 import { formatNumberTr } from "@/lib/format";
 import { efCreditsLine } from "@/lib/ef-credits/plan-credits";
 import { efPlannedLine } from "@/lib/ef-credits/public-state-core";
-import { getPlan, type BillingCycle, type PlanDef, type PlanId } from "@/lib/billing/plans";
+import { getPlan, type BillingCycle, type PlanDef, type CatalogPlanId } from "@/lib/billing/plans";
 import { registrationQuote, registrationSelection, seatBounds, type SeatCalcOffers } from "@/lib/billing/seat-calculator-model";
 
 /**
@@ -18,7 +18,7 @@ const PlanPicker = dynamic(() => import("./plan-picker").then((m) => m.PlanPicke
 });
 
 export type PlanExplorerSelection = {
-  planId: PlanId;
+  planId: CatalogPlanId;
   planName: string;
   seats: number;
   cycle: BillingCycle;
@@ -56,12 +56,12 @@ export function PlanExplorer({
   const maxSeats = seatBounds(plans).inputMax;
   const [seats, setSeats] = useState(() => Math.min(maxSeats, Math.max(1, initialSeats ?? 2)));
   const [cycle, setCycle] = useState<BillingCycle>(initialCycle);
-  const [chosen, setChosen] = useState<PlanId | null>(null);
+  const [chosen, setChosen] = useState<CatalogPlanId | null>(null);
 
   const selection = registrationSelection(plans, offers, seats, cycle, null);
-  const recommendedId = selection.calc.planId as PlanId;
+  const recommendedId = selection.calc.planId as CatalogPlanId;
   const chosenQuote = chosen ? registrationQuote(plans, offers, chosen, seats, cycle) : null;
-  const selectedId: PlanId = chosen && chosenQuote && !chosenQuote.maxSeatsExceeded ? chosen : (selection.planId as PlanId);
+  const selectedId: CatalogPlanId = chosen && chosenQuote && !chosenQuote.maxSeatsExceeded ? chosen : (selection.planId as CatalogPlanId);
   const quote = registrationQuote(plans, offers, selectedId, seats, cycle);
   const plan = plans.find((p) => p.id === selectedId) ?? getPlan(selectedId);
   const monthlyTry = quote ? (cycle === "yearly" ? Math.round(quote.totalForCycleTry / 12) : quote.totalMonthlyTry) : null;

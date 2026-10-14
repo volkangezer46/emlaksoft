@@ -7,14 +7,18 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getPlatformSetting, setPlatformSetting } from "@/lib/platform-settings";
 import {
-  ALL_PLAN_IDS,
   BASE_CATALOG,
+  CUSTOM_PLANS_MAX,
   PLAN_DEFINITIONS_SETTING_KEY,
   PLAN_FIELD_LIMITS,
   RECOMMENDED_CATALOG_OVERRIDES,
   applyPlanOverrides,
+  catalogPlanDefs,
+  customPlanRecord,
   diffAgainstDefault,
+  isCustomPlanIdFormat,
   resolveCatalogSettings,
+  sanitizeCustomPlan,
   sanitizeSeatTiers,
   serializePlanCatalogSettings,
   type PlanCatalogSettings,
@@ -22,7 +26,7 @@ import {
 import { parsePlanForm } from "@/lib/billing/plan-form";
 import { PLAN_DEFINITIONS_TAG } from "@/lib/billing/plan-definitions";
 import { PLAN_SUPPORT_TAG, getPlanSupport } from "@/lib/billing/plan-support";
-import type { PlanDef, PlanId } from "@/lib/billing/plans";
+import { isPlanId, type PlanDef, type PlanId } from "@/lib/billing/plans";
 import { EF_WELCOME_SETTING_KEY } from "@/lib/ef-credits/config";
 import { validateSeatCatalog } from "@/lib/billing/seat-pricing";
 import {
@@ -56,9 +60,66 @@ async function persist(settings: PlanCatalogSettings, staffId: string): Promise<
     revalidatePath("/admin/billing/planlar");
     revalidatePath("/fiyatlar");
     revalidatePath("/kayit");
+    revalidatePath("/app/abonelik");
     revalidatePath("/");
   }
   return ok;
+}
+
+/** Düzenlenen paket: taban (kod varsayılanı + düzenleme) ya da adminden eklenen (tam tanım). */
+type PlanTarget = { kind: "base"; id: PlanId; base: PlanDef } | { kind: "custom"; id: string; def: PlanDef };
+
+function resolveTarget(settings: PlanCatalogSettings, id: string): PlanTarget | null {
+  if (isPlanId(id)) return { kind: "base", id, base: BASE_CATALOG.find((p) => p.id === id)! };
+  if (!isCustomPlanIdFormat(id)) return null;
+  const def = (settings.customPlans ?? []).find((p) => p.id === id);
+  return def ? { kind: "custom", id, def } : null;
+}
+
+function replaceCustom(settings: PlanCatalogSettings, next: PlanDef): PlanDef[] {
+  return (settings.customPlans ?? []).map((p) => (p.id === next.id ? next : p));
+}
+
+/** Eklenen paket depoya yazılabilir mi (aynı doğrulayıcı okuma tarafında da çalışır; kayıt sessizce düşmesin). */
+function customRecordValid(def: PlanDef): boolean {
+  return sanitizeCustomPlan(def.id, customPlanRecord(def)) !== null;
+}
+
+/**
+ * Paket kimliği kayıt defteri (`billing_plans`, 20261014002000): FK hedefi. Yeni paket satırı, kademe değişimi ve
+ * arşiv durumu buraya yazılır; tanımın kendisi platform_settings belgesinde kalır.
+ */
+async function writePlanRegistry(
+  id: string,
+  change: { create: true; tier: PlanId; staffId: string } | { create?: false; tier?: PlanId; archived?: boolean },
+): Promise<string | null> {
+  const admin = createAdminClient();
+  const stamp = new Date().toISOString();
+  const { error } = change.create
+    ? // Upsert: önceki denemede satır açılıp tanım yazılamadıysa aynı kimlikle yeniden denenebilir (taban kimlik buraya gelmez).
+      await admin
+        .from("billing_plans")
+        .upsert({ id, tier: change.tier, is_base: false, archived_at: null, created_by: change.staffId, updated_at: stamp }, { onConflict: "id" })
+    : await admin
+        .from("billing_plans")
+        .update({
+          ...(change.tier ? { tier: change.tier } : {}),
+          ...(change.archived === undefined ? {} : { archived_at: change.archived ? stamp : null }),
+          updated_at: stamp,
+        })
+        .eq("id", id)
+        .eq("is_base", false);
+  if (error) {
+    console.error("writePlanRegistry", error.code, error.message);
+    return error.code === "23505" ? "Bu paket kimliği zaten kullanılıyor." : "Paket kayıt defteri güncellenemedi; değişiklik kaydedilmedi.";
+  }
+  return null;
+}
+
+/** Form `tier` alanı: taban kademe kimliği (eklenen paketin dahil modülleri bu kademeden gelir). */
+function parseTier(raw: FormDataEntryValue | null): PlanId | null {
+  const v = String(raw ?? "").trim();
+  return isPlanId(v) ? v : null;
 }
 
 /**
@@ -71,6 +132,7 @@ async function syncEntitlements(plan: PlanDef): Promise<string | null> {
     return "Limit değişikliği için 20260817000210 migration'ı uygulanmalı (plan_entitlements yazma yetkisi yok). Fiyat ve metin alanları yine kaydedilebilir.";
   }
   if (plan.id === "business" && !support.businessPlan) return "Business paketi için migration henüz uygulanmamış.";
+  if (!isPlanId(plan.id) && !support.catalogEngine) return "Eklenen paket için 20261014002000 migration'ı uygulanmalı.";
   const admin = createAdminClient();
   const { error } = await admin.from("plan_entitlements").upsert(
     {
@@ -90,40 +152,54 @@ async function syncEntitlements(plan: PlanDef): Promise<string | null> {
   return null;
 }
 
-function isPlanId(v: string): v is PlanId {
-  return (ALL_PLAN_IDS as readonly string[]).includes(v);
-}
-
-/** Tek paketin tanımını (fiyat, limit, kota, özellik, görünürlük) kaydeder. */
+/**
+ * Tek paketin tanımını (fiyat, limit, kota, özellik, görünürlük) kaydeder. Taban pakette varsayılandan fark (diff),
+ * adminden eklenen pakette tam tanım (+ modül kademesi `tier`) yazılır. Mevcut aboneliklerin kayıtlı ve kilitli
+ * tutarı değişmez (fiyat kilidi `quoteFromDefinition` / SQL `plan_campaign_lock_amount`).
+ */
 export async function savePlanDefinition(formData: FormData): Promise<PlanOpResult> {
   const g = await guard("save");
   if ("error" in g) return { error: g.error };
   const id = String(formData.get("plan_id") ?? "");
-  if (!isPlanId(id)) return { error: "Geçersiz paket." };
-  const base = BASE_CATALOG.find((p) => p.id === id)!;
+  const settings = await loadSettings();
+  const target = resolveTarget(settings, id);
+  if (!target) return { error: "Geçersiz paket." };
 
   const fields: Record<string, string> = {};
   for (const [k, v] of formData.entries()) if (typeof v === "string") fields[k] = v;
-  const parsed = parsePlanForm(base, fields);
+  const parsed = parsePlanForm(target.kind === "base" ? target.base : target.def, fields);
   if ("error" in parsed) return { error: parsed.error };
 
-  const settings = await loadSettings();
   const support = await getPlanSupport();
   if (id === "business" && parsed.plan.hidden === false && !support.businessPlan) {
     return { error: "Business paketi migration uygulanmadan yayına alınamaz (gizli kalır)." };
   }
 
   const nextOverrides = { ...settings.overrides };
-  const diff = diffAgainstDefault(base, parsed.plan);
-  if (Object.keys(diff).length > 0) nextOverrides[id] = diff;
-  else delete nextOverrides[id];
+  let nextCustom = settings.customPlans ?? [];
+  let diff: unknown;
+  let tierChange: PlanId | null = null;
+  if (target.kind === "base") {
+    const d = diffAgainstDefault(target.base, parsed.plan);
+    if (Object.keys(d).length > 0) nextOverrides[target.id] = d;
+    else delete nextOverrides[target.id];
+    diff = d;
+  } else {
+    const tier = parseTier(formData.get("tier")) ?? target.def.tier ?? "office";
+    const next: PlanDef = { ...parsed.plan, id, tier, custom: true };
+    if (target.def.archived) next.archived = true;
+    if (!customRecordValid(next)) return { error: "Paket tanımı eksik ya da geçersiz." };
+    if (tier !== target.def.tier) tierChange = tier;
+    nextCustom = replaceCustom(settings, next);
+    diff = { tier, monthlyTry: next.monthlyTry, limits: next.limits, hidden: Boolean(next.hidden) };
+  }
 
-  const effective = applyPlanOverrides(nextOverrides);
-  if (!effective.some((p) => !p.hidden)) return { error: "En az bir paket yayında kalmalı." };
+  const effective = catalogPlanDefs({ overrides: nextOverrides, customPlans: nextCustom });
+  if (!effective.some((p) => !p.hidden && !p.archived)) return { error: "En az bir paket yayında kalmalı." };
   const seatReport = validateSeatCatalog(effective);
   if (seatReport.errors.length > 0) return { error: `Ek kullanıcı fiyatlaması geçersiz: ${seatReport.errors[0]}` };
 
-  const before = applyPlanOverrides(settings.overrides).find((p) => p.id === id)!;
+  const before = catalogPlanDefs(settings).find((p) => p.id === id)!;
   const limitsChanged = JSON.stringify(before.limits) !== JSON.stringify(parsed.plan.limits);
   let notice: string | undefined;
   if (limitsChanged) {
@@ -131,8 +207,14 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
     if (err) return { error: err };
     notice = "Limitler kota tablosuyla senkronlandı. Mevcut aboneliklerin tutarı değişmez.";
   }
+  if (tierChange) {
+    const err = await writePlanRegistry(id, { tier: tierChange });
+    if (err) return { error: err };
+  }
 
-  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
+  if (!(await persist({ ...settings, overrides: nextOverrides, customPlans: nextCustom }, g.staff.id))) {
+    return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
+  }
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.plan.save",
@@ -147,12 +229,12 @@ export async function savePlanDefinition(formData: FormData): Promise<PlanOpResu
   };
 }
 
-/** Paketin düzenlemelerini siler; plans.ts varsayılanına döner (limitler de senkronlanır). */
+/** Paketin düzenlemelerini siler; plans.ts varsayılanına döner (limitler de senkronlanır). Eklenen paketin varsayılanı yoktur. */
 export async function resetPlanDefinition(formData: FormData): Promise<PlanOpResult> {
   const g = await guard("reset");
   if ("error" in g) return { error: g.error };
   const id = String(formData.get("plan_id") ?? "");
-  if (!isPlanId(id)) return { error: "Geçersiz paket." };
+  if (!isPlanId(id)) return { error: isCustomPlanIdFormat(id) ? "Eklenen paketin kod varsayılanı yok; arşivleyebilirsiniz." : "Geçersiz paket." };
   const settings = await loadSettings();
   if (!settings.overrides[id]) return { ok: true, notice: "Paket zaten varsayılanda." };
   const base = BASE_CATALOG.find((p) => p.id === id)!;
@@ -241,8 +323,9 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
   const g = await guard("seat-apply");
   if ("error" in g) return { error: g.error };
   const id = String(formData.get("plan_id") ?? "");
-  if (!isPlanId(id)) return { error: "Geçersiz paket." };
-  const base = BASE_CATALOG.find((p) => p.id === id)!;
+  const settings = await loadSettings();
+  const target = resolveTarget(settings, id);
+  if (!target) return { error: "Geçersiz paket." };
 
   const priceRaw = String(formData.get("monthly_try") ?? "").trim();
   if (!/^\d+$/.test(priceRaw) || Number(priceRaw) < 1 || Number(priceRaw) > PLAN_FIELD_LIMITS.priceMax) {
@@ -263,8 +346,7 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
     return { error: "Azami kullanıcı pozitif tam sayı olmalı." };
   }
 
-  const settings = await loadSettings();
-  const current = applyPlanOverrides(settings.overrides).find((p) => p.id === id)!;
+  const current = catalogPlanDefs(settings).find((p) => p.id === id)!;
   const edited: PlanDef = {
     ...current,
     monthlyTry: Number(priceRaw),
@@ -276,14 +358,22 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
     return { error: "Taban fiyat, kampanya fiyatının üstünde kalmalı; önce kampanya fiyatını güncelleyin." };
   }
   const nextOverrides = { ...settings.overrides };
-  const diff = diffAgainstDefault(base, edited);
-  if (Object.keys(diff).length > 0) nextOverrides[id] = diff;
-  else delete nextOverrides[id];
-  const effective = applyPlanOverrides(nextOverrides);
+  let nextCustom = settings.customPlans ?? [];
+  if (target.kind === "base") {
+    const diff = diffAgainstDefault(target.base, edited);
+    if (Object.keys(diff).length > 0) nextOverrides[target.id] = diff;
+    else delete nextOverrides[target.id];
+  } else {
+    if (!customRecordValid(edited)) return { error: "Paket tanımı geçersiz." };
+    nextCustom = replaceCustom(settings, edited);
+  }
+  const effective = catalogPlanDefs({ overrides: nextOverrides, customPlans: nextCustom });
   const report = validateSeatCatalog(effective);
   if (report.errors.length > 0) return { error: `Uygulanamadı: ${report.errors[0]}` };
 
-  if (!(await persist({ ...settings, overrides: nextOverrides }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
+  if (!(await persist({ ...settings, overrides: nextOverrides, customPlans: nextCustom }, g.staff.id))) {
+    return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
+  }
   await logPlatformActivity({
     actorId: g.staff.id,
     action: "billing.seat_pricing.apply",
@@ -293,6 +383,118 @@ export async function applySimulatedSeatPricing(formData: FormData): Promise<Pla
   });
   const warn = report.warnings.length > 0 ? ` Uyarı: ${report.warnings[0]}` : "";
   return { ok: true, notice: `Fiyatlama uygulandı. Mevcut abonelerin kayıtlı ve kilitli tutarı değişmez; yeni satışlar ve ek kullanıcılar yeni fiyatla alınır.${warn}` };
+}
+
+/**
+ * ADMİNDEN YENİ PAKET (plan katalog motoru). Kimlik (küçük harf slug), ad, modül kademesi ve aylık fiyat alınır; limit,
+ * özellik listesi, ek kullanıcı fiyatlaması ve analiz bakiyesi hakkı kademenin GÜNCEL taban tanımından kopyalanır
+ * (sonra paket kartından düzenlenir). Sıra: kayıt defteri satırı (FK) -> kota satırı -> katalog belgesi. Yayındaysa
+ * fiyat sayfasında, kayıtta ve paket değiştirme seçeneklerinde hemen görünür.
+ */
+export async function createCustomPlan(formData: FormData): Promise<PlanOpResult> {
+  const g = await guard("create");
+  if ("error" in g) return { error: g.error };
+  const id = String(formData.get("plan_id") ?? "").trim().toLowerCase();
+  if (!isCustomPlanIdFormat(id)) {
+    return { error: "Paket kimliği 3-32 karakter olmalı: küçük harf ile başlar, yalnız a-z, 0-9 ve _ içerir; taban kimlikler kullanılamaz." };
+  }
+  const tier = parseTier(formData.get("tier"));
+  if (!tier) return { error: "Modül kademesi seçin." };
+  const name = String(formData.get("name") ?? "").replace(/\s+/g, " ").trim();
+  if (name.length < 2 || name.length > PLAN_FIELD_LIMITS.nameMax) return { error: `Ad 2-${PLAN_FIELD_LIMITS.nameMax} karakter olmalı.` };
+  const priceRaw = String(formData.get("monthly_try") ?? "").trim();
+  if (!/^\d+$/.test(priceRaw) || Number(priceRaw) < 1 || Number(priceRaw) > PLAN_FIELD_LIMITS.priceMax) {
+    return { error: "Aylık fiyat pozitif tam sayı olmalı (KDV hariç)." };
+  }
+
+  const support = await getPlanSupport();
+  if (!support.catalogEngine) return { error: "Yeni paket için 20261014002000 migration'ı uygulanmalı (paket kayıt defteri yok)." };
+  const settings = await loadSettings();
+  const current = catalogPlanDefs(settings);
+  if (current.some((p) => p.id === id)) return { error: "Bu paket kimliği zaten var." };
+  if ((settings.customPlans ?? []).length >= CUSTOM_PLANS_MAX) return { error: `En fazla ${CUSTOM_PLANS_MAX} eklenen paket tanımlanabilir.` };
+  if (current.some((p) => p.name.toLocaleLowerCase("tr") === name.toLocaleLowerCase("tr"))) return { error: "Aynı adda bir paket var." };
+
+  const template = current.find((p) => p.id === tier)!;
+  const def: PlanDef = {
+    ...template,
+    id,
+    tier,
+    custom: true,
+    name,
+    monthlyTry: Number(priceRaw),
+    eyebrow: template.eyebrow,
+    hidden: formData.get("hidden") === "on",
+  };
+  delete def.popular;
+  delete def.order;
+  delete def.archived;
+  delete def.campaignMonthlyTry;
+  if (!customRecordValid(def)) return { error: "Paket tanımı oluşturulamadı (kademe tanımı geçersiz)." };
+  const nextCustom = [...(settings.customPlans ?? []), def];
+  const report = validateSeatCatalog(catalogPlanDefs({ overrides: settings.overrides, customPlans: nextCustom }));
+  if (report.errors.length > 0) return { error: `Ek kullanıcı fiyatlaması geçersiz: ${report.errors[0]}` };
+
+  const regErr = await writePlanRegistry(id, { create: true, tier, staffId: g.staff.id });
+  if (regErr) return { error: regErr };
+  const entErr = await syncEntitlements(def);
+  if (entErr) return { error: entErr };
+  if (!(await persist({ ...settings, customPlans: nextCustom }, g.staff.id))) {
+    return { error: actionErrorMessage(null, "Paket tanımı kaydedilemedi; aynı kimlikle tekrar deneyin.") };
+  }
+  await logPlatformActivity({
+    actorId: g.staff.id,
+    action: "billing.plan.create",
+    entityType: "plan",
+    entityId: id,
+    meta: { tier, monthlyTry: def.monthlyTry, hidden: Boolean(def.hidden), template: tier },
+  });
+  const warn = report.warnings.length > 0 ? ` Uyarı: ${report.warnings[0]}` : "";
+  return {
+    ok: true,
+    notice: def.hidden
+      ? `${name} paketi gizli olarak eklendi; ayrıntıları paket kartından düzenleyip yayına alabilirsiniz.${warn}`
+      : `${name} paketi eklendi; fiyat sayfası, kayıt ve paket değiştirme seçeneklerinde görünür.${warn}`,
+  };
+}
+
+/**
+ * Eklenen paketi arşivler (satışa kapatır) ya da arşivden çıkarır. Arşivli paket fiyat sayfası, kayıt ve paket
+ * değiştirme listelerinde görünmez; o paketteki ofisler aynı tutar ve fiyat kilidiyle yenilenmeye devam eder.
+ * Taban paketler arşivlenmez (gizlenir).
+ */
+export async function setCustomPlanArchived(formData: FormData): Promise<PlanOpResult> {
+  const g = await guard("archive");
+  if ("error" in g) return { error: g.error };
+  const id = String(formData.get("plan_id") ?? "");
+  const archived = formData.get("archived") === "1";
+  const settings = await loadSettings();
+  const target = resolveTarget(settings, id);
+  if (!target) return { error: "Geçersiz paket." };
+  if (target.kind === "base") return { error: "Taban paketler arşivlenmez; gizleyebilirsiniz." };
+  if (Boolean(target.def.archived) === archived) return { ok: true, notice: "Değişiklik yok." };
+  const next: PlanDef = { ...target.def };
+  if (archived) next.archived = true;
+  else delete next.archived;
+  const nextCustom = replaceCustom(settings, next);
+  if (!catalogPlanDefs({ overrides: settings.overrides, customPlans: nextCustom }).some((p) => !p.hidden && !p.archived)) {
+    return { error: "En az bir paket yayında kalmalı." };
+  }
+  const regErr = await writePlanRegistry(id, { archived });
+  if (regErr) return { error: regErr };
+  if (!(await persist({ ...settings, customPlans: nextCustom }, g.staff.id))) return { error: actionErrorMessage(null, "Ayar kaydedilemedi.") };
+  await logPlatformActivity({
+    actorId: g.staff.id,
+    action: archived ? "billing.plan.archive" : "billing.plan.unarchive",
+    entityType: "plan",
+    entityId: id,
+  });
+  return {
+    ok: true,
+    notice: archived
+      ? `${next.name} arşivlendi: yeni satışa kapalı; bu paketteki ofisler aynı tutarla yenilenmeye devam eder.`
+      : `${next.name} arşivden çıkarıldı.`,
+  };
 }
 
 /** Koltuk doluluk uyarı eşiği (ofis tarafı satın alma yönlendirmesi bu eşiği kullanır). */

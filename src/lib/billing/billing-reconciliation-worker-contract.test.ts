@@ -37,7 +37,7 @@ describe("billing reconciliation worker contract", () => {
     expect(source).toContain('.eq("tenant_id", capture.tenant_id)');
     expect(source).toContain('.filter("meta->>conversationId", "eq", capture.conversation_id)');
     expect(source).toContain('.eq("token", token)');
-    expect(source).toContain("isPlanId(plan)");
+    expect(source).toContain("isCatalogPlanKey(plan)");
   });
 
   it("expires stale drafts but never performs an automatic refund", () => {

@@ -21,7 +21,7 @@ import {
   autoRenewAttemptAllowed,
   parseAutoRenewFlag,
 } from "@/lib/billing/cards";
-import type { BillingCycle, PlanId } from "@/lib/billing/plans";
+import type { BillingCycle, CatalogPlanId } from "@/lib/billing/plans";
 import { insertNotifications, type NotificationRow } from "@/lib/notify-batch";
 import { CARD_UPDATE_HREF, loadDunningPolicy, type DunningPolicy } from "@/lib/billing/dunning-policy";
 import { randomBytes } from "node:crypto";
@@ -180,7 +180,7 @@ async function renewOne(
     ip: p.auto_renew_consent_ip,
   });
 
-  const plan = sub.plan as PlanId;
+  const plan = sub.plan as CatalogPlanId;
   const cycle = (sub.billing_cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const conversationId = `es-${tenantId.slice(0, 8)}-${randomBytes(12).toString("hex")}`;
   const amounts = invoiceAmountsTry(Number(sub.amount_try));

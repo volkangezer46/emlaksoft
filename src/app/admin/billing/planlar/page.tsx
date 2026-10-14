@@ -9,13 +9,14 @@ import { getPlatformSetting } from "@/lib/platform-settings";
 import { computeSeatAnalytics } from "@/lib/billing/seat-analytics";
 import { findSeatCrossovers, validateSeatCatalog } from "@/lib/billing/seat-pricing";
 import { warnRatioOf } from "@/lib/billing/seat-settings";
-import { planLabel } from "@/lib/billing/plans";
+import { BASE_PLAN_IDS, isPlanId, planLabel, type PlanDef } from "@/lib/billing/plans";
+import { PLAN_GATES, gatesIncludedIn } from "@/lib/billing/page-gates";
 import { getFoundersStatus, getPlanSupport } from "@/lib/billing/plan-support";
 import { BillingNav } from "../billing-nav";
 import { ApplyRecommended } from "./apply-recommended";
 import { EfCreditsSection } from "./ef-credits-section";
 import { EF_WHOLESALE_SETTING_KEY, isWholesaleUnknown, parseEfWholesale } from "@/lib/accounting/ef-economics";
-import { CampaignForm, PlanEditor } from "./plan-editor";
+import { CampaignForm, NewPlanForm, PlanEditor, type ModuleScope } from "./plan-editor";
 import { PriceSimulator } from "./price-simulator";
 import { SeatAnalyticsPanel, type SeatListKey } from "./seat-analytics-panel";
 import { loadSeatSubscriberRows } from "./seat-data";
@@ -54,6 +55,15 @@ export default async function PlansAdminPage({
 
   const seatData = section === "planlar" ? null : await loadSeatSubscriberRows(admin);
   const seatReport = validateSeatCatalog(defs);
+  // Modül kademesi seçenekleri: taban paketler (adları katalogdan), kademe sırasıyla.
+  const tierOptions = BASE_PLAN_IDS.map((id) => ({ id, name: defs.find((d) => d.id === id)?.name ?? planLabel(id) }));
+  const moduleScopeOf = (plan: PlanDef): ModuleScope => {
+    const included = new Set(gatesIncludedIn(plan).map((g) => g.href));
+    return {
+      included: PLAN_GATES.filter((g) => included.has(g.href)).map((g) => g.title),
+      excluded: PLAN_GATES.filter((g) => !included.has(g.href)).map((g) => g.title),
+    };
+  };
   const crossovers = findSeatCrossovers(defs);
 
   return (
@@ -63,7 +73,7 @@ export default async function PlansAdminPage({
         icon={Layers}
         eyebrow="Faturalama · katalog"
         title="Plan tanımları"
-        description="Fiyat, limit, kota ve özellik listesi buradan düzenlenir; kayıt, fiyat sayfası ve yeni ödemeler bu tanımlardan beslenir. Mevcut abonelikler kendi tutarını korur."
+        description="Paket ekleme, fiyat, limit, kota, modül kademesi ve özellik listesi buradan yönetilir; kayıt, fiyat sayfası, paket değiştirme ve yeni ödemeler bu katalogdan beslenir. Mevcut abonelikler kendi tutarını ve fiyat kilidini korur."
         actions={isSuper ? <ApplyRecommended /> : undefined}
       />
       <BillingNav active="planlar" />
@@ -116,12 +126,15 @@ export default async function PlansAdminPage({
             ) : null}
           </section>
           <div className="space-y-3">
+            {isSuper ? <NewPlanForm tierOptions={tierOptions} ready={support.catalogEngine} /> : null}
             {defs.map((plan) => (
               <PlanEditor
                 key={plan.id}
                 plan={plan}
                 plans={defs}
-                customized={Boolean(catalog.overrides[plan.id])}
+                customized={isPlanId(plan.id) && Boolean(catalog.overrides[plan.id])}
+                moduleScope={moduleScopeOf(plan)}
+                tierOptions={tierOptions}
                 subscribers={counts.get(plan.id) ?? 0}
                 businessReady={support.businessPlan}
                 efValuationCost={efValuationCost}
