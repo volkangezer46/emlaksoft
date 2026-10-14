@@ -38,6 +38,7 @@ export type ActionErrorKind =
   | "timeout"
   | "network"
   | "rate_limit"
+  | "period_locked"
   | "schema"
   | "unknown";
 
@@ -55,6 +56,8 @@ export const ACTION_ERROR_HINTS: Record<ActionErrorKind, string> = {
   timeout: "işlem zaman aşımına uğradı; birkaç saniye sonra tekrar deneyin.",
   network: "bağlantı sorunu olabilir; birkaç saniye sonra tekrar deneyin.",
   rate_limit: "çok sık deneme yapıldı; bir dakika bekleyip tekrar deneyin.",
+  period_locked:
+    "işlem kapatılmış (kilitli) bir muhasebe ayına düşüyor; ay kilidini ofis sahibi ya da genel müdür Muhasebe > Ayarlar > Dönem kapanışı bölümünden açabilir.",
   schema: "bu özellik için sistem güncellemesi bekleniyor; destek ekibine bildirin.",
   unknown: "beklenmeyen bir sorun oluştu; birkaç saniye sonra tekrar deneyin, sürerse destek ekibine yazın.",
 };
@@ -123,6 +126,8 @@ function asErrorLike(err: unknown): ErrorLike | null {
 export function classifyActionError(err: unknown): ActionErrorKind {
   const e = asErrorLike(err);
   if (!e) return "unknown";
+  // Finans ay kilidi tetiği (cash_entries / finance_open_items): kira, komisyon, Kasam ve Muhasebe action'ları aynı mesajı verir.
+  if (typeof e.message === "string" && e.message.includes("DONEM_KILITLI")) return "period_locked";
   const code = e.code == null ? "" : String(e.code);
   if (code && CODE_KIND[code]) return CODE_KIND[code];
   const status = typeof e.status === "number" ? e.status : Number(e.status) || 0;

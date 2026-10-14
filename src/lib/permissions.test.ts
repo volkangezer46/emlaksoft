@@ -105,9 +105,9 @@ describe("rol sınırları", () => {
     expect(hasPermission("accounting", "commissions", "delete")).toBe(true);
   });
 
-  it("muhasebe gider/aidat (expenses) modülünü yalnız görüntüler", () => {
-    expect(hasPermission("accounting", "expenses", "view")).toBe(true);
-    for (const a of ["create", "edit", "delete"] as const) expect(hasPermission("accounting", "expenses", a)).toBe(false);
+  it("muhasebe gelir/gider (expenses) ekler ve düzenler, silemez (finans v2, 20261014001200)", () => {
+    for (const a of ["view", "create", "edit"] as const) expect(hasPermission("accounting", "expenses", a)).toBe(true);
+    expect(hasPermission("accounting", "expenses", "delete")).toBe(false);
   });
 
   it("muhasebe fatura silemez (yalnızca oluşturur/düzenler)", () => {

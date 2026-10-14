@@ -22,8 +22,19 @@ export const REALTIME_ALL_TABLES = ["deals", "commissions", "portal_listings", "
  */
 export const REALTIME_EXTENDED_TABLES = ["properties", "customer_demands", "appointments", "tasks", "listing_pool_entries", "cash_entries"] as const;
 
-/** 20261012002300 (merkez tabloları) ve 20261012002500 (fsbo_leads) ile yayına eklenen tablolar. */
-export const REALTIME_MORE_TABLES = ["offers", "rent_charges", "rent_payments", "property_keys", "fsbo_leads"] as const;
+/**
+ * 20261012002300 (merkez tabloları), 20261012002500 (fsbo_leads) ve 20261014001000 (finans v2: açık kalem + cari) ile
+ * yayına eklenen tablolar.
+ */
+export const REALTIME_MORE_TABLES = [
+  "offers",
+  "rent_charges",
+  "rent_payments",
+  "property_keys",
+  "fsbo_leads",
+  "finance_open_items",
+  "finance_parties",
+] as const;
 
 /** Rota öneki → o sayfada tazelenmesi anlamlı tablolar (realtime aboneliğinin TEK kaynağı). */
 export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -37,7 +48,7 @@ export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> =
   ["/app/randevular", ["appointments"]],
   ["/app/gorevler", ["tasks"]],
   ["/app/ilan-havuzu", ["listing_pool_entries", "properties"]],
-  ["/app/giderler", ["cash_entries"]],
+  ["/app/giderler", ["cash_entries", "finance_open_items", "finance_parties"]],
   ["/app/kiralama", ["deals", "properties", "rent_charges", "rent_payments"]],
   ["/app/aidat", ["rent_charges", "rent_payments"]],
   ["/app/kira-artis", ["rent_charges", "properties"]],

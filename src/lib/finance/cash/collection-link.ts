@@ -22,6 +22,14 @@ export type CollectionCashResult =
   | { ok: false; code: "invalid_id" | "rpc_error" | "amount_exceeds_source" | "rejected"; outcome?: string; warning: string };
 
 export const COLLECTION_CASH_WARN = "Tahsilat kaydedildi ancak seçilen hesaba hareket yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
+/** Hareket tarihi kapatılmış (kilitli) muhasebe ayına düştü: tetik DONEM_KILITLI. */
+export const PERIOD_LOCKED_CASH_WARN =
+  "Kayıt yapıldı ancak tarihi kapatılmış (kilitli) bir muhasebe ayına düştüğü için hesaba hareket yazılamadı. Kilidi ofis sahibi ya da genel müdür açabilir.";
+
+/** RPC hatası finans ay kilidi tetiğinden mi geldi (DONEM_KILITLI). */
+export function isPeriodLockedError(error: { message?: string | null } | null | undefined): boolean {
+  return typeof error?.message === "string" && error.message.includes("DONEM_KILITLI");
+}
 
 export async function recordCollectionCashResult(
   supabase: SupabaseClient,
@@ -42,7 +50,7 @@ export async function recordCollectionCashResult(
   });
   if (error) {
     if (!isMissingCashSchema(error)) console.error("recordCollectionCash", { code: error.code });
-    return { ok: false, code: "rpc_error", warning: COLLECTION_CASH_WARN };
+    return { ok: false, code: "rpc_error", warning: isPeriodLockedError(error) ? PERIOD_LOCKED_CASH_WARN : COLLECTION_CASH_WARN };
   }
   const res = data as { outcome?: string; reason?: string } | null;
   if (res?.outcome === "recorded") return { ok: true };
@@ -88,7 +96,7 @@ export async function recordOwnerPayoutCash(
   });
   if (error) {
     if (!isMissingCashSchema(error)) console.error("recordOwnerPayoutCash", { code: error.code });
-    return OWNER_PAYOUT_CASH_WARN;
+    return isPeriodLockedError(error) ? PERIOD_LOCKED_CASH_WARN : OWNER_PAYOUT_CASH_WARN;
   }
   const outcome = (data as { outcome?: string } | null)?.outcome;
   return outcome === "recorded" || outcome === "duplicate" ? null : OWNER_PAYOUT_CASH_WARN;
