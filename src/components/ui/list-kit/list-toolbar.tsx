@@ -4,7 +4,7 @@ import { Rows3, Rows4, Search, SlidersHorizontal, X } from "lucide-react";
 import { buildHref, formatCount, mergeParams, type ParamRecord } from "@/lib/ui/filter-params";
 import { cn } from "@/lib/utils";
 import { densityOf, hiddenFields, type ActiveChip } from "./list-logic";
-import { SheetClose } from "./sheet-close";
+import { PanelSearchCarry, SheetClose } from "./sheet-close";
 import { ViewSwitcher, type ViewOption } from "./view-switcher";
 
 /**
@@ -27,6 +27,8 @@ import { ViewSwitcher, type ViewOption } from "./view-switcher";
 const CONTROL =
   "min-h-9 touch:min-h-11 rounded-[var(--radius-control)] border border-line bg-surface text-sm text-text transition focus:border-brand-400 focus:outline-none focus:shadow-[var(--focus-gap),var(--focus-ring)]";
 
+const FILTER_BADGE = "numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white";
+
 export function ListToolbar({
   pathname,
   params,
@@ -45,6 +47,7 @@ export function ListToolbar({
   resultNoun = "sonuç",
   actions,
   sheetExtras,
+  sheetParamKeys = [],
   className,
 }: {
   pathname: string;
@@ -76,13 +79,21 @@ export function ListToolbar({
    * Sayfa aynı öğelerin geniş ekran kopyasını `max-sm:hidden` ile saklar; böylece telefonda liste ilk ekranda başlar.
    */
   sheetExtras?: ReactNode;
+  /**
+   * Alt sayfaya taşınan hızlı süzgeçlerin/sıralamanın param anahtarları (ör. tip, sıcaklık, sıralama): telefonda
+   * "Filtreler" rozeti bunları da sayar (dış kopyalar gizli olduğundan etkin süzgeç başka türlü görünmez).
+   */
+  sheetParamKeys?: readonly string[];
   className?: string;
 }) {
   const q = typeof params[searchName] === "string" ? (params[searchName] as string) : "";
-  const panelActive = panelParamKeys.filter((k) => {
+  const isActive = (k: string) => {
     const v = params[k];
     return Array.isArray(v) ? v.some(Boolean) : Boolean(v);
-  }).length;
+  };
+  const panelActive = panelParamKeys.filter(isActive).length;
+  // Telefon rozeti: panel + alt sayfadaki hızlı süzgeçler (aynı anahtar iki listede olsa da bir kez sayılır).
+  const sheetActive = [...new Set([...panelParamKeys, ...sheetParamKeys])].filter(isActive).length;
   // Arama formu panel alanlarını, panel formu aramayı gizli alan olarak taşır.
   const searchHidden = hiddenFields(params, [searchName]);
   const panelHidden = hiddenFields(params, panelParamKeys);
@@ -142,8 +153,9 @@ export function ListToolbar({
               <SlidersHorizontal aria-hidden="true" className="h-4 w-4 text-text-muted" />
               Filtreler
               {panelActive > 0 ? (
-                <span className="numeric rounded-full bg-brand-600 px-1.5 text-xs font-semibold text-white">{panelActive}</span>
+                <span className={cn(FILTER_BADGE, sheetActive !== panelActive && "max-sm:hidden")}>{panelActive}</span>
               ) : null}
+              {sheetActive > 0 && sheetActive !== panelActive ? <span className={cn(FILTER_BADGE, "sm:hidden")}>{sheetActive}</span> : null}
             </summary>
             <div
               role="group"
@@ -175,6 +187,7 @@ export function ListToolbar({
                   {panelHidden.map(([k, v]) => (
                     <input key={`${k}-${v}`} type="hidden" name={k} value={v} />
                   ))}
+                  <PanelSearchCarry name={searchName} />
                   {panel}
                   <button
                     type="submit"

@@ -110,11 +110,16 @@
   .tbl-stack thead { display: none; }
   /* Kompakt kart (YD6): 1. satır = seçim kutusu + kimlik + eylemler, 2. satır = kalan hücreler. Sıra `order` ile
      kurulur; sıfır yükseklikli `::after` (order 2) satırı böler. 390×844'te ilk ekranda ≥4 kart (liste sözleşmesi). */
-  .tbl-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; padding: 0.625rem 0.875rem; }
+  .tbl-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; padding: 0.625rem 0.875rem; }
   .tbl-stack td { order: 3; display: block; padding: 0 !important; border: 0; text-align: left !important; max-width: 100%; }
   .tbl-stack tr:has(td[data-primary])::after { content: ""; order: 2; flex-basis: 100%; height: 0; }
   .tbl-stack td[data-primary], .tbl-stack td:first-child:has(input[type="checkbox"]) { order: 0; }
-  .tbl-stack td[data-primary] { flex: 1 1 0%; min-width: min(9rem, 100%); font-weight: 600; }
+  /* min-width 7rem: 390 px'te (kart iç genişliği ~330 px) seçim kutusu 44 + üç eylem 3×44 yanında kimlik sığar; 9rem'de
+     müşteri kartının eylemleri ayrı satıra kayıp kartı ~48 px uzatıyordu (Playwright ölçümü). */
+  .tbl-stack td[data-primary] { flex: 1 1 0%; min-width: min(7rem, 100%); font-weight: 600; }
+  /* globals.css'teki katmansız `p { text-wrap: pretty }` kısayolu text-wrap-mode'u `wrap`a çeker ve katmanlı `.truncate`'in
+     nowrap'ını ezer: kartta kimlik adı 2–3 satıra kırılıp kartı uzatıyordu. Kartta kırpma geri gelir. */
+  .tbl-stack td p.truncate { text-wrap-mode: nowrap; }
   .tbl-stack tr:not(:has(td[data-primary])) td:first-child { flex-basis: 100%; font-weight: 600; }
   .tbl-stack td[data-label]::before { content: attr(data-label) " · "; color: var(--text-faint); font-size: 0.75rem; font-weight: 500; }
   .tbl-stack td[data-actions] { flex-basis: 100%; }
@@ -154,6 +159,8 @@
     padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom));
     box-shadow: var(--shadow-lg);
   }
+  /* Alt sayfa açıkken arkadaki liste kaymasın (zemin tam ekran; JS'siz kilit). */
+  html:has(.lk-filter[open]) { overflow: hidden; }
 }
 @media (max-width: 639.98px) and (prefers-reduced-motion: no-preference) {
   @keyframes lk-sheet-in { from { transform: translateY(100%); } to { transform: none; } }

@@ -521,7 +521,7 @@ import: `@/components/ui/list-kit`.
 | Bileşen | Ne yapar | Önemli kural |
 | --- | --- | --- |
 | `KpiStrip` | İkon kapsüllü, tıklanabilir KPI kartları (`items: KpiItem[]`) | `href` zorunlu. `series` (eskiden yeniye sayılar) YALNIZ gerçek kayıt tarihlerinden (`bucketByWeek`) verilir; yoksa ya da tamamı 0 ise çubuk/trend çizilmez. `showTrend` son yarıyı önceki yarıyla kıyaslar (`trendOf`); önceki dönem 0 ise yüzde uydurmaz. `attention`: sıfır değilse kırmızı. |
-| `ListToolbar` | Görünüm anahtarı, arama, "Filtreler (n)" paneli, sıralama yuvası, yoğunluk, aktif filtre çipleri, kayıtlı görünüm yuvası | Arama ve panel iki ayrı `<form method=get>`; her form sahip olmadığı parametreleri gizli alanla taşır, `sayfa` sıfırlanır. `panel` içine `FilterGrid` + `FilterSelect` (native select) koy; `panelParamKeys` panel alanlarının TAMAMI olmalı (rozet + gizli alan ayrımı). Telefonda (<640 px) üstte yalnız arama + "Filtreler" kalır; panel, görünüm, sıralama, yoğunluk, kayıtlı görünümler ve `sheetExtras` (sayfanın hızlı süzgeç çipleri, özel alan formu) TEK alt sayfada açılır — sayfa aynı öğelerin geniş ekran kopyasını `max-sm:hidden` ile saklar. |
+| `ListToolbar` | Görünüm anahtarı, arama, "Filtreler (n)" paneli, sıralama yuvası, yoğunluk, aktif filtre çipleri, kayıtlı görünüm yuvası | Arama ve panel iki ayrı `<form method=get>`; her form sahip olmadığı parametreleri gizli alanla taşır, `sayfa` sıfırlanır. `panel` içine `FilterGrid` + `FilterSelect` (native select) koy; `panelParamKeys` panel alanlarının TAMAMI olmalı (rozet + gizli alan ayrımı). Telefonda (<640 px) üstte yalnız arama + "Filtreler" kalır; panel, görünüm, sıralama, yoğunluk, kayıtlı görünümler ve `sheetExtras` (sayfanın hızlı süzgeç çipleri, özel alan formu) TEK alt sayfada açılır — sayfa aynı öğelerin geniş ekran kopyasını `max-sm:hidden` ile saklar. `sheetParamKeys` alt sayfaya taşınan süzgeçlerin anahtarlarıdır (telefon rozeti bunları da sayar). Panel formu aramadaki yazılmış ama gönderilmemiş metni taşır (`PanelSearchCarry`, JS'siz yolda URL'deki değer); tersi bilinçli ödünleşim: aramada Enter, panelde değiştirilip uygulanmamış seçimleri göndermez. Escape alt sayfayı/paneli kapatır. |
 | `CategoryChips` | Sayaçlı kategori çipleri (`?kategori=` ya da `paramName`) | Sunucu filtresi (link). `counts` yalnız gerçek sayımla verilir; güvenilir değilse `null` (sayı gösterilmez). Sayacı 0 olan pasif çip gizlenir. |
 | `StatusPill` | `tone-*` token kapsülü (success / warning / danger / info / neutral) | Renk tek başına anlam taşımaz, metin zorunlu; kontrast token katmanında garantili (açık/koyu/vurgu temaları). |
 | `EntityThumb` | Satır görseli: kapak; yoksa `icon` ya da `name` baş harf avatarı | Sabit kutu, CLS yok. |
@@ -537,7 +537,9 @@ import: `@/components/ui/list-kit`.
   sayım) `*-list-logic.ts` içinde, testiyle.
 - **Mobil liste (390×844'te ilk ekranda ≥4 satır, her dokunma hedefi ≥44 px):** `TableFrame stack` kartı iki
   satırdır (kimlik + eylemler / kalan hücreler); satırın tamamı detay bağlantısıysa yinelenen "detayı aç" eylemine
-  `RowActionLink hideWhenStacked` ver. İkincil bloklar (ilgili ekran bağlantıları, hatırlatma kartları) `.lp-defer`
+  `RowActionLink hideWhenStacked` ver. Masaüstünde `hidden …:table-cell` ile saklanan her sütun `TD stackHide`
+  taşımalı: `.tbl-stack td { display: block }` katmansızdır ve Tailwind'in katmanlı `.hidden`'ını ezer (sözleşme testi
+  müşteri/portföy satırlarında bunu kilitler). İkincil bloklar (ilgili ekran bağlantıları, hatırlatma kartları) `.lp-defer`
   ile telefonda sayfalamanın altına iner; KPI şeridi telefonda tek satır çiptir. Sözleşme:
   `list-kit/mobile-list-contract.test.ts` (statik) + `e2e/mobile-list.spec.ts` (oturumlu Playwright ölçümü).
 - **Gerçek veri disiplini:** sayaç/trend/seri hesaplanamıyorsa çizilmez. Tarama tabanlı sayımlar (ör. tip

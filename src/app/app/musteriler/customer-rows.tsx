@@ -156,7 +156,8 @@ export function CustomerTable({
                 <TD primary>
                   <IntentLink href={c.href} className="absolute inset-0" aria-label={`${c.name} detayları`} />
                   <div className="flex items-center gap-3">
-                    <EntityThumb alt="" name={c.name} size="sm" />
+                    {/* Kartta (<768 px) baş harf avatarı gizli: üç eylem düğmesinin yanında ada yer kalsın. */}
+                    <EntityThumb alt="" name={c.name} size="sm" className="max-md:hidden" />
                     <div className="min-w-0">
                       <p className="max-w-[14rem] truncate font-semibold text-text">{c.name}</p>
                       <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-text-muted">
@@ -196,11 +197,11 @@ export function CustomerTable({
                     </p>
                   ) : null}
                 </TD>
-                <TD className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
-                <TD className="hidden text-text-muted lg:table-cell">
+                <TD stackHide className="hidden text-text-muted 2xl:table-cell">{c.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
+                <TD stackHide className="hidden text-text-muted lg:table-cell">
                   {c.lastContact ?? <span className="text-text-faint">Temas yok</span>}
                 </TD>
-                <TD className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
+                <TD stackHide className="numeric hidden text-text-muted 2xl:table-cell">{c.createdLabel}</TD>
                 <TD actions>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} hideWhenStacked />

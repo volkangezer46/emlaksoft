@@ -694,14 +694,14 @@ export default async function PropertiesPage({
           label="Portföy tipi"
         />
         {healthKnownTotal > 0 ? (
-          <div className="flex min-w-[15rem] flex-wrap items-center gap-3" aria-label="Fiyat sağlığı dağılımı">
+          <div className="flex min-w-[15rem] items-center gap-3 max-sm:flex-wrap" aria-label="Fiyat sağlığı dağılımı">
             <Gauge aria-hidden="true" className="h-4 w-4 shrink-0 text-brand-600" />
             <div className="flex h-2 w-24 shrink-0 gap-0.5 overflow-hidden rounded-full bg-canvas">
               {healthSegments.map((s) => (
                 <div key={s.label} className={`pipeline-fill h-full ${s.bar}`} style={{ width: `${(s.count / healthTotal) * 100}%`, animationDelay: s.delay }} />
               ))}
             </div>
-            <div className="flex flex-wrap gap-1">
+            <div className="flex gap-1 max-sm:flex-wrap">
               {healthSegments.map((s) => (
                 <FilterChip
                   key={s.label}
@@ -850,6 +850,7 @@ export default async function PropertiesPage({
         resultCount={anyFilter ? totalFilteredCount : undefined}
         resultNoun="sonuç"
         savedViews={<SavedViews route={PATH} views={savedViews} currentParams={savedViewParams} />}
+        sheetParamKeys={["kategori", "sirala", "ozel"]}
         sheetExtras={
           <>
             {quickChips("grid gap-3")}

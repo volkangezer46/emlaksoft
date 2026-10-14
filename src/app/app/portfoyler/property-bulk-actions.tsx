@@ -123,7 +123,7 @@ export function PropertyBulkBar() {
                     key={s.value}
                     type="button"
                     onClick={() => apply(s.value)}
-                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-text transition hover:bg-canvas"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-text transition hover:bg-canvas touch:min-h-11"
                   >
                     {s.label}
                   </button>

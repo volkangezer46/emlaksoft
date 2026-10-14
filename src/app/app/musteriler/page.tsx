@@ -568,11 +568,11 @@ export default async function CustomersPage({
             <FilterGrid>
               <label className="grid gap-1 text-xs font-semibold text-text-muted">
                 Eklenme (başlangıç)
-                <input name="from" type="date" defaultValue={fromF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400" />
+                <input name="from" type="date" defaultValue={fromF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400 touch:min-h-11" />
               </label>
               <label className="grid gap-1 text-xs font-semibold text-text-muted">
                 Eklenme (bitiş)
-                <input name="to" type="date" defaultValue={toF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400" />
+                <input name="to" type="date" defaultValue={toF} className="min-h-9 min-w-0 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 text-sm font-normal text-text outline-none focus:border-brand-400 touch:min-h-11" />
               </label>
             </FilterGrid>
           </>
@@ -594,6 +594,7 @@ export default async function CustomersPage({
         chips={chips}
         resultCount={chips.length > 0 ? totalFiltered : undefined}
         savedViews={<SavedViews route="/app/musteriler" views={savedViews} currentParams={savedViewParams} />}
+        sheetParamKeys={["type", "segment", "sort", "ozel"]}
         sheetExtras={
           <>
             {quickChips()}

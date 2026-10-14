@@ -115,7 +115,7 @@ export function PropertyTable({
                   <p className="font-medium text-text max-md:inline">{p.type}</p>
                   <p className="text-xs text-text-muted max-md:ml-1.5 max-md:inline">{p.tx}</p>
                 </TD>
-                <TD className="hidden text-text-muted xl:table-cell">
+                <TD stackHide className="hidden text-text-muted xl:table-cell">
                   <span className="flex items-center gap-1.5">
                     <SpriteIcon name="map-pin" className="h-3.5 w-3.5 shrink-0 text-text-faint" />
                     <span className="max-w-[12rem] truncate">{p.location}</span>
@@ -127,13 +127,13 @@ export function PropertyTable({
                 <TD>
                   <StatusPill tone={p.statusTone}>{p.statusLabel}</StatusPill>
                 </TD>
-                <TD className="hidden xl:table-cell">
+                <TD stackHide className="hidden xl:table-cell">
                   {p.health ? <StatusPill tone={p.health.tone}>{p.health.label}</StatusPill> : <span className="text-text-faint">—</span>}
                 </TD>
-                <TD className="hidden 2xl:table-cell">
+                <TD stackHide className="hidden 2xl:table-cell">
                   <PortalCell live={p.portalsLive} total={p.portalsTotal} />
                 </TD>
-                <TD className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
+                <TD stackHide className="numeric hidden text-text-muted 2xl:table-cell">{p.createdLabel}</TD>
                 <TD actions>
                   <RowActions>
                     <RowActionLink href={p.href} label={`${p.title} detayını aç`} icon={Eye} hideWhenStacked />

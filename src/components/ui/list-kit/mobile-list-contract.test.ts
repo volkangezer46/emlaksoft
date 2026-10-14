@@ -11,6 +11,7 @@ import { ListPager } from "./list-pager";
 import { ListToolbar } from "./list-toolbar";
 import { RowActionLink, RowActions } from "./row-actions";
 import { ViewSwitcher } from "./view-switcher";
+import { TD } from "../table";
 import { pageWindow } from "./list-logic";
 
 /**
@@ -167,6 +168,33 @@ describe("mobil liste sözleşmesi — filtreler tek alt sayfada", () => {
     expect(panelForm).not.toContain('name="sayfa"');
   });
 
+  it("telefon rozeti alt sayfaya taşınan hızlı süzgeçleri de sayar; masaüstü rozeti yalnız paneli", () => {
+    const out = html(
+      createElement(ListToolbar, {
+        pathname: "/app/portfoyler",
+        params: { status: "live", kategori: "daire", sirala: "eski" },
+        panelParamKeys: ["status"],
+        sheetParamKeys: ["kategori", "sirala", "status"],
+        panel: createElement(FilterSelect, { name: "status", label: "Durum", value: "live", options: [{ value: "live", label: "Yayında" }] }),
+        sheetExtras: createElement("nav", null, "çip"),
+      }),
+    );
+    const summary = out.slice(out.indexOf("<summary"), out.indexOf("</summary>"));
+    expect(summary).toMatch(/<span class="[^"]*max-sm:hidden">1<\/span>/);
+    expect(summary).toMatch(/<span class="[^"]*sm:hidden">3<\/span>/);
+    // Hızlı süzgeç yokken tek rozet (yinelenen sayı yok).
+    expect(fullToolbar().slice(0, fullToolbar().indexOf("</summary>"))).not.toMatch(/sm:hidden">\d/);
+  });
+
+  it("panel formu aramadaki güncel metni taşır (istemci adası); Escape kapatır; açıkken arka sayfa kaymaz", () => {
+    const panelForm = fullToolbar().slice(fullToolbar().lastIndexOf("<form"));
+    expect(panelForm).toContain("<span hidden=\"\"></span>"); // PanelSearchCarry
+    const island = read("src/components/ui/list-kit/sheet-close.tsx");
+    expect(island).toMatch(/addEventListener\("formdata"/);
+    expect(island).toMatch(/e\.key !== "Escape"/);
+    expect(stripComments(read("src/app/list-page.css"))).toMatch(/html:has\(\.lk-filter\[open\]\) \{ overflow: hidden; \}/);
+  });
+
   it("panel yoksa masaüstünde Filtreler düğmesi çizilmez (yalnız telefonda sıralama/görünüm için)", () => {
     const out = html(createElement(ListToolbar, { pathname: "/x", params: {}, sort: createElement("span", null, "s") }));
     expect(out).toMatch(/<details[^>]*class="lk-filter group relative sm:hidden"/);
@@ -191,6 +219,26 @@ describe("mobil liste sözleşmesi — 390×844'te ilk ekranda ≥4 satır (yerl
     expect(listCss).toMatch(/\.tbl-stack td\[data-primary\] \{ flex: 1 1 0%;/);
     expect(listCss).toMatch(/\.tbl-stack > div, \.tbl-stack > div > div \{[^}]*max-height: none !important;/);
     expect(listCss).toMatch(/\.tbl-stack \[data-stack-hide\] \{ display: none; \}/);
+    // 390 px'te seçim kutusu + kimlik + üç eylem tek satır (9rem'de müşteri kartının eylemleri alta kayıyordu).
+    expect(listCss).toMatch(/\.tbl-stack td\[data-primary\] \{ flex: 1 1 0%; min-width: min\(7rem, 100%\);/);
+    // globals.css `p { text-wrap: pretty }` `.truncate`'i ezer; kartta kimlik adı tek satır kırpılır.
+    expect(listCss).toMatch(/\.tbl-stack td p\.truncate \{ text-wrap-mode: nowrap; \}/);
+  });
+
+  it("masaüstünde gizli sütunlar kartta da gizli: `hidden …:table-cell` TD'leri `stackHide` taşır", () => {
+    // `.tbl-stack td { display: block }` katmansızdır (console-base.css → list-page.css) ve Tailwind'in `@layer utilities`
+    // içindeki `.hidden`'ını EZER: işaretlenmeyen gizli sütun (konum, fiyat sağlığı, portal, tarih…) kartta görünür ve kart
+    // ~95 px'ten ~143 px'e uzar (390×844'te ≥4 satır bozulur). Gizleme `data-stack-hide` ile açıkça yapılır.
+    expect(listCss).not.toMatch(/@layer[^{]*\{[^@]*\.tbl-stack td \{/); // kural katmansız kalırsa bu test anlamlı
+    for (const file of ["src/app/app/musteriler/customer-rows.tsx", "src/app/app/portfoyler/property-rows.tsx"]) {
+      const cells = [...read(file).matchAll(/<TD\b[^>]*>/g)].map((m) => m[0]);
+      const hiddenCells = cells.filter((c) => /className="[^"]*\bhidden\b[^"]*\b\w+:table-cell\b/.test(c));
+      expect(hiddenCells.length, `${file}: gizli sütun bulunamadı`).toBeGreaterThan(0);
+      expect(hiddenCells.filter((c) => !/\bstackHide\b/.test(c)), file).toEqual([]);
+    }
+    const td = html(createElement("table", null, createElement("tbody", null, createElement("tr", null, createElement(TD, { stackHide: true, className: "hidden xl:table-cell" }, "x")))));
+    expect(td).toContain('data-stack-hide=""');
+    expect(html(createElement("table", null, createElement("tbody", null, createElement("tr", null, createElement(TD, null, "x")))))).not.toContain("data-stack-hide");
   });
 
   it("hero eylemleri tek satır, ikincil bloklar (.lp-defer) telefonda listenin altına", () => {
@@ -221,14 +269,78 @@ describe("mobil liste sözleşmesi — 390×844'te ilk ekranda ≥4 satır (yerl
   });
 });
 
+/** JSX kaynağındaki etkileşimli açılış etiketleri (`<button …>`, `<Link …>` …): `{…}` ifadeleri ve dizgiler atlanarak kapanış `>` bulunur. */
+function jsxInteractiveTags(src: string): { tag: string; text: string; line: number }[] {
+  const out: { tag: string; text: string; line: number }[] = [];
+  for (const m of src.matchAll(/<(input|select|textarea|button|summary|a|Link|IntentLink)\b/g)) {
+    let i = m.index + m[0].length;
+    let depth = 0;
+    let quote: string | null = null;
+    for (; i < src.length; i++) {
+      const c = src[i]!;
+      if (quote) {
+        if (c === quote && src[i - 1] !== "\\") quote = null;
+        continue;
+      }
+      if (c === '"' || ((c === "'" || c === "`") && depth > 0)) quote = c;
+      else if (c === "{") depth++;
+      else if (c === "}") depth--;
+      else if (c === ">" && depth === 0) break;
+    }
+    out.push({ tag: m[1]!, text: src.slice(m.index, i + 1), line: src.slice(0, m.index).split("\n").length });
+  }
+  return out;
+}
+
+/** Yorumlar (belge yorumundaki "Native <select>" gibi) etiket sanılmasın; satır numaraları korunur. */
+const stripSourceComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, " ")).replace(/(^|\s)\/\/[^\n]*/g, "$1");
+
+/**
+ * Etiketin sınıf metni: `className` ifadesi + ifadede ya da `{...yayılım}`da geçen ve AYNI dosyada tanımlı sabit/işlevlerin
+ * gövdesi (ör. `className={PAGER_BTN}`, `cn(CONTROL, …)`, `filterChipClass(…)`, `{...trigger}`).
+ */
+function classTextOf(tagText: string, src: string): string {
+  const exprs: string[] = [];
+  const at = tagText.indexOf("className=");
+  if (at >= 0) {
+    const open = at + "className=".length;
+    if (tagText[open] === '"') exprs.push(tagText.slice(open + 1, tagText.indexOf('"', open + 1)));
+    else if (tagText[open] === "{") {
+      let depth = 0;
+      let j = open;
+      for (; j < tagText.length; j++) {
+        if (tagText[j] === "{") depth++;
+        else if (tagText[j] === "}" && --depth === 0) break;
+      }
+      exprs.push(tagText.slice(open + 1, j));
+    }
+  }
+  for (const s of tagText.matchAll(/\{\.\.\.(\w+)\}/g)) exprs.push(s[1]!);
+  let text = exprs.join(" ");
+  for (const id of new Set(exprs.join(" ").match(/\b[A-Za-z_]\w*\b/g) ?? [])) {
+    const decl = new RegExp(`(?:const|let|function)\\s+${id}\\b`).exec(src);
+    if (decl) text += " " + src.slice(decl.index, decl.index + 700);
+  }
+  return ` ${text.replace(/\$\{[^}]*\}/g, " ").replace(/[`"'{}()]/g, " ")} `;
+}
+
+/** Bilinçli muaf: satırı kaplayan bindirme bağlantısı ve kart görünümünde tüm kart (ikisi de 44 px'ten çok büyük). */
+const TOUCH_EXEMPT = /(?:^|\s)(?:absolute inset-0|hover-lift)(?:\s|$)/;
+
 describe("mobil liste sözleşmesi — sayfa dosyalarında dokunma güvencesi (kaynak)", () => {
-  // Liste ekranlarının (müşteriler/portföyler) kendi yazdığı odaklanabilir öğeler: her `focus-ring` sınıf dizgisi
-  // dokunmatikte 44 px güvencesi taşır. Yeni öğe eklerken `touch:min-h-11` (ikon düğmede `touch:size-11`) ekleyin.
+  // Liste ekranlarının (müşteriler/portföyler) kendi yazdığı TÜM etkileşimli JSX öğeleri (input/select/textarea/button/
+  // summary/a/Link/IntentLink; `focus-ring` taşısın taşımasın) dokunmatikte 44 px güvencesi taşır. Yeni öğe eklerken
+  // `touch:min-h-11` (ikon düğmede `touch:size-11`) ekleyin.
   const FILES = [
     "src/app/app/musteriler/page.tsx",
+    "src/app/app/musteriler/customer-rows.tsx",
     "src/app/app/musteriler/customer-row-delete.tsx",
     "src/app/app/portfoyler/page.tsx",
+    "src/app/app/portfoyler/property-rows.tsx",
     "src/app/app/portfoyler/property-row-compare.tsx",
+    "src/app/app/portfoyler/property-sort-select.tsx",
+    "src/app/app/portfoyler/property-bulk-actions.tsx",
     "src/components/app/saved-views.tsx",
     "src/components/app/custom-field-filter-bar.tsx",
     "src/components/ui/list-kit/list-toolbar.tsx",
@@ -237,22 +349,32 @@ describe("mobil liste sözleşmesi — sayfa dosyalarında dokunma güvencesi (k
   ];
   for (const file of FILES) {
     it(file, () => {
-      const src = read(file);
-      const found: string[] = [];
-      // Düz dizgiler ("…focus-ring…") ve className şablonları (className={`…`}); `cn(CONTROL, "…")` güvenceyi CONTROL'den alır.
-      for (const m of src.matchAll(/"([^"\n]*\bfocus-ring\b[^"\n]*)"/g)) {
-        if (/cn\(\s*CONTROL,\s*$/.test(src.slice(Math.max(0, m.index - 80), m.index))) continue;
-        found.push(m[1]!);
+      const src = stripSourceComments(read(file));
+      const bad: string[] = [];
+      const tags = jsxInteractiveTags(src);
+      for (const t of tags) {
+        if (/type="hidden"/.test(t.text)) continue;
+        const cls = classTextOf(t.text, src);
+        if (/(?:^|\s)sr-only(?:\s|$)/.test(cls) || TOUCH_EXEMPT.test(cls)) continue;
+        if (!HEIGHT_OK.test(cls) || (FIXED_WIDTH.test(cls) && !WIDTH_OK.test(cls))) bad.push(`${file}:${t.line} <${t.tag}>`);
       }
-      for (const m of src.matchAll(/className=\{`([^`]*)`\}/g)) if (/\bfocus-ring\b/.test(m[1]!)) found.push(m[1]!);
-      const bad = found.filter((s) => {
-        const cls = ` ${s.replace(/\$\{[^}]*\}/g, " ")} `;
-        return !HEIGHT_OK.test(cls) || (FIXED_WIDTH.test(cls) && !WIDTH_OK.test(cls));
-      });
-      expect(found.length, `${file}: denetlenecek öğe bulunamadı`).toBeGreaterThan(0);
+      expect(tags.length, `${file}: denetlenecek öğe bulunamadı`).toBeGreaterThan(0);
       expect(bad, file).toEqual([]);
     });
   }
+
+  it("kaynak denetçisi gerçekten yakalar (focus-ring'siz ham girdi, sınıfsız bağlantı, küçük ikon düğmesi)", () => {
+    const check = (src: string) =>
+      jsxInteractiveTags(src).filter((t) => {
+        const cls = classTextOf(t.text, src);
+        return !/type="hidden"/.test(t.text) && !(HEIGHT_OK.test(cls) && !(FIXED_WIDTH.test(cls) && !WIDTH_OK.test(cls)));
+      }).length;
+    expect(check('<input name="from" type="date" className="min-h-9 rounded border" />')).toBe(1);
+    expect(check("<Link href={x}>git</Link>")).toBe(1);
+    expect(check('<button onClick={() => go(a > b)} className="grid h-8 w-8 touch:h-11">x</button>')).toBe(1);
+    expect(check('const B = "touch:min-h-11 px-2";\n<Link href={x} className={B}>git</Link>')).toBe(0);
+    expect(check('<input type="hidden" name="q" value={q} />')).toBe(0);
+  });
 
   it("portföy sıralama seçicisi ve satır karşılaştırma düğmesi dokunmatikte 44 px", () => {
     expect(read("src/app/app/portfoyler/property-sort-select.tsx")).toContain("outline-none touch:min-h-11 touch:text-base");
