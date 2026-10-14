@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { resetRpcProbes } from "@/lib/supabase/rpc-probe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_MATRIX, type AppRole } from "@/lib/permissions";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
@@ -6,6 +7,7 @@ import {
   buildAdvisorMetrics,
   currentMonthPeriod,
   earningInRange,
+  loadAdvisorCountsRpc,
   loadAdvisorMetrics,
   loadTargetActualsLive,
   trMonthPeriod,
@@ -34,9 +36,18 @@ type Fixture = {
   targets: Record<string, unknown>[];
 };
 
-function fakeClient(fx: Fixture) {
+type RpcHandler = (fn: string, args: Record<string, unknown>) => { data: unknown; error: unknown };
+
+function fakeClient(fx: Fixture, rpcHandler?: RpcHandler) {
   const commissionQueries: { kind: "all" | "own-deal" | "own-split"; viewer?: unknown }[] = [];
+  /** PostgREST istek günlüğü: "table" | "table:head" | "rpc:<ad>". */
+  const requests: string[] = [];
   const client = {
+    rpc(fn: string, args: Record<string, unknown>) {
+      requests.push(`rpc:${fn}`);
+      if (!rpcHandler) return Promise.resolve({ data: null, error: { code: "PGRST202", message: "Could not find the function" } });
+      return Promise.resolve(rpcHandler(fn, args));
+    },
     from(table: keyof Fixture) {
       const filters: Filter[] = [];
       let head = false;
@@ -51,6 +62,7 @@ function fakeClient(fx: Fixture) {
         return builder;
       };
       builder.then = (resolve: (v: unknown) => unknown) => {
+        requests.push(head ? `${table}:head` : table);
         const eq = (c: string) => filters.find((f) => f.op === "eq" && f.col === c)?.val;
         let rows = [...(fx[table] ?? [])];
         if (table === "profiles") {
@@ -81,7 +93,7 @@ function fakeClient(fx: Fixture) {
       return builder;
     },
   };
-  return { client: client as unknown as SupabaseClient, commissionQueries };
+  return { client: client as unknown as SupabaseClient, commissionQueries, requests };
 }
 
 const permsOf = (role: AppRole) => DEFAULT_MATRIX[role] as EffectivePermissions;
@@ -264,5 +276,52 @@ describe("buildAdvisorMetrics (saf)", () => {
     const out = buildAdvisorMetrics(facts, { period: PERIOD, seeAllEarnings: false, viewerId: "u2", nowMs: NOW });
     expect(out.rows.find((r) => r.id === "u1")!.commissionCount).toBeNull();
     expect(out.totals.revenue).toBe(summarizeAdvisorEarning(fixture.commissions as never, "Can Demir", "u2").collected);
+  });
+});
+
+describe("advisor_counts: danışman başına sayım tek tur (KQ5)", () => {
+  beforeEach(() => resetRpcProbes());
+  const LIVE = ["live", "Yayında"];
+  const countsFromFixture: RpcHandler = (fn, args) => {
+    if (fn !== "advisor_counts") return { data: null, error: { code: "42883" } };
+    const ids = args.p_ids as string[];
+    expect(args.p_tenant_id).toBe("t1");
+    expect(args.p_include_sample).toBe(false);
+    expect(args.p_live_statuses).toEqual(LIVE);
+    return {
+      data: ids.map((id) => ({
+        profile_id: id,
+        customers: fixture.customers.filter((c) => c.assigned_to === id).length,
+        live_properties: fixture.properties.filter((p) => p.assigned_to === id).length,
+      })),
+      error: null,
+    };
+  };
+
+  it("RPC varken danışman başına head-count isteği atılmaz; tek RPC çağrısı, sayılar eski yolla aynı", async () => {
+    const viaRpc = fakeClient(fixture, countsFromFixture);
+    const res = await loadAdvisorMetrics(viaRpc.client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
+    expect(viaRpc.requests.filter((r) => r === "rpc:advisor_counts")).toHaveLength(1);
+    expect(viaRpc.requests.filter((r) => r.endsWith(":head"))).toEqual([]);
+    // advisor-metrics'in müşteri/portföy sayımı için attığı istek sayısı 2'den az (eskiden ekip x 2).
+    expect(viaRpc.requests.filter((r) => r === "rpc:advisor_counts" || r === "properties").length).toBeLessThan(2);
+
+    const viaScan = fakeClient(fixture);
+    const legacy = await loadAdvisorMetrics(viaScan.client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
+    expect(res.rows).toEqual(legacy.rows);
+    expect(res.rows.find((r) => r.id === "u1")!.customerCount).toBe(2);
+    expect(res.rows.find((r) => r.id === "u1")!.activePropertyCount).toBe(1);
+  });
+
+  it("RPC yoksa tablo başına tek taramaya düşer (danışman sayısından bağımsız; head-count yok)", async () => {
+    const { client, requests } = fakeClient(fixture);
+    await loadAdvisorMetrics(client, { viewer: owner, tenantId: "t1", period: PERIOD, nowMs: NOW, sample: SAMPLE });
+    expect(requests.filter((r) => r.endsWith(":head"))).toEqual([]);
+    expect(requests.filter((r) => r === "properties")).toHaveLength(1);
+  });
+
+  it("bozuk RPC yanıtı sahte sıfır üretmez: null döner", async () => {
+    const bad = { rpc: async () => ({ data: [{ profile_id: "u1", customers: "x", live_properties: 1 }], error: null }) };
+    expect(await loadAdvisorCountsRpc(bad as never, ["u1"], { tenantId: "t1", includeSample: false })).toBeNull();
   });
 });

@@ -128,12 +128,24 @@ async function writeSpecialties(supabase: Supabase, ctx: Ctx, profileId: string,
     const { error } = await supabase.from("advisor_specialties").delete().eq("tenant_id", ctx.tenantId).eq("profile_id", profileId).in("id", diff.remove);
     if (error) return { error: dbError("saveAdvisorSpecialties.delete", error, "Uzmanlıklar kaydedilemedi.") };
   }
-  for (const u of diff.update) {
-    const { error } = await supabase
-      .from("advisor_specialties")
-      .update({ level: u.row.level, price_min: u.row.price_min, price_max: u.row.price_max, experience_years: u.row.experience_years })
-      .eq("id", u.id)
-      .eq("tenant_id", ctx.tenantId);
+  // Değişen satırlar TEK upsert (id çakışmasında güncelleme; eskiden satır başına sıralı update). Anahtar alanlar
+  // (tür/değer/işlem) mevcut satırla aynıdır, kiracı ve kişi satır içinde sabitlenir (RLS insert/update ikisi de owner/gm).
+  if (diff.update.length) {
+    const { error } = await supabase.from("advisor_specialties").upsert(
+      diff.update.map((u) => ({
+        id: u.id,
+        tenant_id: ctx.tenantId,
+        profile_id: profileId,
+        kind: u.row.kind,
+        value: u.row.value,
+        transaction_type: u.row.transaction_type,
+        level: u.row.level,
+        price_min: u.row.price_min,
+        price_max: u.row.price_max,
+        experience_years: u.row.experience_years,
+      })),
+      { onConflict: "id" },
+    );
     if (error) return { error: dbError("saveAdvisorSpecialties.update", error, "Uzmanlıklar kaydedilemedi.") };
   }
   if (diff.insert.length) {
@@ -203,8 +215,19 @@ async function writeRegions(supabase: Supabase, ctx: Ctx, profileId: string, raw
     const { error } = await supabase.from("advisor_regions").delete().eq("tenant_id", ctx.tenantId).eq("profile_id", profileId).in("id", diff.remove);
     if (error) return { error: dbError("saveAdvisorRegions.delete", error, "Bölgeler kaydedilemedi.") };
   }
-  for (const u of diff.update) {
-    const { error } = await supabase.from("advisor_regions").update({ weight: u.row.weight }).eq("id", u.id).eq("tenant_id", ctx.tenantId);
+  if (diff.update.length) {
+    const { error } = await supabase.from("advisor_regions").upsert(
+      diff.update.map((u) => ({
+        id: u.id,
+        tenant_id: ctx.tenantId,
+        profile_id: profileId,
+        province_id: u.row.province_id,
+        district_id: u.row.district_id,
+        neighborhood_id: u.row.neighborhood_id,
+        weight: u.row.weight,
+      })),
+      { onConflict: "id" },
+    );
     if (error) return { error: dbError("saveAdvisorRegions.update", error, "Bölgeler kaydedilemedi.") };
   }
   if (diff.insert.length) {

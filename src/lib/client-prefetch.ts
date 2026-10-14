@@ -16,6 +16,10 @@ import {
  * staleTimes süresi = 300 sn). Sunucu yükü: tek kuyruk, aynı anda en çok 2 istek, 700 ms aralık, aynı adres
  * 30 sn içinde tekrarlanmaz; önbellek geçersiz kılınınca (router.refresh / mutasyon) `onInvalidate` ile istenen
  * hedefler 1,5 sn sonra, en sık 10 sn'de bir, aynı kuyruğa toplu geri alınır (sunucu yükü sınırlı).
+ *
+ * AĞIR SAYFALAR (KQ5): `IDLE_PARTIAL_PATHS` (müşteriler, komisyon, raporlar) boşta yalnız KISMİ önceden yüklenir
+ * (kind "auto": `loading.tsx` sınırına kadar kabuk; sunucu sorguları çalışmaz). Bu sayfaların TAM yüklemesi yalnız
+ * niyetle (hover / odak / dokunma: `prefetchFullNow`) yapılır; ana ekran açılışında arka planda ağır RSC inmez.
  */
 
 export type PrefetchRouter = {
@@ -23,10 +27,28 @@ export type PrefetchRouter = {
 };
 
 const FULL = "full" as unknown as PrefetchKind;
+const AUTO = "auto" as unknown as PrefetchKind;
+
+/** Boşta yalnız KISMİ önceden yüklenen ağır merkezler (tam yükleme yalnız niyetle). */
+export const IDLE_PARTIAL_PATHS: readonly string[] = ["/app/musteriler", "/app/komisyon", "/app/raporlar"];
+
+/** Adres boşta kısmi mi yüklenmeli? (yol eşleşmesi; sorgu dizesi ve # yok sayılır, detay alt yolları ağır sayılmaz) */
+export function isIdlePartialHref(href: string): boolean {
+  const path = href.split("#", 1)[0]!.split("?", 1)[0]!.replace(/\/+$/, "");
+  return IDLE_PARTIAL_PATHS.includes(path);
+}
+
+/** Boş kuyrukta kullanılacak önceden yükleme türü. */
+export function idlePrefetchKind(href: string): "full" | "auto" {
+  return isIdlePartialHref(href) ? "auto" : "full";
+}
 
 type Item = { href: string; router: PrefetchRouter };
 const queue: Item[] = [];
+/** Son TAM önceden yükleme zamanı (adres başına). */
 const lastAt = new Map<string, number>();
+/** Son KISMİ önceden yükleme zamanı (yalnız ağır sayfalar; niyetle tam yüklemeyi engellemez). */
+const lastPartialAt = new Map<string, number>();
 const wanted = new Set<string>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -55,6 +77,25 @@ function fire(router: PrefetchRouter, href: string): void {
   }
 }
 
+/** Kısmi önceden yükleme: veri önbelleğe girmez, bu yüzden `markFetched` işaretlenmez (gelişte tazeleme kararı bozulmaz). */
+function firePartial(router: PrefetchRouter, href: string): void {
+  lastPartialAt.set(href, now());
+  try {
+    router.prefetch(href, { kind: AUTO });
+  } catch {
+    /* en iyi çaba */
+  }
+}
+
+function recentlyDone(href: string, partial: boolean): boolean {
+  const t = now();
+  const full = lastAt.get(href);
+  if (full !== undefined && t - full < PREFETCH_MIN_REPEAT_MS) return true;
+  if (!partial) return false;
+  const part = lastPartialAt.get(href);
+  return part !== undefined && t - part < PREFETCH_MIN_REPEAT_MS;
+}
+
 function pump(): void {
   timer = null;
   if (typeof document !== "undefined" && document.visibilityState === "hidden") {
@@ -65,16 +106,20 @@ function pump(): void {
   let started = 0;
   while (started < PREFETCH_CONCURRENCY && queue.length > 0) {
     const item = queue.shift()!;
-    const last = lastAt.get(item.href);
-    if (last !== undefined && now() - last < PREFETCH_MIN_REPEAT_MS) continue;
-    fire(item.router, item.href);
+    const partial = isIdlePartialHref(item.href);
+    if (recentlyDone(item.href, partial)) continue;
+    if (partial) firePartial(item.router, item.href);
+    else fire(item.router, item.href);
     started++;
   }
   if (queue.length > 0) timer = setTimeout(pump, PREFETCH_SLOT_MS);
 }
 
-/** Boşta, sırayla, aralıklı tam önceden yükleme. Veri tasarrufu / yavaş ağda hiçbir şey yapmaz. */
-export function enqueueFullPrefetch(router: PrefetchRouter, hrefs: readonly string[]): () => void {
+/**
+ * Boşta, sırayla, aralıklı önceden yükleme: ağır sayfalar (`IDLE_PARTIAL_PATHS`) KISMİ, diğerleri TAM.
+ * Veri tasarrufu / yavaş ağda hiçbir şey yapmaz.
+ */
+export function enqueueIdlePrefetch(router: PrefetchRouter, hrefs: readonly string[]): () => void {
   if (!canPrefetchOnThisConnection()) return () => {};
   const added: Item[] = [];
   for (const href of hrefs) {
@@ -98,11 +143,10 @@ export function enqueueFullPrefetch(router: PrefetchRouter, hrefs: readonly stri
   };
 }
 
-/** Niyet (hover / odak / dokunma / görünür alan): kuyruğu beklemeden, ama aynı adres 30 sn'de bir. */
+/** Niyet (hover / odak / dokunma / görünür alan): kuyruğu beklemeden TAM, ama aynı adres tekrar süresinde bir kez. */
 export function prefetchFullNow(router: PrefetchRouter | null | undefined, href: string): void {
   if (!router || !isLocalPath(href) || !canPrefetchOnThisConnection()) return;
-  const last = lastAt.get(href);
-  if (last !== undefined && now() - last < PREFETCH_MIN_REPEAT_MS) return;
+  if (recentlyDone(href, false)) return;
   fire(router, href);
 }
 
@@ -110,6 +154,7 @@ export function prefetchFullNow(router: PrefetchRouter | null | undefined, href:
 export function resetPrefetchState(): void {
   queue.length = 0;
   lastAt.clear();
+  lastPartialAt.clear();
   wanted.clear();
   if (timer) clearTimeout(timer);
   timer = null;
