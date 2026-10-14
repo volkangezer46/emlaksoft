@@ -1,6 +1,7 @@
 /**
  * Rapor merkezi kişiselleştirme okuyucusu (SUNUCU, DG4): kayıtlı görünümler, zamanlanmış abonelikler ve alıcı listesi.
- * Kiracıda `ctx.supabase` RLS'li oturum istemcisidir (kendi + ofiste paylaşılan görünüm, yalnız kendi aboneliği);
+ * Kiracıda `ctx.supabase` RLS'li oturum istemcisidir (kendi + ofiste paylaşılan görünüm; abonelikte kendi + kendisine
+ * gelen, ofis sahibi/gm için ofisteki tümü);
  * platformda bağlamın servis istemcisi (personel + `reports` kapısından sonra), personel kimliğiyle açık süzgeç.
  * Tablolar yoksa (migration bekliyor) `ready: false` döner; rapor merkezi bozulmaz.
  */
@@ -37,6 +38,14 @@ export type ReportSubscriptionItem = {
   lastRunAt: string | null;
   lastStatus: string | null;
   lastError: string | null;
+  /** Aboneliği oluşturan kişi (kendisiyse "Siz"). */
+  ownerName: string;
+  /** Kendi aboneliği (sil + durdur). */
+  mine: boolean;
+  /** Alıcısı olduğu başkasının aboneliği ("Beni çıkar"). */
+  incoming: boolean;
+  /** Durdur/sürdür yetkisi (sahibi ya da ofis sahibi/gm). */
+  canToggle: boolean;
 };
 
 export type PersonOption = { id: string; name: string; hint: string };
@@ -54,6 +63,8 @@ const MISSING = new Set(["42P01", "PGRST205", "42703"]);
 type ViewRow = { id: string; report_id: string; name: string; filters: unknown; shared: boolean; user_id: string | null; staff_id: string | null };
 type SubRow = {
   id: string;
+  user_id: string | null;
+  staff_id: string | null;
   report_id: string;
   name: string;
   format: ReportFormat;
@@ -79,11 +90,18 @@ export async function loadPersonalization(ctx: ReportContext, reports: readonly 
   views = platform ? views.is("tenant_id", null).or(`staff_id.eq.${ctx.userId},shared.eq.true`) : views.eq("tenant_id", ctx.tenantId!);
   if (reportId) views = views.eq("report_id", reportId);
 
+  // Ofis sahibi/gm ofisteki tüm abonelikleri görür (durdurabilir); diğerleri kendi + kendisine gelen.
+  const manager = !platform && (ctx.role === "owner" || ctx.role === "gm");
   let subs = db
     .from("report_subscriptions")
-    .select("id, report_id, name, format, frequency, weekday, month_day, relative_range, recipient_ids, active, next_run_at, last_run_at, last_status, last_error")
+    .select("id, user_id, staff_id, report_id, name, format, frequency, weekday, month_day, relative_range, recipient_ids, active, next_run_at, last_run_at, last_status, last_error")
     .eq("scope", ctx.scope);
-  subs = platform ? subs.eq("staff_id", ctx.userId) : subs.eq("tenant_id", ctx.tenantId!).eq("user_id", ctx.userId);
+  // ctx.userId oturumdan gelen UUID'dir; or() dizgesine güvenle gömülür.
+  if (platform) subs = subs.or(`staff_id.eq.${ctx.userId},recipient_ids.cs.{${ctx.userId}}`);
+  else {
+    subs = subs.eq("tenant_id", ctx.tenantId!);
+    if (!manager) subs = subs.or(`user_id.eq.${ctx.userId},recipient_ids.cs.{${ctx.userId}}`);
+  }
   if (reportId) subs = subs.eq("report_id", reportId);
 
   const people = platform
@@ -92,7 +110,7 @@ export async function loadPersonalization(ctx: ReportContext, reports: readonly 
 
   const [vRes, sRes, pRes] = await Promise.all([
     views.order("name", { ascending: true }).limit(200),
-    subs.order("created_at", { ascending: true }).limit(100),
+    subs.order("created_at", { ascending: true }).limit(manager ? 300 : 100),
     people,
   ]);
   if ((vRes.error && MISSING.has(String(vRes.error.code))) || (sRes.error && MISSING.has(String(sRes.error.code)))) return empty;
@@ -133,10 +151,13 @@ export async function loadPersonalization(ctx: ReportContext, reports: readonly 
 
   for (const s of (sRes.data ?? []) as SubRow[]) {
     const def = byId.get(s.report_id);
+    const ownerId = platform ? s.staff_id : s.user_id;
+    const mine = ownerId === ctx.userId;
+    const incoming = !mine && (s.recipient_ids ?? []).includes(ctx.userId);
     out.subscriptions.push({
       id: s.id,
       reportId: s.report_id,
-      reportTitle: def?.title ?? "Kaldırılmış rapor",
+      reportTitle: def?.title ?? "Kaldırılmış ya da erişiminiz olmayan rapor",
       reportHref: def ? savedViewHref(ctx.scope, def.id, {}) : "",
       name: s.name,
       format: s.format,
@@ -149,6 +170,10 @@ export async function loadPersonalization(ctx: ReportContext, reports: readonly 
       lastRunAt: s.last_run_at,
       lastStatus: s.last_status,
       lastError: s.last_error,
+      ownerName: mine ? "Siz" : ((ownerId && names.get(ownerId)) ?? "Erişimi kalkmış kişi"),
+      mine,
+      incoming,
+      canToggle: mine || manager,
     });
   }
   return out;

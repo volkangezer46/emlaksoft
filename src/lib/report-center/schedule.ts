@@ -84,8 +84,17 @@ export function nextRunDay(spec: ScheduleSpec, afterKey: string): string {
 /**
  * Göreli dönem (abonelik "her gönderimde dönemi yenile" seçiliyse tarih filtresi bununla kurulur):
  * günlük = dün, haftalık = son 7 gün (dün dahil), aylık = önceki takvim ayı.
+ *
+ * `runKey` (gönderimin yapıldığı gün) teslim gününden SONRAYSA (cron kesintisi / süre bütçesi yüzünden gecikmiş teslim)
+ * dönem gecikmeyi KAPSAYACAK biçimde genişler: başlangıç teslim gününün dönemi, bitiş gönderim gününün dönemi. Böylece
+ * `next_run_at` bugünden ileri atlasa da arada kalan günler sessizce kaybolmaz (tek dosyada gelir).
  */
-export function periodRange(frequency: SubscriptionFrequency, dueKey: string): { from: string; to: string } {
+export function periodRange(frequency: SubscriptionFrequency, dueKey: string, runKey: string = dueKey): { from: string; to: string } {
+  const start = basePeriod(frequency, dueKey);
+  return runKey > dueKey ? { from: start.from, to: basePeriod(frequency, runKey).to } : start;
+}
+
+function basePeriod(frequency: SubscriptionFrequency, dueKey: string): { from: string; to: string } {
   const yesterday = addDays(dueKey, -1);
   if (frequency === "daily") return { from: yesterday, to: yesterday };
   if (frequency === "weekly") return { from: addDays(dueKey, -7), to: yesterday };
@@ -99,15 +108,16 @@ export function hasDateRange(def: Pick<ReportDef, "filters">): boolean {
   return def.filters.some((f) => f.key === "from" && f.kind === "date") && def.filters.some((f) => f.key === "to" && f.kind === "date");
 }
 
-/** Teslimde kullanılacak filtreler: kayıtlı filtreler + (göreli dönemse) dönemin tarih aralığı. */
+/** Teslimde kullanılacak filtreler: kayıtlı filtreler + (göreli dönemse) dönemin tarih aralığı (gecikmeyi kapsar). */
 export function scheduledFilters(
   def: Pick<ReportDef, "filters">,
   filters: Filters,
   sub: { frequency: SubscriptionFrequency; relativeRange: boolean },
   dueKey: string,
+  runKey: string = dueKey,
 ): Filters {
   if (!sub.relativeRange || !hasDateRange(def)) return { ...filters };
-  return { ...filters, ...periodRange(sub.frequency, dueKey) };
+  return { ...filters, ...periodRange(sub.frequency, dueKey, runKey) };
 }
 
 /**

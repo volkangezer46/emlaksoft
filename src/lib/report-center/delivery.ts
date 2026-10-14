@@ -12,7 +12,16 @@
  * sorgunun içinde açık süzgeçtir ve `export-data-scope-contract` bunu her rapor için çalıştırarak doğrular. Alıcının
  * izinleri DB'den (rol + ofis + kullanıcı istisnaları) birleştirilir; liste kapsamı zorlaması açık ofiste sahip
  * dışındaki herkes yalnız kendi kayıtlarını alır (fail-closed). Ofis "toplu dışa aktarma onayı" kuralı açıksa onaydan
- * muaf olmayan (owner/gm dışı) alıcıya gönderilmez.
+ * muaf olmayan (owner/gm dışı) alıcıya gönderilmez. Sahibin kendisi de her teslimde yeniden doğrulanır (rapor izni +
+ * raporun görünürlük kuralı); yetkisi kalkmışsa abonelik atlanır.
+ *
+ * Kapasite ve adalet: zamanı gelmiş TÜM abonelikler `order(next_run_at, id)` + `range` ile sayfalanır, ofis başına
+ * sıra (round-robin) ile dizilir ve süre bütçesi dolana kadar işlenir; bir ofisin çok sayıdaki aboneliği diğer ofisleri
+ * aç bırakmaz. İşlenemeyen sayısı `remaining` olarak döner (cron heartbeat'i "iş kaldı" der). Gecikmiş teslimde
+ * göreli dönem gecikmeyi kapsayacak biçimde genişler (`periodRange(…, runKey)`), arada kalan dönem kaybolmaz.
+ *
+ * Sayaçlar: `failed` YALNIZ gerçek üretim/gönderim hatasıdır. Yetkisi olmayan, onay kuralına takılan ya da adresi
+ * bulunamayan alıcı beklenen bir durumdur: `skippedRecipients`'a sayılır, cron hatası sayılmaz.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { lockedGate } from "@/lib/billing/page-gates";
@@ -29,10 +38,11 @@ import { SCOPE_ENFORCEMENT_KEY } from "@/lib/settings/registry/tenant";
 import { getSettingDef } from "@/lib/settings/registry";
 import { coerceInput } from "@/lib/settings/view";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
+import { fetchAllPaged } from "@/lib/cron-run";
 import { summarizeFilters } from "./filters";
 import { reportCenterHref } from "./links";
 import { getReport, platformReportAllowed, tenantReportAllowed } from "./registry";
-import { storedViewFilters } from "./saved-views";
+import { readViewFilters } from "./saved-views";
 import { isSchedulable, nextRunDay, periodRange, runDayStartIso, scheduledFilters, trKeyOf, hasDateRange, type ScheduleSpec, type SubscriptionFrequency } from "./schedule";
 import { REPORT_FORMAT_LABELS, type Filters, type ReportContext, type ReportDb, type ReportDef, type ReportFormat } from "./types";
 import { formatDateTr } from "./values";
@@ -41,8 +51,10 @@ import type { RenderResult } from "./render";
 export const SUBSCRIPTION_SEND_ACTION = "report.subscription.sent";
 const SOURCE = "report-subscription";
 const TEMPLATE = "report_subscription";
-/** Bir cron turunda işlenen en çok abonelik (süre bütçesi; kalanlar ertesi tura kalır, `next_run_at` ilerlemez). */
-export const DELIVERY_BATCH = 40;
+/** Zamanı gelmiş abonelikleri okuma sayfası (`order(next_run_at, id)` + `range`). İşleme sınırı süre bütçesidir. */
+export const DELIVERY_PAGE_SIZE = 500;
+/** Bir turda okunacak en çok sayfa (koruma; 20 x 500 = 10.000 zamanı gelmiş abonelik). */
+const DELIVERY_MAX_PAGES = 20;
 const ACTIVE_TENANT_STATUSES = ["active", "trial", "past_due"];
 const MISSING = new Set(["42P01", "PGRST205", "42703"]);
 
@@ -101,14 +113,19 @@ export type DeliveryDeps = {
 export type DeliverySummary = {
   due: number;
   processed: number;
+  /** Süre bütçesi dolduğu için bu turda işlenemeyen (ertesi tura kalan) zamanı gelmiş abonelik. */
+  remaining: number;
   sent: number;
   channelDisabled: number;
+  /** Yalnız gerçek üretim/gönderim/DB hatası (cron hatası sayılır). */
   failed: number;
   skipped: number;
+  /** Yetkisi/onayı/adresi olmadığı için atlanan alıcı (beklenen durum; hata DEĞİL). */
+  skippedRecipients: number;
   schemaMissing: boolean;
 };
 
-type Outcome = { status: RunStatus; recipients: number; sent: number; rows: number; error: string | null };
+type Outcome = { status: RunStatus; recipients: number; sent: number; rows: number; error: string | null; skippedRecipients: number };
 
 type TenantInfo = {
   ok: boolean;
@@ -210,12 +227,13 @@ function composeMail(input: {
   filters: Filters;
   ctx: ReportContext | null;
   dueKey: string;
+  runKey: string;
   rendered: { rowCount: number; truncated: boolean; attached: boolean } | null;
   channelClosed: boolean;
   appUrl: string;
 }): { subject: string; text: string } {
-  const { def, sub, filters, dueKey } = input;
-  const range = sub.relative_range && hasDateRange(def) ? periodRange(sub.frequency, dueKey) : null;
+  const { def, sub, filters, dueKey, runKey } = input;
+  const range = sub.relative_range && hasDateRange(def) ? periodRange(sub.frequency, dueKey, runKey) : null;
   const period = range ? (range.from === range.to ? dayTr(range.from) : `${dayTr(range.from)} – ${dayTr(range.to)}`) : dayTr(dueKey);
   const subject = `${def.title} · ${period}`;
   const summary = summarizeFilters(def, filters, input.ctx?.names);
@@ -236,7 +254,11 @@ function composeMail(input: {
   if (summary.length) lines.push(`Filtreler: ${summary.map((s) => `${s.label}: ${s.value}`).join(" · ")}`);
   lines.push("", `Rapor merkezinde aç: ${link}`);
   if (def.personalData) lines.push("", "Bu rapor kişisel veri içerebilir (KVKK). Dosyayı yetkisiz kişilerle paylaşmayın.");
-  lines.push("", `Bu e-postayı "${sub.name}" aboneliği nedeniyle alıyorsunuz. Aboneliği rapor merkezinden durdurabilirsiniz.`);
+  const stopper = sub.scope === "tenant" ? "aboneliği oluşturan kişi ya da ofis sahibi/genel müdür" : "aboneliği oluşturan personel";
+  lines.push(
+    "",
+    `Bu e-postayı "${sub.name}" aboneliği nedeniyle alıyorsunuz. Almak istemiyorsanız rapor merkezindeki "Zamanlanmış gönderim" bölümünden "Beni çıkar"ı seçin; ${stopper} aboneliği durdurabilir.`,
+  );
   return { subject, text: lines.join("\n") };
 }
 
@@ -255,12 +277,14 @@ async function loadRecipients(db: Db, sub: SubscriptionRow, deps: DeliveryDeps):
   return ((data ?? []) as { id: string; full_name: string | null; role: string; email: string | null }[]).map((r) => ({ id: r.id, name: r.full_name ?? "", role: r.role, email: r.email }));
 }
 
-async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: DeliveryDeps): Promise<Outcome> {
-  const skip = (error: string): Outcome => ({ status: "skipped", recipients: 0, sent: 0, rows: 0, error });
+async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, runKey: string, deps: DeliveryDeps): Promise<Outcome> {
+  const skip = (error: string): Outcome => ({ status: "skipped", recipients: 0, sent: 0, rows: 0, error, skippedRecipients: 0 });
   const def = getReport(sub.scope, sub.report_id);
   if (!def || !isSchedulable(def)) return skip("Rapor artık zamanlanamıyor.");
-  const baseFilters = storedViewFilters(def, sub.filters);
-  const filters = scheduledFilters(def, baseFilters, { frequency: sub.frequency, relativeRange: sub.relative_range }, dueKey);
+  const stored = readViewFilters(def, sub.filters);
+  // Filtrelerden biri geçersizleştiyse (seçenek kaldırıldı vb.) filtresiz/eksik tam rapor sessizce GİTMEZ.
+  if (stored.dropped.length > 0) return skip(`Kayıtlı filtre geçersizleşti (${stored.dropped.join(", ")}); aboneliği yeni filtreyle yeniden oluşturun.`);
+  const filters = scheduledFilters(def, stored.filters, { frequency: sub.frequency, relativeRange: sub.relative_range }, dueKey, runKey);
 
   let tenant: TenantInfo | null = null;
   let platformCtx: ReportContext | null = null;
@@ -271,6 +295,17 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
     if (!owner) return skip("Abonelik sahibi artık bu ofiste aktif değil.");
     tenant = await loadTenantInfo(db, sub.tenant_id, def, deps);
     if (!tenant.ok) return skip(tenant.reason ?? "Ofis doğrulanamadı.");
+    // Sahibin kendisi de her teslimde yeniden doğrulanır: rapor izni ya da raporun görünürlüğü kalktıysa gönderilmez.
+    const role = String((owner as { role?: string }).role ?? "");
+    const octx = await buildScheduledTenantContext(
+      db,
+      { tenantId: sub.tenant_id, userId: sub.user_id, role, officeName: tenant.name, enforced: tenant.enforced, sample: tenant.sample! },
+      deps.nowMs,
+    );
+    const ownerAllowed =
+      effectiveHasPermission(octx.perms, "reports", "view") &&
+      tenantReportAllowed(def, { perms: octx.perms, role, officeWide: octx.officeWide, seeAllEarnings: octx.seeAllEarnings });
+    if (!ownerAllowed) return skip("Abonelik sahibinin bu rapora yetkisi yok.");
   } else {
     if (!sub.staff_id) return skip("Abonelik sahibi yok.");
     const { data: owner } = await db.from("platform_staff").select("id, role").eq("id", sub.staff_id).eq("is_active", true).maybeSingle();
@@ -287,24 +322,28 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
     // Kanal kapalı: rapor ÜRETİLMEZ; AD7 günlüğüne her alıcı için 'disabled' kaydı düşer (sahte gönderim yok).
     for (const r of recipients) {
       if (!r.email) continue;
-      const mail = composeMail({ def, sub, recipientName: r.name, filters, ctx: null, dueKey, rendered: null, channelClosed: true, appUrl: deps.appUrl });
+      const mail = composeMail({ def, sub, recipientName: r.name, filters, ctx: null, dueKey, runKey, rendered: null, channelClosed: true, appUrl: deps.appUrl });
       await deps.send({ to: r.email, ...mail, template: TEMPLATE, source: SOURCE, tenantId: sub.tenant_id, actorId: sub.staff_id });
     }
-    return { status: "channel_disabled", recipients: recipients.length, sent: 0, rows: 0, error: short(channel.reason ?? "E-posta kanalı kapalı") };
+    return { status: "channel_disabled", recipients: recipients.length, sent: 0, rows: 0, error: short(channel.reason ?? "E-posta kanalı kapalı"), skippedRecipients: 0 };
   }
 
   let sent = 0;
-  let eligible = 0;
   let rows = 0;
+  let failures = 0;
   let lastError: string | null = null;
+  // Atlanan alıcılar (beklenen durum): neden → sayı. Hata sayılmaz; teslim günlüğüne not düşer.
+  const skippedWhy = new Map<string, number>();
+  const skipRecipient = (why: string) => skippedWhy.set(why, (skippedWhy.get(why) ?? 0) + 1);
   let platformRender: RenderResult | null = null;
   for (const r of recipients) {
     if (deps.shouldStop?.()) {
       lastError = "Süre bütçesi doldu; kalan alıcılar atlandı.";
+      failures += 1;
       break;
     }
     if (!r.email) {
-      lastError = "Alıcının e-posta adresi bulunamadı.";
+      skipRecipient("e-posta adresi yok");
       continue;
     }
     let ctx: ReportContext;
@@ -319,7 +358,7 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
         effectiveHasPermission(rctx.perms, "reports", "view") &&
         tenantReportAllowed(def, { perms: rctx.perms, role: r.role, officeWide: rctx.officeWide, seeAllEarnings: rctx.seeAllEarnings });
       if (!allowed) {
-        lastError = "Bazı alıcıların bu rapora yetkisi yok.";
+        skipRecipient("rapora yetkisi yok");
         continue;
       }
       ctx = rctx;
@@ -328,17 +367,18 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
         // Ofis kontrol: toplu dışa aktarma onayı açıksa cron onay isteyemez; muaf olmayan alıcıya gönderilmez.
         if (tenant!.rulesError) {
           lastError = "Ofis onay kuralları okunamadı.";
+          failures += 1;
           continue;
         }
         const decision = evaluateApprovalRule(tenant!.rules!, "bulk_export", { rows: rendered.total, exportEntity: def.id, channel: "full" });
         if (decision.required) {
-          lastError = "Ofiste toplu dışa aktarma onayı gerekiyor; onaydan muaf olmayan alıcıya gönderilmedi.";
+          skipRecipient("ofiste toplu dışa aktarma onayı gerekiyor");
           continue;
         }
       }
     } else {
       if (!platformCanAccess(r.role as PlatformRole, "reports") || !platformReportAllowed(def, r.role as PlatformRole)) {
-        lastError = "Bazı alıcıların bu rapora yetkisi yok.";
+        skipRecipient("rapora yetkisi yok");
         continue;
       }
       platformCtx ??= deps.platformContext({ id: sub.staff_id!, role: ownerRole });
@@ -347,14 +387,14 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
       platformRender ??= await deps.render({ format: sub.format, def, ctx, filters, generatedBy: "Zamanlanmış rapor" });
       rendered = platformRender;
     }
-    eligible += 1;
     if (!rendered.ok) {
       lastError = rendered.error;
+      failures += 1;
       continue;
     }
     rows = Math.max(rows, rendered.rowCount);
     const attached = rendered.body.byteLength <= deps.attachmentMaxBytes;
-    const mail = composeMail({ def, sub, recipientName: r.name, filters, ctx, dueKey, rendered: { rowCount: rendered.rowCount, truncated: rendered.truncated, attached }, channelClosed: false, appUrl: deps.appUrl });
+    const mail = composeMail({ def, sub, recipientName: r.name, filters, ctx, dueKey, runKey, rendered: { rowCount: rendered.rowCount, truncated: rendered.truncated, attached }, channelClosed: false, appUrl: deps.appUrl });
     const res = await deps.send({
       to: r.email,
       ...mail,
@@ -376,33 +416,67 @@ async function deliverOne(db: Db, sub: SubscriptionRow, dueKey: string, deps: De
       });
     } else {
       lastError = res.error;
+      failures += 1;
     }
   }
-  const status: RunStatus = eligible === 0 ? "skipped" : sent === eligible && sent === recipients.length ? "sent" : sent > 0 ? "partial" : "failed";
-  return { status, recipients: recipients.length, sent, rows, error: short(status === "sent" ? null : lastError) };
+  const skippedRecipients = [...skippedWhy.values()].reduce((a, b) => a + b, 0);
+  const skippedNote = skippedRecipients > 0 ? `${skippedRecipients} alıcı atlandı (${[...skippedWhy.keys()].join(", ")}).` : null;
+  // Yalnız gerçek hata (üretim/gönderim/onay kuralı okunamadı/süre) 'partial'/'failed' yapar; atlanan alıcı yapmaz.
+  const status: RunStatus = failures === 0 ? (sent > 0 ? "sent" : "skipped") : sent > 0 ? "partial" : "failed";
+  const error = failures > 0 ? [lastError, skippedNote].filter(Boolean).join(" ") : skippedNote;
+  return { status, recipients: recipients.length, sent, rows, error: short(error || null), skippedRecipients };
 }
 
 const SELECT =
   "id, scope, tenant_id, user_id, staff_id, report_id, name, filters, relative_range, format, frequency, weekday, month_day, recipient_ids, next_run_at";
 
+/**
+ * Kiracı başına adil sıra: her ofisin (platform tek grup) en eski aboneliği önce, sonra ikinci turlar. Bir ofisin
+ * yüzlerce aboneliği süre bütçesini tek başına tüketemez. Grup sırası, grubun en eski `next_run_at`'idir (girdi sırası).
+ */
+export function fairOrder<T extends { tenant_id: string | null }>(rows: readonly T[]): T[] {
+  const groups = new Map<string, T[]>();
+  for (const r of rows) {
+    const k = r.tenant_id ?? "platform";
+    const g = groups.get(k);
+    if (g) g.push(r);
+    else groups.set(k, [r]);
+  }
+  const lists = [...groups.values()];
+  const out: T[] = [];
+  for (let i = 0; out.length < rows.length; i++) for (const g of lists) if (i < g.length) out.push(g[i]!);
+  return out;
+}
+
 /** Zamanı gelmiş abonelikleri teslim eder. `db`: çağıran cron'un servis istemcisi. */
 export async function runReportSubscriptionDelivery(db: Db, deps: DeliveryDeps): Promise<DeliverySummary> {
-  const out: DeliverySummary = { due: 0, processed: 0, sent: 0, channelDisabled: 0, failed: 0, skipped: 0, schemaMissing: false };
+  const out: DeliverySummary = { due: 0, processed: 0, remaining: 0, sent: 0, channelDisabled: 0, failed: 0, skipped: 0, skippedRecipients: 0, schemaMissing: false };
   const nowIso = new Date(deps.nowMs).toISOString();
-  const { data, error } = await db
-    .from("report_subscriptions")
-    .select(SELECT)
-    .eq("active", true)
-    .lte("next_run_at", nowIso)
-    .order("next_run_at", { ascending: true })
-    .order("id", { ascending: true })
-    .limit(DELIVERY_BATCH);
-  if (error) {
-    if (MISSING.has(String(error.code))) out.schemaMissing = true;
-    else out.failed += 1;
+  let schemaMissing = false;
+  // Tümü sayfalanır (sabit `.limit` yok): sıra deterministik (next_run_at, id), kapasiteyi süre bütçesi belirler.
+  const { rows, error } = await fetchAllPaged<SubscriptionRow>(
+    async (from, to) => {
+      const res = await db
+        .from("report_subscriptions")
+        .select(SELECT)
+        .eq("active", true)
+        .lte("next_run_at", nowIso)
+        .order("next_run_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(from, to);
+      if (res.error && MISSING.has(String(res.error.code))) schemaMissing = true;
+      return { data: (res.data ?? null) as SubscriptionRow[] | null, error: res.error };
+    },
+    DELIVERY_PAGE_SIZE,
+    DELIVERY_MAX_PAGES,
+  );
+  if (schemaMissing) {
+    out.schemaMissing = true;
     return out;
   }
-  const subs = (data ?? []) as SubscriptionRow[];
+  // Okuma hatası: o ana kadar okunanlar yine işlenir, hata bir kez sayılır.
+  if (error) out.failed += 1;
+  const subs = fairOrder(rows);
   out.due = subs.length;
   const todayKey = trKeyOf(deps.nowMs);
 
@@ -410,14 +484,17 @@ export async function runReportSubscriptionDelivery(db: Db, deps: DeliveryDeps):
     if (deps.shouldStop?.()) break;
     const dueKey = trKeyOf(Date.parse(sub.next_run_at));
     const spec: ScheduleSpec = { frequency: sub.frequency, weekday: sub.weekday, monthDay: sub.month_day };
-    // Kesintiden sonra geçmiş dönemler birikmez: bir sonraki teslim bugünden SONRAKİ ilk uygun gün.
-    const nextIso = runDayStartIso(nextRunDay(spec, dueKey > todayKey ? dueKey : todayKey));
+    // Kesintiden sonra geçmiş dönemler birikmez: bir sonraki teslim bugünden SONRAKİ ilk uygun gün. Kaçan günler
+    // gecikmiş teslimin dönemine katılır (`runKey` = bugün).
+    const runKey = dueKey > todayKey ? dueKey : todayKey;
+    const nextIso = runDayStartIso(nextRunDay(spec, runKey));
 
     // Dönem başına TEK teslim: günlük satırı tekil (abonelik, dönem). Zaten varsa yalnız zaman ilerler.
     const claim = await db
       .from("report_subscription_runs")
       .upsert({ subscription_id: sub.id, tenant_id: sub.tenant_id, period_key: dueKey, status: "running" }, { onConflict: "subscription_id,period_key", ignoreDuplicates: true })
       .select("id");
+    out.processed += 1;
     if (claim.error) {
       out.failed += 1;
       continue;
@@ -426,20 +503,20 @@ export async function runReportSubscriptionDelivery(db: Db, deps: DeliveryDeps):
     let outcome: Outcome | null = null;
     if (runId) {
       try {
-        outcome = await deliverOne(db, sub, dueKey, deps);
+        outcome = await deliverOne(db, sub, dueKey, runKey, deps);
       } catch (e) {
         console.error("report-subscription", sub.id, e instanceof Error ? e.message : e);
-        outcome = { status: "failed", recipients: 0, sent: 0, rows: 0, error: "Beklenmeyen hata." };
+        outcome = { status: "failed", recipients: 0, sent: 0, rows: 0, error: "Beklenmeyen hata.", skippedRecipients: 0 };
       }
       await db
         .from("report_subscription_runs")
         .update({ status: outcome.status, recipients: outcome.recipients, sent: outcome.sent, row_count: outcome.rows, error: outcome.error, finished_at: new Date(deps.nowMs).toISOString() })
         .eq("id", runId);
-      out.processed += 1;
       if (outcome.status === "sent" || outcome.status === "partial") out.sent += 1;
       if (outcome.status === "partial" || outcome.status === "failed") out.failed += 1;
       if (outcome.status === "channel_disabled") out.channelDisabled += 1;
       if (outcome.status === "skipped") out.skipped += 1;
+      out.skippedRecipients += outcome.skippedRecipients;
     }
     await db
       .from("report_subscriptions")
@@ -450,5 +527,6 @@ export async function runReportSubscriptionDelivery(db: Db, deps: DeliveryDeps):
       })
       .eq("id", sub.id);
   }
+  out.remaining = Math.max(0, out.due - out.processed);
   return out;
 }

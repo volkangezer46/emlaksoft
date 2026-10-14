@@ -86,6 +86,7 @@ function SubscriptionLine({ scope, s, showReport }: { scope: ReportScope; s: Rep
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold text-text">{s.name}</span>
         {!s.active ? <StatusBadge tone="neutral">Durduruldu</StatusBadge> : null}
+        {s.incoming ? <StatusBadge tone="neutral">Size gönderiliyor</StatusBadge> : null}
         {st ? <StatusBadge tone={st.tone}>{st.label}</StatusBadge> : null}
       </div>
       {showReport && s.reportHref ? (
@@ -95,13 +96,14 @@ function SubscriptionLine({ scope, s, showReport }: { scope: ReportScope; s: Rep
       ) : null}
       <p className="text-xs text-text-muted">
         {s.schedule} · {REPORT_FORMAT_LABELS[s.format]} · {s.recipients.join(", ")}
+        {s.mine ? "" : ` · Oluşturan: ${s.ownerName}`}
       </p>
       <p className="text-xs text-text-faint">
         {s.active ? `Sıradaki gönderim: ${formatDateTimeTr(s.nextRunAt).slice(0, 10)}` : "Gönderim durduruldu"}
         {s.lastRunAt ? ` · Son: ${formatDateTimeTr(s.lastRunAt)}` : ""}
         {s.lastError ? ` · ${s.lastError}` : ""}
       </p>
-      <SubscriptionActions scope={scope} id={s.id} name={s.name} active={s.active} />
+      <SubscriptionActions scope={scope} id={s.id} name={s.name} active={s.active} canToggle={s.canToggle} canDelete={s.mine} canLeave={s.incoming} />
     </li>
   );
 }
@@ -185,8 +187,8 @@ export function PersonalOverview({ scope, data }: { scope: ReportScope; data: Pe
       <Card>
         <CardHeader>
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2"><BellRing className="h-4 w-4 text-text-faint" aria-hidden />Rapor abonelikleriniz</CardTitle>
-            <CardDescription>E-postayla düzenli gelen raporlar.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><BellRing className="h-4 w-4 text-text-faint" aria-hidden />Rapor abonelikleri</CardTitle>
+            <CardDescription>Oluşturduğunuz ve size e-postayla düzenli gelen raporlar.</CardDescription>
           </div>
         </CardHeader>
         <CardContent>

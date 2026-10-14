@@ -26,6 +26,9 @@ import { requirePermission } from "@/lib/require-permission";
  * `platformReportAllowed`. Kiracı yazımları RLS'li oturum istemcisiyle (tenant_id + user_id = oturum), platform yazımları
  * rapor bağlamının servis istemcisiyle ve personel kimliğiyle. Alıcılar yalnız kendi ofisinin aktif kullanıcıları
  * (platformda aktif personel) olabilir; teslimde her alıcı raporu kendi yetkisiyle alır.
+ * Durdur/sürdür: sahibi; kiracıda ayrıca ofis sahibi/gm ofisteki her aboneliği (RLS `report_subscriptions_manage`).
+ * Alıcı kendini listeden çıkarır (`leaveReportSubscription`; kiracıda `report_subscription_leave` RPC'si).
+ * DB ayrıca sahip başına tavanı ve `next_run_at` alt sınırını tetikleyiciyle uygular (doğrudan PostgREST yazımına karşı).
  */
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -64,6 +67,11 @@ function owner(a: Actor): Record<string, string | null> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ownRows(a: Actor, query: any): any {
   return a.scope === "platform" ? query.eq("scope", "platform").eq("staff_id", a.ctx.userId) : query.eq("scope", "tenant").eq("tenant_id", a.ctx.tenantId).eq("user_id", a.ctx.userId);
+}
+
+/** Ofis sahibi/gm ofisteki tüm abonelikleri yönetir (durdur/sürdür); diğerleri yalnız kendininkini. */
+function canManageOffice(a: Actor): boolean {
+  return a.scope === "tenant" && (a.ctx.role === "owner" || a.ctx.role === "gm");
 }
 
 function scopeOf(raw: unknown): ReportScope {
@@ -179,7 +187,10 @@ export async function createReportSubscription(input: {
     active: true,
     next_run_at: runDayStartIso(first),
   });
-  if (error) return { ok: false, error: MISSING.has(String(error.code)) ? SETUP_PENDING : actionErrorMessage(error, "Abonelik kaydedilemedi.") };
+  if (error) {
+    if (String(error.message ?? "").includes("report_subscription_limit")) return { ok: false, error: `En çok ${SUBSCRIPTION_PER_OWNER_MAX} rapor aboneliğiniz olabilir.` };
+    return { ok: false, error: MISSING.has(String(error.code)) ? SETUP_PENDING : actionErrorMessage(error, "Abonelik kaydedilemedi.") };
+  }
   revalidate(scope);
   return { ok: true };
 }
@@ -190,10 +201,10 @@ export async function setReportSubscriptionActive(input: { scope: ReportScope; i
   if (!a.ok) return a;
   const id = String(input.id ?? "").trim();
   if (!id) return { ok: false, error: "Abonelik bulunamadı." };
-  const { data, error } = await ownRows(
-    a.actor,
-    a.actor.ctx.supabase.from("report_subscriptions").update({ active: input.active === true, updated_at: new Date(now()).toISOString() }).eq("id", id),
-  ).select("id");
+  const update = a.actor.ctx.supabase.from("report_subscriptions").update({ active: input.active === true, updated_at: new Date(now()).toISOString() }).eq("id", id);
+  // Ofis sahibi/gm: ofisteki her abonelik (RLS aynı koşulu uygular); diğerleri yalnız kendi aboneliği.
+  const scoped = canManageOffice(a.actor) ? update.eq("scope", "tenant").eq("tenant_id", a.actor.ctx.tenantId) : ownRows(a.actor, update);
+  const { data, error } = await scoped.select("id");
   if (error) return { ok: false, error: actionErrorMessage(error, "Abonelik güncellenemedi.") };
   if (!data || data.length === 0) return { ok: false, error: "Abonelik bulunamadı." };
   revalidate(scope);
@@ -209,6 +220,38 @@ export async function deleteReportSubscription(input: { scope: ReportScope; id: 
   const { data, error } = await ownRows(a.actor, a.actor.ctx.supabase.from("report_subscriptions").delete().eq("id", id)).select("id");
   if (error) return { ok: false, error: actionErrorMessage(error, "Abonelik silinemedi.") };
   if (!data || data.length === 0) return { ok: false, error: "Abonelik bulunamadı." };
+  revalidate(scope);
+  return { ok: true };
+}
+
+/** Alıcı kendini aboneliğin alıcı listesinden çıkarır; son alıcıysa abonelik durdurulur. */
+export async function leaveReportSubscription(input: { scope: ReportScope; id: string }): Promise<Result> {
+  const scope = scopeOf(input?.scope);
+  const a = await actor(scope);
+  if (!a.ok) return a;
+  const id = String(input.id ?? "").trim();
+  if (!id) return { ok: false, error: "Abonelik bulunamadı." };
+  const ctx = a.actor.ctx;
+  if (scope === "tenant") {
+    const { data, error } = await ctx.supabase.rpc("report_subscription_leave", { p_id: id });
+    if (error) return { ok: false, error: MISSING.has(String(error.code)) || error.code === "PGRST202" ? SETUP_PENDING : actionErrorMessage(error, "Abonelikten çıkılamadı.") };
+    if (data !== "left" && data !== "paused") return { ok: false, error: "Abonelik bulunamadı (yalnız size gelen abonelikten çıkabilirsiniz)." };
+  } else {
+    // Platform satırları yalnız service_role'dedir: bağlamın servis istemcisi, personel kimliğiyle açık süzgeç.
+    const db = ctx.supabase;
+    const { data: row, error } = await db.from("report_subscriptions").select("id, staff_id, recipient_ids").eq("id", id).eq("scope", "platform").maybeSingle();
+    if (error) return { ok: false, error: actionErrorMessage(error, "Abonelikten çıkılamadı.") };
+    const sub = row as { staff_id: string; recipient_ids: string[] } | null;
+    if (!sub || !(sub.recipient_ids ?? []).includes(ctx.userId)) return { ok: false, error: "Abonelik bulunamadı (yalnız size gelen abonelikten çıkabilirsiniz)." };
+    const rest = sub.recipient_ids.filter((r) => r !== ctx.userId);
+    const patch = rest.length > 0 ? { recipient_ids: rest } : { recipient_ids: [sub.staff_id], active: false };
+    const { error: upError } = await db
+      .from("report_subscriptions")
+      .update({ ...patch, updated_at: new Date(now()).toISOString() })
+      .eq("id", id)
+      .eq("scope", "platform");
+    if (upError) return { ok: false, error: actionErrorMessage(upError, "Abonelikten çıkılamadı.") };
+  }
   revalidate(scope);
   return { ok: true };
 }

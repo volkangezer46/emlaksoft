@@ -14,7 +14,13 @@ const MATE = "aaaaaaaa-2222-4222-8222-222222222222";
 const FOREIGN = "bbbbbbbb-1111-4111-8111-111111111111";
 
 type Row = Record<string, unknown>;
-const state: { tables: Record<string, Row[]>; inserts: { table: string; row: Row }[]; gate: Row } = { tables: {}, inserts: [], gate: {} };
+const state: { tables: Record<string, Row[]>; inserts: { table: string; row: Row }[]; gate: Row; rpcs: { fn: string; args: Row }[]; rpcResult: unknown } = {
+  tables: {},
+  inserts: [],
+  gate: {},
+  rpcs: [],
+  rpcResult: "left",
+};
 
 function fakeDb() {
   const from = (table: string) => {
@@ -36,7 +42,11 @@ function fakeDb() {
     };
     return q;
   };
-  return { from };
+  const rpc = async (fn: string, args: Row) => {
+    state.rpcs.push({ fn, args });
+    return { data: state.rpcResult, error: null };
+  };
+  return { from, rpc };
 }
 
 vi.mock("next/cache", async (orig) => ({ ...(await orig<typeof import("next/cache")>()), revalidatePath: () => undefined }));
@@ -68,7 +78,7 @@ vi.mock("@/lib/report-center/context", () => ({
   }),
 }));
 
-const { createReportSubscription, saveReportView } = await import("@/app/actions/report-center");
+const { createReportSubscription, leaveReportSubscription, saveReportView } = await import("@/app/actions/report-center");
 
 const base = {
   scope: "tenant" as const,
@@ -82,6 +92,8 @@ const base = {
 
 beforeEach(() => {
   state.inserts = [];
+  state.rpcs = [];
+  state.rpcResult = "left";
   state.gate = { ok: true, userId: ME, tenantId: T1, role: "owner", impersonating: false };
   state.tables = {
     profiles: [
@@ -135,5 +147,16 @@ describe("rapor aboneliği — kiracı yalıtımı", () => {
     const res = await saveReportView({ scope: "tenant", reportId: "musteriler", name: "Alıcılar", filters: { type: "Alıcı", sayfa: "2" }, shared: true });
     expect(res).toEqual({ ok: true });
     expect(state.inserts[0]).toMatchObject({ table: "report_saved_views", row: { tenant_id: T1, user_id: ME, filters: { type: "Alıcı" }, shared: true } });
+  });
+
+  it("alıcı kendini RPC ile çıkarır; kendisine gelmeyen abonelikte hata döner", async () => {
+    state.gate = { ok: true, userId: MATE, tenantId: T1, role: "advisor", impersonating: false };
+    expect(await leaveReportSubscription({ scope: "tenant", id: "sub-1" })).toEqual({ ok: true });
+    expect(state.rpcs).toEqual([{ fn: "report_subscription_leave", args: { p_id: "sub-1" } }]);
+    state.rpcResult = "not_found";
+    expect(await leaveReportSubscription({ scope: "tenant", id: "sub-2" })).toEqual({
+      ok: false,
+      error: "Abonelik bulunamadı (yalnız size gelen abonelikten çıkabilirsiniz).",
+    });
   });
 });

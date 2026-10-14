@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { runReportSubscriptionDelivery, type DeliveryDeps } from "./delivery";
+import { fairOrder, runReportSubscriptionDelivery, type DeliveryDeps } from "./delivery";
 import { runDayStartIso } from "./schedule";
 import type { RenderResult } from "./render";
 
@@ -20,6 +20,7 @@ function fakeDb(seed: Record<string, Row[]>) {
     let payload: Row | null = null;
     let onConflict: string[] = [];
     let single = false;
+    let window: [number, number] | null = null;
     const q = {
       select: () => q,
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), q),
@@ -29,6 +30,7 @@ function fakeDb(seed: Record<string, Row[]>) {
       or: () => q,
       order: () => q,
       limit: () => q,
+      range: (a: number, b: number) => ((window = [a, b]), q),
       maybeSingle: () => ((single = true), q),
       insert: (p: Row) => ((op = "insert"), (payload = p), q),
       update: (p: Row) => ((op = "update"), (payload = p), q),
@@ -45,8 +47,9 @@ function fakeDb(seed: Record<string, Row[]>) {
           return resolve({ data: [row], error: null });
         }
         if (op === "update") for (const r of hit()) Object.assign(r, payload);
-        const data = hit();
-        resolve({ data: single ? (data[0] ?? null) : data, error: null, count: data.length });
+        const all = hit();
+        const data = window ? all.slice(window[0], window[1] + 1) : all;
+        resolve({ data: single ? (data[0] ?? null) : data, error: null, count: all.length });
       },
     };
     return q;
@@ -59,6 +62,7 @@ const T2 = "22222222-2222-4222-8222-222222222222";
 const OWNER = "aaaaaaaa-1111-4111-8111-111111111111";
 const GM = "aaaaaaaa-2222-4222-8222-222222222222";
 const FOREIGN = "bbbbbbbb-1111-4111-8111-111111111111";
+const NOMAIL = "aaaaaaaa-3333-4333-8333-333333333333";
 const NOW = Date.parse("2026-10-19T07:00:00Z"); // Pazartesi 10:00 TR
 
 function seed(over: Partial<Row> = {}) {
@@ -71,7 +75,9 @@ function seed(over: Partial<Row> = {}) {
       { id: OWNER, tenant_id: T1, full_name: "Ayşe Sahip", role: "owner", is_active: true },
       { id: GM, tenant_id: T1, full_name: "Mert Müdür", role: "gm", is_active: true },
       { id: FOREIGN, tenant_id: T2, full_name: "Yabancı Kişi", role: "owner", is_active: true },
+      { id: NOMAIL, tenant_id: T1, full_name: "Adressiz Kişi", role: "gm", is_active: true },
     ],
+    tenant_role_permissions: [] as Row[],
     report_subscriptions: [
       {
         id: "sub-1",
@@ -225,5 +231,66 @@ describe("zamanlanmış rapor teslimi", () => {
     const mail = send.mock.calls[0]![0];
     expect(mail.attachments).toBeUndefined();
     expect(mail.text).toContain("https://emlaksoft.com.tr/app/raporlar?sekme=merkez&rapor=musteriler");
+  });
+
+  it("yetkisiz/adressiz alıcı atlanır ama hata sayılmaz (cron heartbeat'i kırılmaz)", async () => {
+    const { db, tables } = fakeDb(seed({ recipient_ids: [OWNER, NOMAIL] }));
+    const { d, send } = deps();
+    const out = await runReportSubscriptionDelivery(db, d);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(out).toMatchObject({ sent: 1, failed: 0, skippedRecipients: 1 });
+    expect(tables.report_subscription_runs[0]).toMatchObject({ status: "sent", sent: 1 });
+    expect(String(tables.report_subscriptions[0]!.last_error)).toContain("1 alıcı atlandı");
+  });
+
+  it("sahibinin rapor izni kalktıysa abonelik atlanır (meslektaşlara gitmez)", async () => {
+    const s = seed({ user_id: GM, recipient_ids: [OWNER] });
+    s.tenant_role_permissions.push({ tenant_id: T1, role: "gm", module: "reports", action: "view", allowed: false });
+    const { db, tables } = fakeDb(s);
+    const { d, send } = deps();
+    const out = await runReportSubscriptionDelivery(db, d);
+    expect(out).toMatchObject({ skipped: 1, failed: 0 });
+    expect(send).not.toHaveBeenCalled();
+    expect(tables.report_subscriptions[0]).toMatchObject({ last_status: "skipped", last_error: "Abonelik sahibinin bu rapora yetkisi yok." });
+  });
+
+  it("kayıtlı filtre geçersizleştiyse filtresiz rapor GİTMEZ; neden son hataya yazılır", async () => {
+    const { db, tables } = fakeDb(seed({ filters: { type: "olmayan-tur", source: "" } }));
+    const { d, send, render } = deps();
+    const out = await runReportSubscriptionDelivery(db, d);
+    expect(out.skipped).toBe(1);
+    expect(render).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+    expect(String(tables.report_subscriptions[0]!.last_error)).toContain("Kayıtlı filtre geçersizleşti (type)");
+  });
+
+  it("gecikmiş günlük teslim kaçan günleri kapsar; sonraki teslim yarın", async () => {
+    const { db, tables } = fakeDb(seed({ frequency: "daily", weekday: null, next_run_at: runDayStartIso("2026-10-17") }));
+    const { d, render, send } = deps();
+    await runReportSubscriptionDelivery(db, d);
+    expect(render.mock.calls[0]![0].filters).toMatchObject({ from: "2026-10-16", to: "2026-10-18" });
+    expect(send.mock.calls[0]![0].text).toContain("16.10.2026 – 18.10.2026");
+    expect(tables.report_subscription_runs[0]).toMatchObject({ period_key: "2026-10-17" });
+    expect(tables.report_subscriptions[0]!.next_run_at).toBe(runDayStartIso("2026-10-20"));
+  });
+
+  it("süre bütçesi dolarsa işlenemeyenler 'remaining' olarak döner, zamanları ilerlemez", async () => {
+    const { db, tables } = fakeDb(seed());
+    const { d, send } = deps({ shouldStop: () => true });
+    const out = await runReportSubscriptionDelivery(db, d);
+    expect(out).toMatchObject({ due: 1, processed: 0, remaining: 1 });
+    expect(send).not.toHaveBeenCalled();
+    expect(tables.report_subscriptions[0]!.next_run_at).toBe(runDayStartIso("2026-10-19"));
+  });
+
+  it("teslim sırası ofisler arasında adil (bir ofisin çok aboneliği diğerini aç bırakmaz)", () => {
+    const rows = [
+      { id: "a1", tenant_id: "A" },
+      { id: "a2", tenant_id: "A" },
+      { id: "a3", tenant_id: "A" },
+      { id: "b1", tenant_id: "B" },
+      { id: "p1", tenant_id: null },
+    ];
+    expect(fairOrder(rows).map((r) => r.id)).toEqual(["a1", "b1", "p1", "a2", "a3"]);
   });
 });

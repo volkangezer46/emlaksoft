@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BellPlus, BookmarkPlus, Pause, Play, Trash2, X } from "lucide-react";
+import { BellOff, BellPlus, BookmarkPlus, Pause, Play, Trash2, X } from "lucide-react";
 import {
   createReportSubscription,
   deleteReportSubscription,
   deleteReportView,
+  leaveReportSubscription,
   saveReportView,
   setReportSubscriptionActive,
 } from "@/app/actions/report-center";
@@ -19,7 +20,8 @@ import { useToast } from "@/components/app/toast-provider";
 import type { ReportScope } from "@/lib/report-center/types";
 
 /**
- * Rapor merkezi kişiselleştirme formları (İSTEMCİ, DG4): görünüm kaydet/sil, abonelik oluştur/durdur/sil.
+ * Rapor merkezi kişiselleştirme formları (İSTEMCİ, DG4): görünüm kaydet/sil, abonelik oluştur/durdur/sil, alıcı olarak
+ * abonelikten çık.
  * Sunucu modülü İÇE AKTARMAZ (yalnız server action'lar ve saf tipler). Sonuç hem toast'la (panelde) hem satır içi
  * durum metniyle (toast sağlayıcısı olmayan /admin'de) bildirilir.
  */
@@ -262,30 +264,64 @@ export function SubscriptionForm({
   );
 }
 
-export function SubscriptionActions({ scope, id, name, active }: { scope: ReportScope; id: string; name: string; active: boolean }) {
+export function SubscriptionActions({
+  scope,
+  id,
+  name,
+  active,
+  canToggle,
+  canDelete,
+  canLeave,
+}: {
+  scope: ReportScope;
+  id: string;
+  name: string;
+  active: boolean;
+  canToggle: boolean;
+  canDelete: boolean;
+  canLeave: boolean;
+}) {
   const { pending, message, run } = useAction();
+  if (!canToggle && !canDelete && !canLeave) return null;
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <Button
-        variant="ghost"
-        size="xs"
-        icon={active ? Pause : Play}
-        loading={pending}
-        onClick={() => run(() => setReportSubscriptionActive({ scope, id, active: !active }), active ? "Abonelik durduruldu" : "Abonelik yeniden başladı")}
-      >
-        {active ? "Durdur" : "Sürdür"}
-      </Button>
-      <ConfirmDialog
-        trigger={
-          <Button variant="ghost" size="xs" icon={Trash2} aria-label={`${name} aboneliğini sil`}>
-            Sil
-          </Button>
-        }
-        title="Abonelik silinsin mi?"
-        description={`"${name}" aboneliği silinir; bundan sonra e-posta gönderilmez.`}
-        confirmLabel="Sil"
-        onConfirm={() => run(() => deleteReportSubscription({ scope, id }), "Abonelik silindi")}
-      />
+      {canToggle ? (
+        <Button
+          variant="ghost"
+          size="xs"
+          icon={active ? Pause : Play}
+          loading={pending}
+          onClick={() => run(() => setReportSubscriptionActive({ scope, id, active: !active }), active ? "Abonelik durduruldu" : "Abonelik yeniden başladı")}
+        >
+          {active ? "Durdur" : "Sürdür"}
+        </Button>
+      ) : null}
+      {canLeave ? (
+        <ConfirmDialog
+          trigger={
+            <Button variant="ghost" size="xs" icon={BellOff} aria-label={`${name} aboneliğinden çık`}>
+              Beni çıkar
+            </Button>
+          }
+          title="Bu abonelikten çıkılsın mı?"
+          description={`"${name}" raporu artık size e-postayla gönderilmez. Diğer alıcılar almaya devam eder.`}
+          confirmLabel="Beni çıkar"
+          onConfirm={() => run(() => leaveReportSubscription({ scope, id }), "Abonelikten çıkıldı")}
+        />
+      ) : null}
+      {canDelete ? (
+        <ConfirmDialog
+          trigger={
+            <Button variant="ghost" size="xs" icon={Trash2} aria-label={`${name} aboneliğini sil`}>
+              Sil
+            </Button>
+          }
+          title="Abonelik silinsin mi?"
+          description={`"${name}" aboneliği silinir; bundan sonra e-posta gönderilmez.`}
+          confirmLabel="Sil"
+          onConfirm={() => run(() => deleteReportSubscription({ scope, id }), "Abonelik silindi")}
+        />
+      ) : null}
       <Status message={message} />
     </div>
   );

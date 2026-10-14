@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseFilters } from "./filters";
 import { getReport, TENANT_REPORT_LIST, PLATFORM_REPORT_LIST } from "./registry";
-import { cleanViewFilters, savedViewHref, storedViewFilters } from "./saved-views";
+import { cleanViewFilters, readViewFilters, savedViewHref, storedViewFilters } from "./saved-views";
 import { reportChartFromTable } from "./chart";
 import {
   isoWeekday,
@@ -42,6 +42,11 @@ describe("zamanlama (TR takvim günü)", () => {
     expect(periodRange("weekly", "2026-10-19")).toEqual({ from: "2026-10-12", to: "2026-10-18" });
     expect(periodRange("monthly", "2026-03-03")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
     expect(periodRange("monthly", "2026-01-05")).toEqual({ from: "2025-12-01", to: "2025-12-31" });
+    // Gecikmiş teslim: dönem gecikmeyi kapsar (arada kalan gün/ay kaybolmaz).
+    expect(periodRange("daily", "2026-10-17", "2026-10-19")).toEqual({ from: "2026-10-16", to: "2026-10-18" });
+    expect(periodRange("weekly", "2026-10-12", "2026-10-15")).toEqual({ from: "2026-10-05", to: "2026-10-14" });
+    expect(periodRange("monthly", "2026-03-03", "2026-03-05")).toEqual({ from: "2026-02-01", to: "2026-02-28" });
+    expect(periodRange("monthly", "2026-03-03", "2026-04-10")).toEqual({ from: "2026-02-01", to: "2026-03-31" });
   });
 
   it("teslim filtreleri: göreli dönem tarih aralığını değiştirir, diğer filtreler korunur", () => {
@@ -100,7 +105,10 @@ describe("kayıtlı görünüm: açılınca filtreler AYNEN gelir", () => {
   it("tanımda olmayan anahtar atılır, geçersiz kayıt boş filtreye düşer (rapor yine açılır)", () => {
     const def = getReport("tenant", "musteriler")!;
     expect(storedViewFilters(def, { type: "Alıcı", sayfa: "3", hack: "x" })).toEqual({ type: "Alıcı" });
+    // Kaydederken doğrulama bütündür (hata); okurken anahtar anahtar (geçerli olanlar korunur).
     expect(cleanViewFilters(def, { type: "olmayan-tur" }).ok).toBe(false);
+    expect(readViewFilters(def, { type: "olmayan-tur", from: "2026-09-01", q: "Ayşe" })).toEqual({ filters: { from: "2026-09-01", q: "Ayşe" }, dropped: ["type"] });
+    expect(readViewFilters(def, { from: "2026-09-30", to: "2026-09-01", type: "Alıcı" })).toEqual({ filters: { type: "Alıcı" }, dropped: ["from", "to"] });
     expect(storedViewFilters(def, { from: "2026-02-30" })).toEqual({});
     expect(storedViewFilters(def, null)).toEqual({});
   });
