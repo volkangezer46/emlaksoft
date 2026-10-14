@@ -87,6 +87,14 @@ export function closedTimeline(code: string, nowMs: number): { createdAt: string
   };
 }
 
+/**
+ * Örnek görselin depo yolu. property_media CHECK kısıtı (20260802000420) yolu `<tenant>/<property>/<uuid v1-5>.webp`
+ * biçiminde ister; okunur ad (`ornek-<sahne>.webp`) yalnız file_name'e yazılır.
+ */
+export function demoMediaStoragePath(tenantId: string, propertyId: string, uuid: string): string {
+  return `${tenantId}/${propertyId}/${uuid.toLowerCase()}.webp`;
+}
+
 /** İlan açıklaması (deterministik; 5000 karakter sınırının çok altında). */
 export function demoDescription(p: ShowcaseProperty): string {
   const district = DISTRICT_LABEL[p.district] ?? "İstanbul";

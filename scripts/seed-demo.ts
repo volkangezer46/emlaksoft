@@ -12,6 +12,7 @@
  * ASLA demo-ofis dışındaki bir tenant'a yazmaz.
  */
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import dotenv from "dotenv";
 import sharp from "sharp";
@@ -23,6 +24,7 @@ import {
   DEMO_OFFICE_PHONE,
   DEMO_STAFF_PHONES,
   closedTimeline,
+  demoMediaStoragePath,
   demoDescription,
   demoSceneSvg,
   demoScenesFor,
@@ -463,7 +465,8 @@ async function enrichShowcase(
       files.push({ name: `ornek-${scene}.webp`, body: await sharp(Buffer.from(demoSceneSvg(scene, p.code))).webp({ quality: 82 }).toBuffer() });
     }
     for (const [i, f] of files.entries()) {
-      const path = `${tenantId}/${propId}/${f.name}`;
+      // Depo yolu property_media CHECK kısıtına uymalı (<tenant>/<property>/<uuid>.webp); okunur ad file_name'de kalır.
+      const path = demoMediaStoragePath(tenantId, propId, randomUUID());
       const { error: upErr } = await admin.storage
         .from("property-media")
         .upload(path, f.body, { contentType: "image/webp", upsert: true, cacheControl: "31536000" });
@@ -485,6 +488,8 @@ async function enrichShowcase(
       });
       if (insErr) {
         console.warn(`  ! ${p.code} görsel kaydı yazılamadı: ${insErr.message}`);
+        // Kayıtsız (sahipsiz) nesne bırakma.
+        await admin.storage.from("property-media").remove([path]);
         break;
       }
       photos += 1;

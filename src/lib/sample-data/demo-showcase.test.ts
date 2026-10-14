@@ -7,6 +7,7 @@ import {
   DEMO_STAFF_PHONES,
   closedTimeline,
   demoDescription,
+  demoMediaStoragePath,
   demoSceneSvg,
   demoScenesFor,
 } from "./demo-showcase";
@@ -14,6 +15,19 @@ import {
 const NOW = Date.parse("2026-10-14T09:00:00Z");
 
 describe("demo vitrin zenginleştirmesi (YD1)", () => {
+  it("örnek görsel depo yolu property_media CHECK kısıtının regex'ine uyar (okunur ad yolda yok)", () => {
+    const tenant = "2b1f6c1e-8a0d-4c55-9f3e-0f5b7d1a2c33";
+    const property = "9c0e2d4a-1b3f-4e6a-8d7c-5a4b3c2d1e0f";
+    // Canlı kısıt (20260802000420): '^<tenant_id>/<property_id>/<uuid v1-5>[.](jpg|png|gif|webp)$'
+    const check = new RegExp(
+      `^${tenant}/${property}/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](jpg|png|gif|webp)$`,
+    );
+    const path = demoMediaStoragePath(tenant, property, crypto.randomUUID());
+    expect(path).toMatch(check);
+    expect(demoMediaStoragePath(tenant, property, "A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D")).toMatch(check);
+    expect(`${tenant}/${property}/ornek-living.webp`).not.toMatch(check);
+  });
+
   it("açıklama: mahalle + metrekare içerir, sınır içinde ve açıklama kuralından geçer", () => {
     const text = demoDescription({
       code: "DEMO-001",
