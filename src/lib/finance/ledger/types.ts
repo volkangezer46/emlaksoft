@@ -153,8 +153,8 @@ export type OpenItemView = {
   href: string;
 };
 
-export type AgingBucketKey = "vadesi_gelmedi" | "0-30" | "31-60" | "61-90" | "90+";
-export const AGING_BUCKETS: readonly AgingBucketKey[] = ["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+"] as const;
+export type AgingBucketKey = "vadesi_gelmedi" | "0-30" | "31-60" | "61-90" | "90+" | "vadesiz";
+export const AGING_BUCKETS: readonly AgingBucketKey[] = ["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+", "vadesiz"] as const;
 export type AgingBucket = { bucket: AgingBucketKey; count: number; amount: Money };
 
 // ---------------------------------------------------------------------------

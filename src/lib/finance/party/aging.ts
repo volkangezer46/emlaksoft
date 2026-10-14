@@ -4,7 +4,8 @@
  * Tanımlar (ekranda, ekstrede ve raporda aynı):
  *  - Bakiye işareti: pozitif = cari bize borçlu (alacağımız var), negatif = biz cariye borçluyuz.
  *  - Yaşlandırma: vade tarihinden bugüne geçen gün. Vadesi bugün ya da ileride olan kalem "vadesi gelmedi";
- *    1–30 gün "0–30", 31–60, 61–90, 91 ve üstü "90+". Vadesiz kalem "vadesi gelmedi" sayılır.
+ *    1–30 gün "0–30", 31–60, 61–90, 91 ve üstü "90+". Vadesiz kalem (vade tarihi yok) ayrı "vadesiz" kovasındadır:
+ *    gecikmiş sayılmaz, "90+"ya da "vadesi gelmedi"ye karışmaz (`finance_aging` RPC'si ile aynı).
  *  - Kalem durumu: ödenen 0 → açık, 0 < ödenen < tutar → kısmi, ödenen ≥ tutar → kapandı.
  * Para hesabı kuruş (tam sayı) üzerinden yapılır; toplamlar kayan nokta sapması taşımaz.
  */
@@ -92,7 +93,7 @@ export function daysPastDue(dueDate: string, today: string): number {
 // Yaşlandırma
 // ---------------------------------------------------------------------------
 
-export const AGING_BUCKETS = ["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+"] as const;
+export const AGING_BUCKETS = ["vadesi_gelmedi", "0-30", "31-60", "61-90", "90+", "vadesiz"] as const;
 export type AgingBucketKey = (typeof AGING_BUCKETS)[number];
 
 export const AGING_LABEL: Record<AgingBucketKey, string> = {
@@ -101,14 +102,20 @@ export const AGING_LABEL: Record<AgingBucketKey, string> = {
   "31-60": "31–60 gün",
   "61-90": "61–90 gün",
   "90+": "90+ gün",
+  vadesiz: "Vadesiz",
 };
+
+/** Gecikmiş kova mı (vadesi gelmemiş ve vadesiz kalem gecikme toplamına ve "Vadesi geçen" süzgecine girmez). */
+export function isOverdueBucket(bucket: AgingBucketKey): boolean {
+  return bucket !== "vadesi_gelmedi" && bucket !== "vadesiz";
+}
 
 export function agingBucketKeyOf(value: unknown): AgingBucketKey | null {
   return typeof value === "string" && (AGING_BUCKETS as readonly string[]).includes(value) ? (value as AgingBucketKey) : null;
 }
 
 export function agingBucketOf(dueDate: string | null | undefined, today: string): AgingBucketKey {
-  if (!dueDate || !isIsoDay(dueDate.slice(0, 10))) return "vadesi_gelmedi";
+  if (!dueDate || !isIsoDay(dueDate.slice(0, 10))) return "vadesiz";
   const d = daysPastDue(dueDate, today);
   if (d <= 0) return "vadesi_gelmedi";
   if (d <= 30) return "0-30";
@@ -118,28 +125,30 @@ export function agingBucketOf(dueDate: string | null | undefined, today: string)
 }
 
 /**
- * Kovanın vade aralığı (her iki uç dahil). Filtreli liste sorgusu bunu kullanır; `includeNull` vadesiz kalemleri de
- * "vadesi gelmedi" kovasına katar. `agingBucketOf` ile birebir aynı sınırlar (testle sabit).
+ * Kovanın vade aralığı (her iki uç dahil). Filtreli liste sorgusu bunu kullanır; `nullOnly` yalnız vadesiz kalemleri
+ * seçer (aralık uçları o zaman kullanılmaz). `agingBucketOf` ile birebir aynı sınırlar (testle sabit).
  */
-export function bucketDueRange(bucket: AgingBucketKey, today: string): { dueFrom: string | null; dueTo: string | null; includeNull: boolean } {
+export function bucketDueRange(bucket: AgingBucketKey, today: string): { dueFrom: string | null; dueTo: string | null; nullOnly: boolean } {
   switch (bucket) {
+    case "vadesiz":
+      return { dueFrom: null, dueTo: null, nullOnly: true };
     case "vadesi_gelmedi":
-      return { dueFrom: today, dueTo: null, includeNull: true };
+      return { dueFrom: today, dueTo: null, nullOnly: false };
     case "0-30":
-      return { dueFrom: addDays(today, -30), dueTo: addDays(today, -1), includeNull: false };
+      return { dueFrom: addDays(today, -30), dueTo: addDays(today, -1), nullOnly: false };
     case "31-60":
-      return { dueFrom: addDays(today, -60), dueTo: addDays(today, -31), includeNull: false };
+      return { dueFrom: addDays(today, -60), dueTo: addDays(today, -31), nullOnly: false };
     case "61-90":
-      return { dueFrom: addDays(today, -90), dueTo: addDays(today, -61), includeNull: false };
+      return { dueFrom: addDays(today, -90), dueTo: addDays(today, -61), nullOnly: false };
     case "90+":
-      return { dueFrom: null, dueTo: addDays(today, -91), includeNull: false };
+      return { dueFrom: null, dueTo: addDays(today, -91), nullOnly: false };
   }
 }
 
 export type AgingRow = { bucket: AgingBucketKey; cnt: number; amount: number };
 export type AgingSummary = { rows: AgingRow[]; total: number; count: number; overdue: number; overdueCount: number };
 
-/** RPC (`finance_aging`) satırlarını 5 kovaya tamamlar (eksik kova 0), sırayı sabitler ve toplamları kuruşla çıkarır. */
+/** RPC (`finance_aging`) satırlarını 6 kovaya tamamlar (eksik kova 0), sırayı sabitler ve toplamları kuruşla çıkarır. */
 export function normalizeAging(raw: readonly { bucket?: unknown; cnt?: unknown; amount?: unknown }[] | null | undefined): AgingSummary {
   const byKey = new Map<AgingBucketKey, { cnt: number; k: number }>();
   for (const r of raw ?? []) {
@@ -172,7 +181,7 @@ function summarize(rows: readonly { bucket: AgingBucketKey; cnt: number; k: numb
   for (const r of rows) {
     totalK += r.k;
     count += r.cnt;
-    if (r.bucket !== "vadesi_gelmedi") {
+    if (isOverdueBucket(r.bucket)) {
       overdueK += r.k;
       overdueCount += r.cnt;
     }
