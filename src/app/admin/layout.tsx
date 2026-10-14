@@ -93,24 +93,24 @@ async function AdminShell({ children }: { children: React.ReactNode }) {
   }
   const strips = [
     demoPolicy.platform ? (
-      <StatusStrip key="demo" tone="danger" role="alert" href={securityHref}>
+      <StatusStrip key="demo" tone="danger" href={securityHref}>
         Platform demo girişi AÇIK: giriş sayfasındaki kartla herkes tek tıkla süper admin olabilir.{" "}
         {demoPolicy.row?.until ? `Bitiş: ${STRIP_DATE.format(new Date(demoPolicy.row.until))}.` : "Süre sınırı yok (sunucu ortamı ayarı)."}
         {securityHref ? " Kapat →" : null}
       </StatusStrip>
     ) : null,
     mfaSyncIssue === "env_on_db_off" ? (
-      <StatusStrip key="mfa-sync" tone="danger" role="alert" href={securityHref}>
+      <StatusStrip key="mfa-sync" tone="danger" href={securityHref}>
         MFA tutarsız: sunucu ortamında PLATFORM_MFA_ENFORCEMENT açık ama &quot;platform.mfa_enforced&quot; ayarı kapalı; veritabanı personel kapıları MFA istemiyor. Güvenlik politikasından açın.
       </StatusStrip>
     ) : null,
     !mfaPolicy.enforced ? (
-      <StatusStrip key="mfa-off" tone="warning" role="status" href={securityHref}>
+      <StatusStrip key="mfa-off" tone="warning" href={securityHref}>
         Personel için iki adımlı doğrulama (TOTP) zorunlu değil.{securityHref ? " Personel > Güvenlik politikası'ndan açabilirsiniz." : ""}
       </StatusStrip>
     ) : null,
     graceDaysLeft !== null && mfaPolicy.graceUntil ? (
-      <StatusStrip key="mfa-grace" tone="warning" role="status" href="/admin/hesabim?sekme=guvenlik">
+      <StatusStrip key="mfa-grace" tone="warning" href="/admin/hesabim?sekme=guvenlik">
         İki adımlı doğrulama {STRIP_DATE.format(new Date(mfaPolicy.graceUntil))} itibarıyla zorunlu ({graceDaysLeft} gün kaldı). Hesabım &gt; Güvenlik&apos;ten doğrulayıcınızı şimdi kurun.
       </StatusStrip>
     ) : null,
@@ -169,14 +169,17 @@ const STRIP_DATE = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul
  * Kabuk bilgi şeridi (tam genişlik, yuvarlak kart): ton token'lı (`.tone-warning` / `.tone-danger`,
  * açık + koyu temada AA). Bağlantı verilirse tüm şerit ilgili ayara gider (sağda ok).
  */
+/**
+ * Kalıcı yönetim şeridi. Canlı bölge rolü (`role="status"`) DIŞ kapsayıcıdadır: bağlantıya rol verilirse bağlantı adı ve
+ * izinli rol denetimi (axe link-name / aria-allowed-role) bozulur. Şeritler sayfa boyunca kalıcı olduğundan `alert`
+ * değil `status` kullanılır (her gezinmede ekran okuyucuyu kesmez); aciliyet tonla (`danger`) verilir.
+ */
 function StatusStrip({
   tone,
-  role,
   href,
   children,
 }: {
   tone: "warning" | "danger";
-  role: "status" | "alert";
   href?: string;
   children: React.ReactNode;
 }) {
@@ -188,13 +191,15 @@ function StatusStrip({
     </>
   );
   const cls = `tone-${tone} flex items-center gap-2.5 rounded-[var(--radius-control)] px-3.5 py-1.5 text-xs font-medium leading-5`;
-  return href ? (
-    <Link href={href} role={role} className={`${cls} focus-ring transition-[filter] hover:brightness-[0.98]`}>
-      {body}
-    </Link>
-  ) : (
-    <p role={role} className={cls}>
-      {body}
-    </p>
+  return (
+    <div role="status">
+      {href ? (
+        <Link href={href} className={`${cls} focus-ring transition-[filter] hover:brightness-[0.98]`}>
+          {body}
+        </Link>
+      ) : (
+        <p className={cls}>{body}</p>
+      )}
+    </div>
   );
 }

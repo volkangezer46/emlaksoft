@@ -13,6 +13,8 @@ const mainContentShells = [
   "src/components/public/portal-kit.tsx",
   "src/app/musteri-portali/[token]/page.tsx",
   "src/app/malik-portali/[token]/page.tsx",
+  // /araclar kabuğu: kendi atlama bağlantısı YOK, kök layout'unkini kullanır.
+  "src/components/tools/tools-shell.tsx",
 ] as const;
 
 const directPublicMainPages = [
@@ -31,6 +33,12 @@ describe("navigation accessibility contract", () => {
 
     for (const file of mainContentShells) {
       expect(source(file).match(/id="main-content"/g), file).toHaveLength(1);
+    }
+  });
+
+  it("shells do not render a second skip link (root layout owns the only one)", () => {
+    for (const file of mainContentShells) {
+      expect(source(file), file).not.toMatch(/href="#(icerik|main-content)"/);
     }
   });
 

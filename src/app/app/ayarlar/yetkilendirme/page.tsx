@@ -17,7 +17,7 @@ import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { StatRow } from "@/components/ui/stat-row";
 import { Alert } from "@/components/ui/alert";
 import { FilterDate, FilterGrid, FilterSelect, ListPager, pageWindow, parsePage } from "@/components/ui/list-kit";
-import { MODULE_LABELS } from "./role-permissions-matrix";
+import { MODULE_LABELS } from "@/lib/permission-module-labels";
 import { RolesSection, parseMatrixRole } from "./roles-section";
 import { listAccessAudit } from "@/app/actions/access-control";
 import {

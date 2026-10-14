@@ -1,6 +1,7 @@
 
 /**
- * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, ilan, talep, randevu, görev).
+ * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, ilan, talep, randevu, görev; izin varsa
+ * anlaşma, teklif ve gelir/gider kaydı).
  * Liste rol izinlerine, paket kilidine ve kapalı modüle göre `getAppActions` ile SUNUCUDA süzülmüş eylemlerden seçilir
  * (komut paleti ve üst çubuk "Yeni" menüsüyle aynı kaynak; app/layout.tsx → nav-shell-server); yetkisiz eylem görünmez. Hedefler ≥56 px yüksekliktedir.
  *
@@ -14,6 +15,9 @@ const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
   { href: "/app/randevular/yeni", label: "Yeni randevu" },
   { href: "/app/gorevler/yeni", label: "Yeni görev" },
   { href: "/app/portfoy-avi/yeni", label: "Sahibinden ilan ekle" },
+  { href: "/app/anlasmalar/yeni", label: "Yeni anlaşma" },
+  { href: "/app/teklifler/yeni", label: "Teklif" },
+  { href: "/app/giderler", label: "Gelir/Gider kaydı" },
 ];
 
 /** Çağrı merkezi için ilk eylem görüşme kaydıdır. */

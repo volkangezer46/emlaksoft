@@ -6,18 +6,15 @@ import { SiteFooter } from "@/components/site-footer";
 import "@/app/marketing.css";
 import "@/app/marketing-sections.css";
 
-/** /araclar için ortak üst menü + alt bilgi (ana sayfayla aynı SiteHeader/SiteFooter). Her zaman açık tema. */
+/**
+ * /araclar için ortak üst menü + alt bilgi (ana sayfayla aynı SiteHeader/SiteFooter). Her zaman açık tema.
+ * Atlama bağlantısı kök layout'taki TEK "#main-content" bağlantısıdır (ikinci bağlantı yok; ux-accessibility-contract).
+ */
 export function ToolsShell({ children }: { children: ReactNode }) {
   return (
     <div className="mk bg-surface text-text">
-      <a
-        href="#icerik"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded-[var(--radius-control)] focus:bg-surface focus:px-4 focus:py-2 focus:font-semibold focus:text-ink-950 focus:shadow-[var(--shadow-md)]"
-      >
-        İçeriğe geç
-      </a>
       <SiteHeader />
-      <main id="icerik">{children}</main>
+      <main id="main-content">{children}</main>
       <SiteFooter />
     </div>
   );

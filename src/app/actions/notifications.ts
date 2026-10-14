@@ -59,10 +59,24 @@ export async function markAllNotificationsRead(): Promise<void> {
  * /app/bildirimler arşiv sayfası için form-action sarmalayıcıları — server
  * component'te <form action={...}> yalnız FormData imzası kabul eder.
  */
+/** Gruplanmış satır ("× N") birden çok `id` gönderir; hepsi tek sorguda okundu işaretlenir (en çok bir sayfa: 50). */
 export async function markNotificationReadForm(formData: FormData): Promise<void> {
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
-  await markNotificationRead(id);
+  const ids = [...new Set(formData.getAll("id").map((v) => String(v ?? "").trim()).filter(Boolean))].slice(0, 50);
+  if (ids.length === 0) return;
+  if (ids.length === 1) {
+    await markNotificationRead(ids[0]);
+    return;
+  }
+  const gate = await requireActiveTenant();
+  if (!gate.ok) return;
+  const supabase = await createClient();
+  await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .in("id", ids)
+    .eq("tenant_id", gate.tenantId)
+    .or(`user_id.eq.${gate.userId},user_id.is.null`);
+  revalidatePath("/app", "layout");
 }
 
 export async function markAllNotificationsReadForm(): Promise<void> {

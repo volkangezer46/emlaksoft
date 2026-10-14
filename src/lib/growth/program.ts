@@ -516,6 +516,22 @@ export const NUDGE_COPY: Record<NudgeMoment, { title: string; text: string; cta:
   },
 };
 
+/** "İlk anlaşmanızı kaydettiniz" kartının penceresi: ilk gerçek kazançtan sonraki 7 gün. */
+export const FIRST_DEAL_NUDGE_WINDOW_MS = 7 * 24 * 3_600_000;
+
+/**
+ * İlk anlaşma davet kartı yalnız GERÇEKTEN ilk anlaşmada görünür: örnek olmayan kazanılmış anlaşma sayısı tam 1 ve o
+ * kazanç son 7 gün içinde (kazanç tarihi vekili: anlaşmanın updated_at'i). 18 kazanımlı ofiste ya da haftalar sonra çıkmaz.
+ * Gelecek tarihli (saat kayması) değer pencere dışı sayılır. Saf: `nowMs` çağırandan (`@/lib/clock`).
+ */
+export function shouldShowFirstDealNudge(input: { realWonCount: number; firstWonAt: string | null | undefined; nowMs: number }): boolean {
+  if (input.realWonCount !== 1 || !input.firstWonAt) return false;
+  const t = Date.parse(input.firstWonAt);
+  if (Number.isNaN(t)) return false;
+  const age = input.nowMs - t;
+  return age >= 0 && age <= FIRST_DEAL_NUDGE_WINDOW_MS;
+}
+
 export function nudgeStorageKey(moment: NudgeMoment): string {
   return `emlaksoft:growth-nudge:${moment}`;
 }

@@ -566,7 +566,7 @@ export function AppSidebar({
                   onFocus={warmNewSheet}
                   onTouchStart={warmNewSheet}
                   aria-haspopup="dialog"
-                  aria-label="Yeni kayıt ekle"
+                  aria-label="Hızlı ekle menüsü"
                   className={`${slotClass} text-brand-700`}
                 >
                   <span className="grid h-7 w-11 place-items-center rounded-full bg-brand-600 text-white">

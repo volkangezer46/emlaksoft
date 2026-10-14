@@ -20,12 +20,26 @@ const GROUPS: { title: string; hrefs: string[] }[] = [
   { title: "Kayıtlar", hrefs: ["/app/hizli", "/app/musteriler/yeni", "/app/talepler/yeni", "/app/portfoyler/yeni", "/app/projeler/yeni", "/app/kiralama/yeni"] },
   { title: "Gün planı", hrefs: ["/app/randevular/yeni", "/app/gorevler/yeni", "/app/gelen-kutusu?sekme=cagri", "/app/acik-ev/yeni"] },
   { title: "Anlaşma", hrefs: ["/app/anlasmalar/yeni", "/app/teklifler/yeni", "/app/sozlesmeler/yeni", "/app/onaylar/yeni", "/app/portfoyler/sunumlar/yeni"] },
+  { title: "Finans", hrefs: ["/app/giderler"] },
 ];
+
+/**
+ * Hızlı ekle menüsünde kısa adlar (izne bağlı: eylem `getAppActions` süzgecinden geçmediyse satır hiç yoktur).
+ * "Yeni anlaşma" (commissions), "Teklif" (offers), "Gelir/Gider kaydı" (expenses).
+ */
+const MENU_LABELS: Record<string, string> = {
+  "/app/anlasmalar/yeni": "Yeni anlaşma",
+  "/app/teklifler/yeni": "Teklif",
+  "/app/giderler": "Gelir/Gider kaydı",
+};
 
 function groupEntries(entries: PaletteEntry[]) {
   const used = new Set<string>();
   const groups = GROUPS.map((g) => {
-    const items = g.hrefs.flatMap((h) => entries.find((e) => e.href === h) ?? []);
+    const items = g.hrefs.flatMap((h) => {
+      const hit = entries.find((e) => e.href === h);
+      return hit ? [{ ...hit, label: MENU_LABELS[h] ?? hit.label }] : [];
+    });
     items.forEach((i) => used.add(i.href));
     return { title: g.title, items };
   });
@@ -44,7 +58,7 @@ export function QuickCreateMenuBody({ creatableModules, lockedHrefs }: { creatab
         <button
           type="button"
           className="focus-ring press inline-flex h-11 min-w-11 items-center justify-center gap-1.5 sm:h-10 rounded-[var(--radius-control)] bg-brand-600 px-3 text-xs font-bold text-white transition hover:bg-brand-700"
-          aria-label="Hızlı yeni kayıt menüsü"
+          aria-label="Hızlı ekle menüsü"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden sm:inline">Yeni</span>

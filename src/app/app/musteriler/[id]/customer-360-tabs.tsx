@@ -20,6 +20,7 @@ import { DemandStatusButtons } from "./demand-status-buttons";
 import { EditDemandDialog } from "./edit-demand-dialog";
 import { DetailSegmentTabs, type DetailTabDef } from "@/components/app/detail-tabs";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
+import { NO_CUSTOMER_CTAS, type CustomerCtaPermissions } from "./customer-cta-perms";
 import { CustomerFilesTab } from "./customer-files-tab";
 import { CommunicationTimeline } from "@/components/app/communication-timeline";
 import { formatLeadSource } from "@/lib/lead-sources";
@@ -149,6 +150,7 @@ export function Customer360Tabs({
   tasksSlot,
   preferencesSlot,
   stageNames,
+  can = NO_CUSTOMER_CTAS,
 }: {
   customerId: string;
   customerName: string;
@@ -187,6 +189,8 @@ export function Customer360Tabs({
   preferencesSlot?: ReactNode;
   /** Ofisin görünen anlaşma aşaması adları (aşama anahtarı → ad); verilmezse varsayılan adlar. */
   stageNames?: Record<string, string>;
+  /** CTA/bağlantı izinleri (`customerCtaPermissions(perms)`); verilmezse hiçbir "oluştur" düğmesi çizilmez. */
+  can?: CustomerCtaPermissions;
 }) {
   const stageLabel: Record<string, string> = stageNames ?? stageLabelMap(defaultStageLabels());
   const channelLabel: Record<string, string> = {
@@ -228,10 +232,10 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Target className="h-4 w-4 text-brand-600" /> Talepler
             </h2>
-            <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink>
+            {can.demandsCreate ? <ButtonLink href={`/app/musteriler/${customerId}/talep/yeni`} size="sm" icon={Plus}>Talep ekle</ButtonLink> : null}
           </div>
           {demands.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={{ href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" }} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteri için henüz talep tanımlanmadı." description="Ne aradığını kaydedin; uygun portföyler otomatik eşleşsin." action={can.demandsCreate ? { href: `/app/musteriler/${customerId}/talep/yeni`, label: "Talep ekle" } : undefined} />
           ) : (
             <div className="mt-4 space-y-3">
               {demands.map((d) => (
@@ -271,12 +275,10 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Handshake className="h-4 w-4 text-amber-500" /> Anlaşmalar
             </h2>
-            <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">
-              Satış hattı →
-            </Link>
+            {can.dealsView ? <Link href="/app/anlasmalar" className="text-xs font-semibold text-brand-600 hover:underline">Satış hattı →</Link> : null}
           </div>
           {deals.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={{ href: "/app/anlasmalar/yeni", label: "Anlaşma başlat" }} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı anlaşma yok." description="Görüşme ilerlediyse anlaşmayı başlatın; aşama ve komisyon buradan izlenir." action={can.dealsCreate ? { href: "/app/anlasmalar/yeni", label: "Anlaşma başlat" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {deals.map((d) => (
@@ -302,33 +304,36 @@ export function Customer360Tabs({
             </div>
           )}
         </section>
-        <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
-              <Tag className="h-4 w-4 text-amber-500" /> Teklifler
-            </h2>
-            <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
-          </div>
-          {offers.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={{ href: `/app/teklifler/yeni?musteri=${customerId}`, label: "Teklif oluştur" }} />
-          ) : (
-            <div className="mt-4 space-y-2">
-              {offers.map((o) => (
-                <Link
-                  key={o.id}
-                  href={`/app/teklifler/${o.id}`}
-                  className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
-                >
-                  <div>
-                    <p className="text-sm font-semibold text-ink-950">{OFFER_STATUS_LABEL[o.status] ?? o.status}</p>
-                    <p className="text-xs text-text-muted">{dateTime(o.created_at)}</p>
-                  </div>
-                  <span className="font-display text-sm font-extrabold text-brand-600">{o.amount != null ? money(Number(o.amount)) : "—"}</span>
-                </Link>
-              ))}
+        {/* Teklifler modülü görülemiyorsa bölüm (ve teklif bağlantıları) hiç çizilmez. */}
+        {can.offersView ? (
+          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+                <Tag className="h-4 w-4 text-amber-500" /> Teklifler
+              </h2>
+              <Link href="/app/teklifler" className="text-xs font-semibold text-brand-600 hover:underline">Teklifler →</Link>
             </div>
-          )}
-        </section>
+            {offers.length === 0 ? (
+              <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı teklif yok." action={can.offersCreate ? { href: `/app/teklifler/yeni?musteri=${customerId}`, label: "Teklif oluştur" } : undefined} />
+            ) : (
+              <div className="mt-4 space-y-2">
+                {offers.map((o) => (
+                  <Link
+                    key={o.id}
+                    href={`/app/teklifler/${o.id}`}
+                    className="focus-ring group flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas/50 px-3 py-3 transition hover:border-brand-300"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-ink-950">{OFFER_STATUS_LABEL[o.status] ?? o.status}</p>
+                      <p className="text-xs text-text-muted">{dateTime(o.created_at)}</p>
+                    </div>
+                    <span className="font-display text-sm font-extrabold text-brand-600">{o.amount != null ? money(Number(o.amount)) : "—"}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
       </Pane>
 
       <Pane id="gecmis" active={active}>
@@ -345,10 +350,10 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <FileText className="h-4 w-4 text-danger-500" /> Sözleşmeler ve imza
             </h2>
-            <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link>
+            {can.contractsView ? <Link href="/app/sozlesmeler" className="text-xs font-semibold text-brand-600 hover:underline">Sözleşmeler →</Link> : null}
           </div>
           {contracts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={{ href: `/app/sozlesmeler/yeni?customer=${customerId}`, label: "Sözleşme hazırla" }} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı sözleşme yok." action={can.contractsCreate ? { href: `/app/sozlesmeler/yeni?customer=${customerId}`, label: "Sözleşme hazırla" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {contracts.map((c) => (
@@ -379,10 +384,10 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <CalendarDays className="h-4 w-4 text-mint-600" /> Randevular
             </h2>
-            <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink>
+            {can.appointmentsCreate ? <ButtonLink href={`/app/randevular?customer=${customerId}`} size="sm" icon={Plus}>Randevu ver</ButtonLink> : null}
           </div>
           {appts.length === 0 ? (
-            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={{ href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" }} />
+            <EmptyStateV3 variant="compact" className="mt-4" title="Bu müşteriye bağlı randevu yok." action={can.appointmentsCreate ? { href: `/app/randevular/yeni?customer=${customerId}`, label: "Randevu ver" } : undefined} />
           ) : (
             <div className="mt-4 space-y-2">
               {appts.map((a) => (

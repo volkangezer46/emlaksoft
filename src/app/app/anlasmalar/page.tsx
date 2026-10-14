@@ -22,13 +22,14 @@ import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
 import { ScopeBadge } from "@/components/app/scope-badge";
 import { getStageLabels } from "@/lib/definitions";
-import { daysAgoIso, msSince } from "@/lib/clock";
+import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { periodLabel } from "@/lib/metric-labels";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import type { BoardDeal } from "./deal-board";
 import { DealBoard } from "./deal-board-lazy";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { ReferralNudge } from "@/components/app/referral-nudge";
+import { shouldShowFirstDealNudge } from "@/lib/growth/program";
 import { listSavedViews } from "@/app/actions/saved-views";
 import { SavedViews } from "@/components/app/saved-views";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
@@ -253,9 +254,16 @@ export default async function DealsPage({
     head().eq("stage", "won"),
     head().eq("stage", "lost"),
     head().not("stage", "in", "(won,lost)").lt("updated_at", staleIso),
-    // Davet önerisi tetiği: örnek (demo) anlaşmalar sayılmaz; yalnız gerçek kazanılmış anlaşma.
-    head().eq("stage", "won").eq("is_sample", false),
+    // Davet önerisi tetiği: örnek (demo) anlaşmalar sayılmaz; yalnız gerçek kazanılmış anlaşma. Sayı + en eski kazancın
+    // tarihi (updated_at vekili) tek sorguda: kart yalnız won==1 ve 7 gün içinde (shouldShowFirstDealNudge).
+    scoped(supabase.from("deals").select("updated_at", { count: "exact" }))
+      .eq("stage", "won")
+      .eq("is_sample", false)
+      .order("updated_at", { ascending: true })
+      .limit(1),
   ]);
+  const firstWonRows = (realWonRes.data ?? []) as { updated_at: string }[];
+  const showFirstDealNudge = shouldShowFirstDealNudge({ realWonCount: realWonRes.count ?? 0, firstWonAt: firstWonRows[0]?.updated_at, nowMs: now() });
 
   const checklistByDeal = new Map<string, { done: number; total: number }>();
   for (const r of checklistRows ?? []) {
@@ -467,7 +475,6 @@ export default async function DealsPage({
 
   return (
     <ListPage>
-      <ReferralNudge moment="first_deal" show={(realWonRes.count ?? 0) >= 1} />
       <ListHero
         title="Anlaşma tahtası"
         eyebrow="Anlaşma hattı"
@@ -494,6 +501,8 @@ export default async function DealsPage({
       ) : (
         <>
           <KpiStrip items={kpis} />
+          {/* Davet kartı başlık ve KPI'ların ALTINDA; yalnız ilk gerçek kazançtan sonraki 7 gün. */}
+          <ReferralNudge moment="first_deal" show={showFirstDealNudge} />
 
           {/* Liste görünümünde aşama hunisi + sonuç dağılımı (gerçek sayımlar). Pano görünümünün kendi hunisi var (#huni). */}
           {gorunum === "liste" ? (
@@ -607,7 +616,8 @@ export default async function DealsPage({
             />
           ) : (
             <>
-              {/* Satış hunisi — mevcut dağılım + aşamalar arası oran; satırlar sütuna iner */}
+              {/* Satış hunisi — aşama başına kart sayısı ve tutar (aşamalar arası oran gösterilmez: anlık dağılımda %100'ü
+                  aşabildiği için yanıltıcıydı); satırlar sütuna iner */}
               <section id="huni" className="grid scroll-mt-24 gap-4 lg:grid-cols-[1.6fr_1fr]">
                 <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -615,9 +625,7 @@ export default async function DealsPage({
                     <span className="text-xs text-text-faint">Aşamadaki kart sayısına göre</span>
                   </div>
                   <div className="mt-4 space-y-3">
-                    {funnel.map((f, i) => {
-                      const nextF = funnel[i + 1];
-                      const conv = nextF && f.count > 0 ? Math.round((nextF.count / f.count) * 100) : null;
+                    {funnel.map((f) => {
                       return (
                         <div key={f.key}>
                           <Link
@@ -638,9 +646,6 @@ export default async function DealsPage({
                               />
                             </div>
                           </Link>
-                          {conv != null && f.key !== "won" ? (
-                            <p className="mt-0.5 pl-1 text-xs text-text-faint">↓ sonraki aşamaya oran %{conv}</p>
-                          ) : null}
                         </div>
                       );
                     })}
