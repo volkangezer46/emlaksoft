@@ -45,9 +45,10 @@ export function parseMaintenanceScope(raw: string | null | undefined): Maintenan
   }
 }
 
-/** Bakım sayfası gösterilmeyen yollar: süper admin, giriş (MFA dahil), sağlık, cron, API, statik. */
+/** Bakım sayfası gösterilmeyen yollar: süper admin, giriş (MFA dahil), durum sayfası, sağlık, cron, API, statik. */
 export function isMaintenanceExemptPath(path: string): boolean {
-  if (path === "/bakim") return true;
+  // Durum sayfası bakım sırasında da açık kalır (bakımı ve kesintiyi duyuran yer).
+  if (path === "/bakim" || path === "/durum") return true;
   const prefixes = ["/admin", "/giris", "/api", "/_next"];
   if (prefixes.some((p) => path === p || path.startsWith(`${p}/`))) return true;
   if (path === "/favicon.ico" || path === "/robots.txt" || path === "/sitemap.xml") return true;

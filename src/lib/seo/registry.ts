@@ -187,6 +187,17 @@ const BASE_PAGES: SeoPageDef[] = [
     sitemap: LEGAL,
     jsonLd: [],
   },
+  {
+    path: "/durum",
+    label: "Hizmet durumu",
+    group: "ana",
+    title: "Hizmet Durumu",
+    description: "EmlakSoft hizmet durumu: güncel olaylar, planlı bakımlar ve son 90 günün ölçülen erişilebilirliği.",
+    index: true,
+    canIndex: true,
+    sitemap: { include: true, priority: 0.2, freq: "daily" },
+    jsonLd: [],
+  },
 ];
 
 function toolPages(): SeoPageDef[] {

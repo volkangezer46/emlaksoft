@@ -127,6 +127,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
         palette: [
           L("/admin/billing/planlar", "Plan editörü (fiyat, koltuk)", "Paket fiyatları ve sınırları", ["billing"]),
           L("/admin/billing/kuponlar", "Kuponlar", "İndirim kuponları", ["billing"]),
+          L("/admin/billing/kanal-roi", "Kanal ROI", "Pazarlama harcaması, kayıt, ödeyen, gelir, CAC ve geri ödeme süresi (kanal bazında)", ["billing"]),
           L("/admin/muhasebe", "Muhasebe", "Tahsilat, KDV, muhasebeci CSV", ["billing"]),
           L("/admin/muhasebe/defter", "Fatura defteri", "Tüm faturalar", ["billing"]),
         ],
@@ -214,6 +215,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
           L("/admin/sistem?sekme=hatalar", "Hata kayıtları", "Uygulama hataları", ["sistem"]),
           L("/admin/aktivite", "Aktivite kaydı", "Denetim izi", ["activity"]),
         ],
+        palette: [L("/admin/sistem?sekme=durum", "Durum sayfası ve sürüm geçmişi", "Kamuya açık /durum: olay, planlı bakım, erişilebilirlik; deploy geçmişi", ["sistem"])],
       },
       { href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
       { href: "/admin/personel", label: "Personel", description: "EmlakSoft çalışanları ve rolleri", icon: ShieldCheck, modules: ["personel"] },
