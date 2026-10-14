@@ -9,7 +9,7 @@ import { CASH_CATEGORIES, canHandleSalary } from "@/lib/finance/cash/categories"
 import { loadAccountsWithBalances } from "@/lib/finance/cash/load";
 import { loadCategories } from "@/lib/finance/ledger/load";
 import type { FinanceCategory, FinanceTabId, FinanceTabProps } from "@/lib/finance/ledger/types";
-import { FINANCE_HERO_TEXT, FinanceActions, FinanceTabs, resolveFinanceTab } from "./_tabs/finance-shell";
+import { FINANCE_HERO_TEXT, FinanceActions, FinanceTabs, resolveFinanceTab, financeTabLabel } from "./_tabs/finance-shell";
 import { GenelBakisTab } from "./_tabs/genel-bakis";
 import { HareketlerTab } from "./_tabs/hareketler";
 import { KasaBankaTab } from "./_tabs/kasa-banka";
@@ -88,6 +88,12 @@ async function HeroActions({ canCreate, canSalary }: { canCreate: boolean; canSa
 
 function HeroActionsSkeleton() {
   return <div className="skeleton h-9 w-32 rounded-[var(--radius-control)] touch:h-11" aria-hidden="true" />;
+}
+
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const raw = (await searchParams)?.sekme;
+  const { tab } = resolveFinanceTab({ sekme: Array.isArray(raw) ? raw[0] : raw });
+  return { title: tab === "genel" ? "Muhasebe" : `${financeTabLabel(tab)} · Muhasebe` };
 }
 
 export default async function GiderlerPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {

@@ -669,7 +669,7 @@ export default async function PropertiesPage({
       value: portalCount ?? 0,
       icon: <ICONS.portal />,
       tone: "info",
-      href: "/app/portallar?durum=live",
+      href: "/app/ilan-kontrol/portallar?durum=live",
       hint: "yayındaki ilan",
     },
   ];

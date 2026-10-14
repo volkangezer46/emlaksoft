@@ -5,7 +5,9 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { MatchingView } from "./matching-view";
 import { DemandsView } from "./demands-view";
 
-export const metadata = { title: "Talepler" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ sekme?: string }> }) {
+  return { title: (await searchParams).sekme === "eslesme" ? "Eşleşme · Talepler" : "Talepler" };
+}
 
 /**
  * Talepler: talep listesi + Eşleşme tek sayfada.

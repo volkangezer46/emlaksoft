@@ -43,7 +43,7 @@ function failure(error: { code?: string | null } | null, outcome?: string): Cont
 }
 
 function refresh() {
-  revalidatePath("/app/portallar");
+  revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath("/app/portfoyler");
 }
 

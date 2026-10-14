@@ -12,6 +12,8 @@ import { WhatsAppShareButton } from "@/components/app/whatsapp-share-button";
 import { now } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 
+export const metadata = { title: "Sunumlar · Portföyler" };
+
 type PresentationRow = {
   id: string;
   public_token: string;

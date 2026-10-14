@@ -27,7 +27,7 @@ import { Skeleton, SkeletonBlock, SkeletonTable } from "@/components/ui/skeleton
 import { loadPotentialLosses } from "@/lib/listing-control/server/potential-loss";
 import { summarizeLosses, type PotentialLossRow } from "@/lib/listing-control/potential-loss-core";
 
-export const metadata = { title: "Kayıp-kaçak kalkanı" };
+export const metadata = { title: "Kapanış kayıpları · İlan kontrolü" };
 
 type Closure = {
   id: string;
@@ -139,7 +139,7 @@ export default async function LeakShieldPage({
 }: {
   searchParams?: Promise<{ neden?: string; tip?: string; siddet?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
-  const { perms } = await requireModulePage("leak", "/app/kayip-kacak");
+  const { perms } = await requireModulePage("leak", "/app/ilan-kontrol/kapanis");
   // Kurtarma aksiyonu (teyit) yalnız portal düzenleme yetkisi olana gösterilir;
   // action zaten kendi kapısını da kontrol eder (portals:edit).
   const canConfirm = (perms.portals ?? []).includes("edit");
@@ -238,18 +238,15 @@ export default async function LeakShieldPage({
     if (to) sp.set("to", to);
     if (over.sayfa && over.sayfa > 1) sp.set("sayfa", String(over.sayfa));
     const qs = sp.toString();
-    return qs ? `/app/kayip-kacak?${qs}#kapanislar` : "/app/kayip-kacak#kapanislar";
+    return qs ? `/app/ilan-kontrol/kapanis?${qs}#kapanislar` : "/app/ilan-kontrol/kapanis#kapanislar";
   };
 
   const ctx: Ctx = { nedenF, tipF, sevF, fromF, toF, rangeActive, hasFilter, pageParam, filterHref, canConfirm };
 
-  // Tek merkez: İlan Kontrol alt gezinmesi (Özet · Liste · Uyarılar · Kapanış kayıpları · Rapor). Yalnız portals izni olana
-  // gösterilir (İlan Kontrol sayfaları o izni ister); modül yoksa Kalkan eskisi gibi tek başına çalışır.
-  const showControlNav = effectiveCanAccessModule(perms, "portals");
 
   return (
     <div className="space-y-6">
-      {showControlNav ? <ControlSubNav active="kapanis" /> : null}
+      <ControlSubNav active="kapanis" />
       <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-35" />
         <div className="pointer-events-none absolute -right-14 -top-16 h-56 w-56 rounded-full bg-danger-500/25 blur-[90px]" />
@@ -339,12 +336,12 @@ async function HeroKpis({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                 // Tarih aralığı seçiliyken KPI'lar o aralıktan hesaplanır
                 rangeActive
                   ? { label: "Aralıkta kaçan komisyon", value: moneyTry(lostAll), tone: "text-danger-400", href: filterHref({}) }
-                  : { label: "Bu ay kaçan komisyon", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/kayip-kacak#kapanislar" },
+                  : { label: "Bu ay kaçan komisyon", value: moneyTry(lostMonth), tone: "text-danger-400", href: "/app/ilan-kontrol/kapanis#kapanislar" },
                 rangeActive
                   ? { label: "Aralıkta kapanış", value: String(totalClosuresCount), tone: "", href: filterHref({}) }
-                  : { label: "Toplam kaçan komisyon", value: moneyTry(lostAll), tone: "", href: "/app/kayip-kacak#kapanislar" },
+                  : { label: "Toplam kaçan komisyon", value: moneyTry(lostAll), tone: "", href: "/app/ilan-kontrol/kapanis#kapanislar" },
                 { label: "Rakip kapanış", value: String(competitor), tone: "text-amber-300", href: filterHref({ tip: "rakip" }) },
-                { label: "Teyit gecikmiş", value: String(overdue.length), tone: "text-warn-500", href: "/app/portallar?durum=teyit" },
+                { label: "Teyit gecikmiş", value: String(overdue.length), tone: "text-warn-500", href: "/app/ilan-kontrol/portallar?durum=teyit" },
               ].map((k) => (
                 <Link
                   key={k.label}
@@ -461,9 +458,9 @@ async function SlaSection({ pending }: { pending: Pending }) {
 
           <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             {[
-              { label: "Taze · son 3 gün", value: slaFresh, dot: "bg-mint-500", text: "text-mint-600", href: "/app/portallar?durum=live" },
-              { label: "Yaklaşan · 4–6 gün", value: slaDue, dot: "bg-amber-400", text: "text-amber-600", href: "/app/portallar?durum=live" },
-              { label: "Gecikmiş · 7+ gün", value: slaOverdue, dot: "bg-danger-500", text: "text-danger-500", href: "/app/portallar?durum=teyit" },
+              { label: "Taze · son 3 gün", value: slaFresh, dot: "bg-mint-500", text: "text-mint-600", href: "/app/ilan-kontrol/portallar?durum=live" },
+              { label: "Yaklaşan · 4–6 gün", value: slaDue, dot: "bg-amber-400", text: "text-amber-600", href: "/app/ilan-kontrol/portallar?durum=live" },
+              { label: "Gecikmiş · 7+ gün", value: slaOverdue, dot: "bg-danger-500", text: "text-danger-500", href: "/app/ilan-kontrol/portallar?durum=teyit" },
             ].map((s) => (
               <Link
                 key={s.label}
@@ -605,7 +602,7 @@ async function RiskSection({ ctx, pending }: { ctx: Ctx; pending: Pending }) {
                 </p>
               </div>
             </div>
-            <Link href="/app/portallar?durum=teyit" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
+            <Link href="/app/ilan-kontrol/portallar?durum=teyit" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline">
               Tümü İlan kontrolünde <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -740,11 +737,11 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
                 </Link>
               </span>
             ) : null}
-            <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">İlan kontrolü</Link>
+            <Link href="/app/ilan-kontrol/portallar" className="text-xs font-semibold text-brand-600">İlan kontrolü</Link>
           </div>
         </div>
         {/* ?from=&to= — tarih aralığı GET formu; neden/tip gizli alanlarla korunur */}
-        <form method="get" action="/app/kayip-kacak" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
+        <form method="get" action="/app/ilan-kontrol/kapanis" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
           {nedenF ? <input type="hidden" name="neden" value={nedenF} /> : null}
           {tipF ? <input type="hidden" name="tip" value={tipF} /> : null}
           {sevF ? <input type="hidden" name="siddet" value={sevF} /> : null}
@@ -806,7 +803,7 @@ async function ClosuresSection({ ctx, pending }: { ctx: Ctx; pending: Pending })
         ) : listCount === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-text-muted">
             Filtreye uyan kapanış yok.{" "}
-            <Link href="/app/kayip-kacak#kapanislar" className="font-semibold text-brand-600 hover:underline">
+            <Link href="/app/ilan-kontrol/kapanis#kapanislar" className="font-semibold text-brand-600 hover:underline">
               Filtreleri temizle
             </Link>
           </p>

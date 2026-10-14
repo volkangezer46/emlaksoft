@@ -24,6 +24,8 @@ import { SurveyNav, SurveyNotReady } from "../survey-nav";
 import { AssigneeToggle, AssignmentForm, AudienceToggle, DistributeButton, TriggerForm } from "../settings-forms";
 import { TemplateEditor, type TemplateQuestionVM } from "../template-editor";
 
+export const metadata = { title: "Anket ayarları · Anketler" };
+
 /**
  * Anket ayarları: tetikleyiciler (tek tek aç/kapa, bekleme günü, en çok deneme), anketör ataması (rol değil, görev),
  * dağıtım modu ve şablonlar. Düzenleme `surveys` modülünde SİLME düzeyi izin ister (varsayılan ofis sahibi ve genel müdür);

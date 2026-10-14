@@ -7,7 +7,10 @@ import { AnnouncementsView } from "./announcements-view";
 import { DuyuruAkisi } from "./duyuru-akisi";
 import { NotificationsView } from "./notifications-view";
 
-export const metadata = { title: "Bildirimler" };
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<Sp> }) {
+  const sekme = (await searchParams)?.sekme;
+  return { title: sekme === "duyurular" ? "Duyurular · Bildirimler" : sekme === "yonetim" ? "Duyuru yönetimi" : "Bildirimler" };
+}
 
 type Sp = { sekme?: string; durum?: string; tur?: string; sayfa?: string };
 

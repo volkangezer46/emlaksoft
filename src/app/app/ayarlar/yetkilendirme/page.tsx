@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { ArrowLeft, ArrowUpRight, Fingerprint, ScrollText, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Fingerprint, KeyRound, ScrollText, ShieldCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
@@ -11,12 +11,14 @@ import { formatDateTimeTr } from "@/lib/format";
 import { getSetting } from "@/lib/settings/read";
 import { SCOPE_ENFORCEMENT_KEY } from "@/lib/settings/registry/tenant";
 import { PageHeader } from "@/components/ui/page-header";
+import { HelpTip } from "@/components/ui/help-tip";
 import { type PageTab } from "@/components/app/page-tabs";
 import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { StatRow } from "@/components/ui/stat-row";
 import { Alert } from "@/components/ui/alert";
 import { FilterDate, FilterGrid, FilterSelect, ListPager, pageWindow, parsePage } from "@/components/ui/list-kit";
-import { MODULE_LABELS } from "../roller/role-permissions-matrix";
+import { MODULE_LABELS } from "./role-permissions-matrix";
+import { RolesSection, parseMatrixRole } from "./roles-section";
 import { listAccessAudit } from "@/app/actions/access-control";
 import {
   AUDIT_CHANGE_LABELS,
@@ -33,14 +35,28 @@ import { ScopeTable, type NamedRef, type ScopeMember } from "./scope-table";
 import { OverrideManager, type OverrideListRow, type OverrideMember } from "./override-manager";
 import { UserExceptions, type ExceptionMember, type OverrideRow } from "./user-exceptions";
 
-export const metadata = { title: "Yetkilendirme" };
-
 const PATH = "/app/ayarlar/yetkilendirme";
-const TABS = ["kapsamlar", "istisnalar", "izinler", "gunluk"] as const;
+const TABS = ["roller", "kapsamlar", "istisnalar", "izinler", "gunluk"] as const;
 type Tab = (typeof TABS)[number];
+const TAB_LABELS: Record<Tab, string> = {
+  roller: "Roller",
+  kapsamlar: "Kullanıcı kapsamları",
+  istisnalar: "Kapsam istisnaları",
+  izinler: "İzin istisnaları",
+  gunluk: "Denetim günlüğü",
+};
+
+function parseTab(raw: string | undefined): Tab {
+  return (TABS as readonly string[]).includes(raw ?? "") ? (raw as Tab) : "roller";
+}
+
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
+  const tab = parseTab((await searchParams)?.sekme);
+  return { title: `${TAB_LABELS[tab]} · Yetkiler` };
+}
 const AUDIT_PAGE_SIZE = 50;
 
-/** Kişi bazlı izin matrisinde gösterilen modüller (roller ekranıyla aynı liste). */
+/** Kişi bazlı izin matrisinde gösterilen modüller (Roller sekmesi listesi + office_center). */
 const MODULES: AppModule[] = [
   "dashboard", "customers", "demands", "properties", "matching", "portals", "leak", "appointments", "calls", "commissions",
   "tasks", "team", "support", "settings", "billing", "reports", "valuation", "compliance", "campaigns", "contracts",
@@ -65,17 +81,17 @@ const RESOURCE_HREF: Record<ScopeOverride["resource_type"], string | null> = {
 };
 
 /**
- * Yetkilendirme: kullanıcı kapsamları · kapsam istisnaları · kişi bazlı izin istisnaları · denetim günlüğü.
- * Kapı: `settings` modülü (roller ekranıyla aynı; ayrı `roles` modülü yok). Yazma yalnız owner/gm (client + action).
+ * Yetkiler: rol izin matrisi (ilk sekme, `?role=`) · kullanıcı kapsamları · kapsam istisnaları · kişi bazlı izin
+ * istisnaları · denetim günlüğü. Kapı: `settings` modülü (ayrı `roles` modülü yok). Yazma yalnız owner/gm (client + action).
  */
 export default async function AccessControlPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ sekme?: string; user?: string; kullanici?: string; yapan?: string; tur?: string; from?: string; to?: string; sayfa?: string }>;
+  searchParams?: Promise<{ sekme?: string; role?: string; user?: string; kullanici?: string; yapan?: string; tur?: string; from?: string; to?: string; sayfa?: string }>;
 }) {
   const ctx = await requireModulePage("settings", PATH);
   const sp = (await searchParams) ?? {};
-  const active: Tab = (TABS as readonly string[]).includes(sp.sekme ?? "") ? (sp.sekme as Tab) : "kapsamlar";
+  const active = parseTab(sp.sekme);
   const canEdit = isScopeEditorRole(ctx.role);
   const supabase = await createClient();
   const nowMs = now();
@@ -141,10 +157,11 @@ export default async function AccessControlPage({
   ];
 
   const tabs: PageTab[] = [
-    { id: "kapsamlar", label: "Kullanıcı kapsamları", icon: Users },
-    { id: "istisnalar", label: "Kapsam istisnaları", icon: ShieldCheck },
-    { id: "izinler", label: "İzin istisnaları", icon: Fingerprint },
-    { id: "gunluk", label: "Denetim günlüğü", icon: ScrollText },
+    { id: "roller", label: TAB_LABELS.roller, icon: KeyRound },
+    { id: "kapsamlar", label: TAB_LABELS.kapsamlar, icon: Users },
+    { id: "istisnalar", label: TAB_LABELS.istisnalar, icon: ShieldCheck },
+    { id: "izinler", label: TAB_LABELS.izinler, icon: Fingerprint },
+    { id: "gunluk", label: TAB_LABELS.gunluk, icon: ScrollText },
   ];
 
   const todayKey = trDayKey();
@@ -159,13 +176,13 @@ export default async function AccessControlPage({
         </Link>
       </div>
       <PageHeader
-        title="Yetkilendirme"
+        title="Yetkiler"
         eyebrow="Rol & izin yönetimi"
         icon={<ICONS.yetkilendirme className="h-6 w-6" />}
         description={
           <>
-            Kim hangi kayıtları görür (kapsam), hangi kayıt için geçici istisna var, kişiye özel izinler ve tüm değişikliklerin günlüğü.
-            Rol bazlı izin matrisi için <Link href="/app/ayarlar/roller" className="font-semibold text-brand-600 hover:underline">İzin matrisi</Link>.
+            Her rolün hangi sayfada neleri yapabileceği, kim hangi kayıtları görür (kapsam), geçici istisnalar, kişiye özel izinler ve tüm
+            değişikliklerin günlüğü. Değişiklikler yalnız bu ofisi etkiler ve hemen geçerli olur. <HelpTip topic="yetki-matrisi" />
           </>
         }
       />
@@ -174,8 +191,17 @@ export default async function AccessControlPage({
           Kullanıcı kapsamları, kapsam istisnaları ve denetim günlüğü migration 20261006000100-104 uygulandıktan sonra açılır. Kişi bazlı izin istisnaları çalışır.
         </Alert>
       ) : null}
-      <StatRow items={stats} label="Yetkilendirme özeti" />
-      <SegmentTabs label="Yetkilendirme sekmeleri" active={active} items={tabs.map((t, i) => ({ id: t.id, label: t.label, icon: t.icon, href: i === 0 ? PATH : `${PATH}?sekme=${t.id}` }))} />
+      <StatRow items={stats} label="Yetki özeti" />
+      <SegmentTabs label="Yetki sekmeleri" active={active} items={tabs.map((t) => ({ id: t.id, label: t.label, icon: t.icon, href: `${PATH}?sekme=${t.id}` }))} />
+
+      {active === "roller" ? (
+        <RolesSection
+          tenantId={ctx.tenantId}
+          viewerRole={ctx.role}
+          selectedRole={parseMatrixRole(sp.role)}
+          roleHref={(r) => `${PATH}?sekme=roller&role=${r}`}
+        />
+      ) : null}
 
       {active === "kapsamlar" ? (
         <>
@@ -345,7 +371,7 @@ async function AuditLog({
           <h2 className="font-display font-bold text-ink-950">Denetim günlüğü</h2>
           <p className="text-xs text-text-muted">Yalnız yetki DEĞİŞİKLİKLERİ yazılır (kim, kime, ne, önce/sonra, gerekçe). Okuma izi tutulmaz.</p>
         </div>
-        <Link href="/app/denetim?tur=yetki" className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11">
+        <Link href="/app/ofis-kontrol/kayit?tur=yetki" className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11">
           Tüm değişiklik geçmişi <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </div>

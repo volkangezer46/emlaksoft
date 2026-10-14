@@ -32,6 +32,8 @@ import {
   type StaffOption,
 } from "./referral-actions";
 
+export const metadata = { title: "Tavsiyeler" };
+
 /** Sayfa başına kayıt — liste standardı (musteriler deseni). */
 const PAGE_SIZE = 50;
 

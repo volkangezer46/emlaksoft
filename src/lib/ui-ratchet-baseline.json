@@ -215,7 +215,7 @@
   "hamButon": 5,
   "kucukHedef": 0
  },
- "src/app/app/ayarlar/guvenlik/two-factor-form.tsx": {
+ "src/app/app/hesabim/two-factor-form.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
@@ -653,7 +653,7 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/kayip-kacak/page.tsx": {
+ "src/app/app/ilan-kontrol/kapanis/page.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
@@ -887,25 +887,25 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/portallar/bulk-confirm-form.tsx": {
+ "src/app/app/ilan-kontrol/portallar/bulk-confirm-form.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/portallar/confirm-listing-button.tsx": {
+ "src/app/app/ilan-kontrol/portallar/confirm-listing-button.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/portallar/portal-dialogs.tsx": {
+ "src/app/app/ilan-kontrol/portallar/portal-dialogs.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
   "kucukHedef": 0
  },
- "src/app/app/portallar/portal-row-more.tsx": {
+ "src/app/app/ilan-kontrol/portallar/portal-row-more.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,

@@ -148,8 +148,8 @@ export function buildCustomerIntel(input: CustomerIntelInput, nowMs: number): Cu
         key: "uykuda",
         title: "Uykuda müşteri",
         reason: `${heat.daysSinceContact ?? "—"} gündür temassız ve ısı düşük; yeniden iletişim planlayın.`,
-        href: "/app/akilli-listeler",
-        cta: "Akıllı listeler",
+        href: "/app/musteriler?segment=uykuda",
+        cta: "Uykuda müşteriler",
       });
     }
   }

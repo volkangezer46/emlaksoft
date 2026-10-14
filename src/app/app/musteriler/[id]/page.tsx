@@ -57,6 +57,8 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 import { SmsPanel, SmsPanelTrigger } from "../sms-panel";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
+export const metadata = { title: "Müşteri" };
+
 
 type Rel = { name?: string } | { name?: string }[] | null;
 

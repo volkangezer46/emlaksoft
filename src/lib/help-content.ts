@@ -35,7 +35,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       "Portaldaki ilanınız rakibe veya ofis dışına kapandıysa, ne kadar komisyon kaçırdığınızı tahmin eder.",
     detail:
       "Tahmin = satış bedeli (yoksa liste fiyatı) × komisyon oranı. Portföyde oran yazılı değilse %3 kullanılır. Kesin tutar değil, tahmindir.",
-    href: "/app/kayip-kacak",
+    href: "/app/ilan-kontrol/kapanis",
     hrefLabel: "Kayıp-kaçak sayfası",
   },
   {
@@ -91,12 +91,12 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
   },
   {
     slug: "segment",
-    term: "Segment (Akıllı Listeler)",
+    term: "Segment (müşteri süzgeçleri)",
     aka: "Davranışsal segment",
     short:
-      "Müşterileri son görüşme tarihine ve ilgisine göre gruplara ayırır: Sıcak, İlgili, Soğuk, Uykuda. Böylece önce kimi arayacağınızı görürsünüz.",
-    href: "/app/akilli-listeler",
-    hrefLabel: "Akıllı Listeler",
+      "Müşterileri son görüşme tarihine ve ilgisine göre gruplara ayırır: Sıcak, İlgili, Soğuk, Uykuda; ayrıca Kaybedilme riski ve Satışa çıkabilir süzgeçleri. Böylece önce kimi arayacağınızı görürsünüz.",
+    href: "/app/musteriler?segment=risk",
+    hrefLabel: "Müşteri süzgeçleri",
   },
   {
     slug: "sicaklik",
@@ -106,8 +106,8 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
       "Müşterinin şu an ne kadar canlı olduğunu 0-100 arası gösterir. 70 ve üstü Sıcak, 40-69 İlgili, 15-39 Soğuk.",
     detail:
       "Puanı artıranlar: yakın zamanda görüşmek, açık talep, acil talep, portalda beğeni, açık teklif/anlaşma, yeni kayıt olmak. 15'in altında olup 90 gündür görüşülmeyen müşteri Uykuda sayılır.",
-    href: "/app/akilli-listeler",
-    hrefLabel: "Akıllı Listeler",
+    href: "/app/musteriler?segment=sicak",
+    hrefLabel: "Sıcak müşteriler",
   },
   {
     slug: "lead-skoru",
@@ -148,17 +148,17 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     short:
       "Hangi rolün (danışman, muhasebe vb.) hangi sayfada neleri yapabileceğini gösteren tablo. Dört yetki vardır: görüntüle, ekle, düzenle, sil.",
     detail:
-      "Değişiklik yalnız sizin ofisinizi etkiler ve hemen geçerli olur. Tek bir kişi için istisna vermek isterseniz \"Kullanıcı istisnaları\" sekmesini kullanın.",
-    href: "/app/ayarlar/roller",
+      "Değişiklik yalnız sizin ofisinizi etkiler ve hemen geçerli olur. Tek bir kişi için istisna vermek isterseniz \"İzin istisnaları\" sekmesini kullanın.",
+    href: "/app/ayarlar/yetkilendirme?sekme=roller",
     hrefLabel: "İzin matrisi",
   },
   {
     slug: "tanimlar",
-    term: "Tanımlar (seçim listeleri)",
+    term: "Seçim listeleri",
     short:
       "Formlardaki açılır listelerin seçenekleri: müşteri kaynağı, portföy türü, kayıp nedeni gibi. Kendi seçeneklerinizi ekleyebilirsiniz; sistemin hazır seçenekleri korunur.",
     href: "/app/ayarlar/tanimlar",
-    hrefLabel: "Tanımlar",
+    hrefLabel: "Seçim listeleri",
   },
   {
     slug: "paket-kota",
@@ -183,7 +183,7 @@ export const GLOSSARY: readonly GlossaryEntry[] = [
     slug: "pipeline",
     term: "Satış aşamaları (satış hattı)",
     short:
-      "Bir anlaşmanın yolu: Yeni, Nitelikli, Müzakere, sonunda Kazanıldı veya Kaybedildi (adlarını Tanımlar'dan değiştirebilirsiniz). Anlaşmalar sayfasında kartları aşamadan aşamaya taşırsınız.",
+      "Bir anlaşmanın yolu: Yeni, Nitelikli, Müzakere, sonunda Kazanıldı veya Kaybedildi (adlarını Ayarlar > Seçim listeleri'nden değiştirebilirsiniz). Anlaşmalar sayfasında kartları aşamadan aşamaya taşırsınız.",
     href: "/app/anlasmalar",
     hrefLabel: "Anlaşmalar",
   },
@@ -301,7 +301,7 @@ export const GUIDES: readonly Guide[] = [
       "Ekip: danışmanlarınızı davet edin (ayrıntı için \"Ekibe danışman ekleme\" rehberine bakın).",
       "Veriler: mevcut listenizi içe aktarın ya da ilk müşterinizi elle ekleyin. Önce denemek isterseniz örnek veri yükleyip sonra tek tuşla silebilirsiniz.",
       "Portföy, talep ve randevu: her birinden bir kayıt girin; eşleştirme ve takvim çalışmaya başlar.",
-      "Tanımlar ve vitrin: kayıp nedenleri ile aşama adlarını gözden geçirin, ilanı yayınlayın.",
+      "Seçim listeleri ve vitrin: kayıp nedenleri ile aşama adlarını gözden geçirin, ilanı yayınlayın.",
       "Hiçbir adım zorunlu değildir; \"Sonra yaparım\" diyebilirsiniz. Adımlar Yardım > Başlangıç sekmesinde de listelenir.",
     ],
     href: "/app/baslangic",
@@ -333,7 +333,7 @@ export const GUIDES: readonly Guide[] = [
       "İlan portalda kapanırsa kapanış formu doldurulur; rakibe kapanan ilanlar Kaçan komisyonlar sayfasına düşer.",
       "Vitrin görünümü Ayarlar > Vitrin sayfasındadır.",
     ],
-    href: "/app/portallar",
+    href: "/app/ilan-kontrol/portallar",
     cta: "Portal Kontrol",
   },
   {
@@ -357,11 +357,11 @@ export const GUIDES: readonly Guide[] = [
     steps: [
       "Ayarlar > Roller sayfasını açın; satırlar sayfa grupları, sütunlar roldür. Dört yetki vardır: görüntüle, ekle, düzenle, sil.",
       "Bir rolün izni değişince yalnız sizin ofisinizi etkiler ve hemen geçerli olur.",
-      "Tek kişiye istisna vermek için \"Kullanıcı istisnaları\" sekmesini kullanın.",
+      "Tek kişiye istisna vermek için \"İzin istisnaları\" sekmesini kullanın.",
       "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporları görür; Giderler sayfasını açmak için o kullanıcıya (veya muhasebe rolüne) expenses modülü izni verin.",
       "Paketiniz bir sayfayı kilitliyorsa izin olsa bile sayfa açılmaz; bu durumda Abonelik sayfasına yönlendirilirsiniz.",
     ],
-    href: "/app/ayarlar/roller",
+    href: "/app/ayarlar/yetkilendirme?sekme=roller",
     cta: "İzin matrisi",
   },
   {
@@ -454,7 +454,7 @@ export const GUIDES: readonly Guide[] = [
       "Kategori dağılımı grafiği ve tablo giderlerinizi özetler.",
       "Mülk yönetimi sayfasındaki \"Aidatlar\" sekmesinde yönettiğiniz dairelerin ve sitelerin aidatını, tahsilatını ve borcunu izlersiniz.",
       "İki sayfa da paketinize bağlıdır; kilitliyse Abonelik sayfası hangi pakette açıldığını söyler.",
-      "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Roller'den expenses iznini vermelidir.",
+      "Muhasebe rolü bu sayfaları varsayılan olarak görmez; ofis sahibi Ayarlar > Yetkiler > Roller sekmesinden expenses iznini vermelidir.",
     ],
     href: "/app/giderler",
     cta: "Muhasebe",

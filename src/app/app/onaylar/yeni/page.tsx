@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { NewApprovalForm } from "./new-approval-form";
 
+export const metadata = { title: "Yeni onay talebi" };
+
 export default async function YeniOnayTalebiPage() {
   const { perms, userId } = await requireModulePage("commissions", "/app/onaylar");
   const supabase = await createClient();

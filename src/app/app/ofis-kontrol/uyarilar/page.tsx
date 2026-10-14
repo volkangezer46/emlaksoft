@@ -14,6 +14,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { AlertList } from "../_components/alert-list";
 import { PrivacyNote } from "../_components/privacy-note";
 
+export const metadata = { title: "Uyarılar · Ofis kontrolü" };
+
 const PATH = "/app/ofis-kontrol/uyarilar";
 const PAGE_SIZE = 20;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

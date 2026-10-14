@@ -4,7 +4,9 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { CallsView } from "./calls-view";
 import { InboxView } from "./inbox-view";
 
-export const metadata = { title: "Gelen Kutusu" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ sekme?: string }> }) {
+  return { title: (await searchParams).sekme === "cagri" ? "Çağrı kaydı · Gelen kutusu" : "Gelen kutusu" };
+}
 
 const TABS: readonly PageTab[] = [
   { id: "akis", label: "İletişim akışı", icon: ICONS.gelenKutusu },

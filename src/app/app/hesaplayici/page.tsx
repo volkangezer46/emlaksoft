@@ -6,7 +6,10 @@ import { CalculatorView, type CalculatorSearchParams } from "./calculator-view";
 import { SellerView } from "./seller-view";
 import { InvestmentView, type InvestmentSearchParams } from "./investment-view";
 
-export const metadata = { title: "Hesaplayıcılar" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ sekme?: string }> }) {
+  const sekme = (await searchParams).sekme;
+  return { title: sekme === "yatirim" ? "Yatırım getirisi · Hesaplayıcılar" : sekme === "satici" ? "Satıcı net · Hesaplayıcılar" : "Hesaplayıcılar" };
+}
 
 const TABS = [
   { id: "maliyet", label: "Alım maliyeti & kredi", href: "/app/hesaplayici", icon: Calculator },

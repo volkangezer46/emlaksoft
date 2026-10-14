@@ -33,7 +33,7 @@ describe("denetim akışı: yetki satırı birleşimi", () => {
   });
 
   it("denetim sayfası: yetki kaynağı yalnız owner/gm için sorgulanır (RLS sessiz 0 yok)", () => {
-    const src = readFileSync("src/app/app/denetim/page.tsx", "utf8");
+    const src = readFileSync("src/app/app/ofis-kontrol/kayit/page.tsx", "utf8");
     expect(src).toMatch(/canReadAccess\s*=\s*role === "owner" \|\| role === "gm"/);
     expect(src).toMatch(/includeAccess =\s*canReadAccess &&/);
   });

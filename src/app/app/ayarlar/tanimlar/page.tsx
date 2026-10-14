@@ -7,8 +7,9 @@ import { DEFAULT_DEFINITIONS, DEFINITION_CATEGORIES } from "@/lib/definition-def
 import { DefinitionsManager, type DefRow } from "./definitions-manager";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { ListChecks } from "lucide-react";
 import { HelpTip } from "@/components/ui/help-tip";
-export const metadata = { title: "Tanımlar" };
+export const metadata = { title: "Seçim listeleri" };
 
 export default async function DefinitionsPage() {
   const { tenantId, perms } = await requireModulePage("settings");
@@ -56,7 +57,7 @@ export default async function DefinitionsPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlar
       </Link>
 
-      <PageHeader title="Seçim listeleri & tanımlar" eyebrow="Tanımlar" description={<>Müşteri tipi, kaynak, portföy tipi, kayıp nedeni gibi formlardaki tüm seçenekler ve anlaşma aşama adları buradan yönetilir. Sistemin hazır seçenekleri korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz. <HelpTip topic="tanimlar" /></>} />
+      <PageHeader title="Seçim listeleri" eyebrow="Ayarlar" icon={<ListChecks className="h-6 w-6 text-accent" aria-hidden="true" />} description={<>Müşteri tipi, kaynak, portföy tipi, kayıp nedeni gibi formlardaki tüm seçenekler ve anlaşma aşama adları buradan yönetilir. Sistemin hazır seçenekleri korunur; ofisinize özel seçenekler ekleyebilir, kendi eklediklerinizi düzenleyebilirsiniz. <HelpTip topic="tanimlar" /></>} />
 
       <ReadOnlyGate canEdit={(perms.settings ?? []).includes("edit")}>
         <DefinitionsManager categories={categories} tenantId={tenantId} />

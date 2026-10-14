@@ -165,7 +165,7 @@ function PortalsBody(p: StepBodyProps) {
       {p.canEditSettings ? <PortalMembershipsSection question /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <ChoiceLink
-          href="/app/portallar"
+          href="/app/ilan-kontrol/portallar"
           icon={<ExternalLink className="h-5 w-5" aria-hidden />}
           title="Portal yayınları"
           text="İlanları portallara gönderin, yayın durumunu ve onay bekleyenleri izleyin."

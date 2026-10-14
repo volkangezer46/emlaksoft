@@ -43,12 +43,13 @@ import { effectiveCanAccessModule, getEffectivePermissions } from "@/lib/permiss
 import { parseTab, tabHref } from "@/lib/office-center/logic";
 import { OFFICE_CENTER_TABS } from "@/lib/office-center/types";
 import { AdvisorsTab } from "./_tabs/advisors-tab";
-import { DefinitionsTab } from "./_tabs/definitions-tab";
-import { RoutingTab } from "./_tabs/routing-tab";
 import { StatsTab } from "./_tabs/stats-tab";
 import type { TabContext } from "./_tabs/context";
 
-export const metadata = { title: "Ekip Merkezi" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Sp> }) {
+  const sekme = (await searchParams).sekme;
+  return { title: sekme === "istatistikler" ? "İstatistikler · Ekip" : "Ekip" };
+}
 const RING_C = 2 * Math.PI * 42;
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -92,9 +93,8 @@ const ADVISOR_LIKE = ["owner", "gm", "branch_manager", "team_lead", "advisor"];
 type Sp = { sekme?: string; durum?: string; q?: string; rol?: string; sube?: string; sirala?: string; yon?: string };
 
 /**
- * EKİP MERKEZİ — tek hub. Sekmeler: Ekip (danışman listesi, şubeler, rol karışımı) · Talep dağıtımı · Tanımlar ·
- * İstatistikler. Eski "Ofis Merkezi" içeriği buraya taşındı (ayrı sayfası kaldırıldı; sekmeler `./_tabs`); son üç sekme
- * `office_center` iznini ister, izni olmayan yalnız Ekip sekmesini görür.
+ * EKİP — tek hub. Sekmeler: Ekip (danışman listesi, şubeler, rol karışımı) ·
+ * İstatistikler (`./_tabs`). İstatistikler sekmesi `office_center` iznini ister, izni olmayan yalnız Ekip sekmesini görür.
  */
 export default async function TeamPage({ searchParams }: { searchParams: Promise<Sp> }) {
   const { perms, tenantId, role: viewerRole, userId } = await requireModulePage("team", "/app/ekip");
@@ -102,11 +102,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const canOfficeCenterTabs = effectiveCanAccessModule(perms, "office_center");
   const tab = canOfficeCenterTabs ? parseTab(sp.sekme) : "danismanlar";
   const tabNav = canOfficeCenterTabs ? (
-    <SegmentTabs label="Ekip Merkezi sekmeleri" active={tab} items={OFFICE_CENTER_TABS.map((t) => ({ id: t.id, label: t.label, href: tabHref(t.id) }))} />
+    <SegmentTabs label="Ekip sekmeleri" active={tab} items={OFFICE_CENTER_TABS.map((t) => ({ id: t.id, label: t.label, href: tabHref(t.id) }))} />
   ) : null;
 
   if (tab !== "danismanlar" && tenantId) {
-    // Eski Ofis Merkezi sekmeleri: bu sekmelerin sorguları Ekip sekmesinin ağır yüklerini beklemez.
+    // İstatistikler sekmesi: sorguları Ekip sekmesinin ağır yüklerini beklemez.
     const effective = await getEffectivePermissions(tenantId, viewerRole, userId);
     const tabSupabase = await createClient();
     const tabCtx: TabContext = {
@@ -123,11 +123,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     };
     return (
       <ListPage>
-        <ListHero eyebrow="Ekip & yetkiler" art="ekip" title="Ekip Merkezi" description="Danışmanlarınızı, talep dağıtımını, ofis tanımlarını ve ekip istatistiklerini tek yerden yönetin." />
+        <ListHero eyebrow="Ekip & yetkiler" art="ekip" title="Ekip" description="Danışmanlarınızı ve ekip istatistiklerini tek yerden yönetin." />
         {tabNav}
-        {tab === "dagitim" ? <RoutingTab ctx={tabCtx} /> : null}
-        {tab === "tanimlar" ? <DefinitionsTab ctx={tabCtx} /> : null}
-        {tab === "istatistikler" ? <StatsTab ctx={tabCtx} /> : null}
+        <StatsTab ctx={tabCtx} />
       </ListPage>
     );
   }
@@ -285,7 +283,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             <>
               <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-600">Hiç giriş yapmadı</span>
               {canManage && m.role !== "owner" ? (
-                <Link href={`/app/ekip/${m.id}?sekme=bilgi`} className="rounded-[var(--radius-control)] border border-line px-2 py-0.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">
+                <Link href={`/app/ekip/${m.id}?sekme=profil`} className="rounded-[var(--radius-control)] border border-line px-2 py-0.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300">
                   Daveti yinele
                 </Link>
               ) : null}
@@ -327,11 +325,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       <ListHero
         eyebrow="Ekip & yetkiler"
         art="ekip"
-        title="Ekip Merkezi"
+        title="Ekip"
         description="Danışmanları davet edin, rol ve şube atayın; herkes yalnızca yetkili olduğu müşteri ve portföyleri görür."
         actions={
           <>
-            <ButtonLink href="/app/ayarlar/roller" variant="secondary" size="sm" icon={Fingerprint}>
+            <ButtonLink href="/app/ayarlar/yetkilendirme?sekme=roller" variant="secondary" size="sm" icon={Fingerprint}>
               İzin matrisi
             </ButtonLink>
             <ButtonLink href="/app/ekip/izinler" variant="secondary" size="sm" icon={CalendarRange}>

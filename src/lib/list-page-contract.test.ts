@@ -22,7 +22,7 @@ const REQUIRED = [
   "src/app/app/teklifler/page.tsx",
   "src/app/app/sozlesmeler/page.tsx",
   "src/app/app/portfoyler/page.tsx",
-  "src/app/app/portallar/page.tsx",
+  "src/app/app/ilan-kontrol/portallar/page.tsx",
   "src/app/app/gorevler/page.tsx",
   "src/app/app/kiralama/page.tsx",
   "src/app/app/belgeler/page.tsx",

@@ -85,7 +85,7 @@ export function SpecialtiesField({
     <div className="space-y-3 sm:col-span-2">
       <input type="hidden" name="specialties_json" value={json} />
       <p className="text-xs text-text-muted">
-        Tür portföy tiplerinden, segment ofisin tanımlarından gelir (Ayarlar &gt; Tanımlar). Atama ve ilan havuzu
+        Tür portföy tiplerinden, segment ofisin tanımlarından gelir (Ayarlar &gt; Seçim listeleri). Atama ve ilan havuzu
         önerisi bu bilgiyi kullanır; satır yoksa danışman uzmanlıktan bağımsız değerlendirilir.
       </p>
       {rows.length === 0 ? (

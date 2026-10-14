@@ -60,7 +60,7 @@ export default async function KiraDetayPage({
   const canEdit = perms.rentals?.includes("edit") ?? false;
   const canDelete = perms.rentals?.includes("delete") ?? false;
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin paneli çizilir
-  const tab = resolveTab(sp, RENTAL_TAB_IDS, "tahakkuk", { bakım: "bakim" });
+  const tab = resolveTab(sp, RENTAL_TAB_IDS, "tahakkuk");
 
   const supabase = await createClient();
   const rentalP = supabase

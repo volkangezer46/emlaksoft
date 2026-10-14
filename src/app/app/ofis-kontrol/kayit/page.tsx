@@ -36,6 +36,8 @@ import { actionCodesMatching } from "@/lib/audit-filters";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PersonSelect } from "@/components/ui/person-select";
+import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
+import { OversightNav } from "../_components/oversight-nav";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 
@@ -77,13 +79,16 @@ function diffPreview(oldValue: unknown, newValue: unknown) {
 }
 
 const PAGE_SIZE = 60;
+const PATH = "/app/ofis-kontrol/kayit";
+
+export const metadata = { title: "Denetim kaydı · Ofis kontrolü" };
 
 export default async function AuditPage({
   searchParams,
 }: {
   searchParams?: Promise<{ sayfa?: string; from?: string; to?: string; aktor?: string; risk?: string; tur?: string; ara?: string }>;
 }) {
-  const { role } = await requireModulePage("settings", "/app/denetim");
+  const { role } = await requireModulePage("settings", PATH);
   const params = (await searchParams) ?? {};
   const filters = normalizeAuditFilters(params);
   const { from: fromF, to: toF, aktor: aktorF, risk: riskF, tur: turF, ara: araF } = filters;
@@ -169,7 +174,7 @@ export default async function AuditPage({
   const pageHref = (sayfa: number) => {
     const sp = auditFiltersToParams(filters, sayfa);
     const qs = sp.toString();
-    return qs ? `/app/denetim?${qs}` : "/app/denetim";
+    return qs ? `${PATH}?${qs}` : PATH;
   };
 
   const buckets = Array.from({ length: 12 }, () => 0);
@@ -193,8 +198,8 @@ export default async function AuditPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Denetim kayıtları"
-        eyebrow="KVKK / denetim izi"
+        title="Denetim kaydı"
+        eyebrow="Ofis Kontrol Merkezi"
         description="Kim, ne zaman, neyi değiştirdi? Yapılan işlemlerin değiştirilemeyen kayıt defteri."
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -205,15 +210,10 @@ export default async function AuditPage({
             >
               <FolderArchive className="h-4 w-4 text-brand-600" /> Belge merkezi
             </Link>
-            <Link
-              href="/app/ofis-kontrol"
-              className="focus-ring press inline-flex min-h-10 items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 text-sm font-semibold text-ink-900 transition hover:border-brand-300 touch:min-h-11"
-            >
-              <ShieldAlert className="h-4 w-4 text-brand-600" /> Ofis Kontrol
-            </Link>
           </div>
         }
       />
+      <OversightNav active="kayit" office={hasOfficeWideDataScope(role)} />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/[0.04] p-4">
@@ -230,9 +230,9 @@ export default async function AuditPage({
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
-            { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: "/app/denetim", tone: "text-amber-300" },
-            { label: "Son 24 saat", value: last24Total, icon: Activity, href: `/app/denetim?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
-            { label: "Yüksek riskli", value: highTotal, icon: ShieldAlert, href: "/app/denetim?risk=yuksek", tone: "text-danger-300" },
+            { label: hasFilter ? "Filtre sonucu" : "Toplam kayıt", value: total, icon: ScrollText, href: PATH, tone: "text-amber-300" },
+            { label: "Son 24 saat", value: last24Total, icon: Activity, href: `${PATH}?from=${daysAgoIso(1).slice(0, 10)}`, tone: "text-mint-400" },
+            { label: "Yüksek riskli", value: highTotal, icon: ShieldAlert, href: `${PATH}?risk=yuksek`, tone: "text-danger-300" },
             { label: "Aktör", value: actorOptions.length, icon: Fingerprint, href: "#akis", tone: "text-cyan-400" },
           ].map((k) => (
             <a
@@ -263,7 +263,7 @@ export default async function AuditPage({
           </div>
         </div>
         {/* ?from=&to=&aktor= — sunucu tarafı filtre formu; submit sayfayı 1'e döndürür */}
-        <form method="get" action="/app/denetim" className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
+        <form method="get" action={PATH} className="flex flex-wrap items-center gap-2 border-b border-line bg-canvas/50 px-5 py-3">
           <span className="text-xs font-medium text-text-muted">Tarih:</span>
           <input
             name="from"
@@ -324,7 +324,7 @@ export default async function AuditPage({
             Filtrele
           </button>
           {hasFilter ? (
-            <Link href="/app/denetim" className="text-xs font-semibold text-text-muted underline-offset-2 hover:text-danger-500 hover:underline">
+            <Link href={PATH} className="text-xs font-semibold text-text-muted underline-offset-2 hover:text-danger-500 hover:underline">
               Temizle
             </Link>
           ) : null}
@@ -347,7 +347,7 @@ export default async function AuditPage({
                 total > 0
                   ? { href: pageHref(1), label: "İlk sayfaya dön" }
                   : hasFilter
-                    ? { href: "/app/denetim", label: "Filtreleri temizle" }
+                    ? { href: PATH, label: "Filtreleri temizle" }
                     : { href: "/app/ofis-kontrol", label: "Ofis Kontrol Merkezi" }
               }
             />
@@ -380,7 +380,7 @@ export default async function AuditPage({
                       {actionLabel[r.action] ?? r.action}
                       {risk !== "dusuk" ? (
                         <Link
-                          href={`/app/denetim?risk=${risk}`}
+                          href={`${PATH}?risk=${risk}`}
                           title="Bu risk seviyesine göre filtrele"
                           className={`rounded-full px-2 py-0.5 text-xs font-bold transition hover:ring-1 hover:ring-brand-300 ${riskChip[risk].cls}`}
                         >

@@ -100,7 +100,7 @@ export function buildComparison(plans: readonly PlanDef[] = PLANS, opts: { efVal
 
 /** Kayıp-kaçak motorunun asgari paketi (page-gates'ten). */
 export function lostCommissionPlanName(): string {
-  const gate = findGate("/app/kayip-kacak");
+  const gate = findGate("/app/ilan-kontrol/kapanis");
   return gate ? requiredPlanName(gate) : getPlan("professional").name;
 }
 

@@ -37,7 +37,10 @@ import { getTenantReportingAggregates } from "@/lib/reporting/cache";
 import { getSettings } from "@/lib/settings/read";
 import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
 
-export const metadata = { title: "Raporlar" };
+export async function generateMetadata({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const raw = (await searchParams).sekme;
+  return { title: (Array.isArray(raw) ? raw[0] : raw) === "merkez" ? "Rapor merkezi · Raporlar" : "Raporlar" };
+}
 
 type TenantReportingAggregate = {
   summary: {
@@ -154,7 +157,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { label: "Müşteri", value: customers, max: barMax, href: "/app/musteriler" },
     { label: "Talep", value: demands, max: barMax, href: "/app/talepler" },
     { label: "Portföy", value: properties, max: barMax, href: "/app/portfoyler" },
-    { label: "Canlı portal", value: livePortals, max: barMax, href: "/app/portallar?durum=live" },
+    { label: "Canlı portal", value: livePortals, max: barMax, href: "/app/ilan-kontrol/portallar?durum=live" },
   ];
 
   // Müşteri kaynak dağılımı
@@ -333,7 +336,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           value={money(lost)}
           icon={ICONS.alarm}
           tone="danger"
-          href="/app/kayip-kacak"
+          href="/app/ilan-kontrol/kapanis"
           trend={lostMoM}
           previousText={`Önceki ay ${money(prevLost)}`}
         />
@@ -344,7 +347,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           value={String(overdue)}
           icon={ICONS.portal}
           tone="warn"
-          href="/app/portallar?durum=teyit"
+          href="/app/ilan-kontrol/portallar?durum=teyit"
           attention={overdue > 0}
           hint="Anlık durum · dönem karşılaştırması yok"
         />
@@ -538,7 +541,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
           { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },
           { href: "/app/raporlar/yetki-uyum", icon: ShieldCheck, title: "Yetki uyum raporu", sub: "EİDS iptali sonrası kaldırma süresi" },
-          { href: "/app/kayip-kacak", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
+          { href: "/app/ilan-kontrol/kapanis", icon: ICONS.alarm, title: "Kaçan komisyonlar", sub: "Teyit ve kapanış analizi" },
           { href: "/app/talepler?sekme=eslesme", icon: ICONS.eslestirme, title: "Eşleştirme", sub: "Talep × portföy skorları" },
           { href: "/app/degerleme", icon: Gauge, title: "Değerleme", sub: "Emsal · EmlakFiyati endeksi" },
           { href: "/app/musteriler", icon: ICONS.musteri, title: "Müşteri merkezi", sub: "360 görünüm" },

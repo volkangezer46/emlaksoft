@@ -267,7 +267,7 @@ async function run(req: NextRequest) {
       tenant_id: String(row.tenant_id),
       title: "Portal teyit gecikti",
       body: `${portalDisplayName(row.portal_name)}${row.portal_listing_id ? ` #${row.portal_listing_id}` : ""} — 7+ gündür teyit yok`,
-      href: "/app/portallar",
+      href: "/app/ilan-kontrol/portallar",
       kind: "warning",
       dedupe_key: recent ? buildDedupeKey("portal-teyit", row.id, bucket) : null,
     });
@@ -287,7 +287,7 @@ async function run(req: NextRequest) {
     rows.push({
       tenant_id: String(l.tenant_id),
       ...outOfMembershipText(l),
-      href: "/app/portallar",
+      href: "/app/ilan-kontrol/portallar",
       kind: "warning",
       dedupe_key: buildDedupeKey("portal-uyelik-disi", l.id),
     });
@@ -296,7 +296,7 @@ async function run(req: NextRequest) {
     rows.push({
       tenant_id: w.tenantId,
       ...weeklySummaryText(w.count),
-      href: "/app/portallar",
+      href: "/app/ilan-kontrol/portallar",
       kind: "warning",
       dedupe_key: buildDedupeKey("portal-teyit-ozet", weekBucket),
     });

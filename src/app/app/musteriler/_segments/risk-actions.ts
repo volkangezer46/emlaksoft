@@ -10,7 +10,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 const DAY = 86_400_000;
 
 /**
- * Akıllı listelerdeki "Kaybedilme riski yüksek" bölümünden Arandı / 1 hafta ertele: müşteriyi listeden düşürür.
+ * Müşteriler > "Kaybedilme riski" süzgecinden (?segment=risk) Arandı / 1 hafta ertele: müşteriyi listeden düşürür.
  *
  *  - reason = "called"  → "Arandı ✓": 30 gün gizlenir. "Çağrı olarak da
  *    kaydet" kutusu işaretliyse (log_call=1, varsayılan) calls tablosuna
@@ -81,7 +81,7 @@ export async function dismissRiskFromSmartList(formData: FormData): Promise<void
         direction: "outbound",
         phone: parsePhoneStrict(rawPhone).stored,
         disposition: "Ulaşıldı",
-        notes: "Akıllı listeler risk bölümünden arandı.",
+        notes: "Müşteriler > Kaybedilme riski süzgecinden arandı.",
         handled_by: callGate.userId,
         started_at: now.toISOString(),
       });
@@ -102,5 +102,5 @@ export async function dismissRiskFromSmartList(formData: FormData): Promise<void
     }
   }
 
-  revalidatePath("/app/akilli-listeler");
+  revalidatePath("/app/musteriler");
 }

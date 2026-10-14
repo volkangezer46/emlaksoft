@@ -150,7 +150,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "kayitlar",
     q: "İlanı portallara nasıl yayınlarım?",
     a: "Portföy detayındaki \"Portale Yayınla\" bölümünü kullanın, sonra portal ilan numarasını Portal Kontrol'den bağlayın. Teyit, yenileme ve kapanış durumu Portal Kontrol'de izlenir. Portal Kontrol paketinize bağlıdır.",
-    href: "/app/portallar",
+    href: "/app/ilan-kontrol/portallar",
     hrefLabel: "Portal Kontrol",
   },
   {
@@ -158,7 +158,7 @@ export const FAQ: readonly FaqItem[] = [
     category: "kayitlar",
     q: "Kaçan komisyon ne demek, kesin tutar mı?",
     a: "Portaldaki ilanınız rakibe veya ofis dışına kapandıysa kaçırdığınız komisyonun tahminidir: satış bedeli (yoksa liste fiyatı) × komisyon oranı. Portföyde oran yoksa %3 kullanılır. Kesin tutar değil, tahmindir.",
-    href: "/app/kayip-kacak",
+    href: "/app/ilan-kontrol/kapanis",
     hrefLabel: "Kaçan komisyonlar",
   },
   {
@@ -206,16 +206,16 @@ export const FAQ: readonly FaqItem[] = [
     id: "rol-izin",
     category: "ekip",
     q: "Bir rolün neleri yapabileceğini nasıl değiştiririm?",
-    a: "Ayarlar > Roller sayfasındaki izin matrisinden. Dört yetki vardır: görüntüle, ekle, düzenle, sil. Değişiklik yalnız sizin ofisinizi etkiler ve hemen geçerli olur. Tek kişiye istisna için Kullanıcı istisnaları sekmesi vardır.",
-    href: "/app/ayarlar/roller",
+    a: "Ayarlar > Yetkiler > Roller sekmesindeki izin matrisinden. Dört yetki vardır: görüntüle, ekle, düzenle, sil. Değişiklik yalnız sizin ofisinizi etkiler ve hemen geçerli olur. Tek kişiye istisna için aynı sayfada İzin istisnaları sekmesi vardır.",
+    href: "/app/ayarlar/yetkilendirme?sekme=roller",
     hrefLabel: "İzin matrisi",
   },
   {
     id: "muhasebe-gider",
     category: "ekip",
     q: "Muhasebe rolü neden Giderler sayfasını göremiyor?",
-    a: "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporlara erişir; Giderler ve Aidat expenses modülündedir. Ofis sahibi Ayarlar > Roller'den bu izni vermelidir.",
-    href: "/app/ayarlar/roller",
+    a: "Muhasebe rolü varsayılan olarak komisyon, abonelik ve raporlara erişir; Giderler ve Aidat expenses modülündedir. Ofis sahibi Ayarlar > Yetkiler > Roller sekmesinden bu izni vermelidir.",
+    href: "/app/ayarlar/yetkilendirme?sekme=roller",
     hrefLabel: "İzin matrisi",
   },
   {

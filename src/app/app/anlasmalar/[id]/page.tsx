@@ -115,7 +115,7 @@ export default async function DealDetailPage({
   const [{ perms, userId, role, tenantId }, { id }, sp] = await Promise.all([requireModulePage("commissions"), params, searchParams]);
   const seeAllEarnings = canSeeAllEarnings(perms);
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri çizilir
-  const tab = resolveTab(sp, DEAL_TAB_IDS, "ozet", { gorev: "gorevler" });
+  const tab = resolveTab(sp, DEAL_TAB_IDS, "ozet");
   const timelineCategory = resolveCategory(sp.kategori, DEAL_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;

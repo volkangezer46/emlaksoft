@@ -67,7 +67,7 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
           .eq("assigned_to", userId)
           .lt("due_at", nowIso);
         if (error || !count) return null;
-        return { itemHref: "/app/gorevler", href: "/app/gorevler?filter=overdue&mine=1", count, label: "geciken görevin", tone: "danger" as const };
+        return { itemHref: "/app/gorevler", href: "/app/gorevler?filter=overdue&mine=1", count, label: "geciken görev", tone: "danger" as const };
       })(),
     );
   }
@@ -82,7 +82,7 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
           .eq("status", "bekliyor")
           .neq("requested_by", userId);
         if (error || !count) return null;
-        return { itemHref: "/app/onaylar", href: "/app/onaylar?kim=bana", count, label: "onayınızı bekleyen talebin", tone: "warn" as const };
+        return { itemHref: "/app/onaylar", href: "/app/onaylar?kim=bana", count, label: "onay bekliyor", tone: "warn" as const };
       })(),
     );
   }

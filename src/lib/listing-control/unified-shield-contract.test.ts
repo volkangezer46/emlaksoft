@@ -88,8 +88,8 @@ describe("istemci/sunucu sınırları", () => {
 
 describe("tek sistem: Kalkan ile birleşik akış", () => {
   it("alt gezinme 'Kapanış kayıpları' sekmesi Kalkan yolunu gösterir; Kalkan sayfası aynı şeridi kullanır", () => {
-    expect(src("src/components/listing-control/sub-nav.tsx")).toContain('"/app/kayip-kacak"');
-    expect(src("src/app/app/kayip-kacak/page.tsx")).toContain('<ControlSubNav active="kapanis"');
+    expect(src("src/components/listing-control/sub-nav.tsx")).toContain('"/app/ilan-kontrol/kapanis"');
+    expect(src("src/app/app/ilan-kontrol/kapanis/page.tsx")).toContain('<ControlSubNav active="kapanis"');
   });
   it("Kalkan kapanış kaydı 'CRM'de kapanış var' sayılır (FK ipuçlu gömme)", () => {
     const s = src("src/lib/listing-control/server/sync.ts");

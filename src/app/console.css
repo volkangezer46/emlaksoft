@@ -93,6 +93,12 @@ a.bx:hover, .bx-hover:hover { box-shadow: var(--elev-2); border-color: color-mix
 .nav-scroll[data-more-top] { mask-image: linear-gradient(to bottom, transparent 0, #000 22px); }
 .nav-scroll[data-more-bottom] { mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%); }
 .nav-scroll[data-more-top][data-more-bottom] { mask-image: linear-gradient(to bottom, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%); }
+/* Mobil çekmece: solma yerine belirgin kaydırma GÖLGESİ (uzun ofis menüsünde altta/üstte daha fazlası olduğu görünsün). */
+.nav-scroll.nav-scroll-drawer[data-more-top],
+.nav-scroll.nav-scroll-drawer[data-more-bottom] { mask-image: none; }
+.nav-scroll.nav-scroll-drawer[data-more-top] { box-shadow: inset 0 16px 14px -14px rgba(0, 0, 0, 0.7); }
+.nav-scroll.nav-scroll-drawer[data-more-bottom] { box-shadow: inset 0 -16px 14px -14px rgba(0, 0, 0, 0.7); }
+.nav-scroll.nav-scroll-drawer[data-more-top][data-more-bottom] { box-shadow: inset 0 16px 14px -14px rgba(0, 0, 0, 0.7), inset 0 -16px 14px -14px rgba(0, 0, 0, 0.7); }
 
 .nav-bar {
   position: absolute; left: 0; top: 0; width: 3px; height: 0; border-radius: 9999px;

@@ -22,6 +22,8 @@ import { daysAgoIso, msSince } from "@/lib/clock";
 import { ApplyTemplateButton, AutomationRowActions } from "./automation-actions";
 import { TRIGGER_LABELS, ACTION_LABELS } from "./labels";
 
+export const metadata = { title: "Otomasyonlar" };
+
 type AutomationRow = {
   id:           string;
   name:         string;

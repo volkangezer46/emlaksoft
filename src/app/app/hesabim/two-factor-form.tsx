@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { Loader2, MessageSquareText } from "lucide-react";
-import { setTwoFactorSms, type TwoFactorToggleResult } from "./actions";
+import { setTwoFactorSms, type TwoFactorToggleResult } from "./two-factor-actions";
 
 const initial: TwoFactorToggleResult = {};
 

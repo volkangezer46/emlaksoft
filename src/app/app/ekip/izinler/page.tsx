@@ -39,6 +39,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { AddLeavePanel, AddLeaveTrigger } from "./leave-form";
 
 import { PageHeader } from "@/components/ui/page-header";
+
+export const metadata = { title: "Tatil ve izin takvimi · Ekip" };
 const DAY_MS = 86_400_000;
 const MONTH_RE = /^(\d{4})-(\d{2})$/;
 

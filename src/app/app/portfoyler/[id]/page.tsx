@@ -33,7 +33,7 @@ import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/a
 import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
 import { setPropertyStatus } from "@/app/actions/properties";
-import { ClosePortalDialog } from "@/app/app/portallar/portal-dialogs";
+import { ClosePortalDialog } from "@/app/app/ilan-kontrol/portallar/portal-dialogs";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { getConfiguredPortals } from "@/app/actions/portal-publish";
 import type { PortalName } from "@/lib/integrations/portals";
@@ -101,6 +101,8 @@ import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-pane
 import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
 
+export const metadata = { title: "Portföy" };
+
 
 type Rel = { name?: string; full_name?: string } | { name?: string; full_name?: string }[] | null;
 
@@ -148,7 +150,6 @@ const statusOptions = [
  */
 const PROPERTY_TAB_IDS = ["ozet", "medya", "fiyat", "portallar", "anahtarlar", "belgeler", "konum", "zaman"] as const;
 // Eski çapa/sekme adları
-const PROPERTY_TAB_ALIASES: Record<string, string> = { saglik: "belgeler", harita: "konum", gecmis: "zaman" };
 
 export default async function PropertyDetailPage({
   params,
@@ -162,7 +163,7 @@ export default async function PropertyDetailPage({
   const canEdit = (perms.properties ?? []).includes("edit");
   const canDelete = (perms.properties ?? []).includes("delete");
   // Seçili sekme sunucuda çözülür; yalnız aktif sekmenin bölümleri (ve Suspense sorguları) çalışır
-  const tab = resolveTab(sp, PROPERTY_TAB_IDS, "ozet", PROPERTY_TAB_ALIASES);
+  const tab = resolveTab(sp, PROPERTY_TAB_IDS, "ozet");
   const timelineCategory = resolveCategory(sp.kategori, PROPERTY_TIMELINE_CATEGORIES.map((c) => c.key));
   const rawLimit = Number(Array.isArray(sp.adet) ? sp.adet[0] : sp.adet);
   const timelineLimit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 40), 400) : 40;
@@ -453,7 +454,7 @@ export default async function PropertyDetailPage({
               </p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/app/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
+              <Link href={`/app/ilan-kontrol/portallar?property=${property.id}`} className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-white px-3.5 py-2 text-sm font-semibold text-ink-950">
                 <RadioTower className="h-4 w-4" /> Portal bağla
               </Link>
               <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
@@ -508,7 +509,7 @@ export default async function PropertyDetailPage({
               <Link href={`/app/portfoyler/sunumlar?portfoy=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Sunuma ekle
               </Link>
-              <Link href="/app/kayip-kacak" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
+              <Link href="/app/ilan-kontrol/kapanis" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
               </Link>
               <Link href={`/app/talepler?sekme=eslesme&property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
@@ -799,7 +800,7 @@ export default async function PropertyDetailPage({
                 </h2>
                 <p className="text-xs text-text-muted">{portals.length} kayıt · {livePortals.length} canlı</p>
               </div>
-              <Link href="/app/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
+              <Link href="/app/ilan-kontrol/portallar" className="text-xs font-semibold text-brand-600">Portal Kontrol</Link>
             </div>
             {isClosedStatus && livePortals.length > 0 ? (
               <div className="flex flex-wrap items-center gap-3 border-b border-danger-500/20 bg-danger-500/[0.06] px-5 py-3.5">

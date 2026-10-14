@@ -9,7 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { notifyTenant } from "@/lib/notify";
 import { definitionsFromSettings, definitionKeys, COMMISSION_KEYS, notifyWrites, SLA_KEYS, THRESHOLD_KEYS, toWrites, WEIGHT_KEYS, type DefinitionsSnapshot } from "@/lib/office-center/definitions";
-import { buildLeague, computeTeamHealth, type LeagueEntry } from "@/lib/office-center/logic";
+import { computeTeamHealth } from "@/lib/office-center/logic";
 import { loadPropertyForAssign, rankForProperty } from "@/lib/office-center/smart-assign-load";
 import { topSuggestions, toStoredScore, type SmartSuggestion } from "@/lib/office-center/smart-assign";
 import { loadOfficeStatistics, loadUnassignedProperties } from "@/lib/office-center/store";
@@ -38,8 +38,6 @@ import { ASSIGN_SLA_HOURS_KEY, UNASSIGNED_ALERT_KEY } from "@/lib/settings/regis
 import type { SettingView } from "@/lib/settings/types";
 import { writeSetting } from "@/lib/settings/write";
 import { createClient } from "@/lib/supabase/server";
-import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
-import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { HANDOFF_SCOPES } from "@/lib/team/handoff";
 import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
 
@@ -504,18 +502,6 @@ export async function getOfficeStats(): Promise<{ stats?: OfficeStatistics; erro
   if (!gate.ok) return { error: gate.error };
   const supabase = await createClient();
   return { stats: await loadOfficeStatistics(supabase, gate.tenantId, now()) };
-}
-
-/** Danışman ligi (bu TR ayı). Bireysel kazanç yalnız `earnings_all` izni olanlara (owner/gm) döner. */
-export async function getAdvisorPerformanceLeague(): Promise<{ league: LeagueEntry[]; seeAllEarnings: boolean; sampleLabel: string | null; failed: boolean; error?: string }> {
-  const gate = await requirePermission("office_center", "view");
-  if (!gate.ok) return { league: [], seeAllEarnings: false, sampleLabel: null, failed: false, error: gate.error };
-  const supabase = await createClient();
-  const perms = await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
-  const nowMs = now();
-  const res = await loadAdvisorMetrics(supabase, { viewer: { userId: gate.userId, role: gate.role, perms }, tenantId: gate.tenantId, period: currentMonthPeriod(nowMs), nowMs });
-  const seeAll = canSeeAllEarnings(perms);
-  return { league: buildLeague(res.rows, { viewerId: gate.userId, seeAllEarnings: seeAll }), seeAllEarnings: seeAll, sampleLabel: res.sampleLabel, failed: res.failed };
 }
 
 export async function getTeamHealth(): Promise<{ health?: TeamHealth; error?: string }> {

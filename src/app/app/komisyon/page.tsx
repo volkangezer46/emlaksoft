@@ -34,9 +34,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import { MoneyValue } from "@/components/ui/money-value";
 import { DashCard, SectionHeader, KpiGrid } from "@/components/ui/dashboard-grid";
 import { KpiTile } from "@/components/ui/premium/kpi-card";
-import { Progress } from "@/components/ui/progress";
 import { Illustration } from "@/components/ui/illustrations";
-import { shareOfMax } from "@/app/app/raporlar/report-math";
 import { statusShares } from "./commission-math";
 import { StatusStackBar } from "./status-stack-bar";
 import { PipelineForecastCard } from "./pipeline-forecast";
@@ -275,16 +273,6 @@ export default async function CommissionPage({
   const donemTahsil = Number(aggregate.month_paid);
   const donemBekleyen = Number(aggregate.month_pending);
 
-  // Danışman bazlı dağılım — split etiketlerine göre pay (brüt × oran)
-  const advisorDist = (seeAllEarnings ? aggregate.advisors : []).map((row) => ({
-    label: row.label,
-    pay: Number(row.pay),
-    adet: Number(row.record_count),
-    profileId: row.profile_id ?? null,
-    unresolved: Boolean(row.unresolved),
-  }));
-  const advisorMax = Math.max(1, ...advisorDist.map((a) => a.pay));
-
   // Beklenen vs tahsil edilen — son 6 ay, çift seri (tahakkuk / tahsilat), İstanbul takvimi
   const kpiAyFmt = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "Europe/Istanbul" });
   const aylikSeri = Array.from({ length: 6 }, (_, i) => {
@@ -444,77 +432,28 @@ export default async function CommissionPage({
         ) : null}
       </DashCard>
 
-      {/* Kazanç gizliliği: tüm kazançları görme yetkisi yoksa danışman dağılımı yerine açıklayıcı boş durum */}
-      {!seeAllEarnings ? (
-        <section className="rounded-[var(--radius-panel)] border border-dashed border-line bg-surface p-5 text-sm text-text-muted">
-          <h2 className="font-display font-bold text-text">Danışman bazlı dağılım</h2>
-          <p className="mt-1">
-            Diğer danışmanların payları gizlidir; bu sayfada yalnız kendi komisyon payınız ve kayıtlarınız görünür. Ofis geneli dağılım için ofis yöneticinizden
-            &ldquo;tüm kazançları görme&rdquo; yetkisi isteyebilirsiniz.
-          </p>
-        </section>
+      {/* Danışman bazlı hakediş TEK yerde: Kazanç > Ofis geneli (/app/cuzdan?sekme=ofis); burada kopyası yok. */}
+      {hasAylikSeri ? (
+        <ChartFrame title="Beklenen vs tahsil edilen" subtitle="Son 6 ay · tahakkuk eden brüt komisyon ve tahsilatı" height={260}>
+          <InteractiveChart
+            data={aylikSeri.map((m) => ({ label: m.label, value: Math.round(m.value), value2: Math.round(m.value2) }))}
+            name="Tahakkuk"
+            name2="Tahsil edilen"
+            color="var(--viz-gold)"
+            color2="var(--viz-pos)"
+            diffLabel="Bekleyen"
+            format="money"
+            height={210}
+          />
+        </ChartFrame>
       ) : null}
-
-      {/* Danışman bazlı dağılım + beklenen vs tahsil edilen trend */}
-      {advisorDist.length > 0 || hasAylikSeri ? (
-        <div className="grid items-stretch gap-4 lg:grid-cols-2">
-          {advisorDist.length > 0 ? (
-            <section className="flex flex-col rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
-              <p className="flex items-center gap-2 text-xs font-semibold text-accent-text"><Wallet className="h-4 w-4" /> Paylaşım analizi</p>
-              <h2 className="mt-1 font-display font-bold text-text">Danışman bazlı dağılım</h2>
-              <p className="mt-0.5 text-xs text-text-muted">Tüm defterden hesaplanan en yüksek 8 danışman payı</p>
-              <ul className="mt-4 mb-4 space-y-3">
-                {advisorDist.map((a) => {
-                  const memberId = a.profileId ?? undefined;
-                  return (
-                    <li key={a.profileId ?? a.label}>
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        {memberId ? (
-                          <Link href={`/app/ekip/${memberId}`} className="focus-ring rounded-[4px] font-semibold text-accent-text hover:underline">
-                            {a.label}
-                          </Link>
-                        ) : (
-                          <span className="font-semibold text-text">{a.label}</span>
-                        )}
-                        {a.unresolved ? <span className="ml-2 rounded-full bg-[color-mix(in_srgb,var(--viz-5)_16%,transparent)] px-2 py-0.5 text-xs font-bold text-[color:var(--pm-warn-text)]">Eşleşmedi</span> : null}
-                        <span className="numeric font-display text-sm font-bold text-text">{money(a.pay)}</span>
-                      </div>
-                      <div className="mt-1 flex items-center gap-2">
-                        <Progress className="flex-1" value={shareOfMax(a.pay, advisorMax)} label={`${a.label} payı`} />
-                        <span className="numeric w-14 shrink-0 text-right text-xs font-semibold tabular-nums text-text-muted">{a.adet} kayıt</span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              <Link
-                href={filterHref({})}
-                className="focus-ring mt-auto flex items-center justify-between gap-2 rounded-[var(--radius-control)] border-t border-line pt-3 text-xs font-semibold text-text-muted hover:text-text"
-              >
-                <span>{advisorDist.length} danışman · toplam pay</span>
-                <span className="numeric font-display text-sm font-bold text-text">{money(advisorDist.reduce((t, a) => t + a.pay, 0))}</span>
-              </Link>
-            </section>
-          ) : null}
-          {hasAylikSeri ? (
-            <ChartFrame
-              title="Beklenen vs tahsil edilen"
-              subtitle="Son 6 ay · tahakkuk eden brüt komisyon ve tahsilatı"
-              height={advisorDist.length > 0 ? 300 : 260}
-            >
-              <InteractiveChart
-                data={aylikSeri.map((m) => ({ label: m.label, value: Math.round(m.value), value2: Math.round(m.value2) }))}
-                name="Tahakkuk"
-                name2="Tahsil edilen"
-                color="var(--viz-gold)"
-                color2="var(--viz-pos)"
-                diffLabel="Bekleyen"
-                format="money"
-                height={210}
-              />
-            </ChartFrame>
-          ) : null}
-        </div>
+      {seeAllEarnings ? (
+        <Link
+          href="/app/cuzdan?sekme=ofis"
+          className="focus-ring inline-flex items-center gap-1 self-start text-sm font-semibold text-accent-text hover:underline"
+        >
+          Danışman bazlı hakediş: Kazanç &gt; Ofis geneli <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
       ) : null}
 
       <CommissionSimulator defaultRate={simRate} defaultAdvisorShare={simShare} />

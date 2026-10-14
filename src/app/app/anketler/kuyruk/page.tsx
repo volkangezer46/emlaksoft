@@ -17,6 +17,8 @@ import { EVENT_LABELS, OUTCOME_LABELS, STATUS_LABELS, isSurveyEventType, isSurve
 import { SurveyNav, SurveyNotReady } from "../survey-nav";
 import { QueueTaskCard, type AssigneeOption, type QueueQuestionVM, type QueueTaskVM } from "../queue-task-card";
 
+export const metadata = { title: "Anketör kuyruğu · Anketler" };
+
 const BASE = "/app/anketler/kuyruk";
 
 type Rel<T> = T | T[] | null;

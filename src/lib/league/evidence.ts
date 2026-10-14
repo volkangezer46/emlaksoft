@@ -28,6 +28,6 @@ export function evidenceHref(rule: ScoreRuleKey, staffId: string): string {
     case "nps_promoter":
       return "/app/anketler?sekme=sonuc";
     case "leak_sla_response":
-      return "/app/kayip-kacak";
+      return "/app/ilan-kontrol/kapanis";
   }
 }

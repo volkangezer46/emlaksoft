@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AdvisorMetricRow } from "@/lib/team/advisor-metrics";
-import { assignHref, buildLeague, computeTeamHealth, filterAdvisors, parseAdvisorFilters, parseAssignView, parseTab, sortAdvisors, tabHref, unassignedSlaState } from "./logic";
+import { assignHref, computeTeamHealth, filterAdvisors, parseAdvisorFilters, parseAssignView, parseTab, sortAdvisors, tabHref, unassignedSlaState } from "./logic";
 import type { OfficeAdvisorRow, OfficeStatistics } from "./types";
 
 const NOW = Date.UTC(2026, 9, 5, 9, 0, 0);
@@ -33,11 +32,9 @@ function row(over: Partial<OfficeAdvisorRow>): OfficeAdvisorRow {
 describe("URL filtre kontratı", () => {
   it("bozuk sekme/filtre varsayılana düşer, geçerli olanlar korunur", () => {
     expect(parseTab("yok")).toBe("danismanlar");
-    // "Atamalar" sekmesi kalktı (atama İlan Havuzu'nda); eski yer imi varsayılana düşer.
-    expect(parseTab(["atamalar"])).toBe("danismanlar");
-    // Birleşen sekmeler: eski yer imleri tek "Tanımlar" sekmesine düşer.
-    expect(parseTab("ayarlar")).toBe("tanimlar");
-    expect(parseTab("tanimlamalar")).toBe("tanimlar");
+    // Kaldırılan sekmeler (takma ad yok): varsayılana düşer.
+    for (const removed of ["atamalar", "ayarlar", "tanimlamalar", "tanimlar", "dagitim"]) expect(parseTab([removed]), removed).toBe("danismanlar");
+    expect(parseTab("istatistikler")).toBe("istatistikler");
     const f = parseAdvisorFilters({ q: "  ece ", durum: "x", rol: "advisor", sube: "nope", sirala: "portfoy" });
     expect(f).toEqual({ q: "ece", durum: "", rol: "advisor", sube: "", sirala: "portfoy", yon: "desc" });
     expect(parseAdvisorFilters({}).yon).toBe("asc");
@@ -102,39 +99,5 @@ describe("SLA ve ekip sağlığı", () => {
     const warn = computeTeamHealth({ stats: { ...stats, cancelledAssignmentsThisMonth: 4 }, breachedUnassigned: 0, unassignedThreshold: 5, advisorsWithoutActivity30d: 0 });
     expect(warn.level).toBe("warning");
     expect(warn.alerts.every((a) => a.href.startsWith("/app/ekip") || a.href.startsWith("/app/ilan-havuzu"))).toBe(true);
-  });
-});
-
-describe("danışman ligi kazanç gizliliği", () => {
-  const m = (over: Partial<AdvisorMetricRow>): AdvisorMetricRow => ({
-    id: "x",
-    fullName: "X",
-    role: "advisor",
-    branchId: null,
-    customerCount: 0,
-    newCustomerCount: 0,
-    activePropertyCount: 0,
-    callCount: 0,
-    appointCount: 0,
-    offerCount: 0,
-    dealCount: 0,
-    conversionPct: null,
-    revenue: 1000,
-    pendingRevenue: 0,
-    commissionCount: 1,
-    target: null,
-    targetPct: null,
-    activeDemandCount: null,
-    overdueTaskCount: null,
-    untrackedDemandCount: null,
-    ...over,
-  });
-  it("earnings_all yoksa yalnız kendi geliri görünür; sıra anlaşma sayısına göre", () => {
-    const rows = [m({ id: "me", fullName: "Ben", dealCount: 1 }), m({ id: "other", fullName: "Diğer", dealCount: 4 })];
-    const league = buildLeague(rows, { viewerId: "me", seeAllEarnings: false });
-    expect(league.map((l) => l.advisorId)).toEqual(["other", "me"]);
-    expect(league[0].revenue).toBeNull();
-    expect(league[1].revenue).toBe(1000);
-    expect(buildLeague(rows, { viewerId: "me", seeAllEarnings: true })[0].revenue).toBe(1000);
   });
 });

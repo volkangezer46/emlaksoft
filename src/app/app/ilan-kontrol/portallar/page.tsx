@@ -1,4 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
+import { ControlSubNav } from "@/components/listing-control/sub-nav";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { ButtonLink } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
@@ -86,12 +88,14 @@ function portalHref(durum: string, portal: string, sayfa?: number, property?: st
   if (sayfa && sayfa > 1) sp.set("sayfa", String(sayfa));
   if (property) sp.set("property", property);
   const qs = sp.toString();
-  return qs ? `/app/portallar?${qs}` : "/app/portallar";
+  return qs ? `/app/ilan-kontrol/portallar?${qs}` : "/app/ilan-kontrol/portallar";
 }
 
 const PAGE_SIZE = 50;
 /** Portal dağılımı barları için taranan azami kayıt (tek kolon, hafif). */
 const DIST_LIMIT = 2000;
+export const metadata = { title: "Portal ilanları · İlan kontrolü" };
+
 /** Yeni ilan formundaki portföy önerisi için çekilen azami kayıt; fazlası Combobox aramasıyla bulunur. */
 const PROPERTY_OPTIONS_LIMIT = 300;
 
@@ -100,7 +104,7 @@ export default async function PortalsPage({
 }: {
   searchParams?: Promise<{ durum?: string; portal?: string; sayfa?: string; property?: string }>;
 }) {
-  await requireModulePage("portals", "/app/portallar");
+  const { perms } = await requireModulePage("portals", "/app/ilan-kontrol/portallar");
   const sp = (await searchParams) ?? {};
   const durum = (DURUM_VALUES as readonly string[]).includes(sp.durum ?? "") ? sp.durum! : "";
   const portal = sp.portal ?? "";
@@ -214,17 +218,17 @@ export default async function PortalsPage({
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Yayın ağı izleniyor"
-        title="Portal kontrol merkezi"
-        description="Teyit, kapanış ve kayıp-kaçak sinyalleri tek operasyon akışında."
+        eyebrow="İlan kontrolü"
+        title="Portal ilanları"
+        description="Portal ilanlarının teyit, yenileme ve kapanış kaydı tek operasyon akışında."
         actions={
           <>
-            <ButtonLink href="/app/kayip-kacak" variant="secondary" iconRight={ArrowUpRight}>Kayıp-kaçak panosu</ButtonLink>
             <ButtonLink href="/app/ilan-kontrol/eklenti#aktarim" variant="secondary" iconRight={ArrowUpRight}>Portaldan al</ButtonLink>
             <NewPortalTrigger variant="solid" disabled={propertyOptions.length === 0} />
           </>
         }
       />
+      <ControlSubNav active="portallar" closures={effectiveCanAccessModule(perms, "leak")} />
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {[
           { label: "Canlı ilan", value: live, icon: RadioTower, tone: "text-mint-700", durum: "live" },
@@ -414,7 +418,7 @@ export default async function PortalsPage({
             <div className="grid place-items-center px-6 py-14 text-center">
               <RadioTower className="h-8 w-8 text-text-faint" />
               <p className="mt-3 text-sm font-semibold text-ink-950">Bu filtreyle eşleşen yayın kaydı yok</p>
-              <Link href="/app/portallar" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
+              <Link href="/app/ilan-kontrol/portallar" className="mt-1 text-sm font-semibold text-brand-600 hover:underline">
                 Filtreyi temizle
               </Link>
             </div>

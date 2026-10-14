@@ -6,6 +6,8 @@ import { lockedGate } from "@/lib/billing/page-gates";
 import { getTenantGateContext } from "@/lib/cache/request";
 import { AdvisorDetailView } from "./advisor-view";
 
+export const metadata = { title: "Danışman · Ekip" };
+
 /**
  * Danışman 360. Kapı iki katmanlıdır: KENDİ profili her rolde ve her pakette açıktır (Performansım ile aynı gövde;
  * Ekip modülü olmayan rol `/app/performansim`'e gider). BAŞKASININ profili için Ekip modülü + ofis geneli veri

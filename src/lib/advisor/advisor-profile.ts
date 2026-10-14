@@ -298,7 +298,7 @@ export function validateSpecialties(input: unknown, allowed: AllowedSpecialtyVal
     if (kind !== "property_type" && kind !== "segment") return { ok: false, error: "Uzmanlık türü geçersiz." };
     const value = typeof r.value === "string" ? r.value.trim() : "";
     if (!value || value.length > 64) return { ok: false, error: "Uzmanlık değeri boş olamaz." };
-    if (!allowed[kind].has(value)) return { ok: false, error: `"${value}" ofisin tanımlarında yok (Ayarlar > Tanımlar).` };
+    if (!allowed[kind].has(value)) return { ok: false, error: `"${value}" ofisin tanımlarında yok (Ayarlar > Seçim listeleri).` };
     const txRaw = r.transaction_type;
     const tx = txRaw === null || txRaw === undefined || txRaw === "" ? null : txRaw;
     if (tx !== null && tx !== "Satılık" && tx !== "Kiralık") return { ok: false, error: "İşlem türü Satılık veya Kiralık olmalı." };

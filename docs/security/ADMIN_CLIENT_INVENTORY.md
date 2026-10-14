@@ -8,9 +8,9 @@
 ## Özet
 
 - Toplam birim: **577** (293 dosya) — risk: P0=16, P1=44, P2=517
-- Tenant filtresi: var=297, uygulanamaz=186, yok=61, param=21, devir=12
+- Tenant filtresi: var=297, uygulanamaz=187, yok=61, param=20, devir=12
 - Kapı türü: public-token=35, dosya-duzeyi=157, platform=114, belirsiz=135, elle-dogrulandi=26, oturum-izin=83, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **67**
+- Filtresiz (yok+devir): **73**; RLS'li client'a taşıma adayı: **66**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -414,12 +414,12 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/ticket-attachments/finalize/route.ts:54` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/api/ticket-attachments/route.ts:88` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/api/vitrin-favoriler/route.ts:118` | `POST` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/app/ayarlar/guvenlik/actions.ts:29` | `setTwoFactorSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
-| `src/app/app/ayarlar/guvenlik/page.tsx:78` | `SecuritySettingsPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
+| `src/app/app/ayarlar/guvenlik/page.tsx:62` | `SecuritySettingsPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | uygulanamaz | P2 |
 | `src/app/app/ayarlar/guvenlik/policy-actions.ts:135` | `revokeOfficeSession` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/app/app/ekip/invite-actions.ts:141` | `createAdvisor` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/ekip/invite-actions.ts:31` | `resendInvite` | auth.admin API'si (RLS ile yapılamaz). | oturum-izin | var | P2 |
-| `src/app/app/ekip/page.tsx:150` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/app/ekip/page.tsx:148` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/app/hesabim/two-factor-actions.ts:29` | `setTwoFactorSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/sozlesmeler/[id]/page.tsx:92` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
 | `src/app/danisman/[slug]/page.tsx:171` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/danisman/[slug]/page.tsx:121` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |

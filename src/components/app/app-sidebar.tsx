@@ -284,7 +284,7 @@ export function AppSidebar({
 
       <MenuSearchButton onActivate={() => setOpen(false)} />
 
-      <NavScroller label="Uygulama ana menüsü" className="sb-pad flex-1 overscroll-contain px-3" innerClassName="pb-3">
+      <NavScroller label="Uygulama ana menüsü" className={`sb-pad flex-1 overscroll-contain px-3${variant === "drawer" ? " nav-scroll-drawer" : ""}`} innerClassName="pb-3">
         <div className="sb-expanded">
           {variant === "drawer" ? (
             <>
@@ -405,7 +405,7 @@ export function AppSidebar({
                   data-nav-link
                   data-nav-active={isActive ? "true" : undefined}
                   aria-current={isActive ? "true" : undefined}
-                  aria-label={hub.label}
+                  aria-label={badge ? `${hub.label}, ${badge.label}` : hub.label}
                   className={`focus-ring relative flex h-11 items-center justify-center rounded-[var(--radius-control)] transition-colors ${
                     isActive ? "nav-pill text-white" : "text-white/70 hover:bg-white/8 hover:text-white"
                   }`}

@@ -41,7 +41,7 @@ export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { t
         <div>
           <CardTitle className="flex items-center gap-2"><Users className="h-4 w-4 text-brand-600" aria-hidden /> Danışman kârlılığı</CardTitle>
           <CardDescription>
-            Son 12 ay · ofiste kalan komisyon (brüt − KDV − dış paylar) ↔ danışmanın portföylerine bağlı doğrudan giderler. Yalnız ofis sahibi ve genel müdür görür.
+            Seçili dönem · ofiste kalan komisyon (brüt − KDV − dış paylar) ↔ danışmanın portföylerine bağlı doğrudan giderler. Yalnız ofis sahibi ve genel müdür görür.
           </CardDescription>
         </div>
       </CardHeader>
@@ -73,7 +73,7 @@ export async function AdvisorProfitCard({ tenantId, userId, firstMonthKey }: { t
                   <TD label="Ofiste kalan" align="right" className="numeric">{formatTry(r.retained)}</TD>
                   <TD label="Doğrudan maliyet" align="right" className="numeric">
                     {r.directCosts > 0 ? (
-                      <Link href={`/app/giderler?from=${firstMonthKey}-01`} className="focus-ring rounded hover:underline">{formatTry(r.directCosts)}</Link>
+                      <Link href={`/app/giderler?sekme=hareketler&gorunum=eski-giderler&from=${firstMonthKey}-01`} className="focus-ring rounded hover:underline">{formatTry(r.directCosts)}</Link>
                     ) : (
                       "—"
                     )}

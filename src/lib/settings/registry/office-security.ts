@@ -17,7 +17,7 @@ import {
  * DG7 ofis güvenlik politikası (ofis kapsamı, `tenant_settings`). Varsayılanların HEPSİ bugünkü davranış: 2FA zorunlu rol
  * yok, IP kısıtı yok (sahip muaf), boşta kalma/oturum ömrü kapalı, yeni cihaz bildirimi kapalı.
  * Yazma YALNIZ Ayarlar > Güvenlik'teki korumalı yoldan (`fromBridge`): yalnız ofis sahibi, kendini kilitleme onayı ve
- * SMS hazır mı denetimi orada; Tanımlar merkezi bu ayarları bağlantı olarak gösterir.
+ * SMS hazır mı denetimi orada; Kurallar ve varsayılanlar ekranı bu ayarları bağlantı olarak gösterir.
  */
 const OFFICE_SECURITY = {
   scope: "tenant",

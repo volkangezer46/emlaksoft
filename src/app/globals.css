@@ -1126,9 +1126,6 @@ p {
 
 /* Kart ızgarası stagger girişi: motion.css `.list-stagger` (tek tanım). */
 
-/* TV modu — tüm panel ~%25 büyür (uzaktan okunur), düzen oranları korunur */
-.tv-zoom { zoom: 1.25; }
-
 
 /* ============================================================
    YENİ CSS KATMANI — hepsi progressive enhancement

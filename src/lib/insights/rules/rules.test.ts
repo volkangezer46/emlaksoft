@@ -164,7 +164,7 @@ describe("deadline", () => {
     const [d] = evaluateDeadlines([confirm], NOW);
     expect(d.title).toContain("15 gündür");
     expect(d.severity).toBe("orta");
-    expect(d.href).toBe("/app/portallar?durum=teyit");
+    expect(d.href).toBe("/app/ilan-kontrol/portallar?durum=teyit");
     expect(evaluateDeadlines([{ ...confirm, daysLeft: 2 }], NOW)).toEqual([]);
     expect(evaluateDeadlines([{ ...authority, daysLeft: 30 }], NOW)).toEqual([]);
     expect(evaluateDeadlines([{ ...authority, daysLeft: -1 }], NOW)).toEqual([]);

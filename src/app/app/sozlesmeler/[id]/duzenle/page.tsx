@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { EditContractForm } from "./edit-contract-form";
 
+export const metadata = { title: "Sözleşmeyi düzenle" };
+
 /**
  * Sözleşme düzenleme sayfası — detay sayfasındaki "Düzenle" linkinin hedefi.
  * Yalnızca taslak durumundaki sözleşmeler düzenlenebilir; kaydetmede önceki

@@ -9,7 +9,7 @@ import { createAdvisor, type CreateAdvisorResult } from "../invite-actions";
 import { saveAdvisorExtras } from "@/app/actions/advisor-profile";
 import { clearFormDraft } from "@/components/app/use-form-draft";
 import { useToast } from "@/components/app/toast-provider";
-import { MODULE_LABELS } from "@/app/app/ayarlar/roller/role-permissions-matrix";
+import { MODULE_LABELS } from "@/app/app/ayarlar/yetkilendirme/role-permissions-matrix";
 import { Alert } from "@/components/ui/alert";
 import { ButtonLink } from "@/components/ui/button";
 import { EmailInput } from "@/components/ui/email-input";
@@ -296,7 +296,7 @@ export function AdvisorForm({
             Görünürlük rolden gelir; dağıtım kuralları için{" "}
             <Link href="/app/ayarlar/lead" className="font-semibold text-brand-600 hover:underline">talep ayarları</Link>,
             kişiye özel yetki istisnası için{" "}
-            <Link href="/app/ayarlar/roller" className="font-semibold text-brand-600 hover:underline">izin matrisi</Link>.
+            <Link href="/app/ayarlar/yetkilendirme?sekme=roller" className="font-semibold text-brand-600 hover:underline">izin matrisi</Link>.
           </p>
         </div>
       </>

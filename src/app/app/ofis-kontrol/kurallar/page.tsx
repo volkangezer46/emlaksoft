@@ -8,6 +8,8 @@ import { OversightNav } from "../_components/oversight-nav";
 import { PrivacyNote } from "../_components/privacy-note";
 import { OversightSettingsForm } from "./settings-form";
 
+export const metadata = { title: "Kurallar ve eşikler · Ofis kontrolü" };
+
 export default async function KurallarPage() {
   const { tenantId, role } = await requireModulePage("dashboard", "/app/ofis-kontrol/kurallar");
   if (!tenantId || !hasOfficeWideDataScope(role)) redirect("/app/ofis-kontrol/benim");

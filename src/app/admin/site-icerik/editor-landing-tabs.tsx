@@ -24,7 +24,7 @@ export function setValuationVisible(d: SiteContent, on: boolean): void {
   d.layout = normalizeLayout(d.layout).map((s) => (s.id === "degerleme" ? { ...s, hidden: !on } : s));
 }
 
-const gateHint = "Paket rozeti için /app sayfa yolu (ör. /app/kayip-kacak). Rozet metni sayfa kilidinden üretilir; boş = rozet yok.";
+const gateHint = "Paket rozeti için /app sayfa yolu (ör. /app/ilan-kontrol/kapanis). Rozet metni sayfa kilidinden üretilir; boş = rozet yok.";
 
 export function LayoutTab({ cfg, update, readOnly }: TabProps) {
   const items = normalizeLayout(cfg.layout);

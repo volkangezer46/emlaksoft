@@ -88,6 +88,7 @@ export async function AdvisorDetailView({
   searchParams,
   auth,
   headingAs = "h1",
+  personalView = false,
 }: {
   memberId: string;
   /** Sekme bağlantılarının kökü. */
@@ -98,6 +99,11 @@ export async function AdvisorDetailView({
   auth: { userId: string; role: string; tenantId: string | null; perms: EffectivePermissions };
   /** Performansım üstünde DashboardHero (tek h1) olduğu için orada "h2". */
   headingAs?: "h1" | "h2";
+  /**
+   * Danışmanın KENDİ görünümü (/app/performansim): "Kişisel bilgiler" (Hesabım'da) ve "Kazanç" (Komisyonum kartı ve
+   * /app/cuzdan'da) sekmeleri gizlenir; yöneticinin danışman 360'ında (/app/ekip/[id]) kalır.
+   */
+  personalView?: boolean;
 }) {
   const { perms, userId, role, tenantId } = auth;
   const id = memberId;
@@ -166,15 +172,14 @@ export async function AdvisorDetailView({
     { id: "oncul", label: "Erken işaretler", icon: Gauge },
     { id: "pipeline", label: "Satış hattı", icon: GitBranch },
     { id: "hedef", label: "Hedef", icon: Target, hidden: !effectiveCanAccessModule(perms, "targets") },
-    { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings },
+    { id: "kazanc", label: "Kazanç", icon: Wallet, hidden: !showEarnings || personalView },
     { id: "kosluk", label: "Gelişim önerileri", icon: Sparkles },
     // Aynı veriye üç ad (Kimlik ve kişisel / Profil ve belgeler / Bilgiler) TEK sekmede: "Kişisel bilgiler".
-    { id: "profil", label: "Kişisel bilgiler", icon: BadgeCheck, hidden: (!profileTabVisible || !tenantId) && !canEditInfo },
+    { id: "profil", label: "Kişisel bilgiler", icon: BadgeCheck, hidden: personalView || ((!profileTabVisible || !tenantId) && !canEditInfo) },
     { id: "uzmanlik", label: "Uzmanlık ve bölgeler", icon: MapPinned, hidden: !specialtyReady || !tenantId },
   ];
   const visible = tabs.filter((t) => !t.hidden).map((t) => t.id);
-  // Eski `?sekme=bilgi` bağlantıları (Daveti yinele vb.) "Kişisel bilgiler" sekmesine düşer (alias).
-  const active = resolveTab(searchParams, visible, "ozet", { bilgi: "profil" });
+  const active = resolveTab(searchParams, visible, "ozet");
 
   const ctx: Ctx = {
     supabase,

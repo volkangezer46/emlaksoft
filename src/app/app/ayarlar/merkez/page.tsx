@@ -1,7 +1,7 @@
 import { StaffNoTenantNotice } from "@/components/app/staff-no-tenant-notice";
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { ArrowLeft, ArrowUpRight, Search, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Search, ShieldAlert, SlidersHorizontal } from "lucide-react";
 import { ReadOnlyGate } from "../read-only-gate";
 import { SettingField } from "@/components/settings/setting-field";
 import { PageHeader } from "@/components/ui/page-header";
@@ -21,7 +21,7 @@ import { InsightRulesCard, type InsightRuleRowView } from "./insight-rules-card"
 import { getTenantSettingViews } from "@/lib/settings/read";
 import { OFFICE_SETTING_GROUPS, type OfficeSettingGroupId, type SettingView } from "@/lib/settings/types";
 
-export const metadata = { title: "Tanımlar merkezi" };
+export const metadata = { title: "Kurallar ve varsayılanlar" };
 
 type Sp = Record<string, string | string[] | undefined>;
 const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
@@ -49,7 +49,7 @@ const USED_IN: Record<string, { label: string; href: string }> = {
   "office.assign.weight_performance": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.weight_availability": { label: "İlan Havuzu > Danışmansız ilanlar", href: "/app/ilan-havuzu?atama=bekleyen" },
   "office.assign.unassigned_sla_hours": { label: "İlan Havuzu > Gecikenler", href: "/app/ilan-havuzu?atama=gecikmis" },
-  "office.alert.unassigned_pool_count": { label: "Ofis Merkezi > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
+  "office.alert.unassigned_pool_count": { label: "Ekip > İstatistikler", href: "/app/ekip?sekme=istatistikler" },
 };
 const NOTIFY_USED_IN = { label: "Bildirim tercihleri", href: "/app/ayarlar" };
 
@@ -122,8 +122,8 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
       <PageHeader
         eyebrow="Ayarlar"
         icon={<SlidersHorizontal className="h-6 w-6 text-accent" aria-hidden="true" />}
-        title="Tanımlar merkezi"
-        description="Ofisinize özel Yanıt süreleri, uyarı eşikleri, komisyon ve bildirim varsayılanları. Değişiklikler doğrulanır, geçmişe yazılır ve istediğiniz an varsayılana döndürülebilir."
+        title="Kurallar ve varsayılanlar"
+        description="Ofisinize özel yanıt süreleri, talep dağıtımı, uyarı eşikleri, komisyon ve bildirim varsayılanları. Değişiklikler doğrulanır, geçmişe yazılır ve istediğiniz an varsayılana döndürülebilir."
       />
 
       <StatRow
@@ -172,6 +172,21 @@ export default async function OfficeSettingsCenterPage({ searchParams }: { searc
           </Link>
         ) : null}
       </nav>
+
+      <Link
+        href="/app/ofis-kontrol/kurallar"
+        className="focus-ring lift group flex items-start gap-3 rounded-[var(--radius-panel)] border border-line bg-surface p-4 transition hover:border-brand-300"
+      >
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-card)] bg-amber-400/12 text-amber-600">
+          <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1 font-display font-bold text-ink-950">
+            Ofis kontrolü eşikleri <ArrowUpRight className="h-3.5 w-3.5 text-text-faint transition group-hover:text-brand-600" aria-hidden="true" />
+          </span>
+          <span className="mt-0.5 block text-xs text-text-muted">Danışman işlem uyarıları ve onay kuralları Ofis kontrolü ekranında ayrı tutulur.</span>
+        </span>
+      </Link>
 
       {insightCard && canEdit ? <InsightRulesCard rules={insightCard.rules} narrativeEnabled={insightCard.narrativeEnabled} reopened={insightCard.reopened} /> : null}
 

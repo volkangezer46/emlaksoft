@@ -2,7 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { AlarmClock, ArrowUpRight, ClipboardPlus, MessageCircle, Phone, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toTelHref, toWhatsAppLink } from "@/lib/phone";
-import { dismissRiskFromSmartList } from "./actions";
+import { dismissRiskFromSmartList } from "./risk-actions";
 
 /**
  * "Kaybedilme riski yüksek" satır eylemleri (eski Riskli müşteriler sayfasından taşındı):

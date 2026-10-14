@@ -29,6 +29,8 @@ import { now, trDayKey } from "@/lib/clock";
 import { daysUntilOfferExpiry } from "@/lib/offer-expiry";
 import { buildOfferEvents } from "./offer-events";
 
+export const metadata = { title: "Teklif" };
+
 const STATUS_LABELS: Record<string, string> = {
   draft: "Taslak",
   submitted: "Sunuldu",

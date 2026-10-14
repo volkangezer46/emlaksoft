@@ -1,7 +1,7 @@
 import { BadgeCheck, CalendarCheck, FileSignature, LayoutGrid, Scale, Workflow, type LucideIcon } from "lucide-react";
 import { CountUp } from "@/components/ui/count-up";
 import { CRON_JOBS } from "@/lib/cron-jobs";
-import { NAV_SECTIONS } from "@/lib/nav-config";
+import { NAV_GROUPS } from "@/lib/nav-roles";
 import { menuIconComponent } from "@/lib/site-menu/icon-registry";
 import { defaultSiteContent } from "@/lib/site-content/defaults";
 import type { TrustItem } from "@/lib/site-content/schema";
@@ -9,7 +9,7 @@ import { homeHref } from "./content-link";
 
 /**
  * Sahte rakam yerine doğrulanabilir gerçekler. Kaynaklar: getEffectiveTrialDays (deneme günü, sunucuda okunur),
- * cron envanteri (CRON_JOBS.length = vercel.json, `npm run check:cron` doğrular), nav-config (iş başlığı sayısı), SMS onaylı dijital imza.
+ * cron envanteri (CRON_JOBS.length = vercel.json, `npm run check:cron` doğrular), nav-roles (yan menü grup başlığı sayısı), SMS onaylı dijital imza.
  * DEĞERLER koddan gelir (içerik editöründe değiştirilemez, sahte sayaç yok); yalnız etiket/bağlantı/sıra/gizleme düzenlenir.
  * Yönetimden eklenen öğe (`c_...`) DEĞERSİZ çizilir: yalnız ikon + etiket (elle yazılan sayı yok).
  * Sunucu çıktısı SONUÇ değerini basar (JS kapalıyken de doğru); sayılar ilk görünümde bir kez yukarı sayar (CountUp, ek paket yok).
@@ -23,7 +23,7 @@ export function TrustStrip({ trialDays, content = defaultSiteContent().trust }: 
   const base: Record<string, { icon: LucideIcon; value: string } | null> = {
     deneme: trialDays ? { icon: CalendarCheck, value: `${trialDays} gün` } : null,
     gorev: { icon: Workflow, value: String(CRON_COUNT) },
-    menu: { icon: LayoutGrid, value: String(NAV_SECTIONS.length) },
+    menu: { icon: LayoutGrid, value: String(NAV_GROUPS.length) },
     imza: { icon: FileSignature, value: "SMS" },
     kvkk: { icon: Scale, value: "KVKK" },
   };

@@ -162,7 +162,7 @@ export function navBadgesFromCounts(args: { counts: ShellBadgeCounts; role: stri
       itemHref: "/app/gorevler",
       href: "/app/gorevler?filter=overdue&mine=1",
       count: args.counts.overdueTasks,
-      label: "geciken görevin",
+      label: "geciken görev",
       tone: "danger",
     });
   }
@@ -171,7 +171,7 @@ export function navBadgesFromCounts(args: { counts: ShellBadgeCounts; role: stri
       itemHref: "/app/onaylar",
       href: "/app/onaylar?kim=bana",
       count: args.counts.pendingApprovals,
-      label: "onayınızı bekleyen talebin",
+      label: "onay bekliyor",
       tone: "warn",
     });
   }

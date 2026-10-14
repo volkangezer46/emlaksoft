@@ -17,6 +17,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { NlPanel } from "./nl-panel";
 
+export const metadata = { title: "Arama sonuçları" };
+
 /**
  * Global arama sonuç sayfası — komut paletindeki "Tüm sonuçları gör" hedefi.
  * Aynı searchWorkspace aksiyonunu daha yüksek limitle çağırır; sonuçlar türe

@@ -49,7 +49,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app",
         // Yalnız brifing paneli: anlatım ona göre yazıldı; panel yoksa çalıştırıcı adımı atlar (başka öğeye düşmez).
         selectors: ['[data-tour="brifing"]'],
-        title: "Günün brifingi",
+        title: "Bugün",
         desc: "Karar bekleyenler, bugünün randevuları, geciken görevler ve aranacak müşteriler burada sıralanır. Bir satıra dokunursanız ilgili kayıt açılır.",
       },
       {
@@ -61,26 +61,26 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/ekip",
         selectors: [H1],
-        title: "Ekibiniz",
+        title: "Ekip",
         desc: "Danışmanlarınızı ekleyin; rol, hedef ve uzmanlık alanı verin. Kim ne kadar iş yapıyor buradan izlenir.",
       },
       {
         path: "/app/ilan-havuzu",
         selectors: ['[data-tour="ilan-havuzu"]', H1],
-        title: "İlan havuzu",
+        title: "Havuz ve atama",
         desc: "Ofisin tüm ilanları tek havuzda: sahibi, durumu ve yetki süresiyle. Sahipsiz veya bekleyen ilanı kolayca görürsünüz.",
       },
       {
         path: "/app/ofis-kontrol",
         selectors: ['[data-tour="ofis-kontrol"]', H1],
-        title: "Ofis kontrol",
+        title: "Ofis kontrolü",
         desc: "Geciken işler, eksik bilgiler ve riskler tek ekranda; her satır ilgili kayda götürür.",
       },
       {
         path: "/app/ayarlar",
         selectors: [H1],
-        title: "Ayarlar ve modüller",
-        desc: "Roller, tanımlar, ofis bilgileri ve örnek veri durumu burada. Kullanmadığınız modülleri kapatıp menüyü sadeleştirebilirsiniz.",
+        title: "Ayarlar",
+        desc: "Ofis kimliği ve eşleştirme ayarları burada; üstteki şeritten Yetkiler, Güvenlik, Entegrasyonlar ve Modüller'e geçersiniz. Kullanmadığınız modülleri kapatıp menüyü sadeleştirebilirsiniz.",
       },
       {
         path: "/app/abonelik",
@@ -99,7 +99,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app",
         selectors: ['[data-tour="brifing"]', '[data-tour="kpi"]'],
-        title: "Bugünkü durum",
+        title: "Bugün",
         desc: "Karar bekleyenler, bugünün randevuları ve görevleri bu ekranda toplanır.",
       },
       {
@@ -111,7 +111,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/lig",
         selectors: [H1],
-        title: "Ekip ligi",
+        title: "Lig",
         desc: "Bu ayın sıralaması. Danışman satırına tıklayınca o danışmanın kayıtlarına inersiniz.",
       },
       {
@@ -129,8 +129,8 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/raporlar",
         selectors: [H1],
-        title: "Raporlar ve ofis panosu",
-        desc: "Ofis geneli rapor ve grafikler burada. Soldaki menüden Ofis Panosu (TV) ile aynı bilgiyi ofisteki bir ekrana yansıtabilirsiniz; tam ekranda menü görünmez.",
+        title: "Raporlar",
+        desc: "Ofis geneli rapor ve grafikler burada. Ekibim şeridindeki TV ekranı ile aynı bilgiyi ofisteki bir ekrana yansıtabilirsiniz; tam ekranda menü görünmez.",
       },
     ],
   },
@@ -143,14 +143,14 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app",
         selectors: ['[data-tour="kpi"]', '[data-tour="brifing"]'],
-        title: "Ana ekran",
+        title: "Bugün",
         desc: "Ofisin güncel rakamları burada. Bir rakama dokunursanız o kayıtların listesi açılır.",
       },
       {
         path: "/app/komisyon",
         selectors: [H1],
-        title: "Komisyon defteri",
-        desc: "Kazanılan anlaşmaların komisyonu, danışman ve ofis payı, tahsilat durumu burada. \"Dışa aktar\" ile listeyi CSV olarak indirirsiniz.",
+        title: "Komisyon",
+        desc: "Kazanılan anlaşmaların komisyonu, danışman ve ofis payı, tahsilat durumu burada. Dosya çıktısı Raporlar > Rapor merkezi'nden alınır.",
       },
       {
         path: "/app/cuzdan",
@@ -162,7 +162,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/abonelik",
         selectors: [H1],
         title: "Abonelik ve faturalar",
-        desc: "Paketiniz, analiz bakiyesi ve kayıtlı kartlar burada. Faturalar sekmesinde EmlakSoft faturalarınızı görür ve yazdırırsınız. Giderler sayfası için ofis sahibinin size \"expenses\" izni vermesi gerekir.",
+        desc: "Paketiniz, analiz bakiyesi ve kayıtlı kartlar burada. Faturalar sekmesinde EmlakSoft faturalarınızı görür ve yazdırırsınız. Muhasebe sayfası için ofis sahibinin size Muhasebe izni vermesi gerekir.",
       },
     ],
   },
@@ -175,13 +175,13 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app",
         selectors: ['[data-tour="brifing"]', '[data-tour="aksiyonlar"]'],
-        title: "Bugünkü işleriniz",
+        title: "Bugün",
         desc: "Bugün yapmanız gereken randevular, görevler ve aranacak müşteriler burada özetlenir.",
       },
       {
         path: "/app/musteriler",
         selectors: [H1],
-        title: "Müşterileriniz",
+        title: "Müşteriler",
         desc: "Alıcı, satıcı, kiracı; sıcak ve soğuk tüm müşteriler. Bir kayda girince talep, görüşme ve randevular bir arada.",
       },
       {
@@ -199,7 +199,7 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/portfoyler",
         selectors: [H1],
-        title: "Portföy ve ilanlar",
+        title: "Portföyler",
         desc: "İlanlarınızı ekleyin, fotoğraf ve fiyat güncelleyin, vitrinde ve portallarda yayınlayın.",
       },
       {

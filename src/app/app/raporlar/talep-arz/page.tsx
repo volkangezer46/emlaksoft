@@ -40,6 +40,8 @@ import {
 import type { TalepArzMarker } from "./talep-arz-map";
 import { Combobox } from "@/components/ui/combobox";
 
+export const metadata = { title: "Talep ve arz · Raporlar" };
+
 // Harita ağır bir client komponenti — dynamic import ile ayrı chunk
 // (portfoyler sayfasındaki MapView deseniyle aynı).
 const TalepArzMap = dynamic(() => import("./talep-arz-map").then((m) => m.TalepArzMap), {

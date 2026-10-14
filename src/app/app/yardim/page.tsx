@@ -14,7 +14,11 @@ import { RestartTourButton, TourPicker } from "./restart-tour-button";
 import { FaqSearch, GuidesSearch } from "./help-search";
 import { FeatureBoardTab } from "./feature-board";
 
-export const metadata = { title: "Yardım ve Destek" };
+export async function generateMetadata({ searchParams }: { searchParams?: Promise<{ sekme?: string }> }) {
+  const sekme = (await searchParams)?.sekme;
+  const tab = HELP_TABS.find((t) => t.id === sekme);
+  return { title: tab && tab.id !== "baslangic" ? `${tab.label} · Yardım` : "Yardım" };
+}
 
 const PANEL = "rounded-[var(--radius-panel)] border border-line bg-surface p-5";
 

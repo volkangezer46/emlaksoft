@@ -1,3 +1,6 @@
+import { ActionSegmentList } from "./_segments/action-segment";
+import { ACTION_SEGMENTS, ACTION_SEGMENT_KEYS, parseActionSegment, type ActionSegment } from "./_segments/keys";
+import { getInvisibleFeatures } from "@/lib/modules/prefs";
 import { Suspense } from "react";
 import { measure } from "@/lib/server-timing";
 import { SkeletonCard } from "@/components/ui/viz";
@@ -238,11 +241,15 @@ type FilterChipsProps = {
   customerTypes: CustomerTypeDefs;
   typeF: string;
   segmentF: HeatSegment | "";
+  /** Eylem süzgeci (`?segment=risk|satici`); sıcaklık süzgeciyle aynı parametre. */
+  actionSeg: ActionSegment | null;
+  /** "Akıllı listeler ve tavsiyeler" modülü (smart_lists) kapalıysa eylem süzgeçleri görünmez. */
+  showActions: boolean;
   baseParams: BaseParams;
 };
 
 /** Tip çipleri + sıcaklık segmentleri. `summary` null iken (akış beklerken) sayaçsız, ama tıklanabilir görünür. */
-function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, baseParams }: FilterChipsProps & { summary: CustomersSummary | null }) {
+function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, actionSeg, showActions, baseParams }: FilterChipsProps & { summary: CustomersSummary | null }) {
   return (
     <div className="space-y-2">
       {/* Müşteri tipi çipleri (sunucu filtresi, ?type=) */}
@@ -257,7 +264,7 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ba
         label="Müşteri tipi"
       />
 
-      {/* Sıcaklık segmentleri — akıllı listeler (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
+      {/* Sıcaklık segmentleri (çip = filtre; aktifken tekrar tıklamak kaldırır) */}
       <nav aria-label="Müşteri sıcaklık segmentleri" className="flex flex-wrap items-center gap-1.5">
         <span className="mr-1 text-xs font-semibold text-text-muted">Sıcaklık</span>
         {SEGMENT_CARDS.map((card) => {
@@ -282,6 +289,29 @@ function FilterChipsView({ summary, totalAll, customerTypes, typeF, segmentF, ba
           </span>
         ) : null}
       </nav>
+
+      {/* Eylem süzgeçleri: "bugün kimi aramalıyım?" (risk ve satıcı skoru; aynı ?segment= parametresi) */}
+      {showActions ? (
+        <nav aria-label="Müşteri eylem süzgeçleri" className="flex flex-wrap items-center gap-1.5">
+          <span className="mr-1 text-xs font-semibold text-text-muted">Kimi aramalıyım?</span>
+          {ACTION_SEGMENT_KEYS.map((key) => {
+            const on = actionSeg === key;
+            return (
+              <Link
+                key={key}
+                href={on ? customersHref(baseParams, { segment: undefined, sayfa: undefined }) : customersHref(baseParams, { segment: key, sayfa: undefined })}
+                aria-current={on ? "true" : undefined}
+                title={on ? "Süzgeç aktif — kaldır" : ACTION_SEGMENTS[key].sub}
+                className={`focus-ring press inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition touch:min-h-11 ${
+                  on ? "border-brand-300 bg-brand-600/10 text-brand-700 ring-2 ring-brand-500" : "border-line bg-surface text-text-muted hover:text-text"
+                }`}
+              >
+                {ACTION_SEGMENTS[key].label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
     </div>
   );
 }
@@ -313,6 +343,7 @@ export default async function CustomersPage({
   const { perms, tenantId, userId, role } = await requireModulePage("customers");
   // Kullanıcı kapsamı (ofis bayrağı açıksa): assigned_to üzerinden, yalnız daraltır; KPI sayıları da aynı kapsamla.
   const listScopeP = getListScope({ userId, tenantId, role });
+  const invisibleP = getInvisibleFeatures(tenantId, userId);
   const canCreate = (perms.customers ?? []).includes("create");
   const canEdit = (perms.customers ?? []).includes("edit");
   const canDelete = (perms.customers ?? []).includes("delete");
@@ -330,6 +361,7 @@ export default async function CustomersPage({
     ? (sp.segment as HeatSegment)
     : "";
 
+
   // Sütun sıralaması: ?sirala=ad|tarih & ?yon=asc|desc (varsayılan: tarih desc)
   const siralaF = sp.sirala === "ad" || sp.sirala === "tarih" ? sp.sirala : "";
   const yonF = sp.yon === "asc" || sp.yon === "desc" ? sp.yon : "";
@@ -344,10 +376,14 @@ export default async function CustomersPage({
   // paralel koşar (eskiden her açılışta listeden ÖNCE ayrı bir gidiş-dönüş).
   const customRaw = customFilterRaw(sp as Record<string, string | undefined>);
   const customFilterP = createClient().then((c) => resolveCustomFieldFilter(c, tenantId, "customer", customRaw));
-  const [listScope, customIds] = await Promise.all([
+  const [listScope, customIds, invisible] = await Promise.all([
     listScopeP,
     customRaw ? customFilterP.then((f) => f.ids) : Promise.resolve(null),
+    invisibleP,
   ]);
+  // Eylem süzgeci (?segment=risk|satici): Akıllı listeler modülü kapalıysa yok sayılır.
+  const showActions = !invisible.includes("smart_lists");
+  const actionSeg = showActions ? parseActionSegment(sp.segment) : null;
 
   // Tüm sorgular + skorlama data.ts'te (T1); burada yalnız görünüm.
   const {
@@ -380,6 +416,7 @@ export default async function CustomersPage({
   if (etiketF)   baseParams.etiket = etiketF;
   if (assignedF) baseParams.assigned = assignedF;
   if (segmentF)  baseParams.segment = segmentF;
+  if (actionSeg) baseParams.segment = actionSeg;
   if (fromF)     baseParams.from = fromF;
   if (toF)       baseParams.to = toF;
   if (sortF)     baseParams.sort = sortF;
@@ -417,7 +454,7 @@ export default async function CustomersPage({
     { key: "assigned", label: "Danışman", format: (v) => advisorName.get(v) ?? v },
     { key: "from", label: "Başlangıç" },
     { key: "to", label: "Bitiş" },
-    { key: "segment", label: "Sıcaklık", format: (v) => HEAT_SEGMENTS[v as HeatSegment]?.label ?? v },
+    { key: "segment", label: "Süzgeç", format: (v) => HEAT_SEGMENTS[v as HeatSegment]?.label ?? ACTION_SEGMENTS[v as ActionSegment]?.label ?? v },
     { key: "sort", label: "Sıralama", format: (v) => (v === "hot" ? "Sıcak önce" : v) },
   ]);
   const savedViewParams = Object.fromEntries(Object.entries(baseParams).filter(([k]) => k !== "yogunluk"));
@@ -556,6 +593,8 @@ export default async function CustomersPage({
               customerTypes={customerTypes}
               typeF={typeF}
               segmentF={segmentF}
+              actionSeg={actionSeg}
+              showActions={showActions}
               baseParams={baseParams}
             />
           }
@@ -566,13 +605,19 @@ export default async function CustomersPage({
             customerTypes={customerTypes}
             typeF={typeF}
             segmentF={segmentF}
+            actionSeg={actionSeg}
+            showActions={showActions}
             baseParams={baseParams}
           />
         </Suspense>
       ) : null}
 
 
-      {totalAll === 0 ? (
+      {actionSeg && totalAll > 0 ? (
+        <Suspense fallback={<SkeletonCard height={320} label="Süzgeç hesaplanıyor" />}>
+          <ActionSegmentList segment={actionSeg} tenantId={tenantId} />
+        </Suspense>
+      ) : totalAll === 0 ? (
         <EmptyState
           icon={ICONS.musteri}
           illustration="musteri"
@@ -623,7 +668,7 @@ export default async function CustomersPage({
       )}
 
       {/* Sayfalama — filtre ve sıralama parametreleri linklerde korunur */}
-      {totalFiltered > 0 ? (
+      {totalFiltered > 0 && !actionSeg ? (
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
           <p className="numeric text-text-muted">
             {rangeStart.toLocaleString("tr-TR")}–{rangeEnd.toLocaleString("tr-TR")} / Toplam{" "}

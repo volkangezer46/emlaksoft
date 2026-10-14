@@ -69,6 +69,6 @@ export async function setTwoFactorSms(
   // Migration trigger'i profil 2FA surumunu artirir. Mevcut oturum otomatik
   // dogrulanmis sayilmaz; enable sonrasi yeni SMS kodu gerekir.
   (await cookies()).delete(TWO_FACTOR_COOKIE);
-  revalidatePath("/app/ayarlar/guvenlik");
+  revalidatePath("/app/hesabim");
   return { ok: true };
 }

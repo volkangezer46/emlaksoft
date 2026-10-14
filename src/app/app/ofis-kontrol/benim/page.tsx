@@ -11,6 +11,8 @@ import { PrivacyNote } from "../_components/privacy-note";
 import { EidsMine } from "../_components/eids-mine";
 import { Suspense } from "react";
 
+export const metadata = { title: "Benim akışım · Ofis kontrolü" };
+
 const PATH = "/app/ofis-kontrol/benim";
 
 /** Danışmanın KENDİ işlem akışı: sorgu `aktor` parametresini yok sayar, her zaman oturum sahibine kilitlidir. */

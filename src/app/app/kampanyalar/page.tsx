@@ -12,6 +12,8 @@ import { DataTable, type DataTableColumn, type DataTableRow } from "@/components
 
 import { DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
+
+export const metadata = { title: "Kampanyalar" };
 /**
  * Durum/kanal → paylaşılan Badge varyantları.
  * Etiketler artık burada; ayrı STATUS_LABELS/CHANNEL_LABELS haritaları

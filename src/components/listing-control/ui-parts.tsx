@@ -76,7 +76,7 @@ export function ControlUnavailable({ compact = false }: { compact?: boolean }) {
       variant={compact ? "compact" : "panel"}
       title="İlan kontrol sistemi bu ofiste henüz etkin değil"
       description="Portal ilanları kontrol edilmeye başlandığında burada sayılar, uyarılar ve günlük özet görünür. Şu an gösterilecek gerçek veri yok; bu nedenle hiçbir sayı üretilmedi."
-      secondary={{ label: "Portal Kontrol sayfasına git", href: "/app/portallar" }}
+      secondary={{ label: "Portal Kontrol sayfasına git", href: "/app/ilan-kontrol/portallar" }}
     />
   );
 }

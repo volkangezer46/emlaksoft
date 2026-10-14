@@ -43,6 +43,8 @@ import { DocumentList } from "./document-list";
 import { ListHero, ListPage } from "@/components/ui/list-page";
 import { ButtonLink } from "@/components/ui/button";
 import { DocumentUploadPanel } from "./document-upload-panel";
+
+export const metadata = { title: "Belgeler" };
 /**
  * Belge Merkezi — ofisin dört ayrı yerde duran dosyaları tek listede.
  *

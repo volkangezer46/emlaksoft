@@ -41,7 +41,6 @@ import {
   House,
   KeySquare,
   Landmark,
-  ListFilter,
   Medal,
   MessagesSquare,
   Presentation,
@@ -56,7 +55,6 @@ import {
   Building,
   Building2,
   FileUp,
-  Fingerprint,
   NotebookPen,
   ToggleRight,
   CalendarClock,
@@ -126,8 +124,15 @@ import {
   Crown,
   type LucideIcon,
   ListPlus,
-  BadgeTurkishLira,
   Webhook,
+  Plug,
+  ListOrdered,
+  Radio,
+  PanelsTopLeft,
+  Trash2,
+  MapPinPlus,
+  Eraser,
+  Megaphone,
 } from "lucide-react";
 
 /** Sözlükteki kavram anahtarları — otomatik tamamlama ve tip güvenliği için. */
@@ -257,7 +262,6 @@ export const ICONS = {
   // --- Menü sayfaları (her biri menüde BENZERSİZ) ---------------------------
   briefing: Sunrise,
   kurulum: Rocket,
-  akilliListe: ListFilter,
   anahtarTakip: KeySquare,
   sunum: Presentation,
   onay: BadgeCheck,
@@ -278,13 +282,21 @@ export const ICONS = {
   iceAktarma: FileUp,
   /** Mahalle saha notları. */
   mahalleNotu: NotebookPen,
-  /** Ayarlar sekmeleri: roller/izin matrisi, yetkilendirme kapsamları, modül aç/kapa. */
-  roller: Fingerprint,
+  /** Ayarlar sekmeleri: modül aç/kapa, güvenlik, entegrasyonlar, seçim listeleri, kurallar, aday yakalama, vitrin. */
   moduller: ToggleRight,
+  guvenlik: LockKeyhole,
+  entegrasyon: Plug,
+  secimListesi: ListOrdered,
+  kurallar: SlidersHorizontal,
+  adayYakalama: Radio,
+  vitrin: PanelsTopLeft,
+  copKutusu: Trash2,
+  bolgeBildir: MapPinPlus,
+  gercekKullanim: Eraser,
+  /** Ofis içi duyuru yönetimi. */
+  duyuru: Megaphone,
   /** Ofis sahipliği devri (Ayarlar sekmesi + devir paneli). */
   sahiplik: Crown,
-  /** Kâr / zarar raporu (gelir − gider dengesi). */
-  karZarar: BadgeTurkishLira,
   /** Ofise özel alan tanımları. */
   ozelAlan: ListPlus,
   /** API anahtarı ve webhook olayları. */
