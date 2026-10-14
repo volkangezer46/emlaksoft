@@ -16,6 +16,8 @@ import { isRegistrationOpen } from "@/lib/platform-flags";
 import { TWO_FACTOR_COOKIE } from "@/lib/two-factor";
 import { logLoginEvent } from "@/app/giris/_lib/login-events";
 import { clientIp } from "@/lib/rate-limit";
+import { APP_IDLE_COOKIE } from "@/lib/office-security/policy";
+import { officeLoginIpAllowed } from "@/lib/office-security/enforce";
 
 /**
  * Google OAuth dönüşü (Supabase PKCE). Kod, tarayıcı çerezindeki doğrulayıcıyla oturuma çevrilir
@@ -110,8 +112,29 @@ export async function GET(request: NextRequest) {
     return fail(landing.code);
   }
 
-  // Yeni oturum: eski 2FA kanıt çerezi geçersizdir (signIn ile aynı davranış).
-  (await cookies()).delete(TWO_FACTOR_COOKIE);
+  // DG7: ofis kullanıcısında ofisin IP kısıtı giriş anında uygulanır (signIn ile aynı; destek/personel muaf).
+  if (
+    profile?.is_active &&
+    !staff &&
+    claimTenantId &&
+    profile.tenant_id === claimTenantId &&
+    !(await officeLoginIpAllowed({ tenantId: claimTenantId, role: profile.role as string | null, headers: await headers() }))
+  ) {
+    await supabase.auth.signOut();
+    await logLoginEvent({
+      userId: user.id,
+      tenantId: claimTenantId,
+      ip: await clientIp(),
+      userAgent: (await headers()).get("user-agent"),
+      result: "failed",
+    });
+    return redirectTo("/giris?reason=office_ip");
+  }
+
+  // Yeni oturum: eski 2FA kanıt ve boşta kalma çerezleri geçersizdir (signIn ile aynı davranış).
+  const jar = await cookies();
+  jar.delete(TWO_FACTOR_COOKIE);
+  jar.delete(APP_IDLE_COOKIE);
   if (landing.event) {
     await logLoginEvent({
       userId: user.id,

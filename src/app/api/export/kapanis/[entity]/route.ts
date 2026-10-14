@@ -6,6 +6,7 @@ import { closureDownloadAllowed } from "@/lib/admin/office-closure";
 import { EXPORT_ENTITIES, isFullExportEntity } from "@/lib/export-entities";
 import { EXPORT_QUERIES, openFullCsvStream } from "@/lib/export-full";
 import { daysAgoIso } from "@/lib/clock";
+import { officeRequestPolicyBlock } from "@/lib/office-security/enforce";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -35,13 +36,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ entity: 
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("tenant_id, role, is_active")
+    .select("tenant_id, role, is_active, two_factor_sms")
     .eq("id", user.id)
     .maybeSingle();
   if (!profile?.is_active || profile.role !== "owner" || !profile.tenant_id) {
     return jsonError("Bu paketi yalnız ofis sahibi indirebilir.", 403);
   }
   const tenantId = String(profile.tenant_id);
+  // DG7: proxy /api'yi kapsamaz; ofis IP kısıtı ve 2FA kurulum zorunluluğu burada da uygulanır (requirePermission ile aynı).
+  const policyBlock = await officeRequestPolicyBlock({
+    tenantId,
+    role: profile.role,
+    twoFactorOn: Boolean(profile.two_factor_sms),
+    headers: req.headers,
+  });
+  if (policyBlock) return jsonError(policyBlock, 403);
 
   const [{ data: tenant }, { data: requests }] = await Promise.all([
     supabase.from("tenants").select("status").eq("id", tenantId).maybeSingle(),

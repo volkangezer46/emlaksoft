@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
-import { checkRateLimit, clientIp } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { logActivity } from "@/lib/activity";
 import { isTenantSmsAvailable } from "@/lib/messaging/tenant-providers";
@@ -19,6 +20,7 @@ import {
   OFFICE_NEW_DEVICE_ALERT_KEY,
   OFFICE_SECURITY_KEYS,
   SESSION_MAX_HOURS_LIMIT,
+  officePolicyIp,
   parseRoleList,
 } from "@/lib/office-security/policy";
 import { writeOfficeSecurity } from "@/lib/settings/office-security-write";
@@ -76,7 +78,8 @@ export async function saveOfficeSecurityPolicy(input: {
 
   const { rules } = parseAllowlist(allowlist);
   if (rules.length > 0 && !ownerExempt && !input.confirmLockout) {
-    const ip = await clientIp();
+    // Proxy ile aynı IP kaynağı (x-real-ip → XFF): onay kararı uygulanacak IP ile aynı olmalı.
+    const ip = officePolicyIp(await headers());
     if (!ipMatches(rules, ip)) {
       return {
         code: "lockout",

@@ -120,6 +120,14 @@ export function policyNeedsProxy(p: OfficeSecurityPolicy | null | undefined): p 
   return Boolean(p && (p.mfaRoles.length > 0 || p.ipRules.length > 0 || p.idleMinutes > 0 || p.maxHours > 0));
 }
 
+/**
+ * Politika kararlarında kullanılan istemci IP'si: TEK kaynak (proxy, giriş eylemleri, sunucu kapısı ve Ayarlar ekranı
+ * aynı değeri görür). Traefik X-Real-Ip'i kendisi yazar; yoksa X-Forwarded-For'un ilk değeri.
+ */
+export function officePolicyIp(headers: Pick<Headers, "get">): string | null {
+  return headers.get("x-real-ip")?.trim() || headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;
+}
+
 /** IP izni: kural yok / acil kapatma / muaf sahip = serbest; aksi halde listede olmalı. */
 export function officeIpAllowed(
   p: Pick<OfficeSecurityPolicy, "ipRules" | "ipOwnerExempt">,

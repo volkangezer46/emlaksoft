@@ -3,7 +3,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Building2, History, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { clientIp } from "@/lib/rate-limit";
+import { headers } from "next/headers";
+import { officePolicyIp } from "@/lib/office-security/policy";
 import { loadOfficePolicyForm, loadOfficeSessions, policyIsActive } from "@/lib/office-security/read";
 import { roleLabel } from "@/lib/role-labels";
 import { OfficePolicyForm, RevokeOfficeSessionButton } from "./office-policy-form";
@@ -75,7 +76,7 @@ export default async function SecuritySettingsPage() {
     isNetgsmConfigured(),
     showPolicy && tenantId ? loadOfficePolicyForm(supabase, tenantId) : Promise.resolve(null),
     isOwner && tenantId ? loadOfficeSessions(createAdminClient(), tenantId) : Promise.resolve(null),
-    showPolicy ? clientIp() : Promise.resolve(null),
+    showPolicy ? headers().then(officePolicyIp) : Promise.resolve(null),
     isOwner ? supabase.auth.getClaims() : Promise.resolve(null),
   ]);
   const currentSessionId = typeof claims?.data?.claims?.session_id === "string" ? claims.data.claims.session_id : null;
