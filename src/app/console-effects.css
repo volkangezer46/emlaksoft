@@ -1,0 +1,81 @@
+/* Panel efektleri: yalnız /app ve /admin bileşenlerinin kullandığı el yazımı kurallar (kök globals.css'ten taşındı;
+   public sayfalar indirmez). console-base.css zincirinin İLK dosyası: eski sıralama (globals → konsol) korunur.
+   Sınıf herkese açık bir bileşende de kullanılıyorsa kural buraya DEĞİL globals.css'e yazılır
+   (src/lib/panel-css-split-contract.test.ts). */
+
+/* Hover'da yükselme — kart/satır için. Gölge ve konum birlikte değişir,
+   yalnızca renk değiştirmek "tıklanabilir" hissi vermiyor. */
+.lift-hover { transition: transform var(--motion-base) var(--ease-out-expo), box-shadow var(--motion-base) var(--ease-out); }
+.lift-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--inner-top), var(--elev-3);
+}
+
+.dot-overlay {
+  background-image: radial-gradient(rgba(10, 34, 71, 0.08) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+/* pulse ring (telefon); @keyframes pulse-ring tokens.css --animate-pulse-ring için globals.css'te kalır. */
+.pulse-ring { position: relative; }
+.pulse-ring::before,
+.pulse-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--mint-500);
+  animation: pulse-ring 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.pulse-ring::after { animation-delay: 1.2s; }
+
+@keyframes tour-fade { from { opacity: 0; } to { opacity: 1; } }
+.tour-fade { animation: tour-fade var(--motion-base) var(--ease-out) both; }
+@media (prefers-reduced-motion: reduce) { .tour-fade { animation: none; } }
+
+/* Toast giriş/çıkış — spring hissi veren easing ile */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px); }
+}
+.toast-in { animation: toast-in var(--motion-slow) var(--ease-out-expo) both; }
+.toast-out { animation: toast-out var(--motion-exit-base) var(--ease-in) both; } /* <= toast-provider EXIT_MS */
+
+/* application command center */
+.dashboard-panel {
+  box-shadow: 0 14px 42px -36px rgba(7, 26, 56, 0.58);
+  transition:
+    transform var(--motion-base) var(--ease-out-expo),
+    border-color var(--motion-base) var(--ease-out),
+    box-shadow var(--motion-base) var(--ease-out);
+}
+
+.dashboard-panel:hover {
+  transform: translateY(-2px);
+  border-color: rgba(20, 99, 255, 0.24);
+  box-shadow: 0 24px 58px -38px rgba(20, 99, 255, 0.34);
+}
+
+@keyframes pipeline-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.pipeline-fill {
+  transform-origin: left;
+  animation: pipeline-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* live call audio waveform */
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar {
+  transform-origin: center;
+  animation: wave 1s ease-in-out infinite;
+}

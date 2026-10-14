@@ -319,7 +319,7 @@
   --selection-fg: var(--text);
   --scrollbar-thumb: #c7d0e0;
   --scrollbar-thumb-hover: #aab6cc;
-  /* Tipografi ölçeği (kullanım: .type-display / .type-h1 ... globals.css) */
+  /* Tipografi ölçeği (Tailwind `text-[length:var(--fs-*)]` ya da doğrudan var() ile) */
   --fs-display: clamp(2rem, 1.6rem + 1.6vw, 2.75rem);
   --fs-h1: clamp(1.5rem, 1.3rem + 0.8vw, 1.875rem);
   --fs-h2: 1.25rem;

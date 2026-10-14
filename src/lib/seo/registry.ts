@@ -65,7 +65,7 @@ const BASE_PAGES: SeoPageDef[] = [
     group: "hesap",
     title: "Ofisinizi Ücretsiz Kurun",
     description:
-      "Ofisinizi birkaç dakikada kurun, 14 gün ücretsiz deneyin; kredi kartı gerekmez. İsterseniz örnek müşteri, portföy ve anlaşmalarla dolu başlayın, tek tuşla gerçek kullanıma geçin.",
+      "Ofisinizi birkaç dakikada kurun, 14 gün ücretsiz deneyin; kredi kartı gerekmez. Örnek verilerle başlayıp tek tuşla gerçek kullanıma geçin.",
     ogTitle: "EmlakSoft — Ofisini Ücretsiz Kur",
     ogDescription: "Kurulum sihirbazı, 14 gün ücretsiz deneme, kart gerekmez.",
     index: true,
@@ -148,7 +148,7 @@ const BASE_PAGES: SeoPageDef[] = [
     label: "KVKK başvuru formu",
     group: "yasal",
     title: "KVKK Başvuru Formu",
-    description: "KVKK m.11 kapsamındaki haklarınız için EmlakSoft'a çevrim içi başvurun: bilgi, düzeltme, silme, veri taşıma ve itiraz talepleri 30 gün içinde ücretsiz sonuçlandırılır.",
+    description: "KVKK m.11 haklarınız için çevrim içi başvurun: bilgi, düzeltme, silme, veri taşıma ve itiraz talepleri 30 gün içinde ücretsiz sonuçlandırılır.",
     index: true,
     canIndex: true,
     sitemap: LEGAL,

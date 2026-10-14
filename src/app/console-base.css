@@ -1,4 +1,5 @@
 /* Yalnız /app ve /admin layout'larından yüklenir (public sayfa CSS bütçesi; kök globals.css'ten ayrıldı). */
+@import "./console-effects.css";
 @import "./theme-dark.css";
 @import "./themes.css";
 @import "./premium.css";

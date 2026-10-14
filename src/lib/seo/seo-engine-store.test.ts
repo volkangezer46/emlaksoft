@@ -208,6 +208,10 @@ describe("seoCollector read dönüşümü ve eylem kapsamı", () => {
     notes: [],
   };
   it("/kayit 178 karakter bulgusu long-description önerisiyle gelir ama manualOnly ve eylemsiz", async () => {
+    // Kayıt defteri açıklaması YD8'de 155'in altına indi; bulgu, yönetimden girilmiş uzun bir açıklamayla canlandırılır.
+    const KAYIT_178 =
+      "Ofisinizi birkaç dakikada kurun, 14 gün ücretsiz deneyin; kredi kartı gerekmez. İsterseniz örnek müşteri, portföy ve anlaşmalarla dolu başlayın, tek tuşla gerçek kullanıma geçin.";
+    mem.set(SEO_KEYS.pages, JSON.stringify({ "/kayit": { description: KAYIT_178 } }));
     const settings = await readSeoSettingsFresh();
     const res = auditRunToIssues(run, settings);
     expect(res.scanned).toEqual([`${ORIGIN}/kayit`, `${ORIGIN}/fiyatlar`]);
