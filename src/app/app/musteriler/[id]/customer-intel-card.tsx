@@ -90,7 +90,7 @@ export async function CustomerIntelCard({
           ))}
       </ul>
       <p className="mt-2 text-xs text-text-faint">
-        Sıcaklık, bu kalemlerin toplamıdır (0-100).{intel.heatApproximate ? " Portal beğenisi/acil talep verisi okunamadı; ısı alt sınırdır." : ""}
+        Sıcaklık, bu kalemlerin toplamıdır (0-100).{intel.heatApproximate ? " Portal beğenisi/acil talep verisi okunamadı; sıcaklık alt sınırdır." : ""}
       </p>
 
       <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-line pt-3 text-xs">

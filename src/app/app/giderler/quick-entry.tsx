@@ -187,7 +187,7 @@ export function QuickEntryButtons({
 
   return (
     <>
-      <Button variant="primary" icon={Plus} onClick={() => open({})} onPointerEnter={warmDialog} onFocus={warmDialog} >
+      <Button variant="primary" icon={Plus} onClick={() => open({})} onPointerEnter={warmDialog} onFocus={warmDialog}>
         Yeni kayıt
       </Button>
       <span className="hidden items-center gap-1 sm:inline-flex">

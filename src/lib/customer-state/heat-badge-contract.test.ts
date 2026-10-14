@@ -62,6 +62,9 @@ describe("müşteri sıcaklığı: tek etiket, tek sayı", () => {
     const card = read("src/app/app/musteriler/[id]/customer-intel-card.tsx");
     expect(card).toMatch(/heatBadge\(intel\.heat\)/);
     expect(card).not.toMatch(/\/100<|score\}\/100/);
+    // Tek dil: kartın kullanıcı metninde "ısı" geçmez (başlık "Müşteri sıcaklığı"); yorumlar hariç.
+    const cardCode = card.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(cardCode).not.toMatch(/(^|[^\p{L}])ısı([^\p{L}]|$)/u);
 
     const data = read("src/app/app/musteriler/data.ts");
     expect(data).toMatch(/label: heatBadge\(heat\)\.text/);
