@@ -69,6 +69,8 @@ import { daysAgoIso, msSince, now } from "@/lib/clock";
 import { generateListingText } from "@/lib/listing-text";
 import { CopyListingText } from "@/components/app/copy-listing-text";
 import { WhatsAppLink } from "@/components/app/whatsapp-link";
+import { WaTemplateMenu } from "@/components/app/wa-template-menu";
+import { COMMERCIAL_UNKNOWN_RECIPIENT_NOTE } from "@/lib/whatsapp-share";
 import { MoreActions } from "@/components/app/more-actions";
 import { fetchLatestRates, fxAgeLabel, fxApproxLine } from "@/lib/fx";
 import {
@@ -249,7 +251,8 @@ export default async function PropertyDetailPage({
     // Vitrin görüntülenme sayacı — RLS tenant'a kısıtlar; gün bazlı satırlar toplanır
     supabase.from("listing_views").select("count, day").eq("property_id", id),
     // Vitrin public URL'i için tenant slug'ı
-    supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle(),
+    // Ad/telefon: WhatsApp taslağının {ofis}/{telefon} değişkenleri (aynı satır, ek sorgu yok).
+    supabase.from("tenants").select("slug, name, phone").eq("id", tenantId).maybeSingle(),
     // API yayın adaptörü tanımlı + anahtarı girili portallar (kaldır/güncelle için)
     getConfiguredPortals(),
     // Satış teşhisi için fotoğraf/medya sayısı
@@ -305,6 +308,18 @@ export default async function PropertyDetailPage({
   const province = relName(property.province as Rel);
   const district = relName(property.district as Rel);
   const assignee = assigneeProfile?.full_name ?? null;
+  // Tek dokunuşla WhatsApp taslağı: ofis şablonu portföy değişkenleriyle dolar, alıcıyı danışman WhatsApp'ta seçer.
+  const officeInfo = tenantRow as { name?: string | null; phone?: string | null } | null;
+  const waVars = {
+    portfoy: property.title ?? "",
+    portfoy_kodu: property.property_code ?? "",
+    fiyat: property.list_price != null ? formatPrice(Number(property.list_price), property.transaction_type) : "",
+    adres: [district, province].filter(Boolean).join(" / "),
+    danisman: assignee ?? "",
+    ofis: officeInfo?.name ?? "",
+    telefon: officeInfo?.phone ?? "",
+    link: vitrinHref ? `${getBaseUrl()}${vitrinHref}` : "",
+  };
   const listingText = generateListingText({
     title: property.title,
     transaction_type: property.transaction_type,
@@ -460,6 +475,8 @@ export default async function PropertyDetailPage({
               <Link href={`/app/randevular?property=${property.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Randevular
               </Link>
+              {/* Şablonlu WhatsApp taslağı — portföy değişkenleri dolu; tanıtım iletisi ticari sayılır (İYS notu). */}
+              <WaTemplateMenu share phone={null} vars={waVars} label="WhatsApp taslağı" note={COMMERCIAL_UNKNOWN_RECIPIENT_NOTE} />
               <MoreActions>
               {canEdit ? (
                 <EditPropertyDialog
