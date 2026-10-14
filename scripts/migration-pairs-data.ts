@@ -391,6 +391,8 @@ const F = {
   efCreditLots: "20261010000300_ef_credit_lots_expiry.sql",
   // EP3 (2026-10-13): Bakanlik (EIDS) e-postalari: ofise ozel alma adresi + islenmis e-posta kayitlari (yalniz service_role yazar).
   eidsInbound: "20261013007200_eids_inbound.sql",
+  // DG4 (2026-10-14): rapor merkezi kayitli gorunumleri + zamanlanmis rapor abonelikleri + teslim gunlugu (ofis RLS, platform yalniz service_role).
+  reportSubscriptions: "20261014004000_report_subscriptions.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -632,6 +634,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.webhooksApiKeys]: "ek", // yeni api_keys/webhook_endpoints/webhook_deliveries + RLS (ayarlar:edit) + 3 DEFINER RPC (api_v1_list anon'a acik, yalniz anahtar ozetiyle okur)
     [F.customFields]: "ek", // yeni custom_field_defs/values + RLS (okuma ust kayit gorunurlugu, yazma modul edit) + 2 INVOKER yardimci fonksiyon
     [F.dealGosFields]: "ek", // deals'a 2 nullable kolon (gos_reference_no + CHECK, title_deed_appointment_at) + kismi indeks; politika degismez
+    [F.reportSubscriptions]: "ek", // 3 yeni tablo (report_saved_views, report_subscriptions, report_subscription_runs; ofis satirlari tenant+sahip RLS, platform satirlari yalniz service_role) + abonelik tavan/zaman tetikleyicisi ve alici cikis RPC (report_subscription_leave); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.purgeSampleRpc]: "ek", // yeni SECURITY DEFINER RPC purge_tenant_sample_data (owner/gm veya service_role; yalniz is_sample=true + tenant_id satirlari) + tenants'a 3 nullable sihirbaz sutunu; kod RPC/sutun yokken eski yola duser
   },
 
@@ -822,6 +825,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "DG2-plan-katalog", order: 112, title: "Plan katalog motoru: billing_plans + plan CHECK -> FK + eklenen paket fiyati + 4 fonksiyonda plan dogrulamasi billing_plan_known (20261007001000/001010 ve 20261008001000 SONRASI; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod plan_catalog_engine_ready() yokken 'yeni paket' eklemez; davranis)", files: [F.planCatalogEngine] },
     { id: "DG5-kanal-roi-durum-sayfasi", order: 115, title: "Kanal ROI ve durum sayfasi: marketing_spend + status_incidents/status_incident_updates + release_history (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken harcama yalniz Google Ads, /durum olay bolumu bos, deploy.sh satir yazmaz; sira serbest, ek)", files: [F.channelRoiStatusPage] },
     { id: "DG7-ofis-guvenlik", order: 117, title: "Ofis guvenlik politikalari: ofis sahibinin aktif oturum listesi ve tekil kapatma RPC'leri (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod RPC yokken oturum listesi 'kurulum bekliyor', politika ayarlari RPC'siz calisir; sira serbest, ek)", files: [F.officeSecuritySessions] },
+    { id: "DG4-rapor-abonelik", order: 114, title: "Rapor merkezi kayitli gorunum + zamanlanmis rapor aboneligi + teslim gunlugu (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken 'kurulum bekliyor', gunluk-ozet adimi 'skipped'; sira serbest, ek)", files: [F.reportSubscriptions] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
     { id: "AD12-yasal-yardim-icerik", order: 82, title: "Koda dokunmadan icerik: surumlu yasal belgeler, yeniden onay kayitlari, tarihli mevzuat sabitleri, yardim makaleleri ve oylar (bagimsiz yeni tablolar; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablolar yokken koddaki icerik; sira serbest, ek)", files: [F.legalHelpContent] },
     { id: "FN3-elle-mutabakat", order: 102, title: "Muhasebe > Hareketler: toplu Mutabik isaretle / Mutabakati kaldir RPC'si (20261011001200 sonrasi; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod RPC yokken 'kurulum bekliyor' der; sira serbest, ek)", files: [F.financeEntriesManualReconcile] },

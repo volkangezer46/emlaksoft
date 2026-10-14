@@ -107,13 +107,29 @@ export async function emailChannelStatus(): Promise<EmailChannelStatus> {
 
 export type EmailSendResult = { ok: true; id: string | null } | { ok: false; code: "disabled" | "invalid" | "provider_error"; error: string };
 
-export async function sendEmail(input: { to: string; subject: string; text: string; html?: string }): Promise<EmailSendResult> {
+/** E-posta eki (DG4 zamanlanmış rapor). İçerik ham bayt; Resend'e base64 gider. */
+export type EmailAttachment = { filename: string; content: Uint8Array };
+
+/** Tek iletideki eklerin toplam bayt tavanı (Resend 40 MB kabul eder; bellek ve teslim için bilinçli düşük). */
+export const EMAIL_ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
+
+export async function sendEmail(input: {
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+  attachments?: readonly EmailAttachment[];
+}): Promise<EmailSendResult> {
   const cfg = await resolveEmailChannelConfig();
   if (!cfg.enabled || !cfg.apiKey) return { ok: false, code: "disabled", error: cfg.reason ?? "E-posta kanalı kapalı" };
   const to = input.to.trim();
   if (!EMAIL_RE.test(to) || to.length > 254) return { ok: false, code: "invalid", error: "Geçersiz alıcı" };
   const subject = input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200);
   if (!subject || !input.text.trim()) return { ok: false, code: "invalid", error: "Konu/gövde boş" };
+  const attachments = input.attachments ?? [];
+  if (attachments.reduce((sum, a) => sum + a.content.byteLength, 0) > EMAIL_ATTACHMENT_MAX_BYTES) {
+    return { ok: false, code: "invalid", error: "Ek dosya çok büyük" };
+  }
   try {
     const res = await fetchExternal(
       "https://api.resend.com/emails",
@@ -127,9 +143,12 @@ export async function sendEmail(input: { to: string; subject: string; text: stri
           text: input.text.slice(0, 20_000),
           ...(input.html ? { html: input.html.slice(0, 100_000) } : {}),
           ...(cfg.replyTo ? { reply_to: cfg.replyTo } : {}),
+          ...(attachments.length
+            ? { attachments: attachments.map((a) => ({ filename: a.filename.replace(/[\r\n"]/g, "").slice(0, 120), content: Buffer.from(a.content).toString("base64") })) }
+            : {}),
         }),
       },
-      { timeoutMs: 8_000 },
+      { timeoutMs: attachments.length ? 20_000 : 8_000 },
     );
     let id: string | null = null;
     if (res.ok) {

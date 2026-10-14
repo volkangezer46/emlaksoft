@@ -8,12 +8,18 @@ import { runControlReportDelivery } from "@/lib/listing-control/server/report-de
 import { getDisabledModulesByTenant, isDisabledFor, tenantsDisabledFor } from "@/lib/modules/state";
 import { runLeagueDailyForTenant } from "@/lib/league/daily";
 import { runLicenseSetupTasks } from "@/lib/eids/license-setup";
+import { deliverDueReportSubscriptions } from "@/lib/report-center/delivery-run";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
 /** Uzun süren toplu işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
+/**
+ * DG4 rapor abonelikleri adımı cron'un sonundadır; ofis/lig döngüleri bütçeyi bitirse de teslim aç kalmasın diye son
+ * 60 sn yalnız ona ayrılır (ofis döngüleri `loopDeadline`'da durur, abonelik adımı tam `deadline`'a kadar çalışır).
+ */
+const REPORT_SUBS_RESERVE_MS = 60_000;
 
 async function run(req: NextRequest) {
   const denied = authorizeCron(req);
@@ -28,6 +34,7 @@ async function run(req: NextRequest) {
 
   const startedAt = Date.now();
   const deadline = cronDeadline(startedAt);
+  const loopDeadline = deadline - REPORT_SUBS_RESERVE_MS;
   // order(id) + range sayfalama (sırasız .limit(500) yok): 500+ ofis sessizce atlanmaz.
   const { rows: tenants, error: tenantsError } = await fetchAllPaged<{ id: string; name: string }>((from, to) =>
     admin
@@ -45,7 +52,7 @@ async function run(req: NextRequest) {
   let timedOut = false;
 
   for (const t of tenants) {
-    if (isPastDeadline(Date.now(), deadline)) {
+    if (isPastDeadline(Date.now(), loopDeadline)) {
       timedOut = true;
       break;
     }
@@ -130,7 +137,7 @@ async function run(req: NextRequest) {
   try {
     const leagueDisabled = await getDisabledModulesByTenant(admin);
     for (const t of tenants) {
-      if (isPastDeadline(Date.now(), deadline)) break;
+      if (isPastDeadline(Date.now(), loopDeadline)) break;
       if (isDisabledFor(leagueDisabled, t.id, "team_perf")) continue;
       const r = await runLeagueDailyForTenant(admin, t.id, Date.now());
       leagueFinished += r.finishedChallenges;
@@ -154,17 +161,40 @@ async function run(req: NextRequest) {
     failed += 1;
   }
 
+  // DG4: zamanlanmış rapor abonelikleri (ofis + admin; günlük/haftalık/aylık e-posta eki). Ayrık adım: tablo yoksa
+  // atlanır, hata özet işini bozmaz; kanal kapalıysa AD7 günlüğüne "kanal kapalı" düşer.
+  let reportSubs = 0;
+  let reportSubsChannelOff = 0;
+  let reportSubsSkippedRecipients = 0;
+  let reportSubsRemaining = 0;
+  try {
+    const r = await deliverDueReportSubscriptions(admin, Date.now(), {
+      disabledModules: await getDisabledModulesByTenant(admin),
+      shouldStop: () => isPastDeadline(Date.now(), deadline),
+    });
+    reportSubs = r.sent;
+    reportSubsChannelOff = r.channelDisabled;
+    reportSubsSkippedRecipients = r.skippedRecipients;
+    reportSubsRemaining = r.remaining;
+    // Yalnız gerçek gönderim/üretim hatası; yetkisiz/onaylı/adressiz alıcı atlaması hata sayılmaz.
+    failed += r.failed;
+  } catch (e) {
+    console.error("gunluk-ozet rapor abonelikleri", e);
+    failed += 1;
+  }
+
   const hb = heartbeatFor({
     total: tenants.length,
     processed,
     failed,
-    timedOut,
+    // Ertesi tura kalan zamanı gelmiş abonelik de "iş kaldı" demektir (heartbeat 'error' + detayda sayı).
+    timedOut: timedOut || reportSubsRemaining > 0,
     listError: tenantsError,
-    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi (${licenseTasksClosed} kapandı)`,
+    summary: `${sent} özet gönderildi, ${controlReports} ilan kontrol raporu, ${leagueFinished} meydan okuma, ${leagueBadges} rozet, ${licenseTasks} yetki belgesi görevi (${licenseTasksClosed} kapandı), ${reportSubs} rapor aboneliği (${reportSubsChannelOff} kanal kapalı, ${reportSubsSkippedRecipients} alıcı atlandı${reportSubsRemaining > 0 ? `, ${reportSubsRemaining} abonelik ertesi tura kaldı` : ""})`,
   });
   await recordHeartbeat("gunluk-ozet", hb.status, hb.detail);
 
-  return NextResponse.json({ ok: hb.status === "ok", sent, skippedPrefs, failed, remaining: remainingOf({ total: tenants.length, processed }) });
+  return NextResponse.json({ ok: hb.status === "ok", sent, skippedPrefs, failed, remaining: remainingOf({ total: tenants.length, processed }), reportSubscriptionsRemaining: reportSubsRemaining });
 }
 
 export const GET = guardCron("gunluk-ozet", run);
