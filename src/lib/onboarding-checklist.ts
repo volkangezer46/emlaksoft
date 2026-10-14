@@ -15,6 +15,7 @@ import {
   isOnboardingStepId,
   isWizardStepKey,
   type OnboardingFacts,
+  type OnboardingStepDef,
   type OnboardingStepId,
   type Permission,
   type WizardStepKey,
@@ -49,14 +50,22 @@ export type OnboardingState = {
   complete: boolean;
 };
 
-export function buildOnboarding(facts: OnboardingFacts, skipped: readonly OnboardingStepId[] = []): OnboardingState {
-  const steps: OnboardingStep[] = ONBOARDING_STEP_DEFS.map((d) => ({
-    id: d.id,
+/**
+ * `defs`: adminden düzenlenmiş (sıra/metin/açık-kapalı/hedefleme uygulanmış) adım listesi (`resolveChecklistDefs`,
+ * `onboarding-content.ts`); verilmezse koddaki kayıt aynen kullanılır.
+ */
+export function buildOnboarding(
+  facts: OnboardingFacts,
+  skipped: readonly OnboardingStepId[] = [],
+  defs: readonly OnboardingStepDef[] = ONBOARDING_STEP_DEFS,
+): OnboardingState {
+  const steps: OnboardingStep[] = defs.map((d) => ({
+    id: d.id as OnboardingStepId,
     short: d.short,
     title: d.title,
     description: d.description,
-    ...("href" in d && typeof d.href === "string" ? { href: d.href } : {}),
-    ...("requires" in d && d.requires ? { requires: d.requires } : {}),
+    ...(typeof d.href === "string" ? { href: d.href } : {}),
+    ...(d.requires ? { requires: d.requires } : {}),
     done: d.isDone(facts),
   }));
   return summarize(steps, skipped);
@@ -97,15 +106,19 @@ export function scopeOnboardingToPermissions(
   );
 }
 
-/** Sihirbazda gösterilecek adım: geçerli istek yoksa sıradaki; hepsi bitmişse özet. */
+/** Sihirbazda gösterilecek adım: geçerli istek yoksa sıradaki; hepsi bitmişse özet. Kapatılmış/hedef dışı adım istenemez. */
 export function resolveWizardStep(requested: string | undefined, state: OnboardingState): WizardStepKey {
-  if (isWizardStepKey(requested)) return requested;
+  if (requested === FINISH_STEP) return FINISH_STEP;
+  if (isWizardStepKey(requested) && state.steps.some((s) => s.id === requested)) return requested;
   return state.nextId ?? FINISH_STEP;
 }
 
-/** Geri/ileri komşuları (özet adımı dahil). */
-export function wizardNeighbors(current: WizardStepKey): { prev: WizardStepKey | null; next: WizardStepKey | null } {
-  const order: WizardStepKey[] = [...ONBOARDING_STEP_IDS, FINISH_STEP];
+/** Geri/ileri komşuları (özet adımı dahil). `order`: durumdaki adım sırası (adminden düzenlenmiş olabilir). */
+export function wizardNeighbors(
+  current: WizardStepKey,
+  stepOrder: readonly OnboardingStepId[] = ONBOARDING_STEP_IDS,
+): { prev: WizardStepKey | null; next: WizardStepKey | null } {
+  const order: WizardStepKey[] = [...stepOrder, FINISH_STEP];
   const i = order.indexOf(current);
   return { prev: i > 0 ? order[i - 1] : null, next: i >= 0 && i < order.length - 1 ? order[i + 1] : null };
 }

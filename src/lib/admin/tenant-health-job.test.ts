@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/settings/read", () => ({ getSettings: async () => ({}) }));
+vi.mock("@/lib/settings/read", () => ({ getSettings: async () => ({}), getSetting: async () => "" }));
 
 import { runPlatformTaskReminders, runTenantHealthDaily } from "./tenant-health-job";
 import { getPlan } from "@/lib/billing/plans";
@@ -8,7 +8,7 @@ import { getPlan } from "@/lib/billing/plans";
 type Call = { table: string; op: string; payload?: unknown; filters: string[] };
 
 /** Zincirlenebilir sahte PostgREST istemcisi: tablo başına yanıt + yapılan yazmaların kaydı. */
-function fakeAdmin(opts: { dailyCount?: number; tenantCount?: number; inputs?: unknown[]; tasks?: unknown[]; missing?: boolean }) {
+function fakeAdmin(opts: { dailyCount?: number; tenantCount?: number; inputs?: unknown[]; tasks?: unknown[]; missing?: boolean; setup?: unknown[] }) {
   const calls: Call[] = [];
   const from = (table: string) => {
     const call: Call = { table, op: "select", filters: [] };
@@ -38,7 +38,12 @@ function fakeAdmin(opts: { dailyCount?: number; tenantCount?: number; inputs?: u
     chain.then = (res: (v: unknown) => unknown) => Promise.resolve(result()).then(res);
     return chain;
   };
-  const rpc = vi.fn(async () => (opts.missing ? { data: null, error: { code: "PGRST202", message: "not found" } } : { data: opts.inputs ?? [], error: null }));
+  const missingFn = { data: null, error: { code: "PGRST202", message: "not found" } };
+  const rpc = vi.fn(async (name: string) => {
+    // Kurulum olguları (SN5) ayrı fonksiyon: verilmezse "fonksiyon yok" (skor kurulum girdisiz).
+    if (name === "platform_tenant_onboarding_facts") return opts.setup && !opts.missing ? { data: opts.setup, error: null } : missingFn;
+    return opts.missing ? missingFn : { data: opts.inputs ?? [], error: null };
+  });
   return { client: { from, rpc } as never, calls, rpc };
 }
 
@@ -107,6 +112,51 @@ describe("günlük sağlık skoru işi", () => {
     await runTenantHealthDaily(g.client, NOW + 86_400_000, { weights: { usage: 100, payment: 0, support: 0 } });
     const next = g.calls.find((c) => c.table === "tenant_health_daily" && c.op === "upsert")!.payload as { score: number }[];
     expect(next[0]!.score).toBe(0);
+  });
+
+  it("kurulum ilerlemesi biliniyorsa kullanım bileşenine girer; bilinmiyorsa skor eski formülle", async () => {
+    const facts = (id: string, done: boolean) => ({
+      tenant_id: id,
+      tenant_name: id,
+      status: "active",
+      plan: "office",
+      created_at: "2026-10-01T00:00:00Z",
+      province_id: done ? "p" : null,
+      district_id: done ? "d" : null,
+      address_line: done ? "Atatürk Cad. No: 10 Merkez" : null,
+      license_no: done ? "1234567" : null,
+      owner_you_done: done,
+      members: done ? 3 : 1,
+      pool_enabled: done,
+      pool_advisor_records: done ? 2 : 0,
+      published_properties: 0,
+      active_integrations: 0,
+      sub_status: done ? "active" : "trialing",
+      office_finance: done ? 1 : 0,
+      office_recurring: 0,
+      rentals_answered: done,
+      portal_declared: done ? 1 : 0,
+      eids_received: done,
+    });
+    const f = fakeAdmin({ inputs: [row("a"), row("b")], setup: [facts("a", true), facts("b", false)] });
+    await runTenantHealthDaily(f.client, NOW, { weights: { usage: 100, payment: 0, support: 0 } });
+    const daily = f.calls.find((c) => c.table === "tenant_health_daily" && c.op === "upsert")!.payload as {
+      tenant_id: string;
+      score: number;
+      inputs: { setupPercent: number | null; reasons: string[] };
+    }[];
+    const a = daily.find((d) => d.tenant_id === "a")!;
+    const b = daily.find((d) => d.tenant_id === "b")!;
+    expect(a.inputs.setupPercent).toBe(100);
+    expect(a.score).toBe(15); // kullanım: %85 x 0 + %15 x 1
+    expect(b.inputs.setupPercent).toBe(0);
+    expect(b.score).toBe(0);
+
+    const g = fakeAdmin({ inputs: [row("a")] });
+    await runTenantHealthDaily(g.client, NOW, { weights: { usage: 100, payment: 0, support: 0 } });
+    const plain = g.calls.find((c) => c.table === "tenant_health_daily" && c.op === "upsert")!.payload as { score: number; inputs: { setupPercent: number | null } }[];
+    expect(plain[0]!.inputs.setupPercent).toBeNull();
+    expect(plain[0]!.score).toBe(0);
   });
 
   it("tablo/fonksiyon yoksa sessizce atlar", async () => {

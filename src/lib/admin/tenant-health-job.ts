@@ -6,6 +6,8 @@ import { getSettings } from "@/lib/settings/read";
 import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
 import { HEALTH_WINDOW_DAYS, computeHealth, normalizeWeights, type HealthWeights } from "./health-score";
 import { isCrmMissing } from "./platform-crm";
+import { buildOfficeProgress, loadOnboardingFactsRows } from "./onboarding-progress";
+import { loadOnboardingContent } from "@/lib/onboarding-content-read";
 
 /**
  * OFİS CRM zamanlanmış adımları — `gorev-hatirlat` cron'unun (2 saatte bir) AYRIK adımları (yeni cron yok).
@@ -63,6 +65,19 @@ async function readCatalogIfNeeded(rows: readonly InputRow[]): Promise<PlanDef[]
   }
 }
 
+/**
+ * Ofis başına kurulum yüzdesi (SN5): olgu fonksiyonu yoksa ya da okunamazsa BOŞ harita → skor kurulum girdisiz (eski formül).
+ * Adminden düzenlenen adım listesi (açık/kapalı, paket hedefi) ofisin kendi sihirbazıyla aynı yüzdeyi verir.
+ */
+async function readSetupPercents(admin: SupabaseClient): Promise<Map<string, number>> {
+  try {
+    const [{ rows }, content] = await Promise.all([loadOnboardingFactsRows(admin), loadOnboardingContent()]);
+    return new Map(rows.map((r) => [r.tenant_id, buildOfficeProgress(r, content).percent]));
+  } catch {
+    return new Map();
+  }
+}
+
 export async function runTenantHealthDaily(
   admin: SupabaseClient,
   nowMs: number,
@@ -87,7 +102,7 @@ export async function runTenantHealthDaily(
 
   const weights = opts.weights ?? (await readWeights());
   const rows = (data ?? []) as InputRow[];
-  const catalog = opts.catalog ?? (await readCatalogIfNeeded(rows));
+  const [catalog, setup] = await Promise.all([opts.catalog ?? readCatalogIfNeeded(rows), readSetupPercents(admin)]);
   const computedAt = new Date(nowMs).toISOString();
   const daily: Record<string, unknown>[] = [];
   const latest: Record<string, unknown>[] = [];
@@ -107,6 +122,7 @@ export async function runTenantHealthDaily(
       csatN: Number(r.csat_n) || 0,
       overdueInvoices: Number(r.overdue_invoices) || 0,
       maxOverdueDays: Number(r.max_overdue_days) || 0,
+      setupPercent: setup.get(r.tenant_id) ?? null,
     };
     const h = computeHealth(inputs, weights);
     daily.push({

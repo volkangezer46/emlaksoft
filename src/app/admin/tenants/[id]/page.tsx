@@ -81,6 +81,8 @@ import { HEALTH_DEFAULT_RISK_THRESHOLD } from "@/lib/admin/health-score";
 import { officeAdminCan } from "@/lib/admin/office-admin-access";
 import { CRM_SETTING_KEYS } from "@/lib/settings/registry/crm";
 import { getSetting } from "@/lib/settings/read";
+import { loadOfficeProgress } from "@/lib/admin/onboarding-progress";
+import { OfficeProgressCard } from "../kurulum/office-progress";
 
 const tenantStatusLabel: Record<string, string> = {
   trial: "Deneme",
@@ -392,13 +394,17 @@ export default async function AdminTenantDetailPage({
   } else if (active === "kullanim") {
     // Kullanım analitiği: tek toplu sorgu, bellekte gruplanır (5000 üstü kesilir — uyarı gösterilir)
     const USAGE_LIMIT = 5000;
-    const { data: usageLogs } = await admin
-      .from("audit_logs")
-      .select("action, actor_id, created_at")
-      .eq("tenant_id", id)
-      .gte("created_at", daysAgoIso(30))
-      .order("created_at", { ascending: false })
-      .limit(USAGE_LIMIT);
+    // Kurulum ilerlemesi (SN5) kullanım okumasıyla aynı turda.
+    const [{ data: usageLogs }, onboarding] = await Promise.all([
+      admin
+        .from("audit_logs")
+        .select("action, actor_id, created_at")
+        .eq("tenant_id", id)
+        .gte("created_at", daysAgoIso(30))
+        .order("created_at", { ascending: false })
+        .limit(USAGE_LIMIT),
+      loadOfficeProgress(id).catch(() => ({ ready: true, rows: [], error: "okunamadı" })),
+    ]);
     const usageRows = usageLogs ?? [];
     const usageTruncated = usageRows.length >= USAGE_LIMIT;
     const totalOps = usageRows.length;
@@ -421,6 +427,7 @@ export default async function AdminTenantDetailPage({
     content = (
       <div className="space-y-4">
         <LimitsPanel rows={limitRows} planName={plan.name} />
+        <OfficeProgressCard progress={onboarding.rows.find((r) => r.tenantId === id) ?? null} ready={onboarding.ready} />
         <section className="dashboard-panel rounded-[var(--radius-panel)] border border-line bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3.5">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">

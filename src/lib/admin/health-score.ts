@@ -4,7 +4,9 @@
  *
  * Bileşenler (her biri 0..1, sonra ağırlıklı ortalama):
  *  - KULLANIM: giriş sıklığı (30 günde girişli gün / 12), koltuk doluluğu (aktif kullanıcı / koltuk tavanı),
- *    modül benimseme (30 günde işlem yapılan iş alanı / 6). Pay: 0.4 / 0.3 / 0.3.
+ *    modül benimseme (30 günde işlem yapılan iş alanı / 6). Pay: 0.4 / 0.3 / 0.3. KURULUM İLERLEMESİ (SN5; ofis düzeyi
+ *    sihirbaz yüzdesi, `onboarding-progress.ts`) biliniyorsa kullanımın %15'i olur (kalan %85 yukarıdaki üçlü); bilinmiyorsa
+ *    (fonksiyon yok / okunamadı) girdi yok sayılır, skor eski formülle hesaplanır.
  *  - ÖDEME: askıda = 0; gecikmiş (ofis ya da abonelik) = 0.3; vadesi geçmiş açık fatura: ≤7 gün 0.7, ≤30 gün 0.4, üstü 0.1.
  *  - DESTEK: açık talep 0 → 1, 1 → 0.8, 2-3 → 0.6, 4+ → 0.3; CSAT varsa (ortalama-1)/4 ile 0.6/0.4 karışım.
  * Ağırlıklar ayar defterinden (`crm.health_weight_*`, varsayılan kullanım %50, ödeme %30, destek %20); toplam 0 ise varsayılan.
@@ -36,6 +38,8 @@ export type HealthInputs = {
   csatN: number;
   overdueInvoices: number;
   maxOverdueDays: number;
+  /** Kurulum sihirbazı ilerlemesi (0-100); null/yok = bilinmiyor (bileşene girmez). */
+  setupPercent?: number | null;
 };
 
 export type HealthResult = {
@@ -60,11 +64,20 @@ export function normalizeWeights(raw: Partial<Record<keyof HealthWeights, unknow
   return w.usage + w.payment + w.support > 0 ? w : { ...HEALTH_DEFAULT_WEIGHTS };
 }
 
-export function usageComponent(i: Pick<HealthInputs, "loginDays" | "activeUsers" | "seatLimit" | "moduleAreas">): number {
+/** Kurulum ilerlemesinin kullanım bileşenindeki payı (yalnız girdi biliniyorsa). */
+export const HEALTH_SETUP_SHARE = 0.15;
+
+const setupOf = (i: Pick<HealthInputs, "setupPercent">): number | null =>
+  typeof i.setupPercent === "number" && Number.isFinite(i.setupPercent) ? i.setupPercent : null;
+
+export function usageComponent(i: Pick<HealthInputs, "loginDays" | "activeUsers" | "seatLimit" | "moduleAreas" | "setupPercent">): number {
   const login = clamp01(i.loginDays / HEALTH_LOGIN_DAYS_TARGET);
   const seat = i.seatLimit && i.seatLimit > 0 ? clamp01(i.activeUsers / i.seatLimit) : i.activeUsers > 0 ? 1 : 0;
   const adoption = clamp01(i.moduleAreas / HEALTH_MODULE_TARGET);
-  return 0.4 * login + 0.3 * seat + 0.3 * adoption;
+  const base = 0.4 * login + 0.3 * seat + 0.3 * adoption;
+  const setup = setupOf(i);
+  if (setup === null) return base;
+  return (1 - HEALTH_SETUP_SHARE) * base + HEALTH_SETUP_SHARE * clamp01(setup / 100);
 }
 
 export function paymentComponent(i: Pick<HealthInputs, "status" | "subStatus" | "overdueInvoices" | "maxOverdueDays">): number {
@@ -97,6 +110,10 @@ export function computeHealth(i: HealthInputs, weights: HealthWeights = HEALTH_D
   if (i.loginDays < HEALTH_LOGIN_DAYS_TARGET / 2) reasons.push({ text: i.loginDays === 0 ? "30 gündür giriş yok" : `30 günde yalnız ${i.loginDays} gün giriş`, loss: w.usage * 0.4 });
   if (i.seatLimit && i.activeUsers / i.seatLimit < 0.5) reasons.push({ text: `Koltuk doluluğu düşük (${i.activeUsers}/${i.seatLimit})`, loss: w.usage * 0.3 * 0.5 });
   if (i.moduleAreas < HEALTH_MODULE_TARGET / 2) reasons.push({ text: `Az modül kullanılıyor (${i.moduleAreas})`, loss: w.usage * 0.3 * 0.6 });
+  const setup = setupOf(i);
+  if (setup !== null && setup < 50) {
+    reasons.push({ text: `Kurulum yarım (%${Math.round(setup)})`, loss: w.usage * HEALTH_SETUP_SHARE * (1 - clamp01(setup / 100)) });
+  }
   if (i.status === "suspended") reasons.push({ text: "Ofis askıda", loss: w.payment });
   else if (i.status === "past_due" || i.subStatus === "past_due") reasons.push({ text: "Ödeme gecikmiş", loss: w.payment * 0.7 });
   if (i.overdueInvoices > 0) reasons.push({ text: `${i.overdueInvoices} vadesi geçmiş fatura (${i.maxOverdueDays} gün)`, loss: w.payment * 0.5 });

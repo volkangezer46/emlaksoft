@@ -52,6 +52,16 @@ describe("ofis sağlık skoru (saf)", () => {
     expect(supportComponent({ openTickets: 0, csatAvg: 1, csatN: 3 })).toBeCloseTo(0.6);
   });
 
+  it("kurulum ilerlemesi (SN5) biliniyorsa kullanımın %15'i; bilinmiyorsa formül değişmez", () => {
+    expect(usageComponent({ ...healthy, setupPercent: null })).toBe(usageComponent(healthy));
+    expect(usageComponent({ ...healthy, setupPercent: 100 })).toBeCloseTo(usageComponent(healthy));
+    expect(usageComponent({ ...healthy, setupPercent: 0 })).toBeCloseTo(0.85 * usageComponent(healthy));
+    const half = computeHealth({ ...healthy, setupPercent: 20 });
+    expect(half.score).toBeLessThan(computeHealth(healthy).score);
+    expect(half.reasons).toContain("Kurulum yarım (%20)");
+    expect(computeHealth({ ...healthy, setupPercent: 80 }).reasons).toEqual([]);
+  });
+
   it("bantlar ve süzgeç aralığı eşiğe göre", () => {
     expect(healthBand(39)).toBe("riskli");
     expect(healthBand(40)).toBe("izlenmeli");

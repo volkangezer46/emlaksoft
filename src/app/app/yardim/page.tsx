@@ -11,6 +11,8 @@ import { loadOnboardingState } from "../_home/data";
 import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-effective";
 import { boardEnabledFor } from "@/lib/product-feedback/store";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
+import { loadOnboardingContent } from "@/lib/onboarding-content-read";
+import { resolveTours } from "@/lib/onboarding-content";
 import { FaqSearch, GuidesSearch } from "./help-search";
 import { FeatureBoardTab } from "./feature-board";
 
@@ -62,7 +64,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
         ))}
       </nav>
 
-      {tab === "baslangic" ? <TourPicker /> : null}
+      {tab === "baslangic" ? <TourPickerSection /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
       {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
@@ -164,4 +166,11 @@ function GlossaryTab({ glossary }: { glossary: readonly GlossaryEntry[] }) {
       </dl>
     </section>
   );
+}
+
+/** Tur kartları: adminden düzenlenen ad/açıklama (Ofisler > Kurulum > İçerik); okunamazsa koddaki varsayılan. */
+async function TourPickerSection() {
+  const content = await loadOnboardingContent();
+  const tours = resolveTours(content, {}).map((t) => ({ id: t.id, label: t.label, description: t.description }));
+  return <TourPicker tours={tours} />;
 }
