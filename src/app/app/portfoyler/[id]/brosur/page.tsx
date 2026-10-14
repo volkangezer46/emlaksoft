@@ -8,6 +8,7 @@ import { moneyTry } from "@/lib/leak-shield";
 import { getBaseUrl } from "@/lib/base-url";
 import { PrintButton } from "@/components/ui/print-button";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { readPropertyDescription } from "@/lib/property-description";
 import { buildQrListingUrl, qrImageSrc } from "@/lib/qr-source";
 import {
   PUBLIC_COVER_COLUMNS,
@@ -24,23 +25,6 @@ function relName(value: Rel) {
   if (!value) return null;
   const row = Array.isArray(value) ? value[0] : value;
   return row?.name ?? null;
-}
-
-/**
- * İlan açıklaması: `description` kolonu her kurulumda bulunmayabilir → ana
- * sorgudan ayrı ve hataya toleranslı okunur (vitrin/paylas sayfalarındaki
- * fetchDescription deseni). Eski kayıtlar için features.description'a düşülür.
- */
-async function fetchDescription(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  propertyId: string,
-  features: unknown,
-): Promise<string | null> {
-  const { data } = await supabase.from("properties").select("description").eq("id", propertyId).maybeSingle();
-  const col = (data as { description?: string | null } | null)?.description;
-  const feat = ((features ?? {}) as { description?: string }).description;
-  const text = String(col ?? feat ?? "").trim();
-  return text || null;
 }
 
 /**
@@ -90,12 +74,10 @@ export default async function PropertyBrochurePage({
   const coverId = firstPublicImageByProperty(coverRows).get(id);
   const cover = coverId ? { id: coverId } : null;
 
-  const [description, { data: advisor }] = await Promise.all([
-    fetchDescription(supabase, id, property.features),
-    property.assigned_to
-      ? supabase.from("profiles").select("full_name, phone").eq("id", property.assigned_to).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const description = readPropertyDescription(property.features);
+  const { data: advisor } = property.assigned_to
+    ? await supabase.from("profiles").select("full_name, phone").eq("id", property.assigned_to).maybeSingle()
+    : { data: null };
 
   const officeName = tenant?.name ?? "Emlak ofisi";
   const features = (property.features ?? {}) as {

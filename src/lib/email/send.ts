@@ -3,6 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings/read";
 import { EMAIL_FOOTER_KEY } from "@/lib/settings/registry/email";
+import { isDemoTenantId } from "@/lib/demo-sandbox";
+import { DEMO_SANDBOX_MESSAGE } from "@/lib/demo-tenant";
 import { sendEmail, type EmailAttachment, type EmailSendResult } from "./provider";
 import { DEFAULT_EMAIL_FOOTER, renderBrandedHtml, renderTemplate, templateDef, templateSettingKey, type EmailTemplateKey } from "./templates";
 
@@ -11,6 +13,7 @@ import { DEFAULT_EMAIL_FOOTER, renderBrandedHtml, renderTemplate, templateDef, t
  * Sıra: (1) bastırma listesi (bounce/şikâyet/elle) → eşleşirse İSTEK ATILMAZ, günlüğe `suppressed`;
  * (2) sağlayıcı (`provider.ts`) → kanal kapalıysa istek atılmaz, günlüğe `disabled` ("kanal kapalı"; sahte gönderim yok);
  * kabul edilirse `sent` + sağlayıcı kimliği (webhook teslim/bounce/şikâyet/açılmayı bu kimlikle işler), hata `failed`.
+ * YD1: demo kiracının (`tenantId` demo-ofis) e-postası sağlayıcıya GİTMEZ; günlüğe `disabled` + "demo: gönderilmedi".
  * Alıcı adresi DÜZ SAKLANMAZ: maskeli gösterim + SHA-256 özeti. Gövde saklanmaz. Günlük tablosu yoksa (migration
  * 20261013004600 öncesi) gönderim sürer, kayıt sessizce atlanır.
  */
@@ -77,33 +80,67 @@ export async function sendLoggedEmail(input: LoggedSendInput): Promise<LoggedSen
     admin = null; // ortam eksik (test/önizleme): günlük ve bastırma atlanır, gönderim kuralı aynı
   }
 
-  const suppressed = admin ? await isSuppressedHash(admin, hash) : false;
-  const res: LoggedSendResult = suppressed
-    ? { ok: false, code: "suppressed", error: SUPPRESSED_ERROR }
-    : await sendEmail({ to, subject: input.subject, text: input.text, html: input.html, attachments: input.attachments });
+  const demo = await isDemoTenantId(input.tenantId, admin);
+  const suppressed = !demo && admin ? await isSuppressedHash(admin, hash) : false;
+  const res: LoggedSendResult = demo
+    ? { ok: false, code: "disabled", error: DEMO_SANDBOX_MESSAGE }
+    : suppressed
+      ? { ok: false, code: "suppressed", error: SUPPRESSED_ERROR }
+      : await sendEmail({ to, subject: input.subject, text: input.text, html: input.html, attachments: input.attachments });
 
-  if (admin) {
-    const status = res.ok ? "sent" : res.code === "suppressed" ? "suppressed" : res.code === "disabled" ? "disabled" : "failed";
-    const row = {
-      tenant_id: input.tenantId && UUID_RE.test(input.tenantId) ? input.tenantId : null,
-      template: input.template.slice(0, 64) || "serbest",
-      source: input.source.slice(0, 64) || "system",
-      to_hash: hash,
-      to_masked: maskEmail(to),
-      subject: input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200),
-      status,
-      provider_id: res.ok ? res.id : null,
-      error: res.ok ? null : res.error.slice(0, 300),
-      actor_id: input.actorId && UUID_RE.test(input.actorId) ? input.actorId : null,
-    };
-    try {
-      const { error } = await admin.from("email_sends").insert(row);
-      if (error && error.code !== "42P01" && error.code !== "PGRST205") console.error("email_sends insert", error.code);
-    } catch {
-      // günlük yazılamadı: gönderim sonucu yine döner
-    }
-  }
+  if (admin) await insertEmailLog(admin.from("email_sends").insert(emailLogRow(input, to, hash, res)));
   return res;
+}
+
+/**
+ * Uygulama dışından (GoTrue: ekip daveti, erişim/parola bağlantısı) gidecek e-posta demo kiracıda GÖNDERİLMEZ:
+ * çağıran bu işlevi kullanır; demo ise günlüğe `disabled` + "demo: gönderilmedi" yazılır ve true döner (çağıran
+ * gönderimi atlar). Demo değilse hiçbir şey yazmaz, false döner.
+ */
+export async function demoSandboxAuthEmail(input: { tenantId: string; to: string; template: string; source: string; subject: string; actorId?: string | null }): Promise<boolean> {
+  let admin: SupabaseClient | null = null;
+  try {
+    admin = createAdminClient();
+  } catch {
+    admin = null;
+  }
+  if (!(await isDemoTenantId(input.tenantId, admin))) return false;
+  const to = input.to.trim();
+  const res: LoggedSendResult = { ok: false, code: "disabled", error: DEMO_SANDBOX_MESSAGE };
+  if (admin) await insertEmailLog(admin.from("email_sends").insert(emailLogRow(input, to, emailHash(to), res)));
+  return true;
+}
+
+/** Günlük satırı (SAF): alıcı maskeli + özet; gövde saklanmaz. */
+function emailLogRow(
+  input: Pick<LoggedSendInput, "tenantId" | "template" | "source" | "subject" | "actorId">,
+  to: string,
+  hash: string,
+  res: LoggedSendResult,
+) {
+  const status = res.ok ? "sent" : res.code === "suppressed" ? "suppressed" : res.code === "disabled" ? "disabled" : "failed";
+  return {
+    tenant_id: input.tenantId && UUID_RE.test(input.tenantId) ? input.tenantId : null,
+    template: input.template.slice(0, 64) || "serbest",
+    source: input.source.slice(0, 64) || "system",
+    to_hash: hash,
+    to_masked: maskEmail(to),
+    subject: input.subject.replace(/[\r\n]+/g, " ").trim().slice(0, 200),
+    status,
+    provider_id: res.ok ? res.id : null,
+    error: res.ok ? null : res.error.slice(0, 300),
+    actor_id: input.actorId && UUID_RE.test(input.actorId) ? input.actorId : null,
+  };
+}
+
+/** Günlük yazımı EN İYİ ÇABADIR: tablo yoksa ya da yazma hatasında gönderim sonucu değişmez. */
+async function insertEmailLog(pending: PromiseLike<{ error: { code?: string } | null }>): Promise<void> {
+  try {
+    const { error } = await pending;
+    if (error && error.code !== "42P01" && error.code !== "PGRST205") console.error("email_sends insert", error.code);
+  } catch {
+    // günlük yazılamadı: gönderim sonucu yine döner
+  }
 }
 
 /** Şablonun panelde kayıtlı konu/gövdesi + ortak alt bilgi (yoksa varsayılan). */

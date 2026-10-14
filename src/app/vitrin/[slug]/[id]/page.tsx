@@ -46,6 +46,7 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { LicenseNotice } from "@/components/public/license-notice";
+import { readPropertyDescription } from "@/lib/property-description";
 import { VitrinChat } from "@/components/public/vitrin-chat";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { VITRIN_AI_CHAT_KEY } from "@/lib/settings/registry/tenant";
@@ -104,23 +105,6 @@ type Feat = {
   floor?: number | string;
   building_age?: number | string;
 };
-
-/**
- * İlan açıklaması: `description` kolonu her kurulumda bulunmayabilir → ana sorgudan
- * ayrı ve hataya toleranslı okunur (kolon yoksa data null kalır, sayfa çalışmaya
- * devam eder). Eski kayıtlar için features.description'a düşülür.
- */
-async function fetchDescription(
-  admin: ReturnType<typeof createAdminClient>,
-  id: string,
-  features: unknown,
-): Promise<string | null> {
-  const { data } = await admin.from("properties").select("description").eq("id", id).eq("is_sample", false).maybeSingle();
-  const col = (data as { description?: string | null } | null)?.description;
-  const feat = ((features ?? {}) as Feat).description;
-  const text = String(col ?? feat ?? "").trim();
-  return text || null;
-}
 
 function buildLoc(property: { address_line?: string | null; district?: unknown; province?: unknown }) {
   return [property.address_line, relName(property.district as Rel), relName(property.province as Rel)]
@@ -193,7 +177,7 @@ export async function generateMetadata({
     addressLine: property.address_line,
   });
   const title = resolveSeoPattern(seo.patterns, "listing", "title", vars);
-  const rawDesc = await fetchDescription(admin, id, property.features);
+  const rawDesc = readPropertyDescription(property.features);
   const description = (rawDesc ?? resolveSeoPattern(seo.patterns, "listing", "description", vars))
     .replace(/\s+/g, " ")
     .slice(0, 160);
@@ -349,7 +333,7 @@ export default async function VitrinPropertyPage({ params }: { params: Promise<{
     : Promise.resolve({ data: null });
   const [description, { data: similarData }, fxRates, , { data: advisorRow }, { data: bookingRow }, { data: compRows }, { data: avatarRow }] =
     await Promise.all([
-    fetchDescription(admin, id, property.features),
+    readPropertyDescription(property.features),
     similarQuery,
     // Döviz karşılığı sunucuda hesaplanır — ISR (revalidate=120) korunur,
     // client'ta kur çekme/hesap YOK. Kur yoksa null → satır hiç basılmaz.

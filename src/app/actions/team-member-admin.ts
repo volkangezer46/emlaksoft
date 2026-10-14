@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoSandboxAuthEmail } from "@/lib/email/send";
 import { createClient } from "@/lib/supabase/server";
 import { logActivity } from "@/lib/activity";
 import { getBaseUrl } from "@/lib/base-url";
@@ -109,6 +110,20 @@ async function sendAccessMail(
   if (!email) return { error: "Üyenin e-posta adresi bulunamadı." };
   if (kind === "invite" && authUser.user?.last_sign_in_at) {
     return { error: "Üye zaten giriş yapmış; parola sıfırlama bağlantısı gönderin." };
+  }
+
+  // YD1: demo kiracıda erişim/davet e-postası gitmez; günlüğe "demo: gönderilmedi" düşer.
+  if (
+    await demoSandboxAuthEmail({
+      tenantId: ctx.tenantId,
+      to: email,
+      template: kind === "reset" ? "password_reset" : "team_invite",
+      source: kind === "reset" ? "team_password_reset" : "team_invite_resend",
+      subject: kind === "reset" ? "Parola sıfırlama bağlantısı" : "Ekip daveti (yineleme)",
+      actorId: ctx.actorId,
+    })
+  ) {
+    return { error: "Demo ofiste e-posta gönderilmez (demo: gönderilmedi)." };
   }
 
   const supabase = await createClient();

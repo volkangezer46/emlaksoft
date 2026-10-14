@@ -12,6 +12,7 @@ import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { createTeamMember } from "@/app/actions/team";
+import { demoSandboxAuthEmail } from "@/lib/email/send";
 import { canManageRole } from "@/lib/team/assignable-roles";
 import { INVITE_MODES, type InviteMode } from "./yeni/advisor-tabs";
 
@@ -42,6 +43,9 @@ export async function resendInvite(formData: FormData): Promise<void> {
   const { data: authUser } = await admin.auth.admin.getUserById(id);
   const email = authUser?.user?.email;
   if (!email) return;
+
+  // YD1: demo kiracıda davet e-postası gitmez; günlüğe "demo: gönderilmedi" düşer.
+  if (await demoSandboxAuthEmail({ tenantId: gate.tenantId, to: email, template: "team_invite", source: "team_invite_resend", subject: "Ekip daveti (yineleme)", actorId: gate.userId })) return;
 
   const appUrl = getBaseUrl();
   try {
@@ -171,7 +175,13 @@ export async function createAdvisor(formData: FormData): Promise<CreateAdvisorRe
   }
 
   let emailSent = false;
-  if (mode === "email") {
+  const demoSandbox =
+    mode === "email" &&
+    (await demoSandboxAuthEmail({ tenantId: gate.tenantId, to: email, template: "team_invite", source: "team_invite", subject: "Ekip daveti", actorId: gate.userId }));
+  if (demoSandbox) {
+    // YD1: demo ofisten gerçek davet e-postası gitmez (hesap açılır, bağlantı gönderilmez).
+    warnings.push("Demo ofis: davet e-postası gönderilmedi (demo: gönderilmedi).");
+  } else if (mode === "email") {
     try {
       const supabase = await createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {

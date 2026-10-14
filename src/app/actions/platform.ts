@@ -18,6 +18,7 @@ import { logActivity } from "@/lib/activity";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { logError } from "@/lib/error-log";
 import { parseImpersonationReason } from "@/lib/platform-security/impersonation-reason";
+import { impersonationAllowedForStaff } from "@/lib/demo-tenant";
 import { requireStepUp } from "@/lib/platform-security/step-up";
 import { OFFICE_CLOSE_QUEUE_ONLY, officeCloseBlockedOutsideQueue } from "@/lib/platform-security/four-eyes";
 import { OFFICE_CLOSE_STATUSES, statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
@@ -96,10 +97,12 @@ export async function startImpersonation(formData: FormData): Promise<void> {
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
-    .select("id, name, status")
+    .select("id, name, status, slug")
     .eq("id", tenantId)
     .maybeSingle();
   if (!tenant || tenant.status === "suspended" || tenant.status === "cancelled") return;
+  // YD1: demo platform kişilikleri (herkese açık giriş kartları) yalnız demo ofise girebilir; gerçek ofise giriş reddedilir.
+  if (!impersonationAllowedForStaff(staff.email, tenant.slug)) redirect("/admin/tenants?destek=demo");
 
   const supabase = await createClient();
   const {

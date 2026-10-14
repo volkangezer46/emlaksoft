@@ -14,9 +14,8 @@ import { planAmountTry } from "@/lib/billing/plans";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { deriveDemoPassword } from "@/lib/demo-credentials";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { DEMO_TENANT_NAME, DEMO_TENANT_SLUG } from "@/lib/demo-tenant";
 
-const DEMO_TENANT_SLUG = "demo-ofis";
-const DEMO_TENANT_NAME = "Demo Emlak Ofisi";
 
 /** `redirectTo`: istemcinin tarayıcı gezinmesiyle gideceği adres (platform kişilikleri; yeni oturum çerezleri gönderilsin diye). */
 export type DemoLoginResult = { error?: string; redirectTo?: string };
