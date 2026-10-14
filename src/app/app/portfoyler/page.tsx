@@ -44,7 +44,7 @@ import { compactTry, countByType, featureSummary, priceHealthPill, propertyStatu
 import { OwnerPortalLinkButton } from "@/components/app/portal-link-dialog";
 import { ListLimitNotice } from "@/components/app/list-limit-notice";
 import { EmptyState } from "@/components/ui/empty-state";
-import { propertyStatusLabel } from "@/lib/property-labels";
+import { priceHealthLabel, propertyStatusLabel } from "@/lib/property-labels";
 import { ICONS } from "@/lib/icons";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
 import { applyScopeFilter, getListScope } from "@/lib/access-control";
@@ -161,9 +161,9 @@ const STATUS_DB_VALUES: Record<string, string[]> = {
 
 /** ?saglik= kontratı — değerler properties.price_health kolonuyla (green/yellow/red ve Türkçe eşleri) eşlenir. */
 const SAGLIK_FILTERS = [
-  { value: "iyi", label: "İyi" },
-  { value: "izle", label: "İzle" },
-  { value: "riskli", label: "Riskli" },
+  { value: "iyi", label: priceHealthLabel("green") },
+  { value: "izle", label: priceHealthLabel("yellow") },
+  { value: "riskli", label: priceHealthLabel("red") },
 ] as const;
 type SaglikValue = (typeof SAGLIK_FILTERS)[number]["value"];
 
@@ -173,7 +173,7 @@ const SAGLIK_DB_VALUES: Record<SaglikValue, string[]> = {
   riskli: ["red", "Kırmızı"],
 };
 
-/** price_health kolonunu rozet etiketine çevirir (green/Yeşil → İyi vb.). */
+/** price_health kolonunu rozet etiketine çevirir (green/Yeşil → Uygun vb.; tek ölçek `priceHealthLabel`). */
 function healthLabel(health: string | null): string {
   return priceHealthPill(health)?.label ?? "Bekliyor";
 }
@@ -524,9 +524,9 @@ export default async function PropertiesPage({
   const healthKnownTotal = greenN + yellowN + redN;
   const healthTotal = Math.max(1, healthKnownTotal);
   const healthSegments: { label: string; param: SaglikValue; count: number; bar: string; dot: string; delay: string }[] = [
-    { label: "İyi", param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", delay: "0s" },
-    { label: "İzle", param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", delay: "0.12s" },
-    { label: "Riskli", param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", delay: "0.24s" },
+    { label: priceHealthLabel("green"), param: "iyi", count: greenN, bar: "bg-mint-500", dot: "bg-mint-400", delay: "0s" },
+    { label: priceHealthLabel("yellow"), param: "izle", count: yellowN, bar: "bg-amber-400", dot: "bg-amber-400", delay: "0.12s" },
+    { label: priceHealthLabel("red"), param: "riskli", count: redN, bar: "bg-danger-500", dot: "bg-danger-500", delay: "0.24s" },
   ];
 
   // Sayfalama linki — aktif filtreleri koruyarak yalnız ?sayfa= değiştirir.
@@ -638,7 +638,7 @@ export default async function PropertiesPage({
       tone: "warning",
       attention: true,
       href: hrefWith({ saglik: "riskli", gorunum: "", sayfa: "" }),
-      hint: `${yellowN} izle · ${redN} riskli`,
+      hint: `${yellowN} ${priceHealthLabel("yellow").toLocaleLowerCase("tr-TR")} · ${redN} ${priceHealthLabel("red").toLocaleLowerCase("tr-TR")}`,
     },
     {
       label: "Canlı portal",

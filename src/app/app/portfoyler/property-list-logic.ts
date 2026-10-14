@@ -1,4 +1,5 @@
 import type { PillTone } from "@/components/ui/list-kit";
+import { priceHealthLabel } from "@/lib/property-labels";
 
 /**
  * Portföy listesi saf yardımcıları (sayfadan ayrıldı: test edilebilir).
@@ -26,11 +27,11 @@ export function propertyStatusTone(status: string | null | undefined): PillTone 
   }
 }
 
-/** price_health kolonu → ton + etiket; bilinmiyorsa null (kapsül hiç çizilmez). */
+/** price_health kolonu → ton + etiket (etiket `priceHealthLabel`, detay rozetiyle aynı); bilinmiyorsa null (kapsül hiç çizilmez). */
 export function priceHealthPill(health: string | null | undefined): { tone: PillTone; label: string } | null {
-  if (health === "green" || health === "Yeşil") return { tone: "success", label: "İyi" };
-  if (health === "yellow" || health === "Sarı") return { tone: "warning", label: "İzle" };
-  if (health === "red" || health === "Kırmızı") return { tone: "danger", label: "Riskli" };
+  if (health === "green" || health === "Yeşil") return { tone: "success", label: priceHealthLabel("green") };
+  if (health === "yellow" || health === "Sarı") return { tone: "warning", label: priceHealthLabel("yellow") };
+  if (health === "red" || health === "Kırmızı") return { tone: "danger", label: priceHealthLabel("red") };
   return null;
 }
 

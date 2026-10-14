@@ -17,8 +17,8 @@ describe("propertyStatusTone", () => {
 
 describe("priceHealthPill", () => {
   it("Türkçe ve İngilizce değerleri eşler, bilinmeyende null döner", () => {
-    expect(priceHealthPill("green")).toEqual({ tone: "success", label: "İyi" });
-    expect(priceHealthPill("Sarı")).toEqual({ tone: "warning", label: "İzle" });
+    expect(priceHealthPill("green")).toEqual({ tone: "success", label: "Uygun" });
+    expect(priceHealthPill("Sarı")).toEqual({ tone: "warning", label: "İzlenmeli" });
     expect(priceHealthPill("red")).toEqual({ tone: "danger", label: "Riskli" });
     expect(priceHealthPill("pending")).toBeNull();
     expect(priceHealthPill(null)).toBeNull();

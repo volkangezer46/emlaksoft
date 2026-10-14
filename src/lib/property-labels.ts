@@ -23,10 +23,14 @@ export function propertyStatusLabel(status: string | null | undefined): string {
   return PROPERTY_STATUS_LABEL[status.toLowerCase()] ?? status;
 }
 
-/** price_health kolonu (green/yellow/red/pending ve Türkçe eşleri) → rozet etiketi. */
+/**
+ * Fiyat sağlığı etiketi (TEK ölçek, YD5): liste kapsülü, süzgeç çipleri, dağılım çubuğu, portföy künyesi rozeti ve
+ * "Fiyat & değerleme" kutusu aynı kelimeyi kullanır. Girdi kolon ham değeri (green/yellow/red/pending ve Türkçe eşleri)
+ * ya da `PriceHealth` bandıdır.
+ */
 export function priceHealthLabel(health: string | null | undefined): string {
-  if (health === "green" || health === "Yeşil") return "uygun";
-  if (health === "yellow" || health === "Sarı") return "izlenmeli";
-  if (health === "red" || health === "Kırmızı") return "riskli";
-  return "bekliyor";
+  if (health === "green" || health === "Yeşil") return "Uygun";
+  if (health === "yellow" || health === "Sarı") return "İzlenmeli";
+  if (health === "red" || health === "Kırmızı") return "Riskli";
+  return "Bekliyor";
 }

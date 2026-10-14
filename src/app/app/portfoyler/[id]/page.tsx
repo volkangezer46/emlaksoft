@@ -62,7 +62,7 @@ import { PropertyMap } from "@/components/app/property-map";
 import { PhotoQualityCard } from "@/components/app/photo-quality-card";
 import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
-import { computePriceHealth } from "@/lib/price-health";
+import { computePriceHealth, resolveShownPriceHealth } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
@@ -315,8 +315,6 @@ export default async function PropertyDetailPage({
     features: (property.features ?? null) as Record<string, unknown> | null,
   });
 
-  const healthGood = property.price_health === "green" || property.price_health === "Yeşil";
-  const healthWarn = property.price_health === "yellow" || property.price_health === "Sarı" || property.price_health === "red";
   const portalHealth = livePortals.length ? (livePortals.length - overdue.length) / livePortals.length : 1;
 
   const commissionPreview =
@@ -333,11 +331,19 @@ export default async function PropertyDetailPage({
       ? Math.round(Number(property.list_price) / Number(features.sqm))
       : null;
 
-  const priceSignal = computePriceHealth({
-    listPrice: property.list_price != null ? Number(property.list_price) : null,
-    sqm: features.sqm != null ? Number(features.sqm) : null,
-    districtHint: district ?? province,
-  });
+  // TEK fiyat sağlığı (YD5): künye rozeti, "Fiyat & değerleme" kutusu, satış teşhisi ve yatırım kartı aynı sonucu okur.
+  // Bant saklanan kolondan (liste/sayaç/süzgeçle aynı); anlık m² modeli yalnız aynı bandı veriyorsa sapma yüzdesi ekler.
+  const priceSignal = resolveShownPriceHealth(
+    property.price_health,
+    computePriceHealth({
+      listPrice: property.list_price != null ? Number(property.list_price) : null,
+      sqm: features.sqm != null ? Number(features.sqm) : null,
+      districtHint: district ?? province,
+      transactionType: property.transaction_type,
+    }),
+  );
+  const healthGood = priceSignal.health === "green";
+  const healthWarn = priceSignal.health === "yellow" || priceSignal.health === "red";
 
   const isRentListing =
     property.transaction_type === "rent" || property.transaction_type === "Kiralık" || property.transaction_type === "kiralik";
@@ -353,7 +359,13 @@ export default async function PropertyDetailPage({
         status: property.status,
         daysOnMarket,
         priceHealth: priceSignal.health,
-        priceDeltaPct: priceSignal.deltaPct,
+        // Teşhis işaretli sapma bekler (+ = emsal üstü); model mutlak yüzde verir, yön orta değerden çıkar.
+        priceDeltaPct:
+          priceSignal.deltaPct != null && priceSignal.mid != null && property.list_price != null
+            ? Number(property.list_price) >= priceSignal.mid
+              ? priceSignal.deltaPct
+              : -priceSignal.deltaPct
+            : null,
         totalViews,
         views7d,
         livePortals: livePortals.length,
@@ -407,7 +419,7 @@ export default async function PropertyDetailPage({
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold text-white/80">{property.property_code}</span>
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${healthGood ? "bg-mint-500/20 text-mint-300" : healthWarn ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/60"}`}>
-                Fiyat {priceHealthLabel(property.price_health)}
+                Fiyat {priceHealthLabel(priceSignal.health).toLocaleLowerCase("tr-TR")}
               </span>
               <span className="rounded-full bg-brand-600/20 px-2.5 py-1 text-xs font-bold text-cyan-300">{propertyStatusLabel(property.status)}</span>
               <SampleRecordBadge show={property.is_sample === true} />
@@ -633,7 +645,7 @@ export default async function PropertyDetailPage({
               <div className="mt-3 rounded-[var(--radius-card)] border border-line bg-canvas/60 px-3 py-3">
                 <p className="text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Fiyat sağlığı</p>
                 <p className="mt-1 text-sm font-semibold text-ink-950">
-                  {priceSignal.health === "green" ? "Yeşil" : priceSignal.health === "yellow" ? "Sarı" : priceSignal.health === "red" ? "Kırmızı" : "Bekliyor"}
+                  {priceHealthLabel(priceSignal.health)}
                   {priceSignal.deltaPct != null ? ` · %${priceSignal.deltaPct}` : ""}
                 </p>
                 <p className="mt-0.5 text-xs text-text-muted">{priceSignal.note}</p>
