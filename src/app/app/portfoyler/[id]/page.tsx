@@ -62,7 +62,7 @@ import { PropertyMap } from "@/components/app/property-map";
 import { PhotoQualityCard } from "@/components/app/photo-quality-card";
 import { ListingAnalysisCard } from "@/components/app/listing-analysis-card";
 import { NeighborhoodNotesPanel } from "@/components/app/neighborhood-notes-panel";
-import { computePriceHealth, resolveShownPriceHealth } from "@/lib/price-health";
+import { computePriceHealth, resolveShownPriceHealth, signedPriceDelta } from "@/lib/price-health";
 import { diagnoseSaleBlockers, isDiagnosable } from "@/lib/sale-diagnostics";
 import { SaleDiagnosticsCard } from "@/components/app/sale-diagnostics-card";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
@@ -359,13 +359,8 @@ export default async function PropertyDetailPage({
         status: property.status,
         daysOnMarket,
         priceHealth: priceSignal.health,
-        // Teşhis işaretli sapma bekler (+ = emsal üstü); model mutlak yüzde verir, yön orta değerden çıkar.
-        priceDeltaPct:
-          priceSignal.deltaPct != null && priceSignal.mid != null && property.list_price != null
-            ? Number(property.list_price) >= priceSignal.mid
-              ? priceSignal.deltaPct
-              : -priceSignal.deltaPct
-            : null,
+        // Teşhis işaretli sapma bekler (+ = emsal üstü, - = altı); yön orta değerden çıkar.
+        priceDeltaPct: signedPriceDelta(property.list_price, priceSignal),
         totalViews,
         views7d,
         livePortals: livePortals.length,

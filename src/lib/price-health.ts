@@ -61,6 +61,17 @@ export function resolveShownPriceHealth(stored: string | null | undefined, refer
   };
 }
 
+/**
+ * Satış teşhisinin beklediği İŞARETLİ sapma (+ = emsal üstü, - = emsal altı). Model mutlak yüzde verir; yön liste
+ * fiyatının orta değere göre konumundan çıkar. Orta değer ya da sapma yoksa (ör. bantlar farklı) null: teşhis yön uydurmaz.
+ */
+export function signedPriceDelta(listPrice: number | string | null | undefined, result: Pick<PriceHealthResult, "mid" | "deltaPct">): number | null {
+  if (result.deltaPct == null || result.mid == null || listPrice == null) return null;
+  const price = Number(listPrice);
+  if (!Number.isFinite(price)) return null;
+  return price >= result.mid ? result.deltaPct : -result.deltaPct;
+}
+
 /** Kaynak + güven (saf). Canlı m² fiyatı varsa emsal/orta, yoksa sabit tablo/düşük. */
 export function priceHealthProvenance(hasLiveSqmPrice: boolean): { source: PriceHealthSource; confidence: PriceHealthConfidence } {
   return hasLiveSqmPrice ? { source: "emsal", confidence: "orta" } : { source: "referans_modeli", confidence: "dusuk" };
