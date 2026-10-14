@@ -15,14 +15,43 @@
 # kalp atışını (cron_heartbeats 'uyari-motoru', 5 dk'da bir) okur; eşik dakikası (varsayılan 20; Sistem > Uyarılar)
 # boyunca gelmezse kanallara uyarı + alert_events (source='host'), tekrar aralığında hatırlatma, nabız dönünce "düzeldi".
 # Karar ve durum Python tarafında (/run/emlaksoft/engine-watch.json); burada yalnız özet satırı JSONL'e yazılır.
+#
+# İMLEÇ (KQ4): hatalar.cursor "<last_seen mikro saniye UTC>|<error_logs.id>" çiftini tutar; sorgu (last_seen, id) > imleç
+# ile ilerler. Eski biçim (saniye hassasiyetli tek zaman) okunursa o saniyenin sonuna yuvarlanır (o saniyedeki satırlar
+# önceki çalışmada zaten yazılmıştı). Böylece servis yeniden başlatıldığında aynı id için yinelenen satır yazılmaz; yalnız
+# last_seen'i ilerleyen (yeniden görülen) hata yeni satır üretir.
+# Test: ERROR_WATCH_OUT_DIR (çıktı klasörü) + ERROR_WATCH_ONCE=1 (tek hata turu, sağlık/motor yoklaması yok, döngü yok).
 set -uo pipefail
 DB=supabase-db-moqbebljyeyprktd19zb1ihn
-OUT_DIR=/var/log/emlaksoft
+OUT_DIR=${ERROR_WATCH_OUT_DIR:-/var/log/emlaksoft}
 OUT=$OUT_DIR/hatalar.jsonl
 STATE=$OUT_DIR/hatalar.cursor
 ALERT="$(cd "$(dirname "$0")" && pwd)/alert-send.py"
 mkdir -p "$OUT_DIR"
-CURSOR=$(cat "$STATE" 2>/dev/null || date -u +%Y-%m-%dT%H:%M:%SZ)
+NIL_ID=00000000-0000-0000-0000-000000000000
+MAX_ID=ffffffff-ffff-ffff-ffff-ffffffffffff
+CUR_TS=""
+CUR_ID=""
+# İmleç dosyasını okur ve doğrular; CUR_TS / CUR_ID kurulur. Bozuk ya da yoksa "şimdi"den başlar (geriye taramaz).
+load_cursor() {
+  local raw ts id=""
+  raw=$(head -c 200 "$STATE" 2>/dev/null | tr -d '[:space:]')
+  ts=${raw%%|*}
+  [ "$ts" != "$raw" ] && id=${raw#*|}
+  if [[ "$ts" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$ ]] \
+    && [[ "$id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]; then
+    CUR_TS=$ts
+    CUR_ID=$id
+  elif [[ "$ts" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2})Z$ ]]; then
+    # Eski (saniye) biçim: o saniyenin tamamı önceki çalışmada yazılmıştı.
+    CUR_TS="${BASH_REMATCH[1]}.999999Z"
+    CUR_ID=$MAX_ID
+  else
+    CUR_TS=$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)
+    CUR_ID=$NIL_ID
+  fi
+}
+load_cursor
 TICK=0
 DOWN=0
 DOWN_SINCE=0
@@ -47,8 +76,7 @@ rule_repeat_sec() {
 
 # Uyarı gönderir; çıktıyı RES'e, iletildiyse SENT=1 yazar (karar çıkış kodundan; stderr ayrı dosyaya).
 alert_call() {
-  RES=$(python3 -I "$ALERT" "$@" 2>>"$ALERT_ERR")
-  if [ $? -eq 0 ]; then SENT=1; else SENT=0; fi
+  if RES=$(python3 -I "$ALERT" "$@" 2>>"$ALERT_ERR"); then SENT=1; else SENT=0; fi
 }
 log_alert() {
   printf '{"zaman":"%s","kaynak":"uyari","tekrar":1,"digest":null,"yol":"/api/health","mesaj":%s}\n' "$1" \
@@ -110,6 +138,39 @@ engine_check() {
     "$(printf '%s' "$out" | python3 -I -c 'import sys,json; print(json.dumps(sys.stdin.read()[:400]))')" >> "$OUT"
 }
 
+# Yeni/yeniden görülen hatalar: (last_seen, id) imlecinden sonrası, en çok 500 satır/tur (fazlası sonraki turda).
+# Satır biçimi "<last_seen µs>\t<id>\t<json>": json_build_object sekmeyi kaçışlar, ham sekme yalnız ayırıcıdır.
+# İmleç psql değişkeni olarak geçer (:'ad' tırnaklaması psql'de; SQL'e metin birleştirilmez). DB hatasında 1 döner.
+poll_errors() {
+  local rows last
+  rows=$(docker exec -i "$DB" psql -U postgres -d postgres -At -F $'\t' -v ON_ERROR_STOP=1 \
+    -v cts="$CUR_TS" -v cid="$CUR_ID" 2>/dev/null <<'SQL'
+select to_char(last_seen at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'), id,
+  json_build_object(
+    'zaman', to_char(last_seen at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+    'kaynak', source, 'tekrar', occurrences, 'digest', digest, 'yol', path,
+    'mesaj', left(message, 400), 'yigin', left(coalesce(stack, ''), 1200), 'id', id)
+from public.error_logs e
+where (last_seen, id) > (:'cts'::timestamptz, :'cid'::uuid) and resolved_at is null
+  and coalesce(to_jsonb(e)->>'status', 'open') = 'open'
+order by last_seen, id
+limit 500
+SQL
+  ) || return 1
+  [ -n "$rows" ] || return 0
+  printf '%s\n' "$rows" | cut -f3- >> "$OUT"
+  last=$(printf '%s\n' "$rows" | tail -n 1)
+  CUR_TS=$(printf '%s\n' "$last" | cut -f1)
+  CUR_ID=$(printf '%s\n' "$last" | cut -f2)
+  # Atomik yazım: yarım kalan imleç yeniden başlatmada bozuk sayılıp "şimdi"ye düşmesin.
+  printf '%s|%s\n' "$CUR_TS" "$CUR_ID" > "$STATE.tmp" && mv -f "$STATE.tmp" "$STATE"
+}
+
+if [ "${ERROR_WATCH_ONCE:-0}" = 1 ]; then
+  poll_errors
+  exit $?
+fi
+
 python3 -I "$ALERT" refresh >/dev/null 2>&1 || true
 
 while true; do
@@ -118,19 +179,6 @@ while true; do
   if [ $((TICK % 4)) = 2 ]; then engine_check; fi
   # Kanal/kural önbelleği 5 dakikada bir (DB çökerse son şifreli kopya kullanılır).
   if [ $((TICK % 20)) = 0 ]; then python3 -I "$ALERT" refresh >/dev/null 2>&1 || true; fi
-  ROWS=$(docker exec "$DB" psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c "
-    select json_build_object(
-      'zaman', to_char(last_seen at time zone 'UTC','YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'),
-      'kaynak', source, 'tekrar', occurrences, 'digest', digest, 'yol', path,
-      'mesaj', left(message, 400), 'yigin', left(coalesce(stack,''), 1200), 'id', id)
-    from public.error_logs e
-    where last_seen > '$CURSOR'::timestamptz and resolved_at is null
-      and coalesce(to_jsonb(e)->>'status', 'open') = 'open'
-    order by last_seen" 2>/dev/null) || { sleep 15; continue; }
-  if [ -n "$ROWS" ]; then
-    printf '%s\n' "$ROWS" >> "$OUT"
-    CURSOR=$(printf '%s\n' "$ROWS" | tail -1 | python3 -I -c "import sys,json; print(json.loads(sys.stdin.read())['zaman'])")
-    echo "$CURSOR" > "$STATE"
-  fi
+  poll_errors || true
   sleep 15
 done

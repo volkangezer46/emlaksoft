@@ -6,7 +6,7 @@
 > hariç. Her şey Türkçe oturumda sahibin kendi terminalinde / Supabase SQL editöründe yapılır.
 
 Kaynaklar: `docs/HAFIZA.md` §2 (durum) · `docs/design/BIRLESIK_YOL_HARITASI.md` §4 (sıra ve gruplar) ·
-`docs/design/GUVENLIK_DENETIMI_3.md` · `docs/runbooks/RESTORE.md` · `docs/runbooks/ROLLBACK.md`.
+`docs/design/GUVENLIK_DENETIMI_3.md` · `docs/runbooks/RESTORE.md` · `docs/runbooks/GERI_DONUS.md`.
 Bu kılavuzun makine karşılığı: `npm run check:migration-pairs` (veri: `scripts/migration-pairs-data.ts`).
 
 Durum özeti (GÜNCEL, 2026-10-05): bu kılavuzun P1–P11b pencereleri (40 dosya) CANLIDA UYGULANDI; yalnız **P12**
@@ -416,7 +416,7 @@ select pg_get_functiondef('public.can_view_commission_earnings(uuid,uuid,uuid)':
 
 Geri alma dosyaları `supabase/rollbacks/<ad>.rollback.sql` altındadır; **runner'a bağlı DEĞİLDİR**, elle ve **ters sırada** çalıştırılır. Dosyalar
 `schema_migrations` ledger satırına DOKUNMAZ: geri aldıktan sonra ledger "uygulandı" demeye devam eder; yeniden uygulamak için ledger satırının
-silinmesi ve yeni forward migration kararı sahibe aittir. `docs/runbooks/ROLLBACK.md` ilkeleri geçerlidir: önce uygulama geri alma / özelliği kapatma;
+silinmesi ve yeni forward migration kararı sahibe aittir. `docs/runbooks/GERI_DONUS.md` ilkeleri geçerlidir: önce uygulama geri alma / özelliği kapatma;
 veri bozulduysa yazmaları durdurun ve `RESTORE.md`.
 
 | Pencere | Rollback dosyası | Not |
