@@ -29,6 +29,8 @@ import type { SignupField } from "@/lib/signup-errors";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
 import { now } from "@/lib/clock";
+import { APP_IDLE_COOKIE } from "@/lib/office-security/policy";
+import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
 
 export type AuthResult = {
   error?: string;
@@ -81,8 +83,9 @@ export async function signIn(
   const target = /^\/(?![/\\])/.test(next) ? next : "/app";
   const cookieStore = await cookies();
   cookieStore.delete(TWO_FACTOR_COOKIE);
-  // AD11: önceki oturumdan kalan boşta kalma çerezi yeni oturumu hemen kapatmasın.
+  // AD11/DG7: önceki oturumdan kalan boşta kalma çerezleri yeni oturumu hemen kapatmasın.
   cookieStore.delete(IDLE_COOKIE);
+  cookieStore.delete(APP_IDLE_COOKIE);
   let isPlatformStaff = false;
 
   if (userId) {
@@ -224,6 +227,14 @@ export async function signIn(
       if (tenantError || !tenant) {
         await supabase.auth.signOut();
         return { error: actionErrorMessage(tenantError, "Ofis durumu doğrulanamadı.") };
+      }
+
+      // DG7: ofisin IP kısıtı giriş anında da uygulanır (oturum açık kalmaz, 2FA SMS'i gönderilmez, günlükte
+      // başarılı görünmez). Karar proxy ile aynı IP kaynağı ve önbellekli politikayla verilir.
+      if (!(await officeLoginIpAllowed({ tenantId, role: profile.role, headers: await headers() }))) {
+        await supabase.auth.signOut();
+        await logLoginEvent({ userId, tenantId, ip, userAgent, result: "failed" });
+        return { error: OFFICE_IP_LOGIN_ERROR };
       }
     }
 
@@ -545,5 +556,6 @@ export async function signOut() {
   const jar = await cookies();
   jar.delete(TWO_FACTOR_COOKIE);
   jar.delete(IDLE_COOKIE);
+  jar.delete(APP_IDLE_COOKIE);
   redirect("/");
 }

@@ -19,6 +19,7 @@ import { hashOtpForStorage, verifyOtpHash } from "@/lib/otp-hmac";
 import { sendSignerSms } from "@/app/imza/_lib/sms";
 import { sendSms } from "@/lib/messaging/netgsm";
 import { logLoginEvent } from "../_lib/login-events";
+import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
 
 export type VerifyResult = { error?: string; ok?: true; resent?: true };
 
@@ -81,6 +82,14 @@ export async function verifyLoginCode(
     await supabase.auth.signOut();
     (await cookies()).delete(TWO_FACTOR_COOKIE);
     return { error: "Hesap veya iki adımlı doğrulama ayarı geçersiz." };
+  }
+
+  // DG7: kod adımında da ofis IP kısıtı (giriş ile kod arasında ağ değişmiş olabilir); oturum açık bırakılmaz.
+  if (!(await officeLoginIpAllowed({ tenantId, role: profile.role, headers: await headers() }))) {
+    await supabase.auth.signOut();
+    (await cookies()).delete(TWO_FACTOR_COOKIE);
+    await logLoginEvent({ userId: user.id, tenantId, ip, userAgent, result: "failed" });
+    return { error: OFFICE_IP_LOGIN_ERROR };
   }
 
   if (!challenge) return { error: "Bekleyen doğrulama kodu yok. Yeni kod isteyin." };

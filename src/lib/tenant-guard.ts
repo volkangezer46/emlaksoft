@@ -1,10 +1,11 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getPlatformStaffIdentity } from "@/lib/platform";
 import { getRequestIdentity } from "@/lib/cache/request";
+import { officeRequestPolicyBlock } from "@/lib/office-security/enforce";
 import {
   TWO_FACTOR_COOKIE,
   isTwoFactorCookieValid,
@@ -117,6 +118,24 @@ async function resolveActiveTenant(allowSuspended: boolean): Promise<ActiveTenan
     }
     if (!tenantId || profile.tenant_id !== tenantId || profile.role !== claimedRole) {
       return { ok: false, error: "Kimlik ve ofis bilgileri uyuşmuyor." };
+    }
+    // DG7: proxy matcher'ı /api rotalarını (indirme uçları, eklenti köprüsü) kapsamaz; ofis IP kısıtı ve 2FA kurulum
+    // zorunluluğu burada da uygulanır. Her istekte denetlenir: /api yolunda "doğrulandı" başlığı istemciden gelebilir
+    // (proxy silmez), güvenilmez. Maliyet: 30 sn önbellekli tüm-ofis görüntüsünde tek Map araması.
+    let reqHeaders: Headers | null = null;
+    try {
+      reqHeaders = await headers();
+    } catch {
+      reqHeaders = null;
+    }
+    if (reqHeaders) {
+      const blocked = await officeRequestPolicyBlock({
+        tenantId,
+        role: profile.role,
+        twoFactorOn: Boolean(profile.two_factor_sms),
+        headers: reqHeaders,
+      });
+      if (blocked) return { ok: false, error: blocked };
     }
   } else {
     if (!staff || !tenantId || claimedRole !== "readonly") {

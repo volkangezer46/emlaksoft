@@ -70,11 +70,8 @@ async function applyIdlePolicy(request: NextRequest, response: NextResponse, idl
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
   if (!isAdminPolicyPath(path)) {
-    const response = await updateSession(request);
-    // AD11: giriş sayfaları önceki oturumdan kalan boşta kalma çerezini düşürür (yoksa yeni açılan oturum ilk /admin
-    // isteğinde eski etkinlik zamanıyla hemen kapanırdı). signIn/signOut da siler; bu, diğer giriş yollarını kapsar.
-    if (path.startsWith("/giris") && request.cookies.has(IDLE_COOKIE)) response.cookies.delete(IDLE_COOKIE);
-    return response;
+    // AD11/DG7: giriş sayfalarında eski boşta kalma çerezleri updateSession'da, YALNIZ oturum yokken düşer.
+    return updateSession(request);
   }
 
   // AD11: yönetim IP izin listesi kimlik çözümünden ÖNCE (izinsiz IP oturum çerezi bile işletmez).

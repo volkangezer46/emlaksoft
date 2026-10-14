@@ -48,6 +48,8 @@ import {
 } from "@/lib/admin/office-360";
 import { loadOfficeManagement, officeAdminCanMap } from "@/lib/admin/office-management";
 import { OfficeManagement } from "./office-management";
+import { OfficeSecurityPanel } from "./office-security-panel";
+import { loadOfficePolicyForm, policyIsActive } from "@/lib/office-security/read";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { isExpiredActive } from "@/lib/admin/platform-metrics";
 import { platformCanAccess } from "@/lib/platform-access";
@@ -211,9 +213,10 @@ export default async function AdminTenantDetailPage({
 
   else if (active === "yonetim") {
     const can = officeAdminCanMap(staff.role);
-    const [mgmt, moduleState] = await Promise.all([
+    const [mgmt, moduleState, securityPolicy] = await Promise.all([
       loadOfficeManagement(admin, id, { withMembers: access.members, withNotes: can.note }),
       loadTenantModuleState(admin, id),
+      loadOfficePolicyForm(admin, id),
     ]);
     content = (
       <>
@@ -257,6 +260,12 @@ export default async function AdminTenantDetailPage({
         locked={moduleState.locked}
         status={moduleState.status}
         canEdit={can.plan_status}
+      />
+      <OfficeSecurityPanel
+        tenantId={tenant.id}
+        policy={securityPolicy}
+        active={policyIsActive(securityPolicy)}
+        canReset={can.reset_security_policy}
       />
       </>
     );

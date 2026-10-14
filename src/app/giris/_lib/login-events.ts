@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notifyIfNewDevice } from "@/lib/office-security/new-device";
 
 /**
  * Giriş günlüğü — her giriş denemesi login_events'e yazılır.
@@ -16,6 +17,15 @@ export async function logLoginEvent(input: {
 }): Promise<void> {
   try {
     const admin = createAdminClient();
+    // DG7: ofis "yeni cihaz bildirimi" açıksa bu giriş önceki başarılı girişlerle karşılaştırılır (satır yazılmadan önce).
+    if (input.result === "success" && input.userId && input.tenantId) {
+      await notifyIfNewDevice(admin, {
+        userId: input.userId,
+        tenantId: input.tenantId,
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+      });
+    }
     const { error } = await admin.from("login_events").insert({
       user_id: input.userId ?? null,
       tenant_id: input.tenantId ?? null,
