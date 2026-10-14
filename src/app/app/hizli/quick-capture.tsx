@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import Link from "@/components/ui/smart-link";
 import { CalendarClock, Check, ChevronsUpDown, CloudOff, History, Loader2, LocateFixed, TriangleAlert } from "lucide-react";
@@ -23,12 +23,25 @@ import {
   enqueueOutbox,
   isNetworkFailure,
   outcomeFromResult,
+  pickerLabelKey,
   removeOutboxItem,
+  SCOPE_TENANT_FIELD,
+  SCOPE_USER_FIELD,
+  type CaptureScope,
   type DraftValues,
   type OutboxItem,
   type OutboxKind,
 } from "@/lib/field-capture/outbox";
-import { LocationSuggestionRow, NoteAssist, OutboxPanel, outboxChanged, restoreDraft, useFormDraft, useLocationSuggestion } from "./field-assist";
+import {
+  CaptureScopeProvider,
+  LocationSuggestionRow,
+  NoteAssist,
+  OutboxPanel,
+  outboxChanged,
+  restoreDraft,
+  useFormDraft,
+  useLocationSuggestion,
+} from "./field-assist";
 import dynamic from "next/dynamic";
 import type { WatermarkSettings } from "@/lib/watermark";
 
@@ -72,6 +85,20 @@ const ACTIONS: Record<OutboxKind, (fd: FormData) => Promise<Result>> = {
   property: quickCreateProperty,
 };
 
+/** Kuyruğa yazılmayan istemci alanları (istek kimliği ve kapsam öğenin kendisinde durur). */
+const CLIENT_FIELDS = new Set(["client_request_id", SCOPE_TENANT_FIELD, SCOPE_USER_FIELD]);
+
+/** Seçici (Combobox) tetikleyicisindeki görünen etiket: kuyruktan forma geri yüklemede seçim etiketiyle gelsin. */
+function pickerLabel(triggerId: string): string {
+  return document.getElementById(triggerId)?.querySelector("span")?.textContent?.trim() ?? "";
+}
+
+/** Geri yüklenen seçimin etiketi (etiket saklanmadıysa genel ad; değer yine seçili gelir). */
+function restoredLabel(v: DraftValues | null, field: string, fallback: string): string | undefined {
+  if (!v?.[field]) return undefined;
+  return v[pickerLabelKey(field)] || fallback;
+}
+
 function newRequestId(): string {
   try {
     return crypto.randomUUID();
@@ -86,7 +113,13 @@ function newRequestId(): string {
  * taşır; bağlantı yoksa ya da istek ağ hatasıyla düşerse form bu cihazda sıraya girer (bağlantı gelince bir kez gönderilir).
  * Başarıda (ya da sıraya alınınca) yerel taslak silinir.
  */
-function useQuick(kind: OutboxKind, draft: ReturnType<typeof useFormDraft>, labelOf: (fd: FormData) => string) {
+function useQuick(
+  kind: OutboxKind,
+  draft: ReturnType<typeof useFormDraft>,
+  labelOf: (fd: FormData) => string,
+  /** Seçici alan → tetikleyici kimliği (ör. customer_id → hq-call-customer). */
+  pickers: Record<string, string> = {},
+) {
   const action = ACTIONS[kind];
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<Result>({});
@@ -97,8 +130,15 @@ function useQuick(kind: OutboxKind, draft: ReturnType<typeof useFormDraft>, labe
 
   function queue(fd: FormData, id: string) {
     const fields: [string, string][] = [];
-    for (const [k, v] of fd.entries()) if (typeof v === "string" && k !== "client_request_id") fields.push([k, v]);
-    const ok = id ? enqueueOutbox(browserStore(), { id, kind, fields, label: labelOf(fd), nowMs: now() }) : false;
+    for (const [k, v] of fd.entries()) if (typeof v === "string" && !CLIENT_FIELDS.has(k)) fields.push([k, v]);
+    const labels: Record<string, string> = {};
+    for (const [field, triggerId] of Object.entries(pickers)) {
+      const label = fd.get(field) ? pickerLabel(triggerId) : "";
+      if (label) labels[field] = label;
+    }
+    // Kapsamsız (oturum bilinmiyor) sıraya alma yok: kayıt başka oturumun kuyruğuna düşmesin.
+    const scope = draft.scope;
+    const ok = id && scope ? enqueueOutbox(browserStore(), scope, { id, kind, fields, label: labelOf(fd), labels, nowMs: now() }) : false;
     if (ok) {
       outboxChanged();
       draft.clear();
@@ -118,6 +158,11 @@ function useQuick(kind: OutboxKind, draft: ReturnType<typeof useFormDraft>, labe
     requestId.current ??= newRequestId();
     const id = requestId.current;
     if (id) fd.set("client_request_id", id);
+    // Sunucu oturumla karşılaştırır: form başka oturumda açık kaldıysa kayıt yanlış ofise/kullanıcıya açılmaz.
+    if (draft.scope) {
+      fd.set(SCOPE_TENANT_FIELD, draft.scope.tenantId);
+      fd.set(SCOPE_USER_FIELD, draft.scope.userId);
+    }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       queue(fd, id);
       return;
@@ -313,9 +358,11 @@ function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: Ret
 
 /* ------------------------------ Görüşme notu ------------------------------ */
 
+const CALL_PICKERS = { customer_id: "hq-call-customer" };
+
 function CallTab({ customers, onPlanAppointment }: { customers: ComboboxOption[]; onPlanAppointment?: (p: Omit<AppointmentPrefill, "seq">) => void }) {
   const draft = useFormDraft("gorusme", ["customer_id"]);
-  const q = useQuick("call", draft, () => "Görüşme notu");
+  const q = useQuick("call", draft, () => "Görüşme notu", CALL_PICKERS);
   if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
   if (q.done && !draft.restored) {
     const d = q.done;
@@ -356,6 +403,8 @@ function CallForm({ q, draft, customers }: { q: ReturnType<typeof useQuick>; dra
           emptyText="Eşleşen müşteri yok"
           onSearch={searchCustomers}
           options={customers}
+          defaultValue={v?.customer_id}
+          selectedLabel={restoredLabel(v, "customer_id", "Seçili müşteri")}
           className="[&_button]:min-h-11"
         />
       </FormField>
@@ -399,6 +448,8 @@ function CallForm({ q, draft, customers }: { q: ReturnType<typeof useQuick>; dra
 
 /* -------------------------------- Randevu -------------------------------- */
 
+const APPOINTMENT_PICKERS = { customer_id: "hq-appt-customer", property_id: "hq-appt-property" };
+
 function AppointmentTab({
   customers,
   properties,
@@ -413,7 +464,7 @@ function AppointmentTab({
   prefill: AppointmentPrefill | null;
 }) {
   const draft = useFormDraft("randevu", ["customer_id", "property_id", "confirm_conflict"]);
-  const q = useQuick("appointment", draft, () => "Randevu");
+  const q = useQuick("appointment", draft, () => "Randevu", APPOINTMENT_PICKERS);
   if (q.queued && !draft.restored) return <Queued onAgain={q.again} />;
   if (q.done && !draft.restored) {
     return <Success title="Randevu planlandı" openHref="/app/randevular" openLabel="Kaydı aç (randevular)" onAgain={q.again} />;
@@ -454,8 +505,11 @@ function AppointmentForm({
   const [apptType, setApptType] = useState(
     v?.appointment_type && typeOptions.some((o) => o.value === v.appointment_type) ? v.appointment_type : (typeOptions[0]?.value ?? "showing"),
   );
-  const [customerId, setCustomerId] = useState(prefill?.customerId ?? "");
-  const [propertyId, setPropertyId] = useState("");
+  // Ön dolgu (nottan randevu) önce; yoksa kuyruktan geri yüklenen seçim.
+  const initialCustomer = prefill?.customerId ?? v?.customer_id ?? "";
+  const initialCustomerLabel = prefill?.customerLabel || restoredLabel(v, "customer_id", "Seçili müşteri");
+  const [customerId, setCustomerId] = useState(initialCustomer);
+  const [propertyId, setPropertyId] = useState(v?.property_id ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
   // Sunucu (createAppointment) ile AYNI kural: yer göstermede müşteri + portföy, diğer türlerde en az biri.
   const missing = appointmentMissing({ appointment_type: apptType, customer_id: customerId, property_id: propertyId });
@@ -512,8 +566,8 @@ function AppointmentForm({
           emptyText="Eşleşen müşteri yok"
           onSearch={searchCustomers}
           options={customers}
-          defaultValue={prefill?.customerId}
-          selectedLabel={prefill?.customerLabel || undefined}
+          defaultValue={initialCustomer || undefined}
+          selectedLabel={initialCustomerLabel || undefined}
           onValueChange={setCustomerId}
           className="[&_button]:min-h-11"
         />
@@ -528,6 +582,8 @@ function AppointmentForm({
           emptyText="Eşleşen portföy yok"
           onSearch={searchProperties}
           options={properties}
+          defaultValue={v?.property_id}
+          selectedLabel={restoredLabel(v, "property_id", "Seçili portföy")}
           onValueChange={setPropertyId}
           className="[&_button]:min-h-11"
         />
@@ -697,6 +753,7 @@ export function QuickCapture({
   propertyTypeOptions = [],
   transactionOptions = [],
   brand,
+  scope: scopeProp,
 }: {
   tabs: QuickTabId[];
   initial: QuickTabId;
@@ -707,7 +764,10 @@ export function QuickCapture({
   propertyTypeOptions?: { value: string; label: string }[];
   transactionOptions?: { value: string; label: string }[];
   brand?: QuickPropertyBrand;
+  /** Aktif oturum (kiracı + kullanıcı): taslak ve kuyruk yalnız bu oturuma aittir. */
+  scope: CaptureScope;
 }) {
+  const scope = useMemo(() => ({ tenantId: scopeProp.tenantId, userId: scopeProp.userId }), [scopeProp.tenantId, scopeProp.userId]);
   const [active, setActive] = useState<QuickTabId>(initial);
   const [prefill, setPrefill] = useState<AppointmentPrefill | null>(null);
   const items: MorphTabItem[] = tabs.map((t) => ({ id: t, label: TAB_META[t].label, icon: TAB_META[t].icon }));
@@ -732,8 +792,11 @@ export function QuickCapture({
   /** Kuyruktaki öğeyi gönderir (aynı action, aynı istek kimliği → sunucuda en çok bir kayıt). */
   async function sendQueued(item: OutboxItem) {
     const fd = new FormData();
-    for (const [k, v] of item.fields) fd.append(k, v);
+    for (const [k, v] of item.fields) if (!CLIENT_FIELDS.has(k)) fd.append(k, v);
     fd.set("client_request_id", item.id);
+    // Öğenin sahibi: sunucu oturumla uyuşmazsa reddeder (başka oturumun kaydı bu ofiste açılmaz).
+    fd.set(SCOPE_TENANT_FIELD, item.tenantId);
+    fd.set(SCOPE_USER_FIELD, item.userId);
     try {
       return outcomeFromResult(await ACTIONS[item.kind](fd));
     } catch (e) {
@@ -744,9 +807,10 @@ export function QuickCapture({
   function restoreQueued(item: OutboxItem) {
     const tab = KIND_TAB[item.kind];
     const values: DraftValues = {};
-    for (const [k, v] of item.fields) values[k] = v;
-    restoreDraft(tab, values);
-    removeOutboxItem(browserStore(), item.id);
+    for (const [k, v] of item.fields) if (!CLIENT_FIELDS.has(k)) values[k] = v;
+    for (const [field, label] of Object.entries(item.labels ?? {})) values[pickerLabelKey(field)] = label;
+    restoreDraft(scope, tab, values);
+    removeOutboxItem(browserStore(), scope, item.id);
     outboxChanged();
     if (tabs.includes(tab)) select(tab);
   }
@@ -759,35 +823,37 @@ export function QuickCapture({
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <OutboxPanel
-        send={sendQueued}
-        onRestore={restoreQueued}
-        hrefFor={(item, id) =>
-          item.kind === "customer" && id
-            ? `/app/musteriler/${id}`
-            : item.kind === "property" && id
-              ? `/app/portfoyler/${id}`
-              : item.kind === "appointment"
-                ? "/app/randevular"
-                : item.kind === "call"
-                  ? "/app/gelen-kutusu?sekme=cagri"
-                  : null
-        }
-      />
-      <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" />
-      {tabs.map((t) => (
-        <section
-          key={t}
-          id={`hq-panel-${t}`}
-          role="tabpanel"
-          aria-labelledby={`hq-tab-${t}`}
-          hidden={active !== t}
-          className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5"
-        >
-          {panels[t]}
-        </section>
-      ))}
-    </div>
+    <CaptureScopeProvider value={scope}>
+      <div className="flex flex-col gap-4">
+        <OutboxPanel
+          send={sendQueued}
+          onRestore={restoreQueued}
+          hrefFor={(item, id) =>
+            item.kind === "customer" && id
+              ? `/app/musteriler/${id}`
+              : item.kind === "property" && id
+                ? `/app/portfoyler/${id}`
+                : item.kind === "appointment"
+                  ? "/app/randevular"
+                  : item.kind === "call"
+                    ? "/app/gelen-kutusu?sekme=cagri"
+                    : null
+          }
+        />
+        <MorphTabs items={items} activeId={active} onSelect={select} orientation="horizontal" label="Hızlı kayıt türü" idPrefix="hq" />
+        {tabs.map((t) => (
+          <section
+            key={t}
+            id={`hq-panel-${t}`}
+            role="tabpanel"
+            aria-labelledby={`hq-tab-${t}`}
+            hidden={active !== t}
+            className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5"
+          >
+            {panels[t]}
+          </section>
+        ))}
+      </div>
+    </CaptureScopeProvider>
   );
 }

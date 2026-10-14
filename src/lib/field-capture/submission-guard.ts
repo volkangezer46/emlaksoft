@@ -52,6 +52,22 @@ export function readRequestId(formData: FormData): string | null {
   return UUID_RE.test(raw) ? raw.toLowerCase() : null;
 }
 
+export const SCOPE_MISMATCH_ERROR =
+  "Bu kayıt bu cihazda başka bir oturumda (başka kullanıcı ya da ofis) sıraya alınmıştı; bu oturumla gönderilmedi.";
+
+/**
+ * İstemcinin bildirdiği kapsam (`client_tenant_id` / `client_user_id`, kuyruk öğesinin sahibi) oturumla uyuşmuyor mu?
+ * Alanlar yoksa (eski istemci) kontrol yapılmaz; varsa ikisi de oturumla AYNI olmalı. Uyuşmazlıkta hata metni döner:
+ * başka kullanıcının sıraya aldığı kayıt bu oturumun kiracısında/adına AÇILMAZ.
+ */
+export function scopeMismatchError(formData: FormData, session: { tenantId: string | null; userId: string }): string | null {
+  const tenant = formData.get("client_tenant_id");
+  const user = formData.get("client_user_id");
+  if (tenant === null && user === null) return null;
+  if (String(tenant ?? "") !== (session.tenantId ?? "") || String(user ?? "") !== session.userId) return SCOPE_MISMATCH_ERROR;
+  return null;
+}
+
 /** Oturumlu Supabase istemcisiyle depo (RLS: yalnız kendi kiracı + kullanıcı satırı). */
 export function supabaseSubmissionStore(supabase: SupabaseClient): SubmissionStore {
   const t = () => supabase.from("client_submissions");

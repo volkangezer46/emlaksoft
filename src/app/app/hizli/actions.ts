@@ -17,7 +17,7 @@ import { parsePhoneStrict } from "@/lib/phone-rules";
 import { isOwnerSideCustomerType } from "@/lib/demand-criteria";
 import { validateGeoChain } from "@/lib/geo/reader";
 import { isValidPoint, suggestGeoForPoint, type GeoPointSuggestion } from "@/lib/geo/nearest";
-import { onceByRequest, readRequestId, supabaseSubmissionStore, type SubmissionKind } from "@/lib/field-capture/submission-guard";
+import { onceByRequest, readRequestId, scopeMismatchError, supabaseSubmissionStore, type SubmissionKind } from "@/lib/field-capture/submission-guard";
 import { extractNoteFieldsForTenant, NOTE_FIELDS_MAX_TEXT } from "@/lib/field-capture/note-fields-server";
 import type { NoteFieldSuggestions } from "@/lib/field-capture/note-fields";
 import { QUICK_INTENT_TYPES, QUICK_INTENT_TRANSACTION, buildQuickPropertyTitle, type QuickIntent } from "./quick-intents";
@@ -44,9 +44,14 @@ async function guarded<T extends { ok?: boolean; id?: string; error?: string }>(
   run: () => Promise<T>,
 ): Promise<T | { ok?: boolean; id?: string; error?: string }> {
   const requestId = readRequestId(formData);
-  if (!requestId) return run();
+  const claimsScope = formData.has("client_tenant_id") || formData.has("client_user_id");
+  if (!requestId && !claimsScope) return run();
   const gate = await requirePermission(gateModule, "create");
   if (!gate.ok) return { error: gate.error };
+  // Kuyruk öğesi başka oturumda (kullanıcı/ofis) sıraya alındıysa bu oturumun adına kayıt AÇILMAZ.
+  const mismatch = scopeMismatchError(formData, { tenantId: gate.tenantId, userId: gate.userId });
+  if (mismatch) return { error: mismatch };
+  if (!requestId) return run();
   return onceByRequest(supabaseSubmissionStore(await createClient()), { tenantId: gate.tenantId, userId: gate.userId }, kind, requestId, run);
 }
 

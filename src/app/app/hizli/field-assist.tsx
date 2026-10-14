@@ -1,20 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { Button } from "@/components/ui/button";
-import { CalendarClock, Check, CloudOff, ListChecks, Loader2, MapPin, Mic, MicOff, RotateCcw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { CalendarClock, Check, CloudOff, ListChecks, Loader2, MapPin, Mic, MicOff, RotateCcw, Sparkles, Trash2, TriangleAlert, Wand2 } from "lucide-react";
 import { now, toTrLocalInput } from "@/lib/clock";
 import {
   browserStore,
   clearDraft,
   flushOutbox,
   formValues,
+  isOutboxStorageKey,
   loadDraft,
-  OUTBOX_KEY,
+  outboxKey,
+  pruneOutbox,
   readOutbox,
   removeOutboxItem,
   saveDraft,
+  SCOPE_TENANT_FIELD,
+  SCOPE_USER_FIELD,
+  type CaptureScope,
   type DraftValues,
   type OutboxItem,
   type SendOutcome,
@@ -30,6 +35,23 @@ import { extractQuickNoteFields, suggestQuickLocation } from "./actions";
 
 /** Onaylanmış öneri düğmesi vurgusu (kanonik Button üzerine). */
 const APPLIED = "border-mint-500/50 bg-mint-500/10 text-mint-700";
+
+/* --------------------------------- Kapsam --------------------------------- */
+
+/**
+ * Taslak ve kuyruk aktif oturumun kiracı + kullanıcısına bağlıdır (sayfa sunucudan verir). Kapsam yoksa (sağlayıcı
+ * dışı kullanım) taslak/kuyruk kapalıdır: başka oturumun verisine düşmektense hiç saklamamak.
+ */
+const CaptureScopeContext = createContext<CaptureScope | null>(null);
+export const CaptureScopeProvider = CaptureScopeContext.Provider;
+
+function useCaptureScope(): CaptureScope | null {
+  return useContext(CaptureScopeContext);
+}
+
+function scopedKey(scope: CaptureScope | null, key: string): string {
+  return scope ? `${scope.tenantId}:${scope.userId}:${key}` : `-:${key}`;
+}
 
 /* --------------------------------- Taslak --------------------------------- */
 
@@ -50,15 +72,16 @@ function setDraftCache(key: string, values: DraftValues | null) {
   draftListeners.forEach((l) => l());
 }
 
-function draftSnapshot(key: string): DraftValues | null {
-  if (!draftCache.has(key)) draftCache.set(key, loadDraft(browserStore(), key, now()));
-  return draftCache.get(key) ?? null;
+function draftSnapshot(scope: CaptureScope | null, key: string): DraftValues | null {
+  const ck = scopedKey(scope, key);
+  if (!draftCache.has(ck)) draftCache.set(ck, scope ? loadDraft(browserStore(), scope, key, now()) : null);
+  return draftCache.get(ck) ?? null;
 }
 
 /** Kuyruktan reddedilen kaydı ilgili sekmenin formuna geri yükler. */
-export function restoreDraft(key: string, values: DraftValues) {
-  saveDraft(browserStore(), key, values, now());
-  setDraftCache(key, values);
+export function restoreDraft(scope: CaptureScope, key: string, values: DraftValues) {
+  saveDraft(browserStore(), scope, key, values, now());
+  setDraftCache(scopedKey(scope, key), values);
 }
 
 /**
@@ -66,19 +89,25 @@ export function restoreDraft(key: string, values: DraftValues) {
  * değerleriyle yeniden kurulur. `track` formun onInput'una bağlanır (gecikmeli kayıt).
  */
 export function useFormDraft(key: string, skip: readonly string[] = []) {
-  const values = useSyncExternalStore(subscribeDrafts, () => draftSnapshot(key), () => null);
-  const version = useSyncExternalStore(subscribeDrafts, () => draftVersion.get(key) ?? 0, () => 0);
+  const scope = useCaptureScope();
+  const ck = scopedKey(scope, key);
+  const values = useSyncExternalStore(subscribeDrafts, () => draftSnapshot(scope, key), () => null);
+  const version = useSyncExternalStore(subscribeDrafts, () => draftVersion.get(ck) ?? 0, () => 0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   function track(form: HTMLFormElement) {
+    if (!scope) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => saveDraft(browserStore(), key, formValues(form, ["client_request_id", ...skip]), now()), 400);
+    timer.current = setTimeout(
+      () => saveDraft(browserStore(), scope, key, formValues(form, ["client_request_id", SCOPE_TENANT_FIELD, SCOPE_USER_FIELD, ...skip]), now()),
+      400,
+    );
   }
   function clear() {
     if (timer.current) clearTimeout(timer.current);
-    clearDraft(browserStore(), key);
-    setDraftCache(key, null);
+    if (scope) clearDraft(browserStore(), scope, key);
+    setDraftCache(ck, null);
   }
-  return { values, formKey: `${version}-${values ? "t" : "b"}`, track, clear, restored: Boolean(values) };
+  return { values, formKey: `${version}-${values ? "t" : "b"}`, track, clear, restored: Boolean(values), scope };
 }
 
 /* ---------------------------------- Kuyruk ---------------------------------- */
@@ -90,7 +119,7 @@ function notifyOutbox() {
 function subscribeOutbox(cb: () => void) {
   outboxListeners.add(cb);
   const onStorage = (e: StorageEvent) => {
-    if (e.key === OUTBOX_KEY) cb();
+    if (isOutboxStorageKey(e.key)) cb();
   };
   window.addEventListener("storage", onStorage);
   return () => {
@@ -98,14 +127,10 @@ function subscribeOutbox(cb: () => void) {
     window.removeEventListener("storage", onStorage);
   };
 }
-function outboxRaw(): string {
-  return browserStore()?.get(OUTBOX_KEY) ?? "";
-}
-
-export function useOutboxItems(): OutboxItem[] {
-  const raw = useSyncExternalStore(subscribeOutbox, outboxRaw, () => "");
-  // `raw` değişince yeniden okunur (depo dizesi kararlı ilkel değer).
-  return useMemo(() => (raw ? readOutbox(browserStore()) : []), [raw]);
+export function useOutboxItems(scope: CaptureScope | null): OutboxItem[] {
+  const raw = useSyncExternalStore(subscribeOutbox, () => (scope ? (browserStore()?.get(outboxKey(scope)) ?? "") : ""), () => "");
+  // `raw` değişince yeniden okunur (depo dizesi kararlı ilkel değer). Yalnız aktif oturumun öğeleri.
+  return useMemo(() => (raw && scope ? readOutbox(browserStore(), scope) : []), [raw, scope]);
 }
 
 export function outboxChanged() {
@@ -129,7 +154,8 @@ export function OutboxPanel({
   onRestore: (item: OutboxItem) => void;
   hrefFor: (item: OutboxItem, id?: string) => string | null;
 }) {
-  const items = useOutboxItems();
+  const scope = useCaptureScope();
+  const items = useOutboxItems(scope);
   const online = useSyncExternalStore(
     (cb) => {
       window.addEventListener("online", cb);
@@ -143,21 +169,35 @@ export function OutboxPanel({
     () => true,
   );
   const [sent, setSent] = useState<SentNotice[]>([]);
+  const [expired, setExpired] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const pending = items.filter((i) => i.state === "pending");
   const failed = items.filter((i) => i.state === "failed");
 
   // Bağlantı geldiğinde / sayfa açılışında / sekme görünür olunca boşalt (tek uçuşlu: flushOutbox aynı sözü paylaşır).
+  // Süresi dolan (7 gün) öğeler gönderilmeden silinir ve kullanıcıya söylenir.
+  function noteExpired(list: OutboxItem[]) {
+    if (list.length > 0) setExpired((prev) => [...list.map((i) => i.label), ...prev].slice(0, 5));
+  }
   function flush() {
-    if (!navigator.onLine || readOutbox(browserStore()).every((i) => i.state !== "pending")) return;
+    if (!scope) return;
+    noteExpired(pruneOutbox(browserStore(), scope, now()));
+    notifyOutbox();
+    if (!navigator.onLine || readOutbox(browserStore(), scope).every((i) => i.state !== "pending")) return;
     setBusy(true);
     const ids = new Map<string, string | undefined>();
-    void flushOutbox(browserStore(), async (item) => {
-      const r = await send(item);
-      if (r.kind === "ok") ids.set(item.id, r.id);
-      return r;
-    })
+    void flushOutbox(
+      browserStore(),
+      scope,
+      async (item) => {
+        const r = await send(item);
+        if (r.kind === "ok") ids.set(item.id, r.id);
+        return r;
+      },
+      now(),
+    )
       .then((report) => {
+        noteExpired(report.expired);
         if (report.sent.length > 0) {
           setSent((prev) => [...report.sent.map((i) => ({ id: i.id, label: i.label, href: hrefFor(i, ids.get(i.id)) })), ...prev].slice(0, 5));
         }
@@ -185,7 +225,7 @@ export function OutboxPanel({
     };
   }, []);
 
-  if (items.length === 0 && sent.length === 0 && online) return null;
+  if (items.length === 0 && sent.length === 0 && expired.length === 0 && online) return null;
   return (
     <section aria-label="Bekleyen kayıtlar" className="rounded-[var(--radius-panel)] border border-line bg-surface p-3 text-sm">
       {!online ? (
@@ -222,7 +262,7 @@ export function OutboxPanel({
                 size="sm"
                 icon={Trash2}
                 onClick={() => {
-                  removeOutboxItem(browserStore(), i.id);
+                  if (scope) removeOutboxItem(browserStore(), scope, i.id);
                   notifyOutbox();
                 }}
                 className="text-danger-600"
@@ -230,6 +270,15 @@ export function OutboxPanel({
               >
                 Sil
               </Button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {expired.length > 0 ? (
+        <ul className="mt-2 space-y-1">
+          {expired.map((label, idx) => (
+            <li key={`${label}-${idx}`} className="flex items-center gap-2 text-xs text-amber-700">
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> Süresi doldu (7 gün), gönderilmeden bu cihazdan silindi: {label}
             </li>
           ))}
         </ul>
