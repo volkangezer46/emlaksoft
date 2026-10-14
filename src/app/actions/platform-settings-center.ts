@@ -25,7 +25,6 @@ const REVALIDATE = "/admin/ayarlar/merkez";
 function done(res: Awaited<ReturnType<typeof writeSetting>>): CenterResult {
   if (!res.ok) return { error: res.error };
   revalidatePath(REVALIDATE);
-  revalidatePath("/admin/ayarlar");
   return { ok: true, changed: res.changed, degraded: res.degraded };
 }
 

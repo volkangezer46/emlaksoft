@@ -33,7 +33,7 @@ import type { PlatformModule } from "@/lib/platform-access";
  * Yan menü (UXD-3): tek öğeli grup başlıksız düz satırdır; çok öğeli grupta çekirdek satır hep görünür, kalan öğeler
  * grubun kendi açılır alanındadır (eski ortak "Diğer" grubu yok: Büyüme/Analiz tarifesi Gelir'de, Toplu duyuru
  * Destek'te, Coğrafya/Personel/Ayarlar Sistem'de).
- * Kaldırılan "Demo & aday" (self-servis kayıt; demo talebi/aday takibi yok): eski /admin/satis -> /admin/tenants?durum=trial.
+ * Kaldırılan "Demo & aday" (self-servis kayıt; demo talebi/aday takibi yok): deneme hunisi /admin/tenants?durum=trial.
  */
 
 export type AdminBadgeKey = "tickets" | "risk";
@@ -217,7 +217,7 @@ export const ADMIN_NAV: readonly AdminNavSection[] = [
       { href: "/admin/geo", label: "Coğrafya", description: "İl, ilçe, mahalle verisi; içe aktarma ve eşleştirme sekmeleri", icon: MapPin, modules: ["geo"] },
       { href: "/admin/personel", label: "Personel", description: "EmlakSoft çalışanları ve rolleri", icon: ShieldCheck, modules: ["personel"] },
       {
-        href: "/admin/ayarlar",
+        href: "/admin/ayarlar/merkez",
         label: "Ayarlar",
         description: "Genel platform ayarları, özellik bayrakları, yasal metinler",
         icon: Settings,
@@ -285,7 +285,7 @@ export function adminTabPathname(pathname: string, sekme: string | null | undefi
 }
 
 /**
- * Sekme aktif mi: en uzun eşleşen yol kazanır (/admin/ayarlar/merkez, /admin/ayarlar'ı ezmez). Alt sayfalar (`children`)
+ * Sekme aktif mi: en uzun eşleşen yol kazanır (/admin/ayarlar/yasal/[slug], /admin/ayarlar/yasal sekmesini etkin yapar). Alt sayfalar (`children`)
  * da sekmenin yoludur: /admin/site/sayfalar "İçerik" sekmesini etkin yapar ("Genel bakış" /admin/site'ı değil).
  */
 export function activeTabHref(pathname: string, tabs: readonly AdminNavLink[]): string | null {

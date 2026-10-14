@@ -3,7 +3,7 @@ import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
 import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { requireModulePage } from "@/lib/require-module-page";
-import { AnnouncementsView } from "../ayarlar/duyurular/announcements-view";
+import { AnnouncementsView } from "./announcements-view";
 import { DuyuruAkisi } from "./duyuru-akisi";
 import { NotificationsView } from "./notifications-view";
 
@@ -13,7 +13,7 @@ type Sp = { sekme?: string; durum?: string; tur?: string; sayfa?: string };
 
 /**
  * Bildirimler: kişisel bildirim akışı + ofis duyuruları (herkes okur; ana ekrandaki duyuru satırı buraya taşındı) +
- * duyuru yönetimi (eski /app/ayarlar/duyurular). Yönetim `settings` iznine bağlıdır: izin yoksa sekme gizlenir.
+ * duyuru yönetimi. Yönetim `settings` iznine bağlıdır: izin yoksa sekme gizlenir.
  */
 export default async function NotificationsPage({ searchParams }: { searchParams?: Promise<Sp> }) {
   const { perms } = await requireModulePage("dashboard");

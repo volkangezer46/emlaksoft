@@ -37,7 +37,7 @@ const BASELINE: Record<Kind, Record<string, number>> = {
   talepDizisi: {
     "src/app/actions/customer-portal.ts": 1,
     "src/app/actions/properties.ts": 1,
-    "src/app/app/arama/calls-view.tsx": 1,
+    "src/app/app/gelen-kutusu/calls-view.tsx": 1,
     "src/app/app/musteriler/[id]/page.tsx": 1,
     "src/app/app/talepler/demands-view.tsx": 1,
     "src/app/app/yabanci-satis/page.tsx": 1,

@@ -55,7 +55,7 @@ export const TERMS = {
   },
   ornekVeri: {
     canonical: "Örnek veri",
-    definition: "Ofisin içine yüklenen is_sample kayıtlar. Demo talebi akışı yoktur (self-servis kayıt; eski /admin/satis ve public /demo yönlendirilir).",
+    definition: "Ofisin içine yüklenen is_sample kayıtlar. Demo talebi akışı yoktur (self-servis kayıt; public /demo kayıt sayfasına yönlendirilir).",
     forbidden: [/demo modundasınız/i, /demo verileriyle/i, /dolu demo/i, /demo ofisle/i],
   },
   hesapKredisi: {
@@ -134,7 +134,7 @@ export const LOSS_TERMS = {
   },
   atRisk: {
     canonical: "Risk altındaki müşteriler",
-    definition: "Uzun süredir ilgilenilmeyen, kaybedilme riski taşıyan müşteri ve talepler. Sayfa: /app/kayip-satis.",
+    definition: "Uzun süredir ilgilenilmeyen, kaybedilme riski taşıyan müşteri ve talepler. Yer: Akıllı listeler, 'Kaybedilme riski yüksek' bölümü (/app/akilli-listeler?segment=churn).",
   },
 } as const;
 

@@ -458,8 +458,8 @@ export default async function SurveyResultsPage({ searchParams }: { searchParams
                 </ul>
               )}
               <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3 text-xs">
-                <Link href="/app/kayip-satis" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
-                  Kayıp satış nedenleri
+                <Link href="/app/akilli-listeler?segment=churn" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">
+                  Riskli müşteriler
                 </Link>
                 <span className="text-text-faint">·</span>
                 <Link href="/app/kayip-kacak" className="focus-ring rounded-[var(--radius-control)] font-semibold text-brand-700 underline-offset-2 hover:underline">

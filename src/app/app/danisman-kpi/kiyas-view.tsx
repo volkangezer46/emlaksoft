@@ -3,7 +3,7 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import Link from "@/components/ui/smart-link";
 import { ArrowLeftRight, Info, UsersRound } from "lucide-react";
 import { SkeletonCard } from "@/components/ui/viz";
-import { LigOzeti } from "../ekip/kiyas/lig-ozeti";
+import { LigOzeti } from "./lig-ozeti";
 import { createClient } from "@/lib/supabase/server";
 import { now } from "@/lib/clock";
 import { PageHeader } from "@/components/ui/page-header";
@@ -45,7 +45,7 @@ export type KiyasViewProps = {
 const LINK =
   "focus-ring relative z-10 inline-flex touch:min-h-11 touch:min-w-11 items-center justify-end rounded-[var(--radius-control)] hover:text-brand-600 hover:underline";
 
-/** Karne içindeki "Kıyas" görünümü (eski /app/ekip/kiyas sayfası; kapı çağıran sayfada). */
+/** Karne içindeki "Kıyas" görünümü (kapı çağıran sayfada). */
 export async function KiyasView({ tenantId, userId, perms, role, sirala, filtre }: KiyasViewProps) {
   const canHandoff = (perms.team ?? []).includes("edit");
   const seeAllEarnings = canSeeAllEarnings(perms);

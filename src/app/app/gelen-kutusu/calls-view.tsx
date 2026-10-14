@@ -13,7 +13,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
 import { CallConsole } from "./call-console";
 import { CallAiSummary } from "./call-ai-summary";
-import { LinkToCustomer } from "../gelen-kutusu/link-to-customer";
+import { LinkToCustomer } from "./link-to-customer";
 import { formatTurkishPhone, toTelHref } from "@/lib/phone";
 import { isAiConfigured } from "@/lib/ai-advisor";
 

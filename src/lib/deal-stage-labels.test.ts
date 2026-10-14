@@ -59,7 +59,7 @@ const SRC = join(process.cwd(), "src");
 
 describe("aşama adı sabit metin sözleşmesi", () => {
   it("anlaşma aşaması adları yalnız definition-defaults.ts içinde sabit yazılır", () => {
-    // Kapsam dışı: platform satış hattı (admin/satis, ayrı kavram: demo talepleri) ve kullanıcıya dönük genel metinler.
+    // Kapsam dışı: platform satış hattı (ayrı kavram: demo talepleri) ve kullanıcıya dönük genel metinler.
     const allowed = [/^lib\/definition-defaults\.ts$/, /^app\/admin\//];
     const patterns = [/qualified:\s*"Nitelikli"/, /negotiation:\s*"Müzakere"/, /\{\s*key:\s*"negotiation",\s*label:/, /value:\s*"negotiation",\s*label:/];
     const offenders: string[] = [];

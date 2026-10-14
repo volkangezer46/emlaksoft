@@ -3,7 +3,7 @@ import { test, expect, type Page, type Locator } from "@playwright/test";
 /**
  * Oturumlu E2E akışları — 5. dalga (Dalga N kanıtlama):
  *  - Anlaşma evrak dosyası (şablondan oluştur + checkbox toggle + ilerleme)
- *  - Duyuru panosu uçtan uca (/app/ayarlar/duyurular → dashboard bandı → Okudum)
+ *  - Duyuru panosu uçtan uca (/app/bildirimler?sekme=yonetim → dashboard bandı → Okudum)
  *  - NPS anketi uçtan uca (/app/raporlar/memnuniyet → public /anket/[token])
  *  - Günün rotası görünümü (/app/randevular?gorunum=rota)
  *  - Vitrin v2: favori kalbi + /vitrin/demo-ofis/favoriler + fiyat alarmı formu
@@ -82,7 +82,7 @@ test.describe("Anlasma evrak dosyasi (/app/anlasmalar/[id])", () => {
   });
 });
 
-test.describe("Duyuru panosu uctan uca (/app/ayarlar/duyurular -> dashboard bandi)", () => {
+test.describe("Duyuru panosu uctan uca (/app/bildirimler?sekme=yonetim -> dashboard bandi)", () => {
   test("yeni duyuru yayinlanir; dashboard bandinda gorunur; Okudum ile okundu durumuna gecer", async ({
     page,
   }) => {
@@ -90,7 +90,7 @@ test.describe("Duyuru panosu uctan uca (/app/ayarlar/duyurular -> dashboard band
 
     const title = `E2E Duyuru ${Date.now()}`;
 
-    await page.goto("/app/ayarlar/duyurular");
+    await page.goto("/app/bildirimler?sekme=yonetim");
     await expectAppShell(page);
     await expect(page.getByRole("heading", { name: "Yeni duyuru" })).toBeVisible({ timeout: 30_000 });
 

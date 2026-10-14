@@ -34,7 +34,6 @@ export const ROUTE_TABLES: ReadonlyArray<readonly [string, readonly string[]]> =
   ["/app/portfoyler/anahtarlar", ["property_keys", "properties"]],
   ["/app/portfoyler", ["portal_listings", "properties"]],
   ["/app/talepler", ["customer_demands"]],
-  ["/app/eslestirme", ["customer_demands", "properties"]],
   ["/app/randevular", ["appointments"]],
   ["/app/gorevler", ["tasks"]],
   ["/app/ilan-havuzu", ["listing_pool_entries", "properties"]],

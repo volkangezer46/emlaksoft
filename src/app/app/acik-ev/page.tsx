@@ -1,5 +1,4 @@
 import { KpiGrid } from "@/components/ui/dashboard-grid";
-import { redirect } from "next/navigation";
 import Link from "@/components/ui/smart-link";
 import {
   ArrowUpRight,
@@ -58,11 +57,10 @@ function countdownLabel(iso: string): string | null {
 export default async function AcikEvPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ durum?: string; yeni?: string }>;
+  searchParams?: Promise<{ durum?: string }>;
 }) {
   const { perms } = await requireModulePage("open_house", "/app/acik-ev");
   const params = (await searchParams) ?? {};
-  if (params.yeni === "1") redirect("/app/acik-ev/yeni");
   const durum = Object.keys(FILTER_LABELS).includes(params.durum ?? "") ? params.durum : undefined;
   const events = await listOpenHouses();
   const canCreate = (perms.open_house ?? perms.appointments ?? []).includes("create");

@@ -356,7 +356,7 @@ describe("P12: ligde tutar sızmaz", () => {
       "app/app/lig/challenges-panel.tsx",
       "app/app/lig/challenge-form.tsx",
       "app/app/performansim/lig-kocu.tsx",
-      "app/app/ekip/kiyas/lig-ozeti.tsx",
+      "app/app/danisman-kpi/lig-ozeti.tsx",
       "app/actions/league.ts",
     ]) {
       expect(read(p), p).not.toMatch(MONEY);

@@ -1,7 +1,7 @@
 import { PageSegmentTabs, type PageTab } from "@/components/app/page-tabs";
 import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
-import { CallsView } from "../arama/calls-view";
+import { CallsView } from "./calls-view";
 import { InboxView } from "./inbox-view";
 
 export const metadata = { title: "Gelen Kutusu" };
@@ -12,9 +12,8 @@ const TABS: readonly PageTab[] = [
 ];
 
 /**
- * Gelen Kutusu: iletişim akışı + çağrı kaydı (eski /app/arama) tek sayfada.
+ * Gelen Kutusu: iletişim akışı + çağrı kaydı tek sayfada.
  * `?sekme=cagri` çağrı kaydını açar; iki sekme de `calls` modülündedir (tek kapı).
- * Eski /app/arama yolu parametreleri koruyarak buraya yönlendirir.
  */
 export default async function InboxPage({
   searchParams,

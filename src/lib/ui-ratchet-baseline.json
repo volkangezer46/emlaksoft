@@ -143,19 +143,19 @@
   "hamButon": 4,
   "kucukHedef": 0
  },
- "src/app/app/arama/call-ai-summary.tsx": {
+ "src/app/app/gelen-kutusu/call-ai-summary.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/arama/call-console.tsx": {
+ "src/app/app/gelen-kutusu/call-console.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/arama/calls-view.tsx": {
+ "src/app/app/gelen-kutusu/calls-view.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
@@ -203,7 +203,7 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/ayarlar/duyurular/announcements-manager.tsx": {
+ "src/app/app/bildirimler/announcements-manager.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 4,
@@ -479,13 +479,13 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/eslestirme/save-match-button.tsx": {
+ "src/app/app/talepler/save-match-button.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/app/app/eslestirme/send-match-button.tsx": {
+ "src/app/app/talepler/send-match-button.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
@@ -1235,7 +1235,7 @@
   "hamButon": 2,
   "kucukHedef": 0
  },
- "src/app/app/yatirim/investment-analyzer.tsx": {
+ "src/app/app/hesaplayici/investment-analyzer.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 1,

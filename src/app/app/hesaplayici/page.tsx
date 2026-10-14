@@ -4,7 +4,7 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { cn } from "@/lib/utils";
 import { CalculatorView, type CalculatorSearchParams } from "./calculator-view";
 import { SellerView } from "./seller-view";
-import { InvestmentView, type InvestmentSearchParams } from "../yatirim/investment-view";
+import { InvestmentView, type InvestmentSearchParams } from "./investment-view";
 
 export const metadata = { title: "Hesaplayıcılar" };
 
@@ -18,7 +18,6 @@ const TABS = [
  * Hesaplayıcılar: alım maliyeti & kredi + yatırım getirisi tek sayfada, iki sekme.
  * `?sekme=satici` satıcı net/vergi hesabını, `?sekme=yatirim` yatırım analizini açar; diğer değerler ("kredi", "maliyet", boş)
  * alım maliyeti sekmesine gider (eski `?sekme=kredi` bağlantıları çalışır).
- * Eski /app/yatirim yolu parametreleri koruyarak buraya yönlendirir.
  *
  * MODÜL KAPISI: iki sekme de `valuation` — tek kapı.
  */

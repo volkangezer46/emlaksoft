@@ -96,7 +96,7 @@ describe("bakım/kayıt bayrakları önbelleği", () => {
   });
 
   it("muaf yollar: admin, giriş/mfa, api, statik; public ve /app muaf değil", () => {
-    for (const p of ["/admin", "/admin/ayarlar", "/giris", "/giris/mfa", "/api/health", "/api/cron/x", "/_next/static/a", "/logo.png", "/bakim"]) {
+    for (const p of ["/admin", "/admin/ayarlar/merkez", "/giris", "/giris/mfa", "/api/health", "/api/cron/x", "/_next/static/a", "/logo.png", "/bakim"]) {
       expect(isMaintenanceExemptPath(p), p).toBe(true);
     }
     for (const p of ["/", "/kayit", "/app", "/app/musteriler", "/vitrin/ofis", "/paylas/abc"]) {
