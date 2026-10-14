@@ -14,8 +14,8 @@ import {
  * İŞLEVSEL SQL TESTİ (pglite): SN1 — 20261014021010_platform_staff_can_gates.
  * Kabul: (1) SQL platform_staff_can, TS `platformCan` ile tüm sabit rol × modül × eylem ve özel rol matrislerinde birebir aynı;
  * (2) özel role "billing onayla" verilen personel update_tenant_plan_subscription'ı çalıştırabilir, verilmeyen (yalnız görüntüle,
- * taban rolü billing olsa bile) çalıştıramaz; sabit rollerde sonuç aynı; (3) politikalar (platform_settings, platform_mrr_daily)
- * ve küçük kapılar matrise uyar; (4) canlı gövde yaması tek ifadeyi değiştirir, idempotenttir; rollback eski rol kapısına döner.
+ * taban rolü billing olsa bile) çalıştıramaz; sabit rollerde sonuç aynı; (3) platform_mrr_daily politikası ve küçük kapılar
+ * matrise uyar; platform_settings politikası BİLEREK sabit super_admin'de kalır (sistem:approve özel rolüne doğrudan yazım yok); (4) canlı gövde yaması tek ifadeyi değiştirir, idempotenttir; rollback eski rol kapısına döner.
  * update_tenant_plan_subscription / convert_demo_request_to_tenant burada yalnız kapı bölümüyle taslaktır; kapı metni gerçek
  * migration'daki (20260825000300) ifadeyle aynıdır (aşağıdaki test kaynakta varlığını doğrular).
  */
@@ -230,7 +230,8 @@ describe.skipIf(!mod)("SN1 platform_staff_can: SQL kapıları DG1 özel rol matr
     expect(await gates("billing")).toEqual({ ticketStaff: true, operator: false, superAdmin: false, growth: false, settings: 0, mrr: 1, actor: true });
     expect(await gates("support")).toEqual({ ticketStaff: true, operator: false, superAdmin: false, growth: false, settings: 0, mrr: 0, actor: true });
     // Özel roller: taban rol değil matris.
-    expect(await gates("settingsAdmin")).toEqual({ ticketStaff: false, operator: true, superAdmin: true, growth: false, settings: 1, mrr: 1, actor: false });
+    // platform_settings matrise açılmaz: sistem:approve verilmiş özel rol bile tabloyu oturumuyla göremez/yazamaz.
+    expect(await gates("settingsAdmin")).toEqual({ ticketStaff: false, operator: true, superAdmin: true, growth: false, settings: 0, mrr: 1, actor: false });
     expect(await gates("billingViewer")).toEqual({ ticketStaff: true, operator: false, superAdmin: false, growth: false, settings: 0, mrr: 0, actor: true });
     // Kimlik bürünmede portal kuralı kapısı kapalı (eski davranış).
     await asStaff(staff.super_admin!, { app_metadata: { impersonating: "true" } });
@@ -261,6 +262,9 @@ describe.skipIf(!mod)("SN1 platform_staff_can: SQL kapıları DG1 özel rol matr
     await db.exec(read(SN1));
     expect(await planChange(staff.billingApprover!)).toBeNull();
     await asStaff(staff.settingsAdmin!);
+    expect((await q(`select key from public.platform_settings`)).length).toBe(0);
+    expect(await fails(`insert into public.platform_settings(key, value) values ('x', 'y')`)).toMatch(/row-level security/);
+    await asStaff(staff.super_admin!);
     expect((await q(`select key from public.platform_settings`)).length).toBe(1);
     await db.exec(`reset role`);
   });

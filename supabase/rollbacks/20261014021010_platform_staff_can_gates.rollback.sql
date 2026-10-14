@@ -4,12 +4,6 @@
 
 set local lock_timeout = '5s';
 
-drop policy if exists platform_settings_super_admin on public.platform_settings;
-create policy platform_settings_super_admin on public.platform_settings
-  for all
-  using (exists (select 1 from public.platform_staff s where s.id = (select auth.uid()) and s.is_active and s.role = 'super_admin'))
-  with check (exists (select 1 from public.platform_staff s where s.id = (select auth.uid()) and s.is_active and s.role = 'super_admin'));
-
 drop policy if exists platform_mrr_daily_staff_select on public.platform_mrr_daily;
 create policy platform_mrr_daily_staff_select on public.platform_mrr_daily
   for select to authenticated

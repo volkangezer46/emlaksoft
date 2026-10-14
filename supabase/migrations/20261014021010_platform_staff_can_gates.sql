@@ -21,7 +21,6 @@
 --        pt_rules_is_operator              super_admin|ops                  -> sistem:write
 --        pt_rules_is_super_admin           super_admin                      -> sistem:approve
 --        growth_staff_super_admin          super_admin                      -> sales:approve  (TS ADMIN_GATE: sales)
---        platform_settings_super_admin     super_admin (politika, ALL)      -> sistem:approve
 --        platform_mrr_daily_staff_select   super_admin|ops|billing          -> reports:view
 --      BİLEREK DOKUNULMAYANLAR (yetki değil yönlendirme/alıcı listesi ya da tam karşılığı olan modül yok):
 --        support_pick_assignee / SLA yükseltme bildirim alıcıları / pt_rules_publish_system bildirim alıcıları (kime iş/bildirim
@@ -250,12 +249,9 @@ $$;
 -- ---------------------------------------------------------------------------
 -- 4) Politikalar
 -- ---------------------------------------------------------------------------
-drop policy if exists platform_settings_super_admin on public.platform_settings;
-create policy platform_settings_super_admin on public.platform_settings
-  for all to authenticated
-  using ((select public.platform_staff_can('sistem', 'approve')))
-  with check ((select public.platform_staff_can('sistem', 'approve')));
-
+-- platform_settings_super_admin BİLEREK eski kuralında (s.role = 'super_admin'): uygulama bu tabloya yalnız servis istemcisiyle
+-- (setPlatformSetting + denetim kaydı) erişir, TS ayar kapıları da hâlâ sabit super_admin'e bakar. Politikayı matrise açmak
+-- sistem:approve verilmiş özel rol personeline denetimsiz doğrudan PostgREST yazımı verirdi.
 drop policy if exists platform_mrr_daily_staff_select on public.platform_mrr_daily;
 create policy platform_mrr_daily_staff_select on public.platform_mrr_daily
   for select to authenticated
