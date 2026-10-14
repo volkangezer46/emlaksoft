@@ -181,7 +181,7 @@ describe.skipIf(!mod)("SN1 finans: hareket satırında danışman carisi kapsam�
   });
 
   it("düzenli kira (cron): hareket cari + stopajla oluşur; hesaptan net çıkar, gider kaydı brüt kirayı taşır", async () => {
-    await makeRule("Ofis kirası (stopajlı)", 10000, "auto", { party: landlord, wh: 20 });
+    const { id } = await makeRule("Ofis kirası (stopajlı)", 10000, "auto", { party: landlord, wh: 20 });
     expect(await runDue()).toMatchObject({ outcome: "ok", failed: 0 });
     const [e] = await entryOf("Ofis kirası (stopajlı)");
     const want = entryAmounts(10000, null, true, 20);
@@ -190,6 +190,7 @@ describe.skipIf(!mod)("SN1 finans: hareket satırında danışman carisi kapsam�
     expect(e!.wh).toBe(2000);
     const exp = (await q(`select amount::float8 as a from public.expenses where id = $1`, [e!.expense_id]))[0]!;
     expect(exp.a).toBe(10000);
+    expect((await q(`select amount::float8 as a from public.recurring_occurrences where rule_id = $1`, [id]))[0]!.a).toBe(10000);
   });
 
   it("KDV'li düzenli ödeme: KDV tutarı yazılır, gider kaydı KDV hariç net tutardır (v2 kuralı)", async () => {
@@ -223,6 +224,11 @@ describe.skipIf(!mod)("SN1 finans: hareket satırında danışman carisi kapsam�
     expect(res).toMatchObject({ outcome: "applied", created: 1, failed: 0 });
     const [e] = await entryOf("Depo kirası (ekstre)");
     expect(e).toMatchObject({ amount: 8000, wh_rate: 20, wh: 2000, party_id: landlord });
+    // Dönem tutarı cron/onay yoluyla aynı anlamda: belge (brüt) tutarı; nakit yalnız harekette ve audit 'cash'te.
+    await db.exec(`reset role`);
+    expect((await q(`select amount::float8 as a, status from public.recurring_occurrences where rule_id = $1`, [id]))[0]).toMatchObject({ a: 10000, status: "posted" });
+    const audit = (await q(`select new_value from public.audit_logs where action = 'recurring.post' and entity_id = $1`, [id]))[0]!.new_value as Record<string, unknown>;
+    expect(audit).toMatchObject({ amount: 10000, cash: 8000, withholding_amount: 2000 });
   });
 
   it("rollback: politika ve düzenli ödeme eski haline döner (4 argümanlı sürüm düşer); migration yeniden uygulanabilir", async () => {

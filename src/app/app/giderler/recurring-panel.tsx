@@ -44,8 +44,8 @@ export type RulePartyOption = { id: string; name: string; kindLabel: string };
 
 /**
  * Hazır kural şablonları. "stopajli_kira": kira gideri, %20 stopaj; brüt, stopaj ve net ayrı GÖSTERİLİR.
- * DİKKAT: düzenli ödeme döngüsü (recurring_run_due) kuralın KDV/stopaj oranını henüz harekete aktarmaz; hesaba her ay
- * kuraldaki tutar (brüt) işlenir. Form bunu açıkça söyler; oranlar şimdilik bilgi amaçlıdır (Vergi sekmesine yansımaz).
+ * Düzenli ödeme döngüsü (recurring_post_occurrence, 20261014021000) KDV/stopajı ve cariyi harekete yazar: hesaba nakit
+ * (brüt − stopaj) işlenir, Vergi sekmesinde sayılır. Form notu bu migration'a bağlıdır (yayın aynı pencerede).
  */
 export type RuleTemplate = "stopajli_kira";
 
@@ -314,8 +314,8 @@ function RuleDialog({
                   ) : null}
                   {vatRate || withholdingRate ? (
                     <p className="text-xs leading-relaxed text-text-muted" role="note">
-                      Oranlar şimdilik bilgi amaçlıdır: hesaba her ay yukarıdaki tutar ({withholdingRate ? "brüt" : "KDV dahil"}) tek hareket olarak işlenir; KDV ve stopaj bu
-                      hareketlere yazılmaz, Vergi sekmesinde sayılmaz.
+                      {withholdingRate ? "Hesaba her ay net tutar (brüt − stopaj) işlenir" : "Hesaba her ay KDV dahil tutar işlenir"};{" "}
+                      {vatRate && withholdingRate ? "KDV ve stopaj" : withholdingRate ? "stopaj" : "KDV"} harekete yazılır, Vergi sekmesinde sayılır.
                     </p>
                   ) : null}
                 </div>

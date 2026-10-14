@@ -115,6 +115,7 @@ begin
     v_vat := v_amt.vat;
     v_net := v_amt.net;
   else
+    v_gross := v_amount;
     select * into v_amt from public.finance_entry_amounts(v_amount, v_vat_rate, true, v_wh_rate);
     v_cash := v_amt.cash;
     v_wh := v_amt.withheld;
@@ -148,13 +149,14 @@ begin
     return 'duplicate';
   end;
 
+  -- Dönem tutarı her kipte BELGE (brüt) tutarıdır: ekstreden işlenen dönem cron/onay yolu ile aynı anlamı taşır; nakit 'cash'te.
   update public.recurring_occurrences
-     set status = 'posted', amount = v_amount, entry_id = v_entry, decided_by = p_actor, decided_at = pg_catalog.now(), skip_reason = null
+     set status = 'posted', amount = v_gross, entry_id = v_entry, decided_by = p_actor, decided_at = pg_catalog.now(), skip_reason = null
    where id = o.id;
   if r.scope = 'office' then
     insert into public.audit_logs (tenant_id, actor_id, action, entity_type, entity_id, new_value)
     values (r.tenant_id, p_actor, 'recurring.post', 'recurring_rule', r.id,
-      jsonb_build_object('period', o.period, 'amount', v_amount, 'entry_id', v_entry, 'mode', r.mode)
+      jsonb_build_object('period', o.period, 'amount', v_gross, 'entry_id', v_entry, 'mode', r.mode)
         || case when v_vat_rate is null and v_wh_rate is null then '{}'::jsonb
                 else jsonb_build_object('cash', v_cash, 'vat_rate', v_vat_rate, 'vat_amount', v_vat,
                                         'withholding_rate', v_wh_rate, 'withholding_amount', v_wh) end);
