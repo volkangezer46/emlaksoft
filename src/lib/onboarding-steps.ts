@@ -78,6 +78,14 @@ export const ONBOARDING_STEP_DEFS = [
     isDone: (f) => f.officeLocationDone,
   },
   {
+    id: "yetki-belgesi",
+    requires: SETTINGS_EDIT,
+    short: "Yetki belgesi",
+    title: "Yetki belgesi no",
+    description: "Malikler e-Devlet'te (EİDS) ofisine bu numarayla ilan yetkisi verir; numara ilan ve vitrinde de görünür.",
+    isDone: (f) => f.extra["yetki-belgesi"] === true,
+  },
+  {
     id: "you",
     short: "Sen",
     title: "Sen ve uzmanlığın",
@@ -110,6 +118,15 @@ export const ONBOARDING_STEP_DEFS = [
     // üyelik tablosu henüz yoksa (olgu yok) eski kural geçerli.
     isDone: (f) =>
       f.extra["portal-uyelik"] === true || (f.extra["portal-uyelik"] === undefined && (f.publishedProperties > 0 || f.activeIntegrations > 0)),
+  },
+  {
+    id: "eids-eposta",
+    requires: SETTINGS_EDIT,
+    short: "Bakanlık e-postaları",
+    title: "Bakanlık e-postalarını EmlakSoft'a ilet (isteğe bağlı)",
+    description: "Malik yetki verince ya da iptal edince gelen EİDS e-postası EmlakSoft'a iletilsin; portföy eşleşsin, görev açılsın.",
+    // İlk e-posta (ya da Gmail onay kodu) alma adresine ulaşınca tamamlanır (EP3 eids_inbound_addresses.last_received_at).
+    isDone: (f) => f.extra["eids-eposta"] === true,
   },
   {
     id: "giderler-kasa",
@@ -173,6 +190,9 @@ const LEGACY_STEP_ALIASES: Record<string, WizardStepKey> = {
   marka: "office",
   odak: "you",
   ekip: "team",
+  // EİDS kurulum bağlantıları (görev, Yardım, eski profil-tamamla adresi)
+  yetki: "yetki-belgesi",
+  eids: "eids-eposta",
 };
 
 export function resolveLegacyStep(v: string | null | undefined): WizardStepKey | null {

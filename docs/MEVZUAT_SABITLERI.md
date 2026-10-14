@@ -75,6 +75,7 @@ eşiği %10, DKV eşik/dilimler, ikamet izni 200.000 USD, vatandaşlık 400.000 
 | İlan/reklamda yetki belgesi no + işletme unvanı + iletişim | `src/components/public/license-notice.tsx`; alanlar `tenants.license_no`, `license_title`, `license_valid_until` (migration `20260826001800`) | Taşınmaz Ticareti Hakkında Yönetmelik m.14/2-i (kullanıcı raporundan; madde no resmi metinden doğrulanamadı) | Sorumluluk ofis/şirket sahibinde |
 | Belge süresi uyarısı | `src/lib/license.ts` 60/30/7 gün | Ürün kararı (yeni cron yok; uygulama içi kart + ayar rozeti) | ÜRÜN KARARI |
 | Yetki belgesi no biçimi | `license.ts` `normalizeLicenseNo` (esnek: harf/rakam/boşluk/.-/_) | Resmi biçim doğrulanamadı | DOĞRULANAMADI |
+| EİDS yetkisiz ilan / 3 günde kaldırmama cezası (28.620 – 858.620 TL, 2026) | `legal-constants` `eidsPenaltyMinTry`/`eidsPenaltyMaxTry`; metin TEK yerde `src/lib/eids/legal-text.ts` + `components/eids/legal-note.tsx` (görev, pano, kılavuz) | Yönetmelik md. 14/2-h, 14/2-j; 2026 yeniden değerleme (ikincil kaynak) | DOĞRULANMADI; TARİHLİ sabit (DATED_LEGAL_KEYS): yılbaşında yeni tutar mevzuat panelinden (`legal_constants` geçmişi) girilir. Sunucu yüzeyleri `getEffectiveLegalValues()` okur: İlan Kontrol > Yetki kılavuzu, kurulum adımı, Yardım rehberi + SSS ve AI SSS bağlamı (`getHelpContent` → `applyEffectiveEidsPenalty`). `values` geçirmeyen yeni yüzey (ör. EP4 görev metni, pano kartı) koddaki tabana düşer; eklerken değeri sunucuda okuyup geçirin |
 
 ## Adlandırma
 

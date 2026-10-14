@@ -7,6 +7,9 @@ import { updateTenantInfo } from "@/app/actions/settings";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { GeoSelect } from "@/components/app/geo-select";
 import type { GeoOption } from "@/lib/geo/types";
+import Link from "@/components/ui/smart-link";
+import { LICENSE_NO_MAX, TTBS_BELGE_SORGULA_URL, licenseNoFormatHint, type LicenseNoHint } from "@/lib/license";
+import { EIDS_HELP_HREF } from "@/lib/eids/links";
 
 type Tenant = {
   name: string;
@@ -35,6 +38,55 @@ const BADGE_TONE: Record<string, string> = {
 
 const fieldClass =
   "w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
+
+const HINT_TONE: Record<LicenseNoHint["tone"], string> = {
+  ok: "text-mint-700",
+  warning: "text-amber-700",
+  danger: "text-danger-500",
+};
+
+/**
+ * Yetki belgesi no (EİDS): malikler e-Devlet'te ofise bu numarayla yetki verir. Boşken "zorunlu hale geliyor" uyarısı,
+ * yazarken canlı biçim ipucu (kaydı engellemez; katı kural sunucuda `normalizeLicenseNo`). `#yetki-belgesi` çapası
+ * kurulum görevi ve sihirbaz bağlantılarının hedefidir.
+ */
+function LicenseNoField({ defaultValue }: { defaultValue: string }) {
+  const [value, setValue] = useState(defaultValue);
+  const hint = licenseNoFormatHint(value);
+  const empty = !value.trim();
+  return (
+    <div id="yetki-belgesi" className="scroll-mt-24 sm:col-span-2">
+      <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license">
+        Yetki belgesi no <span className="text-xs font-normal text-text-muted">(zorunlu hale geliyor)</span>
+      </label>
+      <input
+        id="tenant-license"
+        name="license_no"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        maxLength={LICENSE_NO_MAX}
+        autoComplete="off"
+        aria-describedby="tenant-license-hint tenant-license-help"
+        aria-invalid={hint.tone === "danger" || undefined}
+        className={`${fieldClass} sm:max-w-xs ${empty ? "border-amber-400" : ""}`}
+        placeholder="3401234"
+      />
+      <p id="tenant-license-hint" className={`mt-1 text-xs ${HINT_TONE[hint.tone]}`} role={hint.tone === "danger" ? "alert" : undefined}>
+        {hint.message}
+      </p>
+      <p id="tenant-license-help" className="mt-1 text-xs text-text-muted">
+        Malikler e-Devlet&apos;te (EİDS) ofisinize bu numarayla ilan yetkisi verir. Numara ilan, vitrin, sunum ve broşürde de görünür.{" "}
+        <a href={TTBS_BELGE_SORGULA_URL} target="_blank" rel="noreferrer" className="font-semibold text-brand-600 hover:underline">
+          TTBS BelgeSorgula
+        </a>{" "}
+        ·{" "}
+        <Link href={EIDS_HELP_HREF} className="font-semibold text-brand-600 hover:underline">
+          EİDS rehberi
+        </Link>
+      </p>
+    </div>
+  );
+}
 
 export function CompanyForm({
   tenant,
@@ -104,11 +156,7 @@ export function CompanyForm({
           <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-tax-number">Vergi / TC no</label>
           <input id="tenant-tax-number" name="tax_number" defaultValue={tenant.tax_number ?? ""} className={fieldClass} placeholder="1234567890" />
         </div>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-ink-950" htmlFor="tenant-license">Yetki belgesi no</label>
-          <input id="tenant-license" name="license_no" defaultValue={tenant.license_no ?? ""} maxLength={60} className={fieldClass} placeholder="TR-46-00123" />
-          <p className="mt-1 text-xs text-text-muted">Harf, rakam ve boşluk girebilirsiniz. İlan, vitrin, sunum ve broşürde görünür.</p>
-        </div>
+        <LicenseNoField defaultValue={tenant.license_no ?? ""} />
         {licenseColumnsReady ? (
           <>
             <div>

@@ -38,7 +38,7 @@ const full: OnboardingFacts = {
 
 describe("onboarding-steps kaydı", () => {
   it("adım sırası: ofis, sen, ekip, havuz, portallar, giderler ve kasa, paket", () => {
-    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "you", "team", "pool", "portals", "giderler-kasa", "mulk-yonetimi", "plan"]);
+    expect([...ONBOARDING_STEP_IDS]).toEqual(["office", "yetki-belgesi", "you", "team", "pool", "portals", "eids-eposta", "giderler-kasa", "mulk-yonetimi", "plan"]);
     expect(new Set(ONBOARDING_STEP_IDS).size).toBe(ONBOARDING_STEP_DEFS.length);
   });
 
@@ -58,7 +58,7 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(8);
+    expect(s.total).toBe(10);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -79,13 +79,13 @@ describe("onboarding-checklist", () => {
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
     const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1 });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(38);
-    expect(s.nextId).toBe("team");
+    expect(s.percent).toBe(30);
+    expect(s.nextId).toBe("yetki-belgesi");
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
     const s = buildOnboarding(empty, ["office"]);
-    expect(s.nextId).toBe("you");
+    expect(s.nextId).toBe("yetki-belgesi");
     expect(s.steps[0].done).toBe(false);
     expect(s.doneCount).toBe(0);
   });
@@ -98,7 +98,7 @@ describe("onboarding-checklist", () => {
   });
 
   it("tüm adımlar dolu: complete", () => {
-    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true, "mulk-yonetimi": true } });
+    const s = buildOnboarding({ ...full, extra: { "giderler-kasa": true, "mulk-yonetimi": true, "yetki-belgesi": true, "eids-eposta": true } });
     expect(s.complete).toBe(true);
     expect(s.percent).toBe(100);
     expect(resolveWizardStep(undefined, s)).toBe("bitis");
@@ -124,9 +124,21 @@ describe("onboarding-checklist", () => {
 
   it("geri/ileri komşuları", () => {
     expect(wizardNeighbors("team")).toEqual({ prev: "you", next: "pool" });
-    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "you" });
+    expect(wizardNeighbors("office")).toEqual({ prev: null, next: "yetki-belgesi" });
     expect(wizardNeighbors("plan")).toEqual({ prev: "mulk-yonetimi", next: "bitis" });
     expect(wizardNeighbors("bitis")).toEqual({ prev: "plan", next: null });
+  });
+});
+
+describe("EİDS kurulum adımları (EP5)", () => {
+  it("yetki belgesi no ve Bakanlık e-postaları gerçek olgudan tamamlanır; eski adresler eşlenir", () => {
+    const done = (id: string, extra: Record<string, boolean>) => buildOnboarding({ ...empty, extra }).steps.find((x) => x.id === id)?.done;
+    expect(done("yetki-belgesi", {})).toBe(false);
+    expect(done("yetki-belgesi", { "yetki-belgesi": true })).toBe(true);
+    expect(done("eids-eposta", {})).toBe(false);
+    expect(done("eids-eposta", { "eids-eposta": true })).toBe(true);
+    expect(resolveLegacyStep("yetki")).toBe("yetki-belgesi");
+    expect(resolveLegacyStep("eids")).toBe("eids-eposta");
   });
 });
 

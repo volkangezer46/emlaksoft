@@ -61,10 +61,12 @@ describe("tarihli değer hesaplayıcıya gerçekten yansır", () => {
     expect(withDb.totalCosts - withCode.totalCosts).toBe(7_500 - LEGAL_CONSTANTS.landRegistryServiceFeeTry.value);
   });
 
-  it("DATED_LEGAL_KEYS listesindeki her sabit bir hesaplayıcı çıktısını değiştirir (liste yalan söylemez)", async () => {
+  it("DATED_LEGAL_KEYS listesindeki her sabit bir hesaplayıcı çıktısını ya da EİDS ceza metnini değiştirir (liste yalan söylemez)", async () => {
     const { DATED_LEGAL_KEYS } = await import("./index");
     const { purchaseRatesFromLegal } = await import("@/lib/purchase-costs");
     const { computeSellerProceeds } = await import("@/lib/seller-proceeds");
+    const { eidsLegalNoteText } = await import("@/lib/eids/legal-text");
+    const eidsBase = eidsLegalNoteText();
     const base = purchaseRatesFromLegal();
     // Satıcı tarafı: 5 yıl içinde, yüksek kazanç, ÜFE eşiği üstü, DKV eşiğine yakın satış.
     const sellerInput = { salePrice: 20_000_000, acquisitionPrice: 2_000_000, holdingMonths: 30, ufeIncreasePct: 12 };
@@ -73,13 +75,20 @@ describe("tarihli değer hesaplayıcıya gerçekten yansır", () => {
       const v = { [k]: LEGAL_CONSTANTS[k].value * 3 + 7 };
       const purchaseChanged = JSON.stringify(purchaseRatesFromLegal(v)) !== JSON.stringify(base);
       const sellerChanged = JSON.stringify(computeSellerProceeds({ ...sellerInput, legal: v })) !== sellerBase;
-      expect(purchaseChanged || sellerChanged, k).toBe(true);
+      const eidsChanged = eidsLegalNoteText(v) !== eidsBase;
+      expect(purchaseChanged || sellerChanged || eidsChanged, k).toBe(true);
     }
   });
 
-  it("hesaplayıcı sayfaları değerleri sunucuda okuyup istemciye geçirir", async () => {
+  it("hesaplayıcı sayfaları ve EİDS yüzeyleri değerleri sunucuda okuyup istemciye geçirir", async () => {
     const { readFileSync } = await import("node:fs");
-    for (const f of ["src/app/app/hesaplayici/seller-view.tsx", "src/app/app/hesaplayici/calculator-view.tsx"]) {
+    for (const f of [
+      "src/app/app/hesaplayici/seller-view.tsx",
+      "src/app/app/hesaplayici/calculator-view.tsx",
+      "src/components/eids/authority-guide-section.tsx",
+      "src/app/app/baslangic/step-bodies.tsx",
+      "src/lib/help-center/store.ts",
+    ]) {
       expect(readFileSync(f, "utf8"), f).toMatch(/getEffectiveLegalValues\(\)/);
     }
   });

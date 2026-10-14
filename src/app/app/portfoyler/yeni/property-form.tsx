@@ -83,7 +83,10 @@ export function PropertyForm({
   poolSource,
   customFields = [],
   fsbo,
+  office,
 }: {
+  /** Ofis adı + yetki belge numarası (İlan sahibi sekmesindeki maliğe hazır EİDS mesajı). */
+  office?: { name: string; licenseNo: string | null };
   /** Sahibinden ilan adayından dönüşüm (?fsbo=<id>): alanlar önden dolar, kayıt sonunda aday "Portföye döndü" olur. */
   fsbo?: { id: string; title: string; transaction: string; rooms: string; sqm: string; price: string; ownerName: string; ownerPhone: string; locationText: string };
   /** Ofisin etkin özel alanları (yeni kayıtta girilir; doğrulama/yazım sunucuda). */
@@ -223,6 +226,7 @@ export function PropertyForm({
       <OwnerInfoSection
         poolEnabled={poolEnabled}
         prefill={fsbo && (fsbo.ownerName || fsbo.ownerPhone) ? { name: fsbo.ownerName, phone: fsbo.ownerPhone } : undefined}
+        office={office}
       />
     ),
   };

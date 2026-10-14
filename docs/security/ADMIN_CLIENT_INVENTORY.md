@@ -355,7 +355,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/cron/ef-kontor-hak/route.ts:73` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var | P2 |
 | `src/app/api/cron/geo-sync/route.ts:49` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | yok | P2 |
 | `src/app/api/cron/gorev-hatirlat/route.ts:26` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var | P2 |
-| `src/app/api/cron/gunluk-ozet/route.ts:23` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
+| `src/app/api/cron/gunluk-ozet/route.ts:24` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
 | `src/app/api/cron/haftalik-ozet/route.ts:56` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
 | `src/app/api/cron/havuz-atama/route.ts:33` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
 | `src/app/api/cron/kira-tahakkuk/route.ts:86` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
@@ -493,7 +493,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/growth/store.ts:347` | `getAdminGrowthOverview` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/growth/store.ts:110` | `getReferralOverview` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/growth/store.ts:159` | `recordSignupAttributionSafe` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
-| `src/lib/help-center/store.ts:20` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/lib/help-center/store.ts:22` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/integrations/einvoice/server-writes.ts:24` | `writeEInvoiceResult` | Gerekçe doğrulanmadı. | dosya-duzeyi | param | P2 |
 | `src/lib/lead-intake.ts:103` | `intakeLead` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/lib/legal-constants/store.ts:17` | `db` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |

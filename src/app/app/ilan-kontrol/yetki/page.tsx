@@ -17,6 +17,7 @@ import { ControlUnavailable } from "@/components/listing-control/ui-parts";
 import { AuthorityRowActions } from "@/components/listing-control/authority-row-actions";
 import { AuthorityMatchPanel } from "@/components/listing-control/authority-match-panel";
 import { EidsInboxSection } from "./eids-inbox";
+import { EidsAuthorityGuideSection } from "@/components/eids/authority-guide-section";
 import { loadAuthorityQueue, type AuthorityQueueItem } from "@/lib/eids/authority-queue";
 import { loadLatestUndoable } from "@/lib/eids/load";
 import { EIDS_EVENT_KIND_LABELS } from "@/lib/eids/event-labels";
@@ -81,6 +82,11 @@ export default async function YetkiKuyrukPage({ searchParams }: { searchParams: 
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Yetki kuyruğu" }]}
       />
       <ControlSubNav active="yetki" closures={effectiveCanAccessModule(perms, "leak")} />
+      <Suspense fallback={null}>
+        <div className="mb-4">
+          <EidsAuthorityGuideSection tenantId={tenantId} />
+        </div>
+      </Suspense>
       <nav aria-label="Yetki sekmeleri" className="mb-4 flex flex-wrap gap-1.5">
         <FilterChip href={`${CONTROL_BASE}/yetki`} active={sekme === "kuyruk"}>Kuyruk</FilterChip>
         <FilterChip href={`${CONTROL_BASE}/yetki?sekme=eslestir`} active={sekme === "eslestir"}>Eşleştir</FilterChip>

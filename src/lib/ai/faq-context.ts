@@ -1,4 +1,5 @@
 import { FAQ, FAQ_PRICE_PATTERN, type FaqItem } from "@/lib/help-faq";
+import { stripEidsPenaltyAmounts } from "@/lib/eids/legal-text";
 
 /**
  * AI asistanına ürün kullanım bilgisi (SSS) besleme — SAF seçici. SSS listesi çağırandan gelir (yardım merkezi CMS: kod + DB). Ağ/AI çağrısı YOKTUR: seçilen kayıtlar yalnız
@@ -6,7 +7,8 @@ import { FAQ, FAQ_PRICE_PATTERN, type FaqItem } from "@/lib/help-faq";
  * olarak eklenir. Ağ çağrısı burada yazılmaz.
  *
  * Dürüstlük: soruyla ilgili SSS kaydı bulunamazsa HİÇBİR şey eklenmez (uydurma yönlendirme yok). Fiyat/tutar içeren
- * kayıt asla beslenmez (güncel fiyat sayfada; FAQ_PRICE_PATTERN).
+ * kayıt asla beslenmez (güncel fiyat sayfada; FAQ_PRICE_PATTERN). Mevzuat ceza tutarı (EİDS) ürün fiyatı değildir; denetimden
+ * önce ayıklanır, kayıt tutarıyla birlikte beslenir.
  */
 
 const STOP = new Set([
@@ -33,7 +35,7 @@ export function selectFaqForQuestion(question: string, faq: readonly FaqItem[] =
   if (qTokens.size === 0) return [];
   const out: FaqMatch[] = [];
   for (const item of faq) {
-    if (FAQ_PRICE_PATTERN.test(item.q) || FAQ_PRICE_PATTERN.test(item.a)) continue;
+    if (FAQ_PRICE_PATTERN.test(item.q) || FAQ_PRICE_PATTERN.test(stripEidsPenaltyAmounts(item.a))) continue;
     const titleTokens = new Set(tokenize(item.q));
     const bodyTokens = new Set(tokenize(item.a));
     let score = 0;

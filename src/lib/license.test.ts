@@ -6,6 +6,7 @@ import {
   licenseAmendmentChanges,
   licenseAmendmentMessage,
   licenseExpiryReminderStep,
+  licenseNoFormatHint,
   licenseStatus,
   listingPublishLicenseWarning,
   normalizeLicenseNo,
@@ -100,5 +101,17 @@ describe("yetki belgesi tadil + yıllık harç + bitiş kademesi", () => {
     expect(licenseExpiryReminderStep("2027-03-01", "2027-03-10")).toBe("expired");
     expect(licenseExpiryReminderStep("2027-03-01", "2027-05-10")).toBeNull();
     expect(licenseExpiryReminderStep(null, "2027-03-10")).toBeNull();
+  });
+});
+
+describe("yetki belgesi no canlı biçim ipucu (EP5)", () => {
+  it("boş: zorunluya yönlendirir; rakam: uygun; harfli: uyarır; geçersiz: ne oldu + ne yapmalı", () => {
+    expect(licenseNoFormatHint("").tone).toBe("warning");
+    expect(licenseNoFormatHint("").message).toContain("BelgeSorgula");
+    expect(licenseNoFormatHint(" 3401234 ").tone).toBe("ok");
+    expect(licenseNoFormatHint("TR-46-00123").tone).toBe("warning");
+    const bad = licenseNoFormatHint("@@@");
+    expect(bad.tone).toBe("danger");
+    expect(bad.message).toContain("Belgenizdeki numarayı aynen yazın");
   });
 });

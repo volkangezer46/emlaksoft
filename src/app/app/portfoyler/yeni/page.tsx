@@ -17,14 +17,17 @@ export default async function NewPropertyPage({ searchParams }: { searchParams: 
   if (!(perms.properties ?? []).includes("create")) redirect("/app/portfoyler");
 
   const supabase = await createClient();
-  const [provinces, { data: branches }, propertyTypes, transactionTypes, poolEnabled] = await Promise.all([
+  const [provinces, { data: branches }, propertyTypes, transactionTypes, poolEnabled, { data: tenantRow }] = await Promise.all([
     // İl listesi 81 satırlık sabit referans verisi — istekler arası cache'li (src/lib/geo.ts)
     getProvinceOptions(),
     supabase.from("branches").select("id, name").eq("is_active", true).order("name"),
     getDefinitionsOrDefault("property_type"),
     getDefinitionsOrDefault("transaction_type"),
     tenantId ? isPoolEnabled(supabase, tenantId) : Promise.resolve(false),
+    // Maliğe hazır EİDS mesajı: ofis adı + yetki belge numarası (RLS kiracı sınırı).
+    tenantId ? supabase.from("tenants").select("name, license_no").eq("id", tenantId).maybeSingle() : Promise.resolve({ data: null }),
   ]);
+  const office = tenantRow ? { name: String(tenantRow.name ?? ""), licenseNo: (tenantRow.license_no as string | null) ?? null } : undefined;
 
   // Sahibinden ilan adayından dönüşüm: yalnız aynı ofisin, henüz kapanmamış adayı önden doldurur (RLS + kiracı filtresi).
   type FsboPrefill = { id: string; title: string; transaction: string; rooms: string; sqm: string; price: string; ownerName: string; ownerPhone: string; locationText: string };
@@ -66,6 +69,7 @@ export default async function NewPropertyPage({ searchParams }: { searchParams: 
       transactionTypes={transactionTypes.map((d) => d.value)}
       userId={userId}
       poolEnabled={poolEnabled}
+      office={office}
       poolSource={poolSource === "manual" ? undefined : poolSource}
     />
   );

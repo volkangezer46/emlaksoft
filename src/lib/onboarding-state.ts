@@ -65,6 +65,13 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
       // Portal üyelikleri (EP1): sahip/genel müdür kartı en az bir kez kaydetti mi (her portal "Bilmiyorum" olsa da beyan
       // sayılır; eklentinin açtığı 'unknown' satırı sayılmaz). Tablo yoksa hata → olgu yazılmaz, eski kural.
       supabase.from("tenant_portal_accounts").select("portal", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("source", "owner_declared"),
+      // Bakanlık (EİDS) e-postaları adımı: etkin alma adresine en az bir e-posta ulaştı mı (EP3 tablosu; yoksa hata = adım bitmedi).
+      supabase
+        .from("eids_inbound_addresses")
+        .select("tenant_id", { count: "exact", head: true })
+        .eq("tenant_id", tenantId)
+        .is("revoked_at", null)
+        .not("last_received_at", "is", null),
     ]),
     supabase
       .from("tenants")
@@ -98,7 +105,7 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const appointments = results[9].count ?? 0;
   const customDefinitions = results[5].count ?? 0;
 
-  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes, rentalsModRes, portalAccRes] = optional;
+  const [titleRes, specRes, regionRes, poolRes, subRes, cashAccRes, ruleRes, poolSpecRes, poolRegionRes, rentalsModRes, portalAccRes, eidsMailRes] = optional;
   const title = String((titleRes.error ? null : (titleRes.data as { title?: string | null } | null)?.title) ?? "").trim();
   const specCount = specRes.error ? 0 : (specRes.count ?? 0);
   const regionCount = regionRes.error ? 0 : (regionRes.count ?? 0);
@@ -107,6 +114,8 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
   const extra: Record<string, boolean> = {
     "giderler-kasa": (!cashAccRes.error && (cashAccRes.count ?? 0) > 0) || (!ruleRes.error && (ruleRes.count ?? 0) > 0),
     "mulk-yonetimi": !rentalsModRes.error && (rentalsModRes.count ?? 0) > 0,
+    "yetki-belgesi": Boolean(profile.facts.licenseNo?.trim()),
+    "eids-eposta": !eidsMailRes.error && (eidsMailRes.count ?? 0) > 0,
   };
   // Üyelik kartını yalnız owner/gm kaydedebilir: diğer roller (settings:edit olsa da) bu beyanı yapamaz, adım onlara açık kalmaz.
   const viewerRole = titleRes.error ? null : ((titleRes.data as { role?: string | null } | null)?.role ?? null);
