@@ -83,7 +83,7 @@ describe("loadSampleKpiScope", () => {
 
 /** Ofis KPI yüzeyleri merkezi kapsamı kullanmak ZORUNDA (kopya eşik/sorgu yasak). */
 const KPI_SURFACES = [
-  "src/app/app/page.tsx",
+  "src/app/app/(bugun)/page.tsx",
   "src/lib/team/advisor-metrics.ts",
   "src/lib/tv/tv-data.ts",
   "src/app/app/raporlar/page.tsx",

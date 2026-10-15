@@ -98,7 +98,7 @@ describe("görünürlük sözleşmesi", () => {
   it("görünürlük tüketicileri tek kapıdan süzer (nav-config, palet, sekme, ana ekran)", () => {
     const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
     expect(read("src/app/app/layout.tsx")).toContain("mergeHidden(officeClosedModules, hiddenModules)");
-    expect(read("src/app/app/page.tsx")).toContain("getInvisibleFeatures");
+    expect(read("src/app/app/(bugun)/page.tsx")).toContain("getInvisibleFeatures");
     expect(read("src/components/app/command-search-panel.tsx")).toContain("useClosedModules");
     // Yan menü, kırıntı ve sekme şeridi menü düzenini SUNUCUDA aynı kapalı listeyle süzülmüş alır (nav-shell-server).
     const layout = read("src/app/app/layout.tsx");

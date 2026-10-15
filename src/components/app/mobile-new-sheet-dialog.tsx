@@ -1,21 +1,30 @@
 "use client";
 
+import { useLayoutEffect } from "react";
 import Link from "@/components/ui/smart-link";
 import { X } from "lucide-react";
 import { Dialog, DialogClose, DialogDescription, DialogSheetContent, DialogTitle } from "@/components/ui/dialog";
 import type { PaletteEntry } from "@/lib/palette-core";
 import { SHEET_ROW_CLASS } from "@/components/app/mobile-new-sheet";
 
-/** "+ Yeni" eylem sayfası (Radix Dialog gövdesi) — app-sidebar.tsx tarafından ilk dokunuşta yüklenir. */
+/**
+ * "+ Yeni" eylem sayfası (Radix Dialog gövdesi) — app-sidebar.tsx tarafından ilk dokunuşta yüklenir. `onShown`: gövde açık
+ * bağlandığı commit'te (boyamadan ÖNCE) çağrılır; dokunma örtüsü (B032, tap-veil.ts) aynı karede kalkar.
+ */
 export function MobileNewSheet({
   open,
   onOpenChange,
   actions,
+  onShown,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   actions: readonly PaletteEntry[];
+  onShown?: () => void;
 }) {
+  useLayoutEffect(() => {
+    if (open) onShown?.();
+  }, [open, onShown]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogSheetContent aria-describedby="mobile-new-desc">

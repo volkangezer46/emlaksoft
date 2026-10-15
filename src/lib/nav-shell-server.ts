@@ -4,7 +4,6 @@ import { isManagementRole } from "@/lib/nav-roles";
 import { APP_ACTIONS, getAppActions } from "@/lib/palette-core";
 import type { AppModule } from "@/lib/permissions";
 import type {
-  ResolvableNav,
   ShellAction,
   ShellHub,
   ShellIcon,
@@ -99,13 +98,6 @@ export function buildShellNavSet(input: { accessible: readonly AppModule[]; clos
   const personal = isManagementRole(role) ? toShellNav(hubNav(accessible, { role: "advisor", closed }), memo) : null;
   const owner = role === "owner" ? own : toShellNav(hubNav(accessible, { role: "owner", closed }), memo);
   return { own, personal, owner, extra: navExtraPathOwners() };
-}
-
-/** Sekme şeridi iskeleti: TAM erişimde ofis yöneticisi düzeni (yalnız yollar; etiket/ikon taşımaz). */
-export function buildPlaceholderNav(allModules: readonly AppModule[]): ResolvableNav {
-  const nav = hubNav(allModules, { role: "owner" });
-  const strip = (hs: readonly NavHub[]) => hs.map((h) => ({ pages: h.pages.map((p) => ({ href: p.href })) }));
-  return { hubs: strip(nav.hubs), dock: strip(nav.dock), tools: nav.tools.map((t) => ({ href: t.href })) };
 }
 
 /** Hızlı oluşturma eylemleri (yan menü ikon modu açılır paneli, mobil "+ Yeni"): palette-core `getAppActions` ile aynı süzgeç. */

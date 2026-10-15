@@ -1,16 +1,17 @@
 
 /**
- * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, ilan, talep, randevu, görev; izin varsa
+ * Mobil alt çubuğun "+ Yeni" eylem sayfası: en sık kayıtlar tek dokunuşla (müşteri, portföy, talep, randevu, görev; izin varsa
  * anlaşma, teklif ve gelir/gider kaydı).
  * Liste rol izinlerine, paket kilidine ve kapalı modüle göre `getAppActions` ile SUNUCUDA süzülmüş eylemlerden seçilir
  * (komut paleti ve üst çubuk "Yeni" menüsüyle aynı kaynak; app/layout.tsx → nav-shell-server); yetkisiz eylem görünmez. Hedefler ≥56 px yüksekliktedir.
  *
  * Bu dosya HAFİFTİR (eylem listesi + sınıf sabiti): Radix Dialog gövdesi `mobile-new-sheet-dialog.tsx` içindedir ve
- * kenar çubuğu tarafından ilk "+ Yeni" dokunuşunda yüklenir (kabuk paketine girmez).
+ * kenar çubuğu tarafından ilk "+ Yeni" dokunuşunda yüklenir (kabuk paketine girmez); dokunma anında aynı görünümlü hafif
+ * örtü (app-sidebar, tap-veil.ts) çizilir. Terim: ofisin kendi kaydı "Portföy" (portaldaki karşılığı "İlan"; B193).
  */
 const SHEET_ACTIONS: readonly { href: string; label: string }[] = [
   { href: "/app/musteriler/yeni", label: "Yeni müşteri" },
-  { href: "/app/portfoyler/yeni", label: "Yeni ilan" },
+  { href: "/app/portfoyler/yeni", label: "Yeni portföy" },
   { href: "/app/talepler/yeni", label: "Yeni talep" },
   { href: "/app/randevular/yeni", label: "Yeni randevu" },
   { href: "/app/gorevler/yeni", label: "Yeni görev" },

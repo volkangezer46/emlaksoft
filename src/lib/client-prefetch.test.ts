@@ -1,15 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CLIENT_CACHE_REFRESHED_EVENT,
   enqueueIdlePrefetch,
-  IDLE_PARTIAL_PATHS,
-  idlePrefetchKind,
-  isIdlePartialHref,
+  HUB_FULL_COUNT,
+  noteCacheInvalidated,
   prefetchFullNow,
   resetPrefetchState,
+  takeIdleRowBudget,
+  TIER_BUDGET,
   type PrefetchRouter,
 } from "@/lib/client-prefetch";
 
-/** KQ5: ağır merkezler boşta yalnız KISMİ; tam yükleme yalnız niyetle (hover/odak). */
+/**
+ * B024 / B012: öncelik kuyruğu (kardeş sekmeler → ilk 3 merkez TAM → kalan merkezler yalnız rota ağacı), kademe başına
+ * ayrı bütçe, aynı adres kısmi + tam çift çekilmez, önbellek tazelenince "yakın zamanda çekildi" düşer ve etkin
+ * merkezin ilk hedefleri yeniden ısınır (sözleşme a: `es:client-cache-refreshed`).
+ */
 
 function recorder() {
   const calls: { href: string; kind: string }[] = [];
@@ -17,23 +23,17 @@ function recorder() {
   return { router, calls };
 }
 
-describe("ağır sayfa sınıflaması", () => {
-  it("müşteriler, komisyon, raporlar boşta kısmi; detay alt yolları ve diğer merkezler tam", () => {
-    expect(IDLE_PARTIAL_PATHS).toEqual(["/app/musteriler", "/app/komisyon", "/app/raporlar"]);
-    expect(isIdlePartialHref("/app/musteriler")).toBe(true);
-    expect(isIdlePartialHref("/app/raporlar?sekme=merkez")).toBe(true);
-    expect(isIdlePartialHref("/app/komisyon/#x")).toBe(true);
-    expect(isIdlePartialHref("/app/musteriler/123")).toBe(false);
-    expect(idlePrefetchKind("/app/portfoyler")).toBe("full");
-    expect(idlePrefetchKind("/app/komisyon")).toBe("auto");
-  });
-});
-
-describe("boşta kuyruk ve niyet", () => {
+describe("öncelik kuyruğu ve niyet", () => {
+  let listeners: Map<string, (() => void)[]>;
   beforeEach(() => {
     vi.useFakeTimers();
+    listeners = new Map();
     vi.stubGlobal("navigator", { connection: { effectiveType: "4g" } });
-    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    vi.stubGlobal("window", {
+      setTimeout,
+      clearTimeout,
+      addEventListener: (type: string, fn: () => void) => listeners.set(type, [...(listeners.get(type) ?? []), fn]),
+    });
     vi.stubGlobal("document", { visibilityState: "visible" });
     resetPrefetchState();
   });
@@ -43,31 +43,99 @@ describe("boşta kuyruk ve niyet", () => {
     vi.useRealTimers();
   });
 
-  it("boşta: ağır merkezler kind=auto, diğerleri kind=full", async () => {
+  it("kardeş sekmeler menü merkezlerinden ÖNCE; ilk 3 merkez TAM, kalanı rota ağacı (auto)", async () => {
     const { router, calls } = recorder();
-    enqueueIdlePrefetch(router, ["/app/portfoyler", "/app/musteriler", "/app/komisyon", "/app/raporlar", "/app/gorevler"]);
+    // Menü önce kaydolsa da kardeş sekmeler kuyruğun önüne geçer.
+    enqueueIdlePrefetch(router, ["/app/musteriler", "/app/portfoyler", "/app/anlasmalar", "/app/komisyon", "/app/raporlar"], "hubs");
+    enqueueIdlePrefetch(router, ["/app/randevular", "/app/gorevler"], "siblings");
     await vi.runAllTimersAsync();
-    const byHref = Object.fromEntries(calls.map((c) => [c.href, c.kind]));
-    expect(byHref).toEqual({
-      "/app/portfoyler": "full",
-      "/app/musteriler": "auto",
-      "/app/komisyon": "auto",
-      "/app/raporlar": "auto",
-      "/app/gorevler": "full",
-    });
+    expect(calls).toEqual([
+      { href: "/app/randevular", kind: "full" },
+      { href: "/app/gorevler", kind: "full" },
+      { href: "/app/musteriler", kind: "full" },
+      { href: "/app/portfoyler", kind: "full" },
+      { href: "/app/anlasmalar", kind: "full" },
+      { href: "/app/komisyon", kind: "auto" },
+      { href: "/app/raporlar", kind: "auto" },
+    ]);
+    expect(HUB_FULL_COUNT).toBe(3);
   });
 
-  it("boşta kısmi yükleme, ardından gelen hover'ın TAM yüklemesini engellemez", async () => {
+  it("aynı adres kısmi + tam çift çekilmez: TAM kuyruktaki adres ağaç kademesinden düşer", async () => {
     const { router, calls } = recorder();
-    enqueueIdlePrefetch(router, ["/app/musteriler"]);
+    enqueueIdlePrefetch(router, ["/app/a", "/app/b", "/app/c", "/app/gorevler"], "hubs"); // gorevler → ağaç
+    enqueueIdlePrefetch(router, ["/app/gorevler"], "siblings"); // aynı adres TAM'a yükselir
     await vi.runAllTimersAsync();
-    prefetchFullNow(router, "/app/musteriler");
-    expect(calls).toEqual([
-      { href: "/app/musteriler", kind: "auto" },
-      { href: "/app/musteriler", kind: "full" },
-    ]);
-    // Tekrar hover: tekrar süresi içinde yeniden istenmez.
-    prefetchFullNow(router, "/app/musteriler");
-    expect(calls).toHaveLength(2);
+    expect(calls.filter((c) => c.href === "/app/gorevler")).toEqual([{ href: "/app/gorevler", kind: "full" }]);
+  });
+
+  it("niyetle TAM yüklenen adres sonradan ağaç olarak istenmez; tekrar süresi içinde ikinci TAM yok", async () => {
+    const { router, calls } = recorder();
+    prefetchFullNow(router, "/app/komisyon");
+    enqueueIdlePrefetch(router, ["/app/a", "/app/b", "/app/c", "/app/komisyon"], "hubs");
+    await vi.runAllTimersAsync();
+    prefetchFullNow(router, "/app/komisyon");
+    expect(calls.filter((c) => c.href === "/app/komisyon")).toEqual([{ href: "/app/komisyon", kind: "full" }]);
+  });
+
+  it("kademe bütçeleri ayrıdır: merkezler kardeş sekme bütçesini tüketmez", async () => {
+    const { router, calls } = recorder();
+    const many = Array.from({ length: TIER_BUDGET.tree + HUB_FULL_COUNT + 4 }, (_, i) => `/app/m${i}`);
+    enqueueIdlePrefetch(router, many, "hubs");
+    enqueueIdlePrefetch(router, ["/app/s1", "/app/s2"], "siblings");
+    await vi.runAllTimersAsync();
+    expect(calls.filter((c) => c.kind === "auto")).toHaveLength(TIER_BUDGET.tree);
+    expect(calls.slice(0, 2).map((c) => c.href)).toEqual(["/app/s1", "/app/s2"]);
+  });
+
+  it("kuyruktan çıkarma: merkez değişince eski kardeşlerin başlamamış istekleri düşer", async () => {
+    const { router, calls } = recorder();
+    const cancel = enqueueIdlePrefetch(router, ["/app/x1", "/app/x2", "/app/x3", "/app/x4"], "siblings");
+    cancel();
+    await vi.runAllTimersAsync();
+    expect(calls).toEqual([]);
+  });
+
+  it("önbellek tazelendi olayı: tekrar süresi sıfırlanır, etkin merkezin ilk 3 hedefi 1,5 sn sonra yeniden ısınır", async () => {
+    const { router, calls } = recorder();
+    enqueueIdlePrefetch(router, ["/app/t1", "/app/t2", "/app/t3", "/app/t4"], "siblings");
+    await vi.runAllTimersAsync();
+    expect(calls).toHaveLength(4);
+    // Olay dinleyicisi kaydedildi (sözleşme a).
+    expect(listeners.get(CLIENT_CACHE_REFRESHED_EVENT)).toHaveLength(1);
+    // Tekrar süresi içinde niyet yeni istek atmaz…
+    prefetchFullNow(router, "/app/t4");
+    expect(calls).toHaveLength(4);
+    // …önbellek düşünce atar; ilk 3 kardeş 1,5 sn sonra yeniden ısınır.
+    listeners.get(CLIENT_CACHE_REFRESHED_EVENT)![0]!();
+    prefetchFullNow(router, "/app/t4");
+    expect(calls).toHaveLength(5);
+    await vi.advanceTimersByTimeAsync(1_400);
+    expect(calls).toHaveLength(5);
+    await vi.runAllTimersAsync();
+    expect(calls.slice(5).map((c) => c.href)).toEqual(["/app/t1", "/app/t2", "/app/t3"]);
+    expect(calls.slice(5).every((c) => c.kind === "full")).toBe(true);
+    // En sık 10 sn'de bir: hemen ardından gelen ikinci olay yeniden ısıtmaz.
+    noteCacheInvalidated();
+    await vi.runAllTimersAsync();
+    expect(calls).toHaveLength(8);
+  });
+
+  it("ilk satır bütçesi: ilk 2 FARKLI adres; aynı adres yeniden sorulunca bütçe harcamadan true", () => {
+    expect(takeIdleRowBudget("/app/musteriler?", "/app/musteriler/1", 2)).toBe(true);
+    expect(takeIdleRowBudget("/app/musteriler?", "/app/musteriler/1", 2)).toBe(true);
+    expect(takeIdleRowBudget("/app/musteriler?", "/app/musteriler/2", 2)).toBe(true);
+    expect(takeIdleRowBudget("/app/musteriler?", "/app/musteriler/3", 2)).toBe(false);
+    // Başka sayfada bütçe yeniden başlar.
+    expect(takeIdleRowBudget("/app/portfoyler?", "/app/portfoyler/9", 2)).toBe(true);
+  });
+
+  it("veri tasarrufunda hiçbir şey yapılmaz", async () => {
+    vi.stubGlobal("navigator", { connection: { saveData: true } });
+    const { router, calls } = recorder();
+    enqueueIdlePrefetch(router, ["/app/a"], "siblings");
+    prefetchFullNow(router, "/app/b");
+    await vi.runAllTimersAsync();
+    expect(calls).toEqual([]);
   });
 });

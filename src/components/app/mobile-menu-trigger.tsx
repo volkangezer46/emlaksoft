@@ -11,9 +11,13 @@ import { Button } from "@/components/ui/button";
  * (`MobileMenuTrigger`), çekmece kenar çubuğunda kalır; ikisi bu bağlamla aynı durumu paylaşır.
  *
  * Kenar çubuğu (`app-sidebar`, `admin-sidebar`) çekmece gövdesini tembel yüklediği için `register` ile kendi
- * açma/ısıtma işleyicilerini kaydeder; düğme bu işleyicileri çağırır (kayıt yoksa yalnız durum açılır).
+ * işleyicilerini kaydeder; düğme bu işleyicileri çağırır (kayıt yoksa yalnız durum açılır):
+ *  - `warm`: parçayı önceden indir (hover / odak / dokunma),
+ *  - `press`: dokunma ANINDA (pointerdown) hafif örtü çiz (B032; Radix gövdesi tıklamadan sonra bağlanır),
+ *  - `open`: açmayı kendisi yönetir (örtü bu karede çizildiyse ağır bağlamayı boyamadan sonraya bırakır),
+ *  - `mount`: yalnız gövdeyi bağla (`open` yoksa durum burada açılır).
  */
-type Handlers = { mount?: () => void; warm?: () => void };
+type Handlers = { mount?: () => void; warm?: () => void; press?: () => void; open?: () => void };
 
 type MobileMenuState = {
   open: boolean;
@@ -21,6 +25,8 @@ type MobileMenuState = {
   /** Çekmeceyi açar; odak kapanışta açan öğeye (`openerRef`) döner. */
   requestOpen: () => void;
   warm: () => void;
+  /** Dokunma anı (pointerdown): örtü + ısıtma. */
+  press: () => void;
   openerRef: RefObject<HTMLElement | null>;
   register: (handlers: Handlers) => () => void;
 };
@@ -31,15 +37,25 @@ export function MobileMenuProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const openerRef = useRef<HTMLElement | null>(null);
   const handlersRef = useRef<Handlers>({});
-  // Kenar çubuğu henüz akmadan (ayrı Suspense dilimi) dokunulduysa çekmece kayıt anında yüklenir.
+  // Kenar çubuğu henüz bağlanmadan dokunulduysa çekmece kayıt anında yüklenir.
   const pendingMountRef = useRef(false);
   const requestOpen = useCallback(() => {
     openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    if (handlersRef.current.mount) handlersRef.current.mount();
+    const h = handlersRef.current;
+    if (h.open) {
+      h.open();
+      return;
+    }
+    if (h.mount) h.mount();
     else pendingMountRef.current = true;
     setOpen(true);
   }, []);
   const warm = useCallback(() => handlersRef.current.warm?.(), []);
+  const press = useCallback(() => {
+    const h = handlersRef.current;
+    h.warm?.();
+    h.press?.();
+  }, []);
   const register = useCallback((handlers: Handlers) => {
     handlersRef.current = handlers;
     if (pendingMountRef.current && handlers.mount) {
@@ -50,7 +66,7 @@ export function MobileMenuProvider({ children }: { children: ReactNode }) {
       if (handlersRef.current === handlers) handlersRef.current = {};
     };
   }, []);
-  const value = useMemo(() => ({ open, setOpen, requestOpen, warm, openerRef, register }), [open, requestOpen, warm, register]);
+  const value = useMemo(() => ({ open, setOpen, requestOpen, warm, press, openerRef, register }), [open, requestOpen, warm, press, register]);
   return <MobileMenuContext.Provider value={value}>{children}</MobileMenuContext.Provider>;
 }
 
@@ -66,10 +82,19 @@ export function useMobileMenu(): MobileMenuState {
       setOpen,
       requestOpen: () => {
         openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        handlersRef.current.mount?.();
+        const h = handlersRef.current;
+        if (h.open) {
+          h.open();
+          return;
+        }
+        h.mount?.();
         setOpen(true);
       },
       warm: () => handlersRef.current.warm?.(),
+      press: () => {
+        handlersRef.current.warm?.();
+        handlersRef.current.press?.();
+      },
       openerRef,
       register: (handlers) => {
         handlersRef.current = handlers;
@@ -84,22 +109,28 @@ export function useMobileMenu(): MobileMenuState {
 }
 
 /**
- * Üst çubuktaki hamburger (yalnız çekmece kırılımının altında). /app: üst çubuk konumlandırılmış (`sticky`) olduğundan
- * mutlak konumla sol kenarda dikey ortalanır; başlığın `pl-16` boşluğu bu düğmeye ayrılmıştır. /admin: üst çubuk
- * (h-16) ayrı bileşendir; düğme layout'taki sıfır yükseklikli yapışkan kapta aynı `pl-16` boşluğuna oturur.
+ * Üst çubuktaki hamburger (yalnız çekmece kırılımının altında). /app: üst çubuk konumlandırılmış (`sticky`, çentik
+ * bandının altına yapışır) olduğundan mutlak konumla sol kenarda dikey ortalanır; başlığın sol dolgusu bu düğmeye
+ * ayrılmıştır. /admin: üst çubuk (h-16) ayrı bileşendir; düğme layout'taki sıfır yükseklikli yapışkan kapta aynı sol
+ * boşluğa oturur ve üst çubuk gibi durum çubuğu (safe-area) payı kadar aşağıdadır.
+ * Çentik (B135): yatayda sol kenar en az `env(safe-area-inset-left)`; iOS PWA'da (viewportFit cover + black-translucent)
+ * düğme çentik/durum çubuğu bandına girmez.
  */
 const VARIANT_CLASS = {
   app: "top-1/2 -translate-y-1/2 bg-ink-950 hover:bg-ink-950 active:bg-ink-950 shadow-[var(--shadow-card)] lg:hidden",
-  admin: "top-2.5 bg-[var(--navy-800)] hover:bg-[var(--navy-800)] active:bg-[var(--navy-800)] shadow-[var(--elev-3)] md:hidden",
+  admin: "top-[calc(0.625rem+env(safe-area-inset-top))] bg-[var(--navy-800)] hover:bg-[var(--navy-800)] active:bg-[var(--navy-800)] shadow-[var(--elev-3)] md:hidden",
 } as const;
 
 export function MobileMenuTrigger({ controlsId, label, variant = "app" }: { controlsId: string; label: string; variant?: keyof typeof VARIANT_CLASS }) {
-  const { open, requestOpen, warm } = useMobileMenu();
+  const { open, requestOpen, warm, press } = useMobileMenu();
   return (
     <Button
       variant="ghost"
       size="icon"
       onClick={requestOpen}
+      onPointerDown={(e) => {
+        if (e.button === 0) press();
+      }}
       onPointerEnter={warm}
       onFocus={warm}
       onTouchStart={warm}
@@ -108,7 +139,7 @@ export function MobileMenuTrigger({ controlsId, label, variant = "app" }: { cont
       aria-controls={controlsId}
       aria-label={label}
       // Kanonik düğme (odak/basma tek yerde); koyu zemin ve 44px kare burada sabitlenir (twMerge ghost zemin/renklerini varyant sınıflarıyla ezer).
-      className={`absolute left-3 z-10 grid h-11 w-11 place-items-center text-white hover:text-white ${VARIANT_CLASS[variant]}`}
+      className={`absolute left-[max(0.75rem,env(safe-area-inset-left))] z-10 grid h-11 w-11 place-items-center text-white hover:text-white ${VARIANT_CLASS[variant]}`}
     >
       <Menu className="h-5 w-5" aria-hidden />
     </Button>

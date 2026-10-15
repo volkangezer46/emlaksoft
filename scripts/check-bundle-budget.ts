@@ -22,7 +22,7 @@
  * KOPYA MODÜL ORANI: aynı turbopack modül kimliğinin (`,123456,e=>{` / `[123456,(e,t)=>{`) rotanın ilk yük dosyalarında
  * birden fazla kez geçtiği bayt / toplam bayt (konsey/dup.mjs mantığı). İSTEK: ilk yük JS + CSS dosya sayısı.
  */
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { gzipSync } from "node:zlib";
 import { STATIC_HTML_BUDGET, checkStaticHtmlBudget, type BudgetViolation } from "../src/lib/perf/budgets";
@@ -141,9 +141,47 @@ export function checkBudget(loads: RouteLoad[]): Violation[] {
 }
 
 /** Bir rotanın ilk yükünü .next çıktısından ölçer; manifest yoksa null. */
+const MANIFEST_FILE = "page_client-reference-manifest.js";
+
+/**
+ * Rotanın manifest dosyası. Rota grupları (`(bugun)` gibi parantezli klasörler) URL'de görünmez: `/app` ana ekranı
+ * `server/app/app/(bugun)/page_client-reference-manifest.js` altındadır. Önce düz yol, yoksa her düzeyde grup klasörleri
+ * denenir (ilk eşleşme). Bulunamazsa null.
+ */
+export function routeManifestPath(nextDir: string, route: string): string | null {
+  const segments = route.split("/").filter(Boolean);
+  const walk = (dir: string, rest: string[]): string | null => {
+    if (rest.length === 0) {
+      const direct = path.join(dir, MANIFEST_FILE);
+      if (existsSync(direct)) return direct;
+    } else {
+      const next = path.join(dir, rest[0]!);
+      if (existsSync(next)) {
+        const hit = walk(next, rest.slice(1));
+        if (hit) return hit;
+      }
+    }
+    let groups: string[] = [];
+    try {
+      groups = readdirSync(dir, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && /^\(.+\)$/.test(e.name))
+        .map((e) => e.name)
+        .sort();
+    } catch {
+      return null;
+    }
+    for (const g of groups) {
+      const hit = walk(path.join(dir, g), rest);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(path.join(nextDir, "server", "app"), segments);
+}
+
 export function measureRoute(nextDir: string, route: string, rootMainFiles: string[]): RouteLoad | null {
-  const mf = path.join(nextDir, "server", "app", route.replace(/^\//, ""), "page_client-reference-manifest.js");
-  if (!existsSync(mf)) return null;
+  const mf = routeManifestPath(nextDir, route);
+  if (!mf) return null;
   const manifest = parseClientReferenceManifest(readFileSync(mf, "utf8"));
   if (!manifest) return null;
   const { js, css } = initialFiles(manifest, rootMainFiles);

@@ -4,8 +4,7 @@ import Link from "@/components/ui/smart-link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { resolveScope, SCOPE_COOKIE } from "@/lib/ui/scope";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
-import { Alert } from "@/components/ui/alert";
+import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { moduleLabelFor } from "@/lib/permission-module-labels";
 import { getRequestUser } from "@/lib/supabase/auth-cache";
 import { getRequestSampleScope } from "@/lib/cache/request";
@@ -20,49 +19,51 @@ import { DashboardGrid, DashCell, DashboardStack } from "@/components/ui/dashboa
 import { DeferredSection } from "@/components/ui/deferred-section";
 // Doğrudan dosyadan: `ui/motion` barrel'ı Reveal/MotionProvider (motion çekirdeği ~19 KB) ile birlikte gelir; FadeSwap 0 KB CSS.
 import { FadeSwap } from "@/components/ui/motion/fade-swap";
-import { NeYapmak } from "./_home/ne-yapmak";
-import { neYapmakChips } from "./_home/ne-yapmak-chips";
-import { BugunKisayol, BugunKisayolIskelet } from "./_home/bugun-kisayol";
-import { BugunOfiste } from "./_home/bugun-ofiste";
+import { NeYapmak } from "../_home/ne-yapmak";
+import { neYapmakChips } from "../_home/ne-yapmak-chips";
+import { BugunKisayol, BugunKisayolIskelet } from "../_home/bugun-kisayol";
+import { BugunOfiste } from "../_home/bugun-ofiste";
 import { loadShouldShowWelcome } from "@/lib/welcome-state";
-import { DashboardWidgetProvider, Widget } from "./dashboard-widgets";
-import { buildHomeBounds, parseHomePeriod, type HomeCtx } from "./_home/data";
-import { preloadDashboardSnapshot } from "./_home/data-batch";
-import { BlokIskelet, PanelIskelet } from "./_home/ortak";
-import { HosgeldinKredisi } from "./_home/hosgeldin-kredisi";
-import { AnaHero } from "./_home/ana-hero";
-import { BostaOnyukle } from "./_home/bosta-onyukle";
-import { DurumCubugu } from "./_home/durum-cubugu";
-import { KontorBandi } from "./_home/kontor-bandi";
-import { BosOfisKapisi } from "./_home/bos-ofis-kapisi";
-import { BaslangicKarti } from "./_home/baslangic-karti";
-import { IlanSagligi } from "./_home/ilan-sagligi";
-import { Gorevler } from "./_home/gorevler";
-import { KiralamaProje } from "./_home/kiralama-proje";
-import { CanliAkis } from "./_home/canli-akis";
-import { PortfoySeridi } from "./_home/portfoy-seridi";
-import { KaynakDagilimi } from "./_home/kaynak-dagilimi";
-import { Brifing, BrifingIskelet } from "./_home/brifing";
-import { Dikkat, DikkatIskelet } from "./_home/dikkat";
-import { GelirEgrisi } from "./_home/gelir-egrisi";
-import { MetrikSeridi, MetrikSeridiIskelet } from "./_home/metrik-seridi";
-import { EkipPerformans, EkipPerformansIskelet } from "./_home/ekip-performans";
-import { HuniHedef, HuniHedefIskelet, KisiselHedef } from "./_home/huni-hedef";
-import { Program } from "./_home/program";
-import { DanismanAra, DanismanAraIskelet } from "./_home/danisman-ara";
-import { Tahsilat, TahsilatIskelet } from "./_home/tahsilat";
-import { GiderOzeti } from "./_home/gider-ozeti";
-import { OfisNabzi } from "./_home/ofis-nabzi";
-import { EidsYetkiSagligi } from "./_home/eids-yetki-sagligi";
-import { homeHref, type HomeParams } from "./_home/kapsam-anahtari";
-import { homeLayoutFor, type MoreBlock } from "./_home/home-layout";
+import { DashboardWidgetProvider, Widget } from "../dashboard-widgets";
+import { buildHomeBounds, parseHomePeriod, type HomeCtx } from "../_home/data";
+import { preloadDashboardSnapshot } from "../_home/data-batch";
+import { BlokIskelet, PanelIskelet } from "../_home/ortak";
+import { Skeleton, SkeletonRow } from "@/components/ui/skeleton";
+import { HosgeldinKredisi } from "../_home/hosgeldin-kredisi";
+import { AnaHero } from "../_home/ana-hero";
+import { BostaOnyukle } from "../_home/bosta-onyukle";
+import { DurumCubugu } from "../_home/durum-cubugu";
+import { KontorBandi } from "../_home/kontor-bandi";
+import { BosOfisKapisi } from "../_home/bos-ofis-kapisi";
+import { BaslangicKarti } from "../_home/baslangic-karti";
+import { IlanSagligi } from "../_home/ilan-sagligi";
+import { Gorevler } from "../_home/gorevler";
+import { KiralamaProje } from "../_home/kiralama-proje";
+import { CanliAkis } from "../_home/canli-akis";
+import { PortfoySeridi } from "../_home/portfoy-seridi";
+import { KaynakDagilimi } from "../_home/kaynak-dagilimi";
+import { Brifing, BrifingIskelet } from "../_home/brifing";
+import { Dikkat, DikkatIskelet } from "../_home/dikkat";
+import { GelirEgrisi } from "../_home/gelir-egrisi";
+import { MetrikSeridi, MetrikSeridiIskelet } from "../_home/metrik-seridi";
+import { EkipPerformans, EkipPerformansIskelet } from "../_home/ekip-performans";
+import { HuniHedef, HuniHedefIskelet, KisiselHedef } from "../_home/huni-hedef";
+import { Program } from "../_home/program";
+import { DanismanAra, DanismanAraIskelet } from "../_home/danisman-ara";
+import { Tahsilat, TahsilatIskelet } from "../_home/tahsilat";
+import { GiderOzeti } from "../_home/gider-ozeti";
+import { OfisNabzi } from "../_home/ofis-nabzi";
+import { EidsYetkiSagligi } from "../_home/eids-yetki-sagligi";
+import { homeHref, type HomeParams } from "../_home/kapsam-anahtari";
+import { homeLayoutFor, type MoreBlock } from "../_home/home-layout";
 
 export const metadata = { title: "Ana ekran" };
 
 /**
  * "Bugün" ana ekranı — tasarım sistemi v4 (referans: /admin kontrol paneli). Sayfa yalnız yetki + bağlam + ROL YERLEŞİMİ
- * (`_home/home-layout.ts`, saf) kurar; her blok `_home/*` içinde kendi verisini yükler ve kendi <Suspense> sınırında,
- * içerik yüksekliğinde iskeletle akar (CLS yok).
+ * (`_home/home-layout.ts`, saf) kurar; her blok `_home/*` içinde kendi verisini yükler. Sınır sayısı azdır (B021): ilk ekran
+ * blokları (Başlangıç kartı + boş ofis kapısı + "Bugün" satırı) TEK <Suspense>'te, gerçek düzenle aynı iskeletle birlikte
+ * açılır; yalnız varsayılan kapalı "Ofis özeti" / "Daha fazla" blokları kendi sınırlarında akar (CLS yok).
  *
  * Her rol: DashboardHero (tarih · rol bağlamı, selamlama, tek cümle öncelik, tazelik, dönem/kapsam seçici) → durum çubuğu
  * → KpiGrid (dönem/kapsam değişince FadeSwap). Ardından:
@@ -70,19 +71,24 @@ export const metadata = { title: "Ana ekran" };
  *    ofis hedefi (5) → Program / Görevler → tek İlan sağlığı bloğu → "Daha fazla" (varsayılan kapalı). Üstte tek Başlangıç kartı + en çok 2 bant.
  *  - Danışman: Sıradaki eylem (7) + Bugün ara (5) → Program / Görevler / Kişisel hedef. Takım lideri: + ekip tablosu.
  *  - Muhasebe: Tahsilat odağı + gider özeti. Arama merkezi: Bugün ara + görevler.
- * Ekran altı satırlar DeferredSection ile görünür alana yaklaşınca bağlanır. Reveal (motion `m.*`) burada bilinçli
- * olarak YOK: /app ilk yük bütçesi (≤ 5 KB) motion çekirdeğini (~19 KB) kaldırmaz; giriş CSS'tir (list-stagger, FadeSwap).
+ * Ekran altı satırlar DeferredSection ile ilk boyamadan sonra boşta (ya da görünür alana yaklaşınca) bağlanır. Reveal
+ * (motion `m.*`) burada bilinçli olarak YOK: /app ilk yük bütçesi motion çekirdeğini (~19 KB) kaldırmaz; ilk açılışta giriş
+ * animasyonu da yoktur (içerik geldiği karede tam opak; B027), dönem/kapsam değişimi FadeSwap'tır.
  */
 export default async function AppHomePage({
   searchParams,
 }: {
   searchParams?: Promise<{ donem?: string; kapsam?: string; daha?: string; icgoru?: string; ozet?: string; yetki?: string; sayfa?: string }>;
 }) {
-  // searchParams ile oturum/yetki kapısı birbirinden bağımsız: aynı turda.
-  const [sp, gate] = await Promise.all([searchParams, measure("home-gate", () => requireModulePage("dashboard"))]);
-  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa } = sp ?? {};
-  // Yetkisiz sayfadan gelindi (requireModulePage → ?yetki=yok&sayfa=<modül>): kapatılabilir bilgi şeridi.
-  const deniedNotice = yetki === "yok" ? { label: moduleLabelFor(sayfa) } : null;
+  const { donem, kapsam, daha, icgoru, ozet, yetki, sayfa } = (await searchParams) ?? {};
+  // Yetkisiz sayfadan gelindi (requireModulePage → ?yetki=yok&sayfa=<modül>): YALNIZ hafif yetki kartı (B041). Pano kapısı
+  // ve yükleyicileri (izin turu, anlık görüntü RPC'si, hoş geldin kapısı, bloklar) hiç başlamaz; kart kabukla birlikte
+  // anında çizilir. Oturum yerel JWT'den (istek-içi önbellekli); "dashboard" izni aranmaz (yoksa kapı kendine yönlenirdi).
+  if (yetki === "yok") {
+    if (!(await getRequestUser())) redirect("/giris");
+    return <YetkiKarti label={moduleLabelFor(sayfa)} />;
+  }
+  const gate = await measure("home-gate", () => requireModulePage("dashboard"));
 
   const { tenantId, perms, role, userId } = gate;
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
@@ -184,13 +190,15 @@ export default async function AppHomePage({
         </Suspense>
       </div>
     );
+  // İlk ekran blokları (dikkat / sıradaki eylem / kısayollar / tahsilat / bugün ara) AYRI Suspense taşımaz: hepsi
+  // `BosOfisKapisi` ile aynı TEK sınırda, birlikte ve tek seferde açılır (B021: sınır sayısı ↓, tek gösterim turu).
+  // Verileri kapı beklenmeden başlar (`warmHomeFirstScreen`, `preloadDashboardSnapshot`). Dönem/kapsam değişiminde eski
+  // içerik yenisi gelene dek kalır (geçiş), sonra FadeSwap ile yer değiştirir; iskelet yanıp sönmez.
   const dikkat = (
     <div data-tour="brifing" className="h-full">
-      <Suspense key={swapKey} fallback={<DikkatIskelet />}>
-        <FadeSwap swapKey={swapKey} className="h-full">
-          <Dikkat ctx={ctx} params={params} maxItems={5} />
-        </FadeSwap>
-      </Suspense>
+      <FadeSwap swapKey={swapKey} className="h-full">
+        <Dikkat ctx={ctx} params={params} maxItems={5} />
+      </FadeSwap>
     </div>
   );
   const gelir =
@@ -201,9 +209,7 @@ export default async function AppHomePage({
     ) : null;
   const brifing = (eyebrow?: string, maxRows?: number) => (
     <div data-tour="brifing" className="h-full">
-      <Suspense fallback={<BrifingIskelet />}>
-        <Brifing ctx={ctx} params={params} eyebrow={eyebrow} maxRows={maxRows} />
-      </Suspense>
+      <Brifing ctx={ctx} params={params} eyebrow={eyebrow} maxRows={maxRows} />
     </div>
   );
   const ekip = (
@@ -231,11 +237,9 @@ export default async function AppHomePage({
       <KisiselHedef ctx={ctx} />
     </Suspense>
   );
-  const ara = (
-    <Suspense fallback={<DanismanAraIskelet />}>
-      <DanismanAra ctx={ctx} />
-    </Suspense>
-  );
+  // "Bugün ara" iki yerde: arama merkezinin ilk ekranı (kapı sınırında) ve danışmanın "Özetim" bölümü (kendi sınırı).
+  const araNode = <DanismanAra ctx={ctx} />;
+  const ara = <Suspense fallback={<DanismanAraIskelet />}>{araNode}</Suspense>;
   const gider = (
     <Suspense fallback={<PanelIskelet rows={4} className="min-h-[14rem]" />}>
       <GiderOzeti ctx={ctx} />
@@ -270,18 +274,25 @@ export default async function AppHomePage({
    * İskelet hücreleri gerçek hücrelerle aynı span'ı taşır (CLS=0).
    */
   type DeferredItem = { span: 3 | 4 | 5 | 6 | 7 | 8 | 12; node: ReactNode };
+  const liveItems = (items: DeferredItem[]) => items.filter((it) => it.node !== null && it.node !== undefined);
+  /** Ertelenmiş satırın yer tutucusu (aynı ızgara + span; `aria-busy` taşımaz). Kapı sınırının yedeği de bunu kullanır. */
+  const deferredSkeleton = (key: string, items: DeferredItem[], cls?: string) => {
+    const live = liveItems(items);
+    if (live.length === 0) return null;
+    return (
+      <DashboardGrid key={key} className={cls} stagger={false}>
+        {live.map((it, i) => cell(it.span, <SessizPanelIskelet />, `${key}-sk-${i}`))}
+      </DashboardGrid>
+    );
+  };
   const deferredGrid = (key: string, items: DeferredItem[], cls?: string) => {
-    const live = items.filter((it) => it.node !== null && it.node !== undefined);
+    const live = liveItems(items);
     if (live.length === 0) return null;
     return (
       <DeferredSection
         key={key}
         label="Ek bloklar"
-        fallback={
-          <DashboardGrid className={cls} stagger={false}>
-            {live.map((it, i) => cell(it.span, <PanelIskelet rows={3} className="min-h-[15rem]" />, `${key}-sk-${i}`))}
-          </DashboardGrid>
-        }
+        fallback={deferredSkeleton(`${key}-f`, live, cls)}
       >
         {/* stagger kapalı: iskelet yerini alan içerik sıfır opaklıktan tekrar belirmez (çift yükleme hissi). */}
         <DashboardGrid className={cls} stagger={false}>{live.map((it, i) => cell(it.span, it.node, `${key}-${i}`))}</DashboardGrid>
@@ -302,23 +313,26 @@ export default async function AppHomePage({
   const side = (
     <div className="flex h-full flex-col gap-4">
       <div data-tour="kisayollar">
-        <Suspense fallback={<BugunKisayolIskelet />}>
-          <BugunKisayol ctx={ctx} />
-        </Suspense>
+        <BugunKisayol ctx={ctx} />
       </div>
-      {layout.variant === "management" ? (
-        <Suspense fallback={<PanelIskelet rows={3} className="min-h-[10rem]" />}>
-          <BugunOfiste ctx={ctx} params={params} />
-        </Suspense>
-      ) : null}
+      {layout.variant === "management" ? <BugunOfiste ctx={ctx} params={params} /> : null}
+    </div>
+  );
+  const sideSkeleton = (
+    <div className="flex h-full flex-col gap-4">
+      <BugunKisayolIskelet />
+      {layout.variant === "management" ? <PanelIskelet rows={3} className="min-h-[10rem]" /> : null}
     </div>
   );
   // "Ofis özeti" (varsayılan kapalı): KPI, gelir eğrisi, ekip, huni, ilan sağlığı ve "Daha fazla" blokları.
   const ozetRows: ReactNode[] = [];
+  /** Kapı sınırının yedeği: "Bugün" satırlarıyla AYNI ızgara ve span'lar (iskelet → içerik düzen sıçraması yok). */
+  const skeletonRows: ReactNode[] = [];
 
   switch (layout.variant) {
     case "management":
       rows.push(grid("r1", [cell(7, dikkat, "dikkat"), cell(5, side, "side")]), deferredGrid("r2", bottomItemsBy(6, true)));
+      skeletonRows.push(grid("r1-sk", [cell(7, <DikkatIskelet />, "dikkat"), cell(5, sideSkeleton, "side")]), deferredSkeleton("r2-sk", bottomItemsBy(6, true)));
       ozetRows.push(
         <Suspense key="nabiz" fallback={null}><OfisNabzi ctx={ctx} /></Suspense>,
         // EİDS Yetki Sağlığı (yönetim; ofis özeti açıkken). Her sayı kendi kuyruğuna gider.
@@ -334,6 +348,7 @@ export default async function AppHomePage({
     case "advisor":
     case "team_lead":
       rows.push(grid("r1", [cell(7, brifing("Sıradaki eylem", 2), "brifing"), cell(5, side, "side")]), deferredGrid("r2", bottomItemsBy(6, true)));
+      skeletonRows.push(grid("r1-sk", [cell(7, <BrifingIskelet />, "brifing"), cell(5, sideSkeleton, "side")]), deferredSkeleton("r2-sk", bottomItemsBy(6, true)));
       ozetRows.push(
         layout.callList ? grid("o1", [cell(12, ara, "ara", { widget: "ara" })]) : null,
         ...(layout.team && !off("team_perf") ? [deferredGrid("ot", [{ span: 12, node: widgetWrap("ekip-perf", ekip) }])] : []),
@@ -341,21 +356,13 @@ export default async function AppHomePage({
       );
       break;
     case "accounting":
-      rows.push(
-        grid("r1", [
-          cell(
-            12,
-            <Suspense fallback={<TahsilatIskelet />}>
-              <Tahsilat ctx={ctx} />
-            </Suspense>,
-            "tahsilat",
-          ),
-        ]),
-      );
+      rows.push(grid("r1", [cell(12, <Tahsilat ctx={ctx} />, "tahsilat")]));
+      skeletonRows.push(grid("r1-sk", [cell(12, <TahsilatIskelet />, "tahsilat")]));
       ozetRows.push(deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
     case "call_center":
-      rows.push(grid("r1", [cell(12, ara, "ara", { widget: "ara" })]));
+      rows.push(grid("r1", [cell(12, araNode, "ara", { widget: "ara" })]));
+      skeletonRows.push(grid("r1-sk", [cell(12, <DanismanAraIskelet />, "ara")]));
       ozetRows.push(deferredGrid("o2", bottomItemsBy(12, false)), deferredGrid("o2b", bottomItemsBy(12, true)));
       break;
   }
@@ -389,24 +396,6 @@ export default async function AppHomePage({
       <DashboardStack>
         <div className="flex flex-col gap-3">
           <AnaHero ctx={ctx} layout={layout} params={params} officeView={officeView} hasName={Boolean(fullName)} />
-          {deniedNotice ? (
-            <Alert
-              tone="info"
-              title={deniedNotice.label ? `Bu sayfa rolünüz için kapalı (${deniedNotice.label})` : "Bu sayfa rolünüz için kapalı"}
-              action={
-                <Link
-                  href={homeHref(params, {})}
-                  scroll={false}
-                  aria-label="Bilgi şeridini kapat"
-                  className="focus-ring press grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-full text-current transition hover:bg-black/5"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                </Link>
-              }
-            >
-              Erişim için ofis yöneticinizden yetki isteyebilirsiniz.
-            </Alert>
-          ) : null}
           <NeYapmak chips={neYapmakChips(layout.variant, role === "owner")} />
           {layout.statusBar ? (
             <DurumCubugu>
@@ -414,20 +403,28 @@ export default async function AppHomePage({
                   burada DEĞİL: Başlangıç kartı / Bildirimler > Duyurular. */}
               <Suspense fallback={null}>
                 <KontorBandi ctx={ctx} valuationClosed={off("valuation")} />
-              </Suspense>
-              <Suspense fallback={null}>
                 <HosgeldinKredisi ctx={ctx} />
               </Suspense>
             </DurumCubugu>
           ) : null}
         </div>
 
-        {/* Tek "Başlangıç" kartı: ofis profili + örnek veri durumu + ilk adımlar; tamamlanınca kaybolur */}
-        <Suspense fallback={null}>
+        {/* TEK sınır: Başlangıç kartı + boş ofis kapısı + "Bugün" ilk ekran blokları birlikte açılır. Yedek, gerçek düzenle
+            aynıdır ("Bugün" başlığı metin olarak + aynı ızgarada blok iskeletleri + özet düğmesi yeri). */}
+        <Suspense
+          fallback={
+            <div className="flex min-w-0 flex-col gap-5">
+              <section aria-label="Bugün" className="flex flex-col gap-3">
+                <h2 className="font-display text-lg font-bold text-text">Bugün</h2>
+                {skeletonRows}
+              </section>
+              <Skeleton className="h-11 w-72 max-w-full rounded-full" />
+            </div>
+          }
+        >
+          {/* Tek "Başlangıç" kartı: ofis profili + örnek veri durumu + ilk adımlar; tamamlanınca kaybolur */}
           <BaslangicKarti ctx={ctx} />
-        </Suspense>
-        {/* Müşteri + portföy yokken tüm dolu bloklar gizlenir; yerinde Başlangıç kartı ilk adımları gösterir */}
-        <Suspense fallback={<PanelIskelet rows={2} className="min-h-[24rem]" />}>
+          {/* Müşteri + portföy yokken tüm dolu bloklar gizlenir; yerinde Başlangıç kartı ilk adımları gösterir */}
           <BosOfisKapisi ctx={ctx}>
             <div className="flex min-w-0 flex-col gap-5">
               <section aria-label="Bugün" className="flex flex-col gap-3">
@@ -471,7 +468,7 @@ export default async function AppHomePage({
                       label="Daha fazla"
                       fallback={
                         <DashboardGrid stagger={false}>
-                          {layout.more.map((k) => cell(MORE_SPAN[k], <PanelIskelet rows={3} className="min-h-[15rem]" />, `m-sk-${k}`))}
+                          {layout.more.map((k) => cell(MORE_SPAN[k], <SessizPanelIskelet />, `m-sk-${k}`))}
                         </DashboardGrid>
                       }
                     >
@@ -495,5 +492,51 @@ export default async function AppHomePage({
         />
       </DashboardStack>
     </DashboardWidgetProvider>
+  );
+}
+
+/**
+ * Ertelenmiş (ekran altı) satırın yer tutucusu: gerçek panelle aynı ölçü (min-h-[15rem], CLS yok) ama `role="status"` /
+ * `aria-busy` TAŞIMAZ (B048): görünmeyen bölge ekran okuyucuya ve ölçüme "yükleniyor" demez; bölüm ilk boyamadan sonra
+ * boşta kendiliğinden bağlanır (DeferredSection).
+ */
+function SessizPanelIskelet() {
+  return (
+    <div aria-hidden="true" className="min-h-[15rem] space-y-2.5 rounded-[var(--pm-r)] border border-line bg-surface p-5">
+      <Skeleton className="h-4 w-1/2" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <SkeletonRow key={i} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Yetkisiz sayfa kartı (B041): `requireModulePage` reddi `/app?yetki=yok&sayfa=<modül>` adresine gelir. Pano çizilmez
+ * (eskiden tam "Bugün" panosu yükleniyordu: 0,9-3,8 sn); yalnız neden + çıkış yolu. Sorgu yok, kabukla birlikte anında.
+ */
+function YetkiKarti({ label }: { label: string | null }) {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center px-4 py-10">
+      <section aria-labelledby="yetki-karti-baslik" className="w-full max-w-md text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-card)] border border-line bg-surface-raised">
+          <Lock className="h-7 w-7 text-text-muted" aria-hidden="true" />
+        </div>
+        <h1 id="yetki-karti-baslik" className="mt-4 font-display text-lg font-bold text-ink-950">
+          {label ? `Bu sayfa rolünüz için kapalı (${label})` : "Bu sayfa rolünüz için kapalı"}
+        </h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-text-muted">
+          Erişim için ofis yöneticinizden yetki isteyebilirsiniz. Çalışmaya ana ekrandan devam edin.
+        </p>
+        <div className="mt-6 flex justify-center">
+          <Link
+            href="/app"
+            className="focus-ring press inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-5 text-sm font-semibold text-white transition hover:bg-accent-hover touch:min-h-11"
+          >
+            Ana ekrana dön
+          </Link>
+        </div>
+      </section>
+    </div>
   );
 }

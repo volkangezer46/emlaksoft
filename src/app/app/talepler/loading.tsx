@@ -1,13 +1,6 @@
-import { SkeletonFilterBar, SkeletonKpiStrip, SkeletonPage, SkeletonPageHeader, SkeletonPanel } from "@/components/ui/skeleton";
+import { ListPageSkeleton } from "@/components/ui/list-page-skeleton";
 
-/** Talepler: PageHeader → 3'lü KPI kartı → filtre → kart listesi. */
+/** Talepler: liste hero (Eşleşme + Yeni talep) → 5 KPI → 2 grafik → araç çubuğu → tablo (gerçek ListPage düzeni; B023). */
 export default function Loading() {
-  return (
-    <SkeletonPage label="Talepler yükleniyor">
-      <SkeletonPageHeader actions={2} />
-      <SkeletonKpiStrip cols={3} />
-      <SkeletonFilterBar />
-      <SkeletonPanel rows={8} title={false} />
-    </SkeletonPage>
-  );
+  return <ListPageSkeleton label="Talepler yükleniyor" actions={2} kpis={5} charts={2} />;
 }

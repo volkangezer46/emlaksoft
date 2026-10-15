@@ -16,14 +16,16 @@ export const CSP_REPORT_PATH = "/api/csp-rapor";
 export const CSP_REPORT_GROUP = "csp";
 
 /**
- * Bilinen satır içi önyükleme betiklerinin özetleri. Kök layout'taki tema betiği (src/lib/theme.ts THEME_BOOT_SCRIPT)
- * ve konsol yan menü betiği (src/components/ui/console/sidebar-boot.tsx SIDEBAR_BOOT_SCRIPT) nonce alamaz: kök layout
+ * Bilinen satır içi önyükleme betiklerinin özetleri. Kök layout'taki tema betiği (src/lib/theme.ts THEME_BOOT_SCRIPT),
+ * konsol yan menü betiği (src/components/ui/console/sidebar-boot.tsx SIDEBAR_BOOT_SCRIPT) ve panel akış gösterim betiği
+ * (src/components/app/stream-reveal-boot.tsx STREAM_REVEAL_SCRIPT) nonce alamaz: kök layout
  * statik sayfaları da çizer, `headers()` okuyamaz. Betik metni değişirse özet de değişmelidir
  * (src/lib/security/csp-report-only.test.ts kaynaktan yeniden hesaplayıp karşılaştırır).
  */
 export const INLINE_SCRIPT_HASHES = {
   themeBoot: "sha256-LksNZ2zRFViRT5Uaa5ma3TFyJ25j6k7f5P1IBHdic0I=",
   sidebarBoot: "sha256-77TapEol/dNdMzJZw9OzdDZ0epAs4spgzuBMoC5suGg=",
+  streamReveal: "sha256-KfjddQsTFoR/ff16OYcJuukOFETFLLhisoxw753PRvQ=",
 } as const;
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -60,7 +62,7 @@ const NONCE_RE = /^[A-Za-z0-9+/]{16,64}={0,2}$/;
 export function buildReportOnlyCsp(nonce: string, reportUrl: string): string {
   if (!NONCE_RE.test(nonce)) throw new Error("geçersiz nonce");
   return [
-    `script-src 'nonce-${nonce}' 'strict-dynamic' '${INLINE_SCRIPT_HASHES.themeBoot}' '${INLINE_SCRIPT_HASHES.sidebarBoot}' 'report-sample' 'unsafe-inline' https:`,
+    `script-src 'nonce-${nonce}' 'strict-dynamic' '${INLINE_SCRIPT_HASHES.themeBoot}' '${INLINE_SCRIPT_HASHES.sidebarBoot}' '${INLINE_SCRIPT_HASHES.streamReveal}' 'report-sample' 'unsafe-inline' https:`,
     "object-src 'none'",
     "base-uri 'self'",
     `report-uri ${reportUrl}`,

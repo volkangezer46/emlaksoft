@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { runWhenIdle } from "@/lib/idle";
 
 /**
- * DeferredSection — ekran-altı blokları görünür alana yaklaşınca çizen kapı.
+ * DeferredSection — ekran-altı blokları ilk boyamadan SONRA bağlayan kapı.
  *
- * Sunucu bileşenlerini `children` olarak alır (RSC yükü yine sunucuda hazırlanır ve akar); DOM'a bağlama,
- * hidrasyon ve alt iskelet/içerik geçişleri yalnız kullanıcı o bölgeye yaklaşınca olur. İlk HTML'de
- * `fallback` (içerikle AYNI yükseklikte iskelet) vardır → düzen kayması yok, ilk boyama ve ana iş parçacığı
- * yükü daha küçük. IntersectionObserver yoksa (eski tarayıcı) hemen çizer. Hareket yok: değişim anlıktır,
- * `prefers-reduced-motion` tercihinde ek bir şey yapılmaz (animasyon kullanılmaz).
+ * Sunucu bileşenlerini `children` olarak alır (RSC yükü yine sunucuda hazırlanır ve akar); DOM'a bağlama ve hidrasyon
+ * ilk boyamayı geciktirmesin diye ertelenir. Bağlama iki yoldan hangisi önce gelirse: (1) tarayıcı BOŞTA (ilk
+ * boyama/etkileşim işleri bitince; B048 — eskiden yalnız kaydırınca bağlanıyordu, alt paneller 3-20 sn "Yükleniyor"
+ * kalıyordu), (2) bölge görünür alana `rootMargin` kadar yaklaşınca. İlk HTML'de `fallback` (içerikle AYNI yükseklikte
+ * iskelet) vardır → düzen kayması yok. Yedek ekran dışında beklediği için `role="status"` / `aria-busy` TAŞIMAMALI
+ * (çağıran `aria-hidden` iskelet verir); kap da meşgul işaretlenmez. IntersectionObserver yoksa hemen çizer.
+ * Hareket yok: değişim anlıktır.
  *
  * Not: veri çekimi ertelenmez (sunucu bileşenleri isteğin parçasıdır); bu kapı yalnız istemci maliyetini erteler.
  */
@@ -21,7 +24,7 @@ export function DeferredSection({
   label,
 }: {
   children: ReactNode;
-  /** Görünür olana dek çizilen iskelet; içerikle aynı yükseklikte olmalı (CLS=0). */
+  /** Bağlanana dek çizilen iskelet; içerikle aynı yükseklikte olmalı (CLS=0) ve `aria-busy`/`role="status"` taşımamalı. */
   fallback: ReactNode;
   /** Görünür alana bu kadar kala çizmeye başla. */
   rootMargin?: string;
@@ -36,21 +39,30 @@ export function DeferredSection({
     if (show) return;
     const el = ref.current;
     if (!el) return;
+    const reveal = () => setShow(true);
+    // İlk boyamadan sonra boşta kendiliğinden bağlan (görünür alana gelmesini bekleme).
+    const cancelIdle = runWhenIdle(reveal);
     if (typeof IntersectionObserver === "undefined") {
-      const t = setTimeout(() => setShow(true), 0);
-      return () => clearTimeout(t);
+      const t = setTimeout(reveal, 0);
+      return () => {
+        cancelIdle();
+        clearTimeout(t);
+      };
     }
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
-          setShow(true);
+          reveal();
           io.disconnect();
         }
       },
       { rootMargin },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      cancelIdle();
+      io.disconnect();
+    };
   }, [rootMargin, show]);
 
   return (

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import { SIDEBAR_BOOT_SCRIPT } from "@/components/ui/console/sidebar-boot";
+import { STREAM_REVEAL_SCRIPT } from "@/components/app/stream-reveal-boot";
 import {
   CSP_REPORT_PATH,
   INLINE_SCRIPT_HASHES,
@@ -21,6 +22,7 @@ describe("CSP rapor modu politikası", () => {
   it("satır içi önyükleme betiklerinin özetleri kaynakla aynı (betik değişince özet de güncellenmeli)", () => {
     expect(INLINE_SCRIPT_HASHES.themeBoot).toBe(sha(THEME_BOOT_SCRIPT));
     expect(INLINE_SCRIPT_HASHES.sidebarBoot).toBe(sha(SIDEBAR_BOOT_SCRIPT));
+    expect(INLINE_SCRIPT_HASHES.streamReveal).toBe(sha(STREAM_REVEAL_SCRIPT));
   });
 
   it("nonce + strict-dynamic + özetler; rapor ucu iki biçimde", () => {
@@ -29,6 +31,7 @@ describe("CSP rapor modu politikası", () => {
     expect(p).toContain(`script-src 'nonce-${nonce}' 'strict-dynamic'`);
     expect(p).toContain(`'${INLINE_SCRIPT_HASHES.themeBoot}'`);
     expect(p).toContain(`'${INLINE_SCRIPT_HASHES.sidebarBoot}'`);
+    expect(p).toContain(`'${INLINE_SCRIPT_HASHES.streamReveal}'`);
     // Satır içi ihlaller ancak betik örneğiyle ayırt edilir.
     expect(p).toMatch(/script-src [^;]*'report-sample'/);
     expect(p).toContain("object-src 'none'");

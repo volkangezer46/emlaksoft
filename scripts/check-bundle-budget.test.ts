@@ -15,6 +15,7 @@ import {
   initialFiles,
   measureRoute,
   parseClientReferenceManifest,
+  routeManifestPath,
   staticHomeFromBuild,
   staticHtmlReport,
   type RouteLoad,
@@ -103,6 +104,21 @@ describe("check-bundle-budget", () => {
     expect(m!.dupRatio).toBe(0);
     expect(m!.missingFiles).toEqual(["static/chunks/yok.js"]);
     expect(measureRoute(dir, "/admin", [])).toBeNull();
+  });
+
+  it("rota grubu: /app ana ekranı `(bugun)` grubundaysa manifest grup klasöründen bulunur", () => {
+    const g = mkdtempSync(path.join(tmpdir(), "bundle-group-"));
+    try {
+      mkdirSync(path.join(g, "server/app/app/(bugun)"), { recursive: true });
+      mkdirSync(path.join(g, "server/app/app/musteriler"), { recursive: true });
+      writeFileSync(path.join(g, "server/app/app/(bugun)/page_client-reference-manifest.js"), "x");
+      writeFileSync(path.join(g, "server/app/app/musteriler/page_client-reference-manifest.js"), "x");
+      expect(routeManifestPath(g, "/app")).toBe(path.join(g, "server/app/app/(bugun)/page_client-reference-manifest.js"));
+      expect(routeManifestPath(g, "/app/musteriler")).toBe(path.join(g, "server/app/app/musteriler/page_client-reference-manifest.js"));
+      expect(routeManifestPath(g, "/app/yok")).toBeNull();
+    } finally {
+      rmSync(g, { recursive: true, force: true });
+    }
   });
 
   it("coverageGaps: manifesti olmayan rota ve diskte olmayan chunk ihlal adayıdır", () => {

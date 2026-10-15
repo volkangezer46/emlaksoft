@@ -15,8 +15,20 @@ type State = {
 };
 
 /**
- * Global error boundary
- * Catch React errors ve kullanıcıya güzel hata göster
+ * Next'in çerçeve "hataları" gerçek hata değildir, yönlendirme sinyalidir: `notFound()` / `forbidden()` /
+ * `unauthorized()` → digest `NEXT_HTTP_ERROR_FALLBACK;<kod>`, `redirect()` → digest `NEXT_REDIRECT;…`. Sunucu bileşeninden
+ * gelince istemcide React #441 (digest taşıyan) hatası olarak görünür. Bunları yakalayan özel sınır Next'in kendi
+ * not-found / yönlendirme sınırlarını devre dışı bırakır (silinmiş kayıtta menüsüz "Bir şeyler ters gitti" çıkıyordu, B072).
+ */
+export function isNextFrameworkError(error: unknown): boolean {
+  const digest = typeof error === "object" && error !== null ? (error as { digest?: unknown }).digest : undefined;
+  return typeof digest === "string" && (digest.startsWith("NEXT_HTTP_ERROR_FALLBACK") || digest.startsWith("NEXT_REDIRECT"));
+}
+
+/**
+ * Kabuk hata sınırı (/app layout): yalnız GERÇEK hataları yakalar. Çerçeve sinyalleri (notFound / redirect) yeniden
+ * fırlatılır; böylece kabuk içindeki `app/app/not-found.tsx` ve Next yönlendirmesi çalışır (Next'in kendi ErrorBoundary'si
+ * de `getDerivedStateFromError` içinde aynısını yapar). Sayfa hataları zaten `app/app/error.tsx`'te (kabuk ayakta) kalır.
  */
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
@@ -25,10 +37,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
+    if (isNextFrameworkError(error)) throw error;
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: unknown) {
+    if (isNextFrameworkError(error)) return;
     console.error("ErrorBoundary caught:", error, errorInfo);
     // Hata kaydına da yaz (aynı hata tekrarlanırsa sayaç artar); başarısızlık akışı bozmaz.
     try {
