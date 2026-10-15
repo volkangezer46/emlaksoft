@@ -6,7 +6,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { syncPendingEInvoices } from "@/lib/integrations/einvoice/service";
 import { notifyTenant } from "@/lib/notify";
 import { appointmentHref } from "@/lib/notification-text";
-import { prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
+import { prepareTenantSmsSender, prepareTenantWhatsAppSender } from "@/lib/messaging/tenant-providers";
+import { isValidWhatsAppTemplateLanguage, isValidWhatsAppTemplateName } from "@/lib/messaging/whatsapp-contract";
+import { sendLoggedEmail } from "@/lib/email/send";
+import { renderBrandedHtml } from "@/lib/email/templates";
 import { gateIysRecipient } from "@/lib/iys/gate";
 import { DEMO_BLOCKED, isSampleRecipient } from "@/lib/sample-scope";
 import { getDisabledModulesByTenant, isDisabledFor, loadTenantModuleState } from "@/lib/modules/state";
@@ -33,8 +36,10 @@ import {
  *      tüm tenant'ların AKTİF otomasyonlarını tarar.
  *   2. dispatchAutomationEvent()  — olay tabanlı tetikleyiciler (new_customer,
  *      new_demand, new_property, offer_received, deal_won, deal_lost,
- *      property_matched). Server action'lardan başarılı yazım SONRASI çağrılır.
- *      ASLA throw etmez — otomasyon hatası ana işlemi bozamaz.
+ *      property_matched, inbound_message, lead_form_submitted). Server action'lardan
+ *      / webhook'tan başarılı yazım SONRASI çağrılır. ASLA throw etmez — otomasyon hatası ana işlemi bozamaz.
+ *      İletişim tetikleyicileri (inbound_message, lead_form_submitted) kural + kayıt başına SAATTE BİR kez çalışır
+ *      (yüksek hacimli gelen mesajda patlama freni). Otomasyonun GÖNDERDİĞİ mesaj tetikleyici olmaz (yalnız gelen).
  *
  * MÜKERRER KORUMASI (dedupe):
  *   - Zamanlanmış tetikleyicilerde aynı kayıt için aynı otomasyonun her cron'da
@@ -62,7 +67,12 @@ export type AutomationEventTrigger =
   | "offer_received"
   | "deal_won"
   | "deal_lost"
-  | "new_fsbo_lead";
+  | "new_fsbo_lead"
+  | "inbound_message"
+  | "lead_form_submitted";
+
+/** Kural + kayıt başına saatte en çok bir kez çalışan (iletişim hacmine bağlı) tetikleyiciler. */
+const HOURLY_CAPPED_TRIGGERS: ReadonlySet<AutomationEventTrigger> = new Set(["inbound_message", "lead_form_submitted"]);
 
 /** Tetikleyicisi kapatılabilir bir modüle ait olaylar: modül kapalıyken tetiklenmez. */
 const EVENT_TRIGGER_FEATURE: Partial<Record<AutomationEventTrigger, FeatureKey>> = {
@@ -89,7 +99,7 @@ type AutomationRow = {
 };
 
 export type AutomationEventPayload = {
-  entityType: "customer" | "demand" | "property" | "offer" | "deal" | "appointment" | "fsbo_lead";
+  entityType: "customer" | "demand" | "property" | "offer" | "deal" | "appointment" | "fsbo_lead" | "communication";
   entityId: string;
   /** Bildirim/görev metinlerinde görünen insan-okur etiket (müşteri adı, portföy kodu vb.) */
   label?: string | null;
@@ -197,6 +207,8 @@ function hrefForEntity(payload: AutomationEventPayload): string {
       return payload.entityId ? appointmentHref(payload.entityId) : "/app/randevular";
     case "fsbo_lead":
       return `/app/portfoy-avi/${payload.entityId}`;
+    case "communication":
+      return payload.customerId ? `/app/musteriler/${payload.customerId}` : "/app/gelen-kutusu";
   }
 }
 
@@ -234,6 +246,33 @@ async function resolveConsentedMarketingPhone(
   if (!verdict.allowed) return { ok: false, reason: "iys_consent_not_granted" };
 
   return { ok: true, phone };
+}
+
+type MarketingEmailResolution =
+  | { ok: true; email: string }
+  | { ok: false; reason: string };
+
+/** E-posta karşılığı: adres yalnız kiracıya ait aktif müşteri satırından, izin merkezi İYS kapısının "email" kanalından. */
+async function resolveConsentedMarketingEmail(
+  admin: SupabaseClient,
+  tenantId: string,
+  payload: AutomationEventPayload,
+): Promise<MarketingEmailResolution> {
+  if (!payload.customerId) return { ok: false, reason: "no_customer_consent_context" };
+  const { data: customer, error: customerError } = await admin
+    .from("customers")
+    .select("email, is_sample")
+    .eq("id", payload.customerId)
+    .eq("tenant_id", tenantId)
+    .is("deleted_at", null)
+    .eq("blacklist", false)
+    .maybeSingle();
+  if (isSampleRecipient(customer)) return { ok: false, reason: DEMO_BLOCKED };
+  const email = typeof customer?.email === "string" ? customer.email.trim() : "";
+  if (customerError || !email) return { ok: false, reason: "customer_or_email_unavailable" };
+  const verdict = await gateIysRecipient(admin, { tenantId, kind: "automation", channel: "email", customerId: payload.customerId });
+  if (!verdict.allowed) return { ok: false, reason: "iys_consent_not_granted" };
+  return { ok: true, email };
 }
 
 // ---------------------------------------------------------------------------
@@ -349,10 +388,47 @@ async function executeAction(
       }
 
       case "send_whatsapp": {
-        // Existing automation rows contain free text, not an approved Meta
-        // template name/language contract. Business-initiated free text is
-        // never sent or downgraded to the global platform account.
-        return { type, result: "skip", detail: "whatsapp_template_contract_required" };
+        // Business-initiated WhatsApp is ONLY an approved Meta template (name + language). Legacy rows carrying free
+        // text (cfg.template) stay fail-closed; free text is never sent or downgraded to a session message.
+        const templateName = String(cfg.template_name ?? "").trim();
+        const language = String(cfg.language ?? "").trim();
+        if (!isValidWhatsAppTemplateName(templateName) || !isValidWhatsAppTemplateLanguage(language)) {
+          return { type, result: "skip", detail: "whatsapp_template_contract_required" };
+        }
+        // Same order as SMS: tenant-owned provider first, then the send-time consent lookup right before network I/O.
+        const waSender = await prepareTenantWhatsAppSender(automation.tenant_id, { source: "automation", audience: "contact" });
+        const waRecipient = await resolveConsentedMarketingPhone(admin, automation.tenant_id, payload, "whatsapp");
+        if (!waRecipient.ok) return { type, result: "skip", detail: waRecipient.reason };
+        const bodyParameter = renderTemplate(String(cfg.body_param ?? ""), payload).trim().slice(0, 600);
+        const waRes = await waSender(waRecipient.phone, {
+          name: templateName,
+          language,
+          ...(bodyParameter ? { bodyParameter } : {}),
+        });
+        // Şablon parametre uyuşmazlığı / kanal kapalı: kural hataya düşmez, nedeniyle atlanır ve loglanır.
+        if (!waRes.ok) return { type, result: "skip", detail: waRes.code ?? "whatsapp_send_failed" };
+        return { type, result: "ok" };
+      }
+
+      case "send_email": {
+        const subject = renderTemplate(String(cfg.subject ?? automation.name), payload).trim().slice(0, 200);
+        const bodyRaw = String(cfg.body ?? "").trim();
+        if (!bodyRaw) return { type, result: "skip", detail: "no_email_body" };
+        const mailRecipient = await resolveConsentedMarketingEmail(admin, automation.tenant_id, payload);
+        if (!mailRecipient.ok) return { type, result: "skip", detail: mailRecipient.reason };
+        const text = renderTemplate(bodyRaw, payload);
+        const mailRes = await sendLoggedEmail({
+          to: mailRecipient.email,
+          subject: subject || automation.name,
+          text,
+          html: renderBrandedHtml({ title: subject || automation.name, body: text, vars: {} }),
+          template: "automation",
+          source: "automation",
+          tenantId: automation.tenant_id,
+        });
+        // Kanal kapalı / bastırılmış adres: sahte gönderim yok, nedeniyle atlanır.
+        if (!mailRes.ok) return { type, result: "skip", detail: mailRes.code === "disabled" ? "email_channel_disabled" : mailRes.code ?? "email_send_failed" };
+        return { type, result: "ok" };
       }
 
       case "assign_to_staff": {
@@ -523,6 +599,44 @@ async function bumpRunStats(admin: SupabaseClient, automation: AutomationRow, fi
 // 1) Olay tabanlı giriş noktası
 // ---------------------------------------------------------------------------
 
+/** Kural bu kayıt için son bir saatte çalıştı mı (log okunamazsa "çalıştı" sayılır: mükerrer mesaj riskine girilmez). */
+async function firedWithinLastHour(admin: SupabaseClient, automationId: string, entityId: string): Promise<boolean> {
+  const { data, error } = await admin
+    .from("automation_logs")
+    .select("id")
+    .eq("automation_id", automationId)
+    .eq("entity_id", entityId)
+    .gte("created_at", new Date(Date.now() - 3_600_000).toISOString())
+    .limit(1);
+  if (error) return true;
+  return (data ?? []).length > 0;
+}
+
+/**
+ * Takip dizisi (src/lib/automation/sequence-runner.ts) adımlarını otomasyonla AYNI eylem uygulayıcısından geçirir:
+ * SMS/WhatsApp/e-posta için aynı kiracı sağlayıcısı + İYS kapısı, görev için aynı mükerrer izi. `ruleId` görev izinin
+ * kural kısmıdır (dizide adım kimliği). Log yazmaz; çağıran kendi adım sonucunu tutar.
+ */
+export async function executeSequenceAction(
+  admin: SupabaseClient,
+  rule: { ruleId: string; tenantId: string; name: string },
+  action: { type: string; config: Record<string, unknown> },
+  payload: AutomationEventPayload,
+): Promise<{ result: "ok" | "skip" | "error"; detail?: string }> {
+  const pseudo: AutomationRow = {
+    id: rule.ruleId,
+    tenant_id: rule.tenantId,
+    name: rule.name,
+    trigger_type: "sequence",
+    trigger_config: {},
+    conditions: [],
+    actions: [action],
+    run_count: 0,
+  };
+  const out = await executeAction(admin, pseudo, action, payload);
+  return { result: out.result, detail: out.detail };
+}
+
 /**
  * Olay tabanlı tetikleyici: ilgili tenant'ın aktif otomasyonlarını bulup
  * aksiyonlarını uygular. ASLA throw etmez — çağıran server action'ın
@@ -550,7 +664,9 @@ export async function dispatchAutomationEvent(
 
     if (error || !data || data.length === 0) return;
 
+    const capped = HOURLY_CAPPED_TRIGGERS.has(trigger);
     for (const row of data as AutomationRow[]) {
+      if (capped && (await firedWithinLastHour(admin, row.id, payload.entityId))) continue;
       const { executed } = await runAutomationForEntity(admin, row, payload);
       await bumpRunStats(admin, row, executed > 0 ? 1 : 0);
     }

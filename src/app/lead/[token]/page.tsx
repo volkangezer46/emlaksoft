@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Home, MapPin, Search } from "lucide-react";
+import Link from "next/link";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { provinceOptionsResult } from "@/lib/geo/reader";
-
-export const revalidate = 60;
+import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page";
+import { loadLeadListing, normalizeListingRef, type LeadListing } from "@/lib/lead-listing";
 import { LeadForm } from "./lead-form";
 import { getLeadFormCopy } from "@/lib/legal-copy-server";
 
@@ -13,76 +14,114 @@ export const dynamic = "force-dynamic";
 // Token'lı kişiye özel başvuru formu: arama motorlarına kapalı (robots.txt Disallow'a ek olarak meta noindex).
 export const metadata = { robots: { index: false, follow: false } };
 
-export default async function PublicLeadPage({ params }: { params: Promise<{ token: string }> }) {
+/**
+ * Ofis markalı talep formu (COM-13). Public yüzey her zaman AÇIK temadadır; logo ve marka rengi ortak token'lı sayfa
+ * kabuğundan (`PublicTokenPage`) gelir. `?ilan=<kimlik|kod>` verilirse sunucu yalnız bu ofisin yayındaki portföyünü
+ * doğrular ve formun üstünde kart olarak gösterir; talep o portföye bağlanır (doğrulanmayan değer yok sayılır).
+ */
+export default async function PublicLeadPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ token: string }>;
+  searchParams?: Promise<{ ilan?: string | string[] }>;
+}) {
   const { token } = await params;
+  const sp = (await searchParams) ?? {};
+  const ilanRaw = Array.isArray(sp.ilan) ? sp.ilan[0] : sp.ilan;
+  const listingRef = normalizeListingRef(ilanRaw);
   const admin = createAdminClient();
 
   // tenant ve provinces bağımsız → paralel
-  const [{ data: tenant }, { data: provinces }] = await Promise.all([
+  const [{ data: tenant }, { data: provinces }, copy] = await Promise.all([
     admin
       .from("tenants")
-      .select("name, slug, status, logo_url, brand_color, lead_capture_enabled")
+      .select("id, name, slug, status, logo_url, brand_color, lead_capture_enabled")
       .eq("lead_capture_token", token)
       .maybeSingle(),
     provinceOptionsResult(),
+    // Onay/aydınlatma/pazarlama metinleri yönetimden (yoksa legal-copy.ts); rıza kanıtı sürümü aynı metinden türetilir.
+    getLeadFormCopy(),
   ]);
 
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
 
   const closed = tenant.lead_capture_enabled === false;
-  // Onay/aydınlatma/pazarlama metinleri yönetimden (yoksa legal-copy.ts); rıza kanıtı sürümü aynı metinden türetilir.
-  const copy = await getLeadFormCopy();
+  const listing: LeadListing | null = listingRef && !closed ? await loadLeadListing(admin, String(tenant.id), ilanRaw) : null;
+  const office = tenant.name || "Emlak ofisi";
 
   return (
-    <div className="min-h-screen bg-[image:var(--grad-ink)] px-4 py-10 text-white sm:py-16">
-      <div className="pointer-events-none fixed inset-0 -z-10 grid-overlay-dark opacity-30" />
-      <div className="pointer-events-none fixed -right-20 -top-20 -z-10 h-72 w-72 rounded-full bg-brand-600/25 blur-[110px]" />
-      <div className="pointer-events-none fixed -left-16 bottom-0 -z-10 h-64 w-64 rounded-full bg-mint-500/20 blur-[110px]" />
-
-      <div className="mx-auto max-w-lg">
-        {tenant.slug ? (
-          <Link
-            href={`/vitrin/${tenant.slug}`}
-            className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60 transition hover:text-white"
-          >
-            <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-white/10 text-xs font-bold text-white">
-              {tenant.name ? tenant.name[0] : "E"}
-            </span>
-            {tenant.name || "EmlakSoft"}
-          </Link>
-        ) : (
-          <div className="mb-5 flex items-center justify-center gap-2 text-xs font-semibold text-white/60">
-            <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-white/10 text-xs font-bold text-white">
-              {tenant.name ? tenant.name[0] : "E"}
-            </span>
-            {tenant.name || "EmlakSoft"}
-          </div>
-        )}
-
-        <div className="overflow-hidden rounded-[var(--radius-hero)] border border-white/15 bg-white/[0.06] p-6 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.7)] backdrop-blur-xl sm:p-8">
-          <h1 className="font-display text-2xl font-extrabold leading-tight sm:text-3xl">
-            Size en uygun mülkü bulalım
-          </h1>
-          <p className="mt-2 text-sm text-white/55">
-            Talebinizi bırakın, uzman danışmanımız kısa süre içinde sizinle iletişime geçsin.
+    <PublicTokenPage
+      office={office}
+      logoUrl={tenant.logo_url ?? null}
+      brandColor={tenant.brand_color ?? null}
+      icon={listing ? Home : Search}
+      title={listing ? "Bu ilanla ilgileniyorum" : "Size en uygun mülkü bulalım"}
+      subtitle={
+        listing
+          ? "Bilgilerinizi bırakın; ilanın danışmanı sizi kısa süre içinde arasın."
+          : "Talebinizi bırakın, uzman danışmanımız kısa süre içinde sizinle iletişime geçsin."
+      }
+      purpose="Bu sayfa yalnızca talep ve başvuru içindir"
+      width="lg"
+      footerExtra={
+        tenant.slug ? (
+          <p>
+            <Link
+              href={`/vitrin/${tenant.slug}`}
+              className="focus-ring rounded-sm font-semibold underline-offset-2 transition hover:text-text-muted hover:underline"
+            >
+              {office} portföylerini inceleyin
+            </Link>
           </p>
-
-          {closed ? (
-            <p className="mt-6 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
-              Bu form şu anda kapalı. Lütfen daha sonra tekrar deneyin.
-            </p>
-          ) : (
-            <LeadForm token={token} provinces={provinces ?? []} vitrinSlug={tenant.slug ?? null} copy={copy} />
-          )}
-        </div>
-
-        <p className="mt-6 text-center text-xs text-white/30">
-          <Link href="/" className="font-semibold underline-offset-2 transition hover:text-white/70 hover:underline">
-            Powered by EmlakSoft
-          </Link>{" "}
-          — Türkiye&apos;nin emlak işletim sistemi
-        </p>
-      </div>
-    </div>
+        ) : null
+      }
+    >
+      {closed ? (
+        <PublicStateBox
+          icon={Search}
+          title="Bu form şu anda kapalı."
+          description="Lütfen daha sonra tekrar deneyin ya da ofisi doğrudan arayın."
+        />
+      ) : (
+        <>
+          {listing ? (
+            <div
+              className="mb-4 flex items-start gap-3 rounded-[var(--radius-card)] border px-3.5 py-3"
+              style={{ borderColor: "var(--pb-edge)", backgroundColor: "var(--pb-veil)" }}
+            >
+              <span
+                aria-hidden="true"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-control)]"
+                style={{ backgroundColor: "var(--pb-soft)", color: "var(--pb-ink)" }}
+              >
+                <Home className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-faint">
+                  İlgilendiğiniz ilan{listing.code ? ` · ${listing.code}` : ""}
+                </p>
+                <p className="mt-0.5 line-clamp-2 text-sm font-bold text-ink-950">{listing.title ?? "Portföy"}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
+                  {listing.priceText ? <span className="font-semibold text-ink-950">{listing.priceText}</span> : null}
+                  {listing.place ? (
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="h-3 w-3" aria-hidden="true" /> {listing.place}
+                    </span>
+                  ) : null}
+                </p>
+              </div>
+            </div>
+          ) : null}
+          <LeadForm
+            token={token}
+            provinces={provinces ?? []}
+            vitrinSlug={tenant.slug ?? null}
+            copy={copy}
+            listingRef={listing ? listing.id : null}
+          />
+        </>
+      )}
+    </PublicTokenPage>
   );
 }

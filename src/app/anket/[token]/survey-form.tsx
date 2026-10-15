@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { CheckCircle2, ExternalLink, HeartHandshake, Loader2, PartyPopper, Phone, Send } from "lucide-react";
 import { submitSurveyByToken } from "@/app/actions/survey-public";
+import { recordSurveyReviewClick } from "@/app/actions/survey-review";
 
 /**
  * NPS puan formu + puana göre değişen teşekkür ekranı.
@@ -29,6 +30,35 @@ export function SurveyForm({
   const [done, setDone] = useState<null | { score: number; alreadyAnswered: boolean }>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Tıklama izi (COM-12): bağlantı her durumda açılır; iz yazımı beklenmez ve hatası kullanıcıya yansımaz.
+  function trackReview() {
+    void recordSurveyReviewClick(token).catch(() => undefined);
+  }
+
+  /**
+   * Google yorum bağlantısı HERKESE gösterilir (Google politikası "review gating"i yasaklar): memnun müşteriye
+   * birincil düğme, diğerlerine sade ikincil bağlantı. Teşvik/ödül metni YOK.
+   */
+  function reviewLink(prominent: boolean) {
+    if (!googleReviewUrl) return null;
+    return (
+      <a
+        href={googleReviewUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={trackReview}
+        className={
+          prominent
+            ? "focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
+            : "focus-ring mt-4 inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-text-muted underline-offset-2 transition hover:text-ink-950 hover:underline"
+        }
+      >
+        <ExternalLink className={prominent ? "h-4 w-4" : "h-3.5 w-3.5"} aria-hidden="true" />
+        {prominent ? "Google'da yorum bırakın" : "Deneyiminizi Google'da da paylaşabilirsiniz"}
+      </a>
+    );
+  }
 
   function toneClasses(n: number, selected: boolean): string {
     if (n <= 6) {
@@ -95,16 +125,7 @@ export function SurveyForm({
           </p>
           {/* Google yorum bağlantısı varsa birincil eylem odur, telefon ikincil kalır. Teşvik/ödül metni YOK. */}
           <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            {googleReviewUrl ? (
-              <a
-                href={googleReviewUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="focus-ring press inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-card)] bg-mint-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-mint-700"
-              >
-                <ExternalLink className="h-4 w-4" /> Google&apos;da yorum bırakın
-              </a>
-            ) : null}
+            {reviewLink(true)}
             {officePhone ? (
               <a
                 href={`tel:${officePhone.replace(/\s/g, "")}`}
@@ -132,6 +153,7 @@ export function SurveyForm({
             Beklentinizi karşılayamadığımız için üzgünüz. Deneyiminizi iyileştirmek için sizi
             arayabilir miyiz? Ekibimiz en kısa sürede sizinle iletişime geçecek.
           </p>
+          {reviewLink(false)}
         </div>
       );
     }
@@ -144,6 +166,7 @@ export function SurveyForm({
         <p className="mt-1 text-xs leading-relaxed text-text-muted">
           Değerlendirmeniz kaydedildi. Daha iyi bir deneyim için sürekli çalışıyoruz.
         </p>
+        {reviewLink(false)}
       </div>
     );
   }

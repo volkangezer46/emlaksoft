@@ -10,6 +10,8 @@ import { routeNewLead } from "@/lib/lead-routing/server";
 import { now } from "@/lib/clock";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
+import { withinBusinessHours } from "@/lib/lead-routing/logic";
+import { loadLeadListing, listingContextLine } from "@/lib/lead-listing";
 
 export type LeadInput = {
   fullName: string;
@@ -26,6 +28,11 @@ export type LeadInput = {
   rooms?: string;
   /** Müşteri tipleri (definitions/customer_type). Verilmezse ['alici'] — geriye uyumlu. */
   customer_types?: string[];
+  /**
+   * İlan bağlamı (COM-13): formdaki `?ilan=` değeri (portföy kimliği ya da kodu). Sunucuda bu ofise ait YAYINDAKİ
+   * portföye çözülür (IDOR yok); çözülemezse yok sayılır. Talep notuna ve iletişim kaydının portföy bağına yazılır.
+   */
+  listingRef?: string;
   consent?: {
     requestId: string;
     scope: "lead_intake" | "valuation_lead";
@@ -88,6 +95,73 @@ async function pickAssignee(
   return best;
 }
 
+export type RoutedLeadCustomerInput = {
+  fullName: string;
+  /** Doğrulanmış saklama biçimi (parsePhoneStrict().stored) ya da null. */
+  phone: string | null;
+  email?: string | null;
+  source: string;
+  channel: string;
+  notes?: string | null;
+  customerTypes?: string[];
+  provinceId?: string | null;
+  propertyType?: string | null;
+  transactionType?: string | null;
+  budgetMax?: number | null;
+};
+
+export type RoutedLeadCustomerResult =
+  | { ok: true; customerId: string; assignedTo: string | null; routing: { strategy: string; reason: string; deferred: boolean } | null }
+  | { ok: false; error: string };
+
+/**
+ * TEK yeni-aday oluşturucu: dağıtım motoruyla (yöntem/mesai ofis ayarından; motor hata verirse "en az yüklü") danışman
+ * seçer ve müşteriyi yazar. Public form (intakeLead) ve bilinmeyen numaradan gelen mesaj (automation/inbound-intake)
+ * aynı yolu kullanır. Telefon çağıranda `parsePhoneStrict` ile doğrulanmış olmalıdır.
+ */
+export async function createRoutedLeadCustomer(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  input: RoutedLeadCustomerInput,
+): Promise<RoutedLeadCustomerResult> {
+  let assignedTo: string | null = null;
+  let routing: { strategy: string; reason: string; deferred: boolean } | null = null;
+  const route = await routeNewLead(
+    admin,
+    tenantId,
+    { provinceId: input.provinceId || null, propertyType: input.propertyType || null, transactionType: input.transactionType || null, budgetMax: input.budgetMax ?? null },
+    now(),
+  );
+  if (route.ok) {
+    assignedTo = route.assigneeId;
+    routing = { strategy: route.strategy, reason: route.reason, deferred: route.deferred };
+  } else {
+    assignedTo = await pickAssignee(admin, tenantId);
+  }
+  const { data: created, error } = await admin
+    .from("customers")
+    .insert({
+      tenant_id: tenantId,
+      full_name: input.fullName,
+      phone: input.phone || null,
+      email: normalizeEmail(input.email ?? undefined) || null,
+      customer_types: input.customerTypes?.length ? input.customerTypes : ["alici"],
+      province_id: input.provinceId || null,
+      source: input.source,
+      lead_channel: input.channel,
+      auto_assigned: !!assignedTo,
+      assigned_to: assignedTo,
+      notes: input.notes?.trim() || null,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("createRoutedLeadCustomer insert", error);
+    return { ok: false, error: "Kayıt oluşturulamadı." };
+  }
+  return { ok: true, customerId: created.id as string, assignedTo, routing };
+}
+
 export async function intakeLead(token: string, input: LeadInput): Promise<LeadResult> {
   const fullName = input.fullName?.trim();
   if (!fullName) return { ok: false, error: "Ad soyad zorunlu.", status: 400 };
@@ -142,43 +216,30 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     }
   }
 
+  // İlan bağlamı: yalnız bu ofise ait, yayındaki portföy (çözülemezse yok sayılır).
+  const listing = input.listingRef ? await loadLeadListing(admin, tenantId, input.listingRef) : null;
+  const listingLine = listing ? listingContextLine(listing) : null;
+  const messageWithListing = [listingLine, input.message?.trim()].filter(Boolean).join("\n") || undefined;
+
   if (!customerId) {
     // TEK MOTOR (lead-routing): yöntem/mesai ofis ayarından; motor hata verirse eski "en az yüklü" yoluna düşer.
-    const route = await routeNewLead(
-      admin,
-      tenantId,
-      { provinceId: input.provinceId || null, propertyType: input.propertyType || null, transactionType: input.transactionType || null, budgetMax: input.budgetMax ?? null },
-      now(),
-    );
-    if (route.ok) {
-      assignedTo = route.assigneeId;
-      routing = { strategy: route.strategy, reason: route.reason, deferred: route.deferred };
-    } else {
-      assignedTo = await pickAssignee(admin, tenantId);
-    }
-    const { data: created, error } = await admin
-      .from("customers")
-      .insert({
-        tenant_id: tenantId,
-        full_name: fullName,
-        phone: phone || null,
-        email: normalizeEmail(input.email) || null,
-        customer_types: input.customer_types?.length ? input.customer_types : ["alici"],
-        province_id: input.provinceId || null,
-        source,
-        lead_channel: channel,
-        auto_assigned: !!assignedTo,
-        assigned_to: assignedTo,
-        notes: input.message?.trim() || null,
-      })
-      .select("id")
-      .single();
-
-    if (error || !created) {
-      console.error("intakeLead insert", error);
-      return { ok: false, error: "Kayıt oluşturulamadı.", status: 500 };
-    }
-    customerId = created.id as string;
+    const created = await createRoutedLeadCustomer(admin, tenantId, {
+      fullName,
+      phone: phone || null,
+      email: input.email ?? null,
+      source,
+      channel,
+      notes: messageWithListing ?? null,
+      customerTypes: input.customer_types,
+      provinceId: input.provinceId || null,
+      propertyType: input.propertyType || null,
+      transactionType: input.transactionType || null,
+      budgetMax: input.budgetMax ?? null,
+    });
+    if (!created.ok) return { ok: false, error: created.error, status: 500 };
+    customerId = created.customerId;
+    assignedTo = created.assignedTo;
+    routing = created.routing;
   }
 
   // Public forms must persist server-verified consent evidence before the lead
@@ -222,7 +283,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
    */
   const commDraft = buildLeadCommunication({
     customerId,
-    message: input.message,
+    message: messageWithListing,
     channel,
     source,
     duplicate,
@@ -232,6 +293,8 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
       tenant_id: tenantId,
       created_by: null, // public form — panel kullanıcısı yok
       ...commDraft,
+      // Danışman hangi ilanı sorduğunu iletişim kaydından portföye tıklayarak görür (COM-13).
+      ...(listing ? { property_id: listing.id } : {}),
     });
     if (commErr) console.error("intakeLead communication", commErr);
   }
@@ -257,7 +320,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     action: duplicate ? "lead.intake.duplicate" : "lead.intake",
     entity_type: "customer",
     entity_id: customerId,
-    new_value: { full_name: fullName, phone, channel, source, assigned_to: assignedTo, ...(routing ? { routing } : {}) },
+    new_value: { full_name: fullName, phone, channel, source, assigned_to: assignedTo, ...(routing ? { routing } : {}), ...(listing ? { property_id: listing.id } : {}) },
   });
 
   /*
@@ -271,7 +334,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
     tenantId,
     userId: assignedTo,
     title: duplicate ? "Mevcut müşteriden yeni talep" : "Yeni talep geldi",
-    body: `${fullName}${phone ? ` · ${phone}` : ""} · ${source}${mesajOzeti ? ` · ${mesajOzeti}` : ""}`,
+    body: `${fullName}${phone ? ` · ${phone}` : ""} · ${source}${listing ? ` · ${listing.code ?? "ilan"}` : ""}${mesajOzeti ? ` · ${mesajOzeti}` : ""}`,
     href: `/app/musteriler/${customerId}`,
     kind: "success",
   });
@@ -289,6 +352,23 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
       fields: { source, channel },
     }).catch((e) => console.error("intakeLead automation new_customer", e instanceof Error ? e.message : e));
   }
+
+  // Form başvurusu tetikleyicisi (COM-14): mükerrer müşteri dahil HER başvuruda; kural + müşteri başına saatte bir.
+  void dispatchAutomationEvent(tenantId, "lead_form_submitted", {
+    entityType: "customer",
+    entityId: customerId,
+    customerId,
+    propertyId: listing?.id ?? null,
+    label: fullName,
+    assignedTo,
+    fields: {
+      source,
+      channel,
+      is_new_contact: duplicate ? "hayir" : "evet",
+      has_property: listing ? "evet" : "hayir",
+      after_hours: withinBusinessHours(now()) ? "hayir" : "evet",
+    },
+  }).catch((e) => console.error("intakeLead automation lead_form_submitted", e instanceof Error ? e.message : e));
 
   return { ok: true, customerId, assignedTo, duplicate };
 }

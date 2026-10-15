@@ -3,9 +3,31 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { listApprovedTenantWhatsAppTemplates, type ApprovedWhatsAppTemplate } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { isValidWhatsAppTemplateLanguage, isValidWhatsAppTemplateName } from "@/lib/messaging/whatsapp-contract";
 
 export type AutomationResult = { ok?: boolean; error?: string; id?: string };
+export type AutomationTemplateListResult =
+  | { ok: true; templates: ApprovedWhatsAppTemplate[] }
+  | { ok: false; error: string };
+
+/**
+ * Sihirbazdaki "WhatsApp şablonu gönder" eylemi için ofisin ONAYLI Meta şablonları (yalnız ad + dil; sağlayıcı
+ * anahtarı sunucuda kalır). Otomasyonu düzenleyen yetki (settings:edit) ister; dakikada 10 yenileme.
+ */
+export async function listAutomationWhatsAppTemplates(): Promise<AutomationTemplateListResult> {
+  const gate = await requirePermission("settings", "edit");
+  if (!gate.ok) return { ok: false, error: gate.error };
+  const rate = await checkRateLimit(`automation-wa-templates:${gate.tenantId}:${gate.userId}`, {
+    limit: 10,
+    windowSec: 60,
+    failurePolicy: "deny",
+  });
+  if (!rate.allowed) return { ok: false, error: "Şablon listesi çok sık yenilendi; lütfen bir dakika sonra tekrar deneyin." };
+  return listApprovedTenantWhatsAppTemplates(gate.tenantId);
+}
 
 const TEMPLATES: Record<string, {
   name: string;
@@ -163,11 +185,17 @@ const TRIGGER_TYPES = [
   "no_contact_days", "offer_received", "deal_won", "deal_lost",
   "auth_expiring", "appointment_missed", "demand_stale",
   "new_fsbo_lead", "fsbo_no_contact_days",
+  // COM-14 (20261018070000): iletişim olayı tetikleyicileri.
+  "inbound_message", "lead_form_submitted",
 ] as const;
 
-/** automation_action enum'unun bugünkü değerleri. */
+/** Müşteri bağlamı olmayan tetikleyiciler: mesaj/etiket eylemi burada çalışamaz (labels.ts ile aynı küme). */
+const NO_CUSTOMER_TRIGGERS = new Set(["new_property", "auth_expiring", "new_fsbo_lead", "fsbo_no_contact_days"]);
+const MESSAGE_ACTIONS = new Set(["send_sms", "send_whatsapp", "send_email", "add_tag"]);
+
+/** Kural eylem türleri (automations.actions jsonb; send_email motorda İYS "email" kapısıyla çalışır). */
 const ACTION_TYPES = [
-  "send_whatsapp", "send_sms", "create_task", "assign_to_staff",
+  "send_whatsapp", "send_sms", "send_email", "create_task", "assign_to_staff",
   "notify_manager", "add_tag", "change_status", "send_notification",
 ] as const;
 
@@ -253,7 +281,7 @@ async function parseWizardForm(
   }
   if (conditions.length > 3) return { error: "En fazla 3 koşul eklenebilir." };
 
-  // actions — tek aksiyon; config beyaz liste
+  // actions — en fazla 3 eylem, sırayla çalışır; config beyaz liste
   let rawActions: { type?: unknown; config?: Record<string, unknown> }[] = [];
   try {
     const raw = JSON.parse(String(formData.get("actions") ?? "[]"));
@@ -263,6 +291,7 @@ async function parseWizardForm(
     return { error: actionErrorMessage(null, "Aksiyon okunamadı.") };
   }
   if (rawActions.length === 0) return { error: "En az bir aksiyon seçin." };
+  if (rawActions.length > 3) return { error: "Bir kurala en çok 3 eylem eklenebilir." };
 
   const actions: ParsedWizard["actions"] = [];
   for (const a of rawActions.slice(0, 3)) {
@@ -270,10 +299,15 @@ async function parseWizardForm(
     if (!(ACTION_TYPES as readonly string[]).includes(type)) {
       return { error: "Geçersiz aksiyon türü." };
     }
+    if (NO_CUSTOMER_TRIGGERS.has(triggerType) && MESSAGE_ACTIONS.has(type)) {
+      return { error: "Bu tetikleyicide müşteri olmadığından mesaj ve etiket eylemleri kullanılamaz." };
+    }
     if (type === "send_whatsapp") {
-      return {
-        error: "WhatsApp otomasyonu, onaylı Meta şablon adı ve dil sözleşmesi eklenene kadar kullanılamaz.",
-      };
+      // İş başlatan WhatsApp yalnız onaylı Meta şablonudur; serbest metin kaydedilmez.
+      const src = (a.config ?? {}) as Record<string, unknown>;
+      if (!isValidWhatsAppTemplateName(src.template_name) || !isValidWhatsAppTemplateLanguage(src.language)) {
+        return { error: "WhatsApp eylemi için onaylı Meta şablon adı ve dil sözleşmesi gerekli (ör. portfoy_duyurusu · tr)." };
+      }
     }
     if (triggerType.includes("fsbo") && !["create_task", "assign_to_staff", "notify_manager", "send_notification"].includes(type)) {
       return { error: "Sahibinden ilan kurallarında yalnız görev, atama ve bildirim eylemleri kullanılabilir." };
@@ -294,11 +328,26 @@ async function parseWizardForm(
         }
         break;
       }
-      case "send_sms":
-      case "send_whatsapp": {
+      case "send_sms": {
         const template = truncated(src.template, 500);
         if (!template) return { error: "Mesaj metni zorunlu." };
         config.template = template;
+        break;
+      }
+      case "send_whatsapp": {
+        config.template_name = String(src.template_name).trim();
+        config.language = String(src.language).trim();
+        const bodyParam = truncated(src.body_param, 200);
+        if (bodyParam) config.body_param = bodyParam;
+        break;
+      }
+      case "send_email": {
+        const subject = truncated(src.subject, 200);
+        const body = truncated(src.body, 4000);
+        if (!subject) return { error: "E-posta konusu zorunlu." };
+        if (!body) return { error: "E-posta metni zorunlu." };
+        config.subject = subject;
+        config.body = body;
         break;
       }
       case "notify_manager":

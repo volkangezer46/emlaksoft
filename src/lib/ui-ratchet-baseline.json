@@ -830,7 +830,7 @@
  "src/app/app/otomasyonlar/automation-wizard.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 8,
+  "hamButon": 7,
   "kucukHedef": 0
  },
  "src/app/app/otomasyonlar/[id]/page.tsx": {

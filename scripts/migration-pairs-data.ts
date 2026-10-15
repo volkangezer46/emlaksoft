@@ -521,6 +521,11 @@ const F = {
   a6CampaignReportRpc: "20261018060000_campaign_report_rpc.sql",
   a6InboxConversationState: "20261018060100_inbox_conversation_state.sql",
   a6CommunicationsBodyTrgm: "20261018060200_communications_body_trgm.sql",
+  // A7 (2026-10-18): otomasyon iletisim tetikleyicileri + takip dizileri + WhatsApp gelen medya kovasi + anket Google yorum izi.
+  a7AutomationTriggerInbound: "20261018070000_automation_trigger_inbound.sql",
+  a7MessageSequences: "20261018070001_message_sequences.sql",
+  a7InboundMediaBucket: "20261018070002_inbound_media_bucket.sql",
+  a7SurveyReviewClick: "20261018070003_survey_review_click.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -807,6 +812,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a6CampaignReportRpc]: "ek", // campaign_report + campaign_recipient_page (SECURITY INVOKER, kiraci kosullu); tablo degismez
     [F.a6InboxConversationState]: "ek", // communications/calls.resolved_at + resolved_by (nullable) + inbox_conversations (SECURITY INVOKER)
     [F.a6CommunicationsBodyTrgm]: "ek", // yalniz GIN trigram indeksleri (communications.body/contact_address, calls.phone)
+    [F.a7AutomationTriggerInbound]: "ek", // yalniz enum degeri ekler (inbound_message, lead_form_submitted; idempotent); tablo/politika/veri degismez
+    [F.a7MessageSequences]: "ek", // yeni tablolar (message_sequences/_steps/_enrollments/_step_runs) + RLS; mevcut tablo degismez
+    [F.a7InboundMediaBucket]: "ek", // ozel storage kovasi inbound-media (politika eklenmez; yalniz service_role)
+    [F.a7SurveyReviewClick]: "ek", // surveys.review_clicked_at nullable sutun + kismi indeks
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1078,6 +1087,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A6-kampanya-raporu", order: 1866, title: "Kampanya raporu: campaign_report (durum sayilari, hata gruplari, 7 gun icinde yanit/randevu/ret atfi) + campaign_recipient_page (sunucu sayfalama). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken eski 500 satirlik listeye duser; sira serbest, ek)", files: [F.a6CampaignReportRpc] },
     { id: "A6-gelen-kutusu-konusmalar", order: 1867, title: "Gelen kutusu v2: communications/calls.resolved_at + resolved_by ve inbox_conversations (kisi bazli konusma, yanit bekliyor). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken Konusmalar sekmesi 'etkin degil' der; sira serbest, ek)", files: [F.a6InboxConversationState] },
     { id: "A6-gelen-kutusu-arama-indeksi", order: 1868, title: "Gelen kutusu aramasi icin GIN trigram indeksleri (mesaj icerigi + numara). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (indeks yokken arama yalniz yavaslar; sira serbest, ek)", files: [F.a6CommunicationsBodyTrgm] },
+    { id: "A7-otomasyon-iletisim-tetikleyici", order: 1870, title: "automation_trigger enum: inbound_message + lead_form_submitted (sira serbest, ek; kod enum yokken bu tetikleyicilerle kural kaydedilemez, mevcut kurallar etkilenmez)", files: [F.a7AutomationTriggerInbound] },
+    { id: "A7-takip-dizileri", order: 1871, title: "Takip dizileri (drip): message_sequences + adimlar + kayitlar + idempotent adim sonucu (sira serbest, ek; kod tablolar yokken diziler sekmesi kurulum bekliyor gosterir, cron bos doner)", files: [F.a7MessageSequences] },
+    { id: "A7-whatsapp-gelen-medya", order: 1872, title: "WhatsApp gelen medya ozel kovasi inbound-media (sira serbest, ek; kod kova yokken medyayi saklamaz, metin ozeti yazar)", files: [F.a7InboundMediaBucket] },
+    { id: "A7-anket-google-yorum-izi", order: 1873, title: "surveys.review_clicked_at (sira serbest, ek; kod sutun yokken tiklama izini atlar)", files: [F.a7SurveyReviewClick] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },

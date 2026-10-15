@@ -2,8 +2,12 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTurkishPhone, isValidTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 import { notifyTenant } from "@/lib/notify";
 import { applyMessageLogStatus } from "@/lib/messaging/message-log";
+import { handleInboundFirstContact } from "@/lib/automation/inbound-intake";
+import { storeInboundWhatsAppMedia } from "@/lib/messaging/whatsapp-media";
+import { INBOUND_MEDIA_KIND_LABEL } from "@/lib/messaging/whatsapp-media-rules";
 import {
   advanceMetaDeliveryState,
   decideMetaEventClaim,
@@ -108,8 +112,23 @@ async function applyCommunicationDeliveryStatus(
   }
 }
 
-function messageBody(message: MetaInboundMessage): string {
+/**
+ * İletişim gövdesi: metin aynen; medya "[Fotoğraf] açıklama" / "[Belge: ad]"; konum adres + harita bağlantısı.
+ * Medya dosyası ayrıca özel kovaya yazılır (provider_metadata.media), gövde yalnız okunur özettir.
+ */
+export function messageBody(message: MetaInboundMessage): string {
   if (message.type === "text") return message.text?.body?.trim().slice(0, 4096) || "(boş metin)";
+  if (message.type === "location" && message.location) {
+    const { latitude, longitude, name, address } = message.location;
+    const place = [name, address].filter(Boolean).join(", ");
+    return `Konum${place ? `: ${place}` : ""} · https://www.google.com/maps?q=${latitude.toFixed(6)},${longitude.toFixed(6)}`.slice(0, 4096);
+  }
+  const kind = INBOUND_MEDIA_KIND_LABEL[message.type];
+  if (kind) {
+    const label = message.type === "document" && message.media?.filename ? `${kind}: ${message.media.filename}` : kind;
+    const caption = message.media?.caption ? ` ${message.media.caption}` : "";
+    return `[${label}]${caption}`.slice(0, 4096);
+  }
   return `[${message.type} mesajı]`;
 }
 
@@ -424,13 +443,16 @@ export async function ingestMetaInboundMessage(
     const tenantId = resolved.tenantId;
     const phone = normalizeTurkishPhone(message.from);
     const validPhone = isValidTurkishMobile(phone);
+    // Yabancı numara da kayıtlı müşteriyle eşleşsin (saklama biçimi +E.164; phone-rules tek kaynak).
+    const intl = validPhone ? null : parsePhoneStrict(`+${message.from.replace(/\D/g, "")}`);
+    const matchPhone = validPhone ? phone : intl?.ok && intl.stored ? intl.stored : null;
 
-    const { data: customers, error: customerError } = validPhone
+    const { data: customers, error: customerError } = matchPhone
       ? await admin
           .from("customers")
           .select("id, full_name, assigned_to, created_at")
           .eq("tenant_id", tenantId)
-          .eq("phone", phone)
+          .eq("phone", matchPhone)
           .is("deleted_at", null)
           .order("created_at", { ascending: true })
           .limit(2)
@@ -457,6 +479,8 @@ export async function ingestMetaInboundMessage(
           timestamp: message.timestamp ?? null,
           message_type: message.type,
           customer_match_count: (customers ?? []).length,
+          ...(message.location ? { location: message.location } : {}),
+          ...(message.media ? { media_pending: true } : {}),
         },
       })
       .select("id")
@@ -476,15 +500,56 @@ export async function ingestMetaInboundMessage(
       return { ok: true, duplicate: true, reason: "communication_duplicate" };
     }
 
+    // Medya (COM-03): Meta adresi ~5 dk geçerli → indirme BU işlemde. Hata mesajı düşürmez; nedeni metadata'ya yazılır.
+    if (message.media) {
+      const stored = await storeInboundWhatsAppMedia(admin, {
+        tenantId,
+        communicationId: String(communication.id),
+        mediaId: message.media.id,
+        kind: message.type,
+        declaredMime: message.media.mimeType,
+        filename: message.media.filename,
+        receivedAt: new Date(),
+      });
+      const { error: mediaMetaError } = await admin
+        .from("communications")
+        .update({
+          provider_metadata: {
+            phone_number_id: phoneNumberId,
+            timestamp: message.timestamp ?? null,
+            message_type: message.type,
+            customer_match_count: (customers ?? []).length,
+            ...(stored.ok ? { media: [stored.media] } : { media_error: stored.code }),
+          },
+        })
+        .eq("id", communication.id)
+        .eq("tenant_id", tenantId);
+      if (mediaMetaError) console.error("[meta-webhook] media metadata update failed", { code: mediaMetaError.code });
+    }
+
+    // İlk temas (COM-02/14/05): bilinmeyen numaradan kayıt + karşılama, dizi durdurma, "gelen mesaj" tetikleyicisi.
+    const intake = await handleInboundFirstContact(admin, {
+      tenantId,
+      channel: "whatsapp",
+      rawFrom: message.from,
+      body: messageBody(message),
+      communicationId: String(communication.id),
+      customer: customer
+        ? { id: String(customer.id), full_name: (customer.full_name as string | null) ?? null, assigned_to: (customer.assigned_to as string | null) ?? null }
+        : null,
+    });
+
     await notifyTenant({
       tenantId,
-      userId: (customer?.assigned_to as string | null | undefined) ?? null,
-      title: customer?.full_name
-        ? `Yeni WhatsApp mesajı: ${customer.full_name}`
-        : `Yeni WhatsApp mesajı: ${validPhone ? formatTurkishPhone(phone) : message.from}`,
+      userId: intake.assignedTo,
+      title: intake.created
+        ? `Yeni talep (WhatsApp): ${intake.customerName ?? message.from}`
+        : intake.customerName
+          ? `Yeni WhatsApp mesajı: ${intake.customerName}`
+          : `Yeni WhatsApp mesajı: ${validPhone ? formatTurkishPhone(phone) : message.from}`,
       body: messageBody(message).slice(0, 120),
-      href: customer?.id ? `/app/musteriler/${customer.id}` : "/app/gelen-kutusu",
-      kind: "info",
+      href: intake.customerId ? `/app/musteriler/${intake.customerId}` : "/app/gelen-kutusu",
+      kind: intake.created ? "success" : "info",
     });
 
     const marked = await markEvent(claimed.id, {

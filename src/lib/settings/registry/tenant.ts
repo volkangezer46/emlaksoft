@@ -512,6 +512,66 @@ const leadRouting: AnySettingDef[] = [
 ];
 
 /**
+ * Bilinmeyen numaradan gelen WhatsApp/SMS (COM-02). Varsayılan KAPALI = bugünkü davranış (mesaj eşleşmemiş satır olarak
+ * gelen kutusuna düşer). Okuyucu: src/lib/automation/inbound-intake.ts (webhook işleyicileri çağırır).
+ */
+export const INBOUND_KEYS = {
+  autoCreate: "office.inbound.auto_create_lead",
+  autoAck: "office.inbound.auto_ack",
+  ackHours: "office.inbound.ack_text_hours",
+  ackAfter: "office.inbound.ack_text_after_hours",
+} as const;
+export const INBOUND_ACK_DEFAULT_HOURS =
+  "Merhaba, mesajınız için teşekkür ederiz. Danışmanımız en kısa sürede size dönüş yapacak.";
+export const INBOUND_ACK_DEFAULT_AFTER =
+  "Merhaba, mesajınız bize ulaştı. Şu an mesai dışındayız; ilk iş saatinde size dönüş yapacağız.";
+
+const inbound: AnySettingDef[] = [
+  defineBool({
+    ...TENANT,
+    key: INBOUND_KEYS.autoCreate,
+    group: "dagitim",
+    default: false,
+    label: "Bilinmeyen numaradan yazanı talep olarak kaydet",
+    description: "Kayıtlı olmayan bir numara WhatsApp'tan ya da SMS ile yazınca müşteri kaydı (kaynak: WhatsApp/SMS) açılır ve talep dağıtım yöntemiyle bir danışmana atanır.",
+    impact: "Aynı numaradan günde en çok bir kayıt açılır; kara listedeki numara atlanır. Kapalıyken mesaj gelen kutusuna eşleşmemiş satır olarak düşer.",
+  }),
+  defineBool({
+    ...TENANT,
+    key: INBOUND_KEYS.autoAck,
+    group: "dagitim",
+    default: false,
+    label: "WhatsApp'tan ilk yazana otomatik karşılama",
+    description: "Kayıtlı olmayan numaradan gelen ilk WhatsApp mesajına, ofisin kendi WhatsApp hesabından aşağıdaki karşılama metni gider (24 saatlik yanıt penceresi içinde serbest metin).",
+    impact: "Aynı numaraya 24 saatte en çok bir karşılama gider. Ofisin WhatsApp Cloud API bağlantısı yoksa hiçbir şey gönderilmez.",
+  }),
+  defineString({
+    ...TENANT,
+    key: INBOUND_KEYS.ackHours,
+    group: "dagitim",
+    default: INBOUND_ACK_DEFAULT_HOURS,
+    maxLength: 500,
+    minLength: 1,
+    multiline: true,
+    label: "Karşılama metni (mesai içi)",
+    description: "Pazartesi-Cumartesi 09:00-19:00 arasında gönderilir.",
+    impact: "Yalnız otomatik karşılama açıkken kullanılır.",
+  }),
+  defineString({
+    ...TENANT,
+    key: INBOUND_KEYS.ackAfter,
+    group: "dagitim",
+    default: INBOUND_ACK_DEFAULT_AFTER,
+    maxLength: 500,
+    minLength: 1,
+    multiline: true,
+    label: "Karşılama metni (mesai dışı)",
+    description: "Pazar günü ve 09:00-19:00 dışında gönderilir.",
+    impact: "Yalnız otomatik karşılama açıkken kullanılır.",
+  }),
+];
+
+/**
  * Yapay zekâ özellikleri (ofis izni, hepsi varsayılan KAPALI). Her çağrı `openai-client.ts` üzerinden gider (kişisel veri
  * maskelenir, denetim kaydı + kredi defteri yazılır) ve çıktı yalnız TASLAKTIR; kullanıcı onaylamadan hiçbir kayıt değişmez.
  */
@@ -575,4 +635,4 @@ const leadOrigins: AnySettingDef[] = [
   } as AnySettingDef,
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...leadOrigins, ...aiFeatures];
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...inbound, ...leadOrigins, ...aiFeatures];

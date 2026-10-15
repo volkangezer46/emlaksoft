@@ -91,6 +91,7 @@ const MUAF: Record<string, string> = {
   "customer-portal-feedback.ts::submitMatchFeedbackByToken": "Musteri portali begen/gec geri bildirimi; token ile.",
   "customer-portal-requests.ts::submitPortalRequest": "Musteri portali teklif/erteleme/bakim istegi; token ve sahiplik SQL RPC icinde (20261007000620), service_role yok.",
   "survey-public.ts::submitSurveyByToken": "NPS memnuniyet anketi; token ankete sabit.",
+  "survey-review.ts::recordSurveyReviewClick": "Anket teşekkür ekranındaki Google yorum tıklama izi; UUID token ankete sabit, IP hız sınırı (deny), yalnız cevaplanmış anketin ilk tıklaması, tenant filtreli yazım.",
   "survey-public.ts::submitSurveyTaskByToken": "Anketör görevi bağlı linki; UUID token tek göreve sabit, IP hız sınırı (deny), honeypot, modül ve ofis aktiflik denetimi, tenant filtreli yazım.",
   "referral-public.ts::submitReferralByToken": "Tavsiye formu; token referral_links kaydina sabit.",
   "document-request-public.ts::prepareDocRequestUpload": "Evrak linki yukleme izni; token SHA-256 ozetiyle cozulur (sure/iptal/limit), IP+token hiz siniri (deny), tek nesnelik izin.",

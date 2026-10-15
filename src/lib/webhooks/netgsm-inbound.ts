@@ -3,6 +3,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { formatTurkishPhone, isValidTurkishMobile, normalizeTurkishPhone } from "@/lib/phone";
 import { notifyTenant } from "@/lib/notify";
+import { handleInboundFirstContact } from "@/lib/automation/inbound-intake";
 import {
   decideNetgsmEventClaim,
   NETGSM_EVENT_CLAIM_LEASE_MS,
@@ -251,15 +252,29 @@ export async function ingestNetgsmInbound(
       return { ok: true, duplicate: true, reason: "communication_duplicate" };
     }
 
+    // İlk temas (COM-02/14/05): bilinmeyen numaradan kayıt, dizi durdurma, "gelen mesaj" tetikleyicisi (SMS'te karşılama yok).
+    const intake = await handleInboundFirstContact(admin, {
+      tenantId,
+      channel: "sms",
+      rawFrom: phone,
+      body: message.message,
+      communicationId: String(communication.id),
+      customer: customer
+        ? { id: String(customer.id), full_name: (customer.full_name as string | null) ?? null, assigned_to: (customer.assigned_to as string | null) ?? null }
+        : null,
+    });
+
     await notifyTenant({
       tenantId,
-      userId: (customer?.assigned_to as string | null | undefined) ?? null,
-      title: customer?.full_name
-        ? `Yeni SMS: ${customer.full_name}`
-        : `Yeni SMS: ${formatTurkishPhone(phone)}`,
+      userId: intake.assignedTo,
+      title: intake.created
+        ? `Yeni talep (SMS): ${intake.customerName ?? formatTurkishPhone(phone)}`
+        : intake.customerName
+          ? `Yeni SMS: ${intake.customerName}`
+          : `Yeni SMS: ${formatTurkishPhone(phone)}`,
       body: message.message.slice(0, 120),
-      href: customer?.id ? `/app/musteriler/${customer.id}` : "/app/gelen-kutusu",
-      kind: "info",
+      href: intake.customerId ? `/app/musteriler/${intake.customerId}` : "/app/gelen-kutusu",
+      kind: intake.created ? "success" : "info",
     });
 
     const marked = await markEvent(claimed.id, {

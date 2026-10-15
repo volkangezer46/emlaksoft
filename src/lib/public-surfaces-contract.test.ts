@@ -266,11 +266,13 @@ describe("B152: herkese açık konum mahalle/ilçe düzeyinde", () => {
 });
 
 describe("B154: koyu formlarda telefon ülke seçici koyu ton", () => {
-  it("PhoneInput tone='dark' varyantı; lead-form ve değerleme hunisi kullanır", () => {
+  it("PhoneInput tone='dark' varyantı; değerleme hunisi kullanır (talep formu COM-13 ile açık temada)", () => {
     const input = read("src/components/ui/phone-input.tsx");
     expect(input).toContain('tone?: "light" | "dark"');
     expect(input).toContain("border-white/15 bg-white/[0.06] text-white");
-    expect(read("src/app/lead/[token]/lead-form.tsx")).toContain('tone="dark"');
+    // Talep formu ofis markalı açık kabuğa (PublicTokenPage) taşındı: koyu ton kullanılmaz.
+    expect(read("src/app/lead/[token]/lead-form.tsx")).not.toContain('tone="dark"');
+    expect(read("src/app/lead/[token]/page.tsx")).toContain("PublicTokenPage");
     expect(read("src/components/public/valuation-funnel.tsx")).toContain('tone="dark"');
   });
 });

@@ -135,6 +135,8 @@ export async function insertCustomerRecord(
         label: v.fullName,
         phone: v.phone || null,
         assignedTo: userId,
+        // Koşul alanı "kaynak": panelden eklenen müşteri formdan/WhatsApp'tan geleninden ayrışsın (COM-14).
+        fields: { source: "panel", channel: "panel" },
       }))
       .catch((e) => console.error("automation new_customer", e)),
   );

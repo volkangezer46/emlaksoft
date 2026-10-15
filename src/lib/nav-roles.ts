@@ -245,6 +245,7 @@ const AYARLAR: HubDef = {
     p("/app/ayarlar/ozel-alanlar", "Özel alanlar"),
     p("/app/ayarlar/api-webhook", "API ve webhook"),
     p("/app/otomasyonlar", "Otomasyonlar"),
+    p("/app/otomasyonlar/diziler", "Takip dizileri"),
     p("/app/ayarlar/is-akislari", "İş akışları"),
     p("/app/ayarlar/etiketler", "Etiketler"),
     p("/app/ayarlar/mesaj-sablonlari", "Mesaj şablonları"),

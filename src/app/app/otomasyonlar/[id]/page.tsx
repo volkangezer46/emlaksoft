@@ -8,7 +8,7 @@ import { AutomationToggleButton } from "../automation-actions";
 import { AutomationWizard, type WizardInitial } from "../automation-wizard";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
-import { TRIGGER_LABELS, ACTION_LABELS, STATUS_LABELS, TRIGGER_CONFIG_LABELS, CONDITION_OP_LABELS } from "../labels";
+import { TRIGGER_LABELS, ACTION_LABELS, STATUS_LABELS, TRIGGER_CONFIG_LABELS, CONDITION_OP_LABELS, skipReasonLabel } from "../labels";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 
 export const metadata = { title: "Otomasyon kuralı" };
@@ -35,7 +35,31 @@ const LOG_ENTITY_LABELS: Record<string, string> = {
   offer:       "Teklif",
   deal:        "Anlaşma",
   appointment: "Randevu",
+  communication: "Gelen mesaj",
+  fsbo_lead:   "Sahibinden ilan",
 };
+
+/** Eylem kartındaki tek satırlık özet (ne gönderilir / ne açılır). */
+function actionSummary(a: Record<string, unknown>): string | null {
+  const cfg = (a.config ?? {}) as Record<string, unknown>;
+  switch (String(a.type)) {
+    case "send_whatsapp":
+      return cfg.template_name ? `Şablon: ${String(cfg.template_name)} · ${String(cfg.language ?? "")}` : "Onaylı şablon seçilmemiş: çalışmaz";
+    case "send_email":
+      return cfg.subject ? `Konu: ${String(cfg.subject)}` : null;
+    case "send_sms":
+      return cfg.template ? String(cfg.template) : null;
+    case "create_task":
+      return cfg.title ? String(cfg.title) : null;
+    case "add_tag":
+      return cfg.tag ? `#${String(cfg.tag)}` : null;
+    case "notify_manager":
+    case "send_notification":
+      return cfg.message ? String(cfg.message) : null;
+    default:
+      return null;
+  }
+}
 
 /** Log satırındaki entity'ye tıklanınca gidilecek hedef (sıfır çıkmaz metrik). */
 function logEntityHref(entityType: string | null, entityId: string | null): string {
@@ -45,7 +69,9 @@ function logEntityHref(entityType: string | null, entityId: string | null): stri
     case "demand":      return "/app/talepler";
     case "offer":       return "/app/teklifler";
     case "deal":        return "/app/anlasmalar";
-    case "appointment": return "/app/randevular";
+    case "appointment": return entityId ? `/app/randevular?randevu=${entityId}` : "/app/randevular";
+    case "communication": return "/app/gelen-kutusu";
+    case "fsbo_lead":   return entityId ? `/app/portfoy-avi/${entityId}` : "/app/portfoy-avi";
     default:            return "/app/otomasyonlar";
   }
 }
@@ -186,11 +212,18 @@ export default async function AutomationDetailPage({ params }: { params: Promise
             <p className="text-sm text-text-muted">Aksiyon tanımlanmamış.</p>
           ) : (
             <ul className="space-y-1.5">
-              {actions.map((a: Record<string, unknown>, i: number) => (
-                <li key={i} className="flex items-center gap-2 rounded-[var(--radius-control)] bg-mint-500/8 px-2.5 py-2 text-sm font-medium text-mint-700">
-                  <Zap className="h-3.5 w-3.5" /> {ACTION_LABELS[String(a.type)] ?? String(a.type)}
-                </li>
-              ))}
+              {actions.map((a: Record<string, unknown>, i: number) => {
+                const summary = actionSummary(a);
+                return (
+                  <li key={i} className="rounded-[var(--radius-control)] bg-mint-500/8 px-2.5 py-2 text-sm font-medium text-mint-700">
+                    <span className="flex items-center gap-2">
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-mint-500/15 text-xs font-extrabold">{i + 1}</span>
+                      <Zap className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {ACTION_LABELS[String(a.type)] ?? String(a.type)}
+                    </span>
+                    {summary ? <span className="mt-0.5 block truncate pl-7 text-xs font-normal text-text-muted">{summary}</span> : null}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </section>
@@ -223,7 +256,7 @@ export default async function AutomationDetailPage({ params }: { params: Promise
                 : taken
                     .map((a) => {
                       const label = ACTION_LABELS[String(a.type ?? "")] ?? String(a.type ?? "");
-                      return a.detail ? `${label} (${a.detail})` : label;
+                      return a.detail ? `${label} (${skipReasonLabel(a.detail)})` : label;
                     })
                     .filter(Boolean)
                     .join(", ");
