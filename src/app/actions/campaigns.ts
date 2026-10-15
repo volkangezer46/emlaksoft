@@ -13,13 +13,13 @@ import {
 } from "@/lib/messaging/whatsapp-cloud";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { describeIysGate, describeSkipReasons, gateIysRecipients, type IysGateResult } from "@/lib/iys/gate";
+import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
 
 export type CampaignResult = { ok?: boolean; error?: string; id?: string };
 export type WhatsAppTemplateListResult =
   | { ok: true; templates: ApprovedWhatsAppTemplate[] }
   | { ok: false; error: string };
 
-const CAMPAIGN_FILTERS = new Set(["all", "type:alici", "type:satici", "type:kira"]);
 const WHATSAPP_TEMPLATE_NAME_RE = /^[a-z0-9_]{1,512}$/;
 const WHATSAPP_TEMPLATE_LANGUAGE_RE = /^[a-z]{2,3}(?:_[A-Z]{2})?$/;
 
@@ -64,24 +64,53 @@ export async function previewCampaignAudience(channel: string, filter: string): 
   const ch = String(channel ?? "").trim();
   const flt = String(filter ?? "all").trim();
   if (ch !== "sms" && ch !== "whatsapp") return { ok: false, error: "Geçersiz kampanya kanalı." };
-  if (!CAMPAIGN_FILTERS.has(flt)) return { ok: false, error: "Geçersiz hedef kitle filtresi." };
+  const parsed = parseCampaignFilter(flt);
+  if (!parsed) return { ok: false, error: "Geçersiz hedef kitle filtresi." };
 
   const supabase = await createClient();
+  const readError: CampaignAudiencePreview = { ok: false, error: "Hedef kitle okunamadı; sayfayı yenileyip tekrar deneyin." };
+
+  // İlçe filtresi: o ilçede AÇIK talebi olan müşteriler (SQL'deki exists koşuluyla aynı küme).
+  let districtCustomers: Set<string> | null = null;
+  if (parsed.kind === "district") {
+    districtCustomers = new Set();
+    for (let page = 0; page < PREVIEW_MAX_PAGES; page += 1) {
+      const { data, error } = await supabase
+        .from("customer_demands")
+        .select("id, customer_id")
+        .eq("tenant_id", gate.tenantId)
+        .eq("district_id", parsed.value)
+        .in("status", [...CAMPAIGN_OPEN_DEMAND_STATUSES])
+        .order("id", { ascending: true })
+        .range(page * PREVIEW_PAGE, page * PREVIEW_PAGE + PREVIEW_PAGE - 1);
+      if (error) return readError;
+      const got = (data ?? []) as { customer_id: string }[];
+      for (const r of got) districtCustomers.add(r.customer_id);
+      if (got.length < PREVIEW_PAGE) break;
+    }
+  }
+
   const ids: string[] = [];
   for (let page = 0; page < PREVIEW_MAX_PAGES; page += 1) {
     let q = supabase
       .from("customers")
-      .select("id")
+      .select("id, tags")
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .eq("blacklist", false)
       .not("phone", "is", null)
       .neq("phone", "");
-    if (flt !== "all") q = q.contains("customer_types", [flt.split(":")[1]]);
+    if (parsed.kind === "type") q = q.contains("customer_types", [parsed.value]);
+    if (parsed.kind === "advisor") q = q.eq("assigned_to", parsed.value);
     const { data, error } = await q.order("id", { ascending: true }).range(page * PREVIEW_PAGE, page * PREVIEW_PAGE + PREVIEW_PAGE - 1);
-    if (error) return { ok: false, error: "Hedef kitle okunamadı; sayfayı yenileyip tekrar deneyin." };
-    const got = (data ?? []) as { id: string }[];
-    ids.push(...got.map((r) => r.id));
+    if (error) return readError;
+    const got = (data ?? []) as { id: string; tags: string[] | null }[];
+    for (const r of got) {
+      // Etiket: tam eşleşme (SQL'de c.tags @> array[etiket]); dizi literali kaçışı gerekmesin diye burada süzülür.
+      if (parsed.kind === "tag" && !(r.tags ?? []).includes(parsed.value)) continue;
+      if (districtCustomers && !districtCustomers.has(r.id)) continue;
+      ids.push(r.id);
+    }
     if (got.length < PREVIEW_PAGE) break;
   }
 
@@ -133,7 +162,7 @@ export async function createCampaign(
       error: "WhatsApp kampanyası için Meta tarafından onaylanmış şablon adı ve geçerli dil kodu zorunludur.",
     };
   }
-  if (!CAMPAIGN_FILTERS.has(filter)) {
+  if (!isValidCampaignFilter(filter)) {
     return { error: "Geçersiz hedef kitle filtresi." };
   }
 
