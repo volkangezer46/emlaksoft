@@ -5,7 +5,12 @@ import { Check, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { saveVitrinSettings, type VitrinSettingsResult } from "@/app/actions/vitrin-settings";
-import { VITRIN_INTRO_MAX, type VitrinSettings } from "@/lib/vitrin-settings-logic";
+import {
+  VITRIN_INTRO_MAX,
+  VITRIN_SEO_DESCRIPTION_MAX,
+  VITRIN_SEO_TITLE_MAX,
+  type VitrinSettings,
+} from "@/lib/vitrin-settings-logic";
 
 function Row({
   id,
@@ -33,9 +38,14 @@ function Row({
   );
 }
 
-export function VitrinForm({ settings }: { settings: VitrinSettings }) {
+const fieldClass =
+  "mt-2 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-400";
+
+export function VitrinForm({ settings, seoMetaAvailable = true }: { settings: VitrinSettings; seoMetaAvailable?: boolean }) {
   const [state, formAction, pending] = useActionState<VitrinSettingsResult, FormData>(saveVitrinSettings, {});
   const [intro, setIntro] = useState(settings.intro ?? "");
+  const [seoTitle, setSeoTitle] = useState(settings.seoTitle ?? "");
+  const [seoDescription, setSeoDescription] = useState(settings.seoDescription ?? "");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -53,7 +63,7 @@ export function VitrinForm({ settings }: { settings: VitrinSettings }) {
           maxLength={VITRIN_INTRO_MAX}
           value={intro}
           onChange={(e) => setIntro(e.target.value)}
-          className="mt-2 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-400"
+          className={fieldClass}
         />
         <p className="mt-1 text-right text-xs text-text-faint">
           {intro.length}/{VITRIN_INTRO_MAX}
@@ -100,6 +110,51 @@ export function VitrinForm({ settings }: { settings: VitrinSettings }) {
           defaultChecked={settings.seoOptin}
         />
       </div>
+
+      <fieldset className="space-y-4" disabled={!seoMetaAvailable}>
+        <legend className="text-sm font-semibold text-ink-950">Arama sonuçlarındaki görünüm</legend>
+        <p className="-mt-2 text-xs text-text-muted">
+          {seoMetaAvailable
+            ? "Boş bırakırsanız başlık ofis adınız ve ilan sayınızdan, açıklama tanıtım metninizden otomatik oluşturulur."
+            : "Bu alanlar veritabanı güncellemesi tamamlanınca açılır; o zamana kadar başlık ve açıklama otomatik oluşturulur."}
+        </p>
+        <div>
+          <label htmlFor="vitrin-seo-title" className="text-sm font-semibold text-ink-950">
+            Arama başlığı
+          </label>
+          <input
+            id="vitrin-seo-title"
+            name="seoTitle"
+            type="text"
+            maxLength={VITRIN_SEO_TITLE_MAX}
+            value={seoTitle}
+            onChange={(e) => setSeoTitle(e.target.value)}
+            aria-describedby="vitrin-seo-title-count"
+            className={fieldClass}
+          />
+          <p id="vitrin-seo-title-count" className="mt-1 text-right text-xs text-text-faint">
+            {seoTitle.length}/{VITRIN_SEO_TITLE_MAX}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="vitrin-seo-description" className="text-sm font-semibold text-ink-950">
+            Arama açıklaması
+          </label>
+          <textarea
+            id="vitrin-seo-description"
+            name="seoDescription"
+            rows={2}
+            maxLength={VITRIN_SEO_DESCRIPTION_MAX}
+            value={seoDescription}
+            onChange={(e) => setSeoDescription(e.target.value)}
+            aria-describedby="vitrin-seo-description-count"
+            className={fieldClass}
+          />
+          <p id="vitrin-seo-description-count" className="mt-1 text-right text-xs text-text-faint">
+            {seoDescription.length}/{VITRIN_SEO_DESCRIPTION_MAX}
+          </p>
+        </div>
+      </fieldset>
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" loading={pending}>

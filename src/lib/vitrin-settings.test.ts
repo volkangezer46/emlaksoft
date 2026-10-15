@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   VITRIN_DEFAULTS,
   VITRIN_INTRO_MAX,
+  VITRIN_SEO_DESCRIPTION_MAX,
+  VITRIN_SEO_TITLE_MAX,
   isMissingColumnError,
   resolveOptInSlugs,
   settingsFromRow,
@@ -41,6 +43,23 @@ describe("vitrin ayarları mantığı", () => {
   it("tanıtım metni sınırı aşılırsa reddeder", () => {
     const v = validateVitrinInput({ intro: "a".repeat(VITRIN_INTRO_MAX + 1), enabled: "on", showPhone: "on", showLeadForm: "on", showValuation: "on", seoOptin: null });
     expect(v.ok).toBe(false);
+  });
+
+  it("elle SEO başlığı/açıklaması: boşluk sadeleşir, boş null olur, sınır (70/160) aşılırsa reddedilir", () => {
+    const base = { intro: "", enabled: "on", showPhone: "on", showLeadForm: "on", showValuation: "on", seoOptin: null };
+    const ok = validateVitrinInput({ ...base, seoTitle: "  Kadıköy\n satılık  ", seoDescription: "   " });
+    expect(ok.ok && ok.settings.seoTitle).toBe("Kadıköy satılık");
+    expect(ok.ok && ok.settings.seoDescription).toBeNull();
+    expect(validateVitrinInput({ ...base, seoTitle: "a".repeat(VITRIN_SEO_TITLE_MAX) }).ok).toBe(true);
+    expect(validateVitrinInput({ ...base, seoTitle: "a".repeat(VITRIN_SEO_TITLE_MAX + 1) }).ok).toBe(false);
+    expect(validateVitrinInput({ ...base, seoDescription: "a".repeat(VITRIN_SEO_DESCRIPTION_MAX + 1) }).ok).toBe(false);
+    expect(settingsFromRow({ vitrin_seo_title: " Başlık ", vitrin_seo_description: null })).toMatchObject({ seoTitle: "Başlık", seoDescription: null });
+  });
+
+  it("SEO metni sınırları migration CHECK'iyle aynı", () => {
+    const sql = read("supabase/migrations/20261016120400_tenant_vitrin_seo_meta.sql");
+    expect(sql).toContain(`char_length(vitrin_seo_title) <= ${VITRIN_SEO_TITLE_MAX}`);
+    expect(sql).toContain(`char_length(vitrin_seo_description) <= ${VITRIN_SEO_DESCRIPTION_MAX}`);
   });
 
   it("eksik sütun hatasını tanır", () => {

@@ -54,7 +54,7 @@ export default async function VitrinSettingsPage() {
       {state.available ? (
         <section className="surface-card rounded-[var(--radius-panel)] p-4 md:p-6">
           <ReadOnlyGate canEdit={canEdit}>
-            <VitrinForm settings={state.settings} />
+            <VitrinForm settings={state.settings} seoMetaAvailable={state.seoMetaAvailable !== false} />
           </ReadOnlyGate>
         </section>
       ) : (
