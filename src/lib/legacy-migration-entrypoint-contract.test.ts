@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const legacy = readFileSync("scripts/apply-migrations.js", "utf8");
-const applyOne = readFileSync("scripts/apply-one.ts", "utf8");
-const apply008 = readFileSync("scripts/apply-migration-008.ts", "utf8");
 const oldBundle = readFileSync("supabase/apply_premium_plus.sql", "utf8");
 const oldSprint = readFileSync("docs/arsiv/SPRINT_FINAL.md", "utf8");
 const smoke = readFileSync("scripts/smoke-test.js", "utf8");
@@ -17,13 +15,9 @@ describe("legacy migration entrypoint", () => {
     expect(legacy).not.toContain("apply_premium_plus.sql");
   });
 
-  it("retires direct single-file executors and makes the obsolete SQL bundle abort", () => {
-    for (const source of [applyOne, apply008]) {
-      expect(source).toContain("throw new Error");
-      expect(source).not.toContain("new Client");
-      expect(source).not.toContain("client.query");
-      expect(source).not.toContain("readFileSync");
-    }
+  it("removes direct single-file executors and makes the obsolete SQL bundle abort", () => {
+    expect(existsSync("scripts/apply-one.ts")).toBe(false);
+    expect(existsSync("scripts/apply-migration-008.ts")).toBe(false);
     expect(oldBundle).toContain("raise exception");
     expect(oldBundle).not.toContain("create table");
     expect(oldBundle).not.toContain("create policy");

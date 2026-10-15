@@ -289,7 +289,7 @@ Hiçbir dosyadan import edilmeyen (giriş noktaları hariç):
 | `src/app/app/sample-data-cta.tsx` | bileşen kullanılmıyor |
 | `src/components/admin/sparkline.tsx`, `src/components/count-up.tsx`, `src/components/app/live-office-strip.tsx`, `src/components/app/use-query-dialog.ts` | kullanılmayan UI |
 | `src/components/ui/date-range-field.tsx`, `filter-bar.tsx`, `status-badge.tsx`, `switch.tsx` | tasarım sistemi bileşenleri hiç benimsenmemiş (CLAUDE.md `FilterBar`ı öneriyor, kullanım 0; `docs/DESIGN_SYSTEM.md` ile çelişir) |
-| `src/hooks/use-api.ts` | kullanılmıyor |
+| ~~`src/hooks/use-api.ts`~~ | silindi (2026-10-15) |
 | `src/lib/efatura.ts`, `src/lib/expense-categories.ts`, `src/lib/lead-sources.ts` | kullanılmıyor (lead-sources için `lead-score.ts` string geçişi var, doğrula) |
 
 Yalnız testten import edilenler (üretimde ölü): `lib/rent-increase.ts`, `lib/tapu-cost.ts`, `lib/validation/contact.ts`, `lib/migration-integrity.ts` (scripts kullanıyor: ölü değil), `lib/admin-client-allowlist.ts` (sözleşme testi: kasıtlı).

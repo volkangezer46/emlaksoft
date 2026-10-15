@@ -13,7 +13,7 @@ const eslintConfig = defineConfig([
       //  * purity → zaman okumaları `src/lib/clock.ts` yardımcılarına taşındı.
       //  * set-state-in-effect → efektle state kopyalama/sıfırlama desenleri
       //    action akışına, olay yöneticilerine veya türetmeye çevrildi.
-      // Kalan iki bilinçli istisna (`use-api.ts`, `use-app-api.ts` — cache'ten
+      // Kalan bilinçli istisna (`use-app-api.ts` — cache'ten
       // anında boyama) satır bazlı, gerekçeli disable ile işaretli. Böylece
       // yeni ihlaller sessizce birikmek yerine CI'da yakalanır.
       //

@@ -30,7 +30,7 @@
 - 📈 **Abonelik yönetimi** · plan upgrade · trial · otomatik yenileme
 
 **Teknik altyapı**
-- ⚡ **useApi hook** · client-side cache · focus refresh · error handling
+- ⚡ **useAppApi hook** · client-side cache · focus refresh · error handling
 - 🔄 **Realtime refresh** · Supabase broadcast · soft route refresh
 - 🎨 **HGDekor UI** · Phone OS-inspired · gradient depth · premium design
 - 🧪 **Smoke test** · auth + DB health check · migration guard
