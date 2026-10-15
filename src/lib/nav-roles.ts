@@ -84,6 +84,7 @@ const MUSTERILER: HubDef = {
   icon: "baslikMusteri",
   pages: [
     p("/app/musteriler", "Müşteriler"),
+    p("/app/arama-listesi", "Arama listesi"),
     p("/app/talepler", "Talepler"),
     p("/app/gelen-kutusu", "Gelen kutusu"),
     p("/app/tavsiyeler", "Tavsiyeler"),
@@ -324,7 +325,7 @@ const CALL_CENTER: RoleNav = {
   hubs: [
     { id: "bugun", label: "Bugün", icon: "baslikBugun", pages: [p("/app", "Ana ekran")] },
     GELEN_KUTUSU,
-    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/talepler"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
+    { id: "musteriler", label: "Müşteriler", icon: "baslikMusteri", pages: [p("/app/musteriler"), p("/app/arama-listesi", "Arama listesi"), p("/app/talepler"), p("/app/portfoy-avi", "Sahibinden ilanlar")] },
     RANDEVU_GOREV,
   ],
   dock: [ABONELIK, YARDIM],

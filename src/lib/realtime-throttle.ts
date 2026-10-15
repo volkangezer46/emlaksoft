@@ -161,6 +161,7 @@ export const NOT_LIVE_ROUTES: Readonly<Record<string, string>> = {
   "/app/acik-ev": "açık ev etkinlikleri Broadcast kapsamında değil",
   "/app/ag": "ofisler arası ağ: başka ofislerin verisi, ofis konusu taşımaz",
   "/app/anketler": "anket yanıtları herkese açık uçtan, seyrek",
+  "/app/arama-listesi": "arama kuyruğu görüşme sırasında yeniden sıralanmamalı; sonuç kaydı kuyruğu kendisi tazeler",
   "/app/asistan": "sohbet ekranı; veri değişikliği göstermez",
   "/app/ayarlar": "ayar ekranları; kaydeden sekme revalidate eder",
   "/app/belgeler": "belge arşivi Broadcast kapsamında değil",
