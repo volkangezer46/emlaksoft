@@ -148,6 +148,8 @@ values
    'required', 'in', 'komisyon', 'office', 'none', 'commissions', 'edit', false, '102 / 120'),
   ('payout.paid', 'Hakediş ödemesi', 'payout', 'commission_payout', true, 'optional', 'payable', 'stopaj',
    'required', 'out', 'danisman_hakedis', 'office', 'none', 'commissions', 'edit', true, '335 / 102, 360'),
+  ('payout.approved', 'Hakediş tahakkuku', 'payout', 'commission_payout', true, 'required', 'payable', 'danisman_hakedis',
+   'none', null, null, 'office', 'expense', 'commissions', 'edit', true, '740/770 / 335'),
   ('payout.personal', 'Hakediş (Kasam)', 'payout', 'commission_payout', true, 'none', null, null,
    'required', 'in', 'danisman_hakedis', 'user', 'excluded', 'commissions', 'view', false, '-'),
   ('rent.accrued', 'Kira tahakkuku', 'rent_charge', 'rent_charge', true, 'none', null, null,

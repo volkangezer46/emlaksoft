@@ -132,6 +132,17 @@ describe("kâr/zarar defter eki (finance_pnl)", () => {
     expect(cashPnlAdjustments(keys, null, expenses).get("2026-09")).toEqual({ manualIncome: 0, extraExpense: 0 });
   });
 
+  it("K/Z v3: komisyon payı gider satırı (danisman_hakedis) ek gidere girmez (paylar commission_splits'ten düşülür)", () => {
+    const [m] = pnlCashMonths([
+      { month: "2026-03-01", income: 106000, expense: 72750, income_by_category: { komisyon: 100000, hizmet_bedeli: 6000 },
+        expense_by_category: { danisman_hakedis: 60000, kira: 12000, kirtasiye: 750 } },
+    ]);
+    expect(m!.expense).toBe(12750);
+    expect(m!.manualIncome).toBe(6000);
+    expect(m!.expenseByCategory.danisman_hakedis).toBe(60000);
+    expect(cashPnlAdjustments(["2026-03"], [m!], [{ date: "2026-03-12", amount: 750 }]).get("2026-03")).toEqual({ manualIncome: 6000, extraExpense: 12000 });
+  });
+
   it("yönetim ücreti (kira_yonetimi) elle gelire eklenmez; mülk sahibine yansıtılan gider farka katılmaz", () => {
     const cash = pnlCashMonths([
       { month: "2026-09-01", expense: 20000, income_by_category: { komisyon: 50000, kira_yonetimi: 1500, hizmet_bedeli: 2000 } },

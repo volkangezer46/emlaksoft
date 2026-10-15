@@ -1,6 +1,6 @@
 /**
- * Kârlılık karşılaştırmaları (SAF; DB/saat yok). Girdi `finance_pnl` RPC'sinin aylık satırlarıdır (gelir = ofise kalan
- * komisyon + yönetim ücreti + elle girilen gelir; gider = ofis giderleri; TL, örnek veri hariç).
+ * Kârlılık karşılaştırmaları (SAF; DB/saat yok). Girdi `finance_pnl` RPC'sinin aylık satırlarıdır (tahakkuk esası: gelir = brüt
+ * komisyon + yönetim ücreti + elle girilen gelir; gider = ofis giderleri + danışman/dış taraf payları; TL, örnek veri hariç).
  *  - `yearOverYear`: son N ayın her biri ↔ geçen yılın aynı ayı (gelir, gider, net ve değişim yüzdesi) + yılbaşından bugüne
  *    (YBB) toplam karşılaştırması. İçinde bulunulan ay "devam ediyor" işaretlidir.
  *  - `incomeSourceMix`: gelir kaynaklarının payı (komisyon, yönetim ücreti, diğer kategoriler).

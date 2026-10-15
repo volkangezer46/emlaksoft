@@ -33,6 +33,8 @@ export const splitKey = (splitId: string) => `split:${id(splitId)}`;
 /** Hakediş ödemesi: `payout:{id}`; kişisel Kasam'a işleme: `payout:{id}:personal`. */
 export const payoutKey = (payoutId: string) => `payout:${id(payoutId)}`;
 export const payoutPersonalKey = (payoutId: string) => `payout:${id(payoutId)}:personal`;
+/** Payı (split) olmayan hakedişin onay tahakkuku (WP2 tetikleyicisi yazar): `payout:{id}:approved`. */
+export const payoutApprovedKey = (payoutId: string) => `payout:${id(payoutId)}:approved`;
 /** Kira tahakkuku (yalnız görünüm, kayıt yazmaz): `rent_charge:{id}`. */
 export const rentChargeKey = (chargeId: string) => `rent_charge:${id(chargeId)}`;
 /** Kira tahsilatı (rent_payments): `rent:{id}`. */

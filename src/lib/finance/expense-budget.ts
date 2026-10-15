@@ -305,6 +305,13 @@ export function categoryAmounts(raw: unknown): Map<string, number> {
  */
 export const PNL_INCOME_EXCLUDED: ReadonlySet<string> = new Set(["komisyon", "kira_tahsilat", "aidat_tahsilat", "kira_yonetimi", "transfer"]);
 
+/**
+ * Kâr/zarara EK gider sayılmayan gider kategorileri: K/Z v3 (20261017010400, tahakkuk esası) ofis dışı komisyon paylarını
+ * ayrı `danisman_hakedis` gider satırı olarak verir; `computeOfficePnl` bu payları `commission_splits`'ten zaten düşer.
+ * Böylece danışman payı İKİ KEZ düşülmez ve ay neti finance_pnl neti ile aynı kalır.
+ */
+export const PNL_EXPENSE_EXCLUDED: ReadonlySet<string> = new Set(["danisman_hakedis"]);
+
 /** `finance_pnl` satırı. */
 export type PnlRaw = { month?: unknown; income?: unknown; expense?: unknown; net?: unknown; income_by_category?: unknown; expense_by_category?: unknown };
 export type PnlCashMonth = {
@@ -314,7 +321,7 @@ export type PnlCashMonth = {
   manualIncome: number;
   manualIncomeByCategory: Record<string, number>;
   income: number;
-  /** finance_pnl gideri (expenses + deftere bağlı olmayan çıkışlar). */
+  /** finance_pnl gideri (expenses + deftere bağlı olmayan çıkışlar); komisyon payı satırı (`PNL_EXPENSE_EXCLUDED`) hariç. */
   expense: number;
   incomeByCategory: Record<string, number>;
   expenseByCategory: Record<string, number>;
@@ -330,7 +337,11 @@ export function pnlCashMonths(raw: readonly PnlRaw[]): PnlCashMonth[] {
     const expenseByCategory = Object.fromEntries(categoryAmounts(r.expense_by_category));
     const manualIncomeByCategory = Object.fromEntries(Object.entries(incomeByCategory).filter(([k, v]) => !PNL_INCOME_EXCLUDED.has(k) && v > 0));
     const manualIncome = round2(Object.values(manualIncomeByCategory).reduce((s, v) => s + v, 0));
-    out.push({ key, manualIncome, manualIncomeByCategory, income: round2(money(r.income)), expense: round2(money(r.expense)), incomeByCategory, expenseByCategory });
+    const excludedExpense = Object.entries(expenseByCategory).reduce((sum, [k, v]) => (PNL_EXPENSE_EXCLUDED.has(k) ? sum + v : sum), 0);
+    out.push({
+      key, manualIncome, manualIncomeByCategory, income: round2(money(r.income)), expense: round2(money(r.expense) - excludedExpense),
+      incomeByCategory, expenseByCategory,
+    });
   }
   return out.sort((a, b) => a.key.localeCompare(b.key));
 }
