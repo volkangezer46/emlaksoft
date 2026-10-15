@@ -105,17 +105,24 @@ curl -s -X POST -H "Authorization: Bearer $(cat /root/.coolify-token)" \
 
 ## Yayın, bellek, yedek ve sayaç denetimi (işletme notları)
 
-**Yayın ve geri dönüş (`scripts/sunucu/deploy.sh`):** derlemeden ÖNCE yayındaki imaj `PREV` olarak alınır
-(`docker inspect emlaksoft-app --format '{{.Config.Image}}'`; `latest` ise kimliği `emlaksoft-app:onceki` etiketine bağlanır).
-Yeni sürüm ayağa kalkınca sağlık önce konteyner içinden (`127.0.0.1:3000/api/health`, Traefik'ten bağımsız), sonra dış
-`https://emlaksoft.com.tr/api/health` ile beklenir (toplam 120 sn). Başarısızsa `APP_TAG=${PREV#emlaksoft-app:}` ile önceki imaj
-yeniden ayağa kaldırılır, sağlığı yeniden beklenir, sonuç yazılır ve betik **exit 1** ile biter (yeni sürüm yayında kalmaz).
-Derlemeden sonra `check-bundle-budget.ts --gate` yalnız uyarı verir; ardından `npm run --if-present check:acl -- --warn`
-çalışır — yalnız `ACL_GATE=strict` iken başarısızlık yayını durdurur. RELEASE_MIGRATION kuralı aynı (yukarıda).
+**Yayın (`scripts/sunucu/release.sh`, tek komut):** kirli çalışma ağacında başlamaz (`ALLOW_DIRTY=1` bilinçli geçiş) → hızlı kapı
+(`scripts/gate/fast.sh`) → migration provası (`db:rehearse --pending`, tek transaction + ROLLBACK; `REHEARSE_GATE=warn`) → RLS kapısı
+(`db:rls-audit`; `RLS_GATE=warn`) → `db:migrate` (hatada DURUR, çıkış kodu korunur; sürüm işareti/deploy/push yapılmaz) → tüm
+dosyalar ledger'da + `RELEASE_MIGRATION(_CHECKSUM/_COUNT)` → `deploy.sh` → `git push`. Ayrıntılı sıra: `docs/DEPLOY.md` §0.
+
+**Deploy ve geri dönüş (`scripts/sunucu/deploy.sh`, `scripts/sunucu/bluegreen.sh`):** derlemeden ÖNCE yayındaki imaj `PREV` olarak
+alınır (`latest` ise kimliği `emlaksoft-app:onceki` etiketine bağlanır). Paket bütçesi aşımı yayını durdurur (`BUNDLE_GATE=warn`);
+ACL denetimi yalnız `ACL_GATE=strict` iken durdurur. Geçiş **mavi/yeşil (kesintisiz)**: yeşil (`emlaksoft-app-green`) yeni imajla açılır,
+Docker sağlığı `healthy` + konteyner içi `/api/health` 200 beklenir; sonra mavi (`emlaksoft-app`) boşaltılıp (`/tmp/emlaksoft-drain` →
+503, Traefik havuzdan çıkarır) yeni imajla yeniden kurulur, en son yeşil boşaltılıp kaldırılır. Yeşil sağlıklı olmazsa mavi HİÇ
+kapanmaz (eski sürüm yayında kalır, exit 1). Traefik etiketleri değişen yayında (ilk SK1 yayını gibi) çakışmayı önlemek için mavi
+tek seferlik yeniden kurulur (kısa kesinti). Yayından sonra bekçi (public smoke + measure-live) art arda 3 yeşilden sonra kırmızıda
+önceki sürüme kesintisiz döner. Her sonuç `public.release_history`'ye yazılır. Elle geri dönüş `scripts/sunucu/rollback.sh`
+(`--dry-run` önce): aynı `swap_to` ile kesintisiz; hedef sağlıklı olmazsa yayındaki sürüm yerinde kalır (`docs/runbooks/GERI_DONUS.md`).
 
 **Bellek sınırı (`deploy/compose.prod.yml`):** `mem_limit: 2g`, `memswap_limit: 2g` (takas yok), `NODE_OPTIONS=--max-old-space-size=1536`
 (V8 yığını sınırın altında kalır; kalan ~500 MB yerel bellek/arabellek), `stop_grace_period: 20s`. Konteyner adı, Traefik etiketleri
-aynı; blue/green YOK (yayın anında birkaç saniyelik kesinti olabilir). Dockerfile HEALTHCHECK `--start-interval=2s` (Docker ≥25):
+aynı; yayın ve elle geri dönüş mavi/yeşildir (yukarıda; geçiş sırasında iki konteyner birlikte çalışır, bellek payı buna göre). Dockerfile HEALTHCHECK `--start-interval=2s` (Docker ≥25):
 açılışta sağlık 2 sn arayla denenir, `healthy` durumu daha erken gelir.
 
 **Yedek şifreleme (`scripts/sunucu/backup-db.sh`):**

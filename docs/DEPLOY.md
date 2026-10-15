@@ -1,10 +1,38 @@
 # EmlakSoft — Deploy Rehberi (tek kaynak)
 
 **2026-10-13'ten beri üretim Hetzner sunucusunda** (https://emlaksoft.com.tr): self-hosted Supabase (Coolify servisi,
-`https://api.emlaksoft.com.tr`) + uygulama Docker imajı. Kod yayını: `scripts/sunucu/deploy.sh` (BuildKit secret ile derleme,
-`deploy/compose.prod.yml`). Aşağıdaki "Vercel ortam değişkenleri" tablosu artık `/root/emlaksoft/.env.production` için geçerlidir
-(değişiklikten sonra `deploy.sh`). Cron: `scripts/sunucu/install-cron.sh`; gece yedeği `scripts/sunucu/backup-db.sh`.
+`https://api.emlaksoft.com.tr`) + uygulama Docker imajı. Yayın TEK komut: `bash scripts/sunucu/release.sh` (aşağıda §0).
+Aşağıdaki "Vercel ortam değişkenleri" tablosu artık `/root/emlaksoft/.env.production` için geçerlidir (değişiklikten sonra
+`deploy.sh`). Cron: `scripts/sunucu/install-cron.sh`; gece yedeği `scripts/sunucu/backup-db.sh`.
 Ayrıntı ve açık işler: `docs/SUNUCU_DEVIR.md`. Aşağıdaki Vercel ifadeleri yedek ortam içindir.
+
+## 0. Hetzner yayın akışı (`scripts/sunucu/release.sh`)
+
+Sıra; her adım düşerse yayın DURUR (sonraki adımlar koşmaz, çıkış kodu sıfırdan farklı):
+
+1. **Kirli çalışma ağacı:** `git status --porcelain` boş değilse (`.claude/` altındaki izlenmeyenler hariç) yayın başlamaz.
+   Yayınlanan imaj commit'lenmemiş kod taşımaz; bilinçli geçiş `ALLOW_DIRTY=1` (günlüğe yazılır).
+2. **Hızlı kapı:** `scripts/gate/fast.sh` (tsc + lint + tam vitest, ardından check:links/cron/migrations, audit:actions).
+   `SKIP_GATE=1` yalnız acil düzeltmede.
+3. **Migration provası:** `npm run db:rehearse -- --pending` bekleyen dosyaları GERÇEK şemada tek transaction'da çalıştırıp her
+   koşulda geri alır; bozuk dosya gerçek migration'dan ÖNCE yakalanır (`/tmp/emlaksoft-gate/rehearse.log`). Bilinçli geçiş
+   `REHEARSE_GATE=warn`.
+4. **RLS kapısı:** `npm run db:rls-audit` gerçek migration'dan ÖNCE koşar; ihlalde durur (`/tmp/emlaksoft-gate/rls-audit.log`).
+   Bilinçli geçiş (ör. yayının kendi getirdiği kurallar henüz uygulanmadıysa) `RLS_GATE=warn`.
+5. **Migration:** `npm run db:migrate` (PostgREST DDL izleyicileri kapalı; EXIT tuzağı her çıkışta yeniden açar). Hata olursa
+   çıkış kodu KORUNUR ve yayın durur: sürüm işareti yazılmaz, deploy ve push yapılmaz (tam çıktı `/tmp/emlaksoft-gate/migrate.log`).
+6. **Ledger + sürüm işareti:** `check:migrations -- --database --release` diskteki TÜM dosyalar ledger'da değilse durur;
+   `.env.production` `RELEASE_MIGRATION(_CHECKSUM/_COUNT)` güncellenir.
+7. **Deploy (`scripts/sunucu/deploy.sh`):** Docker imajı (BuildKit secret), statik parçalar kalıcı klasörde birleşir, paket bütçesi
+   (`BUNDLE_GATE=warn`), ACL denetimi (`ACL_GATE=strict`), tek "reload schema" + RPC ısıtma, ardından **mavi/yeşil kesintisiz
+   geçiş** (`scripts/sunucu/bluegreen.sh`): yeşil yeni imajla açılır → sağlıklı → mavi boşaltılıp yeni imajla kurulur → yeşil
+   kaldırılır. Yeşil sağlıklı olmazsa eski sürüm hiç kapanmadan yayında kalır. Traefik etiketleri değişen yayında (ör. yeni yük
+   dengeleyici ayarı) tek seferlik yeniden kurma yapılır (kısa kesinti). Yayından sonra **bekçi** (public smoke + measure-live);
+   art arda 3 yeşilden sonra kırmızıda önceki sürüme kesintisiz döner. Sonuç `public.release_history`'ye yazılır.
+8. **`git push`** (yalnız deploy başarılıysa).
+
+Elle geri dönüş: `bash scripts/sunucu/rollback.sh [--dry-run] [etiket]` — deploy ile AYNI mavi/yeşil geçişi kullanır (kesintisiz);
+hedef sağlıklı olmazsa yayındaki sürüm yerinde kalır. DB geri alınmaz (forward-only). Ayrıntı `docs/runbooks/GERI_DONUS.md`.
 
 Vercel + Supabase üretim hattı (YEDEK). Bu belge eski iki checklist'i birleştirir
 (`docs/arsiv/DEPLOY_CHECKLIST_kok.md`, `docs/arsiv/DEPLOY_CHECKLIST_docs.md`). Rota/migration sayıları burada

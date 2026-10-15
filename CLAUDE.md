@@ -7,11 +7,14 @@ Müşteri/talep/portföy/randevu/anlaşma/komisyon omurgası + kayıp-kaçak kal
 (emsal motoru), otomasyonlar, sözleşmeyle doğrulanan cron envanteri (bkz. `vercel.json`), AI asistan,
 vitrin ve token'lı public portallar.
 Tamamı Türkçe. Canlı TEK ortam: https://emlaksoft.com.tr (Hetzner `emlaksoft-prod`, bu sunucu; self-hosted Supabase aynı makinede).
-Yayın tek komut: `bash scripts/sunucu/release.sh` = hızlı kapı `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından
-check:links/cron/migrations, audit:actions) → `npm run db:migrate` → `.env.production` `RELEASE_MIGRATION(_CHECKSUM)` işareti →
-`scripts/sunucu/deploy.sh` (Docker imajı + Coolify Traefik/Let's Encrypt, sağlık kontrolü) → `git push`. Kapı, ortam işareti ya da deploy düşerse durur;
-migration adımı hatada DURMAZ (`db:migrate` çıktısı süzülür, çıkış kodu yutulur): çıktısını kontrol edin;
-yerel `npm run build` kapıda YOK (derleme Docker içinde; tam zincir `scripts/gate/full.sh`). Tek env kaynağı `.env.production`.
+Yayın tek komut: `bash scripts/sunucu/release.sh` = kirli çalışma ağacı denetimi (commit'lenmemiş değişiklikte durur; `ALLOW_DIRTY=1`)
+→ hızlı kapı `scripts/gate/fast.sh` (tsc + lint + tam vitest paralel, ardından check:links/cron/migrations, audit:actions)
+→ migration provası `db:rehearse --pending` (tek transaction + ROLLBACK; `REHEARSE_GATE=warn`) → RLS denetimi `db:rls-audit`
+(`RLS_GATE=warn`) → `npm run db:migrate` (hatada DURUR, çıkış kodu korunur) → tüm dosyalar ledger'da + `.env.production`
+`RELEASE_MIGRATION(_CHECKSUM/_COUNT)` işareti → `scripts/sunucu/deploy.sh` (Docker imajı, mavi/yeşil kesintisiz geçiş, yayın sonrası
+bekçi) → `git push`. Herhangi bir adım düşerse durur. Elle geri dönüş `scripts/sunucu/rollback.sh` (aynı mavi/yeşil geçiş;
+`docs/runbooks/GERI_DONUS.md`). Yerel `npm run build` kapıda YOK (derleme Docker içinde; tam zincir `scripts/gate/full.sh`).
+Tek env kaynağı `.env.production`.
 Sunucu düzeni ve eksikler `docs/SUNUCU_DEVIR.md`; deploy sırası ve zorunlu ortam değişkenleri `docs/DEPLOY.md`.
 Eski Vercel + bulut Supabase kurulumu dondurulmuştur: yeni iş, env ya da belge oraya yönlendirilmez.
 

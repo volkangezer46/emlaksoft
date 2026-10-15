@@ -41,6 +41,7 @@ case "$1" in
   inspect)
     case "$*" in
       *Config.Image*) [ -n "\${FAKE_IMAGE:-}" ] && echo "$FAKE_IMAGE" ;;
+      *State.Health*) case " \${FAKE_UNHEALTHY:-} " in *" $2 "*) echo starting ;; *) echo healthy ;; esac ;;
     esac
     exit 0 ;;
   image) exit "\${FAKE_IMAGE_RC:-0}" ;;
@@ -391,10 +392,11 @@ case "$1" in
 esac
 exit 0
 `;
-  /** deploy.sh'teki geçiş + bekçi tanımları (COMPOSE= … static up öncesi) + sürücü. */
+  /** Ortak mavi/yeşil kitaplığı (bluegreen.sh) + deploy.sh'teki bekçi tanımları (static up öncesi) + sürücü. */
   function harness(name: string, driver: string, env: Record<string, string> = {}, extra: Record<string, string> = {}) {
     const src = readFileSync(path.join(DIR, "deploy.sh"), "utf8");
-    const defs = src.slice(src.indexOf("COMPOSE=(docker compose"), src.indexOf('"${COMPOSE[@]}" up -d --no-deps static'));
+    const lib = readFileSync(path.join(DIR, "bluegreen.sh"), "utf8");
+    const defs = `${lib}\n${src.slice(src.indexOf("WATCHDOG_GREENS=3"), src.indexOf('"${COMPOSE[@]}" up -d --no-deps static'))}`;
     const { dir, bin } = fakeBin(name, extra);
     writeFileSync(path.join(bin, "docker"), SWAP_DOCKER);
     const script = path.join(dir, "h.sh");
@@ -474,12 +476,13 @@ describe("rollback.sh --dry-run", () => {
   function rollback(
     args: string[],
     name: string,
-    opts: { imageRc?: string; psqlOut?: string; migOut?: string; envMig?: string } = {},
+    opts: { imageRc?: string; psqlOut?: string; migOut?: string; envMig?: string; unhealthy?: string } = {},
   ) {
     const { dir, bin } = fakeBin(name);
     const repo = path.join(dir, "repo");
     mkdirSync(path.join(repo, "scripts/sunucu"), { recursive: true });
     copyFileSync(path.join(DIR, "rollback.sh"), path.join(repo, "scripts/sunucu/rollback.sh"));
+    copyFileSync(path.join(DIR, "bluegreen.sh"), path.join(repo, "scripts/sunucu/bluegreen.sh"));
     writeFileSync(path.join(dir, "psql-out"), opts.psqlOut ?? "BEGIN\n202610141107-62e14a2e\nROLLBACK\n");
     const mig: Record<string, string> = {};
     if (opts.migOut !== undefined) {
@@ -491,6 +494,7 @@ describe("rollback.sh --dry-run", () => {
       FAKE_DIR: dir, FAKE_IMAGE: "emlaksoft-app:202610141340-65ed9f68", FAKE_PSQL_OUT: path.join(dir, "psql-out"),
       FAKE_IMAGE_RC: opts.imageRc ?? "0", ROLLBACK_LOCK_DIR: dir, FAKE_TAGS: "202610141340-65ed9f68 202610141107-62e14a2e",
       ROLLBACK_STATIC_DIR: path.join(dir, "yok"), ROLLBACK_HEALTH_URL: `file://${path.join(dir, "psql-out")}`,
+      DRAIN_WAIT: "0", SETTLE_WAIT: "0", READY_TRIES: "2", FAKE_UNHEALTHY: opts.unhealthy ?? "",
       ...mig,
     }, bin, repo);
     return { ...r, calls: read(path.join(dir, "calls.log")), psql: read(path.join(dir, "psql.log")) };
@@ -501,7 +505,7 @@ describe("rollback.sh --dry-run", () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain("Yayındaki sürüm : emlaksoft-app:202610141340-65ed9f68");
     expect(r.out).toContain("Hedef imaj      : emlaksoft-app:202610141107-62e14a2e");
-    expect(r.out).toContain("Komut           : APP_TAG=202610141107-62e14a2e docker compose -f deploy/compose.prod.yml up -d --remove-orphans");
+    expect(r.out).toContain("Geçiş           : mavi/yeşil: yeşil emlaksoft-app:202610141107-62e14a2e ile açılır");
     expect(r.calls).toContain("docker image inspect emlaksoft-app:202610141107-62e14a2e");
     expect(r.calls).not.toContain("compose");
     expect(r.calls).not.toContain("docker create");
@@ -546,13 +550,48 @@ describe("rollback.sh --dry-run", () => {
     expect(rows.map((r) => Object.values(r)[0])).toEqual(["20261014022000_a.sql"]);
   });
 
-  it("gerçek dönüş (sahte docker): compose hedef etiketle, latest hedefe taşınır, rolled_back yazılır", () => {
+  it("gerçek dönüş (sahte docker): deploy.sh ile aynı mavi/yeşil sıra, latest hedefe taşınır, rolled_back yazılır", () => {
     const r = rollback([], "rb-real");
     expect(r.code).toBe(0);
-    expect(r.calls).toContain("docker compose -f deploy/compose.prod.yml up -d --remove-orphans");
-    expect(r.calls).toContain("docker tag emlaksoft-app:202610141107-62e14a2e emlaksoft-app:latest");
+    expect(r.calls).not.toContain("--remove-orphans");
+    const order = [
+      "docker compose -f deploy/compose.prod.yml --profile green up -d --no-deps app-green",
+      "docker exec emlaksoft-app sh -c : > /tmp/emlaksoft-drain",
+      "docker compose -f deploy/compose.prod.yml up -d --no-deps app",
+      "docker exec emlaksoft-app-green sh -c : > /tmp/emlaksoft-drain",
+      "docker compose -f deploy/compose.prod.yml --profile green rm -sf app-green",
+      "docker tag emlaksoft-app:202610141107-62e14a2e emlaksoft-app:latest",
+    ].map((x) => r.calls.indexOf(x));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(r.psql).toContain("outcome=rolled_back");
     expect(r.psql).toMatch(/insert into public\.release_history/);
+  });
+
+  it("hedef (yeşil) sağlıklı olmazsa yayındaki mavi HİÇ boşaltılmaz; failed yazılır, çıkış 1", () => {
+    const r = rollback([], "rb-green-bad", { unhealthy: "emlaksoft-app-green" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("hiç kapanmadan yayında kaldı");
+    expect(r.calls).not.toContain("docker exec emlaksoft-app sh -c");
+    expect(r.calls).not.toContain("docker tag emlaksoft-app:202610141107-62e14a2e emlaksoft-app:latest");
+    expect(r.psql).toContain("outcome=failed");
+  });
+
+  it("mavi hedefle kurulamazsa mavi yayındaki sürümle yeniden kurulur; failed yazılır", () => {
+    const r = rollback([], "rb-blue-bad", { unhealthy: "emlaksoft-app" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("Önceki sürüme geri çıkılıyor: emlaksoft-app:202610141340-65ed9f68");
+    expect(r.psql).toContain("outcome=failed");
+    expect(r.calls).not.toContain("emlaksoft-app:latest");
+  });
+
+  it("deploy.sh ve rollback.sh aynı geçiş kitaplığını kullanır (swap_to tek tanım)", () => {
+    for (const f of ["deploy.sh", "rollback.sh"]) {
+      const src = readFileSync(path.join(DIR, f), "utf8");
+      expect(src).toContain(". scripts/sunucu/bluegreen.sh");
+      expect(src).not.toContain("swap_to() {");
+    }
+    expect(readFileSync(path.join(DIR, "bluegreen.sh"), "utf8")).toContain("swap_to() {");
   });
 
   it("imaj yerelde yoksa 1 ile durur", () => {
@@ -597,7 +636,7 @@ describe("deploy.sh: prune_images son ok sürümleri korur", () => {
 const SHELLCHECK = process.env.SHELLCHECK || (spawnSync("shellcheck", ["--version"]).status === 0 ? "shellcheck" : "");
 describe.skipIf(!SHELLCHECK)("shellcheck", () => {
   it("sunucu betikleri temiz", () => {
-    const files = ["error-watch.sh", "cron-call.sh", "release.sh", "deploy.sh", "rollback.sh", "host-metrics.sh", "realtime-capacity-check.sh"]
+    const files = ["error-watch.sh", "cron-call.sh", "release.sh", "deploy.sh", "rollback.sh", "bluegreen.sh", "host-metrics.sh", "realtime-capacity-check.sh"]
       .map((f) => path.join(DIR, f));
     const r = spawnSync(SHELLCHECK, files, { encoding: "utf8" });
     expect(r.stdout + r.stderr).toBe("");

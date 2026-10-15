@@ -8,16 +8,18 @@ Uygulama geri dönüşü ile veri kurtarma ayrı kararlardır. Güvenliği geri 
 bash scripts/sunucu/rollback.sh --dry-run && bash scripts/sunucu/rollback.sh
 ```
 
-- `--dry-run`: yayındaki sürümü, hedef imajı ve çalıştırılacak `docker compose` komutunu yazar; hiçbir şey değiştirmez.
+- `--dry-run`: yayındaki sürümü, hedef imajı ve geçiş yöntemini (mavi/yeşil) yazar; hiçbir şey değiştirmez.
 - Hedef verilmezse `public.release_history`'de yayındakinden önce `ok` biten ve sonradan geri alınmamış en yeni sürüm seçilir.
   Belirli bir sürüm için: `bash scripts/sunucu/rollback.sh 202610141107-62e14a2e`.
 - Betik hedef imajın yerelde olduğunu doğrular (`deploy.sh` `prune_images` son iki `ok` sürümün imajını her zaman korur),
-  hedefin statik parçalarını `/srv/emlaksoft/next-static`'e ekler, `docker compose up` çalıştırır, sağlığı 120 sn bekler
-  (konteyner içi + `https://emlaksoft.com.tr/api/health`) ve geri alınan sürüm için `release_history`'ye `rolled_back`
+  hedefin statik parçalarını `/srv/emlaksoft/next-static`'e ekler ve `deploy.sh` ile AYNI mavi/yeşil geçişi yapar
+  (`scripts/sunucu/bluegreen.sh` `swap_to`; KESİNTİSİZ): yeşil hedef imajla açılır, sağlıklı olunca mavi boşaltılıp hedefle
+  yeniden kurulur, yeşil kaldırılır. Ardından dış adres (`https://emlaksoft.com.tr/api/health`) doğrulanır ve geri alınan sürüm için `release_history`'ye `rolled_back`
   satırı yazar (`/admin/sistem?sekme=durum`). Başarılı dönüşte `emlaksoft-app:latest` etiketi de hedef imaja taşınır:
   `APP_TAG`'siz sonraki bir `docker compose up` (elle ya da başka bir betik) geri alınan imaja dönmez. Taşıma başarısız
-  olursa betik uyarır; elle `docker tag emlaksoft-app:<hedef> emlaksoft-app:latest`. Hedef sağlıklı olmazsa önceki imaja geri çıkılır, `failed` yazılır, çıkış 1.
-- Yeni sürüm yayın sırasında 120 sn içinde sağlıklı olmazsa `deploy.sh` zaten kendiliğinden önceki imaja döner;
+  olursa betik uyarır; elle `docker tag emlaksoft-app:<hedef> emlaksoft-app:latest`. Hedef (yeşil) sağlıklı olmazsa yayındaki mavi hiç kapanmaz;
+  mavi hedefle kurulamazsa yayındaki sürümle yeniden kurulur. Her iki durumda `failed` yazılır, çıkış 1.
+- Yeni sürüm yayın sırasında sağlıklı olmazsa `deploy.sh` zaten eski sürümü yayında tutar (ya da bekçi kesintisiz geri döner);
   `rollback.sh` yayından SONRA fark edilen sorunlar içindir.
 
 ## Şema uyumu
