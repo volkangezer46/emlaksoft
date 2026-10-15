@@ -57,10 +57,23 @@ describe("malik kira ekstresi", () => {
         { title: "Musluk", cost: 300, status: "open", createdAt: "2026-03-11T10:00:00Z" },
       ],
     );
-    expect(s.totals).toEqual({ accrued: 30000, collected: 20000, expense: 1500, net: 18500, overdue: 10000 });
+    expect(s.totals).toEqual({ accrued: 30000, collected: 20000, expense: 1500, net: 18500, overdue: 10000, withheld: 0 });
     expect(s.months[2]).toMatchObject({ month: "2026-03", collected: 10000, expense: 1500, net: 8500, overdue: 10000 });
     expect(s.expenses).toEqual([{ title: "Kombi bakımı", cost: 1500, date: "2026-03-10" }]);
     expect(s.hasData).toBe(true);
+  });
+
+  it("işyeri kirasında stopaj ödeme ayına yazılır; ödenmemiş tahakkuğun stopajı sayılmaz (SP9)", () => {
+    const s = buildRentStatement(
+      2026,
+      [
+        { period: "2026-01-01", amount: 20000, status: "paid", paidAt: "2026-01-05T10:00:00Z", withholding: 5000 },
+        { period: "2026-02-01", amount: 20000, status: "pending", paidAt: null, withholding: 5000 },
+      ],
+      [],
+    );
+    expect(s.totals.withheld).toBe(5000);
+    expect(s.months[0]).toMatchObject({ collected: 20000, withheld: 5000, net: 20000 });
   });
 
   it("beyan hatırlatması yalnız Şubat-Mart; yıllar en çok 6", () => {

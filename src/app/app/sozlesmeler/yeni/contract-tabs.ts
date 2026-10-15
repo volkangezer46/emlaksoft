@@ -11,7 +11,7 @@ export const CONTRACT_TABS = [
     id: "bilgiler",
     label: "Sözleşme bilgileri",
     description: "Başlık, tür ve (varsa) son geçerlilik tarihi.",
-    fields: ["title", "contract_type", "expires_at", "customer_id", "property_id", "rental_id", "rent_increase_basis", "rent_increase_fixed_pct"],
+    fields: ["title", "contract_type", "expires_at", "customer_id", "property_id", "rental_id", "deal_id", "offer_id", "rent_increase_basis", "rent_increase_fixed_pct"],
     required: ["title"],
   },
   {

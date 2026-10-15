@@ -11,8 +11,25 @@ import {
   DialogTrigger,
 } from "@/components/ui/inline-dialog";
 
-/** Pazarlık turu ekleme diyaloğu — taraf + tutar + not; round_no server'da son+1. */
-export function OfferRoundDialog({ offerId }: { offerId: string }) {
+/**
+ * Pazarlık turu ekleme diyaloğu — taraf + tutar + not; round_no server'da son+1.
+ * Malik portalından gelen karşı teklif "Tur olarak ilet" ile açılırsa taraf/tutar/not önceden dolu gelir (SP2).
+ */
+export function OfferRoundDialog({
+  offerId,
+  defaultSide = "buyer",
+  defaultAmount,
+  defaultNote,
+  triggerLabel = "Tur ekle",
+  triggerClassName,
+}: {
+  offerId: string;
+  defaultSide?: "buyer" | "seller";
+  defaultAmount?: number | null;
+  defaultNote?: string | null;
+  triggerLabel?: string;
+  triggerClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   // Başarıda kapatma action akışında — OfferEditDialog ile aynı desen.
   const [state, action, pending] = useActionState<OfferResult, FormData>(
@@ -29,9 +46,12 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas"
+          className={
+            triggerClassName ??
+            "focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-hairline px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:bg-canvas sm:min-h-0"
+          }
         >
-          <Plus className="h-3.5 w-3.5" /> Tur ekle
+          <Plus className="h-3.5 w-3.5" /> {triggerLabel}
         </button>
       </DialogTrigger>
 
@@ -44,7 +64,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
             <select
               name="side"
               required
-              defaultValue="buyer"
+              defaultValue={defaultSide}
               className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             >
               <option value="buyer">Alıcı</option>
@@ -60,6 +80,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
               step="1000"
               required
               placeholder="Tur tutarı"
+              defaultValue={defaultAmount ?? undefined}
               className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
             />
           </label>
@@ -67,6 +88,7 @@ export function OfferRoundDialog({ offerId }: { offerId: string }) {
             aria-label="Tur notu"
             name="note"
             rows={3}
+            defaultValue={defaultNote ?? undefined}
             placeholder="Not (opsiyonel)"
             className="rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300"
           />

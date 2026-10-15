@@ -121,6 +121,7 @@ const FORMS = [
   {
     name: "teklif",
     source: "src/app/app/teklifler/yeni/new-offer-form.tsx",
+    extraSources: ["src/app/app/teklifler/offer-terms-fields.tsx"],
     tabs: OFFER_TABS as readonly TabLike[],
     draft: OFFER_DRAFT_FIELDS as readonly string[],
   },

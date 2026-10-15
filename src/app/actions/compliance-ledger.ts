@@ -7,7 +7,9 @@ import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import {
   DEFAULT_LEDGER_THRESHOLDS,
+  buildLedgerDraftsFromDeal,
   computeLedgerFlags,
+  isMethod,
   computeRetainUntil,
   parseLedgerForm,
   parseRetentionYears,
@@ -189,4 +191,151 @@ export async function saveLedgerSettings(
   });
   revalidatePath("/app/uyum/kayit-defteri");
   return { ok: true, message: "Ayarlar kaydedildi. Yeni kayıtlar bu eşiklerle işaretlenir; eski kayıtlar değişmez." };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const trDayOf = (iso: string) => {
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? new Date(ms + 3 * 3_600_000).toISOString().slice(0, 10) : iso.slice(0, 10);
+};
+
+/**
+ * SP7: kapanmış (kazanılmış) anlaşmadan deftere taraf başına satır yazar — danışman ödeme yöntemini ve her iki taraf
+ * için "kimlik aslı görüldü" kutusunu kapanışta onaylar. Kaynak 'auto'; aynı anlaşma + taraf için ikinci satır DB'de
+ * engellenir (tekrar deneme güvenli). Defter değiştirilemez; düzeltme yine yeni kayıttır. Kimlik numarası alınmaz.
+ * Kapanış sihirbazı da bu eylemi çağırabilir (form alanları: deal_id, payment_method, buyer_identity, seller_identity).
+ */
+export async function recordDealInLedger(
+  _prev: LedgerActionResult,
+  formData: FormData,
+): Promise<LedgerActionResult> {
+  const gate = await requirePermission("customers", "create");
+  if (!gate.ok) return { error: gate.error };
+
+  const dealId = String(formData.get("deal_id") ?? "").trim();
+  const method = String(formData.get("payment_method") ?? "").trim();
+  if (!UUID_RE.test(dealId)) return { error: "Anlaşma bulunamadı." };
+  if (!isMethod(method)) return { error: "Ödeme yöntemini seçin." };
+  const buyerChecked = formData.get("buyer_identity") === "on";
+  const sellerChecked = formData.get("seller_identity") === "on";
+
+  const supabase = await createClient();
+  const [dealRes, closedRes, settingsRes] = await Promise.all([
+    supabase
+      .from("deals")
+      .select("id, stage, deal_type, deal_value, property_id, customer_id, updated_at")
+      .eq("id", dealId)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
+    supabase.from("deals").select("closed_at").eq("id", dealId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    supabase
+      .from("compliance_ledger_settings")
+      .select("cash_threshold_try, amount_threshold_try, retention_years")
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
+  ]);
+  if (settingsRes.error) {
+    return { error: MISSING_TABLE.test(settingsRes.error.message) ? MISSING_MSG : actionErrorMessage(settingsRes.error, "Ayarlar okunamadı.") };
+  }
+  const deal = dealRes.data as {
+    id: string;
+    stage: string;
+    deal_type: "sale" | "rent";
+    deal_value: number | string | null;
+    property_id: string | null;
+    customer_id: string | null;
+    updated_at: string;
+  } | null;
+  if (!deal) return { error: "Anlaşma bulunamadı." };
+  if (deal.stage !== "won") return { error: "Yalnız kazanılmış (kapanmış) anlaşma deftere işlenir." };
+  const amount = deal.deal_value != null ? Number(deal.deal_value) : 0;
+  if (!(amount > 0)) return { error: "Anlaşma değeri girilmemiş; önce anlaşmaya tutar girin ya da kaydı elle ekleyin." };
+
+  // Taraflar: alıcı/kiracı = anlaşma müşterisi; satıcı/ev sahibi = portföyün ilan sahibi kaydı (yoksa yazılmaz).
+  const [buyerRes, ownerRes] = await Promise.all([
+    deal.customer_id
+      ? supabase.from("customers").select("id, full_name").eq("id", deal.customer_id).eq("tenant_id", gate.tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    deal.property_id
+      ? supabase.from("property_owner_info").select("customer_id").eq("property_id", deal.property_id).eq("tenant_id", gate.tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const buyer = buyerRes.data as { id: string; full_name: string | null } | null;
+  const ownerCustomerId = (ownerRes.data as { customer_id?: string | null } | null)?.customer_id ?? null;
+  const sellerRes = ownerCustomerId
+    ? await supabase.from("customers").select("id, full_name").eq("id", ownerCustomerId).eq("tenant_id", gate.tenantId).maybeSingle()
+    : { data: null };
+  const seller = sellerRes.data as { id: string; full_name: string | null } | null;
+
+  const closedAt = closedRes.error ? null : ((closedRes.data as { closed_at?: string | null } | null)?.closed_at ?? null);
+  const rows = buildLedgerDraftsFromDeal({
+    dealId: deal.id,
+    dealType: deal.deal_type,
+    closedDay: trDayOf(closedAt ?? deal.updated_at),
+    amountTry: amount,
+    buyer: buyer?.full_name ? { name: buyer.full_name, customerId: buyer.id } : null,
+    seller: seller?.full_name ? { name: seller.full_name, customerId: seller.id } : null,
+    propertyId: deal.property_id,
+    method,
+    buyerIdentityChecked: buyerChecked,
+    sellerIdentityChecked: sellerChecked,
+  });
+  if (rows.length === 0) return { error: "Anlaşmada taraf bilgisi yok; kaydı elle ekleyin." };
+
+  const thresholds = toThresholds(settingsRes.data as SettingsRow);
+  const payload = rows.map((r) => {
+    const retainUntil = computeRetainUntil(r.transactionDate, thresholds.retentionYears);
+    return {
+      tenant_id: gate.tenantId,
+      kind: "entry",
+      source: "auto",
+      transaction_type: r.transactionType,
+      transaction_date: r.transactionDate,
+      party_name: r.partyName,
+      party_role: r.partyRole,
+      counterparty_name: r.counterpartyName,
+      identity_checked: r.identityChecked,
+      amount_try: r.amountTry,
+      payment_method: r.method,
+      flags: computeLedgerFlags({ amountTry: r.amountTry, method: r.method, identityChecked: r.identityChecked }, thresholds),
+      threshold_snapshot: {
+        cash_threshold_try: thresholds.cashThresholdTry,
+        amount_threshold_try: thresholds.amountThresholdTry,
+        retention_years: thresholds.retentionYears,
+      },
+      note: r.note,
+      customer_id: r.customerId,
+      property_id: r.propertyId,
+      deal_id: r.dealId,
+      retain_until: retainUntil,
+      created_by: gate.userId,
+    };
+  });
+
+  const { error } = await supabase.from("compliance_ledger_entries").insert(payload);
+  if (error) {
+    if (error.code === "23505") return { error: "Bu anlaşma zaten deftere işlenmiş." };
+    if (error.code === "42703" || error.code === "PGRST204") return { error: "Kapanıştan deftere işleme bu ortamda henüz etkin değil; kaydı elle ekleyin." };
+    console.error("recordDealInLedger", error.message);
+    return { error: MISSING_TABLE.test(error.message) ? MISSING_MSG : actionErrorMessage(error, "Deftere işlenemedi.") };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "compliance_ledger.from_deal",
+    entityType: "deal",
+    entityId: deal.id,
+    // Kişisel veri (taraf adı, tutar) denetim kaydına kopyalanmaz.
+    newValue: { rows: rows.length, identity: { buyer: buyerChecked, seller: sellerChecked } },
+  });
+  revalidatePath("/app/uyum/kayit-defteri");
+  revalidatePath("/app/uyum/denetim-dosyasi");
+  const missingSeller = !seller?.full_name;
+  return {
+    ok: true,
+    message: missingSeller
+      ? `${rows.length} satır deftere işlendi. Portföyde ilan sahibi kaydı olmadığı için karşı taraf satırını elle ekleyin.`
+      : `${rows.length} satır deftere işlendi.`,
+  };
 }

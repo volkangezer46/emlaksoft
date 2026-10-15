@@ -26,7 +26,10 @@ import {
   type LedgerPartyRole,
   type LedgerTxType,
 } from "@/lib/compliance/ledger";
-import { LedgerEntryForm, LedgerSettingsForm, type CorrectionDefaults } from "./ledger-forms";
+import { DealLedgerForm, LedgerEntryForm, LedgerSettingsForm, type CorrectionDefaults } from "./ledger-forms";
+import { loadUnrecordedClosings } from "@/lib/compliance/ledger-closings";
+import { daysAgoIso } from "@/lib/clock";
+import { dealTypeLabel } from "@/lib/deal-type-label";
 
 export const metadata = { title: "Yasal kayıt defteri" };
 
@@ -166,6 +169,15 @@ export default async function LedgerPage({
   ]);
 
   const rows = (listRes.data ?? []) as unknown as EntryRow[];
+  // SP7: otomatik (kapanıştan) satırlar ve deftere işlenmemiş kapanışlar — sütun/tablo yoksa sessizce gizlenir.
+  const rowIds = rows.map((r) => r.id);
+  const [autoRes, closings] = await Promise.all([
+    rowIds.length
+      ? supabase.from("compliance_ledger_entries").select("id").in("id", rowIds).eq("source", "auto")
+      : Promise.resolve({ data: [] as { id: string }[], error: null }),
+    loadUnrecordedClosings(supabase, { sinceDay: daysAgoIso(365).slice(0, 10), limit: 10 }),
+  ]);
+  const autoIds = new Set(autoRes.error ? [] : ((autoRes.data ?? []) as { id: string }[]).map((r) => r.id));
   const matched = listRes.count ?? 0;
   const lastPage = Math.max(1, Math.ceil(matched / LEDGER_PAGE_SIZE));
 
@@ -194,8 +206,50 @@ export default async function LedgerPage({
           { label: "Kimlik görüldü işaretsiz", value: noIdRes.count ?? 0, href: href({ filtre: "kimliksiz" }), attention: true },
           { label: "Nakit işlemler", value: cashRes.count ?? 0, href: href({ filtre: "nakit" }) },
           { label: "Saklama süresi dolmuş", value: expiredRes.count ?? 0, href: href({ filtre: "suredoldu" }), hint: "ofis ayarına göre" },
+          ...(closings.available
+            ? [{ label: "Deftere işlenmemiş kapanış", value: closings.total, href: `${BASE}#kapanislar`, attention: closings.total > 0, hint: "son 365 gün" }]
+            : []),
         ]}
       />
+
+      {closings.available && closings.total > 0 ? (
+        <Card id="kapanislar" className="scroll-mt-20">
+          <CardHeader>
+            <div>
+              <CardTitle>Kapanmış, deftere işlenmemiş anlaşmalar ({closings.total})</CardTitle>
+              <CardDescription>
+                Tutar, tarih ve taraflar anlaşmadan gelir. Ödeme yöntemini seçip tarafların kimlik aslını gördüğünüzü onaylayın;
+                satırlar “Otomatik” etiketiyle eklenir ve sonradan değiştirilemez.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-line">
+              {closings.items.map((c) => (
+                <li key={c.id} className="py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <Link href={`/app/anlasmalar/${c.id}`} className="focus-ring min-w-0 rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 hover:text-brand-600">
+                      {dealTypeLabel(c.dealType)} · {c.propertyLabel ?? "Portföy"}
+                      {c.customerName ? <span className="font-normal text-text-muted"> · {c.customerName}</span> : null}
+                    </Link>
+                    <span className="text-xs text-text-muted">
+                      {c.amount != null ? formatTryAmount(c.amount) : "Tutar girilmemiş"} · {formatDateTr(c.closedDay)}
+                    </span>
+                  </div>
+                  {c.amount != null ? (
+                    <DealLedgerForm dealId={c.id} dealType={c.dealType} />
+                  ) : (
+                    <p className="mt-1 text-xs text-text-muted">Anlaşmaya tutar girildiğinde buradan deftere işlenebilir.</p>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {closings.total > closings.items.length ? (
+              <p className="mt-2 text-xs text-text-muted">İlk {closings.items.length} kapanış gösteriliyor; işlendikçe sıradakiler gelir.</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -280,6 +334,7 @@ export default async function LedgerPage({
                     {r.note ? <p className="mt-1 text-xs text-text-muted">{r.note}</p> : null}
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {r.kind === "correction" ? <Badge variant="info" size="sm">Düzeltme kaydı</Badge> : null}
+                      {autoIds.has(r.id) ? <Badge variant="success" size="sm">Otomatik · kapanıştan</Badge> : null}
                       {(r.flags ?? []).map((flag) => (
                         <Badge key={flag} variant={flag === "identity_not_checked" ? "neutral" : "warning"} size="sm">
                           {LEDGER_FLAG_LABELS[flag as LedgerFlag] ?? flag}

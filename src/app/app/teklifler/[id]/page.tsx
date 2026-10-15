@@ -3,8 +3,12 @@ import Link from "@/components/ui/smart-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  ArrowLeftRight,
   ArrowUpRight,
+  Banknote,
   Building2,
+  Columns3,
+  KeyRound,
   FileSignature,
   Handshake,
   History,
@@ -28,6 +32,10 @@ import { ActivityTimeline } from "@/components/ui/activity-timeline";
 import { now, trDayKey } from "@/lib/clock";
 import { daysUntilOfferExpiry } from "@/lib/offer-expiry";
 import { buildOfferEvents } from "./offer-events";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { formatDateTr } from "@/lib/format";
+import { DealContractCta, dealContractHref } from "@/app/app/sozlesmeler/_components/deal-contract-cta";
+import { OFFER_PAYMENT_LABELS, hasAnyOfferTerm } from "@/lib/offer-terms";
 
 export const metadata = { title: "Teklif" };
 
@@ -63,6 +71,8 @@ function diffMoney(n: number) {
 
 const SIDE_LABELS: Record<string, string> = { buyer: "Alıcı", seller: "Satıcı" };
 
+const CONTRACT_STATUS_LABELS: Record<string, string> = { draft: "Taslak", sent: "İmzada", signed: "İmzalandı", rejected: "Reddedildi", cancelled: "İptal" };
+
 const SIDE_STYLE: Record<string, string> = {
   buyer: "bg-brand-50 text-brand-700 ring-brand-600/20",
   seller: "bg-amber-50 text-amber-700 ring-amber-600/20",
@@ -85,11 +95,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   const supabase = await createClient();
 
   // Hepsi yalnız `id`'ye bağlı → tek turda (önceden 4 sıralı tur). deal_id kolonu henüz yoksa sorgu hata döner → yok sayılır.
-  const [stageLabels, offer, rounds, { data: linkRow }] = await Promise.all([
+  const [stageLabels, offer, rounds, { data: linkRow }, contractsRes] = await Promise.all([
     getStageLabels(),
     getOffer(id),
     listOfferRounds(id),
     supabase.from("offers").select("deal_id").eq("id", id).maybeSingle(),
+    // SP3: bu tekliften hazırlanan sözleşmeler (contracts.offer_id yoksa hata → liste çizilmez).
+    (perms.contracts ?? []).includes("view")
+      ? supabase.from("contracts").select("id, title, status").eq("offer_id", id).order("created_at", { ascending: false }).limit(10)
+      : Promise.resolve({ data: null, error: null }),
   ]);
   const stageNames = stageLabelMap(stageLabels);
   if (!offer) notFound();
@@ -108,7 +122,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
   let exactLink = false;
   const linkedDealId = (linkRow as { deal_id?: string | null } | null)?.deal_id ?? null;
   // Kesin bağ + yaklaşık eşleşme AYNI turda (yedek sorgu yalnız kesin bağ yoksa/bulunamazsa kullanılır).
-  const [{ data: linkedDeal }, { data: dealRows }] = await Promise.all([
+  const [{ data: linkedDeal }, { data: dealRows }, openOffersRes] = await Promise.all([
     linkedDealId
       ? supabase.from("deals").select("id, stage").eq("id", linkedDealId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -121,7 +135,15 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           .order("created_at", { ascending: false })
           .limit(1)
       : Promise.resolve({ data: null }),
+    // Aynı portföyde değerlendirmedeki teklif sayısı (yan yana karşılaştırma bağlantısı ≥2 iken).
+    supabase
+      .from("offers")
+      .select("id", { count: "exact", head: true })
+      .eq("property_id", offer.property_id)
+      .in("status", ["submitted", "countered"]),
   ]);
+  const openOfferCount = openOffersRes.error ? 0 : (openOffersRes.count ?? 0);
+  const linkedContracts = (contractsRes.error ? [] : ((contractsRes.data ?? []) as { id: string; title: string; status: string }[]));
   if (linkedDeal) {
     relatedDeal = linkedDeal as { id: string; stage: string };
     exactLink = true;
@@ -191,13 +213,35 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
 
   const telHref = toTelHref(customer?.phone);
   const waHref = toWhatsAppLink(customer?.phone);
-  // Sözleşme ön dolgusu: sozlesmeler sayfasındaki yeni sözleşme diyaloğu
-  // ?customer= & ?property= paramlarını okuyup kayda bağlar.
-  const contractParams = new URLSearchParams();
-  if (offer.customer_id) contractParams.set("customer", offer.customer_id);
-  if (offer.property_id) contractParams.set("property", offer.property_id);
-  const contractQs = contractParams.toString();
-  const contractHref = contractQs ? `/app/sozlesmeler?${contractQs}` : "/app/sozlesmeler";
+  const canCreateContract = (perms.contracts ?? []).includes("create");
+  const canCreateRental = (perms.rentals ?? []).includes("create");
+  const isRentalOffer = /kiral/i.test(property?.transaction_type ?? "");
+  const exactDealId = exactLink && relatedDeal ? relatedDeal.id : null;
+  // Kiralık kabul: kira kaydı formu portföy + kiracı + aylık kira ile dolu açılır (SP4).
+  const rentalQs = new URLSearchParams();
+  if (offer.property_id) rentalQs.set("portfoy", offer.property_id);
+  if (offer.customer_id) rentalQs.set("musteri", offer.customer_id);
+  rentalQs.set("tutar", String(Math.round(Number(offer.counter_amount ?? offer.amount) || 0)));
+  if (exactDealId) rentalQs.set("anlasma", exactDealId);
+  const rentalHref = `/app/kiralama/yeni?${rentalQs.toString()}`;
+
+  const terms = offer.terms;
+  const ownerCounter = offer.ownerCounter;
+  const lastRoundAt = rounds.length > 0 ? rounds[rounds.length - 1].created_at : null;
+  // Malik karşı teklifi, ondan SONRA tur eklenmediyse "değerlendirme bekliyor" sayılır.
+  const ownerCounterPending = Boolean(ownerCounter && !isClosed && (!lastRoundAt || lastRoundAt < ownerCounter.at));
+
+  const nba: { title: string; label: string; href: string | null } = ownerCounterPending
+    ? { title: "Malik karşı teklif önerdi", label: "İncele", href: "#pazarlik" }
+    : offer.status === "accepted"
+      ? canCreateContract
+        ? { title: "Kapora sözleşmesini hazırlayın", label: "Hazırla", href: dealContractHref({ dealId: exactDealId, offerId: offer.id, kind: "kapora" }) }
+        : { title: "Teklif kabul edildi", label: "Sonraki adım", href: "#sonraki-adim" }
+      : isClosed
+        ? { title: `Teklif ${STATUS_LABELS[offer.status]?.toLocaleLowerCase("tr-TR") ?? "kapandı"}`, label: "", href: null }
+        : expiryLeft != null && expiryLeft <= 2
+          ? { title: expiryLeft < 0 ? "Geçerlilik süresi doldu" : "Geçerlilik bitiyor", label: "İşlemler", href: "#islemler" }
+          : { title: "Pazarlığı sürdürün", label: "Tur ekle", href: "#pazarlik" };
 
   return (
     <div className="space-y-6">
@@ -300,14 +344,93 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
             )}
           </section>
 
+          {/* Ödeme ve tapu koşulları (SP2) */}
+          {offer.termsAvailable ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
+                  <Banknote className="h-4 w-4 text-brand-600" /> Ödeme ve tapu koşulları
+                </h2>
+                {openOfferCount >= 2 ? (
+                  <Link
+                    href={`/app/teklifler/karsilastir?portfoy=${offer.property_id}`}
+                    className="focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold text-brand-700 transition hover:border-brand-300 sm:min-h-9"
+                  >
+                    <Columns3 className="h-3.5 w-3.5" aria-hidden /> {openOfferCount} teklifi karşılaştır
+                  </Link>
+                ) : null}
+              </div>
+              {hasAnyOfferTerm(terms) ? (
+                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+                  <div className="flex justify-between gap-3 sm:block">
+                    <dt className="text-xs text-text-muted">Ödeme şekli</dt>
+                    <dd className="font-semibold text-ink-950">{terms.payment_method ? OFFER_PAYMENT_LABELS[terms.payment_method] : "Belirtilmedi"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 sm:block">
+                    <dt className="text-xs text-text-muted">Kapora</dt>
+                    <dd className="numeric font-semibold text-ink-950">{terms.deposit_amount != null ? money(terms.deposit_amount) : "Belirtilmedi"}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3 sm:block">
+                    <dt className="text-xs text-text-muted">Önerilen tapu tarihi</dt>
+                    <dd className="font-semibold text-ink-950">
+                      {terms.proposed_deed_date
+                        ? formatDateTr(terms.proposed_deed_date, { day: "numeric", month: "long", year: "numeric" })
+                        : "Belirtilmedi"}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3 sm:block">
+                    <dt className="text-xs text-text-muted">Kredi şartı</dt>
+                    <dd className={`font-semibold ${terms.credit_contingency ? "text-amber-700" : "text-ink-950"}`}>
+                      {terms.credit_contingency ? "Kredi onayına bağlı" : "Yok"}
+                    </dd>
+                  </div>
+                  {terms.swap_note ? (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-text-muted">Takas</dt>
+                      <dd className="whitespace-pre-wrap text-ink-800">{terms.swap_note}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : (
+                <p className="text-sm text-text-muted">
+                  Ödeme şekli, kapora ve tapu tarihi girilmemiş.{canEdit && !isClosed ? " “Teklifi düzenle” > Ödeme ve tapu sekmesinden ekleyebilirsiniz." : ""}
+                </p>
+              )}
+            </section>
+          ) : null}
+
           {/* Pazarlık geçmişi */}
-          <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+          <section id="pazarlik" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
                 <History className="h-4 w-4 text-brand-600" /> Pazarlık geçmişi
               </h2>
               {canEdit && !isClosed ? <OfferRoundDialog offerId={offer.id} /> : null}
             </div>
+
+            {ownerCounter && ownerCounterPending ? (
+              <div className="mb-4 rounded-[var(--radius-card)] border border-amber-400/45 bg-amber-400/[0.08] p-4">
+                <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
+                  <ArrowLeftRight className="h-4 w-4" aria-hidden /> Malik portalından karşı teklif: {money(ownerCounter.amount)}
+                </p>
+                {ownerCounter.note ? <p className="mt-1 whitespace-pre-wrap text-sm text-ink-800">“{ownerCounter.note}”</p> : null}
+                <p className="mt-1 text-xs text-text-muted">
+                  {dateTime(ownerCounter.at)} · Alıcıya otomatik iletilmedi. Uygunsa satıcı turu olarak ekleyip alıcıya sunun.
+                </p>
+                {canEdit ? (
+                  <div className="mt-3">
+                    <OfferRoundDialog
+                      offerId={offer.id}
+                      defaultSide="seller"
+                      defaultAmount={ownerCounter.amount}
+                      defaultNote={ownerCounter.note ? `Malik karşı teklifi: ${ownerCounter.note}` : "Malik karşı teklifi (portal)"}
+                      triggerLabel="Satıcı turu olarak ekle"
+                      triggerClassName="focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-amber-500 px-4 text-sm font-semibold text-white transition hover:bg-amber-600"
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {/* Özet: liste fiyatı vs son teklif */}
             <div className="mb-4 flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm">
@@ -383,21 +506,39 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
         {/* Sağ: zaman çizelgesi + aksiyonlar */}
         <div className="space-y-6">
           {offer.status === "accepted" ? (
-            <section className="rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/[0.06] p-5">
+            <section id="sonraki-adim" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-mint-500/30 bg-mint-500/[0.06] p-5">
               <h2 className="flex items-center gap-2 text-sm font-bold text-mint-700">
                 <FileSignature className="h-4 w-4" /> Sonraki adım
               </h2>
               <p className="mt-1 text-xs text-text-muted">
-                Teklif kabul edildi — anlaşmayı pipeline&apos;a taşıyın, sözleşme taslağını başlatın.
+                Teklif kabul edildi — anlaşmayı pipeline&apos;a taşıyın; {isRentalOffer ? "kira kaydını açın ve " : ""}sözleşmeyi teklif bilgileriyle dolu başlatın.
               </p>
               {canEdit && !exactLink ? (
                 <div className="mt-3">
                   <ConvertToDealButton offerId={offer.id} />
                 </div>
               ) : null}
-              <ButtonLink href={contractHref} size="sm" variant="secondary" className="mt-3 w-full">
-                Sözleşme taslağı oluştur
-              </ButtonLink>
+              {isRentalOffer && canCreateRental ? (
+                <ButtonLink href={rentalHref} size="sm" variant="secondary" icon={KeyRound} className="mt-3 min-h-11 w-full sm:min-h-0">
+                  Kira kaydı oluştur
+                </ButtonLink>
+              ) : null}
+              {canCreateContract ? <DealContractCta dealId={exactDealId} offerId={offer.id} className="mt-3 grid gap-2" /> : null}
+              {linkedContracts.length > 0 ? (
+                <ul className="mt-3 space-y-1.5 border-t border-mint-500/20 pt-3">
+                  {linkedContracts.map((c) => (
+                    <li key={c.id}>
+                      <Link
+                        href={`/app/sozlesmeler/${c.id}`}
+                        className="focus-ring flex min-h-11 items-center justify-between gap-2 rounded-[var(--radius-control)] text-sm font-semibold text-ink-950 hover:text-brand-600 sm:min-h-0"
+                      >
+                        <span className="truncate">{c.title}</span>
+                        <span className="shrink-0 text-xs font-medium text-text-muted">{CONTRACT_STATUS_LABELS[c.status] ?? c.status}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </section>
           ) : null}
 
@@ -436,7 +577,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           </section>
 
           {canEdit ? (
-            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+            <section id="islemler" className="scroll-mt-20 rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
               <h2 className="mb-3 text-sm font-bold text-ink-950">İşlemler</h2>
               <OfferStatusActions offerId={offer.id} status={offer.status} />
               {!["accepted", "rejected", "withdrawn"].includes(offer.status) ? (
@@ -448,6 +589,7 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
                       valid_until: offer.valid_until,
                       notes: offer.notes,
                       owner_visible_note: offer.owner_visible_note,
+                      terms: offer.termsAvailable ? offer.terms : null,
                     }}
                   />
                 </div>
@@ -456,6 +598,8 @@ export default async function OfferDetailPage({ params }: { params: Promise<{ id
           ) : null}
         </div>
       </div>
+
+      <MobileActionBar primary={nba} phone={customer?.phone} contactName={customer?.full_name} />
     </div>
   );
 }

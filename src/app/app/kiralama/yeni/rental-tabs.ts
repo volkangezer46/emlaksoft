@@ -15,8 +15,8 @@ export const RENTAL_TABS = [
   {
     id: "bedel",
     label: "Bedel ve vade",
-    description: "Aylık kira, ödeme günü ve depozito.",
-    fields: ["monthly_rent", "due_day", "deposit"],
+    description: "Aylık kira, ödeme günü, depozito, kullanım ve stopaj.",
+    fields: ["monthly_rent", "due_day", "deposit", "usage", "withholding_rate"],
     required: ["monthly_rent", "due_day"],
   },
   {

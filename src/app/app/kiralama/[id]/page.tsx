@@ -21,6 +21,9 @@ import { EdevletTransferCard } from "./edevlet-transfer-card";
 import { OwnerTab } from "./owner-tab";
 import { RentNoticesCard } from "./rent-notices-card";
 import { loadLateFeeSettings, loadRentalPayments } from "@/lib/property-management/load";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { RentalProcessCard } from "./rental-process-card";
+import { buildRentalProcess, parseHandoverSteps } from "@/lib/rental-process";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Kira detayı" };
@@ -75,7 +78,7 @@ export default async function KiraDetayPage({
   // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
   // Hepsi yalnız `id`/tenant'a bağlı → ana kayıtla AYNI turda (önceden 3 sıralı tur).
   // Depozito emanet hareketleri (WP4, 20261017010500): sütun yoksa hata → "kasaya işlenmedi" sayılır, ana sorgu etkilenmez.
-  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes] = await Promise.all([
+  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes, extraRes, withholdingRes] = await Promise.all([
     rentalP,
     canViewContracts
       ? Promise.resolve(supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20))
@@ -84,7 +87,18 @@ export default async function KiraDetayPage({
     loadRentalPayments(supabase, tenantId ?? "", id),
     loadLateFeeSettings(supabase, tenantId ?? ""),
     supabase.from("rentals").select("deposit_received_entry_id, deposit_returned_entry_id").eq("id", id).maybeSingle(),
+    // SP9 kullanım/stopaj + SP4 süreç adımları (20261019040003): sütun yoksa hata → stopajsız, süreç yalnız kayıtlardan.
+    supabase.from("rentals").select("usage, withholding_rate, handover_steps").eq("id", id).maybeSingle(),
+    supabase.from("rent_charges").select("id, withholding_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? "").gt("withholding_amount", 0),
   ]);
+  const rentalExtra = extraRes.error
+    ? null
+    : (extraRes.data as { usage?: string | null; withholding_rate?: number | string | null; handover_steps?: unknown } | null);
+  const withholdingById = new Map<string, number>(
+    withholdingRes.error
+      ? []
+      : ((withholdingRes.data ?? []) as { id: string; withholding_amount: number | string }[]).map((w) => [w.id, Number(w.withholding_amount) || 0]),
+  );
   const depositCash = depositCashRes.error
     ? { available: false, received: false, returned: false }
     : {
@@ -113,7 +127,20 @@ export default async function KiraDetayPage({
     ...c,
     amount: Number(c.amount),
     paid_amount: paymentsAvailable ? (paidById.get(c.id) ?? 0) : c.status === "paid" ? Number(c.amount) : 0,
+    withholding: withholdingById.get(c.id) ?? 0,
   }));
+
+  // SP4 kiralık süreç: imzalı sözleşme, kasaya işlenen depozito ve en eski tahakkukun ödenmesi kendiliğinden işaretlenir.
+  const oldestCharge = chargeRows.length > 0 ? chargeRows[chargeRows.length - 1] : null;
+  const process = buildRentalProcess({
+    createdDay: String(rental.created_at).slice(0, 10),
+    manual: parseHandoverSteps(rentalExtra?.handover_steps),
+    contractStatuses: linkedContracts.map((c) => String(c.status)),
+    deposit: rental.deposit != null ? Number(rental.deposit) : null,
+    depositReceived: depositCash.received,
+    firstChargePaid: Boolean(oldestCharge && oldestCharge.amount > 0 && oldestCharge.paid_amount >= oldestCharge.amount),
+  });
+  const withholdingRate = rentalExtra?.withholding_rate != null ? Number(rentalExtra.withholding_rate) : 0;
 
   const active = rental.status === "active";
   const today = daysAgoIso(0).slice(0, 10);
@@ -141,12 +168,18 @@ export default async function KiraDetayPage({
   const openMaintenance = maintenance.filter((m) => m.status !== "done").length;
   const sekmeHref = (t: string) => `/app/kiralama/${rental.id}?sekme=${t}`;
 
+  // Yeni kira (≤ 90 gün) ve süreç bitmemişse sıradaki süreç adımı da aday (gecikmeden sonra).
+  const youngRental = String(rental.created_at).slice(0, 10) >= daysAgoIso(90).slice(0, 10);
+  const processNext = active && youngRental ? process.next : null;
+
   /** Sağ sütun — tek "sonraki en iyi eylem". */
   const nba: { title: string; reason: string; href: string | null; label: string } =
     active && ended
       ? { title: "Süresi dolan kaydı sonlandırın", reason: `Bitiş tarihi (${dateLabel(rental.end_date!)}) geçti.`, href: null, label: "" }
       : overdueCount > 0
         ? { title: `${overdueCount} geciken tahakkuk`, reason: "Kiracıyla görüşüp ödemeyi işaretleyin.", href: sekmeHref("tahakkuk"), label: "Tahakkuklara git" }
+        : processNext
+          ? { title: `Kira süreci: ${processNext.label}`, reason: processNext.hint, href: "#kira-sureci", label: "Süreci aç" }
         : endingSoon
           ? { title: "Kira artışını hesaplayın", reason: `Sözleşme ${daysToEnd === 0 ? "bugün" : `${daysToEnd} gün içinde`} bitiyor.`, href: "/app/kira-artis", label: "Kira artışı" }
           : openMaintenance > 0
@@ -187,6 +220,8 @@ export default async function KiraDetayPage({
                   end_date: rental.end_date ? String(rental.end_date).slice(0, 10) : null,
                   deposit: rental.deposit != null ? Number(rental.deposit) : null,
                   notes: rental.notes ?? null,
+                  usage: rentalExtra ? (rentalExtra.usage === "isyeri" ? "isyeri" : "konut") : null,
+                  withholding_rate: withholdingRate,
                 }}
               />
             ) : null}
@@ -226,6 +261,12 @@ export default async function KiraDetayPage({
             <span className="numeric font-semibold text-white">{money(Number(rental.monthly_rent))}</span>
             <span className="text-white/50">· her ayın {rental.due_day}. günü</span>
           </div>
+          {rentalExtra?.usage === "isyeri" || withholdingRate > 0 ? (
+            <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
+              <span className="text-white/80">{rentalExtra?.usage === "isyeri" ? "İşyeri" : "Konut"}</span>
+              <span className="text-white/50">· {withholdingRate > 0 ? `%${String(withholdingRate).replace(".", ",")} stopaj (kiracı keser)` : "stopaj yok"}</span>
+            </div>
+          ) : null}
           {rental.deposit != null ? (
             <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-3 py-2 text-sm">
               <span className="text-white/80">Depozito:</span>
@@ -264,6 +305,9 @@ export default async function KiraDetayPage({
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-4">
+          {active ? (
+            <RentalProcessCard rentalId={rental.id} steps={process.steps} done={process.done} total={process.total} canEdit={canEdit} />
+          ) : null}
           <DetailSegmentTabs basePath={`/app/kiralama/${rental.id}`} tabs={tabDefs} active={tab} label="Kira sekmeleri" />
 
           {tab === "tahakkuk" ? (
@@ -447,6 +491,12 @@ export default async function KiraDetayPage({
           </section>
         </aside>
       </div>
+
+      <MobileActionBar
+        primary={{ title: nba.title, label: nba.label, href: nba.href }}
+        phone={renter?.phone}
+        contactName={renter?.full_name}
+      />
     </div>
   );
 }

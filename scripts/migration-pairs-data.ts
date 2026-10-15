@@ -534,6 +534,12 @@ const F = {
   a9AuthLoginThrottle: "20261018090000_auth_login_throttle.sql",
   a9OfficeTotp: "20261018090100_office_totp_two_factor.sql",
   a9KvkkSubjectExports: "20261018090200_kvkk_subject_exports.sql",
+  // B4 (2026-10-19): teklif kosullari + malik karsi teklifi, sozlesme-anlasma bagi, imza kaniti, kira stopaji + kiralik surec, defter otomatik kaynak.
+  b4OfferTerms: "20261019040000_offer_terms_owner_counter.sql",
+  b4ContractsDealLink: "20261019040001_contracts_deal_link.sql",
+  b4ContractEvidence: "20261019040002_contract_signature_evidence.sql",
+  b4RentalWithholding: "20261019040003_rental_withholding_handover.sql",
+  b4LedgerAutoSource: "20261019040004_compliance_ledger_auto_source.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -830,6 +836,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
+    [F.b4OfferTerms]: "ek", // offers'a nullable kosul sutunlari + malik karsi teklif sutunlari + owner_counter_offer_atomic (yalniz service_role, outbox bildirimi); teklif durumu/tutari degismez
+    [F.b4ContractsDealLink]: "davranis", // contracts.deal_id/offer_id (bilesik FK, set null) + tek adayli eslesmelerin bir kerelik geri doldurmasi
+    [F.b4ContractEvidence]: "davranis", // contracts.body_sha256/verify_code + imzaci kanit sutunlari; ozet yazildiktan sonra baslik/govde kilit tetigi
+    [F.b4RentalWithholding]: "davranis", // rentals.usage/withholding_rate/handover_steps + rent_charges.withholding_amount; oran > 0 ise yeni tahakkuk NET yazilir (BEFORE INSERT tetigi); varsayilan oran 0 = bugunku davranis
+    [F.b4LedgerAutoSource]: "ek", // compliance_ledger_entries.source (manual|auto) + otomatik satir tekillik indeksi; mevcut satirlar 'manual'
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1108,6 +1119,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A7-anket-google-yorum-izi", order: 1873, title: "surveys.review_clicked_at (sira serbest, ek; kod sutun yokken tiklama izini atlar)", files: [F.a7SurveyReviewClick] },
     { id: "A9-giris-kisitlayici", order: 1891, title: "Giris sertlestirme: hesap + IP basarisizlik kovalari ve ilerleyen bekleme (auth_login_throttle + peek/fail/clear, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken check_rate_limit sabit penceresine duser; ek)", files: [F.a9AuthLoginThrottle] },
     { id: "A9-ofis-totp-2fa", order: 1892, title: "Ofis kullanicilari icin authenticator (TOTP) 2FA: profiles.two_factor_method (varsayilan sms) + yontem degisiminde two_factor_version artar + two_factor_recovery_codes (HMAC ozet, tek kullanim) + 2FA oturum kapisi TOTP yonteminde AAL2'yi de kabul eder (20261007001100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod two_factor_method okur; davranis)", files: [F.a9OfficeTotp] },
+    { id: "B4-teklif-kosullari-malik-karsi-teklif", order: 1940, title: "SP2 teklif kosullari (odeme sekli, kapora, tapu tarihi, kredi sarti, takas) + malik portalindan karsi teklif RPC'si (outbox bildirimli, aliciya otomatik gitmez) (20260810000990 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun/RPC yokken kosullari yazmaz ve formu 'etkin degil' gosterir; ek)", files: [F.b4OfferTerms] },
+    { id: "B4-sozlesme-anlasma-bagi", order: 1941, title: "SP3 contracts.deal_id/offer_id kesin bag + tek adayli eski sozlesmelerin geri doldurmasi (20260809000020 tenant sinir indeksleri SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken bagsiz yazar; davranis)", files: [F.b4ContractsDealLink] },
+    { id: "B4-imza-kaniti", order: 1942, title: "SP8 imza tamamlama sertifikasi: icerik SHA-256, dogrulama kodu, imzaci basina kanit + metin kilidi tetigi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken kanit yazmaz; davranis)", files: [F.b4ContractEvidence] },
+    { id: "B4-kira-stopaj-surec", order: 1943, title: "SP9 isyeri kirasi stopaji (rentals.usage/withholding_rate, rent_charges.withholding_amount + NET tahakkuk tetigi) ve SP4 kiralik surec adimlari (rentals.handover_steps) (20261008001100 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: varsayilan oran 0 iken davranis degismez; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.b4RentalWithholding] },
+    { id: "B4-defter-otomatik-kaynak", order: 1944, title: "SP7 yasal kayit defteri otomatik kaynak etiketi + anlasma/taraf tekillik indeksi (20260821000200 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken eylem 'etkin degil' der; ek)", files: [F.b4LedgerAutoSource] },
     { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1405,6 +1421,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     // A9: 2FA kapisi govdesi perf turunun plpgsql govdesi uzerine kurulur; dokum tablosu kvkk_requests'e baglanir.
     [F.a9OfficeTotp, F.perfIndexesRpc],
     [F.a9KvkkSubjectExports, F.k5Kvkk],
+    // B4: stopaj tetigi tahsilat cekirdeginin rent_charges yapisina; defter kaynagi defter tablosuna dayanir.
+    [F.b4RentalWithholding, F.propertyManagementCore],
+    [F.b4LedgerAutoSource, F.ledger],
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],

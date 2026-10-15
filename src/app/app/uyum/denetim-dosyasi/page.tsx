@@ -4,6 +4,9 @@ import { AlertTriangle, ArrowLeft, CheckCircle2, FileCheck2, Info } from "lucide
 import { requireModulePage } from "@/lib/require-module-page";
 import { buildAuditDossier } from "@/app/actions/audit-dossier";
 import { PrintButton } from "@/components/ui/print-button";
+import { createClient } from "@/lib/supabase/server";
+import { loadUnrecordedClosings } from "@/lib/compliance/ledger-closings";
+import { daysAgoIso } from "@/lib/clock";
 
 export const metadata = { title: "Denetim dosyası" };
 
@@ -35,7 +38,12 @@ function tarih(iso: string | null) {
  */
 export default async function AuditDossierPage() {
   await requireModulePage("compliance", "/app/uyum");
-  const d = await buildAuditDossier();
+  const supabase = await createClient();
+  // SP7: kapanmış ama yasal kayıt defterine işlenmemiş anlaşmalar (son 365 gün) — dosyayla AYNI turda okunur.
+  const [d, closings] = await Promise.all([
+    buildAuditDossier(),
+    loadUnrecordedClosings(supabase, { sinceDay: daysAgoIso(365).slice(0, 10), limit: 1 }),
+  ]);
   if (!d) notFound();
 
   const yetkiOran = d.yetki.toplam > 0 ? Math.round((d.yetki.belgeli / d.yetki.toplam) * 100) : null;
@@ -79,6 +87,21 @@ export default async function AuditDossierPage() {
             ))}
           </dl>
         </header>
+
+        {closings.available && closings.total > 0 ? (
+          <section className="print-avoid-break mt-6 rounded-[var(--radius-card)] border border-amber-400/40 bg-amber-400/[0.06] px-4 py-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="text-sm font-semibold text-ink-950">Kapanmış ama yasal kayıt defterine işlenmemiş anlaşma</p>
+              <span className="numeric rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-bold text-amber-700">{closings.total}</span>
+            </div>
+            <p className="mt-1 text-xs leading-relaxed text-text-muted">
+              Son 365 günde kazanılan anlaşmalardan deftere satırı olmayanlar.{" "}
+              <Link href="/app/uyum/kayit-defteri#kapanislar" className="no-print font-semibold text-brand-600 hover:underline">
+                Kayıt defterinde işle
+              </Link>
+            </p>
+          </section>
+        ) : null}
 
         {/* EKSİKLER EN ÜSTTE — dosyanın en değerli kısmı */}
         <section className="print-avoid-break mt-6">

@@ -13,6 +13,7 @@ import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { trDayKey } from "@/lib/clock";
+import { parseOfferTerms, readOfferTerms, type OfferTerms } from "@/lib/offer-terms";
 
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
@@ -50,6 +51,35 @@ async function saveOwnerNote(
   return "Teklif kaydedildi; malike görünen açıklama kaydedilemedi.";
 }
 
+const TERMS_MISSING = "Teklif kaydedildi; ödeme koşulları bu ortamda henüz kaydedilemiyor (veritabanı güncellemesi bekliyor).";
+
+/**
+ * Yapılandırılmış teklif koşulları (SP2). Atomik teklif RPC'si bu sütunları bilmez; durum/tutar koruması etkilenmez.
+ * Sütunlar yoksa (20261019040000 uygulanmamış) açık mesaj döner, teklif kaydı geri alınmaz.
+ */
+async function saveOfferTerms(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  offerId: string,
+  terms: OfferTerms,
+): Promise<string | null> {
+  const { error } = await admin
+    .from("offers")
+    .update({
+      payment_method: terms.payment_method,
+      deposit_amount: terms.deposit_amount,
+      proposed_deed_date: terms.proposed_deed_date,
+      credit_contingency: terms.credit_contingency,
+      swap_note: terms.swap_note,
+    })
+    .eq("id", offerId)
+    .eq("tenant_id", tenantId);
+  if (!error) return null;
+  if (error.code === "42703" || error.code === "PGRST204") return TERMS_MISSING;
+  console.error("offer terms", { code: error.code });
+  return "Teklif kaydedildi; ödeme koşulları kaydedilemedi.";
+}
+
 export async function createOffer(
   _prev: OfferResult,
   fd: FormData,
@@ -73,6 +103,8 @@ export async function createOffer(
   }
   if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
   const amount = amountResult.value;
+  const terms = parseOfferTerms(fd, { offerAmount: amount, todayKey: trDayKey() });
+  if (!terms.ok) return { error: terms.error };
 
   const references = await validateTenantReferences(gate.tenantId, {
     propertyId,
@@ -103,6 +135,8 @@ export async function createOffer(
   const offerId = transition.offer_id;
   const ownerNoteError = ownerNote.value ? await saveOwnerNote(admin, gate.tenantId, offerId, ownerNote.value) : null;
   if (ownerNoteError) console.error("createOffer owner note", ownerNoteError);
+  const termsError = terms.present ? await saveOfferTerms(admin, gate.tenantId, offerId, terms.value) : null;
+  if (termsError) console.error("createOffer terms", termsError);
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   afterSafe(() =>
@@ -254,6 +288,9 @@ export async function updateOffer(
   }
   if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
   if (!ownerNote.ok) return { error: ownerNote.error };
+  // Düzenlemede geçmiş tapu tarihi reddedilmez (kayıtlı eski tarih başka alan düzenlenirken engel olmasın).
+  const terms = parseOfferTerms(fd, { offerAmount: amountResult.value });
+  if (!terms.ok) return { error: terms.error };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("update_offer_terms_atomic", {
@@ -275,10 +312,12 @@ export async function updateOffer(
   if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Teklif güncellenemedi.") };
   // Alan formda varsa (düzenleme penceresi) yazılır; boşaltmak da bir karardır (null).
   const ownerNoteError = fd.has("owner_visible_note") ? await saveOwnerNote(admin, gate.tenantId, id, ownerNote.value) : null;
+  const termsError = terms.present ? await saveOfferTerms(admin, gate.tenantId, id, terms.value) : null;
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${id}`);
   if (ownerNoteError) return { error: ownerNoteError };
+  if (termsError) return { error: termsError };
   return { ok: true, id };
 }
 
@@ -290,7 +329,7 @@ export async function getOffer(id: string) {
   const supabase = await createClient();
   // Malike görünen açıklama AYRI ve paralel okunur: SK8 migration'ı yoksa (sütun yok) detay sayfası bozulmaz, alan boş
   // gelir; ek tur bekleme süresine eklenmez.
-  const [{ data }, noteRes] = await Promise.all([
+  const [{ data }, noteRes, termsRes] = await Promise.all([
     supabase
       .from("offers")
       .select(
@@ -300,6 +339,13 @@ export async function getOffer(id: string) {
       .eq("tenant_id", gate.tenantId)
       .maybeSingle(),
     supabase.from("offers").select("owner_visible_note").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle(),
+    // SP2 koşulları + malik karşı teklifi: sütunlar yoksa (20261019040000) hata → boş koşul, sayfa bozulmaz.
+    supabase
+      .from("offers")
+      .select("payment_method, deposit_amount, proposed_deed_date, credit_contingency, swap_note, owner_counter_amount, owner_counter_note, owner_counter_at")
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
   ]);
 
   // B2: ofis geneli kapsam dışındaki roller id ile yalnız kendi oluşturdukları teklifi açabilir.
@@ -309,7 +355,21 @@ export async function getOffer(id: string) {
   const ownerVisibleNote = noteRes.error
     ? null
     : ((noteRes.data as { owner_visible_note?: string | null } | null)?.owner_visible_note ?? null);
-  return { ...data, owner_visible_note: ownerVisibleNote };
+  const termsRow = termsRes.error ? null : ((termsRes.data as Record<string, unknown> | null) ?? null);
+  return {
+    ...data,
+    owner_visible_note: ownerVisibleNote,
+    terms: readOfferTerms(termsRow),
+    termsAvailable: !termsRes.error,
+    ownerCounter:
+      termsRow && termsRow.owner_counter_amount != null && typeof termsRow.owner_counter_at === "string"
+        ? {
+            amount: Number(termsRow.owner_counter_amount),
+            note: typeof termsRow.owner_counter_note === "string" ? termsRow.owner_counter_note : null,
+            at: termsRow.owner_counter_at,
+          }
+        : null,
+  };
 }
 
 export type ConvertOfferResult = {

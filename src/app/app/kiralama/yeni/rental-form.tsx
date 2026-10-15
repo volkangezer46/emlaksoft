@@ -1,13 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createRental } from "@/app/actions/rentals";
 import { searchCustomers, searchProperties } from "@/app/actions/lookup";
 import { useCreateForm } from "@/components/app/use-create-form";
 import { Combobox } from "@/components/ui/combobox";
-import { FormField, FormInput, FormTextarea } from "@/components/ui/form-controls";
+import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
+import {
+  DEFAULT_WORKPLACE_WITHHOLDING_RATE,
+  RENTAL_USAGES,
+  WITHHOLDING_TENANT_NOTE,
+  parseWithholdingRate,
+  splitGrossRent,
+  type RentalUsage,
+} from "@/lib/rent-withholding";
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { RENTAL_DRAFT_FIELDS, RENTAL_FORM_ID, RENTAL_TABS } from "./rental-tabs";
@@ -51,6 +59,7 @@ export function RentalForm({
   defaultCustomerId = null,
   defaultMonthlyRent = null,
   defaultStartDate,
+  sourceNote = null,
   userId,
 }: {
   properties: Property[];
@@ -63,12 +72,23 @@ export function RentalForm({
   defaultMonthlyRent?: number | null;
   /** Sunucudan gelen bugün (YYYY-MM-DD). */
   defaultStartDate: string;
+  /** Anlaşmadan gelindiyse kullanıcıya gösterilen kaynak notu (SP4). */
+  sourceNote?: string | null;
   userId: string;
 }) {
   const { onSubmit, pending, error } = useCreateForm((fd) => createRental({}, fd), {
     successMessage: "Kira kaydı oluşturuldu",
     redirectTo: () => "/app/kiralama",
   });
+
+  // SP9: işyeri seçilince stopaj oranı (elle değiştirilmediyse) %20 önerisiyle dolar; konuta dönünce 0'a iner.
+  const [usage, setUsage] = useState<RentalUsage>("konut");
+  const [rate, setRate] = useState("0");
+  const [rateTouched, setRateTouched] = useState(false);
+  function changeUsage(next: RentalUsage) {
+    setUsage(next);
+    if (!rateTouched) setRate(next === "isyeri" ? String(DEFAULT_WORKPLACE_WITHHOLDING_RATE) : "0");
+  }
 
   const tabs: FormTab[] = useMemo(
     () =>
@@ -141,6 +161,48 @@ export function RentalForm({
         <FormField label="Depozito (₺)" htmlFor="rental-deposit">
           <FormInput name="deposit" type="number" min="0" step="0.01" placeholder="Opsiyonel" />
         </FormField>
+        <FormField label="Kullanım" htmlFor="rental-usage">
+          <FormSelect
+            id="rental-usage"
+            name="usage"
+            value={usage}
+            onChange={(e) => changeUsage(e.target.value === "isyeri" ? "isyeri" : "konut")}
+            className="appearance-none"
+          >
+            {RENTAL_USAGES.map((u) => (
+              <option key={u.value} value={u.value}>
+                {u.label}
+              </option>
+            ))}
+          </FormSelect>
+        </FormField>
+        <FormField
+          label="Kiracının kestiği stopaj (%)"
+          htmlFor="rental-withholding"
+          hint={
+            usage === "isyeri"
+              ? "Kiracı şirket/kurumsa genellikle %20 keser; şahıs kiracıda 0 yazın."
+              : "Konut kiracısı şahıssa 0; kiracı şirketse stopaj oranını yazın."
+          }
+        >
+          <FormInput
+            id="rental-withholding"
+            name="withholding_rate"
+            inputMode="decimal"
+            autoComplete="off"
+            value={rate}
+            onChange={(e) => {
+              setRate(e.target.value);
+              setRateTouched(true);
+            }}
+            placeholder="0"
+          />
+        </FormField>
+        {Number(rate.replace(",", ".")) > 0 ? (
+          <p className="rounded-[var(--radius-control)] bg-amber-400/[0.08] px-3 py-2 text-xs leading-relaxed text-text-muted sm:col-span-2">
+            {WITHHOLDING_TENANT_NOTE}
+          </p>
+        ) : null}
       </>
     ),
     sure: (
@@ -171,6 +233,8 @@ export function RentalForm({
     const start = dayLabel(values.start_date);
     const end = dayLabel(values.end_date);
     const notes = (values.notes ?? "").trim();
+    const rateValue = parseWithholdingRate(values.withholding_rate) ?? 0;
+    const split = rent != null && rent > 0 ? splitGrossRent(rent, rateValue) : null;
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -187,6 +251,14 @@ export function RentalForm({
           <SummaryRow label="Yıllık bedel" value={rent != null && rent > 0 ? formatTry(rent * 12) : "Hesaplanamadı"} muted={!(rent != null && rent > 0)} tab="bedel" field="monthly_rent" />
           <SummaryRow label="Vade günü" value={dueDay ? `Ayın ${dueDay}. günü` : "Zorunlu"} muted={!dueDay} tab="bedel" field="due_day" />
           <SummaryRow label="Depozito" value={deposit != null && deposit > 0 ? formatTry(deposit) : "Girilmedi"} muted={!(deposit != null && deposit > 0)} tab="bedel" field="deposit" />
+          <SummaryRow label="Kullanım" value={values.usage === "isyeri" ? "İşyeri" : "Konut"} tab="bedel" field="usage" />
+          <SummaryRow
+            label="Stopaj / net tahsilat"
+            value={split && split.withholding > 0 ? `${formatTry(split.withholding)} / ${formatTry(split.net)}` : "Stopaj yok"}
+            muted={!(split && split.withholding > 0)}
+            tab="bedel"
+            field="withholding_rate"
+          />
           <SummaryRow label="Başlangıç" value={start ?? "Zorunlu"} muted={!start} tab="sure" field="start_date" />
           <SummaryRow label="Bitiş" value={end ?? "Süresiz"} muted={!end} tab="sure" field="end_date" />
           <SummaryRow label="Notlar" value={notes || "Girilmedi"} muted={!notes} tab="sure" field="notes" />
@@ -198,7 +270,7 @@ export function RentalForm({
   return (
     <TabbedFormShell
       title="Yeni kira kaydı"
-      description="Portföyü kiracısıyla eşleştirin — aylık tahakkuklar vade gününe göre otomatik oluşturulur."
+      description={sourceNote ?? "Portföyü kiracısıyla eşleştirin — aylık tahakkuklar vade gününe göre otomatik oluşturulur."}
       breadcrumbs={[{ label: "Mülk yönetimi", href: "/app/kiralama" }, { label: "Yeni kira kaydı" }]}
       cancelHref="/app/kiralama"
       submitLabel="Kaydet"

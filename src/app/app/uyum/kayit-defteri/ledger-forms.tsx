@@ -4,12 +4,14 @@ import { useActionState, useRef, useState } from "react";
 import { Plus, Save } from "lucide-react";
 import {
   addLedgerEntry,
+  recordDealInLedger,
   saveLedgerSettings,
   type LedgerActionResult,
 } from "@/app/actions/compliance-ledger";
 import { searchCustomers } from "@/app/actions/lookup";
 import { Alert } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import {
@@ -165,6 +167,52 @@ export function LedgerSettingsForm({
       </FormField>
       <div className="flex flex-wrap items-center gap-3 sm:col-span-3">
         <Button type="submit" variant="secondary" icon={Save} loading={pending}>Ayarları kaydet</Button>
+        <Result state={state} />
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Kapanmış anlaşmayı deftere işleme (SP7) — kapanışın "kimlik görüldü" adımı: ödeme yöntemi + her iki taraf için kimlik
+ * aslı görüldü onayı. Kimlik numarası ya da fotokopisi istenmez. İşaretlenmeyen taraf "kimlik görüldü işaretsiz" olarak düşer.
+ */
+export function DealLedgerForm({ dealId, dealType }: { dealId: string; dealType: "sale" | "rent" }) {
+  const [state, action, pending] = useActionState(recordDealInLedger, initial);
+  const buyerLabel = dealType === "rent" ? "Kiracının" : "Alıcının";
+  const sellerLabel = dealType === "rent" ? "Ev sahibinin" : "Satıcının";
+  return (
+    <form action={action} className="mt-3 space-y-3">
+      <input type="hidden" name="deal_id" value={dealId} />
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,14rem)_1fr]">
+        <FormField label="Ödeme yöntemi" htmlFor={`ledger-method-${dealId}`} required>
+          <FormSelect id={`ledger-method-${dealId}`} name="payment_method" required defaultValue="" className="min-h-11 appearance-none">
+            <option value="" disabled>
+              Seçin
+            </option>
+            {LEDGER_METHODS.map((m) => (
+              <option key={m} value={m}>
+                {LEDGER_METHOD_LABELS[m]}
+              </option>
+            ))}
+          </FormSelect>
+        </FormField>
+        <fieldset className="grid gap-2 sm:grid-cols-2">
+          <legend className="sr-only">Kimlik kontrolü</legend>
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 text-sm">
+            <Checkbox name="buyer_identity" />
+            <span>{buyerLabel} kimlik aslı görüldü</span>
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 text-sm">
+            <Checkbox name="seller_identity" />
+            <span>{sellerLabel} kimlik aslı görüldü</span>
+          </label>
+        </fieldset>
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" icon={Save} loading={pending} className="min-h-11 sm:min-h-0">
+          Deftere işle
+        </Button>
         <Result state={state} />
       </div>
     </form>

@@ -21,6 +21,7 @@ import { parseFixedPct, parseIncreaseBasis } from "@/lib/rental-contract/build";
 import { isMissingSchemaError } from "@/lib/property-owner/info";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { cleanUserAgent, contractContentSha256, generateVerifyCode, signerIpHash } from "@/lib/contract-evidence";
 
 type TenantStatusRel = { status?: string | null } | { status?: string | null }[] | null;
 function tenantStatusOf(rel: TenantStatusRel): string | null | undefined {
@@ -32,6 +33,8 @@ function appBaseUrl() {
 }
 
 export type ContractResult = { ok?: boolean; error?: string; id?: string; notified?: number };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const CONTRACT_TYPES = ["satis", "kira", "sozlesme", "teklif", "yer_gosterme", "kapora", "diger"] as const;
 
@@ -59,6 +62,9 @@ export async function createContract(
   // Kiralamadan oluşturma (H6): kira kaydı + artış maddesi alanı. Boşsa mevcut akış aynen çalışır.
   const rentalId     = String(fd.get("rental_id")    ?? "").trim() || null;
   const increaseBasis = parseIncreaseBasis(fd.get("rent_increase_basis"));
+  // SP3: anlaşmadan / kabul edilen tekliften hazırlanan sözleşmenin kesin bağı (boşsa eski akış).
+  let dealId         = String(fd.get("deal_id")      ?? "").trim() || null;
+  let offerId        = String(fd.get("offer_id")     ?? "").trim() || null;
   const fixedPct     = parseFixedPct(fd.get("rent_increase_fixed_pct"));
 
   if (!title) return { error: "Sözleşme başlığı zorunludur." };
@@ -86,13 +92,33 @@ export async function createContract(
     customerId = (rental as { renter_customer_id: string }).renter_customer_id;
   }
 
+  if (dealId || offerId) {
+    if ((dealId && !UUID_RE.test(dealId)) || (offerId && !UUID_RE.test(offerId))) return { error: "Anlaşma veya teklif bulunamadı." };
+    const [dealRes, offerRes] = await Promise.all([
+      dealId
+        ? supabase.from("deals").select("id, property_id, customer_id").eq("id", dealId).eq("tenant_id", gate.tenantId).maybeSingle()
+        : Promise.resolve({ data: null }),
+      offerId
+        ? supabase.from("offers").select("id, property_id, customer_id").eq("id", offerId).eq("tenant_id", gate.tenantId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const deal = dealRes.data as { id: string; property_id: string | null; customer_id: string | null } | null;
+    const offer = offerRes.data as { id: string; property_id: string; customer_id: string | null } | null;
+    if (dealId && !deal) dealId = null;
+    if (offerId && !offer) offerId = null;
+    if (!dealId && !offerId) return { error: "Anlaşma veya teklif bulunamadı." };
+    // Bağ kaynağı kayıttır (formdaki gizli alan güvenilmez): portföy/müşteri teklif ya da anlaşmadan gelir.
+    propertyId = offer?.property_id ?? deal?.property_id ?? propertyId;
+    customerId = offer?.customer_id ?? deal?.customer_id ?? customerId;
+  }
+
   const references = await validateTenantReferences(gate.tenantId, {
     propertyId,
     customerId,
   });
   if (!references.ok) return { error: references.error };
 
-  const { data, error } = await supabase
+  const insertContract = (withDealLink: boolean) => supabase
     .from("contracts")
     .insert({
       tenant_id:     gate.tenantId,
@@ -112,9 +138,16 @@ export async function createContract(
             rent_increase_fixed_pct: increaseBasis === "sabit" ? fixedPct.value : null,
           }
         : {}),
+      ...(withDealLink ? { deal_id: dealId, offer_id: offerId } : {}),
     })
     .select("id")
     .single();
+
+  let { data, error } = await insertContract(Boolean(dealId || offerId));
+  // SP3 sütunları yoksa (20261019040001 uygulanmamış) sözleşme bağsız oluşur; ön dolgu yine kullanılır.
+  if (error && (dealId || offerId) && (error.code === "42703" || error.code === "PGRST204")) {
+    ({ data, error } = await insertContract(false));
+  }
 
   if (error || !data) {
     if (rentalId && isMissingSchemaError(error)) {
@@ -125,6 +158,8 @@ export async function createContract(
 
   revalidatePath("/app/sozlesmeler");
   if (rentalId) revalidatePath(`/app/kiralama/${rentalId}`);
+  if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
+  if (offerId) revalidatePath(`/app/teklifler/${offerId}`);
   return { ok: true, id: data.id };
 }
 
@@ -221,6 +256,31 @@ export async function updateContractBody(
 // İmzalatmaya gönder (imzalayan ekle + durum → sent)
 // ---------------------------------------------------------------------------
 
+type AdminDb = ReturnType<typeof createAdminClient>;
+const isMissingColumn = (code: string | undefined) => code === "42703" || code === "PGRST204";
+
+/**
+ * SP8: imzaya gönderimde içerik özetini ve herkese açık doğrulama kodunu kilitler (yalnız bir kez; özet varsa dokunmaz).
+ * Sütunlar yoksa (20261019040002 uygulanmamış) sessizce atlanır; imza akışı etkilenmez. Kod çakışırsa yeniden üretilir.
+ */
+async function lockContractEvidence(admin: AdminDb, tenantId: string, contractId: string, title: string, body: string): Promise<void> {
+  const hash = contractContentSha256(title, body);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await admin
+      .from("contracts")
+      .update({ body_sha256: hash, verify_code: generateVerifyCode(), evidence_locked_at: new Date().toISOString() })
+      .eq("id", contractId)
+      .eq("tenant_id", tenantId)
+      .is("body_sha256", null);
+    if (!error) return;
+    if (isMissingColumn(error.code)) return;
+    if (error.code !== "23505") {
+      console.error("lockContractEvidence", { code: error.code });
+      return;
+    }
+  }
+}
+
 export async function sendContractForSigning(
   contractId: string,
   signers: { full_name: string; email?: string; phone?: string }[],
@@ -286,11 +346,14 @@ export async function sendContractForSigning(
 
   const { data: contract } = await admin
     .from("contracts")
-    .select("title")
+    .select("title, body")
     .eq("id", contractId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   const contractTitle = contract?.title ?? "Sözleşme";
+  if (contract?.title != null && typeof contract.body === "string") {
+    await lockContractEvidence(admin, gate.tenantId, contractId, contract.title, contract.body);
+  }
 
   // İmza linklerini tenant-owned Netgsm kaydıyla gönder. Platform hesabı ancak
   // açık fallback politikası varsa kullanılabilir; SMS hatası akışı bloklamaz.
@@ -317,6 +380,7 @@ export async function sendContractForSigning(
 export async function signContractByToken(
   token: string,
   ip?: string,
+  userAgent?: string | null,
 ): Promise<ContractResult> {
   const admin = createAdminClient();
 
@@ -363,6 +427,22 @@ export async function signContractByToken(
   if (requireVerified && !signer.verified_at) {
     return { error: "İmzadan önce SMS doğrulaması gereklidir. Lütfen telefonunuza gönderilen kodu doğrulayın." };
   }
+  // SP8: imzalanan metin, gönderimde kilitlenen metinle aynı olmalı (özet karşılaştırması). Sütunlar yoksa atlanır.
+  const { data: evidenceRow, error: evidenceError } = await admin
+    .from("contracts")
+    .select("title, body, body_sha256")
+    .eq("id", signer.contract_id)
+    .maybeSingle();
+  const evidence = evidenceError ? null : (evidenceRow as { title: string; body: string; body_sha256: string | null } | null);
+  const signedHash = evidence ? contractContentSha256(evidence.title, evidence.body) : null;
+  if (evidence?.body_sha256 && signedHash !== evidence.body_sha256) {
+    console.error("signContractByToken body hash mismatch", { contract: signer.contract_id });
+    return { error: "Sözleşme metni gönderimden sonra değişmiş görünüyor; imza alınamadı. Lütfen ofisle iletişime geçin." };
+  }
+  // Kanıt alanları gelmeden önce gönderilmiş sözleşme: ilk imzada imzalanan metin kilitlenir (özet + doğrulama kodu).
+  if (evidence && !evidence.body_sha256) {
+    await lockContractEvidence(admin, contract.tenant_id, signer.contract_id, evidence.title, evidence.body);
+  }
   const { data: transitionData, error: transitionError } = await admin.rpc(
     "sign_contract_atomic",
     {
@@ -379,7 +459,24 @@ export async function signContractByToken(
     ? transitionData as Record<string, unknown>
     : null;
   const outcome = typeof transition?.outcome === "string" ? transition.outcome : "invalid_result";
-  if (outcome === "applied" || outcome === "replay") return { ok: true };
+  if (outcome === "applied") {
+    // İmzacı başına kanıt (SP8): imzalanan metnin özeti, IP özeti, tarayıcı ve OTP kanalı. Yazılamazsa imza geçerli kalır.
+    const { error: evidenceWriteError } = await admin
+      .from("contract_signers")
+      .update({
+        signed_body_sha256: signedHash,
+        signed_user_agent: cleanUserAgent(userAgent),
+        signed_ip_hash: signerIpHash(signer.contract_id, ip),
+        otp_channel: signer.verified_at ? "sms" : "none",
+      })
+      .eq("id", signer.id)
+      .is("signed_body_sha256", null);
+    if (evidenceWriteError && !isMissingColumn(evidenceWriteError.code)) {
+      console.error("signContractByToken evidence", { code: evidenceWriteError.code });
+    }
+    return { ok: true };
+  }
+  if (outcome === "replay") return { ok: true };
   if (outcome === "expired") return { error: "Bu imza linkinin geçerlilik süresi dolmuştur." };
   if (outcome === "verification_required") return { error: "İmzadan önce SMS doğrulaması gereklidir." };
   if (outcome === "inactive_tenant" || outcome === "invalid_link") return { error: "Sözleşme bulunamadı." };
@@ -411,7 +508,7 @@ export async function submitSignatureByToken(
   });
   if (!allowed) return { error: "Çok fazla deneme. Lütfen biraz sonra tekrar deneyin." };
 
-  const result = await signContractByToken(token, ip);
+  const result = await signContractByToken(token, ip, hdrs.get("user-agent"));
   if (result.ok) revalidatePath(`/imza/${token}`);
   return result;
 }

@@ -15,6 +15,8 @@ import { isIsoDate } from "@/lib/workflow-state";
 import { checkRentalExtension } from "@/lib/workflow-rules";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { trDayKey } from "@/lib/clock";
+import { parseRentalUsage, parseWithholdingRate } from "@/lib/rent-withholding";
+import { isManualRentalStepKey, parseHandoverSteps } from "@/lib/rental-process";
 
 /**
  * Mülk yönetimi (kiralama) server action'ları.
@@ -46,8 +48,12 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   const endDate     = String(fd.get("end_date") ?? "").trim() || null;
   const depositResult = parseMoneyInput(fd.get("deposit"), { allowZero: true, max: 1_000_000_000 });
   const notes       = String(fd.get("notes") ?? "").trim() || null;
+  // SP9: kullanım + stopaj oranı (alan yoksa konut/0 = bugünkü davranış).
+  const usage       = parseRentalUsage(fd.get("usage"));
+  const withholdingRate = parseWithholdingRate(fd.get("withholding_rate"));
 
   if (!propertyId) return { error: "Portföy seçin." };
+  if (withholdingRate === null) return { error: "Stopaj oranı 0 ile 50 arasında olmalı." };
   if (!renterId) return { error: "Kiracı (müşteri) seçin." };
   if (!monthlyRentResult.ok || monthlyRentResult.value == null) return { error: "Geçerli bir aylık kira tutarı girin." };
   if (isNaN(dueDay) || dueDay < 1 || dueDay > 28) return { error: "Vade günü 1-28 arasında olmalı." };
@@ -91,6 +97,21 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
   const rentalId = transition.rental_id;
   const rentalDealId = typeof transition.deal_id === "string" ? transition.deal_id : null;
 
+  // Kullanım/stopaj atomik RPC'nin dışında yazılır (RPC bu sütunları bilmez). İlk tahakkuk cron'la sonra açıldığı için
+  // oran ondan önce yerleşir. Sütunlar yoksa (20261019040003 bekliyor) stopajsız devam edilir ve kullanıcıya söylenir.
+  let withholdingWarning: string | null = null;
+  if (usage !== "konut" || withholdingRate > 0) {
+    const { error: whError } = await admin
+      .from("rentals")
+      .update({ usage, withholding_rate: withholdingRate })
+      .eq("id", rentalId)
+      .eq("tenant_id", gate.tenantId);
+    if (whError) {
+      console.error("createRental withholding", { code: whError.code });
+      withholdingWarning = "Kira kaydı oluşturuldu; kullanım/stopaj bilgisi bu ortamda henüz kaydedilemiyor.";
+    }
+  }
+
   // Kiralama kapanışı sonrası temizlik (satış kapanışıyla aynı): kiracının karşılanan kiralık talepleri kapanır,
   // yıldönümü boşsa "Kiralama" yazılır; portföyde kalan randevu/teklifler danışmanlara bildirilir (iptal edilmez).
   if (rentalDealId) {
@@ -127,6 +148,7 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
 
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/portfoyler/${propertyId}`);
+  if (withholdingWarning) console.error(withholdingWarning);
   return { ok: true, id: rentalId };
 }
 
@@ -179,8 +201,13 @@ export async function updateRental(_prev: RentalResult, fd: FormData): Promise<R
   const endDate = String(fd.get("end_date") ?? "").trim() || null;
   const depositResult = parseMoneyInput(fd.get("deposit"), { allowZero: true, max: 1_000_000_000 });
   const notes = String(fd.get("notes") ?? "").trim() || null;
+  // SP9: düzenleme penceresinde alan varsa kullanım/stopaj da yazılır (yalnız SONRAKİ tahakkukları etkiler).
+  const hasWithholding = fd.has("withholding_rate");
+  const usage = parseRentalUsage(fd.get("usage"));
+  const withholdingRate = hasWithholding ? parseWithholdingRate(fd.get("withholding_rate")) : 0;
 
   if (isNaN(dueDay) || dueDay < 1 || dueDay > 28) return { error: "Vade günü 1-28 arasında olmalı." };
+  if (withholdingRate === null) return { error: "Stopaj oranı 0 ile 50 arasında olmalı." };
   if (endDate && !isIsoDate(endDate)) return { error: "Geçerli bir bitiş tarihi girin." };
   if (!depositResult.ok) return { error: "Geçerli bir depozito tutarı girin." };
   if (notes && notes.length > 5000) return { error: "Not en fazla 5000 karakter olabilir." };
@@ -211,6 +238,18 @@ export async function updateRental(_prev: RentalResult, fd: FormData): Promise<R
     return { error: actionErrorMessage(error, "Kira kaydı güncellenemedi.") };
   }
   if (!updated) return { error: "Kira kaydı bu sırada değişti; sayfayı yenileyin." };
+  if (hasWithholding) {
+    const { error: whError } = await admin
+      .from("rentals")
+      .update({ usage, withholding_rate: withholdingRate })
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .eq("status", "active");
+    if (whError) {
+      console.error("updateRental withholding", { code: whError.code });
+      return { error: "Kira kaydı güncellendi; kullanım/stopaj bilgisi bu ortamda henüz kaydedilemiyor." };
+    }
+  }
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -566,4 +605,49 @@ export async function updateMaintenanceRequest(
   revalidatePath("/app/kiralama");
   revalidatePath(`/app/kiralama/${rentalId}`);
   return { ok: true };
+}
+
+/**
+ * Kiralık süreç adımını (SP4) elle işaretler / geri alır: `rentals.handover_steps` {adım: "YYYY-MM-DD"}.
+ * Kayıtlardan kendiliğinden tamamlanan adımlar (imzalı sözleşme, depozito + ilk kira) burada değil, kayıtla değişir.
+ */
+export async function setRentalProcessStep(rentalId: string, step: string, done: boolean): Promise<RentalResult> {
+  const gate = await requirePermission("rentals", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(rentalId))) return { error: "Kira kaydı bulunamadı." };
+  if (!isManualRentalStepKey(step)) return { error: "Geçersiz adım." };
+
+  const admin = createAdminClient();
+  const { data: rental, error: readError } = await admin
+    .from("rentals")
+    .select("id, handover_steps")
+    .eq("id", rentalId)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (readError) {
+    if (readError.code === "42703" || readError.code === "PGRST204") return { error: "Kira süreci adımları bu ortamda henüz etkin değil." };
+    return { error: actionErrorMessage(readError, "Kira kaydı okunamadı.") };
+  }
+  if (!rental) return { error: "Kira kaydı bulunamadı." };
+
+  const steps = parseHandoverSteps((rental as { handover_steps?: unknown }).handover_steps);
+  if (done) steps[step] = trDayKey();
+  else delete steps[step];
+  const { error } = await admin
+    .from("rentals")
+    .update({ handover_steps: steps })
+    .eq("id", rentalId)
+    .eq("tenant_id", gate.tenantId);
+  if (error) return { error: actionErrorMessage(error, "Adım kaydedilemedi.") };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: done ? "rental.step_done" : "rental.step_undone",
+    entityType: "rental",
+    entityId: rentalId,
+    newValue: { step },
+  });
+  revalidatePath(`/app/kiralama/${rentalId}`);
+  return { ok: true, id: rentalId };
 }

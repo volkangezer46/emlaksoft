@@ -23,6 +23,9 @@ import { DAY_MS, msUntil } from "@/lib/clock";
 import { GOS_CLAUSE_MARKER, appendGosClause, gosClauseApplies } from "@/lib/gos-info";
 import { CONTRACT_DRAFT_FIELDS, CONTRACT_FORM_ID, CONTRACT_TABS } from "./contract-tabs";
 import type { RentalContractContext } from "./rental-context";
+import type { DealContractContext } from "./deal-context";
+import { dealContractHref } from "../_components/deal-contract-cta";
+import { DEAL_CONTRACT_KINDS, buildDealContractBody, fillDealTokens } from "@/lib/sale-contract/build";
 import {
   INCREASE_BASES,
   buildRentalContractBody,
@@ -181,6 +184,7 @@ export function NewContractForm({
   prefillProperty = "",
   prefillTur = "",
   rentalContext = null,
+  dealContext = null,
   canSaveTemplate = false,
   userId,
 }: {
@@ -193,6 +197,8 @@ export function NewContractForm({
   prefillTur?: string;
   /** Kiralama kaydından gelindiyse (?kira=): ön dolgu ve artış maddesi alanı. */
   rentalContext?: RentalContractContext | null;
+  /** Anlaşmadan / kabul edilen tekliften gelindiyse (?anlasma=&teklif=&sablon=): kapora / aracılık ön dolgusu (SP3). */
+  dealContext?: DealContractContext | null;
   /** Ofis şablonu yazma izni (settings:edit); yoksa "şablon olarak kaydet" seçeneği çizilmez. */
   canSaveTemplate?: boolean;
   userId: string;
@@ -215,9 +221,9 @@ export function NewContractForm({
   // Kiralamadan gelindiyse ofisin kira şablonları varsa galeri önce açılır (hazır taslak da orada); yoksa doğrudan form.
   const hasKiraTemplates = templates.some((t) => t.type === "kira");
   const [step, setStep] = useState<"template" | "form">(
-    rentalContext ? (hasKiraTemplates ? "template" : "form") : hasPrefill || templates.length === 0 ? "form" : "template",
+    rentalContext ? (hasKiraTemplates ? "template" : "form") : dealContext || hasPrefill || templates.length === 0 ? "form" : "template",
   );
-  const [body, setBody] = useState(rentalContext?.defaultBody ?? activeTemplate ?? "");
+  const [body, setBody] = useState(rentalContext?.defaultBody ?? dealContext?.defaultBody ?? activeTemplate ?? "");
   const [generatedBody, setGeneratedBody] = useState(rentalContext?.defaultBody ?? "");
   const [increaseBasis, setIncreaseBasis] = useState<IncreaseBasis>("tufe");
   const [fixedPct, setFixedPct] = useState("");
@@ -249,7 +255,13 @@ export function NewContractForm({
 
   function applyDbTemplate(t: ContractTemplateOption) {
     // Kiralamadan gelindiyse ofis şablonundaki {kiraci}, {kira_bedeli} gibi alanlar kira kaydıyla dolar.
-    setBody(rentalContext ? fillRentalTokens(t.content, rentalData(increaseBasis, fixedPct)) : t.content);
+    setBody(
+      rentalContext
+        ? fillRentalTokens(t.content, rentalData(increaseBasis, fixedPct))
+        : dealContext
+          ? fillDealTokens(t.content, dealContext.data)
+          : t.content,
+    );
     if (contractTypes.some((ct) => ct.value === t.type)) setSelectedType(t.type);
     setStep("form");
   }
@@ -377,6 +389,32 @@ export function NewContractForm({
     bilgiler: (
       <>
         {rentalContext ? <input type="hidden" name="rental_id" value={rentalContext.rentalId} /> : null}
+        {dealContext?.dealId ? <input type="hidden" name="deal_id" value={dealContext.dealId} /> : null}
+        {dealContext?.offerId ? <input type="hidden" name="offer_id" value={dealContext.offerId} /> : null}
+        {dealContext ? (
+          <div className="space-y-2 rounded-[var(--radius-control)] border border-brand-300/60 bg-brand-600/5 p-3 sm:col-span-2">
+            <p className="text-xs font-medium text-brand-700">
+              {dealContext.sourceLabel} — tutar, alıcı, satıcı/malik, portföy adresi ve kapora metne doldu; sözleşme{" "}
+              {dealContext.dealId ? "anlaşmaya" : "teklife"} bağlı kaydedilecek. Boş kalan alanları (___) metinde tamamlayın.
+            </p>
+            <nav aria-label="Taslak türü" className="flex flex-wrap gap-2">
+              {DEAL_CONTRACT_KINDS.map((k) => (
+                <Link
+                  key={k.value}
+                  href={dealContractHref({ dealId: dealContext.dealId, offerId: dealContext.offerId, kind: k.value })}
+                  aria-current={k.value === dealContext.kind ? "page" : undefined}
+                  className={`focus-ring press inline-flex min-h-11 items-center rounded-[var(--radius-control)] border px-3 text-xs font-semibold transition sm:min-h-9 ${
+                    k.value === dealContext.kind
+                      ? "border-brand-500 bg-brand-600/10 text-brand-700"
+                      : "border-line bg-surface text-text-muted hover:border-brand-300"
+                  }`}
+                >
+                  {k.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        ) : null}
         {prefillCustomer ? <input type="hidden" name="customer_id" value={prefillCustomer} /> : null}
         {prefillProperty ? <input type="hidden" name="property_id" value={prefillProperty} /> : null}
         {/* Ön dolgu yoksa müşteri / portföy aramalı seçiciyle bağlanabilir (bağsız sözleşme kalmasın). */}
@@ -408,7 +446,9 @@ export function NewContractForm({
         ) : null}
         {prefillCustomer || prefillProperty ? (
           <p className="rounded-[var(--radius-control)] bg-brand-600/8 px-3 py-2 text-xs font-medium text-brand-700 sm:col-span-2">
-            {rentalContext
+            {dealContext
+              ? "Anlaşma/teklif akışından gelindi — müşteri ve portföy bağı sözleşmeye otomatik eklenecek."
+              : rentalContext
               ? "Kira kaydından gelindi — kiracı, portföy ve kira kaydı bağı sözleşmeye otomatik eklenecek; sözleşme sayfasından kira kaydına geri dönülebilir."
               : isYerGosterme
               ? "Randevu akışından gelindi — müşteri ve portföy bağı otomatik eklenecek; içerikte yer gösterme tutanağı şablonu hazır."
@@ -420,7 +460,7 @@ export function NewContractForm({
             name="title"
             type="text"
             required
-            defaultValue={rentalContext ? rentalContext.title : isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
+            defaultValue={rentalContext ? rentalContext.title : dealContext ? dealContext.title : isYerGosterme ? "Yer Gösterme Tutanağı" : undefined}
             placeholder="ör. Daire Kira Sözleşmesi — Ahmet Yılmaz"
           />
         </FormField>
@@ -437,7 +477,7 @@ export function NewContractForm({
           </FormSelect>
         </FormField>
         <FormField label="Son geçerlilik tarihi (opsiyonel)" htmlFor="sozl-expires">
-          <FormInput name="expires_at" type="date" defaultValue={rentalContext?.expiresAt ?? undefined} />
+          <FormInput name="expires_at" type="date" defaultValue={rentalContext?.expiresAt ?? dealContext?.expiresAt ?? undefined} />
         </FormField>
         {rentalContext ? (
           <>
@@ -480,7 +520,7 @@ export function NewContractForm({
         <div className="sm:col-span-2">
           <div className="mb-1.5 flex items-center justify-between">
             <label htmlFor="sozl-body" className="text-sm font-semibold text-ink-950">Sözleşme içeriği</label>
-            {activeTemplate && (
+            {(activeTemplate || dealContext) && (
               <button
                 type="button"
                 onClick={() => {
@@ -488,7 +528,8 @@ export function NewContractForm({
                     const next = buildRentalContractBody(rentalData(increaseBasis, fixedPct));
                     setBody(next);
                     setGeneratedBody(next);
-                  } else setBody(activeTemplate);
+                  } else if (dealContext) setBody(buildDealContractBody(dealContext.kind, dealContext.data));
+                  else setBody(activeTemplate);
                 }}
                 className="text-xs font-semibold text-brand-600 hover:underline"
               >

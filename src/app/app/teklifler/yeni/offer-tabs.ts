@@ -19,6 +19,13 @@ export const OFFER_TABS = [
     fields: ["amount", "valid_until", "notes", "owner_visible_note"],
     required: ["amount"],
   },
+  {
+    id: "odeme",
+    label: "Ödeme ve tapu",
+    description: "Ödeme şekli, kapora, tapu tarihi, kredi şartı ve takas (SP2).",
+    fields: ["payment_method", "deposit_amount", "proposed_deed_date", "credit_contingency", "swap_note"],
+    required: [],
+  },
 ] as const;
 
 /**

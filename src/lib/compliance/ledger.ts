@@ -235,3 +235,92 @@ export function parseLedgerFilters(sp: { filtre?: string; tur?: string; sayfa?: 
   const n = Number(sp.sayfa);
   return { filtre, tur, sayfa: Number.isInteger(n) && n >= 1 && n <= 10_000 ? n : 1 };
 }
+
+// ---------------------------------------------------------------------------
+// SP7: kapanmış anlaşmadan defter taslağı (SAF)
+// ---------------------------------------------------------------------------
+
+export const LEDGER_SOURCES = ["manual", "auto"] as const;
+export type LedgerSource = (typeof LEDGER_SOURCES)[number];
+
+export type LedgerDealDraftInput = {
+  dealId: string;
+  dealType: "sale" | "rent";
+  /** Kapanış (kazanma) günü, YYYY-MM-DD. */
+  closedDay: string;
+  /** Satış bedeli ya da aylık kira. */
+  amountTry: number;
+  buyer: { name: string; customerId: string | null } | null;
+  seller: { name: string; customerId: string | null } | null;
+  propertyId: string | null;
+  method: LedgerMethod;
+  buyerIdentityChecked: boolean;
+  sellerIdentityChecked: boolean;
+};
+
+export type LedgerDraftRow = {
+  transactionType: LedgerTxType;
+  transactionDate: string;
+  partyName: string;
+  partyRole: LedgerPartyRole;
+  counterpartyName: string | null;
+  identityChecked: boolean;
+  amountTry: number;
+  method: LedgerMethod;
+  customerId: string | null;
+  propertyId: string | null;
+  dealId: string;
+  note: string;
+};
+
+/**
+ * Kapanmış anlaşmadan taraf başına bir defter satırı üretir (satışta alıcı + satıcı, kiralıkta kiracı + ev sahibi).
+ * Adı bilinmeyen taraf için satır üretilmez (uydurma kayıt yok). Tutar ≤ 0 ise hiç satır yok. Kimlik bayrağı
+ * danışmanın kapanışta işaretlediği "kimlik aslı görüldü" kutusundan gelir; TC kimlik no alınmaz.
+ */
+export function buildLedgerDraftsFromDeal(i: LedgerDealDraftInput): LedgerDraftRow[] {
+  if (!(i.amountTry > 0) || !isValidIsoDate(i.closedDay)) return [];
+  const sale = i.dealType === "sale";
+  const txType: LedgerTxType = sale ? "sale" : "rental";
+  const buyerRole: LedgerPartyRole = sale ? "buyer" : "tenant";
+  const sellerRole: LedgerPartyRole = sale ? "seller" : "landlord";
+  const amount = Math.round(i.amountTry * 100) / 100;
+  const name = (v: string | null | undefined) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 160);
+  const note = sale ? "Kapanmış satış anlaşmasından otomatik taslak." : "Kapanmış kiralık anlaşmadan otomatik taslak (aylık kira).";
+  const rows: LedgerDraftRow[] = [];
+  const buyerName = name(i.buyer?.name);
+  const sellerName = name(i.seller?.name);
+  if (buyerName) {
+    rows.push({
+      transactionType: txType,
+      transactionDate: i.closedDay,
+      partyName: buyerName,
+      partyRole: buyerRole,
+      counterpartyName: sellerName || null,
+      identityChecked: i.buyerIdentityChecked,
+      amountTry: amount,
+      method: i.method,
+      customerId: i.buyer?.customerId ?? null,
+      propertyId: i.propertyId,
+      dealId: i.dealId,
+      note,
+    });
+  }
+  if (sellerName) {
+    rows.push({
+      transactionType: txType,
+      transactionDate: i.closedDay,
+      partyName: sellerName,
+      partyRole: sellerRole,
+      counterpartyName: buyerName || null,
+      identityChecked: i.sellerIdentityChecked,
+      amountTry: amount,
+      method: i.method,
+      customerId: i.seller?.customerId ?? null,
+      propertyId: i.propertyId,
+      dealId: i.dealId,
+      note,
+    });
+  }
+  return rows;
+}

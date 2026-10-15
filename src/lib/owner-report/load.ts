@@ -127,14 +127,24 @@ export async function loadRentStatementData(db: SupabaseClient, tenantId: string
   const rows = error ? [] : ((rentals ?? []) as { id: string; start_date: string }[]);
   if (rows.length === 0) return { firstStartDay: null, charges: [], expenses: [], rentalCount: 0 };
   const ids = rows.map((r) => r.id);
-  const [charges, maintenance] = await Promise.all([
+  const [charges, withholding, maintenance] = await Promise.all([
     db
       .from("rent_charges")
-      .select("period, amount, status, paid_at")
+      .select("id, period, amount, status, paid_at")
       .eq("tenant_id", tenantId)
       .in("rental_id", ids)
       .gte("period", `${year - 1}-12-01`)
       .lte("period", `${year}-12-01`)
+      .limit(1000),
+    // SP9 stopaj (20261019040003): sütun yoksa hata → stopaj 0 sayılır; ana sorgu etkilenmez.
+    db
+      .from("rent_charges")
+      .select("id, withholding_amount")
+      .eq("tenant_id", tenantId)
+      .in("rental_id", ids)
+      .gte("period", `${year - 1}-12-01`)
+      .lte("period", `${year}-12-01`)
+      .gt("withholding_amount", 0)
       .limit(1000),
     db
       .from("maintenance_requests")
@@ -145,14 +155,20 @@ export async function loadRentStatementData(db: SupabaseClient, tenantId: string
       .lt("created_at", `${year + 1}-01-01T00:00:00+03:00`)
       .limit(1000),
   ]);
+  const withholdingById = new Map<string, number>(
+    withholding.error
+      ? []
+      : ((withholding.data ?? []) as { id: string; withholding_amount: number | string }[]).map((w) => [w.id, Number(w.withholding_amount) || 0]),
+  );
   return {
     firstStartDay: rows[0]?.start_date ?? null,
     rentalCount: rows.length,
-    charges: ((charges.data ?? []) as { period: string; amount: number | string; status: string; paid_at: string | null }[]).map((c) => ({
+    charges: ((charges.data ?? []) as { id: string; period: string; amount: number | string; status: string; paid_at: string | null }[]).map((c) => ({
       period: String(c.period).slice(0, 10),
       amount: Number(c.amount),
       status: c.status,
       paidAt: c.paid_at,
+      withholding: withholdingById.get(c.id) ?? 0,
     })),
     expenses: ((maintenance.data ?? []) as { title: string; cost: number | string | null; status: string; created_at: string }[]).map((m) => ({
       title: m.title,

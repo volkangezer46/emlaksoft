@@ -5,6 +5,7 @@ import { RENT_DECLARATION_NOTE, buildRentStatement, statementYears } from "@/lib
 import { now, trDayKey } from "@/lib/clock";
 import { PrintButton } from "@/components/ui/print-button";
 import { formatTryDecimal } from "@/lib/format";
+import { WITHHOLDING_OWNER_NOTE } from "@/lib/rent-withholding";
 
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
 
@@ -112,6 +113,27 @@ export async function OwnerRentStatementView({
               </tfoot>
             </table>
           </div>
+
+          {s.totals.withheld > 0 ? (
+            <section aria-labelledby="stopaj-baslik" className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+              <h2 id="stopaj-baslik" className="text-sm font-bold text-ink-950">Stopaj (kiracının kestiği vergi)</h2>
+              <dl className="mt-2 space-y-1.5 text-sm">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-text-muted">Size ödenen net kira</dt>
+                  <dd className="tabular-nums font-semibold text-ink-950">{money(s.totals.collected)}</dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-text-muted">Kiracının yaptığı stopaj</dt>
+                  <dd className="tabular-nums font-semibold text-ink-950">{money(s.totals.withheld)}</dd>
+                </div>
+                <div className="flex justify-between gap-3 border-t border-line pt-1.5">
+                  <dt className="font-semibold text-ink-950">Brüt kira geliri ({year})</dt>
+                  <dd className="tabular-nums font-bold text-ink-950">{money(s.totals.collected + s.totals.withheld)}</dd>
+                </div>
+              </dl>
+              <p className="mt-2 text-xs leading-relaxed text-text-muted">{WITHHOLDING_OWNER_NOTE}</p>
+            </section>
+          ) : null}
 
           {s.expenses.length > 0 ? (
             <section>

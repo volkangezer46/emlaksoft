@@ -33,6 +33,8 @@ type Charge = {
   status: string;
   paid_at: string | null;
   paid_amount: number;
+  /** SP9: kiracının kestiği stopaj (tutar NET'tir; brüt = tutar + stopaj). Yoksa 0. */
+  withholding?: number;
 };
 
 export type ChargePayment = {
@@ -221,8 +223,11 @@ export function ChargesPanel({
 
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
                   <div>
-                    <dt className="text-xs text-text-muted">Tutar</dt>
+                    <dt className="text-xs text-text-muted">{c.withholding && c.withholding > 0 ? "Net tutar" : "Tutar"}</dt>
                     <dd className="numeric font-bold text-ink-950">{money(c.amount)}</dd>
+                    {c.withholding && c.withholding > 0 ? (
+                      <dd className="numeric text-xs text-text-muted">+ {money(c.withholding)} stopaj (brüt {money(c.amount + c.withholding)})</dd>
+                    ) : null}
                   </div>
                   <div>
                     <dt className="text-xs text-text-muted">Ödenen</dt>
