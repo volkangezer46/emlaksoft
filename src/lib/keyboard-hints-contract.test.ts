@@ -60,7 +60,7 @@ describe("Ctrl/⌘K her yerde komut paleti", () => {
     const qe = read("src/app/app/giderler/quick-entry.tsx");
     expect(qe).toMatch(/k === "m" && !chained/);
     expect(qe).not.toMatch(/Control\+K/);
-    expect(read("src/app/app/giderler/_components/entry-dialog.tsx")).not.toMatch(/Ctrl K komutlar/);
+    expect(read("src/app/app/giderler/kayit/_components/entry-workspace.tsx")).not.toMatch(/Ctrl K komutlar/);
     expect(read("src/app/app/giderler/_tabs/finance-shell.tsx")).not.toMatch(/Yeni kayıt için Ctrl K/);
   });
 

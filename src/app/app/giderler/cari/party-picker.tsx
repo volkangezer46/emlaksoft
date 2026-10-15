@@ -7,7 +7,7 @@ import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { PARTY_KIND_LABEL, partyKindLabel, partyKindOf, type PartyKindKey } from "@/lib/finance/party/aging";
 
 /**
- * PartyPicker — cari seçici (Hareketler, yeni kayıt penceresi ve Cari formlarında ortak).
+ * PartyPicker — cari seçici (Hareketler, yeni kayıt sayfası ve Cari formlarında ortak).
  *
  * - Form uyumu: seçilen carinin kimliği `name` adlı alanla gönderilir (boş = cari yok).
  * - Arama: yazdıkça (≥2 harf) ofisin arşivlenmemiş carileri aranır (RLS: yalnız kendi ofisi); açılışta son 30 cari.

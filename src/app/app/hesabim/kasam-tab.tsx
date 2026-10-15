@@ -6,7 +6,7 @@ import { loadAccountsWithBalances } from "@/lib/finance/cash/load";
 import { DuzenliTab } from "../giderler/_tabs/duzenli";
 import { HareketlerTab, type EntriesNav } from "../giderler/_tabs/hareketler";
 import { KasaBankaTab } from "../giderler/_tabs/kasa-banka";
-import { QuickEntryButtons, type AccountOption } from "../giderler/quick-entry";
+import { QuickEntryButtons } from "../giderler/quick-entry";
 
 const KASAM_NAV: EntriesNav = { base: "/app/hesabim", sekme: "kasam" };
 const kasamHref = (accountId: string) => `/app/hesabim?sekme=kasam&hesap=${accountId}`;
@@ -34,9 +34,6 @@ export async function KasamTab({
   }
   // Ofis hesapları (expenses yetkisi olanlarda RLS'ten gelir) burada süzülür: yalnız bu kullanıcının kişisel hesapları.
   const mine = cash.accounts.filter((a) => a.owner_scope === "user" && a.owner_user_id === userId);
-  const options: AccountOption[] = mine
-    .filter((a) => !a.archived_at)
-    .map((a) => ({ id: a.id, name: a.name, kind: a.kind, currency: a.currency, scope: a.owner_scope }));
   const flat = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])) as Record<string, string | undefined>;
 
   return (
@@ -48,7 +45,7 @@ export async function KasamTab({
             <p className="text-xs text-text-muted">Kendi gelir ve giderlerinizi takip edin. Yalnız siz görürsünüz; ofis sahibi dahil kimse göremez ve ofis kâr-zararına girmez.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <QuickEntryButtons accounts={options} defaultDate={today} canSalary={false} />
+            {mine.some((a) => !a.archived_at) ? <QuickEntryButtons personal /> : null}
           </div>
         </header>
         <KasaBankaTab supabase={supabase} accounts={mine} today={today} canOffice={false} entriesHref={kasamHref} statementHref={kasamEkstreHref} reviewAccountId={isUuid(flat.ekstre) ? flat.ekstre : null} />

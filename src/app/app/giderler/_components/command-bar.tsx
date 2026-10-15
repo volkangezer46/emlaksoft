@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowDownCircle, ArrowLeftRight, ArrowRight, ArrowUpCircle, CornerDownLeft, Search, Sparkles } from "lucide-react";
 import { Dialog, DialogContent, DialogTitleHidden } from "@/components/ui/dialog";
@@ -9,11 +9,12 @@ import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { CASH_CATEGORIES, cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { hasSmartSignal, parseSmartEntry } from "@/lib/finance/smart-entry";
 import { cn } from "@/lib/utils";
-import type { CommandTab, EntryCategoryOption, NewEntryDetail } from "../quick-entry";
+import { entryHref, type EntryLinkInput } from "@/lib/finance/entry-workspace";
+import type { CommandTab } from "../quick-entry";
 
 /**
  * Muhasebe komut çubuğu (M tuşu; Ctrl/⌘K her yerde olduğu gibi genel paleti açar). Yalnız açılınca iner (`next/dynamic`). Satırlar:
- *  1) Yazılan metin bir kayda benziyorsa "Kaydet: …" (tek satır akıllı giriş; pencere önceden dolu açılır),
+ *  1) Yazılan metin bir kayda benziyorsa "Kaydet: …" (tek satır akıllı giriş; kayıt sayfası önceden dolu açılır),
  *  2) Yeni gelir (G) / Yeni gider (E) / Transfer (T),
  *  3) sekmelere git (etiketler finance-shell.tsx'ten prop olarak gelir; kopya yok),
  *  4) "Tüm uygulamada ara" (genel komut paleti; Ctrl/⌘K ile de doğrudan açılır).
@@ -24,24 +25,18 @@ type Command = { id: string; label: string; hint?: string; icon: typeof Search; 
 
 const SYSTEM_CATS = CASH_CATEGORIES.map((c) => ({ value: c.value, label: c.label, direction: c.direction }));
 
-export function CommandBar({
-  tabs,
-  categories,
-  onClose,
-  onNewEntry,
-}: {
-  tabs: readonly CommandTab[];
-  /** Pencereyle AYNI kategori listesi (ofisin `x_…` kategorileri dahil); verilmezse sistem kategorileri. */
-  categories?: readonly EntryCategoryOption[];
-  onClose: () => void;
-  onNewEntry: (detail: NewEntryDetail) => void;
-}) {
+export function CommandBar({ tabs, onClose }: { tabs: readonly CommandTab[]; onClose: () => void }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [index, setIndex] = useState(0);
-  const cats = useMemo(
-    () => (categories && categories.length > 0 ? categories.map((c) => ({ value: c.value, label: c.label, direction: c.direction })) : SYSTEM_CATS),
-    [categories],
+  // Önizleme sistem kategorileriyle yapılır; kayıt sayfası metni ofisin kendi kategorileriyle yeniden ayrıştırır.
+  const cats = SYSTEM_CATS;
+  const onNewEntry = useCallback(
+    (input: EntryLinkInput) => {
+      onClose();
+      router.push(entryHref(input));
+    },
+    [onClose, router],
   );
 
   const commands = useMemo<Command[]>(() => {
@@ -56,12 +51,12 @@ export function CommandBar({
         smart.partyName,
         smart.deferred ? "vadeli" : null,
       ].filter(Boolean);
-      list.push({ id: "smart", label: `Kaydet: ${parts.join(" · ")}`, hint: "Pencere önceden dolu açılır", icon: Sparkles, kbd: "Enter", run: () => onNewEntry({ text }) });
+      list.push({ id: "smart", label: `Kaydet: ${parts.join(" · ")}`, hint: "Kayıt sayfası önceden dolu açılır", icon: Sparkles, kbd: "Enter", run: () => onNewEntry({ tab: smart.direction === "in" ? "gelir" : smart.direction === "transfer" ? "transfer" : "gider", text }) });
     }
     const actions: Command[] = [
-      { id: "in", label: "Yeni gelir", icon: ArrowDownCircle, kbd: "G", run: () => onNewEntry({ direction: "in" }) },
-      { id: "out", label: "Yeni gider", icon: ArrowUpCircle, kbd: "E", run: () => onNewEntry({ direction: "out" }) },
-      { id: "transfer", label: "Hesaplar arası transfer", icon: ArrowLeftRight, kbd: "T", run: () => onNewEntry({ direction: "transfer" }) },
+      { id: "in", label: "Yeni gelir", icon: ArrowDownCircle, kbd: "G", run: () => onNewEntry({ tab: "gelir" }) },
+      { id: "out", label: "Yeni gider", icon: ArrowUpCircle, kbd: "E", run: () => onNewEntry({ tab: "gider" }) },
+      { id: "transfer", label: "Hesaplar arası transfer", icon: ArrowLeftRight, kbd: "T", run: () => onNewEntry({ tab: "transfer" }) },
     ];
     const go: Command[] = tabs.map((t) => ({
       id: `tab-${t.id}`,

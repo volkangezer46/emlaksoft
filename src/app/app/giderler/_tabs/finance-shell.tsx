@@ -15,7 +15,7 @@ import { SegmentTabs } from "@/components/ui/segment-tabs";
 import { MorphNavMore } from "@/components/ui/morph-nav-more";
 import { splitNavTabs } from "@/lib/morph-tabs";
 import type { FinanceTabId } from "@/lib/finance/ledger/types";
-import { QuickEntryButtons, type AccountOption, type EntryCategoryOption, type RuleSuggestFn } from "../quick-entry";
+import { QuickEntryButtons } from "../quick-entry";
 
 /**
  * Muhasebe merkezinin ortak üst kısmı (TEK kaynak): sekme kimlikleri ve KULLANICIYA GÖRÜNEN etiketler, sekme çözümü,
@@ -95,34 +95,9 @@ export function financeCommandTabs(): { id: string; label: string; hint: string;
   return FINANCE_TAB_META.map((t) => ({ id: t.id, label: t.label, hint: t.hint, href: financeHref(t.id) }));
 }
 
-/** Hero eylemi: tek "Yeni kayıt" (gelir / gider / transfer) + klavye kısayolları ve komut çubuğu. */
-export function FinanceActions({
-  accounts,
-  defaultDate,
-  canSalary,
-  canCreate,
-  categories,
-  suggestRule,
-}: {
-  accounts: readonly AccountOption[];
-  defaultDate: string;
-  canSalary: boolean;
-  canCreate: boolean;
-  categories: readonly EntryCategoryOption[];
-  suggestRule?: RuleSuggestFn;
-}) {
-  return (
-    <QuickEntryButtons
-      accounts={accounts}
-      defaultDate={defaultDate}
-      canSalary={canSalary}
-      office={canCreate}
-      categories={categories}
-      suggestRule={suggestRule}
-      hotkeys
-      commandTabs={financeCommandTabs()}
-    />
-  );
+/** Hero eylemi: "Yeni kayıt" (tam sayfa kayıt çalışma alanı; gelir / gider / transfer / belge / toplu) + kısayollar ve komut çubuğu. */
+export function FinanceActions() {
+  return <QuickEntryButtons hotkeys commandTabs={financeCommandTabs()} />;
 }
 
 /** Sekme şeridi: 5 görünür sekme + "Diğer" (etkin sekme taşmadaysa görünür kümeye alınır; mobilde etiketler hep görünür). */
