@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { ArrowUpRight, Loader2, Zap } from "lucide-react";
+import { ArrowUpRight, CalendarClock, Loader2, Phone, UserRound, X, Zap } from "lucide-react";
 import Link from "@/components/ui/smart-link";
 import { createTask } from "@/app/actions/tasks";
+import { searchCustomers } from "@/app/actions/lookup";
+import { now, toTrLocalInput } from "@/lib/clock";
+import { parseQuickTask } from "@/lib/quick-task-parse";
 import { useToast } from "@/components/app/toast-provider";
 import { Input } from "@/components/ui/input";
 import { noteLocalMutation } from "@/lib/realtime";
@@ -11,7 +14,11 @@ import { noteLocalMutation } from "@/lib/realtime";
 /** Listenin üstünde vurgulanan son hızlı görevler (sayfa ömrü; en yenisi üstte). */
 const RECENT_MAX = 3;
 
-type Recent = { key: string; title: string; id: string | null };
+type Recent = { key: string; title: string; id: string | null; badge: string };
+type CustomerHit = { id: string; label: string };
+
+const CHIP =
+  "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition touch:min-h-11";
 
 /**
  * Tek satır "hızlı görev": başlığı yaz, Enter — varsayılanlarla (Takip, normal, bana atanır) eklenir.
@@ -21,6 +28,8 @@ type Recent = { key: string; title: string; id: string | null };
  * başlık alana geri gelir.
  * Tekilleştirme: sunucu listesi tazelenip aynı kimlikli görev listede çizildiğinde iyimser satır gizlenir (iki kez
  * görünmez); listedeki kart bir kez kısa süre vurgulanır. `listedIds`: sayfanın bu turda çizdiği görev kimlikleri.
+ * GA-04 Türkçe doğal dil: "yarın 10'da Ahmet'i ara" yazarken önizleme çipleri belirir — vade ("Yarın 10:00"), arama
+ * görevi ve eşleşen müşteri. Her çip tek dokunuşla kaldırılır (yanlış ayrıştırmaya karşı); Enter vade/tür/müşteriyle kaydeder.
  */
 export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] }) {
   const { push } = useToast();
@@ -29,6 +38,48 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
   const [recent, setRecent] = useState<Recent[]>([]);
   const [pending, startTransition] = useTransition();
   const seq = useRef(0);
+  const [text, setText] = useState("");
+  const [parsedAt, setParsedAt] = useState(0);
+  const [dropDue, setDropDue] = useState(false);
+  const [dropKind, setDropKind] = useState(false);
+  const [hits, setHits] = useState<CustomerHit[]>([]);
+  const [customer, setCustomer] = useState<CustomerHit | null>(null);
+  const [dropCustomer, setDropCustomer] = useState(false);
+  const parsed = useMemo(() => (text.trim() && parsedAt ? parseQuickTask(text, parsedAt) : null), [text, parsedAt]);
+  const hint = parsed?.personHint ?? null;
+  const dueOn = Boolean(parsed?.dueIso) && !dropDue;
+  const callOn = parsed?.kind === "call" && !dropKind;
+  const chosen = !hint || dropCustomer ? null : (customer ?? (hits.length === 1 ? hits[0]! : null));
+
+  // Kişi ipucu → müşteri araması (gecikmeli; aynı kapsam kuralı, yetki sunucuda).
+  useEffect(() => {
+    if (!hint) return;
+    let alive = true;
+    const t = window.setTimeout(async () => {
+      try {
+        const res = await searchCustomers(hint);
+        if (!alive) return;
+        const next = res.slice(0, 3).map((o) => ({ id: o.value, label: o.label }));
+        setHits(next);
+        setCustomer((c) => (c && next.some((h) => h.id === c.id) ? c : null));
+      } catch {
+        if (alive) setHits([]);
+      }
+    }, 300);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+  }, [hint]);
+
+  const resetDraft = () => {
+    setText("");
+    setDropDue(false);
+    setDropKind(false);
+    setDropCustomer(false);
+    setCustomer(null);
+    setHits([]);
+  };
   const listedKey = listedIds.join(",");
   const listed = useMemo(() => new Set(listedKey ? listedKey.split(",") : []), [listedKey]);
   // Sunucu satırı gelen iyimser satır çizilmez (kayıt listede görünür; ikinci kopya ve kalıcı vurgu olmaz).
@@ -47,21 +98,31 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
     }
   }, [recent, listed]);
 
-  const restore = (title: string, message: string) => {
-    if (inputRef.current && !inputRef.current.value) inputRef.current.value = title;
+  const restore = (raw: string, message: string) => {
+    setText((cur) => (cur ? cur : raw));
     setError(message);
     push(message, "err");
   };
 
   const action = (formData: FormData) => {
-    const title = String(formData.get("title") ?? "").trim();
-    if (!title) return;
+    const raw = String(formData.get("title") ?? "").trim();
+    if (!raw) return;
+    // Önizleme çipleri ne gösteriyorsa o kaydedilir: vade çipi kaldırıldıysa ham metin başlık olur.
+    const p = parseQuickTask(raw, now());
+    const useDue = Boolean(p.dueIso) && !dropDue;
+    const title = useDue ? p.title : raw;
+    const kind = p.kind === "call" && !dropKind ? "call" : "followup";
+    formData.set("title", title);
+    formData.set("kind", kind);
+    if (useDue && p.dueIso) formData.set("due_at", toTrLocalInput(p.dueIso));
+    if (chosen) formData.set("customer_id", chosen.id);
+    const badge = [kind === "call" ? "Arama" : "Takip", useDue ? p.dueLabel : null].filter(Boolean).join(" · ");
     // Anında geri bildirim: alan hemen boşalır, görev listenin üstünde iyimser satır olarak belirir.
-    if (inputRef.current) inputRef.current.value = "";
+    resetDraft();
     setError(null);
     seq.current += 1;
     const key = `q${seq.current}`;
-    setRecent((prev) => [{ key, title, id: null }, ...prev].slice(0, RECENT_MAX));
+    setRecent((prev) => [{ key, title, id: null, badge }, ...prev].slice(0, RECENT_MAX));
     // Bu sekmenin yazımı: ofis konusundan dönen yankı ikinci tazeleme üretmez (diğer cihazlar görür).
     noteLocalMutation(["tasks"]);
     startTransition(async () => {
@@ -74,10 +135,10 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
           return;
         }
         setRecent((prev) => prev.filter((r) => r.key !== key));
-        restore(title, res.error ?? "Görev eklenemedi.");
+        restore(raw, res.error ?? "Görev eklenemedi.");
       } catch {
         setRecent((prev) => prev.filter((r) => r.key !== key));
-        restore(title, "Görev eklenemedi. Lütfen tekrar deneyin.");
+        restore(raw, "Görev eklenemedi. Lütfen tekrar deneyin.");
       }
     });
   };
@@ -91,13 +152,67 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
             ref={inputRef}
             name="title"
             aria-label="Hızlı görev"
-            placeholder="Hızlı görev: başlığı yazıp Enter'a basın…"
+            aria-describedby="quick-task-preview"
+            placeholder="Hızlı görev: örn. yarın 10'da Ahmet'i ara — Enter"
             autoComplete="off"
+            enterKeyHint="done"
+            value={text}
+            onChange={(e) => {
+              const v = e.target.value;
+              setText(v);
+              setParsedAt(now());
+              if (!v.trim()) resetDraft();
+            }}
             className="pl-9"
           />
-          <input type="hidden" name="kind" value="followup" />
           <input type="hidden" name="priority" value="normal" />
         </div>
+        {parsed && (parsed.dueIso || parsed.kind || hint) ? (
+          <div id="quick-task-preview" className="flex flex-wrap items-center gap-1.5" aria-live="polite">
+            {parsed.dueIso ? (
+              <button
+                type="button"
+                onClick={() => setDropDue((d) => !d)}
+                aria-pressed={dueOn}
+                title={dueOn ? "Vadeyi kaldır" : "Vadeyi geri ekle"}
+                className={`${CHIP} ${dueOn ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-line bg-canvas text-text-faint line-through"}`}
+              >
+                <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+                {parsed.dueLabel}
+                {parsed.assumed ? <span className="font-normal">(varsayılan)</span> : null}
+                {dueOn ? <X className="h-3 w-3" aria-hidden /> : null}
+              </button>
+            ) : null}
+            {parsed.kind === "call" ? (
+              <button
+                type="button"
+                onClick={() => setDropKind((d) => !d)}
+                aria-pressed={callOn}
+                title={callOn ? "Takip görevi yap" : "Arama görevi yap"}
+                className={`${CHIP} ${callOn ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-line bg-canvas text-text-faint line-through"}`}
+              >
+                <Phone className="h-3.5 w-3.5" aria-hidden /> Arama görevi
+                {callOn ? <X className="h-3 w-3" aria-hidden /> : null}
+              </button>
+            ) : null}
+            {hint && !dropCustomer
+              ? (chosen ? [chosen] : hits).map((h) => (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => (chosen ? setDropCustomer(true) : setCustomer(h))}
+                    aria-pressed={chosen?.id === h.id}
+                    title={chosen ? "Müşteri bağını kaldır" : "Bu müşteriye bağla"}
+                    className={`${CHIP} ${chosen?.id === h.id ? "border-brand-300 bg-brand-600/8 text-brand-700" : "border-dashed border-line bg-canvas text-text-muted hover:border-brand-300"}`}
+                  >
+                    <UserRound className="h-3.5 w-3.5" aria-hidden />
+                    {chosen ? `Müşteri: ${h.label}` : `${h.label}?`}
+                    {chosen ? <X className="h-3 w-3" aria-hidden /> : null}
+                  </button>
+                ))
+              : null}
+          </div>
+        ) : null}
         {error ? <p className="text-xs font-medium text-danger-600" role="alert">{error}</p> : null}
       </form>
 
@@ -115,7 +230,7 @@ export function QuickTask({ listedIds = [] }: { listedIds?: readonly string[] })
               )}
               <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-950">{r.title}</span>
               <span className="rounded-full bg-brand-600/12 px-2 py-0.5 text-xs font-bold text-brand-700">
-                {r.id ? "Yeni · Takip" : "Ekleniyor"}
+                {r.id ? `Yeni · ${r.badge}` : "Ekleniyor"}
               </span>
               {r.id ? (
                 <Link

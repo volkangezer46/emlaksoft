@@ -587,7 +587,9 @@ export async function rescheduleTasks(ids: string[], preset: DuePreset): Promise
     const iso = new Date(ms).toISOString();
     byDue.set(iso, [...(byDue.get(iso) ?? []), r.id]);
   }
-  if (byDue.size === 0) return { error: "Taşınacak açık görev bulunamadı." };
+  if (byDue.size === 0) {
+    return { error: preset === "today18" && duePresetMs("today18", nowMs) == null ? "Bugün 18:00 geçti; başka bir seçenek seçin." : "Taşınacak açık görev bulunamadı." };
+  }
 
   let updatedCount = 0;
   for (const [dueAt, group] of byDue) {

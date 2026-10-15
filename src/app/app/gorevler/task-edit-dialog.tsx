@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { DueQuickPicks } from "@/components/ui/due-quick-picks";
 import { toTrLocalInput } from "@/lib/clock";
 import { CalendarClock, ListTodo, Pencil } from "lucide-react";
 import { updateTask, type TaskResult } from "@/app/actions/tasks";
@@ -176,6 +177,7 @@ export function TaskEditDialog({
                 onChange={(e) => setDue(e.target.value)}
                 className={`mt-1 ${fieldClass}`}
               />
+              <DueQuickPicks onPick={setDue} baseLocal={due} />
             </label>
             <label className="text-xs font-semibold text-text-muted">
               Tekrar

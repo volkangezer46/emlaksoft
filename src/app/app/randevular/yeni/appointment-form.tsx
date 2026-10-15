@@ -19,6 +19,7 @@ import {
 import { isPast, parseTrLocalDateTime } from "@/lib/clock";
 import { APPOINTMENT_DRAFT_FIELDS, APPOINTMENT_FORM_ID, APPOINTMENT_TABS, appointmentMissing } from "./appointment-tabs";
 import { PersonSelect } from "@/components/ui/person-select";
+import { DueQuickPicks, setNativeInputValue } from "@/components/ui/due-quick-picks";
 
 type Option = { id: string; label: string };
 
@@ -79,6 +80,7 @@ export function AppointmentForm({
   // Geçmiş saat: ilk gönderimde satır içi onay istenir; onaylanan "tarihTsaat" değeri bir sonraki gönderimde geçer.
   const [pastAsk, setPastAsk] = useState<string | null>(null);
   const pastOk = useRef<string | null>(null);
+  const quickRef = useRef<HTMLDivElement>(null);
   function guardedSubmit(e: FormEvent<HTMLFormElement>) {
     const fd = new FormData(e.currentTarget);
     const key = `${String(fd.get("date") ?? "")}T${String(fd.get("time") ?? "")}`;
@@ -135,6 +137,19 @@ export function AppointmentForm({
         <FormField label="Saat" htmlFor="appointment-time" required>
           <FormInput name="time" type="time" required defaultValue={defaultTime} />
         </FormField>
+        {/* GA-04 hazır zaman çipleri: tarih + saat alanlarını tek dokunuşla doldurur (TR saati). */}
+        <div ref={quickRef} className="sm:col-span-2 -mt-2">
+          <DueQuickPicks
+            label="Hızlı zaman seçimi"
+            presets={["today18", "tomorrow10", "monday10", "nextweek"]}
+            onPick={(local) => {
+              const form = quickRef.current?.closest("form");
+              const [d, t] = local.split("T");
+              setNativeInputValue(form?.elements.namedItem("date") as HTMLInputElement | null, d ?? "");
+              setNativeInputValue(form?.elements.namedItem("time") as HTMLInputElement | null, t ?? "");
+            }}
+          />
+        </div>
       </>
     ),
     katilimci: (
