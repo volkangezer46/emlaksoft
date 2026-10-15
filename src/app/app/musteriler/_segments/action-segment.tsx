@@ -9,6 +9,7 @@ import { fetchAllRows } from "@/lib/supabase/fetch-all";
 import { loadCustomerStates } from "@/lib/customer-state/load";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RiskRowActions } from "./risk-row-actions";
+import { ContactOutcomePrompt } from "../contact-outcome-prompt";
 import { LossReasons, type ClosedDeal } from "./loss-reasons";
 import { ACTION_SEGMENTS, type ActionSegment } from "./keys";
 
@@ -127,6 +128,7 @@ export async function ActionSegmentList({ segment, tenantId }: { segment: Action
           ))}
         </ul>
       )}
+      {segment === "risk" && rows.length > 0 ? <ContactOutcomePrompt /> : null}
       {rows.length > 100 ? <p className="text-xs text-text-faint">İlk 100 müşteri gösteriliyor (en yüksek skordan).</p> : null}
 
       {segment === "risk" && closedDealsRes ? (

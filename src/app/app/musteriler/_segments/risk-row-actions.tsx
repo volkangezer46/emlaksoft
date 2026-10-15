@@ -12,7 +12,8 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
   return (
     <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:shrink-0">
       {phone ? (
-        <>
+        // Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir.
+        <span className="contents" data-contact-outcome="" data-customer-id={customerId} data-customer-name={name} data-phone={phone}>
           <a
             href={toTelHref(phone) ?? "#"}
             aria-label={`${name} ara`}
@@ -31,7 +32,7 @@ export function RiskRowActions({ customerId, name, phone }: { customerId: string
           >
             <MessageCircle className="h-3.5 w-3.5" />
           </a>
-        </>
+        </span>
       ) : null}
       {/* Arandı: 30 gün listeden düşer. Kutu işaretliyse çağrı kaydı da atılır (müşteri zaman tüneline düşer). */}
       <form action={dismissRiskFromSmartList} className="flex items-center gap-1.5">

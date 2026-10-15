@@ -15,6 +15,7 @@ import {
 import { CustomerRowCheckbox, CustomerSelectAllCheckbox } from "./customer-bulk-actions";
 import { CustomerRowMore } from "./customer-row-delete";
 import { customerTypeTone } from "./customer-list-logic";
+import { ContactOutcomePrompt } from "./contact-outcome-prompt";
 
 /** Sayfanın hazırladığı, sunuma hazır müşteri satır modeli. */
 export type CustomerVM = {
@@ -196,8 +197,11 @@ export function CustomerTable({
                 <TD actions>
                   <RowActions>
                     <RowActionLink href={c.href} label={`${c.name} detayını aç`} icon={Eye} hideWhenStacked />
-                    {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
-                    {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
+                    {/* Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir. */}
+                    <span className="contents" data-contact-outcome="" data-customer-id={c.id} data-customer-name={c.name} data-phone={c.phone ?? ""}>
+                      {c.telHref ? <RowActionAnchor href={c.telHref} label={`${c.name} numarasını ara`} icon={Phone} /> : null}
+                      {c.waHref ? <RowActionLink href={c.waHref} label={`${c.name} ile WhatsApp görüşmesi`} icon={MessageCircle} external tone="success" /> : null}
+                    </span>
                     <CustomerRowMore customerId={c.id} name={c.name} waMsisdn={toWhatsAppMsisdn(c.phone) || null} canEdit={canEdit} canDelete={canDelete} />
                   </RowActions>
                 </TD>
@@ -206,6 +210,7 @@ export function CustomerTable({
           </TBody>
         </Table>
       </TableFrame>
+      <ContactOutcomePrompt />
     </div>
   );
 }
