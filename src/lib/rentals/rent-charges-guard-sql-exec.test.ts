@@ -10,6 +10,8 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
  * amount/paid_at/rental_id/tenant_id değiştiremez (42501); finansal olmayan güncelleme serbest; record/void RPC'leri çalışmaya
  * devam eder (DEFINER); service_role/cron etkilenmez; tahsilat kaydı olan tahakkuk silinemez (iptal edilmiş dahil), ödemesiz ve
  * örnek kira tahakkuku silinebilir; rollback.
+ * SK1/B177: dönem ve tahsilat tarihleri SABİT DEĞİL, pglite saatine (İstanbul) göre üretilir: RPC'nin now()'a göre gecikme
+ * kuralı (vade + 7 gün) belirli bir günde testi kendiliğinden kırmaz. Gece +30/+60/+365 gün kaydırmalı koşar.
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -46,6 +48,10 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
   let db: Db;
   let T: string, T2: string, BM: string, P: string, R: string, RS: string;
   let C1: string, C2: string, C3: string, CS: string;
+  /** Bugün (İstanbul, pglite saati) ve ay başı + n ay; beforeAll'da doldurulur. */
+  let TODAY = "";
+  const months: Record<number, string> = {};
+  const M = (n: number) => months[n]!;
   const q = async (sql: string, params?: unknown[]) => (await db.query(sql, params)).rows;
   const admin = async () =>
     db.exec(`reset role; select set_config('request.jwt.claim.role','service_role',false), set_config('request.jwt.claim.sub','',false)`);
@@ -56,7 +62,7 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
     await db.exec(`set role authenticated`);
   };
   const pay = async (charge: string, amount: number) =>
-    (await q(`select public.record_rent_payment($1::uuid, $2::numeric, '2026-10-06'::date, 'cash', null) as r`, [charge, amount]))[0]!.r as Record<string, unknown>;
+    (await q(`select public.record_rent_payment($1::uuid, $2::numeric, $3::date, 'cash', null) as r`, [charge, amount, TODAY]))[0]!.r as Record<string, unknown>;
   const charge = async (id: string) =>
     (await q(`select status, paid_amount::float8 as paid, amount::float8 as amount, paid_at from public.rent_charges where id = $1`, [id]))[0] as
       | { status: string; paid: number; amount: number; paid_at: string | null }
@@ -77,10 +83,16 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
     RS = (await q(`insert into public.rentals(tenant_id, property_id, is_sample) values ($1,$2,true) returning id`, [T, P]))[0]!.id as string;
     await db.exec(read("supabase/migrations/20261008001100_property_management_core.sql"));
     await db.exec(read("supabase/migrations/20261012001300_rent_charges_financial_guard.sql"));
-    C1 = await mkCharge(R, "2026-10-01");
-    C2 = await mkCharge(R, "2026-11-01");
-    C3 = await mkCharge(R, "2026-12-01");
-    CS = await mkCharge(RS, "2026-10-01");
+    const clock = (await q(`select (now() at time zone 'Europe/Istanbul')::date::text as d,
+      array(select (date_trunc('month', (now() at time zone 'Europe/Istanbul')) + (n || ' month')::interval)::date::text
+              from generate_series(-1, 4) n order by n) as m`))[0]! as { d: string; m: string[] };
+    TODAY = clock.d;
+    clock.m.forEach((v, i) => (months[i - 1] = v));
+    C1 = await mkCharge(R, M(0));
+    // C2 gelecek ayın dönemi: vade + 7 gün bugünden sonra → kısmi tahsilat "partial" kalır (gecikme kuralına düşmez).
+    C2 = await mkCharge(R, M(1));
+    C3 = await mkCharge(R, M(2));
+    CS = await mkCharge(RS, M(0));
   });
 
   it("şube müdürü doğrudan paid_amount/status/amount/paid_at/rental_id/tenant_id değiştiremez (42501), tahakkuk değişmez", async () => {
@@ -94,7 +106,7 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
       "paid_at = now()",
       `rental_id = '${RS}'`,
       `tenant_id = '${T2}'`,
-      "period = '2026-09-01'",
+      `period = '${M(-1)}'`,
     ]) {
       await expect(q(`update public.rent_charges set ${set} where id = $1`, [C1]), set).rejects.toThrow(/dogrudan degistirilemez/);
     }
@@ -132,7 +144,7 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
     await asBm();
     await expect(q(`delete from public.rent_charges where id = $1`, [C2])).rejects.toThrow(/silinemez/);
     // Yalnız iptal edilmiş tahsilat da iz taşır: silinemez.
-    const C4 = await mkCharge(R, "2027-01-01", 5000);
+    const C4 = await mkCharge(R, M(3), 5000);
     await asBm();
     const p = (await pay(C4, 5000)).payment_id as string;
     expect((await q(`select public.void_rent_payment($1::uuid, 'hatali tahsilat') as r`, [p]))[0]!.r).toMatchObject({ outcome: "voided" });
@@ -140,7 +152,7 @@ describe.skipIf(!mod)("rent_charges finansal sütun kapısı (pglite)", () => {
     await admin();
     expect((await q(`select count(*)::int as n from public.rent_payments where charge_id = $1`, [C4]))[0]!.n).toBe(1);
     // Tahsilatsız tahakkuk silinebilir.
-    const C5 = await mkCharge(R, "2027-02-01", 5000);
+    const C5 = await mkCharge(R, M(4), 5000);
     await asBm();
     expect(await q(`delete from public.rent_charges where id = $1 returning id`, [C5])).toHaveLength(1);
   });

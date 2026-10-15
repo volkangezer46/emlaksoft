@@ -23,6 +23,8 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "scripts/**/*.test.ts"],
     // src/ metin dosyaları koşu başına bir kez okunur (sözleşme testleri paylaşır): test-support/src-tree.ts.
     globalSetup: ["./vitest.global-setup.ts"],
+    // SK1/B177: TEST_TIME_SHIFT_DAYS=<n> ile saat n gün ileri (yalnız Date; pglite now() dahil). Gece +30/+60/+365.
+    setupFiles: ["./src/test/time-shift-setup.ts"],
     // pglite'lı SQL testlerinin beforeAll kurulumu tam koşu yükünde 10 sn varsayılanı aşıyor.
     hookTimeout: 60_000,
     // Testler .env.local'a bağımlı olmamalı; DB'ye giden hiçbir test yok.

@@ -1,7 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
+import { assertMutationE2ETarget } from "./scripts/e2e/mutation-guard";
 
 const remoteBaseUrl = process.env.APP_URL?.trim().replace(/\/$/, "") || null;
 const authenticatedE2EEnabled = process.env.E2E_MUTATION_ALLOWED === "true";
+// SK1/B178: mutasyonlu (oturumlu) projeler canlı hosta ya da canlı Supabase'e bağlı yerel sunucuya karşı BAŞLAMAZ.
+// Gece işi izole, geçici Supabase'e karşı koşar (.github/workflows/nightly.yml). Public smoke etkilenmez.
+assertMutationE2ETarget(process.env);
 
 /**
  * EmlakSoft E2E test configuration.
