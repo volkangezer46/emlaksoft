@@ -38,6 +38,7 @@ export default async function NewContractPage({
       prefillProperty={rentalContext?.propertyId ?? params.property ?? ""}
       prefillTur={rentalContext ? "kira" : (params.tur ?? "")}
       rentalContext={rentalContext}
+      canSaveTemplate={perms.settings?.includes("edit") ?? false}
     />
   );
 }

@@ -12,6 +12,7 @@ import { notifyPoolAssigned, notifyPoolEntry } from "@/lib/pool/notify";
 import { computeSuggestions, loadPoolRule, toPoolProperty } from "@/lib/pool/server";
 import { toStoredSuggestions } from "@/lib/pool/score";
 import { actionErrorMessage, sqlRaiseMessage } from "@/lib/action-errors";
+import { poolBranchRule } from "@/lib/access-control/admin-rules";
 
 export type PoolActionResult = { ok?: boolean; error?: string };
 
@@ -73,6 +74,24 @@ export async function assignPoolEntry(entryId: string, profileId: string, method
   const score = entry.suggestions?.find((s) => s.profile_id === profileId)?.score ?? null;
 
   const supabase = await createClient();
+  // Şube müdürü: yalnız kendi şubesindeki ilanı kendi şubesindeki kişiye (SK10 / B165). Aynı kural RPC'de de var
+  // (assign_pool_entry, 20261016100300); burada erken ve anlaşılır Türkçe ret için.
+  if (gate.role === "branch_manager") {
+    const [actor, property, target] = await Promise.all([
+      supabase.from("profiles").select("branch_id").eq("id", gate.userId).eq("tenant_id", gate.tenantId).maybeSingle(),
+      supabase.from("properties").select("branch_id").eq("id", entry.property_id).eq("tenant_id", gate.tenantId).maybeSingle(),
+      supabase.from("profiles").select("branch_id").eq("id", profileId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    ]);
+    const branchOf = (r: { data: unknown }) => ((r.data as { branch_id?: string | null } | null)?.branch_id ?? null);
+    const rule = poolBranchRule({
+      actorRole: gate.role,
+      actorBranchId: branchOf(actor),
+      propertyBranchId: branchOf(property),
+      targetBranchId: branchOf(target),
+    });
+    if (!rule.ok) return { error: rule.reason };
+  }
+
   const { error } = await supabase.rpc("assign_pool_entry", {
     p_entry_id: entryId,
     p_profile_id: profileId,

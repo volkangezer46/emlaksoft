@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getModuleDef, isFeatureKey, type FeatureKey } from "@/lib/modules/registry";
 import { isModuleEnabled } from "@/lib/modules/state";
 
@@ -45,11 +46,14 @@ export function moduleClosedActionMessage(key: FeatureKey): string {
   return `${getModuleDef(key).label} modülü bu ofiste kapalı. Ofis sahibi Ayarlar > Modüller bölümünden yeniden açabilir.`;
 }
 
-/** Kapalı modülün yazma eylemi için hata metni; izinliyse null. İstek içinde önbelleklidir (`isModuleEnabled`). */
-export async function moduleActionBlock(tenantId: string, mod: string, action: string): Promise<string | null> {
+/**
+ * Kapalı modülün yazma eylemi için hata metni; izinliyse null. İstek başına tekilleşir (React `cache()`; SK10 / B033):
+ * aynı istekte ikinci `requirePermission` çağrısı modül durumu için ek DB turu atmaz (`isModuleEnabled` de önbellekli).
+ */
+export const moduleActionBlock = cache(async function moduleActionBlock(tenantId: string, mod: string, action: string): Promise<string | null> {
   if (action === "view") return null;
   const key = featureForPermissionModule(mod);
   if (!key) return null;
   if (await isModuleEnabled(tenantId, key)) return null;
   return moduleClosedActionMessage(key);
-}
+});

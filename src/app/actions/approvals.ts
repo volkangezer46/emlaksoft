@@ -1,17 +1,45 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { afterSafe } from "@/lib/after-safe";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { notifyTenant } from "@/lib/notify";
-import { canDecide, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
+import { canDecide, canDecideApproval, isApprovalKind, kindMeta, APPROVAL_DECIDER_ROLES } from "@/lib/approvals";
+import { getEffectivePermissions, mergeEffectivePermissions, type RoleOverrideRow, type UserOverrideRow } from "@/lib/permissions-effective";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { proposalMessage } from "@/lib/price-proposals/model";
 
 export type ApprovalResult = { ok?: boolean; error?: string; id?: string; info?: string };
 
 const PATH = "/app/onaylar";
+
+const NOT_DECIDER = "Onay/ret kararı yalnız karar yetkisi (komisyon düzenleme) olan yöneticiler tarafından verilebilir.";
+
+/**
+ * Yeni talep bildiriminin alıcıları: karar düğmesini gören ve karar verebilen yöneticiler — `canDecideApproval` ile
+ * AYNI kural (kademe + etkin commissions:edit; ofis rol istisnası ve kişi istisnası dahil). Tek turda üç okuma.
+ */
+async function approvalDeciderIds(supabase: Awaited<ReturnType<typeof createClient>>, tenantId: string): Promise<string[]> {
+  const [{ data: managers }, { data: roleRows }, { data: userRows }] = await Promise.all([
+    supabase.from("profiles").select("id, role").eq("tenant_id", tenantId).eq("is_active", true).in("role", [...APPROVAL_DECIDER_ROLES]),
+    supabase.from("tenant_role_permissions").select("role, module, action, allowed").eq("tenant_id", tenantId).eq("module", "commissions"),
+    supabase.from("user_permission_overrides").select("user_id, module, actions, expires_at").eq("tenant_id", tenantId).eq("module", "commissions"),
+  ]);
+  const roleOverrides = (roleRows ?? []) as (RoleOverrideRow & { role: string })[];
+  const userOverrides = (userRows ?? []) as (UserOverrideRow & { user_id: string })[];
+  return ((managers ?? []) as { id: string; role: string }[])
+    .filter((m) => {
+      const perms = mergeEffectivePermissions(
+        m.role,
+        roleOverrides.filter((r) => r.role === m.role),
+        m.role === "owner" ? [] : userOverrides.filter((u) => u.user_id === m.id),
+      );
+      return canDecideApproval(m.role, perms);
+    })
+    .map((m) => m.id);
+}
 
 /** "3,5" gibi TR ondalık girişini de kabul eder; boş/geçersiz → null. */
 function num(v: FormDataEntryValue | null): number | null {
@@ -34,7 +62,8 @@ export async function createApprovalRequest(
   _prev: ApprovalResult,
   fd: FormData,
 ): Promise<ApprovalResult> {
-  const gate = await requirePermission("commissions", "view");
+  // `write`: modül kapısı view, ama kayıt yazar → salt okunur tavanı (SK10 / B168).
+  const gate = await requirePermission("commissions", "view", { write: true });
   if (!gate.ok) return { error: gate.error };
 
   const kind = String(fd.get("kind") ?? "").trim();
@@ -86,28 +115,25 @@ export async function createApprovalRequest(
     newValue: { kind, title, current_value: currentValue, requested_value: requestedValue },
   });
 
-  // Yöneticilere bildirim. Tercih anahtarı GEÇİLMİYOR: bu bir pazarlama/özet
-  // bildirimi değil, iş akışını bloklayan bir karar isteği — susturulmamalı.
-  const { data: managers } = await supabase
-    .from("profiles")
-    .select("id")
-    .eq("tenant_id", gate.tenantId)
-    .in("role", [...APPROVAL_DECIDER_ROLES]);
-
-  await Promise.all(
-    (managers ?? [])
-      .filter((m) => m.id !== gate.userId)
-      .map((m) =>
+  // Karar verebilen yöneticilere bildirim (canDecideApproval ile aynı kural). Tercih anahtarı GEÇİLMİYOR: bu bir
+  // pazarlama/özet bildirimi değil, iş akışını bloklayan bir karar isteği — susturulmamalı. Yanıttan SONRA gider.
+  const tenantId = gate.tenantId;
+  const actorId = gate.userId;
+  afterSafe(async () => {
+    const recipients = (await approvalDeciderIds(supabase, tenantId)).filter((id) => id !== actorId);
+    await Promise.all(
+      recipients.map((userId) =>
         notifyTenant({
-          tenantId: gate.tenantId,
-          userId: m.id,
+          tenantId,
+          userId,
           title: `🔔 Onay bekliyor: ${title}`,
           body: `${kindMeta(kind).label} · karar bekleniyor`,
           href: "/app/onaylar?durum=bekliyor",
           kind: "warning",
         }),
       ),
-  );
+    );
+  }, "approval.notify_deciders");
 
   revalidatePath(PATH);
   return { ok: true, id: data.id };
@@ -118,7 +144,7 @@ export async function createApprovalRequest(
  *
  * ÜÇ KAPI birden:
  *  1. `commissions:edit` — modül yetkisi (tenant override'ları dahil)
- *  2. `isApprovalDeciderRole(gate.role)` — kademe kontrolü. accounting rolü commissions'ta
+ *  2. `canDecideApproval(gate.role, perms)` — kademe + etkin commissions:edit (tek yüklem). accounting rolü commissions'ta
  *     tam CRUD'a sahip ama indirim politikasına karar veremez.
  *  3. `requested_by !== userId` — KENDİ TALEBİNİ ONAYLAYAMAZ. Bu kural olmadan
  *     modülün tamamı anlamsız: yönetici kendi indirimini kendi onaylarsa kayıt
@@ -130,6 +156,10 @@ export async function decideApproval(
 ): Promise<ApprovalResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  // TEK yüklem (sayfa düğmesi, rozet, bildirim alıcısı ile aynı). Etkin izin istek içi önbellekli: ek DB turu yok.
+  if (!canDecideApproval(gate.role, await getEffectivePermissions(gate.tenantId, gate.role, gate.userId))) {
+    return { error: NOT_DECIDER };
+  }
 
   const id = String(fd.get("id") ?? "").trim();
   if (!id) return { error: "Talep bulunamadı." };
@@ -190,14 +220,16 @@ export async function decideApproval(
   });
 
   if (row.requested_by) {
-    await notifyTenant({
+    // Talep sahibine bildirim yanıttan SONRA gider (karar ekranı beklemez).
+    const notice: Parameters<typeof notifyTenant>[0] = {
       tenantId: gate.tenantId,
-      userId: row.requested_by,
+      userId: row.requested_by as string,
       title: decision === "onaylandi" ? `✅ Onaylandı: ${row.title}` : `❌ Reddedildi: ${note}`,
       body: decision === "onaylandi" ? (note || `${kindMeta(row.kind).label} talebiniz onaylandı.`) : row.title,
       href: `/app/onaylar?durum=${decision}&kim=benim`,
       kind: decision === "onaylandi" ? "success" : "danger",
-    });
+    };
+    afterSafe(() => notifyTenant(notice), "approval.notify_requester");
   }
 
   // Fiyat önerisi bağlantısı: mülk sahibi onayladı, ofis kuralı yönetici onayı istedi (GUVENLIK-1, 20261012001200).
@@ -287,6 +319,7 @@ export type BulkApprovalResult = { error?: string; decided?: number; skipped?: n
 export async function decideApprovalsBulk(ids: string[], decision: string, note: string): Promise<BulkApprovalResult> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error };
+  if (!canDecideApproval(gate.role, await getEffectivePermissions(gate.tenantId, gate.role, gate.userId))) return { error: NOT_DECIDER };
   if (decision !== "onaylandi" && decision !== "reddedildi") return { error: "Geçersiz karar." };
   const cleanNote = String(note ?? "").trim().slice(0, 2000);
   if (decision === "reddedildi" && !cleanNote) return { error: "Ret için gerekçe zorunludur." };
@@ -321,7 +354,7 @@ export async function cancelApprovalRequest(
   _prev: ApprovalResult,
   fd: FormData,
 ): Promise<ApprovalResult> {
-  const gate = await requirePermission("commissions", "view");
+  const gate = await requirePermission("commissions", "view", { write: true });
   if (!gate.ok) return { error: gate.error };
 
   const id = String(fd.get("id") ?? "").trim();
@@ -368,7 +401,7 @@ export async function addApprovalComment(
   _prev: ApprovalResult,
   fd: FormData,
 ): Promise<ApprovalResult> {
-  const gate = await requirePermission("commissions", "view");
+  const gate = await requirePermission("commissions", "view", { write: true });
   if (!gate.ok) return { error: gate.error };
 
   const requestId = String(fd.get("request_id") ?? "").trim();

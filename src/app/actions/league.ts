@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -117,11 +118,11 @@ export async function createChallenge(_prev: LeagueResult, fd: FormData): Promis
 }
 
 /** Süren meydan okumayı iptal eder (sonuç mühürlenmez, kutlama gitmez). */
-export async function cancelChallenge(formData: FormData): Promise<void> {
+export async function cancelChallenge(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("targets", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Yarışma bulunamadı." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -130,7 +131,8 @@ export async function cancelChallenge(formData: FormData): Promise<void> {
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .eq("status", "active");
-  if (!error) {
+  if (error) return { error: actionErrorMessage(error, "Yarışma iptal edilemedi.") };
+  {
     await logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,
@@ -140,4 +142,5 @@ export async function cancelChallenge(formData: FormData): Promise<void> {
     });
   }
   revalidatePath("/app/lig");
+  return { ok: true };
 }

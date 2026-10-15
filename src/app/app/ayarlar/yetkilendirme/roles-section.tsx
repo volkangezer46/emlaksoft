@@ -3,7 +3,7 @@ import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
 import type { AppModule, AppRole } from "@/lib/permissions";
-import { PERMISSION_EDITOR_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
+import { canEditRolePermissions } from "@/lib/access-control/admin-rules";
 import { ROLE_LABELS } from "@/lib/role-labels";
 import { RolePermissionsMatrix } from "./role-permissions-matrix";
 
@@ -64,7 +64,8 @@ export async function RolesSection({
   selectedRole: AppRole;
   roleHref: (role: AppRole) => string;
 }) {
-  const isManager = PERMISSION_EDITOR_ROLES.includes(viewerRole as TeamRole);
+  // Tek kural (admin-rules): owner/gm düzenler, gm kendi (gm) satırını düzenlemez. Eylem ve RLS aynı kuralı uygular.
+  const editRule = canEditRolePermissions(viewerRole, selectedRole);
   const supabase = await createClient();
   const [{ data: overrideRows }, effective] = await Promise.all([
     tenantId
@@ -93,7 +94,16 @@ export async function RolesSection({
           <p className="mt-1.5 text-sm text-text-muted">Kilitlenme riskine karşı bu rol düzenlenemez; tüm modüllere her zaman erişimi vardır.</p>
         </section>
       ) : (
-        <RolePermissionsMatrix role={selectedRole} modules={ROLE_MATRIX_MODULES} effective={effective} overriddenCells={overriddenCells} readOnly={!isManager} />
+        // key: rol çipi değişince matris sıfırdan kurulur; önceki rolün yerel durumu yeni role yazılamaz (B162).
+        <RolePermissionsMatrix
+          key={selectedRole}
+          role={selectedRole}
+          modules={ROLE_MATRIX_MODULES}
+          effective={effective}
+          overriddenCells={overriddenCells}
+          readOnly={!editRule.ok}
+          readOnlyReason={editRule.ok ? null : editRule.reason}
+        />
       )}
     </div>
   );

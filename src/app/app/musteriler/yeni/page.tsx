@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { parsePhoneStrict } from "@/lib/phone-rules";
@@ -27,7 +27,8 @@ export default async function NewCustomerPage({
   const linkRaw = one(sp.bagla).trim();
   const linkRef = LINK_REF.test(linkRaw) ? linkRaw : "";
   const { perms, userId, tenantId } = await requireModulePage("customers");
-  if (!(perms.customers ?? []).includes("create")) redirect("/app/musteriler");
+  // Ekleme yetkisi yoksa açıklamalı yetki kartı (sessizce listeye dönmek yerine; SK10 / B168).
+  if (!(perms.customers ?? []).includes("create")) redirect(deniedPageHref("customers"));
 
   const supabase = await createClient();
   const [{ data: provinces }, { data: branches }, typeDefs, txDefs, propDefs, urgDefs] = await Promise.all([

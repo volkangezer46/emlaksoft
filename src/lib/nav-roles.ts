@@ -1,5 +1,5 @@
 import type { ICONS } from "@/lib/icons";
-import type { AppRole } from "@/lib/permissions";
+import type { AppModule, AppRole } from "@/lib/permissions";
 import { MANAGEMENT_ROLES } from "@/lib/ui/scope";
 
 /**
@@ -24,6 +24,8 @@ export type HubPageRef = {
   label?: string;
   /** true: yalnız sayfanın KENDİ modül izni aranır (sahibi öğenin ek koşulu `needsItemModule` yok sayılır; ör. danışmanın Hedefim sayfası). */
   ownModule?: boolean;
+  /** Yalnız bu rollerde görünür (ör. Sahiplik devri yalnız ofis sahibine; sayfa başkasına yalnız bilgi gösterir). */
+  roles?: readonly AppRole[];
 };
 
 export type HubDef = {
@@ -36,6 +38,12 @@ export type HubDef = {
   short?: string;
   /** Şeritteki sıra = dizi sırası. İlk 5 sayfa görünür, kalanı "Diğer" menüsündedir. */
   pages: readonly HubPageRef[];
+  /**
+   * Merkezin ANA sayfasının modül kapısı (`requireModulePage` ile aynı izin): rolde bu modülün görüntüleme izni yoksa
+   * merkez hiç çıkmaz; başka modüldeki tek bir alt sayfa ("Aidatlar") merkezi tek başına ayakta tutmaz (SK10: muhasebe
+   * rolünde "Mülk yönetimi" çıkmaz, Aidatlar Muhasebe merkezindedir).
+   */
+  gate?: AppModule;
 };
 
 /** Mobil alt çubuk yuvası: bir merkez kimliği, "new" (+ Yeni eylem sayfası) ya da "menu" (tam menü çekmecesi). */
@@ -52,7 +60,12 @@ export type RoleNav = {
   mobile: readonly MobileSlot[];
 };
 
-const p = (href: string, label?: string, ownModule?: boolean): HubPageRef => ({ href, ...(label ? { label } : {}), ...(ownModule ? { ownModule } : {}) });
+const p = (href: string, label?: string, ownModule?: boolean, roles?: readonly AppRole[]): HubPageRef => ({
+  href,
+  ...(label ? { label } : {}),
+  ...(ownModule ? { ownModule } : {}),
+  ...(roles ? { roles } : {}),
+});
 
 /* ------------------------------- Ortak merkezler ------------------------------- */
 
@@ -125,8 +138,12 @@ const KIRALAMA_AIDAT: HubDef = {
   label: "Mülk yönetimi",
   group: "Finans",
   icon: "anahtar",
+  gate: "rentals",
   pages: [p("/app/kiralama", "Kiralar"), p("/app/aidat", "Aidatlar"), p("/app/kira-artis", "Kira artışı")],
 };
+
+/** Muhasebe rolü: kira modülü (rentals) yok; aidat tahsilatı (expenses) Muhasebe merkezinin sekmesidir. */
+const MUHASEBE_MUHASEBECI: HubDef = { ...MUHASEBE, pages: [...MUHASEBE.pages, p("/app/aidat", "Aidatlar")] };
 
 /** Ofis içi duyuru yönetimi (Bildirimler sayfasının yönetim sekmesi; `settings` izniyle görünür). */
 export const DUYURU_YONETIM_HREF = "/app/bildirimler?sekme=yonetim";
@@ -234,7 +251,8 @@ const AYARLAR: HubDef = {
     p("/app/ayarlar/cop-kutusu", "Çöp kutusu"),
     p("/app/ayarlar/cografya-bildir", "Bölge bildirimi"),
     p("/app/ayarlar/gercek-kullanim", "Gerçek kullanım"),
-    p("/app/ayarlar/sahiplik-devri", "Sahiplik devri"),
+    // Ofis sahipliğini yalnız ofis sahibi devreder; genel müdüre sekme gösterilmez (B075).
+    p("/app/ayarlar/sahiplik-devri", "Sahiplik devri", false, ["owner"]),
   ],
 };
 const ABONELIK: HubDef = { id: "abonelik", label: "Abonelik", icon: "abonelik", pages: [p("/app/abonelik")] };
@@ -291,8 +309,12 @@ const ADVISOR: RoleNav = {
   mobile: ["bugun", "musteriler", "new", "ilanlar", "ben"],
 };
 
+/**
+ * Muhasebe: varsayılan yetkide kira modülü (rentals) yok → "Mülk yönetimi" satırı YOK (erişilemeyen merkez 0, SK10);
+ * aidat tahsilatı (expenses) Muhasebe merkezinin sekmesidir.
+ */
 const ACCOUNTING: RoleNav = {
-  hubs: [BUGUN, KOMISYON, MUHASEBE, KIRALAMA_AIDAT, RAPORLAR, ABONELIK_SATIRI],
+  hubs: [BUGUN, KOMISYON, MUHASEBE_MUHASEBECI, RAPORLAR, ABONELIK_SATIRI],
   dock: [YARDIM],
   tools: TOOLS_COMMON,
   mobile: ["bugun", "muhasebe", "raporlar", "menu"],

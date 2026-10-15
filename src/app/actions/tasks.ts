@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { DAY_MS, now, parseTrLocalDateTime, trDayStartMs } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -388,12 +389,12 @@ export async function completeTask(formData: FormData): Promise<CompleteTaskResu
  * Toplu tamamlama: /app/gorevler listesindeki checkbox seçimi.
  * Tek UPDATE ile .in() — yalnız açık görevler; kapalı olanlar dokunulmaz.
  */
-export async function completeTasksBulk(formData: FormData): Promise<void> {
+export async function completeTasksBulk(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("tasks", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const ids = [...new Set(formData.getAll("ids").map((v) => String(v).trim()).filter(Boolean))].slice(0, 200);
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "Görev seçin." };
 
   const supabase = await createClient();
   // Tekrarlı satırları tamamlamadan ÖNCE oku (kopyalanacak alanlar).
@@ -416,7 +417,7 @@ export async function completeTasksBulk(formData: FormData): Promise<void> {
 
   if (error) {
     console.error("completeTasksBulk", error);
-    return;
+    return { error: actionErrorMessage(error, "Görevler tamamlanamadı.") };
   }
 
   // Sonraki kopyalar — kayıt başına SIRAYLA: aynı zincirden birden çok görev
@@ -433,21 +434,24 @@ export async function completeTasksBulk(formData: FormData): Promise<void> {
     newValue: { count: ids.length },
   });
   revalidatePath("/app/gorevler");
+  return { ok: true };
 }
 
-export async function reopenTask(formData: FormData): Promise<void> {
+export async function reopenTask(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("tasks", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Görev bulunamadı." };
 
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from("tasks")
     .update({ status: "open", completed_at: null })
     .eq("id", id)
     .eq("tenant_id", gate.tenantId);
+  if (error) return { error: actionErrorMessage(error, "Görev yeniden açılamadı.") };
   revalidatePath("/app/gorevler");
+  return { ok: true };
 }
 
 export async function deleteTask(formData: FormData): Promise<TaskResult> {

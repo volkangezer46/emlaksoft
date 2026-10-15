@@ -5,6 +5,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { now, trDayKey } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
 import { currentMonthPeriod, loadAdvisorMetrics } from "@/lib/team/advisor-metrics";
+import { hrefAccessible } from "@/lib/nav-config";
+import { effectiveCanAccessModule } from "@/lib/permissions-merge";
+import type { AppModule } from "@/lib/permissions";
 import { afterFirstScreen, type HomeCtx } from "./data";
 import { monthProgress, rankTeam, teamStatus, TEAM_STATUS_LABEL, type TeamStatus } from "./home-metrics";
 
@@ -28,8 +31,13 @@ export function EkipPerformansIskelet() {
 
 const DOT: Record<TeamStatus, string> = { ok: "pm-t-success", warn: "pm-t-warn", danger: "pm-t-danger", none: "pm-t-neutral" };
 
-/** Sıfır çıkmaz metrik: her hücre danışman + metrik süzgeçli hedefe gider (dokunma hedefi satır yüksekliği kadar). */
-function CellLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
+/**
+ * Sıfır çıkmaz metrik: her hücre danışman + metrik süzgeçli hedefe gider (dokunma hedefi satır yüksekliği kadar).
+ * `open=false`: hedef sayfa bu rolde kapalı (menü erişim süzgeci, SK10 / B057) → bağlantı çizilmez, değer düz yazılır;
+ * "rolünüz için kapalı" ekranına götüren bağlantı kalmaz (ör. takım liderinde Teklifler / Hedefler / Ekip).
+ */
+function CellLink({ href, label, open = true, children }: { href: string; label: string; open?: boolean; children: React.ReactNode }) {
+  if (!open) return <span className="inline-flex min-h-8 items-center justify-end px-1">{children}</span>;
   return (
     <Link href={href} aria-label={label} className="focus-ring -mx-1 inline-flex min-h-8 min-w-8 touch:min-h-11 touch:min-w-11 items-center justify-end rounded-sm px-1 hover:text-[var(--accent-text)] hover:underline">
       {children}
@@ -59,6 +67,13 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
   // Hücre hedefleri sayımla aynı pencere: bu ayın başı → bugün (teklif created_at, TR günü).
   const monthFrom = ctx.monthStartKey;
   const today = trDayKey(nowMs);
+  // Bağlantı erişim süzgeci: menüyle aynı kural (modül izni). Takım liderinde ekip/teklif/hedef sayfaları kapalıdır.
+  const accessible = (Object.keys(ctx.perms) as AppModule[]).filter((m) => effectiveCanAccessModule(ctx.perms, m));
+  const canOpen = (href: string) => hrefAccessible(href, accessible);
+  const teamOpen = canOpen("/app/ekip");
+  const offersOpen = canOpen("/app/teklifler");
+  const appointmentsOpen = canOpen("/app/randevular");
+  const targetsOpen = canOpen("/app/hedefler");
 
   return (
     <section aria-labelledby="ekip-baslik" className={`ds-card ds-pad ${CARD_MIN} flex h-full flex-col`}>
@@ -72,9 +87,11 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
           </h2>
           <p className="ds-sub mt-0.5">Bu ay görüşme, randevu, teklif ve hedef</p>
         </div>
-        <Link href="/app/ekip" className="ds-link focus-ring">
-          Tüm ekip <ArrowUpRight aria-hidden="true" />
-        </Link>
+        {teamOpen ? (
+          <Link href="/app/ekip" className="ds-link focus-ring">
+            Tüm ekip <ArrowUpRight aria-hidden="true" />
+          </Link>
+        ) : null}
       </header>
       {res.failed ? (
         <p className="mt-3 px-1 text-sm text-[var(--pm-warn-text)]">Ekip metrikleri şu an okunamadı; sayılar gösterilmiyor.</p>
@@ -84,7 +101,7 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
           illustration="ekip"
           title="Henüz ekip verisi yok"
           description="Danışman ekleyin; görüşme, randevu ve anlaşmalar burada tablo olur."
-          action={{ href: "/app/ekip", label: "Ekibe git" }}
+          action={teamOpen ? { href: "/app/ekip", label: "Ekibe git" } : undefined}
         />
       ) : (
         <div className="pm-cq mt-2 overflow-x-auto">
@@ -109,28 +126,33 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
                 return (
                   <tr key={r.id}>
                     <th scope="row">
-                      <Link href={`/app/ekip/${r.id}`} className="focus-ring rounded-sm" title={r.fullName}>
-                        {r.fullName}
-                      </Link>
+                      {teamOpen ? (
+                        <Link href={`/app/ekip/${r.id}`} className="focus-ring rounded-sm" title={r.fullName}>
+                          {r.fullName}
+                        </Link>
+                      ) : (
+                        <span title={r.fullName}>{r.fullName}</span>
+                      )}
                     </th>
                     <td>
-                      <CellLink href={`/app/ekip/${r.id}`} label={`${r.fullName}: bu ay ${r.callCount} görüşme`}>
+                      <CellLink href={`/app/ekip/${r.id}`} open={teamOpen} label={`${r.fullName}: bu ay ${r.callCount} görüşme`}>
                         {r.callCount}
                       </CellLink>
                     </td>
                     <td className="pm-cq-hide-narrow">
-                      <CellLink href={`/app/randevular?danisman=${r.id}`} label={`${r.fullName}: randevuları`}>
+                      <CellLink href={`/app/randevular?danisman=${r.id}`} open={appointmentsOpen} label={`${r.fullName}: randevuları`}>
                         {r.appointCount}
                       </CellLink>
                     </td>
                     <td>
-                      <CellLink href={`/app/teklifler?danisman=${r.id}&from=${monthFrom}&to=${today}`} label={`${r.fullName}: bu ay ${r.offerCount} teklif`}>
+                      <CellLink href={`/app/teklifler?danisman=${r.id}&from=${monthFrom}&to=${today}`} open={offersOpen} label={`${r.fullName}: bu ay ${r.offerCount} teklif`}>
                         {r.offerCount}
                       </CellLink>
                     </td>
                     <td className="font-semibold text-ink-950">
                       <CellLink
                         href={`/app/teklifler?danisman=${r.id}&durum=accepted&from=${monthFrom}&to=${today}`}
+                        open={offersOpen}
                         label={`${r.fullName}: bu ay ${r.dealCount} kabul edilen teklif`}
                       >
                         {r.dealCount}
@@ -140,7 +162,7 @@ export async function EkipPerformans({ ctx }: { ctx: HomeCtx }) {
                       {r.targetPct === null ? (
                         <span className="text-text-faint" title="Bu ay için hedef tanımlı değil">—</span>
                       ) : (
-                        <CellLink href="/app/hedefler" label={`${r.fullName}: hedef gerçekleşmesi yüzde ${r.targetPct}`}>
+                        <CellLink href="/app/hedefler" open={targetsOpen} label={`${r.fullName}: hedef gerçekleşmesi yüzde ${r.targetPct}`}>
                           %{r.targetPct}
                         </CellLink>
                       )}

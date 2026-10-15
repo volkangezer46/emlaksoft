@@ -290,6 +290,10 @@ const assign: AnySettingDef[] = [
  * Kapsam uygulaması: AÇIK/KAPALI (varsayılan KAPALI = bugünkü davranış: listeler yalnız rol kuralıyla süzülür).
  * Açılınca talep/müşteri/portföy/anlaşma/görev listeleri ve CSV'leri kullanıcı kapsamına (kendi/takım/şube) daralır;
  * kapsam yalnız daraltır, mevcut rol kuralını asla genişletmez. Yönetimi: /app/ayarlar/yetkilendirme.
+ * SK10 (B160): bayrak açıkken aynı kural VERİTABANINDA da uygulanır (RLS `scope_context` / `scope_owner_ids`,
+ * 20261016100000): müşteri, portföy, anlaşma, talep, görev ve randevu satırları kapsam dışındaysa PostgREST ile de
+ * okunamaz/düzenlenemez; silinmiş müşteri/portföy yalnız silme yetkilisine görünür. Varsayılan yeni ofislerde de
+ * KAPALI kalır; açmak ofis sahibinin kararıdır (bu kayıt değişmedikçe hiçbir ofiste davranış değişmez).
  */
 export const SCOPE_ENFORCEMENT_KEY = "office.access.scope_enforcement";
 
@@ -301,8 +305,8 @@ const access: AnySettingDef[] = [
     default: false,
     risk: "high",
     label: "Liste kapsamını uygula",
-    description: "Açıkken talep, müşteri, portföy, anlaşma ve görev listeleri kullanıcının kapsamıyla (kendi kayıtları / takım / şube) sınırlanır; ofis geneli kapsamdaki yöneticiler etkilenmez.",
-    impact: "Danışmanlar yalnız kendilerine atanmış kayıtları, takım liderleri takımlarını, şube müdürleri şubelerini görür. Kapatınca eski görünüm hemen geri gelir; veri silinmez veya değişmez.",
+    description: "Açıkken talep, müşteri, portföy, anlaşma, görev ve randevu kayıtları kullanıcının kapsamıyla (kendi kayıtları / takım / şube) sınırlanır; ofis geneli kapsamdaki yöneticiler etkilenmez. Sınır veritabanında da uygulanır.",
+    impact: "Danışmanlar yalnız kendilerine atanmış ya da kendi açtıkları kayıtları, takım liderleri takımlarını, şube müdürleri şubelerini görür; şubesi tanımlı olmayan şube müdürü yalnız kendi kayıtlarını görür. Silinmiş kayıtlar yalnız silme yetkisi olana görünür. Kaydı kapsam dışındaki birine devretmeyi ofis geneli kapsamdaki yönetici yapar. Kapatınca eski görünüm hemen geri gelir; veri silinmez veya değişmez.",
   }),
 ];
 

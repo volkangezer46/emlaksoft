@@ -10,6 +10,7 @@
  * `now()` ile okur, buraya geçirir.
  */
 import { MANAGEMENT_TIER_ROLES } from "@/lib/team/assignable-roles";
+import { effectiveHasPermission, type EffectivePermissions } from "@/lib/permissions-merge";
 
 export const APPROVAL_KINDS = [
   "komisyon_indirimi",
@@ -102,6 +103,14 @@ export const APPROVAL_STATUS_LABEL: Record<ApprovalStatus, string> = {
   iptal: "İptal edildi",
 };
 
+/** Durum sekmesine göre liste/grafik başlığı (ek gerektirmeyen ad öbeği; "Bekliyor talepler" yazılmaz). */
+export const APPROVAL_STATUS_HEADING: Record<ApprovalStatus, string> = {
+  bekliyor: "Bekleyen talepler",
+  onaylandi: "Onaylanan talepler",
+  reddedildi: "Reddedilen talepler",
+  iptal: "İptal edilen talepler",
+};
+
 /**
  * Karar verebilen roller.
  *
@@ -115,6 +124,16 @@ export const APPROVAL_DECIDER_ROLES: readonly string[] = MANAGEMENT_TIER_ROLES;
 
 export function isApprovalDeciderRole(role: string | null | undefined): boolean {
   return APPROVAL_DECIDER_ROLES.includes(String(role ?? ""));
+}
+
+/**
+ * KARAR YETKİSİ — TEK yüklem (SK10 / B164): yönetim kademesi + etkin `commissions:edit`. Onaylar sayfasındaki
+ * Onayla/Reddet ve toplu karar, menü rozeti (nav-badges, bootstrap-core), yeni talep bildiriminin alıcıları ve
+ * `decideApproval` bunu kullanır; "düğmeyi gören karar verebilir". Şube müdürü/takım liderinin varsayılan matrisinde
+ * komisyon yalnız `view` olduğundan karar düğmesi görmezler; ofis rol istisnasıyla `edit` verilirse görürler (sahip kararı).
+ */
+export function canDecideApproval(role: string | null | undefined, perms: EffectivePermissions | null | undefined): boolean {
+  return isApprovalDeciderRole(role) && Boolean(perms) && effectiveHasPermission(perms as EffectivePermissions, "commissions", "edit");
 }
 
 /**

@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -230,13 +231,13 @@ export async function updateItemNote(_prev: ChecklistResult, fd: FormData): Prom
 }
 
 /** Maddeyi siler — ConfirmDialog formAction deseni (bkz. deleteDealCost). */
-export async function deleteItem(fd: FormData): Promise<void> {
+export async function deleteItem(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("commissions", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const itemId = String(fd.get("item_id") ?? "").trim();
   const dealId = String(fd.get("deal_id") ?? "").trim();
-  if (!itemId) return;
+  if (!itemId) return { error: "Madde bulunamadı." };
 
   const supabase = await createClient();
   const { data: item } = await supabase
@@ -245,7 +246,7 @@ export async function deleteItem(fd: FormData): Promise<void> {
     .eq("id", itemId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (!item) return;
+  if (!item) return { error: "Madde bulunamadı." };
 
   const { error } = await supabase
     .from("deal_checklist_items")
@@ -254,7 +255,7 @@ export async function deleteItem(fd: FormData): Promise<void> {
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deleteItem", error);
-    return;
+    return { error: actionErrorMessage(error, "Madde silinemedi.") };
   }
 
   await logActivity({
@@ -268,6 +269,7 @@ export async function deleteItem(fd: FormData): Promise<void> {
 
   revalidatePath(`/app/anlasmalar/${dealId || item.deal_id}`);
   revalidatePath("/app/anlasmalar");
+  return { ok: true };
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -134,7 +134,8 @@ function updatedAgo(iso: string) {
 }
 
 function dealTitle(d: BoardDeal) {
-  return d.property_title ?? d.property_code ?? "Anlaşma";
+  // Portföysüz anlaşma "Anlaşma" diye görünmesin (B194): ayırt edici ve ek gerektirmeyen yedek.
+  return d.property_title ?? d.property_code ?? "Portföysüz anlaşma";
 }
 
 /** Ekran okuyucu duyurularında anlaşmayı ayırt eden ad (portföy yoksa müşteri). */
@@ -357,6 +358,12 @@ export function DealBoard({
 
   return (
     <div>
+      {/* İzinsiz rolde aşama düğmesi çizilmez (sözleşme k); nedeni bir kez, kartlar arasında tekrar etmeden yazılır. */}
+      {!canEdit ? (
+        <p className="mb-2 text-xs font-medium text-text-muted" role="note">
+          Aşama değiştirme yöneticide. Kartları açıp ayrıntıyı görebilirsiniz.
+        </p>
+      ) : null}
       <DndContext
         id={dndId}
         sensors={sensors}
@@ -711,7 +718,7 @@ function BoardCard({
               type="button"
               ref={setActivatorNodeRef}
               {...attributes}
-              aria-label={`${title} anlaşmasını taşı`}
+              aria-label={`Anlaşmayı taşı: ${dealSpokenName(d)}`}
               title="Sürükleyerek taşı (klavye: Boşluk veya Enter, sonra sol/sağ ok)"
               className="focus-ring relative z-10 -my-2 -mr-2 grid h-11 w-11 shrink-0 cursor-grab touch-none place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:text-text-muted active:cursor-grabbing aria-disabled:cursor-default aria-disabled:opacity-50"
             >
@@ -742,7 +749,7 @@ function BoardCard({
       </div>
       {/* Düğme satırı sürüklemeyi başlatmaz (bkz. board-dnd.ts NO_DRAG_PROPS). */}
       <div {...NO_DRAG_PROPS} className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
-        <StatusTransitionBar dealId={d.id} stage={d.stage} stageLabels={stageLabels} />
+        <StatusTransitionBar dealId={d.id} stage={d.stage} canEdit={canEdit} stageLabels={stageLabels} />
         {canEdit ? (
           <button
             type="button"
@@ -770,7 +777,7 @@ function BoardCard({
             Müşteri
           </Link>
         ) : null}
-        {next ? (
+        {canEdit && next ? (
           <button
             type="button"
             disabled={busy}
@@ -780,7 +787,7 @@ function BoardCard({
             {stageLabels[next].label} <ArrowRight className="h-3 w-3" />
           </button>
         ) : null}
-        {stage === "negotiation" ? (
+        {canEdit && stage === "negotiation" ? (
           <button
             type="button"
             disabled={busy}
@@ -790,7 +797,7 @@ function BoardCard({
             <Sparkles className="h-3 w-3" /> Kazan
           </button>
         ) : null}
-        {!isClosingStage(stage) ? (
+        {canEdit && !isClosingStage(stage) ? (
           <button
             type="button"
             disabled={busy}

@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { parseTrLocalDateTime } from "@/lib/clock";
 import { createClient } from "@/lib/supabase/server";
@@ -128,16 +129,18 @@ export async function updateTarget(
 }
 
 /** ConfirmDialog `formAction` deseniyle uyumlu silme (bkz. `deleteTask`). */
-export async function deleteTarget(formData: FormData): Promise<void> {
+export async function deleteTarget(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("targets", "delete");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Hedef bulunamadı." };
 
   const supabase = await createClient();
-  await supabase.from("targets").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  const { error } = await supabase.from("targets").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  if (error) return { error: actionErrorMessage(error, "Hedef silinemedi.") };
   revalidatePath("/app/hedefler");
+  return { ok: true };
 }
 
 export async function listTargets(period?: string) {

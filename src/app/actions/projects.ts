@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -743,12 +744,12 @@ export async function createPaymentPlan(
  * ConfirmDialog `formAction` uyumlu: FormData alır, void döner
  * (hata durumunda sessiz no-op — koşullar UI'da da denetlenir).
  */
-export async function deletePaymentPlan(fd: FormData): Promise<void> {
+export async function deletePaymentPlan(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("projects", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const unitId = String(fd.get("unit_id") ?? "").trim();
-  if (!unitId) return;
+  if (!unitId) return { error: "Daire bulunamadı." };
 
   const supabase = await createClient();
   const { data: unit } = await supabase
@@ -757,7 +758,7 @@ export async function deletePaymentPlan(fd: FormData): Promise<void> {
     .eq("id", unitId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (!unit) return;
+  if (!unit) return { error: "Daire bulunamadı." };
 
   const { data: paid } = await supabase
     .from("unit_payments")
@@ -766,7 +767,7 @@ export async function deletePaymentPlan(fd: FormData): Promise<void> {
     .eq("tenant_id", gate.tenantId)
     .eq("status", "paid")
     .limit(1);
-  if ((paid ?? []).length > 0) return; // ödeme alınmış plan silinemez
+  if ((paid ?? []).length > 0) return { error: "Ödeme alınmış plan silinemez." };
 
   const { error } = await supabase
     .from("unit_payments")
@@ -775,7 +776,7 @@ export async function deletePaymentPlan(fd: FormData): Promise<void> {
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("deletePaymentPlan", error);
-    return;
+    return { error: actionErrorMessage(error, "Ödeme planı silinemedi.") };
   }
 
   await logActivity({
@@ -788,6 +789,7 @@ export async function deletePaymentPlan(fd: FormData): Promise<void> {
   });
 
   revalidateUnit(unit.project_id);
+  return { ok: true };
 }
 
 /** Ödendi ↔ bekliyor geçişi — overdue satır da 'paid' yapılabilir; geri alınırsa 'pending' olur (cron yeniden gecikmeye alır). */

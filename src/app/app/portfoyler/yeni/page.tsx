@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { requireModulePage } from "@/lib/require-module-page";
+import { deniedPageHref, requireModulePage } from "@/lib/require-module-page";
 import { loadCustomFieldInputDefs } from "@/lib/custom-fields/save";
 import { createClient } from "@/lib/supabase/server";
 import { getProvinceOptions } from "@/lib/geo/reader";
@@ -14,7 +14,8 @@ export default async function NewPropertyPage({ searchParams }: { searchParams: 
   const { kaynak, fsbo: fsboParam } = await searchParams;
   const poolSource = parseIncomingPoolSource(kaynak);
   const { perms, userId, tenantId } = await requireModulePage("properties", "/app/portfoyler");
-  if (!(perms.properties ?? []).includes("create")) redirect("/app/portfoyler");
+  // Ekleme yetkisi yoksa açıklamalı yetki kartı (sessizce listeye dönmek yerine; SK10 / B168).
+  if (!(perms.properties ?? []).includes("create")) redirect(deniedPageHref("properties"));
 
   const supabase = await createClient();
   const [provinces, { data: branches }, propertyTypes, transactionTypes, poolEnabled, { data: tenantRow }] = await Promise.all([

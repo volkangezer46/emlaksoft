@@ -6,6 +6,7 @@
  *  - user   → ownerColumn = self
  *  - team   → ownerColumn IN (takım üyeleri + self); takım bilinmiyorsa/boşsa self (fail-closed)
  *  - branch → ownerColumn IN (şube üyeleri + self); şube bilinmiyorsa/boşsa self
+ * Aynı kural RLS'te: `public.scope_owner_ids()` (SK10 / B160, 20261016100000) — fail-closed self dahil birebir.
  */
 import type { AccessScope, UserScope } from "./types";
 

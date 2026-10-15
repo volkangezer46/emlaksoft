@@ -801,8 +801,33 @@ function pageVisible(info: PageInfo, accessible: readonly AppModule[], closed: r
   return !isClosedHref(info.href, closed);
 }
 
-function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[]): NavHub | null {
+/** Yolun katalogdaki sayfası (tam eşleşme, yoksa en uzun ön ek: /app/ekip/123 → /app/ekip). */
+function pageInfoFor(href: string): PageInfo | null {
+  const path = href.split(/[?#]/)[0] ?? href;
+  const exact = PAGE_INDEX.get(path);
+  if (exact) return exact;
+  let best: PageInfo | null = null;
+  for (const [key, info] of PAGE_INDEX) {
+    if (key !== "/app" && path.startsWith(`${key}/`) && (!best || key.length > best.href.length)) best = info;
+  }
+  return best;
+}
+
+/**
+ * Bağlantı ERİŞİM SÜZGECİ (SK10 / B057): hedef sayfa rolde açılabilir mi? Menü ile aynı kural (modül izni + öğe koşulu
+ * + ofisin kapattığı modül). Kart/tablo içindeki bağlantılar bununla süzülür; "rolünüz için kapalı" ekranına götüren
+ * bağlantı çizilmez. Katalogda olmayan yol (ör. /app/hesabim) engellenmez.
+ */
+export function hrefAccessible(href: string, accessible: readonly AppModule[], closed: readonly string[] = []): boolean {
+  const info = pageInfoFor(href);
+  return info ? pageVisible(info, accessible, closed) : true;
+}
+
+function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonly string[], role?: string | null): NavHub | null {
+  // Merkezin ana sayfa kapısı (requireModulePage ile aynı izin): yoksa merkez çıkmaz.
+  if (def.gate && !accessible.includes(def.gate)) return null;
   const pages = def.pages.flatMap((ref) => {
+    if (ref.roles && !(role && (ref.roles as readonly string[]).includes(role))) return [];
     const info = PAGE_INDEX.get(ref.href);
     return info && pageVisible(info, accessible, closed, ref.ownModule) ? [publicPage(info, ref.label)] : [];
   });
@@ -818,7 +843,7 @@ function buildHub(def: HubDef, accessible: readonly AppModule[], closed: readonl
 export function hubNav(accessible: readonly AppModule[], opts: { role?: string | null; closed?: readonly string[] } = {}): HubNavModel {
   const layout = navLayoutFor(opts.role);
   const closed = opts.closed ?? [];
-  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed) ?? []);
+  const build = (defs: readonly HubDef[]) => defs.flatMap((d) => buildHub(d, accessible, closed, opts.role) ?? []);
   const hubs = build(layout.hubs);
   const dock = build(layout.dock);
   const tools = layout.tools.flatMap((href) => {

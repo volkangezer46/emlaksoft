@@ -5,12 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
 import { PERMISSION_EDITOR_ROLES, type TeamRole } from "@/lib/team/assignable-roles";
 import { logActivity } from "@/lib/activity";
-import { canEditPermissionOverride } from "@/lib/access-control/admin-rules";
+import { canEditPermissionOverride, canEditRolePermissions } from "@/lib/access-control/admin-rules";
 import { recordAccessAudit } from "@/lib/access-control/audit";
+import { effectiveHasPermission, getEffectivePermissions } from "@/lib/permissions-effective";
 import type { AppAction, AppModule, AppRole } from "@/lib/permissions";
 import { actionErrorMessage } from "@/lib/action-errors";
 
-export type PermissionActionResult = { error?: string; ok?: boolean };
+/** `allowed`: başarılı hücre yazımında sunucunun kaydettiği değer (istemci iyimser durumu buna eşitler). */
+export type PermissionActionResult = { error?: string; ok?: boolean; allowed?: boolean };
 
 // owner rolü daima tam yetkilidir — bu ekrandan düzenlenemez, kendini kilitleme riskine karşı.
 const EDITABLE_ROLES: AppRole[] = [
@@ -41,6 +43,14 @@ export async function updateTenantPermission(
   const ctx = await requireRoleManager();
   if ("error" in ctx) return { error: ctx.error };
   if (!EDITABLE_ROLES.includes(role)) return { error: "Bu rol düzenlenemez." };
+  // Tek kural (admin-rules): gm kendi rolünü düzenlemez, kendinde olmayan izni veremez. Etkin izin istek içi önbellekli
+  // (requirePermission aynı değeri zaten okudu; ek DB turu yok). RLS de aynı satırı reddeder (20261016100200).
+  const actorPerms = ctx.role === "gm" ? await getEffectivePermissions(ctx.tenantId, ctx.role, ctx.userId) : null;
+  const rule = canEditRolePermissions(ctx.role, role, {
+    grant: allowed,
+    actorHas: actorPerms ? effectiveHasPermission(actorPerms, mod, action) : true,
+  });
+  if (!rule.ok) return { error: rule.reason };
 
   const supabase = await createClient();
   const { error } = await supabase.from("tenant_role_permissions").upsert(
@@ -71,7 +81,8 @@ export async function updateTenantPermission(
 
   revalidatePath("/app/ayarlar/yetkilendirme");
   revalidatePath("/app");
-  return { ok: true };
+  // İstemci matrisi hedef değeri sunucunun yazdığı değerden alır (SK10 / B162).
+  return { ok: true, allowed };
 }
 
 // ========== Kullanıcı bazlı istisnalar (user_permission_overrides) ==========
@@ -239,6 +250,8 @@ export async function resetRolePermissions(role: AppRole): Promise<PermissionAct
   const ctx = await requireRoleManager();
   if ("error" in ctx) return { error: ctx.error };
   if (!EDITABLE_ROLES.includes(role)) return { error: "Bu rol düzenlenemez." };
+  const rule = canEditRolePermissions(ctx.role, role);
+  if (!rule.ok) return { error: rule.reason };
 
   const supabase = await createClient();
   const { error } = await supabase

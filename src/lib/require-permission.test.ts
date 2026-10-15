@@ -71,8 +71,15 @@ describe("requirePermission: paralel kontrol, sabit hata önceliği", () => {
   it("destek oturumunda (salt-okunur) duraklatma kontrolü hiç başlamaz", async () => {
     impersonating = true;
     pauseBlock = "Abonelik duraklatıldı.";
-    const res = await requirePermission("customers", "edit");
+    const res = await requirePermission("customers", "view");
     expect(res.ok).toBe(true);
     expect(started).not.toContain("pause");
+  });
+
+  it("SK10 salt okunur tavanı: destek oturumunda yazma eylemi DB turu atmadan reddedilir", async () => {
+    impersonating = true;
+    const res = await requirePermission("customers", "edit");
+    expect(res).toEqual({ ok: false, error: "Bu işlem için yetkiniz yok (salt okunur hesap)." });
+    expect(started).toEqual([]);
   });
 });

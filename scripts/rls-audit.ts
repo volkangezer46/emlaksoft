@@ -14,6 +14,9 @@
  * Her şey tek bir transaction içinde yapılır ve SONUNDA ROLLBACK edilir —
  * denetim kullanıcının verisine hiçbir şey yazmaz.
  *
+ * YAZMA-IZIN-YOK (SK10): kiracı koşullu her yazma politikası izin ya da auth.uid() koşulu taşımalı
+ * (kural: scripts/rls-write-policy-rule.ts). Çıkış kodunu etkiler.
+ *
  * Çalıştırma:  npx tsx scripts/rls-audit.ts [--strict] [--no-acl]
  *   --strict  sarılmamış (InitPlan'sız) yardımcı çağrıları ve ACL kapısı (check:acl) hataları da çıkış kodunu etkiler.
  *             Varsayılan: ikisi de yalnız raporlanır.
@@ -22,6 +25,7 @@
 import dotenv from "dotenv";
 import { Client } from "pg";
 import { printFindings, runAclCheck } from "./check-function-acl.ts";
+import { findUnguardedWritePolicies, type WritePolicyRow } from "./rls-write-policy-rule.ts";
 
 const ARGS = process.argv.slice(2);
 const STRICT = ARGS.includes("--strict");
@@ -147,6 +151,19 @@ async function main() {
       from pg_catalog.pg_policy pol join pg_catalog.pg_class c on c.oid = pol.polrelid
       where c.relnamespace = 'public'::regnamespace
       order by 1, 2`);
+    // --- 2c) Yazma politikası izin/kendi-satır kuralı (SK10 / B159, B182) ---
+    /*
+     * Kiracı koşulu taşıyan her ALL/INSERT/UPDATE/DELETE politikası ya bir izin (has_effective_permission, rol yardımcısı)
+     * ya da kendi-satır (auth.uid()) koşulu içermeli; yalnız `tenant_id = current_tenant_id()` diyen yazma politikası
+     * ofisteki her rolün yazabilmesi demektir. Kural saf modülde: scripts/rls-write-policy-rule.ts (sözleşme testiyle kilitli).
+     */
+    const { rows: yazmaPol } = await c.query<WritePolicyRow>(`
+      select tablename, policyname, cmd, roles::text as roles, qual, with_check
+      from pg_catalog.pg_policies where schemaname = 'public'`);
+    for (const b of findUnguardedWritePolicies(yazmaPol)) {
+      bulgular.push({ tablo: b.tablo, tur: "YAZMA-IZIN-YOK", detay: `${b.politika}: ${b.detay}` });
+    }
+
     await c.query("set local search_path to default");
     for (const p of tumPol) {
       const ciplak = unwrappedHelperCalls(p.ifade);

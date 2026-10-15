@@ -322,8 +322,15 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   return { ok: true };
 }
 
-export async function setAppointmentStatus(formData: FormData): Promise<void> {
-  await updateAppointmentStatus(formData);
+/**
+ * Randevu durum menüsü / form eylemi. `updateAppointmentStatus` sonucunu artık YUTMAZ (SK10 / B166): `{ok}|{error}`
+ * döner; menü hata alınca iyimser durumu geri alır ve bildirim gösterir.
+ */
+export function setAppointmentStatus(formData: FormData): Promise<AppointmentResult>;
+/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
+export function setAppointmentStatus(formData: FormData): Promise<void>;
+export async function setAppointmentStatus(formData: FormData): Promise<AppointmentResult | void> {
+  return updateAppointmentStatus(formData);
 }
 
 /** Randevu erteleme / düzenleme — tarih, saat, tür, süre, yer, not. */

@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -322,15 +323,18 @@ export async function checkoutPropertyKey(_prev: KeyResult, fd: FormData): Promi
 // ---------------------------------------------------------------------------
 // İade al (tek tık) — hem detay bölümünden hem panodan çağrılır
 // ---------------------------------------------------------------------------
-export async function returnPropertyKey(fd: FormData): Promise<void> {
+export function returnPropertyKey(fd: FormData): Promise<ActionOutcome>;
+/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
+export function returnPropertyKey(fd: FormData): Promise<void>;
+export async function returnPropertyKey(fd: FormData): Promise<ActionOutcome | void> {
   const gate = await requirePermission("properties", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const keyId = String(fd.get("key_id") ?? "").trim();
-  if (!keyId) return;
+  if (!keyId) return { error: "Anahtar bulunamadı." };
 
   const key = await loadKey(keyId, gate.tenantId);
-  if (!key) return;
+  if (!key) return { error: "Anahtar bulunamadı." };
 
   const supabase = await createClient();
   const returnedAt = new Date().toISOString();
@@ -349,7 +353,7 @@ export async function returnPropertyKey(fd: FormData): Promise<void> {
 
   if (error) {
     console.error("returnPropertyKey", error);
-    return;
+    return { error: actionErrorMessage(error, "Anahtar iadesi kaydedilemedi.") };
   }
 
   await insertKeyEvent(supabase, {
@@ -373,20 +377,21 @@ export async function returnPropertyKey(fd: FormData): Promise<void> {
   });
 
   revalidateKeyViews(key.property_id);
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
 // Kayıp bildir (ConfirmDialog formAction)
 // ---------------------------------------------------------------------------
-export async function reportPropertyKeyLost(fd: FormData): Promise<void> {
+export async function reportPropertyKeyLost(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("properties", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const keyId = String(fd.get("key_id") ?? "").trim();
-  if (!keyId) return;
+  if (!keyId) return { error: "Anahtar bulunamadı." };
 
   const key = await loadKey(keyId, gate.tenantId);
-  if (!key) return;
+  if (!key) return { error: "Anahtar bulunamadı." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -397,7 +402,7 @@ export async function reportPropertyKeyLost(fd: FormData): Promise<void> {
 
   if (error) {
     console.error("reportPropertyKeyLost", error);
-    return;
+    return { error: actionErrorMessage(error, "Kayıp bildirimi kaydedilemedi.") };
   }
 
   await insertKeyEvent(supabase, {
@@ -421,22 +426,23 @@ export async function reportPropertyKeyLost(fd: FormData): Promise<void> {
   });
 
   revalidateKeyViews(key.property_id);
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------------------
 // Sil (ConfirmDialog formAction) — events cascade ile gider
 // ---------------------------------------------------------------------------
-export async function deletePropertyKey(fd: FormData): Promise<void> {
+export async function deletePropertyKey(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("properties", "delete");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const keyId = String(fd.get("key_id") ?? "").trim();
-  if (!keyId) return;
+  if (!keyId) return { error: "Anahtar bulunamadı." };
 
   const key = await loadKey(keyId, gate.tenantId);
-  if (!key) return;
+  if (!key) return { error: "Anahtar bulunamadı." };
   // Dışarıdaki (zimmetli) anahtar silinmez: önce iade alınmalı.
-  if (isKeyOut(key.status)) return;
+  if (isKeyOut(key.status)) return { error: "Dışarıdaki anahtar silinemez; önce iade alın." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -447,7 +453,7 @@ export async function deletePropertyKey(fd: FormData): Promise<void> {
 
   if (error) {
     console.error("deletePropertyKey", error);
-    return;
+    return { error: actionErrorMessage(error, "Anahtar silinemedi.") };
   }
 
   await logActivity({
@@ -460,4 +466,5 @@ export async function deletePropertyKey(fd: FormData): Promise<void> {
   });
 
   revalidateKeyViews(key.property_id);
+  return { ok: true };
 }

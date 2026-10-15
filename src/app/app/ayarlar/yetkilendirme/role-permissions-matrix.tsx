@@ -1,9 +1,8 @@
 "use client";
 
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useRouter } from "next/navigation";
 import { Check, RotateCcw } from "lucide-react";
 import { updateTenantPermission, resetRolePermissions } from "@/app/actions/permissions";
 import { DEFAULT_MATRIX, type AppAction, type AppModule, type AppRole } from "@/lib/permissions";
@@ -21,22 +20,40 @@ function cellKey(mod: AppModule, action: AppAction) {
   return `${mod}:${action}`;
 }
 
+type CellChange = { mod: AppModule; action: AppAction; allowed: boolean };
+
+/** İyimser hücre değişikliği: sunucu durumunun (prop) üstüne uygulanır, geçiş bitince prop yeniden tek kaynak olur. */
+function applyCell(prev: Partial<Record<AppModule, AppAction[]>>, change: CellChange) {
+  const current = new Set(prev[change.mod] ?? []);
+  if (change.allowed) current.add(change.action);
+  else current.delete(change.action);
+  return { ...prev, [change.mod]: Array.from(current) };
+}
+
+/**
+ * Rol izin matrisi. Tek kaynak SUNUCU durumudur (`effective` prop'u): hücre tıklaması `useOptimistic` ile anında
+ * görünür, eylem `revalidatePath` ile taze matrisi aynı yanıtta getirir ve iyimser katman kendiliğinden düşer
+ * (çift tazeleme yok). Hata olursa iyimser değer geri sarılır. Rol çipi değişiminde bileşen `key={role}` ile
+ * yeniden kurulur; eski rolün yerel durumu yeni role yazılamaz (SK10 / B162).
+ */
 export function RolePermissionsMatrix({
   role,
   modules,
   effective,
   overriddenCells,
   readOnly,
+  readOnlyReason = null,
 }: {
   role: AppRole;
   modules: AppModule[];
   effective: Partial<Record<AppModule, AppAction[]>>;
   overriddenCells: string[];
   readOnly: boolean;
+  /** Salt görüntüleme nedeni (ör. genel müdür kendi rolünü düzenleyemez); null = varsayılan metin. */
+  readOnlyReason?: string | null;
 }) {
-  const router = useRouter();
   const [, startTransition] = useTransition();
-  const [localEffective, setLocalEffective] = useState(effective);
+  const [optimistic, addOptimistic] = useOptimistic(effective, applyCell);
   const [busyCell, setBusyCell] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resetting, setResetting] = useState(false);
@@ -44,30 +61,21 @@ export function RolePermissionsMatrix({
   const defaults = DEFAULT_MATRIX[role] ?? {};
 
   function isAllowed(mod: AppModule, action: AppAction) {
-    return (localEffective[mod] ?? []).includes(action);
+    return (optimistic[mod] ?? []).includes(action);
   }
 
   function toggle(mod: AppModule, action: AppAction) {
     if (readOnly) return;
     const key = cellKey(mod, action);
+    // Hedef değer SUNUCU durumundan (prop + bekleyen iyimser katman) hesaplanır; bayat yerel kopya yok.
     const next = !isAllowed(mod, action);
     setError(null);
     setBusyCell(key);
-    setLocalEffective((prev) => {
-      const current = new Set(prev[mod] ?? []);
-      if (next) current.add(action);
-      else current.delete(action);
-      return { ...prev, [mod]: Array.from(current) };
-    });
     startTransition(async () => {
+      addOptimistic({ mod, action, allowed: next });
       const result = await updateTenantPermission(role, mod, action, next);
       setBusyCell(null);
-      if (!result.ok) {
-        setError(result.error ?? "Güncellenemedi.");
-        setLocalEffective(effective);
-      } else {
-        router.refresh();
-      }
+      if (!result.ok) setError(result.error ?? "Güncellenemedi.");
     });
   }
 
@@ -78,12 +86,7 @@ export function RolePermissionsMatrix({
     startTransition(async () => {
       const result = await resetRolePermissions(role);
       setResetting(false);
-      if (!result.ok) {
-        setError(result.error ?? "Varsayılana döndürülemedi.");
-      } else {
-        setLocalEffective(defaults);
-        router.refresh();
-      }
+      if (!result.ok) setError(result.error ?? "Varsayılana döndürülemedi.");
     });
   }
 
@@ -96,7 +99,7 @@ export function RolePermissionsMatrix({
           <h2 className="font-display font-bold text-ink-950">İzin matrisi</h2>
           <p className="mt-1 text-xs text-text-muted">
             {readOnly
-              ? "Salt görüntüleme — düzenlemek için ofis sahibi veya genel müdür olmalısınız."
+              ? (readOnlyReason ?? "Salt görüntüleme — düzenlemek için ofis sahibi veya genel müdür olmalısınız.")
               : "Bir hücreye tıklayarak izni açıp kapatabilirsiniz. Değişiklik anında kaydedilir."}
           </p>
         </div>

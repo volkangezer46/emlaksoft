@@ -20,13 +20,14 @@ describe("rol bazlı merkez yapısı (nav-roles)", () => {
     }
   });
 
-  it("satır sayıları: ofis yönetimi 11, danışman 6, muhasebe 6, çağrı 4; bütçeyi aşmaz", () => {
+  it("satır sayıları: ofis yönetimi 11, danışman 6, muhasebe 5, çağrı 4; bütçeyi aşmaz", () => {
     expect(NAV_BY_ROLE.owner.hubs).toHaveLength(11);
     expect(NAV_BY_ROLE.gm.hubs).toHaveLength(11);
     expect(NAV_BY_ROLE.branch_manager.hubs).toHaveLength(10);
     expect(NAV_BY_ROLE.advisor.hubs).toHaveLength(6);
     expect(NAV_BY_ROLE.team_lead.hubs).toHaveLength(6);
-    expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(6);
+    // SK10: muhasebede "Mülk yönetimi" (rentals) satırı yok; Aidatlar Muhasebe merkezinde.
+    expect(NAV_BY_ROLE.accounting.hubs).toHaveLength(5);
     expect(NAV_BY_ROLE.call_center.hubs).toHaveLength(4);
     for (const role of ["advisor", "team_lead"] as const) expect(NAV_BY_ROLE[role].hubs.length).toBeLessThanOrEqual(NAV_BUDGET.advisor);
     for (const role of ROLES) expect(NAV_BY_ROLE[role].hubs.length, role).toBeLessThanOrEqual(NAV_BUDGET.office);

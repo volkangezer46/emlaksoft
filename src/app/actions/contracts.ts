@@ -703,12 +703,15 @@ export async function listContractTemplates(): Promise<ContractTemplateOption[]>
   }));
 }
 
-/** Ofisin kendi şablonunu kaydeder ("Bu içeriği şablon olarak kaydet"). */
+/**
+ * Ofisin kendi şablonunu kaydeder ("Bu içeriği şablon olarak kaydet"). Ofis şablonu ofis ayarıdır: kapı, Ayarlar >
+ * Sözleşme şablonları ve RLS (contract_templates yazma = settings:edit, 20261016100100) ile AYNI (SK10 / B159).
+ */
 export async function saveContractTemplate(
   _prev: ContractResult,
   fd: FormData,
 ): Promise<ContractResult> {
-  const gate = await requirePermission("contracts", "create");
+  const gate = await requirePermission("settings", "edit");
   if (!gate.ok) return { error: gate.error };
 
   const title   = String(fd.get("title")   ?? "").trim();
