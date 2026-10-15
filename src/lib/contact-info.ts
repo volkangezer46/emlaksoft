@@ -9,7 +9,10 @@
  */
 export const DEFAULT_SUPPORT_EMAIL = "destek@emlaksoft.com.tr";
 
-/** Statik bağlamlar (menü varsayılanları, push konusu, SSS bileşeni) için e-posta: eski env yedeği > koddaki varsayılan. */
+/**
+ * Derleme anı e-postası (eski env yedeği > koddaki varsayılan): istemci önizlemesi, push konusu ve menü varsayılanları.
+ * Herkese açık sunucu yüzeyleri (ana sayfa SSS'si, üst menü, alt bilgi) bunu `getSupportContact()` ile değiştirir.
+ */
 export const SUPPORT_EMAIL: string = process.env.NEXT_PUBLIC_SUPPORT_EMAIL?.trim() || DEFAULT_SUPPORT_EMAIL;
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 

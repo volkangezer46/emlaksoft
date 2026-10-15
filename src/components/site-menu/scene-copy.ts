@@ -1,4 +1,3 @@
-import { SUPPORT_EMAIL } from "@/lib/contact-info";
 import type { SceneKind } from "@/lib/site-menu/previews";
 
 /**
@@ -35,5 +34,5 @@ export const SCENE_COPY: Record<SceneKind, SceneCopy> = {
   security: { eyebrow: "Güvenlik ve KVKK", title: "Verinizi süreçle koruyun", text: "Satır düzeyinde güvenlik, rol ve izin matrisi, denetim kaydı ve dışa aktarma.", cta: "Güvenlik bölümüne git" },
   consent: { eyebrow: "Telefon ve KVKK uyumu", title: "Doğru numara, izinli iletişim", text: "Ülkeye göre biçimlenen telefon girişi ve iletişim izni takibi tek yerde.", cta: "Uyumu inceleyin" },
   legal: { eyebrow: "KVKK aydınlatma", title: "Yasal metin açık ve erişilebilir", text: "Verilerin nasıl işlendiğini anlatan aydınlatma metnine buradan ulaşın.", cta: "Metni okuyun" },
-  support: { eyebrow: "Destek", title: "Sorunuz mu var, yazın", text: `Destek ekibimiz sorularınıza e-postayla dönüş yapar; adresimiz ${SUPPORT_EMAIL}.`, cta: "E-posta gönderin" },
+  support: { eyebrow: "Destek", title: "Sorunuz mu var, yazın", text: "Destek ekibimiz sorularınıza e-postayla dönüş yapar; bize yazmanız yeterli.", cta: "E-posta gönderin" },
 };

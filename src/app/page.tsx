@@ -1,6 +1,7 @@
 import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { getLiveSiteContent } from "@/lib/site-content/store";
+import { getSupportContact } from "@/lib/contact-info-server";
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo/store";
 import { renderHome } from "./_home/render-home";
@@ -20,7 +21,9 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function HomePage() {
   // Metinler yönetim panelinden (Site içeriği); yayın yoksa bugünkü metin. Okuma sunucuda, etiketli önbellekten (sayfa statik kalır).
-  const [pricing, content] = await Promise.all([getPublicPricing(), getLiveSiteContent()]);
+  // Destek adresi ayar defterinden (support.email); ayar değişince statik kopya yayın sonrası zinciriyle tazelenir
+  // (src/app/actions/platform-settings-center.ts).
+  const [pricing, content, support] = await Promise.all([getPublicPricing(), getLiveSiteContent(), getSupportContact()]);
   const efCatalog = await getEfCatalog();
-  return renderHome({ content, pricing, efCatalog });
+  return renderHome({ content, pricing, efCatalog, support });
 }

@@ -137,7 +137,7 @@ describe("renderHome: canlı ana sayfa ile birebir aynı ağaç", () => {
   it("page.tsx yalnız yayındaki içerikle renderHome çağırır (önizleme bayrağı yok, dinamik API yok)", () => {
     const page = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
     expect(page).toContain("getLiveSiteContent()");
-    expect(page).toContain("renderHome({ content, pricing, efCatalog })");
+    expect(page).toContain("renderHome({ content, pricing, efCatalog, support })");
     expect(page).not.toMatch(/preview|force-dynamic|searchParams|cookies\(|headers\(/);
   });
 });

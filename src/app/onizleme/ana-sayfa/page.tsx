@@ -3,6 +3,7 @@ import { renderHome } from "@/app/_home/render-home";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
 import { now } from "@/lib/clock";
 import { getEfCatalog } from "@/lib/ef-credits/credit-reader";
+import { getSupportContact } from "@/lib/contact-info-server";
 import { verifyPreviewToken, type PreviewVerdict } from "@/lib/preview-token";
 import { PREVIEW_BRIDGE_JS } from "./bridge";
 import { readPreviewDraft } from "./draft";
@@ -52,11 +53,11 @@ export default async function HomeDraftPreviewPage({ searchParams }: { searchPar
   const { t } = await searchParams;
   const verdict = verifyPreviewToken(typeof t === "string" ? t : null, { surface: "sitecontent", nowMs: now() });
   if (!verdict.ok) return <Invalid reason={verdict.reason} />;
-  const [draft, pricing, efCatalog] = await Promise.all([readPreviewDraft(), getPublicPricing(), getEfCatalog()]);
+  const [draft, pricing, efCatalog, support] = await Promise.all([readPreviewDraft(), getPublicPricing(), getEfCatalog(), getSupportContact()]);
   if (draft.hash !== verdict.draftHash) return <Invalid reason="stale" />;
   return (
     <>
-      {renderHome({ content: draft.content, pricing, efCatalog, preview: true })}
+      {renderHome({ content: draft.content, pricing, efCatalog, preview: true, support })}
       {/* Yerinde düzenleme köprüsü: yalnız yönetim iframe'inde etkin (bridge.ts); yeni sekmede hiçbir şey yapmaz. */}
       <script dangerouslySetInnerHTML={{ __html: PREVIEW_BRIDGE_JS }} />
     </>

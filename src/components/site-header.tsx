@@ -5,6 +5,8 @@ import { SpeculationRules } from "@/components/marketing/speculation-rules";
 import { now } from "@/lib/clock";
 import { customCtas, toPublicMenu } from "@/lib/site-menu/public";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
+import { applySupportEmail } from "@/lib/site-menu/support-contact";
+import { getSupportContact } from "@/lib/contact-info-server";
 
 /**
  * Üst bar (sunucu bileşeni): menü verisi TEK KAYNAKTAN, yani admin'in yayınladığı yapılandırmadan (yoksa varsayılan menü)
@@ -21,7 +23,9 @@ const ANNOUNCEMENT_BOOT =
   'try{var b=document.currentScript&&document.currentScript.previousElementSibling,k=b&&b.getAttribute("data-key"),v=" "+(window.localStorage.getItem("mk-ann-off")||"")+" ";if(k&&v.indexOf(" "+k+" ")>-1)document.documentElement.setAttribute("data-mk-ann-off","1")}catch(e){}';
 
 export async function SiteHeader() {
-  const cfg = await getLiveSiteMenu();
+  // Destek adresi ayar defterinden (support.email); menüdeki derleme anı adresinin yerine geçer.
+  const [rawCfg, support] = await Promise.all([getLiveSiteMenu(), getSupportContact()]);
+  const cfg = applySupportEmail(rawCfg, support.email);
   const at = now();
   const menu = toPublicMenu(cfg, at);
   const groups = toClientGroups(menu);

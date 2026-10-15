@@ -81,7 +81,7 @@ describe("önizleme rotası sözleşmesi", () => {
   it("dinamik, noindex, taslağı gerçek ana sayfa işleviyle çizer", () => {
     expect(page).toContain('export const dynamic = "force-dynamic"');
     expect(page).toMatch(/robots:\s*\{\s*index:\s*false/);
-    expect(page).toContain("renderHome({ content: draft.content, pricing, efCatalog, preview: true })");
+    expect(page).toContain("renderHome({ content: draft.content, pricing, efCatalog, preview: true, support })");
     expect(page).toContain("getPublicPricing()");
     expect(page).toContain('reason="stale"');
   });
