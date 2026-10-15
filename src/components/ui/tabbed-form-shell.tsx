@@ -423,13 +423,19 @@ export function TabbedFormShell({
     const onFieldEdit = (e: Event) => clearCustom(e.target);
     const onSubmitIntent = (e: Event) => {
       if (e instanceof KeyboardEvent && e.key !== "Enter") return;
-      if (e instanceof MouseEvent && !(e.target as Element | null)?.closest?.("button[type=submit], input[type=submit], button:not([type])")) return;
+      // `data-tfs-submit`: requestSubmit çağıran type="button" düğmeler (eksik alan onayı) — aksi halde programatik
+      // değişen alanda eski özel ileti kalır ve gönderim takılırdı.
+      if (e instanceof MouseEvent && !(e.target as Element | null)?.closest?.("button[type=submit], input[type=submit], button:not([type]), [data-tfs-submit]")) return;
       clearCustom();
     };
     const localize = (el: Element) => {
       if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement)) return;
-      // Alanın kendi özel iletisi (bileşen kuralı) varsa dokunulmaz.
-      if (el.validity.customError && !el.hasAttribute(CV_ATTR)) return;
+      // Bizim eski iletimiz önce kaldırılır (yeniden hesaplanır; alan artık geçerliyse takılı kalmaz). Alanın kendi özel
+      // iletisi (bileşen kuralı, ör. Combobox) varsa dokunulmaz.
+      if (el.hasAttribute(CV_ATTR)) {
+        el.setCustomValidity("");
+        el.removeAttribute(CV_ATTR);
+      } else if (el.validity.customError) return;
       const msg = fieldValidityMessage(el);
       if (!msg) return;
       el.setCustomValidity(msg);
@@ -854,6 +860,7 @@ export function SubmitConfirmBand({
           size="sm"
           className="touch:h-11"
           autoFocus
+          data-tfs-submit=""
           onClick={() => {
             onConfirm();
             ref.current?.closest("form")?.requestSubmit();
