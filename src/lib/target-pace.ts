@@ -1,0 +1,63 @@
+/**
+ * HEDEF TEMPOSU (saf). Dönemin geçen payına göre beklenen ilerleme ile gerçekleşmeyi kıyaslar.
+ *
+ * Kural: dönemin en az %50'si geçmişken gerçekleşme, beklenen tempoya göre %70'in altındaysa "yavas".
+ *   beklenen = hedef × geçen pay;   tempo oranı = gerçekleşme / beklenen.
+ * Dönem başında (pay < %50) uyarı yok: erken dönem dalgalanması gürültü üretir.
+ * Hedef 0 / tanımsız → "yok" (uyarı yok). Hedef tutturulduysa → "tamam" (dönem içinde de).
+ * Dönem bittiyse ve hedef tutmadıysa → "bitti" (tempo uyarısı artık eyleme dönük değil).
+ *
+ * Zaman enjekte edilir (`nowMs`); dönem sınırları çağıranın hesabıdır (targetPeriodRange, TR takvimi).
+ */
+
+/** Uyarının devreye girdiği asgari geçen dönem payı (0–1). */
+export const TARGET_PACE_MIN_ELAPSED = 0.5;
+/** Beklenen tempoya göre bu oranın altı "yavaş" sayılır (0–1). */
+export const TARGET_PACE_SLOW_RATIO = 0.7;
+
+export type TargetPaceStatus = "yok" | "baslamadi" | "erken" | "yolunda" | "yavas" | "tamam" | "bitti";
+
+export type TargetPace = {
+  status: TargetPaceStatus;
+  /** Dönemin geçen payı (0–1, sınırlı). */
+  elapsedShare: number;
+  /** Bu ana kadar beklenen gerçekleşme (hedef × geçen pay). */
+  expected: number;
+  /** Gerçekleşme / beklenen; beklenen 0 ise null. */
+  paceRatio: number | null;
+};
+
+export function evaluateTargetPace(input: {
+  actual: number;
+  target: number;
+  startMs: number;
+  endMs: number;
+  nowMs: number;
+}): TargetPace {
+  const actual = Number.isFinite(input.actual) ? Math.max(0, input.actual) : 0;
+  const target = Number.isFinite(input.target) ? input.target : 0;
+  const total = input.endMs - input.startMs;
+  const rawShare = total > 0 ? (input.nowMs - input.startMs) / total : Number.NaN;
+  const elapsedShare = Number.isFinite(rawShare) ? Math.max(0, Math.min(1, rawShare)) : 0;
+  const expected = target > 0 ? target * elapsedShare : 0;
+  const paceRatio = expected > 0 ? actual / expected : null;
+  const base = { elapsedShare, expected, paceRatio };
+
+  if (!(target > 0) || !(total > 0)) return { ...base, status: "yok" };
+  if (actual >= target) return { ...base, status: "tamam" };
+  if (input.nowMs < input.startMs) return { ...base, status: "baslamadi" };
+  if (input.nowMs >= input.endMs) return { ...base, status: "bitti" };
+  if (elapsedShare < TARGET_PACE_MIN_ELAPSED) return { ...base, status: "erken" };
+  return { ...base, status: paceRatio !== null && paceRatio < TARGET_PACE_SLOW_RATIO ? "yavas" : "yolunda" };
+}
+
+/** Bir hedefin birden çok ölçütünden (anlaşma, gelir, randevu, portföy) temposu düşük olanların etiketleri. */
+export function slowPaceLabels(
+  metrics: readonly { label: string; actual: number; target: number }[],
+  range: { start: number; end: number },
+  nowMs: number,
+): string[] {
+  return metrics
+    .filter((m) => evaluateTargetPace({ actual: m.actual, target: m.target, startMs: range.start, endMs: range.end, nowMs }).status === "yavas")
+    .map((m) => m.label);
+}
