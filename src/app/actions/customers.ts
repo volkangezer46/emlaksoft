@@ -11,13 +11,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
-import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
+import { formatTurkishPhone, PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso, trDayKey } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { insertCustomerRecord, parseCustomerForm } from "@/lib/customer-create";
 import { assertCustomerNotDuplicate, CUSTOMER_DUPLICATE_ERROR } from "@/lib/duplicate-finders";
+import { CUSTOMER_MERGE_REF_LABELS, summarizeMergeRefs } from "@/lib/merge-labels";
+import { buildFieldChoices, customerNoteLines, sanitizeOverrides, type MergeFieldChoice } from "@/lib/merge-plan";
 import { isSalesAssigneeRole } from "@/lib/team/assignable-roles";
 
 /** `duplicate: true` → aynı telefon/e-posta ofiste kayıtlı; istemci onay alıp `allow_duplicate=1` ile yeniden gönderir. */
@@ -739,44 +741,21 @@ export async function bulkAddTag(ids: string[], tag: string): Promise<BulkCustom
 // ============================================================
 
 /**
- * customer_id kolonu taşınan alt kayıt tabloları — migrations'tan tespit
- * edildi (grep customer_id). Bu listeler artık YALNIZ getMergePreview'in
- * sayım sorguları için; asıl taşımayı yapan tek doğruluk kaynağı DB
- * fonksiyonu `public.merge_customers`tır (migration 20260726000093).
- * Yeni tablo eklenirse HEM burası HEM o fonksiyon güncellenmeli.
- *
- * Bilinçli olarak taşınmayanlar:
- *  - kvkk_erasure_log: tarihsel denetim kaydı, FK'sız; geçmişi değiştirmek
- *    KVKK izini bozar.
- *  - open_house_visitors.created_customer_id: "bu ziyaretçiden şu müşteri
- *    yaratıldı" tarihsel bağı; taşımak kaynak istatistiğini bozar.
+ * Birleştirmenin TEK doğruluk kaynağı DB'dir (migration 20261018010000):
+ *  - `merge_preview_counts('customers', ...)` customers(id)'ye FK veren TÜM tabloları (pg_constraint'ten, dinamik) sayar;
+ *  - `merge_customers` v2 aynı listeyi tek transaction'da taşır, alan seçimini (p_overrides) uygular, kopyanın farklı
+ *    telefon/e-postası ve notlarını ana kaydın notuna ekler, kopyaları soft-delete eder ve tek audit kaydı yazar.
+ * Etiketler: `src/lib/merge-labels.ts` (sözleşme testi her FK'nin etiketli olduğunu doğrular).
  */
-const MERGE_MOVE_TABLES: ReadonlyArray<{ table: string; label: string }> = [
-  { table: "customer_demands", label: "talep" },
-  { table: "calls", label: "çağrı" },
-  { table: "appointments", label: "randevu" },
-  { table: "offers", label: "teklif" },
-  { table: "contracts", label: "sözleşme" },
-  { table: "deals", label: "anlaşma" },
-  { table: "tasks", label: "görev" },
-  { table: "communications", label: "görüşme" },
-  { table: "customer_files", label: "dosya" },
-  { table: "payment_links", label: "ödeme linki" },
-  { table: "customer_portal_tokens", label: "portal erişimi" },
-];
+/** Tek birleştirmede en fazla bu kadar kopya kabul edilir (RPC ile aynı sınır). */
+const MERGE_DUP_LIMIT = 10;
 
-/**
- * Benzersizlik kısıtı olan alt tablolar — düz `update ... in (dupIds)`
- * unique ihlaliyle patlar. Ana kayıtta aynı anahtar yoksa taşınır; varsa
- * satır soft-delete'li duplicate üzerinde kalır (veri kaybı yok).
- *  - iys_consents:          unique(tenant_id, customer_id, channel)
- *  - portal_match_feedback: unique(customer_id, property_id)
- *  - lost_sale_dismissals:  unique(tenant_id, customer_id)
- */
-const MERGE_UNIQUE_TABLES: ReadonlyArray<{ table: string; label: string; keyCols: string[] }> = [
-  { table: "iys_consents", label: "İYS izni", keyCols: ["channel"] },
-  { table: "portal_match_feedback", label: "portal geri bildirimi", keyCols: ["property_id"] },
-  { table: "lost_sale_dismissals", label: "kayıp satış ertelemesi", keyCols: [] },
+const CUSTOMER_OVERRIDE_FIELDS: ReadonlyArray<{ field: "full_name" | "phone" | "email" | "assigned_to" | "branch_id"; label: string }> = [
+  { field: "full_name", label: "Ad soyad" },
+  { field: "phone", label: "Telefon" },
+  { field: "email", label: "E-posta" },
+  { field: "assigned_to", label: "Danışman" },
+  { field: "branch_id", label: "Şube" },
 ];
 
 type CustomerMergeRow = {
@@ -792,55 +771,51 @@ type CustomerMergeRow = {
   province_id: string | null;
   district_id: string | null;
   branch_id: string | null;
+  assigned_to: string | null;
   customer_types: string[] | null;
   tags: string[] | null;
   created_at: string;
 };
 
-const MERGE_FILL_FIELDS: ReadonlyArray<{ field: keyof CustomerMergeRow; label: string }> = [
+/** SQL'deki doldurma listesiyle aynı sıra (ana kayıtta boşsa en eski kopyadan). `kind: "ref"` = kimlik, adla gösterilir. */
+const MERGE_FILL_FIELDS: ReadonlyArray<{ field: keyof CustomerMergeRow; label: string; kind?: "ref" }> = [
   { field: "phone", label: "Telefon" },
   { field: "email", label: "E-posta" },
-  { field: "notes", label: "Notlar" },
   { field: "source", label: "Kaynak" },
   { field: "birth_date", label: "Doğum tarihi" },
   { field: "anniversary_date", label: "Yıldönümü" },
   { field: "anniversary_note", label: "Yıldönümü notu" },
-  { field: "province_id", label: "İl bilgisi" },
-  { field: "district_id", label: "İlçe bilgisi" },
-  { field: "branch_id", label: "Şube bilgisi" },
+  { field: "province_id", label: "İl bilgisi", kind: "ref" },
+  { field: "district_id", label: "İlçe bilgisi", kind: "ref" },
+  { field: "branch_id", label: "Şube bilgisi", kind: "ref" },
+  { field: "assigned_to", label: "Danışman", kind: "ref" },
 ];
 
-/**
- * Ana kayıtta BOŞ olan alanları duplicate'lerden (eskiden yeniye) doldurur.
- * Ana kayıt doluysa asla dokunulmaz. customer_types/tags dizileri birleşir.
- */
-function computeFillPatch(primary: CustomerMergeRow, dups: CustomerMergeRow[]) {
-  const patch: Record<string, unknown> = {};
+const filledText = (v: unknown) => (typeof v === "string" ? v.trim() : v == null ? "" : String(v));
+
+/** Ana kayıtta (alan seçimi uygulanmış haliyle) BOŞ olan alanların kopyadan doldurulacak değerleri. */
+function computeFillPatch(primary: CustomerMergeRow, dups: CustomerMergeRow[], names: Map<string, string>) {
   const filled: Array<{ label: string; value: string }> = [];
-  for (const { field, label } of MERGE_FILL_FIELDS) {
-    if (primary[field]) continue; // ana doluysa dokunma
-    const donor = dups.find((d) => d[field]);
+  const next = { ...primary };
+  for (const { field, label, kind } of MERGE_FILL_FIELDS) {
+    if (filledText(primary[field])) continue;
+    const donor = dups.find((d) => filledText(d[field]));
     if (!donor) continue;
-    patch[field] = donor[field];
-    filled.push({ label, value: String(donor[field]) });
+    const raw = filledText(donor[field]);
+    (next as Record<string, unknown>)[field] = donor[field];
+    filled.push({ label, value: kind === "ref" ? (names.get(raw) ?? "eklenecek") : raw });
   }
   const mergedTypes = [...new Set([...(primary.customer_types ?? []), ...dups.flatMap((d) => d.customer_types ?? [])])];
-  if (mergedTypes.length > (primary.customer_types ?? []).length) {
-    patch.customer_types = mergedTypes;
-    filled.push({ label: "Müşteri tipi", value: mergedTypes.join(", ") });
-  }
+  if (mergedTypes.length > (primary.customer_types ?? []).length) filled.push({ label: "Müşteri tipi", value: mergedTypes.join(", ") });
   const mergedTags = [...new Set([...(primary.tags ?? []), ...dups.flatMap((d) => d.tags ?? [])])];
-  if (mergedTags.length > (primary.tags ?? []).length) {
-    patch.tags = mergedTags;
-    filled.push({ label: "Etiketler", value: mergedTags.join(", ") });
-  }
-  return { patch, filled };
+  if (mergedTags.length > (primary.tags ?? []).length) filled.push({ label: "Etiketler", value: mergedTags.join(", ") });
+  return { filled, next };
 }
 
 const MERGE_SELECT_COLS =
-  "id, full_name, phone, email, notes, source, birth_date, anniversary_date, anniversary_note, province_id, district_id, branch_id, customer_types, tags, created_at";
+  "id, full_name, phone, email, notes, source, birth_date, anniversary_date, anniversary_note, province_id, district_id, branch_id, assigned_to, customer_types, tags, created_at";
 
-/** Ana + duplicate kayıtları tenant doğrulamasıyla yükler (silinmişler hariç). */
+/** Ana + kopya kayıtları tenant doğrulamasıyla yükler (silinmişler hariç). */
 async function loadMergeParties(
   supabase: Awaited<ReturnType<typeof createClient>>,
   tenantId: string,
@@ -867,51 +842,122 @@ async function loadMergeParties(
   return { primary, dups };
 }
 
+/** Danışman, şube, il ve ilçe kimliklerinin adları (önizleme gösterimi için; bulunamayan kimlik atlanır). */
+async function loadMergeRefNames(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantId: string,
+  rows: CustomerMergeRow[],
+): Promise<Map<string, string>> {
+  const uniq = (k: keyof CustomerMergeRow) => [...new Set(rows.map((r) => r[k]).filter((v): v is string => typeof v === "string" && !!v))];
+  const advisors = uniq("assigned_to");
+  const branches = uniq("branch_id");
+  const provinces = uniq("province_id");
+  const districts = uniq("district_id");
+  const none = Promise.resolve({ data: [] as Array<{ id: string; name?: string | null; full_name?: string | null }> });
+  // Coğrafya adları tek merkezden (geo/reader); yalnız önizlemede gerektiği için tembel yüklenir.
+  const { getDistrictNameMap, getProvinceNameMap } = await import("@/lib/geo/reader");
+  const [a, b, p, d] = await Promise.all([
+    advisors.length ? supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).in("id", advisors) : none,
+    branches.length ? supabase.from("branches").select("id, name").eq("tenant_id", tenantId).in("id", branches) : none,
+    provinces.length ? getProvinceNameMap(provinces) : Promise.resolve(new Map<string, string>()),
+    districts.length ? getDistrictNameMap(districts) : Promise.resolve(new Map<string, string>()),
+  ]);
+  const out = new Map<string, string>([...p, ...d]);
+  for (const res of [a, b]) {
+    for (const r of ((res as { data: unknown }).data ?? []) as Array<{ id: string; name?: string | null; full_name?: string | null }>) {
+      const label = (r.full_name ?? r.name ?? "").trim();
+      if (label) out.set(r.id, label);
+    }
+  }
+  return out;
+}
+
+function mergeStamp(): string {
+  const [y, m, d] = trDayKey().split("-");
+  return `${d}.${m}.${y}`;
+}
+
 export type MergePreview = {
   ok?: boolean;
   error?: string;
   counts?: Array<{ label: string; count: number }>;
   totalMoves?: number;
   filled?: Array<{ label: string; value: string }>;
+  /** Kayıtlar arasında farklı olan alanlar (ad, telefon, e-posta, danışman, şube) — sihirbazın "Alan seçimi" adımı. */
+  choices?: MergeFieldChoice[];
+  /** Kaybolmasın diye ana kaydın notuna eklenecek satırlar (farklı telefon/e-posta, kopya notları). */
+  noteLines?: string[];
 };
 
 /**
- * Birleştirme sihirbazı 2. adım özeti: taşınacak alt kayıt sayıları (gerçek
- * count sorguları) + ana kayda kopyalanacak boş alanlar. Hiçbir şey yazmaz.
+ * Birleştirme sihirbazı önizlemesi: taşınacak bağlı kayıt sayıları (DB, tüm FK'ler), alan seçimi seçenekleri,
+ * doldurulacak boş alanlar ve nota eklenecek satırlar. `overrides` verilirse (alan -> kaynak kayıt) özet o seçime göre
+ * hesaplanır. Hiçbir şey yazmaz.
  */
 export async function getMergePreview(
   primaryId: string,
   duplicateIds: string[],
+  overrides?: Record<string, string>,
 ): Promise<MergePreview> {
   const gate = await requirePermission("customers", "delete");
   if (!gate.ok) return { error: gate.error };
+  primaryId = String(primaryId ?? "").trim();
+  duplicateIds = [...new Set((duplicateIds ?? []).map((s) => String(s).trim()).filter(Boolean))];
   if (!primaryId || !duplicateIds.length) return { error: "Kayıt seçilmedi." };
-  if (duplicateIds.includes(primaryId)) return { error: "Ana kayıt duplicate listesinde olamaz." };
+  if (duplicateIds.includes(primaryId)) return { error: "Ana kayıt kopya listesinde olamaz." };
+  if (duplicateIds.length > MERGE_DUP_LIMIT) return { error: `Tek seferde en fazla ${MERGE_DUP_LIMIT} kayıt birleştirilebilir.` };
+  const sel = sanitizeOverrides(overrides, CUSTOMER_OVERRIDE_FIELDS.map((f) => f.field), primaryId, duplicateIds);
+  if (!sel.ok) return { error: sel.error };
 
   const supabase = await createClient();
   const parties = await loadMergeParties(supabase, gate.tenantId, primaryId, duplicateIds);
   if ("error" in parties) return { error: parties.error };
 
-  const counts: Array<{ label: string; count: number }> = [];
-  let totalMoves = 0;
-  for (const t of [...MERGE_MOVE_TABLES, ...MERGE_UNIQUE_TABLES]) {
-    const { count, error } = await supabase
-      .from(t.table)
-      .select("id", { count: "exact", head: true })
-      .in("customer_id", duplicateIds)
-      .eq("tenant_id", gate.tenantId);
-    if (error) {
-      console.error(`getMergePreview ${t.table}`, error);
-      continue;
-    }
-    if (count) {
-      counts.push({ label: t.label, count });
-      totalMoves += count;
-    }
+  const [refs, names] = await Promise.all([
+    supabase.rpc("merge_preview_counts", {
+      p_target: "customers",
+      p_tenant_id: gate.tenantId,
+      p_primary: primaryId,
+      p_duplicates: duplicateIds,
+    }),
+    loadMergeRefNames(supabase, gate.tenantId, [parties.primary, ...parties.dups]),
+  ]);
+  if (refs.error) {
+    console.error("getMergePreview rpc", refs.error);
+    return { error: "Taşınacak kayıtlar sayılamadı. Lütfen tekrar deneyin." };
   }
+  const { counts, total } = summarizeMergeRefs(CUSTOMER_MERGE_REF_LABELS, (refs.data as { moved?: unknown } | null)?.moved);
 
-  const { filled } = computeFillPatch(parties.primary, parties.dups);
-  return { ok: true, counts, totalMoves, filled };
+  const all = [parties.primary, ...parties.dups];
+  const choices = buildFieldChoices(
+    primaryId,
+    all.map((r) => ({
+      id: r.id,
+      values: Object.fromEntries(CUSTOMER_OVERRIDE_FIELDS.map(({ field }) => [field, r[field]])),
+      display: {
+        phone: r.phone ? formatTurkishPhone(r.phone) : null,
+        assigned_to: r.assigned_to ? (names.get(r.assigned_to) ?? "Danışman") : null,
+        branch_id: r.branch_id ? (names.get(r.branch_id) ?? "Şube") : null,
+      },
+    })),
+    CUSTOMER_OVERRIDE_FIELDS,
+  );
+
+  // Alan seçimi uygulanmış ana kayıt → doldurma ve not satırları onun üzerinden.
+  const effective: CustomerMergeRow = { ...parties.primary };
+  for (const [field, source] of Object.entries(sel.overrides)) {
+    const src = parties.dups.find((d) => d.id === source);
+    if (src) (effective as Record<string, unknown>)[field] = src[field as keyof CustomerMergeRow];
+  }
+  const { filled, next } = computeFillPatch(effective, parties.dups, names);
+  const noteLines = customerNoteLines({
+    primary: parties.primary,
+    dups: parties.dups,
+    finalPhone: next.phone,
+    finalEmail: next.email,
+    stamp: mergeStamp(),
+  });
+  return { ok: true, counts, totalMoves: total, filled, choices, noteLines };
 }
 
 export type MergeResult = {
@@ -922,24 +968,15 @@ export type MergeResult = {
   deletedCount?: number;
 };
 
-/** Tek birleştirmede en fazla bu kadar duplicate kabul edilir. */
-const MERGE_DUP_LIMIT = 10;
-
 /**
- * Müşteri birleştirme — geri alınamaz.
- *
- * Tüm yazma işi TEK TRANSACTION'da DB fonksiyonunda yapılır:
- * `public.merge_customers` (migration 20260726000093) alt kayıt taşıma,
- * benzersiz kısıtlı tablolar, share_links, boş alan doldurma, soft delete
- * ve audit kaydını atomik yürütür — ya hepsi ya hiçbiri. Taşınan tablo
- * listesinin TEK doğruluk kaynağı o fonksiyondur; buradaki
- * MERGE_MOVE_TABLES/MERGE_UNIQUE_TABLES yalnız önizleme (getMergePreview)
- * içindir. Fonksiyon yalnız service_role çağırabilir; yetki kapısı ve ön
- * doğrulamalar bu action'da kalır.
+ * Müşteri birleştirme — geri alınamaz. Tüm yazma işi TEK TRANSACTION'da `public.merge_customers` v2'de
+ * (20261018010000): bağlı kayıtların tamamı, alan seçimi, boş alan doldurma, not satırları, soft delete, audit.
+ * Fonksiyon yalnız service_role çağırabilir; yetki kapısı ve ön doğrulamalar bu action'da kalır.
  */
 export async function mergeCustomers(
   primaryId: string,
   duplicateIds: string[],
+  overrides?: Record<string, string>,
 ): Promise<MergeResult> {
   const gate = await requirePermission("customers", "delete");
   if (!gate.ok) return { error: gate.error };
@@ -948,13 +985,15 @@ export async function mergeCustomers(
   duplicateIds = [...new Set((duplicateIds ?? []).map((s) => String(s).trim()).filter(Boolean))];
   if (!primaryId) return { error: "Ana kayıt seçilmedi." };
   if (!duplicateIds.length) return { error: "Birleştirilecek kayıt seçilmedi." };
-  if (duplicateIds.includes(primaryId)) return { error: "Ana kayıt duplicate listesinde olamaz." };
+  if (duplicateIds.includes(primaryId)) return { error: "Ana kayıt kopya listesinde olamaz." };
   if (duplicateIds.length > MERGE_DUP_LIMIT) {
     return { error: `Tek seferde en fazla ${MERGE_DUP_LIMIT} kayıt birleştirilebilir.` };
   }
+  const sel = sanitizeOverrides(overrides, CUSTOMER_OVERRIDE_FIELDS.map((f) => f.field), primaryId, duplicateIds);
+  if (!sel.ok) return { error: sel.error };
 
-  // Ön doğrulama: kayıtlar bu tenant'a ait ve silinmemiş mi? (RPC de aynı
-  // kontrolü yapar ama burada kullanıcıya net Türkçe hata dönebiliyoruz.)
+  // Ön doğrulama: kayıtlar bu tenant'a ait ve silinmemiş mi? (RPC de aynı kontrolü yapar ama burada kullanıcıya net
+  // Türkçe hata dönebiliyoruz.)
   const supabase = await createClient();
   const tenantId = gate.tenantId;
   const parties = await loadMergeParties(supabase, tenantId, primaryId, duplicateIds);
@@ -967,6 +1006,7 @@ export async function mergeCustomers(
     p_primary: primaryId,
     p_duplicates: duplicateIds,
     p_actor: gate.userId,
+    p_overrides: sel.overrides,
   });
   if (error) {
     console.error("mergeCustomers rpc", error);
@@ -986,6 +1026,7 @@ export async function mergeCustomers(
     deletedCount: result.deleted_count ?? duplicateIds.length,
   };
 }
+
 
 /**
  * Müşteri kartındaki "Danışmanı değiştir" (tek müşteri). Hedef danışman bu ofisin AKTİF SATIŞ rolündeki kullanıcısı
