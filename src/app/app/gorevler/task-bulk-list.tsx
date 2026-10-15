@@ -2,8 +2,10 @@
 
 import { createContext, useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, X } from "lucide-react";
-import { completeTasksBulk } from "@/app/actions/tasks";
+import { CheckCheck, UserCog, X } from "lucide-react";
+import { bulkAssignTasks, completeTasksBulk } from "@/app/actions/tasks";
+import { Button } from "@/components/ui/button";
+import { PersonSelect } from "@/components/ui/person-select";
 import { useToast } from "@/components/app/toast-provider";
 import { useAutoAnimate } from "@/components/ui/auto-animate";
 
@@ -32,11 +34,18 @@ type Item = {
 
 const EMPTY_DONE: ReadonlySet<string> = new Set();
 
-export function TaskBulkList({ items }: { items: Item[] }) {
+/**
+ * `members`: "Sorumlu değiştir" seçicisi (ofisin aktif üyeleri). Boşsa toplu sorumlu değiştirme gösterilmez;
+ * yetki sunucuda `tasks.edit` ile yeniden denetlenir (seçim zaten yalnız düzenleme yetkisinde açılır).
+ */
+export function TaskBulkList({ items, members = [] }: { items: Item[]; members?: { id: string; name: string }[] }) {
   const router = useRouter();
   const { push } = useToast();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [pending, startTransition] = useTransition();
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignee, setAssignee] = useState("");
+  const [assignPending, startAssign] = useTransition();
   // Tamamlanan/silinen görev satırı yumuşak çıkar, kalanlar yerine kayar (key = görev id).
   const listRef = useAutoAnimate<HTMLDivElement>();
   // Boş taban + birleştirici reducer: transition boyunca id'ler kümede kalır,
@@ -80,6 +89,24 @@ export function TaskBulkList({ items }: { items: Item[] }) {
     });
   }
 
+  function reassign() {
+    if (selected.size === 0 || !assignee || assignPending) return;
+    const ids = [...selected];
+    const name = members.find((m) => m.id === assignee)?.name ?? "seçilen kişi";
+    startAssign(async () => {
+      const res = await bulkAssignTasks(ids, assignee);
+      if (res.error) {
+        push(res.error, "err");
+        return;
+      }
+      push(`${res.updatedCount ?? ids.length} görev ${name} kişisine devredildi`, "ok");
+      setSelected(new Set());
+      setAssignOpen(false);
+      setAssignee("");
+      router.refresh();
+    });
+  }
+
   return (
     <OptimisticDoneContext.Provider value={optimisticDone}>
     <div ref={listRef} className="space-y-2">
@@ -107,6 +134,21 @@ export function TaskBulkList({ items }: { items: Item[] }) {
                 <CheckCheck className="h-4 w-4" />
                 Seçilenleri tamamla
               </button>
+              {members.length > 0 ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setAssignee("");
+                    setAssignOpen((o) => !o);
+                  }}
+                  aria-expanded={assignOpen}
+                  disabled={pending || assignPending}
+                >
+                  <UserCog className="h-4 w-4" />
+                  Sorumlu değiştir
+                </Button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setSelected(new Set())}
@@ -119,6 +161,28 @@ export function TaskBulkList({ items }: { items: Item[] }) {
             <span className="text-xs text-text-faint">Toplu tamamlamak için görevleri işaretleyin.</span>
           )}
         </div>
+      ) : null}
+
+      {assignOpen && selected.size > 0 ? (
+        <section aria-label="Sorumlu değiştir" className="rounded-[var(--radius-card)] border border-brand-300 bg-surface p-4">
+          <p className="text-sm font-semibold text-ink-950">Sorumlu değiştir</p>
+          <p className="mt-0.5 text-xs text-text-muted">{selected.size} görev seçili — hepsi aynı kişiye devredilir.</p>
+          <label htmlFor="task-bulk-assign" className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
+            Sorumlu
+          </label>
+          <PersonSelect
+            id="task-bulk-assign"
+            className="max-w-sm"
+            value={assignee}
+            onValueChange={setAssignee}
+            people={members}
+            emptyLabel="Kişi seçin"
+          />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setAssignOpen(false)}>Vazgeç</Button>
+            <Button size="sm" loading={assignPending} disabled={!assignee} onClick={reassign}>Ata</Button>
+          </div>
+        </section>
       ) : null}
 
       {items.map((item, i) => (

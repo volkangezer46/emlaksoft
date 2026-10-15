@@ -8,6 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { publishBlockReasons } from "@/lib/property-owner/server";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { afterSafe } from "@/lib/after-safe";
+import { logActivity } from "@/lib/activity";
+import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
+import { trDayKey } from "@/lib/clock";
+import { isSalesAssigneeRole } from "@/lib/team/assignable-roles";
 
 const MANUAL_STATUSES = ["draft", "live", "reserved", "passive", "withdrawn", "archived"] as const;
 
@@ -112,4 +117,69 @@ function blockedSummary(blocked: NonNullable<BulkUpdateResult["blocked"]>): stri
   const shown = blocked.slice(0, 3).map((b) => `${b.label}: ${b.reason}`).join(" · ");
   const more = blocked.length > 3 ? ` · ve ${blocked.length - 3} portföy daha` : "";
   return `${blocked.length} portföy yayına alınamadı — ${shown}${more}`;
+}
+
+const BULK_ASSIGN_LIMIT = 200;
+
+export type BulkAssignPropertiesResult = { ok?: boolean; error?: string; updatedCount?: number };
+
+/**
+ * Toplu sorumlu değiştirme (bkz. `bulkAssignCustomers` deseni): seçili portföyler aynı danışmana devredilir.
+ * Kapı `properties.edit`; kimlikler ofis + silinmemiş süzgecinden geçer; hedef bu ofisin AKTİF satış rolündeki
+ * kullanıcısı olmalı (müşteri devriyle aynı kural). Tek denetim kaydı (`property.reassign`, toplu temsil) ve el
+ * değiştiren portföy varsa hedefe tek seferlik bildirim.
+ */
+export async function bulkAssignProperties(ids: string[], assignedTo: string): Promise<BulkAssignPropertiesResult> {
+  const gate = await requirePermission("properties", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id).trim()).filter(Boolean))];
+  if (!list.length) return { error: "Portföy seçilmedi." };
+  if (list.length > BULK_ASSIGN_LIMIT) return { error: `Tek seferde en fazla ${BULK_ASSIGN_LIMIT} portföy güncellenebilir.` };
+  const target = String(assignedTo ?? "").trim();
+  if (!target) return { error: "Danışman seçin." };
+
+  const supabase = await createClient();
+  const [targetRes, beforeRes] = await Promise.all([
+    supabase.from("profiles").select("id, role").eq("id", target).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle(),
+    supabase.from("properties").select("id, assigned_to").in("id", list).eq("tenant_id", gate.tenantId).is("deleted_at", null),
+  ]);
+  const targetRow = targetRes.data as { id: string; role: string | null } | null;
+  if (!targetRow) return { error: "Seçilen danışman bu ofiste aktif değil." };
+  if (!isSalesAssigneeRole(targetRow.role)) return { error: "Bu kullanıcının rolüne portföy atanamaz (yalnız satış rolleri)." };
+  const previous = ((beforeRes.data ?? []) as { id: string; assigned_to: string | null }[]);
+  const validIds = previous.map((p) => p.id);
+  if (!validIds.length) return { error: "Güncellenecek portföy bulunamadı." };
+  const movedCount = previous.filter((p) => (p.assigned_to ?? "") !== target).length;
+
+  const { error } = await supabase
+    .from("properties")
+    .update({ assigned_to: target, updated_at: new Date().toISOString() })
+    .in("id", validIds)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("bulkAssignProperties", error);
+    return { error: actionErrorMessage(error, "Danışman ataması yapılamadı.") };
+  }
+  if (target !== gate.userId && movedCount > 0) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: target,
+      title: movedCount === 1 ? "Size 1 portföy devredildi" : `Size ${movedCount} portföy devredildi`,
+      body: "Toplu atama ile portföyler size devredildi. Malik ve ilan durumunu kontrol edip ilk adımı planlayın.",
+      href: "/app/portfoyler",
+      dedupeKey: `property-bulk-assign:${target}:${idsDigest(validIds)}:${trDayKey()}`,
+    });
+  }
+  afterSafe(() => logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "property.reassign",
+    entityType: "property",
+    oldValue: { previous },
+    newValue: { ids: validIds, assigned_to: target, count: validIds.length, bulk: true },
+  }));
+
+  revalidatePath("/app/portfoyler");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, updatedCount: validIds.length };
 }
