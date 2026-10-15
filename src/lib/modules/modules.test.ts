@@ -243,7 +243,7 @@ describe("menü birleşimi 41 -> 36 ve kapalı modül kapısı", () => {
       expect(topHrefs).not.toContain(gone);
     }
     const tabsOf = (href: string) => items.find((i) => i.href === href)?.tabs?.map((t) => t.href);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/arama-listesi", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
     expect(tabsOf("/app/portfoyler")).toEqual(["/app/portfoyler", "/app/portfoy-avi", "/app/portfoyler/anahtarlar", "/app/portfoyler/sunumlar", "/app/ilan-havuzu", "/app/ayarlar/filigran"]);
   });

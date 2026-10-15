@@ -22,6 +22,9 @@ import { createCall } from "@/app/actions/calls";
 import { createCommunication } from "@/app/actions/communications";
 import { createTask } from "@/app/actions/tasks";
 
+/** Sonuç kaydedilince yayılan pencere olayı (`detail.customerId`); arama listesi bununla sıradakine geçer. */
+export const CONTACT_OUTCOME_LOGGED_EVENT = "emlaksoft:contact-outcome-logged";
+
 /** Sayfada birden fazla örnek bağlanırsa (liste + süzgeç) yalnız ilki dinler; aynı temas iki kez sorulmaz. */
 let owner: symbol | null = null;
 
@@ -131,6 +134,7 @@ export function ContactOutcomePrompt() {
       if (log.task) taskError = (await createTask({}, toFormData(log.task))).error;
       setNote("");
       dispatch({ type: "logged" });
+      window.dispatchEvent(new CustomEvent(CONTACT_OUTCOME_LOGGED_EVENT, { detail: { customerId: contact.customerId } }));
       if (taskError) toast.push(`Görüşme kaydedildi; geri arama görevi oluşturulamadı: ${taskError}`, "err");
       else toast.push(log.task ? "Görüşme kaydedildi, yarın 10:00 için geri arama görevi açıldı." : "Görüşme sonucu kaydedildi.", "ok");
     });

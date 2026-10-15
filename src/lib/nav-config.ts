@@ -124,6 +124,7 @@ export const NAV_SECTIONS: readonly NavSection[] = [
         module: "customers",
         tabs: [
           { href: "/app/musteriler", label: "Müşteriler", icon: ICONS.musteri, module: "customers" },
+          { href: "/app/arama-listesi", label: "Arama listesi", icon: ICONS.telefon, module: "customers", description: "Bugün aranacak müşteriler sırayla; ara, sonucu kaydet, sıradakine geç", keywords: ["arama", "power dialer", "bugün ara", "telefon", "geri arama"] },
           { href: "/app/tavsiyeler", label: "Tavsiyeler", icon: ICONS.tavsiye, module: "customers", description: "Müşteri tavsiye bağlantıları ve referans zinciri", keywords: ["referans", "tavsiye"] },
           // Modül ayarı modülün içinde (yol sabit; aynı sayfa Ayarlar dizininden de açılır — tek form, iki giriş).
           { href: "/app/ayarlar/etiketler", label: "Etiketler", icon: ICONS.musteri, module: "customers", description: "Müşteri etiketlerini yeniden adlandır, birleştir ya da kaldır", keywords: ["etiket", "ayar"] },

@@ -113,6 +113,7 @@ import { provinceOptionsResult } from "@/lib/geo/reader";
 import { EmlakFiyatiEndeksPanel } from "@/components/app/emlakfiyati-endeks-panel";
 import { mapPropertyTypeToTip } from "@/lib/integrations/emlakfiyati/contract";
 import { SampleRecordBadge } from "@/components/ui/sample-data-badge";
+import { PropertyPublicRecordsCard } from "@/components/app/property-public-records-card";
 
 export const metadata = { title: "Portföy" };
 
@@ -192,7 +193,7 @@ export default async function PropertyDetailPage({
     supabase
       .from("properties")
       .select(
-        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, currency, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, branch_id, province:geo_provinces(name), district:geo_districts(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
+        "id, is_sample, property_code, title, transaction_type, property_type, status, list_price, currency, min_price, commission_rate, address_line, province_id, district_id, neighborhood_id, parcel_block, parcel_lot, lat, lng, features, price_health, published_at, created_at, updated_at, assigned_to, branch_id, province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name), assignee:profiles!properties_assigned_to_fkey(full_name)",
       )
       .eq("id", id)
       .is("deleted_at", null)
@@ -333,6 +334,7 @@ export default async function PropertyDetailPage({
   const features = (property.features ?? {}) as { rooms?: string | null; sqm?: number | null };
   const province = relName(property.province as Rel);
   const district = relName(property.district as Rel);
+  const neighborhood = relName(property.neighborhood as Rel);
   const assignee = assigneeProfile?.full_name ?? null;
   // Tek dokunuşla WhatsApp taslağı: ofis şablonu portföy değişkenleriyle dolar, alıcıyı danışman WhatsApp'ta seçer.
   const officeInfo = tenantRow as { name?: string | null; phone?: string | null } | null;
@@ -723,6 +725,11 @@ export default async function PropertyDetailPage({
               </p>
             </section>
           </div>
+
+          {/* Kamu kayıt kısayolları: TKGM parsel sorgu (ada/parsel varsa) + AFAD/DASK bağlantıları — yalnız dış link */}
+          <PropertyPublicRecordsCard
+            parcel={{ province, district, neighborhood, block: property.parcel_block, lot: property.parcel_lot }}
+          />
 
           {/* Kaynak/atama/yabancıya satış künyesi + portföye bağlı giderler (kendi sorgusu) */}
           <Suspense fallback={null}>

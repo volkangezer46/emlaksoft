@@ -126,7 +126,7 @@ describe("menü sadeleştirme (konsey dalga 2, paket D)", () => {
     const tabsOf = (h: string) => items.find((i) => i.href === h)?.tabs?.map((t) => t.href) ?? [];
     expect(tabsOf("/app/ilan-kontrol")).toEqual([]);
     expect(tabsOf("/app/anlasmalar")).toEqual(["/app/anlasmalar", "/app/teklifler"]);
-    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
+    expect(tabsOf("/app/musteriler")).toEqual(["/app/musteriler", "/app/arama-listesi", "/app/tavsiyeler", "/app/ayarlar/etiketler"]);
   });
   it("Ofis kataloğu 9 sayfa tutar (yan menüde görünürlük rol bazlı merkezlerle belirlenir, bkz. nav-roles)", () => {
     const ofis = NAV_SECTIONS.find((s) => s.id === "ofis")!;
