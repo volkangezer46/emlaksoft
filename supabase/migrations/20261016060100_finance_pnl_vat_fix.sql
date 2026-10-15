@@ -1,6 +1,7 @@
 -- MIGRATION 20261016060100_finance_pnl_vat_fix.sql
 -- UYGULANMADI: yalniz restore edilebilir backup/PITR dogrulandiktan sonra SAHIBI uygular.
--- Geri alma: supabase/rollbacks/20261016060100_finance_pnl_vat_fix.rollback.sql (uc fonksiyonun canli govdesi birebir).
+-- Geri alma: supabase/rollbacks/20261016060100_finance_pnl_vat_fix.rollback.sql (dort fonksiyonun canli govdesi birebir;
+--   finance_budget_vs_actual_for silinir).
 -- BAGIMLILIK: 20261014001100_finance_ledger_v2_rpc.sql (finance_pnl, finance_vat_summary ilk tanim + ACL),
 --   20261014011000_finance_party_advisor_scope.sql (finance_open_item_settle son govdesi; P12 cari kapsami).
 --
@@ -16,7 +17,9 @@
 --   KDV'si ikinci kez sayilmaz. (b) finance_open_item_settle tahsilat/odeme hareketine ORANTILI KDV yazar (kalem KDV'si x belge payi /
 --   kalem tutari; son tahsilat kalan KDV'yi alir, yuvarlama artigi kalmaz). Boylece finance_pnl geliri KDV haric sayar ve Hareketler'de
 --   KDV gorunur. Nakit tutar, stopaj ve kalem kapanisi DEGISMEZ.
--- IMZA/ACL: uc fonksiyonun imzasi ayni; CREATE OR REPLACE ACL'i korur (yine de yeniden yazilir).
+-- BULGU SK6/B018 (butce icgorusu ile Butce sekmesi farkli kaynak): govde finance_budget_vs_actual_for(p_tenant, p_month, p_include_salary)
+--   fonksiyonuna tasinir (YALNIZ service_role); finance_budget_vs_actual onu oturum kapisindan (finance_v2_ctx) cagirir. Ayrinti dosya sonunda.
+-- IMZA/ACL: mevcut dort fonksiyonun imzasi ayni; CREATE OR REPLACE ACL'i korur (yine de yeniden yazilir). Yeni fonksiyon yalniz service_role.
 -- KOD SIRASI: bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod RPC ciktisini ayni anahtarlarla okur; yalniz degerler duzelir).
 set local lock_timeout = '5s';
 
@@ -261,3 +264,86 @@ revoke all on function public.finance_vat_summary(date, date) from public, anon;
 grant execute on function public.finance_vat_summary(date, date) to authenticated, service_role;
 revoke all on function public.finance_open_item_settle(uuid, uuid, numeric, date, text) from public, anon;
 grant execute on function public.finance_open_item_settle(uuid, uuid, numeric, date, text) to authenticated, service_role;
+
+-- ===========================================================================
+-- SK6/B018: Butce <-> gerceklesen TEK KAYNAK. Icgoru motoru (expense_budget@1) eskiden v1 'expense_budgets' tablosunu ve yalniz
+--   'expenses' toplamini okuyordu; Butce sekmesi ise finance_budgets (v2) + hareketleri (finance_budget_vs_actual). Kart 45.000 TL
+--   derken sekme 70.710 TL gosteriyordu. Govde finance_budget_vs_actual_for'a tasinir; sekme (oturum, finance_v2_ctx) ve motor
+--   (service_role, acik kiraci) AYNI govdeyi okur. finance_budget_vs_actual'in imzasi, guvenligi ve ciktisi AYNI.
+--   Tek fark: komisyon tahsilati hareketi (source_type 'commission', SK6/B109 ile KDV DAHIL yazilir; v1 hareketinde vat_amount bos)
+--   gerceklesene KDV HARIC girer (komisyonun KDV payi orantili dusulur); boylece gelir hedefi kar/zarar ile ayni tabanda kalir.
+-- ===========================================================================
+create or replace function public.finance_budget_vs_actual_for(p_tenant uuid, p_month date, p_include_salary boolean)
+returns table (direction text, category text, budget numeric, actual numeric)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_m date := pg_catalog.date_trunc('month', p_month)::date;
+  v_m_end date;
+  v_gm boolean := coalesce(p_include_salary, false);
+begin
+  if p_tenant is null or p_month is null then perform public.finance_v2_raise('invalid_input'); end if;
+  v_m_end := (v_m + interval '1 month')::date;
+  return query
+  with b as (
+    select distinct on (fb.direction, fb.category) fb.direction as bdir, fb.category as bcat, fb.amount as bamt
+      from public.finance_budgets fb
+     where fb.tenant_id = p_tenant and fb.period_month <= v_m and (fb.category is distinct from 'maas' or v_gm)
+     order by fb.direction, fb.category, fb.period_month desc
+  ),
+  a as (
+    select 'out'::text as adir, public.finance_v2_budget_category(x.category::text, 'out') as acat, x.amount as aamt
+      from public.expenses x
+     where x.tenant_id = p_tenant and x.is_sample = false and x.expense_date >= v_m and x.expense_date < v_m_end
+       and not exists (select 1 from public.owner_charge_links l where l.kind = 'expense' and l.ref_id = x.id and l.tenant_id = x.tenant_id)
+    union all
+    select e.direction,
+           public.finance_v2_budget_category(coalesce(e.category, case when e.direction = 'in' then 'diger_gelir' else 'diger_gider' end), e.direction),
+           e.amount + coalesce(e.withholding_amount, 0)
+             - coalesce(e.vat_amount,
+                        case when e.source_type = 'commission' then
+                          (select pg_catalog.round(e.amount * c.vat_amount / nullif(c.gross_amount + c.vat_amount, 0), 2)
+                             from public.commissions c
+                            where c.id = e.source_id and c.tenant_id = e.tenant_id and c.vat_amount > 0)
+                        end, 0)
+      from public.cash_entries e
+      join public.finance_accounts ac on ac.id = e.account_id and ac.tenant_id = e.tenant_id and ac.owner_scope = 'office'
+     where e.tenant_id = p_tenant and e.voided_at is null and e.is_sample = false and e.currency = 'TRY'
+       and e.entry_date >= v_m and e.entry_date < v_m_end
+       and ((e.kind = 'income') or (e.kind = 'expense' and e.expense_id is null))
+       and coalesce(e.category, '') not in ('transfer', 'mulk_sahibi_odeme')
+       and (e.category is distinct from 'maas' or v_gm)
+  ),
+  aa as (select a.adir, a.acat, sum(a.aamt) as aamt from a group by a.adir, a.acat)
+  select coalesce(b.bdir, aa.adir), coalesce(b.bcat, aa.acat), coalesce(b.bamt, 0)::numeric, coalesce(aa.aamt, 0)::numeric
+    from b
+    full join aa on aa.adir = b.bdir and aa.acat = b.bcat
+   where coalesce(b.bamt, 0) > 0 or coalesce(aa.aamt, 0) > 0
+   order by 1, 2;
+end;
+$$;
+
+-- Acik kiraci parametresi: YALNIZ service_role (icgoru motoru). Oturum yolu asagidaki sarmalayicidan gecer (finance_v2_ctx kapisi).
+revoke all on function public.finance_budget_vs_actual_for(uuid, date, boolean) from public, anon, authenticated;
+grant execute on function public.finance_budget_vs_actual_for(uuid, date, boolean) to service_role;
+
+create or replace function public.finance_budget_vs_actual(p_month date)
+returns table (direction text, category text, budget numeric, actual numeric)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_tenant uuid := public.finance_v2_ctx('view');
+begin
+  if p_month is null then perform public.finance_v2_raise('invalid_input'); end if;
+  return query select * from public.finance_budget_vs_actual_for(v_tenant, p_month, public.finance_is_owner_gm());
+end;
+$$;
+
+revoke all on function public.finance_budget_vs_actual(date) from public, anon;
+grant execute on function public.finance_budget_vs_actual(date) to authenticated, service_role;

@@ -193,7 +193,8 @@ describe("expense_budget: bütçe uyarıları (yönetim)", () => {
     expect(out).toHaveLength(2);
     expect(out[0]!.severity).toBe("yuksek"); // aşım önde
     expect(out[0]!.audience).toEqual({ type: "management" });
-    expect(out[0]!.href).toBe("/app/giderler?sekme=hareketler&kategori=ofis&from=2026-10-01&to=2026-10-31");
+    expect(out[0]!.href).toBe("/app/giderler?sekme=butce&ay=2026-10#gider"); // Bütçe sekmesi: aynı kaynak (B018)
+    expect(out.every((d) => d.refreshOnConflict === true)).toBe(true);
     const warn = out.find((d) => d.severity === "orta")!;
     expect(warn.evidence.find((e) => e.label === "Önceki aya göre")?.value).toBe("+%60");
     expectWellFormed(out);

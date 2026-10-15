@@ -161,6 +161,37 @@ describe.skipIf(!mod)("kâr/zarar KDV + vadeli kalem KDV'si (pglite, 20261016060
     expect((await q(`select vat_amount from public.cash_entries where id = $1`, [e]))[0]!.vat_amount).toBeNull();
   });
 
+  it("B018: bütçe ↔ gerçekleşen tek kaynak — oturum sarmalayıcısı ve service_role kiracı fonksiyonu aynı satırları verir", async () => {
+    await asOwner();
+    await one(`public.finance_budget_set('2026-10-01'::date, 'out', 'kira', 40000::numeric)`);
+    // Kira + aidat ofis bütçesine sayılır (finance_v2_budget_category); 'kira' satırı ayrı oluşmaz.
+    await one(`public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ account_id: BANKA, direction: "out", amount: 50000, entry_date: "2026-10-03", category: "kira", title: "Ofis kirası" })]);
+    await one(`public.finance_record_entry_v2($1::jsonb)`, [JSON.stringify({ account_id: BANKA, direction: "out", amount: 20710, entry_date: "2026-10-04", category: "aidat", title: "Aidat" })]);
+    const session = await q(`select direction, category, budget::float8 as b, actual::float8 as a from public.finance_budget_vs_actual('2026-10-15'::date) where direction = 'out'`);
+    await db.exec(`reset role`);
+    const engine = await q(`select direction, category, budget::float8 as b, actual::float8 as a from public.finance_budget_vs_actual_for($1::uuid, '2026-10-15'::date, true) where direction = 'out'`, [T]);
+    expect(engine).toEqual(session);
+    const ofis = engine.find((r) => r.category === "ofis")!;
+    expect(ofis.b).toBe(40000);
+    expect(ofis.a).toBeGreaterThanOrEqual(70710);
+    expect(engine.some((r) => r.category === "kira")).toBe(false);
+    // Kiracı fonksiyonu oturum rolüne kapalı.
+    await asOwner();
+    await expect(q(`select * from public.finance_budget_vs_actual_for($1::uuid, '2026-10-15'::date, true)`, [T])).rejects.toThrow();
+  });
+
+  it("B018: komisyon tahsilatı (KDV dahil, v1 hareketi) gelir gerçekleşenine KDV hariç girer", async () => {
+    await db.exec(`reset role`);
+    const c = (await q(`insert into public.commissions(tenant_id, gross_amount, vat_amount, status, created_at) values ($1, 10000, 2000, 'paid', '2026-10-05T10:00:00+03') returning id`, [T]))[0]!.id as string;
+    await asOwner();
+    await db.exec(`select set_config('test.perms', current_setting('test.perms') || ' commissions:edit', false)`);
+    const before = (await q(`select actual::float8 as a from public.finance_budget_vs_actual('2026-10-01'::date) where direction = 'in' and category = 'komisyon'`))[0]?.a ?? 0;
+    const res = await one<{ outcome: string }>(`public.finance_record_entry($1::uuid, 'in', 12000::numeric, '2026-10-06'::date, 'komisyon', 'Komisyon tahsilatı', null, null, null, 'commission', $2::uuid)`, [BANKA, c]);
+    expect(res.outcome).toBe("recorded");
+    const after = (await q(`select actual::float8 as a from public.finance_budget_vs_actual('2026-10-01'::date) where direction = 'in' and category = 'komisyon'`))[0]!.a;
+    expect(Number(after) - Number(before)).toBe(10000);
+  });
+
   it("rollback dosyası temiz çalışır ve eski govdeye döner", async () => {
     await db.exec(`reset role`);
     await db.exec(read("supabase/rollbacks/20261016060100_finance_pnl_vat_fix.rollback.sql"));

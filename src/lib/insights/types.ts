@@ -1,3 +1,5 @@
+import type { AppAction, AppModule } from "@/lib/permissions";
+
 /**
  * Insight Engine — ortak tipler (SAF; sunucu modülü içermez, istemciden de import edilebilir).
  *
@@ -59,7 +61,19 @@ export type InsightDraft = {
   /** Öncelik girdileri (priority.ts). */
   urgencyDays?: number | null;
   impact?: number | null;
+  /**
+   * DURUM tipi kural (SK6/B018, ör. bütçe aşımı): aynı dedupe anahtarıyla AÇIK içgörü varsa başlık, gerekçe, kanıt, öncelik,
+   * son geçerlilik ve updated_at yeni değerlerle güncellenir; state, state_reason ve notified_at KORUNUR (yeniden zil yok).
+   * Varsayılan (olay tipi): çakışmada satıra dokunulmaz.
+   */
+  refreshOnConflict?: boolean;
 };
+
+/**
+ * Kuralın alıcıdan istediği modül izni (SK6/B165). Rol (yönetim kümesi) tek başına yetmez: alıcının ETKİN izni
+ * (varsayılan matris + ofis rol istisnaları + kullanıcı istisnaları) bu izni taşımalıdır; taşımayana içgörü gitmez.
+ */
+export type InsightPermission = { module: AppModule; action: AppAction };
 
 /**
  * Kural çalıştırma sonucu. `liveEntityIds`: kişi başı üst sınır (capPerUser) UYGULANMADAN ÖNCEKİ, hâlâ geçerli olgu

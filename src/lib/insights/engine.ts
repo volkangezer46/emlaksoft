@@ -9,6 +9,8 @@ import { qualitySuppressedRules } from "@/lib/insights/quality";
 import { isQualityReopened, isRuleMuted, loadInsightSettings } from "@/lib/insights/settings";
 import {
   InsightsTableMissing,
+  attachRecipientPermissions,
+  expireInsightsForUsers,
   expireStaleInsights,
   insertInsights,
   loadActiveRecipients,
@@ -17,13 +19,15 @@ import {
   loadRuleQuality,
   loadSuppressions,
   markNotified,
+  refreshInsights,
   runHousekeeping,
   toInsightRow,
   type InsightRow,
   type Recipient,
 } from "@/lib/insights/store";
 import { INSIGHT_RULES, buildDigestDraft, DIGEST_RULE_ID, type InsightRule } from "@/lib/insights/rules";
-import { INSIGHT_MANAGEMENT_ROLES, normalizeRuleRun, ruleBase, type InsightDraft } from "@/lib/insights/types";
+import { INSIGHT_MANAGEMENT_ROLES, normalizeRuleRun, ruleBase, type InsightDraft, type InsightPermission } from "@/lib/insights/types";
+import { effectiveHasPermission } from "@/lib/permissions-merge";
 
 /**
  * Insight Engine — tenant tarama döngüsü.
@@ -77,6 +81,8 @@ export type EngineSummary = {
   rulesMuted: number;
   /** Koşulu kalkan (olgu düşen) ve bu turda kapatılan açık içgörü sayısı. */
   expired: number;
+  /** Durum tipi kuralda (bütçe) güncel değerlerle yenilenen açık içgörü sayısı (SK6/B018). */
+  refreshed: number;
   housekeepingDeleted: number | null;
   remaining: number;
   timedOut: boolean;
@@ -93,6 +99,7 @@ export type TenantResult = {
   rulesUnavailable: string[];
   rulesMuted: number;
   expired: number;
+  refreshed: number;
 };
 
 /** Saf: ofiste içgörü üretilsin mi? Gerçek veri eşiğin altındaysa (hâlâ demo ofis) üretilmez. */
@@ -100,15 +107,20 @@ export function shouldGenerateForTenant(counts: { realCustomers: number; realPro
   return !includeSample(counts);
 }
 
-/** Saf: taslağın alıcılarını çözer (yönetim → yönetim rolündeki aktif kullanıcılar; kullanıcı → aktif ve içgörü alabilen). */
-export function resolveRecipients(draft: InsightDraft, recipients: readonly Recipient[]): string[] {
+/**
+ * Saf: taslağın alıcılarını çözer (yönetim → yönetim rolündeki aktif kullanıcılar; kullanıcı → aktif ve içgörü alabilen).
+ * SK6/B165: kural izin istiyorsa (`required`, ör. bütçe → expenses:view) alıcının ETKİN izni de aranır; rol tek başına yetmez.
+ * İzni yüklenmemiş alıcı (perms yok) izin isteyen içgörüyü almaz (güvenli taraf).
+ */
+export function resolveRecipients(draft: InsightDraft, recipients: readonly Recipient[], required: InsightPermission | null = null): string[] {
+  const allowed = (r: Recipient) => !required || (r.perms ? effectiveHasPermission(r.perms, required.module, required.action) : false);
   if (draft.audience.type === "user") {
     const id = draft.audience.userId;
-    return recipients.some((r) => r.id === id) ? [id] : [];
+    return recipients.some((r) => r.id === id && allowed(r)) ? [id] : [];
   }
   const mgmt = new Set<string>(INSIGHT_MANAGEMENT_ROLES);
   return recipients
-    .filter((r) => mgmt.has(r.role))
+    .filter((r) => mgmt.has(r.role) && allowed(r))
     .map((r) => r.id)
     .sort()
     .slice(0, MAX_MANAGEMENT_RECIPIENTS);
@@ -127,13 +139,32 @@ export function planInsightRows(args: {
   suppressed: ReadonlySet<string>;
   dismissalsByRule: ReadonlyMap<string, number>;
   existingOpenKeys: ReadonlyMap<string, ReadonlySet<string>>;
-}): { rows: InsightRow[]; resolved: Resolved[] } {
+  /** Kural kimliği → alıcıdan istenen izin (SK6/B165). */
+  requiredPermissionByRule?: ReadonlyMap<string, InsightPermission>;
+}): { rows: InsightRow[]; resolved: Resolved[]; refresh: InsightRow[] } {
   const fanned: Resolved[] = [];
+  const refresh: InsightRow[] = [];
+  const refreshSeen = new Set<string>();
   for (const draft of args.drafts) {
-    for (const uid of resolveRecipients(draft, args.recipients)) {
+    const required = args.requiredPermissionByRule?.get(draft.ruleId) ?? null;
+    for (const uid of resolveRecipients(draft, args.recipients, required)) {
       if (args.suppressed.has(suppressionKey(uid, ruleBase(draft.ruleId), draft.entityId))) continue;
-      // Zaten açık olan içgörü yeniden planlanmaz (kapasiteyi boşuna doldurmasın).
-      if (args.existingOpenKeys.get(uid)?.has(draft.dedupeKey)) continue;
+      // Zaten açık olan içgörü yeniden planlanmaz (kapasiteyi boşuna doldurmasın). Durum tipi kural (bütçe) ise
+      // açık satır güncel başlık/gerekçe/kanıtla yenilenir (SK6/B018); kapasiteye ve zile girmez.
+      if (args.existingOpenKeys.get(uid)?.has(draft.dedupeKey)) {
+        const k = `${uid}|${draft.dedupeKey}`;
+        if (draft.refreshOnConflict && !refreshSeen.has(k)) {
+          refreshSeen.add(k);
+          const pr = computePriority({
+            severity: draft.severity,
+            urgencyDays: draft.urgencyDays,
+            impact: draft.impact,
+            recentDismissals: args.dismissalsByRule.get(ruleBase(draft.ruleId)) ?? 0,
+          });
+          refresh.push(toInsightRow({ tenantId: args.tenantId, userId: uid, draft, priority: pr.priority, priorityNote: explainPriority(pr) }));
+        }
+        continue;
+      }
       fanned.push({ recipientUserId: uid, draft });
     }
   }
@@ -166,7 +197,7 @@ export function planInsightRows(args: {
       resolved.push({ recipientUserId: uid, draft: s.draft });
     }
   }
-  return { rows, resolved };
+  return { rows, resolved, refresh };
 }
 
 async function countReal(admin: SupabaseClient, tenantId: string, table: "customers" | "properties"): Promise<number> {
@@ -188,7 +219,7 @@ export async function processTenant(
   deps: EngineDeps = {},
   deadlineMs: number = Number.POSITIVE_INFINITY,
 ): Promise<TenantResult> {
-  const result: TenantResult = { skipped: null, inserted: 0, notified: 0, notifyFailed: 0, rulesUnavailable: [], rulesMuted: 0, expired: 0 };
+  const result: TenantResult = { skipped: null, inserted: 0, notified: 0, notifyFailed: 0, rulesUnavailable: [], rulesMuted: 0, expired: 0, refreshed: 0 };
 
   // Örnek veri ofiste içgörü üretmez.
   const [realCustomers, realProperties] = await Promise.all([countReal(admin, tenantId, "customers"), countReal(admin, tenantId, "properties")]);
@@ -215,7 +246,10 @@ export async function processTenant(
   const drafts: InsightDraft[] = [];
   // Koşulu kalkan içgörüleri kapatma adayları: yalnız HATASIZ ve zaman bütçesi içinde biten, canlı küme veren kurallar.
   const closures: { ruleId: string; live: ReadonlySet<string> }[] = [];
-  for (const rule of deps.rules ?? INSIGHT_RULES) {
+  const rules = deps.rules ?? INSIGHT_RULES;
+  const requiredPermissionByRule = new Map<string, InsightPermission>();
+  for (const rule of rules) if (rule.requiredPermission) requiredPermissionByRule.set(rule.id, rule.requiredPermission);
+  for (const rule of rules) {
     if (now() >= deadlineMs) break;
     if (isMuted(rule.id)) {
       result.rulesMuted += 1;
@@ -236,13 +270,18 @@ export async function processTenant(
     }
   }
 
+  // İzin isteyen kuralın taslağı varsa alıcıların etkin izinleri bir kez yüklenir (SK6/B165).
+  const needsPerms = drafts.some((d) => requiredPermissionByRule.has(d.ruleId));
+  const planRecipients = needsPerms ? await attachRecipientPermissions(admin, tenantId, recipients, nowMs) : recipients;
+
   const plan = planInsightRows({
     tenantId,
     drafts,
-    recipients,
+    recipients: planRecipients,
     suppressed: suppressions.suppressed,
     dismissalsByRule: suppressions.dismissalsByRule,
     existingOpenKeys,
+    requiredPermissionByRule,
   });
 
   // Digest (post kural): kullanıcı başına, yalnız bu turda planlanan + zaten açık olanlarla değil, planlananlarla.
@@ -274,6 +313,28 @@ export async function processTenant(
 
   const inserted = await insertInsights(admin, rows);
   result.inserted = inserted.length;
+  // Durum tipi içgörüler (bütçe) güncel değerlerle yenilenir; bildirim listesine girmez.
+  try {
+    result.refreshed = await refreshInsights(admin, plan.refresh, nowMs);
+  } catch (e) {
+    if (e instanceof InsightsTableMissing) throw e;
+    console.error("insight-engine refresh", e instanceof Error ? e.message : "hata");
+  }
+
+  // İzin isteyen kuralların, izni olmayan (yüklenmiş izinle doğrulanan) alıcılardaki açık içgörüleri kapanır (SK6/B165).
+  if (needsPerms) {
+    for (const [ruleId, required] of requiredPermissionByRule) {
+      const denied = planRecipients
+        .filter((r) => r.perms && !effectiveHasPermission(r.perms, required.module, required.action))
+        .map((r) => r.id);
+      if (denied.length === 0) continue;
+      try {
+        result.expired += await expireInsightsForUsers(admin, tenantId, ruleId, denied, nowMs);
+      } catch (e) {
+        console.error("insight-engine expire forbidden", ruleId, e instanceof Error ? e.message : "hata");
+      }
+    }
+  }
 
   // Olgusu düşen (koşulu kalkan) açık içgörüler bu turda kapanır. Bir kuralın kapatma hatası diğerlerini ve bildirimi durdurmaz.
   for (const c of closures) {
@@ -346,6 +407,7 @@ export async function runInsightEngine(admin: SupabaseClient, opts: EngineOption
     rulesUnavailable: [],
     rulesMuted: 0,
     expired: 0,
+    refreshed: 0,
     housekeepingDeleted: null,
     remaining: 0,
     timedOut: false,
@@ -391,6 +453,7 @@ export async function runInsightEngine(admin: SupabaseClient, opts: EngineOption
       summary.notifyFailed += r.notifyFailed;
       summary.rulesMuted += r.rulesMuted;
       summary.expired += r.expired;
+      summary.refreshed += r.refreshed;
       if (r.skipped === "sample") summary.tenantsSkippedSample += 1;
       for (const u of r.rulesUnavailable) if (!summary.rulesUnavailable.includes(u)) summary.rulesUnavailable.push(u);
     } catch (e) {

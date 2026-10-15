@@ -1,4 +1,4 @@
--- 20261016060100 geri alma: finance_pnl, finance_vat_summary ve finance_open_item_settle'in canli govdeleri (pg_get_functiondef, birebir;
+-- 20261016060100 geri alma: finance_pnl, finance_vat_summary, finance_open_item_settle ve finance_budget_vs_actual'in canli govdeleri (pg_get_functiondef, birebir;
 --   20261014001100 / 20261014011000 sonrasi). CREATE OR REPLACE ACL'i korur.
 --   NOT: geri alma B103 (KDV'nin kar/zarardan ikinci kez dusulmesi) ve B104'u (vadeli kalem KDV'sinin beyana girmemesi) geri getirir.
 --   Bu migration ile yazilan tahsilat hareketlerinin vat_amount'u kalir (eski govde bu alani okumaz; kar/zarar KDV haric kalir).
@@ -191,3 +191,55 @@ revoke all on function public.finance_vat_summary(date, date) from public, anon;
 grant execute on function public.finance_vat_summary(date, date) to authenticated, service_role;
 revoke all on function public.finance_open_item_settle(uuid, uuid, numeric, date, text) from public, anon;
 grant execute on function public.finance_open_item_settle(uuid, uuid, numeric, date, text) to authenticated, service_role;
+
+-- SK6/B018 geri alma: finance_budget_vs_actual eski (tek parca) govdesine doner, service_role yardimcisi silinir.
+CREATE OR REPLACE FUNCTION public.finance_budget_vs_actual(p_month date)
+ RETURNS TABLE(direction text, category text, budget numeric, actual numeric)
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_tenant uuid := public.finance_v2_ctx('view');
+  v_gm boolean := public.finance_is_owner_gm();
+  v_m date := pg_catalog.date_trunc('month', p_month)::date;
+  v_m_end date;
+begin
+  if p_month is null then perform public.finance_v2_raise('invalid_input'); end if;
+  v_m_end := (v_m + interval '1 month')::date;
+  return query
+  with b as (
+    select distinct on (fb.direction, fb.category) fb.direction as bdir, fb.category as bcat, fb.amount as bamt
+      from public.finance_budgets fb
+     where fb.tenant_id = v_tenant and fb.period_month <= v_m and (fb.category is distinct from 'maas' or v_gm)
+     order by fb.direction, fb.category, fb.period_month desc
+  ),
+  a as (
+    select 'out'::text as adir, public.finance_v2_budget_category(x.category::text, 'out') as acat, x.amount as aamt
+      from public.expenses x
+     where x.tenant_id = v_tenant and x.is_sample = false and x.expense_date >= v_m and x.expense_date < v_m_end
+       and not exists (select 1 from public.owner_charge_links l where l.kind = 'expense' and l.ref_id = x.id and l.tenant_id = x.tenant_id)
+    union all
+    select e.direction,
+           public.finance_v2_budget_category(coalesce(e.category, case when e.direction = 'in' then 'diger_gelir' else 'diger_gider' end), e.direction),
+           e.amount + coalesce(e.withholding_amount, 0) - coalesce(e.vat_amount, 0)
+      from public.cash_entries e
+      join public.finance_accounts ac on ac.id = e.account_id and ac.tenant_id = e.tenant_id and ac.owner_scope = 'office'
+     where e.tenant_id = v_tenant and e.voided_at is null and e.is_sample = false and e.currency = 'TRY'
+       and e.entry_date >= v_m and e.entry_date < v_m_end
+       and ((e.kind = 'income') or (e.kind = 'expense' and e.expense_id is null))
+       and coalesce(e.category, '') not in ('transfer', 'mulk_sahibi_odeme')
+       and (e.category is distinct from 'maas' or v_gm)
+  ),
+  aa as (select a.adir, a.acat, sum(a.aamt) as aamt from a group by a.adir, a.acat)
+  select coalesce(b.bdir, aa.adir), coalesce(b.bcat, aa.acat), coalesce(b.bamt, 0)::numeric, coalesce(aa.aamt, 0)::numeric
+    from b
+    full join aa on aa.adir = b.bdir and aa.acat = b.bcat
+   where coalesce(b.bamt, 0) > 0 or coalesce(aa.aamt, 0) > 0
+   order by 1, 2;
+end;
+$function$;
+
+revoke all on function public.finance_budget_vs_actual(date) from public, anon;
+grant execute on function public.finance_budget_vs_actual(date) to authenticated, service_role;
+drop function if exists public.finance_budget_vs_actual_for(uuid, date, boolean);

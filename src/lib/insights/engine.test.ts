@@ -12,6 +12,7 @@ import { suppressionKey } from "@/lib/insights/dedupe";
 import { InsightFactsUnavailable } from "@/lib/insights/facts";
 import type { InsightRule } from "@/lib/insights/rules";
 import type { InsightDraft } from "@/lib/insights/types";
+import { mergeEffectivePermissions } from "@/lib/permissions-merge";
 
 const NOW = Date.UTC(2026, 9, 6, 9, 0, 0);
 const U1 = "11111111-1111-4111-8111-111111111111";
@@ -119,6 +120,57 @@ describe("planInsightRows", () => {
     const { rows } = plan([draft({ href: "javascript:alert(1)", evidence: Array.from({ length: 12 }, (_, i) => ({ label: `l${i}`, value: "v" })) })]);
     expect(rows[0].href.startsWith("/")).toBe(true);
     expect((rows[0].evidence as unknown[]).length).toBeLessThanOrEqual(8);
+  });
+});
+
+describe("SK6/B165: izin isteyen kural (gider içgörüleri → expenses:view)", () => {
+  const BM = "66666666-6666-4666-8666-666666666666";
+  const EXP = { module: "expenses", action: "view" } as const;
+  const withPerms = [
+    { id: OWNER, role: "owner", perms: mergeEffectivePermissions("owner", [], []) },
+    { id: GM, role: "gm", perms: mergeEffectivePermissions("gm", [], []) },
+    { id: BM, role: "branch_manager", perms: mergeEffectivePermissions("branch_manager", [], []) },
+  ];
+  const budget = draft({ ruleId: "expense_budget@1", audience: { type: "management" }, entityId: null, entityType: null, dedupeKey: "fin-budget:x:2026-10-over" });
+
+  it("rol yönetimde olsa da gider izni olmayan şube müdürüne gitmez", () => {
+    expect(resolveRecipients(budget, withPerms).sort()).toEqual([BM, GM, OWNER].sort()); // izin istenmezse eski davranış
+    expect(resolveRecipients(budget, withPerms, EXP).sort()).toEqual([GM, OWNER].sort());
+  });
+
+  it("ofis rol istisnası şube müdürüne gider görüntüleme verirse alır; izni yüklenmemiş alıcı almaz", () => {
+    const granted = [{ id: BM, role: "branch_manager", perms: mergeEffectivePermissions("branch_manager", [{ module: "expenses", action: "view", allowed: true }], []) }];
+    expect(resolveRecipients(budget, granted, EXP)).toEqual([BM]);
+    expect(resolveRecipients(budget, [{ id: OWNER, role: "owner" }], EXP)).toEqual([]);
+  });
+
+  it("planInsightRows kural kimliğine göre izni uygular", () => {
+    const { rows } = plan([budget], { recipients: withPerms, requiredPermissionByRule: new Map([["expense_budget@1", EXP]]) });
+    expect(rows.map((r) => r.recipient_user_id).sort()).toEqual([GM, OWNER].sort());
+  });
+});
+
+describe("SK6/B018: durum tipi içgörü (bütçe) çakışmada yenilenir", () => {
+  const over = (title: string) =>
+    draft({ ruleId: "expense_budget@1", title, audience: { type: "user", userId: OWNER }, entityId: null, entityType: null, dedupeKey: "fin-budget:x:2026-10-over", refreshOnConflict: true });
+
+  it("açık satır varsa yeni satır planlanmaz, güncel başlıkla yenileme satırı döner", () => {
+    const existing = new Map([[OWNER, new Set(["fin-budget:x:2026-10-over"])]]);
+    const res = plan([over("Bütçe aşıldı (%177): Ofis gideri")], { existingOpenKeys: existing });
+    expect(res.rows).toEqual([]);
+    expect(res.refresh).toHaveLength(1);
+    expect(res.refresh[0]).toMatchObject({ recipient_user_id: OWNER, title: "Bütçe aşıldı (%177): Ofis gideri", dedupe_key: "fin-budget:x:2026-10-over" });
+    // state / notified_at taşınmaz: yenileme yalnız taslak sütunlarını yazar.
+    expect(res.refresh[0]).not.toHaveProperty("state");
+    expect(res.refresh[0]).not.toHaveProperty("notified_at");
+  });
+
+  it("olay tipi taslak (bayraksız) yenilenmez; açık satır yoksa normal eklenir", () => {
+    const existing = new Map([[OWNER, new Set(["fin-budget:x:2026-10-over"])]]);
+    expect(plan([{ ...over("x"), refreshOnConflict: undefined }], { existingOpenKeys: existing }).refresh).toEqual([]);
+    const fresh = plan([over("Bütçe aşıldı (%113): Ofis gideri")]);
+    expect(fresh.rows).toHaveLength(1);
+    expect(fresh.refresh).toEqual([]);
   });
 });
 
