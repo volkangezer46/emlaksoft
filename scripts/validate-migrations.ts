@@ -3,8 +3,11 @@
  *
  * Offline mode validates naming, ordering identifiers, duplicate contents and
  * checksums. `--database` additionally compares the immutable files with the
- * read-only `schema_migrations` ledger and fails if production is behind.
- * Nothing in this script writes to the database.
+ * read-only `schema_migrations` ledger and fails if production is behind:
+ * EVERY file on disk must be in the ledger (pending 0), not only the latest name.
+ * `--release` prints RELEASE_MIGRATION / _CHECKSUM / _COUNT for .env.production
+ * (release.sh runs `--database --release` after db:migrate; /api/health checks
+ * the count at runtime). Nothing in this script writes to the database.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -151,6 +154,8 @@ async function main() {
   if (releaseFormat && latest && latestChecksum) {
     console.log(`RELEASE_MIGRATION=${latest}`);
     console.log(`RELEASE_MIGRATION_CHECKSUM=${latestChecksum}`);
+    // SK1: /api/health yalnız son dosyayı değil "tüm dosyalar ledger'da" koşulunu da sınar (sayım, bkz. route.ts).
+    console.log(`RELEASE_MIGRATION_COUNT=${files.length}`);
     return;
   }
   console.log(`Migration kontratı sağlıklı: ${files.length} dosya · son ${latest} · sha256 ${latestChecksum}`);

@@ -3,6 +3,7 @@ import Link from "@/components/ui/smart-link";
 import { Building2, MonitorSmartphone, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getRequestClaims } from "@/lib/supabase/auth-cache";
 import { headers } from "next/headers";
 import { officePolicyIp } from "@/lib/office-security/policy";
 import { loadOfficePolicyForm, loadOfficeSessions, policyIsActive } from "@/lib/office-security/read";
@@ -61,9 +62,9 @@ export default async function SecuritySettingsPage() {
     showPolicy && tenantId ? loadOfficePolicyForm(supabase, tenantId) : Promise.resolve(null),
     isOwner && tenantId ? loadOfficeSessions(createAdminClient(), tenantId) : Promise.resolve(null),
     showPolicy ? headers().then(officePolicyIp) : Promise.resolve(null),
-    isOwner ? supabase.auth.getClaims() : Promise.resolve(null),
+    isOwner ? getRequestClaims() : Promise.resolve(null),
   ]);
-  const currentSessionId = typeof claims?.data?.claims?.session_id === "string" ? claims.data.claims.session_id : null;
+  const currentSessionId = typeof claims?.session_id === "string" ? claims.session_id : null;
 
 
   return (

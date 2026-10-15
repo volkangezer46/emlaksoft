@@ -25,6 +25,8 @@ export const TX = {
   serverInfo: "select current_setting('server_version_num')::int as version_num, current_user as usr, now()::text as tx_now",
   ledgerExists: "select to_regclass('public.schema_migrations')::text as ledger",
   ledgerApplied: "select version from public.schema_migrations where version = any($1::text[]) order by version",
+  /** `--pending` (SK1 yayın provası): uygulanmış tüm dosyalar; bekleyenler diskten farkla bulunur. */
+  ledgerAll: "select version from public.schema_migrations order by version",
   /** service_role kimliği: auth.role() = 'service_role' (fatura RPC'leri ve profil eşitleme tetikleyicisi bunu ister). */
   asService: "select set_config('request.jwt.claims', '{\"role\":\"service_role\"}', true) as claims",
   resetRole: "reset role",

@@ -55,9 +55,13 @@ export const TIMEOUTS = {
 // Bayraklar (apply-migrations.ts kadar sıkı: bilinmeyen bayrak / argüman = çıkış 2, hiçbir şey yapılmaz)
 // ---------------------------------------------------------------------------------------------------------
 
-export const KNOWN_FLAGS = ["--yes-i-understand-locks", "--with-earnings", "--ef", "--help", "-h"] as const;
+export const KNOWN_FLAGS = ["--yes-i-understand-locks", "--with-earnings", "--ef", "--pending", "--help", "-h"] as const;
 
-export type RehearsalFlags = { yes: boolean; withEarnings: boolean; ef: boolean; help: boolean };
+/**
+ * `pending` (SK1 yayın provası): hedef küme sabit liste değil, ledger'da OLMAYAN tüm dosyalar (bağlandıktan sonra
+ * hesaplanır, `pendingMigrations`). Fatura smoke'u koşmaz; yalnız dosyaları sırayla çalıştırır ve geri alır.
+ */
+export type RehearsalFlags = { yes: boolean; withEarnings: boolean; ef: boolean; pending: boolean; help: boolean };
 
 export type ParsedArgs = { ok: true; flags: RehearsalFlags } | { ok: false; error: string };
 
@@ -73,19 +77,24 @@ export function parseRehearsalArgs(argv: readonly string[]): ParsedArgs {
   if (seen.has("--ef") && seen.has("--with-earnings")) {
     return { ok: false, error: "--ef ile --with-earnings birlikte verilemez (ayrı kümeler). Hiçbir şey yapılmadı." };
   }
+  if (seen.has("--pending") && (seen.has("--ef") || seen.has("--with-earnings"))) {
+    return { ok: false, error: "--pending tek başına verilir (--ef / --with-earnings ile değil). Hiçbir şey yapılmadı." };
+  }
   return {
     ok: true,
     flags: {
       yes: seen.has("--yes-i-understand-locks"),
       withEarnings: seen.has("--with-earnings"),
       ef: seen.has("--ef"),
+      pending: seen.has("--pending"),
       help: seen.has("--help") || seen.has("-h"),
     },
   };
 }
 
-/** Bayraklara göre prova edilecek dosyalar, uygulama sırasıyla. */
-export function targetFilesFor(flags: Pick<RehearsalFlags, "withEarnings" | "ef">): string[] {
+/** Bayraklara göre prova edilecek dosyalar, uygulama sırasıyla (`pending`: boş; bağlandıktan sonra doldurulur). */
+export function targetFilesFor(flags: Pick<RehearsalFlags, "withEarnings" | "ef"> & { pending?: boolean }): string[] {
+  if (flags.pending) return [];
   if (flags.ef) return [...EF_FILES];
   return [...PROMOTED_FILES, ...(flags.withEarnings ? [EARNINGS_FILE] : [])];
 }
@@ -98,6 +107,9 @@ export const USAGE = [
   "  --yes-i-understand-locks  kısa süreli tablo kilitlerini kabul ettiğinizi belirtir (ZORUNLU)",
   "  --with-earnings           kazanç gizliliği migration'ını da en sonda prova eder",
   "  --ef                      yalnız EmlakFiyati kontör kümesi (cüzdan, raporlar, kontör paketi faturası) + işlevsel smoke",
+  "  --pending                 yayın provası: ledger'da olmayan TÜM dosyalar (apply-migrations sırasıyla) tek transaction'da",
+  "                            çalışır ve geri alınır; üst düzey CONCURRENTLY / transaction denetimi / ADD VALUE içeren dosya",
+  "                            apply-migrations'ta da (dosya başına transaction) çalışamayacağı için FAIL sayılır",
   "  --help, -h                bu metin",
 ].join("\n");
 
@@ -186,6 +198,17 @@ export function topLevelSql(sql: string): string {
 }
 
 const TX_KEYWORDS = new Set(["begin", "start", "commit", "end", "rollback", "abort", "savepoint", "release", "prepare"]);
+
+/**
+ * Yayın provası hedefi: diskteki dosyalardan ledger'da olmayanlar, apply-migrations ile AYNI sırada
+ * (`localeCompare(_, "en")`). Ledger'da olup diskte olmayan kayıtlar burada yok sayılır (check:migrations yakalar).
+ */
+export function pendingMigrations(files: readonly string[], applied: Iterable<string>): string[] {
+  const done = new Set(applied);
+  return files
+    .filter((f) => f.endsWith(".sql") && !done.has(f))
+    .sort((a, b) => a.localeCompare(b, "en"));
+}
 
 /** Dosyada üst düzeyde yasak deyim varsa açıklamalarını döner (boş = güvenli). */
 export function findTransactionControl(sql: string): string[] {

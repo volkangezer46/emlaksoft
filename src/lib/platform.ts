@@ -3,7 +3,8 @@ import { getPlatformMfaPolicyNow, mfaRequiredFor } from "@/lib/platform-security
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getRequestUser } from "@/lib/supabase/auth-cache";
+import { getRequestClaims, getRequestStaffFact, getRequestUser } from "@/lib/supabase/auth-cache";
+import { adminDeniedHref } from "@/lib/supabase/proxy-gates";
 import {
   isPlatformBaseRole,
   normalizeMatrix,
@@ -134,6 +135,11 @@ export async function bootstrapPlatformStaffIfAllowed(
 export const getPlatformMfaCandidate = cache(async (): Promise<PlatformStaff | null> => {
   const user = await getRequestUser();
   if (!user?.email) return null;
+  // SK1/B045: proxy bu istekte kapı RPC'sinde aktif personel satırı GÖRMEDİYSE (ofis kullanıcısı) platform_staff okuması
+  // atlanır — her /app isteğindeki gereksiz personel sorgusu kalkar. Yalnız ön-izin listesindeki (PLATFORM_ADMIN_EMAILS)
+  // ilk erişim önyüklemesi için okuma sürer. Olgu bilinmiyorsa (başlık yok) eskisi gibi okunur; istek başına tek okuma
+  // React cache() ile (bu fonksiyon) sağlanır.
+  if ((await getRequestStaffFact()) === false && !isPlatformAllowlistedEmail(user.email)) return null;
 
   const supabase = await createClient();
   const withRole = await supabase
@@ -210,10 +216,10 @@ export const isPlatformSessionExpired = cache(async (): Promise<boolean> => {
   try {
     const policy = await readAdminAccessPolicyCached();
     if (policy.maxHours <= 0) return false;
-    const supabase = await createClient();
-    const { data, error } = await supabase.auth.getClaims();
-    if (error || !data?.claims) return false;
-    return sessionExpired(sessionStartSec(data.claims as Record<string, unknown>), Math.floor(now() / 1000), policy.maxHours);
+    // SK1/B019: claim'ler proxy'nin imzalı başlığından (aynı istekte yeniden doğrulama / Auth turu YOK).
+    const claims = await getRequestClaims();
+    if (!claims) return false;
+    return sessionExpired(sessionStartSec(claims), Math.floor(now() / 1000), policy.maxHours);
   } catch {
     return false;
   }
@@ -258,13 +264,15 @@ export async function requirePlatformStaffForAccount(): Promise<PlatformStaff> {
 }
 
 /**
- * Sayfa/aksiyon seviyesi departman yetkisi. Personel değilse `requirePlatformStaff`
- * gibi yönlendirir; modüle (ya da istenen eyleme) yetkisi yoksa kendi dashboard'una (/admin) döner.
+ * Sayfa/aksiyon seviyesi departman yetkisi. Personel değilse `requirePlatformStaff` gibi yönlendirir; modüle (ya da
+ * istenen eyleme) yetkisi yoksa `/admin?yetki=yok&sayfa=<modül>`'e döner (SK1/B122): kontrol paneli ağır pano yerine
+ * hangi sayfanın kapalı olduğunu ve kimden isteneceğini anlatan hafif kartı çizer. Sayfa istekleri bu noktaya gelmeden
+ * proxy'de aynı kapıdan geçer (kabuk akmadan 307; bkz. proxy-gates.ts `adminPathModule`).
  */
 export async function requirePlatformModule(module: PlatformModule, action?: PlatformAction): Promise<PlatformStaff> {
   const staff = await requirePlatformStaff();
   if (!platformCan(staff, module, gateAction(action))) {
-    redirect("/admin");
+    redirect(adminDeniedHref(module));
   }
   return staff;
 }

@@ -14,6 +14,7 @@ import {
   formatResults,
   normalizeValue,
   parseRehearsalArgs,
+  pendingMigrations,
   targetFilesFor,
   topLevelSql,
 } from "./core";
@@ -106,14 +107,14 @@ describe("bayraklar (apply-migrations kadar sıkı)", () => {
   });
 
   it("geçerli bayraklar", () => {
-    expect(parseRehearsalArgs([])).toEqual({ ok: true, flags: { yes: false, withEarnings: false, ef: false, help: false } });
+    expect(parseRehearsalArgs([])).toEqual({ ok: true, flags: { yes: false, withEarnings: false, ef: false, pending: false, help: false } });
     expect(parseRehearsalArgs(["--yes-i-understand-locks", "--with-earnings"])).toEqual({
       ok: true,
-      flags: { yes: true, withEarnings: true, ef: false, help: false },
+      flags: { yes: true, withEarnings: true, ef: false, pending: false, help: false },
     });
     expect(parseRehearsalArgs(["--yes-i-understand-locks", "--ef"])).toEqual({
       ok: true,
-      flags: { yes: true, withEarnings: false, ef: true, help: false },
+      flags: { yes: true, withEarnings: false, ef: true, pending: false, help: false },
     });
     expect(parseRehearsalArgs(["-h"])).toMatchObject({ ok: true, flags: { help: true } });
   });
@@ -126,6 +127,25 @@ describe("bayraklar (apply-migrations kadar sıkı)", () => {
     expect(targetFilesFor({ ef: false, withEarnings: true })).toEqual([...PROMOTED_FILES, EARNINGS_FILE]);
     expect([...EF_FILES]).toEqual([...EF_FILES].sort());
     expect(runner).toContain("targetFilesFor(flags)");
+  });
+
+  it("--pending (SK1 yayın provası): tek başına; hedef ledger farkı, apply-migrations sırası", () => {
+    expect(parseRehearsalArgs(["--yes-i-understand-locks", "--pending"])).toEqual({
+      ok: true,
+      flags: { yes: true, withEarnings: false, ef: false, pending: true, help: false },
+    });
+    expect(parseRehearsalArgs(["--pending", "--ef"]).ok).toBe(false);
+    expect(parseRehearsalArgs(["--pending", "--with-earnings"]).ok).toBe(false);
+    expect(targetFilesFor({ ef: false, withEarnings: false, pending: true })).toEqual([]);
+    expect(
+      pendingMigrations(["20260726000087b_b.sql", "20260726000087_a.sql", "20261016010000_c.sql", "README.md"], [
+        "20260726000087_a.sql",
+      ]),
+    ).toEqual(["20260726000087b_b.sql", "20261016010000_c.sql"]);
+    expect(runner).toContain("await rehearsePending()");
+    expect(runner).toContain("TX.ledgerAll");
+    expect(TX.ledgerAll).toMatch(/^select\b/);
+    expect(readFileSync("scripts/sunucu/release.sh", "utf8")).toContain("db:rehearse -- --yes-i-understand-locks --pending");
   });
 
   it("onay bayrağı yoksa bağlanmadan çıkış 2; bayrak hatası çıkış 2", () => {

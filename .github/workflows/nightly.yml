@@ -1,8 +1,13 @@
 name: Nightly
 
-# Gece boyu salt-okunur denetimler. Yazma yapan hiçbir adım yok:
+# Gece boyu denetimler. CANLIYA yazma yapan hiçbir adım yok:
 # - db:rls-audit yalnız katalog sorgular.
 # - cron:smoke yalnız --auth-only modunda (yetkisiz isteğin reddini doğrular).
+# - (SK1/B177) zaman kaydırmalı birim/SQL koşusu: saat +30, +60, +365 gün ileride (src/test/time-shift-setup.ts);
+#   tarihe bağlı testlerin belirli bir günde kendiliğinden kırılması yayın kapısından ÖNCE burada yakalanır.
+# - (SK1) test:tz: TZ=Europe/Istanbul ile tam vitest.
+# - (SK1/B178) oturumlu E2E: runner içinde açılan GEÇİCİ, izole Supabase'e karşı (canlı DB'ye asla). Migration'lar sıfırdan
+#   uygulanır, test kullanıcısı scripts/e2e-user.ts ile kurulur; playwright.config.ts mutasyon kapısı canlı hostu reddeder.
 # Gerekli secret/variable tanımlı değilse ilgili adım atlanır, iş hata vermez.
 
 on:
@@ -51,3 +56,113 @@ jobs:
       - name: Cron smoke atlandı
         if: ${{ env.APP_URL == '' }}
         run: echo "APP_URL değişkeni tanımlı değil; cron:smoke atlandı."
+
+  time-shift:
+    name: Zaman kaydırmalı testler (+${{ matrix.days }} gün)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        days: [30, 60, 365]
+    env:
+      TEST_TIME_SHIFT_DAYS: ${{ matrix.days }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Önce B177'nin tarih bombası olan iki SQL dosyası (22 test), sonra tam koşu (ikisi de zorunlu).
+      - name: Tarihe bağlı SQL testleri (+${{ matrix.days }} gün)
+        run: npx vitest run src/lib/rentals/rent-charges-guard-sql-exec.test.ts src/lib/finance/statement/statement-sql-exec.test.ts
+
+      # 2026-10-15: +30/+60/+365 günde tam koşu 971/971 dosya yeşil (B177 düzeltmesinden sonra).
+      - name: Tam vitest (+${{ matrix.days }} gün)
+        run: npx vitest run
+
+  test-tz:
+    name: Saat dilimi (Europe/Istanbul)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run test:tz
+
+  e2e-isolated:
+    name: Oturumlu E2E (izole, geçici Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      E2E_MUTATION_ALLOWED: "true"
+      E2E_USER_EMAIL: e2e-gece@e2e.emlaksoft.test
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Proje klasörü DIŞINDA boş bir Supabase projesi: CLI'nin kendi migration uygulaması depodaki dosyalara dokunmaz;
+      # şema aşağıda depo aracıyla (npm run db:migrate, public.schema_migrations ledger'ı) sıfırdan kurulur.
+      - name: Geçici Supabase'i başlat
+        run: |
+          mkdir -p "$RUNNER_TEMP/sb" && cd "$RUNNER_TEMP/sb"
+          supabase init --force
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,postgres-meta
+          supabase status -o env > "$RUNNER_TEMP/sb.env"
+
+      - name: Ortam (.env.local, yalnız runner)
+        run: |
+          set -a; . "$RUNNER_TEMP/sb.env"; set +a
+          PASS=$(openssl rand -hex 16)
+          echo "::add-mask::$PASS"
+          echo "E2E_USER_PASSWORD=$PASS" >> "$GITHUB_ENV"
+          # playwright.config.ts mutasyon kapısı yerel sunucunun bağlanacağı Supabase'i süreç ortamından okur (127.0.0.1).
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "SUPABASE_JWT_SECRET=$JWT_SECRET"
+            echo "DATABASE_URL=${DB_URL}?sslmode=disable"
+            echo "NEXT_PUBLIC_APP_URL=http://localhost:3000"
+          } > .env.local
+
+      - name: Şema (tüm migration'lar, geçici DB)
+        run: npm run db:migrate
+
+      - name: Test kullanıcısı
+        run: npx tsx scripts/e2e-user.ts
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Oturumlu E2E
+        run: npx playwright test --project=chromium
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ failure() }}
+        with:
+          name: e2e-gece-rapor
+          path: playwright-report/
+          retention-days: 7

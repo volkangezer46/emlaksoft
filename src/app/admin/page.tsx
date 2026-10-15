@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ShieldOff } from "lucide-react";
 import { requirePlatformStaff } from "@/lib/platform";
 import { now } from "@/lib/clock";
 import { DataFreshness } from "@/components/ui/data-freshness";
@@ -11,7 +11,9 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FadeSwap } from "@/components/ui/motion/fade-swap";
 import { SkeletonCard } from "@/components/ui/viz";
 import { homeVariantFor } from "@/lib/admin/dashboard-layout";
-import { platformCanAccess } from "@/lib/platform-access";
+import { platformCanAccess, platformRoleLabel, type PlatformModule } from "@/lib/platform-access";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PLATFORM_MODULE_LABELS } from "./personel/staff-model";
 import { BillingHome } from "./_dashboards/billing-home";
 import { SupportHome } from "./_dashboards/support-home";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./_dashboards/shared";
@@ -26,13 +28,19 @@ export const metadata = { title: "Kontrol paneli" };
  * Departman rolleri (muhasebe, destek) aynı adreste kendi panelini görür.
  */
 export default async function AdminHomePage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
-  const staff = await requirePlatformStaff();
+  const [staff, sp] = await Promise.all([
+    requirePlatformStaff(),
+    (searchParams ?? Promise.resolve(undefined)).then((v): Record<string, string | string[] | undefined> => v ?? {}),
+  ]);
+
+  // SK1/B122 + B041: yetkisiz sayfadan gelindi (proxy 307 ya da requirePlatformModule): ağır pano ÇİZİLMEZ; hangi sayfanın
+  // kapalı olduğunu ve yetkinin kimden isteneceğini anlatan hafif kart (pano sorguları hiç çalışmaz).
+  if (first(sp.yetki) === "yok") return <AccessDeniedCard module={first(sp.sayfa)} roleLabel={platformRoleLabel(staff)} />;
 
   const variant = homeVariantFor(staff);
   if (variant === "billing") return <BillingHome staffName={staff.full_name} />;
   if (variant === "support") return <SupportHome staffName={staff.full_name} />;
 
-  const sp = (await searchParams) ?? {};
   const period = parsePeriod(sp.donem);
   const params: Record<string, string | undefined> = {};
   for (const [k, v] of Object.entries(sp)) params[k] = Array.isArray(v) ? v[0] : v;
@@ -77,5 +85,28 @@ export default async function AdminHomePage({ searchParams }: { searchParams?: P
         <AttentionSection period={period} role={staff} />
       </Suspense>
     </div>
+  );
+}
+
+function first(v: string | string[] | undefined): string | undefined {
+  return Array.isArray(v) ? v[0] : v;
+}
+
+/** Kapalı sayfanın adı (bilinmeyen modül adı gösterilmez); "(ops: salt okunur)" gibi rol notları atılır. */
+function deniedPageLabel(module: string | undefined): string | null {
+  if (!module || !Object.prototype.hasOwnProperty.call(PLATFORM_MODULE_LABELS, module)) return null;
+  return PLATFORM_MODULE_LABELS[module as PlatformModule].replace(/\s*\(.*\)\s*$/, "");
+}
+
+function AccessDeniedCard({ module, roleLabel }: { module: string | undefined; roleLabel: string }) {
+  const label = deniedPageLabel(module);
+  return (
+    <EmptyState
+      icon={ShieldOff}
+      tone="amber"
+      title={label ? `${label} sayfası rolünüz için kapalı` : "Bu sayfa rolünüz için kapalı"}
+      description={`Rolünüz (${roleLabel}) bu sayfayı açma yetkisi taşımıyor. Erişim gerekiyorsa süper admin'den isteyin: rolünüze bu sayfa Personel yönetimi › Roller ekranından eklenir.`}
+      action={{ href: "/admin", label: "Kontrol paneline dön" }}
+    />
   );
 }

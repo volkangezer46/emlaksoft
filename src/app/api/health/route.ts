@@ -5,6 +5,7 @@ import { getDeploymentStage } from "@/lib/deployment-env";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { evaluateCronHealth } from "@/lib/cron-staleness";
 import { probeSupabaseServices } from "@/lib/health-service-probes";
+import { isDraining } from "@/lib/release-drain";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,18 @@ function releaseMetadata() {
   };
 }
 
+/**
+ * SK1: "diskteki TÜM migration dosyaları ledger'da" beklentisi. release.sh `check:migrations -- --database --release`
+ * çıktısındaki RELEASE_MIGRATION_COUNT'u (.env.production) yazar; ledger'da RELEASE_MIGRATION'a kadar (dahil) en az bu
+ * kadar satır yoksa adı daha küçük bir dosya bekliyor demektir → "pending", 503. Tanımsızsa yalnız son dosya denetlenir.
+ */
+function expectedMigrationCount(): number | null {
+  const raw = runtimeEnvString(process.env.RELEASE_MIGRATION_COUNT);
+  if (!/^\d{1,6}$/.test(raw)) return null;
+  const n = Number(raw);
+  return n > 0 ? n : null;
+}
+
 function productionReadinessRequired() {
   return getDeploymentStage(process.env) === "production";
 }
@@ -68,6 +81,7 @@ export async function GET(request: Request) {
   const requireReleaseContract = productionReadinessRequired();
   const expectedVersion = runtimeEnvString(process.env.RELEASE_MIGRATION) || null;
   const expectedChecksum = runtimeEnvString(process.env.RELEASE_MIGRATION_CHECKSUM) || null;
+  const expectedCount = expectedMigrationCount();
   const hasMigrationExpectation = Boolean(expectedVersion || expectedChecksum);
   const migrationExpectationValid = hasMigrationExpectation
     ? Boolean(
@@ -88,6 +102,11 @@ export async function GET(request: Request) {
       { ok: false },
       { status: configured ? 401 : 404, headers: noStoreHeaders },
     );
+  }
+
+  // Boşaltılan renk: DB'ye hiç gitmeden 503 (yalnız {ok:false}; /api/health/cron etkilenmez).
+  if (!cronMode && isDraining()) {
+    return NextResponse.json({ ok: false }, { status: 503, headers: noStoreHeaders });
   }
 
   try {
@@ -139,16 +158,27 @@ export async function GET(request: Request) {
           .limit(1)
           .maybeSingle();
 
+    // Bekleyen (adı RELEASE_MIGRATION'dan küçük, uygulanmamış) dosya: yalnız sayım (head, satır taşımaz).
+    const pendingCountPromise =
+      expectedVersion && expectedCount
+        ? admin
+            .from("schema_migrations")
+            .select("version", { count: "exact", head: true })
+            .lte("version", expectedVersion)
+        : Promise.resolve(null);
+
     // Alt servis yoklamaları yalnız ayrıntılı modda (secret sahibi); genel durumu düşürmez (bkz. health-service-probes).
     const servicesPromise = detailed
       ? probeSupabaseServices(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
       : Promise.resolve(null);
 
-    const [databaseResult, migrationResult, services] = await Promise.all([
+    const [databaseResult, migrationResult, services, appliedCountResult] = await Promise.all([
       databasePromise,
       migrationPromise,
       servicesPromise,
+      pendingCountPromise,
     ]);
+    const appliedCount = appliedCountResult && !appliedCountResult.error ? appliedCountResult.count ?? null : null;
     const databaseLatencyMs = Date.now() - databaseStarted;
     const databaseReady = !databaseResult.error;
 
@@ -176,6 +206,10 @@ export async function GET(request: Request) {
       migrationReady = false;
     } else if (expectedChecksum && applied.checksum !== expectedChecksum) {
       migrationStatus = "drift";
+      migrationReady = false;
+    } else if (expectedCount && (appliedCount === null || appliedCount < expectedCount)) {
+      // Son dosya uygulanmış ama daha eski adlı bir dosya bekliyor (ya da sayım okunamadı: kapalı başarısız).
+      migrationStatus = appliedCount === null ? "unavailable" : "pending";
       migrationReady = false;
     } else {
       migrationStatus = "ready";
@@ -214,9 +248,10 @@ export async function GET(request: Request) {
                 status: migrationStatus,
                 ready: migrationReady,
                 expected: hasMigrationExpectation
-                  ? { version: expectedVersion, checksum: expectedChecksum }
+                  ? { version: expectedVersion, checksum: expectedChecksum, count: expectedCount }
                   : null,
                 applied,
+                appliedCount,
               },
             },
             release: { ...release, ready: releaseIdentityReady },

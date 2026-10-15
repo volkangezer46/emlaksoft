@@ -15,6 +15,12 @@
  * (YAYIN_PENCERESI_2.md §4), (3) saf fiyat yardımcıları, (4) geçici satırlarla işlevsel fatura smoke'u,
  * (5) authenticated rol simülasyonuyla RLS ret denemeleri. Her kontrol PASS / FAIL / ATLANDI; FAIL varsa çıkış 1.
  * Bayrak hatası ya da eksik onay: çıkış 2 ve HİÇBİR ŞEY yapılmaz (bağlantı bile açılmaz).
+ *
+ * `--pending` (SK1 yayın provası, scripts/sunucu/release.sh gerçek migration'dan ÖNCE koşar): hedef, ledger'da
+ * olmayan TÜM dosyalardır (apply-migrations sırası). Her dosya aynı güvenlik taramasından geçer: üst düzey
+ * CONCURRENTLY / transaction denetimi FAIL (apply-migrations dosya başına transaction açtığı için orada da çalışmaz);
+ * ALTER TYPE ... ADD VALUE içeren dosyada prova durur (yeni değer aynı transaction'da kullanılamaz), o ve sonraki
+ * dosyalar ATLANDI. Fatura smoke'u koşmaz. Bozuk dosya FAIL → çıkış 1 → yayın durur.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -32,6 +38,7 @@ import {
   findTransactionControl,
   formatResults,
   parseRehearsalArgs,
+  pendingMigrations,
   targetFilesFor,
   type CheckResult,
   type CheckStatus,
@@ -954,6 +961,39 @@ async function efRlsChecks(s: Smoke): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------------------------------------
+// --pending: yayın provası (ledger'da olmayan tüm dosyalar)
+// ---------------------------------------------------------------------------------------------------------
+async function rehearsePending(): Promise<void> {
+  const applied = (await q<{ version: string }>(TX.ledgerAll)).rows.map((r: { version: string }) => r.version);
+  const pending = pendingMigrations(fs.readdirSync(MIGRATIONS_DIR), applied);
+  if (pending.length === 0) {
+    add("0-on", "bekleyen", "bekleyen migration", "PASS", "bekleyen yok (veritabanı güncel)");
+    return;
+  }
+  add("0-on", "bekleyen", "bekleyen migration", "PASS", `${pending.length} dosya: ${pending.join(", ")}`);
+  const skipFrom = (idx: number, why: string) => {
+    for (const rest of pending.slice(idx)) add("2-uygula", rest.slice(0, 14), `${rest} çalıştı`, "ATLANDI", why);
+  };
+  for (const [idx, file] of pending.entries()) {
+    const text = readMigration(file);
+    const problems = findTransactionControl(text);
+    const hard = problems.filter((p) => !p.startsWith("ALTER TYPE"));
+    if (hard.length > 0) {
+      add("2-uygula", file.slice(0, 14), `${file} güvenlik taraması`, "FAIL", `apply-migrations'ta da çalışmaz: ${hard.join("; ")}`);
+      skipFrom(idx + 1, "önceki dosya taramadan geçmedi");
+      return;
+    }
+    if (problems.length > 0) {
+      skipFrom(idx, "ALTER TYPE ... ADD VALUE: prova bu dosyada durur (yeni değer aynı transaction'da kullanılamaz)");
+      break;
+    }
+    SOURCES.set(file, text);
+    TARGET_FILES.push(file);
+  }
+  await applyAll();
+}
+
+// ---------------------------------------------------------------------------------------------------------
 // Ana akış
 // ---------------------------------------------------------------------------------------------------------
 async function main(): Promise<void> {
@@ -976,6 +1016,10 @@ async function main(): Promise<void> {
     const ledger = (await q<{ ledger: string | null }>(TX.ledgerExists)).rows[0]?.ledger;
     if (!ledger) {
       add("0-on", "ledger", "schema_migrations var", "FAIL", "ledger tablosu yok; prova anlamsız");
+      return;
+    }
+    if (flags.pending) {
+      await rehearsePending();
       return;
     }
     const applied = (await q<{ version: string }>(TX.ledgerApplied, [TARGET_FILES])).rows.map((r: { version: string }) => r.version);

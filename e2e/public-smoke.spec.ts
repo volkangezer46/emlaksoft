@@ -41,16 +41,17 @@ test.describe("Giris (/giris)", () => {
   });
 });
 
-test.describe("Kayit sihirbazi (/kayit)", () => {
-  test("1. adim alanlari gorunur", async ({ page }) => {
+test.describe("Kayit (/kayit)", () => {
+  // Kisa kayit (2 adim, 55d77979): 1) tek ekran form (ad soyad, telefon, e-posta, sifre) → 2) giristen sonra kurulum
+  // sihirbazi (/app/baslangic). Adim gostergesi ("Kurulum adımları") artik kayit sayfasinda YOK.
+  test("kisa kayit formu: dort alan ve gonder dugmesi gorunur", async ({ page }) => {
     await page.goto("/kayit");
     await expect(page.getByRole("heading", { name: "Ücretsiz başlayın" })).toBeVisible();
-    // Adim gostergesi (6 adimli kurulum sihirbazi, f9777457)
-    await expect(page.getByLabel("Kurulum adımları")).toBeVisible();
-    // 1. adim: ad soyad + e-posta + telefon
     await expect(page.locator("#name")).toBeVisible();
-    await expect(page.locator("#email")).toBeVisible();
     await expect(page.locator("#phone")).toBeVisible();
+    await expect(page.locator("#email")).toBeVisible();
+    await expect(page.locator("#password")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Ücretsiz başla/ })).toBeVisible();
   });
 });
 

@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server";
 // middleware.ts ile aynı gerekçe: next/server barrel yerine yalnız NextResponse sınıfı (proxy paket boyutu).
 import { NextResponse } from "next/dist/server/web/spec-extension/response";
-import { updateSession } from "@/lib/supabase/middleware";
-import { AUTH_VERIFIED_HEADER } from "@/lib/supabase/verified-request";
+import { updateSession, verifyAdminApiSession } from "@/lib/supabase/middleware";
+import { AUTH_VERIFIED_HEADER, peekVerifiedUserId } from "@/lib/supabase/verified-request";
 import { now } from "@/lib/clock";
 import {
   IDLE_COOKIE,
@@ -47,7 +47,8 @@ function forbidden(path: string) {
  * oturum /giris/oturum-sonu'nda kapatılır; önceden yükleme (prefetch) istekleri etkinlik sayılmaz.
  */
 async function applyIdlePolicy(request: NextRequest, response: NextResponse, idleMinutes: number): Promise<NextResponse> {
-  const userId = request.headers.get(AUTH_VERIFIED_HEADER);
+  // Başlığı updateSession bu istekte kendisi yazdı (gelen önce silindi): imza denetimi gerekmez.
+  const userId = peekVerifiedUserId(request.headers.get(AUTH_VERIFIED_HEADER));
   const secret = process.env.TWO_FACTOR_COOKIE_SECRET;
   if (!userId || !secret || response.headers.get("x-middleware-next") !== "1") return response;
   const nowSec = Math.floor(now() / 1000);
@@ -109,11 +110,11 @@ export async function proxy(request: NextRequest) {
   // AD11: yönetim IP izin listesi kimlik çözümünden ÖNCE (izinsiz IP oturum çerezi bile işletmez).
   const policy = await readAdminAccessPolicyCached();
   if (!adminIpAllowed(policy, clientIp(request), process.env.ADMIN_IP_ALLOWLIST)) return forbidden(path);
-  // /api/admin rotaları kimliği kendileri doğrular; proxy yalnız IP kapısıdır.
-  // İstemcinin gönderdiği "kapılar geçti" işareti burada da silinir (proxy kapıları bu yolda çalışmaz).
+  // /api/admin rotaları yetkiyi kendileri denetler; proxy IP kapısından sonra yalnız KİMLİĞİ yerel doğrular (SK1/B040:
+  // yerel JWT + oturum canlılığı + aktif personel → imzalı başlık; Auth sunucusuna tur yok). Yönlendirme yapmaz; kimlik
+  // çözülemezse başlık konmaz ve rota kendi 401'ini verir. İstemcinin gönderdiği işaret her durumda önce silinir.
   if (path.startsWith("/api/")) {
-    request.headers.delete(AUTH_VERIFIED_HEADER);
-    return NextResponse.next({ request });
+    return verifyAdminApiSession(request);
   }
 
   const response = await updateSession(request);
@@ -121,9 +122,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Kimlik-doğrulama yalnız /app, /admin, /giris, /kayit için çözülür (getUser() ağ çağrısı);
-  // diğer public sayfalarda yalnız bakım modu bayrağı (30 sn bellek önbellekli) okunur.
+  // Kimlik yalnız /app, /admin, /giris, /kayit için çözülür (çerez + yerel JWT doğrulaması; Auth sunucusuna tur yalnız
+  // belirteç yenilemesinde); diğer public sayfalarda yalnız bakım modu bayrağı (30 sn bellek önbellekli) okunur.
   // API (cron, webhook, health), _next ve uzantılı statik dosyalar proxy dışındadır; tek istisna /api/admin
-  // (yalnız AD11 IP izin listesi kapısı).
+  // (AD11 IP izin listesi kapısı + yerel kimlik doğrulaması, yönlendirmesiz).
   matcher: ["/((?!api/|_next/|.*\\..*).*)", "/api/admin/:path*"],
 };

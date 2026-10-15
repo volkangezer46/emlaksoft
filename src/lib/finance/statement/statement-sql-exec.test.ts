@@ -8,6 +8,8 @@ import { loadPglite, type Db } from "@/lib/test-support/pglite";
  * mevcutla eşle, atla), mutabakat işareti ve durum sayacı, kişisel hesap gizliliği, maaş kapısı, tahsilat bağı yetkisi,
  * doğrudan yazma yok, taslağı at, rollback.
  * 20261011001400: düzenli ödeme (auto/approve) + ekstre = TEK gider/hareket; komisyon ekstreden bağlanınca tahsil edildi olur.
+ * SK1/B177: hesap açılışı ve satır tarihleri SABİT DEĞİL, pglite saatine (İstanbul) göre `D(gün)` ile üretilir: mutabakat
+ * kapsam penceresi gibi now()'a göre kurallar belirli bir günde testi kendiliğinden kırmaz. Gece +30/+60/+365 kaydırmalı koşar.
  */
 const mod = await loadPglite();
 const read = (rel: string) => readFileSync(resolve(process.cwd(), rel), "utf8");
@@ -40,6 +42,9 @@ grant select on all tables in schema public to authenticated;
 const H = (n: number) => `h${String(n).padStart(8, "0")}`;
 const line = (n: number, d: string, dir: "in" | "out", amt: number, desc: string) => ({ d, dir, amt, desc, h: H(n), bal: null });
 const FILE = (c: string) => c.repeat(64);
+/** Bugün (İstanbul, pglite saati; beforeAll'da) + gün. Tarih aritmetiği UTC gün üzerinden (saat dilimi kayması yok). */
+let TODAY = "";
+const D = (days: number) => new Date(Date.parse(`${TODAY}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 describe.skipIf(!mod)("bank statement import (pglite)", () => {
   let db: Db;
@@ -74,44 +79,45 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     await db.exec(read("supabase/migrations/20261011001200_bank_statement_import.sql"));
     await db.exec(read("supabase/migrations/20261011001400_statement_apply_recurring_commission.sql"));
     await db.exec(`grant select on all tables in schema public to authenticated; grant all on all tables in schema public to service_role; grant usage on schema public to service_role`);
+    TODAY = String((await q(`select (now() at time zone 'Europe/Istanbul')::date::text as d`))[0]!.d);
     await as(OWNER, FULL, "owner");
-    BANK = (await rpc(`public.finance_account_create('office','bank','İş Bankası Örnek',null,'TRY',10000::numeric,'2026-10-01'::date)`, [])).account_id as string;
+    BANK = (await rpc(`public.finance_account_create('office','bank','İş Bankası Örnek',null,'TRY',10000::numeric,$1::date)`, [D(-14)])).account_id as string;
     await as(ADV, "", "advisor");
-    PERSONAL = (await rpc(`public.finance_account_create('user','bank','Kişisel banka',null,'TRY',0::numeric,'2026-10-01'::date)`, [])).account_id as string;
+    PERSONAL = (await rpc(`public.finance_account_create('user','bank','Kişisel banka',null,'TRY',0::numeric,$1::date)`, [D(-14)])).account_id as string;
   });
 
   it("satırlar taslak olur; açılıştan önceki ve geçersiz satırlar atılır; mükerrer dosya reddedilir", async () => {
     await as(OWNER, FULL, "owner");
     const res = await stage(BANK, FILE("a"), [
-      line(1, "2026-10-03", "out", 25000.5, "KIRA ODEMESI"),
-      line(2, "2026-10-04", "in", 1500, "HAVALE GELEN"),
-      line(3, "2026-10-05", "out", 300, "ELEKTRIK FATURASI"),
-      line(4, "2026-09-01", "out", 10, "ACILISTAN ONCE"),
+      line(1, D(-12), "out", 25000.5, "KIRA ODEMESI"),
+      line(2, D(-11), "in", 1500, "HAVALE GELEN"),
+      line(3, D(-10), "out", 300, "ELEKTRIK FATURASI"),
+      line(4, D(-45), "out", 10, "ACILISTAN ONCE"),
       { ...line(5, "2090-01-01", "in", 10, "GELECEK") },
-      line(6, "2026-10-05", "in", 0, "SIFIR"),
+      line(6, D(-10), "in", 0, "SIFIR"),
     ]);
     expect(res.outcome).toBe("staged");
     expect(res.inserted).toBe(3);
     expect(res.invalid).toBe(3);
     imp1 = res.import_id as string;
     for (const n of [1, 2, 3]) lineIds[`l${n}`] = await lineId(H(n));
-    expect((await stage(BANK, FILE("a"), [line(9, "2026-10-06", "in", 5, "x")])).outcome).toBe("duplicate_file");
+    expect((await stage(BANK, FILE("a"), [line(9, D(-9), "in", 5, "x")])).outcome).toBe("duplicate_file");
   });
 
   it("çakışan ekstre yeni satır ekler, tekrarları sayar; hepsi tekrarsa nothing_new", async () => {
     await as(OWNER, FULL, "owner");
-    const res = await stage(BANK, FILE("b"), [line(3, "2026-10-05", "out", 300, "ELEKTRIK FATURASI"), line(7, "2026-10-06", "in", 800, "KIRA TAHSILAT")]);
+    const res = await stage(BANK, FILE("b"), [line(3, D(-10), "out", 300, "ELEKTRIK FATURASI"), line(7, D(-9), "in", 800, "KIRA TAHSILAT")]);
     expect(res.outcome).toBe("staged");
     expect(res.inserted).toBe(1);
     expect(res.duplicates).toBe(1);
     lineIds.l7 = await lineId(H(7));
-    expect((await stage(BANK, FILE("c"), [line(3, "2026-10-05", "out", 300, "ELEKTRIK FATURASI")])).outcome).toBe("nothing_new");
+    expect((await stage(BANK, FILE("c"), [line(3, D(-10), "out", 300, "ELEKTRIK FATURASI")])).outcome).toBe("nothing_new");
     expect(await q(`select 1 from public.finance_statement_imports where file_hash = $1`, [FILE("c")])).toHaveLength(0);
   });
 
   it("hareket üretir (import kaynaklı, mutabık), mevcut hareketle eşler, atlar; ofis TL gideri expenses üretir", async () => {
     await as(OWNER, FULL, "owner");
-    const existing = (await rpc(`public.finance_record_entry($1::uuid,'in',1500,'2026-10-04'::date,'diger_gelir','Havale',null,null,null,'manual',null,false,null)`, [BANK])).entry_id as string;
+    const existing = (await rpc(`public.finance_record_entry($1::uuid,'in',1500,$2::date,'diger_gelir','Havale',null,null,null,'manual',null,false,null)`, [BANK, D(-11)])).entry_id as string;
     const res = await apply(BANK, [
       { line_id: lineIds.l1, action: "create", category: "kira", title: "Ofis kirası", expense_category: "ofis" },
       { line_id: lineIds.l2, action: "match", entry_id: existing },
@@ -132,7 +138,7 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     await as(OWNER, FULL, "owner");
     const again = await apply(BANK, [{ line_id: lineIds.l1, action: "create", category: "kira" }]);
     expect(again).toMatchObject({ created: 0, failed: 1 });
-    const other = (await rpc(`public.finance_record_entry($1::uuid,'in',999,'2026-10-06'::date,'diger_gelir','Başka tutar',null,null,null,'manual',null,false,null)`, [BANK])).entry_id as string;
+    const other = (await rpc(`public.finance_record_entry($1::uuid,'in',999,$2::date,'diger_gelir','Başka tutar',null,null,null,'manual',null,false,null)`, [BANK, D(-9)])).entry_id as string;
     const bad = await apply(BANK, [{ line_id: lineIds.l7, action: "match", entry_id: other }]);
     expect(bad).toMatchObject({ matched: 0, failed: 1 });
     const ok = await apply(BANK, [{ line_id: lineIds.l7, action: "create", category: "kira_tahsilat" }]);
@@ -144,14 +150,14 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     const st = (await q(`select * from public.finance_reconciliation_status() where account_id = $1`, [BANK]))[0]!;
     expect(st.has_import).toBe(true);
     expect(st.last_reconciled_at).not.toBeNull();
-    // "Başka tutar" (999, 6 Eki) kapsam penceresinde ve mutabık değil.
+    // "Başka tutar" (999, 9 gün önce) kapsam penceresinde ve mutabık değil.
     expect(Number(st.unreconciled_count)).toBe(1);
     expect(Number(st.pending_lines)).toBe(0);
   });
 
   it("maaş kategorisi yalnız owner/gm; tahsilat bağı ilgili modül yetkisi ister ve mükerrer bağlanmaz", async () => {
     await as(OWNER, FULL, "owner");
-    const s = await stage(BANK, FILE("d"), [line(20, "2026-10-07", "out", 12000, "MAAS ODEMESI"), line(21, "2026-10-07", "in", 4500, "KIRA TAHSILATI"), line(22, "2026-10-08", "in", 4500, "KIRA TAHSILATI 2")]);
+    const s = await stage(BANK, FILE("d"), [line(20, D(-8), "out", 12000, "MAAS ODEMESI"), line(21, D(-8), "in", 4500, "KIRA TAHSILATI"), line(22, D(-7), "in", 4500, "KIRA TAHSILATI 2")]);
     expect(s.inserted).toBe(3);
     const l20 = await lineId(H(20)), l21 = await lineId(H(21)), l22 = await lineId(H(22));
     await as(ADV2, NOCOLLECT, "advisor");
@@ -166,13 +172,13 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
 
   it("kişisel hesap: yalnız sahibi taslağı görür/işler; ofis sahibi ve diğer üyeler göremez", async () => {
     await as(ADV, "", "advisor");
-    const s = await stage(PERSONAL, FILE("e"), [line(30, "2026-10-05", "out", 75, "MARKET")]);
+    const s = await stage(PERSONAL, FILE("e"), [line(30, D(-10), "out", 75, "MARKET")]);
     expect(s.outcome).toBe("staged");
     const id = await lineId(H(30));
     expect(await q(`select 1 from public.finance_statement_lines`)).toHaveLength(1);
     await as(OWNER, FULL, "owner");
     expect((await q(`select id from public.finance_statement_lines where account_id = $1`, [PERSONAL]))).toHaveLength(0);
-    expect((await stage(PERSONAL, FILE("f"), [line(31, "2026-10-05", "out", 1, "x")])).outcome).toBe("forbidden");
+    expect((await stage(PERSONAL, FILE("f"), [line(31, D(-10), "out", 1, "x")])).outcome).toBe("forbidden");
     expect(await apply(PERSONAL, [{ line_id: id, action: "skip" }])).toMatchObject({ outcome: "forbidden" });
     await as(ADV, "", "advisor");
     const ok = await apply(PERSONAL, [{ line_id: id, action: "create", category: "diger_gider" }]);
@@ -186,9 +192,9 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
 
   it("tablolara doğrudan yazma yok; taslağı at yalnız bekleyen satırları siler", async () => {
     await as(OWNER, FULL, "owner");
-    await expect(db.exec(`insert into public.finance_statement_lines(tenant_id, import_id, account_id, line_hash, line_date, direction, amount) values ('${T}', '${imp1}', '${BANK}', 'xxxxxxxxxx', '2026-10-05', 'in', 1)`)).rejects.toThrow();
+    await expect(db.exec(`insert into public.finance_statement_lines(tenant_id, import_id, account_id, line_hash, line_date, direction, amount) values ('${T}', '${imp1}', '${BANK}', 'xxxxxxxxxx', '${D(-10)}', 'in', 1)`)).rejects.toThrow();
     await expect(db.exec(`update public.cash_entries set reconciled_at = null`)).rejects.toThrow();
-    const s = await stage(BANK, FILE("9"), [line(40, "2026-10-09", "in", 11, "Taslak")]);
+    const s = await stage(BANK, FILE("9"), [line(40, D(-6), "in", 11, "Taslak")]);
     const d = await rpc(`public.finance_statement_discard($1::uuid)`, [s.import_id]);
     expect(d).toMatchObject({ outcome: "discarded", removed: 1 });
     expect(await q(`select 1 from public.finance_statement_imports where id = $1`, [s.import_id])).toHaveLength(0);
@@ -314,7 +320,7 @@ describe.skipIf(!mod)("bank statement import (pglite)", () => {
     await db.exec(read("supabase/rollbacks/20261011001400_statement_apply_recurring_commission.rollback.sql"));
     await as(OWNER, FULL, "owner");
     const acc = (await q(`select account_id from public.finance_statement_lines where line_hash = $1`, [H(112)]))[0]!.account_id as string;
-    const s = await stage(acc, "f".repeat(64), [line(130, "2026-10-09", "out", 10, "x")]);
+    const s = await stage(acc, "f".repeat(64), [line(130, D(-6), "out", 10, "x")]);
     expect(s.outcome).toBe("staged");
     expect(await apply(acc, [{ line_id: await lineId(H(130)), action: "recurring", rule_id: "00000000-0000-0000-0000-000000000000" }])).toMatchObject({ created: 0, failed: 1 });
     await db.exec(`reset role`);
