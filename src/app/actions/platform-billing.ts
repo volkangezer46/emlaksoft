@@ -13,7 +13,15 @@ import { tryRefundIdem, tryRefundInvoice, tryReleaseInvoice } from "@/lib/try-cr
 import { efCommit, efReserve } from "@/lib/ef-credits/wallet";
 import { EF_PACK_REFUND_ITEM, efPackClawbackUnits, efPackRefundIdem } from "@/lib/billing/credit-pack-refund";
 import { reverseClaimsForInvoiceSafe } from "@/lib/growth/engine";
-import { parseMoneyTry, validateRefundAmount, MANUAL_PAYMENT_METHODS, type ManualPaymentMethod } from "@/lib/billing/invoice-ops";
+import {
+  parseMoneyTry,
+  validatePaidDate,
+  validateRefundAmount,
+  MANUAL_PAYMENT_METHODS,
+  MARK_PAID_STATUSES,
+  type ManualPaymentMethod,
+} from "@/lib/billing/invoice-ops";
+import { now as clockNow, trDayKey } from "@/lib/clock";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 export type BillingOpResult = { ok?: boolean; error?: string; notice?: string };
@@ -71,21 +79,33 @@ export async function markInvoicePaid(formData: FormData): Promise<BillingOpResu
   if (!MANUAL_PAYMENT_METHODS.some((m) => m.value === method)) return { error: "Ödeme yöntemi seçin." };
   const reference = String(formData.get("reference") ?? "").trim().slice(0, 120);
   const paidDateRaw = String(formData.get("paid_date") ?? "").trim();
-  if (paidDateRaw && !/^\d{4}-\d{2}-\d{2}$/.test(paidDateRaw)) return { error: "Geçersiz ödeme tarihi." };
+  const nowMs = clockNow();
+  // Biçim erken (DB turundan önce) denetlenir; kesim tarihi sınırı fatura okununca.
+  const early = validatePaidDate(paidDateRaw, { todayKey: trDayKey(nowMs), issuedKey: null });
+  if (!early.ok) return { error: early.error };
 
   const admin = createAdminClient();
   const { data: inv } = await admin
     .from("invoices")
-    .select("id, tenant_id, status, total_try, currency, checkout_status, meta")
+    .select("id, tenant_id, status, total_try, currency, checkout_status, meta, created_at")
     .eq("id", invoiceId)
     .maybeSingle();
   if (!inv) return { error: "Fatura bulunamadı." };
   if (inv.status === "paid") return { ok: true, notice: "Fatura zaten ödendi olarak işaretli." };
   if (inv.status === "void") return { error: "İptal edilmiş fatura ödendi işaretlenemez." };
   if (inv.currency !== "TRY") return { error: "Yalnız TRY faturalar elle ödendi işaretlenebilir." };
-  if (inv.status === "draft" && inv.checkout_status) {
-    return { error: "Ödeme oturumu bekleyen taslak fatura elle kapatılamaz; sağlayıcı tahsilatı doğrulanmalı." };
+  // SK6/B169: kesilmemiş taslak (elle ya da ödeme oturumu bekleyen) ödendi işaretlenemez; önce "Faturayı kes".
+  if (!(MARK_PAID_STATUSES as readonly string[]).includes(String(inv.status))) {
+    return {
+      error: inv.status === "draft" && inv.checkout_status
+        ? "Ödeme oturumu bekleyen taslak fatura elle kapatılamaz; sağlayıcı tahsilatı doğrulanmalı."
+        : "Kesilmemiş taslak fatura ödendi işaretlenemez; önce faturayı kesin.",
+    };
   }
+  const manualMeta = (((inv.meta ?? {}) as Record<string, unknown>).manual_invoice ?? {}) as Record<string, unknown>;
+  const issuedIso = typeof manualMeta.issued_at === "string" ? manualMeta.issued_at : (inv.created_at as string | null);
+  const paidDate = validatePaidDate(paidDateRaw, { todayKey: trDayKey(nowMs), issuedKey: issuedIso ? trDayKey(issuedIso) : null });
+  if (!paidDate.ok) return { error: paidDate.error };
 
   const receivedRaw = String(formData.get("received_try") ?? "").trim();
   const total = Number(inv.total_try);
@@ -97,7 +117,7 @@ export async function markInvoicePaid(formData: FormData): Promise<BillingOpResu
     }
   }
 
-  const paidAt = paidDateRaw ? new Date(`${paidDateRaw}T12:00:00+03:00`).toISOString() : new Date().toISOString();
+  const paidAt = paidDate.dateKey ? new Date(`${paidDate.dateKey}T12:00:00+03:00`).toISOString() : new Date(nowMs).toISOString();
   const { data: updated, error } = await admin
     .from("invoices")
     .update({
@@ -106,7 +126,7 @@ export async function markInvoicePaid(formData: FormData): Promise<BillingOpResu
       meta: { ...((inv.meta ?? {}) as Record<string, unknown>), manual_payment: { method, reference: reference || null, by: g.staff.id, recorded_at: new Date().toISOString() } },
     })
     .eq("id", invoiceId)
-    .in("status", ["open", "draft", "uncollectible"])
+    .in("status", [...MARK_PAID_STATUSES])
     .select("id")
     .maybeSingle();
   if (error) {

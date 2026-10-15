@@ -26,11 +26,11 @@ export function InvoiceActions({
   const lbl = "text-xs font-semibold text-text-muted";
   return (
     <div className="space-y-3">
-      {status === "open" || status === "draft" || status === "uncollectible" ? (
+      {status === "open" || status === "uncollectible" ? (
         <InlineOp
           label="Ödendi olarak işaretle"
           confirmLabel="Ödemeyi kaydet"
-          hidden={hidden}
+          hidden={hidden} refreshAfter={false}
           action={markInvoicePaid}
           hint={`Fatura tutarı ${totalTry.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}. Kısmi ödeme desteklenmez.`}
         >
@@ -58,7 +58,7 @@ export function InvoiceActions({
       ) : null}
 
       {isSuperAdmin && (status === "open" || status === "draft" || status === "uncollectible") ? (
-        <InlineOp label="Faturayı iptal et" confirmLabel="İptal et" tone="danger" hidden={hidden} action={voidInvoice}>
+        <InlineOp label="Faturayı iptal et" confirmLabel="İptal et" tone="danger" hidden={hidden} refreshAfter={false} action={voidInvoice}>
           <label className={lbl}>
             İptal nedeni
             <input name="reason" required minLength={3} maxLength={300} className={`mt-1 block w-64 ${opFieldClass}`} />
@@ -71,7 +71,7 @@ export function InvoiceActions({
           label="İade kaydı düş"
           confirmLabel="İadeyi kaydet"
           tone="danger"
-          hidden={hidden}
+          hidden={hidden} refreshAfter={false}
           action={recordInvoiceRefund}
           hint="Bu ekran para göndermez: iadeyi iyzico/banka üzerinden yaptıktan sonra kayıt düşün. Boş tutar = tam iade."
         >
@@ -91,7 +91,7 @@ export function InvoiceActions({
           label="Ters ibraz kaydı düş"
           confirmLabel="Ters ibrazı kaydet"
           tone="danger"
-          hidden={hidden}
+          hidden={hidden} refreshAfter={false}
           action={recordInvoiceChargeback}
           hint="Kart sahibi/banka işlemi geri çektiyse kayıt düşün: bu faturaya bağlı davet/ortak ödülleri geri alınır, verilmiş kredi geri çekilir. Bu ekran para hareketi yapmaz."
         >

@@ -39,3 +39,29 @@ export function validateRefundAmount(raw: string, invoiceTotal: number): { value
   if (n > invoiceTotal + 0.01) return { error: "İade tutarı fatura tutarını aşamaz." };
   return { value: n };
 }
+
+/** "Ödendi olarak işaretle" yalnız kesilmiş ve ödenmemiş faturada (SK6/B169): kesilmemiş taslak ödenemez. */
+export const MARK_PAID_STATUSES = ["open", "uncollectible"] as const;
+
+/**
+ * Elle ödeme tarihi KATI doğrulama (SK6/B169; arayüzdeki `max={today}` sunucuda da geçerli):
+ *  - biçim YYYY-MM-DD ve gidiş-dönüş eşleşmesi (2026-02-31 → 2026-03-03 olmaz; 2026-13-01 reddedilir);
+ *  - İstanbul gününe göre bugünden ileri olamaz;
+ *  - fatura kesim gününden (`issuedKey`, İstanbul günü) önce olamaz.
+ * Boş metin = tarih verilmedi (çağıran "şimdi" kullanır).
+ */
+export function validatePaidDate(
+  raw: string,
+  opts: { todayKey: string; issuedKey: string | null },
+): { ok: true; dateKey: string | null } | { ok: false; error: string } {
+  const s = raw.trim();
+  if (!s) return { ok: true, dateKey: null };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { ok: false, error: "Geçersiz ödeme tarihi (GG.AA.YYYY takvim günü seçin)." };
+  const d = new Date(`${s}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== s) return { ok: false, error: "Geçersiz ödeme tarihi: takvimde olmayan gün." };
+  if (s > opts.todayKey) return { ok: false, error: "Ödeme tarihi bugünden ileri olamaz." };
+  if (opts.issuedKey && s < opts.issuedKey) {
+    return { ok: false, error: `Ödeme tarihi faturanın kesim tarihinden (${opts.issuedKey.split("-").reverse().join(".")}) önce olamaz.` };
+  }
+  return { ok: true, dateKey: s };
+}

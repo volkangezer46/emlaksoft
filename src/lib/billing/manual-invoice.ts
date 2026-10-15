@@ -57,22 +57,39 @@ export function computeLine(position: number, description: string, quantity: num
   return { position, description, quantity, unitNetTry, vatRate, netTry, taxTry, totalTry: r2(netTry + taxTry) };
 }
 
+/** Satırda herhangi bir alan dolu mu (tamamen boş satır atlanır; miktarın varsayılan "1"i tek başına doluluk sayılmaz). */
+export function isManualLineFilled(l: ManualLineInput): boolean {
+  return Boolean(l.description.trim() || l.unitNet.trim() || (l.quantity.trim() && l.quantity.trim() !== "1"));
+}
+
+export type ManualLineIssue = { field: "description" | "quantity" | "unitNet"; message: string };
+
+/**
+ * Tek satır doğrulaması — istemci (satır içi hata, düğme kapısı) ve sunucu (buildManualLines) AYNI kural (SK6/B112).
+ * Boş satır null (atlanır). Geçersiz kalem artık önizlemeden sessizce düşüp sunucuda reddedilmez: düğme kapalı kalır.
+ */
+export function manualLineIssue(l: ManualLineInput): ManualLineIssue | null {
+  if (!isManualLineFilled(l)) return null;
+  const description = l.description.trim().replace(/\s+/g, " ");
+  if (description.length < 2 || description.length > 200) return { field: "description", message: "açıklama 2-200 karakter olmalı." };
+  if (parseQuantity(l.quantity || "1") === null) return { field: "quantity", message: "miktar geçersiz (0'dan büyük, en çok 2 ondalık)." };
+  if (parseUnitPrice(l.unitNet) === null) return { field: "unitNet", message: "birim fiyat geçersiz (KDV hariç, pozitif)." };
+  return null;
+}
+
 /** Form satırlarını doğrular ve hesaplar; tamamen boş satırlar atlanır. */
 export function buildManualLines(inputs: readonly ManualLineInput[], vatRate: number): { lines: InvoiceLine[] } | { error: string } {
   if (!Number.isFinite(vatRate) || vatRate < 0 || vatRate >= 1) return { error: "KDV oranı geçersiz." };
-  const filled = inputs.filter((l) => l.description.trim() || l.quantity.trim() || l.unitNet.trim());
+  const filled = inputs.filter(isManualLineFilled);
   if (filled.length === 0) return { error: "En az bir kalem girin." };
   if (filled.length > MAX_MANUAL_LINES) return { error: `En çok ${MAX_MANUAL_LINES} kalem girilebilir.` };
   const lines: InvoiceLine[] = [];
   for (const [i, l] of filled.entries()) {
     const n = i + 1;
+    const issue = manualLineIssue(l);
+    if (issue) return { error: `${n}. kalem: ${issue.message}` };
     const description = l.description.trim().replace(/\s+/g, " ");
-    if (description.length < 2 || description.length > 200) return { error: `${n}. kalem: açıklama 2-200 karakter olmalı.` };
-    const quantity = parseQuantity(l.quantity || "1");
-    if (quantity === null) return { error: `${n}. kalem: miktar geçersiz.` };
-    const unit = parseUnitPrice(l.unitNet);
-    if (unit === null) return { error: `${n}. kalem: birim fiyat geçersiz (KDV hariç, pozitif).` };
-    lines.push(computeLine(n, description, quantity, unit, vatRate));
+    lines.push(computeLine(n, description, parseQuantity(l.quantity || "1")!, parseUnitPrice(l.unitNet)!, vatRate));
   }
   const t = sumLines(lines);
   if (t.totalTry > MAX_MONEY_TRY) return { error: "Fatura toplamı üst sınırı aşıyor." };
