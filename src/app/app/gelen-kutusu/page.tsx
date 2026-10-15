@@ -3,19 +3,23 @@ import { ICONS } from "@/lib/icons";
 import { requireModulePage } from "@/lib/require-module-page";
 import { CallsView } from "./calls-view";
 import { InboxView } from "./inbox-view";
+import { ConversationsView } from "./conversations-view";
 
 export async function generateMetadata({ searchParams }: { searchParams: Promise<{ sekme?: string }> }) {
-  return { title: (await searchParams).sekme === "cagri" ? "Çağrı kaydı · Gelen kutusu" : "Gelen kutusu" };
+  const sekme = (await searchParams).sekme;
+  return { title: sekme === "cagri" ? "Çağrı kaydı · Gelen kutusu" : sekme === "akis" ? "Tüm akış · Gelen kutusu" : "Gelen kutusu" };
 }
 
 const TABS: readonly PageTab[] = [
-  { id: "akis", label: "İletişim akışı", icon: ICONS.gelenKutusu },
+  { id: "konusma", label: "Konuşmalar", icon: ICONS.mesaj },
+  { id: "akis", label: "Tüm akış", icon: ICONS.gelenKutusu },
   { id: "cagri", label: "Çağrı kaydı", icon: ICONS.telefon },
 ];
 
 /**
- * Gelen Kutusu: iletişim akışı + çağrı kaydı tek sayfada.
- * `?sekme=cagri` çağrı kaydını açar; iki sekme de `calls` modülündedir (tek kapı).
+ * Gelen Kutusu: konuşmalar (varsayılan; kişi bazlı, "yanıt bekliyor") + tüm iletişim akışı + çağrı kaydı tek sayfada.
+ * `?sekme=akis` kronolojik akışı, `?sekme=cagri` çağrı kaydını açar; üç sekme de `calls` modülündedir (tek kapı).
+ * `?customer=<id>` (müşteri kartı / "yanıt bekleyen" önerisi) konuşmayı doğrudan açar.
  */
 export default async function InboxPage({
   searchParams,
@@ -32,17 +36,24 @@ export default async function InboxPage({
   danisman?: string;
   sonuc?: string;
   customer?: string;
+  tel?: string;
 }>;
 }) {
   await requireModulePage("calls", "/app/gelen-kutusu");
   const sp = await searchParams;
-  const active = sp.sekme === "cagri" ? "cagri" : "akis";
+  const active = sp.sekme === "cagri" ? "cagri" : sp.sekme === "akis" ? "akis" : "konusma";
   const rest = Promise.resolve(sp);
 
   return (
     <div className="space-y-6">
       <PageSegmentTabs base="/app/gelen-kutusu" label="Gelen kutusu sekmeleri" tabs={TABS} active={active} />
-      {active === "cagri" ? <CallsView searchParams={rest} /> : <InboxView searchParams={rest} />}
+      {active === "cagri" ? (
+        <CallsView searchParams={rest} />
+      ) : active === "akis" ? (
+        <InboxView searchParams={rest} />
+      ) : (
+        <ConversationsView searchParams={rest} />
+      )}
     </div>
   );
 }

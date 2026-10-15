@@ -7,6 +7,8 @@ import {
   type TenantSmsSender,
   type TenantWhatsAppSender,
 } from "@/lib/messaging/tenant-providers";
+import { hasCampaignPlaceholders, recipientVars, renderCampaignMessage, type CampaignVars } from "@/lib/campaign-personalize";
+import { getBaseUrl } from "@/lib/base-url";
 
 const DEFAULT_CAMPAIGN_LIMIT = 3;
 const DEFAULT_RECIPIENT_BATCH_SIZE = 10;
@@ -304,6 +306,96 @@ async function sendToProvider(
   };
 }
 
+type PersonalizationContext = {
+  office: { name: string | null; phone: string | null; portfolioUrl: string | null; fallbackAdvisor: string | null };
+  advisorNames: Map<string, string>;
+};
+
+/**
+ * Kampanya mesajında `{ad}`, `{ofis}` gibi yer tutucu varsa ofis bağlamını BİR KEZ okur (yoksa null: ek sorgu yok).
+ * Kişiselleştirme sözlüğü `src/lib/campaign-personalize.ts`.
+ */
+async function loadPersonalization(
+  admin: ReturnType<typeof createAdminClient>,
+  campaign: ClaimedCampaign,
+): Promise<PersonalizationContext | null> {
+  const { data: row } = await admin
+    .from("campaigns")
+    .select("message, created_by")
+    .eq("id", campaign.id)
+    .eq("tenant_id", campaign.tenantId)
+    .maybeSingle();
+  const message = (row as { message?: string | null } | null)?.message ?? "";
+  if (!hasCampaignPlaceholders(message)) return null;
+  const createdBy = (row as { created_by?: string | null } | null)?.created_by ?? null;
+  const [{ data: tenant }, creator] = await Promise.all([
+    admin.from("tenants").select("name, phone, slug").eq("id", campaign.tenantId).maybeSingle(),
+    createdBy
+      ? admin.from("profiles").select("full_name").eq("id", createdBy).eq("tenant_id", campaign.tenantId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const t = tenant as { name?: string | null; phone?: string | null; slug?: string | null } | null;
+  let portfolioUrl: string | null = null;
+  if (t?.slug) {
+    try {
+      portfolioUrl = `${getBaseUrl().replace(/\/$/, "")}/vitrin/${encodeURIComponent(t.slug)}`;
+    } catch {
+      portfolioUrl = null;
+    }
+  }
+  return {
+    office: {
+      name: t?.name ?? null,
+      phone: t?.phone ?? null,
+      portfolioUrl,
+      fallbackAdvisor: (creator.data as { full_name?: string | null } | null)?.full_name ?? null,
+    },
+    advisorNames: new Map(),
+  };
+}
+
+/** Alıcının adı ve sorumlu danışmanı (rıza doğrulamasından ÖNCE okunur; doğrulama → sağlayıcı arasında I/O yok). */
+async function loadRecipientVars(
+  admin: ReturnType<typeof createAdminClient>,
+  ctx: PersonalizationContext,
+  tenantId: string,
+  recipientId: string,
+): Promise<CampaignVars> {
+  const { data } = await admin
+    .from("campaign_recipients")
+    .select("full_name, customer:customers!campaign_recipients_customer_id_fkey(assigned_to)")
+    .eq("id", recipientId)
+    .maybeSingle();
+  const r = data as { full_name?: string | null; customer?: { assigned_to?: string | null } | { assigned_to?: string | null }[] | null } | null;
+  const cust = Array.isArray(r?.customer) ? r?.customer[0] : r?.customer;
+  const advisorId = cust?.assigned_to ?? null;
+  let advisorName: string | null = null;
+  if (advisorId) {
+    if (!ctx.advisorNames.has(advisorId)) {
+      const { data: p } = await admin.from("profiles").select("full_name").eq("id", advisorId).eq("tenant_id", tenantId).maybeSingle();
+      ctx.advisorNames.set(advisorId, (p as { full_name?: string | null } | null)?.full_name ?? "");
+    }
+    advisorName = ctx.advisorNames.get(advisorId) || null;
+  }
+  return recipientVars({ fullName: r?.full_name ?? null, advisorName }, ctx.office);
+}
+
+/** Doğrulanmış teslimatı alıcıya göre kişiselleştirir (SAF; ağ/DB yok). */
+function personalizeDelivery(delivery: VerifiedDelivery, vars: CampaignVars | null): VerifiedDelivery {
+  if (!vars) return delivery;
+  const message = renderCampaignMessage(delivery.message, vars);
+  return {
+    ...delivery,
+    message,
+    whatsAppTemplate: delivery.whatsAppTemplate
+      ? {
+          ...delivery.whatsAppTemplate,
+          ...(delivery.whatsAppTemplate.bodyParameter ? { bodyParameter: message } : {}),
+        }
+      : null,
+  };
+}
+
 async function processClaimedCampaign(
   admin: ReturnType<typeof createAdminClient>,
   campaign: ClaimedCampaign,
@@ -335,6 +427,7 @@ async function processClaimedCampaign(
   const whatsAppSender = campaign.channel === "whatsapp"
     ? await prepareTenantWhatsAppSender(campaign.tenantId, { source: "campaign", audience: "contact" })
     : null;
+  const personalization = await loadPersonalization(admin, campaign);
 
   for (let index = 0; index < recipientBatchSize; index += 1) {
     const { data: claimData, error: claimError } = await admin.rpc(
@@ -352,6 +445,9 @@ async function processClaimedCampaign(
     const recipient = parseRecipientClaim(claimData);
     if (!recipient) break;
     result.recipientsClaimed += 1;
+    const vars = personalization
+      ? await loadRecipientVars(admin, personalization, campaign.tenantId, recipient.id)
+      : null;
 
     const { data: verificationData, error: verificationError } = await admin.rpc(
       "verify_campaign_recipient_consent",
@@ -368,14 +464,15 @@ async function processClaimedCampaign(
     }
 
     const verificationRow = asObject(verificationData);
-    const delivery = parseVerifiedDelivery(verificationData);
-    if (!delivery) {
+    const verified = parseVerifiedDelivery(verificationData);
+    if (!verified) {
       const state = verificationRow ? stringField(verificationRow, "state") : null;
       if (state === "blocked") result.blocked += 1;
       else if (state === "dead_letter") result.deadLettered += 1;
       else result.skipped += 1;
       continue;
     }
+    const delivery = personalizeDelivery(verified, vars);
 
     // No database or network work is intentionally placed between the consent
     // verification above and this provider call.

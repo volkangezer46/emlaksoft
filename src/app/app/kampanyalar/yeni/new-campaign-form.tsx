@@ -16,6 +16,9 @@ import {
   type CampaignResult,
 } from "@/app/actions/campaigns";
 import { CAMPAIGN_TEMPLATES } from "@/lib/campaign-templates";
+import { smsInfo } from "@/lib/messaging/sms-segments";
+import { recipientVars, renderCampaignMessage } from "@/lib/campaign-personalize";
+import { CampaignMessageField, type CampaignPreviewContext } from "../campaign-message-field";
 import { CAMPAIGN_DRAFT_FIELDS, CAMPAIGN_FORM_ID, CAMPAIGN_REQUIRED_BY_CHANNEL, CAMPAIGN_TABS } from "./campaign-tabs";
 
 const BASE_FILTERS = [
@@ -75,10 +78,12 @@ export function NewCampaignForm({
   userId,
   initial,
   audienceOptions,
+  previewContext,
 }: {
   userId: string;
   initial?: CampaignInitial | null;
   audienceOptions?: CampaignAudienceOptions;
+  previewContext: CampaignPreviewContext;
 }) {
   const filterGroups = useMemo(() => buildFilterGroups(audienceOptions), [audienceOptions]);
   const FILTERS = useMemo(() => filterGroups.flatMap((g) => g.options), [filterGroups]);
@@ -345,7 +350,7 @@ export function NewCampaignForm({
                   key={t.id}
                   type="button"
                   onClick={() => setMessage(t.message)}
-                  className="rounded-full border border-line bg-canvas px-2.5 py-1 text-xs font-medium text-text-muted transition hover:border-brand-400 hover:text-brand-600"
+                  className="focus-ring press inline-flex min-h-8 touch:min-h-11 items-center rounded-full border border-line bg-canvas px-2.5 text-xs font-medium text-text-muted transition hover:border-brand-400 hover:text-brand-600"
                 >
                   {t.label}
                 </button>
@@ -355,35 +360,23 @@ export function NewCampaignForm({
         )}
 
         <div className="sm:col-span-2">
-          <div className="mb-1.5 flex items-center justify-between">
-            <label htmlFor="kamp-message" className="text-sm font-semibold text-ink-950">
-              {channel === "sms" ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
-            </label>
-            <span className={`text-xs ${charCount > 160 ? "text-amber-600" : "text-text-faint"}`}>
-              {charCount}/612 karakter
-            </span>
-          </div>
-          <textarea
+          <label htmlFor="kamp-message" className="mb-1.5 block text-sm font-semibold text-ink-950">
+            {channel === "sms" ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
+          </label>
+          <CampaignMessageField
             id="kamp-message"
             name="message"
-            required={channel === "sms"}
-            rows={5}
-            maxLength={612}
+            channel={channel}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            onChange={setMessage}
+            required={channel === "sms"}
             placeholder={channel === "sms"
-              ? "Mesajınızı buraya yazın… ({ad} ve {ofis} otomatik değişir)"
-              : "Şablonda tek bir {{1}} gövde alanı varsa değerini yazın"}
-            className={`${fieldClass} resize-none`}
+              ? "Merhaba {ad}, ... ({ad}, {danisman}, {ofis} her alıcıya göre dolar)"
+              : "Şablonda tek bir {{1}} gövde alanı varsa değerini yazın ({ad} gibi alanlar kullanılabilir)"}
+            context={previewContext}
+            samples={preview?.ok ? preview.samples : null}
+            longestName={preview?.ok ? preview.longestName : null}
           />
-          {channel === "sms" && charCount > 0 && charCount <= 160 && (
-            <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
-          )}
-          {channel === "sms" && charCount > 160 && (
-            <p className="mt-1 text-xs text-amber-600">
-              {Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)
-            </p>
-          )}
         </div>
       </>
     ),
@@ -393,7 +386,16 @@ export function NewCampaignForm({
     const title = (values.title ?? "").trim();
     const filterLabel = FILTERS.find((f) => f.value === (values.filter ?? "all"))?.label ?? FILTERS[0].label;
     const isSms = channel === "sms";
-    const credits = charCount === 0 ? null : charCount <= 160 ? 1 : Math.ceil(charCount / 153);
+    // Kredi en uzun alıcı adıyla doldurulmuş metinden hesaplanır (yer tutucular gönderimde dolar).
+    const longest = preview?.ok && preview.longestName ? preview.longestName : "Ayşe Yılmaz";
+    const measured = renderCampaignMessage(message, recipientVars({ fullName: longest }, {
+      name: previewContext.officeName,
+      phone: previewContext.officePhone,
+      portfolioUrl: previewContext.portfolioUrl,
+      fallbackAdvisor: previewContext.userName,
+    }));
+    const credits = charCount === 0 ? null : smsInfo(measured).segments;
+    const allowedCount = preview?.ok ? preview.allowed : null;
     const templateName = whatsappTemplateName.trim();
     const templateLang = whatsappTemplateLanguage.trim();
     return (
@@ -429,6 +431,13 @@ export function NewCampaignForm({
                 tab="icerik"
                 field="message"
               />
+              <SummaryRow
+                label="Tahmini toplam kredi"
+                value={credits === null || allowedCount === null ? "-" : `${(credits * allowedCount).toLocaleString("tr-TR")}`}
+                muted={credits === null || allowedCount === null}
+                tab="icerik"
+                field="message"
+              />
             </>
           ) : (
             <>
@@ -440,7 +449,7 @@ export function NewCampaignForm({
         <SummaryGroup title="Mesaj önizleme">
           <div className="rounded-[var(--radius-control)] bg-surface p-2.5 text-xs leading-relaxed text-ink-950 shadow-sm">
             {isSms ? (
-              message.trim() || <span className="text-text-faint">Mesaj yazıldığında burada görünür.</span>
+              measured.trim() || <span className="text-text-faint">Mesaj yazıldığında burada görünür.</span>
             ) : templateName ? (
               `Şablon: ${templateName}${message.trim() ? ` · gövde: ${message.trim()}` : ""}`
             ) : (

@@ -1,9 +1,12 @@
 import Link from "@/components/ui/smart-link";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowUpRight, CheckCircle2, Clock3, Copy, Pencil, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowUpRight, CalendarCheck, CheckCircle2, Clock3, Copy, MessageCircleReply, Pencil, UserMinus, Users } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
-import { getCampaign, listCampaignRecipients } from "@/app/actions/campaigns";
+import { getCampaign, getCampaignReport, listCampaignRecipientsPage } from "@/app/actions/campaigns";
+import { CAMPAIGN_ATTRIBUTION_DAYS, CAMPAIGN_RECIPIENT_PAGE_SIZE, parseCampaignRecipientDurum, ratePct } from "@/lib/campaign-report";
+import { ListPager } from "@/components/ui/list-kit/list-pager";
+import { pageWindow } from "@/components/ui/list-kit/list-logic";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
@@ -55,22 +58,18 @@ const RECIPIENT_VARIANT: Record<string, "success" | "warning" | "danger" | "defa
 };
 
 /*
- * ?durum= kontratı: ham enum değerleri + "ulasan" bileşimi.
- * "Ulaşan" KPI'ı sent+delivered toplamı olduğundan tek enum değerine
- * indirgenemez; bileşik değer bu sayfada tanımlı ve yalnızca burada üretilir.
+ * ?durum= kontratı (`src/lib/campaign-report.ts`): ham enum değerleri + "ulasan" (sent+delivered) + 7 gün atıf kümeleri
+ * (yanit / randevu / ret). Süzme ve sayfalama SUNUCUDA (`campaign_recipient_page` RPC); satır sınırı yok.
  */
-function matchesRecipientDurum(status: string, durum: string) {
-  if (!durum) return true;
-  if (durum === "ulasan") return status === "sent" || status === "delivered";
-  return status === durum;
-}
-
 const RECIPIENT_FILTERS = [
   { label: "Tümü", value: "" },
   { label: "Ulaşan", value: "ulasan" },
   { label: "Bekleyen", value: "pending" },
   { label: "Ulaşmayan", value: "failed" },
   { label: "İzin yok", value: "opted_out" },
+  { label: "Yanıt veren", value: "yanit" },
+  { label: "Randevuya dönen", value: "randevu" },
+  { label: "Ret eden", value: "ret" },
 ] as const;
 
 function tarih(iso: string | null) {
@@ -93,54 +92,52 @@ export default async function CampaignDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ durum?: string }>;
+  searchParams?: Promise<{ durum?: string; sayfa?: string }>;
 }) {
   const { perms } = await requireModulePage("campaigns", "/app/kampanyalar");
   const canEdit = (perms.campaigns ?? []).includes("edit");
   const { id } = await params;
-  const { durum = "" } = (await searchParams) ?? {};
+  const sp = (await searchParams) ?? {};
+  const durum = parseCampaignRecipientDurum(sp.durum);
+  const page = Math.max(1, Number.parseInt(sp.sayfa ?? "", 10) || 1);
 
-  const [campaign, recipients] = await Promise.all([getCampaign(id), listCampaignRecipients(id)]);
+  const [campaign, report, recipientPage] = await Promise.all([
+    getCampaign(id),
+    getCampaignReport(id),
+    listCampaignRecipientsPage(id, durum, page),
+  ]);
   if (!campaign) notFound();
 
   const basePath = `/app/kampanyalar/${id}`;
   const durumHref = (value: string) => (value ? `${basePath}?durum=${value}` : basePath);
+  const listParams: Record<string, string> = durum ? { durum } : {};
 
   /*
-   * "Ulasan" hem `sent` hem `delivered` demek. Ilk yazimda yalnizca `sent`
-   * sayiliyordu; teslim onayi gelmis bir alici HICBIR sayacta gorunmuyordu ve
-   * toplam tutmuyordu.
-   *
-   * `opted_out` ayri tutuluyor: IYS izni olmadigi icin gonderilmedi — bu bir
-   * BASARISIZLIK DEGIL, dogru davranis. "Ulasmayan"a katmak, duzeltilecek bir
-   * sorun varmis gibi gosterirdi.
+   * Sayılar `campaign_report` RPC'sinden: durum bazında GERÇEK satır sayısı (eskiden ilk 500 satırdan bellekte sayılıyordu).
+   * "Ulaşan" = sent + delivered. `opted_out` ayrı: İYS izni olmadığı için gönderilmedi; bu bir başarısızlık değil.
+   * RPC yoksa (migration bekliyor) kampanya satırındaki sayaçlara düşülür.
    */
-  const gonderilen = recipients.filter((r) => r.status === "sent" || r.status === "delivered").length;
-  const basarisiz = recipients.filter((r) => r.status === "failed").length;
-  const bekleyen = recipients.filter((r) => r.status === "pending").length;
-  const izinsiz = recipients.filter((r) => r.status === "opted_out").length;
+  const toplam = report?.total ?? campaign.total_count ?? 0;
+  const gonderilen = report ? report.sent + report.delivered : (campaign.sent_count ?? 0);
+  const basarisiz = report?.failed ?? campaign.failed_count ?? 0;
+  const bekleyen = report?.pending ?? 0;
+  const izinsiz = report?.opted_out ?? 0;
+  const recipients = recipientPage.rows;
+  const pager = pageWindow(page, recipientPage.total, CAMPAIGN_RECIPIENT_PAGE_SIZE, recipients.length);
 
-  // KPI kartlarından ve hata özetinden URL parametresiyle daraltılan görünüm.
-  const visibleRecipients = durum
-    ? recipients.filter((r) => matchesRecipientDurum(r.status, durum))
-    : recipients;
-
-  /*
-   * Kampanya satırındaki sayaçlar ile gerçek alıcı satırları ayrışabilir:
-   * toplu güncelleme sırasında kesinti olursa sayaç yazılmadan kalır. Sayfada
-   * GERÇEK satır sayısı gösteriliyor; fark varsa sessizce geçmiyoruz.
-   */
+  // Kampanya satırındaki sayaç ile gerçek alıcı satırları ayrışabilir (toplu güncelleme kesintisi): sessizce geçilmez.
   const sayacSent = campaign.sent_count ?? 0;
-  const sayacTutarsiz = recipients.length > 0 && sayacSent !== gonderilen;
-
-  // Aynı hata metni çoğu zaman tüm başarısızlarda aynı (sağlayıcı hatası).
-  // Tek tek okutmak yerine grupluyoruz.
-  const hataGruplari = new Map<string, number>();
-  for (const r of recipients) {
-    if (r.status !== "failed") continue;
-    const key = r.error_msg?.trim() || "Neden belirtilmedi";
-    hataGruplari.set(key, (hataGruplari.get(key) ?? 0) + 1);
-  }
+  const sayacTutarsiz = Boolean(report) && toplam > 0 && sayacSent !== gonderilen;
+  const hataGruplari = report?.errors ?? [];
+  const ulasilanMusteri = report?.reached_customers ?? 0;
+  const days = report?.window_days ?? CAMPAIGN_ATTRIBUTION_DAYS;
+  const outcomes = report
+    ? [
+        { label: "Yanıt veren", value: report.replied, icon: MessageCircleReply, durum: "yanit" },
+        { label: "Randevuya dönen", value: report.booked, icon: CalendarCheck, durum: "randevu" },
+        { label: "Ret eden (izin geri çekti)", value: report.unsubscribed, icon: UserMinus, durum: "ret" },
+      ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -155,12 +152,12 @@ export default async function CampaignDetailPage({
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* KPI kartları alıcı tablosunu ?durum= parametresiyle süzer */}
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              { label: "Toplam alıcı", value: String(recipients.length), icon: Users, durum: "" },
-              { label: "Ulaşan", value: String(gonderilen), icon: CheckCircle2, durum: "ulasan" },
-              { label: "Ulaşmayan", value: String(basarisiz), icon: AlertTriangle, durum: "failed" },
+              { label: "Toplam alıcı", value: toplam.toLocaleString("tr-TR"), icon: Users, durum: "" },
+              { label: "Ulaşan", value: gonderilen.toLocaleString("tr-TR"), icon: CheckCircle2, durum: "ulasan" },
+              { label: "Ulaşmayan", value: basarisiz.toLocaleString("tr-TR"), icon: AlertTriangle, durum: "failed" },
               {
                 label: izinsiz > 0 ? "İzin yok" : "Bekleyen",
-                value: String(izinsiz > 0 ? izinsiz : bekleyen),
+                value: (izinsiz > 0 ? izinsiz : bekleyen).toLocaleString("tr-TR"),
                 icon: Clock3,
                 durum: izinsiz > 0 ? "opted_out" : "pending",
               },
@@ -195,6 +192,47 @@ export default async function CampaignDetailPage({
         ) : null}
       </div>
 
+      {/* Kampanya sonucu: gönderimden sonraki N gün içinde yanıt / randevu / ret (tahmini atıf, etiketli) */}
+      {report && ulasilanMusteri > 0 ? (
+        <section className="surface-card rounded-[var(--radius-panel)] p-5" aria-labelledby="kampanya-sonucu">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="kampanya-sonucu" className="font-display font-bold text-ink-950">Kampanya sonucu</h2>
+            <p className="text-xs text-text-muted">
+              Ulaşılan {ulasilanMusteri.toLocaleString("tr-TR")} müşterinin gönderimden sonraki {days} gün içindeki hareketi
+            </p>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {outcomes.map((o) => {
+              const rate = ratePct(o.value, ulasilanMusteri);
+              return (
+                <Link
+                  key={o.durum}
+                  href={durumHref(o.durum)}
+                  className={`focus-ring press group flex items-center gap-3 rounded-[var(--radius-card)] border px-4 py-3 transition hover:border-brand-400 ${
+                    durum === o.durum ? "border-brand-500 bg-brand-600/5" : "border-line bg-surface"
+                  } ${o.value === 0 ? "opacity-70" : ""}`}
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+                    <o.icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="numeric block font-display text-lg font-extrabold text-ink-950">
+                      {o.value.toLocaleString("tr-TR")}
+                      {rate ? <span className="ml-1.5 text-xs font-semibold text-text-muted">{rate}</span> : null}
+                    </span>
+                    <span className="block text-xs text-text-muted">{o.label}</span>
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 shrink-0 text-text-faint transition group-hover:text-brand-600" />
+                </Link>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-text-faint">
+            Tahmini atıf: aynı müşteriden gelen mesaj ya da arama, açılan randevu ve kanal izninin geri çekilmesi {days} gün içinde sayılır.
+          </p>
+        </section>
+      ) : null}
+
       {/* Teslimat işçisinin son hatası (campaigns.last_error): kampanya düzeyinde, alıcı hatalarından ayrı */}
       {campaign.last_error ? (
         <section className="rounded-[var(--radius-panel)] border border-danger-500/30 bg-danger-500/5 p-4" role="status">
@@ -221,18 +259,19 @@ export default async function CampaignDetailPage({
         <p className="mt-2 whitespace-pre-line rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-sm leading-relaxed text-ink-950">
           {campaign.message}
         </p>
+        <p className="mt-2 text-xs text-text-faint">
+          {"{ad}"}, {"{danisman}"} gibi alanlar her alıcıya kendi bilgisiyle doldurularak gönderilir.
+        </p>
       </section>
 
       {/* Hata özeti — aynı hata çoğu zaman tüm başarısızlarda aynı */}
-      {hataGruplari.size > 0 ? (
+      {hataGruplari.length > 0 ? (
         <section className="rounded-[var(--radius-panel)] border border-danger-500/30 bg-danger-500/5 p-5">
           <h2 className="flex items-center gap-2 font-display font-bold text-danger-600">
             <AlertTriangle className="h-4 w-4" /> Neden ulaşmadı
           </h2>
           <ul className="mt-3 space-y-2">
-            {[...hataGruplari.entries()]
-              .sort((a, b) => b[1] - a[1])
-              .map(([mesaj, adet]) => (
+            {hataGruplari.map(({ msg: mesaj, count: adet }) => (
                 <li key={mesaj}>
                   <Link
                     href={durumHref("failed")}
@@ -240,7 +279,7 @@ export default async function CampaignDetailPage({
                   >
                     <span className="min-w-0 text-sm text-ink-950">{mesaj}</span>
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-danger-500/10 px-2.5 py-0.5 text-xs font-bold text-danger-600">
-                      {adet} alıcı
+                      {adet.toLocaleString("tr-TR")} alıcı
                       <ArrowUpRight className="hover-action h-3 w-3 opacity-0 transition group-hover:opacity-100" />
                     </span>
                   </Link>
@@ -250,38 +289,37 @@ export default async function CampaignDetailPage({
         </section>
       ) : null}
 
-      <section className="surface-card rounded-[var(--radius-panel)] p-5">
+      <section className="surface-card rounded-[var(--radius-panel)] p-4 sm:p-5" aria-labelledby="alicilar">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
+          <h2 id="alicilar" className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Users className="h-4 w-4 text-brand-600" /> Alıcılar
           </h2>
-          <span className="flex items-center gap-2">
-            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
-              {visibleRecipients.length} kayıt
-              {visibleRecipients.length !== recipients.length ? ` · ${recipients.length} içinden` : ""}
-            </span>
+          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
+            {recipientPage.total.toLocaleString("tr-TR")} kayıt
+            {durum && toplam > 0 ? ` · ${toplam.toLocaleString("tr-TR")} içinden` : ""}
           </span>
         </div>
 
-        {/* Durum filtre çipleri — KPI kartlarıyla aynı ?durum= kontratı */}
-        {recipients.length > 0 ? (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+        {/* Durum filtre çipleri — KPI kartlarıyla aynı ?durum= kontratı; mobilde yatay kaydırılır */}
+        {toplam > 0 ? (
+          <div className="-mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
             {RECIPIENT_FILTERS.map((f) => (
-              <FilterChip active={durum === f.value}
-                key={f.value}
-                href={durumHref(f.value)}
-              >
+              <FilterChip active={durum === f.value} key={f.value} href={durumHref(f.value)}>
                 {f.label}
               </FilterChip>
             ))}
           </div>
         ) : null}
 
-        {recipients.length === 0 ? (
+        {!recipientPage.available ? (
+          <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
+            Alıcı listesi için veritabanı güncellemesi bekleniyor. Sayılar kampanya sayaçlarından gösteriliyor.
+          </p>
+        ) : toplam === 0 ? (
           <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu kampanyaya alıcı eklenmemiş.
           </p>
-        ) : visibleRecipients.length === 0 ? (
+        ) : recipients.length === 0 ? (
           <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
             Bu durumda alıcı yok.{" "}
             <Link href={basePath} className="font-semibold text-brand-600 hover:underline">
@@ -290,19 +328,49 @@ export default async function CampaignDetailPage({
           </p>
         ) : (
           <>
-            <TableFrame className="mt-3" minWidth={620}>
+            {/* Mobil: kart listesi (yatay kaydırma yok) */}
+            <ul className="mt-3 divide-y divide-hairline overflow-hidden rounded-[var(--radius-card)] border border-line md:hidden">
+              {recipients.map((r) => {
+                const tel = toTelHref(r.phone);
+                return (
+                  <li key={r.id} className="flex items-start gap-3 px-3 py-3">
+                    <div className="min-w-0 flex-1">
+                      {r.customer_id ? (
+                        <Link href={`/app/musteriler/${r.customer_id}`} className="focus-ring block truncate font-semibold text-ink-950">
+                          {r.full_name ?? "İsimsiz"}
+                        </Link>
+                      ) : (
+                        <span className="block truncate font-semibold text-ink-950">{r.full_name ?? "İsimsiz"}</span>
+                      )}
+                      <span className="numeric block text-xs text-text-muted">{formatTurkishPhone(r.phone)}</span>
+                      {r.error_msg ? <span className="mt-0.5 block text-xs text-danger-600">{r.error_msg}</span> : null}
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <Badge variant={RECIPIENT_VARIANT[r.status] ?? "default"}>{RECIPIENT_LABELS[r.status] ?? r.status}</Badge>
+                      {tel ? (
+                        <a href={tel} className="focus-ring inline-flex min-h-11 items-center text-xs font-semibold text-brand-600" aria-label={`${r.full_name ?? "Alıcıyı"} ara`}>
+                          Ara
+                        </a>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <TableFrame className="mt-3 hidden md:block" minWidth={620}>
               <Table>
                 <THead>
                   <TR>
                     <TH>Alıcı</TH>
                     <TH>Telefon</TH>
                     <TH>Durum</TH>
-                    <TH className="hidden md:table-cell">Hata</TH>
-                    <TH className="hidden md:table-cell">Gönderim</TH>
+                    <TH>Hata</TH>
+                    <TH>Gönderim</TH>
                   </TR>
                 </THead>
                 <TBody>
-                  {visibleRecipients.map((r) => {
+                  {recipients.map((r) => {
                     const tel = toTelHref(r.phone);
                     return (
                       <TR key={r.id}>
@@ -332,19 +400,17 @@ export default async function CampaignDetailPage({
                             {RECIPIENT_LABELS[r.status] ?? r.status}
                           </Badge>
                         </TD>
-                        <TD className="hidden text-text-muted md:table-cell">{r.error_msg ?? "—"}</TD>
-                        <TD className="hidden text-text-muted md:table-cell">{tarih(r.sent_at)}</TD>
+                        <TD className="text-text-muted">{r.error_msg ?? "—"}</TD>
+                        <TD className="text-text-muted">{tarih(r.sent_at)}</TD>
                       </TR>
                     );
                   })}
                 </TBody>
               </Table>
             </TableFrame>
-            {recipients.length >= 500 ? (
-              <p className="mt-2 text-xs text-text-faint">
-                İlk 500 alıcı gösteriliyor. Daha fazlası varsa listede yer almıyor.
-              </p>
-            ) : null}
+            <div className="mt-3">
+              <ListPager pathname={basePath} params={listParams} window={pager} total={recipientPage.total} />
+            </div>
           </>
         )}
       </section>

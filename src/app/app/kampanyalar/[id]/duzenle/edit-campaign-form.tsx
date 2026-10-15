@@ -4,9 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "@/components/ui/smart-link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
-import { FormField, FormInput, fieldClass } from "@/components/ui/form-controls";
+import { FormField, FormInput } from "@/components/ui/form-controls";
 import { useToast } from "@/components/app/toast-provider";
 import { updateCampaign } from "@/app/actions/campaigns";
+import { CampaignMessageField, type CampaignPreviewContext, type CampaignPreviewSample } from "../../campaign-message-field";
 
 type Campaign = {
   id: string;
@@ -18,7 +19,17 @@ type Campaign = {
 };
 
 /** Taslak kampanya düzenleme sayfası (popup yok). Kanal ve hedef kitle alıcı kuyruğunu belirler; değişmez. */
-export function EditCampaignForm({ campaign }: { campaign: Campaign }) {
+export function EditCampaignForm({
+  campaign,
+  previewContext,
+  samples,
+  longestName,
+}: {
+  campaign: Campaign;
+  previewContext: CampaignPreviewContext;
+  samples: CampaignPreviewSample[];
+  longestName: string;
+}) {
   const router = useRouter();
   const { push } = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -85,21 +96,18 @@ export function EditCampaignForm({ campaign }: { campaign: Campaign }) {
           </div>
         ) : null}
         <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <label htmlFor="edit-kamp-message" className="text-sm font-semibold text-ink-950">
-              {isSms ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
-            </label>
-            <span className={`text-xs ${message.length > 160 ? "text-amber-600" : "text-text-faint"}`}>{message.length}/612 karakter</span>
-          </div>
-          <textarea
+          <label htmlFor="edit-kamp-message" className="mb-1.5 block text-sm font-semibold text-ink-950">
+            {isSms ? "Mesaj metni" : "Şablon gövde parametresi (isteğe bağlı)"}
+          </label>
+          <CampaignMessageField
             id="edit-kamp-message"
-            name="message"
-            required={isSms}
-            rows={5}
-            maxLength={612}
+            channel={isSms ? "sms" : "whatsapp"}
             value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            className={`${fieldClass} resize-none`}
+            onChange={setMessage}
+            required={isSms}
+            context={previewContext}
+            samples={samples}
+            longestName={longestName}
           />
         </div>
         {error ? (
@@ -110,14 +118,14 @@ export function EditCampaignForm({ campaign }: { campaign: Campaign }) {
         <div className="flex justify-end gap-2">
           <Link
             href={`/app/kampanyalar/${campaign.id}`}
-            className="focus-ring rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold text-text-muted transition hover:bg-canvas"
+            className="focus-ring inline-flex min-h-10 touch:min-h-11 items-center rounded-[var(--radius-control)] border border-line px-4 text-sm font-semibold text-text-muted transition hover:bg-canvas"
           >
             Vazgeç
           </Link>
           <button
             type="submit"
             disabled={pending}
-            className="focus-ring press inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
+            className="focus-ring press inline-flex min-h-10 touch:min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-brand-600 px-4 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:opacity-60"
           >
             <Save className="h-4 w-4" /> {pending ? "Kaydediliyor…" : "Kaydet"}
           </button>

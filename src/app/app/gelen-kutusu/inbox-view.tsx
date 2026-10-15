@@ -12,7 +12,6 @@ import {
   MessageSquare,
   Phone,
   PhoneMissed,
-  Search,
   StickyNote,
   UserX,
   Users,
@@ -20,6 +19,10 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { DAY_MS, daysAgoIso, msSince, now, trDayStartMs } from "@/lib/clock";
+import { relativeTimeTr } from "@/lib/relative-time";
+import { formatDateTimeTr } from "@/lib/format";
+import { FilterBar } from "@/components/ui/filter-bar";
+import { DateRangeField } from "@/components/ui/date-range-field";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -40,7 +43,8 @@ import { whatsappWindowState, windowLabel } from "@/lib/messaging/whatsapp-windo
 import { isTenantWhatsAppSessionReady } from "@/lib/messaging/tenant-providers";
 
 /**
- * Gelen Kutusu — birleşik iletişim akışı (v1: salt görünüm + navigasyon).
+ * Gelen Kutusu — "Tüm akış" sekmesi (`?sekme=akis`): birleşik kronolojik iletişim kaydı. Kişi bazlı konuşmalar ve
+ * "yanıt bekliyor" durumu varsayılan sekmededir (`conversations-view.tsx`).
  *
  * İki kaynağı TEK kronolojik akışta birleştirir:
  *   - communications (sms / whatsapp / email / note / meeting / call özetleri)
@@ -100,19 +104,6 @@ function canDraftReply(item: UnifiedItem): boolean {
   return item.key.startsWith("c-") && item.direction === "inbound" && ["whatsapp", "sms", "email"].includes(item.channel);
 }
 
-function relativeTime(iso: string): string {
-  const mins = Math.floor(msSince(iso) / 60_000);
-  if (mins < 1) return "Az önce";
-  if (mins < 60) return `${mins} dk önce`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours} sa önce`;
-  const days = Math.floor(hours / 24);
-  if (days === 1) return "Dün";
-  if (days < 30) return `${days} gün önce`;
-  if (days < 365) return `${Math.floor(days / 30)} ay önce`;
-  return `${Math.floor(days / 365)} yıl önce`;
-}
-
 function truncate(text: string, max = 120): string {
   const t = text.replace(/\s+/g, " ").trim();
   return t.length > max ? `${t.slice(0, max)}…` : t;
@@ -162,15 +153,29 @@ export async function InboxView({
   // Merge sayfalaması: her kaynaktan bu kadar kayıt çekilir (yorum yukarıda)
   const fetchCeil = offset + PAGE_SIZE;
 
-  const term = q.trim().replace(/[%_,()]/g, " ").trim();
+  const term = q.trim().replace(/[%_,()"\\:]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
   const includeCalls = kanalF === "" || kanalF === "call";
+  // Arama (COM-10): rakam ağırlıklı terim → numara (son 10 hane; "0532 999" de eşleşir), aksi halde mesaj içeriği.
+  // Her iki durumda da müşteri adı/numarası eşleşen müşterilerin kayıtları dahil edilir (eşleşmemiş kayıtlar da aranır).
+  const termDigits = term.replace(/\D/g, "");
+  const phoneSearch = termDigits.length >= 4 && termDigits.length >= term.replace(/[\s+\-]/g, "").length * 0.7;
+  const phoneNeedle = phoneSearch ? termDigits.replace(/^0+/, "").slice(-10) : "";
+  let matchedCustomerIds: string[] = [];
+  if (term) {
+    const { data: matched } = await supabase
+      .from("customers")
+      .select("id")
+      .eq("tenant_id", inboxTenantId ?? "")
+      .ilike(phoneSearch ? "phone" : "full_name", `%${phoneSearch ? phoneNeedle : term}%`)
+      .limit(200);
+    matchedCustomerIds = ((matched ?? []) as { id: string }[]).map((m) => m.id);
+  }
+  const idClause = matchedCustomerIds.length ? `,customer_id.in.(${matchedCustomerIds.join(",")})` : "";
 
   // ---- communications sorgusu ---------------------------------------------
-  // Müşteri araması gömülü tabloda ilike ister → !inner join (arama yokken
-  // left join: müşterisiz kayıtlar da akışta görünmeli).
-  const commSelect = term
-    ? "id, channel, direction, subject, body, outcome, created_at, customer:customers!communications_customer_id_fkey!inner(id, full_name, phone)"
-    : "id, channel, direction, subject, body, outcome, created_at, customer:customers!communications_customer_id_fkey(id, full_name, phone)";
+  // Left join: müşterisiz (eşleşmemiş) kayıtlar da akışta ve aramada görünür.
+  const commSelect =
+    "id, channel, direction, subject, body, outcome, created_at, contact_address, customer:customers!communications_customer_id_fkey(id, full_name, phone)";
   let commQuery = supabase
     .from("communications")
     .select(commSelect, { count: "exact" })
@@ -181,12 +186,17 @@ export async function InboxView({
   if (fromF) commQuery = commQuery.gte("created_at", fromF);
   if (toF) commQuery = commQuery.lte("created_at", `${toF}T23:59:59`);
   if (unmatchedOnly) commQuery = commQuery.is("customer_id", null);
-  if (term) commQuery = commQuery.ilike("customer.full_name", `%${term}%`);
+  if (term) {
+    commQuery = commQuery.or(
+      phoneSearch
+        ? `contact_address.ilike.%${phoneNeedle}%${idClause}`
+        : `body.ilike.%${term}%,subject.ilike.%${term}%${idClause}`,
+    );
+  }
 
   // ---- calls sorgusu (yalnız "Tümü" veya "Telefon" filtresinde) -----------
-  const callSelect = term
-    ? "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey!inner(id, full_name, phone)"
-    : "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey(id, full_name, phone)";
+  const callSelect =
+    "id, direction, phone, disposition, notes, duration_sec, started_at, customer:customers!calls_customer_id_fkey(id, full_name, phone)";
   let callQuery = supabase
     .from("calls")
     .select(callSelect, { count: "exact" })
@@ -196,7 +206,11 @@ export async function InboxView({
   if (fromF) callQuery = callQuery.gte("started_at", fromF);
   if (toF) callQuery = callQuery.lte("started_at", `${toF}T23:59:59`);
   if (unmatchedOnly) callQuery = callQuery.is("customer_id", null);
-  if (term) callQuery = callQuery.ilike("customer.full_name", `%${term}%`);
+  if (term) {
+    callQuery = callQuery.or(
+      phoneSearch ? `phone.ilike.%${phoneNeedle}%${idClause}` : `notes.ilike.%${term}%${idClause}`,
+    );
+  }
 
   // ---- KPI head-count sorguları -------------------------------------------
   const todayStart = new Date(trDayStartMs(now()));
@@ -240,7 +254,7 @@ export async function InboxView({
 
   type CommRow = {
     id: string; channel: string; direction: string; subject: string | null;
-    body: string | null; outcome: string | null; created_at: string;
+    body: string | null; outcome: string | null; created_at: string; contact_address: string | null;
     customer: EmbeddedCustomer | EmbeddedCustomer[] | null;
   };
   for (const r of (commRows ?? []) as unknown as CommRow[]) {
@@ -251,7 +265,7 @@ export async function InboxView({
       direction: r.direction,
       customerId: cust?.id ?? null,
       customerName: cust?.full_name ?? null,
-      phone: cust?.phone ?? null,
+      phone: cust?.phone ?? r.contact_address ?? null,
       summary: truncate(r.body || r.subject || "—"),
       outcome: r.outcome ? (OUTCOME_LABELS.get(r.outcome) ?? r.outcome) : null,
       at: r.created_at,
@@ -314,7 +328,7 @@ export async function InboxView({
   const weekParam = weekAgoIso.slice(0, 10);
 
   // ---- Link kurucu — filtreler çip/sayfa linklerinde korunur ---------------
-  const baseParams: Record<string, string> = {};
+  const baseParams: Record<string, string> = { sekme: "akis" };
   if (q) baseParams.q = q;
   if (kanalF) baseParams.kanal = kanalF;
   if (yonF) baseParams.yon = yonF;
@@ -327,7 +341,7 @@ export async function InboxView({
     const usp = new URLSearchParams();
     for (const [key, value] of Object.entries(merged)) if (value) usp.set(key, value);
     const qs = usp.toString();
-    return qs ? `/app/gelen-kutusu?${qs}` : "/app/gelen-kutusu";
+    return qs ? `/app/gelen-kutusu?${qs}` : "/app/gelen-kutusu?sekme=akis";
   };
 
   const hasAnyFilter = Boolean(q || kanalF || yonF || fromF || toF || unmatchedOnly);
@@ -335,11 +349,11 @@ export async function InboxView({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Gelen Kutusu"
-        description="SMS, WhatsApp, e-posta, çağrı ve notlar — tüm iletişim tek kronolojik akışta."
+        title="Tüm akış"
+        description="SMS, WhatsApp, e-posta, çağrı ve notlar tek kronolojik akışta. Yanıt bekleyenler Konuşmalar sekmesindedir."
         actions={
-          <ButtonLink href="/app/musteriler" variant="primary" icon={Users}>
-            Müşterilere git
+          <ButtonLink href="/app/gelen-kutusu" variant="outline" icon={MessageSquare}>
+            Konuşmalar
           </ButtonLink>
         }
       />
@@ -347,10 +361,10 @@ export async function InboxView({
       {/* Kompakt, tıklanabilir özet — sıfır değerler sönük */}
       <Card className="flex flex-wrap items-center gap-x-2 gap-y-1 p-2">
         {[
-          { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?yon=gelen&from=${todayParam}` },
-          { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?from=${weekParam}` },
-          { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?yon=cevapsiz&from=${weekParam}` },
-          { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?durum=eslesmemis" },
+          { label: "Bugün gelen", value: kpiToday, icon: ArrowDownLeft, href: `/app/gelen-kutusu?sekme=akis&yon=gelen&from=${todayParam}` },
+          { label: "Bu hafta", value: kpiWeek, icon: CalendarClock, href: `/app/gelen-kutusu?sekme=akis&from=${weekParam}` },
+          { label: "Cevapsız (7g)", value: kpiMissed, icon: PhoneMissed, href: `/app/gelen-kutusu?sekme=akis&yon=cevapsiz&from=${weekParam}` },
+          { label: "Eşleşmemiş", value: kpiUnmatched, icon: UserX, href: "/app/gelen-kutusu?sekme=akis&durum=eslesmemis" },
         ].map((item) => (
           <Link
             key={item.label}
@@ -364,78 +378,50 @@ export async function InboxView({
         ))}
       </Card>
 
-      {/* Filtreler — GET formu (sayfa 1'e döner) + kanal çipleri link olarak */}
-      <div className="rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] space-y-3">
-        <form className="flex flex-wrap items-center gap-3" action="/app/gelen-kutusu">
-          {kanalF ? <input type="hidden" name="kanal" value={kanalF} /> : null}
-          {yonF ? <input type="hidden" name="yon" value={yonF} /> : null}
-          {unmatchedOnly ? <input type="hidden" name="durum" value="eslesmemis" /> : null}
-          <div className="relative min-w-[200px] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-            <input
-              name="q"
-              defaultValue={q}
-              aria-label="Müşteri adına göre ara"
-              placeholder="Müşteri adı ara…"
-              className="w-full rounded-[var(--radius-control)] border border-line bg-canvas py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-brand-400 focus:bg-surface"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
-            <span className="text-xs font-medium">Tarih:</span>
-            <input
-              name="from"
-              type="date"
-              aria-label="Başlangıç tarihi"
-              defaultValue={fromF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 touch:min-h-11 text-sm outline-none focus:border-brand-400 sm:flex-none"
-            />
-            <span>—</span>
-            <input
-              name="to"
-              type="date"
-              aria-label="Bitiş tarihi"
-              defaultValue={toF}
-              className="min-w-0 max-w-[150px] flex-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2.5 py-1.5 touch:min-h-11 text-sm outline-none focus:border-brand-400 sm:flex-none"
-            />
-          </div>
-          <button type="submit" className="rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 touch:min-h-11 text-xs font-semibold text-white transition hover:bg-brand-700">
-            Filtrele
-          </button>
-          {hasAnyFilter ? (
-            <Link href="/app/gelen-kutusu" className="text-xs font-semibold text-text-muted hover:text-danger-500">
-              Temizle
-            </Link>
-          ) : null}
-          <span className="ml-auto rounded-full bg-brand-600/10 px-3 py-1.5 text-xs font-semibold text-brand-600">
-            {totalFiltered.toLocaleString("tr-TR")} kayıt
-          </span>
-        </form>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* Filtreler — FilterBar (arama her zaman görünür; tarih aralığı "Filtreler" panelinde) + kanal/yön çipleri */}
+      <div className="space-y-3 rounded-[var(--radius-card)] border border-line bg-surface p-3 shadow-[var(--shadow-xs)] sm:p-4">
+        <FilterBar
+          pathname="/app/gelen-kutusu"
+          params={baseParams}
+          searchPlaceholder="Ad, telefon veya mesaj ara…"
+          searchLabel="Ad, telefon numarası veya mesaj içeriğinde ara"
+          panelParamKeys={["from", "to"]}
+          panel={<DateRangeField fromValue={fromF} toValue={toF} />}
+          resultCount={totalFiltered}
+          resultNoun="kayıt"
+          clearHref="/app/gelen-kutusu?sekme=akis"
+        />
+        <div className="-mx-3 flex gap-1.5 overflow-x-auto px-3 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
           <FilterChip href={hrefWith({ kanal: undefined, sayfa: undefined })} active={!kanalF}>
             Tümü
           </FilterChip>
-          {COMM_CHANNELS.map((c) => (
-            <FilterChip key={c.value} href={hrefWith({ kanal: c.value, sayfa: undefined })} active={kanalF === c.value}>
-              {c.emoji} {c.label}
-            </FilterChip>
-          ))}
-          <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
+          {COMM_CHANNELS.map((c) => {
+            const ChIcon = CHANNEL_META[c.value]?.icon ?? StickyNote;
+            return (
+              <FilterChip key={c.value} href={hrefWith({ kanal: c.value, sayfa: undefined })} active={kanalF === c.value}>
+                <ChIcon className="h-3.5 w-3.5" aria-hidden /> {c.label}
+              </FilterChip>
+            );
+          })}
+          <span aria-hidden className="mx-1 hidden h-4 w-px self-center bg-line sm:block" />
           {YON_FILTERS.map((f) => (
             <FilterChip
               key={f.value}
               href={hrefWith({ yon: yonF === f.value ? undefined : f.value, sayfa: undefined })}
               active={yonF === f.value}
-              className={yonF === f.value && f.value === "cevapsiz" ? "border-danger-500 bg-danger-500" : undefined}
+              tone={f.value === "cevapsiz" ? "danger" : "default"}
             >
-              {f.value === "cevapsiz" ? "☎ " : ""}{f.label}
+              {f.value === "cevapsiz" ? <PhoneMissed className="h-3.5 w-3.5" aria-hidden /> : null}
+              {f.label}
             </FilterChip>
           ))}
-          {unmatchedOnly ? (
-            <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-600">
-              <UserX className="h-3.5 w-3.5" /> Yalnız eşleşmemiş
-              <Link href={hrefWith({ durum: undefined, sayfa: undefined })} className="ml-1 font-semibold hover:text-danger-500" aria-label="Eşleşmemiş filtresini kaldır">×</Link>
-            </span>
-          ) : null}
+          <FilterChip
+            href={hrefWith({ durum: unmatchedOnly ? undefined : "eslesmemis", sayfa: undefined })}
+            active={unmatchedOnly}
+            aria-label={unmatchedOnly ? "Eşleşmemiş filtresini kaldır" : "Yalnız eşleşmemiş kayıtlar"}
+          >
+            <UserX className="h-3.5 w-3.5" aria-hidden /> Eşleşmemiş
+          </FilterChip>
         </div>
         {/* Kayıtlı görünümler — aktif filtre kombinasyonu adlandırılıp saklanır */}
         <SavedViews route="/app/gelen-kutusu" views={savedViews} currentParams={baseParams} />
@@ -451,7 +437,7 @@ export async function InboxView({
               ? "Filtreleri değiştirip tekrar deneyin."
               : "SMS, çağrı ve iletişim kayıtları oluştukça burada tek akışta listelenir. Müşteri kartından iletişim notu ekleyerek başlayabilirsiniz."
           }
-          action={hasAnyFilter ? { href: "/app/gelen-kutusu", label: "Filtreleri temizle" } : { href: "/app/musteriler", label: "Müşterilere git" }}
+          action={hasAnyFilter ? { href: "/app/gelen-kutusu?sekme=akis", label: "Filtreleri temizle" } : { href: "/app/musteriler", label: "Müşterilere git" }}
         />
       ) : (
         <ul className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)] divide-y divide-hairline">
@@ -461,7 +447,7 @@ export async function InboxView({
             const telHref = toTelHref(item.phone);
             const waHref = toWhatsAppLink(item.phone);
             return (
-              <li key={item.key} className="group relative flex flex-wrap items-start gap-3 px-4 py-3 transition hover:bg-canvas">
+              <li key={item.key} className="group relative flex flex-wrap items-start gap-x-3 gap-y-2 px-3 py-3 transition hover:bg-canvas sm:px-4">
                 {/* Satır overlay linki — müşteri kartına gider (müşterisizse link yok) */}
                 {item.customerId ? (
                   <Link
@@ -475,6 +461,9 @@ export async function InboxView({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="order-last ml-auto whitespace-nowrap text-xs text-text-faint sm:hidden" title={formatDateTimeTr(item.at)}>
+                      {relativeTimeTr(item.at)}
+                    </span>
                     {item.customerId ? (
                       <span className="font-semibold text-ink-950">{item.customerName}</span>
                     ) : (
@@ -515,7 +504,7 @@ export async function InboxView({
                     />
                   ) : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1.5 pl-12 sm:w-auto sm:pl-0">
                   {/* İkincil eylemler overlay'in üstünde kalmalı → relative z-10 */}
                   {item.customerId ? (
                     <SmsReplyButton panelId={`sms-${item.key}`} customerName={item.customerName ?? "Müşteri"} />
@@ -553,8 +542,8 @@ export async function InboxView({
                       }}
                     />
                   ) : null}
-                  <span className="whitespace-nowrap text-xs text-text-faint" title={new Date(item.at).toLocaleString("tr-TR")}>
-                    {relativeTime(item.at)}
+                  <span className="hidden whitespace-nowrap text-xs text-text-faint sm:inline" title={new Date(item.at).toLocaleString("tr-TR")}>
+                    {relativeTimeTr(item.at)}
                   </span>
                 </div>
                 {item.customerId ? (

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { copyTitle } from "@/lib/record-copy";
 import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignTag } from "@/lib/campaign-audience";
 import { NewCampaignForm, type CampaignAudienceOptions, type CampaignInitial } from "./new-campaign-form";
+import { loadCampaignPreviewContext } from "../preview-context";
 
 export const metadata = { title: "Yeni kampanya" };
 
@@ -13,7 +14,10 @@ export default async function YeniKampanyaPage({ searchParams }: { searchParams:
   // "Kaydı çoğalt": ?kopya=<kampanya id> → içerik ön doldurulur; alıcı kuyruğu oluşturmada yeniden hesaplanır.
   const sp = await searchParams;
   const copyId = Array.isArray(sp.kopya) ? sp.kopya[0] : sp.kopya;
-  const audienceOptions = tenantId ? await loadAudienceOptions(tenantId) : EMPTY_AUDIENCE_OPTIONS;
+  const [audienceOptions, previewContext] = await Promise.all([
+    tenantId ? loadAudienceOptions(tenantId) : Promise.resolve(EMPTY_AUDIENCE_OPTIONS),
+    loadCampaignPreviewContext(tenantId, userId),
+  ]);
   let initial: CampaignInitial | null = null;
   if (copyId && /^[0-9a-f-]{36}$/i.test(copyId) && tenantId) {
     const supabase = await createClient();
@@ -35,7 +39,7 @@ export default async function YeniKampanyaPage({ searchParams }: { searchParams:
       };
     }
   }
-  return <NewCampaignForm userId={userId} initial={initial} audienceOptions={audienceOptions} />;
+  return <NewCampaignForm userId={userId} initial={initial} audienceOptions={audienceOptions} previewContext={previewContext} />;
 }
 
 const EMPTY_AUDIENCE_OPTIONS: CampaignAudienceOptions = { tags: [], districts: [], advisors: [] };

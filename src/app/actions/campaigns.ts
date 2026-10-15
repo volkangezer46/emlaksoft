@@ -14,6 +14,15 @@ import {
 import { actionErrorMessage } from "@/lib/action-errors";
 import { describeIysGate, describeSkipReasons, gateIysRecipients, type IysGateResult } from "@/lib/iys/gate";
 import { CAMPAIGN_OPEN_DEMAND_STATUSES, isValidCampaignFilter, parseCampaignFilter } from "@/lib/campaign-audience";
+import { SMS_MAX_SEGMENTS, smsInfo } from "@/lib/messaging/sms-segments";
+import { CAMPAIGN_VARIABLE_HELP, unknownPlaceholders } from "@/lib/campaign-personalize";
+import {
+  CAMPAIGN_ATTRIBUTION_DAYS,
+  CAMPAIGN_RECIPIENT_PAGE_SIZE,
+  type CampaignRecipientDurum,
+  type CampaignRecipientRow,
+  type CampaignReport,
+} from "@/lib/campaign-report";
 
 export type CampaignResult = { ok?: boolean; error?: string; id?: string };
 export type WhatsAppTemplateListResult =
@@ -46,9 +55,46 @@ export async function listApprovedWhatsAppTemplates(): Promise<WhatsAppTemplateL
 // Hedef kitle önizlemesi: izinli / izinsiz alıcı sayısı (merkezi İYS kapısı)
 // ---------------------------------------------------------------------------
 
+/** Önizleme için örnek alıcı (yalnız ad ve sorumlu danışman kimliği; telefon istemciye gitmez). */
+export type CampaignSampleRecipient = { name: string; advisorId: string | null };
+
 export type CampaignAudiencePreview =
-  | { ok: true; total: number; allowed: number; skipped: number; reasons: IysGateResult["reasons"]; summary: string; detail: string }
+  | {
+      ok: true;
+      total: number;
+      allowed: number;
+      skipped: number;
+      reasons: IysGateResult["reasons"];
+      summary: string;
+      detail: string;
+      /** İzinli alıcılardan ilk birkaçı: formda alıcı bazlı mesaj önizlemesi. */
+      samples: CampaignSampleRecipient[];
+      /** İzinli alıcılar içindeki en uzun ad: SMS boyu bu adla hesaplanır. */
+      longestName: string;
+    }
   | { ok: false; error: string };
+
+const PREVIEW_SAMPLE_SIZE = 5;
+
+/**
+ * Mesaj metnini kanal kurallarına göre doğrular (oluştur + düzenle ortak): bilinmeyen yer tutucu ve SMS parça sınırı.
+ * Yer tutucular gönderimde alıcıya göre dolar; sınır ham metin üzerinden denetlenir, form en uzun adla uyarır.
+ */
+function validateCampaignMessage(channel: string, message: string): string | null {
+  if (message.length > 612) return "Mesaj en fazla 612 karakter olabilir.";
+  const unknown = unknownPlaceholders(message);
+  if (unknown.length > 0) {
+    const allowed = CAMPAIGN_VARIABLE_HELP.map((v) => v.token).join(", ");
+    return `Tanınmayan alan: ${unknown.join(", ")}. Kullanılabilir alanlar: ${allowed}.`;
+  }
+  if (channel === "sms") {
+    const info = smsInfo(message);
+    if (info.segments > SMS_MAX_SEGMENTS) {
+      return `Mesaj ${info.segments} SMS boyunda; en fazla ${SMS_MAX_SEGMENTS} SMS olabilir. Metni kısaltın.`;
+    }
+  }
+  return null;
+}
 
 const PREVIEW_PAGE = 1000;
 const PREVIEW_MAX_PAGES = 20;
@@ -91,10 +137,11 @@ export async function previewCampaignAudience(channel: string, filter: string): 
   }
 
   const ids: string[] = [];
+  const info = new Map<string, CampaignSampleRecipient>();
   for (let page = 0; page < PREVIEW_MAX_PAGES; page += 1) {
     let q = supabase
       .from("customers")
-      .select("id, tags")
+      .select("id, tags, full_name, assigned_to")
       .eq("tenant_id", gate.tenantId)
       .is("deleted_at", null)
       .eq("blacklist", false)
@@ -104,19 +151,30 @@ export async function previewCampaignAudience(channel: string, filter: string): 
     if (parsed.kind === "advisor") q = q.eq("assigned_to", parsed.value);
     const { data, error } = await q.order("id", { ascending: true }).range(page * PREVIEW_PAGE, page * PREVIEW_PAGE + PREVIEW_PAGE - 1);
     if (error) return readError;
-    const got = (data ?? []) as { id: string; tags: string[] | null }[];
+    const got = (data ?? []) as { id: string; tags: string[] | null; full_name: string | null; assigned_to: string | null }[];
     for (const r of got) {
       // Etiket: tam eşleşme (SQL'de c.tags @> array[etiket]); dizi literali kaçışı gerekmesin diye burada süzülür.
       if (parsed.kind === "tag" && !(r.tags ?? []).includes(parsed.value)) continue;
       if (districtCustomers && !districtCustomers.has(r.id)) continue;
       ids.push(r.id);
+      info.set(r.id, { name: (r.full_name ?? "").trim(), advisorId: r.assigned_to });
     }
     if (got.length < PREVIEW_PAGE) break;
   }
 
   const result = await gateIysRecipients(supabase, { tenantId: gate.tenantId, kind: "campaign", channel: ch, customerIds: ids });
+  const samples: CampaignSampleRecipient[] = [];
+  let longestName = "";
+  for (const id of result.allowed) {
+    const r = info.get(id);
+    if (!r) continue;
+    if (samples.length < PREVIEW_SAMPLE_SIZE && r.name) samples.push(r);
+    if (r.name.length > longestName.length) longestName = r.name;
+  }
   return {
     ok: true,
+    samples,
+    longestName,
     total: result.total,
     allowed: result.allowed.length,
     skipped: result.skippedCount,
@@ -145,7 +203,6 @@ export async function createCampaign(
   const whatsappTemplateLanguage = String(fd.get("whatsappTemplateLanguage") ?? "").trim();
 
   if (!title) return { error: "Kampanya başlığı zorunludur." };
-  if (message.length > 612) return { error: "Mesaj en fazla 612 karakter olabilir." };
   if (channel === "email") {
     return { error: "E-posta gönderim sağlayıcısı henüz yapılandırılmadı; bu kanal kullanılamaz." };
   }
@@ -153,6 +210,8 @@ export async function createCampaign(
     return { error: "Geçersiz kampanya kanalı." };
   }
   if (channel === "sms" && !message) return { error: "SMS mesaj metni zorunludur." };
+  const messageError = validateCampaignMessage(channel, message);
+  if (messageError) return { error: messageError };
   if (
     channel === "whatsapp" &&
     (!WHATSAPP_TEMPLATE_NAME_RE.test(whatsappTemplateName) ||
@@ -228,6 +287,8 @@ export async function updateCampaign(_prev: CampaignResult, fd: FormData): Promi
     .maybeSingle();
   if (!current) return { error: "Kampanya bulunamadı." };
   if (current.status !== "draft") return { error: "Yalnız taslak kampanya düzenlenebilir." };
+  const messageError = validateCampaignMessage(String(current.channel), message);
+  if (messageError) return { error: messageError };
 
   const patch: Record<string, unknown> = { title, message };
   if (current.channel === "sms") {
@@ -405,20 +466,46 @@ export async function getCampaign(id: string) {
   return data;
 }
 
-export async function listCampaignRecipients(campaignId: string) {
+/**
+ * Kampanya raporu (tek RPC turu): durum bazında GERÇEK sayılar (satır sınırı yok), en sık hata nedenleri ve gönderimden sonraki
+ * 7 gün içindeki sonuç atfı (yanıt / randevu / ret). Migration 20261018060000 yoksa null (sayfa uyarı gösterir).
+ */
+export async function getCampaignReport(campaignId: string): Promise<CampaignReport | null> {
   const gate = await requirePermission("campaigns", "view");
-  if (!gate.ok) return [];
-
+  if (!gate.ok) return null;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("campaign_recipients")
-    .select("id, customer_id, full_name, phone, status, error_msg, sent_at, created_at")
-    .eq("campaign_id", campaignId)
-    .order("status", { ascending: true })
-    .order("full_name", { ascending: true })
-    .limit(500);
+  const { data, error } = await supabase.rpc("campaign_report", {
+    p_campaign_id: campaignId,
+    p_window_days: CAMPAIGN_ATTRIBUTION_DAYS,
+  });
+  if (error || !data || typeof data !== "object") return null;
+  return data as CampaignReport;
+}
 
-  return data ?? [];
+/** Sunucuda süzülen ve sayfalanan alıcı listesi (?durum + ?sayfa). */
+export async function listCampaignRecipientsPage(
+  campaignId: string,
+  durum: CampaignRecipientDurum,
+  page: number,
+): Promise<{ rows: CampaignRecipientRow[]; total: number; available: boolean }> {
+  const gate = await requirePermission("campaigns", "view");
+  if (!gate.ok) return { rows: [], total: 0, available: true };
+  const supabase = await createClient();
+  const safePage = Math.max(1, Math.floor(page) || 1);
+  const { data, error } = await supabase.rpc("campaign_recipient_page", {
+    p_campaign_id: campaignId,
+    p_durum: durum,
+    p_window_days: CAMPAIGN_ATTRIBUTION_DAYS,
+    p_limit: CAMPAIGN_RECIPIENT_PAGE_SIZE,
+    p_offset: (safePage - 1) * CAMPAIGN_RECIPIENT_PAGE_SIZE,
+  });
+  if (error) return { rows: [], total: 0, available: false };
+  const rows = (data ?? []) as (CampaignRecipientRow & { total_count: number | string })[];
+  return {
+    rows: rows.map(({ total_count: _t, ...r }) => r),
+    total: rows.length > 0 ? Number(rows[0]!.total_count) : 0,
+    available: true,
+  };
 }
 
 // ---------------------------------------------------------------------------

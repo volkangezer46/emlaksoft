@@ -103,11 +103,13 @@ describe("saf yardımcılar", () => {
     expect(recipientHash("05321234542")).toBeNull();
   });
 
-  it("SMS kredi boyu: GSM-7 160/153, Türkçe karakterde 70/67", () => {
+  it("SMS kredi boyu: GSM-7 160/153, Türkçe dil tablosu 155/149, Unicode 70/67", () => {
     expect(smsSegments("a".repeat(160))).toBe(1);
     expect(smsSegments("a".repeat(161))).toBe(2);
-    expect(smsSegments("ş".repeat(70))).toBe(1);
-    expect(smsSegments("ş".repeat(71))).toBe(2);
+    expect(smsSegments("ş".repeat(155))).toBe(1);
+    expect(smsSegments("ş".repeat(156))).toBe(2);
+    expect(smsSegments("😀".repeat(70))).toBe(1);
+    expect(smsSegments("😀".repeat(71))).toBe(2);
     expect(smsSegments("")).toBe(0);
   });
 

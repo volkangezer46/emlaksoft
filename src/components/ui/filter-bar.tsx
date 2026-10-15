@@ -33,6 +33,7 @@ export function FilterBar({
   panelParamKeys = [],
   resultCount,
   resultNoun = "sonuç",
+  clearHref,
   className,
 }: {
   pathname: string;
@@ -51,6 +52,8 @@ export function FilterBar({
   panelParamKeys?: readonly string[];
   resultCount?: number;
   resultNoun?: string;
+  /** "Temizle" hedefi (varsayılan `pathname`); sekmeli sayfada sekmeyi koruyan adres verilir (ör. `?sekme=akis`). */
+  clearHref?: string;
   className?: string;
 }) {
   const q = typeof params[searchName] === "string" ? (params[searchName] as string) : "";
@@ -113,7 +116,7 @@ export function FilterBar({
         </button>
         {hasAny ? (
           <Link
-            href={pathname}
+            href={clearHref ?? pathname}
             className="focus-ring inline-flex min-h-9 touch:min-h-11 items-center rounded-[var(--radius-control)] px-2 text-sm text-text-muted underline-offset-2 hover:text-text hover:underline"
           >
             Temizle
