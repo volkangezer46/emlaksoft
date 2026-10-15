@@ -43,6 +43,9 @@ async function saveOwnerNote(
     .eq("id", offerId)
     .eq("tenant_id", tenantId);
   if (!error) return null;
+  // Sütun henüz yokken (migration uygulanmamış) boş açıklama "yazılamadı" sayılmaz: kullanıcı alanı hiç doldurmadı,
+  // her düzenlemede yanıltıcı hata çıkmasın.
+  if (value == null && (error.code === "42703" || error.code === "PGRST204")) return null;
   console.error("offer owner_visible_note", { code: error.code });
   return "Teklif kaydedildi; malike görünen açıklama kaydedilemedi.";
 }
