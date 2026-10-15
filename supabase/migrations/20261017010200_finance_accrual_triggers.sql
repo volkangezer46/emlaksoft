@@ -8,6 +8,15 @@
 --   'payout.approved' kurali) + 20261017010100 (v3 gorunum: posting_key'li kalemi olan kaynak hesaplanmis kolda tekrar etmez),
 --   20260816000200/000400 (commission_splits / commission_payouts), 20261008001700 (building_charges / building_payments).
 --
+-- 'payout.approved' kurali (onceden 010000'a yazilmisti; o dosya canlida uygulandigi icin buraya tasindi).
+insert into public.finance_posting_rules
+  (event_type, label, key_prefix, source_type, source_required, item_mode, item_direction, item_category,
+   cash_mode, cash_direction, cash_category, account_scope, pnl, perm_module, perm_action, owner_gm_only, tdhp)
+values
+  ('payout.approved', 'Hakediş tahakkuku', 'payout', 'commission_payout', true, 'required', 'payable', 'danisman_hakedis',
+   'none', null, null, 'office', 'expense', 'commissions', 'edit', true, '740/770 / 335')
+on conflict (event_type) do nothing;
+
 -- NE (kural: TETIKLEYICI YALNIZ TAHAKKUK yazar; nakit yalniz acik RPC'lerle):
 --  1) finance_open_items.offbook_amount: kaynakta "odendi" isaretli ama kasa/banka hareketi olmayan tutar (kasa disi).
 --     finance_open_item_recompute: odenen = greatest(bagli hareketler + ayna kalemler, offbook_amount). Nakit UYDURULMAZ;

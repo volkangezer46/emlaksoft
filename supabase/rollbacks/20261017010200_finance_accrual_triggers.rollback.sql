@@ -78,3 +78,4 @@ grant execute on function public.finance_open_item_recompute(uuid) to service_ro
 
 alter table public.finance_open_items drop constraint if exists finance_open_items_offbook_amount_check;
 alter table public.finance_open_items drop column if exists offbook_amount;
+delete from public.finance_posting_rules where event_type = 'payout.approved';
