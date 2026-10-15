@@ -8,13 +8,13 @@ import { FOUR_EYES_DEFAULTS, FOUR_EYES_KEYS } from "@/lib/platform-security/four
  * Yalnız süper admin değiştirir (personel modülü). SINIR: ayarın kendisi tek imzayla kapatılabilir (dört göze bağlı
  * değil); kapatma/eşik değişikliği Ayar merkezi denetim izine düşer. Bu, impact metinlerinde açıkça yazılıdır.
  */
-const HOME = { href: "/admin/onaylar", label: "Kontrol paneli > Onaylar" } as const;
+// B116: `home` YOK: eşikler Ayar merkezi > Güvenlik'te SettingField olarak düzenlenir (Onaylar sayfası yalnız kuyruktur;
+// eskiden home=/admin/onaylar olduğu için "Düzenle →" Onaylar'a gidiyor, orada da form olmadığından döngüsel çıkmaz oluyordu).
 const PERM = { platformModule: "personel", superAdminOnly: true } as const;
 
 export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
   defineInt({
     key: FOUR_EYES_KEYS.refundThreshold,
-    home: HOME,
     permission: PERM,
     default: FOUR_EYES_DEFAULTS.refundThresholdTry,
     min: 0,
@@ -29,7 +29,6 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
   }),
   defineInt({
     key: FOUR_EYES_KEYS.creditThreshold,
-    home: HOME,
     permission: PERM,
     default: FOUR_EYES_DEFAULTS.creditThresholdTry,
     min: 0,
@@ -43,7 +42,6 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
   }),
   defineBool({
     key: FOUR_EYES_KEYS.officeClose,
-    home: HOME,
     permission: PERM,
     default: FOUR_EYES_DEFAULTS.officeClose,
     category: "guvenlik",
@@ -56,7 +54,6 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
   }),
   defineBool({
     key: FOUR_EYES_KEYS.staffRole,
-    home: HOME,
     permission: PERM,
     default: FOUR_EYES_DEFAULTS.staffRole,
     category: "guvenlik",
@@ -69,7 +66,6 @@ export const FOUR_EYES_SETTING_DEFS: AnySettingDef[] = [
   }),
   defineInt({
     key: FOUR_EYES_KEYS.expiryHours,
-    home: HOME,
     permission: PERM,
     default: FOUR_EYES_DEFAULTS.expiryHours,
     min: 1,

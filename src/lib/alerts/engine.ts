@@ -11,6 +11,9 @@ import { openChannelConfig, sendToChannel } from "./channels";
 import { evaluateAlerts, formatAlertText, isPausedJobEvent, type AlertCondition, type AlertSnapshot } from "./evaluate";
 import { isMuted, mergeRuleConfigs, notifyDecision, type AlertRuleConfig, type AlertRuleKey, isAlertRuleKey } from "./rules";
 import { OPS_ALERT_SETTING_KEYS } from "@/lib/settings/registry/ops-alerts";
+import { notifyPlatformStaff } from "@/lib/platform-notify";
+
+const ALERTS_HREF = "/admin/sistem?sekme=uyarilar";
 
 /**
  * Uyarı motoru (SUNUCU): anlık görüntüyü toplar, kuralları (`evaluate.ts`, saf) uygular, olayları açar/kapatır ve
@@ -62,6 +65,21 @@ async function dispatch(
       return { at: atIso, state, channel: ch.name, kind: ch.kind, ok: r.ok, detail: r.detail };
     }),
   );
+}
+
+/** Kritik olayın zil bildirimi: aktif süper admin + operasyon; kanala ulaşılamadıysa metin bunu söyler. Asla fırlatmaz. */
+export const CRITICAL_STAFF_ROLES = ["super_admin", "ops"] as const;
+
+async function notifyCriticalToStaff(c: Pick<AlertCondition, "title" | "body" | "href" | "ruleKey" | "fingerprint">, deliveries: readonly Delivery[]) {
+  const delivered = deliveries.some((d) => d.ok);
+  await notifyPlatformStaff({
+    title: c.title,
+    body: delivered ? c.body : `${c.body} (Uyarı kanalına iletilemedi: ${deliveries[0]?.detail ?? "kanal yok"}.)`.slice(0, 500),
+    href: c.href || ALERTS_HREF,
+    kind: "danger",
+    roles: [...CRITICAL_STAFF_ROLES],
+    meta: { rule: c.ruleKey, fingerprint: c.fingerprint, channel_delivered: delivered },
+  });
 }
 
 function appendLog(prev: Delivery[] | null, next: Delivery[]): Delivery[] {
@@ -160,6 +178,7 @@ export async function runAlertEvaluation(): Promise<AlertRunResult> {
 
   let opened = 0;
   let notified = 0;
+  let staffNotified = 0;
   let resolved = 0;
   let failures = 0;
 
@@ -182,11 +201,18 @@ export async function runAlertEvaluation(): Promise<AlertRunResult> {
     const decision = notifyDecision(ev, cfg, nowMs);
     const patch: Record<string, unknown> = { last_at: nowIso, title: c.title, body: c.body, href: c.href, severity: c.severity };
     if (decision === "notify") {
-      const deliveries = await dispatch(channels, c, ev.last_notified_at ? "reminder" : "firing", nowIso);
+      const firstNotice = !ev.last_notified_at;
+      const deliveries = await dispatch(channels, c, firstNotice ? "firing" : "reminder", nowIso);
       patch.deliveries = appendLog(ev.deliveries, deliveries);
       patch.last_notified_at = nowIso;
       patch.notify_count = (ev.notify_count ?? 0) + 1;
       notified += 1;
+      // B114: kritik olay kanal olsa da olmasa da süper admin + operasyon ziline düşer (yalnız ilk bildirimde; hatırlatma
+      // kanala gider, zile tekrar yazılmaz). Zil, `staff:<uid>` Broadcast konusuyla anında güncellenir.
+      if (firstNotice && c.severity === "critical") {
+        await notifyCriticalToStaff(c, deliveries);
+        staffNotified += 1;
+      }
     }
     const { error } = await admin.from("alert_events").update(patch).eq("id", ev.id);
     if (error) failures += 1;
@@ -231,7 +257,7 @@ export async function runAlertEvaluation(): Promise<AlertRunResult> {
     }).catch(() => undefined);
   }
 
-  const detail = `${firing.length} tetikte · ${opened} yeni · ${notified} bildirim · ${resolved} düzeldi · ${channels.length} kanal${failures ? ` · ${failures} hata` : ""}`;
+  const detail = `${firing.length} tetikte · ${opened} yeni · ${notified} bildirim · ${staffNotified} zil · ${resolved} düzeldi · ${channels.length} kanal${failures ? ` · ${failures} hata` : ""}`;
   return { status: failures > 0 ? "error" : "ok", detail };
 }
 

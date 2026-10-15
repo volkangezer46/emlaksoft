@@ -48,6 +48,12 @@ export type HubMeta = {
   configureLabel: string;
   /** "Test et" ne yapar (kartta açıklama); null = zararsız test tanımlı değil. */
   testNote: string | null;
+  /**
+   * ZORUNLU kanal (B117): yapılandırılmamışsa kart "Yapılandırılmadı" (gri) DEĞİL "Sorunlu" (kırmızı) olur ve "Sorunlu"
+   * sayısına girer. "always": her ortamda (Resend: doğrulama, fatura, KVKK e-postası); "live-billing": canlı tahsilat
+   * açıkken (iyzico; demo tahsilat izni yoksa).
+   */
+  required?: "always" | "live-billing";
 };
 
 export const HUB_META: Record<HubKey, HubMeta> = {
@@ -58,6 +64,7 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     configureHref: null,
     configureLabel: "Sunucu ortamı (.env.production): IYZICO_API_KEY, IYZICO_SECRET_KEY, IYZICO_BASE_URL",
     testNote: "Sabit bir BIN sorgusu (ödeme oluşturmaz)",
+    required: "live-billing",
   },
   netgsm: {
     label: "Netgsm SMS",
@@ -74,6 +81,7 @@ export const HUB_META: Record<HubKey, HubMeta> = {
     configureHref: `${INTEGRATIONS_HREF}#anahtar-eposta`,
     configureLabel: "Bu sayfada: E-posta kanalı",
     testNote: "Alan adı listesi okunur (e-posta göndermez)",
+    required: "always",
   },
   whatsapp: {
     label: "WhatsApp (platform)",
@@ -170,6 +178,8 @@ export type HubCard = {
   key: HubKey;
   meta: HubMeta;
   configured: boolean;
+  /** Bu ortamda zorunlu mu (`isRequiredHub`); zorunlu + yapılandırılmamış = "Sorunlu". */
+  required?: boolean;
   /** Ek durum notu (ör. "Kaynak: sunucu ortamı", "Belirteç geri çekilmiş"). */
   notes: string[];
   /** Sağlayıcının bildirdiği/bilinen alarm (ör. 401). */
@@ -192,9 +202,23 @@ export function errorRate(stats: Pick<CallStats, "ok" | "fail"> | null): number 
   return Math.round((stats.fail / total) * 1000) / 10;
 }
 
-/** Kart tonu: yapılandırılmadı → off; alarm, son test başarısız ya da hata oranı ≥ %20 → danger; hata var → warn. */
-export function cardTone(card: Pick<HubCard, "configured" | "alarm" | "stats" | "lastTest">): HubTone {
-  if (!card.configured) return "off";
+/** Entegrasyon bu ortamda zorunlu mu? `liveBilling`: canlı tahsilat açık (demo tahsilat izni yok). */
+export function isRequiredHub(key: HubKey, opts: { liveBilling: boolean }): boolean {
+  const r = HUB_META[key].required;
+  return r === "always" || (r === "live-billing" && opts.liveBilling);
+}
+
+/** Zorunlu ama yapılandırılmamış kart (KPI ipucu ve kart notu: "zorunlu kanal eksik"). */
+export function isMissingRequired(card: Pick<HubCard, "configured" | "required">): boolean {
+  return Boolean(card.required) && !card.configured;
+}
+
+/**
+ * Kart tonu: zorunlu + yapılandırılmadı → danger (B117: "Sorunlu 0" yanılgısı); yapılandırılmadı → off; alarm, son test
+ * başarısız ya da hata oranı ≥ %20 → danger; hata var → warn.
+ */
+export function cardTone(card: Pick<HubCard, "configured" | "alarm" | "stats" | "lastTest"> & { required?: boolean }): HubTone {
+  if (!card.configured) return card.required ? "danger" : "off";
   if (card.alarm) return "danger";
   if (card.lastTest && !card.lastTest.ok) return "danger";
   const rate = errorRate(card.stats);

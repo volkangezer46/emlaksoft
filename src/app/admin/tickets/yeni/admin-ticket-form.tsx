@@ -84,8 +84,8 @@ export function AdminTicketForm({
         setError(res.error ?? "Talep oluşturulamadı.");
         return;
       }
+      // Yeni talep sayfası dinamik ve eylem onu revalidatePath ile tazeledi: ayrıca router.refresh yok (B037, çift RSC turu).
       router.push(`/admin/tickets/${res.ticketId}`);
-      router.refresh();
     });
   }
 

@@ -26,6 +26,7 @@ import { TicketStatusDonut, TicketResolutionGauge } from "./ticket-dashboard-vis
 import { TicketQueueView, type TicketQueueRow } from "./ticket-queue-view";
 import {
   buildTicketListHref,
+  FIRST_RESPONSE_FILTER,
   formatDurationHours,
   isUuid,
   normalizeTicketFilters,
@@ -257,6 +258,7 @@ export default async function AdminTicketsPage({
     );
 
   if (filters.durum === "acik") listQuery = listQuery.in("status", [...TICKET_OPEN_STATUSES]);
+  else if (filters.durum === FIRST_RESPONSE_FILTER) listQuery = listQuery.in("status", [...TICKET_OPEN_STATUSES]).is("first_response_at", null);
   else if (filters.durum === "cozulmus") listQuery = listQuery.in("status", ["resolved", "closed"]);
   else if (filters.durum) listQuery = listQuery.eq("status", filters.durum);
   if (filters.oncelik) listQuery = listQuery.eq("priority", filters.oncelik);
@@ -302,6 +304,7 @@ export default async function AdminTicketsPage({
     staffResult,
     tenantOptionsResult,
     categoryDefinitionsResult,
+    firstResponseResult,
   ] = await Promise.all([
     usesCanonicalQueue
       ? admin.rpc("support_ticket_queue_v2", {
@@ -335,7 +338,13 @@ export default async function AdminTicketsPage({
       .order("name")
       .limit(2000),
     categoryDefinitionsQuery,
+    // B123: "İlk yanıt bekliyor" kümesi (açık + ilk yanıt yok) sayacı; ofis süzgeci varsa ona göre.
+    (filters.tenant
+      ? admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", [...TICKET_OPEN_STATUSES]).is("first_response_at", null).eq("tenant_id", filters.tenant)
+      : admin.from("support_tickets").select("id", { count: "exact", head: true }).in("status", [...TICKET_OPEN_STATUSES]).is("first_response_at", null)),
   ]);
+  const awaitingFirst = firstResponseResult.error ? null : (firstResponseResult.count ?? 0);
+  if (firstResponseResult.error) console.error("admin tickets first-response count", firstResponseResult.error.code);
 
   queryFailure([
     queueResult.error,
@@ -563,6 +572,13 @@ export default async function AdminTicketsPage({
             </Link>
             <Link href={hrefFor({ durum: "acik" })} aria-current={filters.durum === "acik" ? "page" : undefined} className={statusPillClass(filters.durum === "acik")}>
               Açık kuyruk <StatusCount count={open} active={filters.durum === "acik"} />
+            </Link>
+            <Link
+              href={hrefFor({ durum: filters.durum === FIRST_RESPONSE_FILTER ? null : FIRST_RESPONSE_FILTER })}
+              aria-current={filters.durum === FIRST_RESPONSE_FILTER ? "page" : undefined}
+              className={statusPillClass(filters.durum === FIRST_RESPONSE_FILTER)}
+            >
+              İlk yanıt bekliyor {awaitingFirst !== null ? <StatusCount count={awaitingFirst} active={filters.durum === FIRST_RESPONSE_FILTER} /> : null}
             </Link>
             {TICKET_STATUS_KEYS.map((status) => {
               const active = filters.durum === status;

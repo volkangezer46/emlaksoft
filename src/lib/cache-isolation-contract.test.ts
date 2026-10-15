@@ -27,6 +27,8 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/app/vitrin/[slug]/page.tsx": { calls: 1, scope: "tenant", why: "vitrin ilan listesi; anahtar tenant.id + filtreler, is_sample=false" },
   "src/components/app/ef-credit-badge.tsx": { calls: 1, scope: "tenant", why: "EF bakiyesi; tenantId argümanı anahtara girer" },
   "src/lib/admin-badges.ts": { calls: 1, scope: "platform", why: "platform rozet sayıları" },
+  "src/lib/admin/ops-readiness.ts": { calls: 1, scope: "platform", why: "SK4/B114: operasyon hazırlık sinyalleri (uyarı kanalı, kritik uyarı teslimi, yedek, tatbikat, e-posta); platform geneli" },
+  "src/lib/status-page/cache.ts": { calls: 1, scope: "platform", why: "SK4/B017: kamu /durum anlık görüntüsü (yalnız public alanlar), ≤60 sn yaş sınırı" },
   "src/lib/billing/plan-definitions.ts": { calls: 3, scope: "platform", why: "plan kataloğu / koltuk / EF tarifesi" },
   "src/lib/billing/plan-support.ts": { calls: 1, scope: "platform", why: "şema yetenek yoklaması" },
   "src/lib/billing/seat-purchase.ts": { calls: 1, scope: "platform", why: "şema yetenek yoklaması" },

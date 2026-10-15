@@ -12,6 +12,8 @@ import { isMissingRelationError } from "@/lib/support/desk-data";
 import { parseMacroActions, parseTagList } from "@/lib/support/macro-template";
 import { parseSlaMatrixForm } from "@/lib/support/sla-policy";
 import { isTicketPriority, isUuid, validateTicketCategory } from "@/lib/support/ticket-contract";
+import { afterSafe } from "@/lib/after-safe";
+import { bustAdminCounters } from "@/lib/admin/counter-tags";
 
 /**
  * Destek masası 2.0 (AD9) server action'ları. Hepsi `requirePlatformModule("tickets")` kapısından geçer;
@@ -293,15 +295,19 @@ export async function applyTicketMacroActions(formData: FormData): Promise<DeskA
     else {
       applied.push("atama");
       if (assignee && assignee !== staff.id) {
-        await notifyPlatformStaff({
-          staffId: assignee,
-          title: "Yeni destek talebi atandı",
-          body: "Destek kuyruğunuzda yeni bir sorumluluk var.",
-          href: `/admin/tickets/${ticketId}`,
-          kind: "info",
-          roles: ["super_admin", "ops", "support", "billing"],
-          meta: { ticket_id: ticketId },
-        });
+        afterSafe(
+          () =>
+            notifyPlatformStaff({
+              staffId: assignee,
+              title: "Yeni destek talebi atandı",
+              body: "Destek kuyruğunuzda yeni bir sorumluluk var.",
+              href: `/admin/tickets/${ticketId}`,
+              kind: "info",
+              roles: ["super_admin", "ops", "support", "billing"],
+              meta: { ticket_id: ticketId },
+            }),
+          "macro-assign-notify",
+        );
       }
     }
   }
@@ -316,6 +322,8 @@ export async function applyTicketMacroActions(formData: FormData): Promise<DeskA
   revalidatePath(`/admin/tickets/${ticketId}`);
   revalidatePath("/admin/tickets");
   revalidatePath("/admin/tickets/makrolar");
+  // B011: makro durum/öncelik değiştirdiyse açık/acil talep sayaçları bir sonraki istekte taze.
+  if (applied.includes("durum") || applied.includes("öncelik")) bustAdminCounters();
   if (failures.length) return { error: `Yanıt gönderildi; makro eylemlerinden bazıları uygulanamadı: ${failures.join(", ")}.`, applied };
   return { ok: true, applied };
 }

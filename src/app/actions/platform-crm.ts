@@ -16,7 +16,8 @@ import {
 } from "@/lib/admin/platform-crm";
 import { canChangeTrial } from "@/lib/billing/admin-billing-fixes";
 import { now, parseTrLocalDateTime } from "@/lib/clock";
-import { requirePlatformModule } from "@/lib/platform";
+import { guardPlatformAction } from "@/lib/platform-guards";
+import { afterSafe } from "@/lib/after-safe";
 import { platformCanAccess, type PlatformRole } from "@/lib/platform-access";
 import { applyTenantPlanStatus } from "@/lib/admin/tenant-plan-status";
 import { requireStepUp } from "@/lib/platform-security/step-up";
@@ -30,7 +31,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * OFİS CRM eylemleri (AD5): etiket tanımları, ofis etiketleri, sorumlu personel (CSM), yaşam döngüsü aşaması,
  * yapılandırılmış notlar, takip görevleri, toplu işlemler ve admin kayıtlı görünümleri.
  *
- * Kapı: her eylem `requirePlatformModule("tenants")`; eylem bazında rol kuralı (etiket TANIMI süper admin + ops;
+ * Kapı: her eylem `guardPlatformAction({ module: "tenants" })` (B122: yetkisizlikte /admin'e YÖNLENDİRMEZ, `{ error }` döner;
+ * pencere sayfa değiştirmeden mesajı gösterir); eylem bazında rol kuralı (etiket TANIMI süper admin + ops;
  * toplu deneme `canChangeTrial`; toplu durum `plan_status`, askı/iptal yalnız süper admin). Ofisin müşteri verisi
  * hiçbir eylemde okunmaz. Her ofis değişikliği `platform_audit_logs`'a (entity_id = ofis) yazılır → Ofis 360 zaman
  * çizelgesinde görünür. Tablolar yoksa (migration bekliyor) anlaşılır hata döner.
@@ -73,7 +75,9 @@ function revalidateCrm(tenantId?: string) {
 // ---------------------------------------------------------------------------
 
 export async function saveTenantTag(formData: FormData): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!canManageTags(staff.role)) return { error: DENIED };
   const id = uuid(text(formData, "id"));
   const name = cleanTagName(text(formData, "name"));
@@ -91,7 +95,9 @@ export async function saveTenantTag(formData: FormData): Promise<CrmActionResult
 }
 
 export async function deleteTenantTag(formData: FormData): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!canManageTags(staff.role)) return { error: DENIED };
   const id = uuid(text(formData, "id"));
   if (!id) return { error: "Etiket bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -114,7 +120,9 @@ async function tenantExists(admin: ReturnType<typeof db>, tenantId: string): Pro
 }
 
 export async function setTenantTags(tenantId: string, tagIds: string[]): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -149,7 +157,9 @@ async function upsertCrm(admin: ReturnType<typeof db>, tenantId: string, patch: 
 }
 
 export async function setTenantAccountOwner(tenantId: string, ownerStaffId: string | null): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -180,7 +190,9 @@ export async function setTenantAccountOwner(tenantId: string, ownerStaffId: stri
 }
 
 export async function setTenantLifecycleStage(tenantId: string, stage: string | null): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(tenantId);
   if (!id) return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -199,7 +211,9 @@ export async function setTenantLifecycleStage(tenantId: string, stage: string | 
 // ---------------------------------------------------------------------------
 
 export async function saveTenantCrmNote(formData: FormData): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const noteId = uuid(text(formData, "id"));
   const tenantId = uuid(text(formData, "tenant_id"));
@@ -214,19 +228,26 @@ export async function saveTenantCrmNote(formData: FormData): Promise<CrmActionRe
   // Düzenleme silmeyle aynı kural: yalnız yazarı ya da süper admin (başkasının notu sessizce değiştirilemez).
   let editQ = admin.from("platform_tenant_notes").update({ category, body, pinned, edited_by: staff.id, edited_at: nowIso }).eq("id", noteId ?? "").eq("tenant_id", tenantId);
   if (staff.role !== "super_admin") editQ = editQ.eq("author_staff_id", staff.id);
+  // B037: ofis varlığı ayrı turla sorulmaz; olmayan ofis yabancı anahtar hatasıyla (23503) döner. Denetim kaydı yanıttan
+  // SONRA yazılır (after); istemci notu iyimser ekler, tazeleme tek seferdir (revalidatePath; istemci router.refresh yapmaz).
   const res = noteId
     ? await editQ.select("id").maybeSingle()
-    : (await tenantExists(admin, tenantId))
-      ? await admin.from("platform_tenant_notes").insert({ tenant_id: tenantId, category, body, pinned, author_staff_id: staff.id }).select("id").single()
-      : { data: null, error: null };
-  if (res.error || !res.data) return { error: res.error ? failMessage(res.error, "Not kaydedilemedi. Sayfayı yenileyip tekrar deneyin.") : noteId ? "Not bulunamadı ya da yalnız yazarı düzenleyebilir." : "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
-  await logPlatformActivity({ actorId: staff.id, action: "tenant.crm_note", entityType: "tenant", entityId: tenantId, meta: { note_id: res.data.id, category, pinned, edit: Boolean(noteId) } });
+    : await admin.from("platform_tenant_notes").insert({ tenant_id: tenantId, category, body, pinned, author_staff_id: staff.id }).select("id").single();
+  if (res.error?.code === "23503") return { error: "Ofis bulunamadı. Sayfayı yenileyip tekrar deneyin." };
+  if (res.error || !res.data) return { error: res.error ? failMessage(res.error, "Not kaydedilemedi. Sayfayı yenileyip tekrar deneyin.") : "Not bulunamadı ya da yalnız yazarı düzenleyebilir." };
+  const noteRowId = res.data.id;
+  afterSafe(
+    () => logPlatformActivity({ actorId: staff.id, action: "tenant.crm_note", entityType: "tenant", entityId: tenantId, meta: { note_id: noteRowId, category, pinned, edit: Boolean(noteId) } }),
+    "crm-note-audit",
+  );
   revalidateCrm(tenantId);
   return { ok: true, id: res.data.id, message: noteId ? "Not güncellendi." : "Not eklendi." };
 }
 
 export async function setTenantCrmNotePinned(noteId: string, pinned: boolean): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(noteId);
   if (!id) return { error: "Not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -241,7 +262,9 @@ export async function setTenantCrmNotePinned(noteId: string, pinned: boolean): P
 }
 
 export async function deleteTenantCrmNote(noteId: string): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(noteId);
   if (!id) return { error: "Not bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -263,7 +286,9 @@ export async function deleteTenantCrmNote(noteId: string): Promise<CrmActionResu
 // ---------------------------------------------------------------------------
 
 export async function createPlatformTask(formData: FormData): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const tenantId = uuid(text(formData, "tenant_id"));
   const title = text(formData, "title");
@@ -302,7 +327,9 @@ export async function createPlatformTask(formData: FormData): Promise<CrmActionR
 }
 
 export async function setPlatformTaskDone(taskId: string, done: boolean): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(taskId);
   if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -322,7 +349,9 @@ export async function setPlatformTaskDone(taskId: string, done: boolean): Promis
 }
 
 export async function deletePlatformTask(taskId: string): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!officeAdminCan(staff, "note")) return { error: DENIED };
   const id = uuid(taskId);
   if (!id) return { error: "Görev bulunamadı. Sayfayı yenileyip tekrar deneyin." };
@@ -358,7 +387,9 @@ const BULK_STATUSES = new Set(["active", "trial", "past_due", "suspended", "canc
  * başında BİR KEZ doğrulanır (her ofiste ayrı MFA turu açılmaz), sonra kapısız çekirdek `applyTenantPlanStatus` yazar.
  */
 export async function bulkTenantAction(tenantIds: string[], action: BulkTenantOp, stepUpCode?: string): Promise<BulkTenantResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error, done: 0, failed: [] };
+  const staff = g.staff;
   const ids = [...new Set((Array.isArray(tenantIds) ? tenantIds : []).map(uuid).filter(Boolean))];
   if (ids.length === 0) return { error: "Ofis seçin.", done: 0, failed: [] };
   if (ids.length > BULK_MAX) return { error: `Tek seferde en çok ${BULK_MAX} ofis seçilebilir.`, done: 0, failed: [] };
@@ -490,7 +521,9 @@ export async function bulkTenantAction(tenantIds: string[], action: BulkTenantOp
 // ---------------------------------------------------------------------------
 
 export async function createAdminSavedView(route: string, name: string, params: Record<string, string>): Promise<CrmActionResult & { view?: AdminSavedView }> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   if (!ADMIN_VIEW_PARAMS[route]) return { error: "Bu sayfa için görünüm kaydedilemez." };
   const clean = sanitizeViewParams(route, params) ?? {};
   const n = String(name ?? "").replace(/\s+/g, " ").trim();
@@ -503,7 +536,9 @@ export async function createAdminSavedView(route: string, name: string, params: 
 }
 
 export async function deleteAdminSavedView(id: string): Promise<CrmActionResult> {
-  const staff = await requirePlatformModule("tenants");
+  const g = await guardPlatformAction({ module: "tenants" });
+  if ("error" in g) return { error: g.error };
+  const staff = g.staff;
   const viewId = uuid(id);
   if (!viewId) return { error: "Görünüm bulunamadı. Sayfayı yenileyip tekrar deneyin." };
   const { data, error } = await db().from("admin_saved_views").delete().eq("id", viewId).eq("staff_id", staff.id).select("route");

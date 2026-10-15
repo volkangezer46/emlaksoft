@@ -29,7 +29,9 @@ import { ChartCard } from "@/components/ui/chart-frame";
 import { AreaTrend, AreaTrendChart, BarCompare } from "@/components/ui/viz/server-charts";
 import { AttentionList } from "@/components/ui/attention-list";
 import { StackedBar } from "@/components/admin/admin-bars";
-import { getAdminHealth } from "@/lib/admin-badges";
+import { getAdminHealth, liveOpenTickets } from "@/lib/admin-badges";
+import { ADMIN_DASHBOARD_TAG } from "@/lib/admin/counter-tags";
+import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
 import { getPlatformInsights } from "@/lib/insights/platform-read";
 import { PlatformInsightList } from "../_components/platform-insight-list";
 import { readLatestEfReconciliation } from "@/lib/ef-credits/reconcile-reader";
@@ -133,8 +135,28 @@ const getAdminDashboardData = unstable_cache(
     };
   },
   ["admin-dashboard-v7"],
-  { revalidate: 60, tags: ["admin-dashboard"] },
+  // B011: 10 sn (eskiden 60). Talep/fatura eylemleri `bustAdminCounters()` ile etiketi anında düşürür; açık ve acil
+  // talep sayıları bu önbellekte DEĞİL (`liveTicketCounts`, önbelleksiz).
+  { revalidate: 10, tags: [ADMIN_DASHBOARD_TAG] },
 );
+
+/**
+ * Açık ve acil talep sayıları: önbellek DIŞINDA iki HEAD sayımı (paralel, istek içinde bir kez). Talep açılınca/çözülünce
+ * Dikkat kuyruğu ve hero bir sonraki tazelemede (canlı olayla <1 sn) doğru sayıyı gösterir; rozetle aynı kaynak
+ * (`liveOpenTickets`). Okunamazsa null (satır gizlenir; sıfır gibi gösterilmez).
+ */
+const liveTicketCounts = cache(async (): Promise<{ open: number | null; urgent: number | null }> => {
+  const [open, urgentRes] = await Promise.all([
+    liveOpenTickets(),
+    createAdminClient()
+      .from("support_tickets")
+      .select("id", { count: "exact", head: true })
+      .in("status", [...TICKET_OPEN_STATUSES])
+      .eq("priority", "urgent"),
+  ]);
+  if (urgentRes.error) console.error("admin dashboard urgent tickets", urgentRes.error.code);
+  return { open, urgent: urgentRes.error ? null : (urgentRes.count ?? 0) };
+});
 
 /** Aynı istek içinde tüm bölümler tek yükü paylaşır. */
 const loadDashboard = cache(async (period: number) => {
@@ -163,8 +185,6 @@ function derive(data: Data) {
     trial: Number(summary.trial_count),
     totalTenants: Number(summary.tenant_count),
     risk: Number(summary.risk_count),
-    openTickets: Number(summary.open_ticket_count),
-    urgentTickets: Number(summary.urgent_ticket_count),
     soon: Number(summary.trials_ending_7d),
     members: Number(summary.member_count),
     mrr: exactMrr(aggregate.plan_stats, priceMapOf(data.planDefs)),
@@ -176,20 +196,23 @@ const loadAttention = cache(async (period: Period, role: PlatformAccessSubject) 
   const data = await loadDashboard(period);
   const d = derive(data);
   const canBilling = platformCanAccess(role, "billing");
-  const [sys, expiredActive] = await Promise.all([
+  const canTickets = platformCanAccess(role, "tickets");
+  const [sys, expiredActive, tickets] = await Promise.all([
     loadSystemSignals(canBilling),
     canBilling ? countExpiredActive() : Promise.resolve(null),
+    canTickets ? liveTicketCounts() : Promise.resolve({ open: null, urgent: null }),
   ]);
   const input: AttentionInput = {
     refundRequired: data.refundRequired,
     manualReview: data.manualReview,
     cronErrors: sys.health ? sys.health.cronErrors : null,
     efReconciliation: sys.ef ? sys.ef.status : null,
-    urgentTickets: d.urgentTickets,
-    openTickets: d.openTickets,
+    urgentTickets: tickets.urgent,
+    openTickets: tickets.open,
     risk: d.risk,
     trialsEnding: d.soon,
     newTrials: data.newTenants,
+    readiness: sys.health?.readiness ?? null,
   };
   const queue = buildAttentionQueue(input, role);
   if (!expiredActive) return queue;

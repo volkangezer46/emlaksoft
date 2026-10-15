@@ -134,7 +134,10 @@ json.dump(cfg["state"], open(m.CACHE, "w"))
 calls = []
 def psql(sql, variables=None, timeout=15):
     if "public.alert_events" in sql:
-        calls.append({"op": "insert" if "insert into" in sql else "update", "vars": variables}); return ""
+        # Olay satırı açılışı "insert into public.alert_events", düzeliş "update public.alert_events"; ikisi de B114 ile
+        # aynı ifadede personel zili (platform_notifications) yazar.
+        calls.append({"op": "insert" if "insert into public.alert_events" in sql else "update", "vars": variables,
+                      "staffBell": "insert into public.platform_notifications" in sql}); return ""
     raise RuntimeError("DB yok (test)")
 m.psql = psql
 m.read_env = lambda: {}
@@ -168,7 +171,7 @@ sys.exit(code)
       line,
       stderr: r.stderr,
       sent: pick("SENT") as { payload: { text?: string } }[],
-      calls: pick("CALLS") as { op: string; vars: Record<string, string> }[],
+      calls: pick("CALLS") as { op: string; vars: Record<string, string>; staffBell?: boolean }[],
     };
   }
 
@@ -190,6 +193,8 @@ sys.exit(code)
     expect(fire.sent).toHaveLength(1);
     expect(fire.sent[0]!.payload.text).toContain("[UYARI] Uyarı motoru durdu");
     expect(fire.calls).toEqual([expect.objectContaining({ op: "insert", vars: expect.objectContaining({ rule: "engine_stalled", fp: "engine_stalled" }) })]);
+    // B114: kritik olay kanal olsa da olmasa da süper admin + operasyon ziline aynı ifadede yazılır (hatırlatma değil).
+    expect(fire.calls[0]).toMatchObject({ staffBell: true, vars: { reminder: "0" } });
     expect(JSON.parse(readFileSync(stateFile, "utf8"))).toMatchObject({ alerted: true, notified: true });
 
     // Aynı kesinti, tekrar aralığı (60 dk) dolmadan: yeni gönderim yok.
@@ -198,11 +203,13 @@ sys.exit(code)
     const reminder = check(90 * 60, t0 + 61 * 60);
     expect(reminder.line.startsWith("MOTOR SÜRÜYOR")).toBe(true);
     expect(reminder.sent[0]!.payload.text).toContain("[SÜRÜYOR]");
+    // Hatırlatma zile ikinci kez yazılmaz (SQL koşulu: reminder = '0').
+    expect(reminder.calls[0]).toMatchObject({ vars: { reminder: "1" } });
 
     const resolved = check(2 * 60, t0 + 70 * 60);
     expect(resolved.line.startsWith("MOTOR DÜZELDİ: gönderildi")).toBe(true);
     expect(resolved.sent[0]!.payload.text).toContain("[DÜZELDİ]");
-    expect(resolved.calls[0]).toMatchObject({ op: "update", vars: { fp: "engine_stalled" } });
+    expect(resolved.calls[0]).toMatchObject({ op: "update", vars: { fp: "engine_stalled", label: "Sorun" }, staffBell: true });
     expect(JSON.parse(readFileSync(stateFile, "utf8"))).toMatchObject({ alerted: false });
   });
 

@@ -7,6 +7,7 @@ import { ALL_SETTING_DEFS } from "@/lib/settings/registry";
 import { searchSettings } from "@/lib/settings/view";
 import { SETTING_CATEGORIES } from "@/lib/settings/types";
 import { INVOICE_STATUS_LABELS } from "@/lib/accounting/ledger";
+import { memberSubtitle, tenantSubtitle, ticketNoQuery, ticketSubtitle } from "@/lib/admin/search-format";
 
 export type SearchHit = {
   id: string;
@@ -20,9 +21,44 @@ type Admin = ReturnType<typeof createAdminClient>;
 
 const tryFmt = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 
-/** e-posta için ilike deseni: yalnız LIKE jokerleri temizlenir (nokta/@ korunur; tek filtre, `or` grameri yok). */
-function emailLike(raw: string): string {
-  return `%${raw.slice(0, 80).replace(/[%_\\*"(),]/g, "").trim()}%`;
+/**
+ * Sorgu hatası SESSİZ boş dönüş olmaz (B120: profiles'ta olmayan `email` sütunu 42703 dönüyor, üye araması aylarca
+ * boş kalıyordu): her hata türüyle günlüğe düşer; o bölüm boş kalır, diğerleri yine döner.
+ */
+function logSearchError(kind: string, error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  console.error("admin search", kind, error.code ?? "unknown", error.message ?? "");
+  return true;
+}
+
+type MemberRow = { id: string; full_name: string | null; email: string | null; role: string | null; tenant_id: string | null; tenant_name: string | null; is_active: boolean | null };
+
+/**
+ * Üye araması: ad (profiles.full_name) ya da e-posta (auth.users) — `admin_search_members` (yalnız service_role).
+ * İşlev henüz uygulanmamışsa (migration 20261016040200 yok: PGRST202 / 42883) yalnız ADA göre aranır (kod yayını
+ * migration'dan önce de çalışır); hata yine günlüğe düşer.
+ */
+async function searchMembers(admin: Admin, q: string, limit = 6): Promise<MemberRow[]> {
+  const { data, error } = await admin.rpc("admin_search_members", { p_q: q, p_limit: limit });
+  if (!logSearchError("members", error)) return (data ?? []) as MemberRow[];
+  if (error?.code !== "PGRST202" && error?.code !== "42883") return [];
+  const byName = await admin
+    .from("profiles")
+    .select("id, full_name, role, tenant_id, is_active, tenant:tenants!profiles_tenant_id_fkey(name)")
+    .ilike("full_name", safeLike(q))
+    .limit(limit);
+  if (logSearchError("members.byName", byName.error)) return [];
+  return ((byName.data ?? []) as { id: string; full_name: string | null; role: string | null; tenant_id: string | null; is_active: boolean | null; tenant: { name?: string } | { name?: string }[] | null }[]).map(
+    (p) => ({
+      id: p.id,
+      full_name: p.full_name,
+      email: null,
+      role: p.role,
+      tenant_id: p.tenant_id,
+      tenant_name: (Array.isArray(p.tenant) ? p.tenant[0]?.name : p.tenant?.name) ?? null,
+      is_active: p.is_active,
+    }),
+  );
 }
 
 /**
@@ -32,20 +68,24 @@ function emailLike(raw: string): string {
 async function searchInvoices(admin: Admin, q: string): Promise<SearchHit[]> {
   const like = safeLike(q);
   const select = "id, invoice_no, status, total_try, created_at, tenant:tenants(name)";
-  const [byNo, tenantsByName, profilesByEmail] = await Promise.all([
+  const [byNo, tenantsByName, membersByEmail] = await Promise.all([
     admin.from("invoices").select(select).ilike("invoice_no", like).order("created_at", { ascending: false }).limit(5),
     admin.from("tenants").select("id").ilike("name", like).limit(5),
-    q.includes("@") ? admin.from("profiles").select("tenant_id").ilike("email", emailLike(q)).not("tenant_id", "is", null).limit(5) : Promise.resolve({ data: [] as { tenant_id: string | null }[] }),
+    // E-posta auth.users'ta (profiles'ta e-posta sütunu yok): üye RPC'si ofis kimliğini verir.
+    q.includes("@") ? searchMembers(admin, q, 5) : Promise.resolve([] as MemberRow[]),
   ]);
+  logSearchError("invoices.no", byNo.error);
+  logSearchError("invoices.tenants", tenantsByName.error);
   const tenantIds = [
     ...new Set([
       ...((tenantsByName.data ?? []) as { id: string }[]).map((t) => String(t.id)),
-      ...((profilesByEmail.data ?? []) as { tenant_id: string | null }[]).flatMap((p) => (p.tenant_id ? [String(p.tenant_id)] : [])),
+      ...membersByEmail.flatMap((p) => (p.tenant_id ? [String(p.tenant_id)] : [])),
     ]),
   ];
   const byTenant = tenantIds.length
     ? await admin.from("invoices").select(select).in("tenant_id", tenantIds).order("created_at", { ascending: false }).limit(6)
-    : { data: [] };
+    : { data: [], error: null };
+  logSearchError("invoices.byTenant", byTenant.error);
   const seen = new Set<string>();
   const out: SearchHit[] = [];
   for (const r of [...(byNo.data ?? []), ...(byTenant.data ?? [])] as { id: string; invoice_no: string; status: string; total_try: number; tenant: { name?: string } | { name?: string }[] | null }[]) {
@@ -89,15 +129,10 @@ export async function GET(req: NextRequest) {
         .select("id, name, plan, status")
         .ilike("name", like)
         .limit(6)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          logSearchError("tenants", error);
           for (const t of data ?? []) {
-            hits.push({
-              id: t.id,
-              type: "tenant",
-              title: t.name,
-              subtitle: `${t.plan ?? "—"} · ${t.status ?? "—"}`,
-              href: `/admin/tenants/${t.id}`,
-            });
+            hits.push({ id: t.id, type: "tenant", title: t.name, subtitle: tenantSubtitle(t), href: `/admin/tenants/${t.id}` });
           }
         }),
     );
@@ -105,41 +140,33 @@ export async function GET(req: NextRequest) {
 
   if (platformCanAccess(staff, "members")) {
     tasks.push(
-      admin
-        .from("profiles")
-        .select("id, full_name, email, role")
-        .or(orIlike(["full_name", "email"], q))
-        .limit(6)
-        .then(({ data }) => {
-          for (const m of data ?? []) {
-            hits.push({
-              id: m.id,
-              type: "member",
-              title: m.full_name || m.email || "Kullanıcı",
-              subtitle: `${m.email ?? ""} · ${m.role ?? ""}`.trim(),
-              href: `/admin/members`,
-            });
-          }
-        }),
+      searchMembers(admin, q).then((rows) => {
+        for (const m of rows) {
+          hits.push({
+            id: m.id,
+            type: "member",
+            title: m.full_name || m.email || "Kullanıcı",
+            subtitle: memberSubtitle(m),
+            // Tek kayda giden bağlantı kaydın kendisini açar (eskiden yalnız liste).
+            href: `/admin/members/${m.id}`,
+          });
+        }
+      }),
     );
   }
 
   if (platformCanAccess(staff, "tickets")) {
+    // Talep numarası (ES-YYYY-NNNNNN) tam eşleşme; değilse konu ya da numara içinde geçen.
+    const ticketNo = ticketNoQuery(q);
+    const base = admin.from("support_tickets").select("id, ticket_no, subject, status, priority");
     tasks.push(
-      admin
-        .from("support_tickets")
-        .select("id, subject, status, priority")
-        .ilike("subject", like)
+      (ticketNo ? base.eq("ticket_no", ticketNo) : base.or(orIlike(["subject", "ticket_no"], q)))
+        .order("created_at", { ascending: false })
         .limit(6)
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          logSearchError("tickets", error);
           for (const t of data ?? []) {
-            hits.push({
-              id: t.id,
-              type: "ticket",
-              title: t.subject,
-              subtitle: `${t.status ?? ""} · ${t.priority ?? ""}`.trim(),
-              href: `/admin/tickets/${t.id}`,
-            });
+            hits.push({ id: t.id, type: "ticket", title: t.subject, subtitle: ticketSubtitle(t), href: `/admin/tickets/${t.id}` });
           }
         }),
     );
@@ -151,7 +178,9 @@ export async function GET(req: NextRequest) {
         .then((found) => {
           hits.push(...found);
         })
-        .catch(() => undefined),
+        .catch((e) => {
+          console.error("admin search invoices", e instanceof Error ? e.message : e);
+        }),
     );
   }
 

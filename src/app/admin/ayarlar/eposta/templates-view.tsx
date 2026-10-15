@@ -15,6 +15,9 @@ import { EMAIL_FOOTER_KEY } from "@/lib/settings/registry/email";
 import { getPlatformSettingViews } from "@/lib/settings/read";
 import type { SettingView } from "@/lib/settings/types";
 import { TemplateSampleButton } from "./email-channel-tools";
+import Link from "@/components/ui/smart-link";
+import { INTEGRATIONS_HREF } from "@/lib/admin/integration-hub/model";
+import { templateBadge } from "@/lib/email/template-status";
 
 /**
  * Şablon merkezi: grup grup katalog; her şablonda değişken kataloğu, konu/gövde düzenleme (ayar defteri; tanımsız
@@ -26,8 +29,18 @@ export async function TemplatesView({ canEdit, channelEnabled }: { canEdit: bool
   const byKey = new Map<string, SettingView>(views.map((v) => [v.key, v]));
   const footer = byKey.get(EMAIL_FOOTER_KEY)?.formValue || DEFAULT_EMAIL_FOOTER;
 
+  const blocked = channelEnabled ? 0 : EMAIL_TEMPLATES.filter((t) => templateBadge(t, false).variant === "danger").length;
+
   return (
     <div className="space-y-8">
+      {blocked > 0 ? (
+        <p role="status" className="tone-danger rounded-[var(--radius-card)] px-4 py-3 text-sm font-semibold">
+          E-posta kanalı kapalı: akışa bağlı {blocked} şablon şu an HİÇ gönderilmiyor (doğrulama, fatura, KVKK dahil).{" "}
+          <Link href={`${INTEGRATIONS_HREF}#anahtar-eposta`} className="underline">
+            Resend anahtarı ve gönderen alan adını girin →
+          </Link>
+        </p>
+      ) : null}
       <section aria-labelledby="degiskenler-baslik" className="space-y-2 rounded-[var(--radius-panel)] border border-line bg-surface p-5">
         <h2 id="degiskenler-baslik" className="text-base font-semibold text-ink-950">
           Değişken kataloğu
@@ -91,14 +104,14 @@ function TemplateCard({
   const body = bodyView?.formValue || t.defaultBody;
   const preview = composeTemplateEmail(t.key, { subject, body, footer }, sampleVars(t.key));
   const customized = Boolean((subjectView && !subjectView.isDefault) || (bodyView && !bodyView.isDefault));
-  const wired = !t.usedBy.startsWith("Henüz");
+  const badge = templateBadge(t, channelEnabled);
 
   return (
     <details id={t.key} className="group scroll-mt-24 rounded-[var(--radius-panel)] border border-line bg-surface">
       <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-5 py-3.5">
         <span className="font-semibold text-ink-950">{t.label}</span>
-        <Badge variant={wired ? "success" : "neutral"} size="sm">
-          {wired ? "Kullanımda" : "Akış bekliyor"}
+        <Badge variant={badge.variant} size="sm">
+          {badge.label}
         </Badge>
         {customized ? (
           <Badge variant="info" size="sm">

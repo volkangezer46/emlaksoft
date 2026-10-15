@@ -58,6 +58,19 @@ export const TICKET_CATEGORY_LABEL: Record<string, string> = {
   onboarding: "Kurulum",
 };
 
+/**
+ * "İlk yanıt bekliyor" süzgeci (B123): açık durumdaki (open / in_progress / waiting) ve HİÇ personel yanıtı almamış
+ * (`first_response_at is null`) talepler. Ofisin ek mesajı artık talebi "İşleniyor"a çekmediği için (reply v3) bu küme
+ * "Açık" ile büyük ölçüde örtüşür; yine de atanan personelin elle "İşleniyor" yaptığı ama yanıtlamadığı talepleri de
+ * yakalar. Destek ana sayfası bu kümeyi öne alır.
+ */
+export const FIRST_RESPONSE_FILTER = "ilk-yanit";
+
+/** Talep ilk yanıt mı bekliyor? (açık durum + ilk yanıt yok) */
+export function awaitingFirstResponse(t: { status: string; first_response_at?: string | null }): boolean {
+  return (TICKET_OPEN_STATUSES as readonly string[]).includes(t.status) && !t.first_response_at;
+}
+
 export type TicketSortKey = "queue" | "created_at" | "updated_at" | "subject" | "status";
 export type TicketSortDirection = "asc" | "desc";
 export type TicketSlaFilter = "normal" | "warning" | "breached";
@@ -104,6 +117,7 @@ export function normalizeTicketFilters(raw: {
   const durum =
     raw.durum === "acik" ||
     raw.durum === "cozulmus" ||
+    raw.durum === FIRST_RESPONSE_FILTER ||
     TICKET_STATUS_KEYS.includes(raw.durum as (typeof TICKET_STATUS_KEYS)[number])
       ? raw.durum
       : undefined;
@@ -124,9 +138,12 @@ export function normalizeTicketFilters(raw: {
   const requestedSort = (["queue", "created_at", "updated_at", "subject", "status"] as const).includes(raw.sirala as TicketSortKey)
     ? (raw.sirala as TicketSortKey)
     : "queue";
-  // SLA görünümleri operasyon kuyruğunun kanonik risk sırasını korur.
-  const sirala = sla ? "queue" : etiket && requestedSort === "queue" ? "created_at" : requestedSort;
-  const yon = sirala === "queue" ? "desc" : raw.yon === "asc" || raw.yon === "desc" ? raw.yon : "desc";
+  // SLA görünümleri operasyon kuyruğunun kanonik risk sırasını korur. Etiket ve "İlk yanıt bekliyor" süzgeçleri kanonik
+  // kuyruk RPC'sinde yok: doğrudan sorguya düşer (ilk yanıt bekleyenlerde varsayılan en eski önce).
+  const firstResponse = durum === FIRST_RESPONSE_FILTER;
+  const sirala = sla && !firstResponse ? "queue" : (etiket || firstResponse) && requestedSort === "queue" ? "created_at" : requestedSort;
+  const yon =
+    sirala === "queue" ? "desc" : raw.yon === "asc" || raw.yon === "desc" ? raw.yon : firstResponse && requestedSort === "queue" ? "asc" : "desc";
   const parsedPage = Number(raw.sayfa);
   const sayfa = Number.isInteger(parsedPage) && parsedPage > 1 ? parsedPage : 1;
 

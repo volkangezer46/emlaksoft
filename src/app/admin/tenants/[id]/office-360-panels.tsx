@@ -102,7 +102,7 @@ export function SubscriptionTab({
           <EmptyStateV3 variant="compact" title="Abonelik kaydı yok" description="Bu ofis için abonelik satırı oluşturulmamış." />
         )}
         <p className="border-t border-line px-5 py-3 text-xs text-text-muted">
-          Paket ve durum değişikliği için sayfa başındaki «Abonelik» düğmesini kullanın (manuel işlem, denetim kaydına yazılır).
+          Paket değişikliği (kıst hesaplı) Abonelik sekmesinde; durum düzeltmesi sayfa başındaki «Abonelik durumu» penceresinde (gerekçeli, denetim kaydına yazılır).
         </p>
       </Panel>
 

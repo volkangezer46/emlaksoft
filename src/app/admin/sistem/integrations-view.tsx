@@ -12,6 +12,7 @@ import {
   INTEGRATIONS_HREF,
   TONE_LABELS,
   cardTone,
+  isMissingRequired,
   errorRate,
   type HubCard,
   type HubTone,
@@ -234,6 +235,7 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
   const tones = hub.cards.map(cardTone);
   const configured = hub.cards.filter((c) => c.configured).length;
   const problems = tones.filter((t) => t === "danger" || t === "warn").length;
+  const missingRequired = hub.cards.filter(isMissingRequired).length;
   const officeRows = [...hub.offices.rows, ...hub.offices.einvoice];
   const officeActive = officeRows.filter((r) => r.active).length;
   const officeDegraded = officeRows.filter((r) => r.active && r.status === "degraded").length;
@@ -248,7 +250,7 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
       >
         <KpiGrid label="Entegrasyon göstergeleri" className="lg:grid-cols-4 2xl:grid-cols-4">
           <KpiCard layout="inline" label="Yapılandırılmış" value={`${configured}/${hub.cards.length}`} href="#kartlar" icon={PlugZap} tone={configured === hub.cards.length ? "success" : "brand"} hint="platform entegrasyonu" />
-          <KpiCard layout="inline" label="Sorunlu" value={problems} href="#kartlar" icon={AlertTriangle} tone={problems > 0 ? "danger" : "success"} attention={problems > 0} hint="alarm, hata veya başarısız test" />
+          <KpiCard layout="inline" label="Sorunlu" value={problems} href="#kartlar" icon={AlertTriangle} tone={problems > 0 ? "danger" : "success"} attention={problems > 0} hint={missingRequired > 0 ? `${missingRequired} zorunlu kanal eksik` : "alarm, hata veya başarısız test"} />
           <KpiCard
             layout="inline"
             label="Ofis bağlantısı"

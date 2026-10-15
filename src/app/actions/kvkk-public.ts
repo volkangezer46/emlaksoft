@@ -9,6 +9,11 @@ import { sendTemplateEmail } from "@/lib/email/send";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { emailSchema, optionalPhoneSchema } from "@/lib/validation/contact";
 import { parseApplication, submitApplication, verifyApplication, hashEmail } from "@/lib/compliance/platform-kvkk-service";
+import { emailChannelStatus } from "@/lib/email/provider";
+import { getLegalEntity } from "@/lib/legal-entity";
+import { notifyPlatformStaff } from "@/lib/platform-notify";
+import { afterSafe } from "@/lib/after-safe";
+import { PLATFORM_KVKK_TYPE_LABELS } from "@/lib/compliance/platform-kvkk";
 
 /**
  * KVKK BAŞVURU FORMU (herkese açık, /kvkk-basvuru; DG6). Oturum YOK: service_role ile yalnız `platform_kvkk_requests`
@@ -59,8 +64,29 @@ export async function submitKvkkApplication(fd: FormData): Promise<KvkkApplyResu
   ]);
   if (!byIp.allowed || !byEmail.allowed) return { error: BUSY };
 
-  const res = await submitApplication(createAdminClient(), parsed.value, { nowMs: now(), send: sendTemplateEmail });
-  if (!res.ok) return { error: res.error };
+  // B117: e-posta kanalı kapalıysa doğrulama kodu gidemez: kayıt açılmaz, alternatif yol gösterilir, personel uyarılır.
+  const [channel, entity] = await Promise.all([emailChannelStatus().catch(() => null), getLegalEntity().catch(() => null)]);
+  const channelOpen = channel ? channel.enabled : true;
+  const alternatives = entity ? [entity.kep ? `KEP: ${entity.kep}` : "", entity.adres ? `Posta: ${entity.unvan ? `${entity.unvan}, ` : ""}${entity.adres}` : ""] : [];
+  const res = await submitApplication(createAdminClient(), parsed.value, { nowMs: now(), send: sendTemplateEmail, channelOpen, alternatives });
+  if (!res.ok) {
+    if ("channelClosed" in res && res.channelClosed) {
+      const typeLabel = PLATFORM_KVKK_TYPE_LABELS[parsed.value.type] ?? parsed.value.type;
+      afterSafe(
+        () =>
+          notifyPlatformStaff({
+            title: "KVKK başvurusu alınamadı: e-posta kanalı kapalı",
+            body: `E-posta kanalı kapalı olduğu için bir ${typeLabel} başvurusu kaydedilemedi; başvuru sahibine KEP/posta yolu gösterildi. E-posta kanalını açın.`,
+            href: "/admin/sistem?sekme=entegrasyonlar#entegrasyon-resend",
+            kind: "danger",
+            roles: ["super_admin", "ops", "support"],
+            meta: { source: "kvkk_public", request_type: parsed.value.type, reason: "email_channel_off" },
+          }),
+        "kvkk-channel-closed-notify",
+      );
+    }
+    return { error: res.error };
+  }
   await logPlatformActivity({
     actorId: null,
     action: res.resent ? "kvkk.public.code_resent" : "kvkk.public.submitted",

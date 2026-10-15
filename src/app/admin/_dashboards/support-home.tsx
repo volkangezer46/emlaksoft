@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { CheckCircle2, Clock, Inbox, LifeBuoy, Siren } from "lucide-react";
+import { CheckCircle2, Clock, Hourglass, Inbox, LifeBuoy, Siren } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DashboardHero } from "@/components/ui/dashboard-hero";
@@ -10,6 +10,7 @@ import { Ring } from "@/components/ui/console/ring";
 import { DataFreshness } from "@/components/ui/data-freshness";
 import { DAY_MS, TR_OFFSET_MS, msSince, now, trParts } from "@/lib/clock";
 import { TICKET_OPEN_STATUSES } from "@/lib/support/ticket-contract";
+import { FIRST_RESPONSE_FILTER, awaitingFirstResponse } from "../tickets/ticket-list-model";
 import { adminEyebrow, adminGreeting, firstNameOf } from "./shared";
 
 const statusLabel: Record<string, string> = {
@@ -43,7 +44,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
 
   const { data } = await admin
     .from("support_tickets")
-    .select("id, subject, priority, status, created_at, tenant:tenants(name)")
+    .select("id, subject, priority, status, created_at, first_response_at, tenant:tenants(name)")
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -59,7 +60,12 @@ export async function SupportHome({ staffName }: { staffName: string }) {
   const monthStart = Date.UTC(tp.year, tp.month, 1) - TR_OFFSET_MS;
   const resolvedThisMonth = rows.filter((t) => ["resolved", "closed"].includes(t.status) && new Date(t.created_at).getTime() >= monthStart).length;
 
-  const waitingQueue = [...openRows].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  // B123: "İlk yanıt bekliyor" kümesi (açık durumda, hiç personel yanıtı yok) kuyruğun BAŞINDA; içinde en eski önce.
+  const firstPending = (t: (typeof openRows)[number]) => awaitingFirstResponse(t);
+  const awaitingFirst = openRows.filter(firstPending).length;
+  const waitingQueue = [...openRows].sort(
+    (a, b) => Number(firstPending(b)) - Number(firstPending(a)) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  );
   const resolvedTotal = rows.filter((t) => ["resolved", "closed"].includes(t.status)).length;
 
   const priorities = ["urgent", "high", "normal", "low"].map((p) => ({
@@ -78,7 +84,7 @@ export async function SupportHome({ staffName }: { staffName: string }) {
         summary={
           oldest ? (
             <p>
-              Önce en uzun bekleyeni yanıtlayın:{" "}
+              {firstPending(oldest) ? "Önce ilk yanıtı en uzun bekleyeni yanıtlayın:" : "Önce en uzun bekleyeni yanıtlayın:"}{" "}
               <Link href={`/admin/tickets/${oldest.id}`} className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
                 {oldest.subject}
               </Link>
@@ -92,6 +98,17 @@ export async function SupportHome({ staffName }: { staffName: string }) {
       />
 
       <KpiGrid label="Destek özet göstergeleri">
+        <KpiCard
+          layout="inline"
+          tinted={awaitingFirst > 0}
+          label="İlk yanıt bekliyor"
+          value={awaitingFirst}
+          href={`/admin/tickets?durum=${FIRST_RESPONSE_FILTER}`}
+          icon={Hourglass}
+          tone={awaitingFirst > 0 ? "warn" : "success"}
+          attention={awaitingFirst > 0}
+          hint={awaitingFirst > 0 ? "Henüz hiç yanıt verilmedi" : "Her talebe ilk yanıt verildi"}
+        />
         <KpiCard layout="inline" label="Açık talep" value={open} href="/admin/tickets?durum=open" icon={Inbox} tone="brand" hint="Yeni, ilk yanıt bekleyen" />
         <KpiCard layout="inline" label="İşleniyor" value={inProgress} href="/admin/tickets?durum=in_progress" icon={Clock} tone="neutral" hint="Ekipte çalışılan" />
         <KpiCard layout="inline" label="Yanıt bekliyor" value={waiting} href="/admin/tickets?durum=waiting" icon={LifeBuoy} tone="warn" hint="Müşteri yanıtı bekleniyor" />
@@ -113,13 +130,13 @@ export async function SupportHome({ staffName }: { staffName: string }) {
         <div className="min-w-0 md:col-span-6 xl:col-span-7">
           <AttentionList
             title="En uzun bekleyenler"
-            subtitle="Bekleme süresine göre"
+            subtitle="Önce ilk yanıt bekleyenler, sonra bekleme süresi"
             items={waitingQueue.slice(0, 7).map((t) => {
               const days = Math.floor(msSince(t.created_at) / DAY_MS);
               return {
                 id: t.id,
                 label: t.subject,
-                hint: `${nameOf(t.tenant as Rel)} · ${statusLabel[t.status] ?? t.status} · ${days > 0 ? `${days} gündür açık` : "bugün açıldı"}`,
+                hint: `${nameOf(t.tenant as Rel)} · ${firstPending(t) ? "İlk yanıt bekliyor" : (statusLabel[t.status] ?? t.status)} · ${days > 0 ? `${days} gündür açık` : "bugün açıldı"}`,
                 href: `/admin/tickets/${t.id}`,
                 level: priorityLevel[t.priority] ?? "orta",
               };

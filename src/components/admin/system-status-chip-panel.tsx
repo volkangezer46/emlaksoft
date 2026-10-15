@@ -52,6 +52,24 @@ export function SystemStatusChipPanel({ health, clock = "", initialOpen }: { hea
             <span className="break-words">Hatalı iş: {health.failedJobs.join(", ")}</span>
           </p>
         ) : null}
+        {health.readiness && health.readiness.length > 0 ? (
+          <ul className="mt-3 space-y-1" aria-label="Operasyon uyarıları">
+            {health.readiness.map((r) => (
+              <li key={r.id}>
+                <Link
+                  href={r.href}
+                  title={r.hint}
+                  className={`focus-ring flex min-h-9 items-start gap-1.5 rounded-[var(--radius-control)] px-2.5 py-2 text-xs font-semibold touch:min-h-11 ${
+                    r.tone === "danger" ? "bg-danger-500/10 text-danger-600" : "bg-amber-500/10 text-amber-800"
+                  }`}
+                >
+                  <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="min-w-0 flex-1 break-words">{r.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : null}
         <Link
           href="/admin/sistem"
           className="focus-ring mt-3 flex min-h-9 items-center justify-between rounded-[var(--radius-control)] border border-line px-3 text-sm font-semibold text-ink-950 transition hover:bg-canvas touch:min-h-11"

@@ -5,7 +5,6 @@ import { startTransition, useActionState, useState, useTransition } from "react"
 import type { ReactNode } from "react";
 import { StepUpCodeField } from "@/components/admin/step-up";
 import { statusChangeNeedsStepUp } from "@/lib/platform-security/step-up-policy";
-import { useRouter } from "next/navigation";
 import {
   Ban,
   CalendarClock,
@@ -36,9 +35,11 @@ import {
   grantEntitlementOverride,
   previewAdminPlanChangeAction,
   previewAdminSeatChange,
+  previewAdminSetPlanStatus,
   revokeEntitlementOverride,
   saveSubscriptionDeal,
   type PlanPreviewResult,
+  type PlanStatusPreviewResult,
   type SeatPreviewResult,
   type SubOpsResult,
 } from "@/app/actions/platform-subscription-ops";
@@ -57,6 +58,8 @@ import { CANCEL_REASONS } from "@/lib/billing/subscription-ops-core";
 import { ENTITLEMENT_KEYS, ENTITLEMENT_LABELS, describeOverride } from "@/lib/billing/entitlements/overrides";
 import type { OverrideView, SubscriptionOpsData } from "@/lib/billing/subscription-ops";
 import { cn } from "@/lib/utils";
+import { PLAN_AMOUNT_SOURCE_LABEL } from "@/lib/billing/plan-status-amount";
+import { useToast } from "@/components/app/toast-provider";
 
 type PlanOption = { id: string; name: string; monthlyTry: number };
 type Action = (prev: SubOpsResult, formData: FormData) => Promise<SubOpsResult>;
@@ -105,8 +108,10 @@ function Feedback({ state }: { state: SubOpsResult }) {
 }
 
 /**
- * Gerekçe diyaloğu: tetik düğmesi + başlık + alanlar + zorunlu gerekçe. Başarıda kapanır, sayfa tazelenir ve sonuç
- * metni konsolun üstündeki bilgi bandına düşer (`onDone`).
+ * Gerekçe diyaloğu: tetik düğmesi + başlık + alanlar + zorunlu gerekçe. Başarıda kapanır ve sonuç metni konsolun
+ * üstündeki bilgi bandına düşer (`onDone`). Tazeleme TEK seferdir: eylem `revalidatePath` yapar, yanıtla gelen yeni
+ * sayfa ağacı uygulanır (B037: eskiden ayrıca `router.refresh()` çağrılıyordu, 8-13 gereksiz RSC isteği). Yetkisizlikte
+ * eylem yönlendirmez, hata döner (B122): mesaj pencerede ve bildirimde (toast) görünür, sayfa değişmez.
  */
 function OpDialog({
   tenantId,
@@ -124,6 +129,7 @@ function OpDialog({
   onDone,
   submitDisabled,
   size = "sm",
+  onOpen,
 }: {
   tenantId: string;
   action: Action;
@@ -140,23 +146,32 @@ function OpDialog({
   onDone?: (message: string) => void;
   submitDisabled?: boolean;
   size?: "sm" | "md" | "lg";
+  /** Pencere açılınca (ör. sunucu önizlemesini getirmek için). */
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const router = useRouter();
+  const toast = useToast();
   const [state, run, pending] = useActionState(async (prev: SubOpsResult, formData: FormData) => {
     const result = await action(prev, formData);
     if (result.ok) {
       startTransition(() => {
         setOpen(false);
         onDone?.(result.message ?? "Kaydedildi.");
-        router.refresh();
       });
+    } else if (result.error) {
+      toast.push(result.error, "err");
     }
     return result;
   }, initial);
   const idBase = title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) onOpen?.();
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent size={size}>
         <DialogHeader title={title} description={description} icon={icon} tone={tone} />
@@ -187,51 +202,58 @@ function OpDialog({
 }
 
 // ---------------------------------------------------------------------------
-// Sayfa başı: hızlı paket/durum düzeltmesi (gerekçeli)
+// Sayfa başı: abonelik DURUMU düzeltmesi (gerekçeli). Paket değişikliği tek yerde: Abonelik sekmesi (kıst hesaplı).
 // ---------------------------------------------------------------------------
 
-export function SubscriptionPanel({
-  tenantId,
-  currentPlan,
-  currentStatus,
-  plans,
-}: {
-  tenantId: string;
-  currentPlan: string;
-  currentStatus: string;
-  plans: PlanOption[];
-}) {
-  const [plan, setPlan] = useState(currentPlan);
+/**
+ * B118: sayfa başı pencere yalnız DURUM düzeltir (paket seçimi yok: paket değişikliğinin tek merkezi Abonelik sekmesi,
+ * kıst hesaplı). "Aylık tutar" katalogdan DEĞİL, sunucudaki RPC tutar dalından gelir (`previewAdminSetPlanStatus`):
+ * plan değişmediği için kayıtlı tutar korunur (ör. 5.990 ₺), katalog fiyatı (5.490 ₺) yanlışlıkla vaat edilmez.
+ * Düğme yalnız `billing:write` yetkisinde çizilir (sayfa kapısı, B122).
+ */
+export function SubscriptionPanel({ tenantId, currentStatus }: { tenantId: string; currentStatus: string }) {
   const [status, setStatus] = useState(currentStatus);
-  const selectedPlan = plans.find((option) => option.id === plan);
+  const [amount, setAmount] = useState<PlanStatusPreviewResult | null>(null);
+  const [loadingAmount, startAmount] = useTransition();
+  const loadAmount = () => {
+    const fd = new FormData();
+    fd.set("tenant_id", tenantId);
+    startAmount(async () => {
+      try {
+        setAmount(await previewAdminSetPlanStatus(fd));
+      } catch {
+        setAmount({ error: "Tutar okunamadı." });
+      }
+    });
+  };
+  const a = amount?.preview;
   return (
     <OpDialog
       tenantId={tenantId}
       action={adminSetPlanStatus}
       trigger={
         <Button variant="outline" size="md" type="button">
-          <CreditCard className="h-4 w-4" /> Abonelik değiştir
+          <CreditCard className="h-4 w-4" /> Abonelik durumu
         </Button>
       }
-      title="Aboneliği değiştir"
-      description="Paket ve durumu doğrudan düzeltir (kıst hesap yok). Kıst hesaplı değişiklik: Abonelik sekmesi."
+      title="Abonelik durumunu düzelt"
+      description="Ofis ve abonelik durumunu doğrudan düzeltir. Paket değişikliği (kıst hesaplı) Abonelik sekmesindedir."
       icon={<CreditCard />}
       submitLabel="Kaydet"
+      onOpen={loadAmount}
     >
-      <FormField label="Paket" htmlFor="sub-plan">
-        <FormSelect id="sub-plan" name="plan" value={plan} onChange={(event) => setPlan(event.target.value)}>
-          {plans.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name} — {money(option.monthlyTry, "/ay")}
-            </option>
-          ))}
-        </FormSelect>
-      </FormField>
-      {selectedPlan ? (
-        <p className="-mt-2 text-xs text-text-muted">
-          Yeni tutar: <span className="font-semibold text-ink-950">{money(selectedPlan.monthlyTry, "/ay")}</span> olarak güncellenecek.
-        </p>
-      ) : null}
+      <p className="text-xs text-text-muted" aria-live="polite">
+        Aylık tutar:{" "}
+        {loadingAmount && !a ? (
+          <span className="font-semibold text-ink-950">hesaplanıyor…</span>
+        ) : a?.amountTry != null ? (
+          <>
+            <span className="font-semibold text-ink-950">{money(a.amountTry, "/ay")}</span> ({PLAN_AMOUNT_SOURCE_LABEL[a.source]})
+          </>
+        ) : (
+          <span className="font-semibold text-ink-950">{amount?.error ?? "—"}</span>
+        )}
+      </p>
       <FormField label="Durum" htmlFor="sub-status">
         <FormSelect id="sub-status" name="status" value={status} onChange={(event) => setStatus(event.target.value)}>
           {STATUS_OPTIONS.map((option) => (
@@ -449,7 +471,7 @@ function LifecycleCard({ tenantId, data, paused, cancelled, onDone }: CardProps 
       ) : null}
       {cancelled ? (
         <p className="text-xs text-text-muted">
-          Abonelik iptal edilmiş{sub.cancelReason ? ` · Neden: ${sub.cancelReasonLabel ?? sub.cancelReason}` : ""}. Yeniden açmak için sayfa başındaki «Abonelik değiştir» ile durumu düzeltin.
+          Abonelik iptal edilmiş{sub.cancelReason ? ` · Neden: ${sub.cancelReasonLabel ?? sub.cancelReason}` : ""}. Yeniden açmak için sayfa başındaki «Abonelik durumu» ile durumu düzeltin.
         </p>
       ) : null}
     </Card>
@@ -845,7 +867,6 @@ function OverridesCard({ tenantId, data, limits, todayKey, onDone }: CardProps &
 // ---------------------------------------------------------------------------
 
 export function SeatChangeDialog({ tenantId, currentExtra }: { tenantId: string; currentExtra: number }) {
-  const router = useRouter();
   const [target, setTarget] = useState(String(currentExtra));
   const [billing, setBilling] = useState<"invoice" | "free">("invoice");
   const [preview, setPreview] = useState<SeatPreviewResult | null>(null);
@@ -875,7 +896,6 @@ export function SeatChangeDialog({ tenantId, currentExtra }: { tenantId: string;
       submitLabel={net > 0 ? "Onayla ve faturalandır" : "Onayla"}
       hidden={{ extra_seats: target, billing, confirm_net_try: String(net), quoted_at_ms: p ? String(p.quotedAtMs) : "" }}
       submitDisabled={!p}
-      onDone={() => router.refresh()}
     >
       <FormField label="Ek koltuk (toplam)" htmlFor="ops-seat-target" hint={`Şu an ${currentExtra}. 0-500.`}>
         <FormInput
@@ -933,7 +953,6 @@ export function SeatChangeDialog({ tenantId, currentExtra }: { tenantId: string;
 // ---------------------------------------------------------------------------
 
 export function AutoRenewOffButton({ tenantId }: { tenantId: string }) {
-  const router = useRouter();
   return (
     <OpDialog
       tenantId={tenantId}
@@ -944,7 +963,6 @@ export function AutoRenewOffButton({ tenantId }: { tenantId: string }) {
       icon={<PowerOff />}
       tone="danger"
       submitLabel="Kapat"
-      onDone={() => router.refresh()}
     />
   );
 }
