@@ -149,11 +149,11 @@ describe("public mutation outbox worker", () => {
     err.mockRestore();
   });
 
-  it("randevu teyidi yanıttan sonra kuyruğu after() ile boşaltır", async () => {
+  it("randevu teyidi yanıttan sonra kuyruğu afterSafe() ile boşaltır (ham after() yok: actions-after-contract)", async () => {
     const { readFileSync } = await import("node:fs");
     const action = readFileSync("src/app/actions/appointments-confirm.ts", "utf8");
-    expect(action).toContain('import { after } from "next/server";');
-    expect(action).toMatch(/after\(\(\) => kickPublicMutationOutbox\(PUBLIC_OUTBOX_KICK_LIMIT\)\)/);
-    expect(action.indexOf("after(() => kickPublicMutationOutbox")).toBeGreaterThan(action.indexOf('outcome !== "applied" && outcome !== "replay"'));
+    expect(action).toContain('import { afterSafe } from "@/lib/after-safe";');
+    expect(action).toMatch(/afterSafe\(\(\) => kickPublicMutationOutbox\(PUBLIC_OUTBOX_KICK_LIMIT\)/);
+    expect(action.indexOf("afterSafe(() => kickPublicMutationOutbox")).toBeGreaterThan(action.indexOf('outcome !== "applied" && outcome !== "replay"'));
   });
 });

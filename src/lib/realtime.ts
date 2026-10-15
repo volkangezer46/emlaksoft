@@ -132,6 +132,18 @@ type Entry = {
 };
 
 const UNAUTHORIZED_RE = /unauthori[sz]ed|permission|not allowed|forbidden|denied/i;
+/**
+ * Realtime kiracı sınırı reddi (B014: max_concurrent_users / katılım / olay hızı; _realtime.tenants). Telemetride AYRI tür
+ * (`rt:LIMIT:<önek>`) olarak sayılır; sunucu tarafı %80 uyarısı scripts/sunucu/realtime-capacity-check.sh.
+ */
+const LIMIT_RE = /too many|too_many|rate ?limit|ratelimit|limit reached|max_concurrent|maxconcurrent/i;
+
+/** Abonelik hatasının telemetri türü: yetki reddi > sınır reddi > ham durum. */
+export function realtimeIssueKind(kind: string, detail: string | undefined, unauthorized: boolean): string {
+  if (unauthorized) return "UNAUTHORIZED";
+  if (detail && LIMIT_RE.test(detail)) return "LIMIT";
+  return kind;
+}
 
 /** Konu başına tek kanal, referans sayımlı tüketiciler, durum yayını ve geri çekilmeli yeniden kurulum (saf; test edilir). */
 export function createTopicHub(deps: HubDeps) {
@@ -243,7 +255,7 @@ export function createTopicHub(deps: HubDeps) {
     if (detail && UNAUTHORIZED_RE.test(detail)) e.unauthorized = true;
     setStatus(e, "offline");
     emit(e, { status: "offline", first: false, rejoin: false });
-    deps.report?.(e.unauthorized ? "UNAUTHORIZED" : kind, e.topic, detail);
+    deps.report?.(realtimeIssueKind(kind, detail, e.unauthorized), e.topic, detail);
     scheduleRetry(e);
   }
 
