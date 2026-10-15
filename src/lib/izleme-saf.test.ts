@@ -118,19 +118,22 @@ describe("realtime throttle", () => {
   it("2 sn geçtiyse yalnız debounce", () => {
     expect(computeRefreshDelay(103_000, 100_000, 150)).toBe(150);
   });
-  it("rota duyarlı tablo alt kümesi", () => {
-    expect(tablesForPath("/app/musteriler")).toEqual(["customers"]);
-    expect(tablesForPath("/app/musteriler/abc")).toEqual(["customers"]);
-    expect(tablesForPath("/app/komisyon")).toEqual(["commissions"]);
-    // 15 + finans v2 (20261014001000): finance_open_items, finance_parties
-    expect(tablesForPath("/app")).toHaveLength(17);
-    expect(tablesForPath("/app/giderler")).toEqual(["cash_entries", "finance_open_items", "finance_parties"]);
-    expect(tablesForPath("/app/teklifler")).toEqual(["offers", "deals"]);
-    expect(tablesForPath("/app/portfoyler/anahtarlar")).toEqual(["property_keys", "properties"]);
-    expect(tablesForPath("/app/gorevler")).toEqual(["tasks"]);
-    expect(tablesForPath("/app/portfoy-avi/abc")).toEqual(["fsbo_leads"]);
-    expect(tablesForPath("/app/randevular")).toEqual(["appointments"]);
-    expect(tablesForPath("/app/musteriler-x")).toEqual([]);
-    expect(tablesForPath("/app/ayarlar")).toEqual([]);
+  it("rota duyarlı tablo alt kümesi (SK2: her /app rotası ortak menü rozeti tablosunu da dinler)", () => {
+    const g = "approval_requests";
+    expect(tablesForPath("/app/musteriler")).toEqual(["customers", g]);
+    expect(tablesForPath("/app/musteriler/abc")).toEqual(["customers", g]);
+    expect(tablesForPath("/app/komisyon")).toEqual(["commissions", g]);
+    // Ana pano yalnız gösterdiği özetler (B002): 10 tablo, onay talebi dahil.
+    expect(tablesForPath("/app")).toHaveLength(10);
+    expect(tablesForPath("/app/giderler")).toEqual(["cash_entries", "finance_open_items", "finance_parties", g]);
+    expect(tablesForPath("/app/teklifler")).toEqual(["offers", "deals", g]);
+    expect(tablesForPath("/app/portfoyler/anahtarlar")).toEqual(["property_keys", "properties", g]);
+    expect(tablesForPath("/app/gorevler")).toEqual(["tasks", g]);
+    expect(tablesForPath("/app/portfoy-avi/abc")).toEqual(["fsbo_leads", g]);
+    expect(tablesForPath("/app/randevular")).toEqual(["appointments", g]);
+    expect(tablesForPath("/app/onaylar")).toEqual([g]);
+    expect(tablesForPath("/app/musteriler-x")).toEqual([g]);
+    expect(tablesForPath("/app/ayarlar")).toEqual([g]);
+    expect(tablesForPath("/admin")).toEqual([]);
   });
 });

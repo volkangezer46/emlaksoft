@@ -191,6 +191,8 @@ export default async function TasksPage({
   } else {
     query = query.eq("status", "open").order("due_at", { ascending: true, nullsFirst: false });
   }
+  // İkincil sıra (B052): aynı vadedeki / vadesiz görevler belirsiz sırada sayfa dışına düşmesin; en yeni eklenen önce.
+  if (filter !== "all") query = query.order("created_at", { ascending: false });
   query = query.range(offset, offset + PAGE_SIZE - 1);
 
   // Anlaşma seçici ve kanban/takvim verisi sayaç turunu BEKLEMEZ: sayaçlarla aynı anda başlar.
@@ -211,7 +213,7 @@ export default async function TasksPage({
       ? (() => {
           const laneQ = () => applyBase(supabase.from("tasks").select(TASK_SELECT, { count: "exact" }).eq("tenant_id", ctx.tenantId));
           return Promise.all([
-            laneQ().eq("status", "open").or(`due_at.is.null,due_at.gte.${nowIso}`).order("due_at", { ascending: true, nullsFirst: false }).limit(KANBAN_LIMIT),
+            laneQ().eq("status", "open").or(`due_at.is.null,due_at.gte.${nowIso}`).order("due_at", { ascending: true, nullsFirst: false }).order("created_at", { ascending: false }).limit(KANBAN_LIMIT),
             laneQ().eq("status", "open").lt("due_at", nowIso).order("due_at", { ascending: true }).limit(KANBAN_LIMIT),
             laneQ().eq("status", "done").order("completed_at", { ascending: false }).limit(KANBAN_LIMIT),
             laneQ().eq("status", "cancelled").order("created_at", { ascending: false }).limit(KANBAN_LIMIT),

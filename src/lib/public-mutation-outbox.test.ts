@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase/admin", () => ({
   }),
 }));
 
-import { processPublicMutationOutbox } from "@/lib/public-mutation-outbox";
+import { kickPublicMutationOutbox, processPublicMutationOutbox, PUBLIC_OUTBOX_KICK_LIMIT } from "@/lib/public-mutation-outbox";
 
 const CLAIM = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -136,5 +136,24 @@ describe("public mutation outbox worker", () => {
     });
 
     await expect(processPublicMutationOutbox()).rejects.toThrow("invalid lease");
+  });
+
+  it("anında boşaltma (B016): en çok 10 iş kiralar, hatayı yutar (cron yedek)", async () => {
+    await expect(kickPublicMutationOutbox()).resolves.toBeUndefined();
+    expect(db.rpc).toHaveBeenCalledWith("claim_public_mutation_effects", expect.objectContaining({ p_limit: PUBLIC_OUTBOX_KICK_LIMIT }));
+    expect(PUBLIC_OUTBOX_KICK_LIMIT).toBe(10);
+    db.rpc.mockImplementation(async () => ({ data: null, error: { code: "57014" } }));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(kickPublicMutationOutbox()).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it("randevu teyidi yanıttan sonra kuyruğu after() ile boşaltır", async () => {
+    const { readFileSync } = await import("node:fs");
+    const action = readFileSync("src/app/actions/appointments-confirm.ts", "utf8");
+    expect(action).toContain('import { after } from "next/server";');
+    expect(action).toMatch(/after\(\(\) => kickPublicMutationOutbox\(PUBLIC_OUTBOX_KICK_LIMIT\)\)/);
+    expect(action.indexOf("after(() => kickPublicMutationOutbox")).toBeGreaterThan(action.indexOf('outcome !== "applied" && outcome !== "replay"'));
   });
 });

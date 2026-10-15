@@ -8,14 +8,34 @@
  */
 
 /**
- * Önbellekten gösterilen sayfa bu süreden eskiyse arkadan tazelenir. 5 sn DENENDİ ve REDDEDİLDİ: router.refresh() TÜM
- * segment önbelleğini düşürür; her tıklamada tazeleme komşu sayfaları da düşürüp sonraki tıklamayı ağa çıkarıyordu
- * (ölçüm). 20 sn: sık gezinmede anında, durup beklenen sayfada tazeleme; dış değişiklikleri realtime, kendi
- * değişikliklerini mutasyon revalidate eder.
+ * Önbellekten gösterilen sayfa bu süreden eskiyse arkadan tazelenir (belge: CLAUDE.md "HIZ ANA İLKESİ" >20 sn; sabit ile
+ * belge EŞİT, client-cache-policy.test.ts kilitler). 5 sn DENENDİ ve REDDEDİLDİ: router.refresh() TÜM segment önbelleğini
+ * düşürür; her tıklamada tazeleme komşu sayfaları da düşürüp sonraki tıklamayı ağa çıkarıyordu (ölçüm). 20 sn: sık
+ * gezinmede anında, durup beklenen sayfada tazeleme; dış değişiklikleri realtime (açık sayfa) ve olay geçersizlemesi
+ * (kapalı rota, `invalidatedAt`), kendi değişikliklerini mutasyon revalidate eder.
  */
-export const REVALIDATE_AFTER_MS = 60_000;
+export const REVALIDATE_AFTER_MS = 20_000;
 /** İki arka plan tazelemesi arası en az süre (tazeleme TÜM segment önbelleğini geçersiz kılar). */
-export const BG_REFRESH_MIN_GAP_MS = 60_000;
+export const BG_REFRESH_MIN_GAP_MS = 15_000;
+/**
+ * İŞ KUYRUĞU rotaları (B010): onay listesi, destek talepleri, yönetim panosu. Bekleyen iş eski görünmemeli (saha:
+ * Onaylar önbellekten 287 ms'de açıldı, yeni talep 70 sn görünmedi): önbellekten gösterilen sayfa 3 sn'den eskiyse ve
+ * oturumdaki ilk açılışı da (önceden yüklenmiş olabilir) arkadan tazelenir.
+ */
+export const WORK_QUEUE_REVALIDATE_AFTER_MS = 3_000;
+export const WORK_QUEUE_BG_REFRESH_MIN_GAP_MS = 3_000;
+/** Tam eşleşen (`exact`) ya da önek (alt sayfalar dahil) iş kuyruğu rotaları. */
+export const WORK_QUEUE_ROUTES: ReadonlyArray<{ path: string; exact?: boolean }> = [
+  { path: "/app/onaylar" },
+  { path: "/app/destek" },
+  { path: "/admin", exact: true },
+  { path: "/admin/tickets" },
+];
+
+export function isWorkQueuePath(pathname: string): boolean {
+  const p = pathname.split(/[?#]/, 1)[0].replace(/\/+$/, "") || "/";
+  return WORK_QUEUE_ROUTES.some((r) => p === r.path || (!r.exact && p.startsWith(`${r.path}/`)));
+}
 /** Arka plan tazelemesinden sonra kapı yönlendirmesi sayılan pencere. */
 export const GATE_REDIRECT_WINDOW_MS = 15_000;
 /** Aynı adres bu süre içinde yeniden önceden yüklenmez. */
@@ -33,21 +53,32 @@ export type ArrivalDecision = "mark" | "fresh" | "refresh";
 
 /**
  * Bir adrese gelince ne yapılır?
- * - mark: adres bu oturumda ilk kez (canlı çekildi varsayılır) → yalnız zaman damgası konur.
- * - fresh: önbellek verisi yeni (≤ REVALIDATE_AFTER_MS) → dokunma.
- * - refresh: önbellekten gösterildi ve eski → sessiz arka plan tazelemesi.
+ * - mark: adres bu oturumda ilk kez ve sayfa yeni yüklendi (canlı çekildi) → yalnız zaman damgası konur.
+ * - fresh: önbellek verisi yeni (≤ eşik) ve sonradan geçersizlenmedi → dokunma.
+ * - refresh: önbellekten gösterildi ve eski / realtime olayıyla geçersizlendi / iş kuyruğunun oturumdaki ilk açılışı
+ *   (önceden yüklenmiş olabilir) → sessiz arka plan tazelemesi.
  */
 export function decideArrival(input: {
   fetchedAt: number | undefined;
   nowMs: number;
   lastBgRefreshAt: number | null;
   hidden: boolean;
+  /** İş kuyruğu rotası mı (`isWorkQueuePath`). */
+  workQueue?: boolean;
+  /** Bu rotanın verisini değiştiren son realtime olayı / bildirim (client-cache-state `getInvalidatedAt`). */
+  invalidatedAt?: number;
+  /** Sayfa yüklemesinden sonraki ilk varış (veri canlı çekildi; önceden yükleme olamaz). */
+  firstArrival?: boolean;
 }): ArrivalDecision {
-  const { fetchedAt, nowMs, lastBgRefreshAt, hidden } = input;
-  if (fetchedAt === undefined) return "mark";
-  if (nowMs - fetchedAt <= REVALIDATE_AFTER_MS) return "fresh";
+  const { fetchedAt, nowMs, lastBgRefreshAt, hidden, workQueue = false, invalidatedAt, firstArrival = false } = input;
+  if (firstArrival) return "mark";
+  const invalidated = invalidatedAt !== undefined && (fetchedAt === undefined || invalidatedAt > fetchedAt);
+  if (fetchedAt === undefined && !invalidated && !workQueue) return "mark";
+  const maxAge = workQueue ? WORK_QUEUE_REVALIDATE_AFTER_MS : REVALIDATE_AFTER_MS;
+  if (!invalidated && fetchedAt !== undefined && nowMs - fetchedAt <= maxAge) return "fresh";
   if (hidden) return "fresh";
-  if (lastBgRefreshAt !== null && nowMs - lastBgRefreshAt < BG_REFRESH_MIN_GAP_MS) return "fresh";
+  const gap = workQueue || invalidated ? WORK_QUEUE_BG_REFRESH_MIN_GAP_MS : BG_REFRESH_MIN_GAP_MS;
+  if (lastBgRefreshAt !== null && nowMs - lastBgRefreshAt < gap) return "fresh";
   return "refresh";
 }
 
