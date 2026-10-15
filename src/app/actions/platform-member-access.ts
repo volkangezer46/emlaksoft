@@ -101,7 +101,7 @@ export async function resetMemberTwoFactor(fd: FormData): Promise<AccessActionRe
 
   const { error } = await admin
     .from("profiles")
-    .update({ two_factor_sms: false })
+    .update({ two_factor_sms: false, two_factor_method: "sms" })
     .eq("id", member.id)
     .eq("tenant_id", member.tenant_id);
   if (error) return { error: actionErrorMessage(error, "2FA sıfırlanamadı.") };

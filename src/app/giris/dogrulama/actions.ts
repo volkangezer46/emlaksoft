@@ -22,9 +22,13 @@ import { logLoginEvent } from "../_lib/login-events";
 import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-security/enforce";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { afterSafe } from "@/lib/after-safe";
+import { logActivity } from "@/lib/activity";
+import { now } from "@/lib/clock";
 import { recordLoginAudit } from "@/lib/office-security/new-device";
+import { claimsAreAal2, countUnusedRecoveryCodes, issueTwoFactorSessionProof } from "@/lib/two-factor-session";
+import { hashRecoveryCode, normalizeRecoveryCode } from "@/lib/two-factor-recovery";
 
-export type VerifyResult = { error?: string; ok?: true; resent?: true };
+export type VerifyResult = { error?: string; ok?: true; resent?: true; next?: string };
 
 /**
  * SMS ile gönderilen 6 haneli giriş kodunu doğrular. Doğruysa es_2fa_ok
@@ -69,7 +73,7 @@ export async function verifyLoginCode(
       .maybeSingle(),
     admin
       .from("profiles")
-      .select("tenant_id, role, is_active, two_factor_sms, two_factor_version, phone")
+      .select("tenant_id, role, is_active, two_factor_sms, two_factor_method, two_factor_version, phone")
       .eq("id", user.id)
       .maybeSingle(),
   ]);
@@ -78,6 +82,7 @@ export async function verifyLoginCode(
     profileError ||
     !profile?.is_active ||
     !profile.two_factor_sms ||
+    profile.two_factor_method === "totp" ||
     !profile.phone ||
     profile.tenant_id !== tenantId ||
     profile.role !== user.app_metadata?.role
@@ -220,12 +225,13 @@ export async function resendLoginCode(
   const admin = createAdminClient();
   const { data: profile } = await admin
     .from("profiles")
-    .select("two_factor_sms, phone, tenant_id, role, is_active")
+    .select("two_factor_sms, two_factor_method, phone, tenant_id, role, is_active")
     .eq("id", user.id)
     .maybeSingle();
   if (
     !profile?.is_active ||
     !profile.two_factor_sms ||
+    profile.two_factor_method === "totp" ||
     !profile.phone ||
     profile.tenant_id !== user.app_metadata?.tenant_id ||
     profile.role !== user.app_metadata?.role
@@ -293,4 +299,136 @@ export async function cancelLoginVerification(): Promise<void> {
   await supabase.auth.signOut();
   (await cookies()).delete(TWO_FACTOR_COOKIE);
   redirect("/giris");
+}
+
+/**
+ * Authenticator (TOTP) yöntemli ofis kullanıcısı için ortak giriş bağlamı: kanonik profil, kiracı/rol eşleşmesi ve
+ * ofis IP kısıtı. Geçersizse oturum kapatılır (SMS yolu ile aynı kural).
+ */
+async function totpLoginContext() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/giris");
+  const admin = createAdminClient();
+  const tenantId = (user.app_metadata?.tenant_id as string | undefined) ?? null;
+  const ip = await clientIp();
+  const hdrs = await headers();
+  const userAgent = hdrs.get("user-agent");
+  const { data: profile, error } = await admin
+    .from("profiles")
+    .select("tenant_id, role, is_active, two_factor_sms, two_factor_method, two_factor_version")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (
+    error ||
+    !profile?.is_active ||
+    !profile.two_factor_sms ||
+    profile.two_factor_method !== "totp" ||
+    profile.tenant_id !== tenantId ||
+    profile.role !== user.app_metadata?.role
+  ) {
+    await supabase.auth.signOut();
+    (await cookies()).delete(TWO_FACTOR_COOKIE);
+    return { error: "Hesap veya iki adımlı doğrulama ayarı geçersiz." } as const;
+  }
+  if (!(await officeLoginIpAllowed({ tenantId, role: profile.role, headers: hdrs }))) {
+    await supabase.auth.signOut();
+    (await cookies()).delete(TWO_FACTOR_COOKIE);
+    await logLoginEvent({ userId: user.id, tenantId, ip, userAgent, result: "failed" });
+    return { error: OFFICE_IP_LOGIN_ERROR } as const;
+  }
+  return { supabase, admin, user, profile, tenantId, ip, userAgent } as const;
+}
+
+async function finishTotpLogin(
+  ctx: Exclude<Awaited<ReturnType<typeof totpLoginContext>>, { error: string }>,
+): Promise<VerifyResult> {
+  const { data: claimsData, error: claimsError } = await ctx.supabase.auth.getClaims();
+  const proof = await issueTwoFactorSessionProof({
+    claims: claimsError ? null : ((claimsData?.claims as Record<string, unknown> | undefined) ?? null),
+    admin: ctx.admin,
+    userId: ctx.user.id,
+    profileVersion: ctx.profile.two_factor_version,
+  });
+  if (!proof.ok) return { error: proof.error };
+  await logLoginEvent({ userId: ctx.user.id, tenantId: ctx.tenantId, ip: ctx.ip, userAgent: ctx.userAgent, result: "success" });
+  if (ctx.tenantId) {
+    const acceptLanguage = (await headers()).get("accept-language");
+    const auditTenantId = ctx.tenantId;
+    const userId = ctx.user.id;
+    const { userAgent, ip } = ctx;
+    afterSafe(() => recordLoginAudit({ tenantId: auditTenantId, userId, userAgent, acceptLanguage, ip, method: "two_factor" }), "auth.login");
+  }
+  return { ok: true };
+}
+
+/**
+ * Authenticator kodu istemcide (`supabase.auth.mfa.verify`) doğrulandıktan sonra çağrılır: oturumun gerçekten AAL2
+ * olduğu SUNUCUDA doğrulanır, oturum kanıtı + çerez yazılır ve kullanıcı hedefe gider.
+ */
+export async function completeTotpLogin(rawNext: string): Promise<VerifyResult> {
+  const next = safeNextPath(rawNext);
+  const ctx = await totpLoginContext();
+  if ("error" in ctx) return { error: ctx.error };
+  const { data: claimsData, error: claimsError } = await ctx.supabase.auth.getClaims();
+  if (claimsError || !claimsAreAal2(claimsData?.claims as Record<string, unknown> | undefined)) {
+    await logLoginEvent({ userId: ctx.user.id, tenantId: ctx.tenantId, ip: ctx.ip, userAgent: ctx.userAgent, result: "2fa_failed" });
+    return { error: "Authenticator doğrulaması tamamlanmadı. Kodu yeniden girin." };
+  }
+  const done = await finishTotpLogin(ctx);
+  // İstemci doğrudan çağırdığı için yönlendirme istemcide yapılır (router.replace); hedef süzülmüş döner.
+  return done.ok ? { ok: true, next } : done;
+}
+
+/** Telefonu yanında olmayan kullanıcı: tek kullanımlık kurtarma kodu (10 karakter) ile girişi tamamlar. */
+export async function verifyRecoveryCode(_prev: VerifyResult, fd: FormData): Promise<VerifyResult> {
+  const next = safeNextPath(String(fd.get("next") ?? "/app"));
+  const normalized = normalizeRecoveryCode(String(fd.get("recovery_code") ?? ""));
+  if (!normalized) return { error: "Kurtarma kodu 10 karakterdir (ör. ABCDE-FGHJK)." };
+
+  const ctx = await totpLoginContext();
+  if ("error" in ctx) return { error: ctx.error };
+
+  const { allowed } = await checkRateLimit(`2fa-recovery:${ctx.user.id}`, { limit: 5, windowSec: 900, failurePolicy: "deny" });
+  if (!allowed) return { error: "Çok fazla deneme yapıldı. Lütfen 15 dakika sonra tekrar deneyin." };
+
+  let codeHash: string;
+  try {
+    codeHash = hashRecoveryCode(normalized, ctx.user.id);
+  } catch {
+    return { error: "Doğrulama güvenli şekilde tamamlanamadı. Lütfen yöneticinize başvurun." };
+  }
+  // Tek kullanım: yalnız kullanılmamış kod, tek UPDATE ile atomik işaretlenir (paralel istekte ikinci istek boş döner).
+  const { data: used, error } = await ctx.admin
+    .from("two_factor_recovery_codes")
+    .update({ used_at: new Date(now()).toISOString() })
+    .eq("user_id", ctx.user.id)
+    .eq("code_hash", codeHash)
+    .is("used_at", null)
+    .select("id")
+    .maybeSingle();
+  if (error || !used) {
+    await logLoginEvent({ userId: ctx.user.id, tenantId: ctx.tenantId, ip: ctx.ip, userAgent: ctx.userAgent, result: "2fa_failed" });
+    return { error: "Kurtarma kodu geçersiz ya da daha önce kullanılmış." };
+  }
+  if (ctx.tenantId) {
+    const left = await countUnusedRecoveryCodes(ctx.admin, ctx.user.id);
+    afterSafe(
+      () =>
+        logActivity({
+          tenantId: ctx.tenantId!,
+          actorId: ctx.user.id,
+          action: "security.recovery_code_used",
+          entityType: "profile",
+          entityId: ctx.user.id,
+          newValue: { remaining: left },
+        }),
+      "auth.recovery-code",
+    );
+  }
+  const done = await finishTotpLogin(ctx);
+  if (!done.ok) return done;
+  redirect(next);
 }

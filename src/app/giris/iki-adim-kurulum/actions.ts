@@ -21,6 +21,14 @@ import {
 } from "@/lib/two-factor";
 import { logLoginEvent } from "../_lib/login-events";
 import { safeNextPath } from "@/lib/auth/safe-next";
+import {
+  deleteTotpFactors,
+  hasVerifiedTotpFactor,
+  issueTwoFactorSessionProof,
+  replaceRecoveryCodes,
+  claimsAreAal2,
+} from "@/lib/two-factor-session";
+import { logActivity } from "@/lib/activity";
 
 /**
  * DG7 iki adımlı doğrulama KURULUMU (ofis politikası rolü için zorunlu kıldığında proxy buraya yönlendirir).
@@ -157,7 +165,7 @@ export async function confirmSetupCode(_prev: SetupResult, fd: FormData): Promis
   // Telefon doğrulandı: 2FA açılır (tetik two_factor_version'ı artırır; bağlama yeni sürümle kurulur).
   const { data: enabled, error: enableError } = await admin
     .from("profiles")
-    .update({ two_factor_sms: true })
+    .update({ two_factor_sms: true, two_factor_method: "sms" })
     .eq("id", user.id)
     .eq("tenant_id", tenantId)
     .eq("is_active", true)
@@ -199,4 +207,53 @@ export async function confirmSetupCode(_prev: SetupResult, fd: FormData): Promis
   if (proofError) redirect(`/giris/dogrulama?next=${encodeURIComponent(next)}`);
   jar.set(TWO_FACTOR_COOKIE, cookieValue, twoFactorCookieOptions());
   redirect(next);
+}
+
+export type SetupTotpResult = { error?: string; ok?: true; codes?: string[] };
+
+/** Authenticator kurulumu öncesi: 2FA henüz kapalıyken eski/yarım TOTP faktörleri temizlenir. */
+export async function prepareSetupTotp(): Promise<SetupTotpResult> {
+  const { admin, user, profile, tenantId } = await currentProfile();
+  if (!profile || !tenantId) return { error: "Hesap doğrulanamadı. Lütfen yeniden giriş yapın." };
+  if (profile.two_factor_sms) return { error: "İki adımlı doğrulama zaten açık." };
+  const { ok } = await deleteTotpFactors(admin, user.id);
+  return ok ? { ok: true } : { error: "Authenticator kurulumu hazırlanamadı. Lütfen tekrar deneyin." };
+}
+
+/**
+ * Authenticator kodu istemcide doğrulandıktan (AAL2) sonra: 2FA yöntemi TOTP olarak açılır, 10 kurtarma kodu üretilir
+ * ve bu oturum doğrulanmış sayılır (proxy kurulum kapısı ile 2FA kapısını birlikte geçer).
+ */
+export async function activateSetupTotp(): Promise<SetupTotpResult> {
+  const { supabase, admin, user, profile, tenantId } = await currentProfile();
+  if (!profile || !tenantId) return { error: "Hesap doğrulanamadı. Lütfen yeniden giriş yapın." };
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
+  const claims = claimsError ? null : ((claimsData?.claims as Record<string, unknown> | undefined) ?? null);
+  if (!claimsAreAal2(claims) || !(await hasVerifiedTotpFactor(admin, user.id))) {
+    return { error: "Authenticator doğrulaması tamamlanmadı. Kodu yeniden girin." };
+  }
+  const { data: enabled, error } = await admin
+    .from("profiles")
+    .update({ two_factor_sms: true, two_factor_method: "totp" })
+    .eq("id", user.id)
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true)
+    .select("two_factor_version")
+    .maybeSingle();
+  if (error || !enabled) return { error: "İki adımlı doğrulama açılamadı. Lütfen tekrar deneyin." };
+
+  const recovery = await replaceRecoveryCodes(admin, user.id);
+  if (!recovery.ok) return { error: recovery.error };
+  await admin.from("login_challenges").delete().eq("user_id", user.id);
+  const proof = await issueTwoFactorSessionProof({ claims, admin, userId: user.id, profileVersion: enabled.two_factor_version });
+  // Kanıt yazılamazsa 2FA yine açıktır: kodlar gösterilir, proxy kullanıcıyı normal doğrulama ekranına götürür.
+  if (!proof.ok) console.error("activateSetupTotp proof", proof.error);
+  await logActivity({
+    tenantId,
+    actorId: user.id,
+    action: "security.two_factor_totp_enabled",
+    entityType: "profile",
+    entityId: user.id,
+  });
+  return { ok: true, codes: recovery.codes };
 }

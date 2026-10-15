@@ -79,7 +79,7 @@ export function OfficePolicyForm({ initial, currentIp, canEdit }: { initial: Pol
       <div>
         <p className="text-sm font-semibold text-ink-950">İki adımlı doğrulama zorunlu roller</p>
         <p className="mb-2 text-xs text-text-muted">
-          Seçilen roldeki kullanıcı SMS doğrulamasını kurmadan panele giremez; bir sonraki tıklamasında kurulum ekranına yönlenir.
+          Seçilen roldeki kullanıcı iki adımlı doğrulamayı (authenticator uygulaması veya SMS kodu) kurmadan panele giremez; bir sonraki tıklamasında kurulum ekranına yönlenir.
         </p>
         <div className="flex flex-wrap gap-2" role="group" aria-label="2FA zorunlu roller">
           {MFA_ROLE_IDS.map((r) => (
