@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { now } from "@/lib/clock";
-import { subscribeToInserts } from "@/lib/realtime";
+import { subscribeTopic, tenantTopic } from "@/lib/realtime";
+import { parseTenantChange } from "@/lib/realtime-throttle";
 import type { TvData } from "@/lib/tv/tv-data";
 import { DEFAULT_TV_SETTINGS, ROTATION_SECONDS, parseTvSettings, type TvSettings } from "@/lib/tv/tv-logic";
 
@@ -57,14 +58,15 @@ export function useTvSettings(tenantId: string): [TvSettings, (patch: Partial<Tv
 }
 
 /* -------------------------------------------------------------------------- */
-/* Canlı veri: realtime INSERT + 45 sn yedek yoklama (router.refresh YOK)      */
+/* Canlı veri: ofis konusu (Broadcast) + 45 sn yedek yoklama (router.refresh YOK) */
 /* -------------------------------------------------------------------------- */
 
 export type TvStatus = "loading" | "ok" | "offline" | "session" | "forbidden";
 
 const POLL_MS = 45_000;
-const RT_DEBOUNCE_MS = 1_500;
-const RT_TABLES = ["customers", "appointments", "offers", "properties", "commissions", "tasks"] as const;
+const RT_DEBOUNCE_MS = 400;
+const RT_MIN_GAP_MS = 5_000;
+const RT_TABLES = ["customers", "appointments", "offers", "properties", "commissions", "tasks", "deals"] as const;
 
 export function useTvData(tenantId: string, revenueRequested: boolean) {
   const [data, setData] = useState<TvData | null>(null);
@@ -138,19 +140,36 @@ export function useTvData(tenantId: string, revenueRequested: boolean) {
     };
   }, [load]);
 
-  // Realtime: tenant filtreli INSERT'ler → debounce'lu anında tazeleme (supabase-js tembel yüklenir)
+  // Realtime (SK2): ofis konusu (deyim düzeyinde Broadcast; sayfadaki kanal layout'la paylaşılır). Panonun tablolarına
+  // ekleme/güncelleme gelince JSON ucu yeniden okunur: ilk olay RT_DEBOUNCE_MS sonra, seri olaylar en sık RT_MIN_GAP_MS'de
+  // bir (sürekli akış yoklamayı sonsuza dek ertelemesin). Kopup yeniden katılınca tek okuma.
   useEffect(() => {
-    let debounce: ReturnType<typeof setTimeout> | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let last = 0;
     const bump = () => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => void load(), RT_DEBOUNCE_MS);
+      if (timer) return;
+      const wait = Math.max(RT_DEBOUNCE_MS, last + RT_MIN_GAP_MS - now());
+      timer = setTimeout(() => {
+        timer = null;
+        last = now();
+        void load();
+      }, wait);
     };
-    const offs = RT_TABLES.map((table) =>
-      subscribeToInserts({ channel: `es-tv:${tenantId}:${table}`, table, filter: `tenant_id=eq.${tenantId}`, onInsert: bump }),
-    );
+    const tables = new Set<string>(RT_TABLES);
+    const off = subscribeTopic(tenantTopic(tenantId), {
+      on: {
+        change: (payload) => {
+          const evt = parseTenantChange(payload);
+          if (evt && tables.has(evt.t) && evt.op !== "DELETE") bump();
+        },
+      },
+      onStatus: (s) => {
+        if (s.rejoin) bump();
+      },
+    });
     return () => {
-      if (debounce) clearTimeout(debounce);
-      offs.forEach((off) => off());
+      if (timer) clearTimeout(timer);
+      off();
     };
   }, [tenantId, load]);
 

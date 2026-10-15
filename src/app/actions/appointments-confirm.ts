@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { afterSafe } from "@/lib/after-safe";
+import { kickPublicMutationOutbox, PUBLIC_OUTBOX_KICK_LIMIT } from "@/lib/public-mutation-outbox";
 
 export type ConfirmResponse = "coming" | "cancelled";
 export type ConfirmResult = { ok?: boolean; error?: string; response?: ConfirmResponse };
@@ -63,6 +65,9 @@ export async function respondToAppointmentByToken(fd: FormData): Promise<Confirm
     return { error: actionErrorMessage(null, "Yanıt kaydedilemedi. Lütfen tekrar deneyin.") };
   }
 
+  // B016: bildirim niyeti kuyrukta; yanıt döndükten hemen sonra kiralı + idempotent boşaltma (ofis zili <1 sn).
+  // Cron (*/2) yedek kalır; replay de kuyrukta kalan işi onarır.
+  afterSafe(() => kickPublicMutationOutbox(PUBLIC_OUTBOX_KICK_LIMIT), "randevu teyidi bildirim kuyrugu");
   revalidatePath("/app/randevular");
   return { ok: true, response };
 }

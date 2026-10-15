@@ -3,14 +3,16 @@
 import { Suspense, startTransition, useEffect, useRef } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { now } from "@/lib/clock";
-import { decideArrival, isGateRedirectAfterRefresh, isGatePath } from "@/lib/client-cache-policy";
+import { decideArrival, isGateRedirectAfterRefresh, isGatePath, isWorkQueuePath } from "@/lib/client-cache-policy";
 import {
   clearClientCacheState,
   getFetchedAt,
+  getInvalidatedAt,
   getLastBgRefreshAt,
   markBgRefresh,
   markFetched,
   noteClientCacheRefreshed,
+  takeFirstArrival,
 } from "@/lib/client-cache-state";
 import { resetPrefetchState } from "@/lib/client-prefetch";
 import { SCOPE_CHANGE_EVENT } from "@/lib/ui/use-nav-role";
@@ -22,7 +24,9 @@ import { SCOPE_CHANGE_EVENT } from "@/lib/ui/use-nav-role";
  * tazeliği sağlar:
  *  (a) önbellekten gösterilen ve >20 sn eski sayfa için sessiz arka plan tazelemesi (`router.refresh()`,
  *      startTransition içinde: etkileşimi bloklamaz, kaydırma/form durumu korunur); iki tazeleme arası ≥15 sn,
- *      sekme arkadayken yapılmaz;
+ *      sekme arkadayken yapılmaz. İŞ KUYRUĞU rotalarında (onaylar, destek, yönetim panosu) eşik 3 sn ve oturumdaki ilk
+ *      açılış da tazelenir; realtime olayı ya da bildirim bağlantısı rotayı geçersizlediyse (client-cache-state
+ *      `invalidateClientCache`) dönüşte süre beklenmeden tazelenir (B010);
  *  (b) kapı reddi: tazeleme proxy kapısından geçemezse (askı / giriş / 2FA) tam sayfa yüklemesi yapılır → bellek
  *      önbelleği tamamen sıfırlanır; başka hesabın/kapsamın verisi görünmez;
  *  (c) kimlik (kullanıcı+ofis) değişince ve kapsam (Ofis geneli / Benim işlerim) değişince önbellek temizlenir
@@ -73,6 +77,9 @@ function Inner({ identity }: { identity: string }) {
       nowMs: now(),
       lastBgRefreshAt: getLastBgRefreshAt(),
       hidden: document.visibilityState === "hidden",
+      workQueue: isWorkQueuePath(pathname),
+      invalidatedAt: getInvalidatedAt(key),
+      firstArrival: takeFirstArrival(),
     });
     if (decision === "mark") {
       markFetched(key);
@@ -87,7 +94,7 @@ function Inner({ identity }: { identity: string }) {
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [key, router]);
+  }, [key, pathname, router]);
 
   // Kimlik değişti (kullanıcı / ofis / vekil oturum): eski kimliğin önbelleği kalmasın.
   useEffect(() => {

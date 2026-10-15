@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Building2, LifeBuoy, LockKeyhole, Shield, Sparkles } from "lucide-react";
-import { subscribeToInserts } from "@/lib/realtime";
+import {
+  getActiveTenantId,
+  loadRealtimeClient,
+  onActiveTenantChange,
+  subscribeToInserts,
+  subscribeTopic,
+  tenantTopic,
+} from "@/lib/realtime";
+import { parseTenantChange } from "@/lib/realtime-throttle";
 import { cn } from "@/lib/utils";
 import {
   TicketAttachmentList,
@@ -30,10 +38,18 @@ function safeMessages(messages: TicketMessage[], audience: "tenant" | "staff") {
   return [...filtered].sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 
+const MESSAGE_SELECT = "id, body, author_kind, author_user_id, visibility, created_at";
+
 /**
  * Tek konuşma bileşeni iki güven sınırını korur: tenant görünümünde sunucudan
  * yanlışlıkla gelse dahi internal satır render edilmez ve Realtime callback'i
  * internal payload'ı reddeder. RLS ana sınırdır; bu ikinci savunmadır.
+ *
+ * Canlı veri (SK2, B007): ofis görünümü ofis konusunu (`tenant:<ofis>`, deyim düzeyinde Broadcast; sayfadaki kanal
+ * layout'la paylaşılır) dinler. Konu yalnız kimlik taşır: bu talebe ait (olay `r` = ticket_id) yeni mesajlar
+ * kullanıcının RLS'iyle okunup akışa eklenir; ek dosya ya da talebin durum/öncelik/atama değişikliği (support_tickets,
+ * `ids`) sayfayı tazeler. İç notlar konuya hiç yazılmaz (tetikleyici modu 'ticket'). Personel görünümü (/admin,
+ * audience="staff") ofis konusuna katılamaz: `postgres_changes` INSERT aboneliğiyle kalır.
  */
 export function TicketThread({
   ticketId,
@@ -53,6 +69,7 @@ export function TicketThread({
   const router = useRouter();
   const [liveItems, setLiveItems] = useState<LiveMessage[]>([]);
   const [announcement, setAnnouncement] = useState("");
+  const tenantId = useSyncExternalStore(onActiveTenantChange, getActiveTenantId, () => null);
 
   const items = useMemo<LiveMessage[]>(() => {
     const next = safeMessages(initial, audience);
@@ -63,31 +80,80 @@ export function TicketThread({
     return [...merged, ...realtimeExtras].sort((a, b) => a.created_at.localeCompare(b.created_at));
   }, [audience, initial, liveItems]);
 
+  const addLive = useCallback(
+    (row: TicketMessage) => {
+      if (audience === "tenant" && row.visibility !== "public") return;
+      setLiveItems((previous) => {
+        if (previous.some((message) => message.id === row.id)) return previous;
+        return [...previous, { ...row, live: true }].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      });
+      setAnnouncement(row.author_kind === "staff" ? "Destek ekibinden yeni yanıt geldi." : "Yeni mesaj eklendi.");
+    },
+    [audience],
+  );
+
+  // Ofis görünümü: ofis konusu (Broadcast). Mesaj kimlikleri RLS'li okunur; ek ya da durum değişikliği tazeler.
   useEffect(() => {
-    if (!ticketId) return;
+    if (!ticketId || audience !== "tenant" || !tenantId) return;
+    let cancelled = false;
+    const readMessages = async (ids: readonly string[]) => {
+      const client = await loadRealtimeClient();
+      if (!client || cancelled || ids.length === 0) return;
+      const { data } = await client
+        .from("support_ticket_messages")
+        .select(MESSAGE_SELECT)
+        .eq("ticket_id", ticketId)
+        .eq("visibility", "public")
+        .in("id", [...ids]);
+      if (cancelled) return;
+      for (const row of (data ?? []) as TicketMessage[]) addLive(row);
+    };
+    const mine = (refs: readonly string[] | undefined, bulk: boolean | undefined) => bulk === true || !refs || refs.includes(ticketId);
+    const off = subscribeTopic(tenantTopic(tenantId), {
+      on: {
+        change: (payload) => {
+          const evt = parseTenantChange(payload);
+          if (!evt) return;
+          if (evt.t === "support_ticket_messages" && mine(evt.r, evt.bulk)) {
+            if (evt.op === "INSERT" && evt.ids && !evt.bulk) void readMessages(evt.ids);
+            else router.refresh();
+          } else if (evt.t === "support_ticket_attachments" && mine(evt.r, evt.bulk)) {
+            router.refresh();
+            setAnnouncement("Konuşmaya güvenli bir dosya eklendi.");
+          } else if (evt.t === "support_tickets" && mine(evt.ids, evt.bulk)) {
+            // Durum, öncelik, atama: başlık ve kontroller sunucudan yeniden okunur.
+            router.refresh();
+          }
+        },
+      },
+      onStatus: (s) => {
+        if (s.rejoin) router.refresh();
+      },
+    });
+    return () => {
+      cancelled = true;
+      off();
+    };
+  }, [addLive, audience, router, tenantId, ticketId]);
+
+  // Personel görünümü: postgres_changes INSERT (platform personeli ofis konusuna katılamaz).
+  useEffect(() => {
+    if (!ticketId || audience !== "staff") return;
     return subscribeToInserts<TicketMessage & { ticket_id: string }>({
       channel: `es-rt-ticket:${audience}:${ticketId}`,
       table: "support_ticket_messages",
       filter: `ticket_id=eq.${ticketId}`,
-      onInsert: (row) => {
-        if (audience === "tenant" && row.visibility !== "public") return;
-        setLiveItems((previous) => {
-          if (previous.some((message) => message.id === row.id)) return previous;
-          return [...previous, { ...row, live: true }].sort((a, b) => a.created_at.localeCompare(b.created_at));
-        });
-        setAnnouncement(row.author_kind === "staff" ? "Destek ekibinden yeni yanıt geldi." : "Yeni mesaj eklendi.");
-      },
+      onInsert: (row) => addLive(row),
     });
-  }, [audience, ticketId]);
+  }, [addLive, audience, ticketId]);
 
   useEffect(() => {
-    if (!ticketId) return;
+    if (!ticketId || audience !== "staff") return;
     return subscribeToInserts<TicketAttachmentDisplay & { ticket_id: string }>({
       channel: `es-rt-ticket-attachments:${audience}:${ticketId}`,
       table: "support_ticket_attachments",
       filter: `ticket_id=eq.${ticketId}`,
-      onInsert: (row) => {
-        if (audience === "tenant" && row.visibility !== "public") return;
+      onInsert: () => {
         router.refresh();
         setAnnouncement("Konuşmaya güvenli bir dosya eklendi.");
       },

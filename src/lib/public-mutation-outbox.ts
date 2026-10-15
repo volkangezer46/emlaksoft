@@ -163,3 +163,22 @@ export async function processPublicMutationOutbox(
   summary.deadLetterBacklog = deadLetterResult.count ?? 0;
   return summary;
 }
+
+/** Public mutasyon sonrası anında boşaltmada en çok bu kadar iş alınır (cron 50 alır). */
+export const PUBLIC_OUTBOX_KICK_LIMIT = 10;
+
+/**
+ * Public mutasyonun (randevu teyidi gibi) bildirimini yanıttan HEMEN SONRA üret (B016): cron 2 dakikada bir koşar;
+ * müşteri yanıtı ofis ziline ~120 sn geç düşüyordu. Çağıran `after(() => kickPublicMutationOutbox())` ile yanıtı
+ * bekletmez. İşlem kiralı (lease) ve idempotenttir: aynı iş cron'la yarışsa da tek bildirim oluşur; cron yedek kalır.
+ * Hata yutulur (yanıt zaten döndü; iş kuyrukta kalır, cron tekrar dener).
+ */
+export async function kickPublicMutationOutbox(limit = PUBLIC_OUTBOX_KICK_LIMIT): Promise<void> {
+  try {
+    await processPublicMutationOutbox(limit);
+  } catch (error) {
+    console.error("public mutation outbox kick failed", {
+      detail: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    });
+  }
+}

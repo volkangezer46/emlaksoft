@@ -440,6 +440,10 @@ const F = {
   kq2AgentPhotosLimits: "20261015015000_agent_photos_bucket_limits.sql",
   kq2RevokeAnonRpcs: "20261015016000_revoke_anon_definer_rpcs.sql",
   kq2RealtimeTrim: "20261015017000_realtime_publication_trim.sql",
+  // SK2 (2026-10-16): ofis ekranlarinda canli veri — deyim duzeyinde Broadcast (tenant:<ofis> / inbox:<kullanici>, PII yok)
+  // + supabase_realtime yayin kirpma (okuma politikalari kurulana dek ertelenir; scripts/sunucu/realtime-policies.sql).
+  sk2TenantBroadcast: "20261016020000_tenant_broadcast_changes.sql",
+  sk2RealtimeTrim: "20261016020100_realtime_publication_trim.sql",
   // YD2 (2026-10-15): sunumda ilan bazinda musteri geri bildirimi (ilgileniyorum/degil + not; yalniz service_role yazar).
   presentationFeedback: "20261015042000_presentation_feedback.sql",
   // YD3 (2026-10-15): musteriye randevu teyit/hatirlatma SMS izi (appointments 2 nullable sutun).
@@ -686,6 +690,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.kq2AgentPhotosLimits]: "siki", // agent-photos kovasi: 3 MB + jpeg/png/webp (uygulama zaten ayni siniri uygular); mevcut nesneler etkilenmez
     [F.kq2RevokeAnonRpcs]: "siki", // anon/PUBLIC EXECUTE geri alinir: aidat_kpi, tcmb_rate_on, increment_template_usage (+ tetikleyici fonksiyonlari); anon cagiran yok, authenticated/service_role korunur
     [F.kq2RealtimeTrim]: "davranis", // supabase_realtime yayininda kodda abone olunmayan tablo DROP (canlida 21/21 abone listesinde: hicbir tablo cikmaz); iz yayin yorumunda
+    [F.sk2TenantBroadcast]: "davranis", // 2 yeni DEFINER tetikleyici fonksiyonu (rt_emit_tenant_change deyim duzeyi, rt_emit_notification satir duzeyi) + 30 tabloda AFTER INSERT/UPDATE/DELETE FOR EACH STATEMENT + notifications AFTER INSERT; tetikleyici hatasi yazimi DUSURMEZ (WARNING); realtime.messages okuma politikalari yalniz sahibi rolde (yoksa NOTICE, supabase_admin adimi); tablo/veri degismez
+    [F.sk2RealtimeTrim]: "davranis", // supabase_realtime yayinindan sayfa tablolari cikar (kalan: support_ticket_messages/attachments, personel gorunumu); Broadcast okuma politikalari YOKSA hicbir sey yapmaz; geri alma statik listeyi geri ekler
     [F.tenantOnboardingFacts]: "ek", // yalniz yeni salt-okunur service_role fonksiyonu platform_tenant_onboarding_facts (ofis bazinda kurulum olgulari); mevcut nesne/veri degismez, kod fonksiyon yokken kurulum ilerlemesi "kurulum bekliyor", saglik skoru kurulum girdisiz
     [F.appointmentNotificationDeepLinks]: "davranis", // create_public_booking_atomic / respond_appointment_confirmation_atomic govdeleri AYNI, yalniz bildirim href'i /app/randevular?randevu=<id>; mevcut bildirim satirlari degismez
     [F.appointmentCustomerMessages]: "ek", // appointments'a 2 nullable sutun (customer_confirm_sent_at, customer_reminded_at); mevcut satir/davranis ayni, kod sutunlar yokken musteri hatirlatma adimini atlar
@@ -932,6 +938,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "SN1-personel-kapilari-matris", order: 142, title: "Personel SQL kapilari DG1 ozel rol matrisine: platform_staff_can + update_tenant_plan_subscription / convert_demo_request_to_tenant / destek / portal kurali / buyume kapilari + platform_mrr_daily politikasi (platform_settings bilerek sabit super_admin'de) (DG1 20261014001300 ve DG2 20261014002000 SONRASI; KOD YAYINIYLA AYNI pencerede ya da SONRA: sabit rollerde davranis ayni; davranis)", files: [F.platformStaffCanGates] },
     { id: "KQ5-sayim-rpcleri", order: 155, title: "Sunucu N+1 azaltma: advisor_counts (danisman basina musteri/yayindaki portfoy tek tur) + onboarding_snapshot (kurulum olgulari tek tur) SECURITY INVOKER fonksiyonlari (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod fonksiyon yokken eski sorgulara duser; sira serbest, ek)", files: [F.advisorCountsRpc, F.onboardingSnapshotRpc] },
     { id: "KQ2-rls-maliyeti-db-yuzeyi", order: 152, title: "RLS maliyeti ve DB yuzeyi: commissions_select / ilan kontrol / ekstre politikalari InitPlan (anlam ayni), kimlik fonksiyonlarina islem ici onbellek, get_metrics_snapshot tek gecis (cikti ayni), commission_splits indeksi + 2 yinelenen indeks, agent-photos sinirlari, 3 RPC'de anon EXECUTE geri alma, Realtime yayin listesi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod hicbir yeni nesneye dayanmaz, anon'dan geri alinan RPC'leri yalniz oturumlu cagirir; sira dosya numarasiyla; ONCE restore edilebilir yedek dogrulanir)", files: [F.kq2CommissionsRls, F.kq2LcFinanceRls, F.kq2IdentityCache, F.kq2MetricsSinglePass, F.kq2IndexHygiene, F.kq2AgentPhotosLimits, F.kq2RevokeAnonRpcs, F.kq2RealtimeTrim] },
+    { id: "SK2-canli-veri-broadcast", order: 202, title: "Ofis ekranlarinda canli veri: deyim duzeyinde Broadcast tetikleyicileri (tenant:<ofis> konusu {t,op,ids<=50,r,by} | {t,op,bulk}; kisisel bildirim inbox:<kullanici>) + realtime.messages okuma politikalari + supabase_realtime yayin kirpma (KOD YAYINIYLA BIRLIKTE: once migration (020000 tetikleyiciler; 020100 politikasiz ertelenir) -> supabase_admin scripts/sunucu/realtime-policies.sql (DEPLOY'DAN ONCE; eski istemciyi etkilemez) -> deploy -> canli dogrulama rt-e2e S1-S4 -> supabase_admin realtime-policies.sql -v trim=1; politika yokken istemci eski postgres_changes yoluna duser; davranis)", files: [F.sk2TenantBroadcast, F.sk2RealtimeTrim] },
     { id: "SN5-kurulum-ilerlemesi", order: 145, title: "Ofis bazinda kurulum ilerlemesi: platform_tenant_onboarding_facts salt-okunur fonksiyonu (admin toplu liste, Ofis 360, saglik skoru girdisi; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod fonksiyon yokken ilerleme 'kurulum bekliyor' der ve saglik skoru eski bilesenlerle hesaplanir; sira serbest, ek)", files: [F.tenantOnboardingFacts] },
     { id: "GP4-randevu-bildirim-baglantisi", order: 120, title: "Herkese acik randevu bildirimleri (online randevu, teyit/iptal yaniti) tek randevuyu acar: /app/randevular?randevu=<id> (bagimsiz; govdeler ayni, yalniz bildirim href'i; KOD YAYINIYLA AYNI pencerede ya da SONRA, once uygulanirsa eski kod parametreyi yok sayar ve genel listeyi acar; davranis)", files: [F.appointmentNotificationDeepLinks] },
     { id: "YD3-randevu-musteri-iletisi", order: 163, title: "Randevu musteri iletisi izi: appointments.customer_confirm_sent_at + customer_reminded_at (2 nullable sutun; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutunlar yokken musteri hatirlatma SMS adimini atlar ve teyit SMS izini yazmaz; sira serbest, ek)", files: [F.appointmentCustomerMessages] },
@@ -1189,6 +1196,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.kq2LcFinanceRls, F.lcLifecycleEvents],
     [F.kq2LcFinanceRls, F.earningsStatementPrivacy],
     [F.kq2MetricsSinglePass, F.dashboardSnapshotRpcs],
+    // SK2: yayin kirpma Broadcast tetikleyicisini (020000) ve KQ2 yayin listesini (017000) esas alir.
+    [F.sk2RealtimeTrim, F.sk2TenantBroadcast],
+    [F.sk2RealtimeTrim, F.kq2RealtimeTrim],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
