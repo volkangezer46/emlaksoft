@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Copy, Loader2, MessageCircle, MessageSquareText, Send, X } from "lucide-react";
-import { sendMatchToCustomer } from "@/app/actions/matching";
+import { markMatchChannel, sendMatchToCustomer } from "@/app/actions/matching";
 import { useToast } from "@/components/app/toast-provider";
 
 type Ready = { url: string; message: string; whatsappHref: string | null; smsHref: string | null; hasPhone: boolean };
@@ -25,6 +25,15 @@ export function SendMatchButton({ demandId, propertyId }: { demandId: string; pr
       if ("error" in res) push(res.error, "err");
       else setReady(res);
     });
+
+  // Seçilen kanal "3 gün önce WhatsApp ile gönderildi" rozetine yazılır (yanıt beklenmez, hata akışı bozmaz).
+  const mark = (channel: "whatsapp" | "sms") => {
+    const fd = new FormData();
+    fd.set("demand_id", demandId);
+    fd.set("property_id", propertyId);
+    fd.set("channel", channel);
+    void markMatchChannel(fd).catch(() => undefined);
+  };
 
   const copy = async () => {
     if (!ready) return;
@@ -50,12 +59,12 @@ export function SendMatchButton({ demandId, propertyId }: { demandId: string; pr
   return (
     <div role="group" aria-label="Müşteriye gönder" className="flex w-full flex-wrap items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface-raised p-2 lg:w-auto">
       {ready.whatsappHref ? (
-        <a href={ready.whatsappHref} target="_blank" rel="noopener noreferrer" className={chip}>
+        <a href={ready.whatsappHref} target="_blank" rel="noopener noreferrer" className={chip} onClick={() => mark("whatsapp")}>
           <MessageCircle className="h-3.5 w-3.5" aria-hidden="true" /> WhatsApp
         </a>
       ) : null}
       {ready.smsHref ? (
-        <a href={ready.smsHref} className={chip}>
+        <a href={ready.smsHref} className={chip} onClick={() => mark("sms")}>
           <MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" /> SMS
         </a>
       ) : null}

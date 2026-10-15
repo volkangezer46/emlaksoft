@@ -24,7 +24,7 @@ describe("eşleşme toplu gönderim planı", () => {
     const list = [r(1), r(2, { blacklist: true }), r(3, { isSample: true }), r(4, { phone: null }), r(5, { phone: "123" }), r(6, { customerId: null }), r(7, { demandId: "d7b", customerId: "c1" }), r(8)];
     const plan = planMatchBulkSend(list, null);
     expect(plan.send.map((x) => x.customerId)).toEqual(["c1", "c8"]);
-    expect(plan.counts).toEqual({ no_customer: 1, duplicate: 1, blacklist: 1, sample: 1, no_phone: 2, no_consent: 0 });
+    expect(plan.counts).toEqual({ no_customer: 1, duplicate: 1, already_sent: 0, blacklist: 1, sample: 1, no_phone: 2, no_consent: 0 });
     expect(consentCandidateIds(list)).toEqual(["c1", "c8"]);
   });
 
@@ -49,7 +49,7 @@ describe("eşleşme toplu gönderim planı", () => {
   });
 
   it("onay metni gönderilecek ve izni yok sayısını her zaman gösterir", () => {
-    const text = describeMatchBulkPlan({ send: 3, overCap: 0, counts: { no_customer: 0, duplicate: 0, blacklist: 1, sample: 0, no_phone: 0, no_consent: 2 } });
+    const text = describeMatchBulkPlan({ send: 3, overCap: 0, counts: { no_customer: 0, duplicate: 0, already_sent: 0, blacklist: 1, sample: 0, no_phone: 0, no_consent: 2 } });
     expect(text).toContain("Gönderilecek: 3");
     expect(text).toContain("İzni yok: 2");
     expect(text).toContain("İletişim engelli: 1");
@@ -83,5 +83,19 @@ describe("toplu gönderim eylemi sözleşmesi", () => {
     expect(ui).toContain("previewBulkMatchSend(");
     expect(ui).toContain("<ConfirmDialog");
     expect(ui).toContain("Tümüne gönder (");
+  });
+});
+
+describe("planMatchBulkSend: daha önce gönderilen (CRM-G4)", () => {
+  it("alreadySent alıcı atlanır ve sayılır", () => {
+    const plan = planMatchBulkSend(
+      [
+        { demandId: "d1", customerId: "c1", fullName: "A", phone: "05321234567", blacklist: false, isSample: false, alreadySent: true },
+        { demandId: "d2", customerId: "c2", fullName: "B", phone: "05321234568", blacklist: false, isSample: false },
+      ],
+      null,
+    );
+    expect(plan.send.map((r) => r.customerId)).toEqual(["c2"]);
+    expect(plan.counts.already_sent).toBe(1);
   });
 });

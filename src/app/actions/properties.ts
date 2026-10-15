@@ -17,9 +17,8 @@ import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { resolvePriceHealth } from "@/lib/comparables";
-import { notifyMatchingDemandsForProperty } from "@/lib/match-notify";
-import { notifyTenant } from "@/lib/notify";
-import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
+import { notifyMatchesForPropertyChange, notifyMatchesForPublishedProperty, notifyMatchingDemandsForProperty } from "@/lib/match-notify";
+import { type MatchProperty } from "@/lib/matching";
 import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { parseMoneyInput } from "@/lib/money-input";
@@ -155,78 +154,6 @@ async function healthPriceTry(
 ): Promise<{ priceTry: number | null; unrated: boolean }> {
   if (currency === "TRY") return { priceTry: listPrice, unrated: false };
   return priceForHealth(listPrice, currency, await fetchLatestRates(supabase));
-}
-
-/**
- * Fiyat DÜŞTÜĞÜNDE eşleşen açık taleplerin danışmanlarına bildirim gönderir.
- *
- * match-notify.ts'teki desenin fiyat-düşüşü varyantı: aynı skorlayıcı
- * (scoreDemandProperty) yeniden kullanılır; talep sahibinin danışmanı
- * (customers.assigned_to) hedeflenir, danışman atanmamışsa fiyatı güncelleyen
- * kullanıcıya düşer. Bildirim patlamasını önlemek için en iyi 10 eşleşmeyle
- * sınırlı. Best-effort: hata fiyat güncellemesini asla bozmaz.
- *
- * Not: export EDİLMİYOR — "use server" dosyasında export edilen her fonksiyon
- * tarayıcıdan çağrılabilir bir uç nokta olur (bkz. lib/notify.ts açıklaması).
- */
-async function notifyPriceDropToMatchingDemands(input: {
-  tenantId: string;
-  fallbackUserId: string;
-  property: MatchProperty;
-  oldPrice: number;
-  newPrice: number;
-}): Promise<void> {
-  try {
-    const admin = createAdminClient();
-    // Ofise özel ağırlıklar — döngü DIŞINDA tek sorgu; tanımsızsa varsayılan davranış.
-    const weightsPromise = fetchTenantMatchingWeights(admin, input.tenantId);
-    const { data: demands } = await admin
-      .from("customer_demands")
-      .select(
-        "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria, customer:customers!customer_demands_customer_id_fkey(full_name, assigned_to)",
-      )
-      .eq("tenant_id", input.tenantId)
-      .in("status", ["new", "active", "matched"])
-      .limit(500);
-
-    if (!demands?.length) return;
-
-    const weights = await weightsPromise;
-    const MATCH_THRESHOLD = 60; // match-notify.ts ile aynı "iyi/güçlü" eşiği
-    type CustomerRel = { full_name?: string | null; assigned_to?: string | null };
-    const matched: { customerName: string; advisorId: string | null; score: number }[] = [];
-    for (const d of demands) {
-      const result = scoreDemandProperty(d as unknown as MatchDemand, input.property, weights);
-      if (!result.eliminated && result.score >= MATCH_THRESHOLD) {
-        const rel = d.customer as CustomerRel | CustomerRel[] | null;
-        const customer = Array.isArray(rel) ? rel[0] : rel;
-        matched.push({
-          customerName: customer?.full_name ?? "Müşteri",
-          advisorId: customer?.assigned_to ?? null,
-          score: result.score,
-        });
-      }
-    }
-
-    if (!matched.length) return;
-    matched.sort((a, b) => b.score - a.score);
-
-    const fmt = (v: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(v);
-    const label = input.property.title ?? input.property.property_code;
-    for (const m of matched.slice(0, 10)) {
-      await notifyTenant({
-        tenantId: input.tenantId,
-        userId: m.advisorId ?? input.fallbackUserId,
-        title: `${label} fiyatı düştü: ₺${fmt(input.oldPrice)} → ₺${fmt(input.newPrice)}`,
-        body: `${m.customerName} talebiyle eşleşiyor.`,
-        href: `/app/talepler?sekme=eslesme&property=${input.property.id}`,
-        kind: "info",
-        prefKey: "priceDrop",
-      });
-    }
-  } catch (e) {
-    console.error("notifyPriceDropToMatchingDemands", e);
-  }
 }
 
 /**
@@ -798,28 +725,26 @@ export async function updateProperty(formData: FormData): Promise<PropertyResult
     newValue: { title, list_price: priceValue },
   }));
 
-  // Fiyat DÜŞTÜYSE eşleşen taleplerin danışmanlarını uyar; artışta hiçbir şey yapma.
+  // Fiyat DÜŞTÜYSE yeni fiyatla eşiği geçen (ve daha önce gönderilmiş) taleplerin danışmanlarını uyar (lib/match-notify,
+  // CRM-G5); artışta hiçbir şey yapma. Yanıt sonrası çalışır, kaydı bekletmez.
   if (oldPrice != null && Number.isFinite(oldPrice) && priceValue < oldPrice) {
-    await notifyPriceDropToMatchingDemands({
-      tenantId: gate.tenantId,
-      fallbackUserId: gate.userId,
-      property: {
-        id,
-        property_code: existing?.property_code ?? "",
-        title,
-        transaction_type: transactionType,
-        property_type: propertyType,
-        status: existing?.status ?? "live",
-        // Talep bütçeleri ₺: döviz fiyat ₺ karşılığıyla eşleşir.
-        list_price: healthPrice.priceTry ?? priceValue,
-        province_id: provinceId || null,
-        district_id: districtId || null,
-        neighborhood_id: neighborhoodId || null,
-        features: { rooms: rooms || null, sqm: sqmValue },
-      },
-      oldPrice,
-      newPrice: priceValue,
-    });
+    const newPriceTry = healthPrice.priceTry ?? priceValue;
+    const prevPriceTry = priceValue > 0 ? (oldPrice * newPriceTry) / priceValue : oldPrice;
+    const changed: MatchProperty = {
+      id,
+      property_code: existing?.property_code ?? "",
+      title,
+      transaction_type: transactionType,
+      property_type: propertyType,
+      status: existing?.status ?? "live",
+      // Talep bütçeleri ₺: döviz fiyat ₺ karşılığıyla eşleşir.
+      list_price: newPriceTry,
+      province_id: provinceId || null,
+      district_id: districtId || null,
+      neighborhood_id: neighborhoodId || null,
+      features: mergedFeatures as MatchProperty["features"],
+    };
+    afterSafe(() => notifyMatchesForPropertyChange(gate.tenantId, gate.userId, changed, { reason: "price_drop", prevPriceTry }), "fiyat düşüşü eşleşme");
   }
 
   revalidatePath("/app/portfoyler");
@@ -877,6 +802,8 @@ export async function setPropertyStatus(formData: FormData): Promise<void> {
       const { notifyListingIndexNow } = await import("@/lib/seo/indexnow-public");
       await notifyListingIndexNow(admin, gate.tenantId, id);
     }, "ilan IndexNow");
+    // Yayına alınan portföy açık taleplerle yeniden eşleşir (CRM-G5).
+    afterSafe(() => notifyMatchesForPublishedProperty(gate.tenantId, gate.userId, id), "yayın eşleşme");
   }
 }
 

@@ -22,6 +22,8 @@ import { validateGeoChain } from "@/lib/geo/reader";
 import { findSimilarOpenDemands } from "@/lib/duplicate-finders";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
+import { notifyMatchesForDemand } from "@/lib/match-notify";
+import { isWidenKind, widenDemandPatch, widenLabel } from "@/lib/match-widen";
 
 export type DemandResult = { error?: string; ok?: boolean; id?: string };
 
@@ -149,6 +151,9 @@ export async function createDemand(
       },
     }),
   );
+
+  // Yeni talep mevcut portföylerle hemen eşleşir: güçlü eşleşmeler danışmana tek bildirim (CRM-G5).
+  afterSafe(() => notifyMatchesForDemand(gate.tenantId, gate.userId, data.id), "talep eşleşme");
 
   revalidateDemandPaths(gate.tenantId, customerId);
   return { ok: true, id: data.id };
@@ -287,7 +292,75 @@ export async function updateDemand(
     newValue: { transaction_type: transactionType, status: status || undefined },
   });
 
+  // Kriter değişince yeniden eşleştir (gün başına tek bildirim; zaten önerilen çiftler tekrar bildirilmez).
+  afterSafe(() => notifyMatchesForDemand(gate.tenantId, gate.userId, id), "talep eşleşme");
+
   revalidateDemandPaths(gate.tenantId, updated.customer_id);
+  return { ok: true, id };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * "Kriteri genişlet" önerisini uygular (CRM-G6): yama SUNUCUDA mevcut talepten yeniden hesaplanır (`widenDemandPatch`);
+ * istemci yalnız varyant türünü gönderir. Uygulanamıyorsa (ör. bütçe yok) hata döner.
+ */
+export async function applyDemandWiden(formData: FormData): Promise<DemandResult> {
+  const gate = await requirePermission("demands", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(formData.get("id") ?? "").trim();
+  const kind = String(formData.get("kind") ?? "").trim();
+  if (!UUID_RE.test(id) || !isWidenKind(kind)) return { error: "Geçersiz öneri." };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("customer_demands")
+    .select("id, customer_id, budget_min, budget_max, district_id, neighborhood_id, rooms, min_sqm, criteria")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!existing) return { error: "Talep bulunamadı veya başka bir ofise ait." };
+
+  const patch = widenDemandPatch(
+    {
+      ...existing,
+      budget_min: existing.budget_min != null ? Number(existing.budget_min) : null,
+      budget_max: existing.budget_max != null ? Number(existing.budget_max) : null,
+      min_sqm: existing.min_sqm != null ? Number(existing.min_sqm) : null,
+    },
+    kind,
+  );
+  if (!patch) return { error: "Bu öneri talebe artık uygulanamıyor; sayfayı yenileyin." };
+
+  const { error } = await supabase
+    .from("customer_demands")
+    .update(patch)
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId);
+  if (error) {
+    console.error("applyDemandWiden", { code: error.code });
+    return { error: actionErrorMessage(error, "Talep güncellenemedi.") };
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "demand.widen",
+    entityType: "customer_demand",
+    entityId: id,
+    oldValue: {
+      budget_max: existing.budget_max,
+      district_id: existing.district_id,
+      neighborhood_id: existing.neighborhood_id,
+      rooms: existing.rooms,
+      min_sqm: existing.min_sqm,
+    },
+    newValue: { kind, label: widenLabel(kind, patch), ...patch },
+  });
+  afterSafe(() => notifyMatchesForDemand(gate.tenantId, gate.userId, id), "talep eşleşme");
+
+  revalidateDemandPaths(gate.tenantId, existing.customer_id as string);
+  revalidatePath(`/app/talepler/${id}`);
   return { ok: true, id };
 }
 

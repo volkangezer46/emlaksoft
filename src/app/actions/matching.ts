@@ -10,6 +10,8 @@ import { insertPropertyShareLink } from "@/lib/share-links";
 import { buildMatchShareMessage, toSmsHref } from "@/lib/match-share-message";
 import { toWhatsAppLink } from "@/lib/phone";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { recordMatchChannel, recordMatchEvent } from "@/lib/match-state-store";
+import { dismissReasonLabel, isDismissReason, isMatchChannel } from "@/lib/match-state";
 
 export type MatchActionResult = { error?: string; ok?: boolean; score?: number };
 
@@ -184,6 +186,18 @@ export async function sendMatchToCustomer(formData: FormData): Promise<SendMatch
   });
   const phone = customer?.phone ?? null;
 
+  // Çift durumu (CRM-G4): "gönderildi" + paylaşım token'ı ("açıldı" rozeti) — tablo yoksa sessizce atlanır.
+  await recordMatchEvent(supabase, {
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    demandId,
+    propertyId,
+    customerId: customer?.id ?? (demand.customer_id as string | null) ?? null,
+    event: { kind: "send" },
+    channel: "link",
+    shareToken: link.token,
+  });
+
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
@@ -193,5 +207,75 @@ export async function sendMatchToCustomer(formData: FormData): Promise<SendMatch
     newValue: { demand_id: demandId, property_id: propertyId, property_code: property.property_code, share_token: link.token },
   });
   if (customer?.id) revalidatePath(`/app/musteriler/${customer.id}`);
+  revalidatePath("/app/talepler");
+  revalidatePath(`/app/talepler/${demandId}`);
   return { ok: true, url: link.url, message, whatsappHref: toWhatsAppLink(phone, message), smsHref: toSmsHref(phone, message), hasPhone: Boolean(phone) };
+}
+
+/** Gönderim şeridinde seçilen kanal (WhatsApp / SMS / kopyala): yalnız son gönderimin kanal etiketi güncellenir. */
+export async function markMatchChannel(formData: FormData): Promise<{ ok: true } | { error: string }> {
+  const gate = await requirePermission("matching", "create");
+  if (!gate.ok) return { error: gate.error };
+  const demandId = String(formData.get("demand_id") ?? "").trim();
+  const propertyId = String(formData.get("property_id") ?? "").trim();
+  const channel = String(formData.get("channel") ?? "").trim();
+  if (!UUID.test(demandId) || !UUID.test(propertyId) || !isMatchChannel(channel)) return { error: "Geçersiz kanal." };
+  const supabase = await createClient();
+  await recordMatchChannel(supabase, { tenantId: gate.tenantId, demandId, propertyId, channel });
+  return { ok: true };
+}
+
+export type MatchStateActionResult = { ok: true } | { error: string };
+
+/**
+ * "Uygun değil" (CRM-G4): çift listeden gizlenir, gerekçe (fiyat / konum / kat / oda / diğer) saklanır; aynı portföy bu
+ * talebe yeniden önerilmez ve bildirim üretmez. `undo=1` gizlemeyi geri alır. Olay denetim günlüğüne yazılır.
+ */
+export async function setMatchDismissed(formData: FormData): Promise<MatchStateActionResult> {
+  const gate = await requirePermission("matching", "create");
+  if (!gate.ok) return { error: gate.error };
+  const demandId = String(formData.get("demand_id") ?? "").trim();
+  const propertyId = String(formData.get("property_id") ?? "").trim();
+  const undo = formData.get("undo") === "1";
+  const reasonRaw = String(formData.get("reason") ?? "").trim();
+  const reason = isDismissReason(reasonRaw) ? reasonRaw : "other";
+  const note = String(formData.get("note") ?? "").trim().slice(0, 300) || null;
+  if (!UUID.test(demandId) || !UUID.test(propertyId)) return { error: "Talep ve portföy zorunlu." };
+
+  const supabase = await createClient();
+  const [{ data: demand }, { data: property }] = await Promise.all([
+    supabase.from("customer_demands").select("id, customer_id").eq("id", demandId).eq("tenant_id", gate.tenantId).maybeSingle(),
+    supabase.from("properties").select("id, property_code").eq("id", propertyId).eq("tenant_id", gate.tenantId).maybeSingle(),
+  ]);
+  if (!demand || !property) return { error: "Kayıt bulunamadı." };
+
+  const state = await recordMatchEvent(supabase, {
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    demandId,
+    propertyId,
+    customerId: (demand.customer_id as string | null) ?? null,
+    event: undo ? { kind: "restore" } : { kind: "dismiss" },
+    dismissReason: undo ? null : reason,
+    dismissNote: undo ? null : note,
+  });
+  if (!state) return { error: actionErrorMessage(null, "Eşleşme durumu kaydedilemedi. Lütfen tekrar deneyin.") };
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: undo ? "match.restored" : "match.dismissed",
+    entityType: "customer_demand",
+    entityId: demandId,
+    newValue: {
+      property_id: propertyId,
+      property_code: property.property_code,
+      ...(undo ? {} : { reason, reason_label: dismissReasonLabel(reason), note }),
+    },
+  });
+
+  revalidatePath("/app/talepler");
+  revalidatePath(`/app/talepler/${demandId}`);
+  if (demand.customer_id) revalidatePath(`/app/musteriler/${demand.customer_id}`);
+  return { ok: true };
 }

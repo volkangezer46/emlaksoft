@@ -7,6 +7,9 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
 import { insertPropertyShareLink } from "@/lib/share-links";
+import { fetchMatchStates, MATCH_SHOW_MIN } from "@/lib/match-candidates";
+import { wasSent } from "@/lib/match-state";
+import { recordMatchEvent } from "@/lib/match-state-store";
 import { buildMatchShareMessage } from "@/lib/match-share-message";
 import { gateIysRecipients } from "@/lib/iys/gate";
 import { isTenantSmsAvailable, prepareTenantSmsSender } from "@/lib/messaging/tenant-providers";
@@ -44,7 +47,6 @@ export type BulkMatchSendResult =
   | ({ ok: true; sent: number; failed: number; stoppedReason: string | null } & BulkMatchCounts);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const MATCH_MIN_SCORE = 35;
 
 type Gate = { tenantId: string; userId: string };
 
@@ -57,7 +59,9 @@ async function gates(): Promise<{ error: string } | Gate> {
   return { tenantId: gate.tenantId, userId: gate.userId };
 }
 
-function readInput(formData: FormData): { error: string } | { propertyId: string; demandIds: string[] } {
+type BulkInput = { propertyId: string; demandIds: string[]; includeSent: boolean };
+
+function readInput(formData: FormData): { error: string } | BulkInput {
   const propertyId = String(formData.get("property_id") ?? "").trim();
   const demandIds = [
     ...new Set(
@@ -72,7 +76,8 @@ function readInput(formData: FormData): { error: string } | { propertyId: string
   if (demandIds.length === 0) return { error: "Gönderilecek eşleşme yok." };
   if (demandIds.length > MATCH_BULK_MAX_DEMANDS) return { error: `En fazla ${MATCH_BULK_MAX_DEMANDS} talep seçilebilir.` };
   if (demandIds.some((id) => !UUID.test(id))) return { error: "Geçersiz talep seçimi." };
-  return { propertyId, demandIds };
+  // Daha önce gönderilen çiftler (CRM-G4) varsayılan HARİÇ; danışman bilerek yeniden gönderebilir.
+  return { propertyId, demandIds, includeSent: formData.get("include_sent") === "1" };
 }
 
 type PropertyRow = MatchProperty & { is_sample?: boolean | null };
@@ -87,9 +92,9 @@ type Planned = {
 async function buildPlan(
   supabase: SupabaseClient,
   gate: Gate,
-  input: { propertyId: string; demandIds: string[] },
+  input: BulkInput,
 ): Promise<{ error: string } | Planned> {
-  const [{ data: property }, { data: demands }, weights] = await Promise.all([
+  const [{ data: property }, { data: demands }, weights, states] = await Promise.all([
     supabase
       .from("properties")
       .select(
@@ -108,8 +113,10 @@ async function buildPlan(
       .eq("tenant_id", gate.tenantId)
       .neq("status", "closed"),
     fetchTenantMatchingWeights(supabase, gate.tenantId),
+    input.includeSent ? Promise.resolve([]) : fetchMatchStates(supabase, { demandIds: input.demandIds, tenantId: gate.tenantId }),
   ]);
   if (!property) return { error: "Portföy bulunamadı." };
+  const sentDemandIds = new Set(states.filter((st) => st.property_id === input.propertyId && wasSent(st)).map((st) => st.demand_id));
   if (property.is_sample) return { error: "Örnek portföy müşteriye gönderilemez." };
 
   const matchProperty: PropertyRow = {
@@ -144,7 +151,7 @@ async function buildPlan(
       urgency: d.urgency,
       status: d.status,
     };
-    if (scoreDemandProperty(md, matchProperty, weights).score < MATCH_MIN_SCORE) {
+    if (scoreDemandProperty(md, matchProperty, weights).score < MATCH_SHOW_MIN) {
       notMatching += 1;
       continue;
     }
@@ -158,6 +165,7 @@ async function buildPlan(
       phone: live?.phone ?? null,
       blacklist: Boolean(live?.blacklist),
       isSample: Boolean(live?.is_sample),
+      alreadySent: sentDemandIds.has(d.id as string),
     });
   }
 
@@ -255,6 +263,16 @@ export async function sendBulkMatchToCustomers(formData: FormData): Promise<Bulk
       subject: "Eşleşme",
       body: message,
     });
+    await recordMatchEvent(supabase, {
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      demandId: r.demandId,
+      propertyId: property.id,
+      customerId,
+      event: { kind: "send" },
+      channel: "sms",
+      shareToken: link.token,
+    });
     await logActivity({
       tenantId: gate.tenantId,
       actorId: gate.userId,
@@ -276,5 +294,6 @@ export async function sendBulkMatchToCustomers(formData: FormData): Promise<Bulk
     newValue: { property_code: property.property_code, sent, failed, stopped: stoppedReason != null, ...counts },
   });
   revalidatePath("/app/gelen-kutusu");
+  revalidatePath("/app/talepler");
   return { ok: true, sent, failed, stoppedReason, ...counts };
 }
