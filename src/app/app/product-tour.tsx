@@ -174,13 +174,14 @@ export function ProductTour({
   useEffect(() => {
     if (phase === "run" || phase === "final" || !role) return;
     const params = new URLSearchParams(window.location.search);
-    if (pathname.startsWith("/app/pano-tv")) return;
+    // Tur yalnız ana panelde başlar: ?tur= başka sayfalarda o sayfanın kendi parametresidir (ör. Muhasebe > Yeni kayıt
+    // ?tur=gider sekmesi, İlan kontrol ?tur=<anomali>). Turun bağlantıları hep /app?tur=… üretir (tourHref).
+    if (pathname !== "/app") return;
     const raw = params.get(TOUR_PARAM);
     let id: TourId;
     if (raw) {
       id = getTour(raw, toursRef.current)?.id ?? tourIdForRole(role);
     } else {
-      if (pathname !== "/app") return;
       id = tourIdForRole(role);
       if (isTourDone(id) !== false) return; // görüldü ya da depolama yok → rahatsız etme
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

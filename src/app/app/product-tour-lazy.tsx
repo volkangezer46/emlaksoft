@@ -38,8 +38,8 @@ function tourDecision(pathname: string, role: string): TourDecision {
   if (!role) return "skip";
   const params = new URLSearchParams(window.location.search);
   if (params.get("tv") === "1" || pathname.startsWith("/app/pano-tv")) return "skip";
-  if (params.get(TOUR_PARAM)) return "load";
   if (pathname !== "/app") return "skip";
+  if (params.get(TOUR_PARAM)) return "load";
   if (isTourDone(tourIdForRole(role)) !== false) return "skip";
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return "skip";
   return "ask-server";
