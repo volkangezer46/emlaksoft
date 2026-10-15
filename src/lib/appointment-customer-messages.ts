@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   appointmentConfirmUrl,
   appointmentCustomerText,
+  appointmentWhatsAppHref,
   shouldRemindCustomer,
   isCustomerMessageHour,
 } from "@/lib/appointment-messages";
@@ -86,6 +87,63 @@ export async function sendAppointmentConfirmation(
   } catch (e) {
     console.error("sendAppointmentConfirmation", e instanceof Error ? e.message : "hata");
     return "sms_failed";
+  }
+}
+
+export type RescheduleNotice = {
+  /** SMS sonucu (ayar kapalı / kanal yok / numara yok bilgi amaçlı). */
+  outcome: ConfirmSendOutcome;
+  /** SMS gitmediyse danışmanın kendi WhatsApp'ından göndereceği hazır taslak (numara geçersizse null). */
+  waHref: string | null;
+};
+
+/**
+ * GA-01: randevu saati değişti → müşteriye yeni saat (işlem amaçlı, teyit iletisiyle AYNI kanal ve kurallar: ofis ayarı +
+ * SMS kanalı + TR cep). SMS gitmezse wa.me taslağı döner; danışman tek dokunuşla iletir. Sahte başarı yok.
+ */
+export async function notifyAppointmentRescheduled(
+  db: SupabaseClient,
+  input: { tenantId: string; appointmentId: string; appUrl: string; previousAt: string },
+): Promise<RescheduleNotice> {
+  try {
+    const [{ data: appt }, { data: tenant }, settings] = await Promise.all([
+      db
+        .from("appointments")
+        .select("id, appointment_type, scheduled_at, confirm_token, is_sample, customer:customers!appointments_customer_id_fkey(full_name, phone)")
+        .eq("tenant_id", input.tenantId)
+        .eq("id", input.appointmentId)
+        .maybeSingle(),
+      db.from("tenants").select("name").eq("id", input.tenantId).maybeSingle(),
+      readTenantSettings(db, input.tenantId, [APPOINTMENT_CUSTOMER_SMS_KEY]),
+    ]);
+    const row = appt as ConfirmRow | null;
+    const customer = row ? one(row.customer) : null;
+    if (!row || !customer?.phone) return { outcome: "no_phone", waHref: null };
+    const text = appointmentCustomerText({
+      kind: "reschedule",
+      customerName: customer.full_name,
+      officeName: (tenant as { name?: string | null } | null)?.name ?? null,
+      appointmentType: row.appointment_type,
+      scheduledAt: row.scheduled_at,
+      previousAt: input.previousAt,
+      confirmUrl: appointmentConfirmUrl(input.appUrl, row.confirm_token),
+    });
+    const waHref = appointmentWhatsAppHref(customer.phone, text);
+    if (row.is_sample || settings[APPOINTMENT_CUSTOMER_SMS_KEY] !== true) return { outcome: "off", waHref };
+    if (!isValidTurkishMobile(customer.phone)) return { outcome: "no_phone", waHref };
+    if (!(await isTenantSmsAvailable(input.tenantId))) return { outcome: "no_channel", waHref };
+    const res = await sendTenantSms(input.tenantId, customer.phone, text, { source: "appointment_confirm", audience: "contact" });
+    if (!res.ok) return { outcome: "sms_failed", waHref };
+    const { error } = await db
+      .from("appointments")
+      .update({ customer_confirm_sent_at: new Date(now()).toISOString() })
+      .eq("tenant_id", input.tenantId)
+      .eq("id", row.id);
+    if (error) console.error("appointment reschedule mark", { code: error.code });
+    return { outcome: "sms_sent", waHref: null };
+  } catch (e) {
+    console.error("notifyAppointmentRescheduled", e instanceof Error ? e.message : "hata");
+    return { outcome: "sms_failed", waHref: null };
   }
 }
 

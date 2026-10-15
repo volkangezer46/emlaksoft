@@ -12,6 +12,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { afterSafe } from "@/lib/after-safe";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import { trDayKey } from "@/lib/clock";
+import { duePresetMs, isDuePreset, type DuePreset } from "@/lib/due-presets";
 
 export type TaskResult = { error?: string; ok?: boolean; id?: string };
 
@@ -553,4 +554,165 @@ export async function deleteTask(formData: FormData): Promise<TaskResult> {
   });
   revalidatePath("/app/gorevler");
   return { ok: true, id };
+}
+
+export type RescheduleTasksResult = { ok?: boolean; error?: string; updatedCount?: number; dueAt?: string | null };
+
+/**
+ * GA-04 / GA-10 / GA-05: açık görevlerin vadesini hazır seçenekle taşır ("Yarın 10:00", "Pazartesi 10:00", "+1 hafta",
+ * "Bugün 18:00"). Toplu çubuk, mobil kaydırma "Yarın" ve arama kuyruğu "Atla (yarın)" AYNI eylemi kullanır.
+ * Saat sunucuda hesaplanır (istemci saatine güvenilmez); "+1 hafta" her görevin kendi vadesinden yürür.
+ */
+export async function rescheduleTasks(ids: string[], preset: DuePreset): Promise<RescheduleTasksResult> {
+  const gate = await requirePermission("tasks", "edit");
+  if (!gate.ok) return { error: gate.error };
+  if (!isDuePreset(preset)) return { error: "Geçersiz vade seçeneği." };
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map((id) => String(id).trim()).filter(Boolean))];
+  if (!list.length) return { error: "Görev seçilmedi." };
+  if (list.length > BULK_ASSIGN_LIMIT) return { error: `Tek seferde en fazla ${BULK_ASSIGN_LIMIT} görev güncellenebilir.` };
+
+  const supabase = await createClient();
+  const { data: rows, error: readError } = await supabase
+    .from("tasks")
+    .select("id, due_at")
+    .in("id", list)
+    .eq("tenant_id", gate.tenantId)
+    .eq("status", "open");
+  if (readError) return { error: actionErrorMessage(readError, "Görevler okunamadı.") };
+  const nowMs = now();
+  const byDue = new Map<string, string[]>();
+  for (const r of (rows ?? []) as { id: string; due_at: string | null }[]) {
+    const ms = duePresetMs(preset, nowMs, r.due_at ? Date.parse(r.due_at) : null);
+    if (ms == null) continue;
+    const iso = new Date(ms).toISOString();
+    byDue.set(iso, [...(byDue.get(iso) ?? []), r.id]);
+  }
+  if (byDue.size === 0) return { error: "Taşınacak açık görev bulunamadı." };
+
+  let updatedCount = 0;
+  for (const [dueAt, group] of byDue) {
+    const { error } = await supabase.from("tasks").update({ due_at: dueAt }).in("id", group).eq("tenant_id", gate.tenantId).eq("status", "open");
+    if (error) {
+      console.error("rescheduleTasks", error);
+      return { error: actionErrorMessage(error, "Vade taşınamadı.") };
+    }
+    updatedCount += group.length;
+  }
+  afterSafe(() =>
+    logActivity({
+      tenantId: gate.tenantId,
+      actorId: gate.userId,
+      action: "task.reschedule",
+      entityType: "task",
+      ...(updatedCount === 1 ? { entityId: [...byDue.values()][0]![0] } : {}),
+      newValue: { ids: [...byDue.values()].flat(), preset, count: updatedCount },
+    }),
+  );
+  revalidatePath("/app/gorevler");
+  revalidatePath("/app");
+  return { ok: true, updatedCount, dueAt: byDue.size === 1 ? [...byDue.keys()][0]! : null };
+}
+
+export type SettleCallTasksResult = {
+  ok?: boolean;
+  error?: string;
+  /** Kapatılan açık arama görevi sayısı ("Ulaşıldı"). */
+  closed?: number;
+  /** "Geri ara": mevcut açık arama görevinin vadesi taşındı (yenisi açılmadı). */
+  moved?: boolean;
+  /** "Geri ara": açık görev yoktu, yenisi açıldı. */
+  created?: boolean;
+};
+
+/**
+ * GA-05: görüşme sonucu müşterinin AÇIK arama görevlerini yönetir (tek kuyruk kuralı).
+ *  - reached: müşterinin açık `call` görevleri tamamlanır (tekrarlı olanın sonraki kopyası üretilir).
+ *  - callback: açık arama görevi varsa EN ESKİ vadeli olanın vadesi taşınır (görev birikmez); yoksa yenisi açılır.
+ *  - unreached: görev açık kalır (hâlâ aranacak).
+ */
+export async function settleCustomerCallTasks(input: {
+  customerId: string;
+  outcome: "reached" | "unreached" | "callback";
+  /** callback: "YYYY-MM-DDTHH:mm" (TR). */
+  dueLocal?: string;
+  title?: string;
+  notes?: string;
+}): Promise<SettleCallTasksResult> {
+  const customerId = String(input?.customerId ?? "").trim();
+  if (!customerId) return { error: "Müşteri bulunamadı." };
+  const outcome = input?.outcome;
+  if (outcome === "unreached") return { ok: true, closed: 0 };
+  if (outcome !== "reached" && outcome !== "callback") return { error: "Geçersiz sonuç." };
+
+  const gate = await requirePermission("tasks", outcome === "reached" ? "edit" : "create");
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  const { data: open, error: readError } = await supabase
+    .from("tasks")
+    .select("id, title, notes, kind, priority, status, due_at, assigned_to, customer_id, property_id, deal_id, recurrence, recurrence_parent_id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("customer_id", customerId)
+    .eq("kind", "call")
+    .eq("status", "open")
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .limit(50);
+  if (readError) return { error: actionErrorMessage(readError, "Arama görevleri okunamadı.") };
+  const tasks = (open ?? []) as RecurringSource[];
+
+  if (outcome === "reached") {
+    if (tasks.length === 0) return { ok: true, closed: 0 };
+    const ids = tasks.map((t) => t.id);
+    const { data: closedRows, error } = await supabase
+      .from("tasks")
+      .update({ status: "done", completed_at: new Date().toISOString() })
+      .in("id", ids)
+      .eq("tenant_id", gate.tenantId)
+      .eq("status", "open")
+      .select("id");
+    if (error) return { error: actionErrorMessage(error, "Arama görevleri kapatılamadı.") };
+    for (const t of tasks) await spawnNextRecurring(supabase, gate.tenantId, gate.userId, t);
+    const closed = (closedRows ?? []).length;
+    afterSafe(() =>
+      logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "task.complete_bulk",
+        entityType: "task",
+        newValue: { count: closed, source: "contact_outcome", customer_id: customerId },
+      }),
+    );
+    revalidatePath("/app/gorevler");
+    revalidatePath("/app/arama-listesi");
+    return { ok: true, closed };
+  }
+
+  const due = parseTrLocalDateTime(String(input.dueLocal ?? ""));
+  if (!due) return { error: "Geri arama zamanı geçersiz." };
+  const first = tasks[0];
+  if (first) {
+    const note = String(input.notes ?? "").trim();
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        due_at: due.toISOString(),
+        ...(note ? { notes: [first.notes, note].filter(Boolean).join("\n").slice(0, 4000) } : {}),
+      })
+      .eq("id", first.id)
+      .eq("tenant_id", gate.tenantId);
+    if (error) return { error: actionErrorMessage(error, "Geri arama görevi güncellenemedi.") };
+    revalidatePath("/app/gorevler");
+    revalidatePath("/app/arama-listesi");
+    return { ok: true, moved: true };
+  }
+  const fd = new FormData();
+  fd.set("title", String(input.title ?? "Geri ara").slice(0, 200));
+  fd.set("kind", "call");
+  fd.set("priority", "normal");
+  fd.set("customer_id", customerId);
+  fd.set("due_at", String(input.dueLocal));
+  if (input.notes) fd.set("notes", String(input.notes));
+  const res = await createTask({}, fd);
+  if (res.error) return { error: res.error };
+  revalidatePath("/app/arama-listesi");
+  return { ok: true, created: true };
 }

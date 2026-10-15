@@ -10,19 +10,21 @@
  *    4) "dokun / teyit / randevu / kurtar" sonraki adımı olan diğerleri; kademe içinde ısı puanı, sonra temassız gün.
  */
 import type { CustomerState, NextBestAction } from "@/lib/customer-state/core";
+import { formatTrTime } from "@/lib/clock";
 
 export const CALL_LIST_MAX = 40;
 
-export type CallListTier = "oncelik" | "risk" | "sicak" | "takip";
+export type CallListTier = "gorev" | "oncelik" | "risk" | "sicak" | "takip";
 
 export const CALL_LIST_TIER_LABELS: Readonly<Record<CallListTier, string>> = {
+  gorev: "Arama görevi",
   oncelik: "Arama önceliği",
   risk: "Kaybedilme riski",
   sicak: "Sıcak müşteri",
   takip: "Takip zamanı",
 };
 
-const TIER_ORDER: readonly CallListTier[] = ["oncelik", "risk", "sicak", "takip"];
+const TIER_ORDER: readonly CallListTier[] = ["gorev", "oncelik", "risk", "sicak", "takip"];
 const FOLLOW_UP_ACTIONS: ReadonlySet<NextBestAction["key"]> = new Set(["kurtar", "dokun", "teyit", "randevu"]);
 
 export type CallListState = Pick<
@@ -39,6 +41,9 @@ export type CallListCandidate = {
 };
 
 export type CallListEntry = {
+  /** Kuyruk anahtarı: müşteri satırında müşteri kimliği, müşterisiz görev satırında `gorev:<id>`. */
+  key: string;
+  /** Müşterisiz görev satırında boş. */
   customerId: string;
   name: string;
   phone: string;
@@ -46,6 +51,8 @@ export type CallListEntry = {
   reasons: string[];
   nextAction: { text: string; href: string } | null;
   daysSinceContact: number | null;
+  /** GA-05: bu satırı kuyruğa sokan (ya da öne çeken) açık arama görevi. */
+  task?: { id: string; title: string; dueAt: string | null; overdue: boolean } | null;
 };
 
 function tierOf(c: CallListCandidate, state: CallListState, priority: ReadonlyMap<string, number>): CallListTier | null {
@@ -79,6 +86,7 @@ export function buildCallList(
     const reasons = state.reasons.map((r) => r.label).filter(Boolean).slice(0, 3);
     picked.push({
       entry: {
+        key: c.id,
         customerId: c.id,
         name: c.name || "Müşteri",
         phone,
@@ -102,12 +110,88 @@ export function buildCallList(
 }
 
 /** Bekleyen + bu oturumda kaydedilenler: kaydedilen müşteri listede "Arandı" olarak sona iner, sıradaki öne çıkar. */
-export function splitCallQueue<T extends { customerId: string }>(
+export function splitCallQueue<T extends { customerId: string; key?: string }>(
   entries: readonly T[],
   loggedIds: ReadonlySet<string>,
 ): { pending: T[]; done: T[] } {
   const pending: T[] = [];
   const done: T[] = [];
-  for (const e of entries) (loggedIds.has(e.customerId) ? done : pending).push(e);
+  for (const e of entries) (loggedIds.has(e.key ?? e.customerId) ? done : pending).push(e);
   return { pending, done };
+}
+
+// ---------------------------------------------------------------------------
+// GA-05: açık arama görevleri aynı kuyrukta
+// ---------------------------------------------------------------------------
+
+export type CallTaskInput = {
+  id: string;
+  title: string;
+  dueAt: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  phone: string | null;
+  blacklist: boolean;
+};
+
+function taskReason(t: CallTaskInput, nowMs: number): { text: string; overdue: boolean } {
+  const due = t.dueAt ? Date.parse(t.dueAt) : NaN;
+  const overdue = Number.isFinite(due) && due < nowMs;
+  const when = !Number.isFinite(due) ? "vadesiz" : overdue ? "gecikti" : `bugün ${formatTrTime(due)}`;
+  return { text: `Görev: ${t.title} · ${when}`, overdue };
+}
+
+/**
+ * Vadesi bugün sonuna kadar olan açık `call` görevlerini müşteri kuyruğuyla birleştirir (SAF):
+ *  - müşterili görev → o müşterinin satırı "Arama görevi" kademesine (en üst) çıkar, gerekçenin başına görev yazılır;
+ *    müşteri listede yoksa (bugün temas edilmiş, son 300 dışı, gerekçesiz) görevden yeni satır açılır;
+ *  - müşterisiz ya da telefonsuz görev → ayrı görev satırı (anahtar `gorev:<id>`); kara listedeki müşteri yine dışarıda;
+ *  - müşteri başına tek görev (en erken vadeli); görev satırları vade sırasıyla, kalan müşteriler eski sırasıyla.
+ */
+export function mergeCallTasks(
+  entries: readonly CallListEntry[],
+  tasks: readonly CallTaskInput[],
+  nowMs: number,
+  max = CALL_LIST_MAX,
+): CallListEntry[] {
+  const sorted = [...tasks].sort((a, b) => (a.dueAt ?? "9").localeCompare(b.dueAt ?? "9"));
+  const byCustomer = new Map(entries.map((e) => [e.customerId, e]));
+  const taskRows: CallListEntry[] = [];
+  const used = new Set<string>();
+  for (const t of sorted) {
+    if (t.blacklist) continue;
+    const reason = taskReason(t, nowMs);
+    const task = { id: t.id, title: t.title, dueAt: t.dueAt, overdue: reason.overdue };
+    const phone = (t.phone ?? "").trim();
+    if (t.customerId && phone) {
+      if (used.has(t.customerId)) continue;
+      used.add(t.customerId);
+      const existing = byCustomer.get(t.customerId);
+      taskRows.push({
+        key: t.customerId,
+        customerId: t.customerId,
+        name: existing?.name ?? (t.customerName || "Müşteri"),
+        phone,
+        tier: "gorev",
+        reasons: [reason.text, ...(existing?.reasons ?? [])].slice(0, 3),
+        nextAction: existing?.nextAction ?? null,
+        daysSinceContact: existing?.daysSinceContact ?? null,
+        task,
+      });
+      continue;
+    }
+    taskRows.push({
+      key: `gorev:${t.id}`,
+      customerId: t.customerId ?? "",
+      name: t.customerName || t.title,
+      phone: "",
+      tier: "gorev",
+      reasons: [reason.text],
+      nextAction: null,
+      daysSinceContact: null,
+      task,
+    });
+  }
+  const rest = entries.filter((e) => !used.has(e.customerId));
+  return [...taskRows, ...rest].slice(0, Math.max(max, taskRows.length));
 }

@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Check, MessageCircle, Phone, SkipForward } from "lucide-react";
+import { AlarmClock, Check, CheckCircle2, ClipboardList, MessageCircle, Phone, SkipForward } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CALL_LIST_TIER_LABELS, splitCallQueue } from "@/lib/call-list";
+import { completeTask, rescheduleTasks } from "@/app/actions/tasks";
+import { useToast } from "@/components/app/toast-provider";
 import { CONTACT_OUTCOME_LOGGED_EVENT, ContactOutcomePrompt } from "../musteriler/contact-outcome-prompt";
 import type { CallListRowVM } from "./data";
 
@@ -14,6 +16,7 @@ const ACTION =
   "focus-ring press inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] px-4 text-sm font-semibold transition";
 
 function ContactLinks({ row, primary }: { row: CallListRowVM; primary: boolean }) {
+  if (!row.customerId) return null;
   return (
     // Temas sonrası sonuç kaydı: bu kapsayıcıdaki tel:/WhatsApp tıklaması ContactOutcomePrompt'a bildirilir.
     <span
@@ -56,12 +59,50 @@ function lastContactLabel(days: number | null): string {
 /**
  * Arama kuyruğu: en üstte sıradaki müşteri (büyük ara/WhatsApp düğmeleri), altında sıradakiler.
  * Görüşme sonucu kaydedilince (CONTACT_OUTCOME_LOGGED_EVENT) müşteri "Arandı"ya iner ve sayfa sessizce tazelenir;
- * "Atla" müşteriyi bu oturumda sona taşır (kayıt atmaz).
+ * "Atla" müşteriyi bu oturumda sona taşır (kayıt atmaz). Açık arama görevi olan satırda (GA-05) "Yarına at" görevin
+ * vadesini yarın 10:00'a taşır; müşterisiz görev satırı "Görevi tamamla" ile kapanır. Sonuç kaydı müşterinin açık
+ * arama görevlerini kapatır (ContactOutcomePrompt → settleCustomerCallTasks).
  */
 export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
   const router = useRouter();
+  const toast = useToast();
   const [logged, setLogged] = useState<ReadonlySet<string>>(() => new Set());
   const [skipped, setSkipped] = useState<readonly string[]>([]);
+  const [busy, startTask] = useTransition();
+
+  const markDone = (key: string) => setLogged((prev) => new Set(prev).add(key));
+  // GA-05: görev satırında "Yarına at" vadeyi yarın 10:00'a taşır (görevler sayfasıyla aynı eylem); "Tamamla" kapatır.
+  const postpone = (row: CallListRowVM) => {
+    const taskId = row.task?.id;
+    if (!taskId) return;
+    markDone(row.key);
+    startTask(async () => {
+      const res = await rescheduleTasks([taskId], "tomorrow10");
+      if (res.error) {
+        setLogged((prev) => {
+          const next = new Set(prev);
+          next.delete(row.key);
+          return next;
+        });
+        toast.push(res.error, "err");
+        return;
+      }
+      toast.push("Arama görevi yarın 10:00'a taşındı.", "ok");
+      router.refresh();
+    });
+  };
+  const finishTask = (row: CallListRowVM) => {
+    const taskId = row.task?.id;
+    if (!taskId) return;
+    markDone(row.key);
+    startTask(async () => {
+      const fd = new FormData();
+      fd.set("id", taskId);
+      await completeTask(fd);
+      toast.push("Arama görevi tamamlandı.", "ok");
+      router.refresh();
+    });
+  };
 
   useEffect(() => {
     const onLogged = (e: Event) => {
@@ -75,8 +116,8 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
   }, [router]);
 
   const { pending, done } = splitCallQueue(rows, logged);
-  const skipRank = (id: string) => skipped.indexOf(id);
-  const ordered = [...pending].sort((a, b) => skipRank(a.customerId) - skipRank(b.customerId));
+  const skipRank = (key: string) => skipped.indexOf(key);
+  const ordered = [...pending].sort((a, b) => skipRank(a.key) - skipRank(b.key));
   const [current, ...rest] = ordered;
 
   if (rows.length === 0 || !current) {
@@ -113,7 +154,9 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
           </Link>
         </h2>
         <p className="mt-0.5 text-sm text-text-muted">
-          {current.phoneLabel} · {CALL_LIST_TIER_LABELS[current.tier]} · {lastContactLabel(current.daysSinceContact)}
+          {current.customerId
+            ? `${current.phoneLabel} · ${CALL_LIST_TIER_LABELS[current.tier]} · ${lastContactLabel(current.daysSinceContact)}`
+            : CALL_LIST_TIER_LABELS.gorev}
         </p>
         <ul className="mt-3 flex flex-wrap gap-1">
           {current.reasons.map((r) => (
@@ -132,12 +175,23 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
         ) : null}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <ContactLinks row={current} primary />
-          {rest.length > 0 ? (
+          {current.task ? (
+            <>
+              {!current.customerId ? (
+                <Button type="button" variant="secondary" icon={CheckCircle2} disabled={busy} onClick={() => finishTask(current)}>
+                  Görevi tamamla
+                </Button>
+              ) : null}
+              <Button type="button" variant="ghost" icon={AlarmClock} disabled={busy} onClick={() => postpone(current)}>
+                Yarına at
+              </Button>
+            </>
+          ) : rest.length > 0 ? (
             <Button
               type="button"
               variant="ghost"
               icon={SkipForward}
-              onClick={() => setSkipped((prev) => [...prev.filter((id) => id !== current.customerId), current.customerId])}
+              onClick={() => setSkipped((prev) => [...prev.filter((id) => id !== current.key), current.key])}
             >
               Atla
             </Button>
@@ -155,7 +209,7 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
           </h2>
           <ol className="divide-y divide-line">
             {rest.map((row, i) => (
-              <li key={row.customerId} className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <li key={row.key} className="flex flex-wrap items-center gap-3 px-5 py-3">
                 <span className="w-6 text-right text-xs font-semibold tabular-nums text-text-faint">{i + 2}</span>
                 <div className="min-w-0 flex-1">
                   <Link href={row.href} className="focus-ring rounded-sm text-sm font-semibold text-ink-950 hover:underline">
@@ -165,7 +219,16 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
                     {CALL_LIST_TIER_LABELS[row.tier]} · {row.reasons.join(" · ")}
                   </p>
                 </div>
-                <ContactLinks row={row} primary={false} />
+                {row.customerId ? (
+                  <ContactLinks row={row} primary={false} />
+                ) : (
+                  <Link
+                    href={row.href}
+                    className={`${ACTION} border border-line bg-surface text-ink-950 hover:bg-[var(--surface-hover)]`}
+                  >
+                    <ClipboardList className="h-4 w-4" aria-hidden /> Görevi aç
+                  </Link>
+                )}
               </li>
             ))}
           </ol>
@@ -179,7 +242,7 @@ export function CallQueue({ rows }: { rows: CallListRowVM[] }) {
           </h2>
           <ul className="mt-2 flex flex-wrap gap-2">
             {done.map((row) => (
-              <li key={row.customerId}>
+              <li key={row.key}>
                 <Link href={row.href} className="focus-ring rounded-sm text-sm text-text-muted hover:text-ink-950">
                   {row.name}
                 </Link>

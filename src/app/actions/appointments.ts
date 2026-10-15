@@ -22,7 +22,14 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { formatOfficeTime, officeDayWindow } from "@/lib/time/office-tz";
 import { missingFieldsError } from "@/lib/form-rules";
 import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
-import { sendAppointmentConfirmation, type ConfirmSendOutcome } from "@/lib/appointment-customer-messages";
+import {
+  notifyAppointmentRescheduled,
+  sendAppointmentConfirmation,
+  type ConfirmSendOutcome,
+  type RescheduleNotice,
+} from "@/lib/appointment-customer-messages";
+import { appointmentNoShowText, appointmentWhatsAppHref, rescheduleResetPatch } from "@/lib/appointment-messages";
+import { duePresetMs } from "@/lib/due-presets";
 import { getBaseUrl } from "@/lib/base-url";
 import { now } from "@/lib/clock";
 import {
@@ -30,6 +37,8 @@ import {
   followUpTaskMarker,
   followUpTaskNotes,
   followUpTaskTitle,
+  noShowTaskMarker,
+  noShowTaskTitle,
 } from "@/lib/appointment-follow-up";
 
 export type AppointmentResult = {
@@ -51,6 +60,13 @@ export type AppointmentResult = {
    * (`created` yeni açıldı, `exists` aynı randevu için zaten vardı, `skipped` müşteri yok / hata).
    */
   followUpTask?: "created" | "exists" | "skipped";
+  /**
+   * GA-01: saat değişti → müşteri teyidi/hatırlatma izleri sıfırlandı; müşteriye yeni saat SMS ile gitti
+   * (`outcome: "sms_sent"`) ya da danışmana WhatsApp taslağı (`waHref`) döndü.
+   */
+  rescheduled?: RescheduleNotice;
+  /** GA-14: müşteri gelmedi → nazik "yeniden planlayalım mı" WhatsApp taslağı (numara yoksa null). */
+  noShowWaHref?: string | null;
 };
 
 const TYPES = ["showing", "office", "valuation", "contract"];
@@ -286,7 +302,7 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   const supabase = await createClient();
   const { data: current, error: currentError } = await supabase
     .from("appointments")
-    .select("id, status, customer_id, property_id, assigned_to, created_by, customer:customers!appointments_customer_id_fkey(full_name)")
+    .select("id, status, scheduled_at, customer_id, property_id, assigned_to, created_by, customer:customers!appointments_customer_id_fkey(full_name, phone)")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -345,10 +361,117 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
     });
   }
 
+  // GA-14: müşteri gelmedi → yarın 10:00 arama görevi (açık arama görevi varsa o taşınır) + nazik WhatsApp taslağı.
+  let noShowWaHref: string | null | undefined;
+  if (status === "completed" && patch.outcome === "gelmedi") {
+    const customer = current.customer as
+      | { full_name?: string | null; phone?: string | null }
+      | { full_name?: string | null; phone?: string | null }[]
+      | null;
+    const c = Array.isArray(customer) ? customer[0] : customer;
+    followUpTask = await ensureNoShowCallTask(supabase, gate, {
+      appointmentId: id,
+      customerId: (current.customer_id as string | null) ?? null,
+      propertyId: (current.property_id as string | null) ?? null,
+      advisorId: (current.assigned_to as string | null) ?? (current.created_by as string | null) ?? gate.userId,
+      customerName: c?.full_name ?? null,
+    });
+    if (c?.phone) {
+      const { data: tenant } = await supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle();
+      noShowWaHref = appointmentWhatsAppHref(
+        c.phone,
+        appointmentNoShowText({
+          customerName: c.full_name ?? null,
+          officeName: (tenant as { name?: string | null } | null)?.name ?? null,
+          scheduledAt: String(current.scheduled_at),
+        }),
+      );
+    } else noShowWaHref = null;
+  }
+
   revalidatePath("/app/randevular");
   if (followUpTask === "created") revalidatePath("/app/gorevler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, ...(followUpTask ? { followUpTask } : {}) };
+  return { ok: true, ...(followUpTask ? { followUpTask } : {}), ...(noShowWaHref !== undefined ? { noShowWaHref } : {}) };
+}
+
+/**
+ * GA-14 gelmeyen müşteri: randevunun danışmanına yarın 10:00 "yeniden planla" arama görevi. Tek kuyruk kuralı (GA-05):
+ * müşterinin AÇIK arama görevi varsa yenisi açılmaz, en erken vadelisi yarın 10:00'a taşınır. Aynı randevu için iz
+ * (`noShowTaskMarker`) taşıyan görev varsa "exists". Müşterisiz randevuda görev açılmaz.
+ */
+async function ensureNoShowCallTask(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gate: { tenantId: string; userId: string },
+  input: { appointmentId: string; customerId: string | null; propertyId: string | null; advisorId: string; customerName: string | null },
+): Promise<"created" | "exists" | "skipped"> {
+  if (!input.customerId) return "skipped";
+  const dueAt = new Date(duePresetMs("tomorrow10", now())!).toISOString();
+  const marker = noShowTaskMarker(input.appointmentId);
+  const [{ data: marked, error: markedError }, { data: openCalls, error: openError }] = await Promise.all([
+    supabase.from("tasks").select("id").eq("tenant_id", gate.tenantId).eq("customer_id", input.customerId).like("notes", `%${marker}%`).limit(1),
+    supabase
+      .from("tasks")
+      .select("id")
+      .eq("tenant_id", gate.tenantId)
+      .eq("customer_id", input.customerId)
+      .eq("kind", "call")
+      .eq("status", "open")
+      .order("due_at", { ascending: true, nullsFirst: false })
+      .limit(1),
+  ]);
+  if (markedError || openError) {
+    console.error("ensureNoShowCallTask lookup", markedError ?? openError);
+    return "skipped";
+  }
+  if ((marked ?? []).length > 0) return "exists";
+  const existing = (openCalls ?? [])[0] as { id: string } | undefined;
+  if (existing) {
+    const { error } = await supabase.from("tasks").update({ due_at: dueAt }).eq("id", existing.id).eq("tenant_id", gate.tenantId);
+    if (error) console.error("ensureNoShowCallTask move", error);
+    return "exists";
+  }
+  const title = noShowTaskTitle(input.customerName);
+  const { data: created, error } = await supabase
+    .from("tasks")
+    .insert({
+      tenant_id: gate.tenantId,
+      title,
+      notes: `Müşteri randevuya gelmedi: nedenini öğrenin ve yeni bir saat planlayın.\n(${marker})`,
+      kind: "call",
+      priority: "high",
+      status: "open",
+      due_at: dueAt,
+      assigned_to: input.advisorId,
+      customer_id: input.customerId,
+      property_id: input.propertyId,
+      created_by: gate.userId,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("ensureNoShowCallTask insert", error);
+    return "skipped";
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.create",
+    entityType: "task",
+    entityId: created.id as string,
+    newValue: { title, kind: "call", priority: "high", source: "appointment_no_show", appointment_id: input.appointmentId },
+  });
+  if (input.advisorId !== gate.userId) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: input.advisorId,
+      title: "Size arama görevi açıldı",
+      body: `${title}. Termin: yarın 10:00.`,
+      href: `/app/gorevler?gorev=${created.id as string}`,
+      dedupeKey: `appt-noshow:${input.appointmentId}`,
+    });
+  }
+  return "created";
 }
 
 /**
@@ -468,7 +591,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
 
   const { data: current } = await supabase
     .from("appointments")
-    .select("assigned_to, created_by")
+    .select("assigned_to, created_by, scheduled_at, status, customer_id")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -517,6 +640,13 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
     if (warning) return { conflictWarning: warning };
   }
 
+  // GA-01: saat değiştiyse eski teyit/hatırlatma izleri geçersiz (yeni saate hatırlatma gidebilsin, teyit yenilensin).
+  const previousAt = String(current.scheduled_at);
+  const resetPatch = rescheduleResetPatch(
+    { scheduled_at: previousAt, status: (current.status as string | null) ?? null },
+    scheduledAt.toISOString(),
+  );
+
   const { error } = await supabase
     .from("appointments")
     .update({
@@ -526,6 +656,7 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
       location: location || null,
       notes: notes || null,
       ...patchExtra,
+      ...(resetPatch ?? {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
@@ -536,19 +667,46 @@ export async function updateAppointment(formData: FormData): Promise<Appointment
     return { error: actionErrorMessage(error, "Randevu güncellenemedi.") };
   }
 
+  // Müşteriye yeni saat: teyit iletisiyle aynı İYS işlem kanalı (ayar + SMS hesabı); yoksa WhatsApp taslağı döner.
+  const customerId = hasCustomer ? String(formData.get("customer_id") ?? "").trim() || null : ((current.customer_id as string | null) ?? null);
+  const rescheduled: RescheduleNotice | undefined =
+    resetPatch && customerId
+      ? await notifyAppointmentRescheduled(supabase, { tenantId: gate.tenantId, appointmentId: id, appUrl: getBaseUrl(), previousAt })
+      : undefined;
+
+  // Danışman değişti: yeni danışmana tek seferlik bildirim (tercih "Randevu").
+  if (patchExtra.assigned_to && patchExtra.assigned_to !== gate.userId) {
+    const when = `${formatDateTr(scheduledAt.toISOString(), { day: "numeric", month: "long" })} ${formatTrTime(scheduledAt)}`;
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: String(patchExtra.assigned_to),
+      title: `Size randevu devredildi: ${when} · ${appointmentTypeLabel(appointmentType)}`,
+      body: `Randevu size atandı${location ? ` (${location.slice(0, 80)})` : ""}. Takviminizi kontrol edin.`,
+      href: `/app/randevular?randevu=${id}`,
+      dedupeKey: `appt-reassigned:${id}:${String(patchExtra.assigned_to)}:${scheduledAt.getTime()}`,
+      prefKey: "appointment",
+    });
+  }
+
   await logActivity({
     tenantId: gate.tenantId,
     actorId: gate.userId,
     action: "appointment.update",
     entityType: "appointment",
     entityId: id,
-    newValue: { appointment_type: appointmentType, scheduled_at: scheduledAt.toISOString(), ...patchExtra },
+    ...(resetPatch ? { oldValue: { scheduled_at: previousAt, status: current.status } } : {}),
+    newValue: {
+      appointment_type: appointmentType,
+      scheduled_at: scheduledAt.toISOString(),
+      ...patchExtra,
+      ...(resetPatch ? { rescheduled: true, customer_message: rescheduled?.outcome ?? "off" } : {}),
+    },
   });
 
   revalidatePath("/app/randevular");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true };
+  return { ok: true, ...(rescheduled ? { rescheduled } : {}) };
 }
 
 const BULK_ASSIGN_LIMIT = 200;

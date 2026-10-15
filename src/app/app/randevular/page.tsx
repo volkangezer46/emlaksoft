@@ -12,6 +12,7 @@ import {
   Route as RouteIcon,
   Search,
   Hourglass,
+  UserX,
 } from "lucide-react";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -137,6 +138,7 @@ export default async function AppointmentsPage({
     yogunluk?: string;
     yeni?: string;
     randevu?: string;
+    sonuc?: string;
   }>;
 }) {
   const gate = await requireModulePage("appointments");
@@ -152,6 +154,8 @@ export default async function AppointmentsPage({
   const canCreateAppt = (gate.perms.appointments ?? []).includes("create");
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && (FILTERABLE_STATUSES as readonly string[]).includes(sp.durum) ? sp.durum : "";
+  // GA-14: ?sonuc=olumlu|kararsiz|olumsuz|gelmedi — randevu sonucu süzgeci (ör. "Gelmeyen" KPI'sı).
+  const sonucF = sp.sonuc && isAppointmentOutcome(sp.sonuc) ? sp.sonuc : "";
   const customerF = sp.customer ?? "";
   // ?property= — eşleştirme ekranındaki "Randevu ver" kısayolu portföyü de
   // taşır: liste o portföye süzülür ve yeni randevu diyaloğu ön seçili gelir.
@@ -236,6 +240,7 @@ export default async function AppointmentsPage({
       .lt("scheduled_at", toIso(windowEnd));
     if (tipF) query = query.eq("appointment_type", tipF);
     if (durumF) query = query.eq("status", durumF);
+    if (sonucF) query = query.eq("outcome", sonucF);
     if (customerF) query = query.eq("customer_id", customerF);
     if (propertyF) query = query.eq("property_id", propertyF);
     if (danismanF) query = query.eq("assigned_to", danismanF);
@@ -323,6 +328,7 @@ export default async function AppointmentsPage({
     { count: officeCount },
     { count: valuationCount },
     { count: contractCount },
+    { count: noShowCount },
     { data: weekBarRows },
     { data: ownProfile },
     leaveRows,
@@ -332,7 +338,7 @@ export default async function AppointmentsPage({
   ] = await batchAll("Randevular", [
     "appointments", "appointments-total", "appointment-types", "filter-customer", "filter-property",
     "count-today", "count-pending", "count-confirmed", "count-signature", "count-completed",
-    "count-showing", "count-office", "count-valuation", "count-contract",
+    "count-showing", "count-office", "count-valuation", "count-contract", "count-no-show",
     "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name",
   ], [
     apptP,
@@ -356,6 +362,7 @@ export default async function AppointmentsPage({
     countBase().eq("appointment_type", "office"),
     countBase().eq("appointment_type", "valuation"),
     countBase().eq("appointment_type", "contract"),
+    countBase().eq("outcome", "gelmedi"),
     // Haftalık yoğunluk şeridi — önümüzdeki 7 gün, görünümden bağımsız pencere.
     (() => {
       let w = supabase
@@ -415,9 +422,10 @@ export default async function AppointmentsPage({
     : [];
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih/arama/danışman dahil).
-  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
+  const apptHref = (patch: { tip?: string; durum?: string; sonuc?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
     const tip = patch.tip !== undefined ? patch.tip : tipF;
     const durum = patch.durum !== undefined ? patch.durum : durumF;
+    const sonuc = patch.sonuc !== undefined ? patch.sonuc : sonucF;
     const cust = patch.customer !== undefined ? patch.customer : customerF;
     const prop = patch.property !== undefined ? patch.property : propertyF;
     const view = patch.gorunum !== undefined ? patch.gorunum : gorunum;
@@ -429,6 +437,7 @@ export default async function AppointmentsPage({
     if (qq) usp.set("q", qq);
     if (tip) usp.set("tip", tip);
     if (durum) usp.set("durum", durum);
+    if (sonuc) usp.set("sonuc", sonuc);
     if (cust) usp.set("customer", cust);
     if (prop) usp.set("property", prop);
     if (view && view !== "ay") usp.set("gorunum", view);
@@ -445,6 +454,7 @@ export default async function AppointmentsPage({
   if (q) urlParams.q = q;
   if (tipF) urlParams.tip = tipF;
   if (durumF) urlParams.durum = durumF;
+  if (sonucF) urlParams.sonuc = sonucF;
   if (customerF) urlParams.customer = customerF;
   if (propertyF) urlParams.property = propertyF;
   if (gorunum !== "ay") urlParams.gorunum = gorunum;
@@ -455,7 +465,7 @@ export default async function AppointmentsPage({
   if (randevuF) urlParams.randevu = randevuF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const savedViewParams = Object.fromEntries(
-    Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "gorunum", "danisman"].includes(k)),
+    Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "sonuc", "gorunum", "danisman"].includes(k)),
   );
 
   // Haftalık yoğunluk — ayrı "önümüzdeki 7 gün" penceresinden (görünümden bağımsız).
@@ -699,11 +709,24 @@ export default async function AppointmentsPage({
     { label: "Yer gösterme", value: typeCounts.showing!, icon: <MapPinned />, tone: "success", href: apptHref({ tip: "showing", gorunum: "ay" }), hint: "toplam" },
     { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan" },
   );
+  // GA-14: gelmeme oranı (tamamlanan randevular içinde "Gelmedi" sonucu); yalnız gerçekten varsa gösterilir.
+  if ((noShowCount ?? 0) > 0) {
+    const rate = statusCounts.completed! > 0 ? Math.round(((noShowCount ?? 0) / statusCounts.completed!) * 100) : null;
+    kpis.push({
+      label: "Gelmeyen müşteri",
+      value: noShowCount ?? 0,
+      icon: <UserX />,
+      tone: "danger",
+      href: apptHref({ durum: "", sonuc: "gelmedi", gorunum: "ay" }),
+      hint: rate != null ? `tamamlananın %${rate}'i` : "gelmedi işaretli",
+    });
+  }
 
   const chips = buildActiveChips(PATH, urlParams, [
     { key: "q", label: "Arama" },
     { key: "tip", label: "Tür", format: (v) => typeLabel[v] ?? v },
     { key: "durum", label: "Durum", format: (v) => APPOINTMENT_STATUS_LABELS[v] ?? v },
+    { key: "sonuc", label: "Sonuç", format: (v) => (isAppointmentOutcome(v) ? APPOINTMENT_OUTCOME_META[v].label : v) },
     { key: "customer", label: "Müşteri", format: () => filteredCustomer?.full_name ?? "Seçili müşteri" },
     { key: "property", label: "Portföy", format: () => filteredProperty?.title || filteredProperty?.property_code || "Seçili portföy" },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },

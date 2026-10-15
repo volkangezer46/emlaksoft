@@ -5,6 +5,8 @@
  *  - olumlu   → "Teklif gir" (/app/teklifler/yeni, müşteri + portföy ön dolgulu)
  *  - kararsız → danışmana 2 iş günü sonrasına takip görevi (sunucu eylemi açar) + "2. gösterim planla"
  *  - olumsuz  → "Talebi güncelle" (müşteri kartının Talepler sekmesi)
+ *  - gelmedi  → yarın 10:00 "yeniden planla" arama görevi (sunucu; müşterinin açık arama görevi varsa o taşınır) +
+ *               "Yeniden planla" kısayolu + müşteriye nazik WhatsApp taslağı (GA-14)
  * Bağlantılar ön dolgu sözleşmesinin kanonik adlarını kullanır (`prefillHref`).
  */
 import { addBusinessDaysMs } from "@/lib/eids/actions-core";
@@ -69,6 +71,15 @@ export function appointmentNextSteps(
       },
     ];
   }
+  if (outcome === "gelmedi") {
+    return [
+      {
+        label: "Yeniden planla",
+        href: prefillHref("/app/randevular/yeni", ids),
+        hint: "Aynı müşteri ve portföyle yeni randevu; yarın 10:00 arama görevi de açıldı.",
+      },
+    ];
+  }
   return [
     {
       label: "Talebi güncelle",
@@ -76,4 +87,14 @@ export function appointmentNextSteps(
       hint: "Müşterinin arama kriterlerini gözden geçirin.",
     },
   ];
+}
+
+/** GA-14: gelmeyen müşteri için arama görevinin not izi (aynı randevu için ikinci görev açılmaz). */
+export function noShowTaskMarker(appointmentId: string): string {
+  return `randevu-gelmedi:${appointmentId}`;
+}
+
+export function noShowTaskTitle(customerName: string | null | undefined): string {
+  const name = (customerName ?? "").trim();
+  return `${name || "Müşteri"} — randevuya gelmedi, yeniden planlamak için arayın`.slice(0, 200);
 }

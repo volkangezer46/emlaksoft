@@ -8,6 +8,7 @@ import { beginCronRun } from "@/lib/cron-pause";
 import { fetchAllPaged, heartbeatFor, guardCron } from "@/lib/cron-run";
 import { appointmentReminderKey, planAdvisorReminders, type ReminderAppointment } from "@/lib/appointment-messages";
 import { runCustomerReminderStep } from "@/lib/appointment-customer-messages";
+import { runDepartureReminderStep } from "@/lib/appointment-departure-step";
 import { runWebhookRetries } from "@/lib/integrations-api/webhooks";
 import { log } from "@/lib/log";
 import { errorFields } from "@/lib/log-error";
@@ -98,6 +99,18 @@ async function run(req: NextRequest) {
   const result = await insertNotificationsDetailed(admin, plan.rows);
   const notified = result.written;
 
+  // GA-07: "2 saat kala" + "yola çıkma zamanı" (önceki duraktan kuş uçuşu tahmin). Hata diğer adımları etkilemez.
+  let departureNote = "";
+  let departureFailed = 0;
+  try {
+    const dr = await runDepartureReminderStep(admin, { nowMs: startedAt });
+    departureFailed = dr.failed;
+    if (dr.written > 0) departureNote = `, ${dr.written} yola çıkma/2 saat bildirimi`;
+  } catch (e) {
+    log.error("cron_randevu_hatirlat_departure_failed", { route: "/api/cron/randevu-hatirlat", ...errorFields(e) });
+    departureNote = ", yola çıkma adımı hata";
+  }
+
   // Müşteriye hatırlatma SMS'i (ofis ayarı açıksa; bu cron'un ayrık adımı, YENİ cron yok). Hata danışman adımını etkilemez.
   let customerNote = "";
   let customerFailed = 0;
@@ -125,10 +138,10 @@ async function run(req: NextRequest) {
   const hb = heartbeatFor({
     total: list.length,
     processed: list.length,
-    failed: result.failed + customerFailed,
+    failed: result.failed + customerFailed + departureFailed,
     timedOut: false,
     listError,
-    summary: `${notified} hatırlatma, ${skipped} atlandı${unownedNote}${customerNote}${webhookNote}`,
+    summary: `${notified} hatırlatma, ${skipped} atlandı${unownedNote}${departureNote}${customerNote}${webhookNote}`,
   });
   await recordHeartbeat("randevu-hatirlat", hb.status, hb.detail);
 

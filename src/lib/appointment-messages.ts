@@ -33,7 +33,7 @@ function firstName(name: string | null | undefined): string | null {
   return first ? first : null;
 }
 
-export type AppointmentMessageKind = "confirm" | "reminder";
+export type AppointmentMessageKind = "confirm" | "reminder" | "reschedule";
 
 /**
  * Müşteriye giden teyit/hatırlatma metni (SMS ve WhatsApp taslağı AYNI metin). Bağlantı yoksa (token yok) yalnız bilgi verir.
@@ -45,13 +45,20 @@ export function appointmentCustomerText(input: {
   appointmentType: string | null | undefined;
   scheduledAt: string | Date;
   confirmUrl: string | null;
+  /** Yalnız `reschedule`: eski saat ("15 Ekim 14:30 yerine …"). */
+  previousAt?: string | Date | null;
 }): string {
   const greet = firstName(input.customerName) ? `Merhaba ${firstName(input.customerName)},` : "Merhaba,";
   const office = input.officeName?.trim() ? `${input.officeName.trim()} ile ` : "";
   const type = appointmentTypeLabel(input.appointmentType ?? "").toLocaleLowerCase("tr");
   const when = appointmentWhenLabel(input.scheduledAt);
   const subject = `${office}${when}${type ? ` ${type}` : ""} randevunuz`;
-  const head = input.kind === "confirm" ? `${greet} ${subject} planlandı.` : `${greet} hatırlatma: ${subject} yaklaşıyor.`;
+  const head =
+    input.kind === "confirm"
+      ? `${greet} ${subject} planlandı.`
+      : input.kind === "reschedule"
+        ? `${greet} ${office}${type ? `${type} ` : ""}randevunuz${input.previousAt ? ` ${appointmentWhenLabel(input.previousAt)} yerine` : ""} ${when} olarak güncellendi.`
+        : `${greet} hatırlatma: ${subject} yaklaşıyor.`;
   return input.confirmUrl ? `${head} Teyit veya iptal için: ${input.confirmUrl}` : head;
 }
 
@@ -166,4 +173,39 @@ export function shouldRemindCustomer(c: CustomerReminderCandidate, nowMs: number
     return false;
   }
   return isCustomerMessageHour(nowMs);
+}
+
+// ---------------------------------------------------------------------------
+// Yeniden planlama (GA-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * Saat değişince müşteri teyidi ve hatırlatma izleri sıfırlanır (eski saate verilen teyit yeni saat için geçerli değil;
+ * yeni saate hatırlatma gidebilsin). Danışmanın "teyitli" işareti beklemeye döner. Saat aynıysa (not/konum düzenleme)
+ * ya da randevu kapanmışsa null: hiçbir iz değişmez.
+ */
+export function rescheduleResetPatch(
+  current: { scheduled_at: string; status: string | null },
+  nextIso: string,
+): Record<string, unknown> | null {
+  if (new Date(current.scheduled_at).getTime() === new Date(nextIso).getTime()) return null;
+  if (current.status !== "pending" && current.status !== "confirmed" && current.status !== "signature") return null;
+  return {
+    customer_response: null,
+    responded_at: null,
+    customer_reminded_at: null,
+    customer_confirm_sent_at: null,
+    ...(current.status === "confirmed" ? { status: "pending" } : {}),
+  };
+}
+
+/** GA-14: gelmeyen müşteriye nazik "yeniden planlayalım mı" taslağı (danışman kendi WhatsApp'ından gönderir). */
+export function appointmentNoShowText(input: {
+  customerName: string | null | undefined;
+  officeName: string | null | undefined;
+  scheduledAt: string | Date;
+}): string {
+  const greet = firstName(input.customerName) ? `Merhaba ${firstName(input.customerName)},` : "Merhaba,";
+  const office = input.officeName?.trim() ? ` ${input.officeName.trim()} olarak` : "";
+  return `${greet} ${appointmentWhenLabel(input.scheduledAt)} randevumuzda sizi göremedik.${office} size uygun yeni bir gün ve saat planlamak isteriz. Ne zaman müsait olursunuz?`;
 }

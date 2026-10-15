@@ -18,6 +18,7 @@ const NEXT_STEP_HINT: Record<AppointmentOutcome, string> = {
   olumlu: "Kaydettikten sonra “Teklif gir” ile müşteri ve portföy hazır gelen teklif formunu açabilirsiniz.",
   kararsiz: `Randevunun danışmanına ${UNDECIDED_FOLLOW_UP_BUSINESS_DAYS} iş günü sonrasına takip görevi açılır; “2. gösterim planla” kısayolu da sunulur.`,
   olumsuz: "Kaydettikten sonra “Talebi güncelle” ile müşterinin arama kriterlerini gözden geçirebilirsiniz.",
+  gelmedi: "Yarın 10:00 için “yeniden planla” arama görevi açılır (açık arama görevi varsa o taşınır); müşteriye nazik bir WhatsApp mesajı da hazırlanır.",
 };
 
 /**
@@ -64,16 +65,23 @@ export function CompleteAppointmentDialog({
         return;
       }
       const [next] = appointmentNextSteps(outcome || null, { customerId, propertyId });
+      const noShow = outcome === "gelmedi";
       const taskNote =
         res.followUpTask === "created"
-          ? " Takip görevi açıldı."
+          ? noShow ? " Yarın 10:00 için arama görevi açıldı." : " Takip görevi açıldı."
           : res.followUpTask === "exists"
-            ? " Bu randevunun takip görevi zaten var."
+            ? noShow ? " Müşterinin açık arama görevi yarın 10:00'a taşındı." : " Bu randevunun takip görevi zaten var."
             : "";
+      const waHref = res.noShowWaHref;
       push(
-        `Randevu tamamlandı.${taskNote}`,
+        noShow ? `Gelmedi olarak kaydedildi.${taskNote}` : `Randevu tamamlandı.${taskNote}`,
         "ok",
-        next ? { action: { label: next.label, onClick: () => router.push(next.href) } } : undefined,
+        // Gelmeyen müşteri: birincil eylem nazik "yeniden planlayalım mı" mesajı (wa.me; danışman gönderir).
+        waHref
+          ? { action: { label: "WhatsApp'tan yazın", onClick: () => window.open(waHref, "_blank", "noopener,noreferrer") } }
+          : next
+            ? { action: { label: next.label, onClick: () => router.push(next.href) } }
+            : undefined,
       );
       setOpen(false);
       setOutcome("");
@@ -110,7 +118,7 @@ export function CompleteAppointmentDialog({
           <div className="space-y-4 sm:col-span-2">
             <div>
               <span className="text-xs font-semibold text-text-muted">Sonuç</span>
-              <div className="mt-1.5 grid grid-cols-3 gap-2">
+              <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {APPOINTMENT_OUTCOMES.map((key) => {
                   const meta = APPOINTMENT_OUTCOME_META[key];
                   const active = outcome === key;

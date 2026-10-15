@@ -4,7 +4,8 @@ import { loadCustomerStates } from "@/lib/customer-state/load";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { applyScopeFilter, type ScopeFilter } from "@/lib/access-control/query-scope";
 import { getInsightsForUser } from "@/lib/insights/read";
-import { buildCallList, CALL_LIST_MAX, type CallListCandidate, type CallListEntry } from "@/lib/call-list";
+import { buildCallList, CALL_LIST_MAX, mergeCallTasks, type CallListCandidate, type CallListEntry, type CallTaskInput } from "@/lib/call-list";
+import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { toTelHref, toWhatsAppLink, formatTurkishPhone } from "@/lib/phone";
 
 /** Kapsamdaki son müşteriler (ana ekrandaki "Bugün ara" ile aynı pencere genişliğinin üstü). */
@@ -42,7 +43,9 @@ export async function loadCallList(input: {
   const supabase = await createClient();
   const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, input.scopeFilter, { ownerColumn: "assigned_to" });
 
-  const [custRes, insights] = await Promise.all([
+  // GA-05: vadesi bugün sonuna kadar olan AÇIK arama görevleri aynı kuyrukta (sorumlu kapsamı müşteriyle aynı süzgeç).
+  const dayEndIso = new Date(trDayStartMs(now()) + DAY_MS).toISOString();
+  const [custRes, insights, taskRes] = await Promise.all([
     scoped(
       supabase
         .from("customers")
@@ -53,8 +56,18 @@ export async function loadCallList(input: {
         .limit(CANDIDATE_LIMIT),
     ),
     input.tenantId ? getInsightsForUser({ tenantId: input.tenantId, userId: input.userId, role: input.role, limit: 50 }) : Promise.resolve([]),
+    scoped(
+      supabase
+        .from("tasks")
+        .select("id, title, due_at, customer_id, customer:customers!tasks_customer_id_fkey(full_name, phone, blacklist, deleted_at)")
+        .eq("kind", "call")
+        .eq("status", "open")
+        .lt("due_at", dayEndIso)
+        .order("due_at", { ascending: true })
+        .limit(CALL_LIST_MAX),
+    ),
   ]);
-  assertQueryBatchSucceeded([custRes], ["call-list-customers"], "Arama listesi");
+  assertQueryBatchSucceeded([custRes, taskRes], ["call-list-customers", "call-list-tasks"], "Arama listesi");
   const customers = [...((custRes.data ?? []) as CustomerRow[])];
 
   const priorityIds = insights
@@ -90,11 +103,35 @@ export async function loadCallList(input: {
     };
   });
 
-  return buildCallList(candidates, priorityIds, CALL_LIST_MAX).map((e) => ({
+  type TaskRow = {
+    id: string;
+    title: string;
+    due_at: string | null;
+    customer_id: string | null;
+    customer:
+      | { full_name: string | null; phone: string | null; blacklist: boolean | null; deleted_at: string | null }
+      | { full_name: string | null; phone: string | null; blacklist: boolean | null; deleted_at: string | null }[]
+      | null;
+  };
+  const callTasks: CallTaskInput[] = ((taskRes.data ?? []) as TaskRow[]).map((t) => {
+    const c = Array.isArray(t.customer) ? (t.customer[0] ?? null) : t.customer;
+    const alive = c && !c.deleted_at ? c : null;
+    return {
+      id: t.id,
+      title: t.title,
+      dueAt: t.due_at,
+      customerId: alive ? t.customer_id : null,
+      customerName: alive?.full_name ?? null,
+      phone: alive?.phone ?? null,
+      blacklist: Boolean(alive?.blacklist),
+    };
+  });
+
+  return mergeCallTasks(buildCallList(candidates, priorityIds, CALL_LIST_MAX), callTasks, now()).map((e) => ({
     ...e,
     phoneLabel: formatTurkishPhone(e.phone) || e.phone,
     telHref: toTelHref(e.phone),
     waHref: toWhatsAppLink(e.phone),
-    href: `/app/musteriler/${e.customerId}`,
+    href: e.customerId ? `/app/musteriler/${e.customerId}` : `/app/gorevler?gorev=${e.task?.id ?? ""}`,
   }));
 }

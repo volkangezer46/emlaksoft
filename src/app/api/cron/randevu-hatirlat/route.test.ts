@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   inserted: [] as Row[],
   heartbeat: vi.fn(async (..._args: unknown[]) => true),
   customerStep: vi.fn(async (..._args: unknown[]) => ({ sent: 0, failed: 0, note: null as string | null })),
+  departureStep: vi.fn(async (..._args: unknown[]) => ({ written: 0, failed: 0 })),
 }));
 
 function appointmentsQuery() {
@@ -36,6 +37,7 @@ vi.mock("@/lib/cron-heartbeat", () => ({ recordHeartbeat: h.heartbeat }));
 vi.mock("@/lib/base-url", () => ({ getBaseUrl: () => "https://app.test" }));
 vi.mock("@/lib/integrations-api/webhooks", () => ({ runWebhookRetries: async () => ({ attempted: 0, delivered: 0 }) }));
 vi.mock("@/lib/appointment-customer-messages", () => ({ runCustomerReminderStep: h.customerStep }));
+vi.mock("@/lib/appointment-departure-step", () => ({ runDepartureReminderStep: h.departureStep }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => ({ from: () => appointmentsQuery() }) }));
 vi.mock("@/lib/notify-batch", () => ({
   findNotifiedIds: async () => new Set<string>(),
@@ -67,6 +69,7 @@ beforeEach(() => {
   h.window = null;
   h.heartbeat.mockClear();
   h.customerStep.mockClear();
+  h.departureStep.mockClear();
 });
 
 describe("randevu-hatirlat: hedefli hatırlatma", () => {
@@ -103,5 +106,15 @@ describe("randevu-hatirlat: hedefli hatırlatma", () => {
     expect(res.status).toBe(200);
     expect(h.inserted).toHaveLength(1);
     expect(String(h.heartbeat.mock.calls[0]![2])).toContain("müşteri adımı hata");
+  });
+
+  it("yola çıkma adımı hatası danışman hatırlatmasını bozmaz (GA-07)", async () => {
+    h.appointments = [appt("a1", { assigned_to: "u1" })];
+    h.departureStep.mockRejectedValueOnce(new Error("db"));
+    const res = await GET(req());
+    expect(res.status).toBe(200);
+    expect(h.inserted).toHaveLength(1);
+    expect(h.departureStep).toHaveBeenCalledTimes(1);
+    expect(String(h.heartbeat.mock.calls[0]![2])).toContain("yola çıkma adımı hata");
   });
 });
