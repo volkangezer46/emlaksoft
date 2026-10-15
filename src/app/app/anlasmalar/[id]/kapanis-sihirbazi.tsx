@@ -14,6 +14,8 @@ import { updatePropertyCommissionRate } from "@/app/actions/property-commission-
 import { createTask } from "@/app/actions/tasks";
 import { calculateCommission } from "@/lib/commission";
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
+import type { PostCloseSummary } from "@/lib/post-close-model";
+import { PostClosePanel } from "./post-close-panel";
 import {
   COLLECTION_TASK_PREFIX,
   advisorShareOf,
@@ -92,6 +94,8 @@ export function KapanisSihirbazi(props: KapanisProps) {
   const [outcome, setOutcome] = useState<ClosingOutcome | null>(startOutcome);
   const [step, setStep] = useState<ClosingStep>(initialStep(startOutcome, props.stage));
   const [taskCreated, setTaskCreated] = useState(false);
+  // Kazanma sonrası temizlik özeti (talepler, yıldönümü, portföyde kalan randevu/teklif); adımlar arasında kalır.
+  const [postClose, setPostClose] = useState<PostCloseSummary | null>(null);
 
   if (props.stage !== "won" && props.stage !== "lost" && outcome === null) {
     return (
@@ -173,8 +177,9 @@ export function KapanisSihirbazi(props: KapanisProps) {
       </ol>
 
       <div className="mt-5 space-y-4">
+        {postClose ? <PostClosePanel summary={postClose} /> : null}
         {activeOutcome === "won" ? (
-          <WonBody {...props} step={step} go={setStep} />
+          <WonBody {...props} step={step} go={setStep} onWon={(s) => setPostClose(s ?? null)} />
         ) : (
           <LostBody {...props} step={step} go={setStep} taskCreated={taskCreated} onTask={() => setTaskCreated(true)} />
         )}
@@ -241,7 +246,7 @@ function ChoiceCard({
   );
 }
 
-type BodyProps = KapanisProps & { step: ClosingStep; go: (s: ClosingStep) => void };
+type BodyProps = KapanisProps & { step: ClosingStep; go: (s: ClosingStep) => void; onWon?: (s: PostCloseSummary | undefined) => void };
 
 // ---------------------------------------------------------------- Kazanıldı
 
@@ -411,6 +416,7 @@ function ConfirmStep(p: BodyProps) {
     r.startTransition(async () => {
       const res = await updateDealStage(fd);
       if (res.error) return r.setError(res.error);
+      p.onWon?.(res.postClose);
       r.router.refresh();
       p.go("paylar");
     });

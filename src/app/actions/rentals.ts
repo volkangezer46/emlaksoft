@@ -9,6 +9,7 @@ import { logActivity } from "@/lib/activity";
 import { computeLegalIncreaseIn } from "@/lib/tufe";
 import { loadTufeTable } from "@/lib/tufe-server";
 import { triggerPlaybooks } from "@/lib/playbook-trigger";
+import { notifyPostCloseAdvisors, runPostCloseCleanup } from "@/lib/post-close";
 import { parseMoneyInput } from "@/lib/money-input";
 import { isIsoDate } from "@/lib/workflow-state";
 import { checkRentalExtension } from "@/lib/workflow-rules";
@@ -88,6 +89,24 @@ export async function createRental(_prev: RentalResult, fd: FormData): Promise<R
     return { error: actionErrorMessage(null, "Kira kaydı oluşturulamadı.") };
   }
   const rentalId = transition.rental_id;
+  const rentalDealId = typeof transition.deal_id === "string" ? transition.deal_id : null;
+
+  // Kiralama kapanışı sonrası temizlik (satış kapanışıyla aynı): kiracının karşılanan kiralık talepleri kapanır,
+  // yıldönümü boşsa "Kiralama" yazılır; portföyde kalan randevu/teklifler danışmanlara bildirilir (iptal edilmez).
+  if (rentalDealId) {
+    afterSafe(async () => {
+      const summary = await runPostCloseCleanup({
+        db: admin,
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        dealId: rentalDealId,
+        dealType: "rent",
+        customerId: renterId,
+        propertyId,
+      });
+      await notifyPostCloseAdvisors({ db: admin, tenantId: gate.tenantId, actorId: gate.userId, summary });
+    }, "kira kaydı sonrası temizlik");
+  }
 
   // İş akışı (playbook) tetikle — sözleşme/depozito/anahtar teslim paketi
   afterSafe(() =>
