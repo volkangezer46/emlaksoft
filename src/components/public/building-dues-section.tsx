@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Building2 } from "lucide-react";
+import { Building2, Megaphone, Pin } from "lucide-react";
 import { PortalSection } from "@/components/public/portal-kit";
 import { BUILDING_PAYMENT_METHOD_LABELS, BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/building-management/charges";
 import { loadPortalCustomerDues } from "@/lib/building-management/load";
+import { ANNOUNCEMENT_CATEGORY_LABELS, loadPortalAnnouncements } from "@/lib/building-management/announcements";
+import { daysAgoIso } from "@/lib/clock";
 import { cariBalanceLabel } from "@/lib/building-management/unit-ledger";
 import { formatDateTr, formatTryDecimal } from "@/lib/format";
 
@@ -28,10 +30,29 @@ export async function BuildingDuesSection({
 }) {
   const units = await loadPortalCustomerDues(db, { tenantId, role, customerId, propertyId });
   if (!units || units.length === 0) return null;
+  // Binanın son 90 gündeki duyuruları (yalnız portalda görünür olanlar; tablo yoksa boş).
+  const announcements = await loadPortalAnnouncements(db, { tenantId, buildingIds: units.map((u) => u.buildingId), sinceIso: daysAgoIso(90) });
   const money = (n: number) => formatTryDecimal(n, 2);
   return (
     <PortalSection id="bina-aidat" icon={Building2} title="Bina aidatım" iconClassName="text-brand-600">
       <div className="space-y-3">
+        {announcements.length > 0 ? (
+          <div className="rounded-[var(--radius-card)] border border-brand-200 bg-brand-50/60 px-4 py-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-ink-950"><Megaphone className="h-4 w-4 text-brand-600" aria-hidden="true" /> Bina duyuruları</p>
+            <ul className="mt-2 space-y-2.5">
+              {announcements.map((a) => (
+                <li key={a.id} className="text-sm">
+                  <p className="flex flex-wrap items-center gap-x-2 font-semibold text-ink-950">
+                    {a.pinned ? <Pin className="h-3.5 w-3.5 text-brand-600" aria-label="Sabitlendi" /> : null}
+                    {a.title}
+                    <span className="text-xs font-normal text-text-muted">{ANNOUNCEMENT_CATEGORY_LABELS[a.category]} · {formatDateTr(a.createdAt, { day: "2-digit", month: "long" })}</span>
+                  </p>
+                  <p className="mt-0.5 whitespace-pre-line text-text-muted">{a.body}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {units.map((u) => (
           <div key={u.unitId} className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-xs)]">
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">

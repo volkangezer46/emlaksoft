@@ -369,6 +369,7 @@ export async function loadUnitOptions(db: SupabaseClient, tenantId: string, buil
  */
 export type PortalUnitDues = {
   unitId: string;
+  buildingId: string;
   title: string;
   balance: number;
   charges: { id: string; title: string; dueDate: string; amount: number; paid: number; status: "pending" | "partial" | "paid" }[];
@@ -384,7 +385,7 @@ export async function loadPortalCustomerDues(
   if ((input.customerId && !UUID.test(input.customerId)) || (input.propertyId && !UUID.test(input.propertyId))) return [];
   let uq = db
     .from("building_units")
-    .select("id, block, unit_no, owner_customer_id, tenant_customer_id, payer, building:buildings!building_units_building_tenant_fkey(name)")
+    .select("id, building_id, block, unit_no, owner_customer_id, tenant_customer_id, payer, building:buildings!building_units_building_tenant_fkey(name)")
     .eq("tenant_id", tenantId)
     .eq("active", true);
   if (input.customerId) uq = uq.eq(input.role === "owner" ? "owner_customer_id" : "tenant_customer_id", input.customerId);
@@ -392,7 +393,7 @@ export async function loadPortalCustomerDues(
   else return [];
   const uRes = await uq.limit(50);
   if (uRes.error) return null;
-  const units = (uRes.data ?? []) as unknown as { id: string; block: string | null; unit_no: string; building: { name: string } | { name: string }[] | null }[];
+  const units = (uRes.data ?? []) as unknown as { id: string; building_id: string; block: string | null; unit_no: string; building: { name: string } | { name: string }[] | null }[];
   if (units.length === 0) return [];
   const ids = units.map((u) => u.id);
   const [chRes, payRes] = await Promise.all([
@@ -410,6 +411,7 @@ export async function loadPortalCustomerDues(
     const cari = buildCari(mine, pays);
     return {
       unitId: u.id,
+      buildingId: u.building_id,
       title: `${one(u.building)?.name ?? "Bina"} · ${unitLabel({ block: u.block, unitNo: u.unit_no })}`,
       balance: cari.totals.balance,
       charges: mine.slice(0, 24).map((c) => ({ id: c.id, title: c.batchTitle, dueDate: c.dueDate, amount: c.amount, paid: c.paid, status: c.status })),
