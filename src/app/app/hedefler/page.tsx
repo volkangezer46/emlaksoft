@@ -6,6 +6,7 @@ import { now, shiftMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
 import { targetPeriodRange } from "@/lib/team/target-actuals";
 import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
 import { loadTargetActivityCounts, type TargetActivity, type TargetActivityItem } from "@/lib/supabase/list-count-rpcs";
+import { slowPaceLabels } from "@/lib/target-pace";
 import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -273,6 +274,19 @@ export default async function HedeflerPage() {
             const act = activityById.get(t.id);
             const tAppt = Number((t as { target_appointments?: number | null }).target_appointments ?? 0);
             const tList = Number((t as { target_listings?: number | null }).target_listings ?? 0);
+            // Tempo rozeti (saf kural: target-pace.ts): dönemin ≥%50'si geçti ve ölçüt beklenen temponun %70'inin altında.
+            const slowLabels = done
+              ? []
+              : slowPaceLabels(
+                  [
+                    { label: "Anlaşma", actual: t.actual_deals, target: Number(t.target_deals) },
+                    ...(t.revVisible ? [{ label: "Gelir", actual: Number(t.actual_revenue), target: Number(t.target_revenue) }] : []),
+                    ...(act?.appointments != null ? [{ label: "Randevu", actual: act.appointments, target: tAppt }] : []),
+                    ...(act?.listings != null ? [{ label: "Yeni portföy", actual: act.listings, target: tList }] : []),
+                  ],
+                  targetPeriodRange(t.period_start, t.period),
+                  nowMs,
+                );
             return (
               <div key={t.id} className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-400/40">
                 <Link
@@ -298,6 +312,15 @@ export default async function HedeflerPage() {
                     <div>
                       <p className="text-xs font-semibold text-text-muted">{period}</p>
                       <p className="mt-0.5 font-display font-bold text-text group-hover:text-accent-text">{profileLabel(t.profile)}</p>
+                      {slowLabels.length > 0 ? (
+                        <p
+                          className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-warning-strong"
+                          title={`Dönemin yarısı geçti; ${slowLabels.join(", ")} beklenen temponun %70'inin altında.`}
+                        >
+                          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                          Tempo düşük · {slowLabels.join(", ")}
+                        </p>
+                      ) : null}
                       {done ? (
                         <p className="mt-0.5 flex items-center gap-2 text-xs font-bold text-success-strong">
                           {isTargetReachedMoment(progress, 100) && elapsed < 100 ? <Celebration tick label="Hedef tamamlandı" /> : null}
