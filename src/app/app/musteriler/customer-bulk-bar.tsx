@@ -73,7 +73,13 @@ export function CustomerBulkBarBody({
                   void restoreCustomerAssignments(previous).then((r) => {
                     if (r.error) push(r.error, "err");
                     else {
-                      push(`${r.updatedCount ?? previous.length} müşterinin önceki ataması geri yüklendi`, "ok");
+                      const skipped = r.skippedCount ?? 0;
+                      push(
+                        skipped > 0
+                          ? `${r.updatedCount ?? 0} müşterinin önceki ataması geri yüklendi; ${skipped} müşterinin önceki danışmanı artık aktif satış rolünde olmadığı için atama değişmedi`
+                          : `${r.updatedCount ?? previous.length} müşterinin önceki ataması geri yüklendi`,
+                        "ok",
+                      );
                       router.refresh();
                     }
                   });

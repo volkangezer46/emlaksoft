@@ -8,22 +8,27 @@
 # Adımlar: (1) yayındaki sürüm konteynerden okunur; (2) hedef = public.release_history'de yayındakinden ÖNCE "ok" biten,
 # sonradan geri alınmamış ("rolled_back") en yeni sürüm; (3) hedef imajın yerelde varlığı doğrulanır (deploy.sh'in
 # prune_images'ı son iki ok sürümü korur); (4) hedef imajın statik parçaları kalıcı klasöre eklenir (14 gün budaması
-# eski parçaları silmiş olabilir); (5) `docker compose up`; (6) sağlık 120 sn beklenir (konteyner içi + dış adres);
-# (7) `latest` etiketi hedefe taşınır; release_history'ye geri alınan sürüm için "rolled_back" satırı yazılır.
-# Hedef sağlıklı olmazsa önceki imaja geri çıkılır ve "failed" yazılır; betik 1 ile biter.
+# eski parçaları silmiş olabilir); (5) deploy.sh ile AYNI mavi/yeşil geçiş (scripts/sunucu/bluegreen.sh `swap_to`):
+# yeşil hedef imajla açılır → sağlıklı → mavi boşaltılıp hedefle yeniden kurulur → yeşil kaldırılır; KESİNTİSİZ;
+# (6) dış sağlık adresi doğrulanır; (7) `latest` etiketi hedefe taşınır; release_history'ye geri alınan sürüm için
+# "rolled_back" satırı yazılır. Hedef (yeşil) sağlıklı olmazsa mavi HİÇ kapanmamıştır: yayındaki sürüm kesintisiz
+# yayında kalır. Mavi hedefle kurulamazsa mavi yayındaki sürüme geri kurulur. Her iki durumda "failed" yazılır, çıkış 1.
 #
 # ŞEMA UYUMU: migration'lar forward-only'dir; geri dönüş DB'yi geri ALMAZ. Hedef kod mevcut (daha yeni) şemayla
 # çalışmalıdır (eklemeli migration'lar uyumludur). .env.production RELEASE_MIGRATION'ı değişmez: DB zaten o
 # migration'dadır, /api/health hazır döner. Ayrıntı: docs/runbooks/GERI_DONUS.md.
-# Ortam (yalnız test): ROLLBACK_HEALTH_URL (dış sağlık adresi), ROLLBACK_LOCK_DIR, ROLLBACK_STATIC_DIR.
+# Ortam (yalnız test): ROLLBACK_HEALTH_URL (dış sağlık adresi), ROLLBACK_LOCK_DIR, ROLLBACK_STATIC_DIR;
+# DRAIN_WAIT / SETTLE_WAIT / READY_TRIES (bluegreen.sh).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 DB_CONTAINER=supabase-db-moqbebljyeyprktd19zb1ihn
 APP=emlaksoft-app
-COMPOSE=deploy/compose.prod.yml
 STATIC_DIR=${ROLLBACK_STATIC_DIR:-/srv/emlaksoft/next-static}
 HEALTH_URL=${ROLLBACK_HEALTH_URL:-https://emlaksoft.com.tr/api/health}
+# Mavi/yeşil geçiş (deploy.sh ile ortak): COMPOSE, BLUE, GREEN, wait_ready, external_ok, green_down, swap_to.
+# shellcheck source=scripts/sunucu/bluegreen.sh
+. scripts/sunucu/bluegreen.sh
 TAG_RE='^[0-9]{12}-[0-9a-f]{4,40}(-dirty)?$'
 
 DRY=0
@@ -107,11 +112,11 @@ SQL
 )
 TARGET_MIG=$(printf '%s\n' "$TARGET_MIG" | grep -E '^[0-9]{14}[A-Za-z0-9_.-]*$' | head -n 1 || true)
 ENV_MIG=$(sed -n 's/^RELEASE_MIGRATION=//p' .env.production 2>/dev/null | head -n 1 || true)
-CMD="APP_TAG=$TARGET docker compose -f $COMPOSE up -d --remove-orphans"
+CMD="mavi/yeşil: yeşil $APP:$TARGET ile açılır → sağlıklı → mavi $APP:$TARGET ile yeniden kurulur → yeşil kaldırılır (kesintisiz)"
 
 echo "Yayındaki sürüm : $APP:$CUR"
 echo "Hedef imaj      : $APP:$TARGET"
-echo "Komut           : $CMD"
+echo "Geçiş           : $CMD"
 SCHEMA_DIFF=0
 if [ -n "$TARGET_MIG" ] && [ -n "$ENV_MIG" ] && [ "$TARGET_MIG" != "$ENV_MIG" ]; then
   SCHEMA_DIFF=1
@@ -149,20 +154,6 @@ values (:'sha', :'tag', :'outcome', :'started'::timestamptz, :'dur'::integer, nu
 SQL
 }
 
-wait_healthy() {
-  local _i
-  for _i in $(seq 1 60); do
-    if docker exec "$APP" node -e \
-      "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" \
-      >/dev/null 2>&1 \
-      && curl -fsS -o /dev/null "$HEALTH_URL" 2>/dev/null; then
-      return 0
-    fi
-    sleep 2
-  done
-  return 1
-}
-
 # (4) Hedefin statik parçaları (açık sekmeler ve sayfa ilk yüklemesi için; konteyner klasörü salt-okunur bağlar).
 if [ -d "$STATIC_DIR" ]; then
   CID=$(docker create "$APP:$TARGET")
@@ -171,24 +162,47 @@ if [ -d "$STATIC_DIR" ]; then
   chown -R 1001:1001 "$STATIC_DIR" || true
 fi
 
-# (5) + (6)
-echo "Geri dönülüyor: $APP:$CUR → $APP:$TARGET"
-APP_TAG="$TARGET" docker compose -f "$COMPOSE" up -d --remove-orphans
-if wait_healthy; then
-  echo "Geri dönüş başarılı: $APP:$TARGET yayında"
+# (5) + (6) Kesintisiz geçiş (swap_to dönüş kodu: 0 = mavi hedefte ve sağlıklı · 1 = yeşil sağlıklı olmadı, mavi hiç
+# kapanmadı · 2 = mavi hedefle kurulamadı, yeşil hedefle trafikte).
+echo "Geri dönülüyor (mavi/yeşil): $APP:$CUR → $APP:$TARGET"
+set +e
+swap_to "$TARGET"
+SWAP_RC=$?
+set -e
+if [ "$SWAP_RC" = 0 ] && external_ok; then
+  echo "Geri dönüş başarılı: $APP:$TARGET yayında (kesintisiz)"
   # latest de hedefi göstermeli: APP_TAG'siz sonraki bir `compose up` (elle ya da başka betik) geri alınan imaja dönmesin.
   docker tag "$APP:$TARGET" "$APP:latest" || echo "[uyari] $APP:latest hedefe taşınamadı — elle: docker tag $APP:$TARGET $APP:latest"
-  record_rollback rolled_back "elle geri dönüş: $APP:$CUR → $APP:$TARGET (sağlık 200)"
+  record_rollback rolled_back "elle geri dönüş (mavi/yeşil): $APP:$CUR → $APP:$TARGET (sağlık 200)"
   curl -s "$HEALTH_URL"; echo
   exit 0
 fi
 
-echo "Hedef 120 sn içinde sağlıklı olmadı: $APP:$TARGET"
-docker logs --tail 30 "$APP" || true
+if [ "$SWAP_RC" = 1 ]; then
+  echo "Hedef ($APP:$TARGET) sağlıklı olmadı: yayındaki sürüm ($APP:$CUR) hiç kapanmadan yayında kaldı"
+  record_rollback failed "elle geri dönüş başarısız: $APP:$TARGET (yeşil) sağlıklı olmadı; $APP:$CUR kesintisiz yayında kaldı"
+  exit 1
+fi
+
+# 2 (mavi hedefle kurulamadı) ya da 0 ama dış adres doğrulanamadı: mavi yayındaki sürüme geri kurulur.
+echo "Hedef doğrulanamadı (geçiş kodu $SWAP_RC): $APP:$TARGET"
+docker logs --tail 30 "$BLUE" || true
 if [[ "$CUR" =~ $TAG_RE ]] && docker image inspect "$APP:$CUR" >/dev/null 2>&1; then
   echo "Önceki sürüme geri çıkılıyor: $APP:$CUR"
-  APP_TAG="$CUR" docker compose -f "$COMPOSE" up -d --remove-orphans
-  if wait_healthy; then echo "$APP:$CUR yeniden yayında"; else echo "$APP:$CUR de sağlıklı değil — elle müdahale gerekiyor"; fi
+  BACK_OK=0
+  if [ "$SWAP_RC" = 0 ]; then
+    # Mavi hedefte ve sağlıklı ama dış adres doğrulanamadı: yine mavi/yeşil ile (kesintisiz) geri çıkılır.
+    set +e; swap_to "$CUR" && BACK_OK=1; set -e
+  else
+    # Yeşil hedefle trafikte, mavi kurulamadı: mavi yayındaki sürümle yeniden kurulur, sağlıklıysa yeşil kaldırılır.
+    APP_TAG="$CUR" "${COMPOSE[@]}" up -d --no-deps app
+    if wait_ready "$BLUE"; then green_down; BACK_OK=1; fi
+  fi
+  if [ "$BACK_OK" = 1 ]; then
+    echo "$APP:$CUR yeniden yayında"
+  else
+    echo "$APP:$CUR de sağlıklı değil — elle müdahale gerekiyor: docker ps | grep $APP"
+  fi
 fi
-record_rollback failed "elle geri dönüş başarısız: $APP:$TARGET 120 sn içinde sağlıklı olmadı; $APP:$CUR'e geri çıkıldı"
+record_rollback failed "elle geri dönüş başarısız: $APP:$TARGET doğrulanamadı (geçiş kodu $SWAP_RC); $APP:$CUR'e geri çıkılmaya çalışıldı"
 exit 1

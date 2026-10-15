@@ -49,6 +49,17 @@ export function NotFoundPanel({ lists }: { lists: readonly (readonly [string, st
                 Çöp kutusu
               </Link>
             </>
+          ) : target.kind === "section" ? (
+            <>
+              <Link href={target.sectionHref} className={PRIMARY}>
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                {target.sectionLabel} sayfasına dön
+              </Link>
+              <Link href="/app" className={SECONDARY}>
+                <Home className="h-4 w-4" aria-hidden="true" />
+                Ana ekran
+              </Link>
+            </>
           ) : (
             <Link href="/app" className={PRIMARY}>
               <Home className="h-4 w-4" aria-hidden="true" />

@@ -54,6 +54,7 @@ export function CallConsole({
   customers,
   matchCounts = {},
   demandCounts = {},
+  canOpenMatching = false,
   initialCustomerId,
 }: {
   customers: Customer[];
@@ -61,6 +62,8 @@ export function CallConsole({
   matchCounts?: Record<string, number>;
   /** müşteri id → açık talep adedi */
   demandCounts?: Record<string, number>;
+  /** Talep + eşleşme modülü açık mı: değilse "Eşleşen portföy" kutusu bağlantısız (yalnız sayı) çizilir. */
+  canOpenMatching?: boolean;
   /** ?customer= kısayolu — konsol bu müşteriyle açılır */
   initialCustomerId?: string;
 }) {
@@ -202,10 +205,18 @@ export function CallConsole({
                 <p className="text-xs text-white/35">Açık talep</p>
                 <p className="mt-1 font-display text-lg font-bold text-white">{demandN}</p>
               </Link>
-              <Link href={`/app/talepler?sekme=eslesme&customer=${customerId}`} className="focus-ring rounded-[var(--radius-control)] border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
-                <p className="text-xs text-white/35">Eşleşen portföy</p>
-                <p className="mt-1 font-display text-lg font-bold text-mint-400">{matchN}</p>
-              </Link>
+              {canOpenMatching ? (
+                <Link href={`/app/talepler?sekme=eslesme&customer=${customerId}`} className="focus-ring rounded-[var(--radius-control)] border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
+                  <p className="text-xs text-white/35">Eşleşen portföy</p>
+                  <p className="mt-1 font-display text-lg font-bold text-mint-400">{matchN}</p>
+                </Link>
+              ) : (
+                // Eşleşme izni yok: hedef sayfa açılamaz, bağlantı verilmez (sayı bilgi olarak kalır).
+                <div className="rounded-[var(--radius-control)] border border-white/10 bg-white/5 p-3">
+                  <p className="text-xs text-white/35">Eşleşen portföy</p>
+                  <p className="mt-1 font-display text-lg font-bold text-mint-400">{matchN}</p>
+                </div>
+              )}
             </div>
           ) : null}
         </div>

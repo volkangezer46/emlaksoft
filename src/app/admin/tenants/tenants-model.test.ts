@@ -76,3 +76,16 @@ describe("envanter sayımları", () => {
     expect(activityHealth(12).label).toBe("Etkin");
   });
 });
+
+describe("aboneliği eksik süzgeci (M3)", () => {
+  it("URL'den okunur, çipte adıyla görünür ve billing-home kartı bu süzgece bağlanır", async () => {
+    const { readFileSync } = await import("node:fs");
+    const f = parseTenantFilters({ durum: "aboneligi-eksik" }, isPlan);
+    expect(f.durum).toBe("aboneligi-eksik");
+    expect(tenantsHref(f)).toBe("/admin/tenants?durum=aboneligi-eksik");
+    expect(activeChips(f, (p) => p, (s) => s)[0]!.label).toBe("Durum: Aboneliği eksik");
+    const home = readFileSync("src/app/admin/_dashboards/billing-home.tsx", "utf8");
+    const card = home.slice(home.indexOf('label="Aboneliği eksik ofis"'), home.indexOf('label="Aboneliği eksik ofis"') + 200);
+    expect(card).toContain('href="/admin/tenants?durum=aboneligi-eksik"');
+  });
+});

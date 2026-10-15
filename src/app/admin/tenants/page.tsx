@@ -44,6 +44,7 @@ import {
   tenantInventory,
   tenantsHref,
   EXPIRED_ACTIVE_FILTER,
+  MISSING_SUBSCRIPTION_FILTER,
   toggleFilter,
   type InventoryRow,
 } from "./tenants-model";
@@ -68,6 +69,7 @@ const STATUS_COLOR: Record<string, string> = {
 /** Hızlı süzgeç çipleri (filtre kontratı: her çip URL'i değiştirir, sunucu sorgusu buna göre daralır). */
 const QUICK = [
   { key: "risk", label: "Riskli", param: "durum" as const, value: "risk" as const },
+  { key: "abonelik", label: "Aboneliği eksik", param: "durum" as const, value: MISSING_SUBSCRIPTION_FILTER },
   { key: "bitiyor", label: "Denemesi bitiyor", param: "deneme" as const, value: "bitiyor" as const },
   { key: "yeni", label: "Son 30 gün kayıt", param: "yeni" as const, value: "30" as const },
   { key: "demo", label: "Demo veride", param: "veri" as const, value: "demo" as const },
@@ -116,6 +118,7 @@ export default async function AdminTenantsPage({
   const admin = createAdminClient();
 
   const expiredOnly = f.durum === EXPIRED_ACTIVE_FILTER;
+  const missingSubOnly = f.durum === MISSING_SUBSCRIPTION_FILTER;
   // Eşik ayar defterinden (crm.health_risk_threshold); okunamazsa varsayılan. Süzgeç ve rozet aynı eşiği kullanır.
   const riskThreshold = await getSetting<number>(CRM_SETTING_KEYS.riskThreshold).catch(() => HEALTH_DEFAULT_RISK_THRESHOLD);
   const ownerFilter = f.sorumlu === "ben" ? staff.id : f.sorumlu;
@@ -130,7 +133,7 @@ export default async function AdminTenantsPage({
     needCrm ? "crm:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey!inner(account_owner_staff_id, health_score)" : "",
     ownerFilter === "yok" ? "own:platform_tenant_crm!platform_tenant_crm_tenant_id_fkey(account_owner_staff_id)" : "",
   ].filter(Boolean);
-  const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}${crmEmbeds.length ? `, ${crmEmbeds.join(", ")}` : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
+  const listCols = `id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at${expiredOnly ? ", sub:subscriptions!subscriptions_tenant_id_fkey!inner(id)" : ""}${missingSubOnly ? ", nosub:subscriptions!subscriptions_tenant_id_fkey(id)" : ""}${crmEmbeds.length ? `, ${crmEmbeds.join(", ")}` : ""}` as "id, name, slug, plan, status, trial_ends_at, created_at, updated_at, sample_seeded_at";
   let listQuery = admin
     .from("tenants")
     .select(listCols, { count: "exact" })
@@ -143,6 +146,9 @@ export default async function AdminTenantsPage({
       .lt("sub.current_period_end", daysAgoIso(0))
       .is("sub.pause_started_at", null)
       .eq("sub.cancel_at_period_end", false);
+  // "Aboneliği eksik": aktif ofis + aktif abonelik satırına TERS birleşim (gömme yalnız aktif satırları getirir, boşsa yok).
+  // missing_subscription_count (platform_reporting_aggregates) ile aynı küme.
+  else if (missingSubOnly) listQuery = listQuery.eq("status", "active").eq("nosub.status", "active").is("nosub", null);
   else if (f.durum) listQuery = listQuery.eq("status", f.durum);
   if (f.yeni) listQuery = listQuery.gte("created_at", daysAgoIso(Number(f.yeni)));
   if (f.deneme === "bitiyor") listQuery = listQuery.eq("status", "trial").gte("trial_ends_at", daysAgoIso(0)).lte("trial_ends_at", daysFromNowIso(7));
@@ -405,7 +411,7 @@ export default async function AdminTenantsPage({
                   key={c.key}
                   href={toggleFilter(f, c.param, c.value)}
                   on={f[c.param] === c.value}
-                  count={c.key === "risk" ? riskCount : c.key === "bitiyor" ? inv.trialEnding7 : c.key === "yeni" ? inv.newLast30 : c.key === "demo" ? inv.demo : inv.total - inv.demo}
+                  count={c.key === "abonelik" ? undefined : c.key === "risk" ? riskCount : c.key === "bitiyor" ? inv.trialEnding7 : c.key === "yeni" ? inv.newLast30 : c.key === "demo" ? inv.demo : inv.total - inv.demo}
                   icon={c.key === "risk" ? <AlertTriangle aria-hidden="true" /> : c.key === "yeni" ? <Sparkles aria-hidden="true" /> : undefined}
                 >
                   {c.label}

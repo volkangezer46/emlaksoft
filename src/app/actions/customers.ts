@@ -106,7 +106,24 @@ export async function updateCustomer(
   // Kayıt ve atama alanları: yalnız form gönderdiyse yazılır (diğer çağıranlar etkilenmez)
   if (formData.has("source")) updatePatch.source = String(formData.get("source") ?? "").trim() || null;
   if (formData.has("lead_source_detail")) updatePatch.lead_source_detail = String(formData.get("lead_source_detail") ?? "").trim() || null;
-  if (formData.has("assigned_to")) updatePatch.assigned_to = String(formData.get("assigned_to") ?? "").trim() || null;
+  if (formData.has("assigned_to")) {
+    const nextAssignee = String(formData.get("assigned_to") ?? "").trim();
+    // Yeni bir danışmana atama, toplu/tekil atamayla aynı kurala bağlı: bu ofisin AKTİF SATIŞ rolündeki kullanıcısı.
+    // Kayıt zaten o kişideyse (ör. çağrı merkezinin açtığı müşteri) diğer alanların düzenlenmesi engellenmez.
+    if (nextAssignee) {
+      const [{ data: currentRow }, { data: targetRow }] = await Promise.all([
+        supabase.from("customers").select("assigned_to").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle(),
+        supabase.from("profiles").select("id, role").eq("id", nextAssignee).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle(),
+      ]);
+      const unchanged = (currentRow as { assigned_to: string | null } | null)?.assigned_to === nextAssignee;
+      if (!unchanged) {
+        const target = targetRow as { id: string; role: string | null } | null;
+        if (!target) return { error: "Seçilen danışman bu ofiste aktif değil." };
+        if (!isSalesAssigneeRole(target.role)) return { error: "Bu kullanıcının rolüne müşteri atanamaz (yalnız satış rolleri)." };
+      }
+    }
+    updatePatch.assigned_to = nextAssignee || null;
+  }
   if (formData.has("blacklist_present")) updatePatch.blacklist = formData.get("blacklist") === "on";
 
   const { error } = await supabase
@@ -225,6 +242,8 @@ export type BulkCustomerResult = {
   updatedCount?: number;
   /** Toplu atamada işlem ÖNCESİ atamalar ("Geri al" bunlarla `restoreCustomerAssignments` çağırır). */
   previous?: { id: string; assigned_to: string | null }[];
+  /** "Geri al"da önceki danışmanı artık aktif satış rolünde olmadığı için yerinde bırakılan müşteri sayısı. */
+  skippedCount?: number;
 };
 
 /** Toplu işlem üst sınırı — tek istekte devasa update'leri engeller. */
@@ -312,9 +331,10 @@ export async function bulkAssignCustomers(
 }
 
 /**
- * Toplu atamanın "Geri al"ı (B069): müşterileri işlem öncesi danışmanlarına döndürür. Yeni bir atama değil, önceki
- * durumun geri yüklenmesidir: hedef bu ofisin profili (ya da danışmansız) olmalı; satış rolü şartı aranmaz (müşteri
- * önceden çağrı merkezinin açtığı kayıt olabilir). Aynı hedefe gidenler tek UPDATE ile yazılır.
+ * Toplu atamanın "Geri al"ı (B069): müşterileri işlem öncesi danışmanlarına döndürür. Yazma yine bir atamadır ve
+ * `bulkAssignCustomers` ile aynı kurala bağlıdır: hedef bu ofisin AKTİF SATIŞ rolündeki kullanıcısı (ya da danışmansız).
+ * Önceki danışmanı artık bu şartı taşımayan (pasifleşmiş, rolü değişmiş, çağrı merkezi) müşteriler yerinde bırakılır ve
+ * `skippedCount` ile bildirilir; hiçbiri geri yüklenemiyorsa hata döner. Aynı hedefe gidenler tek UPDATE ile yazılır.
  */
 export async function restoreCustomerAssignments(
   previous: { id: string; assigned_to: string | null }[],
@@ -328,15 +348,33 @@ export async function restoreCustomerAssignments(
   const supabase = await createClient();
   const validIds = new Set(await resolveTenantCustomerIds(supabase, gate.tenantId, rows.map((r) => String(r.id))));
   const targets = [...new Set(rows.map((r) => r.assigned_to).filter((v): v is string => typeof v === "string" && v.length > 0))];
+  const allowedTargets = new Set<string>();
   if (targets.length > 0) {
-    const { data } = await supabase.from("profiles").select("id").eq("tenant_id", gate.tenantId).in("id", targets);
-    if ((data ?? []).length !== targets.length) return { error: "Önceki danışmanlardan biri bu ofiste bulunamadı." };
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("tenant_id", gate.tenantId)
+      .eq("is_active", true)
+      .in("id", targets);
+    for (const p of (data ?? []) as { id: string; role: string | null }[]) if (isSalesAssigneeRole(p.role)) allowedTargets.add(p.id);
   }
   const groups = new Map<string, string[]>();
+  let skippedCount = 0;
   for (const r of rows) {
     if (!validIds.has(String(r.id))) continue;
     const key = r.assigned_to ?? "";
+    if (key && !allowedTargets.has(key)) {
+      skippedCount += 1;
+      continue;
+    }
     groups.set(key, [...(groups.get(key) ?? []), String(r.id)]);
+  }
+  if (groups.size === 0) {
+    return {
+      error: skippedCount > 0
+        ? "Önceki danışmanlar artık bu ofiste aktif satış rolünde değil; atamalar geri alınamadı."
+        : "Geri alınacak atama yok.",
+    };
   }
   const results = await Promise.all(
     [...groups].map(([to, ids]) =>
@@ -354,11 +392,11 @@ export async function restoreCustomerAssignments(
     actorId: gate.userId,
     action: "customer.bulk_assign_undo",
     entityType: "customer",
-    newValue: { count: restored },
+    newValue: { count: restored, skipped: skippedCount },
   }));
   revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, updatedCount: restored };
+  return { ok: true, updatedCount: restored, skippedCount };
 }
 
 /** Birden fazla müşteriyi toplu soft delete (deleted_at) ile siler. */

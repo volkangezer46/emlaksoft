@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { DAY_MS, daysAgoIso, now, trDayKey } from "@/lib/clock";
 import { unreturnedMissedCalls } from "@/lib/calls/callback";
 import { formatDateTimeTr, formatDateTr } from "@/lib/format";
@@ -72,7 +73,10 @@ export async function CallsView({
 }: {
   searchParams?: Promise<{ yon?: string; geri?: string; danisman?: string; sonuc?: string; from?: string; to?: string; sayfa?: string; customer?: string }>;
 }) {
-  await requireModulePage("calls");
+  const { perms } = await requireModulePage("calls");
+  // "Eşleşen portföy" kutusu /app/talepler?sekme=eslesme'ye gider: talep + eşleşme modülü izni yoksa o sekme talep
+  // listesine düşerdi (yanlış hedef); bağlantı yalnız ikisi de açıkken verilir.
+  const canOpenMatching = effectiveCanAccessModule(perms, "demands") && effectiveCanAccessModule(perms, "matching");
   const params = (await searchParams) ?? {};
   // ?customer= — müşteri detayındaki "Görüşme kaydet" kısayolu: konsolda
   // ilgili müşteri seçili gelir (liste filtrelenmez, yalnızca ön seçim).
@@ -294,7 +298,7 @@ export async function CallsView({
             </div></div>
       </section>
 
-      <CallConsole customers={customerList} demandCounts={demandCounts} matchCounts={matchCounts} initialCustomerId={preCustomerId} />
+      <CallConsole customers={customerList} demandCounts={demandCounts} matchCounts={matchCounts} canOpenMatching={canOpenMatching} initialCustomerId={preCustomerId} />
 
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-4">

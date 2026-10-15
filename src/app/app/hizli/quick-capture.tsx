@@ -324,17 +324,34 @@ function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: Ret
   // Mükerrer kapısı (B092): sunucu aynı telefonla kayıt bulursa ikinci gönderim "Yine de kaydet" onayıyla gider.
   // Onay YALNIZ uyarının verildiği numara için geçerlidir: numara düzeltildiyse kapı yeni numarayı yeniden denetler.
   const submittedPhone = useRef<string | null>(null);
+  // Numara uyarıdan sonra değiştiyse düğme "Yine de kaydet" demez (onay o numaraya aitti). Gizli `phone` alanı
+  // PhoneInput'un durum güncellemesiyle bir tur sonra yazıldığı için karşılaştırma bir sonraki görev döngüsünde yapılır.
+  const [phoneChanged, setPhoneChanged] = useState(false);
+  const recheckPhone = (form: HTMLFormElement) => {
+    window.setTimeout(() => {
+      const now = String(new FormData(form).get("phone") ?? "");
+      setPhoneChanged(submittedPhone.current !== null && now !== submittedPhone.current);
+    }, 0);
+  };
+  const confirmPending = Boolean(q.result.duplicate) && !phoneChanged;
   return (
     <form
       onSubmit={(e) => {
         const phoneNow = String(new FormData(e.currentTarget).get("phone") ?? "");
         const confirmed = Boolean(q.result.duplicate) && submittedPhone.current === phoneNow;
         submittedPhone.current = phoneNow;
+        setPhoneChanged(false);
         q.onSubmit(e, confirmed ? { allow_duplicate: "1" } : undefined);
       }}
       onKeyDown={q.onKeyDown}
-      onInput={(e) => draft.track(e.currentTarget)}
-      onChange={(e) => draft.track(e.currentTarget)}
+      onInput={(e) => {
+        draft.track(e.currentTarget);
+        recheckPhone(e.currentTarget);
+      }}
+      onChange={(e) => {
+        draft.track(e.currentTarget);
+        recheckPhone(e.currentTarget);
+      }}
       className="flex flex-col gap-4"
     >
       <DraftBadge show={draft.restored} onDiscard={draft.clear} />
@@ -365,7 +382,7 @@ function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: Ret
       </FormField>
       <NoteAssist textareaId="hq-cust-notes" demand={Boolean(QUICK_INTENT_TRANSACTION[intent as QuickIntent])} />
       <ErrorBand error={q.result.error} />
-      <SubmitRow pending={q.pending} label={q.result.duplicate ? "Yine de kaydet" : "Müşteriyi kaydet"} />
+      <SubmitRow pending={q.pending} label={confirmPending ? "Yine de kaydet" : "Müşteriyi kaydet"} />
     </form>
   );
 }

@@ -50,7 +50,7 @@ import { platformCanAccess, type PlatformAccessSubject } from "@/lib/platform-ac
 import { relativeTimeTR } from "@/lib/admin-format";
 import { formatTry } from "@/lib/format";
 import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
-import { exactArr, exactMrr, exactTrendMrr, monthlyPrice, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
+import { exactArr, exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
 
@@ -695,13 +695,14 @@ export async function CompositionSection({ period }: { period: Period }) {
   const { aggregate } = data;
   // Gizli planlar (örn. Business) dahil: bu planda ofisi olan hiçbir satır sessizce düşmez.
   const shownPlans = data.planDefs.filter((p) => !p.hidden || Number(aggregate.plan_stats.find((r) => r.plan === p.id)?.tenant_count ?? 0) > 0);
-  // Plan bazında MRR: gerçek abonelik MRR'ı + aboneliği eksik aktif ofisler için katalog fiyatı (exactMrr ile aynı kural).
+  // Plan bazında MRR: yalnız gerçek abonelik MRR'ı (plan_stats.subscription_mrr). Aboneliği eksik aktif ofis 0 ekler;
+  // katalog fiyatı yedeği YOK (exactMrr ile aynı kural; eksik abonelik billing-home'da ayrı uyarıdır).
   const rows = shownPlans.map((plan) => {
     const row = aggregate.plan_stats.find((r) => r.plan === plan.id);
-    const missing = row ? Math.max(0, Number(row.active_count) - Number(row.subscription_count)) : 0;
+    const mrr = Number(row?.subscription_mrr);
     return {
       label: plan.name,
-      value: row ? Math.round(Number(row.subscription_mrr) + missing * monthlyPrice(plan.id, priceMapOf(data.planDefs))) : 0,
+      value: Number.isFinite(mrr) ? Math.round(mrr) : 0,
       hint: `${row ? Number(row.tenant_count) : 0} ofis`,
       href: `/admin/tenants?plan=${plan.id}`,
     };

@@ -24,6 +24,7 @@ import { fetchTenantTags } from "../tenant-tags";
 import { DeleteCustomerButton } from "./delete-customer-button";
 import { Customer360Tabs, CUSTOMER_TAB_IDS } from "./customer-360-tabs";
 import { customerCtaPermissions } from "./customer-cta-perms";
+import { effectiveCanAccessModule } from "@/lib/permissions-effective";
 import { resolveTab } from "@/components/app/detail-tabs";
 import { CustomerTasks, type CustomerTaskRow } from "./customer-tasks";
 import { RentReminderPref } from "./rent-reminder-pref";
@@ -126,6 +127,9 @@ export default async function CustomerDetailPage({
   const canTaskEdit = (perms.tasks ?? []).includes("edit");
   const canTaskDelete = (perms.tasks ?? []).includes("delete");
   const canTaskView = (perms.tasks ?? []).includes("view");
+  // Eşleşme ekranı (/app/talepler?sekme=eslesme) talep + eşleşme modülü ister; yoksa sekme talep listesine düşer:
+  // "Eşleştir" düğmesi, eşleşme KPI'ı ve eşleşme önerisi yalnız ikisi de açıkken gösterilir.
+  const canMatch = effectiveCanAccessModule(perms, "demands") && effectiveCanAccessModule(perms, "matching");
   // Seçili sekme sunucuda çözülür; yalnız o sekmenin verisi çekilir.
   const tab = resolveTab(sp, CUSTOMER_TAB_IDS, "ozet");
   const activeCategory = resolveCategory(sp.kategori, CUSTOMER_TIMELINE_CATEGORIES.map((c) => c.key));
@@ -376,7 +380,7 @@ export default async function CustomerDetailPage({
           lastActivityAt,
           createdAt: customer.created_at,
           openDemandCount: activeDemands.length,
-          candidatePropertyCount: matchCandidateCount,
+          candidatePropertyCount: canMatch ? matchCandidateCount : 0,
           submittedOfferId: submittedOffer?.id ?? null,
           pastAppointmentPending,
         },
@@ -439,7 +443,7 @@ export default async function CustomerDetailPage({
   const lastDays = lastActivityAt ? Math.floor(msSince(lastActivityAt) / DAY_MS) : null;
   const kpis: KpiItem[] = [
     { label: "Açık talep", value: activeDemandCount, href: `${base}?sekme=talepler`, icon: <Target />, tone: "info", hint: `${demands.length} talep kaydı` },
-    ...(activeDemands.length > 0
+    ...(activeDemands.length > 0 && canMatch
       ? [{ label: "Eşleşme adayı portföy", value: matchCandidateCount, href: `/app/talepler?sekme=eslesme&customer=${customer.id}`, icon: <Sparkles />, tone: "success" as const, hint: "aktif portföy havuzu" }]
       : []),
     ...(appts.length > 0
@@ -601,9 +605,11 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     className="h-auto gap-1.5 border border-white/15 bg-white/5 px-3.5 py-2 text-sm text-white hover:bg-white/10 hover:text-white touch:min-h-11"
                   />
                 ) : null}
-                <Link href={`/app/talepler?sekme=eslesme&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <Target className="h-4 w-4" /> Eşleştir
-                </Link>
+                {canMatch ? (
+                  <Link href={`/app/talepler?sekme=eslesme&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
+                    <Target className="h-4 w-4" /> Eşleştir
+                  </Link>
+                ) : null}
                 {canEdit ? (
                   <EditCustomerDialog
                     customer={{
