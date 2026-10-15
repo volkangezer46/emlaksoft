@@ -49,9 +49,23 @@ export function AppointmentRowMore({
       const fd = new FormData();
       fd.set("id", id);
       fd.set("status", "signature");
-      await setAppointmentStatus(fd);
+      // Sonuç artık yutulmaz (SK10 / B166): yetki reddi ya da yarış hatası bildirimle görünür, satır değişmez.
+      const res = await setAppointmentStatus(fd);
+      if (!res.ok) {
+        push(res.error ?? "Randevu durumu güncellenemedi.", "err");
+        return;
+      }
       router.refresh();
     });
+  }
+
+  async function cancelAppointment() {
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("status", "cancelled");
+    const res = await setAppointmentStatus(fd);
+    if (!res.ok) push(res.error ?? "Randevu iptal edilemedi.", "err");
+    else push("Randevu iptal edildi", "ok");
   }
 
   async function copyConfirm() {
@@ -130,8 +144,7 @@ export function AppointmentRowMore({
           title="Randevuyu iptal et"
           description={`${customerName} ile ${whenLabel} randevusu iptal edilecek ve takvimden kalkacak.`}
           confirmLabel="İptal et"
-          formAction={setAppointmentStatus}
-          hiddenFields={{ id, status: "cancelled" }}
+          onConfirm={cancelAppointment}
         />
       ) : null}
     </>

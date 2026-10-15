@@ -135,7 +135,8 @@ describe("navigation accessibility contract", () => {
     // Klavye ve ekran okuyucu tutamağı: dnd-kit role/aria/tabIndex öznitelikleri, 44 px dokunma alanı.
     expect(board).toContain("ref={setActivatorNodeRef}");
     expect(board).toContain("{...attributes}");
-    expect(board).toContain("aria-label={`${title} anlaşmasını taşı`}");
+    // B194: taşıma tutamacının adı ayırt edici konuşma adından (portföysüz anlaşmada müşteri) kurulur.
+    expect(board).toContain("aria-label={`Anlaşmayı taşı: ${dealSpokenName(d)}`}");
     expect(board).toMatch(/ref=\{setActivatorNodeRef\}[\s\S]{0,400}h-11 w-11[^"]*touch-none/);
 
     // Türkçe duyurular ve kullanım talimatı; talimat kimliği hidrasyonda sabit (useId).

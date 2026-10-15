@@ -22,13 +22,16 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { now as nowMs, trMonthStartIso } from "@/lib/clock";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import {
   APPROVAL_KINDS,
+  APPROVAL_STATUS_HEADING,
   APPROVAL_STATUS_LABEL,
   averageDecisionHours,
+  canDecideApproval,
   formatDelta,
   isApprovalKind,
   isApprovalStatus,
@@ -120,7 +123,7 @@ export default async function OnaylarPage({
 }: {
   searchParams?: Promise<{ durum?: string; tur?: string; kim?: string; sayfa?: string; talep_eden?: string; bas?: string; bit?: string }>;
 }) {
-  const { userId, role } = await requireModulePage("commissions", "/app/onaylar");
+  const { userId, role, perms } = await requireModulePage("commissions", "/app/onaylar");
   const params = (await searchParams) ?? {};
 
   // Varsayılan sekme "bekliyor": bu ekranın işi karar bekleyenleri öne almak.
@@ -136,7 +139,10 @@ export default async function OnaylarPage({
   const basIso = bas ? new Date(Date.parse(`${bas}T00:00:00+03:00`)).toISOString() : null;
   const bitIso = bit ? new Date(Date.parse(`${bit}T00:00:00+03:00`) + 86_400_000).toISOString() : null;
 
+  // Yönetim kademesi (talep eden süzgeci, kurallar bağlantısı) ve KARAR yetkisi ayrı: karar düğmesi yalnız
+  // canDecideApproval (kademe + etkin commissions:edit) ile çizilir — "düğmeyi gören karar verebilir" (SK10 / B164).
   const manager = isApprovalDeciderRole(role);
+  const decider = canDecideApproval(role, perms);
   const supabase = await createClient();
   const t = nowMs();
 
@@ -214,7 +220,7 @@ export default async function OnaylarPage({
     bas: bas || undefined,
     bit: bit || undefined,
   };
-  const bulkEnabled = manager && durum === "bekliyor";
+  const bulkEnabled = decider && durum === "bekliyor";
 
   const list = (rows ?? []) as Row[];
   const toplam = total ?? 0;
@@ -272,7 +278,7 @@ export default async function OnaylarPage({
         description="Müdür onayı gereken işler — komisyon indirimi, olağandışı gider, fiyat değişikliği. Talep, karar ve gerekçe kayıt altında."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {manager ? (
+            {hasOfficeWideDataScope(role) ? (
               <ButtonLink href="/app/ofis-kontrol/kurallar" variant="secondary">
                 Onay kuralları
               </ButtonLink>
@@ -308,7 +314,7 @@ export default async function OnaylarPage({
       {(turRows ?? []).length < 1000 ? (
         <ListCharts>
           <DistributionCard
-            title={`${APPROVAL_STATUS_LABEL[durum]} talepler · tür`}
+            title={APPROVAL_STATUS_HEADING[durum]}
             subtitle="Komisyon, gider, fiyat ve diğer onay türleri"
             icon={PieChart}
             tone="success"
@@ -472,8 +478,10 @@ export default async function OnaylarPage({
                     : "bg-ink-950/[0.05] text-text-muted";
 
               return (
-                <details key={r.id} className="group px-5 py-4 transition open:bg-brand-600/[0.02]">
+                <details key={r.id} className="group px-4 py-4 transition open:bg-brand-600/[0.02] sm:px-5">
+                  {/* Mobilde "içerik üstte, eylemler altta": baş grup tam satır, delta + karar düğmeleri alt satırda sağda. */}
                   <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3">
+                    <span className="flex min-w-0 flex-1 items-start gap-3 max-sm:basis-full">
                     {bulkEnabled && !benim ? <BulkRowCheckbox id={r.id} label={`${r.title} talebini`} /> : null}
                     <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] ${TONE_CHIP[meta.tone]}`}>
                       <Icon className="h-4 w-4" />
@@ -481,7 +489,7 @@ export default async function OnaylarPage({
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${TONE_CHIP[meta.tone]}`}>{meta.label}</span>
-                        <span className="truncate text-sm font-semibold text-ink-950">{r.title}</span>
+                        <span className="line-clamp-2 min-w-0 basis-full text-sm font-semibold text-ink-950 sm:basis-auto">{r.title}</span>
                         {r.status !== "bekliyor" ? (
                           <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_CHIP[r.status]}`}>
                             {APPROVAL_STATUS_LABEL[r.status]}
@@ -512,9 +520,10 @@ export default async function OnaylarPage({
                         ) : null}
                       </span>
                     </span>
-                    <span className={`numeric shrink-0 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-bold ${deltaCls}`}>{delta.text}</span>
-                    <span className="flex shrink-0 flex-wrap items-center gap-2">
-                      {r.status === "bekliyor" && manager && !benim ? (
+                    </span>
+                    <span className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:w-full">
+                      <span className={`numeric shrink-0 rounded-[var(--radius-control)] px-2.5 py-1 text-xs font-bold ${deltaCls}`}>{delta.text}</span>
+                      {r.status === "bekliyor" && decider && !benim ? (
                         <DecisionControls requestId={r.id} requestTitle={r.title} />
                       ) : null}
                       {r.status === "bekliyor" && benim ? (
@@ -551,7 +560,7 @@ export default async function OnaylarPage({
                         </p>
                       ) : null}
                       {r.status === "iptal" ? <p className="mt-1">Talep sahibi tarafından geri çekildi.</p> : null}
-                      {r.status === "bekliyor" && benim && manager ? (
+                      {r.status === "bekliyor" && benim && decider ? (
                         <p className="mt-1 text-amber-700">Kendi talebinizi onaylayamazsınız — başka bir yönetici karar vermeli.</p>
                       ) : null}
                     </div>

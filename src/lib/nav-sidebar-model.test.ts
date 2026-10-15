@@ -41,8 +41,10 @@ describe("yan menü görünür yüzeyi (hubNav)", () => {
     expect(closedNav.hubs.some((h) => h.label === "Mülk yönetimi" && h.pages.some((p) => p.href === "/app/kiralama"))).toBe(false);
   });
 
-  it("muhasebe 4 satır, çağrı merkezi 4 satır", () => {
-    expect(labels("accounting")).toEqual(["Bugün", "Komisyon", "Muhasebe", "Mülk yönetimi", "Raporlar", "Abonelik"]);
+  it("muhasebe 5 satır (Mülk yönetimi yok, Aidatlar Muhasebe'de), çağrı merkezi 4 satır", () => {
+    // SK10: menü satırı sayfa kapısıyla aynı izinden süzülür; muhasebede kira (rentals) yok → "Mülk yönetimi" çıkmaz.
+    expect(labels("accounting")).toEqual(["Bugün", "Komisyon", "Muhasebe", "Raporlar", "Abonelik"]);
+    expect(pagesOf("accounting", "muhasebe").map((p) => p.href)).toEqual(["/app/giderler", "/app/aidat"]);
     expect(labels("call_center")).toEqual(["Bugün", "Gelen kutusu", "Müşteriler", "Randevular"]);
     expect(pagesOf("accounting", "muhasebe").map((p) => p.label)).toContain("Gelir ve gider");
   });

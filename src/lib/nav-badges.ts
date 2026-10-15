@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
-import { isApprovalDeciderRole } from "@/lib/approvals";
+import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
+import type { EffectivePermissions } from "@/lib/permissions-merge";
 import type { AppModule } from "@/lib/permissions";
 import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
 
@@ -25,6 +26,8 @@ type Input = {
   userId: string | null;
   role: string | null | undefined;
   accessible: readonly AppModule[];
+  /** Etkin izin (verilmezse istek içi önbellekli `getEffectivePermissions`; layout aynı değeri zaten okur). */
+  perms?: EffectivePermissions;
 };
 
 /** Rozetin ait olduğu modül: spekülatif (izin beklemeden) hesaplanan rozetler bununla süzülür. */
@@ -51,7 +54,7 @@ export function tabCountsFromUsage(usage: readonly PlanUsageRow[]): Record<strin
   return out;
 }
 
-export async function getNavBadges({ supabase, tenantId, userId, role, accessible }: Input): Promise<NavBadge[]> {
+export async function getNavBadges({ supabase, tenantId, userId, role, accessible, perms }: Input): Promise<NavBadge[]> {
   if (!tenantId || !userId) return [];
   const nowIso = new Date(now()).toISOString();
   const jobs: Promise<NavBadge | null>[] = [];
@@ -75,13 +78,17 @@ export async function getNavBadges({ supabase, tenantId, userId, role, accessibl
   if (accessible.includes("commissions") && isApprovalDeciderRole(role)) {
     jobs.push(
       (async () => {
-        const { count, error } = await supabase
-          .from("approval_requests")
-          .select("id", { count: "exact", head: true })
-          .eq("tenant_id", tenantId)
-          .eq("status", "bekliyor")
-          .neq("requested_by", userId);
-        if (error || !count) return null;
+        // Karar yetkisi (canDecideApproval) ile sayım paralel: ek bekleme yok; yetkisizse rozet çıkmaz (SK10 / B164).
+        const [effective, { count, error }] = await Promise.all([
+          perms ?? import("@/lib/permissions-effective").then((m) => m.getEffectivePermissions(tenantId, role, userId)),
+          supabase
+            .from("approval_requests")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenantId)
+            .eq("status", "bekliyor")
+            .neq("requested_by", userId),
+        ]);
+        if (!canDecideApproval(role, effective) || error || !count) return null;
         return { itemHref: "/app/onaylar", href: "/app/onaylar?kim=bana", count, label: "onay bekliyor", tone: "warn" as const };
       })(),
     );

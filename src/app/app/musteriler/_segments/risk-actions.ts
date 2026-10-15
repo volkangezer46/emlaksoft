@@ -1,5 +1,7 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
+import { actionErrorMessage } from "@/lib/action-errors";
 import { closeCallPriorityAfterContact } from "@/lib/insights/close-on-contact";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -21,13 +23,16 @@ const DAY = 86_400_000;
  * Müşteri başına tek satır (unique tenant_id+customer_id) — tekrar basmak
  * süreyi tazeler (upsert).
  */
-export async function dismissRiskFromSmartList(formData: FormData): Promise<void> {
+export function dismissRiskFromSmartList(formData: FormData): Promise<ActionOutcome>;
+/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
+export function dismissRiskFromSmartList(formData: FormData): Promise<void>;
+export async function dismissRiskFromSmartList(formData: FormData): Promise<ActionOutcome | void> {
   const gate = await requirePermission("customers", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const customerId = String(formData.get("customer_id") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!customerId || (reason !== "called" && reason !== "snoozed")) return;
+  if (!customerId || (reason !== "called" && reason !== "snoozed")) return { error: "Geçersiz istek." };
 
   const now = new Date();
   const until = new Date(now.getTime() + (reason === "called" ? 30 : 7) * DAY).toISOString();
@@ -49,7 +54,7 @@ export async function dismissRiskFromSmartList(formData: FormData): Promise<void
 
   if (error) {
     console.error("dismissRiskFromSmartList", error);
-    return;
+    return { error: actionErrorMessage(error, "Kayıt güncellenemedi.") };
   }
 
   await logActivity({
@@ -103,4 +108,5 @@ export async function dismissRiskFromSmartList(formData: FormData): Promise<void
   }
 
   revalidatePath("/app/musteriler");
+  return { ok: true };
 }

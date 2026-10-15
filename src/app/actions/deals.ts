@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { OPEN_DEAL_STAGES } from "@/lib/workflow-state";
 import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { revalidatePath } from "next/cache";
@@ -608,13 +609,13 @@ export async function toggleDealCostPaid(costId: string, dealId: string): Promis
 }
 
 /** İşlem dosyası kalemini siler — ConfirmDialog formAction deseni. */
-export async function deleteDealCost(fd: FormData): Promise<void> {
+export async function deleteDealCost(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("commissions", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const costId = String(fd.get("cost_id") ?? "").trim();
   const dealId = String(fd.get("deal_id") ?? "").trim();
-  if (!costId) return;
+  if (!costId) return { error: "Masraf kaydı bulunamadı." };
 
   const supabase = await createClient();
   const { error } = await supabase
@@ -622,9 +623,13 @@ export async function deleteDealCost(fd: FormData): Promise<void> {
     .delete()
     .eq("id", costId)
     .eq("tenant_id", gate.tenantId);
-  if (error) console.error("deleteDealCost", error);
+  if (error) {
+    console.error("deleteDealCost", error);
+    return { error: actionErrorMessage(error, "Masraf silinemedi.") };
+  }
 
   if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
+  return { ok: true };
 }
 
 // ============================================================
@@ -681,13 +686,13 @@ export async function addDealNote(_prev: DealResult, fd: FormData): Promise<Deal
  * kontrol edilir ki kullanıcı sessiz no-op yerine anlamlı hata görsün.
  * ConfirmDialog formAction deseni (bkz. deleteDealCost).
  */
-export async function deleteDealNote(fd: FormData): Promise<void> {
+export async function deleteDealNote(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("commissions", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const noteId = String(fd.get("note_id") ?? "").trim();
   const dealId = String(fd.get("deal_id") ?? "").trim();
-  if (!noteId) return;
+  if (!noteId) return { error: "Not bulunamadı." };
 
   const supabase = await createClient();
   const { data: note } = await supabase
@@ -696,7 +701,7 @@ export async function deleteDealNote(fd: FormData): Promise<void> {
     .eq("id", noteId)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
-  if (!note || note.author_id !== gate.userId) return; // yalnız kendi notu
+  if (!note || note.author_id !== gate.userId) return { error: "Yalnız kendi notunuzu silebilirsiniz." };
 
   const { error } = await supabase
     .from("deal_notes")
@@ -704,10 +709,14 @@ export async function deleteDealNote(fd: FormData): Promise<void> {
     .eq("id", noteId)
     .eq("tenant_id", gate.tenantId)
     .eq("author_id", gate.userId);
-  if (error) console.error("deleteDealNote", error);
+  if (error) {
+    console.error("deleteDealNote", error);
+    return { error: actionErrorMessage(error, "Not silinemedi.") };
+  }
 
   if (dealId) revalidatePath(`/app/anlasmalar/${dealId}`);
   revalidatePath("/app/anlasmalar");
+  return { ok: true };
 }
 
 /** Toplu işlem üst sınırı (liste sayfası 50 satır; birkaç sayfalık seçim için pay). */

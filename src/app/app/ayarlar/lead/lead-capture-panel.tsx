@@ -45,6 +45,7 @@ export function LeadCapturePanel({
   vitrinUrl?: string;
 }) {
   const [pending, startTransition] = useTransition();
+  const [toggleError, setToggleError] = useState<string | null>(null);
   const formUrl = `${baseUrl}/lead/${token}`;
   const webhookUrl = `${baseUrl}/api/leads/${token}`;
 
@@ -90,7 +91,11 @@ export function LeadCapturePanel({
               onClick={() => {
                 const fd = new FormData();
                 fd.set("enabled", String(!enabled));
-                startTransition(() => setLeadCaptureEnabled(fd));
+                setToggleError(null);
+                startTransition(async () => {
+                  const res = await setLeadCaptureEnabled(fd);
+                  if (res.error) setToggleError(res.error);
+                });
               }}
               className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-xs font-semibold text-ink-950 transition hover:border-brand-300 disabled:opacity-60"
             >
@@ -98,6 +103,11 @@ export function LeadCapturePanel({
             </button>
           </div>
         </div>
+        {toggleError ? (
+          <p className="mt-2 text-xs font-medium text-danger-600" role="alert">
+            {toggleError}
+          </p>
+        ) : null}
       </section>
 
       <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
@@ -116,9 +126,7 @@ export function LeadCapturePanel({
               title="Anahtarı yenile"
               description="Anahtar yenilenirse mevcut form ve bağlantı uç noktası çalışmaz; sitenize gömdüğünüz formu yeni adresle güncellemeniz gerekir."
               confirmLabel="Yenile"
-              onConfirm={async () => {
-                await regenerateLeadToken();
-              }}
+              onConfirm={() => regenerateLeadToken()}
               trigger={
                 <button
                   type="button"

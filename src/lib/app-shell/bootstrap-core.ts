@@ -1,9 +1,9 @@
 import { resolvePlanDef, type PlanDef } from "@/lib/billing/plans";
-import { isApprovalDeciderRole } from "@/lib/approvals";
+import { canDecideApproval, isApprovalDeciderRole } from "@/lib/approvals";
 import type { ModuleRow } from "@/lib/modules/logic";
 import type { NavBadge, PlanUsageRow } from "@/lib/nav-badges";
 import type { AppModule } from "@/lib/permissions";
-import type { UserOverrideRow } from "@/lib/permissions-effective";
+import { mergeEffectivePermissions, type EffectivePermissions, type UserOverrideRow } from "@/lib/permissions-merge";
 
 /**
  * `app_shell_bootstrap()` RPC yanıtının SAF tarafı (DB/React yok; vitest kapsamında).
@@ -115,6 +115,10 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
       : null
     : undefined;
 
+  // Bekleyen onay rozeti yalnız KARAR VEREBİLENE (SK10 / B164: canDecideApproval = kademe + etkin commissions:edit).
+  // Sayı burada sıfırlanır; böylece rozeti çizen her yol (navBadgesFromCounts) aynı kurala uyar.
+  const canDecide = canDecideApproval(role, mergeEffectivePermissions(role, roleOverrides, userOverrides));
+
   return {
     profile: { id, fullName: str(raw.profile.full_name) ?? "", role, tenantId },
     office,
@@ -130,7 +134,7 @@ export function parseShellBootstrap(raw: unknown): ShellBootstrap | null {
     },
     badges: {
       overdueTasks: count(raw.badges.overdue_tasks),
-      pendingApprovals: count(raw.badges.pending_approvals),
+      pendingApprovals: canDecide ? count(raw.badges.pending_approvals) : 0,
     },
   };
 }
@@ -153,9 +157,15 @@ export function usageRowsFromCounts(plan: string | undefined, counts: ShellUsage
 
 /**
  * Menü rozetleri — `getNavBadges` ile aynı kurallar: geciken görev rozeti yalnız `tasks` erişimiyle; bekleyen onay
- * rozeti yalnız `commissions` erişimi + karar yetkili rolle. Sıfır sayıda rozet çıkmaz.
+ * rozeti yalnız `commissions` erişimi + karar yetkisi (`canDecideApproval`; `perms` verilmezse kademe — sayı zaten
+ * `parseShellBootstrap`'ta karar yetkisine göre sıfırlanır). Sıfır sayıda rozet çıkmaz.
  */
-export function navBadgesFromCounts(args: { counts: ShellBadgeCounts; role: string | null | undefined; accessible: readonly AppModule[] }): NavBadge[] {
+export function navBadgesFromCounts(args: {
+  counts: ShellBadgeCounts;
+  role: string | null | undefined;
+  accessible: readonly AppModule[];
+  perms?: EffectivePermissions;
+}): NavBadge[] {
   const badges: NavBadge[] = [];
   if (args.accessible.includes("tasks") && args.counts.overdueTasks > 0) {
     badges.push({
@@ -166,7 +176,8 @@ export function navBadgesFromCounts(args: { counts: ShellBadgeCounts; role: stri
       tone: "danger",
     });
   }
-  if (args.accessible.includes("commissions") && isApprovalDeciderRole(args.role) && args.counts.pendingApprovals > 0) {
+  const decider = args.perms ? canDecideApproval(args.role, args.perms) : isApprovalDeciderRole(args.role);
+  if (args.accessible.includes("commissions") && decider && args.counts.pendingApprovals > 0) {
     badges.push({
       itemHref: "/app/onaylar",
       href: "/app/onaylar?kim=bana",

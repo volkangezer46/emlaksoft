@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useOptimistic, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { CheckCircle2, RefreshCw } from "lucide-react";
 import { confirmPortalListing } from "@/app/actions/portal-listings";
 import { useToast } from "@/components/app/toast-provider";
@@ -17,11 +16,11 @@ export const ConfirmedListingsContext = createContext<ReadonlySet<string>>(new S
  *
  * React 19 optimistic desen: tıklandığı AN buton yeşil "Teyit edildi ✓"
  * durumuna geçer ve kilitlenir; server action arkada çalışır. Başarıda kalıcı
- * state ile teyitli kalır, hatada optimistic değer kendiliğinden geri sarılır
- * (+ toast ve refresh).
+ * state ile teyitli kalır. Eylem `{ok}|{error}` döner (SK10 / B166): yetki reddi
+ * ("yetkiniz yok"), hata ya da canlı olmayan ilan → iyimser değer geri sarılır,
+ * neden bildirimle gösterilir; kalıcı "Teyit edildi" YAZILMAZ.
  */
 export function ConfirmListingButton({ listingId }: { listingId: string }) {
-  const router = useRouter();
   const { push } = useToast();
   const [pending, startTransition] = useTransition();
   const [savedConfirmed, setSavedConfirmed] = useState(false);
@@ -36,11 +35,11 @@ export function ConfirmListingButton({ listingId }: { listingId: string }) {
       const fd = new FormData();
       fd.set("id", listingId);
       try {
-        await confirmPortalListing(fd);
-        setSavedConfirmed(true); // revalidate sonrası da teyitli kalsın
+        const res = await confirmPortalListing(fd);
+        if (res.ok) setSavedConfirmed(true); // revalidate sonrası da teyitli kalsın
+        else push(res.error ?? "Teyit edilemedi", "err");
       } catch {
         push("Teyit edilemedi", "err");
-        router.refresh();
       }
     });
   }

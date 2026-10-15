@@ -142,6 +142,43 @@ export function canEditPermissionOverride(actor: Actor, target: Target): RuleRes
   return { ok: true };
 }
 
+/**
+ * Rol izin matrisi (tenant_role_permissions) hücresini kim düzenler? TEK kural (SK10 / B161); eylem
+ * (`actions/permissions.ts`), arayüz (`roles-section.tsx` readOnly) ve RLS (`tenant_role_permissions_write`,
+ * 20261016100200) aynı koşulu uygular:
+ *  - yalnız owner/gm yazar; ofis sahibi rolü hiç düzenlenmez (daima tam yetkili, kilitlenme koruması);
+ *  - genel müdür KENDİ rolünün (gm) satırını düzenleyemez (kendini yükseltme/daraltma yasağı); bunu ofis sahibi yapar;
+ *  - genel müdür, kendinde olmayan bir izni başka role VEREMEZ (`grant` + `actorHas=false`).
+ */
+export function canEditRolePermissions(
+  actorRole: string,
+  targetRole: string,
+  change?: { grant: boolean; actorHas: boolean },
+): RuleResult {
+  if (!isScopeEditorRole(actorRole)) return deny("Bu işlem için yetkiniz yok. Sadece ofis sahibi ve genel müdür izin matrisini düzenleyebilir.");
+  if (targetRole === "owner") return deny("Ofis sahibi rolü düzenlenemez; her zaman tam yetkilidir.");
+  if (actorRole === "gm" && targetRole === "gm") return deny("Genel müdür kendi rolünün izinlerini değiştiremez; bunu ofis sahibi yapar.");
+  if (actorRole === "gm" && change?.grant && !change.actorHas) return deny("Kendinizde olmayan bir izni başka role veremezsiniz.");
+  return { ok: true };
+}
+
+/**
+ * İlan havuzu ataması: şube müdürü yalnız KENDİ şubesindeki ilanı KENDİ şubesindeki kişiye atar; şubesi yoksa atayamaz
+ * (SK10 / B165). Aynı kural DB'de `assign_pool_entry` (20261016100300). Diğer roller için kısıt yok (owner/gm ofis geneli).
+ */
+export function poolBranchRule(input: {
+  actorRole: string;
+  actorBranchId: string | null;
+  propertyBranchId: string | null;
+  targetBranchId: string | null;
+}): RuleResult {
+  if (input.actorRole !== "branch_manager") return { ok: true };
+  if (!input.actorBranchId) return deny("Şubeniz tanımlı değil; bu atamayı ofis yönetimi yapar.");
+  if (input.propertyBranchId !== input.actorBranchId) return deny("Bu ilan sizin şubenize ait değil.");
+  if (input.targetBranchId !== input.actorBranchId) return deny("Atanacak kişi sizin şubenizde değil.");
+  return { ok: true };
+}
+
 /** Denetim günlüğü değişiklik türü etiketleri (ekran + CSV tek kaynak). */
 export const AUDIT_CHANGE_LABELS: Record<string, string> = {
   scope_created: "Kapsam tanımlandı",

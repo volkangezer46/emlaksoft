@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/require-permission";
@@ -28,9 +29,10 @@ export async function retryRegistrationDemoSeed(): Promise<{ ok?: boolean; error
 }
 
 /** Bandı kapatır (örnek veri istemiyorum). */
-export async function dismissDemoSeedRetry(): Promise<void> {
+export async function dismissDemoSeedRetry(): Promise<ActionOutcome> {
   const gate = await requirePermission("settings", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   (await cookies()).delete(DEMO_SEED_FAILED_COOKIE);
   revalidatePath("/app");
+  return { ok: true };
 }

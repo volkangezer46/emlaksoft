@@ -8,7 +8,16 @@ EmlakSoft'ta yetkilendirme, rol × modül × aksiyon matrisi (var olan `permissi
 
 ---
 
-## GERÇEK DURUM (2026-10-10 rol duman testi, bulgu B1) — ÖNCE BUNU OKU
+## GÜNCEL DURUM (SK10, 2026-10-16) — ÖNCE BUNU OKU
+
+- Kapsam artık **veritabanında da** uygulanır (bayrak açıkken): `public.scope_context()` / `scope_owner_ids()` /
+  `scope_enforced()` / `scope_allows(uuid)` (20261016100000_scope_rls.sql) customers, properties, deals, customer_demands,
+  tasks ve appointments tablolarının SELECT / UPDATE / DELETE politikalarına bağlıdır. Bayrak KAPALIYKEN (varsayılan,
+  yeni ofisler dahil) sonuç kümesi değişmez. Silinmiş müşteri/portföy bayrak açıkken yalnız silme yetkilisine görünür.
+- Yazma politikaları modül izni taşır (20261016100100); `scripts/rls-audit.ts` YAZMA-IZIN-YOK kuralı yeni ihlali yakalar.
+- Aşağıdaki "2026-10-10" notu tarihsel bağlamdır.
+
+## TARİHSEL DURUM (2026-10-10 rol duman testi, bulgu B1)
 
 Bu belgenin aşağıdaki "DB RLS" / "SQL RLS" bölümleri **hedef tasarımdır; veritabanında UYGULANMAMIŞTIR**. Bugünkü davranış:
 

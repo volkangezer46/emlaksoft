@@ -238,10 +238,52 @@ const svcAcik = exported.filter((f) => {
   return RISKLI_PARAM.test(imza) && !MUAF[f.key];
 });
 
-if (acik.length === 0 && svcAcik.length === 0) {
+/* ===========================================================================
+ * UCUNCU KONTROL (SK10 / B166): yetki reddini YUTAN void eylem
+ * ===========================================================================
+ * `requirePermission` cagiran ve disa acik bir eylem `Promise<void>` dondurmemeli: void eylemde kapi reddi
+ * (`if (!gate.ok) return;`) istemciye hic ulasmaz; iyimser arayuz "Teyit edildi" der, kullanici yetkisiz
+ * oldugunu ogrenmez. Eylem `{ ok } | { error }` dondurur (src/lib/action-outcome.ts); dogrudan `<form action>`
+ * olarak kullaniliyorsa form uyumlu asiri yukleme eklenir (`export function f(fd): Promise<void>;`).
+ * TABAN: bu kural yazildiginda baska paketlerin dosyalarinda kalan eylemler (her biri sahibiyle); YENI void eylem
+ * kirar, listede olup artik void olmayan (bayat) anahtar da kirar -> liste kendiliginden daralir.
+ */
+const VOID_TABAN: Record<string, string> = {
+  "customers.ts::reassignCustomer": "SK7 (customers.ts) kendi bulgusu kapsaminda {ok|error} donusune cevirir.",
+  "properties.ts::setPropertyStatus": "SK9 (properties.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
+  "properties.ts::reassignProperty": "SK9 (properties.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
+  "property-media.ts::deletePropertyMedia": "SK9 (property-media.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
+  "property-media.ts::setCoverPropertyMedia": "SK9 (property-media.ts): karar.json B166 dagilimi; <=5 hedefinde kalan kullanim.",
+};
+const VOID_HEADER_RE = /\)\s*:\s*Promise<void>\s*$/;
+const voidGated = exported
+  .filter((f) => {
+    const brace = f.body.indexOf("{");
+    const header = brace >= 0 ? f.body.slice(0, brace) : f.body;
+    return VOID_HEADER_RE.test(header) && /\brequirePermission\s*\(/.test(f.body);
+  })
+  .map((f) => f.key);
+const voidYeni = voidGated.filter((k) => !VOID_TABAN[k]);
+const voidBayat = Object.keys(VOID_TABAN).filter((k) => !voidGated.includes(k));
+console.log(`void + requirePermission eylem: ${voidGated.length} (taban ${Object.keys(VOID_TABAN).length})`);
+
+// Bayat taban anahtarı yalnız UYARI: sahibi paket eylemini çevirdiğinde bu betiği bilmeden kırılmasın.
+if (voidBayat.length > 0) {
+  console.log(`[UYARI VOID-TABAN-BAYAT] ${voidBayat.length} anahtar artık void değil; VOID_TABAN'dan silinebilir:`);
+  for (const k of voidBayat) console.log(`   ${k}`);
+}
+
+if (acik.length === 0 && svcAcik.length === 0 && voidYeni.length === 0) {
   console.log("BULGU YOK — hepsinde yetki kapısı var (doğrudan ya da delegasyonla).");
   console.log("service_role kullanan action'larda çağıran kaynaklı kiracı kimliği yok.");
+  console.log("Yetki reddini yutan yeni void eylem yok.");
   process.exit(0);
+}
+
+if (voidYeni.length > 0) {
+  console.log(`\n[VOID-EYLEM] ${voidYeni.length} action requirePermission çağırıp Promise<void> döndürüyor:`);
+  for (const k of voidYeni) console.log(`   ${k}`);
+  console.log("Yetki reddi istemciye ulaşmalı: { ok } | { error } döndürün (src/lib/action-outcome.ts).");
 }
 
 if (svcAcik.length > 0) {

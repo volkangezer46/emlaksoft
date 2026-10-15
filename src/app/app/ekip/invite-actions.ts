@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
@@ -22,12 +23,12 @@ import { INVITE_MODES, type InviteMode } from "./yeni/advisor-tabs";
  * yineleme = şifre belirleme (recovery) e-postası göndermektir; mevcut şifre sıfırlama
  * akışıyla aynı `/sifre-yenile` sayfasına düşer (bkz. actions/password-reset.ts).
  */
-export async function resendInvite(formData: FormData): Promise<void> {
+export async function resendInvite(formData: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("team", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Üye bulunamadı." };
 
   const admin = createAdminClient();
 
@@ -37,15 +38,15 @@ export async function resendInvite(formData: FormData): Promise<void> {
     .select("id, tenant_id")
     .eq("id", id)
     .maybeSingle();
-  if (!target || target.tenant_id !== gate.tenantId) return;
+  if (!target || target.tenant_id !== gate.tenantId) return { error: "Üye bu ofise ait değil." };
 
   // profiles'ta e-posta tutulmuyor — auth kullanıcısından oku.
   const { data: authUser } = await admin.auth.admin.getUserById(id);
   const email = authUser?.user?.email;
-  if (!email) return;
+  if (!email) return { error: "Üyenin e-posta adresi bulunamadı." };
 
   // YD1: demo kiracıda davet e-postası gitmez; günlüğe "demo: gönderilmedi" düşer.
-  if (await demoSandboxAuthEmail({ tenantId: gate.tenantId, to: email, template: "team_invite", source: "team_invite_resend", subject: "Ekip daveti (yineleme)", actorId: gate.userId })) return;
+  if (await demoSandboxAuthEmail({ tenantId: gate.tenantId, to: email, template: "team_invite", source: "team_invite_resend", subject: "Ekip daveti (yineleme)", actorId: gate.userId })) return { ok: true };
 
   const appUrl = getBaseUrl();
   try {
@@ -57,6 +58,7 @@ export async function resendInvite(formData: FormData): Promise<void> {
   } catch (e) {
     console.error("resendInvite", e);
   }
+  return { ok: true };
 }
 
 export type CreateAdvisorResult = {

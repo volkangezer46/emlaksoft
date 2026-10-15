@@ -181,6 +181,7 @@ export function NewContractForm({
   prefillProperty = "",
   prefillTur = "",
   rentalContext = null,
+  canSaveTemplate = false,
   userId,
 }: {
   contractTypes?: { value: string; label: string }[];
@@ -192,6 +193,8 @@ export function NewContractForm({
   prefillTur?: string;
   /** Kiralama kaydından gelindiyse (?kira=): ön dolgu ve artış maddesi alanı. */
   rentalContext?: RentalContractContext | null;
+  /** Ofis şablonu yazma izni (settings:edit); yoksa "şablon olarak kaydet" seçeneği çizilmez. */
+  canSaveTemplate?: boolean;
   userId: string;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -262,7 +265,7 @@ export function NewContractForm({
         return;
       }
       // "Bu içeriği şablon olarak kaydet" — ofis (tenant) şablonu oluşur
-      if (saveAsTemplate) {
+      if (saveAsTemplate && canSaveTemplate) {
         const tfd = new FormData();
         tfd.set("title",   String(fd.get("title") ?? "Şablon"));
         tfd.set("type",    String(fd.get("contract_type") ?? "diger"));
@@ -517,6 +520,7 @@ export function NewContractForm({
             className={`${fieldClass} resize-y font-mono text-xs`}
           />
         </div>
+        {canSaveTemplate ? (
         <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3.5 py-2.5 sm:col-span-2">
           <input
             type="checkbox"
@@ -531,6 +535,7 @@ export function NewContractForm({
             </span>
           </span>
         </label>
+        ) : null}
       </>
     ),
   };
@@ -585,12 +590,14 @@ export function NewContractForm({
             tab="icerik"
             field="sozl-body"
           />
-          <SummaryRow
-            label="Şablon olarak kaydet"
-            value={saveAsTemplate ? "Evet" : "Hayır"}
-            muted={!saveAsTemplate}
-            tab="icerik"
-          />
+          {canSaveTemplate ? (
+            <SummaryRow
+              label="Şablon olarak kaydet"
+              value={saveAsTemplate ? "Evet" : "Hayır"}
+              muted={!saveAsTemplate}
+              tab="icerik"
+            />
+          ) : null}
         </SummaryGroup>
       </>
     );

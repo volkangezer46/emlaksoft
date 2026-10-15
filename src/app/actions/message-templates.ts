@@ -1,5 +1,6 @@
 "use server";
 
+import type { ActionOutcome } from "@/lib/action-outcome";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
@@ -139,15 +140,16 @@ export async function updateMessageTemplate(_prev: TemplateResult, fd: FormData)
 }
 
 /** Şablonu kalıcı siler. ConfirmDialog formAction imzası (void döner). */
-export async function deleteMessageTemplateForm(fd: FormData): Promise<void> {
+export async function deleteMessageTemplateForm(fd: FormData): Promise<ActionOutcome> {
   const gate = await requirePermission("settings", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
 
   const id = String(fd.get("id") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Şablon bulunamadı." };
 
   const supabase = await createClient();
-  await supabase.from("message_templates").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  const { error } = await supabase.from("message_templates").delete().eq("id", id).eq("tenant_id", gate.tenantId);
+  if (error) return { error: actionErrorMessage(error, "Şablon silinemedi.") };
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -158,6 +160,7 @@ export async function deleteMessageTemplateForm(fd: FormData): Promise<void> {
   });
 
   revalidateTemplates();
+  return { ok: true };
 }
 
 /** Aktif/pasif değiştirir — pasif şablon WhatsApp menüsünde görünmez. */
@@ -256,11 +259,16 @@ export async function listMessageTemplates(): Promise<{ templates: MessageTempla
  * Kullanım sayacı +1 (atomik RPC). Fire-and-forget çağrılır; hata kullanıcıya
  * yansımaz — mesaj gönderimi sayaçtan daha önemli.
  */
-export async function recordTemplateUsage(id: string): Promise<void> {
+export async function recordTemplateUsage(id: string): Promise<ActionOutcome> {
   const gate = await requirePermission("customers", "view");
-  if (!gate.ok || !id) return;
+  if (!gate.ok) return { error: gate.error };
+  if (!id) return { error: "Şablon bulunamadı." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("increment_template_usage", { p_template_id: id });
-  if (error) console.error("recordTemplateUsage", error);
+  if (error) {
+    console.error("recordTemplateUsage", error);
+    return { error: actionErrorMessage(error, "Şablon kullanımı kaydedilemedi.") };
+  }
+  return { ok: true };
 }

@@ -243,6 +243,9 @@ export const DEFAULT_MATRIX: Record<AppRole, Partial<Record<AppModule, AppAction
     valuation: VIEW,
     surveys: VIEW,
     prospecting: VIEW,
+    // Yardım / Destek sayfası (SK10 / B168, B189): tur bitişi Yardım'ı gösterir; salt okunur da açabilmeli.
+    // DB kopyası: 20261016100200_trp_gm_guard_readonly_support.sql.
+    support: VIEW,
   },
 };
 

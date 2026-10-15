@@ -8,7 +8,13 @@
  *   gelir (`mineOnly` → self, değilse none): bugünkü davranış birebir korunur.
  * - AÇIKSA kullanıcı kapsamı uygulanır; eski kural daha darsa o kazanır (kapsam yalnız daraltır).
  * - team/branch üyeleri `profiles` üzerinden (RLS: kendi ofisi) okunur; şema yoksa fail-closed self.
+ *   Şubesi tanımlı olmayan şube müdürü (ya da takımı olmayan takım lideri) fail-closed KENDİ kapsamına düşer.
  * Çağıran sayfa `applyScopeFilter(query, filter, { ownerColumn })` ile sorguya bağlar; rozet `badge` ile çizilir.
+ *
+ * VERİTABANI KARŞILIĞI (SK10 / B160): bayrak açıkken aynı kural RLS'te de uygulanır (`public.scope_context()`,
+ * `scope_owner_ids()`; 20261016100000). Uygulama süzgeci sayfalama/sayım ve rozet için kalır; RLS gizlilik sınırıdır.
+ * İki taraf aynı rol varsayılanını kullanır (`scope-rules.ts` getDefaultScopeForRole); RLS ayrıca kaydı AÇAN kişiyi
+ * (created_by) kendi kapsamında sayar ve silinmiş müşteri/portföyü yalnız silme yetkilisine gösterir.
  */
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";

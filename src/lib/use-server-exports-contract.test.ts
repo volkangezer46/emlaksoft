@@ -27,6 +27,10 @@ describe('"use server" dışa aktarım sözleşmesi', () => {
       src.split("\n").forEach((line, i) => {
         if (!/^export\s/.test(line)) return;
         if (/^export\s+(async\s+function|type\s|interface\s|declare\s)/.test(line)) return;
+        // TypeScript aşırı yükleme İMZASI (gövdesiz, `;` ile biter) derlemede silinir; aynı adın async gövdesi dosyada
+        // olmalı. SK10: `{ok|error}` döndüren eylemin `<form action>` ile de kullanılabilmesi (form tipi void bekler).
+        const overload = /^export\s+function\s+(\w+)\s*\([^)]*\)\s*:\s*[^{]*;\s*$/.exec(line);
+        if (overload && src.includes(`export async function ${overload[1]}(`)) return;
         if (/^export\s+\{[^}]*\}\s+from\s/.test(line) && /^export\s+\{\s*type\s/.test(line)) return;
         bad.push(`${relative(process.cwd(), f)}:${i + 1}: ${line.trim().slice(0, 100)}`);
       });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useOptimistic, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { CheckCheck, Loader2 } from "lucide-react";
 import { confirmPortalListingsBulk } from "@/app/actions/portal-listings";
 import { useToast } from "@/components/app/toast-provider";
@@ -17,8 +16,8 @@ import { ConfirmedListingsContext } from "./confirm-listing-button";
  * React 19 optimistic desen: "Seçilenleri teyit et" tıklanır tıklanmaz seçili
  * satırların teyit butonları ConfirmedListingsContext üzerinden yeşil
  * "Teyit edildi ✓" durumuna geçer; action arkada çalışır. Başarıda kalıcı
- * state ile teyitli kalırlar, hatada optimistic küme kendiliğinden geri
- * sarılır (+ toast ve refresh).
+ * state ile teyitli kalırlar; eylem `{error}` dönerse (yetki reddi dahil) optimistic
+ * küme kendiliğinden geri sarılır ve neden bildirimle gösterilir (SK10 / B166).
  */
 export function BulkConfirmForm({
   selectableCount,
@@ -28,7 +27,6 @@ export function BulkConfirmForm({
   selectableCount: number;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const { push } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [selected, setSelected] = useState(0);
@@ -65,11 +63,11 @@ export function BulkConfirmForm({
       boxes().forEach((b) => (b.checked = false));
       setSelected(0);
       try {
-        await confirmPortalListingsBulk(fd);
-        setSavedConfirmed((prev) => new Set([...prev, ...ids])); // revalidate sonrası da kalıcı
+        const res = await confirmPortalListingsBulk(fd);
+        if (res.ok) setSavedConfirmed((prev) => new Set([...prev, ...ids])); // revalidate sonrası da kalıcı
+        else push(res.error ?? "Teyit edilemedi", "err"); // iyimser küme geçiş bitince geri sarılır
       } catch {
         push("Teyit edilemedi", "err");
-        router.refresh();
       }
     });
   }

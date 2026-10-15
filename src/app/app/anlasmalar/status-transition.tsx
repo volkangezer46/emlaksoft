@@ -37,14 +37,20 @@ const FLOW: FlowItem[] = [
  * Kart üzerindeki "Geçiş" menüsü: sürükle-bırakın klavye/alternatif yolu.
  * Kazanıldı ve Kaybedildi popup AÇMAZ; anlaşma detayındaki Kapanış sekmesine (sihirbaz) götürür,
  * aşama orada onaylanınca değişir. Diğer geçişler doğrudan `updateDealStage` ile yapılır.
+ *
+ * Yetki (SK10 / B057, sözleşme k): `canEdit` SUNUCUDA etkin izinden (commissions:edit) hesaplanır ve ZORUNLUDUR.
+ * İzin yoksa menü hiç çizilmez; "basınca yetkiniz yok" diyen düğme kalmaz (tahta nedeni bir kez yazar).
  */
 export function StatusTransitionBar({
   dealId,
   stage,
+  canEdit,
   stageLabels = defaultStageLabels(),
 }: {
   dealId: string;
   stage: string;
+  /** Aşama değiştirme izni (commissions:edit); false ise hiçbir şey çizilmez. */
+  canEdit: boolean;
   /** Ofisin görünen aşama adları. */
   stageLabels?: StageLabels;
 }) {
@@ -53,7 +59,7 @@ export function StatusTransitionBar({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const options = FLOW.filter((f) => f.from === stage);
+  const options = canEdit ? FLOW.filter((f) => f.from === stage) : [];
 
   if (options.length === 0) return null;
 

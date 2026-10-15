@@ -145,11 +145,18 @@ async function recordManualPresent(listingIds: readonly string[]): Promise<void>
   }
 }
 
-export async function confirmPortalListing(formData: FormData): Promise<void> {
+/**
+ * Tekil teyit. `{ok}|{error}` döner (SK10 / B166): yetki reddi, hata ya da 0 satır (ilan canlı değil) istemciye ulaşır;
+ * teyit düğmesi iyimser "Teyit edildi" durumunu geri alır ve bildirim gösterir. Form eylemi olarak da kullanılır.
+ */
+export function confirmPortalListing(formData: FormData): Promise<PortalResult>;
+/** Form eylemi olarak da verilebilir: React `<form action>` tipi void bekler, form sonucu yok sayar (bkz. action-outcome). */
+export function confirmPortalListing(formData: FormData): Promise<void>;
+export async function confirmPortalListing(formData: FormData): Promise<PortalResult | void> {
   const gate = await requirePermission("portals", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "");
-  if (!id) return;
+  if (!id) return { error: "İlan bulunamadı." };
 
   const admin = createAdminClient();
   const { data: updated, error } = await admin
@@ -160,16 +167,18 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
     .eq("status", "live")
     .select("id")
     .maybeSingle();
-  if (error || !updated) {
+  if (error) {
     console.error("confirmPortalListing", error);
-    return;
+    return { error: actionErrorMessage(error, "Teyit kaydedilemedi.") };
   }
+  if (!updated) return { error: "İlan yayında değil ya da bulunamadı; teyit edilmedi." };
   await recordManualPresent([id]);
 
   revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
+  return { ok: true };
 }
 
 /**
@@ -177,29 +186,33 @@ export async function confirmPortalListing(formData: FormData): Promise<void> {
  * Tek update + `.in()` ile çalışır; yalnızca canlı ilanlar teyitlenir
  * (kapanmış bir kaydı yanlışlıkla diriltmemek için status koşulu var).
  */
-export async function confirmPortalListingsBulk(formData: FormData): Promise<void> {
+export async function confirmPortalListingsBulk(formData: FormData): Promise<PortalResult & { confirmed?: number }> {
   const gate = await requirePermission("portals", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const ids = [...new Set(formData.getAll("ids").map((v) => String(v).trim()).filter(Boolean))];
-  if (ids.length === 0) return;
+  if (ids.length === 0) return { error: "İlan seçin." };
 
   const admin = createAdminClient();
-  const { error } = await admin
+  const { data: updated, error } = await admin
     .from("portal_listings")
     .update({ last_confirmed_at: new Date().toISOString() })
     .in("id", ids)
     .eq("tenant_id", gate.tenantId)
-    .eq("status", "live");
+    .eq("status", "live")
+    .select("id");
   if (error) {
     console.error("confirmPortalListingsBulk", error);
-    return;
+    return { error: actionErrorMessage(error, "Teyit kaydedilemedi.") };
   }
-  await recordManualPresent(ids);
+  const confirmed = (updated ?? []).map((r) => String((r as { id: string }).id));
+  if (confirmed.length === 0) return { error: "Seçilen ilanlar yayında değil; teyit edilmedi." };
+  await recordManualPresent(confirmed);
 
   revalidatePath("/app/ilan-kontrol/portallar");
   revalidatePath("/app/ilan-kontrol/kapanis");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
+  return { ok: true, confirmed: confirmed.length };
 }
 
 export async function closePortalListing(formData: FormData): Promise<PortalResult> {
