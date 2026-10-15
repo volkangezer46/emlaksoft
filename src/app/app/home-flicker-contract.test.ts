@@ -22,11 +22,12 @@ describe("ana ekran yanıp sönme sözleşmesi", () => {
     expect(src).not.toMatch(/<DashboardGrid(?![^>]*stagger=\{false\})[^>]*>/);
   });
 
-  it("realtime kancası subscribe() içinde refresh çağırmaz", () => {
+  it("realtime kancası subscribe() içinde refresh çağırmaz; yalnız YENİDEN katılımda (ilk SUBSCRIBED değil) tazeleme ister", () => {
     const src = read("src/hooks/use-realtime-refresh.ts");
-    const subscribeIdx = src.indexOf("ch.subscribe()");
+    const subscribeIdx = src.indexOf("ch.subscribe(");
     expect(subscribeIdx).toBeGreaterThan(0);
-    const around = src.slice(Math.max(0, subscribeIdx - 40), subscribeIdx + 40);
-    expect(around).not.toContain("router.refresh");
+    const body = src.slice(subscribeIdx, src.indexOf("});", subscribeIdx));
+    expect(body).not.toContain("router.refresh");
+    expect(body).toMatch(/if \(joinedOnce\) onRejoin\?\.\(\);/);
   });
 });
