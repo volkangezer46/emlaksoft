@@ -45,12 +45,14 @@ async function accountOf(accountId: string): Promise<Pick<FinanceAccount, "id" |
   return (data as Pick<FinanceAccount, "id" | "owner_scope" | "currency" | "archived_at"> | null) ?? null;
 }
 
-async function entryScope(entryId: string): Promise<"office" | "user" | null> {
+/** Hareketin hesabı ve kapsamı (ofis/kişisel). Hesap kimliği düzenleme doğrulamasına da gider (B101). */
+async function entryScope(entryId: string): Promise<{ scope: "office" | "user"; accountId: string } | null> {
   const supabase = await createClient();
   const { data: entry } = await supabase.from("cash_entries").select("account_id").eq("id", entryId).maybeSingle();
   if (!entry) return null;
-  const acc = await accountOf(String((entry as { account_id: string }).account_id));
-  return acc?.owner_scope ?? null;
+  const accountId = String((entry as { account_id: string }).account_id);
+  const acc = await accountOf(accountId);
+  return acc ? { scope: acc.owner_scope, accountId } : null;
 }
 
 function rpcFailure(error: { code?: string | null; message?: string | null } | null, fallback: string): FinanceResult {
@@ -216,10 +218,12 @@ export async function updateCashEntry(entryId: string, input: Record<string, unk
   if (!isUuid(entryId)) return { error: "Hareket bulunamadı." };
   const scope = await entryScope(entryId);
   if (!scope) return { error: "Hareket bulunamadı." };
-  const gate = await gateFor(scope, "edit");
+  const gate = await gateFor(scope.scope, "edit");
   if (!gate.ok) return { error: gate.error };
   const direction: CashDirection = String(input.direction) === "in" ? "in" : "out";
-  const parsed = parseEntryInput(input as Record<string, string>, direction, trDayKey(now()));
+  // Hesap değiştirilemez: doğrulama hareketin KENDİ hesabıyla yapılır (pencere accountId göndermiyordu → her düzenleme
+  // "Hangi hesap olduğunu seçin." ile düşüyordu, B101).
+  const parsed = parseEntryInput({ ...(input as Record<string, string>), accountId: scope.accountId }, direction, trDayKey(now()));
   if (!parsed.ok) return { error: parsed.error };
   const e = parsed.value;
 
@@ -247,7 +251,7 @@ export async function voidCashEntry(entryId: string, reason: string): Promise<Fi
   if (!isUuid(entryId)) return { error: "Hareket bulunamadı." };
   const scope = await entryScope(entryId);
   if (!scope) return { error: "Hareket bulunamadı." };
-  const gate = await gateFor(scope, "delete");
+  const gate = await gateFor(scope.scope, "delete");
   if (!gate.ok) return { error: gate.error };
   const text = String(reason ?? "").trim();
   if (text.length < 3) return { error: "İptal nedenini yazın (en az 3 karakter)." };

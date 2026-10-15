@@ -1,9 +1,11 @@
 /**
- * Ofis kâr/zarar (SAF): ay bazında komisyon − KDV − dağıtılan paylar − gider = net.
+ * Ofis kâr/zarar (SAF): ay bazında komisyon (KDV hariç) − dağıtılan paylar − gider = net. KDV YALNIZ BİLGİDİR.
  *
  * Tanımlar (ekranda da yazılır):
- *  - Komisyon (brüt): `commissions.gross_amount` (= net + KDV, `calculateCommission`); ay = komisyon kaydı tarihi (tahakkuk).
- *    İptal edilen komisyon sayılmaz. Tahsilat (nakit akışı) değil, tahakkuktur.
+ *  - Komisyon (KDV hariç): `commissions.gross_amount` KDV HARİÇ matrahtır (kapanış RPC'si v_net'i yazar; KDV ayrıca
+ *    `commissions.vat_amount`'tadır). Ay = komisyon kaydı tarihi (tahakkuk). İptal edilen komisyon sayılmaz. Tahsilat değildir.
+ *  - KDV (`vat`): yalnız bilgi olarak taşınır; net'ten DÜŞÜLMEZ (matrahta zaten yok; beyan Vergi sekmesindedir). SK6/B103:
+ *    eskiden "gross = net + KDV" varsayımıyla KDV ikinci kez düşülüyordu (2026 neti ~626 bin ₺ eksik).
  *  - Dağıtılan paylar: `commission_splits` satırlarından ofis DIŞINA giden paylar (danışman, referans, franchise, diğer);
  *    `kind = 'office'` ofiste kalır. Paylaşımı tanımlanmamış komisyon sayılır ve uyarılır (payı bilinmiyor).
  *  - Gider: `expenses.amount`, ay = `expense_date`.
@@ -69,7 +71,8 @@ export function buildProfitLoss(monthKeys: readonly string[], commissions: reado
     const m = months.get(trMonth(f.date));
     if (m) m.fees += f.amount;
   }
-  for (const m of months.values()) m.net = m.revenue + m.fees - m.vat - m.shares - m.expenses;
+  // KDV net'e girmez (matrah KDV hariç; yalnız bilgi).
+  for (const m of months.values()) m.net = m.revenue + m.fees - m.shares - m.expenses;
   const list = [...months.values()];
   const totals = list.reduce(
     (a, m) => ({ revenue: a.revenue + m.revenue, vat: a.vat + m.vat, shares: a.shares + m.shares, expenses: a.expenses + m.expenses, net: a.net + m.net, commissions: a.commissions + m.commissions, fees: a.fees + m.fees }),
@@ -89,7 +92,7 @@ export type OfficePnl = {
 };
 
 /**
- * Ofis kâr/zararının TEK hesabı: taban (`buildProfitLoss`: komisyon tahakkuku − KDV − dış paylar + yönetim ücreti − gider)
+ * Ofis kâr/zararının TEK hesabı: taban (`buildProfitLoss`: komisyon tahakkuku (KDV hariç) − dış paylar + yönetim ücreti − gider)
  * + Muhasebe v2 defter eki (`cashPnlAdjustments`: elle girilen gelir, `expenses` dışı çıkışlar). Komisyon ve kira tahsilatı
  * iki kez sayılmaz. `cash` null ise (RPC yok) ek sıfırdır. Ay net'i, finance_pnl'in (gelir − gider) net'iyle aynıdır.
  */

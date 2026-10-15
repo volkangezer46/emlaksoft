@@ -113,3 +113,113 @@ export async function voidCollectionCash(
   const { error } = await supabase.rpc("finance_void_source_entries", { p_source_type: sourceType, p_source_id: sourceId, p_reason: reason });
   if (error && !isMissingCashSchema(error)) console.error("voidCollectionCash", { code: error.code });
 }
+
+/* ================================================================================================
+ * Komisyon tahsilatı ↔ kasa (SK6/B109)
+ * ============================================================================================== */
+
+/**
+ * Komisyon tahsilatının kasaya yazılacak tutarı: KDV DAHİL. `gross_amount` KDV hariç matrahtır (kapanış RPC'si v_net'i yazar);
+ * müşteriden tahsil edilen matrah + KDV'dir. finance_record_entry'nin komisyon tavanı da gross_amount + vat_amount. Kuruşa yuvarlanır.
+ */
+export function commissionCashAmount(row: { gross_amount: unknown; vat_amount?: unknown }): number {
+  const gross = Number(row.gross_amount);
+  if (!Number.isFinite(gross)) return 0;
+  const vat = Math.max(0, Number(row.vat_amount ?? 0) || 0);
+  return Math.round((gross + vat) * 100) / 100;
+}
+
+export const COMMISSION_ACCOUNT_REQUIRED = "Tahsilatın girdiği hesabı seçin; komisyon kasaya yazılmadan tahsil edildi işaretlenemez.";
+export const COMMISSION_NO_ACCOUNT_CONFIRM =
+  "Ofiste kasa ya da banka hesabı yok. Tahsilatı kasaya yazmadan işaretlemek için onaylayın; hesap açınca Kasa ve banka sekmesinden kasaya işleyebilirsiniz.";
+
+export type CollectionAccountDecision =
+  | { ok: true; accountId: string | null }
+  | { ok: false; code: "account_required" | "confirm_no_cash" | "invalid_account"; error: string };
+
+/**
+ * "Tahsil edildi" işaretlemeden ÖNCE hesap kararı (SUNUCU; arayüzle aynı kural):
+ *  - hesap verildiyse o hesap (biçim denetimi; yetki, mükerrer ve tavan denetimi RPC'de);
+ *  - verilmediyse ve ofiste arşivlenmemiş ofis hesabı görünüyorsa → reddedilir (hesap zorunlu);
+ *  - ofiste hesap yoksa (ya da muhasebe şeması yoksa) yalnız bilinçli `skipCash` onayıyla kasaya yazmadan geçer.
+ * Hesap sayımı okunamazsa (beklenmeyen hata) güvenli taraf: hesap istenir.
+ */
+export async function decideCollectionAccount(
+  supabase: SupabaseClient,
+  args: { accountId?: string | null; skipCash?: boolean },
+): Promise<CollectionAccountDecision> {
+  const accountId = String(args.accountId ?? "").trim();
+  if (accountId) {
+    return isUuid(accountId) ? { ok: true, accountId } : { ok: false, code: "invalid_account", error: "Seçilen hesap geçersiz." };
+  }
+  const { count, error } = await supabase
+    .from("finance_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_scope", "office")
+    .is("archived_at", null);
+  const accounts = error ? (isMissingCashSchema(error) ? 0 : null) : (count ?? 0);
+  if (accounts === null || accounts > 0) return { ok: false, code: "account_required", error: COMMISSION_ACCOUNT_REQUIRED };
+  return args.skipCash ? { ok: true, accountId: null } : { ok: false, code: "confirm_no_cash", error: COMMISSION_NO_ACCOUNT_CONFIRM };
+}
+
+export type CommissionCashGap = { id: string; amount: number; date: string; label: string };
+
+type GapRow = {
+  id: string;
+  gross_amount: unknown;
+  vat_amount: unknown;
+  created_at: string;
+  deal?: { deal_type?: string | null; property?: { title?: string | null; property_code?: string | null } | { title?: string | null; property_code?: string | null }[] | null } | { deal_type?: string | null }[] | null;
+};
+
+const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+
+/**
+ * "Kasaya işle" kuyruğu (Kasa ve banka sekmesi): tahsil edilmiş (paid/collected) ama geçerli (iptal edilmemiş) kasa hareketi
+ * olmayan komisyonlar. Örnek veri dışlanır; en yeni `limit` tahsilat taranır (`partial` = tarama sınırına ulaşıldı).
+ * Şema yoksa ya da okunamazsa `available=false` (sahte sıfır yok).
+ */
+export async function loadCommissionsMissingCash(
+  supabase: SupabaseClient,
+  tenantId: string,
+  limit = 200,
+): Promise<{ available: boolean; rows: CommissionCashGap[]; total: number; partial: boolean }> {
+  const empty = { available: false, rows: [] as CommissionCashGap[], total: 0, partial: false };
+  const { data, error } = await supabase
+    .from("commissions")
+    .select("id, gross_amount, vat_amount, created_at, deal:deals!commissions_deal_id_fkey(deal_type, property:properties!deals_property_id_fkey(title, property_code))")
+    .eq("tenant_id", tenantId)
+    .in("status", ["paid", "collected"])
+    .eq("is_sample", false)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (!isMissingCashSchema(error)) console.error("loadCommissionsMissingCash", { code: error.code });
+    return empty;
+  }
+  const rows = (data ?? []) as unknown as GapRow[];
+  if (rows.length === 0) return { ...empty, available: true };
+  const ent = await supabase
+    .from("cash_entries")
+    .select("source_id")
+    .eq("tenant_id", tenantId)
+    .eq("source_type", "commission")
+    .is("voided_at", null)
+    .in("source_id", rows.map((r) => r.id));
+  if (ent.error) {
+    if (!isMissingCashSchema(ent.error)) console.error("loadCommissionsMissingCash entries", { code: ent.error.code });
+    return empty;
+  }
+  const linked = new Set(((ent.data ?? []) as { source_id: string | null }[]).map((e) => String(e.source_id)));
+  const gaps: CommissionCashGap[] = [];
+  for (const r of rows) {
+    if (linked.has(r.id)) continue;
+    const amount = commissionCashAmount(r);
+    if (!(amount > 0)) continue;
+    const deal = one(r.deal as GapRow["deal"]) as { deal_type?: string | null; property?: unknown } | null;
+    const prop = one(deal?.property as { title?: string | null; property_code?: string | null } | null);
+    const label = prop?.title?.trim() || prop?.property_code?.trim() || (deal?.deal_type === "rent" ? "Kiralama komisyonu" : "Satış komisyonu");
+    gaps.push({ id: r.id, amount, date: r.created_at, label });
+  }
+  return { available: true, rows: gaps, total: Math.round(gaps.reduce((s, r) => s + r.amount, 0) * 100) / 100, partial: rows.length >= limit };
+}

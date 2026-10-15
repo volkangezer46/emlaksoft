@@ -7,7 +7,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
-import { recordCollectionCashResult, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import { commissionCashAmount, decideCollectionAccount, recordCollectionCashResult, voidCollectionCash } from "@/lib/finance/cash/collection-link";
 import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 
 /**
@@ -27,6 +27,8 @@ export type CommissionResult = {
   info?: string;
   /** Tahsil edilmiş komisyonun paylaşımı değişiyor: arayüz "Değişiklik gerekçesi" alanını göstermeli. */
   needsReason?: boolean;
+  /** Ofiste hesap yok: tahsilatı kasaya yazmadan işaretlemek için bilinçli onay gerekir (SK6/B109). */
+  needsCashConfirm?: boolean;
 };
 
 const SPLIT_REASON_MIN = 5;
@@ -128,10 +130,14 @@ export async function updateCommissionSplits(
  * Seçilen komisyonları topluca "tahsil edildi" (paid) işaretler —
  * workflow.ts'teki tekil mark_commission_paid akışının toplu hali.
  * Zaten tahsil edilmiş kayıtlar sessizce atlanır.
+ *
+ * SK6/B109: ofiste hesap varsa hesap ZORUNLU (işaretleme ile kasa kopmaz); ofiste hesap yoksa yalnız bilinçli
+ * `skipCash` onayıyla kasaya yazmadan işaretlenir (`needsCashConfirm`). Kasaya KDV DAHİL tutar yazılır.
  */
 export async function markCommissionsPaidBulk(
   ids: string[],
-  accountId?: string | null,
+  accountId: string | null,
+  opts?: { skipCash?: boolean },
 ): Promise<CommissionResult & { updated?: number; cashFailedIds: string[]; cashFailedCount: number }> {
   const gate = await requirePermission("commissions", "edit");
   if (!gate.ok) return { error: gate.error, cashFailedIds: [], cashFailedCount: 0 };
@@ -142,13 +148,17 @@ export async function markCommissionsPaidBulk(
   if (clean.length === 0) return { error: "En az bir kayıt seçin.", cashFailedIds: [], cashFailedCount: 0 };
 
   const supabase = await createClient();
+  const decision = await decideCollectionAccount(supabase, { accountId, skipCash: opts?.skipCash });
+  if (!decision.ok) {
+    return { error: decision.error, needsCashConfirm: decision.code === "confirm_no_cash" || undefined, cashFailedIds: [], cashFailedCount: 0 };
+  }
   const { data, error } = await supabase
     .from("commissions")
     .update({ status: "paid" })
     .in("id", clean)
     .eq("tenant_id", gate.tenantId)
     .not("status", "in", "(paid,collected)")
-    .select("id, gross_amount");
+    .select("id, gross_amount, vat_amount");
 
   if (error) {
     console.error("markCommissionsPaidBulk", error);
@@ -156,14 +166,14 @@ export async function markCommissionsPaidBulk(
   }
 
   const updatedIds = (data ?? []).map((r) => r.id as string);
-  // Istege bagli "Hangi hesaba girdi?": secildiyse her tahsilat icin ofis hesabina bir hareket (ayni komisyon iki kez yazilmaz).
+  // Her tahsilat için ofis hesabına bir hareket (aynı komisyon iki kez yazılmaz; RPC hesaptan bağımsız mükerrer denetler).
   let info: string | undefined;
   const cashFailedIds: string[] = [];
-  if (accountId) {
+  if (decision.accountId) {
     const today = trDayKey(now());
     for (const row of data ?? []) {
       const res = await recordCollectionCashResult(supabase, {
-        accountId, sourceType: "commission", sourceId: row.id as string, amount: Number(row.gross_amount), date: today, title: "Komisyon tahsilatı",
+        accountId: decision.accountId, sourceType: "commission", sourceId: row.id as string, amount: commissionCashAmount(row), date: today, title: "Komisyon tahsilatı",
       });
       if (!res.ok) {
         cashFailedIds.push(row.id as string);
@@ -178,7 +188,7 @@ export async function markCommissionsPaidBulk(
       action: "commission.paid_bulk",
       entityType: "commission",
       entityId: updatedIds[0],
-      newValue: { ids: updatedIds, count: updatedIds.length },
+      newValue: { ids: updatedIds, count: updatedIds.length, account_id: decision.accountId, cash_skipped: decision.accountId === null },
     });
   }
 
@@ -208,7 +218,7 @@ export async function retryCommissionCash(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("commissions")
-    .select("id, gross_amount")
+    .select("id, gross_amount, vat_amount")
     .in("id", clean)
     .eq("tenant_id", gate.tenantId)
     .in("status", ["paid", "collected"]);
@@ -222,13 +232,14 @@ export async function retryCommissionCash(
   let recorded = 0;
   for (const row of data ?? []) {
     const res = await recordCollectionCashResult(supabase, {
-      accountId, sourceType: "commission", sourceId: row.id as string, amount: Number(row.gross_amount), date: today, title: "Komisyon tahsilatı",
+      accountId, sourceType: "commission", sourceId: row.id as string, amount: commissionCashAmount(row), date: today, title: "Komisyon tahsilatı",
     });
     if (res.ok) recorded += 1; // recorded ya da duplicate
     else failedIds.push(row.id as string);
   }
 
   revalidatePath("/app/komisyon");
+  revalidatePath("/app/giderler");
   revalidateTenantData(gate.tenantId);
   if (failedIds.length > 0) {
     return {

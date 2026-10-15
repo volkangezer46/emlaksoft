@@ -7,6 +7,7 @@ import { markCommissionsPaidBulk, retryCommissionCash } from "@/app/actions/comm
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 /**
  * Toplu tahsilat seçimi — sunucu tarafında render edilen defter satırlarına
@@ -63,6 +64,9 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [accountId, setAccountId] = useState("");
+  // SK6/B109: ofiste hesap varsa hesap zorunlu; hesap yoksa (0) "kasaya yazmadan işaretle" bilinçli onayı.
+  const [accountCount, setAccountCount] = useState<number | null>(null);
+  const [confirmNoCash, setConfirmNoCash] = useState(false);
   // Tahsilat kaydedildi ama kasa hareketi yazılamayanlar: uyarı + "Yeniden dene" (aynı hesapla, idempotent).
   const [cashFailed, setCashFailed] = useState<{ ids: string[]; accountId: string } | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -88,12 +92,23 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
   const count = ctx.selected.size;
   const allSelected = count > 0 && allIds.every((id) => ctx.selected.has(id));
 
-  async function collect() {
+  const needAccount = accountCount !== null && accountCount > 0 && !accountId;
+
+  async function collect(skipCash = false) {
     if (!ctx || ctx.selected.size === 0) return;
+    if (needAccount) {
+      push("Tahsilatın girdiği hesabı seçin", "err");
+      return;
+    }
+    if (accountCount === 0 && !skipCash) {
+      setConfirmNoCash(true);
+      return;
+    }
     setBusy(true);
-    const res = await markCommissionsPaidBulk(Array.from(ctx.selected), accountId || null);
+    const res = await markCommissionsPaidBulk(Array.from(ctx.selected), accountId || null, { skipCash });
     setBusy(false);
-    if (res.error) push(res.error, "err");
+    if (res.needsCashConfirm) setConfirmNoCash(true);
+    else if (res.error) push(res.error, "err");
     else {
       push(`${res.updated ?? 0} komisyon tahsil edildi olarak işaretlendi`, "ok");
       if (res.cashFailedCount > 0) {
@@ -130,11 +145,12 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
           <span className="rounded-full bg-accent-subtle px-2.5 py-1 text-xs font-bold text-accent-text">
             {count} seçili
           </span>
-          <FinanceAccountPicker value={accountId} onChange={setAccountId} />
+          <FinanceAccountPicker value={accountId} onChange={setAccountId} required onAccountsLoaded={setAccountCount} />
           <button
             type="button"
-            onClick={collect}
-            disabled={busy}
+            onClick={() => collect()}
+            disabled={busy || needAccount}
+            title={needAccount ? "Önce tahsilatın girdiği hesabı seçin" : undefined}
             className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-3 py-1.5 text-xs font-bold text-[color:var(--viz-pos)] transition hover:bg-[color-mix(in_srgb,var(--viz-pos)_22%,transparent)] disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -148,6 +164,15 @@ export function BulkCollectBar({ allIds }: { allIds: string[] }) {
           >
             <X className="h-3.5 w-3.5" /> Seçimi bırak
           </button>
+          <ConfirmDialog
+            open={confirmNoCash}
+            onOpenChange={setConfirmNoCash}
+            title="Kasaya yazmadan işaretle"
+            description="Ofiste kasa ya da banka hesabı yok. Seçilen komisyonlar tahsil edildi işaretlenir ama kasaya hareket yazılmaz. Hesap açınca Muhasebe > Kasa ve banka sekmesindeki “Kasaya işle” listesinden yazabilirsiniz."
+            confirmLabel="Kasaya yazmadan işaretle"
+            tone="default"
+            onConfirm={() => collect(true)}
+          />
         </>
       ) : (
         <span className="text-xs text-text-faint">

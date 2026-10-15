@@ -5,13 +5,19 @@ import { SUPPRESSION_DAYS, suppressionKey } from "@/lib/insights/dedupe";
 import type { RuleQualityRow } from "@/lib/insights/quality";
 import { INSIGHT_EXCLUDED_ROLES, ruleBase, type InsightDraft, type InsightSeverity } from "@/lib/insights/types";
 import { isMissingSchemaError } from "@/lib/insights/facts";
+import { mergeEffectivePermissions, type EffectivePermissions, type RoleOverrideRow, type UserOverrideRow } from "@/lib/permissions-merge";
 
 /**
  * Engine tarafı depo işlemleri (service_role istemcisi PARAMETRE olarak gelir; bu dosya istemci oluşturmaz).
  * Her sorgu AÇIK `tenant_id` filtresi taşır (service_role RLS'i atlar).
  */
 
-export type Recipient = { id: string; role: string };
+export type Recipient = {
+  id: string;
+  role: string;
+  /** Etkin izin (yalnız izin isteyen kural taslağı varsa yüklenir; yoksa izin isteyen içgörü bu alıcıya GİTMEZ). */
+  perms?: EffectivePermissions;
+};
 
 export type InsightRow = {
   tenant_id: string;
@@ -75,6 +81,49 @@ export async function loadActiveRecipients(admin: SupabaseClient, tenantId: stri
   if (error) throw new Error(`profiles: ${error.code ?? "hata"}`);
   const excluded = new Set<string>(INSIGHT_EXCLUDED_ROLES);
   return ((data ?? []) as { id: string; role: string }[]).filter((p) => !excluded.has(p.role)).map((p) => ({ id: p.id, role: p.role }));
+}
+
+/**
+ * Alıcıların ETKİN izinleri (SK6/B165): varsayılan matris + ofis rol istisnaları (tenant_role_permissions) + kullanıcı
+ * istisnaları (user_permission_overrides); oturumdaki `getEffectivePermissions` ile aynı saf birleşim (`mergeEffectivePermissions`).
+ * Katmanlar okunamazsa alıcılar izinsiz döner (izin isteyen içgörü kimseye gitmez; güvenli taraf).
+ */
+export async function attachRecipientPermissions(
+  admin: SupabaseClient,
+  tenantId: string,
+  recipients: readonly Recipient[],
+  nowMs: number,
+): Promise<Recipient[]> {
+  const [roleRes, userRes] = await Promise.all([
+    fetchAllRowsKeepError((from, to) =>
+      admin.from("tenant_role_permissions").select("role, module, action, allowed").eq("tenant_id", tenantId).order("id", { ascending: true }).range(from, to),
+    ),
+    fetchAllRowsKeepError((from, to) =>
+      admin
+        .from("user_permission_overrides")
+        .select("user_id, module, actions, expires_at")
+        .eq("tenant_id", tenantId)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
+  if (roleRes.error || userRes.error) {
+    console.error("insight-engine permissions", (roleRes.error ?? userRes.error)?.code ?? "hata");
+    return recipients.map((r) => ({ id: r.id, role: r.role }));
+  }
+  const byRole = new Map<string, RoleOverrideRow[]>();
+  for (const r of (roleRes.data ?? []) as (RoleOverrideRow & { role: string })[]) {
+    const list = byRole.get(r.role) ?? [];
+    list.push({ module: r.module, action: r.action, allowed: r.allowed });
+    byRole.set(r.role, list);
+  }
+  const byUser = new Map<string, UserOverrideRow[]>();
+  for (const r of (userRes.data ?? []) as (UserOverrideRow & { user_id: string })[]) {
+    const list = byUser.get(r.user_id) ?? [];
+    list.push({ module: r.module, actions: r.actions ?? [], expires_at: r.expires_at });
+    byUser.set(r.user_id, list);
+  }
+  return recipients.map((r) => ({ id: r.id, role: r.role, perms: mergeEffectivePermissions(r.role, byRole.get(r.role) ?? [], byUser.get(r.id) ?? [], nowMs) }));
 }
 
 export type SuppressionState = {
@@ -200,6 +249,30 @@ export async function insertInsights(admin: SupabaseClient, rows: readonly Insig
   return inserted;
 }
 
+/**
+ * DURUM tipi içgörüyü yeniler (SK6/B018): satırlar, alıcıda zaten AÇIK olan (tenant, alıcı, dedupe_key) üçlüsüdür. Çakışmada
+ * yalnız taslaktan gelen sütunlar ve updated_at yazılır; state, state_reason, snoozed_until, notified_at, created_at KORUNUR.
+ * Dönen satırlar bildirim için KULLANILMAZ (yeniden zil yok). Dönen: yenilenen satır sayısı.
+ */
+export async function refreshInsights(admin: SupabaseClient, rows: readonly InsightRow[], nowMs: number): Promise<number> {
+  if (rows.length === 0) return 0;
+  const updatedAt = new Date(nowMs).toISOString();
+  let n = 0;
+  for (let i = 0; i < rows.length; i += 200) {
+    const chunk = rows.slice(i, i + 200).map((r) => ({ ...r, updated_at: updatedAt }));
+    const { data, error } = await admin
+      .from("insights")
+      .upsert(chunk, { onConflict: "tenant_id,recipient_user_id,dedupe_key", ignoreDuplicates: false })
+      .select("id");
+    if (error) {
+      if (isMissingSchemaError(error)) throw new InsightsTableMissing();
+      throw new Error(`insights(refresh): ${error.code ?? "hata"}`);
+    }
+    n += (data ?? []).length;
+  }
+  return n;
+}
+
 export class InsightsTableMissing extends Error {
   constructor() {
     super("insights tablosu yok (migration uygulanmadı)");
@@ -271,6 +344,35 @@ export async function expireStaleInsights(
     closed += (upd ?? []).length;
   }
   return closed;
+}
+
+/**
+ * İzni olmayan alıcının açık içgörülerini kapatır (SK6/B165): izin isteyen kural (ör. bütçe → expenses:view) daha önce
+ * izinsiz alıcıya (gider izni olmayan şube müdürü) dağıtılmış olabilir. Yalnız valid_until şimdiye çekilir; state değişmez.
+ */
+export async function expireInsightsForUsers(
+  admin: SupabaseClient,
+  tenantId: string,
+  ruleId: string,
+  userIds: readonly string[],
+  nowMs: number,
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const nowIso = new Date(nowMs).toISOString();
+  const { data, error } = await admin
+    .from("insights")
+    .update({ valid_until: nowIso })
+    .eq("tenant_id", tenantId)
+    .eq("rule_id", ruleId)
+    .in("recipient_user_id", [...userIds])
+    .in("state", ["new", "seen", "snoozed"])
+    .gt("valid_until", nowIso)
+    .select("id");
+  if (error) {
+    if (isMissingSchemaError(error)) return 0;
+    throw new Error(`insights(forbidden): ${error.code ?? "hata"}`);
+  }
+  return (data ?? []).length;
 }
 
 /**

@@ -1,7 +1,8 @@
 /**
  * Danışman kârlılığı (SAF; yalnız owner/gm görür — kazanç gizliliği P12 ile uyumlu, çağıran sayfa kapıyı uygular).
  *
- *   ofiste kalan = komisyon (brüt) − KDV − ofis DIŞINA dağıtılan paylar (danışman, referans, franchise...)
+ *   ofiste kalan = komisyon (KDV hariç matrah, `gross_amount`) − ofis DIŞINA dağıtılan paylar (danışman, referans, franchise...)
+ *   KDV düşülmez: `gross_amount` zaten KDV hariçtir (SK6/B103; `vat` yalnız bilgi).
  *   net katkı    = ofiste kalan − doğrudan maliyet
  *   doğrudan maliyet = danışmanın portföylerine bağlı gider kayıtları (`expenses.property_id` → `properties.assigned_to`)
  *
@@ -57,7 +58,7 @@ export function computeAdvisorProfitability(
     const own = splitsBy.get(c.commissionId) ?? [];
     if (own.length === 0) r.unsplit += 1;
     const out = own.filter((s) => s.kind !== "office").reduce((a, s) => a + s.amount, 0);
-    r.retained += c.gross - c.vat - out;
+    r.retained += c.gross - out;
   }
 
   let unattributed = 0;

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { InsightDraft, InsightKind, InsightRuleRun } from "@/lib/insights/types";
+import type { InsightDraft, InsightKind, InsightPermission, InsightRuleRun } from "@/lib/insights/types";
 import {
   InsightFactsUnavailable,
   loadDeadlines,
@@ -46,7 +46,8 @@ import {
   evaluatePortalRoi,
   evaluateSubscriptions,
 } from "@/lib/insights/rules/finance";
-import { loadBudgetContext, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
+import { loadBudgetContext, loadBudgetContextShared, loadPortalRoi, loadRecurringSeries } from "@/lib/finance/load";
+import { CASH_CATEGORIES } from "@/lib/finance/cash/categories";
 import { pickLeastEfficientPortal, unusedPortalSubscriptions } from "@/lib/finance/portal-roi";
 import { EXPENSE_CATEGORIES } from "@/lib/definition-defaults";
 import { trNextMonthStartMs } from "@/lib/clock";
@@ -75,6 +76,11 @@ import { EIDS_NO_EMAIL_RULE_ID, evaluateEidsNoEmailSeen } from "@/lib/insights/r
 import { EIDS_MAIL_SILENT_RULE_ID, evaluateEidsMailSilent } from "@/lib/insights/rules/eids-mail-silent";
 
 const categoryLabel = (value: string): string => EXPENSE_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+/** Bütçe anahtarı etiketi (Bütçe sekmesiyle aynı sıra: sistem hareket kategorisi → gider tanımı → anahtar). */
+const budgetLabel = (value: string): string =>
+  CASH_CATEGORIES.find((c) => c.value === value && c.direction === "out")?.label ?? categoryLabel(value);
+/** Gider içgörüleri (bütçe, abonelik, portal maliyeti) ofis giderini gösterir: alıcıda gider görüntüleme izni şart (SK6/B165). */
+const EXPENSES_VIEW: InsightPermission = { module: "expenses", action: "view" };
 
 /**
  * KURAL KAYIT LİSTESİ (tek ortak dosya). Sonraki rol paketleri (danışman 5a, yönetim 5b, muhasebe 5c)
@@ -95,6 +101,11 @@ export type InsightRule = {
    * `null` = bu kural için otomatik kapatma yok. Yalnız dizi döndüren kural da kabul edilir ("kapatma yok" sayılır).
    */
   run: (admin: SupabaseClient, tenantId: string, nowMs: number) => Promise<InsightRuleRun | InsightDraft[]>;
+  /**
+   * Alıcıdan istenen modül izni (SK6/B165). Verilirse engine yalnız rolü uyan VE bu izni (etkin: matris + ofis/kullanıcı
+   * istisnaları) taşıyan alıcılara dağıtır. Ör. gider içgörüleri → expenses:view (gider izni olmayan şube müdürüne gitmez).
+   */
+  requiredPermission?: InsightPermission;
 };
 
 /** Olgu kümesi satır tavanına ulaştıysa küme kesik olabilir: kapatma yok (güvenli taraf). */
@@ -291,12 +302,14 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: EXPENSE_BUDGET_RULE_ID,
     kind: "anomaly",
     label: "Gider bütçesi aşımı",
+    requiredPermission: EXPENSES_VIEW,
     run: async (admin, tenantId, nowMs) => {
-      const ctx = await loadBudgetContext(admin, tenantId, nowMs);
+      // SK6/B018: Bütçe sekmesiyle TEK KAYNAK (finance_budget_vs_actual_for); fonksiyon yoksa eski v1 yükleyici.
+      const ctx = (await loadBudgetContextShared(admin, tenantId, nowMs)) ?? (await loadBudgetContext(admin, tenantId, nowMs));
       if (!ctx.available) throw new InsightFactsUnavailable("expense_budgets");
       return noClose(
         evaluateExpenseBudgets(
-          { monthKey: ctx.monthKey, monthStart: ctx.monthStart, monthEnd: ctx.monthEnd, rows: ctx.rows.map((r) => ({ ...r, label: categoryLabel(r.category) })) },
+          { monthKey: ctx.monthKey, monthStart: ctx.monthStart, monthEnd: ctx.monthEnd, rows: ctx.rows.map((r) => ({ ...r, label: budgetLabel(r.category) })) },
           nowMs,
           trNextMonthStartMs(nowMs),
         ),
@@ -307,6 +320,7 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: SUBSCRIPTION_RULE_ID,
     kind: "deadline",
     label: "Yaklaşan abonelik ve düzenli ödemeler",
+    requiredPermission: EXPENSES_VIEW,
     run: async (admin, tenantId, nowMs) => {
       const [recurring, portal] = await Promise.all([loadRecurringSeries(admin, tenantId, nowMs), loadPortalRoi(admin, tenantId, nowMs)]);
       if (!recurring.available) throw new InsightFactsUnavailable("expenses.recurrence");
@@ -326,6 +340,7 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     id: PORTAL_ROI_RULE_ID,
     kind: "anomaly",
     label: "Portal maliyet verimliliği",
+    requiredPermission: EXPENSES_VIEW,
     run: async (admin, tenantId, nowMs) => {
       const portal = await loadPortalRoi(admin, tenantId, nowMs);
       if (!portal.available) throw new InsightFactsUnavailable("expenses.portal_key");

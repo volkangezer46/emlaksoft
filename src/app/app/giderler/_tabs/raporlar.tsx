@@ -192,12 +192,12 @@ function PnlSection({
 }) {
   const t = pl.totals;
   const entries = (f: string, tt: string, extra = "") => `${FINANCE_PATH}?sekme=hareketler&from=${f}&to=${tt}${extra}`;
-  /** Ofise kalan gelir (aylık çubuk): komisyon − KDV − dış paylar + yönetim ücreti + elle girilen gelir. */
-  const incomeOf = (m: OfficePnl["months"][number]) => m.revenue - m.vat - m.shares + m.fees + m.other;
+  /** Ofise kalan gelir (aylık çubuk): komisyon (KDV hariç matrah) − dış paylar + yönetim ücreti + elle girilen gelir. KDV düşülmez (B103). */
+  const incomeOf = (m: OfficePnl["months"][number]) => m.revenue - m.shares + m.fees + m.other;
   const kpis: KpiItem[] = [
-    { label: "Komisyon (brüt)", value: formatTry(t.revenue), icon: <ArrowDownCircle />, tone: "success", href: `/app/komisyon?from=${from}`, hint: `${t.commissions} kayıt · son ${period} ay`, series: pl.months.map((m) => m.revenue) },
+    { label: "Komisyon (KDV hariç)", value: formatTry(t.revenue), icon: <ArrowDownCircle />, tone: "success", href: `/app/komisyon?from=${from}`, hint: `${t.commissions} kayıt · son ${period} ay`, series: pl.months.map((m) => m.revenue) },
     { label: "Diğer gelir (elle)", value: formatTry(t.other), icon: <HandCoins />, tone: "neutral", href: entries(from, to, "&tur=gelir&kaynak=elle"), hint: "hizmet bedeli, diğer gelir" },
-    { label: "KDV ve dağıtılan paylar", value: formatTry(t.vat + t.shares), icon: <Share2 />, tone: "neutral", href: `/app/komisyon?from=${from}`, hint: `KDV ${formatTry(t.vat)} · paylar ${formatTry(t.shares)}` },
+    { label: "Dağıtılan paylar", value: formatTry(t.shares), icon: <Share2 />, tone: "neutral", href: `/app/komisyon?from=${from}`, hint: `Komisyon KDV'si ${formatTry(t.vat)} ayrıca (bilgi; net'ten düşülmez)` },
     { label: "Gider", value: formatTry(t.expenses), icon: <ArrowUpCircle />, tone: "warning", href: entries(from, to, "&tur=gider"), hint: `son ${period} ay`, series: pl.months.map((m) => m.expenses) },
     { label: "Net", value: formatTry(t.net), icon: <Scale />, tone: t.net < 0 ? "danger" : "info", href: "#aylik-kar-zarar", hint: "aylık tablo", attention: t.net < 0 },
   ];
@@ -230,7 +230,7 @@ function PnlSection({
         <CardHeader>
           <div>
             <CardTitle>Aylık gelir ve gider</CardTitle>
-            <CardDescription>Aya tıklayınca o ayın hareketleri açılır. Gelir = ofise kalan komisyon (KDV ve dış paylar düşülmüş), yönetim ücreti ve elle girilen gelir.</CardDescription>
+            <CardDescription>Aya tıklayınca o ayın hareketleri açılır. Gelir = ofise kalan komisyon (KDV hariç, dış paylar düşülmüş), yönetim ücreti ve elle girilen gelir.</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -270,7 +270,7 @@ function PnlSection({
         <CardHeader>
           <div>
             <CardTitle>Aylık kâr / zarar</CardTitle>
-            <CardDescription>Komisyon (tahakkuk) ve elle girilen gelirden KDV, danışman ve diğer dış paylar ile ofis giderleri düşülünce kalan net.</CardDescription>
+            <CardDescription>Komisyon (tahakkuk, KDV hariç) ve elle girilen gelirden danışman ve diğer dış paylar ile ofis giderleri düşülünce kalan net. KDV yalnız bilgi sütunudur.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -282,7 +282,7 @@ function PnlSection({
                   <TH align="right">Komisyon</TH>
                   {t.fees > 0 ? <TH align="right">Yönetim ücreti</TH> : null}
                   {t.other > 0 ? <TH align="right">Diğer gelir</TH> : null}
-                  <TH align="right">KDV</TH>
+                  <TH align="right">KDV (bilgi)</TH>
                   <TH align="right">Paylar</TH>
                   <TH align="right">Gider</TH>
                   <TH align="right">Net</TH>
@@ -307,8 +307,8 @@ function PnlSection({
                           <Link href={entries(r.from, r.to, "&tur=gelir&kaynak=elle")} className="hover:underline">{formatTry(m.other)}</Link>
                         </TD>
                       ) : null}
-                      <TD label="KDV" align="right" className="numeric">
-                        <Link href={`/app/komisyon?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.vat)}</Link>
+                      <TD label="KDV (bilgi)" align="right" className="numeric text-text-muted">
+                        <Link href={`${FINANCE_PATH}?sekme=vergi`} className="hover:underline">{formatTry(m.vat)}</Link>
                       </TD>
                       <TD label="Paylar" align="right" className="numeric">
                         <Link href={`/app/komisyon?from=${r.from}&to=${r.to}`} className="hover:underline">{formatTry(m.shares)}</Link>
@@ -326,7 +326,7 @@ function PnlSection({
             </Table>
           </TableFrame>
           <p className="text-xs leading-relaxed text-text-faint">
-            Komisyon tahakkuk esasına göre (kayıt ayı) sayılır; tahsilat değildir. İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
+            Komisyon tahakkuk esasına göre (kayıt ayı) ve KDV hariç matrahla sayılır; tahsilat değildir. KDV sütunu yalnız bilgidir, net tutardan düşülmez (beyan Vergi sekmesinde). İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
             danışman/referans/franchise paylarıdır. Yönetim ücreti, mülk yönetimindeki kira tahsilatlarından ofise kalan ücrettir; mülk sahibine yansıtılan gider ofis
             gideri sayılmaz.{pl.cashLinked ? " Diğer gelir: Muhasebe'de elle girilen gelir hareketleridir; gider, gidere dönüşmemiş kasa çıkışlarını (maaş vb.) da içerir." : ""} Gelir/kurumlar
             vergisi hesaplanmaz; mali müşavirinizle doğrulayın.

@@ -181,6 +181,13 @@ export type LoadAdvisorMetricsOptions = {
   includeInactive?: boolean;
   /** Örnek veri KPI kapsamı. Verilmezse `loadSampleKpiScope` ile yüklenir (tek karar noktası: lib/sample-scope). */
   sample?: SampleKpiScope;
+  /**
+   * Kazanç görünümü (SK6/B106, Kazanç > Ofis geneli): "office" verilir ve izleyen `earnings_all` iznine sahipse kişi kapsamı
+   * rolden bağımsız ofis genelidir (ör. muhasebe hakediş hazırlar; RLS commissions_select/commission_splits_select zaten
+   * earnings_all ile tüm ofisi açar). Bu görünümde yalnız komisyon okunur: müşteri/portföy/arama/randevu/teklif sayımları atlanır.
+   * İzin yoksa seçenek etkisizdir (kapsam rol kuralına döner).
+   */
+  earningsScope?: "office";
 };
 
 /* -------------------------------------------------------------------------- */
@@ -496,9 +503,12 @@ export async function loadAdvisorMetrics(
   const { viewer, tenantId, period, nowMs } = opts;
   // Örnek veri kapsamı ile profil sorgusu birbirinden bağımsız: sıralı beklemek bir tur boşa harcar (waterfall).
   const samplePromise = opts.sample ? Promise.resolve(opts.sample) : loadSampleKpiScope(supabase, tenantId);
-  const officeWide = hasOfficeWideDataScope(viewer.role);
   const seeAllEarnings = canSeeAllEarnings(viewer.perms);
+  // Kazanç görünümü: kapsam izinden gelir (sekme kapısı da earnings_all'a bakar); etkinlik sayımları gerekmez.
+  const earningsView = opts.earningsScope === "office" && seeAllEarnings;
+  const officeWide = hasOfficeWideDataScope(viewer.role) || earningsView;
   const scope: "office" | "self" = officeWide ? "office" : "self";
+  const activity = !earningsView;
 
   const subjects = opts.subjectIds?.length
     ? [...new Set(officeWide ? opts.subjectIds : opts.subjectIds.filter((id) => id === viewer.userId))]
@@ -562,7 +572,7 @@ export async function loadAdvisorMetrics(
     return out;
   };
   const advisorCounts = async (): Promise<[Map<string, number>, Map<string, number>]> => {
-    if (ids.length === 0) return [new Map(), new Map()];
+    if (ids.length === 0 || !activity) return [new Map(), new Map()];
     const viaRpc = await loadAdvisorCountsRpc(supabase, ids, { tenantId: tenantId || null, includeSample: sample.include });
     if (viaRpc) return viaRpc;
     return Promise.all([
@@ -595,25 +605,25 @@ export async function loadAdvisorMetrics(
     taskRes,
   ] = await Promise.all([
     advisorCounts(),
-    ids.length
+    activity && ids.length
       ? scan(
           tsq(supabase.from("customers").select("assigned_to").is("deleted_at", null)).gte("created_at", period.startIso).lt("created_at", period.endIso).not("assigned_to", "is", null),
           "assigned_to",
         ).limit(SCAN_LIMIT)
       : null,
-    ids.length
+    activity && ids.length
       ? scan(
           tsq(supabase.from("calls").select("handled_by")).gte("started_at", period.startIso).lt("started_at", period.endIso).not("handled_by", "is", null),
           "handled_by",
         ).limit(SCAN_LIMIT)
       : null,
-    ids.length
+    activity && ids.length
       ? scan(
           tsq(supabase.from("appointments").select("assigned_to")).neq("status", "cancelled").gte("scheduled_at", period.startIso).lt("scheduled_at", period.endIso).not("assigned_to", "is", null),
           "assigned_to",
         ).limit(SCAN_LIMIT)
       : null,
-    ids.length
+    activity && ids.length
       ? scan(
           tsq(supabase.from("offers").select("created_by, status")).gte("created_at", period.startIso).lt("created_at", period.endIso).not("created_by", "is", null),
           "created_by",

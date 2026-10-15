@@ -1,25 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Undo2 } from "lucide-react";
 import { recordCashEntry, updateCashEntry, voidCashEntry } from "@/app/actions/finance-accounts";
-import { adoptLegacyExpenses } from "@/app/actions/finance-ledger";
+import { adoptLegacyExpenses, updateEntryV2 } from "@/app/actions/finance-ledger";
 import { useToast } from "@/components/app/toast-provider";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader } from "@/components/ui/dialog";
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
-import { categoriesFor, isCashCategory, type CashDirection } from "@/lib/finance/cash/categories";
+import { Switch } from "@/components/ui/switch";
+import { cashCategoryLabel, categoriesFor, isCashCategory, type CashDirection } from "@/lib/finance/cash/categories";
+import { formatAccountMoney } from "@/lib/finance/cash/money";
+import { editBaseline, entryV2Patch, validateEntryEdit, type EntryEditForm, type EntryEditSource } from "@/lib/finance/ledger/entry-edit";
+import { LEDGER_VAT_RATES, entryAmounts } from "@/lib/finance/ledger/vat";
+import { parseMoneyInput } from "@/lib/money-input";
+import { cn } from "@/lib/utils";
 
 export type EditableEntry = {
   id: string;
   direction: CashDirection;
+  /** Satırdaki NAKİT tutar (cash_entries.amount). */
   amount: number;
   date: string;
   category: string | null;
   title: string;
   counterparty: string | null;
   note: string | null;
+  /**
+   * Muhasebe defteri (ofis hesabı) satırı: KDV/stopaj bilgisi. Verilirse pencere defter v2 ile kaydeder (`updateEntryV2`:
+   * belge tutarı + KDV dahil/hariç + KDV ve stopaj oranı). Verilmezse (kişisel Kasam) eski yol (`updateCashEntry`).
+   */
+  ledger?: Omit<EntryEditSource, "amount"> | null;
+  /** Ofisin kendi kategorileri dahil seçenekler; verilmezse sistem kategorileri. */
+  categoryOptions?: readonly { value: string; label: string }[];
+  currency?: string;
 };
 
 /**
@@ -88,48 +103,156 @@ export function EntryRowActions({
   );
 }
 
+/** KDV/stopaj seçim çipi: gizli yerel radyo + etiket (klavye/ekran okuyucu yerel davranış; dokunma hedefi 44 px). */
+function Chip({ name, checked, onSelect, children }: { name: string; checked: boolean; onSelect: () => void; children: React.ReactNode }) {
+  return (
+    <label
+      className={cn(
+        "press inline-flex min-h-9 touch:min-h-11 cursor-pointer items-center gap-1 rounded-full border px-3 text-xs font-semibold transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500 has-[:focus-visible]:ring-offset-1",
+        checked ? "border-ink-950 bg-ink-950 text-white" : "border-line bg-surface text-text-muted hover:border-brand-300 hover:text-ink-950",
+      )}
+    >
+      <input type="radio" name={name} checked={checked} onChange={onSelect} className="sr-only" />
+      {children}
+    </label>
+  );
+}
+
+const WITHHOLDING_CHOICES = [null, 15, 20] as const;
+
 function EditDialog({ entry, today, canSalary, onClose }: { entry: EditableEntry; today: string; canSalary: boolean; onClose: () => void }) {
-  const router = useRouter();
   const { push } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const categories = categoriesFor(entry.direction).filter((c) => canSalary || c.value !== "maas" || entry.category === "maas");
+  const currency = entry.currency ?? "TRY";
+  // Defter (ofis) satırı: belge tutarı nakitten geri kurulur; nakdi birebir veremiyorsa tutar alanları kilitlenir.
+  const baseline = useMemo(() => (entry.ledger ? editBaseline({ amount: entry.amount, ...entry.ledger }) : null), [entry]);
+  const v2 = Boolean(baseline);
+  const monetaryLocked = Boolean(baseline && !baseline.monetaryEditable);
+  const [amount, setAmount] = useState(String(baseline ? baseline.document : entry.amount).replace(".", ","));
+  const [vatRate, setVatRate] = useState<number | null>(baseline?.vatRate ?? null);
+  const [vatIncluded, setVatIncluded] = useState<boolean>(baseline?.vatIncluded ?? true);
+  const [whRate, setWhRate] = useState<number | null>(baseline?.withholdingRate ?? null);
+  const base = entry.categoryOptions ?? categoriesFor(entry.direction).filter((c) => canSalary || c.value !== "maas" || entry.category === "maas");
+  // Seçenekte olmayan mevcut kategori (ör. arşivlenmiş) sessizce değişmesin diye listede tutulur.
+  const categories = entry.category && !base.some((c) => c.value === entry.category) ? [...base, { value: entry.category, label: entry.category }] : base;
+  const parsedAmount = parseMoneyInput(amount);
+  const preview = v2 && !monetaryLocked && parsedAmount.ok && parsedAmount.value ? entryAmounts(parsedAmount.value, vatRate, vatRate === null ? true : vatIncluded, whRate) : null;
+  const whChoices = whRate !== null && !WITHHOLDING_CHOICES.includes(whRate as 15 | 20) ? [...WITHHOLDING_CHOICES, whRate] : WITHHOLDING_CHOICES;
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    setBusy(true);
-    setError(null);
-    const res = await updateCashEntry(entry.id, {
-      direction: entry.direction,
-      amount: String(fd.get("amount") ?? ""),
+    const form: EntryEditForm = {
+      amount: monetaryLocked ? String(baseline!.document) : amount,
+      date: String(fd.get("date") ?? ""),
       category: String(fd.get("category") ?? ""),
       title: String(fd.get("title") ?? ""),
-      date: String(fd.get("date") ?? ""),
       counterparty: String(fd.get("counterparty") ?? ""),
       note: String(fd.get("note") ?? ""),
-    });
+      vatRate: v2 ? vatRate : null,
+      vatIncluded: v2 ? vatIncluded : true,
+      withholdingRate: v2 ? whRate : null,
+    };
+    // İstemci doğrulaması tek karede (sunucuya gitmeden); hatalı alana odak.
+    const checked = validateEntryEdit(form, today, cashCategoryLabel(form.category) || "Hareket");
+    if (!checked.ok) {
+      setError(checked.error);
+      (formRef.current?.querySelector(`[name="${checked.field}"]`) as HTMLElement | null)?.focus();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const v = checked.value;
+    // Defter v2: belge tutarı + KDV dahil/hariç + oranlar birlikte (B101). Kilitli/kişisel kayıt: eski yol, nakit aynen kalır.
+    const res =
+      v2 && !monetaryLocked
+        ? await updateEntryV2(entry.id, entryV2Patch(v))
+        : await updateCashEntry(entry.id, {
+            direction: entry.direction,
+            amount: monetaryLocked ? String(entry.amount) : String(v.amount),
+            category: v.category,
+            title: v.title,
+            date: v.date,
+            counterparty: v.counterparty,
+            note: v.note,
+          });
     setBusy(false);
-    if (res.error) return setError(res.error);
+    const failure = "error" in res && res.error ? res.error : null;
+    if (failure) return setError(failure);
+    // Eylem revalidatePath yapar; sayfa aynı yanıtla tazelenir (ayrıca router.refresh yok: çift tazeleme, B037).
     push("Hareket güncellendi", "ok");
     onClose();
-    router.refresh();
   }
 
   return (
     <Dialog open onOpenChange={(v) => (v ? undefined : onClose())}>
       <DialogContent size="md">
         <DialogHeader title="Hareketi düzenle" description="Tahsilata veya transfere bağlı hareketler düzenlenemez." icon={<Pencil />} />
-        <form onSubmit={submit}>
+        <form ref={formRef} onSubmit={submit} noValidate>
           <DialogBody className="grid gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label="Tutar" htmlFor="ee-amount" required>
-                <FormInput id="ee-amount" name="amount" inputMode="decimal" defaultValue={String(entry.amount).replace(".", ",")} required autoFocus />
+              <FormField
+                label={v2 ? "Belge tutarı" : "Tutar"}
+                htmlFor="ee-amount"
+                required
+                hint={v2 ? (vatRate !== null && !vatIncluded ? "KDV hariç tutar (faturadaki matrah)" : "Faturadaki toplam (stopaj dahil)") : undefined}
+              >
+                <FormInput
+                  id="ee-amount"
+                  name="amount"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(ev) => setAmount(ev.target.value)}
+                  readOnly={monetaryLocked}
+                  required
+                  autoFocus={!monetaryLocked}
+                />
               </FormField>
               <FormField label="Tarih" htmlFor="ee-date">
                 <FormInput id="ee-date" name="date" type="date" defaultValue={entry.date} max={today} min="2000-01-01" />
               </FormField>
             </div>
+            {v2 ? (
+              <div className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5">
+                {monetaryLocked ? (
+                  <p className="text-xs text-text-muted">
+                    Bu hareketin stopaj/KDV bilgisi tutardan geri kurulamıyor; tutar alanları kilitli (nakit değişmez). Tutarı değiştirmek için hareketi iptal edip yeniden girin.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="KDV oranı">
+                      <span className="mr-1 text-xs font-semibold text-text-muted">KDV</span>
+                      <Chip name="ee-vat" checked={vatRate === null} onSelect={() => setVatRate(null)}>Bilinmiyor</Chip>
+                      {LEDGER_VAT_RATES.map((r) => (
+                        <Chip key={r} name="ee-vat" checked={vatRate === r} onSelect={() => setVatRate(r)}>%{r}</Chip>
+                      ))}
+                      {vatRate !== null && vatRate > 0 ? (
+                        <span className="ml-auto inline-flex items-center gap-2 text-xs">
+                          <label htmlFor="ee-vat-incl" className="font-semibold text-text-muted">{vatIncluded ? "Tutara dahil" : "Tutara hariç"}</label>
+                          <Switch id="ee-vat-incl" checked={vatIncluded} onCheckedChange={setVatIncluded} aria-label="KDV tutara dahil" />
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Stopaj oranı">
+                      <span className="mr-1 text-xs font-semibold text-text-muted">Stopaj</span>
+                      {whChoices.map((r) => (
+                        <Chip key={String(r)} name="ee-wh" checked={whRate === r} onSelect={() => setWhRate(r)}>{r === null ? "Yok" : `%${r}`}</Chip>
+                      ))}
+                    </div>
+                    {preview ? (
+                      <p className="numeric mt-2 text-xs text-text-muted" aria-live="polite">
+                        Net {formatAccountMoney(preview.net, currency)}
+                        {preview.vat !== null ? <> · KDV {formatAccountMoney(preview.vat, currency)}</> : null}
+                        {preview.withheld ? <> · Stopaj {formatAccountMoney(preview.withheld, currency)}</> : null}
+                        {" · "}Hesaba yansıyan <strong className="text-text">{formatAccountMoney(preview.cash, currency)}</strong>
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            ) : null}
             <FormField label="Ne için?" htmlFor="ee-category" required>
               <FormSelect id="ee-category" name="category" defaultValue={entry.category ?? ""} required>
                 {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -173,8 +296,8 @@ function VoidDialog({ entry, isTransfer, undo, onClose }: { entry: EditableEntry
     // Geri al: iptal edilen elle girilmiş hareket aynı bilgilerle yeniden yazılır (sistem kategorisi + transfer değil).
     const restorable = undo && !isTransfer && entry.category && isCashCategory(entry.category, entry.direction) ? undo : null;
     push("Hareket iptal edildi", "ok", restorable ? { action: { label: "Geri al", onClick: () => void restore(restorable) } } : undefined);
+    // Eylem revalidatePath yapar: sayfa aynı yanıtla tazelenir (router.refresh ikinci tur olurdu, B037).
     onClose();
-    router.refresh();
   }
 
   async function restore(info: UndoInfo) {

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
+import { afterSafe } from "@/lib/after-safe";
 import { requirePlatformModule } from "@/lib/platform";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -91,15 +93,16 @@ export async function createManualInvoice(formData: FormData): Promise<InvoiceOp
     return { error: error.message?.includes("manual_invoice_tenant") ? "Ofis bulunamadı." : "Taslak fatura oluşturulamadı; birkaç dakika sonra tekrar deneyin." };
   }
   const id = String(data ?? "");
-  await logPlatformActivity({
-    actorId: staff.id,
-    action: "billing.invoice.manual_draft",
-    entityType: "invoice",
-    entityId: id || null,
-    meta: { tenantId, invoiceNo, category, lines: built.lines.length, vatRate },
-  });
-  refresh(id || undefined);
-  return { ok: true, id, notice: "Taslak oluşturuldu. Kontrol edip 'Faturayı kes' ile kesin." };
+  if (!UUID.test(id)) return { error: "Taslak fatura oluşturulamadı; birkaç dakika sonra tekrar deneyin." };
+  // SK6/B037: denetim kaydı yanıttan SONRA (after); listeler revalidate edilir ve yönlendirme AYNI yanıtta döner
+  // (istemci router.push + ek RSC turları yok).
+  const snapshot = { tenantId, invoiceNo, category, lines: built.lines.length, vatRate };
+  afterSafe(
+    () => logPlatformActivity({ actorId: staff.id, action: "billing.invoice.manual_draft", entityType: "invoice", entityId: id, meta: snapshot }),
+    "billing.invoice.manual_draft",
+  );
+  refresh(id);
+  redirect(`/admin/billing/faturalar/${id}`);
 }
 
 /**

@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
 
 const BUCKET_TONE: Record<AgingBucketKey, { bar: string; dot: string }> = {
   vadesi_gelmedi: { bar: "bg-brand-400", dot: "bg-brand-400" },
-  "0-30": { bar: "bg-warning-400", dot: "bg-warning-400" },
-  "31-60": { bar: "bg-warning-600", dot: "bg-warning-600" },
+  "0-30": { bar: "bg-warn-400", dot: "bg-warn-400" },
+  "31-60": { bar: "bg-warn-600", dot: "bg-warn-600" },
   "61-90": { bar: "bg-danger-400", dot: "bg-danger-400" },
   "90+": { bar: "bg-danger-600", dot: "bg-danger-600" },
   vadesiz: { bar: "bg-text-muted", dot: "bg-text-muted" },

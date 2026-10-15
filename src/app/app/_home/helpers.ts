@@ -1,7 +1,7 @@
 /**
  * "Bugün" ana ekranı — saf yardımcılar (DB'ye ve React'e bağımlı değil; vitest kapsamında).
  */
-import { DAY_MS, msSince, trDayKey, trParts } from "@/lib/clock";
+import { DAY_MS, msSince, now, trDayKey, trParts } from "@/lib/clock";
 
 export type TrendInfo = { label: string; dir: "up" | "down" | "flat" | "new"; good?: boolean };
 
@@ -176,21 +176,35 @@ export function sumLost(rows: { estimated_lost_commission: number | string | nul
   return rows.reduce((sum, row) => sum + Number(row.estimated_lost_commission || 0), 0);
 }
 
-/** `tenant_commission_aggregates` dönüşünün ana ekranın kullandığı kısmı. */
+/** `tenant_commission_aggregates` dönüşünün ana ekranın kullandığı kısmı (`ym` = İstanbul yerel ayı, 20261016060000). */
 export type CommissionAggregate = {
-  monthly: { month_start: string; accrued: number | string | null; paid: number | string | null }[];
+  monthly: { ym?: string | null; month_start: string; accrued: number | string | null; paid: number | string | null }[];
 };
+
+const YM = /^\d{4}-\d{2}$/;
+
+/** Ay satırının YYYY-MM anahtarı: `ym` varsa o; yoksa month_start'ın Türkiye takvimindeki ayı. */
+function monthKeyOf(m: CommissionAggregate["monthly"][number]): string {
+  if (m.ym && YM.test(m.ym)) return m.ym;
+  return trDayKey(m.month_start).slice(0, 7);
+}
 
 /**
  * Son 6 ay (bu ay dahil) tahakkuk/tahsil özeti — eski 500 satırlık JS toplamıyla
  * aynı anlam: tahsil = paid|collected, bekleyen = diğer tüm durumlar (tahakkuk - tahsil).
- * `monthly` RPC'de her zaman 6 ay (eskiden yeniye) döner; eksikse sıfırla doldurulur.
+ * Satırlar KONUMLA değil ay anahtarıyla (`ym`) eşlenir ve aynı aya düşenler toplanır (B077: eski UTC ekseninde bir ay iki kez,
+ * komşusu hiç gelmiyordu). `keys` dışındaki aylar yok sayılır; eksik ay sıfırdır.
  */
-export function commissionSummaryFromAggregate(agg: CommissionAggregate | null | undefined) {
-  const monthly = agg?.monthly ?? [];
-  const last6 = monthly.slice(-6);
-  const monthTotals = Array.from({ length: 6 }, (_, i) => Number(last6[last6.length - 6 + i]?.accrued ?? 0));
-  const paid = last6.reduce((s, m) => s + Number(m.paid ?? 0), 0);
+export function commissionSummaryFromAggregate(agg: CommissionAggregate | null | undefined, keys: string[] = lastSixMonthKeys(now())) {
+  const index = new Map(keys.map((k, i) => [k, i]));
+  const monthTotals = keys.map(() => 0);
+  let paid = 0;
+  for (const m of agg?.monthly ?? []) {
+    const i = index.get(monthKeyOf(m));
+    if (i === undefined) continue;
+    monthTotals[i] += Number(m.accrued ?? 0);
+    paid += Number(m.paid ?? 0);
+  }
   const accrued = monthTotals.reduce((s, v) => s + v, 0);
   return { paid, pending: accrued - paid, monthTotals };
 }

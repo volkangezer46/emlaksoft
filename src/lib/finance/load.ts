@@ -113,6 +113,46 @@ export async function loadBudgetContext(db: SupabaseClient, tenantId: string, no
   return base;
 }
 
+/** `finance_budget_vs_actual_for` (20261016060100) — yalnız service_role, açık kiracı; Bütçe sekmesinin RPC'siyle aynı gövde. */
+export const BUDGET_VS_ACTUAL_FOR_RPC = "finance_budget_vs_actual_for";
+
+type BudgetVsActualRaw = { direction: string; category: string; budget: number | string | null; actual: number | string | null };
+
+/**
+ * Bütçe ↔ gerçekleşen, Bütçe sekmesiyle TEK KAYNAK (SK6/B018): kategori anahtarı finance_v2_budget_category eşlemesiyle
+ * (kira/aidat/muhasebe → ofis), gerçekleşen kâr/zarar tabanıyla (KDV hariç, stopaj dahil, hareketler + giderler) gelir.
+ * Yalnız gider yönü ve bütçesi olan kategoriler içgörü üretir; maaş bütçesi dışarıda (alıcılar maaşı göremeyebilir).
+ * Fonksiyon yoksa (migration uygulanmadı) `null`: çağıran eski `loadBudgetContext`'e düşer.
+ */
+export async function loadBudgetContextShared(admin: SupabaseClient, tenantId: string, nowMs: number): Promise<BudgetContext | null> {
+  const monthKey = trMonthKey(nowMs);
+  const prevMonthKey = shiftMonthKey(monthKey, -1) ?? monthKey;
+  const call = (m: string) => admin.rpc(BUDGET_VS_ACTUAL_FOR_RPC, { p_tenant: tenantId, p_month: `${m}-01`, p_include_salary: false });
+  const [cur, prev] = await Promise.all([call(monthKey), call(prevMonthKey)]);
+  const err = cur.error ?? prev.error;
+  if (err) {
+    if (isMissingFinanceSchema(err) || err.code === "PGRST202" || err.code === "42883") return null;
+    throw new Error(`${BUDGET_VS_ACTUAL_FOR_RPC}: ${err.code ?? "hata"}`);
+  }
+  const outOf = (data: unknown) => ((data ?? []) as BudgetVsActualRaw[]).filter((r) => r.direction === "out" && String(r.category ?? "").trim() !== "");
+  const curOut = outOf(cur.data);
+  const budgets = curOut.filter((r) => num(r.budget) > 0).map((r) => ({ category: r.category, monthlyAmount: num(r.budget) }));
+  const thisMonth = new Map(curOut.map((r) => [r.category, num(r.actual)]));
+  const prevMonth = new Map(outOf(prev.data).map((r) => [r.category, num(r.actual)]));
+  return {
+    available: true,
+    monthKey,
+    prevMonthKey,
+    monthStart: `${monthKey}-01`,
+    monthEnd: lastDayOfMonth(monthKey),
+    prevMonthStart: `${prevMonthKey}-01`,
+    prevMonthEnd: lastDayOfMonth(prevMonthKey),
+    rows: budgets.length > 0 ? computeBudgetRows(budgets, thisMonth, prevMonth) : [],
+    budgetCount: budgets.length,
+    budgets: new Map(budgets.map((b) => [b.category, b.monthlyAmount])),
+  };
+}
+
 export type RecurringContext = { available: boolean; todayKey: string; series: RecurringSeries[] };
 
 export async function loadRecurringSeries(db: SupabaseClient, tenantId: string, nowMs: number): Promise<RecurringContext> {

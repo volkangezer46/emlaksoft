@@ -18,6 +18,7 @@ export function InlineOp({
   action,
   children,
   hint,
+  refreshAfter = true,
 }: {
   label: string;
   confirmLabel: string;
@@ -27,6 +28,11 @@ export function InlineOp({
   /** Onay satırındaki ek alanlar (name= öznitelikli input/select). */
   children?: ReactNode;
   hint?: string;
+  /**
+   * Başarıdan sonra router.refresh(). Eylem bulunduğu sayfanın yolunu zaten revalidatePath ile tazeliyorsa (sunucu eylemi
+   * yanıtı güncel RSC'yi taşır) false verin: çift tazeleme ve ek RSC turu olmaz (SK6/B037).
+   */
+  refreshAfter?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -73,7 +79,7 @@ export function InlineOp({
           }
           setMsg({ ok: true, text: res.notice ?? "İşlem kaydedildi." });
           setOpen(false);
-          router.refresh();
+          if (refreshAfter) router.refresh();
         });
       }}
     >

@@ -6,7 +6,8 @@ import { RECURRENCE_LABEL, renewalInfo, type RecurringSeries } from "@/lib/finan
 import { PORTAL_LABEL, type PortalRoiRow, type WorstPortal } from "@/lib/finance/portal-roi";
 
 /**
- * GİDER içgörüleri (SAF). Alıcı yalnız YÖNETİM rolleridir (ofis giderleri danışmana gösterilmez).
+ * GİDER içgörüleri (SAF). Alıcı YÖNETİM rolü VE gider görüntüleme izni (expenses:view) olanlardır (SK6/B165; kural kaydı
+ * `requiredPermission`); ofis giderleri danışmana ve gider izni olmayan şube müdürüne gösterilmez.
  *
  *  expense_budget@1  Kategori bütçesinin %80'ine ulaşıldı (orta) / %100 aşıldı (yüksek → zil). Önceki aya sapma kanıtta.
  *  subscription@1    Tekrarlayan gider/aboneliğin yenilemesi 7 gün içinde (ya da kayıt girilmedi) + kullanılmayan portal aboneliği.
@@ -61,13 +62,17 @@ export function evaluateExpenseBudgets(facts: BudgetFacts, nowMs: number, monthE
           value: r.deltaPctVsPrev === null ? (r.prevSpent > 0 ? money(r.deltaVsPrev) : "önceki ay gider yok") : `${r.deltaPctVsPrev >= 0 ? "+" : ""}%${r.deltaPctVsPrev}`,
         },
       ],
-      href: `/app/giderler?sekme=hareketler&kategori=${encodeURIComponent(r.category)}&from=${facts.monthStart}&to=${facts.monthEnd}`,
+      // Bütçe sekmesindeki satır (aynı kaynak: finance_budget_vs_actual); bütçe anahtarı birden çok hareket kategorisini kapsar
+      // (ofis = kira + aidat + muhasebe…), bu yüzden Hareketler'in tek kategori süzgeci kümeyi vermez.
+      href: `/app/giderler?sekme=butce&ay=${facts.monthKey}#gider`,
       entityType: null,
       entityId: null,
       isForecast: false,
       confidence: null,
       // Eşik geçişi (warn → over) yeni içgörü + yeni zil bildirimi üretir.
       dedupeKey: buildDedupeKey("fin-budget", shortHash(r.category), `${facts.monthKey}-${over ? "over" : "warn"}`),
+      // DURUM tipi: aynı ay ve eşikte rakamlar değiştikçe açık kart güncellenir (SK6/B018; state/notified_at korunur).
+      refreshOnConflict: true,
       validUntilMs: Math.max(nowMs + dayMs(1), monthEndMs),
       audience: { type: "management" },
       urgencyDays: null,

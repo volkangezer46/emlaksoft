@@ -10,7 +10,7 @@
  * - MRR tahmini (doğrusal eğilim; ETİKETLİ tahmin, en az 3 ay gerçek veri)
  * - Churn nedenleri (abonelik iptal nedeni serbest metni; normalize edilip gruplanır)
  * - Aylık tüketim kovaları (AI kredisi, değerleme raporu, EmlakFiyati analiz bakiyesi)
- * - Ofis bazlı MRR (`computeTenantMrr`; günlük anlık görüntü ve `exactMrr` aynı kural) + ay sonu MRR eğrisi
+ * - Ofis bazlı MRR (`computeTenantMrr`; günlük anlık görüntü ve `exactMrr` aynı kural: yalnız aktif abonelik, iç ofis 0) + ay sonu MRR eğrisi
  *   (`platform_mrr_daily`; anlık görüntü öncesi aylar `null`) + dönemsel churn + dönemi bitmiş aktif abonelik
  */
 import { trDayKey, trMonthKey } from "@/lib/clock";
@@ -204,29 +204,36 @@ export function monthlyUsage(rows: readonly LedgerPoint[], units: readonly strin
 // ---- Ofis bazlı MRR (anlık görüntü ve canlı toplamın ORTAK kuralı) ---------------
 
 export type TenantMrrInput = {
-  /** tenants.status */
+  /** tenants.status (bilgi; kural abonelik durumuna bakar). */
   tenantStatus: string;
   /** tenants.plan */
   tenantPlan: string | null;
   /** Ofisin abonelik satırı (yoksa null). */
   sub: { status: string; amount_try: number | string | null } | null;
+  /** tenants.is_internal: iç/test/demo ofis (e2e-test, admin, demo-ofis) platform MRR'ına girmez. */
+  internal?: boolean;
 };
 
 /**
  * Tek ofisin aylık yinelenen geliri — `exactMrr` (reporting/platform) ile AYNI kural, ofis bazında:
+ *  - iç/test/demo ofis (`internal`) her durumda 0,
  *  - aktif aboneliği varsa kayıtlı tutar (fatura tutarı; katalogdan yeniden hesaplanmaz),
- *  - aboneliği aktif DEĞİL ama ofis aktifse katalog fiyatı (aboneliği eksik aktif ofis),
- *  - diğer her durumda 0 (deneme, gecikmiş, askı, iptal gelir sayılmaz).
- * `prices`: plan kimliği → aylık liste fiyatı (`priceMapOf(getPlanDefinitions())`).
+ *  - diğer her durumda 0: aboneliği eksik aktif ofis de 0 ekler (katalog fiyatı YEDEĞİ YOK; ayrı uyarı sayacına gider),
+ *    deneme, gecikmiş, askı, iptal gelir sayılmaz.
  */
-export function computeTenantMrr(input: TenantMrrInput, prices: ReadonlyMap<string, number>): number {
+export function computeTenantMrr(input: TenantMrrInput): number {
+  if (input.internal) return 0;
   const sub = input.sub;
   if (sub && sub.status === "active") {
     const amount = Number(sub.amount_try);
     return Number.isFinite(amount) && amount > 0 ? Math.round(amount * 100) / 100 : 0;
   }
-  if (input.tenantStatus === "active") return prices.get(input.tenantPlan ?? "") ?? 0;
   return 0;
+}
+
+/** Aktif ama aktif aboneliği olmayan, iç olmayan ofis ("aboneliği eksik ofis" uyarısı; MRR'a 0 ekler). */
+export function isMissingSubscription(input: TenantMrrInput): boolean {
+  return !input.internal && input.tenantStatus === "active" && input.sub?.status !== "active";
 }
 
 // ---- MRR eğrisi (platform_mrr_daily ay sonu değerleri) ----------------------------

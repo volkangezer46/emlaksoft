@@ -465,6 +465,13 @@ const F = {
   // SK5 (2026-10-16): bildirim okunma durumu kisi basina (notification_reads) + komisyon is_sample anlasmadan turer.
   sk5NotificationReads: "20261016050000_notification_reads.sql",
   sk5CommissionsInheritSample: "20261016050100_commissions_inherit_sample.sql",
+  // SK6 (2026-10-16): finans, rapor ve platform MRR dogrulugu (alti dosya, tek pencere, dosya sirasiyla).
+  sk6ReportingLocalAxis: "20261016060000_reporting_aggregates_local_axis.sql",
+  sk6FinancePnlVatFix: "20261016060100_finance_pnl_vat_fix.sql",
+  sk6RentalKpiOverdue: "20261016060200_rental_kpi_overdue.sql",
+  sk6CommissionSplitsDeriveRate: "20261016060300_commission_splits_derive_rate.sql",
+  sk6TenantIsInternal: "20261016060400_tenant_is_internal.sql",
+  sk6PlatformReportingLocalAxis: "20261016060500_platform_reporting_local_axis.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -705,6 +712,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.appointmentCustomerMessages]: "ek", // appointments'a 2 nullable sutun (customer_confirm_sent_at, customer_reminded_at); mevcut satir/davranis ayni, kod sutunlar yokken musteri hatirlatma adimini atlar
     [F.yd7RoleTimeouts]: "davranis", // rol ayari: anon 3s / authenticated 8s / authenticator 8s statement_timeout (canlidaki Supabase varsayilani, gevsemez) + service_role 60s (PostgREST taklidinde authenticator'in 8s'i yerine; sunucu/cron yollari kisalmaz) + 4 rolde idle_in_transaction 60s; superuser ise veritabani log_min_duration_statement 1s (degilse NOTICE, supabase_admin ile elle); tablo/veri degismez
     [F.yd7GeoStatsMv]: "davranis", // geo_province_stats / geo_district_stats duz gorunumden AYNI ad ve kolonlarla materialized view'a (+ yeni geo_level_counts, refresh_geo_stats yalniz service_role); sayim son yenilemedeki durum (cron gunluk + /admin/geo yazimi sonrasi), anon/authenticated okuma izni kalkar (kodda okuyan yok); veri degismez
+    [F.sk6ReportingLocalAxis]: "davranis", // tenant_reporting/commission_aggregates eksen Istanbul yerel ayi + 'ym'; ofis geneli RPC kullanicidan bagimsiz (kiraci onbellegi), izleyene gore degisen komisyon/gider yeni tenant_reporting_viewer_aggregates'ten; gider serisi yalniz expenses:view (yoksa null)
+    [F.sk6FinancePnlVatFix]: "davranis", // finance_pnl komisyon geliri = matrah - dis paylar (KDV yalniz bilgi); finance_vat_summary acik kalem KDV'sini duzenleme ayinda sayar; finance_open_item_settle tahsilata oransal KDV yazar; yeni finance_budget_vs_actual_for (yalniz service_role); imza/ACL ayni
+    [F.sk6RentalKpiOverdue]: "ek", // rental_kpi_snapshot'a period_overdue + period_total anahtarlari; eski anahtarlar ve anlamlari ayni (SECURITY INVOKER, ACL ayni)
+    [F.sk6CommissionSplitsDeriveRate]: "davranis", // commission_normalize_splits: oran yoksa pct/tutardan turetilir, 'Ofis' etiketi office, tutarsiz oran/tutar 23514; yalniz demo 1be1a3b9 kaydi yeniden yazilir (gercek ofis verisi degismez)
+    [F.sk6TenantIsInternal]: "davranis", // tenants.is_internal (varsayilan false, tablo yeniden yazilmaz) + yalniz e2e-test/admin/demo-ofis true + bayragi yalniz sunucu degistirir (BEFORE INSERT/UPDATE OF is_internal tetikleyicisi 42501); gercek ofis verisi degismez
+    [F.sk6PlatformReportingLocalAxis]: "davranis", // platform_reporting_aggregates ic ofisleri dislar, p_from/p_to ve ay/hafta ekseni Istanbul, plan ekseni gizli paketleri kapsar, mrr_trend platform_mrr_daily ay sonu anlik goruntusunden (goruntusuz ay satir yok), summary.missing_subscription_count/internal_count; imza/ACL ayni
     [F.yd7BatchCountRpcs]: "ek", // yalniz 5 yeni salt-okunur fonksiyon: offer_counts / demand_counts / target_activity_counts (SECURITY INVOKER, yalniz authenticated, RLS gecerli) + kvkk_customer_related_counts / ef_credit_balances (yalniz service_role); kod fonksiyon yokken eski ayri sorgulara duser
     [F.sk1FinanceFxInline]: "davranis", // finance_fx ayni sonuc, SET search_path kalkar + nitelikli isleçler: cagiran sorguya inline (yalniz plan); grant'lar korunur
     [F.sk1PgrstWatchScope]: "davranis", // extensions.pgrst_*_watch yalniz public/storage/graphql_public DDL'inde NOTIFY; fonksiyon sahibi (supabase_admin) degilse no-op (scripts/sunucu/pgrst-watch-scope.sh)
@@ -962,6 +975,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "YD7-veritabani-isletim", order: 167, title: "Veritabani isletim sertlestirmesi: rol duzeyi statement_timeout / idle_in_transaction (service_role daha uzun) + yavas sorgu gunlugu (superuser ise), geo sayimlari materialized view + refresh_geo_stats (cron operational-retention geoStats adimi), toplu sayim RPC'leri (teklif/talep/hedef sayaclari, KVKK iliskili kayit, EF bakiye listesi) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC/gorunum yokken eski sorgulara duser; sira dosya numarasiyla; log_min_duration_statement icin supabase_admin adimi; davranis)", files: [F.yd7RoleTimeouts, F.yd7GeoStatsMv, F.yd7BatchCountRpcs] },
     { id: "SK4-admin-canli-veri", order: 204, title: "Admin canli veri ve destek: personel ozel Broadcast konulari (admin:staff, staff:<uid>; 5 tablo + platform_notifications tetikleyicisi, realtime.messages personel politikasi) + reply_support_ticket_v3 (ofis yaniti acik talebi acik birakir; v2 devreder; tek seferlik in_progress -> open duzeltmesi) + admin_search_members (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod kanal katilamazsa 60 sn yoklamaya, kod reply_support_ticket_v2 cagirir, migration sonrasi v2 v3'e devreder, arama fonksiyonu yoksa ad aramasina duser; sira dosya numarasiyla; davranis)", files: [F.sk4AdminStaffBroadcast, F.sk4ReplySupportTicketV3, F.sk4AdminSearchMembers] },
     { id: "KQ6-bildirim-temizligi", order: 156, title: "Bildirim gurultusu temizligi: anahtarsiz 'Portal teyit gecikti' kopyalari ilan basina en yeniye, gelecek tarihli kopyalar en yeniye, kalan gelecek created_at now() (bagimsiz yalniz veri; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; geri alinamaz, PITR; davranis)", files: [F.notificationsDedupeCleanup] },
+    { id: "SK6-finans-rapor-platform-mrr", order: 206, title: "SK6 finans/rapor/platform MRR dogrulugu: rapor RPC'leri yerel ay ekseni + ofis geneli/izleyen ayrimi, kar-zarar ve KDV duzeltmesi, kiralama gecikmis dilimi, komisyon pay orani turetme, tenants.is_internal (e2e-test/admin/demo-ofis) ve platform toplulastirmasi (ic ofis haric, Istanbul siniri, ay sonu anlik goruntu egrisi). Sira dosya numarasiyla (060500, 060400'den SONRA). 060000 KOD YAYINIYLA AYNI PENCERE (once migration, sonra kod; arada eski kod Raporlar'da serileri bos gosterebilir); digerleri KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod yeni anahtar/sutun yokken eski davranisa duser). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.sk6ReportingLocalAxis, F.sk6FinancePnlVatFix, F.sk6RentalKpiOverdue, F.sk6CommissionSplitsDeriveRate, F.sk6TenantIsInternal, F.sk6PlatformReportingLocalAxis] },
     { id: "YD1-demo-gece-sifirlama", order: 161, title: "Demo kiracinin gece sifirlamasi: demo_reset_state tabani + demo_tenant_nightly_reset (yalniz slug=demo-ofis; dis baglanti yuzeyleri ve tabandan sonra eklenen is kayitlari silinir). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken adimi atlar); ek", files: [F.demoTenantNightlyReset] },
     { id: "YD8-csp-olcum-statik-yasal", order: 168, title: "Herkese acik sayfa hafifligi: CSP rapor modu satirlari (error_logs source 'csp') hata patlamasi sayacina girmez (record_error_occurrence govdesi ayni + tek kosul) ve yasal sayfalar statik sunuma acilir (statik.routes yoksa yazilir; varsa dokunulmaz) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: CSP satirlari migration yokken yalniz sayaca da girer, statik yasal sayfa kodu zaten yayinda; sira dosya numarasiyla; davranis)", files: [F.yd8ErrorLogsCspSource, F.yd8StaticLegalPagesOn] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1216,6 +1230,15 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk2RealtimeTrim, F.kq2RealtimeTrim],
     // SK4: ozel konu politikasi growth_flag_on (MFA bayragi) yardimcisini kullanir.
     [F.sk4AdminStaffBroadcast, F.growthEngine],
+    // SK6: her dosya degistirdigi fonksiyonun son canli govdesinin uzerine yazar; platform toplulastirmasi is_internal ve platform_mrr_daily'yi okur.
+    [F.sk6ReportingLocalAxis, F.earningsStatementPrivacy],
+    [F.sk6FinancePnlVatFix, F.financeLedgerV2Rpc],
+    [F.sk6FinancePnlVatFix, F.financePartyAdvisorScope],
+    [F.sk6RentalKpiOverdue, F.dbPerfRlsInitplanKpi],
+    [F.sk6CommissionSplitsDeriveRate, F.commissionSplitProfile],
+    [F.sk6CommissionSplitsDeriveRate, F.commissionSplitsIntegrity],
+    [F.sk6PlatformReportingLocalAxis, F.sk6TenantIsInternal],
+    [F.sk6PlatformReportingLocalAxis, F.platformMrrDaily],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

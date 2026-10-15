@@ -42,6 +42,18 @@ function idOf(v: Rel) {
   return Array.isArray(v) ? (v[0]?.id ?? null) : (v.id ?? null);
 }
 
+/**
+ * Fatura kümesi gösteren kartlar Fatura defterine (/admin/billing/defter) bağlanır: o sayfa `durum` (LEDGER_STATUS_FILTERS) ve
+ * `donem` (bu-ay | gecen-ay | ozel | tumu) süzgeçlerini kabul eder. /admin/billing yalnız abonelik durumlarını süzer.
+ * Sözleşme: billing-home-links-contract.test.ts.
+ */
+const LEDGER_PAID_THIS_MONTH = "/admin/billing/defter?donem=bu-ay&durum=paid";
+const LEDGER_PAID_ALL = "/admin/billing/defter?donem=tumu&durum=paid";
+const LEDGER_OPEN = "/admin/billing/defter?donem=tumu&durum=open";
+const LEDGER_OVERDUE = "/admin/billing/defter?donem=tumu&durum=gecikmis";
+const LEDGER_ALL = "/admin/billing/defter?donem=tumu";
+const ledgerInvoiceHref = (invoiceNo: string | null) => (invoiceNo ? `${LEDGER_ALL}&q=${encodeURIComponent(invoiceNo)}` : LEDGER_ALL);
+
 function money(n: number) {
   return new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(n);
 }
@@ -53,14 +65,15 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const [{ data: subs }, { data: invoices }, platformMrr, catalogDefs] = await Promise.all([
     admin
       .from("subscriptions")
-      .select("id, plan, status, amount_try, current_period_end, pause_started_at, cancel_at_period_end, created_at")
+      .select("id, status, current_period_end, pause_started_at, cancel_at_period_end, created_at")
       .order("created_at", { ascending: false }),
     admin
       .from("invoices")
       .select("id, invoice_no, status, total_try, due_at, paid_at, created_at, tenant:tenants(id, name)")
       .order("created_at", { ascending: false })
       .limit(60),
-    // MRR TEK kaynak (exactMrr; panel, /admin/billing ve raporlarla aynı). Okunamazsa null → "Veri yok".
+    // MRR, aktif abonelik sayısı, plan dağılımı ve aboneliği eksik ofis TEK kaynaktan (platform_reporting_aggregates → exactMrr;
+    // panel, /admin/billing ve raporlarla aynı; iç/test/demo ofis hariç). Okunamazsa null → "Veri yok".
     loadPlatformMrr(admin, now()).catch(() => null),
     // Paket kataloğu (DG2): adminden eklenen paketler de gelir dağılımında; okunamazsa kod tanımlı taban paketler.
     getPlanDefinitions().catch(() => PLANS),
@@ -70,7 +83,8 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const invRows = invoices ?? [];
 
   const mrr = platformMrr?.mrr ?? null;
-  const activeCount = subRows.filter((s) => s.status === "active").length;
+  const activeCount = platformMrr?.activeSubscriptions ?? null;
+  const missingSubs = platformMrr?.missingSubscriptions ?? 0;
   const trialing = subRows.filter((s) => s.status === "trialing").length;
   const pastDue = subRows.filter((s) => s.status === "past_due").length;
 
@@ -86,14 +100,14 @@ export async function BillingHome({ staffName }: { staffName: string }) {
   const overdueTotal = overdue.reduce((sum, i) => sum + Number(i.total_try || 0), 0);
   const openTotal = invRows.filter((i) => i.status === "open").reduce((sum, i) => sum + Number(i.total_try || 0), 0);
 
-  // Plan bazlı gelir dağılımı (aktif abonelikler)
+  // Plan bazlı gelir dağılımı: MRR ile aynı RPC yanıtı (aktif abonelik tutarları; toplamı KPI'daki MRR).
   // Satıştaki paketler her zaman; gizli/arşivli paket yalnız aktif geliri varsa listelenir.
   const planRevenue = catalogDefs
     .map((plan) => ({
       key: plan.id,
       label: plan.name,
       listed: !plan.hidden && !plan.archived,
-      value: subRows.filter((s) => s.status === "active" && s.plan === plan.id).reduce((sum, s) => sum + Number(s.amount_try || 0), 0),
+      value: platformMrr?.planMrr[plan.id] ?? 0,
     }))
     .filter((p) => p.listed || p.value > 0);
   const maxPlan = Math.max(1, ...planRevenue.map((p) => p.value));
@@ -112,7 +126,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           oldest ? (
             <p>
               Tahsilat önceliği: en eski geciken fatura{" "}
-              <Link href={oldestTenantId ? `/admin/tenants/${oldestTenantId}` : "/admin/billing?durum=open"} className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
+              <Link href={oldestTenantId ? `/admin/tenants/${oldestTenantId}` : LEDGER_OVERDUE} className="focus-ring rounded-sm font-semibold text-accent-text hover:underline">
                 {nameOf(oldest.tenant as Rel)}
               </Link>{" "}
               ({Math.max(1, Math.floor(msSince(oldest.due_at as string) / DAY_MS))} gündür bekliyor).
@@ -134,14 +148,35 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           tone="gold"
           hint={mrr === null ? "Gelir özeti okunamadı" : `Yıllık ${money(exactArr(mrr))}`}
         />
-        <KpiCard layout="inline" label="Aktif abonelik" value={activeCount} href="/admin/billing?durum=active" icon={CreditCard} tone="brand" hint={`${trialing} deneme aboneliği`} />
-        <KpiCard layout="inline" label="Bu ay tahsilat" value={money(collectedThisMonth)} href="/admin/billing?durum=paid" icon={Wallet} tone="success" hint="Ödenen faturalar" />
+        <KpiCard
+          layout="inline"
+          label="Aktif abonelik"
+          value={activeCount === null ? "Veri yok" : activeCount}
+          href="/admin/billing?durum=active"
+          icon={CreditCard}
+          tone="brand"
+          hint={`${trialing} deneme aboneliği`}
+        />
+        {missingSubs > 0 ? (
+          <KpiCard
+            layout="inline"
+            tinted
+            label="Aboneliği eksik ofis"
+            value={missingSubs}
+            href="/admin/tenants?durum=active"
+            icon={AlertTriangle}
+            tone="warn"
+            attention
+            hint="Aktif ama aboneliği yok · MRR'a eklenmez"
+          />
+        ) : null}
+        <KpiCard layout="inline" label="Bu ay tahsilat" value={money(collectedThisMonth)} href={LEDGER_PAID_THIS_MONTH} icon={Wallet} tone="success" hint="Ödenen faturalar" />
         <KpiCard
           layout="inline"
           tinted={overdue.length > 0}
           label="Gecikmiş fatura"
           value={money(overdueTotal)}
-          href="/admin/billing?durum=open"
+          href={LEDGER_OVERDUE}
           icon={AlertTriangle}
           tone={overdue.length > 0 ? "danger" : "success"}
           attention={overdue.length > 0}
@@ -170,7 +205,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
             hint="Ödenmedi işaretle ya da dönemi uzat"
           />
         ) : null}
-        <KpiCard layout="inline" label="Açık bakiye" value={money(openTotal)} href="/admin/billing?durum=open" icon={Receipt} tone="warn" hint="Ödenmemiş açık faturalar" />
+        <KpiCard layout="inline" label="Açık bakiye" value={money(openTotal)} href={LEDGER_OPEN} icon={Receipt} tone="warn" hint="Ödenmemiş açık faturalar" />
       </KpiGrid>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-6 xl:grid-cols-12">
@@ -181,7 +216,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
           subtitle="Tahsilat kuyruğu · en eski başta"
           icon={AlertTriangle}
           tone="danger"
-          href="/admin/billing?durum=open"
+          href={LEDGER_OVERDUE}
           hrefLabel="Tümü"
           height={0}
         >
@@ -194,7 +229,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 const days = Math.max(1, Math.floor(msSince(i.due_at as string) / DAY_MS));
                 return (
                   <li key={i.id}>
-                    <Link href={tenantId ? `/admin/tenants/${tenantId}` : "/admin/billing?durum=open"} className="ds-row focus-ring">
+                    <Link href={tenantId ? `/admin/tenants/${tenantId}` : ledgerInvoiceHref(i.invoice_no)} className="ds-row focus-ring">
                       <span className="ds-row-ico pm-t-danger" aria-hidden="true">
                         <AlertTriangle />
                       </span>
@@ -222,11 +257,11 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 </span>
               </Ring>
               <div className="min-w-0 flex-1 basis-40 space-y-1">
-                <Link href="/admin/billing?durum=paid" className="qrow focus-ring justify-between">
+                <Link href={LEDGER_PAID_ALL} className="qrow focus-ring justify-between">
                   <span className="text-sm text-text-muted">Ödenen</span>
                   <span className="num text-sm text-text">{money(paidTotal)}</span>
                 </Link>
-                <Link href="/admin/billing?durum=open" className="qrow focus-ring justify-between">
+                <Link href={LEDGER_OPEN} className="qrow focus-ring justify-between">
                   <span className="text-sm text-text-muted">Açık</span>
                   <span className="num text-sm text-text">{money(openTotal)}</span>
                 </Link>
@@ -238,24 +273,28 @@ export async function BillingHome({ staffName }: { staffName: string }) {
         </ChartCard>
 
         <ChartCard as="h2" className="md:col-span-6 xl:col-span-5" title="Gelir dağılımı" subtitle="Plan bazlı aylık gelir" icon={TrendingUp} tone="gold" height={0}>
-          <ul className="space-y-3">
-            {planRevenue.map((p) => (
-              <li key={p.key}>
-                <Link href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
-                  <span className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-text group-hover:text-accent-text">{p.label}</span>
-                    <span className="tabular-nums text-text-muted">{money(p.value)}</span>
-                  </span>
-                  <span className="ds-bar pm-t-gold mt-1.5">
-                    <span className="motion-progress-fill" style={{ width: `${Math.max((p.value / maxPlan) * 100, p.value > 0 ? 3 : 0)}%` }} />
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {platformMrr === null ? (
+            <EmptyState variant="compact" illustration="rapor" title="Gelir dağılımı okunamadı" description="Plan bazlı gelir, aylık yinelenen gelirle aynı özetten gelir." />
+          ) : (
+            <ul className="space-y-3">
+              {planRevenue.map((p) => (
+                <li key={p.key}>
+                  <Link href={`/admin/tenants?plan=${p.key}`} className="focus-ring group block rounded-[var(--radius-control)]">
+                    <span className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-text group-hover:text-accent-text">{p.label}</span>
+                      <span className="tabular-nums text-text-muted">{money(p.value)}</span>
+                    </span>
+                    <span className="ds-bar pm-t-gold mt-1.5">
+                      <span className="motion-progress-fill" style={{ width: `${Math.max((p.value / maxPlan) * 100, p.value > 0 ? 3 : 0)}%` }} />
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </ChartCard>
 
-        <ChartCard as="h2" className="md:col-span-6 xl:col-span-7" title="Son faturalar" subtitle="Fatura akışı" icon={FileText} tone="brand" href="/admin/billing" hrefLabel="Tümü" height={0}>
+        <ChartCard as="h2" className="md:col-span-6 xl:col-span-7" title="Son faturalar" subtitle="Fatura akışı" icon={FileText} tone="brand" href={LEDGER_ALL} hrefLabel="Tümü" height={0}>
           {invRows.length === 0 ? (
             <EmptyState variant="compact" illustration="belge" title="Henüz fatura yok" description="Kesilen faturalar burada listelenir." />
           ) : (
@@ -265,7 +304,7 @@ export async function BillingHome({ staffName }: { staffName: string }) {
                 const tenantId = idOf(i.tenant as Rel);
                 return (
                   <li key={i.id}>
-                    <Link href={tenantId ? `/admin/tenants/${tenantId}` : "/admin/billing"} className="ds-row focus-ring min-h-11">
+                    <Link href={tenantId ? `/admin/tenants/${tenantId}` : ledgerInvoiceHref(i.invoice_no)} className="ds-row focus-ring min-h-11">
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-text">{nameOf(i.tenant as Rel)}</span>
                         <span className="block text-xs text-text-muted">

@@ -31,6 +31,7 @@ import {
   type KpiItem,
 } from "@/components/ui/list-kit";
 import { RentalTable, type RentalVM } from "./rental-rows";
+import { OVERDUE_7D_LABEL, periodCollection } from "./collection-math";
 import { ReminderSettingsCard } from "./reminder-settings-card";
 import { LateFeeCard } from "./late-fee-card";
 import { loadLateFeeSettings, loadManagementFeeIncome, loadOwnerBalances } from "@/lib/property-management/load";
@@ -89,7 +90,16 @@ const PAGE_SIZE = 30;
 const RENTAL_LIMIT = 300;
 const CHARGE_LIMIT = 2000;
 
-type RentalKpiSnapshot = { periodPaid: number; periodPending: number; overdueCount: number; overdueSum: number; activeRentals: number };
+type RentalKpiSnapshot = {
+  periodPaid: number;
+  periodPending: number;
+  /** 20261016060200: bu dönemin 'overdue' kalanı ve tahakkuk toplamı; RPC eskiyse null (satır sorgusundan hesaplanır). */
+  periodOverdue: number | null;
+  periodTotal: number | null;
+  overdueCount: number;
+  overdueSum: number;
+  activeRentals: number;
+};
 
 /** `rental_kpi_snapshot` RPC'si (20261009000400); yoksa 60 sn atlanır, hata/geçersiz çıktı null → eski sorgular. */
 async function loadRentalKpiSnapshot(
@@ -110,7 +120,9 @@ async function loadRentalKpiSnapshot(
       overdueSum: Number(d.overdue_sum),
       activeRentals: Number(d.active_rentals),
     };
-    return Object.values(out).some((v) => !Number.isFinite(v)) ? null : out;
+    if (Object.values(out).some((v) => !Number.isFinite(v))) return null;
+    const opt = (v: unknown) => (v === undefined || v === null || !Number.isFinite(Number(v)) ? null : Number(v));
+    return { ...out, periodOverdue: opt(d.period_overdue), periodTotal: opt(d.period_total) };
   } catch {
     return null;
   }
@@ -218,18 +230,26 @@ export default async function KiralamaPage({
   const curMonthByRental = new Map<string, string>();
   let paidSum = 0;
   let pendingSum = 0;
+  // Bu dönemin 'overdue' tahakkuklarının kalanı (B107): eskiden hiçbir dilime girmiyordu.
+  let periodOverdueSum = 0;
+  let periodTotal = 0;
   for (const c of curCharges) {
     curMonthByRental.set(String(c.rental_id), String(c.status));
     const amount = Number(c.amount);
     // Tahsilat kaydı etkinse ödenen toplam (kısmi dahil); değilse eski davranış (yalnız tam ödenenler).
     const paidPart = pmReady ? Math.min(amount, Number(c.paid_amount ?? 0)) : c.status === "paid" ? amount : 0;
     paidSum += paidPart;
+    periodTotal += amount;
     if (c.status === "pending" || c.status === "partial") pendingSum += remainingAmount(amount, paidPart);
+    else if (c.status === "overdue") periodOverdueSum += remainingAmount(amount, paidPart);
   }
   if (kpiSnap) {
     paidSum = kpiSnap.periodPaid;
     pendingSum = kpiSnap.periodPending;
+    if (kpiSnap.periodOverdue !== null) periodOverdueSum = kpiSnap.periodOverdue;
+    if (kpiSnap.periodTotal !== null) periodTotal = kpiSnap.periodTotal;
   }
+  const collection = periodCollection({ paid: paidSum, pending: pendingSum, overdue: periodOverdueSum, total: periodTotal });
   const overdueRows = (overdueChargeRes.data ?? []) as unknown as { rental_id: string; amount: number | string; paid_amount?: number | string }[];
   const overdueRentals = new Set(overdueRows.map((c) => String(c.rental_id)));
   const overdueSum = kpiSnap
@@ -343,7 +363,9 @@ export default async function KiralamaPage({
     kpis.push({ label: "Bu ay tahsil edilen", value: money(paidSum), icon: <Wallet />, tone: "success", href: hrefWith({ durum: pmReady ? "collected" : "paid", evre: "", sahip: "", yonetim: "" }), hint: pmReady ? "kısmi ödemeler dahil" : "ödenen tahakkuk" });
     kpis.push({ label: "Bu ay tahsil edilecek", value: money(pendingSum), icon: <Hourglass />, tone: "warning", href: hrefWith({ durum: "pending", evre: "", sahip: "", yonetim: "" }), hint: "kalan tutar" });
   }
-  kpis.push({ label: "Geciken tahakkuk", value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `kalan ${money(overdueSum)}` : "tüm dönemler" });
+  // "Gecikmiş (7+ gün)": durum 'overdue' (kira-tahakkuk cron'u vadeden 7+ gün sonra işaretler). Cari'deki "Vadesi geçen"
+  // (vadesi bugünden önce, toleranssız) ayrı bir küme olduğundan etiket açıkça yazılır (B108).
+  kpis.push({ label: OVERDUE_7D_LABEL, value: overdueCount, icon: <AlertTriangle />, tone: "danger", href: hrefWith({ durum: "overdue", evre: "", sahip: "", yonetim: "" }), attention: true, hint: pmReady ? `vadeden 7+ gün geçmiş · kalan ${money(overdueSum)}` : "vadeden 7+ gün geçmiş · tüm dönemler" });
   if (ownerBalances) {
     kpis.push({ label: "Mülk sahiplerine ödenecek", value: money(payableSum), icon: <HandCoins />, tone: payableSum > 0 ? "warning" : "neutral", href: hrefWith({ sahip: "odenecek", durum: "", evre: "", yonetim: "" }), hint: `${payableRentals.size} kira` });
   }
@@ -403,15 +425,16 @@ export default async function KiralamaPage({
             {sumsReliable ? (
               <DistributionCard
                 title="Bu ayın tahsilatı"
-                subtitle="Ödenen ve bekleyen tahakkuk tutarı"
+                subtitle="Bu ayın tahakkuku: tahsil edilen, bekleyen ve gecikmiş kalan"
                 icon={Wallet}
                 tone="success"
                 format="money"
                 href={`${PATH}?durum=pending`}
-                centerLabel="bu ay"
+                centerLabel={collection.rate === null ? "bu ay tahakkuk" : `tahakkuk · %${collection.rate} tahsil`}
                 slices={[
-                  { label: "Tahsil edildi", value: paidSum, tone: "success", href: `${PATH}?durum=paid` },
-                  { label: "Bekleyen", value: pendingSum, tone: "warn", href: `${PATH}?durum=pending` },
+                  { label: "Tahsil edildi", value: collection.paid, tone: "success", href: `${PATH}?durum=paid` },
+                  { label: "Bekleyen", value: collection.pending, tone: "warn", href: `${PATH}?durum=pending` },
+                  { label: OVERDUE_7D_LABEL, value: collection.overdue, tone: "danger", href: `${PATH}?durum=overdue` },
                 ]}
               />
             ) : null}
@@ -437,11 +460,11 @@ export default async function KiralamaPage({
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           {prop ? (
-                            <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline">
+                            <Link href={`/app/portfoyler/${prop.id}`} className="focus-ring block truncate rounded-[var(--radius-control)] text-sm font-bold text-ink-950 hover:text-brand-600 hover:underline max-md:line-clamp-2 max-md:whitespace-normal">
                               {propName}
                             </Link>
                           ) : (
-                            <p className="truncate text-sm font-bold text-ink-950">{propName}</p>
+                            <p className="truncate text-sm font-bold text-ink-950 max-md:line-clamp-2 max-md:whitespace-normal">{propName}</p>
                           )}
                           {renter ? (
                             <Link href={`/app/musteriler/${renter.id}`} className="focus-ring rounded-[var(--radius-control)] text-xs text-text-muted hover:text-brand-600 hover:underline">

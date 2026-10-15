@@ -301,17 +301,18 @@ describe("komisyon sızıntısı", () => {
 describe("danışman kârlılığı", () => {
   const names = new Map([["u1", "Ayşe"], ["u2", "Can"]]);
 
-  it("ofiste kalan − doğrudan maliyet; iptal komisyon sayılmaz; ortak gider ayrı", () => {
+  it("ofiste kalan = matrah (KDV hariç) − dış paylar; KDV düşülmez (B103); iptal komisyon sayılmaz; ortak gider ayrı", () => {
     const r = computeAdvisorProfitability(
       [
-        { commissionId: "c1", advisorId: "u1", gross: 100_000, vat: 16_667, status: "paid" },
-        { commissionId: "c2", advisorId: "u1", gross: 50_000, vat: 8_333, status: "cancelled" },
-        { commissionId: "c3", advisorId: "u2", gross: 60_000, vat: 10_000, status: "calculated" },
+        // gross = KDV HARİÇ matrah; vat yalnız bilgi.
+        { commissionId: "c1", advisorId: "u1", gross: 100_000, vat: 20_000, status: "paid" },
+        { commissionId: "c2", advisorId: "u1", gross: 50_000, vat: 10_000, status: "cancelled" },
+        { commissionId: "c3", advisorId: "u2", gross: 60_000, vat: 12_000, status: "calculated" },
       ],
       [
         { commissionId: "c1", kind: "advisor", amount: 40_000 },
-        { commissionId: "c1", kind: "office", amount: 43_333 },
-        { commissionId: "c3", kind: "office", amount: 50_000 },
+        { commissionId: "c1", kind: "office", amount: 60_000 },
+        { commissionId: "c3", kind: "office", amount: 60_000 },
       ],
       [{ advisorId: "u1", amount: 3_000 }, { advisorId: null, amount: 9_000 }],
       names,
@@ -319,10 +320,10 @@ describe("danışman kârlılığı", () => {
     expect(r.unattributedExpenses).toBe(9_000);
     const a = r.rows.find((x) => x.advisorId === "u1")!;
     expect(a.commissions).toBe(1);
-    expect(a.retained).toBe(43_333);
+    expect(a.retained).toBe(60_000);
     expect(a.directCosts).toBe(3_000);
-    expect(a.net).toBe(40_333);
-    expect(r.rows[0]!.advisorId).toBe("u2"); // net 50.000 > 40.333
+    expect(a.net).toBe(57_000);
+    expect(r.rows[0]!.advisorId).toBe("u2"); // net 60.000 > 57.000
     expect(r.rows.find((x) => x.advisorId === "u2")!.unsplit).toBe(0);
   });
 

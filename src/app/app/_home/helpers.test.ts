@@ -101,19 +101,38 @@ describe("pipeline ve ekip", () => {
 });
 
 describe("commissionSummaryFromAggregate", () => {
-  it("6 aylık tahakkuk/tahsil toplamını ve aylık seriyi RPC çıktısından üretir", () => {
+  const keys = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"];
+  it("6 aylık tahakkuk/tahsil toplamını ve aylık seriyi RPC çıktısından ym ile üretir", () => {
     const monthly = [100, 0, 50, 0, 200, 300].map((accrued, i) => ({
+      ym: `2026-0${i + 1}`,
       month_start: `2026-0${i + 1}-01T00:00:00+03:00`,
       accrued,
       paid: i === 5 ? "120" : i === 0 ? 100 : 0,
     }));
-    const s = commissionSummaryFromAggregate({ monthly });
+    const s = commissionSummaryFromAggregate({ monthly }, keys);
     expect(s.monthTotals).toEqual([100, 0, 50, 0, 200, 300]);
     expect(s.paid).toBe(220);
     expect(s.pending).toBe(430); // 650 - 220: eski commissionTotals ile aynı anlam
   });
+  it("konumla değil ay anahtarıyla eşler; aynı aya düşen satırlar toplanır (B077)", () => {
+    // Eski UTC ekseni: Mayıs ve Temmuz iki kez, Haziran hiç gelmiyordu; ikinci değer birincinin üstüne yazılıyordu.
+    const monthly = [
+      { ym: "2026-05", month_start: "2026-04-30T21:00:00Z", accrued: 290000, paid: 0 },
+      { ym: "2026-05", month_start: "2026-05-30T21:00:00Z", accrued: 10, paid: 0 },
+      { ym: "2026-07", month_start: "2026-06-30T21:00:00Z", accrued: 517900, paid: 0 },
+      { ym: "2026-07", month_start: "2026-07-30T21:00:00Z", accrued: 290000, paid: 0 },
+      { ym: "2025-12", month_start: "2025-11-30T21:00:00Z", accrued: 999, paid: 999 },
+    ];
+    const s = commissionSummaryFromAggregate({ monthly }, ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]);
+    expect(s.monthTotals).toEqual([290010, 0, 807900, 0, 0, 0]);
+    expect(s.paid).toBe(0);
+  });
+  it("ym yoksa month_start Türkiye takvimine göre aya çevrilir", () => {
+    const s = commissionSummaryFromAggregate({ monthly: [{ month_start: "2026-05-31T21:00:00Z", accrued: 5, paid: 5 }] }, keys);
+    expect(s.monthTotals).toEqual([0, 0, 0, 0, 0, 5]);
+  });
   it("boş veride sıfır döner", () => {
-    expect(commissionSummaryFromAggregate(null)).toEqual({ paid: 0, pending: 0, monthTotals: [0, 0, 0, 0, 0, 0] });
+    expect(commissionSummaryFromAggregate(null, keys)).toEqual({ paid: 0, pending: 0, monthTotals: [0, 0, 0, 0, 0, 0] });
   });
 });
 
