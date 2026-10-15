@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { runWhenIdle } from "@/lib/idle";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { tablesForPath } from "@/lib/realtime-throttle";
-import { emitNotificationInsert, type NotificationInsertRow } from "@/lib/realtime";
+import { emitNotificationInsert, ensureRealtimeAuth, type NotificationInsertRow } from "@/lib/realtime";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 /** App layout: açık rotanın tablolarında değişiklik → soft refresh; bildirimler ayrı kanaldan anında zile. */
@@ -13,11 +13,11 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
     tenantId,
     // Rotaya inen TEK kanal: yalnız açık sayfanın tabloları dinlenir (REALTIME_ALL_TABLES /
     // REALTIME_EXTENDED_TABLES / REALTIME_MORE_TABLES ve rota eşlemesi tek kaynak: src/lib/realtime-throttle.ts);
-    // ilgili tablosu olmayan rotada kanal açılmaz. İki yenileme arası en az 10 sn.
+    // ilgili tablosu olmayan rotada kanal açılmaz. İlk olay ~150 ms'de tazeler; iki yenileme arası en az 2 sn.
     // notifications burada YOK: INSERT'ler aşağıdaki özel kanaldan zile akar; aynı tabloya
     // ikinci bir "*" aboneliği (Realtime list_changes poller maliyeti) gereksizdi.
     tablesForPath,
-    debounceMs: 1200,
+    debounceMs: 150,
   });
 
   // Bildirim INSERT'lerini anlık olarak zile köprüle. Kanal burada açılıyor
@@ -40,6 +40,7 @@ export function RealtimeRefresh({ tenantId }: { tenantId: string | null }) {
       const client = createClient();
       supabase = client;
       const { data } = await client.auth.getSession();
+      await ensureRealtimeAuth(client);
       if (cancelled) return;
       const uid = data.session?.user?.id ?? null;
       channel = client

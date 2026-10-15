@@ -9,9 +9,11 @@
  * postgres_changes kanalında dinlenir, ilgisiz rotada kanal hiç açılmaz (Realtime sunucusu boşa satır
  * süzmez, istemci boşa olay işlemez); (2) iki yenileme arası en az REALTIME_MIN_INTERVAL_MS, (3) bekleyen
  * yenileme varken gelen olaylar BİRLEŞTİRİLİR (zamanlayıcı yeniden kurulmaz).
+ * Saha ölçümü (2026-10-15): commit → WS olayı medyan ~300 ms; 10 sn alt sınır art arda ikinci değişikliği 5–9 sn
+ * geciktiriyordu. 2 sn: ilk olay anında, seri olaylar 2 sn'de bir birleşik tazeleme.
  */
 
-export const REALTIME_MIN_INTERVAL_MS = 10_000;
+export const REALTIME_MIN_INTERVAL_MS = 2_000;
 
 /** Yayındaki (supabase_realtime publication) çekirdek tablolar. Hepsi `ROUTE_TABLES`'ta en az bir rotaya bağlıdır (test). */
 export const REALTIME_ALL_TABLES = ["deals", "commissions", "portal_listings", "customers"] as const;
@@ -97,14 +99,15 @@ const ACTOR_COLUMNS_BY_EVENT: Record<string, readonly string[]> = {
 };
 
 /**
- * Olay yok sayılmalı mı?
- * (1) Kendi mutasyonumuzun yankısı: satırı son yazan benim; server action zaten revalidatePath yaptı.
- * (2) Değişiklik, son yenilememizden ÖNCE commit edildiyse o yenileme zaten içerir.
+ * Olay yok sayılmalı mı? Yalnız kendi mutasyonumuzun yankısı: satırı son yazan benim; server action zaten
+ * revalidatePath yaptı. Çağıran `selfUserId`'yi yalnız bu sekme odaktayken verir (yazan sekme odaktadır); aynı
+ * kullanıcının ikinci sekmesi/cihazı kendi kaydını böylece görür.
+ * Saate dayalı "son yenilemeden önce commit edildi" kuralı KALDIRILDI: commit_timestamp sunucu saati,
+ * karşılaştırılan an istemci saatiydi; saati ileri olan cihazda gerçek değişiklikler sessizce yok sayılıyordu.
  */
 export function shouldIgnoreRealtimeEvent(
   payload: { new?: Record<string, unknown> | null; commit_timestamp?: string | null; eventType?: string },
   selfUserId: string | null,
-  lastRefreshAtMs: number | null,
 ): boolean {
   const row = payload.new ?? null;
   const actorCols = (payload.eventType && ACTOR_COLUMNS_BY_EVENT[payload.eventType]) || [];
@@ -112,10 +115,6 @@ export function shouldIgnoreRealtimeEvent(
     for (const col of actorCols) {
       if (row[col] === selfUserId) return true;
     }
-  }
-  if (lastRefreshAtMs !== null && payload.commit_timestamp) {
-    const t = Date.parse(payload.commit_timestamp);
-    if (Number.isFinite(t) && t <= lastRefreshAtMs) return true;
   }
   return false;
 }

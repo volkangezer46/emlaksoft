@@ -110,13 +110,13 @@ describe("evaluateCronHealth", () => {
 
 describe("realtime throttle", () => {
   it("ilk olay yalnız debounce bekler", () => {
-    expect(computeRefreshDelay(1_000, null, 1_200)).toBe(1_200);
+    expect(computeRefreshDelay(1_000, null, 150)).toBe(150);
   });
-  it("yakın zamanda yenilendiyse 10 sn dolana kadar bekler", () => {
-    expect(computeRefreshDelay(103_000, 100_000, 1_200)).toBe(7_000);
+  it("yakın zamanda yenilendiyse 2 sn dolana kadar bekler", () => {
+    expect(computeRefreshDelay(100_500, 100_000, 150)).toBe(1_500);
   });
-  it("10 sn geçtiyse yalnız debounce", () => {
-    expect(computeRefreshDelay(115_000, 100_000, 1_200)).toBe(1_200);
+  it("2 sn geçtiyse yalnız debounce", () => {
+    expect(computeRefreshDelay(103_000, 100_000, 150)).toBe(150);
   });
   it("rota duyarlı tablo alt kümesi", () => {
     expect(tablesForPath("/app/musteriler")).toEqual(["customers"]);

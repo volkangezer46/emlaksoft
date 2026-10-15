@@ -8,11 +8,11 @@ type SyncClient = Parameters<ReturnType<typeof createTableChannelSync>["attach"]
 
 /** Sahte supabase istemcisi: açılan/kaldırılan kanalları ve bağlamaları kaydeder. */
 function fakeClient() {
-  const open = new Map<string, { topic: string; bindings: Binding[]; subscribed: boolean }>();
+  const open = new Map<string, { topic: string; bindings: Binding[]; subscribed: boolean; status?: (s: string) => void }>();
   const removed: string[] = [];
   const client = {
     channel: vi.fn((topic: string) => {
-      const rec = { topic, bindings: [] as Binding[], subscribed: false };
+      const rec: { topic: string; bindings: Binding[]; subscribed: boolean; status?: (s: string) => void } = { topic, bindings: [], subscribed: false };
       open.set(topic, rec);
       const ch = {
         topic,
@@ -20,8 +20,9 @@ function fakeClient() {
           rec.bindings.push({ table: cfg.table, filter: cfg.filter });
           return ch;
         },
-        subscribe: () => {
+        subscribe: (cb?: (s: string) => void) => {
           rec.subscribed = true;
+          rec.status = cb;
           return ch;
         },
       };
@@ -118,5 +119,32 @@ describe("useRealtimeRefresh: rotaya inen tek tablo kanalı", () => {
     const hook = readFileSync("src/hooks/use-realtime-refresh.ts", "utf8");
     expect((hook.match(/\.channel\(/g) ?? []).length).toBe(1);
     expect(hook).toMatch(/import\("@\/lib\/supabase\/client"\)/); // supabase-js dinamik yüklenir
+  });
+
+  it("kanal kopup yeniden katılınca (ikinci SUBSCRIBED) tek tazeleme ister; ilk katılım istemez", () => {
+    const f = fakeClient();
+    const onRejoin = vi.fn();
+    const sync = createTableChannelSync({ tenantId: "t1", onEvent: () => {}, onRejoin });
+    sync.attach(f.asClient);
+    sync.setTables(tablesForPath("/app/musteriler"));
+    const ch = [...f.open.values()][0];
+    ch.status?.("SUBSCRIBED");
+    expect(onRejoin).not.toHaveBeenCalled();
+    ch.status?.("CHANNEL_ERROR");
+    ch.status?.("SUBSCRIBED");
+    expect(onRejoin).toHaveBeenCalledTimes(1);
+  });
+
+  it("kanal oturum jetonu verilmeden açılmaz (anon katılım RLS ile her olayı süzer)", () => {
+    const hook = readFileSync("src/hooks/use-realtime-refresh.ts", "utf8");
+    const auth = hook.indexOf("await ensureRealtimeAuth(supabase)");
+    expect(auth).toBeGreaterThan(-1);
+    expect(auth).toBeLessThan(hook.indexOf("sync.attach(supabase)"));
+    const lib = readFileSync("src/lib/realtime.ts", "utf8");
+    expect(lib.indexOf("await ensureRealtimeAuth(supabase)")).toBeGreaterThan(-1);
+    expect(lib.indexOf("await ensureRealtimeAuth(supabase)")).toBeLessThan(lib.indexOf(".subscribe()"));
+    const layout = readFileSync("src/components/app/realtime-refresh.tsx", "utf8");
+    expect(layout.indexOf("await ensureRealtimeAuth(client)")).toBeGreaterThan(-1);
+    expect(layout.indexOf("await ensureRealtimeAuth(client)")).toBeLessThan(layout.indexOf(".subscribe()"));
   });
 });

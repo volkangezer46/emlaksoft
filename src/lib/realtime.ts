@@ -16,6 +16,20 @@
 import type { RealtimePostgresInsertPayload } from "@supabase/supabase-js";
 import { runWhenIdle } from "@/lib/idle";
 
+/**
+ * Kanal katılımı (phx_join) oturum jetonunu taşısın diye abone olmadan ÖNCE çağrılır. supabase-js jetonu oturum
+ * okunduktan sonra (INITIAL_SESSION) eşzamansız verir; ondan önce abone olan kanal anon katılır, RLS her olayı süzer
+ * ve sayfa hiç canlı güncellenmez (saha ölçümü 2026-10-15: doğrudan açılan /app sayfalarında 150 sn'de 0 olay).
+ * Argümansız setAuth istemcinin jeton geri çağrısını (oturum) kullanır; yenilenen jeton da aynı yoldan gider.
+ */
+export async function ensureRealtimeAuth(client: { realtime: { setAuth: (token?: string | null) => Promise<void> } }): Promise<void> {
+  try {
+    await client.realtime.setAuth();
+  } catch {
+    // Jeton alınamadı: kanal yine açılır; olay gelmezse önbellek tazelemesi (ClientCacheSync) yedektir.
+  }
+}
+
 export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
   /** Kanal adı benzersiz olmalı (ör. `es-rt-ticket:${id}`). */
   channel: string;
@@ -28,9 +42,11 @@ export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
   // modülü import eden zil gibi bileşenler paketi şişirmez.
   let cancelled = false;
   let cleanup: (() => void) | null = null;
-  const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(({ createClient }) => {
+  const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(async ({ createClient }) => {
     if (cancelled) return;
     const supabase = createClient();
+    await ensureRealtimeAuth(supabase);
+    if (cancelled) return;
     const channel = supabase
       .channel(opts.channel)
       .on(

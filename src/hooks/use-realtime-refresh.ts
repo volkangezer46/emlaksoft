@@ -6,6 +6,7 @@ import { runWhenIdle } from "@/lib/idle";
 import { now } from "@/lib/clock";
 import { noteClientCacheRefreshed } from "@/lib/client-cache-state";
 import { computeRefreshDelay, shouldIgnoreRealtimeEvent } from "@/lib/realtime-throttle";
+import { ensureRealtimeAuth } from "@/lib/realtime";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 
 type RealtimePayload = { new?: Record<string, unknown> | null; commit_timestamp?: string | null; eventType?: string };
@@ -18,12 +19,15 @@ type ChannelClient = Pick<SupabaseClient, "channel" | "removeChannel">;
  * yeni küme için tek `postgres_changes` kanalı açılır; küme boşsa kanal açılmaz. İstemci (supabase-js) boşta
  * yüklendiği için `attach` sonradan gelebilir: o ana kadar istenen küme saklanır, bağlanınca uygulanır.
  * Konu adına sıra eklenir: aynı küme hızla geri gelirse (A→B→A) ayrılmakta olan eski kanal yeniden kullanılmaz.
+ * `onRejoin`: aynı kanal kopup YENİDEN katıldığında (ilk SUBSCRIBED'dan sonraki her SUBSCRIBED) çağrılır; aradaki
+ * değişiklikler postgres_changes ile yeniden oynatılmadığı için çağıran tek tazeleme yapar.
  */
 export function createTableChannelSync(opts: {
   tenantId: string;
   onEvent: (table: string, payload: RealtimePayload) => void;
+  onRejoin?: () => void;
 }) {
-  const { tenantId, onEvent } = opts;
+  const { tenantId, onEvent, onRejoin } = opts;
   let client: ChannelClient | null = null;
   let channel: RealtimeChannel | null = null;
   let openKey = "";
@@ -49,7 +53,12 @@ export function createTableChannelSync(opts: {
         (payload) => onEvent(table, payload as RealtimePayload),
       );
     }
-    ch.subscribe();
+    let joinedOnce = false;
+    ch.subscribe((status) => {
+      if (status !== "SUBSCRIBED") return;
+      if (joinedOnce) onRejoin?.();
+      joinedOnce = true;
+    });
     channel = ch;
     openKey = key;
   };
@@ -76,7 +85,9 @@ export function createTableChannelSync(opts: {
  *
  * Abonelik ROTAYA iner: `tablesForPath` verilirse açık rotanın tabloları TEK kanalda dinlenir; rota değişip küme
  * değişince eski kanal kaldırılıp yenisine abone olunur, ilgili tablosu olmayan rotada kanal açılmaz.
- * Fırtına önleme: iki yenileme arası en az 10 sn; bekleyen yenileme varken gelen olaylar birleştirilir.
+ * Fırtına önleme: iki yenileme arası en az 2 sn (REALTIME_MIN_INTERVAL_MS); bekleyen yenileme varken gelen olaylar
+ * birleştirilir. Kanal oturum jetonu hazır olmadan açılmaz (anon katılım olay taşımaz); bağlantı kopup geri gelince
+ * kaçırılan değişiklikler için tek tazeleme yapılır, ağ geri gelince soket beklemeden yeniden bağlanır.
  */
 export function useRealtimeRefresh(opts: {
   tenantId: string | null | undefined;
@@ -126,8 +137,9 @@ export function useRealtimeRefresh(opts: {
       }, delay);
     };
     const bump = (_table: string, payload?: RealtimePayload) => {
-      // Kendi yazımızın yankısı / son tazelemede zaten görünen değişiklik: mutasyon revalidatePath ile tazeler.
-      if (payload && shouldIgnoreRealtimeEvent(payload, selfUserId, lastRefreshAt.current)) return;
+      // Kendi yazımızın yankısı: mutasyon revalidatePath ile tazeler. Yalnız odaktaki (yazan) sekmede yok sayılır;
+      // aynı kullanıcının arka plandaki sekmesi/ikinci cihazı kaydı görür.
+      if (payload && shouldIgnoreRealtimeEvent(payload, document.hasFocus() ? selfUserId : null)) return;
       if (document.visibilityState === "hidden") {
         pending = true;
         return;
@@ -141,23 +153,33 @@ export function useRealtimeRefresh(opts: {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    const sync = createTableChannelSync({ tenantId, onEvent: bump });
+    const sync = createTableChannelSync({ tenantId, onEvent: bump, onRejoin: () => bump("*") });
     syncRef.current = sync;
     sync.setTables(tablesRef.current.split("|").filter(Boolean));
 
     // supabase-js ilk boyamayı bloklamasın: istemci boşta/sonra ayrı parça olarak yüklenir.
-    const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(({ createClient }) => {
+    let onOnline: (() => void) | null = null;
+    const cancelIdle = runWhenIdle(() => void import("@/lib/supabase/client").then(async ({ createClient }) => {
       if (cancelled) return;
       const supabase = createClient();
-      void supabase.auth.getSession().then(({ data }) => {
-        selfUserId = data.session?.user?.id ?? null;
-      });
+      const { data } = await supabase.auth.getSession();
+      selfUserId = data.session?.user?.id ?? null;
+      // Jeton katılımdan ÖNCE: yoksa kanal anon katılır ve RLS her olayı süzer (doğrudan açılan sayfada 0 olay).
+      await ensureRealtimeAuth(supabase);
+      if (cancelled) return;
       sync.attach(supabase);
+      // Ağ geri gelince realtime-js'in artan bekleme aralığını (1/2/5/10 sn) beklemeden bağlan; yeniden katılım
+      // onRejoin ile tek tazeleme yapar.
+      onOnline = () => {
+        if (!supabase.realtime.isConnected()) supabase.realtime.connect();
+      };
+      window.addEventListener("online", onOnline);
     }));
 
     return () => {
       cancelled = true;
       cancelIdle();
+      if (onOnline) window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVisible);
       if (timer.current) clearTimeout(timer.current);
       timer.current = null;
