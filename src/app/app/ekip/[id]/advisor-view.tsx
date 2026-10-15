@@ -8,6 +8,7 @@ import { notFound } from "next/navigation";
 import { Activity, ArrowLeft, BadgeCheck, MapPinned, ArrowUpRight, CalendarDays, Gauge, GitBranch, LayoutDashboard, MessagesSquare, Phone, Sparkles, Target, Wallet } from "lucide-react";
 import { canCoach } from "@/lib/coaching/logic";
 import { BirebirTab } from "./birebir-tab";
+import { OrientationCard } from "./orientation-card";
 import { createClient } from "@/lib/supabase/server";
 import { formatTurkishPhone } from "@/lib/phone";
 import { now, trDayKey } from "@/lib/clock";
@@ -287,6 +288,20 @@ export async function AdvisorDetailView({
       {active === "ozet" ? (
         <Suspense fallback={<TabSkeleton />}>
           <OverviewTab ctx={ctx} canHandoff={canHandoff} editableScopes={handoffEditableScopes(perms)} />
+        </Suspense>
+      ) : null}
+      {/* OA9: yeni danışman oryantasyonu (liste varsa ilerleme; yoksa yalnız ekip yöneticisine yeni üyede "başlat"). */}
+      {active === "ozet" && tenantId ? (
+        <Suspense fallback={null}>
+          <OrientationCard
+            supabase={supabase}
+            tenantId={tenantId}
+            memberId={id}
+            isSelf={id === userId}
+            canManage={(perms.team ?? []).includes("edit")}
+            joinedAt={member.created_at}
+            isActive={member.is_active}
+          />
         </Suspense>
       ) : null}
       {active === "ozet" && effectiveCanAccessModule(perms, "portals") ? (

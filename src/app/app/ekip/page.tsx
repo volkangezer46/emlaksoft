@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   UserPlus,
   UserRound,
+  UserRoundSearch,
   Users,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -338,6 +339,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
             <ButtonLink href="/app/ekip/kartvizitim" variant="secondary" size="sm" icon={IdCard}>
               Kartvizitim
             </ButtonLink>
+            {(perms.team ?? []).includes("edit") ? (
+              <ButtonLink href="/app/ekip/adaylar" variant="secondary" size="sm" icon={UserRoundSearch}>
+                Danışman adayları
+              </ButtonLink>
+            ) : null}
             {canManage ? (
               <ButtonLink href="/app/ekip/yeni" icon={UserPlus}>
                 Danışman ekle
