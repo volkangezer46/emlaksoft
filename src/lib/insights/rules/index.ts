@@ -18,6 +18,10 @@ import { AUTHORITY_EXPIRED_RULE_ID, evaluateAuthorityExpiredRun } from "@/lib/in
 import { loadExpiredAuthorities } from "@/lib/insights/authority-facts";
 import { DOCUMENT_EXPIRY_RULE_ID, evaluateDocumentExpiryRun } from "@/lib/insights/rules/document-expiry";
 import { loadDocumentExpiryFacts } from "@/lib/insights/document-expiry-facts";
+import { OFFER_EXPIRY_RULE_ID, evaluateOfferExpiryRun } from "@/lib/insights/rules/offer-expiry";
+import { loadOfferExpiryFacts } from "@/lib/insights/offer-expiry-facts";
+import { APPROVAL_STALE_RULE_ID, evaluateApprovalStaleRun } from "@/lib/insights/rules/approval-stale";
+import { loadApprovalDeciders, loadApprovalStaleFacts } from "@/lib/insights/approval-stale-facts";
 import { ANOMALY_RULE_ID, evaluateAnomalies } from "@/lib/insights/rules/anomaly";
 import { LIFECYCLE_RULE_ID, evaluateLifecycle } from "@/lib/insights/rules/lifecycle";
 import { loadLifecycleFacts } from "@/lib/insights/lifecycle-facts";
@@ -109,6 +113,11 @@ export type InsightRule = {
    */
   requiredPermission?: InsightPermission;
 };
+
+/** Ofis modülü açık mı (kapalı modülün kuralı kart üretmez; açık kartları kapanır). */
+async function moduleEnabled(admin: SupabaseClient, tenantId: string, key: string): Promise<boolean> {
+  return isFeatureEnabledIn(await loadTenantModuleState(admin, tenantId), key);
+}
 
 /** Olgu kümesi satır tavanına ulaştıysa küme kesik olabilir: kapatma yok (güvenli taraf). */
 function guardTruncated(run: InsightRuleRun, factCount: number): InsightRuleRun {
@@ -241,6 +250,30 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     kind: "deadline",
     label: "Süresi yaklaşan / geçen müşteri belgeleri",
     run: async (admin, tenantId, nowMs) => evaluateDocumentExpiryRun(await loadDocumentExpiryFacts(admin, tenantId, nowMs), nowMs),
+  },
+  {
+    // Yanıt bekleyen teklifin geçerliliği 0-3 gün içinde doluyor (alıcı: teklifi açan danışman). Teklifler modülü kapalıysa
+    // kart üretilmez ve açık kartlar kapanır. Olgu yükleyicisi sayfalı ve eksiksiz: canlı küme güvenilir.
+    id: OFFER_EXPIRY_RULE_ID,
+    kind: "deadline",
+    label: "Geçerliliği dolmak üzere olan teklifler",
+    run: async (admin, tenantId, nowMs) => {
+      if (!(await moduleEnabled(admin, tenantId, "offers"))) return { drafts: [], liveEntityIds: new Set<string>() };
+      return evaluateOfferExpiryRun(await loadOfferExpiryFacts(admin, tenantId, nowMs), nowMs);
+    },
+  },
+  {
+    // 24 saati geçen bekleyen onay → karar vericilere hatırlatma; 72 saati geçen → ofis sahibine yükseltme.
+    // Onay akışları modülü kapalıysa kart üretilmez ve açık kartlar kapanır.
+    id: APPROVAL_STALE_RULE_ID,
+    kind: "deadline",
+    label: "Karar bekleyen onay talepleri (24 saat / 72 saat)",
+    run: async (admin, tenantId, nowMs) => {
+      if (!(await moduleEnabled(admin, tenantId, "approvals"))) return { drafts: [], liveEntityIds: new Set<string>() };
+      const facts = await loadApprovalStaleFacts(admin, tenantId, nowMs);
+      if (facts.length === 0) return { drafts: [], liveEntityIds: new Set<string>() };
+      return evaluateApprovalStaleRun(facts, await loadApprovalDeciders(admin, tenantId, nowMs), nowMs);
+    },
   },
   // EİDS YETKİ UYUMU (saf kurallar: rules/eids-*.ts; olgular: eids-facts.ts, dört kural aynı portföy kümesini paylaşır).
   // E-posta gelmeyen durumun güvenlik ağı: iptal/dolmuş ama portalda yayında, bilinmeyen yetkiyle yayında, 120 gün teyitsiz
