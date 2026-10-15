@@ -23,7 +23,7 @@ export function FavNavBadge({ slug, variant = "light" }: { slug: string; variant
   return (
     <Link
       href={`/vitrin/${slug}/favoriler`}
-      className={`focus-ring press inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition ${cls}`}
+      className={`focus-ring press inline-flex min-h-11 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition ${cls}`}
     >
       <Heart className={`h-3.5 w-3.5 ${count > 0 ? "fill-danger-500 text-danger-500" : ""}`} />
       Favorilerim

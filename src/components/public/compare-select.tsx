@@ -121,7 +121,7 @@ export function CompareToggle({
         toggleCompare(item);
       }}
       // Cam bütçesi: her ilan kartında tekrar eder; cam yok, zemin neredeyse opak.
-      className={`focus-ring press relative z-10 grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] transition disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`focus-ring press relative z-10 grid h-9 w-9 touch:h-11 touch:w-11 place-items-center rounded-full border shadow-[var(--shadow-sm)] transition disabled:cursor-not-allowed disabled:opacity-50 ${
         active
           ? "border-mint-500/50 bg-mint-500 text-white"
           : "border-white/40 bg-white/95 text-ink-950/60 hover:text-mint-600"
@@ -175,7 +175,7 @@ export function CompareBar() {
             }}
             aria-label="Seçimi temizle"
             title="Seçimi temizle"
-            className="focus-ring press grid h-8 w-8 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
+            className="focus-ring press grid h-8 w-8 touch:h-11 touch:w-11 place-items-center rounded-full text-white/50 transition hover:bg-white/10 hover:text-white"
           >
             <X className="h-4 w-4" />
           </button>

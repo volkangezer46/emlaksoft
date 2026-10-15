@@ -25,13 +25,13 @@ export function FavButton({
   const text = active ? "Favorilerden çıkar" : "Favorilere ekle";
 
   const shape = label
-    ? `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold ${
+    ? `inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold touch:min-h-11 ${
         active
           ? "border-red-200 bg-red-50 text-red-600"
           : "border-line bg-surface text-text-muted hover:border-red-200 hover:text-red-500"
       }`
     : // Cam bütçesi: her ilan kartında tekrar eder; cam yok, zemin neredeyse opak.
-      `grid h-9 w-9 place-items-center rounded-full border shadow-[var(--shadow-sm)] ${
+      `grid h-9 w-9 touch:h-11 touch:w-11 place-items-center rounded-full border shadow-[var(--shadow-sm)] ${
         active
           ? "border-red-200 bg-white text-red-500"
           : "border-white/40 bg-white/95 text-ink-950/60 hover:text-red-500"

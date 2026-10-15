@@ -7,9 +7,9 @@
 
 ## Özet
 
-- Toplam birim: **611** (312 dosya) — risk: P0=16, P1=47, P2=548
-- Tenant filtresi: var=312, uygulanamaz=195, yok=59, param=24, devir=21
-- Kapı türü: public-token=41, dosya-duzeyi=162, platform=136, belirsiz=131, elle-dogrulandi=26, oturum-izin=88, cron=24, webhook-imza=3
+- Toplam birim: **613** (314 dosya) — risk: P0=16, P1=47, P2=550
+- Tenant filtresi: var=314, uygulanamaz=195, yok=59, param=24, devir=21
+- Kapı türü: public-token=43, dosya-duzeyi=162, platform=136, belirsiz=131, elle-dogrulandi=26, oturum-izin=88, cron=24, webhook-imza=3
 - Filtresiz (yok+devir): **80**; RLS'li client'a taşıma adayı: **69**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
@@ -280,6 +280,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/platform.ts:97` | `startImpersonation` | Platform personeli: kiracılar arası yönetim paneli. | platform | var (yazma) | P2 |
 | `src/app/actions/platform.ts:275` | `stopImpersonation` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/app/actions/platform.ts:49` | `updateTenantPlanStatus` | Platform personeli: kiracılar arası yönetim paneli. | platform | uygulanamaz | P2 |
+| `src/app/actions/portal-link-renew.ts:36` | `requestPortalLinkRenewal` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/portal-listings.ts:255` | `closePortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/portal-listings.ts:167` | `confirmPortalListing` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/portal-listings.ts:201` | `confirmPortalListingsBulk` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
@@ -452,8 +453,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/giris/iki-adim-kurulum/actions.ts:47` | `currentProfile` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/imza/[token]/page.tsx:39` | `PublicContractSignPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/lead/[token]/page.tsx:33` | `PublicLeadPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
-| `src/app/malik-portali/[token]/page.tsx:119` | `MalikPortaliPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
-| `src/app/musteri-portali/[token]/page.tsx:123` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/malik-portali/[token]/page.tsx:126` | `MalikPortaliPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/musteri-portali/[token]/page.tsx:130` | `CustomerPortalPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/odeme-link/[token]/page.tsx:43` | `PublicPaymentLinkPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/paylas/[token]/page.tsx:61` | `generateMetadata` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/paylas/[token]/page.tsx:124` | `PublicSharePage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
@@ -461,15 +462,15 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/sunum/[token]/page.tsx:111` | `PublicPresentationPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/tavsiye/[token]/page.tsx:48` | `ReferralPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx:29` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/[ilan]/page.tsx:131` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/[ilan]/page.tsx:221` | `VitrinPropertyPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
+| `src/app/vitrin/[slug]/[ilan]/page.tsx:133` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/[ilan]/page.tsx:223` | `VitrinPropertyPage` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/degerleme/page.tsx:26` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/degerleme/page.tsx:60` | `VitrinDegerlemePage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/vitrin/[slug]/favoriler/page.tsx:26` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/favoriler/page.tsx:42` | `VitrinFavorilerPage` | Oturumsuz token'lı public yüzey. | public-token | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/manifest.webmanifest/route.ts:17` | `GET` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/vitrin/[slug]/opengraph-image.tsx:15` | `Image` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/vitrin/[slug]/page.tsx:86` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/vitrin/[slug]/page.tsx:83` | `loadOfficeHead` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/lib/activity.ts:17` | `writeActivity` | Gerekçe doğrulanmadı. | belirsiz | var (yazma) | P2 |
 | `src/lib/admin-badges.ts:42` | `cachedBadges` | Sistem/altyapı işi; kapı elle incelendi (bkz. kapı kanıtı). | elle-dogrulandi | uygulanamaz | P2 |
 | `src/lib/admin/activity-query.ts:119` | `queryActivity` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
@@ -594,6 +595,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/lib/platform.ts:86` | `bootstrapPlatformStaffIfAllowed` | Gerekçe doğrulanmadı. | dosya-duzeyi | uygulanamaz (yazma) | P2 |
 | `src/lib/playbook-trigger.ts:28` | `triggerPlaybooks` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/lib/pool/system-assign.ts:21` | `assignPoolEntryAsSystem` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
+| `src/lib/portal-link-renew.ts:31` | `loadExpiredPortalLink` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/lib/product-feedback/store.ts:103` | `createFeatureRequest` | Gerekçe doğrulanmadı. | dosya-duzeyi | var (yazma) | P2 |
 | `src/lib/product-feedback/store.ts:293` | `listRequestsForAdmin` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |
 | `src/lib/product-feedback/store.ts:406` | `listSurveyComments` | Gerekçe doğrulanmadı. | dosya-duzeyi | var | P2 |

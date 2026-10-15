@@ -114,7 +114,7 @@ export function PortalRequestForm({ token, refId, variant }: { token: string; re
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-ink-950">{META[variant].open}</p>
-        <button type="button" onClick={() => setOpen(false)} aria-label="Kapat" className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-surface-hover">
+        <button type="button" onClick={() => setOpen(false)} aria-label="Kapat" className="focus-ring grid h-9 w-9 touch:h-11 touch:w-11 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-surface-hover">
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>

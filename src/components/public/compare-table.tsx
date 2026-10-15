@@ -163,7 +163,7 @@ export function CompareTable({
             type="button"
             onClick={onClose}
             aria-label="Karşılaştırmayı kapat"
-            className="focus-ring press grid h-9 w-9 shrink-0 place-items-center rounded-full border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
+            className="focus-ring press grid h-9 w-9 touch:h-11 touch:w-11 shrink-0 place-items-center rounded-full border border-line text-text-muted transition hover:border-brand-300 hover:text-brand-600"
           >
             <X className="h-4 w-4" />
           </button>

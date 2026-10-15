@@ -2,6 +2,8 @@ import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { loadExpiredPortalLink } from "@/lib/portal-link-renew";
+import { ExpiredPortalLinkScreen } from "@/components/public/expired-portal-link";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -109,8 +111,13 @@ export default async function CustomerPortalPage({
   // "Son görülme" yalnız gerçek ziyaretçide yazılır; WhatsApp/Telegram önizleme botu yan etki üretmez (SK8 B150).
   const data = await getCustomerPortalData(token, { recordSeen: !isLinkPreviewHeaders(requestHeaders) });
 
-  // Geçersiz/süresi dolmuş token: gerçek 404 + ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
-  if (!data) notFound();
+  // Süresi dolmuş (kayıtlı) token: ofis adı + iletişim + "Yeni bağlantı iste" (PUB-7). Bilinmeyen token: gerçek 404 +
+  // ortak "bağlantı geçersiz" ekranı (../not-found.tsx, SK8 B153).
+  if (!data) {
+    const expired = await loadExpiredPortalLink("customer", token, clockNow());
+    if (expired) return <ExpiredPortalLinkScreen link={expired} token={token} />;
+    notFound();
+  }
 
   const { customer, tenant, demands, appointments, matches, tabs, owner, renter, documents, processes, requestsEnabled } = data;
   // TEK PORTAL: rolüne göre sekme (alıcı / malik / kiracı / belgeler); yalnız veri olan sekme görünür.

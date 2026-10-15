@@ -9,7 +9,7 @@ export const metadata = { title: "Hoş geldiniz" };
 
 /**
  * Yeni danışman başlangıç akışı: profil, hedef, ilk müşteri, bugünkü görevler (4 kısa adım).
- * Sayfa içi adımlar (popup değil). Tercih kullanıcı çerezidir; tamamlanınca ya da kapatılınca
+ * Sayfa içi adımlar (popup değil). Tamamlanma profilde (sunucuda, cihazlar arası) tutulur; tamamlanınca ya da kapatılınca
  * ana ekran bir daha buraya yönlendirmez. Ofis sahibi/yönetici için akış yoktur: Ana ekrana döner.
  */
 export default async function HosGeldinPage() {

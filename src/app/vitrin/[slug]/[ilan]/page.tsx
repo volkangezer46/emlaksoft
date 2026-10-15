@@ -50,6 +50,8 @@ import { VitrinCardShell } from "@/components/public/vitrin-fav";
 import { FavNavBadge } from "../fav-nav-badge";
 import { PriceAlertForm } from "./price-alert-form";
 import { MapEmbed } from "./map-embed";
+import { NearbyPanel } from "./nearby-panel";
+import { parseNearbyPlaces } from "@/lib/vitrin/nearby";
 import { PurchaseCalculator } from "./purchase-calculator";
 import { InvestmentPanel } from "./investment-panel";
 import { DAY_MS, msSince, now } from "@/lib/clock";
@@ -272,7 +274,7 @@ async function renderVitrinProperty(
 
   // Medya (ilan çözüldükten sonra, ilan id'siyle) ve EİDS taşınmaz no (20260826002950: sütun yoksa sorgu hata verir →
   // gösterilmez, sayfa bozulmaz) bağımsız → paralel. KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar).
-  const [{ data: mediaRows }, { data: eidsRow, error: eidsError }] = await Promise.all([
+  const [{ data: mediaRows }, { data: eidsRow, error: eidsError }, { data: nearbyRow, error: nearbyError }] = await Promise.all([
     selectWithDocumentFlag<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
       admin
         .from("property_media")
@@ -288,7 +290,10 @@ async function renderVitrinProperty(
       .eq("tenant_id", tenant.id)
       .eq("is_sample", false)
       .maybeSingle(),
+    // PUB-8: danışmanın girdiği çevre noktaları (20261019010001; sütun yoksa hata → bölüm gizlenir, sayfa bozulmaz).
+    admin.from("properties").select("nearby_places").eq("id", property.id).eq("tenant_id", tenant.id).eq("is_sample", false).maybeSingle(),
   ]);
+  const nearbyPlaces = nearbyError ? [] : parseNearbyPlaces((nearbyRow as { nearby_places?: unknown } | null)?.nearby_places);
   const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 
   const price = property.list_price != null ? Number(property.list_price) : null;
@@ -711,6 +716,8 @@ async function renderVitrinProperty(
                 </div>
               )}
             </section>
+
+            <NearbyPanel places={nearbyPlaces} />
 
             {/* Alım maliyeti & kredi hesaplayıcısı — yalnız fiyatlı SATILIK ilanda
                 (kiralıkta peşinat/taksit kavramı yok). Tamamen client hesap:
