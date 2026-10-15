@@ -326,7 +326,7 @@ export function safeHref(value: unknown): string | null {
 // Açık kalem kaynakları
 // ---------------------------------------------------------------------------
 
-export const OPEN_ITEM_SOURCES = ["manual", "rent", "commission", "recurring", "owner_payout"] as const;
+export const OPEN_ITEM_SOURCES = ["manual", "rent", "commission", "recurring", "owner_payout", "building", "due", "payout"] as const;
 export type OpenItemSource = (typeof OPEN_ITEM_SOURCES)[number];
 
 export const OPEN_ITEM_SOURCE_LABEL: Record<OpenItemSource, string> = {
@@ -335,6 +335,9 @@ export const OPEN_ITEM_SOURCE_LABEL: Record<OpenItemSource, string> = {
   commission: "Komisyon",
   recurring: "Düzenli ödeme",
   owner_payout: "Mülk sahibine ödeme",
+  building: "Bina aidatı",
+  due: "Aidat borcu",
+  payout: "Danışman hakedişi",
 };
 
 export function openItemSourceOf(value: unknown): OpenItemSource | null {

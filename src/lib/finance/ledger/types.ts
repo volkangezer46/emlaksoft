@@ -135,7 +135,7 @@ export type OpenItem = {
   isSample: boolean;
 };
 
-export type OpenItemSource = "manual" | "rent" | "commission" | "recurring" | "owner_payout";
+export type OpenItemSource = "manual" | "rent" | "commission" | "recurring" | "owner_payout" | "building" | "due" | "payout";
 
 /** `finance_open_items_v` satırı (tüm kaynakların birleşimi; her satır tıklanabilir). */
 export type OpenItemView = {

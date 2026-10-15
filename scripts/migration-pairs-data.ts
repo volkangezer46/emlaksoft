@@ -494,6 +494,9 @@ const F = {
   b1TeamHandoffWorkload: "20261016120100_team_handoff_workload.sql",
   // B4 (2026-10-16): ofis vitrini elle SEO basligi/aciklamasi (tenants.vitrin_seo_title / vitrin_seo_description).
   b4TenantVitrinSeoMeta: "20261016120400_tenant_vitrin_seo_meta.sql",
+  // Finans entegrasyonu WP1 (2026-10-17): kayit cekirdegi (finance_post / finance_reverse) + acik kalem gorunumu v3.
+  wp1FinancePostingCore: "20261017010000_finance_posting_core.sql",
+  wp1FinanceOpenItemsV3: "20261017010100_finance_open_items_v3.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -765,6 +768,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk8PublicSurfaces]: "ek", // offers.owner_visible_note (nullable, <=2000) + increment_share_view(text) SECURITY DEFINER yalniz service_role; veri degismez; kod sutun/RPC yokken aciklamayi gostermez/yazmaz, paylasim sayaci atlanir
     [F.p4CustomerFilesValidUntil]: "ek", // yalniz nullable sutun + kismi indeks; RLS/yetki ayni; kod sutun yokken tarihsiz listeye duser
     [F.b4TenantVitrinSeoMeta]: "ek", // yalniz iki nullable sutun + uzunluk CHECK'i; RLS/yetki ayni; kod sutunlar yokken SEO kalibina duser
+    [F.wp1FinancePostingCore]: "davranis", // cash_entries/finance_open_items posting_key (kiraci basina tekil) + event_type + reversal_of, finance_open_items.invoice_id, cash_entries.source_type CHECK genisler, eski kaynak tekilligi yalniz posting_key'siz satirlara; finance_posting_rules (yalniz definer okur); finance_post/finance_reverse (authenticated, modul izni + owner/gm + P12) ve ic surumleri (yalniz service_role); acik kalem odeme hesabi ayna kayitlari isaretli sayar (mevcut satirlarda sonuc ayni); audit_logs tetikleyicileri
+    [F.wp1FinanceOpenItemsV3]: "davranis", // finance_open_items_v kolonlari ayni: komisyon alacagi brut+KDV-net tahsilat (eskisi KDV kadar eksik), posting_key'li kalemi olan kaynak tekrar etmez, bina/aidat/hakedis kollari + cari cozumu; finance_v2_source_visible 'payout' commissions:view
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
     [F.alertEnginePulseRule]: "ek", // alert_rules CHECK mevcut tanimdan genisler (engine_stalled) + tek tohum satiri (acik, 20 dk, 60 dk); mevcut veri degismez, kod satir yokken varsayilanla calisir
@@ -1021,6 +1026,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "YD8-csp-olcum-statik-yasal", order: 168, title: "Herkese acik sayfa hafifligi: CSP rapor modu satirlari (error_logs source 'csp') hata patlamasi sayacina girmez (record_error_occurrence govdesi ayni + tek kosul) ve yasal sayfalar statik sunuma acilir (statik.routes yoksa yazilir; varsa dokunulmaz) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: CSP satirlari migration yokken yalniz sayaca da girer, statik yasal sayfa kodu zaten yayinda; sira dosya numarasiyla; davranis)", files: [F.yd8ErrorLogsCspSource, F.yd8StaticLegalPagesOn] },
     { id: "SK8-herkese-acik-yuzeyler", order: 208, title: "Herkese acik musteri yuzeyleri: offers.owner_visible_note (malik portalinda tek teklif metni; ic not offers.notes artik public degil) + atomik increment_share_view (yeni degeri dondurur; ilk acilis bildirimi yalniz 1 iken) (bagimsiz; KOD YAYININDAN ONCE uygulanir: kod sutun/RPC yokken malik aciklamasi bos, paylasim sayaci atlanir; sira serbest, ek)", files: [F.sk8PublicSurfaces] },
     { id: "P4-belge-gecerlilik", order: 1004, title: "Belge gecerlilik tarihi: customer_files.valid_until (opsiyonel) + kismi indeks (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken listeyi tarihsiz gosterir, gecerlilik filtresi bos doner, document_expiry@1 etkin degil sayilir; sira serbest, ek)", files: [F.p4CustomerFilesValidUntil] },
+    { id: "FNE-WP1-kayit-cekirdegi", order: 1701, title: "Finans entegrasyonu WP1 kayit cekirdegi: posting_key/event_type/reversal_of + finance_post/finance_reverse + denetim tetikleyicileri, ARDINDAN acik kalem gorunumu v3 (komisyon alacagi brut+KDV-tahsilat, bina/aidat/hakedis kollari, cari cozumu). Iki dosya BIRLIKTE ve sirayla; FN1 (20261014001000/001100/001200), GP1 (20261014011000) ve SK6 (20261016060100) SONRASI. KOD YAYININDAN ONCE ya da SONRA uygulanabilir (henuz cagiran yok; v3 yeni kaynak turlerini kod taniyor, eski kod bilinmeyen kaynagi yok sayar). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp1FinancePostingCore, F.wp1FinanceOpenItemsV3] },
     { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1285,6 +1291,13 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk6PlatformReportingLocalAxis, F.platformMrrDaily],
     // SK9: sayim RPC'si properties.currency kolonunu okur; 090100 ancak 090000'dan sonra uygulanir.
     [F.sk9PublishGateCounts, F.sk9PropertyCurrency],
+    // WP1: kayit cekirdegi finans v2 semasi, P12 cari kapsami ve son settle/KDV govdeleri uzerine kurulur; v3 gorunumu posting_key okur.
+    [F.wp1FinancePostingCore, F.financeLedgerV2Rpc],
+    [F.wp1FinancePostingCore, F.financePartyAdvisorScope],
+    [F.wp1FinancePostingCore, F.sk6FinancePnlVatFix],
+    [F.wp1FinanceOpenItemsV3, F.wp1FinancePostingCore],
+    [F.wp1FinanceOpenItemsV3, F.buildingManagement],
+    [F.wp1FinanceOpenItemsV3, F.payouts],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

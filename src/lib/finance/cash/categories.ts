@@ -3,6 +3,8 @@
  * Gider kategorisi, ofis gideri üretilirken `expenses.category` tanım değerlerine (definition-defaults EXPENSE_CATEGORIES) eşlenir;
  * böylece Giderler özeti/kâr-zarar mevcut kategori kırılımıyla çalışmaya devam eder.
  */
+import { POSTING_CATEGORY_LABEL } from "../posting/rules";
+
 export type CashDirection = "in" | "out";
 
 export type CashCategory = { value: string; label: string; direction: CashDirection; expenseCategory?: string };
@@ -42,7 +44,7 @@ export function cashCategoryLabel(value: string | null | undefined): string {
   if (!value) return "—";
   if (value === TRANSFER_CATEGORY) return "Transfer";
   if (value === OWNER_PAYOUT_CATEGORY) return "Mülk sahibi ödemesi";
-  return CASH_CATEGORIES.find((c) => c.value === value)?.label ?? value;
+  return CASH_CATEGORIES.find((c) => c.value === value)?.label ?? POSTING_CATEGORY_LABEL[value] ?? value;
 }
 
 export function isCashCategory(value: string, direction: CashDirection): boolean {
