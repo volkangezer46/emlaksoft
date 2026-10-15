@@ -1,6 +1,6 @@
 /**
  * Eşleşmeyi toplu gönderme planı (SAF): tek portföyün eşleştiği alıcılara (ör. fiyat düşüşünde) aynı eşleşme mesajı.
- * Karar sırası alıcı başına: müşteri yok → aynı müşteri ikinci kez → iletişim engelli → örnek kayıt → geçerli cep telefonu yok
+ * Karar sırası alıcı başına: müşteri yok → aynı müşteri ikinci kez → daha önce gönderildi → iletişim engelli → örnek kayıt → geçerli cep telefonu yok
  * → İYS izni yok. Kalanlar sırayla, en fazla `MATCH_BULK_SEND_CAP` kişiye gönderilir; aşan kısım raporlanır (sessiz düşürme yok).
  *
  * İYS: toplu ileti ticari iletidir. Ofis ayarı "yalnız uyar" olsa bile toplu gönderimde izni eksik alıcı ATLANIR
@@ -20,13 +20,16 @@ export type MatchBulkRecipient = {
   phone: string | null;
   blacklist: boolean;
   isSample: boolean;
+  /** Bu portföy bu talebe daha önce gönderildi (demand_property_matches, CRM-G4); varsayılan hariç tutulur. */
+  alreadySent?: boolean;
 };
 
-export type MatchBulkSkipReason = "no_customer" | "duplicate" | "blacklist" | "sample" | "no_phone" | "no_consent";
+export type MatchBulkSkipReason = "no_customer" | "duplicate" | "already_sent" | "blacklist" | "sample" | "no_phone" | "no_consent";
 
 export const MATCH_BULK_SKIP_LABELS: Record<MatchBulkSkipReason, string> = {
   no_customer: "Müşteri kaydı yok",
   duplicate: "Aynı müşteri (tek mesaj gönderilir)",
+  already_sent: "Daha önce gönderildi",
   blacklist: "İletişim engelli",
   sample: "Örnek kayıt",
   no_phone: "Geçerli cep telefonu yok",
@@ -61,7 +64,7 @@ export function planMatchBulkSend(
   consentAllowed: ReadonlySet<string> | null,
   cap: number = Number.POSITIVE_INFINITY,
 ): MatchBulkPlan {
-  const counts: MatchBulkPlan["counts"] = { no_customer: 0, duplicate: 0, blacklist: 0, sample: 0, no_phone: 0, no_consent: 0 };
+  const counts: MatchBulkPlan["counts"] = { no_customer: 0, duplicate: 0, already_sent: 0, blacklist: 0, sample: 0, no_phone: 0, no_consent: 0 };
   const skipped: MatchBulkPlan["skipped"] = [];
   const eligible: MatchBulkRecipient[] = [];
   const seen = new Set<string>();
@@ -79,7 +82,8 @@ export function planMatchBulkSend(
       continue;
     }
     seen.add(r.customerId);
-    if (r.blacklist) skip(r, "blacklist");
+    if (r.alreadySent) skip(r, "already_sent");
+    else if (r.blacklist) skip(r, "blacklist");
     else if (r.isSample) skip(r, "sample");
     else if (!r.phone || !isValidTurkishMobile(normalizeTurkishPhone(r.phone))) skip(r, "no_phone");
     else if (consentAllowed && !consentAllowed.has(r.customerId)) skip(r, "no_consent");
@@ -92,6 +96,7 @@ export function planMatchBulkSend(
 /** Onay penceresi metni: gönderilecek / izni yok / diğer atlananlar. */
 export function describeMatchBulkPlan(p: { send: number; overCap: number; counts: Record<MatchBulkSkipReason, number> }): string {
   const parts = [`Gönderilecek: ${p.send}`, `İzni yok: ${p.counts.no_consent}`];
+  if (p.counts.already_sent) parts.push(`Daha önce gönderildi: ${p.counts.already_sent}`);
   if (p.counts.blacklist) parts.push(`İletişim engelli: ${p.counts.blacklist}`);
   if (p.counts.no_phone) parts.push(`Telefonu yok: ${p.counts.no_phone}`);
   if (p.counts.sample) parts.push(`Örnek kayıt: ${p.counts.sample}`);

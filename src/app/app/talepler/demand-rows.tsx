@@ -29,34 +29,44 @@ export type DemandVM = {
   statusTone: PillTone;
   urgencyLabel: string | null;
   urgencyTone: PillTone;
-  /** Eşleşme potansiyeli (skor motorundan): kapalı talepte null. */
-  match: { strong: number; good: number; best: number } | null;
+  /** Eşleşme özeti (TEK okuyucu, gizlenenler hariç): kapalı talepte ya da aday okunamadıysa null. */
+  match: { shown: number; strong: number; good: number; best: number } | null;
   ageLabel: string;
   /** Acil ve açık talep: yaş etiketi vurgulanır. */
   ageUrgent: boolean;
   advisor: string | null;
 };
 
+/**
+ * Eşleşme sütunu (CRM-G6): uygun portföy sayısı (güçlü olanlar vurgulu) → talebe süzülü Eşleşme sekmesi; sıfırsa
+ * "Kriteri genişlet" önerisine (talep detayı) gider. Mobilde aynı rozet müşteri adının altına iner.
+ */
 function MatchPill({ d }: { d: DemandVM }) {
   const m = d.match;
   if (!m) return <span className="text-text-faint">—</span>;
-  if (m.strong > 0 || m.good > 0) {
+  if (m.shown > 0) {
+    const label = m.strong > 0 ? `${m.shown} eşleşme · ${m.strong} güçlü` : `${m.shown} eşleşme`;
     return (
       <Link
         href={`/app/talepler?sekme=eslesme&demand=${d.id}`}
         prefetch={false}
         title={`En iyi skor ${m.best} · eşleştirmede aç`}
-        className={`focus-ring relative z-10 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition hover:opacity-80 ${m.strong > 0 ? "tone-success" : "tone-neutral"}`}
+        className={`focus-ring relative z-10 inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full px-2.5 text-xs font-semibold transition hover:opacity-80 touch:min-h-11 ${m.strong > 0 ? "tone-success" : m.good > 0 ? "tone-info" : "tone-neutral"}`}
       >
         <SpriteIcon name="sparkles" className="h-3 w-3" />
-        {m.strong > 0 ? `${m.strong} güçlü eşleşme` : `${m.good} iyi eşleşme`}
+        {label}
       </Link>
     );
   }
   return (
-    <span title="Portföy havuzunda skor ≥ 55 aday yok" className="text-xs text-text-faint">
-      Eşleşme adayı yok
-    </span>
+    <Link
+      href={`/app/talepler/${d.id}#kriter-genislet`}
+      prefetch={false}
+      title="Uygun portföy yok: kriteri genişletme önerilerini görün"
+      className="focus-ring relative z-10 inline-flex min-h-7 items-center gap-1 whitespace-nowrap rounded-full border border-dashed border-line-strong px-2.5 text-xs font-semibold text-text-muted transition hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
+    >
+      Eşleşme yok · genişlet
+    </Link>
   );
 }
 
@@ -127,6 +137,11 @@ export function DemandTable({ rows, density, canBulk = false }: { rows: DemandVM
                         <p className="max-w-[14rem] truncate font-semibold text-text">{d.customerName ?? "Müşteri yok"}</p>
                       )}
                       <p className="mt-0.5 truncate text-xs text-text-muted">{d.kind}</p>
+                      {d.match ? (
+                        <div className="mt-1 xl:hidden">
+                          <MatchPill d={d} />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </TD>

@@ -6,12 +6,8 @@ import { loadDemandCounts, type DemandCounts } from "@/lib/supabase/list-count-r
 import { getProvince } from "@/lib/geo/reader";
 import { requireModulePage } from "@/lib/require-module-page";
 import { daysAgoIso, msSince, now } from "@/lib/clock";
-import {
-  fetchTenantMatchingWeights,
-  scoreDemandProperty,
-  type MatchDemand,
-  type MatchProperty,
-} from "@/lib/matching";
+import { fetchTenantMatchingWeights, type MatchDemand } from "@/lib/matching";
+import { loadDemandMatches, type DemandMatchSummary } from "@/lib/match-candidates";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
@@ -82,6 +78,8 @@ type DemandRow = {
   created_at: string;
   province_id: string | null;
   district_id: string | null;
+  neighborhood_id: string | null;
+  criteria: unknown;
   customer: Rel;
   province: Rel;
 };
@@ -103,7 +101,7 @@ const POOL_LIMIT = 500;
 const SERIES_SCAN_LIMIT = 2000;
 const OPEN_STATUSES = ["new", "active", "matched"];
 
-type Matches = Map<string, { strong: number; good: number; best: number }>;
+type Matches = Map<string, DemandMatchSummary>;
 
 type Pending = {
   /** Sayfa dilimi + gerçek toplam + eşleşme potansiyeli (liste, portföy havuzu ve ofis ağırlıklarından türer). */
@@ -197,7 +195,7 @@ export async function DemandsView({
     ? `customer:${CUSTOMER_FK}!inner(id, full_name, assigned_to)`
     : `customer:${CUSTOMER_FK}(id, full_name, assigned_to)`;
 
-  const LIST_COLS = `id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, ${listCustomerEmbed}, province:geo_provinces(name)`;
+  const LIST_COLS = `id, transaction_type, property_type, budget_min, budget_max, rooms, min_sqm, urgency, status, created_at, province_id, district_id, neighborhood_id, criteria, ${listCustomerEmbed}, province:geo_provinces(name)`;
 
   /** Danışman kapsamı + (isteğe bağlı) durum/aciliyet filtreleriyle temel sorgu. */
   const buildBase = (select: string, opts?: { count: "exact"; head?: boolean }, useUserFilters = true) => {
@@ -234,40 +232,29 @@ export async function DemandsView({
     .range(offset, offset + PAGE_SIZE - 1);
 
   // Ağır bölümler (liste + eşleşme skorları, segment havuzu) kendi Suspense sınırında bekler.
-  const propsP = Promise.resolve(
-    supabase
-      .from("properties")
-      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
-      .is("deleted_at", null)
-      .in("status", ["live", "draft", "reserved", "Yayında"])
-      .order("created_at", { ascending: false })
-      .limit(300),
-  );
+  // Eşleşme sayısı TEK okuyucudan (CRM-G3/G6): sayfadaki açık talepler için tek aday sorgusu (il/işlem türüyle daraltılmış),
+  // aynı eşik ve aynı gizleme kuralı (müşteri beğenmedi / "uygun değil") — talep detayındaki sayıyla aynı.
   const weightsP = fetchTenantMatchingWeights(supabase);
   const rawListP = search.empty ? Promise.resolve({ data: [], count: 0 }) : Promise.resolve(listQuery);
 
   const pending: Pending = {
-    listP: batchAll("Talepler", ["demands", "properties", "matching-weights"], [rawListP, propsP, weightsP]).then(([{ data, count }, { data: propsData }, weights]) => {
+    listP: batchAll("Talepler", ["demands"], [rawListP]).then(async ([{ data, count }]) => {
       const rows = (data ?? []) as unknown as DemandRow[];
-      const matchProps = (propsData ?? []).map((p) => ({
-        ...p,
-        list_price: p.list_price != null ? Number(p.list_price) : null,
-        features: (p.features ?? {}) as MatchProperty["features"],
-      })) as MatchProperty[];
-      const matchByDemand: Matches = new Map();
-      for (const d of rows) {
-        if (d.status === "closed") continue;
-        let strong = 0;
-        let good = 0;
-        let best = 0;
-        for (const p of matchProps) {
-          const res = scoreDemandProperty(d as unknown as MatchDemand, p, weights);
-          if (res.score > best) best = res.score;
-          if (res.score >= 75) strong += 1;
-          else if (res.score >= 55) good += 1;
-        }
-        matchByDemand.set(d.id, { strong, good, best });
-      }
+      const open = rows
+        .filter((d) => d.status !== "closed")
+        .map((d) => ({
+          ...d,
+          budget_min: d.budget_min != null ? Number(d.budget_min) : null,
+          budget_max: d.budget_max != null ? Number(d.budget_max) : null,
+          min_sqm: d.min_sqm != null ? Number(d.min_sqm) : null,
+        })) as unknown as (MatchDemand & { customer: Rel })[];
+      const matches = await loadDemandMatches(supabase, {
+        demands: open,
+        customerOf: (d) => relOne<{ id: string }>(d.customer)?.id ?? null,
+        weights: weightsP,
+      });
+      // Aday okunamadıysa sayı GÖSTERİLMEZ ("eşleşme yok" yanlış olur).
+      const matchByDemand: Matches = matches.error ? new Map() : matches.byDemand;
       return { rows, total: count ?? rows.length, matchByDemand };
     }),
     poolP: Promise.resolve(

@@ -17,18 +17,19 @@ import {
   MATCHING_WEIGHT_KEYS,
   MATCHING_WEIGHT_LABELS,
   matchingWeightsPercent,
-  scoreDemandProperty,
   tierCls,
   tierLabel,
-  tierOf,
   type MatchDemand,
   type MatchingWeights,
-  type MatchProperty,
 } from "@/lib/matching";
 import { moneyTry } from "@/lib/leak-shield";
 import { requireModulePage } from "@/lib/require-module-page";
 import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criteria";
-import { fetchMatchCandidateProperties, MATCH_CANDIDATE_LIMIT } from "@/lib/match-candidates";
+import { loadDemandMatches, MATCH_CANDIDATE_LIMIT, MATCH_SHOW_MIN } from "@/lib/match-candidates";
+import { wasSent } from "@/lib/match-state";
+import { now as clockNow } from "@/lib/clock";
+import { MatchDismissButton } from "./match-dismiss-button";
+import { MatchStateBadge } from "./match-state-badge";
 import { SaveMatchButton } from "./save-match-button";
 import { SendMatchButton } from "./send-match-button";
 import { BulkSendMatches } from "./bulk-send-matches";
@@ -71,7 +72,7 @@ export async function MatchingView({
   searchParams,
   canCreateOffer = false,
 }: {
-  searchParams: Promise<{ demand?: string; property?: string; customer?: string; kademe?: string; minSkor?: string; sayfa?: string; kriter?: string }>;
+  searchParams: Promise<{ demand?: string; property?: string; customer?: string; kademe?: string; minSkor?: string; sayfa?: string; kriter?: string; gizlenen?: string }>;
   /** `offers:create` (sunucuda hesaplanır, sözleşme k): yoksa "Teklif al" kısayolu çizilmez. */
   canCreateOffer?: boolean;
 }) {
@@ -86,7 +87,7 @@ export async function MatchingView({
 
   // Skor filtresi linkleri mevcut varlık filtrelerini (customer/demand/property) korur.
   // Filtre değişiminde sayfa 1'e döner: patch.sayfa verilmedikçe ?sayfa= yazılmaz.
-  const matchHref = (patch: { kademe?: string | null; minSkor?: string | null; sayfa?: number | null }) => {
+  const matchHref = (patch: { kademe?: string | null; minSkor?: string | null; sayfa?: number | null; gizlenen?: boolean }) => {
     const q = new URLSearchParams();
     if (sp.customer) q.set("customer", sp.customer);
     if (sp.demand) q.set("demand", sp.demand);
@@ -96,6 +97,8 @@ export async function MatchingView({
     const minSkor = patch.minSkor !== undefined ? patch.minSkor : sp.minSkor;
     if (kademe) q.set("kademe", kademe);
     if (minSkor) q.set("minSkor", minSkor);
+    const gizlenen = patch.gizlenen !== undefined ? patch.gizlenen : sp.gizlenen === "1";
+    if (gizlenen) q.set("gizlenen", "1");
     if (patch.sayfa != null && patch.sayfa > 1) q.set("sayfa", String(patch.sayfa));
     const s = q.toString();
     return s ? `/app/talepler?sekme=eslesme&${s}` : "/app/talepler?sekme=eslesme";
@@ -120,15 +123,7 @@ export async function MatchingView({
         }
       : null;
 
-  type FeedbackRow = { customer_id: string; property_id: string; verdict: string };
-  const feedbackFor = async (customerIds: string[]): Promise<FeedbackRow[]> => {
-    if (customerIds.length === 0) return [];
-    const { data } = await supabase.from("portal_match_feedback").select("customer_id, property_id, verdict").in("customer_id", customerIds);
-    return (data ?? []) as FeedbackRow[];
-  };
-
-  // Ağırlık + talep (+ müşteri biliniyorsa geri bildirim) sorguları birbirinden bağımsız → TEK tur.
-  // ?customer= / ?demand= süzgeci sorguda (eskiden son 80 talep bellekte süzülüyordu).
+  // Talep sorgusu ağırlıklarla AYNI turda; ?customer= / ?demand= süzgeci SORGUDA (eskiden son 80 talep bellekte süzülüyordu).
   let demandsQuery = supabase
     .from("customer_demands")
     .select(
@@ -140,7 +135,6 @@ export async function MatchingView({
   const demandsPromise = previewDemand
     ? Promise.resolve({ data: [] as DemandRow[] })
     : demandsQuery.order("created_at", { ascending: false }).limit(80);
-  const earlyFeedbackP = !previewDemand && customerF ? feedbackFor([customerF]) : null;
   const [tenantWeightsRaw, { data: demandsData }] = await Promise.all([tenantWeightsPromise, demandsPromise]);
   const tenantWeights: MatchingWeights | null = tenantWeightsRaw ?? null;
   const weightPercents = matchingWeightsPercent(tenantWeights ?? undefined);
@@ -150,66 +144,23 @@ export async function MatchingView({
   if (!previewDemand && sp.customer && !customerF) demands = [];
   if (!previewDemand && sp.demand && !demandF) demands = [];
 
-  // ── Aday portföyler + geri bildirim (ikisi de yalnız taleplere bağlı) → TEK tur ─────────────
-  // Aday: form içi önizleme ile AYNI sorgu (src/lib/match-candidates.ts): talepler il/işlem türü kümesine göre
-  // sınırlı aday kümesine daraltılır, skor bellekte hesaplanır.
-  // Geri bildirim (v1): disliked (müşteri, portföy) çifti listeden çıkarılır, liked çifti +10 bonus ve 💚 rozeti alır.
-  const feedbackCustomerIds = [
-    ...new Set(demands.map((d) => customerOf(d)?.id).filter((x): x is string => x != null)),
-  ];
-  const [candidates, feedbackData] = await Promise.all([
-    fetchMatchCandidateProperties(supabase, {
-      demands,
-      propertyId: sp.property ?? null,
-    }),
-    earlyFeedbackP ?? feedbackFor(feedbackCustomerIds),
-  ]);
+  // ── TEK eşleşme okuyucusu (src/lib/match-candidates.ts): aday portföyler + müşteri geri bildirimi + eşleşme durumu
+  // (CRM-G4) TEK turda; skor kuralı talep detayı ve Müşteri 360 ile AYNI. Müşteri "beğenmedi" / danışman "uygun değil"
+  // çiftleri gizlenir (?gizlenen=1 ile rozetli geri gelir), beğenilen +10 ve 💚 rozeti alır.
+  const showHidden = sp.gizlenen === "1";
+  const candidates = await loadDemandMatches(supabase, {
+    demands,
+    customerOf: (d) => customerOf(d)?.id ?? null,
+    propertyId: sp.property ?? null,
+    includeHidden: showHidden,
+    weights: tenantWeights,
+    withState: !previewDemand,
+  });
   const properties = candidates.properties;
-
-  const likedPairs = new Set<string>();
-  const dislikedPairs = new Set<string>();
-  for (const fb of feedbackData ?? []) {
-    const key = `${fb.customer_id}:${fb.property_id}`;
-    if (fb.verdict === "liked") likedPairs.add(key);
-    else if (fb.verdict === "disliked") dislikedPairs.add(key);
-  }
-
-  type Pair = {
-    demand: DemandRow;
-    property: MatchProperty;
-    score: number;
-    tier: ReturnType<typeof scoreDemandProperty>["tier"];
-    reasons: ReturnType<typeof scoreDemandProperty>["reasons"];
-    likedByCustomer: boolean;
-  };
-
-  const pairs: Pair[] = [];
-  let hiddenByFeedback = 0;
-  for (const demand of demands) {
-    const customerId = customerOf(demand)?.id ?? null;
-    for (const property of properties) {
-      const fbKey = customerId ? `${customerId}:${property.id}` : null;
-      const result = scoreDemandProperty(demand, property, tenantWeights);
-      if (fbKey && dislikedPairs.has(fbKey)) {
-        // "Müşteri ilgilenmedi" — listede görünecek skordaysa gizlenen sayısına yaz.
-        if (result.score >= 35) hiddenByFeedback += 1;
-        continue;
-      }
-      const likedByCustomer = fbKey != null && likedPairs.has(fbKey);
-      const score = likedByCustomer ? Math.min(100, result.score + 10) : result.score;
-      if (score < 35) continue;
-      pairs.push({
-        demand,
-        property,
-        score,
-        tier: likedByCustomer ? tierOf(score) : result.tier,
-        reasons: result.reasons,
-        likedByCustomer,
-      });
-    }
-  }
-
-  pairs.sort((a, b) => b.score - a.score);
+  const pairs = candidates.pairs;
+  const hiddenByFeedback = candidates.hiddenByFeedback;
+  const hiddenDismissed = candidates.hiddenDismissed;
+  const nowMs = clockNow();
   // Hero istatistikleri ve skor dağılımı TAM kümeden; liste skor filtresinden.
   let filteredPairs = pairs;
   if (kademeF) filteredPairs = filteredPairs.filter((p) => p.tier === kademeF);
@@ -221,15 +172,17 @@ export async function MatchingView({
   const sayfaParsed = Number.parseInt(sp.sayfa ?? "", 10);
   const page = Math.min(Number.isFinite(sayfaParsed) && sayfaParsed > 0 ? sayfaParsed : 1, totalPages);
   const top = filteredPairs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const strong = pairs.filter((p) => p.tier === "strong").length;
-  const good = pairs.filter((p) => p.tier === "good").length;
-  const avg = pairs.length ? Math.round(pairs.reduce((s, p) => s + p.score, 0) / pairs.length) : 0;
+  // İstatistikler gizlenen çiftleri saymaz (?gizlenen=1 yalnız listeyi genişletir).
+  const visiblePairs = pairs.filter((p) => p.hiddenBy == null);
+  const strong = visiblePairs.filter((p) => p.tier === "strong").length;
+  const good = visiblePairs.filter((p) => p.tier === "good").length;
+  const avg = visiblePairs.length ? Math.round(visiblePairs.reduce((s, p) => s + p.score, 0) / visiblePairs.length) : 0;
   const hitRate = demands.length && properties.length
-    ? Math.min(1, pairs.length / Math.max(1, demands.length))
+    ? Math.min(1, visiblePairs.length / Math.max(1, demands.length))
     : 0;
 
   const scoreBuckets = [0, 0, 0, 0]; // 35-54, 55-74, 75-89, 90+
-  pairs.forEach((p) => {
+  visiblePairs.forEach((p) => {
     if (p.score >= 90) scoreBuckets[3] += 1;
     else if (p.score >= 75) scoreBuckets[2] += 1;
     else if (p.score >= 55) scoreBuckets[1] += 1;
@@ -240,10 +193,13 @@ export async function MatchingView({
   // Tek portföye süzülü (?property=): "Tümüne gönder" — ör. fiyat düşüşünde eşleşen tüm alıcılara aynı mesaj (skor
   // filtresine uyan, kayıtlı talepler; sıra skor sırası). İzin/engel/telefon kontrolü sunucuda (matching-bulk).
   const propertyF = sp.property && UUID_RE.test(sp.property) ? sp.property : null;
-  const bulkDemandIds =
+  // Gizlenen çiftler (uygun değil / beğenmedi) toplu gönderime girmez; daha önce gönderilenler sunucuda varsayılan hariç.
+  const bulkPairs =
     propertyF && !previewDemand
-      ? [...new Set(filteredPairs.filter((p) => p.property.id === propertyF).map((p) => p.demand.id))]
+      ? filteredPairs.filter((p) => p.property.id === propertyF && p.hiddenBy == null)
       : [];
+  const bulkDemandIds = [...new Set(bulkPairs.map((p) => p.demand.id))];
+  const bulkSentCount = new Set(bulkPairs.filter((p) => wasSent(p.state)).map((p) => p.demand.id)).size;
   // Tek müşteriye süzülü (?customer= / ?demand=): satır seçimiyle çoklu sunum (?portfoy=a,b,c&musteri=).
   const selectionCustomerId =
     previewDemand || propertyF ? null : customerF ?? (demandF && demands.length === 1 ? customerOf(demands[0])?.id ?? null : null);
@@ -358,13 +314,18 @@ export async function MatchingView({
         </Link>
       </div>
 
-      {(sp.customer || sp.demand || sp.property || kademeF || minSkorF != null) ? (
+      {(sp.customer || sp.demand || sp.property || kademeF || minSkorF != null || showHidden) ? (
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-cyan-400/30 bg-cyan-400/8 px-4 py-3 text-sm text-ink-950">
           <Sparkles className="h-4 w-4 text-cyan-600" />
           Filtre aktif
           {sp.customer ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">müşteri</span> : null}
           {sp.demand ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">talep</span> : null}
           {sp.property ? <span className="rounded-full bg-white px-2 py-0.5 text-xs font-bold">portföy</span> : null}
+          {showHidden ? (
+            <Link href={matchHref({ gizlenen: false })} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold hover:text-brand-600" title="Gizlenen önerileri yeniden sakla">
+              gizlenenler dahil ✕
+            </Link>
+          ) : null}
           {kademeF ? (
             <Link href={matchHref({ kademe: null })} className="rounded-full bg-white px-2 py-0.5 text-xs font-bold hover:text-brand-600" title="Kademe filtresini kaldır">
               {kademeF === "strong" ? "güçlü eşleşme" : "iyi eşleşme"} ✕
@@ -387,17 +348,31 @@ export async function MatchingView({
               <Target className="h-4 w-4 text-brand-600" /> Eşleşme önerileri
             </h2>
             <p className="text-xs text-text-muted">
-              {filteredPairs.length} öneri · skor ≥ {minSkorF ?? 35}
+              {filteredPairs.length} öneri · skor ≥ {minSkorF ?? MATCH_SHOW_MIN}
               {kademeF ? ` · ${kademeF === "strong" ? "güçlü" : "iyi"} kademe` : ""}
               {totalPages > 1 ? ` · sayfa ${page}/${totalPages}` : ""}
             </p>
-            {hiddenByFeedback > 0 ? (
-              <p className="mt-0.5 text-xs text-amber-600">
-                {hiddenByFeedback} eşleşme müşteri geri bildirimiyle gizlendi (&quot;müşteri ilgilenmedi&quot;).
+            {hiddenByFeedback + hiddenDismissed > 0 ? (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-700">
+                <span>
+                  {[
+                    hiddenDismissed > 0 ? `${hiddenDismissed} öneri "uygun değil" işaretli` : null,
+                    hiddenByFeedback > 0 ? `${hiddenByFeedback} öneriyi müşteri beğenmedi` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                  {showHidden ? " (listede gösteriliyor)" : " (gizlendi)"}
+                </span>
+                <Link
+                  href={matchHref({ gizlenen: !showHidden })}
+                  className="focus-ring inline-flex min-h-8 items-center rounded-full border border-line bg-surface px-2.5 font-semibold text-ink-950 hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
+                >
+                  {showHidden ? "Gizlenenleri sakla" : "Gizlenenleri göster"}
+                </Link>
               </p>
             ) : null}
           </div>
-          {bulkDemandIds.length > 0 && propertyF ? <BulkSendMatches propertyId={propertyF} demandIds={bulkDemandIds} /> : null}
+          {bulkDemandIds.length > 0 && propertyF ? <BulkSendMatches propertyId={propertyF} demandIds={bulkDemandIds} sentCount={bulkSentCount} /> : null}
           {selectionCustomerId && top.length > 0 ? <MatchSelectionBar customerId={selectionCustomerId} /> : null}
         </div>
 
@@ -437,7 +412,7 @@ export async function MatchingView({
               return (
                 <article
                   key={`${pair.demand.id}-${pair.property.id}`}
-                  className="grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.1fr_1.1fr_auto] lg:items-center"
+                  className={`grid gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02] lg:grid-cols-[1.1fr_1.1fr_auto] lg:items-center ${pair.hiddenBy ? "bg-canvas/60 opacity-75" : ""}`}
                 >
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.08em] text-brand-600">
@@ -495,6 +470,14 @@ export async function MatchingView({
                         </span>
                       ) : null}
                     </div>
+                    {pair.hiddenBy === "feedback" ? (
+                      <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-700">Müşteri beğenmedi</span>
+                    ) : null}
+                    <MatchStateBadge
+                      state={pair.state}
+                      nowMs={nowMs}
+                      opened={Boolean(pair.state?.share_token && candidates.openedTokens.has(pair.state.share_token))}
+                    />
                     <div className="flex flex-wrap gap-1 lg:justify-end">
                       {pair.reasons.filter((r) => r.ok).slice(0, 4).map((r) => (
                         <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-semibold text-mint-600">
@@ -561,6 +544,11 @@ export async function MatchingView({
                         <>
                           <SendMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
                           <SaveMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
+                          <MatchDismissButton
+                            demandId={pair.demand.id}
+                            propertyId={pair.property.id}
+                            dismissed={pair.state?.state === "dismissed"}
+                          />
                         </>
                       )}
                       <Link

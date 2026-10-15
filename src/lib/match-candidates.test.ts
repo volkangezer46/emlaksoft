@@ -47,3 +47,105 @@ describe("match-notify sıralı kırpma (B15)", () => {
     expect(src).toContain("demandsError");
   });
 });
+
+import { MATCH_LIKED_BONUS, MATCH_SHOW_MIN, scoreDemandMatches } from "./match-candidates";
+import type { MatchDemand, MatchProperty } from "./matching";
+import type { MatchStateRow } from "./match-state";
+
+const md: MatchDemand = {
+  id: "d1",
+  transaction_type: "Satılık",
+  property_type: "Daire",
+  province_id: "prov",
+  district_id: null,
+  neighborhood_id: null,
+  budget_min: null,
+  budget_max: 1_000_000,
+  rooms: "3+1",
+  min_sqm: null,
+  urgency: null,
+  status: "active",
+  criteria: {},
+};
+const mp = (id: string, over: Partial<MatchProperty> = {}): MatchProperty => ({
+  id,
+  property_code: id,
+  title: id,
+  transaction_type: "Satılık",
+  property_type: "Daire",
+  status: "live",
+  list_price: 900_000,
+  province_id: "prov",
+  district_id: null,
+  neighborhood_id: null,
+  features: { rooms: "3+1", sqm: 100 },
+  ...over,
+});
+const st = (property_id: string, state: MatchStateRow["state"]): MatchStateRow => ({
+  demand_id: "d1",
+  property_id,
+  state,
+  dismiss_reason: null,
+  dismissed_at: null,
+  sent_at: null,
+  send_count: 0,
+  channel: null,
+  share_token: null,
+  updated_at: "2026-10-01",
+});
+
+describe("scoreDemandMatches — tek kural (CRM-G3/G4)", () => {
+  const properties = [mp("a"), mp("b"), mp("c"), mp("rent", { transaction_type: "Kiralık" })];
+  it("eşik altı (işlem türü uyumsuz) düşer; beğenmedi ve uygun değil gizlenir ve sayılır", () => {
+    const r = scoreDemandMatches({
+      demands: [md],
+      properties,
+      customerOf: () => "c1",
+      feedback: [{ customer_id: "c1", property_id: "b", verdict: "disliked" }],
+      states: [st("c", "dismissed")],
+    });
+    expect(r.pairs.map((p) => p.property.id)).toEqual(["a"]);
+    expect(r.hiddenByFeedback).toBe(1);
+    expect(r.hiddenDismissed).toBe(1);
+    expect(r.byDemand.get("d1")?.shown).toBe(1);
+    expect(r.pairs.every((p) => p.score >= MATCH_SHOW_MIN)).toBe(true);
+  });
+  it("includeHidden gizlenenleri işaretli döndürür ama özet saymaz", () => {
+    const r = scoreDemandMatches({ demands: [md], properties, customerOf: () => "c1", states: [st("c", "dismissed")], includeHidden: true });
+    expect(r.pairs.find((p) => p.property.id === "c")?.hiddenBy).toBe("dismissed");
+    expect(r.byDemand.get("d1")?.shown).toBe(2);
+  });
+  it("beğenilen portföy bonus alır", () => {
+    const base = scoreDemandMatches({ demands: [md], properties: [mp("a", { status: "draft" })], customerOf: () => "c1" }).pairs[0]!.score;
+    const liked = scoreDemandMatches({
+      demands: [md],
+      properties: [mp("a", { status: "draft" })],
+      customerOf: () => "c1",
+      feedback: [{ customer_id: "c1", property_id: "a", verdict: "liked" }],
+    }).pairs[0]!;
+    expect(liked.score).toBe(Math.min(100, base + MATCH_LIKED_BONUS));
+    expect(liked.likedByCustomer).toBe(true);
+  });
+});
+
+describe("sözleşme: portföyü eşleşme için okuyan tek yer match-candidates (CRM-G3)", () => {
+  const surfaces = [
+    "src/app/app/talepler/[id]/page.tsx",
+    "src/app/app/talepler/matching-view.tsx",
+    "src/app/app/talepler/demands-view.tsx",
+    "src/app/app/musteriler/[id]/sections.tsx",
+    "src/app/app/musteriler/[id]/matched-properties-widget.tsx",
+  ];
+  it.each(surfaces)("%s kendi aday sorgusunu/eşiğini kurmaz", (file) => {
+    const src = readFileSync(file, "utf8");
+    expect(src).not.toMatch(/from\("properties"\)/);
+    expect(src).not.toMatch(/SALE_VARIANTS|RENT_VARIANTS/);
+    expect(src).not.toMatch(/score (>=|<) (35|45|60)\b/);
+    expect(src).not.toMatch(/scoreDemandProperty\(/);
+  });
+  it("yüzeyler tek okuyucuyu kullanır", () => {
+    for (const file of surfaces.filter((f) => !f.endsWith("widget.tsx"))) {
+      expect(readFileSync(file, "utf8"), file).toContain("loadDemandMatches(");
+    }
+  });
+});

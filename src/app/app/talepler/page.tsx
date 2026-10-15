@@ -39,6 +39,7 @@ export default async function DemandsPage({
   kademe?: string;
   minSkor?: string;
   kriter?: string;
+  gizlenen?: string;
 }>;
 }) {
   const { perms } = await requireModulePage("demands", "/app/talepler");
@@ -55,7 +56,7 @@ export default async function DemandsPage({
       <PageSegmentTabs base="/app/talepler" label="Talep sekmeleri" tabs={tabs} active={active} />
       {active === "eslesme" ? (
         <Suspense
-          key={`${sp.customer ?? ""}|${sp.demand ?? ""}|${sp.property ?? ""}|${sp.kriter ?? ""}`}
+          key={`${sp.customer ?? ""}|${sp.demand ?? ""}|${sp.property ?? ""}|${sp.kriter ?? ""}|${sp.gizlenen ?? ""}`}
           fallback={
             <div className="space-y-6" role="status" aria-label="Eşleşmeler hesaplanıyor">
               <SkeletonKpiStrip cols={4} />

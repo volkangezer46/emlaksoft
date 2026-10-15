@@ -23,16 +23,19 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import {
   fetchTenantMatchingWeights,
-  scoreDemandProperty,
   tierCls,
   tierLabel,
-  tierOf,
   type MatchDemand,
   type MatchingWeights,
-  type MatchProperty,
 } from "@/lib/matching";
+import { loadDemandMatches, MATCH_SHOW_MIN } from "@/lib/match-candidates";
+import { suggestWidening, WIDEN_SUGGEST_BELOW } from "@/lib/match-widen";
+import { MatchDismissButton } from "../match-dismiss-button";
+import { MatchStateBadge } from "../match-state-badge";
+import { SendMatchButton } from "../send-match-button";
+import { WidenCriteriaCard } from "./widen-criteria-card";
 import { moneyTry } from "@/lib/leak-shield";
-import { msSince } from "@/lib/clock";
+import { msSince, now as clockNow } from "@/lib/clock";
 import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 // Talep formu tek kopya müşteri-360'ta yaşar — aynı dialog + updateDemand action'ı
 import { EditDemandDialog } from "../../musteriler/[id]/edit-demand-dialog";
@@ -93,12 +96,6 @@ function longDateTime(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
 
-// Eşleştirme motorundaki SQL ön filtre deseniyle aynı işlem türü varyantları
-const SALE_VARIANTS = ["Satılık", "satılık", "Satilik", "satilik", "SATILIK", "sale", "Sale", "Satış", "satış", "Satis", "satis"];
-const RENT_VARIANTS = ["Kiralık", "kiralık", "Kiralik", "kiralik", "KİRALIK", "rent", "Rent", "Kira", "kira"];
-const isSaleTx = (v: string) => ["satılık", "satilik", "sale", "satış", "satis"].some((x) => v.includes(x));
-const isRentTx = (v: string) => ["kiralık", "kiralik", "rent", "kira"].some((x) => v.includes(x));
-
 /** Eşleşen portföyün kapak küçük resmi: ortak söz çözülünce çizilir, yoksa simge. */
 async function MatchCover({ coverMapP, propertyId, alt }: { coverMapP: Promise<Map<string, string>>; propertyId: string; alt: string }) {
   const coverId = (await coverMapP).get(propertyId);
@@ -111,11 +108,12 @@ export default async function DemandDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ kategori?: string; adet?: string }>;
+  searchParams?: Promise<{ kategori?: string; adet?: string; gizlenen?: string }>;
 }) {
   // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
   const [{ perms, tenantId }, { id }, spRaw] = await Promise.all([requireModulePage("demands"), params, searchParams]);
   const canEdit = (perms.demands ?? []).includes("edit");
+  const canMatchAct = (perms.matching ?? []).includes("create");
   const taskPerms = perms.tasks ?? [];
   const canTaskView = taskPerms.includes("view");
   const canApptView = (perms.appointments ?? []).includes("view");
@@ -156,26 +154,15 @@ export default async function DemandDetailPage({
   const districtName = relOne<{ name: string }>(demand.district)?.name ?? null;
   const neighborhoodName = relOne<{ name: string }>(demand.neighborhood)?.name ?? null;
 
-  // ── Aday portföyler: eslestirme sayfasındaki SQL ön filtre deseni (tek talep) ──
-  const rawTx = (demand.transaction_type ?? "").trim();
-  const normTx = rawTx.toLocaleLowerCase("tr-TR");
-  const txVariants = new Set<string>();
-  if (normTx) {
-    if (isSaleTx(normTx)) SALE_VARIANTS.forEach((v) => txVariants.add(v));
-    else if (isRentTx(normTx)) RENT_VARIANTS.forEach((v) => txVariants.add(v));
-    txVariants.add(rawTx);
-  }
-
-  let propQuery = supabase
-    .from("properties")
-    .select(
-      "id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features",
-    )
-    .is("deleted_at", null)
-    .in("status", ["live", "draft", "reserved", "Yayında"]);
-  if (normTx && txVariants.size > 0) propQuery = propQuery.in("transaction_type", [...txVariants]);
-  // İli null portföy "İl (belirsiz)" olarak yine skorlanır — dışarıda bırakma.
-  if (demand.province_id) propQuery = propQuery.or(`province_id.is.null,province_id.eq.${demand.province_id}`);
+  // ── Eşleşmeler: TEK okuyucu (src/lib/match-candidates.ts) — Eşleşme sekmesi ve Müşteri 360 ile aynı aday sorgusu, eşik,
+  // müşteri geri bildirimi ve eşleşme durumu (CRM-G3/G4). Görev/randevu/olay sorgularıyla AYNI turda çalışır.
+  const showHidden = sp.gizlenen === "1";
+  const matchesP = loadDemandMatches(supabase, {
+    demands: [demand],
+    customerOf: () => customer?.id ?? null,
+    includeHidden: true,
+    weights: weightsP,
+  });
 
   // Görev/randevu sorguları TEK kez başlar; hem aşağıdaki batch hem zaman tüneli (olay) üreticisi aynı sözleri paylaşır.
   const taskP = Promise.resolve(
@@ -208,8 +195,7 @@ export default async function DemandDetailPage({
   const [
     { data: provinces },
     fetchedWeights,
-    { data: propertiesData },
-    { data: feedbackData },
+    matchResult,
     { data: networkRow },
     { data: agentProfile },
     { data: taskRows },
@@ -218,13 +204,7 @@ export default async function DemandDetailPage({
   ] = await Promise.all([
     provincesP,
     weightsP,
-    propQuery.order("created_at", { ascending: false }).limit(200),
-    customer
-      ? supabase
-          .from("portal_match_feedback")
-          .select("property_id, verdict")
-          .eq("customer_id", customer.id)
-      : Promise.resolve({ data: [] as { property_id: string; verdict: string }[] }),
+    matchesP,
     networkP,
     customer?.assigned_to
       ? supabase.from("profiles").select("full_name").eq("id", customer.assigned_to).maybeSingle()
@@ -244,49 +224,24 @@ export default async function DemandDetailPage({
   // Ofise özel kriter ağırlıkları — merkez yardımcı (lib/matching tek doğruluk kaynağı)
   const tenantWeights: MatchingWeights | null = fetchedWeights ?? null;
 
-  const properties = (propertiesData ?? []).map((p) => ({
-    ...p,
-    list_price: p.list_price != null ? Number(p.list_price) : null,
-    features: (p.features ?? {}) as MatchProperty["features"],
-  })) as MatchProperty[];
-
-  // Müşteri portal geri bildirimi: disliked gizlenir, liked +10 bonus + rozet
-  const likedIds = new Set<string>();
-  const dislikedIds = new Set<string>();
-  for (const fb of feedbackData ?? []) {
-    if (fb.verdict === "liked") likedIds.add(fb.property_id);
-    else if (fb.verdict === "disliked") dislikedIds.add(fb.property_id);
-  }
-
-  type Match = {
-    property: MatchProperty;
-    score: number;
-    tier: ReturnType<typeof scoreDemandProperty>["tier"];
-    reasons: ReturnType<typeof scoreDemandProperty>["reasons"];
-    likedByCustomer: boolean;
-  };
-
-  const matches: Match[] = [];
-  let hiddenByFeedback = 0;
-  for (const property of properties) {
-    const result = scoreDemandProperty(demand, property, tenantWeights);
-    if (dislikedIds.has(property.id)) {
-      if (result.score >= 35) hiddenByFeedback += 1;
-      continue;
-    }
-    const liked = likedIds.has(property.id);
-    const score = liked ? Math.min(100, result.score + 10) : result.score;
-    if (score < 35) continue;
-    matches.push({
-      property,
-      score,
-      tier: liked ? tierOf(score) : result.tier,
-      reasons: result.reasons,
-      likedByCustomer: liked,
-    });
-  }
-  matches.sort((a, b) => b.score - a.score);
+  // Gizlenenler (müşteri beğenmedi / "uygun değil") her zaman SAYILIR; listeye yalnız ?gizlenen=1 ile döner.
+  const matches = showHidden ? matchResult.pairs : matchResult.pairs.filter((m) => m.hiddenBy == null);
+  const visibleCount = matchResult.pairs.length - matchResult.hiddenByFeedback - matchResult.hiddenDismissed;
   const topMatches = matches.slice(0, 10);
+  const nowMs = clockNow();
+
+  // CRM-G6: az/sıfır eşleşmede AYNI aday kümesiyle "kriteri genişlet" önerileri (kapalı talepte yok).
+  const widenSuggestions =
+    demand.status !== "closed" && visibleCount < WIDEN_SUGGEST_BELOW && !matchResult.error
+      ? suggestWidening({
+          demand,
+          properties: matchResult.properties,
+          weights: tenantWeights,
+          customerId: customer?.id ?? null,
+          feedback: matchResult.feedback,
+          states: matchResult.states,
+        })
+      : [];
 
   // Kapak görselleri — portföy listesindeki desen (yalnız listelenen 10 portföy için)
   // Kapaklar listeyi BEKLETMEZ: sözle başlar, her küçük resim kendi Suspense sınırında çözülür (üçüncü ardışık tur kalktı).
@@ -414,94 +369,131 @@ export default async function DemandDetailPage({
 
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
         {/* ── Bu talebin eşleşmeleri ──────────────────────────────────────── */}
-        <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-5 py-4">
-            <div>
+        <div className="min-w-0 space-y-4">
+        <section id="eslesmeler" className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface shadow-[var(--shadow-xs)]">
+          <div className="flex flex-wrap items-start justify-between gap-2 border-b border-line px-4 py-4 sm:px-5">
+            <div className="min-w-0">
               <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
                 <Crosshair className="h-4 w-4 text-brand-600" /> Bu talebin eşleşmeleri
               </h2>
               <p className="text-xs text-text-muted">
-                {matches.length} portföy skorlandı · ilk {topMatches.length} gösteriliyor · skor ≥ 35
+                {visibleCount} uygun portföy · ilk {topMatches.length} gösteriliyor · skor ≥ {MATCH_SHOW_MIN}
                 {tenantWeights ? " · ofise özel ağırlıklar" : ""}
               </p>
-              {hiddenByFeedback > 0 ? (
-                <p className="mt-0.5 text-xs text-amber-600">
-                  {hiddenByFeedback} portföy müşteri geri bildirimiyle gizlendi (&quot;müşteri ilgilenmedi&quot;).
+              {matchResult.truncated ? (
+                <p className="mt-0.5 text-xs text-amber-700">Aday portföy çok: yalnız en yeni portföyler tarandı.</p>
+              ) : null}
+              {matchResult.hiddenByFeedback + matchResult.hiddenDismissed > 0 ? (
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-700">
+                  <span>
+                    {[
+                      matchResult.hiddenDismissed > 0 ? `${matchResult.hiddenDismissed} öneri "uygun değil" işaretli` : null,
+                      matchResult.hiddenByFeedback > 0 ? `${matchResult.hiddenByFeedback} öneriyi müşteri beğenmedi` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <Link
+                    href={showHidden ? `/app/talepler/${demand.id}#eslesmeler` : `/app/talepler/${demand.id}?gizlenen=1#eslesmeler`}
+                    className="focus-ring inline-flex min-h-8 items-center rounded-full border border-line bg-surface px-2.5 font-semibold text-ink-950 hover:border-brand-300 hover:text-brand-600 touch:min-h-11"
+                  >
+                    {showHidden ? "Gizlenenleri sakla" : "Gizlenenleri göster"}
+                  </Link>
                 </p>
               ) : null}
             </div>
             <Link
               href={`/app/talepler?sekme=eslesme&demand=${demand.id}`}
-              className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+              className="focus-ring inline-flex min-h-8 shrink-0 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11"
             >
               Tümünü gör <ArrowUpRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
+          {matchResult.error ? (
+            <p role="alert" className="border-b border-line bg-danger-500/10 px-5 py-3 text-sm text-ink-950">
+              {matchResult.error} Boş liste &quot;eşleşme yok&quot; anlamına gelmez.
+            </p>
+          ) : null}
+
           {topMatches.length === 0 ? (
-            <div className="grid place-items-center px-6 py-14 text-center">
+            <div className="grid place-items-center px-6 py-12 text-center">
               <Crosshair className="h-8 w-8 text-text-faint" />
               <p className="mt-3 font-display font-bold text-ink-950">Henüz eşleşen portföy yok</p>
               <p className="mt-1 max-w-md text-sm text-text-muted">
-                Kriterlere uyan yayında portföy eklendiğinde burada skorlanır.
+                {widenSuggestions.length > 0
+                  ? "Aşağıdaki kriter genişletme önerileriyle uygun portföy bulabilirsiniz."
+                  : "Kriterlere uyan portföy eklendiğinde burada skorlanır ve size bildirim gelir."}
               </p>
-              <Link href="/app/portfoyler" className="mt-4 rounded-[var(--radius-control)] bg-brand-600 px-4 py-2 text-sm font-semibold text-white">
+              <Link href="/app/portfoyler" className="focus-ring mt-4 inline-flex min-h-9 items-center rounded-[var(--radius-control)] border border-line px-4 text-sm font-semibold text-ink-950 hover:border-brand-300 touch:min-h-11">
                 Portföylere git
               </Link>
             </div>
           ) : (
             <div className="divide-y divide-line">
               {topMatches.map((m) => {
+                const opened = Boolean(m.state?.share_token && matchResult.openedTokens.has(m.state.share_token));
                 return (
-                  <article key={m.property.id} className="flex items-center gap-4 px-5 py-4 transition hover:bg-brand-600/[0.02]">
-                    <Link
-                      href={`/app/portfoyler/${m.property.id}`}
-                      className="relative grid h-16 w-20 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-card)] bg-[image:var(--grad-brand-soft)]"
-                      aria-label={`${m.property.title ?? m.property.property_code} portföyünü aç`}
-                    >
-                      <Suspense fallback={<Building2 className="h-6 w-6 text-brand-600/35" />}>
-                        <MatchCover coverMapP={coverMapP} propertyId={m.property.id} alt={m.property.title ?? m.property.property_code} />
-                      </Suspense>
-                    </Link>
-
-                    <div className="min-w-0 flex-1">
+                  <article key={m.property.id} className={`px-4 py-4 transition hover:bg-brand-600/[0.02] sm:px-5 ${m.hiddenBy ? "bg-canvas/60 opacity-75" : ""}`}>
+                    <div className="flex items-start gap-3 sm:items-center sm:gap-4">
                       <Link
                         href={`/app/portfoyler/${m.property.id}`}
-                        className="block truncate font-display text-base font-bold text-ink-950 hover:text-brand-600"
+                        className="relative grid h-14 w-16 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-card)] bg-[image:var(--grad-brand-soft)] sm:h-16 sm:w-20"
+                        aria-label={`${m.property.title ?? m.property.property_code} portföyünü aç`}
                       >
-                        {m.property.title ?? m.property.property_code}
+                        <Suspense fallback={<Building2 className="h-6 w-6 text-brand-600/35" />}>
+                          <MatchCover coverMapP={coverMapP} propertyId={m.property.id} alt={m.property.title ?? m.property.property_code} />
+                        </Suspense>
                       </Link>
-                      <p className="mt-0.5 text-xs text-text-muted">
-                        {m.property.property_code} · {m.property.transaction_type} · {m.property.property_type}
-                        {m.property.list_price != null ? ` · ${moneyTry(m.property.list_price)}` : ""}
-                      </p>
-                      <div className="mt-1.5 flex flex-wrap gap-1">
-                        {m.reasons.filter((r) => r.ok).slice(0, 4).map((r) => (
-                          <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-semibold text-mint-600">
-                            {r.label}
-                          </span>
-                        ))}
-                        {m.likedByCustomer ? (
-                          <span
-                            className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600"
-                            title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
-                          >
-                            💚 Müşteri beğendi
-                          </span>
-                        ) : null}
-                      </div>
-                    </div>
 
-                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-display text-2xl font-extrabold text-ink-950">{m.score}</span>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          href={`/app/portfoyler/${m.property.id}`}
+                          className="block truncate font-display text-base font-bold text-ink-950 hover:text-brand-600"
+                        >
+                          {m.property.title ?? m.property.property_code}
+                        </Link>
+                        <p className="mt-0.5 truncate text-xs text-text-muted">
+                          {m.property.property_code} · {m.property.transaction_type} · {m.property.property_type}
+                          {m.property.list_price != null ? ` · ${moneyTry(m.property.list_price)}` : ""}
+                        </p>
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {m.reasons.filter((r) => r.ok).slice(0, 4).map((r) => (
+                            <span key={r.label} className="rounded-full bg-mint-500/10 px-2 py-0.5 text-xs font-semibold text-mint-600">
+                              {r.label}
+                            </span>
+                          ))}
+                          {m.likedByCustomer ? (
+                            <span
+                              className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-600"
+                              title="Müşteri portalında bu portföyü beğendi — skora +10 eklendi"
+                            >
+                              💚 Müşteri beğendi
+                            </span>
+                          ) : null}
+                          {m.hiddenBy === "feedback" ? (
+                            <span className="rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-700">Müşteri beğenmedi</span>
+                          ) : null}
+                          <MatchStateBadge state={m.state} nowMs={nowMs} opened={opened} />
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="font-display text-2xl font-extrabold leading-none text-ink-950">{m.score}</span>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${tierCls(m.tier)}`}>
                           {tierLabel(m.tier)}
                         </span>
                       </div>
+                    </div>
+                    {/* Eylemler: her zaman görünür (hover'a bağlı değil); mobilde tam genişlik satır. */}
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 sm:pl-24">
+                      {canMatchAct && m.hiddenBy == null ? <SendMatchButton demandId={demand.id} propertyId={m.property.id} /> : null}
+                      {canMatchAct && m.hiddenBy !== "feedback" ? (
+                        <MatchDismissButton demandId={demand.id} propertyId={m.property.id} dismissed={m.hiddenBy === "dismissed"} />
+                      ) : null}
                       <Link
                         href={`/app/talepler?sekme=eslesme&demand=${demand.id}&property=${m.property.id}`}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
+                        className="focus-ring ml-auto inline-flex min-h-8 items-center gap-1 text-xs font-semibold text-brand-600 hover:underline touch:min-h-11"
                       >
                         Eşleştirmede aç <ArrowUpRight className="h-3.5 w-3.5" />
                       </Link>
@@ -512,6 +504,16 @@ export default async function DemandDetailPage({
             </div>
           )}
         </section>
+
+        {widenSuggestions.length > 0 ? (
+          <WidenCriteriaCard
+            demandId={demand.id}
+            currentCount={visibleCount}
+            suggestions={widenSuggestions}
+            canApply={canEdit}
+          />
+        ) : null}
+        </div>
 
         <div className="space-y-4 lg:row-span-2">
           {/* Mahalle notları (F5): talebin mahallesi için ofis içi saha notları */}

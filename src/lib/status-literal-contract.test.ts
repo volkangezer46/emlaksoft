@@ -31,12 +31,11 @@ const EXEMPT = new Set(["src/lib/workflow-state.ts"]);
 /**
  * Bugünkü kalan kopyalar (dosya başına tavan). Aşağıdakiler bu paketin dosya kapsamı dışındaydı
  * (detay sayfaları, customer-state, properties, anlaşma/sayfa görünümleri); sonraki turlarda
- * sabite bağlanıp buradan düşülür. Toplam: talepDizisi 14, anlasmaKapali 14, anlasmaAcikDizisi 0.
+ * sabite bağlanıp buradan düşülür. Toplam: talepDizisi 12, anlasmaKapali 14, anlasmaAcikDizisi 0.
  */
 const BASELINE: Record<Kind, Record<string, number>> = {
   talepDizisi: {
     "src/app/actions/customer-portal.ts": 1,
-    "src/app/actions/properties.ts": 1,
     "src/app/app/gelen-kutusu/calls-view.tsx": 1,
     "src/app/app/musteriler/[id]/page.tsx": 1,
     "src/app/app/talepler/demands-view.tsx": 1,
@@ -46,7 +45,6 @@ const BASELINE: Record<Kind, Record<string, number>> = {
     "src/lib/customer-state/seller.ts": 1,
     "src/lib/insights/lifecycle-facts.ts": 1,
     "src/lib/insights/revenue-facts.ts": 1,
-    "src/lib/match-notify.ts": 1,
     "src/lib/office-score.ts": 2,
   },
   anlasmaAcikDizisi: {},

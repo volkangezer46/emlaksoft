@@ -3,15 +3,16 @@
  *
  * NEDEN: `page.tsx` tek bir 22 sorguluk `Promise.all` ile açılıyordu. Sorgular
  * paralel olsa da ilk boyama EN YAVAŞINI bekliyordu — ve en yavaşları sayfanın
- * EN ALTINDAKİ iki bölümdü: 100 aktif portföyün `features` JSONB'siyle çekildiği
+ * EN ALTINDAKİ iki bölümdü: aday portföylerin `features` JSONB'siyle çekildiği
  * eşleştirme widget'ı ile anket + sunum sorguları.
  *
  * ÇÖZÜM: bu iki bölüm kendi `<Suspense>` sınırlarına alındı, sorguları da
  * buraya taşındı. Künye ve sekmeler artık onları beklemiyor.
- * Görünüm/davranış aynı: bileşenler ve props'ları değişmedi.
  */
 import { createClient } from "@/lib/supabase/server";
-import { fetchTenantMatchingWeights, type MatchProperty } from "@/lib/matching";
+import type { MatchDemand } from "@/lib/matching";
+import { loadDemandMatches } from "@/lib/match-candidates";
+import { now as clockNow } from "@/lib/clock";
 import { MatchedPropertiesWidget } from "./matched-properties-widget";
 import {
   CustomerSatisfactionSection,
@@ -25,32 +26,46 @@ function Skeleton({ className }: { className: string }) {
 
 export const MatchedSkeleton = () => <Skeleton className="h-56" />;
 
-type ActiveDemand = Parameters<typeof MatchedPropertiesWidget>[0]["demands"];
+type ActiveDemand = { id: string }[];
+
+const DEMAND_MATCH_COLS =
+  "id, transaction_type, property_type, province_id, district_id, neighborhood_id, budget_min, budget_max, rooms, min_sqm, urgency, status, criteria";
 
 /**
- * Portföy öneri widget'ı — aday portföyler + ofise özel eşleştirme ağırlıkları.
- * Sayfanın en pahalı sorgusu (100 satır, `features` JSONB dahil) buradaydı.
+ * Portföy öneri widget'ı — TEK eşleşme okuyucusu (src/lib/match-candidates.ts, CRM-G3): talep detayı ve Eşleşme
+ * sekmesiyle aynı aday sorgusu (il/işlem türüyle daraltılmış, kırpma bayraklı), aynı eşik, müşteri geri bildirimi
+ * (beğenmedi gizlenir, beğendi +10) ve eşleşme durumu ("uygun değil" gizlenir, gönderim rozeti).
+ * Talep satırları burada GERÇEK değerleriyle (ilçe, mahalle, kriterler) yeniden okunur; sayfanın taşıdığı kısa
+ * talep listesinden yalnız kimlikler kullanılır.
  */
 export async function MatchedSection({ demands, customerId }: { demands: ActiveDemand; customerId?: string }) {
+  if (demands.length === 0) return null;
   const supabase = await createClient();
-  const [{ data: propertiesForMatch }, weights] = await Promise.all([
-    supabase
-      .from("properties")
-      .select("id, property_code, title, transaction_type, property_type, status, list_price, province_id, district_id, features")
-      .is("deleted_at", null)
-      .in("status", ["live", "draft", "Yayında"])
-      .order("created_at", { ascending: false })
-      .limit(100),
-    fetchTenantMatchingWeights(supabase),
-  ]);
+  const { data } = await supabase
+    .from("customer_demands")
+    .select(DEMAND_MATCH_COLS)
+    .in("id", demands.map((d) => d.id))
+    .in("status", ["new", "active"]);
+  const rows = ((data ?? []) as unknown as MatchDemand[]).map((d) => ({
+    ...d,
+    budget_min: d.budget_min != null ? Number(d.budget_min) : null,
+    budget_max: d.budget_max != null ? Number(d.budget_max) : null,
+    min_sqm: d.min_sqm != null ? Number(d.min_sqm) : null,
+  }));
+  if (rows.length === 0) return null;
+  const result = await loadDemandMatches(supabase, { demands: rows, customerOf: () => customerId ?? null });
 
-  const properties = (propertiesForMatch ?? []).map((p) => ({
-    ...p,
-    list_price: p.list_price != null ? Number(p.list_price) : null,
-    features: (p.features ?? {}) as MatchProperty["features"],
-  })) as MatchProperty[];
-
-  return <MatchedPropertiesWidget demands={demands} properties={properties} weights={weights} customerId={customerId} />;
+  return (
+    <MatchedPropertiesWidget
+      demandCount={rows.length}
+      pairs={result.pairs}
+      openedTokens={result.openedTokens}
+      hiddenCount={result.hiddenByFeedback + result.hiddenDismissed}
+      truncated={result.truncated}
+      customerId={customerId}
+      nowMs={clockNow()}
+    />
+  );
 }
 
 /**

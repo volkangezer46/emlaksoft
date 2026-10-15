@@ -14,9 +14,10 @@ import { describeMatchBulkPlan, MATCH_BULK_SEND_CAP, MATCH_BULK_SKIP_LABELS, typ
 
 type Summary = BulkMatchCounts & { sent: number; failed: number; stoppedReason: string | null };
 
-function payload(propertyId: string, demandIds: string[]): FormData {
+function payload(propertyId: string, demandIds: string[], includeSent: boolean): FormData {
   const fd = new FormData();
   fd.set("property_id", propertyId);
+  if (includeSent) fd.set("include_sent", "1");
   for (const id of demandIds) fd.append("demand_ids", id);
   return fd;
 }
@@ -26,8 +27,18 @@ function payload(propertyId: string, demandIds: string[]): FormData {
  * mesajını ofisin SMS hesabından gönderir. Önce sunucu önizlemesi (İYS + engel + telefon kontrolü) onay penceresinde sayılarla
  * gösterilir; onayda gönderim sunucuda sırayla ve en fazla MATCH_BULK_SEND_CAP kişiye yapılır, sonuç özeti satır içinde kalır.
  */
-export function BulkSendMatches({ propertyId, demandIds }: { propertyId: string; demandIds: string[] }) {
+export function BulkSendMatches({
+  propertyId,
+  demandIds,
+  sentCount = 0,
+}: {
+  propertyId: string;
+  demandIds: string[];
+  /** Bu portföyün daha önce gönderildiği talep sayısı (varsayılan hariç tutulur). */
+  sentCount?: number;
+}) {
   const [checking, startChecking] = useTransition();
+  const [includeSent, setIncludeSent] = useState(false);
   const [open, setOpen] = useState(false);
   const [preview, setPreview] = useState<(BulkMatchCounts & { smsReady: boolean }) | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -38,7 +49,7 @@ export function BulkSendMatches({ propertyId, demandIds }: { propertyId: string;
   const check = () =>
     startChecking(async () => {
       setSummary(null);
-      const res = await previewBulkMatchSend(payload(propertyId, demandIds));
+      const res = await previewBulkMatchSend(payload(propertyId, demandIds, includeSent));
       if ("error" in res) {
         push(res.error, "err");
         return;
@@ -52,7 +63,7 @@ export function BulkSendMatches({ propertyId, demandIds }: { propertyId: string;
     });
 
   const confirm = async () => {
-    const res = await sendBulkMatchToCustomers(payload(propertyId, demandIds));
+    const res = await sendBulkMatchToCustomers(payload(propertyId, demandIds, includeSent));
     if ("error" in res) return res;
     setSummary(res);
     setPreview(null);
@@ -77,8 +88,19 @@ export function BulkSendMatches({ propertyId, demandIds }: { propertyId: string;
         onClick={check}
         title={`Bu portföyün eşleştiği müşterilere eşleşme mesajını SMS ile gönder (en fazla ${MATCH_BULK_SEND_CAP} kişi)`}
       >
-        Tümüne gönder ({demandIds.length})
+        Tümüne gönder ({includeSent ? demandIds.length : Math.max(0, demandIds.length - sentCount)})
       </Button>
+      {sentCount > 0 ? (
+        <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-xs text-text-muted touch:min-h-11">
+          <input
+            type="checkbox"
+            checked={includeSent}
+            onChange={(e) => setIncludeSent(e.target.checked)}
+            className="h-4 w-4 accent-[var(--brand-600)]"
+          />
+          Daha önce gönderilen {sentCount} müşteriyi de dahil et
+        </label>
+      ) : null}
 
       <ConfirmDialog
         open={open}
