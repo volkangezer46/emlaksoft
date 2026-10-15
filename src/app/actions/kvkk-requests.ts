@@ -13,6 +13,12 @@ import {
   parseDueDays,
 } from "@/lib/compliance/kvkk-requests";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  buildSubjectExport,
+  loadSubjectData,
+  subjectExportHash,
+} from "@/lib/compliance/subject-export";
 
 export type KvkkRequestResult = { ok?: boolean; error?: string; message?: string };
 
@@ -138,4 +144,94 @@ export async function updateKvkkRequestStatus(
   });
   revalidatePath("/app/uyum/talepler");
   return { ok: true, message: "Talep güncellendi." };
+}
+
+const EXPORT_MISSING_TABLE = /kvkk_subject_exports|schema cache|does not exist/i;
+
+/**
+ * Araştırma 7: veri sahibi dökümü — talebe bağlı müşterinin tüm kişisel verisi (kişi kartı, talepler, randevular,
+ * iletişim/mesajlar, çağrılar, teklifler, İYS izinleri + geçmişi, belge listesi, KVKK başvuruları, işlem kaydı)
+ * tek tıkla JSON anlık görüntüsüne alınır, SHA-256 ile mühürlenir, talebe eklenir ve işlem kaydına düşer.
+ * Açık talep "işlemde"ye alınır. Yazdırılabilir görünüm ve JSON indirme `/app/uyum/talepler/[id]/dokum`.
+ */
+export async function generateKvkkSubjectExport(
+  _prev: KvkkRequestResult,
+  formData: FormData,
+): Promise<KvkkRequestResult> {
+  const gate = await requirePermission("compliance", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(formData.get("id") ?? "").trim();
+  if (!UUID_RE.test(id)) return { error: "Geçersiz istek." };
+
+  const supabase = await createClient();
+  const [{ data: request, error: requestError }, { data: office }] = await Promise.all([
+    supabase
+      .from("kvkk_requests")
+      .select("id, request_type, status, customer_id, created_at, due_at")
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
+    supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
+  ]);
+  if (requestError || !request) return { error: "Talep bulunamadı." };
+  if (!request.customer_id) {
+    return { error: "Döküm için talebin bir müşteriye bağlı olması gerekir. Başvuru sahibini müşteri olarak seçip yeni talep açın." };
+  }
+
+  const admin = createAdminClient();
+  const raw = await loadSubjectData(supabase, admin, gate.tenantId, request.customer_id);
+  if (!raw.customer) return { error: "Talebe bağlı müşteri kaydına erişilemedi." };
+
+  const doc = buildSubjectExport(raw, {
+    requestId: request.id,
+    requestType: request.request_type,
+    requestCreatedAt: request.created_at ?? null,
+    dueAt: request.due_at ?? null,
+    officeName: (office as { name?: string | null } | null)?.name ?? null,
+    generatedAt: new Date(now()).toISOString(),
+  });
+  const sha = subjectExportHash(doc);
+
+  // Saklama: ofisin süresi dolmuş dökümleri silinir (kişisel veri gereğinden uzun tutulmaz).
+  await admin.from("kvkk_subject_exports").delete().eq("tenant_id", gate.tenantId).lt("expires_at", new Date(now()).toISOString());
+  const { data: saved, error: saveError } = await admin
+    .from("kvkk_subject_exports")
+    .insert({
+      tenant_id: gate.tenantId,
+      request_id: request.id,
+      customer_id: request.customer_id,
+      generated_by: gate.userId,
+      payload: doc,
+      payload_sha256: sha,
+      item_counts: doc.counts,
+    })
+    .select("id")
+    .single();
+  if (saveError || !saved) {
+    console.error("generateKvkkSubjectExport", saveError?.message);
+    return {
+      error: saveError && EXPORT_MISSING_TABLE.test(saveError.message)
+        ? "Veri dökümü bu ortamda henüz etkin değil."
+        : actionErrorMessage(saveError, "Döküm kaydedilemedi."),
+    };
+  }
+
+  if (request.status === "open") {
+    await supabase
+      .from("kvkk_requests")
+      .update({ status: "in_progress", updated_at: new Date(now()).toISOString() })
+      .eq("id", request.id)
+      .eq("tenant_id", gate.tenantId);
+  }
+
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "kvkk.subject_export_generated",
+    entityType: "kvkk_request",
+    entityId: request.id,
+    newValue: { export_id: saved.id, customer_id: request.customer_id, sha256: sha, counts: doc.counts },
+  });
+  revalidatePath("/app/uyum/talepler");
+  return { ok: true, message: "Veri dökümü hazırlandı ve talebe eklendi." };
 }

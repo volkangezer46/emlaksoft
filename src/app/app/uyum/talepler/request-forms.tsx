@@ -1,16 +1,18 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Plus, RotateCcw, Save } from "lucide-react";
+import { FileSearch, Plus, RotateCcw, Save } from "lucide-react";
+import Link from "@/components/ui/smart-link";
 import {
   createKvkkRequest,
+  generateKvkkSubjectExport,
   updateKvkkRequestStatus,
   type KvkkRequestResult,
 } from "@/app/actions/kvkk-requests";
 import { searchCustomers } from "@/app/actions/lookup";
 import { Alert } from "@/components/ui/alert";
 import { Combobox } from "@/components/ui/combobox";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClass } from "@/components/ui/button";
 import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import {
   DEFAULT_DUE_DAYS,
@@ -126,5 +128,41 @@ export function StatusForm({ id, status, canEdit }: { id: string; status: string
       {finishing ? <FormInput aria-label="Çözüm notu" name="resolution_note" placeholder="Çözüm notu (zorunlu)" maxLength={1000} required /> : null}
       <Result state={state} />
     </form>
+  );
+}
+
+/**
+ * Araştırma 7: tek tıkla veri sahibi dökümü (JSON + yazdırılabilir). Döküm varsa açma bağlantısı ve yenileme düğmesi
+ * birlikte görünür; yenileme yeni bir anlık görüntü ekler (eskisi kanıt olarak kalır, 90 gün sonra silinir).
+ */
+export function SubjectExportForm({
+  id,
+  canEdit,
+  lastExportAt,
+}: {
+  id: string;
+  canEdit: boolean;
+  lastExportAt: string | null;
+}) {
+  const [state, action, pending] = useActionState(generateKvkkSubjectExport, initial);
+  if (!canEdit && !lastExportAt) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {lastExportAt ? (
+        <Link href={`/app/uyum/talepler/${id}/dokum`} className={buttonClass({ variant: "outline", size: "sm" })}>
+          <FileSearch className="h-3.5 w-3.5" aria-hidden="true" /> Dökümü aç
+          <span className="font-normal text-text-muted">· {lastExportAt}</span>
+        </Link>
+      ) : null}
+      {canEdit ? (
+        <form action={action}>
+          <input type="hidden" name="id" value={id} />
+          <Button type="submit" size="sm" variant={lastExportAt ? "ghost" : "outline"} icon={lastExportAt ? RotateCcw : FileSearch} loading={pending}>
+            {lastExportAt ? "Yenile" : "Veri dökümü oluştur"}
+          </Button>
+        </form>
+      ) : null}
+      <Result state={state} />
+    </div>
   );
 }

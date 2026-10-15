@@ -104,7 +104,7 @@ function form(over: Record<string, string> = {}) {
     name: "Ayşe Yılmaz",
     phone: "05321234567",
     email: "ayse@example.com",
-    password: "gizli-sifre-123",
+    password: "Mavi-Kedi-Bodrum-88",
     company: "Yılmaz Gayrimenkul",
     agents: "2-10",
     legal_consent: "accepted",
@@ -267,7 +267,7 @@ describe("signUp — başarılı akış", () => {
     );
     expect(h.attribution).toHaveBeenCalledWith("tenant-1", expect.any(FormData));
     expect(h.deleteUser).not.toHaveBeenCalled();
-    expect(h.signInWithPassword).toHaveBeenCalledWith({ email: "ayse@example.com", password: "gizli-sifre-123" });
+    expect(h.signInWithPassword).toHaveBeenCalledWith({ email: "ayse@example.com", password: "Mavi-Kedi-Bodrum-88" });
     expect(h.loginEvent).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", tenantId: "tenant-1", result: "success" }));
   });
 

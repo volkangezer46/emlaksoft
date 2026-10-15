@@ -215,12 +215,6 @@
   "hamButon": 5,
   "kucukHedef": 0
  },
- "src/app/app/hesabim/two-factor-form.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/app/app/ayarlar/is-akislari/playbooks-manager.tsx": {
   "hamRenk": 0,
   "hamPalet": 2,

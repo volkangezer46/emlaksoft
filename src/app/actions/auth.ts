@@ -26,6 +26,7 @@ import {
 } from "@/lib/two-factor";
 import { hashOtpForStorage } from "@/lib/otp-hmac";
 import type { SignupField } from "@/lib/signup-errors";
+import { passwordPolicyError } from "@/lib/password-policy";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { IDLE_COOKIE } from "@/lib/platform-security/admin-access";
 import { now } from "@/lib/clock";
@@ -34,6 +35,8 @@ import { OFFICE_IP_LOGIN_ERROR, officeLoginIpAllowed } from "@/lib/office-securi
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { afterSafe } from "@/lib/after-safe";
 import { recordLoginAudit } from "@/lib/office-security/new-device";
+import { checkLoginThrottle, clearLoginFailures, recordLoginFailure } from "@/lib/auth/login-throttle";
+import { formatWait, throttleMessage } from "@/lib/auth/login-throttle-core";
 
 export type AuthResult = {
   error?: string;
@@ -71,6 +74,12 @@ export async function signIn(
     await logLoginEvent({ ip, userAgent, result: "failed" });
     return { error: "Çok fazla giriş denemesi yapıldı. Lütfen biraz sonra tekrar deneyin." };
   }
+  // Araştırma 5: hesap + IP kovaları, ilerleyen bekleme (bekleme dolmadan GoTrue'ya gidilmez; hesap kilitlenmez).
+  const throttle = await checkLoginThrottle(email, ip);
+  if (!throttle.allowed) {
+    await logLoginEvent({ ip, userAgent, result: "failed" });
+    return { error: throttleMessage(throttle) };
+  }
   const supabase = await createClient();
   const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email,
@@ -78,9 +87,14 @@ export async function signIn(
   });
 
   if (error) {
-    await logLoginEvent({ ip, userAgent, result: "failed" });
-    return { error: "Giriş başarısız. E-posta veya şifreyi kontrol edin." };
+    const [after] = await Promise.all([recordLoginFailure(email, ip), logLoginEvent({ ip, userAgent, result: "failed" })]);
+    return {
+      error: after.allowed
+        ? "Giriş başarısız. E-posta veya şifreyi kontrol edin."
+        : `Giriş başarısız. E-posta veya şifreyi kontrol edin. Bir sonraki deneme için ${formatWait(after.retryAfterSec)} beklemeniz gerekiyor.`,
+    };
   }
+  afterSafe(() => clearLoginFailures(email, ip), "auth.login-throttle");
 
   const userId = signInData.user?.id ?? null;
   const target = safeNextPath(next);
@@ -97,7 +111,7 @@ export async function signIn(
       await Promise.all([
         admin
           .from("profiles")
-          .select("two_factor_sms, two_factor_version, phone, tenant_id, role, is_active")
+          .select("two_factor_sms, two_factor_method, two_factor_version, phone, tenant_id, role, is_active")
           .eq("id", userId)
           .maybeSingle(),
         admin
@@ -242,7 +256,8 @@ export async function signIn(
     }
 
     if (profile?.is_active && profile.two_factor_sms) {
-      if (!profile.phone) {
+      const totpMethod = profile.two_factor_method === "totp";
+      if (!totpMethod && !profile.phone) {
         await supabase.auth.signOut();
         return {
           error: "İki adımlı doğrulama telefonu bulunamadı. Yöneticinize başvurun.",
@@ -262,6 +277,12 @@ export async function signIn(
           await supabase.auth.signOut();
           return { error: actionErrorMessage(proofClearError, "İki adımlı doğrulama oturumu hazırlanamadı.") };
         }
+      }
+
+      // Araştırma 4: authenticator yönteminde SMS gönderilmez; doğrulama ekranı TOTP / kurtarma kodu ister.
+      if (totpMethod) {
+        await logLoginEvent({ userId, tenantId, ip, userAgent, result: "2fa_pending" });
+        redirect(`/giris/dogrulama?next=${encodeURIComponent(target)}`);
       }
 
       const { allowed } = await checkRateLimit(`2fa-send:${userId}`, {
@@ -397,9 +418,9 @@ export async function signUp(
     if (!fullName) return { error: "Ad soyad zorunlu.", field: "name" };
     if (!email) return { error: "E-posta zorunlu.", field: "email" };
     if (!password) return { error: "Şifre zorunlu.", field: "password" };
-    if (password.length < 8) {
-      return { error: "Şifre en az 8 karakter olmalı.", field: "password" };
-    }
+    // Ortak parola politikası: yaygın/Türkçe zayıf liste, dizi/tekrar, e-posta / ad / ofis adı parolada geçemez.
+    const weak = passwordPolicyError(password, { email, fullName, officeName: company });
+    if (weak) return { error: weak, field: "password" };
   }
   // Cep telefonu iki yolda da zorunlu (güvenlik doğrulaması ve bildirimler); TR cep kuralı aşağıda parsePhoneStrict ile.
   if (!rawPhone) {

@@ -530,6 +530,10 @@ const F = {
   a8DealStageHistory: "20261018080000_deal_stage_history.sql",
   a8TargetsScopeCalls: "20261018080001_targets_scope_calls.sql",
   a8ReportPeriodFunnel: "20261018080002_report_period_funnel.sql",
+  // A9 (2026-10-18): giris kisitlayici (hesap + IP kovalari), ofis authenticator 2FA + kurtarma kodlari, KVKK veri sahibi dokumu.
+  a9AuthLoginThrottle: "20261018090000_auth_login_throttle.sql",
+  a9OfficeTotp: "20261018090100_office_totp_two_factor.sql",
+  a9KvkkSubjectExports: "20261018090200_kvkk_subject_exports.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -823,6 +827,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a7MessageSequences]: "ek", // yeni tablolar (message_sequences/_steps/_enrollments/_step_runs) + RLS; mevcut tablo degismez
     [F.a7InboundMediaBucket]: "ek", // ozel storage kovasi inbound-media (politika eklenmez; yalniz service_role)
     [F.a7SurveyReviewClick]: "ek", // surveys.review_clicked_at nullable sutun + kismi indeks
+    [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
+    [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
+    [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1099,6 +1106,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A7-takip-dizileri", order: 1871, title: "Takip dizileri (drip): message_sequences + adimlar + kayitlar + idempotent adim sonucu (sira serbest, ek; kod tablolar yokken diziler sekmesi kurulum bekliyor gosterir, cron bos doner)", files: [F.a7MessageSequences] },
     { id: "A7-whatsapp-gelen-medya", order: 1872, title: "WhatsApp gelen medya ozel kovasi inbound-media (sira serbest, ek; kod kova yokken medyayi saklamaz, metin ozeti yazar)", files: [F.a7InboundMediaBucket] },
     { id: "A7-anket-google-yorum-izi", order: 1873, title: "surveys.review_clicked_at (sira serbest, ek; kod sutun yokken tiklama izini atlar)", files: [F.a7SurveyReviewClick] },
+    { id: "A9-giris-kisitlayici", order: 1891, title: "Giris sertlestirme: hesap + IP basarisizlik kovalari ve ilerleyen bekleme (auth_login_throttle + peek/fail/clear, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken check_rate_limit sabit penceresine duser; ek)", files: [F.a9AuthLoginThrottle] },
+    { id: "A9-ofis-totp-2fa", order: 1892, title: "Ofis kullanicilari icin authenticator (TOTP) 2FA: profiles.two_factor_method (varsayilan sms) + yontem degisiminde two_factor_version artar + two_factor_recovery_codes (HMAC ozet, tek kullanim) + 2FA oturum kapisi TOTP yonteminde AAL2'yi de kabul eder (20261007001100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod two_factor_method okur; davranis)", files: [F.a9OfficeTotp] },
+    { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1392,6 +1402,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a8TargetsScopeCalls, F.takimTeams],
     [F.a8ReportPeriodFunnel, F.a8DealStageHistory],
     [F.a8ReportPeriodFunnel, F.expenseBudgetsRecurring],
+    // A9: 2FA kapisi govdesi perf turunun plpgsql govdesi uzerine kurulur; dokum tablosu kvkk_requests'e baglanir.
+    [F.a9OfficeTotp, F.perfIndexesRpc],
+    [F.a9KvkkSubjectExports, F.k5Kvkk],
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],

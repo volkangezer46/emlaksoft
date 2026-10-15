@@ -2,6 +2,8 @@ import { KeyRound, ShieldCheck, UserRound, Bell, MonitorSmartphone, LayoutGrid, 
 import { isNetgsmConfigured } from "@/lib/messaging/netgsm";
 import { getTenantNetgsmConfig } from "@/lib/messaging/tenant-providers";
 import { TwoFactorForm } from "./two-factor-form";
+import { unusedRecoveryCodeCount } from "./two-factor-actions";
+import { readOfficeSecurityPolicyCached } from "@/lib/office-security/policy-cache";
 import { trDayKey, now as nowMs } from "@/lib/clock";
 import { KasamTab } from "./kasam-tab";
 import { PageHeader } from "@/components/ui/page-header";
@@ -64,7 +66,7 @@ export default async function AccountPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, phone, title, two_factor_sms")
+    .select("full_name, phone, title, two_factor_sms, two_factor_method")
     .eq("id", auth.userId)
     .maybeSingle();
 
@@ -87,6 +89,16 @@ export default async function AccountPage({
     active === "guvenlik"
       ? (auth.tenantId ? (await getTenantNetgsmConfig(auth.tenantId)) !== null : false) || (await isNetgsmConfigured())
       : false;
+  // 2FA yöntemi + kurtarma kodu sayısı + ofis politikası zorunluluğu (yalnız Güvenlik sekmesinde okunur).
+  const twoFactorMethod: "sms" | "totp" = profile?.two_factor_method === "totp" ? "totp" : "sms";
+  const [recoveryLeft, officePolicy] =
+    active === "guvenlik"
+      ? await Promise.all([
+          profile?.two_factor_sms && twoFactorMethod === "totp" ? unusedRecoveryCodeCount() : Promise.resolve(0),
+          auth.tenantId ? readOfficeSecurityPolicyCached(auth.tenantId) : Promise.resolve(null),
+        ])
+      : [0, null];
+  const twoFactorRequired = Boolean(officePolicy && auth.role && officePolicy.mfaRoles.includes(auth.role));
   // Google bağlama dönüşü (/auth/callback?akis=link → ?google=baglandi | hata kodu).
   const googleEnabled = isGoogleAuthEnabled();
   const googleParam = typeof sp.google === "string" ? sp.google : null;
@@ -205,12 +217,19 @@ export default async function AccountPage({
           <Card>
             <CardHeader>
               <div>
-                <CardTitle>İki adımlı doğrulama (SMS)</CardTitle>
-                <CardDescription>Açıkken her girişte telefonunuza gönderilen 6 haneli kod istenir.</CardDescription>
+                <CardTitle>İki adımlı doğrulama</CardTitle>
+                <CardDescription>Parolanıza ek olarak her girişte authenticator uygulamasındaki ya da SMS ile gelen 6 haneli kod istenir.</CardDescription>
               </div>
             </CardHeader>
             <CardContent>
-              <TwoFactorForm enabled={Boolean(profile?.two_factor_sms)} phone={profile?.phone ?? null} smsConfigured={smsConfigured} />
+              <TwoFactorForm
+                enabled={Boolean(profile?.two_factor_sms)}
+                method={twoFactorMethod}
+                phone={profile?.phone ?? null}
+                smsConfigured={smsConfigured}
+                recoveryLeft={recoveryLeft}
+                required={twoFactorRequired}
+              />
             </CardContent>
           </Card>
           <Card>

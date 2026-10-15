@@ -9,13 +9,14 @@ import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { now } from "@/lib/clock";
 import {
+  KVKK_CUSTOMER_TYPES,
   KVKK_REQUEST_LABELS,
   KVKK_STATUS_LABELS,
   daysLeft,
   isKvkkStatus,
   type KvkkRequestType,
 } from "@/lib/compliance/kvkk-requests";
-import { NewRequestForm, StatusForm } from "./request-forms";
+import { NewRequestForm, StatusForm, SubjectExportForm } from "./request-forms";
 
 export const metadata = { title: "KVKK talepleri" };
 
@@ -44,7 +45,7 @@ export default async function KvkkRequestsPage({
   const canEdit = (perms.compliance ?? []).includes("edit");
   const supabase = await createClient();
 
-  const [reqRes] = await Promise.all([
+  const [reqRes, exportRes] = await Promise.all([
     supabase
       .from("kvkk_requests")
       .select(
@@ -52,7 +53,18 @@ export default async function KvkkRequestsPage({
       )
       .order("created_at", { ascending: false })
       .limit(200),
+    // Veri sahibi dökümleri (yalnız tarih; içerik döküm sayfasında okunur). Tablo yoksa sessizce boş.
+    supabase
+      .from("kvkk_subject_exports")
+      .select("request_id, generated_at")
+      .order("generated_at", { ascending: false })
+      .limit(500),
   ]);
+  const lastExport = new Map<string, string>();
+  for (const e of (exportRes.data ?? []) as { request_id: string; generated_at: string }[]) {
+    if (!lastExport.has(e.request_id)) lastExport.set(e.request_id, e.generated_at);
+  }
+  const shortDate = new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" });
 
   const supported = !reqRes.error;
   const all = (reqRes.data ?? []) as unknown as Row[];
@@ -70,7 +82,7 @@ export default async function KvkkRequestsPage({
         title="KVKK talepleri"
         eyebrow="Veri sahibi başvuruları"
         icon={<ClipboardList className="h-6 w-6" />}
-        description="Erişim, taşınabilirlik, düzeltme, itiraz ve silme taleplerini; ofis hesabı kapatma ve veri indirme taleplerini süresiyle kaydedin."
+        description="Erişim, taşınabilirlik, düzeltme, itiraz ve silme taleplerini süresiyle kaydedin; müşteriye bağlı talepte tek tıkla kişisel veri dökümü (yazdırılabilir + JSON) hazırlayın."
         className="mb-0"
       />
 
@@ -150,6 +162,15 @@ export default async function KvkkRequestsPage({
                           </p>
                           {r.note ? <p className="mt-1 text-xs text-text-muted">{r.note}</p> : null}
                           {r.resolution_note ? <p className="mt-1 text-xs text-text">Çözüm: {r.resolution_note}</p> : null}
+                          {cust && KVKK_CUSTOMER_TYPES.includes(r.request_type) ? (
+                            <div className="mt-2">
+                              <SubjectExportForm
+                                id={r.id}
+                                canEdit={canEdit && active}
+                                lastExportAt={lastExport.has(r.id) ? shortDate.format(new Date(lastExport.get(r.id)!)) : null}
+                              />
+                            </div>
+                          ) : null}
                         </div>
                         <p className={`text-xs font-semibold ${active && left < 0 ? "text-danger-600" : "text-text-muted"}`}>
                           {active
