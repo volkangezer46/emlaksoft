@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { pctPossessive } from "@/lib/tr-suffix";
 import { AlarmClock, BadgeCheck, Handshake, Hourglass, ListChecks, PhoneIncoming, Target, Timer, UserPlus, Wallet } from "lucide-react";
 import { bucketCountFor, bucketDates } from "@/components/ui/premium";
 import { KpiCard, KpiCardSkeleton } from "@/components/ui/kpi-card";
@@ -167,7 +168,7 @@ async function buildMetric(key: MetricKey, ctx: HomeCtx): Promise<MetricSpec | n
         value: isPending ? c.pending : c.paid,
         format: "money",
         tone: isPending ? "gold" : "success",
-        context: isPending ? `6 ay tahakkuk ${moneyTry(accrued)}` : `Tahakkukun %${accrued > 0 ? Math.round((c.paid / accrued) * 100) : 0}'i`,
+        context: isPending ? `6 ay tahakkuk ${moneyTry(accrued)}` : `Tahakkukun ${pctPossessive(accrued > 0 ? Math.round((c.paid / accrued) * 100) : 0)}`,
         href: isPending ? "/app/komisyon?durum=bekleyen" : "/app/komisyon?durum=tahsil",
         series: c.monthTotals,
         seriesLabel: "Son 6 ay komisyon tahakkuku",

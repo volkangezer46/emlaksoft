@@ -8,6 +8,7 @@ import { loadTaskSummary, type HomeCtx } from "./data";
 import { formatTrTime } from "@/lib/clock";
 import { taskHref } from "@/lib/notification-text";
 import { PanelLink } from "./ortak";
+import { taskEmptyAction } from "./siradaki";
 
 export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
   const summary = await loadTaskSummary(ctx);
@@ -53,8 +54,8 @@ export async function Gorevler({ ctx }: { ctx: HomeCtx }) {
             illustration="gorev"
             tone="mint"
             title="Bugün için açık görev yok"
-            description="Yeni görev ekleyerek günü planlayın."
-            action={{ href: "/app/gorevler", label: "Görev ekle" }}
+            description={taskEmptyAction(ctx.perms) ? "Yeni görev ekleyerek günü planlayın." : "Size atanan görevler burada görünür."}
+            action={taskEmptyAction(ctx.perms) ?? undefined}
           />
         ) : (
         <ul className="mt-4 space-y-2.5">

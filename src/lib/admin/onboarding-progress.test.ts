@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_ONBOARDING_CONTENT, parseOnboardingContent } from "@/lib/onboarding-content";
-import { ONBOARDING_STEP_IDS } from "@/lib/onboarding-steps";
+import { ONBOARDING_STEP_IDS, getOnboardingStepDef } from "@/lib/onboarding-steps";
 import { PROGRESS_DONE_FILTER, buildOfficeProgress, filterProgress, stuckSummary, type OnboardingFactsRow } from "./onboarding-progress";
 
 const base = (id: string, extra: Partial<OnboardingFactsRow> = {}): OnboardingFactsRow => ({
@@ -46,7 +46,8 @@ const allDone: Partial<OnboardingFactsRow> = {
 describe("ofis bazında kurulum ilerlemesi (SN5)", () => {
   it("olgulardan sihirbazla aynı kurallarla ilerleme ve takılan adım çıkar", () => {
     const empty = buildOfficeProgress(base("a"), EMPTY_ONBOARDING_CONTENT);
-    expect(empty.total).toBe(ONBOARDING_STEP_IDS.length);
+    // İsteğe bağlı adımlar (paket, mülk yönetimi, Bakanlık e-postası) sayaca katılmaz.
+    expect(empty.total).toBe(ONBOARDING_STEP_IDS.filter((id) => !getOnboardingStepDef(id)?.optional).length);
     expect(empty.doneCount).toBe(0);
     expect(empty.stuckId).toBe("office");
 

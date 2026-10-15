@@ -4,6 +4,7 @@ import {
   buildOnboarding,
   resolveWizardStep,
   scopeOnboardingToPermissions,
+  splitOptional,
   visibleFirstTasks,
   wizardNeighbors,
   type OnboardingFacts,
@@ -54,7 +55,8 @@ describe("onboarding-checklist", () => {
     const s = buildOnboarding(empty);
     expect(s.percent).toBe(0);
     expect(s.nextId).toBe("office");
-    expect(s.total).toBe(10);
+    // 10 adımın 3'ü isteğe bağlı (eids-eposta, mulk-yonetimi, plan): sayaca katılmaz.
+    expect(s.total).toBe(7);
     expect(s.complete).toBe(false);
     expect(s.settled).toBe(false);
   });
@@ -75,8 +77,26 @@ describe("onboarding-checklist", () => {
   it("yüzde ve sonraki adım gerçek veriden hesaplanır", () => {
     const s = buildOnboarding({ ...empty, officeLocationDone: true, youDone: true, poolEnabled: true, poolAdvisorRecords: 1 });
     expect(s.doneCount).toBe(3);
-    expect(s.percent).toBe(30);
+    expect(s.percent).toBe(43);
     expect(s.nextId).toBe("yetki-belgesi");
+  });
+
+  it("isteğe bağlı adımlar yüzdeye, sayaca ve 'tamam' kararına katılmaz", () => {
+    const optional = buildOnboarding(empty).steps.filter((s) => s.optional).map((s) => s.id);
+    expect(optional).toEqual(["eids-eposta", "mulk-yonetimi", "plan"]);
+    const s = buildOnboarding({
+      ...full,
+      planPaid: false,
+      extra: { "giderler-kasa": true, "yetki-belgesi": true },
+    });
+    // Paket ödenmemiş, mülk yönetimi ve e-posta cevapsız: zorunlular tamam → kurulum tamam (%100).
+    expect(s.complete).toBe(true);
+    expect(s.percent).toBe(100);
+    expect(s.settled).toBe(true);
+    expect(s.nextId).toBeNull();
+    const parts = splitOptional(s.steps);
+    expect(parts.required.length).toBe(7);
+    expect(parts.optional.map((x) => x.id)).toEqual(optional);
   });
 
   it("atlanan adım sonraki adım seçilmez ama tamamlanmış sayılmaz", () => {
@@ -145,12 +165,19 @@ describe("giderler-kasa adımı", () => {
 });
 
 describe("ilk işler kontrol listesi (sihirbaz adımı değil)", () => {
-  it("beş iş gerçek sayımdan tamamlanır", () => {
+  it("işler gerçek sayımdan tamamlanır ve her biri götürdüğü sayfanın oluşturma iznini taşır", () => {
     const none = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
-    expect(none.map((t) => t.id)).toEqual(["data", "property", "demand", "appointment", "defs"]);
-    expect(none.every((t) => !t.done && t.href.startsWith("/app/"))).toBe(true);
-    const some = buildFirstTasks({ customers: 3, properties: 0, demands: 1, appointments: 0, customDefinitions: 2 });
-    expect(some.filter((t) => t.done).map((t) => t.id)).toEqual(["data", "demand", "defs"]);
+    expect(none.map((t) => t.id)).toEqual(["data", "property", "demand", "appointment", "defs", "expense", "commission"]);
+    expect(none.every((t) => !t.done && t.href.startsWith("/app/") && t.requires)).toBe(true);
+    const some = buildFirstTasks({ customers: 3, properties: 0, demands: 1, appointments: 0, customDefinitions: 2, officeCash: true });
+    expect(some.filter((t) => t.done).map((t) => t.id)).toEqual(["data", "demand", "defs", "expense"]);
+  });
+
+  it("muhasebe yalnız kendi ilk işlerini, danışman yalnız satış işlerini görür", () => {
+    const tasks = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
+    expect(visibleFirstTasks(tasks, { ...DEFAULT_MATRIX.accounting }).map((t) => t.id)).toEqual(["expense", "commission"]);
+    expect(visibleFirstTasks(tasks, { ...DEFAULT_MATRIX.advisor }).map((t) => t.id)).toEqual(["data", "property", "demand", "appointment"]);
+    expect(visibleFirstTasks(tasks, { ...DEFAULT_MATRIX.readonly })).toEqual([]);
   });
 });
 

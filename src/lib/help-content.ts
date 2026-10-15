@@ -210,7 +210,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Müşteri nasıl eklenir?",
     intro: "Müşteri kaydı talep, randevu ve anlaşmanın başlangıcıdır.",
     steps: [
-      "Soldaki menüden Müşteriler sayfasını açın.",
+      "Menüden Müşteriler'i açın.",
       "Sağ üstteki \"Yeni müşteri\" düğmesine basın.",
       "Kişi sekmesinde ad soyadı ve telefonu yazın. Zorunlu olan tek alan ad soyaddır; telefonsuz kayıtta onay istenir.",
       "İsterseniz e-posta ve ilçeyi \"E-posta ve bölge\" sekmesine yazın.",
@@ -239,7 +239,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Randevu nasıl planlanır?",
     intro: "Yer gösterme veya görüşme randevusunu takvime yazın.",
     steps: [
-      "Soldaki menüden Randevular sayfasını açın.",
+      "Menüdeki Bugün grubundan Randevular'ı açın.",
       "\"Yeni randevu\" ile formu açın (müşteri kartından \"Randevu ver\" derseniz müşteri hazır gelir).",
       "Randevu türünü, tarihi ve saati seçin. Bu üçü zorunludur.",
       "İsterseniz müşteriyi, portföyü ve buluşma yerini ekleyin.",
@@ -253,7 +253,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Teklif nasıl kaydedilir?",
     intro: "Bir portföye gelen teklifi kayıt altına alın, kabul edilince anlaşmaya çevirin.",
     steps: [
-      "Soldaki menüden Teklifler sayfasını açın (paketinizde varsa).",
+      "Anlaşmalar merkezindeki Teklifler sekmesini açın (paketinizde varsa).",
       "\"Yeni teklif\" düğmesine basın.",
       "Portföyü seçin ve teklif tutarını yazın. Bu ikisi zorunludur.",
       "İsterseniz müşteriyi, geçerlilik tarihini ve notu ekleyin.",
@@ -296,7 +296,7 @@ export const GUIDES: readonly Guide[] = [
     title: "İlk gün kurulum",
     intro: "Ofisinizi yarım saatte çalışır hale getirmek için sırayla şunları yapın.",
     steps: [
-      "Soldaki menüden Ofis kurulumu sayfasını açın. İlerleme çubuğu gerçek kayıtlarınızdan hesaplanır.",
+      "Ana ekrandaki Başlangıç kartından Kurulum'u açın. İlerleme çubuğu gerçek kayıtlarınızdan hesaplanır.",
       "Ofis bilgileri: ad, telefon ve şehri yazın (en az ikisi dolu olunca adım tamamlanır).",
       "Ekip: danışmanlarınızı davet edin (ayrıntı için \"Ekibe danışman ekleme\" rehberine bakın).",
       "Veriler: mevcut listenizi içe aktarın ya da ilk müşterinizi elle ekleyin. Önce denemek isterseniz örnek veri yükleyip sonra tek tuşla silebilirsiniz.",
@@ -312,7 +312,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Portföy ekleme ve neden taslak kalır?",
     intro: "Portföy kaydı her zaman açılır; ancak ilan sahibi bilgileri eksikse ilan yayına alınamaz ve taslak kalır.",
     steps: [
-      "Soldaki menüden Portföyler sayfasını açın ve yeni portföy formunu başlatın. Başlık, fiyat ve konum ile kaydı açabilirsiniz.",
+      "Menüden Portföyler'i açın ve yeni portföy formunu başlatın. Başlık, fiyat ve konum ile kaydı açabilirsiniz.",
       "İlanın yayına alınabilmesi için sekiz zorunlu bilgi gerekir: ilan sahibi, sahibin telefonu, ilişki türü (malik/vekil/mirasçı/kurum), tapu durumu, yetki sözleşmesi türü, yetki başlangıç ve bitiş tarihleri, ilan kaynağı, KVKK / iletişim onayı.",
       "Yetki tarihleri yalnız \"özel yetki\" ve \"süreli yetki\" türlerinde zorunludur; bitiş tarihi başlangıçtan önce olamaz.",
       "Minimum satış fiyatı ile müşteri notu zorunlu değildir; yalnız ilan sahibi puanını yükseltir.",
@@ -341,7 +341,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Ekibe danışman ekleme",
     intro: "Danışmanı iki yoldan biriyle davet edersiniz; koltuk limitiniz dolduysa önce koltuk eklenir.",
     steps: [
-      "Soldaki menüden Ekip sayfasını açın ve yeni danışman formuna gidin (Ofis kurulumunda en fazla 3 kişiyi hızlıca da davet edebilirsiniz).",
+      "Menüden Ekibim'i açın ve yeni danışman formuna gidin (Kurulum'da en fazla 3 kişiyi hızlıca da davet edebilirsiniz).",
       "Ad soyad, e-posta ve rolü girin.",
       "Hesap teslimi bölümünde iki mod vardır. E-posta daveti: danışmana parola belirleme bağlantısı gider, parolayı siz görmezsiniz. Geçici parola üret: parola kayıttan sonra size bir kez gösterilir, siz iletirsiniz.",
       "Davet e-postası ulaşmadıysa ya da danışman hiç giriş yapmadıysa Ekip listesinde \"Daveti yinele\" ile erişim bağlantısını yeniden gönderin.",
@@ -423,7 +423,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Komisyon defteri",
     intro: "Kazanılan her anlaşmanın komisyonu, payları ve tahsilat durumu Komisyon sayfasında durur.",
     steps: [
-      "Soldaki menüden Komisyon sayfasını açın; Kazanç ve Onaylar sekmeleri yanındadır.",
+      "Menüden Komisyon'u (danışmanda Komisyonum) açın; Kazanç ve Onaylar sekmeleri yanındadır.",
       "Her satır bir anlaşmadır: toplam komisyon, danışman payı, ofis payı ve tahsilat durumu görünür.",
       "Tahsilat geldikçe işaretleyin; birden çok satırı toplu tahsil edebilirsiniz.",
       "Payı değiştirmek için pay düzenleyiciyi kullanın. Komisyon elle yazılmaz.",
@@ -517,7 +517,7 @@ export const GUIDES: readonly Guide[] = [
     title: "Davet et ve kazan",
     intro: "Başka bir ofisi davet edin; koşullar sağlanınca hesap krediniz yüklenir.",
     steps: [
-      "Soldaki menüden Davet et ve kazan sayfasını açın ve davet bağlantınızı paylaşın.",
+      "Menünün alt kısmındaki Araçlar'dan Davet et ve kazan sayfasını açın ve davet bağlantınızı paylaşın.",
       "Ödül; davet ettiğiniz ofis ilk gerçek ödemesini yaptıktan, bir kez yenileyip aboneliği aktif kaldıktan ve bekleme süresi dolduktan sonra yüklenir. Deneme veya kayıt tek başına ödül vermez.",
       "İade, iptal veya ters ibrazda ödül geri alınır.",
       "Ödül kuralı sayfada güncel olarak yazılıdır; tanımlı kural yoksa sayfa yalnız davetlerinizi izler.",

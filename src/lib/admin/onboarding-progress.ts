@@ -99,7 +99,8 @@ export function officeOnboardingFacts(r: OnboardingFactsRow): OnboardingFacts {
 export function buildOfficeProgress(r: OnboardingFactsRow, content: OnboardingContent): OfficeProgress {
   const defs = resolveChecklistDefs(content, { plan: r.plan ?? null });
   const state: OnboardingState = buildOnboarding(officeOnboardingFacts(r), [], defs);
-  const stuck = state.steps.find((s) => !s.done) ?? null;
+  // Takılan adım yalnız ZORUNLU adımlardan (isteğe bağlı adım ofisi "takılmış" göstermez; sayaçla aynı kural).
+  const stuck = state.steps.find((s) => !s.done && !s.optional) ?? null;
   return {
     tenantId: r.tenant_id,
     name: r.tenant_name,

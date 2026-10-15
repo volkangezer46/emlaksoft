@@ -23,6 +23,7 @@ import {
   type TenantSessionSummary,
   type TenantPersistedMessage,
 } from "@/app/actions/ai-tenant-advisor";
+import Link from "@/components/ui/smart-link";
 import { msSince } from "@/lib/clock";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AdvisorActionCards } from "./action-cards";
@@ -37,7 +38,10 @@ const SUGGESTIONS = [
   "Fiyatı yüksek portföylerim hangileri?",
 ];
 
-/** Basit biçimlendirme: **kalın**, _italik_ ve /app/... derin linkleri tıklanabilir. */
+/**
+ * Basit biçimlendirme: **kalın**, _italik_, `[etiket](/app/...)` ve çıplak /app/... derin bağlantıları uygulama içi
+ * bağlantı (Link) olarak çizilir: tam sayfa yeniden yükleme yok, bağlantı adıyla görünür.
+ */
 function renderContent(text: string, streaming = false) {
   const lines = text.split("\n");
   return lines.map((line, i) => {
@@ -52,14 +56,18 @@ function renderContent(text: string, streaming = false) {
         <span key={i} className="block h-2" />
       );
     }
-    const parts = line.split(/(\*\*[^*]+\*\*|\/app\/[^\s).,;]+)/g);
+    const parts = line.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(\/app\/[^)\s]*\)|\/app\/[^\s).,;]+)/g);
     return (
       <p key={i} className="leading-relaxed">
         {parts.map((p, j) =>
           p.startsWith("**") && p.endsWith("**") ? (
             <strong key={j} className="font-semibold text-ink-950">{p.slice(2, -2)}</strong>
+          ) : /^\[[^\]]+\]\(\/app\//.test(p) ? (
+            <Link key={j} href={p.slice(p.indexOf("](") + 2, -1)} className="font-semibold text-brand-600 hover:underline">
+              {p.slice(1, p.indexOf("]("))}
+            </Link>
           ) : p.startsWith("/app/") ? (
-            <a key={j} href={p} className="font-semibold text-brand-600 hover:underline">{p}</a>
+            <Link key={j} href={p} className="font-semibold text-brand-600 hover:underline">{p}</Link>
           ) : p.startsWith("_") && p.endsWith("_") ? (
             <em key={j} className="text-text-faint">{p.slice(1, -1)}</em>
           ) : (

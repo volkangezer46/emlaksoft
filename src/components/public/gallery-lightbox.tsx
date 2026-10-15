@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useCallback, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Expand, X } from "lucide-react";
+import { withAccusative } from "@/lib/tr-suffix";
 import {
   Dialog,
   DialogDescription,
@@ -120,7 +121,7 @@ export function GalleryLightbox({
               key={img.id}
               type="button"
               onClick={() => setIndex(i)}
-              aria-label={`Fotoğraf ${i + 1}'i göster`}
+              aria-label={`Fotoğraf ${withAccusative(i + 1)} göster`}
               aria-current={i === index}
               className={`relative aspect-square w-full overflow-hidden rounded-[var(--radius-control)] transition ${
                 i === index ? "ring-2 ring-brand-500" : "opacity-75 hover:opacity-100"

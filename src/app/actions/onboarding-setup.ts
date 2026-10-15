@@ -13,7 +13,10 @@ import { resolveOfficeGeo } from "@/lib/geo/resolve";
 import { isOnboardingStepId } from "@/lib/onboarding-steps";
 import { getOfficeTemplate, isOfficeTemplateKey } from "@/lib/onboarding-templates";
 import { normalizeLicenseNo } from "@/lib/license";
+import { markUiState } from "@/app/actions/ui-state";
+import { readOwnUiState } from "@/lib/ui-state-server";
 import {
+  nextSkipUiKey,
   parseSkipped,
   serializeSkipped,
   setupSkipCookieName,
@@ -97,8 +100,8 @@ export async function saveOfficeProfile(formData: FormData): Promise<OnboardingS
 }
 
 /**
- * "Sonra yaparım" tercihi — kullanıcıya özel çerez; veri/şema değişmez. Atlanan adım
- * tamamlanmış sayılmaz, yalnız "sıradaki" önerisinden ve ana ekran şeridinden çıkar.
+ * "Sonra yaparım" tercihi — KALICI kaynak kullanıcı profili (`ui_state`, `markUiState`; başka cihazda da hatırlanır),
+ * çerez yalnız eski kayıt/yedek. Atlanan adım tamamlanmış sayılmaz, yalnız "sıradaki" önerisinden ve ana ekran şeridinden çıkar.
  */
 export async function setSetupStepSkipped(stepId: string, skip: boolean): Promise<OnboardingSetupResult> {
   const gate = await requirePermission("dashboard", "view");
@@ -106,7 +109,11 @@ export async function setSetupStepSkipped(stepId: string, skip: boolean): Promis
   if (!isOnboardingStepId(stepId)) return { error: "Geçersiz adım." };
   const jar = await cookies();
   const name = setupSkipCookieName(gate.userId);
-  const next = toggleSkipped(parseSkipped(jar.get(name)?.value), stepId, skip);
+  const cookieSkipped = parseSkipped(jar.get(name)?.value);
+  const key = nextSkipUiKey(await readOwnUiState(gate.userId), stepId, skip, cookieSkipped);
+  // Profil yazılamazsa (destek oturumu / sütun yok) çerez bu cihazda yine geçerli kalır.
+  if (key) await markUiState(key).catch(() => ({ ok: false }));
+  const next = toggleSkipped(cookieSkipped, stepId, skip);
   jar.set(name, serializeSkipped(next), {
     path: "/app",
     maxAge: SETUP_COOKIE_MAX_AGE,

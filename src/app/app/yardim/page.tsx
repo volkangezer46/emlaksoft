@@ -13,6 +13,9 @@ import { boardEnabledFor } from "@/lib/product-feedback/store";
 import { RestartTourButton, TourPicker } from "./restart-tour-button";
 import { loadOnboardingContent } from "@/lib/onboarding-content-read";
 import { resolveTours } from "@/lib/onboarding-content";
+import { listableTours } from "@/lib/product-tour-data";
+import { getClosedFeatures } from "@/lib/modules/state";
+import type { AppAction, AppModule } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { FaqSearch, GuidesSearch } from "./help-search";
 import { FeatureBoardTab } from "./feature-board";
@@ -65,7 +68,7 @@ export default async function HelpPage({ searchParams }: { searchParams?: Promis
         ))}
       </nav>
 
-      {tab === "baslangic" ? <TourPickerSection tenantId={tenantId} role={role} /> : null}
+      {tab === "baslangic" ? <TourPickerSection tenantId={tenantId} role={role} perms={perms} /> : null}
       {tab === "baslangic" ? <StartTab tenantId={tenantId} perms={perms} /> : null}
       {tab === "rehberler" ? <GuidesSearch initialQ={q} guides={help.guides} /> : null}
       {tab === "sss" ? <FaqSearch initialQ={q} faq={help.faq} /> : null}
@@ -171,12 +174,12 @@ function GlossaryTab({ glossary }: { glossary: readonly GlossaryEntry[] }) {
 
 /** Tur kartları: adminden düzenlenen ad/açıklama (Ofisler > Kurulum > İçerik); okunamazsa koddaki varsayılan. */
 /**
- * Tur kartları, turun açılacağı bağlamla (rol + paket) aynı süzgeçten geçer: adminden tüm adımları kapatılan ya da bu
- * kullanıcının rolü/paketi için boş kalan turun kartı gösterilmez (tıklanınca hiçbir şey olmayan çıkmaz kart olmasın).
+ * Tur kartları, turun açılacağı bağlamla (rol + paket + yetki + kapalı modüller) aynı süzgeçten geçer: erişilebilir adımı
+ * 3'ten az kalan turun kartı gösterilmez (tıklanınca hiçbir şey olmayan çıkmaz kart olmasın). Rolün kendi turu ilk sıradadır.
  */
-async function TourPickerSection({ tenantId, role }: { tenantId: string | null; role: string }) {
+async function TourPickerSection({ tenantId, role, perms }: { tenantId: string | null; role: string; perms: EffectivePermissions }) {
   const supabase = await createClient();
-  const [content, planRow] = await Promise.all([
+  const [content, planRow, closed] = await Promise.all([
     loadOnboardingContent(),
     tenantId
       ? supabase
@@ -186,10 +189,15 @@ async function TourPickerSection({ tenantId, role }: { tenantId: string | null; 
           .maybeSingle()
           .then((r) => r.data as { plan?: string | null } | null, () => null)
       : Promise.resolve(null),
+    getClosedFeatures(tenantId).catch(() => [] as string[]),
   ]);
-  const tours = resolveTours(content, { role, plan: planRow?.plan ?? null })
-    .filter((t) => t.steps.length > 0)
-    .map((t) => ({ id: t.id, label: t.label, description: t.description }));
+  const accessible = (Object.keys(perms) as AppModule[]).filter((m) => effectiveHasPermission(perms, m, "view"));
+  const ctx = { accessible, closed, role, can: (m: AppModule, a: AppAction) => effectiveHasPermission(perms, m, a) };
+  const tours = listableTours(ctx, resolveTours(content, { role, plan: planRow?.plan ?? null })).map((t) => ({
+    id: t.id,
+    label: t.label,
+    description: t.description,
+  }));
   if (tours.length === 0) return null;
   return <TourPicker tours={tours} />;
 }

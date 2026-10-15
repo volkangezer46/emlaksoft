@@ -31,7 +31,8 @@ import { evaluatePlanChange } from "@/lib/billing/plan-change-core";
 import { evaluatePause } from "@/lib/billing/pause-core";
 import { getPauseMaxDays, isPauseEnabled, isPlanChangeEnabled, loadPaidCapNetTry, loadPlanChangeState } from "@/lib/billing/plan-change";
 import { getPlanSupport } from "@/lib/billing/plan-support";
-import { isIyzicoConfigured } from "@/lib/billing/iyzico";
+import { onlinePaymentMode, PAYMENT_OFF_TEXT, PAYMENT_SUPPORT_HREF } from "@/lib/billing/payment-mode";
+import { pctPossessive } from "@/lib/tr-suffix";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { CheckoutButton } from "./checkout-button";
 import { PlanAdvisor } from "./plan-advisor";
@@ -88,7 +89,10 @@ export default async function BillingPage({
   const active = resolveTab(sp, ABONELIK_TAB_IDS, "plan");
   const cycle = (sp.cycle === "yearly" ? "yearly" : "monthly") as BillingCycle;
   const supabase = await createClient();
-  const configured = isIyzicoConfigured();
+  // Tek bayrak: bağlı (live) / demo açık / ikisi de kapalı (off). Kapalıyken satın alma düğmesi ve demo vaadi yok.
+  const paymentMode = onlinePaymentMode();
+  const configured = paymentMode === "live";
+  const paymentOff = paymentMode === "off";
 
   const user = await getRequestUser();
   const tenantId = user?.app_metadata?.tenant_id as string | undefined;
@@ -330,9 +334,11 @@ export default async function BillingPage({
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik & iyzico" description={<>{configured
+      <PageHeader title="Paket ve ödeme" eyebrow="Abonelik" description={<>{configured
                 ? "Ödeme altyapısı (iyzico) bağlı. Ödeme sonrası aboneliğiniz otomatik başlar."
-                : "Ödeme altyapısı henüz bağlı değil; paket yükseltmeyi deneme amaçlı demo ödemeyle görebilirsiniz."} <HelpTip topic="paket-kota" /></>} />
+                : paymentOff
+                  ? <>{PAYMENT_OFF_TEXT}{" "}<Link href={PAYMENT_SUPPORT_HREF} className="font-semibold text-accent-text hover:underline">Destek talebi aç</Link></>
+                  : "Ödeme altyapısı henüz bağlı değil; bu ortamda paket yükseltmeyi demo ödemeyle deneyebilirsiniz."} <HelpTip topic="paket-kota" /></>} />
 
       <section className="theme-dark grid gap-3 rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-3 sm:p-4">
 <div className="rounded-[var(--radius-card)] border border-white/10 bg-white/5 px-5 py-4 backdrop-blur">
@@ -508,7 +514,7 @@ export default async function BillingPage({
                       />
                     </div>
                     <p className={`mt-1 text-xs font-semibold ${doluluk >= 100 ? "text-danger-strong" : "text-text-muted"}`}>
-                      {doluluk >= 100 ? "Paket limiti doldu — üst pakete geçin" : `Limitin %${doluluk}'i kullanımda`}
+                      {doluluk >= 100 ? "Paket limiti doldu — üst pakete geçin" : `Limitin ${pctPossessive(doluluk)} kullanımda`}
                     </p>
                   </>
                 ) : (
@@ -587,7 +593,7 @@ export default async function BillingPage({
         </Link>
         <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-text-muted">
           <ShieldCheck className="h-3.5 w-3.5 text-success-strong" />
-          {configured ? "Güvenli ödeme" : "Demo mod"}
+          {configured ? "Güvenli ödeme" : paymentOff ? "Online ödeme kapalı" : "Demo mod"}
         </span>
       </div>
 
@@ -623,7 +629,7 @@ export default async function BillingPage({
               <p className="mt-1 text-xs text-text-faint">
                 KDV hariç
                 {cycle === "yearly"
-                  ? ` · ${plan.yearlyPaidMonths ?? 10} ay ödenir, aylık ${money(Math.round(amount / 12))}'ye gelir`
+                  ? ` · ${plan.yearlyPaidMonths ?? 10} ay ödenir, aylık karşılığı ${money(Math.round(amount / 12))}`
                   : ""}
               </p>
               <ul className="mt-4 flex-1 space-y-2">
@@ -646,6 +652,13 @@ export default async function BillingPage({
                 ) : sellable && subPaused ? (
                   <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
                     Aboneliğiniz duraklatıldı; paket işlemleri için önce devam ettirin.
+                  </p>
+                ) : sellable && paymentOff ? (
+                  <p className="rounded-[var(--radius-control)] border border-dashed border-line-strong px-3 py-2 text-center text-xs text-text-muted">
+                    {current ? "Mevcut paketiniz." : "Online ödeme şu an kapalı."}{" "}
+                    <Link href={PAYMENT_SUPPORT_HREF} className="font-semibold text-accent-text hover:underline">
+                      Destekle iletişime geçin
+                    </Link>
                   </p>
                 ) : sellable ? (
                   <CheckoutButton

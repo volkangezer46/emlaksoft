@@ -16,7 +16,15 @@ import {
 } from "./data";
 import { appointmentTypeLabel } from "@/lib/appointment-labels";
 import { overdueListingsOf } from "./helpers";
-import { SKIP_COOKIE, buildNextActions, onboardingNextOf, parseSkipCookie, pickNextAction, type NextActionTone } from "./siradaki";
+import {
+  FALLBACK_ACTION_KEY,
+  SKIP_COOKIE,
+  buildNextActions,
+  onboardingNextOf,
+  parseSkipCookie,
+  pickNextAction,
+  type NextActionTone,
+} from "./siradaki";
 import { SiradakiGec } from "./siradaki-gec";
 
 /** Ton → premium ton sınıfı (odak kartının sol şeridi `--t` ile boyanır). */
@@ -71,11 +79,13 @@ export async function SiradakiEylem({ ctx }: { ctx: HomeCtx }) {
     pendingCommissionText: commission && commission.pending > 0 ? moneyTry(commission.pending) : null,
     // Yetkiye göre daraltılmış durum: danışmana "Ofis bilgilerin" gibi yapamayacağı adım önerilmez.
     onboardingNext: onboardingNextOf(onboarding),
+    // Her aday ve yedek, götürdüğü sayfanın izniyle süzülür (muhasebeye "Müşteri ekle" önerilmez).
+    perms: ctx.perms,
   });
   const todayKey = trDayKey();
   const dismissed = parseSkipCookie(jar.get(SKIP_COOKIE)?.value ? decodeURIComponent(jar.get(SKIP_COOKIE)!.value) : undefined, todayKey);
   const action = pickNextAction(actions, dismissed);
-  const canSkip = action.key !== "musteri-ekle" && actions.some((a) => a.key !== action.key && !dismissed.includes(a.key));
+  const canSkip = action.key !== FALLBACK_ACTION_KEY && actions.some((a) => a.key !== action.key && !dismissed.includes(a.key));
 
   return (
     <section

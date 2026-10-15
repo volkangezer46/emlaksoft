@@ -3,10 +3,14 @@
  *
  * Öncelik sırası (tek kaynak): bugünkü randevu → gecikmiş görev → dönüş bekleyen sıcak müşteri →
  * yetki belgesi bitişi → 7+ gün teyitsiz ilan → bekleyen komisyon → kurulumun eksik adımı →
- * hiçbiri yoksa "Müşteri ekle". Yalnız GERÇEK sayı > 0 olan adım aday olur (sahte vaat yok).
+ * hiçbiri yoksa rolün yedek eylemi ("Müşteri ekle"; müşteri ekleyemeyene "Komisyonları aç" / "Müşterilere göz at").
+ * Yalnız GERÇEK sayı > 0 olan adım aday olur (sahte vaat yok). Her aday ve yedek, götürdüğü sayfanın izniyle süzülür:
+ * kullanıcının açamayacağı sayfaya giden düğme çizilmez (`home-href-contract.test.ts`).
  */
 
 import type { OnboardingState } from "@/lib/onboarding-checklist";
+import type { AppAction, AppModule } from "@/lib/permissions";
+import type { EffectivePermissions } from "@/lib/permissions-effective";
 
 export type NextActionTone = "brand" | "danger" | "warn" | "success";
 
@@ -32,7 +36,26 @@ export type NextActionInput = {
   /** Yalnız kullanıcı kendi (ya da earnings_all ile ofis) komisyonunu görebiliyorsa > 0 verilir. */
   pendingCommissionText: string | null;
   onboardingNext: { title: string; href: string } | null;
+  /** Etkin izinler: verilirse her aday götürdüğü sayfanın izniyle süzülür ve yedek eylem role göre seçilir. */
+  perms?: EffectivePermissions;
 };
+
+type Need = { module: AppModule; action: AppAction };
+
+/** Aday eylemin götürdüğü sayfanın kapısı (sayfanın `requireModulePage` modülü + gereken eylem). */
+const ACTION_NEEDS: Readonly<Record<string, Need>> = {
+  randevu: { module: "appointments", action: "view" },
+  gorev: { module: "tasks", action: "view" },
+  sicak: { module: "customers", action: "view" },
+  yetki: { module: "properties", action: "view" },
+  teyit: { module: "portals", action: "view" },
+  komisyon: { module: "commissions", action: "view" },
+  kurulum: { module: "dashboard", action: "view" },
+};
+
+function allows(perms: EffectivePermissions | undefined, need: Need | undefined): boolean {
+  return !perms || !need || (perms[need.module] ?? []).includes(need.action);
+}
 
 export const FALLBACK_ACTION_KEY = "musteri-ekle";
 
@@ -54,6 +77,24 @@ export const FALLBACK_ACTION: NextAction = {
   href: "/app/hizli?sekme=musteri",
   tone: "brand",
 };
+
+/**
+ * Rolün yedek eylemi (anahtar her zaman `FALLBACK_ACTION_KEY`: "Bugün için geç" ile atlanmaz). Müşteri ekleyebilen
+ * "Müşteri ekle"; ekleyemeyen muhasebe "Komisyonları aç"; salt okunur "Müşterilere göz at"; hiçbiri yoksa "Görevleri aç"
+ * ya da en son ana ekranın kendisi (her rolün açabildiği tek sayfa).
+ */
+export function fallbackActionFor(perms: EffectivePermissions | undefined): NextAction {
+  const can = (module: AppModule, action: AppAction) => allows(perms, { module, action });
+  if (can("customers", "create")) return FALLBACK_ACTION;
+  const base = { key: FALLBACK_ACTION_KEY, title: "Bugün için bekleyen iş görünmüyor", tone: "brand" as const };
+  if (can("commissions", "edit"))
+    return { ...base, label: "Komisyonları aç", reason: "Tahsilatı bekleyen komisyonları kontrol etmek kasayı güncel tutar.", href: "/app/komisyon" };
+  if (can("customers", "view"))
+    return { ...base, label: "Müşterilere göz at", reason: "Ofisin müşteri listesine ve son hareketlere buradan bakabilirsiniz.", href: "/app/musteriler" };
+  if (can("tasks", "view"))
+    return { ...base, label: "Görevleri aç", reason: "Ofisin açık görevlerini buradan izleyebilirsiniz.", href: "/app/gorevler" };
+  return { ...base, label: "Ana ekranı yenile", reason: "Yeni bir iş geldiğinde burada görünür.", href: "/app" };
+}
 
 /** Aday eylemler öncelik sırasıyla; her zaman son eleman sönmez yedek eylemdir. */
 export function buildNextActions(i: NextActionInput): NextAction[] {
@@ -129,14 +170,20 @@ export function buildNextActions(i: NextActionInput): NextAction[] {
       tone: "brand",
     });
   }
-  out.push(FALLBACK_ACTION);
-  return out;
+  const permitted = out.filter((a) => allows(i.perms, ACTION_NEEDS[a.key]));
+  permitted.push(fallbackActionFor(i.perms));
+  return permitted;
 }
 
 /** "Bugün için geç" ile atlananlar dışındaki ilk eylem; yedek eylem hiç atlanamaz. */
 export function pickNextAction(actions: readonly NextAction[], dismissed: readonly string[]): NextAction {
   const skip = new Set(dismissed);
-  return actions.find((a) => a.key === FALLBACK_ACTION_KEY || !skip.has(a.key)) ?? FALLBACK_ACTION;
+  return actions.find((a) => a.key === FALLBACK_ACTION_KEY || !skip.has(a.key)) ?? actions[actions.length - 1] ?? FALLBACK_ACTION;
+}
+
+/** Görev paneli boş durumunun düğmesi: yalnız görev oluşturabilene ("Görev ekle"); yoksa düğme yok. */
+export function taskEmptyAction(perms: EffectivePermissions | undefined): { href: string; label: string } | null {
+  return allows(perms, { module: "tasks", action: "create" }) ? { href: "/app/gorevler", label: "Görev ekle" } : null;
 }
 
 export const SKIP_COOKIE = "es_eylem_gec";

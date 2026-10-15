@@ -1,5 +1,5 @@
 import { visibleSections } from "@/lib/nav-config";
-import type { AppModule } from "@/lib/permissions";
+import type { AppAction, AppModule } from "@/lib/permissions";
 import { TOUR_ROLES, tourIdForRole, type TourId } from "@/lib/product-tour-roles";
 
 /**
@@ -27,6 +27,27 @@ export type TourStepDef = {
   title: string;
   desc: string;
   descMobile?: string;
+  /**
+   * Adımın sayfası menüde olmayan bir EYLEM akışıysa (`TOURABLE_FLOWS`) gereken izin. Menüdeki sayfalar için gerekmez
+   * (menü zaten yetkiye göre süzülür); akış adımı bu izin yoksa elenir.
+   */
+  requires?: { module: AppModule; action: AppAction };
+};
+
+/**
+ * Menüde bilerek bulunmayan (nav-config `HIDDEN_APP_PAGES`) ama tura girebilen eylem akışları ve izin şartı.
+ * Örn. Kurulum sihirbazı ofis ayarı düzenleyebilene (settings:edit) gösterilir; danışmanın turunda elenir.
+ */
+export const TOURABLE_FLOWS: Readonly<Record<string, { module: AppModule; action: AppAction }>> = {
+  "/app/baslangic": { module: "settings", action: "edit" },
+};
+
+/** Tur adımı süzgecinin bağlamı. `can` verilmezse akış adımları yalnız modül görünürlüğüyle (accessible) denetlenir. */
+export type TourResolveCtx = {
+  accessible: readonly AppModule[];
+  closed: readonly string[];
+  role?: string | null;
+  can?: (module: AppModule, action: AppAction) => boolean;
 };
 
 export type TourDef = {
@@ -58,7 +79,8 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/baslangic",
         selectors: ['[data-tour="kurulum"]', H1],
         title: "Ofis kurulumu",
-        desc: "Sekiz kısa adımda ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
+        desc: "Kısa adımlarla ofis bilgilerinizi, ekibinizi, verilerinizi ve vitrininizi hazırlayın; her adımı sonraya bırakabilirsiniz. Örnek veriyle başlayıp hazır olunca tek tuşla gerçek kullanıma geçebilirsiniz.",
+        requires: TOURABLE_FLOWS["/app/baslangic"],
       },
       {
         path: "/app/ekip",
@@ -87,8 +109,8 @@ export const TOURS: readonly TourDef[] = [
       {
         path: "/app/abonelik",
         selectors: [H1],
-        title: "Krediler",
-        desc: "Hesap kredisi (TL) faturalarınızdan düşer, analiz bakiyesi ise değerleme ve rapor işlemlerinde harcanır. Hesap kredisi ve Analiz bakiyesi sekmelerinden bakiyenizi görürsünüz.",
+        title: "Abonelik",
+        desc: "Paketiniz, kullanıcı sayınız ve faturalarınız burada. Hesap kredisi (TL) faturalarınızdan düşer, analiz bakiyesi değerleme ve rapor işlemlerinde harcanır; ikisini de kendi sekmesinden görürsünüz.",
       },
     ],
   },
@@ -126,7 +148,7 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/anlasmalar",
         selectors: [H1],
         title: "Anlaşmalar",
-        desc: "Müzakereden kapanışa tüm fırsatlar. Kapanan anlaşma komisyonu otomatik hesaplar.",
+        desc: "Müzakereden kapanışa tüm anlaşmalar. Kapanan anlaşma komisyonu otomatik hesaplar.",
       },
       {
         path: "/app/raporlar",
@@ -202,14 +224,14 @@ export const TOURS: readonly TourDef[] = [
         path: "/app/portfoyler",
         selectors: [H1],
         title: "Portföyler",
-        desc: "İlanlarınızı ekleyin, fotoğraf ve fiyat güncelleyin, vitrinde ve portallarda yayınlayın.",
+        desc: "Portföylerinizi ekleyin, fotoğraf ve fiyat güncelleyin, vitrinde ve portallarda ilan olarak yayınlayın.",
       },
       {
         path: "/app",
         selectors: ['[data-tour="arama"]'],
         title: "Arama kutusu",
-        desc: "Müşteri adı, ilan numarası veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
-        descMobile: "Üstteki Arama simgesine dokunun; müşteri adı, ilan numarası veya görev yazın, hepsi tek kutudan bulunur.",
+        desc: "Müşteri adı, portföy kodu veya görev yazın; hepsi tek kutudan bulunur. Bilgisayarda Ctrl+K kısayolu da açar.",
+        descMobile: "Üstteki Arama simgesine dokunun; müşteri adı, portföy kodu veya görev yazın, hepsi tek kutudan bulunur.",
       },
     ],
   },
@@ -223,13 +245,10 @@ export function getTour(id: string, tours: readonly TourDef[] = TOURS): TourDef 
 
 /**
  * Turun çalıştırılacak adımları: yetkisiz, ofisin kapattığı ve menüde olmayan sayfaların adımları elenir
- * (`/app` ana ekranı her zaman vardır). Saf fonksiyon: istemci ve test aynı kapıyı kullanır.
+ * (`/app` ana ekranı her zaman vardır). Menüde olmayan sayfa yalnız `TOURABLE_FLOWS` listesindeyse ve izin şartı
+ * (`requires` ya da akışın kendi şartı) sağlanıyorsa kalır. Saf fonksiyon: istemci ve test aynı kapıyı kullanır.
  */
-export function resolveTourSteps(
-  id: TourId,
-  ctx: { accessible: readonly AppModule[]; closed: readonly string[]; role?: string | null },
-  tours: readonly TourDef[] = TOURS,
-): TourStepDef[] {
+export function resolveTourSteps(id: TourId, ctx: TourResolveCtx, tours: readonly TourDef[] = TOURS): TourStepDef[] {
   const tour = getTour(id, tours);
   if (!tour) return [];
   const sections = visibleSections(ctx.accessible, { closed: ctx.closed });
@@ -239,5 +258,26 @@ export function resolveTourSteps(
       allowed.add(item.href);
       for (const tab of item.tabs ?? []) allowed.add(tab.href);
     }
-  return tour.steps.filter((s) => allowed.has(s.path));
+  const permits = (req: { module: AppModule; action: AppAction }) =>
+    ctx.accessible.includes(req.module) && (ctx.can ? ctx.can(req.module, req.action) : true);
+  return tour.steps.filter((s) => {
+    if (s.requires && !permits(s.requires)) return false;
+    if (allowed.has(s.path)) return true;
+    const flow = TOURABLE_FLOWS[s.path];
+    return Boolean(flow && permits(flow));
+  });
+}
+
+/** En az bu kadar erişilebilir adımı kalan tur listelenir (Yardım ve tur bitişi); daha kısası boş vaattir. */
+export const MIN_LISTED_TOUR_STEPS = 3;
+
+/**
+ * Yardım ve tur bitişinde listelenecek turlar: rolün kendi turu önde, kalanlar tanım sırasıyla; erişilebilir adımı
+ * `MIN_LISTED_TOUR_STEPS`'ten az kalan turlar gizlenir.
+ */
+export function listableTours(ctx: TourResolveCtx, tours: readonly TourDef[] = TOURS): TourDef[] {
+  const own = tourIdForRole(ctx.role ?? null);
+  return tours
+    .filter((t) => resolveTourSteps(t.id, ctx, tours).length >= MIN_LISTED_TOUR_STEPS)
+    .sort((a, b) => Number(b.id === own) - Number(a.id === own));
 }

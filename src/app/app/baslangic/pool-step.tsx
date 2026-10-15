@@ -11,7 +11,16 @@ import { setListingPoolEnabled } from "@/app/actions/onboarding-wizard";
  * Adım "İlan havuzu ve atama": tek anahtar. Açıkken yeni/atanmamış ilanlar uzmanlığa göre danışmanlara önerilir ve atanır;
  * kapalıyken ilan akışı olduğu gibi çalışır (varsayılan kapalı). Mod, eşik ve SLA ayrıntıları İlan havuzu sayfasındadır.
  */
-export function PoolStep({ enabled, canConfigure }: { enabled: boolean; canConfigure: boolean }) {
+export function PoolStep({
+  enabled,
+  canConfigure,
+  missingRecords,
+}: {
+  enabled: boolean;
+  canConfigure: boolean;
+  /** Havuz açık ama adım tamamlanmadı: atama için gerçek uzmanlık/bölge kaydı yok. */
+  missingRecords: boolean;
+}) {
   const router = useRouter();
   const [on, setOn] = useState(enabled);
   const [pending, startTransition] = useTransition();
@@ -41,6 +50,15 @@ export function PoolStep({ enabled, canConfigure }: { enabled: boolean; canConfi
         </div>
         <Switch checked={on} onCheckedChange={toggle} disabled={!canConfigure || pending} aria-labelledby="pool-switch-label" />
       </div>
+      {on && missingRecords ? (
+        <Alert tone="warning">
+          Havuz açık; atama yapılabilmesi için en az bir danışmanın gerçek uzmanlık ya da bölge kaydı gerekir (örnek kayıtlar
+          sayılmaz).{" "}
+          <Link href="/app/ekip" className="font-semibold text-brand-600 hover:underline">
+            Ekipte uzmanlık ve bölge ekle
+          </Link>
+        </Alert>
+      ) : null}
       {!canConfigure ? <Alert tone="info">Havuz ayarını yalnız ofis sahibi ve genel müdür değiştirebilir. Bu adımı atlayabilirsin.</Alert> : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <Link href="/app/ilan-havuzu" className="focus-ring inline-flex min-h-11 items-center text-sm font-semibold text-brand-600 hover:underline">
