@@ -54,6 +54,14 @@ describe("yerel yazım yankısı", () => {
     expect(isLocalEcho({ ...ev, ids: null }, Date.now())).toBe(false);
     expect(isLocalEcho(ev, Date.now() + 10_000)).toBe(false);
   });
+
+  it("yerel yazım işareti TEK yankıyı yutar (aynı kayda başkasının sonraki yazımı tazeler)", () => {
+    const ID2 = "aaaaaaaa-2222-4333-8444-555555555555";
+    noteAdminLocalWrite(["support_tickets"], [ID2]);
+    const ev: AdminRtEvent = { t: "support_tickets", op: "UPDATE", by: null, ids: [ID2] };
+    expect(isLocalEcho(ev, Date.now())).toBe(true);
+    expect(isLocalEcho(ev, Date.now())).toBe(false);
+  });
 });
 
 describe("createAdminChannels (sahte istemci)", () => {

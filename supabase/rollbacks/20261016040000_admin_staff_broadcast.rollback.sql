@@ -27,3 +27,4 @@ drop function if exists public.rt_emit_staff_change();
 drop function if exists public.rt_emit_staff_notification();
 drop function if exists public.rt_staff_payload(text, text, uuid, text[]);
 drop function if exists public.rt_staff_send(jsonb, text);
+drop function if exists public.rt_staff_can_listen();

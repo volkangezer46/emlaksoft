@@ -83,10 +83,13 @@ export function noteAdminLocalWrite(tables: readonly string[], ids: readonly str
 export function isLocalEcho(ev: AdminRtEvent, atMs: number): boolean {
   if (!ev.ids) return false;
   for (const [k, at] of localWrites) if (atMs - at > ECHO_WINDOW_MS) localWrites.delete(k);
-  return ev.ids.every((id) => {
+  const echo = ev.ids.every((id) => {
     const at = localWrites.get(`${ev.t}:${id}`);
     return at !== undefined && atMs - at <= ECHO_WINDOW_MS;
   });
+  // İşaret TEK yankıyı yutar: aynı pencerede başka birinin (ör. ofisin yeni mesajı) aynı kayda yazımı yok sayılmaz.
+  if (echo) for (const id of ev.ids) localWrites.delete(`${ev.t}:${id}`);
+  return echo;
 }
 
 // --- Zil köprüsü (f) -----------------------------------------------------------------------------------------------

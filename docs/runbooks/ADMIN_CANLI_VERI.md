@@ -23,6 +23,8 @@ Doğrulama (salt okunur):
 select tgrelid::regclass, tgname from pg_trigger where tgname like 'rt_staff_%' order by 1, 2;   -- 15 + 1 satır
 select policyname from pg_policies where schemaname = 'realtime' and tablename = 'messages';      -- rt_admin_staff_read, rt_staff_self_read
 select proname from pg_proc where proname in ('reply_support_ticket_v3', 'admin_search_members');
+-- Katılım kapısı authenticated'a açık olmalı (politika growth_flag_on'u doğrudan çağırmaz; o fonksiyon authenticated'a kapalı):
+select has_function_privilege('authenticated', 'public.rt_staff_can_listen()', 'execute');           -- t
 ```
 
 Elle kabul: /admin açıkken tarayıcı geliştirici araçlarında en az bir `wss://…/realtime/v1/websocket` bağlantısı; ofis

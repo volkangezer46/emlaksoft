@@ -43,6 +43,8 @@ grant usage on schema auth to authenticated;
 create table public.platform_settings(key text primary key, value text);
 create function public.growth_flag_on(p_key text) returns boolean language sql stable security definer set search_path = '' as $$
   select coalesce((select lower(btrim(coalesce(s.value, ''))) in ('on', 'true', '1') from public.platform_settings s where s.key = p_key), false) $$;
+-- Canlidaki gibi: growth_flag_on authenticated'a ACIK DEGIL (politika dogrudan cagirirsa her katilim 'permission denied').
+revoke all on function public.growth_flag_on(text) from public;
 create table public.platform_staff(id uuid primary key, role text not null default 'support', is_active boolean not null default true);
 create function public.is_platform_staff() returns boolean language plpgsql stable security definer set search_path = '' as $$
 begin
@@ -217,6 +219,14 @@ describe.skipIf(!mod)("SK4 admin canlı veri + destek + arama migration'ları (p
     expect(await visible(STAFF, "admin:staff", { aal: "aal1" })).toBe(0);
     expect(await visible(STAFF, "admin:staff", { aal: "aal2" })).toBe(1);
     await db.exec(`delete from public.platform_settings where key = 'platform.mfa_enforced'`);
+  });
+
+  it("katılım kapısı authenticated'a açık, anon'a kapalı (growth_flag_on yetkisi gerekmez)", async () => {
+    await db.exec("reset role");
+    const [r] = await q(`select has_function_privilege('authenticated', 'public.rt_staff_can_listen()', 'execute') as auth_ok,
+      has_function_privilege('anon', 'public.rt_staff_can_listen()', 'execute') as anon_ok,
+      has_function_privilege('authenticated', 'public.growth_flag_on(text)', 'execute') as flag_ok`);
+    expect(r).toMatchObject({ auth_ok: true, anon_ok: false, flag_ok: false });
   });
 
   it("realtime.send yoksa yazma bozulmaz (yalın Postgres)", async () => {

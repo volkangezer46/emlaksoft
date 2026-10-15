@@ -174,6 +174,31 @@ begin
   end if;
 end $$;
 
+-- Katilim kapisi (politikalarin TEK yardimcisi): aktif personel (impersonation haric) + MFA zorunluysa aal2.
+-- growth_flag_on authenticated'a ACIK DEGIL (canlida EXECUTE yok): politikada dogrudan cagrilirsa 'permission denied'
+-- ile HER katilim reddedilir. Bu yuzden bayrak okumasi bu DEFINER fonksiyonun icinde yapilir; yalniz authenticated cagirir.
+create or replace function public.rt_staff_can_listen()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select public.is_platform_staff()
+    and (not public.growth_flag_on('platform.mfa_enforced') or coalesce(auth.jwt() ->> 'aal', '') = 'aal2');
+$$;
+
+revoke all on function public.rt_staff_can_listen() from public;
+do $$
+begin
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'anon') then
+    execute 'revoke all on function public.rt_staff_can_listen() from anon';
+  end if;
+  if exists (select 1 from pg_catalog.pg_roles where rolname = 'authenticated') then
+    execute 'grant execute on function public.rt_staff_can_listen() to authenticated';
+  end if;
+end $$;
+
 -- Ozel konu erisimi: yalniz aktif personel; 'admin:staff' ortak, 'staff:<uid>' yalniz kendi kimligi.
 do $$
 begin
@@ -189,8 +214,7 @@ begin
       using (
         realtime.messages.extension in ('broadcast')
         and (select realtime.topic()) = 'admin:staff'
-        and (select public.is_platform_staff())
-        and (select not public.growth_flag_on('platform.mfa_enforced') or (auth.jwt() ->> 'aal') = 'aal2')
+        and (select public.rt_staff_can_listen())
       )
   $p$;
   execute $p$
@@ -199,8 +223,7 @@ begin
       using (
         realtime.messages.extension in ('broadcast')
         and (select realtime.topic()) = 'staff:' || (select auth.uid())::text
-        and (select public.is_platform_staff())
-        and (select not public.growth_flag_on('platform.mfa_enforced') or (auth.jwt() ->> 'aal') = 'aal2')
+        and (select public.rt_staff_can_listen())
       )
   $p$;
 end $$;
