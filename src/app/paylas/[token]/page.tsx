@@ -12,12 +12,14 @@ import { officeMessageHref, resolvePublicContact } from "@/lib/public-contact";
 import { PublicContactActions } from "@/components/public/public-contact-actions";
 import { formatPublicPrice, listingCurrency, type ListingCurrency } from "@/lib/public-price";
 import { publicLocation } from "@/lib/public-location";
-import dynamicImport from "next/dynamic";
 import { ShareFeedback } from "@/components/public/share-feedback";
 import { ShareButton } from "@/components/public/share-button";
 import { createShortLivedPropertyMediaUrl } from "@/lib/property-media-access";
 import { isPublicTenantActive } from "@/lib/public-tenant";
-import { isPublicListingImage, selectWithDocumentFlag } from "@/lib/public-property-media";
+import { isPublicListingImage } from "@/lib/public-property-media";
+import { selectWithMediaMeta } from "@/lib/media/meta-query";
+import { mediaShortLabel, splitFloorPlans } from "@/lib/media/room-tags";
+import { ListingMediaGallery } from "@/components/public/listing-media-gallery";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { normalizeExternalHref } from "@/lib/external-href";
@@ -32,16 +34,11 @@ type ShareMediaRow = {
   external_url: string | null;
   is_cover: boolean;
   is_document?: boolean | null;
+  room_tag?: string | null;
+  caption?: string | null;
 };
 
 export const dynamic = "force-dynamic";
-
-// Lightbox etkileşimli client komponenti — dynamic import ile ayrı chunk'a
-// alınır, galeri alanı yüklenene dek en-boy oranını koruyan iskelet görünür.
-const GalleryLightbox = dynamicImport(
-  () => import("@/components/public/gallery-lightbox").then((m) => m.GalleryLightbox),
-  { loading: () => <div className="aspect-[16/10] w-full animate-pulse rounded-[var(--radius-card)] bg-white/10" /> },
-);
 
 // SK8 B094: ilanın para birimi (features.currency) formatMoney ile.
 function money(n: number | null, currency: ListingCurrency) {
@@ -152,8 +149,9 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
       .eq("is_sample", false)
       .is("deleted_at", null)
       .maybeSingle(),
-    // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
-    selectWithDocumentFlag<ShareMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover", (columns) =>
+    // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı; selectWithDocumentFlag'e düşer).
+    // Oda etiketi/açıklama: kat planı ayrı sekme ve alt yazı.
+    selectWithMediaMeta<ShareMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover", (columns) =>
       admin
         .from("property_media")
         .select(columns)
@@ -208,6 +206,8 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
   const media = mediaRows ?? [];
   // KVKK P0-9: belge (is_document; sütun yoksa belge adlı) görsel paylaşım linkinde gösterilmez (tek kural).
   const images = media.filter((m) => isPublicListingImage(m));
+  const { photos: photoRows, floorPlans: floorPlanRows } = splitFloorPlans(images);
+  const shareTitle = property.title || property.property_code || "Portföy";
   const tours = media.flatMap((item) => {
     const externalUrl = normalizeExternalHref(item.external_url);
     return item.kind !== "image" && externalUrl
@@ -329,12 +329,25 @@ export default async function PublicSharePage({ params }: { params: Promise<{ to
 
           {images.length > 0 ? (
             <div className="border-b border-white/10 p-4">
-              <GalleryLightbox
-                images={images.map((m) => ({
+              <ListingMediaGallery
+                photos={photoRows.map((m) => {
+                  const label = mediaShortLabel(m);
+                  return {
+                    id: m.id,
+                    src: createShortLivedPropertyMediaUrl(m.id, "share"),
+                    alt: label ? `${label} · ${shareTitle}` : null,
+                    caption: label,
+                  };
+                })}
+                floorPlans={floorPlanRows.map((m, i) => ({
                   id: m.id,
                   src: createShortLivedPropertyMediaUrl(m.id, "share"),
+                  alt: `Kat planı ${i + 1} · ${shareTitle}`,
+                  caption: mediaShortLabel(m),
                 }))}
-                alt={property.title || property.property_code || "Portföy"}
+                tone="dark"
+                tabsClassName="[&_[role=tabpanel]]:pt-3"
+                alt={shareTitle}
                 priority
                 sizes="(max-width: 640px) 100vw, 600px"
                 mainClassName="relative aspect-[16/10] w-full overflow-hidden rounded-[var(--radius-card)]"

@@ -11,7 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export type GalleryImage = { id: string; alt?: string | null; src?: string };
+export type GalleryImage = {
+  id: string;
+  alt?: string | null;
+  src?: string;
+  /** Görünür alt yazı (oda etiketi / açıklama); ana görselde ve tam ekranda gösterilir. */
+  caption?: string | null;
+};
 
 const MAX_THUMBS = 10;
 const SWIPE_PX = 40;
@@ -57,6 +63,8 @@ type GalleryLightboxProps = {
   thumbsClassName?: string;
   priority?: boolean;
   sizes?: string;
+  /** "contain": kat planı gibi kırpılmaması gereken çizimler (beyaz zeminde tam görünür). */
+  fit?: "cover" | "contain";
 };
 
 /**
@@ -73,6 +81,7 @@ export function GalleryLightbox({
   thumbsClassName = "grid grid-cols-5 gap-2 p-2",
   priority = false,
   sizes = "(max-width: 1024px) 100vw, 60vw",
+  fit = "cover",
 }: GalleryLightboxProps) {
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState(false);
@@ -96,7 +105,7 @@ export function GalleryLightbox({
         }}
         onTouchStart={swipe.onTouchStart}
         onTouchEnd={swipe.onTouchEnd}
-        className={`block w-full cursor-zoom-in touch-pan-y ${mainClassName}`}
+        className={`block w-full cursor-zoom-in touch-pan-y ${fit === "contain" ? "bg-white" : ""} ${mainClassName}`}
         aria-label="Fotoğrafı tam ekran aç"
       >
         <Image
@@ -107,8 +116,13 @@ export function GalleryLightbox({
           priority={priority}
           sizes={sizes}
           unoptimized
-          className="object-cover"
+          className={fit === "contain" ? "object-contain p-2" : "object-cover"}
         />
+        {current.caption ? (
+          <span className="absolute bottom-3 left-3 max-w-[calc(100%-6.5rem)] truncate rounded-full bg-ink-950/70 px-2.5 py-1 text-xs font-bold text-white">
+            {current.caption}
+          </span>
+        ) : null}
         <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-ink-950/70 px-2.5 py-1 text-xs font-bold text-white">
           <Expand className="h-3.5 w-3.5" /> {index + 1}/{count}
         </span>
@@ -133,7 +147,7 @@ export function GalleryLightbox({
                 fill
                 sizes="120px"
                 unoptimized
-                className="object-cover"
+                className={fit === "contain" ? "bg-white object-contain" : "object-cover"}
               />
             </button>
           ))}
@@ -174,8 +188,9 @@ export function GalleryLightbox({
                 Galeride {count} fotoğraf var. Önceki ve sonraki fotoğrafa ok tuşlarıyla geçebilirsiniz.
               </DialogDescription>
               <div className="flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
-                <span className="text-sm font-semibold text-white/80">
+                <span className="min-w-0 truncate text-sm font-semibold text-white/80">
                   {index + 1} / {count}
+                  {current.caption ? <span className="ml-2 text-white">{current.caption}</span> : null}
                 </span>
                 <button
                   type="button"

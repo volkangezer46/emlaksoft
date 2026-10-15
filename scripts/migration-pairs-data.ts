@@ -537,6 +537,8 @@ const F = {
   // B1 (2026-10-19): vitrin sunucu suzgeci + gercek sayfalama (RPC), ilan cevresi (danisman girdisi).
   b1VitrinListingSearch: "20261019010000_vitrin_listing_search.sql",
   b1PropertyNearbyPlaces: "20261019010001_property_nearby_places.sql",
+  // B3 (2026-10-19): portfoy medyasi oda etiketi + aciklama + kat plani (room_tag = kat_plani).
+  b3PropertyMediaRoomTag: "20261019030000_property_media_room_tag_caption.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -835,6 +837,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
     [F.b1VitrinListingSearch]: "ek", // yalniz yeni salt-okur RPC'ler (vitrin_listing_search/_facets, vitrin_json_number), EXECUTE yalniz service_role; kod RPC yokken eski sorguya duser
     [F.b1PropertyNearbyPlaces]: "ek", // properties.nearby_places jsonb (varsayilan bos dizi) + sekil CHECK; mevcut veri degismez
+    [F.b3PropertyMediaRoomTag]: "ek", // property_media.room_tag + caption (nullable, CHECK); RLS/veri degismez, kod sutunlar yokken alanlari gizler
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1116,6 +1119,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "B1-vitrin-sunucu-suzgeci", order: 1910, title: "Vitrin listesi sunucu suzgeci + gercek sayfalama: vitrin_listing_search / vitrin_listing_facets / vitrin_json_number (salt okur, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken eski PostgREST sorgusuna duser; ek)", files: [F.b1VitrinListingSearch] },
     { id: "B1-ilan-cevresi", order: 1911, title: "Ilan cevresi: properties.nearby_places jsonb (danisman girer, vitrin detayinda 'Cevrede neler var'; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: sutun yokken portfoy karti 'kurulum bekliyor' der, vitrin bolumu gizlenir; ek)", files: [F.b1PropertyNearbyPlaces] },
     { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
+    { id: "B3-medya-oda-etiketi-kat-plani", order: 1930, title: "Portfoy medyasi oda etiketi + aciklama + kat plani: property_media.room_tag (sabit liste, kat_plani) + caption (1-80) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken etiket/aciklama alanlarini gizler, galeri eskisi gibi; ek)", files: [F.b3PropertyMediaRoomTag] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },

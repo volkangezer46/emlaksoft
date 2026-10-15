@@ -362,6 +362,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/api/property-media/[id]/private/route.ts", fn: "GET", calls: 1, tenantFilter: "yok" },
   { file: "src/app/api/property-media/[id]/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/property-media/[id]/thumb/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
+  { file: "src/app/api/property-media/zip/[propertyId]/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/rent-receipts/[noticeId]/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/takvim/[token]/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },
   { file: "src/app/api/ticket-attachments/[id]/route.ts", fn: "GET", calls: 1, tenantFilter: "var" },

@@ -116,6 +116,8 @@ const PUBLIC_MEDIA_SURFACES = [
   // Ofis içi ama dışarı verilen: basılı broşür + ofis TV'si
   "src/app/app/portfoyler/[id]/brosur/page.tsx",
   "src/lib/tv/tv-data.ts",
+  // Ofis içi ama dışarı verilen: toplu ZIP indirme (portal/sosyal medya paylaşımı; belge ZIP'e girmez, PF-09)
+  "src/app/api/property-media/zip/[propertyId]/route.ts",
 ];
 
 function walk(dir: string): string[] {
@@ -132,7 +134,8 @@ describe("sözleşme: public yüzeyler aynı kuralı kullanır", () => {
     expect(hits.length, f).toBeGreaterThan(0);
     for (const h of hits) {
       const before = src.slice(Math.max(0, (h.index ?? 0) - 400), h.index);
-      expect(before, `${f}: property_media sorgusu selectWithDocumentFlag dışında`).toContain("selectWithDocumentFlag");
+      // selectWithMediaMeta (oda etiketi/açıklama) is_document'i de seçer ve sütun yoksa selectWithDocumentFlag'e düşer.
+      expect(before, `${f}: property_media sorgusu selectWithDocumentFlag dışında`).toMatch(/selectWithDocumentFlag|selectWithMediaMeta/);
     }
     expect(/isPublicListingImage\(|firstPublicImageByProperty\(/.test(src), f).toBe(true);
   });

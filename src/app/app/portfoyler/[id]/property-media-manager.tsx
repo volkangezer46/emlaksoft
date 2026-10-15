@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { useActionState } from "react";
 import Image from "next/image";
-import { AlertCircle, Camera, Check, Copy, Droplets, FileLock2, Film, GripVertical, ImageIcon, ImagePlus, Link2, Loader2, LockKeyhole, RefreshCw, ScanText, Sparkles, Star, Trash2, Upload, View, X } from "lucide-react";
+import { AlertCircle, ArrowDownToLine, ArrowLeft, ArrowRight, Camera, Check, ChevronsLeft, ChevronsRight, Copy, Download, Droplets, FileLock2, Film, GripVertical, ImageIcon, ImagePlus, LayoutPanelTop, Link2, Loader2, LockKeyhole, RefreshCw, ScanText, Sparkles, Star, Tag, Trash2, Upload, View, X } from "lucide-react";
 import {
   addPropertyMediaUrl,
   applyDocFieldsToProperty,
@@ -15,11 +15,15 @@ import {
   reorderPropertyMedia,
   setCoverPropertyMedia,
   setPropertyMediaDocument,
+  updatePropertyMediaMeta,
   type MediaResult,
   type PropertyDocFields,
 } from "@/app/actions/property-media";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Button, buttonClass } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { FLOOR_PLAN_TAG, CAPTION_MAX, ROOM_TAGS, ROOM_TAG_LABEL, isFloorPlan, mediaAltText, mediaShortLabel } from "@/lib/media/room-tags";
 import { uploadToDirectFileTarget } from "@/lib/direct-file-upload-client";
 import { DEFAULT_WATERMARK, type WatermarkSettings } from "@/lib/watermark";
 import { applyWatermarkToFile, loadWatermarkLogo } from "@/lib/watermark-canvas";
@@ -38,7 +42,13 @@ export type MediaItem = {
   /** Yüklemede ölçülen piksel boyutu (eski kayıtta yok → kalite uyarısı üretilmez). */
   width?: number | null;
   height?: number | null;
+  /** Oda etiketi (`kat_plani` = kat planı) ve açıklama; sütunlar yoksa (migration öncesi) gelmez. */
+  room_tag?: string | null;
+  caption?: string | null;
 };
+
+/** Yükleme türü: ilan fotoğrafı, kat planı (ayrı sekmede gösterilir) ya da belge (dışarıda gösterilmez). */
+type UploadKind = "photo" | "floorplan" | "document";
 
 /** OCR sonuç dialogundaki düzenlenebilir alanlar (C8). */
 const OCR_FIELDS: { key: keyof PropertyDocFields; label: string }[] = [
@@ -73,6 +83,8 @@ type QueueItem = {
   error?: string;
   /** Yükleme türü "Belge" seçiliyken kuyruğa girdi (yeniden denemede de korunur). */
   asDocument: boolean;
+  /** Yükleme türü "Kat planı" seçiliyken kuyruğa girdi (PNG çizim JPEG'e çevrilmez, kayıt kat planı etiketi alır). */
+  asFloorPlan: boolean;
   /** Yüklenen son dosyanın ölçüsü ve kalite uyarısı (düşük çözünürlük / dikey / panorama). */
   dims?: { width: number; height: number };
   warning?: string | null;
@@ -123,14 +135,15 @@ function hasTransparency(ctx: CanvasRenderingContext2D, w: number, h: number): b
  * kullanılır; desteklemeyen/başarısız tarayıcıda ORİJİNAL dosya döner
  * (sunucu limiti 15 MB zaten koruyor) — asla yanlış yönde küçültme yapılmaz. Belgeler (tapu) olduğu gibi kalır.
  */
-async function resizeImageForUpload(original: File, asDocument = false): Promise<File> {
+async function resizeImageForUpload(original: File, asDocument = false, keepPng = false): Promise<File> {
   if (asDocument || !RESIZABLE_TYPES.includes(original.type)) return original;
   let bitmap: ImageBitmap | null = null;
   try {
     bitmap = await createImageBitmap(original, { imageOrientation: "from-image" });
     const longEdge = Math.max(bitmap.width, bitmap.height);
     const isPng = original.type === "image/png";
-    if (longEdge <= MAX_UPLOAD_DIM && !isPng) return original;
+    // Kat planı çizgileri JPEG'de bulanıklaşır: PNG kat planı yalnız büyükse küçültülür, PNG kalır.
+    if (longEdge <= MAX_UPLOAD_DIM && (!isPng || keepPng)) return original;
 
     const scale = longEdge > MAX_UPLOAD_DIM ? MAX_UPLOAD_DIM / longEdge : 1;
     const w = Math.round(bitmap.width * scale);
@@ -143,7 +156,7 @@ async function resizeImageForUpload(original: File, asDocument = false): Promise
     ctx.drawImage(bitmap, 0, 0, w, h);
 
     // Şeffaf PNG korunur; opak PNG ve JPEG/WebP çıktısı JPEG'e sıkıştırılır.
-    const outType = isPng && hasTransparency(ctx, w, h) ? "image/png" : "image/jpeg";
+    const outType = isPng && (keepPng || hasTransparency(ctx, w, h)) ? "image/png" : "image/jpeg";
     if (outType === "image/png" && scale === 1) return original;
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, outType, 0.85),
@@ -177,6 +190,7 @@ export function PropertyMediaManager({
   officeName = "",
   logoUrl = null,
   documentFlagAvailable = true,
+  metaAvailable = false,
   pendingFiles,
   onPendingQueued,
 }: {
@@ -188,6 +202,8 @@ export function PropertyMediaManager({
   canEdit: boolean;
   /** `property_media.is_document` sütunu var mı (migration öncesi işaret anahtarları gizlenir, ad kuralı geçerli). */
   documentFlagAvailable?: boolean;
+  /** `property_media.room_tag` / `caption` sütunları var mı (migration öncesi etiket, açıklama ve kat planı gizlenir). */
+  metaAvailable?: boolean;
   /** Ofis filigran ayarı (Ayarlar › Fotoğraf filigranı) */
   watermark?: WatermarkSettings;
   officeName?: string;
@@ -200,7 +216,7 @@ export function PropertyMediaManager({
   // Son parti kameradan mı geldi? → yükleme bitince "Bir daha çek" göster (art arda çekim akışı)
   const [lastFromCamera, setLastFromCamera] = useState(false);
   // Yükleme türü: Fotoğraf (paylaşımda gösterilir) / Belge (tapu, yetki belgesi — dışarıda gösterilmez)
-  const [uploadAsDocument, setUploadAsDocument] = useState(false);
+  const [uploadKind, setUploadKind] = useState<UploadKind>("photo");
   const [, startTransition] = useTransition();
 
   // Filigran logosu bir kez yüklenip önbelleğe alınır (20 fotoğrafta 20 istek olmasın).
@@ -223,7 +239,7 @@ export function PropertyMediaManager({
   async function uploadOne(item: QueueItem) {
     patchQueue(item.key, { status: "uploading", error: undefined });
     try {
-      const resized = await resizeImageForUpload(item.file, item.asDocument);
+      const resized = await resizeImageForUpload(item.file, item.asDocument, item.asFloorPlan);
       // Filigran boyutlandırmadan SONRA basılır: damga son çözünürlüğe göre
       // ölçeklenir, küçültme damgayı bulanıklaştırmaz.
       let file = resized;
@@ -242,7 +258,7 @@ export function PropertyMediaManager({
       }
       // Kalite: yüklenen SON dosya ölçülür (belgede uyarı yok — okunurluk ayrı konu).
       const dims = await measureImage(file);
-      const warning = dims && !item.asDocument ? assessPhoto(dims).warning : null;
+      const warning = dims && !item.asDocument && !item.asFloorPlan ? assessPhoto(dims).warning : null;
       if (dims) patchQueue(item.key, { dims, warning });
       const prepared = await preparePropertyMediaUpload({
         propertyId,
@@ -263,7 +279,13 @@ export function PropertyMediaManager({
         return;
       }
 
-      const finalized = await finalizePropertyMediaUpload(propertyId, prepared.upload.sessionId, item.asDocument, dims);
+      const finalized = await finalizePropertyMediaUpload(
+        propertyId,
+        prepared.upload.sessionId,
+        item.asDocument,
+        dims,
+        item.asFloorPlan ? FLOOR_PLAN_TAG : null,
+      );
       if (!finalized.ok) {
         patchQueue(item.key, { status: "error", error: finalized.error });
         return;
@@ -286,7 +308,8 @@ export function PropertyMediaManager({
       file,
       name: file.name || "fotoğraf.jpg",
       status: "queued",
-      asDocument: uploadAsDocument,
+      asDocument: uploadKind === "document",
+      asFloorPlan: uploadKind === "floorplan" && metaAvailable,
     }));
     // Önceki partinin biten satırları temizlenir, hatalılar yeniden dene için kalır
     setQueue((prev) => [
@@ -406,51 +429,34 @@ export function PropertyMediaManager({
   const serverImages = allImages.filter((m) => !m.is_document);
   const documents = allImages.filter((m) => m.is_document);
   const links = media.filter((m) => m.kind !== "image");
-  const imageKey = allImages.map((m) => m.id).join(",");
+  const imageKey = allImages.map((m) => `${m.id}:${m.room_tag ?? ""}`).join(",");
 
   // ---------------------------------------------------------------------
-  // Sürükle-bırak sıralama (anlaşma tahtasıyla AYNI teknik: HTML5 native
-  // draggable + dataTransfer; ek paket yok). `order` yalnızca kullanıcı
-  // sürüklediğinde dolar; sunucu listesi değişince (kaydedildi/silindi)
-  // sıfırlanır ve tek doğruluk kaynağı yine sunucu olur.
+  // Sıralama: masaüstünde sürükle-bırak (HTML5 draggable), dokunmatikte seçili görselin ok düğmeleri
+  // (Başa al / Öne al / Geri al / Sona al). `order` yalnız kullanıcı sıra değiştirdiğinde dolar; sunucu
+  // listesi değişince (kaydedildi/silindi) sıfırlanır ve tek doğruluk kaynağı yine sunucudur.
+  // Fotoğraflar ve kat planları kendi listesi içinde sıralanır; kat planları yayında ayrı sekmededir.
   // ---------------------------------------------------------------------
   const [order, setOrder] = useState<string[] | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const byId = new Map(allImages.map((m) => [m.id, m]));
   const photoById = new Map(serverImages.map((m) => [m.id, m]));
-  const images = order
+  const orderedPublic = order
     ? [
         ...order.map((id) => photoById.get(id)).filter((m): m is MediaItem => Boolean(m)),
         ...serverImages.filter((m) => !order.includes(m.id)),
       ]
     : serverImages;
+  const images = orderedPublic.filter((m) => !isFloorPlan(m));
+  const floorPlans = orderedPublic.filter((m) => isFloorPlan(m));
 
-  /** Sürüklenen görseli hedefin yerine taşır (canlı önizleme). */
-  function moveOver(targetId: string) {
-    if (!dragId || dragId === targetId) return;
-    const current = images.map((m) => m.id);
-    const from = current.indexOf(dragId);
-    const to = current.indexOf(targetId);
-    if (from < 0 || to < 0) return;
-    const next = [...current];
-    const [moved] = next.splice(from, 1);
-    // Çıkarma sonrası hedefin indeksi kayabilir → yeniden bulunur.
-    // Aşağı sürüklerken hedefin ARDINA, yukarı sürüklerken ÖNÜNE bırakılır.
-    const t = next.indexOf(targetId);
-    next.splice(from < to ? t + 1 : t, 0, moved);
-    setOrder(next);
-  }
-
-  /** Bırakınca sırayı kalıcı yazar (video/tur bağlantıları listenin sonuna alınır). */
-  function commitOrder() {
-    // onDrop + onDragEnd arka arkaya tetiklenir; ikinci çağrı sessizce düşer.
-    if (!dragId) return;
-    const ids = images.map((m) => m.id);
+  /** Yeni sırayı kalıcı yazar (belgeler ve video/tur bağlantıları listenin sonuna alınır). */
+  function saveOrder(ids: string[]) {
     const same = ids.every((id, i) => serverImages[i]?.id === id);
-    setDragId(null);
     if (same) return;
     setSavingOrder(true);
     setOrderError(null);
@@ -464,11 +470,63 @@ export function PropertyMediaManager({
     });
   }
 
+  /** Sürüklenen görseli hedefin yerine taşır (canlı önizleme; yalnız aynı liste içinde). */
+  function moveOver(targetId: string) {
+    if (!dragId || dragId === targetId) return;
+    const dragged = byId.get(dragId);
+    const target = byId.get(targetId);
+    if (!dragged || !target || isFloorPlan(dragged) !== isFloorPlan(target)) return;
+    const current = [...images, ...floorPlans].map((m) => m.id);
+    const from = current.indexOf(dragId);
+    const to = current.indexOf(targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...current];
+    const [moved] = next.splice(from, 1);
+    // Çıkarma sonrası hedefin indeksi kayabilir → yeniden bulunur.
+    // Aşağı sürüklerken hedefin ARDINA, yukarı sürüklerken ÖNÜNE bırakılır.
+    const t = next.indexOf(targetId);
+    next.splice(from < to ? t + 1 : t, 0, moved);
+    setOrder(next);
+  }
+
+  /** Bırakınca sırayı kalıcı yazar. */
+  function commitOrder() {
+    // onDrop + onDragEnd arka arkaya tetiklenir; ikinci çağrı sessizce düşer.
+    if (!dragId) return;
+    setDragId(null);
+    saveOrder([...images, ...floorPlans].map((m) => m.id));
+  }
+
+  /**
+   * Dokunmatik/klavye sıralama: seçili görseli kendi listesinde taşır. "first"/"last" uçlara, sayı kadar adım.
+   * Art arda dokunuşlar tek kayda birleşir (700 ms sessizlikten sonra yazılır).
+   */
+  function moveItem(id: string, step: number | "first" | "last") {
+    const item = byId.get(id);
+    if (!item || item.is_document) return;
+    const list = (isFloorPlan(item) ? floorPlans : images).map((m) => m.id);
+    const from = list.indexOf(id);
+    if (from < 0) return;
+    const to =
+      step === "first" ? 0 : step === "last" ? list.length - 1 : Math.max(0, Math.min(list.length - 1, from + step));
+    if (to === from) return;
+    const nextList = [...list];
+    nextList.splice(from, 1);
+    nextList.splice(to, 0, id);
+    const next = isFloorPlan(item)
+      ? [...images.map((m) => m.id), ...nextList]
+      : [...nextList, ...floorPlans.map((m) => m.id)];
+    setOrder(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => saveOrder(next), 700);
+  }
+
   // ---------------------------------------------------------------------
   // Çoklu seçim + toplu işlemler
   // ---------------------------------------------------------------------
   const [selected, setSelected] = useState<string[]>([]);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [metaPending, startMeta] = useTransition();
 
   // Sunucu listesi değişince (yükleme/silme/sıra kaydı) yerel sıra ve seçim
   // sıfırlanır. useEffect DEĞİL, render sırasında ayarlama: React'in önerdiği
@@ -483,6 +541,7 @@ export function PropertyMediaManager({
 
   const selectedSet = new Set(selected);
   const allSelected = allImages.length > 0 && selected.length === allImages.length;
+  const single = selected.length === 1 ? byId.get(selected[0]) ?? null : null;
 
   function toggleSelect(id: string) {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -509,6 +568,17 @@ export function PropertyMediaManager({
     });
   }
 
+  /** Oda etiketi / açıklama / kat planı yazar (tek görsel düzenleyici ve toplu "Kat planı yap"). */
+  function saveMeta(ids: string[], input: { roomTag?: string | null; caption?: string | null }, clearSelection = false) {
+    if (ids.length === 0) return;
+    setBulkError(null);
+    startMeta(async () => {
+      const r = await updatePropertyMediaMeta(propertyId, ids, input);
+      if (r.error) setBulkError(r.error);
+      else if (clearSelection) setSelected([]);
+    });
+  }
+
   function makeCover(id: string) {
     const fd = new FormData();
     fd.set("id", id);
@@ -516,25 +586,211 @@ export function PropertyMediaManager({
     startTransition(() => setCoverPropertyMedia(fd));
   }
 
-  const unstamped = images.filter((m) => !m.has_watermark).length;
+  const unstamped = orderedPublic.filter((m) => !m.has_watermark).length;
   // Kapak önerisi yalnız ölçülmüş fotoğraflardan (boyut yoksa öneri yok) ve yalnız düzenleyene.
   const coverSuggestion = canEdit ? suggestCover(images) : null;
+  const zipHref = `/api/property-media/zip/${propertyId}`;
+
+  /** Fotoğraf / kat planı kartı (belge kartı ayrı bölümde). */
+  function renderImageCard(m: MediaItem, i: number) {
+    const plan = isFloorPlan(m);
+    const label = mediaShortLabel(m);
+    const draggableCard = canEdit && !plan;
+    return (
+      <div
+        key={m.id}
+        draggable={draggableCard}
+        onDragStart={(e) => {
+          if (!draggableCard) return;
+          e.dataTransfer.setData("text/plain", m.id);
+          e.dataTransfer.effectAllowed = "move";
+          setDragId(m.id);
+        }}
+        onDragOver={(e) => {
+          if (!dragId || plan) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          moveOver(m.id);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          commitOrder();
+        }}
+        onDragEnd={commitOrder}
+        className={`group relative aspect-[4/3] overflow-hidden rounded-[var(--radius-card)] border transition ${
+          plan ? "bg-white" : "bg-canvas"
+        } ${
+          dragId === m.id
+            ? "border-brand-300 opacity-40"
+            : selectedSet.has(m.id)
+              ? "border-brand-400 ring-2 ring-brand-400/35"
+              : "border-line"
+        } ${draggableCard ? "cursor-grab active:cursor-grabbing" : ""}`}
+      >
+        <Image
+          src={`/api/property-media/${m.id}/download`}
+          alt={mediaAltText(m, plan ? "Kat planı" : `Portföy fotoğrafı ${i + 1}`)}
+          fill
+          sizes="(max-width: 640px) 50vw, 25vw"
+          className={plan ? "object-contain p-1" : "object-cover"}
+          unoptimized
+          draggable={false}
+        />
+        {canEdit ? (
+          <>
+            {/* Kartın tamamı seçim etiketidir: telefonda görsele dokunmak seçer (sıra/etiket paneli açılır). */}
+            <label className="absolute inset-0 z-[5] cursor-pointer">
+              <span className="absolute left-1 top-1 grid h-9 w-9 place-items-center touch:h-11 touch:w-11">
+                <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(m.id)}
+                    onChange={() => toggleSelect(m.id)}
+                    aria-label={`${plan ? "Kat planını" : "Görseli"} seç${label ? ` (${label})` : ""}`}
+                    className="h-4 w-4 accent-[var(--brand-600)] touch:h-5 touch:w-5"
+                  />
+                </span>
+              </span>
+            </label>
+            {draggableCard ? (
+              <span
+                aria-hidden
+                className="hover-action absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-ink-950/55 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100 [@media(hover:none)]:hidden"
+              >
+                <GripVertical className="h-3.5 w-3.5" />
+              </span>
+            ) : null}
+          </>
+        ) : null}
+        {/* Sıra numarası + etiket — sürükleyerek/oklarla değiştirilen düzen görünür olsun */}
+        <span className="pointer-events-none absolute bottom-2 left-2 z-10 inline-flex max-w-[calc(100%-1rem)] items-center gap-1 rounded-full bg-ink-950/65 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
+          <span>{i + 1}</span>
+          {label ? <span className="truncate font-semibold">· {label}</span> : null}
+        </span>
+        <div className="pointer-events-none absolute left-1/2 top-2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-1">
+          {m.is_cover && !plan ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-xs font-bold text-white">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Kapak
+            </span>
+          ) : null}
+          {canEdit && !m.has_watermark ? (
+            <span
+              title="Bu görsel filigransız yüklendi. Ayar değişse bile eski görseller yeniden damgalanmaz — yeniden yükleyerek damgalayabilirsiniz."
+              className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
+            >
+              <Droplets className="h-3 w-3" /> Filigran yok
+            </span>
+          ) : null}
+          {canEdit && !plan
+            ? (() => {
+                const q = assessPhoto(m);
+                return q.issues.length > 0 ? (
+                  <span
+                    title={q.warning ?? undefined}
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
+                  >
+                    <AlertCircle className="h-3 w-3" aria-hidden /> {ISSUE_BADGE[q.issues[0]]}
+                  </span>
+                ) : null;
+              })()
+            : null}
+        </div>
+        {canEdit ? (
+          // Dokunmatikte gizli: aynı eylemler seçim panelinde 44 px hedeflerle (görsele dokunmak seçer).
+          <div className="hover-action absolute inset-x-0 bottom-0 z-10 flex items-center justify-end gap-1 bg-gradient-to-t from-ink-950/80 to-transparent p-2 opacity-0 transition group-hover:opacity-100 [@media(hover:none)]:hidden">
+            <button
+              type="button"
+              title="AI ile oku (tapu/yetki belgesi)"
+              aria-label="AI ile oku (tapu/yetki belgesi)"
+              disabled={ocrPending}
+              onClick={() => runOcr(m.id)}
+              className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60 touch:min-h-11 touch:min-w-11"
+            >
+              {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
+            </button>
+            {!m.is_cover && !plan ? (
+              <button
+                type="button"
+                title="Kapak yap"
+                aria-label="Kapak yap"
+                onClick={() => makeCover(m.id)}
+                className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
+              >
+                <Star className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            {documentFlagAvailable ? (
+              <button
+                type="button"
+                title="Belge olarak işaretle (dışarıda gösterilmez)"
+                aria-label="Belge olarak işaretle (dışarıda gösterilmez)"
+                onClick={() => markDocument([m.id], true)}
+                className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
+              >
+                <FileLock2 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+            <ConfirmDialog
+              trigger={
+                <button
+                  type="button"
+                  title="Sil"
+                  aria-label="Sil"
+                  className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              }
+              title={plan ? "Kat planı silinsin mi?" : "Görsel silinsin mi?"}
+              description={plan ? "Bu kat planı kalıcı olarak silinir." : "Bu görsel kalıcı olarak silinir."}
+              confirmLabel="Sil"
+              formAction={deletePropertyMedia}
+              hiddenFields={{ id: m.id, property_id: propertyId }}
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
 
   const [urlState, urlAction, urlPending] = useActionState<MediaResult, FormData>(
     addPropertyMediaUrl,
     {},
   );
 
+  const uploadKinds: { value: UploadKind; label: string; icon: typeof ImageIcon; title: string }[] = [
+    { value: "photo", label: "Fotoğraf", icon: ImageIcon, title: "İlan fotoğrafı: paylaşım, sunum ve vitrinde gösterilir." },
+    ...(metaAvailable
+      ? [
+          {
+            value: "floorplan" as const,
+            label: "Kat planı",
+            icon: LayoutPanelTop,
+            title: "Kat planı: vitrin, paylaşım ve sunumda fotoğraflardan ayrı 'Kat planı' sekmesinde gösterilir.",
+          },
+        ]
+      : []),
+    {
+      value: "document",
+      label: "Belge",
+      icon: FileLock2,
+      title: "Tapu, yetki belgesi, kimlik gibi belgeler: paylaşım, sunum ve vitrinde ASLA gösterilmez.",
+    },
+  ];
+  const uploadLabel = uploadKind === "document" ? "Belge yükle" : uploadKind === "floorplan" ? "Kat planı yükle" : "Fotoğraf yükle";
+  const publicCount = images.length + floorPlans.length;
+
   return (
     <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-4 sm:px-5">
+        <div className="min-w-0">
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <ImagePlus className="h-4 w-4 text-brand-600" /> Medya galerisi
           </h2>
           <p className="flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
-            {images.length} fotoğraf · {documents.length} belge · {links.length} video/tur — fotoğraflar paylaşımda
-            gösterilir, belgeler gösterilmez
+            {images.length} fotoğraf{floorPlans.length > 0 ? ` · ${floorPlans.length} kat planı` : ""} · {documents.length} belge ·{" "}
+            {links.length} video/tur — fotoğraflar paylaşımda gösterilir, belgeler gösterilmez
             {canEdit ? (
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
@@ -551,95 +807,119 @@ export function PropertyMediaManager({
             ) : null}
           </p>
         </div>
-        {canEdit ? (
-          <div className="flex flex-wrap items-center gap-2">
-            {pendingFiles && pendingFiles.length > 0 ? (
-              <Button
-                icon={Upload}
-                onClick={() => {
-                  void enqueueFiles(pendingFiles, false);
-                  onPendingQueued?.();
-                }}
-                disabled={uploading}
-              >
-                Paylaşılan {pendingFiles.length} fotoğrafı yükle
-              </Button>
-            ) : null}
-            <input
-              aria-label="Fotoğraf seç"
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              multiple
-              className="hidden"
-              onChange={(e) => onFileChange(e, false)}
-            />
-            {/* Saha çekimi: arka kamerayı doğrudan açar. UA yerine CSS ile yalnız
-                dokunmatik cihazda görünür (hover-action deseniyle aynı yaklaşım). */}
-            <input
-              aria-label="Kamerayla fotoğraf çek"
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => onFileChange(e, true)}
-            />
-            {/* Yükleme türü (KVKK P0-9): Belge seçilirse kayıt ilk andan "dışarıda gösterilmez" işaretli doğar. */}
-            <div
-              role="radiogroup"
-              aria-label="Yükleme türü"
-              className="inline-flex rounded-[var(--radius-control)] border border-line bg-canvas p-0.5 text-xs font-semibold"
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {canEdit && pendingFiles && pendingFiles.length > 0 ? (
+            <Button
+              icon={Upload}
+              onClick={() => {
+                void enqueueFiles(pendingFiles, false);
+                onPendingQueued?.();
+              }}
+              disabled={uploading}
             >
+              Paylaşılan {pendingFiles.length} fotoğrafı yükle
+            </Button>
+          ) : null}
+          {canEdit ? (
+            <>
+              <input
+                aria-label="Fotoğraf seç"
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={(e) => onFileChange(e, false)}
+              />
+              {/* Saha çekimi: arka kamerayı doğrudan açar. UA yerine CSS ile yalnız
+                  dokunmatik cihazda görünür (hover-action deseniyle aynı yaklaşım). */}
+              <input
+                aria-label="Kamerayla fotoğraf çek"
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => onFileChange(e, true)}
+              />
+              {/* Yükleme türü (KVKK P0-9): Belge seçilirse kayıt ilk andan "dışarıda gösterilmez" işaretli doğar;
+                  Kat planı seçilirse kayıt kat planı etiketiyle doğar (yayında ayrı sekme, kapak olmaz). */}
+              <div
+                role="radiogroup"
+                aria-label="Yükleme türü"
+                className="inline-flex max-w-full rounded-[var(--radius-control)] border border-line bg-canvas p-0.5 text-xs font-semibold"
+              >
+                {uploadKinds.map((k) => {
+                  const active = uploadKind === k.value;
+                  const Icon = k.icon;
+                  return (
+                    <button
+                      key={k.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => setUploadKind(k.value)}
+                      disabled={uploading}
+                      title={k.title}
+                      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-[var(--radius-control)] px-2.5 py-1.5 touch:min-h-11 ${
+                        active ? "bg-surface text-ink-950 shadow-sm" : "text-text-muted hover:text-ink-950"
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" aria-hidden /> {k.label}
+                    </button>
+                  );
+                })}
+              </div>
               <button
                 type="button"
-                role="radio"
-                aria-checked={!uploadAsDocument}
-                onClick={() => setUploadAsDocument(false)}
+                onClick={() => cameraRef.current?.click()}
                 disabled={uploading}
-                title="İlan fotoğrafı: paylaşım, sunum ve vitrinde gösterilir."
-                className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2.5 py-1.5 ${
-                  !uploadAsDocument ? "bg-surface text-ink-950 shadow-sm" : "text-text-muted hover:text-ink-950"
-                }`}
+                className="hidden min-h-11 items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 [@media(hover:none)]:inline-flex"
               >
-                <ImageIcon className="h-3.5 w-3.5" /> Fotoğraf
+                <Camera className="h-4 w-4" /> Kamera ile çek
               </button>
               <button
                 type="button"
-                role="radio"
-                aria-checked={uploadAsDocument}
-                onClick={() => setUploadAsDocument(true)}
+                onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                title="Tapu, yetki belgesi, kimlik gibi belgeler: paylaşım, sunum ve vitrinde ASLA gösterilmez."
-                className={`inline-flex items-center gap-1 rounded-[var(--radius-control)] px-2.5 py-1.5 ${
-                  uploadAsDocument ? "bg-surface text-ink-950 shadow-sm" : "text-text-muted hover:text-ink-950"
-                }`}
+                className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60 touch:min-h-11"
               >
-                <FileLock2 className="h-3.5 w-3.5" /> Belge
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                {uploadLabel}
               </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => cameraRef.current?.click()}
-              disabled={uploading}
-              className="hidden items-center gap-1.5 rounded-[var(--radius-control)] bg-brand-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-60 [@media(hover:none)]:inline-flex"
-            >
-              <Camera className="h-4 w-4" /> Kamera ile çek
-            </button>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={uploading}
-              className="btn-shine inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-ink-950 px-3.5 py-2 text-sm font-semibold text-white hover:bg-ink-800 disabled:opacity-60"
-            >
-              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {uploadAsDocument ? "Belge yükle" : "Fotoğraf yükle"}
-            </button>
-          </div>
-        ) : null}
+            </>
+          ) : null}
+          {publicCount > 0 ? (
+            // Toplu indirme (PF-09): sıralı ZIP; belge, video ve tur bağlantıları girmez. Filigranlı seçenek
+            // yüklenirken damgalanmamış görsellere ofis filigranını ZIP'teki kopyada basar.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className={buttonClass({ variant: "outline", size: "md" })}>
+                  <Download className="h-4 w-4" aria-hidden /> İndir
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="min-w-[15rem]">
+                <DropdownMenuItem asChild>
+                  <a href={zipHref} className="touch:min-h-11">
+                    <ArrowDownToLine className="h-4 w-4" aria-hidden /> Tüm fotoğraflar (ZIP)
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`${zipHref}?filigran=1`} className="touch:min-h-11">
+                    <Droplets className="h-4 w-4" aria-hidden /> Filigranlı fotoğraflar (ZIP)
+                  </a>
+                </DropdownMenuItem>
+                <p className="px-2.5 pb-1 pt-1.5 text-xs text-text-muted">
+                  Galeri sırasıyla, en çok 60 görsel. Belgeler ZIP&apos;e eklenmez.
+                </p>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
       </div>
 
-      <div className="p-5">
+      {/* Telefonda seçim paneli ekranın altına sabitlenir: son satırlar panelin arkasında kalmasın diye alt boşluk. */}
+      <div className={`p-4 sm:p-5 ${canEdit && single && !single.is_document ? "pb-72 lg:pb-5" : ""}`}>
         {queue.length > 0 ? (
           <div className="mb-4 space-y-1.5">
             {queue.map((q) => (
@@ -719,49 +999,87 @@ export function PropertyMediaManager({
 
         {allImages.length > 0 && canEdit ? (
           <div className="mb-3 flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2">
-            <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950 touch:min-h-11">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={() => setSelected(allSelected ? [] : allImages.map((m) => m.id))}
-                className="h-4 w-4 accent-[var(--brand-600)]"
+                className="h-4 w-4 accent-[var(--brand-600)] touch:h-5 touch:w-5"
               />
               Tümünü seç
             </label>
             <span className="text-xs text-text-muted">
-              {selected.length > 0 ? `${selected.length} görsel seçili` : "Sıralamak için sürükleyip bırakın"}
+              {selected.length > 0 ? (
+                `${selected.length} görsel seçili`
+              ) : (
+                <>
+                  <span className="[@media(hover:none)]:hidden">Sıralamak için sürükleyip bırakın ya da bir görsel seçin</span>
+                  <span className="hidden [@media(hover:none)]:inline">Sıralamak ve etiketlemek için bir görsel seçin</span>
+                </>
+              )}
             </span>
             <span className="flex-1" />
-            {selected.length === 1 && !byId.get(selected[0])?.is_cover && !byId.get(selected[0])?.is_document ? (
-              <button
-                type="button"
-                onClick={() => makeCover(selected[0])}
-                className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
-              >
-                <Star className="h-3.5 w-3.5 text-amber-500" /> Kapak yap
-              </button>
+            {single && !single.is_cover && !single.is_document && !isFloorPlan(single) ? (
+              <Button variant="secondary" size="sm" icon={Star} onClick={() => makeCover(single.id)}>
+                Kapak yap
+              </Button>
+            ) : null}
+            {selected.length > 0 && metaAvailable ? (
+              <>
+                {selected.some((id) => !byId.get(id)?.is_document && !isFloorPlan(byId.get(id) ?? {})) ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={LayoutPanelTop}
+                    loading={metaPending}
+                    title="Seçilenler yayında fotoğraflardan ayrı 'Kat planı' sekmesinde gösterilir."
+                    onClick={() =>
+                      saveMeta(
+                        selected.filter((id) => !byId.get(id)?.is_document && !isFloorPlan(byId.get(id) ?? {})),
+                        { roomTag: FLOOR_PLAN_TAG },
+                        true,
+                      )
+                    }
+                  >
+                    Kat planı yap ({selected.filter((id) => !byId.get(id)?.is_document && !isFloorPlan(byId.get(id) ?? {})).length})
+                  </Button>
+                ) : null}
+                {selected.some((id) => isFloorPlan(byId.get(id) ?? {})) ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={ImageIcon}
+                    loading={metaPending}
+                    onClick={() => saveMeta(selected.filter((id) => isFloorPlan(byId.get(id) ?? {})), { roomTag: null }, true)}
+                  >
+                    Fotoğrafa çevir ({selected.filter((id) => isFloorPlan(byId.get(id) ?? {})).length})
+                  </Button>
+                ) : null}
+              </>
             ) : null}
             {selected.length > 0 && documentFlagAvailable ? (
               <>
                 {selected.some((id) => !byId.get(id)?.is_document) ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={FileLock2}
                     onClick={() => markDocument(selected.filter((id) => !byId.get(id)?.is_document), true)}
                     title="Seçilenler paylaşım, sunum ve vitrinde gösterilmez."
-                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
                   >
-                    <FileLock2 className="h-3.5 w-3.5" /> Belge yap ({selected.filter((id) => !byId.get(id)?.is_document).length})
-                  </button>
+                    Belge yap ({selected.filter((id) => !byId.get(id)?.is_document).length})
+                  </Button>
                 ) : null}
                 {selected.some((id) => byId.get(id)?.is_document) ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={ImageIcon}
                     onClick={() => markDocument(selected.filter((id) => byId.get(id)?.is_document), false)}
                     title="Seçilenler ilan fotoğrafı olur ve paylaşımda gösterilir."
-                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-ink-950 hover:border-brand-300"
                   >
-                    <ImageIcon className="h-3.5 w-3.5" /> Fotoğraf yap ({selected.filter((id) => byId.get(id)?.is_document).length})
-                  </button>
+                    Fotoğraf yap ({selected.filter((id) => byId.get(id)?.is_document).length})
+                  </Button>
                 ) : null}
               </>
             ) : null}
@@ -770,7 +1088,7 @@ export function PropertyMediaManager({
                 trigger={
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5 text-xs font-semibold text-danger-500 hover:bg-danger-500/15"
+                    className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/10 px-3 py-1.5 text-xs font-semibold text-danger-500 hover:bg-danger-500/15 touch:min-h-11"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Seçilenleri sil ({selected.length})
                   </button>
@@ -781,16 +1099,57 @@ export function PropertyMediaManager({
                 onConfirm={bulkDelete}
               />
             ) : null}
+            {selected.length > 0 ? (
+              <Button variant="ghost" size="icon" icon={X} aria-label="Seçimi kaldır" onClick={() => setSelected([])} />
+            ) : null}
             {savingOrder ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
+              <span role="status" className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Sıra kaydediliyor…
               </span>
             ) : null}
           </div>
         ) : null}
 
+        {canEdit && single && !single.is_document ? (
+          <SelectedMediaPanel
+            key={`${single.id}:${single.room_tag ?? ""}:${single.caption ?? ""}`}
+            item={single}
+            position={(isFloorPlan(single) ? floorPlans : images).findIndex((m) => m.id === single.id)}
+            total={(isFloorPlan(single) ? floorPlans : images).length}
+            metaAvailable={metaAvailable}
+            pending={metaPending}
+            onMove={(step) => moveItem(single.id, step)}
+            onSaveMeta={(input) => saveMeta([single.id], input)}
+            onClose={() => setSelected([])}
+            actions={
+              <>
+                {!single.is_cover && !isFloorPlan(single) ? (
+                  <Button variant="ghost" size="icon" icon={Star} aria-label="Kapak yap" title="Kapak yap" onClick={() => makeCover(single.id)} />
+                ) : null}
+                <ConfirmDialog
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Sil"
+                      title="Sil"
+                      className={buttonClass({ variant: "ghost", size: "icon", className: "text-danger-500" })}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  }
+                  title={isFloorPlan(single) ? "Kat planı silinsin mi?" : "Görsel silinsin mi?"}
+                  description="Bu görsel kalıcı olarak silinir."
+                  confirmLabel="Sil"
+                  formAction={deletePropertyMedia}
+                  hiddenFields={{ id: single.id, property_id: propertyId }}
+                />
+              </>
+            }
+          />
+        ) : null}
+
         {orderError || bulkError ? (
-          <p className="mb-3 text-sm font-medium text-danger-500">{orderError ?? bulkError}</p>
+          <p role="alert" className="mb-3 text-sm font-medium text-danger-500">{orderError ?? bulkError}</p>
         ) : null}
 
         {coverSuggestion ? (
@@ -807,144 +1166,22 @@ export function PropertyMediaManager({
 
         {images.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {images.map((m, i) => (
-              <div
-                key={m.id}
-                draggable={canEdit}
-                onDragStart={(e) => {
-                  if (!canEdit) return;
-                  e.dataTransfer.setData("text/plain", m.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  setDragId(m.id);
-                }}
-                onDragOver={(e) => {
-                  if (!dragId) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  moveOver(m.id);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  commitOrder();
-                }}
-                onDragEnd={commitOrder}
-                className={`group relative aspect-[4/3] overflow-hidden rounded-[var(--radius-card)] border bg-canvas transition ${
-                  dragId === m.id
-                    ? "border-brand-300 opacity-40"
-                    : selectedSet.has(m.id)
-                      ? "border-brand-400 ring-2 ring-brand-400/35"
-                      : "border-line"
-                } ${canEdit ? "cursor-grab active:cursor-grabbing" : ""}`}
-              >
-                <Image
-                  src={`/api/property-media/${m.id}/download`}
-                  alt="Portföy görseli"
-                  fill
-                  sizes="(max-width: 640px) 50vw, 25vw"
-                  className="object-cover"
-                  unoptimized
-                  draggable={false}
-                />
-                {canEdit ? (
-                  <>
-                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(m.id)}
-                        onChange={() => toggleSelect(m.id)}
-                        aria-label="Görseli seç"
-                        className="h-4 w-4 accent-[var(--brand-600)]"
-                      />
-                    </label>
-                    <span className="hover-action absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-ink-950/55 text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">
-                      <GripVertical className="h-3.5 w-3.5" />
-                    </span>
-                  </>
-                ) : null}
-                {/* Sıra numarası — sürükleyerek değiştirilen düzen görünür olsun */}
-                <span className="absolute bottom-2 left-2 z-10 rounded-full bg-ink-950/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
-                  {i + 1}
-                </span>
-                <div className="absolute left-1/2 top-2 z-10 flex -translate-x-1/2 flex-wrap justify-center gap-1">
-                  {m.is_cover ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-xs font-bold text-white">
-                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> Kapak
-                    </span>
-                  ) : null}
-                  {canEdit && !m.has_watermark ? (
-                    <span
-                      title="Bu görsel filigransız yüklendi. Ayar değişse bile eski görseller yeniden damgalanmaz — yeniden yükleyerek damgalayabilirsiniz."
-                      className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
-                    >
-                      <Droplets className="h-3 w-3" /> Filigran yok
-                    </span>
-                  ) : null}
-                  {canEdit
-                    ? (() => {
-                        const q = assessPhoto(m);
-                        return q.issues.length > 0 ? (
-                          <span
-                            title={q.warning ?? undefined}
-                            className="inline-flex items-center gap-1 rounded-full bg-amber-400/85 px-2 py-0.5 text-xs font-bold text-ink-950"
-                          >
-                            <AlertCircle className="h-3 w-3" aria-hidden /> {ISSUE_BADGE[q.issues[0]]}
-                          </span>
-                        ) : null;
-                      })()
-                    : null}
-                </div>
-                {canEdit ? (
-                  <div className="hover-action absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-ink-950/80 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
-                    <button
-                      type="button"
-                      title="AI ile oku (tapu/yetki belgesi)"
-                      disabled={ocrPending}
-                      onClick={() => runOcr(m.id)}
-                      className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-brand-600 hover:bg-white disabled:opacity-60 touch:min-h-11 touch:min-w-11"
-                    >
-                      {ocrBusyId === m.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanText className="h-3.5 w-3.5" />}
-                    </button>
-                    {!m.is_cover ? (
-                      <button
-                        type="button"
-                        title="Kapak yap"
-                        onClick={() => makeCover(m.id)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
-                      >
-                        <Star className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                    {documentFlagAvailable ? (
-                      <button
-                        type="button"
-                        title="Belge olarak işaretle (dışarıda gösterilmez)"
-                        aria-label="Belge olarak işaretle (dışarıda gösterilmez)"
-                        onClick={() => markDocument([m.id], true)}
-                        className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-white/90 text-ink-950 hover:bg-white touch:min-h-11 touch:min-w-11"
-                      >
-                        <FileLock2 className="h-3.5 w-3.5" />
-                      </button>
-                    ) : null}
-                    <ConfirmDialog
-                      trigger={
-                        <button
-                          type="button"
-                          title="Sil"
-                          className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      }
-                      title="Görsel silinsin mi?"
-                      description="Bu görsel kalıcı olarak silinir."
-                      confirmLabel="Sil"
-                      formAction={deletePropertyMedia}
-                      hiddenFields={{ id: m.id, property_id: propertyId }}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ))}
+            {images.map((m, i) => renderImageCard(m, i))}
+          </div>
+        ) : null}
+
+        {/* PF-01 / PUB-9: kat planları ayrı şeritte; yayında (vitrin, paylaşım, sunum, broşür) ayrı sekmede gösterilir. */}
+        {floorPlans.length > 0 ? (
+          <div className="mt-5">
+            <h3 className="mb-1 flex items-center gap-1.5 text-sm font-bold text-ink-950">
+              <LayoutPanelTop className="h-4 w-4 text-brand-600" aria-hidden /> Kat planları ({floorPlans.length})
+            </h3>
+            <p className="mb-3 text-xs text-text-muted">
+              Vitrin, paylaşım linki ve sunumda fotoğraflardan ayrı &quot;Kat planı&quot; sekmesinde gösterilir; kapak olmaz.
+            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {floorPlans.map((m, i) => renderImageCard(m, i))}
+            </div>
           </div>
         ) : null}
 
@@ -979,14 +1216,16 @@ export function PropertyMediaManager({
                     draggable={false}
                   />
                   {canEdit ? (
-                    <label className="absolute left-2 top-2 z-10 grid h-7 w-7 cursor-pointer place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(m.id)}
-                        onChange={() => toggleSelect(m.id)}
-                        aria-label="Belgeyi seç"
-                        className="h-4 w-4 accent-[var(--brand-600)]"
-                      />
+                    <label className="absolute left-1 top-1 z-10 grid h-9 w-9 cursor-pointer place-items-center touch:h-11 touch:w-11">
+                      <span className="grid h-7 w-7 place-items-center rounded-[var(--radius-control)] bg-ink-950/55 backdrop-blur-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedSet.has(m.id)}
+                          onChange={() => toggleSelect(m.id)}
+                          aria-label="Belgeyi seç"
+                          className="h-4 w-4 accent-[var(--brand-600)] touch:h-5 touch:w-5"
+                        />
+                      </span>
                     </label>
                   ) : null}
                   <span className="absolute left-1/2 top-2 z-10 inline-flex -translate-x-1/2 items-center gap-1 rounded-full bg-ink-950/80 px-2 py-0.5 text-xs font-bold text-white">
@@ -1019,6 +1258,7 @@ export function PropertyMediaManager({
                           <button
                             type="button"
                             title="Sil"
+                            aria-label="Sil"
                             className="grid h-7 w-7 min-h-9 min-w-9 place-items-center rounded-[var(--radius-control)] bg-danger-500 text-white hover:bg-danger-600 touch:min-h-11 touch:min-w-11"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1038,7 +1278,7 @@ export function PropertyMediaManager({
           </div>
         ) : null}
 
-        {canEdit && images.length > 0 && unstamped > 0 && watermark.enabled ? (
+        {canEdit && publicCount > 0 && unstamped > 0 && watermark.enabled ? (
           <p className="mt-2 text-xs text-text-faint">
             {unstamped} görsel filigransız. Filigran yükleme anında basıldığı için eski görseller
             geriye dönük damgalanmaz — istersen o fotoğrafları silip yeniden yükleyebilirsin.
@@ -1204,5 +1444,140 @@ export function PropertyMediaManager({
         </div>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * Tek seçili fotoğraf / kat planı paneli: dokunmatik sıralama (Başa al, Öne al, Arkaya al, Sona al; ≥44 px hedef),
+ * kapak/silme ve oda etiketi + açıklama. Telefonda (< lg) ekranın altına, mobil alt gezinmenin üstüne sabitlenir:
+ * aşağıdaki bir fotoğrafa dokunan kullanıcı paneli görmek için yukarı kaydırmak zorunda kalmaz. Masaüstünde galeri
+ * üstünde satır içi durur. Etiket seçimi anında kaydedilir; açıklama "Kaydet" ile (Enter da kaydeder). `key` seçili
+ * kaydın kimliği + değerleriyle verilir: sunucudan yeni değer gelince alanlar kendiliğinden tazelenir.
+ */
+function SelectedMediaPanel({
+  item,
+  position,
+  total,
+  metaAvailable,
+  pending,
+  actions,
+  onMove,
+  onSaveMeta,
+  onClose,
+}: {
+  item: MediaItem;
+  position: number;
+  total: number;
+  metaAvailable: boolean;
+  pending: boolean;
+  /** Başlık satırındaki ek eylemler (Kapak yap, Sil). */
+  actions?: ReactNode;
+  onMove: (step: number | "first" | "last") => void;
+  onSaveMeta: (input: { roomTag?: string | null; caption?: string | null }) => void;
+  onClose: () => void;
+}) {
+  const plan = isFloorPlan(item);
+  const [caption, setCaption] = useState(item.caption ?? "");
+  const captionDirty = caption.trim() !== (item.caption ?? "").trim();
+  const atStart = position <= 0;
+  const atEnd = position >= total - 1;
+  const noun = plan ? "kat planı" : "fotoğraf";
+  const moves: { label: string; icon: typeof ArrowLeft; step: number | "first" | "last"; disabled: boolean }[] = [
+    { label: "Başa al", icon: ChevronsLeft, step: "first", disabled: atStart },
+    { label: "Öne al", icon: ArrowLeft, step: -1, disabled: atStart },
+    { label: "Arkaya al", icon: ArrowRight, step: 1, disabled: atEnd },
+    { label: "Sona al", icon: ChevronsRight, step: "last", disabled: atEnd },
+  ];
+
+  return (
+    <div
+      role="region"
+      aria-label={`Seçili ${noun}: sıra ve etiket`}
+      className="fixed inset-x-2 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] z-30 max-h-[60dvh] overflow-y-auto overscroll-contain rounded-[var(--radius-card)] border border-brand-300/60 bg-surface p-3 shadow-[var(--elev-2)] lg:static lg:mb-3 lg:max-h-none lg:overflow-visible lg:bg-brand-600/5 lg:shadow-none"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-xs font-bold text-ink-950">
+          {plan ? "Kat planı" : "Fotoğraf"} {position + 1} / {total}
+          <span className="ml-1 hidden font-medium text-text-muted sm:inline">
+            — sırası {plan ? "kat planları" : "fotoğraflar"} içinde değişir
+          </span>
+        </p>
+        <div className="flex shrink-0 items-center gap-1">
+          {actions}
+          <Button variant="ghost" size="icon" icon={X} aria-label="Seçimi kapat" onClick={onClose} />
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap" role="group" aria-label="Sırayı değiştir">
+        {moves.map((m) => {
+          const Icon = m.icon;
+          return (
+            <button
+              key={m.label}
+              type="button"
+              disabled={m.disabled}
+              onClick={() => onMove(m.step)}
+              aria-label={m.label}
+              title={m.label}
+              className={buttonClass({ variant: "secondary", size: "sm", className: "w-full min-w-0 sm:w-auto" })}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="hidden sm:inline">{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {metaAvailable ? (
+        <form
+          className="mt-2 grid gap-2 sm:grid-cols-[minmax(10rem,13rem)_1fr_auto] sm:items-end"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (captionDirty) onSaveMeta({ caption: caption.trim() || null });
+          }}
+        >
+          <label className="text-xs font-semibold text-text-muted">
+            <span className="mb-1 flex items-center gap-1">
+              <Tag className="h-3.5 w-3.5" aria-hidden /> Oda etiketi
+            </span>
+            <select
+              value={item.room_tag ?? ""}
+              disabled={pending}
+              onChange={(e) => onSaveMeta({ roomTag: e.target.value || null })}
+              className="surface-sunken w-full rounded-[var(--radius-control)] border border-hairline px-3 py-[0.4375rem] text-sm font-semibold text-ink-950 focus:border-brand-400 focus:outline-none touch:min-h-11 touch:text-base"
+            >
+              <option value="">Etiket yok</option>
+              {ROOM_TAGS.map((t) => (
+                <option key={t} value={t}>
+                  {ROOM_TAG_LABEL[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-[1fr_auto] items-end gap-2 sm:contents">
+            <label className="min-w-0 text-xs font-semibold text-text-muted">
+              <span className="mb-1 flex items-center justify-between gap-2">
+                <span>Açıklama (vitrinde alt yazı)</span>
+                <span className="font-medium tabular-nums text-text-faint">
+                  {Array.from(caption).length}/{CAPTION_MAX}
+                </span>
+              </span>
+              <Input
+                value={caption}
+                maxLength={CAPTION_MAX}
+                enterKeyHint="done"
+                placeholder={plan ? "ör. Zemin kat planı" : "ör. Deniz manzaralı salon"}
+                onChange={(e) => setCaption(e.target.value)}
+              />
+            </label>
+            <Button type="submit" variant="navy" size="md" loading={pending} disabled={!captionDirty}>
+              Kaydet
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="mt-2 text-xs text-text-muted">
+          Oda etiketi, açıklama ve kat planı ayrımı veritabanı güncellemesinden sonra açılır.
+        </p>
+      )}
+    </div>
   );
 }
