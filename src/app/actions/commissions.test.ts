@@ -15,7 +15,8 @@ let db: Mock;
 const requirePermission = vi.fn();
 const logActivity = vi.fn(async () => ({ ok: true }));
 const recordCollectionCashResult = vi.fn();
-const voidCollectionCash = vi.fn(async () => undefined);
+const reverseSourceCash = vi.fn();
+const loadCommissionCollection = vi.fn();
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn(), unstable_cache: (fn: unknown) => fn }));
 vi.mock("@/lib/revalidate", () => ({ revalidateTenantData: vi.fn() }));
@@ -25,7 +26,8 @@ vi.mock("@/lib/require-permission", () => ({ requirePermission: (...a: unknown[]
 vi.mock("@/lib/finance/cash/collection-link", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/finance/cash/collection-link")>()),
   recordCollectionCashResult: (...a: unknown[]) => recordCollectionCashResult(...(a as [])),
-  voidCollectionCash: (...a: unknown[]) => voidCollectionCash(...(a as [])),
+  reverseSourceCash: (...a: unknown[]) => reverseSourceCash(...(a as [])),
+  loadCommissionCollection: (...a: unknown[]) => loadCommissionCollection(...(a as [])),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => db.client }));
 
@@ -47,7 +49,8 @@ describe("komisyon eylemleri", () => {
     requirePermission.mockReset().mockResolvedValue(ownerGate);
     logActivity.mockClear();
     recordCollectionCashResult.mockReset().mockResolvedValue({ ok: true });
-    voidCollectionCash.mockClear();
+    reverseSourceCash.mockReset().mockResolvedValue({ ok: true, reversed: 1, mirrored: 0, failed: 0, message: null });
+    loadCommissionCollection.mockReset().mockResolvedValue({ collected: 0, nextSeq: 1, total: 1200, remaining: 1200 });
   });
 
   it("yetki reddinde hiçbir şey yazılmaz (toplu, yeniden deneme, paylaşım)", async () => {
@@ -214,5 +217,78 @@ describe("komisyon eylemleri", () => {
     expect(res.ok).toBe(true);
     expect(logActivity).toHaveBeenCalledTimes(1);
     expect(db.tables.commissions[0]!.splits).toEqual([{ label: "Ofis", rate: 100, amount: 1000 }]);
+  });
+
+  describe("kısmi tahsilat (WP3)", () => {
+    const C = "c0000000-0000-4000-8000-000000000001";
+
+    it("tutar kalanı aşamaz; hesap ve tutar zorunlu; tahsil edilmiş komisyona kısmi tahsilat yazılmaz", async () => {
+      setup([comm(C, "calculated", 1000, 200)]);
+      loadCommissionCollection.mockResolvedValue({ collected: 700, nextSeq: 2, total: 1200, remaining: 500 });
+      const { recordCommissionCollection } = await import("./commissions");
+      expect((await recordCommissionCollection(C, { accountId: "", amount: 100 })).error).toContain("hesabı seçin");
+      expect((await recordCommissionCollection(C, { accountId: ACC, amount: 0 })).error).toContain("tutarı girin");
+      expect((await recordCommissionCollection(C, { accountId: ACC, amount: 500.01 })).error).toContain("aşamaz");
+      expect((await recordCommissionCollection(C, { accountId: ACC, amount: 100, date: "2999-01-01" })).error).toContain("tarih");
+      setup([comm(C, "paid", 1000, 200)]);
+      expect((await recordCommissionCollection(C, { accountId: ACC, amount: 100 })).error).toContain("zaten tahsil");
+      expect(recordCollectionCashResult).not.toHaveBeenCalled();
+    });
+
+    it("kısmi tahsilat kasaya yazılır, kalan döner; durum değişmez", async () => {
+      setup([comm(C, "calculated", 1000, 200)]);
+      const { recordCommissionCollection } = await import("./commissions");
+      const res = await recordCommissionCollection(C, { accountId: ACC, amount: 400 });
+      expect(res).toMatchObject({ ok: true, remaining: 800, fullyCollected: false });
+      expect(recordCollectionCashResult.mock.calls[0]![1]).toMatchObject({ accountId: ACC, sourceType: "commission", sourceId: C, amount: 400 });
+      expect(db.tables.commissions[0]!.status).toBe("calculated");
+      expect(logActivity).toHaveBeenCalledWith(expect.objectContaining({ action: "commission.collection_recorded" }));
+    });
+
+    it("kalan sıfırlanınca komisyon tahsil edildi (paid) olur; eşzamanlı aynı sıra (duplicate) hata döner", async () => {
+      setup([comm(C, "calculated", 1000, 200)]);
+      loadCommissionCollection.mockResolvedValue({ collected: 700, nextSeq: 2, total: 1200, remaining: 500 });
+      const { recordCommissionCollection } = await import("./commissions");
+      recordCollectionCashResult.mockResolvedValueOnce({ ok: true, duplicate: true });
+      expect((await recordCommissionCollection(C, { accountId: ACC, amount: 500 })).error).toContain("başka bir tahsilat");
+      expect(db.tables.commissions[0]!.status).toBe("calculated");
+      expect(await recordCommissionCollection(C, { accountId: ACC, amount: 500 })).toMatchObject({ ok: true, remaining: 0, fullyCollected: true });
+      expect(db.tables.commissions[0]!.status).toBe("paid");
+      expect(db.hasFilter("commissions", "eq", "tenant_id", T, "update")).toBe(true);
+    });
+  });
+
+  describe("tahsilatı geri al → finance_reverse", () => {
+    it("önce kasa hareketleri geri alınır, sonra durum calculated olur; kasa geri alınamazsa durum değişmez", async () => {
+      setup([comm("c1", "paid", 1000, 200)]);
+      const { revertCommissionPayment } = await import("./commissions");
+      reverseSourceCash.mockResolvedValueOnce({ ok: false, reversed: 0, mirrored: 0, failed: 1, message: "Ters kayıt için açık bir ay bulunamadı." });
+      expect((await revertCommissionPayment("c1")).error).toContain("açık bir ay");
+      expect(db.tables.commissions[0]!.status).toBe("paid");
+      reverseSourceCash.mockResolvedValueOnce({ ok: true, reversed: 1, mirrored: 1, failed: 0, message: null });
+      const res = await revertCommissionPayment("c1");
+      expect(res).toMatchObject({ ok: true, info: expect.stringContaining("ters kayıt") });
+      expect(reverseSourceCash).toHaveBeenLastCalledWith(expect.anything(), "commission", "c1", expect.any(String));
+      expect(db.tables.commissions[0]!.status).toBe("calculated");
+    });
+
+    it("ödenmiş hakedişi olan komisyonun tahsilatı geri alınmaz; kısmi tahsilatlı bekleyen komisyonda yalnız hareketler geri alınır", async () => {
+      db = createTableMock({
+        commissions: [comm("c1", "paid", 1000)],
+        commission_payouts: [{ id: "y1", tenant_id: T, commission_id: "c1", status: "paid" }],
+        finance_accounts: [officeAccount],
+      });
+      const { revertCommissionPayment } = await import("./commissions");
+      expect((await revertCommissionPayment("c1")).error).toContain("hakedişi ödenmiş");
+      expect(reverseSourceCash).not.toHaveBeenCalled();
+
+      setup([comm("c2", "calculated", 1000)]);
+      loadCommissionCollection.mockResolvedValueOnce({ collected: 0, nextSeq: 1, total: 1000, remaining: 1000 });
+      expect((await revertCommissionPayment("c2")).error).toContain("tahsil edilmiş görünmüyor");
+      loadCommissionCollection.mockResolvedValueOnce({ collected: 300, nextSeq: 2, total: 1000, remaining: 700 });
+      expect(await revertCommissionPayment("c2")).toMatchObject({ ok: true });
+      expect(reverseSourceCash).toHaveBeenCalledTimes(1);
+      expect(db.log.some((q) => q.table === "commissions" && q.kind === "update")).toBe(false);
+    });
   });
 });

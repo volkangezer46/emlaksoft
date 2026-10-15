@@ -46,6 +46,7 @@ import { InvoiceCutButton } from "@/components/app/einvoice/invoice-cut-button";
 import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
 import { commissionPayoutState, type CommissionPayoutState, type ExistingPayout, type PayoutSplit } from "@/lib/finance/commission-payouts";
 import { PayoutBulkButton } from "./payout-bulk-button";
+import { commissionCashAmount } from "@/lib/finance/cash/collection-link";
 
 export const metadata = { title: "Komisyon" };
 type CommissionRow = {
@@ -226,8 +227,10 @@ export default async function CommissionPage({
   // e-Fatura: satırda "Fatura kes" / "Faturayı gör" / "e-Fatura'yı bağla" (commissions.create; sayfa başına tek tur).
   // Hakediş ödemesi (commission_payouts): yazma RLS'i yalnız owner/gm; durum yalnız onlara okunur (aynı turda).
   const canPay = canEdit && isApprovalExemptRole(role);
+  // Kısmi tahsilat (WP3): kasaya yazılmış net tahsilat satır başına; kasa hareketleri yalnız Muhasebe görüntüleme yetkisiyle okunur.
+  const canSeeCash = canEdit && (perms.expenses ?? []).includes("view");
   const rowIds = rows.map((r) => r.id);
-  const [invoiceCtx, payoutSplitRes, payoutRes] = await Promise.all([
+  const [invoiceCtx, payoutSplitRes, payoutRes, cashRes] = await Promise.all([
     loadInvoiceButtonContext(
       supabase,
       tenantId,
@@ -251,7 +254,21 @@ export default async function CommissionPage({
           .in("commission_id", rowIds)
           .neq("status", "cancelled")
       : Promise.resolve({ data: [] as (ExistingPayout & { commission_id: string })[] }),
+    canSeeCash && rowIds.length
+      ? supabase
+          .from("cash_entries")
+          .select("source_id, direction, amount")
+          .eq("source_type", "commission")
+          .is("voided_at", null)
+          .in("source_id", rowIds)
+      : Promise.resolve({ data: null, error: null }),
   ]);
+  // Kasa okunamazsa (yetki/şema) kısmi tahsilat gösterilmez: sahte sıfır yok.
+  const collectedById = new Map<string, number>();
+  const cashReadable = canSeeCash && !cashRes.error && cashRes.data !== null;
+  for (const e of (cashRes.data ?? []) as { source_id: string; direction: string; amount: number | string }[]) {
+    collectedById.set(e.source_id, (collectedById.get(e.source_id) ?? 0) + (e.direction === "in" ? 1 : -1) * (Number(e.amount) || 0));
+  }
   const payoutStates = new Map<string, { state: CommissionPayoutState; payableAmount: number }>();
   if (canPay) {
     const splitsAll = (payoutSplitRes.data ?? []) as PayoutSplit[];
@@ -670,6 +687,11 @@ export default async function CommissionPage({
                           amount={Number(row.gross_amount)}
                           status={row.status}
                           payout={canPay ? payoutStates.get(row.id) : undefined}
+                          collection={
+                            cashReadable
+                              ? { total: commissionCashAmount(row), collected: Math.max(0, Math.round((collectedById.get(row.id) ?? 0) * 100) / 100) }
+                              : undefined
+                          }
                         />
                       </div>
                     ) : null}

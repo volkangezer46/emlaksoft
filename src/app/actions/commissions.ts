@@ -7,8 +7,16 @@ import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
-import { commissionCashAmount, decideCollectionAccount, recordCollectionCashResult, voidCollectionCash } from "@/lib/finance/cash/collection-link";
+import {
+  commissionCashAmount,
+  decideCollectionAccount,
+  loadCommissionCollection,
+  recordCollectionCashResult,
+  reverseSourceCash,
+} from "@/lib/finance/cash/collection-link";
+import { isUuid } from "@/lib/finance/cash/input";
 import { isApprovalExemptRole } from "@/lib/team/assignable-roles";
+import { isIsoDate, postgrestInList, SETTLED_COMMISSION_STATUSES } from "@/lib/workflow-state";
 
 /**
  * Paylaşım satırı. `party` verilirse taraf kimliği AÇIKTIR (Konsey #0+#8): "staff" = ofis personeli (profileId zorunlu),
@@ -157,7 +165,7 @@ export async function markCommissionsPaidBulk(
     .update({ status: "paid" })
     .in("id", clean)
     .eq("tenant_id", gate.tenantId)
-    .not("status", "in", "(paid,collected)")
+    .not("status", "in", postgrestInList(SETTLED_COMMISSION_STATUSES))
     .select("id, gross_amount, vat_amount");
 
   if (error) {
@@ -166,7 +174,8 @@ export async function markCommissionsPaidBulk(
   }
 
   const updatedIds = (data ?? []).map((r) => r.id as string);
-  // Her tahsilat için ofis hesabına bir hareket (aynı komisyon iki kez yazılmaz; RPC hesaptan bağımsız mükerrer denetler).
+  // Her tahsilat için ofis hesabına bir hareket (`commission:{id}:col:{n}`): önceki kısmi tahsilatlar düşülür, kalan yazılır;
+  // tamamı yazılmışsa yeni hareket yazılmaz.
   let info: string | undefined;
   const cashFailedIds: string[] = [];
   if (decision.accountId) {
@@ -221,7 +230,7 @@ export async function retryCommissionCash(
     .select("id, gross_amount, vat_amount")
     .in("id", clean)
     .eq("tenant_id", gate.tenantId)
-    .in("status", ["paid", "collected"]);
+    .in("status", [...SETTLED_COMMISSION_STATUSES]);
   if (error) {
     console.error("retryCommissionCash", error);
     return { error: actionErrorMessage(error, "Kayıtlar okunamadı."), ...none };
@@ -253,19 +262,88 @@ export async function retryCommissionCash(
   return { ok: true, failedIds, failedCount: 0, recorded };
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 /**
- * Tahsilatı geri alır: `paid`/`collected` → `calculated`.
+ * Kısmi tahsilat (WP3): müşteriden komisyonun bir kısmı tahsil edildi. Seçilen ofis hesabına `commission:{id}:col:{n}` olayı
+ * yazılır (kayıt servisi); tutar KDV dahil kalan tutarı aşamaz. Kalan sıfırlanınca komisyon "tahsil edildi" (paid) olur.
+ * Hesap zorunludur (kısmi tahsilat yalnız kasada izlenir).
+ */
+export async function recordCommissionCollection(
+  commissionId: string,
+  input: { accountId: string; amount: number; date?: string | null },
+): Promise<CommissionResult & { remaining?: number; fullyCollected?: boolean }> {
+  const gate = await requirePermission("commissions", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const id = String(commissionId ?? "").trim();
+  if (!isUuid(id)) return { error: "Komisyon kaydı bulunamadı." };
+  const accountId = String(input.accountId ?? "").trim();
+  if (!isUuid(accountId)) return { error: "Tahsilatın girdiği hesabı seçin." };
+  const amount = round2(Number(input.amount));
+  if (!Number.isFinite(amount) || amount < 0.01) return { error: "Tahsil edilen tutarı girin." };
+  const today = trDayKey(now());
+  const date = String(input.date ?? "").trim() || today;
+  if (!isIsoDate(date) || date > today) return { error: "Geçerli, gelecekte olmayan bir tarih girin." };
+
+  const supabase = await createClient();
+  const { data: commission } = await supabase
+    .from("commissions")
+    .select("id, status")
+    .eq("id", id)
+    .eq("tenant_id", gate.tenantId)
+    .maybeSingle();
+  if (!commission) return { error: "Komisyon kaydı bulunamadı." };
+  if ((SETTLED_COMMISSION_STATUSES as readonly string[]).includes(String(commission.status))) {
+    return { error: "Bu komisyon zaten tahsil edildi olarak işaretli." };
+  }
+  const state = await loadCommissionCollection(supabase, id);
+  if (!state) return { error: "Tahsilat durumu okunamadı. Hesap yetkinizi kontrol edip tekrar deneyin." };
+  if (state.remaining < 0.01) return { error: "Bu komisyonun tahsil edilecek tutarı kalmadı." };
+  if (amount > state.remaining + 0.005) {
+    return { error: `Tutar kalan tahsilatı (${state.remaining.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺) aşamaz.` };
+  }
+
+  const res = await recordCollectionCashResult(supabase, {
+    accountId, sourceType: "commission", sourceId: id, amount, date, title: "Komisyon tahsilatı (kısmi)",
+  });
+  if (!res.ok) return { error: res.warning };
+  // Aynı sıra numarası başka oturumda kullanıldı: bu tutar yazılmadı.
+  if (res.duplicate) return { error: "Bu sırada başka bir tahsilat kaydedildi. Sayfayı yenileyip kalan tutarı kontrol edin." };
+
+  const remaining = Math.max(0, round2(state.remaining - amount));
+  const fullyCollected = remaining < 0.005;
+  if (fullyCollected) {
+    const { error } = await supabase
+      .from("commissions")
+      .update({ status: "paid" })
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .not("status", "in", postgrestInList(SETTLED_COMMISSION_STATUSES));
+    if (error) console.error("recordCommissionCollection status", error);
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "commission.collection_recorded",
+    entityType: "commission",
+    entityId: id,
+    newValue: { amount, date, account_id: accountId, remaining, fully_collected: fullyCollected },
+  });
+
+  revalidatePath("/app/komisyon");
+  revalidatePath("/app/giderler");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, remaining, fullyCollected };
+}
+
+/**
+ * Tahsilatı geri alır: `paid`/`collected` → `calculated`; kasaya yazılmış tahsilat hareketleri kayıt servisiyle geri alınır
+ * (`finance_reverse`: açık ayda iptal, kilitli ayda ilk açık aya ayna kayıt; hiçbir şey silinmez).
+ * Henüz "tahsil edildi" işaretlenmemiş ama kısmi tahsilatı olan komisyonda yalnız kısmi tahsilat hareketleri geri alınır.
  *
- * NEDEN (denetim P0): Repoda komisyonu `paid` yapan ÜÇ yol vardı
- * (workflow.ts `mark_commission_paid`, buradaki toplu işaretleme ve ödeme
- * linki webhook'u) ama `paid` durumundan GERİ DÖNDÜREN hiçbir update yoktu.
- * Tek yanlış tıklama cüzdan/hakediş rakamlarını kalıcı bozuyor, düzeltmek
- * için DB'ye elle girmek gerekiyordu.
- *
- * Hedef durum `calculated`: komisyonun ilk yazıldığı durum (deals.ts ve
- * workflow.ts insert'lerinde `status: "calculated"`), yani "hesaplandı ama
- * tahsil edilmedi". Tutar/paylaşım alanlarına DOKUNULMAZ — yalnız tahsilat
- * bayrağı geri alınır.
+ * NEDEN (denetim P0): komisyonu `paid` yapan yollar vardı ama geri döndüren yoktu; tek yanlış tıklama cüzdan/hakediş
+ * rakamlarını kalıcı bozuyordu. Hedef durum `calculated` (ilk yazıldığı durum). Tutar/paylaşım alanlarına DOKUNULMAZ.
+ * Kasa hareketi geri alınamazsa (ör. açık ay yok) durum DEĞİŞMEZ: kasa ile komisyon birbirinden kopmaz.
  */
 export async function revertCommissionPayment(commissionId: string): Promise<CommissionResult> {
   const gate = await requirePermission("commissions", "edit");
@@ -284,9 +362,10 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
 
   if (!commission) return { error: "Komisyon kaydı bulunamadı." };
 
-  const paid = commission.status === "paid" || commission.status === "collected";
+  const paid = (SETTLED_COMMISSION_STATUSES as readonly string[]).includes(String(commission.status));
+  const partial = paid ? null : await loadCommissionCollection(supabase, id);
   // Sessiz no-op yerine anlamlı hata: kullanıcı neden bir şey olmadığını görsün.
-  if (!paid) return { error: "Bu komisyon zaten tahsil edilmiş görünmüyor." };
+  if (!paid && !(partial && partial.collected > 0)) return { error: "Bu komisyon zaten tahsil edilmiş görünmüyor." };
 
   // Danışman hakedişi ödenmiş komisyonun tahsilatı geri alınamaz (ödenmiş hakediş geri çevrilemez; para izi korunur).
   const { data: paidPayouts } = await supabase
@@ -300,24 +379,29 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
     return { error: "Bu komisyonun danışman hakedişi ödenmiş; tahsilat geri alınamaz." };
   }
 
-  const { data: updated, error } = await supabase
-    .from("commissions")
-    .update({ status: "calculated" })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId)
-    .in("status", ["paid", "collected"]) // yarış koşulu: bu arada değiştiyse dokunma
-    .select("id");
-
-  if (error) {
-    console.error("revertCommissionPayment", error);
-    return { error: actionErrorMessage(error, "Tahsilat geri alınamadı.") };
-  }
-  if (!updated || updated.length === 0) {
-    return { error: "Kayıt bu sırada değişti. Sayfayı yenileyip tekrar deneyin." };
+  // Önce kasa: hareketler geri alınamazsa komisyon durumu değişmez.
+  const cash = await reverseSourceCash(supabase, "commission", id, "Komisyon tahsilatı geri alındı");
+  if (!cash.ok) {
+    return { error: cash.message ?? "Tahsilatın kasa hareketi geri alınamadı; Finans > Hareketler'den kontrol edin." };
   }
 
-  // Bu tahsilat bir hesaba hareket olarak yazildiysa o hareket de iptal olur (bakiye/ozet tutarli kalir).
-  await voidCollectionCash(supabase, "commission", id, "Komisyon tahsilatı geri alındı");
+  if (paid) {
+    const { data: updated, error } = await supabase
+      .from("commissions")
+      .update({ status: "calculated" })
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .in("status", [...SETTLED_COMMISSION_STATUSES]) // yarış koşulu: bu arada değiştiyse dokunma
+      .select("id");
+
+    if (error) {
+      console.error("revertCommissionPayment", error);
+      return { error: actionErrorMessage(error, "Tahsilat geri alınamadı.") };
+    }
+    if (!updated || updated.length === 0) {
+      return { error: "Kayıt bu sırada değişti. Sayfayı yenileyip tekrar deneyin." };
+    }
+  }
 
   await logActivity({
     tenantId: gate.tenantId,
@@ -326,12 +410,13 @@ export async function revertCommissionPayment(commissionId: string): Promise<Com
     entityType: "commission",
     entityId: id,
     oldValue: { status: commission.status },
-    newValue: { status: "calculated" },
+    newValue: { status: "calculated", cash_reversed: cash.reversed, cash_mirrored: cash.mirrored },
   });
 
   revalidatePath("/app/komisyon");
   revalidatePath("/app/raporlar");
+  revalidatePath("/app/giderler");
   revalidatePath("/app");
   revalidateTenantData(gate.tenantId);
-  return { ok: true };
+  return { ok: true, info: cash.mirrored > 0 ? "Kapatılmış aya düşen tahsilat hareketi ilk açık ayda ters kayıtla geri alındı." : undefined };
 }

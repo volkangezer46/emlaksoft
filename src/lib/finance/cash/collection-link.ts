@@ -1,34 +1,134 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingCashSchema } from "./load";
 import { isUuid } from "./input";
-import { OWNER_PAYOUT_CATEGORY } from "./categories";
+import { OPEN_FINANCE_ITEM_STATUSES, type FinanceOpenItemStatus } from "@/lib/workflow-state";
+import { financePost, financeReverse, type PostResult, type PostingEvent } from "../posting/client";
+import { buildingChargeKey, buildingPaymentKey, commissionCollectionKey, commissionKey, ownerPayoutKey, rentPaymentKey } from "../posting/keys";
 
 /**
- * Komisyon / kira / aidat tahsilatını isteğe bağlı olarak ofis hesabına hareket olarak yazar (SUNUCU yardımcısı; "use server" DEĞİL).
- * Hesap seçilmediyse HİÇBİR ŞEY yapmaz (tahsilat davranışı aynı kalır). Hareket hatası tahsilatı BOZMAZ: uyarı metni döner.
- * Çift sayım yok: RPC (tenant, source_type, source_id, account) üçlüsünü benzersiz tutar; tekrar çağrı `duplicate` olur.
+ * Komisyon / kira / aidat tahsilatını ve mülk sahibi ödemesini ofis hesabına yazar (SUNUCU yardımcısı; "use server" DEĞİL).
+ * Tek kayıt servisinin (`finance_post`, 20261017010000) ince sarmalayıcısıdır; olay anahtarları:
+ *  - komisyon tahsilatı `commission:{id}:col:{n}` (n = komisyonun sıradaki tahsilatı; kısmi tahsilat desteklenir),
+ *  - kira tahsilatı `rent:{rent_payments.id}`, bina aidatı tahsilatı `building:{building_payments.id}`,
+ *  - mülk sahibi ödemesi `owner_payout:{owner_payouts.id}`.
+ * Aynı anahtarla tekrar çağrı `duplicate` döner (yeni satır yok). Hesap seçilmediyse HİÇBİR ŞEY yapmaz.
+ * Hareket hatası tahsilatı BOZMAZ: uyarı metni döner.
  */
 export type CollectionSource = "commission" | "rent" | "building";
 
-const SOURCE_CATEGORY: Record<CollectionSource, string> = {
-  commission: "komisyon",
-  rent: "kira_tahsilat",
-  building: "aidat_tahsilat",
-};
-
 /** Yapılandırılmış sonuç: ok=true -> hareket yazıldı ya da zaten vardı (idempotent); ok=false -> code makine okur, warning yalnız GÖSTERİM. */
 export type CollectionCashResult =
-  | { ok: true; skipped?: boolean; duplicate?: boolean }
+  | { ok: true; skipped?: boolean; duplicate?: boolean; entryId?: string; amount?: number }
   | { ok: false; code: "invalid_id" | "rpc_error" | "amount_exceeds_source" | "rejected"; outcome?: string; warning: string };
 
 export const COLLECTION_CASH_WARN = "Tahsilat kaydedildi ancak seçilen hesaba hareket yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
-/** Hareket tarihi kapatılmış (kilitli) muhasebe ayına düştü: tetik DONEM_KILITLI. */
+/** Hareket tarihi kapatılmış (kilitli) muhasebe ayına düştü. */
 export const PERIOD_LOCKED_CASH_WARN =
   "Kayıt yapıldı ancak tarihi kapatılmış (kilitli) bir muhasebe ayına düştüğü için hesaba hareket yazılamadı. Kilidi ofis sahibi ya da genel müdür açabilir.";
+const ACCOUNT_HIDDEN_WARN = "Seçilen hesap bulunamadı ya da bu hesaba hareket yazma yetkiniz yok.";
 
 /** RPC hatası finans ay kilidi tetiğinden mi geldi (DONEM_KILITLI). */
 export function isPeriodLockedError(error: { message?: string | null } | null | undefined): boolean {
   return typeof error?.message === "string" && error.message.includes("DONEM_KILITLI");
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Kayıt servisi sonucu → tahsilat sonucu (SAF; test edilir). */
+export function collectionResultOf(res: PostResult, amount: number, fallbackWarn = COLLECTION_CASH_WARN): CollectionCashResult {
+  if (res.ok) {
+    if (res.outcome === "duplicate") return { ok: true, duplicate: true, entryId: res.entryIds[0] };
+    return { ok: true, entryId: res.entryIds[0], amount };
+  }
+  if (res.outcome === "amount_exceeds_open") {
+    return { ok: false, code: "amount_exceeds_source", outcome: res.outcome, warning: "Tahsilat tutarı kaynak kaydın kalan tutarını aşıyor; hareket yazılmadı." };
+  }
+  if (res.outcome === "period_locked") return { ok: false, code: "rejected", outcome: res.outcome, warning: PERIOD_LOCKED_CASH_WARN };
+  if (res.outcome === "rpc_error" || res.outcome === "unknown") return { ok: false, code: "rpc_error", outcome: res.outcome, warning: fallbackWarn };
+  return { ok: false, code: "rejected", outcome: res.outcome, warning: res.message ? `${fallbackWarn} (${res.message})` : fallbackWarn };
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * Komisyon tahsilat durumu (kısmi tahsilat)
+ * ---------------------------------------------------------------------------------------------- */
+
+export type SourceEntryRow = {
+  id: string;
+  direction: string;
+  amount: unknown;
+  posting_key: string | null;
+  voided_at: string | null;
+  reversal_of: string | null;
+};
+
+export type CommissionCollection = {
+  /** Net tahsil edilen (iptal edilmemiş giriş − ayna çıkış), KDV dahil. */
+  collected: number;
+  /** Sıradaki tahsilatın sırası (`commission:{id}:col:{n}`); iptal edilmiş anahtarlar da sayılır (anahtar bir kez kullanılır). */
+  nextSeq: number;
+};
+
+/** SAF: komisyonun kasa hareketlerinden net tahsilat ve sıradaki tahsilat sırası. */
+export function summarizeCommissionEntries(rows: readonly SourceEntryRow[]): CommissionCollection {
+  let collected = 0;
+  let maxSeq = 0;
+  for (const r of rows) {
+    const m = /:col:(\d+)/.exec(r.posting_key ?? "");
+    if (m) maxSeq = Math.max(maxSeq, Number(m[1]));
+    if (r.voided_at) continue;
+    const amt = Number(r.amount) || 0;
+    collected += r.direction === "in" ? amt : -amt;
+  }
+  return { collected: Math.max(0, round2(collected)), nextSeq: maxSeq + 1 };
+}
+
+/** Kaynağın (komisyon/kira/aidat/mülk sahibi ödemesi) ofis hareketleri; okunamazsa null. */
+async function loadSourceEntries(supabase: SupabaseClient, sourceType: string, sourceId: string): Promise<SourceEntryRow[] | null> {
+  const { data, error } = await supabase
+    .from("cash_entries")
+    .select("id, direction, amount, posting_key, voided_at, reversal_of")
+    .eq("source_type", sourceType)
+    .eq("source_id", sourceId);
+  if (error) {
+    if (!isMissingCashSchema(error)) console.error("loadSourceEntries", { code: error.code });
+    return null;
+  }
+  return (data ?? []) as SourceEntryRow[];
+}
+
+/** Komisyonun tahsilat durumu (KDV dahil toplam, net tahsil edilen, kalan, sıradaki sıra). Okunamazsa null. */
+export async function loadCommissionCollection(
+  supabase: SupabaseClient,
+  commissionId: string,
+): Promise<(CommissionCollection & { total: number; remaining: number }) | null> {
+  if (!isUuid(commissionId)) return null;
+  const [{ data: c, error }, rows] = await Promise.all([
+    supabase.from("commissions").select("id, gross_amount, vat_amount").eq("id", commissionId).maybeSingle(),
+    loadSourceEntries(supabase, "commission", commissionId),
+  ]);
+  if (error || !c || rows === null) return null;
+  const total = commissionCashAmount(c);
+  const s = summarizeCommissionEntries(rows);
+  return { ...s, total, remaining: Math.max(0, round2(total - s.collected)) };
+}
+
+/** Kayıt servisiyle açılmış açık kalem (anahtarıyla); açık ve kalanı tutarı karşılıyorsa kimliği, değilse null. */
+async function settleableItem(supabase: SupabaseClient, key: string, amount: number): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("finance_open_items")
+    .select("id, amount, paid_amount, status")
+    .eq("posting_key", key)
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as { id: string; amount: unknown; paid_amount: unknown; status: FinanceOpenItemStatus };
+  if (!OPEN_FINANCE_ITEM_STATUSES.includes(row.status)) return null;
+  return Number(row.amount) - Number(row.paid_amount ?? 0) + 0.005 >= amount ? row.id : null;
+}
+
+/** Hesap bu oturuma görünür bir ofis hesabı mı (RLS: expenses:view). Görünmüyorsa kaynak hareketleri de okunamaz. */
+async function officeAccountVisible(supabase: SupabaseClient, accountId: string): Promise<boolean> {
+  const { data, error } = await supabase.from("finance_accounts").select("id, owner_scope").eq("id", accountId).maybeSingle();
+  return !error && Boolean(data) && (data as { owner_scope?: string }).owner_scope === "office";
 }
 
 export async function recordCollectionCashResult(
@@ -38,27 +138,53 @@ export async function recordCollectionCashResult(
   const accountId = (args.accountId ?? "").trim();
   if (!accountId) return { ok: true, skipped: true };
   if (!isUuid(accountId) || !isUuid(args.sourceId)) return { ok: false, code: "invalid_id", warning: COLLECTION_CASH_WARN };
-  const { data, error } = await supabase.rpc("finance_record_entry", {
-    p_account_id: accountId,
-    p_direction: "in",
-    p_amount: args.amount,
-    p_entry_date: args.date,
-    p_category: SOURCE_CATEGORY[args.sourceType],
-    p_title: args.title.slice(0, 160),
-    p_source_type: args.sourceType,
-    p_source_id: args.sourceId,
-  });
-  if (error) {
-    if (!isMissingCashSchema(error)) console.error("recordCollectionCash", { code: error.code });
-    return { ok: false, code: "rpc_error", warning: isPeriodLockedError(error) ? PERIOD_LOCKED_CASH_WARN : COLLECTION_CASH_WARN };
+  const title = args.title.slice(0, 160);
+  let amount = round2(Number(args.amount));
+  if (!(amount > 0)) return { ok: false, code: "rejected", warning: COLLECTION_CASH_WARN };
+
+  let event: PostingEvent;
+  if (args.sourceType === "commission") {
+    // Tahsilat sırası ve kalan tutar kasa hareketlerinden okunur: hesap görünmüyorsa hareketler de görünmez (yanlış kalan) → yazılmaz.
+    if (!(await officeAccountVisible(supabase, accountId))) return { ok: false, code: "rejected", warning: ACCOUNT_HIDDEN_WARN };
+    const state = await loadCommissionCollection(supabase, args.sourceId);
+    if (!state) return { ok: false, code: "rpc_error", warning: COLLECTION_CASH_WARN };
+    // Tamamı tahsil edilmiş: tekrar çağrı (yeniden dene / çift tıklama) yeni hareket yazmaz.
+    if (state.remaining < 0.005) return { ok: true, duplicate: true };
+    // "Tahsil edildi" işaretleme kalan tutarı yazar (önceki kısmi tahsilatlar düşülür).
+    amount = Math.min(amount, state.remaining);
+    const settles = await settleableItem(supabase, commissionKey(args.sourceId), amount);
+    event = {
+      eventType: "commission.collected",
+      postingKey: commissionCollectionKey(args.sourceId, state.nextSeq),
+      date: args.date,
+      sourceId: args.sourceId,
+      title,
+      entries: [{ accountId, amount, title, ...(settles ? { settles } : {}) }],
+    };
+  } else if (args.sourceType === "rent") {
+    event = {
+      eventType: "rent.collected",
+      postingKey: rentPaymentKey(args.sourceId),
+      date: args.date,
+      sourceId: args.sourceId,
+      title,
+      entries: [{ accountId, amount, title }],
+    };
+  } else {
+    // Bina aidatı tahsilatı, tahakkuk kalemi (building_charge:{charge_id}) kayıt servisinde açıksa onu kapatır.
+    const { data: pay } = await supabase.from("building_payments").select("charge_id").eq("id", args.sourceId).maybeSingle();
+    const chargeId = (pay as { charge_id?: string | null } | null)?.charge_id ?? null;
+    const settles = chargeId && isUuid(chargeId) ? await settleableItem(supabase, buildingChargeKey(chargeId), amount) : null;
+    event = {
+      eventType: "building.collected",
+      postingKey: buildingPaymentKey(args.sourceId),
+      date: args.date,
+      sourceId: args.sourceId,
+      title,
+      entries: [{ accountId, amount, title, ...(settles ? { settles } : {}) }],
+    };
   }
-  const res = data as { outcome?: string; reason?: string } | null;
-  if (res?.outcome === "recorded") return { ok: true };
-  if (res?.outcome === "duplicate") return { ok: true, duplicate: true };
-  if (res?.reason === "amount_exceeds_source") {
-    return { ok: false, code: "amount_exceeds_source", outcome: res.outcome, warning: "Tahsilat tutarı kaynak kaydın tutarını aşıyor; hareket yazılmadı." };
-  }
-  return { ok: false, code: "rejected", outcome: res?.outcome, warning: COLLECTION_CASH_WARN };
+  return collectionResultOf(await financePost(supabase, event), amount);
 }
 
 /** Eski çağıranlar için: başarıda null, hatada gösterim metni. Yeni kod `recordCollectionCashResult` kullanır. */
@@ -73,7 +199,7 @@ export async function recordCollectionCash(
 export const OWNER_PAYOUT_CASH_WARN = "Ödeme kaydedildi ancak seçilen hesaba çıkış hareketi yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
 
 /**
- * Mülk sahibi hakediş ödemesini isteğe bağlı olarak ofis hesabına ÇIKIŞ olarak yazar (source_type 'owner_payout', source_id = owner_payouts.id).
+ * Mülk sahibi hakediş ödemesini ofis hesabına ÇIKIŞ olarak yazar (`owner.paid`, anahtar `owner_payout:{id}`).
  * Hesap seçilmediyse hiçbir şey yapmaz. Hareket hatası ödemeyi BOZMAZ: uyarı metni döner (null = sorun yok).
  */
 export async function recordOwnerPayoutCash(
@@ -83,35 +209,72 @@ export async function recordOwnerPayoutCash(
   const accountId = (args.accountId ?? "").trim();
   if (!accountId) return null;
   if (!isUuid(accountId) || !isUuid(args.payoutId)) return OWNER_PAYOUT_CASH_WARN;
-  const { data, error } = await supabase.rpc("finance_record_entry", {
-    p_account_id: accountId,
-    p_direction: "out",
-    p_amount: args.amount,
-    p_entry_date: args.date,
-    p_category: OWNER_PAYOUT_CATEGORY,
-    p_title: args.title.slice(0, 160),
-    p_counterparty: args.counterparty ? args.counterparty.slice(0, 120) : null,
-    p_source_type: "owner_payout",
-    p_source_id: args.payoutId,
+  const title = args.title.slice(0, 160);
+  const res = await financePost(supabase, {
+    eventType: "owner.paid",
+    postingKey: ownerPayoutKey(args.payoutId),
+    date: args.date,
+    sourceId: args.payoutId,
+    title,
+    entries: [{ accountId, amount: round2(Number(args.amount)), title, counterparty: args.counterparty ? args.counterparty.slice(0, 120) : undefined }],
   });
-  if (error) {
-    if (!isMissingCashSchema(error)) console.error("recordOwnerPayoutCash", { code: error.code });
-    return isPeriodLockedError(error) ? PERIOD_LOCKED_CASH_WARN : OWNER_PAYOUT_CASH_WARN;
-  }
-  const outcome = (data as { outcome?: string } | null)?.outcome;
-  return outcome === "recorded" || outcome === "duplicate" ? null : OWNER_PAYOUT_CASH_WARN;
+  const out = collectionResultOf(res, args.amount, OWNER_PAYOUT_CASH_WARN);
+  return out.ok ? null : out.warning;
 }
 
-/** Tahsilat geri alınınca/iptal edilince bağlı hareketi iptal eder (en iyi çaba; şema yoksa sessiz). Ödeme iptalinde 'owner_payout'. */
+export type SourceReverseResult = { ok: boolean; reversed: number; mirrored: number; failed: number; message: string | null };
+
+/**
+ * Kaynağın (tahsilat / ödeme) tüm geçerli ofis hareketlerini geri alır: kayıt servisinin `finance_reverse`'i (açık ayda iptal,
+ * kilitli ayda ilk açık aya `reversal_of` bağlı ayna). Hiçbir şey silinmez. Hareketler bu oturuma görünmüyorsa ya da yalnız
+ * eski yol (anahtarsız) hareketler varsa eski `finance_void_source_entries` RPC'si (kaynak modülü yetkisiyle) kullanılır.
+ */
+export async function reverseSourceCash(
+  supabase: SupabaseClient,
+  sourceType: CollectionSource | "owner_payout",
+  sourceId: string,
+  reason: string,
+): Promise<SourceReverseResult> {
+  const done = (r: Partial<SourceReverseResult>): SourceReverseResult => ({ ok: true, reversed: 0, mirrored: 0, failed: 0, message: null, ...r });
+  if (!isUuid(sourceId)) return done({ ok: false, message: "Kayıt bulunamadı." });
+  const rows = await loadSourceEntries(supabase, sourceType, sourceId);
+  const mirroredIds = new Set((rows ?? []).filter((r) => r.reversal_of).map((r) => r.reversal_of as string));
+  const live = (rows ?? []).filter((r) => !r.voided_at && !r.reversal_of && !mirroredIds.has(r.id));
+  const posted = live.filter((r) => r.posting_key);
+  if (rows === null || rows.length === 0 || (posted.length === 0 && live.length > 0)) {
+    const { error } = await supabase.rpc("finance_void_source_entries", { p_source_type: sourceType, p_source_id: sourceId, p_reason: reason });
+    if (error && !isMissingCashSchema(error)) {
+      console.error("reverseSourceCash legacy", { code: error.code });
+      return done({ ok: false, failed: live.length || 1, message: isPeriodLockedError(error) ? PERIOD_LOCKED_CASH_WARN : "Bağlı kasa hareketi iptal edilemedi." });
+    }
+    return done({ reversed: live.length });
+  }
+  let reversed = 0;
+  let mirrored = 0;
+  let failed = 0;
+  let message: string | null = null;
+  for (const e of live) {
+    const r = await financeReverse(supabase, { targetId: e.id, reason });
+    if (r.ok) {
+      reversed += 1;
+      if (r.outcome === "mirrored") mirrored += 1;
+    } else {
+      failed += 1;
+      message = r.message;
+    }
+  }
+  return { ok: failed === 0, reversed, mirrored, failed, message };
+}
+
+/** Tahsilat geri alınınca/iptal edilince bağlı hareketi geri alır (en iyi çaba). Ödeme iptalinde 'owner_payout'. */
 export async function voidCollectionCash(
   supabase: SupabaseClient,
   sourceType: CollectionSource | "owner_payout",
   sourceId: string,
   reason = "Tahsilat geri alındı",
 ): Promise<void> {
-  if (!isUuid(sourceId)) return;
-  const { error } = await supabase.rpc("finance_void_source_entries", { p_source_type: sourceType, p_source_id: sourceId, p_reason: reason });
-  if (error && !isMissingCashSchema(error)) console.error("voidCollectionCash", { code: error.code });
+  const res = await reverseSourceCash(supabase, sourceType, sourceId, reason);
+  if (!res.ok) console.error("voidCollectionCash", { sourceType, failed: res.failed });
 }
 
 /* ================================================================================================
@@ -120,7 +283,7 @@ export async function voidCollectionCash(
 
 /**
  * Komisyon tahsilatının kasaya yazılacak tutarı: KDV DAHİL. `gross_amount` KDV hariç matrahtır (kapanış RPC'si v_net'i yazar);
- * müşteriden tahsil edilen matrah + KDV'dir. finance_record_entry'nin komisyon tavanı da gross_amount + vat_amount. Kuruşa yuvarlanır.
+ * müşteriden tahsil edilen matrah + KDV'dir (açık kalem v3 alacağı da gross_amount + vat_amount). Kuruşa yuvarlanır.
  */
 export function commissionCashAmount(row: { gross_amount: unknown; vat_amount?: unknown }): number {
   const gross = Number(row.gross_amount);
@@ -175,8 +338,8 @@ type GapRow = {
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 
 /**
- * "Kasaya işle" kuyruğu (Kasa ve banka sekmesi): tahsil edilmiş (paid/collected) ama geçerli (iptal edilmemiş) kasa hareketi
- * olmayan komisyonlar. Örnek veri dışlanır; en yeni `limit` tahsilat taranır (`partial` = tarama sınırına ulaşıldı).
+ * "Kasaya işle" kuyruğu (Kasa ve banka sekmesi): tahsil edilmiş (paid/collected) ama KDV dahil tutarının tamamı geçerli
+ * (iptal edilmemiş) kasa hareketiyle karşılanmamış komisyonlar; tutar = eksik kalan kısım. Örnek veri dışlanır; en yeni `limit` tahsilat taranır (`partial` = tarama sınırına ulaşıldı).
  * Şema yoksa ya da okunamazsa `available=false` (sahte sıfır yok).
  */
 export async function loadCommissionsMissingCash(
@@ -201,7 +364,7 @@ export async function loadCommissionsMissingCash(
   if (rows.length === 0) return { ...empty, available: true };
   const ent = await supabase
     .from("cash_entries")
-    .select("source_id")
+    .select("source_id, direction, amount")
     .eq("tenant_id", tenantId)
     .eq("source_type", "commission")
     .is("voided_at", null)
@@ -210,12 +373,16 @@ export async function loadCommissionsMissingCash(
     if (!isMissingCashSchema(ent.error)) console.error("loadCommissionsMissingCash entries", { code: ent.error.code });
     return empty;
   }
-  const linked = new Set(((ent.data ?? []) as { source_id: string | null }[]).map((e) => String(e.source_id)));
+  // Kısmi tahsilat: kuyruktaki tutar = KDV dahil toplam − net kasaya yazılan (ayna çıkışlar düşer).
+  const linked = new Map<string, number>();
+  for (const e of (ent.data ?? []) as { source_id: string | null; direction: string; amount: unknown }[]) {
+    const k = String(e.source_id);
+    linked.set(k, (linked.get(k) ?? 0) + (e.direction === "in" ? 1 : -1) * (Number(e.amount) || 0));
+  }
   const gaps: CommissionCashGap[] = [];
   for (const r of rows) {
-    if (linked.has(r.id)) continue;
-    const amount = commissionCashAmount(r);
-    if (!(amount > 0)) continue;
+    const amount = Math.round((commissionCashAmount(r) - Math.max(0, linked.get(r.id) ?? 0)) * 100) / 100;
+    if (!(amount >= 0.01)) continue;
     const deal = one(r.deal as GapRow["deal"]) as { deal_type?: string | null; property?: unknown } | null;
     const prop = one(deal?.property as { title?: string | null; property_code?: string | null } | null);
     const label = prop?.title?.trim() || prop?.property_code?.trim() || (deal?.deal_type === "rent" ? "Kiralama komisyonu" : "Satış komisyonu");

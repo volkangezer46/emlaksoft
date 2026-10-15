@@ -27,6 +27,7 @@ import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/a
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { currentMonthPeriod, earningInRange, fetchCommissionRows, trYearPeriod } from "@/lib/team/advisor-metrics";
 import { OfficeEarnings } from "./office-earnings";
+import { PayoutPersonalButton } from "./payout-personal-button";
 import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
 import { Celebration } from "@/components/ui/illustrations";
 import { isFirstCollectionMoment } from "@/lib/celebration-conditions";
@@ -102,7 +103,7 @@ export default async function CuzdanPage({
 
   const supabase = await createClient();
 
-  const [{ data: profile }, { data: office }, commissionRes, { data: payoutRows }] = await Promise.all([
+  const [{ data: profile }, { data: office }, commissionRes, { data: payoutRows }, { data: personalAccounts }, { data: personalEntries }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     // Bordro çıktısının başlık bandı: ofis adı belgeye kimlik verir.
     tenantId
@@ -127,7 +128,25 @@ export default async function CuzdanPage({
       .eq("status", "paid")
       .order("paid_at", { ascending: false })
       .limit(PAYOUT_LIMIT),
+    // "Kasama işle" (WP3): kişisel hesaplarım (Kasam) ve Kasam'a işlenmiş hakedişler (`payout.personal`).
+    // Şema/yetki yoksa boş döner: düğme çizilmez.
+    supabase
+      .from("finance_accounts")
+      .select("id, name")
+      .eq("owner_scope", "user")
+      .eq("owner_user_id", userId)
+      .is("archived_at", null)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("cash_entries")
+      .select("source_id")
+      .eq("source_type", "commission_payout")
+      .eq("event_type", "payout.personal")
+      .is("voided_at", null)
+      .limit(PAYOUT_LIMIT),
   ]);
+  const kasam = ((personalAccounts ?? []) as { id: string; name: string }[]).map((a) => ({ id: a.id, name: a.name }));
+  const inKasam = new Set(((personalEntries ?? []) as { source_id: string | null }[]).map((e) => String(e.source_id)));
 
   const fullName = (profile?.full_name as string | undefined) ?? null;
   const rows = commissionRes.rows;
@@ -389,7 +408,16 @@ export default async function CuzdanPage({
                       {p.payment_ref ? ` · ${p.payment_ref}` : ""}
                     </p>
                   </div>
-                  <span className="numeric font-display text-sm font-bold text-success-strong">{money(Number(p.amount) || 0)}</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {kasam.length > 0 ? (
+                      inKasam.has(p.id) ? (
+                        <span className="relative z-10 rounded-full bg-canvas px-2 py-0.5 text-xs font-semibold text-text-muted">Kasam&apos;da</span>
+                      ) : (
+                        <PayoutPersonalButton payoutId={p.id} amount={Number(p.amount) || 0} accounts={kasam} />
+                      )
+                    ) : null}
+                    <span className="numeric font-display text-sm font-bold text-success-strong">{money(Number(p.amount) || 0)}</span>
+                  </div>
                 </li>
               );
             })}
