@@ -4,12 +4,18 @@ import {
   PROPERTY_REASON_LABEL,
   demandsSimilar,
   emailLookupKey,
+  groupPropertyDuplicates,
   phoneLookupVariants,
+  propertyCompleteness,
   propertyMatchReasons,
   scopeHit,
   type DuplicateHit,
+  type PropertyMatchReason,
   type PropertyProbe,
+  type PropertyScanRow,
 } from "@/lib/duplicate-match";
+import { parsePhoneStrict } from "@/lib/phone-rules";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 
 /**
  * Mükerrer arama sorguları (salt-okunur). Kullanıcı oturumlu client ile çalışır (RLS + açık tenant filtresi);
@@ -322,4 +328,222 @@ export async function findSimilarOpenDemands(
       viewer,
     ),
   );
+}
+
+// ── Portföy çift kayıt taraması + veri sağlığı (salt-okunur; oturumlu client, RLS + açık tenant filtresi) ────────────
+
+/** Taramaya giren en fazla portföy (en yeniler). Üstündeyse sayfa "son N kayıt tarandı" der. */
+export const PROPERTY_SCAN_LIMIT = 3000;
+
+export type PropertyDupRecord = {
+  id: string;
+  code: string;
+  title: string | null;
+  address: string | null;
+  price: number | null;
+  currency: string | null;
+  transaction: string | null;
+  status: string | null;
+  advisor: string | null;
+  createdAt: string;
+  mediaCount: number;
+  hasLocation: boolean;
+  completeness: number;
+};
+
+export type PropertyDupGroup = { key: string; reasons: PropertyMatchReason[]; records: PropertyDupRecord[] };
+
+type PropertyScanDbRow = PropertyScanRow & {
+  property_code: string;
+  list_price: number | null;
+  currency: string | null;
+  status: string | null;
+  assigned_to: string | null;
+  lat: number | null;
+};
+
+/**
+ * Ofisteki olası çift portföyleri bulur (aynı ada/parsel, benzer adres, benzer başlık + mahalle; aynı işlem türü).
+ * Tek tur portföy okuması + yalnız gruplardaki kayıtlar için danışman adı ve medya sayısı (paralel).
+ */
+export async function scanPropertyDuplicates(
+  supabase: SupabaseClient,
+  tenantId: string,
+): Promise<{ groups: PropertyDupGroup[]; scanned: number; truncated: boolean } | { error: string }> {
+  // PostgREST sayfa sınırı (max_rows) yüzünden tek .limit() sessizce kesilir: sayfalı oku, üst sınır açık.
+  const read = await readAllPaged<PropertyScanDbRow>(
+    (from, to) =>
+      supabase
+        .from("properties")
+        .select(
+          "id, property_code, title, address_line, parcel_block, parcel_lot, property_type, transaction_type, district_id, neighborhood_id, list_price, currency, status, assigned_to, lat, created_at",
+        )
+        .eq("tenant_id", tenantId)
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to) as unknown as PromiseLike<{ data: PropertyScanDbRow[] | null; error: { message: string } | null }>,
+    { maxRows: PROPERTY_SCAN_LIMIT },
+  );
+  if (read.error) {
+    console.error("scanPropertyDuplicates", read.error);
+    return { error: "Portföy taraması çalıştırılamadı." };
+  }
+  const rows = read.rows;
+  const raw = groupPropertyDuplicates(rows);
+  const ids = [...new Set(raw.flatMap((g) => g.ids))];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const owners = [...new Set(ids.map((id) => byId.get(id)?.assigned_to).filter((v): v is string => !!v))];
+  const [names, media] = await Promise.all([
+    advisorNames(supabase, tenantId, owners),
+    ids.length > 0
+      ? readAllPaged<{ property_id: string }>(
+          (from, to) =>
+            supabase
+              .from("property_media")
+              .select("property_id")
+              .eq("tenant_id", tenantId)
+              .in("property_id", ids)
+              .order("id", { ascending: true })
+              .range(from, to) as unknown as PromiseLike<{ data: { property_id: string }[] | null; error: { message: string } | null }>,
+          { maxRows: 5000 },
+        )
+      : Promise.resolve({ rows: [] as { property_id: string }[] }),
+  ]);
+  const mediaCount = new Map<string, number>();
+  for (const m of media.rows) {
+    mediaCount.set(m.property_id, (mediaCount.get(m.property_id) ?? 0) + 1);
+  }
+  const groups: PropertyDupGroup[] = raw.map((g) => ({
+    key: [...g.ids].sort().join(","),
+    reasons: g.reasons,
+    records: g.ids
+      .map((id) => byId.get(id))
+      .filter((r): r is PropertyScanDbRow => !!r)
+      .map((r) => {
+        const count = mediaCount.get(r.id) ?? 0;
+        return {
+          id: r.id,
+          code: r.property_code,
+          title: r.title,
+          address: r.address_line,
+          price: r.list_price != null ? Number(r.list_price) : null,
+          currency: r.currency,
+          transaction: r.transaction_type,
+          status: r.status,
+          advisor: r.assigned_to ? (names.get(r.assigned_to) ?? null) : null,
+          createdAt: r.created_at,
+          mediaCount: count,
+          hasLocation: r.lat != null,
+          completeness: propertyCompleteness({ ...r, media_count: count }),
+        };
+      }),
+  }));
+  return { groups, scanned: rows.length, truncated: read.truncated };
+}
+
+/** Veri sağlığı kalemi: sayı + en fazla 5 örnek kayıt (doğrudan kayda gider). */
+export type DataHealthItem = {
+  key: string;
+  label: string;
+  desc: string;
+  count: number;
+  /** Sayı tarama sınırına takıldıysa "en az" anlamındadır. */
+  capped: boolean;
+  samples: Array<{ id: string; label: string; detail: string | null; href: string }>;
+};
+
+const HEALTH_SAMPLE = 5;
+/** Geçersiz telefon taraması en çok bu kadar kaydı okur (telefon biçimi SQL'de değil, ortak `parsePhone` ile denetlenir). */
+export const PHONE_HEALTH_SCAN = 3000;
+
+/** Müşteri veri sağlığı: telefonsuz kayıtlar ve geçersiz biçimli telefonlar. */
+export async function loadCustomerDataHealth(supabase: SupabaseClient, tenantId: string): Promise<DataHealthItem[]> {
+  const [noPhone, withPhone] = await Promise.all([
+    supabase
+      .from("customers")
+      .select("id, full_name, email", { count: "exact" })
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .or("phone.is.null,phone.eq.")
+      .order("created_at", { ascending: false })
+      .limit(HEALTH_SAMPLE),
+    readAllPaged<{ id: string; full_name: string | null; phone: string }>(
+      (from, to) =>
+        supabase
+          .from("customers")
+          .select("id, full_name, phone")
+          .eq("tenant_id", tenantId)
+          .is("deleted_at", null)
+          .not("phone", "is", null)
+          .neq("phone", "")
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to) as unknown as PromiseLike<{ data: { id: string; full_name: string | null; phone: string }[] | null; error: { message: string } | null }>,
+      { maxRows: PHONE_HEALTH_SCAN },
+    ),
+  ]);
+  const noPhoneRows = (noPhone.data ?? []) as { id: string; full_name: string | null; email: string | null }[];
+  const phoneRows = withPhone.rows;
+  // Kayıtla AYNI kural (sunucu kapısı parsePhoneStrict): ülke biçimine uymayan numara "geçersiz".
+  const invalid = phoneRows.filter((r) => !parsePhoneStrict(r.phone).ok);
+  return [
+    {
+      key: "telefonsuz",
+      label: "Telefonu olmayan müşteri",
+      desc: "Aranamaz, WhatsApp ve SMS gönderilemez; çift kayıt taraması da bu kayıtları telefonla eşleyemez.",
+      count: noPhone.count ?? noPhoneRows.length,
+      capped: false,
+      samples: noPhoneRows.map((r) => ({ id: r.id, label: r.full_name || "Adsız kayıt", detail: r.email, href: `/app/musteriler/${r.id}` })),
+    },
+    {
+      key: "gecersiz-telefon",
+      label: "Geçersiz telefon biçimi",
+      desc: "Numara eksik ya da hatalı yazılmış; arama ve mesaj gönderimi başarısız olur. Kaydı açıp numarayı düzeltin.",
+      count: invalid.length,
+      capped: withPhone.truncated,
+      samples: invalid
+        .slice(0, HEALTH_SAMPLE)
+        .map((r) => ({ id: r.id, label: r.full_name || "Adsız kayıt", detail: r.phone, href: `/app/musteriler/${r.id}` })),
+    },
+  ];
+}
+
+/** Portföy veri sağlığı: konumu (harita noktası) ve mahallesi olmayan ilanlar. */
+export async function loadPropertyDataHealth(supabase: SupabaseClient, tenantId: string): Promise<DataHealthItem[]> {
+  const q = () =>
+    supabase
+      .from("properties")
+      .select("id, property_code, title", { count: "exact" })
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(HEALTH_SAMPLE);
+  const [noLatLng, noHood] = await Promise.all([q().is("lat", null), q().is("neighborhood_id", null)]);
+  type P = { id: string; property_code: string; title: string | null };
+  const sample = (rows: unknown) =>
+    ((rows ?? []) as P[]).map((r) => ({
+      id: r.id,
+      label: r.title || "Başlıksız ilan",
+      detail: r.property_code,
+      href: `/app/portfoyler/${r.id}`,
+    }));
+  return [
+    {
+      key: "konumsuz",
+      label: "Harita konumu olmayan ilan",
+      desc: "Haritada ve yakındaki ilan eşleşmelerinde görünmez; vitrinde konum gösterilemez.",
+      count: noLatLng.count ?? 0,
+      capped: false,
+      samples: sample(noLatLng.data),
+    },
+    {
+      key: "mahallesiz",
+      label: "Mahallesi seçilmemiş ilan",
+      desc: "Talep eşleştirme, emsal değerleme ve çift kayıt taraması mahalleye göre çalışır.",
+      count: noHood.count ?? 0,
+      capped: false,
+      samples: sample(noHood.data),
+    },
+  ];
 }

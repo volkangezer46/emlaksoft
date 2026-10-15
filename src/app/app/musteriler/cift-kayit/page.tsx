@@ -2,7 +2,10 @@ import Link from "@/components/ui/smart-link";
 import { ArrowLeft, ArrowUpRight, CheckCircle2, Copy, Info, Mail, Phone, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
+import { Suspense } from "react";
 import { DuplicateGroupsClient } from "./groups-client";
+import { loadCustomerDataHealth } from "@/lib/duplicate-finders";
+import { DataHealthCard, DataHealthCardSkeleton } from "@/components/app/data-health-card";
 
 import { PageHeader } from "@/components/ui/page-header";
 export const metadata = { title: "Çift kayıt kontrolü" };
@@ -200,18 +203,31 @@ export default async function DuplicateCustomersPage({
         />
       )}
 
+      {tenantId ? (
+        <Suspense fallback={<DataHealthCardSkeleton />}>
+          <CustomerDataHealth tenantId={tenantId} />
+        </Suspense>
+      ) : null}
+
       <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-3 text-xs leading-relaxed text-text-muted">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" />
         <span>
-          Birleştirme; talep, randevu, çağrı, görüşme, anlaşma, teklif ve görev kayıtlarını taşıyan{" "}
-          <strong>geri alınamaz</strong> bir işlemdir ve yanlış eşleşmede veriler karışır —
-          özellikle &quot;aynı ad soyad&quot; sinyali tek başına kanıt değildir. Emin olduğunuz
-          gruplarda <strong>Birleştir</strong> sihirbazını kullanın: ana kaydı seçin, taşınacakların
-          özetini görün, onaylayın. <strong>En dolu kayıt</strong> yeşil çerçeveyle işaretli. Aynı
-          kişi olmadığından eminseniz <strong>Bu grup mükerrer değil</strong> ile grubu bu cihazda
-          gizleyebilirsiniz.
+          Birleştirme; talep, randevu, çağrı, görüşme, teklif, sözleşme, kiracılık, malik olunan portföy, sunum, anket ve
+          portal kayıtları dahil kopyaya bağlı <strong>tüm</strong> kayıtları ana kayda taşıyan{" "}
+          <strong>geri alınamaz</strong> bir işlemdir. Yanlış eşleşmede veriler karışır; özellikle &quot;aynı ad
+          soyad&quot; sinyali tek başına kanıt değildir. <strong>Birleştir</strong> sihirbazında ana kaydı seçin, farklı
+          alanlarda hangi değerin kalacağını belirleyin, özeti görüp onaylayın. Seçilmeyen telefon, e-posta ve kopya
+          notları kaybolmaz, ana kaydın notuna eklenir. <strong>En dolu kayıt</strong> yeşil çerçeveyle işaretli. Aynı kişi
+          olmadığından eminseniz <strong>Bu grup mükerrer değil</strong> ile grubu bu cihazda gizleyebilirsiniz.
         </span>
       </p>
     </div>
   );
+}
+
+/** Veri sağlığı (telefonsuz / geçersiz telefon) — sayfayı bekletmeden akışla gelir. */
+async function CustomerDataHealth({ tenantId }: { tenantId: string }) {
+  const supabase = await createClient();
+  const items = await loadCustomerDataHealth(supabase, tenantId);
+  return <DataHealthCard title="Müşteri veri sağlığı" items={items} />;
 }

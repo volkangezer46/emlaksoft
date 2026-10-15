@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "@/components/ui/smart-link";
 import { ArrowUpRight, Eye, EyeOff, Mail, Phone, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useHiddenGroups } from "@/components/app/hidden-groups-store";
 import { formatTurkishPhone } from "@/lib/phone";
 import { MergeButton, MergePanel } from "./merge-wizard";
 
@@ -47,77 +49,17 @@ const SIGNAL_META: Record<
 };
 
 /**
- * "Yanlış eşleşme / yoksay" — DB'siz hafif çözüm: grup imzası
- * (signal::key) localStorage'da tutulur, kart gizlenir. Cihaza özeldir;
- * yanlışlıkla gizlenen grup "Gizlenenleri göster" ile geri gelir.
+ * "Yanlış eşleşme / yoksay" — DB'siz hafif çözüm: grup imzası (signal::key) cihazda tutulur, kart gizlenir
+ * (`useHiddenGroups`). Yanlışlıkla gizlenen grup "Gizlenenleri göster" ile geri gelir.
  */
 const HIDDEN_KEY = "emlaksoft:cift-kayit:gizli-gruplar";
-
-function readHidden(): string[] {
-  try {
-    const raw = localStorage.getItem(HIDDEN_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter((s): s is string => typeof s === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
-const HIDDEN_EVENT = "emlaksoft:cift-kayit:hidden-changed";
-
-function writeHidden(list: string[]) {
-  try {
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(list));
-  } catch {
-    // localStorage kapalıysa sessizce geç — gizleme sadece kolaylık
-  }
-  window.dispatchEvent(new Event(HIDDEN_EVENT));
-}
-
-/* useSyncExternalStore ile hydration-güvenli okuma: server snapshot boş liste,
-   client snapshot localStorage — effect içinde setState gerekmez. */
-const EMPTY_HIDDEN: string[] = [];
-let hiddenCache: { raw: string | null; list: string[] } = { raw: null, list: EMPTY_HIDDEN };
-
-function subscribeHidden(cb: () => void) {
-  window.addEventListener(HIDDEN_EVENT, cb);
-  window.addEventListener("storage", cb);
-  return () => {
-    window.removeEventListener(HIDDEN_EVENT, cb);
-    window.removeEventListener("storage", cb);
-  };
-}
-
-function getHiddenSnapshot(): string[] {
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(HIDDEN_KEY);
-  } catch {
-    raw = null;
-  }
-  if (raw !== hiddenCache.raw) {
-    let list: string[] = EMPTY_HIDDEN;
-    try {
-      const arr = raw ? JSON.parse(raw) : [];
-      list = Array.isArray(arr) ? arr.filter((s): s is string => typeof s === "string") : EMPTY_HIDDEN;
-    } catch {
-      list = EMPTY_HIDDEN;
-    }
-    hiddenCache = { raw, list };
-  }
-  return hiddenCache.list;
-}
-
-function getHiddenServerSnapshot(): string[] {
-  return EMPTY_HIDDEN;
-}
 
 function tarih(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", dateStyle: "medium" }).format(new Date(iso));
 }
 
 export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) {
-  const hidden = useSyncExternalStore(subscribeHidden, getHiddenSnapshot, getHiddenServerSnapshot);
+  const { hidden, hide, unhide } = useHiddenGroups(HIDDEN_KEY);
   const [showHidden, setShowHidden] = useState(false);
 
   const sigOf = (g: DuplicateGroup) => `${g.signal}::${g.key}`;
@@ -125,37 +67,20 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
   const gizliSayisi = groups.filter((g) => hiddenSet.has(sigOf(g))).length;
   const gosterilen = !showHidden ? groups.filter((g) => !hiddenSet.has(sigOf(g))) : groups;
 
-  function hideGroup(g: DuplicateGroup) {
-    writeHidden([...new Set([...readHidden(), sigOf(g)])]);
-  }
-
-  function unhideGroup(g: DuplicateGroup) {
-    writeHidden(readHidden().filter((s) => s !== sigOf(g)));
-  }
+  const hideGroup = (g: DuplicateGroup) => hide(sigOf(g));
+  const unhideGroup = (g: DuplicateGroup) => unhide(sigOf(g));
 
   return (
     <div className="space-y-4">
       {gizliSayisi > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-canvas px-4 py-2.5">
           <p className="text-xs text-text-muted">
             <span className="numeric font-semibold">{gizliSayisi}</span> grup &quot;mükerrer
             değil&quot; olarak işaretlendi (yalnızca bu cihazda gizli).
           </p>
-          <button
-            type="button"
-            onClick={() => setShowHidden((v) => !v)}
-            className="focus-ring press inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
-          >
-            {showHidden ? (
-              <>
-                <EyeOff className="h-3.5 w-3.5" /> Gizlenenleri sakla
-              </>
-            ) : (
-              <>
-                <Eye className="h-3.5 w-3.5" /> Gizlenenleri göster
-              </>
-            )}
-          </button>
+          <Button variant="secondary" size="sm" icon={showHidden ? EyeOff : Eye} onClick={() => setShowHidden((v) => !v)} className="shrink-0">
+            {showHidden ? "Gizlenenleri sakla" : "Gizlenenleri göster"}
+          </Button>
         </div>
       ) : null}
 
@@ -174,7 +99,7 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
           return (
             <section
               key={sigOf(g)}
-              className={`surface-card rounded-[var(--radius-panel)] p-5 ${gizli ? "opacity-60" : ""}`}
+              className={`surface-card rounded-[var(--radius-panel)] p-4 sm:p-5 ${gizli ? "opacity-60" : ""}`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -186,28 +111,19 @@ export function DuplicateGroupsClient({ groups }: { groups: DuplicateGroup[] }) 
                   </p>
                   <p className="mt-1 text-xs text-text-faint">{meta.desc}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-canvas px-2.5 py-1 text-xs font-semibold text-text-muted">
                     {g.kayitlar.length} kayıt
                   </span>
                   {gizli ? (
-                    <button
-                      type="button"
-                      onClick={() => unhideGroup(g)}
-                      className="focus-ring press rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
-                    >
+                    <Button variant="secondary" size="sm" onClick={() => unhideGroup(g)}>
                       Tekrar göster
-                    </button>
+                    </Button>
                   ) : (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => hideGroup(g)}
-                        title="Grubu bu cihazda gizle — veri silinmez"
-                        className="focus-ring press rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition hover:border-brand-400 hover:text-brand-600"
-                      >
+                      <Button variant="secondary" size="sm" onClick={() => hideGroup(g)} title="Grubu bu cihazda gizle; veri silinmez">
                         Bu grup mükerrer değil
-                      </button>
+                      </Button>
                       {g.kayitlar.length > 1 ? <MergeButton panelId={`merge-${g.kayitlar[0].customer_id}`} /> : null}
                     </>
                   )}
