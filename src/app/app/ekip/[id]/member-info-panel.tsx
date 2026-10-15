@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import Link from "@/components/ui/smart-link";
 import { KeyRound, Mail, Power, Save, Send } from "lucide-react";
 import {
   requestMemberEmailChange,
@@ -17,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { EmailInput } from "@/components/ui/email-input";
 import { FormField, FormInput } from "@/components/ui/form-controls";
 import { PhoneInput } from "@/components/ui/phone-input";
+import type { HandoffScope } from "@/lib/team/handoff";
+import { DeactivateWithHandoff } from "./member-handoff";
 
 const initial: MemberAdminResult = {};
 
@@ -33,7 +34,8 @@ function fmtDate(iso: string | null) {
 
 /**
  * "Bilgiler" sekmesi (P0-11, P1-B3): üye bilgisi düzenleme, erişim (parola sıfırlama / davet),
- * pasifleştirme. Popup yok; onay satır içidir. E-posta yalnız gösterilir (auth kimliği; güvenli
+ * pasifleştirme. Popup yok; onay satır içidir. Pasife almadan önce açık iş sayımları gösterilir ve
+ * "Devret ve pasife al" tek adımda sunulur (G5); devretmeden pasife alma açık onay ister. E-posta yalnız gösterilir (auth kimliği; güvenli
  * değişim akışı yok).
  */
 export function MemberInfoPanel({
@@ -45,6 +47,8 @@ export function MemberInfoPanel({
   email,
   lastSignInAt,
   neverSignedIn,
+  advisors,
+  editableScopes,
 }: {
   memberId: string;
   fullName: string;
@@ -54,6 +58,10 @@ export function MemberInfoPanel({
   email: string | null;
   lastSignInAt: string | null;
   neverSignedIn: boolean;
+  /** Pasife alırken devralan seçimi için ofisin diğer aktif üyeleri. */
+  advisors: { id: string; full_name: string }[];
+  /** Yöneticinin devredebildiği kapsamlar (modül `edit` izni). */
+  editableScopes: HandoffScope[];
 }) {
   const [saveState, saveAction, saving] = useActionState(updateMemberProfile, initial);
   const [resetState, resetAction, resetting] = useActionState(sendMemberPasswordReset, initial);
@@ -165,18 +173,13 @@ export function MemberInfoPanel({
         <CardContent className="space-y-3">
           {isActive ? (
             confirmingOff ? (
-              <div className="space-y-3 rounded-[var(--radius-control)] border border-danger-500/30 bg-danger-500/5 p-3">
-                <p className="text-sm text-text">
-                  Üye pasife alınırsa oturumları kapanır ve giriş yapamaz. Müşteri, portföy ve görevleri üyede kalır;
-                  önce <Link href={`/app/ekip/devir?from=${memberId}`} className="font-semibold text-brand-600 underline">iş yükünü devretmeniz</Link> önerilir.
-                </p>
-                <form action={activeAction} className="flex flex-wrap gap-2">
-                  <input type="hidden" name="id" value={memberId} />
-                  <input type="hidden" name="is_active" value="false" />
-                  <Button type="submit" variant="danger" icon={Power} loading={toggling}>Evet, pasife al</Button>
-                  <Button type="button" variant="secondary" onClick={() => setConfirmingOff(false)}>Vazgeç</Button>
-                </form>
-              </div>
+              <DeactivateWithHandoff
+                memberId={memberId}
+                memberName={fullName}
+                advisors={advisors}
+                editableScopes={editableScopes}
+                onCancel={() => setConfirmingOff(false)}
+              />
             ) : (
               <Button type="button" variant="secondary" icon={Power} onClick={() => setConfirmingOff(true)}>
                 Pasife al

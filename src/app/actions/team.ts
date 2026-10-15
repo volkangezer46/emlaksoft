@@ -9,12 +9,16 @@ import { logActivity } from "@/lib/activity";
 import { now } from "@/lib/clock";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
 import {
+  HANDOFF_FSBO_OPEN_STATUSES,
   HANDOFF_PERMISSION,
+  HANDOFF_RPC,
   HANDOFF_SCOPES,
   HANDOFF_SCOPE_LABELS,
   parseHandoffInput,
+  parseHandoffRpcResult,
   type HandoffScope,
 } from "@/lib/team/handoff";
+import { isMissingFunctionError, recordRpcOutcome, rpcKnownMissing } from "@/lib/supabase/rpc-probe";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
@@ -23,7 +27,7 @@ import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { ASSIGNABLE_ROLES, MANAGER_ROLES, canManageRole, type TeamRole } from "@/lib/team/assignable-roles";
 import { syncScopeForRoleChange } from "@/lib/access-control/scope-sync";
 import { ensureBranchBelongsToTenant, ensureSeatAvailable, provisionTeamMember } from "@/lib/team/provision-member";
-import { actionErrorMessage } from "@/lib/action-errors";
+import { actionErrorMessage, classifyActionError, sqlRaiseMessage } from "@/lib/action-errors";
 
 export type TeamResult = { error?: string; ok?: boolean; id?: string };
 
@@ -341,20 +345,26 @@ export async function deleteBranch(formData: FormData): Promise<TeamResult> {
 
 /**
  * İş yükü devri — bir danışmanın (ör. ekipten ayrılan) seçilen iş kalemlerini başka bir danışmana aktarır:
- * müşteri, portföy, AÇIK anlaşma, açık görev, yaklaşan randevu (açık talepler müşteri sahipliğiyle taşınır;
- * `customer_demands`te ayrı sahip kolonu yoktur). Zorunlu gerekçe + seçili her kalem için düzenleme yetkisi.
+ * müşteri, portföy (+ havuz ataması), AÇIK anlaşma, açık görev, yaklaşan randevu, açık sahibinden adayı (açık talepler
+ * müşteri sahipliğiyle taşınır; `customer_demands`te ayrı sahip kolonu yoktur). Zorunlu gerekçe + seçili her kalem için
+ * düzenleme yetkisi.
  *
- * Atomik değil (RPC/migration yok) ama tutarlı: adımlar sırayla çalışır, biri hata verirse önceki adımlar
- * aynı kimlik kümesiyle geri çevrilir; geri çevirme de başarısız olursa kısmi durum açıkça raporlanır ve
- * denetim kaydına yazılır.
+ * Hızlı yol `team_handoff_workload` RPC'sidir (migration 20261016120100): tüm kapsamlar + denetim satırı TEK transaction'da,
+ * yetki/kiracı/sahip kapıları SQL'de de doğrulanır. Fonksiyon yoksa (migration uygulanmadı) eski yola düşer: adımlar sırayla
+ * çalışır, biri hata verirse önceki adımlar aynı kimlik kümesiyle geri çevrilir; geri çevirme de başarısız olursa kısmi durum
+ * açıkça raporlanır ve denetim kaydına yazılır.
  */
 export type HandoffResult = TeamResult & {
   counts?: Partial<Record<HandoffScope, number>>;
+  /** Portföyle birlikte devralana geçen havuz ataması sayısı (yalnız RPC yolu). */
+  poolCount?: number;
   /** Hata sonrası geri çevrilemeyen adımlar (varsa kısmi durum). */
   partial?: HandoffScope[];
   /** Seçili olup devredilecek kayıt bulunmayan (0 adet) kapsamlar. */
   skipped?: HandoffScope[];
 };
+
+const HANDOFF_SQL_CODES = ["P0001", "P0002", "22023", "42501"] as const;
 
 export async function handoffMemberWorkload(formData: FormData): Promise<HandoffResult> {
   const gate = await requirePermission("team", "edit");
@@ -371,6 +381,74 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
   }
 
   const supabase = await createClient();
+
+  if (!rpcKnownMissing(HANDOFF_RPC)) {
+    const { data, error } = await supabase.rpc(HANDOFF_RPC, { p_from: from, p_to: to, p_scopes: scopes, p_reason: reason });
+    recordRpcOutcome(HANDOFF_RPC, error);
+    if (!error) {
+      const res = parseHandoffRpcResult(data);
+      if (!res) return { error: "Devir yanıtı okunamadı; ekranı yenileyip sonucu kontrol edin." };
+      const fromName = (data as { from_name?: string | null }).from_name ?? null;
+      const counts: Partial<Record<HandoffScope, number>> = {};
+      for (const scope of scopes) counts[scope] = res.counts[scope] ?? 0;
+      await finishHandoff({ gate, from, to, reason, fromName, counts, moved: res.ids });
+      return { ok: true, counts, poolCount: res.poolCount, skipped: scopes.filter((sc) => !counts[sc]) };
+    }
+    if (!isMissingFunctionError(error)) {
+      console.error("handoffMemberWorkload rpc", error);
+      return { error: sqlRaiseMessage(error, HANDOFF_SQL_CODES) ?? actionErrorMessage(error, "Devir yapılamadı; hiçbir kayıt devredilmedi.") };
+    }
+  }
+
+  return legacyHandoff({ supabase, gate, from, to, scopes, reason });
+}
+
+type HandoffGate = { tenantId: string; userId: string; role: string };
+
+/** Ortak bitiş: sayfaları tazele + devralana bildirim (yalnız gerçekten taşınan kalem varsa, devralan işlemi yapan değilse). */
+async function finishHandoff(input: {
+  gate: HandoffGate;
+  from: string;
+  to: string;
+  reason: string;
+  fromName: string | null;
+  counts: Partial<Record<HandoffScope, number>>;
+  moved: Partial<Record<HandoffScope, string[]>>;
+}) {
+  const { gate, from, to, reason, fromName, counts, moved } = input;
+  revalidatePath("/app/musteriler");
+  revalidatePath("/app/portfoyler");
+  revalidatePath("/app/anlasmalar");
+  revalidatePath("/app/gorevler");
+  revalidatePath("/app/randevular");
+  revalidatePath("/app/portfoy-avi");
+  revalidatePath("/app/ekip/devir");
+  revalidatePath(`/app/ekip/${from}`);
+  revalidatePath(`/app/ekip/${to}`);
+  const movedParts = HANDOFF_SCOPES.filter((sc) => (counts[sc] ?? 0) > 0).map((sc) => `${counts[sc]} ${HANDOFF_SCOPE_LABELS[sc].toLocaleLowerCase("tr-TR")}`);
+  if (movedParts.length > 0 && to !== gate.userId) {
+    const allIds = HANDOFF_SCOPES.flatMap((sc) => moved[sc] ?? []);
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: to,
+      title: `İş yükü devri: ${fromName ?? "Bir danışman"} → size`,
+      body: `Size devredildi: ${movedParts.join(", ")}. Gerekçe: ${reason.slice(0, 160)}`,
+      href: `/app/ekip/${to}`,
+      dedupeKey: `team-handoff:${from}:${to}:${idsDigest(allIds)}`,
+    });
+  }
+}
+
+/** RPC yokken (migration uygulanmadı) eski tablo tablo yol: sıralı adımlar + en iyi çabayla geri çevirme. */
+async function legacyHandoff(input: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  gate: HandoffGate;
+  from: string;
+  to: string;
+  scopes: HandoffScope[];
+  reason: string;
+}): Promise<HandoffResult> {
+  const { supabase, gate, from, to, scopes, reason } = input;
 
   // Devralan ve devreden aynı ofiste mi? (RLS zaten tenant'ı kısıtlar; yine de doğrula)
   const { data: people } = await supabase
@@ -430,6 +508,17 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
         .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
         .gte("scheduled_at", nowIso)
         .select("id"),
+    fsbo_leads: () =>
+      supabase
+        .from("fsbo_leads")
+        .update({ assigned_to: to })
+        .eq("tenant_id", gate.tenantId)
+        .eq("assigned_to", from)
+        .is("deleted_at", null)
+        .in("status", [...HANDOFF_FSBO_OPEN_STATUSES])
+        .select("id")
+        // Tablo henüz yoksa (sahibinden modülü migration'ı uygulanmadı) taşınacak aday yoktur.
+        .then((r) => (r.error && classifyActionError(r.error) === "schema" ? { data: [], error: null } : r)),
   };
   const TABLE: Record<HandoffScope, string> = {
     customers: "customers",
@@ -437,6 +526,7 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
     deals: "deals",
     tasks: "tasks",
     appointments: "appointments",
+    fsbo_leads: "fsbo_leads",
   };
 
   const moved: Partial<Record<HandoffScope, string[]>> = {};
@@ -518,33 +608,14 @@ export async function handoffMemberWorkload(formData: FormData): Promise<Handoff
     },
   });
 
-  revalidatePath("/app/musteriler");
-  revalidatePath("/app/portfoyler");
-  revalidatePath("/app/anlasmalar");
-  revalidatePath("/app/gorevler");
-  revalidatePath("/app/randevular");
-  revalidatePath(`/app/ekip/${from}`);
-  revalidatePath(`/app/ekip/${to}`);
-  const skipped = scopes.filter((sc) => !counts[sc]);
-  // Devralana bildirim (yalnız gerçekten taşınan kalem varsa ve devralan işlemi yapan kişi değilse).
-  const movedParts = HANDOFF_SCOPES.filter((sc) => (counts[sc] ?? 0) > 0).map((sc) => `${counts[sc]} ${HANDOFF_SCOPE_LABELS[sc].toLocaleLowerCase("tr-TR")}`);
-  if (movedParts.length > 0 && to !== gate.userId) {
-    const allIds = HANDOFF_SCOPES.flatMap((sc) => moved[sc] ?? []);
-    await notifyAssignment({
-      tenantId: gate.tenantId,
-      userId: to,
-      title: `İş yükü devri: ${source.full_name ?? "Bir danışman"} → size`,
-      body: `Size devredildi: ${movedParts.join(", ")}. Gerekçe: ${reason.slice(0, 160)}`,
-      href: `/app/ekip/${to}`,
-      dedupeKey: `team-handoff:${from}:${to}:${idsDigest(allIds)}`,
-    });
-  }
-  return { ok: true, counts, skipped };
+  await finishHandoff({ gate, from, to, reason, fromName: source.full_name ?? null, counts, moved });
+  return { ok: true, counts, skipped: scopes.filter((sc) => !counts[sc]) };
 }
 
 /**
  * Devir paneli için GERÇEK sayımlar (devir adımlarındaki süzgeçlerle aynı): müşteri, portföy, açık anlaşma,
- * açık görev, yaklaşan randevu. `team:view` yeter; satır sayısı taşımaz (head count).
+ * açık görev, yaklaşan randevu, açık sahibinden adayı. `team:view` yeter; satır sayısı taşımaz (head count).
+ * `fsbo_leads` tablosu yoksa (modül migration'ı uygulanmadı) aday sayısı 0'dır.
  */
 export async function getHandoffCounts(fromId: string): Promise<{ counts?: Record<HandoffScope, number>; error?: string }> {
   const gate = await requirePermission("team", "view");
@@ -553,7 +624,7 @@ export async function getHandoffCounts(fromId: string): Promise<{ counts?: Recor
   const supabase = await createClient();
   const nowIso = new Date(now()).toISOString();
   const head = { count: "exact", head: true } as const;
-  const [c, p, d, t, a] = await Promise.all([
+  const [c, p, d, t, a, f] = await Promise.all([
     supabase.from("customers").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
     supabase.from("properties").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).is("deleted_at", null),
     supabase.from("deals").select("id", head).eq("tenant_id", gate.tenantId).eq("assigned_to", fromId).not("stage", "in", postgrestInList(CLOSED_DEAL_STAGES)),
@@ -565,8 +636,18 @@ export async function getHandoffCounts(fromId: string): Promise<{ counts?: Recor
       .eq("assigned_to", fromId)
       .in("status", [...UNCLOSED_APPOINTMENT_STATUSES])
       .gte("scheduled_at", nowIso),
+    supabase
+      .from("fsbo_leads")
+      .select("id", head)
+      .eq("tenant_id", gate.tenantId)
+      .eq("assigned_to", fromId)
+      .is("deleted_at", null)
+      .in("status", [...HANDOFF_FSBO_OPEN_STATUSES]),
   ]);
-  if (c.error || p.error || d.error || t.error || a.error) return { error: actionErrorMessage(c.error, "Sayımlar okunamadı.") };
+  const fsboError = f.error && classifyActionError(f.error) !== "schema" ? f.error : null;
+  if (c.error || p.error || d.error || t.error || a.error || fsboError) {
+    return { error: actionErrorMessage(c.error ?? p.error ?? d.error ?? t.error ?? a.error ?? fsboError, "Sayımlar okunamadı.") };
+  }
   return {
     counts: {
       customers: c.count ?? 0,
@@ -574,6 +655,7 @@ export async function getHandoffCounts(fromId: string): Promise<{ counts?: Recor
       deals: d.count ?? 0,
       tasks: t.count ?? 0,
       appointments: a.count ?? 0,
+      fsbo_leads: f.error ? 0 : (f.count ?? 0),
     },
   };
 }
