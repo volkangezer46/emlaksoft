@@ -531,7 +531,9 @@ html[data-theme="dark"] .ds-hero {
 
 /* ---- Mobil liste sayfaları: KPI'lar tek satır yatay kaydırmalı küçük çip (KpiStrip → .kpi-compact), sıfır değerli olanlar gizli.
    Liste (asıl iş) ilk ekranda başlasın diye hero + KPI bloğu kompakt tutulur; masaüstü ızgara aynen kalır. */
-@media (max-width: 639px) {
+/* Kısa ekran (≤500 px yükseklik, 844x390 yatay telefon) da aynı kompakt şeridi alır: masaüstü KPI ızgarası listeyi ilk
+   ekranın dışına itiyordu (B137). */
+@media (max-width: 639px), (max-height: 500px) {
   .kpi-flow.kpi-compact {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -541,12 +543,16 @@ html[data-theme="dark"] .ds-hero {
   }
   .kpi-flow.kpi-compact > * { flex: 0 0 auto; min-width: 8.5rem; max-width: 12rem; scroll-snap-align: start; }
   .kpi-flow.kpi-compact > .kpi-zero { display: none; }
-  /* Tek satırlık çip (YD6): etiket + değer yan yana, 44 px dokunma hedefi; şerit ~44 px yer kaplar. */
-  .kpi-compact .pm-card { flex-direction: row; align-items: center; gap: 0.5rem; min-height: 44px; padding: 0.25rem 0.75rem; }
-  .kpi-compact .pm-card > * { margin-top: 0; }
-  .kpi-compact .pm-card-head { min-width: 0; flex: 0 1 auto; }
+  /* İki satırlık çip (B134): etiket üstte (tek satır, kırpılır), değer altta — etiket ile değer ASLA kesişmez. Tek satırlı
+     düzende başlık alanı 15 px'e küçülüp `min-width:4.5rem` başlık değerin üstüne taşıyordu. 44 px hedef korunur. */
+  .kpi-compact .pm-card { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0; min-height: 44px; padding: 0.3rem 0.75rem; }
+  .kpi-compact .pm-card > * { margin-top: 0; max-width: 100%; }
+  .kpi-compact .pm-card-head { min-width: 0; width: 100%; flex: 0 0 auto; }
   .kpi-compact .pm-ico, .kpi-compact .pm-card-bars, .kpi-compact .pm-chart, .kpi-compact .pm-card-arrow, .kpi-compact .pm-pill { display: none; }
   .kpi-compact .pm-sub { display: none; }
-  .kpi-compact .pm-card-title { -webkit-line-clamp: 1; line-clamp: 1; }
-  .kpi-compact .pm-value { font-size: 1rem; }
+  .kpi-compact .pm-card-title {
+    -webkit-line-clamp: 1; line-clamp: 1; min-width: 0; flex: 1 1 auto;
+    font-size: 0.75rem; line-height: 1.2; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; overflow: hidden; display: block;
+  }
+  .kpi-compact .pm-value { font-size: 1rem; line-height: 1.2; }
 }

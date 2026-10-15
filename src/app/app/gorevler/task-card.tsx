@@ -1,11 +1,13 @@
 "use client";
 
-import { useContext, useOptimistic, useTransition } from "react";
+import { useContext, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, MoreHorizontal, Pencil, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
 import { now as clockNow } from "@/lib/clock";
@@ -102,6 +104,9 @@ export function TaskCard({
   // Toplu tamamlamada seçili kartlar da anında "done" görünsün (TaskBulkList).
   const bulkDone = useContext(OptimisticDoneContext);
   const done = optimisticStatus === "done" || bulkDone.has(task.id);
+  // Düzenleme paneli ve silme onayı denetimli: masaüstü ikon düğmeleri ile mobil "…" menüsü aynı örneği açar.
+  const [editOpen, setEditOpen] = useState(focused);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   function setStatus(next: "done" | "open") {
     if (pending) return; // çifte tıklama koruması
@@ -164,146 +169,194 @@ export function TaskCard({
   const chainRoot = task.recurrence_parent_id ?? (task.recurrence ? task.id : null);
   const editTask = { id: task.id, title: task.title, notes: task.notes, kind: task.kind, priority: task.priority, due_at: task.due_at, recurrence: task.recurrence, assigned_to: task.assigned_to, deal_id: task.deal_id ?? null };
 
+  const canEditHere = canEdit && !done && !systemKind;
+  const canDeleteHere = canDelete && !takedown;
+
   return (
     <article
-      className={`group relative flex items-start gap-3 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition ${
+      data-task-card=""
+      // <640 px: iki satır (B133) — üstte başlık + meta tam genişlik, altta eylem satırı (Tamamla geniş, Düzenle/Sil "…"
+      // menüsünde). Tek satırlı düzende 390 px'te metin sütununa 45 px kalıyor, kart 270-390 px uzuyordu.
+      className={`group relative flex flex-col gap-2.5 rounded-[var(--radius-card)] border bg-surface px-4 py-3.5 transition sm:flex-row sm:items-start sm:gap-3 ${
         done ? "border-line opacity-70" : highPr ? "border-danger-500/25" : "border-line"
       }${focused ? " ring-2 ring-brand-300" : ""}`}
       aria-current={focused ? "true" : undefined}
     >
       {href ? (
         <Link href={href} className="absolute inset-0 rounded-[var(--radius-card)]" aria-label={`${task.title} kaydını aç`} />
-      ) : canEdit && !done && !systemKind ? (
+      ) : canEditHere ? (
         // Müşterisiz/portföysüz görevde gidilecek kayıt yok — kartın kendisi
         // düzenleme diyaloğunu açar (overlay tetikleyicili ikinci diyalog örneği).
         <TaskEditDialog task={editTask} members={members} deals={deals} variant="overlay" />
       ) : null}
-      {compact ? null : (
-        <span
-          className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition ${
-            done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
-          }`}
-        >
-          <meta.icon className="h-4 w-4" />
-        </span>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className={`text-sm font-semibold transition ${done ? "text-text-muted line-through" : "text-ink-950"}`}>{task.title}</p>
-          <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-muted">{meta.label}</span>
-          {task.recurrence && RECURRENCE_LABELS[task.recurrence] ? (
-            <span className="flex items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-bold text-cyan-600">
-              <Repeat className="h-3 w-3" /> {RECURRENCE_LABELS[task.recurrence]}
-            </span>
-          ) : null}
-          {highPr && !done ? (
-            <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-500">{urgent ? "Acil" : "Yüksek"}</span>
-          ) : null}
-          {task.priority === "low" && !done ? (
-            <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
-          ) : null}
-        </div>
-        {task.notes && !compact ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span className={`flex items-center gap-1 ${due.cls}`}>
-            <Clock className="h-3 w-3" /> {due.text}
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        {compact ? null : (
+          <span
+            className={`mt-0.5 hidden h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] transition sm:grid ${
+              done ? "bg-mint-500/10 text-mint-600" : "bg-brand-600/10 text-brand-600"
+            }`}
+          >
+            <meta.icon className="h-4 w-4" />
           </span>
-          {assignee ? (
-            task.assigned_to ? (
-              <Link
-                href={`/app/ekip/${task.assigned_to}`}
-                className="relative z-10 flex items-center gap-1 text-text-muted transition hover:text-brand-600 hover:underline"
-              >
-                <User className="h-3 w-3" /> {assignee}
-              </Link>
-            ) : (
-              <span className="flex items-center gap-1 text-text-muted">
-                <User className="h-3 w-3" /> {assignee}
+        )}
+
+        <div className="min-w-0 flex-1" data-task-text="">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className={`text-sm font-semibold transition ${done ? "text-text-muted line-through" : "text-ink-950"}`}>{task.title}</p>
+            <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-muted">{meta.label}</span>
+            {task.recurrence && RECURRENCE_LABELS[task.recurrence] ? (
+              <span className="flex items-center gap-1 rounded-full bg-cyan-500/10 px-2 py-0.5 text-xs font-bold text-cyan-600">
+                <Repeat className="h-3 w-3" /> {RECURRENCE_LABELS[task.recurrence]}
               </span>
-            )
-          ) : null}
-          {customer ? (
-            <Link
-              href={`/app/musteriler/${task.customer_id}`}
-              className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
-            >
-              {customer}
-            </Link>
-          ) : null}
-          {task.deal_id ? (
-            <Link
-              href={`/app/anlasmalar/${task.deal_id}`}
-              className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
-              title="Bağlı anlaşma"
-            >
-              <Briefcase className="h-3 w-3" /> {task.deal_label ?? "Anlaşma"}
-            </Link>
-          ) : null}
-          {chainRoot ? (
-            <Link
-              href={`/app/gorevler?filter=all&zincir=${chainRoot}`}
-              className="relative z-10 flex items-center gap-1 text-cyan-600 hover:underline"
-              title="Bu tekrar zincirindeki tüm görevler"
-            >
-              <Link2 className="h-3 w-3" /> Tekrar zinciri
-            </Link>
-          ) : null}
+            ) : null}
+            {highPr && !done ? (
+              <span className="rounded-full bg-danger-500/10 px-2 py-0.5 text-xs font-bold text-danger-500">{urgent ? "Acil" : "Yüksek"}</span>
+            ) : null}
+            {task.priority === "low" && !done ? (
+              <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
+            ) : null}
+          </div>
+          {task.notes && !compact ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+            <span className={`flex items-center gap-1 ${due.cls}`}>
+              <Clock className="h-3 w-3" /> {due.text}
+            </span>
+            {assignee ? (
+              task.assigned_to ? (
+                <Link
+                  href={`/app/ekip/${task.assigned_to}`}
+                  className="relative z-10 flex items-center gap-1 text-text-muted transition hover:text-brand-600 hover:underline"
+                >
+                  <User className="h-3 w-3" /> {assignee}
+                </Link>
+              ) : (
+                <span className="flex items-center gap-1 text-text-muted">
+                  <User className="h-3 w-3" /> {assignee}
+                </span>
+              )
+            ) : null}
+            {customer ? (
+              <Link
+                href={`/app/musteriler/${task.customer_id}`}
+                className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+              >
+                {customer}
+              </Link>
+            ) : null}
+            {task.deal_id ? (
+              <Link
+                href={`/app/anlasmalar/${task.deal_id}`}
+                className="relative z-10 flex items-center gap-1 font-semibold text-brand-600 hover:underline"
+                title="Bağlı anlaşma"
+              >
+                <Briefcase className="h-3 w-3" /> {task.deal_label ?? "Anlaşma"}
+              </Link>
+            ) : null}
+            {chainRoot ? (
+              <Link
+                href={`/app/gorevler?filter=all&zincir=${chainRoot}`}
+                className="relative z-10 flex items-center gap-1 text-cyan-600 hover:underline"
+                title="Bu tekrar zincirindeki tüm görevler"
+              >
+                <Link2 className="h-3 w-3" /> Tekrar zinciri
+              </Link>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="relative z-10 flex shrink-0 items-center gap-1.5">
-        {canEdit && !done && !systemKind ? (
-          <TaskEditDialog task={editTask} members={members} deals={deals} defaultOpen={focused} />
-        ) : null}
-        {takedown ? (
-          <Link
-            href={`/app/gorevler/eids/${task.id}`}
-            className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500/10 px-3 py-2 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/20 touch:min-h-11"
-          >
-            <ListChecks className="h-4 w-4" /> Kontrol listesi
-          </Link>
-        ) : canEdit ? (
-          done ? (
-            /* `title=""` yerine Tip: klavye odagında da açılır, dokunmatikte
-               kilitlenmez ve ekran dışına taşmaz. `aria-label` ayrıca şart —
-               ikon-only butonda `title` ekran okuyucularda tutarlı okunmuyor. */
-            <Tip label="Yeniden aç">
+      {canEdit || canDeleteHere || takedown ? (
+        <div className="relative z-10 flex shrink-0 items-center gap-1.5 max-sm:w-full">
+          {canEditHere ? (
+            <Button
+              size="icon"
+              variant="secondary"
+              icon={Pencil}
+              onClick={() => setEditOpen((v) => !v)}
+              aria-label="Görevi düzenle"
+              aria-expanded={editOpen}
+              className="max-sm:hidden"
+            />
+          ) : null}
+          {takedown ? (
+            <Link
+              href={`/app/gorevler/eids/${task.id}`}
+              className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-danger-500/10 px-3 py-2 text-xs font-semibold text-danger-600 transition hover:bg-danger-500/20 max-sm:flex-1 touch:min-h-11"
+            >
+              <ListChecks className="h-4 w-4" /> Kontrol listesi
+            </Link>
+          ) : canEdit ? (
+            done ? (
+              /* `title=""` yerine Tip: klavye odagında da açılır, dokunmatikte
+                 kilitlenmez ve ekran dışına taşmaz. `aria-label` ayrıca şart —
+                 ikon-only butonda `title` ekran okuyucularda tutarlı okunmuyor. */
+              <Tip label="Yeniden aç">
+                <button
+                  type="button"
+                  onClick={() => setStatus("open")}
+                  disabled={pending}
+                  aria-label="Görevi yeniden aç"
+                  className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
+                >
+                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                </button>
+              </Tip>
+            ) : (
               <button
                 type="button"
-                onClick={() => setStatus("open")}
+                onClick={() => setStatus("done")}
                 disabled={pending}
-                aria-label="Görevi yeniden aç"
-                className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:border-brand-300 disabled:opacity-50 touch:min-h-11 touch:min-w-11"
+                className="focus-ring press inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60 max-sm:flex-1 touch:min-h-11"
               >
-                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                <CheckCircle2 className="h-4 w-4" /> Tamamla
               </button>
-            </Tip>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setStatus("done")}
-              disabled={pending}
-              className="focus-ring press inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-mint-500/10 px-3 py-2 text-xs font-semibold text-mint-600 transition hover:bg-mint-500/20 disabled:opacity-60"
-            >
-              <CheckCircle2 className="h-4 w-4" /> Tamamla
-            </button>
-          )
-        ) : null}
-        {canDelete && !takedown ? (
-          <ConfirmDialog
-            title="Görevi sil"
-            description={`“${task.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
-            confirmLabel="Sil"
-            onConfirm={removeTask}
-            trigger={
-              <button type="button" aria-label="Görevi sil" className="focus-ring press grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-danger-500 transition hover:border-danger-500/40 touch:min-h-11 touch:min-w-11">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            }
-          />
-        ) : null}
-      </div>
+            )
+          ) : null}
+          {canDeleteHere ? (
+            <Button
+              size="icon"
+              variant="secondary"
+              icon={Trash2}
+              onClick={() => setDeleteOpen(true)}
+              aria-label="Görevi sil"
+              className="text-danger-500 hover:border-danger-500/40 max-sm:hidden"
+            />
+          ) : null}
+          {canEditHere || canDeleteHere ? (
+            // <640 px: Düzenle ve Sil "…" menüsünde (kart iki satır; eylem satırında Tamamla geniş).
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="secondary" icon={MoreHorizontal} aria-label={`Diğer işlemler: ${task.title}`} className="ml-auto shrink-0 sm:hidden" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {canEditHere ? (
+                  <DropdownMenuItem onSelect={() => setEditOpen(true)}>
+                    <Pencil aria-hidden="true" /> Düzenle
+                  </DropdownMenuItem>
+                ) : null}
+                {canDeleteHere ? (
+                  <DropdownMenuItem danger onSelect={() => setDeleteOpen(true)}>
+                    <Trash2 aria-hidden="true" /> Sil…
+                  </DropdownMenuItem>
+                ) : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : null}
+        </div>
+      ) : null}
+      {canEditHere ? (
+        <TaskEditDialog task={editTask} members={members} deals={deals} variant="none" open={editOpen} onOpenChange={setEditOpen} />
+      ) : null}
+      {canDeleteHere ? (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title="Görevi sil"
+          description={`“${task.title}” kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
+          confirmLabel="Sil"
+          onConfirm={removeTask}
+        />
+      ) : null}
     </article>
   );
 }

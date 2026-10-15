@@ -844,7 +844,7 @@ export function AreaTrendChart({
           onToggle={toggle}
         />
       ) : null}
-      <table className="sr-only">
+      <div className="sr-only"><table>
         <caption>{ariaLabel ?? name}</caption>
         <tbody>
           {allRows.map((r, i) => (
@@ -854,7 +854,7 @@ export function AreaTrendChart({
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </figure>
   );
 }

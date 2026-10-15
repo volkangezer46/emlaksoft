@@ -60,6 +60,10 @@ describe("rozet ve yardımcılar", () => {
     expect(centerScrollLeft(0, 100, 300)).toBe(0);
     expect(centerScrollLeft(400, 100, 300)).toBe(300);
   });
+  it("centerScrollLeft: şeritten geniş sekme sol kenarına hizalanır (etiket ekran dışına itilmez)", () => {
+    expect(centerScrollLeft(120, 523, 390)).toBe(120);
+    expect(centerScrollLeft(0, 653, 390)).toBe(0);
+  });
 });
 
 describe("tabProgress / slideDirection", () => {

@@ -18,8 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ViewPrefs } from "@/components/ui/console/view-prefs";
-import { FontScalePicker } from "@/components/font-scale-picker";
+import { FontScaleMenuItems, ViewPrefs } from "@/components/ui/console/view-prefs";
 import type { FontScale } from "@/lib/font-scale";
 import type { UiPrefs } from "@/lib/ui-prefs";
 import type { UserMenuLink } from "./user-menu";
@@ -104,6 +103,7 @@ export function UserMenuPanel({
             </DropdownMenuItem>
           ) : null}
           {links.length > 0 || inApp ? <DropdownMenuSeparator /> : null}
+          {/* Görünüm tercihleri gerçek menü öğeleridir (onay kutusu + radyo grubu): ok tuşlarıyla ulaşılır, anında uygulanır. */}
           {viewPrefs ? (
             <>
               <ViewPrefs cookieName={viewPrefs.cookieName} initial={viewPrefs.initial} />
@@ -112,7 +112,7 @@ export function UserMenuPanel({
           ) : null}
           {fontScale ? (
             <>
-              <FontScalePicker initial={fontScale} className="px-3 py-2" />
+              <FontScaleMenuItems initial={fontScale} />
               <DropdownMenuSeparator />
             </>
           ) : null}

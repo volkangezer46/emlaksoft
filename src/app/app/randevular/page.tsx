@@ -13,6 +13,7 @@ import {
   Search,
   Hourglass,
 } from "lucide-react";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { ButtonLink } from "@/components/ui/button";
 import { ColumnChartCard, DistributionCard, ListCharts, ListHero, ListPage } from "@/components/ui/list-page";
@@ -902,12 +903,17 @@ export default async function AppointmentsPage({
         </section>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* grid-cols-1 (minmax(0,1fr)): örtük `auto` iz ICS adresinin nowrap genişliğini (672 px) taşıyıp kartın sağ yarısını
+          kesiyordu (B130). Ekran altı blok: `cv-auto` ile ilk boyamada çizilmez; ayar kartı kendi sorgusunu akışla getirir
+          (listeyi bekletmez). */}
+      <div className="cv-auto grid grid-cols-1 gap-4 md:grid-cols-2" style={{ containIntrinsicSize: "auto 40rem" }}>
         {/* Kişisel ICS abonelik linki — Google/Apple/Outlook otomatik senkron */}
         <CalendarSubscribeCard token={calendarToken} />
 
         {/* Müşterinin kendi randevusunu aldığı public link (/randevu-al/[token]) */}
-        <BookingLinkCard userId={gate.userId} />
+        <Suspense fallback={<div className="dashboard-panel min-h-[28rem] min-w-0 rounded-[var(--radius-panel)] border border-line bg-surface" aria-hidden="true" />}>
+          <BookingLinkCard userId={gate.userId} />
+        </Suspense>
       </div>
     </ListPage>
   );

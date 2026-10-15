@@ -140,7 +140,9 @@ tr[data-row-state="saving"] { cursor: progress; }
 .adm-tbl tbody tr:hover { background: color-mix(in srgb, var(--accent) 4%, transparent); }
 .adm-tbl tbody tr:hover > td:first-child { box-shadow: inset 2px 0 0 0 var(--accent); }
 .adm-tbl tbody tr[data-dirty="1"]:hover > td:first-child { box-shadow: inset 3px 0 0 0 var(--amber-400); }
-.adm-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
+/* position:relative — içteki absolute `sr-only` metinlerin kapsayıcı bloğu kaydırıcı olur; aksi halde kaydırıcı onları
+   kırpmaz ve belge genişliği 1346 px'e çıkardı (/admin/tenants 768 px, B140). */
+.adm-scroll { position: relative; overflow-x: auto; overscroll-behavior-x: contain; }
 .adm-ent { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
 .adm-ent-ico {
   display: grid; place-items: center; width: 2.5rem; height: 2.5rem; flex-shrink: 0; border-radius: 0.75rem;
@@ -152,6 +154,18 @@ tr[data-row-state="saving"] { cursor: progress; }
 .adm-ent-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.5rem; margin-top: 0.15rem; font-size: 0.75rem; color: var(--text-muted); }
 .adm-ent-meta > * { display: inline-flex; align-items: center; gap: 0.25rem; }
 .adm-ent-meta svg { width: 0.75rem; height: 0.75rem; }
+/* Tek satırlık meta (ofis listesi, B127): rozetler alt satıra sarmaz; sığmayan sonda kırpılır, ayrıntı ipucunda. */
+.adm-ent-meta--line { flex-wrap: nowrap; overflow: hidden; white-space: nowrap; }
+.adm-ent-meta--line > * { flex-shrink: 0; }
+/* Yapışkan işlemler sütunu (B127/B141): yatay kaydırmada "İşlemler" görünür kalır (1280 px'te ekran dışındaydı). Kart
+   görünümünde (<768) yok. */
+@media (min-width: 768px) {
+  .adm-tbl :is(th, td).adm-sticky-act { position: sticky; right: 0; }
+  /* Ayırıcı gölge kaydırmaya bağlı (a11y.css `tbl-act-edge`): yalnız tablo yatay kayarken. */
+  .adm-tbl td.adm-sticky-act { z-index: 1; background: var(--surface); }
+  .adm-tbl thead th.adm-sticky-act { z-index: 3; }
+  .adm-tbl tbody tr:hover > td.adm-sticky-act { background-image: linear-gradient(color-mix(in srgb, var(--accent) 4%, transparent), color-mix(in srgb, var(--accent) 4%, transparent)); }
+}
 .adm-pill {
   display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2rem; padding: 0 0.6rem; border-radius: 0.625rem;
   background: var(--t-soft); color: var(--t-text); border: 1px solid color-mix(in srgb, var(--t) 22%, transparent);

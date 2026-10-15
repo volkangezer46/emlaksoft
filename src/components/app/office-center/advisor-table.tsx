@@ -56,7 +56,7 @@ export async function AdvisorTable({
   const avatars = await loadAvatarMap(rows.map((r) => r.id));
   return (
     <>
-    <ul className="list-stagger space-y-2.5 sm:hidden" aria-label="Danışman kartları">
+    <ul className="list-stagger space-y-2.5 md:hidden" aria-label="Danışman kartları">
       {rows.map((r) => (
         <MobileCard key={r.id} className={!r.isActive ? "opacity-70" : ""}>
           <div className="flex items-start gap-2.5">
@@ -121,8 +121,10 @@ export async function AdvisorTable({
         </MobileCard>
       ))}
     </ul>
-    <div className="hidden sm:block">
-    <TableFrame stickyFirst minWidth={1120}>
+    {/* Tablo md+ (768): tablette 1120 px'lik tablo yerine kart; ikincil sütunlar (uzmanlık, bölge) yalnız xl'de, işlem
+        sütunu yatay kaydırmada sağa yapışık (TD actions + TableFrame stickyActions, B141). */}
+    <div className="hidden md:block">
+    <TableFrame stickyFirst minWidth={880}>
       <Table>
         <THead>
           <TR>
@@ -138,8 +140,8 @@ export async function AdvisorTable({
                 )}
               </TH>
             ))}
-            <TH>Uzmanlık</TH>
-            <TH>Bölge</TH>
+            <TH className="hidden xl:table-cell">Uzmanlık</TH>
+            <TH className="hidden xl:table-cell">Bölge</TH>
             <TH>Rol · takım/şube</TH>
             {actions ? <TH>İşlem</TH> : null}
           </TR>
@@ -182,10 +184,10 @@ export async function AdvisorTable({
               <TD>
                 <span className="text-xs text-text-muted">{r.lastActivityAt ? relativeTimeTR(r.lastActivityAt) : "90+ gün / kayıt yok"}</span>
               </TD>
-              <TD>
+              <TD className="hidden xl:table-cell">
                 <span className="text-xs text-text-muted">{r.specialties.length ? r.specialties.join(", ") : "—"}</span>
               </TD>
-              <TD>
+              <TD className="hidden xl:table-cell">
                 <span className="text-xs text-text-muted">{r.regions.length ? r.regions.join(", ") : "—"}</span>
               </TD>
               <TD>
@@ -193,7 +195,7 @@ export async function AdvisorTable({
                 <p className="text-xs text-text-muted">{[r.teamName, r.branchName].filter(Boolean).join(" · ") || "—"}</p>
               </TD>
               {actions ? (
-                <TD>
+                <TD actions>
                   {r.role === "owner" ? (
                     <span className="text-xs text-text-faint">Ofis sahibi</span>
                   ) : r.id === actions.viewerId ? (

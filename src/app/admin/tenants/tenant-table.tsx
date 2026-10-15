@@ -184,7 +184,7 @@ export function TenantTable({
                 ) : null}
                 <th scope="col">Durum</th>
                 <th scope="col">Paket</th>
-                <th scope="col" className="text-right">
+                <th scope="col" className="adm-sticky-act text-right">
                   İşlemler
                 </th>
               </tr>
@@ -312,16 +312,21 @@ function TenantRow({
             {row.status === "active" ? <span className="status-pulse absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--surface)] bg-mint-500" /> : null}
           </span>
           <div className="min-w-0">
-            <Link href={detail} title={row.name} className="adm-ent-name focus-ring block min-w-0 truncate rounded-sm hover:text-accent-text">
+            {/* İkincil bilgiler (adres kısaltması, kayıt tarihi) başlık ipucunda; rozetler TEK satır (B127: çok satırlı meta
+                satırları 93-148 px'e çıkarıyordu). */}
+            <Link
+              href={detail}
+              title={`${row.name} · /${row.slug} · kayıt ${row.createdLabel}`}
+              className="adm-ent-name focus-ring block min-w-0 truncate rounded-sm hover:text-accent-text"
+            >
               {row.name}
             </Link>
-            <div className="adm-ent-meta">
-              <span className="min-w-0 max-w-full truncate" title={`/${row.slug}`}>/{row.slug}</span>
+            <div className="adm-ent-meta adm-ent-meta--line" title={`/${row.slug} · kayıt ${row.createdLabel}`}>
               <Link href={`/admin/members?tenant=${row.id}`} className="font-semibold text-accent-text hover:underline" title="Ofisin kullanıcılarını listele">
                 <Users aria-hidden="true" /> {row.members === null ? "—" : `${row.members} üye`}
               </Link>
-              <span title="Kayıt tarihi">
-                <CalendarDays aria-hidden="true" /> {row.createdLabel}
+              <span className="sr-only">
+                <CalendarDays aria-hidden="true" /> Kayıt {row.createdLabel}
               </span>
               <span className={HEALTH_TEXT[row.health.tone]} title={healthTitle}>
                 ● {row.health.label}
@@ -377,7 +382,7 @@ function TenantRow({
           className="w-[9.25rem]"
         />
       </td>
-      <td>
+      <td className="adm-sticky-act">
         <div className="adm-acts">
           <RowSaveActions draft={draft}>
             <ButtonLink href={`${detail}?sekme=yonetim`} size="sm" variant="outline" icon={Settings2} aria-label={`Yönet: ${row.name}`} title="Ofis yönetimi">
@@ -473,10 +478,16 @@ function CrmCells({ crm }: { crm: TenantRowData["crm"] }) {
       </td>
       <td data-label="Etiketler">
         {crm.tags.length ? (
-          <div className="flex max-w-[12rem] flex-wrap gap-1">
-            {crm.tags.map((t) => (
+          // En çok 2 etiket + "+N" tek satırda (kalanlar ipucunda); çok satırlı etiket yığını satırı uzatıyordu (B127).
+          <div className="flex max-w-[12rem] items-center gap-1 whitespace-nowrap">
+            {crm.tags.slice(0, 2).map((t) => (
               <TagBadge key={t.id} tag={t} href={t.href} />
             ))}
+            {crm.tags.length > 2 ? (
+              <span className="adm-badge pm-t-neutral" title={crm.tags.slice(2).map((t) => t.name).join(", ")}>
+                +{crm.tags.length - 2}
+              </span>
+            ) : null}
           </div>
         ) : (
           <span className="text-xs text-text-faint">—</span>

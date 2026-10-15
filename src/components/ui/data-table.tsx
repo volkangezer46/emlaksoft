@@ -76,7 +76,7 @@ import {
  *  - `selectable`     : satır seçimi + toplu eylem çubuğu (`bulkActions`)
  *  - `keyboardNav`    : ok/j/k gezinme, Enter açar, Space seçer
  *  - `revealRowActions`: satır eylemleri yalnız hover/odakta görünür
- *  - `mobileCards`    : ≤640px'de kart listesi (`column.priority` ile)
+ *  - `mobileCards`    : <768px'de kart listesi (`column.priority` ile; tablet dikeyde de kart, B141)
  *  - `loading`        : iskelet satırlar
  */
 
@@ -393,7 +393,8 @@ const DataTableRowView = memo(function DataTableRowView({
         </TD>
       ))}
       {hasActions ? (
-        <TD align="right" className={cn("whitespace-nowrap", densityMeta.cellClass)}>
+        // `actions`: işlem sütunu yatay kaydırmada sağa yapışır (TableFrame stickyActions, 768 px tablette görünür kalır).
+        <TD align="right" actions className={cn("whitespace-nowrap", densityMeta.cellClass)}>
           {/* relative + z-10: satırı kaplayan görünmez bağlantının
               üstünde kalsın, tıklama aksiyona gelsin */}
           <span
@@ -796,9 +797,9 @@ export function DataTable({
           </div>
         ) : null}
 
-        {/* Kart listesi (≤640px) */}
+        {/* Kart listesi (<768px: telefon + tablet dikey; 640-767 px'te 980 px'lik tablo çiziliyordu) */}
         {cardParts ? (
-          <div className="sm:hidden" aria-busy={loading || undefined}>
+          <div className="md:hidden" aria-busy={loading || undefined}>
             {loading ? (
               <ul className="space-y-2" aria-hidden="true">
                 {Array.from({ length: Math.min(loadingRows, 4) }).map((_, i) => (
@@ -870,7 +871,7 @@ export function DataTable({
         <div
           ref={wrapperRef}
           onKeyDown={onTableKeyDown}
-          className={cardParts ? "hidden sm:block" : undefined}
+          className={cardParts ? "hidden md:block" : undefined}
         >
           <TableFrame minWidth={minWidth} maxHeight={stickyMax}>
             <Table aria-busy={loading || undefined} data-density={density}>

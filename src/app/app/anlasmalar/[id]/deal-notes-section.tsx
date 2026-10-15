@@ -105,7 +105,7 @@ export function DealNotesSection({
                       <button
                         type="button"
                         aria-label="Notu sil"
-                        className="focus-ring press grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint opacity-0 transition hover:bg-danger-500/10 hover:text-danger-600 focus-visible:opacity-100 group-hover/not:opacity-100 touch:min-h-11 touch:min-w-11"
+                        className="hover-action focus-ring press grid h-7 w-7 min-h-9 min-w-9 shrink-0 place-items-center rounded-[var(--radius-control)] text-text-faint opacity-0 transition hover:bg-danger-500/10 hover:text-danger-600 focus-visible:opacity-100 group-hover/not:opacity-100 group-focus-within/not:opacity-100 touch:min-h-11 touch:min-w-11"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>

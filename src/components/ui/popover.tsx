@@ -28,7 +28,8 @@ export function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "popover-in z-[60] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)] outline-none",
+          // Kısa ekranda (yatay telefon) panel kullanılabilir yükseklikle sınırlanır ve kendi içinde kayar.
+          "popover-in z-[60] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--shadow-lg)] outline-none",
           className,
         )}
       />

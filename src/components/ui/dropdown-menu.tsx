@@ -22,11 +22,18 @@ export function DropdownMenu({ modal = false, ...props }: ComponentProps<typeof 
 }
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 export const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
+/**
+ * Kısa ekranda (844x390 yatay telefon) menü görünür alana sığar: yükseklik Radix'in hesapladığı kullanılabilir alanla
+ * sınırlanır ve içerik kendi içinde kayar ("Çıkış yap" ekran dışında kalmaz; konum `fixed` olduğu için sayfa
+ * kaydırması işe yaramıyordu).
+ */
 export function DropdownMenuContent({
   className,
   sideOffset = 6,
   align = "end",
+  collisionPadding = 8,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
@@ -35,8 +42,9 @@ export function DropdownMenuContent({
         {...props}
         align={align}
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
-          "popover-in z-[60] min-w-[11rem] overflow-hidden rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-card)]",
+          "popover-in z-[60] max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[11rem] overflow-y-auto overflow-x-hidden overscroll-contain rounded-[var(--radius-card)] border border-line bg-surface p-1.5 shadow-[var(--shadow-card)]",
           className,
         )}
       />
@@ -84,6 +92,30 @@ export function DropdownMenuCheckboxItem({
       </DropdownMenuPrimitive.ItemIndicator>
       {children}
     </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
+/** Tek seçimli menü öğesi (`DropdownMenuRadioGroup` içinde): ok tuşlarıyla gezilir, seçim işaretle gösterilir. */
+export function DropdownMenuRadioItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  return (
+    <DropdownMenuPrimitive.RadioItem
+      {...props}
+      className={cn(
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-[var(--radius-control)] py-2 pl-8 pr-3 text-sm text-ink-950 outline-none transition touch:min-h-11",
+        "data-[highlighted]:bg-surface-selected data-[highlighted]:text-brand-700 data-[state=checked]:font-semibold",
+        "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className,
+      )}
+    >
+      <DropdownMenuPrimitive.ItemIndicator className="absolute left-2.5">
+        <Check className="h-4 w-4 text-brand-600" />
+      </DropdownMenuPrimitive.ItemIndicator>
+      {children}
+    </DropdownMenuPrimitive.RadioItem>
   );
 }
 

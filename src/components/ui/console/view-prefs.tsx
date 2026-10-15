@@ -2,45 +2,89 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { saveFontScale } from "@/app/actions/font-scale";
+import { applyFontScale, DEFAULT_FONT_SCALE, FONT_SCALES, isFontScale, readAppliedFontScale, type FontScale } from "@/lib/font-scale";
 import { cn } from "@/lib/utils";
 import { writeUiPrefsCookie, type UiPrefs } from "@/lib/ui-prefs";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
 
 /**
- * Kullanıcı menüsü: "Sade görünüm" anahtarı. Tercih ofis+kullanıcı kapsamlı
- * çereze yazılır, ardından sunucu çıktısı yenilenir (menü SSR'da uygulanır). Yazı boyutu: FontScalePicker.
+ * Kullanıcı menüsü görünüm tercihleri — Radix menü öğeleri (B171): ok tuşlarıyla tüm denetimlere ulaşılır
+ * (eski role=switch düğmesi ve Kaydet/Vazgeç'li radyo grubu menünün roving focus'una girmiyordu).
+ * Seçim menüyü kapatmaz (`preventDefault`), etkisi anında görünür.
  */
+
+/** "Sade görünüm": ofis+kullanıcı kapsamlı çereze yazılır, sunucu çıktısı yenilenir (menü SSR'da uygulanır). */
 export function ViewPrefs({ cookieName, initial }: { cookieName: string; initial: UiPrefs }) {
   const router = useRouter();
   const [prefs, setPrefs] = useState(initial);
   const [pending, startTransition] = useTransition();
 
-  const save = (next: UiPrefs) => {
+  const toggle = (simple: boolean) => {
+    const next = { ...prefs, simple };
     setPrefs(next);
     writeUiPrefsCookie(cookieName, next);
     startTransition(() => router.refresh());
   };
 
   return (
-    <div className="space-y-3 px-3 py-2" aria-busy={pending}>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={prefs.simple}
-        onClick={() => save({ ...prefs, simple: !prefs.simple })}
-        className="focus-ring flex min-h-11 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] text-left text-sm text-ink-950"
-      >
-        <span className="min-w-0">
-          <span className="block font-semibold">Sade görünüm</span>
-          <span className="block text-xs text-text-muted">{prefs.simple ? "Yalnız sık kullanılan sayfalar" : "Tüm sayfalar görünür"}</span>
-        </span>
-        <span
-          aria-hidden
-          className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", prefs.simple ? "bg-accent" : "bg-surface-sunken ring-1 ring-line")}
-        >
-          <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", prefs.simple ? "left-[1.375rem]" : "left-0.5")} />
-        </span>
-      </button>
+    <DropdownMenuCheckboxItem
+      checked={prefs.simple}
+      onCheckedChange={(v) => toggle(v === true)}
+      onSelect={(e) => e.preventDefault()}
+      aria-busy={pending}
+    >
+      <span className="min-w-0">
+        <span className="block font-semibold">Sade görünüm</span>
+        <span className="block text-xs text-text-muted">{prefs.simple ? "Yalnız sık kullanılan sayfalar" : "Tüm sayfalar görünür"}</span>
+      </span>
+    </DropdownMenuCheckboxItem>
+  );
+}
 
-    </div>
+/**
+ * Yazı boyutu (Küçük / Normal / Büyük): seçim ANINDA uygulanır ve kaydedilir (Kaydet/Vazgeç yok). Kayıt düşerse önceki
+ * kayıtlı değere dönülür ve neden menüde yazılır.
+ */
+export function FontScaleMenuItems({ initial }: { initial: FontScale }) {
+  const [scale, setScale] = useState<FontScale>(() => readAppliedFontScale() ?? initial ?? DEFAULT_FONT_SCALE);
+  const [error, setError] = useState("");
+  const [pending, startTransition] = useTransition();
+
+  const choose = (raw: string) => {
+    if (!isFontScale(raw) || raw === scale) return;
+    const prev = scale;
+    setScale(raw);
+    setError("");
+    applyFontScale(raw);
+    startTransition(async () => {
+      const result = await saveFontScale(raw);
+      if (!result.ok) {
+        setScale(prev);
+        applyFontScale(prev);
+        setError(result.error);
+      }
+    });
+  };
+
+  return (
+    <>
+      <DropdownMenuLabel>Yazı boyutu</DropdownMenuLabel>
+      <DropdownMenuRadioGroup value={scale} onValueChange={choose} aria-label="Yazı boyutu" aria-busy={pending}>
+        {FONT_SCALES.map((f) => (
+          <DropdownMenuRadioItem key={f.value} value={f.value} onSelect={(e) => e.preventDefault()}>
+            {f.label}
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+      <p role="status" aria-live="polite" className={cn("px-3 text-xs", error ? "py-1 text-danger-500" : "sr-only")}>
+        {error}
+      </p>
+    </>
   );
 }

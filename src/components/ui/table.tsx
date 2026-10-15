@@ -27,11 +27,18 @@ export function TableFrame({
   maxHeight,
   density = "rahat",
   stickyFirst = false,
+  stickyActions = true,
   stack = false,
 }: {
   children: ReactNode;
   /** Yatay kaydırmada ilk sütun (kimlik) sabit kalır — dar ekranda bağlam kaybolmaz. */
   stickyFirst?: boolean;
+  /**
+   * Yatay kaydırmada işlem sütunu (son hücre `TD actions`) sağda yapışık kalır — 768 px tablette 940-1654 px'lik
+   * tablolarda işlemler ekran dışında kalmıyor (B141). Yalnız son hücresi `TD actions` olan tablolara etki eder;
+   * kart görünümünde (`stack`, <768 px) kapalıdır.
+   */
+  stickyActions?: boolean;
   className?: string;
   /** "kompakt": satır dikey boşluğu azalır (liste yoğunluk anahtarı, ?yogunluk=kompakt). */
   density?: "rahat" | "kompakt";
@@ -54,12 +61,15 @@ export function TableFrame({
         "surface-card w-full min-w-0 max-w-full [contain:inline-size] overflow-hidden rounded-[var(--radius-panel)]",
         density === "kompakt" && "[&_td]:py-1.5 [&_th]:py-1.5",
         stickyFirst && "tbl-sticky-first",
+        stickyActions && "tbl-sticky-actions",
         stack && "tbl-stack",
         className,
       )}
     >
+      {/* `tbl-scroll` (a11y.css): kenar gölgesi kaydırma ipucu (kaydırılacak içerik varken görünür) ve kısa ekranda
+          (≤500 px yükseklik) `maxHeight` kalkar — iç dikey kaydırıcı sayfa kaydırmasıyla iç içe geçmez. */}
       <div
-        className={cn("relative w-full max-w-full [contain:inline-size] overflow-x-auto", maxHeight && "overflow-y-auto")}
+        className={cn("tbl-scroll relative w-full max-w-full [contain:inline-size] overflow-x-auto", maxHeight && "overflow-y-auto")}
         style={maxHeight ? { maxHeight } : undefined}
       >
         {/* İç kap `w-max` (width:max-content) — tablonun DOĞAL genişliğine büyür,
@@ -85,10 +95,27 @@ export function TableFrame({
   );
 }
 
-export function Table({ className, ...props }: ComponentProps<"table">) {
-  // sr-only tablo `w-full` ile çakışırsa 1px kırpma bozulur ve sayfa yatay taşar.
-  const srOnly = className?.split(/\s+/).includes("sr-only");
-  return <table {...props} className={cn("text-left text-sm", !srOnly && "w-full", className)} />;
+export function Table({
+  className,
+  srOnly = false,
+  ...props
+}: ComponentProps<"table"> & {
+  /**
+   * Yalnız ekran okuyucu için (grafiklerin veri tablosu). Tablo `width:1px`'e küçülemez (min-content'e büyür) ve
+   * absolute konumla belgeyi yana taşırırdı (320 px'te /app/raporlar 367 px); bu yüzden `sr-only` bir div'e sarılır.
+   */
+  srOnly?: boolean;
+}) {
+  if (srOnly) {
+    return (
+      <div className="sr-only">
+        <table {...props} className={cn("text-left text-sm", className)} />
+      </div>
+    );
+  }
+  // `tbl`: satır/hücre varsayılanları (saç teli ayırıcı, hücre dolgusu) tablo düzeyindeki seçicilerden gelir
+  // (globals.css) — her satıra/hücreye aynı sınıfı yazmak HTML ve RSC yükünü satır × hücre kadar şişiriyordu (B029).
+  return <table {...props} className={cn("tbl w-full text-left text-sm", className)} />;
 }
 
 export function THead({
@@ -134,8 +161,8 @@ export function TR({
   return (
     <tr
       {...props}
+      // Saç teli alt kenar + renk geçişi `.tbl` seçicisinden gelir (globals.css); satır başına sınıf yazılmaz (B029).
       className={cn(
-        "hairline-b transition-colors last:border-0",
         // Hover'da yalnızca zemin değil, sol kenarda ince marka vurgusu:
         // gözün "hangi satırdayım" sorusunu anında cevaplar. Zemin rol token'ından
         // (--surface-hover): açık/koyu ve her yüzeyde aynı formül. Gölge/cursor `.tbl-row-link` (console-kit.css);
@@ -144,7 +171,7 @@ export function TR({
         // aynı şekilde hover zemini kazanır; bileşen katmanına taşınırsa ezilir.
         interactive && "group tbl-row-link hover:bg-surface-hover",
         className,
-      )}
+      ) || undefined}
     />
   );
 }
@@ -213,15 +240,18 @@ export function TD({
       {...(primary ? { "data-primary": "" } : null)}
       {...(stackHide ? { "data-stack-hide": "" } : null)}
       {...(title !== undefined ? { title } : null)}
-      className={cn(
-        "px-4 py-3",
-        truncate && "td-truncate",
-        alignClass[align],
-        // Tablolarda sağa hizalama fiilen "sayı" demektir. tabular-nums'u
-        // otomatik açıyoruz; tutar kolonları böylece kuruş kuruşa hizalanır.
-        align === "right" && "numeric",
-        className,
-      )}
+      // Dolgu (px-4 py-3) `.tbl` seçicisinden gelir (globals.css, components katmanı → çağıranın px-/py- sınıfı ezer);
+      // sola hizalama tablodan miras (`text-left`). Varsayılan hücre sınıfsız çizilir (B029: satır × hücre yükü).
+      className={
+        cn(
+          truncate && "td-truncate",
+          align !== "left" && alignClass[align],
+          // Tablolarda sağa hizalama fiilen "sayı" demektir. tabular-nums'u
+          // otomatik açıyoruz; tutar kolonları böylece kuruş kuruşa hizalanır.
+          align === "right" && "numeric",
+          className,
+        ) || undefined
+      }
     />
   );
 }

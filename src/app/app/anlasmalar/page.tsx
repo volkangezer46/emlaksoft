@@ -669,30 +669,33 @@ export default async function DealsPage({
                     <h2 className="font-display text-sm font-extrabold uppercase tracking-[0.08em] text-ink-950">Aşama bazlı değer</h2>
                     {pipelineValue + wonValue > 0 ? (
                       <>
-                        <div className="mt-4 flex h-4 gap-0.5 overflow-hidden rounded-[var(--radius-control)]">
+                        {/* Dilimler SÜS (B131): 13-44 px genişlik × 15 px yükseklikte dokunma hedefi olamaz; aynı hedefe giden
+                            lejant satırı tek, tam satır bağlantıdır (dokunmatikte 44 px). Oran fare üstü başlıkta okunur. */}
+                        <div className="mt-4 flex h-4 gap-0.5 overflow-hidden rounded-[var(--radius-control)]" aria-hidden="true">
                           {funnel
                             .filter((f) => f.value > 0)
                             .map((f) => (
-                              <Link
+                              <span
                                 key={f.key}
-                                href={`#sutun-${f.key}`}
                                 title={`${f.label}: ${money(f.value)}`}
-                                className={`${f.bar} focus-ring block h-full transition hover:opacity-80`}
+                                className={`${f.bar} block h-full`}
                                 style={{ width: `${Math.max(3, Math.round((f.value / (pipelineValue + wonValue)) * 100))}%` }}
-                                aria-label={`${f.label} sütununa git — ${money(f.value)}`}
                               />
                             ))}
                         </div>
-                        <ul className="mt-3 space-y-1.5">
+                        <ul className="mt-3 space-y-0.5">
                           {funnel.map((f) => (
-                            <li key={f.key} className="flex items-center gap-2 text-xs">
-                              <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${f.bar}`} aria-hidden />
-                              <span className="text-text-muted">{f.label}</span>
+                            <li key={f.key}>
                               <Link
                                 href={hrefWith({ gorunum: "liste", asama: f.key, sayfa: "" })}
-                                className="numeric focus-ring ml-auto rounded-[var(--radius-control)] font-bold text-ink-950 hover:text-brand-600 hover:underline"
+                                aria-label={`${f.label}: ${money(f.value)} — listede aç`}
+                                className="group/lg focus-ring flex min-h-8 items-center gap-2 rounded-[var(--radius-control)] px-1.5 text-xs transition hover:bg-surface-hover touch:min-h-11"
                               >
-                                {money(f.value)}
+                                <span className={`h-2.5 w-2.5 shrink-0 rounded-[3px] ${f.bar}`} aria-hidden />
+                                <span className="text-text-muted">{f.label}</span>
+                                <span className="numeric ml-auto font-bold text-ink-950 group-hover/lg:text-brand-600 group-hover/lg:underline">
+                                  {money(f.value)}
+                                </span>
                               </Link>
                             </li>
                           ))}

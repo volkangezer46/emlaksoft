@@ -51,10 +51,15 @@ export function TaskEditDialog({
   members,
   deals,
   defaultOpen = false,
+  open: openProp,
+  onOpenChange,
 }: {
   task: Task;
   /** Panel açık başlar (görev derin bağlantısı `?gorev=<id>`). */
   defaultOpen?: boolean;
+  /** Denetimli kullanım (ör. mobil "…" menüsündeki "Düzenle" öğesi): `variant="none"` ile tetikleyicisiz. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** Atanan seçici (görev devri); verilmezse atama alanı gösterilmez. */
   members?: { id: string; name: string }[];
   /** Anlaşma bağı seçici; verilmezse alan gösterilmez (eski bağ korunur). */
@@ -63,10 +68,16 @@ export function TaskEditDialog({
    * "icon": eylem çubuğundaki kalem düğmesi (varsayılan).
    * "overlay": kartın tamamını kaplayan görünmez tetikleyici — müşterisiz/
    * portföysüz görevlerde karta tıklamak düzenlemeyi açar.
+   * "none": tetikleyici yok; panel `open`/`onOpenChange` ile dışarıdan açılır.
    */
-  variant?: "icon" | "overlay";
+  variant?: "icon" | "overlay" | "none";
 }) {
-  const [open, setOpen] = useState(defaultOpen);
+  const [openState, setOpenState] = useState(defaultOpen);
+  const open = openProp ?? openState;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setOpenState(next);
+    onOpenChange?.(next);
+  };
   // Tekrar yalnız terminli görevde seçilebilir — termin alanını izle.
   const [due, setDue] = useState(() => toLocalInput(task.due_at));
   // Başarıda kapatma efekt içinde değil, action akışında yapılıyor: efekt
@@ -100,7 +111,7 @@ export function TaskEditDialog({
       error={state.error}
       hiddenFields={<input type="hidden" name="id" value={task.id} />}
       fieldLabels={{ title: "Başlık", kind: "Tür", priority: "Öncelik", due_at: "Son tarih", recurrence: "Tekrar", assigned_to: "Atanan", deal_id: "İlgili anlaşma", notes: "Not" }}
-      trigger={({ onClick, ...aria }) =>
+      trigger={variant === "none" ? undefined : ({ onClick, ...aria }) =>
         variant === "overlay" ? (
           <button
             type="button"
