@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readTenantSettings } from "@/lib/settings/tenant-read";
 import {
+  DEFAULT_EXPORT_ROLES_TEXT,
+  EXPORT_ROLE_IDS,
+  OFFICE_EXPORT_ROLES_KEY,
   OFFICE_IDLE_MINUTES_KEY,
   OFFICE_IP_ALLOWLIST_KEY,
   OFFICE_IP_OWNER_EXEMPT_KEY,
@@ -8,6 +11,7 @@ import {
   OFFICE_MFA_ROLES_KEY,
   OFFICE_NEW_DEVICE_ALERT_KEY,
   OFFICE_SECURITY_KEYS,
+  normalizeExportRoles,
   parseRoleList,
 } from "./policy";
 
@@ -22,6 +26,8 @@ export type OfficePolicyForm = {
   idleMinutes: number;
   maxHours: number;
   newDeviceAlert: boolean;
+  /** Dışa aktarabilen roller (sahip her zaman dahil; varsayılan tüm roller). */
+  exportRoles: string[];
 };
 
 export async function loadOfficePolicyForm(db: SupabaseClient, tenantId: string): Promise<OfficePolicyForm> {
@@ -33,12 +39,13 @@ export async function loadOfficePolicyForm(db: SupabaseClient, tenantId: string)
     idleMinutes: Number(v[OFFICE_IDLE_MINUTES_KEY] ?? 0) || 0,
     maxHours: Number(v[OFFICE_MAX_HOURS_KEY] ?? 0) || 0,
     newDeviceAlert: v[OFFICE_NEW_DEVICE_ALERT_KEY] === true,
+    exportRoles: normalizeExportRoles(String(v[OFFICE_EXPORT_ROLES_KEY] ?? DEFAULT_EXPORT_ROLES_TEXT)),
   };
 }
 
 /** Politika varsayılandan farklı mı (ekran özeti ve admin acil sıfırlama düğmesi için). */
 export function policyIsActive(p: OfficePolicyForm): boolean {
-  return p.mfaRoles.length > 0 || p.ipAllowlist.trim() !== "" || !p.ipOwnerExempt || p.idleMinutes > 0 || p.maxHours > 0 || p.newDeviceAlert;
+  return p.mfaRoles.length > 0 || p.ipAllowlist.trim() !== "" || !p.ipOwnerExempt || p.idleMinutes > 0 || p.maxHours > 0 || p.newDeviceAlert || p.exportRoles.length < EXPORT_ROLE_IDS.length;
 }
 
 export type OfficeSessionRow = {

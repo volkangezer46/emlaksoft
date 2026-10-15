@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   activity: [] as unknown[],
   platformActivity: [] as unknown[],
   approvalCalls: [] as unknown[],
+  officePolicy: null as unknown,
 }));
 
 vi.mock("@/lib/require-permission", () => ({
@@ -39,6 +40,7 @@ vi.mock("@/lib/oversight/approval-gate", () => ({
   },
 }));
 vi.mock("@/lib/platform", () => ({ getPlatformStaff: async () => state.staff }));
+vi.mock("@/lib/office-security/policy-cache", () => ({ readOfficeSecurityPolicyCached: async () => state.officePolicy }));
 
 import { handleReportDownload } from "./download";
 
@@ -53,6 +55,7 @@ beforeEach(() => {
   state.activity = [];
   state.platformActivity = [];
   state.approvalCalls = [];
+  state.officePolicy = null;
 });
 
 describe("kiracı raporu indirme", () => {
@@ -82,6 +85,17 @@ describe("kiracı raporu indirme", () => {
     for (const id of ["kar-zarar", "ekip-kullanicilari", "uyum-kayit-defteri", "yetki-denetimi"]) {
       expect((await handleReportDownload("tenant", id, req("format=csv"))).status, id).toBe(403);
     }
+  });
+
+  it("G4: ofis politikası rolün dışa aktarmasını kapatmışsa 403 (görüntüleme kapıları ayrı)", async () => {
+    const { ctx } = testCtx({ perms: DEFAULT_MATRIX.advisor });
+    state.ctx = ctx;
+    state.officePolicy = { exportRoles: ["owner", "gm"] };
+    const res = await handleReportDownload("tenant", "musteriler", req("format=csv"));
+    expect(res.status).toBe(403);
+    expect(state.activity).toEqual([]);
+    state.officePolicy = { exportRoles: ["owner", "advisor"] };
+    expect((await handleReportDownload("tenant", "musteriler", req("format=csv"))).status).toBe(200);
   });
 
   it("hız sınırı aşılınca 429 + Retry-After", async () => {

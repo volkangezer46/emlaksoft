@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/activity";
 import { fetchExternal } from "@/lib/external-fetch";
+import { officeExportBlock } from "@/lib/office-security/export-gate";
 import { requestApprovalIfNeeded } from "@/lib/oversight/approval-gate";
 import { logPlatformActivity } from "@/lib/platform-activity";
 import { getPlatformStaff } from "@/lib/platform";
@@ -66,7 +67,7 @@ export type Authorized =
   | { ok: true; def: ReportDef; ctx: ReportContext & { logoUrl?: string | null }; actorId: string; actorName: string; tenantId: string | null }
   | { ok: false; status: number; error: string };
 
-/** Kiracı raporu için kapılar: oturum → `reports` modülü → raporun kendi modülü → rol/kazanç kuralı. */
+/** Kiracı raporu için kapılar: oturum → `reports` modülü → raporun kendi modülü → rol/kazanç kuralı → dışa aktarma rolü. */
 export async function authorizeTenantReport(id: string): Promise<Authorized> {
   const def = getReport("tenant", id);
   if (!def || !def.module) return { ok: false, status: 404, error: "Rapor bulunamadı." };
@@ -78,6 +79,9 @@ export async function authorizeTenantReport(id: string): Promise<Authorized> {
   if (!tenantReportAllowed(def, { perms: ctx.perms, role: gate.role, officeWide: ctx.officeWide, seeAllEarnings: ctx.seeAllEarnings })) {
     return { ok: false, status: 403, error: "Bu rapor için yetkiniz yok." };
   }
+  // G4: dışa aktarma görüntülemeden ayrı yetki (ofis güvenlik politikası; varsayılan tüm roller).
+  const exportBlock = await officeExportBlock(gate.tenantId, gate.role);
+  if (exportBlock) return { ok: false, status: 403, error: exportBlock };
   const { data: me } = await ctx.supabase.from("profiles").select("full_name").eq("id", gate.userId).eq("tenant_id", gate.tenantId).maybeSingle();
   return { ok: true, def, ctx, actorId: gate.userId, actorName: (me as { full_name?: string | null } | null)?.full_name ?? "", tenantId: gate.tenantId };
 }

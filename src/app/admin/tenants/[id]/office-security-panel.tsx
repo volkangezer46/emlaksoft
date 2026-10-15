@@ -8,6 +8,7 @@ import { FormField, FormTextarea } from "@/components/ui/form-controls";
 import { StepUpCodeField } from "@/components/admin/step-up";
 import { resetOfficeSecurityPolicyByAdmin } from "@/app/actions/admin-office-security";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { EXPORT_ROLE_IDS } from "@/lib/office-security/policy";
 
 type PolicyView = {
   mfaRoles: string[];
@@ -16,6 +17,7 @@ type PolicyView = {
   idleMinutes: number;
   maxHours: number;
   newDeviceAlert: boolean;
+  exportRoles: string[];
 };
 
 /**
@@ -34,6 +36,10 @@ export function OfficeSecurityPanel({ tenantId, policy, active, canReset }: { te
     { label: "Boşta kalma", value: policy.idleMinutes ? `${policy.idleMinutes} dk` : "Kapalı" },
     { label: "En uzun oturum", value: policy.maxHours ? `${policy.maxHours} saat` : "Sınırsız" },
     { label: "Yeni cihaz bildirimi", value: policy.newDeviceAlert ? "Açık" : "Kapalı" },
+    {
+      label: "Dışa aktarma rolleri",
+      value: policy.exportRoles.length >= EXPORT_ROLE_IDS.length ? "Tüm roller" : policy.exportRoles.map((r) => ROLE_LABELS[r] ?? r).join(", "),
+    },
   ];
 
   return (
