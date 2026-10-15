@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import Link from "next/link";
 import Image from "next/image";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
@@ -197,7 +198,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
       admin
         .from("properties")
         .select(
-          "id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
+          "id, title, property_code, transaction_type, property_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
           { count: "exact" },
         )
         .eq("tenant_id", agent.tenant_id)
@@ -514,7 +515,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
                 const feat = (p.features ?? {}) as { rooms?: string; sqm?: number };
                 const coverId = coverMap.get(p.id);
                 const loc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
-                const href = officeSlug ? `/vitrin/${officeSlug}/${p.id}` : null;
+                const href = officeSlug ? vitrinListingPath(officeSlug, listingSlugInput(p)) : null;
                 const card = (
                   <>
                     <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">

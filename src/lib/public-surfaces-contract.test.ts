@@ -24,7 +24,7 @@ const CONTACT_SURFACES = [
   "src/app/acik-ev-kayit/[token]/page.tsx",
   "src/app/tavsiye/[token]/page.tsx",
   "src/app/vitrin/[slug]/page.tsx",
-  "src/app/vitrin/[slug]/[id]/page.tsx",
+  "src/app/vitrin/[slug]/[ilan]/page.tsx",
 ];
 
 describe("B149: malik portalına iç teklif notu (offers.notes) sızmaz", () => {
@@ -154,10 +154,10 @@ describe("B153/B046: token linkleri gerçek 404 + ortak ekran; açılış ekran�
   });
 
   it("ilan detayı: loading.tsx yok; yayından kalkan ilan ofis markalı 404", () => {
-    expect(exists("src/app/vitrin/[slug]/[id]/loading.tsx")).toBe(false);
-    expect(read("src/app/vitrin/[slug]/[id]/not-found.tsx")).toContain("Bu ilan yayından kalktı");
+    expect(exists("src/app/vitrin/[slug]/[ilan]/loading.tsx")).toBe(false);
+    expect(read("src/app/vitrin/[slug]/[ilan]/not-found.tsx")).toContain("Bu ilan yayından kalktı");
     expect(read("src/app/vitrin/[slug]/not-found.tsx")).toContain("PublicLinkNotFound");
-    const page = read("src/app/vitrin/[slug]/[id]/page.tsx");
+    const page = read("src/app/vitrin/[slug]/[ilan]/page.tsx");
     expect(page).toMatch(/settleNotFound\(await loadRemovedListingCtx\(/);
     expect(page).toMatch(/finally \{\s*slot\.settle\(null\);/);
   });
@@ -178,7 +178,7 @@ describe("B153/B046: token linkleri gerçek 404 + ortak ekran; açılış ekran�
   });
 
   it("harita dokunuşla yüklenir (ilk çizimde iframe yok)", () => {
-    const src = read("src/app/vitrin/[slug]/[id]/map-embed.tsx");
+    const src = read("src/app/vitrin/[slug]/[ilan]/map-embed.tsx");
     expect(src).toContain("Haritayı göster");
     expect(src).toMatch(/\{shown \? \(/);
   });
@@ -195,10 +195,10 @@ describe("B151: önizleme kartları", () => {
   });
 
   it("vitrin ilanı metadata'sında images anahtarı yok (dosya kartı eklenir); twitter-image var", () => {
-    const page = read("src/app/vitrin/[slug]/[id]/page.tsx");
+    const page = read("src/app/vitrin/[slug]/[ilan]/page.tsx");
     const meta = page.slice(page.indexOf("export async function generateMetadata"), page.indexOf("export default async function"));
     expect(meta).not.toMatch(/\bimages\s*:/);
-    expect(exists("src/app/vitrin/[slug]/[id]/twitter-image.tsx")).toBe(true);
+    expect(exists("src/app/vitrin/[slug]/[ilan]/twitter-image.tsx")).toBe(true);
   });
 });
 
@@ -238,7 +238,7 @@ describe("B152: herkese açık konum mahalle/ilçe düzeyinde", () => {
     const ld = buildVitrinListingLd({
       base: "https://x.test",
       slug: "demo-ofis",
-      id: input.id,
+      listing: { id: input.id },
       name: "İşyeri",
       description: null,
       officeName: "Demo",
@@ -259,7 +259,7 @@ describe("B152: herkese açık konum mahalle/ilçe düzeyinde", () => {
     const vitrin = read("src/app/vitrin/[slug]/page.tsx");
     expect(vitrin).toMatch(/PUBLIC_EXACT_LOCATION \? \["title", "property_code", "address_line"\] : \["title", "property_code"\]/);
     expect(read("src/app/paylas/[token]/page.tsx")).not.toMatch(/property\.address_line \?/);
-    const detail = read("src/app/vitrin/[slug]/[id]/page.tsx");
+    const detail = read("src/app/vitrin/[slug]/[ilan]/page.tsx");
     expect(detail).not.toMatch(/streetAddress: property\.address_line/);
     expect(detail).not.toContain("google.com/maps?q=");
   });
@@ -305,11 +305,11 @@ describe("B094 (sözleşme f): public fiyat ilanın para biriminden", () => {
   it("vitrin, ilan, paylaşım, sunum ve önizleme kartı formatPublicPrice kullanır", () => {
     for (const f of [
       "src/app/vitrin/[slug]/page.tsx",
-      "src/app/vitrin/[slug]/[id]/page.tsx",
+      "src/app/vitrin/[slug]/[ilan]/page.tsx",
       "src/app/paylas/[token]/page.tsx",
       "src/app/sunum/[token]/page.tsx",
       "src/lib/public-link-og.ts",
-      "src/app/vitrin/[slug]/[id]/opengraph-image.tsx",
+      "src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx",
     ]) {
       const src = read(f);
       expect(src, f).toContain("formatPublicPrice");

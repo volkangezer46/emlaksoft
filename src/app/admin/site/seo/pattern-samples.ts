@@ -1,4 +1,5 @@
 import "server-only";
+import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import type { SeoPatternVars } from "@/lib/seo/patterns";
@@ -82,7 +83,7 @@ export async function loadPatternData(): Promise<PatternData> {
         .or(OPEN_LISTING_OR_FILTER);
       out.office = { url: `/vitrin/${ownerTenant.slug}`, vars: { ofis: ownerTenant.name, ilan_sayisi: count ?? 0 }, ownText: null };
       out.listing = {
-        url: `/vitrin/${ownerTenant.slug}/${p.id}`,
+        url: vitrinListingPath(ownerTenant.slug, listingSlugInput(p)),
         vars: {
           ofis: ownerTenant.name,
           ilan_basligi: p.title || p.property_code,

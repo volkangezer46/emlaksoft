@@ -39,7 +39,7 @@ export type SeoPatternVar = (typeof SEO_PATTERN_VARS)[number]["key"] | InternalV
 export type SeoPatternVars = Partial<Record<SeoPatternVar, string | number | null | undefined>>;
 
 /**
- * Varsayılan kalıplar (vitrin/[slug], vitrin/[slug]/[id], danisman/[slug] generateMetadata). Ofis ve danışman bugünkü
+ * Varsayılan kalıplar (vitrin/[slug], vitrin/[slug]/[ilan], danisman/[slug] generateMetadata). Ofis ve danışman bugünkü
  * sabit metindir. İlan (SP7): markalı başlık (60 karakter, marka korunarak kelime sınırında kısalır;
  * `listingDefaultTitle`) ve oda/m²/fiyat/ilçeden açıklama (ham adres alanı KULLANILMAZ).
  */

@@ -25,8 +25,8 @@ pilot sayfa dönüştürülür.
 Bu birinci hata sınıfının dosyaları (72 dosya: 62 `dynamic`, 9 `revalidate`, 1 `dynamicParams`):
 
 - dynamicParams: `src/app/araclar/[slug]/page.tsx`
-- revalidate: `danisman/[slug]/page.tsx`, `lead/[token]/page.tsx`, `robots.ts`, `vitrin/[slug]/page.tsx`, `vitrin/[slug]/[id]/page.tsx`,
-  `vitrin/[slug]/degerleme/page.tsx`, `vitrin/[slug]/favoriler/page.tsx`, `vitrin/[slug]/opengraph-image.tsx`, `vitrin/[slug]/[id]/opengraph-image.tsx`
+- revalidate: `danisman/[slug]/page.tsx`, `lead/[token]/page.tsx`, `robots.ts`, `vitrin/[slug]/page.tsx`, `vitrin/[slug]/[ilan]/page.tsx`,
+  `vitrin/[slug]/degerleme/page.tsx`, `vitrin/[slug]/favoriler/page.tsx`, `vitrin/[slug]/opengraph-image.tsx`, `vitrin/[slug]/[ilan]/opengraph-image.tsx`
 - dynamic (sayfalar): `[...slug]`, `acik-ev-kayit/[token]`, `admin/muhasebe`, `admin/muhasebe/defter`, `anket/[token]`, `app/ayarlar/filigran`,
   `app/ayarlar/lead`, `app/ayarlar/vitrin`, `app/gorevler`, `app/lig`, `bakim`, `degerleme-raporu/[token]`, `evrak/[token]`, `imza/[token]`,
   `lead/[token]`, `malik-portali/[token]`, `musteri-portali/[token]`, `odeme-link/[token]`, `paylas/[token]`, `randevu-al/[token]`,

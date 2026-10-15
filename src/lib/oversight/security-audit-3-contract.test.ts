@@ -109,11 +109,11 @@ describe("#8 talebi acan dogrulamasi", () => {
 
 describe("#10 vitrin kapaliyken tum public yuzeyler kapali", () => {
   const surfaces = [
-    "src/app/vitrin/[slug]/[id]/page.tsx",
+    "src/app/vitrin/[slug]/[ilan]/page.tsx",
     "src/app/vitrin/[slug]/degerleme/page.tsx",
     "src/app/vitrin/[slug]/favoriler/page.tsx",
     "src/app/vitrin/[slug]/opengraph-image.tsx",
-    "src/app/vitrin/[slug]/[id]/opengraph-image.tsx",
+    "src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx",
     "src/app/actions/vitrin.ts",
     "src/app/actions/vitrin-alerts.ts",
     "src/app/actions/public-valuation.ts",

@@ -3,6 +3,7 @@ import { isClosedListing } from "@/lib/closed-listing";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { vitrinIndexable, type NeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { indexNowPrint } from "./indexnow-events";
+import { listingKod, listingSlugInput, vitrinListingPath, type ListingSlugRow } from "@/lib/vitrin/listing-slug";
 
 /**
  * Herkese açık içerik yayın anı IndexNow kuralları (SAF — sunucu ve test ortak).
@@ -26,20 +27,18 @@ export type ListingIndexNowTenant = NeverIndexTenant & {
   seoOptin: boolean;
 };
 
-export type ListingIndexNowListing = {
-  id: string;
+/** Slug sütunları (transaction_type, property_type, features.rooms, ilçe/il) kanonik okunur adres için gerekir. */
+export type ListingIndexNowListing = ListingSlugRow & {
   status: string | null | undefined;
   is_sample?: boolean | null;
   deleted_at?: string | null;
-  features?: unknown;
 };
 
 export type IndexNowEligibility = { ok: true; path: string } | { ok: false; reason: string };
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,62}$/;
-const ID_RE = /^[0-9a-f-]{8,64}$/i;
 
-/** İlan adresi IndexNow'a bildirilebilir mi? Uygunsa vitrin ilan yolu (/vitrin/<ofis>/<ilan>). */
+/** İlan adresi IndexNow'a bildirilebilir mi? Uygunsa kanonik vitrin ilan yolu (/vitrin/<ofis>/<okunur-slug>-<kod>). */
 export function listingIndexNowEligibility(input: {
   tenant: ListingIndexNowTenant | null | undefined;
   listing: ListingIndexNowListing | null | undefined;
@@ -57,8 +56,8 @@ export function listingIndexNowEligibility(input: {
   if (listing.is_sample === true) return { ok: false, reason: "örnek ilan" };
   if (isClosedListing(listing.features)) return { ok: false, reason: "ilan kapandı" };
   const slug = typeof tenant.slug === "string" ? tenant.slug.trim().toLowerCase() : "";
-  if (!SLUG_RE.test(slug) || !ID_RE.test(listing.id)) return { ok: false, reason: "adres üretilemedi" };
-  return { ok: true, path: `/vitrin/${slug}/${listing.id}` };
+  if (!SLUG_RE.test(slug) || !listingKod(listing.id)) return { ok: false, reason: "adres üretilemedi" };
+  return { ok: true, path: vitrinListingPath(slug, listingSlugInput(listing)) };
 }
 
 /**

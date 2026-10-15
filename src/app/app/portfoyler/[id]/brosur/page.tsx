@@ -10,6 +10,7 @@ import { PrintButton } from "@/components/ui/print-button";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { readPropertyDescription } from "@/lib/property-description";
 import { buildQrListingUrl, qrImageSrc } from "@/lib/qr-source";
+import { listingSlugInput } from "@/lib/vitrin/listing-slug";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -119,7 +120,7 @@ export default async function PropertyBrochurePage({
   const baseUrl = getBaseUrl();
   // Harici QR servisi (goqr.me) — vitrin-qr.tsx deseni; yalnız public ilan URL'i iletilir.
   // QR hedefi `?kaynak=qr` taşır: taramadan gelen başvurular kaynak raporunda "QR tabela" olarak görünür.
-  const qrTarget = buildQrListingUrl(baseUrl, tenant?.slug, property.id);
+  const qrTarget = buildQrListingUrl(baseUrl, tenant?.slug, listingSlugInput(property));
   const qrSrc = qrTarget ? qrImageSrc(qrTarget) : null;
   // EİDS taşınmaz no (20260826002950): sütun yoksa gösterilmez.
   const { data: eidsRow, error: eidsError } = await supabase.from("properties").select("eids_property_no").eq("id", property.id).maybeSingle();

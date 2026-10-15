@@ -65,6 +65,6 @@ export async function setClosedListing(propertyId: string, closed: boolean): Pro
   revalidatePath(`/app/portfoyler/${id}`);
   revalidatePath("/app/portfoyler");
   revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   return { ok: true, closed, livePortals };
 }

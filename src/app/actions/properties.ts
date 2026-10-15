@@ -87,7 +87,7 @@ const MANUAL_STATUSES = ["draft", "live", "reserved", "archived"];
  */
 function revalidateVitrinPaths() {
   revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   // Liste verisi unstable_cache içinde ("vitrin" etiketi) — yol geçersizleştirmesine ek olarak etiket de düşer.
   revalidateTag("vitrin", "max");
 }

@@ -22,7 +22,7 @@ const directPublicMainPages = [
   "src/app/_home/render-home.tsx",
   "src/app/danisman/[slug]/page.tsx",
   "src/app/vitrin/[slug]/page.tsx",
-  "src/app/vitrin/[slug]/[id]/page.tsx",
+  "src/app/vitrin/[slug]/[ilan]/page.tsx",
   "src/app/vitrin/[slug]/favoriler/page.tsx",
   "src/app/vitrin/[slug]/degerleme/page.tsx",
 ] as const;
@@ -192,7 +192,7 @@ describe("navigation accessibility contract", () => {
 
   it("does not render missing public media URLs as deceptive hash links", () => {
     for (const file of [
-      "src/app/vitrin/[slug]/[id]/page.tsx",
+      "src/app/vitrin/[slug]/[ilan]/page.tsx",
       "src/app/paylas/[token]/page.tsx",
     ]) {
       const content = source(file);

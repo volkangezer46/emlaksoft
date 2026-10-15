@@ -54,6 +54,7 @@ import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
 import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
+import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { EidsAuthorityCard } from "./eids-authority-card";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
@@ -317,7 +318,7 @@ export default async function PropertyDetailPage({
     .reduce((s, r) => s + Number(r.count ?? 0), 0);
   const vitrinSlug = (tenantRow as { slug?: string | null } | null)?.slug ?? null;
   const isLiveListing = property.status === "live";
-  const vitrinHref = vitrinSlug && isLiveListing ? `/vitrin/${vitrinSlug}/${property.id}` : null;
+  const vitrinHref = vitrinSlug && isLiveListing ? vitrinListingPath(vitrinSlug, listingSlugInput(property)) : null;
 
   // Kapanmış (satılan/kiralanan/arşiv) portföyde hâlâ canlı portal ilanı var mı?
   const isClosedStatus = ["sold", "rented", "archived"].includes(property.status);
@@ -1033,7 +1034,7 @@ export default async function PropertyDetailPage({
 
           {/* QR'lı tabela: vitrin ilan sayfasına `?kaynak=qr` ile gider; taramadan gelen talepler kaynak raporunda ayrışır */}
           <VitrinQr
-            vitrinUrl={buildQrListingUrl(getBaseUrl(), vitrinSlug, property.id) ?? ""}
+            vitrinUrl={buildQrListingUrl(getBaseUrl(), vitrinSlug, listingSlugInput(property)) ?? ""}
             heading="QR'lı tabela ve afiş"
             hint={`Tabelaya, cama veya ilan afişine basın. Tarayan kişi bu ilanın vitrin sayfasına gider; oradan bıraktığı talep kaynak raporunda "${QR_SOURCE_LABEL}" olarak görünür.${isLiveListing ? "" : " Not: portföy yayında değil; QR yayına alınana kadar vitrinde açılmaz."}`}
             emptyHint="QR kodu için önce ofis vitrin adresi (slug) tanımlanmalı (Ayarlar)."

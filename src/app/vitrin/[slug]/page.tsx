@@ -31,6 +31,7 @@ import { vitrinRobots } from "@/lib/seo/patterns";
 import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
 import { vitrinOfficeMeta } from "@/lib/vitrin-seo/office-meta";
+import { listingSlugInput, vitrinListingPath, vitrinListingUrl } from "@/lib/vitrin/listing-slug";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -470,7 +471,7 @@ async function VitrinGrid({
     itemListElement: properties.slice(0, 20).map((p, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${siteUrl}/vitrin/${slug}/${p.id}`,
+      url: vitrinListingUrl(siteUrl, slug, listingSlugInput(p)),
       name: p.title || p.property_code,
     })),
   };
@@ -509,6 +510,7 @@ async function VitrinGrid({
           };
           const coverId = coverMap.get(p.id);
           const loc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
+          const href = vitrinListingPath(slug, listingSlugInput(p));
           return (
             <VitrinCardShell
               key={p.id}
@@ -516,7 +518,7 @@ async function VitrinGrid({
               item={{
                 id: p.id,
                 title: p.title || p.property_code,
-                href: `/vitrin/${slug}/${p.id}`,
+                href,
                 coverId: coverId ?? null,
                 price: p.list_price != null ? Number(p.list_price) : null,
                 tx: p.transaction_type,
@@ -528,7 +530,7 @@ async function VitrinGrid({
               }}
             >
             <Link
-              href={`/vitrin/${slug}/${p.id}`}
+              href={href}
               className="lift group overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">

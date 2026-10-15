@@ -11,6 +11,8 @@ import { cache } from "react";
  */
 export type RemovedListingSimilar = {
   id: string;
+  /** Kanonik ilan yolu (`vitrinListingPath`). */
+  href: string;
   title: string;
   price: string;
   tx: string | null;

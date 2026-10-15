@@ -131,7 +131,7 @@ export function FavorilerClient({ slug }: { slug: string }) {
             return (
               <div key={p.id} className="relative">
                 <Link
-                  href={`/vitrin/${slug}/${p.id}`}
+                  href={p.href}
                   className="lift group block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">

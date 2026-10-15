@@ -186,7 +186,7 @@ const TZ_TZLESS_BASELINE: Record<string, number> = {
   "src/app/randevu-al/[token]/booking-form.tsx": 1,
   "src/app/randevu-teyit/[token]/page.tsx": 2,
   "src/app/sunum/[token]/page.tsx": 1,
-  "src/app/vitrin/[slug]/[id]/page.tsx": 1,
+  "src/app/vitrin/[slug]/[ilan]/page.tsx": 1,
   "src/components/listing-control/extension-wizard.tsx": 1,
   "src/components/settings/setting-field.tsx": 1,
   "src/lib/admin-format.ts": 1,

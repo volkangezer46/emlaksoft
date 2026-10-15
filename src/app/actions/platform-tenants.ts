@@ -172,7 +172,7 @@ function revalidateOffice(tenantId: string) {
 
 function revalidateVitrin(...slugs: (string | null | undefined)[]) {
   revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   revalidatePath("/sitemap.xml");
   for (const slug of slugs) if (slug) revalidatePath(`/vitrin/${slug}`);
 }

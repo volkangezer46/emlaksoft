@@ -153,7 +153,7 @@ describe("zamanlanmış işler kapalı modüllü ofisleri atlar", () => {
 describe("public yüzeyler kapalı modülde 'kapalı' sayfası döner", () => {
   const PAGES: { file: string; key: FeatureKey }[] = [
     { file: "src/app/vitrin/[slug]/page.tsx", key: "vitrin" },
-    { file: "src/app/vitrin/[slug]/[id]/page.tsx", key: "vitrin" },
+    { file: "src/app/vitrin/[slug]/[ilan]/page.tsx", key: "vitrin" },
     { file: "src/app/vitrin/[slug]/degerleme/page.tsx", key: "vitrin" },
     { file: "src/app/vitrin/[slug]/favoriler/page.tsx", key: "vitrin" },
     { file: "src/app/danisman/[slug]/page.tsx", key: "vitrin" },
