@@ -19,6 +19,7 @@ import { computeOfficeScore, loadOfficeScoreInputs } from "@/lib/office-score";
 import { moneyTry } from "@/lib/leak-shield";
 import { trDayKey } from "@/lib/clock";
 import { fetchAllRows } from "@/lib/supabase/fetch-all";
+import { foldBranchRollup, loadBranchRollup, type BranchRollup } from "@/lib/franchise/branch-rollup";
 import { assertQueryBatchSucceeded } from "@/lib/supabase/query-batch";
 import { StatCard } from "@/components/app/stat-card";
 import { ChartFrame, BarCompare } from "@/app/app/_ui/lazy-chart";
@@ -85,7 +86,9 @@ export default async function FranchiseBiPage({
 
   // Dönem yalnız işlem akışına uygulanır (deals/closures); portföy, müşteri ve
   // danışman sayıları anlık envanterdir — tarihle süzülmez.
-  // PostgREST max_rows (1000) sınırı: sayımlar sayfalı okunur (fetchAllRows); eksik veri sessizce gösterilmez.
+  // Portföy/müşteri/işlem sayımları tek GROUP BY turunda (branch_rollup RPC, RLS geçerli). RPC yoksa (migration
+  // uygulanmadı) eski yol: PostgREST max_rows (1000) sınırı nedeniyle sayfalı okuma (fetchAllRows) + aynı JS katlaması;
+  // eksik veri sessizce gösterilmez.
   const dealsPage = (from: number, to: number) => {
     let q = supabase.from("deals").select("id, assigned_to, deal_value, stage, created_at").order("id", { ascending: true }).range(from, to);
     if (fromIso) q = q.gte("created_at", fromIso);
@@ -103,33 +106,49 @@ export default async function FranchiseBiPage({
     return q;
   };
 
-  const [inputs, tenantRes, branchesRes, propertiesRes, customersRes, profilesRes, dealsRes, closuresRes] =
+  const [inputs, tenantRes, branchesRes, profilesRes, closuresRes, rollupRpc] =
     await Promise.all([
       loadOfficeScoreInputs(supabase),
       supabase.from("tenants").select("name, plan").limit(1).maybeSingle(),
       supabase.from("branches").select("id, name, is_active").eq("is_active", true).order("name").limit(50),
-      fetchAllRows((from, to) => supabase.from("properties").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
-      fetchAllRows((from, to) => supabase.from("customers").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
       supabase.from("profiles").select("id, branch_id, full_name").eq("is_active", true).limit(200),
-      fetchAllRows(dealsPage),
       fetchAllRows(closuresPage),
+      loadBranchRollup(supabase, { fromIso, toIso }),
     ]);
   assertQueryBatchSucceeded(
-    [tenantRes, branchesRes, propertiesRes, customersRes, profilesRes, dealsRes, closuresRes],
-    ["franchise-tenant", "franchise-branches", "franchise-properties", "franchise-customers", "franchise-profiles", "franchise-deals", "franchise-closures"],
+    [tenantRes, branchesRes, profilesRes, closuresRes],
+    ["franchise-tenant", "franchise-branches", "franchise-profiles", "franchise-closures"],
     "Şube analitiği",
   );
   const { data: tenant } = tenantRes;
   const { data: branches } = branchesRes;
-  const { data: properties } = propertiesRes;
-  const { data: customers } = customersRes;
   const { data: profiles } = profilesRes;
-  const { data: deals } = dealsRes;
   const { data: closures } = closuresRes;
+
+  let branchCounts: BranchRollup;
+  if (rollupRpc) {
+    branchCounts = rollupRpc;
+  } else {
+    const [propertiesRes, customersRes, dealsRes] = await Promise.all([
+      fetchAllRows((from, to) => supabase.from("properties").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
+      fetchAllRows((from, to) => supabase.from("customers").select("id, branch_id").is("deleted_at", null).order("id", { ascending: true }).range(from, to)),
+      fetchAllRows(dealsPage),
+    ]);
+    assertQueryBatchSucceeded(
+      [propertiesRes, customersRes, dealsRes],
+      ["franchise-properties", "franchise-customers", "franchise-deals"],
+      "Şube analitiği",
+    );
+    branchCounts = foldBranchRollup({
+      properties: propertiesRes.data ?? [],
+      customers: customersRes.data ?? [],
+      deals: dealsRes.data ?? [],
+      activeProfiles: profiles ?? [],
+    });
+  }
 
   const office = computeOfficeScore(inputs);
   const branchList = branches ?? [];
-  const advisorBranch = new Map((profiles ?? []).map((p) => [p.id, p.branch_id as string | null]));
 
   type Row = { id: string; name: string; properties: number; customers: number; advisors: number; won: number; wonValue: number; lost: number };
   const rollup = new Map<string, Row>();
@@ -139,15 +158,14 @@ export default async function FranchiseBiPage({
   const unassigned: Row = { id: "unassigned", name: "Şubesiz", properties: 0, customers: 0, advisors: 0, won: 0, wonValue: 0, lost: 0 };
   const bucket = (id: string | null) => (id && rollup.has(id) ? rollup.get(id)! : unassigned);
 
-  (properties ?? []).forEach((p) => { bucket(p.branch_id as string | null).properties += 1; });
-  (customers ?? []).forEach((c) => { bucket(c.branch_id as string | null).customers += 1; });
+  for (const [branchId, c] of branchCounts) {
+    const row = bucket(branchId);
+    row.properties += c.properties;
+    row.customers += c.customers;
+    row.won += c.won;
+    row.wonValue += c.wonValue;
+  }
   (profiles ?? []).forEach((p) => { bucket(p.branch_id as string | null).advisors += 1; });
-  (deals ?? []).forEach((d) => {
-    if (d.stage !== "won") return;
-    const row = bucket(advisorBranch.get(d.assigned_to as string) ?? null);
-    row.won += 1;
-    row.wonValue += Number(d.deal_value || 0);
-  });
   (closures ?? []).forEach((c) => {
     const pl = c.portal_listing as { property?: { branch_id?: string | null } | { branch_id?: string | null }[] } | { property?: { branch_id?: string | null } | { branch_id?: string | null }[] }[] | null;
     const plObj = Array.isArray(pl) ? pl[0] : pl;
