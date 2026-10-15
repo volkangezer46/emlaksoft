@@ -92,7 +92,7 @@ export const OFFICE_SECURITY_SETTING_DEFS: AnySettingDef[] = [
     default: false,
     risk: "low",
     label: "Yeni cihazdan giriş bildirimi",
-    description: "Bir kullanıcı daha önce görülmemiş bir cihaz/tarayıcıdan girdiğinde kendisine ve ofis sahibine bildirim gider.",
+    description: "Bir kullanıcı son 90 günde görülmemiş bir cihaz/tarayıcıdan girdiğinde kendisine, ofis sahibine ve yöneticilere bildirim gider.",
     impact: "Tanımadığınız bir giriş fark edilir; Ayarlar > Güvenlik'ten o oturumu kapatabilirsiniz.",
   }),
 ];
