@@ -28,11 +28,13 @@ import {
   Target,
   TrendingUp,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { LicenseStatusCard } from "@/components/app/license-status-card";
 import { requireModulePage } from "@/lib/require-module-page";
 import { ButtonLink } from "@/components/ui/button";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { DetailSegmentTabs, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { getDefinitions } from "@/lib/definitions";
 import { moneyTry } from "@/lib/leak-shield";
@@ -617,6 +619,14 @@ export default async function PropertyDetailPage({
               <Link href="/app/ilan-kontrol/kapanis" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 <Siren className="h-4 w-4" /> Kayıp-kaçak
               </Link>
+              {(perms.expenses ?? []).includes("create") ? (
+                <Link
+                  href={entryHref({ tab: "gider", propertyId: property.id, propertyLabel: [property.property_code, property.title].filter(Boolean).join(" · ") })}
+                  className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white"
+                >
+                  <Wallet className="h-4 w-4" /> Gider ekle
+                </Link>
+              ) : null}
               <Link href={pipelineHref} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white">
                 Satış hattı{relatedDeal ? <ArrowUpRight className="h-3.5 w-3.5 text-white/60" /> : null}
               </Link>
@@ -791,6 +801,7 @@ export default async function PropertyDetailPage({
           <Suspense fallback={null}>
             <PropertyExtraPanel
               propertyId={property.id}
+              propertyLabel={[property.property_code, property.title].filter(Boolean).join(" · ")}
               canSeeExpenses={(perms.expenses ?? []).includes("view")}
               canCreateExpense={(perms.expenses ?? []).includes("create")}
             />

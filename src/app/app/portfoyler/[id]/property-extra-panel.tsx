@@ -2,6 +2,7 @@ import Link from "@/components/ui/smart-link";
 import { Globe2, Receipt, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { formatTry } from "@/lib/format";
+import { entryHref } from "@/lib/finance/entry-workspace";
 
 /**
  * Portföy künyesinin tabloda olup ekranda görünmeyen alanları + portföye bağlı giderler.
@@ -10,7 +11,18 @@ import { formatTry } from "@/lib/format";
  * - foreign_eligible / foreign_note: yabancıya satış uygunluğu (düzenleme: Yabancıya satış ekranı)
  * - expenses.property_id: bu portföy için yapılan giderler (liste: Muhasebe > Hareketler > Eski giderler, `portfoy=` süzgeci)
  */
-export async function PropertyExtraPanel({ propertyId, canSeeExpenses, canCreateExpense }: { propertyId: string; canSeeExpenses: boolean; canCreateExpense: boolean }) {
+export async function PropertyExtraPanel({
+  propertyId,
+  propertyLabel,
+  canSeeExpenses,
+  canCreateExpense,
+}: {
+  propertyId: string;
+  /** Kayıt sayfasındaki portföy seçicisinde gösterilecek ad ("P-102 · Başlık"). */
+  propertyLabel?: string | null;
+  canSeeExpenses: boolean;
+  canCreateExpense: boolean;
+}) {
   const supabase = await createClient();
   const [{ data: extra }, expenseRes] = await Promise.all([
     supabase
@@ -77,9 +89,19 @@ export async function PropertyExtraPanel({ propertyId, canSeeExpenses, canCreate
         <div className="rounded-[var(--radius-panel)] border border-line bg-surface p-5">
           <div className="flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950"><Receipt className="h-4 w-4 text-brand-600" /> Giderler</h2>
-            <Link href={`/app/giderler?sekme=hareketler&gorunum=eski-giderler&portfoy=${propertyId}`} className="text-xs font-semibold text-brand-600 hover:underline">
-              {expenseCount > 0 ? `Tümü (${expenseCount}) →` : canCreateExpense ? "Gider ekle →" : "Giderler →"}
-            </Link>
+            <span className="flex flex-wrap items-center justify-end gap-x-3">
+              {canCreateExpense ? (
+                // Portföy masrafı (ilan reklamı, fotoğraf, tadilat…): kayıt sayfası bu portföye bağlı açılır.
+                <Link href={entryHref({ tab: "gider", propertyId, propertyLabel })} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
+                  + Gider ekle
+                </Link>
+              ) : null}
+              {expenseCount > 0 || !canCreateExpense ? (
+                <Link href={`/app/giderler?sekme=hareketler&gorunum=eski-giderler&portfoy=${propertyId}`} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-600 hover:underline">
+                  {expenseCount > 0 ? `Tümü (${expenseCount}) →` : "Giderler →"}
+                </Link>
+              ) : null}
+            </span>
           </div>
           {expenseCount === 0 ? (
             <p className="mt-3 text-sm text-text-muted">Bu portföye bağlı gider yok (ilan, fotoğraf, tabela vb. giderleri buradan izlenir).</p>

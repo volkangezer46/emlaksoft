@@ -203,6 +203,23 @@ export async function GenelBakisTab(props: FinanceTabProps) {
         </div>
       ) : null}
 
+      {props.canCreate ? (
+        <nav aria-label="Hızlı kayıt" className="grid grid-cols-2 gap-2 sm:max-w-md">
+          <Link
+            href={entryHref({ tab: "gelir" })}
+            className="focus-ring press lift flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 text-base font-semibold text-success-strong shadow-[var(--shadow-xs)] transition hover:border-mint-600"
+          >
+            <ArrowDownCircle className="h-5 w-5" aria-hidden="true" /> Gelir ekle
+          </Link>
+          <Link
+            href={entryHref({ tab: "gider" })}
+            className="focus-ring press lift flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 text-base font-semibold text-danger-strong shadow-[var(--shadow-xs)] transition hover:border-danger-400"
+          >
+            <ArrowUpCircle className="h-5 w-5" aria-hidden="true" /> Gider ekle
+          </Link>
+        </nav>
+      ) : null}
+
       <KpiStrip items={kpis} />
 
       {alerts.length > 0 ? (

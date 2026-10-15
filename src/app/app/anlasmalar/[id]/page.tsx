@@ -22,7 +22,10 @@ import {
   Tag,
   TrendingUp,
   User,
+  Wallet,
 } from "lucide-react";
+import { ButtonLink } from "@/components/ui/button";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
@@ -431,7 +434,26 @@ export default async function DealDetailPage({
         <ArrowLeft className="h-4 w-4" /> Satış hattına dön
       </Link>
 
-      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`} />
+      <PageHeader title={property?.title ?? property?.property_code ?? "Portföysüz anlaşma"} eyebrow={`${dealTypeLabel(deal.deal_type)} anlaşması`} description={`${customer?.full_name ?? "Müşteri atanmadı"} · ${tarih(deal.created_at)} tarihinde açıldı`}
+        actions={
+          // Anlaşmaya bağlı ofis masrafı (ekspertiz, tapu harcı, ilan…); kapora/kapanış kalemleri "İşlem dosyası"nda kalır.
+          (perms.expenses ?? []).includes("create") ? (
+            <ButtonLink
+              href={entryHref({
+                tab: "gider",
+                title: `Anlaşma masrafı · ${property?.property_code ?? customer?.full_name ?? ""}`.replace(/ · $/, "").slice(0, 160),
+                propertyId: property?.id ?? null,
+                propertyLabel: [property?.property_code, property?.title].filter(Boolean).join(" · ") || null,
+              })}
+              variant="outline"
+              size="sm"
+              icon={Wallet}
+            >
+              Masraf ekle
+            </ButtonLink>
+          ) : null
+        }
+      />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative">{/* Satış hattı şeridi: anlaşmanın hangi aşamada olduğunu tek bakışta göster. */}
           <ol className="relative mt-6 flex flex-wrap gap-2" aria-label="Anlaşma aşaması">
             {STAGES.map((s, i) => {

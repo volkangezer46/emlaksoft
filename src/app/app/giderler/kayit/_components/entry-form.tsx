@@ -2,22 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Building2,
-  CalendarClock,
-  Check,
-  FileText,
-  Landmark,
-  Percent,
-  Repeat,
-  RotateCcw,
-  Sparkles,
-  Tag,
-  Trash2,
-  Users,
-  Wallet,
-  Wand2,
-} from "lucide-react";
+import { CalendarClock, Check, ChevronDown, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { recordCashEntry, transferBetweenAccounts } from "@/app/actions/finance-accounts";
 import { createOpenItem, linkAttachment, recordEntryV2 } from "@/app/actions/finance-ledger";
 import { createRecurringRule } from "@/app/actions/recurring-rules";
@@ -29,7 +14,7 @@ import { FormActionBar, useFormDirty } from "@/components/ui/form-action-bar";
 import { FormError, FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/form-controls";
 import { Switch } from "@/components/ui/switch";
 import { now as nowMs } from "@/lib/clock";
-import { formatAmountInput, parseAmountShorthand } from "@/lib/finance/amount-shorthand";
+import { formatAmountEdit, formatAmountInput, parseAmountShorthand } from "@/lib/finance/amount-shorthand";
 import { BUDGET_GROUP_LABEL, SALARY_CATEGORY, budgetCategoryFor, expenseCategoryFor } from "@/lib/finance/cash/categories";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
 import {
@@ -37,11 +22,13 @@ import {
   budgetImpact,
   categoryFromHistory,
   computeEntryTotals,
+  detailsOpenKey,
   directionTab,
   draftKey,
   entryEditHref,
   findDuplicates,
   similarEntries,
+  topCategories,
   type RecentEntry,
 } from "@/lib/finance/entry-workspace";
 import { LEDGER_VAT_RATES, RENT_WITHHOLDING_RATE } from "@/lib/finance/ledger/vat";
@@ -52,13 +39,15 @@ import { cn } from "@/lib/utils";
 import { PartyPicker } from "../../cari/party-picker";
 import type { EntryCategoryOption, EntryDirection, RuleSuggestFn, RuleSuggestion } from "../../quick-entry";
 import type { WorkspaceAccount, WorkspaceBudget } from "../_data";
-import { AttachmentField, EntrySummary, RadioChip, Section, type OcrResult, type UploadState } from "./entry-ui";
+import { AttachmentField, EntryLiveSummary, RadioChip, chipClass, type OcrResult, type UploadState } from "./entry-ui";
 
 /**
- * Tek kayıt formu (Gider / Gelir / Transfer sekmeleri; eski "Yeni kayıt" penceresinin TAM SAYFA karşılığı, popup yok).
- * Sol: bölümler (tutar ve tarih · kategori · cari · hesap · ödeme durumu/vade · KDV/stopaj · bağlantılar · not ve ek · tekrar).
- * Sağ: canlı özet (net/KDV/brüt, bakiye önce→sonra, bütçe etkisi, olası mükerrer, benzer kayıtlar). Mobilde tek sütun ve
- * yapışkan alt eylem çubuğu (FormActionBar).
+ * Tek kayıt formu (Gider / Gelir / Transfer sekmeleri; popup yok). SADE: tek kartta yalnız temel alanlar — Tutar (büyük),
+ * Kategori (en sık 6 + "Tümü"), Tarih (Bugün/Dün + tarih), Hesap (tek hesapsa gizli), Açıklama. Geri kalan her şey (cari,
+ * ödeme durumu/vade, KDV ve stopaj, portföy, belge/fiş, not, tekrar) TEK katlanır "Ayrıntılar (isteğe bağlı)" bölümünde;
+ * önceden doldurma / fiş okuma / tek satır giriş bu alanlardan birini doldurursa kendiliğinden açılır, açık/kapalı tercihi
+ * kullanıcı başına saklanır. Transfer: kaynak, hedef, tutar, tarih, not. Canlı özet mobilde tutarın altında tek şerit,
+ * masaüstünde küçük kart (net/KDV/brüt yalnız KDV seçiliyse, bakiye sonrası; bütçe/mükerrer/benzer yalnız ilgiliyse).
  *
  * Akıllı: tek satır giriş (smart-entry), tutar kısaltmaları (48k, 1,2m), kurala dayalı kategori önerisi
  * (finance_rule_suggest), cariye geçmişte en sık kullanılan kategori, fiş okuma (OCR) ile boş alanları doldurma.
@@ -80,6 +69,8 @@ export type EntrySeed = {
   vatRate: number | null;
   category: string | null;
   title: string | null;
+  propertyId?: string | null;
+  propertyLabel?: string | null;
 };
 
 export type EntryFormContext = {
@@ -254,7 +245,7 @@ export function EntryForm({
   const [vatRate, setVatRate] = useState<number | null>(sp?.vatRate ?? seed.vatRate ?? null);
   const [vatIncluded, setVatIncluded] = useState(sp?.vatIncluded ?? ctx.vatIncludedDefault);
   const [withholdingRate, setWithholdingRate] = useState<number | null>(null);
-  const [propertyId, setPropertyId] = useState("");
+  const [propertyId, setPropertyId] = useState(seed.propertyId ?? "");
   const [note, setNote] = useState("");
   const [documentUrl, setDocumentUrl] = useState("");
   const [repeat, setRepeat] = useState(false);
@@ -269,6 +260,22 @@ export function EntryForm({
   const [missingShown, setMissingShown] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
   const [draftHandled, setDraftHandled] = useState(false);
+  const [everDirty, setEverDirty] = useState(false);
+  const [showAllCats, setShowAllCats] = useState(false);
+  const [showSmart, setShowSmart] = useState(Boolean(seed.text));
+  // "Ayrıntılar": önceden doldurma bir ayrıntı alanını doldurduysa açık başlar; yoksa kullanıcının son tercihi (yerel).
+  const detailsKey = detailsOpenKey(ctx.userId);
+  const storedDetails = useSyncExternalStore(noopSubscribe, () => readStorage(detailsKey), () => null);
+  const [detailsPick, setDetailsPick] = useState<boolean | null>(() =>
+    seed.partyId || seed.partyName || seed.vatRate != null || seed.attachmentId || seed.propertyId || seed.openItemId || sp?.partyName || sp?.vatRate != null || sp?.deferred ? true : null,
+  );
+  const detailsOpen = detailsPick ?? storedDetails === "1";
+  const openDetails = () => setDetailsPick(true);
+  function toggleDetails() {
+    const next = !detailsOpen;
+    setDetailsPick(next);
+    writeStorage(detailsKey, next ? "1" : "0");
+  }
   const formRef = useRef<HTMLFormElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
   const smartOwned = useRef<Set<SmartField>>(sp ? smartFieldsOf(sp) : new Set());
@@ -363,6 +370,7 @@ export function EntryForm({
     );
     take("date", parsed.dayOffset != null, () => setDate(shiftDayKey(today, parsed.dayOffset!)), () => setDate(today));
     smartOwned.current = next;
+    if (next.has("party") || next.has("vat") || next.has("deferred")) openDetails();
   }
 
   function pickCategory(value: string) {
@@ -407,6 +415,7 @@ export function EntryForm({
     if (ocr.date && /^\d{4}-\d{2}-\d{2}$/.test(ocr.date) && ocr.date <= today) setDate(ocr.date);
     if (ocr.vatRate != null && vatRate == null) setVatRate(ocr.vatRate);
     if (ocr.vendor && !partyLabel) setPartyName(ocr.vendor);
+    if ((ocr.vatRate != null && vatRate == null) || (ocr.vendor && !partyLabel)) openDetails();
     push("Fişten okunan bilgiler boş alanlara yazıldı; kontrol edin.", "ok");
   }
 
@@ -453,14 +462,10 @@ export function EntryForm({
     return () => window.clearTimeout(timer);
   }, [draftJson, draftDirty, dKey, busy]);
 
-  function saveDraftNow() {
-    const savedAt = nowMs();
-    writeStorage(dKey, JSON.stringify({ ...draftData, savedAt }));
-    setDraftSavedAt(savedAt);
-    push("Taslak bu cihazda saklandı", "ok");
-  }
-
-  const storedDraft = draftHandled || draftDirty ? null : parseDraft(storedDraftRaw);
+  // Bu oturumda yazmaya başlandıysa banner bir daha çıkmaz (alan silinince kişinin KENDİ otomatik taslağı "geri yükle"
+  // diye önüne gelmesin).
+  if (draftDirty && !everDirty) setEverDirty(true);
+  const storedDraft = draftHandled || draftDirty || everDirty ? null : parseDraft(storedDraftRaw);
 
   function restoreDraft(d: Draft) {
     setAmountText(d.amountText);
@@ -486,6 +491,7 @@ export function EntryForm({
     setRepeatDay(d.repeatDay);
     setRepeatMode(d.repeatMode);
     if (d.attachment) setUpload({ status: "done", id: d.attachment.id, name: d.attachment.name });
+    if (d.partyId || d.partyName || d.vatRate != null || d.withholdingRate != null || d.propertyId || d.note || d.documentUrl || d.repeat || d.deferred || d.attachment) openDetails();
     setDraftHandled(true);
     setDraftSavedAt(d.savedAt);
   }
@@ -665,8 +671,43 @@ export function EntryForm({
     }
   }
 
-  const saveLabel = isTransfer ? "Transferi kaydet" : deferredMode ? (direction === "in" ? "Alacağı kaydet" : "Borcu kaydet") : direction === "in" ? "Geliri kaydet" : "Gideri kaydet";
+  const saveLabel = deferredMode ? (direction === "in" ? "Alacağı kaydet" : "Borcu kaydet") : "Kaydet";
+  const formLabel = isTransfer ? "Transfer kaydı" : direction === "in" ? "Gelir kaydı" : "Gider kaydı";
   const yesterday = shiftDayKey(today, -1);
+  const showAccount = isTransfer || accounts.length !== 1;
+  const visibleCats = showAllCats ? cats : topCategories(cats, ctx.recent, direction, 6, effCategory);
+  const hiddenCatCount = cats.length - visibleCats.length;
+  const amountInvalid = amountText.trim() !== "" && amount == null;
+
+  // Ayrıntılar kapalıyken doldurulmuş olanlar başlıkta özetlenir (gizli değer kalmasın).
+  const filledDetails = [
+    partyLabel ? `Cari: ${partyLabel}` : null,
+    deferredMode ? "Vadeli" : null,
+    officeMode && vatRate != null ? `KDV %${vatRate}` : null,
+    officeMode && withholdingRate ? `Stopaj %${withholdingRate}` : null,
+    officeMode && propertyId ? "Portföy" : null,
+    upload.status === "done" || documentUrl ? "Belge" : null,
+    note.trim() ? "Not" : null,
+    repeat ? "Her ay" : null,
+  ].filter((x): x is string => Boolean(x));
+
+  const summaryProps = {
+    direction,
+    currency,
+    totals,
+    showTax: officeMode && !isTransfer,
+    account: chosen && needsAccount ? { name: chosen.name, currency: chosen.currency, before: chosen.balance, after: balanceAfter(chosen.balance, totals) } : null,
+    toAccount:
+      isTransfer && toChosen
+        ? { name: toChosen.name, currency: toChosen.currency, before: toChosen.balance, after: Math.round((toChosen.balance + (totals?.cash ?? 0)) * 100) / 100 }
+        : null,
+    budget,
+    duplicates,
+    similar,
+    categoryLabelOf: catLabelOf,
+    hrefOf: (id: string) => entryEditHref(id, { personal: personalScope }),
+    deferredNote: deferredMode ? (direction === "in" ? "Vadeli: alacak açılır, hesap bakiyesi şimdi değişmez." : "Vadeli: borç açılır, hesap bakiyesi şimdi değişmez.") : null,
+  };
 
   if (accounts.length === 0 && !office) {
     return (
@@ -676,20 +717,64 @@ export function EntryForm({
     );
   }
 
+  const accountPicker = (
+    <div className={cn("grid gap-3", isTransfer && "sm:grid-cols-2")}>
+      <FormField
+        label={isTransfer ? "Hangi hesaptan?" : "Hesap"}
+        htmlFor="ew-account"
+        required
+        hint={personal ? "Kişisel hesap: yalnız siz görürsünüz, ofis kâr-zararına girmez." : undefined}
+      >
+        <Combobox
+          id="ew-account"
+          value={accountId}
+          onValueChange={setAccountId}
+          required
+          options={accountOptions}
+          placeholder="Hesap seçin"
+          searchPlaceholder="Hesap ara…"
+          emptyText="Eşleşen hesap yok"
+        />
+      </FormField>
+      {isTransfer ? (
+        <FormField label="Hangi hesaba?" htmlFor="ew-to-account" required>
+          <Combobox
+            id="ew-to-account"
+            value={toAccountId}
+            onValueChange={setToAccountId}
+            required
+            options={accountOptions.filter((o) => o.value !== accountId)}
+            placeholder="Hedef hesap"
+            searchPlaceholder="Hesap ara…"
+            emptyText="Eşleşen hesap yok"
+          />
+        </FormField>
+      ) : null}
+      {isTransfer && chosen && toChosen && chosen.currency !== toChosen.currency ? (
+        <p className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold sm:col-span-2">Farklı para birimli hesaplar arasında transfer yapılamaz.</p>
+      ) : null}
+      {accounts.length === 0 ? (
+        <a href={personalScope ? "/app/hesabim?sekme=kasam" : "/app/giderler?sekme=kasa-banka"} className="inline-flex min-h-11 items-center text-xs font-semibold text-accent-text hover:underline">
+          Henüz hesap yok: {personalScope ? "Kasam'dan" : "Kasa ve banka sekmesinden"} açın
+        </a>
+      ) : null}
+    </div>
+  );
+
   return (
     <form
       ref={formRef}
       onSubmit={submit}
       noValidate
       hidden={hidden}
-      aria-label={saveLabel}
+      aria-label={formLabel}
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
           formRef.current?.requestSubmit();
         }
       }}
-      className="grid gap-4"
+      className="grid grid-cols-[minmax(0,1fr)] gap-3"
     >
       {seed.openItemId ? (
         <p role="status" className="tone-info flex items-center gap-2 rounded-[var(--radius-card)] px-4 py-3 text-sm">
@@ -697,9 +782,9 @@ export function EntryForm({
         </p>
       ) : null}
       {storedDraft ? (
-        <div role="status" className="tone-info flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] px-4 py-3 text-sm">
+        <div role="status" className="tone-info flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] px-4 py-2 text-sm">
           <RotateCcw className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 flex-1">Kaydedilmemiş bir taslağınız var{storedDraft.amountText ? ` (${storedDraft.amountText}${storedDraft.title ? ` · ${storedDraft.title}` : ""})` : ""}.</span>
+          <span className="min-w-0 flex-1">Yarım kalan bir kaydınız var{storedDraft.amountText ? ` (${storedDraft.amountText}${storedDraft.title ? ` · ${storedDraft.title}` : ""})` : ""}.</span>
           <Button size="sm" variant="secondary" icon={RotateCcw} onClick={() => restoreDraft(storedDraft)}>
             Geri yükle
           </Button>
@@ -709,59 +794,141 @@ export function EntryForm({
         </div>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="grid min-w-0 gap-4">
-          <Section title="Tutar ve tarih" icon={Wallet}>
-            {!isTransfer ? (
-              <div>
-                <label htmlFor="ew-smart" className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-text-muted">
-                  <Sparkles className="h-3.5 w-3.5 text-accent-text" aria-hidden="true" /> Tek satırda yazın (isteğe bağlı)
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3">
+          {/* Temel alanlar: tek kart */}
+          <section aria-label={formLabel} className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 rounded-[var(--radius-card)] border border-line bg-surface p-4 shadow-[var(--elev-1)] sm:p-5">
+            <div className="grid gap-2">
+              <div className="flex items-end justify-between gap-2">
+                <label htmlFor="ew-amount" className="text-sm font-medium text-ink-950">
+                  {officeMode && !isTransfer && vatRate != null && vatRate > 0 ? (vatIncluded ? "Tutar (KDV dahil)" : "Tutar (KDV hariç)") : "Tutar"}
+                  <span aria-hidden="true" className="ml-0.5 text-danger-500">*</span>
                 </label>
-                <FormInput
-                  id="ew-smart"
-                  value={smartText}
-                  onChange={(e) => applySmart(e.target.value)}
-                  autoComplete="off"
-                  maxLength={300}
-                  placeholder={office ? "ör. gider 4.500 portal Sahibinden · 48k komisyon Ahmet Yılmaz vadeli" : "ör. 1.250 market dün"}
-                />
-                {smart ? (
-                  <ul className="mt-1.5 flex flex-wrap gap-1 text-xs" aria-label="Anlaşılanlar">
-                    {smart.amount != null ? <li className="numeric rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{formatAccountMoney(smart.amount, currency)}</li> : null}
-                    {smart.category ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{catLabelOf(smart.category)}</li> : null}
-                    {smart.partyName ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Cari: {smart.partyName}</li> : null}
-                    {smart.vatRate != null ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">KDV %{smart.vatRate}</li> : null}
-                    {smart.deferred && officeMode ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Vadeli</li> : null}
-                    {smart.dayOffset != null && smart.dayOffset !== 0 ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{smart.dayOffset === -1 ? "Dün" : `${Math.abs(smart.dayOffset)} gün önce`}</li> : null}
-                  </ul>
+                {!isTransfer ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Sparkles}
+                    onClick={() => setShowSmart((v) => !v)}
+                    aria-expanded={showSmart}
+                    aria-controls="ew-smart-wrap"
+                    className="rounded-full px-2 font-semibold text-accent-text"
+                  >
+                    Tek satırda yazın
+                  </Button>
                 ) : null}
               </div>
-            ) : null}
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
-              <FormField
-                label={officeMode && !isTransfer && vatRate != null && vatRate > 0 ? (vatIncluded ? "Tutar (KDV dahil)" : "Tutar (KDV hariç)") : "Tutar"}
-                htmlFor="ew-amount"
-                required
-                hint={amount != null && amountText && formatAmountInput(amount) !== amountText ? `= ${formatAccountMoney(amount, currency)}` : "1.234,56 · 48k · 1,2m yazabilirsiniz"}
-              >
+              {!isTransfer && showSmart ? (
+                <div id="ew-smart-wrap">
+                  <FormInput
+                    id="ew-smart"
+                    aria-label="Tek satırda yazın"
+                    value={smartText}
+                    onChange={(e) => applySmart(e.target.value)}
+                    autoComplete="off"
+                    maxLength={300}
+                    placeholder={office ? "ör. 4.500 portal Sahibinden · 48k komisyon Ahmet Yılmaz vadeli" : "ör. 1.250 market dün"}
+                  />
+                  {smart ? (
+                    <ul className="mt-1.5 flex flex-wrap gap-1 text-xs" aria-label="Anlaşılanlar">
+                      {smart.amount != null ? <li className="numeric rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{formatAccountMoney(smart.amount, currency)}</li> : null}
+                      {smart.category ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{catLabelOf(smart.category)}</li> : null}
+                      {smart.partyName ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Cari: {smart.partyName}</li> : null}
+                      {smart.vatRate != null ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">KDV %{smart.vatRate}</li> : null}
+                      {smart.deferred && officeMode ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">Vadeli</li> : null}
+                      {smart.dayOffset != null && smart.dayOffset !== 0 ? <li className="rounded-full bg-surface-accent-soft px-2 py-0.5 font-semibold text-accent-text">{smart.dayOffset === -1 ? "Dün" : `${Math.abs(smart.dayOffset)} gün önce`}</li> : null}
+                    </ul>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="relative">
                 <FormInput
                   ref={amountRef}
                   id="ew-amount"
                   name="amount"
                   inputMode="decimal"
                   autoComplete="off"
-                  placeholder="0,00"
+                  enterKeyHint="done"
+                  placeholder="0"
                   autoFocus={!hidden}
                   value={amountText}
+                  aria-required="true"
+                  aria-invalid={amountInvalid || undefined}
+                  aria-describedby="ew-amount-hint"
                   onChange={(e) => {
                     release("amount");
                     setAmountText(e.target.value);
                   }}
+                  // Odakta binliksiz düzenleme biçimi: biçimli "1.500" sonuna rakam eklenince yanlış tutar oluşmaz.
+                  onFocus={() => (amount != null && amountText !== formatAmountEdit(amount) ? setAmountText(formatAmountEdit(amount)) : undefined)}
                   onBlur={() => (amount != null ? setAmountText(formatAmountInput(amount)) : undefined)}
-                  className="numeric h-12 text-xl font-bold"
+                  className="numeric h-14 pr-12 text-2xl font-bold sm:text-3xl"
                 />
-              </FormField>
-              <FormField label="Tarih" htmlFor="ew-date" hint={date === today ? "Bugün" : date === yesterday ? "Dün" : undefined}>
+                <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-lg font-semibold text-text-faint">
+                  {currency === "USD" ? "$" : currency === "EUR" ? "€" : "₺"}
+                </span>
+              </div>
+              <p id="ew-amount-hint" className={cn("text-xs", amountInvalid ? "font-semibold text-danger-strong" : "text-text-muted")}>
+                {amountInvalid
+                  ? "Tutar anlaşılamadı. Örnek: 1.250,50 · 1250 · 48k · 1,2m"
+                  : amount != null && amountText && formatAmountInput(amount) !== amountText && formatAmountEdit(amount) !== amountText
+                    ? `= ${formatAccountMoney(amount, currency)}`
+                    : "1.250,50 · 48k · 1,2m yazabilirsiniz"}
+              </p>
+              <EntryLiveSummary compact {...summaryProps} className="lg:hidden" />
+            </div>
+
+            {!isTransfer ? (
+              <div className="grid gap-2">
+                <p id="ew-category-label" className="text-sm font-medium text-ink-950">
+                  Kategori<span aria-hidden="true" className="ml-0.5 text-danger-500">*</span>
+                </p>
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-labelledby="ew-category-label" aria-required="true">
+                  {visibleCats.map((c) => (
+                    <RadioChip key={c.value} name="ew-category" checked={effCategory === c.value} onSelect={() => pickCategory(c.value)} className={cn(chipClass(effCategory === c.value), "min-h-11 px-3.5 text-sm")}>
+                      {c.label}
+                    </RadioChip>
+                  ))}
+                  {hiddenCatCount > 0 || showAllCats ? (
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowAllCats((v) => !v)}
+                      aria-expanded={showAllCats}
+                      className="min-h-11 rounded-full border border-dashed border-line-strong px-3.5 font-semibold"
+                    >
+                      {showAllCats ? "Daha az" : `Tümü (${cats.length})`}
+                    </Button>
+                  ) : null}
+                </div>
+                {historyPick && !category ? (
+                  <p className="flex items-center gap-1 text-xs text-text-muted">
+                    <Wand2 className="h-3.5 w-3.5 text-accent-text" aria-hidden="true" /> Bu cariye önceki {historyPick.count} kayda göre seçildi; değiştirebilirsiniz.
+                  </p>
+                ) : suggestion && suggestion.category !== effCategory ? (
+                  <Button variant="secondary" size="sm" icon={Wand2} onClick={() => pickCategory(suggestion.category)} className="justify-self-start rounded-full border-dashed text-accent-text">
+                    Öneri: {catLabelOf(suggestion.category)}
+                  </Button>
+                ) : suggestion?.mode === "auto" && suggestion.category === effCategory ? (
+                  <p className="flex items-center gap-1 text-xs text-text-muted">
+                    <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Kategori kurala göre otomatik seçildi.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <label htmlFor="ew-date" className="text-sm font-medium text-ink-950">
+                Tarih
+              </label>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <div className="flex gap-1.5" role="radiogroup" aria-label="Hızlı tarih">
+                  <RadioChip name="ew-quick-date" checked={date === today} onSelect={() => { release("date"); setDate(today); }} className={cn(chipClass(date === today), "min-h-11 px-3.5 text-sm")}>
+                    Bugün
+                  </RadioChip>
+                  <RadioChip name="ew-quick-date" checked={date === yesterday} onSelect={() => { release("date"); setDate(yesterday); }} className={cn(chipClass(date === yesterday), "min-h-11 px-3.5 text-sm")}>
+                    Dün
+                  </RadioChip>
+                </div>
                 <FormInput
                   id="ew-date"
                   name="date"
@@ -773,45 +940,15 @@ export function EntryForm({
                     release("date");
                     setDate(e.target.value);
                   }}
+                  className="h-11 w-auto min-w-0 flex-1 basis-40 sm:flex-none"
                 />
-              </FormField>
-            </div>
-            <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Hızlı tarih">
-              <RadioChip name="ew-quick-date" checked={date === today} onSelect={() => setDate(today)}>
-                Bugün
-              </RadioChip>
-              <RadioChip name="ew-quick-date" checked={date === yesterday} onSelect={() => setDate(yesterday)}>
-                Dün
-              </RadioChip>
-              <RadioChip name="ew-quick-date" checked={date === `${today.slice(0, 7)}-01`} onSelect={() => setDate(`${today.slice(0, 7)}-01`)}>
-                Ay başı
-              </RadioChip>
-            </div>
-          </Section>
-
-          {!isTransfer ? (
-            <Section title="Kategori" icon={Tag} description={direction === "in" ? "Gelirin türü (kâr-zarar ve raporlar bu kırılımı kullanır)." : "Giderin türü (bütçe ve kâr-zarar bu kırılımı kullanır)."}>
-              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Kategori" aria-required="true">
-                {cats.map((c) => (
-                  <RadioChip key={c.value} name="ew-category" checked={effCategory === c.value} onSelect={() => pickCategory(c.value)}>
-                    {c.label}
-                  </RadioChip>
-                ))}
               </div>
-              {historyPick && !category ? (
-                <p className="flex items-center gap-1 text-xs text-text-muted">
-                  <Wand2 className="h-3.5 w-3.5 text-accent-text" aria-hidden="true" /> Bu cariye önceki {historyPick.count} kayda göre seçildi; değiştirebilirsiniz.
-                </p>
-              ) : suggestion && suggestion.category !== effCategory ? (
-                <Button variant="secondary" size="sm" icon={Wand2} onClick={() => pickCategory(suggestion.category)} className="justify-self-start rounded-full border-dashed text-accent-text">
-                  Kurala göre öneri: {catLabelOf(suggestion.category)}
-                </Button>
-              ) : suggestion?.mode === "auto" && suggestion.category === effCategory ? (
-                <p className="flex items-center gap-1 text-xs text-text-muted">
-                  <Wand2 className="h-3.5 w-3.5" aria-hidden="true" /> Kategori kurala göre otomatik seçildi.
-                </p>
-              ) : null}
-              <FormField label="Açıklama" htmlFor="ew-title" hint="Boş bırakılırsa kategori adı kullanılır.">
+            </div>
+
+            {needsAccount && showAccount ? accountPicker : null}
+
+            {!isTransfer ? (
+              <FormField label="Açıklama" htmlFor="ew-title">
                 <FormInput
                   id="ew-title"
                   value={title}
@@ -821,304 +958,274 @@ export function EntryForm({
                   }}
                   name="title"
                   maxLength={160}
-                  placeholder={direction === "in" ? "ör. Ekim kira yönetim bedeli" : "ör. Sahibinden Ekim paketi"}
+                  enterKeyHint="done"
+                  placeholder={direction === "in" ? "ör. Ekim kira yönetim bedeli (boşsa kategori adı)" : "ör. Sahibinden Ekim paketi (boşsa kategori adı)"}
                 />
               </FormField>
-            </Section>
-          ) : null}
-
-          {!isTransfer ? (
-            <Section title={direction === "in" ? "Kimden? (cari / karşı taraf)" : "Kime? (cari / karşı taraf)"} icon={Users}>
-              {officeMode ? (
-                <FormField
-                  label="Cari"
-                  htmlFor="ew-party"
-                  required={deferredMode}
-                  hint={partyName && !picked ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni cari açılır.` : "Kişi ya da firma; yoksa yazın, yeni cari olarak açılır."}
-                >
-                  <PartyPicker
-                    key={pickerKey}
-                    id="ew-party"
-                    name="party"
-                    defaultValue={picked?.id ?? null}
-                    defaultLabel={picked?.name ?? null}
-                    kindHint={partyKind}
-                    allowCreate
-                    onValueChange={(p) => {
-                      release("party");
-                      setPicked(p ? { id: p.id, name: p.name } : null);
-                    }}
-                  />
-                </FormField>
-              ) : (
-                <FormField label={direction === "in" ? "Kimden?" : "Kime?"} htmlFor="ew-counterparty">
-                  <FormInput
-                    id="ew-counterparty"
-                    maxLength={120}
-                    value={partyName ?? ""}
-                    onChange={(e) => {
-                      release("party");
-                      setPartyName(e.target.value || null);
-                    }}
-                    placeholder={direction === "in" ? "Müşteri / kurum" : "Firma / kişi"}
-                  />
-                </FormField>
-              )}
-            </Section>
-          ) : null}
-
-          {officeMode && !isTransfer ? (
-            <Section title="Ödeme durumu" icon={CalendarClock}>
-              <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-line bg-canvas p-1" role="radiogroup" aria-label="Ödeme durumu">
-                {[
-                  { on: !deferred, label: direction === "in" ? "Tahsil edildi" : "Ödendi", icon: Check, set: false },
-                  { on: deferred, label: "Vadeli", icon: CalendarClock, set: true },
-                ].map((o) => (
-                  <RadioChip
-                    key={o.label}
-                    name="ew-paid"
-                    checked={o.on}
-                    onSelect={() => {
-                      release("deferred");
-                      setDeferred(o.set);
-                      if (o.set) setRepeat(false);
-                    }}
-                    className={cn(
-                      "press inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-sm font-semibold transition",
-                      o.on ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950",
-                    )}
-                  >
-                    <o.icon className="h-4 w-4" aria-hidden="true" />
-                    {o.label}
-                  </RadioChip>
-                ))}
-              </div>
-              {deferred ? (
-                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
-                  <FormField
-                    label="Vade tarihi"
-                    htmlFor="ew-due"
-                    hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Cari'den kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Cari'den kapatılır. Hareket şimdi oluşmaz."}
-                  >
-                    <FormInput
-                      id="ew-due"
-                      type="date"
-                      value={dueDate}
-                      min={date}
-                      onChange={(e) => {
-                        release("deferred");
-                        setDueDate(e.target.value);
-                      }}
-                    />
-                  </FormField>
-                  <FormField label="Para birimi" htmlFor="ew-open-currency">
-                    <FormSelect id="ew-open-currency" value={openCurrency} onChange={(e) => setOpenCurrency(e.target.value === "USD" || e.target.value === "EUR" ? e.target.value : "TRY")}>
-                      <option value="TRY">TL</option>
-                      <option value="USD">USD</option>
-                      <option value="EUR">EUR</option>
-                    </FormSelect>
-                  </FormField>
-                  <div className="flex flex-wrap gap-1.5 sm:col-span-2" role="radiogroup" aria-label="Hızlı vade">
-                    {[7, 15, 30, 60].map((d) => (
-                      <RadioChip key={d} name="ew-quick-due" checked={dueDate === shiftDayKey(date, d)} onSelect={() => setDueDate(shiftDayKey(date, d))}>
-                        {d} gün
-                      </RadioChip>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </Section>
-          ) : null}
-
-          {needsAccount ? (
-            <Section title={isTransfer ? "Hesaplar" : "Hesap (kasa / banka)"} icon={Landmark}>
-              <div className={cn("grid gap-3", isTransfer && "sm:grid-cols-2")}>
-                <FormField
-                  label={isTransfer ? "Hangi hesaptan?" : "Hangi hesap?"}
-                  htmlFor="ew-account"
-                  required
-                  hint={personal ? "Kişisel hesap: yalnız siz görürsünüz, ofis kâr-zararına girmez." : chosen ? `Bakiye ${formatAccountMoney(chosen.balance, chosen.currency)}` : undefined}
-                >
-                  <Combobox
-                    id="ew-account"
-                    value={accountId}
-                    onValueChange={setAccountId}
-                    required
-                    options={accountOptions}
-                    placeholder="Hesap seçin"
-                    searchPlaceholder="Hesap ara…"
-                    emptyText="Eşleşen hesap yok"
-                  />
-                </FormField>
-                {isTransfer ? (
-                  <FormField label="Hangi hesaba?" htmlFor="ew-to-account" required hint={toChosen ? `Bakiye ${formatAccountMoney(toChosen.balance, toChosen.currency)}` : undefined}>
-                    <Combobox
-                      id="ew-to-account"
-                      value={toAccountId}
-                      onValueChange={setToAccountId}
-                      required
-                      options={accountOptions.filter((o) => o.value !== accountId)}
-                      placeholder="Hedef hesap"
-                      searchPlaceholder="Hesap ara…"
-                      emptyText="Eşleşen hesap yok"
-                    />
-                  </FormField>
-                ) : null}
-              </div>
-              {isTransfer && chosen && toChosen && chosen.currency !== toChosen.currency ? (
-                <p className="tone-warning rounded-[var(--radius-control)] px-3 py-2 text-xs font-semibold">Farklı para birimli hesaplar arasında transfer yapılamaz.</p>
-              ) : null}
-              {accounts.length === 0 ? (
-                <a href={personalScope ? "/app/hesabim?sekme=kasam" : "/app/giderler?sekme=kasa-banka"} className="text-xs font-semibold text-accent-text hover:underline">
-                  Henüz hesap yok: {personalScope ? "Kasam'dan" : "Kasa ve banka sekmesinden"} açın
-                </a>
-              ) : null}
-            </Section>
-          ) : null}
-
-          {officeMode && !isTransfer ? (
-            <Section title="KDV ve stopaj" icon={Percent} description="Oran seçtikçe net, KDV ve brüt sağdaki özette hesaplanır.">
-              <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="KDV oranı">
-                <span className="mr-1 text-xs font-semibold text-text-muted">KDV</span>
-                <RadioChip
-                  name="ew-vat"
-                  checked={vatRate == null}
-                  onSelect={() => {
-                    release("vat");
-                    setVatRate(null);
-                  }}
-                >
-                  Yok
-                </RadioChip>
-                {LEDGER_VAT_RATES.filter((r) => r > 0).map((r) => (
-                  <RadioChip
-                    key={r}
-                    name="ew-vat"
-                    checked={vatRate === r}
-                    onSelect={() => {
-                      release("vat");
-                      setVatRate(r);
-                    }}
-                  >
-                    %{r}
-                  </RadioChip>
-                ))}
-                {vatRate != null && vatRate > 0 ? (
-                  <span className="ml-auto inline-flex items-center gap-2 text-xs">
-                    <label htmlFor="ew-vat-incl" className="font-semibold text-text-muted">
-                      {vatIncluded ? "Tutara dahil" : "Tutara ek"}
-                    </label>
-                    <Switch
-                      id="ew-vat-incl"
-                      checked={vatIncluded}
-                      onCheckedChange={(v) => {
-                        release("vatIncluded");
-                        setVatIncluded(v);
-                      }}
-                      aria-label="KDV tutara dahil"
-                    />
-                  </span>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Stopaj oranı">
-                <span className="mr-1 text-xs font-semibold text-text-muted">Stopaj</span>
-                <RadioChip name="ew-wh" checked={withholdingRate == null} onSelect={() => setWithholdingRate(null)}>
-                  Yok
-                </RadioChip>
-                {[...new Set<number>([...WITHHOLDING_CHOICES, ...(suggestedWh ? [suggestedWh] : [])])].map((r) => (
-                  <RadioChip key={r} name="ew-wh" checked={withholdingRate === r} onSelect={() => setWithholdingRate(r)}>
-                    %{r}
-                  </RadioChip>
-                ))}
-              </div>
-              {suggestedWh && withholdingRate == null ? (
-                <Button variant="secondary" size="sm" onClick={() => setWithholdingRate(suggestedWh)} className="justify-self-start rounded-full border-dashed text-warning-strong">
-                  {isRent ? `İşyeri kirasında %${suggestedWh} stopaj kesilir. Uygula` : `Bu kategoride %${suggestedWh} stopaj önerilir. Uygula`}
-                </Button>
-              ) : null}
-              {withholdingRate && totals?.withheld != null ? (
-                <p className="numeric text-xs text-text-muted">
-                  Stopaj %{withholdingRate}: {formatAccountMoney(totals.withheld, currency)} vergi dairesine; hesaptan {direction === "in" ? "giren" : "çıkan"} {formatAccountMoney(totals.cash, currency)}.
-                </p>
-              ) : null}
-            </Section>
-          ) : null}
-
-          {officeMode && !isTransfer ? (
-            <Section title="Bağlantılar" icon={Building2} description="İlgili portföy (portföy detayındaki gider ve getiri hesabına yansır).">
-              <Combobox
-                name="property_id"
-                aria-label="İlgili portföy (isteğe bağlı)"
-                placeholder="Portföy (isteğe bağlı)"
-                searchPlaceholder="Portföy kodu veya başlığı…"
-                emptyText="Eşleşen portföy yok"
-                onSearch={searchProperties}
-                options={[]}
-                value={propertyId}
-                onValueChange={setPropertyId}
-              />
-            </Section>
-          ) : null}
-
-          <Section title={officeMode && !isTransfer ? "Not ve belge" : "Not"} icon={FileText}>
-            {officeMode && !isTransfer ? (
-              <AttachmentField id="ew-file" value={upload} onChange={setUpload} onOcr={onOcr} />
-            ) : !isTransfer ? (
-              <FormField label="Belge bağlantısı" htmlFor="ew-doc" hint="Fiş, makbuz veya fatura (https://…)">
-                <FormInput id="ew-doc" name="documentUrl" type="url" inputMode="url" maxLength={500} placeholder="https://" value={documentUrl} onChange={(e) => setDocumentUrl(e.target.value)} />
+            ) : (
+              <FormField label="Not" htmlFor="ew-note">
+                <FormInput id="ew-note" name="note" maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} placeholder="İsteğe bağlı" />
               </FormField>
-            ) : null}
-            <FormField label="Not" htmlFor="ew-note">
-              <FormTextarea id="ew-note" name="note" rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
-            </FormField>
-          </Section>
+            )}
+          </section>
 
-          {!isTransfer && !deferredMode ? (
-            <Section title="Tekrar" icon={Repeat}>
-              <div className="flex items-center justify-between gap-3">
-                <label htmlFor="ew-repeat" className="text-sm font-semibold text-text">
-                  Her ay tekrarla
-                  <span className="block text-xs font-normal text-text-muted">Gelecek aydan itibaren aynı tutar düzenli ödeme kuralı olarak işlenir (Tekrarlayanlar sekmesi).</span>
-                </label>
-                <Switch id="ew-repeat" checked={repeat} onCheckedChange={setRepeat} aria-label="Her ay tekrarla" />
+          {/* Ayrıntılar (isteğe bağlı): tek katlanır bölüm */}
+          {!isTransfer ? (
+            <section aria-label="Ayrıntılar" className="min-w-0 rounded-[var(--radius-card)] border border-line bg-surface shadow-[var(--elev-1)]">
+              <Button
+                variant="ghost"
+                onClick={toggleDetails}
+                aria-expanded={detailsOpen}
+                aria-controls="ew-details"
+                className="h-auto min-h-14 w-full justify-start gap-2 rounded-[var(--radius-card)] px-4 py-2 text-left text-text sm:px-5"
+              >
+                <SlidersHorizontal className="h-4 w-4 shrink-0 text-text-faint" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-text">Ayrıntılar (isteğe bağlı)</span>
+                  <span className="block truncate text-xs text-text-muted">
+                    {filledDetails.length > 0
+                      ? filledDetails.join(" · ")
+                      : officeMode
+                        ? "Cari, vade, KDV ve stopaj, portföy, belge, not, tekrar"
+                        : "Karşı taraf, belge, not, tekrar"}
+                  </span>
+                </span>
+                <ChevronDown className={cn("h-4 w-4 shrink-0 text-text-faint transition-transform", detailsOpen && "rotate-180")} aria-hidden="true" />
+              </Button>
+              <div id="ew-details" hidden={!detailsOpen} className="grid grid-cols-[minmax(0,1fr)] gap-5 border-t border-line px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
+                {officeMode ? (
+                  <FormField
+                    label={direction === "in" ? "Kimden? (cari)" : "Kime? (cari)"}
+                    htmlFor="ew-party"
+                    required={deferredMode}
+                    hint={partyName && !picked ? `Yazılan: ${partyName}. Seçmezseniz bu adla yeni cari açılır.` : "Kişi ya da firma; yoksa yazın, yeni cari olarak açılır."}
+                  >
+                    <PartyPicker
+                      key={pickerKey}
+                      id="ew-party"
+                      name="party"
+                      defaultValue={picked?.id ?? null}
+                      defaultLabel={picked?.name ?? null}
+                      kindHint={partyKind}
+                      allowCreate
+                      onValueChange={(p) => {
+                        release("party");
+                        setPicked(p ? { id: p.id, name: p.name } : null);
+                      }}
+                    />
+                  </FormField>
+                ) : (
+                  <FormField label={direction === "in" ? "Kimden?" : "Kime?"} htmlFor="ew-counterparty">
+                    <FormInput
+                      id="ew-counterparty"
+                      maxLength={120}
+                      value={partyName ?? ""}
+                      onChange={(e) => {
+                        release("party");
+                        setPartyName(e.target.value || null);
+                      }}
+                      placeholder={direction === "in" ? "Müşteri / kurum" : "Firma / kişi"}
+                    />
+                  </FormField>
+                )}
+
+                {officeMode ? (
+                  <div className="grid gap-2">
+                    <p className="text-sm font-medium text-ink-950">Ödeme durumu</p>
+                    <div className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-line bg-canvas p-1" role="radiogroup" aria-label="Ödeme durumu">
+                      {[
+                        { on: !deferred, label: direction === "in" ? "Tahsil edildi" : "Ödendi", icon: Check, set: false },
+                        { on: deferred, label: "Vadeli", icon: CalendarClock, set: true },
+                      ].map((o) => (
+                        <RadioChip
+                          key={o.label}
+                          name="ew-paid"
+                          checked={o.on}
+                          onSelect={() => {
+                            release("deferred");
+                            setDeferred(o.set);
+                            if (o.set) setRepeat(false);
+                          }}
+                          className={cn(
+                            "press inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-sm font-semibold transition",
+                            o.on ? "bg-surface text-ink-950 shadow-[var(--shadow-xs)]" : "text-text-muted hover:text-ink-950",
+                          )}
+                        >
+                          <o.icon className="h-4 w-4" aria-hidden="true" />
+                          {o.label}
+                        </RadioChip>
+                      ))}
+                    </div>
+                    {deferred ? (
+                      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
+                        <FormField
+                          label="Vade tarihi"
+                          htmlFor="ew-due"
+                          hint={direction === "in" ? "Alacak olarak açılır; tahsil edince Cari'den kapatılır. Hareket şimdi oluşmaz." : "Borç olarak açılır; ödeyince Cari'den kapatılır. Hareket şimdi oluşmaz."}
+                        >
+                          <FormInput
+                            id="ew-due"
+                            type="date"
+                            value={dueDate}
+                            min={date}
+                            onChange={(e) => {
+                              release("deferred");
+                              setDueDate(e.target.value);
+                            }}
+                          />
+                        </FormField>
+                        <FormField label="Para birimi" htmlFor="ew-open-currency">
+                          <FormSelect id="ew-open-currency" value={openCurrency} onChange={(e) => setOpenCurrency(e.target.value === "USD" || e.target.value === "EUR" ? e.target.value : "TRY")}>
+                            <option value="TRY">TL</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                          </FormSelect>
+                        </FormField>
+                        <div className="flex flex-wrap gap-1.5 sm:col-span-2" role="radiogroup" aria-label="Hızlı vade">
+                          {[7, 15, 30, 60].map((d) => (
+                            <RadioChip key={d} name="ew-quick-due" checked={dueDate === shiftDayKey(date, d)} onSelect={() => setDueDate(shiftDayKey(date, d))}>
+                              {d} gün
+                            </RadioChip>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {needsAccount && !showAccount ? accountPicker : null}
+
+                {officeMode ? (
+                  <div className="grid gap-2">
+                    <p className="text-sm font-medium text-ink-950">KDV ve stopaj</p>
+                    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="KDV oranı">
+                      <span className="mr-1 w-12 text-xs font-semibold text-text-muted">KDV</span>
+                      <RadioChip
+                        name="ew-vat"
+                        checked={vatRate == null}
+                        onSelect={() => {
+                          release("vat");
+                          setVatRate(null);
+                        }}
+                      >
+                        Yok
+                      </RadioChip>
+                      {LEDGER_VAT_RATES.filter((r) => r > 0).map((r) => (
+                        <RadioChip
+                          key={r}
+                          name="ew-vat"
+                          checked={vatRate === r}
+                          onSelect={() => {
+                            release("vat");
+                            setVatRate(r);
+                          }}
+                        >
+                          %{r}
+                        </RadioChip>
+                      ))}
+                      {vatRate != null && vatRate > 0 ? (
+                        <span className="ml-auto inline-flex min-h-11 items-center gap-2 text-xs">
+                          <label htmlFor="ew-vat-incl" className="font-semibold text-text-muted">
+                            {vatIncluded ? "Tutara dahil" : "Tutara ek"}
+                          </label>
+                          <Switch
+                            id="ew-vat-incl"
+                            checked={vatIncluded}
+                            onCheckedChange={(v) => {
+                              release("vatIncluded");
+                              setVatIncluded(v);
+                            }}
+                            aria-label="KDV tutara dahil"
+                          />
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Stopaj oranı">
+                      <span className="mr-1 w-12 text-xs font-semibold text-text-muted">Stopaj</span>
+                      <RadioChip name="ew-wh" checked={withholdingRate == null} onSelect={() => setWithholdingRate(null)}>
+                        Yok
+                      </RadioChip>
+                      {[...new Set<number>([...WITHHOLDING_CHOICES, ...(suggestedWh ? [suggestedWh] : [])])].map((r) => (
+                        <RadioChip key={r} name="ew-wh" checked={withholdingRate === r} onSelect={() => setWithholdingRate(r)}>
+                          %{r}
+                        </RadioChip>
+                      ))}
+                    </div>
+                    {suggestedWh && withholdingRate == null ? (
+                      <Button variant="secondary" size="sm" onClick={() => setWithholdingRate(suggestedWh)} className="justify-self-start rounded-full border-dashed text-warning-strong">
+                        {isRent ? `İşyeri kirasında %${suggestedWh} stopaj kesilir. Uygula` : `Bu kategoride %${suggestedWh} stopaj önerilir. Uygula`}
+                      </Button>
+                    ) : null}
+                    {withholdingRate && totals?.withheld != null ? (
+                      <p className="numeric text-xs text-text-muted">
+                        Stopaj %{withholdingRate}: {formatAccountMoney(totals.withheld, currency)} vergi dairesine; hesaptan {direction === "in" ? "giren" : "çıkan"} {formatAccountMoney(totals.cash, currency)}.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {officeMode ? (
+                  <FormField label="İlgili portföy" htmlFor="ew-property" hint="Portföy detayındaki gider ve getiri hesabına yansır.">
+                    <Combobox
+                      id="ew-property"
+                      name="property_id"
+                      placeholder="Portföy seçin"
+                      searchPlaceholder="Portföy kodu veya başlığı…"
+                      emptyText="Eşleşen portföy yok"
+                      onSearch={searchProperties}
+                      options={[]}
+                      value={propertyId}
+                      onValueChange={setPropertyId}
+                      selectedLabel={seed.propertyId && propertyId === seed.propertyId ? (seed.propertyLabel ?? "Seçili portföy") : undefined}
+                    />
+                  </FormField>
+                ) : null}
+
+                {officeMode ? (
+                  <FormField label="Belge / fiş" htmlFor="ew-file" inject={false}>
+                    <AttachmentField id="ew-file" value={upload} onChange={setUpload} onOcr={onOcr} />
+                  </FormField>
+                ) : (
+                  <FormField label="Belge bağlantısı" htmlFor="ew-doc" hint="Fiş, makbuz veya fatura (https://…)">
+                    <FormInput id="ew-doc" name="documentUrl" type="url" inputMode="url" maxLength={500} placeholder="https://" value={documentUrl} onChange={(e) => setDocumentUrl(e.target.value)} />
+                  </FormField>
+                )}
+
+                <FormField label="Not" htmlFor="ew-note">
+                  <FormTextarea id="ew-note" name="note" rows={2} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
+                </FormField>
+
+                {!deferredMode ? (
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <label htmlFor="ew-repeat" className="text-sm font-medium text-ink-950">
+                        Her ay tekrarla
+                        <span className="block text-xs font-normal text-text-muted">Gelecek aydan itibaren aynı tutar düzenli kayıt olarak işlenir.</span>
+                      </label>
+                      <Switch id="ew-repeat" checked={repeat} onCheckedChange={setRepeat} aria-label="Her ay tekrarla" />
+                    </div>
+                    {repeat ? (
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <FormField label="Ayın kaçıncı günü?" htmlFor="ew-repeat-day" hint="31 = ayın son günü">
+                          <FormInput id="ew-repeat-day" name="repeatDay" type="number" inputMode="numeric" min={1} max={31} value={repeatDay} onChange={(e) => setRepeatDay(e.target.value)} />
+                        </FormField>
+                        <FormField label="Nasıl işlensin?" htmlFor="ew-repeat-mode">
+                          <FormSelect id="ew-repeat-mode" value={repeatMode} onChange={(e) => setRepeatMode(e.target.value === "approve" ? "approve" : "auto")}>
+                            <option value="auto">Otomatik kaydet</option>
+                            <option value="approve">Bana sor</option>
+                          </FormSelect>
+                        </FormField>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
-              {repeat ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <FormField label="Ayın kaçıncı günü?" htmlFor="ew-repeat-day" hint="31 = ayın son günü">
-                    <FormInput id="ew-repeat-day" name="repeatDay" type="number" min={1} max={31} value={repeatDay} onChange={(e) => setRepeatDay(e.target.value)} />
-                  </FormField>
-                  <FormField label="Nasıl işlensin?" htmlFor="ew-repeat-mode">
-                    <FormSelect id="ew-repeat-mode" value={repeatMode} onChange={(e) => setRepeatMode(e.target.value === "approve" ? "approve" : "auto")}>
-                      <option value="auto">Otomatik kaydet</option>
-                      <option value="approve">Bana sor</option>
-                    </FormSelect>
-                  </FormField>
-                </div>
-              ) : null}
-            </Section>
+            </section>
           ) : null}
         </div>
 
-        <aside className="min-w-0 lg:sticky lg:top-20" aria-label="Canlı özet">
-          <EntrySummary
-            direction={direction}
-            currency={currency}
-            totals={totals}
-            showTax={officeMode && !isTransfer}
-            categoryLabel={effCategory ? catLabelOf(effCategory) : null}
-            account={chosen && needsAccount ? { name: chosen.name, currency: chosen.currency, before: chosen.balance, after: balanceAfter(chosen.balance, totals) } : null}
-            toAccount={
-              isTransfer && toChosen && totals
-                ? { name: toChosen.name, currency: toChosen.currency, before: toChosen.balance, after: Math.round((toChosen.balance + totals.cash) * 100) / 100 }
-                : null
-            }
-            budget={budget}
-            duplicates={duplicates}
-            similar={similar}
-            categoryLabelOf={catLabelOf}
-            hrefOf={(id) => entryEditHref(id, { personal: personalScope })}
-            deferredNote={deferredMode ? (direction === "in" ? "Vadeli: alacak açılır, hesap bakiyesi şimdi değişmez." : "Vadeli: borç açılır, hesap bakiyesi şimdi değişmez.") : null}
-          />
+        <aside className="hidden min-w-0 lg:sticky lg:top-20 lg:block" aria-label="Canlı özet">
+          <EntryLiveSummary {...summaryProps} />
         </aside>
       </div>
 
@@ -1139,8 +1246,9 @@ export function EntryForm({
         cancelLabel="Vazgeç"
         missing={missing.map((m) => ({ label: m.label, onGo: () => focusMissing(m.selector) }))}
         progress={{ done: Math.max(0, requiredTotal - missing.length), total: requiredTotal }}
-        draft={{ savedAt: draftSavedAt, onSave: saveDraftNow }}
+        draft={{ savedAt: draftSavedAt }}
         saveAndNew
+        saveAndNewLabel="Kaydet ve yeni"
       />
     </form>
   );

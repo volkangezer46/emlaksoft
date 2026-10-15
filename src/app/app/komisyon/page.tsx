@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import Link from "@/components/ui/smart-link";
+import { entryHref } from "@/lib/finance/entry-workspace";
 import { createClient } from "@/lib/supabase/server";
 import { now as nowMs } from "@/lib/clock";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -229,6 +230,7 @@ export default async function CommissionPage({
   const canPay = canEdit && isApprovalExemptRole(role);
   // Kısmi tahsilat (WP3): kasaya yazılmış net tahsilat satır başına; kasa hareketleri yalnız Muhasebe görüntüleme yetkisiyle okunur.
   const canSeeCash = canEdit && (perms.expenses ?? []).includes("view");
+  const canExpense = (perms.expenses ?? []).includes("create");
   const rowIds = rows.map((r) => r.id);
   const [invoiceCtx, payoutSplitRes, payoutRes, cashRes] = await Promise.all([
     loadInvoiceButtonContext(
@@ -693,6 +695,21 @@ export default async function CommissionPage({
                               : undefined
                           }
                         />
+                        {/* Tahsilat yukarıdaki "Tahsil et" akışında; bu satıra bağlı masraf (referans ödemesi vb.) kayıt sayfasında. */}
+                        {canExpense ? (
+                          <Link
+                            href={entryHref({
+                              tab: "gider",
+                              category: "diger_gider",
+                              title: `Komisyon masrafı${property?.property_code ? ` · ${property.property_code}` : ""}`.slice(0, 160),
+                              propertyId: property?.id ?? null,
+                              propertyLabel: [property?.property_code, property?.title].filter(Boolean).join(" · ") || null,
+                            })}
+                            className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-text-muted hover:text-accent-text hover:underline sm:min-h-8"
+                          >
+                            <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Masraf ekle
+                          </Link>
+                        ) : null}
                       </div>
                     ) : null}
                   </article>

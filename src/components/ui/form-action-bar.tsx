@@ -36,15 +36,24 @@ export function useFormDirty(formRef: RefObject<HTMLFormElement | null>, disable
     const frame = requestAnimationFrame(() => {
       initialRef.current = snap();
     });
+    // Denetim olaydan SONRA (bir sonraki görev) yapılır. Form dinleyicisi React'in kök dinleyicisinden ÖNCE çalışır; burada
+    // eşzamanlı setDirty, React'in aynı olayı işlemeden önce bekleyen güncellemeyi boşaltmasına yol açıyordu: yeniden çizim
+    // KONTROLLÜ alanın eski değerini DOM'a geri yazıyor, React değişikliği görmüyor ve tuş kayboluyordu (Muhasebe > Yeni
+    // kayıt tutar alanına hiçbir şey yazılamıyordu; keyup ↔ input her tuşta kirli durumunu çevirip döngüyü sürdürüyordu).
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const check = (e: Event) => {
-      if (!e.isTrusted) return;
-      const d = isDirty(initialRef.current, snap());
-      setDirty((prev) => (prev === d ? prev : d));
+      if (!e.isTrusted || timer !== undefined) return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        const d = isDirty(initialRef.current, snap());
+        setDirty((prev) => (prev === d ? prev : d));
+      }, 0);
     };
     const events = ["input", "change", "click", "keyup"] as const;
     for (const ev of events) form.addEventListener(ev, check);
     return () => {
       cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
       for (const ev of events) form.removeEventListener(ev, check);
     };
   }, [formRef]);
@@ -121,10 +130,12 @@ export type FormActionBarProps = {
   progress?: { done: number; total: number } | null;
   /** Eksik zorunlu alanlar; ilki sayaçta tıklanınca gidilir. */
   missing?: MissingField[];
-  /** Taslak desteği: son kayıt zamanı (ms) + "Taslak kaydet". */
-  draft?: { savedAt: number | null; onSave: () => void } | null;
+  /** Taslak desteği: son kayıt zamanı (ms) + "Taslak kaydet" (`onSave` yoksa düğme çizilmez; yalnız otomatik taslak rozeti). */
+  draft?: { savedAt: number | null; onSave?: () => void } | null;
   /** "Kaydet ve yenisini ekle" (yalnız useCreateForm'lu formlar). */
   saveAndNew?: boolean;
+  /** "Kaydet ve yenisini ekle" düğmesinin etiketi (ör. sade formlarda "Kaydet ve yeni"). */
+  saveAndNewLabel?: string;
   /**
    * Birincil düğmeyi geçici olarak gönderim dışı bir eyleme çevirir (ör. mobil adım akışında "Sonraki").
    * null/undefined: normal Kaydet. Ctrl+Enter kısayolu yine kaydeder.
@@ -157,6 +168,7 @@ export function FormActionBar({
   missing = [],
   draft,
   saveAndNew,
+  saveAndNewLabel = "Kaydet ve yenisini ekle",
   primaryAction,
   shortcuts = "save",
   focusErrorBand = true,
@@ -231,11 +243,11 @@ export function FormActionBar({
 
   const submitCls = destructive ? "bg-danger-500 text-white hover:bg-danger-600" : undefined;
   const busy = pending;
-  const hasSecondary = Boolean(draft || saveAndNew);
+  const hasSecondary = Boolean(draft?.onSave || saveAndNew);
   // İkincil eylemler: geniş ekranda çubukta, mobilde "Daha fazla" ile satır içi açılır (popup değil).
   const secondaryButtons = (
     <>
-      {draft ? (
+      {draft?.onSave ? (
         <Button type="button" variant="ghost" size="lg" icon={Save} disabled={busy || !dirty} onClick={draft.onSave}>
           Taslak kaydet
         </Button>
@@ -248,7 +260,7 @@ export function FormActionBar({
           disabled={busy || submitDisabled}
           onClick={() => setSubmitIntent("new")}
         >
-          Kaydet ve yenisini ekle
+          {saveAndNewLabel}
         </Button>
       ) : null}
     </>
