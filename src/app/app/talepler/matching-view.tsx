@@ -31,6 +31,9 @@ import { decodeDemandPreviewParam, parseDemandValues } from "@/lib/demand-criter
 import { fetchMatchCandidateProperties, MATCH_CANDIDATE_LIMIT } from "@/lib/match-candidates";
 import { SaveMatchButton } from "./save-match-button";
 import { SendMatchButton } from "./send-match-button";
+import { BulkSendMatches } from "./bulk-send-matches";
+import { MatchSelectCheckbox, MatchSelectionBar, MatchSelectionProvider } from "./match-selection";
+import { Fragment } from "react";
 import { RadialGauge } from "@/components/ui/viz";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -234,6 +237,18 @@ export async function MatchingView({
   });
   const maxBucket = Math.max(1, ...scoreBuckets);
 
+  // Tek portföye süzülü (?property=): "Tümüne gönder" — ör. fiyat düşüşünde eşleşen tüm alıcılara aynı mesaj (skor
+  // filtresine uyan, kayıtlı talepler; sıra skor sırası). İzin/engel/telefon kontrolü sunucuda (matching-bulk).
+  const propertyF = sp.property && UUID_RE.test(sp.property) ? sp.property : null;
+  const bulkDemandIds =
+    propertyF && !previewDemand
+      ? [...new Set(filteredPairs.filter((p) => p.property.id === propertyF).map((p) => p.demand.id))]
+      : [];
+  // Tek müşteriye süzülü (?customer= / ?demand=): satır seçimiyle çoklu sunum (?portfoy=a,b,c&musteri=).
+  const selectionCustomerId =
+    previewDemand || propertyF ? null : customerF ?? (demandF && demands.length === 1 ? customerOf(demands[0])?.id ?? null : null);
+  const SelectionWrap = selectionCustomerId ? MatchSelectionProvider : Fragment;
+
   return (
     <div className="space-y-6">
       {candidates.error ? (
@@ -364,8 +379,9 @@ export async function MatchingView({
         </div>
       ) : null}
 
+      <SelectionWrap>
       <section className="overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface">
-        <div className="flex items-center justify-between border-b border-line px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Target className="h-4 w-4 text-brand-600" /> Eşleşme önerileri
@@ -381,6 +397,8 @@ export async function MatchingView({
               </p>
             ) : null}
           </div>
+          {bulkDemandIds.length > 0 && propertyF ? <BulkSendMatches propertyId={propertyF} demandIds={bulkDemandIds} /> : null}
+          {selectionCustomerId && top.length > 0 ? <MatchSelectionBar customerId={selectionCustomerId} /> : null}
         </div>
 
         {top.length === 0 ? (
@@ -536,6 +554,9 @@ export async function MatchingView({
                       ) : null}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      {selectionCustomerId ? (
+                        <MatchSelectCheckbox propertyId={pair.property.id} label={pair.property.title ?? pair.property.property_code ?? "Portföy"} />
+                      ) : null}
                       {pair.demand.id === PREVIEW_DEMAND_ID ? null : (
                         <>
                           <SendMatchButton demandId={pair.demand.id} propertyId={pair.property.id} />
@@ -584,6 +605,7 @@ export async function MatchingView({
           </div>
         ) : null}
       </section>
+      </SelectionWrap>
     </div>
   );
 }
