@@ -66,14 +66,26 @@ export function DecisionControls({ requestId, requestTitle }: { requestId: strin
     [push, setOptimistic],
   );
 
-  // Geri al süresi dolmadan sayfadan ayrılınca karar kaybolmasın: bekleyen karar hemen gönderilir.
+  // Geri al süresi dolmadan sayfadan ayrılınca karar kaybolmasın: bekleyen karar hemen gönderilir. Uygulama içi
+  // geçişte bileşen sökülürken; sekme gizlenince / kapanırken (mobilde sekme değişimi, uygulamadan çıkış) da
+  // `visibilitychange`/`pagehide` ile — sekme kapatma sökülme temizliğini hiç çalıştırmaz.
   useEffect(() => {
-    return () => {
+    const flush = () => {
       const pending = pendingRef.current;
       if (!pending) return;
       clearTimeout(pending.timer);
       pendingRef.current = null;
       void decideApproval(init, pending.fd);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+      flush();
     };
   }, []);
 

@@ -16,7 +16,7 @@
 --   property_dues                                    -> expenses:create / edit / delete
 --   property_keys, property_key_events               -> properties:edit (silme properties:delete)
 --   rent_reminders (ofis kanali guncelleme)          -> rentals:edit
---   staff_leaves                                     -> team:edit; ya da team:view + kendi adina 'talep'
+--   staff_leaves                                     -> team:edit; ya da team:view + kendi adina 'talep' (ekleme / geri cekme)
 --   unit_payments                                    -> projects:edit
 --   agent_badges, agent_score_snapshots, automation_logs, playbook_runs: YALNIZ cron/sunucu (service_role) yazar ->
 --     authenticated/anon'un INSERT/UPDATE/DELETE yetkisi REVOKE; okuma politikasi (tenant) korunur.
@@ -421,9 +421,16 @@ create policy staff_leaves_update on public.staff_leaves
   using (tenant_id = (select public.current_tenant_id()) and (select public.has_effective_permission('team', 'edit')))
   with check (tenant_id = (select public.current_tenant_id()) and (select public.has_effective_permission('team', 'edit')));
 drop policy if exists staff_leaves_delete on public.staff_leaves;
+-- Izni olmayan kendi bekleyen ('talep') kaydini geri ceker (deleteLeave kurali); onayli/reddedilmis kayit yalniz team:edit.
 create policy staff_leaves_delete on public.staff_leaves
   for delete to authenticated
-  using (tenant_id = (select public.current_tenant_id()) and (select public.has_effective_permission('team', 'edit')));
+  using (
+    tenant_id = (select public.current_tenant_id())
+    and (
+      (select public.has_effective_permission('team', 'edit'))
+      or ((select public.has_effective_permission('team', 'view')) and staff_id = (select auth.uid()) and status = 'talep')
+    )
+  );
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- unit_payments (proje odeme plani): projects:edit
