@@ -24,6 +24,34 @@ export type ImportRow = { row: number; [key: string]: string | number | undefine
 
 export type RowIssue = { level: "error" | "warning"; message: string };
 
+/**
+ * Sunucunun satır başına önceden çözdüğü bağlam (coğrafya, danışman). Saf planlayıcılar veritabanına gitmez;
+ * çağıran (import-data) çözümleri bu haritayla verir. İstemciden GELMEZ (satır alanı değildir).
+ */
+export type RowGeo = {
+  provinceId: string | null;
+  districtId: string | null;
+  neighborhoodId: string | null;
+  /** Önizleme notu: "Kadıköy / İstanbul · Caferağa" */
+  label: string;
+  /** Çözülemeyen/belirsiz kısım (uyarı olarak satıra eklenir). */
+  issue?: string;
+};
+export type RowEnrichment = {
+  geo?: RowGeo;
+  /** Dosyadaki danışman çözüldüyse profil kimliği; çözülemediyse undefined + `advisorIssue`. */
+  advisorId?: string;
+  advisorIssue?: string;
+};
+export type EnrichmentMap = ReadonlyMap<number, RowEnrichment>;
+
+function enrichmentIssues(e: RowEnrichment | undefined): RowIssue[] {
+  const out: RowIssue[] = [];
+  if (e?.geo?.issue) out.push({ level: "warning", message: `Konum: ${e.geo.issue}` });
+  if (e?.advisorIssue) out.push({ level: "warning", message: e.advisorIssue });
+  return out;
+}
+
 export type PlannedRow<T = unknown> = {
   row: number;
   status: RowStatus;
@@ -35,6 +63,8 @@ export type PlannedRow<T = unknown> = {
   /** Yalnız "update": uygulanacak alanlar ve geri alma için eski değerleri. */
   patch?: Record<string, unknown>;
   prev?: Record<string, unknown>;
+  /** Yalnız portföy "update": malik boş ve dosyada malik telefonu var (yazımda malik müşterisi bağlanır). */
+  needsOwner?: boolean;
 };
 
 export type ImportCounters = {
@@ -141,6 +171,11 @@ export type NormalizedCustomer = {
   customer_type: string;
   source: string;
   notes: string;
+  tags: string[];
+  province_id: string | null;
+  district_id: string | null;
+  /** Dosyadaki danışman (çözüldüyse); yoksa sihirbazdaki ortak atama geçerlidir. */
+  advisor_id: string | null;
 };
 
 export type ExistingCustomer = {
@@ -151,6 +186,9 @@ export type ExistingCustomer = {
   customer_types?: string[] | null;
   source?: string | null;
   notes?: string | null;
+  tags?: string[] | null;
+  province_id?: string | null;
+  district_id?: string | null;
 };
 
 export type CustomerLookup = {
@@ -160,7 +198,24 @@ export type CustomerLookup = {
 
 export const DEFAULT_IMPORT_SOURCE = "İçe aktarma";
 
-export function validateCustomerRow(r: ImportRow): { data?: NormalizedCustomer; issues: RowIssue[] } {
+/** Etiket hücresi: ";", ",", "|" veya Google Kişiler'in " ::: " ayracıyla bölünür; sistem etiketleri (* myContacts) atılır. */
+export const TAG_MAX = 20;
+export function parseTagList(raw: unknown): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of clean(raw).split(/\s*(?::::|[;,|])\s*/)) {
+    const t = part.replace(/^\*\s*/, "").replace(/\s+/g, " ").trim().slice(0, 40);
+    if (!t || /^(mycontacts|starred)$/i.test(t)) continue;
+    const k = foldText(t);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+    if (out.length >= TAG_MAX) break;
+  }
+  return out;
+}
+
+export function validateCustomerRow(r: ImportRow, enrich?: RowEnrichment): { data?: NormalizedCustomer; issues: RowIssue[] } {
   const issues: RowIssue[] = [];
   const fullName = clean(r.full_name);
   const phoneRaw = clean(r.phone);
@@ -187,6 +242,7 @@ export function validateCustomerRow(r: ImportRow): { data?: NormalizedCustomer; 
   }
   const typeRaw = clean(r.customer_type);
   const type = typeRaw ? (canonicalFromDefaults("customer_type", typeRaw, false) ?? typeRaw) : "";
+  issues.push(...enrichmentIssues(enrich));
   return {
     issues,
     data: {
@@ -196,6 +252,10 @@ export function validateCustomerRow(r: ImportRow): { data?: NormalizedCustomer; 
       customer_type: type,
       source: clean(r.source),
       notes: clean(r.notes),
+      tags: parseTagList(r.tags),
+      province_id: enrich?.geo?.provinceId ?? null,
+      district_id: enrich?.geo?.districtId ?? null,
+      advisor_id: enrich?.advisorId ?? null,
     },
   };
 }
@@ -262,6 +322,17 @@ export function buildCustomerPatch(
     const types = existing.customer_types ?? [];
     if (!types.includes(data.customer_type)) set("customer_types", [...types, data.customer_type], types);
   }
+  if (data.tags.length) {
+    const tags = existing.tags ?? [];
+    const have = new Set(tags.map(foldText));
+    const add = data.tags.filter((t) => !have.has(foldText(t)));
+    if (add.length) set("tags", [...tags, ...add].slice(0, TAG_MAX), tags);
+  }
+  // Konum yalnız boşsa doldurulur (danışmanın elle girdiği bölge ezilmez).
+  if (data.province_id && !existing.province_id) {
+    set("province_id", data.province_id, existing.province_id);
+    if (data.district_id && !existing.district_id) set("district_id", data.district_id, existing.district_id);
+  }
   return { patch, prev };
 }
 
@@ -277,9 +348,10 @@ export function planCustomerRows(
   lookup: CustomerLookup,
   policy: DuplicatePolicy,
   seen: Set<string> = new Set(),
+  enrich?: EnrichmentMap,
 ): PlannedRow<NormalizedCustomer>[] {
   return rows.map((r) => {
-    const v = validateCustomerRow(r);
+    const v = validateCustomerRow(r, enrich?.get(r.row));
     if (!v.data) return { row: r.row, status: "error" as const, issues: v.issues };
     const { data, issues } = v;
     const keys = [data.phone ? `p:${data.phone}` : "", data.email ? `e:${data.email}` : ""].filter(Boolean);
@@ -347,6 +419,19 @@ export type NormalizedProperty = {
   rooms: string | null;
   sqm: number | null;
   address_line: string | null;
+  net_sqm: number | null;
+  floor: number | null;
+  building_age: number | null;
+  heating: string | null;
+  description: string | null;
+  portal_listing_no: string | null;
+  owner_name: string | null;
+  owner_phone: string | null;
+  photo_urls: string[];
+  province_id: string | null;
+  district_id: string | null;
+  neighborhood_id: string | null;
+  advisor_id: string | null;
 };
 
 export type ExistingProperty = {
@@ -355,12 +440,122 @@ export type ExistingProperty = {
   address_line: string | null;
   list_price: number | null;
   features: Record<string, unknown> | null;
+  province_id?: string | null;
+  district_id?: string | null;
+  neighborhood_id?: string | null;
+  owner_customer_id?: string | null;
 };
 
 export const propertyKey = (title: string, address: string | null | undefined) =>
   `${foldText(title)}|${foldText(address ?? "")}`;
 
-export function validatePropertyRow(r: ImportRow): { data?: NormalizedProperty; issues: RowIssue[] } {
+/** Portal ilan numarası anahtarı (sahibinden / hepsiemlak ilan no): en güçlü mükerrer işareti. */
+export const portalNoKey = (no: string) => `pn:${foldText(no).replace(/\s+/g, "")}`;
+
+/** Bir hücrede en çok bu kadar fotoğraf bağlantısı alınır (geri kalanı uyarıyla atlanır). */
+export const PHOTO_URLS_MAX = 20;
+export const PROPERTY_TEXT_MAX = 5000;
+
+/** "a.jpg;b.jpg", satır sonu, virgül, boşluk ya da "|" ile ayrılmış bağlantılar → yalnız https. */
+export function parsePhotoUrls(raw: unknown): { urls: string[]; dropped: number; insecure: number } {
+  const urls: string[] = [];
+  let dropped = 0;
+  let insecure = 0;
+  const seen = new Set<string>();
+  for (const part of clean(raw).split(/[\s;,|]+/)) {
+    if (!part) continue;
+    let u: URL;
+    try {
+      u = new URL(part);
+    } catch {
+      dropped += 1;
+      continue;
+    }
+    if (u.protocol === "http:") {
+      insecure += 1;
+      continue;
+    }
+    if (u.protocol !== "https:" || u.username || u.password || part.length > 1000) {
+      dropped += 1;
+      continue;
+    }
+    if (seen.has(u.href)) continue;
+    seen.add(u.href);
+    if (urls.length >= PHOTO_URLS_MAX) {
+      dropped += 1;
+      continue;
+    }
+    urls.push(u.href);
+  }
+  return { urls, dropped, insecure };
+}
+
+/** Kat: "3", "Giriş Katı", "Bahçe katı", "Yüksek giriş", "Kot 2", "Bodrum" → tam sayı (giriş = 0, kot/bodrum eksi). */
+export function parseFloorText(raw: unknown): number | null | "invalid" {
+  const f = foldText(clean(raw));
+  if (!f) return null;
+  const n = f.match(/^(-?\d{1,3})(?:\s+(?:n?ci|n?inci|n?uncu|ncu|nci))?(?:\s+kat)?$/);
+  if (n) return Number(n[1]);
+  if (/^(giris|zemin|bahce|yuksek giris|bahce kati|giris kati|zemin kat|yuksek giris kati|bahce dubleks)/.test(f)) return 0;
+  const kot = f.match(/^kot\s*(\d)/);
+  if (kot) return -Number(kot[1]);
+  if (/^(bodrum|kot|yari bodrum)/.test(f)) return -1;
+  return "invalid";
+}
+
+/** Bina yaşı: "12", "0 (Yeni)", "Sıfır", "5-10 arası" (alt sınır) → tam sayı. */
+export function parseBuildingAge(raw: unknown): number | null | "invalid" {
+  const f = foldText(clean(raw));
+  if (!f) return null;
+  if (/^(sifir|yeni|0)/.test(f)) return 0;
+  const m = f.match(/^(\d{1,3})/);
+  if (m) {
+    const n = Number(m[1]);
+    return n <= 300 ? n : "invalid";
+  }
+  return "invalid";
+}
+
+/**
+ * Portföy türü hücresi bazen kategori yolu olarak gelir ("Emlak > Konut > Satılık > Daire", "Satılık Daire").
+ * Tür için yolun son anlamlı parçası, işlem türü için içindeki "Satılık/Kiralık" kullanılır.
+ */
+function splitCategory(raw: string): string[] {
+  return raw.split(/\s*(?:>|\/|»|›|-)\s*/).map((p) => p.trim()).filter(Boolean);
+}
+
+function propertyTypeFrom(raw: string): string | null {
+  const direct = canonicalFromDefaults("property_type", raw, false);
+  if (direct) return direct;
+  const parts = splitCategory(raw);
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const hit = canonicalFromDefaults("property_type", parts[i]!, false);
+    if (hit) return hit;
+  }
+  // "Satılık Daire" → "Daire"
+  const words = raw.split(/\s+/);
+  for (let i = words.length - 1; i >= 0; i--) {
+    const hit = canonicalFromDefaults("property_type", words.slice(i).join(" "), false);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function transactionFrom(txRaw: string, categoryRaw: string): string | null {
+  // Gevşek kök eşleşmesi ("satış" → Satılık) yalnız işlem türü sütununda; kategori yolunda tam kelime aranır.
+  const direct = txRaw ? canonicalFromDefaults("transaction_type", txRaw, true) : null;
+  if (direct) return direct;
+  for (const src of [txRaw, categoryRaw]) {
+    if (!src) continue;
+    for (const part of [...splitCategory(src), ...src.split(/\s+/)]) {
+      const hit = canonicalFromDefaults("transaction_type", part, false);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+export function validatePropertyRow(r: ImportRow, enrich?: RowEnrichment): { data?: NormalizedProperty; issues: RowIssue[] } {
   const issues: RowIssue[] = [];
   const title = clean(r.title);
   if (!title) return { issues: [{ level: "error", message: "Başlık boş." }] };
@@ -375,18 +570,22 @@ export function validatePropertyRow(r: ImportRow): { data?: NormalizedProperty; 
   } else {
     issues.push({ level: "warning", message: "Fiyat boş; portföy fiyatsız eklenecek." });
   }
-  const sqmRaw = clean(r.sqm);
-  let sqm: number | null = null;
-  if (sqmRaw) {
-    sqm = parseTurkishNumber(sqmRaw);
-    if (sqm === null || sqm <= 0) {
-      issues.push({ level: "warning", message: `m² sayı değil, yok sayıldı: "${sqmRaw}".` });
-      sqm = null;
+  const area = (key: "sqm" | "net_sqm", label: string): number | null => {
+    const raw = clean(r[key]);
+    if (!raw) return null;
+    const n = parseTurkishNumber(raw);
+    if (n === null || n <= 0 || n > 1_000_000) {
+      issues.push({ level: "warning", message: `${label} sayı değil, yok sayıldı: "${raw}".` });
+      return null;
     }
-  }
+    return n;
+  };
+  const sqm = area("sqm", "m²");
+  const netSqm = area("net_sqm", "Net m²");
 
   const txRaw = clean(r.transaction_type);
-  let transaction = canonicalFromDefaults("transaction_type", txRaw, true);
+  const ptRaw = clean(r.property_type);
+  let transaction = transactionFrom(txRaw, ptRaw);
   if (!transaction) {
     transaction = DEFAULT_DEFINITIONS.transaction_type[0].value;
     issues.push({
@@ -396,11 +595,41 @@ export function validatePropertyRow(r: ImportRow): { data?: NormalizedProperty; 
         : `İşlem türü boş; "${transaction}" varsayıldı.`,
     });
   }
-  const ptRaw = clean(r.property_type);
   const propertyType = ptRaw
-    ? (canonicalFromDefaults("property_type", ptRaw, false) ?? ptRaw)
+    ? (propertyTypeFrom(ptRaw) ?? ptRaw)
     : (DEFAULT_DEFINITIONS.property_type.find((d) => d.value === "Diğer")?.value ?? "Diğer");
   if (!ptRaw) issues.push({ level: "warning", message: `Portföy türü boş; "${propertyType}" varsayıldı.` });
+
+  const floorRaw = clean(r.floor);
+  const floor = parseFloorText(floorRaw);
+  if (floor === "invalid") issues.push({ level: "warning", message: `Kat tanınmadı, yok sayıldı: "${floorRaw.slice(0, 40)}".` });
+  const ageRaw = clean(r.building_age);
+  const age = parseBuildingAge(ageRaw);
+  if (age === "invalid") issues.push({ level: "warning", message: `Bina yaşı tanınmadı, yok sayıldı: "${ageRaw.slice(0, 40)}".` });
+
+  const description = clean(r.description).replace(/\r\n/g, "\n");
+  if (description.length > PROPERTY_TEXT_MAX) {
+    issues.push({ level: "warning", message: `Açıklama ${PROPERTY_TEXT_MAX} karakterden uzun; kırpılarak kaydedilir.` });
+  }
+
+  // Malik: telefon geçersizse satır reddedilmez, malik bağı kurulmaz.
+  const ownerName = clean(r.owner_name).slice(0, 120) || null;
+  const ownerPhoneRaw = clean(r.owner_phone);
+  let ownerPhone: string | null = null;
+  if (ownerPhoneRaw) {
+    const p = parsePhoneStrict(ownerPhoneRaw);
+    if (p.ok && p.stored) ownerPhone = p.stored;
+    else issues.push({ level: "warning", message: `Malik telefonu geçersiz, malik bağlanmaz: "${ownerPhoneRaw.slice(0, 40)}".` });
+  } else if (ownerName) {
+    issues.push({ level: "warning", message: "Malik adı var ama telefonu yok; malik bağı için telefon gerekir." });
+  }
+
+  const photos = parsePhotoUrls(r.photo_urls);
+  if (photos.insecure) issues.push({ level: "warning", message: `${photos.insecure} fotoğraf bağlantısı güvenli değil (http); atlandı.` });
+  if (photos.dropped) issues.push({ level: "warning", message: `${photos.dropped} fotoğraf bağlantısı geçersiz ya da sınırın (${PHOTO_URLS_MAX}) üstünde; atlandı.` });
+
+  const portalNo = clean(r.portal_listing_no).replace(/\s+/g, "").slice(0, 40) || null;
+  issues.push(...enrichmentIssues(enrich));
 
   return {
     issues,
@@ -412,8 +641,38 @@ export function validatePropertyRow(r: ImportRow): { data?: NormalizedProperty; 
       rooms: clean(r.rooms) || null,
       sqm,
       address_line: clean(r.address_line) || null,
+      net_sqm: netSqm,
+      floor: floor === "invalid" ? null : floor,
+      building_age: age === "invalid" ? null : age,
+      heating: clean(r.heating).slice(0, 60) || null,
+      description: description ? description.slice(0, PROPERTY_TEXT_MAX) : null,
+      portal_listing_no: portalNo,
+      owner_name: ownerPhone ? ownerName : null,
+      owner_phone: ownerPhone,
+      photo_urls: photos.urls,
+      province_id: enrich?.geo?.provinceId ?? null,
+      district_id: enrich?.geo?.districtId ?? null,
+      neighborhood_id: enrich?.geo?.neighborhoodId ?? null,
+      advisor_id: enrich?.advisorId ?? null,
     },
   };
+}
+
+/** Portföy features'ına dosyadan gelen ek alanlar (boş olanlar yazılmaz; açıklama ayrıca property-description ile). */
+export function importFeatureValues(d: NormalizedProperty): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (d.rooms) out.rooms = d.rooms;
+  if (d.sqm !== null) {
+    out.sqm = d.sqm;
+    out.gross_sqm = d.sqm;
+  }
+  if (d.net_sqm !== null) out.net_sqm = d.net_sqm;
+  if (d.floor !== null) out.floor = d.floor;
+  if (d.building_age !== null) out.building_age = d.building_age;
+  if (d.heating) out.heating = d.heating;
+  if (d.portal_listing_no) out.portal_listing_no = d.portal_listing_no;
+  if (d.photo_urls.length) out.import_photo_urls = d.photo_urls;
+  return out;
 }
 
 export function planPropertyRows(
@@ -421,33 +680,44 @@ export function planPropertyRows(
   existing: Map<string, ExistingProperty>,
   policy: DuplicatePolicy,
   seen: Set<string> = new Set(),
+  enrich?: EnrichmentMap,
 ): PlannedRow<NormalizedProperty>[] {
   return rows.map((r) => {
-    const v = validatePropertyRow(r);
+    const v = validatePropertyRow(r, enrich?.get(r.row));
     if (!v.data) return { row: r.row, status: "error" as const, issues: v.issues };
     const { data, issues } = v;
     const key = propertyKey(data.title, data.address_line);
-    const dupInFile = seen.has(key);
+    const pnKey = data.portal_listing_no ? portalNoKey(data.portal_listing_no) : null;
+    const dupInFile = seen.has(key) || (pnKey !== null && seen.has(pnKey));
     seen.add(key);
+    if (pnKey) seen.add(pnKey);
     if (dupInFile && policy !== "create") {
       return {
         row: r.row,
         status: "skip" as const,
-        issues: [...issues, { level: "warning" as const, message: "Aynı başlık ve adres dosyada daha önce geçiyor." }],
+        issues: [
+          ...issues,
+          { level: "warning" as const, message: pnKey ? "Aynı ilan no veya başlık + adres dosyada daha önce geçiyor." : "Aynı başlık ve adres dosyada daha önce geçiyor." },
+        ],
         data,
         matchedBy: "dosyada önceki satır",
       };
     }
-    const match = existing.get(key);
+    const byNo = pnKey ? existing.get(pnKey) : undefined;
+    const match = byNo ?? existing.get(key);
+    const matchedBy = byNo ? "ilan no" : "başlık + adres";
     if (!match || policy === "create") {
       return { row: r.row, status: "new" as const, issues, data };
     }
-    const base = { row: r.row, issues, data, existingId: match.id, existingName: match.title, matchedBy: "başlık + adres" };
+    const base = { row: r.row, issues, data, existingId: match.id, existingName: match.title, matchedBy };
     if (policy === "skip") {
       return {
         ...base,
         status: "skip" as const,
-        issues: [...issues, { level: "warning" as const, message: "Atlandı (mevcut): aynı başlık ve adres zaten kayıtlı." }],
+        issues: [
+          ...issues,
+          { level: "warning" as const, message: byNo ? "Atlandı (mevcut): bu ilan no zaten kayıtlı." : "Atlandı (mevcut): aynı başlık ve adres zaten kayıtlı." },
+        ],
       };
     }
     const patch: Record<string, unknown> = {};
@@ -457,21 +727,36 @@ export function planPropertyRows(
       prev.list_price = match.list_price;
     }
     const oldFeatures = match.features ?? {};
-    const nextFeatures = { ...oldFeatures };
-    if (data.rooms && data.rooms !== oldFeatures.rooms) nextFeatures.rooms = data.rooms;
-    if (data.sqm !== null && data.sqm !== oldFeatures.sqm) nextFeatures.sqm = data.sqm;
+    const nextFeatures: Record<string, unknown> = { ...oldFeatures };
+    for (const [k, val] of Object.entries(importFeatureValues(data))) {
+      // Bekleyen fotoğraf listesi yalnız yeni kayıtta yazılır (güncellemede galeri elle yönetilir).
+      if (k === "import_photo_urls") continue;
+      if (JSON.stringify(oldFeatures[k]) !== JSON.stringify(val)) nextFeatures[k] = val;
+    }
+    // Açıklama yalnız boşsa doldurulur (elle yazılmış ilan metni ezilmez).
+    if (data.description && !String(oldFeatures.description ?? "").trim()) nextFeatures.description = data.description;
     if (JSON.stringify(nextFeatures) !== JSON.stringify(oldFeatures)) {
       patch.features = nextFeatures;
       prev.features = oldFeatures;
     }
-    if (!Object.keys(patch).length) {
+    // Konum yalnız boşsa doldurulur.
+    if (data.province_id && !match.province_id) {
+      for (const col of ["province_id", "district_id", "neighborhood_id"] as const) {
+        if (data[col] && !match[col]) {
+          patch[col] = data[col];
+          prev[col] = match[col] ?? null;
+        }
+      }
+    }
+    if (!Object.keys(patch).length && !(data.owner_phone && !match.owner_customer_id)) {
       return {
         ...base,
         status: "skip" as const,
         issues: [...issues, { level: "warning" as const, message: "Mevcut kayıtla aynı; güncellenecek alan yok." }],
       };
     }
-    return { ...base, status: "update" as const, patch, prev };
+    const needsOwner = Boolean(data.owner_phone && !match.owner_customer_id);
+    return { ...base, status: "update" as const, patch, prev, ...(needsOwner ? { needsOwner } : {}) };
   });
 }
 
@@ -499,7 +784,7 @@ export const demandKey = (
   c: { transaction_type: string; property_type: string | null; rooms: string | null; budget_max: number | null },
 ) => [customerId, foldText(c.transaction_type), foldText(c.property_type ?? ""), foldText(c.rooms ?? ""), c.budget_max ?? ""].join("|");
 
-export function validateDemandRow(r: ImportRow): { data?: NormalizedDemand; issues: RowIssue[] } {
+export function validateDemandRow(r: ImportRow, enrich?: RowEnrichment): { data?: NormalizedDemand; issues: RowIssue[] } {
   const issues: RowIssue[] = [];
   const phoneRaw = clean(r.customer_phone);
   const email = normalizeEmail(clean(r.customer_email));
@@ -541,8 +826,12 @@ export function validateDemandRow(r: ImportRow): { data?: NormalizedDemand; issu
     rooms: clean(r.rooms),
     min_sqm: numericText(r.min_sqm),
     urgency,
+    demand_province_id: enrich?.geo?.provinceId ?? "",
+    demand_district_id: enrich?.geo?.districtId ?? "",
+    demand_neighborhood_id: enrich?.geo?.neighborhoodId ?? "",
   });
   if (!parsed.ok) return { issues: [{ level: "error", message: parsed.error }] };
+  issues.push(...enrichmentIssues(enrich));
   return {
     issues,
     data: {
@@ -568,9 +857,10 @@ export function planDemandRows(
   existing: Set<string>,
   policy: DuplicatePolicy,
   seen: Set<string> = new Set(),
+  enrich?: EnrichmentMap,
 ): PlannedRow<NormalizedDemand & { customer_id: string }>[] {
   return rows.map((r) => {
-    const v = validateDemandRow(r);
+    const v = validateDemandRow(r, enrich?.get(r.row));
     if (!v.data) return { row: r.row, status: "error" as const, issues: v.issues };
     const { data, issues } = v;
     const match = findCustomerMatch(lookup, data.customer_phone, data.customer_email);

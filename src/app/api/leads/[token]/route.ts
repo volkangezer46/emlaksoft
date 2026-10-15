@@ -197,7 +197,9 @@ export async function POST(
     channel,
     transactionType: bounded(body.transaction_type, 40),
     propertyType: bounded(body.property_type, 80),
-    provinceId: bounded(body.province_id, 64),
+    provinceId: bounded(body.province_id ?? body.il, 64),
+    // Serbest konum ("Kadıköy İstanbul"): sunucuda il/ilçe/mahalleye çözülür (lib/geo/address-resolve).
+    locationText: bounded(body.location ?? body.konum ?? body.district ?? body.city, 200),
     budgetMin: toNumber(body.budget_min),
     budgetMax: toNumber(body.budget_max),
     rooms: bounded(body.rooms, 40),

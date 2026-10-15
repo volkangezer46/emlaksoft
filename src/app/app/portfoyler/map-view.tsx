@@ -20,6 +20,8 @@ export type MapViewProperty = {
   price: string;
   lat: number;
   lng: number;
+  /** Portföyün kendi koordinatı yok; mahalle merkezi gösteriliyor (içi boş iğne). */
+  approx?: boolean;
 };
 
 const TILE = 256;
@@ -201,14 +203,14 @@ export function MapView({
               onClick={() => setActiveId(active ? null : p.id)}
               className="absolute z-10 -translate-x-1/2 -translate-y-full transition-transform hover:scale-110"
               style={{ left: px, top: py }}
-              aria-label={`${p.title} — ${p.price}`}
-              title={p.title}
+              aria-label={`${p.title} — ${p.price}${p.approx ? " (yaklaşık konum)" : ""}`}
+              title={p.approx ? `${p.title} (yaklaşık konum)` : p.title}
             >
               <MapPin
                 className={`h-8 w-8 drop-shadow-md ${active ? "text-mint-600" : "text-brand-600"}`}
-                fill="currentColor"
-                stroke="white"
-                strokeWidth={1.5}
+                fill={p.approx ? "white" : "currentColor"}
+                stroke={p.approx ? "currentColor" : "white"}
+                strokeWidth={p.approx ? 2 : 1.5}
               />
             </button>
           );
@@ -225,6 +227,9 @@ export function MapView({
           >
             <p className="line-clamp-2 text-sm font-bold text-ink-950">{activePoint.title}</p>
             <p className="mt-1 font-display text-base font-extrabold text-brand-600">{activePoint.price}</p>
+            {activePoint.approx ? (
+              <p className="mt-1 text-xs text-text-muted">Yaklaşık konum: mahalle merkezi. Kesin konum için portföyde haritadan işaretleyin.</p>
+            ) : null}
             <Link
               href={`/app/portfoyler/${activePoint.id}`}
               className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline"
@@ -260,6 +265,12 @@ export function MapView({
         <span className="flex items-center gap-1.5 text-text-muted">
           <MapPin className="h-3.5 w-3.5 text-brand-600" />
           {points.length} portföy haritada
+          {points.some((p) => p.approx) ? (
+            <span className="ml-1 inline-flex items-center gap-1 rounded-full bg-canvas px-2 py-0.5 font-semibold text-text-muted">
+              <MapPin className="h-3 w-3 text-brand-600" fill="white" />
+              {points.filter((p) => p.approx).length} yaklaşık (mahalle merkezi)
+            </span>
+          ) : null}
           {missingCount > 0 ? (
             <span className="ml-1 rounded-full bg-amber-400/15 px-2 py-0.5 font-semibold text-amber-600">
               {missingCount} portföyün konumu işaretlenmemiş

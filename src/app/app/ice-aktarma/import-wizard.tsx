@@ -1,7 +1,7 @@
 "use client";
 
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -12,11 +12,13 @@ import {
   FileSpreadsheet,
   FileWarning,
   History,
+  ImageDown,
   KeyRound,
   ListChecks,
   Receipt,
   RefreshCw,
   Search,
+  Sparkles,
   Undo2,
   UploadCloud,
   Users2,
@@ -32,6 +34,7 @@ import {
   type PlannedRowView,
 } from "@/app/actions/import-data";
 import { rollbackImport, type ImportBatch } from "@/app/actions/import-rollback";
+import { importPropertyPhotos } from "@/app/actions/import-photos";
 import {
   buildIssueCsv,
   countPlanned,
@@ -45,7 +48,13 @@ import {
 import {
   buildTemplateCsv,
   decodeCsvBuffer,
+  detectPreset,
+  FIELD_GROUPS,
   fieldsFor,
+  googleContactsToTable,
+  IMPORT_PRESETS,
+  promoteHeaderRow,
+  type ImportPreset,
   guessMapping,
   IMPORT_CHUNK_SIZE,
   IMPORT_MAX_FILE_BYTES,
@@ -61,6 +70,8 @@ import { isLegacyXls, isXlsxFile, readXlsxTable } from "@/lib/xlsx-import";
 import { batches, crossChunkSeen, PREVIEW_BATCH_MAX } from "./preview-parallel";
 import { previewImportChunks } from "./preview-actions";
 import { Combobox } from "@/components/ui/combobox";
+import { isVCardFile, looksLikeVCard, pickedContactsToTable, vcardToTable, type PickedContact } from "@/lib/vcard-import";
+import { ContactPickButton } from "@/components/app/contact-pick-button";
 
 /**
  * Dört adımlı içe aktarma sihirbazı (müşteri / portföy / talep ortak altyapı).
@@ -78,9 +89,9 @@ const ME = "__me__";
 const UNASSIGNED = "__unassigned__";
 
 const TARGETS: { key: ImportTarget; desc: string; icon: typeof Users2 }[] = [
-  { key: "customers", desc: "Ad soyad, telefon, e-posta, tip, kaynak, not", icon: Users2 },
-  { key: "properties", desc: "Başlık, işlem/portföy türü, fiyat, oda, m², adres", icon: Building2 },
-  { key: "demands", desc: "Müşteri telefonu/e-postası ile eşlenen alıcı/kiracı talepleri", icon: Search },
+  { key: "customers", desc: "Ad soyad, telefon, e-posta, etiket, il, danışman. Telefon rehberi (.vcf) ve Google Kişiler dosyası da olur.", icon: Users2 },
+  { key: "properties", desc: "Başlık, fiyat, il/ilçe/mahalle, m², kat, bina yaşı, açıklama, malik, ilan no, fotoğraf bağlantıları", icon: Building2 },
+  { key: "demands", desc: "Müşteri telefonu/e-postası ile eşlenen alıcı/kiracı talepleri (bölge dahil)", icon: Search },
   { key: "tasks", desc: "Görev, son tarih, tür, öncelik; müşteri telefonu ile isteğe bağlı bağ", icon: ListChecks },
   { key: "appointments", desc: "Tarih-saat, randevu türü, konum; müşteri telefonu ile isteğe bağlı bağ", icon: CalendarDays },
   { key: "expenses", desc: "Gider başlığı, tutar, kategori, tarih", icon: Receipt },
@@ -107,7 +118,7 @@ const TARGET_LIST_HREF: Record<ImportTarget, string> = {
 const DUPLICATE_RULE: Record<ImportTarget, string> = {
   rentals: "Portföy kodu ile eşleşir; portföyde aktif kira varsa satır atlanır. Kiracı/malik telefonla aranır, yoksa oluşturulur.",
   customers: "Telefon, yoksa e-posta ile mevcut müşteri aranır.",
-  properties: "Aynı başlık + adres mevcut portföy sayılır.",
+  properties: "Aynı portal ilan no, yoksa aynı başlık + adres mevcut portföy sayılır.",
   demands: "Aynı müşteri için aynı işlem/tür/oda/bütçeli aktif talep mükerrer sayılır.",
   tasks: "Aynı başlık + son tarih + müşteri mevcut görev sayılır.",
   appointments: "Aynı tarih-saat + tür + müşteri mevcut randevu sayılır.",
@@ -128,6 +139,7 @@ const STATUS_STYLE: Record<RowStatus, string> = {
 };
 
 const nf = new Intl.NumberFormat("tr-TR");
+const STEP_LABELS = ["Dosya & hedef", "Kolon eşleme & politika", "Önizleme", "Sonuç"] as const;
 
 function downloadBlob(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime });
@@ -187,6 +199,8 @@ export type ImportWizardProps = {
   rollbackAllowed: Record<ImportTarget, boolean>;
   team: { id: string; name: string }[];
   recent: ImportBatch[];
+  /** Fotoğraf bağlantısı indirilmeyi bekleyen portföyler (yarıda kalan önceki aktarma). */
+  pendingPhotos?: { ids: string[]; urls: number };
 };
 
 export function ImportWizard({
@@ -197,6 +211,7 @@ export function ImportWizard({
   rollbackAllowed,
   team,
   recent,
+  pendingPhotos,
 }: ImportWizardProps) {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -215,7 +230,49 @@ export function ImportWizard({
   const [batchId, setBatchId] = useState("");
   const [rolledBack, setRolledBack] = useState<string>("");
   const [confirmRollback, setConfirmRollback] = useState(false);
+  const [preset, setPreset] = useState<ImportPreset | null>(null);
+  const [photoQueue, setPhotoQueue] = useState<string[]>([]);
+  const [ownersCreated, setOwnersCreated] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const targetAllowed = (t: { key: ImportTarget }) =>
+    t.key === "properties"
+      ? canImportProperties
+      : t.key === "demands"
+        ? canImportDemands
+        : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
+          ? canImportActivity[t.key]
+          : t.key === "rentals"
+            ? canImportActivity.rentals === true
+            : true;
+
+  /** Okunan tablo: başlık satırı düzeltilir, hazır biçim (Google Kişiler, sahibinden) tanınır, hedef ona göre seçilir. */
+  const acceptTable = (table: ParsedCsv, forced?: ImportPreset) => {
+    let t = forced ? table : promoteHeaderRow(table);
+    const p = forced ?? detectPreset(t.headers);
+    if (p?.id === "google-contacts") t = googleContactsToTable(t);
+    if (!t.headers.length || !t.rows.length) {
+      setFileError(forced ? "Seçilen kişilerde ad ya da telefon/e-posta bulunamadı." : "Dosyada başlık satırı veya veri satırı bulunamadı.");
+      return;
+    }
+    if (t.rows.length > IMPORT_ROW_LIMIT) {
+      setFileError(
+        `Dosyada ${nf.format(t.rows.length)} satır var; tek seferde en fazla ${nf.format(IMPORT_ROW_LIMIT)} satır aktarılabilir. Dosyayı bölerek yükleyin.`,
+      );
+      return;
+    }
+    setPreset(p);
+    if (p && targetAllowed({ key: p.target })) setTarget(p.target);
+    setParsed(t);
+  };
+
+  const handlePicked = (contacts: PickedContact[]) => {
+    setFileError("");
+    setParsed(null);
+    setFileName(`Rehberden ${nf.format(contacts.length)} kişi`);
+    const table = pickedContactsToTable(contacts);
+    acceptTable({ headers: table.headers, rows: table.rows, delimiter: "," }, IMPORT_PRESETS["contact-picker"]);
+  };
 
   const fields = fieldsFor(target);
   const effectivePolicy: DuplicatePolicy =
@@ -234,6 +291,9 @@ export function ImportWizard({
     setConfirmRollback(false);
     setBusy(null);
     setProgress(0);
+    setPreset(null);
+    setPhotoQueue([]);
+    setOwnersCreated(0);
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -252,26 +312,28 @@ export function ImportWizard({
       return;
     }
     const excel = isXlsxFile(file);
+    const vcard = isVCardFile(file);
     const reader = new FileReader();
     reader.onload = async () => {
       try {
-        // .xlsx yalnız burada, dinamik olarak okunur (kütüphane sayfa paketine girmez); çıktı CSV ile aynı biçim.
-        const p: ParsedCsv = excel
-          ? await readXlsxTable(reader.result as ArrayBuffer)
-          : parseCsv(decodeCsvBuffer(reader.result as ArrayBuffer));
-        if (!p.headers.length || !p.rows.length) {
-          setFileError("Dosyada başlık satırı veya veri satırı bulunamadı.");
+        if (excel) {
+          // .xlsx yalnız burada, dinamik olarak okunur (kütüphane sayfa paketine girmez); çıktı CSV ile aynı biçim.
+          acceptTable(await readXlsxTable(reader.result as ArrayBuffer));
           return;
         }
-        if (p.rows.length > IMPORT_ROW_LIMIT) {
-          setFileError(
-            `Dosyada ${nf.format(p.rows.length)} satır var; tek seferde en fazla ${nf.format(IMPORT_ROW_LIMIT)} satır aktarılabilir. Dosyayı bölerek yükleyin.`,
-          );
+        const text = decodeCsvBuffer(reader.result as ArrayBuffer);
+        if (vcard || looksLikeVCard(text)) {
+          const t = vcardToTable(text);
+          if (!t.rows.length) {
+            setFileError(t.contacts ? "Rehber dosyasındaki kişilerde ad ya da telefon/e-posta bulunamadı." : "Dosyada kişi kartı (BEGIN:VCARD) bulunamadı.");
+            return;
+          }
+          acceptTable({ headers: t.headers, rows: t.rows, delimiter: "," }, IMPORT_PRESETS.vcard);
           return;
         }
-        setParsed(p);
+        acceptTable(parseCsv(text));
       } catch {
-        setFileError("Dosya okunamadı. Geçerli bir CSV veya Excel (.xlsx) dosyası yükleyin.");
+        setFileError("Dosya okunamadı. Geçerli bir CSV, Excel (.xlsx) ya da rehber (.vcf) dosyası yükleyin.");
       }
     };
     reader.onerror = () => setFileError("Dosya okunamadı. Lütfen tekrar deneyin.");
@@ -369,6 +431,8 @@ export function ImportWizard({
     setStepError("");
     setProgress(0);
     const all: PlannedRowView[] = [];
+    const photos: string[] = [];
+    let owners = 0;
     const parts = chunkRows(mappedRows, IMPORT_CHUNK_SIZE);
     try {
       for (let i = 0; i < parts.length; i++) {
@@ -380,12 +444,16 @@ export function ImportWizard({
           break;
         }
         all.push(...res.rows);
+        if (res.photoQueue?.length) photos.push(...res.photoQueue);
+        owners += res.ownersCreated ?? 0;
         setProgress(Math.round(((i + 1) / parts.length) * 100));
       }
     } catch {
       setStepError("İçe aktarma sırasında bağlantı hatası oluştu. İşlenen kısım günlükte görünür; geri alabilirsiniz.");
     }
     setPlanned(all);
+    setPhotoQueue(photos);
+    setOwnersCreated(owners);
     setBusy(null);
     setStep(4);
     router.refresh();
@@ -453,15 +521,30 @@ export function ImportWizard({
   return (
     <div className="space-y-5">
       {/* adım göstergesi */}
-      <div className="flex flex-wrap items-center gap-4 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3">
-        {stepBadge(1, "Dosya & hedef")}
-        <span className="h-px w-8 bg-line" />
-        {stepBadge(2, "Kolon eşleme & politika")}
-        <span className="h-px w-8 bg-line" />
-        {stepBadge(3, "Önizleme")}
-        <span className="h-px w-8 bg-line" />
-        {stepBadge(4, "Sonuç")}
-      </div>
+      <nav aria-label="İçe aktarma adımları" className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3">
+        {/* Mobil: tek satır "Adım 2/4 · Kolon eşleme" + ilerleme çubuğu; geniş ekran: dört rozet. */}
+        <div className="sm:hidden">
+          <p className="text-xs font-semibold text-ink-950">
+            Adım {step}/4 · {STEP_LABELS[step - 1]}
+          </p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-canvas">
+            <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${(step / 4) * 100}%` }} />
+          </div>
+        </div>
+        <div className="hidden flex-wrap items-center gap-4 sm:flex">
+          {stepBadge(1, STEP_LABELS[0])}
+          <span className="h-px w-8 bg-line" />
+          {stepBadge(2, STEP_LABELS[1])}
+          <span className="h-px w-8 bg-line" />
+          {stepBadge(3, STEP_LABELS[2])}
+          <span className="h-px w-8 bg-line" />
+          {stepBadge(4, STEP_LABELS[3])}
+        </div>
+      </nav>
+
+      {step === 1 && pendingPhotos && pendingPhotos.ids.length > 0 ? (
+        <PhotoImporter ids={pendingPhotos.ids} totalUrls={pendingPhotos.urls} autoStart={false} resume />
+      ) : null}
 
       {/* ADIM 1 — dosya + hedef */}
       {step === 1 && (
@@ -472,16 +555,7 @@ export function ImportWizard({
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               {TARGETS.map((t) => {
                 const active = target === t.key;
-                const allowed =
-                  t.key === "properties"
-                    ? canImportProperties
-                    : t.key === "demands"
-                      ? canImportDemands
-                      : t.key === "tasks" || t.key === "appointments" || t.key === "expenses"
-                        ? canImportActivity[t.key]
-                        : t.key === "rentals"
-                          ? canImportActivity.rentals === true
-                          : true;
+                const allowed = targetAllowed(t);
                 return (
                   <button
                     key={t.key}
@@ -539,7 +613,7 @@ export function ImportWizard({
           </div>
 
           <div>
-            <h2 className="font-display font-bold text-ink-950">2. CSV dosyası yükleyin</h2>
+            <h2 className="font-display font-bold text-ink-950">2. Dosya yükleyin</h2>
             <p className="text-xs text-text-muted">
               Virgül veya noktalı virgül ayraçlı CSV desteklenir; ayraç ve Türkçe karakter kodlaması
               (UTF-8 / Windows-1254) otomatik algılanır. En fazla {nf.format(IMPORT_ROW_LIMIT)} satır; büyük dosyalar
@@ -553,12 +627,16 @@ export function ImportWizard({
                 <li>Oluşan .csv dosyasını aşağıdan yükleyin. Excel çalışma kitabı (.xlsx) doğrudan da yüklenebilir (ilk sayfa okunur); eski .xls yüklenemez.</li>
               </ol>
               <p className="mt-1.5">Kolonları nasıl düzenleyeceğinizi görmek için aşağıdaki örnek şablonlardan birini indirin.</p>
+              <p className="mt-1.5">
+                <span className="font-semibold text-ink-950">Hazır biçimler:</span> sahibinden.com mağaza Excel&apos;i, Google Kişiler
+                CSV&apos;si ve telefon rehberi (.vcf) dosyası doğrudan tanınır; sütunlar otomatik eşlenir.
+              </p>
             </div>
             <label className="mt-3 block cursor-pointer rounded-[var(--radius-card)] border border-dashed border-line-strong bg-canvas px-6 py-10 text-center transition hover:border-brand-400">
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.vcf,.vcard,text/vcard,text/x-vcard"
                 className="sr-only"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
@@ -566,9 +644,15 @@ export function ImportWizard({
                 }}
               />
               <UploadCloud className="mx-auto h-8 w-8 text-brand-600" />
-              <p className="mt-2 text-sm font-semibold text-ink-950">{fileName || "CSV veya Excel (.xlsx) dosyası seçmek için tıklayın"}</p>
-              <p className="mt-1 text-xs text-text-faint">.csv veya .xlsx (ilk sayfa; ilk satır başlık)</p>
+              <p className="mt-2 text-sm font-semibold text-ink-950">{fileName || "Dosya seçmek için dokunun"}</p>
+              <p className="mt-1 text-xs text-text-faint">.csv, .xlsx (ilk sayfa) veya telefon rehberi .vcf</p>
             </label>
+            <ContactPickButton
+              multiple
+              onPick={handlePicked}
+              label="Telefon rehberinden kişi seç"
+              className="mt-3"
+            />
             {fileError ? (
               <p className="mt-2 flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs text-danger-600" role="alert">
                 <FileWarning className="mt-0.5 h-4 w-4 shrink-0" /> {fileError}
@@ -576,11 +660,13 @@ export function ImportWizard({
             ) : null}
             {parsed ? (
               <p className="mt-2 flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
-                <CheckCircle2 className="h-4 w-4" />
-                {nf.format(parsed.rows.length)} veri satırı, {parsed.headers.length} kolon okundu
-                (ayraç: {parsed.delimiter === ";" ? "noktalı virgül" : "virgül"}).
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                {preset?.target === "customers" && (preset.id === "vcard" || preset.id === "contact-picker")
+                  ? `${nf.format(parsed.rows.length)} kişi okundu.`
+                  : `${nf.format(parsed.rows.length)} veri satırı, ${parsed.headers.length} kolon okundu${parsed.delimiter === ";" ? " (ayraç: noktalı virgül)" : ""}.`}
               </p>
             ) : null}
+            {parsed && preset ? <PresetNote preset={preset} target={target} /> : null}
           </div>
 
           {/* şablonlar */}
@@ -617,8 +703,18 @@ export function ImportWizard({
             </p>
           </div>
 
+          {(FIELD_GROUPS[target] ?? [{ label: "", keys: fields.map((f) => f.key) }]).map((group) => (
+          <div key={group.label || "all"} className="space-y-2">
+          {group.label ? (
+            <h3 className="text-xs font-bold uppercase tracking-wide text-text-muted">
+              {group.label}
+              <span className="ml-2 font-semibold normal-case tracking-normal text-text-faint">
+                {group.keys.filter((k) => mapping[k] !== undefined).length}/{group.keys.length} eşlendi
+              </span>
+            </h3>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {fields.map((f) => (
+            {fields.filter((f) => group.keys.includes(f.key)).map((f) => (
               <FormField
                 key={f.key}
                 label={f.label}
@@ -649,6 +745,14 @@ export function ImportWizard({
               </FormField>
             ))}
           </div>
+          </div>
+          ))}
+          {target === "properties" && (mapping.photo_urls !== undefined || mapping.owner_phone !== undefined) ? (
+            <p className="rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
+              {mapping.owner_phone !== undefined ? "Malik telefonu kayıtlı bir müşteriyle eşleşirse ona bağlanır; yoksa adıyla \"Mülk sahibi\" müşteri açılır. " : ""}
+              {mapping.photo_urls !== undefined ? "Fotoğraf bağlantıları (yalnız https) aktarımdan sonra galeriye indirilir; bu sırada sayfayı açık tutun." : ""}
+            </p>
+          ) : null}
           {demandKeyMissing ? (
             <p className="flex items-start gap-2 rounded-[var(--radius-card)] border border-danger-500/30 bg-danger-500/5 px-3 py-2.5 text-xs text-danger-600" role="alert">
               <FileWarning className="mt-0.5 h-4 w-4 shrink-0" />
@@ -768,6 +872,7 @@ export function ImportWizard({
                       <TD className="px-3 py-2"><StatusBadge status={r.status} /></TD>
                       <TD className="max-w-56 truncate px-3 py-2 text-ink-950">
                         {r.label || <span className="text-text-faint">—</span>}
+                        {r.location ? <span className="block truncate text-text-muted">{r.location}</span> : null}
                         {r.existingName ? <span className="block text-text-faint">eşleşen: {r.existingName} ({r.matchedBy})</span> : null}
                       </TD>
                       <TD className="px-3 py-2 text-text-muted">
@@ -797,7 +902,7 @@ export function ImportWizard({
                     type="button"
                     aria-pressed={filter === k}
                     onClick={() => setFilter(k)}
-                    className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                    className={`focus-ring rounded-full border px-3 py-1 text-xs font-semibold transition touch:min-h-11 ${
                       filter === k ? "border-brand-400 bg-brand-600/[0.08] text-brand-600" : "border-line bg-canvas text-text-muted hover:border-brand-300"
                     }`}
                   >
@@ -882,6 +987,13 @@ export function ImportWizard({
                 <p className="text-xs text-text-muted">{fileName} · {TARGET_LABEL[target]}</p>
               </div>
               <CounterCards c={counters} labels={["Eklendi", "Güncellendi", "Atlandı", "Hatalı"]} />
+              {ownersCreated > 0 ? (
+                <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-canvas px-3 py-2.5 text-xs text-text-muted">
+                  <Users2 className="h-4 w-4 shrink-0 text-brand-600" />
+                  Dosyadaki malikler için {nf.format(ownersCreated)} yeni &quot;Mülk sahibi&quot; müşteri açıldı ve portföylere bağlandı.
+                </p>
+              ) : null}
+              {photoQueue.length > 0 && !rolledBack ? <PhotoImporter ids={photoQueue} autoStart /> : null}
 
               {rolledBack ? (
                 <p className="flex items-center gap-2 rounded-[var(--radius-card)] border border-mint-500/25 bg-mint-500/5 px-3 py-2.5 text-xs font-semibold text-mint-600">
@@ -1079,5 +1191,124 @@ function ImportJournal({
         &quot;güncelle&quot; ile değişenleri eski değerine döndürür. Sonradan elle yapılan değişiklikler de kaybolur.
       </p>
     </section>
+  );
+}
+
+/** Tanınan hazır biçim bildirimi (+ rehber aktarımında KVKK aydınlatma hatırlatması). */
+function PresetNote({ preset, target }: { preset: ImportPreset; target: ImportTarget }) {
+  const contacts = preset.id === "vcard" || preset.id === "contact-picker" || preset.id === "google-contacts";
+  return (
+    <div className="mt-2 space-y-1.5 rounded-[var(--radius-card)] border border-brand-300/50 bg-brand-600/[0.04] px-3 py-2.5 text-xs text-text-muted">
+      <p className="flex items-start gap-2">
+        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden="true" />
+        <span>
+          <span className="font-semibold text-ink-950">{preset.label} tanındı.</span> {preset.note}
+          {preset.target !== target ? ` Hedef olarak "${TARGET_LABEL[preset.target]}" seçmeniz önerilir.` : ""}
+        </span>
+      </p>
+      {contacts ? (
+        <p className="pl-6">
+          KVKK: Rehberdeki kişileri müşteri olarak kaydetmeden önce kişilerin aydınlatıldığından emin olun. Kayıtların kaynağı
+          &quot;İçe aktarma&quot; olarak işaretlenir; telefonu kayıtlı kişiler varsayılan olarak atlanır.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Fotoğraf bağlantılarını galeriye indirir: portföy portföy `importPropertyPhotos` (çağrı başına birkaç bağlantı)
+ * çağrılır; durdurulabilir, kaldığı yerden devam eder (bekleyen liste portföyde saklanır).
+ */
+function PhotoImporter({ ids, totalUrls, autoStart, resume = false }: { ids: string[]; totalUrls?: number; autoStart: boolean; resume?: boolean }) {
+  const [running, setRunning] = useState(false);
+  const [doneProps, setDoneProps] = useState(0);
+  const [added, setAdded] = useState(0);
+  const [failed, setFailed] = useState(0);
+  const [error, setError] = useState("");
+  const [finished, setFinished] = useState(false);
+  const stopRef = useRef(false);
+  const cursor = useRef(0);
+  const started = useRef(false);
+
+  const run = async () => {
+    stopRef.current = false;
+    setRunning(true);
+    setError("");
+    while (cursor.current < ids.length && !stopRef.current) {
+      const id = ids[cursor.current]!;
+      let res;
+      try {
+        res = await importPropertyPhotos(id);
+      } catch {
+        setError("Bağlantı koptu; devam etmek için yeniden başlatın.");
+        break;
+      }
+      setAdded((n) => n + (res.added ?? 0));
+      setFailed((n) => n + (res.failed ?? 0));
+      if (res.error) {
+        setError(`${res.error} Birkaç dakika sonra "Devam et" ile kaldığı yerden sürdürebilirsiniz.`);
+        break;
+      }
+      if ((res.remaining ?? 0) === 0) {
+        cursor.current += 1;
+        setDoneProps(cursor.current);
+      }
+    }
+    if (cursor.current >= ids.length) setFinished(true);
+    setRunning(false);
+  };
+
+  useEffect(() => {
+    if (!autoStart || started.current) return;
+    started.current = true;
+    // Aktarma biter bitmez arka arkaya indirme başlar (kullanıcı durdurabilir).
+    const t = setTimeout(() => void run(), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
+
+  const pct = ids.length ? Math.round((doneProps / ids.length) * 100) : 100;
+  return (
+    <div className="space-y-2 rounded-[var(--radius-card)] border border-line bg-surface p-4" role="status" aria-live="polite">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-600">
+            <ImageDown className="h-4.5 w-4.5" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink-950">
+              {finished
+                ? "Fotoğraflar galeriye aktarıldı"
+                : resume
+                  ? `${nf.format(ids.length)} portföyde bekleyen fotoğraf var${totalUrls ? ` (${nf.format(totalUrls)} bağlantı)` : ""}`
+                  : `Fotoğraflar indiriliyor: ${nf.format(doneProps)}/${nf.format(ids.length)} portföy`}
+            </p>
+            <p className="text-xs text-text-muted">
+              {nf.format(added)} fotoğraf eklendi
+              {failed ? ` · ${nf.format(failed)} bağlantı indirilemedi (erişilemeyen ya da görsel olmayan)` : ""}
+              {!finished && running ? " · sayfayı açık tutun" : ""}
+            </p>
+          </div>
+        </div>
+        {finished ? null : running ? (
+          <Button variant="secondary" size="sm" onClick={() => (stopRef.current = true)}>
+            Duraklat
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => void run()}>
+            <ImageDown className="h-3.5 w-3.5" /> {doneProps > 0 || error ? "Devam et" : "Fotoğrafları indir"}
+          </Button>
+        )}
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
+        <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      {error ? (
+        <p className="text-xs text-danger-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }

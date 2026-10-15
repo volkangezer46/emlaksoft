@@ -193,3 +193,97 @@ describe("yardımcılar", () => {
     expect(lines[1]).toBe('2;Hatalı;"Telefon ""123"" geçersiz";Ali;123');
   });
 });
+
+describe("portföy alan genişletmesi (PUB-4)", () => {
+  it("kat, bina yaşı, fotoğraf bağlantısı ve etiket ayrıştırıcıları", async () => {
+    const { parseFloorText, parseBuildingAge, parsePhotoUrls, parseTagList } = await import("./import-rows");
+    expect(parseFloorText("3")).toBe(3);
+    expect(parseFloorText("3. Kat")).toBe(3);
+    expect(parseFloorText("Yüksek Giriş")).toBe(0);
+    expect(parseFloorText("Kot 2")).toBe(-2);
+    expect(parseFloorText("Villa katı")).toBe("invalid");
+    expect(parseFloorText("")).toBeNull();
+    expect(parseBuildingAge("Sıfır")).toBe(0);
+    expect(parseBuildingAge("5-10 arası")).toBe(5);
+    expect(parseBuildingAge("eski")).toBe("invalid");
+    expect(parsePhotoUrls("https://a.com/1.jpg; http://b.com/2.jpg | bozuk https://a.com/1.jpg")).toEqual({ urls: ["https://a.com/1.jpg"], dropped: 1, insecure: 1 });
+    expect(parseTagList("* myContacts ::: Alıcı; alici, Yatırımcı")).toEqual(["Alıcı", "Yatırımcı"]);
+  });
+
+  it("kategori yolundan işlem + tür, konum/danışman bağlamı, malik ve açıklama", () => {
+    const v = validatePropertyRow(
+      {
+        row: 2,
+        title: "Moda 3+1",
+        list_price: "4.500.000",
+        property_type: "Emlak > Konut > Satılık > Daire",
+        net_sqm: "110",
+        floor: "Bahçe Katı",
+        owner_name: "Ali Kaya",
+        owner_phone: "0532 123 45 67",
+        description: "Deniz manzaralı",
+        portal_listing_no: "12 345",
+      },
+      { geo: { provinceId: "p", districtId: "d", neighborhoodId: null, label: "Kadıköy / İstanbul", issue: "Mahalle çözülemedi." }, advisorId: "u1" },
+    );
+    expect(v.data).toMatchObject({
+      transaction_type: "Satılık",
+      property_type: "Daire",
+      net_sqm: 110,
+      floor: 0,
+      owner_phone: "05321234567",
+      owner_name: "Ali Kaya",
+      description: "Deniz manzaralı",
+      portal_listing_no: "12345",
+      province_id: "p",
+      district_id: "d",
+      advisor_id: "u1",
+    });
+    expect(v.issues.map((i) => i.message)).toContain("Konum: Mahalle çözülemedi.");
+  });
+
+  it("geçersiz malik telefonu satırı reddetmez, malik bağlanmaz", () => {
+    const v = validatePropertyRow({ row: 2, title: "X", list_price: "1", owner_name: "A", owner_phone: "12" });
+    expect(v.data?.owner_phone).toBeNull();
+    expect(v.issues.some((i) => /Malik telefonu geçersiz/.test(i.message))).toBe(true);
+  });
+
+  it("portal ilan no ile mükerrer: başlık değişse de mevcut kayıt bulunur; update yalnız boş konumu doldurur", async () => {
+    const { portalNoKey } = await import("./import-rows");
+    const existing: ExistingProperty = {
+      id: "p1",
+      title: "Eski başlık",
+      address_line: null,
+      list_price: 100,
+      features: { portal_listing_no: "999" },
+      province_id: null,
+      district_id: null,
+      neighborhood_id: null,
+      owner_customer_id: null,
+    };
+    const map = new Map([[portalNoKey("999"), existing]]);
+    const enrich = new Map([[2, { geo: { provinceId: "p", districtId: "d", neighborhoodId: null, label: "" } }]]);
+    const [skip] = planPropertyRows([{ row: 2, title: "Yeni başlık", list_price: "100", portal_listing_no: "999" }], map, "skip", new Set(), enrich);
+    expect(skip).toMatchObject({ status: "skip", existingId: "p1", matchedBy: "ilan no" });
+    const [upd] = planPropertyRows([{ row: 2, title: "Yeni başlık", list_price: "100", portal_listing_no: "999", owner_phone: "05321234567", owner_name: "A" }], map, "update", new Set(), enrich);
+    expect(upd).toMatchObject({ status: "update", needsOwner: true, patch: { province_id: "p", district_id: "d" }, prev: { province_id: null, district_id: null } });
+  });
+
+  it("müşteri: etiketler ve il bağlamı; güncellemede mevcut il ezilmez", () => {
+    const v = validateCustomerRow({ row: 2, full_name: "A", phone: "05321234567", tags: "VIP; Kadıköy" }, { geo: { provinceId: "p", districtId: null, neighborhoodId: null, label: "" } });
+    expect(v.data).toMatchObject({ tags: ["VIP", "Kadıköy"], province_id: "p" });
+    const [planned] = planCustomerRows(
+      [{ row: 2, full_name: "Ayşe Yılmaz", phone: "05321234567", tags: "VIP" }],
+      buildCustomerLookup([{ ...existingAyse, tags: ["Eski"], province_id: "x" }]),
+      "update",
+      new Set(),
+      new Map([[2, { geo: { provinceId: "p", districtId: null, neighborhoodId: null, label: "" } }]]),
+    );
+    expect(planned.patch).toEqual({ tags: ["Eski", "VIP"] });
+  });
+
+  it("talep: bölge bağlamı talep sütunlarına yazılır", () => {
+    const v = validateDemandRow({ row: 2, customer_phone: "05321234567", transaction_type: "Satılık" }, { geo: { provinceId: "p", districtId: "d", neighborhoodId: "n", label: "" } });
+    expect(v.data?.columns).toMatchObject({ province_id: "p", district_id: "d", neighborhood_id: "n" });
+  });
+});
