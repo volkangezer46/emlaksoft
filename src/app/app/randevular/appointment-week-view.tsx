@@ -128,6 +128,8 @@ export function AppointmentWeekView({
           dayHref={dayHref}
           newHref={newHref}
           nowMs={now()}
+          canEdit={canEdit}
+          canEditTasks={canEditTasks}
         />
       </div>
 

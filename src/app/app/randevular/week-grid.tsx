@@ -31,6 +31,8 @@ export type WeekViewAppointment = {
   location: string | null;
   /** Sürükle-bırak kaydı mevcut notu korur (eylem notu formdan yazar). */
   notes: string | null;
+  /** Mobil ajandada sola kaydırma: müşteriye hazır teyit mesajı (wa.me); yoksa null. */
+  confirmWaHref?: string | null;
 };
 
 /** GA-03: saatli açık görev (ajandada randevularla birlikte). */

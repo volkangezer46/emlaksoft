@@ -3,6 +3,7 @@ import { CheckSquare, Plus } from "lucide-react";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { formatTrTime, trDayKey } from "@/lib/clock";
 import type { WeekGridDay, WeekViewAppointment, WeekViewTask } from "./week-grid";
+import { ApptSwipe, TaskSwipe } from "./agenda-swipe";
 
 const TYPE_DOT: Record<string, string> = {
   showing: "bg-brand-600",
@@ -18,7 +19,8 @@ type Item =
 /**
  * GA-03 mobil ajanda (<640 px; sunucu bileşeni): hafta/gün saat ızgarası yerine randevular ve saatli görevler TEK
  * akışta, saat sırasıyla. Hafta görünümünde üstte 7 günlük şerit (sayılı, dokununca o günün ajandası). Bugünde "Şimdi"
- * çizgisi; boş günde "+ Randevu ekle". Her satır kaydın kendisini açar (`?randevu=` / `?gorev=`).
+ * çizgisi; boş günde "+ Randevu ekle". Her satır kaydın kendisini açar (`?randevu=` / `?gorev=`). GA-10: dokunmatikte
+ * satır kaydırılır (randevu: sağa tamamla / sola teyit; görev: sağa tamamla / sola yarın).
  */
 export function AgendaList({
   mode,
@@ -28,6 +30,8 @@ export function AgendaList({
   dayHref,
   newHref,
   nowMs,
+  canEdit = false,
+  canEditTasks = false,
 }: {
   mode: "hafta" | "gun";
   days: WeekGridDay[];
@@ -36,6 +40,8 @@ export function AgendaList({
   dayHref: (dayKey: string) => string;
   newHref: string | null;
   nowMs: number;
+  canEdit?: boolean;
+  canEditTasks?: boolean;
 }) {
   const itemsByDay = new Map<string, Item[]>();
   for (const a of appointments) {
@@ -100,7 +106,19 @@ export function AgendaList({
                 {items.map((item, i) => (
                   <li key={`${item.kind}-${item.kind === "appt" ? item.appt.id : item.task.id}`}>
                     {i === nowIndex ? <NowLine /> : null}
-                    {item.kind === "appt" ? <ApptRow a={item.appt} /> : <TaskRow t={item.task} />}
+                    {item.kind === "appt" ? (
+                      <ApptSwipe
+                        id={item.appt.id}
+                        canComplete={canEdit && item.appt.status !== "completed" && item.appt.status !== "cancelled"}
+                        waHref={item.appt.confirmWaHref ?? null}
+                      >
+                        <ApptRow a={item.appt} />
+                      </ApptSwipe>
+                    ) : (
+                      <TaskSwipe id={item.task.id} canEdit={canEditTasks}>
+                        <TaskRow t={item.task} />
+                      </TaskSwipe>
+                    )}
                   </li>
                 ))}
                 {d.isToday && nowIndex === -1 ? (

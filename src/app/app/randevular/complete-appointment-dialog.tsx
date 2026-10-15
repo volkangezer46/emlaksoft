@@ -37,15 +37,18 @@ export function CompleteAppointmentDialog({
   customerName,
   customerId = null,
   propertyId = null,
+  defaultOpen = false,
 }: {
   appointmentId: string;
   customerName: string;
   customerId?: string | null;
   propertyId?: string | null;
+  /** `?randevu=<id>&tamamla=1` (mobil ajandada sağa kaydırma): panel açık gelir. */
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
   const { push } = useToast();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [outcome, setOutcome] = useState<AppointmentOutcome | "">("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();

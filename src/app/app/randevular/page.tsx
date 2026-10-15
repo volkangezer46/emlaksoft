@@ -139,6 +139,7 @@ export default async function AppointmentsPage({
     yeni?: string;
     randevu?: string;
     sonuc?: string;
+    tamamla?: string;
   }>;
 }) {
   const gate = await requireModulePage("appointments");
@@ -510,6 +511,21 @@ export default async function AppointmentsPage({
       propertyName: p?.title || p?.property_code || null,
       location: r.location,
       notes: r.notes,
+      // Mobil ajandada sola kaydırma: hazır teyit mesajı (yalnız bekleyen/onaylı randevuda).
+      confirmWaHref:
+        c?.phone && (r.status === "pending" || r.status === "confirmed")
+          ? appointmentWhatsAppHref(
+              c.phone,
+              appointmentCustomerText({
+                kind: "confirm",
+                customerName: c.full_name ?? null,
+                officeName: (officeRow as { name?: string | null } | null)?.name ?? null,
+                appointmentType: r.appointment_type,
+                scheduledAt: r.scheduled_at,
+                confirmUrl: appointmentConfirmUrl(getBaseUrl(), r.confirm_token),
+              }),
+            )
+          : null,
     };
   });
   const agendaTasks: WeekViewTask[] = ((agendaTaskRows ?? []) as { id: string; title: string; due_at: string; customer: Rel }[]).map((t) => ({
@@ -649,6 +665,7 @@ export default async function AppointmentsPage({
     return {
       id: appt.id,
       focused: appt.id === randevuF,
+      completeOpen: appt.id === randevuF && sp.tamamla === "1" && appt.status !== "completed" && appt.status !== "cancelled",
       status: appt.status,
       dateLabel: new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date),
       timeLabel: formatTrTime(date),
