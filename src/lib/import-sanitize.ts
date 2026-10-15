@@ -6,7 +6,7 @@ import type { ImportRow } from "@/lib/import-rows";
  * İçe aktarmada bu hücreler `'` önekiyle saklanır ve satıra uyarı eklenir (veri reddedilmez).
  * Telefon/e-posta/sayı alanları kendi doğrulayıcılarından geçtiği için burada dokunulmaz.
  */
-export const FORMULA_TEXT_FIELDS = ["full_name", "notes", "title", "address_line", "source"] as const;
+export const FORMULA_TEXT_FIELDS = ["full_name", "notes", "title", "address_line", "source", "description", "owner_name", "heating", "tags"] as const;
 
 const FORMULA_PREFIX = /^[=+\-@\t\r]/;
 

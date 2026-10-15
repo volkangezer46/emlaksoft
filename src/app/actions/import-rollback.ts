@@ -262,6 +262,17 @@ export async function rollbackImport(batchId: string): Promise<RollbackResult> {
   }
 
   const removeRes = await removeCreated(supabase, { target, tenantId: gate.tenantId, ids: createdIds, checkLinks: true });
+  // Portföy aktarımında dosyadaki malik için açılan müşteriler de kaldırılır (bağlı iş verisi olan dokunulmadan kalır).
+  const ownerIds =
+    target === "properties"
+      ? [...new Set(imports.flatMap((r) => ((r.new_value ?? {}).created_owner_ids as string[] | undefined) ?? []))].filter((id) => UUID_RE.test(id))
+      : [];
+  if (ownerIds.length && (await requirePermission("customers", "delete")).ok) {
+    const ownerRes = await removeCreated(supabase, { target: "customers", tenantId: gate.tenantId, ids: ownerIds, checkLinks: true });
+    removeRes.removed += ownerRes.removed;
+    removeRes.skippedLinked += ownerRes.skippedLinked;
+    removeRes.failed += ownerRes.failed;
+  }
   const restoreRes = firstPrev.size
     ? await restoreUpdated(supabase, { target, tenantId: gate.tenantId, entries: [...firstPrev.values()] })
     : { restored: 0, skippedEdited: 0, failed: 0 };

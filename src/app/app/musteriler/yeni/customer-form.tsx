@@ -29,6 +29,7 @@ import { EmailInput } from "@/components/ui/email-input";
 import { DuplicateHint } from "@/components/app/duplicate-hint";
 import { CUSTOMER_DRAFT_FIELDS, CUSTOMER_FORM_ID, CUSTOMER_TABS } from "./customer-tabs";
 import { Combobox } from "@/components/ui/combobox";
+import { ContactFill } from "./contact-fill";
 
 type Province = { id: string; name: string };
 type Branch = { id: string; name: string };
@@ -139,6 +140,7 @@ export function CustomerForm({
   const tabPanels = {
     kisi: (
       <>
+        <ContactFill phoneInputId="customer-phone" />
         <FormField label="Ad soyad" htmlFor="full_name" required className="sm:col-span-2">
           <FormInput name="full_name" required placeholder="Örn. Ali Kaya" />
         </FormField>

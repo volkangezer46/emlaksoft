@@ -11,7 +11,7 @@ import { GEO_CACHE_TAG, type GeoLevel, type GeoResolution, type GeoResolveInput,
  * yoksa (migration uygulanmadı) BOŞ döner; çözümleme bugünkü gibi çalışır.
  * `valid_to` geçmiş olsa bile eski ad çözülür (eski kayıtlar bulunabilsin).
  */
-const loadAliases = unstable_cache(
+export const loadGeoAliases = unstable_cache(
   async (): Promise<Record<GeoLevel, MatchAlias[]>> => {
     const out: Record<GeoLevel, MatchAlias[]> = { province: [], district: [], neighborhood: [] };
     try {
@@ -46,7 +46,7 @@ export async function resolveGeo(input: GeoResolveInput): Promise<GeoResolution>
   const neighText = (input.neighborhood ?? "").trim();
   if (!provText && !distText && !neighText) return { status: "unmatched", reason: "Bölge bilgisi boş." };
 
-  const [provinces, districts, aliases] = await Promise.all([getProvinces({ includeInactive: true }), getAllDistricts(), loadAliases()]);
+  const [provinces, districts, aliases] = await Promise.all([getProvinces({ includeInactive: true }), getAllDistricts(), loadGeoAliases()]);
   let geo: ResolvedGeo = { ...EMPTY };
   let via: "exact" | "alias" | "fuzzy" = "exact";
   const bump = (v: "exact" | "alias" | "fuzzy") => {

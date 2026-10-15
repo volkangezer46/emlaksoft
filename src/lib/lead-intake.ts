@@ -12,6 +12,7 @@ import { dispatchAutomationEvent } from "@/lib/automation-engine";
 import { SALES_ASSIGNEE_ROLES } from "@/lib/team/assignable-roles";
 import { withinBusinessHours } from "@/lib/lead-routing/logic";
 import { loadLeadListing, listingContextLine } from "@/lib/lead-listing";
+import { resolveAddressText } from "@/lib/geo/address-resolve-server";
 
 export type LeadInput = {
   fullName: string;
@@ -23,6 +24,11 @@ export type LeadInput = {
   transactionType?: string;
   propertyType?: string;
   provinceId?: string;
+  /**
+   * Serbest konum metni ("Kadıköy İstanbul", "Moda, Kadıköy"): il/ilçe/mahalleye çözülür (address-resolve). Formlar
+   * il kimliği yerine il ADI ya da plaka da gönderebilir (`provinceId` alanında); o da aynı adımda çözülür.
+   */
+  locationText?: string;
   budgetMin?: number | null;
   budgetMax?: number | null;
   rooms?: string;
@@ -162,6 +168,36 @@ export async function createRoutedLeadCustomer(
   return { ok: true, customerId: created.id as string, assignedTo, routing };
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type LeadLocation = { provinceId: string | null; districtId: string | null; neighborhoodId: string | null };
+
+/**
+ * Başvurunun konumu: il kimliği geldiyse aynen; il adı/plaka ya da serbest konum metni geldiyse coğrafya merkezinden
+ * çözülür (belirsizse boş kalır — tahmin yok). Çözüm hatası başvuruyu ASLA düşürmez.
+ */
+export async function resolveLeadLocation(input: Pick<LeadInput, "provinceId" | "locationText">): Promise<LeadLocation> {
+  const prov = (input.provinceId ?? "").trim();
+  const text = (input.locationText ?? "").trim().slice(0, 200);
+  const empty: LeadLocation = { provinceId: null, districtId: null, neighborhoodId: null };
+  if (UUID_RE.test(prov) && !text) return { ...empty, provinceId: prov };
+  if (!prov && !text) return empty;
+  try {
+    const r = await resolveAddressText({ province: UUID_RE.test(prov) ? null : prov || null, text });
+    const g = r.geo;
+    // İl kimliği verildiyse metinden çıkan ilçe yalnız o ile aitse kullanılır.
+    if (UUID_RE.test(prov) && g.provinceId && g.provinceId !== prov) return { ...empty, provinceId: prov };
+    return {
+      provinceId: g.provinceId ?? (UUID_RE.test(prov) ? prov : null),
+      districtId: g.districtId,
+      neighborhoodId: g.neighborhoodId,
+    };
+  } catch (e) {
+    console.error("intakeLead konum çözümü", e instanceof Error ? e.message : "unknown");
+    return UUID_RE.test(prov) ? { ...empty, provinceId: prov } : empty;
+  }
+}
+
 export async function intakeLead(token: string, input: LeadInput): Promise<LeadResult> {
   const fullName = input.fullName?.trim();
   if (!fullName) return { ok: false, error: "Ad soyad zorunlu.", status: 400 };
@@ -191,6 +227,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
 
   const tenantId = tenant.id as string;
   const phone = phoneParsed?.stored ?? "";
+  const location = await resolveLeadLocation(input);
   const channel = (input.channel || "web_form").slice(0, 40);
   const source = (input.source || channel).slice(0, 80);
 
@@ -231,7 +268,7 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
       channel,
       notes: messageWithListing ?? null,
       customerTypes: input.customer_types,
-      provinceId: input.provinceId || null,
+      provinceId: location.provinceId,
       propertyType: input.propertyType || null,
       transactionType: input.transactionType || null,
       budgetMax: input.budgetMax ?? null,
@@ -306,7 +343,9 @@ export async function intakeLead(token: string, input: LeadInput): Promise<LeadR
       customer_id: customerId,
       transaction_type: input.transactionType,
       property_type: input.propertyType || null,
-      province_id: input.provinceId || null,
+      province_id: location.provinceId,
+      district_id: location.districtId,
+      neighborhood_id: location.neighborhoodId,
       budget_min: input.budgetMin ?? null,
       budget_max: input.budgetMax ?? null,
       rooms: input.rooms || null,

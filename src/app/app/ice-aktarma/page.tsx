@@ -20,6 +20,7 @@ import { loadAssignableAdvisors } from "@/lib/team/assignable-roles";
 import { ImportWizard } from "./import-wizard";
 import { IMPORT_ROW_LIMIT } from "./import-config";
 import { listRecentImports } from "@/app/actions/import-rollback";
+import { listPendingPhotoImports } from "@/app/actions/import-photos";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { HelpTip } from "@/components/ui/help-tip";
@@ -76,6 +77,7 @@ export default async function ImportPage() {
     { count: newProperties30 },
     teamRows,
     recentImports,
+    pendingPhotos,
   ] = await Promise.all([
     supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null),
     supabase.from("properties").select("id", { count: "exact", head: true }).is("deleted_at", null),
@@ -92,6 +94,8 @@ export default async function ImportPage() {
     // Atanabilir danışmanlar: yalnız aktif SATIŞ rolleri (B070; salt okunur / muhasebe / çağrı merkezi yok).
     tenantId ? loadAssignableAdvisors(supabase, tenantId, { userId, role }) : Promise.resolve([]),
     listRecentImports(),
+    // Yarıda kalan fotoğraf indirmesi (portföy aktarımı): sihirbaz kaldığı yerden sürdürür.
+    updateAllowed.properties ? listPendingPhotoImports() : Promise.resolve({ ids: [] as string[], urls: 0 }),
   ]);
   const team = teamRows.map((m) => ({ id: m.id, name: m.full_name }));
   const recent = recentImports.batches;
@@ -131,7 +135,7 @@ export default async function ImportPage() {
     {
       icon: UploadCloud,
       title: "1 · Dosyayı yükleyin",
-      desc: "CSV dosyanızı sürükleyip bırakın. Ayraç (virgül / noktalı virgül) otomatik algılanır.",
+      desc: "CSV, Excel ya da rehber (.vcf) dosyanızı seçin. Ayraç, Türkçe kodlama ve hazır biçimler otomatik algılanır.",
     },
     {
       icon: Columns3,
@@ -175,10 +179,10 @@ export default async function ImportPage() {
         <ArrowLeft className="h-4 w-4" /> Ayarlara dön
       </Link>
 
-      <PageHeader title="CSV içe aktarma" eyebrow="Veri taşıma" description={<>Eski programınızdan veya Excel&apos;den aldığınız müşteri, portföy ve talep listelerini EmlakSoft&apos;a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın. <HelpTip topic="ice-aktarma" /></>} />
+      <PageHeader title="İçe aktarma" eyebrow="Veri taşıma" description={<>Eski programınızdan, Excel&apos;den, sahibinden.com mağazanızdan ya da telefon rehberinizden müşteri, portföy ve talep listelerini EmlakSoft&apos;a taşıyın: dosya yükleyin, eşleyin, önizleyin, aktarın; gerekirse geri alın. <HelpTip topic="ice-aktarma" /></>} />
 <section className="theme-dark relative overflow-hidden rounded-[var(--radius-panel)] bg-[image:var(--grad-ink)] p-6 text-white"><div className="relative"><p className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/70">
             <FileSpreadsheet className="h-3.5 w-3.5 text-mint-400" />
-            Excel dosyanızı &quot;Farklı Kaydet → CSV&quot; ile kaydedin — .xlsx doğrudan desteklenmez.
+            CSV, Excel (.xlsx), sahibinden.com mağaza Excel&apos;i, Google Kişiler ve telefon rehberi (.vcf) dosyaları doğrudan okunur.
           </p>
 
           {/* KPI şeridi — mevcut veri hacmi; kartlar ilgili modül listesine gider */}
@@ -230,6 +234,7 @@ export default async function ImportPage() {
         rollbackAllowed={rollbackAllowed}
         team={team}
         recent={recent}
+        pendingPhotos={pendingPhotos}
       />
 
       {/* Güvence kartları — aktarımın teknik garantileri */}

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 // Harita (ağır client komponenti, yalnız ?gorunum=harita): dynamic() istemci sarmalayıcıda → ayrı parça.
 import { MapView } from "./map-view-lazy";
+import { buildMapPoints } from "./map-data";
 import { createClient } from "@/lib/supabase/server";
 import { batchAll } from "@/lib/supabase/query-batch";
 import { loadPortfolioCounts } from "@/lib/supabase/count-rpcs";
@@ -120,6 +121,7 @@ type MapRow = {
   currency: string | null;
   lat: number | null;
   lng: number | null;
+  neighborhood_id: string | null;
 };
 
 /** supabase-js gomulu iliskiyi dizi olarak tipler; iki bicimi de karsila. */
@@ -376,7 +378,7 @@ export default async function PropertiesPage({
 
   const LIST_COLS =
     "id, property_code, title, transaction_type, property_type, status, list_price, currency, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at), cover:property_media!property_media_property_id_fkey(id,storage_path,file_size,has_watermark)";
-  const MAP_COLS = "id, property_code, title, transaction_type, list_price, currency, lat, lng";
+  const MAP_COLS = "id, property_code, title, transaction_type, list_price, currency, lat, lng, neighborhood_id";
 
   // Liste/Kart görünümleri sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
   const listQuery =
@@ -401,8 +403,8 @@ export default async function PropertiesPage({
   const mapQuery =
     view === "harita"
       ? buildFilteredQuery(MAP_COLS, { count: "exact" })
-          .not("lat", "is", null)
-          .not("lng", "is", null)
+          // Koordinatı olmayan ama mahallesi bilinen portföy de gelir (mahalle merkezinde "yaklaşık" iğne; map-data.ts).
+          .or("lat.not.is.null,neighborhood_id.not.is.null")
           .order("created_at", { ascending: false })
           .limit(MAP_LIMIT)
       : Promise.resolve({ data: null, count: null });
@@ -556,14 +558,17 @@ export default async function PropertiesPage({
 
   // Harita görünümü verisi — konumlu sonuçlar (cap); konumsuz portföy sayısı bildirilir.
   const mapRows = (mapData ?? []) as unknown as MapRow[];
-  const mapProperties = mapRows.map((p) => ({
-    id: p.id,
-    title: p.title ?? p.property_code,
-    price: formatPropertyPrice(p.list_price, p.transaction_type, propertyCurrency(p)),
-    lat: Number(p.lat),
-    lng: Number(p.lng),
-  }));
-  const missingCoordCount = Math.max(0, totalFilteredCount - (mapLocatedTotal ?? 0));
+  const { points: mapProperties, dropped: mapDropped } = view === "harita"
+    ? await buildMapPoints(supabase, mapRows.map((p) => ({
+        id: p.id,
+        title: p.title ?? p.property_code,
+        price: formatPropertyPrice(p.list_price, p.transaction_type, propertyCurrency(p)),
+        lat: p.lat,
+        lng: p.lng,
+        neighborhood_id: p.neighborhood_id,
+      })))
+    : { points: [], dropped: 0 };
+  const missingCoordCount = Math.max(0, totalFilteredCount - Math.max(0, (mapLocatedTotal ?? 0) - mapDropped));
 
   // ---- Satır modelleri (tablo + mobil liste + kart ortak veri) --------------
   const viewModels: PropertyVM[] = rows.map((property) => {

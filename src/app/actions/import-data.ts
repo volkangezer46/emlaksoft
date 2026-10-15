@@ -21,10 +21,15 @@ import {
   planDemandRows,
   planPropertyRows,
   propertyKey,
+  portalNoKey,
+  importFeatureValues,
   demandKey,
   validatePropertyRow,
   type CustomerLookup,
   type DuplicatePolicy,
+  type EnrichmentMap,
+  type RowEnrichment,
+  type NormalizedProperty,
   type ExistingCustomer,
   type ExistingProperty,
   type ImportCounters,
@@ -49,6 +54,11 @@ import {
   type NormalizedRental,
 } from "@/lib/import-rows-activity";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { createAddressResolver } from "@/lib/geo/address-resolve-server";
+import { describeResolvedGeo } from "@/lib/geo/address-resolve";
+import { loadMemberAccess } from "@/lib/team/member-admin";
+import { withDescription } from "@/lib/property-description";
+import { parsePhoneStrict } from "@/lib/phone-rules";
 
 /**
  * İçe aktarma (müşteri / portföy / talep) — /app/ice-aktarma sihirbazı.
@@ -80,6 +90,9 @@ export type CustomerImportRow = {
   customer_type?: string;
   source?: string;
   notes?: string;
+  tags?: string;
+  city?: string;
+  advisor?: string;
 };
 
 export type PropertyImportRow = {
@@ -90,7 +103,20 @@ export type PropertyImportRow = {
   list_price?: string;
   rooms?: string;
   sqm?: string;
+  net_sqm?: string;
   address_line?: string;
+  province?: string;
+  district?: string;
+  neighborhood?: string;
+  floor?: string;
+  building_age?: string;
+  heating?: string;
+  description?: string;
+  portal_listing_no?: string;
+  owner_name?: string;
+  owner_phone?: string;
+  advisor?: string;
+  photo_urls?: string;
 };
 
 export type DemandImportRow = {
@@ -104,6 +130,7 @@ export type DemandImportRow = {
   rooms?: string;
   min_sqm?: string;
   urgency?: string;
+  location?: string;
 };
 
 export type ImportOptions = {
@@ -126,6 +153,8 @@ export type PlannedRowView = {
   matchedBy?: string;
   /** Önizleme tablosu için kısa özet (ad / başlık). */
   label?: string;
+  /** Önizleme: çözülen konum ("Kadıköy / İstanbul · Caferağa"). */
+  location?: string;
 };
 
 export type ChunkResult = {
@@ -139,6 +168,10 @@ export type ChunkResult = {
   updated?: number;
   /** Yalnız portföy + danışmansız içe aktarma: ilan havuzuna alınan kayıt sayısı (havuz açıksa). */
   pooled?: number;
+  /** Yalnız portföy yazımı: fotoğraf bağlantısı bekleyen yeni portföyler (sihirbaz galeriye indirir). */
+  photoQueue?: string[];
+  /** Yalnız portföy yazımı: dosyadaki malik için açılan yeni müşteri sayısı. */
+  ownersCreated?: number;
 };
 
 const ENTITY: Record<
@@ -225,15 +258,23 @@ async function loadExistingProperties(
   rows: ImportRow[],
 ): Promise<Map<string, ExistingProperty> | null> {
   const titles = new Set<string>();
+  const portalNos = new Set<string>();
   for (const r of rows) {
     const v = validatePropertyRow(r);
     if (v.data) titles.add(v.data.title);
+    if (v.data?.portal_listing_no) portalNos.add(v.data.portal_listing_no);
   }
   const map = new Map<string, ExistingProperty>();
+  const select = "id, title, address_line, list_price, features, province_id, district_id, neighborhood_id, owner_customer_id";
+  const add = (d: ExistingProperty) => {
+    map.set(propertyKey(d.title, d.address_line), d);
+    const no = d.features?.portal_listing_no;
+    if (typeof no === "string" && no.trim()) map.set(portalNoKey(no), d);
+  };
   for (const part of chunked([...titles], LOOKUP_CHUNK)) {
     const { data, error } = await supabase
       .from("properties")
-      .select("id, title, address_line, list_price, features")
+      .select(select)
       .eq("tenant_id", tenantId)
       .is("deleted_at", null)
       .in("title", part);
@@ -241,7 +282,21 @@ async function loadExistingProperties(
       console.error("import property lookup", error);
       return null;
     }
-    for (const d of (data ?? []) as ExistingProperty[]) map.set(propertyKey(d.title, d.address_line), d);
+    for (const d of (data ?? []) as ExistingProperty[]) add(d);
+  }
+  // Portal ilan no ile mükerrer: başlığı değişmiş ilan da yakalanır.
+  for (const part of chunked([...portalNos], LOOKUP_CHUNK)) {
+    const { data, error } = await supabase
+      .from("properties")
+      .select(select)
+      .eq("tenant_id", tenantId)
+      .is("deleted_at", null)
+      .in("features->>portal_listing_no", part);
+    if (error) {
+      console.error("import property portal-no lookup", error.code);
+      return null;
+    }
+    for (const d of (data ?? []) as ExistingProperty[]) add(d);
   }
   return map;
 }
@@ -298,16 +353,17 @@ async function planChunk(
   rows: ImportRow[],
   policy: DuplicatePolicy,
   seen: Set<string>,
+  enrich: EnrichmentMap,
 ): Promise<AnyPlan[] | null> {
   if (target === "customers") {
     const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "phone", email: "email" });
     if (!lookup) return null;
-    return planCustomerRows(rows, lookup, policy, seen) as unknown as AnyPlan[];
+    return planCustomerRows(rows, lookup, policy, seen, enrich) as unknown as AnyPlan[];
   }
   if (target === "properties") {
     const existing = await loadExistingProperties(supabase, tenantId, rows);
     if (!existing) return null;
-    return planPropertyRows(rows, existing, policy, seen) as unknown as AnyPlan[];
+    return planPropertyRows(rows, existing, policy, seen, enrich) as unknown as AnyPlan[];
   }
   if (isActivityTarget(target)) return planActivityChunk(supabase, tenantId, target, rows, policy, seen);
   const lookup = await loadCustomerLookup(supabase, tenantId, rows, { phone: "customer_phone", email: "customer_email" });
@@ -315,7 +371,147 @@ async function planChunk(
   const customerIds = [...new Set([...lookup.byPhone.values(), ...lookup.byEmail.values()].map((c) => c.id))];
   const existing = await loadExistingDemandKeys(supabase, tenantId, customerIds);
   if (!existing) return null;
-  return planDemandRows(rows, lookup, existing, policy, seen) as unknown as AnyPlan[];
+  return planDemandRows(rows, lookup, existing, policy, seen, enrich) as unknown as AnyPlan[];
+}
+
+// ---------------------------------------------------------------------------
+// Satır bağlamı: konum (il/ilçe/mahalle/adres → coğrafya kimlikleri) + dosyadaki danışman
+// ---------------------------------------------------------------------------
+
+const clean = (v: unknown) => String(v ?? "").trim();
+
+/** Satırın konum girdisi (hedefe göre); hiç konum yoksa null. */
+function locationInput(target: ImportTarget, r: ImportRow) {
+  if (target === "properties") {
+    const input = { province: clean(r.province), district: clean(r.district), neighborhood: clean(r.neighborhood), text: clean(r.address_line) };
+    return input.province || input.district || input.neighborhood || input.text ? input : null;
+  }
+  const text = clean(target === "customers" ? r.city : target === "demands" ? r.location : "");
+  return text ? { text } : null;
+}
+
+/** Danışman adı/e-postası → profil kimliği (aktif, bu ofis). E-posta yalnız gerektiğinde auth'tan okunur. */
+async function loadAdvisorIndex(supabase: Db, tenantId: string, needEmail: boolean) {
+  const { data } = await supabase.from("profiles").select("id, full_name").eq("tenant_id", tenantId).eq("is_active", true).limit(300);
+  const byName = new Map<string, string | null>();
+  const byEmail = new Map<string, string>();
+  for (const p of (data ?? []) as { id: string; full_name: string | null }[]) {
+    const k = foldText(p.full_name ?? "");
+    if (!k) continue;
+    // Aynı adda iki kişi: belirsiz (null) — tahmin yok.
+    byName.set(k, byName.has(k) ? null : p.id);
+  }
+  if (needEmail && data && data.length <= 60) {
+    const access = await Promise.all((data as { id: string }[]).map((p) => loadMemberAccess(tenantId, p.id).then((a) => [p.id, a?.email] as const)));
+    for (const [id, email] of access) if (email) byEmail.set(email.trim().toLocaleLowerCase("en-US"), id);
+  }
+  return { byName, byEmail };
+}
+
+async function buildEnrichment(supabase: Db, tenantId: string, target: ImportTarget, rows: ImportRow[]): Promise<Map<number, RowEnrichment>> {
+  const out = new Map<number, RowEnrichment>();
+  if (target !== "customers" && target !== "properties" && target !== "demands") return out;
+  const get = (row: number) => {
+    let e = out.get(row);
+    if (!e) {
+      e = {};
+      out.set(row, e);
+    }
+    return e;
+  };
+
+  const withLocation = rows.map((r) => [r, locationInput(target, r)] as const).filter(([, l]) => l !== null);
+  if (withLocation.length) {
+    const resolve = await createAddressResolver();
+    await Promise.all(
+      withLocation.map(async ([r, input]) => {
+        const res = await resolve(input!);
+        const g = res.geo;
+        get(r.row).geo = {
+          provinceId: g.provinceId,
+          districtId: g.districtId,
+          neighborhoodId: g.neighborhoodId,
+          label: describeResolvedGeo(g),
+          issue: res.status === "ok" ? undefined : `${res.reason ?? "çözülemedi"}${g.provinceId ? ` (eşlenen: ${describeResolvedGeo(g)})` : ""}`,
+        };
+      }),
+    );
+  }
+
+  if (target !== "demands") {
+    const advisorRows = rows.filter((r) => clean(r.advisor));
+    if (advisorRows.length) {
+      const idx = await loadAdvisorIndex(supabase, tenantId, advisorRows.some((r) => clean(r.advisor).includes("@")));
+      for (const r of advisorRows) {
+        const raw = clean(r.advisor);
+        const id = raw.includes("@") ? idx.byEmail.get(raw.toLocaleLowerCase("en-US")) : idx.byName.get(foldText(raw));
+        if (id) get(r.row).advisorId = id;
+        else {
+          get(r.row).advisorIssue =
+            id === null
+              ? `Danışman adı birden çok kişiyle eşleşiyor ("${raw.slice(0, 60)}"); sihirbazdaki atama kullanılır.`
+              : `Danışman bulunamadı ("${raw.slice(0, 60)}"); sihirbazdaki atama kullanılır.`;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Portföy malikleri: telefonla mevcut müşteri bulunur; yoksa (ad + müşteri ekleme yetkisi varsa) "Mülk sahibi" müşteri
+ * açılır. Açılan müşteriler aynı parçanın denetim kaydına (`created_owner_ids`) yazılır → geri alma onları da kaldırır.
+ */
+async function resolveOwners(
+  supabase: Db,
+  ctx: { tenantId: string; userId: string; assigneeId: string | null; canCreateCustomers: boolean },
+  plans: AnyPlan[],
+): Promise<{ byPhone: Map<string, string>; createdIds: string[] }> {
+  const byPhone = new Map<string, string>();
+  const createdIds: string[] = [];
+  const wanted = new Map<string, string | null>();
+  for (const p of plans) {
+    // Güncellenen kayıtta malik yalnız boşsa bağlanır; dolu malikli kayıt için müşteri açılmaz.
+    if (p.status !== "new" && !(p.status === "update" && p.needsOwner)) continue;
+    const d = p.data as unknown as NormalizedProperty | undefined;
+    if (!d?.owner_phone) continue;
+    if (!wanted.has(d.owner_phone) || (!wanted.get(d.owner_phone) && d.owner_name)) wanted.set(d.owner_phone, d.owner_name);
+  }
+  if (!wanted.size) return { byPhone, createdIds };
+  for (const part of chunked([...wanted.keys()], LOOKUP_CHUNK)) {
+    const { data, error } = await supabase.from("customers").select("id, phone").eq("tenant_id", ctx.tenantId).is("deleted_at", null).in("phone", part);
+    if (error) return { byPhone, createdIds };
+    for (const c of data ?? []) if (c.phone && !byPhone.has(String(c.phone))) byPhone.set(String(c.phone), String(c.id));
+  }
+  const toCreate = [...wanted.entries()].filter(([phone, name]) => !byPhone.has(phone) && name && ctx.canCreateCustomers);
+  for (const part of chunked(toCreate, INSERT_CHUNK)) {
+    const { data, error } = await supabase
+      .from("customers")
+      .insert(
+        part.map(([phone, name]) => {
+          const parsed = parsePhoneStrict(phone);
+          return {
+            tenant_id: ctx.tenantId,
+            full_name: name,
+            phone: parsed.ok ? parsed.stored : null,
+            customer_types: ["Mülk sahibi"],
+            source: "İçe aktarma",
+            assigned_to: ctx.assigneeId,
+            created_by: ctx.userId,
+          };
+        }),
+      )
+      .select("id, phone");
+    if (error) {
+      console.error("import owner insert", error.code);
+      continue;
+    }
+    for (const c of data ?? []) {
+      createdIds.push(String(c.id));
+      if (c.phone) byPhone.set(String(c.phone), String(c.id));
+    }
+  }
+  return { byPhone, createdIds };
 }
 
 /**
@@ -398,15 +594,19 @@ async function resolveAssignee(
   return { ok: true, id: assignTo };
 }
 
-function toView(target: ImportTarget, rows: ImportRow[], plans: AnyPlan[], withLabel: boolean): PlannedRowView[] {
-  return plans.map((p, i) => ({
-    row: p.row,
-    status: p.status,
-    issues: p.issues,
-    existingName: p.existingName,
-    matchedBy: p.matchedBy,
-    label: withLabel ? labelOf(target, rows[i], p) : undefined,
-  }));
+function toView(target: ImportTarget, rows: ImportRow[], plans: AnyPlan[], withLabel: boolean, enrich?: EnrichmentMap): PlannedRowView[] {
+  return plans.map((p, i) => {
+    const geo = enrich?.get(p.row)?.geo?.label;
+    return {
+      row: p.row,
+      status: p.status,
+      issues: p.issues,
+      existingName: p.existingName,
+      matchedBy: p.matchedBy,
+      label: withLabel ? labelOf(target, rows[i], p) : undefined,
+      ...(withLabel && geo ? { location: geo } : {}),
+    };
+  });
 }
 
 /** Parça API'leri (sihirbaz) tek istekte en fazla bu kadar satır alır; eski tek-çağrı API'leri IMPORT_ROW_LIMIT'e kadar. */
@@ -456,7 +656,8 @@ async function runChunk(
   if (!assignee.ok) return { error: assignee.error };
 
   const seen = new Set(options.seen ?? []);
-  const plans = await planChunk(supabase, gate.tenantId, target, rows, policy, seen);
+  const enrich = await buildEnrichment(supabase, gate.tenantId, target, rows);
+  const plans = await planChunk(supabase, gate.tenantId, target, rows, policy, seen, enrich);
   if (!plans) return { error: actionErrorMessage(null, "Mükerrer kontrolü yapılamadı. Lütfen tekrar deneyin.") };
   for (const p of plans) {
     if (flaggedRows.has(p.row)) {
@@ -470,7 +671,7 @@ async function runChunk(
   if (dryRun) {
     return {
       ok: true,
-      rows: toView(target, rows, plans, true),
+      rows: toView(target, rows, plans, true, enrich),
       counters: countPlanned(plans),
       seen: [...seen],
     };
@@ -486,6 +687,31 @@ async function runChunk(
   const createdIds: string[] = [];
   const updatedPrev: { id: string; prev: Record<string, unknown> }[] = [];
   const stamp = new Date(now()).toISOString().slice(2, 7).replace("-", "");
+  const owners =
+    target === "properties"
+      ? await resolveOwners(supabase, {
+          tenantId: gate.tenantId,
+          userId: gate.userId,
+          assigneeId: assignee.id,
+          canCreateCustomers: (await requirePermission("customers", "create")).ok,
+        }, plans)
+      : { byPhone: new Map<string, string>(), createdIds: [] as string[] };
+  if (target === "properties") {
+    for (const p of plans) {
+      const d = p.data as unknown as NormalizedProperty | undefined;
+      if (!d?.owner_phone || (p.status !== "new" && !p.needsOwner)) continue;
+      const ownerId = owners.byPhone.get(d.owner_phone);
+      if (!ownerId) {
+        p.issues = [...p.issues, { level: "warning", message: "Malik müşteri olarak bulunamadı/açılamadı; malik bağı kurulmadı." }];
+        continue;
+      }
+      // Güncellemede malik yalnız boşsa bağlanır (planlayıcı yalnız o durumda satırı güncellemeye alır).
+      if (p.status === "update" && p.patch && !("owner_customer_id" in p.patch) && p.needsOwner) {
+        p.patch = { ...p.patch, owner_customer_id: ownerId };
+        p.prev = { ...(p.prev ?? {}), owner_customer_id: null };
+      }
+    }
+  }
 
   const buildInsert = (p: AnyPlan): Record<string, unknown> => {
     const d = p.data as Record<string, unknown>;
@@ -498,22 +724,32 @@ async function runChunk(
         customer_types: d.customer_type ? [d.customer_type] : [],
         source: d.source || "İçe aktarma",
         notes: d.notes || null,
-        assigned_to: assignee.id,
+        tags: Array.isArray(d.tags) ? d.tags : [],
+        province_id: d.province_id ?? null,
+        district_id: d.district_id ?? null,
+        assigned_to: (d.advisor_id as string | null) ?? assignee.id,
         created_by: gate.userId,
       };
     }
     if (target === "properties") {
+      const pd = d as unknown as NormalizedProperty;
+      // Açıklama tek yazma kuralıyla (property-description) features'a girer.
+      const features = withDescription({ rooms: pd.rooms, sqm: pd.sqm, ...importFeatureValues(pd) }, pd.description);
       return {
         tenant_id: gate.tenantId,
         property_code: `ES-${stamp}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`,
-        title: d.title,
-        transaction_type: d.transaction_type,
-        property_type: d.property_type,
+        title: pd.title,
+        transaction_type: pd.transaction_type,
+        property_type: pd.property_type,
         status: "draft",
-        list_price: d.list_price,
-        address_line: d.address_line,
-        features: { rooms: d.rooms, sqm: d.sqm },
-        assigned_to: assignee.id,
+        list_price: pd.list_price,
+        address_line: pd.address_line,
+        province_id: pd.province_id,
+        district_id: pd.district_id,
+        neighborhood_id: pd.neighborhood_id,
+        owner_customer_id: pd.owner_phone ? (owners.byPhone.get(pd.owner_phone) ?? null) : null,
+        features,
+        assigned_to: pd.advisor_id ?? assignee.id,
         created_by: gate.userId,
       };
     }
@@ -566,13 +802,24 @@ async function runChunk(
   };
 
   const table = TABLE[target];
+  const unassignedCreated: string[] = [];
+  const photoQueue: string[] = [];
   for (const part of chunked(toCreate, INSERT_CHUNK)) {
-    const res = await supabase.from(table).insert(part.map(buildInsert)).select("id");
+    const res = await supabase
+      .from(table)
+      .insert(part.map(buildInsert))
+      .select(target === "properties" ? "id, assigned_to, features" : "id");
     if (res?.error) {
       console.error("import insert chunk", target, res.error);
       for (const p of part) fail(p, actionErrorMessage(null, "Veritabanına yazılamadı."));
     } else {
-      for (const d of (res?.data ?? []) as { id: string }[]) createdIds.push(d.id);
+      for (const d of (res?.data ?? []) as unknown as { id: string; assigned_to?: string | null; features?: Record<string, unknown> | null }[]) {
+        createdIds.push(d.id);
+        if (target === "properties") {
+          if (!d.assigned_to) unassignedCreated.push(d.id);
+          if (Array.isArray(d.features?.import_photo_urls) && d.features.import_photo_urls.length) photoQueue.push(d.id);
+        }
+      }
     }
   }
 
@@ -580,6 +827,11 @@ async function runChunk(
     await Promise.all(
       part.map(async (p) => {
         if (!p.existingId || !p.patch) return;
+        if (!Object.keys(p.patch).length) {
+          p.status = "skip";
+          p.issues = [...p.issues, { level: "warning", message: "Mevcut kayıtla aynı; güncellenecek alan yok." }];
+          return;
+        }
         const { error } = await supabase
           .from(table)
           .update(p.patch)
@@ -617,6 +869,8 @@ async function runChunk(
       failed: counters.error,
       created_ids: createdIds,
       updated_ids: updatedPrev.map((u) => u.id),
+      ...(owners.createdIds.length ? { created_owner_ids: owners.createdIds } : {}),
+      ...(photoQueue.length ? { photo_pending: photoQueue.length } : {}),
     },
   });
 
@@ -629,6 +883,9 @@ async function runChunk(
       ids: createdIds,
       checkLinks: false,
     });
+    if (owners.createdIds.length) {
+      await removeCreated(supabase, { target: "customers", tenantId: gate.tenantId, ids: owners.createdIds, checkLinks: false });
+    }
     const undoUpdated = await restoreUpdated(supabase, {
       target,
       tenantId: gate.tenantId,
@@ -647,12 +904,13 @@ async function runChunk(
   // İlan havuzu: danışmansız içe aktarılan portföyler (ofiste havuz açıksa) tek seferde havuza alınır.
   // Havuz kapalıysa/şema yoksa hiçbir şey olmaz; hata içe aktarmayı bozmaz (kayıtlar zaten yazıldı ve denetlendi).
   let pooled = 0;
-  if (target === "properties" && assignee.id === null && createdIds.length > 0) {
+  // Dosyada danışmanı olan satırlar havuza girmez (yalnız gerçekten danışmansız açılanlar).
+  if (target === "properties" && assignee.id === null && createdIds.length > 0 && unassignedCreated.length > 0) {
     const pool = await enqueueListingPoolBatch(supabase, {
       tenantId: gate.tenantId,
       actorId: gate.userId,
       source: "import",
-      propertyIds: createdIds,
+      propertyIds: unassignedCreated,
     });
     pooled = pool.queued;
     if (pooled > 0) {
@@ -660,7 +918,7 @@ async function runChunk(
         tenantId: gate.tenantId,
         actorId: gate.userId,
         count: pooled,
-        firstPropertyId: createdIds[0]!,
+        firstPropertyId: unassignedCreated[0]!,
         sourceLabel: "İçe aktarma",
       });
       revalidatePath("/app/ilan-havuzu");
@@ -668,8 +926,18 @@ async function runChunk(
   }
 
   revalidatePath(meta.path);
+  if (owners.createdIds.length) revalidatePath("/app/musteriler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true, rows: toView(target, rows, plans, false), counters, created, updated, ...(pooled ? { pooled } : {}) };
+  return {
+    ok: true,
+    rows: toView(target, rows, plans, false),
+    counters,
+    created,
+    updated,
+    ...(pooled ? { pooled } : {}),
+    ...(photoQueue.length ? { photoQueue } : {}),
+    ...(owners.createdIds.length ? { ownersCreated: owners.createdIds.length } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------

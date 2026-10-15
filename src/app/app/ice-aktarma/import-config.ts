@@ -40,16 +40,32 @@ export const CUSTOMER_FIELDS: FieldDef[] = [
   { key: "customer_type", label: "Müşteri tipi", hints: ["musteri tipi", "musteri turu", "kisi tipi", "tip", "tur", "type"], sample: "Alıcı" },
   { key: "source", label: "Kaynak", hints: ["kaynak", "nereden", "referans", "source"], sample: "Referans" },
   { key: "notes", label: "Notlar", hints: ["notlar", "not", "aciklama", "yorum", "detay", "notes"], sample: "3+1 arıyor" },
+  { key: "tags", label: "Etiketler", hints: ["etiketler", "etiket", "labels", "group membership", "gruplar", "grup", "tags"], sample: "Yatırımcı; Kadıköy" },
+  { key: "city", label: "İl / bölge", hints: ["yasadigi il", "sehir", "il ilce", "il", "ilce", "bolge", "city", "address 1 city", "address 1 region"], sample: "Kadıköy / İstanbul" },
+  { key: "advisor", label: "Danışman", hints: ["sorumlu danisman", "danisman", "sorumlu", "temsilci", "agent", "owner"], sample: "Mehmet Demir" },
 ];
 
 export const PROPERTY_FIELDS: FieldDef[] = [
   { key: "title", label: "Başlık", required: true, hints: ["ilan basligi", "baslik", "ilan adi", "ilan", "title"], sample: "Kadıköy'de deniz manzaralı 3+1" },
-  { key: "transaction_type", label: "İşlem türü", hints: ["islem turu", "islem", "satilik kiralik", "satilik", "kategori"], sample: "Satılık" },
-  { key: "property_type", label: "Portföy türü", hints: ["emlak tipi", "emlak turu", "portfoy turu", "portfoy tipi", "konut tipi", "emlak", "cins", "tip", "tur"], sample: "Daire" },
+  { key: "transaction_type", label: "İşlem türü", hints: ["islem turu", "islem", "satilik kiralik", "satilik", "durumu"], sample: "Satılık" },
+  { key: "property_type", label: "Portföy türü", hints: ["emlak tipi", "emlak turu", "portfoy turu", "portfoy tipi", "konut tipi", "konut sekli", "kategori", "emlak", "cins", "tip", "tur"], sample: "Daire" },
   { key: "list_price", label: "Liste fiyatı", hints: ["liste fiyati", "ilan fiyati", "satis fiyati", "fiyat", "tutar", "bedel", "price"], sample: "4.500.000" },
   { key: "rooms", label: "Oda sayısı", hints: ["oda sayisi", "oda"], sample: "3+1" },
-  { key: "sqm", label: "Metrekare", hints: ["brut m2", "net m2", "m2", "metrekare", "alan", "brut", "net"], sample: "125" },
-  { key: "address_line", label: "Adres", hints: ["acik adres", "adres", "address", "mahalle"], sample: "Caferağa Mah. Moda Cad. No:12" },
+  { key: "sqm", label: "Brüt m²", hints: ["brut m2", "m2 brut", "brut m", "m brut", "brut metrekare", "metrekare", "m2", "alan", "brut"], sample: "125" },
+  { key: "net_sqm", label: "Net m²", hints: ["net m2", "m2 net", "net m", "m net", "net metrekare", "net"], sample: "110" },
+  { key: "province", label: "İl", hints: ["il", "sehir", "city"], sample: "İstanbul" },
+  { key: "district", label: "İlçe", hints: ["ilce", "district"], sample: "Kadıköy" },
+  { key: "neighborhood", label: "Mahalle", hints: ["mahalle", "semt", "mah"], sample: "Caferağa" },
+  { key: "address_line", label: "Adres", hints: ["acik adres", "adres", "address", "konum"], sample: "Moda Cad. No:12" },
+  { key: "floor", label: "Bulunduğu kat", hints: ["bulundugu kat", "kat no", "kati", "kat"], sample: "3" },
+  { key: "building_age", label: "Bina yaşı", hints: ["bina yasi", "yapi yasi", "yas"], sample: "10" },
+  { key: "heating", label: "Isıtma", hints: ["isitma tipi", "isitma", "isinma", "heating"], sample: "Kombi (Doğalgaz)" },
+  { key: "description", label: "Açıklama", hints: ["ilan aciklamasi", "aciklama", "ilan metni", "detay", "description"], sample: "Denize yürüme mesafesinde, asansörlü." },
+  { key: "portal_listing_no", label: "Portal ilan no", hints: ["ilan no", "ilan numarasi", "ilan id", "sahibinden ilan no", "portal ilan no", "listing id"], sample: "1234567890" },
+  { key: "owner_name", label: "Malik adı", hints: ["malik adi", "mal sahibi adi", "ev sahibi adi", "mal sahibi", "ev sahibi", "malik", "sahibi"], sample: "Ayşe Yılmaz" },
+  { key: "owner_phone", label: "Malik telefonu", hints: ["malik telefonu", "mal sahibi telefonu", "ev sahibi telefonu", "malik tel", "sahibi tel", "sahibi telefon"], sample: "0532 123 45 67" },
+  { key: "advisor", label: "Danışman", hints: ["sorumlu danisman", "danisman", "sorumlu", "temsilci", "agent"], sample: "mehmet@ofis.com" },
+  { key: "photo_urls", label: "Fotoğraf bağlantıları", hints: ["fotograf linkleri", "fotograflar", "fotograf", "resimler", "resim", "gorseller", "foto", "photo", "images", "image"], sample: "https://ornek.com/1.jpg; https://ornek.com/2.jpg" },
 ];
 
 export const DEMAND_FIELDS: FieldDef[] = [
@@ -62,6 +78,7 @@ export const DEMAND_FIELDS: FieldDef[] = [
   { key: "rooms", label: "Oda sayısı", hints: ["oda sayisi", "oda"], sample: "3+1" },
   { key: "min_sqm", label: "Min. m²", hints: ["min m2", "en az m2", "m2", "metrekare"], sample: "100" },
   { key: "urgency", label: "Aciliyet", hints: ["aciliyet", "oncelik"], sample: "Yüksek" },
+  { key: "location", label: "Bölge", hints: ["aranan bolge", "istenen bolge", "bolge", "konum", "lokasyon", "il ilce", "semt", "ilce", "il"], sample: "Kadıköy / İstanbul" },
 ];
 
 const CONTACT_FIELDS: FieldDef[] = [
@@ -288,3 +305,123 @@ export function buildTemplateCsv(target: ImportTarget): string {
   const sample = fields.map((f) => esc(f.sample)).join(";");
   return `﻿${header}\n${sample}\n`;
 }
+
+// ---------------------------------------------------------------------------
+// Başlık satırı + hazır biçimler (sahibinden mağaza Excel'i, Google Kişiler CSV'si)
+// ---------------------------------------------------------------------------
+
+/**
+ * Bazı dışa aktarımlar (mağaza Excel'leri) en üstte bir başlık/tarih satırı taşır: "Mağaza İlanları — 15.10.2026".
+ * İlk 10 satırda en dolu satırın en az %60'ı kadar dolu İLK satır başlık sayılır; üstündekiler atılır.
+ */
+export function promoteHeaderRow<T extends { headers: string[]; rows: string[][] }>(table: T): T {
+  const window = [table.headers, ...table.rows.slice(0, 9)];
+  const filled = window.map((r) => r.filter((c) => String(c ?? "").trim() !== "").length);
+  const max = Math.max(...filled);
+  if (max < 2 || filled[0]! >= Math.max(2, Math.ceil(max * 0.6))) return table;
+  const idx = filled.findIndex((n) => n >= Math.max(2, Math.ceil(max * 0.6)));
+  if (idx <= 0) return table;
+  return { ...table, headers: window[idx]!.map((h) => String(h ?? "").trim()), rows: table.rows.slice(idx) };
+}
+
+export type ImportPresetId = "sahibinden" | "google-contacts" | "vcard" | "contact-picker";
+
+export type ImportPreset = {
+  id: ImportPresetId;
+  label: string;
+  target: ImportTarget;
+  /** Sihirbazda gösterilen tek cümlelik açıklama. */
+  note: string;
+};
+
+export const IMPORT_PRESETS: Record<ImportPresetId, ImportPreset> = {
+  sahibinden: {
+    id: "sahibinden",
+    label: "sahibinden.com mağaza Excel'i",
+    target: "properties",
+    note: "İlan no, il/ilçe/mahalle, m², kat ve bina yaşı sütunları otomatik eşlendi; aynı ilan no ikinci kez eklenmez.",
+  },
+  "google-contacts": {
+    id: "google-contacts",
+    label: "Google Kişiler CSV'si",
+    target: "customers",
+    note: "Ad, soyad, cep telefonu, e-posta, not ve etiketler müşteri alanlarına çevrildi.",
+  },
+  vcard: {
+    id: "vcard",
+    label: "Telefon rehberi (.vcf)",
+    target: "customers",
+    note: "Kişi kartları müşteri satırlarına çevrildi; birden çok numarası olanlarda cep numarası seçildi.",
+  },
+  "contact-picker": {
+    id: "contact-picker",
+    label: "Telefon rehberinden seçilen kişiler",
+    target: "customers",
+    note: "Seçtiğiniz kişiler müşteri satırlarına çevrildi.",
+  },
+};
+
+const foldHeader = (h: string) => fold(h);
+
+/** Başlıklardan hazır biçimi tanır (yoksa null). */
+export function detectPreset(headers: string[]): ImportPreset | null {
+  const set = new Set(headers.map(foldHeader));
+  const has = (...keys: string[]) => keys.some((k) => set.has(k));
+  if (has("given name", "first name") && has("phone 1 value", "e mail 1 value", "email 1 value")) return IMPORT_PRESETS["google-contacts"];
+  if (has("ilan no", "ilan numarasi") && has("ilan basligi", "baslik") && has("fiyat", "ilan fiyati")) return IMPORT_PRESETS.sahibinden;
+  return null;
+}
+
+/** Google Kişiler CSV'sinde çok değerli hücre: "0532 ... ::: 0216 ..." → ilk değer. */
+const firstMulti = (v: string | undefined) => String(v ?? "").split(":::")[0]!.trim();
+
+/**
+ * Google Kişiler CSV'si (yeni ve eski biçim) → Türkçe başlıklı tablo: ad soyad bileşik sütundan, telefon cep öncelikli,
+ * etiketler "Labels"/"Group Membership"tan. Sonuç `guessMapping` ile birebir eşlenir.
+ */
+export function googleContactsToTable(table: { headers: string[]; rows: string[][] }): { headers: string[]; rows: string[][]; delimiter: "," } {
+  const idx = new Map<string, number>();
+  table.headers.forEach((h, i) => {
+    const k = foldHeader(h);
+    if (!idx.has(k)) idx.set(k, i);
+  });
+  const col = (row: string[], ...keys: string[]) => {
+    for (const k of keys) {
+      const i = idx.get(k);
+      if (i !== undefined && String(row[i] ?? "").trim()) return String(row[i]).trim();
+    }
+    return "";
+  };
+  const phoneCols: { value: number; type: number | undefined }[] = [];
+  for (let n = 1; n <= 5; n++) {
+    const v = idx.get(`phone ${n} value`);
+    if (v !== undefined) phoneCols.push({ value: v, type: idx.get(`phone ${n} type`) ?? idx.get(`phone ${n} label`) });
+  }
+  const headers = ["Ad Soyad", "Telefon", "E-posta", "Notlar", "Etiketler", "İl / bölge"];
+  const rows = table.rows.map((r) => {
+    const name =
+      col(r, "name", "display name", "file as") ||
+      [col(r, "name prefix"), col(r, "given name", "first name"), col(r, "additional name", "middle name"), col(r, "family name", "last name"), col(r, "name suffix")]
+        .filter(Boolean)
+        .join(" ") ||
+      col(r, "organization 1 name", "organization name");
+    const phones = phoneCols
+      .map((c) => ({ value: firstMulti(r[c.value]), mobile: /mobile|cep|cell/i.test(String(c.type !== undefined ? r[c.type] : "")) }))
+      .filter((p) => p.value);
+    const phone = (phones.find((p) => p.mobile) ?? phones[0])?.value ?? "";
+    const email = firstMulti(col(r, "e mail 1 value", "email 1 value"));
+    const city = [col(r, "address 1 city"), col(r, "address 1 region")].filter(Boolean).join(" / ");
+    return [name, phone, email, col(r, "notes"), col(r, "labels", "group membership"), city];
+  });
+  return { headers, rows, delimiter: "," };
+}
+
+/** Kolon eşleme ekranında uzun alan listelerini bölümlere ayırır (mobilde kaydırma yükünü azaltır). */
+export const FIELD_GROUPS: Partial<Record<ImportTarget, { label: string; keys: string[] }[]>> = {
+  properties: [
+    { label: "Temel bilgiler", keys: ["title", "transaction_type", "property_type", "list_price", "portal_listing_no"] },
+    { label: "Konum", keys: ["province", "district", "neighborhood", "address_line"] },
+    { label: "Özellikler", keys: ["rooms", "sqm", "net_sqm", "floor", "building_age", "heating", "description"] },
+    { label: "Malik, danışman ve fotoğraflar", keys: ["owner_name", "owner_phone", "advisor", "photo_urls"] },
+  ],
+};
