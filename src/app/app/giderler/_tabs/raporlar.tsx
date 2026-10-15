@@ -21,6 +21,7 @@ import { reportCenterHref } from "@/lib/report-center/links";
 import { CategoryBars } from "../category-bars";
 import { FINANCE_PATH, categoryLabelMap, loadCustomCategories, monthLabelOf, type FinanceTabProps } from "./butce";
 import { AdvisorProfitCard } from "./advisor-profit";
+import { YoyCard } from "./raporlar-yoy";
 
 const PERIODS = [6, 12, 24] as const;
 const SHORT_MONTH = new Intl.DateTimeFormat("tr-TR", { month: "short", timeZone: "UTC" });
@@ -40,7 +41,8 @@ const REPORT_LINKS: readonly { id: string; title: string; description: string; e
 
 /**
  * Raporlar sekmesi (?sekme=raporlar&donem=6|12|24): ofisin TEK kâr/zarar ekranı. Aylık net, komisyon/diğer gelir/KDV/pay/gider
- * kırılımı (hesap TEK fonksiyon: `computeOfficePnl`), kategori kırılımı (finance_pnl), danışman ve portal kârlılığı ve rapor
+ * kırılımı (hesap TEK fonksiyon: `computeOfficePnl`), kategori kırılımı (finance_pnl), geçen yılla karşılaştırma ve gelir
+ * kaynakları (`raporlar-yoy.tsx`, finance_pnl 24 ay), danışman ve portal kârlılığı ve rapor
  * merkezi bağlantıları. Ofisin toplam kazancı yalnız `earnings_all` sahibine; danışman kırılımı yalnız ofis sahibi / GM'ye.
  */
 export async function RaporlarTab({ params, perms, isOwnerGm, tenantId, userId }: FinanceTabProps) {
@@ -83,6 +85,11 @@ export async function RaporlarTab({ params, perms, isOwnerGm, tenantId, userId }
       body = (
         <>
           <PnlSection pl={pl} cash={data.cashPnl ?? null} labelOf={(k) => labels.get(k) ?? k} from={from} to={to} period={period} />
+          {pl.hasData ? (
+            <Suspense fallback={<SkeletonCard height={320} label="Geçen yılla karşılaştırma yükleniyor" />}>
+              <YoyCard current={current} labelOf={(k) => labels.get(k) ?? k} />
+            </Suspense>
+          ) : null}
           {isOwnerGm && pl.hasData ? (
             <Suspense fallback={<SkeletonCard height={320} label="Danışman kârlılığı yükleniyor" />}>
               <AdvisorProfitCard tenantId={tenantId} userId={userId} firstMonthKey={firstKey} />
