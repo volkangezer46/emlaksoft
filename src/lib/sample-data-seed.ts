@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DAY_MS, now } from "@/lib/clock";
+import { DAY_MS, now, trDayKey, trDayStartMs } from "@/lib/clock";
 import { resolveGeo } from "@/lib/geo/resolve";
 import { seedModuleData } from "@/lib/sample-data/modules-seed";
 
@@ -45,16 +45,17 @@ export type SampleSeedReport = {
   failed: { group: string; message: string }[];
 };
 
-/** Bugünün belirli saatine ISO damgası (ör. 14:00) — randevu/görev vadesi için. */
+/**
+ * Bugünün (TÜRKİYE günü) belirli saatine ISO damgası (ör. 14:00) — randevu/görev vadesi için. Sunucu yerel saatine
+ * (`setHours`) bağlı değil (B076: UTC konteynerde 14:00 TR yerine 17:00 TR yazılıyordu).
+ */
 function todayAtIso(hour: number, minute = 0, dayOffset = 0): string {
-  const d = new Date(now() + dayOffset * DAY_MS);
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
+  return new Date(trDayStartMs(now() + dayOffset * DAY_MS) + hour * 3_600_000 + minute * 60_000).toISOString();
 }
 
-/** `YYYY-MM-DD` — bugünden `dayOffset` gün sonrası. */
+/** `YYYY-MM-DD` — bugünden (TR günü) `dayOffset` gün sonrası. */
 function dateKey(dayOffset: number): string {
-  return new Date(now() + dayOffset * DAY_MS).toISOString().slice(0, 10);
+  return trDayKey(now() + dayOffset * DAY_MS);
 }
 
 /** Bulunulan ayın başından `monthsBack` ay önceki ayın 1'i (`YYYY-MM-01`). */

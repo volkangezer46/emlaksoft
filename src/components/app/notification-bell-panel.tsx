@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, startTransition, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, startTransition, type RefObject } from "react";
+import { Anchor as PopoverAnchor } from "@radix-ui/react-popover";
 import Link from "@/components/ui/smart-link";
 import {
   AlertOctagon,
   AlertTriangle,
-  Bell,
   BellOff,
   CheckCheck,
   CheckCircle2,
@@ -22,11 +22,20 @@ import {
 } from "@/app/actions/notifications";
 import { filterByNotifPrefs, readNotifPrefs, type NotifPrefs } from "@/components/app/notification-prefs";
 import { useToast } from "@/components/app/toast-provider";
-import { markAllRead, markReadById, runOptimistic } from "@/lib/optimistic";
+import { runOptimistic } from "@/lib/optimistic";
 import { daysFromNowIso, msSince, now as clockNow, trDayStartMs } from "@/lib/clock";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDateTimeTr } from "@/lib/format";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import { AutoAnimate } from "@/components/ui/auto-animate";
-import { notificationHref, stripNotificationMarker } from "@/lib/notification-text";
+import {
+  markBellAllRead,
+  markBellItemRead,
+  notificationHref,
+  revertBellAllRead,
+  stripNotificationMarker,
+  unmarkBellItemRead,
+} from "@/lib/notification-text";
+import type { BellState, BellStateSetter } from "./notification-bell";
 
 const KIND_META: Record<string, { icon: LucideIcon; cls: string }> = {
   success: { icon: CheckCircle2, cls: "bg-mint-500/12 text-mint-600" },
@@ -60,95 +69,84 @@ function groupByTime(items: NotificationRow[]) {
   return groups.filter((g) => g.items.length > 0);
 }
 
+const REL_DATE: Intl.DateTimeFormatOptions = { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" };
+
 function relTime(iso: string) {
   const mins = Math.floor(msSince(iso) / 60_000);
   if (mins < 1) return "şimdi";
   if (mins < 60) return `${mins} dk önce`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs} sa önce`;
-  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+  return formatDateTimeTr(iso, REL_DATE);
 }
 
+/**
+ * Zil paneli İÇERİĞİ. Düğme ve açık/kapalı durumu kabukta (`notification-bell.tsx`); burası Radix Popover'ı kabuğun
+ * düğmesine bağlar (`PopoverAnchor virtualRef`), düğmeye basış dış tıklama sayılmaz (kabuk aç/kapa yapar).
+ * Yükseklik Radix'in verdiği kullanılabilir yükseklikle sınırlı: başlık + sekmeler + alt bağlantılar sabit, yalnız
+ * liste içten kayar (yatay telefonda da "Tümünü gör" erişilebilir).
+ * Okundu eylemleri iyimserdir: sayaç anında düşer, sunucu reddederse geri alınır ve toast çıkar.
+ */
 export function NotificationBellPanel({
-  items,
-  setItems,
-  shake,
-  setShake,
+  state,
+  setState,
+  open,
+  onOpenChange,
+  anchorRef,
+  onReady,
 }: {
-  items: NotificationRow[];
-  setItems: Dispatch<SetStateAction<NotificationRow[]>>;
-  shake: boolean;
-  setShake: (v: boolean) => void;
+  state: BellState;
+  setState: BellStateSetter;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  anchorRef: RefObject<HTMLButtonElement | null>;
+  onReady: () => void;
 }) {
   const { push } = useToast();
-  // Panel yalnız kullanıcı zile bastığında yüklenir → açık başlar; tercihler localStorage'dan.
-  const [open, setOpen] = useState(true);
   const [prefs, setPrefs] = useState<NotifPrefs | null>(() => readNotifPrefs());
   const [tab, setTab] = useState<"all" | "unread">("all");
   const [markingAll, setMarkingAll] = useState(false);
 
-  // İlk açılışta listeyi sunucudan tazele (kabuk yalnız `initial` + canlı olayları taşır).
+  // Bağlandı: kabuktaki hafif örtü kalkar (içerik bu commit'te DOM'da).
   useEffect(() => {
+    onReady();
+  }, [onReady]);
+
+  // Her açılışta listeyi ve sayacı sunucudan tazele; tercihler de o an okunur (localStorage).
+  useEffect(() => {
+    if (!open) return;
     let alive = true;
     void listMyNotifications().then((next) => {
-      if (alive) startTransition(() => setItems(next));
+      if (!alive) return;
+      startTransition(() => {
+        setPrefs(readNotifPrefs());
+        setState((s) => ({ items: next.items, unread: next.unreadTotal, pulse: next.unreadTotal > s.unread ? s.pulse + 1 : s.pulse }));
+      });
     });
     return () => {
       alive = false;
     };
-  }, [setItems]);
+  }, [open, setState]);
 
+  const items = state.items;
   const visible = useMemo(() => {
     if (!prefs) return items;
     return items.filter((n) => filterByNotifPrefs(n.title, n.body, prefs));
   }, [items, prefs]);
 
-  const unread = visible.filter((n) => !n.read_at).length;
+  // Sayaç sunucunun gerçek sayımıdır (zil rozetiyle aynı); sekme listesi yüklü satırlardan süzülür.
+  const unread = state.unread;
   const shown = tab === "unread" ? visible.filter((n) => !n.read_at) : visible;
   const groups = groupByTime(shown);
 
-  // App Badge API: PWA yüklüyse ana ekran ikonunda okunmamış rozeti.
-  // Desteklemeyen tarayıcılarda (typeof kontrolü) sessizce atlanır.
-  useEffect(() => {
-    const nav = navigator as Navigator & {
-      setAppBadge?: (count?: number) => Promise<void>;
-      clearAppBadge?: () => Promise<void>;
-    };
-    try {
-      if (unread > 0 && typeof nav.setAppBadge === "function") {
-        void nav.setAppBadge(unread).catch(() => {});
-      } else if (unread === 0 && typeof nav.clearAppBadge === "function") {
-        void nav.clearAppBadge().catch(() => {});
-      }
-    } catch {
-      // Rozet desteklenmiyor — görsel zil sayacı zaten var.
-    }
-  }, [unread]);
-
-  async function refresh() {
-    const next = await listMyNotifications();
-    startTransition(() => setItems(next));
-  }
-
-  async function onOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    if (nextOpen) {
-      // Tercihler localStorage'dan okunuyor; efekt yerine burada — panel
-      // açılmadan değerine ihtiyaç yok ve olay içinde okumak daha doğrudan.
-      setPrefs(readNotifPrefs());
-      await refresh();
-    }
-  }
-
   async function onRead(id: string) {
-    // Okunmuşa tekrar tıklanınca sunucuya boş yere yazma + revalidate olmasın.
+    // Okunmuşa tekrar tıklanınca sunucuya boş yere yazılmasın.
     if (items.find((n) => n.id === id)?.read_at) return;
-    const before = items;
-    // Anında okundu göster; sunucu hata verirse eski listeye dön + toast.
+    const markedAt = daysFromNowIso(0);
     await runOptimistic({
-      apply: () => setItems((prev) => markReadById(prev, id, daysFromNowIso(0)) as NotificationRow[]),
+      apply: () => setState((s) => markBellItemRead(s, id, markedAt)),
       commit: () => markNotificationRead(id),
-      rollback: () => setItems(before),
+      rollback: () => setState((s) => unmarkBellItemRead(s, id, markedAt)),
       onError: (m) => push(m, "err"),
       fallbackError: "Bildirim okundu işaretlenemedi",
     });
@@ -157,12 +155,13 @@ export function NotificationBellPanel({
   async function onReadAll() {
     if (markingAll) return;
     setMarkingAll(true);
-    const before = items;
-    // Liste anında okunmuş görünür (spinner yalnız çifte tıklamayı engeller).
+    const before = state;
+    const markedAt = daysFromNowIso(0);
+    // Liste ve rozet anında okunmuş görünür (spinner yalnız çifte tıklamayı engeller).
     await runOptimistic({
-      apply: () => setItems((prev) => markAllRead(prev, daysFromNowIso(0))),
+      apply: () => setState((s) => markBellAllRead(s, markedAt)),
       commit: () => markAllNotificationsRead(),
-      rollback: () => setItems(before),
+      rollback: () => setState((s) => revertBellAllRead(s, before, markedAt)),
       onError: (m) => push(m, "err"),
       fallbackError: "Bildirimler okundu işaretlenemedi",
     });
@@ -194,7 +193,7 @@ export function NotificationBellPanel({
         href={href}
         onClick={() => {
           void onRead(n.id);
-          setOpen(false);
+          onOpenChange(false);
         }}
         className="block border-b border-line last:border-0"
       >
@@ -208,119 +207,117 @@ export function NotificationBellPanel({
   }
 
   return (
-    <Popover open={open} onOpenChange={(nextOpen) => void onOpenChange(nextOpen)}>
-      {/* Yeni bildirimde zile tek seferlik küçük sallanma; hareket azaltma
-          tercihinde kapalı. Global stile dokunmamak için bileşen içi <style>. */}
-      <style>{`
-        @keyframes es-bell-shake {
-          0%, 100% { transform: rotate(0deg); }
-          20% { transform: rotate(12deg); }
-          40% { transform: rotate(-10deg); }
-          60% { transform: rotate(6deg); }
-          80% { transform: rotate(-3deg); }
-        }
-        .es-bell-shake { animation: es-bell-shake 0.55s ease-in-out 1; transform-origin: 50% 0%; }
-        @media (prefers-reduced-motion: reduce) {
-          .es-bell-shake { animation: none; }
-        }
-      `}</style>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="focus-ring relative grid h-11 w-11 place-items-center sm:h-10 sm:w-10 rounded-[var(--radius-control)] border border-line bg-surface text-text-muted transition hover:border-brand-300 hover:text-brand-600"
-          aria-label={`Bildirimler${unread > 0 ? ` (${unread} okunmamış)` : ""}`}
-        >
-          <Bell className={`h-4 w-4${shake ? " es-bell-shake" : ""}`} onAnimationEnd={() => setShake(false)} />
-          {unread > 0 ? (
-            <span aria-hidden="true" className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full border-2 border-white bg-danger-500 px-1 text-xs font-bold leading-none text-white">
-              {unread > 9 ? "9+" : unread}
-            </span>
-          ) : null}
-        </button>
-      </PopoverTrigger>
-
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverAnchor virtualRef={anchorRef} />
       <PopoverContent
         aria-label="Bildirimler"
-        className="w-[min(380px,calc(100vw-1.5rem))] p-0"
+        className="flex w-[min(380px,calc(100vw-1.5rem))] flex-col p-0"
+        style={{ maxHeight: "min(36rem, var(--radix-popover-content-available-height, 36rem))" }}
         align="end"
+        collisionPadding={8}
+        // Zil düğmesine basış "dış tıklama" sayılmaz: aç/kapa kabuktaki düğmenin işidir (yoksa kapanıp yeniden açılırdı).
+        onInteractOutside={(e) => {
+          const target = e.target as Node | null;
+          if (target && anchorRef.current?.contains(target)) e.preventDefault();
+        }}
+        // Kapanınca odak zil düğmesine döner (Radix tetikleyicisi yok; düğme kabukta).
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          anchorRef.current?.focus();
+        }}
       >
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <div className="flex items-center gap-2">
-                <p className="font-display text-sm font-bold text-ink-950">Bildirimler</p>
-                {unread > 0 ? (
-                  <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-xs font-bold text-danger-600">{unread} yeni</span>
-                ) : null}
-              </div>
-              {unread > 0 ? (
-                <button type="button" disabled={markingAll} onClick={onReadAll} className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline disabled:opacity-60">
-                  {markingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
-                  {markingAll ? "İşleniyor…" : "Tümünü oku"}
-                </button>
-              ) : null}
-            </div>
-
-            {/* Sekmeler */}
-            <div role="tablist" aria-label="Bildirim görünümü" className="flex gap-1 border-b border-line px-2 py-1.5">
-              {([
-                { key: "all", label: "Tümü" },
-                { key: "unread", label: `Okunmamış${unread > 0 ? ` (${unread})` : ""}` },
-              ] as const).map((t) => (
-                <button
-                  key={t.key}
-                  type="button"
-                  role="tab"
-                  id={`notification-tab-${t.key}`}
-                  aria-selected={tab === t.key}
-                  aria-controls="notification-tabpanel"
-                  onClick={() => setTab(t.key)}
-                  className={`rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition ${tab === t.key ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:bg-canvas"}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-
-            <div
-              id="notification-tabpanel"
-              role="tabpanel"
-              aria-labelledby={`notification-tab-${tab}`}
-              className="max-h-96 overflow-y-auto"
+        <div className="flex shrink-0 items-center justify-between border-b border-line px-4 py-3">
+          <div className="flex items-center gap-2">
+            <p className="font-display text-sm font-bold text-ink-950">Bildirimler</p>
+            {unread > 0 ? (
+              <span className="rounded-full bg-danger-500/10 px-1.5 py-0.5 text-xs font-bold text-danger-600">{unread} yeni</span>
+            ) : null}
+          </div>
+          {unread > 0 ? (
+            <button
+              type="button"
+              disabled={markingAll}
+              onClick={onReadAll}
+              className="focus-ring inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:underline disabled:opacity-60 touch:min-h-11"
             >
-              {shown.length === 0 ? (
-                <div className="grid place-items-center px-4 py-12 text-center">
-                  <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-canvas text-text-faint">
-                    <BellOff className="h-6 w-6" />
-                  </span>
-                  <p className="mt-3 text-sm font-medium text-ink-950">{tab === "unread" ? "Okunmamış bildirim yok" : "Bildirim yok"}</p>
-                  <p className="mt-0.5 text-xs text-text-muted">Yeni etkinlikler burada görünecek.</p>
-                </div>
-              ) : (
-                groups.map((g) => (
-                  <AutoAnimate key={g.label}>
-                    <p className="sticky top-0 z-10 bg-canvas px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</p>
-                    {g.items.map(renderItem)}
-                  </AutoAnimate>
-                ))
-              )}
-            </div>
+              {markingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+              {markingAll ? "İşleniyor…" : "Tümünü oku"}
+            </button>
+          ) : null}
+        </div>
 
-            {/* Arşiv: tüm bildirimlerin filtreli/sayfalı tam listesi */}
-            <div className="flex divide-x divide-line border-t border-line">
-              <Link
-                href="/app/bildirimler"
-                onClick={() => setOpen(false)}
-                className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
-              >
-                Tümünü gör
-              </Link>
-              <Link
-                href="/app/bildirimler?sekme=duyurular"
-                onClick={() => setOpen(false)}
-                className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas"
-              >
-                Duyurular
-              </Link>
+        {/* Sekmeler */}
+        <div role="tablist" aria-label="Bildirim görünümü" className="flex shrink-0 gap-1 border-b border-line px-2 py-1.5">
+          {([
+            { key: "all", label: "Tümü" },
+            { key: "unread", label: `Okunmamış${unread > 0 ? ` (${unread})` : ""}` },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              id={`notification-tab-${t.key}`}
+              aria-selected={tab === t.key}
+              aria-controls="notification-tabpanel"
+              onClick={() => setTab(t.key)}
+              className={`rounded-[var(--radius-control)] px-3 py-1.5 text-xs font-semibold transition touch:min-h-11 ${tab === t.key ? "bg-brand-600/10 text-brand-600" : "text-text-muted hover:bg-canvas"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          id="notification-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`notification-tab-${tab}`}
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
+          {shown.length === 0 ? (
+            <div className="grid place-items-center px-4 py-12 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-[var(--radius-card)] bg-canvas text-text-faint">
+                <BellOff className="h-6 w-6" />
+              </span>
+              <p className="mt-3 text-sm font-medium text-ink-950">
+                {tab === "unread" && unread > 0 ? "Son bildirimlerin hepsi okundu" : tab === "unread" ? "Okunmamış bildirim yok" : "Bildirim yok"}
+              </p>
+              <p className="mt-0.5 text-xs text-text-muted">
+                {tab === "unread" && unread > 0 ? (
+                  <Link href="/app/bildirimler?durum=okunmamis" onClick={() => onOpenChange(false)} className="font-semibold text-brand-600 hover:underline">
+                    Daha eski {unread} okunmamışı gör
+                  </Link>
+                ) : (
+                  "Yeni etkinlikler burada görünecek."
+                )}
+              </p>
             </div>
+          ) : (
+            groups.map((g) => (
+              <AutoAnimate key={g.label}>
+                <p className="sticky top-0 z-10 bg-canvas px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">{g.label}</p>
+                {g.items.map(renderItem)}
+              </AutoAnimate>
+            ))
+          )}
+        </div>
+
+        {/* Arşiv: tüm bildirimlerin filtreli/sayfalı tam listesi */}
+        <div className="flex shrink-0 divide-x divide-line border-t border-line">
+          <Link
+            href="/app/bildirimler"
+            onClick={() => onOpenChange(false)}
+            className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas touch:min-h-11"
+          >
+            Tümünü gör
+          </Link>
+          <Link
+            href="/app/bildirimler?sekme=duyurular"
+            onClick={() => onOpenChange(false)}
+            className="block flex-1 px-4 py-2.5 text-center text-xs font-semibold text-brand-600 transition hover:bg-canvas touch:min-h-11"
+          >
+            Duyurular
+          </Link>
+        </div>
       </PopoverContent>
     </Popover>
   );

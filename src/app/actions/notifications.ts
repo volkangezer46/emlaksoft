@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { isMissingFunctionError, rpcKnownMissing, recordRpcOutcome } from "@/lib/supabase/rpc-probe";
+import { parseNotificationCounts } from "@/lib/notification-text";
+
+/**
+ * Bildirim okuma/okundu eylemleri — okunma durumu KİŞİ BAŞINA `notification_reads` tablosunda (migration
+ * 20261016050000). Ofis geneli bildirim (user_id NULL) her kullanıcı için ayrı okunur; salt okunur dahil herkes yazar.
+ * Okundu eylemleri `requirePermission`'dan GEÇMEZ (sözleşme m: kişinin kendi okuma durumu iş verisi değildir);
+ * kiracı + oturum kapısı `requireActiveTenant`, satır sınırı RLS (yalnız kendi satırı, yalnız görebildiği bildirim).
+ * Okunmamış sayısı tek kaynaktan: `my_notification_counts()` (zil + /app/bildirimler aynı değer).
+ * Migration yokken (tablo/RPC yok) eski tek-sütun (`notifications.read_at`) yoluna düşer.
+ */
 
 export type NotificationRow = {
   id: string;
@@ -15,72 +26,155 @@ export type NotificationRow = {
   created_at: string;
 };
 
-export async function listMyNotifications(): Promise<NotificationRow[]> {
-  const gate = await requireActiveTenant();
-  if (!gate.ok) return [];
+/** Zil akışı: en yeni 30 kayıt + GERÇEK okunmamış sayısı (listeden sayılmaz). */
+export type NotificationFeed = { items: NotificationRow[]; unreadTotal: number };
 
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("notifications")
-    .select("id, title, body, href, kind, read_at, created_at")
-    .or(`user_id.eq.${gate.userId},user_id.is.null`)
-    .order("created_at", { ascending: false })
-    .limit(30);
+export type NotificationReadResult = { ok: true } | { ok?: false; error: string };
 
-  return (data ?? []) as NotificationRow[];
+const FEED_LIMIT = 30;
+const FORM_MAX_IDS = 50;
+const COUNTS_RPC = "my_notification_counts";
+const MARK_RPC = "mark_my_notifications_read";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Tablo/ilişki henüz yok (migration uygulanmadı): PostgREST ilişki/şema önbelleği ya da Postgres "relation yok". */
+const RELATION_MISSING = new Set(["PGRST200", "PGRST205", "42P01"]);
+
+type Gate = { userId: string; tenantId: string };
+type Db = Awaited<ReturnType<typeof createClient>>;
+type ReadEmbed = { read_at: string | null }[] | { read_at: string | null } | null;
+
+function mineFilter(userId: string): string {
+  return `user_id.eq.${userId},user_id.is.null`;
 }
 
-export async function markNotificationRead(id: string): Promise<void> {
-  const gate = await requireActiveTenant();
-  if (!gate.ok || !id) return;
-  const supabase = await createClient();
-  await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId);
-  revalidatePath("/app", "layout");
+function embeddedReadAt(reads: ReadEmbed): string | null {
+  if (!reads) return null;
+  if (Array.isArray(reads)) return reads[0]?.read_at ?? null;
+  return reads.read_at ?? null;
 }
 
-export async function markAllNotificationsRead(): Promise<void> {
+/** Eski yol (migration öncesi): okunma tek sütunda. */
+async function legacyFeed(supabase: Db, gate: Gate): Promise<NotificationFeed> {
+  const [{ data }, { count }] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id, title, body, href, kind, read_at, created_at")
+      .or(mineFilter(gate.userId))
+      .order("created_at", { ascending: false })
+      .limit(FEED_LIMIT),
+    supabase.from("notifications").select("id", { count: "exact", head: true }).or(mineFilter(gate.userId)).is("read_at", null),
+  ]);
+  return { items: (data ?? []) as NotificationRow[], unreadTotal: count ?? 0 };
+}
+
+export async function listMyNotifications(): Promise<NotificationFeed> {
   const gate = await requireActiveTenant();
-  if (!gate.ok) return;
+  if (!gate.ok) return { items: [], unreadTotal: 0 };
   const supabase = await createClient();
-  await supabase
+  if (rpcKnownMissing(COUNTS_RPC)) return legacyFeed(supabase, gate);
+
+  const [list, counts] = await Promise.all([
+    supabase
+      .from("notifications")
+      .select("id, title, body, href, kind, created_at, reads:notification_reads(read_at)")
+      .or(mineFilter(gate.userId))
+      .eq("reads.user_id", gate.userId)
+      .order("created_at", { ascending: false })
+      .limit(FEED_LIMIT),
+    supabase.rpc(COUNTS_RPC),
+  ]);
+  recordRpcOutcome(COUNTS_RPC, counts.error);
+  if (isMissingFunctionError(counts.error) || RELATION_MISSING.has(list.error?.code ?? "")) return legacyFeed(supabase, gate);
+
+  const items: NotificationRow[] = ((list.data ?? []) as (Omit<NotificationRow, "read_at"> & { reads: ReadEmbed })[]).map(
+    ({ reads, ...n }) => ({ ...n, read_at: embeddedReadAt(reads) }),
+  );
+  // Sayım okunamazsa (geçici hata) listedeki okunmamışlar en azından sıfırın altına düşmez.
+  const unreadTotal = counts.error ? items.filter((n) => !n.read_at).length : parseNotificationCounts(counts.data).unread;
+  return { items, unreadTotal };
+}
+
+/** Yalnız sayaç (ikinci cihazdaki toplu okuma sonrası zilin yeniden eşlenmesi). */
+export async function getMyUnreadNotificationCount(): Promise<{ unread: number } | { error: string }> {
+  const gate = await requireActiveTenant();
+  if (!gate.ok) return { error: gate.error };
+  const supabase = await createClient();
+  if (!rpcKnownMissing(COUNTS_RPC)) {
+    const { data, error } = await supabase.rpc(COUNTS_RPC);
+    recordRpcOutcome(COUNTS_RPC, error);
+    if (!error) return { unread: parseNotificationCounts(data).unread };
+    if (!isMissingFunctionError(error)) return { error: actionErrorMessage(error, "Bildirim sayısı okunamadı") };
+  }
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .or(mineFilter(gate.userId))
+    .is("read_at", null);
+  if (error) return { error: actionErrorMessage(error, "Bildirim sayısı okunamadı") };
+  return { unread: count ?? 0 };
+}
+
+/** ids = null → görebildiği tüm okunmamışlar. Tek tur (RPC); migration yoksa eski tek-sütun güncellemesi. */
+async function markRead(ids: string[] | null, fallbackError: string): Promise<NotificationReadResult> {
+  const gate = await requireActiveTenant();
+  if (!gate.ok) return { error: gate.error };
+  if (gate.impersonating) return { error: "Ofis görüntüleme modunda bildirimler okundu işaretlenmez." };
+  if (ids !== null && ids.length === 0) return { ok: true };
+  const supabase = await createClient();
+
+  if (!rpcKnownMissing(MARK_RPC)) {
+    const { error } = await supabase.rpc(MARK_RPC, { p_ids: ids });
+    recordRpcOutcome(MARK_RPC, error);
+    if (!error) return { ok: true };
+    if (!isMissingFunctionError(error)) return { error: actionErrorMessage(error, fallbackError) };
+  }
+
+  let q = supabase
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("tenant_id", gate.tenantId)
-    .or(`user_id.eq.${gate.userId},user_id.is.null`)
+    .or(mineFilter(gate.userId))
     .is("read_at", null);
-  revalidatePath("/app", "layout");
+  if (ids) q = q.in("id", ids);
+  const { error } = await q;
+  if (error) return { error: actionErrorMessage(error, fallbackError) };
+  return { ok: true };
+}
+
+function cleanIds(values: unknown[]): string[] {
+  return [...new Set(values.map((v) => String(v ?? "").trim()).filter((v) => UUID_RE.test(v)))].slice(0, FORM_MAX_IDS);
 }
 
 /**
- * /app/bildirimler arşiv sayfası için form-action sarmalayıcıları — server
- * component'te <form action={...}> yalnız FormData imzası kabul eder.
+ * Zil paneli (istemci) çağırır: yol yeniden doğrulanmaz — zil durumu istemcide iyimser tutulur, diğer cihaz/sekme
+ * 'reads:<uid>' yayınıyla eşlenir. Böylece her tıklama bütün /app önbelleğini düşürmez.
  */
-/** Gruplanmış satır ("× N") birden çok `id` gönderir; hepsi tek sorguda okundu işaretlenir (en çok bir sayfa: 50). */
-export async function markNotificationReadForm(formData: FormData): Promise<void> {
-  const ids = [...new Set(formData.getAll("id").map((v) => String(v ?? "").trim()).filter(Boolean))].slice(0, 50);
-  if (ids.length === 0) return;
-  if (ids.length === 1) {
-    await markNotificationRead(ids[0]);
-    return;
-  }
-  const gate = await requireActiveTenant();
-  if (!gate.ok) return;
-  const supabase = await createClient();
-  await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .in("id", ids)
-    .eq("tenant_id", gate.tenantId)
-    .or(`user_id.eq.${gate.userId},user_id.is.null`);
-  revalidatePath("/app", "layout");
+export async function markNotificationRead(id: string): Promise<NotificationReadResult> {
+  const ids = cleanIds([id]);
+  if (ids.length === 0) return { error: "Bildirim bulunamadı; sayfayı yenileyip tekrar deneyin." };
+  return markRead(ids, "Bildirim okundu işaretlenemedi");
 }
 
-export async function markAllNotificationsReadForm(): Promise<void> {
-  await markAllNotificationsRead();
+export async function markAllNotificationsRead(): Promise<NotificationReadResult> {
+  return markRead(null, "Bildirimler okundu işaretlenemedi");
+}
+
+/**
+ * /app/bildirimler sayfasının form eylemleri. Gruplanmış satır ("× N") birden çok `id` gönderir; hepsi tek turda
+ * okundu yazılır (en çok bir sayfa: 50). Sayfa kendini yeniler; zil yayınla eşlenir.
+ */
+export async function markNotificationReadForm(formData: FormData): Promise<NotificationReadResult> {
+  const ids = cleanIds(formData.getAll("id"));
+  if (ids.length === 0) return { error: "Bildirim bulunamadı; sayfayı yenileyip tekrar deneyin." };
+  const result = await markRead(ids, "Bildirim okundu işaretlenemedi");
+  if (result.ok) revalidatePath("/app/bildirimler");
+  return result;
+}
+
+export async function markAllNotificationsReadForm(): Promise<NotificationReadResult> {
+  const result = await markRead(null, "Bildirimler okundu işaretlenemedi");
+  if (result.ok) revalidatePath("/app/bildirimler");
+  return result;
 }
 
 /*

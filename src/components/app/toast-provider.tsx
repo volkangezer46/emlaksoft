@@ -4,7 +4,10 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState } fro
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 
 type Tone = "ok" | "err" | "info";
-/** İsteğe bağlı tek eylem (ör. "Geri al"): tıklanınca çalışır ve bildirim kapanır. Eylemli bildirim daha uzun kalır. */
+/**
+ * İsteğe bağlı tek eylem (ör. "Geri al"): tıklanınca çalışır ve bildirim kapanır. Eylemli bildirim en az 15 sn kalır
+ * (B073: 8 sn'de "Geri al" okunup basılamadan kayboluyordu); fare üstündeyken ya da odak içindeyken süre durur.
+ */
 export type ToastAction = { label: string; onClick: () => void };
 type Toast = { id: number; message: string; tone: Tone; action?: ToastAction; leaving?: boolean };
 type PushFn = (message: string, tone?: Tone, opts?: { action?: ToastAction }) => void;
@@ -12,7 +15,7 @@ type PushFn = (message: string, tone?: Tone, opts?: { action?: ToastAction }) =>
 const Ctx = createContext<{ push: PushFn } | null>(null);
 
 const DURATION = 4000;
-const ACTION_DURATION = 8000;
+const ACTION_DURATION = 15_000;
 const EXIT_MS = 160;
 
 const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: string }> = {
@@ -40,7 +43,8 @@ const TONE_STYLE: Record<Tone, { bar: string; icon: React.ReactNode; text: strin
  */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<Toast[]>([]);
-  const timers = useRef<Map<number, { timeout: number; remaining: number; startedAt: number }>>(
+  // `holds`: süreyi durduran etken sayısı (fare üstünde + odak içinde); ikisi de bitince sayaç kaldığı yerden sürer.
+  const timers = useRef<Map<number, { timeout: number; remaining: number; startedAt: number; holds: number }>>(
     new Map(),
   );
 
@@ -60,7 +64,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const schedule = useCallback(
     (id: number, ms: number) => {
       const timeout = window.setTimeout(() => remove(id), ms);
-      timers.current.set(id, { timeout, remaining: ms, startedAt: Date.now() });
+      timers.current.set(id, { timeout, remaining: ms, startedAt: Date.now(), holds: 0 });
     },
     [remove],
   );
@@ -77,6 +81,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const pause = useCallback((id: number) => {
     const timer = timers.current.get(id);
     if (!timer) return;
+    timer.holds += 1;
+    if (timer.holds > 1) return;
     window.clearTimeout(timer.timeout);
     timer.remaining = Math.max(0, timer.remaining - (Date.now() - timer.startedAt));
   }, []);
@@ -84,7 +90,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const resume = useCallback(
     (id: number) => {
       const timer = timers.current.get(id);
-      if (!timer) return;
+      if (!timer || timer.holds === 0) return;
+      timer.holds -= 1;
+      if (timer.holds > 0) return;
       schedule(id, Math.max(600, timer.remaining));
     },
     [schedule],
@@ -107,6 +115,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               key={t.id}
               onMouseEnter={() => pause(t.id)}
               onMouseLeave={() => resume(t.id)}
+              // Odak bildirimin içinde düğmeden düğmeye geçerken süre tek kez durur / tek kez sürer.
+              onFocus={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) pause(t.id);
+              }}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) resume(t.id);
+              }}
               className={`${t.leaving ? "toast-out" : "toast-in"} surface-card pointer-events-auto relative flex items-start gap-3 overflow-hidden rounded-[var(--radius-card)] py-3 pl-4 pr-2 shadow-[var(--inner-top),var(--elev-4)]`}
             >
               <span className={`absolute inset-y-0 left-0 w-[3px] ${s.bar}`} />

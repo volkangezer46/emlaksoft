@@ -83,7 +83,12 @@ export function formatListingPrice(
 }
 
 // ---------------------------------------------------------------------------
-// Tarih (Türkiye saat dilimi)
+// Tarih (Türkiye saat dilimi) — TEK tarih biçim yardımcısı (B076)
+//
+// Yeni kodda `Intl.DateTimeFormat` / `toLocale(Date|Time)String` / tarih `toLocaleString` DOĞRUDAN çağrılmaz
+// (timezone-contract.test.ts yeni timeZone'suz çağrıyı reddeder). Yalnız tarih tutan değer ("YYYY-MM-DD" ya da
+// "YYYY-MM-DDT00:00:00Z") da bu yardımcılarla doğru güne biçimlenir (UTC gece yarısı = TR 03:00, aynı gün).
+// Gün/ay SINIRI (gruplama, "bugün", hafta başı) biçim değil hesaptır: `src/lib/clock.ts` (`trDayKey`, `trDayStartMs`).
 // ---------------------------------------------------------------------------
 
 /** Varsayılan tarih biçimi: "05 Eki 2026". */
@@ -106,4 +111,9 @@ export function formatDateTimeTr(
   options: Intl.DateTimeFormatOptions = DEFAULT_DATETIME,
 ): string {
   return trFormat(value, options);
+}
+
+/** Türkiye saatiyle yalnız saat: "14:00". */
+export function formatTimeTr(value: FormatDateInput): string {
+  return trFormat(value, { hour: "2-digit", minute: "2-digit" });
 }

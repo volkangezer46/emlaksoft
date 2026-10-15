@@ -9,7 +9,7 @@ import { runControlReportDelivery } from "@/lib/listing-control/server/report-de
 import { tenantsDisabledFor } from "@/lib/modules/state";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 import { runOwnerWeeklyReports } from "@/lib/owner-report/run";
-import { trDayKey } from "@/lib/clock";
+import { DAY_MS, now, trDayKey, trDayStartMs, trParts } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
 
 /**
@@ -27,9 +27,13 @@ import { getBaseUrl } from "@/lib/base-url";
  */
 
 
-/** ISO-8601 hafta numarası — marker "YYYY-WW" için (yıl, ISO hafta yılıdır). */
-function isoWeek(d: Date): { year: number; week: number } {
-  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+/**
+ * ISO-8601 hafta numarası — marker "YYYY-WW" için (yıl, ISO hafta yılıdır). Girdi bir AN'dır; takvim günü Türkiye
+ * gününden alınır (B076: sunucu yerel saati UTC konteynerde pazartesi 00:00–03:00 TR'yi önceki haftaya yazıyordu).
+ */
+function isoWeek(atMs: number): { year: number; week: number } {
+  const p = trParts(atMs);
+  const t = new Date(Date.UTC(p.year, p.month, p.day));
   const day = t.getUTCDay() || 7; // Pzt=1 … Paz=7
   t.setUTCDate(t.getUTCDate() + 4 - day); // haftanın perşembesi
   const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
@@ -55,18 +59,17 @@ async function run(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  // Geçen haftanın kapalı aralığı [weekStart, weekEnd): bu haftanın pazartesi
-  // 00:00'ı biter, 7 gün öncesi başlar (gunluk-ozet'teki yerel saat deseni).
-  const weekEnd = new Date();
-  weekEnd.setHours(0, 0, 0, 0);
-  const dow = weekEnd.getDay() || 7; // Pzt=1 … Paz=7
-  weekEnd.setDate(weekEnd.getDate() - (dow - 1));
-  const weekStart = new Date(weekEnd.getTime() - 7 * 86_400_000);
-  const startIso = weekStart.toISOString();
-  const endIso = weekEnd.toISOString();
+  // Geçen haftanın kapalı aralığı [weekStart, weekEnd): bu haftanın pazartesi 00:00'ı (TÜRKİYE saati) biter,
+  // 7 gün öncesi başlar. Türkiye'de yaz saati yok: gün = 24 saat, TZ ortamından bağımsız.
+  const nowMs = now();
+  const dow = trParts(nowMs).weekday || 7; // Pzt=1 … Paz=7
+  const weekEndMs = trDayStartMs(nowMs) - (dow - 1) * DAY_MS;
+  const weekStartMs = weekEndMs - 7 * DAY_MS;
+  const startIso = new Date(weekStartMs).toISOString();
+  const endIso = new Date(weekEndMs).toISOString();
 
   // Özetlenen haftanın marker'ı — tenant başına haftada tek bildirim.
-  const { year, week } = isoWeek(weekStart);
+  const { year, week } = isoWeek(weekStartMs);
   const markerHref = `/app/raporlar?hafta=${year}-${String(week).padStart(2, "0")}`;
 
   const deadline = cronDeadline(Date.now());

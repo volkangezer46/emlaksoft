@@ -4,17 +4,33 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * Doğum günü / yıldönümü cron'u (BUG-3): Türkiye günü, sayfalı okuma (1000 satır sınırında kesilmez),
  * artık yıl olmayan yılda 28 Şubat'ta 29 Şubat doğumlular, modül kapısı ve heartbeat notları.
+ * SK5 (B073): bildirim KİŞİYE gider (müşterinin danışmanı; yoksa ofis sahibi), ofis geneline (user_id NULL) gitmez.
  */
 type Row = Record<string, unknown>;
 
 const h = vi.hoisted(() => ({
   customers: [] as Row[],
+  profiles: [] as Row[],
   inserted: [] as Row[],
   ranges: [] as Array<[number, number]>,
   readError: null as null | { message: string },
   disabled: new Map<string, Set<string>>(),
   heartbeat: vi.fn(async (..._args: unknown[]) => true),
 }));
+
+function profilesQuery() {
+  const filters: Array<(r: Row) => boolean> = [];
+  const chain = {
+    select: () => chain,
+    eq: (k: string, v: unknown) => (filters.push((r) => r[k] === v), chain),
+    in: (k: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[k])), chain),
+    order: () => chain,
+    range: () => chain,
+    then: <T,>(resolve: (v: { data: Row[] | null; error: { message: string } | null }) => T) =>
+      Promise.resolve(resolve({ data: h.profiles.filter((r) => filters.every((f) => f(r))), error: null })),
+  };
+  return chain;
+}
 
 function customersQuery() {
   const filters: Array<(r: Row) => boolean> = [];
@@ -46,7 +62,9 @@ vi.mock("@/lib/supabase/admin", () => ({
     from: (table: string) =>
       table === "customers"
         ? customersQuery()
-        : {
+        : table === "profiles"
+          ? profilesQuery()
+          : {
             insert: async (rows: Row[]) => {
               h.inserted.push(...rows);
               return { error: null };
@@ -69,6 +87,7 @@ const customer = (id: string, tenant: string, birth: string | null, extra: Row =
   id,
   full_name: `Müşteri ${id}`,
   tenant_id: tenant,
+  assigned_to: `adv-${tenant}`,
   birth_date: birth,
   anniversary_date: null,
   anniversary_note: null,
@@ -80,9 +99,17 @@ const customer = (id: string, tenant: string, birth: string | null, extra: Row =
 const call = () => GET(new NextRequest("http://localhost/api/cron/dogum-gunu"));
 const bodyOf = async () => (await (await call()).json()) as { birthdays: number; anniversaries: number; tenants_notified: number; date: string };
 
+/** Her ofiste bir danışman (`adv-<ofis>`) ve bir sahip (`own-<ofis>`). */
+const staffFor = (...tenants: string[]): Row[] =>
+  tenants.flatMap((t) => [
+    { id: `adv-${t}`, tenant_id: t, role: "advisor", is_active: true },
+    { id: `own-${t}`, tenant_id: t, role: "owner", is_active: true },
+  ]);
+
 beforeEach(() => {
   vi.clearAllMocks();
   h.customers = [];
+  h.profiles = staffFor("t1", "t0", "t2", "t-late", "t-open", "t-closed");
   h.inserted = [];
   h.ranges = [];
   h.readError = null;
@@ -102,7 +129,7 @@ describe("dogum-gunu cron", () => {
     expect(body.date).toBe("10/5");
     expect(body.birthdays).toBe(1);
     expect(h.inserted).toHaveLength(1);
-    expect(String(h.inserted[0]!.body)).toContain("Müşteri a");
+    expect(String(h.inserted[0]!.title)).toContain("Müşteri a");
   });
 
   it("1000 satırı aşan listeyi sayfalayarak sonuna kadar okur", async () => {
@@ -139,6 +166,7 @@ describe("dogum-gunu cron", () => {
     await call();
     expect(h.inserted.map((r) => r.tenant_id)).toEqual(["t-open"]);
     expect(String(h.inserted[0]!.body)).toContain("ev alımı");
+    expect(String(h.inserted[0]!.title)).toContain("Yıldönümü: Müşteri a");
     expect(h.heartbeat.mock.calls.at(-1)![2]).toContain("1 ofis atlandı");
   });
 
@@ -151,5 +179,35 @@ describe("dogum-gunu cron", () => {
     const [, status, detail] = h.heartbeat.mock.calls.at(-1)!;
     expect(status).toBe("error");
     expect(String(detail)).toContain("okuması kısmi: zaman aşımı");
+  });
+
+  it("kişiye gider: müşterinin danışmanına; danışmanı yok/pasifse ofis sahibine; ofis geneline (user_id NULL) asla", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-10T09:00:00Z"));
+    h.profiles = [
+      { id: "adv-1", tenant_id: "t1", role: "advisor", is_active: true },
+      { id: "own-1", tenant_id: "t1", role: "owner", is_active: true },
+      { id: "own-2", tenant_id: "t1", role: "owner", is_active: true },
+      { id: "adv-x", tenant_id: "t2", role: "advisor", is_active: true },
+    ];
+    h.customers = [
+      customer("a", "t1", "1990-05-10", { assigned_to: "adv-1" }),
+      customer("b", "t1", "1991-05-10", { assigned_to: null }),
+      // Başka ofisin profili danışman yazılmış (bozuk veri): o kişiye gitmez, sahiplere düşer.
+      customer("c", "t1", "1992-05-10", { assigned_to: "adv-x" }),
+      // Danışmanı pasif (profil listesinde yok) ve ofiste sahip yok: alıcısız, not düşülür.
+      customer("d", "t3", "1993-05-10", { assigned_to: "adv-gone" }),
+    ];
+    const body = (await (await call()).json()) as { notifications: number };
+    const byCustomer = (id: string) => h.inserted.filter((r) => r.href === `/app/musteriler/${id}`).map((r) => r.user_id).sort();
+    expect(byCustomer("a")).toEqual(["adv-1"]);
+    expect(byCustomer("b")).toEqual(["own-1", "own-2"]);
+    expect(byCustomer("c")).toEqual(["own-1", "own-2"]);
+    expect(byCustomer("d")).toEqual([]);
+    expect(h.inserted.every((r) => typeof r.user_id === "string" && r.user_id)).toBe(true);
+    expect(body.notifications).toBe(5);
+    // Aynı gün ikinci koşu yinelenmesin: kişi + müşteri + gün anahtarı.
+    expect(h.inserted.find((r) => r.href === "/app/musteriler/a")!.dedupe_key).toBe("ozel-gun:dogum:a:adv-1:2026-05-10");
+    expect(h.heartbeat.mock.calls.at(-1)![2]).toContain("1 müşteri için alıcı yok");
   });
 });

@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
-import { now } from "@/lib/clock";
+import { DAY_MS, now, trDayKey } from "@/lib/clock";
+import { formatDateTimeTr, formatDateTr } from "@/lib/format";
 import { CallConsole } from "./call-console";
 import { CallAiSummary } from "./call-ai-summary";
 import { LinkToCustomer } from "./link-to-customer";
@@ -169,13 +170,19 @@ export async function CallsView({
     return qs ? `/app/gelen-kutusu?sekme=cagri&${qs}` : "/app/gelen-kutusu?sekme=cagri";
   };
 
-  const today = new Date(now());
+  // Son 7 gün Türkiye gününe göre ayrılır (B076): UTC dilimi (`started_at.slice(0, 10)`) TR 00:00–03:00 arasındaki
+  // aramaları bir önceki güne yazıyordu. Anahtar ve etiket aynı TR gününden.
+  const nowMs = now();
+  const countByDay = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.started_at) continue;
+    const key = trDayKey(r.started_at);
+    countByDay.set(key, (countByDay.get(key) ?? 0) + 1);
+  }
   const volume = Array.from({ length: 7 }).map((_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - (6 - i));
-    const key = d.toISOString().slice(0, 10);
-    const count = rows.filter((r) => r.started_at?.slice(0, 10) === key).length;
-    return { label: d.toLocaleDateString("tr-TR", { weekday: "short" }), count };
+    const dayMs = nowMs - (6 - i) * DAY_MS;
+    const key = trDayKey(dayMs);
+    return { label: formatDateTr(dayMs, { weekday: "short" }), count: countByDay.get(key) ?? 0 };
   });
   const maxVol = Math.max(1, ...volume.map((v) => v.count));
   const answered = rows.filter((call) => call.direction !== "missed").length;
@@ -324,7 +331,7 @@ export async function CallsView({
                   </div>
                   <div><p className="text-xs text-text-faint">Sonuç</p><p className="text-xs font-semibold text-ink-950">{call.disposition ?? "Cevapsız"}</p></div>
                   <div><p className="text-xs text-text-faint">Süre</p><p className="text-xs font-semibold tabular-nums text-ink-950">{duration(call.duration_sec)}</p></div>
-                  <div className="text-xs text-text-muted">{new Intl.DateTimeFormat("tr-TR", { dateStyle: "short", timeStyle: "short" }).format(new Date(call.started_at))}</div>
+                  <div className="text-xs text-text-muted">{formatDateTimeTr(call.started_at, { dateStyle: "short", timeStyle: "short" })}</div>
                   {/* AI özet — yalnız notu olan çağrılarda ve anahtar server'da doğrulanınca */}
                   {aiEnabled && call.notes?.trim() ? <CallAiSummary callId={call.id} /> : null}
                   {!custId ? <div className="md:col-span-4"><LinkToCustomer kind="call" recordId={call.id} phone={call.phone} /></div> : null}

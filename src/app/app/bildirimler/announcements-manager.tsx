@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { toTrLocalInput } from "@/lib/clock";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Info, Loader2, Megaphone, Pencil, Pin, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -38,13 +39,13 @@ function fmtDate(iso: string | null): string {
   return formatDateTr(iso, { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** ISO → datetime-local input değeri (yerel saat, dakika hassasiyeti). */
+/**
+ * ISO → datetime-local input değeri (TÜRKİYE saati, dakika hassasiyeti). Sunucu girdiyi TR saati sayar
+ * (`parseTrLocalDateTime`); tarayıcının yerel saatiyle doldurmak yurt dışından düzenlemede saati kaydırıyordu (B076).
+ */
 function toLocalInput(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return toTrLocalInput(iso);
 }
 
 export function AnnouncementsManager({ announcements, teamCount }: { announcements: AnnouncementRow[]; teamCount: number }) {
