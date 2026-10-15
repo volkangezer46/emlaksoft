@@ -177,6 +177,8 @@ const RAPORLAR: HubDef = {
   icon: "baslikPerformans",
   pages: [
     p("/app/raporlar", "Genel"),
+    p("/app/raporlar/huni", "Satış hunisi"),
+    p("/app/raporlar/satis-hizi", "Satış hızı"),
     p("/app/bolge-analizi", "Bölge"),
     p("/app/raporlar/talep-arz", "Talep ve arz"),
     p("/app/anketler", "Anketler"),

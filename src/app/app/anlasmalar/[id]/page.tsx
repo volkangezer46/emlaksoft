@@ -16,6 +16,7 @@ import {
   StickyNote,
   HeartHandshake,
   History,
+  Hourglass,
   ListChecks,
   MessageSquareQuote,
   Tag,
@@ -26,7 +27,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { getLossReasonOptions, getStageLabels } from "@/lib/definitions";
 import { formatLossReason, lossReasonLabels } from "@/lib/loss-reason";
-import { now } from "@/lib/clock";
+import { DAY_MS, msSince, now, trDayKey } from "@/lib/clock";
 import { hasOfficeWideDataScope } from "@/lib/permission-data-scope";
 import { canSeeAllEarnings } from "@/lib/team/earnings-scope";
 import { Badge } from "@/components/ui/badge";
@@ -58,6 +59,18 @@ import { parseOutcomeParam } from "./kapanis-model";
 import { CopySurveyLinkButton, CreateSurveyButton } from "../../anketler/survey-actions";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { getSettings } from "@/lib/settings/read";
+import { expectedCloseStatus } from "@/lib/forecast/expected-close";
+import { ExpectedCloseField } from "./expected-close-field";
+import {
+  STAGE_STALE_SETTING_KEYS,
+  STALE_DAYS,
+  daysInStageLabel,
+  isOpenStageKey,
+  stageAgeTone,
+  stageStaleDays,
+} from "../deal-list-logic";
 import { DealTimelineSection } from "./deal-timeline-section";
 import { DEAL_TIMELINE_CATEGORIES } from "./deal-events";
 import { resolveCategory } from "@/lib/activity-timeline";
@@ -123,6 +136,14 @@ export default async function DealDetailPage({
   const supabase = await createClient();
   // Etiket/neden okumaları anlaşma sorgusuyla AYNI turda başlar (önceden ondan önce ayrı tur).
   const labelsP = Promise.all([getStageLabels(), getLossReasonOptions()]);
+  // SP1: aşamaya özel bekleme eşiği (genel + aşama ayarı) — aynı turda.
+  const staleP = getSettings(["office.alert.deal_stale_days", ...Object.values(STAGE_STALE_SETTING_KEYS)], { tenantId: tenantId ?? undefined }).then((v) =>
+    stageStaleDays(Number(v["office.alert.deal_stale_days"] ?? STALE_DAYS), {
+      new: v[STAGE_STALE_SETTING_KEYS.new],
+      qualified: v[STAGE_STALE_SETTING_KEYS.qualified],
+      negotiation: v[STAGE_STALE_SETTING_KEYS.negotiation],
+    }),
+  );
 
   // Teklifler + randevu sayısı: deal_side_reads RPC'si anlaşma okumasıyla AYNI turda başlar (id'den kendisi çözer);
   // RPC yoksa/hata verirse (null) aşağıdaki eski sorgular çalışır.
@@ -132,7 +153,7 @@ export default async function DealDetailPage({
       supabase
         .from("deals")
         .select(
-          "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, property_id, customer_id, assigned_to, project_unit_id",
+          "id, deal_type, stage, deal_value, probability, loss_reason, created_at, updated_at, stage_changed_at, expected_close_date, closed_at, property_id, customer_id, assigned_to, project_unit_id",
         )
         .eq("id", id)
         .maybeSingle(),
@@ -260,6 +281,16 @@ export default async function DealDetailPage({
   const stageIdx = STAGES.findIndex((s) => s.key === deal.stage);
   const kayip = deal.stage === "lost";
   const kazanildi = deal.stage === "won";
+  // SP1: aşamada geçen gün (stage_changed_at; yoksa updated_at vekili) + beklenen kapanış durumu.
+  const staleByStage = await staleP;
+  const stageChangedAt = (deal as { stage_changed_at?: string | null }).stage_changed_at ?? deal.updated_at;
+  const expectedClose = (deal as { expected_close_date?: string | null }).expected_close_date ?? null;
+  const closedAt = (deal as { closed_at?: string | null }).closed_at ?? null;
+  const stageDays = Math.max(0, Math.floor(msSince(stageChangedAt) / DAY_MS));
+  const stageTone = stageAgeTone(deal.stage, stageDays, staleByStage);
+  const acik = !kayip && !kazanildi;
+  const closeStatus = acik ? expectedCloseStatus(expectedClose, trDayKey(now())) : null;
+  const canEditDeal = (perms.commissions ?? []).includes("edit");
   const province = property ? rel(property.province as { name: string } | { name: string }[] | null) : null;
   const district = property ? rel(property.district as { name: string } | { name: string }[] | null) : null;
 
@@ -361,6 +392,20 @@ export default async function DealDetailPage({
       ? { title: "Komisyon kaydı açın", reason: "Anlaşma kazanıldı ama komisyon kaydı yok.", href: "/app/komisyon", label: "Komisyon merkezi" }
       : kazanildi
         ? { title: "Evrak dosyasını tamamlayın", reason: "Kapanış evrakları ve masraflar eksiksiz olmalı.", href: `/app/anlasmalar/${deal.id}?sekme=belgeler`, label: "Evraklara git" }
+        : closeStatus === "gecikti" && expectedClose
+          ? {
+              title: "Beklenen kapanış tarihi geçti",
+              reason: `${expectedClose.split("-").reverse().join(".")} için planlanan kapanış gerçekleşmedi. Tarihi güncelleyin ya da sonraki adımı planlayın.`,
+              href: `/app/anlasmalar/${deal.id}?sekme=gorevler`,
+              label: "Görevlere git",
+            }
+        : stageTone !== "ok" && isOpenStageKey(deal.stage)
+          ? {
+              title: `${stageDays} gündür ${stageLabels[deal.stage].label} aşamasında`,
+              reason: `Ofis eşiği ${staleByStage[deal.stage]} gün. Müşteriyle görüşüp anlaşmayı ilerletin ya da kayıp olarak kapatın.`,
+              href: customer ? `/app/musteriler/${customer.id}?sekme=gecmis` : `/app/anlasmalar/${deal.id}?sekme=notlar`,
+              label: customer ? "İletişim kaydı" : "Notlara git",
+            }
         : acikGorev > 0
           ? { title: `${acikGorev} açık görevi tamamlayın`, reason: "Bu anlaşmaya bağlı bekleyen görev var.", href: `/app/anlasmalar/${deal.id}?sekme=gorevler`, label: "Görevlere git" }
           : (offers ?? []).length === 0 && capraz
@@ -412,6 +457,29 @@ export default async function DealDetailPage({
               );
             })}
           </ol>
+
+          {/* SP1: aşamada geçen gün + beklenen kapanış (satır içi düzenleme) / kapanış tarihi */}
+          <div className="relative mt-3 flex flex-wrap items-center gap-2">
+            {acik ? (
+              <span
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${
+                  stageTone === "late"
+                    ? "border-danger-400/60 bg-danger-500/30 text-white"
+                    : stageTone === "warn"
+                      ? "border-amber-300/60 bg-amber-400/25 text-white"
+                      : "border-white/25 bg-white/10 text-white/85"
+                }`}
+                title={isOpenStageKey(deal.stage) ? `Ofis eşiği ${staleByStage[deal.stage]} gün` : undefined}
+              >
+                <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {daysInStageLabel(stageDays)}
+              </span>
+            ) : closedAt ? (
+              <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 text-xs font-bold text-white/85">
+                <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {kazanildi ? "Kazanıldı" : "Kaybedildi"}: {tarih(closedAt)}
+              </span>
+            ) : null}
+            {acik ? <ExpectedCloseField dealId={deal.id} value={expectedClose} status={closeStatus} canEdit={canEditDeal} /> : null}
+          </div>
 
           <div className="relative mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
@@ -1004,6 +1072,8 @@ export default async function DealDetailPage({
         </aside>
       </div>
 
+      {/* SP10: mobilde sonraki eylem + Ara/WhatsApp ekranın altında yapışık (masaüstünde sağ sütun yeterli). */}
+      <MobileActionBar primary={{ title: nba.title, label: nba.label, href: nba.href }} phone={customer?.phone} contactName={customer?.full_name} />
     </div>
   );
 }

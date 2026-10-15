@@ -17,11 +17,11 @@ import dynamic from "next/dynamic";
 /** Parça inerken (istemci içi geçişte) sütun düzenini tutan sakin iskelet: düzen kayması olmaz. */
 function BoardSkeleton() {
   return (
-    <div role="status" aria-label="Anlaşma panosu yükleniyor" aria-busy="true" className="flex gap-3 overflow-x-auto pb-2">
+    <div role="status" aria-label="Anlaşma panosu yükleniyor" aria-busy="true" className="flex gap-3 overflow-x-auto pb-2 max-md:snap-x">
       {["new", "qualified", "negotiation", "won", "lost"].map((key) => (
         <div
           key={key}
-          className="h-64 min-w-[260px] flex-1 rounded-[var(--radius-panel)] border border-line bg-line/60 motion-safe:animate-pulse"
+          className="h-64 w-[85vw] max-w-[22rem] shrink-0 md:w-auto md:min-w-[260px] md:max-w-none md:flex-1 md:shrink rounded-[var(--radius-panel)] border border-line bg-line/60 motion-safe:animate-pulse"
         />
       ))}
     </div>

@@ -179,7 +179,7 @@ describe("sekmeli menü öğeleri", () => {
 
   it("Raporlar ve Otomasyon tek öğe, yolları sabit sekmedir", () => {
     expect(tabsOf(ALL_MODULES, "/app/raporlar")).toEqual([
-      "/app/raporlar", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise",
+      "/app/raporlar", "/app/raporlar/huni", "/app/raporlar/satis-hizi", "/app/bolge-analizi", "/app/raporlar/talep-arz", "/app/raporlar/lead-hizi", "/app/franchise",
     ]);
     expect(tabsOf(ALL_MODULES, "/app/otomasyonlar")).toEqual(["/app/otomasyonlar", "/app/otomasyonlar/diziler", "/app/ayarlar/is-akislari"]);
     const menu = NAV_SECTIONS.flatMap((s) => s.items.map((i) => i.href));

@@ -27,8 +27,10 @@ export type DealVM = {
   probability: number | null;
   advisor: string | null;
   updatedLabel: string;
-  /** 14+ gündür güncellenmeyen açık anlaşma. */
+  /** Aşama eşiğini aşmış açık anlaşma (aşamada geçen gün ≥ ofis eşiği; SP1). */
   stale: boolean;
+  /** "Bu aşamada 5 gün" — yalnız açık aşamalarda. */
+  stageAgeLabel: string | null;
   checklist: { done: number; total: number } | null;
   noteCount: number;
   /** Proje dairesi bağı (deals.project_unit_id): etiket + proje sayfası. */
@@ -122,12 +124,15 @@ export function DealTable({ rows, density, selectable = false }: { rows: DealVM[
                 </TD>
                 <TD>
                   <StatusPill tone={d.stageTone}>{d.stageLabel}</StatusPill>
+                  {d.stageAgeLabel ? (
+                    <span className={`mt-0.5 block text-xs ${d.stale ? "font-semibold text-[var(--warning-strong)]" : "text-text-faint"}`}>{d.stageAgeLabel}</span>
+                  ) : null}
                 </TD>
                 <TD align="right" className="whitespace-nowrap font-semibold text-text">{d.value ?? <span className="font-normal text-text-faint">—</span>}</TD>
                 <TD align="right" className="hidden text-text-muted lg:table-cell">{d.probability != null ? `%${d.probability}` : <span className="text-text-faint">—</span>}</TD>
                 <TD className="hidden text-text-muted xl:table-cell">{d.advisor ?? <span className="text-text-faint">Atanmadı</span>}</TD>
                 <TD className="hidden xl:table-cell">
-                  <span className={d.stale ? "font-semibold text-[var(--warning-strong)]" : "text-text-muted"} title={d.stale ? "14+ gündür güncellenmedi" : undefined}>
+                  <span className="text-text-muted">
                     {d.updatedLabel}
                   </span>
                 </TD>

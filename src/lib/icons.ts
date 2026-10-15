@@ -30,6 +30,8 @@ import {
   ArrowUpDown,
   Smile,
   Timer,
+  Filter,
+  Activity,
   Award,
   BadgeCheck,
   Banknote,
@@ -276,6 +278,9 @@ export const ICONS = {
   /** Raporlar sekmesi: anketör kuyruğu ve anket sonuçları. */
   anketor: Headphones,
   leadHizi: Timer,
+  /** Raporlar sekmeleri: satış hunisi (aşama dönüşümü) ve satış hızı (aşamada geçen gün). */
+  satisHunisi: Filter,
+  satisHizi: Activity,
   /** Ofis Merkezi (danışman yönetimi, havuzdan atama, ofis tanımları) — portföy binasından (Building2) ayrı. */
   ofisMerkezi: Building,
   /** Excel/CSV içe aktarma. */

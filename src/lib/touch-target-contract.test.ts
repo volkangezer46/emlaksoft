@@ -42,6 +42,9 @@ const REQUIRED: [file: string, needles: (string | RegExp)[]][] = [
   ["src/app/app/gorevler/task-bulk-list.tsx", ["justify-center px-1 touch:min-w-11", "hover:border-brand-300 touch:min-h-11"]],
   ["src/components/app/saved-views.tsx", ["touch:min-h-11 touch:min-w-11"]],
   ["src/components/ui/chart-range.tsx", ["touch:w-[24px]"]],
+  // SP10: mobil "sonraki eylem" çubuğu (birincil eylem + Ara/WhatsApp ikonları 44 px) ve kanban sütun çipleri.
+  ["src/components/ui/mobile-action-bar.tsx", ["grid h-11 w-11 shrink-0", "flex min-h-11 min-w-0 flex-1"]],
+  ["src/app/app/anlasmalar/deal-board.tsx", ["inline-flex min-h-11 shrink-0 snap-start"]],
 ];
 
 /**

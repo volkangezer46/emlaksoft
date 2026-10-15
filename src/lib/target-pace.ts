@@ -61,3 +61,58 @@ export function slowPaceLabels(
     .filter((m) => evaluateTargetPace({ actual: m.actual, target: m.target, startMs: range.start, endMs: range.end, nowMs }).status === "yavas")
     .map((m) => m.label);
 }
+
+/* -------------------------------------------------------------------------------------------- */
+/* OA5: boru hattı kapsaması (TAHMİN)                                                            */
+/* -------------------------------------------------------------------------------------------- */
+
+/** Olasılığı boş açık anlaşmada aşama varsayılanı (transition_deal_stage_atomic ile aynı: 20/40/60). */
+export const STAGE_DEFAULT_PROBABILITY: Readonly<Record<string, number>> = { new: 20, qualified: 40, negotiation: 60 };
+
+export type CoverageDeal = { value: number | null; probability: number | null; stage: string };
+
+export type PipelineCoverage = {
+  /** Olasılıkla ağırlıklı beklenen brüt komisyon (₺). */
+  weightedCommission: number;
+  /** Olasılıkla ağırlıklı beklenen anlaşma sayısı. */
+  weightedDeals: number;
+  /** Kalan gelir hedefini karşılama katı (ör. 1.4); kalan 0 ya da hedef yoksa null. */
+  revenueCoverage: number | null;
+  /** Kalan anlaşma hedefini karşılama katı; kalan 0 ya da hedef yoksa null. */
+  dealCoverage: number | null;
+  /** Hesaba giren açık anlaşma sayısı. */
+  openCount: number;
+};
+
+/**
+ * Kapsama = ağırlıklı açık hat ÷ kalan hedef. Olasılık boşsa aşama varsayılanı; o da yoksa anlaşma hesaba girmez.
+ * Tutar boş anlaşma yalnız sayı kapsamasına girer. Açık anlaşma yoksa null (veri yoksa kart yok).
+ */
+export function pipelineCoverage(input: {
+  deals: readonly CoverageDeal[];
+  commissionRatePct: number;
+  remainingRevenue: number | null;
+  remainingDeals: number | null;
+}): PipelineCoverage | null {
+  let weightedCommission = 0;
+  let weightedDeals = 0;
+  let openCount = 0;
+  const rate = Number.isFinite(input.commissionRatePct) && input.commissionRatePct > 0 ? input.commissionRatePct / 100 : 0;
+  for (const d of input.deals) {
+    const p = d.probability != null && Number.isFinite(d.probability) ? d.probability : STAGE_DEFAULT_PROBABILITY[d.stage];
+    if (p == null) continue;
+    const share = Math.max(0, Math.min(100, p)) / 100;
+    openCount += 1;
+    weightedDeals += share;
+    if (d.value != null && d.value > 0) weightedCommission += d.value * rate * share;
+  }
+  if (openCount === 0) return null;
+  const ratio = (num: number, rem: number | null) => (rem != null && rem > 0 ? Math.round((num / rem) * 10) / 10 : null);
+  return {
+    weightedCommission: Math.round(weightedCommission),
+    weightedDeals: Math.round(weightedDeals * 10) / 10,
+    revenueCoverage: ratio(weightedCommission, input.remainingRevenue),
+    dealCoverage: ratio(weightedDeals, input.remainingDeals),
+    openCount,
+  };
+}

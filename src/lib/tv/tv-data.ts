@@ -158,6 +158,8 @@ export async function loadTvData(
       .eq("period", "monthly")
       .eq("period_start", period.startDateKey)
       .is("profile_id", null)
+      .is("team_id", null)
+      .is("branch_id", null)
       .limit(1),
     tsq(supabase.from("properties").select("id, property_code, title, list_price"))
       .is("deleted_at", null)

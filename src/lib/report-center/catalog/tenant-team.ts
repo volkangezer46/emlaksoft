@@ -9,6 +9,7 @@ import { now, trDayKey } from "@/lib/clock";
 import { formatPhoneDisplay } from "@/lib/phone";
 import { currentMonthPeriod, loadAdvisorMetrics, loadTargetActualsLive } from "@/lib/team/advisor-metrics";
 import { ROLE_LABELS } from "@/lib/role-labels";
+import { expandForActuals, foldActuals, type MemberRow } from "@/lib/target-scope";
 import { DATE_RANGE_FIELDS } from "../filters";
 import { STATUS } from "../labels";
 import { applyActorScope, applyDateRange, applyTimestampRange, dayStartIso, enrichCustomers, enrichProfiles, label, nameOf, nextDayStartIso, one, chainEnrich } from "../query-helpers";
@@ -67,7 +68,7 @@ export const hedefGerceklesme = defineReport({
   keywords: ["hedef", "ciro", "gerçekleşme"],
   filters: [{ kind: "select", key: "donem", label: "Dönem türü", options: opts(STATUS.targetPeriod) }, ...DATE_RANGE_FIELDS("Dönem başlangıcı (en erken)", "Dönem başlangıcı (en geç)")],
   columns: [
-    { key: "sahip", label: "Hedef sahibi", type: "text", width: 24, get: (r, c) => (r.profile_id ? nameOf(c, r.profile_id) : "Ofis geneli") },
+    { key: "sahip", label: "Hedef sahibi", type: "text", width: 24, get: (r, c) => (r.profile_id ? nameOf(c, r.profile_id) : r.scope_label ?? "Ofis geneli") },
     { key: "donem", label: "Dönem türü", type: "text", width: 14, get: (r) => label(STATUS.targetPeriod, r.period) },
     { key: "bas", label: "Dönem başlangıcı", type: "date", get: (r) => r.period_start },
     { key: "hedefA", label: "Hedef anlaşma", type: "number", total: true, get: (r) => r.target_deals },
@@ -78,13 +79,14 @@ export const hedefGerceklesme = defineReport({
     { key: "oranG", label: "Gelir gerçekleşme", type: "percent", decimals: 0, get: (r) => (r.revenue_visible && Number(r.target_revenue) > 0 ? (Number(r.actual_revenue) / Number(r.target_revenue)) * 100 : null) },
     { key: "hedefR", label: "Hedef randevu", type: "number", get: (r) => r.target_appointments },
     { key: "hedefP", label: "Hedef yeni portföy", type: "number", get: (r) => r.target_listings },
+    { key: "hedefC", label: "Hedef çağrı", type: "number", get: (r) => r.target_calls },
   ],
   source: {
     kind: "compute",
     run: async (ctx, f) => {
       let q = ctx.supabase
         .from("targets")
-        .select("id, profile_id, period, period_start, target_deals, target_revenue, target_appointments, target_listings")
+        .select("id, profile_id, team_id, branch_id, period, period_start, target_deals, target_revenue, target_appointments, target_listings, target_calls, team:teams!targets_team_id_fkey(name), branch:branches!targets_branch_id_fkey(name)")
         .eq("tenant_id", tid(ctx));
       q = applyActorScope(ctx, q, { actorColumn: "profile_id", earnings: false });
       if (f.donem) q = q.eq("period", f.donem);
@@ -99,15 +101,25 @@ export const hedefGerceklesme = defineReport({
         for (const p of (people ?? []) as Row[]) names.set(p.id, p.full_name);
       }
       for (const [k, v] of names) ctx.names.set(k, v);
-      const actuals = await loadTargetActualsLive(ctx.supabase, {
-        viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
-        tenantId: tid(ctx),
-        targets: rows.map((r) => ({ id: r.id, period: r.period, period_start: r.period_start, profile_id: r.profile_id })),
-        names,
-      });
+      // OA4: takım/şube hedefi üyelerin toplamıdır (hedefler sayfasıyla aynı kural: lib/target-scope).
+      const scopedRows = rows.some((r) => r.team_id || r.branch_id);
+      const memberRows: MemberRow[] = scopedRows
+        ? (((await ctx.supabase.from("profiles").select("id, team_id, branch_id").eq("tenant_id", tid(ctx)).eq("is_active", true).limit(1000)).data ?? []) as MemberRow[])
+        : [];
+      const likes = rows.map((r) => ({ id: r.id, period: r.period, period_start: r.period_start, profile_id: r.profile_id, team_id: r.team_id ?? null, branch_id: r.branch_id ?? null }));
+      const actuals = foldActuals(
+        likes,
+        await loadTargetActualsLive(ctx.supabase, {
+          viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
+          tenantId: tid(ctx),
+          targets: expandForActuals(likes, memberRows),
+          names,
+        }),
+      );
       return rows.map((r) => {
         const a = actuals.get(r.id);
-        return { ...r, actual_deals: a?.deals ?? 0, actual_revenue: a?.revenue ?? 0, revenue_visible: a?.revenueVisible ?? false };
+        const scope_label = r.team_id ? `${one(r.team)?.name ?? "Takım"} takımı` : r.branch_id ? `${one(r.branch)?.name ?? "Şube"} şubesi` : null;
+        return { ...r, scope_label, actual_deals: a?.deals ?? 0, actual_revenue: a?.revenue ?? 0, revenue_visible: a?.revenueVisible ?? false };
       });
     },
   },

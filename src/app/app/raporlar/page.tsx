@@ -11,22 +11,22 @@ import {
   BarChart3,
   Gauge,
   Map as MapIcon,
-  PieChart,
   ShieldCheck,
   Smile,
-  Trophy,
+  Timer,
+  Filter,
 } from "lucide-react";
 import { KpiCard, TrendPill, computeTrend } from "@/components/ui/premium";
 import { RankBars } from "./rank-bars";
+import { ReportScopeBar } from "./_parts/report-scope-bar";
+import { PeriodOverview } from "./_parts/period-overview";
+import { loadReportScopeContext } from "./_parts/report-scope";
 import { NetBars } from "./net-bars";
-import { hasNetData, netSeries, shareOfTotal } from "./report-math";
+import { hasNetData, netSeries } from "./report-math";
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/server";
 import { aggregateSampleLabel, loadSampleKpiScope } from "@/lib/sample-scope";
 import { SampleDataBadge } from "@/components/ui/sample-data-badge";
-import { getDefinitionsOrDefault, getLossReasonOptions, toLabelMap } from "@/lib/definitions";
-import { lossReasonGroupLabel, lossReasonLabels } from "@/lib/loss-reason";
-import { defaultLabelMap } from "@/lib/definition-defaults";
 import { requireModulePage } from "@/lib/require-module-page";
 import { InteractiveChart } from "@/components/app/interactive-chart";
 import { computeOfficeScore, type OfficeScoreInputs } from "@/lib/office-score";
@@ -86,7 +86,7 @@ const TREND_LINK =
   "focus-ring flex items-center gap-1.5 rounded-[var(--radius-control)] after:absolute after:inset-0 after:rounded-[var(--radius-control)] after:content-['']";
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const { tenantId } = await requireModulePage("reports", "/app/raporlar");
+  const { tenantId, role, userId } = await requireModulePage("reports", "/app/raporlar");
   const sp = await searchParams;
   // Rapor merkezi sekmesi (?sekme=merkez): tüm dışa aktarma (Excel / PDF / CSV) burada; dashboard sorguları çalışmaz.
   if ((Array.isArray(sp.sekme) ? sp.sekme[0] : sp.sekme) === "merkez") {
@@ -101,19 +101,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     );
   }
   const supabase = await createClient();
-  // Tanımlar RPC ile paralel başlar (eskiden RPC'den SONRA seri bekleniyordu).
-  const sourceDefsPromise = getDefinitionsOrDefault("customer_source");
   // Ofis geneli toplulaştırma kısa TTL kiracı önbelleğinden; izleyene göre değişen komisyon/gider serisi önbelleksiz hafif
-  // RPC'den (src/lib/reporting/cache.ts, B158). Hepsi aynı turda paralel.
+  // RPC'den (src/lib/reporting/cache.ts, B158). Dönem/kapsam seçicisi (OA1) aynı turda; dönem raporu aşağıda akıtılır.
   // Varsayılan komisyon oranı (kaçan komisyon tahmini) da aynı turda: eskiden sayfa ortasında ardışık bekleniyordu.
   const asOf = clockNow();
-  const [aggregateResult, viewerResult, sourceDefs, lossOptions, sample, lossRateSettings] = await measureAll("raporlar-veri", [
+  const [aggregateResult, viewerResult, sample, lossRateSettings, scopeCtx] = await measureAll("raporlar-veri", [
     getTenantReportingAggregates(supabase, tenantId, asOf),
     getViewerReportingAggregates(supabase, asOf),
-    sourceDefsPromise,
-    getLossReasonOptions(),
     loadSampleKpiScope(supabase, tenantId),
     getSettings(["office.commission.default_rate"], { tenantId: tenantId ?? undefined }),
+    loadReportScopeContext(supabase, { sp, role, userId, tenantId, nowMs: asOf }),
   ]);
   const aggregate = requireReportingData(
     "tenant-reporting-aggregates",
@@ -165,52 +162,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     { label: "Canlı portal", value: livePortals, max: barMax, href: "/app/ilan-kontrol/portallar?durum=live" },
   ];
 
-  // Müşteri kaynak dağılımı
-  const sourceBars = aggregate.customer_sources
-    .map((row) => ({ label: row.source, count: Number(row.customer_count) }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8)
-    // value: müşteriler sayfasının ?source= filtresine giden ham DB değeri
-    .map(({ label, count }) => ({ label, count, value: label === "Belirtilmedi" ? null : label }));
-  const sourceTotal = Math.max(1, customers);
-
-  // Kayıp nedeni raporu — neden × adet + kaybedilen toplam değer
-  // Nedenler `loss_reason` tanımına bağlanır: "<değer>" ve "<değer> | not" aynı etiket altında toplanır;
-  // eski serbest metin kayıtlar kendi adıyla ayrı satırda görünmeye devam eder.
-  const lossLabels = lossReasonLabels(lossOptions);
-  const lossGroups = new Map<string, { reason: string; count: number; value: number }>();
-  for (const row of aggregate.loss_reasons) {
-    const reason = lossReasonGroupLabel(row.reason, lossLabels);
-    const g = lossGroups.get(reason) ?? { reason, count: 0, value: 0 };
-    g.count += Number(row.deal_count);
-    g.value += Number(row.deal_value);
-    lossGroups.set(reason, g);
-  }
-  const allLossRows = [...lossGroups.values()];
-  const lostCount = allLossRows.reduce((sum, row) => sum + row.count, 0);
-  const lostValue = allLossRows.reduce((sum, row) => sum + row.value, 0);
-  const lossRows = allLossRows
-    .sort((a, b) => b.count - a.count || b.value - a.value)
-    .slice(0, 8);
-
-  // Kaynak ROI — customers.source × kazanılan anlaşmalar (customer_id join)
-  // Etiketler: tek sabit kaynak (eski/yeni değerler) üstüne ofisin tanımları
-  const SOURCE_LABELS: Record<string, string> = { ...defaultLabelMap("customer_source"), ...toLabelMap(sourceDefs) };
-  const sourceLabel = (s: string) => SOURCE_LABELS[s] ?? s;
-  const allRoiRows = aggregate.roi.map((row) => ({
-    source: row.source,
-    customers: Number(row.customers),
-    wonCount: Number(row.won_count),
-    wonValue: Number(row.won_value),
-  }));
-  const roiWonCount = allRoiRows.reduce((sum, row) => sum + row.wonCount, 0);
-  const roiWonValue = allRoiRows.reduce((sum, row) => sum + row.wonValue, 0);
-  const roiRows = allRoiRows
-    .sort((a, b) => b.wonValue - a.wonValue || b.wonCount - a.wonCount || b.customers - a.customers)
-    .slice(0, 8);
-  // En değerli kaynak: kazanılan değeri sıfırdan büyük ilk satır
-  const bestSource = roiRows.length > 0 && roiRows[0].wonValue > 0 ? roiRows[0].source : null;
-
   // Gelir/gider karşılaştırma trendi — 12 aylık kova: son 6'sı görünen dönem,
   // ilk 6'sı "hayalet" önceki dönem serisi (aynı sıradaki ay ile kıyaslanır).
   // Ay anahtarı RPC'nin `ym` alanıdır (İstanbul yerel ayı, B077): konum ya da UTC dizgesi kullanılmaz; aynı ay iki satırda
@@ -260,30 +211,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     value: b.value,
     valueText: String(b.value),
   }));
-  const sourceItems = sourceBars.map((b) => ({
-    key: b.label,
-    label: b.value ? sourceLabel(b.value) : b.label,
-    href: b.value ? `/app/musteriler?source=${encodeURIComponent(b.value)}` : "/app/musteriler",
-    value: b.count,
-    valueText: `${b.count} · %${shareOfTotal(b.count, sourceTotal)}`,
-  }));
-  const roiItems = roiRows.map((r) => ({
-    key: r.source,
-    label: sourceLabel(r.source),
-    href: `/app/musteriler?source=${encodeURIComponent(r.source)}`,
-    value: r.wonValue,
-    valueText: `${money(r.wonValue)} · ${r.customers} müşteri · ${r.wonCount} kazanılan${r.source === bestSource ? " · en değerli kaynak" : ""}`,
-  }));
   // Tahmini kaçan komisyon: kaybedilen anlaşma tutarı × ofis varsayılan komisyon oranı (Ofis Tanımları; yoksa %3). TAHMİN.
   const lossRate = Number(lossRateSettings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
-  const lostCommission = (v: number) => Math.round(v * (lossRate / 100));
-  const lossItems = lossRows.map((r) => ({
-    key: r.reason,
-    label: r.reason,
-    href: "/app/anlasmalar?gorunum=liste&asama=lost",
-    value: r.count,
-    valueText: `${r.count} · %${shareOfTotal(r.count, lostCount)} · ${money(r.value)}${r.value > 0 ? ` · ≈ ${money(lostCommission(r.value))} komisyon` : ""}`,
-  }));
 
   return (
     <div className="space-y-6">
@@ -323,6 +252,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </details>
         }
       />
+
+      <ReportScopeBar path="/app/raporlar" ctx={scopeCtx} />
 
       <KpiGrid label="Öne çıkan göstergeler">
         <KpiCard
@@ -490,67 +421,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <RankBars className="mt-3" items={volumeItems} ariaLabel="Hacim dağılımı" seriesLabel="Adet" />
       </section>
 
-      {sourceItems.length > 0 ? (
-        <section className={SECTION}>
-          <div className="flex items-center gap-2">
-            <PieChart className={ICON_ACCENT} aria-hidden="true" />
-            <h2 className={H2}>Müşteri kaynak dağılımı</h2>
-            <span className="ml-auto text-xs tabular-nums text-text-muted">{sourceTotal} müşteri · en yüksek 8 kaynak</span>
-          </div>
-          <RankBars className="mt-3" items={sourceItems} ariaLabel="Müşteri kaynak dağılımı" seriesLabel="Müşteri" />
-        </section>
-      ) : null}
-
-      {/* Kaynak ROI — hangi kaynak gerçekten kazandırıyor? */}
-      <section className={SECTION}>
-        <div className="flex flex-wrap items-center gap-2">
-          <Trophy className={ICON_ACCENT} aria-hidden="true" />
-          <h2 className={H2}>Kaynak ROI · kazanılan anlaşmalar</h2>
-          {roiRows.length > 0 ? (
-            <span className="ml-auto text-xs tabular-nums text-text-muted">
-              {roiWonCount} kazanılan · {money(roiWonValue)} · en yüksek 8 kaynak
-            </span>
-          ) : null}
-        </div>
-        {roiRows.length === 0 ? (
-          <EmptyStateV3
-            illustration="rapor"
-            icon={<BarChart3 />}
-            title="Henüz kaynak verisi yok"
-            description="Müşterilere kaynak girip anlaşma kazandıkça kaynakların getirisi burada karşılaştırılır."
-            action={<Link href="/app/musteriler" className="text-sm font-semibold text-accent-text hover:underline">Müşterilere git</Link>}
-          />
-        ) : (
-          <RankBars className="mt-3" items={roiItems} format="money" color="var(--viz-2)" ariaLabel="Kaynak bazında kazanılan değer" seriesLabel="Kazanılan değer" />
-        )}
-      </section>
-
-      {/* Kayıp nedeni raporu — kaybedilen anlaşmaların neden dağılımı */}
-      <section className={SECTION}>
-        <div className="flex flex-wrap items-center gap-2">
-          <ICONS.alarm className={`h-4 w-4 ${NEG}`} aria-hidden="true" />
-          <h2 className={H2}>Kaybedilen anlaşmalar: kayıp nedeni analizi</h2>
-          {lostCount > 0 ? (
-            <span className="ml-auto text-xs tabular-nums text-text-muted">
-              {lostCount} kaybedilen anlaşma · {money(lostValue)} kaybedilen değer · tahmini kaçan komisyon ≈ {money(lostCommission(lostValue))} (%{lossRate}) · en yüksek 8 neden
-            </span>
-          ) : null}
-        </div>
-        {lossRows.length === 0 ? (
-          <EmptyStateV3
-            illustration="rapor"
-            icon={<BarChart3 />}
-            title="Henüz kaybedilen anlaşma yok"
-            description="Anlaşma tahtasında “Kaybedildi”ye taşınan kartlar nedenleriyle burada toplanır."
-            action={<Link href="/app/anlasmalar" className="text-sm font-semibold text-accent-text hover:underline">Anlaşma tahtasına git</Link>}
-          />
-        ) : (
-          <RankBars className="mt-3" items={lossItems} color="var(--viz-neg)" ariaLabel="Kayıp nedenleri" seriesLabel="Kaybedilen anlaşma" />
-        )}
-      </section>
+      <Suspense fallback={<SkeletonCard height={640} label="Dönem raporu yükleniyor" />}>
+        <PeriodOverview ctx={scopeCtx} lossRate={lossRate} />
+      </Suspense>
 
       <nav aria-label="İlgili raporlar" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {[
+          { href: "/app/raporlar/huni", icon: Filter, title: "Satış hunisi", sub: "Müşteri → randevu → teklif → kazanılan; kaynak ROI" },
+          { href: "/app/raporlar/satis-hizi", icon: Timer, title: "Satış hızı", sub: "Aşamada geçen gün, dönüşüm ve kapanış süresi" },
           { href: "/app/raporlar/talep-arz", icon: MapIcon, title: "Talep-Arz Haritası", sub: "İlçe bazlı talep-arz dengesi" },
           { href: "/app/anketler?sekme=sonuc", icon: Smile, title: "Memnuniyet (NPS)", sub: "Kapanış sonrası anket skoru" },
           { href: "/app/raporlar/lead-hizi", icon: Gauge, title: "Yanıt Hızı", sub: "İlk temasa geçen süre ve hedef uyumu" },

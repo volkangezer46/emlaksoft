@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateTargetPace, slowPaceLabels } from "./target-pace";
+import { evaluateTargetPace, pipelineCoverage, slowPaceLabels } from "./target-pace";
 import { targetPeriodRange } from "./team/target-actuals";
 
 // Ekim 2026 (31 gün), TR takvimi: 2026-09-30T21:00Z → 2026-10-31T21:00Z.
@@ -81,5 +81,33 @@ describe("slowPaceLabels", () => {
       at(0.6),
     );
     expect(labels).toEqual(["Anlaşma"]);
+  });
+});
+
+describe("OA5 boru hattı kapsaması", () => {
+  it("ağırlıklı komisyon ÷ kalan gelir; olasılık boşsa aşama varsayılanı", () => {
+    const c = pipelineCoverage({
+      deals: [
+        { value: 1_000_000, probability: 50, stage: "negotiation" },
+        { value: 2_000_000, probability: null, stage: "qualified" },
+        { value: null, probability: 20, stage: "new" },
+      ],
+      commissionRatePct: 2,
+      remainingRevenue: 20_000,
+      remainingDeals: 2,
+    });
+    // 1M×%2×0,5 = 10.000 + 2M×%2×0,4 = 16.000 → 26.000 / 20.000 = 1,3×
+    expect(c?.weightedCommission).toBe(26_000);
+    expect(c?.revenueCoverage).toBe(1.3);
+    // 0,5 + 0,4 + 0,2 = 1,1 / 2 = 0,55 → 0,6 (bir ondalık)
+    expect(c?.dealCoverage).toBe(0.6);
+    expect(c?.openCount).toBe(3);
+  });
+
+  it("açık anlaşma yoksa kart yok; kalan hedef yoksa oran yok", () => {
+    expect(pipelineCoverage({ deals: [], commissionRatePct: 2, remainingRevenue: 1, remainingDeals: 1 })).toBeNull();
+    const c = pipelineCoverage({ deals: [{ value: 1, probability: 10, stage: "x" }], commissionRatePct: 2, remainingRevenue: 0, remainingDeals: null });
+    expect(c?.revenueCoverage).toBeNull();
+    expect(c?.dealCoverage).toBeNull();
   });
 });

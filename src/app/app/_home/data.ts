@@ -504,6 +504,8 @@ export const loadOfficeTarget = cache(async (ctx: HomeCtx) => {
     .eq("period", "monthly")
     .eq("period_start", ctx.monthStartKey)
     .is("profile_id", null)
+    .is("team_id", null)
+    .is("branch_id", null)
     .maybeSingle();
   assertQueryBatchSucceeded([result], ["office-target"], "Ana panel");
   return result.data;

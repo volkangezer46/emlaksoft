@@ -40,4 +40,26 @@ describe("pipeline komisyon tahmini", () => {
     expect(r.months.find((m) => m.key === "2026-11")?.amount).toBe(60_000);
     expect(r.winRates).toEqual([{ dealType: "sale", rate: 0.4, closed: 10 }]);
   });
+
+  it("SP1: beklenen kapanış tarihi ayı belirler; kapanış anı closedAt'ten okunur", () => {
+    const deals: ForecastDeal[] = [
+      ...closed(10, 4).map((d) => ({ ...d, closedAt: iso(NOW - 70 * day) })),
+      { dealType: "sale", stage: "negotiation", dealValue: 1_000_000, createdAt: iso(NOW - 10 * day), updatedAt: iso(NOW - day), expectedCloseDate: "2026-12-15" },
+    ];
+    const r = buildPipelineForecast(deals, NOW, 3);
+    if (!r.ok) throw new Error("tahmin bekleniyordu");
+    expect(r.medianCycleDays).toBe(30);
+    expect(r.months.find((m) => m.key === "2026-12")?.amount).toBe(12_000);
+  });
+
+  it("SP1: aşamaya özel oran verilirse tür oranının yerine kullanılır", () => {
+    const deals: ForecastDeal[] = [
+      ...closed(10, 4),
+      { dealType: "sale", stage: "negotiation", dealValue: 1_000_000, createdAt: iso(NOW - 10 * day), updatedAt: iso(NOW - day) },
+    ];
+    const r = buildPipelineForecast(deals, NOW, 3, { negotiation: 0.75 });
+    if (!r.ok) throw new Error("tahmin bekleniyordu");
+    expect(r.total).toBe(22_500);
+    expect(r.stageRateCount).toBe(1);
+  });
 });

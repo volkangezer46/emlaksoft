@@ -72,3 +72,61 @@ export function updatedAgoLabel(days: number): string {
   if (days === 1) return "Dün";
   return `${days} gün önce`;
 }
+
+/* ---------------------------------------------------------------------------------------------- */
+/* SP1: aşamada geçen gün + aşamaya özel bayatlık                                                  */
+/* ---------------------------------------------------------------------------------------------- */
+
+export type OpenStageKey = Exclude<(typeof OPEN_DEAL_STAGES)[number], "won" | "lost">;
+/** Açık aşamalar (tek kaynak `OPEN_DEAL_STAGES`). */
+export const OPEN_STAGE_KEYS = OPEN_DEAL_STAGES as readonly OpenStageKey[];
+export type StageStaleDays = Record<OpenStageKey, number>;
+
+/** Ofis Tanımları: aşamaya özel eşik ayarı (0 / boş = genel eşik `office.alert.deal_stale_days`). */
+export const STAGE_STALE_SETTING_KEYS: Record<OpenStageKey, string> = {
+  new: "office.alert.deal_stale_days_new",
+  qualified: "office.alert.deal_stale_days_qualified",
+  negotiation: "office.alert.deal_stale_days_negotiation",
+};
+
+/** Aşama başına bayatlık eşiği: aşama ayarı > 0 ise o, değilse genel eşik. */
+export function stageStaleDays(general: number, overrides: Partial<Record<OpenStageKey, unknown>>): StageStaleDays {
+  const g = Number.isFinite(general) && general > 0 ? Math.round(general) : STALE_DAYS;
+  const pick = (k: OpenStageKey) => {
+    const v = Number(overrides[k]);
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : g;
+  };
+  return { new: pick("new"), qualified: pick("qualified"), negotiation: pick("negotiation") };
+}
+
+export function isOpenStageKey(stage: string): stage is OpenStageKey {
+  return (OPEN_STAGE_KEYS as readonly string[]).includes(stage);
+}
+
+/** Kart tonu: eşiğe ulaştıysa "warn", iki katını geçtiyse "late"; kapanmış aşamada her zaman "ok". */
+export function stageAgeTone(stage: string, days: number, thresholds: StageStaleDays): "ok" | "warn" | "late" {
+  if (!isOpenStageKey(stage)) return "ok";
+  const t = thresholds[stage];
+  if (days >= t * 2) return "late";
+  if (days >= t) return "warn";
+  return "ok";
+}
+
+/** "Bu aşamada 5 gün" (0 → "Bu aşamaya bugün geçti"). */
+export function daysInStageLabel(days: number): string {
+  if (days <= 0) return "Bu aşamaya bugün geçti";
+  return `Bu aşamada ${days} gün`;
+}
+
+/**
+ * Bayat açık anlaşma süzgeci (PostgREST `or` ifadesi): her açık aşama kendi eşiğinden eski `stage_changed_at` ile.
+ * `cutoffIso(days)` çağırandan gelir (saat okuma bileşen dışında). Kapanmış aşamalar hiç eşleşmez.
+ */
+export function staleOrClause(thresholds: StageStaleDays, cutoffIso: (days: number) => string): string {
+  return OPEN_STAGE_KEYS.map((k) => `and(stage.eq.${k},stage_changed_at.lt.${cutoffIso(thresholds[k])})`).join(",");
+}
+
+/** Eşiklerin hepsi aynıysa tek sayı (etiket için), değilse null. */
+export function uniformStaleDays(t: StageStaleDays): number | null {
+  return t.new === t.qualified && t.qualified === t.negotiation ? t.new : null;
+}

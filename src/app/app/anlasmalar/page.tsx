@@ -56,16 +56,23 @@ import {
   type KpiItem,
   type ViewOption,
 } from "@/components/ui/list-kit";
-import { getSetting } from "@/lib/settings/read";
+import { getSettings } from "@/lib/settings/read";
 import { DealTable, type DealVM } from "./deal-rows";
 import { DealBulkBar } from "./deal-bulk-bar";
 import { BulkSelectionProvider } from "@/components/app/bulk-selection";
 import {
   DEAL_STAGE_KEYS,
   OPEN_STAGES,
+  STAGE_STALE_SETTING_KEYS,
   STALE_DAYS as DEFAULT_STALE_DAYS,
+  daysInStageLabel,
   dealStageTone,
+  isOpenStageKey,
   parseStageParam,
+  stageAgeTone,
+  stageStaleDays,
+  staleOrClause,
+  uniformStaleDays,
   sumDeals,
   updatedAgoLabel,
   winRate,
@@ -136,8 +143,17 @@ export default async function DealsPage({
   const sp = (await searchParams) ?? {};
   if (sp.yeni === "1") redirect("/app/anlasmalar/yeni");
   const { perms, role, userId, tenantId } = await requireModulePage("commissions");
-  // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (ayar yoksa kod varsayılanı 14 gün). Arama ön sorgusuyla aynı turda beklenir.
-  const staleDaysPromise = tenantId ? getSetting<number>("office.alert.deal_stale_days", { tenantId }) : Promise.resolve(DEFAULT_STALE_DAYS);
+  // Ofis Tanımları Merkezi: hareketsiz anlaşma eşiği (genel + aşamaya özel; SP1). Bayatlık artık AŞAMADA GEÇEN GÜNDÜR
+  // (deals.stage_changed_at): not eklemek ya da alan düzenlemek kartı "taze" yapmaz. Arama ön sorgusuyla aynı turda beklenir.
+  const staleDaysPromise = tenantId
+    ? getSettings(["office.alert.deal_stale_days", ...Object.values(STAGE_STALE_SETTING_KEYS)], { tenantId }).then((v) =>
+        stageStaleDays(Number(v["office.alert.deal_stale_days"] ?? DEFAULT_STALE_DAYS), {
+          new: v[STAGE_STALE_SETTING_KEYS.new],
+          qualified: v[STAGE_STALE_SETTING_KEYS.qualified],
+          negotiation: v[STAGE_STALE_SETTING_KEYS.negotiation],
+        }),
+      )
+    : Promise.resolve(stageStaleDays(DEFAULT_STALE_DAYS, {}));
   const canCreate = (perms.commissions ?? []).includes("create");
   const canEdit = (perms.commissions ?? []).includes("edit");
   const supabase = await createClient();
@@ -179,31 +195,40 @@ export default async function DealsPage({
   // Özel alan filtresi (?ozel=anahtar:değer): liste ve pano aynı kimlik kümesiyle daralır.
   const customFilterP = resolveCustomFieldFilter(supabase, tenantId, "deal", customFilterRaw(sp as Record<string, string | undefined>));
   const searchP = relatedSearchClause(supabase, q, { customerColumn: "customer_id", propertyColumn: "property_id" });
-  const [listScope, customFilter, STALE_DAYS, search] = await Promise.all([listScopeP, customFilterP, staleDaysPromise, searchP]);
+  const [listScope, customFilter, staleByStage, search] = await Promise.all([listScopeP, customFilterP, staleDaysPromise, searchP]);
+  // Etiketlerde tek sayı (eşikler aynıysa) ya da "aşamaya göre".
+  const STALE_UNIFORM = uniformStaleDays(staleByStage);
+  const staleText = STALE_UNIFORM != null ? `${STALE_UNIFORM}+ gündür aynı aşamada` : "Aşama eşiğini aştı";
   const scoped = <Q,>(q: Q): Q => applyScopeFilter(q, listScope.filter, { ownerColumn: "assigned_to" });
   if (customFilter.active) urlParams.ozel = customFilterValue(customFilter.active.def.key, customFilter.active.value);
   const hrefWith = (patch: Record<string, string>) => buildHref(PATH, mergeResetPage(urlParams, patch));
   const savedViewParams = Object.fromEntries(Object.entries(urlParams).filter(([k]) => k !== "yogunluk"));
 
-  const staleIso = daysAgoIso(STALE_DAYS);
+  const staleClause = staleOrClause(staleByStage, daysAgoIso);
+  // Kazanılan/kaybedilen listesinde tarih aralığı kapanış anına (closed_at) uygulanır; diğerlerinde son güncellemeye.
+  const dateCol = asamaF === "won" || asamaF === "lost" ? "closed_at" : "updated_at";
   const scope: Record<string, string> = danismanF ? { assigned_to: danismanF } : {};
 
   const SELECT_COLS =
-    "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, property_id, customer_id, project_unit_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)";
+    "id, stage, deal_type, deal_value, probability, assigned_to, updated_at, stage_changed_at, expected_close_date, closed_at, property_id, customer_id, project_unit_id, property:properties!deals_property_id_fkey(id, title, property_code), customer:customers!deals_customer_id_fkey(id, full_name, phone), deal_notes!deal_notes_deal_id_fkey(count)";
 
   // Liste/pano ortak filtreleri (danışman kapsamı, arama, bayat); aşama yalnız liste görünümünde.
   let listQuery = scoped(supabase.from("deals").select(SELECT_COLS, { count: "exact" }).match(scope));
-  if (search.clause) listQuery = listQuery.or(search.clause);
+  // Arama ve bayat süzgeci ikisi de `or` ifadesidir: tek `or` içinde VE ile birleşir (iki ayrı or= parametresi yok).
+  if (search.clause && bayatF) listQuery = listQuery.or(`and(or(${search.clause}),or(${staleClause}))`);
+  else if (search.clause) listQuery = listQuery.or(search.clause);
+  else if (bayatF) listQuery = listQuery.or(staleClause);
   listQuery = applyCustomFieldIds(listQuery, customFilter.ids);
-  if (bayatF) listQuery = listQuery.not("stage", "in", "(won,lost)").lt("updated_at", staleIso);
   if (turF) listQuery = listQuery.eq("deal_type", turF === "satis" ? "sale" : "rent");
-  if (fromF) listQuery = listQuery.gte("updated_at", `${fromF}T00:00:00+03:00`);
-  if (toF) listQuery = listQuery.lt("updated_at", `${nextDateKey(toF)}T00:00:00+03:00`);
+  if (fromF) listQuery = listQuery.gte(dateCol, `${fromF}T00:00:00+03:00`);
+  if (toF) listQuery = listQuery.lt(dateCol, `${nextDateKey(toF)}T00:00:00+03:00`);
   if (ornekHaricF) listQuery = listQuery.eq("is_sample", false);
   if (gorunum === "liste") {
     if (asamaF === "acik") listQuery = listQuery.not("stage", "in", "(won,lost)");
     else if (asamaF) listQuery = listQuery.eq("stage", asamaF);
-    listQuery = listQuery.order("updated_at", { ascending: false }).range(offset, offset + PAGE_SIZE - 1);
+    listQuery = listQuery
+      .order(dateCol === "closed_at" ? "closed_at" : "updated_at", { ascending: false, nullsFirst: false })
+      .range(offset, offset + PAGE_SIZE - 1);
   } else {
     // Pipeline 200 anlaşmayla sınırlı; gerçek toplam ListLimitNotice ile gösterilir.
     listQuery = listQuery.order("updated_at", { ascending: false }).limit(200);
@@ -253,7 +278,7 @@ export default async function DealsPage({
     head().eq("stage", "negotiation"),
     head().eq("stage", "won"),
     head().eq("stage", "lost"),
-    head().not("stage", "in", "(won,lost)").lt("updated_at", staleIso),
+    head().or(staleClause),
     // Davet önerisi tetiği: örnek (demo) anlaşmalar sayılmaz; yalnız gerçek kazanılmış anlaşma. Sayı + en eski kazancın
     // tarihi (updated_at vekili) tek sorguda: kart yalnız won==1 ve 7 gün içinde (shouldShowFirstDealNudge).
     scoped(supabase.from("deals").select("updated_at", { count: "exact" }))
@@ -291,6 +316,9 @@ export default async function DealsPage({
     probability: number | string | null;
     assigned_to: string | null;
     updated_at: string;
+    stage_changed_at: string | null;
+    expected_close_date: string | null;
+    closed_at: string | null;
     property_id: string | null;
     customer_id: string | null;
     project_unit_id?: string | null;
@@ -314,6 +342,9 @@ export default async function DealsPage({
       probability: d.probability != null ? Number(d.probability) : null,
       assigned_to: d.assigned_to ?? null,
       updated_at: d.updated_at,
+      stage_changed_at: d.stage_changed_at ?? null,
+      expected_close_date: d.expected_close_date ?? null,
+      closed_at: d.closed_at ?? null,
       property_title: p?.title ?? null,
       property_code: p?.property_code ?? null,
       property_id: p?.id ?? d.property_id,
@@ -374,13 +405,13 @@ export default async function DealsPage({
     });
   }
   kpis.push({
-    label: `${STALE_DAYS}+ gün hareketsiz`,
+    label: STALE_UNIFORM != null ? `${STALE_UNIFORM}+ gün aynı aşamada` : "Aşamada bekleyen",
     value: staleCount,
     icon: <AlarmClock />,
     tone: "warning",
     href: hrefWith({ gorunum: "liste", bayat: "1", asama: "", sayfa: "" }),
     attention: true,
-    hint: "açık anlaşma",
+    hint: STALE_UNIFORM != null ? "açık anlaşma" : `eşik: ${staleByStage.new}/${staleByStage.qualified}/${staleByStage.negotiation} gün`,
   });
 
   const viewOptions: ViewOption[] = [
@@ -396,10 +427,10 @@ export default async function DealsPage({
       format: (v) => (v === "acik" ? "Açık anlaşmalar" : (stageLabels[v as keyof typeof stageLabels]?.label ?? v)),
     },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
-    { key: "bayat", label: "Hareket", format: () => `${STALE_DAYS}+ gündür güncellenmedi` },
+    { key: "bayat", label: "Bekleme", format: () => staleText },
     { key: "tur", label: "İşlem", format: (v) => (v === "kira" ? "Kiralık" : "Satış") },
-    { key: "from", label: "Güncelleme ≥", format: (v) => v.split("-").reverse().join(".") },
-    { key: "to", label: "Güncelleme ≤", format: (v) => v.split("-").reverse().join(".") },
+    { key: "from", label: dateCol === "closed_at" ? "Kapanış ≥" : "Güncelleme ≥", format: (v) => v.split("-").reverse().join(".") },
+    { key: "to", label: dateCol === "closed_at" ? "Kapanış ≤" : "Güncelleme ≤", format: (v) => v.split("-").reverse().join(".") },
     { key: "ornek", label: "Örnek veri", format: () => "Hariç" },
   ]);
 
@@ -409,7 +440,7 @@ export default async function DealsPage({
     gorunum === "liste"
       ? deals.map((d) => {
           const days = Math.floor(msSince(d.updated_at) / 86_400_000);
-          const open = d.stage !== "won" && d.stage !== "lost";
+          const stageDays = Math.floor(msSince(d.stage_changed_at ?? d.updated_at) / 86_400_000);
           return {
             id: d.id,
             href: `${PATH}/${d.id}`,
@@ -423,7 +454,8 @@ export default async function DealsPage({
             probability: d.probability,
             advisor: d.assigned_to ? (advisorName.get(d.assigned_to) ?? null) : null,
             updatedLabel: updatedAgoLabel(days),
-            stale: open && days >= STALE_DAYS,
+            stale: stageAgeTone(d.stage, stageDays, staleByStage) !== "ok",
+            stageAgeLabel: isOpenStageKey(d.stage) ? daysInStageLabel(stageDays) : null,
             checklist: d.checklist_total > 0 ? { done: d.checklist_done, total: d.checklist_total } : null,
             noteCount: d.note_count,
             unit: (() => {
@@ -446,9 +478,11 @@ export default async function DealsPage({
   });
   const funnelMax = Math.max(1, ...funnel.map((f) => f.count));
   const lostValue = lost.reduce((s, d) => s + (d.deal_value || 0), 0);
-  const staleOpen = open.filter((d) => msSince(d.updated_at) > STALE_DAYS * 86_400_000).length;
+  const staleOpen = open.filter(
+    (d) => stageAgeTone(d.stage, Math.floor(msSince(d.stage_changed_at ?? d.updated_at) / 86_400_000), staleByStage) !== "ok",
+  ).length;
 
-  // Aylık kazanılan ciro (son 6 ay) — updated_at won-tarihi vekili (şemada ayrı kapanış tarihi yok).
+  // Aylık kazanılan ciro (son 6 ay) — kapanış anı deals.closed_at (SP1; yoksa updated_at vekili).
   // Ay bucketing saf string matematiğiyle (clock kuralı: bileşende new Date() yok); "YYYY-MM" karşılaştırması.
   const MONTHS_TR = ["Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara"];
   const [curY, curM] = daysAgoIso(0).slice(0, 7).split("-").map(Number); // curM: 1-12
@@ -463,8 +497,9 @@ export default async function DealsPage({
     return { key: `${y}-${String(idx + 1).padStart(2, "0")}`, label: MONTHS_TR[idx], value: 0 };
   });
   for (const w of won) {
-    if (!w.updated_at) continue;
-    const b = wonByMonth.find((x) => x.key === String(w.updated_at).slice(0, 7));
+    const at = w.closed_at ?? w.updated_at;
+    if (!at) continue;
+    const b = wonByMonth.find((x) => x.key === String(at).slice(0, 7));
     if (b) b.value += w.deal_value || 0;
   }
   const wonTrendTotal = wonByMonth.reduce((s, m) => s + m.value, 0);
@@ -558,7 +593,7 @@ export default async function DealsPage({
                   value={bayatF ? "1" : ""}
                   options={[
                     { value: "", label: "Tümü" },
-                    { value: "1", label: `${STALE_DAYS}+ gündür güncellenmedi` },
+                    { value: "1", label: staleText },
                   ]}
                 />
               </FilterGrid>
@@ -713,7 +748,8 @@ export default async function DealsPage({
                     >
                       <AlarmClock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                       <span className="text-xs text-text-muted">
-                        <span className="font-bold text-amber-600">{staleOpen} açık anlaşma</span> {STALE_DAYS}+ gündür güncellenmedi — listede bayat kartları öne alın.
+                        <span className="font-bold text-amber-600">{staleOpen} açık anlaşma</span>{" "}
+                        {STALE_UNIFORM != null ? `${STALE_UNIFORM}+ gündür aynı aşamada bekliyor` : "aşama eşiğini aştı"} — listede bekleyen kartları öne alın.
                       </span>
                     </Link>
                   ) : null}
@@ -760,6 +796,7 @@ export default async function DealsPage({
                 canEdit={canEdit}
                 members={members ?? []}
                 stageLabels={stageLabels}
+                staleDays={staleByStage}
               />
             </>
           )}

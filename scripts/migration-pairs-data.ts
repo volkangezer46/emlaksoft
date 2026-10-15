@@ -526,6 +526,10 @@ const F = {
   a7MessageSequences: "20261018070001_message_sequences.sql",
   a7InboundMediaBucket: "20261018070002_inbound_media_bucket.sql",
   a7SurveyReviewClick: "20261018070003_survey_review_click.sql",
+  // A8 (2026-10-18): anlasma asama gecmisi + satis hizi, takim/sube/cagri hedefi, donem/kapsam raporu + satis hunisi.
+  a8DealStageHistory: "20261018080000_deal_stage_history.sql",
+  a8TargetsScopeCalls: "20261018080001_targets_scope_calls.sql",
+  a8ReportPeriodFunnel: "20261018080002_report_period_funnel.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -808,6 +812,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a1MergeProperties]: "ek", // yeni SECURITY DEFINER merge_properties (authenticated; oturum + ofis + properties:delete govdede; tum properties(id) FK'leri + share_links + medya kapak/sira + soft delete + audit); mevcut nesnelere dokunmaz
     [F.crmG4DemandPropertyMatches]: "ek", // yeni tablo demand_property_matches (RLS: ofis + matching izni + talebi gorebilme; silme yalniz cascade); mevcut nesnelere dokunmaz, kod tablo yokken bos durum kumesiyle calisir
     [F.ga14AppointmentOutcomeNoshow]: "ek", // appointments_outcome_check genisler ('gelmedi' eklenir); RLS/yetki ayni, mevcut satirlar gecerli
+    [F.a8DealStageHistory]: "davranis", // deals'e stage_changed_at/expected_close_date/closed_at + eklemeli deal_stage_events (tek yazar AFTER UPDATE OF stage tetikleyicisi; authenticated yalniz okur, RLS kiraci + anlasma gorunurlugu) + audit_logs'tan geri doldurma; transition_deal_stage_atomic yeni surum (islem yapani GUC'a yazar, govde ayni); deal_stage_velocity + rapor yardimcilari (SECURITY INVOKER)
+    [F.a8TargetsScopeCalls]: "davranis", // targets.team_id/branch_id (en cok bir kapsam CHECK) + target_calls; olu target_demands kolonu DUSER; cift yoksa kapsam+donem benzersiz indeksleri; target_progress_counts (SECURITY INVOKER)
+    [F.a8ReportPeriodFunnel]: "ek", // yalniz yeni SECURITY INVOKER fonksiyonlar: report_period_overview (donem + onceki donem, sube/takim/danisman kapsami) ve report_sales_funnel (kohort huni, kaynak maliyeti); komisyon earnings_all, gider expenses:view kapili
     [F.wp5EinvoiceLedgerLink]: "davranis", // einvoices.party_id + open_item_id; einvoices durum tetigi: issued -> kaynak (komisyon) alacagina bag ya da serbest faturada invoice.issued alacagi (finance_post_internal), cancelled/error -> finance_reverse_internal; komisyon alacagi acilinca faturaya bag; resmilesmis faturalara cari + bag geri doldurmasi (gecmise alacak acilmaz); fonksiyonlar yalniz service_role
     [F.a6CampaignReportRpc]: "ek", // campaign_report + campaign_recipient_page (SECURITY INVOKER, kiraci kosullu); tablo degismez
     [F.a6InboxConversationState]: "ek", // communications/calls.resolved_at + resolved_by (nullable) + inbox_conversations (SECURITY INVOKER)
@@ -1083,6 +1090,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A3-musteri-iletisim-tercihi", order: 1833, title: "Musteri iletisim tercihi: customers.preferred_channel / contact_window / preferred_language + CHECK (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken tercih karti 'kurulum bekliyor' der, sonraki en iyi eylem tercihsiz calisir; sira serbest, ek)", files: [F.a3CustomerContactPrefs] },
     { id: "GA14-randevu-gelmedi", order: 1844, title: "Randevu sonucu 'gelmedi' (no-show): appointments_outcome_check genisler (bagimsiz; KOD YAYININDAN ONCE uygulanir: yeni kod 'gelmedi' yazar, eski kisitta CHECK hatasi alir; ek)", files: [F.ga14AppointmentOutcomeNoshow] },
     { id: "GA08-bildirim-konusu", order: 1850, title: "Bildirim konusu: notifications.topic (randevu/gorev/atama/musteri/portfoy/finans/sistem) + baglantidan tureten BEFORE INSERT tetikleyicisi + gecmis satir geri doldurma + my_notification_counts 'topics' kirilimi. SK5 (20261016050000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolon yokken konusuz yazar ve tur ciplerine duser); ek", files: [F.ga08NotificationsTopic] },
+    { id: "A8-satis-hizi-hedef-huni", order: 1808, title: "Raporlama ve hedefler A8: anlasma asama gecmisi (deal_stage_events + stage_changed_at/expected_close_date/closed_at, audit_logs geri doldurmasi, transition_deal_stage_atomic yeni surum) + satis hizi RPC'si, ARDINDAN takim/sube/cagri hedefi (target_demands duser), ARDINDAN donem/kapsam raporu + satis hunisi. Uc dosya BIRLIKTE ve sirayla; KOD YAYININDAN ONCE uygulanir (yeni kod yeni kolonlari ve RPC'leri okur). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.a8DealStageHistory, F.a8TargetsScopeCalls, F.a8ReportPeriodFunnel] },
     { id: "WP5-efatura-defter", order: 1706, title: "Finans entegrasyonu WP5: e-Fatura deftere baglanir (einvoices.party_id/open_item_id; resmilesen fatura kaynak alacagina baglanir, serbest faturada invoice.issued alacagi acilir, iptal/hata ters kayit; gecmis faturalara yalniz cari + bag). WP1 (20261017010000) ve e-Fatura (20261012001000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolonlar yokken eski fatura listesi; tetik kodu beklemez). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp5EinvoiceLedgerLink] },
     { id: "A6-kampanya-raporu", order: 1866, title: "Kampanya raporu: campaign_report (durum sayilari, hata gruplari, 7 gun icinde yanit/randevu/ret atfi) + campaign_recipient_page (sunucu sayfalama). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken eski 500 satirlik listeye duser; sira serbest, ek)", files: [F.a6CampaignReportRpc] },
     { id: "A6-gelen-kutusu-konusmalar", order: 1867, title: "Gelen kutusu v2: communications/calls.resolved_at + resolved_by ve inbox_conversations (kisi bazli konusma, yanit bekliyor). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken Konusmalar sekmesi 'etkin degil' der; sira serbest, ek)", files: [F.a6InboxConversationState] },
@@ -1378,6 +1386,12 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp4PropertyDuesOpenItems, F.buildingManagement],
     [F.wp4PropertyDuesOpenItems, F.sk10ModuleWritePolicies],
     // WP5: e-Fatura tetigi kayit cekirdegine (finance_post_internal / finance_reverse_internal) ve e-Fatura son yazma yollarina dayanir.
+    // A8: asama gecmisi kapsam RLS'ine (anlasma gorunurlugu) dayanir; hedef kapsami takim tablosuna ve faaliyet hedeflerine; rapor fonksiyonlari asama gecmisi yardimcilarina ve expenses.portal_key'e.
+    [F.a8DealStageHistory, F.sk10ScopeRls],
+    [F.a8TargetsScopeCalls, F.targets],
+    [F.a8TargetsScopeCalls, F.takimTeams],
+    [F.a8ReportPeriodFunnel, F.a8DealStageHistory],
+    [F.a8ReportPeriodFunnel, F.expenseBudgetsRecurring],
     [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
     [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],
