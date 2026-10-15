@@ -1,4 +1,7 @@
 -- SK2 YAYIN NOTU (ZORUNLU, bir kez): ozel Broadcast kanallarinin okuma politikalari (realtime.messages).
+-- SIRA: db:migrate SONRASI, DEPLOY'DAN ONCE calistirin. Politikalar eski istemciyi etkilemez (eski istemci ozel kanal
+-- kullanmaz); deploy'dan once kurulursa yeni istemci ilk katilimda yetki reddi yasamaz ve zil/kisisel bildirim, destek
+-- konusmasi icin hic kesinti olmaz (geri dusus yolu notifications'i kapsamaz).
 -- Neden ayri dosya: realtime.messages'in sahibi supabase_realtime_admin; Supabase'te `postgres` superuser degil ve bu
 -- role uye degil, bu yuzden migration 20261016020000 politika adimini atlar (NOTICE). Icerik migration'daki adimla
 -- AYNIDIR (sozlesme testi: src/lib/realtime-route-contract.test.ts). Idempotent: drop if exists + create.

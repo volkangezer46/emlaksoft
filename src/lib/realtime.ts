@@ -334,7 +334,8 @@ export function createTopicHub(deps: HubDeps) {
     /** Ağ geri geldi / sekme görünür oldu: kopuk kanallar beklemeden yeniden kurulur. */
     reconnectNow(): void {
       for (const e of entries.values()) {
-        if (e.handlers.size === 0 || e.status === "live" || e.building) continue;
+        // Katılımı süren kanal (connecting) bozulmaz: sekme hızlı gidip gelince kur-kapat turu olmasın.
+        if (e.handlers.size === 0 || e.status === "live" || e.building || (e.status === "connecting" && e.channel)) continue;
         clearRetry(e);
         e.attempt = 0;
         const rt = e.client?.realtime;

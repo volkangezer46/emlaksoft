@@ -13,8 +13,9 @@
 -- KAPI ("canli dogrulamadan sonra"): Broadcast okuma politikalari (rt_tenant_topic_read + rt_inbox_topic_read)
 --   realtime.messages'ta YOKSA bu dosya HICBIR SEY yapmaz (NOTICE). Supabase'te migration rolu `postgres` bu
 --   politikalari kuramaz (20261016020000 basligi); canlida sira:
---     (1) db:migrate (020000 tetikleyicileri kurar, 020100 burada ertelenir) -> (2) deploy ->
---     (3) supabase_admin: scripts/sunucu/realtime-policies.sql (politikalar) -> (4) canli dogrulama (rt-e2e S1-S4) ->
+--     (1) db:migrate (020000 tetikleyicileri kurar, 020100 burada ertelenir) ->
+--     (2) supabase_admin: scripts/sunucu/realtime-policies.sql (politikalar; eski istemciyi etkilemez) -> (3) deploy ->
+--     (4) canli dogrulama (rt-e2e S1-S4) ->
 --     (5) supabase_admin: scripts/sunucu/realtime-policies.sql -v trim=1 (bu dosyanin adimi; ayni SQL, idempotent).
 --   Politikalari kurabilen rolle (golge/yerel superuser) calisirsa kirpma burada yapilir.
 -- Yayin yoksa ya da FOR ALL TABLES ise atlanir. Idempotent. Tablo/veri degismez.
