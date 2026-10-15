@@ -326,7 +326,7 @@ function PnlSection({
             </Table>
           </TableFrame>
           <p className="text-xs leading-relaxed text-text-faint">
-            Komisyon tahakkuk esasına göre (kayıt ayı) ve KDV hariç matrahla sayılır; tahsilat değildir. KDV sütunu yalnız bilgidir, net'ten düşülmez (beyan Vergi sekmesinde). İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
+            Komisyon tahakkuk esasına göre (kayıt ayı) ve KDV hariç matrahla sayılır; tahsilat değildir. KDV sütunu yalnız bilgidir, net tutardan düşülmez (beyan Vergi sekmesinde). İptal edilen komisyon ve örnek veri hariç. &quot;Paylar&quot; ofis dışına giden
             danışman/referans/franchise paylarıdır. Yönetim ücreti, mülk yönetimindeki kira tahsilatlarından ofise kalan ücrettir; mülk sahibine yansıtılan gider ofis
             gideri sayılmaz.{pl.cashLinked ? " Diğer gelir: Muhasebe'de elle girilen gelir hareketleridir; gider, gidere dönüşmemiş kasa çıkışlarını (maaş vb.) da içerir." : ""} Gelir/kurumlar
             vergisi hesaplanmaz; mali müşavirinizle doğrulayın.
