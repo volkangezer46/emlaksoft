@@ -1,8 +1,8 @@
 "use client";
 
-import { startTransition, useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, LockKeyhole, Send, Sparkles, X } from "lucide-react";
+import { BellRing, Eye, LockKeyhole, Send, Sparkles, X } from "lucide-react";
 import { replyTicketAsStaff, type TicketResult } from "@/app/actions/tickets";
 import { applyTicketMacroActions } from "@/app/actions/support-desk";
 import { renderMacroBody, type MacroVariables } from "@/lib/support/macro-template";
@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { TicketAttachmentVisibility } from "@/lib/ticket-attachments";
+import { subscribeToInserts } from "@/lib/realtime";
+import { TICKET_TYPING_EVENT, type NewMessagePreview, type TicketTypingDetail } from "@/lib/support/ticket-collision";
 
 type ReplyState = TicketResult & { messageId?: string; warning?: string };
 const initial: ReplyState = {};
@@ -35,6 +37,8 @@ export function StaffReplyForm({
   macros = [],
   macroVars = {},
   version,
+  lastMessageAt = null,
+  viewerId,
 }: {
   ticketId: string;
   closed?: boolean;
@@ -43,6 +47,10 @@ export function StaffReplyForm({
   macroVars?: MacroVariables;
   /** İyimser eşzamanlılık kontrolü — bkz. support_tickets.version. */
   version: number;
+  /** PA-8: sayfa çizildiğindeki en yeni mesaj anı; gönderimde sunucu bundan sonra başkası yazdı mı diye bakar. */
+  lastMessageAt?: string | null;
+  /** Personel kimliği: canlı gelen kendi mesajı "yeni mesaj" sayılmaz. */
+  viewerId?: string;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
@@ -51,11 +59,55 @@ export function StaffReplyForm({
   const [attachmentKey, setAttachmentKey] = useState(0);
   const [requestId, setRequestId] = useState("");
   const [activeMacro, setActiveMacro] = useState<TicketMacro | null>(null);
+  // PA-8: "okudum" ile ilerleyen işaret (sayfa işaretinden yeni ise o geçerli) + canlı gelen yeni mesajlar.
+  const [ackAt, setAckAt] = useState<string | null>(null);
+  const [liveNew, setLiveNew] = useState<NewMessagePreview[]>([]);
+  const [hasDraft, setHasDraft] = useState(false);
+  const typingTimer = useRef<number | null>(null);
+  const seenAt = [lastMessageAt, ackAt].filter((v): v is string => Boolean(v)).sort().at(-1) ?? null;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setRequestId(crypto.randomUUID()), 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  // Siz yazarken başkası mesaj eklerse formun üstünde uyarı (postgres_changes; personel RLS'i okur).
+  useEffect(() => {
+    return subscribeToInserts<{ id: string; ticket_id: string; author_kind: string; author_user_id: string | null; body: string; visibility: string; created_at: string }>({
+      channel: `es-rt-reply-guard:${ticketId}`,
+      table: "support_ticket_messages",
+      filter: `ticket_id=eq.${ticketId}`,
+      onInsert: (row) => {
+        if (viewerId && row.author_user_id === viewerId) return;
+        setLiveNew((prev) => [
+          ...prev.slice(-4),
+          {
+            author: row.author_kind === "staff" ? "Destek personeli" : row.author_kind === "system" ? "Sistem" : "Ofis",
+            excerpt: String(row.body ?? "").replace(/\s+/g, " ").trim().slice(0, 160),
+            at: row.created_at,
+            internal: row.visibility === "internal",
+          },
+        ]);
+      },
+    });
+  }, [ticketId, viewerId]);
+
+  // Yazıyor bayrağı (presence şeridi bunu diğer personele yayar): ilk tuşta açılır, 4 sn duraksamada kapanır.
+  function signalTyping(typing: boolean) {
+    window.dispatchEvent(new CustomEvent<TicketTypingDetail>(TICKET_TYPING_EVENT, { detail: { ticketId, typing } }));
+  }
+  function onDraftInput(value: string) {
+    setHasDraft(value.trim().length > 0);
+    signalTyping(value.trim().length > 0);
+    if (typingTimer.current) window.clearTimeout(typingTimer.current);
+    typingTimer.current = window.setTimeout(() => signalTyping(false), 4000);
+  }
+  useEffect(
+    () => () => {
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+    },
+    [],
+  );
 
   const effectiveVisibility: TicketAttachmentVisibility = closed ? "internal" : visibility;
 
@@ -70,9 +122,21 @@ export function StaffReplyForm({
     if (!stableRequestId) return { error: "Güvenli gönderim kimliği hazırlanıyor. Lütfen tekrar deneyin." };
     replyData.set("request_id", stableRequestId);
     replyData.set("expected_version", String(version));
+    const seen = String(formData.get("seen_at") ?? "");
+    if (seen) replyData.set("seen_at", seen);
+    if (formData.get("force") === "1") replyData.set("force", "1");
 
     const result = (await replyTicketAsStaff({}, replyData)) as ReplyState;
-    if (!result.ok) return result;
+    if (result.newMessages?.length) {
+      // Gönderilmedi: konuşma tazelenir, metin formda kalır; personel okuyup "yine de gönder" der.
+      startTransition(() => router.refresh());
+      return result;
+    }
+    if (!result.ok) {
+      startTransition(() => router.refresh());
+      return result;
+    }
+    signalTyping(false);
 
     // Makro eylemleri (durum/öncelik/atama/etiket) + kullanım sayacı, yanıt kaydedildikten SONRA.
     let macroWarning: string | undefined;
@@ -96,6 +160,8 @@ export function StaffReplyForm({
       setAttachmentKey((value) => value + 1);
       setRequestId(crypto.randomUUID());
       setActiveMacro(null);
+      setLiveNew([]);
+      setHasDraft(false);
       router.refresh();
     });
     // Makro uyarısı yükleme sonucunu gizlemesin: ikisi de tek uyarı satırında gösterilir.
@@ -117,9 +183,27 @@ export function StaffReplyForm({
     setActiveMacro(macro);
   }
 
+  // `<form action>` yerine onSubmit: React form eylemi bitince alanları sıfırlar; çakışma/hata durumunda yazılan yanıt
+  // kaybolmasın diye sıfırlama yalnız başarıda elle yapılır.
+  function submitWith(force: boolean) {
+    const form = formRef.current;
+    if (!form) return;
+    if (!form.reportValidity()) return;
+    const fd = new FormData(form);
+    if (force) fd.set("force", "1");
+    startTransition(() => action(fd));
+  }
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    submitWith(false);
+  }
+  const pendingNew = state.newMessages ?? [];
+  const latestLive = liveNew.at(-1)?.at ?? null;
+
   return (
-    <form ref={formRef} action={action} className="space-y-3">
+    <form ref={formRef} onSubmit={onSubmit} className="space-y-3">
       <input type="hidden" name="request_id" value={requestId} />
+      <input type="hidden" name="seen_at" value={pendingNew.length ? (pendingNew[0]?.at ?? seenAt ?? "") : (seenAt ?? "")} />
       <input type="hidden" name="macro_id" value={activeMacro?.id ?? ""} />
       <div
         role="tablist"
@@ -173,6 +257,7 @@ export function StaffReplyForm({
           maxLength={20_000}
           rows={5}
           placeholder={effectiveVisibility === "internal" ? "Ekip için not yazın…" : "Ofise net ve uygulanabilir bir yanıt yazın…"}
+          onInput={(event) => onDraftInput(event.currentTarget.value)}
           onKeyDown={(event) => {
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
               event.preventDefault();
@@ -228,6 +313,50 @@ export function StaffReplyForm({
           >
             <X className="h-3.5 w-3.5" />
           </Button>
+        </div>
+      ) : null}
+
+      {liveNew.length > 0 && hasDraft && pendingNew.length === 0 ? (
+        <div className="flex flex-wrap items-start gap-2 rounded-[var(--radius-control)] border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-800" role="status" aria-live="polite">
+          <BellRing className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p className="min-w-0 flex-1">
+            Siz yazarken {liveNew.length} yeni mesaj geldi: <span className="font-semibold">{liveNew.at(-1)?.author}</span> — “{liveNew.at(-1)?.excerpt}”
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              if (latestLive) setAckAt(latestLive);
+              setLiveNew([]);
+            }}
+          >
+            Okudum
+          </Button>
+        </div>
+      ) : null}
+
+      {pendingNew.length > 0 ? (
+        <div className="space-y-2 rounded-[var(--radius-card)] border border-amber-400/45 bg-amber-400/10 p-3" role="alert">
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+            <BellRing className="h-4 w-4 shrink-0" aria-hidden /> Siz yazarken {pendingNew.length} yeni mesaj geldi; yanıtınız henüz gönderilmedi.
+          </p>
+          <ul className="space-y-1.5">
+            {pendingNew.map((m) => (
+              <li key={`${m.at}-${m.author}`} className="rounded-[var(--radius-control)] bg-surface px-2.5 py-1.5 text-xs text-text">
+                <span className="font-semibold text-ink-950">{m.author}</span>
+                {m.internal ? <span className="ml-1 text-amber-700">(iç not)</span> : null}: {m.excerpt}
+              </li>
+            ))}
+          </ul>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" size="sm" variant="secondary" onClick={() => textareaRef.current?.focus()}>
+              Yanıtı düzenle
+            </Button>
+            <Button type="button" size="sm" loading={pending} onClick={() => submitWith(true)} icon={Send}>
+              Yine de gönder
+            </Button>
+          </div>
         </div>
       ) : null}
 

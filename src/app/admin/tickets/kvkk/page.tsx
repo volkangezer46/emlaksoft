@@ -166,7 +166,7 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
         />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[720px] text-sm">
             <caption className="sr-only">KVKK başvuruları (en eski önce)</caption>
             <thead className="border-b border-line text-left text-xs text-text-muted">
               <tr>
@@ -187,11 +187,11 @@ export default async function KvkkQueuePage({ searchParams }: { searchParams?: P
                       {r.tenantName}
                     </Link>
                   </td>
-                  <td className="px-4 py-2.5">{KVKK_TYPE_LABELS[r.type] ?? r.type}</td>
-                  <td className="px-4 py-2.5">{KVKK_STATUS_LABELS[r.status] ?? r.status}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-text-muted">{fmtDay(r.createdAt)}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{fmtDay(r.deadlineAt)}</td>
-                  <td className="px-4 py-2.5">
+                  <td data-label="Tür" className="px-4 py-2.5">{KVKK_TYPE_LABELS[r.type] ?? r.type}</td>
+                  <td data-label="Durum" className="px-4 py-2.5">{KVKK_STATUS_LABELS[r.status] ?? r.status}</td>
+                  <td data-label="Oluşturma" className="px-4 py-2.5 tabular-nums text-text-muted">{fmtDay(r.createdAt)}</td>
+                  <td data-label="Son tarih" className="px-4 py-2.5 tabular-nums">{fmtDay(r.deadlineAt)}</td>
+                  <td data-label="Kalan" className="px-4 py-2.5">
                     <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", TONE_CLASS[r.tone])}>
                       {kvkkDaysLeftLabel(r.daysLeft)}
                     </span>

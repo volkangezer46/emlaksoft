@@ -36,9 +36,61 @@ export type BoardItem = {
   mine: boolean;
   voted: boolean;
   canVote: boolean;
+  /** "Yayında" önerinin duyurulduğu yenilik (PA-10); bağlanmadıysa yalnız yayın tarihi. */
+  shipped: ShippedInfo | null;
 };
 
+export type ShippedInfo = { at: string | null; title: string | null; href: string | null };
+
 const BOARD_CAP = 500;
+
+export type ChangelogOption = { id: string; title: string; publishedAt: string; href: string | null };
+
+/** Yenilik bağlantısının ofis tarafındaki hedefi: yalnız /app içi ya da https bağlantı (public yol ofisi panelden çıkarmaz). */
+export function changelogTargetHref(href: string | null | undefined): string | null {
+  if (!href) return null;
+  if (/^\/app(\/|\?|$)/.test(href) || /^https:\/\//.test(href)) return href;
+  return null;
+}
+
+/**
+ * Önerilerin bağlı yenilik girdileri (PA-10, migration 20261019070003). Kolon yoksa ya da okunamazsa boş harita:
+ * pano ve liste bağlantısız çizilir (kurulumdan önce de çalışır). Gömme yerine iki sorgu (ilişki önbelleği beklenmez).
+ */
+export async function loadChangelogLinks(requestIds: readonly string[]): Promise<Map<string, { entryId: string; title: string; href: string | null; publishedAt: string | null }>> {
+  const out = new Map<string, { entryId: string; title: string; href: string | null; publishedAt: string | null }>();
+  const ids = [...new Set(requestIds)];
+  if (ids.length === 0) return out;
+  const admin = createAdminClient();
+  const links: { id: string; changelog_entry_id: string | null }[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await admin.from("product_feature_requests").select("id, changelog_entry_id").in("id", ids.slice(i, i + 200)).not("changelog_entry_id", "is", null);
+    if (error) return out;
+    links.push(...((data ?? []) as { id: string; changelog_entry_id: string | null }[]));
+  }
+  const entryIds = [...new Set(links.map((l) => l.changelog_entry_id).filter((v): v is string => Boolean(v)))];
+  if (entryIds.length === 0) return out;
+  const { data: entries, error } = await admin.from("changelog_entries").select("id, title, href, published_at").in("id", entryIds);
+  if (error) return out;
+  const byId = new Map(((entries ?? []) as { id: string; title: string; href: string | null; published_at: string | null }[]).map((e) => [e.id, e]));
+  for (const l of links) {
+    const e = l.changelog_entry_id ? byId.get(l.changelog_entry_id) : undefined;
+    if (e) out.set(l.id, { entryId: e.id, title: e.title, href: e.href, publishedAt: e.published_at });
+  }
+  return out;
+}
+
+/** Admin öneri formu: son yayımlanmış yenilikler (bağlantı seçimi). Tablo yoksa boş. */
+export async function listRecentChangelogEntries(limit = 30): Promise<ChangelogOption[]> {
+  const { data, error } = await createAdminClient()
+    .from("changelog_entries")
+    .select("id, title, href, published_at")
+    .not("published_at", "is", null)
+    .order("published_at", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  return ((data ?? []) as { id: string; title: string; href: string | null; published_at: string }[]).map((e) => ({ id: e.id, title: e.title, href: e.href, publishedAt: e.published_at }));
+}
 
 /** Ofisin bayrak hedeflemesi için planı (yoksa null). */
 export async function tenantPlanOf(tenantId: string): Promise<string | null> {
@@ -62,7 +114,7 @@ export async function loadBoard(tenantId: string): Promise<{ ready: boolean; ite
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("product_feature_requests")
-    .select("id, tenant_id, title, body, status, vote_count, admin_note, created_at")
+    .select("id, tenant_id, title, body, status, vote_count, admin_note, created_at, status_changed_at")
     .or(`status.in.(${PUBLIC_REQUEST_STATUSES.join(",")}),tenant_id.eq.${tenantId}`)
     .order("vote_count", { ascending: false })
     .order("created_at", { ascending: false })
@@ -71,8 +123,9 @@ export async function loadBoard(tenantId: string): Promise<{ ready: boolean; ite
     if (isSchemaMissing(error)) return { ready: false, items: [], truncated: false };
     throw new Error("Öneri panosu okunamadı.");
   }
-  const rows = (data ?? []) as { id: string; tenant_id: string; title: string; body: string | null; status: RequestStatus; vote_count: number; admin_note: string | null; created_at: string }[];
+  const rows = (data ?? []) as { id: string; tenant_id: string; title: string; body: string | null; status: RequestStatus; vote_count: number; admin_note: string | null; created_at: string; status_changed_at: string | null }[];
   const ids = rows.map((r) => r.id);
+  const shippedLinks = await loadChangelogLinks(rows.filter((r) => r.status === "yayinda").map((r) => r.id));
   const voted = new Set<string>();
   for (let i = 0; i < ids.length; i += 200) {
     const { data: v } = await admin.from("product_feature_request_votes").select("request_id").eq("tenant_id", tenantId).in("request_id", ids.slice(i, i + 200));
@@ -94,6 +147,13 @@ export async function loadBoard(tenantId: string): Promise<{ ready: boolean; ite
         mine: r.tenant_id === tenantId,
         voted: voted.has(r.id),
         canVote: canVoteOn(r, tenantId),
+        shipped:
+          r.status === "yayinda"
+            ? (() => {
+                const link = shippedLinks.get(r.id);
+                return { at: link?.publishedAt ?? r.status_changed_at, title: link?.title ?? null, href: changelogTargetHref(link?.href) };
+              })()
+            : null,
       })),
   };
 }
@@ -286,6 +346,9 @@ export type AdminRequestRow = {
   createdAt: string;
   tenantId: string;
   tenantName: string | null;
+  /** Bağlı yenilik girdisi (PA-10); yoksa null. */
+  changelogEntryId: string | null;
+  changelogTitle: string | null;
 };
 
 /** Admin pano listesi: durum süzgeci + sayfalı (oy sayısına göre). */
@@ -302,7 +365,7 @@ export async function listRequestsForAdmin(input: { status: RequestStatus | null
   }
   type Row = { id: string; title: string; body: string | null; status: RequestStatus; vote_count: number; admin_note: string | null; created_at: string; tenant_id: string };
   const rows = (data ?? []) as unknown as Row[];
-  const names = await tenantNamesFor(rows.map((r) => r.tenant_id));
+  const [names, links] = await Promise.all([tenantNamesFor(rows.map((r) => r.tenant_id)), loadChangelogLinks(rows.map((r) => r.id))]);
   return {
     ready: true,
     total: count ?? 0,
@@ -316,6 +379,8 @@ export async function listRequestsForAdmin(input: { status: RequestStatus | null
       createdAt: r.created_at,
       tenantId: r.tenant_id,
       tenantName: names.get(r.tenant_id) ?? null,
+      changelogEntryId: links.get(r.id)?.entryId ?? null,
+      changelogTitle: links.get(r.id)?.title ?? null,
     })),
   };
 }

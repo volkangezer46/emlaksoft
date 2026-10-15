@@ -1,5 +1,5 @@
 import Link from "@/components/ui/smart-link";
-import { BarChart3, Clock3, ShieldCheck, Star, Ticket, Timer } from "lucide-react";
+import { BarChart3, BookOpenCheck, Clock3, ShieldCheck, Star, Ticket, Timer } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -9,7 +9,7 @@ import { daysAgoIso, now } from "@/lib/clock";
 import { requirePlatformModule } from "@/lib/platform";
 import { PLATFORM_ROLE_LABELS, type PlatformRole } from "@/lib/platform-access";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { computeDeskReport, formatDurationHours, type BreakdownRow, type DeskCsatRow, type DeskTicketRow } from "@/lib/support/desk-report";
+import { computeDeskReport, deflectionStats, formatDurationHours, type BreakdownRow, type DeflectionRow, type DeskCsatRow, type DeskTicketRow } from "@/lib/support/desk-report";
 import { isMissingRelationError } from "@/lib/support/desk-data";
 
 export const metadata = { title: "Destek raporları" };
@@ -100,11 +100,13 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
     .gte("created_at", since)
     .order("created_at", { ascending: false })
     .limit(ROW_CAP);
-  const [ticketsResult, csatResult, staffResult, categoryResult] = await Promise.all([
+  const [ticketsResult, csatResult, staffResult, categoryResult, deflectionResult] = await Promise.all([
     withTags,
     admin.from("support_ticket_csat").select("score, created_at").gte("created_at", since).limit(ROW_CAP),
     admin.from("platform_staff").select("id, full_name, role"),
     admin.from("definitions").select("value, label").eq("category", "ticket_category").is("tenant_id", null),
+    // PA-7: yeni talep formunda makaleyle çözülen (açılmayan) talepler; tablo yoksa (migration 20261019070004) ölçüm yok.
+    admin.from("support_article_deflections").select("kind, slug").gte("created_at", since).limit(ROW_CAP),
   ]);
 
   let tagsInstalled = true;
@@ -137,6 +139,7 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
     return s ? `${s.full_name} · ${PLATFORM_ROLE_LABELS[s.role as PlatformRole] ?? s.role}` : "Eski personel";
   };
   const maxWeekTickets = Math.max(1, ...report.weeks.map((w) => w.tickets));
+  const deflection = deflectionResult.error ? null : deflectionStats((deflectionResult.data ?? []) as DeflectionRow[], report.total);
 
   return (
     <div className="space-y-4">
@@ -202,6 +205,17 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
                 icon: <Clock3 className="h-4 w-4" />,
               },
               {
+                label: "Makaleyle çözülen",
+                value: deflection ? deflection.count : "—",
+                hint: deflection
+                  ? deflection.count > 0
+                    ? `%${(deflection.rate ?? 0).toLocaleString("tr-TR")} talep açılmadan çözüldü`
+                    : "Henüz makaleyle çözülen yok"
+                  : "Ölçüm kurulum bekliyor",
+                href: "/admin/tickets/yardim",
+                icon: <BookOpenCheck className="h-4 w-4" />,
+              },
+              {
                 label: "Açık talep",
                 value: report.open,
                 hint: `${report.total} talep açıldı`,
@@ -225,7 +239,7 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
               </Link>
             </div>
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[520px] text-xs">
+              <table className="adm-tbl-m w-full md:min-w-[520px] text-xs">
                 <thead>
                   <tr className="text-left text-text-faint">
                     <th className="py-1.5 font-semibold">Hafta</th>
@@ -238,7 +252,7 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
                   {report.weeks.map((w) => (
                     <tr key={w.weekStart}>
                       <td className="py-1.5 font-semibold text-ink-950">{weekLabel(w.weekStart)} haftası</td>
-                      <td className="py-1.5">
+                      <td data-label="Talep" className="py-1.5">
                         <Link href="/admin/tickets?sirala=created_at" className="flex items-center gap-2 hover:text-brand-600">
                           <span className="h-1.5 w-20 overflow-hidden rounded-full bg-canvas" aria-hidden>
                             <span className="block h-full rounded-full bg-brand-500/70" style={{ width: `${(w.tickets / maxWeekTickets) * 100}%` }} />
@@ -246,12 +260,12 @@ export default async function SupportReportsPage({ searchParams }: { searchParam
                           <span className="tabular-nums">{w.tickets}</span>
                         </Link>
                       </td>
-                      <td className="py-1.5 tabular-nums">
+                      <td data-label="SLA uyumu" className="py-1.5 tabular-nums">
                         <Link href="/admin/tickets?sla=breached" className={w.compliance != null && w.compliance < 80 ? "font-semibold text-danger-600 hover:underline" : "hover:text-brand-600"}>
                           {pct(w.compliance)}
                         </Link>
                       </td>
-                      <td className="py-1.5 tabular-nums">
+                      <td data-label="CSAT" className="py-1.5 tabular-nums">
                         <Link href="/admin/tickets?durum=cozulmus" className="hover:text-brand-600">
                           {w.csatAverage == null ? "—" : `${w.csatAverage.toLocaleString("tr-TR")}/5 (${w.csatCount})`}
                         </Link>

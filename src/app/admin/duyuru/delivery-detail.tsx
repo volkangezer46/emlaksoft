@@ -152,7 +152,7 @@ export async function DeliveryDetail({ id, status, channel, page, canEdit }: { i
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="adm-tbl-m w-full md:min-w-[720px] text-sm">
               <thead className="border-b border-line bg-canvas/60 text-left text-xs text-text-muted">
                 <tr>
                   <th className="px-4 py-2 font-semibold">Ofis</th>
@@ -171,14 +171,14 @@ export async function DeliveryDetail({ id, status, channel, page, canEdit }: { i
                         {nameOf(d.tenant as Record<string, unknown> | null, "name") ?? "Ofis"}
                       </Link>
                     </td>
-                    <td className="px-4 py-2 text-ink-950">{nameOf(d.user as Record<string, unknown> | null, "full_name") ?? "Kullanıcı"}</td>
-                    <td className="px-4 py-2 text-text-muted">{CHANNEL_LABEL[d.channel] ?? d.channel}</td>
-                    <td className="px-4 py-2">
+                    <td data-label="Kullanıcı" className="px-4 py-2 text-ink-950">{nameOf(d.user as Record<string, unknown> | null, "full_name") ?? "Kullanıcı"}</td>
+                    <td data-label="Kanal" className="px-4 py-2 text-text-muted">{CHANNEL_LABEL[d.channel] ?? d.channel}</td>
+                    <td data-label="Durum" className="px-4 py-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_CLS[d.status] ?? "bg-canvas text-text-muted"}`}>{STATUS_LABEL[d.status] ?? d.status}</span>
                       {d.error ? <span className="mt-0.5 block max-w-xs truncate text-xs text-text-muted" title={d.error}>{d.error}</span> : null}
                     </td>
-                    <td className="px-4 py-2 text-xs text-text-muted">{d.sent_at ? fmt.format(new Date(d.sent_at)) : "—"}{d.attempts > 1 ? ` · ${d.attempts}. deneme` : ""}</td>
-                    <td className="px-4 py-2 text-xs text-text-muted">
+                    <td data-label="Teslim" className="px-4 py-2 text-xs text-text-muted">{d.sent_at ? fmt.format(new Date(d.sent_at)) : "—"}{d.attempts > 1 ? ` · ${d.attempts}. deneme` : ""}</td>
+                    <td data-label="Okundu / tıklandı" className="px-4 py-2 text-xs text-text-muted">
                       {d.read_at ? `Okundu ${fmt.format(new Date(d.read_at))}` : "—"}
                       {d.clicked_at ? ` · Tıklandı ${fmt.format(new Date(d.clicked_at))}` : ""}
                     </td>

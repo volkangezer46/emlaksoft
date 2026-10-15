@@ -39,7 +39,7 @@ export async function SuppressionView({ sp, canEdit }: { sp: EmailPageSearch; ca
         <EmptyState title="Bastırılmış adres yok" description="Bounce ya da şikâyet gelen adresler buraya otomatik eklenir." />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
-          <table className="w-full min-w-[620px] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[620px] text-sm">
             <thead className="bg-canvas text-left text-xs text-text-muted">
               <tr>
                 <th className="px-3 py-2 font-semibold">Adres</th>
@@ -52,13 +52,13 @@ export async function SuppressionView({ sp, canEdit }: { sp: EmailPageSearch; ca
               {data.rows.map((r) => (
                 <tr key={r.id} className="border-t border-line align-top">
                   <td className="px-3 py-2 font-mono text-xs text-ink-950">{r.email_masked}</td>
-                  <td className="px-3 py-2">
+                  <td data-label="Neden" className="px-3 py-2">
                     <Badge variant={r.reason === "manual" ? "neutral" : "danger"} size="sm">
                       {REASON_LABEL[r.reason] ?? r.reason}
                     </Badge>
                     {r.detail ? <p className="mt-1 max-w-[320px] text-xs text-text-muted">{r.detail}</p> : null}
                   </td>
-                  <td className="whitespace-nowrap px-3 py-2 text-xs text-text-muted">{formatDateTimeTr(r.created_at)}</td>
+                  <td data-label="Eklenme" className="whitespace-nowrap px-3 py-2 text-xs text-text-muted">{formatDateTimeTr(r.created_at)}</td>
                   {canEdit ? (
                     <td className="px-3 py-2 text-right">
                       <RemoveSuppressionButton id={r.id} />

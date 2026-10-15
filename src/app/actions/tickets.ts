@@ -24,6 +24,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 import { sendTicketReplyEmail } from "@/lib/support/reply-email";
 import { afterSafe } from "@/lib/after-safe";
 import { bustAdminCounters } from "@/lib/admin/counter-tags";
+import { isSeenMarker, newMessagePreviews, type NewMessagePreview } from "@/lib/support/ticket-collision";
 
 export type TicketResult = {
   error?: string;
@@ -32,6 +33,8 @@ export type TicketResult = {
   ticketId?: string;
   ticketNo?: string;
   messageId?: string;
+  /** PA-8: personel yazarken talebe gelen yeni mesajlar; gönderim YAPILMADI, form "yine de gönder" sorar. */
+  newMessages?: NewMessagePreview[];
 };
 
 type TicketMutationPayload = {
@@ -300,6 +303,31 @@ export async function updateTicketStatus(formData: FormData): Promise<TicketResu
   return publicResult(payload);
 }
 
+/** `seenAt` sonrasında başkasının yazdığı mesajlar (en yeni 5, yazar adlarıyla). Okuma hatasında boş. */
+async function staffUnseenMessages(admin: ReturnType<typeof createAdminClient>, ticketId: string, seenAt: string, selfId: string): Promise<NewMessagePreview[]> {
+  const { data, error } = await admin
+    .from("support_ticket_messages")
+    .select("author_kind, author_user_id, body, visibility, created_at")
+    .eq("ticket_id", ticketId)
+    .gt("created_at", seenAt)
+    .order("created_at", { ascending: false })
+    .limit(5);
+  if (error || !data?.length) return [];
+  const rows = (data as { author_kind: string; author_user_id: string | null; body: string; visibility: string; created_at: string }[]).filter((r) => r.author_user_id !== selfId);
+  if (rows.length === 0) return [];
+  const ids = [...new Set(rows.map((r) => r.author_user_id).filter((v): v is string => Boolean(v)))];
+  const names: Record<string, string> = {};
+  if (ids.length) {
+    const [profiles, staffRows] = await Promise.all([
+      admin.from("profiles").select("id, full_name").in("id", ids),
+      admin.from("platform_staff").select("id, full_name").in("id", ids),
+    ]);
+    for (const p of (profiles.data ?? []) as { id: string; full_name: string | null }[]) if (p.full_name) names[p.id] = p.full_name;
+    for (const p of (staffRows.data ?? []) as { id: string; full_name: string | null }[]) if (p.full_name) names[p.id] = p.full_name;
+  }
+  return newMessagePreviews(rows, selfId, names);
+}
+
 export async function replyTicketAsStaff(
   _prev: TicketResult,
   formData: FormData,
@@ -316,6 +344,14 @@ export async function replyTicketAsStaff(
   if (rateError) return { error: rateError };
 
   const admin = createAdminClient();
+  // PA-8 çakışma kontrolü: form açıldığından (ya da son "okudum"dan) beri başkası mesaj yazdıysa gönderilmez; personel
+  // yeni mesajları görüp "yine de gönder" der (force=1). Okunamazsa kontrol atlanır (gönderim engellenmez).
+  const force = formData.get("force") === "1";
+  const seenAt = formData.get("seen_at");
+  if (!force && isSeenMarker(seenAt)) {
+    const fresh = await staffUnseenMessages(admin, id, seenAt, staff.id);
+    if (fresh.length > 0) return { newMessages: fresh };
+  }
   const { data, error } = await admin.rpc("reply_support_ticket_v2", {
     p_ticket_id: id,
     p_tenant_id: null,
@@ -324,7 +360,8 @@ export async function replyTicketAsStaff(
     p_body: body,
     p_visibility: visibilityRaw,
     p_request_id: requestId(formData),
-    p_expected_version: expectedVersion(formData),
+    // "Yine de gönder": personel yeni mesajları gördü; araya giren sürüm artışı yanıtı yeniden düşürmesin.
+    p_expected_version: force ? null : expectedVersion(formData),
   });
   const payload = payloadOf(data);
   if (error || !payload) return { error: rpcFailure("replyTicketAsStaff", error, "Yanıt eklenemedi.") };

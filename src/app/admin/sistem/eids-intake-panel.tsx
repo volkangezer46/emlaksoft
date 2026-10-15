@@ -117,7 +117,7 @@ export async function EidsIntakePanel() {
 
       {tenantIds.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[36rem] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[36rem] text-sm">
             <thead>
               <tr className="text-left text-xs text-text-muted">
                 <th className="py-2 font-medium">Ofis</th>
@@ -140,14 +140,14 @@ export async function EidsIntakePanel() {
                         {nameOf.get(id) ?? "Ofis"}
                       </Link>
                     </td>
-                    <td className="py-2">
+                    <td data-label="İletme" className="py-2">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${STATE_CLS[st]}`}>{FORWARDING_LABELS[st]}</span>
                     </td>
-                    <td className="py-2 tabular-nums">{c.verified}</td>
-                    <td className="py-2 tabular-nums">{c.arc}</td>
-                    <td className="py-2 tabular-nums">{c.unverified}</td>
-                    <td className="py-2 tabular-nums">{c.rejected}</td>
-                    <td className={`py-2 tabular-nums ${c.unknown > 0 ? "font-semibold text-amber-700" : ""}`}>{c.unknown}</td>
+                    <td data-label="Doğrulanmış" className="py-2 tabular-nums">{c.verified}</td>
+                    <td data-label="ARC ile" className="py-2 tabular-nums">{c.arc}</td>
+                    <td data-label="Doğrulanamadı" className="py-2 tabular-nums">{c.unverified}</td>
+                    <td data-label="Reddedildi" className="py-2 tabular-nums">{c.rejected}</td>
+                    <td data-label="Kalıp dışı" className={`py-2 tabular-nums ${c.unknown > 0 ? "font-semibold text-amber-700" : ""}`}>{c.unknown}</td>
                   </tr>
                 );
               })}

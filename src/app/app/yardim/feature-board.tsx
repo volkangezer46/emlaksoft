@@ -1,5 +1,6 @@
 import { FilterChip } from "@/components/ui/filter-chip";
-import { ThumbsUp } from "lucide-react";
+import { Sparkles, ThumbsUp } from "lucide-react";
+import Link from "@/components/ui/smart-link";
 import { REQUEST_STATUS_LABEL, type RequestStatus } from "@/lib/product-feedback/model";
 import { loadBoard, type BoardItem } from "@/lib/product-feedback/store";
 import { FeatureRequestForm, VoteButton } from "./feature-board-controls";
@@ -85,6 +86,21 @@ export async function FeatureBoardTab({ tenantId, filter, canWrite }: { tenantId
                   <span>{fmt.format(new Date(i.createdAt))}</span>
                 </p>
                 {i.adminNote ? <p className="mt-2 rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-xs text-text">EmlakSoft: {i.adminNote}</p> : null}
+                {i.shipped ? (
+                  <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-text-muted">
+                    <Sparkles className="h-3.5 w-3.5 text-brand-600" aria-hidden />
+                    <span>Yayınlandı{i.shipped.at ? `: ${fmt.format(new Date(i.shipped.at))}` : ""}</span>
+                    {i.shipped.title ? (
+                      i.shipped.href ? (
+                        <Link href={i.shipped.href} className="focus-ring inline-flex min-h-11 items-center font-semibold text-brand-600 hover:underline">
+                          {i.shipped.title}
+                        </Link>
+                      ) : (
+                        <span className="font-semibold text-ink-950">{i.shipped.title}</span>
+                      )
+                    ) : null}
+                  </p>
+                ) : null}
               </div>
             </li>
           ))}

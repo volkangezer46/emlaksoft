@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { addBusinessMinutes, businessMinutesBetween, clockToMinutes, DEFAULT_BUSINESS_DAYS } from "@/lib/support/business-hours";
-import { computeDeskReport, percentile, type DeskTicketRow } from "@/lib/support/desk-report";
+import { computeDeskReport, deflectionStats, percentile, type DeskTicketRow } from "@/lib/support/desk-report";
 import { canEditMacros, macroActionsFromForm, normalizeTag, parseMacroActions, parseTagList, renderMacroBody } from "@/lib/support/macro-template";
 import { DEFAULT_SLA_POLICY, parseSlaMatrixForm, resolveSlaTarget } from "@/lib/support/sla-policy";
 import { platformCanAccess } from "@/lib/platform-access";
@@ -140,5 +140,22 @@ describe("AD9 sözleşmesi", () => {
     expect(ops).not.toContain('staff.role !== "super_admin"');
     expect(extra).not.toContain('staff.role !== "super_admin"');
     expect(ops).toContain("canEditMacros(staff.role)");
+  });
+});
+
+describe("deflectionStats (PA-7)", () => {
+  it("sayı, oran ve en çok çözen makale", () => {
+    const s = deflectionStats(
+      [
+        { kind: "faq", slug: "a" },
+        { kind: "faq", slug: "a" },
+        { kind: "guide", slug: "b" },
+      ],
+      7,
+    );
+    expect(s.count).toBe(3);
+    expect(s.rate).toBe(30);
+    expect(s.top[0]).toEqual({ kind: "faq", slug: "a", count: 2 });
+    expect(deflectionStats([], 0).rate).toBeNull();
   });
 });

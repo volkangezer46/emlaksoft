@@ -100,7 +100,7 @@ export async function MessageLogView({ sp }: { sp: MessageLogSearch }) {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-left text-xs">
+              <table className="adm-tbl-m w-full md:min-w-[820px] text-left text-xs">
                 <thead className="text-text-muted">
                   <tr className="border-b border-line">
                     <th className="px-4 py-2 font-semibold">Zaman</th>
@@ -116,18 +116,18 @@ export async function MessageLogView({ sp }: { sp: MessageLogSearch }) {
                   {data.rows.map((r) => (
                     <tr key={r.id} className="align-top">
                       <td className="whitespace-nowrap px-4 py-2 text-text-muted">{formatDateTimeTr(r.created_at)}</td>
-                      <td className="px-4 py-2">
+                      <td data-label="Kanal" className="px-4 py-2">
                         <Link href={href({ kanal: r.channel, sayfa: undefined })} className="font-semibold text-ink-950 hover:text-brand-600">
                           {MESSAGE_CHANNEL_LABEL[r.channel] ?? r.channel}
                         </Link>
                         <p className="text-text-faint">{MESSAGE_ACCOUNT_LABEL[r.account] ?? r.account}</p>
                       </td>
-                      <td className="numeric px-4 py-2 text-ink-950">{r.to_masked}</td>
-                      <td className="px-4 py-2">
+                      <td data-label="Alıcı" className="numeric px-4 py-2 text-ink-950">{r.to_masked}</td>
+                      <td data-label="Akış" className="px-4 py-2">
                         <span className="font-semibold text-ink-950">{messageSourceLabel(r.source)}</span>
                         <p className="text-text-faint">{MESSAGE_AUDIENCE_LABEL[r.audience] ?? r.audience}</p>
                       </td>
-                      <td className="px-4 py-2">
+                      <td data-label="Ofis" className="px-4 py-2">
                         {r.tenant_id ? (
                           <Link href={`/admin/tenants/${r.tenant_id}?sekme=zaman&kategori=iletisim`} className="font-semibold text-brand-600 hover:underline">
                             {data.tenantNames.get(r.tenant_id) ?? "Ofis"}
@@ -136,7 +136,7 @@ export async function MessageLogView({ sp }: { sp: MessageLogSearch }) {
                           <span className="text-text-faint">—</span>
                         )}
                       </td>
-                      <td className="px-4 py-2">
+                      <td data-label="Durum" className="px-4 py-2">
                         <Link href={href({ durum: r.status, sayfa: undefined })}>
                           <Badge variant={variant(r.status)} size="sm">
                             {MESSAGE_STATUS_LABEL[r.status] ?? r.status}
@@ -145,7 +145,7 @@ export async function MessageLogView({ sp }: { sp: MessageLogSearch }) {
                         {r.error ? <p className="mt-1 max-w-[260px] text-text-muted">{r.error}</p> : null}
                         {r.delivered_at && r.status !== "delivered" ? <p className="mt-1 text-text-faint">Teslim: {formatDateTimeTr(r.delivered_at)}</p> : null}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-2 text-text-muted">
+                      <td data-label="Maliyet" className="whitespace-nowrap px-4 py-2 text-text-muted">
                         {r.channel === "sms" ? (r.segments ? `${r.segments} SMS kredisi` : "—") : r.pricing_category ? `Meta: ${r.pricing_category}` : "Meta faturası"}
                       </td>
                     </tr>

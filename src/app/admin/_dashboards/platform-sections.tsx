@@ -53,6 +53,7 @@ import { getPlanDefinitions } from "@/lib/billing/plan-definitions";
 import { exactArr, exactMrr, exactTrendMrr, priceMapOf, type PlatformReportingAggregate } from "@/lib/reporting/platform";
 import { requireReportingCount, requireReportingData } from "@/lib/reporting/result";
 import { TBody, TD, TH, THead, TR, Table } from "@/components/ui/table";
+import { RetentionStrip } from "./revenue-retention-sections";
 
 /**
  * Platform panel bölümleri (sunucu; /admin ve /admin/raporlar ortak). /admin yalnız dikkat kuyruğu + 4 özet göstergeyi,
@@ -553,7 +554,7 @@ export async function ActivationSection({ period }: { period: Period }) {
   );
 }
 
-/** Birim ekonomisi: ARPA trendi (gerçek). NRR dürüstçe "hesaplanamıyor" (dönemsel gelir anlık görüntüsü yok). */
+/** Birim ekonomisi: ARPA trendi (gerçek) + NRR/GRR (ofis × ay sonu gelir anlık görüntüsünden; veri < 2 ay ise "birikiyor"). */
 export async function UnitEconomicsSection({ period }: { period: Period }) {
   const data = await loadDashboard(period);
   const prices = priceMapOf(data.planDefs);
@@ -574,10 +575,7 @@ export async function UnitEconomicsSection({ period }: { period: Period }) {
           <EmptyState variant="compact" illustration="rapor" title="ARPA eğrisi için veri birikiyor" description="En az iki ay aktif ofis ve gelir oluşunca çizilir." action={{ href: "/admin/billing", label: "Faturalamayı aç" }} />
         )}
       </div>
-      <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--surface-sunken)] px-3 py-2 text-xs leading-5 text-text-muted">
-        <span className="font-semibold text-text">Net gelir tutma (NRR): hesaplanamıyor.</span> Doğru NRR için her ayın başı/sonu ofis bazlı gelir anlık
-        görüntüsü gerekir; bugün yalnız güncel abonelik durumu tutuluyor. Tahmini sayı gösterilmez.
-      </p>
+      <RetentionStrip />
     </ChartCard>
   );
 }
