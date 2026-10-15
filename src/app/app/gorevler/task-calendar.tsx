@@ -1,6 +1,6 @@
 import Link from "@/components/ui/smart-link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { trDayKey } from "@/lib/clock";
+import { formatTrTime, trDayKey } from "@/lib/clock";
 import { buildMonthGrid, monthLabel, WEEKDAY_SHORT } from "@/lib/month-grid";
 
 export type CalendarTask = {
@@ -13,8 +13,17 @@ export type CalendarTask = {
 
 const MAX_PER_DAY = 3;
 
+const DAY_LABEL = new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
+function dayHeading(dayKey: string, todayKey: string): string {
+  const label = DAY_LABEL.format(new Date(`${dayKey}T00:00:00Z`));
+  return dayKey === todayKey ? `Bugün · ${label}` : label;
+}
+
 /**
- * Görev takvimi (vade): ay ızgarası, sunucuda çizilir. Her gün hücresi o günün liste
+ * Görev takvimi (vade): ay ızgarası, sunucuda çizilir.
+ * MP10/GA-03 mobil (<768 px): 720 px tablo yerine yatay kaydırmasız SIKI ay ızgarası (44 px gün düğmeleri, sayı rozeti)
+ * + günlere bölünmüş ajanda listesi (saat sıralı, her görev kendi kaydını açar). Masaüstü tablo değişmez. Her gün hücresi o günün liste
  * görünümüne (`?gun=`) gider; ay oku `?ay=` ile gezinir (filtre kontratı korunur).
  */
 export function TaskCalendar({
@@ -59,7 +68,51 @@ export function TaskCalendar({
           Bu ayda çok sayıda görev var; takvimde ilk 1000 görev gösteriliyor. Gün hücresine tıklayarak tam listeyi açın.
         </p>
       ) : null}
-      <div className="overflow-x-auto">
+      {/* Mobil: sıkı ay ızgarası + ajanda (yatay kaydırma yok). */}
+      <div className="md:hidden">
+        <div className="grid grid-cols-7 gap-1 px-2 pt-2 text-center text-xs font-bold uppercase text-text-muted" aria-hidden>
+          {WEEKDAY_SHORT.map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1 p-2">
+          {weeks.flat().map((d) => {
+            const list = byDay.get(d.dayKey) ?? [];
+            const open = list.filter((t) => t.status === "open").length;
+            const overdue = d.dayKey < todayKey && open > 0;
+            return (
+              <Link
+                key={d.dayKey}
+                href={dayHref(d.dayKey)}
+                aria-label={`${d.dayKey}: ${list.length} görev`}
+                className={`focus-ring flex min-h-11 flex-col items-center justify-center rounded-[var(--radius-control)] text-sm font-semibold transition ${
+                  d.dayKey === todayKey
+                    ? "bg-brand-600 text-white"
+                    : d.inMonth
+                      ? "text-ink-950 hover:bg-brand-600/[0.06]"
+                      : "text-text-faint"
+                }`}
+              >
+                {d.day}
+                {list.length > 0 ? (
+                  <span
+                    className={`numeric mt-0.5 min-w-4 rounded-full px-1 text-xs font-bold leading-4 ${
+                      d.dayKey === todayKey ? "bg-white/25 text-white" : overdue ? "bg-danger-500/12 text-danger-600" : "bg-brand-600/10 text-brand-700"
+                    }`}
+                  >
+                    {list.length}
+                  </span>
+                ) : (
+                  <span className="mt-0.5 h-4" aria-hidden />
+                )}
+              </Link>
+            );
+          })}
+        </div>
+        <AgendaList byDay={byDay} todayKey={todayKey} monthKey={monthKey} dayHref={dayHref} />
+      </div>
+
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[720px] table-fixed border-collapse text-xs">
           <thead>
             <tr>
@@ -121,5 +174,65 @@ export function TaskCalendar({
         </table>
       </div>
     </section>
+  );
+}
+
+/** Mobil ajanda: ayın görevleri günlere bölünmüş, saat sıralı; geçmiş günlerde yalnız açık (geciken) görevler. */
+function AgendaList({
+  byDay,
+  todayKey,
+  monthKey,
+  dayHref,
+}: {
+  byDay: Map<string, CalendarTask[]>;
+  todayKey: string;
+  monthKey: string;
+  dayHref: (dayKey: string) => string;
+}) {
+  const days = [...byDay.entries()]
+    .filter(([k]) => k.startsWith(monthKey))
+    .map(([k, list]) => [k, k < todayKey ? list.filter((t) => t.status === "open") : list] as const)
+    .filter(([, list]) => list.length > 0)
+    .sort(([a], [b]) => a.localeCompare(b));
+  if (days.length === 0) {
+    return <p className="border-t border-line px-4 py-6 text-center text-sm text-text-muted">Bu ayda vadeli görev yok.</p>;
+  }
+  return (
+    <ol className="divide-y divide-line border-t border-line">
+      {days.map(([k, list]) => (
+        <li key={k} className="px-3 py-3">
+          <Link
+            href={dayHref(k)}
+            className={`focus-ring inline-flex min-h-11 items-center rounded-sm text-xs font-bold uppercase tracking-wide ${
+              k < todayKey ? "text-danger-600" : k === todayKey ? "text-brand-700" : "text-text-muted"
+            }`}
+          >
+            {k < todayKey ? `Gecikti · ${dayHeading(k, todayKey)}` : dayHeading(k, todayKey)}
+          </Link>
+          <ul className="mt-1 space-y-1">
+            {[...list]
+              .sort((a, b) => a.due_at.localeCompare(b.due_at))
+              .map((t) => (
+                <li key={t.id}>
+                  <Link
+                    href={`/app/gorevler?gorev=${t.id}`}
+                    className="focus-ring flex min-h-11 items-center gap-3 rounded-[var(--radius-control)] border border-line bg-surface px-3 py-2 transition hover:border-brand-300"
+                  >
+                    <span className="numeric w-11 shrink-0 text-xs font-semibold text-text-muted">{formatTrTime(t.due_at)}</span>
+                    <span
+                      className={`min-w-0 flex-1 truncate text-sm ${t.status === "done" ? "text-text-faint line-through" : "font-semibold text-ink-950"}`}
+                    >
+                      {t.title}
+                    </span>
+                    {t.priority === "high" && t.status === "open" ? (
+                      <span className="shrink-0 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-amber-700">Yüksek</span>
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+          </ul>
+        </li>
+      ))}
+    </ol>
   );
 }

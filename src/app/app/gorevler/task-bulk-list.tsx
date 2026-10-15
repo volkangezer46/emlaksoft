@@ -2,8 +2,9 @@
 
 import { createContext, useOptimistic, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCheck, UserCog, X } from "lucide-react";
-import { bulkAssignTasks, completeTasksBulk } from "@/app/actions/tasks";
+import { CalendarClock, CheckCheck, UserCog, X } from "lucide-react";
+import { bulkAssignTasks, completeTasksBulk, rescheduleTasks } from "@/app/actions/tasks";
+import { DUE_PRESETS, DUE_PRESET_LABELS, type DuePreset } from "@/lib/due-presets";
 import { Button } from "@/components/ui/button";
 import { PersonSelect } from "@/components/ui/person-select";
 import { useToast } from "@/components/app/toast-provider";
@@ -46,6 +47,8 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignee, setAssignee] = useState("");
   const [assignPending, startAssign] = useTransition();
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [movePending, startMove] = useTransition();
   // Tamamlanan/silinen görev satırı yumuşak çıkar, kalanlar yerine kayar (key = görev id).
   const listRef = useAutoAnimate<HTMLDivElement>();
   // Boş taban + birleştirici reducer: transition boyunca id'ler kümede kalır,
@@ -107,6 +110,23 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
     });
   }
 
+  // GA-04: toplu "Vadeyi taşı" — kaydırma "Yarın" ve arama kuyruğu "Yarına at" ile AYNI sunucu eylemi.
+  function move(preset: DuePreset) {
+    if (selected.size === 0 || movePending) return;
+    const ids = [...selected];
+    startMove(async () => {
+      const res = await rescheduleTasks(ids, preset);
+      if (res.error) {
+        push(res.error, "err");
+        return;
+      }
+      push(`${res.updatedCount ?? ids.length} görevin vadesi taşındı: ${DUE_PRESET_LABELS[preset]}`, "ok");
+      setSelected(new Set());
+      setMoveOpen(false);
+      router.refresh();
+    });
+  }
+
   return (
     <OptimisticDoneContext.Provider value={optimisticDone}>
     <div ref={listRef} className="space-y-2">
@@ -134,12 +154,26 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
                 <CheckCheck className="h-4 w-4" />
                 Seçilenleri tamamla
               </button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setAssignOpen(false);
+                  setMoveOpen((o) => !o);
+                }}
+                aria-expanded={moveOpen}
+                disabled={pending || movePending}
+              >
+                <CalendarClock className="h-4 w-4" />
+                Vadeyi taşı
+              </Button>
               {members.length > 0 ? (
                 <Button
                   size="sm"
                   variant="secondary"
                   onClick={() => {
                     setAssignee("");
+                    setMoveOpen(false);
                     setAssignOpen((o) => !o);
                   }}
                   aria-expanded={assignOpen}
@@ -161,6 +195,23 @@ export function TaskBulkList({ items, members = [] }: { items: Item[]; members?:
             <span className="text-xs text-text-faint">Toplu tamamlamak için görevleri işaretleyin.</span>
           )}
         </div>
+      ) : null}
+
+      {moveOpen && selected.size > 0 ? (
+        <section aria-label="Vadeyi taşı" className="rounded-[var(--radius-card)] border border-brand-300 bg-surface p-4">
+          <p className="text-sm font-semibold text-ink-950">Vadeyi taşı</p>
+          <p className="mt-0.5 text-xs text-text-muted">
+            {selected.size} açık görev seçili. &quot;+1 hafta&quot; her görevin kendi vadesinden yürür.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {DUE_PRESETS.map((p) => (
+              <Button key={p} size="sm" variant="outline" disabled={movePending} onClick={() => move(p)}>
+                {DUE_PRESET_LABELS[p]}
+              </Button>
+            ))}
+            <Button size="sm" variant="ghost" onClick={() => setMoveOpen(false)}>Vazgeç</Button>
+          </div>
+        </section>
       ) : null}
 
       {assignOpen && selected.size > 0 ? (

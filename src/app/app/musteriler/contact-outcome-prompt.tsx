@@ -20,7 +20,7 @@ import {
 } from "@/lib/contact-outcome";
 import { createCall } from "@/app/actions/calls";
 import { createCommunication } from "@/app/actions/communications";
-import { createTask } from "@/app/actions/tasks";
+import { settleCustomerCallTasks } from "@/app/actions/tasks";
 
 /** Sonuç kaydedilince yayılan pencere olayı (`detail.customerId`); arama listesi bununla sıradakine geçer. */
 export const CONTACT_OUTCOME_LOGGED_EVENT = "emlaksoft:contact-outcome-logged";
@@ -130,13 +130,23 @@ export function ContactOutcomePrompt() {
         setError(res.error);
         return;
       }
-      let taskError: string | undefined;
-      if (log.task) taskError = (await createTask({}, toFormData(log.task))).error;
+      // GA-05 tek kuyruk: "Ulaşıldı" müşterinin açık arama görevlerini kapatır; "Geri ara" mevcut görevi taşır
+      // (yoksa açar) — görev birikmez.
+      const settled = await settleCustomerCallTasks({
+        customerId: contact.customerId,
+        outcome,
+        dueLocal: log.task?.due_at,
+        title: log.task?.title,
+        notes: log.task?.notes,
+      });
       setNote("");
       dispatch({ type: "logged" });
       window.dispatchEvent(new CustomEvent(CONTACT_OUTCOME_LOGGED_EVENT, { detail: { customerId: contact.customerId } }));
-      if (taskError) toast.push(`Görüşme kaydedildi; geri arama görevi oluşturulamadı: ${taskError}`, "err");
-      else toast.push(log.task ? "Görüşme kaydedildi, yarın 10:00 için geri arama görevi açıldı." : "Görüşme sonucu kaydedildi.", "ok");
+      if (settled.error) toast.push(`Görüşme kaydedildi; arama görevi güncellenemedi: ${settled.error}`, "err");
+      else if (settled.moved) toast.push("Görüşme kaydedildi, mevcut arama görevi yarın 10:00'a taşındı.", "ok");
+      else if (settled.created) toast.push("Görüşme kaydedildi, yarın 10:00 için geri arama görevi açıldı.", "ok");
+      else if (settled.closed) toast.push(`Görüşme kaydedildi, ${settled.closed} arama görevi kapatıldı.`, "ok");
+      else toast.push("Görüşme sonucu kaydedildi.", "ok");
     });
   }
 

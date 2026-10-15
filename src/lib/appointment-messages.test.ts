@@ -5,7 +5,9 @@ import {
   appointmentReminderRecipient,
   appointmentWhatsAppHref,
   isCustomerMessageHour,
+  appointmentNoShowText,
   planAdvisorReminders,
+  rescheduleResetPatch,
   shouldRemindCustomer,
   type ReminderAppointment,
 } from "@/lib/appointment-messages";
@@ -98,5 +100,43 @@ describe("müşteri iletisi", () => {
     expect(shouldRemindCustomer({ ...c, customer_confirm_sent_at: "2026-10-14T03:00:00Z" }, nowMs)).toBe(false);
     expect(shouldRemindCustomer({ ...c, customer_confirm_sent_at: "2026-10-13T09:00:00Z" }, nowMs)).toBe(true);
     expect(shouldRemindCustomer({ ...c, scheduled_at: "2026-10-14T08:00:00Z" }, nowMs)).toBe(false);
+  });
+});
+
+describe("yeniden planlama (GA-01)", () => {
+  const at = "2026-10-15T11:30:00.000Z";
+  it("saat değişince teyit/hatırlatma izleri sıfırlanır; teyitli randevu beklemeye döner", () => {
+    expect(rescheduleResetPatch({ scheduled_at: at, status: "confirmed" }, "2026-10-16T08:00:00.000Z")).toEqual({
+      customer_response: null,
+      responded_at: null,
+      customer_reminded_at: null,
+      customer_confirm_sent_at: null,
+      status: "pending",
+    });
+    expect(rescheduleResetPatch({ scheduled_at: at, status: "pending" }, "2026-10-16T08:00:00.000Z")).not.toHaveProperty("status");
+  });
+  it("aynı saatte not düzenleme ve kapalı randevu sıfırlamaz", () => {
+    expect(rescheduleResetPatch({ scheduled_at: at, status: "confirmed" }, "2026-10-15T14:30:00+03:00")).toBeNull();
+    expect(rescheduleResetPatch({ scheduled_at: at, status: "completed" }, "2026-10-16T08:00:00.000Z")).toBeNull();
+    expect(rescheduleResetPatch({ scheduled_at: at, status: "cancelled" }, "2026-10-16T08:00:00.000Z")).toBeNull();
+  });
+  it("müşteri metni eski ve yeni saati içerir", () => {
+    const text = appointmentCustomerText({
+      kind: "reschedule",
+      customerName: "Ayşe Yılmaz",
+      officeName: "Deniz Emlak",
+      appointmentType: "showing",
+      scheduledAt: "2026-10-16T08:00:00.000Z",
+      previousAt: at,
+      confirmUrl: "https://app.test/randevu-teyit/x",
+    });
+    expect(text).toContain("15 Ekim 14:30 yerine");
+    expect(text).toContain("16 Ekim 11:00 olarak güncellendi");
+    expect(text).toContain("https://app.test/randevu-teyit/x");
+  });
+  it("gelmedi taslağı nazik ve tarihli (GA-14)", () => {
+    const text = appointmentNoShowText({ customerName: "Ayşe Yılmaz", officeName: "Deniz Emlak", scheduledAt: at });
+    expect(text).toContain("Merhaba Ayşe");
+    expect(text).toContain("15 Ekim 14:30");
   });
 });

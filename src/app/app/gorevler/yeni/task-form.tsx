@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { DueQuickPicks } from "@/components/ui/due-quick-picks";
 import { Check } from "lucide-react";
 import { TAB_ICONS as TI } from "@/lib/icons";
 import { createTask } from "@/app/actions/tasks";
@@ -112,9 +113,12 @@ export function TaskForm({
     ),
     zamanlama: (
       <>
-        <FormField label="Son tarih" htmlFor="task-due">
-          <FormInput name="due_at" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
-        </FormField>
+        <div>
+          <FormField label="Son tarih" htmlFor="task-due">
+            <FormInput name="due_at" type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} />
+          </FormField>
+          <DueQuickPicks onPick={setDue} baseLocal={due} />
+        </div>
         <FormField label="Tekrar" htmlFor="task-recurrence" hint={due ? undefined : "Tekrar için önce son tarih seçin."}>
           <FormSelect name="recurrence" defaultValue="" disabled={!due}>
             {recurrenceOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

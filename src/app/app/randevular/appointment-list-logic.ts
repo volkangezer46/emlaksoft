@@ -53,6 +53,7 @@ export const OUTCOME_TONE: Record<string, PillTone> = {
   olumlu: "success",
   kararsiz: "warning",
   olumsuz: "danger",
+  gelmedi: "danger",
 };
 
 /** Süresi geçmiş (bugünden önceki) randevuda "bekliyor/imza" durumları takip gerektirir. */

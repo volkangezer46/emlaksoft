@@ -4,7 +4,7 @@ import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import { useState } from "react";
 import { trDayKey, formatTrTime } from "@/lib/clock";
 import Link from "@/components/ui/smart-link";
-import { ArrowDown, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 
 type AppointmentItem = {
   id: string;
@@ -188,20 +188,21 @@ export function AppointmentCalendar({
             <p className="text-xs text-text-faint">Bu gün randevu yok.</p>
           ) : (
             <div className="space-y-1.5">
-              {/* Çapa: listedeki karta kaydırır (kart id'si `randevu-{id}`) */}
+              {/* GA-02: kaydın kendisini açar (`?randevu=<id>`); liste sayfalı olduğundan çapa 2. sayfadaki randevuda boşa düşüyordu. */}
               {selectedAppts.map((a) => (
-                <a
+                <Link
                   key={a.id}
-                  href={`#randevu-${a.id}`}
-                  className="focus-ring group flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 transition hover:border-brand-300 hover:bg-canvas"
+                  href={`/app/randevular?randevu=${a.id}`}
+                  prefetch={false}
+                  className="focus-ring group flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 transition hover:border-brand-300 hover:bg-canvas"
                 >
                   <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TYPE_COLOR[a.appointment_type] ?? "bg-brand-600"}`} />
                   <span className="text-xs font-semibold text-ink-950">
                     {formatTrTime(a.scheduled_at)}
                   </span>
                   <span className="text-xs text-text-muted">{TYPE_LABEL[a.appointment_type] ?? a.appointment_type}</span>
-                  <ArrowDown className="hover-action ml-auto h-3.5 w-3.5 text-text-faint opacity-0 transition group-hover:text-brand-600 group-hover:opacity-100" />
-                </a>
+                  <ArrowRight className="ml-auto h-3.5 w-3.5 text-text-faint transition group-hover:text-brand-600" aria-hidden />
+                </Link>
               ))}
             </div>
           )}

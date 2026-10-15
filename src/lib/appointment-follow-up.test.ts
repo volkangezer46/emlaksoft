@@ -58,3 +58,11 @@ describe("takip görevi", () => {
     expect(followUpTaskTitle(null)).toContain("Müşteri");
   });
 });
+
+describe("gelmedi (GA-14)", () => {
+  it("gelmedi → ön dolgulu Yeniden planla", () => {
+    const [step] = appointmentNextSteps("gelmedi", { customerId: C, propertyId: P });
+    expect(step.label).toBe("Yeniden planla");
+    expect(readPrefillIds(query(step.href))).toEqual({ customerId: C, propertyId: P });
+  });
+});

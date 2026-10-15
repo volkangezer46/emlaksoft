@@ -10,6 +10,8 @@ import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
 import { VoiceNoteRecorder } from "@/components/app/voice-note-recorder";
 import { PersonSelect } from "@/components/ui/person-select";
+import { useToast } from "@/components/app/toast-provider";
+import { rescheduleToast } from "./reschedule-toast";
 
 type TypeOption = { value: string; label: string };
 type Appointment = {
@@ -53,6 +55,7 @@ export function AppointmentEditDialog({
   // gösterilir ve gizli confirm_conflict=1 ile ikinci gönderim kaydeder.
   const [conflictWarning, setConflictWarning] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const { push } = useToast();
   const types = typeOptions && typeOptions.length > 0 ? typeOptions : DEFAULT_TYPES;
   const { date, time } = localParts(appointment.scheduled_at);
 
@@ -65,8 +68,14 @@ export function AppointmentEditDialog({
         return;
       }
       setConflictWarning(null);
-      if (res?.error) setError(res.error);
-      else setOpen(false);
+      if (res?.error) {
+        setError(res.error);
+        return;
+      }
+      setOpen(false);
+      // GA-01: saat değiştiyse teyit sıfırlandı; müşteriye yeni saat SMS ile gitti ya da WhatsApp taslağı hazır.
+      const t = rescheduleToast(res?.rescheduled);
+      push(t.message, "ok", t.action);
     });
   }
 

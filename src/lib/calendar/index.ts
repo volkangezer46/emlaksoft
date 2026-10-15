@@ -9,6 +9,7 @@
  * OAuth tokenları platform_settings'te tenant bazlı saklanır.
  */
 
+import { escapeICS, foldICSLine, icsDate as formatICSDate } from "@/lib/calendar/ics-feed";
 import {
   discardExternalResponse,
   fetchExternal,
@@ -32,6 +33,10 @@ export type CalendarEvent = {
   organizer?:   { name: string; email: string };
   attendees?:   { name: string; email: string }[];
   url?:         string;
+  /** GA-06: hatırlatma alarmları (başlangıçtan kaç dk önce); varsayılan 30. Boş dizi = alarmsız. */
+  alarmMinutes?: number[];
+  /** GA-06: koordinat (GEO satırı). */
+  geo?: { lat: number; lng: number } | null;
 };
 
 /**
@@ -57,6 +62,7 @@ export function generateICS(event: CalendarEvent): string {
 
   if (event.description) lines.push(`DESCRIPTION:${escapeICS(event.description)}`);
   if (event.location)    lines.push(`LOCATION:${escapeICS(event.location)}`);
+  if (event.geo)         lines.push(`GEO:${event.geo.lat};${event.geo.lng}`);
   if (event.url)         lines.push(`URL:${event.url}`);
 
   if (event.organizer) {
@@ -67,17 +73,12 @@ export function generateICS(event: CalendarEvent): string {
     lines.push(`ATTENDEE;CN=${att.name}:mailto:${att.email}`);
   }
 
+  for (const m of event.alarmMinutes ?? [30]) {
+    lines.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeICS(event.title)}`, `TRIGGER:-PT${Math.max(0, Math.round(m))}M`, "END:VALARM");
+  }
+
   lines.push("END:VEVENT", "END:VCALENDAR");
-  return lines.join("\r\n");
-}
-
-/** ICS için "YYYYMMDDTHHMMSSZ" formatı */
-function formatICSDate(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
-function escapeICS(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return lines.map(foldICSLine).join("\r\n");
 }
 
 // ---------------------------------------------------------------------------

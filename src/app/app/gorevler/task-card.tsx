@@ -3,12 +3,13 @@
 import { useContext, useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, MoreHorizontal, Pencil, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
+import { AlarmClock, Briefcase, CheckCircle2, Clock, FileText, Link2, ListChecks, Loader2, MapPin, Megaphone, MoreHorizontal, Pencil, Phone, Repeat, RotateCcw, ShieldAlert, Trash2, User } from "lucide-react";
 import { Tip } from "@/components/ui/tooltip";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
+import { completeTask, deleteTask, reopenTask, rescheduleTasks } from "@/app/actions/tasks";
+import { SwipeRow } from "@/components/ui/swipe-row";
 import { useToast } from "@/components/app/toast-provider";
 import { now as clockNow } from "@/lib/clock";
 import { TaskEditDialog } from "./task-edit-dialog";
@@ -133,6 +134,24 @@ export function TaskCard({
     });
   }
 
+  // GA-10 mobil kaydırma: sağa = Tamamla (geri alınabilir), sola = yarın 10:00 (toplu "Vadeyi taşı" ile aynı eylem).
+  function swipeComplete() {
+    setStatus("done");
+    push("Görev tamamlandı", "ok", { action: { label: "Geri al", onClick: () => setStatus("open") } });
+  }
+
+  function swipeTomorrow() {
+    startTransition(async () => {
+      const res = await rescheduleTasks([task.id], "tomorrow10");
+      if (res.error) {
+        push(res.error, "err");
+        return;
+      }
+      push("Görev yarın 10:00'a taşındı", "ok");
+      router.refresh();
+    });
+  }
+
   async function removeTask() {
     const fd = new FormData();
     fd.set("id", task.id);
@@ -174,6 +193,11 @@ export function TaskCard({
   const canDeleteHere = canDelete && !takedown;
 
   return (
+    <SwipeRow
+      disabled={!canEditHere || pending}
+      right={{ label: "Tamamla", icon: CheckCircle2, tone: "success", onAction: swipeComplete }}
+      left={{ label: "Yarın 10:00", icon: AlarmClock, tone: "warning", onAction: swipeTomorrow }}
+    >
     <article
       data-task-card=""
       data-task-id={task.id}
@@ -360,5 +384,6 @@ export function TaskCard({
         />
       ) : null}
     </article>
+    </SwipeRow>
   );
 }

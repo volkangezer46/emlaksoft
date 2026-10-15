@@ -404,7 +404,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/cron/operational-retention/route.ts:39` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | param (yazma) | P2 |
 | `src/app/api/cron/portal-teyit/route.ts:205` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var | P2 |
 | `src/app/api/cron/proje-vade/route.ts:39` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var (yazma) | P2 |
-| `src/app/api/cron/randevu-hatirlat/route.ts:39` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var | P2 |
+| `src/app/api/cron/randevu-hatirlat/route.ts:40` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | var | P2 |
 | `src/app/api/cron/tcmb-kur/route.ts:34` | `run` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | uygulanamaz (yazma) | P2 |
 | `src/app/api/cron/ticket-sla/route.ts:23` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
 | `src/app/api/cron/vitrin-alarm/route.ts:29` | `GET` | Zamanlanmış iş: oturum yok, tüm kiracılar üzerinde çalışır. | cron | devir | P2 |
@@ -419,7 +419,7 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/api/property-media/[id]/route.ts:11` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/api/property-media/[id]/thumb/route.ts:52` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/rent-receipts/[noticeId]/route.ts:37` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
-| `src/app/api/takvim/[token]/route.ts:63` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
+| `src/app/api/takvim/[token]/route.ts:62` | `GET` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/api/ticket-attachments/[id]/route.ts:43` | `GET` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/api/ticket-attachments/finalize/route.ts:55` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/api/ticket-attachments/route.ts:89` | `POST` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |

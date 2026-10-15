@@ -12,6 +12,7 @@ import {
   Route as RouteIcon,
   Search,
   Hourglass,
+  UserX,
 } from "lucide-react";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
@@ -27,7 +28,7 @@ import { appointmentConfirmUrl, appointmentCustomerText, appointmentWhatsAppHref
 import { getBaseUrl } from "@/lib/base-url";
 import { getDefinitions } from "@/lib/definitions";
 import { AppointmentCalendar } from "./appointment-calendar";
-import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-week-view";
+import { AppointmentWeekView, type WeekViewAppointment, type WeekViewTask } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop, directionsHref as directionsHrefFor } from "@/lib/route-plan";
@@ -137,6 +138,8 @@ export default async function AppointmentsPage({
     yogunluk?: string;
     yeni?: string;
     randevu?: string;
+    sonuc?: string;
+    tamamla?: string;
   }>;
 }) {
   const gate = await requireModulePage("appointments");
@@ -150,8 +153,13 @@ export default async function AppointmentsPage({
   const newApptHref = newApptQuery.size ? `/app/randevular/yeni?${newApptQuery.toString()}` : "/app/randevular/yeni";
   if (sp.yeni === "1") redirect(newApptHref);
   const canCreateAppt = (gate.perms.appointments ?? []).includes("create");
+  const canEditAppt = (gate.perms.appointments ?? []).includes("edit");
+  const canViewTasks = (gate.perms.tasks ?? []).includes("view");
+  const canEditTasks = (gate.perms.tasks ?? []).includes("edit");
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && (FILTERABLE_STATUSES as readonly string[]).includes(sp.durum) ? sp.durum : "";
+  // GA-14: ?sonuc=olumlu|kararsiz|olumsuz|gelmedi — randevu sonucu süzgeci (ör. "Gelmeyen" KPI'sı).
+  const sonucF = sp.sonuc && isAppointmentOutcome(sp.sonuc) ? sp.sonuc : "";
   const customerF = sp.customer ?? "";
   // ?property= — eşleştirme ekranındaki "Randevu ver" kısayolu portföyü de
   // taşır: liste o portföye süzülür ve yeni randevu diyaloğu ön seçili gelir.
@@ -236,6 +244,7 @@ export default async function AppointmentsPage({
       .lt("scheduled_at", toIso(windowEnd));
     if (tipF) query = query.eq("appointment_type", tipF);
     if (durumF) query = query.eq("status", durumF);
+    if (sonucF) query = query.eq("outcome", sonucF);
     if (customerF) query = query.eq("customer_id", customerF);
     if (propertyF) query = query.eq("property_id", propertyF);
     if (danismanF) query = query.eq("assigned_to", danismanF);
@@ -323,17 +332,19 @@ export default async function AppointmentsPage({
     { count: officeCount },
     { count: valuationCount },
     { count: contractCount },
+    { count: noShowCount },
     { data: weekBarRows },
     { data: ownProfile },
     leaveRows,
     { data: advisorRows },
     savedViews,
     { data: officeRow },
+    { data: agendaTaskRows },
   ] = await batchAll("Randevular", [
     "appointments", "appointments-total", "appointment-types", "filter-customer", "filter-property",
     "count-today", "count-pending", "count-confirmed", "count-signature", "count-completed",
-    "count-showing", "count-office", "count-valuation", "count-contract",
-    "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name",
+    "count-showing", "count-office", "count-valuation", "count-contract", "count-no-show",
+    "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name", "agenda-tasks",
   ], [
     apptP,
     apptTotalP,
@@ -356,6 +367,7 @@ export default async function AppointmentsPage({
     countBase().eq("appointment_type", "office"),
     countBase().eq("appointment_type", "valuation"),
     countBase().eq("appointment_type", "contract"),
+    countBase().eq("outcome", "gelmedi"),
     // Haftalık yoğunluk şeridi — önümüzdeki 7 gün, görünümden bağımsız pencere.
     (() => {
       let w = supabase
@@ -377,6 +389,18 @@ export default async function AppointmentsPage({
     savedViewsPromise,
     // Satırdaki "WhatsApp'ta teyit gönder" taslağında ofis adı (tek satır, RLS kendi ofisi).
     supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
+    // GA-03 tek ajanda: hafta/gün görünümünde penceredeki saatli AÇIK görevler (seçili danışmanın, yoksa kullanıcının).
+    (gorunum === "hafta" || gorunum === "gun") && canViewTasks && !randevuF
+      ? supabase
+          .from("tasks")
+          .select("id, title, due_at, customer:customers!tasks_customer_id_fkey(full_name)")
+          .eq("status", "open")
+          .eq("assigned_to", danismanF || gate.userId)
+          .gte("due_at", toIso(windowStart))
+          .lt("due_at", toIso(windowEnd))
+          .order("due_at", { ascending: true })
+          .limit(200)
+      : Promise.resolve({ data: null as null | { id: string; title: string; due_at: string; customer: Rel }[] }),
   ]);
 
   // Tür başına gerçek toplam (KPI + çipler).
@@ -415,9 +439,10 @@ export default async function AppointmentsPage({
     : [];
 
   // Filtre linkleri diğer parametreleri korur (görünüm/tarih/arama/danışman dahil).
-  const apptHref = (patch: { tip?: string; durum?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
+  const apptHref = (patch: { tip?: string; durum?: string; sonuc?: string; customer?: string; property?: string; gorunum?: string; tarih?: string; gun?: string; danisman?: string; q?: string }) => {
     const tip = patch.tip !== undefined ? patch.tip : tipF;
     const durum = patch.durum !== undefined ? patch.durum : durumF;
+    const sonuc = patch.sonuc !== undefined ? patch.sonuc : sonucF;
     const cust = patch.customer !== undefined ? patch.customer : customerF;
     const prop = patch.property !== undefined ? patch.property : propertyF;
     const view = patch.gorunum !== undefined ? patch.gorunum : gorunum;
@@ -429,6 +454,7 @@ export default async function AppointmentsPage({
     if (qq) usp.set("q", qq);
     if (tip) usp.set("tip", tip);
     if (durum) usp.set("durum", durum);
+    if (sonuc) usp.set("sonuc", sonuc);
     if (cust) usp.set("customer", cust);
     if (prop) usp.set("property", prop);
     if (view && view !== "ay") usp.set("gorunum", view);
@@ -445,6 +471,7 @@ export default async function AppointmentsPage({
   if (q) urlParams.q = q;
   if (tipF) urlParams.tip = tipF;
   if (durumF) urlParams.durum = durumF;
+  if (sonucF) urlParams.sonuc = sonucF;
   if (customerF) urlParams.customer = customerF;
   if (propertyF) urlParams.property = propertyF;
   if (gorunum !== "ay") urlParams.gorunum = gorunum;
@@ -455,7 +482,7 @@ export default async function AppointmentsPage({
   if (randevuF) urlParams.randevu = randevuF;
   if (density === "kompakt") urlParams.yogunluk = "kompakt";
   const savedViewParams = Object.fromEntries(
-    Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "gorunum", "danisman"].includes(k)),
+    Object.entries(urlParams).filter(([k]) => ["q", "tip", "durum", "sonuc", "gorunum", "danisman"].includes(k)),
   );
 
   // Haftalık yoğunluk — ayrı "önümüzdeki 7 gün" penceresinden (görünümden bağımsız).
@@ -483,8 +510,30 @@ export default async function AppointmentsPage({
       customerName: c?.full_name ?? null,
       propertyName: p?.title || p?.property_code || null,
       location: r.location,
+      notes: r.notes,
+      // Mobil ajandada sola kaydırma: hazır teyit mesajı (yalnız bekleyen/onaylı randevuda).
+      confirmWaHref:
+        c?.phone && (r.status === "pending" || r.status === "confirmed")
+          ? appointmentWhatsAppHref(
+              c.phone,
+              appointmentCustomerText({
+                kind: "confirm",
+                customerName: c.full_name ?? null,
+                officeName: (officeRow as { name?: string | null } | null)?.name ?? null,
+                appointmentType: r.appointment_type,
+                scheduledAt: r.scheduled_at,
+                confirmUrl: appointmentConfirmUrl(getBaseUrl(), r.confirm_token),
+              }),
+            )
+          : null,
     };
   });
+  const agendaTasks: WeekViewTask[] = ((agendaTaskRows ?? []) as { id: string; title: string; due_at: string; customer: Rel }[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    due_at: t.due_at,
+    customerName: rel(t.customer)?.full_name ?? null,
+  }));
 
   // Rota önerisi: seçili günde koordinatlı 2+ yer gösterme varsa görünür.
   const routeStops: RouteStop[] = rows
@@ -616,6 +665,7 @@ export default async function AppointmentsPage({
     return {
       id: appt.id,
       focused: appt.id === randevuF,
+      completeOpen: appt.id === randevuF && sp.tamamla === "1" && appt.status !== "completed" && appt.status !== "cancelled",
       status: appt.status,
       dateLabel: new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short", timeZone: "Europe/Istanbul" }).format(date),
       timeLabel: formatTrTime(date),
@@ -699,11 +749,24 @@ export default async function AppointmentsPage({
     { label: "Yer gösterme", value: typeCounts.showing!, icon: <MapPinned />, tone: "success", href: apptHref({ tip: "showing", gorunum: "ay" }), hint: "toplam" },
     { label: "Tamamlanan", value: statusCounts.completed!, icon: <CheckCircle2 />, tone: "success", href: apptHref({ durum: "completed", gorunum: "ay" }), hint: "sonuçlanan" },
   );
+  // GA-14: gelmeme oranı (tamamlanan randevular içinde "Gelmedi" sonucu); yalnız gerçekten varsa gösterilir.
+  if ((noShowCount ?? 0) > 0) {
+    const rate = statusCounts.completed! > 0 ? Math.round(((noShowCount ?? 0) / statusCounts.completed!) * 100) : null;
+    kpis.push({
+      label: "Gelmeyen müşteri",
+      value: noShowCount ?? 0,
+      icon: <UserX />,
+      tone: "danger",
+      href: apptHref({ durum: "", sonuc: "gelmedi", gorunum: "ay" }),
+      hint: rate != null ? `tamamlananın %${rate}'i` : "gelmedi işaretli",
+    });
+  }
 
   const chips = buildActiveChips(PATH, urlParams, [
     { key: "q", label: "Arama" },
     { key: "tip", label: "Tür", format: (v) => typeLabel[v] ?? v },
     { key: "durum", label: "Durum", format: (v) => APPOINTMENT_STATUS_LABELS[v] ?? v },
+    { key: "sonuc", label: "Sonuç", format: (v) => (isAppointmentOutcome(v) ? APPOINTMENT_OUTCOME_META[v].label : v) },
     { key: "customer", label: "Müşteri", format: () => filteredCustomer?.full_name ?? "Seçili müşteri" },
     { key: "property", label: "Portföy", format: () => filteredProperty?.title || filteredProperty?.property_code || "Seçili portföy" },
     { key: "danisman", label: "Danışman", format: (v) => advisorName.get(v) ?? "Seçili danışman" },
@@ -853,6 +916,10 @@ export default async function AppointmentsPage({
             mode={gorunum}
             date={selectedDate}
             appointments={weekViewRows}
+            tasks={agendaTasks}
+            dayHref={(key) => apptHref({ gorunum: "gun", tarih: key })}
+            canEdit={canEditAppt}
+            canEditTasks={canEditTasks}
             prevHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? -7 : -1)) })}
             nextHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? 7 : 1)) })}
             todayHref={apptHref({ tarih: fmtTarih(todayStart) })}

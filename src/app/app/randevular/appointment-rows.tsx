@@ -46,6 +46,8 @@ export type AppointmentVM = {
   confirmWaHref: string | null;
   /** Derin bağlantıyla (?randevu=<id>) açılan randevu: vurgulanır, düzenleme paneli açık gelir. */
   focused?: boolean;
+  /** `?randevu=<id>&tamamla=1`: düzenleme yerine tamamlama (sonuç) paneli açık gelir. */
+  completeOpen?: boolean;
   isShowing: boolean;
   tutanakHref: string;
   edit: { id: string; appointment_type: string; scheduled_at: string; duration_min: number | null; location: string | null; notes: string | null; assigned_to: string | null; customer_id: string | null; customer_label: string | null; property_id: string | null; property_label: string | null };
@@ -62,7 +64,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
     <div className="relative z-10 flex flex-wrap items-center justify-end gap-1.5">
       {completed ? <AppointmentNextSteps outcome={a.outcome?.key} customerId={a.customerId} propertyId={a.propertyId} /> : null}
       {!completed ? (
-        <CompleteAppointmentDialog appointmentId={a.id} customerName={a.customerName} customerId={a.customerId} propertyId={a.propertyId} />
+        <CompleteAppointmentDialog appointmentId={a.id} customerName={a.customerName} customerId={a.customerId} propertyId={a.propertyId} defaultOpen={a.completeOpen} />
       ) : (
         /* Yanlış tamamlanan randevu kilitli değil: geri alma sonuç notunu da siler. */
         <form action={asFormAction(setAppointmentStatus)}>
@@ -77,7 +79,7 @@ function Actions({ a, typeOptions, advisors, withCalendar }: { a: AppointmentVM;
           </button>
         </form>
       )}
-      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} defaultOpen={a.focused} /> : null}
+      {!completed ? <AppointmentEditDialog appointment={a.edit} typeOptions={typeOptions} advisors={advisors} defaultOpen={a.focused && !a.completeOpen} /> : null}
       <RowActions>
         {a.status === "pending" ? (
           <OptimisticConfirmButton id={a.id} className="text-[var(--success-strong)] hover:text-[var(--success-strong)]" />
@@ -162,7 +164,7 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
           </THead>
           <TBody>
             {rows.map((a) => (
-              // id: takvimdeki gün öğeleri #randevu-{id} çapasıyla buraya kaydırır
+              // id: eski çapa hedefi (takvim artık ?randevu=<id> ile kaydın kendisini açar)
               <TR key={a.id} id={`randevu-${a.id}`} interactive className={`scroll-mt-24 target:bg-brand-600/[0.06]${a.focused ? " bg-brand-600/[0.06]" : ""}`} aria-current={a.focused ? "true" : undefined}>
                 <TD className="w-28">
                   {a.cardHref ? <IntentLink href={a.cardHref} className="absolute inset-0" aria-label={`${a.customerName} randevusu detayı`} /> : null}
