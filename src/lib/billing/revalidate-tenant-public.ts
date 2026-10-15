@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
  */
 export function revalidateTenantPublicPaths(tenantSlug?: string | null): void {
   revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   revalidatePath("/vitrin/[slug]/degerleme", "page");
   revalidatePath("/vitrin/[slug]/favoriler", "page");
   revalidatePath("/danisman/[slug]", "page");

@@ -107,8 +107,8 @@ describe("dış gönderim engeli", () => {
 const PUBLIC_FILES = [
   "src/app/vitrin/[slug]/page.tsx",
   "src/app/vitrin/[slug]/opengraph-image.tsx",
-  "src/app/vitrin/[slug]/[id]/page.tsx",
-  "src/app/vitrin/[slug]/[id]/opengraph-image.tsx",
+  "src/app/vitrin/[slug]/[ilan]/page.tsx",
+  "src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx",
   "src/lib/seo/sitemap-data.ts",
   "src/app/sunum/[token]/page.tsx",
   "src/app/paylas/[token]/page.tsx",

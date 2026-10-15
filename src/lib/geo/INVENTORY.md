@@ -51,7 +51,7 @@ Merkez (`src/lib/geo/`): `reader.ts` (önbellekli okuyucular, `validateGeoChain`
 | `src/lib/geo-province-sync.ts` | plaka okuma | `getProvince` |
 | `src/app/admin/sistem/system-view.tsx` | sayımlar | `geoRowCount` |
 | `src/app/admin/geo/**` (gezgin) | doğrudan tablo | `admin-store` |
-| İl listesi çeken sayfalar: `app/ekip`, `ekip/subeler`, `musteriler/yeni`, `musteriler/[id]`, `musteriler/[id]/talep/yeni`, `portfoyler/[id]`, `portfoyler/yeni`, `talepler/yeni`, `talepler/[id]`, `degerleme`, `ag`, `lead/[token]`, `vitrin/[slug]`, `vitrin/[slug]/[id]`, `vitrin/[slug]/degerleme`, `admin/tenants/yeni`, `lib/admin/office-management.ts` | `from("geo_provinces").select("id, name")` | `getProvinceOptions` / `provinceOptionsResult` (yeni kayıt: yalnız aktif; mevcut kaydı düzenleyen `[id]` sayfaları `includeInactive`) |
+| İl listesi çeken sayfalar: `app/ekip`, `ekip/subeler`, `musteriler/yeni`, `musteriler/[id]`, `musteriler/[id]/talep/yeni`, `portfoyler/[id]`, `portfoyler/yeni`, `talepler/yeni`, `talepler/[id]`, `degerleme`, `ag`, `lead/[token]`, `vitrin/[slug]`, `vitrin/[slug]/[ilan]`, `vitrin/[slug]/degerleme`, `admin/tenants/yeni`, `lib/admin/office-management.ts` | `from("geo_provinces").select("id, name")` | `getProvinceOptions` / `provinceOptionsResult` (yeni kayıt: yalnız aktif; mevcut kaydı düzenleyen `[id]` sayfaları `includeInactive`) |
 
 Davranış değişmedi: URL parametreleri, FK'ler, GeoSelect bileşeni (`src/components/app/geo-select.tsx`) aynı; yalnız veri ucu merkez.
 Bilinçli fark: pasif kayıt yeni seçimde görünmez (GeoSelect aktif listeyi alır).

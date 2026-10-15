@@ -109,7 +109,7 @@ const PUBLIC_MEDIA_SURFACES = [
   "src/app/paylas/[token]/page.tsx",
   "src/app/sunum/[token]/page.tsx",
   "src/app/vitrin/[slug]/page.tsx",
-  "src/app/vitrin/[slug]/[id]/page.tsx",
+  "src/app/vitrin/[slug]/[ilan]/page.tsx",
   "src/app/danisman/[slug]/page.tsx",
   "src/app/malik-portali/[token]/page.tsx",
   "src/app/musteri-portali/[token]/page.tsx",

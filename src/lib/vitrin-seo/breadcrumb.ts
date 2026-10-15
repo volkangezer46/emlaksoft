@@ -11,7 +11,8 @@ export type VitrinBreadcrumbInput = {
   officeName?: string | null;
   district?: string | null;
   province?: string | null;
-  listingId: string;
+  /** Kanonik mutlak ilan adresi (`vitrinListingUrl`, src/lib/vitrin/listing-slug.ts). */
+  listingUrl: string;
   listingName: string;
 };
 
@@ -21,7 +22,7 @@ export function vitrinListingBreadcrumbLd(input: VitrinBreadcrumbInput): LdNode 
   const office = (input.officeName ?? "").trim();
   const items: { name: string; item: string }[] = [{ name: office ? `${office} vitrini` : "Vitrin", item: vitrinUrl }];
   if (area) items.push({ name: area, item: vitrinUrl });
-  items.push({ name: input.listingName, item: `${vitrinUrl}/${input.listingId}` });
+  items.push({ name: input.listingName, item: input.listingUrl });
   return {
     "@type": "BreadcrumbList",
     itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, item: it.item })),

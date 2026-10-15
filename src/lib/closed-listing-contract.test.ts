@@ -24,9 +24,9 @@ describe("closed-listing", () => {
 /** Public yüzeyler kapalı portföyü süzmek ZORUNDA (yeni public sorgu eklenirse bu listeye girer). */
 const PUBLIC_SURFACES = [
   "src/app/vitrin/[slug]/page.tsx",
-  "src/app/vitrin/[slug]/[id]/page.tsx",
+  "src/app/vitrin/[slug]/[ilan]/page.tsx",
   "src/app/vitrin/[slug]/opengraph-image.tsx",
-  "src/app/vitrin/[slug]/[id]/opengraph-image.tsx",
+  "src/app/vitrin/[slug]/[ilan]/opengraph-image.tsx",
   "src/app/api/vitrin-favoriler/route.ts",
   "src/app/danisman/[slug]/page.tsx",
   "src/app/api/cron/vitrin-eslesme/route.ts",

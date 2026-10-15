@@ -61,9 +61,9 @@ describe("kalıcı noindex sözleşmesi", () => {
   it("vitrin, ilan ve danışman generateMetadata kalıcı noindex'i robots kararına bağlar", () => {
     expect(read("src/app/vitrin/[slug]/page.tsx")).toMatch(/robots: vitrinRobots\(vitrinCfg\.seoOptin, head\.neverIndex\)/);
     expect(read("src/app/vitrin/[slug]/page.tsx")).toContain("isNeverIndexTenant(tenant, neverIndexList)");
-    expect(read("src/app/vitrin/[slug]/[id]/page.tsx")).toMatch(/robots: vitrinRobots\(vitrinCfg\.seoOptin, isNeverIndexTenant\(tenant, neverIndexList\)\)/);
+    expect(read("src/app/vitrin/[slug]/[ilan]/page.tsx")).toMatch(/robots: vitrinRobots\(vitrinCfg\.seoOptin, isNeverIndexTenant\(tenant, neverIndexList\)\)/);
     expect(read("src/app/danisman/[slug]/page.tsx")).toMatch(/robots: vitrinRobots\(tenant\?\.vitrin_seo_optin === true, !tenant \|\| isNeverIndexTenant\(tenant, neverIndexList\)\)/);
-    for (const f of ["src/app/vitrin/[slug]/page.tsx", "src/app/vitrin/[slug]/[id]/page.tsx", "src/app/danisman/[slug]/page.tsx"]) {
+    for (const f of ["src/app/vitrin/[slug]/page.tsx", "src/app/vitrin/[slug]/[ilan]/page.tsx", "src/app/danisman/[slug]/page.tsx"]) {
       expect(read(f), f).toMatch(/sample_seeded_at, sample_cleared_at/);
     }
   });
@@ -93,7 +93,7 @@ describe("vitrin /[slug] metadata <head> sözleşmesi (HIZ-05)", () => {
   });
 });
 
-describe("vitrin /[slug]/[id] metadata: robota <head>, insana açılış ekranı", () => {
+describe("vitrin /[slug]/[ilan] metadata: robota <head>, insana açılış ekranı", () => {
   const GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
   const GOOGLEBOT_SMARTPHONE =
     "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
@@ -115,10 +115,11 @@ describe("vitrin /[slug]/[id] metadata: robota <head>, insana açılış ekranı
     expect(HTML_LIMITED_BOTS.source.startsWith(HTML_LIMITED_BOT_UA_RE.source)).toBe(true);
   });
   it("ilan detayında açılış ekranı (loading.tsx) YOK: yayından kalkan ilan gerçek 404 döner (SK8 B153); metadata robots/canonical üretir", () => {
-    expect(existsSync(join(process.cwd(), "src/app/vitrin/[slug]/[id]/loading.tsx"))).toBe(false);
-    expect(read("src/app/vitrin/[slug]/[id]/not-found.tsx")).toContain("Bu ilan yayından kalktı");
-    const page = read("src/app/vitrin/[slug]/[id]/page.tsx");
-    expect(page).toContain("alternates: { canonical: `/vitrin/${slug}/${id}` }");
+    expect(existsSync(join(process.cwd(), "src/app/vitrin/[slug]/[ilan]/loading.tsx"))).toBe(false);
+    expect(read("src/app/vitrin/[slug]/[ilan]/not-found.tsx")).toContain("Bu ilan yayından kalktı");
+    const page = read("src/app/vitrin/[slug]/[ilan]/page.tsx");
+    expect(page).toContain("alternates: { canonical: canonicalPath }");
+    expect(page).toContain("const canonicalPath = vitrinListingPath(slug, listingSlugInput(property));");
   });
 });
 
@@ -183,7 +184,13 @@ describe("JSON-LD: BreadcrumbList ve image[]", () => {
   const input = {
     base: "https://emlaksoft.com.tr",
     slug: "gezertasar-emlak",
-    id: "abc",
+    listing: {
+      id: "1a2b3c4d-5e6f-4a1b-8c2d-0123456789ab",
+      district: "Kadıköy",
+      rooms: "3+1",
+      transactionType: "Satılık",
+      propertyType: "Daire",
+    },
     name: "Deniz manzaralı 3+1",
     description: "Kadıköy Satılık Daire · 3+1",
     officeName: "Gezertaş Emlak",
@@ -195,9 +202,10 @@ describe("JSON-LD: BreadcrumbList ve image[]", () => {
     province: "İstanbul",
   };
   const graphOf = (ld: Record<string, unknown>) => ld["@graph"] as Record<string, unknown>[];
+  const LISTING_URL = "https://emlaksoft.com.tr/vitrin/gezertasar-emlak/kadikoy-3-1-satilik-daire-1a2b3c4d5e6f";
 
   it("BreadcrumbList 3 öğe: Vitrin › İlçe › İlan", () => {
-    const bc = vitrinListingBreadcrumbLd({ ...input, listingId: input.id, listingName: input.name });
+    const bc = vitrinListingBreadcrumbLd({ ...input, listingUrl: LISTING_URL, listingName: input.name });
     const items = bc.itemListElement as { position: number; name: string; item: string }[];
     expect(bc["@type"]).toBe("BreadcrumbList");
     expect(items).toHaveLength(3);
@@ -206,10 +214,13 @@ describe("JSON-LD: BreadcrumbList ve image[]", () => {
     // Ara öğe kanonik vitrin URL'si (?q= araması boş dönebilir ve kanonik değildir).
     expect(items[1]).toMatchObject({ name: "Kadıköy", item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak" });
     expect(items.some((i) => i.item.includes("?"))).toBe(false);
-    expect(items[2]).toMatchObject({ name: input.name, item: "https://emlaksoft.com.tr/vitrin/gezertasar-emlak/abc" });
+    expect(items[2]).toMatchObject({ name: input.name, item: LISTING_URL });
+    // RealEstateListing.url ile breadcrumb son öğesi aynı kanonik okunur adres.
+    const listing = graphOf(buildVitrinListingLd(input)).find((n) => n["@type"] === "RealEstateListing")!;
+    expect(listing.url).toBe(LISTING_URL);
     // İlçe yoksa il; ikisi de yoksa iki öğe.
-    expect((vitrinListingBreadcrumbLd({ ...input, district: null, listingId: "abc", listingName: "x" }).itemListElement as unknown[])).toHaveLength(3);
-    expect((vitrinListingBreadcrumbLd({ ...input, district: null, province: null, listingId: "abc", listingName: "x" }).itemListElement as unknown[])).toHaveLength(2);
+    expect((vitrinListingBreadcrumbLd({ ...input, district: null, listingUrl: LISTING_URL, listingName: "x" }).itemListElement as unknown[])).toHaveLength(3);
+    expect((vitrinListingBreadcrumbLd({ ...input, district: null, province: null, listingUrl: LISTING_URL, listingName: "x" }).itemListElement as unknown[])).toHaveLength(2);
   });
   it("image[] yalnız görsel varken basılır; RealEstateListing korunur, priceValidUntil yok", () => {
     const withImg = graphOf(buildVitrinListingLd(input));
@@ -227,8 +238,8 @@ describe("JSON-LD: BreadcrumbList ve image[]", () => {
   it("serializeJsonLd ile kaçışlı basılır (sayfa sözleşmesi)", () => {
     const s = serializeJsonLd(buildVitrinListingLd({ ...input, name: "</script><b>x</b>" }));
     expect(s).not.toContain("</script>");
-    expect(read("src/app/vitrin/[slug]/[id]/page.tsx")).toContain("serializeJsonLd(jsonLd)");
-    expect(read("src/app/vitrin/[slug]/[id]/page.tsx")).not.toContain("priceValidUntil");
+    expect(read("src/app/vitrin/[slug]/[ilan]/page.tsx")).toContain("serializeJsonLd(jsonLd)");
+    expect(read("src/app/vitrin/[slug]/[ilan]/page.tsx")).not.toContain("priceValidUntil");
   });
 });
 
@@ -244,7 +255,7 @@ describe("alt metin", () => {
     expect(listingImageAlt({}, 0)).toBe("Portföy, fotoğraf 1");
   });
   it("ilan galerisi üretilen alt metni kullanır", () => {
-    expect(read("src/app/vitrin/[slug]/[id]/page.tsx")).toContain("alt: listingImageAlt(altInput, i + 1)");
+    expect(read("src/app/vitrin/[slug]/[ilan]/page.tsx")).toContain("alt: listingImageAlt(altInput, i + 1)");
   });
 });
 
@@ -261,6 +272,6 @@ describe("istemci yükü", () => {
       expect(page).not.toContain(imp);
     }
     expect(page).not.toMatch(/import \{[^}]*\bCompareBar\b[^}]*\} from "@\/components\/public\/compare-select"/);
-    expect(read("src/app/vitrin/[slug]/[id]/page.tsx")).not.toContain('from "@/app/lead/[token]/lead-form"');
+    expect(read("src/app/vitrin/[slug]/[ilan]/page.tsx")).not.toContain('from "@/app/lead/[token]/lead-form"');
   });
 });

@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isVitrinEnabled } from "@/lib/vitrin-settings";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -42,6 +43,8 @@ function relName(v: Rel) {
 
 export type VitrinFavItem = {
   id: string;
+  /** Kanonik ilan yolu (`vitrinListingPath`; okunur slug + kod). */
+  href: string;
   title: string;
   transactionType: string | null;
   price: number | null;
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest) {
     const { data: props, error: propertiesError } = await admin
       .from("properties")
       .select(
-        "id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
+        "id, title, property_code, transaction_type, property_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
@@ -171,6 +174,7 @@ export async function POST(req: NextRequest) {
       const feat = (p.features ?? {}) as { rooms?: string; sqm?: number };
       items.push({
         id: p.id,
+        href: vitrinListingPath(slug, listingSlugInput(p)),
         title: p.title || p.property_code,
         transactionType: p.transaction_type,
         price: p.list_price != null ? Number(p.list_price) : null,

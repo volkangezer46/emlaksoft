@@ -32,7 +32,7 @@ describe("vitrinRobots: tek ölçüt ofisin arama onayı", () => {
     expect(vitrinRobots(true)).toEqual({ index: true, follow: true });
   });
   it("vitrin, ilan ve danışman generateMetadata robots kararını vitrinRobots ile verir", () => {
-    for (const f of ["src/app/vitrin/[slug]/page.tsx", "src/app/vitrin/[slug]/[id]/page.tsx", "src/app/danisman/[slug]/page.tsx"]) {
+    for (const f of ["src/app/vitrin/[slug]/page.tsx", "src/app/vitrin/[slug]/[ilan]/page.tsx", "src/app/danisman/[slug]/page.tsx"]) {
       const src = read(f);
       expect(src, f).toMatch(/robots: vitrinRobots\(/);
       // Ofis vitrini kalıbı elle SEO metninden sonra geri düşüş olarak vitrin-seo/office-meta.ts'te çözülür.

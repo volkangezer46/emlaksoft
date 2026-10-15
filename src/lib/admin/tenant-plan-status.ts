@@ -38,7 +38,7 @@ export async function applyTenantPlanStatus(
   revalidatePath("/admin/tenants");
   revalidatePath("/admin/billing");
   revalidatePath("/vitrin/[slug]", "page");
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   revalidatePath("/vitrin/[slug]/degerleme", "page");
   revalidatePath("/vitrin/[slug]/favoriler", "page");
   revalidatePath("/danisman/[slug]", "page");

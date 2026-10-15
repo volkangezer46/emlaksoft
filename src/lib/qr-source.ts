@@ -6,6 +6,8 @@
  * Kaynak değeri yalnız beyaz listedeyse kabul edilir (URL'den serbest metin kaynak alanına YAZILMAZ).
  */
 
+import { vitrinListingUrl, type ListingSlugInput } from "@/lib/vitrin/listing-slug";
+
 export const QR_SOURCE = "qr";
 export const QR_SOURCE_PARAM = "kaynak";
 export const QR_SOURCE_LABEL = "QR tabela";
@@ -18,10 +20,10 @@ export function parseUrlSource(raw: unknown): string | null {
   return ALLOWED_URL_SOURCES.has(v) ? v : null;
 }
 
-/** Vitrin ilan sayfasının QR hedef adresi. Slug yoksa null (QR üretilmez). */
-export function buildQrListingUrl(baseUrl: string, slug: string | null | undefined, propertyId: string): string | null {
+/** Vitrin ilan sayfasının QR hedef adresi (kanonik okunur adres + kaynak etiketi). Slug yoksa null (QR üretilmez). */
+export function buildQrListingUrl(baseUrl: string, slug: string | null | undefined, listing: ListingSlugInput): string | null {
   if (!slug) return null;
-  return `${baseUrl.replace(/\/$/, "")}/vitrin/${encodeURIComponent(slug)}/${propertyId}?${QR_SOURCE_PARAM}=${QR_SOURCE}`;
+  return `${vitrinListingUrl(baseUrl, encodeURIComponent(slug), listing)}?${QR_SOURCE_PARAM}=${QR_SOURCE}`;
 }
 
 /** Harici QR görsel servisi (goqr.me; gerekçe `components/public/vitrin-qr.tsx`). Yalnız public ilan URL'i iletilir. */

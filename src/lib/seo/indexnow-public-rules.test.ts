@@ -16,13 +16,25 @@ const tenant = (o: Partial<ListingIndexNowTenant> = {}): ListingIndexNowTenant =
   seoOptin: true,
   ...o,
 });
-const listing = (o: Record<string, unknown> = {}) => ({ id: ID, status: "live", is_sample: false, deleted_at: null, features: {}, ...o });
+const listing = (o: Record<string, unknown> = {}) => ({
+  id: ID,
+  status: "live",
+  is_sample: false,
+  deleted_at: null,
+  features: { rooms: "3+1" },
+  transaction_type: "Satılık",
+  property_type: "Daire",
+  district: { name: "Kadıköy" },
+  province: { name: "İstanbul" },
+  ...o,
+});
+const PATH = "/vitrin/gezer-emlak/kadikoy-3-1-satilik-daire-4f1c2a9e1111";
 const check = (t = tenant(), l: ReturnType<typeof listing> | null = listing(), sitemapListingsOn = true) =>
   listingIndexNowEligibility({ tenant: t, listing: l, neverIndexList: LIST, sitemapListingsOn });
 
 describe("ilan IndexNow uygunluğu", () => {
   it("arama onaylı, açık vitrindeki yayında ilan → vitrin ilan yolu", () => {
-    expect(check()).toEqual({ ok: true, path: `/vitrin/gezer-emlak/${ID}` });
+    expect(check()).toEqual({ ok: true, path: PATH });
   });
 
   it("ofis arama onayı yoksa bildirilmez", () => {
@@ -62,7 +74,7 @@ describe("ilan IndexNow uygunluğu", () => {
 });
 
 describe("IndexNow olay tekrarı/sıklığı", () => {
-  const url = `https://emlaksoft.com.tr/vitrin/gezer-emlak/${ID}`;
+  const url = `https://emlaksoft.com.tr${PATH}`;
   const t0 = Date.parse("2026-10-16T09:00:00Z");
 
   it("aynı lastmod ya da aynı gün ikinci kez gönderilmez; ertesi gün yeni sürüm gönderilir", () => {

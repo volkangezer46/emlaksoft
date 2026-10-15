@@ -1,5 +1,6 @@
 import type { LdNode } from "@/lib/seo/jsonld";
 import { vitrinListingBreadcrumbLd } from "./breadcrumb";
+import { vitrinListingUrl, type ListingSlugInput } from "@/lib/vitrin/listing-slug";
 
 /**
  * İlan detayı JSON-LD grafiği (SAF): RealEstateListing + BreadcrumbList. Çıktı sayfada `serializeJsonLd` ile basılır.
@@ -13,7 +14,8 @@ export const LISTING_LD_MAX_IMAGES = 10;
 export type VitrinListingLdInput = {
   base: string;
   slug: string;
-  id: string;
+  /** Kanonik ilan adresi girdisi (tek kaynak: src/lib/vitrin/listing-slug.ts). */
+  listing: ListingSlugInput;
   name: string;
   description: string | null;
   officeName: string | null;
@@ -36,7 +38,7 @@ export function listingImageUrls(base: string, ids: readonly string[], max: numb
 }
 
 export function buildVitrinListingLd(input: VitrinListingLdInput): LdNode {
-  const url = `${input.base}/vitrin/${input.slug}/${input.id}`;
+  const url = vitrinListingUrl(input.base, input.slug, input.listing);
   const images = listingImageUrls(input.base, input.imageIds);
   const hasGeo = input.lat != null && input.lng != null && Number.isFinite(input.lat) && Number.isFinite(input.lng);
   const listing: LdNode = {
@@ -70,7 +72,7 @@ export function buildVitrinListingLd(input: VitrinListingLdInput): LdNode {
     officeName: input.officeName,
     district: input.district,
     province: input.province,
-    listingId: input.id,
+    listingUrl: url,
     listingName: input.name,
   });
   return { "@context": "https://schema.org", "@graph": [listing, breadcrumb] };

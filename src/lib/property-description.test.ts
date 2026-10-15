@@ -45,7 +45,7 @@ describe("portföy açıklaması (tek akış)", () => {
       "src/app/app/portfoyler/[id]/brosur/page.tsx",
       "src/app/sunum/[token]/page.tsx",
       "src/app/paylas/[token]/page.tsx",
-      "src/app/vitrin/[slug]/[id]/page.tsx",
+      "src/app/vitrin/[slug]/[ilan]/page.tsx",
     ]) {
       const src = read(rel);
       expect(src, rel).toContain("readPropertyDescription(");

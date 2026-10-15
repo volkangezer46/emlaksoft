@@ -47,7 +47,7 @@ describe("yetki belgesi alanları (migration 20260826001800)", () => {
   it("public ilan yüzeyleri LicenseNotice gösterir", () => {
     for (const p of [
       "src/app/vitrin/[slug]/page.tsx",
-      "src/app/vitrin/[slug]/[id]/page.tsx",
+      "src/app/vitrin/[slug]/[ilan]/page.tsx",
       "src/app/sunum/[token]/page.tsx",
       "src/app/app/portfoyler/[id]/brosur/page.tsx",
     ]) {

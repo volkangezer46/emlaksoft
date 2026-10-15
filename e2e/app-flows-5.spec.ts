@@ -280,14 +280,14 @@ test.describe("Vitrin v2 favori + fiyat alarmi (/vitrin/demo-ofis, auth'suz)", (
         test.skip(true, "demo-ofis vitrininde yayında ilan yok — favori akışı atlandı.");
       }
 
-      // Kalbin ait olduğu kartın ilan linkini (uuid) kaydet — favoriler
+      // Kalbin ait olduğu kartın ilan linkini (okunur slug + 12 haneli kod) kaydet — favoriler
       // sayfasında aynı ilanın listelendiğini kanıtlamak için.
       const shell = heart.locator('xpath=ancestor::div[contains(@class, "relative")][1]');
       const cardHref = await shell
         .locator('a[href^="/vitrin/demo-ofis/"]')
         .first()
         .getAttribute("href");
-      expect(cardHref).toMatch(/\/vitrin\/demo-ofis\/[0-9a-f-]{36}$/);
+      expect(cardHref).toMatch(/\/vitrin\/demo-ofis\/[a-z0-9-]+-[0-9a-f]{12}$/);
 
       await clickUntilVisible(heart, page.locator('button[aria-label="Favorilerden çıkar"]').first());
       // Hero şeridindeki "Favorilerim (1)" chip'i favori sayısını kanıtlar.

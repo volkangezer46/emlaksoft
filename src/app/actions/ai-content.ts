@@ -159,6 +159,6 @@ export async function savePropertyDescription(propertyId: string, text: string):
     newValue: { length: parsed.value?.length ?? 0 },
   });
   revalidatePath(`/app/portfoyler/${propertyId}`);
-  revalidatePath("/vitrin/[slug]/[id]", "page");
+  revalidatePath("/vitrin/[slug]/[ilan]", "page");
   return { ok: true };
 }

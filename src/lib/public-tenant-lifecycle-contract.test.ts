@@ -20,7 +20,7 @@ describe("public tenant lifecycle contract", () => {
   it("guards all vitrin reads, metadata, favorites and lead writes", () => {
     const files = [
       "src/app/vitrin/[slug]/page.tsx",
-      "src/app/vitrin/[slug]/[id]/page.tsx",
+      "src/app/vitrin/[slug]/[ilan]/page.tsx",
       "src/app/vitrin/[slug]/favoriler/page.tsx",
       "src/app/vitrin/[slug]/degerleme/page.tsx",
       "src/app/api/vitrin-favoriler/route.ts",

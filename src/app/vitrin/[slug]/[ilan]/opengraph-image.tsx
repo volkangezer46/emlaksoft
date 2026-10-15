@@ -5,6 +5,7 @@ import { OPEN_LISTING_OR_FILTER } from "@/lib/closed-listing";
 import { OG_SIZE, renderVitrinOg } from "@/lib/vitrin-og";
 import { loadOgPhoto } from "@/lib/public-link-og";
 import { formatPublicPrice, listingCurrency } from "@/lib/public-price";
+import { listingKodIdRange, parseListingKod, pickUniqueByKod } from "@/lib/vitrin/listing-slug";
 
 export const alt = "Emlak ilanı";
 export const size = OG_SIZE;
@@ -20,8 +21,11 @@ const nm = (v: Rel) => (Array.isArray(v) ? v[0]?.name : v?.name) ?? null;
  * (undefined bile) bu dosya görseli EKLENMEZ; bu yüzden sayfa o anahtarı hiç yazmaz (SK8 B151). Fotoğraf kararı burada:
  * ilk public ilan görseli varsa kartın arka planı olur, fotoğrafsız ilanda markalı yedek kart (ofis, başlık, fiyat).
  */
-export default async function Image({ params }: { params: Promise<{ slug: string; id: string }> }) {
-  const { slug, id } = await params;
+export default async function Image({ params }: { params: Promise<{ slug: string; ilan: string }> }) {
+  const { slug, ilan } = await params;
+  // Yalnız `{kod}` çözülür (src/lib/vitrin/listing-slug.ts); açıklayıcı kısım dekoratif.
+  const kod = parseListingKod(ilan);
+  const range = kod ? listingKodIdRange(kod) : null;
   const admin = createAdminClient();
   const { data: tenant } = await admin
     .from("tenants")
@@ -29,18 +33,20 @@ export default async function Image({ params }: { params: Promise<{ slug: string
     .eq("slug", slug)
     .maybeSingle();
   const active = tenant && isPublicTenantActive(tenant.status) && (await isVitrinEnabled(admin, tenant.id));
-  const { data: p } = active
+  const { data: rows } = active && range
     ? await admin
         .from("properties")
         .select("id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)")
-        .eq("id", id)
+        .gte("id", range.lo)
+        .lte("id", range.hi)
         .eq("tenant_id", tenant.id)
         .eq("status", "live")
         .is("deleted_at", null)
         .eq("is_sample", false)
         .or(OPEN_LISTING_OR_FILTER)
-        .maybeSingle()
+        .limit(2)
     : { data: null };
+  const p = kod ? pickUniqueByKod(rows, kod) : null;
 
   if (!tenant || !active || !p) {
     return renderVitrinOg({ office: "EmlakSoft", title: "İlan bulunamadı" });

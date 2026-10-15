@@ -4,7 +4,12 @@ import { now, trDayKey } from "@/lib/clock";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
 import { postIndexNow, type IndexNowEventOutcome } from "./indexnow-events";
-import { indexNowEventAlreadySent, indexNowEventPrints, listingIndexNowEligibility } from "./indexnow-public-rules";
+import {
+  indexNowEventAlreadySent,
+  indexNowEventPrints,
+  listingIndexNowEligibility,
+  type ListingIndexNowListing,
+} from "./indexnow-public-rules";
 import { canonicalUrl } from "./rules";
 import { INDEXNOW_DAILY_LIMIT } from "./schema";
 import { canAutoOptimize, pathOfUrl } from "./scope";
@@ -75,7 +80,9 @@ export async function notifyListingIndexNow(
   const [{ data: listing }, { data: tenant }, vitrin, neverIndexList, seo] = await Promise.all([
     client
       .from("properties")
-      .select("id, status, is_sample, deleted_at, features, updated_at")
+      .select(
+        "id, status, is_sample, deleted_at, features, updated_at, transaction_type, property_type, district:geo_districts(name), province:geo_provinces(name)",
+      )
       .eq("id", propertyId)
       .eq("tenant_id", tenantId)
       .maybeSingle(),
@@ -85,7 +92,7 @@ export async function notifyListingIndexNow(
     getSeoSettings(),
   ]);
   const t = tenant as { slug: string | null; status: string | null; sample_seeded_at: string | null; sample_cleared_at: string | null } | null;
-  const l = listing as { id: string; status: string | null; is_sample: boolean | null; deleted_at: string | null; features: unknown; updated_at: string | null } | null;
+  const l = listing as (ListingIndexNowListing & { updated_at: string | null }) | null;
   const verdict = listingIndexNowEligibility({
     // Ayar sütunları yoksa varsayılan: arama onayı yok (bildirilmez).
     tenant: t ? { ...t, vitrinEnabled: vitrin.settings.enabled, seoOptin: vitrin.settings.seoOptin } : null,

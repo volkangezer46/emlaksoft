@@ -11,6 +11,7 @@ import { listPublishedSitePages } from "@/lib/site-pages/store";
 import { listGuideSitemapEntries } from "@/lib/guides/sitemap";
 import { GUIDES_CACHE_TAG } from "@/lib/guides/store";
 import { loadVitrinSitemapExclusions } from "@/lib/vitrin-seo/store";
+import { LISTING_SLUG_COLUMNS, listingSlugInput, vitrinListingUrl, type ListingSlugRow } from "@/lib/vitrin/listing-slug";
 
 /**
  * Sitemap veri yükleyici (sunucu). Kurallar:
@@ -132,7 +133,7 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
           (from, to) =>
             admin
               .from("properties")
-              .select("id, tenant_id, updated_at")
+              .select(`${LISTING_SLUG_COLUMNS}, tenant_id, updated_at`)
               .eq("status", "live")
               .eq("is_sample", false)
               .is("deleted_at", null)
@@ -144,7 +145,7 @@ async function loadAll(): Promise<{ entries: SitemapEntry[]; generatedAt: string
         for (const l of listings ?? []) {
           const slug = included.get(String(l.tenant_id));
           if (!slug) continue;
-          entries.push({ url: `${base}/vitrin/${slug}/${l.id}`, lastModified: iso(l.updated_at), changeFrequency: "weekly", priority: 0.6 });
+          entries.push({ url: vitrinListingUrl(base, slug, listingSlugInput(l as unknown as ListingSlugRow)), lastModified: iso(l.updated_at), changeFrequency: "weekly", priority: 0.6 });
         }
       }
 

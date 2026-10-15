@@ -52,6 +52,7 @@ import { readTenantSettings } from "@/lib/settings/tenant-read";
 import { HOME_VALUE_SUMMARY_KEY } from "@/lib/settings/registry/tenant";
 import { loadHomeValues } from "@/lib/home-value/load";
 import { HOME_VALUE_NOTE } from "@/lib/home-value/core";
+import { listingSlugInput, vitrinListingPath } from "@/lib/vitrin/listing-slug";
 import {
   PUBLIC_COVER_COLUMNS,
   firstPublicImageByProperty,
@@ -148,8 +149,8 @@ export default async function CustomerPortalPage({
       ? admin
           .from("properties")
           // status: vitrin linki için; transaction_type/features/district:
-          // karşılaştırma tablosuna oda-m²-kat-bina yaşı-ilçe taşır
-          .select("id, status, transaction_type, features, district:geo_districts(name)")
+          // karşılaştırma tablosuna oda-m²-kat-bina yaşı-ilçe taşır; property_type/il: kanonik vitrin adresi
+          .select("id, status, transaction_type, property_type, features, district:geo_districts(name), province:geo_provinces(name)")
           .eq("tenant_id", tenant.id)
           .is("deleted_at", null)
           .in("id", matchIds)
@@ -159,8 +160,10 @@ export default async function CustomerPortalPage({
             id: string;
             status: string | null;
             transaction_type: string | null;
+            property_type: string | null;
             features: unknown;
             district: { name?: string } | { name?: string }[] | null;
+            province: { name?: string } | { name?: string }[] | null;
           }[],
         }),
     matchIds.length > 0
@@ -204,8 +207,10 @@ export default async function CustomerPortalPage({
     id: string;
     status: string | null;
     transaction_type: string | null;
+    property_type: string | null;
     features: unknown;
     district: { name?: string } | { name?: string }[] | null;
+    province: { name?: string } | { name?: string }[] | null;
   };
   const extraRows = (statusRes.data ?? []) as PortalPropExtra[];
   const statusMap = new Map(extraRows.map((s) => [s.id, s.status]));
@@ -287,12 +292,12 @@ export default async function CustomerPortalPage({
                 const verdict = verdictMap.get(m.id) ?? null;
                 // Vitrin detayı yalnızca "live" portföyleri servis eder; diğer
                 // durumlarda kart bilinçli olarak linksiz kalır (404'e götürme).
-                const href =
-                  vitrinSlug && statusMap.get(m.id) === "live"
-                    ? `/vitrin/${vitrinSlug}/${m.id}`
-                    : null;
                 // Karşılaştırma tablosu verisi — vitrin kartlarıyla aynı şekil (tek kopya tablo)
                 const extra = extraMap.get(m.id);
+                const href =
+                  vitrinSlug && extra && statusMap.get(m.id) === "live"
+                    ? vitrinListingPath(vitrinSlug, listingSlugInput(extra))
+                    : null;
                 const feat = (extra?.features ?? {}) as {
                   rooms?: string;
                   sqm?: number;

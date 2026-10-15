@@ -25,6 +25,14 @@ import { resolvePublicContact } from "@/lib/public-contact";
 import { PublicContactActions } from "@/components/public/public-contact-actions";
 import { removedListingSlot, type RemovedListingCtx } from "./removed-listing";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  listingKodIdRange,
+  listingSlugInput,
+  parseListingKod,
+  pickUniqueByKod,
+  vitrinListingPath,
+  vitrinListingUrl,
+} from "@/lib/vitrin/listing-slug";
 import { isVitrinEnabled, loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
 import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
@@ -113,9 +121,13 @@ type Feat = {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string; id: string }>;
+  params: Promise<{ slug: string; ilan: string }>;
 }): Promise<Metadata> {
-  const { slug, id } = await params;
+  const { slug, ilan } = await params;
+  // Adres parçasının yalnız `{kod}` kısmı çözülür; açıklayıcı kısım dekoratiftir (canonical doğru adresi gösterir).
+  const kod = parseListingKod(ilan);
+  if (!kod) return { title: "İlan bulunamadı" };
+  const kodRange = listingKodIdRange(kod);
   const admin = createAdminClient();
 
   // Paylaşım görseli dosya kuralından gelir (opengraph-image.tsx / twitter-image.tsx: ofis markalı kart, ilk public
@@ -129,25 +141,28 @@ export async function generateMetadata({
   if (!tenant || !isPublicTenantActive(tenant.status)) return { title: "İlan bulunamadı" };
 
   // Vitrin ayarı (açık mı + arama onayı), ilan, SEO kalıpları ve kalıcı noindex listesi bağımsız: paralel.
-  const [{ settings: vitrinCfg }, { data: property }, seo, neverIndexList] = await Promise.all([
+  const [{ settings: vitrinCfg }, { data: propertyRows }, seo, neverIndexList] = await Promise.all([
     loadVitrinSettings(admin, tenant.id),
     admin
       .from("properties")
       .select(
         "id, title, property_code, transaction_type, property_type, list_price, address_line, features, province:geo_provinces(name), district:geo_districts(name)",
       )
-      .eq("id", id)
+      .gte("id", kodRange.lo)
+      .lte("id", kodRange.hi)
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
       .is("deleted_at", null)
       .eq("is_sample", false)
       .or(OPEN_LISTING_OR_FILTER)
-      .maybeSingle(),
+      .limit(2),
     getSeoSettings(),
     loadNeverIndexList(),
   ]);
   if (!vitrinCfg.enabled) return { title: "İlan bulunamadı" };
+  const property = pickUniqueByKod(propertyRows, kod);
   if (!property) return { title: "İlan bulunamadı" };
+  const canonicalPath = vitrinListingPath(slug, listingSlugInput(property));
 
   const priceText = money(
     property.list_price != null ? Number(property.list_price) : null,
@@ -183,14 +198,14 @@ export async function generateMetadata({
     // Arama motoru görünürlüğü: kalıcı noindex kuralı (örnek/demo/test/platform kiracısı) ÖNCE, sonra ofisin açık
     // onayı (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt.
     robots: vitrinRobots(vitrinCfg.seoOptin, isNeverIndexTenant(tenant, neverIndexList)),
-    alternates: { canonical: `/vitrin/${slug}/${id}` },
+    alternates: { canonical: canonicalPath },
     openGraph: {
       type: "website",
       locale: "tr_TR",
       siteName: tenant.name ?? "EmlakSoft",
       title,
       description,
-      url: `/vitrin/${slug}/${id}`,
+      url: canonicalPath,
     },
     twitter: { card: "summary_large_image", title, description },
   };
@@ -200,7 +215,7 @@ export async function generateMetadata({
  * İlan detayı. 404 yollarında (`notFound()`) ofis bağlamı istek kapsamlı yuvaya yazılır; `not-found.tsx` ofis markalı
  * "Bu ilan yayından kalktı" görünümünü GERÇEK HTTP 404 ile basar (SK8 B153). Yuva her yolda kapanır (finally).
  */
-export default async function VitrinPropertyPage(props: { params: Promise<{ slug: string; id: string }> }) {
+export default async function VitrinPropertyPage(props: { params: Promise<{ slug: string; ilan: string }> }) {
   const slot = removedListingSlot();
   try {
     return await renderVitrinProperty(props, createAdminClient(), slot.settle);
@@ -210,28 +225,21 @@ export default async function VitrinPropertyPage(props: { params: Promise<{ slug
 }
 
 async function renderVitrinProperty(
-  { params }: { params: Promise<{ slug: string; id: string }> },
+  { params }: { params: Promise<{ slug: string; ilan: string }> },
   admin: ReturnType<typeof createAdminClient>,
   settleNotFound: (ctx: RemovedListingCtx | null) => void,
 ) {
-  const { slug, id } = await params;
+  const { slug, ilan } = await params;
+  // Yalnız `{kod}` çözülür (açıklayıcı kısım dekoratif); biçim dışı parça → ofis markalı 404.
+  const kod = parseListingKod(ilan);
 
-  // tenant (slug), media (params id) ve provinces (bağımsız) yalnızca params'a bağlı → paralel
-  const [{ data: tenant }, { data: mediaRows }, { data: provinces }] = await Promise.all([
+  // tenant (slug) ve provinces (bağımsız) yalnızca params'a bağlı → paralel
+  const [{ data: tenant }, { data: provinces }] = await Promise.all([
     admin
       .from("tenants")
       .select("id, name, status, phone, logo_url, brand_color, license_no, address_line, lead_capture_token, lead_capture_enabled")
       .eq("slug", slug)
       .maybeSingle(),
-    // KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar -> ad kuralı).
-    selectWithDocumentFlag<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
-      admin
-        .from("property_media")
-        .select(columns)
-        .eq("property_id", id)
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true }),
-    ),
     provinceOptionsResult(),
   ]);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
@@ -239,31 +247,48 @@ async function renderVitrinProperty(
   // Ofis vitrinini kapattıysa (vitrin_enabled=false; sütun yoksa açık) ilan detayı da 404.
   if (!(await isVitrinEnabled(admin, tenant.id))) notFound();
 
-  const { data: property } = await admin
-    .from("properties")
-    .select(
-      "id, title, property_code, transaction_type, property_type, status, list_price, address_line, lat, lng, created_at, published_at, assigned_to, features, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name)",
-    )
-    .eq("id", id)
-    .eq("tenant_id", tenant.id)
-    .eq("status", "live")
-    .is("deleted_at", null)
-    .eq("is_sample", false)
-    .or(OPEN_LISTING_OR_FILTER)
-    .maybeSingle();
+  const kodRange = kod ? listingKodIdRange(kod) : null;
+  const { data: propertyRows } = kodRange
+    ? await admin
+        .from("properties")
+        .select(
+          "id, title, property_code, transaction_type, property_type, status, list_price, address_line, lat, lng, created_at, published_at, assigned_to, features, province_id, district_id, province:geo_provinces(name), district:geo_districts(name), neighborhood:geo_neighborhoods(name)",
+        )
+        .gte("id", kodRange.lo)
+        .lte("id", kodRange.hi)
+        .eq("tenant_id", tenant.id)
+        .eq("status", "live")
+        .is("deleted_at", null)
+        .eq("is_sample", false)
+        .or(OPEN_LISTING_OR_FILTER)
+        .limit(2)
+    : { data: null };
+  const property = kod ? pickUniqueByKod(propertyRows, kod) : null;
   if (!property) {
-    settleNotFound(await loadRemovedListingCtx(admin, tenant, slug, id, provinces ?? []));
+    settleNotFound(await loadRemovedListingCtx(admin, tenant, slug, kod, provinces ?? []));
     notFound();
   }
+  const listingUrl = vitrinListingUrl(BASE_URL, slug, listingSlugInput(property));
 
-  // EİDS taşınmaz no (20260826002950): sütun yoksa sorgu hata verir → gösterilmez (sayfa bozulmaz).
-  const { data: eidsRow, error: eidsError } = await admin
-    .from("properties")
-    .select("eids_property_no")
-    .eq("id", property.id)
-    .eq("tenant_id", tenant.id)
-    .eq("is_sample", false)
-    .maybeSingle();
+  // Medya (ilan çözüldükten sonra, ilan id'siyle) ve EİDS taşınmaz no (20260826002950: sütun yoksa sorgu hata verir →
+  // gösterilmez, sayfa bozulmaz) bağımsız → paralel. KVKK P0-9: is_document seçilir (sütun yoksa sütunsuz tekrar).
+  const [{ data: mediaRows }, { data: eidsRow, error: eidsError }] = await Promise.all([
+    selectWithDocumentFlag<VitrinMediaRow[]>("id, kind, file_type, file_name, external_url, is_cover, sort_order", (columns) =>
+      admin
+        .from("property_media")
+        .select(columns)
+        .eq("property_id", property.id)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true }),
+    ),
+    admin
+      .from("properties")
+      .select("eids_property_no")
+      .eq("id", property.id)
+      .eq("tenant_id", tenant.id)
+      .eq("is_sample", false)
+      .maybeSingle(),
+  ]);
   const eidsNo = eidsError ? null : ((eidsRow?.eids_property_no as string | null | undefined) ?? null);
 
   const price = property.list_price != null ? Number(property.list_price) : null;
@@ -278,7 +303,7 @@ async function renderVitrinProperty(
   let similarQuery = admin
     .from("properties")
     .select(
-      "id, title, property_code, transaction_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
+      "id, title, property_code, transaction_type, property_type, list_price, features, province:geo_provinces(name), district:geo_districts(name)",
     )
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
@@ -456,7 +481,7 @@ async function renderVitrinProperty(
   const contact = resolvePublicContact({
     advisorPhone: advisor?.phone ?? null,
     officePhone: tenant.phone,
-    whatsappText: `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${BASE_URL}/vitrin/${slug}/${id}`,
+    whatsappText: `Merhaba, ${property.title || property.property_code} ilanı hakkında bilgi almak istiyorum. ${listingUrl}`,
   });
 
   const specs = [
@@ -478,7 +503,7 @@ async function renderVitrinProperty(
   const jsonLd = buildVitrinListingLd({
     base: BASE_URL,
     slug,
-    id,
+    listing: listingSlugInput(property),
     name: listingName,
     // Kullanıcı açıklaması yoksa gerçek özellikli tanım (ham adres alanı KULLANILMAZ).
     description:
@@ -583,7 +608,7 @@ async function renderVitrinProperty(
                   <ShareButton
                     title={`${property.title || property.property_code} - ${money(price, property.transaction_type, currency)}`}
                     text={loc || undefined}
-                    url={`${BASE_URL}/vitrin/${slug}/${id}`}
+                    url={listingUrl}
                   />
                 </div>
               </div>
@@ -793,6 +818,7 @@ async function renderVitrinProperty(
                 const sCover = similarCoverMap.get(p.id);
                 const sLoc = [relName(p.district as Rel), relName(p.province as Rel)].filter(Boolean).join(", ");
                 const sCurrency = listingCurrency(p.features);
+                const sHref = vitrinListingPath(slug, listingSlugInput(p));
                 return (
                   <VitrinCardShell
                     key={p.id}
@@ -800,7 +826,7 @@ async function renderVitrinProperty(
                     item={{
                       id: p.id,
                       title: p.title || p.property_code,
-                      href: `/vitrin/${slug}/${p.id}`,
+                      href: sHref,
                       coverId: sCover ?? null,
                       price: p.list_price != null ? Number(p.list_price) : null,
                       tx: p.transaction_type,
@@ -812,7 +838,7 @@ async function renderVitrinProperty(
                     }}
                   >
                   <Link
-                    href={`/vitrin/${slug}/${p.id}`}
+                    href={sHref}
                     className="lift group block overflow-hidden rounded-[var(--radius-panel)] border border-line bg-surface transition hover:border-brand-300"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-ink-950/5">
@@ -905,8 +931,6 @@ async function renderVitrinProperty(
   );
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 type RemovedTenant = {
   id: string;
   name: string | null;
@@ -925,23 +949,28 @@ async function loadRemovedListingCtx(
   admin: ReturnType<typeof createAdminClient>,
   tenant: RemovedTenant,
   slug: string,
-  id: string,
+  kod: string | null,
   provinces: { id: string; name: string }[],
 ): Promise<RemovedListingCtx> {
-  const validId = UUID_RE.test(id);
-  const { data: gone } = validId
+  // Kod biçim dışıysa ilan aranmaz; kod belirsizse (ofiste 2 eşleşme) "yayından kalktı" denmez (removed=false).
+  const range = kod ? listingKodIdRange(kod) : null;
+  const { data: goneRows } = range
     ? await admin
         .from("properties")
-        .select("transaction_type, district_id, province_id")
-        .eq("id", id)
+        .select("id, transaction_type, district_id, province_id")
+        .gte("id", range.lo)
+        .lte("id", range.hi)
         .eq("tenant_id", tenant.id)
         .eq("is_sample", false)
         .is("deleted_at", null)
-        .maybeSingle()
+        .limit(2)
     : { data: null };
+  const gone = kod ? pickUniqueByKod(goneRows, kod) : null;
   let similarQuery = admin
     .from("properties")
-    .select("id, title, property_code, transaction_type, list_price, features, district:geo_districts(name)")
+    .select(
+      "id, title, property_code, transaction_type, property_type, list_price, features, district:geo_districts(name), province:geo_provinces(name)",
+    )
     .eq("tenant_id", tenant.id)
     .eq("status", "live")
     .is("deleted_at", null)
@@ -949,7 +978,7 @@ async function loadRemovedListingCtx(
     .or(OPEN_LISTING_OR_FILTER)
     .order("created_at", { ascending: false })
     .limit(4);
-  if (validId) similarQuery = similarQuery.neq("id", id);
+  if (gone) similarQuery = similarQuery.neq("id", gone.id);
   if (gone?.transaction_type) similarQuery = similarQuery.eq("transaction_type", gone.transaction_type);
   if (gone?.district_id) similarQuery = similarQuery.eq("district_id", gone.district_id);
   else if (gone?.province_id) similarQuery = similarQuery.eq("province_id", gone.province_id);
@@ -976,6 +1005,7 @@ async function loadRemovedListingCtx(
     removed: Boolean(gone),
     similar: similarRows.map((p) => ({
       id: p.id as string,
+      href: vitrinListingPath(slug, listingSlugInput(p)),
       title: String(p.title || p.property_code || "Portföy"),
       price: money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, listingCurrency(p.features)),
       tx: p.transaction_type ?? null,
