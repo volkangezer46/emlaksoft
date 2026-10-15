@@ -13,10 +13,15 @@ describe("due feature quality contract", () => {
     expect(action).toContain("validateTenantReferences(gate.tenantId, { propertyId })");
   });
 
-  it("never reports a missing update or delete as successful", () => {
-    expect(action.match(/\.select\("id"\)\s*\.maybeSingle\(\)/g)).toHaveLength(3);
-    expect(action.match(/if \(!data\) return \{ error: "Aidat kaydı bulunamadı\." \};/g)).toHaveLength(3);
-    expect(action).toContain('return { error: actionErrorMessage(error, "Aidat silinemedi.") };');
+  it("writes only through finance_due_* RPCs; never deletes (cancel with reason) and never writes legacy property_dues", () => {
+    for (const rpc of ["finance_due_create", "finance_due_update", "finance_due_mark_paid", "finance_due_reopen", "finance_due_cancel"]) {
+      expect(action).toContain(`rpc("${rpc}"`);
+    }
+    expect(action).not.toContain("property_dues");
+    expect(action).not.toMatch(/\.delete\(\)/);
+    expect(action).not.toContain("deleteDue");
+    expect(action).toContain('requirePermission("expenses", "delete")');
+    expect(action).toContain("İptal nedenini yazın");
   });
 
   it("fails the page instead of presenting database errors as empty financial data", () => {
@@ -25,8 +30,9 @@ describe("due feature quality contract", () => {
   });
 
   it("reports mutation results and exposes an accessible pending/error form", () => {
-    expect(client).toContain("const result = await toggleDuePaid(id, toPaid)");
-    expect(client).toContain("const result = await deleteDue(id)");
+    expect(client).toContain("const result = await toggleDuePaid(id, toPaid,");
+    expect(client).not.toContain("deleteDue");
+    expect(client).toContain("<DueCancelDialog");
     expect(client).toContain('push(result.error, "err")');
     expect(client).toContain("aria-busy={pending}");
     expect(client).toContain('role="alert"');

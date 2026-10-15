@@ -150,7 +150,8 @@ export async function loadOwnerFinance(
     const linkedKeys = new Set(links.map((l) => `${l.kind}:${l.refId}`));
     const [expRes, dueRes] = await Promise.all([
       db.from("expenses").select("id, title, amount, expense_date").eq("tenant_id", tenantId).eq("property_id", propertyId).eq("currency", "TRY").eq("is_sample", false).gt("amount", 0).order("expense_date", { ascending: false }).limit(60),
-      db.from("property_dues").select("id, title, amount, period").eq("tenant_id", tenantId).eq("property_id", propertyId).gt("amount", 0).order("period", { ascending: false }).limit(60),
+      // Aidat = finance_open_items (source_type 'due'); yansıtma anahtarı source_id (eski aidatta property_dues.id). İptal edilen hariç.
+      db.from("finance_open_items").select("id:source_id, title, amount, period:issue_date").eq("tenant_id", tenantId).eq("source_type", "due").eq("property_id", propertyId).neq("status", "cancelled").order("issue_date", { ascending: false }).limit(60),
     ]);
     if (!expRes.error) {
       for (const e of (expRes.data ?? []) as { id: string; title: string; amount: number | string; expense_date: string }[]) {

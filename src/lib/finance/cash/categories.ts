@@ -13,6 +13,8 @@ export const SALARY_CATEGORY = "maas";
 export const TRANSFER_CATEGORY = "transfer";
 /** Mülk sahibi hakediş ödemesinin kasa çıkışı kategorisi (elle seçilemez; yalnız owner_payout kaynağı yazar). */
 export const OWNER_PAYOUT_CATEGORY = "mulk_sahibi_odeme";
+/** Kiracı depozitosu (emanet; giriş = alındı, çıkış = iade). Elle seçilemez; yalnız rental_deposit_post yazar. K/Z dışıdır. */
+export const DEPOSIT_CATEGORY = "depozito";
 
 export const CASH_CATEGORIES: readonly CashCategory[] = [
   // Gider
@@ -44,6 +46,7 @@ export function cashCategoryLabel(value: string | null | undefined): string {
   if (!value) return "—";
   if (value === TRANSFER_CATEGORY) return "Transfer";
   if (value === OWNER_PAYOUT_CATEGORY) return "Mülk sahibi ödemesi";
+  if (value === DEPOSIT_CATEGORY) return "Depozito (emanet)";
   return CASH_CATEGORIES.find((c) => c.value === value)?.label ?? POSTING_CATEGORY_LABEL[value] ?? value;
 }
 

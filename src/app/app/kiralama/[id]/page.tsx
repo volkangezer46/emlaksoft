@@ -74,7 +74,8 @@ export default async function KiraDetayPage({
   // Kiralamadan oluşturulan sözleşmeler (H6, iki yönlü bağ). Hataya dayanıklı: sütun yoksa (migration uygulanmamış) liste boş kalır.
   // Tahsilat kayıtları (migration yoksa paymentsAvailable=false: eski "Ödendi işaretle" akışı). Ana sorgu bu sütunlara BAĞIMLI DEĞİL.
   // Hepsi yalnız `id`/tenant'a bağlı → ana kayıtla AYNI turda (önceden 3 sıralı tur).
-  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData] = await Promise.all([
+  // Depozito emanet hareketleri (WP4, 20261017010500): sütun yoksa hata → "kasaya işlenmedi" sayılır, ana sorgu etkilenmez.
+  const [{ data: rental }, contractsRes, paidRes, paymentData, lateFeeData, depositCashRes] = await Promise.all([
     rentalP,
     canViewContracts
       ? Promise.resolve(supabase.from("contracts").select("id, title, status, created_at, rent_increase_basis").eq("rental_id", id).order("created_at", { ascending: false }).limit(20))
@@ -82,7 +83,15 @@ export default async function KiraDetayPage({
     supabase.from("rent_charges").select("id, paid_amount").eq("rental_id", id).eq("tenant_id", tenantId ?? ""),
     loadRentalPayments(supabase, tenantId ?? "", id),
     loadLateFeeSettings(supabase, tenantId ?? ""),
+    supabase.from("rentals").select("deposit_received_entry_id, deposit_returned_entry_id").eq("id", id).maybeSingle(),
   ]);
+  const depositCash = depositCashRes.error
+    ? { available: false, received: false, returned: false }
+    : {
+        available: true,
+        received: Boolean((depositCashRes.data as { deposit_received_entry_id?: string | null } | null)?.deposit_received_entry_id),
+        returned: Boolean((depositCashRes.data as { deposit_returned_entry_id?: string | null } | null)?.deposit_returned_entry_id),
+      };
   if (!rental) notFound();
   const linkedContracts = contractsRes && !contractsRes.error ? (contractsRes.data ?? []) : [];
   const contractsAvailable = !contractsRes || !contractsRes.error;
@@ -225,6 +234,8 @@ export default async function KiraDetayPage({
                 rentalId={rental.id}
                 returned={Boolean(rental.deposit_returned)}
                 returnedAt={rental.deposit_returned_at ?? null}
+                canEdit={canEdit}
+                cash={depositCash}
               />
             </div>
           ) : null}

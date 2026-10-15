@@ -3,30 +3,23 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "@/components/ui/smart-link";
-import { Check, CheckCheck, Coins, Loader2, MoreVertical, Plus, Trash2, Undo2, X } from "lucide-react";
+import { Ban, Check, CheckCheck, Coins, Loader2, MoreVertical, Plus, Undo2, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { createDue, toggleDuePaid, deleteDue, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
+import { createDue, toggleDuePaid, markDuesPaidBulk, type DueResult } from "@/app/actions/dues";
 import { useToast } from "@/components/app/toast-provider";
-import { isPast, trDayKey } from "@/lib/clock";
+import { trDayKey } from "@/lib/clock";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Combobox } from "@/components/ui/combobox";
 import { searchProperties } from "@/app/actions/lookup";
 import { DueEditPanel } from "./due-edit-panel";
+import { DueCancelDialog } from "./due-cancel-dialog";
+import { FinanceAccountPicker } from "@/components/app/finance-account-picker";
+import { DUE_DIRECTION_LABELS, isDueOpen, isDueOverdue, type DueView } from "@/lib/finance/dues/dues";
 
 type Property = { id: string; property_code: string; title: string | null };
-type Due = {
-  id: string;
-  title: string;
-  amount: number;
-  period: string;
-  due_date: string | null;
-  status: string;
-  notes: string | null;
-  property: { id: string; property_code: string; title: string | null } | { id: string; property_code: string; title: string | null }[] | null;
-};
+type Due = DueView;
 
 const init: DueResult = {};
 
@@ -36,12 +29,9 @@ function money(n: number) {
 function monthLabel(iso: string) {
   return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", month: "long", year: "numeric" }).format(new Date(iso));
 }
-function propOf(p: Due["property"]) {
-  return Array.isArray(p) ? p[0] : p;
-}
 
-/** Aidat satırının ikincil eylemi (⋮): silme. Onay diyaloğu menü kapansa da açık kalır. */
-function DueRowMore({ title, disabled, onDelete }: { title: string; disabled: boolean; onDelete: () => Promise<void> }) {
+/** Aidat satırının ikincil eylemi (⋮): iptal (silme yok). İptal penceresi menü kapansa da açık kalır. */
+function DueRowMore({ id, title, disabled }: { id: string; title: string; disabled: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -59,18 +49,11 @@ function DueRowMore({ title, disabled, onDelete }: { title: string; disabled: bo
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           <DropdownMenuItem danger onSelect={() => setOpen(true)}>
-            <Trash2 aria-hidden="true" /> Aidat kaydını sil…
+            <Ban aria-hidden="true" /> Aidatı iptal et…
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ConfirmDialog
-        open={open}
-        onOpenChange={setOpen}
-        title="Aidat kaydını sil"
-        description={`"${title}" kaydı kalıcı olarak silinecek. Bu işlem geri alınamaz.`}
-        confirmLabel="Sil"
-        onConfirm={onDelete}
-      />
+      <DueCancelDialog dueId={id} title={title} open={open} onOpenChange={setOpen} />
     </>
   );
 }
@@ -80,12 +63,18 @@ export function DuesClient({
   properties,
   canCreate,
   canBulk = false,
+  canCancel = false,
+  today,
 }: {
   dues: Due[];
   properties: Property[];
   canCreate: boolean;
-  /** Toplu "ödendi" işaretleme (expenses edit yetkisi) */
+  /** Ödendi işaretleme ve toplu işlem (expenses edit yetkisi) */
   canBulk?: boolean;
+  /** İptal (expenses delete yetkisi; silme yok) */
+  canCancel?: boolean;
+  /** Bugün (YYYY-AA-GG, İstanbul) — gecikme rozeti sunucuyla aynı günden hesaplanır. */
+  today: string;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -93,9 +82,11 @@ export function DuesClient({
   const [state, action, pending] = useActionState(createDue, init);
   const [, startTransition] = useTransition();
   const [busy, setBusy] = useState<string | null>(null);
-  // Toplu seçim — yalnızca ödenmemiş kayıtlar seçilebilir
+  // Ödemenin çıktığı hesap (isteğe bağlı): seçilirse "Ödendi" kasaya çıkış hareketi yazar, seçilmezse kasa dışı kapatır.
+  const [accountId, setAccountId] = useState("");
+  // Toplu seçim — yalnızca açık (ödenmemiş, iptal edilmemiş) kayıtlar seçilebilir
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const unpaidIds = dues.filter((d) => d.status !== "paid").map((d) => d.id);
+  const unpaidIds = dues.filter((d) => isDueOpen(d.status)).map((d) => d.id);
   const allSelected = selected.size > 0 && unpaidIds.every((id) => selected.has(id));
 
   function toggleSelect(id: string) {
@@ -111,7 +102,7 @@ export function DuesClient({
     if (selected.size === 0) return;
     setBusy("bulk");
     try {
-      const res = await markDuesPaidBulk(Array.from(selected));
+      const res = await markDuesPaidBulk(Array.from(selected), accountId || null);
       if (res.error) push(res.error, "err");
       else {
         push(`${res.updated ?? 0} aidat ödendi olarak işaretlendi`, "ok");
@@ -137,7 +128,7 @@ export function DuesClient({
     setBusy(id);
     startTransition(async () => {
       try {
-        const result = await toggleDuePaid(id, toPaid);
+        const result = await toggleDuePaid(id, toPaid, toPaid ? accountId || null : null);
         if (result.error) push(result.error, "err");
         else {
           push(toPaid ? "Aidat ödendi olarak işaretlendi" : "Aidat bekleyen duruma alındı", "ok");
@@ -150,23 +141,6 @@ export function DuesClient({
       }
     });
   }
-  // ConfirmDialog onConfirm'den çağrılır; onay penceresi kapanınca liste tazelenir
-  async function remove(id: string) {
-    setBusy(id);
-    try {
-      const result = await deleteDue(id);
-      if (result.error) push(result.error, "err");
-      else {
-        push("Aidat kaydı silindi", "ok");
-        router.refresh();
-      }
-    } catch {
-      push("Aidat silinemedi. Lütfen tekrar deneyin.", "err");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   return (
     <div className="space-y-6">
       {canCreate ? (
@@ -193,7 +167,14 @@ export function DuesClient({
               Son ödeme tarihi
               <input name="due_date" type="date" className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-400" />
             </label>
-            <div className="sm:col-span-2 lg:col-span-3">
+            <label className="block text-xs font-semibold text-text-muted">
+              Kim öder?
+              <select name="direction" defaultValue="payable" className="mt-1 w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm font-normal text-ink-950 outline-none focus:border-brand-400">
+                <option value="payable">{DUE_DIRECTION_LABELS.payable} (gider / borç)</option>
+                <option value="receivable">{DUE_DIRECTION_LABELS.receivable} (alacak)</option>
+              </select>
+            </label>
+            <div className="sm:col-span-2 lg:col-span-2">
               <Combobox
                 name="property_id"
                 aria-label="Portföy"
@@ -229,6 +210,7 @@ export function DuesClient({
         {/* Toplu işlem çubuğu — seçim varken görünür */}
         {canBulk && unpaidIds.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-4 py-2.5 shadow-[var(--shadow-xs)]">
+            <FinanceAccountPicker direction="out" value={accountId} onChange={setAccountId} />
             <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-muted">
               <input
                 type="checkbox"
@@ -282,9 +264,11 @@ export function DuesClient({
             </THead>
             <TBody>
                 {dues.map((d) => {
-                  const prop = propOf(d.property);
+                  const prop = d.property;
                   const paid = d.status === "paid";
-                  const overdue = !paid && d.due_date && isPast(d.due_date);
+                  const cancelled = d.status === "cancelled";
+                  const open = isDueOpen(d.status);
+                  const overdue = isDueOverdue(d, today);
                   return (
                     /* Satırın tamamı ilgili portföye tıklanabilir — diğer liste
                        sayfalarıyla tutarlı. Aidatın kendi detay sayfası yok,
@@ -293,7 +277,7 @@ export function DuesClient({
                       {canBulk ? (
                         <TD>
                           {/* relative + z-10: satır örtü linkinin üstünde kalsın */}
-                          {!paid ? (
+                          {open ? (
                             <input
                               type="checkbox"
                               checked={selected.has(d.id)}
@@ -329,26 +313,34 @@ export function DuesClient({
                         {prop ? (prop.title ?? prop.property_code) : "—"}
                       </TD>
                       <TD label="Dönem" className="hidden text-text-muted sm:table-cell">{monthLabel(d.period)}</TD>
-                      <TD label="Tutar" align="right" className="font-bold text-ink-950">{money(Number(d.amount))}</TD>
+                      <TD label="Tutar" align="right" className={cancelled ? "text-text-faint line-through" : "font-bold text-ink-950"}>
+                        {money(d.amount)}
+                        {d.status === "partial" ? <span className="block text-xs font-normal text-text-muted">kalan {money(d.remaining)}</span> : null}
+                      </TD>
                       <TD>
-                        <Badge variant={paid ? "success" : overdue ? "danger" : "warning"} size="sm">
-                          {paid ? "Ödendi" : overdue ? "Gecikti" : "Bekliyor"}
+                        <Badge variant={paid ? "success" : cancelled ? "neutral" : overdue ? "danger" : "warning"} size="sm">
+                          {paid ? "Ödendi" : cancelled ? "İptal" : overdue ? "Gecikti" : d.status === "partial" ? "Kısmi" : "Bekliyor"}
                         </Badge>
+                        {d.direction === "receivable" ? <span className="mt-0.5 block text-xs text-text-muted">{DUE_DIRECTION_LABELS.receivable}</span> : null}
+                        {cancelled && d.cancelReason ? <span className="mt-0.5 block text-xs text-text-muted">Neden: {d.cancelReason}</span> : null}
                       </TD>
                       <TD actions align="right">
                         {/* relative + z-10: satır linkinin üstünde kalsın; mobilde de görünür */}
                         <div className="relative z-10 flex items-center justify-end gap-1.5">
-                          {canBulk ? (
+                          {canBulk && open ? (
                             <DueEditPanel
-                              due={{ id: d.id, title: d.title, amount: Number(d.amount), period: d.period, due_date: d.due_date, notes: d.notes }}
+                              due={{ id: d.id, title: d.title, amount: d.amount, period: d.period, due_date: d.dueDate, notes: d.notes }}
                             />
                           ) : null}
-                          <button type="button" onClick={() => toggle(d.id, !paid)} disabled={busy === d.id}
-                            className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50">
-                            {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}
-                            {paid ? "Geri al" : "Ödendi"}
-                          </button>
-                          <DueRowMore title={d.title} disabled={busy === d.id} onDelete={() => remove(d.id)} />
+                          {canBulk && !cancelled ? (
+                            <button type="button" onClick={() => toggle(d.id, !paid)} disabled={busy === d.id}
+                              title={paid ? "Kasa dışı kapatılmış ödemeyi geri alır" : accountId ? "Seçilen hesaptan çıkış hareketi yazılır" : "Hesap seçilmedi: kasa dışı ödendi olarak kapatılır"}
+                              className="focus-ring press inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-hairline bg-surface px-2 py-1 text-xs font-semibold text-ink-950 shadow-[var(--elev-1)] transition hover:bg-canvas disabled:opacity-50">
+                              {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : paid ? <Undo2 className="h-3 w-3" /> : <Check className="h-3 w-3 text-mint-600" />}
+                              {paid ? "Geri al" : "Ödendi"}
+                            </button>
+                          ) : null}
+                          {canCancel && open ? <DueRowMore id={d.id} title={d.title} disabled={busy === d.id} /> : null}
                         </div>
                       </TD>
                     </TR>

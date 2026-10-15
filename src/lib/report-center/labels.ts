@@ -22,7 +22,7 @@ export const STATUS = {
   project: { planning: "Planlama", selling: "Satışta", delivered: "Teslim edildi" },
   rental: { active: "Aktif", ended: "Sona erdi" },
   rentCharge: { pending: "Bekliyor", partial: "Kısmi ödendi", paid: "Ödendi", overdue: "Gecikti" },
-  due: { unpaid: "Ödenmedi", paid: "Ödendi" },
+  due: { open: "Ödenmedi", partial: "Kısmi ödendi", paid: "Ödendi", cancelled: "İptal" },
   referral: { yeni: "Yeni", iletisim: "İletişimde", musteri: "Müşteri oldu", kazanildi: "Kazanıldı", kayip: "Kayıp" },
   approval: { bekliyor: "Bekliyor", onaylandi: "Onaylandı", reddedildi: "Reddedildi", iptal: "İptal" },
   approvalKind: { komisyon_indirimi: "Komisyon indirimi", gider: "Gider", fiyat_degisikligi: "Fiyat değişikliği", ozel_izin: "Özel izin", diger: "Diğer" },

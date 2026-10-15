@@ -1,4 +1,5 @@
 import { parseMoneyInput } from "@/lib/money-input";
+import { isDueDirection, type DueDirection } from "@/lib/finance/dues/dues";
 
 const DATE_ONLY_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
@@ -18,6 +19,8 @@ export type DueInput = {
   dueDate: string | null;
   propertyId: string | null;
   notes: string | null;
+  /** Ofis öder (payable, varsayılan) ya da ofis tahsil eder (receivable). */
+  direction: DueDirection;
 };
 
 export type DueInputResult =
@@ -31,6 +34,7 @@ export function parseDueInput(fd: FormData, today = new Date()): DueInputResult 
   const rawDueDate = String(fd.get("due_date") ?? "").trim();
   const propertyId = String(fd.get("property_id") ?? "").trim() || null;
   const notes = String(fd.get("notes") ?? "").trim() || null;
+  const rawDirection = String(fd.get("direction") ?? "").trim() || "payable";
   const amount = parseMoneyInput(fd.get("amount"), { max: 9_999_999_999.99 });
 
   if (!title) return { ok: false, error: "Başlık zorunludur." };
@@ -40,9 +44,11 @@ export function parseDueInput(fd: FormData, today = new Date()): DueInputResult 
   if (rawDueDate && !validDateOnly(rawDueDate)) {
     return { ok: false, error: "Son ödeme tarihi geçersiz." };
   }
-  if (notes && notes.length > 4_000) {
-    return { ok: false, error: "Not en fazla 4.000 karakter olabilir." };
+  if (rawDueDate && rawDueDate < period) return { ok: false, error: "Son ödeme tarihi ilgili aydan önce olamaz." };
+  if (notes && notes.length > 1_000) {
+    return { ok: false, error: "Not en fazla 1.000 karakter olabilir." };
   }
+  if (!isDueDirection(rawDirection)) return { ok: false, error: "Aidatın yönünü seçin." };
 
   return {
     ok: true,
@@ -53,6 +59,7 @@ export function parseDueInput(fd: FormData, today = new Date()): DueInputResult 
       dueDate: rawDueDate || null,
       propertyId,
       notes,
+      direction: rawDirection,
     },
   };
 }
