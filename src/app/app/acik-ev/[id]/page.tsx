@@ -8,6 +8,7 @@ import {
   CalendarDays,
   DoorOpen,
   MapPin,
+  MessageCircle,
   Users,
 } from "lucide-react";
 import { requireModulePage } from "@/lib/require-module-page";
@@ -23,6 +24,9 @@ import { RegistrationQrCard } from "./registration-qr-card";
 import { StatusSelect } from "./status-select";
 import { EditOpenHousePanel } from "./edit-open-house-panel";
 import { ConvertVisitorButton } from "./convert-visitor-button";
+import { ConvertAllVisitorsButton } from "./convert-all-visitors-button";
+import { whatsAppDraftHref } from "@/lib/whatsapp-draft";
+import { openHouseThankYouMessage } from "@/lib/open-house-bulk";
 import { OPEN_HOUSE_STATUS_LABELS } from "@/lib/status-labels";
 
 export const metadata = { title: "Açık ev detayı" };
@@ -91,6 +95,8 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
   const canCreate = (perms.open_house ?? perms.appointments ?? []).includes("create");
   const canEdit = (perms.open_house ?? perms.appointments ?? []).includes("edit");
   const canConvert = (perms.customers ?? []).includes("create");
+  const donusmemis = gercekSayi - musteriyeDonusen;
+  const propertyLabel = property?.title ?? property?.property_code ?? null;
 
   return (
     <div className="space-y-6">
@@ -217,10 +223,21 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
           <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
             <Users className="h-4 w-4 text-brand-600" /> Ziyaretçiler
           </h2>
-          <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
-            {gercekSayi} kayıt
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            {canConvert && gercekSayi > 0 ? (
+              <ConvertAllVisitorsButton openHouseId={event.id} pendingCount={donusmemis} />
+            ) : null}
+            <span className="rounded-full bg-brand-600/10 px-2.5 py-1 text-xs font-semibold text-brand-600">
+              {gercekSayi} kayıt
+            </span>
+          </div>
         </div>
+        {visitors.length > 0 ? (
+          <p className="mt-1 text-xs text-text-muted">
+            Teşekkür mesajı: her ziyaretçinin WhatsApp taslağını tek tek açıp kendi hesabınızdan gönderin; sistem toplu
+            gönderim yapmaz.
+          </p>
+        ) : null}
 
         {visitors.length === 0 ? (
           <p className="mt-3 rounded-[var(--radius-card)] border border-dashed border-line-strong px-4 py-10 text-center text-sm text-text-muted">
@@ -242,6 +259,8 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
               <TBody>
                 {visitors.map((v) => {
                   const tel = toTelHref(v.phone);
+                  // Yalnız numara geçerliyse doğrudan kişiye taslak; paylaşım bağlantısı burada anlamsız.
+                  const wa = whatsAppDraftHref(v.phone, openHouseThankYouMessage(v.full_name, propertyLabel));
                   return (
                     <TR key={v.id}>
                       <TD className="font-semibold text-ink-950">
@@ -263,9 +282,22 @@ export default async function OpenHouseDetailPage({ params }: { params: Promise<
                       </TD>
                       <TD>
                         {tel ? (
-                          <a href={tel} className="focus-ring numeric hover:text-brand-600 hover:underline">
-                            {formatTurkishPhone(v.phone)}
-                          </a>
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <a href={tel} className="focus-ring numeric hover:text-brand-600 hover:underline">
+                              {formatTurkishPhone(v.phone)}
+                            </a>
+                            {wa.direct && wa.href ? (
+                              <a
+                                href={wa.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="WhatsApp teşekkür taslağını aç"
+                                className="focus-ring inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-0.5 text-xs font-semibold text-brand-600 transition hover:border-brand-300"
+                              >
+                                <MessageCircle className="h-3 w-3" /> Teşekkür
+                              </a>
+                            ) : null}
+                          </span>
                         ) : (
                           <span className="text-text-faint">—</span>
                         )}

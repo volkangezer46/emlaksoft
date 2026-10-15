@@ -105,6 +105,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/actions/offers.ts", fn: "updateOffer", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/offers.ts", fn: "updateOfferStatus", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/open-house-public.ts", fn: "registerOpenHouseVisitorByToken", calls: 1, tenantFilter: "var" },
+  { file: "src/app/actions/open-house.ts", fn: "convertAllVisitors", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/open-house.ts", fn: "convertVisitorToCustomer", calls: 1, tenantFilter: "var" },
   { file: "src/app/actions/owner-portal-offers.ts", fn: "respondToOfferByToken", calls: 1, tenantFilter: "yok" },
   { file: "src/app/actions/owner-portal.ts", fn: "getOwnerPortalData", calls: 1, tenantFilter: "var" },
