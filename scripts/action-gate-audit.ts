@@ -109,6 +109,7 @@ const MUAF: Record<string, string> = {
   "public-valuation.ts::estimatePublicValuation": "Vitrin degerleme hesabi; rate limit'li, kayit yazmaz.",
   "public-valuation.ts::submitValuationLead": "Satici basvuru formu; rate limit + KVKK onayi ile.",
   "password-reset.ts::requestPasswordReset": "Sifre sifirlama talebi; dogasi geregi oturumsuz, kullanici varligini sizdirmaz.",
+  "password-reset.ts::completePasswordReset": "Sifirlama baglantisinin kurtarma oturumuyla calisir (tenant kapisi yok: 2FA/ofis kapisindan once); getUser ile oturum dogrulanir, yalniz kendi parolasini degistirir, kullanici basina hiz sinirli + ortak parola politikasi.",
 
   // --- OTP ve webhook: kendi sirriyla korunanlar ---
   "contracts.ts::requestSignatureOtp": "E-imza OTP talebi; imza token'i uzerinden, kod SMS ile dogrulanir.",

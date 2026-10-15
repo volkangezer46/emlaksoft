@@ -1,5 +1,7 @@
 "use client";
 
+import { checkPasswordPolicy, type PasswordContext } from "@/lib/password-policy";
+
 /**
  * Şifre gücü ölçeri — kayıt ve şifre yenileme aynı ölçeri paylaşır.
  * Skor 0-4: uzunluk, büyük/küçük harf, rakam ve özel karakter puanlanır.
@@ -22,15 +24,24 @@ const STRENGTH = [
   { label: "Güçlü", cls: "bg-mint-600", w: "w-full" },
 ];
 
-export function PasswordStrengthMeter({ password }: { password: string }) {
+/**
+ * `context` verilirse ortak parola politikası (`@/lib/password-policy`: yaygın/Türkçe zayıf liste, dizi, e-posta/ad/ofis
+ * adı) canlı uygulanır: ihlalde gösterge "Zayıf"ta kalır ve nedeni tek cümleyle yazılır. Sunucu aynı kuralı yeniden uygular.
+ */
+export function PasswordStrengthMeter({ password, context }: { password: string; context?: PasswordContext }) {
   if (!password) return null;
-  const strength = STRENGTH[passwordScore(password)];
+  const policy = context ? checkPasswordPolicy(password, context) : null;
+  const violation = policy && !policy.ok && policy.issue !== "too_short" ? policy.message : null;
+  const strength = STRENGTH[violation ? Math.min(passwordScore(password), 1) : passwordScore(password)];
   return (
     <div className="mt-2">
       <div className="h-1.5 overflow-hidden rounded-full bg-line">
         <div className={`h-full rounded-full transition-all ${strength.cls} ${strength.w}`} />
       </div>
-      <p className="mt-1 text-xs font-semibold text-text-muted">Şifre gücü: {strength.label}</p>
+      <p className="mt-1 text-xs font-semibold text-text-muted" aria-live="polite">
+        Şifre gücü: {strength.label}
+        {violation ? <span className="mt-0.5 block font-medium text-danger-600">{violation}</span> : null}
+      </p>
     </div>
   );
 }

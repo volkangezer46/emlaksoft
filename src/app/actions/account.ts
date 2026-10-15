@@ -11,6 +11,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { PHONE_ERROR_MESSAGE, TR_MOBILE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { validateNewPassword } from "@/lib/account/password-rules";
+import { passwordPolicyError } from "@/lib/password-policy";
 import { emailSchema } from "@/lib/validation/contact";
 import { getBaseUrl } from "@/lib/base-url";
 import { maskEmail } from "@/lib/account/email-change";
@@ -117,6 +118,15 @@ export async function changeMyPassword(_prev: AccountResult, formData: FormData)
     data: { user },
   } = await supabase.auth.getUser();
   if (!user?.email || user.id !== gate.userId) return { error: SESSION_EXPIRED_MESSAGE };
+
+  // Ortak parola politikası (kayıt ve şifre yenileme ile aynı): yaygın liste, e-posta / ad / ofis adı parolada geçemez.
+  const { data: office } = await supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle();
+  const weak = passwordPolicyError(next, {
+    email: user.email,
+    fullName: typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : null,
+    officeName: (office as { name?: string | null } | null)?.name ?? null,
+  });
+  if (weak) return { error: weak };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = resolveSupabasePublicKey();

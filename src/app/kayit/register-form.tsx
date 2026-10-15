@@ -71,6 +71,8 @@ export function RegisterForm({
   const googleMode = googleAccount !== null;
   const [showPassword, setShowPassword] = useState(false);
   const [pw, setPw] = useState("");
+  // Parola politikası bağlamı (e-posta / ad parolada geçmesin): alanlar kontrolsüz, değer form değişiminden okunur.
+  const [pwContext, setPwContext] = useState<{ email: string; fullName: string }>({ email: "", fullName: googleAccount?.name ?? "" });
   const [handledState, setHandledState] = useState(state);
   // Alan hataları ALANIN ALTINDA gösterilir; kullanıcı alanı değiştirince o alanın hatası silinir.
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<SignupField, string>>>({});
@@ -98,6 +100,11 @@ export function RegisterForm({
   }, [state]);
 
   function handleFormChange(e: React.FormEvent<HTMLFormElement>) {
+    const input = e.target as HTMLInputElement;
+    if (input.name === "email" || input.name === "name") {
+      const key = input.name === "email" ? "email" : "fullName";
+      setPwContext((cur) => (cur[key] === input.value ? cur : { ...cur, [key]: input.value }));
+    }
     const host = (e.target as HTMLElement).closest<HTMLElement>("[data-field]");
     const field = host?.dataset.field as SignupField | undefined;
     if (field && fieldErrors[field]) {
@@ -254,7 +261,7 @@ export function RegisterForm({
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <PasswordStrengthMeter password={pw} />
+                <PasswordStrengthMeter password={pw} context={pwContext} />
                 {fieldErrorEl("password")}
               </div>
             </>

@@ -15,11 +15,13 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { PasswordStrengthMeter } from "@/components/auth/password-strength";
+import { completePasswordReset } from "@/app/actions/password-reset";
+import { passwordPolicyError, type PasswordContext } from "@/lib/password-policy";
 
 type Phase = "checking" | "ready" | "invalid" | "done";
 
 const inputCls =
-  "w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-11 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
+  "w-full rounded-[var(--radius-card)] border border-line bg-surface py-3 pl-10 pr-12 text-sm outline-none transition focus:border-brand-400 focus:ring-4 focus:ring-brand-600/10";
 
 export function ResetPasswordForm() {
   const supabase = useMemo(() => createClient(), []);
@@ -29,6 +31,8 @@ export function ResetPasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Parola politikası bağlamı kurtarma oturumundan gelir (e-posta + ad); sunucu aynı kuralı ofis adıyla da uygular.
+  const [pwContext, setPwContext] = useState<PasswordContext>({});
 
   // Recovery oturumu kontrolü: kod takası (?code=) istemci tarafında otomatik
   // yapılır; oturum düşmezse bağlantı geçersiz/süresi dolmuş demektir.
@@ -39,19 +43,24 @@ export function ResetPasswordForm() {
       window.location.hash + window.location.search,
     );
 
-    const markReady = () => {
-      if (active && !urlHasError) setPhase((p) => (p === "checking" ? "ready" : p));
+    const markReady = (user?: { email?: string; user_metadata?: Record<string, unknown> }) => {
+      if (!active || urlHasError) return;
+      if (user) {
+        const fullName = user.user_metadata?.full_name;
+        setPwContext({ email: user.email ?? null, fullName: typeof fullName === "string" ? fullName : null });
+      }
+      setPhase((p) => (p === "checking" ? "ready" : p));
     };
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) markReady();
+      if (session) markReady(session.user);
     });
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       if (urlHasError) setPhase((p) => (p === "checking" ? "invalid" : p));
-      else if (data.session) markReady();
+      else if (data.session) markReady(data.session.user);
     });
     // Kod takası birkaç saniye içinde sonuçlanmazsa bağlantıyı geçersiz say
     const timer = setTimeout(() => {
@@ -68,8 +77,9 @@ export function ResetPasswordForm() {
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
-    if (pw.length < 8) {
-      setError("Şifre en az 8 karakter olmalı.");
+    const weak = passwordPolicyError(pw, pwContext);
+    if (weak) {
+      setError(weak);
       return;
     }
     if (pw !== pw2) {
@@ -77,20 +87,19 @@ export function ResetPasswordForm() {
       return;
     }
     setPending(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password: pw });
-    setPending(false);
-    if (updateError) {
-      const msg = updateError.message ?? "";
-      if (msg.includes("different from the old")) {
-        setError("Yeni şifreniz eski şifrenizle aynı olamaz.");
-      } else if (msg.includes("session missing") || msg.toLowerCase().includes("expired")) {
-        setPhase("invalid");
-      } else {
-        setError("Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir; yeni bağlantı isteyin.");
-      }
-      return;
+    const fd = new FormData();
+    fd.set("password", pw);
+    fd.set("confirm", pw2);
+    try {
+      const result = await completePasswordReset({}, fd);
+      if (result.invalid) setPhase("invalid");
+      else if (result.error) setError(result.error);
+      else setPhase("done");
+    } catch {
+      setError("Şifre güncellenemedi. Bağlantınızı kontrol edip tekrar deneyin.");
+    } finally {
+      setPending(false);
     }
-    setPhase("done");
   }
 
   return (
@@ -166,13 +175,13 @@ export function ResetPasswordForm() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
+                    className="absolute right-1 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-control)] text-text-faint transition hover:bg-canvas hover:text-ink-800"
                     aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <PasswordStrengthMeter password={pw} />
+                <PasswordStrengthMeter password={pw} context={pwContext} />
               </div>
 
               <div>
