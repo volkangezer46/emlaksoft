@@ -5,7 +5,7 @@ import { ChevronDown, Pencil } from "lucide-react";
 import {
   updateTarget,
   type TargetResult,
-} from "@/app/actions/targets-openhouse-sources";
+} from "@/app/actions/targets";
 import { Combobox } from "@/components/ui/combobox";
 import { FormField, Input } from "@/components/ui/input";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
@@ -20,6 +20,11 @@ export type TargetFormValues = {
   target_deals: number;
   target_revenue: number;
   profile_id: string | null;
+  /** OA4: takım / şube hedefi (kapsam düzenlemede değişmez; değiştirmek için silip yeniden ekleyin). */
+  team_id?: string | null;
+  branch_id?: string | null;
+  scope_label?: string | null;
+  target_calls?: number;
   target_appointments?: number;
   target_listings?: number;
   notes?: string | null;
@@ -32,8 +37,6 @@ const PERIODS = [
 ];
 
 // Kısa listede native <select> tercih edildi (bkz. gorevler/yeni/task-form).
-const selectClass =
-  "w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface";
 
 /**
  * Hedef DÜZENLEME dialogu (kalem ikon tetikleyici, hızlı alan düzenleme).
@@ -70,8 +73,17 @@ export function TargetFormDialog({
       pending={pending}
       error={state.error}
       summary
-      hiddenFields={target ? <input type="hidden" name="id" value={target.id} /> : null}
-      fieldLabels={{ period: "Dönem", period_start: "Başlangıç", profile_id: "Danışman", target_deals: "Hedef anlaşma", target_revenue: "Hedef gelir (₺)", target_appointments: "Hedef randevu", target_listings: "Hedef yeni portföy", notes: "Not" }}
+      hiddenFields={
+        <>
+          {Object.entries({
+            id: target.id,
+            kapsam: target.team_id ? "takim" : target.branch_id ? "sube" : "",
+            team_id: target.team_id ?? "",
+            branch_id: target.branch_id ?? "",
+          }).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
+        </>
+      }
+      fieldLabels={{ period: "Dönem", period_start: "Başlangıç", profile_id: "Danışman", target_deals: "Hedef anlaşma", target_revenue: "Hedef gelir (₺)", target_appointments: "Hedef randevu", target_calls: "Hedef çağrı", target_listings: "Hedef yeni portföy", notes: "Not" }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -84,13 +96,13 @@ export function TargetFormDialog({
           <Pencil className="h-4 w-4" />
         </button>
       )}
-      tabs={[{ id: "hedef", label: "Hedef", fields: ["period", "period_start", "profile_id", "target_deals", "target_revenue", "target_appointments", "target_listings", "notes"] }]}
+      tabs={[{ id: "hedef", label: "Hedef", fields: ["period", "period_start", "profile_id", "target_deals", "target_revenue", "target_appointments", "target_calls", "target_listings", "notes"] }]}
       panels={{
         hedef: (
           <>
             <FormField label="Dönem" htmlFor="target-period" required>
               <div className="relative">
-                <select id="target-period" name="period" defaultValue={target?.period ?? "monthly"} className={selectClass}>
+                <select id="target-period" name="period" defaultValue={target?.period ?? "monthly"} className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface touch:min-h-11 touch:text-base">
                   {PERIODS.map((p) => (
                     <option key={p.value} value={p.value}>{p.label}</option>
                   ))}
@@ -101,6 +113,12 @@ export function TargetFormDialog({
             <FormField label="Dönem başlangıcı" htmlFor="target-period-start" required hint="Çeyreklik/yıllık hedefte başlangıç ayını seçin.">
               <Input id="target-period-start" name="period_start" type="month" required defaultValue={defaultMonth} />
             </FormField>
+            {target.team_id || target.branch_id ? (
+              <p className="rounded-[var(--radius-control)] bg-canvas px-3 py-2 text-sm text-text sm:col-span-2">
+                Kapsam: <span className="font-semibold">{target.scope_label ?? (target.team_id ? "Takım" : "Şube")}</span>
+                <span className="block text-xs text-text-muted">Kapsamı değiştirmek için hedefi silip yeniden ekleyin.</span>
+              </p>
+            ) : (
             <FormField label="Danışman" className="sm:col-span-2" hint="Boş bırakılırsa hedef ofis geneli için tanımlanır.">
               <Combobox
                 name="profile_id"
@@ -112,6 +130,7 @@ export function TargetFormDialog({
                 options={members.map((m) => ({ value: m.id, label: m.full_name }))}
               />
             </FormField>
+            )}
             <FormField label="Hedef anlaşma" htmlFor="target-deals" required>
               <Input id="target-deals" name="target_deals" type="number" min={0} step={1} required defaultValue={target ? target.target_deals : ""} placeholder="Örn. 5" />
             </FormField>
@@ -120,6 +139,9 @@ export function TargetFormDialog({
             </FormField>
             <FormField label="Hedef randevu" htmlFor="target-appointments" hint="Gösterim/görüşme sayısı (0 = takip edilmez).">
               <Input id="target-appointments" name="target_appointments" type="number" min={0} step={1} defaultValue={target.target_appointments ?? 0} />
+            </FormField>
+            <FormField label="Hedef çağrı" htmlFor="target-calls" hint="Dönemde yapılan/alınan çağrı (0 = takip edilmez).">
+              <Input id="target-calls" name="target_calls" type="number" min={0} step={1} defaultValue={target.target_calls ?? 0} />
             </FormField>
             <FormField label="Hedef yeni portföy" htmlFor="target-listings" hint="Dönemde eklenen portföy (0 = takip edilmez).">
               <Input id="target-listings" name="target_listings" type="number" min={0} step={1} defaultValue={target.target_listings ?? 0} />

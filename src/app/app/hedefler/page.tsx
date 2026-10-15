@@ -5,9 +5,12 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { now, shiftMonthKey, trMonthStartMsFromKey } from "@/lib/clock";
 import { targetPeriodRange } from "@/lib/team/target-actuals";
 import { loadTargetActualsLive } from "@/lib/team/advisor-metrics";
-import { loadTargetActivityCounts, type TargetActivity, type TargetActivityItem } from "@/lib/supabase/list-count-rpcs";
-import { slowPaceLabels } from "@/lib/target-pace";
-import { deleteTarget, listTargets } from "@/app/actions/targets-openhouse-sources";
+import { pipelineCoverage, slowPaceLabels } from "@/lib/target-pace";
+import { deleteTarget, listTargets } from "@/app/actions/targets";
+import { getSettings } from "@/lib/settings/read";
+import { DEFAULT_COMMISSION_RATE } from "@/lib/commission";
+import { OPEN_DEAL_STAGES } from "@/lib/workflow-state";
+import { expandForActuals, foldActuals, loadTargetProgress, targetMembers, type ProgressItem } from "./target-progress";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TargetFormDialog, type TargetFormValues } from "./target-form-dialog";
@@ -48,9 +51,11 @@ function paceProjection(actual: number, elapsed: number) {
   return actual / (elapsed / 100);
 }
 
-function profileLabel(p: { id: string; full_name: string } | { id: string; full_name: string }[] | null) {
-  if (!p) return "Ofis geneli";
-  return Array.isArray(p) ? p[0]?.full_name ?? "—" : p.full_name;
+/** Açık hat tarama tavanı: aşılırsa kapsama rozeti çizilmez (eksik veriyle tahmin yok). */
+const OPEN_SCAN_LIMIT = 2000;
+
+function coverageText(x: number) {
+  return `${new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 1 }).format(x)}×`;
 }
 
 export default async function HedeflerPage() {
@@ -60,73 +65,82 @@ export default async function HedeflerPage() {
   const canDelete = (ctx.perms.targets ?? []).includes("delete");
 
   const supabase = await createClient();
-  const [rawTargets, { data: members }] = await Promise.all([
+  // Hepsi tek turda: hedefler, üyeler (takım/şube toplamı için), takım/şube listeleri, komisyon oranı ve açık hat (OA5).
+  const [rawTargets, { data: members }, { data: teamRows }, { data: branchRows }, rateSettings, openDealsRes] = await Promise.all([
     listTargets(),
-    supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name"),
+    supabase.from("profiles").select("id, full_name, team_id, branch_id").eq("is_active", true).order("full_name"),
+    supabase.from("teams").select("id, name").eq("is_active", true).order("name").limit(200),
+    supabase.from("branches").select("id, name").eq("is_active", true).order("name").limit(100),
+    getSettings(["office.commission.default_rate"], { tenantId: ctx.tenantId ?? undefined }),
+    // Açık hat (kapsama tahmini): kapsam RLS'i uygulanır; 2000 satır tavanı (aşılırsa rozet çizilmez).
+    supabase.from("deals").select("assigned_to, deal_value, probability, stage").in("stage", [...OPEN_DEAL_STAGES]).eq("is_sample", false).limit(OPEN_SCAN_LIMIT),
   ]);
+  const memberRows = (members ?? []) as { id: string; full_name: string; team_id: string | null; branch_id: string | null }[];
+  const teamName = new Map(((teamRows ?? []) as { id: string; name: string }[]).map((t) => [String(t.id), String(t.name)]));
+  const branchName = new Map(((branchRows ?? []) as { id: string; name: string }[]).map((b) => [String(b.id), String(b.name)]));
+
+  type RawTarget = {
+    id: string;
+    period: string;
+    period_start: string;
+    target_deals: number;
+    target_revenue: number;
+    target_appointments?: number | null;
+    target_listings?: number | null;
+    target_calls?: number | null;
+    notes?: string | null;
+    team_id: string | null;
+    branch_id: string | null;
+    profile: unknown;
+  };
+  const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+  const scoped = (rawTargets as unknown as RawTarget[]).map((t) => ({
+    ...t,
+    profile_id: (one(t.profile as { id?: string } | { id?: string }[] | null)?.id as string | undefined) ?? null,
+    profile_name: (one(t.profile as { full_name?: string } | { full_name?: string }[] | null)?.full_name as string | undefined) ?? null,
+  }));
+  const scopeLabel = (t: (typeof scoped)[number]) =>
+    t.profile_id
+      ? (t.profile_name ?? "—")
+      : t.team_id
+        ? `${teamName.get(t.team_id) ?? "Takım"} takımı`
+        : t.branch_id
+          ? `${branchName.get(t.branch_id) ?? "Şube"} şubesi`
+          : "Ofis geneli";
+  const scopeHref = (t: (typeof scoped)[number]) =>
+    t.profile_id ? `/app/ekip/${t.profile_id}` : t.team_id ? `/app/danisman-kpi?takim=${t.team_id}` : t.branch_id ? `/app/danisman-kpi?sube=${t.branch_id}` : "/app/raporlar";
 
   // Gerçekleşme canlı veriden, TEK KAYNAK (advisor-metrics): anlaşma = kabul edilen teklif, kişi geliri = tahsil edilen
-  // komisyon payı, ofis geneli hedef = Ofis komisyonu (brüt). Danışman KPI / Kıyas / Kazanç ile aynı tanım.
-  const targetLikes = rawTargets.map((t) => {
-    const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
-    return { id: t.id, period: t.period, period_start: t.period_start, profile_id: (prof as { id?: string } | null)?.id ?? null };
-  });
-  // Faaliyet hedefleri (randevu / yeni portföy) gerçekleşmesi: canlı sayım, yalnız hedefi > 0 olanlar.
-  // Randevu = iptal edilmemiş, dönem içinde planlanan (atanan danışmana göre); portföy = dönemde eklenen, örnek veri hariç.
-  // Gerçekleşme okumasıyla AYNI turda başlar (bağımsız) ve tüm hedefler için TEK sorgudur (target_activity_counts);
-  // fonksiyon yoksa hedef başına eski 2 head-count.
-  type ActivityRow = { id: string; period: string; period_start: string; target_appointments?: number | null; target_listings?: number | null; profile: unknown };
-  const activityItems: TargetActivityItem[] = (rawTargets as unknown as ActivityRow[]).flatMap((t) => {
+  // komisyon payı, ofis geneli hedef = Ofis komisyonu (brüt). Takım/şube hedefi üyelerin toplamıdır (target-progress.ts).
+  const targetLikes = scoped.map((t) => ({ id: t.id, period: t.period, period_start: t.period_start, profile_id: t.profile_id, team_id: t.team_id, branch_id: t.branch_id }));
+  // Faaliyet hedefleri (randevu / yeni portföy / çağrı): tek RPC (target_progress_counts), yalnız hedefi > 0 olanlar.
+  const progressItems: ProgressItem[] = scoped.flatMap((t) => {
     const wantA = Number(t.target_appointments ?? 0) > 0;
     const wantL = Number(t.target_listings ?? 0) > 0;
-    if (!wantA && !wantL) return [];
+    const wantC = Number(t.target_calls ?? 0) > 0;
+    if (!wantA && !wantL && !wantC) return [];
     const r = targetPeriodRange(t.period_start, t.period);
-    const prof = Array.isArray(t.profile) ? t.profile[0] : t.profile;
     return [{
       id: t.id,
       startIso: new Date(r.start).toISOString(),
       endIso: new Date(r.end).toISOString(),
-      profileId: (prof as { id?: string } | null)?.id ?? null,
+      profileIds: targetMembers(t, memberRows),
       appointments: wantA,
       listings: wantL,
+      calls: wantC,
     }];
   });
-  const activityP = (ctx.tenantId ? loadTargetActivityCounts(supabase, ctx.tenantId, activityItems) : Promise.resolve(null)).then(async (fast) => {
-    if (fast) return fast;
-    const out = new Map<string, TargetActivity>();
-    await Promise.all(
-      activityItems.map(async (it) => {
-        const [ap, li] = await Promise.all([
-          it.appointments
-            ? (() => {
-                let q = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).neq("status", "cancelled").gte("scheduled_at", it.startIso).lt("scheduled_at", it.endIso);
-                if (it.profileId) q = q.eq("assigned_to", it.profileId);
-                return q;
-              })()
-            : Promise.resolve({ count: null }),
-          it.listings
-            ? (() => {
-                let q = supabase.from("properties").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).is("deleted_at", null).eq("is_sample", false).gte("created_at", it.startIso).lt("created_at", it.endIso);
-                if (it.profileId) q = q.eq("assigned_to", it.profileId);
-                return q;
-              })()
-            : Promise.resolve({ count: null }),
-        ]);
-        out.set(it.id, { appointments: it.appointments ? (ap.count ?? 0) : null, listings: it.listings ? (li.count ?? 0) : null });
-      }),
-    );
-    return out;
-  });
-  const [actuals, activityById] = await Promise.all([
+  const [rawActuals, progressById] = await Promise.all([
     loadTargetActualsLive(supabase, {
       viewer: { userId: ctx.userId, role: ctx.role, perms: ctx.perms },
       tenantId: ctx.tenantId,
-      targets: targetLikes,
-      names: new Map(((members ?? []) as { id: string; full_name: string }[]).map((m) => [m.id, m.full_name])),
+      targets: expandForActuals(targetLikes, memberRows),
+      names: new Map(memberRows.map((m) => [m.id, m.full_name])),
     }),
-    activityP,
+    ctx.tenantId ? loadTargetProgress(supabase, ctx.tenantId, progressItems) : Promise.resolve(null),
   ]);
-  const targets = rawTargets.map((t) => {
+  const actuals = foldActuals(targetLikes, rawActuals);
+  const targets = scoped.map((t) => {
     const a = actuals.get(t.id);
     return {
       ...t,
@@ -135,7 +149,28 @@ export default async function HedeflerPage() {
       revVisible: a?.revenueVisible ?? false,
     };
   });
-  const memberList = (members ?? []) as { id: string; full_name: string }[];
+  const memberList = memberRows.map((m) => ({ id: m.id, full_name: m.full_name }));
+
+  // OA5: boru hattı kapsaması (tahmin) — açık anlaşmaların olasılıkla ağırlıklı komisyonu ÷ kalan gelir hedefi.
+  const openDeals = (openDealsRes.data ?? []) as { assigned_to: string | null; deal_value: number | string | null; probability: number | string | null; stage: string }[];
+  const openScanFull = openDeals.length >= OPEN_SCAN_LIMIT;
+  const commissionRate = Number(rateSettings["office.commission.default_rate"] ?? DEFAULT_COMMISSION_RATE) || DEFAULT_COMMISSION_RATE;
+  const coverageOf = (t: (typeof targets)[number]) => {
+    if (openScanFull) return null;
+    const ids = targetMembers(t, memberRows);
+    const set = ids ? new Set(ids) : null;
+    const deals = openDeals
+      .filter((d) => !set || (d.assigned_to != null && set.has(d.assigned_to)))
+      .map((d) => ({ value: d.deal_value != null ? Number(d.deal_value) : null, probability: d.probability != null ? Number(d.probability) : null, stage: d.stage }));
+    return pipelineCoverage({
+      deals,
+      commissionRatePct: commissionRate,
+      remainingRevenue: t.revVisible && Number(t.target_revenue) > 0 ? Math.max(0, Number(t.target_revenue) - Number(t.actual_revenue)) : null,
+      remainingDeals: Number(t.target_deals) > 0 ? Math.max(0, Number(t.target_deals) - t.actual_deals) : null,
+    });
+  };
+  const openDealsHref = (t: (typeof targets)[number]) =>
+    t.profile_id ? `/app/anlasmalar?gorunum=liste&asama=acik&danisman=${t.profile_id}` : "/app/anlasmalar?gorunum=liste&asama=acik";
 
   // Kart hesapları tek yerde: özet KPI'lar, takım kıyası ve kartlar aynı sayıları okur.
   // Varsayılan görünüm GÜNCEL dönem: şimdi içinde bulunduğumuz dönemin hedefleri listenin ve takım kıyasının başına
@@ -163,7 +198,7 @@ export default async function HedeflerPage() {
   // Takım kıyası: en güncel dönemdeki (aynı period + period_start) kişi hedefleri
   const latest = enriched[0]?.t ?? null;
   const race = latest
-    ? enriched.filter((e) => e.t.period === latest.period && e.t.period_start === latest.period_start)
+    ? enriched.filter((e) => e.t.profile_id && e.t.period === latest.period && e.t.period_start === latest.period_start)
     : [];
   const showRace = race.length >= 2;
   const raceSorted = [...race].sort((a, b) => b.progress - a.progress);
@@ -184,7 +219,13 @@ export default async function HedeflerPage() {
   {canCreate ? <TargetCreateTrigger /> : null}
 </div>
 } />
-{canCreate ? <TargetCreatePanel members={memberList} /> : null}
+{canCreate ? (
+  <TargetCreatePanel
+    members={memberList}
+    teams={[...teamName].map(([id, name]) => ({ id, name }))}
+    branches={[...branchName].map(([id, name]) => ({ id, name }))}
+  />
+) : null}
 {targets.length > 0 ? (
         <KpiGrid count={4}>
           <KpiTile label="Tanımlı hedef" value={targets.length} icon={Gauge} tone="brand" href="#hedef-listesi" />
@@ -205,9 +246,8 @@ export default async function HedeflerPage() {
           </div>
           <div className="mt-4 space-y-2.5">
             {raceSorted.map((e, i) => {
-              const prof = Array.isArray(e.t.profile) ? e.t.profile[0] : e.t.profile;
-              const pid = (prof as { id?: string } | null)?.id ?? null;
-              const name = profileLabel(e.t.profile);
+              const pid = e.t.profile_id;
+              const name = scopeLabel(e.t);
               return (
                 <Link
                   key={e.t.id}
@@ -255,8 +295,10 @@ export default async function HedeflerPage() {
         <div id="hedef-listesi" className="grid scroll-mt-24 items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {enriched.map(({ t, dealPct, revPct, elapsed, progress, done, behind }) => {
             const period     = new Date(t.period_start).toLocaleDateString("tr-TR", { month: "long", year: "numeric" });
-            const prof       = Array.isArray(t.profile) ? t.profile[0] : t.profile;
-            const profId     = (prof as { id?: string } | null)?.id ?? null;
+            const profId     = t.profile_id;
+            const label      = scopeLabel(t);
+            const coverage   = isCurrentPeriod(t) ? coverageOf(t) : null;
+            const covValue   = coverage ? (coverage.revenueCoverage ?? coverage.dealCoverage) : null;
             // Tempo projeksiyonu: "bu hızla dönem sonunda ~X" — clock.ts tabanlı elapsed
             const projDeals   = paceProjection(t.actual_deals, elapsed);
             const projRevenue = paceProjection(Number(t.actual_revenue), elapsed);
@@ -267,11 +309,16 @@ export default async function HedeflerPage() {
               target_deals:   t.target_deals,
               target_revenue: Number(t.target_revenue),
               profile_id:     profId,
+              team_id:        t.team_id,
+              branch_id:      t.branch_id,
+              scope_label:    label,
+              target_calls:   Number(t.target_calls ?? 0),
               target_appointments: Number((t as { target_appointments?: number | null }).target_appointments ?? 0),
               target_listings:     Number((t as { target_listings?: number | null }).target_listings ?? 0),
               notes:               (t as { notes?: string | null }).notes ?? null,
             };
-            const act = activityById.get(t.id);
+            const act = progressById?.get(t.id);
+            const tCalls = Number(t.target_calls ?? 0);
             const tAppt = Number((t as { target_appointments?: number | null }).target_appointments ?? 0);
             const tList = Number((t as { target_listings?: number | null }).target_listings ?? 0);
             // Tempo rozeti (saf kural: target-pace.ts): dönemin ≥%50'si geçti ve ölçüt beklenen temponun %70'inin altında.
@@ -283,6 +330,7 @@ export default async function HedeflerPage() {
                     ...(t.revVisible ? [{ label: "Gelir", actual: Number(t.actual_revenue), target: Number(t.target_revenue) }] : []),
                     ...(act?.appointments != null ? [{ label: "Randevu", actual: act.appointments, target: tAppt }] : []),
                     ...(act?.listings != null ? [{ label: "Yeni portföy", actual: act.listings, target: tList }] : []),
+                    ...(act?.calls != null ? [{ label: "Çağrı", actual: act.calls, target: tCalls }] : []),
                   ],
                   targetPeriodRange(t.period_start, t.period),
                   nowMs,
@@ -290,9 +338,9 @@ export default async function HedeflerPage() {
             return (
               <div key={t.id} className="group relative rounded-[var(--radius-panel)] border border-line bg-surface p-5 transition hover:border-brand-400/40">
                 <Link
-                  href={profId ? `/app/ekip/${profId}` : "/app/raporlar"}
+                  href={scopeHref(t)}
                   className="absolute inset-0 rounded-[var(--radius-panel)]"
-                  aria-label={profId ? `${profileLabel(t.profile)} danışman detayı` : "Ofis geneli raporlar"}
+                  aria-label={profId ? `${label} danışman detayı` : t.team_id || t.branch_id ? `${label} ekip karnesi` : "Ofis geneli raporlar"}
                 />
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -311,7 +359,7 @@ export default async function HedeflerPage() {
                     </RadialGauge>
                     <div>
                       <p className="text-xs font-semibold text-text-muted">{period}</p>
-                      <p className="mt-0.5 font-display font-bold text-text group-hover:text-accent-text">{profileLabel(t.profile)}</p>
+                      <p className="mt-0.5 font-display font-bold text-text group-hover:text-accent-text">{label}</p>
                       {slowLabels.length > 0 ? (
                         <p
                           className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-bold text-warning-strong"
@@ -346,7 +394,7 @@ export default async function HedeflerPage() {
                           </button>
                         }
                         title="Hedef silinsin mi?"
-                        description={`${profileLabel(t.profile)} · ${period} hedefi kalıcı olarak silinir.`}
+                        description={`${label} · ${period} hedefi kalıcı olarak silinir.`}
                         confirmLabel="Hedefi sil"
                         formAction={deleteTarget}
                         hiddenFields={{ id: t.id }}
@@ -376,7 +424,7 @@ export default async function HedeflerPage() {
                   {/* Gelir hedefi */}
                   <div>
                     <div className="mb-1 flex justify-between text-xs">
-                      <span className="text-text-muted">{(Array.isArray(t.profile) ? t.profile[0] : t.profile) ? "Gelir (komisyon payı)" : "Ofis komisyonu (brüt)"}</span>
+                      <span className="text-text-muted">{profId || t.team_id || t.branch_id ? "Gelir (komisyon payı)" : "Ofis komisyonu (brüt)"}</span>
                       <Link href="/app/komisyon?durum=tahsil" className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
                         {t.revVisible ? money(Number(t.actual_revenue)) : "Gizli"} / {money(Number(t.target_revenue))}
                       </Link>
@@ -416,6 +464,38 @@ export default async function HedeflerPage() {
                         <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct(act.listings, tList)}%` }} />
                       </div>
                     </div>
+                  ) : null}
+                  {act?.calls != null ? (
+                    <div>
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="text-text-muted">Çağrı</span>
+                        <Link href={profId ? `/app/gelen-kutusu?sekme=cagri&danisman=${profId}` : "/app/gelen-kutusu?sekme=cagri"} className="focus-ring relative z-10 rounded-[var(--radius-control)] font-semibold text-text hover:text-accent-text hover:underline">
+                          {act.calls} / {tCalls}
+                        </Link>
+                      </div>
+                      <div className="h-2 overflow-hidden rounded-full bg-line">
+                        <div className="h-full rounded-full bg-[color:var(--viz-3)] transition-all" style={{ width: `${pct(act.calls, tCalls)}%` }} />
+                      </div>
+                    </div>
+                  ) : null}
+                  {/* OA5: boru hattı kapsaması (tahmin) — kalan hedefi karşılayacak açık iş var mı? */}
+                  {coverage && covValue != null && !done ? (
+                    <Link
+                      href={openDealsHref(t)}
+                      className={`focus-ring relative z-10 flex min-h-9 items-center justify-between gap-2 rounded-[var(--radius-control)] px-2.5 py-1.5 text-xs transition touch:min-h-11 ${
+                        covValue >= 1 ? "bg-mint-500/10 text-success-strong hover:bg-mint-500/15" : "bg-amber-400/15 text-warning-strong hover:bg-amber-400/25"
+                      }`}
+                      title={
+                        coverage.revenueCoverage != null
+                          ? `Açık ${coverage.openCount} anlaşmanın olasılıkla ağırlıklı komisyonu ≈ ${money(coverage.weightedCommission)} (brüt, %${commissionRate} oran) ÷ kalan gelir hedefi`
+                          : `Açık ${coverage.openCount} anlaşmanın olasılıkla ağırlıklı sayısı ≈ ${coverage.weightedDeals} ÷ kalan anlaşma hedefi`
+                      }
+                    >
+                      <span className="font-semibold">Boru hattı kapsaması · tahmin</span>
+                      <span className="numeric font-extrabold">
+                        {coverageText(covValue)} {coverage.revenueCoverage != null ? "gelir" : "anlaşma"}
+                      </span>
+                    </Link>
                   ) : null}
                   {formValues.notes ? (
                     <p className="rounded-[var(--radius-control)] bg-canvas px-2.5 py-1.5 text-xs text-text-muted">{formValues.notes}</p>

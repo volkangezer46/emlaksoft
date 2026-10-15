@@ -65,10 +65,9 @@ export function ReportScopeBar({ path, ctx, extra = {} }: { path: string; ctx: R
             <CalendarRange className="h-4 w-4" aria-hidden="true" /> Özel tarih aralığı
           </summary>
           <form method="get" action={path} className="grid gap-2 border-t border-line p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            {Object.entries({ ...extra, ...scopeParams }).map(([k, v]) => (
+            {Object.entries({ ...extra, ...scopeParams, donem: "ozel" }).map(([k, v]) => (
               <input key={k} type="hidden" name={k} value={v} />
             ))}
-            <input type="hidden" name="donem" value="ozel" />
             <FilterDate name="baslangic" label="Başlangıç" value={period.from} />
             <FilterDate name="bitis" label="Bitiş" value={period.to} />
             <Button type="submit" size="sm" variant="outline">
