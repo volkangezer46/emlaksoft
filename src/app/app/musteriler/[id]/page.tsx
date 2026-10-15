@@ -10,7 +10,6 @@ import {
   CalendarDays,
   Mail,
   MapPin,
-  MessageSquare,
   PhoneCall,
   Sparkles,
   Target,
@@ -37,7 +36,8 @@ import { leadTierCls } from "@/lib/customer-state/lead";
 import { TEMPERATURE_LABELS } from "@/lib/customer-state/core";
 import { loadCustomerStates, prefetchCustomerStateSignals } from "@/lib/customer-state/load";
 import { heatBadge, heatTitle } from "@/lib/customer-state/heat";
-import { CommunicationTimeline } from "@/components/app/communication-timeline";
+import { CommunicationTimeline, CustomerQuickNote } from "@/components/app/communication-timeline";
+import { loadAssignableAdvisors, type AssignableAdvisor } from "@/lib/team/assignable-roles";
 import { MatchedSection, MatchedSkeleton, SatisfactionSection } from "./sections";
 import { buildCustomerEvents, CUSTOMER_TIMELINE_CATEGORIES } from "./customer-events";
 import { countByCategory, filterByCategory, resolveCategory } from "@/lib/activity-timeline";
@@ -117,8 +117,10 @@ export default async function CustomerDetailPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Yetki kapısı + route parametreleri birbirine bağlı değil: tek turda çözülür.
-  const [{ perms, userId, tenantId }, { id }, sp] = await Promise.all([requireModulePage("customers"), params, searchParams]);
+  const [{ perms, userId, tenantId, role }, { id }, sp] = await Promise.all([requireModulePage("customers"), params, searchParams]);
   const canEdit = (perms.customers ?? []).includes("edit");
+  // İletişim kaydı/not: createCommunication `customers:create` ister.
+  const canCreateComm = (perms.customers ?? []).includes("create");
   const canDelete = (perms.customers ?? []).includes("delete");
   const canTaskCreate = (perms.tasks ?? []).includes("create");
   const canTaskEdit = (perms.tasks ?? []).includes("edit");
@@ -161,7 +163,7 @@ export default async function CustomerDetailPage({
     { data: waTenant },
     { data: waAdvisor },
     { data: editBranches },
-    { data: editAdvisors },
+    editAdvisors,
     sourceDefs,
     prefRes,
     stageNames,
@@ -265,7 +267,8 @@ export default async function CustomerDetailPage({
     supabase.from("profiles").select("full_name").eq("id", userId).maybeSingle(),
     // Düzenleme paneli seçenekleri (yalnız düzenleme yetkisi varsa gerekir)
     canEdit ? supabase.from("branches").select("id, name").eq("is_active", true).order("name") : noRows,
-    canEdit ? supabase.from("profiles").select("id, full_name").eq("is_active", true).order("full_name") : noRows,
+    // Danışman seçicileri yalnız aktif SATIŞ rolleri (B070); takım lideri kendi takımını önde görür.
+    canEdit && tenantId ? loadAssignableAdvisors(supabase, tenantId, { userId, role }) : Promise.resolve([] as AssignableAdvisor[]),
     canEdit ? getDefinitionsOrDefault("customer_source") : Promise.resolve([]),
     // Kira hatırlatması tercihi (H3 sütunları): yalnız "özet" sekmesinde; sütun yoksa kart çizilmez (hata yok sayılır).
     tab === "ozet"
@@ -591,9 +594,13 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                 <Link href={`/app/gelen-kutusu?sekme=cagri&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <PhoneCall className="h-4 w-4" /> Görüşme kaydet
                 </Link>
-                <Link href={`/app/musteriler/${customer.id}?sekme=gecmis`} scroll={false} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
-                  <MessageSquare className="h-4 w-4" /> Not ekle
-                </Link>
+                {canCreateComm ? (
+                  // B054: sekme turu yerine satır içi panel (tek alan + Kaydet); not Notlar kartında iyimser görünür.
+                  <CustomerQuickNote
+                    customerId={customer.id}
+                    className="h-auto gap-1.5 border border-white/15 bg-white/5 px-3.5 py-2 text-sm text-white hover:bg-white/10 hover:text-white touch:min-h-11"
+                  />
+                ) : null}
                 <Link href={`/app/talepler?sekme=eslesme&customer=${customer.id}`} className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-white/15 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                   <Target className="h-4 w-4" /> Eşleştir
                 </Link>
@@ -620,12 +627,13 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
                     provinces={provinces ?? []}
                     types={customerTypeOptions}
                     branches={(editBranches ?? []) as { id: string; name: string }[]}
-                    advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]}
+                    advisors={editAdvisors}
                     sources={sourceDefs.map((d) => ({ value: d.value, label: d.label }))}
                   />
                 ) : null}
-                {canEdit && (editAdvisors ?? []).length > 0 ? (
-                  <ReassignAdvisorForm customerId={customer.id} current={customer.assigned_to} advisors={(editAdvisors ?? []) as { id: string; full_name: string }[]} />
+                {canEdit && editAdvisors.length > 0 ? (
+                  // key: sunucudaki atama değişince seçici yeni değerle yeniden bağlanır (B063).
+                  <ReassignAdvisorForm key={customer.assigned_to ?? "yok"} customerId={customer.id} current={customer.assigned_to} advisors={editAdvisors} />
                 ) : null}
                 {canDelete ? <DeleteCustomerButton customerId={customer.id} /> : null}
                 </MoreActions>
@@ -705,7 +713,7 @@ Aday skoru ${lead.score} (ayrı ölçek): ${lead.factors.map((f) => `${f.label}:
             consents={consentsData ?? []}
             files={filesData ?? []}
             communications={(commsData ?? []) as Parameters<typeof CommunicationTimeline>[0]["initialItems"]}
-            canCreateComm={(perms.customers ?? []).includes("create")}
+            canCreateComm={canCreateComm}
             can={customerCtaPermissions(perms)}
             active={tab}
             counts={{

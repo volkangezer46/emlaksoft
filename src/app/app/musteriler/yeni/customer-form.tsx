@@ -43,6 +43,15 @@ const TAB_ICONS = {
 
 const FIELD_LABELS = { full_name: "Ad soyad", phone: "Telefon" };
 
+/** Form başına istek kimliği (sunucu `onceByRequest`); eski tarayıcıda boş (fren atlanır, mükerrer kapısı yine çalışır). */
+function newRequestId(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return "";
+  }
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "";
@@ -86,6 +95,9 @@ export function CustomerForm({
     redirectTo: (r) => detailOrList("/app/musteriler", r.id),
   });
   const req = useDemandRequired();
+  // İstek kimliği ilk gönderimde üretilir ve bileşen ömrü boyunca sabit kalır (ret sonrası "Yine de yeni kayıt" aynı kimlikle
+  // gider; başarılı kayıttan sonra sayfa değişir, "Kaydet ve yenisini ekle" tam yükler). Render'da üretilmez (SSR uyumu).
+  const requestIdRef = useRef<string | null>(null);
   const [customerType, setCustomerType] = useState("Alıcı");
   const ownerSide = isOwnerSideCustomerType(customerType);
   // Müşteri kaydedildi ama talep düştü: yeniden gönderim müşteriyi çoğaltır — kilitle, devam bağlantısı ver.
@@ -104,6 +116,9 @@ export function CustomerForm({
     // Onay yalnız bu gönderim için geçerli: sunucu hatası/çift kayıt reddi sonrası ya da sonraki kayıtta yeniden sorulur.
     noPhoneOk.current = false;
     setPhoneAsk(false);
+    requestIdRef.current ??= newRequestId();
+    const idInput = e.currentTarget.elements.namedItem("client_request_id");
+    if (idInput instanceof HTMLInputElement) idInput.value = requestIdRef.current;
     onSubmit(e);
   }
 
@@ -137,8 +152,6 @@ export function CustomerForm({
           />
           {linkRef ? <input type="hidden" name={"link_ref"} value={linkRef} /> : null}
         </FormField>
-        {/* Çift kayıt uyarısı telefonun hemen altında: yazarken (500 ms gecikmeyle) görünür. */}
-        <DuplicateHint kind="customer" />
         <FormField label="Müşteri türü" htmlFor="type">
           <FormSelect name="type" defaultValue="Alıcı" onChange={(e) => setCustomerType(e.target.value)}>
             {types.map((t) => (
@@ -308,6 +321,11 @@ export function CustomerForm({
       submitDisabled={Boolean(partialCustomerId)}
       notice={
         <>
+          {/* Gerçek idempotency (B091): her form açılışı tek istek kimliği; çift tık/yeniden deneme ikinci kayıt açmaz. */}
+          <input type="hidden" name={"client_request_id"} defaultValue="" />
+          {/* Çift kayıt uyarısı FORM DÜZEYİNDE (B097d): telefon "Kişi", e-posta "İletişim" sekmesinde olsa da görünür;
+              numara tamamlanınca hemen, aksi halde 150 ms gecikmeyle. allow_duplicate girdisi tek kalır. */}
+          <DuplicateHint kind="customer" />
           {phoneAsk ? (
             <SubmitConfirmBand
               message="Telefon girilmedi. Müşteri telefonsuz kaydedilsin mi? Telefonsuz kayıtta çift kayıt kontrolü ve arama/WhatsApp kısayolları çalışmaz."

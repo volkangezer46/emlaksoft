@@ -222,12 +222,28 @@ function parseTokens(toks: Tok[]): Val | null {
 }
 
 /**
+ * Telefon numarası görünümlü girdi mi? (B060) "0532-111-22-33", "0555-999-00-01", "+90 532 111 22 33", "(532) 111-2233":
+ * yalnız rakam + boşluk/tire/parantez (+ baştaki "+"), 10-13 rakam ve hiçbir rakam grubu 4 haneden uzun değil. Böyle
+ * girdi hesap moduna GİRMEZ (eskiden "0532-111-22-33" = 366 hesaplanıp kayıt sonuçları gizleniyordu). Çarpma/bölme/yüzde
+ * içeren ya da ondalık/binlik ayraçlı ifade ("5.400.000 - 200.000") telefon değildir.
+ */
+export function looksLikePhoneInput(input: string): boolean {
+  const s = input.trim();
+  if (!/^\+?[\d\s()-]+$/.test(s)) return false;
+  const groups = s.split(/[^\d]+/).filter(Boolean);
+  const digits = groups.join("");
+  if (digits.length < 10 || digits.length > 13) return false;
+  return groups.every((g) => g.length <= 4);
+}
+
+/**
  * Palet girdisini değerlendirir; matematiksel bir ifade değilse null döner
- * (arama akışı bozulmaz). Sıfıra bölme / bozuk ifade de null'dur.
+ * (arama akışı bozulmaz). Sıfıra bölme / bozuk ifade de null'dur. Telefon görünümlü girdi hesap değildir.
  */
 export function evaluatePaletteInput(input: string): PaletteCalc | null {
   const s = input.trim();
   if (s.length === 0) return null;
+  if (looksLikePhoneInput(s)) return null;
   // Yalnızca rakam/işleç/ayırıcı/parantez/boşluk içermeli
   if (!/^[\d\s+\-*/%().,×÷]+$/.test(s)) return null;
   if (!/\d/.test(s)) return null;

@@ -1,23 +1,21 @@
 "use server";
 
-import { emitWebhook } from "@/lib/integrations-api/webhooks";
 import { requirePermission } from "@/lib/require-permission";
 import { createClient } from "@/lib/supabase/server";
-import { now } from "@/lib/clock";
-import { parsePhoneStrict } from "@/lib/phone-rules";
-import { normalizeEmail } from "@/lib/email";
+import { afterSafe } from "@/lib/after-safe";
 import {
   demandValuesFromFormData,
   hasDemandContent,
   isOwnerSideCustomerType,
   parseDemandValues,
 } from "@/lib/demand-criteria";
-import { createCustomer } from "@/app/actions/customers";
 import { createDemand } from "@/app/actions/demands";
 import { linkRecordToCustomer } from "@/app/actions/communications";
-import { findCustomerDuplicates } from "@/lib/duplicate-finders";
+import { assertCustomerNotDuplicate, CUSTOMER_DUPLICATE_ERROR, type DuplicateGate } from "@/lib/duplicate-finders";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { prepareCustomFieldInputs, writeCustomFieldInputs } from "@/lib/custom-fields/save";
+import { insertCustomerRecord, parseCustomerForm } from "@/lib/customer-create";
+import { onceByRequest, readRequestId, supabaseSubmissionStore } from "@/lib/field-capture/submission-guard";
 
 export type CustomerWithDemandResult = {
   error?: string;
@@ -27,46 +25,28 @@ export type CustomerWithDemandResult = {
   demandId?: string;
   /** Müşteri kaydedildi ama talep kaydedilemedi: kullanıcıya net uyarı + devam bağlantısı. */
   demandError?: string;
+  /** Aynı telefon/e-posta ofiste kayıtlı: form uyarıyı gösterir, "Yine de yeni kayıt" ile allow_duplicate=1 gönderilir. */
+  duplicate?: boolean;
 };
 
-/** Çift gönderim koruma penceresi. */
-const DUPLICATE_SUBMIT_WINDOW_MS = 30_000;
-
-async function findRecentDuplicateCustomer(formData: FormData): Promise<string | null> {
-  const gate = await requirePermission("customers", "create");
-  if (!gate.ok) return null; // asıl hata createCustomer'da döner
-  const phoneRaw = String(formData.get("phone") ?? "").trim();
-  const parsedPhone = phoneRaw ? parsePhoneStrict(phoneRaw) : null;
-  const phone = parsedPhone && parsedPhone.ok ? parsedPhone.stored : "";
-  const email = normalizeEmail(String(formData.get("email") ?? ""));
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  if (!fullName) return null;
-
-  const supabase = await createClient();
-  let q = supabase
-    .from("customers")
-    .select("id")
-    .eq("tenant_id", gate.tenantId)
-    .eq("created_by", gate.userId)
-    .is("deleted_at", null)
-    .gte("created_at", new Date(now() - DUPLICATE_SUBMIT_WINDOW_MS).toISOString())
-    .limit(1);
-  // Kimlik: telefon varsa telefon, yoksa e-posta, ikisi de yoksa ad (tam eşleşme).
-  if (phone) q = q.eq("phone", phone);
-  else if (email) q = q.eq("email", email);
-  else q = q.eq("full_name", fullName);
-  const { data } = await q;
-  return data?.[0]?.id ?? null;
-}
+type Prepared = {
+  dup: DuplicateGate;
+  customFields: Awaited<ReturnType<typeof prepareCustomFieldInputs>>;
+};
 
 /**
  * Yeni müşteri + (varsa) talep — kullanıcı için tek işlem.
  *
- * Faz 1: atomik RPC yok (Faz 2'de `create_customer_with_demand`). İki ardışık insert:
- * 1. Talep, müşteri OLUŞMADAN önce doğrulanır (kullanıcı hatası yarım kayıt bırakmaz).
- * 2. Müşteri oluşur; sonra talep. Talep DB hatasıyla düşerse müşteri kalır ve sonuç
- *    `demandError` + `id` taşır — form müşteriyi tekrar kaydettirmez, talebe devam bağlantısı verir.
- * Mülk sahibi/satıcı türünde talep açılmaz; talep alanları gerçek kriter içermiyorsa talep açılmaz.
+ * Çift gönderim (B091): form her açılışta yeni bir `client_request_id` taşır; `onceByRequest` (client_submissions) aynı
+ * istek kimliğiyle ikinci kaydı AÇMAZ, ilk kaydın kimliğini döndürür. Eski "30 sn içinde aynı telefon" sezgisi kaldırıldı:
+ * farklı kişi aynı numarayla bilerek ("Yine de yeni kayıt") kaydedilebilir ve özel alan / link_ref / webhook atlanmaz.
+ *
+ * Hız (B033) — sıralı DB turları: (1) yetki kapıları paralel → (2) fren kaydı ∥ mükerrer kapısı ∥ özel alan hazırlığı →
+ * (3) müşteri insert → [(4) özel alan yazımı ∥ kaynak kayıt bağı ∥ talep — yalnız varsa]. Fren kapanışı, denetim,
+ * otomasyon ve webhook yanıt sonrasına (`after`) kalır.
+ *
+ * Faz 1: atomik RPC yok. Talep, müşteri OLUŞMADAN önce doğrulanır (kullanıcı hatası yarım kayıt bırakmaz). Talep DB
+ * hatasıyla düşerse müşteri kalır ve sonuç `demandError` + `id` taşır. Mülk sahibi/satıcı türünde talep açılmaz.
  */
 export async function createCustomerWithDemand(
   _prev: CustomerWithDemandResult,
@@ -76,71 +56,84 @@ export async function createCustomerWithDemand(
   const values = demandValuesFromFormData(formData);
   const wantsDemand = !isOwnerSideCustomerType(type) && hasDemandContent(values);
 
+  // Ağ turu olmadan doğrulama (hata erken döner).
+  const parsed = parseCustomerForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
   if (wantsDemand) {
-    const gate = await requirePermission("demands", "create");
-    if (!gate.ok) return { error: `Talep kaydı için yetkiniz yok: ${gate.error}` };
-    const parsed = parseDemandValues(values);
-    if (!parsed.ok) return { error: parsed.error };
+    const demandParsed = parseDemandValues(values);
+    if (!demandParsed.ok) return { error: demandParsed.error };
   }
 
-  // B13: çift gönderim (çift tık / yeniden deneme) — aynı kullanıcının kısa pencerede aynı kimlikle
-  // oluşturduğu müşteri varsa yenisi açılmaz, mevcut kayıt döndürülür (idempotent).
-  const recent = await findRecentDuplicateCustomer(formData);
-  if (recent) return { ok: true, id: recent };
+  // (1) Yetki kapıları tek turda.
+  const [gate, demandGate] = await Promise.all([
+    requirePermission("customers", "create"),
+    wantsDemand ? requirePermission("demands", "create") : Promise.resolve(null),
+  ]);
+  if (!gate.ok) return { error: gate.error };
+  if (demandGate && !demandGate.ok) return { error: `Talep kaydı için yetkiniz yok: ${demandGate.error}` };
 
-  // Giriş anı mükerrer kontrolü: aynı telefon/e-posta ofiste varsa kasıtlı onay (allow_duplicate=1) olmadan kaydedilmez.
-  if (String(formData.get("allow_duplicate") ?? "") !== "1") {
-    const gate = await requirePermission("customers", "create");
-    if (gate.ok) {
-      const dups = await findCustomerDuplicates(
-        await createClient(),
-        {
-          tenantId: gate.tenantId,
-          phone: String(formData.get("phone") ?? ""),
-          email: String(formData.get("email") ?? ""),
-        },
-        { userId: gate.userId, officeWide: false },
-      );
-      if (dups.length > 0) {
+  const supabase = await createClient();
+  const ctx = { tenantId: gate.tenantId, userId: gate.userId };
+  const allowDuplicate = String(formData.get("allow_duplicate") ?? "") === "1";
+
+  // (2) Fren kaydıyla AYNI turda: mükerrer kapısı + özel alanların kayıttan ÖNCE doğrulanması. Telefon burada
+  // parseCustomerForm'un parsePhoneStrict ile ürettiği saklama biçimidir (ham telefon DB'ye/sorguya gitmez).
+  const prepare = async (): Promise<Prepared> => {
+    const [dup, customFields] = await Promise.all([
+      assertCustomerNotDuplicate(supabase, ctx, { phone: parsed.values.phone, email: parsed.values.email }, allowDuplicate),
+      prepareCustomFieldInputs(supabase, gate.tenantId, "customer", formData),
+    ]);
+    return { dup, customFields };
+  };
+
+  const result = await onceByRequest<CustomerWithDemandResult, Prepared>(
+    supabaseSubmissionStore(supabase),
+    ctx,
+    "customer",
+    readRequestId(formData),
+    async ({ dup, customFields }) => {
+      // Giriş anı mükerrer kapısı (B092): aynı telefon/e-posta ofiste varsa kasıtlı onay olmadan kaydedilmez.
+      if (dup.duplicate) return { error: CUSTOMER_DUPLICATE_ERROR, duplicate: true };
+      if (!customFields.ok) return { error: customFields.error };
+
+      // (3) Müşteri.
+      const customer = await insertCustomerRecord(supabase, ctx, parsed.values);
+      if (!customer.ok || !customer.id) return { error: customer.error ?? actionErrorMessage(null, "Müşteri eklenemedi.") };
+      const customerId = customer.id;
+
+      // (4) Bağımlı yazımlar paralel: özel alanlar, gelen kutusu/çağrı bağı (hata müşteri kaydını bozmaz), talep.
+      const linkMatch = /^([ac])-([0-9a-f-]{36})$/i.exec(String(formData.get("link_ref") ?? "").trim());
+      const demandForm = new FormData();
+      if (wantsDemand) {
+        demandForm.set("customer_id", customerId);
+        for (const [k, v] of Object.entries(values)) demandForm.set(k, v);
+        // Yeni müşterinin açık talebi olamaz: benzer talep denetimi boşa tur yapmasın.
+        demandForm.set("allow_duplicate", "1");
+      }
+      const [, , demand] = await Promise.all([
+        customFields.value.rows.length > 0
+          ? writeCustomFieldInputs(supabase, { ...ctx, recordId: customerId }, customFields.value)
+          : Promise.resolve(true),
+        linkMatch
+          ? linkRecordToCustomer(linkMatch[1].toLowerCase() === "a" ? "call" : "comm", linkMatch[2], customerId).catch((e) => {
+              console.error("createCustomerWithDemand link", e instanceof Error ? e.message : "bilinmeyen hata");
+              return null;
+            })
+          : Promise.resolve(null),
+        wantsDemand ? createDemand({}, demandForm) : Promise.resolve(null),
+      ]);
+      if (!demand) return { ok: true, id: customerId };
+      if (!demand.ok) {
+        const reason = demand.error ?? actionErrorMessage(null, "Talep kaydedilemedi.");
         return {
-          error:
-            "Bu telefon/e-posta ile ofiste kayıt var. Formdaki uyarıyı inceleyin; yine de yeni kayıt açmak için \"Yine de yeni kayıt\" seçin.",
+          id: customerId,
+          demandError: reason,
+          error: `Müşteri kaydedildi ancak talep kaydedilemedi: ${reason}`,
         };
       }
-    }
-  }
-
-  // Özel alanlar (müşteri): kayıttan ÖNCE doğrulanır; müşteri yazılınca eklenir (talebe taşınmaz).
-  const cfGate = await requirePermission("customers", "create");
-  const cfDb = cfGate.ok ? await createClient() : null;
-  const customFields = cfGate.ok && cfDb ? await prepareCustomFieldInputs(cfDb, cfGate.tenantId, "customer", formData) : null;
-  if (customFields && !customFields.ok) return { error: customFields.error };
-
-  const customer = await createCustomer({}, formData);
-  if (!customer.ok || !customer.id) return { error: customer.error ?? actionErrorMessage(null, "Müşteri eklenemedi.") };
-  if (cfGate.ok && cfDb && customFields?.ok) {
-    await writeCustomFieldInputs(cfDb, { tenantId: cfGate.tenantId, userId: cfGate.userId, recordId: customer.id }, customFields.value);
-  }
-  // Gelen kutusu / çağrı kaydından açıldıysa kaynak kayıt yeni müşteriye bağlanır (hata müşteri kaydını bozmaz).
-  const linkRef = String(formData.get("link_ref") ?? "").trim();
-  const linkMatch = /^([ac])-([0-9a-f-]{36})$/i.exec(linkRef);
-  if (linkMatch) {
-    await linkRecordToCustomer(linkMatch[1].toLowerCase() === "a" ? "call" : "comm", linkMatch[2], customer.id);
-  }
-  emitWebhook("customer.created", "customer", customer.id);
-  if (!wantsDemand) return { ok: true, id: customer.id };
-
-  const demandForm = new FormData();
-  demandForm.set("customer_id", customer.id);
-  for (const [k, v] of Object.entries(values)) demandForm.set(k, v);
-  const demand = await createDemand({}, demandForm);
-  if (!demand.ok) {
-    const reason = demand.error ?? actionErrorMessage(null, "Talep kaydedilemedi.");
-    return {
-      id: customer.id,
-      demandError: reason,
-      error: `Müşteri kaydedildi ancak talep kaydedilemedi: ${reason}`,
-    };
-  }
-  return { ok: true, id: customer.id, demandId: demand.id };
+      return { ok: true, id: customerId, demandId: demand.id };
+    },
+    { prepare, defer: (task) => afterSafe(task, "client_submissions kapanışı") },
+  );
+  return result as CustomerWithDemandResult;
 }

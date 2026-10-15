@@ -94,6 +94,12 @@ export function DuplicateHint({ kind }: { kind: DuplicateKind }) {
                         </Link>
                       ) : null}
                     </>
+                  ) : h.label ? (
+                    // Kapsam dışı tam telefon eşleşmesi (B059): yalnız ad + danışman adı; kayıt açılamaz.
+                    <p className="flex items-center gap-2 text-xs">
+                      <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      Bu numara {h.advisor ? `${h.advisor} danışmanının` : "başka bir danışmanın"} müşterisi: {h.label}. Ayrıntı için danışmana ya da yöneticinize danışın.
+                    </p>
                   ) : (
                     <p className="flex items-center gap-2 text-xs">
                       <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -108,8 +114,10 @@ export function DuplicateHint({ kind }: { kind: DuplicateKind }) {
             {confirmed ? (
               <>
                 <span className="text-xs font-semibold">Mükerrer olduğunu bilerek kaydedeceksiniz.</span>
+                {/* Onay düğmesi kaybolunca odak formda kalsın (B091): Ctrl+Enter ile kaydet çalışır. */}
                 <button
                   type="button"
+                  autoFocus
                   onClick={() => setConfirmedFor("")}
                   className="focus-ring text-xs font-semibold underline underline-offset-2"
                 >

@@ -93,6 +93,7 @@ describe("KQ1: /app/ara Location kökü", () => {
     vi.resetModules();
     vi.doUnmock("@/lib/require-permission");
     vi.doUnmock("@/lib/supabase/server");
+    vi.doUnmock("@/lib/access-control/list-scope");
   });
 
   it("istek 0.0.0.0:3000'den gelse de Location herkese açık köktür (tek eşleşme → müşteri kartı)", async () => {
@@ -104,6 +105,8 @@ describe("KQ1: /app/ara Location kökü", () => {
     for (const m of ["select", "eq", "is", "ilike", "limit"]) query[m] = () => query;
     query.then = (resolve: (v: unknown) => void) => resolve({ data: [{ id: "c1" }], error: null });
     vi.doMock("@/lib/supabase/server", () => ({ createClient: async () => ({ from: () => query }) }));
+    // SK7: /app/ara müşteri listesiyle aynı kapsamı (getListScope) kullanır; bu test yalnız Location kökünü sınar.
+    vi.doMock("@/lib/access-control/list-scope", () => ({ getListScope: async () => ({ filter: { kind: "none" }, enforced: false, badge: null }) }));
     const { GET } = await import("@/app/app/ara/route");
     const res = await GET(new NextRequest("http://0.0.0.0:3000/app/ara?tel=05321000001"));
     const location = res.headers.get("location") ?? "";

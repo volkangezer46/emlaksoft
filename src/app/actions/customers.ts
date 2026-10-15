@@ -11,16 +11,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
 import { idsDigest, notifyAssignment } from "@/lib/assignment-notify";
-import { dispatchAutomationEvent } from "@/lib/automation-engine";
-import { triggerPlaybooks } from "@/lib/playbook-trigger";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
 import { EMAIL_ERROR_MESSAGE, isValidEmail, normalizeEmail } from "@/lib/email";
 import { daysFromNowIso, trDayKey } from "@/lib/clock";
-import { planLimitErrorMessage } from "@/lib/billing/plan-limit-error";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { insertCustomerRecord, parseCustomerForm } from "@/lib/customer-create";
+import { assertCustomerNotDuplicate, CUSTOMER_DUPLICATE_ERROR } from "@/lib/duplicate-finders";
+import { isSalesAssigneeRole } from "@/lib/team/assignable-roles";
 
-export type CustomerResult = { error?: string; ok?: boolean; id?: string };
+/** `duplicate: true` → aynı telefon/e-posta ofiste kayıtlı; istemci onay alıp `allow_duplicate=1` ile yeniden gönderir. */
+export type CustomerResult = { error?: string; ok?: boolean; id?: string; duplicate?: boolean };
 
 /** Boş ise geçerli; dolu ise ISO tarih (YYYY-MM-DD) formatını ve gerçek takvim gününü doğrular. */
 function isValidOptionalDate(value: string): boolean {
@@ -32,6 +33,11 @@ function isValidOptionalDate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
 }
 
+/**
+ * Yeni müşteri — TEK sunucu kapısı (B092): yetki → doğrulama → mükerrer kapısı (aynı telefon/e-posta ofiste varsa
+ * `allow_duplicate=1` onayı olmadan kayıt açılmaz; hızlı kayıt "Yine de kaydet" ile, form "Yine de yeni kayıt" ile onaylar)
+ * → çekirdek insert (src/lib/customer-create.ts). Oluşturan kişi kayda atanır (çağrı merkezi de müşteri açabilir).
+ */
 export async function createCustomer(
   _prev: CustomerResult,
   formData: FormData,
@@ -39,98 +45,19 @@ export async function createCustomer(
   const gate = await requirePermission("customers", "create");
   if (!gate.ok) return { error: gate.error };
 
+  const parsed = parseCustomerForm(formData);
+  if (!parsed.ok) return { error: parsed.error };
+
   const supabase = await createClient();
-  const tenantId = gate.tenantId;
-  const user = { id: gate.userId };
+  const dup = await assertCustomerNotDuplicate(
+    supabase,
+    { tenantId: gate.tenantId },
+    { phone: parsed.values.phone, email: parsed.values.email },
+    String(formData.get("allow_duplicate") ?? "") === "1",
+  );
+  if (dup.duplicate) return { error: CUSTOMER_DUPLICATE_ERROR, duplicate: true };
 
-  const fullName = String(formData.get("full_name") ?? "").trim();
-  const phone = String(formData.get("phone") ?? "").trim();
-  const email = normalizeEmail(String(formData.get("email") ?? ""));
-  const type = String(formData.get("type") ?? "").trim();
-  const provinceId = String(formData.get("province_id") ?? "").trim();
-  const districtId = String(formData.get("district_id") ?? "").trim();
-  const branchId = String(formData.get("branch_id") ?? "").trim();
-  const notes = String(formData.get("notes") ?? "").trim();
-  const birthDate = String(formData.get("birth_date") ?? "").trim();
-  const anniversaryDate = String(formData.get("anniversary_date") ?? "").trim();
-  const anniversaryNote = String(formData.get("anniversary_note") ?? "").trim();
-
-  if (!fullName) return { error: "Ad soyad zorunlu." };
-  const parsedPhone = phone ? parsePhoneStrict(phone) : null;
-  if (parsedPhone && !parsedPhone.ok) return { error: parsedPhone.error ?? PHONE_ERROR_MESSAGE };
-  if (email && !isValidEmail(email)) return { error: EMAIL_ERROR_MESSAGE };
-  if (!isValidOptionalDate(birthDate)) return { error: "Doğum tarihi geçersiz." };
-  if (!isValidOptionalDate(anniversaryDate)) return { error: "Yıldönümü tarihi geçersiz." };
-  const normalizedPhone = parsedPhone?.stored ?? "";
-
-  const { data, error } = await supabase
-    .from("customers")
-    .insert({
-      tenant_id: tenantId,
-      full_name: fullName,
-      phone: normalizedPhone || null,
-      email: email || null,
-      customer_types: type ? [type] : [],
-      province_id: provinceId || null,
-      district_id: districtId || null,
-      branch_id: branchId || null,
-      notes: notes || null,
-      birth_date: birthDate || null,
-      anniversary_date: anniversaryDate || null,
-      anniversary_note: anniversaryNote || null,
-      assigned_to: user.id,
-      created_by: user.id,
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    console.error("createCustomer", error);
-    return { error: planLimitErrorMessage(error) ?? actionErrorMessage(error, "Müşteri eklenemedi. Lütfen tekrar deneyin.") };
-  }
-
-  afterSafe(() => logActivity({
-    tenantId,
-    actorId: gate.userId,
-    action: "customer.create",
-    entityType: "customer",
-    entityId: data.id,
-    newValue: { full_name: fullName },
-  }));
-
-  // Otomasyon tetikle — hata ana işlemi asla bozmasın
-  afterSafe(() =>
-    Promise.resolve()
-      .then(() => dispatchAutomationEvent(tenantId, "new_customer", {
-      entityType: "customer",
-      entityId: data.id,
-      customerId: data.id,
-      label: fullName,
-      phone: normalizedPhone || null,
-      assignedTo: user.id,
-    }))
-      .catch((e) => console.error("automation new_customer", e)),
-    );
-
-  // İş akışı (playbook) tetikle — çok adımlı görev paketi; hata ana işlemi bozmaz
-  afterSafe(() => triggerPlaybooks({
-    tenantId,
-    event: "yeni_musteri",
-    actorId: user.id,
-    entity: {
-      type: "customer",
-      id: data.id,
-      label: fullName,
-      ownerId: user.id,
-      customerId: data.id,
-      fields: { customer_type: type || null },
-    },
-  }));
-
-  emitWebhook("customer.created", "customer", data.id);
-  revalidatePath("/app/musteriler");
-  revalidateTenantData(gate.tenantId);
-  return { ok: true, id: data.id };
+  return insertCustomerRecord(supabase, { tenantId: gate.tenantId, userId: gate.userId }, parsed.values);
 }
 
 export async function updateCustomer(
@@ -292,7 +219,13 @@ export async function deleteCustomerWithResult(formData: FormData): Promise<{ ok
   return { ok: true };
 }
 
-export type BulkCustomerResult = { ok?: boolean; error?: string; updatedCount?: number };
+export type BulkCustomerResult = {
+  ok?: boolean;
+  error?: string;
+  updatedCount?: number;
+  /** Toplu atamada işlem ÖNCESİ atamalar ("Geri al" bunlarla `restoreCustomerAssignments` çağırır). */
+  previous?: { id: string; assigned_to: string | null }[];
+};
 
 /** Toplu işlem üst sınırı — tek istekte devasa update'leri engeller. */
 const BULK_LIMIT = 200;
@@ -325,24 +258,23 @@ export async function bulkAssignCustomers(
   const supabase = await createClient();
   const validIds = await resolveTenantCustomerIds(supabase, gate.tenantId, ids);
   if (!validIds.length) return { error: "Güncellenecek müşteri bulunamadı." };
-  // Hedef danışman bu ofisin AKTİF kullanıcısı olmalı (tekil `reassignCustomer` ile aynı kural; başka ofisin kimliği yazılamaz).
+  // Hedef danışman bu ofisin AKTİF SATIŞ rolündeki kullanıcısı olmalı (B070; tekil `reassignCustomer` ile aynı kural):
+  // salt okunur, ofis muhasebe ve çağrı merkezine müşteri atanamaz; başka ofisin kimliği yazılamaz.
+  // Hedef doğrulaması ve "önceki atamalar" (Geri al + bildirim sayısı) aynı turda.
+  const [targetRes, beforeRes] = await Promise.all([
+    assignedTo
+      ? supabase.from("profiles").select("id, role").eq("id", assignedTo).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase.from("customers").select("id, assigned_to").in("id", validIds).eq("tenant_id", gate.tenantId),
+  ]);
   if (assignedTo) {
-    const { data: target } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", assignedTo)
-      .eq("tenant_id", gate.tenantId)
-      .eq("is_active", true)
-      .maybeSingle();
+    const target = targetRes.data as { id: string; role: string | null } | null;
     if (!target) return { error: "Seçilen danışman bu ofiste aktif değil." };
+    if (!isSalesAssigneeRole(target.role)) return { error: "Bu kullanıcının rolüne müşteri atanamaz (yalnız satış rolleri)." };
   }
+  const previous = ((beforeRes.data ?? []) as { id: string; assigned_to: string | null }[]).map((c) => ({ id: c.id, assigned_to: c.assigned_to ?? null }));
   // Bildirim için: gerçekten el değiştiren müşteri sayısı (zaten o danışmandaysa devir sayılmaz).
-  const { data: before } = await supabase
-    .from("customers")
-    .select("id, assigned_to")
-    .in("id", validIds)
-    .eq("tenant_id", gate.tenantId);
-  const movedCount = ((before ?? []) as { id: string; assigned_to: string | null }[]).filter((c) => (c.assigned_to ?? "") !== (assignedTo || "")).length;
+  const movedCount = previous.filter((c) => (c.assigned_to ?? "") !== (assignedTo || "")).length;
 
   const { error } = await supabase
     .from("customers")
@@ -376,7 +308,57 @@ export async function bulkAssignCustomers(
   revalidatePath("/app/musteriler");
   for (const id of validIds) revalidatePath(`/app/musteriler/${id}`);
   revalidateTenantData(gate.tenantId);
-  return { ok: true, updatedCount: validIds.length };
+  return { ok: true, updatedCount: validIds.length, previous };
+}
+
+/**
+ * Toplu atamanın "Geri al"ı (B069): müşterileri işlem öncesi danışmanlarına döndürür. Yeni bir atama değil, önceki
+ * durumun geri yüklenmesidir: hedef bu ofisin profili (ya da danışmansız) olmalı; satış rolü şartı aranmaz (müşteri
+ * önceden çağrı merkezinin açtığı kayıt olabilir). Aynı hedefe gidenler tek UPDATE ile yazılır.
+ */
+export async function restoreCustomerAssignments(
+  previous: { id: string; assigned_to: string | null }[],
+): Promise<BulkCustomerResult> {
+  const gate = await requirePermission("customers", "edit");
+  if (!gate.ok) return { error: gate.error };
+  const rows = (Array.isArray(previous) ? previous : []).slice(0, BULK_LIMIT + 1);
+  if (rows.length === 0) return { error: "Geri alınacak atama yok." };
+  if (rows.length > BULK_LIMIT) return { error: `Tek seferde en fazla ${BULK_LIMIT} müşteri güncellenebilir.` };
+
+  const supabase = await createClient();
+  const validIds = new Set(await resolveTenantCustomerIds(supabase, gate.tenantId, rows.map((r) => String(r.id))));
+  const targets = [...new Set(rows.map((r) => r.assigned_to).filter((v): v is string => typeof v === "string" && v.length > 0))];
+  if (targets.length > 0) {
+    const { data } = await supabase.from("profiles").select("id").eq("tenant_id", gate.tenantId).in("id", targets);
+    if ((data ?? []).length !== targets.length) return { error: "Önceki danışmanlardan biri bu ofiste bulunamadı." };
+  }
+  const groups = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!validIds.has(String(r.id))) continue;
+    const key = r.assigned_to ?? "";
+    groups.set(key, [...(groups.get(key) ?? []), String(r.id)]);
+  }
+  const results = await Promise.all(
+    [...groups].map(([to, ids]) =>
+      supabase.from("customers").update({ assigned_to: to || null }).in("id", ids).eq("tenant_id", gate.tenantId),
+    ),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    console.error("restoreCustomerAssignments", failed.error);
+    return { error: actionErrorMessage(failed.error, "Atamalar geri alınamadı.") };
+  }
+  const restored = [...groups.values()].reduce((n, ids) => n + ids.length, 0);
+  afterSafe(() => logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "customer.bulk_assign_undo",
+    entityType: "customer",
+    newValue: { count: restored },
+  }));
+  revalidatePath("/app/musteriler");
+  revalidateTenantData(gate.tenantId);
+  return { ok: true, updatedCount: restored };
 }
 
 /** Birden fazla müşteriyi toplu soft delete (deleted_at) ile siler. */
@@ -968,38 +950,35 @@ export async function mergeCustomers(
 }
 
 /**
- * Müşteri kartındaki "Danışmanı değiştir" (tek müşteri). Hedef danışman bu ofisin AKTİF kullanıcısı olmalı
- * (başka ofisin kimliği yazılamaz); değişiklik denetim kaydına eski/yeni değerle düşer ve yeni danışmana
- * zil bildirimi gider (kendine atamada bildirim yok). Toplu atama: `bulkAssignCustomers`.
+ * Müşteri kartındaki "Danışmanı değiştir" (tek müşteri). Hedef danışman bu ofisin AKTİF SATIŞ rolündeki kullanıcısı
+ * olmalı (B070: salt okunur / muhasebe / çağrı merkezi reddedilir; başka ofisin kimliği yazılamaz); değişiklik denetim
+ * kaydına eski/yeni değerle düşer ve yeni danışmana zil bildirimi gider (kendine atamada bildirim yok).
+ * Sonuç döner (B063): istemci başarıda toast gösterir, hatada seçimi geri alıp nedeni yazar. Toplu atama: `bulkAssignCustomers`.
  */
-export async function reassignCustomer(formData: FormData): Promise<void> {
+export async function reassignCustomer(formData: FormData): Promise<CustomerReassignResult> {
   const gate = await requirePermission("customers", "edit");
-  if (!gate.ok) return;
+  if (!gate.ok) return { error: gate.error };
   const id = String(formData.get("id") ?? "").trim();
   const assignedTo = String(formData.get("assigned_to") ?? "").trim();
-  if (!id) return;
+  if (!id) return { error: "Müşteri bulunamadı." };
 
   const supabase = await createClient();
-  const { data: current } = await supabase
-    .from("customers")
-    .select("id, full_name, assigned_to")
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (!current) return;
+  // Müşteri ve hedef danışman bağımsız: tek turda okunur.
+  const [{ data: current }, targetRes] = await Promise.all([
+    supabase.from("customers").select("id, full_name, assigned_to").eq("id", id).eq("tenant_id", gate.tenantId).is("deleted_at", null).maybeSingle(),
+    assignedTo
+      ? supabase.from("profiles").select("id, full_name, role").eq("id", assignedTo).eq("tenant_id", gate.tenantId).eq("is_active", true).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!current) return { error: "Müşteri bulunamadı." };
   const previous = (current as { assigned_to: string | null }).assigned_to ?? null;
-  if ((assignedTo || null) === previous) return;
+  const target = targetRes.data as { id: string; full_name: string | null; role: string | null } | null;
   if (assignedTo) {
-    const { data: target } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", assignedTo)
-      .eq("tenant_id", gate.tenantId)
-      .eq("is_active", true)
-      .maybeSingle();
-    if (!target) return;
+    if (!target) return { error: "Seçilen danışman bu ofiste aktif değil." };
+    if (!isSalesAssigneeRole(target.role)) return { error: "Bu kullanıcının rolüne müşteri atanamaz (yalnız satış rolleri)." };
   }
+  const advisorName = target?.full_name ?? null;
+  if ((assignedTo || null) === previous) return { ok: true, assignedTo: previous, advisorName };
 
   const { error } = await supabase
     .from("customers")
@@ -1008,7 +987,7 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
     .eq("tenant_id", gate.tenantId);
   if (error) {
     console.error("reassignCustomer", error);
-    return;
+    return { error: actionErrorMessage(error, "Danışman değiştirilemedi.") };
   }
   afterSafe(() => logActivity({
     tenantId: gate.tenantId,
@@ -1032,7 +1011,10 @@ export async function reassignCustomer(formData: FormData): Promise<void> {
   revalidatePath("/app/musteriler");
   revalidatePath(`/app/musteriler/${id}`);
   revalidateTenantData(gate.tenantId);
+  return { ok: true, assignedTo: assignedTo || null, advisorName };
 }
+
+export type CustomerReassignResult = { ok?: boolean; error?: string; assignedTo?: string | null; advisorName?: string | null };
 
 /**
  * Müşteri notlarına tarih damgalı satır EKLER (mevcut not ezilmez).

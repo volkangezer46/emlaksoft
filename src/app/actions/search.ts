@@ -4,11 +4,12 @@ import { dealTypeLabel } from "@/lib/deal-type-label";
 import { createClient } from "@/lib/supabase/server";
 import { getStageLabels } from "@/lib/definitions";
 import { stageLabelMap } from "@/lib/deal-stage-labels";
-import { orIlike, safeLike } from "@/lib/pgrst";
+import { orIlike, phoneDigitsNeedle, safeLike, searchTermFilter } from "@/lib/pgrst";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { formatTurkishPhone } from "@/lib/phone";
-import { phoneSearchNeedle } from "@/lib/caller-lookup";
 import { getEffectivePermissions } from "@/lib/permissions-effective";
+import { getListScope } from "@/lib/access-control/list-scope";
+import { applyScopeFilter, type ScopeFilter } from "@/lib/access-control/query-scope";
 import {
   canSearchKind,
   hasOfficeWideDataScope,
@@ -54,10 +55,18 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   const q = query.trim();
   if (q.length < 2) return [];
 
+  // Bağımsız okumalar TEK turda (B035): izinler, liste kapsamı (müşteri listesiyle AYNI getListScope) ve aşama adları.
   const supabase = await createClient();
-  const permissions = await getEffectivePermissions(gate.tenantId, gate.role, gate.userId);
+  const [permissions, listScope, stageLabels] = await Promise.all([
+    getEffectivePermissions(gate.tenantId, gate.role, gate.userId),
+    getListScope({ userId: gate.userId, tenantId: gate.tenantId, role: gate.role }),
+    getStageLabels(),
+  ]);
   const canSearch = (kind: SearchableKind) => canSearchKind(permissions, kind);
   const officeWide = hasOfficeWideDataScope(gate.role);
+  // Kapsam (B059): müşteri/portföy/talep/görev listeleriyle aynı süzgeç; anlaşmalar listesi gibi ofis geneli olmayan rolde "kendi".
+  const scope: ScopeFilter = listScope.filter;
+  const dealScope: ScopeFilter = officeWide ? scope : { kind: "self", userId: gate.userId };
   // Temizleme artik ortak yardimcida: onceden `%` ve `_` birakiliyordu,
   // yani kullanici `%` yazip tum kayitlari cekebiliyordu.
   const like = safeLike(q);
@@ -66,17 +75,23 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
   const cap = Math.min(Math.max(Math.floor(limit) || 20, 1), 100);
   const factor = Math.max(1, Math.ceil(cap / 20));
   const per = (n: number) => n * factor;
-  const DEAL_STAGE_LABEL = stageLabelMap(await getStageLabels());
+  const DEAL_STAGE_LABEL = stageLabelMap(stageLabels);
 
-  // Arayan tanıma: numara her biçimde yazılabilir ("0532 123 45 67", "+90 532…"); saklama biçimine göre rakam araması.
-  const phoneNeedle = phoneSearchNeedle(q);
-  const customerBase = supabase
-    .from("customers")
-    .select("id, full_name, phone")
-    .eq("tenant_id", gate.tenantId)
-    .is("deleted_at", null);
-  let customerQuery = (phoneNeedle ? customerBase.ilike("phone", `%${phoneNeedle.needle}%`) : customerBase.or(orIlike(["full_name", "phone", "email"], q))).limit(
-    per(8),
+  // Müşteri: TEK trigram sorgusu (search_fold / phone_digits; liste ve /app/ara ile aynı searchTermFilter).
+  // Numara her biçimde yazılabilir ("0532 123 45 67", "+90 532…"): telefon görünümlüyse yalnız rakam sütununda aranır.
+  const phoneNeedle = phoneDigitsNeedle(q);
+  const customerFilter = searchTermFilter(q);
+  const customerQuery = applyScopeFilter(
+    supabase
+      .from("customers")
+      .select("id, full_name, phone")
+      .eq("tenant_id", gate.tenantId)
+      .is("deleted_at", null)
+      // Anlamsız girdi (yalnız sembol) hiçbir müşteriyle eşleşmez — tüm listeyi döndürmez.
+      .or(customerFilter ?? "id.is.null")
+      .limit(per(8)),
+    scope,
+    { ownerColumn: "assigned_to" },
   );
   let propertyQuery = supabase
     .from("properties")
@@ -122,17 +137,14 @@ export async function searchWorkspace(query: string, limit: number = 20): Promis
     .or(orIlike(["title", "notes"], q))
     .limit(per(6));
 
-  // Tenant RLS is not a substitute for the product's row scope. Roles without
-  // office-wide access may only discover records assigned to/created by them.
-  if (!officeWide) {
-    customerQuery = customerQuery.eq("assigned_to", gate.userId);
-    propertyQuery = propertyQuery.eq("assigned_to", gate.userId);
-    demandQuery = demandQuery.eq("customer.assigned_to", gate.userId);
-    ticketQuery = ticketQuery.eq("created_by", gate.userId);
-    dealsByCustomerQuery = dealsByCustomerQuery.eq("assigned_to", gate.userId);
-    dealsByPropertyQuery = dealsByPropertyQuery.eq("assigned_to", gate.userId);
-    taskQuery = taskQuery.eq("assigned_to", gate.userId);
-  }
+  // Kayıt kapsamı LİSTELERLE AYNI (B059): getListScope süzgeci (ofis bayrağı kapalıyken liste gibi ofis geneli).
+  // Destek talepleri ayrı kural: ofis geneli olmayan rol yalnız kendi açtığını görür.
+  propertyQuery = applyScopeFilter(propertyQuery, scope, { ownerColumn: "assigned_to" });
+  demandQuery = applyScopeFilter(demandQuery, scope, { ownerColumn: "customer.assigned_to" });
+  taskQuery = applyScopeFilter(taskQuery, scope, { ownerColumn: "assigned_to" });
+  dealsByCustomerQuery = applyScopeFilter(dealsByCustomerQuery, dealScope, { ownerColumn: "assigned_to" });
+  dealsByPropertyQuery = applyScopeFilter(dealsByPropertyQuery, dealScope, { ownerColumn: "assigned_to" });
+  if (!officeWide) ticketQuery = ticketQuery.eq("created_by", gate.userId);
 
   const empty = Promise.resolve({ data: [], error: null });
   const [

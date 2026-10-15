@@ -162,6 +162,117 @@ type PaletteIntent = {
 };
 
 export const PALETTE_INTENTS: readonly PaletteIntent[] = [
+  // ── Eylem fiilleri (B058): kullanıcı "müşteri ekle", "ilan paylaş" gibi günlük fiille yazar ────────────────
+  {
+    id: "yeni-musteri",
+    label: "Yeni müşteri ekle",
+    description: "Müşteri kaydı aç (aynı telefon ofiste varsa uyarır)",
+    href: "/app/musteriler/yeni",
+    icon: ICONS.musteri,
+    needs: "create",
+    module: "customers",
+    triggers: [["musteri", "ekle"], ["musteri", "olustur"], ["musteri", "kaydet"], ["yeni", "musteri"], ["kisi", "ekle"], ["alici", "ekle"]],
+  },
+  {
+    id: "yeni-portfoy",
+    label: "Yeni portföy ekle",
+    description: "İlan/portföy kaydı aç",
+    href: "/app/portfoyler/yeni",
+    icon: ICONS.portfoy,
+    needs: "create",
+    module: "properties",
+    triggers: [["portfoy", "ekle"], ["ilan", "ekle"], ["ilan", "gir"], ["yeni", "portfoy"], ["yeni", "ilan"], ["portfoy", "olustur"]],
+  },
+  {
+    id: "yeni-talep",
+    label: "Yeni talep ekle",
+    description: "Müşterinin aradığı evi kaydet",
+    href: "/app/talepler/yeni",
+    icon: ICONS.talep,
+    needs: "create",
+    module: "demands",
+    triggers: [["talep", "ekle"], ["talep", "olustur"], ["yeni", "talep"], ["arayis", "ekle"]],
+  },
+  {
+    id: "yeni-randevu",
+    label: "Randevu ver",
+    description: "Yer gösterme ya da görüşme randevusu planla",
+    href: "/app/randevular/yeni",
+    icon: ICONS.randevu,
+    needs: "create",
+    module: "appointments",
+    triggers: [["randevu", "ekle"], ["randevu", "ver"], ["randevu", "olustur"], ["yeni", "randevu"], ["randevu"]],
+  },
+  {
+    id: "ilan-paylas",
+    label: "İlan paylaş (sunum hazırla)",
+    description: "Portföyü müşteriye özel sunum bağlantısıyla gönder",
+    href: "/app/portfoyler/sunumlar/yeni",
+    icon: ICONS.sunum,
+    needs: "create",
+    module: "properties",
+    triggers: [["ilan", "paylas"], ["portfoy", "paylas"], ["paylas"], ["sunum"]],
+  },
+  {
+    id: "bugun-ozet",
+    label: "Bugün",
+    description: "Bugün ne oldu: yeni kayıtlar, randevular, dikkat gerektirenler",
+    href: "/app",
+    icon: ICONS.dashboard,
+    needs: "access",
+    module: "dashboard",
+    triggers: [["bugun"], ["ne", "oldu"], ["gunun", "ozeti"]],
+  },
+  {
+    id: "gider-ekle",
+    label: "Gelir/gider kaydı",
+    description: "Masraf ya da gelir kaydı gir",
+    href: "/app/giderler",
+    icon: ICONS.gider,
+    needs: "create",
+    module: "expenses",
+    triggers: [["gider", "ekle"], ["masraf", "ekle"], ["gelir", "ekle"], ["masraf", "gir"]],
+  },
+  {
+    id: "tahsilat",
+    label: "Komisyon tahsilatı",
+    description: "Komisyon defteri, tahsil edilen ve bekleyen",
+    href: "/app/komisyon",
+    icon: ICONS.komisyon,
+    needs: "access",
+    module: "commissions",
+    triggers: [["tahsilat"], ["tahsil"], ["alacak"]],
+  },
+  {
+    id: "arama-kaydi",
+    label: "Görüşme kaydet",
+    description: "Gelen/giden aramayı ve sonucunu kaydet",
+    href: "/app/gelen-kutusu?sekme=cagri",
+    icon: ICONS.telefon,
+    needs: "access",
+    module: "calls",
+    triggers: [["arama"], ["cagri"], ["gorusme", "kaydet"], ["arayan"]],
+  },
+  {
+    id: "ciro",
+    label: "Ciro ve satış raporu",
+    description: "Bu ayın cirosu, kapanan satışlar ve komisyon",
+    href: "/app/raporlar",
+    icon: ICONS.rapor,
+    needs: "access",
+    module: "reports",
+    triggers: [["ciro"], ["bu", "ay"], ["satis", "raporu"]],
+  },
+  {
+    id: "portala-aktar",
+    label: "Portal ilanları",
+    description: "İlanların portallardaki durumu, aktarım ve teyit",
+    href: "/app/ilan-kontrol",
+    icon: ICONS.ilanKontrol,
+    needs: "access",
+    module: "portals",
+    triggers: [["portala", "aktar"], ["portal", "aktar"], ["portal"], ["sahibinden"]],
+  },
   {
     id: "havuz",
     label: "Havuz ve atama",
@@ -286,7 +397,7 @@ export function getAppIntents(
   const tokens = foldTr(q).split(/\s+/).filter(Boolean);
   if (q.trim().length < 2 || tokens.length === 0) return [];
   const { creatable = accessible, locked = [], closed = [] } = opts;
-  return PALETTE_INTENTS.filter((intent) => {
+  const rows: PaletteEntry[] = PALETTE_INTENTS.filter((intent) => {
     const pool = intent.needs === "create" ? creatable : accessible;
     const path = intent.href.split("?")[0]!;
     if (!pool.includes(intent.module)) return false;
@@ -294,6 +405,38 @@ export function getAppIntents(
     if (locked.some((l) => path === l || path.startsWith(`${l}/`))) return false;
     return intent.triggers.some((words) => words.every((w) => tokens.some((t) => wordMatches(t, w))));
   }).map(({ label, href, icon, description }) => ({ label, href, icon, description }));
+  // Yardım indeksi (B058): "nasıl …", "… nedir", "yardım" → Yardım merkezinde bu metinle arama (rehber + SSS + sözlük).
+  if (accessible.includes("support") && !isClosedFeatureHref("/app/yardim", closed) && tokens.some((t) => HELP_WORDS.has(t))) {
+    rows.push({
+      label: `Yardımda ara: "${q.trim()}"`,
+      href: `/app/yardim?q=${encodeURIComponent(q.trim())}`,
+      icon: ICONS.destek,
+      description: "Rehberler, sık sorulanlar ve sözlük",
+    });
+  }
+  return rows;
+}
+
+const HELP_WORDS = new Set(["nasil", "nedir", "neden", "yardim", "rehber"]);
+
+/**
+ * Paletin arama modundaki SAYFA satırları (panel ile sözleşme testi AYNI işlevi kullanır): önce niyet tablosu, sonra
+ * eşleşen eylemler ve "Git" sayfaları; tekilleştirilmiş, en çok 6. Ana ekran çiplerinin her rolde en az bir sonuç
+ * vermesi bununla doğrulanır.
+ */
+export function getPaletteRows(
+  q: string,
+  opts: { accessible: readonly AppModule[]; creatable?: readonly AppModule[]; locked?: readonly string[]; closed?: readonly string[] },
+): PaletteEntry[] {
+  if (q.trim().length < 2) return [];
+  const creatable = opts.creatable ?? opts.accessible;
+  const locked = opts.locked ?? [];
+  const closed = opts.closed ?? [];
+  const intents = getAppIntents(opts.accessible, q, { creatable, locked, closed });
+  const actions = getAppActions(creatable, q, locked, closed);
+  const goItems = getAppGoItems(opts.accessible, q, closed);
+  const seen = new Set<string>();
+  return [...intents, ...actions, ...goItems].filter((e) => (seen.has(e.href) ? false : (seen.add(e.href), true))).slice(0, 6);
 }
 
 

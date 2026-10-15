@@ -1,14 +1,26 @@
 "use client";
 
-import { useActionState, useTransition, useState } from "react";
+import { useEffect, useRef, useTransition, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   MessageSquare, Mail, FileText, Users, Plus, Trash2, Clock,
   PhoneIncoming, PhoneOutgoing, PhoneMissed, ChevronDown,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { createCommunication, type CommResult } from "@/app/actions/communications";
 import { COMM_CHANNELS, COMM_OUTCOMES } from "@/lib/comm-types";
-import { msSince } from "@/lib/clock";
+import { msSince, now } from "@/lib/clock";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useToast } from "@/components/app/toast-provider";
+import {
+  Dialog,
+  DialogBody,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTrigger,
+} from "@/components/ui/inline-dialog";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -78,6 +90,210 @@ function formatDuration(sec: number) {
 const init: CommResult = {};
 
 // ---------------------------------------------------------------------------
+// Not olayları (B054): hero'daki "Not ekle", Özet'teki "Notlar" kartı ve "İletişim geçmişi" aynı notu
+// İYİMSER olarak (sunucu yanıtı beklenmeden) gösterir; sunucu onayı gelince geçici kimlik gerçeğiyle değişir,
+// hata olursa geri alınır. Tek `router.refresh()` sunucu verisini eşitler (tam sayfa yükleme yok).
+// ---------------------------------------------------------------------------
+
+const NOTE_EVENT = "es:customer-note";
+
+type NoteEvent =
+  | { customerId: string; phase: "optimistic"; item: CommRow }
+  | { customerId: string; phase: "commit"; tempId: string; id: string }
+  | { customerId: string; phase: "rollback"; tempId: string };
+
+function emitNote(detail: NoteEvent) {
+  window.dispatchEvent(new CustomEvent<NoteEvent>(NOTE_EVENT, { detail }));
+}
+
+/** Bu müşterinin not olaylarını listeye uygular (iyimser ekle → gerçek kimlik → ya da geri al). */
+function applyNoteEvent(prev: CommRow[], ev: NoteEvent): CommRow[] {
+  if (ev.phase === "optimistic") return prev.some((i) => i.id === ev.item.id) ? prev : [ev.item, ...prev];
+  if (ev.phase === "commit") {
+    // Sunucu verisi önce geldiyse (refresh) gerçek kayıt zaten listede: geçiciyi düş.
+    if (prev.some((i) => i.id === ev.id)) return prev.filter((i) => i.id !== ev.tempId);
+    return prev.map((i) => (i.id === ev.tempId ? { ...i, id: ev.id } : i));
+  }
+  return prev.filter((i) => i.id !== ev.tempId);
+}
+
+function useNoteEvents(customerId: string, onEvent: (ev: NoteEvent) => void) {
+  const handler = useRef(onEvent);
+  useEffect(() => {
+    handler.current = onEvent;
+  });
+  useEffect(() => {
+    const listen = (e: Event) => {
+      const detail = (e as CustomEvent<NoteEvent>).detail;
+      if (detail?.customerId === customerId) handler.current(detail);
+    };
+    window.addEventListener(NOTE_EVENT, listen);
+    return () => window.removeEventListener(NOTE_EVENT, listen);
+  }, [customerId]);
+}
+
+/** Sunucudan gelen liste değişince (router.refresh) yerel listeyi eşitler; bekleyen iyimser kayıtlar korunur. */
+function useSyncedItems(initialItems: CommRow[]) {
+  const [items, setItems] = useState<CommRow[]>(initialItems);
+  const [source, setSource] = useState(initialItems);
+  if (source !== initialItems) {
+    setSource(initialItems);
+    setItems((prev) => {
+      const pending = prev.filter((i) => i.id.startsWith(TEMP_PREFIX) && !initialItems.some((s) => s.body === i.body && s.channel === i.channel));
+      return [...pending, ...initialItems];
+    });
+  }
+  return [items, setItems] as const;
+}
+
+const TEMP_PREFIX = "tmp-";
+let tempSeq = 0;
+
+/** İletişim notu mu? (Özet "Notlar" kartı ve hızlı not bunları gösterir.) */
+export function isCommNote(item: Pick<CommRow, "channel" | "direction">): boolean {
+  return item.channel === "note" || item.direction === "internal";
+}
+
+/**
+ * Müşteri kartı hero'su: "Not ekle" — satır içi panel (tek alan + Kaydet; kanal "Not", yön "İç not"). Akış ≤3 dokunuş,
+ * not Notlar kartında ve iletişim geçmişinde İYİMSER görünür; çift tıklama tek not yazar; hata panelde görünür.
+ */
+export function CustomerQuickNote({ customerId, className }: { customerId: string; className?: string }) {
+  const router = useRouter();
+  const { push } = useToast();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const inFlight = useRef(false);
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (inFlight.current) return;
+    const form = e.currentTarget;
+    const body = String(new FormData(form).get("body") ?? "").trim();
+    if (!body) {
+      setError("Not boş olamaz.");
+      return;
+    }
+    inFlight.current = true;
+    setError(null);
+    const tempId = `${TEMP_PREFIX}${++tempSeq}`;
+    emitNote({
+      customerId,
+      phase: "optimistic",
+      item: {
+        id: tempId,
+        channel: "note",
+        direction: "internal",
+        subject: null,
+        body,
+        outcome: null,
+        duration_sec: null,
+        scheduled_at: null,
+        created_at: new Date(now()).toISOString(),
+        created_by: { full_name: "Siz" },
+      },
+    });
+    const fd = new FormData();
+    fd.set("customer_id", customerId);
+    fd.set("channel", "note");
+    fd.set("direction", "internal");
+    fd.set("body", body);
+    startTransition(async () => {
+      try {
+        const res = await createCommunication(init, fd);
+        if (res.ok && res.id) {
+          emitNote({ customerId, phase: "commit", tempId, id: res.id });
+          push("Not eklendi", "ok");
+          form.reset();
+          setOpen(false);
+          router.refresh();
+        } else {
+          emitNote({ customerId, phase: "rollback", tempId });
+          setError(res.error ?? "Not kaydedilemedi. Lütfen tekrar deneyin.");
+        }
+      } catch {
+        emitNote({ customerId, phase: "rollback", tempId });
+        setError("Bağlantı hatası: not kaydedilemedi. Lütfen tekrar deneyin.");
+      } finally {
+        inFlight.current = false;
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setError(null); }}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" icon={MessageSquare} className={className}>
+          Not ekle
+        </Button>
+      </DialogTrigger>
+      <DialogContent size="md">
+        <DialogHeader title="Not ekle" description="İç not olarak kaydedilir; Notlar kartında ve iletişim geçmişinde görünür." />
+        <form onSubmit={submit}>
+          <DialogBody>
+            <label htmlFor={`quick-note-${customerId}`} className="sr-only">Not</label>
+            <textarea
+              id={`quick-note-${customerId}`}
+              aria-label="Not"
+              name="body"
+              rows={3}
+              required
+              maxLength={4000}
+              placeholder="Görüşme özeti, hatırlatma…"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
+              className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300 touch:text-base"
+            />
+            {error ? (
+              <p role="alert" className="mt-2 rounded-[var(--radius-control)] bg-danger-500/8 px-3 py-2 text-xs font-medium text-danger-600">{error}</p>
+            ) : null}
+          </DialogBody>
+          <DialogFooter>
+            <DialogClose className="rounded-[var(--radius-control)] border border-line px-3.5 py-2 text-sm font-semibold text-ink-950 touch:min-h-11">Vazgeç</DialogClose>
+            <Button type="submit" size="sm" icon={Plus} loading={pending}>
+              {pending ? "Kaydediliyor…" : "Kaydet"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Özet "Notlar" kartı: son 3 iletişim notu (iyimser eklenen dahil). Not yoksa `emptyText` (verilmediyse hiçbir şey). */
+export function RecentNotes({
+  customerId,
+  initialItems,
+  limit = 3,
+  emptyText,
+}: {
+  customerId: string;
+  initialItems: CommRow[];
+  limit?: number;
+  emptyText?: string;
+}) {
+  const [items, setItems] = useSyncedItems(initialItems);
+  useNoteEvents(customerId, (ev) => setItems((prev) => applyNoteEvent(prev, ev)));
+  const notes = items.filter(isCommNote).slice(0, limit);
+  if (notes.length === 0) return emptyText ? <p className="mt-3 text-sm text-text-muted">{emptyText}</p> : null;
+  return (
+    <ul className="mt-3 space-y-2" aria-label="Son notlar">
+      {notes.map((n) => (
+        <li key={n.id} className={`rounded-[var(--radius-control)] border border-line bg-canvas/60 px-3 py-2 ${n.id.startsWith(TEMP_PREFIX) ? "opacity-70" : ""}`}>
+          <p className="line-clamp-3 whitespace-pre-line text-sm text-ink-950">{n.body ?? n.subject}</p>
+          <p className="mt-0.5 text-xs text-text-faint">{authorName(n.created_by)} · {relTime(n.created_at)}</p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -90,21 +306,53 @@ export function CommunicationTimeline({
   initialItems: CommRow[];
   canCreate: boolean;
 }) {
-  const [items, setItems] = useState<CommRow[]>(initialItems);
+  const router = useRouter();
+  const { push } = useToast();
+  const [items, setItems] = useSyncedItems(initialItems);
   const [showForm, setShowForm] = useState(false);
-  const [state, , isPending] = useActionState(createCommunication, init);
-  const [, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const inFlight = useRef(false);
+  useNoteEvents(customerId, (ev) => setItems((prev) => applyNoteEvent(prev, ev)));
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    // Çift gönderim kilidi: pending bir sonraki render'a kadar güncellenmez; ref anında kilitler.
+    if (inFlight.current) return;
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     fd.set("customer_id", customerId);
+    inFlight.current = true;
+    setError(null);
     startTransition(async () => {
-      const result = await createCommunication(init, fd);
-      if (result.ok) {
-        setShowForm(false);
-        // Optimistic: reload sayfası yerine basit refresh
-        window.location.reload();
+      try {
+        const result = await createCommunication(init, fd);
+        if (result.ok && result.id) {
+          const created: CommRow = {
+            id: result.id,
+            channel: String(fd.get("channel") ?? "note"),
+            direction: String(fd.get("direction") ?? "outbound"),
+            subject: null,
+            body: String(fd.get("body") ?? "").trim() || null,
+            outcome: String(fd.get("outcome") ?? "") || null,
+            duration_sec: Number(fd.get("duration_sec")) || null,
+            scheduled_at: null,
+            created_at: new Date(now()).toISOString(),
+            created_by: { full_name: "Siz" },
+          };
+          // İyimser ekleme + tek tazeleme (tam sayfa yükleme yok); Notlar kartı da aynı olayla güncellenir.
+          emitNote({ customerId, phase: "optimistic", item: created });
+          form.reset();
+          setShowForm(false);
+          push("Kayıt eklendi", "ok");
+          router.refresh();
+        } else {
+          setError(result.error ?? "İletişim kaydı oluşturulamadı.");
+        }
+      } catch {
+        setError("Bağlantı hatası: kayıt oluşturulamadı. Lütfen tekrar deneyin.");
+      } finally {
+        inFlight.current = false;
       }
     });
   }
@@ -177,8 +425,8 @@ export function CommunicationTimeline({
             <textarea id="ct-body" name="body" rows={3} placeholder="Görüşme özeti, mesaj içeriği veya not…" className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-brand-300" />
           </div>
 
-          {state?.error && (
-            <p role="alert" className="rounded-[var(--radius-control)] bg-red-50 px-3 py-2 text-xs text-red-600">{state.error}</p>
+          {error && (
+            <p role="alert" className="rounded-[var(--radius-control)] bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
           )}
 
           <div className="flex justify-end">
@@ -247,9 +495,14 @@ export function CommunicationTimeline({
                     description="İletişim kaydı kalıcı olarak silinir."
                     confirmLabel="Sil"
                     onConfirm={() => {
+                      if (item.id.startsWith(TEMP_PREFIX)) return;
                       startTransition(async () => {
                         const { deleteCommunication } = await import("@/app/actions/communications");
-                        await deleteCommunication(item.id, customerId);
+                        const res = await deleteCommunication(item.id, customerId);
+                        if (res.error) {
+                          push(res.error, "err");
+                          return;
+                        }
                         setItems((prev) => prev.filter((i) => i.id !== item.id));
                       });
                     }}

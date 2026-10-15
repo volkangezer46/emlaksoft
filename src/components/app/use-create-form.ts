@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/app/toast-provider";
+import { clearActiveFormDrafts } from "@/components/app/use-form-draft";
 import { takeSubmitIntent } from "@/lib/form-submit-intent";
 import { resolveSubmitOutcome, type FormResultLike, type SubmitOptions } from "@/lib/form-logic";
 
@@ -68,6 +69,9 @@ export function useCreateForm<R extends FormResultLike>(
         console.error("useCreateForm.afterSuccess", e);
       }
       push(outcome.message, "ok");
+      // B097a: taslak, yönlendirmeden ÖNCE silinir (kabuk pending=false anını görmeden ayrılır; aksi halde sonraki
+      // açılışta "taslak var" bandı çıkardı). Form dosyalarına dokunmadan tüm taslaklı formlar için geçerli.
+      clearActiveFormDrafts();
       if (intent === "new") {
         // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın (alan durumu sıfırlansın) — tam yükleme.
         // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- bilinçli tam yükleme: form durumu sıfırlanır

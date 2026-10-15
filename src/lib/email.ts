@@ -11,9 +11,13 @@
 const LOCAL_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*$/;
 const LABEL_RE = /^[\p{L}\p{N}](?:[\p{L}\p{N}-]*[\p{L}\p{N}])?$/u;
 
-/** Kırpar, NFC'ye çevirir, küçük harfe çevirir ('I' -> 'i'; yerel ayardan bağımsız). */
+/**
+ * Kırpar, NFC'ye çevirir, küçük harfe çevirir ('I' -> 'i'; yerel ayardan bağımsız).
+ * Türkçe 'İ' ÖNCE 'i' olur (B097b): `toLowerCase('İ')` 'i' + birleşen nokta (U+0307) üretip "SELİN@ornek.com"u geçersiz
+ * sayıyordu. Aynı yardımcı istemcide ve sunucuda kullanılır.
+ */
 export function normalizeEmail(input: string | null | undefined): string {
-  return (input ?? "").normalize("NFC").trim().toLowerCase();
+  return (input ?? "").normalize("NFC").trim().replace(/İ/g, "i").toLowerCase();
 }
 
 export function isValidEmail(input: string | null | undefined): boolean {

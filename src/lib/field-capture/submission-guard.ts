@@ -116,24 +116,34 @@ export function supabaseSubmissionStore(supabase: SupabaseClient): SubmissionSto
 
 /**
  * `run` yalnız bu istek kimliğiyle daha önce kayıt AÇILMADIYSA çalışır. Kimlik yoksa (eski istemci) doğrudan çalışır.
+ *
+ * Hız seçenekleri (SK7 / B033 — müşteri formu):
+ *  - `prepare`: fren kaydıyla AYNI turda başlatılan bağımsız okumalar (mükerrer kontrolü, özel alan hazırlığı); sonucu
+ *    `run`'a verilir. Fren "zaten kaydedildi/gönderiliyor" derse sonuç kullanılmaz.
+ *  - `defer`: kapanış (complete/release + budama) yanıtı bekletmesin diye `after()` içine alınır. Kapanış gelene kadar aynı
+ *    kimlikle gelen ikinci istek "gönderiliyor" yanıtı alır (yeni kayıt açılmaz).
  */
-export async function onceByRequest<T extends GuardedResult>(
+export async function onceByRequest<T extends GuardedResult, P = undefined>(
   store: SubmissionStore,
   ctx: { tenantId: string; userId: string },
   kind: SubmissionKind,
   requestId: string | null,
-  run: () => Promise<T>,
+  run: (prepared: P) => Promise<T>,
+  opts: { prepare?: () => Promise<P>; defer?: (task: () => Promise<void>) => void } = {},
 ): Promise<T | GuardedResult> {
-  if (!requestId) return run();
+  const preparedP: Promise<P> = opts.prepare ? opts.prepare() : Promise.resolve(undefined as P);
+  // Fren erken dönerse hazırlık sonucu beklenmez: yakalanmamış red olmasın.
+  preparedP.catch(() => undefined);
+  if (!requestId) return run(await preparedP);
   const key: SubmissionKey = { ...ctx, requestId };
   const iso = (ms: number) => new Date(ms).toISOString();
 
   const claim = await store.claim(key, kind);
   if (claim.error) {
-    if (isMissingSubmissionTable(claim.error)) return run();
+    if (isMissingSubmissionTable(claim.error)) return run(await preparedP);
     if (claim.error.code !== "23505") {
       console.error("client_submissions claim", { code: claim.error.code ?? null });
-      return run();
+      return run(await preparedP);
     }
     const prev = await store.read(key);
     if (prev?.completed_at) return { ok: true, ...(prev.result_id ? { id: prev.result_id } : {}) };
@@ -147,18 +157,23 @@ export async function onceByRequest<T extends GuardedResult>(
 
   let res: T;
   try {
-    res = await run();
+    res = await run(await preparedP);
   } catch (e) {
     await store.release(key).catch(() => undefined);
     throw e;
   }
-  try {
-    if (res.ok) await store.complete(key, res.id && UUID_RE.test(res.id) ? res.id : null, iso(now()));
-    else await store.release(key);
-    await store.prune(ctx.tenantId, ctx.userId, iso(now() - RETENTION_MS));
-  } catch (e) {
-    // Fren kaydı yazılamadı: kayıt yine de açıldı/açılmadı; sonucu bozmayız.
-    console.error("client_submissions finalize", e instanceof Error ? e.message : "bilinmeyen hata");
-  }
+  const finalize = async () => {
+    try {
+      if (res.ok) await store.complete(key, res.id && UUID_RE.test(res.id) ? res.id : null, iso(now()));
+      else await store.release(key);
+      await store.prune(ctx.tenantId, ctx.userId, iso(now() - RETENTION_MS));
+    } catch (e) {
+      // Fren kaydı yazılamadı: kayıt yine de açıldı/açılmadı; sonucu bozmayız.
+      console.error("client_submissions finalize", e instanceof Error ? e.message : "bilinmeyen hata");
+    }
+  };
+  // Ret (doğrulama/mükerrer) kapanışı HEMEN yapılır: kullanıcı aynı kimlikle onaylayıp yeniden gönderebilsin.
+  if (opts.defer && res.ok) opts.defer(finalize);
+  else await finalize();
   return res;
 }

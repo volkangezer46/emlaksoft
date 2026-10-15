@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ScopeFilter } from "@/lib/access-control/query-scope";
 import {
   PROPERTY_REASON_LABEL,
   demandsSimilar,
@@ -14,9 +15,13 @@ import {
  * Mükerrer arama sorguları (salt-okunur). Kullanıcı oturumlu client ile çalışır (RLS + açık tenant filtresi);
  * kapsam dışı satırlar `scopeHit` ile maskelenir. İndeks: customers(tenant_id, phone) VAR;
  * e-posta için (tenant_id, email) indeksi YOK (küçük tenant'ta sorun değil; büyürse migration önerilir).
+ *
+ * KAPSAM (B059): görünürlük müşteri LİSTESİYLE aynı süzgeçtir (`Viewer.scope` = getListScope().filter). Verilmezse eski
+ * kural (ofis geneli rol ya da kendine atanmış). Kapsam dışı TAM telefon eşleşmesi SECURITY DEFINER
+ * `lookup_customer_by_phone` ile yalnız ad + maskeli telefon + danışman adı olarak gelir ("Bu numara X danışmanının müşterisi").
  */
 
-export type Viewer = { userId: string; officeWide: boolean };
+export type Viewer = { userId: string; officeWide: boolean; scope?: ScopeFilter };
 
 const MAX_HITS = 3;
 
@@ -24,6 +29,20 @@ const EMPTY_HIT: DuplicateHit = {
   id: null, visible: true, label: null, advisor: null, lastContact: null,
   code: null, price: null, status: null, reasons: [],
 };
+
+/** Kayıt sahibi (assigned_to) bu bakana açık mı? Liste kapsamı verildiyse O, yoksa eski rol kuralı. */
+export function viewerCanSee(viewer: Viewer, ownerId: string | null): boolean {
+  const s = viewer.scope;
+  if (!s) return viewer.officeWide || (!!ownerId && ownerId === viewer.userId);
+  if (s.kind === "none") return true;
+  if (s.kind === "self") return !!ownerId && ownerId === s.userId;
+  return !!ownerId && s.ids.includes(ownerId);
+}
+
+/** scopeHit'e geçen biçim: kapsam kararı burada verilir (duplicate-match saf kalır). */
+function scopeViewer(viewer: Viewer, ownerId: string | null): { userId: string; officeWide: boolean } {
+  return { userId: viewer.userId, officeWide: viewerCanSee(viewer, ownerId) };
+}
 
 async function advisorNames(supabase: SupabaseClient, tenantId: string, ids: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -33,74 +52,121 @@ async function advisorNames(supabase: SupabaseClient, tenantId: string, ids: str
   return out;
 }
 
+/** Kapsam dışı müşteri ipucu (yalnız maskeli bilgi; kimlik/e-posta/not YOK). */
+export type ForeignCustomerHint = { name: string; phoneMasked: string; advisor: string | null };
+
+/**
+ * Tam telefon eşleşmesi — kapsam dışı dahil, maskeli (SECURITY DEFINER RPC; kiracı + customers:view şartlı).
+ * RPC yoksa (migration öncesi) ya da hata olursa boş liste: ipucu atlanır, akış bozulmaz.
+ */
+export async function lookupForeignCustomersByPhone(
+  supabase: SupabaseClient,
+  phone: string,
+  excludeIds: readonly string[] = [],
+): Promise<ForeignCustomerHint[]> {
+  const variants = phoneLookupVariants(phone);
+  if (variants.length === 0) return [];
+  try {
+    const { data, error } = await supabase.rpc("lookup_customer_by_phone", { p_phone: variants[0], p_exclude: [...excludeIds] });
+    if (error || !Array.isArray(data)) return [];
+    // Yalnız RPC sözleşmesine uyan satırlar (ad + maskeli telefon + danışman adı); başka biçim yok sayılır.
+    return (data as Record<string, unknown>[])
+      .filter((r) => r && typeof r === "object" && "phone_masked" in r && "full_name" in r)
+      .map((r) => ({
+        name: typeof r.full_name === "string" && r.full_name ? r.full_name : "Adsız kayıt",
+        phoneMasked: typeof r.phone_masked === "string" ? r.phone_masked : "",
+        advisor: typeof r.advisor_name === "string" && r.advisor_name ? r.advisor_name : null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 type CustomerRow = { id: string; full_name: string; phone: string | null; email: string | null; assigned_to: string | null; created_by: string | null };
 
+/** Telefon/e-posta eşleşmeleri TEK turda (telefon ∥ e-posta). */
+async function customerMatches(
+  supabase: SupabaseClient,
+  args: { tenantId: string; variants: string[]; email: string },
+  cols: string,
+): Promise<{ phone: CustomerRow[]; email: CustomerRow[] }> {
+  const base = () => supabase.from("customers").select(cols).eq("tenant_id", args.tenantId).is("deleted_at", null);
+  const none = Promise.resolve({ data: [] as CustomerRow[] });
+  const [byPhone, byEmail] = await Promise.all([
+    args.variants.length > 0 ? base().in("phone", args.variants).limit(10) : none,
+    args.email ? base().eq("email", args.email).limit(10) : none,
+  ]);
+  return {
+    phone: ((byPhone as { data: unknown }).data ?? []) as CustomerRow[],
+    email: ((byEmail as { data: unknown }).data ?? []) as CustomerRow[],
+  };
+}
+
+/**
+ * Giriş anı mükerrer uyarısı. `detail: false` ilk (hızlı) yanıttır: tek tur (telefon ∥ e-posta ∥ kapsam dışı RPC),
+ * ad + eşleşme nedeni; danışman adı ve son temas yok. `detail: true` (varsayılan) ikinci turda bunları ekler.
+ */
 export async function findCustomerDuplicates(
   supabase: SupabaseClient,
   args: { tenantId: string; phone: string; email: string; excludeId?: string },
   viewer: Viewer,
+  opts: { detail?: boolean } = {},
 ): Promise<DuplicateHit[]> {
+  const detail = opts.detail ?? true;
   const variants = phoneLookupVariants(args.phone);
   const email = emailLookupKey(args.email);
   if (variants.length === 0 && !email) return [];
 
+  const [matches, foreign] = await Promise.all([
+    customerMatches(supabase, { tenantId: args.tenantId, variants, email }, "id, full_name, phone, email, assigned_to, created_by"),
+    variants.length > 0 ? lookupForeignCustomersByPhone(supabase, args.phone) : Promise.resolve([] as ForeignCustomerHint[]),
+  ]);
+
   const found = new Map<string, { row: CustomerRow; reasons: Set<string> }>();
-  const add = (rows: CustomerRow[] | null, reason: string) => {
-    for (const r of rows ?? []) {
+  const add = (rows: CustomerRow[], reason: string) => {
+    for (const r of rows) {
       if (args.excludeId && r.id === args.excludeId) continue;
       const e = found.get(r.id) ?? { row: r, reasons: new Set<string>() };
       e.reasons.add(reason);
       found.set(r.id, e);
     }
   };
-  const cols = "id, full_name, phone, email, assigned_to, created_by";
-  if (variants.length > 0) {
-    const { data } = await supabase
-      .from("customers")
-      .select(cols)
-      .eq("tenant_id", args.tenantId)
-      .is("deleted_at", null)
-      .in("phone", variants)
-      .limit(10);
-    add(data as CustomerRow[] | null, "telefon");
-  }
-  if (email) {
-    const { data } = await supabase
-      .from("customers")
-      .select(cols)
-      .eq("tenant_id", args.tenantId)
-      .is("deleted_at", null)
-      .eq("email", email)
-      .limit(10);
-    add(data as CustomerRow[] | null, "e-posta");
-  }
-  const entries = [...found.values()].slice(0, MAX_HITS);
-  if (entries.length === 0) return [];
+  add(matches.phone, "telefon");
+  add(matches.email, "e-posta");
+  const entries = [...found.values()];
 
-  const visibleIds = entries
-    .filter((e) => viewer.officeWide || e.row.assigned_to === viewer.userId)
-    .map((e) => e.row.id);
-  const advisors = await advisorNames(
-    supabase,
-    args.tenantId,
-    [...new Set(entries.filter((e) => visibleIds.includes(e.row.id)).map((e) => e.row.assigned_to).filter((v): v is string => !!v))],
-  );
+  const visible = entries.filter((e) => viewerCanSee(viewer, e.row.assigned_to));
+  const hiddenNonPhone = entries.filter((e) => !viewerCanSee(viewer, e.row.assigned_to) && !e.reasons.has("telefon"));
+  const hiddenPhone = entries.filter((e) => !viewerCanSee(viewer, e.row.assigned_to) && e.reasons.has("telefon"));
+  // Kapsam dışı telefon eşleşmesi: RPC'nin maskeli satırları. Görünen kayıtlar RPC'de de vardır: hepsi görünüyorsa maskeli
+  // satır yok; karışıksa (aynı numara hem kapsamda hem dışında — nadir) görünenler hariç tutularak bir kez daha sorulur.
+  // RPC yoksa (migration öncesi) RLS'in döndürdüğü kapsam dışı satırlar eskisi gibi maskelenir.
+  const visiblePhoneIds = visible.filter((e) => e.reasons.has("telefon")).map((e) => e.row.id);
+  const foreignRows =
+    visiblePhoneIds.length === 0
+      ? foreign
+      : foreign.length > visiblePhoneIds.length
+        ? await lookupForeignCustomersByPhone(supabase, args.phone, visiblePhoneIds)
+        : [];
+
   const lastContact = new Map<string, string | null>();
-  if (visibleIds.length > 0) {
-    try {
-      const { data } = await supabase.rpc("customer_heat_signals", { p_tenant_id: args.tenantId, p_customer_ids: visibleIds });
-      for (const s of (data ?? []) as { customer_id: string; last_contact: string | null }[]) {
-        lastContact.set(s.customer_id, s.last_contact);
-      }
-    } catch {
-      // son temas bilgisi isteğe bağlı
+  let advisors = new Map<string, string>();
+  const visibleIds = visible.map((e) => e.row.id).slice(0, MAX_HITS);
+  if (detail && visibleIds.length > 0) {
+    const owners = [...new Set(visible.map((e) => e.row.assigned_to).filter((v): v is string => !!v))];
+    const [names, heat] = await Promise.all([
+      advisorNames(supabase, args.tenantId, owners),
+      Promise.resolve(supabase.rpc("customer_heat_signals", { p_tenant_id: args.tenantId, p_customer_ids: visibleIds })).catch(() => ({ data: null })),
+    ]);
+    advisors = names;
+    for (const s of ((heat as { data: unknown }).data ?? []) as { customer_id: string; last_contact: string | null }[]) {
+      lastContact.set(s.customer_id, s.last_contact);
     }
   }
 
-  return entries.map(({ row, reasons }) => {
-    // Gizlilik: ayrıntı yalnız ofis geneli kapsam ya da KENDİNE ATANMIŞ kayıtta açılır (created_by yetmez).
-    const owner = row.assigned_to;
-    return scopeHit(
+  const out: DuplicateHit[] = visible.map(({ row, reasons }) =>
+    // Gizlilik: ayrıntı yalnız liste kapsamındaki kayıtta açılır (created_by yetmez).
+    scopeHit(
       {
         ...EMPTY_HIT,
         id: row.id,
@@ -109,11 +175,56 @@ export async function findCustomerDuplicates(
         lastContact: lastContact.get(row.id) ?? null,
         reasons: [...reasons],
       },
-      owner,
-      viewer,
-    );
-  });
+      row.assigned_to,
+      scopeViewer(viewer, row.assigned_to),
+    ),
+  );
+  if (foreignRows.length > 0) {
+    for (const f of foreignRows) {
+      // Kimlik yok (id=null, kayıt açılamaz); yalnız ad + danışman: "Bu numara X danışmanının müşterisi".
+      out.push({ ...EMPTY_HIT, visible: false, label: f.name, advisor: f.advisor, reasons: ["telefon"] });
+    }
+  } else {
+    for (const e of hiddenPhone) out.push(scopeHit({ ...EMPTY_HIT, reasons: [...e.reasons] }, e.row.assigned_to, scopeViewer(viewer, e.row.assigned_to)));
+  }
+  for (const e of hiddenNonPhone) out.push(scopeHit({ ...EMPTY_HIT, reasons: [...e.reasons] }, e.row.assigned_to, scopeViewer(viewer, e.row.assigned_to)));
+  return out.slice(0, MAX_HITS);
 }
+
+export type DuplicateGate = { duplicate: false } | { duplicate: true; count: number };
+
+/**
+ * TEK sunucu mükerrer kapısı (B092): aynı telefon ya da e-posta ofiste (kapsam dışı dahil) kayıtlıysa, kasıtlı onay
+ * (`allow_duplicate=1`) olmadan yeni müşteri açılmaz. Tek tur (telefon ∥ e-posta ∥ maskeli RPC). Kapı sorgusu hata
+ * verirse kayıt ENGELLENMEZ (fail-open; kayıt kaybı mükerrerden daha kötü), hata günlüğe düşer.
+ */
+export async function assertCustomerNotDuplicate(
+  supabase: SupabaseClient,
+  ctx: { tenantId: string },
+  input: { phone: string; email: string },
+  allowDuplicate: boolean,
+): Promise<DuplicateGate> {
+  if (allowDuplicate) return { duplicate: false };
+  const variants = phoneLookupVariants(input.phone);
+  const email = emailLookupKey(input.email);
+  if (variants.length === 0 && !email) return { duplicate: false };
+  try {
+    const [matches, foreign] = await Promise.all([
+      customerMatches(supabase, { tenantId: ctx.tenantId, variants, email }, "id"),
+      variants.length > 0 ? lookupForeignCustomersByPhone(supabase, input.phone) : Promise.resolve([] as ForeignCustomerHint[]),
+    ]);
+    const ids = new Set([...matches.phone, ...matches.email].map((r) => r.id));
+    const count = Math.max(ids.size, foreign.length);
+    return count > 0 ? { duplicate: true, count } : { duplicate: false };
+  } catch (e) {
+    console.error("assertCustomerNotDuplicate", e instanceof Error ? e.message : "bilinmeyen hata");
+    return { duplicate: false };
+  }
+}
+
+/** Mükerrer reddinin kullanıcı metni (form "Yine de yeni kayıt" / hızlı kayıt "Yine de kaydet" ile onaylanır). */
+export const CUSTOMER_DUPLICATE_ERROR =
+  "Bu telefon/e-posta ile ofiste kayıt var. Mevcut kaydı kontrol edin; farklı kişiyse onaylayıp yine de yeni kayıt açın.";
 
 type PropertyRow = {
   id: string; property_code: string; title: string | null; address_line: string | null;

@@ -2,9 +2,12 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/require-permission";
-import { orIlike } from "@/lib/pgrst";
+import { orIlike, phoneDigitsNeedle, searchTermFilter } from "@/lib/pgrst";
+import { getListScope } from "@/lib/access-control/list-scope";
+import { applyScopeFilter } from "@/lib/access-control/query-scope";
 import type { ComboboxOption } from "@/components/ui/combobox";
 import { DEAL_OPTION_SELECT, dealOptionLabel, type DealOptionSource } from "@/lib/deal-option-label";
+import { lookupForeignCustomersByPhone, type ForeignCustomerHint } from "@/lib/duplicate-finders";
 
 /**
  * Seçici kutuları için sunucu taraflı arama.
@@ -36,15 +39,25 @@ export async function searchCustomers(query: string): Promise<ComboboxOption[]> 
 
   const q = query.trim();
   if (q.length < MIN_QUERY) return [];
+  const filter = searchTermFilter(q);
+  if (!filter) return [];
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("customers")
-    .select("id, full_name, phone")
-    .is("deleted_at", null)
-    .or(orIlike(["full_name", "phone", "email"], q))
-    .order("full_name")
-    .limit(LIMIT);
+  // Kapsam müşteri LİSTESİYLE AYNI (B059); arama tek çekirdekten (Türkçe katlama + telefon rakamları, B060).
+  const [supabase, listScope] = await Promise.all([
+    createClient(),
+    getListScope({ userId: gate.userId, tenantId: gate.tenantId, role: gate.role }),
+  ]);
+  const { data, error } = await applyScopeFilter(
+    supabase
+      .from("customers")
+      .select("id, full_name, phone")
+      .is("deleted_at", null)
+      .or(filter)
+      .order("full_name")
+      .limit(LIMIT),
+    listScope.filter,
+    { ownerColumn: "assigned_to" },
+  );
 
   if (error || !data) return [];
   return data.map((c) => ({
@@ -52,6 +65,56 @@ export async function searchCustomers(query: string): Promise<ComboboxOption[]> 
     label: c.full_name ?? "İsimsiz",
     hint: c.phone ?? undefined,
   }));
+}
+
+export type CallerPhoneLookup = {
+  /** Kapsam içindeki TEK eşleşme (birden çoksa ya da yoksa null: konsol seçmez). */
+  match: (ComboboxOption & { phone: string | null }) | null;
+  /** Kapsam içi eşleşme sayısı (0, 1 ya da "2+" için 2). */
+  count: number;
+  /** Kapsam DIŞI tam eşleşme: yalnız ad, maskeli telefon, danışman adı ("Bu numara X danışmanının müşterisi"). */
+  foreign: ForeignCustomerHint[];
+};
+
+/**
+ * Çağrı konsolu: numara tamamlanınca arayan müşteriyi bulur (B064). Kapsam içi tek eşleşme otomatik seçilir; kapsam dışı
+ * tam eşleşmede yalnız maskeli bilgi döner (SECURITY DEFINER `lookup_customer_by_phone`). Salt-okunur.
+ */
+export async function lookupCustomerByPhone(phone: string): Promise<CallerPhoneLookup> {
+  const empty: CallerPhoneLookup = { match: null, count: 0, foreign: [] };
+  const gate = await requirePermission("customers", "view");
+  if (!gate.ok) return empty;
+  const needle = phoneDigitsNeedle(String(phone ?? "").slice(0, 40));
+  if (!needle || needle.length < 10) return empty;
+
+  const [supabase, listScope] = await Promise.all([
+    createClient(),
+    getListScope({ userId: gate.userId, tenantId: gate.tenantId, role: gate.role }),
+  ]);
+  const [own, foreign] = await Promise.all([
+    applyScopeFilter(
+      supabase
+        .from("customers")
+        .select("id, full_name, phone")
+        .eq("tenant_id", gate.tenantId)
+        .is("deleted_at", null)
+        .ilike("phone_digits", `%${needle}%`)
+        .limit(2),
+      listScope.filter,
+      { ownerColumn: "assigned_to" },
+    ),
+    lookupForeignCustomersByPhone(supabase, phone),
+  ]);
+  const rows = (own.data ?? []) as { id: string; full_name: string | null; phone: string | null }[];
+  if (rows.length > 0) {
+    const one = rows.length === 1 ? rows[0]! : null;
+    return {
+      match: one ? { value: one.id, label: one.full_name ?? "İsimsiz", hint: one.phone ?? undefined, phone: one.phone } : null,
+      count: rows.length,
+      foreign: [],
+    };
+  }
+  return { match: null, count: 0, foreign };
 }
 
 /** Portföy arama sonucu: seçici seçeneği + liste fiyatı / işlem türü (form ön dolgusu için). */
@@ -205,7 +268,8 @@ export async function searchDeals(query: string): Promise<ComboboxOption[]> {
 
   const supabase = await createClient();
   const [{ data: cust }, { data: props }] = await Promise.all([
-    supabase.from("customers").select("id").is("deleted_at", null).or(orIlike(["full_name"], q)).limit(LIMIT),
+    // Müşteri adı araması tek çekirdekten (Türkçe katlamalı search_fold; "isik" → "Işık").
+    supabase.from("customers").select("id").is("deleted_at", null).or(searchTermFilter(q) ?? "id.is.null").limit(LIMIT),
     supabase.from("properties").select("id").is("deleted_at", null).or(orIlike(["property_code", "title"], q)).limit(LIMIT),
   ]);
   const custIds = (cust ?? []).map((c) => c.id as string);

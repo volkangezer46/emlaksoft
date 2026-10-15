@@ -22,7 +22,7 @@ import { DetailSegmentTabs, type DetailTabDef } from "@/components/app/detail-ta
 import { EmptyStateV3 } from "@/components/ui/empty-state";
 import { NO_CUSTOMER_CTAS, type CustomerCtaPermissions } from "./customer-cta-perms";
 import { CustomerFilesTab } from "./customer-files-tab";
-import { CommunicationTimeline } from "@/components/app/communication-timeline";
+import { CommunicationTimeline, RecentNotes } from "@/components/app/communication-timeline";
 import { formatLeadSource } from "@/lib/lead-sources";
 import { ActivityTimeline, type TimelineCategory, type TimelineEvent } from "@/components/ui/activity-timeline";
 import { APPT_STATUS_LABEL, APPT_TYPE_LABEL, CONTRACT_STATUS_LABEL, OFFER_STATUS_LABEL } from "@/lib/activity-timeline-sources";
@@ -429,7 +429,9 @@ export function Customer360Tabs({
             <h2 className="flex items-center gap-2 font-display font-bold text-ink-950">
               <Sparkles className="h-4 w-4 text-amber-500" /> Notlar
             </h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes || "Not eklenmedi."}</p>
+            {notes ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-text-muted">{notes}</p> : null}
+            {/* Son 3 iletişim notu (hero "Not ekle" ile eklenen not burada İYİMSER görünür, B054). */}
+            <RecentNotes customerId={customerId} initialItems={communications} emptyText={notes ? undefined : "Not eklenmedi."} />
             <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4 text-xs text-text-faint">
               <span>
                 Kaynak: {formatLeadSource(source) ?? "belirtilmedi"}

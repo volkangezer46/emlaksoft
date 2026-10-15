@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseTrLocalDateTime, toTrLocalInput } from "@/lib/clock";
 import { PHONE_ERROR_MESSAGE } from "@/lib/phone";
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { parseMoneyInput } from "@/lib/money-input";
 import { isOwnerSideCustomerType } from "@/lib/demand-criteria";
 import { validateGeoChain } from "@/lib/geo/reader";
 import { isValidPoint, suggestGeoForPoint, type GeoPointSuggestion } from "@/lib/geo/nearest";
@@ -84,6 +85,9 @@ export async function quickCreateCustomer(formData: FormData): Promise<CustomerR
   out.set("phone", phone);
   if (type) out.set("type", type);
   out.set("notes", String(formData.get("notes") ?? ""));
+  // Mükerrer kapısı createCustomer'da (B092): aynı telefon ofiste varsa `duplicate: true` döner; hızlı form "Yine de kaydet"
+  // ile (çevrimdışı kuyruktan geri yüklenen kayıt da) allow_duplicate=1 gönderir.
+  if (formData.get("allow_duplicate") === "1") out.set("allow_duplicate", "1");
 
   return guarded(formData, "customer", "customers", async () => {
     const res = await createCustomer({}, out);
@@ -187,9 +191,12 @@ export async function quickCreateProperty(formData: FormData): Promise<PropertyR
   const propertyType = String(formData.get("property_type") ?? "").trim();
   if (!transactionType || !propertyType) return { error: "İşlem ve portföy türü seçin." };
   const rooms = String(formData.get("rooms") ?? "").trim().slice(0, 20);
-  const sqmRaw = String(formData.get("sqm") ?? "").trim().replace(",", ".");
-  const sqm = sqmRaw ? Number(sqmRaw) : null;
-  if (sqm !== null && (!Number.isFinite(sqm) || sqm <= 0 || sqm > 1_000_000)) return { error: "Geçerli bir m² girin." };
+  // m² ön-ayrıştırması TR sayı biçimiyle (sözleşme g, B093): "1.250" → 1250 (eskiden 1.25), "120,5" → 120.5; "m²" eki atılır.
+  // Ham değer createProperty'ye iletilir (asıl doğrulama orada); burada yalnız başlık ve erken hata için okunur.
+  const sqmRaw = String(formData.get("sqm") ?? "").trim().replace(/\s*m(?:²|2)\s*$/iu, "");
+  const sqmParsed = parseMoneyInput(sqmRaw, { max: 1_000_000 });
+  const sqm = sqmParsed.ok ? sqmParsed.value : null;
+  if (!sqmParsed.ok || (sqmRaw && (sqm === null || sqm <= 0))) return { error: "Geçerli bir m² girin." };
 
   const chain = {
     province_id: String(formData.get("province_id") ?? "").trim(),
@@ -214,7 +221,7 @@ export async function quickCreateProperty(formData: FormData): Promise<PropertyR
   out.set("list_price", String(formData.get("list_price") ?? ""));
   out.set("commission_rate", String(Number.isFinite(rate) && rate > 0 ? rate : DEFAULT_COMMISSION_RATE));
   out.set("rooms", rooms);
-  if (sqm !== null) out.set("sqm", String(sqm));
+  if (sqmRaw) out.set("sqm", sqmRaw);
   for (const k of ["lat", "lng", "address_line"]) out.set(k, String(formData.get(k) ?? "").slice(0, 200));
   for (const [k, v] of Object.entries(chain)) if (v) out.set(k, v);
   if (formData.get("allow_duplicate") === "1") out.set("allow_duplicate", "1");

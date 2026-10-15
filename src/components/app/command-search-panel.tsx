@@ -39,8 +39,9 @@ import {
   createRecentsStore,
   getAppActions,
   getAppGoItems,
-  getAppIntents,
   getAppearanceCommands,
+  getPaletteRows,
+  matchesQuery,
   OPEN_PALETTE_EVENT,
   paletteQueryFromEvent,
   runAppearanceCommand,
@@ -48,6 +49,9 @@ import {
   type PaletteEntry,
   type RecentItem,
 } from "@/lib/palette-core";
+
+/** Yazma bittikten sonra sunucu araması (B035: 80-120 ms aralığı; sonuç ≤300 ms hedefi). */
+const SEARCH_DEBOUNCE_MS = 100;
 
 const kindMeta: Record<SearchHit["kind"], { label: string; icon: typeof Users; tone: string }> = {
   customer: { label: "Müşteri", icon: Users, tone: "text-brand-600 bg-brand-600/10" },
@@ -115,7 +119,7 @@ export function CommandSearchPanel({
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(initialOpen);
   const [q, setQ] = useState(initialQuery);
-  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [serverHits, setHits] = useState<SearchHit[]>([]);
   const [pending, setPending] = useState(false);
   const [active, setActive] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,8 +172,8 @@ export function CommandSearchPanel({
   const runSearch = useCallback((value: string) => {
     if (timer.current) clearTimeout(timer.current);
     const requestId = ++searchSequence.current;
-    // Matematiksel ifade sunucuya gitmez: hesap satırı gösterilir.
-    if (value.trim().length < 2 || evaluatePaletteInput(value) !== null) {
+    // Hesap satırı kayıt sonuçlarını GİZLEMEZ (B060): ifade de aranır, hesap satırı listenin üstünde kalır.
+    if (value.trim().length < 2) {
       setHits([]);
       setActive(0);
       setPending(false);
@@ -193,7 +197,18 @@ export function CommandSearchPanel({
           setPending(false);
         });
       }
-    }, 180);
+    }, SEARCH_DEBOUNCE_MS);
+  }, []);
+
+  /** Kapatma (Esc, dış tıklama, Kapat, gezinme): giriş, sonuçlar ve seçili satır sıfırlanır; uçuştaki arama düşer (B058). */
+  const closePalette = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    searchSequence.current += 1;
+    setOpen(false);
+    setQ("");
+    setHits([]);
+    setActive(0);
+    setPending(false);
   }, []);
 
   useEffect(() => {
@@ -231,7 +246,7 @@ export function CommandSearchPanel({
         setActive(0);
         queueMicrotask(() => inputRef.current?.focus());
       }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closePalette();
     };
     const onOpen = (e: Event) => {
       setOpen(true);
@@ -250,25 +265,32 @@ export function CommandSearchPanel({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener(OPEN_PALETTE_EVENT, onOpen);
     };
-  }, [runSearch]);
+  }, [runSearch, closePalette]);
 
-  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve atama), sonra eşleşen eylemler ve
-  // sayfalar. Eşleşme yoksa liste boş kalır ve "AI Asistan'a sor" satırı görünür.
-  const pageRows = useMemo<PaletteEntry[]>(() => {
-    if (q.trim().length < 2) return [];
-    const intents = getAppIntents(accessibleModules, q, { creatable: creatableModules, locked: lockedHrefs, closed: closedModules });
-    const seen = new Set<string>();
-    return [...intents, ...quickActions, ...goItems]
-      .filter((e) => (seen.has(e.href) ? false : (seen.add(e.href), true)))
-      .slice(0, 6);
-  }, [q, accessibleModules, creatableModules, lockedHrefs, closedModules, quickActions, goItems]);
+  // Arama modunda (≥2 karakter) sayfa önerileri: önce niyet tablosu ("ata" -> Havuz ve atama, "müşteri ekle" -> Yeni
+  // müşteri), sonra eşleşen eylemler ve sayfalar (getPaletteRows: ana ekran çipleri sözleşme testiyle aynı işlev).
+  // Eşleşme yoksa liste boş kalır ve "AI Asistan'a sor" satırı görünür.
+  const pageRows = useMemo<PaletteEntry[]>(
+    () => getPaletteRows(q, { accessible: accessibleModules, creatable: creatableModules, locked: lockedHrefs, closed: closedModules }),
+    [q, accessibleModules, creatableModules, lockedHrefs, closedModules],
+  );
 
-  // Hesap makinesi: girdi matematiksel ifadeyse sonuç en üstte "= X" satırı.
+  // Hesap makinesi: girdi matematiksel ifadeyse sonuç en üstte "= X" satırı (kayıt sonuçları altında kalır).
   const calc = evaluatePaletteInput(q);
   const calcVisible = calc !== null;
+  const calcOffset = calcVisible ? 1 : 0;
 
   // Boş durumda son kullanılanlar + hızlı eylemler; klavye ve Enter o listede gezinir.
   const showQuick = !calcVisible && q.trim().length < 2;
+
+  // Sunucu yanıtı gelene kadar YEREL son kayıtlar (B035): yazılan metne uyan son görülen kayıtlar anında görünür.
+  const hits = useMemo<SearchHit[]>(() => {
+    if (serverHits.length > 0 || !pending || q.trim().length < 2) return serverHits;
+    return visibleRecents
+      .filter((item) => isSearchKind(item.kind) && matchesQuery(item.label, q))
+      .slice(0, 5)
+      .map((item) => ({ id: item.href, kind: item.kind as SearchHit["kind"], title: item.label, subtitle: "Son görülen", href: item.href }));
+  }, [serverHits, pending, q, visibleRecents]);
 
   // AI Asistan satırı — arama metni varken listenin en altında görünür;
   // seçilince yazılan metin /app/asistan sayfasına ?q ile taşınır (ilk mesaj olur).
@@ -278,20 +300,18 @@ export function CommandSearchPanel({
 
   // "Tüm sonuçları gör" — sonuç listesi doluyken en altta, AI satırının üstünde;
   // klavye navigasyonuna dahil. Hedef: /app/arama-sonuclari sayfası (yüksek limit).
-  const allVisible = !calcVisible && !showQuick && hits.length > 0;
+  const allVisible = !showQuick && hits.length > 0;
   const allHref = `/app/arama-sonuclari?q=${encodeURIComponent(trimmed)}`;
 
   // Gezinilebilir satır sırası: [hesap] → [son kullanılanlar → hızlı eylemler | sonuçlar] → [tüm sonuçlar] → [AI]
-  const baseCount = calcVisible ? 1 : showQuick ? visibleRecents.length + quickActions.length + goItems.length : pageRows.length + hits.length + appearance.length;
+  const baseCount =
+    calcOffset + (showQuick ? visibleRecents.length + quickActions.length + goItems.length : pageRows.length + hits.length + appearance.length);
   const allIndex = baseCount;
   const askIndex = baseCount + (allVisible ? 1 : 0);
   const maxIndex = baseCount + (allVisible ? 1 : 0) + (askVisible ? 1 : 0) - 1;
 
   function goHref(href: string) {
-    setOpen(false);
-    setQ("");
-    setHits([]);
-    setActive(0);
+    closePalette();
     router.push(href);
   }
 
@@ -310,10 +330,7 @@ export function CommandSearchPanel({
       entry.action,
       uiPrefCookie ? { cookieName: uiPrefCookie, current: readUiPrefsCookie(uiPrefCookie) } : null,
     );
-    setOpen(false);
-    setQ("");
-    setHits([]);
-    setActive(0);
+    closePalette();
     if (!result.applied) return;
     toast.push(entry.done);
     if (result.refresh) router.refresh();
@@ -327,12 +344,21 @@ export function CommandSearchPanel({
       .catch(() => toast.push("Panoya kopyalanamadı", "err"));
   }
 
-  function selectIndex(i: number) {
-    if (calcVisible && i === 0) {
+  function selectIndex(index: number) {
+    if (calcVisible && index === 0) {
       copyCalc();
       return;
     }
-    if (!calcVisible && showQuick) {
+    if (allVisible && index === allIndex) {
+      goHref(allHref);
+      return;
+    }
+    if (askVisible && index === askIndex) {
+      goHref(askHref);
+      return;
+    }
+    const i = index - calcOffset;
+    if (showQuick) {
       if (i < visibleRecents.length && visibleRecents[i]) {
         goRecent(visibleRecents[i]!);
         return;
@@ -344,7 +370,7 @@ export function CommandSearchPanel({
         return;
       }
     }
-    if (!calcVisible && !showQuick) {
+    if (!showQuick) {
       const page = pageRows[i];
       if (page) {
         goRecent({ label: page.label, href: page.href, kind: "page" });
@@ -357,14 +383,8 @@ export function CommandSearchPanel({
       }
       if (j >= hits.length && appearance[j - hits.length]) {
         runAppearance(appearance[j - hits.length]!);
-        return;
       }
     }
-    if (allVisible && i === allIndex) {
-      goHref(allHref);
-      return;
-    }
-    if (askVisible && i === askIndex) goHref(askHref);
   }
 
   // Tüm sonuçlar satırı — sonuç listesi doluyken AI satırının hemen üstünde.
@@ -476,7 +496,7 @@ export function CommandSearchPanel({
             type="button"
             aria-label="Aramayı kapat"
             className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setOpen(false)}
+            onClick={closePalette}
           />
           <div className="popover-in fixed inset-x-2 top-[4.5rem] z-50 sm:absolute sm:inset-x-auto sm:left-0 sm:right-0 sm:top-[calc(100%+8px)] overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-surface shadow-[var(--inner-top),var(--elev-5)]">
             <div className="hairline-b flex items-center gap-2 px-4">
@@ -512,7 +532,7 @@ export function CommandSearchPanel({
                 autoFocus
               />
               {pending ? <Loader2 className="h-4 w-4 animate-spin text-brand-600" /> : null}
-              <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas touch:min-h-11 touch:min-w-11" aria-label="Kapat">
+              <button type="button" onClick={closePalette} className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] text-text-muted hover:bg-canvas touch:min-h-11 touch:min-w-11" aria-label="Kapat">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -522,9 +542,9 @@ export function CommandSearchPanel({
                 <div>
                   <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Hesap makinesi</p>
                   {calcRow}
-                  {askRow ? <div className="mt-1 border-t border-line pt-1">{askRow}</div> : null}
                 </div>
-              ) : showQuick ? (
+              ) : null}
+              {showQuick ? (
                 <div>
                   {visibleRecents.length > 0 ? (
                     <>
@@ -623,7 +643,8 @@ export function CommandSearchPanel({
                 </div>
               ) : pageRows.length === 0 && hits.length === 0 && appearance.length === 0 && !pending ? (
                 <div>
-                  <p className="px-3 py-8 text-center text-sm text-text-muted">Sonuç bulunamadı.</p>
+                  {/* Hesap satırı varsa "sonuç yok" denmez (hesap bir sonuçtur). */}
+                  {calcVisible ? null : <p className="px-3 py-8 text-center text-sm text-text-muted">Sonuç bulunamadı.</p>}
                   {askRow ? <div className="border-t border-line pt-1">{askRow}</div> : null}
                 </div>
               ) : (
@@ -632,8 +653,9 @@ export function CommandSearchPanel({
                     <li role="group" aria-label="Git">
                       <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Git</p>
                       <ul className="space-y-1">
-                        {pageRows.map((row, i) => {
+                        {pageRows.map((row, ri) => {
                           const Icon = row.icon;
+                          const i = calcOffset + ri;
                           return (
                             <li key={row.href}>
                               <button
@@ -668,7 +690,7 @@ export function CommandSearchPanel({
                   {hits.map((hit, hi) => {
                     const meta = kindMeta[hit.kind];
                     const Icon = meta.icon;
-                    const i = pageRows.length + hi;
+                    const i = calcOffset + pageRows.length + hi;
                     return (
                       <li key={`${hit.kind}-${hit.id}`}>
                         <button
@@ -702,7 +724,7 @@ export function CommandSearchPanel({
                       <p className="px-3 pb-1.5 pt-2 text-xs font-bold uppercase tracking-[0.08em] text-text-faint">Görünüm</p>
                       <ul className="space-y-1">
                         {appearance.map((entry, i) => {
-                          const idx = pageRows.length + hits.length + i;
+                          const idx = calcOffset + pageRows.length + hits.length + i;
                           return (
                             <li key={entry.id}>
                               <button

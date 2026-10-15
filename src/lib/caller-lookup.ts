@@ -4,10 +4,11 @@
  * Saklama biçimi (CLAUDE.md "İletişim alanları"): TR `05XXXXXXXXX` / sabit `0XXXXXXXXXX`, yabancı `+<E.164>`.
  * Arama kutusuna ya da `/app/ara?tel=` kısayoluna gelen numara her biçimde olabilir ("0532 123 45 67", "+90 532…",
  * "(532) 123-4567", "+49 151…"). Tam numara `parsePhoneStrict` ile saklama biçimine çevrilir; kısmi numarada (en az 7 rakam)
- * son rakamlar kullanılır. Döndürülen `needle`, `phone` sütununda `ilike %needle%` ile eşleşir (biçim farkı eşleşmeyi bozmaz).
+ * son rakamlar kullanılır. Döndürülen `needle`, `phone_digits` sütununda `ilike %needle%` ile eşleşir (biçim farkı eşleşmeyi bozmaz).
  * Malik (`properties.owner_customer_id`) ve kiracı (`rentals.renter_customer_id`) da `customers` kaydıdır: tek arama yeter.
  */
 import { parsePhoneStrict } from "@/lib/phone-rules";
+import { phoneDigitsNeedle } from "@/lib/pgrst";
 
 const PHONE_CHARS = /^[+\d\s().\-/]+$/;
 export const MIN_PHONE_DIGITS = 7;
@@ -35,12 +36,9 @@ export function phoneSearchNeedle(raw: string | null | undefined): PhoneNeedle |
     const needle = p.stored.startsWith("0") ? digits.slice(1) : digits;
     return { stored: p.stored, needle };
   }
-  let digits = s.replace(/\D/g, "");
-  if (s.startsWith("+90") || (digits.startsWith("90") && digits.length === 12)) digits = digits.slice(2);
-  else if (digits.startsWith("0090")) digits = digits.slice(4);
-  if (digits.startsWith("0")) digits = digits.slice(1);
-  if (digits.length < MIN_PHONE_DIGITS) return null;
-  return { stored: null, needle: digits.slice(-10) };
+  // Kısmi/geçersiz numara: istemci ve liste aramasıyla AYNI kural (src/lib/pgrst.ts phoneDigitsNeedle).
+  const needle = phoneDigitsNeedle(s);
+  return needle ? { stored: null, needle } : null;
 }
 
 export type CallerMatch = { id: string };

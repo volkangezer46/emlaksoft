@@ -67,14 +67,18 @@ describe("KQ3 form sözleşmesi", () => {
     expect(src).not.toMatch(/86_400_000/);
   });
 
-  it("müşteri formunda telefon ilk adımda, çift kayıt uyarısı telefonun yanında", () => {
+  it("müşteri formunda telefon ilk adımda, çift kayıt uyarısı FORM DÜZEYİ bantta (SK7 / B097d)", () => {
     const kisi = CUSTOMER_TABS[0];
     expect(kisi.id).toBe("kisi");
     expect(kisi.fields as readonly string[]).toContain("phone");
     const src = read("src/app/app/musteriler/yeni/customer-form.tsx");
     const kisiPanel = src.slice(src.indexOf("kisi: ("), src.indexOf("iletisim: ("));
     expect(kisiPanel).toContain('name="phone"');
-    expect(kisiPanel).toContain('<DuplicateHint kind="customer" />');
+    // Telefon "Kişi", e-posta "İletişim" sekmesinde: uyarı gizli sekmede kalmasın diye sekmelerin üstündeki bantta tek kez.
+    expect(kisiPanel).not.toContain("<DuplicateHint");
+    const notice = src.slice(src.indexOf("notice={"), src.indexOf("onSubmit={guardedSubmit}"));
+    expect(notice).toContain('<DuplicateHint kind="customer" />');
+    expect(src.match(/<DuplicateHint\b/g)).toHaveLength(1);
     expect(src).toContain("Telefonsuz kaydet");
   });
 
