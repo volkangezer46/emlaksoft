@@ -1,11 +1,13 @@
 import Link from "@/components/ui/smart-link";
 import type { Metadata } from "next";
-import { Archive, BarChart3, Bot, Braces, Globe, History, ListChecks, Map as MapIcon, SearchCheck, Shuffle, WandSparkles } from "lucide-react";
+import { Archive, BarChart3, Bot, Braces, Globe, History, ListChecks, Map as MapIcon, SearchCheck, Shuffle, Store, WandSparkles } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { FAQS } from "@/components/marketing/faq";
-import { PLANS } from "@/lib/billing/plans";
+import { buildHomeFaqs, faqForJsonLd } from "@/components/marketing/faq";
+import { getEffectiveTrialDays, getPublicPlanDefinitions } from "@/lib/billing/plan-definitions";
+import { getLiveSiteContent } from "@/lib/site-content/store";
+import { visibleSections } from "@/lib/site-content/schema";
 import { getBaseUrl } from "@/lib/base-url";
 import { CRON_JOBS } from "@/lib/cron-jobs";
 import { formatDateTimeTr } from "@/lib/format";
@@ -27,6 +29,9 @@ import { SEO_KEYS, type SeoPages } from "@/lib/seo/schema";
 import { getPlatformSettingsMany } from "@/lib/platform-settings";
 import { buildFaq } from "@/lib/pricing-page-model";
 import { loadPatternData } from "./pattern-samples";
+import { loadVitrinOffices } from "./vitrin-offices";
+import { NeverIndexForm } from "./seo-vitrin-panel";
+import { DEFAULT_NEVER_INDEX_SLUGS } from "@/lib/vitrin-seo/never-index";
 import { SeoTabs } from "./seo-tabs";
 import { AiSuggestPanel, SeoAiSettingsPanel, SeoDraftPanel } from "./seo-growth-panels";
 import { PatternsPanel } from "./seo-patterns-panel";
@@ -61,6 +66,7 @@ const TABS = [
   { id: "robot", label: "Denetim robotu", icon: Bot },
   { id: "sayfalar", label: "Sayfa başlıkları ve açıklamaları", icon: ListChecks, expert: true },
   { id: "kaliplar", label: "Dinamik kalıplar", icon: WandSparkles, expert: true },
+  { id: "vitrin", label: "Vitrin", icon: Store, expert: true },
   { id: "sitemap", label: "Sitemap ve robots", icon: MapIcon, expert: true },
   { id: "yonlendirme", label: "Yönlendirmeler ve 404", icon: Shuffle, expert: true },
   { id: "veri", label: "Yapılandırılmış veri", icon: Braces, expert: true },
@@ -99,6 +105,7 @@ export default async function AdminSeoPage({ searchParams }: { searchParams?: Pr
       {active === "genel" ? <GeneralTab canEdit={canSensitive} base={base} /> : null}
       {active === "sayfalar" ? <PagesTab selected={sp.sayfa} canSensitive={canSensitive} base={base} /> : null}
       {active === "kaliplar" ? <PatternsTab canEdit={canSensitive} base={base} /> : null}
+      {active === "vitrin" ? <VitrinTab canEdit={canSensitive} /> : null}
       {active === "sitemap" ? <SitemapTab canEdit={canSensitive} base={base} /> : null}
       {active === "veri" ? <StructuredDataTab base={base} /> : null}
       {active === "yonlendirme" ? <RedirectsTab canBulk={canSensitive} prefill={sp.kaynak} prefillTo={sp.hedef} /> : null}
@@ -170,7 +177,8 @@ async function SeoDraftSection({ canPublish }: { canPublish: boolean }) {
 /* ------------------------------ Sayfalar ------------------------------ */
 
 async function PagesTab({ selected, canSensitive, base }: { selected?: string; canSensitive: boolean; base: string }) {
-  const [s, audit] = await Promise.all([readSeoSettingsFresh(), readAuditLatest()]);
+  const [s, audit, planDefs] = await Promise.all([readSeoSettingsFresh(), readAuditLatest(), getPublicPlanDefinitions()]);
+  const plans = planDefs.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }));
   const rows = seoPages().map((def) => {
     const ov = s.pages[def.path];
     const view = effectivePageView(def, ov, s.global);
@@ -179,7 +187,7 @@ async function PagesTab({ selected, canSensitive, base }: { selected?: string; c
       global: s.global,
       base,
       path: def.path,
-      plans: PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry })),
+      plans,
       kinds,
       tool: def.group === "arac" && def.path !== "/araclar" ? { title: def.title ?? def.label, description: def.description ?? "", url: `${base}${def.path}` } : undefined,
     });
@@ -330,10 +338,12 @@ async function SitemapTab({ canEdit, base }: { canEdit: boolean; base: string })
 /* ------------------------------ Yapılandırılmış veri ------------------------------ */
 
 async function StructuredDataTab({ base }: { base: string }) {
-  const s = await readSeoSettingsFresh();
-  const plans = PLANS.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }));
+  // Canlı ana sayfayla aynı kaynak: admin paket tanımları + yayındaki site içeriğinin SSS'si (gizli bölümde FAQPage yok).
+  const [s, planDefs, trialDays, content] = await Promise.all([readSeoSettingsFresh(), getPublicPlanDefinitions(), getEffectiveTrialDays(), getLiveSiteContent()]);
+  const plans = planDefs.map((p) => ({ id: p.id, name: p.name, monthlyTry: p.monthlyTry }));
+  const homeFaq = visibleSections(content).includes("sss") ? faqForJsonLd(buildHomeFaqs({ trialDays, plans: planDefs, content: content.faq })) : [];
   const samples = [
-    { path: "/", faq: FAQS as readonly { q: string; a: string }[] },
+    { path: "/", faq: homeFaq },
     { path: "/fiyatlar", faq: buildFaq() },
   ].map(({ path, faq }) => {
     const def = getSeoPage(path);
@@ -353,7 +363,7 @@ async function StructuredDataTab({ base }: { base: string }) {
         <CardContent>
           <ul className="space-y-2 text-sm text-text-muted">
             <li><strong className="text-ink-950">Organization</strong> ve <strong className="text-ink-950">WebSite</strong>: ana sayfa. Ad, logo, sosyal profiller ve iletişim Genel sekmesinden; boş alan basılmaz. SearchAction yok (çalışan site içi arama olmadığı için).</li>
-            <li><strong className="text-ink-950">SoftwareApplication + Offer</strong>: ana sayfa ve /fiyatlar; paket başına gerçek, KDV hariç aylık fiyat (paket kaynağı: plans.ts).</li>
+            <li><strong className="text-ink-950">SoftwareApplication + Offer</strong>: ana sayfa ve /fiyatlar; paket başına gerçek, KDV hariç aylık fiyat (paket kaynağı: yönetimdeki paket tanımları).</li>
             <li><strong className="text-ink-950">FAQPage</strong>: yalnız sayfada görünen SSS ile birebir.</li>
             <li><strong className="text-ink-950">BreadcrumbList</strong>: iç sayfalar.</li>
             <li><strong className="text-ink-950">WebApplication</strong>: ücretsiz araçlar. <strong className="text-ink-950">RealEstateListing/Offer</strong>: vitrin ilan sayfası (kodda).</li>
@@ -477,44 +487,59 @@ async function RedirectsTab({ canBulk, prefill, prefillTo }: { canBulk: boolean;
 
 async function PatternsTab({ canEdit, base }: { canEdit: boolean; base: string }) {
   const [s, data] = await Promise.all([readSeoSettingsFresh(), loadPatternData()]);
-  const indexed = data.optIn.filter((r) => r.optin && r.vitrinEnabled).length;
   return (
     <div className="space-y-6">
       <PatternsPanel value={s.patterns} samples={{ office: data.office, listing: data.listing, agent: data.agent }} base={base} canEdit={canEdit} />
+    </div>
+  );
+}
+
+/* ------------------------------ Vitrin ------------------------------ */
+
+async function VitrinTab({ canEdit }: { canEdit: boolean }) {
+  const [s, data] = await Promise.all([readSeoSettingsFresh(), loadVitrinOffices()]);
+  const indexed = data.rows.filter((r) => r.optin && r.vitrinEnabled && !r.neverIndex).length;
+  const extra = data.neverIndexList.filter((x) => !DEFAULT_NEVER_INDEX_SLUGS.includes(x)).sort();
+  return (
+    <div className="space-y-6">
+      <NeverIndexForm defaults={DEFAULT_NEVER_INDEX_SLUGS} extra={extra} canEdit={canEdit} />
       <Card>
         <CardHeader>
           <div>
             <CardTitle>Ofis vitrinleri: arama motoru durumu</CardTitle>
             <CardDescription>
-              Salt okunur. Vitrin, ilan ve danışman sayfalarının indekslenmesi YALNIZ ofisin kendi onayına bağlıdır (Ayarlar, Vitrin: “vitrinim aramalarda görünsün”); onay kararı ofisindir ve burada değiştirilmez. Onaysız ofislerin sayfaları “noindex, follow” döner.
+              Vitrin, ilan ve danışman sayfalarının indekslenmesi ofisin kendi onayına bağlıdır (Ayarlar, Vitrin: “vitrinim aramalarda görünsün”); onay kararı ofisindir ve burada değiştirilmez. Onaysız ya da kalıcı noindex listesindeki ofislerin sayfaları “noindex, follow” döner. İlan sayısı: yayındaki, kapanmamış, örnek olmayan ilanlar.
             </CardDescription>
           </div>
           <StatusBadge tone={indexed > 0 ? "success" : "neutral"}>{indexed} indekslenir</StatusBadge>
         </CardHeader>
-        {data.optIn.length === 0 ? (
+        {data.rows.length === 0 ? (
           <CardContent>
             <p className="text-sm text-text-muted">Aktif ofis bulunamadı.</p>
           </CardContent>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="w-full min-w-[36rem] text-left text-sm">
+            <Table className="w-full min-w-[40rem] text-left text-sm">
               <THead>
                 <TR className="border-b border-line text-xs uppercase tracking-wide text-text-muted">
                   <TH scope="col" className="px-4 py-2 font-semibold">Ofis</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Durum</TH>
+                  <TH scope="col" className="px-4 py-2 text-right font-semibold">Yayındaki ilan</TH>
                   <TH scope="col" className="px-4 py-2 font-semibold">Neden</TH>
                 </TR>
               </THead>
               <TBody className="divide-y divide-line">
-                {data.optIn.map((r) => {
-                  const ok = r.optin && r.vitrinEnabled;
+                {data.rows.map((r) => {
+                  const ok = r.optin && r.vitrinEnabled && !r.neverIndex;
                   const reason = !r.vitrinEnabled
                     ? "Ofis vitrinini kapatmış (sayfalar 404)."
-                    : r.optin
-                      ? s.sitemap.vitrinOffices
-                        ? "Ofis arama onayı verdi; sitemap’e girer."
-                        : "Ofis arama onayı verdi; ancak sitemap’te vitrin ofisleri kapalı."
-                      : "Ofis arama onayı vermedi.";
+                    : r.neverIndex
+                      ? "Kalıcı noindex (liste ya da örnek veri); onaydan bağımsız."
+                      : r.optin
+                        ? s.sitemap.vitrinOffices
+                          ? "Ofis arama onayı verdi; sitemap’e girer."
+                          : "Ofis arama onayı verdi; ancak sitemap’te vitrin ofisleri kapalı."
+                        : "Ofis arama onayı vermedi.";
                   return (
                     <TR key={r.id}>
                       <TD className="px-4 py-2.5">
@@ -526,15 +551,25 @@ async function PatternsTab({ canEdit, base }: { canEdit: boolean; base: string }
                       <TD className="px-4 py-2.5">
                         <StatusBadge tone={ok ? "success" : "neutral"}>{ok ? "index, follow" : "noindex, follow"}</StatusBadge>
                       </TD>
+                      <TD className="px-4 py-2.5 text-right tabular-nums">
+                        {r.vitrinEnabled ? (
+                          <a href={`/vitrin/${r.slug}`} target="_blank" rel="noreferrer" className="font-semibold text-ink-950 hover:underline">
+                            {r.liveListings.toLocaleString("tr-TR")}
+                          </a>
+                        ) : (
+                          r.liveListings.toLocaleString("tr-TR")
+                        )}
+                      </TD>
                       <TD className="px-4 py-2.5 text-text-muted">{reason}</TD>
                     </TR>
                   );
                 })}
               </TBody>
             </Table>
-            {data.optInTotal > data.optIn.length ? (
-              <p className="px-4 py-2 text-xs text-text-muted">İlk {data.optIn.length} ofis gösteriliyor (toplam {data.optInTotal}); onay verenler önce listelenir.</p>
+            {data.total > data.rows.length ? (
+              <p className="px-4 py-2 text-xs text-text-muted">İlk {data.rows.length} ofis gösteriliyor (toplam {data.total}); onay verenler önce listelenir.</p>
             ) : null}
+            {data.countsPartial ? <p className="px-4 py-2 text-xs text-text-muted">İlan sayıları eksik olabilir (sayım üst sınırına ulaşıldı ya da okunamadı).</p> : null}
           </div>
         )}
       </Card>

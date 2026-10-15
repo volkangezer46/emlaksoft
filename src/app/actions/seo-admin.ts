@@ -44,6 +44,9 @@ import { captureLiveDigests, runAfterPublish } from "@/lib/publishing/after-publ
 import { hashOf } from "@/lib/publishing/schedule";
 import { changedPagePaths, discardSeoDraftPatch, draftSeoPageField, seoPublishSurface } from "@/lib/seo/publish-surface";
 import { canAutoOptimize } from "@/lib/seo/scope";
+import { getPlatformSetting } from "@/lib/platform-settings";
+import { writeSetting } from "@/lib/settings/write";
+import { VITRIN_NEVER_INDEX_KEY, parseNeverIndexInput, resolveNeverIndexList } from "@/lib/vitrin-seo/never-index";
 
 export type SeoActionResult = { ok?: boolean; error?: string; message?: string; data?: string };
 
@@ -239,6 +242,36 @@ function robotsInputFromForm(fd: FormData) {
     llmsTxtEnabled: bool(fd, "llmsTxtEnabled"),
     llmsTxt: text(fd, "llmsTxt") ?? "",
   };
+}
+
+/* ------------------------------ Vitrin kalıcı noindex ------------------------------ */
+
+/**
+ * `seo.vitrin.never_index`: opt-in'den bağımsız HER ZAMAN noindex olan ofis slug'ları (varsayılanlar ayrıca hep geçerli).
+ * Listeden çıkarmak bir ofisi arama motoruna açabildiği için süper admin işidir. Yazım ayar defteri köprüsüyle
+ * (`writeSetting`, fromBridge: doğrulama + settings_history + denetim); okuyucu SEO önbellek etiketiyle düşer.
+ */
+export async function saveVitrinNeverIndex(fd: FormData): Promise<SeoActionResult> {
+  const g = await guard(true);
+  if ("error" in g) return g;
+  const raw = typeof fd.get("slugs") === "string" ? (fd.get("slugs") as string) : "";
+  const parsed = parseNeverIndexInput(raw);
+  if (!parsed.ok) return { error: parsed.error };
+  const prev = new Set(resolveNeverIndexList(await getPlatformSetting(VITRIN_NEVER_INDEX_KEY)));
+  const next = new Set(resolveNeverIndexList(JSON.stringify(parsed.slugs)));
+  const added = [...next].filter((x) => !prev.has(x));
+  const removed = [...prev].filter((x) => !next.has(x));
+  const res = await writeSetting({
+    key: VITRIN_NEVER_INDEX_KEY,
+    value: JSON.stringify(parsed.slugs),
+    reason: `SEO merkezi, Vitrin: ${added.length} eklendi, ${removed.length} çıkarıldı`,
+    fromBridge: true,
+  });
+  if (!res.ok) return { error: res.error };
+  if (res.changed === false) return { ok: true, message: "Değişiklik yok." };
+  await audit(g.staff, "seo.vitrin.never_index.save", "vitrin-never-index", { added, removed, count: parsed.slugs.length });
+  refresh();
+  return { ok: true, message: "Kalıcı noindex listesi kaydedildi." };
 }
 
 /* ------------------------------ Yönlendirmeler ------------------------------ */

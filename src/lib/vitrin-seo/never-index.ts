@@ -77,3 +77,36 @@ export function isNeverIndexTenant(t: NeverIndexTenant, list: readonly string[])
 export function vitrinIndexable(optin: boolean, t: NeverIndexTenant, list: readonly string[]): boolean {
   return optin === true && !isNeverIndexTenant(t, list);
 }
+
+/** Yönetimden girilebilecek ek slug sayısı üst sınırı. */
+export const NEVER_INDEX_MAX_EXTRA = 500;
+
+/**
+ * Yönetim formu girdisini SIKI çözümler (virgül/boşluk/satır ayrımlı slug listesi). Geçersiz bir öğe sessizce atılmaz:
+ * hata döner. Varsayılanlar saklanmaz (her zaman geçerlidir); sonuç tekrarsız ve sıralı ek slug listesidir.
+ */
+export function parseNeverIndexInput(raw: string): { ok: true; slugs: string[] } | { ok: false; error: string } {
+  const text = raw.trim();
+  let parts: string[];
+  if (text.startsWith("[")) {
+    // Depo biçimi (JSON dizi): geçmiş sürüme dönüşte aynı doğrulamadan geçer.
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return { ok: false, error: "Liste çözümlenemedi (bozuk JSON)." };
+    }
+    if (!Array.isArray(parsed) || parsed.some((x) => typeof x !== "string")) return { ok: false, error: "Liste yalnız metin öğeleri içerebilir." };
+    parts = (parsed as string[]).map((p) => p.trim()).filter(Boolean);
+  } else {
+    parts = text.split(/[\s,;]+/).map((p) => p.trim()).filter(Boolean);
+  }
+  const out = new Set<string>();
+  for (const p of parts) {
+    const s = normalizeSlug(p);
+    if (!s) return { ok: false, error: `Geçersiz ofis adresi (slug): “${p.slice(0, 64)}”. Yalnız küçük harf, rakam ve tire kullanılabilir.` };
+    if (!DEFAULT_NEVER_INDEX_SLUGS.includes(s)) out.add(s);
+  }
+  if (out.size > NEVER_INDEX_MAX_EXTRA) return { ok: false, error: `En çok ${NEVER_INDEX_MAX_EXTRA} ofis eklenebilir.` };
+  return { ok: true, slugs: [...out].sort() };
+}
