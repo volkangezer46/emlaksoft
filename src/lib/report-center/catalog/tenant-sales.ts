@@ -3,7 +3,7 @@
  */
 import { DEFAULT_DEFINITIONS } from "@/lib/definition-defaults";
 import { commissionShares } from "@/lib/export-entities";
-import { now } from "@/lib/clock";
+import { now, trDayKey } from "@/lib/clock";
 import { getStageLabels } from "@/lib/definitions";
 import { defaultStageLabels, stageLabelMap } from "@/lib/deal-stage-labels";
 import { DEAL_STAGES } from "@/lib/workflow-state";
@@ -385,4 +385,104 @@ export const aramalar = defineReport({
   },
 });
 
-export const SALES_REPORTS = [randevular, gorevler, teklifler, anlasmalar, komisyonlar, komisyonOdemeleri, onaylar, aramalar];
+/**
+ * OA2: Satış hunisi — dönemde kaydedilen müşteri kohortu kaynağa göre (randevu → teklif → kazanılan → komisyon, kaynak maliyeti).
+ * Kaynak `report_sales_funnel` (20261018080002; SECURITY INVOKER: kiracı + kayıt kapsamı RLS'te). Ofis geneli olmayan
+ * görüntüleyende danışman kendisine kilitlenir; komisyon yalnız earnings_all, maliyet yalnız expenses:view ile dolu gelir.
+ */
+export const satisHunisi = defineReport({
+  id: "satis-hunisi",
+  title: "Satış hunisi (aşama dönüşümü)",
+  description: "Dönemde kaydedilen müşteriler kaynağa göre: randevu, teklif ve kazanılan anlaşmaya dönüşüm oranları, ciro, komisyon ve kaynak maliyeti.",
+  category: "satis",
+  scope: "tenant",
+  module: "reports",
+  keywords: ["huni", "dönüşüm", "kaynak", "roi", "getiri", "maliyet"],
+  filters: [ADVISOR_FILTER, ...DATE_RANGE_FIELDS("Müşteri kaydı başlangıcı", "Müşteri kaydı bitişi")],
+  columns: [
+    { key: "kaynak", label: "Kaynak", type: "text", width: 22, get: (r) => r.source_label },
+    { key: "musteri", label: "Yeni müşteri sayısı", type: "number", total: true, get: (r) => r.customers },
+    { key: "randevu", label: "Randevuya ulaşan", type: "number", total: true, get: (r) => r.appointments },
+    { key: "randevuOran", label: "Randevu oranı", type: "percent", decimals: 1, get: (r) => pctOf(r.appointments, r.customers) },
+    { key: "teklif", label: "Teklife ulaşan", type: "number", total: true, get: (r) => r.offers },
+    { key: "teklifOran", label: "Teklif oranı", type: "percent", decimals: 1, get: (r) => pctOf(r.offers, r.customers) },
+    { key: "kazanilan", label: "Kazanılan", type: "number", total: true, get: (r) => r.won },
+    { key: "kazanmaOran", label: "Kazanma oranı", type: "percent", decimals: 1, get: (r) => pctOf(r.won, r.customers) },
+    { key: "ciro", label: "Kazanılan ciro", type: "money", decimals: 0, total: true, get: (r) => r.won_value },
+    { key: "komisyon", label: "Komisyon (brüt)", type: "money", decimals: 0, total: true, get: (r) => r.commission },
+    { key: "maliyet", label: "Kaynak maliyeti", type: "money", decimals: 0, total: true, get: (r) => r.cost },
+    { key: "medyan", label: "Kazanmaya medyan gün", type: "number", get: (r) => r.median_days_to_won },
+  ],
+  source: {
+    kind: "compute",
+    run: async (ctx, f) => {
+      const today = trDayKey(now());
+      const from = typeof f.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.from) ? f.from : `${today.slice(0, 7)}-01`;
+      const to = typeof f.to === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f.to) ? f.to : today;
+      const profile = ctx.officeWide ? (typeof f.advisor === "string" && f.advisor ? f.advisor : null) : ctx.userId;
+      const { data, error } = await ctx.supabase.rpc("report_sales_funnel", {
+        p_from: from <= to ? from : to,
+        p_to: from <= to ? to : from,
+        p_branch: null,
+        p_team: null,
+        p_profile: profile,
+      });
+      if (error) throw error;
+      const sources = ((data as { sources?: Row[] } | null)?.sources ?? []) as Row[];
+      await loadDefLabels(ctx, "customer_source");
+      const labels = memoLabels(ctx, "customer_source");
+      return sources.map((r) => ({ ...r, source_label: r.source === "Belirtilmedi" ? "Belirtilmedi" : label(labels, r.source) }));
+    },
+  },
+});
+
+/** SP1: Anlaşma aşama geçmişi — eklemeli `deal_stage_events` (kim, ne zaman, hangi aşamadan hangisine). */
+export const anlasmaAsamaGecmisi = defineReport({
+  id: "anlasma-asama-gecmisi",
+  title: "Anlaşma aşama geçmişi",
+  description: "Her aşama değişikliği: anlaşma, önceki ve yeni aşama, değiştiren kişi ve tarih. Satış hızı ve aşama süresi analizinin ham verisi.",
+  category: "satis",
+  scope: "tenant",
+  module: "commissions",
+  keywords: ["aşama", "geçmiş", "pipeline", "satış hızı", "değişiklik"],
+  filters: [ADVISOR_FILTER, ...DATE_RANGE_FIELDS("Değişiklik başlangıcı", "Değişiklik bitişi")],
+  columns: [
+    { key: "tarih", label: "Değişiklik zamanı", type: "datetime", get: (r) => r.changed_at },
+    { key: "kod", label: "Portföy kodu", type: "text", width: 14, get: (r) => one(one(r.deal)?.property)?.property_code },
+    { key: "portfoy", label: "Portföy", type: "text", width: 30, get: (r) => one(one(r.deal)?.property)?.title },
+    { key: "onceki", label: "Önceki aşama", type: "text", width: 16, get: (r, c) => (r.from_stage ? label((c.memo.get("stageNames") as Record<string, string>) ?? {}, r.from_stage) : "Oluşturuldu") },
+    { key: "yeni", label: "Yeni aşama", type: "text", width: 16, get: (r, c) => label((c.memo.get("stageNames") as Record<string, string>) ?? {}, r.to_stage) },
+    { key: "degistiren", label: "Değiştiren", type: "text", width: 20, get: (r, c) => nameOf(c, r.changed_by) },
+    { key: "danisman", label: "Anlaşma danışmanı", type: "text", width: 20, get: (r, c) => nameOf(c, one(r.deal)?.assigned_to) },
+  ],
+  source: {
+    kind: "query",
+    build: (ctx, f) => {
+      let q = ctx.supabase
+        .from("deal_stage_events")
+        .select(
+          "id, from_stage, to_stage, changed_by, changed_at, deal:deals!deal_stage_events_deal_id_fkey!inner(assigned_to, tenant_id, property:properties!deals_property_id_fkey(property_code, title, tenant_id))",
+          { count: "exact" },
+        )
+        .eq("tenant_id", tid(ctx))
+        .eq("deal.tenant_id", tid(ctx));
+      q = applyActorScope(ctx, q, { sample: true, actorColumn: "deal.assigned_to" });
+      if (f.advisor) q = q.eq("deal.assigned_to", f.advisor);
+      q = applyTimestampRange(q, "changed_at", f);
+      return q.order("changed_at", { ascending: false }).order("id", { ascending: true });
+    },
+    enrich: chainEnrich(
+      async (_rows, ctx) => {
+        if (!ctx.memo.has("stageNames")) ctx.memo.set("stageNames", stageLabelMap(await getStageLabels()));
+      },
+      enrichProfiles((r) => [r.changed_by, one(r.deal)?.assigned_to]),
+    ),
+  },
+});
+
+function pctOf(part: unknown, whole: unknown): number | null {
+  const w = Number(whole);
+  return w > 0 ? Math.round((Number(part) / w) * 1000) / 10 : null;
+}
+
+export const SALES_REPORTS = [randevular, gorevler, teklifler, anlasmalar, satisHunisi, anlasmaAsamaGecmisi, komisyonlar, komisyonOdemeleri, onaylar, aramalar];
