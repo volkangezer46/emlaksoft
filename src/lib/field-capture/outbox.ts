@@ -28,7 +28,7 @@ export type OutboxItem = {
   /** İstek kimliği (UUID) — sunucuda çift kayıt freni anahtarı. */
   id: string;
   kind: OutboxKind;
-  /** FormData girdileri (yalnız metin). */
+  /** FormData girdileri (yalnız metin; fotoğraflar IndexedDB'de, öğeye `photo_batch` alanıyla bağlı — `photo-queue.ts`). */
   fields: [string, string][];
   /** Listede gösterilecek kısa ad ("Müşteri: Ali Kaya"). */
   label: string;
@@ -64,6 +64,20 @@ export const DRAFT_TTL_MS = 7 * 86_400_000;
 /** Kuyruk öğesinin cihazda en uzun kalma süresi (taslakla aynı KVKK sınırı). */
 export const OUTBOX_TTL_MS = DRAFT_TTL_MS;
 const MAX_ITEMS = 50;
+/** Saha fotoğraf kuyruğunun IndexedDB adı (`photo-idb.ts`); çıkışta saha anahtarlarıyla birlikte silinir. */
+export const FIELD_PHOTO_DB = "emlaksoft-saha-foto";
+/**
+ * Yüklenmeyi bekleyen fotoğrafı olan portföy sayısının kapsam başına özeti (IndexedDB eşzamansız; çıkış uyarısı
+ * eşzamanlı okur). `photo-sync.ts` yazar; önek saha öneki olduğu için çıkışta silinir.
+ */
+const PHOTO_PENDING_PREFIX = `${FIELD_CAPTURE_PREFIX}foto-bekleyen:v1:`;
+
+export function writePendingPhotoCount(store: KeyValueStore | null, scope: CaptureScope, count: number) {
+  if (!store) return;
+  const key = PHOTO_PENDING_PREFIX + scopeId(scope);
+  if (count > 0) store.set(key, String(count));
+  else store.remove(key);
+}
 
 function scopeId(scope: CaptureScope): string {
   return `${scope.tenantId || "-"}:${scope.userId || "-"}`;
@@ -370,12 +384,20 @@ function fieldCaptureKeys(ls: EnumerableStore): string[] {
   return keys;
 }
 
-/** Bu cihazdaki (tüm kapsamların) gönderilmemiş kuyruk öğesi sayısı: çıkışta kullanıcı uyarılır. */
+/**
+ * Bu cihazdaki (tüm kapsamların) gönderilmemiş kuyruk öğesi sayısı + fotoğrafları henüz yüklenmemiş portföy sayısı:
+ * çıkışta kullanıcı uyarılır.
+ */
 export function countUnsentOnDevice(ls: EnumerableStore | null = localStorageOrNull()): number {
   if (!ls) return 0;
   try {
     let n = 0;
     for (const k of fieldCaptureKeys(ls)) {
+      if (k.startsWith(PHOTO_PENDING_PREFIX)) {
+        const c = Number(ls.getItem(k));
+        if (Number.isFinite(c) && c > 0) n += Math.floor(c);
+        continue;
+      }
       if (!k.startsWith(OUTBOX_PREFIX)) continue;
       const parsed = JSON.parse(ls.getItem(k) ?? "[]") as unknown;
       if (Array.isArray(parsed)) n += parsed.filter(isItem).length;
@@ -386,8 +408,16 @@ export function countUnsentOnDevice(ls: EnumerableStore | null = localStorageOrN
   }
 }
 
-/** Çıkışta bu cihazdaki TÜM saha taslaklarını ve kuyruklarını siler (kişisel veri sonraki kullanıcıya kalmaz). */
+/**
+ * Çıkışta bu cihazdaki TÜM saha taslaklarını, kuyruklarını ve kuyruktaki fotoğrafları (IndexedDB) siler (kişisel veri
+ * sonraki kullanıcıya kalmaz).
+ */
 export function clearFieldCaptureStorage(ls: EnumerableStore | null = localStorageOrNull()) {
+  try {
+    if (typeof indexedDB !== "undefined") indexedDB.deleteDatabase(FIELD_PHOTO_DB);
+  } catch {
+    // IndexedDB yok/engelli: fotoğraf kuyruğu da yoktur
+  }
   if (!ls) return;
   try {
     for (const k of fieldCaptureKeys(ls)) ls.removeItem(k);
