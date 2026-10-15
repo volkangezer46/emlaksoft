@@ -7,10 +7,10 @@
 
 ## Özet
 
-- Toplam birim: **597** (304 dosya) — risk: P0=13, P1=45, P2=539
-- Tenant filtresi: var=306, uygulanamaz=192, yok=56, param=24, devir=19
-- Kapı türü: public-token=38, dosya-duzeyi=160, platform=135, belirsiz=127, elle-dogrulandi=26, oturum-izin=84, cron=24, webhook-imza=3
-- Filtresiz (yok+devir): **75**; RLS'li client'a taşıma adayı: **66**
+- Toplam birim: **598** (304 dosya) — risk: P0=13, P1=45, P2=540
+- Tenant filtresi: var=307, uygulanamaz=192, yok=56, param=24, devir=19
+- Kapı türü: public-token=38, dosya-duzeyi=160, platform=135, belirsiz=127, elle-dogrulandi=26, oturum-izin=85, cron=24, webhook-imza=3
+- Filtresiz (yok+devir): **75**; RLS'li client'a taşıma adayı: **67**
 
 Risk ölçütü: P0 = tenant filtresi yok/devir VE kapı belirsiz; P1 = filtresiz ama kapı zayıf/oturum-izin
 (kiracı kimliği istemciden gelirse IDOR), veya yalnız parametre filtreli + zayıf kapı + yazma; P2 = diğerleri.
@@ -171,7 +171,8 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/actions/offers.ts:258` | `updateOffer` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/offers.ts:140` | `updateOfferStatus` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/open-house-public.ts:60` | `registerOpenHouseVisitorByToken` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
-| `src/app/actions/open-house.ts:78` | `convertVisitorToCustomer` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/open-house.ts:154` | `convertAllVisitors` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
+| `src/app/actions/open-house.ts:86` | `convertVisitorToCustomer` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/actions/owner-portal.ts:217` | `getOwnerPortalData` | Oturumsuz token'lı public yüzey. | public-token | var (yazma) | P2 |
 | `src/app/actions/payment-link-manage.ts:70` | `cancelPaymentLink` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/actions/payment-link-manage.ts:127` | `extendPaymentLink` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
