@@ -24,6 +24,13 @@ import { missingFieldsError } from "@/lib/form-rules";
 import { appointmentMissing } from "@/app/app/randevular/yeni/appointment-tabs";
 import { sendAppointmentConfirmation, type ConfirmSendOutcome } from "@/lib/appointment-customer-messages";
 import { getBaseUrl } from "@/lib/base-url";
+import { now } from "@/lib/clock";
+import {
+  followUpDueIso,
+  followUpTaskMarker,
+  followUpTaskNotes,
+  followUpTaskTitle,
+} from "@/lib/appointment-follow-up";
 
 export type AppointmentResult = {
   error?: string;
@@ -39,6 +46,11 @@ export type AppointmentResult = {
    * hesabı yok (danışman satırdaki "WhatsApp'ta teyit gönder" ile iletir); diğerleri bilgi amaçlı.
    */
   customerMessage?: ConfirmSendOutcome;
+  /**
+   * Tamamlanan randevunun takip zinciri: kararsız sonuçta danışmana açılan takip görevi
+   * (`created` yeni açıldı, `exists` aynı randevu için zaten vardı, `skipped` müşteri yok / hata).
+   */
+  followUpTask?: "created" | "exists" | "skipped";
 };
 
 const TYPES = ["showing", "office", "valuation", "contract"];
@@ -274,7 +286,7 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   const supabase = await createClient();
   const { data: current, error: currentError } = await supabase
     .from("appointments")
-    .select("id, status")
+    .select("id, status, customer_id, property_id, assigned_to, created_by, customer:customers!appointments_customer_id_fkey(full_name)")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -319,9 +331,100 @@ export async function updateAppointmentStatus(formData: FormData): Promise<Appoi
   }
   if (!updated) return { error: "Randevu bu sırada değişti; sayfayı yenileyin." };
 
+  // Takip zinciri: kararsız geçen randevuya danışmanın takip görevi (kayıt geri alınmaz; hata yalnız loglanır).
+  let followUpTask: AppointmentResult["followUpTask"];
+  if (status === "completed" && patch.outcome === "kararsiz") {
+    const customer = current.customer as { full_name?: string | null } | { full_name?: string | null }[] | null;
+    followUpTask = await ensureUndecidedFollowUpTask(supabase, gate, {
+      appointmentId: id,
+      customerId: (current.customer_id as string | null) ?? null,
+      propertyId: (current.property_id as string | null) ?? null,
+      advisorId: (current.assigned_to as string | null) ?? (current.created_by as string | null) ?? gate.userId,
+      customerName: (Array.isArray(customer) ? customer[0]?.full_name : customer?.full_name) ?? null,
+      outcomeNote: (patch.outcome_note as string | undefined) ?? null,
+    });
+  }
+
   revalidatePath("/app/randevular");
+  if (followUpTask === "created") revalidatePath("/app/gorevler");
   revalidateTenantData(gate.tenantId);
-  return { ok: true };
+  return { ok: true, ...(followUpTask ? { followUpTask } : {}) };
+}
+
+/**
+ * Kararsız randevu sonrası takip görevi (2 iş günü sonra, randevunun danışmanına). İdempotent: not alanındaki
+ * randevu izi (`followUpTaskMarker`) taşıyan görev — hangi durumda olursa olsun — varsa ikincisi açılmaz
+ * (geri al → yeniden tamamla döngüsü). Müşterisiz randevuda görev açılmaz.
+ */
+async function ensureUndecidedFollowUpTask(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  gate: { tenantId: string; userId: string },
+  input: {
+    appointmentId: string;
+    customerId: string | null;
+    propertyId: string | null;
+    advisorId: string;
+    customerName: string | null;
+    outcomeNote: string | null;
+  },
+): Promise<"created" | "exists" | "skipped"> {
+  if (!input.customerId) return "skipped";
+  const marker = followUpTaskMarker(input.appointmentId);
+  const { data: existing, error: existingError } = await supabase
+    .from("tasks")
+    .select("id")
+    .eq("tenant_id", gate.tenantId)
+    .eq("customer_id", input.customerId)
+    .like("notes", `%${marker}%`)
+    .limit(1);
+  if (existingError) {
+    console.error("ensureUndecidedFollowUpTask lookup", existingError);
+    return "skipped";
+  }
+  if ((existing ?? []).length > 0) return "exists";
+
+  const title = followUpTaskTitle(input.customerName);
+  const { data: created, error } = await supabase
+    .from("tasks")
+    .insert({
+      tenant_id: gate.tenantId,
+      title,
+      notes: followUpTaskNotes(input.appointmentId, input.outcomeNote),
+      kind: "followup",
+      priority: "normal",
+      status: "open",
+      due_at: followUpDueIso(now()),
+      assigned_to: input.advisorId,
+      customer_id: input.customerId,
+      property_id: input.propertyId,
+      created_by: gate.userId,
+    })
+    .select("id")
+    .single();
+  if (error || !created) {
+    console.error("ensureUndecidedFollowUpTask insert", error);
+    return "skipped";
+  }
+  await logActivity({
+    tenantId: gate.tenantId,
+    actorId: gate.userId,
+    action: "task.create",
+    entityType: "task",
+    entityId: created.id as string,
+    newValue: { title, kind: "followup", priority: "normal", source: "appointment_undecided", appointment_id: input.appointmentId },
+  });
+  // Başkasının randevusunu tamamlayan yönetici: görev danışmana düştü, haber verilir (tek seferlik anahtar).
+  if (input.advisorId !== gate.userId) {
+    await notifyAssignment({
+      tenantId: gate.tenantId,
+      userId: input.advisorId,
+      title: "Size takip görevi açıldı",
+      body: `${title}. Termin: 2 iş günü sonra.`,
+      href: "/app/gorevler",
+      dedupeKey: `appt-followup:${input.appointmentId}`,
+    });
+  }
+  return "created";
 }
 
 /**

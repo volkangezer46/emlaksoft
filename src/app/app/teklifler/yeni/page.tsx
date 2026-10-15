@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { now } from "@/lib/clock";
+import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
 import { NewOfferForm } from "./new-offer-form";
 
 export const metadata = { title: "Yeni teklif" };
@@ -9,16 +10,14 @@ export const metadata = { title: "Yeni teklif" };
 export default async function NewOfferPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ musteri?: string; portfoy?: string }>;
+  searchParams?: Promise<PrefillSearchParams>;
 }) {
   const { perms, userId } = await requireModulePage("offers", "/app/teklifler");
   const canCreate = perms.offers?.includes("create") ?? perms.commissions?.includes("create") ?? false;
   if (!canCreate) redirect("/app/teklifler");
 
-  const params = (await searchParams) ?? {};
-  // ?musteri=&portfoy= — eşleştirme ekranındaki "Teklif al" kısayolunun ön dolgusu.
-  const prefillCustomerId = (params.musteri ?? "").trim() || null;
-  const prefillPropertyId = (params.portfoy ?? "").trim() || null;
+  // ?customer=&property= (eş adlar ?musteri=&portfoy= de geçerli) — "Teklif al" / "Teklif gir" kısayollarının ön dolgusu.
+  const { customerId: prefillCustomerId, propertyId: prefillPropertyId } = readPrefillIds(await searchParams);
 
   // Seçiciler sunucu taraflı aranır (searchOfferProperties / searchCustomers): ofis kaç
   // kayıt tutarsa tutsun seçilebilir. Sayfa yalnız ön dolgudaki tek kaydı (.eq('id')) getirir.

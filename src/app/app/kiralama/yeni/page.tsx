@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireModulePage } from "@/lib/require-module-page";
 import { trDayKey } from "@/lib/clock";
+import { readPrefillIds, type PrefillSearchParams } from "@/lib/prefill-params";
 import { RentalForm } from "./rental-form";
 
 export const metadata = { title: "Yeni kira kaydı" };
@@ -9,17 +10,16 @@ export const metadata = { title: "Yeni kira kaydı" };
 export default async function NewRentalPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ portfoy?: string; musteri?: string; tutar?: string }>;
+  searchParams?: Promise<PrefillSearchParams>;
 }) {
   // Paket kilidi kilitli kök yol üzerinden uygulanır (/app/kiralama → page-gates).
   const { perms, userId } = await requireModulePage("rentals", "/app/kiralama");
   if (!(perms.rentals ?? []).includes("create")) redirect("/app/kiralama");
 
-  // Kazanılan kira anlaşması köprüsü: ?portfoy=&musteri=&tutar= ön dolgusu.
+  // Kazanılan kira anlaşması köprüsü: ?property=&customer=&tutar= ön dolgusu (eş adlar ?portfoy=&musteri= de geçerli).
   const params = (await searchParams) ?? {};
-  const prefillPropertyId = (params.portfoy ?? "").trim() || null;
-  const prefillCustomerId = (params.musteri ?? "").trim() || null;
-  const rentParsed = Number(params.tutar ?? "");
+  const { propertyId: prefillPropertyId, customerId: prefillCustomerId } = readPrefillIds(params);
+  const rentParsed = Number(typeof params.tutar === "string" ? params.tutar : "");
   const prefillRent = Number.isFinite(rentParsed) && rentParsed > 0 ? Math.round(rentParsed) : null;
 
   const supabase = await createClient();

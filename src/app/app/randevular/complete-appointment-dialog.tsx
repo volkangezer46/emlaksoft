@@ -9,7 +9,16 @@ import {
   APPOINTMENT_OUTCOME_META,
   type AppointmentOutcome,
 } from "@/lib/appointment-outcome";
+import { appointmentNextSteps, UNDECIDED_FOLLOW_UP_BUSINESS_DAYS } from "@/lib/appointment-follow-up";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import { useToast } from "@/components/app/toast-provider";
+
+/** Seçilen sonuca göre kaydettikten sonra ne olacağı (takip zinciri). */
+const NEXT_STEP_HINT: Record<AppointmentOutcome, string> = {
+  olumlu: "Kaydettikten sonra “Teklif gir” ile müşteri ve portföy hazır gelen teklif formunu açabilirsiniz.",
+  kararsiz: `Randevunun danışmanına ${UNDECIDED_FOLLOW_UP_BUSINESS_DAYS} iş günü sonrasına takip görevi açılır; “2. gösterim planla” kısayolu da sunulur.`,
+  olumsuz: "Kaydettikten sonra “Talebi güncelle” ile müşterinin arama kriterlerini gözden geçirebilirsiniz.",
+};
 
 /**
  * "Tamamlandı" artık düz bir damga değil: randevunun NASIL geçtiği sorulur
@@ -18,15 +27,23 @@ import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
  *
  * Popup yok: sayfa içi panel. Bu değerlendirme, müşteri portalındaki eşleştirme
  * geri bildirimiyle KARIŞTIRILMAMALIDIR. Sonuç seçmek zorunlu değildir.
+ *
+ * Takip zinciri: kayıttan sonra sonuca göre sonraki adım bildirimle sunulur (olumlu → Teklif gir, kararsız →
+ * 2. gösterim planla + sunucuda takip görevi, olumsuz → Talebi güncelle). Aynı kısayol tamamlanan satırda da kalır.
  */
 export function CompleteAppointmentDialog({
   appointmentId,
   customerName,
+  customerId = null,
+  propertyId = null,
 }: {
   appointmentId: string;
   customerName: string;
+  customerId?: string | null;
+  propertyId?: string | null;
 }) {
   const router = useRouter();
+  const { push } = useToast();
   const [open, setOpen] = useState(false);
   const [outcome, setOutcome] = useState<AppointmentOutcome | "">("");
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +63,18 @@ export function CompleteAppointmentDialog({
         setError(res.error);
         return;
       }
+      const [next] = appointmentNextSteps(outcome || null, { customerId, propertyId });
+      const taskNote =
+        res.followUpTask === "created"
+          ? " Takip görevi açıldı."
+          : res.followUpTask === "exists"
+            ? " Bu randevunun takip görevi zaten var."
+            : "";
+      push(
+        `Randevu tamamlandı.${taskNote}`,
+        "ok",
+        next ? { action: { label: next.label, onClick: () => router.push(next.href) } } : undefined,
+      );
       setOpen(false);
       setOutcome("");
       router.refresh();
@@ -103,6 +132,11 @@ export function CompleteAppointmentDialog({
                   );
                 })}
               </div>
+              {outcome ? (
+                <p className="mt-1.5 text-xs font-medium text-brand-700" aria-live="polite">
+                  {NEXT_STEP_HINT[outcome]}
+                </p>
+              ) : null}
               <p className="mt-1.5 text-xs text-text-faint">
                 Seçmeden de tamamlayabilirsiniz. Bu değerlendirme danışman notudur; müşteri portalındaki
                 eşleştirme beğenisinden bağımsızdır.
