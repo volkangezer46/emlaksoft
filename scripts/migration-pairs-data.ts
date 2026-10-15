@@ -448,6 +448,11 @@ const F = {
   yd7RoleTimeouts: "20261015047000_db_role_timeouts.sql",
   yd7GeoStatsMv: "20261015047010_geo_stats_materialized.sql",
   yd7BatchCountRpcs: "20261015047020_batch_count_rpcs.sql",
+  // SK4 (2026-10-16): admin paneline canli veri (personel ozel Broadcast konulari), ofis ek mesaji durumu korur (v3),
+  // admin komut paleti uye e-posta aramasi.
+  sk4AdminStaffBroadcast: "20261016040000_admin_staff_broadcast.sql",
+  sk4ReplySupportTicketV3: "20261016040100_reply_support_ticket_v3.sql",
+  sk4AdminSearchMembers: "20261016040200_admin_search_members.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -687,6 +692,9 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.yd7RoleTimeouts]: "davranis", // rol ayari: anon 3s / authenticated 8s / authenticator 8s statement_timeout (canlidaki Supabase varsayilani, gevsemez) + service_role 60s (PostgREST taklidinde authenticator'in 8s'i yerine; sunucu/cron yollari kisalmaz) + 4 rolde idle_in_transaction 60s; superuser ise veritabani log_min_duration_statement 1s (degilse NOTICE, supabase_admin ile elle); tablo/veri degismez
     [F.yd7GeoStatsMv]: "davranis", // geo_province_stats / geo_district_stats duz gorunumden AYNI ad ve kolonlarla materialized view'a (+ yeni geo_level_counts, refresh_geo_stats yalniz service_role); sayim son yenilemedeki durum (cron gunluk + /admin/geo yazimi sonrasi), anon/authenticated okuma izni kalkar (kodda okuyan yok); veri degismez
     [F.yd7BatchCountRpcs]: "ek", // yalniz 5 yeni salt-okunur fonksiyon: offer_counts / demand_counts / target_activity_counts (SECURITY INVOKER, yalniz authenticated, RLS gecerli) + kvkk_customer_related_counts / ef_credit_balances (yalniz service_role); kod fonksiyon yokken eski ayri sorgulara duser
+    [F.sk4AdminStaffBroadcast]: "ek", // yeni DEFINER tetikleyici fonksiyonlari (rt_emit_staff_change deyim duzeyi, rt_emit_staff_notification satir duzeyi) 5 admin tablosu + platform_notifications'a AFTER tetikleyici; realtime.send ile yalniz kimlik iceren <=200 B olay (kisisel veri yok) + realtime.messages'a yalniz aktif personel SELECT politikasi ('admin:staff', 'staff:<uid>'); mevcut veri/RLS degismez, realtime semasi yoksa gonderim sessiz gecer
+    [F.sk4ReplySupportTicketV3]: "davranis", // yeni reply_support_ticket_v3 (ofis public yaniti open/in_progress durumunu korur, waiting -> ilk yanita gore open/in_progress); v2 ayni imzayla v3'e devreder; TEK SEFERLIK veri duzeltmesi in_progress + ilk yanitsiz + atanmamis -> open (canlida 1 satir; geri alinmaz)
+    [F.sk4AdminSearchMembers]: "ek", // yalniz yeni salt-okunur DEFINER fonksiyon admin_search_members (yalniz service_role; ad + auth.users e-posta); kod fonksiyon yokken uyeyi yalniz adla arar
     [F.notificationsDedupeCleanup]: "davranis", // yalniz veri: dedupe_key NULL 'Portal teyit gecikti' satirlari ilan basina en yeniye, gelecek tarihli anahtarsiz kopyalar en yeniye iner, kalan gelecek created_at now(); sema/fonksiyon degismez, geri alma islem yapmaz (PITR)
     [F.demoTenantNightlyReset]: "ek", // yeni demo_reset_state tablosu + demo_tenant_nightly_reset (service_role); kod fonksiyon yokken adimi atlar; fonksiyon yalniz slug=demo-ofis kiracisinda calisir
     [F.yd8ErrorLogsCspSource]: "davranis", // record_error_occurrence govdesi AYNI, yalniz dakikalik hata sayaci kosuluna p_source <> 'csp'; imza/yetki ayni; kod migration yokken de yazar (yalniz CSP satirlari sayaca girer)
@@ -929,6 +937,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "YD5-arayuz-durumu", order: 165, title: "Urun turu ve davet karti kapatma durumu sunucuda: profiles.ui_state + profile_ui_state_mark (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod sutun/fonksiyon yokken yalniz tarayici onbellegiyle calisir; sira serbest, ek)", files: [F.profilesUiState] },
     { id: "YD4-saha-kullanimi", order: 164, title: "Saha kullanimi: fotograf boyutlari (property_media.width/height) + cevrimdisi hizli kayit kuyrugu icin istek kimligi tablosu client_submissions (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo/sutun yokken cift kayit frenini atlar ve boyutu kaydetmez; sira serbest, ek)", files: [F.yd4FieldCapture] },
     { id: "YD7-veritabani-isletim", order: 167, title: "Veritabani isletim sertlestirmesi: rol duzeyi statement_timeout / idle_in_transaction (service_role daha uzun) + yavas sorgu gunlugu (superuser ise), geo sayimlari materialized view + refresh_geo_stats (cron operational-retention geoStats adimi), toplu sayim RPC'leri (teklif/talep/hedef sayaclari, KVKK iliskili kayit, EF bakiye listesi) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC/gorunum yokken eski sorgulara duser; sira dosya numarasiyla; log_min_duration_statement icin supabase_admin adimi; davranis)", files: [F.yd7RoleTimeouts, F.yd7GeoStatsMv, F.yd7BatchCountRpcs] },
+    { id: "SK4-admin-canli-veri", order: 204, title: "Admin canli veri ve destek: personel ozel Broadcast konulari (admin:staff, staff:<uid>; 5 tablo + platform_notifications tetikleyicisi, realtime.messages personel politikasi) + reply_support_ticket_v3 (ofis yaniti acik talebi acik birakir; v2 devreder; tek seferlik in_progress -> open duzeltmesi) + admin_search_members (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod kanal katilamazsa 60 sn yoklamaya, v3 yoksa (PGRST202) v2'ye, arama fonksiyonu yoksa ad aramasina duser; sira dosya numarasiyla; davranis)", files: [F.sk4AdminStaffBroadcast, F.sk4ReplySupportTicketV3, F.sk4AdminSearchMembers] },
     { id: "KQ6-bildirim-temizligi", order: 156, title: "Bildirim gurultusu temizligi: anahtarsiz 'Portal teyit gecikti' kopyalari ilan basina en yeniye, gelecek tarihli kopyalar en yeniye, kalan gelecek created_at now() (bagimsiz yalniz veri; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; geri alinamaz, PITR; davranis)", files: [F.notificationsDedupeCleanup] },
     { id: "YD1-demo-gece-sifirlama", order: 161, title: "Demo kiracinin gece sifirlamasi: demo_reset_state tabani + demo_tenant_nightly_reset (yalniz slug=demo-ofis; dis baglanti yuzeyleri ve tabandan sonra eklenen is kayitlari silinir). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken adimi atlar); ek", files: [F.demoTenantNightlyReset] },
     { id: "YD8-csp-olcum-statik-yasal", order: 168, title: "Herkese acik sayfa hafifligi: CSP rapor modu satirlari (error_logs source 'csp') hata patlamasi sayacina girmez (record_error_occurrence govdesi ayni + tek kosul) ve yasal sayfalar statik sunuma acilir (statik.routes yoksa yazilir; varsa dokunulmaz) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: CSP satirlari migration yokken yalniz sayaca da girer, statik yasal sayfa kodu zaten yayinda; sira dosya numarasiyla; davranis)", files: [F.yd8ErrorLogsCspSource, F.yd8StaticLegalPagesOn] },
@@ -1179,6 +1188,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.kq2LcFinanceRls, F.lcLifecycleEvents],
     [F.kq2LcFinanceRls, F.earningsStatementPrivacy],
     [F.kq2MetricsSinglePass, F.dashboardSnapshotRpcs],
+    // SK4: ozel konu politikasi growth_flag_on (MFA bayragi) yardimcisini kullanir.
+    [F.sk4AdminStaffBroadcast, F.growthEngine],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun
