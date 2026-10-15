@@ -9,8 +9,11 @@ import {
   Clock,
   FileSignature,
   FileText,
+  Fingerprint,
+  Handshake,
   History,
   KeyRound,
+  Tag,
   ShieldAlert,
   User,
   XCircle,
@@ -31,6 +34,8 @@ import { riskSummary, scanContract } from "@/lib/contract-risk";
 import { now } from "@/lib/clock";
 import { ContactActions, DetailSegmentTabs, NextActionCard, resolveTab, type DetailTabDef } from "@/components/app/detail-tabs";
 import { DuplicateRecordButton } from "@/components/app/record-ops-buttons";
+import { MobileActionBar } from "@/components/ui/mobile-action-bar";
+import { formatVerifyCode, shortHash } from "@/lib/contract-evidence";
 
 export const metadata = { title: "Sözleşme" };
 
@@ -104,14 +109,19 @@ export default async function ContractDetailPage({
   const rentalLinkP = Promise.resolve(supabase.from("contracts").select("rental_id, rent_increase_basis").eq("id", id).maybeSingle());
   // Sürüm geçmişi — içerik düzenlendikçe önceki haller burada listelenir (yalnız o sekmede)
   const versionsP = tab === "surum" ? listContractVersions(id) : Promise.resolve([]);
+  // SP3 anlaşma/teklif bağı ve SP8 imza kanıtı: ayrı ve hataya dayanıklı (sütunlar yoksa kart/chip gizlenir).
+  const dealLinkP = Promise.resolve(supabase.from("contracts").select("deal_id, offer_id").eq("id", id).maybeSingle());
+  const evidenceP = Promise.resolve(supabase.from("contracts").select("body_sha256, verify_code").eq("id", id).maybeSingle());
 
-  // Dört bağımsız okuma tek turda (önceden 4 sıralı tur).
-  const [{ data }, { data: signerRows, error: signerError }, rentalLinkRes, versions, smsReminder] = await Promise.all([
+  // Bağımsız okumalar tek turda.
+  const [{ data }, { data: signerRows, error: signerError }, rentalLinkRes, versions, smsReminder, dealLinkRes, evidenceRes] = await Promise.all([
     contractP,
     signersP,
     rentalLinkP,
     versionsP,
     smsReminderP,
+    dealLinkP,
+    evidenceP,
   ]);
   if (!data) notFound();
   if (signerError) throw new Error("Sözleşme imzalayanları okunamadı.");
@@ -125,6 +135,8 @@ export default async function ContractDetailPage({
   const rentalLink = rentalLinkRes.error ? null : (rentalLinkRes.data as { rental_id?: string | null; rent_increase_basis?: string | null } | null);
   const linkedRentalId = rentalLink?.rental_id ?? null;
   const INCREASE_LABELS: Record<string, string> = { tufe: "TÜFE (TBK m.344)", sabit: "Sabit yüzde", yok: "Artış maddesi yok" };
+  const dealLink = dealLinkRes.error ? null : (dealLinkRes.data as { deal_id?: string | null; offer_id?: string | null } | null);
+  const evidence = evidenceRes.error ? null : (evidenceRes.data as { body_sha256?: string | null; verify_code?: string | null } | null);
 
   /*
    * Risk taramasi (X4). Onceden HICBIR kontrol yoktu: `createContract`
@@ -249,6 +261,24 @@ export default async function ContractDetailPage({
             {rentalLink?.rent_increase_basis ? <span className="text-xs text-text-muted">· {INCREASE_LABELS[rentalLink.rent_increase_basis] ?? rentalLink.rent_increase_basis}</span> : null}
           </div>
         )}
+        {dealLink?.deal_id ? (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <Handshake className="h-4 w-4 text-brand-700" />
+            <span className="text-text-muted">Anlaşma:</span>
+            <Link href={`/app/anlasmalar/${dealLink.deal_id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-text hover:underline">
+              Anlaşmayı aç
+            </Link>
+          </div>
+        ) : null}
+        {dealLink?.offer_id ? (
+          <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
+            <Tag className="h-4 w-4 text-brand-700" />
+            <span className="text-text-muted">Teklif:</span>
+            <Link href={`/app/teklifler/${dealLink.offer_id}`} className="focus-ring rounded-[var(--radius-control)] font-semibold text-text hover:underline">
+              Kabul edilen teklif
+            </Link>
+          </div>
+        ) : null}
         {contract.expires_at && (
           <div className="flex items-center gap-2 rounded-[var(--radius-card)] border border-line bg-surface px-3 py-2 text-sm shadow-[var(--shadow-xs)]">
             <Clock className="h-4 w-4 text-amber-700" />
@@ -535,9 +565,43 @@ export default async function ContractDetailPage({
               </div>
             </dl>
           </section>
+          {contract.status === "sent" || contract.status === "signed" ? (
+            <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)]">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-ink-950">
+                <Fingerprint className="h-4 w-4 text-brand-600" aria-hidden /> İmza kanıtı
+              </h2>
+              {evidence?.body_sha256 ? (
+                <dl className="mt-2 space-y-1.5 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-text-muted">İçerik özeti</dt>
+                    <dd className="truncate font-mono text-xs text-ink-950" title={evidence.body_sha256}>{shortHash(evidence.body_sha256)}</dd>
+                  </div>
+                  {evidence.verify_code ? (
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-text-muted">Doğrulama kodu</dt>
+                      <dd className="font-mono text-xs font-semibold text-ink-950">{formatVerifyCode(evidence.verify_code)}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : (
+                <p className="mt-2 text-xs text-text-muted">İçerik özeti ilk imzada kilitlenir.</p>
+              )}
+              <Link
+                href={`/app/sozlesmeler/${id}/sertifika`}
+                className="focus-ring press mt-3 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[var(--radius-control)] border border-line text-sm font-semibold text-brand-700 transition hover:border-brand-300"
+              >
+                <FileSignature className="h-4 w-4" aria-hidden /> Tamamlama sertifikası
+              </Link>
+            </section>
+          ) : null}
         </aside>
       </div>
 
+      <MobileActionBar
+        primary={{ title: nba.title, label: nba.label, href: nba.href }}
+        phone={customerRel?.phone}
+        contactName={customerRel?.full_name}
+      />
     </div>
   );
 }

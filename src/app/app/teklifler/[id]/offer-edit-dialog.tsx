@@ -4,6 +4,8 @@ import { useActionState, useState } from "react";
 import { Pencil } from "lucide-react";
 import { updateOffer, type OfferResult } from "@/app/actions/offers";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
+import type { OfferTerms } from "@/lib/offer-terms";
+import { OfferTermsFields } from "../offer-terms-fields";
 
 type Offer = {
   id: string;
@@ -12,6 +14,8 @@ type Offer = {
   notes: string | null;
   /** Malike görünen açıklama (SK8 B149); iç not `notes` malike gitmez. */
   owner_visible_note?: string | null;
+  /** SP2 koşulları; null = sütunlar henüz yok (sekme gizlenir, alanlar gönderilmez). */
+  terms?: OfferTerms | null;
 };
 
 export function OfferEditDialog({ offer }: { offer: Offer }) {
@@ -44,6 +48,11 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
         valid_until: "Geçerlilik",
         notes: "İç not",
         owner_visible_note: "Malike görünen açıklama",
+        payment_method: "Ödeme şekli",
+        deposit_amount: "Kapora",
+        proposed_deed_date: "Tapu tarihi",
+        credit_contingency: "Kredi şartı",
+        swap_note: "Takas",
       }}
       trigger={({ onClick, ...aria }) => (
         <button
@@ -55,7 +64,12 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
           <Pencil className="h-4 w-4" /> Teklifi düzenle
         </button>
       )}
-      tabs={[{ id: "teklif", label: "Teklif", fields: ["amount", "valid_until", "notes", "owner_visible_note"] }]}
+      tabs={[
+        { id: "teklif", label: "Teklif", fields: ["amount", "valid_until", "notes", "owner_visible_note"] },
+        ...(offer.terms
+          ? [{ id: "odeme", label: "Ödeme ve tapu", fields: ["payment_method", "deposit_amount", "proposed_deed_date", "credit_contingency", "swap_note"] }]
+          : []),
+      ]}
       panels={{
         teklif: (
           <>
@@ -84,6 +98,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
             </label>
           </>
         ),
+        ...(offer.terms ? { odeme: <OfferTermsFields idPrefix={`offer-edit-${offer.id}`} defaults={offer.terms} /> } : {}),
       }}
     />
   );

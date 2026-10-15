@@ -23,6 +23,8 @@ import { officeMessageHref, resolvePublicContact } from "@/lib/public-contact";
 import { PublicContactActions } from "@/components/public/public-contact-actions";
 import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 import { OfferActions } from "./offer-actions";
+import { OwnerCounterOfferForm } from "./owner-counter-offer";
+import { OFFER_BADGE_LABELS, OFFER_PAYMENT_LABELS, compareOfferBadges, readOfferTerms, type OfferTerms } from "@/lib/offer-terms";
 import {
   PortalContactBar,
   PortalEmpty,
@@ -148,7 +150,8 @@ export default async function MalikPortaliPage({
   ]);
   const tokenSwitch = switchRes.error ? null : ((switchRes.data as { weekly_report_enabled?: boolean | null } | null)?.weekly_report_enabled ?? null);
   const weeklyReportOn = (tokenSwitch ?? ownerSettings[OWNER_WEEKLY_REPORT_KEY] === true) === true;
-  const [{ data: propertyRel }, { data: coverRows }, { data: priceRows }] = await Promise.all([
+  const offerIds = offers.map((o) => o.id);
+  const [{ data: propertyRel }, { data: coverRows }, { data: priceRows }, offerTermsRes] = await Promise.all([
     admin
       .from("properties")
       .select("assigned_to, tenant:tenants(phone, lead_capture_token, lead_capture_enabled)")
@@ -177,7 +180,39 @@ export default async function MalikPortaliPage({
       .eq("price_field", "list_price")
       .order("created_at", { ascending: false })
       .limit(10),
+    // SP2 teklif koşulları + malik karşı teklifi (sütunlar yoksa hata → koşulsuz kart; iç not burada okunmaz).
+    offerIds.length > 0
+      ? admin
+          .from("offers")
+          .select("id, payment_method, deposit_amount, proposed_deed_date, credit_contingency, swap_note, valid_until, owner_counter_amount, owner_counter_at")
+          .eq("tenant_id", tenant.id)
+          .eq("property_id", property.id)
+          .in("id", offerIds)
+      : Promise.resolve({ data: [] as Record<string, unknown>[], error: null }),
   ]);
+  const offerExtras = new Map<string, { terms: OfferTerms; validUntil: string | null; counterAmount: number | null }>(
+    offerTermsRes.error
+      ? []
+      : ((offerTermsRes.data ?? []) as Record<string, unknown>[]).map((r) => [
+          String(r.id),
+          {
+            terms: readOfferTerms(r),
+            validUntil: typeof r.valid_until === "string" ? r.valid_until.slice(0, 10) : null,
+            counterAmount: r.owner_counter_amount != null ? Number(r.owner_counter_amount) : null,
+          },
+        ]),
+  );
+  const counterEnabled = !offerTermsRes.error;
+  const openOffers = offers.filter((o) => o.status === "submitted" || o.status === "countered");
+  const offerBadges = compareOfferBadges(
+    openOffers.map((o) => ({
+      id: o.id,
+      amount: Number(o.amount) || 0,
+      status: o.status,
+      valid_until: offerExtras.get(o.id)?.validUntil ?? null,
+      terms: offerExtras.get(o.id)?.terms ?? readOfferTerms(null),
+    })),
+  );
 
   const advisorId = (propertyRel?.assigned_to as string | null) ?? null;
   const { data: advisor } = advisorId
@@ -337,6 +372,12 @@ export default async function MalikPortaliPage({
             <PortalEmpty icon={Tag} title="Henüz teklif gelmedi. Teklifler geldiğinde burada görünür." />
           ) : (
             <div className="space-y-2">
+              {openOffers.length >= 2 ? (
+                <p className="rounded-[var(--radius-card)] bg-canvas px-3 py-2 text-xs leading-relaxed text-text-muted">
+                  Değerlendirmede {openOffers.length} teklif var. Yeşil etiketler teklifleri karşılaştırır: en yüksek tutar, en yüksek kapora,
+                  en erken tapu tarihi ve kredi şartı olmayan teklifler.
+                </p>
+              ) : null}
               {offers.map((o) => (
                 <div key={o.id} className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 shadow-[var(--shadow-xs)]">
                   <div className="flex items-start justify-between gap-3">
@@ -344,6 +385,40 @@ export default async function MalikPortaliPage({
                       <p className="font-bold text-ink-950">{money(o.amount)}</p>
                       {/* Yalnız danışmanın malike yazdığı açıklama; iç not (offers.notes) burada YOK (SK8 B149). */}
                       {o.ownerNote && <p className="mt-1 text-xs text-text-muted line-clamp-3">{o.ownerNote}</p>}
+                      {(() => {
+                        const extra = offerExtras.get(o.id);
+                        const t = extra?.terms;
+                        const chips = [
+                          t?.payment_method ? `Ödeme: ${OFFER_PAYMENT_LABELS[t.payment_method]}` : null,
+                          t?.deposit_amount != null ? `Kapora: ${money(t.deposit_amount)}` : null,
+                          t?.proposed_deed_date ? `Tapu: ${formatDate(t.proposed_deed_date)}` : null,
+                          t?.credit_contingency ? "Kredi onayına bağlı" : null,
+                          extra?.validUntil ? `Geçerlilik: ${formatDate(extra.validUntil)}` : null,
+                        ].filter((c): c is string => Boolean(c));
+                        const badges = offerBadges.get(o.id) ?? [];
+                        if (chips.length === 0 && badges.length === 0 && !t?.swap_note) return null;
+                        return (
+                          <div className="mt-2 space-y-1.5">
+                            {badges.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {badges.map((b) => (
+                                  <span key={b} className="rounded-full bg-mint-500/12 px-2 py-0.5 text-xs font-bold text-mint-700">
+                                    {OFFER_BADGE_LABELS[b]}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {chips.length > 0 ? (
+                              <ul className="flex flex-wrap gap-1.5 text-xs text-text-muted">
+                                {chips.map((c) => (
+                                  <li key={c} className="rounded-[var(--radius-control)] border border-line bg-canvas px-2 py-0.5">{c}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                            {t?.swap_note ? <p className="text-xs text-text-muted line-clamp-2">Takas: {t.swap_note}</p> : null}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="shrink-0 text-right">
                       <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${
@@ -360,9 +435,21 @@ export default async function MalikPortaliPage({
                     </div>
                   </div>
                   {/* Malik aksiyonları — yalnızca değerlendirmedeki teklifler */}
-                  {o.status === "submitted" && (
+                  {(o.status === "submitted" || o.status === "countered") && (
                     <div className="mt-3 border-t border-line pt-3">
-                      <OfferActions token={token} offerId={o.id} amountLabel={money(o.amount)} />
+                      {o.status === "submitted" ? <OfferActions token={token} offerId={o.id} amountLabel={money(o.amount)} /> : null}
+                      {offerExtras.get(o.id)?.counterAmount != null ? (
+                        <p className="mt-2 text-xs font-semibold text-amber-700">
+                          Danışmanınıza ilettiğiniz karşı teklif: {money(offerExtras.get(o.id)!.counterAmount)}
+                        </p>
+                      ) : null}
+                      {counterEnabled ? (
+                        <OwnerCounterOfferForm
+                          token={token}
+                          offerId={o.id}
+                          currentCounter={offerExtras.get(o.id)?.counterAmount != null ? money(offerExtras.get(o.id)!.counterAmount) : null}
+                        />
+                      ) : null}
                     </div>
                   )}
                 </div>

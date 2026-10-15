@@ -11,6 +11,8 @@ import { isSignerSmsAvailable, maskPhone } from "../_lib/sms";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { formatDateTimeTr } from "@/lib/format";
 import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
+import Link from "next/link";
+import { formatVerifyCode } from "@/lib/contract-evidence";
 
 // İmza linkleri kişiye özeldir → arama motorlarına kapalı.
 // WhatsApp önizlemesi ofis markalı; yalnız ofis adı + belge türü (public-link-og), görsel `opengraph-image.tsx`.
@@ -64,7 +66,14 @@ export default async function PublicContractSignPage({ params }: { params: Promi
   const cancelled = contract.status === "cancelled";
   const alreadySigned = signer.status === "signed";
   // SMS OTP zorunlu mu? Telefon kayıtlı + (tenant Netgsm kaydı VEYA platform varsayılanı)
-  const smsRequired = await isSignerSmsAvailable(contract.tenant_id, signer.phone);
+  const [smsRequired, evidenceRes] = await Promise.all([
+    isSignerSmsAvailable(contract.tenant_id, signer.phone),
+    // SP8 doğrulama kodu (sütun yoksa hata → gösterilmez). Yalnız imzalamış kişiye gösterilir.
+    signer.status === "signed"
+      ? admin.from("contracts").select("verify_code").eq("id", contract.id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+  const verifyCode = evidenceRes.error ? null : ((evidenceRes.data as { verify_code?: string | null } | null)?.verify_code ?? null);
 
   return (
     <div className="min-h-screen bg-[image:var(--grad-ink)] px-4 py-10 print:bg-none print:p-0">
@@ -132,6 +141,15 @@ export default async function PublicContractSignPage({ params }: { params: Promi
                 <Clock3 className="h-3.5 w-3.5 text-mint-600" />
                 İmza zaman damgası: {formatDate(signer.signed_at)}
               </p>
+              {verifyCode ? (
+                <p className="mt-2 text-xs text-text-muted">
+                  Doğrulama kodu:{" "}
+                  <Link href={`/imza/dogrula/${verifyCode}`} className="font-mono font-bold tracking-wider text-brand-700 hover:underline">
+                    {formatVerifyCode(verifyCode)}
+                  </Link>{" "}
+                  — imzalı belgenin bütünlüğünü bu kodla denetleyebilirsiniz.
+                </p>
+              ) : null}
               {signer.verified_at ? (
                 <p className="mt-2 block">
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-mint-500/30 bg-surface px-3 py-1.5 text-xs font-semibold text-mint-600">

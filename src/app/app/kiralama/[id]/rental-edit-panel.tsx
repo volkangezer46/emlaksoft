@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, FileText, Pencil, Wallet } from "lucide-react";
+import { CalendarPlus, FileText, Percent, Pencil, Wallet } from "lucide-react";
 import { extendRental, updateRental } from "@/app/actions/rentals";
 import { useToast } from "@/components/app/toast-provider";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
@@ -19,6 +19,9 @@ type RentalLite = {
   end_date: string | null;
   deposit: number | null;
   notes: string | null;
+  /** SP9: null = sütunlar henüz yok (sekme gizlenir). */
+  usage?: "konut" | "isyeri" | null;
+  withholding_rate?: number | null;
 };
 
 /**
@@ -80,7 +83,7 @@ export function RentalEditPanel({ rental }: { rental: RentalLite }) {
         pending={pending}
         error={editError}
         hiddenFields={<input type="hidden" name="rental_id" value={rental.id} />}
-        fieldLabels={{ due_day: "Vade günü", end_date: "Bitiş tarihi", deposit: "Depozito (₺)", notes: "Not" }}
+        fieldLabels={{ due_day: "Vade günü", end_date: "Bitiş tarihi", deposit: "Depozito (₺)", notes: "Not", usage: "Kullanım", withholding_rate: "Stopaj (%)" }}
         trigger={({ onClick, ...aria }) => (
           <button type="button" onClick={onClick} {...aria} className={triggerClass}>
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Düzenle
@@ -88,6 +91,9 @@ export function RentalEditPanel({ rental }: { rental: RentalLite }) {
         )}
         tabs={[
           { id: "sozlesme", label: "Sözleşme", icon: Wallet, fields: ["due_day", "end_date", "deposit"] },
+          ...(rental.usage
+            ? [{ id: "stopaj", label: "Kullanım ve stopaj", icon: Percent, fields: ["usage", "withholding_rate"] }]
+            : []),
           { id: "not", label: "Not", icon: FileText, fields: ["notes"] },
         ]}
         panels={{
@@ -107,6 +113,34 @@ export function RentalEditPanel({ rental }: { rental: RentalLite }) {
               </label>
             </>
           ),
+          ...(rental.usage
+            ? {
+                stopaj: (
+                  <>
+                    <label className="text-xs font-semibold text-text-muted">
+                      Kullanım
+                      <select name="usage" defaultValue={rental.usage} className={`mt-1 min-h-11 ${fieldClass}`}>
+                        <option value="konut">Konut</option>
+                        <option value="isyeri">İşyeri</option>
+                      </select>
+                    </label>
+                    <label className="text-xs font-semibold text-text-muted">
+                      Kiracının kestiği stopaj (%)
+                      <input
+                        name="withholding_rate"
+                        inputMode="decimal"
+                        defaultValue={rental.withholding_rate ?? 0}
+                        className={`mt-1 min-h-11 ${fieldClass}`}
+                      />
+                    </label>
+                    <p className="text-xs leading-relaxed text-text-muted sm:col-span-2">
+                      Oran yalnız bundan sonra açılacak tahakkukları etkiler: tahakkuk net tutarla açılır, stopaj ayrı gösterilir.
+                      Oluşmuş tahakkuklar değişmez.
+                    </p>
+                  </>
+                ),
+              }
+            : {}),
           not: (
             <label className="text-xs font-semibold text-text-muted sm:col-span-2">
               Not

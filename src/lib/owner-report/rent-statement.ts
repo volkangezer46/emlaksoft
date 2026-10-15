@@ -6,15 +6,25 @@
  * Ofis hizmet bedeli/komisyon veya vergi bu ekstrede HESAPLANMAZ (kayıt yok; uydurulmaz). Vergi beyanı için değildir.
  */
 
-export type StatementCharge = { period: string; amount: number; status: string; paidAt: string | null };
+/** amount = kiracıdan tahsil edilecek (NET) tutar; withholding = kiracının kestiği stopaj (SP9; yoksa 0). */
+export type StatementCharge = { period: string; amount: number; status: string; paidAt: string | null; withholding?: number };
 export type StatementExpense = { title: string; cost: number | null; status: string; createdAt: string };
 
-export type StatementMonth = { month: string; accrued: number; collected: number; expense: number; net: number; overdue: number };
+export type StatementMonth = {
+  month: string;
+  accrued: number;
+  collected: number;
+  expense: number;
+  net: number;
+  overdue: number;
+  /** Ödenen tahakkuklarda kiracının kestiği stopaj (ödeme ayına göre). Brüt kira = tahsilat + stopaj. */
+  withheld: number;
+};
 
 export type RentStatement = {
   year: number;
   months: StatementMonth[];
-  totals: { accrued: number; collected: number; expense: number; net: number; overdue: number };
+  totals: { accrued: number; collected: number; expense: number; net: number; overdue: number; withheld: number };
   expenses: { title: string; cost: number; date: string }[];
   hasData: boolean;
 };
@@ -40,6 +50,7 @@ export function buildRentStatement(year: number, charges: readonly StatementChar
     expense: 0,
     net: 0,
     overdue: 0,
+    withheld: 0,
   }));
   const byKey = new Map(months.map((m) => [m.month, m]));
 
@@ -52,7 +63,10 @@ export function buildRentStatement(year: number, charges: readonly StatementChar
     }
     if (c.status === "paid") {
       const target = byKey.get(monthKey(c.paidAt ?? c.period));
-      if (target) target.collected += c.amount;
+      if (target) {
+        target.collected += c.amount;
+        target.withheld += c.withholding && c.withholding > 0 ? c.withholding : 0;
+      }
     }
   }
   const expenseRows: { title: string; cost: number; date: string }[] = [];
@@ -71,8 +85,9 @@ export function buildRentStatement(year: number, charges: readonly StatementChar
       expense: acc.expense + m.expense,
       net: acc.net + m.net,
       overdue: acc.overdue + m.overdue,
+      withheld: acc.withheld + m.withheld,
     }),
-    { accrued: 0, collected: 0, expense: 0, net: 0, overdue: 0 },
+    { accrued: 0, collected: 0, expense: 0, net: 0, overdue: 0, withheld: 0 },
   );
   return {
     year,

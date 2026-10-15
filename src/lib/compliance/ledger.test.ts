@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLedgerDraftsFromDeal,
   DEFAULT_LEDGER_THRESHOLDS,
   computeLedgerFlags,
   computeRetainUntil,
@@ -134,5 +135,34 @@ describe("filtre", () => {
       tur: "sale",
       sayfa: 4,
     });
+  });
+});
+
+describe("buildLedgerDraftsFromDeal (SP7)", () => {
+  const base = {
+    dealId: "d1",
+    dealType: "sale" as const,
+    closedDay: "2026-10-10",
+    amountTry: 5_000_000,
+    buyer: { name: " Ayşe  Demir ", customerId: "c1" },
+    seller: { name: "Mehmet Kaya", customerId: null },
+    propertyId: "p1",
+    method: "bank_transfer" as const,
+    buyerIdentityChecked: true,
+    sellerIdentityChecked: false,
+  };
+
+  it("satışta alıcı ve satıcı için birer satır; karşı taraf ve kimlik bayrağı taşınır", () => {
+    const rows = buildLedgerDraftsFromDeal(base);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ transactionType: "sale", partyName: "Ayşe Demir", partyRole: "buyer", counterpartyName: "Mehmet Kaya", identityChecked: true, customerId: "c1", dealId: "d1" });
+    expect(rows[1]).toMatchObject({ partyRole: "seller", identityChecked: false, counterpartyName: "Ayşe Demir" });
+  });
+
+  it("kiralıkta kiracı / ev sahibi rolü; adı olmayan taraf ve sıfır tutar satır üretmez", () => {
+    const rows = buildLedgerDraftsFromDeal({ ...base, dealType: "rent", seller: null });
+    expect(rows.map((r) => [r.transactionType, r.partyRole])).toEqual([["rental", "tenant"]]);
+    expect(buildLedgerDraftsFromDeal({ ...base, amountTry: 0 })).toEqual([]);
+    expect(buildLedgerDraftsFromDeal({ ...base, closedDay: "2026-13-01" })).toEqual([]);
   });
 });

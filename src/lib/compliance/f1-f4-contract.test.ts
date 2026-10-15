@@ -24,7 +24,7 @@ describe("F1 yasal kayıt defteri sözleşmesi", () => {
   });
   it("action'lar kapılı; dosya çıktısı Rapor merkezinde yalnız owner/gm'e açık ve denetim logu yazar; log kişisel veri taşımaz", () => {
     const src = read("src/app/actions/compliance-ledger.ts");
-    expect(src.match(/requirePermission\(/g)?.length).toBe(2);
+    expect(src.match(/requirePermission\(/g)?.length).toBe(3); // ekle, ayarlar, kapanıştan deftere işle (SP7)
     expect(src).toContain('isOfficeLevel(gate.role)');
     expect(src).not.toContain("exportLedgerCsv");
     const report = read("src/lib/report-center/catalog/tenant-finance.ts");

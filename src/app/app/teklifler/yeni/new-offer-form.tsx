@@ -25,6 +25,8 @@ import { detailOrList } from "@/lib/form-logic";
 import { parseLooseNumber } from "@/lib/form-tabs";
 import { formatTry } from "@/lib/utils";
 import { OFFER_DRAFT_FIELDS, OFFER_FORM_ID, OFFER_TABS } from "./offer-tabs";
+import { OfferTermsFields } from "../offer-terms-fields";
+import { OFFER_PAYMENT_LABELS, isOfferPaymentMethod } from "@/lib/offer-terms";
 import { formatNumberTr } from "@/lib/format";
 
 type PropertyOption = PropertyPriceSummary;
@@ -32,7 +34,7 @@ type CustomerOption = { id: string; full_name: string };
 
 const formatTl = formatNumberTr;
 
-const TAB_ICONS = { taraflar: TI.taraflar, kosullar: TI.kosullar } as const;
+const TAB_ICONS = { taraflar: TI.taraflar, kosullar: TI.kosullar, odeme: TI.fiyat } as const;
 
 const FIELD_LABELS = { property_id: "Portföy", amount: "Teklif tutarı" };
 
@@ -199,11 +201,12 @@ export function NewOfferForm({
             name="owner_visible_note"
             rows={3}
             maxLength={2000}
-            placeholder="ör. Peşin ödeme, 30 gün içinde tapu"
+            placeholder="ör. Alıcı ciddi, hafta içi görüşebilir"
           />
         </FormField>
       </>
     ),
+    odeme: <OfferTermsFields idPrefix="offer-terms" minDate={todayIso} />,
   };
 
   function renderSummary({ values, display }: TabbedSummaryContext) {
@@ -215,6 +218,10 @@ export function NewOfferForm({
     const validUntil = (values.valid_until ?? "").trim();
     const notes = (values.notes ?? "").trim();
     const ownerNote = (values.owner_visible_note ?? "").trim();
+    const payment = (values.payment_method ?? "").trim();
+    const deposit = parseLooseNumber(values.deposit_amount);
+    const deed = (values.proposed_deed_date ?? "").trim();
+    const credit = values.credit_contingency === "on" || values.credit_contingency === "true";
     return (
       <>
         <div className="rounded-[var(--radius-control)] border border-line bg-canvas/60 p-3">
@@ -246,6 +253,28 @@ export function NewOfferForm({
             field="valid_until"
           />
           <SummaryRow label="İç not" value={notes || "Girilmedi"} muted={!notes} tab="kosullar" field="notes" />
+          <SummaryRow
+            label="Ödeme şekli"
+            value={isOfferPaymentMethod(payment) ? OFFER_PAYMENT_LABELS[payment] : "Belirtilmedi"}
+            muted={!isOfferPaymentMethod(payment)}
+            tab="odeme"
+            field="payment_method"
+          />
+          <SummaryRow
+            label="Kapora"
+            value={deposit != null && deposit > 0 ? formatTry(deposit) : "Girilmedi"}
+            muted={!(deposit != null && deposit > 0)}
+            tab="odeme"
+            field="deposit_amount"
+          />
+          <SummaryRow
+            label="Tapu tarihi"
+            value={deed ? deed.split("-").reverse().join(".") : "Belirtilmedi"}
+            muted={!deed}
+            tab="odeme"
+            field="proposed_deed_date"
+          />
+          <SummaryRow label="Kredi şartı" value={credit ? "Var" : "Yok"} muted={!credit} tab="odeme" field="credit_contingency" />
           <SummaryRow
             label="Malike görünen"
             value={ownerNote || "Girilmedi"}

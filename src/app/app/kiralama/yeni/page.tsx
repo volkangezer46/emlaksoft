@@ -17,12 +17,31 @@ export default async function NewRentalPage({
   if (!(perms.rentals ?? []).includes("create")) redirect("/app/kiralama");
 
   // Kazanılan kira anlaşması köprüsü: ?property=&customer=&tutar= ön dolgusu (eş adlar ?portfoy=&musteri= de geçerli).
-  const params = (await searchParams) ?? {};
-  const { propertyId: prefillPropertyId, customerId: prefillCustomerId } = readPrefillIds(params);
-  const rentParsed = Number(typeof params.tutar === "string" ? params.tutar : "");
-  const prefillRent = Number.isFinite(rentParsed) && rentParsed > 0 ? Math.round(rentParsed) : null;
+  // SP4: ?anlasma=<id> verilirse eksik alanlar anlaşmadan (portföy, müşteri, anlaşma değeri) tamamlanır.
+  const sp = (await searchParams) ?? {};
+  const ids = readPrefillIds(sp);
+  const rentParsed = Number(typeof sp.tutar === "string" ? sp.tutar : "");
+  let prefillRent = Number.isFinite(rentParsed) && rentParsed > 0 ? Math.round(rentParsed) : null;
 
   const supabase = await createClient();
+  const dealParam = typeof sp.anlasma === "string" && /^[0-9a-f-]{36}$/i.test(sp.anlasma) ? sp.anlasma : null;
+  let prefillPropertyId = ids.propertyId;
+  let prefillCustomerId = ids.customerId;
+  let dealLabel: string | null = null;
+  if (dealParam) {
+    const { data: deal } = await supabase
+      .from("deals")
+      .select("id, deal_type, deal_value, property_id, customer_id")
+      .eq("id", dealParam)
+      .maybeSingle();
+    if (deal && (deal as { deal_type?: string }).deal_type === "rent") {
+      const d = deal as { deal_value: number | string | null; property_id: string | null; customer_id: string | null };
+      prefillPropertyId ??= d.property_id;
+      prefillCustomerId ??= d.customer_id;
+      if (prefillRent == null && d.deal_value != null && Number(d.deal_value) > 0) prefillRent = Math.round(Number(d.deal_value));
+      dealLabel = "Kiralık anlaşmadan gelindi — portföy, kiracı ve aylık kira dolduruldu; kayıt açılınca anlaşma kazanıldı olarak kapanır.";
+    }
+  }
   const [{ data: propData }, { data: custData }] = await Promise.all([
     supabase
       .from("properties")
@@ -73,6 +92,7 @@ export default async function NewRentalPage({
       defaultCustomerId={validCustomer}
       defaultMonthlyRent={prefillRent}
       defaultStartDate={trDayKey()}
+      sourceNote={dealLabel}
       userId={userId}
     />
   );

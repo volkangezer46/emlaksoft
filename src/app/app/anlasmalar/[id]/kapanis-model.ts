@@ -102,7 +102,7 @@ export function wonReadiness(i: ReadinessInput, ids: { dealId: string; propertyI
       ok: i.commissionRate != null && i.commissionRate > 0 && i.commissionRate <= 100,
       href: ids.propertyId ? `/app/portfoyler/${ids.propertyId}` : undefined,
     },
-    { key: "type", label: "Satış anlaşması (kiralık anlaşma kapanışı Mülk yönetimi ekranından yapılır)", ok: i.dealType !== "rent", href: i.dealType === "rent" ? "/app/kiralama" : undefined },
+    { key: "type", label: "Satış anlaşması (kiralık anlaşma, kira kaydı açılınca kapanır: “Kira kaydı oluştur”)", ok: i.dealType !== "rent", href: i.dealType === "rent" ? `/app/kiralama/yeni?anlasma=${ids.dealId}` : undefined },
   ];
 }
 
