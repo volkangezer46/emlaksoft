@@ -322,9 +322,16 @@ function CustomerForm({ q, draft }: { q: ReturnType<typeof useQuick>; draft: Ret
   const v = draft.values;
   const [intent, setIntent] = useState<string>(v?.intent && v.intent in QUICK_INTENT_TRANSACTION ? v.intent : "al");
   // Mükerrer kapısı (B092): sunucu aynı telefonla kayıt bulursa ikinci gönderim "Yine de kaydet" onayıyla gider.
+  // Onay YALNIZ uyarının verildiği numara için geçerlidir: numara düzeltildiyse kapı yeni numarayı yeniden denetler.
+  const submittedPhone = useRef<string | null>(null);
   return (
     <form
-      onSubmit={(e) => q.onSubmit(e, q.result.duplicate ? { allow_duplicate: "1" } : undefined)}
+      onSubmit={(e) => {
+        const phoneNow = String(new FormData(e.currentTarget).get("phone") ?? "");
+        const confirmed = Boolean(q.result.duplicate) && submittedPhone.current === phoneNow;
+        submittedPhone.current = phoneNow;
+        q.onSubmit(e, confirmed ? { allow_duplicate: "1" } : undefined);
+      }}
       onKeyDown={q.onKeyDown}
       onInput={(e) => draft.track(e.currentTarget)}
       onChange={(e) => draft.track(e.currentTarget)}
