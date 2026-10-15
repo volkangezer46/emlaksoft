@@ -27,6 +27,8 @@ import { formatTurkishPhone, toTelHref, toWhatsAppLink } from "@/lib/phone";
 import { AgentShareCard } from "./agent-share-card";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 import { getSeoSettings } from "@/lib/seo/store";
+import { advisorLd, serializeJsonLd } from "@/lib/seo/jsonld";
+import { getBaseUrl } from "@/lib/base-url";
 import { resolveSeoPattern, vitrinRobots } from "@/lib/seo/patterns";
 import { isNeverIndexTenant } from "@/lib/vitrin-seo/never-index";
 import { loadNeverIndexList } from "@/lib/vitrin-seo/store";
@@ -109,6 +111,27 @@ const loadAgent = cache(async function loadAgent(slug: string): Promise<AgentRec
   return data as AgentRecord;
 });
 
+/**
+ * Ofis adı + arama motoru kararı (generateMetadata ve sayfa gövdesi aynı istekte paylaşır). Kalıcı noindex kuralı
+ * (örnek/demo/test/platform ofisi; vitrin-seo/never-index.ts) ÖNCE, sonra ofisin açık onayı (tenants.vitrin_seo_optin);
+ * sitemap ile aynı ölçüt. Ofis okunamazsa noindex.
+ */
+const loadAgentSeo = cache(async function loadAgentSeo(tenantId: string) {
+  const admin = createAdminClient();
+  const [{ data: tenant }, neverIndexList] = await Promise.all([
+    admin
+      .from("tenants")
+      .select("name, slug, vitrin_seo_optin, sample_seeded_at, sample_cleared_at")
+      .eq("id", tenantId)
+      .maybeSingle(),
+    loadNeverIndexList(),
+  ]);
+  return {
+    tenant,
+    robots: vitrinRobots(tenant?.vitrin_seo_optin === true, !tenant || isNeverIndexTenant(tenant, neverIndexList)),
+  };
+});
+
 export async function generateMetadata({
   params,
 }: {
@@ -118,16 +141,7 @@ export async function generateMetadata({
   const agent = await loadAgent(slug);
   if (!agent) return { title: "Danışman bulunamadı", robots: { index: false, follow: false } };
 
-  const admin = createAdminClient();
-  const [{ data: tenant }, seo, neverIndexList] = await Promise.all([
-    admin
-      .from("tenants")
-      .select("name, slug, vitrin_seo_optin, sample_seeded_at, sample_cleared_at")
-      .eq("id", agent.tenant_id)
-      .maybeSingle(),
-    getSeoSettings(),
-    loadNeverIndexList(),
-  ]);
+  const [{ tenant, robots }, seo] = await Promise.all([loadAgentSeo(agent.tenant_id), getSeoSettings()]);
   const office = (tenant?.name as string | null) ?? "Emlak ofisi";
   const role = agent.title?.trim() || "Emlak danışmanı";
 
@@ -145,9 +159,8 @@ export async function generateMetadata({
   return {
     title: { absolute: title },
     description,
-    // Arama motoru görünürlüğü: kalıcı noindex kuralı (örnek/demo/test/platform ofisi; vitrin-seo/never-index.ts)
-    // ÖNCE, sonra ofisin açık onayı (tenants.vitrin_seo_optin); sitemap ile aynı ölçüt. Ofis okunamazsa noindex.
-    robots: vitrinRobots(tenant?.vitrin_seo_optin === true, !tenant || isNeverIndexTenant(tenant, neverIndexList)),
+    // Arama motoru görünürlüğü: loadAgentSeo (kalıcı noindex kuralı önce, sonra ofis onayı; sitemap ile aynı ölçüt).
+    robots,
     alternates: { canonical: `/danisman/${slug}` },
     openGraph: {
       type: "profile",
@@ -171,7 +184,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
   const admin = createAdminClient();
   if (await isPublicFeatureClosed(admin, agent.tenant_id, "vitrin")) return <PublicModuleClosed />;
 
-  const [{ data: tenant }, { data: booking }, { data: listingRows, count: listingCount }, { data: surveyRows }] =
+  const [{ data: tenant }, { data: booking }, { data: listingRows, count: listingCount }, { data: surveyRows }, agentSeo] =
     await Promise.all([
       admin.from("tenants").select("name, slug, brand_color, logo_url").eq("id", agent.tenant_id).maybeSingle(),
       admin
@@ -204,6 +217,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
         .not("score", "is", null)
         .order("answered_at", { ascending: false })
         .limit(200),
+      loadAgentSeo(agent.tenant_id),
     ]);
 
   const office = (tenant?.name as string | null) ?? "Emlak ofisi";
@@ -269,6 +283,24 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
       who: shortenCustomerName(surveyCustomerNames.get(s.customer_id) ?? null),
     }));
 
+  // Yapılandırılmış veri yalnız sayfa İNDEKSLENEBİLİRKEN (metadata robots ile aynı karar); yalnız kartta görünen alanlar.
+  const ld = agentSeo.robots.index
+    ? advisorLd(
+        {
+          slug,
+          name: agent.full_name,
+          jobTitle: role,
+          bio: agent.bio,
+          photoUrl: agent.photo_url,
+          phone: agent.phone,
+          specialties,
+          languages,
+          office: { name: tenant?.name as string | null | undefined, slug: officeSlug },
+        },
+        getBaseUrl(),
+      )
+    : null;
+
   const telHref = toTelHref(agent.phone);
   const waHref = toWhatsAppLink(agent.phone);
   const bookingToken = (booking?.public_token as string | null) ?? null;
@@ -292,6 +324,7 @@ export default async function AgentCardPage({ params }: { params: Promise<{ slug
 
   return (
     <div className="min-h-screen bg-canvas pb-24 sm:pb-0">
+      {ld ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(ld) }} /> : null}
       {/* ---------------------------------------------------------------- Hero */}
       <header className="theme-dark relative overflow-hidden bg-[image:var(--grad-ink)] text-white">
         <div className="pointer-events-none absolute inset-0 grid-overlay-dark opacity-30" />

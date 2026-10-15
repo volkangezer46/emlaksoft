@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { PLANS } from "@/lib/billing/plans";
 import { FAQS } from "@/components/marketing/faq";
 import {
+  advisorLd,
   breadcrumbLd,
   buildPageJsonLd,
   extractJsonLdBlocks,
@@ -71,6 +72,48 @@ describe("JSON-LD üretimi", () => {
     expect(s).not.toContain(">");
     expect(s).toContain("\\u003c/script\\u003e");
     expect(JSON.parse(s).name).toBe("</script><script>alert(1)</script> & x");
+  });
+});
+
+describe("danışman JSON-LD (advisorLd)", () => {
+  const base = "https://emlaksoft.com.tr";
+  const input = {
+    slug: "ayse-yilmaz",
+    name: "Ayşe Yılmaz",
+    jobTitle: "Kıdemli danışman",
+    bio: "Kadıköy  uzmanı\n10 yıl",
+    photoUrl: "https://cdn.example.com/a.jpg",
+    phone: "05321234567",
+    specialties: ["Konut", "Konut", " "],
+    languages: ["Türkçe", "İngilizce"],
+    office: { name: "Gezer Emlak", slug: "gezer-emlak" },
+  };
+
+  it("RealEstateAgent, worksFor ofis vitrin adresine bağlanır ve doğrulayıcıdan geçer", () => {
+    const ld = advisorLd(input, base) as Record<string, unknown>;
+    expect(ld["@type"]).toBe("RealEstateAgent");
+    expect(ld.url).toBe(`${base}/danisman/ayse-yilmaz`);
+    expect(ld.worksFor).toEqual({ "@type": "RealEstateAgent", name: "Gezer Emlak", url: `${base}/vitrin/gezer-emlak` });
+    expect(ld.telephone).toBe("+905321234567");
+    expect(ld.description).toBe("Kadıköy uzmanı 10 yıl");
+    expect(ld.knowsAbout).toEqual(["Konut"]);
+    expect(ld.knowsLanguage).toEqual(["Türkçe", "İngilizce"]);
+    expect(validateJsonLd(ld)).toEqual([]);
+  });
+
+  it("yalnız verilen (sayfada görünen) alanlar: telefon/portre/tanıtım yoksa hiç basılmaz; puan asla yok", () => {
+    const ld = advisorLd({ slug: "ali", name: "Ali", office: { name: "Ofis", slug: null } }, base) as Record<string, unknown>;
+    expect(ld).not.toHaveProperty("telephone");
+    expect(ld).not.toHaveProperty("image");
+    expect(ld).not.toHaveProperty("description");
+    expect(ld.worksFor).toEqual({ "@type": "RealEstateAgent", name: "Ofis" });
+    expect(JSON.stringify(ld)).not.toMatch(/aggregateRating|review/i);
+  });
+
+  it("güvensiz portre adresi (http/javascript) basılmaz; adsız danışman için düğüm yok", () => {
+    expect(advisorLd({ ...input, photoUrl: "javascript:alert(1)" }, base)).not.toHaveProperty("image");
+    expect(advisorLd({ ...input, photoUrl: "http://x/a.jpg" }, base)).not.toHaveProperty("image");
+    expect(advisorLd({ ...input, name: "  " }, base)).toBeNull();
   });
 });
 

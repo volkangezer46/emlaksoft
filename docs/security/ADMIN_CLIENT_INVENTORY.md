@@ -429,9 +429,9 @@ Not: cron/platform birimlerinin "filtresiz" olması tasarım gereğidir (kiracı
 | `src/app/app/ekip/page.tsx:148` | `TeamPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var | P2 |
 | `src/app/app/hesabim/two-factor-actions.ts:29` | `setTwoFactorSms` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | var (yazma) | P2 |
 | `src/app/app/sozlesmeler/[id]/page.tsx:94` | `ContractDetailPage` | Oturumlu işlem; admin gerekçesi doğrulanmadı (RLS'li client'a taşıma adayı). | oturum-izin | param | P2 |
-| `src/app/danisman/[slug]/page.tsx:171` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
-| `src/app/danisman/[slug]/page.tsx:121` | `generateMetadata` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
-| `src/app/danisman/[slug]/page.tsx:94` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:184` | `AgentCardPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:96` | `loadAgent` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
+| `src/app/danisman/[slug]/page.tsx:120` | `loadAgentSeo` | Gerekçe doğrulanmadı. | belirsiz | uygulanamaz | P2 |
 | `src/app/danisman/[slug]/vcard/route.ts:50` | `GET` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |
 | `src/app/degerleme-raporu/[token]/page.tsx:67` | `PublicValuationReportPage` | Oturumsuz token'lı public yüzey. | public-token | var | P2 |
 | `src/app/evrak/[token]/page.tsx:65` | `EvrakPage` | Gerekçe doğrulanmadı. | belirsiz | var | P2 |

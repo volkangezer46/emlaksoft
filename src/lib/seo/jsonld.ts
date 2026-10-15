@@ -135,6 +135,57 @@ export function webApplicationLd(tool: { title: string; description: string; url
   };
 }
 
+/** Danışman kartı (/danisman/[slug]) için sayfada GÖRÜNEN, doğrulanabilir alanlar. Müşteri/anket verisi buraya girmez. */
+export type AdvisorLdInput = {
+  /** Danışmanın herkese açık kart yolu (/danisman/<slug>). */
+  slug: string;
+  name: string;
+  jobTitle?: string | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  /** Yalnız sayfada zaten gösterilen telefon (kart "Ara" düğmesi) geçirilir. */
+  phone?: string | null;
+  specialties?: readonly string[] | null;
+  languages?: readonly string[] | null;
+  office: { name: string | null | undefined; slug?: string | null };
+};
+
+const cleanList = (v: readonly string[] | null | undefined) => [...new Set((v ?? []).map((x) => String(x ?? "").trim()).filter(Boolean))];
+
+/**
+ * Danışman JSON-LD (RealEstateAgent). Yalnız kartta görünen bilgi: ad, unvan, tanıtım, portre, uzmanlık, dil ve
+ * (gösteriliyorsa) telefon. `worksFor` ofisin herkese açık vitrin adresine bağlanır (vitrin slug'ı yoksa yalnız ad).
+ * Puan/yorum (AggregateRating/Review) ÜRETİLMEZ: memnuniyet ortalaması doğrulanabilir bir değerlendirme kaydı değildir.
+ * Çağıran yalnız sayfa İNDEKSLENEBİLİRKEN basar (noindex kartta yapılandırılmış veri yok).
+ */
+export function advisorLd(a: AdvisorLdInput, base: string): LdNode | null {
+  const name = a.name.trim();
+  if (!name || !a.slug) return null;
+  const url = canonicalUrl(base, `/danisman/${a.slug}`);
+  const node: LdNode = { "@context": "https://schema.org", "@type": "RealEstateAgent", "@id": `${url}#danisman`, name, url };
+  const jobTitle = a.jobTitle?.trim();
+  if (jobTitle) node.jobTitle = jobTitle;
+  const bio = a.bio?.replace(/\s+/g, " ").trim();
+  if (bio) node.description = bio.slice(0, 500);
+  const photo = a.photoUrl?.trim();
+  if (photo && (/^https:\/\//i.test(photo) || photo.startsWith("/"))) node.image = canonicalUrl(base, photo);
+  const phone = a.phone?.trim();
+  if (phone) node.telephone = toE164(phone);
+  const specialties = cleanList(a.specialties);
+  if (specialties.length > 0) node.knowsAbout = specialties;
+  const languages = cleanList(a.languages);
+  if (languages.length > 0) node.knowsLanguage = languages;
+  const officeName = a.office.name?.trim();
+  if (officeName) {
+    node.worksFor = {
+      "@type": "RealEstateAgent",
+      name: officeName,
+      ...(a.office.slug ? { url: canonicalUrl(base, `/vitrin/${a.office.slug}`) } : {}),
+    };
+  }
+  return node;
+}
+
 export type PageLdContext = {
   global: SeoGlobal;
   base: string;
