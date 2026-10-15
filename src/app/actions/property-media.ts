@@ -6,6 +6,7 @@ import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { logActivity } from "@/lib/activity";
+import { afterSafe } from "@/lib/after-safe";
 import { extractPropertyDocFields, type PropertyDocFields } from "@/lib/ai/document-ocr";
 import {
   documentUploadFileName,
@@ -22,6 +23,8 @@ import type {
   DirectFileUploadPrepareResult,
 } from "@/lib/direct-file-uploads";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { parseTrDecimal } from "@/lib/money-input";
+import { AREA_MAX_SQM } from "@/lib/area-input";
 
 export type { PropertyDocFields } from "@/lib/ai/document-ocr";
 
@@ -134,14 +137,18 @@ export async function finalizePropertyMediaUpload(
   }
 
   if (result.created) {
-    await logActivity({
-      tenantId: gate.tenantId,
-      actorId: gate.userId,
-      action: "property_media.upload",
-      entityType: "property",
-      entityId: propertyId,
-      newValue: { media_id: result.id, upload_mode: "signed_direct", is_document: isDocument === true },
-    });
+    // Denetim kaydı yanıttan sonra yazılır: paralel yüklemede her dosya bir DB turu daha beklemesin (yükleme hızı).
+    const mediaId = result.id;
+    afterSafe(() =>
+      logActivity({
+        tenantId: gate.tenantId,
+        actorId: gate.userId,
+        action: "property_media.upload",
+        entityType: "property",
+        entityId: propertyId,
+        newValue: { media_id: mediaId, upload_mode: "signed_direct", is_document: isDocument === true },
+      }),
+    );
   }
   revalidatePath(`/app/portfoyler/${propertyId}`);
   return result;
@@ -644,8 +651,9 @@ export async function applyDocFieldsToProperty(
 
   const ada = s200(input.ada);
   const parsel = s200(input.parsel);
-  const sqmRaw = input.yuzolcumu_m2 != null ? Number(String(input.yuzolcumu_m2).replace(",", ".")) : null;
-  const sqm = sqmRaw != null && Number.isFinite(sqmRaw) && sqmRaw > 0 ? sqmRaw : null;
+  // Tapu yüzölçümü tek Türkçe ayrıştırıcıdan: "1.250" → 1250 (eskiden 1.25), "120 m²" → 120; geçersiz → yazılmaz (B093).
+  const sqmParsed = input.yuzolcumu_m2 != null ? parseTrDecimal(input.yuzolcumu_m2 as number | string, { max: AREA_MAX_SQM, decimals: 4 }) : null;
+  const sqm = sqmParsed?.ok ? sqmParsed.value : null;
 
   const applied: string[] = [];
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };

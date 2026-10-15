@@ -476,6 +476,9 @@ const F = {
   sk6PlatformReportingLocalAxis: "20261016060500_platform_reporting_local_axis.sql",
   // SK7 (2026-10-16): musteri arama cekirdegi (Turkce katlamali search_fold + phone_digits uretilmis sutunlari, trigram indeksleri, maskeli arayan tanima RPC'si).
   sk7CustomerSearchFold: "20261016070000_customer_search_fold.sql",
+  // SK9 (2026-10-16): portfoy para birimi kolonu + yayin kapisi DB kopyasi / aktif satilik stok sayimi / portalda varlik tanimi.
+  sk9PropertyCurrency: "20261016090000_property_currency.sql",
+  sk9PublishGateCounts: "20261016090100_publish_gate_portfolio_counts.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -722,6 +725,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk6CommissionSplitsDeriveRate]: "davranis", // commission_normalize_splits: oran yoksa pct/tutardan turetilir, 'Ofis' etiketi office, tutarsiz oran/tutar 23514; yalniz demo 1be1a3b9 kaydi yeniden yazilir (gercek ofis verisi degismez)
     [F.sk6TenantIsInternal]: "davranis", // tenants.is_internal (varsayilan false, tablo yeniden yazilmaz) + yalniz e2e-test/admin/demo-ofis true + bayragi yalniz sunucu degistirir (BEFORE INSERT/UPDATE OF is_internal tetikleyicisi 42501); gercek ofis verisi degismez
     [F.sk6PlatformReportingLocalAxis]: "davranis", // platform_reporting_aggregates ic ofisleri dislar, p_from/p_to ve ay/hafta ekseni Istanbul, plan ekseni gizli paketleri kapsar, mrr_trend platform_mrr_daily ay sonu anlik goruntusunden (goruntusuz ay satir yok), summary.missing_subscription_count/internal_count; imza/ACL ayni
+    [F.sk9PropertyCurrency]: "davranis", // properties.currency (TRY|USD|EUR, not null default TRY, CHECK) + features.currency'den backfill + doviz kayitlarinda turetilmis price_health temizligi (gece tazelemesi/duzenleme ₺ karsiligiyla yeniden yazar)
+    [F.sk9PublishGateCounts]: "siki", // transition_property_status_atomic 'live' icin il/ilce + tamamlanmis ilan sahibi kaydi ister (publish_blocked); portfolio_counts ciktisina sale_stock_value/sale_stock_fx/rent_monthly_total eklenir (imza ayni); property_portal_presence yeni saf fonksiyon
     [F.yd7BatchCountRpcs]: "ek", // yalniz 5 yeni salt-okunur fonksiyon: offer_counts / demand_counts / target_activity_counts (SECURITY INVOKER, yalniz authenticated, RLS gecerli) + kvkk_customer_related_counts / ef_credit_balances (yalniz service_role); kod fonksiyon yokken eski ayri sorgulara duser
     [F.sk1FinanceFxInline]: "davranis", // finance_fx ayni sonuc, SET search_path kalkar + nitelikli isleçler: cagiran sorguya inline (yalniz plan); grant'lar korunur
     [F.sk1PgrstWatchScope]: "davranis", // extensions.pgrst_*_watch yalniz public/storage/graphql_public DDL'inde NOTIFY; fonksiyon sahibi (supabase_admin) degilse no-op (scripts/sunucu/pgrst-watch-scope.sh)
@@ -984,6 +989,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "KQ6-bildirim-temizligi", order: 156, title: "Bildirim gurultusu temizligi: anahtarsiz 'Portal teyit gecikti' kopyalari ilan basina en yeniye, gelecek tarihli kopyalar en yeniye, kalan gelecek created_at now() (bagimsiz yalniz veri; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; geri alinamaz, PITR; davranis)", files: [F.notificationsDedupeCleanup] },
     { id: "SK6-finans-rapor-platform-mrr", order: 206, title: "SK6 finans/rapor/platform MRR dogrulugu: rapor RPC'leri yerel ay ekseni + ofis geneli/izleyen ayrimi, kar-zarar ve KDV duzeltmesi, kiralama gecikmis dilimi, komisyon pay orani turetme, tenants.is_internal (e2e-test/admin/demo-ofis) ve platform toplulastirmasi (ic ofis haric, Istanbul siniri, ay sonu anlik goruntu egrisi). Sira dosya numarasiyla (060500, 060400'den SONRA). 060000 KOD YAYINIYLA AYNI PENCERE (once migration, sonra kod; arada eski kod Raporlar'da serileri bos gosterebilir); digerleri KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod yeni anahtar/sutun yokken eski davranisa duser). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.sk6ReportingLocalAxis, F.sk6FinancePnlVatFix, F.sk6RentalKpiOverdue, F.sk6CommissionSplitsDeriveRate, F.sk6TenantIsInternal, F.sk6PlatformReportingLocalAxis] },
     { id: "YD1-demo-gece-sifirlama", order: 161, title: "Demo kiracinin gece sifirlamasi: demo_reset_state tabani + demo_tenant_nightly_reset (yalniz slug=demo-ofis; dis baglanti yuzeyleri ve tabandan sonra eklenen is kayitlari silinir). Bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod fonksiyon yokken adimi atlar); ek", files: [F.demoTenantNightlyReset] },
+    { id: "SK9-portfoy-veri-dogrulugu", order: 209, title: "Portfoy ve ilan verisi dogrulugu: properties.currency (features.currency'den backfill; doviz kayitlarinin turetilmis fiyat sagligi bosaltilir) ve ARDINDAN yayin kapisi DB kopyasi (transition_property_status_atomic: 'live' icin il/ilce + tamamlanmis ilan sahibi kaydi), aktif satilik stok / aylik kira toplami (portfolio_counts), portalda varlik tanimi (property_portal_presence) (iki dosya BIRLIKTE ve sirayla; KOD YAYININDAN ONCE uygulanir: SK9 kodu properties.currency okur/yazar; RPC yeni alanlari yokken kart '—' der; ONCE restore edilebilir yedek dogrulanir; davranis/siki)", files: [F.sk9PropertyCurrency, F.sk9PublishGateCounts] },
     { id: "YD8-csp-olcum-statik-yasal", order: 168, title: "Herkese acik sayfa hafifligi: CSP rapor modu satirlari (error_logs source 'csp') hata patlamasi sayacina girmez (record_error_occurrence govdesi ayni + tek kosul) ve yasal sayfalar statik sunuma acilir (statik.routes yoksa yazilir; varsa dokunulmaz) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: CSP satirlari migration yokken yalniz sayaca da girer, statik yasal sayfa kodu zaten yayinda; sira dosya numarasiyla; davranis)", files: [F.yd8ErrorLogsCspSource, F.yd8StaticLegalPagesOn] },
     { id: "SK8-herkese-acik-yuzeyler", order: 208, title: "Herkese acik musteri yuzeyleri: offers.owner_visible_note (malik portalinda tek teklif metni; ic not offers.notes artik public degil) + atomik increment_share_view (yeni degeri dondurur; ilk acilis bildirimi yalniz 1 iken) (bagimsiz; KOD YAYININDAN ONCE uygulanir: kod sutun/RPC yokken malik aciklamasi bos, paylasim sayaci atlanir; sira serbest, ek)", files: [F.sk8PublicSurfaces] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
@@ -1247,6 +1253,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.sk6CommissionSplitsDeriveRate, F.commissionSplitsIntegrity],
     [F.sk6PlatformReportingLocalAxis, F.sk6TenantIsInternal],
     [F.sk6PlatformReportingLocalAxis, F.platformMrrDaily],
+    // SK9: sayim RPC'si properties.currency kolonunu okur; 090100 ancak 090000'dan sonra uygulanir.
+    [F.sk9PublishGateCounts, F.sk9PropertyCurrency],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

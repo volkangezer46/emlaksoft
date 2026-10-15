@@ -65,10 +65,11 @@ export const EIDS_EXEMPT_LABELS: Record<EidsExemptReason, string> = {
 export const EIDS_EXEMPT_RISK =
   "Dikkat: istisna yalnız gerçekten EİDS onayı alınamayan taşınmazlar içindir. Yanlış beyan, yetkisiz ilan sayılabilir ve idari para cezasına yol açabilir; dayanak belgeyi saklayın.";
 
-export const AUTHORITY_QUEUE_FILTERS = ["bekleyen", "bitiyor", "dolmus", "iptal", "bilinmiyor", "teyitsiz", "belgesiz"] as const;
+export const AUTHORITY_QUEUE_FILTERS = ["kaldir", "bekleyen", "bitiyor", "dolmus", "iptal", "bilinmiyor", "teyitsiz", "belgesiz"] as const;
 export type AuthorityQueueFilter = (typeof AUTHORITY_QUEUE_FILTERS)[number];
 
 export const AUTHORITY_QUEUE_LABELS: Record<AuthorityQueueFilter, string> = {
+  kaldir: "İptal ya da dolmuş ama yayında",
   bekleyen: "Onayı bekleyen",
   bitiyor: "15 günde bitiyor",
   dolmus: "Süresi dolmuş",
@@ -107,6 +108,10 @@ export type AuthorityQueueRow = {
   authority_eids_verified_at?: string | null;
   authority_last_email_at?: string | null;
   eids_exempt_reason?: string | null;
+  /** Portalda canlı kaydı var mı (portal_listings.status='live'); okuyucu doldurur. `undefined` = bilinmiyor. */
+  portal_live?: boolean;
+  /** Açık `eids_takedown` görevi var mı (Bakanlık e-postasıyla açılır); okuyucu doldurur. */
+  takedown_open?: boolean;
 };
 
 type DisplayInput = Pick<AuthorityQueueRow, "authority_eids_status" | "authorization_end" | "authorization_start"> & {
@@ -145,6 +150,11 @@ export function classifyAuthority(row: AuthorityQueueRow, nowMs: number): { buck
     buckets.push("teyitsiz");
   }
   if (!(row.authority_doc_no ?? "").trim()) buckets.push("belgesiz");
+  // "Kaldır" (B082): yetki süresi dolmuş ya da iptal/ret edilmiş AMA portalda hâlâ canlı ilan var — ya da Bakanlık
+  // e-postasıyla açılmış kaldırma görevi bekliyor. Sayı veriden hesaplanır (yalnız görev sayısı değil): süre dolumu
+  // görev açmadığı için eskiden kart 0 diyordu.
+  const lapsed = display === "expired" || display === "revoked" || display === "rejected";
+  if ((lapsed && row.portal_live === true) || row.takedown_open === true) buckets.unshift("kaldir");
   return { buckets, term, display };
 }
 

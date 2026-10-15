@@ -152,8 +152,8 @@ describe("sözleşme: public yüzeyler aynı kuralı kullanır", () => {
     const files = walk("src/app")
       .filter((f) => /\.(ts|tsx)$/.test(f) && !/\.test\.tsx?$/.test(f))
       .filter((f) => !internal.test(f))
-      // Oturumlu, tenant kapılı ofis içi indirme ucu (public değil).
-      .filter((f) => f !== "src/app/api/property-media/[id]/download/route.ts")
+      // Oturumlu, `properties:view` + tenant kapılı ofis içi uçlar (public değil): tam boy indirme ve liste küçük resmi (SK9/B031).
+      .filter((f) => f !== "src/app/api/property-media/[id]/download/route.ts" && f !== "src/app/api/property-media/[id]/thumb/route.ts")
       .filter((f) => read(f).includes('.from("property_media")'));
     expect(files.filter((f) => !PUBLIC_MEDIA_SURFACES.includes(f))).toEqual([]);
   });

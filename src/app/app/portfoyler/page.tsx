@@ -74,7 +74,8 @@ import { EIDS_FILTER_LABELS, isEidsFilter } from "@/lib/eids/status";
 import { DAY_MS, daysAgoIso, msSince, now } from "@/lib/clock";
 import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { fetchLatestRates, formatFx, fxAgeLabel, fxApproxLine } from "@/lib/fx";
-import { formatListingPrice } from "@/lib/format";
+import { formatPropertyPrice, propertyCurrency } from "@/lib/property-currency";
+import { propertyThumbUrl } from "@/lib/property-media-thumb";
 import { formatDateTr } from "@/lib/format";
 import { searchGeoIds } from "@/lib/geo/reader";
 import { applyCustomFieldIds, customFilterRaw, customFilterValue, resolveCustomFieldFilter } from "@/lib/custom-fields/filter";
@@ -92,6 +93,7 @@ type PropertyRow = {
   property_type: string;
   status: string;
   list_price: number | null;
+  currency: string | null;
   price_health: string | null;
   features: Record<string, unknown> | null;
   created_at: string;
@@ -103,8 +105,10 @@ type PropertyRow = {
   province: { name: string } | { name: string }[] | null;
   district: { name: string } | { name: string }[] | null;
   portal_listings: { portal_name: string; status: string; last_confirmed_at: string | null }[] | null;
-  cover: { id: string }[] | { id: string } | null;
+  cover: CoverRow[] | CoverRow | null;
 };
+
+type CoverRow = { id: string; storage_path: string | null; file_size: number | null; has_watermark: boolean | null };
 
 type MapRow = {
   id: string;
@@ -112,6 +116,7 @@ type MapRow = {
   title: string | null;
   transaction_type: string;
   list_price: number | null;
+  currency: string | null;
   lat: number | null;
   lng: number | null;
 };
@@ -127,8 +132,6 @@ function locationLabel(row: PropertyRow): string {
   const parts = [relName(row.province), relName(row.district)].filter(Boolean);
   return parts.length ? parts.join(" / ") : "Konum belirtilmedi";
 }
-
-const formatPrice = formatListingPrice;
 
 function formatDate(iso: string) {
   return formatDateTr(iso);
@@ -151,10 +154,13 @@ const STATUS_FILTERS = [
   { label: "Yayında", value: "live" },
   { label: "Teyit", value: "pending" },
   { label: "Taslak", value: "draft" },
+  // "Aktif satılık stok" kartının kümesi (B084): yayında + opsiyonlu.
+  { label: "Aktif stok (yayında + opsiyonlu)", value: "stok" },
 ] as const;
 
 const STATUS_DB_VALUES: Record<string, string[]> = {
   live: ["live", "Yayında"],
+  stok: ["live", "Yayında", "reserved"],
   pending: ["pending", "teyit", "confirming"],
   draft: ["draft", "taslak"],
 };
@@ -366,8 +372,8 @@ export default async function PropertiesPage({
   const filtersEmpty = !statusValues && !qOrClause && !saglikValues && !kategoriF && !addedSince && !danismanF && !eidsFilter && !hasPropertyNlFilters(nlFilters) && !customPre?.active;
 
   const LIST_COLS =
-    "id, property_code, title, transaction_type, property_type, status, list_price, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at), cover:property_media!property_media_property_id_fkey(id)";
-  const MAP_COLS = "id, property_code, title, transaction_type, list_price, lat, lng";
+    "id, property_code, title, transaction_type, property_type, status, list_price, currency, price_health, features, created_at, published_at, province_id, district_id, lat, lng, province:geo_provinces(name), district:geo_districts(name), portal_listings!portal_listings_property_id_fkey(portal_name,status,last_confirmed_at), cover:property_media!property_media_property_id_fkey(id,storage_path,file_size,has_watermark)";
+  const MAP_COLS = "id, property_code, title, transaction_type, list_price, currency, lat, lng";
 
   // Liste/Kart görünümleri sunucu-sayfalı; harita görünümü tüm konumlu sonuçları (cap) çeker.
   const listQuery =
@@ -455,10 +461,10 @@ export default async function PropertiesPage({
     contextHealth ? contextHealth.green : none,
     contextHealth ? contextHealth.yellow : none,
     contextHealth ? contextHealth.red : none,
-    // Tek hafif tarama: portföy değeri + tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt).
+    // Tek hafif tarama: tip sayaçları + haftalık seri (en yeni SCAN_LIMIT kayıt). Değer toplamı artık RPC'de (B084).
     scoped(supabase
       .from("properties")
-      .select("list_price, property_type, created_at")
+      .select("property_type, created_at")
       .is("deleted_at", null))
       .order("created_at", { ascending: false })
       .limit(SCAN_LIMIT),
@@ -494,11 +500,18 @@ export default async function PropertiesPage({
   const rangeEnd = Math.min(offset + rows.length, totalFilteredCount);
   const nowMs = now();
 
-  // Toplam portföy değeri + döviz karşılığı. Türk emlak piyasası fiilen
-  // dolarize; ofis sahibi "kaç dolarlık portföyüm var" sorusunu soruyor.
-  const scan = (scanRows ?? []) as { list_price: number | null; property_type: string | null; created_at: string }[];
-  const totalValueTry = scan.reduce((sum, p) => sum + Number(p.list_price ?? 0), 0);
-  const totalValueFx = fxApproxLine(totalValueTry, fxRates);
+  // "Aktif satılık stok" (B084): RPC tek taramada Satılık ∧ (yayında, opsiyonlu) ∧ örnek değil ₺ toplamını verir —
+  // eskiden kesik taramanın TÜM list_price toplamıydı (satılmış, taslak ve aylık kiralar dahil). Döviz fiyatlı stok
+  // ₺ toplamına karışmaz, ayrı yazılır; kira toplamı ayrı gösterilir. Döviz karşılığı ipucunda (title).
+  const scan = (scanRows ?? []) as { property_type: string | null; created_at: string }[];
+  const saleStockTry = rpcCounts?.saleStockValue ?? null;
+  const saleStockFx = rpcCounts?.saleStockFx ?? null;
+  const rentMonthly = rpcCounts?.rentMonthlyTotal ?? null;
+  const saleStockFxParts = [
+    saleStockFx?.USD ? formatFx(saleStockFx.USD, "USD") : null,
+    saleStockFx?.EUR ? formatFx(saleStockFx.EUR, "EUR") : null,
+  ].filter((v): v is string => Boolean(v));
+  const totalValueFx = saleStockTry != null ? fxApproxLine(saleStockTry, fxRates) : null;
   const fxTitle = fxRates ? `TCMB ${fxRates.rateDate} satış kuru — ${fxAgeLabel(fxRates.rateDate, now())}` : undefined;
   // Tarama kesildiyse (SCAN_LIMIT) tip sayaçları ve eski haftalar eksik olur → göstermeyiz.
   const scanTruncated = scan.length >= SCAN_LIMIT;
@@ -509,11 +522,12 @@ export default async function PropertiesPage({
       ? bucketByWeek(scan.map((r) => r.created_at), nowMs, TREND_WEEKS)
       : undefined;
 
-  // Kapak görselleri — listeye gömülü (property_id -> media id). Görsel tenant/yetki kontrollü download ucu üzerinden servis edilir.
-  const coverByProperty = new Map<string, string>();
+  // Kapak görselleri — listeye gömülü. Liste 160 px (kart görünümü 480 px) WebP küçük resim ucundan, içerik özetli URL
+  // ve kalıcı önbellekle gelir (B031; eskiden tam boy indirme ucu, no-store). Karşılaştırma tablosu tam boy kalır.
+  const coverByProperty = new Map<string, CoverRow>();
   for (const p of rows) {
     const first = Array.isArray(p.cover) ? p.cover[0] : p.cover;
-    if (first?.id) coverByProperty.set(p.id, first.id);
+    if (first?.id) coverByProperty.set(p.id, first);
   }
 
   // Fiyat sağlığı dağılımı — head-count sorgularından (gerçek toplamlar).
@@ -541,7 +555,7 @@ export default async function PropertiesPage({
   const mapProperties = mapRows.map((p) => ({
     id: p.id,
     title: p.title ?? p.property_code,
-    price: formatPrice(p.list_price, p.transaction_type),
+    price: formatPropertyPrice(p.list_price, p.transaction_type, propertyCurrency(p)),
     lat: Number(p.lat),
     lng: Number(p.lng),
   }));
@@ -550,7 +564,9 @@ export default async function PropertiesPage({
   // ---- Satır modelleri (tablo + mobil liste + kart ortak veri) --------------
   const viewModels: PropertyVM[] = rows.map((property) => {
     const portals = property.portal_listings ?? [];
-    const coverId = coverByProperty.get(property.id);
+    const cover = coverByProperty.get(property.id) ?? null;
+    const coverId = cover?.id;
+    const currency = propertyCurrency(property);
     const feat = (property.features ?? {}) as { rooms?: string; sqm?: number; floor?: number | string; building_age?: number | string };
     const title = property.title ?? property.property_code;
     const compareItem: CompareItem = {
@@ -572,12 +588,12 @@ export default async function PropertiesPage({
       code: property.property_code,
       title,
       href: `/app/portfoyler/${property.id}`,
-      coverSrc: coverId ? `/api/property-media/${coverId}/download` : null,
+      coverSrc: cover ? propertyThumbUrl(cover.id, cover, view === "kart" ? "kart" : "liste") : null,
       subtitle: featureSummary(property.features),
       tx: property.transaction_type,
       type: property.property_type,
       location: locationLabel(property),
-      price: formatPrice(property.list_price, property.transaction_type),
+      price: formatPropertyPrice(property.list_price, property.transaction_type, currency),
       statusLabel: propertyStatusLabel(property.status),
       statusTone: propertyStatusTone(property.status),
       health: priceHealthPill(property.price_health),
@@ -612,7 +628,7 @@ export default async function PropertiesPage({
       icon: <FileCheck2 />,
       tone: "success",
       href: buildHref(PATH, new URLSearchParams({ ...(q ? { q } : {}), status: "live" })),
-      hint: total > 0 ? `toplamın %${Math.round(((liveCount ?? 0) / total) * 100)}'i` : undefined,
+      hint: total > 0 ? `toplam içinde %${Math.round(((liveCount ?? 0) / total) * 100)}` : undefined,
     },
     {
       label: "Son 4 hafta eklenen",
@@ -623,13 +639,17 @@ export default async function PropertiesPage({
       hint: "yeni kayıt",
     },
     {
-      label: "Portföy değeri",
-      value: compactTry(totalValueTry),
+      // Kartın kümesi = hedef listenin süzgeci: Satılık + (yayında, opsiyonlu). Kira toplamı ayrı yazılır (B084).
+      label: "Aktif satılık stok",
+      value: saleStockTry != null ? compactTry(saleStockTry) : "—",
       icon: <Banknote />,
       tone: "success",
-      href: buildHref(PATH, new URLSearchParams({ sirala: "fiyat_yuksek" })),
-      hint: totalValueFx ?? (scanTruncated ? `en yeni ${SCAN_LIMIT.toLocaleString("tr-TR")} kayıt` : undefined),
-      title: [formatFx(totalValueTry, "TRY"), fxTitle].filter(Boolean).join(" · ") || undefined,
+      href: buildHref(PATH, new URLSearchParams({ islem: "Satılık", status: "stok", sirala: "fiyat_yuksek" })),
+      hint: [
+        saleStockFxParts.length ? `+ ${saleStockFxParts.join(" · ")} döviz fiyatlı` : null,
+        rentMonthly != null ? `Kira (aylık): ${compactTry(rentMonthly)}` : null,
+      ].filter(Boolean).join(" · ") || (totalValueFx ?? undefined),
+      title: [saleStockTry != null ? formatFx(saleStockTry, "TRY") : null, totalValueFx, fxTitle].filter(Boolean).join(" · ") || undefined,
     },
     {
       label: "Fiyat uyarısı",
@@ -926,7 +946,7 @@ export default async function PropertiesPage({
                     >
                       <div className="relative flex h-36 items-center justify-center overflow-hidden bg-[image:var(--grad-brand-soft)]">
                         {vm.coverSrc ? (
-                          <FillImg src={vm.coverSrc} alt={vm.title} className="object-cover transition duration-500 group-hover:scale-105" />
+                          <FillImg src={vm.coverSrc} alt={vm.title} width={480} height={288} className="object-cover transition duration-500 group-hover:scale-105" />
                         ) : (
                           <>
                             <div className="pointer-events-none absolute inset-0 dot-overlay opacity-60" />

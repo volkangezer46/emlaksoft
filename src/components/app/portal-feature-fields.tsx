@@ -10,6 +10,7 @@ import {
   PORTAL_FEATURES,
   featureFormValue,
 } from "@/lib/portal-transfer/features";
+import { PROPERTY_CURRENCY_OPTIONS } from "@/lib/property-currency";
 
 /**
  * Portal formlarının istediği ek portföy alanları (yeni portföy formu ve düzenleme penceresi ORTAK kullanır).
@@ -69,6 +70,27 @@ function ChoiceField({ name, idPrefix, defaults, options, yesNo }: { name: strin
   );
 }
 
+/**
+ * Fiyat sekmesindeki para birimi seçicisi (B094): liste fiyatının yanında durur. Değer `features.currency`
+ * biçimindedir (TL | USD | EUR); sunucu hem `properties.currency` sütununa hem features'a yazar.
+ */
+export function PropertyCurrencyField({ defaultValue, idPrefix = "pf", className }: { defaultValue?: string | null; idPrefix?: string; className?: string }) {
+  const id = `${idPrefix}-currency`;
+  const current = CURRENCY_OPTIONS.find((o) => o === (defaultValue === "TRY" ? "TL" : defaultValue)) ?? "TL";
+  return (
+    <FormField label="Para birimi" htmlFor={id} inject={false} className={className}>
+      <div className="relative">
+        <FormSelect id={id} name="currency" defaultValue={current} className="appearance-none">
+          {PROPERTY_CURRENCY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </FormSelect>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
+      </div>
+    </FormField>
+  );
+}
+
 export function PortalFeatureFields({ defaults, idPrefix = "pf" }: { defaults?: Defaults; idPrefix?: string }) {
   return (
     <>
@@ -89,7 +111,6 @@ export function PortalFeatureFields({ defaults, idPrefix = "pf" }: { defaults?: 
       <NumberField name="dues" idPrefix={idPrefix} defaults={defaults} placeholder="Örn. 1500" />
       <ChoiceField name="credit_eligible" idPrefix={idPrefix} defaults={defaults} yesNo />
       <ChoiceField name="swap_ok" idPrefix={idPrefix} defaults={defaults} yesNo />
-      <ChoiceField name="currency" idPrefix={idPrefix} defaults={defaults} options={CURRENCY_OPTIONS} />
     </>
   );
 }

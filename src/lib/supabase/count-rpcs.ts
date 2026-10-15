@@ -23,6 +23,15 @@ function num(v: unknown): number | null {
 export type PortfolioCounts = {
   total: number; live: number; pending: number; draft: number; sale: number; rent: number; recent: number;
   green: number; yellow: number; red: number;
+  /**
+   * "Aktif satılık stok" (B084, migration 20261016090100): Satılık ∧ status ∈ (live, reserved) ∧ örnek değil, ₺ fiyatlı
+   * kayıtların list_price toplamı. RPC eski sürümse null (kart "bilinmiyor" der; sahte toplam yok).
+   */
+  saleStockValue: number | null;
+  /** Aynı kümenin döviz fiyatlı kısmı, kendi para biriminde ({ USD, EUR }); ₺ toplamına KARIŞTIRILMAZ. */
+  saleStockFx: { USD: number; EUR: number } | null;
+  /** Aktif kiralık (live, reserved) aylık kira toplamı (₺); satış stokuna eklenmez. */
+  rentMonthlyTotal: number | null;
 };
 
 export function parsePortfolioCounts(raw: unknown): PortfolioCounts | null {
@@ -34,7 +43,13 @@ export function parsePortfolioCounts(raw: unknown): PortfolioCounts | null {
     if (n === null) return null;
     out[k] = n;
   }
-  return out as PortfolioCounts;
+  const fx = r.sale_stock_fx && typeof r.sale_stock_fx === "object" ? (r.sale_stock_fx as Record<string, unknown>) : null;
+  return {
+    ...(out as Omit<PortfolioCounts, "saleStockValue" | "saleStockFx" | "rentMonthlyTotal">),
+    saleStockValue: num(r.sale_stock_value),
+    saleStockFx: fx ? { USD: num(fx.USD) ?? 0, EUR: num(fx.EUR) ?? 0 } : null,
+    rentMonthlyTotal: num(r.rent_monthly_total),
+  };
 }
 
 export type TaskCounts = {

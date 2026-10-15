@@ -13,7 +13,8 @@ import { GeoSelect } from "@/components/app/geo-select";
 import { HEATING_OPTIONS, FACADE_OPTIONS } from "@/app/app/portfoyler/yeni/property-options";
 import { defaultDefinitionValues, LEGACY_TRANSACTION_TYPE_VALUES } from "@/lib/definition-defaults";
 import { Combobox } from "@/components/ui/combobox";
-import { PortalFeatureFields } from "@/components/app/portal-feature-fields";
+import { PortalFeatureFields, PropertyCurrencyField } from "@/components/app/portal-feature-fields";
+import { currencyFeatureValue, propertyCurrency } from "@/lib/property-currency";
 import { PORTAL_FEATURES } from "@/lib/portal-transfer/features";
 
 type Province = { id: string; name: string };
@@ -25,6 +26,8 @@ type Props = {
     transaction_type: string;
     property_type: string;
     list_price: number | null;
+    /** Para birimi sütunu (TRY | USD | EUR); yoksa features.currency okunur. */
+    currency?: string | null;
     min_price: number | null;
     commission_rate: number | null;
     address_line: string | null;
@@ -131,8 +134,8 @@ export function EditPropertyDialog({
         </button>
       )}
       tabs={[
-        { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "min_price", "commission_rate", "branch_id"] },
-        { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade", ...PORTAL_FEATURES.map((f) => f.key)] },
+        { id: "temel", label: "Temel", icon: Home, fields: ["title", "transaction_type", "property_type", "list_price", "currency", "min_price", "commission_rate", "branch_id"] },
+        { id: "ozellik", label: "Özellikler", icon: Ruler, fields: ["rooms", "sqm", "floor", "heating", "building_age", "facade", ...PORTAL_FEATURES.map((f) => f.key).filter((k) => k !== "currency")] },
         { id: "konum", label: "Konum ve tapu", icon: MapPin, fields: ["address_line", "parcel_block", "parcel_lot"] },
         { id: "aciklama", label: "Açıklama", icon: FileText, fields: ["description", "virtual_tour_url"] },
       ]}
@@ -159,6 +162,7 @@ export function EditPropertyDialog({
               Liste fiyatı
               <input name="list_price" required defaultValue={property.list_price ?? ""} className={field} />
             </label>
+            <PropertyCurrencyField idPrefix="edit" defaultValue={currencyFeatureValue(propertyCurrency(property))} />
             <label className="text-xs font-medium text-text-muted">
               Min. fiyat
               <input name="min_price" defaultValue={property.min_price ?? ""} className={field} />

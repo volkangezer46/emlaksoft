@@ -284,7 +284,9 @@ async function syncChunk(db: Db, tenantId: string, ids: string[], cfg: ListingCo
       health_color: ev.health.color,
       health_partial: ev.health.partial,
       risk_score: ev.risk.score,
-      portals_live: ev.portalsLive,
+      // Tek tanım (B083, kpi.ts portalPresence): "canlı" = portal kaydı live (doğrulanmış + teyitsiz); pano ve Kapanış
+      // da kayıt durumunu sayar. Tarayıcının göremediği kayıt `k_portal_missing` ile ayrıca işaretlenir.
+      portals_live: snapListings.length,
       open_anomalies: ev.anomalies.filter((a) => a.severity !== "info").length,
       assigned_at: assignedAtIso,
       last_verified_at: snapListings.map((l) => l.lastSuccessAt).filter((x): x is string => !!x).sort().pop() ?? null,

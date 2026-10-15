@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import { formatPhoneDisplay, formatTurkishPhone } from "@/lib/phone";
 
 /**
  * ZORLAYICI SÖZLEŞME: telefon/e-posta girişi ve doğrulaması tek tip olmalı.
@@ -216,5 +217,51 @@ describe("telefon sunucu kapısı ve PhoneInput tek kaynak", () => {
 
   it("PhoneInput kopyalanamaz; kullanım ortak bileşenden gelir", () => {
     expect(phoneInputCopies).toEqual([]);
+  });
+});
+
+/**
+ * GÖRÜNTÜLEME (B086): yabancı numara TR maskesine sokulup kesilmez. `formatTurkishPhone` '+' ile başlayıp +90 olmayan
+ * girdiyi `formatPhoneDisplay`'e devreder; böylece onu çağıran tüm görüntüleme yerleri kökten düzelir.
+ * Ham `{x.phone}` JSX basımı yeni dosyada YASAK (gösterim `formatPhoneDisplay`); mevcutlar gerekçeli listede kalır.
+ */
+const RAW_PHONE_JSX = />\s*\{\s*[A-Za-z_][A-Za-z0-9_?.]*\.phone(?:\s*\?\?[^}]*)?\s*\}/;
+const RAW_PHONE_JSX_ALLOWED: Record<string, string> = {
+  "src/components/legal-markup.tsx": "platform destek telefonu sabit metni (ofis/müşteri kaydı değil)",
+  "src/app/on-bilgilendirme/page.tsx": "platform destek telefonu sabit metni",
+  "src/app/mesafeli-satis/page.tsx": "platform destek telefonu sabit metni",
+  "src/app/app/ag/page.tsx": "rollout bekliyor: ağ kişisi telefonu",
+  "src/app/app/portfoyler/[id]/brosur/page.tsx": "rollout bekliyor: broşür ofis/danışman telefonu",
+  "src/app/app/portfoyler/sunumlar/yeni/presentation-form.tsx": "rollout bekliyor: sunum formu müşteri seçici",
+  "src/app/app/kiralama/[id]/page.tsx": "rollout bekliyor: kiracı telefonu",
+  "src/app/app/yabanci-satis/page.tsx": "rollout bekliyor: yabancıya satış müşteri telefonu",
+};
+
+describe("telefon gösterimi (B086)", () => {
+  it("formatTurkishPhone yabancı numarayı kesmez, formatPhoneDisplay'e devreder", () => {
+    expect(formatTurkishPhone("+447911123456")).toBe("+44 791 112 3456");
+    expect(formatTurkishPhone("+4915123456789")).toBe(formatPhoneDisplay("+4915123456789"));
+    expect(formatTurkishPhone("+4915123456789")).not.toBe("+491 512 34 56");
+  });
+
+  it("TR numaraları eski 4-3-2-2 maskesini korur (+90 dahil)", () => {
+    expect(formatTurkishPhone("05321234567")).toBe("0532 123 45 67");
+    expect(formatTurkishPhone("+905321234567")).toBe("0532 123 45 67");
+    expect(formatPhoneDisplay("05321234567")).toBe("0532 123 45 67");
+  });
+
+  it("ham {x.phone} JSX basımı yalnız gerekçeli dosyalarda; anlaşma detayı biçimlenmiş telefon gösterir", () => {
+    const found: string[] = [];
+    for (const abs of walk("src")) {
+      const file = rel(abs);
+      if (!file.endsWith(".tsx") || file.endsWith(".test.tsx")) continue;
+      if (RAW_PHONE_JSX.test(readFileSync(abs, "utf8"))) found.push(file);
+    }
+    const unexpected = found.filter((f) => !(f in RAW_PHONE_JSX_ALLOWED));
+    expect(unexpected, `Ham telefon basımı (formatPhoneDisplay kullanın):\n${unexpected.join("\n")}`).toEqual([]);
+    const stale = Object.keys(RAW_PHONE_JSX_ALLOWED).filter((f) => !found.includes(f));
+    expect(stale, `Düzeltilmiş dosyayı listeden çıkarın:\n${stale.join("\n")}`).toEqual([]);
+    const deal = readFileSync("src/app/app/anlasmalar/[id]/page.tsx", "utf8");
+    expect(deal).toContain("formatPhoneDisplay(customer.phone)");
   });
 });

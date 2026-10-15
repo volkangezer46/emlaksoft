@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { now } from "@/lib/clock";
 import { isMissingSchema } from "@/lib/listing-control/server/db";
+import { readAllPaged } from "@/lib/supabase/read-all-paged";
 import {
   classifyAuthority,
   summarizeAuthorityQueue,
@@ -38,7 +39,33 @@ const LEDGER_COLUMNS = "authority_eids_source, authority_eids_verified_at, autho
 
 type PropRow = AuthorityQueueRow & { property_code: string | null; title: string | null; assigned_to: string | null };
 
+/**
+ * "Kaldır" kovası girdileri (B082): portalda canlı kaydı olan ve açık `eids_takedown` görevi olan portföy kimlikleri.
+ * Okunamazsa boş küme (kova ölçülmez, diğer kovalar etkilenmez). Ana sorguyla aynı turda koşar.
+ */
+async function loadTakedownSignals(supabase: SupabaseClient, tenantId: string): Promise<{ live: Set<string>; takedown: Set<string> }> {
+  const [live, tasks] = await Promise.all([
+    readAllPaged<{ property_id: string | null }>((from, to) =>
+      supabase.from("portal_listings").select("property_id").eq("tenant_id", tenantId).eq("status", "live").order("id").range(from, to),
+    ),
+    readAllPaged<{ property_id: string | null }>((from, to) =>
+      supabase
+        .from("tasks")
+        .select("property_id")
+        .eq("tenant_id", tenantId)
+        .eq("kind", "eids_takedown")
+        .eq("status", "open")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  const ids = (r: { rows: { property_id: string | null }[]; error: string | null }) =>
+    new Set(r.error ? [] : r.rows.map((x) => x.property_id).filter((v): v is string => Boolean(v)));
+  return { live: ids(live), takedown: ids(tasks) };
+}
+
 export async function loadAuthorityQueue(supabase: SupabaseClient, tenantId: string): Promise<AuthorityQueueLoad> {
+  const signalsP = loadTakedownSignals(supabase, tenantId);
   const query = (cols: string) =>
     supabase
       .from("properties")
@@ -55,7 +82,12 @@ export async function loadAuthorityQueue(supabase: SupabaseClient, tenantId: str
     res = await query(COLUMNS);
   }
   if (res.error) return { available: false };
-  const rows = (res.data ?? []) as unknown as PropRow[];
+  const signals = await signalsP;
+  const rows = ((res.data ?? []) as unknown as PropRow[]).map((r) => ({
+    ...r,
+    portal_live: signals.live.has(r.id),
+    takedown_open: signals.takedown.has(r.id),
+  }));
   const nowMs = now();
   const summary = summarizeAuthorityQueue(rows, nowMs);
 

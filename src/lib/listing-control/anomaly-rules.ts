@@ -190,14 +190,21 @@ export function evaluateAnomalyRules(
     }
   }
 
-  // 6) Satılmış/kiralanmış portföy hâlâ portalda (veri hazır; hemen).
-  if ((s.stage === "sold" || s.stage === "rented") && s.listings.some((l) => !isMissingState(l.state))) {
+  // 6) Satılmış/kiralanmış portföyün portal KAYDI hâlâ live: kapanışta ilan kaldırılmadı (veri hazır; hemen).
+  // Tarayıcı göremese de (missing/unchecked) kayıt live ise uyarılır — eskiden yalnız tarayıcı durumuna bakılıyordu
+  // ve kaydı live ama tarayıcıda "missing" olan satılmış ilanlar (DEMO-002, DEMO-010) uyarı üretmiyordu (B083).
+  if ((s.stage === "sold" || s.stage === "rented") && s.listings.length > 0) {
     out.push({
       type: "sold_still_listed",
       severity: "high",
       dedupeKey: `sold_still_listed:${s.propertyId}`,
       portalListingId: null,
-      details: { stage: s.stage, portals: s.listings.filter((l) => !isMissingState(l.state)).map((l) => l.portal) },
+      details: {
+        stage: s.stage,
+        reason: "Kapanışta ilan kaldırılmadı",
+        portals: s.listings.map((l) => l.portal),
+        verifiedPortals: s.listings.filter((l) => !isMissingState(l.state) && l.state !== "unchecked").map((l) => l.portal),
+      },
       slaDueAt: slaDue,
     });
   }

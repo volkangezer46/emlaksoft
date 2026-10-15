@@ -16,10 +16,10 @@ import { GeoSelect } from "@/components/app/geo-select";
 import { useToast } from "@/components/app/toast-provider";
 import { clearFormDraft } from "@/components/app/use-form-draft";
 import { commissionSummary, parseLooseNumber } from "@/lib/form-tabs";
-import { formatTry } from "@/lib/utils";
 import { evaluateOwnerInfo, parseOwnerInfoForm } from "@/lib/property-owner/info";
 import { OwnerInfoSection } from "./owner-info-section";
-import { PortalFeatureFields } from "@/components/app/portal-feature-fields";
+import { PortalFeatureFields, PropertyCurrencyField } from "@/components/app/portal-feature-fields";
+import { formatPropertyMoney, normalizePropertyCurrency } from "@/lib/property-currency";
 import { FACADE_OPTIONS, HEATING_OPTIONS } from "./property-options";
 import { PROPERTY_DRAFT_FIELDS, PROPERTY_FORM_ID, PROPERTY_TABS } from "./property-tabs";
 
@@ -113,10 +113,17 @@ export function PropertyForm({
     const result = await createProperty(formData);
     if (result.ok) {
       clearFormDraft(userId, PROPERTY_FORM_ID);
+      // Kayıt sonrası iniş (B053): yeni portföyün detayı, İlan sahibi sekmesi açık — yayın için eksikler orada.
+      const ownerHref = result.id ? `/app/portfoyler/${result.id}?sekme=sahip` : null;
       if (result.authorityWarning) push(result.authorityWarning, "info");
+      for (const w of result.warnings ?? []) push(w, "info");
       if (result.pooled) push("Portföy taslak olarak oluşturuldu ve ilan havuzuna gönderildi", "ok");
       else if (result.ownerMissing && result.ownerMissing.length > 0) {
-        push(`Portföy taslak olarak oluşturuldu. İlan sahibi bilgisi %${result.ownerInfoScore ?? 0} tamam: yayın için ${result.ownerMissing.length} eksik var`, "info");
+        push(
+          `Portföy taslak olarak oluşturuldu. İlan sahibi bilgisi %${result.ownerInfoScore ?? 0} tamam: yayın için ${result.ownerMissing.length} eksik var`,
+          "info",
+          ownerHref ? { action: { label: "Eksikleri tamamla", onClick: () => router.push(ownerHref) } } : undefined,
+        );
       } else push("Portföy taslak olarak oluşturuldu", "ok");
       if (intent === "new") {
         // "Kaydet ve yenisini ekle": aynı sayfa temiz açılsın — tam yükleme.
@@ -124,7 +131,7 @@ export function PropertyForm({
         window.location.assign(`${window.location.pathname}?kaydedildi=1`);
         return;
       }
-      router.push("/app/portfoyler");
+      router.push(ownerHref ?? "/app/portfoyler");
       return;
     }
     setPending(false);
@@ -191,6 +198,8 @@ export function PropertyForm({
         <FormField label="Liste fiyatı" htmlFor="list-price" required>
           <FormInput name="list_price" required inputMode="decimal" placeholder="6.750.000" defaultValue={fsbo?.price} />
         </FormField>
+        <PropertyCurrencyField idPrefix="yeni" />
+
         <FormField label="Komisyon oranı (%)" htmlFor="commission-rate" required>
           <FormInput name="commission_rate" required inputMode="decimal" min="0.01" max="100" step="0.01" placeholder="3" />
         </FormField>
@@ -237,6 +246,9 @@ export function PropertyForm({
     const rate = parseLooseNumber(values.commission_rate);
     const sqm = parseLooseNumber(values.sqm);
     const calc = commissionSummary(values.list_price, values.commission_rate, values.sqm);
+    // Fiyat, komisyon ve m² birim fiyatı seçilen para biriminde (B094).
+    const currency = normalizePropertyCurrency(values.currency) ?? "TRY";
+    const money = (n: number) => formatPropertyMoney(n, currency);
     const province = provinces.find((p) => p.id === values.province_id)?.name;
     const branch = branches.find((b) => b.id === values.branch_id)?.name;
     // Önizleme: seçilen mevcut müşterinin telefonu kayıtlıysa karşılanmış sayılır (sunucu kesin kararı verir).
@@ -253,13 +265,13 @@ export function PropertyForm({
               ))}
             </div>
           ) : null}
-          <p className="numeric mt-3 text-lg font-semibold text-ink-950">{price != null && price > 0 ? formatTry(price) : "Fiyat girilmedi"}</p>
+          <p className="numeric mt-3 text-lg font-semibold text-ink-950">{price != null && price > 0 ? money(price) : "Fiyat girilmedi"}</p>
         </div>
         <SummaryGroup title="Fiyat ve komisyon">
-          <SummaryRow label="Liste fiyatı" value={price != null && price > 0 ? formatTry(price) : "Zorunlu"} muted={!(price != null && price > 0)} tab="fiyat" field="list_price" />
+          <SummaryRow label="Liste fiyatı" value={price != null && price > 0 ? money(price) : "Zorunlu"} muted={!(price != null && price > 0)} tab="fiyat" field="list_price" />
           <SummaryRow label="Komisyon oranı" value={rate != null && rate > 0 ? `%${formatNumber(rate)}` : "Zorunlu"} muted={!(rate != null && rate > 0)} tab="fiyat" field="commission_rate" />
-          <SummaryRow label="Tahmini komisyon" value={calc ? formatTry(calc.amount) : "Fiyat ve oran girilince"} muted={!calc} tab="fiyat" field="list_price" />
-          <SummaryRow label="m² birim fiyatı" value={calc?.perSqm ? formatTry(calc.perSqm) : "Fiyat ve m² girilince"} muted={!calc?.perSqm} tab="temel" field="sqm" />
+          <SummaryRow label="Tahmini komisyon" value={calc ? money(calc.amount) : "Fiyat ve oran girilince"} muted={!calc} tab="fiyat" field="list_price" />
+          <SummaryRow label="m² birim fiyatı" value={calc?.perSqm ? money(calc.perSqm) : "Fiyat ve m² girilince"} muted={!calc?.perSqm} tab="temel" field="sqm" />
         </SummaryGroup>
         <SummaryGroup title="Konum">
           <SummaryRow label="İl" value={province ?? "Seçilmedi"} muted={!province} tab="konum" />

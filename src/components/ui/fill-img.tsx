@@ -13,11 +13,26 @@ const FILL_ALT: CSSProperties = { position: "absolute", height: "100%", width: "
  * işaretlemeyi basar (alt, loading=lazy, decoding=async, data-nimg=fill, sınıf, fill stili, src sırası dahil) ve
  * hata anında alt metni görünür yapar (next/image `showAltText` davranışı). Üst öğe `relative` olmalıdır.
  */
-export function FillImg({ src, alt, className }: { src: string; alt: string; className?: string }) {
+export function FillImg({
+  src,
+  alt,
+  className,
+  width,
+  height,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  /** İsteğe bağlı içsel boyut (B031): tarayıcı en-boy oranını bilir, kod çözme ipucu alır; yerleşim yine `fill`. */
+  width?: number;
+  height?: number;
+}) {
   const [showAlt, setShowAlt] = useState(false);
   return (
     <img
       alt={alt}
+      width={width}
+      height={height}
       loading="lazy"
       decoding="async"
       data-nimg="fill"

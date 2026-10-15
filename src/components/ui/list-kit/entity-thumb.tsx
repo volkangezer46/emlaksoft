@@ -14,6 +14,8 @@ const BOX = {
   sm: "h-10 w-14",
   md: "h-12 w-[4.5rem]",
 } as const;
+/** Kutunun piksel boyutu: `<img>` width/height öznitelikleri (en-boy oranı bilinir, CLS yok). */
+const BOX_PX = { sm: { width: 56, height: 40 }, md: { width: 72, height: 48 } } as const;
 
 export function EntityThumb({
   src,
@@ -43,7 +45,7 @@ export function EntityThumb({
       )}
     >
       {src ? (
-        <FillImg src={src} alt={alt} className="object-cover" />
+        <FillImg src={src} alt={alt} className="object-cover" width={BOX_PX[size].width} height={BOX_PX[size].height} />
       ) : Icon ? (
         <SmartIcon icon={Icon} className="h-5 w-5 text-brand-600/45" />
       ) : null}

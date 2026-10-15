@@ -11,6 +11,7 @@ import { comparablesSourceEntry, listComparableDetails } from "@/lib/comparables
 import { getBaseUrl } from "@/lib/base-url";
 import { getDistrict, getProvinceName } from "@/lib/geo/reader";
 import { actionErrorMessage } from "@/lib/action-errors";
+import { parseAreaInput } from "@/lib/area-input";
 
 export type ValuationResult = { error?: string; ok?: boolean; id?: string };
 export type ValuationShareResult = { error?: string; ok?: boolean; url?: string };
@@ -178,8 +179,6 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   const title = String(formData.get("title") ?? "").trim();
   const listPriceRaw = String(formData.get("list_price") ?? "").replace(/[^\d.,]/g, "");
   const listPrice = listPriceRaw ? Number(listPriceRaw.replace(/\./g, "").replace(",", ".")) : null;
-  const sqmRaw = String(formData.get("sqm") ?? "").trim();
-  const sqm = sqmRaw ? Number(sqmRaw.replace(",", ".")) : null;
   // Onceden ilce SERBEST METIN ("Ilce ipucu") olarak aliniyordu; bu yuzden
   // `geo_districts` ile eslesemiyor ve emsal motoru yalnizca bir portfoy
   // secildiginde calisabiliyordu. Artik formdan gercek `district_id` geliyor.
@@ -187,6 +186,10 @@ export async function createValuation(formData: FormData): Promise<ValuationResu
   const formDistrictId = String(formData.get("district_id") ?? "").trim();
   const formPropertyType = String(formData.get("property_type") ?? "").trim();
   const formTransactionType = String(formData.get("transaction_type") ?? "").trim();
+  // Tek Türkçe ayrıştırıcı: "1.250" → 1250 (eskiden 1.25), "120 m²" → 120, boş → null; geçersiz alan adıyla reddedilir (B093).
+  const sqmResult = parseAreaInput(formData.get("sqm"), { label: "m²", propertyType: formPropertyType });
+  if (!sqmResult.ok) return { error: sqmResult.error };
+  const sqm = sqmResult.value;
 
   if (!title && !propertyId) return { error: "Başlık veya portföy zorunlu." };
 

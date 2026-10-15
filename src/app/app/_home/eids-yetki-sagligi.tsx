@@ -10,7 +10,8 @@ import { afterFirstScreen, type HomeCtx } from "./data";
 /**
  * EİDS YETKİ SAĞLIĞI (ofis panosu, yönetim). Sayılar kendi kuyruk sayfalarının AYNI okuyucusundan gelir (birebir tutar):
  *  - 15 günde bitecek / bilinmiyor → `loadAuthorityQueue` özeti = /app/ilan-kontrol/yetki?kova=… sayacı,
- *  - iptal/dolmuş ama yayında → açık `eids_takedown` görevleri = /app/gorevler?tur=eids_takedown listesi,
+ *  - iptal/dolmuş ama yayında → `loadAuthorityQueue` "kaldir" kovası = /app/ilan-kontrol/yetki?kova=kaldir (veriden: süresi
+ *    dolmuş/iptal ∧ portalda canlı kayıt, ya da açık `eids_takedown` görevi; B082 — eskiden yalnız görev sayısıydı),
  *  - eşleştir kuyruğu → eşleşmemiş Bakanlık e-postaları (EP3) = Yetki > Eşleştir sekmesi,
  *  - yetkili → onaylı ve süresi geçerli portföy (Yetki sayfası),
  *  - iletme durumu → alma adresi (bağlı / sessiz / kurulmadı) = Ayarlar > Entegrasyonlar.
@@ -29,7 +30,7 @@ async function loadRows(tenantId: string): Promise<Row[] | null> {
   const supabase = await createClient();
   const nowMs = now();
   const today = trDayKey(nowMs);
-  const [queue, approved, takedown, unmatched, address] = await Promise.all([
+  const [queue, approved, unmatched, address] = await Promise.all([
     loadAuthorityQueue(supabase, tenantId),
     supabase
       .from("properties")
@@ -40,7 +41,6 @@ async function loadRows(tenantId: string): Promise<Row[] | null> {
       .not("status", "in", "(sold,rented,archived,withdrawn,passive)")
       .eq("authority_eids_status", "approved")
       .gte("authorization_end", today),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("kind", "eids_takedown").eq("status", "open"),
     supabase
       .from("eids_inbound_messages")
       .select("id", { count: "exact", head: true })
@@ -53,9 +53,9 @@ async function loadRows(tenantId: string): Promise<Row[] | null> {
   const rows: Row[] = [];
   if (!approved.error) rows.push({ key: "yetkili", label: "Yetkili (süresi geçerli)", value: approved.count ?? 0, href: "/app/ilan-kontrol/yetki", tone: "ok" });
   rows.push({ key: "bitiyor", label: "15 gün içinde bitecek", value: counts.bitiyor ?? 0, href: "/app/ilan-kontrol/yetki?kova=bitiyor", tone: (counts.bitiyor ?? 0) > 0 ? "warn" : "muted" });
-  if (!takedown.error) {
-    const n = takedown.count ?? 0;
-    rows.push({ key: "kaldir", label: "İptal ya da dolmuş ama yayında", value: n, href: "/app/gorevler?tur=eids_takedown", tone: n > 0 ? "danger" : "muted" });
+  {
+    const n = counts.kaldir ?? 0;
+    rows.push({ key: "kaldir", label: "İptal ya da dolmuş ama yayında", value: n, href: "/app/ilan-kontrol/yetki?kova=kaldir", tone: n > 0 ? "danger" : "muted" });
   }
   // EP2 kovası ("bilinmiyor") kuyruğa eklendiyse aynı özetten gelir; yoksa satır çizilmez.
   if (typeof counts.bilinmiyor === "number") {

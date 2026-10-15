@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/require-permission";
 import { publishBlockReason } from "@/lib/property-owner/server";
 import { authorityPublishGate } from "@/lib/eids/ledger";
 import { closedListingBlock } from "@/lib/closed-listing-guard";
+import { propertyCurrency } from "@/lib/property-currency";
 import {
   publishToPortal,
   updateOnPortal,
@@ -56,6 +57,8 @@ function toPayload(property: PropertyRow): PropertyPayload {
     title:           property.title ?? property.property_code,
     description:     property.address_line ?? undefined,
     listPrice:       property.list_price ?? 0,
+    // Para birimi (B094): sözleşme (f) gereği features.currency de yazılır; eskiden dolar fiyat portala TRY gidiyordu.
+    currency:        propertyCurrency({ features: property.features }),
     propertyType:    property.property_type ?? "daire",
     transactionType: property.transaction_type === "kiralik" ? "kiralik" : "satilik",
     province:        relName(property.province),

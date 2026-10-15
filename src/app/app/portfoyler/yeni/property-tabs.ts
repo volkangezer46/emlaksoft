@@ -10,7 +10,7 @@ export const PROPERTY_TABS = [
   {
     id: "temel",
     label: "Temel",
-    description: "İlanın başlığı ve türü.",
+    description: "Portföyün başlığı ve türü.",
     fields: ["title", "transaction_type", "property_type", "rooms", "sqm", "branch_id", "fsbo_lead_id"],
     required: ["title", "transaction_type", "property_type"],
   },
@@ -24,8 +24,8 @@ export const PROPERTY_TABS = [
   {
     id: "fiyat",
     label: "Fiyat ve komisyon",
-    description: "Liste fiyatı ve anlaşılan komisyon oranı.",
-    fields: ["list_price", "commission_rate"],
+    description: "Liste fiyatı, para birimi ve anlaşılan komisyon oranı.",
+    fields: ["list_price", "currency", "commission_rate"],
     required: ["list_price", "commission_rate"],
   },
   {
@@ -54,7 +54,6 @@ export const PROPERTY_TABS = [
       "dues",
       "credit_eligible",
       "swap_ok",
-      "currency",
     ],
     required: [],
   },
@@ -98,6 +97,7 @@ export const PROPERTY_DRAFT_FIELDS = [
   "sqm",
   "branch_id",
   "list_price",
+  "currency",
   "commission_rate",
   "floor",
   "heating",
