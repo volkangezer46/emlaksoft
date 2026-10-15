@@ -29,6 +29,8 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { cookies } from "next/headers";
 import { SCOPE_COOKIE } from "@/lib/ui/scope";
 import { ProductTourLazy } from "./product-tour-lazy";
+import { PwaAssist } from "@/components/app/pwa-assist";
+import { offlineScopeFingerprint } from "@/lib/pwa/offline-scope";
 import { ToastProvider } from "@/components/app/toast-provider";
 import { EmailVerifyStrip } from "@/components/app/email-verify-strip";
 import { PlatformBannerSlot, WhatsNewSlot } from "@/components/app/office-broadcast-slots";
@@ -501,6 +503,8 @@ async function ShellBoot() {
       {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
       <ProductTourLazy role={m.platformStaffFullAccess || m.impersonating ? "" : m.effectiveRole} accessible={m.accessibleModules} />
       <RealtimeRefresh tenantId={m.tenantId} />
+      {/* PWA: yükleme / anlık bildirim kartı yalnız ana ekranda ve birkaç oturumdan sonra; kart kodu tembel iner. */}
+      {m.impersonating ? null : <PwaAssist scope={offlineScopeFingerprint(m.tenantId, m.userId)} />}
       <ClientCacheSync identity={`app:${m.userId ?? "-"}:${m.tenantId ?? "-"}:${m.impersonating ? "imp" : "std"}`} />
       {/* Klavye kisayollari: komut paleti (Ctrl+K) zaten vardi ama tek
           kisayol oydu. "g" onekli iki tusluk dizi bilincli — tek harf,

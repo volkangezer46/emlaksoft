@@ -401,6 +401,7 @@ export const ADMIN_CLIENT_ALLOWLIST: readonly AdminClientAllowEntry[] = [
   { file: "src/app/vitrin/[slug]/degerleme/page.tsx", fn: "VitrinDegerlemePage", calls: 1, tenantFilter: "var" },
   { file: "src/app/vitrin/[slug]/favoriler/page.tsx", fn: "generateMetadata", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/vitrin/[slug]/favoriler/page.tsx", fn: "VitrinFavorilerPage", calls: 1, tenantFilter: "uygulanamaz" },
+  { file: "src/app/vitrin/[slug]/manifest.webmanifest/route.ts", fn: "GET", calls: 1, tenantFilter: "uygulanamaz" },
   { file: "src/app/vitrin/[slug]/opengraph-image.tsx", fn: "Image", calls: 1, tenantFilter: "var" },
   { file: "src/app/vitrin/[slug]/page.tsx", fn: "loadOfficeHead", calls: 1, tenantFilter: "var" },
   { file: "src/lib/activity.ts", fn: "writeActivity", calls: 1, tenantFilter: "var" },

@@ -1,5 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
+import { pushAllowed } from "@/lib/notification-delivery";
+import { now } from "@/lib/clock";
+import { notificationTopic, pushActionsFor, pushTag, type PushEntityRef } from "@/lib/notification-topics";
 import { getSettingDef } from "@/lib/settings/registry";
 import { notifyKey } from "@/lib/settings/registry/tenant";
 import { coerceInput } from "@/lib/settings/view";
@@ -48,7 +51,15 @@ export type NotifPrefKey =
   | "insight"
   | "assignment"
   | "authority"
-  | "survey";
+  | "survey"
+  | "task";
+
+/** Kolon henüz yok (migration 20261018050000 uygulanmadı): konu yazılmadan yeniden denenir. */
+function isMissingTopicColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const msg = String(error.message ?? "").toLowerCase();
+  return msg.includes("topic") && (error.code === "42703" || error.code === "PGRST204" || msg.includes("schema cache"));
+}
 
 /** Ofisin `office.notify.default_<tür>` kaydı "kapalı" mı? Kayıt yok/okunamıyor/tür tanımsız = false (davranış değişmez). */
 async function officeDefaultIsOff(admin: ReturnType<typeof createAdminClient>, tenantId: string, prefKey: string): Promise<boolean> {
@@ -84,8 +95,13 @@ export async function notifyTenant(input: {
    * Cakisma (23505) sessizce "zaten gonderilmis" sayilir. Kolon yoksa (migration 001500 uygulanmadi) hata firlatir.
    */
   dedupeKey?: string;
+  /** Push eylem düğmeleri için kayıt (görev → Tamamla / Yarına ertele). Yalnız push yüküne girer. */
+  entity?: PushEntityRef;
+  /** "Ara" eylemi için telefon (cevapsız arama, yeni başvuru). Yalnız push yüküne girer. */
+  tel?: string | null;
 }) {
   const admin = createAdminClient();
+  let prefsForPush: unknown = null;
 
   if (input.userId) {
     const { data: profile, error: profileError } = await admin
@@ -98,6 +114,7 @@ export async function notifyTenant(input: {
     if (profileError) throw new Error("Bildirim hedefi doğrulanamadı.");
     if (!profile) throw new Error("Bildirim hedefi bu ofiste aktif değil.");
     const prefs = profile?.notification_prefs as Record<string, unknown> | null | undefined;
+    prefsForPush = prefs ?? null;
     if (
       input.prefKey
       && prefs
@@ -111,7 +128,8 @@ export async function notifyTenant(input: {
     }
   }
 
-  const { error: notificationError } = await admin.from("notifications").insert({
+  const topic = notificationTopic({ prefKey: input.prefKey, href: input.href });
+  const row = {
     tenant_id: input.tenantId,
     user_id: input.userId ?? null,
     title: input.title,
@@ -119,17 +137,27 @@ export async function notifyTenant(input: {
     href: input.href ?? null,
     kind: input.kind ?? "info",
     ...(input.dedupeKey ? { dedupe_key: input.dedupeKey } : {}),
-  });
+  };
+  let { error: notificationError } = await admin.from("notifications").insert({ ...row, topic });
+  // Konu kolonu yoksa (migration öncesi) konusuz yazılır; DB tetikleyicisi gelince bağlantıdan türetir.
+  if (isMissingTopicColumn(notificationError)) ({ error: notificationError } = await admin.from("notifications").insert(row));
   // Ayni anahtar daha once yazilmis: bildirim zaten var (tek kez); push da tekrar gonderilmez.
   if (notificationError && input.dedupeKey && notificationError.code === "23505") return;
   if (notificationError) throw new Error("Bildirim kalıcılaştırılamadı.");
 
-  if (input.userId) {
+  // Kanal + sessiz saat (GA-09): satır zaten yazıldı; push yalnız kullanıcı izin veriyorsa gider.
+  if (input.userId && pushAllowed({ prefs: prefsForPush, prefKey: input.prefKey, kind: input.kind, nowMs: now() })) {
     // Best-effort: VAPID yoksa sessizce atlar, bildirim satırı zaten yazıldı.
     void sendPushToUser(input.tenantId, input.userId, {
       title: input.title,
       body: input.body,
       href: input.href,
+      topic,
+      kind: input.kind ?? "info",
+      tag: pushTag({ topic, dedupeKey: input.dedupeKey, entity: input.entity, href: input.href }),
+      actions: pushActionsFor({ entity: input.entity, tel: input.tel }),
+      ...(input.entity ? { entity: input.entity } : {}),
+      ...(input.tel ? { tel: input.tel } : {}),
     });
   }
 }

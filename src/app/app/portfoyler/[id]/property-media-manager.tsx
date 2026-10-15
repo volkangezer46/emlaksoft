@@ -177,7 +177,12 @@ export function PropertyMediaManager({
   officeName = "",
   logoUrl = null,
   documentFlagAvailable = true,
+  pendingFiles,
+  onPendingQueued,
 }: {
+  /** Başka yerden gelen dosyalar (telefonun Paylaş menüsü, /app/paylas-al): kullanıcı dokununca kuyruğa girer. */
+  pendingFiles?: File[];
+  onPendingQueued?: () => void;
   propertyId: string;
   media: MediaItem[];
   canEdit: boolean;
@@ -548,6 +553,18 @@ export function PropertyMediaManager({
         </div>
         {canEdit ? (
           <div className="flex flex-wrap items-center gap-2">
+            {pendingFiles && pendingFiles.length > 0 ? (
+              <Button
+                icon={Upload}
+                onClick={() => {
+                  void enqueueFiles(pendingFiles, false);
+                  onPendingQueued?.();
+                }}
+                disabled={uploading}
+              >
+                Paylaşılan {pendingFiles.length} fotoğrafı yükle
+              </Button>
+            ) : null}
             <input
               aria-label="Fotoğraf seç"
               ref={fileRef}

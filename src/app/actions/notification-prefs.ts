@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { requireActiveTenant } from "@/lib/tenant-guard";
 import { getSettings } from "@/lib/settings/read";
 import { notifyKey } from "@/lib/settings/registry/tenant";
-import type { NotifPrefs } from "@/components/app/notification-prefs";
+import type { NotifPrefFlags, NotifPrefs } from "@/components/app/notification-prefs";
+import { DEFAULT_QUIET_HOURS, parsePushChannel, parseQuietHours } from "@/lib/notification-delivery";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 const DEFAULTS: NotifPrefs = {
@@ -25,17 +26,21 @@ const DEFAULTS: NotifPrefs = {
   assignment: true,
   authority: true,
   survey: true,
+  task: true,
+  push: {},
+  quiet: DEFAULT_QUIET_HOURS,
 };
 
 // Helper function (not exported, not a server action)
 function mergeNotifPrefs(raw: unknown, base: NotifPrefs): NotifPrefs {
   if (!raw || typeof raw !== "object") return base;
-  return { ...base, ...(raw as Partial<NotifPrefs>) };
+  const r = raw as Partial<NotifPrefs> & Record<string, unknown>;
+  return { ...base, ...r, push: parsePushChannel(r.push), quiet: parseQuietHours(r.quiet) };
 }
 
 /** Ofis Tanımları Merkezi: ofisin bildirim varsayılanları (kayıt yoksa kod varsayılanı DEFAULTS). */
 async function officeDefaults(tenantId: string): Promise<NotifPrefs> {
-  const keys = Object.keys(DEFAULTS) as (keyof NotifPrefs)[];
+  const keys = (Object.keys(DEFAULTS) as (keyof NotifPrefs)[]).filter((k): k is keyof NotifPrefFlags => k !== "push" && k !== "quiet");
   const values = await getSettings(keys.map(notifyKey), { tenantId });
   const out = { ...DEFAULTS };
   for (const k of keys) {
@@ -84,6 +89,10 @@ export async function saveNotificationPrefs(prefs: NotifPrefs): Promise<{ error?
     assignment: prefs.assignment !== false,
     authority: prefs.authority !== false,
     survey: prefs.survey !== false,
+    task: prefs.task !== false,
+    // Kanal haritası yalnız bilinen tür anahtarlarını taşır; sessiz saat biçimi doğrulanır (bozuk değer varsayılana döner).
+    push: Object.fromEntries(Object.entries(parsePushChannel(prefs.push)).filter(([k]) => k in DEFAULTS && k !== "push" && k !== "quiet")),
+    quiet: parseQuietHours(prefs.quiet),
   };
 
   const supabase = await createClient();

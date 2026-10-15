@@ -601,6 +601,7 @@ export const HIDDEN_APP_PAGES: Readonly<Record<string, string>> = {
   "/app/baslangic": "Kurulum sihirbazı bir EYLEM akışıdır: ana ekran kurulum şeridi, Ayarlar dizini kartı ve komut paleti eylemi",
   "/app/hesabim": "Kullanıcı menüsünden (sağ üst) açılır; danışmanda 'Ben' merkezinin 'Profilim' sekmesi, komut paletinde aranabilir",
   "/app/hizli": "Sahada hızlı kayıt: üst çubuk 'Yeni' menüsü ve komut paleti eylemi",
+  "/app/paylas-al": "Telefonun Paylaş menüsünden gelen fotoğraf/metin/kişi kartı (PWA share_target) ve çevrimdışı alınan notların karşılama sayfası; menüye girmez",
   "/app/hos-geldin": "Danışman ilk giriş karşılaması; koşul sağlanmazsa ana ekrana yönlendirir",
   "/app/ice-aktarma": "Toplu yükleme bir EYLEM sayfasıdır: Müşteriler/Portföyler başlığındaki 'İçe aktar' düğmesi ve komut paleti eylemi",
   "/app/modul-kapali": "Kapalı modül bilgilendirme sayfası (modül kapısı yönlendirir)",

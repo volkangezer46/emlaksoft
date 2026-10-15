@@ -1457,12 +1457,6 @@
   "hamButon": 1,
   "kucukHedef": 0
  },
- "src/components/app/notification-prefs.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
-  "kucukHedef": 0
- },
  "src/components/app/office-status-chip.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
@@ -1479,12 +1473,6 @@
   "hamRenk": 0,
   "hamPalet": 0,
   "hamButon": 3,
-  "kucukHedef": 0
- },
- "src/components/app/push-subscribe.tsx": {
-  "hamRenk": 0,
-  "hamPalet": 0,
-  "hamButon": 1,
   "kucukHedef": 0
  },
  "src/components/app/quick-create-menu-body.tsx": {

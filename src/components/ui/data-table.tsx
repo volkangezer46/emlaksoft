@@ -1040,7 +1040,7 @@ export function DataTable({
           <div
             role="region"
             aria-label="Toplu eylemler"
-            className="surface-card motion-enter sticky bottom-4 z-30 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
+            className="surface-card motion-enter sticky bottom-[calc(var(--mobile-nav-offset,0px)+0.75rem)] z-30 lg:bottom-4 flex flex-wrap items-center gap-3 rounded-[var(--radius-panel)] px-4 py-2.5 shadow-[var(--elev-3)]"
           >
             <p className="numeric text-sm font-semibold text-ink-950" aria-live="polite">
               {selectionLabel(effectiveSelected.size)}

@@ -151,3 +151,16 @@ CI'daki manuel `workflow_dispatch` hattı `app_url` ile aynı kontrolleri uzak d
 
 Tek kaynak `vercel.json`; route, zamanlama, auth guard, heartbeat ve `/admin/sistem` kapsamı `npm run check:cron`
 ile doğrulanır.
+
+## Anlık bildirim (Web Push / VAPID)
+
+Push kanalı VAPID anahtarı olmadan sessizce kapalıdır (bildirimler yalnız zile düşer; Hesabım > Bildirimler "push kanalı kapalı" der).
+Anahtarlar depoda TUTULMAZ ve kod tarafından üretilmez. Sunucuda bir kez, yerelde üretin (üçüncü tarafa gitmez):
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+`.env.production` içine: `NEXT_PUBLIC_VAPID_PUBLIC_KEY=<public>`, `VAPID_PRIVATE_KEY=<private>`, `VAPID_SUBJECT=mailto:destek@emlaksoft.com.tr`.
+Genel anahtar derleme anında pakete gömülür: anahtar eklendikten sonra yeniden derleme + deploy gerekir. Anahtar değişirse mevcut
+abonelikler geçersizleşir (kullanıcılar Bildirimler sayfasındaki kartla yeniden açar). Deneme: Hesabım > Bildirimler > "Deneme gönder".

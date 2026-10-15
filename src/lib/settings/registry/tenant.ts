@@ -179,6 +179,7 @@ export const NOTIFY_DEFAULTS: { id: string; label: string; description: string; 
   { id: "assignment", label: "Devir ve atamalar", description: "Size devredilen müşteri, portföy, iş yükü ve başkasının sizin adınıza açtığı randevu", default: true },
   { id: "authority", label: "Portföy yetki bitimi", description: "Portföy yetki (satış/kiralama yetkisi) bitiş hatırlatmaları", default: true },
   { id: "survey", label: "Anket sonuçları", description: "Düşük puan takibi, destekleyen müşteri ve ekip nabzı daveti", default: true },
+  { id: "task", label: "Görev hatırlatmaları", description: "Vadesi yaklaşan ve geciken görev hatırlatmaları", default: true },
 ];
 
 export const notifyKey = (id: string) => `office.notify.default_${id.toLowerCase()}`;

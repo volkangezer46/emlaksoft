@@ -33,12 +33,34 @@ describe("service worker privacy boundary", () => {
     expect(worker).toContain("slice(0, 300)");
   });
 
-  it("forces the one-time v6 privacy migration and removes managed legacy caches", () => {
-    expect(worker).toContain('const VERSION = "v6"');
+  it("keeps the one-time v6 force-activation marker (v7+ use the normal waiting update flow) and removes managed legacy caches", () => {
+    expect(worker).toContain('const VERSION = "v7"');
     expect(worker).toContain('const FORCE_ACTIVATE_VERSION = "v6"');
     expect(worker).toContain("self.skipWaiting()");
     expect(worker).toContain("key.startsWith(MANAGED_CACHE_PREFIX)");
     expect(worker).toContain("caches.delete(key)");
+  });
+
+  it("push actions: tag dedupe, whitelisted actions, tel/entity sanitised, record actions only via same-origin POST", () => {
+    expect(worker).toContain("options.tag = tag");
+    expect(worker).toContain('new Set(["open", "call", "done", "snooze"])');
+    expect(worker).toContain("function safeTel(");
+    expect(worker).toContain("function safeEntity(");
+    expect(worker).toContain('fetch("/api/app/push-eylem"');
+    expect(worker).toContain('"x-emlaksoft-push": "1"');
+    expect(worker).toContain('credentials: "same-origin"');
+    expect(worker).toContain("setAppBadge");
+  });
+
+  it("share target files stay on the device in a separate TTL-bounded cache, never in page caches", () => {
+    expect(worker).toContain('const SHARE_CACHE = "es-share-inbox"');
+    expect(worker).not.toContain('SHARE_CACHE = "emlaksoft-');
+    expect(worker).toContain("SHARE_TTL_MS");
+    expect(worker).toContain("purgeOldShares");
+    expect(worker).toContain('"PURGE_SHARES"');
+    // POST is intercepted only for the exact share path; every other non-GET stays on the network.
+    expect(worker).toContain('request.method === "POST" && url.origin === self.location.origin && url.pathname === SHARE_PATH');
+    expect(worker).toContain('if (request.method !== "GET") return;');
   });
 
   it("purges the known v4 caches before registering an uncached worker update", () => {

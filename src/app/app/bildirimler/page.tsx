@@ -12,7 +12,7 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
   return { title: sekme === "duyurular" ? "Duyurular · Bildirimler" : sekme === "yonetim" ? "Duyuru yönetimi" : "Bildirimler" };
 }
 
-type Sp = { sekme?: string; durum?: string; tur?: string; sayfa?: string };
+type Sp = { sekme?: string; durum?: string; tur?: string; konu?: string; sayfa?: string };
 
 /**
  * Bildirimler: kişisel bildirim akışı + ofis duyuruları (herkes okur; ana ekrandaki duyuru satırı buraya taşındı) +

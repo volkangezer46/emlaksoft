@@ -910,6 +910,16 @@ html:has(nav[aria-label="Mobil hızlı gezinme"], .fab-bar) {
   scroll-padding-bottom: calc(9rem + env(safe-area-inset-bottom, 0px));
 }
 
+/* MP4: alttan sabit katmanlar (bildirim toast'ı, "Yeni sürüm hazır" çubuğu, tablo toplu işlem çubuğu, PWA kartı)
+   mobil alt gezinmenin ÜSTÜNDE durur: `bottom-[calc(var(--mobile-nav-offset)+0.75rem)] lg:bottom-4`. Alt gezinme yoksa
+   (public sayfalar, yönetim konsolu) yalnız güvenli alan payı; klavye açıkken gezinme gizlendiği için pay da düşer.
+   Sözleşme: src/components/ui/mobile-overlay-contract.test.ts. */
+:root { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+@media (max-width: 1023.98px) {
+  html:has(nav[aria-label="Mobil hızlı gezinme"]) { --mobile-nav-offset: calc(3.5rem + 1px + env(safe-area-inset-bottom, 0px)); }
+  html:has(.fab-bar[data-kb="1"]) { --mobile-nav-offset: env(safe-area-inset-bottom, 0px); }
+}
+
 /* Ekran klavyesi açıkken mobil alt gezinme gizlenir (klavyenin üstünde ~61 px'lik çubuk alanı kapatıyordu): form çubuğunun
    `data-kb` işareti (visualViewport) ya da dokunmatikte odaklanmış metin alanı. */
 html:has(.fab-bar[data-kb="1"]) nav[aria-label="Mobil hızlı gezinme"] { display: none; }
