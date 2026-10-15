@@ -107,7 +107,7 @@ export default async function AramaSonuclariPage({
               name="q"
               type="search"
               defaultValue={q}
-              placeholder="En az 2 karakter — ad, telefon, ilan no…"
+              placeholder="En az 2 karakter — ad, telefon, portföy kodu…"
               aria-label="Arama sorgusu"
               className="w-full rounded-[var(--radius-control)] border border-line bg-surface py-2.5 pl-10 pr-3 text-sm text-text placeholder:text-text-faint outline-none transition focus:border-brand-400"
             />

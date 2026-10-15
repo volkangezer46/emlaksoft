@@ -52,6 +52,7 @@ import {
   type TvTheme,
 } from "@/lib/tv/tv-logic";
 import { useClock, useReducedMotion, useRotation, useSystemDark, useTvData, useTvSettings, useWakeLock } from "./tv-hooks";
+import { TERMS } from "@/lib/terms";
 
 const nf = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 });
 const compactMoney = (n: number) =>
@@ -587,7 +588,7 @@ function Sections({
           <div className="tv-stats">
             <Stat label="Aktif talep" value={stats.activeDemands} />
             <Stat label="Yeni müşteri · ay" value={stats.newCustomers} />
-            <Stat label="Açık fırsat" value={stats.openDeals} />
+            <Stat label={TERMS.openDeals} value={stats.openDeals} />
             <Stat label={sales ? "Bugün kazanılan" : "Randevu · ay"} value={sales ? stats.wonToday : stats.monthAppointments} tone={sales && stats.wonToday > 0 ? "good" : undefined} />
           </div>
         </Card>

@@ -11,22 +11,34 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { now } from "@/lib/clock";
-import type { AppModule } from "@/lib/permissions";
-import { TOURS, getTour, resolveTourSteps, tourIdForRole, type TourDef, type TourId, type TourStepDef } from "@/lib/product-tour-data";
+import { hasPermission, type AppAction, type AppModule } from "@/lib/permissions";
+import {
+  TOURS,
+  getTour,
+  listableTours,
+  resolveTourSteps,
+  tourIdForRole,
+  type TourDef,
+  type TourId,
+  type TourResolveCtx,
+  type TourStepDef,
+} from "@/lib/product-tour-data";
 import { TOUR_PARAM, isTourDone, markServerSynced, markTourDone } from "@/lib/product-tour-storage";
 import { tourStateKey } from "@/lib/ui-state";
 import { markUiState } from "@/app/actions/ui-state";
-import { loadProductTours } from "@/app/actions/onboarding-content";
 
 /**
  * Rol bazlı ürün turları — ölçümü yerel, modal davranışı ortak Radix altyapısında çalışan spotlight.
- * Turların varsayılan içeriği `src/lib/product-tour-data.ts`; adminden düzenlenen hali (Ofisler > Kurulum > İçerik) tur
- * açılmadan önce `loadProductTours` eylemiyle bir kez alınır (rol/paket hedefi sunucuda uygulanır), alınamazsa varsayılan.
+ * Turların varsayılan içeriği `src/lib/product-tour-data.ts`; adminden düzenlenen hali (Ofisler > Kurulum > İçerik)
+ * `ProductTourLazy` tarafından tur parçasıyla PARALEL istenir (`toursRequest`); en çok `TOURS_WAIT_MS` beklenir, gelmezse
+ * varsayılanla başlanır. Sabit bekleme yok: tur, ilk adımın hedefi ölçülür ölçülmez açılır.
  *
  * NASIL: Hedef elementin getBoundingClientRect'i ölçülür; tam ekran katman içinde hedef boyutunda şeffaf bir
  * "delik" konumlanır ve devasa bir box-shadow geri kalanı karartır. Konum yalnız transform ile verilir,
- * adımlar arasında opacity geçişi vardır (CLS üretmez). Adım başka bir sayfadaysa router ile oraya gidilir;
- * hedef 3 sn içinde görünmezse adım sessizce atlanır.
+ * adımlar arasında opacity geçişi vardır (CLS üretmez). Adım başka bir sayfadaysa router ile oraya gidilir ve adres o
+ * sayfaya geçene kadar ÖLÇÜM YAPILMAZ (önceki sayfanın başlığı vurgulanmaz); önceki sayfada bulunan öğeler ve iskelet
+ * (`aria-busy`) içindekiler aday sayılmaz. Hedef DOM'dan koparsa yeniden aranır; boyutu ResizeObserver ile izlenir.
+ * Görünüm alanının %60'ından uzun hedefte yalnız başlığı vurgulanır. Hedef süre içinde görünmezse adım sessizce atlanır.
  *
  * KURALLAR:
  * - Otomatik başlama yalnız ana ekranda, rolün turu daha önce görülmediyse (profil `ui_state`; localStorage önbellek) ve
@@ -35,34 +47,47 @@ import { loadProductTours } from "@/app/actions/onboarding-content";
  *   Yeniden başlatma, hareket azaltma açık olsa bile çalışır.
  * - Klavye: sağ/sol ok = ileri/geri, Esc = kapat, düğmeler odaklanabilir. Dar ekranda balon alta sabitlenir.
  * - TV panosunda hiç başlamaz. SSR güvenli: yalnız effect sonrası render edilir.
+ * - Tek katman: tur açıkken `<html data-tur-acik>` işaretlenir; diğer otomatik katmanlar (kurulum bitişindeki tur sayacı)
+ *   bu işaret varken kendiliğinden açılmaz.
  */
 
 const PAD = 8; // delik ile hedef arası nefes payı (px)
 const CARD_W = 336; // balon kart genişliği (px)
 const CARD_H = 250; // yerleşim hesabı için tahmini kart yüksekliği (px)
 const GAP = 12; // delik ile kart arası boşluk (px)
-const FIND_TRIES = 30; // 30 x 100 ms = 3 sn hedef bekleme
+const FIND_TRIES = 50; // en çok ~5 sn hedef bekleme (sayfa geçişi dahil)
+const TOURS_WAIT_MS = 400; // düzenlenmiş turlar için en uzun bekleme; sonra varsayılan turlarla başlanır
+const TALL_RATIO = 0.6; // hedef görünüm alanının bu oranından uzunsa yalnız başlığı vurgulanır
 
 type Rect = { top: number; left: number; width: number; height: number };
 type Phase = "idle" | "run" | "final" | "off";
+type TourCtx = { role: string; accessible: readonly AppModule[]; closed: readonly string[] };
 
-/** Düzenlenmiş turlar sayfa ömründe bir kez istenir (tur yeniden başlatılınca aynı yanıt). Hata = null (varsayılan turlar). */
-let toursRequest: Promise<TourDef[] | null> | null = null;
-function fetchTours(): Promise<TourDef[] | null> {
-  toursRequest ??= loadProductTours().catch(() => null);
-  return toursRequest;
+/** Düzenlenmiş turlar en çok `ms` beklenir; gelmezse ya da hata verirse null (varsayılan turlar). */
+function withinBudget(request: Promise<TourDef[] | null> | undefined, ms: number): Promise<TourDef[] | null> {
+  if (!request) return Promise.resolve(null);
+  return Promise.race([
+    request.catch(() => null),
+    new Promise<null>((resolve) => window.setTimeout(() => resolve(null), ms)),
+  ]);
 }
 
-/** Seçicilerden ilk *görünür* elementi döndürür (mobilde gizli aside vb. elenir). Geçersiz seçici (adminden) atlanır. */
-function findTarget(selectors: readonly string[]): HTMLElement | null {
+function queryAll(selector: string): HTMLElement[] {
+  try {
+    return Array.from(document.querySelectorAll<HTMLElement>(selector));
+  } catch {
+    return []; // geçersiz seçici (adminden) atlanır
+  }
+}
+
+/**
+ * Seçicilerden ilk *görünür ve bağlı* elementi döndürür (mobilde gizli aside vb. elenir). `stale`: önceki sayfadan kalan
+ * adaylar (sayfa geçişinde eski başlık ölçülmesin); iskelet (`aria-busy="true"`) içindeki öğe aday değildir.
+ */
+function findTarget(selectors: readonly string[], stale?: ReadonlySet<Element>): HTMLElement | null {
   for (const selector of selectors) {
-    let found: NodeListOf<HTMLElement>;
-    try {
-      found = document.querySelectorAll<HTMLElement>(selector);
-    } catch {
-      continue;
-    }
-    for (const el of found) {
+    for (const el of queryAll(selector)) {
+      if (!el.isConnected || stale?.has(el) || el.closest('[aria-busy="true"]')) continue;
       const r = el.getBoundingClientRect();
       if (r.width > 4 && r.height > 4) return el;
     }
@@ -70,7 +95,33 @@ function findTarget(selectors: readonly string[]): HTMLElement | null {
   return null;
 }
 
-export function ProductTour({ role, accessible }: { role: string; accessible: readonly AppModule[] }) {
+/** Görünüm alanının %60'ından uzun hedefte vurgulanacak öğe: ilk başlığı (yoksa hedefin kendisi). */
+function focusPart(el: HTMLElement): HTMLElement {
+  if (el.getBoundingClientRect().height <= window.innerHeight * TALL_RATIO) return el;
+  const head = el.querySelector<HTMLElement>("[data-tour-baslik], h1, h2, h3");
+  return head && head.getBoundingClientRect().height > 4 ? head : el;
+}
+
+/** Tur süzgeci bağlamı: akış adımlarının izni (ör. Kurulum = settings:edit) modül görünürlüğü + rol matrisiyle. */
+function resolveCtx(c: TourCtx): TourResolveCtx {
+  return {
+    accessible: c.accessible,
+    closed: c.closed,
+    role: c.role,
+    can: (module: AppModule, action: AppAction) => c.accessible.includes(module) && hasPermission(c.role, module, action),
+  };
+}
+
+export function ProductTour({
+  role,
+  accessible,
+  toursRequest,
+}: {
+  role: string;
+  accessible: readonly AppModule[];
+  /** `ProductTourLazy`'nin tur parçasıyla paralel başlattığı düzenlenmiş tur isteği. */
+  toursRequest?: Promise<TourDef[] | null>;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const closed = useClosedModules();
@@ -85,14 +136,22 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   const dirRef = useRef<1 | -1>(1);
 
   // Başlatıcıların her render'da yeniden kurulmaması için en güncel bağlam ref'te tutulur.
-  const ctxRef = useRef({ role, accessible, closed });
+  const ctxRef = useRef<TourCtx>({ role, accessible, closed });
   useEffect(() => {
     ctxRef.current = { role, accessible, closed };
   }, [role, accessible, closed]);
 
+  // Tek katman kuralı: tur açıkken diğer otomatik katmanlar ertelenir (bkz. baslangic/finish-tour.tsx).
+  useEffect(() => {
+    if (phase !== "run" && phase !== "final") return;
+    document.documentElement.dataset.turAcik = "1";
+    return () => {
+      delete document.documentElement.dataset.turAcik;
+    };
+  }, [phase]);
+
   const begin = useCallback((id: TourId): boolean => {
-    const c = ctxRef.current;
-    const resolved = resolveTourSteps(id, { accessible: c.accessible, closed: c.closed, role: c.role }, toursRef.current);
+    const resolved = resolveTourSteps(id, resolveCtx(ctxRef.current), toursRef.current);
     if (resolved.length === 0) return false;
     markTourDone(id, new Date(now()).toISOString());
     // Kalıcı işaret profilde (cihazlar arası, YD5); yazılamazsa yerel önbellek yine bu cihazda korur.
@@ -126,29 +185,27 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
       if (isTourDone(id) !== false) return; // görüldü ya da depolama yok → rahatsız etme
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     }
-    // Giriş animasyonları otursun, sayfa ölçülebilir olsun; düzenlenmiş turlar bu sürede gelir (gelmezse varsayılan).
+    if (raw) {
+      // Adres çubuğunda ?tur=… kalmasın: sayfa yenilenince tur tekrar açılmasın.
+      params.delete(TOUR_PARAM);
+      const qs = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    }
+    // Sabit bekleme yok: düzenlenmiş turlar zaten paralel istendi (en çok TOURS_WAIT_MS); balon ilk adımın hedefi
+    // ölçülünce açılır (adım effect'i hedefi bekler).
     let cancelled = false;
-    const t = window.setTimeout(() => {
-      if (raw) {
-        // Adres çubuğunda ?tur=… kalmasın: sayfa yenilenince tur tekrar açılmasın.
-        params.delete(TOUR_PARAM);
-        const qs = params.toString();
-        window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    void withinBudget(toursRequest, TOURS_WAIT_MS).then((list) => {
+      if (cancelled) return;
+      if (list && list.length > 0) {
+        toursRef.current = list;
+        setTours(list);
       }
-      void fetchTours().then((list) => {
-        if (cancelled) return;
-        if (list && list.length > 0) {
-          toursRef.current = list;
-          setTours(list);
-        }
-        begin(id);
-      });
-    }, 800);
+      begin(id);
+    });
     return () => {
       cancelled = true;
-      window.clearTimeout(t);
     };
-  }, [pathname, phase, role, begin]);
+  }, [pathname, phase, role, begin, toursRequest]);
 
   const close = useCallback(() => setPhase("off"), []);
 
@@ -168,7 +225,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
     setIndex((i) => Math.max(0, i - 1));
   }, []);
 
-  // Aktif adım: gerekirse sayfaya git, hedefi bekle, ölç; resize/scroll'da pozisyonu güncelle
+  // Aktif adım: gerekirse sayfaya git, adres o sayfaya geçince hedefi bekle, ölç; boyut/kaydırma değişince yeniden ölç
   useEffect(() => {
     if (phase !== "run") return;
     const step = steps[index];
@@ -177,6 +234,9 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
     let poll: number | undefined;
     let raf = 0;
     let detach: (() => void) | undefined;
+    // Sayfa değişecekse önceki sayfadaki adaylar (ör. eski H1) bu adımda ölçülmez.
+    let stale: Set<Element> | undefined;
+    let tries = 0;
 
     // Hedef bulunamazsa adımı sessizce atla (geri giderken geriye, yoksa ileriye)
     const skip = () => {
@@ -188,9 +248,20 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
       }
     };
 
-    const attach = (el: HTMLElement) => {
-      el.scrollIntoView({ block: mobile ? "start" : "center", behavior: "smooth" });
+    const attach = (target: HTMLElement) => {
+      const el = focusPart(target);
+      // Mobilde yalnız gerektiği kadar kaydır (block:"nearest"): sayfa hedefin ötesine atlamasın.
+      el.scrollIntoView({ block: mobile ? "nearest" : "center", behavior: "smooth" });
       const update = () => {
+        if (cancelled) return;
+        if (!el.isConnected) {
+          // Hedef DOM'dan koptu (iskelet → içerik, yeniden çizim): ölçümü bırak, yeniden ara.
+          detach?.();
+          detach = undefined;
+          tries = 0;
+          look();
+          return;
+        }
         const r = el.getBoundingClientRect();
         setMeasured({ index, rect: { top: r.top, left: r.left, width: r.width, height: r.height } });
       };
@@ -199,26 +270,39 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
         cancelAnimationFrame(raf);
         raf = requestAnimationFrame(update);
       };
+      const ro = typeof ResizeObserver === "function" ? new ResizeObserver(onMove) : null;
+      // Ölçülen öğe işaretlenir (E2E: delik ile hedef arasındaki fark ≤4 px sözleşmesi).
+      el.setAttribute("data-tour-hedef", "");
+      ro?.observe(el);
+      if (el !== target) ro?.observe(target);
       window.addEventListener("resize", onMove);
       window.addEventListener("scroll", onMove, true);
       detach = () => {
+        ro?.disconnect();
+        el.removeAttribute("data-tour-hedef");
         window.removeEventListener("resize", onMove);
         window.removeEventListener("scroll", onMove, true);
       };
     };
 
-    let tries = 0;
-    const look = () => {
+    function look() {
       if (cancelled) return;
-      const el = findTarget(step.selectors);
+      // Adres adımın sayfasına geçmeden ölçüm yok (geçişte eski sayfa hâlâ ekranda).
+      const onPage = window.location.pathname === step.path;
+      const el = onPage ? findTarget(step.selectors, stale) : null;
       if (el) return attach(el);
       if (++tries > FIND_TRIES) return skip();
-      poll = window.setTimeout(look, 100);
-    };
+      poll = window.setTimeout(look, onPage ? 50 : 100);
+    }
+
     // Sayfa değişimi ve ilk ölçüm mikro-gecikmeyle (react-hooks/set-state-in-effect)
     poll = window.setTimeout(() => {
       if (cancelled) return;
-      if (window.location.pathname !== step.path) router.push(step.path);
+      if (window.location.pathname !== step.path) {
+        // Yalnız sayfa içeriğindeki eski adaylar (kabuktaki ortak öğeler, ör. arama kutusu, sayfa değişince de geçerlidir).
+        stale = new Set(step.selectors.flatMap(queryAll).filter((el) => el.closest("#main-content")));
+        router.push(step.path);
+      }
       look();
     }, 0);
 
@@ -235,7 +319,9 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
   // ---- Bitiş ekranı: delik yok, ortalanmış kart ----
   if (phase === "final") {
     const tour = tourId ? getTour(tourId, tours) : null;
-    const others = tours.filter((t) => t.id !== tourId && resolveTourSteps(t.id, { accessible, closed, role }, tours).length > 0);
+    // Rolün kendi turu önde; erişilebilir adımı 3'ten az kalan turlar listelenmez.
+    const others = listableTours(resolveCtx({ role, accessible, closed }), tours).filter((t) => t.id !== tourId);
+    const canHelp = accessible.includes("support");
     return (
       <Dialog open onOpenChange={(nextOpen) => !nextOpen && close()}>
         <DialogFullscreenContent
@@ -254,7 +340,9 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
           <DialogDescription asChild>
             <p className="mt-1 text-sm text-text-muted">
               {tour ? `${tour.label} bitti. ` : "Tur bitti. "}
-              Takıldığınızda soldaki menüden Yardım sayfasını açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz.
+              {canHelp
+                ? "Takıldığınızda menünün alt kısmındaki Yardım'ı açın; turları oradan istediğiniz zaman yeniden başlatabilirsiniz."
+                : "Turları istediğiniz zaman kullanıcı menünüzden yeniden başlatabilirsiniz."}
             </p>
           </DialogDescription>
           {others.length > 0 ? (
@@ -345,6 +433,7 @@ export function ProductTour({ role, accessible }: { role: string; accessible: re
           bağlanır (key) ve opacity ile belirir, top/left/width/height animasyonu yok. */}
       <div
         key={`hole-${index}`}
+        data-tour-delik=""
         className="tour-fade absolute left-0 top-0 rounded-[var(--radius-panel)]"
         style={{
           transform: `translate(${hole.left}px, ${hole.top}px)`,

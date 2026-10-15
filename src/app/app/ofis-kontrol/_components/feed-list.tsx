@@ -3,7 +3,7 @@ import { ArrowUpRight, ScrollText } from "lucide-react";
 import { riskOf, type RiskLevel } from "@/lib/audit-labels";
 import { trDayKey } from "@/lib/clock";
 import { dayHeading } from "@/lib/activity-timeline";
-import { categoryOf, ENTITY_LABEL, entityHref, feedActionLabel, FEED_CATEGORIES } from "@/lib/oversight/feed";
+import { categoryOf, entityHref, entityLabel, feedActionLabel, FEED_CATEGORIES } from "@/lib/oversight/feed";
 import { feedParams, hasFeedFilter, type FeedFilters, type FeedPage, type FeedRow } from "@/lib/oversight/feed-query";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -144,7 +144,7 @@ export function FeedList({
                     </p>
                     {detail || r.entity_type ? (
                       <p className="mt-0.5 truncate text-xs text-text-muted">
-                        {r.entity_type ? (ENTITY_LABEL[r.entity_type] ?? r.entity_type) : ""}
+                        {r.entity_type ? entityLabel(r.entity_type) : ""}
                         {detail ? `${r.entity_type ? " · " : ""}${detail}` : ""}
                       </p>
                     ) : null}

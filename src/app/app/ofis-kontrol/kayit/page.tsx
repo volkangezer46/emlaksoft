@@ -38,6 +38,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PersonSelect } from "@/components/ui/person-select";
 import { hasOfficeWideDataScope } from "@/lib/team/assignable-roles";
 import { OversightNav } from "../_components/oversight-nav";
+import { entityLabel } from "@/lib/labels/entity";
 // `logActivity` çağrılarında geçen TÜM aksiyon kodları (grep: action: "...").
 // Haritada olmayan kod ham haliyle görünür — sessizce kaybolmaz.
 
@@ -63,7 +64,14 @@ const ENTITY_ROUTES: Record<string, string> = {
   deal: "/app/anlasmalar",
 };
 
+/** Kayıt kimlikleri (UUID) ekranda ham gösterilmez. */
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
 function diffPreview(oldValue: unknown, newValue: unknown) {
+  return rawDiffPreview(oldValue, newValue).replace(UUID_RE, "(kayıt)");
+}
+
+function rawDiffPreview(oldValue: unknown, newValue: unknown) {
   if (oldValue && newValue && typeof oldValue === "object" && typeof newValue === "object") {
     const o = oldValue as Record<string, unknown>;
     const n = newValue as Record<string, unknown>;
@@ -362,7 +370,8 @@ export default async function AuditPage({
                 <div className="divide-y divide-line">
             {g.items.map((r) => {
               const entityRoute = r.entity_type ? ENTITY_ROUTES[r.entity_type] : undefined;
-              const entityLine = `${r.entity_type ?? "—"}${r.entity_id ? ` · ${String(r.entity_id).slice(0, 8)}…` : ""}`;
+              // Ham tür kodu ve UUID parçası gösterilmez: Türkçe tür adı; kayda bağlantı varsa ad tıklanır.
+              const entityLine = r.entity_type ? entityLabel(r.entity_type) : "—";
               const risk = riskOf(r.action);
               // Aktör linki yalnızca ofis profili çözüldüyse: platform
               // personeli /app/ekip altında yok, 404'e link vermeyelim.

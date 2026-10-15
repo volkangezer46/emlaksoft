@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { AppModule } from "@/lib/permissions";
-import { TOURS, getTour, resolveTourSteps, tourIdForRole } from "./product-tour-data";
+import { hasPermission, type AppAction, type AppModule } from "@/lib/permissions";
+import { TOURABLE_FLOWS, TOURS, getTour, listableTours, resolveTourSteps, tourIdForRole } from "./product-tour-data";
 import { TOUR_RESTART_HREF, tourHref } from "./product-tour-storage";
 
 const ALL: AppModule[] = [
@@ -70,6 +70,34 @@ describe("ürün turları veri sözleşmesi", () => {
     expect(tourIdForRole("advisor")).toBe("danisman");
     expect(tourIdForRole("whatever")).toBe("danisman");
     expect(getTour("yok")).toBeNull();
+  });
+
+  it("Kurulum akışı (TOURABLE_FLOWS) ofis sahibinin turunda kalır, ayar düzenleyemeyende elenir", () => {
+    expect(TOURABLE_FLOWS["/app/baslangic"]).toEqual({ module: "settings", action: "edit" });
+    const owner = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "owner", can: (m, a) => hasPermission("owner", m, a) });
+    expect(owner.map((s) => s.path)).toContain("/app/baslangic");
+    expect(owner.find((s) => s.path === "/app/baslangic")?.title).toBe("Ofis kurulumu");
+    // Danışman ayarları görür ama düzenleyemez: akış adımı düşer.
+    const advisorCan = (m: AppModule, a: AppAction) => hasPermission("advisor", m, a);
+    const advisor = resolveTourSteps("ofis-sahibi", { accessible: ALL, closed: [], role: "advisor", can: advisorCan });
+    expect(advisor.map((s) => s.path)).not.toContain("/app/baslangic");
+  });
+
+  it("tur metinlerinde sabit adım sayısı yok; Krediler adımı Abonelik oldu", () => {
+    const words = /\b(iki|üç|dört|beş|altı|yedi|sekiz|dokuz|on|\d+)\s+(kısa\s+)?adım/i;
+    for (const t of TOURS) for (const s of t.steps) expect(`${s.title} ${s.desc}`, `${t.id}:${s.path}`).not.toMatch(words);
+    const owner = getTour("ofis-sahibi")!;
+    expect(owner.steps.find((s) => s.path === "/app/abonelik")?.title).toBe("Abonelik");
+    expect(owner.steps.some((s) => s.title === "Krediler")).toBe(false);
+  });
+
+  it("listelenen turlar: rolün turu önde, 3'ten az erişilebilir adımı kalan tur gizli", () => {
+    const can = (m: AppModule, a: AppAction) => hasPermission("advisor", m, a);
+    const advisorMods = ALL.filter((m) => hasPermission("advisor", m, "view"));
+    const list = listableTours({ accessible: advisorMods, closed: [], role: "advisor", can });
+    expect(list[0]?.id).toBe("danisman");
+    for (const t of list) expect(resolveTourSteps(t.id, { accessible: advisorMods, closed: [], role: "advisor", can }).length).toBeGreaterThanOrEqual(3);
+    expect(listableTours({ accessible: ["dashboard"], closed: [], role: "advisor" })).toEqual([]);
   });
 
   it("yeniden başlatma adresleri", () => {

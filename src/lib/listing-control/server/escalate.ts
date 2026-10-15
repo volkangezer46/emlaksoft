@@ -1,6 +1,7 @@
 import { insertNotificationsDetailed, type NotificationRow } from "@/lib/notify-batch";
 import { notifyTenant } from "@/lib/notify";
 import { buildDedupeKey } from "@/lib/notify-dedupe";
+import { noteLink } from "@/lib/note-links";
 import { normalizeListingControlConfig, type ListingControlConfig } from "../config";
 import { planSlaEscalation, slaNotificationKind, type SlaRecipients } from "../sla-plan";
 import type { AnomalySeverity } from "../types";
@@ -238,7 +239,8 @@ async function createSlaTasks(
       const { error } = await db.from("tasks").insert({
         tenant_id: t.tenantId,
         title,
-        notes: `Portal ilan kontrolü bir sorun tespit etti. Açıklama girin ya da düzeltin: ${anomalyHref(t.propertyId)}`,
+        // Bağlantı not içinde etiketli yazılır; görev ekranı onu "İlan kontrolünde aç" bağlantısı olarak çizer (ham yol görünmez).
+        notes: `Portal ilan kontrolü bir sorun tespit etti. Açıklama girin ya da düzeltin: ${noteLink("İlan kontrolünde aç", anomalyHref(t.propertyId))}`,
         kind: "followup",
         priority: t.severity === "critical" || t.severity === "high" ? "high" : "normal",
         status: "open",

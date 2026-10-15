@@ -35,7 +35,8 @@ export function FinishTourStarter({ auto = true }: { auto?: boolean }) {
   const [stopped, setStopped] = useState(false);
 
   useEffect(() => {
-    if (!auto || alreadyAutoStarted()) return;
+    // Tek katman kuralı: bir tur zaten açıksa (product-tour `data-tur-acik`) sayaç kurulmaz.
+    if (!auto || alreadyAutoStarted() || document.documentElement.dataset.turAcik === "1") return;
     const arm = window.setTimeout(() => setLeft(COUNTDOWN_SEC), 0);
     return () => window.clearTimeout(arm);
   }, [auto]);

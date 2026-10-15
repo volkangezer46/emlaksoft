@@ -3,14 +3,18 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { requireModulePage } from "@/lib/require-module-page";
 import { effectiveHasPermission } from "@/lib/permissions-effective";
-import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
-import { resolveWizardStep } from "@/lib/onboarding-checklist";
+import { loadOnboardingSnapshot, withFirstTaskFacts } from "@/lib/onboarding-state";
+import { resolveWizardStep, scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboarding-checklist";
 import { createClient } from "@/lib/supabase/server";
 import { SetupWizard } from "./setup-wizard";
 
 export const metadata = { title: "Kurulum" };
 
-/** Kurulum sihirbazı: durum gerçek veriden hesaplanır (lib/onboarding-state), ana ekran şeridiyle aynı kaynak. */
+/**
+ * Kurulum sihirbazı: durum gerçek veriden hesaplanır (lib/onboarding-state), ana ekran kartıyla AYNI kaynak ve AYNI
+ * yetki süzgeci (`scopeOnboardingToPermissions`): danışmanın kart sayacı ile sihirbaz sayacı aynıdır, yapamayacağı adım
+ * (ofis bilgileri, giderler, havuz…) şeritte görünmez. İlk işler de izinle süzülür.
+ */
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -41,9 +45,11 @@ export default async function OnboardingPage({
     );
   }
 
-  const { state, skipped, tenant, counts } = snap;
-  // Yalnız gerçek adım kimliği; bilinmeyen değer ilk eksik adıma düşer.
+  const { skipped, tenant, counts } = snap;
+  const state = scopeOnboardingToPermissions(snap.state, perms, skipped);
+  // Yalnız gerçek (ve yetkili) adım kimliği; bilinmeyen değer ilk eksik adıma düşer.
   const current = resolveWizardStep(adim ?? undefined, state);
+  const firstTasks = await withFirstTaskFacts(visibleFirstTasks(snap.firstTasks, perms), tenantId);
   const showSampleData =
     counts.customers === 0 && counts.properties === 0 && !tenant?.sample_seeded_at && counts.sampleCustomers === 0;
   // Demo yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts).
@@ -69,7 +75,7 @@ export default async function OnboardingPage({
         showSampleData={showSampleData}
         showStartChoice={showStartChoice}
         canSeedSample={canSeedSample}
-        firstTasks={snap.firstTasks}
+        firstTasks={firstTasks}
         sampleCustomers={counts.sampleCustomers}
         body={{
           tenantId,

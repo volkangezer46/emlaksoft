@@ -17,6 +17,7 @@ import { getDb, loadPropertyBriefs } from "@/components/listing-control/readers"
 import { loadPortalGaps } from "@/components/listing-control/portal-gap-readers";
 import { getActivePortals } from "@/lib/portals/membership";
 import { PORTAL_MEMBERSHIP_HREF } from "@/lib/portals/catalog";
+import { withLocative } from "@/lib/tr-suffix";
 
 export const metadata = { title: "Portalda olmayan portföyler" };
 
@@ -41,7 +42,7 @@ export default async function EksikPortalPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         eyebrow="İlan Kontrol"
-        title={`${PORTAL_FORM_RULES[portal].label}'te olmayan portföyler`}
+        title={`${withLocative(PORTAL_FORM_RULES[portal].label)} olmayan portföyler`}
         description="Yayındaki portföy, ofisinizin kullandığı bu portalda canlı ilan taşımıyor. Satırdan “Portala aktar” ile eklentiyle forma doldurabilirsiniz."
         breadcrumbs={[{ label: "İlan Kontrol", href: CONTROL_BASE }, { label: "Eksik portal" }]}
       />
@@ -97,11 +98,11 @@ async function Body({ portal, sayfa, tenantId }: { portal: TransferPortal; sayfa
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-muted">
-        <span className="font-semibold tabular-nums text-text">{gap.missing.length}</span> portföy {PORTAL_FORM_RULES[portal].label}&apos;te yok ({gap.used} portföyünüz bu portalda yayında).
+        <span className="font-semibold tabular-nums text-text">{gap.missing.length}</span> portföy {withLocative(PORTAL_FORM_RULES[portal].label)} yok ({gap.used} portföyünüz bu portalda yayında).
       </p>
       <TableFrame stack minWidth={640}>
         <Table>
-          <caption className="sr-only">{PORTAL_FORM_RULES[portal].label}&apos;te olmayan portföyler</caption>
+          <caption className="sr-only">{withLocative(PORTAL_FORM_RULES[portal].label)} olmayan portföyler</caption>
           <THead>
             <TR>
               <TH>Portföy</TH>

@@ -12,9 +12,19 @@ import { getEffectivePermissions } from "@/lib/permissions-effective";
 import { buildAdvisorScope, gated, type AdvisorScope } from "@/lib/ai/advisor-scope";
 import { DAY_MS, now, trDayStartMs } from "@/lib/clock";
 import { trMonthContext } from "@/lib/team/scorecard";
-import { faqContextForMessages, selectFaqForQuestion } from "@/lib/ai/faq-context";
+import { faqContextForMessages } from "@/lib/ai/faq-context";
 import { getHelpContent } from "@/lib/help-center/store";
 import type { FaqItem } from "@/lib/help-faq";
+import {
+  fallbackAdvisorActions,
+  fallbackTenantAdvisor,
+  money,
+  type AdvisorAction,
+  type AdvisorHotCustomer,
+  type HotLead,
+  type TenantAdvisorContext,
+  type TenantAdvisorMessage,
+} from "@/lib/ai/tenant-advisor-fallback";
 import { actionErrorMessage } from "@/lib/action-errors";
 
 // ---------------------------------------------------------------------------
@@ -23,7 +33,7 @@ import { actionErrorMessage } from "@/lib/action-errors";
 // OpenAI anahtarı yoksa kural tabanlı yedek yanıtlar üretir (bkz. lib/ai-advisor).
 // ---------------------------------------------------------------------------
 
-export type TenantAdvisorMessage = { role: "user" | "assistant"; content: string };
+export type { AdvisorAction, AdvisorHotCustomer, TenantAdvisorMessage } from "@/lib/ai/tenant-advisor-fallback";
 export type TenantAdvisorResult = { reply: string; usedAI: boolean };
 export type AskTenantAdvisorResult = TenantAdvisorResult & { sessionId: string };
 
@@ -33,12 +43,6 @@ export type AskTenantAdvisorResult = TenantAdvisorResult & { sessionId: string }
 // onaylar (onay action'ları bu dosyanın sonunda).
 // ---------------------------------------------------------------------------
 
-export type AdvisorHotCustomer = { id: string; name: string; score: number };
-
-export type AdvisorAction =
-  | { type: "suggest_task"; params: { title: string; due_in_days: number; customer_name?: string } }
-  | { type: "draft_sms"; params: { customer_name: string; message: string } }
-  | { type: "list_hot_customers"; params: { customers: AdvisorHotCustomer[] } };
 
 const MAX_MESSAGES = 12;
 const MAX_LEN = 2000;
@@ -68,33 +72,11 @@ async function advisorScopeFor(gate: { tenantId: string; userId: string; role: s
   return buildAdvisorScope(perms, gate.role, gate.userId);
 }
 
-const money = (n: number) => `₺${Math.round(n).toLocaleString("tr-TR")}`;
 
 // ---------------------------------------------------------------------------
 // Bağlam — ofisin canlı verileri (RLS zaten tenant'a sınırlar)
 // ---------------------------------------------------------------------------
 
-type HotLead = { id: string; name: string; score: number };
-type OverpricedProperty = { id: string; label: string; price: number | null };
-
-type TenantAdvisorContext = {
-  scope: AdvisorScope;
-  customers: number;
-  properties: number;
-  activeDeals: number;
-  wonThisMonth: number;
-  wonValueThisMonth: number;
-  newDemands: number;
-  openTasks: number;
-  tasksOverdue: number;
-  tasksDueToday: number;
-  todayAppointments: number;
-  pendingCommission: number;
-  hotLeadCount: number;
-  hotLeads: HotLead[];
-  overpricedCount: number;
-  overpriced: OverpricedProperty[];
-};
 
 async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promise<TenantAdvisorContext> {
   const supabase = await createClient();
@@ -121,6 +103,7 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     { data: commissionRows },
     { data: leadCustomers },
     { data: redProperties, count: overpricedCount },
+    commissionAgg,
   ] = await Promise.all([
     gated(scope.customers, () =>
       mine(supabase.from("customers").select("id", { count: "exact", head: true }).is("deleted_at", null)),
@@ -211,6 +194,13 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
           .limit(5),
       ),
     ),
+    // Ciro: ana ekran komisyon özetiyle aynı RPC (aylık tahsil edilen; kazanç gizliliği RPC içinde).
+    scope.commissions
+      ? supabase.rpc("tenant_commission_aggregates", { p_as_of: new Date(now()).toISOString() }).then(
+          (r) => r,
+          () => null,
+        )
+      : Promise.resolve(null),
   ]);
 
   // Sıcaklık: tek okuyucu (lib/customer-state) — ekranlarla aynı müşteri aynı sıcaklıkta.
@@ -230,6 +220,9 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     (sum, r) => sum + (Number(r.gross_amount) || 0),
     0,
   );
+  // Ciro = bu ay tahsil edilen komisyon; ana ekran komisyon özetiyle aynı kaynak (RPC kazanç gizliliğini kendisi uygular).
+  const monthly = (commissionAgg?.data as { monthly?: { paid?: number | string | null }[] } | null)?.monthly ?? [];
+  const collectedThisMonth = scope.commissions && !commissionAgg?.error ? Number(monthly[monthly.length - 1]?.paid ?? 0) || 0 : null;
   const wonValueThisMonth = (wonDeals ?? []).reduce(
     (sum, d) => sum + (Number(d.deal_value) || 0),
     0,
@@ -242,6 +235,7 @@ async function buildTenantContext(tenantId: string, scope: AdvisorScope): Promis
     activeDeals: activeDeals ?? 0,
     wonThisMonth: (wonDeals ?? []).length,
     wonValueThisMonth,
+    collectedThisMonth,
     newDemands: newDemands ?? 0,
     openTasks: openTasks ?? 0,
     tasksOverdue: tasksOverdue ?? 0,
@@ -267,7 +261,7 @@ function contextToText(c: TenantAdvisorContext): string {
     lines.push(
       `Toplam müşteri: ${c.customers} (liste: /app/musteriler)`,
       `Sıcak müşteri (öncelikli aranacaklar): ${c.hotLeadCount} (liste: /app/musteriler?sort=hot)`,
-      ...c.hotLeads.map((l) => `- Sıcak müşteri: ${l.name} (skor ${l.score}, detay: /app/musteriler/${l.id})`),
+      ...c.hotLeads.map((l) => `- Sıcak müşteri: ${l.name} (sıcaklık ${l.score}/100, detay: /app/musteriler/${l.id})`),
     );
   }
   if (s.properties) {
@@ -283,8 +277,11 @@ function contextToText(c: TenantAdvisorContext): string {
   if (s.deals) {
     lines.push(
       `Devam eden anlaşma: ${c.activeDeals} (liste: /app/anlasmalar)`,
-      `Bu ay kazanılan anlaşma: ${c.wonThisMonth} (toplam değer ${money(c.wonValueThisMonth)})`,
+      `Bu ay kazanılan anlaşma: ${c.wonThisMonth} (satış hacmi, ciro değildir: ${money(c.wonValueThisMonth)})`,
     );
+  }
+  if (c.collectedThisMonth !== null) {
+    lines.push(`Bu ayın cirosu (tahsil edilen komisyon): ${money(c.collectedThisMonth)} (liste: /app/komisyon)`);
   }
   if (s.demands) lines.push(`Yeni (işlenmemiş) talep: ${c.newDemands} (liste: /app/talepler)`);
   if (s.tasks) {
@@ -349,126 +346,7 @@ ${contextToText(context)}` },
 // Kural tabanlı yedek yanıtlar — anahtar yoksa / hata olursa
 // ---------------------------------------------------------------------------
 
-/** Son kullanıcı mesajından konu tespiti — yedek yanıt VE yedek eylem kartları paylaşır. */
-function detectTopics(messages: TenantAdvisorMessage[]) {
-  const last = (messages.filter((m) => m.role === "user").pop()?.content ?? "").toLocaleLowerCase("tr-TR");
-  return {
-    call: /(kimi ara|aramalıyım|arayayım|sıcak|öncelik|bugün ne yap)/.test(last),
-    performance: /(performans|bu ay|rapor|kazan|satış|gelir|komisyon|ciro)/.test(last),
-    price: /(fiyat|pahalı|yüksek|riskli|portföy)/.test(last),
-    tasks: /(görev|gecik|randevu|takvim|plan)/.test(last),
-  };
-}
-
-function fallbackTenantAdvisor(messages: TenantAdvisorMessage[], c: TenantAdvisorContext, faq?: readonly FaqItem[]): string {
-  const topic = detectTopics(messages);
-  const focused = topic.call || topic.performance || topic.price || topic.tasks;
-  const parts: string[] = [];
-
-  // Yapay zeka yokken de ürün kullanımı sorusuna resmî SSS yanıtı (CRM konusu değilse; eşleşme yoksa eski davranış).
-  if (!focused) {
-    const lastQ = messages.filter((m) => m.role === "user").pop()?.content ?? "";
-    const hit = selectFaqForQuestion(lastQ, faq, 1, 3)[0];
-    if (hit) return `**${hit.item.q}**\n${hit.item.a}${hit.item.href ? `\nİlgili sayfa: ${hit.item.href}` : ""}`;
-  }
-
-  if (topic.call || !focused) {
-    if (c.hotLeadCount > 0) {
-      parts.push(
-        `**Bugün aranacaklar:** ${c.hotLeadCount} sıcak müşterin dönüş bekliyor.\n` +
-          c.hotLeads
-            .map((l) => `- ${l.name} (skor ${l.score}) → /app/musteriler/${l.id}`)
-            .join("\n") +
-          `\nTam liste: /app/musteriler?sort=hot`,
-      );
-    } else {
-      parts.push(
-        `**Bugün aranacaklar:** Şu an sıcak müşteri görünmüyor. ${
-          c.newDemands > 0
-            ? `${c.newDemands} yeni talep işlenmeyi bekliyor → /app/talepler`
-            : `Yeni müşteri kaydı ve talep girerek huniyi besleyebilirsin → /app/musteriler`
-        }`,
-      );
-    }
-  }
-
-  if (topic.performance || !focused) {
-    parts.push(
-      `**Bu ay performansın:** ${c.wonThisMonth} anlaşma kazandın (toplam ${money(c.wonValueThisMonth)}). ` +
-        `Devam eden ${c.activeDeals} anlaşman var → /app/anlasmalar. ` +
-        (c.pendingCommission > 0
-          ? `${money(c.pendingCommission)} komisyon tahsilat bekliyor → /app/komisyon?durum=bekleyen. `
-          : "") +
-        `Ayrıntılı analiz: /app/raporlar · /app/danisman-kpi`,
-    );
-  }
-
-  if (topic.price || !focused) {
-    if (c.overpricedCount > 0) {
-      parts.push(
-        `**Fiyatı yüksek portföyler:** ${c.overpricedCount} portföyün fiyat sağlığı riskli (kırmızı).\n` +
-          c.overpriced
-            .map((p) => `- ${p.label}${p.price != null ? ` · ${money(p.price)}` : ""} → /app/portfoyler/${p.id}`)
-            .join("\n") +
-          `\nTam liste: /app/portfoyler?saglik=riskli — mal sahipleriyle fiyat revizyonu görüş.`,
-      );
-    } else {
-      parts.push(
-        `**Fiyat sağlığı:** Riskli (kırmızı) fiyatlı portföyün yok — sağlıklı. Kontrol: /app/portfoyler`,
-      );
-    }
-  }
-
-  if (topic.tasks || !focused) {
-    parts.push(
-      `**Gün planı:** ` +
-        (c.tasksOverdue > 0 ? `${c.tasksOverdue} gecikmiş görev var → /app/gorevler?filter=overdue. ` : "") +
-        (c.tasksDueToday > 0 ? `${c.tasksDueToday} görevin bugün vadeli → /app/gorevler?filter=today. ` : "") +
-        (c.todayAppointments > 0 ? `Bugün ${c.todayAppointments} randevun var → /app/randevular. ` : "") +
-        (c.tasksOverdue === 0 && c.tasksDueToday === 0 && c.todayAppointments === 0
-          ? "Bugün vadesi gelen görev veya randevu yok — sıcak müşterileri aramak için iyi bir gün."
-          : ""),
-    );
-  }
-
-  const priority: string[] = [];
-  if (c.tasksOverdue > 0) priority.push(`${c.tasksOverdue} gecikmiş görevi kapat (/app/gorevler?filter=overdue)`);
-  if (c.hotLeadCount > 0) priority.push(`${c.hotLeadCount} sıcak müşteriyi ara (/app/musteriler?sort=hot)`);
-  if (c.newDemands > 0) priority.push(`${c.newDemands} yeni talebi eşleştir (/app/talepler?sekme=eslesme)`);
-  if (c.overpricedCount > 0) priority.push(`${c.overpricedCount} riskli fiyatlı portföyü gözden geçir (/app/portfoyler?saglik=riskli)`);
-
-  return (
-    parts.join("\n\n") +
-    (priority.length
-      ? `\n\n**Bugünün öncelikleri:**\n${priority.map((p, i) => `${i + 1}. ${p}`).join("\n")}`
-      : "") +
-    `\n\n_Not: OpenAI anahtarı tanımlı değil — bu yanıt ofisinin canlı verilerinden kural tabanlı üretildi._`
-  );
-}
-
-/**
- * Yedek kip eylem kartları — AI'lı akışla AYNI kart biçimi: "bugün kimi
- * aramalıyım" tarzı sorularda (veya genel soruda) ilk 3 sıcak müşteri için
- * hazır "Görev oluştur" önerileri üretir.
- */
-function fallbackAdvisorActions(
-  messages: TenantAdvisorMessage[],
-  c: TenantAdvisorContext,
-): AdvisorAction[] {
-  const topic = detectTopics(messages);
-  const focused = topic.call || topic.performance || topic.price || topic.tasks;
-  if (!topic.call && focused) return [];
-
-  return c.hotLeads.slice(0, 3).map((l) => ({
-    type: "suggest_task",
-    params: {
-      title: `${l.name} adlı sıcak müşteriyi ara`,
-      due_in_days: 1,
-      customer_name: l.name,
-    },
-  }));
-}
-
+/* detectTopics, fallbackTenantAdvisor, fallbackAdvisorActions: src/lib/ai/tenant-advisor-fallback.ts (saf, testli). */
 // ---------------------------------------------------------------------------
 // Sohbet — DB'ye kayıtlı (RLS'li client; kullanıcı yalnızca kendi oturumları)
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import { ChartCard } from "@/components/ui/chart-frame";
 import { FunnelChart } from "@/components/ui/viz";
 import { Skeleton } from "@/components/ui/skeleton";
 import { now } from "@/lib/clock";
+import { pctPossessive } from "@/lib/tr-suffix";
 import { moneyTry } from "@/lib/leak-shield";
 import { afterFirstScreen, loadCommissionSummary, loadDeals, loadDemandCounts, loadMyTarget, loadOfficeTarget, type HomeCtx } from "./data";
 import { pipelineStats } from "./helpers";
@@ -76,7 +77,7 @@ function TargetBar({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.min(100, pace.pct)}
-        aria-valuetext={`%${pace.pct}${pace.pct > 100 ? " (hedef aşıldı)" : ""}, ayın %${pace.expectedPct}'i geçti`}
+        aria-valuetext={`%${pace.pct}${pace.pct > 100 ? " (hedef aşıldı)" : ""}, ayın ${pctPossessive(pace.expectedPct)} geçti`}
         className="relative mt-1.5 h-2.5 overflow-hidden rounded-full bg-[var(--surface-sunken)]"
       >
         <span className="absolute inset-y-0 left-0 block rounded-full" style={{ width: `${fill}%`, background: "var(--t)" }} />

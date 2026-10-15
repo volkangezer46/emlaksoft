@@ -14,6 +14,7 @@ import { loadBuildingChargesPage, loadBuildingKpi } from "@/lib/building-managem
 import { BUILDING_STATUS_LABELS, deriveBuildingChargeStatus } from "@/lib/building-management/charges";
 import { BinalarTab } from "./binalar-tab";
 import { CariTab } from "./cari-tab";
+import { pctPossessive } from "@/lib/tr-suffix";
 
 export const metadata = { title: "Aidat & Bina Yönetimi" };
 
@@ -276,7 +277,7 @@ export default async function AidatPage({
       // Tahsilat ödeme tarihine (paid_at) göre sayılır: liste ?odeme= ile aynı kümeyi açar (?donem= tahakkuk ayıdır).
       href: href({ durum: "paid", donem: null, odeme: monthKey }),
       // Bina aidatı tahsilatı karta dahil ama ?odeme= listesi yalnız tekil mülk aidatını süzer: fark ipucunda söylenir.
-      hint: `${chargedMonth > 0 ? `tahakkukun %${Math.min(100, Math.round((collectedMonth / chargedMonth) * 100))}'i` : "tahakkuk yok"}${
+      hint: `${chargedMonth > 0 ? `tahakkukun ${pctPossessive(Math.min(100, Math.round((collectedMonth / chargedMonth) * 100)))}` : "tahakkuk yok"}${
         (bldKpi?.collectedMonth ?? 0) > 0 ? " · liste yalnız tekil mülk aidatı" : ""
       }`,
     },

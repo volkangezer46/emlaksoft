@@ -9,6 +9,7 @@ import { cancelChallenge } from "@/app/actions/league";
 import { challengeRemainingMs, remainingLabel } from "@/lib/league/challenge";
 import type { ChallengeCard } from "@/lib/league/challenge-load";
 import { evidenceHref } from "@/lib/league/evidence";
+import { possessiveSuffix } from "@/lib/tr-suffix";
 import { ChallengeForm, type MetricOption } from "./challenge-form";
 
 function dateLabel(iso: string) {
@@ -110,7 +111,7 @@ export function ChallengesPanel({
                   </div>
                   <Progress
                     value={progress.pct}
-                    label={`${def.title}: hedefin yüzde ${progress.pct}'i`}
+                    label={`${def.title}: hedefin yüzde ${progress.pct}'${possessiveSuffix(progress.pct)}`}
                     tone={progress.reached ? "success" : "accent"}
                   />
                 </div>

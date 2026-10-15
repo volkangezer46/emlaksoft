@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getProvinceOptions } from "@/lib/geo/reader";
 import { loadRegions, loadSpecialties, loadSpecialtyOptions } from "@/lib/advisor/advisor-store";
 import { getPublicPricing } from "@/lib/billing/public-pricing";
+import { getPlanDefinition } from "@/lib/billing/plan-definitions";
+import { onlinePaymentMode, PAYMENT_OFF_TEXT, PAYMENT_SUPPORT_HREF } from "@/lib/billing/payment-mode";
 import { isPoolEnabled } from "@/lib/pool/server";
 import type { OnboardingStep } from "@/lib/onboarding-checklist";
 import type { OnboardingStepId } from "@/lib/onboarding-steps";
@@ -140,7 +142,14 @@ function TeamBody(p: StepBodyProps) {
 
 async function PoolBody(p: StepBodyProps) {
   const enabled = await isPoolEnabled(await createClient(), p.tenantId);
-  return <PoolStep enabled={enabled} canConfigure={p.role === "owner" || p.role === "gm"} />;
+  // Adım "havuz açık VE en az bir gerçek uzmanlık/bölge kaydı" ile tamamlanır; açık ama tamamlanmamışsa eksik olan kayıttır.
+  return (
+    <PoolStep
+      enabled={enabled}
+      canConfigure={p.role === "owner" || p.role === "gm"}
+      missingRecords={enabled && !p.step.done}
+    />
+  );
 }
 
 function ChoiceLink({ href, icon, title, text }: { href: string; icon: ReactNode; title: string; text: string }) {
@@ -201,8 +210,23 @@ async function MulkYonetimiBody(p: StepBodyProps) {
   return <MulkYonetimiStep enabled={!state.closed.includes("rentals")} canEdit={canEdit} nextHref={p.nextHref} />;
 }
 
+/**
+ * Paket adımı ofisin GERÇEK paketini ve üye sayısını gösterir: ödenmiş abonelikte "Mevcut paketiniz" özeti (öneri yok),
+ * denemede danışman sayısı üye sayısıyla başlar. Satın alma bağlantısı abonelik sayfasıyla aynı ödeme bayrağına bağlıdır.
+ */
 async function PlanBody(p: StepBodyProps) {
-  const { plans, offers, trialDays, efValuationCost, efLive } = await getPublicPricing();
+  const supabase = await createClient();
+  const [{ plans, offers, trialDays, efValuationCost, efLive }, subRes, tenantRes, membersRes] = await Promise.all([
+    getPublicPricing(),
+    supabase.from("subscriptions").select("plan, status").eq("tenant_id", p.tenantId).maybeSingle(),
+    supabase.from("tenants").select("plan").eq("id", p.tenantId).maybeSingle(),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("tenant_id", p.tenantId).eq("is_active", true),
+  ]);
+  const sub = subRes.data as { plan?: string | null; status?: string | null } | null;
+  const planId = sub?.plan ?? (tenantRes.data as { plan?: string | null } | null)?.plan ?? null;
+  const planDef = planId ? await getPlanDefinition(planId).catch(() => null) : null;
+  const members = Math.max(1, membersRes.count ?? 1);
+  const mode = onlinePaymentMode();
   return (
     <PlanStep
       plans={plans}
@@ -212,6 +236,14 @@ async function PlanBody(p: StepBodyProps) {
       efLive={efLive}
       nextHref={p.nextHref}
       canManageBilling={p.canManageBilling}
+      current={
+        p.step.done && planDef
+          ? { planName: planDef.name, members, seatLimit: planDef.limits.seats }
+          : null
+      }
+      initialSeats={members}
+      paymentOffNote={mode === "off" ? PAYMENT_OFF_TEXT : null}
+      supportHref={PAYMENT_SUPPORT_HREF}
     />
   );
 }

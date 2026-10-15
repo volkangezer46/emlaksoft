@@ -118,20 +118,15 @@ export function entityHref(entityType: string | null, entityId: string | null): 
       return "/app/komisyon";
     case "appointment":
       return "/app/randevular";
+    case "task":
+      return `/app/gorevler?gorev=${entityId}`;
+    case "customer_demand":
+    case "demand":
+      return `/app/talepler/${entityId}`;
     default:
       return null;
   }
 }
 
-/** Kayit turu icin okunur ad (hedef bagiyla birlikte gosterilir). */
-export const ENTITY_LABEL: Record<string, string> = {
-  customer: "Müşteri",
-  property: "İlan",
-  deal: "Anlaşma",
-  approval_request: "Onay talebi",
-  commission: "Komisyon",
-  appointment: "Randevu",
-  demand: "Talep",
-  customers: "Müşteri listesi",
-  properties: "İlan listesi",
-};
+/** Kayit turu icin okunur ad: tek sozluk `src/lib/labels/entity.ts` (ham kod gosterilmez, bilinmeyen tur "Kayıt"). */
+export { entityLabel } from "@/lib/labels/entity";

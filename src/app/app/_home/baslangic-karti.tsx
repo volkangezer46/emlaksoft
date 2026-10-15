@@ -4,7 +4,8 @@ import { ArrowRight, Circle, FlaskConical, Rocket } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { ICONS } from "@/lib/icons";
 import { DEMO_SEED_FAILED_COOKIE } from "@/lib/sample-registration-seed";
-import { loadOnboardingSnapshot } from "@/lib/onboarding-state";
+import { loadOnboardingSnapshot, withFirstTaskFacts } from "@/lib/onboarding-state";
+import { effectiveHasPermission } from "@/lib/permissions-effective";
 import { scopeOnboardingToPermissions, visibleFirstTasks } from "@/lib/onboarding-checklist";
 import { OrnekVeriYenile } from "./ornek-veri-yenile";
 import { SampleSeedButton } from "./sample-seed-button";
@@ -14,6 +15,13 @@ const R = 26;
 const C = 2 * Math.PI * R;
 const MAX_STEP_CHIPS = 4;
 const MAX_TASKS = 3;
+
+/** Örnek veri yükleme yetkisi: seedSampleData ile aynı altı modülde oluşturma (actions/sample-data.ts). */
+function canSeed(perms: HomeCtx["perms"]): boolean {
+  return (["customers", "properties", "demands", "tasks", "appointments", "commissions"] as const).every((m) =>
+    effectiveHasPermission(perms, m, "create"),
+  );
+}
 
 /**
  * TEK "Başlangıç" kartı, TEK ilerleme halkası (tek Kurulum sihirbazı, `lib/onboarding-steps` kaydı). Eksik varken kısa:
@@ -41,7 +49,10 @@ export async function BaslangicKarti({ ctx }: { ctx: HomeCtx }) {
   const state = scopeOnboardingToPermissions(snap.state, ctx.perms, snap.skipped);
   const nextStep = state.steps.find((s) => s.id === state.nextId) ?? null;
   const pendingSteps = state.steps.filter((s) => !s.done && !snap.skipped.includes(s.id)).slice(0, MAX_STEP_CHIPS);
-  const tasks = visibleFirstTasks(snap.firstTasks, ctx.perms).filter((t) => !t.done).slice(0, MAX_TASKS);
+  const tasks = (await withFirstTaskFacts(visibleFirstTasks(snap.firstTasks, ctx.perms), ctx.tenantId)).filter((t) => !t.done).slice(0, MAX_TASKS);
+  // Boş ofis düğmeleri yalnız o kaydı oluşturabilene çizilir (kapalı sayfaya giden CTA yok).
+  const canCustomer = effectiveHasPermission(ctx.perms, "customers", "create");
+  const canProperty = effectiveHasPermission(ctx.perms, "properties", "create");
   const showWizard = state.total > 0 && !state.settled;
 
   if (!showWizard && !showRetry && !showSampleLive && tasks.length === 0 && !isEmpty) return null;
@@ -145,21 +156,27 @@ export async function BaslangicKarti({ ctx }: { ctx: HomeCtx }) {
         </div>
       ) : null}
 
-      {isEmpty ? (
+      {isEmpty && (canCustomer || canProperty) ? (
         <div className="flex flex-wrap items-center gap-2">
-          <ButtonLink href="/app/musteriler/yeni" icon={ICONS.musteri}>
-            Müşteri ekle
-          </ButtonLink>
-          <ButtonLink href="/app/portfoyler/yeni" variant="secondary" icon={ICONS.portfoy}>
-            Portföy ekle
-          </ButtonLink>
-          {seeded || showRetry ? null : <SampleSeedButton />}
-          <Link
-            href="/app/ice-aktarma"
-            className="focus-ring inline-flex min-h-11 items-center gap-1 px-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
-          >
-            Kendi verini içe aktar <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
+          {canCustomer ? (
+            <ButtonLink href="/app/musteriler/yeni" icon={ICONS.musteri}>
+              Müşteri ekle
+            </ButtonLink>
+          ) : null}
+          {canProperty ? (
+            <ButtonLink href="/app/portfoyler/yeni" variant="secondary" icon={ICONS.portfoy}>
+              Portföy ekle
+            </ButtonLink>
+          ) : null}
+          {seeded || showRetry || !canSeed(ctx.perms) ? null : <SampleSeedButton />}
+          {canCustomer ? (
+            <Link
+              href="/app/ice-aktarma"
+              className="focus-ring inline-flex min-h-11 items-center gap-1 px-1 text-sm font-semibold text-brand-600 hover:text-brand-700"
+            >
+              Kendi verini içe aktar <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </section>

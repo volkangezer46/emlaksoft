@@ -8,9 +8,22 @@ import { tourIdForRole } from "@/lib/product-tour-roles";
 import { TOUR_PARAM, isTourDone, markServerSynced, markTourDone, needsServerSync } from "@/lib/product-tour-storage";
 import { tourStateKey } from "@/lib/ui-state";
 import { loadUiState, markUiState } from "@/app/actions/ui-state";
+import { loadProductTours } from "@/app/actions/onboarding-content";
+import type { TourDef } from "@/lib/product-tour-data";
 
 // Tur kodu (Radix Dialog dahil) yalnız tur gerçekten açılacaksa indirilir.
-const ProductTour = dynamic(() => import("./product-tour").then((m) => m.ProductTour), { ssr: false });
+const loadTourChunk = () => import("./product-tour").then((m) => m.ProductTour);
+const ProductTour = dynamic(loadTourChunk, { ssr: false });
+
+/**
+ * Düzenlenmiş turlar sayfa ömründe bir kez istenir; tur parçasının indirilmesiyle PARALEL başlar (B039: eskiden 800 ms
+ * bekleme + ardından sıralı istek). Hata = null (çalıştırıcı varsayılan turlarla devam eder).
+ */
+let toursRequest: Promise<TourDef[] | null> | null = null;
+function requestTours(): Promise<TourDef[] | null> {
+  toursRequest ??= loadProductTours().catch(() => null);
+  return toursRequest;
+}
 
 type TourDecision = "load" | "ask-server" | "skip";
 
@@ -55,7 +68,10 @@ export function ProductTourLazy({ role, accessible }: { role: string; accessible
     const decision = tourDecision(pathname, role);
     if (decision === "skip") return;
     let cancelled = false;
+    // Tur parçası karar beklenmeden indirilmeye başlar (önbellekte hazır olsun).
+    void loadTourChunk().catch(() => {});
     if (decision === "load") {
+      void requestTours();
       const t = window.setTimeout(() => setLoad(true), 0);
       return () => window.clearTimeout(t);
     }
@@ -69,14 +85,17 @@ export function ProductTourLazy({ role, accessible }: { role: string; accessible
           markServerSynced(id);
           return;
         }
+        void requestTours();
         setLoad(true);
       })
       .catch(() => {
-        if (!cancelled) setLoad(true);
+        if (cancelled) return;
+        void requestTours();
+        setLoad(true);
       });
     return () => {
       cancelled = true;
     };
   }, [pathname, role, load]);
-  return load ? <ProductTour role={role} accessible={accessible} /> : null;
+  return load ? <ProductTour role={role} accessible={accessible} toursRequest={toursRequest ?? undefined} /> : null;
 }

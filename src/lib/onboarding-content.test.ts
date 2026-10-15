@@ -10,7 +10,7 @@ import {
   EMPTY_ONBOARDING_CONTENT,
 } from "./onboarding-content";
 import { buildOnboarding, wizardNeighbors, resolveWizardStep, type OnboardingFacts } from "./onboarding-checklist";
-import { ONBOARDING_STEP_IDS } from "./onboarding-steps";
+import { ONBOARDING_STEP_IDS, getOnboardingStepDef } from "./onboarding-steps";
 import { TOURS, resolveTourSteps } from "./product-tour-data";
 import type { AppModule } from "./permissions";
 import { getSettingDef } from "./settings/registry";
@@ -107,7 +107,8 @@ describe("tur ve kurulum içeriği (SN5)", () => {
 
     const state = buildOnboarding({ ...FACTS, members: 3 }, [], ownerDefs);
     expect(state.steps[0]).toMatchObject({ id: "team", title: "Ekibini çağır", done: true });
-    expect(state.total).toBe(ownerDefs.length);
+    // İsteğe bağlı adımlar (paket, mülk yönetimi, Bakanlık e-postası) sayaca katılmaz.
+    expect(state.total).toBe(ownerDefs.filter((d) => !getOnboardingStepDef(d.id)?.optional).length);
     expect(state.nextId).toBe("office");
     // Sihirbaz komşuları ve istenen adım düzenlenmiş listeye göre.
     const order = state.steps.map((s) => s.id);

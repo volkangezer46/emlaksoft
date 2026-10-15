@@ -3,7 +3,8 @@
  *
  * Kayıt dört soruluktur (ad, cep, e-posta, şifre); ofisin geri kalanı üye olduktan sonra `/app/baslangic` sihirbazında
  * tamamlanır. Her adım atlanabilir, ilerleme gerçek veriden hesaplanır (sahte ilerleme yok), "sonra yaparım" tercihi
- * kullanıcı çerezindedir (`setup-skip.ts`). Ana ekran Başlangıç kartı, Ayarlar dizini, Yardım ve sihirbaz AYNI listeyi okur.
+ * kullanıcı profilindedir (`profiles.ui_state`, `setup-skip.ts`; cihazlar arası). Ana ekran Başlangıç kartı, Ayarlar dizini,
+ * Yardım ve sihirbaz AYNI listeyi okur. İsteğe bağlı adımlar (`optional`) yüzdeye ve "tamamlandı" kararına katılmaz.
  *
  * YENİ ADIM EKLEMEK (ör. "Giderler ve kasa"):
  *  1) Aşağıdaki `ONBOARDING_STEP_DEFS` dizisine, istenen sıraya bir kayıt ekle (`id`, `short`, `title`, `description`, `isDone`).
@@ -61,6 +62,11 @@ export type OnboardingStepDef = {
    * "Ofis bilgilerin" ya da "Giderler ve kasa" gösterilmez.
    */
   requires?: Permission;
+  /**
+   * İsteğe bağlı adım: listede ayrı grupta durur, ilerleme yüzdesine, adım sayacına ve "kurulum tamam" kararına KATILMAZ
+   * (ör. paket seçimi online ödeme kapalıyken tamamlanamaz; kurulum yine de bitebilmeli).
+   */
+  optional?: boolean;
 };
 
 const SETTINGS_EDIT: Permission = { module: "settings", action: "edit" };
@@ -124,6 +130,7 @@ export const ONBOARDING_STEP_DEFS = [
     requires: SETTINGS_EDIT,
     short: "Bakanlık e-postaları",
     title: "Bakanlık e-postalarını EmlakSoft'a ilet (isteğe bağlı)",
+    optional: true,
     description: "Malik yetki verince ya da iptal edince gelen EİDS e-postası EmlakSoft'a iletilsin; portföy eşleşsin, görev açılsın.",
     // İlk e-posta (ya da Gmail onay kodu) alma adresine ulaşınca tamamlanır (EP3 eids_inbound_addresses.last_received_at).
     isDone: (f) => f.extra["eids-eposta"] === true,
@@ -142,6 +149,7 @@ export const ONBOARDING_STEP_DEFS = [
     requires: SETTINGS_EDIT,
     short: "Mülk yönetimi",
     title: "Mülk yönetimi (isteğe bağlı)",
+    optional: true,
     description: PROPERTY_MANAGEMENT_QUESTION,
     // Cevap (Evet/Hayır) ofisin rentals modül satırı olarak saklanır; cevap gelene kadar mevcut davranış (modül açık) sürer.
     isDone: (f) => f.extra["mulk-yonetimi"] === true,
@@ -151,6 +159,7 @@ export const ONBOARDING_STEP_DEFS = [
     requires: { module: "billing", action: "edit" },
     short: "Paket",
     title: "Paketini seç (isteğe bağlı)",
+    optional: true,
     description: "Deneme süresince her şey açık; paketi şimdi seçebilir ya da denemeye devam edebilirsin.",
     isDone: (f) => f.planPaid,
   },
