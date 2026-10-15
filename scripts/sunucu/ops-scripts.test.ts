@@ -249,6 +249,170 @@ describe("release.sh: migration başarısızsa yayın durur", () => {
   });
 });
 
+describe("release.sh: SK1 yayın güvenliği (prova, RLS kapısı, PostgREST izleyicileri, tüm dosyalar ledger'da)", () => {
+  const NPM = `#!/usr/bin/env bash
+echo "npm $*" >> "$FAKE_DIR/calls.log"
+case "$*" in
+  *db:rehearse*) echo "[FAIL] 2-uygula kasıtlı bozuk"; exit "\${FAKE_REHEARSE_RC:-0}" ;;
+  *db:rls-audit*) echo "[POLITIKA-YOK] 1 bulgu"; exit "\${FAKE_RLS_RC:-0}" ;;
+  *db:migrate*) echo "tamam"; exit "\${FAKE_MIGRATE_RC:-0}" ;;
+  *check:migrations*) printf 'RELEASE_MIGRATION=20261016010300_x.sql\nRELEASE_MIGRATION_CHECKSUM=abcdef0123456789\nRELEASE_MIGRATION_COUNT=451\n' ;;
+esac
+exit 0
+`;
+  function release(name: string, env: Record<string, string> = {}) {
+    const { dir, bin } = fakeBin(name, {
+      npm: NPM,
+      git: `#!/usr/bin/env bash\necho "git $*" >> "$FAKE_DIR/calls.log"\nexit 0\n`,
+    });
+    const repo = path.join(dir, "repo");
+    mkdirSync(path.join(repo, "scripts/sunucu"), { recursive: true });
+    copyFileSync(path.join(DIR, "release.sh"), path.join(repo, "scripts/sunucu/release.sh"));
+    writeFileSync(path.join(repo, "scripts/sunucu/deploy.sh"), `echo DEPLOY_CALLED >> "$FAKE_DIR/calls.log"\necho '{"ok":true}'\n`);
+    writeFileSync(path.join(repo, ".env.production"), "RELEASE_MIGRATION=x\nRELEASE_MIGRATION_CHECKSUM=y\n");
+    const r = run(path.join(repo, "scripts/sunucu/release.sh"), [], { FAKE_DIR: dir, SKIP_GATE: "1", ...env }, bin, repo);
+    return { ...r, calls: read(path.join(dir, "calls.log")), psql: read(path.join(dir, "psql.log")), env: read(path.join(repo, ".env.production")) };
+  }
+
+  it("bozuk migration provada yakalanır: gerçek migrate, RLS, izleyici kapatma ve deploy YOK", () => {
+    const r = release("rel-rehearse", { FAKE_REHEARSE_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("Migration provası başarısız");
+    expect(r.calls).toContain("npm run -s db:rehearse -- --yes-i-understand-locks --pending");
+    expect(r.calls).not.toContain("db:migrate");
+    expect(r.calls).not.toContain("db:rls-audit");
+    expect(r.calls).not.toContain("DEPLOY_CALLED");
+    expect(r.psql).not.toContain("disable");
+  });
+
+  it("RLS ihlali gerçek migration'dan ÖNCE durdurur; RLS_GATE=warn bilinçli geçiştir", () => {
+    const r = release("rel-rls", { FAKE_RLS_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("RLS denetimi başarısız — yayın durduruldu");
+    expect(r.calls.indexOf("db:rls-audit")).toBeGreaterThan(r.calls.indexOf("db:rehearse"));
+    expect(r.calls).not.toContain("db:migrate");
+    const w = release("rel-rls-warn", { FAKE_RLS_RC: "1", RLS_GATE: "warn" });
+    expect(w.code).toBe(0);
+    expect(w.calls).toContain("db:migrate");
+  });
+
+  it("migrate düşerse çıkış kodu korunur ve izleyiciler tuzakla yeniden AÇILIR; reload NOTIFY'ı gönderilir", () => {
+    const r = release("rel-trap", { FAKE_MIGRATE_RC: "3" });
+    expect(r.code).toBe(3);
+    const off = r.psql.indexOf("alter event trigger pgrst_ddl_watch disable");
+    const on = r.psql.indexOf("alter event trigger pgrst_ddl_watch enable");
+    expect(off).toBeGreaterThan(-1);
+    expect(on).toBeGreaterThan(off);
+    expect(r.psql).toContain("alter event trigger pgrst_drop_watch enable");
+    expect(r.psql.slice(on)).toContain("notify pgrst, 'reload schema'");
+    expect(r.calls).not.toContain("check:migrations");
+  });
+
+  it("başarılı yayın: tüm dosyalar ledger'da denetimi, sayım .env.production'a eklenir, NOTIFY deploy'a bırakılır", () => {
+    const r = release("rel-ok");
+    expect(r.code).toBe(0);
+    expect(r.calls).toContain("npm run -s check:migrations -- --database --release");
+    expect(r.env).toContain("RELEASE_MIGRATION=20261016010300_x.sql");
+    expect(r.env).toContain("RELEASE_MIGRATION_CHECKSUM=abcdef0123456789");
+    expect(r.env).toContain("RELEASE_MIGRATION_COUNT=451");
+    expect(r.calls).toContain("DEPLOY_CALLED");
+    expect(r.calls).toContain("git push");
+    expect(r.psql).not.toContain("notify pgrst");
+    expect(r.psql.indexOf("pgrst_ddl_watch enable")).toBeGreaterThan(r.psql.indexOf("pgrst_ddl_watch disable"));
+  });
+});
+
+describe("deploy.sh: mavi/yeşil geçiş ve bekçi (SK1/B043, B179)", () => {
+  const SWAP_DOCKER = `#!/usr/bin/env bash
+echo "docker $*" >> "$FAKE_DIR/calls.log"
+bad() { case " \${FAKE_UNHEALTHY:-} " in *" $1 "*) return 0 ;; esac; return 1; }
+case "$1" in
+  inspect)
+    if [[ "$*" == *Labels* ]]; then [ -n "\${FAKE_LABEL_DIFF:-}" ] && echo "traefik.eski=1"; exit 0; fi
+    if bad "$2"; then echo starting; else echo healthy; fi; exit 0 ;;
+  exec) if [ "$3" = node ] && bad "$2"; then exit 1; fi; exit 0 ;;
+esac
+exit 0
+`;
+  /** deploy.sh'teki geçiş + bekçi tanımları (COMPOSE= … static up öncesi) + sürücü. */
+  function harness(name: string, driver: string, env: Record<string, string> = {}, extra: Record<string, string> = {}) {
+    const src = readFileSync(path.join(DIR, "deploy.sh"), "utf8");
+    const defs = src.slice(src.indexOf("COMPOSE=(docker compose"), src.indexOf('"${COMPOSE[@]}" up -d --no-deps static'));
+    const { dir, bin } = fakeBin(name, extra);
+    writeFileSync(path.join(bin, "docker"), SWAP_DOCKER);
+    const script = path.join(dir, "h.sh");
+    writeFileSync(script, `set -euo pipefail\n${defs}\n${driver}\n`);
+    const r = run(script, [], { FAKE_DIR: dir, DRAIN_WAIT: "0", SETTLE_WAIT: "0", READY_TRIES: "2", ...env }, bin);
+    return { ...r, dir, calls: read(path.join(dir, "calls.log")) };
+  }
+
+  it("sıra: yeşil yeni etiketle açılır → mavi boşaltılır → mavi yeni etiketle kurulur → yeşil boşaltılıp kaldırılır", () => {
+    const r = harness("swap-ok", 'set +e; swap_to T1; echo "RC=$?"');
+    expect(r.out).toContain("RC=0");
+    const c = r.calls;
+    const order = [
+      "docker compose -f deploy/compose.prod.yml --profile green up -d --no-deps app-green",
+      "docker exec emlaksoft-app sh -c : > /tmp/emlaksoft-drain",
+      "docker compose -f deploy/compose.prod.yml up -d --no-deps app",
+      "docker exec emlaksoft-app-green sh -c : > /tmp/emlaksoft-drain",
+      "docker compose -f deploy/compose.prod.yml --profile green rm -sf app-green",
+    ].map((s) => c.indexOf(s));
+    expect(order.every((i) => i > -1)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it("yeşil sağlıklı olmazsa mavi HİÇ boşaltılmaz/yeniden kurulmaz (eski sürüm kesintisiz yayında), kod 1", () => {
+    const r = harness("swap-green-bad", 'set +e; swap_to T1; echo "RC=$?"', { FAKE_UNHEALTHY: "emlaksoft-app-green" });
+    expect(r.out).toContain("RC=1");
+    expect(r.calls).not.toContain("docker exec emlaksoft-app sh -c");
+    expect(r.calls).not.toContain("up -d --no-deps app\n");
+    expect(r.calls).toContain("rm -sf app-green");
+  });
+
+  it("Traefik etiketleri değiştiyse (ilk yayın) yeşil AÇILMAZ (Traefik çakışması); mavi tek seferlik yeniden kurulur", () => {
+    const r = harness("swap-labels", 'set +e; swap_to T1; echo "RC=$?"', { FAKE_LABEL_DIFF: "1" });
+    expect(r.out).toContain("RC=0");
+    expect(r.out).toContain("Traefik etiketleri değişti");
+    expect(r.calls).not.toContain("app-green");
+    expect(r.calls).toContain("docker compose -f deploy/compose.prod.yml up -d --no-deps app");
+  });
+
+  it("mavi yeniden kurulamazsa kod 2 (yeşil trafikte kalır, kaldırılmaz)", () => {
+    const r = harness("swap-blue-bad", 'set +e; swap_to T1; echo "RC=$?"', { FAKE_UNHEALTHY: "emlaksoft-app" });
+    expect(r.out).toContain("RC=2");
+    expect(r.calls).not.toContain("emlaksoft-app-green sh -c");
+  });
+
+  function watch(name: string, streak: string, e2eRc: string, measureRc: string, env: Record<string, string> = {}) {
+    const extra = {
+      npm: `#!/usr/bin/env bash\necho "npm $*" >> "$FAKE_DIR/calls.log"\nexit ${e2eRc}\n`,
+      npx: `#!/usr/bin/env bash\necho "npx $*" >> "$FAKE_DIR/calls.log"\necho "BÜTÇE: ölçüm"\nexit ${measureRc}\n`,
+    };
+    const state = path.join(tmp, `${name}-seri`);
+    writeFileSync(state, streak);
+    const r = harness(name, 'set +e; watchdog; echo "WRC=$?"', { WATCHDOG_STATE: state, ...env }, extra);
+    return { ...r, streak: read(state).trim() };
+  }
+
+  it("bekçi: yeşil seriyi artırır; 3 yeşile kadar kırmızı yalnız uyarı; sonra geri dönüş; ölçülemedi (3) nötr", () => {
+    expect(watch("wd-green", "1", "0", "0")).toMatchObject({ streak: "2" });
+    expect(watch("wd-green", "1", "0", "0").out).toContain("WRC=0");
+    const warn = watch("wd-warn", "2", "0", "1");
+    expect(warn.out).toContain("WRC=0");
+    expect(warn.out).toContain("yalnız uyarı");
+    expect(warn.streak).toBe("0");
+    const back = watch("wd-back", "3", "1", "0");
+    expect(back.out).toContain("WRC=1");
+    expect(back.out).toContain("public smoke kırık");
+    expect(watch("wd-forced-warn", "5", "0", "1", { WATCHDOG: "warn" }).out).toContain("WRC=0");
+    const neutral = watch("wd-neutral", "2", "0", "3");
+    expect(neutral.out).toContain("WRC=0");
+    expect(neutral.streak).toBe("2");
+    expect(neutral.calls).toContain("npm run -s test:e2e:public");
+    expect(neutral.calls).toContain("npx tsx scripts/perf/measure-live.mts --watchdog --json");
+  });
+});
+
 describe("rollback.sh --dry-run", () => {
   function rollback(
     args: string[],

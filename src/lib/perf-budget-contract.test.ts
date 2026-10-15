@@ -1,6 +1,8 @@
 import { readCached, statKind, walkAll } from "./test-support/src-tree";
 import { dirname, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { LIVE_BUDGETS } from "../../scripts/perf/live-budget";
 
 /**
  * Performans bütçesi sözleşmesi (regresyon kilidi): "tüm sayfalar tıklar tıklamaz açılır".
@@ -15,6 +17,9 @@ import { describe, expect, it } from "vitest";
  *     ne doğrudan ne de içe aktarma zinciriyle; yalnız `next/dynamic` / dinamik `import()` (istemci paketi bölünür).
  * (e) İstemci önbelleği: staleTimes.dynamic ≤300 + arka plan tazeleme + tam önceden yükleme + realtime + temizlik sözleşmesi.
  *     `client-bundle-contract.test.ts` (zod / kabuk panelleri) ile birlikte çalışır.
+ * (f) Canlı bütçe (SK1/B181): statik metin taraması yetmez (canlıda anon kanal hatası bu sözleşmeler yeşilken yaşandı).
+ *     Yayın sonrası bekçi GERÇEK ölçer: scripts/perf/measure-live.mts --watchdog (TTFB/DCL + realtime olay gecikmesi)
+ *     ve public smoke; bütçe değerleri scripts/perf/live-budget.ts'te, saha konseyi hedefleriyle eşit.
  */
 const ROOT = process.cwd();
 
@@ -264,5 +269,43 @@ describe("(e) istemci router önbelleği: 300 sn + arka plan tazeleme + tam önc
     expect(read("src/components/app/app-sidebar.tsx")).toMatch(/useIdlePrefetch\(/);
     expect(read("src/components/app/section-tabs.tsx")).toMatch(/useIdlePrefetch\(/);
     expect(read("src/components/app/intent-link.tsx")).toMatch(/takeViewportBudget/);
+  });
+});
+
+describe("(f) canlı bütçe ve yayın sonrası bekçi (SK1/B179-B181)", () => {
+  const rootRead = (rel: string) => readFileSync(resolve(ROOT, rel), "utf8");
+  it("bütçeler saha konseyi hedefleriyle eşit", () => {
+    expect(LIVE_BUDGETS.ttfbP50Ms).toEqual({ "/app": 60, "/admin": 70 });
+    expect(LIVE_BUDGETS.realtimeP95Ms).toBe(1000);
+    expect(LIVE_BUDGETS.quietLoad1).toBe(4);
+    expect(LIVE_BUDGETS.minSamplesForP95).toBe(20);
+    expect(LIVE_BUDGETS.minSamplesForMedian).toBe(5);
+    expect(LIVE_BUDGETS.ttfbSamples).toBeGreaterThanOrEqual(LIVE_BUDGETS.minSamplesForP95);
+    expect(LIVE_BUDGETS.realtimeSamples).toBeGreaterThanOrEqual(LIVE_BUDGETS.minSamplesForP95);
+  });
+  it("deploy.sh sağlıktan SONRA public smoke + measure-live bekçisini koşar; seri eşiği bütçe modülüyle aynı", () => {
+    const d = rootRead("scripts/sunucu/deploy.sh");
+    expect(d).toContain("APP_URL=https://emlaksoft.com.tr npm run -s test:e2e:public");
+    expect(d).toContain("scripts/perf/measure-live.mts --watchdog");
+    expect(d).toContain(`WATCHDOG_GREENS=${LIVE_BUDGETS.consecutiveGreensBeforeRollback}`);
+    const call = d.indexOf("if watchdog; then");
+    expect(call).toBeGreaterThan(d.indexOf('if [ "$SWAP_RC" = 0 ] && external_ok; then'));
+    expect(d.slice(call)).toContain("record_release ok");
+  });
+  it("measure-live realtime ölçümü gerçek abonelik + INSERT ile; fast.sh flaky kaydı ve 30 sn varsayılan zaman aşımı", () => {
+    const m = rootRead("scripts/perf/measure-live.mts");
+    expect(m).toMatch(/"postgres_changes"/);
+    expect(m).toMatch(/from\("tasks"\)\s*\.insert/);
+    expect(m).toContain("evaluateBudgets(");
+    const f = rootRead("scripts/gate/fast.sh");
+    expect(f).toContain('echo "FLAKY $f"');
+    expect(f).toContain("FLAKY_LIMIT:-3");
+    expect(f).not.toContain("--testTimeout=300000");
+    expect(f).toMatch(/nice -n 19 ionice -c3/);
+    const v = rootRead("vitest.config.ts");
+    expect(v).toMatch(/testTimeout: 30_000/);
+    expect(v).toMatch(/name: "pglite", include: PGLITE_FILES, testTimeout: 120_000/);
+    expect(v).toMatch(/maxWorkers:/);
+    expect(v).toContain('"src/app/actions/**/*.ts", "src/hooks/**/*.ts"');
   });
 });
