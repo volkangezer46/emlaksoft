@@ -1,59 +1,36 @@
+import dynamic from "next/dynamic";
 import { APPOINTMENT_TYPE_LABELS } from "@/lib/appointment-labels";
 import Link from "@/components/ui/smart-link";
-import { formatTrTime, trParts, trDayKey, trTodayCalendarDate } from "@/lib/clock";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { now, trTodayCalendarDate } from "@/lib/clock";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { AgendaList } from "./agenda-list";
+import type { WeekGridDay, WeekViewAppointment, WeekViewTask } from "./week-grid";
+
+export type { WeekViewAppointment, WeekViewTask } from "./week-grid";
 
 /**
  * Hafta / gün görünümü — ?gorunum=hafta|gun (ay: mevcut AppointmentCalendar).
  *
- * Sunucu bileşeni: gezinme ?tarih= linkleriyle yapılır (prev/next/bugün hrefleri
- * sayfada hesaplanır). Randevu blokları listedeki karta (#randevu-{id}) kayan
- * çapa linkleridir — takvimdeki mevcut desenle aynı.
+ * Sunucu kabuğu: gezinme ?tarih= linkleriyle yapılır (prev/next/bugün hrefleri sayfada hesaplanır).
+ *  - ≥640 px: saat ızgarası istemci adası (`week-grid.tsx`, ayrı parça): sürükle-bırak ile saat/gün/süre değiştirme
+ *    (GA-02), saatli görevler sarı blok (GA-03); blok tıklaması randevunun kendisini açar (`?randevu=<id>`).
+ *  - <640 px: yatay kaydırmalı 7 sütun yerine tek akış ajanda (GA-03; hafta şeridi + saat sıralı kartlar).
  */
-
-export type WeekViewAppointment = {
-  id: string;
-  scheduled_at: string;
-  duration_min: number | null;
-  appointment_type: string;
-  status: string;
-  customerName: string | null;
-  propertyName: string | null;
-  location: string | null;
-};
+const WeekGrid = dynamic(() => import("./week-grid").then((m) => m.WeekGrid), {
+  loading: () => <div className="h-[672px] animate-pulse rounded-[var(--radius-control)] bg-canvas" aria-hidden />,
+});
 
 const TYPE_COLOR: Record<string, string> = {
-  showing:   "bg-brand-600",
-  office:    "bg-cyan-500",
+  showing: "bg-brand-600",
+  office: "bg-cyan-500",
   valuation: "bg-amber-500",
-  contract:  "bg-mint-500",
+  contract: "bg-mint-500",
 };
 
 const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
-// Saat ızgarası: 07:00–21:00
-const HOUR_START = 7;
-const HOUR_END = 21;
-const HOUR_PX = 48; // 1 saat = 48px
-const GRID_H = (HOUR_END - HOUR_START) * HOUR_PX;
-
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-/** 07:00 öncesi/21:00 sonrası taşan bloklar ızgara sınırına kırpılır. */
-function blockPos(startIso: string, durationMin: number | null) {
-  const tp = trParts(startIso);
-  const startMin = tp.hour * 60 + tp.minute;
-  const endMin = startMin + (durationMin ?? 60);
-  const lo = HOUR_START * 60;
-  const hi = HOUR_END * 60;
-  const clampedStart = Math.max(lo, Math.min(startMin, hi - 15));
-  const clampedEnd = Math.max(clampedStart + 15, Math.min(endMin, hi));
-  return {
-    top: ((clampedStart - lo) / 60) * HOUR_PX,
-    height: Math.max(20, ((clampedEnd - clampedStart) / 60) * HOUR_PX),
-  };
 }
 
 /** Takvim günü (sahte yerel Date) → "YYYY-MM-DD"; randevuların TR gün anahtarıyla karşılaştırılır. */
@@ -65,27 +42,39 @@ export function AppointmentWeekView({
   mode,
   date,
   appointments,
+  tasks = [],
   prevHref,
   nextHref,
   todayHref,
+  dayHref,
   newHref = null,
+  canEdit = false,
+  canEditTasks = false,
 }: {
   mode: "hafta" | "gun";
   /** Seçili gün (yerel saat, gün başı). */
   date: Date;
   appointments: WeekViewAppointment[];
+  /** GA-03: penceredeki saatli açık görevler (kullanıcının ya da seçili danışmanın). */
+  tasks?: WeekViewTask[];
   prevHref: string;
   nextHref: string;
   todayHref: string;
+  /** Mobil hafta şeridindeki gün → o günün gün görünümü. */
+  dayHref: (dayKey: string) => string;
   /** Randevu oluşturma yetkisi varsa yeni randevu sayfası adresi; yoksa null (boş saat bağlantıları çizilmez). */
   newHref?: string | null;
+  /** Sürükle-bırak (appointments.edit). */
+  canEdit?: boolean;
+  /** Görev bloğunda tamamla düğmesi (tasks.edit). */
+  canEditTasks?: boolean;
 }) {
   const today = trTodayCalendarDate();
 
   // Hafta: seçili günü içeren Pazartesi–Pazar; gün: tek kolon.
   const weekStart = new Date(date);
   weekStart.setDate(date.getDate() - ((date.getDay() + 6) % 7));
-  const days: Date[] =
+  const dates: Date[] =
     mode === "hafta"
       ? Array.from({ length: 7 }, (_, i) => {
           const d = new Date(weekStart);
@@ -93,148 +82,66 @@ export function AppointmentWeekView({
           return d;
         })
       : [date];
+  const days: WeekGridDay[] = dates.map((d) => ({
+    key: dayKeyOf(d),
+    weekday: d.toLocaleDateString("tr-TR", { weekday: "short" }),
+    dayNum: d.getDate(),
+    isToday: sameDay(d, today),
+    longLabel: d.toLocaleDateString("tr-TR", { day: "numeric", month: "long", weekday: "long" }),
+  }));
 
   const rangeLabel =
     mode === "hafta"
-      ? `${days[0].toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} – ${days[6].toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}`
+      ? `${dates[0]!.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })} – ${dates[6]!.toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}`
       : date.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric", weekday: "long" });
 
-  const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
+  const navBtn =
+    "focus-ring grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11";
 
   return (
-    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 shadow-[var(--shadow-xs)] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display font-bold text-ink-950">{rangeLabel}</h2>
         <div className="flex items-center gap-1">
-          <Link
-            href={prevHref}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
-            aria-label={mode === "hafta" ? "Önceki hafta" : "Önceki gün"}
-          >
+          <Link href={prevHref} className={navBtn} aria-label={mode === "hafta" ? "Önceki hafta" : "Önceki gün"}>
             <ChevronLeft className="h-4 w-4" />
           </Link>
           <Link
             href={todayHref}
-            className="rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas"
+            className="focus-ring inline-flex items-center rounded-[var(--radius-control)] border border-line px-2.5 py-1 text-xs font-semibold text-text-muted transition hover:bg-canvas touch:min-h-11"
           >
             Bugün
           </Link>
-          <Link
-            href={nextHref}
-            className="grid h-8 w-8 place-items-center rounded-[var(--radius-control)] border border-line text-text-muted transition hover:bg-canvas touch:min-h-11 touch:min-w-11"
-            aria-label={mode === "hafta" ? "Sonraki hafta" : "Sonraki gün"}
-          >
+          <Link href={nextHref} className={navBtn} aria-label={mode === "hafta" ? "Sonraki hafta" : "Sonraki gün"}>
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <div className={mode === "hafta" ? "min-w-[760px] md:min-w-0" : ""}>
-          {/* Gün başlıkları */}
-          <div className="grid" style={{ gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
-            {/* Dar ekranda yatay kaydırmada saat kolonu sabit kalsın */}
-            <div className="sticky left-0 z-10 bg-surface" />
-            {days.map((d, i) => {
-              const isToday = sameDay(d, today);
-              return (
-                <div key={i} className="border-b border-line px-2 pb-2 text-center">
-                  <p className={`text-xs font-bold uppercase ${isToday ? "text-brand-600" : "text-text-faint"}`}>
-                    {d.toLocaleDateString("tr-TR", { weekday: "short" })}
-                  </p>
-                  <p className={`font-display text-lg font-extrabold ${isToday ? "text-brand-600" : "text-ink-950"}`}>
-                    {d.getDate()}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
+      {/* Mobil: tek akış ajanda (yatay kaydırma yok). */}
+      <div className="mt-4 sm:hidden">
+        <AgendaList
+          mode={mode}
+          days={days}
+          appointments={appointments}
+          tasks={tasks}
+          dayHref={dayHref}
+          newHref={newHref}
+          nowMs={now()}
+        />
+      </div>
 
-          {/* Saat ızgarası + randevu blokları */}
-          <div className="grid" style={{ gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
-            {/* Saat etiketleri — yatay kaydırmada sabit ilk kolon */}
-            <div className="sticky left-0 z-10 bg-surface" style={{ height: GRID_H }}>
-              {hours.map((h) => (
-                <span
-                  key={h}
-                  className="absolute right-2 -translate-y-1/2 text-xs tabular-nums text-text-faint"
-                  style={{ top: (h - HOUR_START) * HOUR_PX }}
-                >
-                  {String(h).padStart(2, "0")}:00
-                </span>
-              ))}
-            </div>
-
-            {days.map((d, i) => {
-              const dayAppts = appointments
-                .filter((a) => trDayKey(a.scheduled_at) === dayKeyOf(d))
-                .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
-              return (
-                <div key={i} className="relative border-l border-line" style={{ height: GRID_H }}>
-                  {hours.map((h) => (
-                    <div
-                      key={h}
-                      className="absolute inset-x-0 border-t border-line/60"
-                      style={{ top: (h - HOUR_START) * HOUR_PX }}
-                      aria-hidden
-                    />
-                  ))}
-                  {/* Boş saat dilimi → yeni randevu (tarih + saat ön dolgulu). Randevu blokları üstte kalır. Hover olmayan (dokunmatik)
-                      cihazda görünmez tam ızgara hedefi kaldırılır: kaydırırken yanlışlıkla form açılıyordu (B144); "Yeni randevu" düğmesi kalır. */}
-                  {newHref
-                    ? hours.map((h) => {
-                        const hh = String(h).padStart(2, "0");
-                        const sep = newHref.includes("?") ? "&" : "?";
-                        return (
-                          <Link
-                            key={h}
-                            href={`${newHref}${sep}tarih=${dayKeyOf(d)}&saat=${hh}:00`}
-                            aria-label={`${d.toLocaleDateString("tr-TR", { day: "numeric", month: "long" })} saat ${hh}:00 için randevu ekle`}
-                            title={`${hh}:00 için randevu ekle`}
-                            className="focus-ring group absolute inset-x-0 z-0 flex items-center justify-center text-brand-600 opacity-0 transition hover:bg-brand-600/[0.06] hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:hidden"
-                            style={{ top: (h - HOUR_START) * HOUR_PX, height: HOUR_PX }}
-                          >
-                            <Plus className="h-4 w-4" aria-hidden />
-                          </Link>
-                        );
-                      })
-                    : null}
-                  {dayAppts.map((a) => {
-                    const startLabel = formatTrTime(a.scheduled_at);
-                    const { top, height } = blockPos(a.scheduled_at, a.duration_min);
-                    const color = TYPE_COLOR[a.appointment_type] ?? "bg-brand-600";
-                    const cancelled = a.status === "cancelled";
-                    return (
-                      // Çapa: listedeki karta kaydırır (kart id'si `randevu-{id}`)
-                      <a
-                        key={a.id}
-                        href={`#randevu-${a.id}`}
-                        title={`${startLabel} · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}${a.customerName ? ` · ${a.customerName}` : ""}`}
-                        className={`focus-ring absolute inset-x-1 z-[1] overflow-hidden rounded-[var(--radius-control)] ${color} px-1.5 py-1 text-white transition hover:brightness-110 ${cancelled ? "opacity-50" : ""}`}
-                        style={{ top, height }}
-                      >
-                        <p className="truncate text-xs font-bold leading-tight">
-                          {startLabel}
-                          {mode === "gun" ? ` · ${TYPE_LABEL[a.appointment_type] ?? a.appointment_type}` : ""}
-                        </p>
-                        {height >= 32 ? (
-                          <p className="truncate text-xs leading-tight opacity-90">
-                            {a.customerName ?? TYPE_LABEL[a.appointment_type] ?? ""}
-                          </p>
-                        ) : null}
-                        {mode === "gun" && height >= 48 ? (
-                          <p className="truncate text-xs leading-tight opacity-75">
-                            {a.propertyName ?? a.location ?? ""}
-                          </p>
-                        ) : null}
-                      </a>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+      {/* ≥640 px: saat ızgarası (sürükle-bırak). */}
+      <div className="mt-4 hidden sm:block">
+        <WeekGrid
+          mode={mode}
+          days={days}
+          appointments={appointments}
+          tasks={tasks}
+          newHref={newHref}
+          canEdit={canEdit}
+          canEditTasks={canEditTasks}
+        />
       </div>
 
       {/* Lejant */}
@@ -244,6 +151,14 @@ export function AppointmentWeekView({
             <span className={`h-2.5 w-2.5 rounded-full ${TYPE_COLOR[key]}`} /> {label}
           </span>
         ))}
+        {tasks.length > 0 ? (
+          <span className="flex items-center gap-1.5 text-xs text-text-muted">
+            <span className="h-2.5 w-2.5 rounded-sm border border-amber-500/60 bg-amber-400/30" /> Saatli görev
+          </span>
+        ) : null}
+        {canEdit ? (
+          <span className="hidden text-xs text-text-faint sm:inline">Randevuyu sürükleyerek taşıyın; alt kenarından süreyi değiştirin.</span>
+        ) : null}
       </div>
     </section>
   );

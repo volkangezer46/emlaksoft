@@ -162,7 +162,7 @@ export function AppointmentTable({ rows, density, typeOptions, advisors }: { row
           </THead>
           <TBody>
             {rows.map((a) => (
-              // id: takvimdeki gün öğeleri #randevu-{id} çapasıyla buraya kaydırır
+              // id: eski çapa hedefi (takvim artık ?randevu=<id> ile kaydın kendisini açar)
               <TR key={a.id} id={`randevu-${a.id}`} interactive className={`scroll-mt-24 target:bg-brand-600/[0.06]${a.focused ? " bg-brand-600/[0.06]" : ""}`} aria-current={a.focused ? "true" : undefined}>
                 <TD className="w-28">
                   {a.cardHref ? <IntentLink href={a.cardHref} className="absolute inset-0" aria-label={`${a.customerName} randevusu detayı`} /> : null}

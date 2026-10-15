@@ -28,7 +28,7 @@ import { appointmentConfirmUrl, appointmentCustomerText, appointmentWhatsAppHref
 import { getBaseUrl } from "@/lib/base-url";
 import { getDefinitions } from "@/lib/definitions";
 import { AppointmentCalendar } from "./appointment-calendar";
-import { AppointmentWeekView, type WeekViewAppointment } from "./appointment-week-view";
+import { AppointmentWeekView, type WeekViewAppointment, type WeekViewTask } from "./appointment-week-view";
 import { RouteSuggestion, type RouteStop } from "./route-suggestion";
 import { RotaView, type RotaAdvisor, type RotaDurak } from "./rota-view";
 import { buildRoutePlan, type RoutePlanStop, directionsHref as directionsHrefFor } from "@/lib/route-plan";
@@ -152,6 +152,9 @@ export default async function AppointmentsPage({
   const newApptHref = newApptQuery.size ? `/app/randevular/yeni?${newApptQuery.toString()}` : "/app/randevular/yeni";
   if (sp.yeni === "1") redirect(newApptHref);
   const canCreateAppt = (gate.perms.appointments ?? []).includes("create");
+  const canEditAppt = (gate.perms.appointments ?? []).includes("edit");
+  const canViewTasks = (gate.perms.tasks ?? []).includes("view");
+  const canEditTasks = (gate.perms.tasks ?? []).includes("edit");
   const tipF = sp.tip && typeLabel[sp.tip] ? sp.tip : "";
   const durumF = sp.durum && (FILTERABLE_STATUSES as readonly string[]).includes(sp.durum) ? sp.durum : "";
   // GA-14: ?sonuc=olumlu|kararsiz|olumsuz|gelmedi — randevu sonucu süzgeci (ör. "Gelmeyen" KPI'sı).
@@ -335,11 +338,12 @@ export default async function AppointmentsPage({
     { data: advisorRows },
     savedViews,
     { data: officeRow },
+    { data: agendaTaskRows },
   ] = await batchAll("Randevular", [
     "appointments", "appointments-total", "appointment-types", "filter-customer", "filter-property",
     "count-today", "count-pending", "count-confirmed", "count-signature", "count-completed",
     "count-showing", "count-office", "count-valuation", "count-contract", "count-no-show",
-    "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name",
+    "week-bar", "own-profile", "leaves", "advisors", "saved-views", "office-name", "agenda-tasks",
   ], [
     apptP,
     apptTotalP,
@@ -384,6 +388,18 @@ export default async function AppointmentsPage({
     savedViewsPromise,
     // Satırdaki "WhatsApp'ta teyit gönder" taslağında ofis adı (tek satır, RLS kendi ofisi).
     supabase.from("tenants").select("name").eq("id", gate.tenantId).maybeSingle(),
+    // GA-03 tek ajanda: hafta/gün görünümünde penceredeki saatli AÇIK görevler (seçili danışmanın, yoksa kullanıcının).
+    (gorunum === "hafta" || gorunum === "gun") && canViewTasks && !randevuF
+      ? supabase
+          .from("tasks")
+          .select("id, title, due_at, customer:customers!tasks_customer_id_fkey(full_name)")
+          .eq("status", "open")
+          .eq("assigned_to", danismanF || gate.userId)
+          .gte("due_at", toIso(windowStart))
+          .lt("due_at", toIso(windowEnd))
+          .order("due_at", { ascending: true })
+          .limit(200)
+      : Promise.resolve({ data: null as null | { id: string; title: string; due_at: string; customer: Rel }[] }),
   ]);
 
   // Tür başına gerçek toplam (KPI + çipler).
@@ -493,8 +509,15 @@ export default async function AppointmentsPage({
       customerName: c?.full_name ?? null,
       propertyName: p?.title || p?.property_code || null,
       location: r.location,
+      notes: r.notes,
     };
   });
+  const agendaTasks: WeekViewTask[] = ((agendaTaskRows ?? []) as { id: string; title: string; due_at: string; customer: Rel }[]).map((t) => ({
+    id: t.id,
+    title: t.title,
+    due_at: t.due_at,
+    customerName: rel(t.customer)?.full_name ?? null,
+  }));
 
   // Rota önerisi: seçili günde koordinatlı 2+ yer gösterme varsa görünür.
   const routeStops: RouteStop[] = rows
@@ -876,6 +899,10 @@ export default async function AppointmentsPage({
             mode={gorunum}
             date={selectedDate}
             appointments={weekViewRows}
+            tasks={agendaTasks}
+            dayHref={(key) => apptHref({ gorunum: "gun", tarih: key })}
+            canEdit={canEditAppt}
+            canEditTasks={canEditTasks}
             prevHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? -7 : -1)) })}
             nextHref={apptHref({ tarih: fmtTarih(shiftDate(selectedDate, gorunum === "hafta" ? 7 : 1)) })}
             todayHref={apptHref({ tarih: fmtTarih(todayStart) })}
