@@ -1,4 +1,4 @@
-import { batchAll } from "@/lib/supabase/query-batch";
+import { assertQueryBatchSucceeded, batchAll } from "@/lib/supabase/query-batch";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { Button } from "@/components/ui/button";
 import Link from "@/components/ui/smart-link";
@@ -344,6 +344,8 @@ type ReadEmbed = { read_at: string | null }[] | null;
 type Db = Awaited<ReturnType<typeof createClient>>;
 
 const COUNTS_RPC = "my_notification_counts";
+/** Tablo/ilişki henüz yok (migration uygulanmadı): PostgREST ilişki/şema önbelleği ya da Postgres "relation yok". */
+const RELATION_MISSING = new Set(["PGRST200", "PGRST205", "42P01"]);
 
 /**
  * Sayfa verisi: liste (sunucu süzgeci + gerçek sayfalama) + sayaçlar. Okunma kişi başı tablodan gömülür; "okunmamış"
@@ -366,12 +368,15 @@ async function loadNotificationsPage(
       .eq("reads.user_id", userId);
     if (opts.durum) listQuery = listQuery.is("reads", null);
     if (opts.tur) listQuery = listQuery.eq("kind", opts.tur);
-    const [list, countsRes] = await batchAll("Bildirimler", [], [
+    // batchAll DEĞİL: migration yokken (RPC PGRST202 / gömme PGRST200) fırlatmadan eski yola düşülmeli.
+    const [list, countsRes] = await Promise.all([
       listQuery.order("created_at", { ascending: false }).range(range[0], range[1]),
       supabase.rpc(COUNTS_RPC),
     ]);
     recordRpcOutcome(COUNTS_RPC, countsRes.error);
-    if (!isMissingFunctionError(countsRes.error) && !list.error) {
+    const missing = isMissingFunctionError(countsRes.error) || RELATION_MISSING.has(list.error?.code ?? "");
+    if (!missing) {
+      assertQueryBatchSucceeded([list, countsRes], ["liste", "sayaçlar"], "Bildirimler");
       const rows = ((list.data ?? []) as (Omit<NotificationListRow, "read_at"> & { reads: ReadEmbed })[]).map(({ reads, ...n }) => ({
         ...n,
         read_at: reads?.[0]?.read_at ?? null,

@@ -1454,7 +1454,7 @@
  "src/components/app/notification-bell-panel.tsx": {
   "hamRenk": 0,
   "hamPalet": 0,
-  "hamButon": 4,
+  "hamButon": 3,
   "kucukHedef": 0
  },
  "src/components/app/notification-bell.tsx": {

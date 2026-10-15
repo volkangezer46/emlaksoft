@@ -300,9 +300,9 @@ const BELL_STYLE = `
   }
   .es-bell-shake { animation: es-bell-shake 0.55s ease-in-out 1; transform-origin: 50% 0%; }
   @keyframes es-badge-pulse {
-    0% { transform: scale(1); box-shadow: 0 0 0 0 rgb(239 68 68 / 0.55); }
+    0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger-500) 55%, transparent); }
     40% { transform: scale(1.25); }
-    100% { transform: scale(1); box-shadow: 0 0 0 8px rgb(239 68 68 / 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 8px transparent; }
   }
   .es-badge-pulse { animation: es-badge-pulse 0.6s ease-out 1; }
   @media (prefers-reduced-motion: reduce) {
