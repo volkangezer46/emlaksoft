@@ -16,15 +16,13 @@ import { cashCategoryLabel } from "@/lib/finance/cash/categories";
 import { ACCOUNT_KIND_LABEL, isUuid } from "@/lib/finance/cash/input";
 import { isMissingCashSchema, loadAccountsWithBalances, loadRecentEntriesByAccount, type AccountWithBalance, type CashEntry } from "@/lib/finance/cash/load";
 import { formatAccountMoney } from "@/lib/finance/cash/money";
-import { AccountFormButton, ArchiveAccountButton, TransferButton } from "../accounts-panel";
+import { AccountFormButton, ArchiveAccountButton, CommissionCashQueue, ReconcileQueue, StatementUploadButton, TransferButton } from "../_lazy";
 import { AccountSparkline, dailyBalanceSeries, type DayMove } from "../kasa-banka/account-sparkline";
-import { ReconcileQueue, type QueueItem } from "../kasa-banka/reconcile-queue";
-import { CommissionCashQueue } from "../kasa-banka/commission-cash-queue";
+import type { QueueItem } from "../kasa-banka/reconcile-queue";
 import { loadCommissionsMissingCash } from "@/lib/finance/cash/collection-link";
 import { effectiveHasPermission } from "@/lib/permissions-merge";
 import { loadMovesForAccounts } from "../kasa-banka/moves";
 import { loadFinanceRules, StatementReview } from "../statement-review";
-import { StatementUploadButton } from "../statement-upload";
 import { FINANCE_BASE } from "./finance-shell";
 
 const KIND_ICON = { cash: Banknote, bank: Landmark, card: CreditCard } as const;

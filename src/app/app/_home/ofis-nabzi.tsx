@@ -43,7 +43,11 @@ export async function OfisNabzi({ ctx }: { ctx: HomeCtx }) {
     loadStaleDeals(ctx)
       .then((s) =>
         ids(
-          ctx.sample.apply(supabase.from("deals").select("assigned_to")).not("stage", "in", "(won,lost)").lt("updated_at", daysAgoIso(s.days)).limit(ROW_CAP),
+          // Ana ekranın "Riskli anlaşma" sayısıyla AYNI süzgeç (aşamada geçen gün; eski şemada son güncelleme).
+          (s.clause
+            ? ctx.sample.apply(supabase.from("deals").select("assigned_to")).or(s.clause)
+            : ctx.sample.apply(supabase.from("deals").select("assigned_to")).not("stage", "in", "(won,lost)").lt("updated_at", daysAgoIso(s.days))
+          ).limit(ROW_CAP),
           "assigned_to",
         ),
       )

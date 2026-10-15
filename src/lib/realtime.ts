@@ -23,25 +23,22 @@ import type { RealtimePostgresInsertPayload, SupabaseClient } from "@supabase/su
 import { runWhenIdle } from "@/lib/idle";
 import { now } from "@/lib/clock";
 import { REALTIME_ECHO_WINDOW_MS, realtimeBackoffMs, type LocalMutation } from "@/lib/realtime-throttle";
+import { publishRealtimeStatus, type RealtimeStatus } from "@/lib/realtime-status";
+import { ensureRealtimeAuth, type NotificationInsertRow } from "@/lib/realtime-bridge";
+
+export {
+  ensureRealtimeAuth,
+  emitNotificationInsert,
+  NOTIF_INSERT_EVENT,
+  onNotificationInsert,
+  type NotificationInsertRow,
+} from "@/lib/realtime-bridge";
+export { getRealtimeStatus, getRealtimeStatusSince, subscribeRealtimeStatus, type RealtimeStatus } from "@/lib/realtime-status";
 
 /** Realtime istemcisi boşta yüklenir ama açılış penceresi kısa kalsın diye en geç bu kadar ms sonra (idle-contract). */
 export const REALTIME_IDLE_TIMEOUT_MS = 800;
 /** Son tüketici ayrıldıktan sonra kanal bu kadar bekler (rota değişiminde ayrıl-katıl turu olmasın). */
 export const TOPIC_LINGER_MS = 5_000;
-
-/**
- * Kanal katılımı (phx_join) oturum jetonunu taşısın diye abone olmadan ÖNCE çağrılır. supabase-js jetonu oturum
- * okunduktan sonra (INITIAL_SESSION) eşzamansız verir; ondan önce abone olan kanal anon katılır, özel kanal reddedilir
- * (saha ölçümü 2026-10-15: doğrudan açılan /app sayfalarında 150 sn'de 0 olay).
- * Argümansız setAuth istemcinin jeton geri çağrısını (oturum) kullanır; yenilenen jeton da aynı yoldan gider.
- */
-export async function ensureRealtimeAuth(client: { realtime: { setAuth: (token?: string | null) => Promise<void> } }): Promise<void> {
-  try {
-    await client.realtime.setAuth();
-  } catch {
-    // Jeton alınamadı: kanal yine açılır; reddedilirse hub geri çekilmeyle yeniden dener.
-  }
-}
 
 let clientPromise: Promise<SupabaseClient | null> | null = null;
 
@@ -72,7 +69,6 @@ export function loadRealtimeClient(): Promise<SupabaseClient | null> {
 /* Konu hub'ı                                                                  */
 /* -------------------------------------------------------------------------- */
 
-export type RealtimeStatus = "idle" | "connecting" | "live" | "offline";
 
 export type TopicStatusEvent = {
   status: RealtimeStatus;
@@ -368,7 +364,6 @@ function reportRealtimeIssue(kind: string, topic: string, detail?: string): void
 }
 
 let hub: ReturnType<typeof createTopicHub> | null = null;
-let statusSince = 0;
 let lastAggregate: RealtimeStatus = "idle";
 
 function pageHub(): ReturnType<typeof createTopicHub> | null {
@@ -382,13 +377,14 @@ function pageHub(): ReturnType<typeof createTopicHub> | null {
       report: reportRealtimeIssue,
     });
     hub = created;
-    statusSince = now();
-    // Ofis konusu durum değişim anı (ilk dinleyici: diğer dinleyiciler güncel anı okur).
+    lastAggregate = created.statusOf("tenant:");
+    publishRealtimeStatus(lastAggregate, now());
+    // Ofis konusu durumu + değişim anı bağımlılıksız depoya yazılır (DataFreshness oradan okur; realtime-status.ts).
     created.onStatusChange(() => {
       const next = created.statusOf("tenant:");
       if (next === lastAggregate) return;
       lastAggregate = next;
-      statusSince = now();
+      publishRealtimeStatus(next, now());
     });
     // Ağ dönünce realtime-js'in artan bekleme aralığını (1/2/5/10 sn) beklemeden bağlan; sekme görünür olunca da.
     window.addEventListener("online", () => created.reconnectNow());
@@ -424,20 +420,6 @@ export function getActiveTenantId(): string | null {
 export function onActiveTenantChange(cb: () => void): () => void {
   activeTenantListeners.add(cb);
   return () => activeTenantListeners.delete(cb);
-}
-
-/** Ofis konusunun canlı bağlantı durumu ("idle": bu sayfada ofis aboneliği yok, ör. /admin). */
-export function getRealtimeStatus(): RealtimeStatus {
-  return hub?.statusOf("tenant:") ?? "idle";
-}
-
-/** Ofis konusu durumunun en son değiştiği an (bağlanamama süresi; DataFreshness toleransı). */
-export function getRealtimeStatusSince(): number {
-  return statusSince;
-}
-
-export function subscribeRealtimeStatus(cb: () => void): () => void {
-  return pageHub()?.onStatusChange(cb) ?? (() => {});
 }
 
 /* -------------------------------------------------------------------------- */
@@ -529,19 +511,6 @@ export function subscribeToInserts<T extends Record<string, unknown>>(opts: {
 /* Bildirim köprüsü                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** Zile giden bildirim satırı: kişisel bildirimde `inbox:<uid>` yükü, ortak bildirimde RLS'li okuma (sözleşme j). */
-export type NotificationInsertRow = {
-  id: string;
-  tenant_id: string;
-  user_id: string | null;
-  title: string;
-  body: string | null;
-  href: string | null;
-  kind: string;
-  read_at: string | null;
-  created_at: string;
-};
-
 export const NOTIFICATION_ROW_FIELDS = ["id", "tenant_id", "user_id", "title", "body", "href", "kind", "read_at", "created_at"] as const;
 
 /** Broadcast / select yükünü NotificationInsertRow'a doğrular; eksik zorunlu alan varsa null. */
@@ -566,18 +535,4 @@ export function toNotificationRow(value: unknown): NotificationInsertRow | null 
     read_at: str("read_at"),
     created_at: createdAt,
   };
-}
-
-export const NOTIF_INSERT_EVENT = "es:notification-insert";
-
-export function emitNotificationInsert(row: NotificationInsertRow): void {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent<NotificationInsertRow>(NOTIF_INSERT_EVENT, { detail: row }));
-}
-
-export function onNotificationInsert(cb: (row: NotificationInsertRow) => void): () => void {
-  if (typeof window === "undefined") return () => {};
-  const handler = (e: Event) => cb((e as CustomEvent<NotificationInsertRow>).detail);
-  window.addEventListener(NOTIF_INSERT_EVENT, handler);
-  return () => window.removeEventListener(NOTIF_INSERT_EVENT, handler);
 }

@@ -43,7 +43,7 @@ import { OpsImpersonationBanner } from "@/components/app/ops-impersonation-banne
 import { DemoTrialStrip } from "@/components/app/demo-trial-strip";
 import { canSwitchToRealUse } from "@/lib/sample-data/real-use";
 import { SectionTabs } from "@/components/app/section-tabs";
-import { RealtimeRefresh } from "@/components/app/realtime-refresh";
+import { RealtimeRefreshLazy } from "@/components/app/realtime-refresh-lazy";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { listMyNotifications } from "@/app/actions/notifications";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -502,7 +502,7 @@ async function ShellBoot() {
       ) : null}
       {/* Rol bazlı ürün turları: sayfalar arasında gezdiği için layout'ta bir kez bağlanır (kod yalnız gerekince iner). */}
       <ProductTourLazy role={m.platformStaffFullAccess || m.impersonating ? "" : m.effectiveRole} accessible={m.accessibleModules} />
-      <RealtimeRefresh tenantId={m.tenantId} />
+      <RealtimeRefreshLazy tenantId={m.tenantId} />
       {/* PWA: yükleme / anlık bildirim kartı yalnız ana ekranda ve birkaç oturumdan sonra; kart kodu tembel iner. */}
       {m.impersonating ? null : <PwaAssist scope={offlineScopeFingerprint(m.tenantId, m.userId)} />}
       <ClientCacheSync identity={`app:${m.userId ?? "-"}:${m.tenantId ?? "-"}:${m.impersonating ? "imp" : "std"}`} />

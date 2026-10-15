@@ -11,6 +11,7 @@ import {
   type HomeValueFact,
   type PriceRevisionFact,
   type ReferralInviteFact,
+  type MatchPairState,
   type UnshownMatchFact,
 } from "@/lib/insights/rules/revenue";
 import { fetchTenantMatchingWeights, scoreDemandProperty, type MatchDemand, type MatchProperty } from "@/lib/matching";
@@ -152,6 +153,24 @@ export async function loadUnshownMatches(admin: SupabaseClient, tenantId: string
     for (const a of res.data) if (a.customer_id && a.property_id) booked.add(`${a.customer_id}|${a.property_id}`);
   }
 
+  // CRM-G4 çift durumu (gösterildi / uygun değil / gönderildi). Tablo henüz yoksa (migration 20261018020000 uygulanmadı)
+  // ya da okunamazsa boş: kural eski davranışla (yalnız randevu) çalışır.
+  const pairState = new Map<string, MatchPairState>();
+  // Talep başına tek (en iyi) çift: parça başına en çok 200 satır döner.
+  for (let i = 0; i < pairs.length; i += 200) {
+    const part = pairs.slice(i, i + 200);
+    const res = await admin
+      .from("demand_property_matches")
+      .select("demand_id, property_id, state")
+      .eq("tenant_id", tenantId)
+      .in("demand_id", [...new Set(part.map((x) => x.d.id))])
+      .in("property_id", [...new Set(part.map((x) => x.p.id))])
+      .neq("state", "suggested")
+      .limit(1000);
+    if (res.error) break;
+    for (const r of (res.data ?? []) as { demand_id: string; property_id: string; state: MatchPairState }[]) pairState.set(`${r.demand_id}|${r.property_id}`, r.state);
+  }
+
   const out: UnshownMatchFact[] = [];
   for (const { d, p, score } of pairs) {
     const customer = one(d.customer);
@@ -167,6 +186,7 @@ export async function loadUnshownMatches(admin: SupabaseClient, tenantId: string
       score,
       pairAgeDays: Math.max(0, Math.floor((nowMs - born) / DAY)),
       hasAppointment: booked.has(`${d.customer_id}|${p.id}`),
+      matchState: pairState.get(`${d.id}|${p.id}`) ?? null,
     });
   }
   return out;

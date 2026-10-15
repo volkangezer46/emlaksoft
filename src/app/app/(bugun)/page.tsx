@@ -94,12 +94,14 @@ export default async function AppHomePage({
   // Anlık görüntü RPC turu (içgörü/metrik/görev) bloklar çizilmeye başlamadan BAŞLAR; bloklar cache'ten okur.
   preloadDashboardSnapshot(tenantId, userId);
   // Hoş geldin kapısı, kapalı modüller, örnek veri kapsamı ve kullanıcı birbirinden bağımsız: TEK turda.
-  const [showWelcome, closedFeatures, sample, user] = await measure("home-ctx", () =>
+  // Kapsam çerezi de aynı turda okunur (ardışık await yok).
+  const [showWelcome, closedFeatures, sample, user, cookieStore] = await measure("home-ctx", () =>
     Promise.all([
       tenantId ? loadShouldShowWelcome(userId, role) : Promise.resolve(false),
       getInvisibleFeatures(tenantId, userId),
       getRequestSampleScope(tenantId) as Promise<SampleKpiScope>,
       getRequestUser(),
+      cookies(),
     ]),
   );
   // Yeni danışman ilk girişinde kısa "Hoş geldin" akışına yönlenir (bir kez; çerez tercihi).
@@ -112,7 +114,7 @@ export default async function AppHomePage({
   const layout = homeLayoutFor(role);
   // Kapsam: URL (?kapsam=) > son seçim çerezi > "ben"; yalnız yönetim rolleri ofis geneline açabilir (lib/ui/scope).
   // Sahip/genel müdür için varsayılan "Ofis geneli" (seçim çerezi yoksa); diğer roller "Benim işlerim".
-  const scopeCookie = (await cookies()).get(SCOPE_COOKIE)?.value;
+  const scopeCookie = cookieStore.get(SCOPE_COOKIE)?.value;
   const { scope, explicit: kapsamParam } = resolveScope({
     canSwitch: isManagement,
     param: kapsam,

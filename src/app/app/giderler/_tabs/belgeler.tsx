@@ -7,9 +7,8 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import { KpiStrip, type KpiItem } from "@/components/ui/list-kit";
 import type { EffectivePermissions } from "@/lib/permissions-effective";
 import { FaturalarTab, type FaturalarParams } from "../faturalar/faturalar-tab";
-import { UploadDropzone } from "../belgeler/upload-dropzone";
-import { ReceiptInbox, type InboxItem, type InboxLink } from "../belgeler/receipt-inbox";
-import { SubscriptionSuggestions } from "../belgeler/subscription-suggestions";
+import type { InboxItem, InboxLink } from "../belgeler/receipt-inbox";
+import { ReceiptInbox, SubscriptionSuggestions, UploadDropzone } from "../_lazy";
 import { subscriptionSuggestions, type PlatformInvoice, type SubscriptionSuggestion } from "@/lib/finance/received-invoice";
 
 /**

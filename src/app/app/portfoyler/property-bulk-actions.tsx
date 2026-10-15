@@ -6,8 +6,14 @@ import { ChevronDown, Loader2, UserCog } from "lucide-react";
 import { bulkAssignProperties, bulkUpdatePropertyStatus } from "@/app/actions/bulk-property";
 import { BulkBar } from "@/components/ui/list-kit";
 import { Button } from "@/components/ui/button";
-import { PersonSelect } from "@/components/ui/person-select";
+import dynamic from "next/dynamic";
 import type { AssignableAdvisor } from "@/lib/team/assignable-roles";
+
+/** Danışman seçici (Combobox + Radix Popover) yalnız "Sorumlu değiştir" açılınca iner; yüklenirken aynı yükseklikte iskelet. */
+const PropertyBulkAssignPicker = dynamic(() => import("./property-bulk-assign").then((m) => m.PropertyBulkAssignPicker), {
+  ssr: false,
+  loading: () => <div aria-hidden="true" className="skeleton h-11 max-w-sm rounded-[var(--radius-control)]" />,
+});
 
 /**
  * Portföy listesinde toplu seçim + toplu durum güncelleme.
@@ -175,15 +181,7 @@ export function PropertyBulkBar({ advisors = [] }: { advisors?: AssignableAdviso
           <label htmlFor="property-bulk-assign" className="mb-1.5 mt-3 block text-xs font-semibold text-text-muted">
             Danışman
           </label>
-          <PersonSelect
-            id="property-bulk-assign"
-            className="max-w-sm"
-            value={advisor}
-            onValueChange={setAdvisor}
-            people={advisors.map((a) => ({ id: a.id, name: a.full_name }))}
-            featuredIds={advisors.filter((a) => a.featured).map((a) => a.id)}
-            emptyLabel="Danışman seçin"
-          />
+          <PropertyBulkAssignPicker advisors={advisors} value={advisor} onValueChange={setAdvisor} />
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" onClick={() => setAssignOpen(false)}>Vazgeç</Button>
             <Button size="sm" loading={pending} disabled={!advisor} onClick={assign}>Ata</Button>

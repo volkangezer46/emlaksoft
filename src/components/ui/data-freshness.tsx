@@ -4,7 +4,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 import { formatTrTime, now } from "@/lib/clock";
 import { ageText, FRESHNESS_LABEL, freshnessLevel, type FreshnessLevel } from "@/lib/ui/freshness";
-import { getRealtimeStatus, getRealtimeStatusSince, subscribeRealtimeStatus, type RealtimeStatus } from "@/lib/realtime";
+import { getRealtimeStatus, getRealtimeStatusSince, subscribeRealtimeStatus, type RealtimeStatus } from "@/lib/realtime-status";
 
 const TONE: Record<FreshnessLevel, string> = {
   taze: "pm-t-success",

@@ -17,7 +17,7 @@ import {
   parseReadsPayload,
   type BellState as BellStateOf,
 } from "@/lib/notification-text";
-import { ensureRealtimeAuth, onNotificationInsert } from "@/lib/realtime";
+import { ensureRealtimeAuth, onNotificationInsert } from "@/lib/realtime-bridge";
 
 /**
  * Zil — hafif kabuk. Zil DÜĞMESİ, açık/kapalı durumu, okunmamış SAYACI (sunucunun gerçek sayımı:
