@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { requirePermission } from "@/lib/require-permission";
 import { isSafeTenantObjectPath } from "@/lib/file-validation";
 import { THUMB_CACHE_CONTROL, THUMB_QUALITY, THUMB_SIZES, thumbDigest, thumbSizeOf } from "@/lib/property-media-thumb";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 
@@ -96,7 +98,7 @@ async function renderThumb(
       .toBuffer();
     return { bytes: webp.buffer.slice(webp.byteOffset, webp.byteOffset + webp.byteLength) as ArrayBuffer, type: "image/webp" };
   } catch (e) {
-    console.error("property-media thumb", e instanceof Error ? e.message : e);
+    log.error("property_media_thumb_failed", { route: "/api/property-media/[id]/thumb", ...errorFields(e) });
     return null;
   }
 }

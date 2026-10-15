@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/public-request-security";
 import { publicRedirect, publicUrl } from "@/lib/public-redirect";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await admin.rpc("platform_announcement_track_click", { p_delivery: id });
     if (!error && typeof data === "string") href = data;
   } catch (e) {
-    console.error("duyuru tıklama", e instanceof Error ? e.message : e);
+    log.error("duyuru_tik_failed", { route: "/api/duyuru/tik", ...errorFields(e) });
   }
   return NextResponse.redirect(safeTarget(href), 303);
 }

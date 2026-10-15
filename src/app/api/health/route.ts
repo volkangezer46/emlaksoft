@@ -6,6 +6,7 @@ import { CRON_JOBS } from "@/lib/cron-jobs";
 import { evaluateCronHealth } from "@/lib/cron-staleness";
 import { probeSupabaseServices } from "@/lib/health-service-probes";
 import { isDraining } from "@/lib/release-drain";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -117,7 +118,7 @@ export async function GET(request: Request) {
         .from("cron_heartbeats")
         .select("job, last_run_at, last_status");
       if (error) {
-        console.error("health cron check failed", { code: error.code });
+        log.error("health_cron_check_failed", { route: "/api/health", code: error.code });
         return NextResponse.json(
           { ok: false, status: "unavailable", at },
           { status: 503, headers: noStoreHeaders },
@@ -198,7 +199,7 @@ export async function GET(request: Request) {
     } else if (migrationResult.error) {
       migrationStatus = "unavailable";
       migrationReady = expectedVersion ? false : null;
-      console.error("health migration check failed", { code: migrationResult.error.code });
+      log.error("health_migration_check_failed", { route: "/api/health", code: migrationResult.error.code });
     } else if (!expectedVersion) {
       migrationStatus = applied ? "observed" : "unknown";
     } else if (!applied) {
@@ -217,7 +218,7 @@ export async function GET(request: Request) {
     }
 
     if (databaseResult.error) {
-      console.error("health database check failed", { code: databaseResult.error.code });
+      log.error("health_database_check_failed", { route: "/api/health", code: databaseResult.error.code });
     }
 
     // Production readiness is a deployment contract, not merely a database
@@ -261,9 +262,7 @@ export async function GET(request: Request) {
       { status: ready ? 200 : 503, headers: noStoreHeaders },
     );
   } catch (error) {
-    console.error("health check failed", {
-      error: error instanceof Error ? error.name : "unknown",
-    });
+    log.error("health_check_failed", { route: "/api/health", code: error instanceof Error ? error.name : "unknown" });
     const publicPayload = { ok: false };
     return NextResponse.json(
       detailed

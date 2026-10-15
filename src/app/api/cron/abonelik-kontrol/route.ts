@@ -22,6 +22,8 @@ import {
   type LifecycleSummary,
 } from "@/lib/billing/subscription-lifecycle";
 import { runMrrSnapshot, type MrrSnapshotSummary } from "@/lib/billing/mrr-snapshot";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const maxDuration = 120;
 
@@ -57,7 +59,7 @@ async function run(req: NextRequest) {
         : typeof err === "object" && "message" in err
           ? String((err as { message: unknown }).message)
           : String(err);
-    console.error("abonelik-kontrol yazma", step, message);
+    log.error("cron_abonelik_kontrol_write_failed", { route: "/api/cron/abonelik-kontrol", step, message });
     failures.push(`${step}: ${message}`.slice(0, 120));
   };
 
@@ -162,7 +164,7 @@ async function run(req: NextRequest) {
           `${getBaseUrl()}${BILLING_HREF}`,
         );
       } catch (e) {
-        console.error("abonelik-kontrol trial email", e instanceof Error ? e.message : "hata");
+        log.error("cron_abonelik_kontrol_trial_email_failed", { route: "/api/cron/abonelik-kontrol", ...errorFields(e) });
       }
     }
   }
@@ -222,7 +224,7 @@ async function run(req: NextRequest) {
     if (overBudget()) deferred.push("abonelik yaşam döngüsü (süre)");
     else lifecycle = await runSubscriptionLifecycle(admin);
   } catch (e) {
-    console.error("abonelik-kontrol lifecycle", e instanceof Error ? e.message : "hata");
+    log.error("cron_abonelik_kontrol_lifecycle_failed", { route: "/api/cron/abonelik-kontrol", ...errorFields(e) });
   }
 
   // Dönem sonunda iptal talepleri (K5): dönem bitince abonelik ve ofis "cancelled" olur.
@@ -278,7 +280,7 @@ async function run(req: NextRequest) {
     if (overBudget()) deferred.push("yetki belgesi (süre)");
     else license = await runLicenseReminders(admin, trDayKey(nowMs));
   } catch (e) {
-    console.error("abonelik-kontrol license", e instanceof Error ? e.message : "hata");
+    log.error("cron_abonelik_kontrol_license_failed", { route: "/api/cron/abonelik-kontrol", ...errorFields(e) });
   }
 
   // Teklif geçerlilik bitimine 2 gün kala hatırlatma (teklifi açana; tek seferlik). Hata asıl işi bozmaz.
@@ -287,7 +289,7 @@ async function run(req: NextRequest) {
     if (overBudget()) deferred.push("teklif bitimi (süre)");
     else offerExpiry = await runOfferExpiryReminders(admin, trDayKey(nowMs));
   } catch (e) {
-    console.error("abonelik-kontrol offer-expiry", e instanceof Error ? e.message : "hata");
+    log.error("cron_abonelik_kontrol_offer_expiry_failed", { route: "/api/cron/abonelik-kontrol", ...errorFields(e) });
   }
 
   // Portföy yetkisi bitiş hatırlatması (30/7/0 gün; varsayılan açık bildirim, tercih "authority"). Hata asıl işi bozmaz.
@@ -296,7 +298,7 @@ async function run(req: NextRequest) {
     if (overBudget()) deferred.push("portföy yetkisi (süre)");
     else authority = await runPropertyAuthorityReminders(admin, trDayKey(nowMs));
   } catch (e) {
-    console.error("abonelik-kontrol authority", e instanceof Error ? e.message : "hata");
+    log.error("cron_abonelik_kontrol_authority_failed", { route: "/api/cron/abonelik-kontrol", ...errorFields(e) });
   }
 
   // SON ADIM: platform MRR günlük anlık görüntüsü (tüm durum değişikliklerinden SONRA; günde ofis başına tek satır,

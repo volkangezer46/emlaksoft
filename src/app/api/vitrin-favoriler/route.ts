@@ -16,6 +16,7 @@ import {
   readRequestBodyLimited,
   requestBodyTooLarge,
 } from "@/lib/public-request-security";
+import { log } from "@/lib/log";
 
 /**
  * Vitrin favorileri çözümleme ucu (public, oturumsuz).
@@ -66,7 +67,7 @@ function databaseUnavailable(operation: DatabaseOperation, error?: unknown) {
       : "unknown";
   const code = /^[a-z0-9_]{1,32}$/i.test(rawCode) ? rawCode : "unknown";
   // Never log provider messages, query values, tenant slugs, IPs or property IDs.
-  console.error("vitrin favorites database unavailable", { operation, code });
+  log.error("vitrin_favorites_db_unavailable", { route: "/api/vitrin-favoriler", operation, code });
   return NextResponse.json(
     { error: "Hizmet geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin." },
     { status: 503 },

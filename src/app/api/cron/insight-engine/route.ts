@@ -3,6 +3,8 @@ import { runBillingReconciliation } from "@/lib/billing/reconciliation";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 /** Tenant döngülü toplu iş: zaman bütçesi (240 sn) bu sınırın altındadır. */
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest) {
       if (p && !p.tableMissing) parts.push(`${p.inserted} platform içgörüsü`);
       if (p && p.rulesUnavailable.length > 0) parts.push(`etkin olmayan platform kuralı: ${p.rulesUnavailable.join(",")}`);
     } catch (e) {
-      console.error("insight-engine platform", e instanceof Error ? e.message : "hata");
+      log.error("cron_insight_engine_platform_failed", { route: "/api/cron/insight-engine", ...errorFields(e) });
       parts.push("platform içgörüleri hata verdi");
     }
 

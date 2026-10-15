@@ -14,6 +14,8 @@ import { sseResponse, streamOpenAIChat } from "@/lib/ai/streaming";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { externalErrorMetadata } from "@/lib/external-fetch";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 // ---------------------------------------------------------------------------
 // Platform (admin) yapay zeka iş danışmanı — akan (streaming) sohbet ucu.
@@ -79,7 +81,7 @@ async function persistTurn(
 
     return sid ?? "";
   } catch (e) {
-    console.error("admin-chat:db", e);
+    log.error("admin_chat_db_failed", { route: "/api/ai/admin-chat", ...errorFields(e) });
     return sessionId ?? "";
   }
 }
@@ -148,7 +150,7 @@ export async function POST(req: Request) {
       } catch (e) {
         // İstemci iptal ettiyse elde kalan kısmı kaydet; başka hata varsa yedeğe düş
         if ((e as Error)?.name !== "AbortError") {
-          console.error("admin-chat:openai", externalErrorMetadata(e));
+          log.error("admin_chat_openai_failed", { route: "/api/ai/admin-chat", ...externalErrorMetadata(e) });
         }
       }
     }

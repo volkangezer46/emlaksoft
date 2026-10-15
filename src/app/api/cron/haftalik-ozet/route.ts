@@ -11,6 +11,8 @@ import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf,
 import { runOwnerWeeklyReports } from "@/lib/owner-report/run";
 import { DAY_MS, now, trDayKey, trDayStartMs, trParts } from "@/lib/clock";
 import { getBaseUrl } from "@/lib/base-url";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /**
  * Haftalık yönetici özeti — her aktif tenant için GEÇEN haftanın (Pzt–Paz)
@@ -231,7 +233,7 @@ async function run(req: NextRequest) {
     controlReports = lc.sent;
     failed += lc.failed;
   } catch (e) {
-    console.error("haftalik-ozet ilan kontrol raporu", e);
+    log.error("cron_haftalik_ozet_ilan_kontrol_failed", { route: "/api/cron/haftalik-ozet", ...errorFields(e) });
   }
 
   // Malik haftalık pazarlama raporu (ofis ayarı açık ofisler; varsayılan KAPALI). En iyi çaba; özet işini bozmaz.
@@ -241,7 +243,7 @@ async function run(req: NextRequest) {
       const r = await runOwnerWeeklyReports(admin, { todayKey: trDayKey(Date.now()), nowIso: new Date().toISOString(), baseUrl: getBaseUrl() });
       ownerReports = r.notified;
     } catch (e) {
-      console.error("haftalik-ozet malik raporu", e instanceof Error ? e.message : "hata");
+      log.error("cron_haftalik_ozet_malik_raporu_failed", { route: "/api/cron/haftalik-ozet", ...errorFields(e) });
     }
   }
 

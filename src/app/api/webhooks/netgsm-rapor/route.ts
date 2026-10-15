@@ -7,6 +7,7 @@ import {
   readRequestBodyLimited,
   requestBodyTooLarge,
 } from "@/lib/public-request-security";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
   }
   if (sets === null) return json({ ok: false, error: "payload_too_large" }, 413);
   if (sets === "too_many") {
-    console.warn("[netgsm-rapor] too many reports in one body", { max: MAX_NETGSM_REPORTS });
+    log.warn("netgsm_rapor_too_many_reports", { route: "/api/webhooks/netgsm-rapor", max: MAX_NETGSM_REPORTS });
     return json({ ok: false, error: "too_many_reports", max: MAX_NETGSM_REPORTS }, 413);
   }
 
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
   }
   if (failed > 0) {
-    console.error("[netgsm-rapor] processing failed", { failed, applied });
+    log.error("netgsm_rapor_processing_failed", { route: "/api/webhooks/netgsm-rapor", failed, applied });
     return json({ ok: false, error: "processing_failed" }, 503);
   }
   return json({ ok: true, applied, ignored });

@@ -31,6 +31,8 @@ import { getDisabledModulesByTenant, isDisabledFor } from "@/lib/modules/state";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { heartbeatFor } from "@/lib/cron-heartbeat-status";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const maxDuration = 300;
 
@@ -76,7 +78,7 @@ async function run(req: NextRequest) {
     const ready = await admin.rpc("ef_credit_ready");
     // Yalnız "fonksiyon/şema yok" (PGRST202 / 42883 / PGRST205) atlandı sayılır; zaman aşımı vb. gerçek hata kırmızıdır.
     if (ready.error && !EF_MISSING_SCHEMA_CODES.has(String(ready.error.code ?? ""))) {
-      console.error("cron ef-kontor-hak hazirlik", ready.error.code ?? "unknown");
+      log.error("cron_ef_kontor_hak_hazirlik_failed", { route: "/api/cron/ef-kontor-hak", code: ready.error.code ?? "unknown" });
       await recordHeartbeat("ef-kontor-hak", "error", `hazırlık sorgusu başarısız (${ready.error.code ?? "bilinmeyen"})`);
       return NextResponse.json({ error: "wallet_ready_failed" }, { status: 500 });
     }
@@ -254,7 +256,7 @@ async function run(req: NextRequest) {
       burnFailed,
     });
   } catch (err) {
-    console.error("cron ef-kontor-hak", err);
+    log.error("cron_ef_kontor_hak_failed", { route: "/api/cron/ef-kontor-hak", ...errorFields(err) });
     await recordHeartbeat("ef-kontor-hak", "error", "hak verme başarısız");
     return NextResponse.json({ error: "grant_failed" }, { status: 500 });
   }

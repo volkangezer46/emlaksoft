@@ -5,6 +5,8 @@ import { getDisabledModulesByTenant, skippedTenantsNote, tenantsDisabledFor } fr
 import { processVitrinPriceAlerts } from "@/lib/vitrin-alert-notify";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -35,7 +37,7 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, ...result });
   } catch (e) {
-    console.error("cron vitrin-alarm", e);
+    log.error("cron_vitrin_alarm_failed", { route: "/api/cron/vitrin-alarm", ...errorFields(e) });
     await recordHeartbeat("vitrin-alarm", "error", e instanceof Error ? e.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false }, { status: 500 });
   }

@@ -11,6 +11,8 @@ import { runLicenseSetupTasks } from "@/lib/eids/license-setup";
 import { deliverDueReportSubscriptions } from "@/lib/report-center/delivery-run";
 import { cronDeadline, fetchAllPaged, heartbeatFor, isPastDeadline, remainingOf, guardCron } from "@/lib/cron-run";
 import { now, trDayStartIso } from "@/lib/clock";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 
 /** Günlük ofis özeti — tercihi açık kullanıcılara */
@@ -129,7 +131,7 @@ async function run(req: NextRequest) {
     controlReports = lc.sent;
     failed += lc.failed;
   } catch (e) {
-    console.error("gunluk-ozet ilan kontrol raporu", e);
+    log.error("cron_gunluk_ozet_ilan_kontrol_failed", { route: "/api/cron/gunluk-ozet", ...errorFields(e) });
   }
 
   // Lig 2.0: biten meydan okumaları mühürle + yeni rozetleri ofise duyur (en iyi çaba; özet işini bozmaz).
@@ -146,7 +148,7 @@ async function run(req: NextRequest) {
       failed += r.failed;
     }
   } catch (e) {
-    console.error("gunluk-ozet lig", e);
+    log.error("cron_gunluk_ozet_lig_failed", { route: "/api/cron/gunluk-ozet", ...errorFields(e) });
   }
 
   // EİDS (EP5): yetki belgesi no boş ofislerde sahibine tek seferlik kurulum görevi; numara girilmişse açık görev kapanır (ayrık adım).
@@ -158,7 +160,7 @@ async function run(req: NextRequest) {
     licenseTasksClosed = r.closed;
     failed += r.failed;
   } catch (e) {
-    console.error("gunluk-ozet yetki belgesi görevi", e);
+    log.error("cron_gunluk_ozet_yetki_belgesi_failed", { route: "/api/cron/gunluk-ozet", ...errorFields(e) });
     failed += 1;
   }
 
@@ -180,7 +182,7 @@ async function run(req: NextRequest) {
     // Yalnız gerçek gönderim/üretim hatası; yetkisiz/onaylı/adressiz alıcı atlaması hata sayılmaz.
     failed += r.failed;
   } catch (e) {
-    console.error("gunluk-ozet rapor abonelikleri", e);
+    log.error("cron_gunluk_ozet_report_subscriptions_failed", { route: "/api/cron/gunluk-ozet", ...errorFields(e) });
     failed += 1;
   }
 

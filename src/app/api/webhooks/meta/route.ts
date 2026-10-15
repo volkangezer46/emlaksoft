@@ -13,6 +13,7 @@ import {
   ingestMetaDeliveryStatus,
   ingestMetaInboundMessage,
 } from "@/lib/webhooks/meta-inbound";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -79,13 +80,13 @@ export async function POST(req: NextRequest) {
 
   // Meta signs the exact network bytes, not a decoded or re-serialized string.
   if (!verifyMetaSignature(appSecret, bodyBytes, req.headers.get("x-hub-signature-256"))) {
-    console.warn("[meta-webhook] rejected", { reason: "bad_signature" });
+    log.warn("meta_webhook_rejected", { route: "/api/webhooks/meta", reason: "bad_signature" });
     return json({ ok: false, error: "bad_signature" }, 401);
   }
 
   const parsed = parseMetaWebhookBytes(bodyBytes);
   if (!parsed.ok) {
-    console.warn("[meta-webhook] rejected", { reason: parsed.reason });
+    log.warn("meta_webhook_rejected", { route: "/api/webhooks/meta", reason: parsed.reason });
     return json({ ok: false, error: "invalid_payload" }, 400);
   }
 
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       else if (!result.duplicate) ingested += 1;
     } catch {
       failed += 1;
-      console.error("[meta-webhook] item processing failed", { reason: "unhandled_error" });
+      log.error("meta_webhook_item_failed", { route: "/api/webhooks/meta", reason: "unhandled_error" });
     }
   }
   for (const status of parsed.statuses) {
@@ -119,19 +120,11 @@ export async function POST(req: NextRequest) {
       else if (!result.duplicate) deliveryStatuses += 1;
     } catch {
       failed += 1;
-      console.error("[meta-webhook] status processing failed", { reason: "unhandled_error" });
+      log.error("meta_webhook_status_failed", { route: "/api/webhooks/meta", reason: "unhandled_error" });
     }
   }
 
-  console.info("[meta-webhook] batch complete", {
-    ingested,
-    quarantined,
-    deliveryStatuses,
-    unmatchedStatuses,
-    ignoredChanges: parsed.ignoredChanges,
-    ignoredStatuses: parsed.ignoredStatuses,
-    failed,
-  });
+  log.info("meta_webhook_batch_complete", { route: "/api/webhooks/meta", ingested, quarantined, deliveryStatuses, unmatchedStatuses, ignoredChanges: parsed.ignoredChanges, ignoredStatuses: parsed.ignoredStatuses, failed });
 
   // A 2xx response would stop provider retries for every failed item in the
   // batch. Successful items are safe on retry because each message is claimed.

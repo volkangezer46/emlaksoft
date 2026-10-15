@@ -20,6 +20,8 @@ import {
   readRequestBodyLimited,
   requestBodyTooLarge,
 } from "@/lib/public-request-security";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 type WebhookBody = {
   iyziEventType?: string;
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
   );
 
   if (!valid) {
-    console.warn("iyzico webhook signature reddedildi");
+    log.warn("iyzico_webhook_signature_rejected", { route: "/api/iyzico/webhook" });
     return NextResponse.json({ ok: false, error: "bad_signature" }, { status: 401 });
   }
 
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
   try {
     providerResult = await retrieveCheckoutForm(String(body.token));
   } catch (error) {
-    console.error("iyzico webhook provider verification", error);
+    log.error("iyzico_webhook_provider_verification_failed", { route: "/api/iyzico/webhook", ...errorFields(error) });
     return NextResponse.json({ ok: false, error: "provider_lookup" }, { status: 502 });
   }
 
@@ -162,7 +164,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (invoiceError) {
-    console.error("iyzico webhook invoice lookup", invoiceError);
+    log.error("iyzico_webhook_invoice_lookup_failed", { route: "/api/iyzico/webhook", ...errorFields(invoiceError) });
     return NextResponse.json({ ok: false, error: "invoice_lookup" }, { status: 500 });
   }
 

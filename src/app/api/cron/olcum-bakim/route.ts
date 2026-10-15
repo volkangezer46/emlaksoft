@@ -4,6 +4,8 @@ import { beginCronRun } from "@/lib/cron-pause";
 import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { heartbeatFor } from "@/lib/cron-heartbeat-status";
 import { runMeasureMaintenance } from "@/lib/measure/maintenance";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
     await recordHeartbeat("olcum-bakim", heartbeatFor({ failed: r.failed }), r.detail);
     return NextResponse.json({ ok: r.failed === 0, ...r });
   } catch (error) {
-    console.error("cron olcum-bakim", error);
+    log.error("cron_olcum_bakim_failed", { route: "/api/cron/olcum-bakim", ...errorFields(error) });
     await recordHeartbeat("olcum-bakim", "error", error instanceof Error ? error.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false, error: "olcum_bakim_failed" }, { status: 500 });
   }

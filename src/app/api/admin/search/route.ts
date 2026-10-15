@@ -8,6 +8,8 @@ import { searchSettings } from "@/lib/settings/view";
 import { SETTING_CATEGORIES } from "@/lib/settings/types";
 import { INVOICE_STATUS_LABELS } from "@/lib/accounting/ledger";
 import { memberSubtitle, tenantSubtitle, ticketNoQuery, ticketSubtitle } from "@/lib/admin/search-format";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export type SearchHit = {
   id: string;
@@ -27,7 +29,7 @@ const tryFmt = (n: number) => new Intl.NumberFormat("tr-TR", { style: "currency"
  */
 function logSearchError(kind: string, error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false;
-  console.error("admin search", kind, error.code ?? "unknown", error.message ?? "");
+  log.error("admin_search_failed", { route: "/api/admin/search", kind, code: error.code ?? "unknown", message: error.message ?? "" });
   return true;
 }
 
@@ -179,7 +181,7 @@ export async function GET(req: NextRequest) {
           hits.push(...found);
         })
         .catch((e) => {
-          console.error("admin search invoices", e instanceof Error ? e.message : e);
+          log.error("admin_search_invoices_failed", { route: "/api/admin/search", ...errorFields(e) });
         }),
     );
   }

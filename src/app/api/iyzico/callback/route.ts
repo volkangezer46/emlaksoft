@@ -14,6 +14,8 @@ import { expectedProviderAmountTry } from "@/lib/try-credits/checkout";
 import { tryInvoiceHold } from "@/lib/try-credits/wallet";
 import { getBaseUrl } from "@/lib/base-url";
 import { saveCardAfterVerifiedPayment } from "@/lib/billing/card-store";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 function appUrl() {
   return getBaseUrl();
@@ -126,7 +128,7 @@ async function handle(token: string | null) {
       `${appUrl()}/app/abonelik?paid=1&plan=${meta.plan ?? "office"}`,
     );
   } catch (e) {
-    console.error("iyzico callback", e);
+    log.error("iyzico_callback_failed", { route: "/api/iyzico/callback", ...errorFields(e) });
     if (resolvedConversationId.startsWith("plink-")) {
       const linkToken = resolvedConversationId.slice("plink-".length);
       return NextResponse.redirect(`${appUrl()}/odeme-link/${linkToken}?error=callback`);

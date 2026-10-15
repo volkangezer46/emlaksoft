@@ -10,6 +10,7 @@ import {
   verifyDocumentFile,
   type DetectedDocument,
 } from "@/lib/file-validation";
+import { log } from "@/lib/log";
 
 /**
  * Gider fişi indirme/önizleme (20261007000700). Desen: `src/app/api/customer-files/[id]/download/route.ts`.
@@ -44,7 +45,7 @@ export async function GET(
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
   if (fileError) {
-    console.error("expense receipt lookup failed", { code: fileError.code });
+    log.error("expense_receipt_lookup_failed", { route: "/api/expense-receipts/[id]/download", code: fileError.code });
     return notFoundResponse();
   }
   if (!file || !isSafeTenantObjectPath(file.storage_path, gate.tenantId, file.expense_id)) {
@@ -54,7 +55,7 @@ export async function GET(
   const admin = createAdminClient();
   const { data: blob, error } = await admin.storage.from("expense-receipts").download(file.storage_path);
   if (error || !blob) {
-    console.error("expense receipt download failed", { statusCode: error?.statusCode });
+    log.error("expense_receipt_download_failed", { route: "/api/expense-receipts/[id]/download", code: error?.statusCode ?? null });
     return notFoundResponse();
   }
 

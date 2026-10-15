@@ -10,6 +10,7 @@ import { trDayKey } from "@/lib/clock";
 import { safeObjectName, type ReceiptSuggestion } from "@/lib/finance/ocr/parse-receipt";
 import { isReceiptOcrEnabled, readReceipt } from "@/lib/finance/ocr/receipt-ocr";
 import { financeAttachmentErrorMessage } from "@/lib/finance/attachment-errors";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -84,7 +85,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const up = await supabase.storage.from(BUCKET).upload(path, bytes, { contentType: type, upsert: false, cacheControl: "0" });
   if (up.error) {
-    console.error("finans belge upload", { status: (up.error as { statusCode?: string }).statusCode ?? null });
+    log.error("finans_belge_upload_failed", { route: "/api/app/finans/belge", code: (up.error as { statusCode?: string }).statusCode ?? null });
     return fail("Dosya kaydedilemedi. Belgeler henüz etkin olmayabilir; biraz sonra yeniden deneyin.", 500);
   }
 
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
   });
   if (error || typeof data !== "string") {
     await supabase.storage.from(BUCKET).remove([path]).catch(() => undefined);
-    if (error) console.error("finans belge register", { code: error.code ?? null });
+    if (error) log.error("finans_belge_register_failed", { route: "/api/app/finans/belge", code: error.code ?? null });
     const forbidden = error?.code === "42501" || (error?.message ?? "").includes("FN:forbidden");
     return fail(error ? financeAttachmentErrorMessage(error, "Belge kaydı") : "Belge kaydedilemedi. Sayfayı yenileyip yeniden deneyin.", forbidden ? 403 : 500);
   }

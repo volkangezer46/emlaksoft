@@ -11,6 +11,8 @@ import { leakSeverity } from "@/lib/listing-control/sla-plan";
 import { loadListingControlConfig } from "@/lib/listing-control/server/db";
 import { runSlaEscalation } from "@/lib/listing-control/server/escalate";
 import type { ListingControlConfig } from "@/lib/listing-control/config";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu işlem: varsayılan süre yetmeyebilir (zaman bütçesi 240 sn). */
 export const maxDuration = 300;
@@ -94,7 +96,7 @@ async function run(req: NextRequest) {
     escalationTasks = esc.tasksCreated;
   } catch (e) {
     escalationFailed = true;
-    console.error("leak-sla anomali gecikme yükseltme", e);
+    log.error("cron_leak_sla_anomaly_escalation_failed", { route: "/api/cron/leak-sla", ...errorFields(e) });
   }
 
   const { data: closures, error } = await admin
@@ -110,7 +112,7 @@ async function run(req: NextRequest) {
     .limit(500);
 
   if (error) {
-    console.error("leak-sla cron", error);
+    log.error("cron_leak_sla_failed", { route: "/api/cron/leak-sla", ...errorFields(error) });
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
   }
 
@@ -176,7 +178,7 @@ async function run(req: NextRequest) {
       .update({ sla_warning_sent_at: new Date().toISOString(), leak_severity: severity })
       .eq("id", c.id);
     if (markError) {
-      console.error("leak-sla işaretleme", markError.message);
+      log.error("cron_leak_sla_mark_failed", { route: "/api/cron/leak-sla", ...errorFields(markError) });
       failed += 1;
       continue;
     }

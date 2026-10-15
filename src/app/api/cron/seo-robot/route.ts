@@ -4,6 +4,8 @@ import { executeSeoRobot } from "@/lib/seo/robot";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { runNightlyKokpitNow, type NightlyOutcome } from "@/lib/site-issues/nightly";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 export const dynamic = "force-dynamic";
 /** Robot + Kokpit gece adımı (toplayıcılar, Otopilot, budama). Sunucu cron çağrısı 300 sn bekler. */
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ ok: true, summary: s, indexNow, notified, kokpit });
   } catch (error) {
-    console.error("cron seo-robot", error);
+    log.error("cron_seo_robot_failed", { route: "/api/cron/seo-robot", ...errorFields(error) });
     await recordHeartbeat("seo-robot", "error", error instanceof Error ? error.message : "bilinmeyen hata");
     return NextResponse.json({ ok: false, error: "seo_robot_failed" }, { status: 500 });
   }

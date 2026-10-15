@@ -6,6 +6,8 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { syncEvds } from "@/lib/evds";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu/uzun işlem: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -92,7 +94,7 @@ async function run(req: NextRequest) {
   try {
     evdsNote = ` · ${(await syncEvds(admin)).detail}`;
   } catch (e) {
-    console.error("tcmb-kur evds", e);
+    log.error("cron_tcmb_kur_evds_failed", { route: "/api/cron/tcmb-kur", ...errorFields(e) });
     evdsNote = " · EVDS: hata";
   }
 

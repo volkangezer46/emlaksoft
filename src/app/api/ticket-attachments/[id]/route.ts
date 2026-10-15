@@ -5,6 +5,7 @@ import {
   isSafeTicketAttachmentPath,
   TICKET_ATTACHMENT_BUCKET,
 } from "@/lib/ticket-attachments";
+import { log } from "@/lib/log";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function GET(
     .from(TICKET_ATTACHMENT_BUCKET)
     .download(attachment.storage_path);
   if (error || !blob) {
-    console.error("ticket attachment download failed", { statusCode: error?.statusCode });
+    log.error("ticket_attachment_download_failed", { route: "/api/ticket-attachments/[id]", code: error?.statusCode ?? null });
     return notFoundResponse();
   }
 

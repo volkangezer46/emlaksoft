@@ -4,6 +4,7 @@ import { recordHeartbeat } from "@/lib/cron-heartbeat";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
 import { runAnnouncementQueue } from "@/lib/platform-announcements/run";
+import { log } from "@/lib/log";
 
 export const maxDuration = 60;
 
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     const detail = error instanceof Error ? error.message : "campaign_delivery_failed";
-    console.error("campaign-delivery cron", detail);
+    log.error("cron_campaign_delivery_failed", { route: "/api/cron/campaign-delivery", message: detail });
     await recordHeartbeat("campaign-delivery", "error", detail);
     return NextResponse.json(
       { ok: false, error: "campaign_delivery_failed" },

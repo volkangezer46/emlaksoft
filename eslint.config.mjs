@@ -40,6 +40,17 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-require-imports": "off",
     },
   },
+  {
+    // API rotaları ham console.* yazmaz: Docker loglarına müşteri telefonu/e-postası
+    // sızmasın diye her kayıt PII maskeli `log.*` (`src/lib/log.ts`) ile, hata nesnesi
+    // yerine `errorFields(e)` (`src/lib/log-error.ts`) ile yazılır. Testler hariç.
+    // Sözleşme: `src/lib/api-structured-log-contract.test.ts`.
+    files: ["src/app/api/**/*.ts", "src/app/api/**/*.tsx"],
+    ignores: ["src/app/api/**/*.test.ts", "src/app/api/**/*.test.tsx"],
+    rules: {
+      "no-console": "error",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

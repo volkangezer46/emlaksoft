@@ -4,6 +4,7 @@ import { runGeoProvinceSyncWorker } from "@/lib/geo-province-sync";
 import { notifyPlatformStaff } from "@/lib/platform-notify";
 import { authorizeCron } from "@/lib/cron-auth";
 import { beginCronRun } from "@/lib/cron-pause";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -47,9 +48,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     const detail = error instanceof Error ? error.message : "unknown";
-    console.error("geo province sync cron", {
-      error: error instanceof Error ? error.name : "unknown",
-    });
+    log.error("cron_geo_province_sync_failed", { route: "/api/cron/geo-province-sync", code: error instanceof Error ? error.name : "unknown" });
     await recordHeartbeat("geo-province-sync", "error", detail);
     return NextResponse.json(
       { ok: false, error: "geo_province_sync_failed" },

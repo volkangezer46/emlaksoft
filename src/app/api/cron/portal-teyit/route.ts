@@ -14,6 +14,8 @@ import { beginCronRun } from "@/lib/cron-pause";
 import { runControlStepBroad } from "@/lib/listing-control/server/cron-steps";
 import { portalDisplayName } from "@/lib/portals/catalog";
 import { WEEK_MS, isNonMemberListing, outOfMembershipText, planPortalTeyit, weeklySummaryText, type NonePortals, type TeyitListing } from "@/lib/portals/teyit-plan";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /** Toplu işlem + fiyat sağlığı adımı: varsayılan süre yetmeyebilir. */
 export const maxDuration = 300;
@@ -99,7 +101,7 @@ async function refreshPriceHealth(admin: ReturnType<typeof createAdminClient>): 
         .eq("tenant_id", tenantId);
       if (!error) updated += 1;
     } catch (e) {
-      console.error("refreshPriceHealth", row.id, e);
+      log.error("portal_teyit_price_health_failed", { route: "/api/cron/portal-teyit", propertyId: row.id, ...errorFields(e) });
     }
   }
   return updated;
@@ -316,7 +318,7 @@ async function run(req: NextRequest) {
   try {
     priceHealthUpdated = await refreshPriceHealth(admin);
   } catch (e) {
-    console.error("portal-teyit refreshPriceHealth", e);
+    log.error("portal_teyit_price_health_refresh_failed", { route: "/api/cron/portal-teyit", ...errorFields(e) });
   }
 
   // Ek adım: kontrol işi planlama + lease hasadı (yeni cron yok; en iyi çaba, teyidi bozmaz).

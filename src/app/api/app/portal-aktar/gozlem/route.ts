@@ -19,6 +19,7 @@ import {
   sanitizeFeedbackPayload,
   type FeedbackPayload,
 } from "@/lib/portal-transfer/feedback-format";
+import { log } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
   const db = await createClient();
   const { data, error } = await db.rpc("pt_report_form_feedback", { p_session_id: second.payload.sessionId, p_payload: second.payload });
   if (error) {
-    console.error("pt_report_form_feedback", { code: error.code });
+    log.error("portal_aktar_form_feedback_failed", { route: "/api/app/portal-aktar/gozlem", code: error.code });
     return NextResponse.json({ ok: false, error: isMissingSchema(error) ? "schema_pending" : "rpc_error" }, { status: 502, headers: NO_STORE });
   }
   const r = (data ?? {}) as { outcome?: string; accepted?: number; dropped?: number; limited?: number };

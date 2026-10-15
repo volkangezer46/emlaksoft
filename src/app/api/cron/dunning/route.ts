@@ -21,6 +21,8 @@ import {
   stageOf,
   type DunningMessageVars,
 } from "@/lib/billing/dunning-policy";
+import { log } from "@/lib/log";
+import { errorFields } from "@/lib/log-error";
 
 /**
  * DUNNING: gecikmiş ödemeler için kademeli tahsilat akışı. Politika ADMINDEN gelir (`dunning.*` ayarları,
@@ -103,8 +105,8 @@ async function run(req: NextRequest) {
       .limit(LIST_LIMIT),
   ]);
   // Sorgu hatası "bildirilecek kimse yok" değildir: sayaca girer, heartbeat error olur.
-  if (invErr) { console.error("dunning invoices", invErr.message); failed += 1; }
-  if (subErr) { console.error("dunning subs", subErr.message); failed += 1; }
+  if (invErr) { log.error("cron_dunning_invoices_failed", { route: "/api/cron/dunning", ...errorFields(invErr) }); failed += 1; }
+  if (subErr) { log.error("cron_dunning_subscriptions_failed", { route: "/api/cron/dunning", ...errorFields(subErr) }); failed += 1; }
 
   const invoices = overdueInvoices ?? [];
   const subs = pastDueSubs ?? [];
@@ -171,7 +173,7 @@ async function run(req: NextRequest) {
           });
           inAppEvents.push({ tenant_id: tenantId, invoice_id: inv.id, stage: "candidate", channel: "staff", result: "sent" });
         } catch (e) {
-          console.error("dunning platform notify", e instanceof Error ? e.message : "error");
+          log.error("cron_dunning_platform_notify_failed", { route: "/api/cron/dunning", ...errorFields(e) });
           failed += 1;
         }
       }
@@ -206,7 +208,7 @@ async function run(req: NextRequest) {
         .limit(suspendDue.length);
       if (error) {
         // Okunamadı: güvenli taraf — bu koşuda askı yok, yeniden uyarı da yok (dedupe_key zaten korur).
-        console.error("dunning final warning lookup", error.message);
+        log.error("cron_dunning_final_warning_lookup_failed", { route: "/api/cron/dunning", ...errorFields(error) });
         failed += 1;
         warnedAt = null;
       } else {
@@ -256,7 +258,7 @@ async function run(req: NextRequest) {
         .update({ reminder_count: stage, last_reminder_at: nowIso })
         .in("id", ids);
       if (error) {
-        console.error("dunning reminder_count update", error.message);
+        log.error("cron_dunning_reminder_count_update_failed", { route: "/api/cron/dunning", ...errorFields(error) });
         failed += 1;
       }
     }
@@ -270,7 +272,7 @@ async function run(req: NextRequest) {
       .upsert(inAppEvents, { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true });
     if (isMissingTable(error)) eventsReady = false;
     else if (error) {
-      console.error("dunning events", error.message);
+      log.error("cron_dunning_events_failed", { route: "/api/cron/dunning", ...errorFields(error) });
       failed += 1;
     }
   }
@@ -287,7 +289,7 @@ async function run(req: NextRequest) {
   try {
     autoRenew = await runAutoRenewPass(admin, now, policy);
   } catch (e) {
-    console.error("dunning auto-renew", e instanceof Error ? e.message : "error");
+    log.error("cron_dunning_auto_renew_failed", { route: "/api/cron/dunning", ...errorFields(e) });
     renewThrew = 1;
   }
   failed += autoRenew.failed + renewThrew;
@@ -298,7 +300,7 @@ async function run(req: NextRequest) {
     const ids = [...suspendTargets.values()].map((x) => x.invoiceId);
     const { data, error } = await admin.from("invoices").select("id").in("id", ids).eq("status", "open");
     if (error) {
-      console.error("dunning suspend recheck", error.message);
+      log.error("cron_dunning_suspend_recheck_failed", { route: "/api/cron/dunning", ...errorFields(error) });
       failed += 1;
       suspendTargets.clear();
     } else {
@@ -414,7 +416,7 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
       .upsert([row], { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true })
       .select("id");
     if (error) {
-      console.error("dunning event", error.message);
+      log.error("cron_dunning_event_failed", { route: "/api/cron/dunning", ...errorFields(error) });
       out.failed += 1;
       return false;
     }
@@ -428,7 +430,7 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
       const base = { tenant_id: j.tenantId, invoice_id: j.invoiceId, stage: j.stage, channel };
       if (!on) {
         // Kanal kapalı: sahte gönderim yok; günlüğe "kanal kapalı" yazılır.
-        console.info(`dunning ${j.stage} ${channel}: kanal kapalı`);
+        log.info("cron_dunning_channel_closed", { route: "/api/cron/dunning", stage: j.stage, channel });
         const fresh = await logRow({ ...base, result: "channel_disabled", detail: `kanal kapalı${channel === "email" && emailCfg?.reason ? `: ${emailCfg.reason}` : channel === "sms" ? ": platform Netgsm hesabı tanımlı değil" : ""}`.slice(0, 300) });
         if (fresh) out.disabled += 1;
         continue;
@@ -439,7 +441,7 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
         .upsert([{ ...base, result: "pending" }], { onConflict: "invoice_id,stage,channel", ignoreDuplicates: true })
         .select("id");
       if (claimErr) {
-        console.error("dunning claim", claimErr.message);
+        log.error("cron_dunning_claim_failed", { route: "/api/cron/dunning", ...errorFields(claimErr) });
         out.failed += 1;
         continue;
       }
@@ -482,7 +484,7 @@ async function deliverExternal(admin: SupabaseClient, jobs: ExternalJob[]) {
         .from("dunning_events")
         .update({ result, detail: detail ? detail.slice(0, 300) : null })
         .eq("id", claimId);
-      if (error) console.error("dunning event update", error.message);
+      if (error) log.error("cron_dunning_event_update_failed", { route: "/api/cron/dunning", ...errorFields(error) });
     }
   }
   return out;
@@ -505,7 +507,7 @@ async function suspendTenant(
     .in("status", SUSPENDABLE)
     .select("id");
   if (error) {
-    console.error("dunning suspend", error.message);
+    log.error("cron_dunning_suspend_failed", { route: "/api/cron/dunning", ...errorFields(error) });
     return { suspended: false, failed: true };
   }
   if (!data || data.length === 0) return { suspended: false, failed: false };
@@ -530,8 +532,8 @@ async function suspendTenant(
       },
     ]),
   ]);
-  if (audit.error) console.error("dunning suspend audit", audit.error.message);
-  if (ev.error && !isMissingTable(ev.error)) console.error("dunning suspend event", ev.error.message);
+  if (audit.error) log.error("cron_dunning_suspend_audit_failed", { route: "/api/cron/dunning", ...errorFields(audit.error) });
+  if (ev.error && !isMissingTable(ev.error)) log.error("cron_dunning_suspend_event_failed", { route: "/api/cron/dunning", ...errorFields(ev.error) });
   try {
     await notifyPlatformStaff({
       title: "Ofis otomatik askıya alındı",
@@ -541,7 +543,7 @@ async function suspendTenant(
       meta,
     });
   } catch (e) {
-    console.error("dunning suspend staff notify", e instanceof Error ? e.message : "error");
+    log.error("cron_dunning_suspend_staff_notify_failed", { route: "/api/cron/dunning", ...errorFields(e) });
   }
   // Denetim kaydı yazılamadıysa askı yine geçerlidir ama koşu hata sayılır (sessiz denetim boşluğu olmaz).
   return { suspended: true, failed: Boolean(audit.error) || note.failed > 0 };
