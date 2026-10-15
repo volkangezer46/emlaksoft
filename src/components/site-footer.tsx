@@ -9,6 +9,8 @@ import { getSeoSettings } from "@/lib/seo/store";
 import { splitYear, toPublicCtas, toPublicMenu } from "@/lib/site-menu/public";
 import { checkPageHref, isExternalHref, type CtaLink, type FooterBadgeIcon } from "@/lib/site-menu/schema-core";
 import { getLiveSiteMenu } from "@/lib/site-menu/store";
+import { applySupportEmail } from "@/lib/site-menu/support-contact";
+import { getSupportContact } from "@/lib/contact-info-server";
 import { SpriteIcon } from "@/components/icons/sprite-icon";
 import { PublicMeasure } from "@/components/public-measure/public-measure";
 
@@ -20,7 +22,8 @@ import { PublicMeasure } from "@/components/public-measure/public-measure";
  * Metinler düz metindir (HTML/markdown işlenmez).
  */
 export async function SiteFooter({ smartCta = false, trialDays }: { smartCta?: boolean; trialDays?: number } = {}) {
-  const cfg = await getLiveSiteMenu();
+  const [rawCfg, support] = await Promise.all([getLiveSiteMenu(), getSupportContact()]);
+  const cfg = applySupportEmail(rawCfg, support.email);
   const menuColumns = toPublicMenu(cfg, now()).footer;
   const brand = cfg.footerBrand;
   const ctas = toPublicCtas(cfg.ctas);

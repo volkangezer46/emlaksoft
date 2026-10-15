@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Copy, ExternalLink, Link2, Power, RefreshCw, Store, Webhook } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Copy, ExternalLink, Globe, Link2, Power, RefreshCw, Store, Webhook } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FormTextarea } from "@/components/ui/form-controls";
 import { regenerateLeadToken, setLeadCaptureEnabled } from "@/app/actions/lead-intake";
+import { saveOfficeSettingAction } from "@/app/actions/office-settings";
+import { LEAD_ALLOWED_ORIGINS_KEY, LEAD_ALLOWED_ORIGINS_MAX, parseLeadOriginsStrict } from "@/lib/lead-origins";
 
 function CopyRow({ label, value, icon: Icon }: { label: string; value: string; icon: React.ComponentType<{ className?: string }> }) {
   const [copied, setCopied] = useState(false);
@@ -33,16 +38,80 @@ function CopyRow({ label, value, icon: Icon }: { label: string; value: string; i
   );
 }
 
+/** Formu gömen ofis siteleri (`lead.allowed_origins`): tarayıcıdan gönderimde izin verilen kaynaklar. */
+function AllowedOriginsEditor({ initial }: { initial: readonly string[] }) {
+  const router = useRouter();
+  const [value, setValue] = useState(initial.join("\n"));
+  const [pending, startTransition] = useTransition();
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null);
+  return (
+    <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-5 shadow-[var(--shadow-xs)]">
+      <h2 className="flex items-center gap-1.5 font-display font-bold text-ink-950">
+        <Globe className="h-4 w-4 text-brand-600" /> Formu gömen siteleriniz
+      </h2>
+      <p className="mt-1 text-xs text-text-muted">
+        Formu kendi web sitenize gömdüyseniz sitenizin adresini yazın (ör. https://ornekemlak.com). Satır başına bir adres, en çok {LEAD_ALLOWED_ORIGINS_MAX}; yalnız https ve yol içermeyen adresler kabul edilir. Listede olmayan sitelerden tarayıcıyla gönderilen form reddedilir.
+      </p>
+      <form
+        className="mt-3 space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const parsed = parseLeadOriginsStrict(value);
+          if (!parsed.ok) {
+            setNote({ ok: false, text: parsed.error });
+            return;
+          }
+          setNote(null);
+          startTransition(async () => {
+            const res = await saveOfficeSettingAction(LEAD_ALLOWED_ORIGINS_KEY, parsed.formatted, "Aday yakalama: izinli site adresleri");
+            if (res.error) {
+              setNote({ ok: false, text: res.error });
+              return;
+            }
+            setValue(parsed.origins.join("\n"));
+            setNote({ ok: true, text: res.changed === false ? "Değişiklik yok." : "Kaydedildi." });
+            router.refresh();
+          });
+        }}
+      >
+        <label htmlFor="lead-allowed-origins" className="sr-only">
+          İzinli site adresleri
+        </label>
+        <FormTextarea
+          id="lead-allowed-origins"
+          rows={3}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="https://ornekemlak.com"
+          spellCheck={false}
+        />
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="submit" variant="outline" size="sm" loading={pending}>
+            Siteleri kaydet
+          </Button>
+          {note ? (
+            <p className={`text-xs font-medium ${note.ok ? "text-mint-600" : "text-danger-600"}`} role={note.ok ? "status" : "alert"}>
+              {note.text}
+            </p>
+          ) : null}
+        </div>
+      </form>
+    </section>
+  );
+}
+
 export function LeadCapturePanel({
   token,
   enabled,
   baseUrl,
   vitrinUrl,
+  allowedOrigins = [],
 }: {
   token: string;
   enabled: boolean;
   baseUrl: string;
   vitrinUrl?: string;
+  allowedOrigins?: readonly string[];
 }) {
   const [pending, startTransition] = useTransition();
   const [toggleError, setToggleError] = useState<string | null>(null);
@@ -170,11 +239,13 @@ export function LeadCapturePanel({
         </pre>
         <ul className="mt-3 space-y-1 text-xs text-text-muted">
           <li>• Desteklenen alanlar: full_name, phone, email, message, source, transaction_type, property_type, province_id, budget_min, budget_max, rooms, kvkk</li>
-          <li>• <code>kvkk</code> sunucuda zorunlu doğrulanır; tarayıcı entegrasyon alanları <code>LEAD_CORS_ORIGINS</code> listesine eklenmelidir.</li>
+          <li>• <code>kvkk</code> sunucuda zorunlu doğrulanır; formu tarayıcıdan gönderen sitenizin adresini aşağıdaki &quot;Formu gömen siteleriniz&quot; listesine ekleyin (sunucudan sunucuya gönderimde gerekmez).</li>
           <li>• Aynı telefon numarası tekrar gelirse mevcut müşteriye eşlenir (mükerrer kayıt önlenir).</li>
           <li>• Her aday, en az yüklü aktif danışmana otomatik atanır ve anında bildirim gönderilir.</li>
         </ul>
       </section>
+
+      <AllowedOriginsEditor initial={allowedOrigins} />
     </div>
   );
 }

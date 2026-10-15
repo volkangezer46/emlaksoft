@@ -6,26 +6,15 @@ import type { SeoPatternVars } from "@/lib/seo/patterns";
 /**
  * /admin/site/seo "Dinamik kalıplar" sekmesinin verisi (salt okunur, yalnız seo modüllü platform personeli; sayfa kapısı
  * requirePlatformModule("seo")). Önizleme GERÇEK kayıtla yapılır: ilk yayındaki ilan, onun ofisi ve ilk yayındaki
- * danışman. Opt-in tablosu ofislerin kendi arama onayını (tenants.vitrin_seo_optin) gösterir; burada değiştirilmez.
+ * danışman. Ofislerin arama onayı tablosu "Vitrin" sekmesindedir (vitrin-offices.ts).
  */
 
 export type PatternSample = { url: string; vars: SeoPatternVars; ownText: string | null } | null;
-
-export type OptInRow = {
-  id: string;
-  slug: string;
-  name: string;
-  status: string;
-  vitrinEnabled: boolean;
-  optin: boolean;
-};
 
 export type PatternData = {
   office: PatternSample;
   listing: PatternSample;
   agent: PatternSample;
-  optIn: OptInRow[];
-  optInTotal: number;
 };
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -40,7 +29,7 @@ function money(n: number | null, tx?: string | null) {
 const ACTIVE = ["trial", "active", "past_due"];
 
 export async function loadPatternData(): Promise<PatternData> {
-  const empty: PatternData = { office: null, listing: null, agent: null, optIn: [], optInTotal: 0 };
+  const empty: PatternData = { office: null, listing: null, agent: null };
   try {
     const admin = createAdminClient();
     const [listingRes, agentRes, tenantsRes] = await Promise.all([
@@ -65,22 +54,16 @@ export async function loadPatternData(): Promise<PatternData> {
         .maybeSingle(),
       admin
         .from("tenants")
-        .select("id, slug, name, status, vitrin_enabled, vitrin_seo_optin", { count: "exact" })
+        .select("id, slug, name, status, vitrin_seo_optin")
         .in("status", ACTIVE)
         .order("vitrin_seo_optin", { ascending: false })
         .order("name", { ascending: true })
         .limit(200),
     ]);
 
-    const tenants = (tenantsRes.data ?? []) as { id: string; slug: string | null; name: string | null; status: string; vitrin_enabled: boolean | null; vitrin_seo_optin: boolean | null }[];
+    const tenants = (tenantsRes.data ?? []) as { id: string; slug: string | null; name: string | null }[];
     const byId = new Map(tenants.map((t) => [t.id, t]));
-    const out: PatternData = {
-      ...empty,
-      optIn: tenants
-        .filter((t) => t.slug)
-        .map((t) => ({ id: t.id, slug: t.slug!, name: t.name ?? t.slug!, status: t.status, vitrinEnabled: t.vitrin_enabled !== false, optin: t.vitrin_seo_optin === true })),
-      optInTotal: tenantsRes.count ?? tenants.length,
-    };
+    const out: PatternData = { ...empty };
 
     const p = listingRes.data as
       | { id: string; tenant_id: string; title: string | null; property_code: string | null; transaction_type: string | null; property_type: string | null; list_price: number | null; address_line: string | null; features: { rooms?: string; description?: string } | null; province: Rel; district: Rel }

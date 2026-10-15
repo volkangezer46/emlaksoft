@@ -2,6 +2,7 @@ import { DEFAULT_SLA_MIN, SLA_OPTIONS_MIN } from "@/lib/response-time/core";
 import type { AnySettingDef } from "../types";
 import { z } from "zod";
 import { defineBool, defineEnum, defineInt, defineNumber, defineString } from "./define";
+import { LEAD_ALLOWED_ORIGINS_KEY, LEAD_ALLOWED_ORIGINS_MAX_LENGTH, parseLeadOriginsStored, parseLeadOriginsStrict } from "@/lib/lead-origins";
 
 /**
  * OFIS (tenant) ayarlari — Ofis Tanimlari Merkezi (/app/ayarlar/merkez).
@@ -537,4 +538,40 @@ const aiFeatures: AnySettingDef[] = [
   }),
 ];
 
-export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...aiFeatures];
+/**
+ * Talep formu uç noktasına tarayıcıdan gönderim yapabilecek ofis siteleri (CORS). Varsayılan boş = bugünkü davranış
+ * (yalnız operatörün LEAD_CORS_ORIGINS listesi ve platform adresi). Sıkı biçim ve birleştirme: src/lib/lead-origins.ts.
+ */
+const leadOriginsBase = defineString({
+  ...TENANT,
+  key: LEAD_ALLOWED_ORIGINS_KEY,
+  group: "dagitim",
+  default: "",
+  maxLength: LEAD_ALLOWED_ORIGINS_MAX_LENGTH,
+  multiline: true,
+  label: "Formu gömen siteleriniz",
+  description: "Aday formunu kendi web sitenize gömdüyseniz sitenizin adresi (https://ornek.com). Satır ya da virgülle en çok 5 adres; yol içermez.",
+  impact: "Listedeki sitelerden tarayıcı ile gönderilen form kabul edilir; listede olmayan siteden gelen tarayıcı isteği reddedilir. Sunucudan sunucuya gönderimler etkilenmez.",
+});
+
+const leadOrigins: AnySettingDef[] = [
+  {
+    ...leadOriginsBase,
+    schema: z
+      .string()
+      .trim()
+      .max(LEAD_ALLOWED_ORIGINS_MAX_LENGTH)
+      .superRefine((v, ctx) => {
+        const r = parseLeadOriginsStrict(v);
+        if (!r.ok) ctx.addIssue({ code: "custom", message: r.error });
+      })
+      // Saklama biçimi tek: tekrarsız, küçük harfli, virgüllü origin listesi.
+      .transform((v) => {
+        const r = parseLeadOriginsStrict(v);
+        return r.ok ? r.formatted : v;
+      }),
+    codec: { parse: (raw) => parseLeadOriginsStored(raw).join(","), format: (v) => v },
+  } as AnySettingDef,
+];
+
+export const TENANT_SETTING_DEFS: AnySettingDef[] = [...sla, ...thresholds, ...commission, ...insight, ...notify, ...lcReport, ...assign, ...access, ...contact, ...reviews, ...compliance, ...leadRouting, ...leadOrigins, ...aiFeatures];

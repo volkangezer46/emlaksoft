@@ -69,11 +69,11 @@ export const LEGAL_SETTING_DEFS: AnySettingDef[] = [
     crossRule: emailRule,
     category: "uyum",
     label: "Destek e-postası",
-    description: "Yasal sayfalar ve askıya alınmış hesap ekranında gösterilen destek adresi.",
+    description: "Yasal sayfalar, ana sayfa SSS'si, site menüsü ve alt bilgi ile askıya alınmış hesap ekranında gösterilen destek adresi.",
     impact:
-      "Yasal sayfalarda ≤30 sn içinde görünür. Boşsa sunucu yedeği, o da yoksa koddaki varsayılan adres kullanılır. " +
-      "DİKKAT: ana sayfa SSS'si ve site menüsü (destek bağlantısı, menü görseli) bu ayarı okumaz; derleme anındaki adresi " +
-      "(NEXT_PUBLIC_SUPPORT_EMAIL ya da koddaki varsayılan) gösterir. Bu yüzeylerde adres yalnız env değişip uygulama yeniden derlenince güncellenir.",
+      "Kaydedince herkese açık sayfaların önbelleği ve statik kopyaları yenilenir; adres genellikle hemen, en geç birkaç dakikada görünür. " +
+      "Boşsa sunucu yedeği, o da yoksa koddaki varsayılan adres kullanılır. Menüde yalnız varsayılan destek adresiyle yazılmış bağlantılar " +
+      "değişir; menüye elle yazdığınız başka bir adres olduğu gibi kalır.",
     risk: "high",
     envFallback: "SUPPORT_EMAIL",
   }),

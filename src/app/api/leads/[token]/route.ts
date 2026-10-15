@@ -5,6 +5,8 @@ import { buildLeadConsentVersion } from "@/lib/legal-copy";
 import { getLeadFormCopy } from "@/lib/legal-copy-server";
 import { publicOrigin } from "@/lib/public-redirect";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { mergeLeadOrigins } from "@/lib/lead-origins";
+import { loadTenantLeadOrigins } from "@/lib/lead-origins-server";
 import {
   PUBLIC_REQUEST_MAX_BYTES,
   clientIpFromHeaders,
@@ -23,16 +25,31 @@ export const dynamic = "force-dynamic";
  *  yönetimden değiştirilen metinde kanıt sürümü metin izini taşır (POST içinde getLeadFormCopy). */
 export const PUBLIC_LEAD_CONSENT_VERSION = buildLeadConsentVersion(false);
 
-function allowedOrigins(): string[] {
-  return [
-    ...parseOriginAllowlist(process.env.LEAD_CORS_ORIGINS),
-    publicOrigin(),
-    ...parseOriginAllowlist(process.env.NEXT_PUBLIC_APP_URL),
-  ];
+/** Operatör (env) + platform adresi: her token için ortak taban. */
+function baseAllowedOrigins(): string[] {
+  return mergeLeadOrigins(
+    parseOriginAllowlist(process.env.LEAD_CORS_ORIGINS),
+    [publicOrigin()],
+    parseOriginAllowlist(process.env.NEXT_PUBLIC_APP_URL),
+  );
+}
+
+const validToken = (token: string) => token.length >= 32 && token.length <= 128 && /^[A-Za-z0-9._~-]+$/.test(token);
+
+/**
+ * Taban + token'ın ofisinin kendi listesi (`lead.allowed_origins`, Ayarlar > Aday yakalama). Origin başlığı yoksa ya da
+ * zaten tabandaysa ofis ayarı okunmaz (gereksiz sorgu yok).
+ */
+async function allowedOrigins(req: NextRequest, token: string): Promise<string[]> {
+  const base = baseAllowedOrigins();
+  const origin = req.headers.get("origin");
+  if (!origin || isAllowedCorsOrigin(origin, base) || !validToken(token)) return base;
+  return mergeLeadOrigins(base, await loadTenantLeadOrigins(token));
 }
 
 function response(
   req: NextRequest,
+  allowed: readonly string[],
   body: Record<string, unknown>,
   status: number,
   extraHeaders?: Record<string, string>,
@@ -40,20 +57,22 @@ function response(
   return NextResponse.json(body, {
     status,
     headers: {
-      ...leadCorsHeaders(req.headers.get("origin"), allowedOrigins()),
+      ...leadCorsHeaders(req.headers.get("origin"), allowed),
       ...extraHeaders,
     },
   });
 }
 
-export async function OPTIONS(req: NextRequest) {
+export async function OPTIONS(req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
   const origin = req.headers.get("origin");
-  if (!isAllowedCorsOrigin(origin, allowedOrigins())) {
-    return response(req, { error: "origin_not_allowed" }, 403);
+  const allowed = await allowedOrigins(req, token);
+  if (!isAllowedCorsOrigin(origin, allowed)) {
+    return response(req, allowed, { error: "origin_not_allowed" }, 403);
   }
   return new NextResponse(null, {
     status: 204,
-    headers: leadCorsHeaders(origin, allowedOrigins()),
+    headers: leadCorsHeaders(origin, allowed),
   });
 }
 
@@ -97,16 +116,17 @@ export async function POST(
   { params }: { params: Promise<{ token: string }> },
 ) {
   const { token } = await params;
-  if (token.length < 32 || token.length > 128 || !/^[A-Za-z0-9._~-]+$/.test(token)) {
-    return response(req, { error: "Geçersiz bağlantı." }, 404);
+  if (!validToken(token)) {
+    return response(req, baseAllowedOrigins(), { error: "Geçersiz bağlantı." }, 404);
   }
 
   const origin = req.headers.get("origin");
-  if (!isAllowedCorsOrigin(origin, allowedOrigins())) {
-    return response(req, { error: "origin_not_allowed" }, 403);
+  const allowed = await allowedOrigins(req, token);
+  if (!isAllowedCorsOrigin(origin, allowed)) {
+    return response(req, allowed, { error: "origin_not_allowed" }, 403);
   }
   if (requestBodyTooLarge(req.headers, PUBLIC_REQUEST_MAX_BYTES)) {
-    return response(req, { error: "İstek gövdesi çok büyük." }, 413);
+    return response(req, allowed, { error: "İstek gövdesi çok büyük." }, 413);
   }
 
   const ip = clientIpFromHeaders(req.headers);
@@ -128,6 +148,7 @@ export async function POST(
     const infrastructureFailure = perIp.degraded || perToken.degraded;
     return response(
       req,
+      allowed,
       { error: infrastructureFailure ? "Güvenlik denetimi kullanılamıyor." : "Çok fazla istek gönderdiniz." },
       infrastructureFailure ? 503 : 429,
       { "Retry-After": infrastructureFailure ? "60" : "600" },
@@ -138,22 +159,22 @@ export async function POST(
   try {
     body = await readBody(req);
   } catch {
-    return response(req, { error: "Geçersiz istek gövdesi." }, 400);
+    return response(req, allowed, { error: "Geçersiz istek gövdesi." }, 400);
   }
-  if (body === null) return response(req, { error: "İstek gövdesi çok büyük." }, 413);
+  if (body === null) return response(req, allowed, { error: "İstek gövdesi çok büyük." }, 413);
 
   // Server-side honeypot: scripts and direct POSTs cannot bypass this gate.
   if (String(body.website ?? "").trim()) {
-    return response(req, { ok: true }, 202);
+    return response(req, allowed, { ok: true }, 202);
   }
   if (!isConsentAccepted(body.kvkk)) {
-    return response(req, { error: "Devam etmek için KVKK onayı gerekli." }, 400);
+    return response(req, allowed, { error: "Devam etmek için KVKK onayı gerekli." }, 400);
   }
 
   const fullName = bounded(body.full_name ?? body.fullName ?? body.name, 120) ?? "";
   const email = bounded(body.email, 254);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return response(req, { error: "Geçerli bir e-posta adresi girin." }, 400);
+    return response(req, allowed, { error: "Geçerli bir e-posta adresi girin." }, 400);
   }
 
   const requestIdCandidate = bounded(body.request_id ?? req.headers.get("x-idempotency-key"), 64);
@@ -188,8 +209,8 @@ export async function POST(
   };
 
   const result = await intakeLead(token, input);
-  if (!result.ok) return response(req, { error: result.error }, result.status);
+  if (!result.ok) return response(req, allowed, { error: result.error }, result.status);
 
   // Do not expose internal customer/profile identifiers to a public caller.
-  return response(req, { ok: true, duplicate: result.duplicate, request_id: requestId }, 200);
+  return response(req, allowed, { ok: true, duplicate: result.duplicate, request_id: requestId }, 200);
 }

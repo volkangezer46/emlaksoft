@@ -33,7 +33,19 @@ export function faqForJsonLd(items: readonly { q: string; a: string }[]): { q: s
 /** Yönetim SEO önizlemesi ve sözleşme testi için varsayılan (plans.ts, deneme günü sayısız) SSS; ana sayfa buildHomeFaqs ile canlı veriyle üretir. */
 export const FAQS: readonly { q: string; a: string }[] = buildHomeFaqs({ plans: PLANS });
 
-export function Faq({ items, heading = defaultSiteContent().sections.sss }: { items: readonly { q: string; a: string }[]; heading?: Heading }) {
+/**
+ * `support`: sunucuda ayar defterinden çözülen destek adresi (`getSupportContact`, ayar > env > varsayılan). Verilmezse
+ * (istemci önizlemesi) derleme anındaki adres gösterilir.
+ */
+export function Faq({
+  items,
+  heading = defaultSiteContent().sections.sss,
+  support,
+}: {
+  items: readonly { q: string; a: string }[];
+  heading?: Heading;
+  support?: { email: string; mailto: string };
+}) {
   return (
     <section id="sss" className="mk-section mk-alt" aria-labelledby="sss-baslik">
       <div className="mk-wrap mk-wrap-faq">
@@ -50,7 +62,7 @@ export function Faq({ items, heading = defaultSiteContent().sections.sss }: { it
           ))}
         </div>
         <p className="mk-faq-note">
-          Sorunuz hâlâ mı var? <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
+          Sorunuz hâlâ mı var? <a href={support?.mailto ?? SUPPORT_MAILTO}>{support?.email ?? SUPPORT_EMAIL}</a>
         </p>
       </div>
     </section>

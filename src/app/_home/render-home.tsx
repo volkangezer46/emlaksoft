@@ -19,6 +19,7 @@ import { Testimonials } from "@/components/marketing/testimonials";
 import { LandingJsonLd } from "@/components/marketing/landing-jsonld";
 import { MotionRoot } from "@/components/marketing/motion-root";
 import type { PublicPricing } from "@/lib/billing/public-pricing";
+import type { SupportContact } from "@/lib/contact-info";
 import type { EfCatalog } from "@/lib/ef-credits/credit-reader";
 import { visibleSections, type LandingSectionId, type SiteContent } from "@/lib/site-content/schema";
 import { StoredHeroImage } from "@/lib/site-media/stored-image";
@@ -32,6 +33,8 @@ export type RenderHomeInput = {
    * Canlı ana sayfada hiç verilmez: canlı ve statik HTML'de `data-cms-path` yoktur.
    */
   preview?: boolean;
+  /** Sunucuda çözülmüş destek iletişimi (SSS altındaki adres). Yoksa derleme anındaki adres. */
+  support?: Pick<SupportContact, "email" | "mailto">;
 };
 
 /**
@@ -77,7 +80,7 @@ const PREVIEW_BAR: React.CSSProperties = {
  * gerçek paket ve deneme verisiyle çizilir. Saf sunucu bileşeni ağacı: kendisi çerez/başlık okumaz (ana sayfa statik kalır).
  * Hero sunucu bileşenidir; tek istemci kodu MotionRoot (markup eklemez: giriş animasyonu ve gösterim duraklatma).
  */
-export function renderHome({ content, pricing, efCatalog, preview = false }: RenderHomeInput): ReactNode {
+export function renderHome({ content, pricing, efCatalog, preview = false, support }: RenderHomeInput): ReactNode {
   const { trialDays, plans } = pricing;
   const faqs = buildHomeFaqs({ trialDays, plans, content: content.faq });
   // Bölüm sırası ve görünürlüğü site içeriğinden (Yönetim > Site içeriği > Bölüm düzeni); hero her zaman ilk.
@@ -93,7 +96,7 @@ export function renderHome({ content, pricing, efCatalog, preview = false }: Ren
     nasil: <HowItWorks trialDays={trialDays} plans={plans} steps={content.steps} heading={content.sections.nasil} />,
     guvenlik: <SecurityBand trialDays={trialDays} plans={plans} content={content.security} heading={content.sections.guvenlik} />,
     fiyat: <PricingSection pricing={pricing} heading={content.sections.fiyat} />,
-    sss: <Faq items={faqs} heading={content.sections.sss} />,
+    sss: <Faq items={faqs} heading={content.sections.sss} {...(support ? { support: { email: support.email, mailto: support.mailto } } : {})} />,
     son: <FinalCta trialDays={trialDays} plans={plans} content={content.finalCta} />,
     // Kanıtlı yorumlar: öğe yoksa bileşen hiçbir şey çizmez (varsayılan düzende zaten gizli).
     testimonials: <Testimonials content={content.testimonials} />,
