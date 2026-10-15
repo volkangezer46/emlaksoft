@@ -23,6 +23,7 @@ import {
 } from "@/lib/integrations/provider-url";
 import { isAmbiguousWhatsAppHttpStatus } from "@/lib/messaging/whatsapp-contract";
 import { withSmsLog, withWhatsAppLog, type MessageLogContext } from "@/lib/messaging/message-log";
+import { needsTurkishEncoding } from "@/lib/messaging/sms-segments";
 
 const PROVIDER_TIMEOUT_MS = 10_000;
 const WHATSAPP_MAX_RESPONSE_BYTES = 256 * 1024;
@@ -409,12 +410,15 @@ function xmlEscape(v: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function buildSingleXml(cfg: NetgsmConfig, phones: string[], text: string): string {
+export function buildSingleXml(cfg: NetgsmConfig, phones: string[], text: string): string {
   // Her numara kendi <no> düğümünde; DIŞ sarmalayıcı <no> YOK (Netgsm 1:n şeması).
   const nos = phones.map((p) => `<no>${p}</no>`).join("\n    ");
+  // Türkçe karakter (ç ş ğ ı İ Ş Ğ) varsa Netgsm'in Türkçe dil tablosu seçilir (`<company dil="TR">`): mesaj UCS-2'ye
+  // (70 karakter/SMS) düşmez, 155 karakter/SMS gider. Emoji gibi Unicode gerektiren metinde ve salt GSM-7'de gönderilmez.
+  const company = needsTurkishEncoding(text) ? `\n    <company dil="TR">Netgsm</company>` : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <mainbody>
-  <header>
+  <header>${company}
     <usercode>${xmlEscape(cfg.usercode)}</usercode>
     <password>${xmlEscape(cfg.password)}</password>
     <msgheader>${xmlEscape(cfg.msgheader)}</msgheader>

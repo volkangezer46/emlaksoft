@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/inline-dialog";
 import { sendCustomerSms } from "@/app/actions/communications";
 import { useToast } from "@/components/app/toast-provider";
+import { SmsCounter } from "@/components/app/sms-counter";
+import { simplifyForSms } from "@/lib/messaging/sms-segments";
 
 /**
  * Tekil SMS dialogu — TEK ortak kopya.
@@ -54,7 +56,6 @@ export function SmsDialog({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const charCount = message.length;
   const canSend = consentGranted && message.trim().length > 0 && !pending;
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -125,16 +126,11 @@ export function SmsDialog({
             </div>
           )}
 
-          {/* Mesaj + karakter/SMS sayacı (kampanya dialoguyla aynı 160/153 hesabı) */}
+          {/* Mesaj + SMS kredi sayacı (tek kaynak: SmsCounter / sms-segments; Türkçe karakter 155/SMS) */}
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label htmlFor="sms-message" className="text-sm font-semibold text-ink-950">
-                Mesaj metni
-              </label>
-              <span className={`text-xs ${charCount > 160 ? "text-amber-600" : "text-text-faint"}`}>
-                {charCount}/460 karakter
-              </span>
-            </div>
+            <label htmlFor="sms-message" className="mb-1.5 block text-sm font-semibold text-ink-950">
+              Mesaj metni
+            </label>
             <textarea
               id="sms-message"
               name="message"
@@ -147,14 +143,7 @@ export function SmsDialog({
               placeholder="Mesajınızı buraya yazın…"
               className="w-full resize-none rounded-[var(--radius-control)] border border-line bg-canvas px-3.5 py-2.5 text-sm text-ink-950 outline-none focus:border-brand-300 disabled:opacity-50"
             />
-            {charCount > 0 && charCount <= 160 && (
-              <p className="mt-1 text-xs text-text-faint">1 SMS kredisi kullanılacak</p>
-            )}
-            {charCount > 160 && (
-              <p className="mt-1 text-xs text-amber-600">
-                {Math.ceil(charCount / 153)} SMS kredisi kullanılacak (uzun mesaj)
-              </p>
-            )}
+            <SmsCounter className="mt-1.5" text={message} onSimplify={() => setMessage(simplifyForSms(message))} />
           </div>
 
           {error && (

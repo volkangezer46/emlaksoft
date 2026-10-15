@@ -81,3 +81,16 @@ describe("legacy WhatsApp provider network boundary", () => {
       .resolves.toMatchObject({ ok: false, code: "http_429" });
   });
 });
+
+describe("Netgsm XML Türkçe kodlama", () => {
+  const cfg = { usercode: "u", password: "p", msgheader: "OFIS" };
+  it("Türkçe karakterli metinde dil=TR gönderir", async () => {
+    const { buildSingleXml } = await import("./netgsm");
+    expect(buildSingleXml(cfg, ["5321234567"], "Şişli'de yeni daire")).toContain('<company dil="TR">Netgsm</company>');
+  });
+  it("salt GSM-7 ya da emoji içeren metinde dil göndermez", async () => {
+    const { buildSingleXml } = await import("./netgsm");
+    expect(buildSingleXml(cfg, ["5321234567"], "Yeni daire")).not.toContain("dil=");
+    expect(buildSingleXml(cfg, ["5321234567"], "Şişli 🏠")).not.toContain("dil=");
+  });
+});

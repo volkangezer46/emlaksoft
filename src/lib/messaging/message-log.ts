@@ -95,30 +95,9 @@ export function maskRecipient(raw: string): string {
   return `+${d.slice(0, 2)}*** ${d.slice(-2)}`;
 }
 
-const GSM7_BASIC =
-  "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
-const GSM7_EXT = "^{}\\[~]|€\f";
-
-/**
- * SMS kredi boyu (tahmini maliyet): yalnız GSM-7 karakterleri 160 (çok parçada 153), başka karakter (Türkçe ı/ş/ğ vb.)
- * varsa UCS-2: 70 (çok parçada 67). Netgsm raporu boy bildirirse günlükteki değer onunla güncellenir.
- */
-export function smsSegments(text: string): number {
-  let septets = 0;
-  let gsm = true;
-  for (const ch of text) {
-    if (GSM7_BASIC.includes(ch)) septets += 1;
-    else if (GSM7_EXT.includes(ch)) septets += 2;
-    else {
-      gsm = false;
-      break;
-    }
-  }
-  if (!text) return 0;
-  if (gsm) return septets <= 160 ? 1 : Math.ceil(septets / 153);
-  const units = [...text].length;
-  return units <= 70 ? 1 : Math.ceil(units / 67);
-}
+/** SMS kredi boyu: tek kaynak `sms-segments.ts` (GSM-7 160/153, Türkçe dil tablosu 155/149, UCS-2 70/67). */
+import { smsSegments } from "./sms-segments";
+export { smsSegments };
 
 /** Sağlayıcı sonucunu günlük durumuna çevirir (SAF): kabul → kuyrukta; belirsiz → belirsiz; diğer hata → başarısız. */
 export function outcomeStatus(result: ProviderSendOutcome): MessageLogStatus {
