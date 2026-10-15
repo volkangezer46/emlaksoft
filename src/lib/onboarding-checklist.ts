@@ -153,10 +153,12 @@ export type FirstTaskCounts = {
   customDefinitions: number;
   /** Ofis kasası/düzenli gider tanımlı mı (muhasebe ilk işi; olgu yoksa tamamlanmamış sayılır). */
   officeCash?: boolean;
+  /** Ofis vitrini arama onayı (tenants.vitrin_seo_optin); olgu yoksa tamamlanmamış sayılır (otomatik açılmaz). */
+  vitrinSeoOptin?: boolean;
 };
 
 export type FirstTask = {
-  id: "data" | "property" | "demand" | "appointment" | "defs" | "expense" | "commission";
+  id: "data" | "property" | "demand" | "appointment" | "defs" | "expense" | "commission" | "vitrin";
   title: string;
   description: string;
   href: string;
@@ -179,6 +181,8 @@ export function buildFirstTasks(c: FirstTaskCounts): FirstTask[] {
     { id: "defs", title: "Tanımlarını gözden geçir", description: "Kayıp nedenleri ve aşama adları ofisinin diline uysun.", href: "/app/ayarlar/tanimlar", done: c.customDefinitions > 0, requires: { module: "settings", action: "edit" } },
     { id: "expense", title: "İlk gider kaydını gir", description: "Kira, fatura ya da portal üyeliği; aylık giderler kasaya işlensin.", href: "/app/giderler?sekme=duzenli", done: c.officeCash === true, requires: { module: "expenses", action: "create" } },
     { id: "commission", title: "Komisyon tahsilatını işle", description: "Kazanılan anlaşmaların tahsil edilen komisyonunu kaydet.", href: "/app/komisyon?durum=bekleyen", done: false, requires: { module: "commissions", action: "edit" } },
+    // Yalnız yönlendirir: arama onayı ofisin kararıdır, hiçbir yerde otomatik açılmaz.
+    { id: "vitrin", title: "Vitrininizi Google'da görünür yapın", description: "Vitrin ayarlarında “vitrinim aramalarda görünsün” onayını verin; ilanlarınız Google'da bulunabilsin.", href: "/app/ayarlar/vitrin", done: c.vitrinSeoOptin === true, requires: { module: "settings", action: "edit" } },
   ];
 }
 

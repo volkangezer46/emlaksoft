@@ -167,7 +167,7 @@ describe("giderler-kasa adımı", () => {
 describe("ilk işler kontrol listesi (sihirbaz adımı değil)", () => {
   it("işler gerçek sayımdan tamamlanır ve her biri götürdüğü sayfanın oluşturma iznini taşır", () => {
     const none = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
-    expect(none.map((t) => t.id)).toEqual(["data", "property", "demand", "appointment", "defs", "expense", "commission"]);
+    expect(none.map((t) => t.id)).toEqual(["data", "property", "demand", "appointment", "defs", "expense", "commission", "vitrin"]);
     expect(none.every((t) => !t.done && t.href.startsWith("/app/") && t.requires)).toBe(true);
     const some = buildFirstTasks({ customers: 3, properties: 0, demands: 1, appointments: 0, customDefinitions: 2, officeCash: true });
     expect(some.filter((t) => t.done).map((t) => t.id)).toEqual(["data", "demand", "defs", "expense"]);
@@ -212,5 +212,17 @@ describe("yetkiye göre Başlangıç kartı kapsamı", () => {
     const tasks = buildFirstTasks({ customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 });
     expect(visibleFirstTasks(tasks, advisor).map((t) => t.id)).not.toContain("defs");
     expect(visibleFirstTasks(tasks, owner).map((t) => t.id)).toContain("defs");
+  });
+});
+
+describe("ilk işler: vitrin arama onayı", () => {
+  it("onay yokken açık, onay verilince tamam; ayarlar/vitrin'e götürür ve ayar düzenleme izni ister", () => {
+    const base = { customers: 0, properties: 0, demands: 0, appointments: 0, customDefinitions: 0 };
+    const open = buildFirstTasks(base).find((t) => t.id === "vitrin")!;
+    expect(open.done).toBe(false);
+    expect(open.href).toBe("/app/ayarlar/vitrin");
+    expect(open.title).toBe("Vitrininizi Google'da görünür yapın");
+    expect(open.requires).toEqual({ module: "settings", action: "edit" });
+    expect(buildFirstTasks({ ...base, vitrinSeoOptin: true }).find((t) => t.id === "vitrin")!.done).toBe(true);
   });
 });

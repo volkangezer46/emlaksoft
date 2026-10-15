@@ -44,22 +44,40 @@ export const loadOnboardingSnapshot = cache(async (tenantId: string): Promise<On
 });
 
 /**
- * "Komisyon tahsilatını işle" ilk işinin olgusu (muhasebe): ofiste örnek olmayan en az bir ödenmiş komisyon var mı.
- * Yalnız bu iş listede açıkken sorulur (tek satırlık okuma); okunamazsa iş açık kalır (sahte "tamam" yok).
+ * Tembel ilk iş olguları: yalnız ilgili iş listede AÇIKKEN tek satırlık okuma yapılır; okunamazsa iş açık kalır (sahte
+ * "tamam" yok).
+ *  - "Komisyon tahsilatını işle" (muhasebe): ofiste örnek olmayan en az bir ödenmiş komisyon var mı.
+ *  - "Vitrininizi Google'da görünür yapın": ofis vitrin arama onayı (tenants.vitrin_seo_optin) verilmiş mi.
  */
 export async function withFirstTaskFacts<T extends { id: string; done: boolean }>(tasks: T[], tenantId: string): Promise<T[]> {
-  if (!tasks.some((t) => t.id === "commission" && !t.done)) return tasks;
+  const open = (id: string) => tasks.some((t) => t.id === id && !t.done);
+  const needCommission = open("commission");
+  const needVitrin = open("vitrin");
+  if (!needCommission && !needVitrin) return tasks;
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("commissions")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .in("status", ["paid", "collected"])
-      .eq("is_sample", false)
-      .limit(1);
-    if (error || !data || data.length === 0) return tasks;
-    return tasks.map((t) => (t.id === "commission" ? { ...t, done: true } : t));
+    const [commissionDone, vitrinDone] = await Promise.all([
+      needCommission
+        ? supabase
+            .from("commissions")
+            .select("id")
+            .eq("tenant_id", tenantId)
+            .in("status", ["paid", "collected"])
+            .eq("is_sample", false)
+            .limit(1)
+            .then(({ data, error }) => !error && Boolean(data && data.length > 0))
+        : Promise.resolve(false),
+      needVitrin
+        ? supabase
+            .from("tenants")
+            .select("vitrin_seo_optin")
+            .eq("id", tenantId)
+            .maybeSingle()
+            .then(({ data, error }) => !error && (data as { vitrin_seo_optin?: boolean | null } | null)?.vitrin_seo_optin === true)
+        : Promise.resolve(false),
+    ]);
+    if (!commissionDone && !vitrinDone) return tasks;
+    return tasks.map((t) => (t.id === "commission" && commissionDone) || (t.id === "vitrin" && vitrinDone) ? { ...t, done: true } : t);
   } catch {
     return tasks;
   }
