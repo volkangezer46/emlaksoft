@@ -125,6 +125,8 @@ export function maskEmailForDisplay(email: string): string {
   return `${local.slice(0, local.length <= 2 ? 1 : 2)}***${e.slice(at)}`;
 }
 
+/** Toplu anonimleştirme UPDATE grubunun üst sınırı (PostgREST `in.(…)` URL uzunluğu güvenli kalır). */
+const ERASURE_BATCH = 100;
 const iso = (ms: number) => new Date(ms).toISOString();
 const trDate = (s: string) => new Intl.DateTimeFormat("tr-TR", { dateStyle: "long", timeZone: "Europe/Istanbul" }).format(new Date(s));
 const sixDigit = () => String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -825,22 +827,28 @@ export async function applyErasure(db: Db, id: string, staffId: string, nowMs: n
       result.failed.push({ office: c.office, reason: kind.reason });
     }
   }
-  for (const d of targets.filter((r) => r.kind === "demo")) {
+  // Demo talepleri ve açık ev ziyaretçileri: kayıt başına UPDATE yerine ERASURE_BATCH'lik gruplar halinde tek
+  // `.in("id", …)` UPDATE (aynı sabit yama). Grup hatası o gruptaki kayıtları başarısız sayar, sonraki gruplar sürer.
+  const demoIds = targets.filter((r) => r.kind === "demo").map((r) => r.id);
+  for (let i = 0; i < demoIds.length; i += ERASURE_BATCH) {
+    const chunk = demoIds.slice(i, i + ERASURE_BATCH);
     const { error } = await db
       .from("demo_requests")
       .update({ full_name: "Anonim", email: null, phone: null, company: null, message: null, notes: null })
-      .eq("id", d.id);
+      .in("id", chunk);
     if (error) {
-      log.error("kvkk_erasure_demo_failed", { ref: row.ref, code: error.code ?? null, message: error.message ?? null });
-      result.failed.push({ office: "EmlakSoft demo talebi", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
-    } else result.demoRequests += 1;
+      log.error("kvkk_erasure_demo_failed", { ref: row.ref, count: chunk.length, code: error.code ?? null, message: error.message ?? null });
+      for (let k = 0; k < chunk.length; k++) result.failed.push({ office: "EmlakSoft demo talebi", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
+    } else result.demoRequests += chunk.length;
   }
-  for (const v of targets.filter((r) => r.kind === "visitor")) {
-    const { error } = await db.from("open_house_visitors").update({ full_name: "Anonim", email: null, phone: null, notes: null }).eq("id", v.id);
+  const visitorIds = targets.filter((r) => r.kind === "visitor").map((r) => r.id);
+  for (let i = 0; i < visitorIds.length; i += ERASURE_BATCH) {
+    const chunk = visitorIds.slice(i, i + ERASURE_BATCH);
+    const { error } = await db.from("open_house_visitors").update({ full_name: "Anonim", email: null, phone: null, notes: null }).in("id", chunk);
     if (error) {
-      log.error("kvkk_erasure_visitor_failed", { ref: row.ref, code: error.code ?? null, message: error.message ?? null });
-      result.failed.push({ office: "Açık ev ziyaretçi kaydı", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
-    } else result.visitors += 1;
+      log.error("kvkk_erasure_visitor_failed", { ref: row.ref, count: chunk.length, code: error.code ?? null, message: error.message ?? null });
+      for (let k = 0; k < chunk.length; k++) result.failed.push({ office: "Açık ev ziyaretçi kaydı", reason: "Kayıt yazılamadı; kısa süre sonra yeniden deneyin." });
+    } else result.visitors += chunk.length;
   }
   const done = result.failed.length === 0;
   const patch = {

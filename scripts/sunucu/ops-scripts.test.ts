@@ -6,7 +6,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { afterAll, describe, expect, it } from "vitest";
 
 /**
- * KQ4 — işletim betikleri (error-watch, cron-call, release, rollback, host-metrics).
+ * KQ4 — işletim betikleri (error-watch, cron-call, release, rollback, host-metrics, realtime-capacity-check).
  * Canlıya DOKUNMAZ: `docker` / `npm` / `git` PATH'te sahte betiklerle değiştirilir (her çağrı günlüğe yazılır); SQL
  * parçaları pglite'ta çalıştırılır (psql değişkenleri literal ile değiştirilerek). shellcheck kuruluysa (PATH ya da
  * SHELLCHECK) betikler ayrıca denetlenir.
@@ -23,6 +23,7 @@ has() { local w; for w in "\${@:2}"; do [ "$w" = "$1" ] && return 0; done; retur
 case "$1" in
   exec)
     if has curl "$@"; then
+      if has -i "$@"; then cat >> "$FAKE_DIR/curl_stdin.log"; fi
       n=$(cat "$FAKE_DIR/curl_n" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "$FAKE_DIR/curl_n"
       read -r -a codes <<< "\${FAKE_CODES:-200}"
       read -r -a rcs <<< "\${FAKE_CURL_RCS:-}"
@@ -106,6 +107,17 @@ describe("cron-call.sh: yeniden deneme + hata nabzı", () => {
     expect(r.code).toBe(0);
     expect(r.curls).toBe(1);
     expect(r.psql).toBe("");
+  });
+
+  it("gizli anahtar komut satırında geçmez: Authorization başlığı stdin'den (curl -H @-)", () => {
+    const r = cronCall("200", "cc-secret");
+    expect(r.code).toBe(0);
+    const calls = read(path.join(r.dir, "calls.log"));
+    expect(calls).toContain("docker exec -i emlaksoft-app curl");
+    expect(calls).toContain("-H @-");
+    expect(calls).not.toContain("test-secret");
+    expect(calls).not.toContain("Authorization");
+    expect(read(path.join(r.dir, "curl_stdin.log"))).toBe("Authorization: Bearer test-secret\n");
   });
 
   it("503 sonra 200 → bir yeniden deneme, nabız yazılmaz", () => {
@@ -263,7 +275,7 @@ exit 0
   function release(name: string, env: Record<string, string> = {}) {
     const { dir, bin } = fakeBin(name, {
       npm: NPM,
-      git: `#!/usr/bin/env bash\necho "git $*" >> "$FAKE_DIR/calls.log"\nexit 0\n`,
+      git: `#!/usr/bin/env bash\necho "git $*" >> "$FAKE_DIR/calls.log"\n[ "$1" = status ] && [ -n "\${FAKE_GIT_STATUS:-}" ] && printf '%b' "$FAKE_GIT_STATUS"\nexit 0\n`,
     });
     const repo = path.join(dir, "repo");
     mkdirSync(path.join(repo, "scripts/sunucu"), { recursive: true });
@@ -319,6 +331,51 @@ exit 0
     expect(r.calls).toContain("git push");
     expect(r.psql).not.toContain("notify pgrst");
     expect(r.psql.indexOf("pgrst_ddl_watch enable")).toBeGreaterThan(r.psql.indexOf("pgrst_ddl_watch disable"));
+  });
+
+  it("kirli çalışma ağacı yayını en başta durdurur (kapı, prova, migrate, deploy YOK)", () => {
+    const r = release("rel-dirty", { FAKE_GIT_STATUS: " M src/app/page.tsx\\n?? notlar.txt\\n" });
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("Çalışma ağacı kirli");
+    expect(r.out).toContain("src/app/page.tsx");
+    expect(r.calls).toContain("git status --porcelain");
+    expect(r.calls).not.toContain("db:rehearse");
+    expect(r.calls).not.toContain("db:migrate");
+    expect(r.calls).not.toContain("DEPLOY_CALLED");
+    expect(r.calls).not.toContain("git push");
+  });
+
+  it(".claude/ altındaki izlenmeyen dosyalar kirli sayılmaz", () => {
+    const r = release("rel-claude", { FAKE_GIT_STATUS: "?? .claude/\\n?? .claude/worktrees/x/\\n" });
+    expect(r.code).toBe(0);
+    expect(r.out).not.toContain("kirli");
+    expect(r.calls).toContain("DEPLOY_CALLED");
+  });
+
+  it("ALLOW_DIRTY=1 bilinçli geçiştir ve günlüğe yazılır", () => {
+    const r = release("rel-allow-dirty", { FAKE_GIT_STATUS: " M .claude/settings.json\\n", ALLOW_DIRTY: "1" });
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("[uyari] çalışma ağacı kirli (ALLOW_DIRTY=1");
+    expect(r.out).toContain(".claude/settings.json");
+    expect(r.calls).toContain("DEPLOY_CALLED");
+  });
+});
+
+describe("realtime-capacity-check.sh --install", () => {
+  it("cron.d + logrotate dosyalarını yazar, ölçüm yapmaz (docker çağrısı yok)", () => {
+    const { dir, bin } = fakeBin("rt-install");
+    const cron = path.join(dir, "cron");
+    const rotate = path.join(dir, "rotate");
+    const r = run(path.join(DIR, "realtime-capacity-check.sh"), ["--install"], {
+      FAKE_DIR: dir, RT_CAPACITY_CRON_FILE: cron, RT_CAPACITY_LOGROTATE_FILE: rotate, RT_CAPACITY_LOG: "/var/log/x.log",
+    }, bin);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("realtime-capacity cron kuruldu");
+    const c = read(cron);
+    expect(c).toContain("SHELL=/bin/bash");
+    expect(c).toMatch(/^\* \* \* \* \* root \/.+\/scripts\/sunucu\/realtime-capacity-check\.sh >> \/var\/log\/x\.log 2>&1$/m);
+    expect(read(rotate)).toContain("/var/log/x.log {");
+    expect(read(path.join(dir, "calls.log"))).toBe("");
   });
 });
 
@@ -540,7 +597,7 @@ describe("deploy.sh: prune_images son ok sürümleri korur", () => {
 const SHELLCHECK = process.env.SHELLCHECK || (spawnSync("shellcheck", ["--version"]).status === 0 ? "shellcheck" : "");
 describe.skipIf(!SHELLCHECK)("shellcheck", () => {
   it("sunucu betikleri temiz", () => {
-    const files = ["error-watch.sh", "cron-call.sh", "release.sh", "deploy.sh", "rollback.sh", "host-metrics.sh"]
+    const files = ["error-watch.sh", "cron-call.sh", "release.sh", "deploy.sh", "rollback.sh", "host-metrics.sh", "realtime-capacity-check.sh"]
       .map((f) => path.join(DIR, f));
     const r = spawnSync(SHELLCHECK, files, { encoding: "utf8" });
     expect(r.stdout + r.stderr).toBe("");

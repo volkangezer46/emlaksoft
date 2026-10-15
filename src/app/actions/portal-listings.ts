@@ -131,14 +131,23 @@ export async function createPortalListing(formData: FormData): Promise<PortalRes
  * `lc_submit_manual_check('present')` RPC'sine de yazılır (JWT'den ofis/kullanıcı, izin + kapsam RPC'de; admin client
  * KULLANILMAZ). En iyi çaba: şema yoksa/RPC reddederse teyit damgası yine de geçerlidir.
  */
+const MANUAL_CHECK_CONCURRENCY = 5;
+
 async function recordManualPresent(listingIds: readonly string[]): Promise<void> {
   const ids = [...new Set(listingIds)].slice(0, 100);
   if (ids.length === 0) return;
   try {
     const supabase = await createClient();
-    for (const id of ids) {
-      const { error } = await supabase.rpc("lc_submit_manual_check", { p_listing_id: id, p_result: "present", p_observed: {} });
-      if (error && !isMissingSchema(error)) console.error("recordManualPresent", { code: error.code });
+    // RPC satır başınadır (p_listing_id tekil): sıralı döngü yerine küçük eşzamanlılıkla (MANUAL_CHECK_CONCURRENCY)
+    // gruplar halinde çağrılır; bir çağrının hatası öbürlerini durdurmaz.
+    for (let i = 0; i < ids.length; i += MANUAL_CHECK_CONCURRENCY) {
+      const chunk = ids.slice(i, i + MANUAL_CHECK_CONCURRENCY);
+      const results = await Promise.all(
+        chunk.map((id) => supabase.rpc("lc_submit_manual_check", { p_listing_id: id, p_result: "present", p_observed: {} })),
+      );
+      for (const { error } of results) {
+        if (error && !isMissingSchema(error)) console.error("recordManualPresent", { code: error.code });
+      }
     }
   } catch (e) {
     console.error("recordManualPresent", e);

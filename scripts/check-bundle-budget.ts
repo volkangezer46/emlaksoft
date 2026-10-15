@@ -30,20 +30,43 @@ import { measureHtml, type HtmlMeasure } from "../src/lib/perf/measure-html";
 import { STATIC_ROUTES } from "../src/lib/static-home/registry";
 import { buildStaticHome } from "../src/lib/static-home/transform";
 
-/** Bütçe ölçülen panel rotaları (ana sayfa statik HTML; Next JS'i yok → hedef değil). */
-export const BUDGET_ROUTES = ["/app", "/app/musteriler", "/app/portfoyler", "/admin"] as const;
+/** Bütçe ölçülen rotalar (ana sayfa statik HTML; Next JS'i yok → hedef değil). Dinamik bölüm klasör adıyla yazılır. */
+export const BUDGET_ROUTES = [
+  "/app",
+  "/app/musteriler",
+  "/app/portfoyler",
+  "/admin",
+  "/app/portfoyler/[id]",
+  "/vitrin/[slug]/[ilan]",
+  "/app/ice-aktarma",
+  "/app/giderler",
+] as const;
 
 /**
  * Eşikler: 2026-10-13 ilk yük inceltmesi sonrası derleme ölçümü + ~%5, yukarı yuvarlı
  * (ölçüm: /app 190.9 · /app/musteriler 193.6 · /app/portfoyler 198.4 · /admin 181.2 KB gzip; önceki: 221.6 · 269.7 · 248.0 · 233.7).
  * Ölçüm tablosu: docs/HAFIZA.md "Panel JS bütçesi". Bilinçli büyüme olursa yeniden ölç, tabloyu ve burayı birlikte güncelle.
+ *
+ * `initial: true` = BAŞLANGIÇ eşiği (2026-10-16): derlemesiz eklendi, ölçülmedi. Değer mevcut panel ölçeğinin (~190-210 KB)
+ * üstünde, gevşek tutuldu (detay/sihirbaz sayfaları daha çok istemci bileşeni taşır). Bu rotalarda aşım ve ölçüm eksiği
+ * --gate'te de yalnız UYARIDIR (çıkış kodunu değiştirmez). İlk derleme ölçümünden sonra eşik ölçüm + ~%5'e çekilip bayrak
+ * kaldırılır; o andan itibaren kapı onları da durdurur.
  */
-export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number }> = {
+export const BUDGET: Record<(typeof BUDGET_ROUTES)[number], { gzipKb: number; initial?: boolean }> = {
   "/app": { gzipKb: 201 },
   "/app/musteriler": { gzipKb: 204 },
   "/app/portfoyler": { gzipKb: 209 },
   "/admin": { gzipKb: 191 },
+  "/app/portfoyler/[id]": { gzipKb: 260, initial: true },
+  "/vitrin/[slug]/[ilan]": { gzipKb: 240, initial: true },
+  "/app/ice-aktarma": { gzipKb: 250, initial: true },
+  "/app/giderler": { gzipKb: 240, initial: true },
 };
+
+/** Başlangıç (henüz ölçülmemiş) eşikli rota mı: ihlali kapıyı düşürmez, uyarı olarak yazılır. */
+export function isInitialBudget(route: string): boolean {
+  return BUDGET[route as keyof typeof BUDGET]?.initial === true;
+}
 /** Kopya modül oranı üst sınırı (kabul ölçütü < %10). */
 export const MAX_DUP_RATIO = 0.1;
 /** Rota başına ilk yük istek sayısı üst sınırı (JS + CSS). */
@@ -302,12 +325,13 @@ export function budgetReport(nextDir: string, gate: boolean): number {
     const l = measureRoute(nextDir, route, rootMainFiles);
     if (l) loads.push(l);
   }
-  console.log("\nPanel ilk yük bütçesi (gzip; kök + layout zinciri + sayfa)");
+  console.log("\nRota ilk yük bütçesi (gzip; kök + layout zinciri + sayfa; * = başlangıç eşiği)");
   console.log("-".repeat(72));
   for (const l of loads) {
     const limit = BUDGET[l.route as keyof typeof BUDGET]?.gzipKb;
+    const mark = isInitialBudget(l.route) ? "*" : " ";
     console.log(
-      `${l.gzipKb.toFixed(1).padStart(7)} KB gz /${String(limit).padStart(4)}  ${l.rawKb.toFixed(0).padStart(5)} KB ham  ` +
+      `${l.gzipKb.toFixed(1).padStart(7)} KB gz /${String(limit).padStart(4)}${mark} ${l.rawKb.toFixed(0).padStart(5)} KB ham  ` +
         `kopya %${(l.dupRatio * 100).toFixed(1).padStart(4)}  istek ${String(l.requests).padStart(2)} (${l.jsFiles.length} js)  ${l.route}`,
     );
   }
@@ -316,13 +340,21 @@ export function budgetReport(nextDir: string, gate: boolean): number {
     console.error("Ölçülecek panel rotası bulunamadı (derleme eksik?).");
     return gate ? 1 : 0;
   }
+  // Başlangıç eşikli rotalar (BUDGET[…].initial) kapıyı düşürmez: ihlal/eksikleri ayrı uyarı olarak yazılır.
   const gaps = coverageGaps(loads);
-  if (gaps.length > 0) {
+  const hardGaps = gaps.filter((g) => !isInitialBudget(g.route));
+  const all = [...checkBudget(loads), ...gaps];
+  const soft = all.filter((v) => isInitialBudget(v.route));
+  if (hardGaps.length > 0) {
     const log = gate ? console.error : console.warn;
-    log(`\nÖlçüm eksiği (${gaps.length})${gate ? "" : " — uyarı"}:`);
-    for (const g of gaps) log(`  ${g.route}: ${g.message}`);
+    log(`\nÖlçüm eksiği (${hardGaps.length})${gate ? "" : " — uyarı"}:`);
+    for (const g of hardGaps) log(`  ${g.route}: ${g.message}`);
   }
-  const violations = [...checkBudget(loads), ...(gate ? gaps : [])];
+  if (soft.length > 0) {
+    console.warn(`\nBaşlangıç eşikli rota uyarısı (${soft.length}; kapıyı düşürmez, ölçüp eşiği güncelleyin):`);
+    for (const v of soft) console.warn(`  ${v.route}: ${v.message}`);
+  }
+  const violations = [...checkBudget(loads).filter((v) => !isInitialBudget(v.route)), ...(gate ? hardGaps : [])];
   if (violations.length === 0) {
     console.log("Bütçe içinde.");
     return 0;

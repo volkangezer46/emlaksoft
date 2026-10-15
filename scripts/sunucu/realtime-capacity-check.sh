@@ -9,13 +9,40 @@
 #   tekrarlar ayni satirin occurrences sayacini arttirir) -> /admin/sistem?sekme=hatalar + error-watch.sh hata akisi +
 #   uygulama ici "hata patlamasi" kurali. Ayni uyari en sik REPEAT_MIN dakikada bir yazilir (durum dosyasi).
 #
-# KURULUM (sahibin/ana oturumun adimi; bir kez):
-#   printf '%s\n' '* * * * * root /root/emlaksoft/scripts/sunucu/realtime-capacity-check.sh >> /var/log/emlaksoft/realtime-capacity.log 2>&1' \
-#     > /etc/cron.d/emlaksoft-realtime-capacity && chmod 644 /etc/cron.d/emlaksoft-realtime-capacity
+# KURULUM (tek sefer, root; sahibin/ana oturumun adimi): scripts/sunucu/realtime-capacity-check.sh --install
+#   -> /etc/cron.d/emlaksoft-realtime-capacity (dakikada bir) + /etc/logrotate.d/emlaksoft-realtime-capacity
+#   (gunluk: /var/log/emlaksoft-realtime-capacity.log). host-metrics.sh --install ile ayni kalip; yeniden calistirmak guvenli.
 # Elle deneme (yazmadan): RT_CAPACITY_DRY=1 scripts/sunucu/realtime-capacity-check.sh
 # Test: RT_CAPACITY_FAKE_CONNECTED / RT_CAPACITY_FAKE_MAX (olcum yerine), RT_CAPACITY_STATE (durum dosyasi),
 #   RT_CAPACITY_DRY=1 (DB'ye yazmaz; karar satirini basar).
 set -uo pipefail
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+
+if [ "${1:-}" = "--install" ]; then
+  # Test: RT_CAPACITY_CRON_FILE / RT_CAPACITY_LOGROTATE_FILE / RT_CAPACITY_LOG (gercek /etc yerine).
+  CRON_FILE=${RT_CAPACITY_CRON_FILE:-/etc/cron.d/emlaksoft-realtime-capacity}
+  ROTATE_FILE=${RT_CAPACITY_LOGROTATE_FILE:-/etc/logrotate.d/emlaksoft-realtime-capacity}
+  LOG=${RT_CAPACITY_LOG:-/var/log/emlaksoft-realtime-capacity.log}
+  cat > "$CRON_FILE" <<CRON || exit 1
+# OTOMATIK: scripts/sunucu/realtime-capacity-check.sh --install — Realtime kapasite uyarisi (dakikada bir)
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * root $SELF >> $LOG 2>&1
+CRON
+  chmod 644 "$CRON_FILE"
+  cat > "$ROTATE_FILE" <<R || exit 1
+$LOG {
+  weekly
+  rotate 4
+  compress
+  missingok
+  notifempty
+}
+R
+  echo "realtime-capacity cron kuruldu ($CRON_FILE)"
+  exit 0
+fi
+
 DB=${RT_CAPACITY_DB:-supabase-db-moqbebljyeyprktd19zb1ihn}
 RT=${RT_CAPACITY_RT:-realtime-dev-moqbebljyeyprktd19zb1ihn}
 TENANT=${RT_CAPACITY_TENANT:-realtime-dev}
