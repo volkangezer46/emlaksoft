@@ -1,6 +1,6 @@
 /**
  * Proje ve daire düzenleme doğrulaması (SAF; server action'lar ve testler ortak kullanır).
- * DB kolonlarıyla birebir: projects (name, developer_name, location, delivery_date, description, status),
+ * DB kolonlarıyla birebir: projects (name, developer_name, location, district_id, delivery_date, description, status),
  * project_units (block, floor, unit_no, rooms, gross_m2 numeric(8,1), list_price numeric(14,2), notes).
  * Daire DURUMU burada düzenlenmez: rezerve/kapora/satış/serbest bırakma kendi denetimli akışındadır
  * (satış atomik RPC + DB tetikleyicisi).
@@ -36,6 +36,13 @@ export const projectEditSchema = z.object({
   name: z.string().trim().min(1, "Proje adı zorunludur.").max(160, "Proje adı en fazla 160 karakter olabilir."),
   developer_name: optText(160),
   location: optText(240),
+  /** İlçe (eşleşme ve bölge analizi için; GeoSelect). Boş = seçilmedi. */
+  district_id: z
+    .string()
+    .trim()
+    .default("")
+    .refine((v) => v === "" || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v), "Geçerli bir ilçe seçin.")
+    .transform((v) => (v === "" ? null : v)),
   delivery_date: z
     .string()
     .trim()
@@ -71,7 +78,7 @@ export function formFields<K extends string>(fd: FormData, keys: readonly K[]): 
   return out;
 }
 
-export const PROJECT_EDIT_FIELDS = ["id", "name", "developer_name", "location", "delivery_date", "description", "status"] as const;
+export const PROJECT_EDIT_FIELDS = ["id", "name", "developer_name", "location", "district_id", "delivery_date", "description", "status"] as const;
 export const UNIT_EDIT_FIELDS = ["id", "block", "floor", "unit_no", "rooms", "gross_m2", "list_price", "notes"] as const;
 
 /** İlk Zod hata mesajı (kullanıcıya tek, anlaşılır cümle). */

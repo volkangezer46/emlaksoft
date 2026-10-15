@@ -14,6 +14,12 @@ import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/tab
 import { PrintButton } from "@/components/ui/print-button";
 import { ShareButton } from "./share-button";
 import { ValuationManage } from "./valuation-manage";
+import { ComparablesEditor, type EditorRow } from "./comparables-editor";
+import { PresentationPanel } from "./presentation-panel";
+import { readComparablesEntry, reportComparables, hasEdits } from "@/lib/valuation/comparable-selection";
+import { DEFAULT_PRESENTATION_OPTIONS, readPresentationEntry } from "@/lib/valuation/listing-pitch";
+import { ReportPitch } from "@/components/valuation/report-pitch";
+import { getBaseUrl } from "@/lib/base-url";
 
 export const metadata = { title: "Değerleme raporu" };
 
@@ -96,13 +102,33 @@ export default async function ValuationReportPage({
           .maybeSingle()
       : Promise.resolve({ data: null }),
     valuation.created_by
-      ? supabase.from("profiles").select("full_name").eq("id", valuation.created_by).maybeSingle()
+      ? supabase.from("profiles").select("full_name, title, phone, photo_url, is_public").eq("id", valuation.created_by).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
 
   // Emsal anlık görüntüsü `sources` jsonb'sinde saklanıyor (yeni kayıtlar);
   // ağırlık/bilgi listelerine sızmasın diye adıyla ayıklanır.
   const storedComparables = extractStoredComparables(valuation.sources);
+  const { selection } = readComparablesEntry(valuation.sources);
+  const selectionEdited = hasEdits(selection);
+  const presentation = readPresentationEntry(valuation.sources);
+  // Sunum açıksa randevu bağlantısı (danışmanın etkin online randevu sayfası) — yalnız sunum bölümünde kullanılır.
+  const { data: booking } =
+    presentation?.options.enabled && presentation.options.cta && valuation.created_by && tenantId
+      ? await supabase
+          .from("booking_settings")
+          .select("public_token")
+          .eq("tenant_id", tenantId)
+          .eq("staff_id", valuation.created_by)
+          .eq("is_active", true)
+          .maybeSingle()
+      : { data: null };
+  const bookingToken = (booking as { public_token?: string } | null)?.public_token ?? null;
+  const authorRow = author as { full_name?: string | null; title?: string | null; phone?: string | null; photo_url?: string | null; is_public?: boolean } | null;
+  const pitchAdvisor =
+    authorRow?.full_name
+      ? { name: authorRow.full_name, title: authorRow.title ?? null, phone: authorRow.is_public ? authorRow.phone ?? null : null, photoUrl: authorRow.photo_url ?? null }
+      : null;
   const sources = (Array.isArray(valuation.sources) ? valuation.sources : []).filter(
     (s: ValuationSource) => !isInternalSource(s.name),
   ) as ValuationSource[];
@@ -161,6 +187,41 @@ export default async function ValuationReportPage({
   const sourceLabel = (s: ComparableDetail["source"]) =>
     s === "won_deal" ? "Kapanış (satış)" : "Ofis portföyü";
 
+  // PF-02: rapor tablosu yalnız DAHİL emsalleri + danışman girdilerini gösterir; düzenleyici hepsini.
+  const selectionRows = reportComparables(storedComparables ? comparableRows : [], selection);
+  const editorRows: EditorRow[] = selectionRows.map((r) =>
+    r.kind === "engine"
+      ? {
+          key: r.key,
+          kind: "engine",
+          label: r.row.property_code ?? r.row.title ?? "Emsal",
+          href: r.row.property_code ? `/app/portfoyler/${r.row.property_id}` : null,
+          sourceLabel: sourceLabel(r.row.source),
+          rooms: r.row.rooms,
+          sqm: r.row.sqm,
+          price: r.row.price,
+          sqmPrice: r.row.adjusted_price_per_sqm ?? r.row.price_per_sqm,
+          included: r.included,
+        }
+      : {
+          key: r.key,
+          kind: "manual",
+          label: r.manual.title ?? "Elle emsal",
+          href: null,
+          sourceLabel: "Danışman girdisi",
+          rooms: r.manual.rooms,
+          sqm: r.manual.sqm,
+          price: r.manual.price,
+          sqmPrice: Math.round(r.manual.price / r.manual.sqm),
+          included: true,
+          manualId: r.manual.id,
+          sourceUrl: r.manual.source_url,
+        },
+  );
+  const includedEngine = comparablesRecomputed ? comparableRows : selectionRows.flatMap((r) => (r.kind === "engine" && r.included ? [r.row] : []));
+  const manualIncluded = selection.manual;
+  const reportCount = includedEngine.length + manualIncluded.length;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -197,6 +258,25 @@ export default async function ValuationReportPage({
           </>
         }
       />
+
+      {canEdit && !comparablesRecomputed ? (
+        <ComparablesEditor
+          key={`${selection.edited_at ?? "motor"}:${selection.excluded.join(",")}:${selection.manual.length}`}
+          valuationId={valuation.id}
+          rows={editorRows}
+          edited={selectionEdited}
+          needsTargetSqm={!selection.target_sqm && !sqm}
+        />
+      ) : null}
+      {canEdit ? (
+        <PresentationPanel
+          key={presentation?.computed_at ?? "yok"}
+          valuationId={valuation.id}
+          initial={presentation?.options ?? DEFAULT_PRESENTATION_OPTIONS}
+          computedAt={presentation?.computed_at || null}
+          cardCount={presentation?.cards.length ?? 0}
+        />
+      ) : null}
 
       <article className="print-sheet surface-card rounded-[var(--radius-panel)] p-6 sm:p-8">
         {/* Rapor başlığı — çıktıda ofis adı belgenin üst bandı oluyor. */}
@@ -377,15 +457,17 @@ export default async function ValuationReportPage({
         </section>
 
         {/* Kullanılan emsaller — tahminin dayandığı somut kayıtlar */}
-        {comparableRows.length > 0 ? (
+        {reportCount > 0 ? (
           <section className="print-avoid-break mt-7">
             <h2 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
               <Building2 className="h-4 w-4 text-brand-600" /> Kullanılan emsaller
             </h2>
             <p className="mt-1 text-xs text-text-faint">
-              Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay.
+              {selectionEdited
+                ? `Danışman tarafından seçilmiş ${reportCount} emsal. `
+                : "Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay. "}
               ₺/m², hedefin kat/yaş/ısıtma/cephe farkına göre düzeltilmiştir; ham değerden
-              farklıysa altında küçük yazıyla gösterilir.
+              farklıysa altında küçük yazıyla gösterilir. Danışman girdisi emsallere düzeltme uygulanmaz.
             </p>
             <TableFrame stack className="mt-3" minWidth={640}>
               <Table>
@@ -401,7 +483,7 @@ export default async function ValuationReportPage({
                   </TR>
                 </THead>
                 <TBody>
-                  {comparableRows.map((c, i) => (
+                  {includedEngine.map((c, i) => (
                     <TR key={`${c.property_id}-${c.source}-${i}`}>
                       <TD primary className="font-semibold text-ink-950">
                         {c.property_code ? (
@@ -438,6 +520,17 @@ export default async function ValuationReportPage({
                       <TD label="Kaynak" className="text-text-muted">{sourceLabel(c.source)}</TD>
                     </TR>
                   ))}
+                  {manualIncluded.map((m) => (
+                    <TR key={`manual-${m.id}`}>
+                      <TD primary className="font-semibold text-ink-950">{m.title ?? "Elle emsal"}</TD>
+                      <TD label="İlçe">{district?.name ?? "—"}</TD>
+                      <TD label="Oda">{m.rooms ?? "—"}</TD>
+                      <TD label="m²" align="right">{m.sqm}</TD>
+                      <TD label="Fiyat" align="right">{money(m.price)}</TD>
+                      <TD label="Düzeltilmiş ₺/m²" align="right">{money(Math.round(m.price / m.sqm))}</TD>
+                      <TD label="Kaynak" className="text-text-muted">Danışman girdisi</TD>
+                    </TR>
+                  ))}
                 </TBody>
               </Table>
             </TableFrame>
@@ -448,6 +541,15 @@ export default async function ValuationReportPage({
               </p>
             ) : null}
           </section>
+        ) : null}
+
+        {presentation ? (
+          <ReportPitch
+            entry={presentation}
+            officeName={office?.name ?? "Emlak ofisi"}
+            advisor={pitchAdvisor}
+            bookingHref={bookingToken ? `${getBaseUrl()}/randevu-al/${bookingToken}` : null}
+          />
         ) : null}
 
         {valuation.notes ? (

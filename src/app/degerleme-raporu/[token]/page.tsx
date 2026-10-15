@@ -17,6 +17,9 @@ import {
 import { Table, TableFrame, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { ShareButton } from "@/components/public/share-button";
 import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
+import { readComparablesEntry, reportComparables, hasEdits } from "@/lib/valuation/comparable-selection";
+import { readPresentationEntry } from "@/lib/valuation/listing-pitch";
+import { ReportPitch } from "@/components/valuation/report-pitch";
 
 type ValuationSource = { name: string; weight: number; value: number; note: string };
 
@@ -92,7 +95,7 @@ export default async function PublicValuationReportPage({
     valuation.created_by
       ? admin
           .from("profiles")
-          .select("full_name")
+          .select("full_name, title, phone, photo_url, is_public")
           .eq("id", valuation.created_by)
           .eq("tenant_id", valuation.tenant_id)
           .eq("is_active", true)
@@ -147,6 +150,39 @@ export default async function PublicValuationReportPage({
   comparableRows = comparableRows.slice(0, 8);
   const sourceLabel = (s: ComparableDetail["source"]) =>
     s === "won_deal" ? "Kapanış (satış)" : "Ofis portföyü";
+
+  // PF-02: yalnız danışmanın DAHİL ettiği emsaller + danışman girdileri (çıkarılanlar müşteriye görünmez).
+  const { selection } = readComparablesEntry(valuation.sources);
+  const selectionEdited = hasEdits(selection);
+  const includedEngine = storedComparables
+    ? reportComparables(comparableRows, selection).flatMap((r) => (r.kind === "engine" && r.included ? [r.row] : []))
+    : comparableRows;
+  const manualIncluded = storedComparables || selection.manual.length > 0 ? selection.manual : [];
+  const reportCount = includedEngine.length + manualIncluded.length;
+
+  // PF-03: yetki alma sunumu (kayıttaki anlık görüntü; bu sayfa ofis verisi için ayrı sorgu atmaz).
+  const presentation = readPresentationEntry(valuation.sources);
+  const { data: booking } =
+    presentation?.options.enabled && presentation.options.cta && valuation.created_by && author
+      ? await admin
+          .from("booking_settings")
+          .select("public_token")
+          .eq("tenant_id", valuation.tenant_id)
+          .eq("staff_id", valuation.created_by)
+          .eq("is_active", true)
+          .maybeSingle()
+      : { data: null };
+  const bookingToken = (booking as { public_token?: string } | null)?.public_token ?? null;
+  const authorRow = author as { full_name?: string | null; title?: string | null; phone?: string | null; photo_url?: string | null; is_public?: boolean } | null;
+  // Danışman telefonu ve fotoğrafı yalnız herkese açık profilde (vitrin kuralı).
+  const pitchAdvisor = authorRow?.full_name
+    ? {
+        name: authorRow.full_name,
+        title: authorRow.title ?? null,
+        phone: authorRow.is_public ? authorRow.phone ?? null : null,
+        photoUrl: authorRow.is_public ? authorRow.photo_url ?? null : null,
+      }
+    : null;
 
   return (
     <div className="min-h-screen bg-canvas px-4 py-8 sm:py-12">
@@ -306,13 +342,15 @@ export default async function PublicValuationReportPage({
           </section>
 
           {/* Kullanılan emsaller — kodlar maskeli, link yok (public) */}
-          {comparableRows.length > 0 ? (
+          {reportCount > 0 ? (
             <section className="print-avoid-break mt-7">
               <h2 className="flex items-center gap-2 font-display text-base font-bold text-ink-950">
                 <Building2 className="h-4 w-4 text-brand-600" /> Kullanılan emsaller
               </h2>
               <p className="mt-1 text-xs text-text-faint">
-                Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay.
+                {selectionEdited
+                  ? `Danışman tarafından seçilmiş ${reportCount} emsal. `
+                  : "Emsal motoru bu kayıtlara dayandı — aynı ilçe/tip, m² bandı ±%30, son 18 ay. "}
                 Gizlilik gereği portföy kimlikleri maskelenmiştir.
               </p>
               <TableFrame className="mt-3" minWidth={620}>
@@ -329,7 +367,7 @@ export default async function PublicValuationReportPage({
                     </TR>
                   </THead>
                   <TBody>
-                    {comparableRows.map((c, i) => (
+                    {includedEngine.map((c, i) => (
                       <TR key={`${c.property_id}-${c.source}-${i}`}>
                         <TD className="font-semibold text-ink-950">{`Emsal ${i + 1}`}</TD>
                         <TD>{c.district_name ?? district?.name ?? "—"}</TD>
@@ -338,6 +376,17 @@ export default async function PublicValuationReportPage({
                         <TD align="right">{money(c.price)}</TD>
                         <TD align="right">{c.price_per_sqm != null ? money(c.price_per_sqm) : "—"}</TD>
                         <TD className="text-text-muted">{sourceLabel(c.source)}</TD>
+                      </TR>
+                    ))}
+                    {manualIncluded.map((m, i) => (
+                      <TR key={`manual-${m.id}`}>
+                        <TD className="font-semibold text-ink-950">{`Emsal ${includedEngine.length + i + 1}`}</TD>
+                        <TD>{district?.name ?? "—"}</TD>
+                        <TD>{m.rooms ?? "—"}</TD>
+                        <TD align="right">{m.sqm}</TD>
+                        <TD align="right">{money(m.price)}</TD>
+                        <TD align="right">{money(Math.round(m.price / m.sqm))}</TD>
+                        <TD className="text-text-muted">Danışman girdisi</TD>
                       </TR>
                     ))}
                   </TBody>
@@ -350,6 +399,15 @@ export default async function PublicValuationReportPage({
                 </p>
               ) : null}
             </section>
+          ) : null}
+
+          {presentation ? (
+            <ReportPitch
+              entry={presentation}
+              officeName={officeName}
+              advisor={pitchAdvisor}
+              bookingHref={bookingToken ? `/randevu-al/${bookingToken}` : null}
+            />
           ) : null}
 
           {valuation.notes ? (

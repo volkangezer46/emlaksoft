@@ -37,6 +37,7 @@ const UNSTABLE_CACHE_REGISTRY: Record<string, { calls: number; scope: Scope; why
   "src/lib/definitions.ts": { calls: 1, scope: "tenant", why: "tanımlar; anahtar scope = tenantId ?? global" },
   "src/lib/ef-credits/credit-reader.ts": { calls: 2, scope: "platform", why: "EF hazır bayrağı + katalog" },
   "src/lib/ef-credits/public-state.ts": { calls: 1, scope: "platform", why: "EF genel durum" },
+  "src/lib/geo/district-centers.ts": { calls: 1, scope: "platform", why: "ilçe merkez koordinatları (bölge haritası)" },
   "src/lib/geo/reader.ts": { calls: 3, scope: "platform", why: "il/ilçe/mahalle sözlüğü" },
   "src/lib/geo/resolve.ts": { calls: 1, scope: "platform", why: "coğrafya takma adları" },
   "src/lib/integrations/emlakfiyati/client.ts": { calls: 1, scope: "platform", why: "dış endeks verisi (bölge + tip argümanı)" },

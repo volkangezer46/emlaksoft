@@ -13,7 +13,7 @@ import { buildVitrinListingLd } from "./vitrin-seo/listing-ld";
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 const exists = (p: string) => existsSync(join(process.cwd(), p));
 
-const TOKEN_TREES = ["paylas", "sunum", "randevu-teyit", "musteri-portali", "malik-portali", "degerleme-raporu", "acik-ev-kayit"];
+const TOKEN_TREES = ["paylas", "sunum", "randevu-teyit", "musteri-portali", "malik-portali", "degerleme-raporu", "acik-ev-kayit", "proje"];
 
 const CONTACT_SURFACES = [
   "src/app/paylas/[token]/page.tsx",

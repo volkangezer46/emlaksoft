@@ -17,6 +17,7 @@ import {
 } from "@/lib/projects/edit-schemas";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { trDayKey } from "@/lib/clock";
+import { getDistrict } from "@/lib/geo/reader";
 
 export type ProjectResult = { ok?: boolean; error?: string; id?: string };
 
@@ -83,7 +84,7 @@ export async function getProject(id: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("projects")
-    .select("id, name, developer_name, location, delivery_date, description, status, created_at")
+    .select("id, name, developer_name, location, district_id, delivery_date, description, status, created_at")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();
@@ -177,11 +178,12 @@ export async function updateProject(_prev: ProjectResult, fd: FormData): Promise
   const parsed = projectEditSchema.safeParse(formFields(fd, PROJECT_EDIT_FIELDS));
   if (!parsed.success) return { error: firstIssue(parsed.error) };
   const { id, ...next } = parsed.data;
+  if (next.district_id && !(await getDistrict(next.district_id))) return { error: "Geçerli bir ilçe seçin." };
 
   const supabase = await createClient();
   const { data: before } = await supabase
     .from("projects")
-    .select("id, name, developer_name, location, delivery_date, description, status")
+    .select("id, name, developer_name, location, district_id, delivery_date, description, status")
     .eq("id", id)
     .eq("tenant_id", gate.tenantId)
     .maybeSingle();

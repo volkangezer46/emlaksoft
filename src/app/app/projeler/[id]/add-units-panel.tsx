@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, LayoutGrid, Plus } from "lucide-react";
+import { Copy, FileSpreadsheet, LayoutGrid, Plus } from "lucide-react";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea, FormField } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { addUnit, bulkAddUnits, type ProjectResult } from "@/app/actions/projects";
+import { UnitImportForm } from "./import-units";
 
 const PANEL_ID = "daire-ekle";
 const init: ProjectResult = {};
@@ -21,16 +22,17 @@ export function AddUnitsTrigger() {
 }
 
 /**
- * Daire ekleme — sayfa içi panel (popup değil), iki sekme:
+ * Daire ekleme — sayfa içi panel (popup değil), üç sekme:
  *  - Tekil: tek daire formu
  *  - Çoğalt: aynı bloka N kat × M daire hızlı üretim (daire no = kat×100+sıra)
+ *  - Fiyat listesi: Excel/CSV'den ekle ya da güncelle (PF-05)
  */
 export function AddUnitsPanel({ projectId }: { projectId: string }) {
   return (
     <InlinePanel
       id={PANEL_ID}
       title="Daire ekle"
-      description="Tek daire girin ya da Çoğalt ile aynı bloka kat kat stok üretin."
+      description="Tek daire girin, Çoğalt ile kat kat stok üretin ya da müteahhidin fiyat listesini Excel'den aktarın."
       icon={<LayoutGrid />}
     >
       {(close) => <AddUnitsForms projectId={projectId} onClose={close} />}
@@ -75,7 +77,14 @@ function AddUnitsForms({ projectId, onClose }: { projectId: string; onClose: () 
               <TabsTrigger value="cogalt" className="flex-1 justify-center">
                 <Copy /> Çoğalt
               </TabsTrigger>
+              <TabsTrigger value="excel" className="flex-1 justify-center">
+                <FileSpreadsheet /> Fiyat listesi
+              </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="excel" className="mt-4">
+              <UnitImportForm projectId={projectId} onDone={onClose} />
+            </TabsContent>
 
             <TabsContent value="tekil" className="mt-4">
               <form action={submit(addUnit)} className="space-y-4">

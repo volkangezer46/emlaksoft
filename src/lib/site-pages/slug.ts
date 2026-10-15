@@ -52,6 +52,7 @@ export const RESERVED_ROUTE_DIRS = [
   "onizleme",
   "p",
   "paylas",
+  "proje",
   "r",
   "randevu-al",
   "randevu-teyit",

@@ -534,6 +534,9 @@ const F = {
   a9AuthLoginThrottle: "20261018090000_auth_login_throttle.sql",
   a9OfficeTotp: "20261018090100_office_totp_two_factor.sql",
   a9KvkkSubjectExports: "20261018090200_kvkk_subject_exports.sql",
+  // B5 (2026-10-19): proje daire fiyat gecmisi + toplu zam/geri al + fiyat listesi aktarimi; proje paylasim sayfasi + galeri.
+  b5ProjectUnitPricing: "20261019050000_project_unit_pricing.sql",
+  b5ProjectPublicPage: "20261019050001_project_public_page.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -830,6 +833,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.a9AuthLoginThrottle]: "ek", // auth_login_throttle (opak kova) + peek/fail/clear RPC yalniz service_role; kod RPC yokken eski sabit pencereye duser
     [F.a9OfficeTotp]: "davranis", // profiles.two_factor_method + yontem surum tetigi + two_factor_recovery_codes; current_session_two_factor_satisfied TOTP+AAL2 oturumu da kabul eder
     [F.a9KvkkSubjectExports]: "ek", // kvkk_subject_exports (degismez dokum, yazma yalniz service_role, okuma compliance:view, 90 gun)
+    [F.b5ProjectUnitPricing]: "ek", // project_unit_price_history (yalniz tetik yazar, okuma projects:view) + liste fiyati AFTER UPDATE tetigi + bulk_reprice/undo/import RPC (DEFINER, kiraci + projects yetkisi; satilmis/odeme planli daire degismez)
+    [F.b5ProjectPublicPage]: "ek", // projects.share_token/share_enabled/share_show_prices/shared_at (varsayilan kapali) + project_media (ekleme yalniz service_role) + ozel project-media kovasi
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1108,6 +1113,8 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "A7-anket-google-yorum-izi", order: 1873, title: "surveys.review_clicked_at (sira serbest, ek; kod sutun yokken tiklama izini atlar)", files: [F.a7SurveyReviewClick] },
     { id: "A9-giris-kisitlayici", order: 1891, title: "Giris sertlestirme: hesap + IP basarisizlik kovalari ve ilerleyen bekleme (auth_login_throttle + peek/fail/clear, yalniz service_role; bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken check_rate_limit sabit penceresine duser; ek)", files: [F.a9AuthLoginThrottle] },
     { id: "A9-ofis-totp-2fa", order: 1892, title: "Ofis kullanicilari icin authenticator (TOTP) 2FA: profiles.two_factor_method (varsayilan sms) + yontem degisiminde two_factor_version artar + two_factor_recovery_codes (HMAC ozet, tek kullanim) + 2FA oturum kapisi TOTP yonteminde AAL2'yi de kabul eder (20261007001100 SONRASI; KOD YAYININDAN ONCE uygulanir: yeni kod two_factor_method okur; davranis)", files: [F.a9OfficeTotp] },
+    { id: "B5-proje-fiyat-listesi", order: 1950, title: "Proje fiyat listesi: daire fiyat gecmisi (tetik) + toplu zam/indirim ve 10 dk geri al + Excel/CSV fiyat listesi aktarimi RPC'leri (projects/unit_payments SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod RPC yokken bu dugmeler 'etkin degil' der; ek)", files: [F.b5ProjectUnitPricing] },
+    { id: "B5-proje-paylasim-sayfasi", order: 1951, title: "Proje paylasim sayfasi + galeri: projects paylasim sutunlari (varsayilan kapali), project_media, ozel project-media kovasi (KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutun yokken paylasim/galeri kartlari 'etkin degil' der, /proje/[token] 404; ek)", files: [F.b5ProjectPublicPage] },
     { id: "A9-kvkk-veri-dokumu", order: 1893, title: "KVKK veri sahibi dokumu: kvkk_subject_exports (talebe bagli degismez JSON + SHA-256; yazma yalniz service_role, okuma ofis + compliance:view, 90 gun saklama) (k5 kvkk_requests SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: tablo yokken dugme 'etkin degil' der; ek)", files: [F.a9KvkkSubjectExports] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
