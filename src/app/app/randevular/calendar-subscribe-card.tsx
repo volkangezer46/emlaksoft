@@ -22,6 +22,8 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [copied, setCopied] = useState<"https" | "webcal" | null>(null);
+  // GA-06: görevler varsayılan olarak aboneliğe dahil; kapatılırsa link `?gorevler=0` taşır (yeniden abone olmak gerekir).
+  const [withTasks, setWithTasks] = useState(true);
   // window.location.origin SSR'da yok — server snapshot null, client'ta gerçek
   // origin (hydration uyuşmazlığı olmadan, effect'te setState de gerekmeden).
   const origin = useSyncExternalStore(
@@ -30,7 +32,7 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
     () => null,
   );
 
-  const httpsUrl = origin && token ? `${origin}/api/takvim/${token}` : null;
+  const httpsUrl = origin && token ? `${origin}/api/takvim/${token}${withTasks ? "" : "?gorevler=0"}` : null;
   const webcalUrl = httpsUrl ? httpsUrl.replace(/^https?:\/\//, "webcal://") : null;
   const googleUrl = webcalUrl
     ? `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl)}`
@@ -71,9 +73,19 @@ export function CalendarSubscribeCard({ token }: { token: string | null }) {
         </div>
       </div>
       <p className="mt-3 text-xs leading-relaxed text-text-muted">
-        Randevularınız Google, Apple veya Outlook takviminizde otomatik güncellensin. Link size
-        özeldir — kimseyle paylaşmayın.
+        Randevularınız ve saatli görevleriniz Google, Apple veya Outlook takviminizde otomatik güncellensin; her
+        randevu 30 dk önce (konumluysa ayrıca 1 saat önce) hatırlatılır. Link size özeldir — kimseyle paylaşmayın.
       </p>
+      <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold text-ink-950">
+        <input
+          type="checkbox"
+          checked={withTasks}
+          onChange={(e) => setWithTasks(e.target.checked)}
+          className="h-4 w-4 accent-brand-600"
+        />
+        Görevleri de göster
+        <span className="font-normal text-text-muted">(değiştirirseniz takvimde yeniden abone olun)</span>
+      </label>
 
       {/* ICS linki + kopyala */}
       <div className="mt-4 flex items-center gap-2 rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2">

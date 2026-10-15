@@ -4,6 +4,8 @@ import { checkRateLimit, clientIp } from "@/lib/rate-limit";
 import { getBaseUrl } from "@/lib/base-url";
 import { log } from "@/lib/log";
 import { errorFields } from "@/lib/log-error";
+import { appointmentAlarmMinutes, escapeICS, foldICSLine, icsEventLines } from "@/lib/calendar/ics-feed";
+import { directionsHref } from "@/lib/route-plan";
 
 /**
  * Kişisel takvim aboneliği (ICS feed) — GET /api/takvim/[token]
@@ -18,6 +20,10 @@ import { errorFields } from "@/lib/log-error";
  * geçmiş 7 gün + gelecek 90 gün. İptal edilen randevu feed'den düşer —
  * takvim uygulaması bir sonraki senkronda etkinliği kendisi siler
  * (METHOD:CANCEL gerekmez).
+ *
+ * GA-06: her randevuda VALARM (30 dk önce; konumluysa ayrıca 60 dk önce), GEO (portföy koordinatı), URL (randevunun
+ * kendisi) ve açıklamada yol tarifi bağlantısı. Vadesi pencere içindeki AÇIK görevler 15 dk'lık "Görev: …" etkinliği
+ * olarak eklenir (10 dk önce alarm); `?gorevler=0` ile abonelik yalnız randevu taşır (abonelik kartındaki seçim).
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,26 +32,19 @@ const APP_URL = getBaseUrl();
 
 const TYPE_LABEL = APPOINTMENT_TYPE_LABELS;
 
-/** RFC 5545 TEXT kaçışı: ters bölü, noktalı virgül, virgül, satır sonu. */
-function escapeICS(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
-}
-
-/** Date → "YYYYMMDDTHHMMSSZ" (UTC). */
-function icsDate(d: Date): string {
-  return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-}
-
 type OwnerRel = { id?: string; full_name?: string | null; is_active?: boolean; tenant_id?: string | null };
 
-type Rel = { full_name?: string; title?: string; property_code?: string; address_line?: string } | null;
+type Rel = { full_name?: string; title?: string; property_code?: string; address_line?: string; lat?: number | null; lng?: number | null } | null;
+
+/** Görev etkinliğinin süresi (dk). */
+const TASK_EVENT_MIN = 15;
 
 function rel<T>(value: T | T[] | null): T | null {
   if (!value) return null;
   return (Array.isArray(value) ? value[0] : value) ?? null;
 }
 
-export async function GET(_req: Request, { params }: { params: Promise<{ token: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   // uuid olmayan girdi sorguya gitmeden 404 olsun (randevu-teyit deseni).
   if (!UUID_RE.test(token)) {
@@ -89,32 +88,47 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
   const windowStart = new Date(nowMs - 7 * 86_400_000).toISOString();
   const windowEnd = new Date(nowMs + 90 * 86_400_000).toISOString();
 
-  const { data: appts, error } = await admin
-    .from("appointments")
-    .select(
-      "id, appointment_type, scheduled_at, duration_min, location, notes, status, updated_at, customer:customers!appointments_customer_id_fkey(full_name), property:properties!appointments_property_id_fkey(title, property_code, address_line)",
-    )
-    .eq("tenant_id", profile.tenant_id)
-    .eq("assigned_to", profile.id)
-    .neq("status", "cancelled")
-    .gte("scheduled_at", windowStart)
-    .lte("scheduled_at", windowEnd)
-    .order("scheduled_at", { ascending: true })
-    .limit(500);
+  const includeTasks = new URL(req.url).searchParams.get("gorevler") !== "0";
+  const [{ data: appts, error }, taskRes] = await Promise.all([
+    admin
+      .from("appointments")
+      .select(
+        "id, appointment_type, scheduled_at, duration_min, location, notes, status, updated_at, customer:customers!appointments_customer_id_fkey(full_name), property:properties!appointments_property_id_fkey(title, property_code, address_line, lat, lng)",
+      )
+      .eq("tenant_id", profile.tenant_id)
+      .eq("assigned_to", profile.id)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", windowStart)
+      .lte("scheduled_at", windowEnd)
+      .order("scheduled_at", { ascending: true })
+      .limit(500),
+    includeTasks
+      ? admin
+          .from("tasks")
+          .select("id, title, notes, due_at, created_at, customer:customers!tasks_customer_id_fkey(full_name)")
+          .eq("tenant_id", profile.tenant_id)
+          .eq("assigned_to", profile.id)
+          .eq("status", "open")
+          .gte("due_at", windowStart)
+          .lte("due_at", windowEnd)
+          .order("due_at", { ascending: true })
+          .limit(500)
+      : Promise.resolve({ data: [] as unknown[], error: null }),
+  ]);
 
   if (error) {
     log.error("takvim_ics_feed_failed", { route: "/api/takvim/[token]", ...errorFields(error) });
     return new Response("Internal error", { status: 500 });
   }
 
-  const dtstamp = icsDate(new Date());
+  const now = new Date();
   const lines: string[] = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
     "PRODID:-//EmlakSoft//Randevular//TR",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
-    `X-WR-CALNAME:${escapeICS(`EmlakSoft Randevular — ${profile.full_name ?? ""}`.trim())}`,
+    foldICSLine(`X-WR-CALNAME:${escapeICS(`EmlakSoft Randevular — ${profile.full_name ?? ""}`.trim())}`),
     "X-WR-TIMEZONE:Europe/Istanbul",
     // Google Calendar yenileme aralığı ipucu
     "X-PUBLISHED-TTL:PT1H",
@@ -131,30 +145,58 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
     const summary = `${typeLabel} — ${customer?.full_name ?? "Müşteri belirtilmemiş"}`;
     // Konum: randevunun serbest metin konumu > portföy adresi > portföy başlığı
     const location = appt.location || property?.address_line || property?.title || property?.property_code || "";
+    const geo = property?.lat != null && property?.lng != null ? { lat: property.lat, lng: property.lng } : null;
+    const route = directionsHref({ lat: geo?.lat ?? null, lng: geo?.lng ?? null, location });
     const descriptionParts = [
       property?.title || property?.property_code ? `Portföy: ${property?.title || property?.property_code}` : "",
       appt.notes ? `Not: ${appt.notes}` : "",
-      `${APP_URL}/app/randevular`,
+      route ? `Yol tarifi: ${route}` : "",
+      `${APP_URL}/app/randevular?randevu=${appt.id}`,
     ].filter(Boolean);
 
     lines.push(
-      "BEGIN:VEVENT",
-      `UID:${appt.id}@emlaksoft`,
-      `DTSTAMP:${dtstamp}`,
-      `DTSTART:${icsDate(start)}`,
-      `DTEND:${icsDate(end)}`,
-      `SUMMARY:${escapeICS(summary)}`,
+      ...icsEventLines({
+        uid: `${appt.id}@emlaksoft`,
+        dtstamp: now,
+        start,
+        end,
+        summary,
+        location: location || null,
+        geo,
+        description: descriptionParts.join("\n"),
+        url: `${APP_URL}/app/randevular?randevu=${appt.id}`,
+        lastModified: appt.updated_at ? new Date(appt.updated_at) : null,
+        status: appt.status === "pending" ? "TENTATIVE" : "CONFIRMED",
+        alarmMinutes: appointmentAlarmMinutes(Boolean(location || geo)),
+      }),
     );
-    if (location) lines.push(`LOCATION:${escapeICS(location)}`);
-    lines.push(`DESCRIPTION:${escapeICS(descriptionParts.join("\n"))}`);
-    if (appt.updated_at) lines.push(`LAST-MODIFIED:${icsDate(new Date(appt.updated_at))}`);
-    lines.push(`STATUS:${appt.status === "pending" ? "TENTATIVE" : "CONFIRMED"}`);
-    lines.push("END:VEVENT");
+  }
+
+  // Saatli açık görevler (GA-06): 15 dk'lık etkinlik, 10 dk önce alarm. Görev hatası randevu akışını bozmaz.
+  if (taskRes.error) log.error("takvim_ics_tasks_failed", { route: "/api/takvim/[token]", ...errorFields(taskRes.error) });
+  type TaskRow = { id: string; title: string; notes: string | null; due_at: string; created_at: string | null; customer: Rel | Rel[] };
+  for (const task of (taskRes.data ?? []) as TaskRow[]) {
+    const start = new Date(task.due_at);
+    if (Number.isNaN(start.getTime())) continue;
+    const customer = rel(task.customer);
+    lines.push(
+      ...icsEventLines({
+        uid: `task-${task.id}@emlaksoft`,
+        dtstamp: now,
+        start,
+        end: new Date(start.getTime() + TASK_EVENT_MIN * 60_000),
+        summary: `Görev: ${task.title}${customer?.full_name ? ` — ${customer.full_name}` : ""}`,
+        description: [task.notes ?? "", `${APP_URL}/app/gorevler?gorev=${task.id}`].filter(Boolean).join("\n"),
+        url: `${APP_URL}/app/gorevler?gorev=${task.id}`,
+        status: "CONFIRMED",
+        alarmMinutes: [10],
+      }),
+    );
   }
 
   lines.push("END:VCALENDAR");
 
-  // CRLF şart (RFC 5545) — 75 oktet katlama zorunlu değil, uygulanmıyor.
+  // CRLF şart (RFC 5545); uzun satırlar 75 oktette katlanır (icsEventLines).
   const body = lines.join("\r\n") + "\r\n";
 
   return new Response(body, {
