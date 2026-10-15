@@ -151,34 +151,30 @@ function TargetCreateForm({ members, teams, branches, onDone }: { members: Membe
       ) : null}
 
       {scope === "takim" ? (
-        <FormField label="Takım" htmlFor="target-team" className="sm:col-span-2" required hint={teams.length === 0 ? "Ofiste tanımlı takım yok; Ekibim > Takımlar'dan ekleyebilirsiniz." : "Gerçekleşme takım üyelerinin toplamıdır."}>
-          <div className="relative">
-            <select id="target-team" name="team_id" defaultValue="" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface touch:min-h-11 touch:text-base" required>
-              <option value="">Takım seçin</option>
-              {teams.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          </div>
+        <FormField label="Takım" className="sm:col-span-2" required hint={teams.length === 0 ? "Ofiste tanımlı takım yok; Ekibim > Takımlar'dan ekleyebilirsiniz." : "Gerçekleşme takım üyelerinin toplamıdır."}>
+          <Combobox
+            name="team_id"
+            aria-label="Takım"
+            placeholder="Takım seçin"
+            searchPlaceholder="Takım ara…"
+            emptyText="Takım bulunamadı"
+            defaultValue=""
+            options={teams.map((t) => ({ value: t.id, label: t.name }))}
+          />
         </FormField>
       ) : null}
 
       {scope === "sube" ? (
-        <FormField label="Şube" htmlFor="target-branch" className="sm:col-span-2" required hint={branches.length === 0 ? "Ofiste tanımlı şube yok." : "Gerçekleşme şube danışmanlarının toplamıdır."}>
-          <div className="relative">
-            <select id="target-branch" name="branch_id" defaultValue="" className="w-full appearance-none rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none transition focus:border-brand-400 focus:bg-surface touch:min-h-11 touch:text-base" required>
-              <option value="">Şube seçin</option>
-              {branches.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-faint" />
-          </div>
+        <FormField label="Şube" className="sm:col-span-2" required hint={branches.length === 0 ? "Ofiste tanımlı şube yok." : "Gerçekleşme şube danışmanlarının toplamıdır."}>
+          <Combobox
+            name="branch_id"
+            aria-label="Şube"
+            placeholder="Şube seçin"
+            searchPlaceholder="Şube ara…"
+            emptyText="Şube bulunamadı"
+            defaultValue=""
+            options={branches.map((b) => ({ value: b.id, label: b.name }))}
+          />
         </FormField>
       ) : null}
 

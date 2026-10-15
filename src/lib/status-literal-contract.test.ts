@@ -53,7 +53,7 @@ const BASELINE: Record<Kind, Record<string, number>> = {
   anlasmaKapali: {
     "src/app/actions/ai-tenant-advisor.ts": 1,
     "src/app/actions/properties.ts": 1,
-    "src/app/app/anlasmalar/page.tsx": 3,
+    "src/app/app/anlasmalar/page.tsx": 1,
     "src/app/app/asistan/insights.ts": 1,
     "src/app/app/ekip/[id]/tab-panels.tsx": 1,
     "src/app/app/gorevler/page.tsx": 1,

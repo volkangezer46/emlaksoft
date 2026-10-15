@@ -39,10 +39,10 @@ export function MobileActionBar({
       {primary.href ? (
         <Link
           href={primary.href}
-          className="focus-ring press flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-brand-600 px-3 text-sm font-semibold text-white transition hover:bg-brand-700"
+          className="focus-ring press flex min-h-11 min-w-0 flex-1 items-center justify-between gap-2 rounded-[var(--radius-control)] bg-accent px-3 text-sm font-semibold text-accent-fg transition hover:bg-accent-hover"
         >
           <span className="min-w-0 truncate">{primary.title}</span>
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-white/85">
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold opacity-85">
             {primary.label} <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
         </Link>

@@ -77,8 +77,9 @@ export function updatedAgoLabel(days: number): string {
 /* SP1: aşamada geçen gün + aşamaya özel bayatlık                                                  */
 /* ---------------------------------------------------------------------------------------------- */
 
-export type OpenStageKey = "new" | "qualified" | "negotiation";
-export const OPEN_STAGE_KEYS: readonly OpenStageKey[] = ["new", "qualified", "negotiation"];
+export type OpenStageKey = Exclude<(typeof OPEN_DEAL_STAGES)[number], "won" | "lost">;
+/** Açık aşamalar (tek kaynak `OPEN_DEAL_STAGES`). */
+export const OPEN_STAGE_KEYS = OPEN_DEAL_STAGES as readonly OpenStageKey[];
 export type StageStaleDays = Record<OpenStageKey, number>;
 
 /** Ofis Tanımları: aşamaya özel eşik ayarı (0 / boş = genel eşik `office.alert.deal_stale_days`). */

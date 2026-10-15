@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Check, Loader2, Pencil, X } from "lucide-react";
+import { CalendarClock, Check, Pencil, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { setDealExpectedClose } from "@/app/actions/deal-forecast";
 import { useToast } from "@/components/app/toast-provider";
 
@@ -74,35 +75,25 @@ export function ExpectedCloseField({
           onChange={(e) => setDraft(e.target.value)}
           className="min-h-9 rounded-[var(--radius-control)] border border-white/30 bg-white px-2 text-sm text-ink-950 touch:min-h-11 touch:text-base"
         />
-        <button
-          type="submit"
-          disabled={pending}
-          aria-label="Kaydet"
-          className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] bg-white text-ink-950 disabled:opacity-60 touch:h-11 touch:w-11"
-        >
-          {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
-        </button>
+        <Button type="submit" size="sm" variant="secondary" icon={Check} loading={pending}>
+          Kaydet
+        </Button>
         {value ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => save("")}
-            className="focus-ring min-h-9 rounded-[var(--radius-control)] px-2 text-xs font-semibold text-white/80 hover:text-white touch:min-h-11"
-          >
+          <Button size="sm" variant="ghost" disabled={pending} onClick={() => save("")} className="text-white/85 hover:text-white">
             Temizle
-          </button>
+          </Button>
         ) : null}
-        <button
-          type="button"
+        <Button
+          size="icon"
+          variant="ghost"
+          icon={X}
           aria-label="Vazgeç"
+          className="text-white/85 hover:text-white"
           onClick={() => {
             setDraft(value ?? "");
             setEditing(false);
           }}
-          className="focus-ring grid h-9 w-9 place-items-center rounded-[var(--radius-control)] text-white/80 hover:text-white touch:h-11 touch:w-11"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
+        />
       </form>
     );
   }
@@ -114,14 +105,16 @@ export function ExpectedCloseField({
     return <span className={`inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold ${tone}`}><CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> {text}</span>;
   }
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
+      variant="ghost"
+      icon={CalendarClock}
+      iconRight={Pencil}
       onClick={() => setEditing(true)}
-      className={`focus-ring inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition hover:bg-white/20 touch:min-h-11 ${tone}`}
+      className={`rounded-full border font-bold hover:bg-white/20 hover:text-white ${tone}`}
       aria-label={`${text} — düzenle`}
     >
-      <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> {text}
-      <Pencil className="h-3 w-3 opacity-70" aria-hidden="true" />
-    </button>
+      {text}
+    </Button>
   );
 }

@@ -16,7 +16,9 @@ const read = (p: string) => readFileSync(resolve(process.cwd(), p), "utf8");
 /** Kendi sorgusunda `tenant_id` kolonu olmayan çocuk tablolar: !inner ebeveyn + ebeveynin kiracı eşitliği. */
 const PARENT_BOUNDED: Record<string, string> = { campaign_recipients: "campaign.tenant_id" };
 /** Kapsamı yükleyicinin içinde (viewer kimliğiyle) uygulayan hesaplanan raporlar — kaynak düzeyinde doğrulanır. */
-const LOADER_SCOPED = new Set(["danisman-performansi", "hedef-gerceklesme", "aday-hizi", "talep-arz", "bolge-analizi"]);
+// satis-hunisi: kiracı sınırı RPC'de (report_sales_funnel, SECURITY INVOKER: current_active_tenant_id + RLS); aktör
+// kapsamı ofis geneli olmayan görüntüleyende p_profile = kullanıcı (aşağıdaki kaynak denetimi).
+const LOADER_SCOPED = new Set(["danisman-performansi", "hedef-gerceklesme", "aday-hizi", "talep-arz", "bolge-analizi", "satis-hunisi"]);
 const queryReports = TENANT_REPORT_LIST.filter((r) => r.source.kind === "query");
 const computeReports = TENANT_REPORT_LIST.filter((r) => r.source.kind === "compute" && !LOADER_SCOPED.has(r.id));
 
@@ -141,3 +143,14 @@ describe("service_role sınırı", () => {
     expect(analysis).toContain('.eq("tenant_id", tid(ctx))');
   });
 });
+
+describe("satış hunisi raporu: kapsam RPC'de, danışman kendine kilitli", () => {
+  it("report_sales_funnel çağrılır; ofis geneli değilse p_profile kullanıcı kimliğidir", () => {
+    const src = read("src/lib/report-center/catalog/tenant-sales.ts");
+    expect(src).toContain('ctx.supabase.rpc("report_sales_funnel"');
+    expect(src).toMatch(/const profile = ctx\.officeWide \? [^;]+ : ctx\.userId;/);
+    const sql = read("supabase/migrations/20261018080002_report_period_funnel.sql");
+    expect(sql).toMatch(/function public\.report_sales_funnel\([\s\S]*?security invoker[\s\S]*?public\.current_active_tenant_id\(\)/);
+  });
+});
+
