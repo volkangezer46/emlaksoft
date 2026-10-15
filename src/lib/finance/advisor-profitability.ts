@@ -4,7 +4,8 @@
  *   ofiste kalan = komisyon (KDV hariç matrah, `gross_amount`) − ofis DIŞINA dağıtılan paylar (danışman, referans, franchise...)
  *   KDV düşülmez: `gross_amount` zaten KDV hariçtir (SK6/B103; `vat` yalnız bilgi).
  *   net katkı    = ofiste kalan − doğrudan maliyet
- *   doğrudan maliyet = danışmanın portföylerine bağlı gider kayıtları (`expenses.property_id` → `properties.assigned_to`)
+ *   doğrudan maliyet = danışmanın portföylerine bağlı ofis giderleri (defter `cash_entries.property_id` → `properties.assigned_to`;
+ *                      deftere taşınmamış eski `expenses` satırları da; bkz. `ledger-expenses.ts`). Ters kayıt negatif satırdır.
  *
  * Portföye bağlanmamış (ortak) giderler danışmana PAYLAŞTIRILMAZ; toplamı ayrıca bildirilir. Paylaşımı tanımlanmamış
  * komisyon varsa uyarı sayısı döner (payı bilinmiyor).

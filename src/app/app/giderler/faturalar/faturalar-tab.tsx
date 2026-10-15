@@ -17,6 +17,8 @@ import { DEFAULT_VAT_RATE, VAT_RATE_OPTIONS, unitNetForGross } from "@/lib/integ
 import {
   EINVOICE_ROW_COLUMNS,
   getConnectionInfo,
+  ledgerLinkHref,
+  loadEInvoiceLedgerLinks,
   type EInvoiceRow,
 } from "@/lib/integrations/einvoice/service";
 import { loadSourcePrefill, SOURCE_QUERY, SOURCE_TYPE_LABEL } from "@/lib/integrations/einvoice/source-prefill";
@@ -276,6 +278,8 @@ export async function FaturalarTab({ tenantId, perms, params, embedded = false }
   if (durum) query = query.eq("status", durum);
   const [listRes, countsRes] = await Promise.all([query, supabase.from("einvoices").select("status").limit(2000)]);
   const rows = ((listRes.data ?? []) as unknown as EInvoiceRow[]);
+  // Defter bağı (WP5): resmileşen fatura alacak kaydına / cariye bağlanır; ayrı okuma, hata listeyi bozmaz.
+  const ledgerLinks = await loadEInvoiceLedgerLinks(supabase, rows.filter((r) => r.status === "issued").map((r) => r.id));
   const counts: Record<string, number> = { draft: 0, issued: 0, error: 0, cancelled: 0 };
   for (const r of (countsRes.data ?? []) as Array<{ status: string }>) counts[r.status] = (counts[r.status] ?? 0) + 1;
 
@@ -328,6 +332,7 @@ export async function FaturalarTab({ tenantId, perms, params, embedded = false }
             <TBody>
               {rows.map((r) => {
                 const href = sourceHref(r);
+                const ledger = ledgerLinkHref(r.status, ledgerLinks.get(r.id));
                 return (
                   <TR key={r.id}>
                     <TD label="Tarih">{dateFmt(r.issue_date)}</TD>
@@ -346,6 +351,11 @@ export async function FaturalarTab({ tenantId, perms, params, embedded = false }
                     <TD label="Durum">
                       <StatusBadge row={r} />
                       {r.error ? <span className="mt-1 block max-w-[260px] text-xs text-danger-600">{r.error}</span> : null}
+                      {ledger ? (
+                        <Link href={ledger.href} className="mt-1 block text-xs font-semibold text-accent-text hover:underline">
+                          {ledger.label}
+                        </Link>
+                      ) : null}
                     </TD>
                     <TD actions align="right">
                       {canInvoice ? (

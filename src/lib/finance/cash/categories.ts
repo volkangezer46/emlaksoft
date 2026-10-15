@@ -84,11 +84,6 @@ export function budgetGroupMembers(key: string): readonly CashCategory[] {
   return CASH_CATEGORIES.filter((c) => c.direction === "out" && c.value !== SALARY_CATEGORY && budgetCategoryFor(c.value, "out") === key);
 }
 
-/** Var olan bir gider kaydı hesaba bağlanırken hareket kategorisi (gider kategorisinden türer). */
-export function cashCategoryForExpense(expenseCategory: string): string {
-  return expenseCategory === "reklam" || expenseCategory === "ofis" || expenseCategory === "ulasim" ? expenseCategory : "diger_gider";
-}
-
 /** Maaş hareketlerini yalnız ofis sahibi ve genel müdür görür/yazar (koordinatör kararı 2026-10-10). */
 export function canHandleSalary(role: string | null | undefined): boolean {
   return role === "owner" || role === "gm";

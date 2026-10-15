@@ -11,7 +11,6 @@ import { getDefinitionsOrDefault } from "@/lib/definitions";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { parseExpenseFinanceFields } from "@/lib/finance/expense-finance-input";
 import { isMissingFinanceSchema } from "@/lib/finance/load";
-import { cashCategoryForExpense } from "@/lib/finance/cash/categories";
 
 const FINANCE_MISSING = "Tekrarlayan gider / portal eşlemesi için veritabanı güncellemesi bekleniyor. Bu alanları boş bırakıp kaydedin.";
 
@@ -35,73 +34,11 @@ export type ExpenseListRow = {
   portal_key?: string | null;
 };
 
-export async function createExpense(
-  _prev: ExpenseResult,
-  fd: FormData,
-): Promise<ExpenseResult> {
-  const gate = await requirePermission("expenses", "create");
-  if (!gate.ok) return { error: gate.error };
-
-  const parsed = parseExpenseForm(fd);
-  if (!parsed.ok) return { error: parsed.error };
-  const { title, amount, category, expenseDate, notes, propertyId, receiptUrl } = parsed.value;
-
-  const fin = parseExpenseFinanceFields(fd);
-  if (!fin.ok) return { error: fin.error };
-
-  const references = await validateTenantReferences(gate.tenantId, { propertyId });
-  if (!references.ok) return { error: references.error };
-
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("expenses")
-    .insert({
-      receipt_url:  receiptUrl,
-      tenant_id:    gate.tenantId,
-      created_by:   gate.userId,
-      title,
-      amount,
-      category,
-      expense_date: expenseDate,
-      notes,
-      property_id:  propertyId,
-      // Yeni sütunlar yalnız doluysa yazılır: şema (20261008000700) yokken eski gider akışı aynen çalışır.
-      // `recurrence` YENİ YAZILMAZ: düzenli ödemenin tek giriş yolu recurring_rules (Konsey #13+#18); eski seriler yalnız okunur / "Kurala çevir".
-      ...(fin.value.portalKey ? { portal_key: fin.value.portalKey } : {}),
-    })
-    .select("id")
-    .single();
-
-  if (error || !data) return { error: isMissingFinanceSchema(error) ? FINANCE_MISSING : actionErrorMessage(error, "Gider kaydedilemedi.") };
-
-  // İsteğe bağlı "Hangi hesaptan çıktı?": seçildiyse aynı gider için ofis hesabına çıkış hareketi (gider kaydı tek gerçek kalır).
-  let info: string | undefined;
-  const accountId = String(fd.get("account_id") ?? "").trim();
-  if (accountId) {
-    const { data: moved, error: moveError } = await supabase.rpc("finance_record_entry", {
-      p_account_id: accountId,
-      p_direction: "out",
-      p_amount: amount,
-      p_entry_date: expenseDate,
-      p_category: cashCategoryForExpense(category),
-      p_title: title,
-      p_note: notes,
-      p_document_url: receiptUrl,
-      p_source_type: "manual",
-      p_source_id: null,
-      p_expense_id: data.id,
-    });
-    const outcome = (moved as { outcome?: string } | null)?.outcome;
-    if (moveError || outcome !== "recorded") {
-      info = "Gider kaydedildi ancak seçilen hesaba hareket yazılamadı. Finans > Hareketler'den ekleyebilirsiniz.";
-    }
-  }
-
-  revalidatePath("/app/giderler");
-  if (propertyId) revalidatePath(`/app/portfoyler/${propertyId}`);
-  revalidateTenantData(gate.tenantId);
-  return { ok: true, id: data.id, info };
-}
+/*
+ * Eski `expenses` tablosu DONDURULDU (WP5, docs/design/FINANS_ENTEGRASYON_2026-10.md): yeni gider yalnız defter yoluyla yazılır
+ * (Muhasebe > Kayıt: `finance_record_entry_v2` / `finance_post` `expense.paid`). Buradaki eylemler yalnız GEÇMİŞ satırları
+ * düzenler/siler/listeler; `.from("expenses").insert` yasaktır (expenses-freeze-contract.test.ts).
+ */
 
 export async function updateExpense(
   _prev: ExpenseResult,

@@ -501,6 +501,8 @@ const F = {
   wp1FinanceOpenItemsV3: "20261017010100_finance_open_items_v3.sql",
   // WP4 (2026-10-17): tekil mulk aidati acik kaleme (due:{id}), property_dues salt okunur, iptal, depozito emaneti, kiraci/malik carisi.
   wp4PropertyDuesOpenItems: "20261017010500_property_dues_open_items.sql",
+  // WP5 (2026-10-17): e-Fatura -> defter (resmilesen fatura kaynak alacagina baglanir / serbest faturada invoice.issued alacagi; iptal = ters kayit).
+  wp5EinvoiceLedgerLink: "20261017010600_einvoice_ledger_link.sql",
 } as const;
 
 export const MIGRATION_GROUP_SPEC: GroupSpec = {
@@ -775,6 +777,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.m3DemoResetNotificationReads]: "ek", // yalniz demo_tenant_nightly_reset govdesi (create or replace): demo kiracinin notification_reads satirlari da silinir; slug kapisi ve yetkiler ayni; tablo yoksa adim atlanir
     [F.wp1FinancePostingCore]: "davranis", // cash_entries/finance_open_items posting_key (kiraci basina tekil) + event_type + reversal_of, finance_open_items.invoice_id, cash_entries.source_type CHECK genisler, eski kaynak tekilligi yalniz posting_key'siz satirlara; finance_posting_rules (yalniz definer okur); finance_post/finance_reverse (authenticated, modul izni + owner/gm + P12) ve ic surumleri (yalniz service_role); acik kalem odeme hesabi ayna kayitlari isaretli sayar (mevcut satirlarda sonuc ayni); audit_logs tetikleyicileri
     [F.wp1FinanceOpenItemsV3]: "davranis", // finance_open_items_v kolonlari ayni: komisyon alacagi brut+KDV-net tahsilat (eskisi KDV kadar eksik), posting_key'li kalemi olan kaynak tekrar etmez, bina/aidat/hakedis kollari + cari cozumu; finance_v2_source_visible 'payout' commissions:view
+    [F.wp5EinvoiceLedgerLink]: "davranis", // einvoices.party_id + open_item_id; einvoices durum tetigi: issued -> kaynak (komisyon) alacagina bag ya da serbest faturada invoice.issued alacagi (finance_post_internal), cancelled/error -> finance_reverse_internal; komisyon alacagi acilinca faturaya bag; resmilesmis faturalara cari + bag geri doldurmasi (gecmise alacak acilmaz); fonksiyonlar yalniz service_role
     [F.wp4PropertyDuesOpenItems]: "davranis", // property_dues -> finance_open_items (source_type due, tek seferlik geri doldurma, odenmis = kasa disi) + property_dues authenticated yazma REVOKE; finance_due_* RPC (iptal, silme yok) + aidat_kpi acik kalemden; rental_deposit_post/unpost (depozito kategorisi); cash_entries kaynak carisi tetigi + geri doldurma (yalniz party_id); owner_charge_links 'due' politikasi acik kalemi dogrular
     [F.messageLog]: "ek", // yeni platform tablosu message_sends (RLS acik, politika yok, yalniz service_role) + message_log_prune RPC; mevcut nesnelere dokunmaz, kod tablo yokken gonderim surer ve gunluk atlanir
     [F.financeRecurringRuleTerms]: "ek", // yalniz yeni RPC recurring_rule_set_terms (security definer, recurring_rule_access edit kapisi; eski recurring_* imzalari ve recurring_run_due degismez); govde FN1 sutunlarini calisma aninda cozer, kod RPC/sutun yokken kural yine kaydedilir
@@ -1035,6 +1038,7 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "FNE-WP1-kayit-cekirdegi", order: 1701, title: "Finans entegrasyonu WP1 kayit cekirdegi: posting_key/event_type/reversal_of + finance_post/finance_reverse + denetim tetikleyicileri, ARDINDAN acik kalem gorunumu v3 (komisyon alacagi brut+KDV-tahsilat, bina/aidat/hakedis kollari, cari cozumu). Iki dosya BIRLIKTE ve sirayla; FN1 (20261014001000/001100/001200), GP1 (20261014011000) ve SK6 (20261016060100) SONRASI. KOD YAYININDAN ONCE ya da SONRA uygulanabilir (henuz cagiran yok; v3 yeni kaynak turlerini kod taniyor, eski kod bilinmeyen kaynagi yok sayar). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp1FinancePostingCore, F.wp1FinanceOpenItemsV3] },
     { id: "B4-vitrin-seo-metni", order: 1204, title: "Ofis vitrini elle SEO basligi/aciklamasi: tenants.vitrin_seo_title (<=70) + vitrin_seo_description (<=160) (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir: kod sutunlar yokken vitrin metadata'si SEO kalibina duser, ayar ekrani alanlari 'etkin degil' der; sira serbest, ek)", files: [F.b4TenantVitrinSeoMeta] },
     { id: "M3-demo-okunma-sifirlama", order: 1531, title: "Demo gece sifirlamasi bildirim okunma izlerini de siler: demo_tenant_nightly_reset yeniden tanimlanir (YD1 20261015041000 sonrasi; notification_reads yoksa adim atlanir; KOD YAYININDAN ONCE ya da SONRA uygulanabilir; ek)", files: [F.m3DemoResetNotificationReads] },
+    { id: "WP5-efatura-defter", order: 1702, title: "Finans entegrasyonu WP5: e-Fatura deftere baglanir (einvoices.party_id/open_item_id; resmilesen fatura kaynak alacagina baglanir, serbest faturada invoice.issued alacagi acilir, iptal/hata ters kayit; gecmis faturalara yalniz cari + bag). WP1 (20261017010000) ve e-Fatura (20261012001000) SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir (kod kolonlar yokken eski fatura listesi; tetik kodu beklemez). ONCE restore edilebilir yedek dogrulanir (davranis)", files: [F.wp5EinvoiceLedgerLink] },
     { id: "WP4-kira-aidat-dues", order: 1305, title: "Finans entegrasyonu WP4: tekil mulk aidati acik kaleme tasinir (property_dues gecmis/salt okunur, due:{id}), aidat iptali (silme yok), depozito emaneti, kiraci/malik carisi (20261016060100 ve 20261014011000 SONRASI; WP1 20261017010000 varsa posting_key damgalanir, yoksa atlanir; KOD YAYININDAN ONCE uygulanir: yeni kod finance_due_* RPC'lerini cagirir, eski kod property_dues'a yazamaz; ONCE restore edilebilir yedek dogrulanir; davranis)", files: [F.wp4PropertyDuesOpenItems] },
     { id: "SN3-sms-whatsapp-gunlugu", order: 144, title: "SMS ve WhatsApp teslim gunlugu: message_sends + message_log_prune (bagimsiz yeni tablo; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken gonderim surer ve gunluk atlanir, ekran 'kurulum bekliyor'; sira serbest, ek)", files: [F.messageLog] },
     { id: "FN6-duzenli-odeme-kosullari", order: 106, title: "Muhasebe v2 FN6: duzenli odeme kuralina cari/KDV/stopaj yazan recurring_rule_set_terms RPC (FN1 20261014001000_finance_ledger_v2 ILE AYNI pencerede, FN1 SONRASI cagrilir; plpgsql govde sutunlari calisma aninda cozer; kod RPC yokken kosullar atlanir, kural kaydedilir; ek)", files: [F.financeRecurringRuleTerms] },
@@ -1313,6 +1317,10 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp4PropertyDuesOpenItems, F.financePartyAdvisorScope],
     [F.wp4PropertyDuesOpenItems, F.buildingManagement],
     [F.wp4PropertyDuesOpenItems, F.sk10ModuleWritePolicies],
+    // WP5: e-Fatura tetigi kayit cekirdegine (finance_post_internal / finance_reverse_internal) ve e-Fatura son yazma yollarina dayanir.
+    [F.wp5EinvoiceLedgerLink, F.wp1FinancePostingCore],
+    [F.wp5EinvoiceLedgerLink, F.einvoiceServerOnlyWrites],
+    [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],
   ],
 
   // Eski K4 dali (20260818000400_property_media_is_document) KALDIRILDI: PB48 (20261007000100) yerini aldi; kod sutun

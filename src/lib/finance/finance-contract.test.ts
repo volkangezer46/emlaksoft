@@ -36,7 +36,9 @@ describe("gider bütçesi / tekrar / portal sözleşmesi", () => {
 
   it("gider action'ları yeni sütunları yalnız doluyken yazar (şema yokken eski akış çalışır)", () => {
     const src = read("src/app/actions/expenses.ts");
-    expect(src).toContain("...(fin.value.portalKey ? { portal_key: fin.value.portalKey } : {})");
+    // WP5: eski gider tablosu donduruldu (ekleme yok); düzenleme portal sütununu yalnız formda varsa yazar.
+    expect(src).not.toMatch(/\.insert\(/);
+    expect(src).toContain("...(fin.value.hasPortal ? { portal_key: fin.value.portalKey } : {})");
     // Konsey #13+#18: düzenli ödemenin TEK giriş yolu recurring_rules; expenses.recurrence yeni yazılmaz.
     expect(src).not.toMatch(/recurrence:\s*fin\.value/);
     expect(read("src/app/app/giderler/expense-edit-dialog.tsx")).not.toContain('name="recurrence"');
