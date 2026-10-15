@@ -5,6 +5,8 @@ import { requireModulePage } from "@/lib/require-module-page";
 import { LeadCapturePanel } from "./lead-capture-panel";
 import { VitrinQr } from "@/components/public/vitrin-qr";
 import { getBaseUrl } from "@/lib/base-url";
+import { getSetting } from "@/lib/settings/read";
+import { LEAD_ALLOWED_ORIGINS_KEY, parseLeadOriginsStored } from "@/lib/lead-origins";
 
 import { ReadOnlyGate } from "../read-only-gate";
 import { PageHeader } from "@/components/ui/page-header";
@@ -16,8 +18,8 @@ export default async function LeadCaptureSettingsPage() {
   const ctx = await requireModulePage("settings");
   const supabase = await createClient();
 
-  // tenant fetch + lead count bağımsız (ikisi de yalnızca tenantId'ye bağlı) → paralel
-  const [{ data: tenant }, { count: leadCount }] = await Promise.all([
+  // tenant fetch + lead count + izinli site listesi bağımsız (hepsi yalnızca tenantId'ye bağlı) → paralel
+  const [{ data: tenant }, { count: leadCount }, originsRaw] = await Promise.all([
     supabase
       .from("tenants")
       .select("lead_capture_token, lead_capture_enabled, slug")
@@ -28,7 +30,9 @@ export default async function LeadCaptureSettingsPage() {
       .select("id", { count: "exact", head: true })
       .eq("tenant_id", ctx.tenantId)
       .eq("auto_assigned", true),
+    getSetting<string>(LEAD_ALLOWED_ORIGINS_KEY, { tenantId: ctx.tenantId ?? undefined }).catch(() => ""),
   ]);
+  const allowedOrigins = parseLeadOriginsStored(originsRaw);
 
   const baseUrl = getBaseUrl();
   const token = tenant?.lead_capture_token ?? "";
@@ -69,7 +73,7 @@ export default async function LeadCaptureSettingsPage() {
       </section>
 
       <ReadOnlyGate canEdit={(ctx.perms.settings ?? []).includes("edit")}>
-        <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} />
+        <LeadCapturePanel token={token} enabled={enabled} baseUrl={baseUrl} vitrinUrl={vitrinUrl} allowedOrigins={allowedOrigins} />
       </ReadOnlyGate>
 
       {/* Vitrin QR kodu — basılı materyal için indirme + yazdırma */}
