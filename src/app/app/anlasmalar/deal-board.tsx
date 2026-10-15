@@ -72,6 +72,9 @@ import {
   type StageNames,
 } from "./board-logic";
 import { PersonSelect } from "@/components/ui/person-select";
+import { STALE_DAYS, daysInStageLabel, isOpenStageKey, stageAgeTone, type StageStaleDays } from "./deal-list-logic";
+
+const DEFAULT_STAGE_STALE: StageStaleDays = { new: STALE_DAYS, qualified: STALE_DAYS, negotiation: STALE_DAYS };
 
 export type BoardDeal = {
   id: string;
@@ -81,6 +84,12 @@ export type BoardDeal = {
   probability: number | null;
   assigned_to: string | null;
   updated_at: string;
+  /** Mevcut aşamaya giriş anı (SP1; migration öncesi kayıtta null → updated_at vekili). */
+  stage_changed_at: string | null;
+  /** Beklenen kapanış tarihi (YYYY-AA-GG). */
+  expected_close_date: string | null;
+  /** Kazanma/kayıp anı. */
+  closed_at: string | null;
   property_title: string | null;
   property_code: string | null;
   property_id: string | null;
@@ -125,13 +134,25 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-/** Kartta hareketsizliği gösterir: bayat anlaşma tek bakışta seçilsin. */
-function updatedAgo(iso: string) {
+/** Kapanmış kartta kapanış yaşı. */
+function closedAgo(iso: string, won: boolean) {
   const days = Math.floor(msSince(iso) / DAY_MS);
-  if (days <= 0) return "Bugün güncellendi";
-  if (days === 1) return "Dün güncellendi";
-  return `${days} gün önce güncellendi`;
+  const verb = won ? "kazanıldı" : "kaybedildi";
+  if (days <= 0) return `Bugün ${verb}`;
+  if (days === 1) return `Dün ${verb}`;
+  return `${days} gün önce ${verb}`;
 }
+
+/** Aşamada geçen tam gün (stage_changed_at; yoksa updated_at). */
+function stageDaysOf(d: BoardDeal) {
+  return Math.max(0, Math.floor(msSince(d.stage_changed_at ?? d.updated_at) / DAY_MS));
+}
+
+const AGE_TONE: Record<"ok" | "warn" | "late", string> = {
+  ok: "text-text-faint",
+  warn: "rounded-full bg-amber-400/15 px-1.5 py-0.5 font-bold text-warning-strong",
+  late: "rounded-full bg-danger-500/12 px-1.5 py-0.5 font-bold text-danger-strong",
+};
 
 function dealTitle(d: BoardDeal) {
   // Portföysüz anlaşma "Anlaşma" diye görünmesin (B194): ayırt edici ve ek gerektirmeyen yedek.
@@ -176,6 +197,7 @@ export function DealBoard({
   canEdit = false,
   members = [],
   stageLabels = defaultStageLabels(),
+  staleDays = DEFAULT_STAGE_STALE,
 }: {
   deals: BoardDeal[];
   /** Düzenleme yetkisi yoksa sürükleme tamamen kapalıdır (tutamaç çizilmez). */
@@ -183,6 +205,8 @@ export function DealBoard({
   members?: Member[];
   /** Ofisin görünen aşama adı/rengi (aşama anahtarları sabit). */
   stageLabels?: StageLabels;
+  /** Aşamaya özel bekleme eşiği (SP1; Ofis Tanımları). */
+  staleDays?: StageStaleDays;
 }) {
   const router = useRouter();
   const { push } = useToast();
@@ -213,7 +237,7 @@ export function DealBoard({
   const [optimisticDeals, applyStagePatch] = useOptimistic(
     deals,
     (state, patch: { id: string; stage: DealStage }) =>
-      state.map((d) => (d.id === patch.id ? { ...d, stage: patch.stage, updated_at: daysAgoIso(0) } : d)),
+      state.map((d) => (d.id === patch.id ? { ...d, stage: patch.stage, updated_at: daysAgoIso(0), stage_changed_at: daysAgoIso(0) } : d)),
   );
 
   const columns = useMemo(() => {
@@ -223,6 +247,32 @@ export function DealBoard({
   }, [optimisticDeals]);
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m.full_name])), [members]);
+
+  // SP10: mobil sütun çipleri — görünen sütun kaydırmadan hesaplanır (kare başına en çok bir kez), çipe dokununca kayar.
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const [visibleCol, setVisibleCol] = useState(0);
+  const onBoardScroll = () => {
+    if (scrollFrameRef.current !== null) return;
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null;
+      const el = boardRef.current;
+      const first = el?.firstElementChild as HTMLElement | null;
+      if (!el || !first) return;
+      const step = first.offsetWidth + 12; // gap-3
+      const idx = Math.max(0, Math.min(STAGES.length - 1, Math.round(el.scrollLeft / Math.max(1, step))));
+      setVisibleCol((prev) => (prev === idx ? prev : idx));
+    });
+  };
+  const scrollToColumn = (idx: number) => {
+    const col = document.getElementById(`sutun-${STAGES[idx]?.key}`);
+    if (!col) return;
+    col.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", inline: "start", block: "nearest" });
+    setVisibleCol(idx);
+  };
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) cancelAnimationFrame(scrollFrameRef.current);
+  }, []);
 
   const stageNames = useMemo(
     () => Object.fromEntries(STAGES.map((s) => [s.key, stageLabels[s.key].label])) as StageNames,
@@ -377,7 +427,36 @@ export function DealBoard({
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        <div id="tahta" className="flex scroll-mt-24 gap-3 overflow-x-auto pb-2">
+        {/* SP10: mobilde aşama çipleri (sayı + toplam) — dokununca ilgili sütuna kayar; etkin sütun vurgulanır. */}
+        <nav aria-label="Aşamaya git" className="sticky top-[calc(3.5rem+env(safe-area-inset-top,0px))] z-20 -mx-1 mb-2 flex snap-x gap-1.5 overflow-x-auto bg-canvas/95 px-1 py-1.5 [scrollbar-width:none] md:hidden">
+          {STAGES.map((col, colIdx) => {
+            const rows = columns[col.key];
+            const active = visibleCol === colIdx;
+            return (
+              <a
+                key={col.key}
+                href={`#sutun-${col.key}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  scrollToColumn(colIdx);
+                }}
+                aria-current={active ? "true" : undefined}
+                className={`focus-ring inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition ${
+                  active ? "border-transparent bg-ink-950 text-white" : "border-line bg-surface text-text-muted"
+                }`}
+              >
+                <span>{stageLabels[col.key].label}</span>
+                <span className={`numeric rounded-full px-1.5 text-xs font-bold ${active ? "bg-white/20" : "bg-canvas"}`}>{rows.length}</span>
+              </a>
+            );
+          })}
+        </nav>
+        <div
+          id="tahta"
+          ref={boardRef}
+          onScroll={onBoardScroll}
+          className={`flex scroll-mt-24 gap-3 overflow-x-auto pb-2 max-md:scroll-px-1 ${activeId ? "" : "max-md:snap-x max-md:snap-mandatory"}`}
+        >
           {STAGES.map((col, colIdx) => {
             const rows = columns[col.key];
             const sum = rows.reduce((s, d) => s + (Number(d.deal_value) || 0), 0);
@@ -404,6 +483,7 @@ export function DealBoard({
                       stage={col.key}
                       next={d.stage === col.key ? next : null}
                       stageLabels={stageLabels}
+                      staleDays={staleDays}
                       memberName={d.assigned_to ? (memberById.get(d.assigned_to) ?? null) : null}
                       busy={busy}
                       canEdit={canEdit}
@@ -463,16 +543,16 @@ export function DealBoard({
               <DialogDescription className="text-sm text-text-muted">{dealTitle(editing)} · {editing.customer_name ?? "Müşteri atanmadı"}</DialogDescription>
               <div>
                 <label htmlFor={`deal-${editing.id}-value`} className="mb-1 block text-xs font-semibold text-text-muted">Anlaşma değeri (₺)</label>
-                <input id={`deal-${editing.id}-value`} name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                <input id={`deal-${editing.id}-value`} name="deal_value" defaultValue={editing.deal_value ?? ""} inputMode="numeric" className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400 touch:min-h-11 touch:text-base" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label htmlFor={`deal-${editing.id}-probability`} className="mb-1 block text-xs font-semibold text-text-muted">Olasılık (%)</label>
-                  <input id={`deal-${editing.id}-probability`} name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400" />
+                  <input id={`deal-${editing.id}-probability`} name="probability" type="number" min={0} max={100} defaultValue={editing.probability ?? ""} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400 touch:min-h-11 touch:text-base" />
                 </div>
                 <div>
                   <label htmlFor={`deal-${editing.id}-type`} className="mb-1 block text-xs font-semibold text-text-muted">Tür</label>
-                  <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400">
+                  <select id={`deal-${editing.id}-type`} name="deal_type" defaultValue={editing.deal_type} className="w-full rounded-[var(--radius-control)] border border-line bg-canvas px-3 py-2.5 text-sm outline-none focus:border-brand-400 touch:min-h-11 touch:text-base">
                     <option value="sale">Satış</option>
                     <option value="rent">Kiralık</option>
                   </select>
@@ -559,7 +639,7 @@ function BoardColumn({
       ref={setNodeRef}
       id={`sutun-${stage}`}
       aria-label={`${label} aşaması, ${count} anlaşma`}
-      className={`min-w-[260px] flex-1 scroll-mt-24 rounded-[var(--radius-panel)] border backdrop-blur transition-[border-color,background-color,opacity] duration-150 ${surface}`}
+      className={`w-[85vw] max-w-[22rem] shrink-0 snap-start scroll-mt-24 rounded-[var(--radius-panel)] border backdrop-blur transition-[border-color,background-color,opacity] duration-150 md:w-auto md:min-w-[260px] md:max-w-none md:flex-1 md:shrink ${surface}`}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <header className="flex items-center justify-between gap-2 border-b border-line/60 px-3.5 py-3">
@@ -652,6 +732,7 @@ function BoardCard({
   stage,
   next,
   stageLabels,
+  staleDays,
   memberName,
   busy,
   canEdit,
@@ -665,6 +746,7 @@ function BoardCard({
   /** Sıradaki aşama (kapanmış sütunlarda yok). */
   next: DealStage | null;
   stageLabels: StageLabels;
+  staleDays: StageStaleDays;
   memberName: string | null;
   busy: boolean;
   canEdit: boolean;
@@ -745,7 +827,16 @@ function BoardCard({
         ) : (
           <span className="text-xs text-text-faint">Danışman atanmadı</span>
         )}
-        <span className="shrink-0 text-xs text-text-faint">{updatedAgo(d.updated_at)}</span>
+        {isOpenStageKey(d.stage) ? (
+          <span
+            className={`shrink-0 text-xs ${AGE_TONE[stageAgeTone(d.stage, stageDaysOf(d), staleDays)]}`}
+            title={`Ofis eşiği ${staleDays[d.stage]} gün`}
+          >
+            {daysInStageLabel(stageDaysOf(d))}
+          </span>
+        ) : (
+          <span className="shrink-0 text-xs text-text-faint">{closedAgo(d.closed_at ?? d.updated_at, d.stage === "won")}</span>
+        )}
       </div>
       {/* Düğme satırı sürüklemeyi başlatmaz (bkz. board-dnd.ts NO_DRAG_PROPS). */}
       <div {...NO_DRAG_PROPS} className="relative z-10 mt-3 flex flex-wrap items-center gap-1.5">
@@ -754,7 +845,7 @@ function BoardCard({
           <button
             type="button"
             onClick={(event) => onEdit(event.currentTarget)}
-            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+            className="inline-flex items-center gap-1 touch:min-h-11 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
           >
             <Pencil className="h-3 w-3" /> Düzenle
           </button>
@@ -763,7 +854,7 @@ function BoardCard({
           <Link
             href={`/app/portfoyler/${d.property_id}`}
             draggable={false}
-            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+            className="inline-flex items-center touch:min-h-11 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
           >
             Portföy
           </Link>
@@ -772,7 +863,7 @@ function BoardCard({
           <Link
             href={`/app/musteriler/${d.customer_id}`}
             draggable={false}
-            className="rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
+            className="inline-flex items-center touch:min-h-11 rounded-[var(--radius-control)] border border-line px-2 py-1 text-xs font-semibold text-text-muted hover:border-brand-300 hover:text-brand-600"
           >
             Müşteri
           </Link>
@@ -782,7 +873,7 @@ function BoardCard({
             type="button"
             disabled={busy}
             onClick={() => onStage(next)}
-            className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
+            className="ml-auto inline-flex items-center gap-1 touch:min-h-11 rounded-[var(--radius-control)] bg-ink-950 px-2 py-1 text-xs font-bold text-white disabled:opacity-50"
           >
             {stageLabels[next].label} <ArrowRight className="h-3 w-3" />
           </button>
@@ -792,7 +883,7 @@ function BoardCard({
             type="button"
             disabled={busy}
             onClick={() => onStage("won")}
-            className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-700 disabled:opacity-50"
+            className="inline-flex items-center gap-1 touch:min-h-11 rounded-[var(--radius-control)] bg-mint-500/15 px-2 py-1 text-xs font-bold text-mint-700 disabled:opacity-50"
           >
             <Sparkles className="h-3 w-3" /> Kazan
           </button>
@@ -802,7 +893,7 @@ function BoardCard({
             type="button"
             disabled={busy}
             onClick={() => onStage("lost")}
-            className="rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
+            className="inline-flex items-center touch:min-h-11 rounded-[var(--radius-control)] px-2 py-1 text-xs font-semibold text-danger-500 hover:bg-danger-500/10 disabled:opacity-50"
           >
             Kayıp
           </button>

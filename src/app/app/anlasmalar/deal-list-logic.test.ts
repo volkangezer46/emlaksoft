@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { dealStageTone, parseStageParam, sumDeals, updatedAgoLabel, winRate } from "./deal-list-logic";
+import {
+  STALE_DAYS,
+  daysInStageLabel,
+  dealStageTone,
+  parseStageParam,
+  stageAgeTone,
+  stageStaleDays,
+  staleOrClause,
+  sumDeals,
+  uniformStaleDays,
+  updatedAgoLabel,
+  winRate,
+} from "./deal-list-logic";
 
 describe("anlaşma liste mantığı", () => {
   it("aşama paramı bilinen değer ya da 'acik'", () => {
@@ -39,3 +51,27 @@ describe("anlaşma liste mantığı", () => {
     expect(updatedAgoLabel(9)).toBe("9 gün önce");
   });
 });
+
+describe("SP1 aşamaya özel bayatlık", () => {
+  it("aşama ayarı > 0 ise o, değilse genel eşik", () => {
+    expect(stageStaleDays(14, { negotiation: 7, new: 0, qualified: "x" })).toEqual({ new: 14, qualified: 14, negotiation: 7 });
+    expect(stageStaleDays(0, {})).toEqual({ new: STALE_DAYS, qualified: STALE_DAYS, negotiation: STALE_DAYS });
+  });
+
+  it("ton: eşikte uyarı, iki katında geç; kapanmış aşama her zaman ok", () => {
+    const t = { new: 10, qualified: 10, negotiation: 5 };
+    expect(stageAgeTone("negotiation", 4, t)).toBe("ok");
+    expect(stageAgeTone("negotiation", 5, t)).toBe("warn");
+    expect(stageAgeTone("negotiation", 10, t)).toBe("late");
+    expect(stageAgeTone("won", 400, t)).toBe("ok");
+  });
+
+  it("or ifadesi her açık aşama için kendi kesim anını taşır", () => {
+    const clause = staleOrClause({ new: 1, qualified: 2, negotiation: 3 }, (d) => `T${d}`);
+    expect(clause).toBe("and(stage.eq.new,stage_changed_at.lt.T1),and(stage.eq.qualified,stage_changed_at.lt.T2),and(stage.eq.negotiation,stage_changed_at.lt.T3)");
+    expect(uniformStaleDays({ new: 3, qualified: 3, negotiation: 3 })).toBe(3);
+    expect(uniformStaleDays({ new: 3, qualified: 4, negotiation: 3 })).toBeNull();
+    expect(daysInStageLabel(0)).toBe("Bu aşamaya bugün geçti");
+  });
+});
+
