@@ -24,6 +24,27 @@ const SCAN_ROOTS = ["app", "lib", "components"].map((d) => join(process.cwd(), "
 // Anahtar: "<rota>::<param>"  (rota, dinamik segmentler [x] normalize edilmiş)
 // ---------------------------------------------------------------------------
 const ALLOWLIST: Record<string, string> = {
+  // Ön dolgu: yeni kayıt sayfaları customer|musteri ve property|portfoy adlarını src/lib/prefill-params.ts readPrefillIds ile okur.
+  "/app/teklifler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/teklifler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/teklifler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/teklifler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/kiralama/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/kiralama/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/kiralama/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/kiralama/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/randevular/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/randevular/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/randevular/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/randevular/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/sozlesmeler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/sozlesmeler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/sozlesmeler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/sozlesmeler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/gorevler/yeni::customer": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/gorevler/yeni::musteri": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/gorevler/yeni::property": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
+  "/app/gorevler/yeni::portfoy": "ön dolgu — readPrefillIds (src/lib/prefill-params.ts) iki yazımı da okur",
   // Hedef bir GET route handler (indirme ucu); `bicim` paramını route.ts okur, betik yalnız page.tsx'i tarar.
   "/admin/analiz-tarifesi/piyasa-verisi::bicim": "route handler — EF piyasa verisi CSV/JSON indirme biçimi",
   // Kira yenileme bildiriminin mükerrer freni: href'teki ?yenileme={yıl}
