@@ -177,8 +177,13 @@ export type CustomerPortalData = {
   requestsEnabled: boolean;
 };
 
+/**
+ * Müşteri portalı token verisi. `recordSeen`: "son görülme" (last_seen_at) yalnız gerçek ziyaretçide yazılır; çağıran
+ * sayfa WhatsApp/Telegram önizleme botunda `false` verir (SK8 B150, `@/lib/link-preview`). Varsayılan: yazmaz.
+ */
 export async function getCustomerPortalData(
   token: string,
+  opts: { recordSeen?: boolean } = {},
 ): Promise<CustomerPortalData | null> {
   const admin = createAdminClient();
 
@@ -207,11 +212,13 @@ export async function getCustomerPortalData(
     { data: propRows },
     weights,
   ] = await Promise.all([
-    // Son görülme zamanını güncelle (yalnızca token'a bağlı)
-    admin.from("customer_portal_tokens")
-      .update({ last_seen_at: new Date().toISOString() })
-      .eq("token", token)
-      .eq("tenant_id", tenantId),
+    // Son görülme zamanını güncelle (yalnızca token'a bağlı); önizleme botunda hiç yazılmaz.
+    opts.recordSeen
+      ? admin.from("customer_portal_tokens")
+          .update({ last_seen_at: new Date().toISOString() })
+          .eq("token", token)
+          .eq("tenant_id", tenantId)
+      : Promise.resolve(null),
     admin.from("customers")
       .select("id, full_name, email, phone")
       .eq("id", customerId)

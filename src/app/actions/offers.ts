@@ -16,6 +16,40 @@ import { trDayKey } from "@/lib/clock";
 
 export type OfferResult = { ok?: boolean; error?: string; id?: string };
 
+const OWNER_NOTE_MAX = 2000;
+
+/** Formdaki "Malike görünen açıklama" (SK8 B149); boşsa null. İç not (`notes`) ayrı alandır ve malike gitmez. */
+function readOwnerNote(fd: FormData): { ok: true; value: string | null } | { ok: false; error: string } {
+  const value = String(fd.get("owner_visible_note") ?? "").trim() || null;
+  if (value && value.length > OWNER_NOTE_MAX) {
+    return { ok: false, error: `Malike görünen açıklama en fazla ${OWNER_NOTE_MAX} karakter olabilir.` };
+  }
+  return { ok: true, value };
+}
+
+/**
+ * Malike görünen açıklamayı yazar (teklif atomik RPC'si bu sütunu bilmez; durum/tutar koruması etkilenmez).
+ * Sütun yoksa (SK8 migration'ı uygulanmamış) hata loglanır ve kullanıcıya açık mesaj döner; teklif kaydı geri alınmaz.
+ */
+async function saveOwnerNote(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  offerId: string,
+  value: string | null,
+): Promise<string | null> {
+  const { error } = await admin
+    .from("offers")
+    .update({ owner_visible_note: value })
+    .eq("id", offerId)
+    .eq("tenant_id", tenantId);
+  if (!error) return null;
+  // Sütun henüz yokken (migration uygulanmamış) boş açıklama "yazılamadı" sayılmaz: kullanıcı alanı hiç doldurmadı,
+  // her düzenlemede yanıltıcı hata çıkmasın.
+  if (value == null && (error.code === "42703" || error.code === "PGRST204")) return null;
+  console.error("offer owner_visible_note", { code: error.code });
+  return "Teklif kaydedildi; malike görünen açıklama kaydedilemedi.";
+}
+
 export async function createOffer(
   _prev: OfferResult,
   fd: FormData,
@@ -28,8 +62,10 @@ export async function createOffer(
   const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
   const notes      = String(fd.get("notes") ?? "").trim() || null;
+  const ownerNote  = readOwnerNote(fd);
 
   if (!propertyId) return { error: "Portföy seçimi zorunludur." };
+  if (!ownerNote.ok) return { error: ownerNote.error };
   if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
   if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
   if (validUntil && validUntil < trDayKey()) {
@@ -65,6 +101,8 @@ export async function createOffer(
     return { error: actionErrorMessage(null, "Teklif kaydedilemedi.") };
   }
   const offerId = transition.offer_id;
+  const ownerNoteError = ownerNote.value ? await saveOwnerNote(admin, gate.tenantId, offerId, ownerNote.value) : null;
+  if (ownerNoteError) console.error("createOffer owner note", ownerNoteError);
 
   // Otomasyon tetikle — hata ana işlemi asla bozmasın
   afterSafe(() =>
@@ -207,6 +245,7 @@ export async function updateOffer(
   const amountResult = parseMoneyInput(fd.get("amount"), { max: 100_000_000_000 });
   const validUntil = String(fd.get("valid_until") ?? "").trim() || null;
   const notes      = String(fd.get("notes") ?? "").trim() || null;
+  const ownerNote  = readOwnerNote(fd);
 
   if (!amountResult.ok || amountResult.value == null) return { error: "Geçerli bir teklif tutarı girin." };
   if (validUntil && !isIsoDate(validUntil)) return { error: "Geçerli bir teklif son tarihi girin." };
@@ -214,6 +253,7 @@ export async function updateOffer(
     return { error: "Teklif son tarihi geçmişte olamaz." };
   }
   if (notes && notes.length > 5000) return { error: "Teklif notu en fazla 5000 karakter olabilir." };
+  if (!ownerNote.ok) return { error: ownerNote.error };
 
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("update_offer_terms_atomic", {
@@ -233,9 +273,12 @@ export async function updateOffer(
   if (outcome === "expired") return { error: "Teklif son tarihi geçmişte olamaz." };
   if (outcome === "invalid_state") return { error: "Kapanmış teklifin koşulları değiştirilemez." };
   if (outcome !== "applied" && outcome !== "replay") return { error: actionErrorMessage(null, "Teklif güncellenemedi.") };
+  // Alan formda varsa (düzenleme penceresi) yazılır; boşaltmak da bir karardır (null).
+  const ownerNoteError = fd.has("owner_visible_note") ? await saveOwnerNote(admin, gate.tenantId, id, ownerNote.value) : null;
 
   revalidatePath("/app/teklifler");
   revalidatePath(`/app/teklifler/${id}`);
+  if (ownerNoteError) return { error: ownerNoteError };
   return { ok: true, id };
 }
 
@@ -245,19 +288,28 @@ export async function getOffer(id: string) {
   if (!gate.ok) return null;
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("offers")
-    .select(
-      "id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, updated_at, created_by, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title, list_price, transaction_type, property_type), customer:customers!offers_customer_id_fkey(id, full_name, phone, email)",
-    )
-    .eq("id", id)
-    .eq("tenant_id", gate.tenantId)
-    .maybeSingle();
+  // Malike görünen açıklama AYRI ve paralel okunur: SK8 migration'ı yoksa (sütun yok) detay sayfası bozulmaz, alan boş
+  // gelir; ek tur bekleme süresine eklenmez.
+  const [{ data }, noteRes] = await Promise.all([
+    supabase
+      .from("offers")
+      .select(
+        "id, amount, currency, status, counter_amount, valid_until, notes, submitted_at, responded_at, created_at, updated_at, created_by, property_id, customer_id, property:properties!offers_property_id_fkey(id, property_code, title, list_price, transaction_type, property_type), customer:customers!offers_customer_id_fkey(id, full_name, phone, email)",
+      )
+      .eq("id", id)
+      .eq("tenant_id", gate.tenantId)
+      .maybeSingle(),
+    supabase.from("offers").select("owner_visible_note").eq("id", id).eq("tenant_id", gate.tenantId).maybeSingle(),
+  ]);
 
   // B2: ofis geneli kapsam dışındaki roller id ile yalnız kendi oluşturdukları teklifi açabilir.
   if (data && !hasOfficeWideDataScope(gate.role) && data.created_by !== gate.userId) return null;
+  if (!data) return data;
 
-  return data;
+  const ownerVisibleNote = noteRes.error
+    ? null
+    : ((noteRes.data as { owner_visible_note?: string | null } | null)?.owner_visible_note ?? null);
+  return { ...data, owner_visible_note: ownerVisibleNote };
 }
 
 export type ConvertOfferResult = {

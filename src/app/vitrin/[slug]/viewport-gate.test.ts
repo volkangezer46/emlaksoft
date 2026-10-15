@@ -1,12 +1,33 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createViewportGate } from "./viewport-gate";
+import { INTENT_EVENTS, __resetViewportIntentForTests, createViewportGate, sameIslandProps } from "./viewport-gate";
 
 /** Sahte IntersectionObserver: test elle "görünür" tetikler; bağlantısı kesilen gözlemci bir daha tetiklenmez. */
 type FakeIo = { el: Element | null; cb: (e: { isIntersecting: boolean }[]) => void; live: boolean };
 let observers: FakeIo[] = [];
 
+/** Sahte belge: yalnız capture dinleyicilerini tutar; `fire` gerçek olay sırası gibi dinleyicileri çağırır. */
+type Listener = { type: string; fn: () => void; once: boolean };
+let listeners: Listener[] = [];
+const fakeDocument = {
+  readyState: "complete",
+  addEventListener(type: string, fn: () => void, opts?: { once?: boolean }) {
+    listeners.push({ type, fn, once: Boolean(opts?.once) });
+  },
+  removeEventListener(type: string, fn: () => void) {
+    listeners = listeners.filter((l) => !(l.type === type && l.fn === fn));
+  },
+};
+const fire = (type: string) => {
+  for (const l of listeners.filter((x) => x.type === type)) {
+    if (l.once) listeners = listeners.filter((x) => x !== l);
+    l.fn();
+  }
+};
+
 beforeEach(() => {
   observers = [];
+  listeners = [];
+  __resetViewportIntentForTests();
   vi.stubGlobal("window", {});
   vi.stubGlobal(
     "IntersectionObserver",
@@ -83,5 +104,62 @@ describe("vitrin ada kapısı (örnek başına gözlem)", () => {
   it("sunucuda (window yok) kapı baştan açıktır (SSR tam HTML basar)", async () => {
     vi.stubGlobal("window", undefined);
     expect(await settled(createViewportGate().released)).toBe(true);
+  });
+});
+
+describe("kullanıcı niyeti (SK8 B146: kaydırmadan çip tıklaması)", () => {
+  it("pointerdown kapıyı açar — görünür alana hiç yaklaşılmadan, TÜM adalar için", async () => {
+    vi.stubGlobal("document", fakeDocument);
+    const talep = createViewportGate();
+    const arama = createViewportGate();
+    talep.watch({} as Element); // form 6.700 px aşağıda: gözlemci tetiklenmez
+    arama.watch({} as Element);
+    expect(await settled(talep.released)).toBe(false);
+    fire("pointerdown"); // "Satılık" çipine dokunuş (click'ten ÖNCE)
+    expect(await settled(talep.released)).toBe(true);
+    expect(await settled(arama.released)).toBe(true);
+    // Dinleyiciler tek seferlik ve temizlenmiş: belge üzerinde kalıntı yok.
+    expect(listeners).toEqual([]);
+  });
+
+  it.each(INTENT_EVENTS)("%s olayı da kapıyı açar", async (type) => {
+    vi.stubGlobal("document", fakeDocument);
+    const gate = createViewportGate();
+    fire(type);
+    expect(await settled(gate.released)).toBe(true);
+  });
+
+  it("niyetten SONRA kurulan kapı baştan açıktır (istemci gezinmesiyle gelen yeni ada beklemez)", async () => {
+    vi.stubGlobal("document", fakeDocument);
+    createViewportGate();
+    fire("keydown");
+    expect(await settled(createViewportGate().released)).toBe(true);
+  });
+
+  it("niyet yokken dinleyiciler capture + passive kurulur, görünürlükle açılınca da kapı tekrar açılmaz", async () => {
+    const add = vi.fn(fakeDocument.addEventListener);
+    vi.stubGlobal("document", { ...fakeDocument, addEventListener: add });
+    const gate = createViewportGate();
+    expect(add.mock.calls.map((c) => c[0]).sort()).toEqual([...INTENT_EVENTS].sort());
+    for (const c of add.mock.calls) expect(c[2]).toMatchObject({ capture: true, passive: true, once: true });
+    const el = {} as Element;
+    gate.watch(el);
+    intersect(el);
+    expect(await settled(gate.released)).toBe(true);
+  });
+});
+
+describe("ada prop eşitliği (memo — hidrasyonu bekleyen sınıra güncelleme gitmez)", () => {
+  it("RSC'den yeni nesne olarak gelen AYNI veri eşittir", () => {
+    const a = { token: "t", provinces: [{ id: "1", name: "İstanbul" }], vitrinSlug: "demo-ofis" };
+    const b = { token: "t", provinces: [{ id: "1", name: "İstanbul" }], vitrinSlug: "demo-ofis" };
+    expect(sameIslandProps(a, b)).toBe(true);
+  });
+
+  it("değişen veri, eksik/fazla anahtar ve React öğesi (children) eşit sayılmaz", () => {
+    expect(sameIslandProps({ token: "a" }, { token: "b" })).toBe(false);
+    expect(sameIslandProps({ token: "a" }, { token: "a", x: 1 })).toBe(false);
+    const el = (k: string) => ({ $$typeof: Symbol.for("react.transitional.element"), key: k, props: {} });
+    expect(sameIslandProps({ children: el("1") }, { children: el("1") })).toBe(false);
   });
 });

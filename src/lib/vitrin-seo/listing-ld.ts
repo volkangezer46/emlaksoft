@@ -4,7 +4,8 @@ import { vitrinListingBreadcrumbLd } from "./breadcrumb";
 /**
  * İlan detayı JSON-LD grafiği (SAF): RealEstateListing + BreadcrumbList. Çıktı sayfada `serializeJsonLd` ile basılır.
  *  - `image[]` yalnız gerçekten var olan public görsellerden (belge değil) üretilir; görsel yoksa alan HİÇ yazılmaz.
- *  - Offer'a `priceValidUntil` eklenmez (uydurma tarih yok); fiyat yoksa Offer yok.
+ *  - Offer'a `priceValidUntil` eklenmez (uydurma tarih yok); fiyat yoksa Offer yok; `priceCurrency` ilanın para birimi.
+ *  - Konum gizliliği (SK8 B152): `streetAddress` yalnız verilirse yazılır; geo yaklaşık (3 ondalık) koordinattır.
  */
 
 export const LISTING_LD_MAX_IMAGES = 10;
@@ -19,9 +20,12 @@ export type VitrinListingLdInput = {
   imageIds: readonly string[];
   createdAt?: string | null;
   price: number | null;
+  /** İlanın para birimi (features.currency → TRY|USD|EUR; SK8 B094). Yoksa TRY. */
+  currency?: "TRY" | "USD" | "EUR";
   sqm: number | null;
   lat?: number | null;
   lng?: number | null;
+  /** Yalnız ofis açık konumu bilerek yayınladığında (public-location.ts); varsayılan gizlilikte null → alan yazılmaz. */
   streetAddress?: string | null;
   district?: string | null;
   province?: string | null;
@@ -43,7 +47,7 @@ export function buildVitrinListingLd(input: VitrinListingLdInput): LdNode {
     ...(images.length > 0 ? { image: images } : {}),
     ...(input.createdAt ? { datePosted: input.createdAt } : {}),
     ...(input.price != null
-      ? { offers: { "@type": "Offer", price: input.price, priceCurrency: "TRY", availability: "https://schema.org/InStock" } }
+      ? { offers: { "@type": "Offer", price: input.price, priceCurrency: input.currency ?? "TRY", availability: "https://schema.org/InStock" } }
       : {}),
     ...(input.sqm ? { floorSize: { "@type": "QuantitativeValue", value: input.sqm, unitCode: "MTK" } } : {}),
     ...(hasGeo ? { geo: { "@type": "GeoCoordinates", latitude: input.lat, longitude: input.lng } } : {}),

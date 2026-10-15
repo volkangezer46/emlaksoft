@@ -19,7 +19,10 @@ import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
 import { getBaseUrl } from "@/lib/base-url";
 import { provinceOptionsResult } from "@/lib/geo/reader";
-import { toTelHref } from "@/lib/phone";
+import { resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { formatPublicPrice, listingCurrency, type ListingCurrency } from "@/lib/public-price";
+import { PUBLIC_EXACT_LOCATION } from "@/lib/public-location";
 import { LicenseNotice } from "@/components/public/license-notice";
 import { loadVitrinSettings } from "@/lib/vitrin-settings";
 import { getSeoSettings } from "@/lib/seo/store";
@@ -42,10 +45,9 @@ function isNewListing(publishedAt: string | null): boolean {
 // ISR: vitrin herkese acik — CDN onbellekli, 2 dk tazelenir (jet hiz)
 export const revalidate = 60;
 
-function money(n: number | null, tx?: string | null) {
-  if (n == null) return "Fiyat için sorun";
-  const s = new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
-  return tx === "rent" || tx === "Kiralık" || (tx ?? "").toLowerCase().includes("kira") ? `${s}/ay` : s;
+// SK8 B094: kart fiyatı ilanın para biriminden (features.currency) formatMoney ile; döviz ilanda TL kur satırı yok.
+function money(n: number | null, tx: string | null | undefined, currency: ListingCurrency) {
+  return formatPublicPrice(n, tx, currency);
 }
 
 type Rel = { name?: string } | { name?: string }[] | null;
@@ -193,7 +195,7 @@ const loadFilteredListing = cache(async (head: OfficeHead, filterKey: string) =>
     let query = admin
       .from("properties")
       .select(
-        "id, title, property_code, transaction_type, property_type, list_price, address_line, features, published_at, province:geo_provinces(name), district:geo_districts(name)",
+        "id, title, property_code, transaction_type, property_type, list_price, features, published_at, province:geo_provinces(name), district:geo_districts(name)",
       )
       .eq("tenant_id", tenant.id)
       .eq("status", "live")
@@ -204,7 +206,8 @@ const loadFilteredListing = cache(async (head: OfficeHead, filterKey: string) =>
     if (q) {
       // Tek yerde temizleme: PostgREST gramerini bozan karakterler ve LIKE jokerleri safeLike/orIlike ile atılır, uzunluk sınırlıdır.
       if (safeLike(q) !== "%%") {
-        query = query.or(orIlike(["title", "property_code", "address_line"], q));
+        // Açık adres (address_line) aranmaz: ekranda gizlenen adres "kapı no" tahminiyle yoklanamasın (SK8 B152).
+        query = query.or(orIlike(PUBLIC_EXACT_LOCATION ? ["title", "property_code", "address_line"] : ["title", "property_code"], q));
       }
     }
     if (min != null) query = query.gte("list_price", min);
@@ -564,11 +567,14 @@ async function VitrinGrid({
                   {feat.sqm ? <span className="flex items-center gap-1"><Ruler className="h-3.5 w-3.5" /> {feat.sqm} m²</span> : null}
                 </div>
                 <p className="mt-3 font-display text-xl font-extrabold text-brand-600">
-                  {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type)}
+                  {money(p.list_price != null ? Number(p.list_price) : null, p.transaction_type, listingCurrency(p.features))}
                 </p>
-                {/* Döviz karşılığı — kur yoksa hiç gösterilmez */}
+                {/* Döviz karşılığı — kur yoksa ya da ilan dövizse hiç gösterilmez */}
                 {(() => {
-                  const line = fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates);
+                  const line =
+                    listingCurrency(p.features) === "TRY"
+                      ? fxApproxLine(p.list_price != null ? Number(p.list_price) : null, fxRates)
+                      : null;
                   return line ? <p className="mt-0.5 text-xs text-text-faint" title={fxTitle}>{line}</p> : null;
                 })()}
               </div>
@@ -680,13 +686,16 @@ export default async function VitrinPage({
           {vitrinCfg.intro ? (
             <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-white/80">{vitrinCfg.intro}</p>
           ) : null}
-          {vitrinCfgAvailable && vitrinCfg.showPhone && tenant.phone && toTelHref(tenant.phone) ? (
-            <a
-              href={toTelHref(tenant.phone) ?? undefined}
-              className="focus-ring mt-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/10"
-            >
-              Ofisi ara: {tenant.phone}
-            </a>
+          {/* İletişim (SK8 B148): ofisin bilerek girdiği telefon, "telefonu göster" ayarı açıksa; tek bileşen. */}
+          {vitrinCfgAvailable && vitrinCfg.showPhone ? (
+            <PublicContactActions
+              contact={resolvePublicContact({
+                officePhone: tenant.phone,
+                whatsappText: `Merhaba, ${tenant.name} vitrinindeki portföyler hakkında bilgi almak istiyorum.`,
+              })}
+              tone="dark"
+              className="mt-4 max-w-sm"
+            />
           ) : null}
 
           {/* Filtre şeridi searchParams okur: kabuk ve metadata beklemesin diye ayrı akar */}

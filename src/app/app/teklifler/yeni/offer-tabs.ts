@@ -16,7 +16,7 @@ export const OFFER_TABS = [
     id: "kosullar",
     label: "Teklif koşulları",
     description: "Tutar, geçerlilik tarihi ve not.",
-    fields: ["amount", "valid_until", "notes"],
+    fields: ["amount", "valid_until", "notes", "owner_visible_note"],
     required: ["amount"],
   },
 ] as const;

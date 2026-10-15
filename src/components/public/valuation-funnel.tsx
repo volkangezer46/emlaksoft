@@ -10,12 +10,17 @@ import {
   listPublicDistricts,
   submitValuationLead,
   type PublicGeoOption,
+  type ValuationConsentMode,
 } from "@/app/actions/public-valuation";
 
 /**
  * "Evim ne kadar eder?" hunisi — 3 adım:
  *  1) kriter formu  2) tahmini aralık (veya dürüst "veri yok")  3) ad+telefon → lead.
  * Görsel dil vitrin lead formuyla birebir (koyu tema).
+ *
+ * Onay (SK8 B156): hesaplama kişisel veri almaz → onay kutusu YOK (yalnız aydınlatma metni bağlantısı). "Beni arayın"
+ * adımının onay düzeni sunucu ayarından gelir (`consentMode`, public-valuation.ts): "legacy" = bugünkü zorunlu kutu;
+ * "v2" (hukuk onayından sonra açılır) = aydınlatma bilgilendirmesi + AYRI, işaretsiz, isteğe bağlı tanıtım onayı.
  */
 
 const inputCls =
@@ -31,6 +36,13 @@ const AGE_OPTIONS = ["0 (yeni)", "1-5", "6-10", "11-20", "21 ve üzeri"];
 const money = (n: number) => new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n) + " ₺";
 
 type Estimate = { sufficient: false } | { sufficient: true; low: number; high: number; note: string };
+
+/** Yeni düzen metinleri — ayar kapalıyken HİÇ görünmez (hukuk onayı bekliyor). */
+const V2_NOTICE =
+  "Ad ve telefonunuz yalnızca değerleme talebiniz için sizi aramak amacıyla, ofisimiz tarafından KVKK kapsamında işlenir.";
+const V2_MARKETING =
+  "Yeni portföy ve kampanya duyuruları için benimle SMS, WhatsApp ve telefonla iletişime geçilmesine onay veriyorum (isteğe bağlı).";
+const LEGACY_CONSENT = "Kişisel verilerimin tanıtım amacıyla işlenmesine onay veriyorum.";
 
 export function ValuationFunnel({
   slug,
@@ -54,8 +66,11 @@ export function ValuationFunnel({
   const [sqm, setSqm] = useState("");
   const [rooms, setRooms] = useState("");
   const [buildingAge, setBuildingAge] = useState("");
-  const [kvkk, setKvkk] = useState(false);
   const [honeypot, setHoneypot] = useState("");
+  // "Beni arayın" adımı onayları (hesaplama adımında onay yok).
+  const [consentMode, setConsentMode] = useState<ValuationConsentMode>("legacy");
+  const [kvkk, setKvkk] = useState(false);
+  const [marketing, setMarketing] = useState(false);
 
   const [districts, setDistricts] = useState<PublicGeoOption[]>([]);
   const [loadingDistricts, startDistricts] = useTransition();
@@ -97,13 +112,13 @@ export function ValuationFunnel({
         sqm: Number(sqm.replace(",", ".")),
         rooms,
         buildingAge,
-        kvkk,
         website: honeypot,
       });
       if (!res.ok) {
         setError(res.error);
         return;
       }
+      setConsentMode(res.consentMode);
       setEstimate(res.sufficient ? { sufficient: true, low: res.low, high: res.high, note: res.note } : { sufficient: false });
       setStep("result");
     } catch {
@@ -131,8 +146,8 @@ export function ValuationFunnel({
         low: estimate?.sufficient ? estimate.low : null,
         high: estimate?.sufficient ? estimate.high : null,
         website: honeypot,
-        // 1. adımda zaten onaylanmış KVKK durumu (checkbox tüm huniyi kapsar).
         kvkk,
+        marketingConsent: consentMode === "v2" ? marketing : undefined,
       });
       if (!res.ok) {
         setLeadError(res.error);
@@ -213,11 +228,47 @@ export function ValuationFunnel({
               required
               className={inputCls}
               placeholder="Cep telefonu (05XX XXX XX XX)"
+              tone="dark"
             />
+            {consentMode === "v2" ? (
+              <>
+                <p className="text-xs leading-relaxed text-white/60">
+                  {V2_NOTICE}{" "}
+                  <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
+                    Aydınlatma metni
+                  </Link>
+                </p>
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
+                  <input
+                    type="checkbox"
+                    checked={marketing}
+                    onChange={(e) => setMarketing(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400"
+                  />
+                  <span>{V2_MARKETING}</span>
+                </label>
+              </>
+            ) : (
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
+                <input
+                  type="checkbox"
+                  required
+                  checked={kvkk}
+                  onChange={(e) => setKvkk(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400"
+                />
+                <span>
+                  {LEGACY_CONSENT}{" "}
+                  <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
+                    Aydınlatma metni
+                  </Link>
+                </span>
+              </label>
+            )}
             {leadError && <p className="text-sm font-medium text-danger-300">{leadError}</p>}
             <button
               type="submit"
-              disabled={leadPending}
+              disabled={leadPending || (consentMode === "legacy" && !kvkk)}
               className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
             >
               {leadPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -337,34 +388,22 @@ export function ValuationFunnel({
         </select>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border border-white/12 bg-white/[0.04] px-3.5 py-3 text-xs leading-relaxed text-white/60 transition hover:border-mint-400/40">
-        <input
-          type="checkbox"
-          required
-          checked={kvkk}
-          onChange={(e) => setKvkk(e.target.checked)}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-mint-400"
-        />
-        <span>
-          Kişisel verilerimin tanıtım amacıyla işlenmesine onay veriyorum.{" "}
-          <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
-            Aydınlatma metni
-          </Link>
-        </span>
-      </label>
-
       {error && <p className="text-sm font-medium text-danger-300">{error}</p>}
 
+      {/* Hesaplama kişisel veri almaz: onay kutusu yok (SK8 B156). */}
       <button
         type="submit"
-        disabled={pending || !kvkk}
+        disabled={pending}
         className="btn-shine inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-card)] bg-white px-4 py-3.5 text-sm font-bold text-ink-950 transition hover:bg-white/90 disabled:opacity-60"
       >
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         Değerimi hesapla
       </button>
       <p className="text-center text-xs text-white/40">
-        Sonuç bir ön tahmindir; resmi değerleme raporu yerine geçmez.
+        Sonuç bir ön tahmindir; resmi değerleme raporu yerine geçmez. Hesaplama için kişisel veri istenmez.{" "}
+        <Link href="/kvkk-aydinlatma" target="_blank" className="font-semibold text-mint-300 underline-offset-2 hover:underline">
+          Aydınlatma metni
+        </Link>
       </p>
     </form>
   );

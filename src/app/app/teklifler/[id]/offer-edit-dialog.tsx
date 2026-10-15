@@ -10,6 +10,8 @@ type Offer = {
   amount: number;
   valid_until: string | null;
   notes: string | null;
+  /** Malike görünen açıklama (SK8 B149); iç not `notes` malike gitmez. */
+  owner_visible_note?: string | null;
 };
 
 export function OfferEditDialog({ offer }: { offer: Offer }) {
@@ -37,7 +39,12 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
       error={state.error}
       summary
       hiddenFields={<input type="hidden" name="id" value={offer.id} />}
-      fieldLabels={{ amount: "Teklif tutarı (₺)", valid_until: "Geçerlilik", notes: "Not" }}
+      fieldLabels={{
+        amount: "Teklif tutarı (₺)",
+        valid_until: "Geçerlilik",
+        notes: "İç not",
+        owner_visible_note: "Malike görünen açıklama",
+      }}
       trigger={({ onClick, ...aria }) => (
         <button
           type="button"
@@ -48,7 +55,7 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
           <Pencil className="h-4 w-4" /> Teklifi düzenle
         </button>
       )}
-      tabs={[{ id: "teklif", label: "Teklif", fields: ["amount", "valid_until", "notes"] }]}
+      tabs={[{ id: "teklif", label: "Teklif", fields: ["amount", "valid_until", "notes", "owner_visible_note"] }]}
       panels={{
         teklif: (
           <>
@@ -61,8 +68,19 @@ export function OfferEditDialog({ offer }: { offer: Offer }) {
               <input name="valid_until" type="date" defaultValue={offer.valid_until?.slice(0, 10) ?? ""} className={fieldClass} />
             </label>
             <label className="text-xs font-semibold text-text-muted sm:col-span-2">
-              Not
-              <textarea name="notes" rows={3} defaultValue={offer.notes ?? ""} placeholder="Not (opsiyonel)" className={fieldClass} />
+              İç not (yalnız ofis içi)
+              <textarea name="notes" rows={3} defaultValue={offer.notes ?? ""} placeholder="Malik ve müşteri portallarında görünmez" className={fieldClass} />
+            </label>
+            <label className="text-xs font-semibold text-text-muted sm:col-span-2">
+              Malike görünen açıklama (isteğe bağlı)
+              <textarea
+                name="owner_visible_note"
+                rows={3}
+                maxLength={2000}
+                defaultValue={offer.owner_visible_note ?? ""}
+                placeholder="Malik panelinde teklifin altında aynen görünür"
+                className={fieldClass}
+              />
             </label>
           </>
         ),

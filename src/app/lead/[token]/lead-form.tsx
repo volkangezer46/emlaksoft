@@ -102,7 +102,7 @@ export function LeadForm({
       />
       <input name="full_name" required aria-label="Ad soyad" autoComplete="name" placeholder="Ad soyad *" className={inputCls} />
       <label htmlFor="lead-phone" className="sr-only">Cep telefonu</label>
-      <PhoneInput id="lead-phone" name="phone" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
+      <PhoneInput id="lead-phone" name="phone" tone="dark" className={inputCls} placeholder="Cep telefonu (05XX XXX XX XX)" />
       <EmailInput name="email" aria-label="E-posta" placeholder="E-posta (opsiyonel)" className={inputCls} />
 
       <div className="grid grid-cols-2 gap-3">

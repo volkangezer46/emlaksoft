@@ -11,7 +11,8 @@ const h = vi.hoisted(() => ({
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/notify", () => ({ notifyTenant: h.notify }));
 
-import { isLinkPreviewRequest, recordPresentationOpen } from "./presentation-open";
+import { recordPresentationOpen, recordShareOpen } from "./presentation-open";
+import { isLinkPreviewHeaders, isLinkPreviewRequest } from "./link-preview";
 
 const PRES = {
   id: "p-1",
@@ -97,5 +98,50 @@ describe("recordPresentationOpen", () => {
       recordPresentationOpen({ rpc: h.rpc } as never, { ...PRES, view_count: 4 }, { isPreviewBot: false, isCreatorPreview: false }),
     ).resolves.toBeUndefined();
     spy.mockRestore();
+  });
+});
+
+describe("SK8 B150: paylaşım linki açılışı (recordShareOpen)", () => {
+  const SHARE = { token: "tok-1", tenant_id: "t-1", entity_id: "prop-1", notifyUserId: "u-1", label: "Moda 3+1" };
+  const rpcReturning = (value: number | null, error: { message: string } | null = null) =>
+    vi.fn(async (..._args: unknown[]) => ({ data: value, error }));
+
+  beforeEach(() => h.notify.mockClear());
+
+  it("WhatsApp önizleme botu (UA) ve ön-yükleme (Sec-Purpose): RPC de bildirim de yok", async () => {
+    const rpc = rpcReturning(1);
+    const wa = new Headers({ "user-agent": "WhatsApp/2.23.20.0 A" });
+    await recordShareOpen({ rpc } as never, SHARE, { isPreviewBot: isLinkPreviewHeaders(wa) });
+    const prefetch = new Headers({ "user-agent": CHROME, "sec-purpose": "prefetch" });
+    await recordShareOpen({ rpc } as never, SHARE, { isPreviewBot: isLinkPreviewHeaders(prefetch) });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(h.notify).not.toHaveBeenCalled();
+  });
+
+  it("gerçek ilk açılış: atomik RPC 1 döndürür → bildirim TAM bir kez", async () => {
+    const rpc = rpcReturning(1);
+    await recordShareOpen({ rpc } as never, SHARE, { isPreviewBot: isLinkPreviewHeaders(new Headers({ "user-agent": SAFARI })) });
+    expect(rpc).toHaveBeenCalledWith("increment_share_view", { p_token: "tok-1" });
+    expect(h.notify).toHaveBeenCalledTimes(1);
+    expect(h.notify).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "t-1", userId: "u-1", title: "Paylaştığınız portföy linki açıldı", href: "/app/portfoyler/prop-1" }),
+    );
+  });
+
+  it("eşzamanlı ikinci açılış (RPC 2), süresi dolmuş link (null) ve RPC hatası bildirim üretmez", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const rpc of [rpcReturning(2), rpcReturning(null), rpcReturning(null, { message: "yok" })]) {
+      await recordShareOpen({ rpc } as never, SHARE, { isPreviewBot: false });
+      expect(rpc).toHaveBeenCalledTimes(1);
+    }
+    expect(h.notify).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("aktif oluşturan yoksa sayaç artar ama bildirim gitmez", async () => {
+    const rpc = rpcReturning(1);
+    await recordShareOpen({ rpc } as never, { ...SHARE, notifyUserId: null }, { isPreviewBot: false });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(h.notify).not.toHaveBeenCalled();
   });
 });

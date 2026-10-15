@@ -12,12 +12,19 @@ import {
 } from "@/components/public/token-page";
 import { CheckinForm } from "./checkin-form";
 import { isPublicTenantActive } from "@/lib/public-tenant";
+import { resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { loadDocLinkOg, publicLinkMetadata } from "@/lib/public-link-og";
 
-// Kayıt linkleri etkinliğe özeldir → arama motorlarına kapalı (randevu-teyit deseni).
-export const metadata: Metadata = {
-  title: "Açık ev kaydı",
-  robots: { index: false, follow: false },
-};
+// Kayıt linkleri etkinliğe özeldir → arama motorlarına kapalı (randevu-teyit deseni). WhatsApp önizlemesi ofis markalı
+// (ilan başlığı + ilk public fotoğraf; adres yok), görsel `opengraph-image.tsx` (SK8 B151).
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  return {
+    ...publicLinkMetadata(await loadDocLinkOg("open_house", token), "Açık ev kaydı"),
+    robots: { index: false, follow: false },
+  };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -52,20 +59,21 @@ export default async function OpenHouseCheckinPage({
   const { data: event } = await admin
     .from("open_houses")
     .select(
-      "id, tenant_id, property_id, scheduled_at, duration_min, status, tenant:tenants(name, status, logo_url, brand_color)",
+      "id, tenant_id, property_id, scheduled_at, duration_min, status, tenant:tenants(name, status, logo_url, brand_color, phone)",
     )
     .eq("public_token", token)
     .maybeSingle();
 
   if (!event) notFound();
 
-  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null };
+  type TenantShape = { name?: string; status?: string; logo_url?: string | null; brand_color?: string | null; phone?: string | null };
   const tenant = rel(event.tenant as TenantShape | TenantShape[] | null);
   if (!tenant || !isPublicTenantActive(tenant.status)) notFound();
   if (await isPublicFeatureClosed(admin, event.tenant_id, "open_house")) return <PublicModuleClosed officeName={tenant.name} />;
   const { data: property } = await admin
     .from("properties")
-    .select("title, property_code")
+    // Danışman telefonu: ilana atanmış AKTİF profil (kiracı sınırlı FK ile gömülü; ek tur yok).
+    .select("title, property_code, advisor:profiles!properties_assignee_tenant_fkey(phone, is_active)")
     .eq("id", event.property_id)
     .eq("tenant_id", event.tenant_id)
     .eq("is_sample", false)
@@ -74,6 +82,14 @@ export default async function OpenHouseCheckinPage({
   if (!property) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const propLabel = property?.title ?? property?.property_code ?? "Açık ev";
+  type AdvisorShape = { phone?: string | null; is_active?: boolean | null };
+  const advisor = rel(property.advisor as AdvisorShape | AdvisorShape[] | null);
+  // İletişim (SK8 B148): danışman → ofisin girdiği telefon; yoksa düğme yok (form zaten talep alır).
+  const contact = resolvePublicContact({
+    advisorPhone: advisor?.is_active === false ? null : (advisor?.phone ?? null),
+    officePhone: tenant.phone ?? null,
+    whatsappText: `Merhaba, "${propLabel}" açık evi hakkında bilgi almak istiyorum.`,
+  });
   const date = new Date(event.scheduled_at);
   const tarih = new Intl.DateTimeFormat("tr-TR", { dateStyle: "full" }).format(date);
   const saat = new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit" }).format(date);
@@ -107,14 +123,20 @@ export default async function OpenHouseCheckinPage({
       />
 
       {ended ? (
-        <PublicStateBox
-          className="mt-5"
-          icon={CalendarX2}
-          title="Bu açık ev etkinliği sona erdi."
-          description="İlgilendiğiniz portföy için ofisimizle iletişime geçebilirsiniz."
-        />
+        <>
+          <PublicStateBox
+            className="mt-5"
+            icon={CalendarX2}
+            title="Bu açık ev etkinliği sona erdi."
+            description="İlgilendiğiniz portföy için ofisimizle iletişime geçebilirsiniz."
+          />
+          <PublicContactActions contact={contact} tone="light" className="mt-4" />
+        </>
       ) : (
-        <CheckinForm token={token} kiosk={kiosk === "1"} />
+        <>
+          <CheckinForm token={token} kiosk={kiosk === "1"} />
+          {kiosk === "1" ? null : <PublicContactActions contact={contact} tone="light" className="mt-4" />}
+        </>
       )}
     </PublicTokenPage>
   );

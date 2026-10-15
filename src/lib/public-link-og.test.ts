@@ -212,3 +212,42 @@ describe("loadDocLinkOg sayfa kapıları", () => {
     expect(await loadDocLinkOg("survey", TOKEN)).toBeNull();
   });
 });
+
+describe("SK8 B151: müşteri/malik portalı ve açık ev önizlemesi ofis markalı, kişi adı yok", () => {
+  const TENANT = { name: "Deniz Emlak", status: "active", logo_url: null, brand_color: "#0f766e" };
+  const PORTAL_TOKEN = "a".repeat(64);
+
+  it("müşteri portalı: 'Müşteri paneliniz · ofis'; süresi dolmuş token, örnek müşteri ve kapalı modül kart vermez", async () => {
+    h.single.customer_portal_tokens = { tenant_id: "t-1", customer_id: "c-1", expires_at: "2999-01-01T00:00:00Z", tenant: TENANT };
+    expect(await loadDocLinkOg("customer_portal", PORTAL_TOKEN)).toBeNull(); // müşteri satırı yok (örnek/silinmiş)
+    h.single.customers = { id: "c-1" };
+    const og = await loadDocLinkOg("customer_portal", PORTAL_TOKEN);
+    expect(og).toMatchObject({ office: "Deniz Emlak", title: "Müşteri paneliniz" });
+    expect(publicLinkMetadata(og, "Müşteri Paneli").openGraph).toMatchObject({ title: "Müşteri paneliniz · Deniz Emlak", siteName: "Deniz Emlak" });
+    h.single.customer_portal_tokens = { ...h.single.customer_portal_tokens, expires_at: "2000-01-01T00:00:00Z" };
+    expect(await loadDocLinkOg("customer_portal", PORTAL_TOKEN)).toBeNull();
+    h.single.customer_portal_tokens = { ...h.single.customer_portal_tokens, expires_at: "2999-01-01T00:00:00Z" };
+    h.closed = true;
+    expect(await loadDocLinkOg("customer_portal", PORTAL_TOKEN)).toBeNull();
+  });
+
+  it("malik portalı: 'Malik paneliniz'; portföy örnek/silinmişse kart yok", async () => {
+    h.single.owner_portal_tokens = { tenant_id: "t-1", property_id: P1, expires_at: "2999-01-01T00:00:00Z", tenant: TENANT };
+    expect(await loadDocLinkOg("owner_portal", PORTAL_TOKEN)).toBeNull();
+    h.single.properties = { id: P1 };
+    expect(await loadDocLinkOg("owner_portal", PORTAL_TOKEN)).toMatchObject({ title: "Malik paneliniz", photoPropertyIds: [] });
+  });
+
+  it("açık ev: başlık ilan başlığı, rozet 'Açık ev', fotoğraf adayı ilan; kapalı modülde yok", async () => {
+    h.single.open_houses = { tenant_id: "t-1", property_id: P1, tenant: TENANT };
+    h.single.properties = { id: P1, title: "Moda'da bahçeli 3+1", property_code: "P-1" };
+    expect(await loadDocLinkOg("open_house", TOKEN)).toMatchObject({
+      office: "Deniz Emlak",
+      badge: "Açık ev",
+      title: "Moda'da bahçeli 3+1",
+      photoPropertyIds: [P1],
+    });
+    h.closed = true;
+    expect(await loadDocLinkOg("open_house", TOKEN)).toBeNull();
+  });
+});

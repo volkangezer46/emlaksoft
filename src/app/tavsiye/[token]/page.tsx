@@ -1,16 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { after } from "next/server";
-import { Gift, HeartHandshake, Link2Off, Phone, ShieldCheck } from "lucide-react";
+import { Gift, HeartHandshake, Link2Off, ShieldCheck } from "lucide-react";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PublicModuleClosed } from "@/components/modules/public-module-closed";
 import { isPublicFeatureClosed } from "@/lib/modules/public";
-import { formatTurkishPhone, toTelHref } from "@/lib/phone";
-import {
-  PublicGhostButton,
-  PublicStateBox,
-  PublicTokenPage,
-} from "@/components/public/token-page";
+import { isLinkPreviewHeaders } from "@/lib/link-preview";
+import { resolvePublicContact } from "@/lib/public-contact";
+import { PublicContactActions } from "@/components/public/public-contact-actions";
+import { PublicStateBox, PublicTokenPage } from "@/components/public/token-page";
 import { ReferralForm } from "./referral-form";
 import { isPublicTenantActive } from "@/lib/public-tenant";
 
@@ -47,13 +46,16 @@ export default async function ReferralPage({
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) notFound();
 
   const admin = createAdminClient();
-  const { data: link } = await admin
+  const [{ data: link }, requestHeaders] = await Promise.all([
+    admin
     .from("referral_links")
     .select(
       "id, tenant_id, customer_id, is_active, reward_note, tenant:tenants(name, status, phone, logo_url, brand_color)",
     )
     .eq("public_token", token)
-    .maybeSingle();
+    .maybeSingle(),
+    headers(),
+  ]);
 
   if (!link) notFound();
 
@@ -78,15 +80,19 @@ export default async function ReferralPage({
   if (!customer) notFound();
   const office = tenant?.name ?? "Emlak ofisi";
   const officePhone = tenant?.phone ?? null;
-  const telHref = toTelHref(officePhone);
+  // İletişim (SK8 B148): ofisin girdiği telefon (tavsiye linkinde danışman yok); yoksa düğme yok.
+  const contact = resolvePublicContact({
+    officePhone,
+    whatsappText: `Merhaba, ${office} tavsiye bağlantısı üzerinden yazıyorum.`,
+  });
   const referrer = customer.full_name ?? "Bir müşterimiz";
   const firstName = referrer.split(" ")[0] || referrer;
   const active = link.is_active !== false;
   const reward = String(link.reward_note ?? "").trim();
 
   // Tıklanma: yanıt gönderildikten SONRA atomik +1 (increment_presentation_view deseni).
-  // Kapalı linkte sayaç şişmesin.
-  if (active) {
+  // Kapalı linkte ve WhatsApp/Telegram önizleme botunda (ya da ön-yüklemede) sayaç şişmesin (SK8 B150).
+  if (active && !isLinkPreviewHeaders(requestHeaders)) {
     after(async () => {
       const { error } = await admin.rpc("increment_referral_click", { p_link_id: link.id });
       if (error) console.error("increment_referral_click", error.message);
@@ -142,14 +148,7 @@ export default async function ReferralPage({
           icon={Link2Off}
           title="Bu tavsiye bağlantısı kapatılmış."
           description={`Yine de bize ulaşmak isterseniz ${office} sizi memnuniyetle dinler.`}
-          action={
-            telHref ? (
-              <PublicGhostButton href={telHref}>
-                <Phone className="h-4 w-4" style={{ color: "var(--pb-ink)" }} aria-hidden="true" />
-                {formatTurkishPhone(officePhone)}
-              </PublicGhostButton>
-            ) : null
-          }
+          action={contact ? <PublicContactActions contact={contact} tone="light" /> : null}
         />
       )}
     </PublicTokenPage>

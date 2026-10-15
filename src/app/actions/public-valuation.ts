@@ -17,6 +17,23 @@ import { publicEvidenceHash } from "@/lib/public-request-security";
 const VALUATION_CONSENT_VERSION = "valuation-lead-v1-2026-08-02";
 
 /**
+ * "Beni arayın" adımının YENİ onay düzeni (SK8 B156) — AYAR, varsayılan KAPALI. Hukuk onayı gelince `true` yapılır
+ * (karar.json ownerInputs: KVKK aydınlatma metni + ayrı İYS tanıtım onayı metni). Açıkken:
+ *  - iletişim talebi için aydınlatma bilgilendirmesi yeterlidir (zorunlu onay kutusu yok); talep kanıtı yine
+ *    `public_lead_consent_events`'e (valuation_lead, v2 sürümü) yazılır;
+ *  - tanıtım/ticari ileti onayı AYRI, işaretsiz ve isteğe bağlı kutudur; işaretlenirse müşterinin `iys_consents`
+ *    kayıtları (sms, whatsapp, call) "granted" yazılır (kaynak vitrin_degerleme, ayrı kapsam).
+ * Kapalıyken "Beni arayın" bugünkü zorunlu onay kutusuyla (v1 metni) çalışır. Bayrak istemciye `consentMode` olarak
+ * hesaplama sonucuyla gider (istemci bunu ayrıca okumaz). Hesaplama adımı HER İKİ durumda da onay istemez.
+ */
+const VALUATION_CONSENT_V2_ENABLED = false;
+const VALUATION_CONSENT_VERSION_V2 = "valuation-lead-v2-2026-10-16";
+const VALUATION_MARKETING_SOURCE = "vitrin_degerleme";
+
+export type ValuationConsentMode = "legacy" | "v2";
+const consentMode = (): ValuationConsentMode => (VALUATION_CONSENT_V2_ENABLED ? "v2" : "legacy");
+
+/**
  * "Evim ne kadar eder?" — /vitrin/[slug]/degerleme public satıcı hunisi.
  *
  * NEDEN service_role: Sayfa herkese açık, oturum yok. Token'lı public sayfalar
@@ -45,15 +62,18 @@ export type PublicEstimateInput = {
   sqm: number;
   rooms?: string;
   buildingAge?: string;
-  kvkk: boolean;
   /** Honeypot — botlar doldurur, gerçek kullanıcı görmez. */
   website?: string;
 };
 
+/**
+ * Hesaplama kişisel veri ALMAZ (il/ilçe/m²/tip); bu yüzden onay istemez (SK8 B156: tanıtım onayı hizmetin ön koşulu
+ * yapılamaz). Hız sınırı ve honeypot kalır. `consentMode`: "Beni arayın" adımının onay düzeni (sunucu ayarı).
+ */
 export type PublicEstimateResult =
   | { ok: false; error: string }
-  | { ok: true; sufficient: false }
-  | { ok: true; sufficient: true; low: number; high: number; note: string };
+  | { ok: true; sufficient: false; consentMode: ValuationConsentMode }
+  | { ok: true; sufficient: true; low: number; high: number; note: string; consentMode: ValuationConsentMode };
 
 /** Aralığı 50.000 ₺ adıma yuvarlar — kesin fiyat izlenimi vermesin. */
 function roundBand(low: number, high: number): { low: number; high: number } {
@@ -74,8 +94,7 @@ export async function estimatePublicValuation(
   input: PublicEstimateInput,
 ): Promise<PublicEstimateResult> {
   // Honeypot dolduysa API'ye inmeden "veri yok" göster — bot ayrımı belli olmasın.
-  if ((input.website ?? "").trim()) return { ok: true, sufficient: false };
-  if (!input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
+  if ((input.website ?? "").trim()) return { ok: true, sufficient: false, consentMode: consentMode() };
 
   // Ücretli harici API çağrısına (EmlakFiyati) inmeden IP bazlı hız sınırı —
   // sınırsız çağrı doğrudan maliyet/DoS vektörü (bkz. kardeş dosyalardaki
@@ -129,7 +148,7 @@ export async function estimatePublicValuation(
     // Kaynak etiketi: piyasa endeksi hesaba girdiyse ziyaretçiye de söylenir (şeffaflık).
     const usedIndex = est.sources.some((s) => s.weight > 0 && s.name === EMLAKFIYATI_SOURCE_NAME);
     const note = usedIndex ? `${est.notes} Piyasa verisi: ${EMLAKFIYATI_SOURCE_NAME}.` : est.notes;
-    return { ok: true, sufficient: true, low: band.low, high: band.high, note };
+    return { ok: true, sufficient: true, low: band.low, high: band.high, note, consentMode: consentMode() };
   }
 
   // Son çare: ilçe geneli medyan ₺/m² (region_stats — yine tenant'ın kendi verisi).
@@ -151,10 +170,11 @@ export async function estimatePublicValuation(
       low: band.low,
       high: band.high,
       note: "İlçe geneli medyan m² fiyatına dayalı kaba tahmin. İnsan onayı önerilir.",
+      consentMode: consentMode(),
     };
   }
 
-  return { ok: true, sufficient: false };
+  return { ok: true, sufficient: false, consentMode: consentMode() };
 }
 
 export type PublicValuationLeadInput = {
@@ -171,7 +191,10 @@ export type PublicValuationLeadInput = {
   low?: number | null;
   high?: number | null;
   website?: string;
-  kvkk: boolean;
+  /** Eski düzen (ayar kapalı): zorunlu KVKK onay kutusu. Yeni düzende yok sayılır (aydınlatma bilgilendirmesi yeterli). */
+  kvkk?: boolean;
+  /** Yeni düzen (ayar açık): ayrı, isteğe bağlı tanıtım/ticari ileti onayı (İYS). Ayar kapalıyken yok sayılır. */
+  marketingConsent?: boolean;
   /** İstemci idempotency anahtarı — verilmezse sunucu üretir. */
   requestId?: string;
 };
@@ -185,7 +208,8 @@ export async function submitValuationLead(
 ): Promise<PublicValuationLeadResult> {
   // Honeypot: botlara sessizce "başarılı" de.
   if ((input.website ?? "").trim()) return { ok: true };
-  if (!input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
+  const mode = consentMode();
+  if (mode === "legacy" && !input.kvkk) return { ok: false, error: "Devam etmek için KVKK onayı gerekli." };
 
   const slug = (input.slug ?? "").trim();
   const fullName = (input.fullName ?? "").trim().slice(0, 120);
@@ -258,7 +282,7 @@ export async function submitValuationLead(
     consent: {
       requestId,
       scope: "valuation_lead",
-      version: VALUATION_CONSENT_VERSION,
+      version: mode === "v2" ? VALUATION_CONSENT_VERSION_V2 : VALUATION_CONSENT_VERSION,
       acceptedAt: new Date().toISOString(),
       ipHash: publicEvidenceHash(ip),
       userAgentHash: publicEvidenceHash(h?.get("user-agent")),
@@ -266,6 +290,25 @@ export async function submitValuationLead(
   });
 
   if (!result.ok) return { ok: false, error: result.error };
+
+  // Yeni düzen: ayrı tanıtım onayı (İYS) yalnız kutu işaretliyse ve yalnız bu müşteri için; hata talebi düşürmez.
+  if (mode === "v2" && input.marketingConsent === true && result.customerId) {
+    const grantedAt = new Date().toISOString();
+    const { error: iysErr } = await admin.from("iys_consents").upsert(
+      (["sms", "whatsapp", "call"] as const).map((channel) => ({
+        tenant_id: tenant.id,
+        customer_id: result.customerId,
+        channel,
+        status: "granted",
+        source: VALUATION_MARKETING_SOURCE,
+        granted_at: grantedAt,
+        revoked_at: null,
+        meta: { version: VALUATION_CONSENT_VERSION_V2, scope: "valuation_marketing", requestId, ipHash: publicEvidenceHash(ip) },
+      })),
+      { onConflict: "tenant_id,customer_id,channel" },
+    );
+    if (iysErr) console.error("submitValuationLead marketing consent", { code: iysErr.code });
+  }
 
   /*
    * DEĞERLEME KAYDI (denetim P0): hesaplanan aralık eskiden yalnızca yukarıdaki
