@@ -12,6 +12,7 @@ import { completeTask, deleteTask, reopenTask } from "@/app/actions/tasks";
 import { useToast } from "@/components/app/toast-provider";
 import { now as clockNow } from "@/lib/clock";
 import { TaskEditDialog } from "./task-edit-dialog";
+import { NoteText } from "@/components/app/note-text";
 import { OptimisticDoneContext } from "./task-bulk-list";
 
 type Rel = { full_name?: string } | { full_name?: string }[] | null;
@@ -216,7 +217,7 @@ export function TaskCard({
               <span className="rounded-full bg-ink-950/6 px-2 py-0.5 text-xs font-bold text-text-faint">Düşük</span>
             ) : null}
           </div>
-          {task.notes && !compact ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted">{task.notes}</p> : null}
+          {task.notes && !compact ? <p className="mt-0.5 line-clamp-1 text-xs text-text-muted"><NoteText text={task.notes} /></p> : null}
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             <span className={`flex items-center gap-1 ${due.cls}`}>
               <Clock className="h-3 w-3" /> {due.text}
