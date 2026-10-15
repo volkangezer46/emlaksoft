@@ -67,7 +67,7 @@ function OppBadge() {
 function PerfTable({ rows, kind }: { rows: PerfRow[]; kind: "query" | "page" }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="adm-tbl-m w-full md:min-w-[640px] text-sm">
         <thead>
           <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-muted">
             <th className="py-2 pr-3 font-semibold">{kind === "query" ? "Sorgu" : "Sayfa"}</th>
@@ -100,10 +100,10 @@ function PerfTable({ rows, kind }: { rows: PerfRow[]; kind: "query" | "page" }) 
                     </Link>
                   )}
                 </td>
-                <td className="py-2 pr-3 text-right tabular-nums">{fmtInt(r.clicks)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{fmtInt(r.impressions)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{fmtPct(r.ctr)}</td>
-                <td className="py-2 pr-3 text-right tabular-nums">{fmtPos(r.avg_position)}</td>
+                <td data-label="Tıklama" className="py-2 pr-3 text-right tabular-nums">{fmtInt(r.clicks)}</td>
+                <td data-label="Gösterim" className="py-2 pr-3 text-right tabular-nums">{fmtInt(r.impressions)}</td>
+                <td data-label="TO (CTR)" className="py-2 pr-3 text-right tabular-nums">{fmtPct(r.ctr)}</td>
+                <td data-label="Ort. sıra" className="py-2 pr-3 text-right tabular-nums">{fmtPos(r.avg_position)}</td>
                 <td className="py-2">{isOpportunity(r) ? <OppBadge /> : null}</td>
               </tr>
             );
@@ -230,7 +230,7 @@ function InspectionTable({ rows }: { rows: InspectionView[] | null }) {
         </div>
       </CardHeader>
       <CardContent className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="adm-tbl-m w-full md:min-w-[640px] text-sm">
           <thead>
             <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-muted">
               <th className="py-2 pr-3 font-semibold">Adres</th>
@@ -257,10 +257,10 @@ function InspectionTable({ rows }: { rows: InspectionView[] | null }) {
                       </a>
                     )}
                   </td>
-                  <td className={`py-2 pr-3 font-semibold ${r.verdict === "PASS" ? "text-mint-700" : "text-danger-600"}`}>{VERDICT[r.verdict] ?? r.verdict}</td>
-                  <td className="max-w-[240px] truncate py-2 pr-3 text-text-muted">{r.coverage ?? "—"}</td>
-                  <td className="py-2 pr-3 text-xs">{mismatch ? <span className="font-semibold text-amber-900">Google farklı seçti</span> : "Uyumlu"}</td>
-                  <td className="py-2 text-xs text-text-muted">{toTrLocalInput(r.checked_at).replace("T", " ")}</td>
+                  <td data-label="Karar" className={`py-2 pr-3 font-semibold ${r.verdict === "PASS" ? "text-mint-700" : "text-danger-600"}`}>{VERDICT[r.verdict] ?? r.verdict}</td>
+                  <td data-label="Kapsam" className="max-w-[240px] truncate py-2 pr-3 text-text-muted">{r.coverage ?? "—"}</td>
+                  <td data-label="Kanonik" className="py-2 pr-3 text-xs">{mismatch ? <span className="font-semibold text-amber-900">Google farklı seçti</span> : "Uyumlu"}</td>
+                  <td data-label="İncelendi" className="py-2 text-xs text-text-muted">{toTrLocalInput(r.checked_at).replace("T", " ")}</td>
                 </tr>
               );
             })}

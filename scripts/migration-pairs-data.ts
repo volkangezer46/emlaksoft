@@ -367,6 +367,12 @@ const F = {
   announcementCenter: "20261013004700_platform_announcement_center.sql",
   // AD9 (2026-10-13): destek masasi 2.0 (SLA matrisi + is saatleri + tatil, otomatik atama, etiket, makro eylemleri, bekleyen bilet otomasyonu).
   supportDeskV2: "20261013004800_support_desk_v2.sql",
+  // B7 (PA-3/7/8/9/10): platform raporu ay sonu MRR, talep birlestirme, destek presence, saptirma olcumu, oneri-yenilik bagi.
+  b7PlatformMrrMonthEnd: "20261019070000_platform_mrr_month_end.sql",
+  b7SupportTicketMerge: "20261019070001_support_ticket_merge.sql",
+  b7TicketDeskPresence: "20261019070002_ticket_desk_presence.sql",
+  b7FeatureRequestChangelog: "20261019070003_feature_request_changelog_link.sql",
+  b7SupportArticleDeflections: "20261019070004_support_article_deflections.sql",
   // AD2 (2026-10-13): fatura satirlari + numarali alacak dekontu (iade tetikleyicisi) + elle fatura taslak RPC'si.
   invoiceLinesCreditNotes: "20261013004100_invoice_lines_credit_notes.sql",
   // AD3 (2026-10-13): tahsilat (dunning) olay gunlugu (yeni tablo; tenants/invoices FK, yalniz service_role).
@@ -742,6 +748,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.eidsInbound]: "ek", // 2 yeni tablo eids_inbound_addresses/eids_inbound_messages (RLS: ofis ici okuma, yazma yalniz service_role); mevcut nesnelere dokunmaz, kod tablolar yokken "kurulum bekliyor"
     [F.emailLog]: "ek", // 3 yeni platform tablosu email_sends/email_events/email_suppressions (RLS acik, politika yok, yalniz service_role) + email_log_prune RPC; mevcut nesnelere dokunmaz, kod tablolar yokken gonderim surer ve gunluk atlanir
     [F.supportDeskV2]: "davranis", // 5 yeni tablo (yalniz service_role) + support_tickets.tags + ticket_macros eylem/sayac kolonlari; SLA hedefi IS SAATINE gore (support_set_derived_ticket_fields degisir), BEFORE INSERT otomatik atama tetikleyicisi, billing rolu destek personeli sayilir; kod tablolar yokken eski davranis
+    [F.b7PlatformMrrMonthEnd]: "ek", // yeni salt-okunur SECURITY DEFINER platform_mrr_month_end (yalniz service_role; ofis x ay sonu MRR); veri degismez
+    [F.b7SupportTicketMerge]: "ek", // support_tickets.merged_into_id/merged_at (+ kolon bazli authenticated SELECT) + yalniz service_role support_merge_tickets RPC'si; mevcut RPC/tetikleyicilere dokunmaz
+    [F.b7TicketDeskPresence]: "ek", // realtime.messages uzerinde yalniz 'ticket-desk:<uuid>' presence okuma/yazma politikalari (aktif personel); diger konulara dokunmaz
+    [F.b7FeatureRequestChangelog]: "ek", // product_feature_requests.changelog_entry_id (nullable FK, on delete set null) + kismi indeks
+    [F.b7SupportArticleDeflections]: "ek", // yeni tablo support_article_deflections (RLS+FORCE, yalniz service_role); kod tablo yokken olcum yazmaz
     [F.financeLedgerV2]: "ek", // 9 yeni tablo (RLS: tenant + expenses:view; yazma yalniz RPC, kayitli gorunum kendi satiri) + cash_entries 8 / recurring_rules 3 nullable kolon + 2 security_invoker gorunum + ay kilidi ve acik kalem tetikleri (kilit tablosu bos dogar) + realtime yayini; mevcut satir/davranis degismez
     [F.financeLedgerV2Rpc]: "ek", // ~30 yeni SECURITY DEFINER finance_* RPC (v2 kayit/guncelleme eski RPC'leri sarar; eski imza ve govdeler degismez)
     [F.platformCustomRolesFourEyes]: "ek", // 2 yeni platform tablosu (ozel rol: aktif personel okur, yazma service_role; onay kuyrugu yalniz service_role) + platform_staff nullable custom_role_id (FK restrict, super admin CHECK); mevcut satirlar null kalir, sabit rol davranisi degismez
@@ -1045,6 +1056,11 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     { id: "EP4-eids-aksiyon-motoru", order: 94, title: "EIDS aksiyon motoru: gorev turleri/oncelik, dedupe_key, kaldirma kontrol listesi + kapanis kapisi + eklenti tetigi, e-posta hatirlatma kanali (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo/sutun yokken gorev uretimi 'kurulum bekliyor'; sira serbest, siki)", files: [F.eidsActions] },
     { id: "AD11-guvenlik-yedek", order: 81, title: "AD11 guvenlik sertlestirmesi: denetim izi append-only + ip/ua/once/sonra, destek erisimi gecmisi (gerekce+bilet), backup_runs/restore_drills, personel oturum RPC'leri (bagimsiz; kod tablolar yokken eski yola duser; sira serbest, siki)", files: [F.ad11SecurityHardening] },
     { id: "AD9-destek-masasi-2", order: 79, title: "Destek masasi 2.0: SLA matrisi (oncelik x plan, is saati + tatil), kategori kurali + sirali dagitimla otomatik atama, bilet etiketleri, makro eylemleri/kullanim sayaci, yanit bekleyen bilet otomasyonu RPC'si (20260802000540 SONRASI; bagimsiz, sira serbest; davranis)", files: [F.supportDeskV2] },
+    { id: "B7-platform-mrr-ay-sonu", order: 1970, title: "Platform MRR ay sonu okuyucusu platform_mrr_month_end (yalniz service_role, salt-okunur; AP7 platform_mrr_daily SONRASI; KOD YAYININDAN ONCE ya da SONRA: fonksiyon yokken MRR hareketleri/NRR/kohort kartlari 'kurulum bekliyor' der; ek)", files: [F.b7PlatformMrrMonthEnd] },
+    { id: "B7-destek-talep-birlestirme", order: 1971, title: "Mukerrer destek talebi birlestirme: support_tickets.merged_into_id/merged_at + support_merge_tickets RPC (yalniz service_role; tek transaction, sabit kilit sirasi) (AD9 destek masasi 2 SONRASI; KOD YAYININDAN ONCE ya da SONRA: kolon/fonksiyon yokken 'Birlestir' paneli gizli; ek)", files: [F.b7SupportTicketMerge] },
+    { id: "B7-destek-presence", order: 1972, title: "Destek talebi personel cakisma seridi: realtime.messages 'ticket-desk:<uuid>' presence politikalari (SK4 rt_staff_can_listen SONRASI; KOD YAYININDAN ONCE ya da SONRA: politika yokken serit sessizce gizli; ek)", files: [F.b7TicketDeskPresence] },
+    { id: "B7-oneri-yenilik-bagi", order: 1973, title: "Oneri panosu dongu kapatma: product_feature_requests.changelog_entry_id (DG8 oneri panosu + AD8 yenilikler SONRASI; KOD YAYININDAN ONCE ya da SONRA: kolon yokken baglanti yazilmaz, durum yine kaydedilir; ek)", files: [F.b7FeatureRequestChangelog] },
+    { id: "B7-talep-saptirma-olcumu", order: 1974, title: "Yeni talepte makaleyle cozulen olcumu: support_article_deflections (yalniz service_role) (AD12 yardim icerigi SONRASI; KOD YAYININDAN ONCE ya da SONRA: tablo yokken olcum yazilmaz; ek)", files: [F.b7SupportArticleDeflections] },
     { id: "SP6-site-medya", order: 70, title: "Site medya kutuphanesi: ozel site-media kovasi + site_media tablosu (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken 'kurulum bekliyor'; sira serbest, ek)", files: [F.siteMedia] },
     { id: "EP1-portal-uyelikleri", order: 91, title: "Portal uyelikleri tek kaynak: tenant_portal_accounts + portal_account_report_login + portal_name kucuk harf duzeltmesi (bagimsiz; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod tablo yokken canli ilan/gider/talep onerisine duser; sira serbest, davranis; 007100 portal_name tetikleyicisi + CHECK 007000'dan SONRA)", files: [F.tenantPortalAccounts, F.portalListingsNameNormalize] },
     { id: "EP2-eids-yetki-defteri", order: 92, title: "EIDS yetki defteri: genisletilmis yetki durumu + 5 sutun, yalniz-eklenir eids_authority_events, eids_apply/undo_authority_event (tek yazma noktasi) ve aday on suzgeci (20261008001300 SONRASI; KOD YAYININDAN ONCE ya da SONRA uygulanabilir, kod yokken eski yola duser; davranis)", files: [F.eidsAuthorityLedger] },
@@ -1410,6 +1426,13 @@ export const MIGRATION_GROUP_SPEC: GroupSpec = {
     [F.wp5EinvoiceLedgerLink, F.financePartyAdvisorScope],
     // A1: merge_properties, merge_fk_refs cekirdegine dayanir.
     [F.a1MergeProperties, F.a1MergeCustomersV2],
+    // B7: ay sonu okuyucusu platform_mrr_daily'ye; birlestirme destek masasi 2'ye (tags); presence SK4 rt_staff_can_listen'e; oneri bagi oneri panosu ve yeniliklere.
+    [F.b7PlatformMrrMonthEnd, F.platformMrrDaily],
+    [F.b7SupportTicketMerge, F.supportDeskV2],
+    [F.b7TicketDeskPresence, F.sk4AdminStaffBroadcast],
+    [F.b7FeatureRequestChangelog, F.flagRulesProductFeedback],
+    [F.b7FeatureRequestChangelog, F.announcementCenter],
+    [F.b7SupportArticleDeflections, F.legalHelpContent],
     // GA-08: my_notification_counts ve notification_reads SK5'te tanimlanir.
     [F.ga08NotificationsTopic, F.sk5NotificationReads],
   ],

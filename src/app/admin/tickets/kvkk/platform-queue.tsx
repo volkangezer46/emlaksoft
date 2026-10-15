@@ -126,7 +126,7 @@ export async function PlatformKvkkQueueSection({
         />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[760px] text-sm">
             <caption className="sr-only">Doğrudan KVKK başvuruları (en yakın son tarih önce)</caption>
             <thead className="border-b border-line text-left text-xs text-text-muted">
               <tr>
@@ -147,12 +147,12 @@ export async function PlatformKvkkQueueSection({
                       {r.ref}
                     </Link>
                   </td>
-                  <td className="px-4 py-2.5">{PLATFORM_KVKK_TYPE_LABELS[r.type] ?? r.type}</td>
-                  <td className="px-4 py-2.5">{PLATFORM_KVKK_STATUS_LABELS[r.status as keyof typeof PLATFORM_KVKK_STATUS_LABELS] ?? r.status}</td>
-                  <td className="px-4 py-2.5 text-text-muted">{IDENTITY_STATUS_LABELS[r.identity as keyof typeof IDENTITY_STATUS_LABELS] ?? r.identity}</td>
-                  <td className="px-4 py-2.5 tabular-nums text-text-muted">{fmtDay(r.createdAt)}</td>
-                  <td className="px-4 py-2.5 tabular-nums">{fmtDay(r.dueAt)}</td>
-                  <td className="px-4 py-2.5">
+                  <td data-label="Tür" className="px-4 py-2.5">{PLATFORM_KVKK_TYPE_LABELS[r.type] ?? r.type}</td>
+                  <td data-label="Durum" className="px-4 py-2.5">{PLATFORM_KVKK_STATUS_LABELS[r.status as keyof typeof PLATFORM_KVKK_STATUS_LABELS] ?? r.status}</td>
+                  <td data-label="Kimlik" className="px-4 py-2.5 text-text-muted">{IDENTITY_STATUS_LABELS[r.identity as keyof typeof IDENTITY_STATUS_LABELS] ?? r.identity}</td>
+                  <td data-label="Başvuru" className="px-4 py-2.5 tabular-nums text-text-muted">{fmtDay(r.createdAt)}</td>
+                  <td data-label="Son tarih" className="px-4 py-2.5 tabular-nums">{fmtDay(r.dueAt)}</td>
+                  <td data-label="Kalan" className="px-4 py-2.5">
                     <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums", TONE_CLASS[r.tone])}>
                       {kvkkDaysLeftLabel(r.daysLeft)}
                     </span>

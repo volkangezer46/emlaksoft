@@ -76,7 +76,7 @@ export default async function AdminSpeedPage() {
           <PurgeWarmButton labels={labels} />
         </div>
         <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-line bg-surface">
-          <table className="w-full min-w-[52rem] text-left text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[52rem] text-left text-sm">
             <thead className="border-b border-line text-xs text-text-faint">
               <tr>
                 <th className="p-3 font-bold">Sayfa</th>
@@ -97,17 +97,17 @@ export default async function AdminSpeedPage() {
                     <span className="block font-mono text-xs text-text-faint">{r.path}</span>
                     {r.disabled ? <span className="mt-1 block text-xs text-text-muted">{r.disabled}</span> : null}
                   </td>
-                  <td className="p-3">
+                  <td data-label="Statik / Normal" className="p-3">
                     {mode === "disabled" || mode === "env_off" ? (
                       <span className="text-xs text-text-muted">{mode === "env_off" ? "STATIC_HOME / STATIC_PAGES=off" : "—"}</span>
                     ) : (
                       <StaticRouteSwitch id={r.id} label={r.label} enabled={mode === "on"} canToggle={isSuper} />
                     )}
                   </td>
-                  <td className="p-3">
+                  <td data-label="Durum" className="p-3">
                     <StatusChip mode={mode} lastStatic={stats?.lastStatic ?? null} />
                   </td>
-                  <td className="p-3 text-xs text-text-muted">
+                  <td data-label="Son çizim" className="p-3 text-xs text-text-muted">
                     {stats?.lastRenderAt ? (
                       <>
                         {fmt(stats.lastRenderAt)}
@@ -120,8 +120,8 @@ export default async function AdminSpeedPage() {
                     )}
                     {stats?.lastError ? <span className="block text-danger-700">Son hata: {stats.lastError}</span> : null}
                   </td>
-                  <td className="p-3 text-xs text-text-muted">{stats?.gzipBytes != null ? `${kb(stats.gzipBytes)} / ${kb(stats.rawBytes)}` : "—"}</td>
-                  <td className="p-3 text-xs text-text-muted">
+                  <td data-label="gzip / ham" className="p-3 text-xs text-text-muted">{stats?.gzipBytes != null ? `${kb(stats.gzipBytes)} / ${kb(stats.rawBytes)}` : "—"}</td>
+                  <td data-label="Son yedeğe düşme" className="p-3 text-xs text-text-muted">
                     {stats?.lastFallbackAt ? (
                       <>
                         {fmt(stats.lastFallbackAt)}

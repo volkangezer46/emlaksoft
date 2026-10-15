@@ -59,7 +59,7 @@ export function SlaMatrixForm({ policies, canEdit }: { policies: SlaPolicyRow[];
       className="space-y-3"
     >
       <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line">
-        <table className="w-full min-w-[760px] text-xs">
+        <table className="adm-sticky-first w-full min-w-[760px] text-xs">
           <thead className="bg-canvas/60">
             <tr className="text-left text-text-faint">
               <th className="px-3 py-2 font-semibold">Plan</th>

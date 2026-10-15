@@ -96,7 +96,7 @@ export async function LogView({ sp }: { sp: EmailPageSearch }) {
         />
       ) : (
         <div className="overflow-x-auto rounded-[var(--radius-card)] border border-line bg-surface">
-          <table className="w-full min-w-[720px] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[720px] text-sm">
             <thead className="bg-canvas text-left text-xs text-text-muted">
               <tr>
                 <th className="px-3 py-2 font-semibold">Zaman</th>
@@ -110,8 +110,8 @@ export async function LogView({ sp }: { sp: EmailPageSearch }) {
               {data.rows.map((r) => (
                 <tr key={r.id} className="border-t border-line align-top">
                   <td className="whitespace-nowrap px-3 py-2 text-xs text-text-muted">{formatDateTimeTr(r.created_at)}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-ink-950">{r.to_masked}</td>
-                  <td className="px-3 py-2">
+                  <td data-label="Alıcı" className="px-3 py-2 font-mono text-xs text-ink-950">{r.to_masked}</td>
+                  <td data-label="Şablon" className="px-3 py-2">
                     <Link href={href({ sablon: r.template, sayfa: undefined })} className="font-semibold text-ink-950 hover:text-brand-600">
                       {emailTemplateLabel(r.template)}
                     </Link>
@@ -119,7 +119,7 @@ export async function LogView({ sp }: { sp: EmailPageSearch }) {
                       {r.subject || "—"} · {r.source}
                     </p>
                   </td>
-                  <td className="px-3 py-2 text-xs">
+                  <td data-label="Ofis" className="px-3 py-2 text-xs">
                     {r.tenant_id ? (
                       <Link href={`/admin/tenants/${r.tenant_id}?sekme=zaman&kategori=iletisim`} className="font-semibold text-brand-600 hover:underline">
                         {data.tenantNames.get(r.tenant_id) ?? "Ofis"}
@@ -128,7 +128,7 @@ export async function LogView({ sp }: { sp: EmailPageSearch }) {
                       <span className="text-text-faint">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2">
+                  <td data-label="Durum" className="px-3 py-2">
                     <Link href={href({ durum: r.status, sayfa: undefined })}>
                       <Badge variant={statusVariant(r.status)} size="sm">
                         {EMAIL_STATUS_LABEL[r.status] ?? r.status}

@@ -311,7 +311,7 @@ async function ListView({ plan, actorId }: { plan: ExplorerPlan; actorId: string
           </p>
         ) : (
           <div className="relative overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
+            <table className="adm-tbl-m w-full text-sm md:min-w-[640px]">
               <thead className="text-left text-xs text-text-muted">
                 <tr>
                   {cols.map((c) => (
@@ -333,13 +333,13 @@ async function ListView({ plan, actorId }: { plan: ExplorerPlan; actorId: string
               <tbody className="divide-y divide-line">
                 {res.rows.map((r) => (
                   <tr key={r.id} className="hover:bg-canvas">
-                    {cols.map((c) => (
-                      <td key={c.key} className="max-w-[280px] truncate px-3 py-2 first:pl-5">
+                    {cols.map((c, ci) => (
+                      <td key={c.key} data-label={ci === 0 ? undefined : c.label} className="max-w-[280px] truncate px-3 py-2 first:pl-5">
                         <Cell col={c} value={r.cells[c.key] ?? null} />
                       </td>
                     ))}
                     {showOffice ? (
-                      <td className="px-3 py-2">
+                      <td data-label="Ofis" className="px-3 py-2">
                         <OfficeCell row={r} names={res.officeNames} hrefFor={officeHref} />
                       </td>
                     ) : null}

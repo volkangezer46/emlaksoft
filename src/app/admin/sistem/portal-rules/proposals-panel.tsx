@@ -84,13 +84,13 @@ function EvidenceBody({ data }: { data: unknown }) {
         return (
           <div key={k} className="overflow-x-auto">
             <p className="text-xs font-semibold text-text-muted">{k.replace(/_/g, " ")}</p>
-            <table className="mt-1 w-full min-w-[420px] text-left text-sm">
+            <table className="adm-tbl-m mt-1 w-full text-left text-sm md:min-w-[420px]">
               <thead className="text-xs text-text-muted">
                 <tr>{cols.map((c) => <th key={c} className="py-1 pr-3 font-semibold">{c.replace(/_/g, " ")}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {items.map((x, i) => (
-                  <tr key={i}>{cols.map((c) => <td key={c} className="py-1 pr-3 tabular-nums">{x[c] == null ? "—" : String(x[c])}</td>)}</tr>
+                  <tr key={i}>{cols.map((c, ci) => <td key={c} data-label={ci === 0 ? undefined : c.replace(/_/g, " ")} className="py-1 pr-3 tabular-nums">{x[c] == null ? "—" : String(x[c])}</td>)}</tr>
                 ))}
               </tbody>
             </table>

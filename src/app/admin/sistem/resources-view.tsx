@@ -149,7 +149,7 @@ export async function ResourcesView() {
           <p className="px-5 py-4 text-sm text-text-muted">Konteyner listesi alınamadı (docker erişimi yok).</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
+            <table className="adm-tbl-m w-full md:min-w-[560px] text-sm">
               <thead className="text-left text-xs text-text-muted">
                 <tr>
                   <th className="px-5 py-2 font-semibold">Ad</th>
@@ -164,13 +164,13 @@ export async function ResourcesView() {
                   return (
                     <tr key={c.name}>
                       <td className="px-5 py-2 font-semibold text-ink-950">{c.name}</td>
-                      <td className="px-3 py-2">
+                      <td data-label="Durum" className="px-3 py-2">
                         <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${bad ? "bg-danger-500/10 text-danger-600" : "bg-mint-500/12 text-mint-700"}`}>
                           {c.state === "running" ? (c.health === "unhealthy" ? "sağlıksız" : "çalışıyor") : c.state || "bilinmiyor"}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs text-text-muted">{c.status}</td>
-                      <td className="numeric max-w-[16rem] truncate px-5 py-2 text-xs text-text-faint">{c.image}</td>
+                      <td data-label="Ayrıntı" className="px-3 py-2 text-xs text-text-muted">{c.status}</td>
+                      <td data-label="İmaj" className="numeric max-w-[16rem] truncate px-5 py-2 text-xs text-text-faint">{c.image}</td>
                     </tr>
                   );
                 })}

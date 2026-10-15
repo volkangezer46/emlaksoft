@@ -28,6 +28,9 @@ import { cn } from "@/lib/utils";
 import { TicketDetailControls } from "./ticket-detail-controls";
 import { TicketMacroManager } from "./ticket-macro-manager";
 import { TicketTagsEditor } from "./ticket-tags-editor";
+import { TicketMergePanel } from "./ticket-merge-panel";
+import { TicketPresence } from "./ticket-presence";
+import { mergeCandidates, type MergeCandidateRow } from "@/lib/support/ticket-merge";
 import { loadMacros, loadTicketTags, SUPPORT_STAFF_ROLES } from "@/lib/support/desk-data";
 import { canEditMacros, describeMacroActions, parseMacroActions } from "@/lib/support/macro-template";
 
@@ -79,6 +82,8 @@ const eventLabel: Record<string, string> = {
   auto_reminder: "Müşteriye otomatik hatırlatma",
   "attachment.uploaded": "Güvenli dosya eklendi",
   "attachment.deleted": "Dosya silindi",
+  merge: "Mükerrer talep birleştirildi",
+  merged_into: "Başka talebe birleştirildi",
 };
 
 type Rel = { name?: string; status?: string } | { name?: string; status?: string }[] | null;
@@ -139,6 +144,8 @@ function eventDetail(event: TicketEvent) {
   if (event.event_type === "tags" && Array.isArray(next?.tags)) return next.tags.length ? next.tags.map((t) => `#${String(t)}`).join(" ") : "Etiketler kaldırıldı";
   if (event.event_type === "priority" && typeof next?.priority === "string") return priorityLabel[next.priority] ?? next.priority;
   if (event.event_type === "category" && typeof next?.category === "string") return categoryLabel[next.category] ?? next.category;
+  if (event.event_type === "merge" && typeof next?.source_no === "string") return `${next.source_no} bu talebe eklendi`;
+  if (event.event_type === "merged_into" && typeof next?.target_no === "string") return `${next.target_no} talebine`;
   return event.visibility === "internal" ? "Yalnız personel" : "Müşteriye görünür";
 }
 
@@ -149,7 +156,7 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
   const { id } = await params;
   const admin = createAdminClient();
 
-  const [ticketResult, messagesResult, eventsResult, attachmentsResult, staffResult, macroResult, categoryDefinitionsResult, csatResult, tags] = await Promise.all([
+  const [ticketResult, messagesResult, eventsResult, attachmentsResult, staffResult, macroResult, categoryDefinitionsResult, csatResult, tags, mergeInfoResult, mergedChildrenResult] = await Promise.all([
     admin
       .from("support_tickets")
       .select("id, ticket_no, subject, body, category, priority, status, created_at, updated_at, tenant_id, created_by, created_by_staff_id, assigned_staff_id, source, first_response_due_at, resolution_due_at, first_response_at, first_response_breached_at, resolution_breached_at, last_activity_at, last_customer_reply_at, last_staff_reply_at, resolved_at, closed_at, reopened_at, reopen_count, resolution_code, resolution_summary, version, tenant:tenants(name,status)")
@@ -192,6 +199,9 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
       .eq("ticket_id", id)
       .maybeSingle(),
     loadTicketTags(id),
+    // PA-9 birleşme bilgisi ayrı okunur: kolonlar (migration 20261019070001) yokken detay sayfası düşmez.
+    admin.from("support_tickets").select("merged_into_id, merged_at").eq("id", id).maybeSingle(),
+    admin.from("support_tickets").select("id, ticket_no, subject").eq("merged_into_id", id).order("merged_at", { ascending: false }).limit(20),
   ]);
 
   if (ticketResult.error) throw new Error(`Destek talebi yüklenemedi: ${ticketResult.error.message}`);
@@ -222,9 +232,25 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
   const ticketAttachments = attachments.filter((attachment) => !attachment.message_id);
   const authorIds = [...new Set([...rows.map((message) => message.author_user_id), ...events.map((event) => event.actor_user_id)].filter(Boolean))] as string[];
 
-  const [profilesResult, actorStaffResult] = await Promise.all([
+  const mergedIntoId = mergeInfoResult.error ? null : ((mergeInfoResult.data as { merged_into_id: string | null } | null)?.merged_into_id ?? null);
+  const mergedChildren = mergedChildrenResult.error ? [] : ((mergedChildrenResult.data ?? []) as { id: string; ticket_no: string | null; subject: string }[]);
+  const mergeEnabled = !mergeInfoResult.error;
+  const [profilesResult, actorStaffResult, candidatesResult, mergedTargetResult] = await Promise.all([
     authorIds.length ? admin.from("profiles").select("id, full_name").in("id", authorIds) : Promise.resolve({ data: [], error: null }),
     authorIds.length ? admin.from("platform_staff").select("id, full_name").in("id", authorIds) : Promise.resolve({ data: [], error: null }),
+    // Birleştirme adayları: aynı ofisin kapalı olmayan diğer talepleri (son hareket sırasıyla).
+    mergeEnabled && !mergedIntoId && ticket.status !== "closed"
+      ? admin
+          .from("support_tickets")
+          .select("id, ticket_no, subject, status, merged_into_id")
+          .eq("tenant_id", ticket.tenant_id)
+          .neq("id", ticket.id)
+          .neq("status", "closed")
+          .is("merged_into_id", null)
+          .order("last_activity_at", { ascending: false, nullsFirst: false })
+          .limit(25)
+      : Promise.resolve({ data: [], error: null }),
+    mergedIntoId ? admin.from("support_tickets").select("id, ticket_no, subject").eq("id", mergedIntoId).maybeSingle() : Promise.resolve({ data: null, error: null }),
   ]);
   if (profilesResult.error) throw new Error(`Konuşma katılımcıları yüklenemedi: ${profilesResult.error.message}`);
   if (actorStaffResult.error) throw new Error(`Personel kimlikleri yüklenemedi: ${actorStaffResult.error.message}`);
@@ -287,6 +313,13 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
     "temsilci.ad": viewer.full_name,
   };
   const statusOptions = Object.entries(statusLabel).map(([value, label]) => ({ value, label }));
+  const lastMessageAt = rawMessages.length ? rawMessages[rawMessages.length - 1]!.created_at : ticket.created_at;
+  const candidates = mergeCandidates((candidatesResult.error ? [] : (candidatesResult.data ?? [])) as MergeCandidateRow[], ticket.id).map((c) => ({
+    id: c.id,
+    label: `${c.ticket_no ?? c.id.slice(0, 8).toUpperCase()} · ${c.subject.length > 60 ? `${c.subject.slice(0, 60)}…` : c.subject}`,
+    hint: statusLabel[c.status] ?? c.status,
+  }));
+  const mergedTarget = (mergedTargetResult.data as { id: string; ticket_no: string | null; subject: string } | null) ?? null;
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 pb-10">
@@ -334,6 +367,32 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
         </div>
       </header>
 
+      {mergedTarget ? (
+        <p className="flex flex-wrap items-center gap-2 rounded-[var(--radius-card)] border border-brand-300/40 bg-brand-600/[0.06] px-4 py-3 text-sm text-text" role="status">
+          <span className="font-semibold text-ink-950">Bu talep birleştirildi.</span>
+          Yanıtlar
+          <Link href={`/admin/tickets/${mergedTarget.id}`} className="focus-ring inline-flex min-h-11 items-center font-semibold text-accent-text hover:underline">
+            {mergedTarget.ticket_no ?? "hedef talep"} · {mergedTarget.subject}
+          </Link>
+          üzerinden sürüyor.
+        </p>
+      ) : null}
+      {mergedChildren.length > 0 ? (
+        <div className="rounded-[var(--radius-card)] border border-line bg-surface px-4 py-3 text-sm">
+          <p className="font-semibold text-ink-950">Bu talebe birleştirilenler ({mergedChildren.length})</p>
+          <ul className="mt-1 flex flex-wrap gap-2">
+            {mergedChildren.map((c) => (
+              <li key={c.id}>
+                <Link href={`/admin/tickets/${c.id}`} className="focus-ring inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold text-accent-text hover:border-brand-300">
+                  {c.ticket_no ?? c.id.slice(0, 8).toUpperCase()} · {c.subject.length > 48 ? `${c.subject.slice(0, 48)}…` : c.subject}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs text-text-muted">Eski taleplerin ekleri kendi sayfalarında durur.</p>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_350px]">
         <main className="min-w-0 space-y-4">
           {ticketAttachments.length ? (
@@ -347,9 +406,10 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
           <section className="rounded-[var(--radius-panel)] border border-line bg-surface p-4 sm:p-5">
             <div className="flex items-start gap-2.5">
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-control)] bg-brand-600/10 text-brand-700"><MessageSquareText className="h-4 w-4" /></span>
-              <div><h2 className="font-display text-sm font-bold text-ink-950">Yanıt veya iç not ekle</h2><p className="mt-0.5 text-xs text-text-muted">Müşteri yanıtı bildirime gider; iç not yalnız destek ekibinde kalır.</p></div>
+              <div className="min-w-0 flex-1"><h2 className="font-display text-sm font-bold text-ink-950">Yanıt veya iç not ekle</h2><p className="mt-0.5 text-xs text-text-muted">Müşteri yanıtı bildirime gider; iç not yalnız destek ekibinde kalır.</p></div>
             </div>
-            <div className="mt-4"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} macroVars={macroVars} version={ticket.version} /></div>
+            <div className="mt-3"><TicketPresence ticketId={ticket.id} viewerId={viewer.id} viewerName={viewer.full_name} /></div>
+            <div className="mt-3"><StaffReplyForm ticketId={ticket.id} closed={ticket.status === "closed"} macros={macros} macroVars={macroVars} version={ticket.version} lastMessageAt={lastMessageAt} viewerId={viewer.id} /></div>
           </section>
         </main>
 
@@ -370,6 +430,14 @@ export default async function AdminTicketDetailPage({ params }: { params: Promis
           </section>
 
           {tags ? <TicketTagsEditor key={tags.join("|")} ticketId={ticket.id} tags={tags} /> : null}
+
+          {mergeEnabled && !mergedIntoId && ticket.status !== "closed" ? (
+            <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
+              <h2 className="font-display text-sm font-bold text-ink-950">Mükerrer talep</h2>
+              <p className="mb-3 mt-0.5 text-xs text-text-muted">Aynı sorun için açılmış ikinci talebi tek konuşmada toplayın; SLA ve raporlar şişmez.</p>
+              <TicketMergePanel ticketId={ticket.id} ticketNo={ticket.ticket_no ?? "Bu talep"} candidates={candidates} />
+            </section>
+          ) : null}
 
           <section className="rounded-[var(--radius-card)] border border-line bg-surface p-4">
             <h2 className="font-display text-sm font-bold text-ink-950">Kayıt bilgileri</h2>

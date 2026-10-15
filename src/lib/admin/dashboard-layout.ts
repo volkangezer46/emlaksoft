@@ -37,17 +37,27 @@ export function homeVariantFor(who: PlatformAccessSubject): HomeVariant {
  * Modül kullanımı Raporlar'ın kendi "Modül benimseme" kartındadır (kopya bölüm yok); sistem sağlığı, aktivite akışı ve
  * coğrafya kendi menü öğelerindedir.
  */
-export type ReportSection = "mrr" | "churn" | "activation" | "unitEconomics" | "usage" | "churnReasons" | "growth" | "composition";
+export type ReportSection =
+  | "mrr"
+  | "mrrMovements"
+  | "churn"
+  | "activation"
+  | "unitEconomics"
+  | "cohorts"
+  | "usage"
+  | "churnReasons"
+  | "growth"
+  | "composition";
 
 /** Gelir/fatura verisi taşıyan bölümler: yalnız `billing` modülü olan rol görür. */
-const BILLING_SECTIONS: ReadonlySet<ReportSection> = new Set(["mrr", "composition", "unitEconomics", "usage", "churnReasons"]);
+const BILLING_SECTIONS: ReadonlySet<ReportSection> = new Set(["mrr", "mrrMovements", "cohorts", "composition", "unitEconomics", "usage", "churnReasons"]);
 
 /**
  * Raporlar analiz bölümlerinin sırası (rol bazlı). Gelir bölümleri yalnız `billing` modülüyle; ofis metrikleri (churn,
  * aktivasyon, büyüme) yalnız `tenants` modülüyle çizilir. Bölüm yalnız bir kez çıkar.
  */
 export function platformReportSections(who: PlatformAccessSubject): ReportSection[] {
-  const order: ReportSection[] = ["mrr", "churn", "activation", "unitEconomics", "usage", "churnReasons", "composition", "growth"];
+  const order: ReportSection[] = ["mrr", "mrrMovements", "churn", "activation", "unitEconomics", "cohorts", "usage", "churnReasons", "composition", "growth"];
   const tenantSections: ReadonlySet<ReportSection> = new Set(["churn", "activation", "growth"]);
   return order.filter(
     (s) => (!BILLING_SECTIONS.has(s) || platformCanAccess(who, "billing")) && (!tenantSections.has(s) || platformCanAccess(who, "tenants")),

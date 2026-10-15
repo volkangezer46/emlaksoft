@@ -175,7 +175,7 @@ function IntegrationCard({ card }: { card: HubCard }) {
 function OfficeTable({ rows }: { rows: OfficeIntegrationRow[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-left text-xs">
+      <table className="adm-tbl-m w-full md:min-w-[640px] text-left text-xs">
         <thead className="text-text-muted">
           <tr className="border-b border-line">
             <th className="px-4 py-2 font-semibold">Ofis</th>
@@ -195,12 +195,12 @@ function OfficeTable({ rows }: { rows: OfficeIntegrationRow[] }) {
                     {r.tenantName}
                   </Link>
                 </td>
-                <td className="px-4 py-2 text-ink-950">{PROVIDER_LABEL[r.provider] ?? r.provider}</td>
-                <td className="px-4 py-2">
+                <td data-label="Entegrasyon" className="px-4 py-2 text-ink-950">{PROVIDER_LABEL[r.provider] ?? r.provider}</td>
+                <td data-label="Durum" className="px-4 py-2">
                   <span className={`inline-flex rounded-full px-2 py-0.5 font-bold ${TONE_PILL[st.tone]}`}>{st.label}</span>
                 </td>
-                <td className="px-4 py-2 text-text-muted">{r.lastCheckedAt ? relativeTimeTR(r.lastCheckedAt) : "—"}</td>
-                <td className="max-w-[260px] truncate px-4 py-2 text-text-muted" title={r.lastError ?? undefined}>
+                <td data-label="Son denetim" className="px-4 py-2 text-text-muted">{r.lastCheckedAt ? relativeTimeTR(r.lastCheckedAt) : "—"}</td>
+                <td data-label="Son hata" className="max-w-[260px] truncate px-4 py-2 text-text-muted" title={r.lastError ?? undefined}>
                   {r.lastError ?? "—"}
                 </td>
               </tr>
@@ -355,7 +355,7 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
       <Panel id="api-anahtarlari" icon={KeyRound} eyebrow="Ofis API'si" title={`Etkin API anahtarları (${hub.apiKeys.active})`}>
         {hub.apiKeys.rows.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-xs">
+            <table className="adm-tbl-m w-full md:min-w-[640px] text-left text-xs">
               <thead className="text-text-muted">
                 <tr className="border-b border-line">
                   <th className="px-4 py-2 font-semibold">Ofis</th>
@@ -373,10 +373,10 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
                         {k.tenantName}
                       </Link>
                     </td>
-                    <td className="px-4 py-2 text-ink-950">{k.name}</td>
-                    <td className="numeric px-4 py-2 text-text-muted">{k.prefix}…</td>
-                    <td className="px-4 py-2 text-text-muted">{k.scopes.join(", ")}</td>
-                    <td className="px-4 py-2 text-text-muted">{k.lastUsedAt ? relativeTimeTR(k.lastUsedAt) : "hiç"}</td>
+                    <td data-label="Ad" className="px-4 py-2 text-ink-950">{k.name}</td>
+                    <td data-label="Önek" className="numeric px-4 py-2 text-text-muted">{k.prefix}…</td>
+                    <td data-label="Kapsam" className="px-4 py-2 text-text-muted">{k.scopes.join(", ")}</td>
+                    <td data-label="Son kullanım" className="px-4 py-2 text-text-muted">{k.lastUsedAt ? relativeTimeTR(k.lastUsedAt) : "hiç"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -404,7 +404,7 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
         </dl>
         {hub.webhooks.rows.length ? (
           <div id="webhook-satirlari" className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-xs">
+            <table className="adm-tbl-m w-full md:min-w-[720px] text-left text-xs">
               <thead className="text-text-muted">
                 <tr className="border-b border-line">
                   <th className="px-4 py-2 font-semibold">Ofis</th>
@@ -424,19 +424,19 @@ export async function IntegrationsView({ portal, portalView, messageLog = {} }: 
                         {d.tenantName}
                       </Link>
                     </td>
-                    <td className="numeric px-4 py-2 text-text-muted">{d.endpointHost}</td>
-                    <td className="numeric px-4 py-2 text-ink-950">{d.event}</td>
-                    <td className="px-4 py-2">
+                    <td data-label="Uç (host)" className="numeric px-4 py-2 text-text-muted">{d.endpointHost}</td>
+                    <td data-label="Olay" className="numeric px-4 py-2 text-ink-950">{d.event}</td>
+                    <td data-label="Durum" className="px-4 py-2">
                       <span className={`inline-flex rounded-full px-2 py-0.5 font-bold ${d.status === "failed" ? TONE_PILL.danger : TONE_PILL.warn}`}>
                         {d.status === "failed" ? "Başarısız" : "Bekliyor"}
                       </span>
                     </td>
-                    <td className="px-4 py-2 tabular-nums text-text-muted">{d.attempts}</td>
-                    <td className="max-w-[220px] truncate px-4 py-2 text-text-muted" title={d.lastError ?? undefined}>
+                    <td data-label="Deneme" className="px-4 py-2 tabular-nums text-text-muted">{d.attempts}</td>
+                    <td data-label="Son yanıt" className="max-w-[220px] truncate px-4 py-2 text-text-muted" title={d.lastError ?? undefined}>
                       {d.lastStatusCode ? `HTTP ${d.lastStatusCode}` : ""}
                       {d.lastError ? `${d.lastStatusCode ? " · " : ""}${d.lastError}` : d.lastStatusCode ? "" : "—"}
                     </td>
-                    <td className="px-4 py-2 text-text-muted">{relativeTimeTR(d.createdAt)}</td>
+                    <td data-label="Zaman" className="px-4 py-2 text-text-muted">{relativeTimeTR(d.createdAt)}</td>
                   </tr>
                 ))}
               </tbody>

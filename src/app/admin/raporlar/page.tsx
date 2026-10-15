@@ -38,6 +38,7 @@ import {
   UnitEconomicsSection,
   UsageSection,
 } from "@/app/admin/_dashboards/platform-sections";
+import { CohortSection, MrrMovementsSection } from "@/app/admin/_dashboards/revenue-retention-sections";
 
 export async function generateMetadata({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }): Promise<Metadata> {
   const sekme = ((await searchParams) ?? {}).sekme;
@@ -46,6 +47,8 @@ export async function generateMetadata({ searchParams }: { searchParams?: Promis
 
 const SECTION_SPAN: Record<ReportSection, string> = {
   mrr: "xl:col-span-12",
+  mrrMovements: "xl:col-span-12",
+  cohorts: "xl:col-span-6",
   churn: "xl:col-span-12",
   activation: "xl:col-span-6",
   unitEconomics: "xl:col-span-6",
@@ -59,6 +62,10 @@ function renderReportSection(section: ReportSection, period: Period): ReactNode 
   switch (section) {
     case "mrr":
       return <MrrSection period={period} />;
+    case "mrrMovements":
+      return <MrrMovementsSection />;
+    case "cohorts":
+      return <CohortSection />;
     case "churn":
       return <ChurnSection period={period} />;
     case "activation":
@@ -85,7 +92,7 @@ function AnalysisSections({ role, period, params }: { role: PlatformAccessSubjec
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 id="analiz-baslik" className="font-display text-lg font-extrabold text-ink-950">Gelir, büyüme ve kullanım analizi</h2>
-          <p className="text-xs text-text-muted">MRR ve tahmin, churn riski, aktivasyon, birim ekonomisi, tüketim, iptal nedenleri, gelir kompozisyonu ve büyüme.</p>
+          <p className="text-xs text-text-muted">MRR ve tahmin, MRR hareketleri, NRR/GRR, kayıt kohortları, churn riski, aktivasyon, birim ekonomisi, tüketim, iptal nedenleri, gelir kompozisyonu ve büyüme.</p>
         </div>
         <SegmentedControl
           label="Analiz dönemi"

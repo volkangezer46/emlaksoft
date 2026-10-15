@@ -96,7 +96,7 @@ export async function DatabaseView() {
           <h2 className="mt-1 font-display font-bold text-ink-950">Toplam boyut (indeks ve TOAST dahil)</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[520px] text-sm">
             <thead className="text-left text-xs text-text-muted">
               <tr>
                 <th className="px-5 py-2 font-semibold">Tablo</th>
@@ -119,9 +119,9 @@ export async function DatabaseView() {
                         <span className="block h-1.5 rounded-full bg-brand-500" style={{ width: `${share}%` }} />
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-ink-950">{formatBytesTr(t.total_bytes)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-text-muted">{formatBytesTr(t.table_bytes)}</td>
-                    <td className="px-5 py-2 text-right tabular-nums text-text-muted">{Number(t.rows_estimate).toLocaleString("tr-TR")}</td>
+                    <td data-label="Toplam" className="px-3 py-2 text-right tabular-nums text-ink-950">{formatBytesTr(t.total_bytes)}</td>
+                    <td data-label="Veri" className="px-3 py-2 text-right tabular-nums text-text-muted">{formatBytesTr(t.table_bytes)}</td>
+                    <td data-label="Tahmini satır" className="px-5 py-2 text-right tabular-nums text-text-muted">{Number(t.rows_estimate).toLocaleString("tr-TR")}</td>
                   </tr>
                 );
               })}

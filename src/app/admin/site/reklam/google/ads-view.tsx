@@ -140,7 +140,7 @@ export function AdsView({ data }: { data: AdsViewData }) {
                   </div>
                 </CardHeader>
                 <CardContent className="overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-sm">
+                  <table className="adm-tbl-m w-full md:min-w-[720px] text-sm">
                     <thead>
                       <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-text-muted">
                         <th className="py-2 pr-3 font-semibold">Kampanya</th>
@@ -166,12 +166,12 @@ export function AdsView({ data }: { data: AdsViewData }) {
                               <ExternalLink className="h-3 w-3" aria-hidden />
                             </a>
                           </td>
-                          <td className="py-2 pr-3 text-right tabular-nums">{money(c.spend)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums">{int(c.clicks)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums">{int(c.conversions)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums">{money(c.cpa)}</td>
-                          <td className="py-2 pr-3 text-right tabular-nums">{int(c.signups)}</td>
-                          <td className="py-2 text-right tabular-nums">{money(c.cac)}</td>
+                          <td data-label="Harcama" className="py-2 pr-3 text-right tabular-nums">{money(c.spend)}</td>
+                          <td data-label="Tıklama" className="py-2 pr-3 text-right tabular-nums">{int(c.clicks)}</td>
+                          <td data-label="Dönüşüm" className="py-2 pr-3 text-right tabular-nums">{int(c.conversions)}</td>
+                          <td data-label="CPA" className="py-2 pr-3 text-right tabular-nums">{money(c.cpa)}</td>
+                          <td data-label="Kayıt" className="py-2 pr-3 text-right tabular-nums">{int(c.signups)}</td>
+                          <td data-label="CAC" className="py-2 text-right tabular-nums">{money(c.cac)}</td>
                         </tr>
                       ))}
                     </tbody>

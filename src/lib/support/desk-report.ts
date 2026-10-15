@@ -200,3 +200,30 @@ export function formatDurationHours(hours: number | null): string {
   if (hours < 48) return `${hours.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} sa`;
   return `${(hours / 24).toLocaleString("tr-TR", { maximumFractionDigits: 1 })} gün`;
 }
+
+// ---- PA-7: makaleyle çözülen (açılmayan) talepler ------------------------------------------
+
+export type DeflectionRow = { kind: string; slug: string };
+export type DeflectionStats = {
+  count: number;
+  /** Makaleyle çözülen / (çözülen + açılan talep); talep ve çözülen yoksa null. */
+  rate: number | null;
+  top: { kind: string; slug: string; count: number }[];
+};
+
+/** Dönemde "Bu sorunumu çözdü" kayıtları: sayı, saptırma oranı ve en çok çözen 3 makale. */
+export function deflectionStats(rows: readonly DeflectionRow[], ticketsOpened: number): DeflectionStats {
+  const byArticle = new Map<string, { kind: string; slug: string; count: number }>();
+  for (const r of rows) {
+    const key = `${r.kind}:${r.slug}`;
+    const cur = byArticle.get(key) ?? { kind: r.kind, slug: r.slug, count: 0 };
+    cur.count++;
+    byArticle.set(key, cur);
+  }
+  const denom = rows.length + Math.max(0, ticketsOpened);
+  return {
+    count: rows.length,
+    rate: denom > 0 ? Math.round((rows.length / denom) * 1000) / 10 : null,
+    top: [...byArticle.values()].sort((a, b) => b.count - a.count || a.slug.localeCompare(b.slug)).slice(0, 3),
+  };
+}

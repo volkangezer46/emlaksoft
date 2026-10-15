@@ -12,6 +12,7 @@ import { FormField, FormInput, FormSelect, FormTextarea } from "@/components/ui/
 import { SummaryGroup, SummaryRow, TabbedFormShell, type FormTab, type TabbedSummaryContext } from "@/components/ui/tabbed-form-shell";
 import { useToast } from "@/components/app/toast-provider";
 import { TICKET_DRAFT_FIELDS, TICKET_FORM_ID, TICKET_TABS } from "./ticket-tabs";
+import { TicketDeflection } from "./ticket-deflection";
 
 type CreateState = TicketResult & { warning?: string };
 const initial: CreateState = {};
@@ -44,6 +45,8 @@ export function NewTicketForm({
 }) {
   const [requestId, setRequestId] = useState("");
   const [attachmentKey, setAttachmentKey] = useState(0);
+  // PA-7: konu yazılırken ilgili yardım makaleleri (öneri bileşeni kendi beklemesini yapar).
+  const [subject, setSubject] = useState("");
   const router = useRouter();
   const { push } = useToast();
   // Form elemanını kabuk üretir; gönderimde buraya alınır (başarıda reset için).
@@ -132,8 +135,10 @@ export function NewTicketForm({
             minLength={3}
             maxLength={200}
             placeholder="Örn. Portal ilanım yayına gitmiyor"
+            onChange={(e) => setSubject(e.target.value)}
           />
         </FormField>
+        <TicketDeflection subject={subject} />
         <FormField label="Kategori" htmlFor="category">
           <FormSelect name="category" defaultValue="general">
             {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

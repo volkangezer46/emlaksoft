@@ -137,7 +137,7 @@ export function SelfTestPanel() {
       <NoteLine note={note} />
       {rows.length ? (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-left text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[34rem] text-left text-sm">
             <thead className="text-xs text-text-faint">
               <tr>
                 <th className="py-1.5 pr-3 font-bold">Yol</th>
@@ -151,12 +151,12 @@ export function SelfTestPanel() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="py-1.5 pr-3 font-mono text-xs text-ink-950">{r.path}</td>
-                  <td className="py-1.5 pr-3">{r.status ?? "—"}</td>
-                  <td className={`py-1.5 pr-3 font-bold ${r.xStatic === "1" ? "text-mint-700" : r.xStatic === "fallback" ? "text-danger-700" : "text-text-muted"}`}>
+                  <td data-label="HTTP" className="py-1.5 pr-3">{r.status ?? "—"}</td>
+                  <td data-label="X-Static" className={`py-1.5 pr-3 font-bold ${r.xStatic === "1" ? "text-mint-700" : r.xStatic === "fallback" ? "text-danger-700" : "text-text-muted"}`}>
                     {r.xStatic === "1" ? "1 (statik)" : r.xStatic === "fallback" ? "yedek" : "yok (normal)"}
                   </td>
-                  <td className="py-1.5 pr-3">{r.nextScripts ?? "—"}</td>
-                  <td className="py-1.5">{r.error ? <span className="text-danger-700">{r.error}</span> : `${kb(r.gzipBytes)} / ${kb(r.rawBytes)}`}</td>
+                  <td data-label="Next betiği" className="py-1.5 pr-3">{r.nextScripts ?? "—"}</td>
+                  <td data-label="Boyut (gzip / ham)" className="py-1.5">{r.error ? <span className="text-danger-700">{r.error}</span> : `${kb(r.gzipBytes)} / ${kb(r.rawBytes)}`}</td>
                 </tr>
               ))}
             </tbody>

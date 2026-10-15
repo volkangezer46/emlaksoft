@@ -78,7 +78,7 @@ export function FormEvidence({ portal, fingerprint, alert, fields }: { portal: T
         <p className="mt-2 text-sm text-text-muted">Katalogda bu dönemde görülen alan yok.</p>
       ) : (
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="adm-tbl-m w-full md:min-w-[560px] text-left text-sm">
             <thead className="text-xs text-text-muted">
               <tr>
                 <th className="py-2 pr-3 font-semibold">Etiket</th>
@@ -93,10 +93,10 @@ export function FormEvidence({ portal, fingerprint, alert, fields }: { portal: T
               {fields.map((f) => (
                 <tr key={f.sig}>
                   <td className="py-2 pr-3 text-ink-950">{f.label ?? <span className="text-text-faint">tek ofis (gizli)</span>}</td>
-                  <td className="py-2 pr-3 text-text-muted">{f.control ?? "—"}</td>
-                  <td className="py-2 pr-3 tabular-nums">{f.optionsN}</td>
-                  <td className="py-2 pr-3 tabular-nums">{f.tenants}</td>
-                  <td className="py-2 pr-3">
+                  <td data-label="Tür" className="py-2 pr-3 text-text-muted">{f.control ?? "—"}</td>
+                  <td data-label="Seçenek" className="py-2 pr-3 tabular-nums">{f.optionsN}</td>
+                  <td data-label="Ofis" className="py-2 pr-3 tabular-nums">{f.tenants}</td>
+                  <td data-label="Eşleşen alan" className="py-2 pr-3">
                     {f.mappedKey ? (
                       <Link href={portalRulesHref(portal, `alan:${f.mappedKey}`)} className="font-semibold text-brand-600 hover:underline">
                         {fieldLabel(f.mappedKey)}
@@ -107,7 +107,7 @@ export function FormEvidence({ portal, fingerprint, alert, fields }: { portal: T
                       </Badge>
                     )}
                   </td>
-                  <td className="py-2 text-text-muted">{f.lastSeen ? relativeTimeTR(f.lastSeen) : "—"}</td>
+                  <td data-label="Son görülme" className="py-2 text-text-muted">{f.lastSeen ? relativeTimeTR(f.lastSeen) : "—"}</td>
                 </tr>
               ))}
             </tbody>
