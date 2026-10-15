@@ -19,7 +19,7 @@ const BASELINE: Record<string, { count: number; reason: string }> = {
   "src/app/actions/building-management.ts": { count: 2, reason: R_ACTION },
   "src/app/actions/import-data.ts": { count: 3, reason: R_ACTION },
   "src/app/actions/import-rollback.ts": { count: 1, reason: R_ACTION },
-  "src/app/actions/network.ts": { count: 1, reason: R_ACTION },
+  "src/app/actions/network/queries.ts": { count: 1, reason: R_ACTION },
   "src/app/actions/projects.ts": { count: 1, reason: R_ACTION },
   "src/app/admin/billing/planlar/page.tsx": { count: 1, reason: R_UI },
   "src/app/admin/billing/planlar/seat-data.ts": { count: 3, reason: R_LOADER },

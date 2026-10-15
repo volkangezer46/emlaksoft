@@ -12,8 +12,8 @@ import {
   removeDemandFromNetwork,
   resumeDemand,
   withdrawDemandResponse,
-  type NetworkResult,
-} from "@/app/actions/network";
+} from "@/app/actions/network/demands";
+import type { NetworkResult } from "@/app/actions/network/shared";
 
 function useRowAction() {
   const router = useRouter();

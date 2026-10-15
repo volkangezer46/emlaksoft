@@ -125,7 +125,8 @@ type Fn = { key: string; file: string; name: string; body: string; exported: boo
 
 function collect(dir: string): Map<string, Fn> {
   const out = new Map<string, Fn>();
-  for (const f of fs.readdirSync(dir)) {
+  // Alt klasörler dahil (ör. network/*.ts bölünmüş action modülleri).
+  for (const f of fs.readdirSync(dir, { recursive: true, encoding: "utf8" })) {
     if (!f.endsWith(".ts") || f.endsWith(".test.ts")) continue;
     const src = fs.readFileSync(path.join(dir, f), "utf8");
     if (!src.includes('"use server"')) continue;

@@ -31,8 +31,8 @@ import {
   listMyRequests,
   listNetworkDemandPool,
   listNetworkPool,
-  type NetworkContact,
-} from "@/app/actions/network";
+} from "@/app/actions/network/queries";
+import type { NetworkContact } from "@/app/actions/network/shared";
 import { StatCard } from "@/components/app/stat-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge, type BadgeVariant } from "@/components/ui/badge";

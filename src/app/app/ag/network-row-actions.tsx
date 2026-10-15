@@ -5,14 +5,9 @@ import { useRouter } from "next/navigation";
 import { Check, Pause, Play, Trash2, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import {
-  pauseNetworkListing,
-  removeFromNetwork,
-  respondCollabRequest,
-  resumeNetworkListing,
-  withdrawRequest,
-  type NetworkResult,
-} from "@/app/actions/network";
+import { respondCollabRequest, withdrawRequest } from "@/app/actions/network/collab";
+import { pauseNetworkListing, removeFromNetwork, resumeNetworkListing } from "@/app/actions/network/listings";
+import type { NetworkResult } from "@/app/actions/network/shared";
 
 function useRowAction() {
   const router = useRouter();
