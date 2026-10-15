@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 const ACTIONS_DIR = join(process.cwd(), "src", "app", "actions");
 
 function actionFiles(): string[] {
-  return readdirSync(ACTIONS_DIR).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+  // Alt klasörler dahil (ör. network/*.ts bölünmüş action modülleri).
+  return readdirSync(ACTIONS_DIR, { recursive: true, encoding: "utf8" }).filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
 }
 
 describe("server action yan etkileri yanıtı bekletmez", () => {

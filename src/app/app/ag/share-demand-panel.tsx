@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea, FormField } from "@/components/ui/input";
 import { Combobox } from "@/components/ui/combobox";
 import { InlinePanel, InlinePanelTrigger } from "@/components/ui/inline-panel";
-import { shareDemandToNetwork, type NetworkResult } from "@/app/actions/network";
+import { shareDemandToNetwork } from "@/app/actions/network/demands";
+import type { NetworkResult } from "@/app/actions/network/shared";
 
 const init: NetworkResult = {};
 

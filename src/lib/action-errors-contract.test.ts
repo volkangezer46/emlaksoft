@@ -26,7 +26,9 @@ import {
 const ACTIONS_DIR = path.join(process.cwd(), "src/app/actions");
 
 function actionFiles(): { rel: string; src: string }[] {
-  return readdirSync(ACTIONS_DIR)
+  // Alt klasörler dahil (ör. network/*.ts bölünmüş action modülleri).
+  return readdirSync(ACTIONS_DIR, { recursive: true, encoding: "utf8" })
+    .map((n) => n.split(path.sep).join("/"))
     .filter((n) => n.endsWith(".ts") && !n.endsWith(".test.ts"))
     .map((n) => ({ rel: `src/app/actions/${n}`, src: readFileSync(path.join(ACTIONS_DIR, n), "utf8").replace(/\r\n/g, "\n") }));
 }

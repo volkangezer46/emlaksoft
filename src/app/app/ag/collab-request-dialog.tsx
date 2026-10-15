@@ -6,7 +6,8 @@ import { Handshake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea, FormField } from "@/components/ui/input";
 import { InlineTabbedPanel } from "@/components/ui/inline-tabbed-panel";
-import { sendCollabRequest, type NetworkResult } from "@/app/actions/network";
+import { sendCollabRequest } from "@/app/actions/network/collab";
+import type { NetworkResult } from "@/app/actions/network/shared";
 
 const init: NetworkResult = {};
 

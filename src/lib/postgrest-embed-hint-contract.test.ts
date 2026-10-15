@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = join(process.cwd(), "src");
 
 /** FK sayısı 1 olduğu doğrulanmış tablolar (belirsizlik yok). */
-const ALLOW = new Set(["src/app/actions/network.ts"]);
+const ALLOW = new Set(["src/app/actions/network/queries.ts"]);
 
 function files(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
