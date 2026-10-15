@@ -57,6 +57,8 @@ import { QR_SOURCE_LABEL, buildQrListingUrl } from "@/lib/qr-source";
 import { PropertyAuthorizationPanel } from "./property-extras";
 import { EidsAuthorityCard } from "./eids-authority-card";
 import { PropertyOwnerCard } from "@/components/app/property-owner-card";
+import { publishBlockReason } from "@/lib/property-owner/server";
+import { Alert } from "@/components/ui/alert";
 import { RelatedPropertiesWidget } from "./related-properties-widget";
 import { PropertyMap } from "@/components/app/property-map";
 import { PhotoQualityCard } from "@/components/app/photo-quality-card";
@@ -160,7 +162,8 @@ const statusOptions = [
  * gerçekten ihtiyaç duyduğu sorgular bekleniyor; ağır/ikincil bölümler
  * `./sections.tsx` içinde kendi `<Suspense>` sınırlarında akarak geliyor.
  */
-const PROPERTY_TAB_IDS = ["ozet", "medya", "fiyat", "portallar", "anahtarlar", "belgeler", "konum", "zaman"] as const;
+// "sahip" listede olmalı: kayıt sonrası iniş (B053) ve yayın kapısı yönlendirmesi `?sekme=sahip` ile gelir.
+const PROPERTY_TAB_IDS = ["ozet", "medya", "fiyat", "portallar", "anahtarlar", "belgeler", "konum", "sahip", "zaman"] as const;
 // Eski çapa/sekme adları
 
 export default async function PropertyDetailPage({
@@ -278,6 +281,12 @@ export default async function PropertyDetailPage({
   ]);
 
   if (!property) notFound();
+
+  // Yayın kapısı yönlendirmesi (`?yayin=eksik`, setPropertyStatus): nedeni (konum / ilan sahibi) sekmede açıkça göster.
+  const publishBlockedReason =
+    tab === "sahip" && sp.yayin === "eksik" && tenantId && property.status !== "live"
+      ? await publishBlockReason(supabase, tenantId, property.id)
+      : null;
 
   // Para birimi (B094): sütun → features.currency → TRY. Fiyat, komisyon ve min. fiyat kendi biriminde gösterilir;
   // fiyat sağlığı ve emsal ₺ karşılığıyla değerlendirilir (kur yoksa "döviz: değerlendirilemedi").
@@ -1115,6 +1124,9 @@ export default async function PropertyDetailPage({
             </div>
           ) : null}
 
+          {tab === "sahip" && publishBlockedReason ? (
+            <Alert tone="warning" title="Portföy yayına alınamadı">{publishBlockedReason}</Alert>
+          ) : null}
           {tab === "sahip" && tenantId ? <PropertyOwnerCard tenantId={tenantId} propertyId={property.id} /> : null}
 
           {tab === "zaman" ? (
