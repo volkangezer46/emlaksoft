@@ -33,11 +33,32 @@ function logSearchError(kind: string, error: { code?: string; message?: string }
 
 type MemberRow = { id: string; full_name: string | null; email: string | null; role: string | null; tenant_id: string | null; tenant_name: string | null; is_active: boolean | null };
 
-/** Üye araması: ad (profiles.full_name) ya da e-posta (auth.users) — `admin_search_members` (yalnız service_role). */
+/**
+ * Üye araması: ad (profiles.full_name) ya da e-posta (auth.users) — `admin_search_members` (yalnız service_role).
+ * İşlev henüz uygulanmamışsa (migration 20261016040200 yok: PGRST202 / 42883) yalnız ADA göre aranır (kod yayını
+ * migration'dan önce de çalışır); hata yine günlüğe düşer.
+ */
 async function searchMembers(admin: Admin, q: string, limit = 6): Promise<MemberRow[]> {
   const { data, error } = await admin.rpc("admin_search_members", { p_q: q, p_limit: limit });
-  if (logSearchError("members", error)) return [];
-  return (data ?? []) as MemberRow[];
+  if (!logSearchError("members", error)) return (data ?? []) as MemberRow[];
+  if (error?.code !== "PGRST202" && error?.code !== "42883") return [];
+  const byName = await admin
+    .from("profiles")
+    .select("id, full_name, role, tenant_id, is_active, tenant:tenants!profiles_tenant_id_fkey(name)")
+    .ilike("full_name", safeLike(q))
+    .limit(limit);
+  if (logSearchError("members.byName", byName.error)) return [];
+  return ((byName.data ?? []) as { id: string; full_name: string | null; role: string | null; tenant_id: string | null; is_active: boolean | null; tenant: { name?: string } | { name?: string }[] | null }[]).map(
+    (p) => ({
+      id: p.id,
+      full_name: p.full_name,
+      email: null,
+      role: p.role,
+      tenant_id: p.tenant_id,
+      tenant_name: (Array.isArray(p.tenant) ? p.tenant[0]?.name : p.tenant?.name) ?? null,
+      is_active: p.is_active,
+    }),
+  );
 }
 
 /**

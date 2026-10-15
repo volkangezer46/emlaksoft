@@ -79,7 +79,7 @@ function stmtName(stmt: ts.Statement): string {
 
 const GATE_PATTERNS: Array<{ kind: GateKind; re: RegExp }> = [
   { kind: "oturum-izin", re: /\b(requirePermission|requireActiveTenant|requireManager|requireModulePage|authorizeTicketAttachmentAccess|authorizeStoredTicketAttachment)\s*\(/ },
-  { kind: "platform", re: /\b(requirePlatformModule|requirePlatformStaff|getPlatformStaff|platformCanAccess)\s*\(/ },
+  { kind: "platform", re: /\b(requirePlatformModule|requirePlatformStaff|getPlatformStaff|platformCanAccess|guardPlatformAction)\s*\(/ },
   { kind: "cron", re: /CRON_SECRET|authorized\(\s*request|recordHeartbeat/ },
   { kind: "webhook-imza", re: /\b(verifyMetaSignature|verifyWebhookSignatureV3|verifyCheckoutPayment|verifyCheckoutRetrieveResponseSignature)\s*\(|x-hub-signature/i },
   { kind: "public-token", re: /\b(token|portal_token|share_token|public_token|verifyOtpHash|verifySignatureOtp|verifyShortLivedPropertyMediaClaim)\b/i },

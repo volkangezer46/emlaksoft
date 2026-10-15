@@ -138,6 +138,8 @@ describe("arama ve etiketler (B120/B192)", () => {
     expect(route).toContain('orIlike(["subject", "ticket_no"], q)');
     expect(route).toContain("href: `/admin/members/${m.id}`");
     expect(route).toContain("logSearchError(");
+    // İşlev henüz uygulanmamışsa (PGRST202 / 42883) ad aramasına düşer (kod migration'dan önce yayınlanabilir).
+    expect(route).toMatch(/PGRST202[\s\S]*42883[\s\S]*\.ilike\("full_name", safeLike\(q\)\)/);
   });
 
   it("ham iç yol ve İngilizce etiket ekranda yok", () => {

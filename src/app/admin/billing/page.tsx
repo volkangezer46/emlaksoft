@@ -275,7 +275,7 @@ export default async function AdminBillingPage({
           <summary className="focus-ring inline-flex cursor-pointer items-center rounded-sm font-semibold text-accent-text hover:underline touch:min-h-11">İade prosedürü</summary>
           <ol className="mt-1.5 list-decimal space-y-1 pl-5">
             <li>İade otomatik değildir: önce iyzico panelinde ödeme referansıyla işlemi bulun, kart payı kadar iade/iptal edin ve iade numarasını not alın.</li>
-            <li>Sonra burada faturanın &quot;İade kaydı&quot;nı düşün (brüt tutar + iyzico iade no). Kontör ve kredi geri alma kendiliğinden çalışır.</li>
+            <li>Sonra burada faturanın &quot;İade kaydı&quot;nı düşün (brüt tutar + iyzico iade no). Analiz bakiyesi ve hesap kredisi geri alma kendiliğinden çalışır.</li>
             <li>Sıra önemlidir: kayıt geri alınamaz; iyzico iadesi yapılmadan kayıt düşmeyin.</li>
             <li>Manuel inceleme ve İade gerekiyor sayıları gün sonunda 0 olmalı; karar ve iade referansını kuyruk notuna yazın.</li>
           </ol>
