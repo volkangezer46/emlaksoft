@@ -46,6 +46,9 @@ export function SectionTabs({
   const { hub, pageHref } = useMemo(() => resolveStripHubIn(pathname, nav, owner, extra), [pathname, nav, owner, extra]);
   // İyimser etkin sekme: yalnız tıklandığı adreste geçerlidir (adres değişince kendiliğinden düşer; efekt gerekmez).
   const [pending, setPending] = useState<{ href: string; from: string } | null>(null);
+  // Adres değişince iyimser durum DÜŞER (render sırasında ayarlama): yoksa geri tuşuyla tıklamanın yapıldığı adrese
+  // dönüldüğünde eski tıklanan sekme yeniden etkin görünürdü.
+  if (pending && pending.from !== pathname) setPending(null);
   const isLocked = (href: string) => lockedHrefs.some((h) => href === h || href.startsWith(`${h}/`));
   // Mevcut merkezin kardeş sayfaları boşta TAM veriyle, kuyruğun en önünde önceden yüklenir (sekme tıklaması ağ turu beklemez).
   const siblingTargets = hub ? hub.pages.map((p) => p.href).filter((h) => h !== pageHref && !isLocked(h)) : [];
