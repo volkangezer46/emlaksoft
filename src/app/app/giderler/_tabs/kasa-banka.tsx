@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "@/components/ui/smart-link";
-import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, FileBarChart, FileSpreadsheet, Inbox, Landmark, Lock, ScanLine, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Banknote, CreditCard, FileBarChart, FileSpreadsheet, HandCoins, Inbox, Landmark, Lock, ScanLine, Wallet } from "lucide-react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,9 @@ import { formatAccountMoney } from "@/lib/finance/cash/money";
 import { AccountFormButton, ArchiveAccountButton, TransferButton } from "../accounts-panel";
 import { AccountSparkline, dailyBalanceSeries, type DayMove } from "../kasa-banka/account-sparkline";
 import { ReconcileQueue, type QueueItem } from "../kasa-banka/reconcile-queue";
+import { CommissionCashQueue } from "../kasa-banka/commission-cash-queue";
+import { loadCommissionsMissingCash } from "@/lib/finance/cash/collection-link";
+import { effectiveHasPermission } from "@/lib/permissions-merge";
 import { loadMovesForAccounts } from "../kasa-banka/moves";
 import { loadFinanceRules, StatementReview } from "../statement-review";
 import { StatementUploadButton } from "../statement-upload";
@@ -66,6 +69,7 @@ export async function KasaBankaTab(props: FinanceTabProps | KasaBankaProps) {
       reviewAccountId={isUuid(ekstre) ? ekstre : null}
       finance
       canRule={props.canEdit}
+      commissionCash={effectiveHasPermission(props.perms, "commissions", "edit") ? props.tenantId : null}
     />
   );
 }
@@ -81,7 +85,8 @@ async function AccountsBoard({
   canSalary = false,
   finance = false,
   canRule = false,
-}: KasaBankaProps & { finance?: boolean; canRule?: boolean }) {
+  commissionCash = null,
+}: KasaBankaProps & { finance?: boolean; canRule?: boolean; /** "Kasaya işle" kuyruğu (komisyon düzenleme yetkisi): kiracı kimliği. */ commissionCash?: string | null }) {
   const active = accounts.filter((a) => !a.archived_at);
   const archived = accounts.filter((a) => a.archived_at);
   const office = active.filter((a) => a.owner_scope === "office");
@@ -151,6 +156,12 @@ async function AccountsBoard({
         </section>
       ) : null}
 
+      {finance && commissionCash ? (
+        <Suspense fallback={null}>
+          <CommissionCashSection supabase={supabase} tenantId={commissionCash} />
+        </Suspense>
+      ) : null}
+
       {active.length === 0 ? (
         <EmptyState
           icon={Wallet}
@@ -192,6 +203,27 @@ async function AccountsBoard({
         </details>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * "Kasaya işle" (SK6/B109): tahsil edildi işaretlenmiş ama kasa hareketi olmayan komisyonlar. Boşsa hiç çizilmez
+ * (veri yoksa kart yok). Tutar KDV dahil tahsilattır.
+ */
+async function CommissionCashSection({ supabase, tenantId }: { supabase: SupabaseClient; tenantId: string }) {
+  const gap = await loadCommissionsMissingCash(supabase, tenantId);
+  if (!gap.available || gap.rows.length === 0) return null;
+  return (
+    <section aria-label="Kasaya işlenmemiş komisyon tahsilatları" className="surface-card grid gap-2 rounded-[var(--radius-panel)] p-4">
+      <h2 className="flex items-center gap-1.5 font-display text-base font-bold text-text">
+        <HandCoins className="h-4 w-4 text-accent-text" aria-hidden="true" /> Kasaya işlenmemiş komisyon tahsilatları
+        <span className="numeric rounded-full bg-surface-accent-soft px-2 text-xs text-accent-text">{gap.rows.length}</span>
+      </h2>
+      <p className="text-xs text-text-muted">
+        Bu komisyonlar tahsil edildi olarak işaretlenmiş ama hiçbir hesaba hareket yazılmamış; bakiye eksik görünür. Hesabı seçip kasaya işleyin.
+      </p>
+      <CommissionCashQueue items={gap.rows} total={gap.total} partial={gap.partial} />
+    </section>
   );
 }
 

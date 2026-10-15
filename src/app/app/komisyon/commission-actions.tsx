@@ -25,6 +25,10 @@ export function CommissionActions({
   const router = useRouter();
   const [busy, setBusy] = useState<"paid" | "link" | "revert" | null>(null);
   const [accountId, setAccountId] = useState("");
+  // SK6/B109: ofiste hesap varsa hesap zorunlu; hesap yoksa (0) "kasaya yazmadan işaretle" bilinçli onayı.
+  const [accountCount, setAccountCount] = useState<number | null>(null);
+  const [confirmNoCash, setConfirmNoCash] = useState(false);
+  const needAccount = accountCount !== null && accountCount > 0 && !accountId;
   const [linkUrl, setLinkUrl] = useState<string | null>(null);
   // Satır içi "Ödeme linkleri" paneli (popup yok): liste, iptal, süre uzatma.
   const [linksOpen, setLinksOpen] = useState(false);
@@ -68,15 +72,25 @@ export function CommissionActions({
     }
   }
 
-  async function markPaid() {
+  async function markPaid(skipCash = false) {
+    if (needAccount) {
+      push("Tahsilatın girdiği hesabı seçin", "err");
+      return;
+    }
+    if (accountCount === 0 && !skipCash) {
+      setConfirmNoCash(true);
+      return;
+    }
     setBusy("paid");
     const fd = new FormData();
     fd.set("action", "mark_commission_paid");
     fd.set("commission_id", commissionId);
     if (accountId) fd.set("account_id", accountId);
+    if (skipCash) fd.set("no_cash", "1");
     const res = await convertWorkflow(fd);
     setBusy(null);
-    if (res.error) push(res.error, "err");
+    if (res.needsCashConfirm) setConfirmNoCash(true);
+    else if (res.error) push(res.error, "err");
     else {
       push("Komisyon tahsil edildi olarak işaretlendi", "ok");
       if (res.info) push(res.info, "err");
@@ -122,12 +136,24 @@ export function CommissionActions({
   return (
     <div className="flex flex-col items-end gap-1.5">
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {!paid ? <FinanceAccountPicker value={accountId} onChange={setAccountId} /> : null}
+        {!paid ? <FinanceAccountPicker value={accountId} onChange={setAccountId} required onAccountsLoaded={setAccountCount} /> : null}
+        {!paid ? (
+          <ConfirmDialog
+            open={confirmNoCash}
+            onOpenChange={setConfirmNoCash}
+            title="Kasaya yazmadan işaretle"
+            description="Ofiste kasa ya da banka hesabı yok. Komisyon tahsil edildi işaretlenir ama kasaya hareket yazılmaz. Hesap açınca Muhasebe > Kasa ve banka sekmesindeki “Kasaya işle” listesinden yazabilirsiniz."
+            confirmLabel="Kasaya yazmadan işaretle"
+            tone="default"
+            onConfirm={() => markPaid(true)}
+          />
+        ) : null}
         {!paid ? (
           <button
             type="button"
-            onClick={markPaid}
-            disabled={busy !== null}
+            onClick={() => markPaid()}
+            disabled={busy !== null || needAccount}
+            title={needAccount ? "Önce tahsilatın girdiği hesabı seçin" : undefined}
             className="inline-flex items-center gap-1 rounded-[var(--radius-control)] bg-[color-mix(in_srgb,var(--viz-pos)_13%,transparent)] px-2.5 py-1.5 text-xs font-bold text-[color:var(--viz-pos)] transition hover:bg-[color-mix(in_srgb,var(--viz-pos)_22%,transparent)] disabled:opacity-50"
           >
             {busy === "paid" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}

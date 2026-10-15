@@ -18,7 +18,17 @@ import { FormField, FormTextarea } from "@/components/ui/form-controls";
 import { PersonSelect } from "@/components/ui/person-select";
 
 type Party = "staff" | "office" | "external";
-export type SplitInitial = { label?: string; rate?: number; profile_id?: string | null; kind?: string | null; unresolved?: boolean };
+export type SplitInitial = {
+  label?: string;
+  rate?: number;
+  profile_id?: string | null;
+  kind?: string | null;
+  unresolved?: boolean;
+  /** Eski/örnek kayıt takma adları (commission_normalize_splits 20261016060300 artık label/rate'e çevirir). */
+  name?: string;
+  pct?: number;
+  amount?: number;
+};
 export type SplitStaff = { id: string; name: string };
 
 /** `id`: yalnız istemci tarafı kararlı satır anahtarı (animasyon + odak korunur); sunucuya gitmez. */
@@ -26,11 +36,17 @@ type Row = { id: number; party: Party; profileId: string; label: string; rate: s
 
 const PARTY_LABEL: Record<Party, string> = { staff: "Ofis personeli", office: "Ofis payı", external: "Dış taraf" };
 
-function rowFromInitial(s: SplitInitial, i: number): Row {
-  const rate = String(s.rate ?? "");
-  if (s.profile_id) return { id: i, party: "staff", profileId: s.profile_id, label: s.label ?? "", rate, unresolved: false };
-  if (s.kind === "office" || (s.label ?? "").trim().toLocaleLowerCase("tr") === "ofis") return { id: i, party: "office", profileId: "", label: "Ofis", rate, unresolved: false };
-  return { id: i, party: "external", profileId: "", label: s.label ?? "", rate, unresolved: Boolean(s.unresolved) };
+/**
+ * Kayıtlı satırdan düzenleyici satırı (SK6/B109): oran yoksa `pct` takma adı, o da yoksa tutardan türetilir (brüt > 0);
+ * 'Ofis' etiketli ya da office türündeki satır, profil kimliği taşısa bile ofis payıdır (DB kuralıyla aynı).
+ */
+function rowFromInitial(s: SplitInitial, i: number, gross: number): Row {
+  const label = (s.label ?? s.name ?? "").trim();
+  const rawRate = s.rate ?? s.pct ?? (gross > 0 && Number.isFinite(Number(s.amount)) ? Math.round((Number(s.amount) / gross) * 100 * 10000) / 10000 : undefined);
+  const rate = rawRate === undefined || rawRate === null ? "" : String(rawRate);
+  if (s.kind === "office" || label.toLocaleLowerCase("tr") === "ofis") return { id: i, party: "office", profileId: "", label: "Ofis", rate, unresolved: false };
+  if (s.profile_id) return { id: i, party: "staff", profileId: s.profile_id, label, rate, unresolved: false };
+  return { id: i, party: "external", profileId: "", label, rate, unresolved: Boolean(s.unresolved) };
 }
 
 function money(n: number) {
@@ -53,7 +69,7 @@ export function CommissionSplitEditor({
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>(
     initial && initial.length > 0
-      ? initial.map(rowFromInitial)
+      ? initial.map((x, i) => rowFromInitial(x, i, gross))
       : [
           { id: 0, party: "staff", profileId: "", label: "", rate: "60", unresolved: false },
           { id: 1, party: "office", profileId: "", label: "Ofis", rate: "40", unresolved: false },

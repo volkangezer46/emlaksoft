@@ -12,9 +12,17 @@ import { parseMoneyInput } from "@/lib/money-input";
 import { validateTenantReferences } from "@/lib/tenant-references";
 import { actionErrorMessage } from "@/lib/action-errors";
 import { now, trDayKey } from "@/lib/clock";
-import { recordCollectionCash } from "@/lib/finance/cash/collection-link";
+import { commissionCashAmount, decideCollectionAccount, recordCollectionCash } from "@/lib/finance/cash/collection-link";
 
-export type WorkflowResult = { error?: string; ok?: boolean; dealId?: string; commissionId?: string; info?: string };
+export type WorkflowResult = {
+  error?: string;
+  ok?: boolean;
+  dealId?: string;
+  commissionId?: string;
+  info?: string;
+  /** Ofiste hesap yok: tahsilatı kasaya yazmadan işaretlemek için bilinçli onay (form `no_cash=1`) gerekir (SK6/B109). */
+  needsCashConfirm?: boolean;
+};
 
 /**
  * Kapanış / satış → deal + commission omurgası (HGDekor convert benzeri).
@@ -124,20 +132,26 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
   if (action === "mark_commission_paid") {
     const id = String(formData.get("commission_id") ?? "").trim();
     if (!id) return { error: "Komisyon bulunamadı." };
+    // SK6/B109: ofiste hesap varsa "Hangi hesaba girdi?" zorunlu; hesap yoksa yalnız bilinçli onayla (no_cash=1) kasaya yazmadan.
+    const decision = await decideCollectionAccount(supabase, {
+      accountId: String(formData.get("account_id") ?? ""),
+      skipCash: String(formData.get("no_cash") ?? "") === "1",
+    });
+    if (!decision.ok) return { error: decision.error, needsCashConfirm: decision.code === "confirm_no_cash" || undefined };
     const { data: updated, error } = await supabase
       .from("commissions")
       .update({ status: "paid" })
       .eq("id", id)
       .eq("tenant_id", gate.tenantId)
       .not("status", "in", "(paid,collected)")
-      .select("id, gross_amount")
+      .select("id, gross_amount, vat_amount")
       .maybeSingle();
     if (error) return { error: actionErrorMessage(error, "Durum güncellenemedi.") };
     if (!updated) return { error: "Komisyon bulunamadı veya zaten tahsil edilmiş." };
-    // Istege bagli "Hangi hesaba girdi?": secilmediyse davranis degismez.
+    // Kasaya KDV DAHİL tahsilat (gross_amount KDV hariç matrah).
     const info = await recordCollectionCash(supabase, {
-      accountId: String(formData.get("account_id") ?? ""), sourceType: "commission", sourceId: id,
-      amount: Number(updated.gross_amount), date: trDayKey(now()), title: "Komisyon tahsilatı",
+      accountId: decision.accountId, sourceType: "commission", sourceId: id,
+      amount: commissionCashAmount(updated), date: trDayKey(now()), title: "Komisyon tahsilatı",
     });
     await logActivity({
       tenantId: gate.tenantId,
@@ -145,6 +159,7 @@ export async function convertWorkflow(formData: FormData): Promise<WorkflowResul
       action: "commission.paid",
       entityType: "commission",
       entityId: id,
+      newValue: { account_id: decision.accountId, cash_skipped: decision.accountId === null },
     });
     revalidatePath("/app/komisyon");
     revalidateTenantData(gate.tenantId);
